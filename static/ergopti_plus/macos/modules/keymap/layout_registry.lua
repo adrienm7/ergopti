@@ -176,7 +176,7 @@ local function default_deps(settings)
 		disable_source = InputSources.disable_keylayout_source_async,
 		select_source = InputSources.set_input_source_async,
 		active_sources = InputSources.list_active_keyboard_layouts,
-		confirm_source = InputSources.confirm_source_async,
+		confirm_source = InputSources.confirm_enabled_async,
 		pending = require("modules.keymap.pending_layout_activation"),
 		bundle_names = Install.bundle_keylayout_names,
 	}

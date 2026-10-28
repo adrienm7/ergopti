@@ -750,7 +750,7 @@ strict_only:finder_detritus`, any other cause, team or a rejection still fails. 
   or a personal file adds `reload_requested` and, after the done marker, one reload through the
   termination coordinator. Mac confirms: do not use the menus during a field run; if the guard
   restores config.toml, the driver reloads once and the menu shows the backend the file names.
-- **L52** Fixed on tmp/wip-composer-macos26-2. 06_field_composer `composer_ready fail:not_enabled`
+- **L52** Fixed on tmp/wip-composer-macos26-2. 06*field_composer `composer_ready fail:not_enabled`
   with "Failed to enable 'Composer Check' — reason=process_failed" (22:31 run): `process_failed`
   was the editor's own kickstart answering 113 after a successful write (see L25). Probe v5
   (mac-2026-10-28_114302 and \_120209) settled the route: the preference write turns a layout on
@@ -771,6 +771,15 @@ strict_only:finder_detritus`, any other cause, team or a rejection still fails. 
   duplicate ids), so the system copy is probably the one read: the driver no longer writes a user
   copy of a bundle the system folder holds and logs each duplicate at boot. Run P8 b again once
   one copy is removed before building anything on in-place bundle edits.
+  Follow-up (tmp/wip-composer-macos26-3): the 12:51 run's child read the composed layout 140 ms
+  after the write ("listed=true enabled=false"), so the check fell back to info:pending_logout;
+  the probe's fresh read came 10 s after its write, and the probe had registered the layout
+  before writing. Same entry shape (integer KeyboardLayout ID, name) and the same `defaults
+import` in both. The first child now also calls TISEnableInputSource on the listed source, and
+  new fresh children read again after 0.5, 1, 2 and 4 s (window 8 s, `[ui]
+  input_source_confirm*\*`). Mac confirms: the log shows "reads on after N fresh read(s)" and the
+check `composer_ready=pass:enabled`; "still reads off after 5 fresh read(s)" means the delay
+  is not the difference: then try registering before the write (the probe's order).
 - **L44** Fixed 6593474037. Wake at 19:46:39 (driver booted 16:54): "Cannot refresh Karabiner
   lease liveness — no live generation exists" and "Wake refresh could not renew the exact
   Karabiner lease liveness", twice each, then the layout refresh retries of L20; nothing
