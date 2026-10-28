@@ -505,7 +505,7 @@ helpers.describe("Gestures: declared sensitivity head and real action-choice own
 					helpers.assert_nil(rows[index].checked)
 				end
 				helpers.assert_eq(rows[3].title, "-")
-				helpers.assert_eq(#rows, 21)
+				helpers.assert_eq(#rows, 3 + #f.controls.sensitivity_values)
 				for index, value in ipairs(f.controls.sensitivity_values) do
 					local expected = string.format("%.1f", value)
 					if value == 3.5 then expected = expected .. " " .. captions["menu.gestures.default_sensitivity"] end
@@ -527,7 +527,7 @@ helpers.describe("Gestures: declared sensitivity head and real action-choice own
 			helpers.assert_eq(rows[2].title, "— " .. f.strings["menu.gestures.sensitivity_hint"] .. " —")
 			head[2].platforms = { "linux" }
 			rows = assert(f.control_slot()).menu[4].menu
-			helpers.assert_eq(#rows, 20)
+			helpers.assert_eq(#rows, 2 + #f.controls.sensitivity_values)
 			f.root.gesture_change_action[1].i18n = "ui_apps.btn_refresh"
 			helpers.assert_eq(assert(f.control_slot()).menu[1].title, f.strings["ui_apps.btn_refresh"])
 		end)
@@ -629,7 +629,8 @@ helpers.describe("Gestures: shared swipe-child template and real native payloads
 					helpers.assert_eq(rows[4].title, f.swipe.captions[locale].sensitivity_3_5)
 					helpers.assert_eq(rows[4].disabled == true, mode ~= "incremental")
 					helpers.assert_eq(#rows[3].menu, 2)
-					helpers.assert_eq(#rows[4].menu, 21, "existing heading/hint/separator and eighteen native values")
+					helpers.assert_eq(#rows[4].menu, 3 + #f.controls.sensitivity_values,
+						"existing heading/hint/separator and the native values")
 					helpers.assert_eq(f.queue, {}, "building cannot queue native action selection")
 					helpers.assert_eq(f.saves, 0)
 				end)
