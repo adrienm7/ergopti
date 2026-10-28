@@ -265,7 +265,11 @@ Test("LLM_MBW_InjectCatalogue: lists all models without probing when the feature
 ; These independent literals exercise the browser adapter rather than a second
 ; quote-only encoder. A valid JavaScript string must retain every source unit.
 _MBW_JsonEscaping(Value, Expected) {
-	AssertEqual(Expected, _LLM_MBW_JsStr(Value), "the native browser must use the actual JSON string owner")
+	Row := _LLM_MBW_LocalRow(Value, "fixture-tag", Map(), false, false, true, false)
+	AssertTrue(Row is Map, "the actual row builder must retain its structured result")
+	AssertEqual(Value, Row["name"], "serialization must retain the original model identity")
+	AssertContains(Row["json"], ",name:" . Expected . ",runtime_name:",
+		"the production browser row must encode every model-name code unit")
 }
 for Fixture in [
 	["plain", "model", '"model"'],
