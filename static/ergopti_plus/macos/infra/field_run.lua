@@ -43,6 +43,7 @@ local Logger = require("infra.logger")
 local Json = require("json")
 local Report = require("field_check_report")
 local ModelCatalogue = require("llm.model_catalogue")
+local TerminationCoordinator = require("infra.termination_coordinator")
 
 local LOG = "field_run"
 
@@ -481,7 +482,7 @@ function Session:handle()
 		self:refuse(echoed, reason)
 		return false
 	end
-	if self.run then
+	if self.run or TerminationCoordinator.terminal_in_progress() then
 		self:refuse(request.request_id, "busy")
 		return false
 	end

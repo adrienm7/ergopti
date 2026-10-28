@@ -26,7 +26,7 @@
 local helpers = require("tests.helpers")
 local Json = require("json")
 
-local MODULES = { "infra.logger", "infra.field_run" }
+local MODULES = { "infra.logger", "infra.field_run", "infra.termination_coordinator", "infra.emergency_exit" }
 local FOLDER = "/repo/build/field-run"
 
 local function read(path)
@@ -144,6 +144,92 @@ end
 local function result_path(id, index, step)
 	return string.format("%s/results/%s/%02d_%s.json", FOLDER, id, index, step)
 end
+
+--- Starts the real terminal owner and holds its native fence callback.
+--- @param kind string The terminal transition that owns the pending fence.
+--- @return table coordinator
+--- @return function refuse_fence Settles that exact native boundary as refused.
+local function pending_coordinator(kind)
+	local coordinator = require("infra.termination_coordinator")
+	local fence
+	local function forbidden() error("no post-fence capability may run before the held fence") end
+	helpers.assert_true(coordinator.init({
+		request_lease = function(_, callback) fence = callback; return true end,
+		drain_input = forbidden,
+		teardown = forbidden,
+		begin_drain = forbidden,
+		finalize_teardown = forbidden,
+		reload = forbidden,
+		exit = forbidden,
+		fatal_exit = forbidden,
+		mark_reload = forbidden,
+		clear_reload = forbidden,
+		schedule = forbidden,
+		fatal_exit_code = 70,
+		user_exit_deadline_seconds = 12,
+	}))
+	local requested = kind == "reload" and coordinator.request_reload("field-admission-reload")
+		or kind == "exit" and coordinator.request_exit("field-admission-exit")
+	helpers.assert_true(requested == true, "the actual coordinator owns the terminal request")
+	helpers.assert_true(type(fence) == "function")
+	helpers.assert_true(coordinator.terminal_in_progress(), "admission runs while the real fence is pending")
+	return coordinator, function() fence(false, "controlled pre-fence refusal") end
+end
+
+helpers.describe("field run: terminal admission", function()
+	for _, kind in ipairs({ "reload", "exit" }) do
+		helpers.it("refuses a request while the real " .. kind .. " fence owns the runtime (field-terminal-admission)", function()
+			helpers.with_stub_scope(MODULES, function()
+				local FieldRun = engine()
+				local state = world()
+				local session = started(FieldRun, state)
+				local snapshots = 0
+				state.ports.config_snapshot = function() snapshots = snapshots + 1; return { tag = "snapshot" } end
+				pending_coordinator(kind)
+				state.request({ schema = 1, request_id = "terminal_" .. kind, steps = Json.array({ "field_lease" }) })
+				state.advance(0)
+				local refused = state.json(FOLDER .. "/refused.json")
+				helpers.assert_not_nil(refused, "the collector receives a refusal, never an accepted doomed run")
+				helpers.assert_eq(refused.request_id, "terminal_" .. kind)
+				helpers.assert_eq(refused.reason, "busy")
+				helpers.assert_nil(state.files[FOLDER .. "/request.json"], "the consumed request has an explicit refusal receipt")
+				helpers.assert_nil(state.files[FOLDER .. "/running.json"])
+				helpers.assert_nil(state.files[FOLDER .. "/results/terminal_" .. kind .. "/accepted.json"])
+				helpers.assert_not_nil(state.files[FOLDER .. "/ready.json"], "a reversible fence keeps field readiness live")
+				helpers.assert_eq(state.watching, true)
+				helpers.assert_nil(session.run)
+				helpers.assert_nil(state.dirs[FOLDER .. "/results/terminal_" .. kind], "no result directory is allocated")
+				helpers.assert_eq(snapshots, 0)
+				helpers.assert_eq(#state.calls, 0)
+			end)
+		end)
+	end
+
+	helpers.it("admits a fresh request after a real pre-fence refusal restores the runtime (field-terminal-admission)", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			started(FieldRun, state)
+			local coordinator, refuse_fence = pending_coordinator("reload")
+			state.request({ schema = 1, request_id = "before_rollback", steps = Json.array({ "field_lease" }) })
+			state.advance(0)
+			helpers.assert_not_nil(state.json(FOLDER .. "/refused.json"))
+			helpers.assert_eq(#state.calls, 0)
+			refuse_fence()
+			helpers.assert_eq(coordinator.terminal_in_progress(), false)
+			helpers.assert_not_nil(state.files[FOLDER .. "/ready.json"], "an aborted fence must not orphan the collector")
+			helpers.assert_eq(state.watching, true)
+			-- The actual collector clears the prior refusal before a fresh request.
+			state.ports.remove(FOLDER .. "/refused.json")
+			state.request({ schema = 1, request_id = "after_rollback", steps = Json.array({ "field_lease" }) })
+			state.advance(0)
+			helpers.assert_eq(#state.calls, 1)
+			helpers.assert_eq(state.calls[1], "field_lease")
+			helpers.assert_eq(state.json(FOLDER .. "/results/after_rollback/accepted.json").request_id, "after_rollback")
+			helpers.assert_not_nil(state.json(FOLDER .. "/results/after_rollback/done.json"))
+		end)
+	end)
+end)
 
 helpers.describe("field run: developer source mode only", function()
 	helpers.it("refuses to start without the clone root and touches nothing", function()
