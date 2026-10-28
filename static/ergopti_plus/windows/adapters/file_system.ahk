@@ -942,10 +942,8 @@ FSCopyReplaceAtomic(Source, Destination) {
 	; The fixed pathname conveys no ownership over a preexisting sidecar.
 	if !FSCopyCreateVerified(Source, Stage)
 		return false
-	if FSAtomicMoveReplace(Stage, Destination)
-		return true
-	try FileDelete(Stage)
-	return false
+	; A refused rename does not identify the file now held at the stage name.
+	return FSAtomicMoveReplace(Stage, Destination)
 }
 
 ; Whether a path is a reparse point (a symbolic link or a junction), which a
