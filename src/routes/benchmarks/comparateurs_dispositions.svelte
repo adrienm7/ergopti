@@ -1,11 +1,11 @@
 <script>
-	import Ergopti from '$lib/components/Ergopti.svelte';
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
-	import SFB from '$lib/components/SFB.svelte';
+	import Ergopti from '#lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
+	import SFB from '#lib/components/SFB.svelte';
 
-	import { version } from '$lib/stores_infos.js';
+	import { version } from '#lib/stores_infos.js';
 	import { base } from '$app/paths';
-	import { getLatestVersion } from '$lib/js/getVersions.js';
+	import { getLatestVersion } from '#lib/js/getVersions.js';
 	let versionValue,
 		version_mineure_kla_iso,
 		version_mineure_kla_iso_plus,

@@ -1,9 +1,9 @@
 <script>
-	import '$lib/css/orb.css';
+	import '#lib/css/orb.css';
 
-	import Ergopti from '$lib/components/Ergopti.svelte';
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
-	import SFB from '$lib/components/SFB.svelte';
+	import Ergopti from '#lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
+	import SFB from '#lib/components/SFB.svelte';
 </script>
 
 <section>

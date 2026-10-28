@@ -21,7 +21,7 @@ FEATURES & RATIONALE:
 
 <script>
 	import { onMount } from 'svelte';
-	import { getRelease } from '$lib/js/getGitHubRelease.js';
+	import { getRelease } from '#lib/js/getGitHubRelease.js';
 
 	import './ergopti-plus.css';
 	import { ui, restoreOS } from './state.svelte.js';

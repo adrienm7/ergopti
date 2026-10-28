@@ -5,8 +5,8 @@
 	import { page } from '$app/state';
 	import { base } from '$app/paths';
 
-	import { getKeyboardData } from '$lib/keyboard/data/getKeyboardData.js';
-	import { version, layoutData, versionsList, discordLink } from '$lib/stores_infos.js';
+	import { getKeyboardData } from '#lib/keyboard/data/getKeyboardData.js';
+	import { version, layoutData, versionsList, discordLink } from '#lib/stores_infos.js';
 
 	function closeMenu() {
 		document.getElementById('menu-btn').checked = false;
