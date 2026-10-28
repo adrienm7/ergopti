@@ -25,6 +25,9 @@ local Manifest    = require("infra.manifest_reader")
 local TapKeys     = require("modules.shortcuts.tap_keys")
 local Hotkeys     = require("adapters.hotkey_registrar")
 local Chord       = require("chord")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
+local RefusalRetry = require("modules.shortcuts.refusal_retry")
 
 local LOG = "shortcuts.bindings"
 
@@ -42,7 +45,7 @@ local LOG = "shortcuts.bindings"
 -- than re-declared, so a change to shortcuts.chatgpt_url cannot diverge from the
 -- AHK driver (which reads the same default from its generated map). Fails fast
 -- if the path is absent.
-M.DEFAULT_CHATGPT_URL = Manifest.default_for("shortcuts.chatgpt_url")
+M.DEFAULT_CHATGPT_URL = Manifest.default_for(ConfigKeys.KEY.SHORTCUTS_CHATGPT_URL)
 local SHORTCUT_ACTION_PARENT = "shortcut_bindings"
 
 local hotkeys       = {}   -- Active hotkey/tap objects, keyed by shortcut id
@@ -76,6 +79,17 @@ local native_acquisition_depth = 0
 -- `started=false` while native hotkeys are exchanged. Preserve that intent
 -- independently so a re-entrant PAUSE can restore keep-awake exactly.
 local rebind_recovery_intent = false
+-- Enabled hotkeys whose own registration was refused while the layer started
+-- (name -> why). Independent hotkeys fail alone: one chord macOS refuses, or a
+-- key the active layout cannot resolve yet, must not take every other shortcut
+-- down with it (2026-10-28: a refused Ctrl+G left every shortcut dead).
+local pending_refusals = {}
+-- Set only by the last bounded retry: a key the layout still cannot resolve is
+-- then bound at its US-ANSI position, which is what macOS itself does for
+-- shortcuts under a non-Latin layout.
+local layout_fallback_admitted = false
+-- Bounded retry series of pending_refusals, created once M.bind_pending exists.
+local refusal_retry
 
 local EXACT_RELEASE_IDS = {
 	tap_keys = true,
@@ -225,12 +239,12 @@ local function get_frontmost_app_name()
 	return name or "Unknown"
 end
 
---- Logs a shortcut invocation via the keylogger module when it is available.
---- Uses a lazy require so the keylogger is optional and need not be pre-wired.
+--- Logs a shortcut invocation via the keystats module when it is available.
+--- Uses a lazy require so the keystats is optional and need not be pre-wired.
 --- @param label string The canonical shortcut label (e.g. "Ctrl+T").
 --- @param app_name string The name of the app in which the shortcut fired.
 local function log_shortcut(label, app_name)
-	local ok_kl, kl = pcall(require, "modules.keylogger")
+	local ok_kl, kl = pcall(require, "modules.keystats")
 	if ok_kl and kl and type(kl.log_shortcut) == "function" then
 		pcall(kl.log_shortcut, label, app_name)
 	end
@@ -243,6 +257,11 @@ end
 --- @return table The hs.hotkey object.
 local function bind_log(mods, key, fn)
 	local label = make_label(mods, key)
+	local refusal = Hotkeys.layout_key_refusal(key)
+	if refusal and not layout_fallback_admitted then return nil, refusal end
+	if refusal then
+		Logger.warn(LOG, "%s is bound at its US-ANSI position after its retries: %s.", label, refusal)
+	end
 	local claim_owner = SHORTCUT_ACTION_PARENT .. ":" .. label
 	if Hotkeys.replace_physical_claims(claim_owner, {
 		{ chord = Chord.format(mods, key), action = "explicit", binding_id = claim_owner },
@@ -263,7 +282,7 @@ local function bind_log(mods, key, fn)
 			native_claim_cleanup[claim_owner] = true
 		end
 		if not ok then error(native, 0) end
-		return nil
+		return nil, "macOS refused " .. label .. " (another hotkey or macOS already holds it)"
 	end
 	native_physical_claims[native] = claim_owner
 	return native
@@ -356,104 +375,13 @@ hotkey_defs.wrap_text_if_selected   = function()
 		get_live_wrap_pairs, delivery_admitted)
 end
 
--- Ctrl shortcuts — alphabetical by id (mirrors list_shortcuts() sort order)
-hotkey_labels.ctrl_a = i18n.get("shortcuts.label_ctrl_a")
-hotkey_defs.ctrl_a   = function()
-	return bind_log({"ctrl"}, "a", text_acts.select_line)
-end
-
-hotkey_labels.ctrl_d = i18n.get("shortcuts.label_ctrl_d")
-hotkey_defs.ctrl_d   = function()
-	return bind_log({"ctrl"}, "d", app_acts.open_downloads)
-end
-
-hotkey_labels.ctrl_e = i18n.get("shortcuts.label_ctrl_e")
-hotkey_defs.ctrl_e   = function()
-	return bind_log({"ctrl"}, "e", app_acts.open_finder)
-end
-
+-- Fixed shortcuts that are not catalogue actions. The other Ctrl-letter chords
+-- (and Cmd+Shift+V) are role-named keyboard slots now; see keyboard_shortcuts.lua.
 hotkey_labels.ctrl_g = i18n.get("shortcuts.label_ctrl_g")
 hotkey_defs.ctrl_g   = function()
 	return bind_log({"ctrl"}, "g", function()
 		app_acts.open_chatgpt(_chatgpt_url or M.DEFAULT_CHATGPT_URL)
 	end)
-end
-
-hotkey_labels.ctrl_h = i18n.get("shortcuts.label_ctrl_h")
-hotkey_defs.ctrl_h   = function()
-	return bind_log({"ctrl"}, "h", sys_acts.interactive_screenshot)
-end
-
-hotkey_labels.ctrl_i = i18n.get("shortcuts.label_ctrl_i")
-hotkey_defs.ctrl_i   = function()
-	return bind_log({"ctrl"}, "i", app_acts.open_settings)
-end
-
-hotkey_labels.ctrl_m = i18n.get("shortcuts.label_ctrl_m")
-hotkey_defs.ctrl_m   = function()
-	return bind_log({"ctrl"}, "m", sys_acts.toggle_awake)
-end
-
-hotkey_labels.ctrl_o = i18n.get("shortcuts.label_ctrl_o")
-hotkey_defs.ctrl_o   = function()
-	return bind_log({"ctrl"}, "o", text_acts.surround_with_parens)
-end
-
-hotkey_labels.ctrl_p = i18n.get("shortcuts.label_ctrl_p")
-hotkey_defs.ctrl_p   = function()
-	return bind_log({"ctrl"}, "p", sys_acts.toggle_display_mirror)
-end
-
-hotkey_labels.ctrl_s = i18n.get("shortcuts.label_ctrl_s")
-hotkey_defs.ctrl_s   = function()
-	return bind_log({"ctrl"}, "s", app_acts.copy_or_open_path)
-end
-
-hotkey_labels.ctrl_t = i18n.get("shortcuts.label_ctrl_t")
-hotkey_defs.ctrl_t   = function()
-	return bind_log({"ctrl"}, "t", sys_acts.teleport_mouse)
-end
-
-hotkey_labels.ctrl_u = i18n.get("shortcuts.label_ctrl_u")
-hotkey_defs.ctrl_u   = function()
-	return bind_log({"ctrl"}, "u", text_acts.toggle_uppercase)
-end
-
-hotkey_labels.ctrl_w = i18n.get("shortcuts.label_ctrl_w")
-hotkey_defs.ctrl_w   = function()
-	return bind_log({"ctrl"}, "w", text_acts.toggle_titlecase)
-end
-
-hotkey_labels.ctrl_x = i18n.get("shortcuts.label_ctrl_x")
-hotkey_defs.ctrl_x   = function()
-	return bind_log({"ctrl"}, "x", sys_acts.copy_pixel_color)
-end
-
-hotkey_labels.ctrl_capslock = i18n.get("shortcuts.label_ctrl_capslock")
-hotkey_defs.ctrl_capslock   = function()
-	return bind_log({"ctrl"}, "capslock", sys_acts.toggle_capslock)
-end
-
-hotkey_labels.ctrl_l = i18n.get("shortcuts.label_ctrl_l")
-hotkey_defs.ctrl_l   = function()
-	return bind_log({"ctrl"}, "l", sys_acts.lock_screen)
-end
-
--- Punctuation shortcuts — after all letter-based ctrl shortcuts
-hotkey_labels.ctrl_period = i18n.get("shortcuts.label_ctrl_period")
-hotkey_defs.ctrl_period   = function()
-	return bind_log({"ctrl"}, ".", sys_acts.open_emoji_picker)
-end
-
-hotkey_labels.ctrl_quote = i18n.get("shortcuts.label_ctrl_quote")
-hotkey_defs.ctrl_quote   = function()
-	return bind_log({"ctrl"}, "'", sys_acts.spotlight_mouse)
-end
-
--- Cmd shortcuts — alphabetical by id
-hotkey_labels.cmd_shift_v = i18n.get("shortcuts.label_cmd_shift_v")
-hotkey_defs.cmd_shift_v   = function()
-	return bind_log({"cmd", "shift"}, "v", text_acts.paste_as_plain_text)
 end
 
 hotkey_labels.cmd_star = i18n.get("shortcuts.label_cmd_star")
@@ -509,6 +437,9 @@ end
 --- re-arm). Only the former owns the subsystem-level state — see M.stop().
 --- @return boolean settled True only when every native owner was released.
 local function release_hotkeys()
+	-- A released layer owns no retry: the next start recomputes every refusal.
+	pending_refusals = {}
+	refusal_retry.cancel()
 	local settled = true
 	for claim_owner in pairs(native_claim_cleanup) do
 		if Hotkeys.replace_physical_claims(claim_owner, {}) == true then
@@ -730,6 +661,35 @@ local function children_have_pause_debt()
 	return debt
 end
 
+--- Acquires one enabled hotkey on its own. A refusal is recorded with its cause
+--- and logged by name; it never aborts the sibling hotkeys.
+--- @param name string The shortcut identifier.
+--- @param def function Its factory.
+--- @return boolean bound True when the hotkey now owns its native binding.
+local function acquire_hotkey(name, def)
+	native_acquisition_depth = native_acquisition_depth + 1
+	local ok, obj, refusal = xpcall(def, debug.traceback)
+	native_acquisition_depth = native_acquisition_depth - 1
+	local object_type = type(obj)
+	if ok and obj ~= nil and (object_type == "table" or object_type == "userdata") then
+		hotkeys[name] = obj
+		pending_refusals[name] = nil
+		Logger.debug(LOG, "Hotkey '%s' bound.", name)
+		return true
+	end
+	if not ok then
+		pending_refusals[name] = "its factory raised"
+		Logger.error(LOG, "Hotkey '%s' factory raised; the other shortcuts stay active: %s.",
+			name, tostring(obj))
+		return false
+	end
+	pending_refusals[name] = tostring(refusal or "its factory returned no hotkey")
+	Logger.warn(LOG,
+		"Hotkey '%s' could not be registered (%s); the other shortcuts stay active and it is retried.",
+		name, pending_refusals[name])
+	return false
+end
+
 --- Binds all configured hotkeys and opens every child owner transactionally.
 --- @param preserve_pause_intent boolean Keep the reversible PAUSE snapshot live.
 --- @param hotkeys_only boolean Rebind native hotkeys without touching child state.
@@ -802,26 +762,21 @@ local function start_bindings(preserve_pause_intent, hotkeys_only)
 
 	_disabled_set.tap_keys = not has_tap_key_assignments()
 	_disabled_set.layer_wheel = not load_layer_wheel()
+	pending_refusals = {}
+	-- Only the layer's lifecycle is all-or-nothing: a pause or stop landing
+	-- mid-start must leave no published hotkey. Each hotkey is an independent
+	-- OS registration, so one refusal is recorded and retried on its own while
+	-- its siblings commit (acquire_hotkey).
 	for name, def in pairs(hotkey_defs) do
 		-- Skip hotkeys that are already active OR that were explicitly disabled
 		-- via M.disable() — the _disabled_set persists across stop/start cycles
 		-- so that resume after focus loss cannot silently re-enable them
 		-- (shortcuts-bindings-reenable-on-resume).
 		if not hotkeys[name] and not _disabled_set[name] then
-			native_acquisition_depth = native_acquisition_depth + 1
-			local ok, obj = xpcall(def, debug.traceback)
-			native_acquisition_depth = native_acquisition_depth - 1
-			local object_type = type(obj)
-			if ok and obj ~= nil and (object_type == "table" or object_type == "userdata") then
-				hotkeys[name] = obj
-				Logger.debug(LOG, "Hotkey '%s' bound.", name)
-				if not admission_open(attempt) then
-					return reject_start(reopened_children,
-						"lifecycle changed during factory '" .. tostring(name) .. "'")
-				end
-			else
+			acquire_hotkey(name, def)
+			if not admission_open(attempt) then
 				return reject_start(reopened_children,
-					"factory '" .. tostring(name) .. "' returned " .. tostring(obj))
+					"lifecycle changed during factory '" .. tostring(name) .. "'")
 			end
 		end
 	end
@@ -832,13 +787,14 @@ local function start_bindings(preserve_pause_intent, hotkeys_only)
 	-- Seed random for keep-awake jitter on first start
 	math.randomseed(os.time())
 
-	local count = 0
-	for _ in pairs(hotkeys) do count = count + 1 end
+	local count = TableUtil.count(hotkeys)
 	started = true
 	delivery_enabled = true
 	if preserve_pause_intent ~= true then pause_restore_intent = nil end
 	finish_attempt()
-	Logger.success(LOG, "Shortcuts bindings started (%d hotkey(s)).", count)
+	Logger.success(LOG, "Shortcuts bindings started (%d hotkey(s), %d waiting for a retry).",
+		count, TableUtil.count(pending_refusals))
+	if next(pending_refusals) ~= nil then refusal_retry.schedule() end
 	return true
 end
 
@@ -1061,6 +1017,44 @@ function M.rebind()
 	return true
 end
 
+--- Retries every enabled hotkey whose registration was refused by the last
+--- start, each on its own. Called when the layout settles again and on the
+--- facade's bounded schedule.
+--- @param final boolean|nil True on the last bounded retry: a key the layout
+---   still cannot resolve is then bound at its US-ANSI position.
+--- @return boolean settled True when no refused hotkey remains.
+function M.bind_pending(final)
+	if not started or not admission_open() or start_attempt ~= nil then
+		return next(pending_refusals) == nil
+	end
+	local names = TableUtil.sorted_keys(pending_refusals)
+	local epoch = lifecycle_epoch
+	layout_fallback_admitted = final == true
+	for _, name in ipairs(names) do
+		if _disabled_set[name] or hotkeys[name] then
+			pending_refusals[name] = nil
+		elseif acquire_hotkey(name, hotkey_defs[name]) then
+			if lifecycle_epoch ~= epoch or not admission_open() then
+				layout_fallback_admitted = false
+				if release_hotkey_identity(name, hotkeys[name]) == true then hotkeys[name] = nil end
+				return false
+			end
+		end
+	end
+	layout_fallback_admitted = false
+	return next(pending_refusals) == nil
+end
+
+--- Lists the enabled hotkeys whose registration is waiting for a retry.
+--- @return table refusals Name to the cause of its refusal (a copy).
+function M.pending_bindings()
+	local copy = {}
+	for name, refusal in pairs(pending_refusals) do copy[name] = refusal end
+	return copy
+end
+
+refusal_retry = RefusalRetry.new(LOG, M.bind_pending)
+
 --- Returns true when bindings have been started and not yet stopped.
 --- @return boolean
 function M.is_started() return started end
@@ -1151,6 +1145,7 @@ function M.disable(name)
 	local h = hotkeys[name]
 	if not h then
 		_disabled_set[name] = true
+		pending_refusals[name] = nil
 		Logger.debug(LOG, "Hotkey '%s' not active — nothing to disable.", name)
 		return true
 	end
@@ -1161,6 +1156,7 @@ function M.disable(name)
 	end
 	hotkeys[name] = nil
 	_disabled_set[name] = true
+	pending_refusals[name] = nil
 	Logger.debug(LOG, "Hotkey '%s' disabled.", name)
 	return true
 end

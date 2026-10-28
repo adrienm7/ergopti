@@ -124,7 +124,7 @@ _NDB_ChildTransportPumpsHeartbeat() {
 			. ", remaining_ms=" . Req._Remaining()
 			. ", dispatch_ms=" . DispatchMs . ", wait_ms=" . WaitMs)
 		AssertEqual("OK", Req.ResponseText)
-		for Path in [Req.ConfigPath, Req.BodyPath, Req.HeaderPath]
+		for Path in [Req.BodyPath, Req.HeaderPath]
 			AssertFalse(FileExist(Path),
 				"terminal HTTP cleanup must remove private transport artifacts")
 	} finally {
@@ -207,7 +207,7 @@ _NDB_CancelDuringStartReportsDispatchRefusal() {
 			"the request must retain its terminal cancellation state")
 		AssertEqual(0, Req.Handle,
 			"the resumed Send stack must not republish the canceled handle")
-		for Path in [Req.ConfigPath, Req.BodyPath, Req.HeaderPath]
+		for Path in [Req.BodyPath, Req.HeaderPath]
 			AssertFalse(FileExist(Path),
 				"start cancellation must leave no private curl artifact behind")
 	} finally {
@@ -380,15 +380,10 @@ _NDB_PartialStartFailureRetainsRefusedChild() {
 	Handle := { start: FakeStart, terminate: FakeTerminate }
 	FakeSpawn(*) => Handle
 	Req := CurlAsyncRequest(Map("spawn", FakeSpawn))
-	DidThrow := false
 	try {
 		Req.Open("GET", "https://example.invalid/partial-start", true)
-		try Req.Send()
-		catch {
-			DidThrow := true
-		}
-		AssertTrue(DidThrow,
-			"the injected partial start failure must reach its caller")
+		AssertFalse(Req.Send(),
+			"the injected partial start failure must be reported to its caller")
 		AssertTrue(Req.Aborted and !Req.Completed,
 			"a refused partial-start rollback must remain non-terminal")
 		AssertTrue(Req.Handle == Handle,
@@ -420,14 +415,9 @@ _NDB_FalseStartVerdictRetainsRefusedChild() {
 	Handle := { start: FakeStart, terminate: FakeTerminate }
 	FakeSpawn(*) => Handle
 	Req := CurlAsyncRequest(Map("spawn", FakeSpawn))
-	DidThrow := false
 	try {
 		Req.Open("GET", "https://example.invalid/false-start", true)
-		try Req.Send()
-		catch {
-			DidThrow := true
-		}
-		AssertTrue(DidThrow,
+		AssertFalse(Req.Send(),
 			"a false child Start receipt must reject dispatch")
 		AssertTrue(Req.Aborted and !Req.Completed and Req.Handle == Handle,
 			"a false Start rollback refusal must retain the exact non-terminal child")
@@ -444,15 +434,16 @@ Test("HTTP transport: false Start rollback retains a refused child (AHK-173)",
 	_NDB_FalseStartVerdictRetainsRefusedChild)
 
 _NDB_CancelledStagingRetriesLockedArtifactCleanup() {
-	State := Map("checkpoint", 0, "spawn", 0, "lock", 0)
+	State := Map("checkpoint", 0, "spawn", 0, "lock", 0, "staged", "")
 	Req := 0
 	LockAndAbortBeforeLaunch(Request) {
 		State["checkpoint"] += 1
-		; The temporary request body can be held briefly by a scanner or backup
-		; agent. Deny delete access deterministically while cancellation races the
-		; staging boundary, then release it before asserting the retained owner
-		; retries cleanup.
-		State["lock"] := FileOpen(Request.BodyPath, "r-d", "UTF-8-RAW")
+		; The staged private request input can be held briefly by a scanner or
+		; backup agent. Deny delete access deterministically while cancellation
+		; races the staging boundary, then release it before asserting the
+		; retained owner retries cleanup.
+		State["staged"] := Request.ManagedCapture["TmpFile"]
+		State["lock"] := FileOpen(State["staged"], "r-d", "UTF-8-RAW")
 		Request.Abort()
 	}
 	FakeSpawn(*) {
@@ -471,23 +462,23 @@ _NDB_CancelledStagingRetriesLockedArtifactCleanup() {
 			"the deterministic staging cancellation boundary must run exactly once")
 		AssertEqual(0, State["spawn"],
 			"a canceled staging request must not construct a curl child")
-		AssertTrue(FileExist(Req.BodyPath),
-			"the deny-delete fixture must hold the staged body until cleanup can be retried")
+		AssertTrue(FileExist(State["staged"]),
+			"the deny-delete fixture must hold the staged input until cleanup can be retried")
 		State["lock"].Close()
 		State["lock"] := 0
 		CleanupStarted := A_TickCount
-		while FileExist(Req.BodyPath) {
+		while FileExist(State["staged"]) {
 			if ((A_TickCount - CleanupStarted) & 0xFFFFFFFF) >= 1000
 				break
 			Sleep(10)
 		}
-		AssertFalse(FileExist(Req.BodyPath),
-			"a canceled request must retain cleanup ownership until a transient body lock releases")
+		AssertFalse(FileExist(State["staged"]),
+			"a canceled request must retain cleanup ownership until a transient input lock releases")
 	} finally {
 		if IsObject(State["lock"])
 			try State["lock"].Close()
 		if IsObject(Req) {
-			for Path in [Req.ConfigPath, Req.BodyPath, Req.HeaderPath]
+			for Path in [Req.BodyPath, Req.HeaderPath]
 				try FileDelete(Path)
 		}
 	}

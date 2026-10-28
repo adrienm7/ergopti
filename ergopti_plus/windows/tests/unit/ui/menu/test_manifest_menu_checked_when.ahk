@@ -52,7 +52,7 @@ Test("checked_when: a falsy getter leaves the row unchecked", () => (
 ))
 
 Test("checked_when: a row that declares none is never checked", () => (
-	; keylogger_enabled has disabled_when but no checked_when. It must not
+	; keystats_enabled has disabled_when but no checked_when. It must not
 	; inherit a checkmark from the sibling predicate.
 	AssertFalse(
 		MenuRenderer_ResolveCheckedWhen("metrics_menu", "show_apps", Map()),

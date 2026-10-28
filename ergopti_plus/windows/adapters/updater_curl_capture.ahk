@@ -17,11 +17,14 @@ class _UpdaterCurlCaptureLedger {
 		this.Retired := false
 	}
 	Acquire(Parent) {
-		if this.Path != "" || this.Retired || this.Acquiring
-			throw Error("Curl capture has already been initialized.")
-		; Cancellation may interrupt any native allocation. Publish the latch
-		; first; the immutable object key retains debt before a path exists.
-		this.Acquiring := true
+		PreviousCritical := Critical("On")
+		try {
+			if this.Path != "" || this.Retired || this.Acquiring
+				throw Error("Curl capture has already been initialized.")
+			; Retirement cannot cross the guard before this latch is published.
+			; Native allocation below stays interruptible with retained custody.
+			this.Acquiring := true
+		} finally Critical(PreviousCritical)
 		try {
 			Parent := RTrim(Parent, "\")
 			DirCreate(Parent)
@@ -39,7 +42,7 @@ class _UpdaterCurlCaptureLedger {
 			this.Directory["handle"] := this.Open(Candidate, 0, 3, true)
 			if !this.Directory["handle"]
 				throw OSError(A_LastError, "Curl capture directory identity refused.")
-			for Name in ["artifact.bin", "headers.bin", "capability.json", "transport.conf"] {
+			for Name in ["artifact.bin", "headers.bin"] {
 				Path := Candidate . "\" . Name
 				Handle := this.Open(Path, 0, 1, false)
 				if !Handle
@@ -81,7 +84,7 @@ class _UpdaterCurlCaptureLedger {
 		}
 	}
 	ValidatePaths() {
-		if this.Retired || this.Acquiring || this.Files.Count != 4
+		if this.Retired || this.Acquiring || this.Files.Count != 2
 			return false
 		Lease := this.AcquireDirectoryLease()
 		if !Lease
@@ -264,3 +267,146 @@ class _UpdaterCurlCaptureLedger {
 	}
 }
 
+
+; A terminal download also owns the staged executable and swap script. Keep
+; their exact identities in the existing retirement queue when a native reader
+; delays deletion; the shared updates directory itself is never removed.
+class _UpdaterStagedArtifactRetirement extends _UpdaterCurlCaptureLedger {
+	__New(Artifacts) {
+		super.__New()
+		this.Capture := Artifacts.HasOwnProp("CurlCapture") ? Artifacts.CurlCapture : 0
+		this.Paths := Map()
+		for Name in ["NewExe", "SwapScript"]
+			if Artifacts.HasOwnProp(Name) && Artifacts.%Name% != ""
+				this.Paths[Name] := Artifacts.%Name%
+		this.ExclusiveAllocated := false
+	}
+	AcquireExclusive() {
+		PreviousCritical := Critical("On")
+		try {
+			if this.Retired || this.Acquiring || this.ExclusiveAllocated || this.ProbeCloseDebt.Length
+				return false
+			; This admission must precede retirement as one RAM transaction.
+			; Native allocation below remains interruptible and retains debt.
+			this.Acquiring := true
+			this.ExclusiveAllocated := true
+		} finally Critical(PreviousCritical)
+		try {
+			Acquired := this.AllocatePrivate()
+			return Acquired && !this.ProbeCloseDebt.Length
+		} finally {
+			this.Acquiring := false
+		}
+	}
+	Identity(Entry) {
+		Native := this.Snapshot(Entry["handle"])
+		if !Native.Get("ok", false) || Native["delete_pending"]
+			throw Error("Staged native identity was refused.")
+		return Format("{:08x}:{:08x}{:08x}", Native["volume"], Native["index_high"], Native["index_low"])
+	}
+	Validate() {
+		if this.Retired || this.Acquiring || !this.ExclusiveAllocated || this.ProbeCloseDebt.Length
+			return false
+		try return this.ValidatePaths()
+		catch {
+			; The inherited native close records its exact live reference before
+			; throwing. That debt refuses READY without losing the terminal owner.
+			if !this.ProbeCloseDebt.Length
+				throw
+			return false
+		}
+	}
+	AllocatePrivate() {
+		if this.Paths.Count != 2
+			return false
+		Parent := ""
+		for Name, Path in this.Paths {
+			if !FSPathIsAdmissible(Path)
+				return false
+			SplitPath(Path, , &Directory)
+			if Directory == "" || (Parent != "" && StrCompare(Parent, Directory, false) != 0)
+				return false
+			Parent := Directory
+		}
+		if Parent == ""
+			return false
+		if !(this.Directory is Map) {
+			Handle := this.Open(Parent, 0, 3, true)
+			if !Handle
+				return false
+			this.Directory := Map("path", Parent, "handle", Handle, "directory", true)
+		}
+		Lease := this.AcquireDirectoryLease()
+		if !Lease
+			return false
+		try {
+			for Name, Path in this.Paths {
+				Handle := this.Open(Path, 0, 1, false)
+				if !Handle
+					return false
+				this.Files[Name] := Map("path", Path, "handle", Handle, "directory", false)
+			}
+			return true
+		} finally this.CloseProbe(Lease)
+	}
+	Retire() {
+		if this.Retired
+			return true
+		if this.Running || this.Acquiring || this.ProbeCloseDebt.Length
+			return false
+		this.Running := true
+		try {
+			; Staged identities were exclusively created by this parent.
+			; Retirement waits for the producer before touching those files;
+			; a delayed retry never acquires authority over a replacement.
+			if this.Capture is _UpdaterCurlCaptureLedger {
+				if this.Capture.Running || this.Capture.Acquiring
+					return false
+				if IsObject(this.Capture.Worker) && !this.Capture.Worker.terminate()
+					return false
+			}
+			if this.Capture is _UpdaterCurlCaptureLedger && !this.Capture.Retire()
+				return false
+			if this.ProbeCloseDebt.Length
+				return false
+			if this.Directory is Map {
+				Lease := this.AcquireDirectoryLease()
+				if !Lease
+					return false
+				try {
+					for Name, Entry in this.Files
+						if !this.RetireEntry(Entry)
+							return false
+				} finally this.CloseProbe(Lease)
+				if this.ProbeCloseDebt.Length
+					return false
+				if !DllCall("kernel32\CloseHandle", "Ptr", this.Directory["handle"], "Int")
+					return false
+				this.Directory["handle"] := 0
+			}
+			this.Capture := 0
+			this.Retired := true
+			return true
+		} finally this.Running := false
+	}
+}
+
+_Updater_BindStagedArtifactTransport(Transport, Owner) {
+	if !(Owner is _UpdaterStagedArtifactRetirement) || !Owner.ExclusiveAllocated || !Owner.ValidatePaths()
+		|| Type(Transport) != "Object" || !Transport.HasOwnProp("Environment")
+		|| !(Transport.Environment is Array) || Transport.Environment.Length == 0
+		|| !Transport.HasOwnProp("Prefix") || Transport.Environment[1].Name != Transport.Prefix . "_URL"
+		throw Error("Parent-owned staged artifact transport was refused.")
+	for Pair in Transport.Environment
+		if Pair.Name == Transport.Prefix . "_STAGING_DIRECTORY_ID"
+			throw Error("Staged artifact transport has already been initialized.")
+	Pairs := [
+		{Name: Transport.Prefix . "_STAGING_DIRECTORY_ID", Value: Owner.Identity(Owner.Directory)},
+		{Name: Transport.Prefix . "_STAGED_EXECUTABLE_ID", Value: Owner.Identity(Owner.Files["NewExe"])},
+		{Name: Transport.Prefix . "_SWAP_WORKER_ID", Value: Owner.Identity(Owner.Files["SwapScript"])}
+	]
+	for Pair in Pairs {
+		Transport.Environment.Push(Pair)
+		EnvSet(Pair.Name, Pair.Value)
+	}
+}

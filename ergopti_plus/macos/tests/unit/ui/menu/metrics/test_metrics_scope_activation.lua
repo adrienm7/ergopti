@@ -6,7 +6,7 @@ local function fixture(synchronous, accepted)
 	local saved = package.loaded["infra.deferred_work"]
 	local callback, starts = nil, 0
 	package.loaded["infra.deferred_work"] = { after = function(_, fn, label)
-		if label == "menu_state.keylogger_start" then
+		if label == "menu_state.keystats_start" then
 			callback = fn
 			if synchronous then fn() end
 			return accepted
@@ -16,8 +16,8 @@ local function fixture(synchronous, accepted)
 	local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
 	local core = { start = function() starts = starts + 1; return true end, stop = function() return true end }
 	local function sync(enabled)
-		return MenuState.sync_state_to_modules({ keylogger_enabled = enabled, hotstrings = {} }, {}, false,
-			{ core_mods = { keylogger = core }, hotstring_editor = {}, save_prefs = function() return true end })
+		return MenuState.sync_state_to_modules({ keystats_enabled = enabled, hotstrings = {} }, {}, false,
+			{ core_mods = { keystats = core }, hotstring_editor = {}, save_prefs = function() return true end })
 	end
 	sync(true)
 	package.loaded["infra.deferred_work"] = saved
@@ -25,7 +25,7 @@ local function fixture(synchronous, accepted)
 end
 
 helpers.describe("Metrics scope deferred activation admission", function()
-	helpers.it("keeps activation pending until the actual keylogger start returns", function()
+	helpers.it("keeps activation pending until the actual keystats start returns", function()
 		local owner, dispatch, starts = fixture(false, true)
 		helpers.assert_eq(owner.metrics_start_pending(), true)
 		helpers.assert_eq(starts(), 0)

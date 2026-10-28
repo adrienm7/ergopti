@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 M.bridge_name = "hotstrings_config_bridge"
 
 local Logger = require("logger.shim")
@@ -34,23 +35,10 @@ local function window_current(context, manager)
 		and type(manager.current_epoch) == "function" and manager.current_epoch(APP_NAME) == context.epoch
 end
 
--- The colour palette the window offers. Deliberately identical to
--- macos/ui/hotstrings_config_window/init.lua COLOR_PRESETS, and duplicated rather
--- than shared because the shared hotstrings TOML reader parses scalars only — it
--- has no array support, so an ordered palette cannot be expressed in
--- _shared/modules/hotstrings/defaults.toml the way the three single colours are.
--- tools/test/test-color-presets-parity.cjs is what keeps the two lists equal;
--- without it this is exactly the second source rule 5.2 forbids.
-local COLOR_PRESETS = {
-	{ i18n = "hs_config.color_red",    hex = "#e53935" },
-	{ i18n = "hs_config.color_green",  hex = "#43a047" },
-	{ i18n = "hs_config.color_orange", hex = "#fb8c00" },
-	{ i18n = "hs_config.color_blue",   hex = "#1e88e5" },
-	{ i18n = "hs_config.color_purple", hex = "#8e44ad" },
-	{ i18n = "hs_config.color_cyan",   hex = "#00838f" },
-	{ i18n = "hs_config.color_yellow", hex = "#fdd835" },
-	{ i18n = "hs_config.color_gray",   hex = "#6e6e73" },
-}
+-- The colour palette the window offers, generated from
+-- _shared/data/native_theme.toml like the macOS window's (same colours, same
+-- order). A palette typed here again would be the second source rule 5.2 forbids.
+local COLOR_PRESETS = require("native_theme_data").hotstring_palette
 
 --- Translates a key, falling back to the key itself.
 ---
@@ -282,9 +270,7 @@ local function _build_initial_payload(state, bindings)
 
 	local order = type(config.get_category_order) == "function" and config.get_category_order() or nil
 	if type(order) ~= "table" or #order == 0 then
-		order = {}
-		for id in pairs(config.get_categories() or {}) do order[#order + 1] = id end
-		table.sort(order)
+		order = TableUtil.sorted_keys(config.get_categories() or {})
 	end
 
 	local categories = config.get_categories() or {}
@@ -386,7 +372,7 @@ end
 
 --- Handles an incoming JS message.
 --- @param payload any  String or table from host_bridge.js.
---- @param state  table Daemon state { engine, keylogger, config, llm, layout }.
+--- @param state  table Daemon state { engine, keystats, config, llm, layout }.
 --- @param context table|nil Trusted routing capabilities owned by this window.
 --- @return any|nil  Response to send back to JS.
 function M.on_message(payload, state, context)

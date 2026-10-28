@@ -810,6 +810,7 @@ RebuildTrayMenu(PublishAuthorizeFn := 0, WorkerFn := 0,
 	; one generation owner. A request delivered while an older detached tree is
 	; building only invalidates that tree; it never enters TrayMenuStage_Begin
 	; recursively or throws out of the user callback.
+	PerfCount("menu.rebuild_request")
 	Acquired := _TrayRootRequestAndTryAcquire(
 		PublishAuthorizeFn, WorkerFn, &RequestedGeneration,
 		ForceFullWorkerWhenQueued, CallerLlm)

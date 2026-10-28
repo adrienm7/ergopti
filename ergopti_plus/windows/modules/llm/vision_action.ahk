@@ -442,13 +442,19 @@ _LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine := true, CurrentF
 		return false
 	if Target.Has("resolved") {
 		Transport := HasMethod(_LLM_Vision_RemoteTransport, "Call")
-			? _LLM_Vision_RemoteTransport : LLM_RemotePostBody_Async
-		Transport.Call(Target["resolved"], Target["url"], Body, OnSuccess, OnFail)
+			? _LLM_Vision_RemoteTransport : _LLM_Vision_RemoteRequest
+		Transport.Call(Target["resolved"], Target["url"], Body, OnSuccess, OnFail, CurrentFn)
 		return
 	}
 	Transport := HasMethod(_LLM_Vision_OllamaTransport, "Call")
 		? _LLM_Vision_OllamaTransport : LLM_OllamaChat_Async
-	Transport.Call(Body, OnSuccess, OnFail)
+	Transport.Call(Body, OnSuccess, OnFail, CurrentFn)
+}
+
+; This production facade and the injected image transport share one ABI.
+; The native owner retains the original requester beyond this call's return.
+_LLM_Vision_RemoteRequest(Resolved, Url, Body, OnSuccess, OnFail, CurrentFn) {
+	return LLM_RemotePostBody_Async(Resolved, Url, Body, OnSuccess, OnFail, 0, "", 0, CurrentFn)
 }
 
 /**
@@ -530,7 +536,7 @@ LLM_Vision_SendText(System, User, MaxTokens, OnSuccess, OnFail, CurrentFn := 0) 
 		if !_LLM_Vision_CallbackCurrent(CurrentFn)
 			return false
 		Transport.Call(Entry, System, User,
-			_LLM_Engine["temperature"] + 0.0, OnSuccess, OnFail, "", MaxTokens)
+			_LLM_Engine["temperature"] + 0.0, OnSuccess, OnFail, "", MaxTokens, "", 0, CurrentFn)
 		return true
 	}
 	; The local server's chat body, written whole: the prediction payload stops

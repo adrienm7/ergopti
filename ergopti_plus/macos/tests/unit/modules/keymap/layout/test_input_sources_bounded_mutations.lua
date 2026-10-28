@@ -15,7 +15,19 @@
 --- predictable missing target must not partially mutate the enabled list.
 --- ==============================================================================
 
-local helpers = require("tests.helpers")
+local BaseHelpers = require("tests.helpers")
+local FIXTURE_MODULES = { "modules.keymap.input_sources", "modules.keymap.layout_install" }
+local helpers = setmetatable({}, { __index = BaseHelpers })
+
+--- Registers the original case under its two exact installation-port owners.
+--- The parent can retain its captured port only for this case, including errors.
+--- @param name string Original regression description.
+--- @param body function Original case body and assertions.
+function helpers.it(name, body)
+	return BaseHelpers.it(name, function()
+		return BaseHelpers.with_fresh_modules(FIXTURE_MODULES, body)
+	end)
+end
 
 local LOCALISED_NAME = "Ergopti+"
 local KL_NAME = "Ergopti_v2_2_2_plus"
@@ -31,6 +43,32 @@ local function reset_fixture_modules()
 	package.loaded["adapters.task_lifecycle"] = nil
 	package.loaded["adapters.input_source_selector"] = nil
 	package.loaded["platform.remap.lease_helper"] = nil
+end
+
+
+--- Loads the real parent with an explicitly empty installed-bundle inventory.
+--- The standard preload hook survives the loader's intentional cache reset;
+--- its exact predecessor is restored even when parent construction raises.
+--- @param overrides table Native task, timer and execute boundaries.
+--- @return table sources Real input-source controller bound to the inventory port.
+local function load_sources_without_installed_bundles(overrides)
+	local module_name = "modules.keymap.layout_install"
+	local preload = package.preload
+	local previous_loader = preload[module_name]
+	preload[module_name] = function()
+		return {
+			highest_installed = function() return nil end,
+			version_gt = function() return false end,
+			bundle_variants = function() return {} end,
+			USER_LAYOUTS_DIR = "/virtual/user-layouts",
+			SYSTEM_LAYOUTS_DIR = "/virtual/system-layouts",
+		}
+	end
+	local outcome = table.pack(xpcall(helpers.load_with_stubs, debug.traceback,
+		"modules.keymap.input_sources", overrides))
+	preload[module_name] = previous_loader
+	if not outcome[1] then error(outcome[2], 0) end
+	return table.unpack(outcome, 2, outcome.n)
 end
 
 
@@ -122,7 +160,7 @@ local function load_fixture(options)
 		return timer
 	end
 
-	local IS = helpers.load_with_stubs("modules.keymap.input_sources", {
+	local IS = load_sources_without_installed_bundles({
 		task = task_api,
 		timer = timer_api,
 		execute = function()
@@ -680,6 +718,144 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		helpers.assert_eq(#offers, 1)
 		helpers.assert_eq(offers[1].kind, "python_not_native")
 		package.loaded["ui.python_runtime_offer"] = nil
+		reset_fixture_modules()
+	end)
+end)
+
+
+helpers.describe("input-source mutations: a terminal callback may start the next one", function()
+	-- The composer's failed enable ran its rollback disable from its own terminal
+	-- callback, which the slot still owned, so the rollback was refused "busy"
+	-- (field session 2026-10-27). The slot is released before the terminal.
+	status_test("(tis-slot-release) admits a mutation started from the previous terminal callback", function()
+		local f = load_fixture()
+		local second_accepted, second_reason = nil, nil
+		helpers.assert_eq(f.IS.set_input_source_async(LOCALISED_NAME, KL_NAME, function()
+			second_accepted = f.IS.set_input_source_async(LOCALISED_NAME, KL_NAME, function(_, _, reason)
+				second_reason = reason
+			end)
+		end), true)
+		f.tasks[1]:complete(0, "-50\n", "")
+		helpers.assert_eq(second_accepted, true, "the follow-up mutation must not be refused as busy")
+		helpers.assert_true(second_reason ~= "busy", "the follow-up mutation must not be refused as busy")
+		f.tasks[2]:complete(0, "0\n", "")
+		reset_fixture_modules()
+	end)
+end)
+
+
+helpers.describe("input-source enable: the preference is not the live state (composer-macos26)", function()
+	-- The editor ended with `launchctl kickstart -k user/<uid>/com.apple.SystemUIServer`,
+	-- a service that is not in the user domain: launchctl answered 113 after every
+	-- successful write, the script exited 1 and every enable read "process_failed"
+	-- (field runs 2026-10-27, L52). The script must end on its own write.
+	helpers.it("ends the enabled-list editor on its own write, with no agent restart", function()
+		local source = helpers.read_driver_source("local ENABLED_LIST_SCRIPT = [[")
+		helpers.assert_not_nil(source, "the editor script's owner is found")
+		local script = source:match("local ENABLED_LIST_SCRIPT = %[%[(.-)%]%]")
+		helpers.assert_not_nil(script, "the editor script is found")
+		helpers.assert_true(script:find("launchctl", 1, true) == nil, "the editor restarts no agent")
+		helpers.assert_true(script:find('run_child(["defaults", "import", DOMAIN, tmp])', 1, true) ~= nil)
+		helpers.assert_true(script:find('os.unlink(tmp)\n\nprint("OK")', 1, true) ~= nil,
+			"OK follows the import directly")
+	end)
+
+	helpers.it("reads a layout as on only from the live list", function()
+		local f = load_fixture()
+		local live = { names = { "French", "Composer Check", f.IS.format_ergopti_display(KL_NAME) },
+			ids = { "com.apple.keylayout.French", "org.unknown.keylayout.Loose Name" } }
+		helpers.assert_eq(f.IS.is_live_enabled("Composer Check", live), true)
+		helpers.assert_eq(f.IS.is_live_enabled("Loose Name", live), true, "a loose layout's id carries its name")
+		helpers.assert_eq(f.IS.is_live_enabled(KL_NAME, live), true, "an Ergopti layout is listed by its display")
+		helpers.assert_eq(f.IS.is_live_enabled("Ergo-L", live), false)
+		local unreadable, reason = f.IS.is_live_enabled("Ergo-L", false)
+		helpers.assert_nil(unreadable)
+		helpers.assert_eq(reason, "live_state_unreadable")
+		reset_fixture_modules()
+	end)
+end)
+
+
+helpers.describe("input-source confirm: a fresh process reads the state (composer-macos26)", function()
+	-- Probe v5 (P5, P9): after the preference write, the writing process and
+	-- Hammerspoon keep a stale list (enabled=false, select -50) while a process
+	-- started after the write sees the layout on and selects it.
+	helpers.it("reads, registers and refreshes through its own owned child", function()
+		local f = load_fixture()
+		local answers = {}
+		helpers.assert_eq(f.IS.confirm_source_async("Composer Check", { register_path = "/u/composed.keylayout", refresh = true },
+			function(ok, state, reason) answers[#answers + 1] = { ok = ok, state = state, reason = reason } end), true)
+		local args = f.tasks[1].args
+		helpers.assert_eq(f.tasks[1].executable, helpers.HEALTHY_PYTHON)
+		helpers.assert_eq(args[1], "-c")
+		helpers.assert_true(args[2]:find("TISRegisterInputSource", 1, true) ~= nil)
+		helpers.assert_eq(args[3], "Composer Check")
+		helpers.assert_eq(args[4], "/u/composed.keylayout")
+		helpers.assert_eq(args[5], "refresh")
+		helpers.assert_eq(args[6], tostring(require("infra.timings").sec("ui", "input_source_reselect_settle_ms")),
+			"the refresh pause comes from the timing registry")
+		f.tasks[1]:complete(0, '{"listed": true, "enabled": true, "selected": false, "register": 0, "refreshed": null}\n', "")
+		helpers.assert_eq(#answers, 1)
+		helpers.assert_eq(answers[1].ok, true)
+		helpers.assert_eq(answers[1].state.enabled, true)
+		reset_fixture_modules()
+	end)
+
+	helpers.it("refuses output that is not the child's JSON state", function()
+		for _, case in ipairs({ { 0, "OK\n" }, { 0, '{"enabled": true}' }, { 1, '{"listed": true}' } }) do
+			local f = load_fixture()
+			local answer
+			f.IS.confirm_source_async("Composer Check", {}, function(ok, _state, reason) answer = { ok = ok, reason = reason } end)
+			f.tasks[1]:complete(case[1], case[2], "")
+			helpers.assert_eq(answer.ok, false)
+			helpers.assert_true(answer.reason == "invalid_output" or answer.reason == "process_failed", tostring(answer.reason))
+			reset_fixture_modules()
+		end
+	end)
+end)
+
+
+helpers.describe("input-source confirm: fresh reads until the write applies (composer-macos26)", function()
+	-- Field run 2026-10-28 12:51: the composed layout was read 140 ms after the
+	-- preference write and found off; probe v5 read it seconds later and found it on.
+	local OFF = '{"listed": true, "enabled": false, "selected": false, "register": 0, "enable": 0, "refreshed": null}\n'
+	local ON = '{"listed": true, "enabled": true, "selected": false, "register": null, "enable": null, "refreshed": null}\n'
+
+	helpers.it("enables from the first child, then reads again from a new child after a delay", function()
+		local f = load_fixture()
+		local answers = {}
+		helpers.assert_eq(f.IS.confirm_enabled_async("Composer Check", { register_path = "/u/composed.keylayout" },
+			function(ok, state, reason) answers[#answers + 1] = { ok = ok, state = state, reason = reason } end), true)
+		helpers.assert_eq(f.tasks[1].args[4], "/u/composed.keylayout")
+		helpers.assert_eq(f.tasks[1].args[5], "enable", "the first child also asks TIS to enable it")
+		f.tasks[1]:complete(0, OFF, "")
+		helpers.assert_eq(#answers, 0, "an off read inside the window is not the answer")
+		helpers.assert_eq(#f.tasks, 1, "the next read waits for its delay")
+		f.timers[#f.timers]:fire()
+		helpers.assert_eq(#f.tasks, 2, "a new fresh child reads again")
+		helpers.assert_eq(f.tasks[2].args[4], "", "the later reads only read")
+		helpers.assert_eq(f.tasks[2].args[5], "")
+		f.tasks[2]:complete(0, ON, "")
+		helpers.assert_eq(#answers, 1)
+		helpers.assert_eq(answers[1].ok, true)
+		helpers.assert_eq(answers[1].state.enabled, true)
+		reset_fixture_modules()
+	end)
+
+	helpers.it("answers the last off read once the bounded window is spent", function()
+		local f = load_fixture()
+		local answers = {}
+		f.IS.confirm_enabled_async("Composer Check", {}, function(ok, state) answers[#answers + 1] = { ok = ok, state = state } end)
+		local reads = 0
+		while #answers == 0 do
+			reads = reads + 1
+			helpers.assert_true(reads <= 10, "the window must end")
+			f.tasks[#f.tasks]:complete(0, OFF, "")
+			if #answers == 0 then f.timers[#f.timers]:fire() end
+		end
+		helpers.assert_eq(reads, 5, "500 ms doubling within 8 s: reads at 0, 0.5, 1.5, 3.5 and 7.5 s")
+		helpers.assert_eq(answers[1].ok, true)
+		helpers.assert_eq(answers[1].state.enabled, false)
 		reset_fixture_modules()
 	end)
 end)

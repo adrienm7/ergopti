@@ -6,6 +6,7 @@
 --- Executes Main's actual character-handler body with the real focus guard.
 --- An ordinary expansion must carry the owner captured before its match log.
 --- ==============================================================================
+local Errors = require("adapter_errors")
 local helpers = require("tests.helpers")
 local fixture = require("tests.support.text_owner_fixture")
 
@@ -22,11 +23,14 @@ helpers.describe("Main retains the ordinary expansion target", function()
 				logger.set_error_observer(function(_, template) errors[#errors + 1] = template end)
 				local environment = setmetatable({
 					secure_focus_guard = guard, script_actions = { is_paused = function() return false end },
+					-- Bare keys: the shared expansion delay reads the held modifiers per key.
+					keyboard_hook = { held_modifiers = function() return {} end },
 					Monotonic = { now_ms = function() return state.now end }, _cached_app_id = "owned-editor",
-					WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end },
+					WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end, cascade_max_arrows = function() return 0 end },
 					terminators_mod = { is_terminator = function() return false end },
 					RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false },
-					keylogger = { is_password_app = function() return false end, suppress = function() end,
+					keyboard_hook = { held_modifiers = function() return {} end },
+					keystats = { is_password_app = function() return false end, is_unrecorded_app = function() return false end, suppress = function() end,
 						unsuppress = function() end, on_keydown = function() end },
 					engine = { reset = function() end, on_char = function()
 						return { trigger = "btw", replacement = "☃", backspace_count = 3 }
@@ -39,7 +43,7 @@ helpers.describe("Main retains the ordinary expansion target", function()
 							local bc, value, _, _, publication = ...
 							count, text, owner = bc, value, publication
 							captured_current = type(owner) == "table" and owner.current()
-							return { ok = false, cleanup_ok = true, error = moved and "programmable publication is no longer current" or "controlled output refused" }
+							return { ok = false, cleanup_ok = true, error = moved and Errors.PROGRAMMABLE_PUBLICATION_STALE or "controlled output refused" }
 						end },
 				}, { __index = _G })
 				local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))

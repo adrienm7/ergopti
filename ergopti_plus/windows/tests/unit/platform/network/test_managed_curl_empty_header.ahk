@@ -1,14 +1,14 @@
 ﻿; tests/unit/platform/network/test_managed_curl_empty_header.ahk
 
 ; ==============================================================================
-; MODULE: Managed curl Empty Header Serialization Tests
+; MODULE: Managed Transport Empty Header Serialization Tests
 ; DESCRIPTION:
-; curl reads a configured header written "Name:" with nothing after the colon
-; as "remove this header", so a caller's present-but-empty field never reached
-; the wire. curl's "Name;" form sends it with an empty value. The real managed
-; transport (worker, capability observation and curl) sends one request to a
-; private loopback listener, which records the exact request head; empty and
-; space-only fields must arrive empty, ordinary fields unchanged.
+; WinHTTP treats REPLACE with an empty value as "remove this header", so a
+; caller's present-but-empty field could never reach the wire. The transport
+; adds an empty field without REPLACE. The real managed transport (worker and
+; WinHTTP) sends one request to a private loopback listener, which records the
+; exact request head; empty and space-only fields must arrive empty, ordinary
+; fields unchanged.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -84,17 +84,13 @@ _MCEH_HeaderLines(Head) {
 	return Lines
 }
 
-; Managed: the production worker. Legacy: the explicit-spawn serializer that
-; the dispatch-port owners still use; both must write the same header lines.
-_MCEH_EmptyFieldsReachTheWire(Mode) {
+; The production worker and real WinHTTP: an empty field must still be sent.
+_MCEH_EmptyFieldsReachTheWire() {
 	Listener := _MCEH_Listener()
 	Request := 0
 	try {
-		if Mode == "managed" {
-			Request := CurlAsyncRequest()
-			Request.SetManagedRouting(_MCEH_DirectSettings)
-		} else
-			Request := CurlAsyncRequest(Map("spawn", ShellRunner_SpawnTreeOwned))
+		Request := CurlAsyncRequest()
+		Request.SetManagedRouting(_MCEH_DirectSettings)
 		Request.SetDeadline(A_TickCount, 30000)
 		Request.Open("GET", "http://127.0.0.1:" . Listener.Port . "/empty-header", true)
 		Request.SetRequestHeader("X-Ergopti-Empty", "")
@@ -121,7 +117,5 @@ _MCEH_EmptyFieldsReachTheWire(Mode) {
 		Listener.Close()
 	}
 }
-Test("managed curl: empty and space-only header values reach the wire (managed-curl-empty-header)",
-	_MCEH_EmptyFieldsReachTheWire.Bind("managed"))
-Test("legacy curl: empty and space-only header values reach the wire (managed-curl-empty-header)",
-	_MCEH_EmptyFieldsReachTheWire.Bind("legacy"))
+Test("managed transport: empty and space-only header values reach the wire (managed-curl-empty-header)",
+	_MCEH_EmptyFieldsReachTheWire)

@@ -9,7 +9,9 @@
 --- pointer click), `hotstrings.arrow_resets_word` (Left, Right, Up, Down),
 --- `hotstrings.shortcut_resets_word` (a key struck under Ctrl, Alt or Super)
 --- and `hotstrings.tap_hold_resets_word` (a tap-hold key's own command, and a
---- shortcut struck under a tap-hold or navigation-layer hold).
+--- shortcut struck under a tap-hold or navigation-layer hold). It also holds
+--- `hotstrings.cascade_max_arrows`, the longest hotstring chain, the other matcher parameter that is read on every
+--- keystroke and follows the same scope (adopt, restore, cleanup ownership).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Before them the buffer kept the last word for as long as the user stayed
@@ -41,6 +43,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local Manifest = require("infra.manifest_reader")
@@ -51,14 +54,23 @@ local Preferences = require("infra.hotstring_preferences")
 local ConfigOutdated = require("config_outdated")
 local Engine = require("modules.hotstrings.engine")
 local Monotonic = require("infra.monotonic")
+local ConfigKeys = require("config_keys")
+local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 local LOG = "hotstrings.word_reset"
 
-local IDLE_PATH = "hotstrings.idle_reset_seconds"
+local IDLE_PATH = KEY.HOTSTRINGS_IDLE_RESET_SECONDS
+local CASCADE_PATH = KEY.HOTSTRINGS_CASCADE_MAX_ARROWS
 
 -- The boolean leaves of [hotstrings] this module owns, each a runtime field of
--- the same name; the feature path is "hotstrings." .. key.
-local SWITCHES = { "click_resets_word", "arrow_resets_word", "shortcut_resets_word", "tap_hold_resets_word" }
+-- the same name, and the full feature path of each.
+local SWITCHES = { LEAF.CLICK_RESETS_WORD, LEAF.ARROW_RESETS_WORD, LEAF.SHORTCUT_RESETS_WORD, LEAF.TAP_HOLD_RESETS_WORD }
+local SWITCH_PATH = {
+	[LEAF.CLICK_RESETS_WORD] = KEY.HOTSTRINGS_CLICK_RESETS_WORD,
+	[LEAF.ARROW_RESETS_WORD] = KEY.HOTSTRINGS_ARROW_RESETS_WORD,
+	[LEAF.SHORTCUT_RESETS_WORD] = KEY.HOTSTRINGS_SHORTCUT_RESETS_WORD,
+	[LEAF.TAP_HOLD_RESETS_WORD] = KEY.HOTSTRINGS_TAP_HOLD_RESETS_WORD,
+}
 
 -- The caret keys arrow_resets_word governs, by the hook's control-key name.
 -- Home, End, Page Up/Down and Insert keep their unconditional reset.
@@ -113,7 +125,7 @@ local _last_key_ms = nil
 --- @param settings table Validated settings.
 --- @return table copy
 local function copy_settings(settings)
-	local copy = { idle_seconds = settings.idle_seconds }
+	local copy = { idle_seconds = settings.idle_seconds, cascade_max_arrows = settings.cascade_max_arrows }
 	for _, key in ipairs(SWITCHES) do copy[key] = settings[key] end
 	return copy
 end
@@ -121,8 +133,9 @@ end
 --- The manifest defaults of every leaf.
 --- @return table settings
 local function default_settings()
-	local defaults = { idle_seconds = Manifest.default_for(IDLE_PATH) }
-	for _, key in ipairs(SWITCHES) do defaults[key] = Manifest.default_for("hotstrings." .. key) end
+	local defaults = { idle_seconds = Manifest.default_for(IDLE_PATH),
+		cascade_max_arrows = Manifest.default_for(CASCADE_PATH) }
+	for _, key in ipairs(SWITCHES) do defaults[key] = Manifest.default_for(SWITCH_PATH[key]) end
 	return defaults
 end
 
@@ -131,8 +144,8 @@ end
 --- unmarked for the cleanup.
 --- @param document table Decoded canonical configuration.
 --- @param mark function|nil Cleanup ownership visitor.
---- @return table settings `{ idle_seconds, click_resets_word, arrow_resets_word,
----   shortcut_resets_word, tap_hold_resets_word }`.
+--- @return table settings `{ idle_seconds, cascade_max_arrows, click_resets_word,
+---   arrow_resets_word, shortcut_resets_word, tap_hold_resets_word }`.
 local function resolve_settings(document, mark)
 	local section = ConfigOutdated.settings_table(document.hotstrings, { "hotstrings" }, Logger)
 	local idle = section and section.idle_reset_seconds
@@ -141,12 +154,21 @@ local function resolve_settings(document, mark)
 		idle = nil
 	end
 	if idle == nil then idle = Manifest.default_for(IDLE_PATH)
-	elseif mark then mark("hotstrings", "idle_reset_seconds") end
+	elseif mark then mark(KEY.HOTSTRINGS, LEAF.IDLE_RESET_SECONDS) end
 	assert(Engine.valid_idle_reset_seconds(idle), "the manifest default of idle_reset_seconds must be valid")
 
-	local settings = { idle_seconds = idle }
+	local arrows = section and section.cascade_max_arrows
+	if arrows ~= nil and not Engine.valid_cascade_max_arrows(arrows) then
+		ConfigOutdated.report(CASCADE_PATH, "the value is not a whole number from 1 to 10", Logger)
+		arrows = nil
+	end
+	if arrows == nil then arrows = Manifest.default_for(CASCADE_PATH)
+	elseif mark then mark(KEY.HOTSTRINGS, LEAF.CASCADE_MAX_ARROWS) end
+	assert(Engine.valid_cascade_max_arrows(arrows), "the manifest default of cascade_max_arrows must be valid")
+
+	local settings = { idle_seconds = idle, cascade_max_arrows = arrows }
 	for _, key in ipairs(SWITCHES) do
-		local path = "hotstrings." .. key
+		local path = SWITCH_PATH[key]
 		local value = section and section[key]
 		if value ~= nil and type(value) ~= "boolean" then
 			ConfigOutdated.report(path, "the value is not a boolean", Logger)
@@ -213,7 +235,8 @@ end
 --- @param snapshot table Value returned by snapshot().
 --- @return boolean restored
 function M.restore_configuration(snapshot)
-	if type(snapshot) ~= "table" or not Engine.valid_idle_reset_seconds(snapshot.idle_seconds) then return false end
+	if type(snapshot) ~= "table" or not Engine.valid_idle_reset_seconds(snapshot.idle_seconds)
+		or not Engine.valid_cascade_max_arrows(snapshot.cascade_max_arrows) then return false end
 	for _, key in ipairs(SWITCHES) do
 		if type(snapshot[key]) ~= "boolean" then return false end
 	end
@@ -236,6 +259,12 @@ end
 --- @return number seconds Pause after which a key starts a new word; 0 = never.
 function M.idle_seconds()
 	return M.current().idle_seconds
+end
+
+--- @return number arrows How many expansions a chain may hold, the first one
+---   included; 1 = a single expansion, no cascade.
+function M.cascade_max_arrows()
+	return M.current().cascade_max_arrows
 end
 
 --- @return boolean Whether a click starts a new word.
@@ -295,7 +324,7 @@ local function set_switch(key, enabled)
 		Logger.warn(LOG, "Invalid value '%s' for hotstrings.%s refused.", tostring(enabled), key)
 		return false
 	end
-	return persist("hotstrings." .. key, key, enabled)
+	return persist(SWITCH_PATH[key], key, enabled)
 end
 
 --- Sets the pause after which a key starts a new word.
@@ -309,11 +338,22 @@ function M.set_idle_seconds(seconds)
 	return persist(IDLE_PATH, "idle_seconds", seconds)
 end
 
+--- Sets the cascade's longest chain.
+--- @param arrows number Whole number from 1 (a single expansion, no cascade) to 10.
+--- @return boolean committed
+function M.set_cascade_max_arrows(arrows)
+	if not Engine.valid_cascade_max_arrows(arrows) then
+		Logger.warn(LOG, "Invalid cascade arrow count '%s' refused.", tostring(arrows))
+		return false
+	end
+	return persist(CASCADE_PATH, LEAF.CASCADE_MAX_ARROWS, arrows)
+end
+
 --- Sets whether a click starts a new word.
 --- @param enabled boolean
 --- @return boolean committed
 function M.set_click_resets_word(enabled)
-	return set_switch("click_resets_word", enabled)
+	return set_switch(LEAF.CLICK_RESETS_WORD, enabled)
 end
 
 --- Flips the click setting.
@@ -326,7 +366,7 @@ end
 --- @param enabled boolean
 --- @return boolean committed
 function M.set_arrow_resets_word(enabled)
-	return set_switch("arrow_resets_word", enabled)
+	return set_switch(LEAF.ARROW_RESETS_WORD, enabled)
 end
 
 --- Flips the arrow setting.
@@ -339,7 +379,7 @@ end
 --- @param enabled boolean
 --- @return boolean committed
 function M.set_shortcut_resets_word(enabled)
-	return set_switch("shortcut_resets_word", enabled)
+	return set_switch(LEAF.SHORTCUT_RESETS_WORD, enabled)
 end
 
 --- Flips the shortcut setting.
@@ -353,7 +393,7 @@ end
 --- @param enabled boolean
 --- @return boolean committed
 function M.set_tap_hold_resets_word(enabled)
-	return set_switch("tap_hold_resets_word", enabled)
+	return set_switch(LEAF.TAP_HOLD_RESETS_WORD, enabled)
 end
 
 --- Flips the tap-hold setting.
@@ -368,7 +408,7 @@ end
 --- @return number|nil seconds Valid value, or nil when the text is not one.
 function M.parse_seconds(text)
 	if type(text) ~= "string" then return nil end
-	local trimmed = text:match("^%s*(.-)%s*$"):gsub(",", ".", 1)
+	local trimmed = TextUtils.trim(text):gsub(",", ".", 1)
 	if not trimmed:match("^%d+%.?%d*$") and not trimmed:match("^%.%d+$") then return nil end
 	local value = tonumber(trimmed)
 	if not Engine.valid_idle_reset_seconds(value) then return nil end
@@ -447,7 +487,8 @@ end
 --- @return boolean applied
 function M.apply_typed_newline(engine, ch, app_id)
 	if ch ~= "\n" or not M.is_terminal_app(app_id) then return false end
-	engine:reset(true, true)
+	-- A submitted line is a navigation for the AI context, as an Enter is.
+	engine:reset(true, true, "navigation")
 	return true
 end
 
@@ -489,14 +530,24 @@ end
 --- @param app_id string|nil Focused application id.
 --- @return string effect "word_start", "unknown" or "kept".
 function M.apply_control(engine, key_name, detail, app_id)
+	-- A Backspace under a modifier removes text by an unknown amount: the AI
+	-- context no longer describes the field and is forgotten by the reset. Every
+	-- other control key is a navigation, which the AI context treats by its own
+	-- preference whatever the word-reset options decide for the hotstring buffer.
+	local ai_effect = key_name ~= "backspace" and "navigation" or nil
 	if key_name == "backspace" and M.deletes_previous_word(detail) then
 		engine:reset(true)
 		return "word_start"
 	end
 	local owner = M.control_owner(key_name, detail)
-	if owner ~= nil and not M.current()[owner .. "_resets_word"] then return "kept" end
+	if owner ~= nil and not M.current()[owner .. "_resets_word"] then
+		-- The word is kept, the caret still moved.
+		if ai_effect then engine:navigated() end
+		return "kept"
+	end
 	local at_word_start = owner ~= nil or key_name == "escape"
-	engine:reset(at_word_start, owner ~= nil and key_name == "shortcut" and selects_whole_field(detail, app_id))
+	engine:reset(at_word_start, owner ~= nil and key_name == "shortcut" and selects_whole_field(detail, app_id),
+		ai_effect)
 	return at_word_start and "word_start" or "unknown"
 end
 
@@ -513,8 +564,13 @@ function M.apply_tap_action(engine, binding)
 	if binding ~= "tap_hold" and not (type(binding) == "string" and binding:match("^tap_hold__")) then
 		return "not_tap_hold"
 	end
-	if not M.tap_hold_resets_word() then return "kept" end
-	engine:reset(true)
+	-- The command's keys may move the caret or change text: a navigation for the
+	-- AI context, whatever the hotstring option decides.
+	if not M.tap_hold_resets_word() then
+		engine:navigated()
+		return "kept"
+	end
+	engine:reset(true, nil, "navigation")
 	return "word_start"
 end
 

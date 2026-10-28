@@ -108,7 +108,7 @@ _OCPC_DeferredSpawnIgnoresPersonalConfig() {
 		_LLM_Ollama_ActiveStreams := []
 		_LLM_Ollama_Pending := ""
 		Job := Map("on_success", (*) => 0, "on_fail", (*) => State["failed"] += 1)
-		_LLM_Ollama_Async[ReqId] := Map("pid", 0, "process_owner", 0, "base_url", _OCPC_CLOSED_ORIGIN,
+		_LLM_Ollama_Async[ReqId] := Map("requester_current", 0, "pid", 0, "process_owner", 0, "base_url", _OCPC_CLOSED_ORIGIN,
 			"tmp_payload", Root . "\request.json", "tmp_stdout", Root . "\request.out",
 			"tmp_status", Root . "\request.status", "tmp_exit", Root . "\request.exit",
 			"on_success", Job["on_success"], "on_fail", Job["on_fail"], "cancelled", false,

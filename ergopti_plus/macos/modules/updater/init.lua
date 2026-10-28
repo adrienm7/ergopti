@@ -14,6 +14,7 @@
 local M = {}
 
 local hs         = hs
+local Identifiers = require("identifiers")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local FileSystem = require("adapters.file_system")
@@ -21,9 +22,10 @@ local JsonCodec  = require("adapters.json_codec")
 local Channels   = require("updater.channels")
 local VersionLabel = require("updater.version_label")
 local Snapshot   = require("diagnostics.snapshot")
+local DevSource  = require("infra.dev_source")
 
 local LOG = "updater"
-local BUNDLED_ID = "com.ergoptiplus.app.hammerspoon"
+local BUNDLED_ID = Identifiers.bundle_ids.hammerspoon
 local DEFAULT_GITHUB = { owner = "adrienm7", repo = "ergopti" }
 
 --- Loads the shared repository identity without introducing a second update
@@ -75,8 +77,12 @@ M.GH_OWNER = github.owner
 M.GH_REPO = github.repo
 
 --- Reports whether Lua is running outside the packaged nested Hammerspoon app.
+--- A developer app (infra/dev_source.lua) runs in that app but from a clone: it
+--- is a source run, so its update checks, installs and uninstall stay off.
+--- Raises when the developer root does not name the running driver.
 --- @return boolean local_source
 function M.is_local_source()
+	if DevSource.is_active() then return true end
 	local info = hs.processInfo
 	if not info then return true end
 	return (info.bundleID or "") ~= BUNDLED_ID
@@ -110,7 +116,7 @@ end
 --- Returns the public releases page used by the About menu.
 --- @return string url
 function M.releases_page_url()
-	return string.format("https://github.com/%s/%s/releases", M.GH_OWNER, M.GH_REPO)
+	return string.format("https://%s/%s/%s/releases", Identifiers.hosts.github, M.GH_OWNER, M.GH_REPO)
 end
 
 --- Resolves the build identity the About menu's version row names: a stamped

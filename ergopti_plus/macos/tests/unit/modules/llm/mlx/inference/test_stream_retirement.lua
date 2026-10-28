@@ -16,7 +16,7 @@ local OWNED = {
 	"infra.notifications", "json", "modules.llm.progressive_reveal",
 	"modules.llm.api_mlx", "modules.llm.api_mlx_fetch", "modules.llm.api_mlx_discovery",
 	"modules.llm.mlx_stream_retirement",
-	"modules.llm.api_mlx_inference", "adapters.shell_runner", "modules.keylogger",
+	"modules.llm.api_mlx_inference", "adapters.shell_runner", "modules.keystats",
 	"infra.logger", "adapters.timer_scheduler", "adapters.http_client",
 	"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 	"llm.prompt_builder", "llm.rewrite", "llm.parser", "llm.profile_selector",
@@ -36,7 +36,7 @@ local function with_stream(scenario)
 		helpers.with_stub_scope(OWNED, function()
 			local f = { native = {}, timers = {}, failures = 0 }
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["modules.keylogger"] = {}
+			package.loaded["modules.keystats"] = {}
 			package.loaded["adapters.http_client"] = { new = function() return {} end }
 			package.loaded["adapters.timer_scheduler"] = {
 				now = function() return 0 end,

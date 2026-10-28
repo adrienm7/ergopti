@@ -162,7 +162,7 @@ end)
 --- nothing — order is deliberately not relied on.
 ---
 --- There are TWO definitions: the real one in the context tracker, and a thin
---- forwarder in the keylogger that delegates to it. `read_driver_source` returns
+--- forwarder in the keystats that delegates to it. `read_driver_source` returns
 --- them concatenated, and the concatenation ORDER depends on how the corpus was
 --- walked — lfs on one machine, a shell listing on another. The first version of
 --- these cases looked only at the first occurrence, so it read the real
@@ -202,7 +202,7 @@ end
 --- nothing — order is deliberately not relied on.
 ---
 --- There are TWO definitions: the real one in the context tracker, and a thin
---- forwarder in the keylogger that delegates to it. `read_driver_source` returns
+--- forwarder in the keystats that delegates to it. `read_driver_source` returns
 --- them concatenated, and the concatenation ORDER depends on how the corpus was
 --- walked — lfs on one machine, a shell listing on another. The first version of
 --- these cases looked only at the first occurrence, so it read the real

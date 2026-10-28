@@ -67,19 +67,23 @@ local function run_action(label, outcome, options)
 		saves = 0,
 		updates = 0,
 		notices = 0,
+		consume = 0,
 	}
 	local state = {
 		terminator_states = { space = false, slash = true, custom_x = false },
+		terminator_consume = { slash = true },
 		delays = {},
 		trigger_char = "★",
 		expansion_delay = 0.1,
 	}
 	local defs = {
 		{ key = "space", chars = { " " }, label_key = "terminators.label_space", default_enabled = true },
-		{ key = "slash", chars = { "/" }, label_key = "terminators.label_slash", default_enabled = false },
+		{ key = "slash", chars = { "/" }, label_key = "terminators.label_slash", default_enabled = false,
+			consume = false },
 		{ key = "custom_x", chars = { "x" }, label = "Custom", custom = true },
 	}
 	local last_changes = nil
+	local consumed = { space = false, slash = true }
 
 	local native_renderer = assert(require("menu.renderer").new({
 		platform = "hs",
@@ -133,6 +137,12 @@ local function run_action(label, outcome, options)
 			DEFAULT_STATE = { expansion_delay = 0.1 },
 			get_terminator_defs = function() return defs end,
 			is_terminator_enabled = function(key) return state.terminator_states[key] end,
+			is_terminator_consume = function(key) return consumed[key] == true end,
+			set_terminators_consume = function(changes)
+				calls.consume = calls.consume + 1
+				for key, value in pairs(changes) do consumed[key] = value end
+				return true
+			end,
 			set_terminators_enabled = function(changes)
 				calls.batches = calls.batches + 1
 				last_changes = clone_flat(changes)
@@ -180,6 +190,7 @@ local function run_action(label, outcome, options)
 			state = state,
 			calls = calls,
 			changes = last_changes,
+			consumed = consumed,
 		}
 	end, debug.traceback)
 
@@ -209,6 +220,9 @@ helpers.describe("word-expander terminator mutations are transactional", functio
 				helpers.assert_eq(fixture.calls.notices, 1, label .. "/" .. outcome)
 				helpers.assert_eq(fixture.state.terminator_states,
 					{ space = false, slash = true, custom_x = false }, label .. "/" .. outcome)
+				helpers.assert_eq(fixture.state.terminator_consume, { slash = true }, label .. "/" .. outcome)
+				helpers.assert_eq(fixture.consumed, { space = false, slash = true },
+					"a refused batch leaves the consumed choice of every built-in as it was: " .. label .. "/" .. outcome)
 			end
 		end
 	end)
@@ -242,6 +256,13 @@ helpers.describe("word-expander terminator mutations are transactional", functio
 			helpers.assert_eq(fixture.calls.saves, 1, case.label)
 			helpers.assert_eq(fixture.calls.updates, 1, case.label)
 			helpers.assert_eq(fixture.calls.notices, 0, case.label)
+			if case.label == i18n.get("common.restore_recommended") then
+				helpers.assert_eq(fixture.consumed, { space = false, slash = false },
+					"the restore returns the consumed choice to the catalogue")
+				helpers.assert_eq(fixture.state.terminator_consume, {}, "and stores no consume key")
+			else
+				helpers.assert_eq(fixture.calls.consume, 0, case.label)
+			end
 		end
 	end)
 

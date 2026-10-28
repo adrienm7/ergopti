@@ -277,6 +277,14 @@ global HSE_RepeatEnabled := true
 global HSE_IdleResetSeconds := ""
 global HSE_ClickResetsWord := ""
 
+; hotstrings.cascade_max_arrows, published the same way: how many expansions
+; (arrows) a chain of hotstrings may hold, 1 = a single expansion. "" reads the
+; manifest default (HSE_CascadeMaxArrowsCurrent, in hotstring_cascade.ahk). The
+; bounds sit here so they exist before any include runs.
+global HSE_CascadeMaxArrows := ""
+global HSE_CASCADE_MIN_ARROWS := 1
+global HSE_CASCADE_MAX_ARROWS := 10
+
 ; hotstrings.arrow_resets_word, hotstrings.shortcut_resets_word and
 ; hotstrings.tap_hold_resets_word, published the same way: whether an arrow
 ; key, a shortcut, or a tap-hold key's own output starts a new word. "" reads
@@ -1067,16 +1075,17 @@ HSE_WordResetFlagCurrent(Key) {
 ; sits behind » exactly, regardless of whether the end char was a word
 ; terminator (the new HSE_FeedChar keeps terminators in the buffer too,
 ; so triggers that span them — e.g. « ,a → ja » — can still match).
-HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := false) {
+HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := false, ExtraStrip := 0) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
 		global HSE_CONSUMED_DELIMITERS
 
-		StripLen := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
+		StripLen := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0) + ExtraStrip
 		EmittedEndChar := (EndChar != "" and !ForceConsumeEndChar
 				and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
 		ClearAll := Spec.HasOwnProp("OnlyText") and !Spec.OnlyText
 		InsertedText := ClearAll ? "" : Replacement . EmittedEndChar
 		Effect := {
+				IsPrivate: Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate,
 				ClearAll: ClearAll,
 				DeleteFromEnd: StripLen,
 				InsertedText: InsertedText,
@@ -1120,6 +1129,26 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 }
 
 
+; Whether one character is part of a word, the rule macOS and Linux share
+; (text_utils.is_hotstring_word_char in _shared/lua/text_utils/init.lua): every
+; non-ASCII character, "@", letters, digits and "_". The shared repeat_key
+; corpus pins the three drivers to it.
+; @param Ch {String} One character (a surrogate pair counts as one).
+; @returns {Boolean}
+HSE_IsWordChar(Ch) {
+		if (Ch == "")
+				return false
+		if (Ord(Ch) > 127)
+				return true
+		return Ch == "@" or RegExMatch(Ch, "^[A-Za-z0-9_]$") > 0
+}
+
+; A word character for the repeat: the shared rule, minus any delimiter the user
+; added to the word delimiters (a custom delimiter ends a word on Windows).
+_HSE_RepeatWordChar(Ch) {
+		return HSE_IsWordChar(Ch) and InStr(_HSE_WordBoundarySet(), Ch) = 0
+}
+
 ; Attempt the magic-key repeat: when the user types <x><MagicKey> and x is
 ; preceded by at least one non-terminator letter (i.e. x is not the first
 ; letter of the word), emit <x><x> instead. This is the engine-level fallback
@@ -1160,8 +1189,9 @@ HSE_TryRepeatKey(MagicKey) {
 		RepeatCharEnd := BufLen - MkLen
 		RepeatCharPos := _TextCodepointStart(HSE_Buffer, RepeatCharEnd)
 		RepeatChar := _TextCompleteTailScalar(SubStr(HSE_Buffer, RepeatCharPos, RepeatCharEnd - RepeatCharPos + 1))
-		; Refuse to repeat whitespace or terminators.
-		if (RepeatChar == "" or InStr(_HSE_WordBoundarySet(), RepeatChar) > 0) {
+		; Only a word character repeats (HSE_IsWordChar, the shared rule), and never
+		; the magic key itself: two keys in a row are a second trigger, not a repeat.
+		if (RepeatChar == "" or RepeatChar == MagicKey or !_HSE_RepeatWordChar(RepeatChar)) {
 				return ""
 		}
 		; The char before RepeatChar must exist and be a non-terminator — this ensures
@@ -1174,10 +1204,10 @@ HSE_TryRepeatKey(MagicKey) {
 		}
 		PredStart := _TextCodepointStart(HSE_Buffer, PredPos)
 		PredChar := _TextCompleteTailScalar(SubStr(HSE_Buffer, PredStart, PredPos - PredStart + 1))
-		; Boundary set, not terminator set: after an opening quote the char is the
-		; FIRST letter of its word, so doubling it is meaningless and the real
-		; expansion must be allowed to win instead.
-		if (PredChar == "" or InStr(_HSE_WordBoundarySet(), PredChar) > 0) {
+		; Word character, not "not a terminator": after an opening quote, a
+		; parenthesis or a hyphen the char is the FIRST letter of its word, so
+		; doubling it is meaningless and the real expansion must win instead.
+		if (PredChar == "" or !_HSE_RepeatWordChar(PredChar)) {
 				return ""
 		}
 		; When PredChar starts at position 1 of the buffer (PredStart == 1) and the buffer
@@ -1293,7 +1323,7 @@ HSE_TryPersonalInfoCombo(MagicKey) {
 		; own data and must not reach the metrics row or the fire trace.
 		; FinalResult routes the send through SendFinalResult (SendInput), which is
 		; what every other @ registration uses — measured, it is the path the
-		; keylogger's InputHook does not observe.
+		; keystats's InputHook does not observe.
 		return {
 				Trigger:     TriggerStr,
 				Length:      StrLen(TriggerStr),
@@ -1419,3 +1449,4 @@ HSE_PreviewNextMatch(Buffer, NextChar) {
 
 #Include hotstring_match.ahk
 #Include hotstring_dispatch.ahk
+#Include hotstring_cascade.ahk

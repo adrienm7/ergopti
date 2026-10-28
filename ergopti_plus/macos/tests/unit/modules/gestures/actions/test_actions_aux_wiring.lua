@@ -57,7 +57,7 @@ helpers.describe("gesture Actions exact-owner wiring", function()
 	it("pins nested axis dispatch to the gesture parent", function(fresh_actions, with_feature_lifecycles)
 		local actions, calls = fresh_actions({ axis_during_release = true })
 		helpers.assert_eq(actions.execute_single(
-			"open_config", "keyboard__cmd_1"), true)
+			"open_config", "keyboard__primary_1"), true)
 		helpers.assert_eq(calls.nested_axis_result, true)
 		helpers.assert_eq(#calls.after, 1)
 		helpers.assert_eq(calls.after[1].label, "line down")
@@ -68,7 +68,7 @@ helpers.describe("gesture Actions exact-owner wiring", function()
 	it("routes catalogue lock_screen through the scoped mouse owner", function(fresh_actions, with_feature_lifecycles)
 		local actions, calls = fresh_actions()
 		helpers.assert_eq(actions.execute_single(
-			"lock_screen", "keyboard__cmd_1"), true)
+			"lock_screen", "keyboard__primary_1"), true)
 		helpers.assert_eq(calls.mouse_actions[#calls.mouse_actions], {
 			name = "lock_screen", parent = "shortcut_bindings",
 		})

@@ -269,6 +269,25 @@ helpers.describe("HS-010 Ollama download shared slot", function()
 		end)
 	end)
 
+	helpers.it("(ollama-upgrade-refusal) names the outdated Ollama when only the final stderr says so", function()
+		with_fixture({}, function(f)
+			local accepted, terminal = start_pull(f)
+			helpers.assert_eq(accepted, true)
+			f.active_tasks.ollama_pull.on_done(1, "", "Error: pull model manifest: 412:\nThe model you are attempting to pull requires a newer version of Ollama.")
+			local titles = {}
+			for _, record in ipairs(f.notification_records) do titles[#titles + 1] = record[1] end
+			helpers.assert_true(table.concat(titles, ","):find("ollama.upgrade_required_title", 1, true) ~= nil,
+				"a refusal read only at completion must still ask for the Ollama upgrade (issue #101)")
+			-- The notice already asks for the upgrade: the caller must be able to
+			-- tell it from a failure, and no ERROR may open the error window (#101)
+			helpers.assert_eq(terminal.cancel, 1)
+			helpers.assert_eq(terminal.reasons[1],
+				require("ui.menu.menu_llm.requirement_operation_registry").CANCEL_RUNTIME_UPGRADE_REQUIRED)
+			helpers.assert_eq(#f.error_records, 0, "an outdated Ollama is not an error: "
+				.. table.concat(f.error_records, " | "))
+		end)
+	end)
+
 	helpers.it("(HS-010-success-control) commits one model only after loadability succeeds", function()
 		with_fixture({}, function(f)
 			local accepted, terminal = start_pull(f)

@@ -19,11 +19,15 @@
 ---    llm.agent_disabled_apps lists the applications the automatic mode ignores.
 ---    The keymap bridge sets them; the AI menu reads and resets them like its
 ---    other native settings.
---- 3. Refusals first: a paused script refuses with the notice of
----    llm_generate_prediction, then the agent's own (mode off, no usable System
+--- 3. Refusals first: a paused script and the AI switched off refuse with the
+---    notices of llm_generate_prediction (the picker greys the manual actions
+---    while the AI is off), then the agent's own (mode off, no usable System
 ---    2), before anything is read. The agent never uses the AI menu's
----    prediction backend: the AI switched off or that backend not ready refuses
----    nothing. A secure field refuses like the tone actions.
+---    prediction backend: that backend not ready refuses nothing. The AI
+---    switched off also disarms the automatic mode (no pause, no triage, no
+---    request in flight), as on Linux; the next keystroke after the switch-on
+---    arms it again. A secure
+---    field refuses like the tone actions.
 --- 4. One transport per system, each behind one function taking the backend and
 ---    its payload, so a new request format plugs in there. A chat backend gets
 ---    a plain chat body built by llm/vision.lua (the local server, a chat
@@ -46,6 +50,7 @@
 local M = {}
 
 local Agent          = require("llm.agent")
+local AgentPlan      = require("llm.request_plan.agent")
 local Vision         = require("llm.vision")
 local Rewrite        = require("llm.rewrite")
 local Formats        = require("llm.remote_formats")
@@ -59,6 +64,8 @@ local JsonCodec      = require("adapters.json_codec")
 local WindowInfo     = require("adapters.window_info")
 local SystemInfo     = require("adapters.system_info")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TextUtils = require("text_utils")
+local ConfigKeys = require("config_keys")
 
 local LOG = "llm.agent_runner"
 
@@ -68,8 +75,16 @@ local LABEL = "AI agent"
 -- The Backboard model prefix of Jev: such a System 1 asks Jev's questions
 local JEV_BACKBOARD_PREFIX = "typesafe/"
 
--- The notice of a paused script, shared with llm_generate_prediction
+-- The notices of a paused script and of the AI switched off, shared with
+-- llm_generate_prediction
 local PAUSED_KEY = "llm.manual_prediction.paused"
+-- What the debug log says for each blocker of the automatic mode (the plan names them).
+local AUTO_BLOCKER_TEXT = {
+	mode = "mode", paused = "paused", ai_off = "AI off", live = "live mode",
+	ai_busy = "AI action in flight or shown", vision = "vision flow",
+	hotstring_preview = "hotstring tooltip shown", focus_blocked = "excluded field or application",
+}
+local DISABLED_KEY = "llm.manual_prediction.disabled"
 
 M.MODE_OFF    = "off"
 M.MODE_ACTION = "action"
@@ -81,10 +96,10 @@ end
 
 -- The runtime keys of the settings, as the preference owner names them
 local SETTING_KEYS = {
-	llm_agent_system1       = "llm.agent_system1",
-	llm_agent_system2       = "llm.agent_system2",
-	llm_agent_mode          = "llm.agent_mode",
-	llm_agent_disabled_apps = "llm.agent_disabled_apps",
+	llm_agent_system1       = ConfigKeys.KEY.LLM_AGENT_SYSTEM1,
+	llm_agent_system2       = ConfigKeys.KEY.LLM_AGENT_SYSTEM2,
+	llm_agent_mode          = ConfigKeys.KEY.LLM_AGENT_MODE,
+	llm_agent_disabled_apps = ConfigKeys.KEY.LLM_AGENT_DISABLED_APPS,
 }
 
 -- The Shortcuts list is read again after this many seconds
@@ -489,7 +504,8 @@ local function report_connector(action, ok, detail)
 		return
 	end
 	local reason = type(detail) == "table" and detail.reason or tostring(detail)
-	Logger.error(LOG, "Agent action '%s' failed: %s.", action.type, tostring(reason))
+	local extra = type(detail) == "table" and detail.detail ~= nil and (" (" .. tostring(detail.detail) .. ")") or ""
+	Logger.error(LOG, "Agent action '%s' failed: %s%s.", action.type, tostring(reason), extra)
 	if type(detail) == "table" and detail.permission then
 		show_notice("llm.agent.permission_needed", detail.permission)
 		local Connectors = require("modules.llm.agent_connectors")
@@ -646,35 +662,44 @@ local function run_agent(generation, source, text, focus, backend, learning)
 	end)
 end
 
---- The refusals every action shares, before anything is read. The agent never
---- uses the AI menu's prediction backend: that menu off, or its backend not
---- ready, refuses nothing here.
+--- The refusals every action shares, before anything is read: a pause, the AI
+--- switch (nothing of the AI runs while it is off, the manual agent included;
+--- the action picker greys these actions then), then the agent's own. The agent
+--- still never uses the AI menu's prediction backend: its backend not being
+--- ready refuses nothing here.
 --- @return table|nil backend System 2's backend, nil after the refusal was shown.
 local function admit()
 	local engine = dependency("modules.llm.prediction_engine", "is_focus_blocked")
 	if not engine then return nil end
-	if is_paused() then
+	-- The order of the refusals is the shared plan's (request_plan/agent.lua); the
+	-- driver reads each fact only when the steps before it have passed.
+	local facts = { paused = is_paused(), ai_enabled = not require("modules.shortcuts.ai_actions").off(),
+		mode = settings().llm_agent_mode }
+	local decision = AgentPlan.admit(facts)
+	local backend, reason
+	if decision.allowed then
+		backend, reason = M.resolve_backend(settings().llm_agent_system2, ProviderUses.SYSTEM2)
+		facts.system2_usable = backend ~= nil
+		facts.focus_blocked = backend ~= nil and engine.is_focus_blocked({}) == true
+		decision = AgentPlan.admit(facts)
+	end
+	if decision.allowed then return backend end
+	if decision.step == "paused" then
 		Logger.info(LOG, "Agent refused: the script is paused.")
-		show_notice(PAUSED_KEY)
-		return nil
-	end
-	if settings().llm_agent_mode == M.MODE_OFF then
+	elseif decision.step == "ai_off" then
+		Logger.info(LOG, "Agent refused: the AI is off.")
+	elseif decision.step == "mode_off" then
 		Logger.info(LOG, "Agent refused: its mode is off.")
-		show_notice("llm.agent.off_notice")
-		return nil
-	end
-	local backend, reason = M.resolve_backend(settings().llm_agent_system2, ProviderUses.SYSTEM2)
-	if not backend then
+	elseif decision.step == "no_system2" then
 		-- Not chosen, not a chat model, or no API entry or key for its provider
 		Logger.info(LOG, "Agent refused: System 2 is not usable (%s).", tostring(reason))
-		show_notice("llm.agent.no_system2")
-		return nil
-	end
-	if engine.is_focus_blocked({}) then
+	else
 		Logger.info(LOG, "Agent refused: the focused field or window refuses AI text.")
-		return nil
 	end
-	return backend
+	local notices = { paused = PAUSED_KEY, disabled = DISABLED_KEY, agent_off = "llm.agent.off_notice",
+		no_system2 = "llm.agent.no_system2" }
+	if decision.notice then show_notice(notices[decision.notice]) end
+	return nil
 end
 
 
@@ -846,7 +871,7 @@ function M.run_command()
 			return
 		end
 		if not is_current(generation, "command") then return end
-		run_agent(generation, "command", typed:match("^%s*(.-)%s*$"), focus, backend, nil)
+		run_agent(generation, "command", TextUtils.trim(typed), focus, backend, nil)
 	end)
 	if committed ~= true then
 		Logger.error(LOG, "Agent command dialog could not be scheduled.")
@@ -917,24 +942,28 @@ end
 --- @return string|nil reason
 local function auto_blocker()
 	local s = settings()
-	if s.llm_agent_mode ~= M.MODE_AUTO then return "mode" end
-	if is_paused() then return "paused" end
+	-- The order of the blockers is the shared plan's (request_plan/agent.lua). The
+	-- AI switched off disarms the automatic mode, as on Linux: no pause, no
+	-- triage, no request in flight survives it.
+	local facts = { mode = s.llm_agent_mode, paused = is_paused(),
+		ai_enabled = not require("modules.shortcuts.ai_actions").off(),
+		live = false, ai_busy = false, vision = false, hotstring_preview = false, focus_blocked = false }
+	local early = AgentPlan.auto_blocker(facts)
+	if early then return AUTO_BLOCKER_TEXT[early] end
 	local engine = package.loaded["modules.llm.prediction_engine"]
 	if type(engine) ~= "table" then return "no engine" end
-	if engine.get_live_prompt() ~= nil then return "live mode" end
+	facts.live = engine.get_live_prompt() ~= nil
 	-- An automatic next-word prediction shows before the typing pause ends: it
 	-- holds nothing back, the agent's actions replace it. Anything the user
 	-- asked for (an explicit prediction, an answer, the agent's own offer) does.
 	local activity = engine.ai_activity()
-	if activity == "explicit" then return "AI action in flight or shown" end
-	if engine.is_visible() and activity ~= "automatic" then return "AI tooltip shown" end
+	facts.ai_busy = activity == "explicit" or (engine.is_visible() and activity ~= "automatic")
 	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
-	if ok_tooltip and type(tooltip) == "table" and type(tooltip.is_hotstring_visible) == "function"
-		and tooltip.is_hotstring_visible() == true then
-		return "hotstring tooltip shown"
-	end
-	if engine.is_focus_blocked(s.llm_agent_disabled_apps) then return "excluded field or application" end
-	return nil
+	facts.hotstring_preview = ok_tooltip and type(tooltip) == "table"
+		and type(tooltip.is_hotstring_visible) == "function" and tooltip.is_hotstring_visible() == true
+	facts.focus_blocked = not (facts.live or facts.ai_busy or facts.hotstring_preview)
+		and engine.is_focus_blocked(s.llm_agent_disabled_apps) == true
+	return AUTO_BLOCKER_TEXT[AgentPlan.auto_blocker(facts)]
 end
 
 --- Triages the sentence typed before the pause.
@@ -949,8 +978,10 @@ local function on_pause(typing)
 	end
 	local config = M.config()
 	local sentence = Rewrite.sentence_span(_typed):match("^(.-)%s*$")
-	if length(sentence) < config.system1.min_chars then return end
-	if sentence == _last_triaged then
+	local skip = AgentPlan.triage_skip({ chars = length(sentence), min_chars = config.system1.min_chars,
+		already_triaged = sentence == _last_triaged })
+	if skip == AgentPlan.SKIP_TOO_SHORT then return end
+	if skip == AgentPlan.SKIP_ALREADY_TRIAGED then
 		Logger.debug(LOG, "Agent triage skipped: this sentence was already triaged.")
 		return
 	end
@@ -1005,6 +1036,12 @@ function M.observe_typing(buffer)
 		if _pause_timer then M.cancel_typing("mode") end
 		return
 	end
+	-- With the AI off no pause is armed: a keystroke only withdraws what is
+	-- left, and the first keystroke after the switch-on arms it again.
+	if require("modules.shortcuts.ai_actions").off() then
+		M.cancel_typing("AI off")
+		return
+	end
 	M.cancel_typing("keystroke")
 	_typed = buffer
 	if type(buffer) ~= "string" or #buffer < M.config().system1.min_chars then return end
@@ -1043,5 +1080,16 @@ function M.set_clock(clock)
 	if clock ~= nil and type(clock) ~= "function" then error("agent_runner.set_clock: a function or nil is required") end
 	_clock = clock or os.time
 end
+
+-- Tool discovery precedes the answer surface, so a prediction reset cannot
+-- revoke that pending stage. Retire the original run on the AI off edge;
+-- enabling the gate again authorizes only a newly requested action.
+local AiActions = require("modules.shortcuts.ai_actions")
+AiActions.subscribe("agent_runner", function()
+	if AiActions.off() then
+		_generation = _generation + 1
+		M.cancel_typing("AI disabled")
+	end
+end)
 
 return M

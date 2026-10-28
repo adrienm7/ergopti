@@ -4,11 +4,11 @@
 ; MODULE: A Ctrl held with the Kana AltGr is the user's Ctrl
 ; DESCRIPTION:
 ; On a standard AltGr layout Windows adds a fake LCtrl to every AltGr press, so
-; the hotstring watcher and the keylogger treat a Ctrl held with AltGr as
+; the hotstring watcher and the keystats treat a Ctrl held with AltGr as
 ; AltGr typing a character. A Kana-style AltGr (SC138 on VK_OEM_8) adds no
 ; Ctrl: Ctrl+AltGr+V (with the AltGr layer off) pasted while the hotstring
 ; buffers kept a context no longer on screen, so a later expansion could
-; backspace over the pasted text, and the keylogger dropped the shortcut
+; backspace over the pasted text, and the keystats dropped the shortcut
 ; (kana-altgr-ctrl-chord-2026-09-26). QWERTY's right Alt adds no Ctrl either,
 ; and it is the Alt of the chord the application receives.
 ; ==============================================================================
@@ -42,7 +42,7 @@ _KACC_AltGrMasksCtrlOnlyWhereItAddsOne() {
 Test("kana altgr ctrl: the Kana AltGr does not mask a real Ctrl chord (kana-altgr-ctrl-chord-2026-09-26)",
 	_KACC_AltGrMasksCtrlOnlyWhereItAddsOne)
 
-; The keylogger's shortcut label for V (vk 0x56, sc 0x2F) pressed while exactly
+; The keystats's shortcut label for V (vk 0x56, sc 0x2F) pressed while exactly
 ; the keys named in Down are physically held, on layout Family, with the alt_gr
 ; tap-hold holding Hold ("" for no alt_gr tap-hold).
 _KACC_Label(Family, Hold, Down*) {
@@ -63,7 +63,7 @@ _KACC_Label(Family, Hold, Down*) {
 	}
 }
 
-_KACC_KeyloggerKeepsKanaCtrlShortcuts() {
+_KACC_KeystatsKeepsKanaCtrlShortcuts() {
 	AssertEqual("", KL_Watchers_DetectShortcut(KLHOOK_VK_PACKET, 0),
 		"text a Send typed (VK_PACKET) is never a shortcut's payload")
 	AssertEqual("Ctrl+V", _KACC_Label("kana", "", "LControl", "SC138"),
@@ -75,16 +75,16 @@ _KACC_KeyloggerKeepsKanaCtrlShortcuts() {
 		"standard layout: LAlt held with AltGr makes the chord a real Ctrl+Alt shortcut")
 	AssertEqual("Ctrl+V", _KACC_Label("standard", "", "LControl"), "standard layout: a Ctrl chord without AltGr")
 }
-Test("kana altgr ctrl: the keylogger keeps a Ctrl+Kana AltGr shortcut (kana-altgr-ctrl-chord-2026-09-26)",
-	_KACC_KeyloggerKeepsKanaCtrlShortcuts)
+Test("kana altgr ctrl: the keystats keeps a Ctrl+Kana AltGr shortcut (kana-altgr-ctrl-chord-2026-09-26)",
+	_KACC_KeystatsKeepsKanaCtrlShortcuts)
 
 ; On QWERTY the AltGr key is a plain right Alt (the boot probe finds no AltGr
 ; level): a key the AltGr layer leaves alone reaches the application under
-; that Alt, so LCtrl+RAlt+V is Windows' Ctrl+Alt+V. The keylogger recorded it
-; as Ctrl+V, and RAlt+V not at all (qwerty-keylogger-ralt-alt-2026-09-27).
+; that Alt, so LCtrl+RAlt+V is Windows' Ctrl+Alt+V. The keystats recorded it
+; as Ctrl+V, and RAlt+V not at all (qwerty-keystats-ralt-alt-2026-09-27).
 ; Held as another modifier by its tap-hold, the key is suppressed and the
 ; application never sees that Alt.
-_KACC_KeyloggerCountsQwertyRightAlt() {
+_KACC_KeystatsCountsQwertyRightAlt() {
 	AssertEqual("Ctrl+Alt+V", _KACC_Label("qwerty", "", "LControl", "RAlt"),
 		"QWERTY: LCtrl+RAlt+V is Windows' Ctrl+Alt+V")
 	AssertEqual("Alt+V", _KACC_Label("qwerty", "", "RAlt"), "QWERTY: RAlt+V is an Alt shortcut")
@@ -96,5 +96,5 @@ _KACC_KeyloggerCountsQwertyRightAlt() {
 	AssertEqual("", _KACC_Label("qwerty", "ctrl", "RAlt"),
 		"QWERTY: AltGr held as Ctrl by its tap-hold is no Alt the application sees")
 }
-Test("kana altgr ctrl: the keylogger counts QWERTY's right Alt as Alt (qwerty-keylogger-ralt-alt-2026-09-27)",
-	_KACC_KeyloggerCountsQwertyRightAlt)
+Test("kana altgr ctrl: the keystats counts QWERTY's right Alt as Alt (qwerty-keystats-ralt-alt-2026-09-27)",
+	_KACC_KeystatsCountsQwertyRightAlt)

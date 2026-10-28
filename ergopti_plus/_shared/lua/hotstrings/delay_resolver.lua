@@ -131,4 +131,121 @@ function M.resolve(inputs)
 	}
 end
 
+
+-- =============================================
+-- =============================================
+-- ======= 2/ Delays as offsets of the base ====
+-- =============================================
+-- =============================================
+
+--- Decimal places of a delay in seconds: whole milliseconds, as every driver
+--- quantises and writes it.
+M.DELAY_DECIMALS = 3
+
+local DELAY_SCALE = 10 ^ M.DELAY_DECIMALS
+
+--- The shortest delay an offset can leave: one millisecond. 0 means "unlimited"
+--- everywhere, so an offset that cancels the base must not become it.
+M.DELAY_STEP = 1 / DELAY_SCALE
+
+--- Rounds seconds to the millisecond grid.
+--- @param seconds number
+--- @return number
+local function quantise(seconds)
+	return math.floor(seconds * DELAY_SCALE + 0.5) / DELAY_SCALE
+end
+
+--- The offset a delay override is stored as: seconds added to the base
+--- expansion delay (`hotstrings.expansion_delay`), so an override keeps its
+--- distance from the base when the base changes. 0 (unlimited) has no offset;
+--- it is the `delay_unlimited` flag.
+--- @param delay number Effective delay in seconds, above 0.
+--- @param base number Base expansion delay in seconds.
+--- @return number offset Signed seconds, on the millisecond grid.
+function M.offset_for(delay, base)
+	assert(type(delay) == "number" and delay > 0, "an offset describes a finite, positive delay")
+	assert(type(base) == "number" and base >= 0, "the base expansion delay is a non-negative number")
+	return quantise(delay - base)
+end
+
+--- The effective delay a stored override describes.
+--- @param rung table|nil A user override rung: `delay_offset` (number) or
+---   `delay_unlimited` (true), as the override file stores them; `legacy_delay`
+---   (seconds) is the absolute spelling of earlier builds, applied as it stands
+---   until it is migrated.
+--- @param base number Base expansion delay in seconds.
+--- @return number|nil seconds nil when the rung holds no delay; 0 is unlimited.
+function M.effective_delay(rung, base)
+	if type(rung) ~= "table" then return nil end
+	if rung.delay_unlimited == true then return 0 end
+	if type(rung.delay_offset) == "number" then
+		return math.max(quantise(base + rung.delay_offset), M.DELAY_STEP)
+	end
+	-- The absolute delay of earlier builds applies as it was until the boot
+	-- migration has rewritten it as an offset: nothing changes for the user meanwhile.
+	if type(rung.legacy_delay) == "number" then return rung.legacy_delay end
+	return nil
+end
+
+--- A copy of a user override rung whose `delay` is the effective seconds, which
+--- is the field M.resolve reads. Every other field passes through.
+--- @param rung table|nil
+--- @param base number Base expansion delay in seconds.
+--- @return table|nil
+function M.with_effective_delay(rung, base)
+	if type(rung) ~= "table" then return rung end
+	local out = {}
+	for key, value in pairs(rung) do out[key] = value end
+	out.delay_offset, out.delay_unlimited = nil, nil
+	out.delay = M.effective_delay(rung, base)
+	return out
+end
+
+--- The key an earlier build used for the menu-set default delay: a category
+--- named like this held only that one delay.
+M.LEGACY_GLOBAL_CATEGORY = "_global"
+
+--- Removes the default-delay record of earlier builds from an override tree and
+--- returns its delay, which becomes the base expansion delay.
+--- @param tree table Override tree { [category] = rung, ... } (mutated).
+--- @return number|nil delay Seconds, nil when the tree held none.
+function M.take_legacy_global(tree)
+	local record = tree[M.LEGACY_GLOBAL_CATEGORY]
+	if type(record) ~= "table" then return nil end
+	tree[M.LEGACY_GLOBAL_CATEGORY] = nil
+	return type(record.legacy_delay) == "number" and record.legacy_delay or nil
+end
+
+--- Converts the absolute `legacy_delay` of every rung of an override tree to the
+--- stored form, keeping its effective delay: an offset of `base`, or the
+--- `delay_unlimited` flag for 0. A delay already stored in the current form wins.
+--- @param tree table Override tree { [category] = rung with sections } (mutated).
+--- @param base number Base expansion delay in effect.
+--- @return boolean changed Whether any rung held a legacy delay.
+function M.adopt_legacy_delays(tree, base)
+	local changed = false
+	local function adopt(rung)
+		if type(rung) ~= "table" or rung.legacy_delay == nil then return end
+		changed = true
+		if rung.delay_offset == nil and rung.delay_unlimited ~= true then
+			if rung.legacy_delay == 0 then
+				rung.delay_unlimited = true
+			else
+				rung.delay_offset = M.offset_for(rung.legacy_delay, base)
+			end
+		end
+		rung.legacy_delay = nil
+	end
+	for _, category in pairs(tree) do
+		adopt(category)
+		for _, section in pairs(type(category) == "table" and category.sections or {}) do adopt(section) end
+	end
+	return changed
+end
+
+--- The override-file leaves that store a delay, in the order a writer clears
+--- them. `delay` is the absolute spelling of earlier builds, kept here so a
+--- clear and a migration remove it.
+M.DELAY_LEAVES = { "delay_offset", "delay_unlimited", "delay" }
+
 return M

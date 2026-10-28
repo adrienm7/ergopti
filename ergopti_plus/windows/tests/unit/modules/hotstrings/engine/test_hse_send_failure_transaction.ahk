@@ -83,10 +83,10 @@ _AHK04_CaptureState() {
 			? { Assigned: true, Value: _OneShotShiftInputHook } : { Assigned: false },
 		SpaceHoldHook: IsSet(_SpaceHoldInputHook)
 			? { Assigned: true, Value: _SpaceHoldInputHook } : { Assigned: false },
-		SynthActive: Keylogger.synth_active,
-		SynthType: Keylogger.synth_type,
-		SynthOwners: Keylogger.synth_owners,
-		SynthPrivate: Keylogger.synth_private
+		SynthActive: Keystats.synth_active,
+		SynthType: Keystats.synth_type,
+		SynthOwners: Keystats.synth_owners,
+		SynthPrivate: Keystats.synth_private
 	}
 }
 
@@ -121,10 +121,10 @@ _AHK04_RestoreState(State) {
 		_OneShotShiftInputHook := State.OneShotShiftHook.Value
 	if State.SpaceHoldHook.Assigned
 		_SpaceHoldInputHook := State.SpaceHoldHook.Value
-	Keylogger.synth_active := State.SynthActive
-	Keylogger.synth_type := State.SynthType
-	Keylogger.synth_owners := State.SynthOwners
-	Keylogger.synth_private := State.SynthPrivate
+	Keystats.synth_active := State.SynthActive
+	Keystats.synth_type := State.SynthType
+	Keystats.synth_owners := State.SynthOwners
+	Keystats.synth_private := State.SynthPrivate
 }
 
 _AHK04_RunIsolated(Callback) {
@@ -162,10 +162,10 @@ _AHK04_RunIsolated(Callback) {
 			_OneShotShiftInputHook := ""
 		if State.SpaceHoldHook.Assigned
 			_SpaceHoldInputHook := ""
-		Keylogger.synth_active := 0
-		Keylogger.synth_type := "none"
-		Keylogger.synth_owners := []
-		Keylogger.synth_private := false
+		Keystats.synth_active := 0
+		Keystats.synth_type := "none"
+		Keystats.synth_owners := []
+		Keystats.synth_private := false
 		Callback.Call()
 	} finally {
 		; Successful fires defer their suppression/synthetic release by 60 ms. Let
@@ -467,7 +467,7 @@ _AHK201_SecondaryTerminalMatchesBalanceAfterRefusalImpl() {
 			"a refusal must preserve the exact first terminal owner")
 		AssertEqual(0, _PrefixWatcherSuppressed,
 			"repeated refused matches must balance prefix suppression")
-		AssertEqual(0, Keylogger.synth_active,
+		AssertEqual(0, Keystats.synth_active,
 			"repeated refused matches must balance synthetic ownership")
 		AssertEqual("ab", HSE_Buffer,
 			"a refused secondary match must not publish canonical output")
@@ -648,7 +648,7 @@ _AHK04_FireMetricImpl() {
 		"a failed first stage must leave the ring unchanged")
 	AssertEqual(0, _PrefixWatcherSuppressed,
 		"a failed first stage must release prefix suppression synchronously")
-	AssertEqual(0, Keylogger.synth_active,
+	AssertEqual(0, Keystats.synth_active,
 		"a failed first stage must release synthetic attribution synchronously")
 
 	_HSE_FireLogQueue := []
@@ -666,7 +666,7 @@ _AHK04_FireMetricImpl() {
 		"the erase stage is intentionally excluded from the emitted-character ring")
 	AssertEqual(0, _PrefixWatcherSuppressed,
 		"a failed second stage must release prefix suppression synchronously")
-	AssertEqual(0, Keylogger.synth_active,
+	AssertEqual(0, Keystats.synth_active,
 		"a failed second stage must release synthetic attribution synchronously")
 
 	_HSE_FireLogQueue := []
@@ -684,7 +684,7 @@ _AHK04_FireMetricImpl() {
 		"the ring must retain only the replacement stage proven to reach the screen")
 	AssertEqual(0, _PrefixWatcherSuppressed,
 		"a failed third stage must release prefix suppression synchronously")
-	AssertEqual(0, Keylogger.synth_active,
+	AssertEqual(0, Keystats.synth_active,
 		"a failed third stage must release synthetic attribution synchronously")
 
 	_HSE_FireLogQueue := []
@@ -1072,7 +1072,7 @@ _HNP_PendingThenCommitted() {
 		AssertEqual("xxZ", _LLM_Bridge_Buffer, "the same effect reaches LLM")
 		AssertEqual(1, _HSE_FireLogQueue.Length, "verified completion records one fire")
 		AssertEqual(0, _PrefixWatcherSuppressed, "completion releases suppression")
-		AssertEqual(0, Keylogger.synth_active, "completion releases its synthetic marker")
+		AssertEqual(0, Keystats.synth_active, "completion releases its synthetic marker")
 		Request.Callback.Call(true, "")
 		AssertEqual("xxZ", HSE_Buffer, "duplicate completion cannot commit again")
 		AssertEqual(1, _HSE_FireLogQueue.Length, "duplicate completion cannot record another fire")
@@ -1093,7 +1093,7 @@ _HNP_RefusalDoesNotCommit() {
 		AssertEqual(0, _HSE_FireLogQueue.Length, "a refused request is not a fire")
 		AssertFalse(Owner["FinalSucceeded"], "refusal cannot become completed output")
 		AssertEqual(0, _PrefixWatcherSuppressed, "refusal releases suppression once")
-		AssertEqual(0, Keylogger.synth_active, "refusal releases its synthetic marker")
+		AssertEqual(0, Keystats.synth_active, "refusal releases its synthetic marker")
 	}
 }
 Test("Notepad pending owner: native refusal leaves canonical state unchanged (notepad-pending)",
@@ -1185,7 +1185,7 @@ _HNP_ThrowingSenderCleansOnce() {
 		AssertTrue(Thrown == Failure, "the original sender exception is preserved")
 		AssertEqual("xxab", HSE_Buffer, "Begin refusal does not commit an effect")
 		AssertEqual(0, _PrefixWatcherSuppressed, "throwing Begin releases suppression once")
-		AssertEqual(0, Keylogger.synth_active, "throwing Begin releases its synthetic marker once")
+		AssertEqual(0, Keystats.synth_active, "throwing Begin releases its synthetic marker once")
 	}
 	_Throw(Failure, Text, Opts, Callback) {
 		throw Failure
@@ -1264,7 +1264,7 @@ _HNP_RefusedCaptureDeclines() {
 		AssertEqual("xxab", HSE_Buffer, "the typed trigger stays in the engine")
 		AssertFalse(_HSE_TerminalOwner is Map, "the declined owner is not left pending")
 		AssertEqual(0, _PrefixWatcherSuppressed, "the declined owner releases suppression")
-		AssertEqual(0, Keylogger.synth_active, "the declined owner releases its synthetic marker")
+		AssertEqual(0, Keystats.synth_active, "the declined owner releases its synthetic marker")
 		AssertEqual(0, _HSE_FireLogQueue.Length, "a declined expansion is not a fire")
 		AssertEqual(0, _HNP_Capture["Released"].Length, "a capture never admitted is never released")
 		Warned := false
@@ -1710,7 +1710,7 @@ _HNPG_RefusedPublicationBody(Mode) {
 	Request.Callback.Call(false, "recorded publication refusal")
 	AssertFalse(Owner["FinalSucceeded"], "authority refusal cannot report successful output")
 	AssertEqual(0, _PrefixWatcherSuppressed, "refusal completion must release owned suppression")
-	AssertEqual(0, Keylogger.synth_active, "refusal completion must release its synthetic marker")
+	AssertEqual(0, Keystats.synth_active, "refusal completion must release its synthetic marker")
 	Request.Callback.Call(false, "duplicate recorded refusal")
 	AssertEqual(0, _PrefixWatcherSuppressed, "duplicate completion cannot release ownership twice")
 }

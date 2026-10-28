@@ -44,17 +44,17 @@ local function with_action(route, mode, action, body)
 		local environment = setmetatable({ arg = arguments }, { __index = _G })
 		environment.Logger = helpers.make_logger_stub()
 		local first = assert(source:find("local function parse_args()", 1, true))
-		local last = assert(source:find("\n--- Prints the CLI usage.", first, true))
+		local last = assert(source:find("======= 6/ Config Resolution", first, true))
 		environment.opts = evaluate(source:sub(first, last - 1) .. "\nreturn parse_args()", environment)
 		helpers.assert_eq(environment.opts.tray, false, "The valid dry-run CLI has no graphical tray")
 		helpers.assert_eq(environment.opts.grab, route ~= "observe")
 		local configuration = assert(io.open(path, "wb"))
 		configuration:write('[shortcuts]\nenabled = true\nwrap_text_if_selected = false\n'
-			.. '[shortcuts.keyboard]\nctrl_j = "' .. action .. '"\n'
+			.. '[shortcuts.keyboard]\nprimary_j = "' .. action .. '"\n'
 			.. '[shortcuts.tap_keys]\nnumber_row_left = "' .. action .. '"\n'
 			.. '[shortcuts.script_control]\nchords_enabled = true\nscript_altgr_enter = "' .. action .. '"\n'
 			.. '[gestures]\nenabled = ' .. tostring(route == "gesture") .. '\ntap_3 = "' .. action .. '"\n'
-			.. '[gesture_parameters]\nkeyboard__ctrl_j__send_text = "ok"\n'
+			.. '[gesture_parameters]\nkeyboard__primary_j__send_text = "ok"\n'
 			.. 'tap_key__number_row_left__send_text = "ok"\nscript__script_altgr_enter__send_text = "ok"\n'
 			.. 'tap_3__send_text = "ok"\n')
 		assert(configuration:close())
@@ -99,7 +99,7 @@ local function with_action(route, mode, action, body)
 			for field, name in pairs({ shortcuts = "modules.shortcuts.manager", event_loop = "adapters.event_loop",
 				gestures = "modules.gestures.manager", ActionHandlers = "modules.shortcuts.action_handlers",
 				prediction_engine = "modules.llm.prediction_engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
-				keyboard_hook = "adapters.keyboard_hook", keylogger = "modules.keylogger.keylogger", Monotonic = "infra.monotonic",
+				keyboard_hook = "adapters.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "infra.monotonic",
 				MagicKeySource = "modules.hotstrings.magic_key_source", script_chords = "modules.shortcuts.script_chords",
 				tap_keys = "modules.shortcuts.tap_keys", hotstrings_config = "modules.hotstrings.hotstrings_config",
 				MagicKey = "modules.hotstrings.magic_key", TapHold = "platform.remap.tap_hold_manager" }) do environment[field] = require(name) end

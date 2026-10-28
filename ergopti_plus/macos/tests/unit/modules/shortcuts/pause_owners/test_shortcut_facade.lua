@@ -115,7 +115,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			gestures = true,
 			shortcuts = true,
 			llm_enabled = false,
-			keylogger_enabled = false,
+			keystats_enabled = false,
 			script_control_enabled = true,
 			personal_info = false,
 			update_channel = "dev",
@@ -238,7 +238,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			end,
 		}
 		package.loaded["modules.llm"] = { set_backend = function() return true end }
-		package.loaded["modules.keylogger"] = {}
+		package.loaded["modules.keystats"] = {}
 		package.loaded["modules.shortcuts"] = shortcuts
 		package.loaded["modules.dynamic_hotstrings"] = {}
 		package.loaded["modules.gestures"] = { SINGLE_SLOTS = {}, DEFAULT_GESTURES = {} }
@@ -369,11 +369,10 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			"ui.menu.menu_llm.streaming_panel",
 			"ui.menu.menu_llm.trigger_panel",
 			"ui.menu.menu_llm.api_panel",
-			"ui.menu.menu_llm.models_selector",
 		}) do
 			package.loaded[name] = { build = function() return {} end }
 		end
-		package.loaded["ui.menu.menu_llm.api_panel"].build_model_picker = function() return {} end
+		package.loaded["ui.menu.menu_llm.api_panel"].active_entry_caption_text = function() return nil end
 		package.loaded["ui.menu.menu_llm.warmup_controller"] = {}
 		package.loaded["ui.menu.menu_llm.backend_panel"] = {
 			is_apple_silicon = function() return false end,

@@ -33,8 +33,9 @@ local Crypto       = require("adapters.crypto")
 local Json         = require("json")
 local Registry     = require("layouts.registry")
 local Catalogue    = require("layouts.catalogue")
-local Outdated     = require("config_outdated")
 local Extension    = require("layouts.extension")
+local Composer     = require("layouts.composer")
+local RegistryStore = require("layouts.registry_store")
 
 local M = {}
 
@@ -54,6 +55,11 @@ M.FAILURE_DOWNLOAD = "download_failed"
 M.FAILURE_WRITE = "write_failed"
 M.FAILURE_RECORD = "record_failed"
 M.FAILURE_SELECT = "select_failed"
+M.FAILURE_INVALID = Composer.FAILURE_INVALID
+
+-- The closed reason of a layout the enabled-sources preference lists but macOS
+-- turns on only at the next login (logged as not_enabled:<reason>).
+M.REASON_REQUIRES_LOGOUT = "macos_requires_logout"
 
 -- The platform name registry entries list when macOS can install them.
 local PLATFORM = "macos"
@@ -68,15 +74,23 @@ local PLATFORM = "macos"
 -- ===========================
 -- ===========================
 
--- Last refresh outcome: { index, source, error } (see Catalogue.resolve_index).
-local _catalogue = { index = nil, source = Catalogue.SOURCE_NONE, error = nil }
 -- The one operation in flight ({ id, action }), nil when idle: an installation
 -- and an uninstallation of the same layout must never interleave their writes.
 local _busy = nil
--- Decoded index shipped with the app, read once.
-local _bundled_index = nil
-local _bundled_index_read = false
 
+-- Catalogue, shipped index, installed record and refresh, shared with Linux.
+local Store = RegistryStore.new({
+	logger = Logger,
+	log = LOG,
+	shipped_noun = "app",
+	prepare_parent = function(deps, path)
+		local prepared, prepare_err = deps.prepare_parent(path)
+		if prepared then return true, nil end
+		return false, "cannot create the folder of " .. path .. ": " .. tostring(prepare_err)
+	end,
+})
+local write_file, bundled_index = Store.write_file, Store.bundled_index
+local read_installed, write_installed = Store.read_installed, Store.write_installed
 
 
 
@@ -162,6 +176,8 @@ local function default_deps(settings)
 		disable_source = InputSources.disable_keylayout_source_async,
 		select_source = InputSources.set_input_source_async,
 		active_sources = InputSources.list_active_keyboard_layouts,
+		confirm_source = InputSources.confirm_enabled_async,
+		pending = require("modules.keymap.pending_layout_activation"),
 		bundle_names = Install.bundle_keylayout_names,
 	}
 end
@@ -186,62 +202,6 @@ end
 -- ======= 3/ Local files =======
 -- ==============================
 -- ==============================
-
---- Writes one file, creating its folder first.
---- @param deps table
---- @param path string
---- @param content string
---- @return boolean ok
---- @return string|nil error
-local function write_file(deps, path, content)
-	local prepared, prepare_err = deps.prepare_parent(path)
-	if not prepared then return false, "cannot create the folder of " .. path .. ": " .. tostring(prepare_err) end
-	local written, write_err = deps.write(path, content)
-	if not written then return false, "cannot write " .. path .. ": " .. tostring(write_err) end
-	return true, nil
-end
-
---- The shipped index, reread for source checkouts so Refresh sees local edits.
---- @param deps table
---- @return table|nil
-local function bundled_index(deps)
-	if deps.bundled_index ~= nil then return deps.bundled_index or nil end
-	if _bundled_index_read and not deps.local_source then return _bundled_index end
-	_bundled_index_read = true
-	if type(deps.bundled_dir) ~= "string" then return nil end
-	local text = deps.read(deps.bundled_dir .. deps.settings.index_file)
-	local index, _, detail = Catalogue.decode_index(text, deps.decode_json, deps.settings.max_file_bytes)
-	if not index then
-		Logger.error(LOG, "The layout index shipped with the app is unusable: %s.", tostring(detail))
-	end
-	_bundled_index = index
-	return index
-end
-
---- Reads the installed-layouts record. An entry this build cannot use is
---- warned once and left out; the other layouts stay installed.
---- @param deps table
---- @return table|nil record
---- @return string|nil error
-local function read_installed(deps)
-	local path = deps.local_dir .. deps.settings.installed_file
-	local text = deps.exists(path) and deps.read(path) or nil
-	if deps.exists(path) and type(text) ~= "string" then return nil, "cannot read " .. path end
-	local record, err = Catalogue.decode_installed(text, deps.decode_installed_json or Json.decode_lossless)
-	for id, item in pairs(record and record.outdated or {}) do
-		Outdated.report_in_file(path, { "layouts", id }, item.detail)
-	end
-	return record, err
-end
-
---- Writes the installed-layouts record.
---- @param deps table
---- @param record table
---- @return boolean ok
---- @return string|nil error
-local function write_installed(deps, record)
-	return write_file(deps, deps.local_dir .. deps.settings.installed_file, deps.encode_json(record))
-end
 
 --- Keyboard names the installed Ergopti bundles already provide.
 --- @param deps table
@@ -279,37 +239,7 @@ function M.refresh(on_done, deps)
 		return false
 	end
 	deps = resolved
-	Logger.start(LOG, "Refreshing the layout catalogue…")
-	Catalogue.refresh(deps.settings, {
-		local_source = deps.local_source,
-		read_cache = function()
-			local index_path = deps.local_dir .. deps.settings.index_file
-			if not deps.exists(index_path) then return nil end
-			local etag_path = deps.local_dir .. deps.settings.etag_file
-			return { text = deps.read(index_path), etag = deps.exists(etag_path) and deps.read(etag_path) or nil }
-		end,
-		write_cache = function(text, etag)
-			local ok, err = write_file(deps, deps.local_dir .. deps.settings.index_file, text)
-			if not ok then return false, err end
-			local etag_path = deps.local_dir .. deps.settings.etag_file
-			if type(etag) == "string" then return write_file(deps, etag_path, etag) end
-			if not deps.delete(etag_path) then return false, "cannot remove " .. etag_path end
-			return true, nil
-		end,
-		bundled_index = bundled_index(deps),
-		decode_json = deps.decode_json,
-		transport = deps.transport,
-	}, function(outcome)
-		_catalogue = { index = outcome.index, source = outcome.source, error = outcome.error }
-		if outcome.cache_warning then Logger.warn(LOG, "%s; refreshed without it.", outcome.cache_warning) end
-		if outcome.error then
-			Logger.warn(LOG, "The layout catalogue shows the %s index: %s (%s).", outcome.source,
-				outcome.error.code, tostring(outcome.error.detail))
-		end
-		if outcome.cache_error then Logger.error(LOG, "%s.", outcome.cache_error) end
-		Logger.success(LOG, "Layout catalogue refreshed from the %s index.", outcome.source)
-		if on_done then on_done(outcome) end
-	end)
+	Store.refresh(deps, nil, on_done)
 	return true
 end
 
@@ -377,9 +307,9 @@ end
 function M.snapshot(deps)
 	local resolved = resolve_deps(deps)
 	local snapshot = {
-		index = _catalogue.index,
-		source = _catalogue.source,
-		error = _catalogue.error,
+		index = Store.catalogue().index,
+		source = Store.catalogue().source,
+		error = Store.catalogue().error,
 		installed = {},
 		provided = {},
 		busy = _busy,
@@ -458,6 +388,54 @@ local function acquire_slot(id, action, on_done)
 	return true
 end
 
+--- What an installed layout's enable came to, read from a fresh process. The
+--- macOS 26 field probe (v5) showed that writing the enabled-sources
+--- preference turns a layout on at once, but only a process started after the
+--- write sees it: Hammerspoon's own list stays stale. A layout the fresh process
+--- does not see on is the fallback: pending until the next login. An
+--- update re-registers the rewritten file and, when it is selected, selects
+--- another layout and back, so the new content applies.
+--- @param deps table
+--- @param id string Layout id.
+--- @param entry table Record entry (keyboard_name).
+--- @param path string Installed .keylayout path.
+--- @param listed boolean Whether the enable wrote the preference.
+--- @param reason string|nil The enable's failure reason.
+--- @param update boolean Whether this replaced an installed copy.
+--- @param callback function fn(state): { enabled, pending_activation, consent, reason }.
+local function settle_enable(deps, id, entry, path, listed, reason, update, callback)
+	if not listed then
+		-- The layout is installed; only the enabled list could not be updated.
+		-- System Settings can still add it by hand.
+		Logger.warn(LOG, "The '%s' layout is installed but not enabled: %s.", id, tostring(reason))
+		callback({ enabled = false, pending_activation = false, consent = false, reason = reason })
+		return
+	end
+	local dispatched = deps.confirm_source(entry.keyboard_name, { register_path = path, refresh = update },
+		function(read, state, read_reason)
+			if not read then
+				Logger.error(LOG, "The '%s' layout is listed in the enabled sources, but whether macOS turned it on cannot be read: %s.",
+					id, tostring(read_reason))
+				callback({ enabled = false, pending_activation = false, consent = false, reason = read_reason })
+				return
+			end
+			if state.enabled == true then
+				deps.pending.forget(id)
+				Logger.info(LOG, "macOS turned the '%s' layout on (%s).", id, tostring(state.id))
+				-- macOS asks the user to allow a keyboard it has not seen before.
+				callback({ enabled = true, pending_activation = false, consent = not update })
+				return
+			end
+			Logger.warn(LOG, "The '%s' layout is installed and listed in the enabled sources, but a fresh process does not see it on (listed=%s); macOS turns it on at the next login (reason=not_enabled:%s).",
+				id, tostring(state.listed), M.REASON_REQUIRES_LOGOUT)
+			deps.pending.record(id, entry.keyboard_name)
+			callback({ enabled = false, pending_activation = true, consent = false, reason = M.REASON_REQUIRES_LOGOUT })
+		end)
+	if dispatched ~= true then
+		Logger.warn(LOG, "The state of the '%s' layout was not read: the fresh-process read did not start.", id)
+	end
+end
+
 --- Publishes a verified layout: the local copy, the installed file, the record.
 --- @param deps table
 --- @param entry table
@@ -482,7 +460,7 @@ local function publish(deps, entry, text)
 end
 
 --- Installs (or updates) one registry layout and adds it to the input sources.
---- on_done(true, { entry, path, source, enabled }) or
+--- on_done(true, { entry, path, source, enabled, pending_activation, consent }) or
 --- on_done(false, failure_code, detail) is called exactly once.
 --- @param id string Registry id.
 --- @param on_done function
@@ -570,13 +548,11 @@ function M.install(id, on_done, deps)
 				finish(false, code, publish_err)
 				return
 			end
-			deps.enable_source(path, entry.name, function(enabled, _output, reason)
-				if not enabled then
-					-- The layout is installed; only the enabled list could not be
-					-- updated. System Settings can still add it by hand.
-					Logger.warn(LOG, "The '%s' layout is installed but not enabled: %s.", id, tostring(reason))
-				end
-				finish(true, { entry = entry, path = path, source = detail.source, enabled = enabled == true })
+			deps.enable_source(path, entry.name, function(listed, _output, reason)
+				settle_enable(deps, id, entry, path, listed == true, reason, record.layouts[id] ~= nil, function(state)
+					finish(true, { entry = entry, path = path, source = detail.source, enabled = state.enabled,
+						pending_activation = state.pending_activation, consent = state.consent })
+				end)
 			end)
 		end)
 	end, deps)
@@ -625,6 +601,7 @@ function M.uninstall(id, on_done, deps)
 				return
 			end
 		end
+		deps.pending.forget(id)
 		local current, current_err = read_installed(deps)
 		local ok, err = false, current_err
 		if current then ok, err = write_installed(deps, Catalogue.without_installed(current, id)) end
@@ -672,12 +649,221 @@ function M.select(id, on_done, deps)
 	end)
 end
 
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 6/ Composed layout =========
+-- ====================================
+-- ====================================
+
+--- Installs the layout the user composed (docs/layout-composer.md): no catalogue
+--- and no download, the caller built the entry from the compiled file. The copy
+--- is published and enabled exactly like a registry layout's.
+--- on_done(true, { entry, path, source, enabled, pending_activation, consent }) or
+--- on_done(false, failure_code, detail) is called exactly once.
+--- @param entry table Record entry of the composition.
+--- @param text string The compiled .keylayout.
+--- @param on_done function
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.install_local(entry, text, on_done, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then
+		on_done(false, M.FAILURE_WRITE, deps_err)
+		return false
+	end
+	deps = resolved
+	local id = type(entry) == "table" and entry.id or nil
+	if not Registry.is_valid_id(id) then
+		on_done(false, M.FAILURE_UNKNOWN_LAYOUT, "'" .. tostring(id) .. "' is not a layout id")
+		return false
+	end
+	if not acquire_slot(id, "install", on_done) then return false end
+	local function finish(ok, code_or_detail, detail)
+		_busy = nil
+		if ok then
+			Logger.success(LOG, "Installed the composed '%s' layout.", id)
+		else
+			Logger.error(LOG, "The composed '%s' layout was not installed (%s): %s.", id, tostring(code_or_detail),
+				tostring(detail))
+		end
+		on_done(ok, code_or_detail, detail)
+	end
+	Logger.start(LOG, "Installing the composed '%s' layout…", id)
+	local record, record_err = read_installed(deps)
+	if not record then
+		finish(false, M.FAILURE_RECORD, record_err)
+		return false
+	end
+	if deps.exists(deps.layouts_dir .. id .. ".keylayout") and not record.layouts[id] then
+		finish(false, M.FAILURE_FOREIGN_FILE, deps.layouts_dir .. id .. ".keylayout was not installed by ErgoptiPlus")
+		return false
+	end
+	if type(entry.keyboard_name) == "string" and bundle_names(deps)[entry.keyboard_name] then
+		finish(false, M.FAILURE_PROVIDED_BY_BUNDLE, "an installed Ergopti bundle already provides "
+			.. entry.keyboard_name)
+		return false
+	end
+	deps.transport.sha256(text, function(digest, digest_err)
+		local verified, reason = Registry.verify(entry, text, digest)
+		if not verified then
+			finish(false, M.FAILURE_INVALID, reason or digest_err)
+			return
+		end
+		local path, code, publish_err = publish(deps, entry, text)
+		if not path then
+			finish(false, code, publish_err)
+			return
+		end
+		deps.enable_source(path, entry.name, function(listed, _output, enable_reason)
+			settle_enable(deps, id, entry, path, listed == true, enable_reason, record.layouts[id] ~= nil, function(state)
+				finish(true, { entry = entry, path = path, source = "composer", enabled = state.enabled,
+					pending_activation = state.pending_activation, consent = state.consent })
+			end)
+		end)
+	end)
+	return true
+end
+
+--- The composer's ports over this module (see layouts/composer.lua).
+--- @param deps table
+--- @return table|nil operations
+--- @return string|nil error
+local function composer_operations(deps)
+	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	local settings, settings_err = Composer.settings(layout_defaults)
+	if not settings then return nil, settings_err end
+	local function installed()
+		local record = read_installed(deps)
+		return record and record.layouts or {}
+	end
+	return Composer.new({
+		settings = settings,
+		max_file_bytes = deps.settings.max_file_bytes,
+		platform = PLATFORM,
+		shortcuts = "full",
+		config_dir = deps.config_dir or ConfigPaths.get_config_dir(),
+		decode_json = deps.decode_json,
+		read = deps.read,
+		exists = deps.exists,
+		delete = deps.delete,
+		write = function(path, content) return write_file(deps, path, content) end,
+		sha256 = deps.transport.sha256,
+		installed = installed,
+		active_id = function() return M.snapshot(deps).active end,
+		sources_env = function()
+			return {
+				platform = PLATFORM,
+				composer_id = settings.id,
+				bundled_index = bundled_index(deps),
+				bundled_dir = deps.bundled_dir,
+				local_dir = deps.local_dir,
+				installed = installed(),
+				read = deps.read,
+				sha256 = deps.transport.sha256,
+				log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+			}
+		end,
+		install = function(entry, text, on_done) return M.install_local(entry, text, on_done, deps) end,
+		uninstall = function(id, on_done) return M.uninstall(id, on_done, deps) end,
+		select = function(id, on_done) return M.select(id, on_done, deps) end,
+		select_after_login = function(id) return deps.pending.request_select(id) end,
+		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+	})
+end
+
+--- The composer's own settings (the reserved id, its folder and bounds).
+--- @return table|nil settings
+--- @return string|nil error
+function M.composer_settings()
+	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	return Composer.settings(layout_defaults)
+end
+
+--- The text of an installed layout's copy, for the Debug check of the composer.
+--- @param id string Layout id.
+--- @param deps table|nil
+--- @return string|nil text
+--- @return string|nil error
+function M.read_local_copy(id, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	local text = resolved.read(resolved.layouts_dir .. id .. ".keylayout")
+	if type(text) ~= "string" then return nil, "the installed copy of '" .. tostring(id) .. "' is unreadable" end
+	return text, nil
+end
+
+--- The digest of a text, through the driver's own digest port (the Debug check of
+--- the composer compares an installed copy with its record).
+--- @param text string
+--- @param on_done function on_done(digest|nil, error|nil)
+--- @param deps table|nil
+function M.sha256_text(text, on_done, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then
+		on_done(nil, deps_err)
+		return
+	end
+	resolved.transport.sha256(text, on_done)
+end
+
+--- Sends the composer page its sources and stored composition.
+--- @param on_done function on_done(data)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_open(on_done, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = composer_operations(resolved) end
+	if not operations then
+		Logger.error(LOG, "The layout composer is unusable: %s.", tostring(deps_err or operations_err))
+		return false
+	end
+	operations.open(on_done)
+	return true
+end
+
+--- Stores a composition and installs its layout.
+--- @param payload table { declaration, keylayout, use }
+--- @param on_done function on_done(ok, code, detail, used)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_save(payload, on_done, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = composer_operations(resolved) end
+	if not operations then
+		on_done(false, M.FAILURE_WRITE, deps_err or operations_err, false)
+		return false
+	end
+	operations.save(payload, on_done)
+	return true
+end
+
+--- Removes the composition.
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_remove(on_done, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = composer_operations(resolved) end
+	if not operations then
+		on_done(false, M.FAILURE_WRITE, deps_err or operations_err)
+		return false
+	end
+	operations.remove(on_done)
+	return true
+end
+
 --- Test seam: forgets the catalogue, the operation slot and the shipped index.
 function M._reset()
-	_catalogue = { index = nil, source = Catalogue.SOURCE_NONE, error = nil }
+	Store.reset()
 	_busy = nil
-	_bundled_index = nil
-	_bundled_index_read = false
 end
 
 --- Roots of committed extension generations, without changing activation choices.

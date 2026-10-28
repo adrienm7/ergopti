@@ -10,6 +10,10 @@
 ; their menu/hotkey call sites elsewhere are unaffected.
 ; ==============================================================================
 
+; The generated key vocabulary the word-reset and cascade settings are named by
+; (a dedupe-safe include: menu_init.ahk and menu_manifest.ahk name it too).
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+
 global _MagicKeyEditorInputHook := ""
 global _MagicKeyEditorStopDebt := false
 ; The window of the live capture, published with its hook.
@@ -612,10 +616,12 @@ ToggleRepeatKeyEnabled(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 
 ; The engine global each word-reset setting publishes to.
 _EditorWordResetGlobal(Key, Value) {
-	global HSE_IdleResetSeconds, HSE_ClickResetsWord
+	global HSE_IdleResetSeconds, HSE_ClickResetsWord, HSE_CascadeMaxArrows
 	global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
 	if (Key == "idle_reset_seconds")
 		HSE_IdleResetSeconds := Value
+	else if (Key == ConfigLeaf.CASCADE_MAX_ARROWS)
+		HSE_CascadeMaxArrows := Value
 	else if (Key == "click_resets_word")
 		HSE_ClickResetsWord := Value
 	else if (Key == "arrow_resets_word")
@@ -624,6 +630,8 @@ _EditorWordResetGlobal(Key, Value) {
 		HSE_ShortcutResetsWord := Value
 	else if (Key == "tap_hold_resets_word")
 		HSE_TapHoldResetsWord := Value
+	else if HSE_PreviewSwitchIsKnown(Key)
+		HSE_PreviewSwitchPublish(Key, Value)
 	else
 		throw ValueError("Unknown word-reset setting: " . Key)
 }
@@ -685,6 +693,20 @@ SetHotstringsIdleResetSeconds(Seconds, WriterFn := 0, NotifyFn := 0, RebuildFn :
 		return false
 	}
 	return _EditorCommitWordReset("idle_reset_seconds", Seconds, "the idle-reset delay",
+		WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Sets the longest chain of hotstrings: how many expansions (arrows) it may hold.
+ * @param {Integer} Arrows A whole number from 1 (a single expansion) to 10.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+SetHotstringsCascadeMaxArrows(Arrows, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	if !HSE_ValidCascadeMaxArrows(Arrows) {
+		try LoggerError("Editors", "Refused cascade arrow count: not a whole number from 1 to 10.")
+		return false
+	}
+	return _EditorCommitWordReset(ConfigLeaf.CASCADE_MAX_ARROWS, Arrows, "the cascade arrow count",
 		WriterFn, NotifyFn, RebuildFn)
 }
 
@@ -758,6 +780,31 @@ ToggleHotstringsClickResetsWord(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 ToggleHotstringsWordResetFlag(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 	return _EditorCommitWordReset(Key, !HSE_WordResetFlagCurrent(Key),
 		"the " . Key . " toggle", WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Flips one preview-bubble switch (hotstrings.preview_star_enabled,
+ * preview_autocorrect_enabled, preview_ai_enabled, preview_colored_tooltips).
+ * The engine and the prediction path read the switches live, so there is no
+ * reload; the bubble on screen is retired because it was promised under the old
+ * value (macOS and Linux revoke it the same way).
+ * @param {String} Key One of HSE_PreviewSwitchKeys().
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+ToggleHotstringsPreviewSwitch(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	if !HSE_PreviewSwitchIsKnown(Key) {
+		try LoggerError("Editors", "Refused unknown preview switch.")
+		return false
+	}
+	Candidate := !HSE_PreviewSwitchCurrent(Key)
+	if !_EditorCommitWordReset(Key, Candidate, "the " . Key . " toggle",
+			WriterFn, NotifyFn, RebuildFn)
+		return false
+	; Retire what the old value promised: a bubble on screen, a prediction timer.
+	TooltipHide("PreviewSwitch", true)
+	if (Key == "preview_ai_enabled" && !Candidate && IsSet(LLM_Engine_CancelTimer))
+		LLM_Engine_CancelTimer()
+	return true
 }
 
 _PersonalInfoReportSaveFailure(NotifyFn := 0) {
@@ -884,12 +931,21 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 	return true
 }
 
+; Every opening creates a fresh native dialog. Default Close only hides it,
+; retaining its edit control and the button callback that captures this Gui.
+_GPTLinkEditorClose(Window, *) {
+	Window.Destroy()
+	return true
+}
+
 GPTLinkEditor(*) {
 		global Features
 		CurrentLink := ""
 		if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("gpt") and Features["shortcuts"]["gpt"].Has("link")
 				CurrentLink := Features["shortcuts"]["gpt"]["link"]
 		GuiToShow := Gui_Create(, t("dialog.gpt_link.title"))
+		GuiToShow.OnEvent("Close", _GPTLinkEditorClose)
+		GuiToShow.OnEvent("Escape", _GPTLinkEditorClose)
 		NewValue := GuiToShow.Add("Edit", "w300", CurrentLink)
 		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ModifyLink(GuiToShow, NewValue.Text))
 		GuiToShow.Show("Center")

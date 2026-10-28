@@ -1,0 +1,299 @@
+﻿; tests/unit/modules/keystats/test_keystats_clipboard_provenance.ahk
+
+; ==============================================================================
+; MODULE: Keystats Clipboard Provenance Regression Tests
+; DESCRIPTION:
+; Drives the real clipboard observer state machine against the shared adapter
+; ownership registry. Pure provenance cases reserve the adapter's notification
+; records and deliver OnClipboardChange directly. The native ownership case
+; also exercises the real text callback while a caller holds the clipboard.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+_KCP_WithCleanState(Body) {
+	global _KL_CLIP_FILTER_PROBE, _Stub_AppendLogRows
+	PreviousInit := Keystats.initialized
+	PreviousApp := Keystats.session_app
+	PreviousProbe := _KL_CLIP_FILTER_PROBE
+	PreviousRows := _Stub_AppendLogRows
+	PreviousTick := KLClip.last_copy_tick
+	PreviousLen := KLClip.last_copy_len
+	PreviousSourceApp := KLClip.last_copy_app
+	PreviousPasteTicks := KLClip.paste_ticks
+	PreviousObserverActive := CBClipboardOwner.observer_active
+	PreviousPending := CBClipboardOwner.pending
+	CB_SetOwnershipObserverActive(true)
+	Keystats.initialized := true
+	Keystats.session_app := "public.exe"
+	_KL_CLIP_FILTER_PROBE := (*) => false
+	_Stub_AppendLogRows := []
+	_KL_Clip_InvalidateProvenance()
+	KLClip.paste_ticks := []
+	try {
+		Body()
+	} finally {
+		CB_SetOwnershipObserverActive(false)
+		CBClipboardOwner.observer_active := PreviousObserverActive
+		CBClipboardOwner.pending := PreviousPending
+		Keystats.initialized := PreviousInit
+		Keystats.session_app := PreviousApp
+		_KL_CLIP_FILTER_PROBE := PreviousProbe
+		_Stub_AppendLogRows := PreviousRows
+		KLClip.last_copy_tick := PreviousTick
+		KLClip.last_copy_len := PreviousLen
+		KLClip.last_copy_app := PreviousSourceApp
+		KLClip.paste_ticks := PreviousPasteTicks
+	}
+}
+
+_KCP_AssertUnknownPaste(Row, Context) {
+	AssertEqual("clipboard_paste", Row["type"], Context . ": a physical paste must still be recorded")
+	AssertEqual(0, Row["char_count"], Context . ": stale clipboard length must be retired")
+	AssertEqual(-1, Row["copy_lag_ms"], Context . ": stale copy age must be retired")
+	AssertEqual("", Row["source_app"], Context . ": stale source application must be retired")
+}
+
+_KCP_DriverTransactionIsInvisible() {
+	_KCP_WithCleanState(_KCP_DriveOwnedTransaction)
+}
+
+_KCP_DriveOwnedTransaction() {
+	global _Stub_AppendLogRows
+	OwnerToken := CB_TryBeginOwnedTransaction("regression_test", true)
+	try {
+		; The adapter reserves this before its temporary write. Synthetic Ctrl+V
+		; is delivered while the owner survives the deferred restore window.
+		CB_ExpectOwnedChange()
+		KL_Clip_OnPaste()
+		AssertEqual(0, _Stub_AppendLogRows.Length,
+			"driver Ctrl+V must emit no clipboard_paste or paste_burst row")
+	} finally {
+		CB_EndOwnedTransaction(OwnerToken)
+	}
+
+	; Deliver the delayed clipboard notification after the transaction ended.
+	; The FIFO mutation generation must still identify it as driver traffic.
+	KL_Clip_OnChange(2)
+	AssertEqual(0, _Stub_AppendLogRows.Length,
+		"a delayed driver write callback must emit no clipboard_copy row")
+}
+Test("keystats clipboard: a deferred driver write/paste transaction emits zero events", _KCP_DriverTransactionIsInvisible)
+
+_KCP_UserCopyPastePairIsPreserved() {
+	_KCP_WithCleanState(_KCP_DriveUserCopyPaste)
+}
+
+_KCP_DriveUserCopyPaste() {
+	global _Stub_AppendLogRows
+	KL_Clip_OnChange(2)
+	KL_Clip_OnPaste()
+	AssertEqual(2, _Stub_AppendLogRows.Length,
+		"one genuine copy and one genuine paste must reach the sink exactly once each")
+	AssertEqual("clipboard_copy", _Stub_AppendLogRows[1]["type"], "the first row must be the user copy")
+	AssertEqual("clipboard_paste", _Stub_AppendLogRows[2]["type"], "the second row must be the user paste")
+	AssertEqual("public.exe", _Stub_AppendLogRows[2]["source_app"],
+		"the paste must retain provenance from the genuine user copy")
+	Assert(_Stub_AppendLogRows[2]["copy_lag_ms"] >= 0,
+		"the genuine copy/paste pair must carry a non-negative wrap-safe lag")
+}
+Test("keystats clipboard: a user copy/paste remains one exact provenance pair", _KCP_UserCopyPastePairIsPreserved)
+
+_KCP_ClearInvalidatesPublicProvenance() {
+	_KCP_WithCleanState(_KCP_DriveClearInvalidation)
+}
+
+_KCP_DriveClearInvalidation() {
+	global _Stub_AppendLogRows
+	KL_Clip_OnChange(2)
+	; Give the public generation distinctive metadata so a stale attribution
+	; cannot accidentally satisfy the unknown defaults.
+	KLClip.last_copy_tick := A_TickCount
+	KLClip.last_copy_len := 73
+	KLClip.last_copy_app := "public-source.exe"
+	KL_Clip_OnChange(0)
+	KL_Clip_OnPaste()
+	AssertEqual(2, _Stub_AppendLogRows.Length,
+		"clipboard clear is state-only: it logs neither content nor a fake copy")
+	_KCP_AssertUnknownPaste(_Stub_AppendLogRows[2], "public -> clear -> paste")
+}
+Test("keystats clipboard: clear atomically invalidates prior public provenance", _KCP_ClearInvalidatesPublicProvenance)
+
+_KCP_PrivateChangeInvalidatesPublicProvenance() {
+	_KCP_WithCleanState(_KCP_DrivePrivateInvalidation)
+}
+
+_KCP_DrivePrivateInvalidation() {
+	global _KL_CLIP_FILTER_PROBE, _Stub_AppendLogRows
+	KLClip.last_copy_tick := A_TickCount
+	KLClip.last_copy_len := 41
+	KLClip.last_copy_app := "public-source.exe"
+	_KL_CLIP_FILTER_PROBE := (*) => true
+	KL_Clip_OnChange(2)
+	_KL_CLIP_FILTER_PROBE := (*) => false
+	KL_Clip_OnPaste()
+	AssertEqual(1, _Stub_AppendLogRows.Length,
+		"a filtered copy logs no row, while the later public physical paste still logs once")
+	_KCP_AssertUnknownPaste(_Stub_AppendLogRows[1], "public -> private -> paste")
+}
+Test("keystats clipboard: filtered change atomically invalidates prior public provenance", _KCP_PrivateChangeInvalidatesPublicProvenance)
+
+_KCP_PersistentDriverWriteInvalidatesWithoutLogging() {
+	_KCP_WithCleanState(_KCP_DrivePersistentDriverWrite)
+}
+
+_KCP_DrivePersistentDriverWrite() {
+	global _Stub_AppendLogRows
+	KLClip.last_copy_tick := A_TickCount
+	KLClip.last_copy_len := 29
+	KLClip.last_copy_app := "old-user-copy.exe"
+	; No surrounding temporary transaction: this is the ownership class used
+	; by persistent CB_Write callers such as copy-path and health-report actions.
+	CB_ExpectOwnedChange()
+	KL_Clip_OnChange(2)
+	KL_Clip_OnPaste()
+	AssertEqual(1, _Stub_AppendLogRows.Length,
+		"persistent driver replacement logs no fake copy and leaves one physical paste")
+	_KCP_AssertUnknownPaste(_Stub_AppendLogRows[1], "public -> persistent driver write -> paste")
+}
+Test("keystats clipboard: persistent driver replacement is silent and retires provenance", _KCP_PersistentDriverWriteInvalidatesWithoutLogging)
+
+_KCP_AllDriverAssignmentsUseOwnedAdapter() {
+	SplitPath(A_ScriptDir, , &WindowsRoot)
+	Violations := []
+	Loop Files, WindowsRoot . "\*.ahk", "FR" {
+		Normalized := StrReplace(A_LoopFileFullPath, "\", "/")
+		if InStr(Normalized, "/tests/") || InStr(Normalized, "/vendor/")
+				|| InStr(Normalized, "/_generated/") || InStr(Normalized, "/adapters/clipboard.ahk")
+			continue
+		Source := FileRead(A_LoopFileFullPath)
+		; Strip full-line comments so documentation examples do not satisfy or
+		; violate the guard. Executable inline lambdas remain visible.
+		Executable := RegExReplace(Source, "m)^[ \t]*;[^\r\n]*$", "")
+		if RegExMatch(Executable, "A_Clipboard\s*:=")
+			Violations.Push(Normalized)
+	}
+	AssertEqual(0, Violations.Length,
+		"every production clipboard assignment outside the adapter must be owned; raw writers: "
+		. _DescribeValue(Violations))
+}
+Test("keystats clipboard: all production assignments funnel through ownership", _KCP_AllDriverAssignmentsUseOwnedAdapter)
+
+_KCP_EveryDeferredPastePairsOwnership() {
+	Pairs := [
+		["_TextSenderStartClipboard", "_TextSenderFinishClipboard"],
+		["SendInstant", "_SendInstant_RestoreClipboard"],
+		["PasteWithoutFormatting", "_PasteWithoutFormattingRestore"],
+		["GesturePastePlain", "_GesturePastePlainRestore"],
+		["GetSelectionAsync", "_SelectionCaptureFinish"],
+		["GestureScreenshotRegion", "GestureRegionCaptureFinish"]
+	]
+	for _, Pair in Pairs {
+		StartBody := _DriverFuncBody(Pair[1])
+		FinishBody := _DriverFuncBody(Pair[2])
+		Assert(StartBody != "" && FinishBody != "",
+			"ownership pair must remain reachable: " . Pair[1] . " -> " . Pair[2])
+		Assert(InStr(StartBody, "CB_TryBeginOwnedTransaction") > 0
+			or InStr(StartBody, "CB_TryBeginPasteTransaction") > 0,
+			Pair[1] . " must acquire shared clipboard ownership before its asynchronous mutation")
+		Assert(InStr(FinishBody, "CB_RestoreOwnedAllEventually") > 0
+			or InStr(FinishBody, "CB_RestorePlainSnapshotEventually") > 0
+			or InStr(FinishBody, "CB_HasRestoreDebtForOwner") > 0,
+			Pair[2] . " must delegate terminal ownership to the retrying restore coordinator")
+	}
+	; Plain-paste restores go through the generation-bound snapshot owner, which
+	; is a coordinator only while it hands the debt to the retrying restore.
+	Assert(InStr(_DriverFuncBody("CB_RestorePlainSnapshotEventually"), "CB_RetryRestoreDebt(") > 0,
+		"CB_RestorePlainSnapshotEventually must delegate to the retrying restore coordinator")
+}
+Test("keystats clipboard: every deferred producer pairs shared ownership", _KCP_EveryDeferredPastePairsOwnership)
+
+; A key-state probe for the paste-chord classifier: the named keys are down.
+_KCP_KeysDown(Keys*) {
+	Down := Map()
+	for Key in Keys
+		Down[Key] := true
+	return (Name) => Down.Has(Name)
+}
+
+; The paste observer replaced the "~^v" and "~+Insert" hotkeys: the driver
+; declares every character key by scan code, so AutoHotkey's hook never looked
+; the virtual-key "~^v" up and no paste was ever recorded (hardening-c). The
+; chords keep the hotkeys' exact modifiers: Ctrl+Shift+V, AltGr+V and Ctrl+Insert
+; are other commands.
+_KCP_PasteChordsKeepTheirExactModifiers() {
+	V := KLClipConst.VK_V
+	Ins := KLClipConst.VK_INSERT
+	AssertTrue(_KL_Clip_IsPasteChord(V, _KCP_KeysDown("Ctrl")), "Ctrl+V must be a paste")
+	AssertTrue(_KL_Clip_IsPasteChord(Ins, _KCP_KeysDown("Shift")), "Shift+Insert must be a paste")
+	AssertFalse(_KL_Clip_IsPasteChord(V, _KCP_KeysDown()), "a bare V is typing, not a paste")
+	AssertFalse(_KL_Clip_IsPasteChord(V, _KCP_KeysDown("Ctrl", "Shift")),
+		"Ctrl+Shift+V is another chord, as it was for the ^v hotkey")
+	AssertFalse(_KL_Clip_IsPasteChord(V, _KCP_KeysDown("Ctrl", "Alt")),
+		"Ctrl+Alt+V (AltGr+V) types a character")
+	AssertFalse(_KL_Clip_IsPasteChord(V, _KCP_KeysDown("Ctrl", "LWin")), "Ctrl+Win+V is another chord")
+	AssertFalse(_KL_Clip_IsPasteChord(Ins, _KCP_KeysDown("Ctrl")), "Ctrl+Insert copies")
+	AssertFalse(_KL_Clip_IsPasteChord(Ins, _KCP_KeysDown("Ctrl", "Shift")),
+		"Ctrl+Shift+Insert is another chord, as it was for the +Insert hotkey")
+	AssertFalse(_KL_Clip_IsPasteChord(Ord("C"), _KCP_KeysDown("Ctrl")), "Ctrl+C is not a paste")
+}
+Test("keystats clipboard: the paste observer keeps the exact Ctrl+V and Shift+Insert chords",
+	_KCP_PasteChordsKeepTheirExactModifiers)
+
+#Include test_clipboard_provenance_owner.ahk
+
+#Include test_clipboard_paste_burst_owner.ahk
+
+#Include test_clipboard_source_title_owner.ahk
+
+
+/** The genuine text observer must never close an interrupted caller's NULL lease. */
+_KCP_NativeTextReadPreservesBorrowedLease() {
+	_KCP_WithCleanState(_KCP_NativeTextReadSubject)
+}
+
+_KCP_NativeTextReadSubject() {
+	global _Stub_AppendLogRows, CB_NATIVE_OPEN_TIMEOUT_MS, CB_NATIVE_OPEN_RETRY_MS
+	Saved := CB_SaveAll()
+	AssertFalse(Saved is String && Saved == "__CB_SAVE_ERROR__", "the native fixture needs its genuine clipboard snapshot")
+	ProbeText := "native clipboard observer probe"
+	Opened := false
+	try {
+		AssertTrue(CB_Write(ProbeText), "the native fixture must publish genuine Unicode clipboard data")
+		; Deliver a controlled unowned notification over the actual native data.
+		CB_DiscardOwnedNotifications()
+		Started := A_TickCount
+		loop {
+			Opened := DllCall("User32\OpenClipboard", "Ptr", 0, "Int") != 0
+			if Opened || TickExpired(Started, CB_NATIVE_OPEN_TIMEOUT_MS)
+				break
+			Sleep(CB_NATIVE_OPEN_RETRY_MS)
+		}
+		AssertTrue(Opened, "the original NULL caller must acquire its real native lock")
+		KL_Clip_OnChange(1)
+		Closed := DllCall("User32\CloseClipboard", "Int") != 0
+		Opened := false
+		AssertTrue(Closed, "the actual keystats text callback must preserve its caller's native Close right")
+		AssertEqual(1, _Stub_AppendLogRows.Length, "one public text notification reaches the recording sink exactly once")
+		AssertEqual(0, _Stub_AppendLogRows[1]["char_count"], "an unavailable native lease supplies no text-length evidence")
+		; After release, actual native reads remain possible despite transient
+		; clipboard-history readers awakened by the fixture's initial write.
+		Started := A_TickCount
+		loop {
+			_Stub_AppendLogRows := []
+			KL_Clip_OnChange(1)
+			AssertEqual(1, _Stub_AppendLogRows.Length, "every admitted notification still has one terminal row")
+			Count := _Stub_AppendLogRows[1]["char_count"]
+			if Count == StrLen(ProbeText) || TickExpired(Started, CB_NATIVE_OPEN_TIMEOUT_MS)
+				break
+			Sleep(CB_NATIVE_OPEN_RETRY_MS)
+		}
+		AssertEqual(StrLen(ProbeText), Count, "a fresh native read after release still counts the actual Unicode payload")
+	} finally {
+		if Opened
+			DllCall("User32\CloseClipboard", "Int")
+		AssertTrue(CB_RestoreAll(Saved), "the native fixture must restore its genuine clipboard snapshot")
+	}
+}
+Test("keystats clipboard: native text observer preserves a borrowed NULL lease (clipboard-borrowed-acquisition)",
+	_KCP_NativeTextReadPreservesBorrowedLease)

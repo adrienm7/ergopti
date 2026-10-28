@@ -1,0 +1,18 @@
+{
+	"schema_version": 1,
+	"name": "Composer Check",
+	"keycode_convention": "iso",
+	"layers": {
+		"base": { "source": "azerty" },
+		"shift": { "source": "azerty" },
+		"altgr": { "source": "qwerty" },
+		"shift_altgr": { "source": "qwerty", "layer": "shift" }
+	},
+	"shortcuts": {
+		"default": { "source": "qwerty", "layer": "base" }
+	},
+	"overrides": {
+		"base": { "KeyW": null },
+		"shift": { "KeyE": "É" }
+	}
+}

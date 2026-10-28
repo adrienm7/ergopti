@@ -115,6 +115,7 @@ local function run_case(family, change, route)
 				else
 					local engine_mod = require("modules.hotstrings.engine")
 					local engine = engine_mod.new()
+					engine:attach_ai_context(require("modules.llm.context").new({ is_active = function() return true end }))
 					local mappings = dynamic.prefix_mappings()
 					if route == "static" then
 						mappings[#mappings + 1] = { auto_expand = true, trigger = trigger,
@@ -129,11 +130,14 @@ local function run_case(family, change, route)
 						if change == "metrics" and char == "★" then retire() end
 					end, record_hotstring = function() commits = commits + 1 end }, { __index = policy })
 					local environment = setmetatable({ secure_focus_guard = guard, script_actions = scripts,
+						-- Bare keys: the shared expansion delay reads the held modifiers per key.
+						keyboard_hook = { held_modifiers = function() return {} end },
 						Monotonic = require("infra.monotonic"), WordReset = require("modules.hotstrings.word_reset"),
 						terminators_mod = require("keymap.terminators"), RepeatKey = repeat_key,
 						MagicKey = require("modules.hotstrings.magic_key"), opts = { dry_run = false },
-						_cached_app_id = "owned-editor", keylogger = metrics, engine_mod = engine_mod,
+						_cached_app_id = "owned-editor", keystats = metrics, engine_mod = engine_mod,
 						engine = engine, dyn_hotstrings = dynamic, injector = injector, Logger = logger,
+						keyboard_hook = session.hook,
 						prediction_engine = change == "prediction" and { on_char = function(char)
 							if char == "★" then retire() end
 						end } or nil,

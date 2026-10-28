@@ -96,7 +96,7 @@ _PVSE_ArmedSuggestionHidesImmediately() {
 	SavedSuggestion := _KLLastShownSuggestion
 	State := Map("calls", 0, "tag", "", "force", false)
 	try {
-		; Private avoids producing a keylogger row while still exercising the real
+		; Private avoids producing a keystats row while still exercising the real
 		; lifecycle state transition.
 		_KLLastShownSuggestion := {
 			Trigger: "secret", Output: "secret", Category: "Personal",

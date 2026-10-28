@@ -11,7 +11,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_timer_finite_admission%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. package.path
+	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
 local uv = require("luv")
 local checks, failures = 0, 0
 
@@ -154,10 +154,10 @@ end)
 check("defer preserves fractional native elapsed delay", function()
 	local loop = fresh("adapters.event_loop")
 	local calls = 0
-	assert(loop.defer(function() calls = calls + 1 end, 8.5))
+	assert(loop.defer(function() calls = calls + 1 end, 250.5)) -- far above any scheduling stall between defer and tick
 	loop._run_idle_tick()
 	assert(calls == 0, "positive delay was delivered immediately")
-	uv.sleep(12)
+	uv.sleep(260)
 	loop._run_idle_tick()
 	assert(calls == 1, "native elapsed time failed to release due work")
 end)

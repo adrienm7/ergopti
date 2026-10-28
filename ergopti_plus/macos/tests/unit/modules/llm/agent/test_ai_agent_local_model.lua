@@ -39,15 +39,15 @@ local function with_consent_world(scenario)
 	local offer = require("modules.llm.local_model_offer")
 	local api = require("modules.llm.api_ollama")
 	local storage = require("adapters.storage")
-	local before = storage.get("llm.ollama_port")
+	local before = storage.get("llm.ollama_owned_port")
 	local function port(value)
-		helpers.assert_true(storage.set("llm.ollama_port", value))
+		helpers.assert_true(storage.set("llm.ollama_owned_port", value))
 		helpers.assert_eq(api.get_base_url(), "http://127.0.0.1:" .. tostring(value))
 	end
 	port(11470)
 	world.alert_answer = "first"
 	local ok, err = xpcall(function() scenario(world, offer, api, port) end, debug.traceback)
-	storage.set("llm.ollama_port", before)
+	storage.set("llm.ollama_owned_port", before)
 	if not ok then error(err, 0) end
 end
 
@@ -137,10 +137,12 @@ helpers.describe("AI agent local model (ai-agent-local-model)", function()
 
 	helpers.it("(local-model-requester) preserves manual downloads and automatic notices while prediction is disabled", function()
 		with_consent_world(function(world, offer)
-			world.engine.set_llm_enabled(false)
 			trigger(world, "llm_agent_selection")
 			World.list_local_models(world, {})
-			helpers.assert_eq(#world.installs, 1, "action-mode agents remain independent of prediction enablement")
+			helpers.assert_eq(#world.installs, 1, "action-mode agents remain independent of the prediction backend")
+			-- The AI switched off refuses a new manual agent run (ai-off-agent) but
+			-- leaves the explicit downloads and the automatic notices alone.
+			world.engine.set_llm_enabled(false)
 			helpers.assert_true(offer.install(DEFAULT_MODEL, { current = function() return true end }))
 			helpers.assert_eq(#world.installs, 2, "explicit menu Download remains allowed")
 			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))

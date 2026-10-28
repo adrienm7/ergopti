@@ -440,3 +440,5 @@ _UCHDisableCancelsFactory() {
 	}
 }
 Test("programmable hotstrings: real live disable cancels a loading factory and its descendants", _UCHDisableCancelsFactory)
+
+#Include test_user_hotstring_loader_lifetime.ahk

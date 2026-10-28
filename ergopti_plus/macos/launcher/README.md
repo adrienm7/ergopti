@@ -14,6 +14,49 @@ The launcher's job is to:
 3. Host [Sparkle](https://sparkle-project.org/) so the in-app updater can
    ship new releases via the configured appcast.
 
+## Developer source mode
+
+A developer build runs the Lua of your clone, so an edit is live after a
+Reload, while keeping the launcher's native logger, Karabiner and helper roles:
+
+```bash
+bash tools/dev/run-macos-dev-app.sh             # build, then open (npm run dev:macos-app)
+bash tools/dev/run-macos-dev-app.sh --open-only # reopen it after a Quit
+```
+
+The runner wraps `ERGOPTI_DEV_SOURCE=1 ERGOPTI_LAUNCHER_ARCHS=native bash
+tools/build/build_macos_app.sh` and `open build/macos/ErgoptiPlus.app`. `native`
+builds the launcher for the host only, which the Command Line Tools can do
+without Xcode (a two-slice `swift build` needs XCBuild); a release refuses it. Quit an installed ErgoptiPlus first: the
+launcher allows one instance. Rebuild only after a change to the Swift launcher,
+a native helper or LuaSocket. Each ad hoc build is a new code identity, so macOS
+asks for Accessibility and Input Monitoring again unless the build is signed
+with the stable certificate (`MACOS_SIGNING_CERTIFICATE_BASE64`).
+
+The build records the clone root in the launcher `Info.plist` under the key
+`dev_source.plist_key` of `_shared/data/identifiers.json`, before signing. The
+launcher then points `MJConfigFile` at `<clone>/static/ergopti_plus/macos/init.lua`,
+logs `developer source mode; Lua runs from <clone>` in `launcher.log`, hands the
+root to the runtime as `dev_source.environment`, and starts no Sparkle. The Lua
+driver treats that runtime as a source run (`Updater.is_local_source()`), so its
+update checks, channel switch, in-app installs and uninstall stay off. If the
+clone's `init.lua` is gone, the launcher refuses to start and names the missing
+file. A saved `.lua` edit under `static/ergopti_plus/macos` or
+`static/ergopti_plus/_shared/lua` reloads the driver (the existing source
+watcher, plus a shared-tree watcher armed only in this mode); the menu's Reload
+row and the AltGr+Backspace script chord reload on demand.
+
+Such an app is never shipped: a release build (`ERGOPTI_RELEASE=true`) refuses
+the switch, the build produces no release archive, and every entry of
+`tools/build/macos-release-archives.cjs` refuses a bundle carrying the key
+(`tools/build/macos-dev-source-guard.cjs`). Native modules that only the build
+stages (LuaSocket) are read from the developer app's own payload; everything else
+comes from the clone, including the commit shown in About (from `.git`).
+
+Linux and Windows have the same mode (`tools/dev/run-linux-dev.sh`,
+`tools/dev/run-windows-dev.ps1`); `docs/design/developer-mode.md` lists, per OS,
+what still differs from the built app.
+
 ## Abrupt launcher termination
 
 `applicationWillTerminate` covers a normal launcher quit, but macOS cannot run
@@ -26,8 +69,11 @@ exports its exact process identity to its Hammerspoon child as
 before immediately resolving that PID. A matching termination event invokes an
 injected emergency-quit callback once. A native `applicationForPID` lookup every
 two seconds is only a backstop for a missed event; it does not shell out or run
-from an eventtap. Direct developer Hammerspoon sessions remain supported: when
-the launcher environment is absent, the guard deliberately stays inactive.
+from an eventtap. When the launcher environment is absent the guard stays
+inactive, but the driver no longer starts there: instance admission
+(`infra/instance_admission.lua`) runs it only in the launcher's embedded runtime
+with the managed log environment. Developers use the developer source mode
+below instead of a stock Hammerspoon.
 
 The emergency callback revokes only ErgoptiPlus-owned resources, including its
 exact Karabiner lease. It must never terminate Karabiner's shared UI, Core
@@ -37,11 +83,17 @@ DriverKit VirtualHID process.
 
 These rules describe the shared Karabiner mode shipped today. The owned mode
 decided in [ADR 011](../../docs/adr/011-owned-karabiner-runtime.md) will add
-Ergopti's own headless runtime, whose console user server is started with the
-owner's PID so that the daemon stops grabbing, and the keyboard returns to
-native input, when that owner disappears. Stock Karabiner processes stay out of
-reach in both modes, except for the explicit, default-on « close other
-Karabiner instances » option of the owned mode.
+Ergopti's own headless runtime. This launcher owns that runtime's console
+user server: the `--installed-physical-source` role starts it with the capture
+stream and ends it with the stream, so the daemon stops grabbing, and the
+keyboard returns to native input, when Hammerspoon's stdin closes. The lease
+worker and the guardian accept the owned `ergoptiplus_remap_cli` next to the
+shared `karabiner_cli`, and the guardian record names the runtime it revokes
+through. The confirmed uninstall retires the owned runtime under one
+administrator prompt. Stock Karabiner processes stay out of reach in both modes,
+except for the explicit, default-on « close other Karabiner instances » option
+of the owned mode, which the Lua driver performs through Karabiner's own quit
+steps.
 
 The Lua suite simulates the missing-parent and native-termination paths. A
 physical Activity Monitor Force Quit and observable keyboard-release check still

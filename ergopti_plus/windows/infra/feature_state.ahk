@@ -16,6 +16,12 @@
 ; boot.ahk.  Do not dereference boot-owned path globals while constructing the
 ; declaration: their empty standalone values are harmless and the real driver
 ; has assigned both before this file executes.
+; The preview-switch readers the loader publishes to. The engine includes the same
+; file; an already included file is skipped.
+#Include hotstrings/preview_switches.ahk
+; The generated key vocabulary (a dedupe-safe include: menu_manifest.ahk names it too).
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+
 global _FeatureStateConfigDir := IsSet(_ConfigDir) ? _ConfigDir : ""
 global _FeatureStateAhkSubDir := IsSet(_AhkSubDir) ? _AhkSubDir : ""
 
@@ -235,7 +241,7 @@ ReadScriptConfig(Cache) {
 		RawKana := _FeatureStateIniGet(Cache, "script", "alt_gr_is_kana_remap")
 		if RawKana != "_"
 				ScriptInformation["AltGrIsKanaRemap"] :=
-					_FeatureStateValidateKanaOverride(RawKana)
+					_FeatureStateReadKanaOverride(Cache, RawKana)
 		; Missing repeat-key intent restores the same neutral baseline as first boot.
 		global HSE_RepeatEnabled
 		RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", "repeat_key_enabled")
@@ -248,6 +254,9 @@ ReadScriptConfig(Cache) {
 		global HSE_IdleResetSeconds, HSE_ClickResetsWord
 		HSE_IdleResetSeconds := _FeatureStateIdleResetSeconds(
 			_FeatureStateIniGet(Cache, "hotstrings", "idle_reset_seconds"))
+		global HSE_CascadeMaxArrows
+		HSE_CascadeMaxArrows := _FeatureStateCascadeMaxArrows(
+			_FeatureStateIniGet(Cache, ConfigKey.HOTSTRINGS, ConfigLeaf.CASCADE_MAX_ARROWS))
 		RawClick := _FeatureStateIniGet(Cache, "hotstrings", "click_resets_word")
 		if RawClick != "_"
 				HSE_ClickResetsWord := _FeatureStateValidateBoolean(
@@ -259,6 +268,11 @@ ReadScriptConfig(Cache) {
 		HSE_ArrowResetsWord := _FeatureStateWordResetFlag(Cache, "arrow_resets_word")
 		HSE_ShortcutResetsWord := _FeatureStateWordResetFlag(Cache, "shortcut_resets_word")
 		HSE_TapHoldResetsWord := _FeatureStateWordResetFlag(Cache, "tap_hold_resets_word")
+		; The preview-bubble switches: the stored value, or the manifest default.
+		global HSE_PreviewSwitches
+		HSE_PreviewSwitches := Map()
+		for PreviewKey in HSE_PreviewSwitchKeys()
+				HSE_PreviewSwitches[PreviewKey] := _FeatureStateWordResetFlag(Cache, PreviewKey)
 		if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 				HSE_AdvanceRuntimeDecisionGeneration()
 		; Paths are always derived from _ConfigDir at startup and are never persisted.
@@ -299,6 +313,30 @@ _FeatureStateIdleResetSeconds(Raw) {
 	try LoggerWarn("Config", "hotstrings.idle_reset_seconds '{1}' is not a number of seconds, 0 or more — using {2} s.",
 		Raw is Object ? Type(Raw) : String(Raw), Default)
 	return Default
+}
+
+; The configured cascade arrow count, or the manifest default for an absent value. A
+; value that is no whole number from 1 to 10 is outdated configuration: one
+; WARNING, read as absent, never a boot failure.
+; @param Raw {Any} The raw TOML value, "_" when absent.
+; @returns {Integer} 1 is a single expansion (no cascade).
+_FeatureStateCascadeMaxArrows(Raw) {
+	Default := ManifestDefaultFor(ConfigKey.HOTSTRINGS_CASCADE_MAX_ARROWS)
+	if Raw == "_"
+		return Default
+	; HSE_ValidCascadeMaxArrows's rule, restated because this reader also boots
+	; without the hotstring engine (tests/support/feature_state_boot_smoke.ahk).
+	if (Raw is Integer) and Raw >= 1 and Raw <= 10
+		return Raw
+	try LoggerWarn("Config", "hotstrings.cascade_max_arrows '{1}' is not a whole number from 1 to 10 — using {2}.",
+		Raw is Object ? Type(Raw) : String(Raw), Default)
+	return Default
+}
+
+_FeatureStateReadKanaOverride(Cache, Value) {
+	if ConfigTomlTryReadBootValue(Cache, ConfigKey.SCRIPT, ConfigLeaf.ALT_GR_IS_KANA_REMAP, &Admitted)
+		Value := Admitted
+	return _FeatureStateValidateKanaOverride(Value)
 }
 
 _FeatureStateValidateKanaOverride(Value) {

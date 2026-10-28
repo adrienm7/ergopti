@@ -168,20 +168,37 @@ function _scan_and_highlight(lower_query) {
 		const lower_text = text.toLowerCase();
 		if (!lower_text.includes(lower_query)) return;
 
+		// Lowercasing can expand a source character, such as İ into i + dot.
+		// Keep matching against the whole folded text (including contextual sigma),
+		// but map its UTF-16 offsets back before slicing the original text node.
+		let source_offsets = null;
+		if (lower_text.length !== text.length) {
+			source_offsets = [];
+			for (let source_idx = 0; source_idx < text.length; source_idx++) {
+				for (let unit = 0; unit < text[source_idx].toLowerCase().length; unit++) {
+					source_offsets.push(source_idx);
+				}
+			}
+		}
+
 		const fragment = document.createDocumentFragment();
 		let last_idx = 0;
+		let search_idx = 0;
 		let idx;
 
-		while ((idx = lower_text.indexOf(lower_query, last_idx)) !== -1) {
-			if (idx > last_idx) {
-				fragment.appendChild(document.createTextNode(text.slice(last_idx, idx)));
+		while ((idx = lower_text.indexOf(lower_query, search_idx)) !== -1) {
+			const start = source_offsets ? source_offsets[idx] : idx;
+			const end = source_offsets ? source_offsets[idx + q_len - 1] + 1 : idx + q_len;
+			if (start > last_idx) {
+				fragment.appendChild(document.createTextNode(text.slice(last_idx, start)));
 			}
 			const span = document.createElement('span');
 			span.className = 'find-highlight';
-			span.textContent = text.slice(idx, idx + q_len);
+			span.textContent = text.slice(start, end);
 			fragment.appendChild(span);
 			_find_matches.push(span);
-			last_idx = idx + q_len;
+			last_idx = end;
+			search_idx = idx + q_len;
 		}
 
 		if (last_idx < text.length) {
@@ -255,12 +272,12 @@ function find_in_page(forward) {
 		_find_index = forward ? 0 : _find_matches.length - 1;
 	} else {
 		// Same query: just advance the cursor
-		if (_find_matches.length === 0) {
-			_set_find_status(_t('ui_typing.not_found'), true);
-			return;
-		}
-		// Detect stale spans (table re-rendered) and re-scan transparently
-		if (_find_index >= 0 && !document.contains(_find_matches[_find_index])) {
+		// A native render can introduce matches after a previous empty scan.
+		// Empty results and detached spans both require the current DOM again.
+		if (
+			_find_matches.length === 0 ||
+			(_find_index >= 0 && !document.contains(_find_matches[_find_index]))
+		) {
 			_clear_highlights();
 			_find_matches = [];
 			_scan_and_highlight(lower_query);

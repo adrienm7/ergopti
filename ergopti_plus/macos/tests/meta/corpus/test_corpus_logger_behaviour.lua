@@ -73,6 +73,9 @@ local EMITTERS = {
 	success = function(...) Logger.success(...) end,
 	warn    = function(...) Logger.warn(...) end,
 	error   = function(...) Logger.error(...) end,
+	-- Not a ninth variant: an INFO line the suppression layers never withhold
+	-- (spec § 4.3), so it is named here for the repeat cases that exercise it.
+	evidence = function(...) Logger.evidence(...) end,
 }
 
 -- Every probe message must be unique. The logger suppresses a line identical to
@@ -549,6 +552,14 @@ helpers.describe("Logger behaviour corpus: repeat collapsing", function()
 						at = step.at + (n - step.range[1]) * step.every,
 						variant = step.variant, module = step.module,
 						template = substitute(step.template, "<n>", tostring(n)),
+					}
+				end
+			elseif step.args then
+				for _, value in ipairs(step.args) do
+					actions[#actions + 1] = {
+						at = step.at,
+						variant = step.variant, module = step.module,
+						template = step.template, arg = value,
 					}
 				end
 			else

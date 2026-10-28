@@ -55,8 +55,8 @@ struct OwnedSuspendedImageRequest {
 			let fields = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
 			(permitted + permitted.map { $0.union(listenerKeys) } + permitted.map { $0.union(logKeys) }
 				+ permitted.map { $0.union(listenerKeys).union(logKeys) }).contains(Set(fields.keys)),
-			fields["log_directory"] == nil || (fields["log_directory"] as? String).map { validPath($0) } == true,
-			fields["listener_event"] == nil || (fields["listener_event"] as? NSNumber).map { CFGetTypeID($0) == CFBooleanGetTypeID() && $0.boolValue } == true,
+			fields["log_directory"] == nil || (fields["log_directory"] as? String).map({ validPath($0) }) == true,
+			fields["listener_event"] == nil || (fields["listener_event"] as? NSNumber).map({ CFGetTypeID($0) == CFBooleanGetTypeID() && $0.boolValue }) == true,
 			unsigned(fields["version"]) == 1,
 			let device = decimal(fields["device"]), device <= UInt64(UInt32.max),
 			let inode = decimal(fields["inode"]), inode > 0,

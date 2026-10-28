@@ -16,6 +16,9 @@ local DEPENDENCIES = {
 	"infra.timings",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
+	"adapters.timer_scheduler",
+	"error_description",
+	"number_policy",
 	"modules.gestures.actions_click",
 }
 
@@ -51,6 +54,7 @@ local function with_fixture(failure_mode, body)
 		},
 		timer = {
 			secondsSinceEpoch = function() return 100 end,
+			absoluteTime = function() return 100000000000 end,
 			doAfter = function(_, callback)
 				return { callback = callback }
 			end,
@@ -169,6 +173,9 @@ local function with_fixture(failure_mode, body)
 			fixture.deferred[#fixture.deferred + 1] = { label = label, callback = callback }
 		end,
 	}
+	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["error_description"] = nil
+	package.loaded["number_policy"] = nil
 	package.loaded["modules.gestures.actions_click"] = nil
 	_G.hs = hs_stub
 

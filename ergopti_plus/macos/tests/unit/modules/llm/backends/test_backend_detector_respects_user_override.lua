@@ -25,7 +25,7 @@ local saved_core = package.loaded["modules.llm"]
 --- @return table A stub API module.
 local function make_api_stub()
 	return {
-		get_base_url          = function() return "http://127.0.0.1:11434" end,
+		get_base_url          = function() return "http://127.0.0.1:11435" end,
 		warmup                = function() end,
 		cancel_streaming      = function() end,
 		is_ready              = function() return false end,
@@ -153,9 +153,9 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 	local function fire_probes()
 		for _, req in ipairs(pending_gets) do
 			if type(req.callback) == "function" then
-				-- Discriminate by URL: Ollama listens on port 11434; anything
+				-- Discriminate by URL: Ergopti's Ollama listens on port 11435; anything
 				-- else is treated as the MLX probe
-				if req.url:find("11434") then
+				if req.url:find("11435") then
 					req.callback(ollama_status, ollama_body, {})
 				else
 					req.callback(mlx_status, mlx_body, {})
@@ -169,7 +169,7 @@ end
 
 --- Loads a fresh copy of modules.llm.init with hs.http.asyncGet REPLACED so it
 --- throws synchronously for the leg identified by `throw_on_url_substr` (e.g.
---- "11434" for Ollama, anything else for MLX), and completes normally for the
+--- "11435" for Ollama, anything else for MLX), and completes normally for the
 --- other leg via the deferred-callback mechanism above.
 --- @param throw_on_url_substr string Substring identifying which probe's URL must throw.
 --- @param other_status number HTTP status for the OTHER (non-throwing) leg.
@@ -390,7 +390,7 @@ helpers.describe("llm.init — auto_detect_backend survives a synchronous asyncG
 		-- discarded: a synchronous throw left ollama_done stuck at false forever,
 		-- so on_both_done() never fired and the callback was silently dropped.
 		local LLM, fire_mlx_leg = load_llm_init_with_one_leg_throwing(
-			"11434",                  -- Ollama leg throws
+			"11435",                  -- Ollama leg throws
 			200, '{"object":"list"}'  -- MLX leg: healthy
 		)
 

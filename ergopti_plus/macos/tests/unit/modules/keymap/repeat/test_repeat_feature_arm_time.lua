@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 local function load_fixture(opts)
 	opts = opts or {}
 	local notifications = {}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		notify_synthetic = function(text, source, deletes, variant)
 			notifications[#notifications + 1] = {
 				text = text, source = source, deletes = deletes, variant = variant,
@@ -49,7 +49,7 @@ local function load_fixture(opts)
 		notifications = notifications,
 		hs = require("hs"),
 		cleanup = function()
-			package.loaded["modules.keylogger"] = nil
+			package.loaded["modules.keystats"] = nil
 			package.loaded["modules.keymap.expander"] = nil
 			package.loaded["modules.keymap.terminator_replay"] = nil
 		end,
@@ -123,8 +123,51 @@ helpers.describe("keymap expander: repeat uses an explicit replacement transacti
 			"the raw carrier and punctuation must both leave the logical buffer")
 		helpers.assert_eq(#fixture.notifications, 1)
 		helpers.assert_eq(fixture.notifications[1].deletes, 2,
-			"keylogger reconciliation must delete the same two codepoints as the screen")
+			"keystats reconciliation must delete the same two codepoints as the screen")
 		helpers.assert_eq(fixture.notifications[1].variant, "repeat_key")
 		fixture.cleanup()
 	end)
+end)
+
+
+--- Decodes one shared hotstrings corpus file.
+--- @param name string File name under _shared/tests/corpus/hotstrings.
+--- @return table vectors
+local function corpus_vectors(name)
+	local fh = assert(io.open(helpers.shared("tests/corpus/hotstrings/" .. name), "rb"))
+	local raw = fh:read("*a")
+	fh:close()
+	local ok, corpus = pcall(require("hs").json.decode, raw)
+	assert(ok and #corpus.vectors > 0, name .. " must be valid JSON holding vectors")
+	return corpus.vectors
+end
+
+helpers.describe("keymap expander: the shared repeat_key_vectors.json corpus", function()
+	for _, vector in ipairs(corpus_vectors("repeat_key_vectors.json")) do
+		helpers.it(vector.id .. " (repeat-key-corpus)", function()
+			local fixture = load_fixture({ buffer = vector.buffer, magic_key = vector.magic_key })
+			fixture.state.start_is_word_boundary = vector.start_is_word_boundary ~= false
+			fixture.synthetic.enter_callback()
+			local fired = fixture.expander.try_repeat_feature(vector.magic_key, true)
+			fixture.synthetic.leave_callback(fired)
+			helpers.assert_eq(fired, vector.fires, vector.description)
+			if vector.fires then
+				local expected = vector.buffer:sub(1, #vector.buffer - #vector.magic_key) .. vector.replacement
+				helpers.assert_eq(fixture.state.buffer, expected, vector.description)
+			end
+			fixture.cleanup()
+		end)
+	end
+end)
+
+helpers.describe("keymap expander: the shared idle_reset_vectors.json corpus", function()
+	local Core = require("hotstring_engine")
+	for _, vector in ipairs(corpus_vectors("idle_reset_vectors.json")) do
+		helpers.it(vector.id .. " (idle-reset-corpus)", function()
+			-- A JSON null decodes to nil or a sentinel: only a number is a keystroke time.
+			local last = type(vector.last_ms) == "number" and vector.last_ms or nil
+			helpers.assert_eq(Core.idle_resets_word(last, vector.now_ms, vector.idle_seconds, 0),
+				vector.resets, vector.description)
+		end)
+	end
 end)

@@ -59,7 +59,7 @@ local ONE_CODEPOINT = 1
 --- @return table state, table registry, table expander
 local function fresh_engine()
 	package.loaded["ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		notify_synthetic = function() end,
 		set_buffer       = function() end,
 		log_hotstring    = function() end,

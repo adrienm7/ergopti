@@ -42,6 +42,7 @@ local focus_timer_state = {}
 --- @param handle table TimerScheduler handle.
 --- @return boolean settled True only when the native timer was released.
 local function cancel_focus_timer(handle)
+	focus_timer_state[handle] = false
 	local ok, result_or_err = xpcall(function()
 		return TimerScheduler.cancel(handle)
 	end, debug.traceback)
@@ -127,7 +128,7 @@ local function focus_hammerspoon(defer_open)
 			-- it pins the task in its own long-lived table before starting it and
 			-- releases it in the completion callback.
 			local candidate = nil
-			local handle, timer_committed = TimerScheduler.after(0.1, function()
+			local handle, timer_committed = TimerScheduler.after(require("infra.timings").sec("ui", "dialog_focus_delay_ms"), function()
 				if focus_timer_state[candidate] ~= true then return end
 				focus_timer_state[candidate] = false
 				if candidate.timer == nil then
@@ -151,7 +152,7 @@ local function focus_hammerspoon(defer_open)
 			tostring(handle_or_err))
 		return false
 	end
-	return true
+	return true, candidate
 end
 
 --- Focus-aware wrapper around hs.dialog.blockAlert.
@@ -159,7 +160,7 @@ end
 --- @return string The text of the button that was clicked.
 function M.block_alert(...)
 	focus_hammerspoon()
-	return hs.dialog.blockAlert(...)
+	return Logger.run_modal(hs.dialog.blockAlert, ...)
 end
 
 --- Focus-aware wrapper around hs.dialog.textPrompt.
@@ -168,7 +169,7 @@ end
 --- @return string The text entered by the user.
 function M.text_prompt(...)
 	focus_hammerspoon()
-	return hs.dialog.textPrompt(...)
+	return Logger.run_modal(hs.dialog.textPrompt, ...)
 end
 
 -- An AppleScript alert holds three buttons: the cancel one and two choices
@@ -244,7 +245,7 @@ function M.choose(title, message, choices, cancel_label, ok_label)
 		end
 	end
 	focus_hammerspoon()
-	local ok, answer, raw = hs.osascript.applescript(
+	local ok, answer, raw = Logger.run_modal(hs.osascript.applescript,
 		M.choose_script(title, message, choices, cancel_label, ok_label))
 	if ok ~= true or type(answer) ~= "string" then
 		error("dialog_util.choose: the dialog failed: " .. tostring(raw), 2)
@@ -294,7 +295,8 @@ end
 --- @return string|nil path The chosen .app path, nil when cancelled.
 function M.choose_application(message, title)
 	focus_hammerspoon()
-	local ok, path = hs.osascript.applescript(M.application_picker_script(message, title))
+	local ok, path = Logger.run_modal(hs.osascript.applescript,
+		M.application_picker_script(message, title))
 	if ok ~= true then
 		error("dialog_util.choose_application: the native application picker failed", 2)
 	end
@@ -307,8 +309,28 @@ end
 function M.alert(...)
 	-- The only wrapper whose dialog does not park the runloop, so the only one
 	-- the deferred raise can reach in time to do what it is for.
-	focus_hammerspoon(true)
-	return hs.dialog.alert(...)
+	local _, focus_timer = focus_hammerspoon(true)
+	local args = table.pack(...)
+	local callback = args[3]
+	local function retire_focus_timer()
+		local handle = focus_timer
+		focus_timer = nil
+		if handle ~= nil then cancel_focus_timer(handle) end
+	end
+	if type(callback) == "function" then
+		args[3] = function(...)
+			-- The native wrapper deletes its alert before delivering this callback.
+			-- Revoke the delayed raise before user work can restore another app.
+			retire_focus_timer()
+			return callback(...)
+		end
+	end
+	local result = table.pack(pcall(hs.dialog.alert, table.unpack(args, 1, args.n)))
+	if not result[1] then
+		retire_focus_timer()
+		error(result[2], 0)
+	end
+	return table.unpack(result, 2, result.n)
 end
 
 return M

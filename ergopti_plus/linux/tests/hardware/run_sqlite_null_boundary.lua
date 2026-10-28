@@ -14,10 +14,10 @@ for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", root .. "/" .. name:lower()))
 end
 
-local Writer = require("modules.keylogger.sqlite_writer")
-local Reader = require("modules.keylogger.sqlite_reader")
+local Writer = require("modules.keystats.sqlite_writer")
+local Reader = require("modules.keystats.sqlite_reader")
 local Json = require("json")
-local Command = require("modules.keylogger.sqlite_command")
+local Command = require("modules.keystats.sqlite_command")
 local database, date, app = root .. "/metrics.sqlite", "2026-10-03", "owned café ' app"
 local checks, failures = 0, 0
 
@@ -85,7 +85,11 @@ check("native nested JSON text keeps escaped NUL and UTF-8 identities", function
 end)
 
 check("native empty row lists and selected app filters keep their meaning", function()
-	assert(next((Reader.read_manifest(database, date, date, { "absent app" }))) == nil)
+	-- The machine's own day is not an application's, so an app filter keeps it
+	-- under _system and a selected absent app adds no other entry.
+	local absent = Reader.read_manifest(database, date, date, { "absent app" })
+	for key in pairs(absent[date] or {}) do assert(key == "_system", "absent app produced entry " .. key) end
+	assert(absent[date] and absent[date]._system.battery_count == 2)
 	assert(next(Reader.read_system_days(database, "2026-10-04", "2026-10-04")) == nil)
 	assert(Reader.read_manifest(database, date, date, {})[date][app].char_letter == 5)
 end)

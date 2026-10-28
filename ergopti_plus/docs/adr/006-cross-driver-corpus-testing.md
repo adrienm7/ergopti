@@ -37,8 +37,20 @@ Current corpus directories:
 
 - `static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json` — hotstring
   expansion input/output pairs.
+- `static/ergopti_plus/_shared/tests/corpus/hotstrings/family_samples.json` —
+  two or three shipped expansions per hotstring family of the menu manifest,
+  read from the shipped packs by `_shared/lua/test/hotstring_family_samples.lua`
+  and replayed by the macOS and Linux E2E harnesses.
+- `static/ergopti_plus/_shared/tests/corpus/hotstrings/sequence_vectors.json` —
+  typed sequences over several mappings (chaining, synthetic output, erase
+  accounting) and the text they leave on screen, replayed by the same harnesses.
 - `static/ergopti_plus/_shared/tests/corpus/tap_hold/vectors.json` — tap-hold
-  timing scenarios and expected key event sequences.
+  configuration accessors.
+- `static/ergopti_plus/_shared/tests/corpus/tap_hold/decision_vectors.json` —
+  timed key streams and the keystrokes the tap-versus-hold decision lets
+  through, replayed by the macOS and Linux engines through
+  `_shared/lua/test/tap_hold_decision_contract.lua`; a driver that decides
+  otherwise is listed in the vector's `divergences` with its reason.
 
 Hammerspoon consumption is implemented in:
 
@@ -82,4 +94,5 @@ Hammerspoon consumption is implemented in:
 
 - Hotstring vectors: `static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json`
 - Tap-hold vectors: `static/ergopti_plus/_shared/tests/corpus/tap_hold/vectors.json`
+- Tap-hold decision vectors: `static/ergopti_plus/_shared/tests/corpus/tap_hold/decision_vectors.json`
 - HS corpus runners: `static/ergopti_plus/macos/tests/meta/corpus/test_corpus_hotstrings.lua`, `test_corpus_tap_hold.lua`

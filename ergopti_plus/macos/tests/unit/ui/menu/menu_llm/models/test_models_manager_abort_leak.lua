@@ -23,8 +23,8 @@ local helpers = require("tests.helpers")
 helpers.describe("models manager: aborted downloads are reset before retry", function()
 	helpers.it("(models-manager-abort-leak) clears abort before invoking the approved download", function()
 		local modules = {
-			"hs", "adapters.timer_scheduler", "infra.logger", "infra.i18n",
-			"infra.dialog_util", "infra.paths",
+			"hs", "adapters.shell_runner", "adapters.timer_scheduler", "infra.logger", "infra.i18n",
+			"infra.dialog_util", "infra.paths", "infra.timings",
 			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
 		}
@@ -66,11 +66,13 @@ helpers.describe("models manager: aborted downloads are reset before retry", fun
 			helpers.with_fresh_modules(modules, function()
 				_G.hs = hs_fixture
 				package.loaded["hs"] = hs_fixture
+				require("tests.support.ui.menu.menu_llm.system_probe_stub").install(16, 100)
 				package.loaded["infra.logger"] = helpers.make_logger_stub()
 				package.loaded["infra.i18n"] = {get = function(key) return key end}
 				package.loaded["infra.dialog_util"] = {
 					block_alert = function() return "menu.llm.btn_download" end,
 				}
+				helpers.provide_timings()
 				package.loaded["infra.paths"] = {
 					shared_llm_path = function()
 						return helpers.shared("modules/llm/models.json")

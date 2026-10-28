@@ -1,9 +1,9 @@
 ﻿; tests/meta/adapters/uia/test_secure_field_probes_focused_element.ahk
 
 ; ==============================================================================
-; MODULE: IsPassword Probe Scope (keylogger-secure-field-window-scoped-probe)
+; MODULE: IsPassword Probe Scope (keystats-secure-field-window-scoped-probe)
 ; DESCRIPTION:
-; The keylogger's secure-field detector asked UIA the right question of the
+; The keystats's secure-field detector asked UIA the right question of the
 ; wrong element. KL_DetectPasswordFor called UIA.ElementFromHandle(hwnd), which
 ; describes the element BEHIND that window handle. Chromium and Electron expose
 ; one Chrome_RenderWidgetHostHWND for the whole window and WPF/UWP one
@@ -23,7 +23,7 @@
 ;
 ; ROOT CAUSE ENCODED: a transitive guard, not a per-function one. The shipped
 ; test for this invariant asserted GetFocusedElement for SFD_ProbeFocusedUia
-; ONLY, so the keylogger sibling was written wrong and the suite stayed green.
+; ONLY, so the keystats sibling was written wrong and the suite stayed green.
 ; This derives the set of IsPassword consumers FROM the source, so a third one
 ; joins the guarantee automatically.
 ; ==============================================================================
@@ -82,7 +82,7 @@ _SFPF_IsPasswordIsReadFromTheFocusedElement() {
 		Assert(InStr(Body, "UIA.GetFocusedElement()") > 0,
 			"'" . Name . "' must read IsPassword from the FOCUSED element. It is a "
 			. "focus-scoped question, and the answer decides whether a keystroke is "
-			. "persisted to disk (keylogger-secure-field-window-scoped-probe)")
+			. "persisted to disk (keystats-secure-field-window-scoped-probe)")
 		Assert(InStr(Body, "UIA.ElementFromHandle(") = 0,
 			"'" . Name . "' must not acquire its element with UIA.ElementFromHandle: that "
 			. "answers about the WINDOW, and for a Chromium / Electron / WPF password box "
@@ -94,7 +94,7 @@ _SFPF_IsPasswordIsReadFromTheFocusedElement() {
 		"IsPassword must be read exactly once, by the disposable worker shared by both secure-field consumers. Found " . Seen)
 }
 
-Test("privacy: every UIA IsPassword verdict is read from the focused element (keylogger-secure-field-window-scoped-probe)",
+Test("privacy: every UIA IsPassword verdict is read from the focused element (keystats-secure-field-window-scoped-probe)",
 	_SFPF_IsPasswordIsReadFromTheFocusedElement)
 
 
@@ -135,7 +135,7 @@ _SFPF_VerdictCacheIsKeyedOnTheFocusedElement() {
 	StopBody := _DriverFuncBody("KL_Hook_Stop")
 	Assert(InStr(StartBody, "KL_PasswordFocusTrackingStart()") > 0
 		and InStr(StopBody, "KL_PasswordFocusTrackingStop()") > 0,
-		"the focused-element invalidator must be lifecycle-paired with the keylogger hook")
+		"the focused-element invalidator must be lifecycle-paired with the keystats hook")
 	TrackerStopBody := _DriverFuncBody("KL_PasswordFocusTrackingStop")
 	UnhookFencePos := InStr(TrackerStopBody, "if !Unhooked")
 	CallbackFreePos := InStr(TrackerStopBody, "KL_FreePasswordFocusCallback")
@@ -155,7 +155,7 @@ _SFPF_VerdictCacheIsKeyedOnTheFocusedElement() {
 			HandlerName . " must invalidate a same-HWND focused element before reuse")
 }
 
-Test("privacy: the keylogger password verdict cache is focused-element scoped (audit-ahk-003-element-cache-key)",
+Test("privacy: the keystats password verdict cache is focused-element scoped (audit-ahk-003-element-cache-key)",
 	_SFPF_VerdictCacheIsKeyedOnTheFocusedElement)
 
 ; FIFO admission classifies the source field before its finally block invalidates

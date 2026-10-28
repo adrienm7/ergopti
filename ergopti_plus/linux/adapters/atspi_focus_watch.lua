@@ -16,8 +16,9 @@ local OwnedProcess = require("adapters.owned_process")
 local Paths = require("infra.paths")
 local AtspiFocus = require("adapters.atspi_focus")
 local Logger = require("logger.shim")
+local ErrorDescription = require("error_description")
 local LOG = "adapters.atspi_focus_watch"
-local MAX_BYTES = 65536
+local MAX_FOCUS_OUTPUT_BYTES = require("llm.process_limits").defaults().max_output_bytes
 local MAX_FRAMES = 128
 
 --- Allocates only daemon-owned FIFO endpoints with close-on-exec descriptors.
@@ -111,7 +112,7 @@ function M.new(options)
 	local lease_ms = Timings.ms("privacy", "atspi_probe_timeout_ms")
 	local barrier_ms = Timings.ms("privacy", "focus_barrier_timeout_ms")
 	local pause = options.pause or function()
-		require("luv").sleep(1)
+		require("luv").sleep(Timings.ms("privacy", "focus_pump_sleep_ms"))
 	end
 	local watcher = {}
 	local transport, operation, callback = nil, nil, nil
@@ -138,12 +139,22 @@ function M.new(options)
 		end
 		return cleanup_ok and transport == nil
 	end
+	--- A revocation listener cannot borrow cancellation or endpoint ownership.
+	--- The receipt is cleared before notification; retire its exact native owner
+	--- even when a consumer refuses the accompanying logical-state update.
+	local function retire()
+		local notified, failure = pcall(publish, nil)
+		if operation then operation:cancel() end
+		local retired = cleanup()
+		if not notified then
+			pcall(Logger.error, LOG, "Native focus revocation listener failed: %s", ErrorDescription.describe(failure))
+		end
+		return retired
+	end
 	local function fail(reason)
 		if not failed then Logger.warn(LOG, "Native focus authority withheld (%s).", reason) end
 		failed, ready = true, false
-		publish(nil)
-		if operation then operation:cancel() end
-		cleanup()
+		retire()
 	end
 
 	--- Registers the single privacy owner before starting the native listener.
@@ -171,7 +182,7 @@ function M.new(options)
 		local ended = false
 		local spawned, child = pcall(start_process, executable, arguments, {
 			owner = "accessibility-focus-watch", capture_tail = true,
-			max_output_bytes = MAX_BYTES, cwd = Paths.driver_root(),
+			max_output_bytes = MAX_FOCUS_OUTPUT_BYTES, cwd = Paths.driver_root(),
 		}, function()
 			ended = true
 			if operation then fail("worker exited") end
@@ -247,7 +258,7 @@ function M.new(options)
 			received = true
 			bytes = bytes + #chunk
 			pending = pending .. chunk
-			if bytes > MAX_BYTES or #pending > MAX_BYTES then fail("output exceeded bound"); break end
+			if bytes > MAX_FOCUS_OUTPUT_BYTES or #pending > MAX_FOCUS_OUTPUT_BYTES then fail("output exceeded bound"); break end
 			if read == MAX_FRAMES then exhausted = true end
 		end
 		if exhausted and not failed then
@@ -315,7 +326,7 @@ function M.new(options)
 			uv.run("nowait")
 			if watcher.pump() then return true end
 			if failed then return false end
-			uv.sleep(1)
+			uv.sleep(Timings.ms("privacy", "focus_pump_sleep_ms"))
 		end
 		publish(nil)
 		return false
@@ -325,9 +336,7 @@ function M.new(options)
 	--- @return boolean settled
 	function watcher.stop()
 		active, ready = false, false
-		publish(nil)
-		if operation then operation:cancel() end
-		return cleanup()
+		return retire()
 	end
 
 	--- Returns physical process, descriptor and private-directory settlement.

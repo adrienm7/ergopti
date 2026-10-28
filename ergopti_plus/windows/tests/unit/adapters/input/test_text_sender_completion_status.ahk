@@ -382,7 +382,7 @@ _TSCD_OwnerRouting() {
 	AtomicCode := _DriverMaskNonCode(&Atomic)
 	DiagnosticCode := _DriverMaskNonCode(&Diagnostic)
 	Guard := RegExMatch(Code, "i)\bif\s*\(\s*Generation\s*!=\s*_TEXT_CLIPBOARD_GENERATION\s*\)")
-	Write := RegExMatch(Code, "i)\bCB_Write\s*\(")
+	Write := RegExMatch(Code, "i)\bCB_WriteTextWithReceipt\s*\(")
 	Ready := RegExMatch(Code, "i)\b_TextSenderTryClipboardDiagnostic\s*\(")
 	Send := RegExMatch(Code, "i)\b_TextSenderRunAtomicOutput\s*\(")
 	Assert(Ready > 0 and Guard > Ready and Send > Guard,
@@ -613,3 +613,5 @@ for Mode in ["matching", "foreign", "unavailable", "unavailable-foreign", "throw
 	Test("TextSender: restore handles " . Mode . " clipboard sequence (text-sender-restore-unavailable)",
 		_TSRO_ClipboardRestoreObservation.Bind(Mode))
 }
+
+#Include test_text_sender_clipboard_owner.ahk

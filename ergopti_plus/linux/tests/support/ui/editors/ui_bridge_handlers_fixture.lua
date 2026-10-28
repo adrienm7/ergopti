@@ -75,7 +75,7 @@ end
 local function build_mock_state()
   return {
     engine    = { loaded = true },
-    keylogger = require("tests.fakes.metrics_keylogger").synchronous({
+    keystats = require("tests.fakes.metrics_keystats").synchronous({
       get_session_stats = function() return { keystrokes = 42, words = 8, duration_ms = 120000 } end,
       get_wpm           = function() return 35.5 end,
       get_app_stats     = function() return { firefox = { keystrokes = 20 }, code = { keystrokes = 22 } } end,

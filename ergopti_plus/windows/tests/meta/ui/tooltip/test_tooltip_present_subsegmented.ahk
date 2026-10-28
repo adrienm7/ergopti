@@ -238,7 +238,7 @@ _TPS_VisibleDecisionCommitHasOneTransitiveOwner() {
 		and DequeueGuard > OwnershipGuard and Clear > DequeueGuard,
 		"surface/dequeue ownership refusal and visible-decision detach must share the pure hide transaction")
 	Assert(HideCriticalOff > Clear and DismissEmit > HideCriticalOff,
-		"TooltipHide must detach decision/metric state in its pixel transaction but defer privacy/keylogger dismissal work until Critical is restored")
+		"TooltipHide must detach decision/metric state in its pixel transaction but defer privacy/keystats dismissal work until Critical is restored")
 }
 
 ; TooltipShow and its deferred callback share one mutable slot. All tuple fields
@@ -549,7 +549,7 @@ _TPS_PostPresentTokenGuardsEveryMutation() {
 		"suggestion state must be token-validated in its short Critical mutation, while privacy/log preparation stays outside that span")
 	AppendCritical := InStr(Append, 'AppendCritical := Critical("On")')
 	AppendGuard := InStr(Append, "PublishGuard.Call()", true, AppendCritical)
-	AppendPush := InStr(Append, "Keylogger._pending_entries.Push(entry)", true,
+	AppendPush := InStr(Append, "Keystats._pending_entries.Push(entry)", true,
 		AppendGuard)
 	AppendCommit := InStr(Append, "PublishCommit.Call()", true, AppendPush)
 	Assert(AppendCritical > 0 and AppendGuard > AppendCritical

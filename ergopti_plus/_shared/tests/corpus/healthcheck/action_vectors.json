@@ -2224,6 +2224,160 @@
 			},
 			"error": "bad_page_checks",
 			"id": "export refuses negative duration"
+		},
+		{
+			"id": "day_log_enable",
+			"driver": "linux",
+			"message": {
+				"action": "day_log",
+				"enabled": true
+			},
+			"expected": {
+				"action": "day_log",
+				"enabled": true
+			}
+		},
+		{
+			"id": "day_log_disable",
+			"driver": "windows",
+			"message": {
+				"action": "day_log",
+				"enabled": false
+			},
+			"expected": {
+				"action": "day_log",
+				"enabled": false
+			}
+		},
+		{
+			"id": "day_log_without_enabled",
+			"driver": "linux",
+			"message": {
+				"action": "day_log"
+			},
+			"error": "bad_enabled"
+		},
+		{
+			"id": "day_log_enabled_must_be_a_boolean",
+			"driver": "linux",
+			"message": {
+				"action": "day_log",
+				"enabled": "yes"
+			},
+			"error": "bad_enabled"
+		},
+		{
+			"id": "day_log_carries_nothing_else",
+			"driver": "linux",
+			"message": {
+				"action": "day_log",
+				"enabled": true,
+				"path": "/tmp/x"
+			},
+			"error": "bad_enabled"
+		},
+		{
+			"id": "save_with_the_day_log",
+			"driver": "linux",
+			"message": {
+				"action": "save",
+				"text": "# report",
+				"name": "ergopti-diagnostics-linux-2.1.0-20260924T100000Z.md",
+				"day_log": true
+			},
+			"expected": {
+				"action": "save",
+				"text": "# report",
+				"name": "ergopti-diagnostics-linux-2.1.0-20260924T100000Z.md",
+				"day_log": true
+			}
+		},
+		{
+			"id": "save_with_day_log_false_drops_the_flag",
+			"driver": "macos",
+			"message": {
+				"action": "save",
+				"text": "# report",
+				"name": "ergopti-diagnostics-linux-2.1.0-20260924T100000Z.md",
+				"day_log": false
+			},
+			"expected": {
+				"action": "save",
+				"text": "# report",
+				"name": "ergopti-diagnostics-linux-2.1.0-20260924T100000Z.md"
+			}
+		},
+		{
+			"id": "save_day_log_must_be_a_boolean",
+			"driver": "linux",
+			"message": {
+				"action": "save",
+				"text": "# report",
+				"name": "ergopti-diagnostics-linux-2.1.0-20260924T100000Z.md",
+				"day_log": "true"
+			},
+			"error": "bad_day_log"
+		},
+		{
+			"id": "report_with_the_day_log",
+			"driver": "linux",
+			"message": {
+				"action": "report",
+				"text": "# report",
+				"fields": {},
+				"day_log": true
+			},
+			"expected": {
+				"action": "report",
+				"text": "# report",
+				"fields": {},
+				"day_log": true
+			}
+		},
+		{
+			"id": "report_day_log_must_be_a_boolean",
+			"driver": "linux",
+			"message": {
+				"action": "report",
+				"text": "# report",
+				"fields": {},
+				"day_log": "1"
+			},
+			"error": "bad_day_log"
+		},
+		{
+			"id": "copy_never_carries_the_day_log",
+			"driver": "linux",
+			"message": {
+				"action": "copy",
+				"text": "# report",
+				"day_log": true
+			},
+			"error": "bad_day_log"
+		},
+		{
+			"id": "export_snapshot_with_the_day_log",
+			"driver": "linux",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": 1,
+				"day_log": true
+			},
+			"expected": {
+				"action": "export_snapshot",
+				"export_sequence": 1,
+				"day_log": true
+			}
+		},
+		{
+			"id": "export_snapshot_day_log_must_be_a_boolean",
+			"driver": "linux",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": 1,
+				"day_log": "yes"
+			},
+			"error": "bad_day_log"
 		}
 	]
 }

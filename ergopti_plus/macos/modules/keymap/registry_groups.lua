@@ -25,6 +25,8 @@ local hs     = hs
 local Logger = require("infra.logger")
 
 local PersonalFiles = require("hotstrings.personal_files")
+local PrivateLabel = require("diagnostics.private_label")
+local TableUtil = require("table_util")
 local LOG = "keymap.registry"
 
 local _delay_resolver = nil
@@ -96,9 +98,7 @@ end
 --- @param source table
 --- @return table
 local function copy_map(source)
-	local out = {}
-	for key, value in pairs(source or {}) do out[key] = value end
-	return out
+	return TableUtil.shallow_copy(source or {})
 end
 
 --- Copies a two-level ownership map without retaining mutable child aliases.
@@ -354,12 +354,7 @@ end
 --- Deep-copies corpus metadata so a caller cannot reach the registered record.
 --- @param value any Plain Lua data.
 --- @return any copy
-local function copy_plain(value)
-	if type(value) ~= "table" then return value end
-	local out = {}
-	for key, child in pairs(value) do out[key] = copy_plain(child) end
-	return out
-end
+local copy_plain = TableUtil.deep_copy
 
 --- Returns the delay inputs of every registered TOML group, detached: its
 --- section names (separators and placeholders excluded) and the corpus
@@ -499,6 +494,34 @@ local function ensure_group_order(name)
 	end
 end
 
+--- Where a mapping file comes from, without its name: a file under the user's
+--- configuration folder is theirs (a personal pack, a user extension, a copy of
+--- a category); any other file ships with the driver.
+--- @param path string Absolute file path.
+--- @return string origin "user", "bundled" or "origin unknown".
+local function file_origin(path)
+	local loaded, ConfigPaths = pcall(require, "infra.config_paths")
+	if not loaded or type(ConfigPaths) ~= "table" or type(ConfigPaths.get_config_dir) ~= "function" then
+		return "origin unknown"
+	end
+	local resolved, config_dir = pcall(ConfigPaths.get_config_dir)
+	if not resolved or type(config_dir) ~= "string" or config_dir == "" then return "origin unknown" end
+	return path:sub(1, #config_dir) == config_dir and "user" or "bundled"
+end
+
+--- Names a mapping file in a log line without its user-chosen name: the masked
+--- placeholder plus its stable load ordinal and its origin, so a boot log still
+--- tells the files apart and says whether a shipped or a user file is meant.
+--- @param name string Group identifier, masked.
+--- @param path string Absolute file path.
+--- @return string label Such as "#2 (bundled, '<name>')".
+local function file_label(name, path)
+	local group = _state.groups[name]
+	local order = group and group.group_order
+	return string.format("#%s (%s, '%s')", tostring(order or "?"), file_origin(path),
+		PrivateLabel.mask(name))
+end
+
 --- Loads mappings from a Lua file via dofile and records the group.
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the Lua hotstring file.
@@ -512,7 +535,7 @@ function M.load_file(name, path)
 	end
 
 	return run_transaction("load_file:" .. name, function()
-		Logger.start(LOG, "Loading Lua mapping file '%s'…", name)
+		Logger.start(LOG, "Loading Lua mapping file '%s'…", PrivateLabel.mask(name))
 		ensure_group_order(name)
 		_state.current_group = name
 
@@ -526,7 +549,7 @@ function M.load_file(name, path)
 		record_group(name, path, "lua")
 		replace_group_section_delays(name, nil)
 		_callbacks.sort_mappings()
-		Logger.success(LOG, "Lua mapping file '%s' loaded (%d total mapping(s)).", name, #_state.mappings)
+		Logger.success(LOG, "Lua mapping file '%s' loaded (%d total mapping(s)).", PrivateLabel.mask(name), #_state.mappings)
 		return true
 	end)
 end
@@ -634,7 +657,7 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 	if resolution ~= nil and (source_content == nil or type(resolution) ~= "table"
 		or type(resolution.priority_reader) ~= "function" or type(resolution.delay_resolver) ~= "function") then return false end
 	return run_transaction("load_toml:" .. name, function()
-		Logger.start(LOG, "Loading TOML mapping file '%s'…", name)
+		Logger.start(LOG, "Loading TOML mapping file '%s'…", PrivateLabel.mask(name))
 
 		local toml_reader       = require("infra.toml.reader")
 		local ok, data, committed
@@ -650,7 +673,7 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 		if section_sources ~= nil then
 			local merged, merge_err = merge_section_sources(data, section_sources, toml_reader)
 			if not merged then
-				Logger.error(LOG, "TOML group '%s' cannot take its bound sections: %s.", name, merge_err)
+				Logger.error(LOG, "TOML group '%s' cannot take its bound sections: %s.", PrivateLabel.mask(name), merge_err)
 				return false
 			end
 			data = merged
@@ -675,6 +698,11 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 	_state.current_group = name
 	local sections_info  = {}
 	local registrations = {}
+	-- Sections the user switched off: a file whose every section is disabled
+	-- legitimately registers nothing, which is not the path problem the zero
+	-- warning below reports.
+	local disabled_sections = 0
+	local enabled_sections = 0
 
 	-- Collision-priority cascade inputs (individual > section > file > source).
 	-- The shared user-override file (hotstrings_config.toml) sits ABOVE the TOML
@@ -759,6 +787,7 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 		end
 
 		if _callbacks.is_section_enabled(name, sec_name) then
+			enabled_sections = enabled_sections + 1
 			-- Flatten the user/TOML layers into one effective override priority so
 			-- the order matches AHK exactly (user-section > user-file > meta-section
 			-- > meta-file). The individual per-entry priority and the source default
@@ -782,7 +811,8 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 				} }
 			end
 		else
-			Logger.debug(LOG, "Section '%s/%s' skipped (disabled in hs.settings).", name, sec_name)
+			disabled_sections = disabled_sections + 1
+			Logger.debug(LOG, "Section '%s/%s' skipped (disabled in hs.settings).", PrivateLabel.mask(name), sec_name)
 		end
 
 		table.insert(sections_info, {
@@ -851,12 +881,21 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 	-- its Logger.start with a success whose count came from every OTHER group —
 	-- the one number guaranteed to look healthy. A group that loads zero entries
 	-- is almost always a path or permission problem, and it now says so.
+	-- The file was read and parsed (a missing or unreadable one failed above),
+	-- so zero mappings is either deliberate or a shipped file gone wrong.
 	local added = #_state.mappings - mappings_before
-	if added == 0 then
-		Logger.warn(LOG, "TOML mapping file '%s' registered ZERO mappings — check the path and its contents.", name)
+	local label = file_label(name, path)
+	if added == 0 and enabled_sections == 0 and disabled_sections > 0 then
+		Logger.info(LOG, "TOML mapping file %s registered no mapping: its %d section(s) are disabled.",
+			label, disabled_sections)
+	elseif added == 0 and file_origin(path) == "user" then
+		-- A personal file the user created and has not filled yet.
+		Logger.info(LOG, "TOML mapping file %s holds no mapping yet.", label)
+	elseif added == 0 then
+		Logger.warn(LOG, "TOML mapping file %s registered ZERO mappings — check the path and its contents.", label)
 	else
-		Logger.success(LOG, "TOML mapping file '%s' loaded (%d mapping(s); %d total).",
-			name, added, #_state.mappings)
+		Logger.success(LOG, "TOML mapping file %s loaded (%d mapping(s); %d total).",
+			label, added, #_state.mappings)
 	end
 	return true
 	end)
@@ -883,7 +922,7 @@ function M.reload_toml(name, path)
 	return run_transaction("reload_toml:" .. name, function()
 		local group = _state.groups[name]
 		if not group then
-			Logger.error(LOG, "reload_toml: unknown group '%s'.", name)
+			Logger.error(LOG, "reload_toml: unknown group '%s'.", PrivateLabel.mask(name))
 			return false
 		end
 		if group.enabled ~= true then
@@ -993,7 +1032,7 @@ function M.disable_group(name)
 		_callbacks.drop_classify_cache()
 		replace_group_section_delays(name, nil)
 
-		Logger.debug(LOG, "Group '%s' disabled (%d mapping(s) remaining).", name, #_state.mappings)
+		Logger.debug(LOG, "Group '%s' disabled (%d mapping(s) remaining).", PrivateLabel.mask(name), #_state.mappings)
 		return true
 	end)
 end
@@ -1044,7 +1083,7 @@ function M.register_lua_group(name, meta_description, sections)
 		sections         = type(sections) == "table" and sections or {},
 	}
 	replace_group_section_delays(name, nil)
-	Logger.debug(LOG, "Lua group '%s' registered.", name)
+	Logger.debug(LOG, "Lua group '%s' registered.", PrivateLabel.mask(name))
 end
 
 --- Enables a previously disabled group by reloading its file (or re-running its hook).
@@ -1060,7 +1099,7 @@ function M.enable_group(name)
 	if g.enabled then M.note_registry_mutation(); return true end
 
 	return run_transaction("enable_group:" .. tostring(name), function()
-		Logger.debug(LOG, "Enabling group '%s' (kind: %s)…", name, g.kind or "?")
+		Logger.debug(LOG, "Enabling group '%s' (kind: %s)…", PrivateLabel.mask(name), g.kind or "?")
 
 		if g.path == nil then
 			-- Programmatic group: mark enabled and run the post-load hook if any.

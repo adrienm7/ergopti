@@ -347,7 +347,7 @@ helpers.describe("karabiner disable state is committed only after STOPPED", func
 			helpers.assert_true(result == false,
 				"the disable request failed even though its prior paused state was restored")
 			helpers.assert_eq(calls.lease_bound_starts, 0,
-				"paused recovery must not restart gesture or keylogger resources")
+				"paused recovery must not restart gesture or keystats resources")
 		end)
 	end)
 

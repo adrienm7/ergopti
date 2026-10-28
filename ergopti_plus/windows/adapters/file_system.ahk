@@ -941,10 +941,10 @@ FSCopyReplaceAtomic(Source, Destination) {
 	if !FSPathIsAdmissible(Source) || !FSPathIsAdmissible(Destination)
 		return false
 	Stage := Destination . ".ergopti-restore.tmp"
-	try FileCopy(Source, Stage, true)
-	catch
+	; The fixed pathname conveys no ownership over a preexisting sidecar.
+	if !FSCopyCreateVerified(Source, Stage)
 		return false
-	if FSSameBytes(Source, Stage) && FSAtomicMoveReplace(Stage, Destination)
+	if FSAtomicMoveReplace(Stage, Destination)
 		return true
 	try FileDelete(Stage)
 	return false

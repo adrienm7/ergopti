@@ -29,8 +29,8 @@ require("test.metrics_widget_menu_contract").register(helpers, {
 		}
 		local ok, result = xpcall(function()
 			local rows = helpers.load_module("ui.menu.menu_builder").build({
-				keylogger = {
-					is_enabled = function() return values.keylogger_enabled end,
+				keystats = {
+					is_enabled = function() return values.keystats_enabled end,
 					get_privacy_state = function() return {} end,
 				},
 			})
@@ -72,7 +72,7 @@ helpers.describe("Metrics widget commands", function()
 				package.loaded["ui.wpm.widget"] = widget
 				local ok, err = xpcall(function()
 					local rows = helpers.load_module("ui.menu.menu_builder").build({
-						keylogger = { is_enabled = function() return true end,
+						keystats = { is_enabled = function() return true end,
 							get_privacy_state = function() return {} end },
 						on_menu_changed = function() calls.rebuild = calls.rebuild + 1 end,
 					})
@@ -119,7 +119,7 @@ helpers.describe("declared inert Metrics migration statuses", function()
 			end
 		end
 		logger.cancel_migration = function() calls.cancel = calls.cancel + 1; return receipt end
-		local rows = helpers.load_module("ui.menu.menu_builder").build({ keylogger = logger })
+		local rows = helpers.load_module("ui.menu.menu_builder").build({ keystats = logger })
 		local i18n = require("infra.i18n")
 		for _, row in ipairs(rows) do
 			if row.title == i18n.get("menu.metrics.title") then return row.menu[#row.menu], calls end
@@ -509,11 +509,11 @@ local function metrics_parent_fixture(body)
 	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
 	local language = locale.current_locale();locale.set_locale("en")
 	local observed = {builds=0,parents=0,getters=0}
-	local context = { keylogger={is_enabled=function()return false end,get_privacy_state=function()return{}end} }
+	local context = { keystats={is_enabled=function()return false end,get_privacy_state=function()return{}end} }
 	local function build(paused, enabled)
 		context.paused=paused==true
 		observed.child_complete=false;observed.native_reads_after_child=0
-		context.keylogger.is_enabled=function()
+		context.keystats.is_enabled=function()
 			if observed.child_complete then observed.native_reads_after_child=observed.native_reads_after_child+1 end
 			return enabled==true
 		end

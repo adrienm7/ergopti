@@ -24,6 +24,7 @@ _OSRA_RouteSource(Symbol, KeyId, HotkeyName, FunctionName) {
 _OSRA_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
+	Code .= "#Include " . _DriverDir . "\_generated\config_keys.ahk`n"
 	for Symbol in ["SIHO_StartOwned", "JsonParse"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "the real admission dependency must have one owner: " . Symbol)
@@ -32,6 +33,7 @@ _OSRA_ChildSource() {
 	for Name in ["OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys",
 		"TapHoldDispatchTap", "TapHoldTapInDispatch", "TapHoldShouldCancelTap", "_TH_TakePressTakenByCombination",
 		"TapHoldForgetTrackedKey", "TapHoldTapIsCommand", "_TapHoldTapEndsCapsWord", "TapHoldDuration",
+		"_TapHoldDurationValid", "TapHoldGlobalDuration",
 		"TapHoldIsEnabled", "TapHoldEntryHasKnownAction", "TapHoldTapAction", "TapHoldHoldModifier", "TapHoldHoldLayer"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the genuine route dependency must exist: " . Name)

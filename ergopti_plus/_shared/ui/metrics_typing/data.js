@@ -87,11 +87,11 @@ function merge_dict(
 
 		// Normalize known control characters to their bracket-marker or space equivalents
 		// so they pass the ctrl-char filters and render with proper chip labels in all tabs.
-		// RS (0x1E) is used by some keylogger versions as a space placeholder.
+		// RS (0x1E) is used by some keystats versions as a space placeholder.
 		display_k = display_k
 			.replace(/\x08/g, '[BS]')
 			.replace(/\x09/g, '[TAB]')
-			// LF (\x0A) was used by older keylogger builds; CR (\x0D) matches
+			// LF (\x0A) was used by older keystats builds; CR (\x0D) matches
 			// some edge cases — both map to [ENTER] so historical data is handled.
 			.replace(/[\x0A\x0D]/g, '[ENTER]')
 			.replace(/\x1B/g, '[ESC]')
@@ -127,15 +127,21 @@ function merge_dict(
 
 		if (real_count <= 0) return;
 
-		if (!target[display_k]) {
-			target[display_k] = {
-				count: 0,
-				time: 0,
-				errors: 0,
-				synth_hs: 0,
-				synth_llm: 0,
-				synth_other: 0
-			};
+		if (!Object.hasOwn(target, display_k)) {
+			// Native text is data even when it names an inherited member or setter.
+			Object.defineProperty(target, display_k, {
+				value: {
+					count: 0,
+					time: 0,
+					errors: 0,
+					synth_hs: 0,
+					synth_llm: 0,
+					synth_other: 0
+				},
+				enumerable: true,
+				writable: true,
+				configurable: true
+			});
 		}
 
 		target[display_k].count += real_count;
@@ -223,26 +229,12 @@ window.setTypingMetricsFreshness = function (freshness, revision) {
 	return !!(window.metrics_freshness && window.metrics_freshness.show(freshness, revision));
 };
 
-/**
- * Processes the manifest after it is injected by the Lua backend. On first
- * call initializes untouched filters; on subsequent calls recomputes KPIs and
- * fetches updated n-gram data.
- */
-function process_manifest() {
+/** Reconciles the admitted manifest without changing native range ownership. */
+function update_manifest_scope() {
 	const start_input = document.getElementById('date_start');
 	const end_input = document.getElementById('date_end');
-	// A filtered request or an app-modal selection predates this first reply.
-	// Nonempty date edits also count before the native input dispatches change.
-	// Their projection must retain its original native ownership token.
-	const has_initial_range_intent =
-		app_state.range_request_sequence > 0 ||
-		app_state.app_selection_mode === APP_SELECTION_MODE.NONE ||
-		app_state.app_selection_mode === APP_SELECTION_MODE.SUBSET ||
-		!!start_input?.value ||
-		!!end_input?.value;
-	if (Object.keys(window.metrics_manifest).length > 0) {
-		app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
-
+	app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
+	if (app_state.manifest_dates_sorted.length > 0) {
 		const app_set = new Set();
 		app_state.manifest_dates_sorted.forEach((date) => {
 			Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
@@ -280,6 +272,34 @@ function process_manifest() {
 		if (!start_input.value) start_input.value = range.start;
 		if (!end_input.value) end_input.value = range.end;
 	}
+}
+
+/** Refreshes manifest charts and metadata without creating another n-gram query. */
+function refresh_manifest_projection() {
+	update_manifest_scope();
+	update_app_btn_text();
+	compute_manifest_metrics();
+}
+
+/**
+ * Processes the manifest after it is injected by the Lua backend. On first
+ * call initializes untouched filters; on subsequent calls recomputes KPIs and
+ * fetches updated n-gram data.
+ */
+function process_manifest() {
+	const start_input = document.getElementById('date_start');
+	const end_input = document.getElementById('date_end');
+	// A filtered request or an app-modal selection predates this first reply.
+	// Nonempty date edits also count before the native input dispatches change.
+	// Their projection must retain its original native ownership token.
+	const has_initial_range_intent =
+		app_state.range_request_sequence > 0 ||
+		app_state.app_selection_mode === APP_SELECTION_MODE.NONE ||
+		app_state.app_selection_mode === APP_SELECTION_MODE.SUBSET ||
+		!!start_input?.value ||
+		!!end_input?.value;
+	update_manifest_scope();
+
 	if (!app_state.did_apply_initial_reset) {
 		app_state.did_apply_initial_reset = true;
 		ensure_live_refresh();
@@ -438,15 +458,16 @@ function compute_manifest_metrics() {
 			if (app.hourly_min5) {
 				Object.keys(app.hourly_min5).forEach((bucket) => {
 					const md = app.hourly_min5[bucket] || {};
-					if (!app_state.minute5_series[bucket]) {
-						app_state.minute5_series[bucket] = { c: 0, es: 0, e_buckets: {} };
+					const datedBucket = `${date_str}T${bucket}`;
+					if (!app_state.minute5_series[datedBucket]) {
+						app_state.minute5_series[datedBucket] = { c: 0, es: 0, e_buckets: {} };
 					}
-					app_state.minute5_series[bucket].c += md.c || 0;
-					app_state.minute5_series[bucket].es += md.es || 0;
+					app_state.minute5_series[datedBucket].c += md.c || 0;
+					app_state.minute5_series[datedBucket].es += md.es || 0;
 					const src_eb = md.e_buckets || {};
 					Object.keys(src_eb).forEach((k) => {
-						app_state.minute5_series[bucket].e_buckets[k] =
-							(app_state.minute5_series[bucket].e_buckets[k] || 0) + (src_eb[k] || 0);
+						app_state.minute5_series[datedBucket].e_buckets[k] =
+							(app_state.minute5_series[datedBucket].e_buckets[k] || 0) + (src_eb[k] || 0);
 					});
 				});
 			}
@@ -566,7 +587,7 @@ function compute_manifest_metrics() {
 
 /**
  * Recomputes the global speed KPI (CPM/MPM) honestly using the precise
- * cache buckets emitted by the keylogger (time_buckets, credited_buckets,
+ * cache buckets emitted by the keystats (time_buckets, credited_buckets,
  * hs_input_*_buckets, llm_input_*_buckets).
  *
  * Vocabulary
@@ -2026,7 +2047,7 @@ function render_ergo_bigram_table() {
 			(d) =>
 				`<tr><td>${escape_html(d.pair)}</td>` +
 				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:center;color:#aaa;">${d.kind}</td></tr>`
+				`<td style="text-align:center;color:${ThemeTokens.color('grey-aaa')};">${d.kind}</td></tr>`
 		)
 		.join('');
 
@@ -2211,7 +2232,7 @@ function render_ergo_trigram_table() {
 			(d) =>
 				`<tr><td>${escape_html(d.seq)}</td>` +
 				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:center;color:#aaa;">${d.kind}</td></tr>`
+				`<td style="text-align:center;color:${ThemeTokens.color('grey-aaa')};">${d.kind}</td></tr>`
 		)
 		.join('');
 
@@ -2351,8 +2372,8 @@ function render_errors_table() {
 			(d) =>
 				`<tr><td>${escape_html(d.pair)}</td>` +
 				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:right;color:#f87171;">${format_number(d.errors)}</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:#f87171;"><b>${(d.rate * 100).toFixed(1)}%</b></td>` +
+				`<td style="text-align:right;color:${ThemeTokens.color('hue-f87171')};">${format_number(d.errors)}</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('hue-f87171')};"><b>${(d.rate * 100).toFixed(1)}%</b></td>` +
 				`</tr>`
 		)
 		.join('');
@@ -2573,7 +2594,7 @@ function render_lexical_kpi() {
 		const label = l === 15 ? '15+' : String(l);
 		bars_html.push(
 			`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:#aaa;width:42px;">${label} car.</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:42px;">${label} car.</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(251, 191, 36);"></div>` +
@@ -2706,7 +2727,7 @@ function render_rhythm_kpi() {
 			const label = k === '500+' ? '500+ car.' : `≤ ${k} car.`;
 			return (
 				`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:#aaa;width:78px;">${label}</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:78px;">${label}</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(56, 189, 248);"></div>` +
@@ -2848,18 +2869,23 @@ function render_records_kpi() {
 	let streak_max = 0,
 		streak_cur = 0,
 		prev = null;
-	const ymd = (s) => new Date(s + 'T12:00:00').getTime();
 	sorted_dates.forEach((d) => {
-		if (prev && ymd(d) - prev === 86400_000) streak_cur += 1;
+		const ordinal = parseDateKey(d);
+		if (prev !== null && shiftMetricsDay(prev, 1) === ordinal) streak_cur += 1;
 		else streak_cur = 1;
 		if (streak_cur > streak_max) streak_max = streak_cur;
-		prev = ymd(d);
+		prev = ordinal;
 	});
 
 	const fr_short = (date_str) => {
 		if (!date_str) return '—';
-		const d = new Date(date_str + 'T12:00:00');
-		return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' });
+		const d = new Date(parseDateKey(date_str));
+		return d.toLocaleDateString('fr-FR', {
+			day: 'numeric',
+			month: 'short',
+			year: '2-digit',
+			timeZone: 'UTC'
+		});
 	};
 
 	const set = (id, html) => {
@@ -3202,7 +3228,7 @@ function render_apps_table() {
 				`</div>` +
 				`</td>` +
 				`<td style="text-align:right;font-variant-numeric:tabular-nums;">${d.cpm > 0 ? d.cpm.toFixed(0) : '—'}</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:#aaa;">${fmt_dur(d.time_ms)}</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};">${fmt_dur(d.time_ms)}</td>` +
 				`</tr>`
 			);
 		})
@@ -3232,6 +3258,8 @@ function sort_apps_table(col) {
 // ===================================================
 // ===================================================
 
+// [ui] metrics_typing_dispatch_delay_ms (pinned: a page script cannot read the registry)
+const DISPATCH_DELAY_MS = 50;
 const LONG_SESSION_THRESHOLD_MS = 90 * 60 * 1000; // 90 min — clinical RSI risk threshold
 
 /**
@@ -3399,7 +3427,7 @@ function render_wellness_kpi() {
 		const text_color = pct > 18 ? 'color:rgb(248,113,113);font-weight:600;' : '';
 		return (
 			`<tr>` +
-			`<td style="color:#aaa;width:90px;">${label}</td>` +
+			`<td style="color:${ThemeTokens.color('grey-aaa')};width:90px;">${label}</td>` +
 			`<td style="text-align:center;width:24px;">${f.startsWith('l') ? 'G' : 'D'}</td>` +
 			`<td style="padding:2px 6px;">` +
 			`<div style="display:flex;align-items:center;gap:6px;">` +
@@ -3436,7 +3464,10 @@ function request_cache_reset() {
 		window.chrome.webview.postMessage(JSON.stringify({ action: 'clear_cache' }));
 		return;
 	}
-	if (window.__ergopti_host === 'linux' && window.webkit?.messageHandlers?.metrics_typing_bridge) {
+	if (
+		hostHasCapability('document_bridge') &&
+		window.webkit?.messageHandlers?.metrics_typing_bridge
+	) {
 		window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'clear_cache' });
 		return;
 	}
@@ -3594,7 +3625,7 @@ function request_range_data(show_loader = true) {
 		// Send the selected range directly so date/app changes refresh the
 		// n-gram tables instead of leaving the initial prefetch on screen.
 		if (
-			window.__ergopti_host === 'linux' &&
+			hostHasCapability('document_bridge') &&
 			window.webkit?.messageHandlers?.metrics_typing_bridge
 		) {
 			try {
@@ -3610,7 +3641,7 @@ function request_range_data(show_loader = true) {
 		}
 		window._lua_request = JSON.stringify(req);
 	};
-	setTimeout(dispatch, 50);
+	setTimeout(dispatch, DISPATCH_DELAY_MS);
 }
 
 /**
@@ -3661,7 +3692,7 @@ function receive_range_data(payload, request_id = null) {
 }
 
 /**
- * Receives a real-time live-update push from the Lua keylogger and
+ * Receives a real-time live-update push from the Lua keystats and
  * re-renders the table after a short debounce to batch rapid keystrokes.
  * @param {Object} today_idx - The current session's live n-gram data.
  */

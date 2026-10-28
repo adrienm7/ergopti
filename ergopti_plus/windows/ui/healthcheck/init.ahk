@@ -11,7 +11,7 @@
 ; FEATURES & RATIONALE:
 ; 1. Two phases: phase A reads registry values, Win32 calls, memory and small
 ;    files under the schema's 5 ms budget, on the thread that also serves the
-;    keyboard hook; phase B runs the network probes as curl children harvested
+;    keyboard hook; phase B runs the network probes as native request children harvested
 ;    by timers, and pushes each answer into the open page.
 ; 2. Every page message goes through HealthCheck_ValidateAction: the host opens
 ;    only the paths it collected, by field id.

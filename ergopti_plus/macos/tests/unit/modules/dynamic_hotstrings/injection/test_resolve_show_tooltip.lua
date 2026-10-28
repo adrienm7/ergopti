@@ -35,7 +35,6 @@ helpers.describe("hotstrings_config.resolve early-return — show_tooltip defaul
 			parse = function()
 				return {
 					sections = {
-						delays = { default_sec = 0.05 },
 						colors = { global_default = "#cccccc", personal = "#aaaaaa" },
 					},
 				}, true

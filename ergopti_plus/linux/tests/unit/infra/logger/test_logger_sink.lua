@@ -79,6 +79,7 @@ end
 --- Native filesystem ownership is covered by run_logger_write_receipts.lua.
 local function with_probe_receipts(failure, test)
 	local Sink = helpers.load_module("infra.logger_sink")
+	local saved_writer = package.loaded["infra.regular_file_writer"]
 	local previous_open, previous_popen = io.open, io.popen
 	local previous_execute, previous_remove = os.execute, os.remove
 	local state = { opened = {}, removed = {}, written = 0, flushed = 0, closed = 0 }
@@ -89,7 +90,7 @@ local function with_probe_receipts(failure, test)
 		if failure == "create" then return nil, "refused" end
 		return { read = function() return path .. "\n" end, close = function() return true end }
 	end
-	io.open = function(name)
+	local open_file = function(name)
 		state.opened[#state.opened + 1] = name
 		if failure == "open" then return nil, "refused" end
 		local handle = {}
@@ -116,9 +117,11 @@ local function with_probe_receipts(failure, test)
 		if failure == "remove" then return nil, "cleanup refused" end
 		return true
 	end
+	package.loaded["infra.regular_file_writer"] = { open = open_file }
 	local ok, err = xpcall(function() test(Sink, state, path) end, debug.traceback)
 	io.open, io.popen = previous_open, previous_popen
 	os.execute, os.remove = previous_execute, previous_remove
+	package.loaded["infra.regular_file_writer"] = saved_writer
 	if not ok then error(err, 0) end
 end
 
@@ -164,6 +167,7 @@ end)
 --- Uses the real sink's write/flush interface; file and console receipts are simulated.
 local function with_write_receipts(channel, refusal, body)
 	local Sink = helpers.load_module("infra.logger_sink")
+	local saved_writer = package.loaded["infra.regular_file_writer"]
 	local dir = "/owned-logger-receipts"
 	local state = { files = {}, diagnostics = {}, console = {}, failing = true }
 	local logger = {}
@@ -182,7 +186,7 @@ local function with_write_receipts(channel, refusal, body)
 		state.diagnostics[#state.diagnostics + 1] = line
 		return true
 	end }
-	io.open = function(path, mode)
+	local open_file = function(path, mode)
 		if path == dir .. "/.write_probe" then return { close = function() return true end } end
 		if path:sub(1, #dir + 1) ~= dir .. "/" then return original_open(path, mode) end
 		local kind = path:find("_errors_", 1, true) and "errors" or "main"
@@ -206,6 +210,7 @@ local function with_write_receipts(channel, refusal, body)
 		state.files[kind] = file
 		return file
 	end
+	package.loaded["infra.regular_file_writer"] = { open = open_file }
 	local ok, err = xpcall(function()
 		helpers.assert_true(Sink.install(logger, { log_dir = dir, redaction_context = { home = "/home/fixture-user", user = "fixture-user" } }))
 		body(Sink, state, logger)
@@ -214,6 +219,7 @@ local function with_write_receipts(channel, refusal, body)
 	io.open, os.execute = original_open, original_execute
 	io.stdout, io.stderr = original_stdout, original_stderr
 	package.loaded["infra.config_paths"] = previous_paths
+	package.loaded["infra.regular_file_writer"] = saved_writer
 	if not ok then error(err, 0) end
 end
 
@@ -277,8 +283,9 @@ end)
 --- independently by the registered run_logger_write_receipts.lua fixture.
 local function with_repoint_receipts(case, body)
 	local Sink = helpers.load_module("infra.logger_sink")
+	local saved_writer = package.loaded["infra.regular_file_writer"]
 	local old, target = "/owned-repoint-old", "/owned-repoint-candidate"
-	local state = { phase = "initial", target = old, old = {}, candidates = {}, console = {} }
+	local state = { phase = "initial", target = old, old = {}, candidates = {}, console = {}, diagnostics = {} }
 	local original_open, original_execute = io.open, os.execute
 	local original_stdout, original_stderr = io.stdout, io.stderr
 	local previous_paths = package.loaded["infra.config_paths"]
@@ -291,8 +298,12 @@ local function with_repoint_receipts(case, body)
 	end
 	io.stdout = { write = function(_, line) state.console[#state.console + 1] = line; return true end,
 		flush = function() return true end }
-	io.stderr = { write = function() return true end }
-	io.open = function(path, mode)
+	io.stderr = { write = function(_, line)
+		if case.stderr_throws then error("diagnostic output is unavailable") end
+		state.diagnostics[#state.diagnostics + 1] = line
+		return true
+	end }
+	local open_file = function(path, mode)
 		local is_old = path:sub(1, #old + 1) == old .. "/"
 		if not is_old and path:sub(1, #target + 1) ~= target .. "/" then return original_open(path, mode) end
 		local kind = path:find("_errors_", 1, true) and "errors" or "main"
@@ -304,8 +315,8 @@ local function with_repoint_receipts(case, body)
 			helpers.assert_eq(state.old.errors.closes, 0)
 		end
 		if not is_old and kind == case.channel then
-			if case.throws then error("simulated native open raised") end
-			return case.value, "simulated native open refused"
+			if case.throws then error(case.failure or "simulated native open raised") end
+			return case.value, case.failure or "simulated native open refused"
 		end
 		local file = { lines = {}, closes = 0 }
 		function file:write(line)
@@ -320,6 +331,7 @@ local function with_repoint_receipts(case, body)
 		end
 		return file
 	end
+	package.loaded["infra.regular_file_writer"] = { open = open_file }
 	local ok, err = xpcall(function()
 		if case.mode ~= "none" then
 			helpers.assert_eq(Sink.install(logger, { log_dir = old, redaction_context = { home = "/home/fixture-user", user = "fixture-user" } }), case.mode ~= "stdout")
@@ -332,10 +344,12 @@ local function with_repoint_receipts(case, body)
 	io.open, os.execute = original_open, original_execute
 	io.stdout, io.stderr = original_stdout, original_stderr
 	package.loaded["infra.config_paths"] = previous_paths
+	package.loaded["infra.regular_file_writer"] = saved_writer
 	if not ok then error(err, 0) end
 end
 
 helpers.describe("linux-logger-repoint-owner", function()
+	local failure = setmetatable({}, { __tostring = function() error("foreign error formatting must not execute") end })
 	for _, case in ipairs({
 		{ name = "nil main", channel = "main" },
 		{ name = "false main", channel = "main", value = false },
@@ -343,6 +357,10 @@ helpers.describe("linux-logger-repoint-owner", function()
 		{ name = "nil optional mirror", channel = "errors", success = true },
 		{ name = "false optional mirror", channel = "errors", value = false, success = true },
 		{ name = "throwing optional mirror", channel = "errors", throws = true, success = true },
+		{ name = "foreign mirror refusal", channel = "errors", failure = failure, success = true },
+		{ name = "foreign mirror throw", channel = "errors", failure = failure, throws = true, success = true },
+		{ name = "private mirror refusal", channel = "errors", failure = "refused /home/fixture-user/private", private = true, success = true },
+		{ name = "unavailable mirror diagnostic", channel = "errors", stderr_throws = true, success = true },
 		{ name = "successful staged pair", observe = true, success = true },
 		{ name = "repeated main refusal", channel = "main", mode = "repeat" },
 		{ name = "mkdir refusal", mode = "mkdir" },
@@ -374,7 +392,20 @@ helpers.describe("linux-logger-repoint-owner", function()
 				if case.channel == "main" then
 					helpers.assert_eq(#state.candidates, attempts, "each failed main must retire its acquired partial mirror")
 				end
+				if case.channel == "errors" and not case.stderr_throws then
+					helpers.assert_eq(#state.diagnostics, 1, "one attempted mirror open must produce one diagnostic")
+					helpers.assert_contains(state.diagnostics[1], "errors channel could not be opened")
+					helpers.assert_contains(state.diagnostics[1], target .. "/ErgoptiPlus_errors_")
+					if type(case.failure) == "table" then helpers.assert_contains(state.diagnostics[1], "error object (table)") end
+					if case.private then
+						helpers.assert_true(not state.diagnostics[1]:find("/home/fixture-user", 1, true),
+							"native refusal details must pass the admitted privacy boundary")
+					end
+				end
 				state.emit("line after transition", "warn")
+				if case.channel == "errors" and not case.stderr_throws then
+					helpers.assert_eq(#state.diagnostics, 1, "emitted records must not repeat the failed open or diagnostic")
+				end
 				if not switched and case.mode ~= "stdout" then
 					helpers.assert_eq(#state.old.main.lines, 1)
 					helpers.assert_eq(#state.old.errors.lines, 1)
@@ -393,21 +424,29 @@ helpers.describe("logger sink — production wiring", function()
 	helpers.it("linux-logger-privacy: boot refuses private admission failure without exposing its exception", function()
 		local block = entry and entry:match("(local privacy_admitted[^\n]*= pcall%b()%s*if not privacy_admitted.-\nend)")
 		helpers.assert_not_nil(block, "The actual bootstrap privacy admission block must be present")
-		local run = assert(load("return function(LoggerSink, Logger, io, os)\n" .. block .. "\nend"))()
-		for _, result in ipairs({ "true", "false", "throw", "refusal" }) do
-			local calls, exits, output = 0, {}, {}
+		local run = assert(load("return function(LoggerSink, Logger, io, os, BootstrapLog)\n" .. block .. "\nend"))()
+		for _, result in ipairs({ "true", "false", "throw", "refusal", "cause" }) do
+			local calls, exits, output, records = 0, {}, {}, {}
 			run({ install = function()
 				calls = calls + 1
 				if result == "throw" then error("PRIVATE_BOOT_CANARY /home/PrivateUser", 0) end
 				if result == "refusal" then return false, "PRIVATE_REFUSAL_CANARY /home/PrivateUser" end
+				if result == "cause" then
+					error("/home/PrivateUser/linux/infra/logger_sink.lua:158: logger_sink: privacy identity unavailable: no account name", 0)
+				end
 				return result == "true"
 			end }, {}, { stderr = { write = function(_, text) output[#output + 1] = text end } },
-				{ exit = function(code) exits[#exits + 1] = code end })
+				{ exit = function(code) exits[#exits + 1] = code end },
+				{ append = function(code) records[#records + 1] = code end })
 			helpers.assert_eq(calls, 1)
-			local refused = result == "throw" or result == "refusal"
+			local refused = result == "throw" or result == "refusal" or result == "cause"
 			helpers.assert_eq(exits, refused and { 1 } or {})
-			helpers.assert_eq(output, refused
-				and { "[logger_sink] Privacy initialization refused; daemon not started.\n" } or {})
+			helpers.assert_eq(records, refused and { "privacy_admission_refused" } or {}, "a refusal leaves its pre-sink record")
+			local message = result == "cause"
+				and "[logger_sink] Privacy initialization refused (privacy identity unavailable: no account name); daemon not started.\n"
+				or "[logger_sink] Privacy initialization refused; daemon not started.\n"
+			helpers.assert_eq(output, refused and { message } or {},
+				"the sink's own cause is named, any other exception text stays unprinted")
 		end
 	end)
 
@@ -647,7 +686,7 @@ local function with_private_log_sink(options, body)
 	local policy = assert(read_file(policy_path))
 	local saved_open, saved_execute, saved_getenv = io.open, os.execute, os.getenv
 	local saved_stdout, saved_stderr = io.stdout, io.stderr
-	local names = { "infra.paths", "infra.config_paths", "infra.timings", "infra.logger_sink" }
+	local names = { "infra.paths", "infra.config_paths", "infra.timings", "infra.logger_sink", "infra.regular_file_reader", "infra.regular_file_writer" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local state = { main = {}, errors = {}, console = {}, diagnostics = {}, commands = 0, policy_reads = 0,
@@ -687,7 +726,7 @@ local function with_private_log_sink(options, body)
 	io.stdout = { write = function(_, line) state.console[#state.console + 1] = line; return true end,
 		flush = function() return true end }
 	io.stderr = { write = function(_, line) state.diagnostics[#state.diagnostics + 1] = line; return true end }
-	io.open = function(path, mode)
+	local open_file = function(path, mode)
 		if mode == "rb" then
 			helpers.assert_eq(path, "/owned-shared/modules/diagnostics/redaction.json")
 			if options.missing_policy then return nil, "owned policy read refusal" end
@@ -710,6 +749,8 @@ local function with_private_log_sink(options, body)
 			return true
 		end, flush = function() return true end, close = function() return true end }
 	end
+	package.loaded["infra.regular_file_reader"] = { open_source = function(path) return open_file(path, "rb") end }
+	package.loaded["infra.regular_file_writer"] = { open = open_file }
 	local ok, err = xpcall(function() body(Sink, state, logger) end, debug.traceback)
 	Sink.uninstall(logger)
 	io.open, os.execute, os.getenv = saved_open, saved_execute, saved_getenv
@@ -878,5 +919,181 @@ helpers.describe("linux-logger-privacy malformed metadata", function()
 				helpers.assert_eq(state[channel], expected)
 			end
 		end)
+	end)
+end)
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 3/ Topical sub-files, as on the other two drivers =======
+-- =================================================================
+-- =================================================================
+
+helpers.describe("linux-logger-topical-fan-out", function()
+	local IDENTITY = { home = "/home/fixture-user", user = "fixture-user" }
+
+	--- A private directory per case so a topical file left by an earlier case
+	--- cannot make a missing fan-out look like a pass.
+	local function topical_dir(name)
+		local dir = temp_dir() .. "/ergopti-topical-" .. name .. "-" .. tostring(os.time()) .. tostring(math.random(1e6))
+		os.execute("mkdir -p '" .. dir .. "'")
+		return dir
+	end
+
+	local function remove_dir(dir)
+		os.execute("rm -rf '" .. dir .. "'")
+	end
+
+	local function with_sink(name, body)
+		local Sink   = helpers.load_module("infra.logger_sink")
+		local Logger = helpers.load_module("logger")
+		local dir    = topical_dir(name)
+		local ok, err = xpcall(function()
+			Sink.install(Logger, { log_dir = dir, redaction_context = IDENTITY })
+			body(Sink, Logger, dir)
+		end, debug.traceback)
+		Sink.uninstall(Logger)
+		remove_dir(dir)
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("linux-logger-topical-fan-out: keystats, llm and hotstrings lines reach their own files", function()
+		with_sink("route", function(_, Logger, dir)
+			Logger.info("modules.keystats.keystats", "marker-keystats")
+			Logger.info("modules.llm.inference", "marker-llm")
+			Logger.info("modules.hotstrings.injector", "marker-hotstrings")
+			Logger.info("sink_test", "marker-unrouted")
+			local keystats = read_file(dir .. "/ErgoptiPlus_keystats.log")
+			local llm = read_file(dir .. "/ErgoptiPlus_llm.log")
+			local hotstrings = read_file(dir .. "/ErgoptiPlus_hotstrings.log")
+			helpers.assert_not_nil(keystats, "the keystats topic file must exist")
+			helpers.assert_contains(keystats, "marker-keystats")
+			helpers.assert_true(not keystats:find("marker%-llm"), "a topic file holds only its own lines")
+			helpers.assert_contains(llm, "marker-llm")
+			helpers.assert_contains(hotstrings, "marker-hotstrings")
+			local main = read_file(dir .. "/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log")
+			helpers.assert_contains(main, "marker-unrouted", "the main log still receives every line")
+			for _, name in ipairs({ "keystats", "llm", "hotstrings" }) do
+				local topic = read_file(dir .. "/ErgoptiPlus_" .. name .. ".log")
+				helpers.assert_true(not topic:find("marker%-unrouted"), name .. " must not hold an unrouted line")
+			end
+		end)
+	end)
+
+	helpers.it("linux-logger-topical-fan-out: macOS-only topics are never created", function()
+		with_sink("platform", function(_, Logger, dir)
+			Logger.info("karabiner", "marker-karabiner")
+			Logger.info("mlx", "marker-mlx")
+			helpers.assert_eq(read_file(dir .. "/ErgoptiPlus_karabiner.log"), nil)
+			helpers.assert_eq(read_file(dir .. "/ErgoptiPlus_mlx.log"), nil)
+		end)
+	end)
+
+	helpers.it("linux-logger-topical-fan-out: a topic file from an earlier day starts over, today's is appended", function()
+		local Sink   = helpers.load_module("infra.logger_sink")
+		local Logger = helpers.load_module("logger")
+		local dir    = topical_dir("rotate")
+		local stale  = io.open(dir .. "/ErgoptiPlus_llm.log", "w")
+		stale:write("2000-01-01 10:00:00:000 [INFO] [modules.llm.inference] marker-yesterday\n")
+		stale:close()
+		local ok, err = xpcall(function()
+			Sink.install(Logger, { log_dir = dir, redaction_context = IDENTITY })
+			Logger.info("modules.llm.inference", "marker-first-today")
+			Sink.uninstall(Logger)
+			Sink.install(Logger, { log_dir = dir, redaction_context = IDENTITY })
+			Logger.info("modules.llm.inference", "marker-second-today")
+			local content = read_file(dir .. "/ErgoptiPlus_llm.log")
+			helpers.assert_true(not content:find("marker%-yesterday"), "an earlier day's lines must be dropped")
+			helpers.assert_contains(content, "marker-first-today")
+			helpers.assert_contains(content, "marker-second-today", "a restart on the same day appends")
+		end, debug.traceback)
+		Sink.uninstall(Logger)
+		remove_dir(dir)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("linux-logger-topical-fan-out: a refused topic handle is retired without silencing the main log", function()
+		with_sink("refuse", function(_, Logger, dir)
+			os.execute("mkdir '" .. dir .. "/ErgoptiPlus_menu.log'")
+			Logger.info("ui.menu.menu_builder", "marker-menu-refused")
+			Logger.info("modules.llm.inference", "marker-llm-after")
+			local main = read_file(dir .. "/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log")
+			helpers.assert_contains(main, "marker-menu-refused")
+			helpers.assert_contains(read_file(dir .. "/ErgoptiPlus_llm.log"), "marker-llm-after")
+		end)
+	end)
+
+	helpers.it("linux-logger-topical-fan-out: the generated table is exactly sub_files.toml's linux entries", function()
+		local raw = read_file(DRIVER_ROOT .. "/../_shared/modules/logger/sub_files.toml")
+		helpers.assert_not_nil(raw, "the canonical routing file must be readable")
+		local expected = {}
+		local current
+		for line in raw:gmatch("[^\r\n]+") do
+			local name = line:match('^name%s*=%s*"([^"]*)"')
+			if name then current = name end
+			local platforms = line:match("^platforms%s*=%s*(%b[])")
+			if platforms and current and platforms:find('"linux"', 1, true) then
+				expected["ErgoptiPlus_" .. current .. ".log"] = true
+			end
+		end
+		local generated = {}
+		for _, sub in ipairs(require("_generated.logger_sub_files")) do generated[sub.name] = true end
+		helpers.assert_true(next(expected) ~= nil, "the canonical file must declare Linux topics")
+		helpers.assert_eq(generated, expected)
+	end)
+end)
+
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 4/ The pre-sink fatal record (bootstrap.log) ==========
+-- ===============================================================
+-- ===============================================================
+
+helpers.describe("linux-bootstrap-log", function()
+	local Bootstrap = helpers.load_module("infra.bootstrap_log")
+
+	helpers.it("linux-bootstrap-log: a known code appends one closed-vocabulary line", function()
+		local dir = temp_dir() .. "/ergopti-bootstrap-" .. tostring(os.time()) .. tostring(math.random(1e6))
+		local ok, err = xpcall(function()
+			helpers.assert_true(Bootstrap.append("privacy_admission_refused", { dir = dir }))
+			helpers.assert_true(Bootstrap.append("second_instance_yielded", { dir = dir }))
+			local content = read_file(dir .. "/" .. require("app_dirs").files.bootstrap_log)
+			helpers.assert_not_nil(content, "the pre-configuration log must exist")
+			helpers.assert_contains(content, "[ERROR] [bootstrap] Privacy initialization refused; daemon not started.")
+			helpers.assert_contains(content, "this start yielded")
+			local lines = 0
+			for _ in content:gmatch("[^\n]+") do lines = lines + 1 end
+			helpers.assert_eq(lines, 2)
+		end, debug.traceback)
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("linux-bootstrap-log: free text is refused, so a path or exception never reaches the file", function()
+		local written, reason = Bootstrap.append("/home/PrivateUser exploded", { dir = temp_dir() .. "/never-created" })
+		helpers.assert_eq(written, false)
+		helpers.assert_eq(reason, "unknown bootstrap code")
+	end)
+
+	helpers.it("linux-bootstrap-log: the entry point records each fatal that precedes the sink", function()
+		local entry = strip_comment_lines(read_file(DRIVER_ROOT .. "/ergopti_hotstrings.lua"))
+		for _, code in ipairs({ "session_lock_refused", "privacy_admission_refused", "second_instance_yielded" }) do
+			helpers.assert_contains(entry, '"' .. code .. '"', "the entry point must append " .. code)
+			helpers.assert_not_nil(Bootstrap.CODES[code], code .. " must be a declared code")
+		end
+	end)
+
+	helpers.it("linux-bootstrap-log: the file name is the shared declaration the Windows driver reads too", function()
+		local name = require("app_dirs").files.bootstrap_log
+		helpers.assert_eq(name, "bootstrap.log")
+		local logger = read_file(DRIVER_ROOT .. "/../windows/infra/logger.ahk")
+		helpers.assert_contains(logger, "AppDirsLogBootstrapName()")
 	end)
 end)

@@ -125,7 +125,7 @@ _LAY_NumberRowSnapshot() {
 			throw TypeError("Number-row source is not readable.")
 		Snapshot["content"] := Content
 		Snapshot["presence"] := Presence
-		Document := TOML_ParseDocument(Content)
+		Document := TOML_ParseDocumentShared(Content)
 		Desired := MasterGateDesiredFeatures(Features)
 		for Path, Expected in Map("layout.direct_access_digits", Snapshot["mode"],
 			"layout.emulated_layout", Desired["layout"].Get("emulated_layout", ""),
@@ -254,15 +254,27 @@ _LAY_NumberRowEdgesRow(Declaration, Expected, RefreshFn := 0) {
 			|| Declaration.Get("path", "") != "layout.number_row_reorder_edges" || Declaration.Get("i18n", "") == ""
 		return ""
 	State := NumberRowEdgesState(Expected.Get("hkl", NumberRowForegroundLayout()), Expected.Get("caps", false))
-	Row := Map("label", t(Declaration["i18n"]), "checked", State["stored"],
-		"action", _LAY_NumberRowEdgesToggle.Bind(!State["stored"], RefreshFn))
+	; The menu shows what the user stored: a closed layout gate empties the live
+	; boolean, so the choice is read from the intent view, as the ordering row's.
+	Stored := _LAY_NumberRowEdgesStoredChoice()
+	Row := Map("label", t(Declaration["i18n"]), "checked", Stored,
+		"action", _LAY_NumberRowEdgesToggle.Bind(!Stored, RefreshFn))
 	if State["reason"] != "" {
 		Row["disabled"] := true
 		Row["disabled_reason_key"] := "platform_reason.number_row_" . State["reason"]
-		if State["stored"]
+		if Stored
 			Row["label"] := Row["label"] . t("menu.layout.number_row_not_applied")
 	}
 	return Row
+}
+
+; The edge-keys choice as stored, whether or not the layout gate lets it act.
+; @returns {Boolean}
+_LAY_NumberRowEdgesStoredChoice() {
+	global Features
+	Desired := IsSet(Features) && Features is Map ? MasterGateDesiredFeatures(Features) : Map()
+	return Desired.Has("layout") && Desired["layout"] is Map && Desired["layout"].Has("number_row_reorder_edges")
+		&& Desired["layout"]["number_row_reorder_edges"] == true
 }
 
 _LAY_NumberRowEdgesToggle(Value, RefreshFn, *) {

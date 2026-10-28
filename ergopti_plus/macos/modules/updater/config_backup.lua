@@ -4,7 +4,7 @@
 --- MODULE: Configuration Backup (macOS)
 --- DESCRIPTION:
 --- Binds the shared configuration backup owner (_shared/lua/updater/
---- config_backup.lua) to this driver: the configuration folder of
+--- config_backup.lua, assembled by config_backup_binding.lua) to this driver: the configuration folder of
 --- infra/config_paths.lua and file ports over the FileSystem adapter's
 --- classified reads, create-only writes and compare-and-publish. The Versions
 --- window backs the configuration up through it before installing a release,
@@ -25,7 +25,7 @@ local ConfigPaths = require("infra.config_paths")
 local FsDir       = require("infra.fs_dir")
 local FileSystem  = require("adapters.file_system")
 local JsonCodec   = require("adapters.json_codec")
-local Shared      = require("updater.config_backup")
+local Binding     = require("updater.config_backup_binding")
 
 local LOG = "updater.config_backup"
 
@@ -44,7 +44,8 @@ M._overrides = nil
 
 --- Classifies one folder entry.
 --- @param path string
---- @return string kind "file", "dir" or "other"
+--- @return string|nil kind "file", "dir" or "other"; nil when the link target is unknowable
+--- @return string|nil error Why the link target cannot be classified
 local function classify(path)
 	local status, attributes = FileSystem.path_status(path)
 	if status ~= "present" or type(attributes) ~= "table" then return "other" end
@@ -52,7 +53,14 @@ local function classify(path)
 	if attributes.mode == "file" then return "file" end
 	if attributes.mode == "link" then
 		-- A link to a folder could lead back up the tree: it is reported, never walked.
-		return FileSystem.directory_status(path) == "present" and "other" or "file"
+		-- Only a regular file is read: opening a FIFO, a socket or a device node can
+		-- block forever, so those targets are "other". A dangling link holds no
+		-- configuration and is "other" too, so it never fails the snapshot; a denied
+		-- or looping target may hide configuration, so it refuses the listing.
+		local target_status, target = FileSystem.followed_mode(path)
+		if target_status == "present" then return target == "file" and "file" or "other" end
+		if target_status == "absent" then return "other" end
+		return nil, string.format("cannot classify %s: %s", path, tostring(target or target_status))
 	end
 	return "other"
 end
@@ -70,7 +78,9 @@ local function list(dir)
 	local entries = {}
 	for _, name in ipairs(names) do
 		if name ~= "." and name ~= ".." then
-			entries[#entries + 1] = { name = name, kind = classify((dir:gsub("/+$", "")) .. "/" .. name) }
+			local kind, refusal = classify((dir:gsub("/+$", "")) .. "/" .. name)
+			if kind == nil then return nil, refusal end
+			entries[#entries + 1] = { name = name, kind = kind }
 		end
 	end
 	return entries
@@ -120,35 +130,48 @@ end
 -- ==============================
 -- ==============================
 
+--- Reads the shared updater defaults the backup rules come from.
+--- @return table|nil defaults
+--- @return string|nil error
+local function read_defaults()
+	local path = Paths.shared("modules/updater/defaults.json")
+	local raw = type(path) == "string" and FileSystem.read(path) or nil
+	if type(raw) ~= "string" then return nil, "the shared updater defaults are unreadable" end
+	local decoded, decode_err = JsonCodec.decode(raw)
+	if decoded == nil then return nil, tostring(decode_err or "the shared updater defaults are not JSON") end
+	return decoded
+end
+
+--- The roots of this driver: the configuration folder only. The settings of
+--- this driver live in hs.settings, not in a file a backup could copy.
+--- @return table|nil roots
+--- @return string|nil reason
+--- @return string|nil log_text
+local function default_roots()
+	local config_dir = ConfigPaths.get_config_dir()
+	if type(config_dir) ~= "string" or config_dir:sub(1, 1) ~= "/" then
+		return nil, "configuration folder unknown",
+			"Configuration backup refused: the configuration folder is unknown."
+	end
+	return { { id = "config", dir = config_dir } }
+end
+
+local _binding = Binding.new({
+	logger = Logger,
+	log = LOG,
+	defaults = read_defaults,
+	json = { encode = JsonCodec.encode, decode = JsonCodec.decode },
+	file_ports = file_ports,
+	clock = clock,
+	default_roots = default_roots,
+	overrides = function() return M._overrides end,
+})
+
 --- Builds the owner over the current configuration folder. It is built per
 --- use: the folder can move while the driver runs (the paths editor).
 --- @return table|nil owner
 --- @return string|nil error
-function M.owner()
-	local path = Paths.shared("modules/updater/defaults.json")
-	local raw = type(path) == "string" and FileSystem.read(path) or nil
-	local decoded = type(raw) == "string" and JsonCodec.decode(raw) or nil
-	local rules, err = Shared.rules(decoded)
-	if not rules then
-		Logger.error(LOG, "Configuration backup unavailable: %s.", tostring(err))
-		return nil, err
-	end
-	local overrides = M._overrides or {}
-	local config_dir = ConfigPaths.get_config_dir()
-	if not overrides.roots and (type(config_dir) ~= "string" or config_dir:sub(1, 1) ~= "/") then
-		Logger.error(LOG, "Configuration backup refused: the configuration folder is unknown.")
-		return nil, "configuration folder unknown"
-	end
-	return Shared.new({
-		rules = rules,
-		roots = overrides.roots or { { id = "config", dir = config_dir } },
-		io = overrides.io or file_ports(),
-		json = { encode = JsonCodec.encode, decode = JsonCodec.decode },
-		clock = overrides.clock or clock,
-		logger = Logger,
-		log = LOG,
-	}), nil
-end
+function M.owner() return _binding.owner() end
 
 M._list = list
 

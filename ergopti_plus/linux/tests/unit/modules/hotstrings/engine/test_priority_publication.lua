@@ -169,7 +169,12 @@ helpers.describe("hotstring priority: committed runtime publication", function()
 				helpers.assert_true(Config.resolve("second", "main") == cached)
 				helpers.assert_eq(state.winner(), "SECOND")
 				local owner = {}
-				helpers.assert_true(Config.acquire(owner)); helpers.assert_true(Config.release(owner))
+				helpers.assert_eq(Config.publication_pending(), false)
+				helpers.assert_true(Config.acquire(owner))
+				helpers.assert_eq(Config.publication_pending(), true,
+					"a held scope transaction is a pending publication for the tray's Quit")
+				helpers.assert_true(Config.release(owner))
+				helpers.assert_eq(Config.publication_pending(), false)
 			end)
 		end)
 

@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 --- Captures immutable header strings using the original wire conversion order.
 --- @param headers table
@@ -17,10 +18,8 @@ local M = {}
 --- @return table view Last value for each normalized field name.
 function M.capture(headers, validate)
 	if type(headers) ~= "table" or type(validate) ~= "function" then error("HTTP headers are invalid") end
-	local names, rows, view = {}, {}, {}
-	for name in pairs(headers) do names[#names + 1] = name end
-	table.sort(names)
-	for _, name in ipairs(names) do
+	local rows, view = {}, {}
+	for _, name in ipairs(TableUtil.sorted_keys(headers)) do
 		local header_name, header_value = tostring(name), tostring(headers[name])
 		local allowed, err = validate(header_name, header_value)
 		if not allowed then error(err) end

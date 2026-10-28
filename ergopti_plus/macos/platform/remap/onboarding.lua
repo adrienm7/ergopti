@@ -96,8 +96,6 @@ local KE_SYSEXT_BUNDLE = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
 -- Karabiner-Elements v16+ relies on Accessibility (per the v16.0.0 release
 -- notes); pre-v16 versions rely on Input Monitoring instead. Both panes are
 -- exposed so the wizard can route the user to the right one.
-local URL_INPUT_MONITORING  = "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
-local URL_ACCESSIBILITY     = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 local URL_SYSTEM_EXTENSIONS = "x-apple.systempreferences:com.apple.LoginItems-Settings.extension?Extensions"
 
 -- Re-poll cadence after the user takes a wizard action, so the next step
@@ -232,11 +230,42 @@ function M.is_sysext_activated()
 	return false
 end
 
+--- Health of the owned runtime (ADR 011): its files, its two launchd jobs and
+--- the VirtualHIDDevice extension. It needs no Karabiner-Elements application,
+--- so none of the shared checks apply; read-only like the shared check.
+--- @return table { runtime_installed, jobs_loaded, sysext_activated, all_ok }
+local function owned_health_check()
+	local owned = KePaths.OWNED
+	local installed = true
+	for _, path in ipairs({ owned.CLI, owned.CORE_SERVICE, owned.CONSOLE, owned.CORE_JOB_FILE }) do
+		if not file_exists(path) then installed = false end
+	end
+	local jobs_loaded = true
+	for _, label in ipairs({ owned.VIRTUAL_HID_LABEL, owned.CORE_LABEL }) do
+		local _, ok = hs.execute("/bin/launchctl print system/" .. label .. " >/dev/null 2>&1")
+		if ok ~= true then jobs_loaded = false end
+	end
+	local report = {
+		runtime_installed = installed,
+		jobs_loaded       = jobs_loaded,
+		sysext_activated  = M.is_sysext_activated(),
+	}
+	report.all_ok = report.runtime_installed and report.jobs_loaded and report.sysext_activated
+	Logger.debug(LOG, "Owned health check: installed=%s jobs=%s sysext=%s all_ok=%s.",
+		tostring(report.runtime_installed), tostring(report.jobs_loaded),
+		tostring(report.sysext_activated), tostring(report.all_ok))
+	return report
+end
+
 --- Returns a snapshot of every dependency in the KE stack with one boolean per
 --- check. Caller can render a checklist or choose which step of the wizard to
 --- launch. all_ok is true only when every dependency is satisfied.
+--- @param runtime string|nil `shared` (default, the official application) or `owned`.
 --- @return table { ke_installed, grabber_present, grabber_running, sysext_activated, all_ok }
-function M.health_check()
+---   for shared; { runtime_installed, jobs_loaded, sysext_activated, all_ok } for owned.
+function M.health_check(runtime)
+	if runtime == KePaths.RUNTIME_OWNED then return owned_health_check() end
+	assert(runtime == nil or runtime == KePaths.RUNTIME_SHARED, "unknown Karabiner runtime: " .. tostring(runtime))
 	local report = {
 		ke_installed     = M.is_ke_app_installed(),
 		grabber_present  = M.is_grabber_binary_present(),
@@ -1159,7 +1188,7 @@ end
 --- scripts grant TCC, so a deep-link is the closest we can get to one click.
 function M.open_input_monitoring_pane()
 	Logger.info(LOG, "Opening Input Monitoring pane…")
-	hs.execute("/usr/bin/open " .. text_utils.shell_quote(URL_INPUT_MONITORING))
+	hs.execute("/usr/bin/open " .. text_utils.shell_quote(require("adapters.privacy_settings").url("input_monitoring")))
 end
 
 --- Opens the System Settings pane where the user grants Accessibility
@@ -1167,7 +1196,7 @@ end
 --- Input Monitoring redundant); v15 and older required Input Monitoring.
 function M.open_accessibility_pane()
 	Logger.info(LOG, "Opening Accessibility pane…")
-	hs.execute("/usr/bin/open " .. text_utils.shell_quote(URL_ACCESSIBILITY))
+	hs.execute("/usr/bin/open " .. text_utils.shell_quote(require("adapters.privacy_settings").url("accessibility")))
 end
 
 --- Opens the System Extensions pane where the user must approve the

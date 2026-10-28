@@ -42,7 +42,7 @@ package.loaded["modules.gestures.actions"] = {
 		return true
 	end,
 }
-package.loaded["modules.keylogger"] = { log_shortcut = function() end }
+package.loaded["modules.keystats"] = { log_shortcut = function() end }
 package.loaded["modules.llm.api_mlx"] = {
 	stop_warmup = function() return true end,
 	resume_warmup = function() return true end,

@@ -328,6 +328,11 @@ GestureCycleWindows(Forward) {
 				; the flag early (unlike hook_dispatcher.ahk's shared-state mutations,
 				; this plain global boolean had no Critical section at all).
 				_PrevCrit := Critical("On")
+				; A logger callback may have completed a pause before admission.
+				if A_IsSuspended {
+						Critical(_PrevCrit)
+						return
+				}
 				try {
 						_GestureCycling := True
 						Activated := GestureActivateWindow(Windows[Target])
@@ -379,6 +384,11 @@ GestureCycleAppWindows(Forward) {
 		for Target in CandidateIndexes {
 				; Same Critical-serialized flag/activation bracket as GestureCycleWindows.
 				_PrevCrit := Critical("On")
+				; A logger callback may have completed a pause before admission.
+				if A_IsSuspended {
+						Critical(_PrevCrit)
+						return
+				}
 				try {
 						_GestureCycling := True
 						Activated := GestureActivateWindow(Windows[Target])

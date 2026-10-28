@@ -35,16 +35,16 @@ local ASSETS_DIR = (Paths.shared("ui/personal_info_editor") or "") .. "/"
 -- Field definitions for the form. Keys match the preferences table.
 local FIELDS = {
 	{ key = "first_name",             label = i18n.get("personal_info.field_firstname") },
-	{ key = "last_name",              label = "Nom" },
-	{ key = "date_of_birth",          label = "Date de naissance" },
-	{ key = "email_address",          label = "E-mail" },
-	{ key = "work_email_address",     label = "E-mail professionnel" },
+	{ key = "last_name",              label = i18n.get("personal_info.field_lastname") },
+	{ key = "date_of_birth",          label = i18n.get("personal_info.field_birthdate") },
+	{ key = "email_address",          label = i18n.get("personal_info.field_email") },
+	{ key = "work_email_address",     label = i18n.get("personal_info.field_work_email") },
 	{ key = "phone_number",           label = i18n.get("personal_info.field_phone_digits") },
 	{ key = "phone_number_clean",     label = i18n.get("personal_info.field_phone_formatted") },
-	{ key = "street_address",         label = "Adresse" },
-	{ key = "postal_code",            label = "Code postal" },
-	{ key = "city",                   label = "Ville" },
-	{ key = "country",                label = "Pays" },
+	{ key = "street_address",         label = i18n.get("personal_info.field_street") },
+	{ key = "postal_code",            label = i18n.get("personal_info.field_postal_code") },
+	{ key = "city",                   label = i18n.get("personal_info.field_city") },
+	{ key = "country",                label = i18n.get("personal_info.field_country") },
 	{ key = "iban",                   label = "IBAN" },
 	{ key = "bic",                    label = "BIC" },
 	{ key = "credit_card",            label = i18n.get("personal_info.field_credit_card") },
@@ -288,7 +288,7 @@ function M.open(current_info, save_callback)
 			end,
 			on_navigation = function(action)
 				if action == "didFinishNavigation" and owner_is_current(owner) then
-					DeferredWork.after(0.05, function() inject_init_data(owner) end, "personal_info_editor.navigation")
+					DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function() inject_init_data(owner) end, "personal_info_editor.navigation")
 				end
 				return true
 			end,

@@ -21,6 +21,13 @@
 ;     covers native Unicode erasure and text storage. Physical InputHook and
 ;     SendInput delivery remain outside this isolated tier.
 ;
+;   Strategy C — Actual TextSender output (mandatory):
+;     Calls production TextSend and its real SendText builtin against a private
+;     foreground Edit. Literal and JSON NUL requests must refuse exactly once
+;     and preserve the receiver; a Unicode control must actually arrive. This
+;     tier runs in Windows CI or a private Wine display and starts no physical
+;     driver hotkeys or input hook.
+;
 ; CORPUS:
 ; Every shared vector is replayed through the production registration factories,
 ; matching, dispatch and intercepted native sender. A virtual document applies
@@ -28,7 +35,7 @@
 ; Explicit terminator consumption selects the end-character path, matching the
 ; macOS and Linux corpus consumers. The sender is the sole substituted boundary.
 ;
-; USAGE (headless CI):
+; USAGE (CI):
 ;   AutoHotkey64.exe run_e2e.ahk
 ; ==============================================================================
 
@@ -66,7 +73,7 @@ global TEST_RESULTS_FILE := _TestResultsPath(A_ScriptDir . "\test_results.txt")
 _TestResultsBeginRun()
 ; The shared app-context simulators publish into KLHook, just as the main
 ; runner does. Load the definition here so E2E never depends on ambient state.
-#Include ../../modules/keylogger/keylogger_hook.ahk
+#Include ../../modules/keystats/keystats_hook.ahk
 #Include ../test_stubs.ahk
 ; The stubs place the roots for tests/; this harness runs one folder deeper.
 global _StaticDir := A_ScriptDir . "\..\..\..\.."
@@ -236,11 +243,11 @@ _E2E_ApplyRecordedEdit(&Document, &NextSend) {
         Entry := _Stub_RecordedSends[NextSend++]
         AssertTrue(Entry.args.Length > 0, "a captured native send must carry its payload")
         Payload := Entry.args[1]
-        AssertTrue(RegExMatch(Payload, "^\{BackSpace (\d+)\}\{Text\}([\s\S]*)$", &Edit),
+        AssertTrue(RegExMatch(Payload, "^\{BackSpace (\d+)\}\{Text\}([\s\S]*)$", &EditMatch),
             "the intercepted sender must emit a recognized atomic text edit: " . Payload)
-        Count := Integer(Edit[1])
+        Count := Integer(EditMatch[1])
         AssertTrue(Count <= _TextCodepointLength(Document), "an expansion must never delete before the virtual document starts")
-        Document := SubStr(Document, 1, StrLen(Document) - _TextTailCodeUnits(Document, Count)) . Edit[2]
+        Document := SubStr(Document, 1, StrLen(Document) - _TextTailCodeUnits(Document, Count)) . EditMatch[2]
         Deleted += Count
         Applied += 1
     }
@@ -279,11 +286,11 @@ _E2E_SendToNativeEdit(EditControl, FnName, Args*) {
     AssertEqual("SendFinalResult", FnName, "the native tier must receive the production final sender")
     AssertTrue(Args.Length == 2 and !Args[2], "the native sender must preserve its command payload")
     _HOOK_RecordSend(FnName, Args*)
-    AssertTrue(RegExMatch(Args[1], "^\{BackSpace (\d+)\}\{Text\}([\s\S]*)$", &Edit),
+    AssertTrue(RegExMatch(Args[1], "^\{BackSpace (\d+)\}\{Text\}([\s\S]*)$", &EditMatch),
         "the native tier must receive a recognized atomic edit")
-    loop Integer(Edit[1])
+    loop Integer(EditMatch[1])
         SendMessage(0x0102, 8, 1, EditControl)
-    _E2E_InsertNativeText(EditControl, Edit[2])
+    _E2E_InsertNativeText(EditControl, EditMatch[2])
     return true
 }
 
@@ -391,6 +398,82 @@ for _Sc in E2E_SCENARIOS {
 
 
 
+
+/** Records completion without replacing the real TextSend or SendText boundary. */
+_E2E_TextSenderComplete(State, Ok, Message) {
+    State.Calls += 1
+    State.Ok := Ok
+    State.Message := Message
+}
+
+/** Genuine Unicode keyboard delivery into one exact private Windows Edit. */
+_E2E_TextSenderNulReceiver(Position, FromJson := false) {
+    Legal := Position == "legal-unicode"
+    Left := Position == "head" ? "" : "private_head"
+    Right := Position == "tail" ? "" : "private_tail"
+    Text := Legal ? Chr(0xE9) . Chr(0x1F642) . " accepted"
+        : FromJson ? JsonParse('"' . Left . '\u0000' . Right . '"') : Left . Chr(0) . Right
+    Before := "retained "
+    Window := Gui()
+    Control := Window.AddEdit("w400 h100 Multi", Before)
+    State := {Calls: 0, Ok: false, Message: ""}
+    PreviousCritical := Critical("Off")
+    try {
+        ; These real keyboard sends run only in Windows CI or our private Wine
+        ; display. No physical driver hotkey module or output seam is installed.
+        Window.Show()
+        Control.Focus()
+        AssertTrue(WinWaitActive("ahk_id " . Window.Hwnd, , 1), "the private receiver must become foreground")
+        AssertEqual(Window.Hwnd, DllCall("GetForegroundWindow", "Ptr"), "the exact private window must own the foreground")
+        AssertEqual(Control.Hwnd, DllCall("GetFocus", "Ptr"), "the exact private Edit must own keyboard focus")
+        AssertEqual(DllCall("GetCurrentProcessId", "UInt"), WinGetPID(Control.Hwnd), "the receiver must belong to this runner")
+        SendMessage(0x00B1, StrLen(Before), StrLen(Before), Control)
+        AssertEqual(Before, Control.Value, "setup must preserve the independent receiver text")
+        if !Legal {
+            AssertTrue(RegExMatch(Text, "\x00") > 0, "the actual public request must retain its NUL")
+            AssertEqual(StrLen(Left) + 1 + StrLen(Right), StrLen(Text), "both sides of the NUL must survive construction")
+        }
+        TextSend(Text, Map("mode", "direct"), _E2E_TextSenderComplete.Bind(State))
+        if Legal {
+            Started := A_TickCount
+            while Control.Value != Before . Text && A_TickCount - Started < 1000
+                Sleep(10)
+        } else
+            Sleep(50)
+        _TestPrint("# native-text-receiver position=" . Position . " json=" . FromJson
+            . " callback_ok=" . State.Ok . " callbacks=" . State.Calls . " unchanged=" . (Before == Control.Value))
+        AssertEqual(1, State.Calls, "the actual sender must complete exactly once")
+        if Legal {
+            AssertTrue(State.Ok, "real Unicode output must be accepted: " . State.Message)
+            AssertEqual("", State.Message, "accepted output must retain no error")
+            AssertEqual(Before . Text, Control.Value, "the real Windows receiver must retain every Unicode code unit")
+        } else {
+            AssertFalse(State.Ok, "unrepresentable NUL text must be refused by the genuine sender")
+            AssertTrue(InStr(State.Message, "NUL") > 0, "the generic refusal must explain the unsupported code unit")
+            AssertEqual(Before, Control.Value, "refused NUL output must leave the actual native receiver unchanged")
+        }
+        Sleep(30)
+        AssertEqual(1, State.Calls, "late input processing must not repeat completion")
+        AssertEqual(Legal ? Before . Text : Before, Control.Value, "no late output may alter the settled receiver")
+    } finally {
+        Window.Destroy()
+        Critical(PreviousCritical)
+    }
+}
+
+for _E2E_NulPosition in ["head", "middle", "tail"] {
+    for _E2E_NulJson in [false, true]
+        Test("e2e[native-text] " . _E2E_NulPosition . " NUL from "
+            . (_E2E_NulJson ? "JSON" : "literal") . " preserves the actual receiver (native-text-nul-receiver)",
+            _E2E_TextSenderNulReceiver.Bind(_E2E_NulPosition, _E2E_NulJson))
+}
+Test("e2e[native-text] legal Unicode reaches the actual receiver (native-text-nul-receiver)",
+    _E2E_TextSenderNulReceiver.Bind("legal-unicode"))
+
+
+
+
+
 ; ==============================
 ; ==============================
 ; ======= 5/ Entry point =======
@@ -403,9 +486,19 @@ for _Sc in E2E_SCENARIOS {
 ; process persistent on some CI runners).
 SetTimer(_E2E_Watchdog, -30000)
 
+; E2E owns its two registering files without joining the unit shard inventory.
+_E2E_PlanModuleOf(File) {
+    Normalized := StrLower(StrReplace(File, "/", "\"))
+    for Name in ["run_e2e.ahk", "test_e2e_number_row.ahk"] {
+        if Normalized == StrLower(A_ScriptDir . "\" . Name)
+            return "e2e"
+    }
+    throw Error("The E2E plan does not own the registering file: " . File)
+}
+
 _E2E_Watchdog() {
     try FileAppend("WATCHDOG: forced exit after 30 s`r`n", "*")
     ExitApp(2)
 }
 
-RunTests()
+RunTests(_E2E_PlanModuleOf)

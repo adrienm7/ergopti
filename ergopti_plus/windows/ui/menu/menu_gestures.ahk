@@ -44,11 +44,28 @@ BuildGesturesMenu(Options := unset) {
 		"scope_clear",      (*) => _GES_ApplyScope("clear", ScopeOptions),
 		"auto_configure",   (*) => GestureAutoConfigureAction(),
 		"manual_tutorial",  (*) => GestureShowManualTutorialDialog(),
+		MenuCommand.GESTURE_RECOMMENDED_INFO, (*) => GestureShowRecommendedInfo(),
 	)
 	Getters := Map("gestures_enabled", _GES_IsEnabled)
-	ListProviders := Map("gesture_slots_ahk", (*) => _GES_SlotRows(),
-		"system_gesture_status", (*) => GestureSystemRows())
-	return MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", ListProviders, Commands, Getters)
+	; There is no status provider: the slot rows below carry the availability
+	; themselves, and « Infos… » explains it in a dialog.
+	ListProviders := Map("gesture_slots_ahk", (*) => _GES_SlotRows())
+	Built := MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", ListProviders, Commands, Getters)
+	if Built is Menu
+		GestureSystemWatchMenu(Built)
+	return Built
+}
+
+/**
+ * Shows why a gesture is offered or greyed out, behind the menu's « Infos… » row.
+ * The text is several sentences long, and AutoHotkey refuses a menu item name
+ * over 260 UTF-16 units. On Windows the driver takes the system's own
+ * assignment over itself, so the shared "remove the system assignment first"
+ * note does not apply and only the Windows reason is shown.
+ * @returns {String} The native button the user pressed.
+ */
+GestureShowRecommendedInfo() {
+	return Ui_MsgBox(t("menu.gestures.recommended_reason_windows"), t("menu.gestures.notify_title"), "Iconi")
 }
 
 ; True when the gestures feature is switched on in the loaded configuration.
@@ -74,8 +91,12 @@ _GES_ApplyScope(Mode, Options := unset) {
 ; Iterates GESTURE_SLOTS in order, inserting a separator before tap_4 as before.
 ; Row DATA since 2026-08-07, as on Linux: each label is the slot plus the action
 ; currently bound to it, which no static declaration can carry.
-_GES_SlotRows() {
+; A slot the system does not map to Ergopti's shortcut is greyed out and its
+; label ends with the reason; the availability is re-read at every build.
+; @param ReadFn {Func|0} Injectable registry reader (tests); the real one when omitted.
+_GES_SlotRows(ReadFn := 0) {
 	global GestureAssignments, GESTURE_ACTIONS, GESTURE_SLOTS, Features
+	GestureSystemRefresh(ReadFn)
 	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
 		and Features["gestures"]["enabled"] = true
 	Rows := []
@@ -92,9 +113,10 @@ _GES_SlotRows() {
 		CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction)
 			? GestureActionDisplayLabel(CurrentAction, GestureBindingId("gesture", Slot))
 			: t("dialog.action_picker.disabled")
+		Reason := GestureSystemUnavailableReason(Slot)
 		Rows.Push(Map(
-			"label",    SlotLabel . " : " . CurrentLabel,
-			"disabled", !GestEnabled,
+			"label",    SlotLabel . " : " . CurrentLabel . (Reason != "" ? " — " . Reason : ""),
+			"disabled", !GestEnabled || Reason != "",
 			"action",   ((_s, _l) => (*) => ShowActionPicker(_l,
 				GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none",
 				(Id) => SetGestureSlotAction(_s, Id), false, GestureBindingId("gesture", _s)))(Slot, SlotLabel)))
@@ -122,9 +144,7 @@ SetGestureSlotAction(Slot, ActionName) {
 	if !GestureAssignConfiguredAction(&GestureAssignments,
 			"gesture", "gestures", Slot, ActionName)
 		return false
-	if ActionName == "none"
-		return ReloadPreservingSuspend()
-	return GestureSystemAfterAssignment(Slot)
+	return ReloadPreservingSuspend()
 }
 
 ; Toggles the Gestures enabled state and reloads.

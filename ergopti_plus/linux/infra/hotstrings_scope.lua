@@ -44,10 +44,15 @@ local PERSONAL_CATEGORY = "personal"
 local ScopeFile = require("config_scope_file")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
+local ConfigKeys = require("config_keys")
 
 local LOG = "infra.hotstrings_scope"
-local REPEAT_PATH = "hotstrings.repeat_key_enabled"
+local REPEAT_PATH = ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED
+local BASE_DELAY_PATH = require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY
+local NativePath = require("native_path")
+local TableUtil = require("table_util")
 local _owner, _sequence = nil, 0
+require("infra.scope_registry").register("hotstrings_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Whether a category or section identity can be named by a canonical path.
 --- @param id string
@@ -109,22 +114,24 @@ function M.new(options)
 		local bundled = Config.bundled_categories()
 		local groups = {}
 		for id, category in pairs(Config.get_categories()) do
-			local sections = {}
-			for section in pairs(category.sections or {}) do sections[#sections + 1] = section end
-			table.sort(sections)
+			local sections = TableUtil.sorted_keys(category.sections or {})
 			-- personal.toml (the "personal" category) and each additional personal file.
 			local personal = id == PERSONAL_CATEGORY or PersonalFiles.components(id) ~= nil
 			groups[#groups + 1] = { id = id, override = { id }, sections = sections, bundled = bundled[id] == true,
 				personal = personal }
 		end
 		table.sort(groups, function(left, right) return left.id < right.id end)
+		-- The base expansion delay is one of the scope's own preferences: after it the
+		-- base is the recommended value (restore) or the default (clear), and the
+		-- delays below are offsets of THAT base, whatever the user's is today.
+		local base_after = mode == "recommended" and Manifest.recommended_for(BASE_DELAY_PATH)
+			or Manifest.default_for(BASE_DELAY_PATH)
 		local changes = Planner.plan({ mode = mode, features = Manifest.features(), groups = groups,
-			inherited = Config.inherited_delay,
-			extra = { { override = { "_global" }, fields = { "delay" } },
-				{ override = { "dynamichotstrings" }, fields = Planner.FIELDS } } })
+			inherited = function(group, section) return Config.inherited_delay(group, section, base_after) end,
+			extra = { { override = { "dynamichotstrings" }, fields = Planner.FIELDS } } })
 		secondary = ScopeFile.new({ path = Config.override_path(),
 			backup_path = Config.override_path() .. options.backup_suffix, remove = remove })
-		return secondary.prepare(Planner.writer_rows(changes))
+		return secondary.prepare(Planner.writer_rows(changes, base_after))
 	end
 
 	local function capture()
@@ -208,7 +215,7 @@ function M.new(options)
 			if Config.apply_configuration(owner, decoded, secondary.candidate(), secondary.target()) ~= true then return false end
 			if not apply_dependents(trigger, previous, active_snapshot.programmable) then return false end
 			-- A first write creates the configuration folder the two files share.
-			local directory = options.path:match("^(.*)/[^/]+$")
+			local directory = NativePath.dirname(options.path)
 			if not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then return false end
 			local published, why = secondary.publish()
 			if published ~= true then

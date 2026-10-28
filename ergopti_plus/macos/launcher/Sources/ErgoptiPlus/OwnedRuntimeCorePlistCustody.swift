@@ -5,7 +5,7 @@ import Darwin
 import Foundation
 
 final class OwnedRuntimeCorePlistCustody {
-	private static let name = "com.ergoptiplus.runtime.core.plist"
+	private static let name = "\(Identifiers.ServiceLabels.macosCore).plist"
 	private static let ledgerName = ".runtime-service-journal"
 	private static let pending = Data("CORE_PLIST|1|pending\n".utf8)
 	private let plistParent: OwnedRuntimeInstallTree, ledgerParent: OwnedRuntimeInstallTree

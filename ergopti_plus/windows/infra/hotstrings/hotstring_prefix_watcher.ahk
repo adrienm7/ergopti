@@ -9,6 +9,7 @@
 ; Sub-modules loaded in order:
 ;   hotstring_inputhook.ahk — globals, public API, InputHook callbacks.
 ;   hotstring_registry.ahk  — TOML / cache-driven prefix-index construction.
+;   preview_switches.ahk    — the four preview-bubble switches and the family rule.
 ;   ../personal_info_mask.ahk    — the shared masking policy, ported.
 ;   ../personal_info_preview.ahk — the @-trigger candidate source.
 ;
@@ -20,5 +21,6 @@
 
 #Include hotstring_inputhook.ahk
 #Include hotstring_registry.ahk
+#Include preview_switches.ahk
 #Include ../personal_info_mask.ahk
 #Include ../personal_info_preview.ahk

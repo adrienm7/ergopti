@@ -13,10 +13,11 @@ local M = {}
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
+local ConfigKeys = require("config_keys")
 
 local LOG = "modules.llm.navigation_settings"
-local KEY = "llm.navigation.val_modifiers"
-local NAVIGATION_KEY = "llm.navigation.nav_modifiers"
+local KEY = ConfigKeys.KEY.LLM_NAVIGATION_VAL_MODIFIERS
+local NAVIGATION_KEY = ConfigKeys.KEY.LLM_NAVIGATION_NAV_MODIFIERS
 local KEYS = { KEY, NAVIGATION_KEY }
 local LABELS = { [KEY] = "Validation modifiers", [NAVIGATION_KEY] = "Navigation modifiers" }
 local ALLOWED = { alt = true, ctrl = true, shift = true, cmd = true }
@@ -239,11 +240,11 @@ function M.capture_collision_configuration()
 	if not navigated then return nil end
 	validation, navigation = detached_chord(validation), detached_chord(navigation)
 	if not validation or not navigation then return nil end
-	local captured, values, source = pcall(collision_many, { KEY, NAVIGATION_KEY, "llm.enabled" })
+	local captured, values, source = pcall(collision_many, { KEY, NAVIGATION_KEY, ConfigKeys.KEY.LLM_ENABLED })
 	if not captured or type(values) ~= "table" or type(source) ~= "table"
 		or source.status ~= "ok" and source.status ~= "absent"
 		or source.status == "ok" and type(source.content) ~= "string"
-		or type(values["llm.enabled"]) ~= "boolean" then return nil end
+		or type(values[ConfigKeys.KEY.LLM_ENABLED]) ~= "boolean" then return nil end
 	local expected_validation = normalise(values[KEY]) or normalise(collision_default(KEY))
 	local expected_navigation = normalise(values[NAVIGATION_KEY]) or normalise(collision_default(NAVIGATION_KEY))
 	if not expected_validation or not expected_navigation or not same_chord(validation, expected_validation)
@@ -251,7 +252,7 @@ function M.capture_collision_configuration()
 	local generated, revision = pcall(collision_generation)
 	if not generated or not ports_current() then return nil end
 	local epoch, actual, defaults = collision_epoch, _values, _defaults
-	local bytes, status, enabled = source.content, source.status, values["llm.enabled"]
+	local bytes, status, enabled = source.content, source.status, values[ConfigKeys.KEY.LLM_ENABLED]
 	local function runtime()
 		return ports_current() and collision_epoch == epoch and rawequal(_values, actual) and rawequal(_defaults, defaults)
 			and same_chord(actual[KEY], validation) and same_chord(actual[NAVIGATION_KEY], navigation)
@@ -259,7 +260,7 @@ function M.capture_collision_configuration()
 	end
 	local function current()
 		if not runtime() or collision_route("config.toml") ~= path then return false end
-		local queried, _, fresh = pcall(collision_many, { KEY, NAVIGATION_KEY, "llm.enabled" })
+		local queried, _, fresh = pcall(collision_many, { KEY, NAVIGATION_KEY, ConfigKeys.KEY.LLM_ENABLED })
 		return queried and type(fresh) == "table" and fresh.content == bytes and fresh.status == status
 			and collision_route("config.toml") == path and runtime()
 	end

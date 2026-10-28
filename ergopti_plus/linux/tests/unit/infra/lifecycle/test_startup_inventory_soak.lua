@@ -55,7 +55,7 @@ local function fixture(options)
 	local collector = { has_flush_debt = function() return false end }
 	env.require = function(name)
 		if name == "luv" then return uv end
-		if name == "modules.keylogger.keylogger" then return collector end
+		if name == "modules.keystats.keystats" then return collector end
 		error("unexpected bootstrap dependency: " .. name)
 	end
 	env.dofile = function(path)

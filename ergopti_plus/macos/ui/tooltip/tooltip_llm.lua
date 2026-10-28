@@ -24,6 +24,7 @@ local Config = require("ui.tooltip.config")
 local Renderer = require("ui.tooltip.renderer")
 local LlmLine = require("tooltip.llm_line")
 local HotPath = require("infra.hotpath_profiler")
+local TextUtils = require("text_utils")
 
 local MAC_KEYCODES_NUMBERS = {
 	[18] = 1, [19] = 2, [20] = 3, [21] = 4, [23] = 5,
@@ -475,7 +476,7 @@ local function parse_validation_shortcut(shortcut)
 	if type(shortcut) ~= "string" or shortcut == "none" then return nil end
 	local mods = {}
 	for token in shortcut:gmatch("[^+]+") do
-		local mod = token:match("^%s*(.-)%s*$"):lower()
+		local mod = TextUtils.trim(token):lower()
 		if mod ~= "" and mod ~= EMPTY_SHORTCUT_PLACEHOLDER then mods[#mods + 1] = mod end
 	end
 	return mods
@@ -1603,7 +1604,7 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 			type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0,
 			tonumber(_state.reserved_count) or 0)
 	end
-	HotPath.log_if_slow("tooltip.show_predictions", _hot_t0, "LLM prediction render")
+	HotPath.log_if_slow("tooltip.show_predictions", _hot_t0)
 	return ok and rendered and still_owned()
 end
 

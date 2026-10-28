@@ -3,7 +3,9 @@
 --- Exercises literal native argv and retained physical program ownership.
 local helpers = require("tests.helpers")
 local Runner = require("adapters.program_runner")
-local Owner = require("modules.gestures.program_owner")
+-- Loaded fresh: a case patches the current logger shim, and suites that load
+-- the gestures manager under a substitute logger leave this owner bound to it.
+local Owner = helpers.load_module("modules.gestures.program_owner")
 local Native = require("luv")
 local scalar = '{"version":1,"executable":"/bin/sh","arguments":[]}'
 
@@ -462,8 +464,8 @@ helpers.describe("private user program real gesture and keyboard bindings", func
 			while manager.stop_programs() ~= true and Native.hrtime() < deadline do Native.run("nowait") end
 			helpers.assert_eq(manager.set_program_paused(false), true)
 			os.remove(output)
-			helpers.assert_eq(keyboard.set_action("ctrl_p", "run_program"), true)
-			helpers.assert_eq(manager.set_action_parameter("keyboard__ctrl_p", "run_program", parameter), true)
+			helpers.assert_eq(keyboard.set_action("primary_p", "run_program"), true)
+			helpers.assert_eq(manager.set_action_parameter("keyboard__primary_p", "run_program", parameter), true)
 			helpers.assert_eq(keyboard.dispatch({ key = "p", mods = { ctrl = true } }), true)
 			deadline = Native.hrtime() + 3e9
 			settled = false
@@ -477,7 +479,7 @@ helpers.describe("private user program real gesture and keyboard bindings", func
 			local canonical = assert(io.open(path, "rb")); local source = canonical:read("*a"); canonical:close()
 			helpers.assert_contains(source, "# retained foreign note")
 			local document = require("toml_codec").decode(source)
-			helpers.assert_eq(document.gesture_parameters["keyboard__ctrl_p__run_program"], parameter)
+			helpers.assert_eq(document.gesture_parameters["keyboard__primary_p__run_program"], parameter)
 			os.remove(output)
 		end)
 	end)
@@ -582,18 +584,18 @@ helpers.describe("private user program durable parameter receipts", function()
 end)
 
 helpers.describe("private program lossless shared parameter corpus", function()
-	helpers.it("checks every platform against independently declared literal vectors", function()
+	helpers.it("checks every executable syntax against independently declared literal vectors", function()
 		local Json, Program = require("json"), require("program_parameter")
 		local file = assert(io.open(require("infra.paths").shared("tests/corpus/action_parameters/program_vectors.json"), "rb"))
 		local corpus = assert(Json.decode_lossless(file:read("*a"))); file:close()
 		local count = 0
 		for _, vector in ipairs(corpus.cases) do
-			for _, platform in ipairs(vector.platforms) do
-				local actual = Program.parse(vector.value, platform)
+			for _, syntax in ipairs(vector.syntaxes) do
+				local actual = Program.parse(vector.value, syntax)
 				if Json.is_null(vector.expected) then
-					helpers.assert_eq(actual, nil, vector.id .. "/" .. platform)
+					helpers.assert_eq(actual, nil, vector.id .. "/" .. syntax)
 				else
-					helpers.assert_not_nil(actual, vector.id .. "/" .. platform)
+					helpers.assert_not_nil(actual, vector.id .. "/" .. syntax)
 					if actual then
 						helpers.assert_eq(actual.executable, vector.expected.executable)
 						helpers.assert_eq(actual.arguments, vector.expected.arguments)
@@ -602,7 +604,7 @@ helpers.describe("private program lossless shared parameter corpus", function()
 				count = count + 1
 			end
 		end
-		helpers.assert_eq(count, 63, "the whole independent cross-platform vector census executes")
+		helpers.assert_eq(count, 42, "the whole independent cross-syntax vector census executes")
 	end)
 end)
 

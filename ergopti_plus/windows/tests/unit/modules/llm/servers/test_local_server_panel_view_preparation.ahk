@@ -285,7 +285,7 @@ class _LSCF_ConfiguredChild extends _LSPN_ReadyChild {
 		_LSM_ChildReceipt.Prototype.start.Call(this)
 		Fixture := this.Fixture
 		Request := Fixture.Requests[Fixture.Requests.Length]
-		Config := FSReadUtf8Exact(Request.ConfigPath)
+		Config := _LSM_RequestImage(Request)
 		Configured := InStr(Config, ":19423/custom/v1/models", true) > 0
 		this.ResponseStatus := Configured ? Fixture.ConfiguredStatus : 200
 		this.ResponseBody := Configured ? Fixture.ConfiguredBody
@@ -608,3 +608,5 @@ Test("local-server-retire-final-settlement: final retry can complete reversible 
 Test("local-server-retire-final-settlement: final retry can complete closed-owner cancellation", _LSPN_FinalSettlementRetirement.Bind(true, true))
 Test("local-server-retire-final-settlement: unsettled reversible cancellation remains owned", _LSPN_FinalSettlementRetirement.Bind(false, false))
 Test("local-server-retire-final-settlement: unsettled closed-owner cancellation remains owned", _LSPN_FinalSettlementRetirement.Bind(false, true))
+
+#Include test_local_server_record_lifetime.ahk

@@ -69,9 +69,10 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 	helpers.it("clears terminal rollback state without logging after sink finalization", function()
 		local previous_logger = package.loaded["infra.logger"]
 		local debug_calls = 0
-		package.loaded["infra.logger"] = {
-			debug = function() debug_calls = debug_calls + 1 end,
-		}
+		-- The storage adapter's owned-alias state requires a logger with error()
+		-- when it loads; every level counts as reopening the logger.
+		local function count() debug_calls = debug_calls + 1 end
+		package.loaded["infra.logger"] = { debug = count, info = count, warn = count, error = count }
 		package.loaded["adapters.storage"] = nil
 		package.loaded["infra.reload_guard"] = nil
 		local rg = require("infra.reload_guard")

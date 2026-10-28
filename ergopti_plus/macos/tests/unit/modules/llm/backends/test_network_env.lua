@@ -30,6 +30,23 @@ local function run(command)
 	return output
 end
 
+helpers.describe("managed-network-children: the HTTPS route precedence is the shared policy's (proxy-policy-single-source)", function()
+	helpers.it("builds the bootstrap guard from proxy_policy.json, not from a typed list", function()
+		package.loaded["modules.llm.network_env"] = nil
+		local NetworkEnv = require("modules.llm.network_env")
+		local Json = require("json")
+		local file = assert(io.open(helpers.shared("modules/network/proxy_policy.json"), "rb"))
+		local policy = assert(Json.decode(file:read("*a"))); file:close()
+		local expected = ""
+		for index = #policy.environment_precedence.https, 1, -1 do
+			expected = "${" .. policy.environment_precedence.https[index] .. ":-" .. expected .. "}"
+		end
+		helpers.assert_eq(NetworkEnv.https_route_expansion(), expected)
+		local prelude = assert(NetworkEnv.bootstrap_prelude("TEST", "/usr/bin/python3"))
+		helpers.assert_true(prelude:find('[ -z "' .. expected .. '" ]', 1, true) ~= nil, prelude)
+	end)
+end)
+
 helpers.describe("managed-network-children", function()
 	helpers.it("names the shared policy and exports the settings for the next command", function()
 		package.loaded["modules.llm.network_env"] = nil
@@ -39,7 +56,7 @@ helpers.describe("managed-network-children", function()
 		local prelude = assert(NetworkEnv.prelude("TEST"))
 		helpers.assert_true(prelude:find(". '" .. policy .. "' && apply_system_network; ", 1, true) ~= nil, prelude)
 		if POSIX then
-			local output = run("env -u https_proxy -u all_proxy -u ALL_PROXY HTTPS_PROXY=http://relay.corp:3129 NO_PROXY= no_proxy= bash -c "
+			local output = run("env -u https_proxy -u all_proxy -u ALL_PROXY -u SSL_CERT_FILE -u SSL_CERT_DIR HTTPS_PROXY=http://relay.corp:3129 NO_PROXY= no_proxy= bash -c "
 				.. sh_quote(prelude .. 'printf "%s|%s|%s" "$HTTPS_PROXY" "$NO_PROXY" "$UV_SYSTEM_CERTS"'))
 			helpers.assert_eq(output, "http://relay.corp:3129|localhost,127.0.0.1,::1|1")
 		end
@@ -68,11 +85,64 @@ helpers.describe("managed-network-children", function()
 		helpers.assert_true(not output:find("__CHILD_STARTED__", 1, true), "refusal must stop the generated prelude")
 	end)
 
+	-- A daemon that reads only HTTPS_PROXY cannot evaluate a PAC: the prelude names
+	-- the origin it downloads from and the launcher resolves that origin.
+	helpers.it("(ollama-pac-route) names the origin whose automatic route is resolved", function()
+		local NetworkEnv = require("modules.llm.network_env")
+		local original_path = NetworkEnv.policy_path
+		NetworkEnv.policy_path = function() return "/fixture/network-retry.sh" end
+		local ok, err = pcall(function()
+			local options = { pac_probe_url = "https://registry.ollama.ai" }
+			for _, build in ipairs({ NetworkEnv.prelude, NetworkEnv.opaque_prelude }) do
+				local prelude = assert(build("TEST", options))
+				local probe_at = prelude:find("OPAQUE_NETWORK_PAC_PROBE_URL='https://registry.ollama.ai'; ", 1, true)
+				local source_at = prelude:find(". '/fixture/network-retry.sh' && ", 1, true)
+				helpers.assert_true(probe_at ~= nil and source_at ~= nil and probe_at < source_at,
+					"the origin is assigned before the policy is sourced: " .. prelude)
+				helpers.assert_true(not assert(build("TEST")):find("PAC_PROBE", 1, true),
+					"a client that names no origin gets the unchanged prelude")
+			end
+			for _, bad in ipairs({ "http://registry.ollama.ai", "https://registry.ollama.ai/path",
+				"https://registry.ollama.ai'; touch x; '", "https://u:p@registry.ollama.ai", 7 }) do
+				local prelude, reason = NetworkEnv.prelude("TEST", { pac_probe_url = bad })
+				helpers.assert_nil(prelude, tostring(bad))
+				helpers.assert_true(type(reason) == "string", tostring(bad))
+			end
+		end)
+		NetworkEnv.policy_path = original_path
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("(route-plan) names every origin of a client, redirect hosts included", function()
+		local NetworkEnv = require("modules.llm.network_env")
+		local origins = assert(NetworkEnv.route_origins("ollama"))
+		helpers.assert_true(#origins >= 2, "the registry and its blob host are both looked up")
+		local original_path = NetworkEnv.policy_path
+		NetworkEnv.policy_path = function() return "/fixture/network-retry.sh" end
+		local ok, err = pcall(function()
+			for _, build in ipairs({ NetworkEnv.prelude, NetworkEnv.opaque_prelude }) do
+				local prelude = assert(build("TEST", { pac_probe_client = "ollama" }))
+				local assigned = prelude:find("OPAQUE_NETWORK_PAC_PROBE_URLS='" .. table.concat(origins, " ") .. "'; ", 1, true)
+				local source_at = prelude:find(". '/fixture/network-retry.sh' && ", 1, true)
+				helpers.assert_true(assigned ~= nil and source_at ~= nil and assigned < source_at,
+					"the origins are assigned before the policy is sourced: " .. prelude)
+				helpers.assert_true(not prelude:find("PAC_PROBE_URL=", 1, true), "one variable names the origins")
+			end
+			local unknown, reason = NetworkEnv.prelude("TEST", { pac_probe_client = "nobody" })
+			helpers.assert_nil(unknown)
+			helpers.assert_true(type(reason) == "string" and not reason:find("https://", 1, true), tostring(reason))
+			local twice = NetworkEnv.prelude("TEST", { pac_probe_client = "ollama", pac_probe_url = "https://registry.ollama.ai" })
+			helpers.assert_nil(twice, "a client and a single origin are never both named")
+		end)
+		NetworkEnv.policy_path = original_path
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("starts the Ollama service with the system network settings", function()
 		package.loaded["modules.llm.ollama_server_command"] = nil
 		local Builder = require("modules.llm.ollama_server_command")
 		local command = assert(Builder.build("/fixture/ollama", "/tmp/logs/ErgoptiPlus_2099-01-01.log", 11434))
-		local prelude = assert(require("modules.llm.network_env").prelude("OLLAMA-SERVER"))
+		local prelude = assert(require("modules.llm.network_env").prelude("OLLAMA-SERVER", Builder.NETWORK_OPTIONS))
 		helpers.assert_true(not prelude:find("apply_system_network opaque", 1, true), "cached local serving requires no outgoing admission")
 		helpers.assert_eq(command:sub(1, #prelude), prelude,
 			"the service pulls the models itself and reads only its own relay variables")

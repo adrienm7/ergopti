@@ -11,7 +11,7 @@ local helpers = require('tests.helpers')
 local modules = {
 	'modules.dynamic_hotstrings.personal_info', 'adapters.file_system',
 	'infra.logger', 'adapters.synthetic_input', 'ui.personal_info_editor',
-	'modules.keylogger',
+	'modules.keystats',
 	'infra.manifest_reader', 'infra.personal_info_fields',
 }
 local function with_subject(content, run)
@@ -35,7 +35,7 @@ local function with_subject(content, run)
 		package.loaded['infra.logger'] = logger
 		package.loaded['adapters.synthetic_input'] = {}
 		package.loaded['ui.personal_info_editor'] = {}
-		package.loaded['modules.keylogger'] = {}
+		package.loaded['modules.keystats'] = {}
 		local subject = require('modules.dynamic_hotstrings.personal_info')
 		local keymap = {
 			get_trigger_char = function() return '@' end,

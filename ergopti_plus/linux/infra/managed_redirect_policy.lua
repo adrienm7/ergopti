@@ -9,6 +9,7 @@
 --- Lazy installed-layout binding; ordinary no-follow requests do not load it.
 local M = {}
 local Paths = require("infra.paths")
+local Reader = require("infra.regular_file_reader")
 local Json = require("json")
 local Shared = require("network.http_redirect")
 local initialized, policy, refusal = false, nil, nil
@@ -19,7 +20,7 @@ local retained = {}
 local function read(relative)
 	local resolved, path = pcall(Paths.shared, relative)
 	if not resolved or type(path) ~= "string" or path == "" or path:find("%z") then return nil end
-	local opened, file = pcall(io.open, path, "rb")
+	local opened, file = pcall(Reader.open_source, path)
 	if not opened or not file then return nil end
 	retained[file] = true
 	local read_ok, bytes = pcall(file.read, file, 32769)

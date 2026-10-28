@@ -25,9 +25,9 @@ local function load_controller(options)
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["platform.remap.lease_helper"] = nil
-	local log_events = { debug = {}, info = {}, warn = {}, error = {} }
+	local log_events = { debug = {}, info = {}, warn = {}, error = {}, evidence = {} }
 	local logger = helpers.make_logger_stub()
-	for _, level in ipairs({ "debug", "info", "warn", "error" }) do
+	for _, level in ipairs({ "debug", "info", "warn", "error", "evidence" }) do
 		logger[level] = function(...)
 			log_events[level][#log_events[level] + 1] = { ... }
 		end

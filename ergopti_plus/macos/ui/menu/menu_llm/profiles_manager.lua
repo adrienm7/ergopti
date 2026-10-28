@@ -18,8 +18,10 @@ local i18n          = require("infra.i18n")
 local dialog        = require("infra.dialog_util")
 local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 local ManifestMenu  = require("infra.manifest_menu")
+local AppProfileOverrides = require("llm.app_profile_overrides")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
 local TimerScheduler = require("adapters.timer_scheduler")
+local ConfigKeys = require("config_keys")
 
 local LOG = "menu_llm.profiles"
 
@@ -58,6 +60,26 @@ local function schedule_editor(callback)
 		return handle, false
 	end
 	return handle, true
+end
+
+--- Keeps an editor draft retryable until its exact profile mutation commits.
+--- Reentrant Save messages never share an in-flight registry transaction, while
+--- a refused transaction leaves the same native draft eligible for recovery.
+--- @param callback function Existing strict profile save transaction.
+--- @return function save Receives one editor payload and returns a literal receipt.
+local function retryable_editor_save(callback)
+	local saving, committed = false, false
+	return function(value)
+		if saving or committed then return false end
+		saving = true
+		local ok, accepted = Logger.callback(LOG, "Profile editor save transaction", callback, value)
+		saving = false
+		if ok == true and accepted == true then
+			committed = true
+			return true
+		end
+		return false
+	end
 end
 
 
@@ -671,7 +693,6 @@ local function clone_builtin_profile(deps, state, src, activate_candidate, repla
 	-- edit, not back in the menu.
 	if prompt_editor and type(prompt_editor.open) == "function" then
 		local timer_fired = false
-		local editor_settled = false
 		local function open_clone_editor()
 			if timer_fired then return false end
 			timer_fired = true
@@ -681,9 +702,7 @@ local function clone_builtin_profile(deps, state, src, activate_candidate, repla
 				"Cloned-profile editor",
 				prompt_editor.open,
 				copy,
-				function(updated)
-				if editor_settled then return false end
-				editor_settled = true
+				retryable_editor_save(function(updated)
 				if type(updated) ~= "table" then return false end
 				if not is_ready() or not settle_profile_mutation_recovery(deps)
 					or not is_ready() then return false end
@@ -693,7 +712,7 @@ local function clone_builtin_profile(deps, state, src, activate_candidate, repla
 				end
 				copy = updated
 				return true
-				end)
+				end))
 			return editor_ok == true and editor_result ~= false
 		end
 		local _, timer_committed = schedule_editor(open_clone_editor)
@@ -1061,8 +1080,8 @@ local function build_profile_menu(
 			
 			-- User profiles get a sub-menu for Editing/Deleting
 			local child_commands = {
-				["llm_profile_use"] = function() return select_profile(deps, state, pid) end,
-				["llm_profile_shortcut"] = function()
+				[ConfigKeys.COMMAND.LLM_PROFILE_USE] = function() return select_profile(deps, state, pid) end,
+				[ConfigKeys.COMMAND.LLM_PROFILE_SHORTCUT] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						return shortcut_ui.prompt_shortcut({
 							native_presentation_id = "profile_shortcut_dialog",
@@ -1078,11 +1097,10 @@ local function build_profile_menu(
 							end,
 						})
 					end,
-				["llm_profile_edit"] = function()
+				[ConfigKeys.COMMAND.LLM_PROFILE_EDIT] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
 						local timer_fired = false
-						local editor_settled = false
 						local function open_profile_editor()
 							if timer_fired then return false end
 							timer_fired = true
@@ -1091,9 +1109,7 @@ local function build_profile_menu(
 								"Custom-profile editor",
 								prompt_editor.open,
 								profile,
-								function(updated)
-									if editor_settled then return false end
-									editor_settled = true
+								retryable_editor_save(function(updated)
 									if type(updated) ~= "table" then return false end
 									if not settle_profile_mutation_recovery(deps) then return false end
 									if type(replace_profile) ~= "function"
@@ -1106,13 +1122,13 @@ local function build_profile_menu(
 										ProfileLabel.format(updated.label, state.llm_num_predictions),
 										"success")
 									return true
-								end)
+								end))
 							return editor_ok == true and editor_result ~= false
 						end
 						local _, timer_committed = schedule_editor(open_profile_editor)
 						return timer_committed == true
 					end,
-				["llm_profile_delete"] = function()
+				[ConfigKeys.COMMAND.LLM_PROFILE_DELETE] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						local ok_c, choice = pcall(dialog.block_alert,
 							string.format(i18n.get("menu.profiles.delete_confirm_title"), display_label),
@@ -1166,7 +1182,6 @@ local function build_profile_menu(
 			or not create_ready() then return false end
 		if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
 		local timer_fired = false
-		local editor_settled = false
 		local function open_create_editor()
 			if timer_fired then return false end
 			timer_fired = true
@@ -1176,9 +1191,7 @@ local function build_profile_menu(
 				"Profile creation editor",
 				prompt_editor.open,
 				nil,
-				function(new_profile)
-					if editor_settled then return false end
-					editor_settled = true
+				retryable_editor_save(function(new_profile)
 					if type(new_profile) ~= "table" then return false end
 					if not create_ready() or not settle_profile_mutation_recovery(deps)
 						or not create_ready() then return false end
@@ -1193,7 +1206,7 @@ local function build_profile_menu(
 						"success")
 					Logger.info(LOG, string.format("Custom profile %s created.", new_profile.id))
 					return true
-				end)
+				end))
 			return editor_ok == true and editor_result ~= false
 		end
 		local _, timer_committed = schedule_editor(open_create_editor)
@@ -1201,13 +1214,59 @@ local function build_profile_menu(
 		return true
 	end
 
+	--- The per-application overrides: map the focused application to the profile in force,
+	--- and one row per mapping that clears it. The same rows as Windows. Each change is
+	--- one acknowledged setting transaction, like every other AI preference.
+	local function app_override_rows()
+		local overrides = AppProfileOverrides.decode(state.llm_app_profile_overrides)
+		if overrides == nil then
+			Logger.error(LOG, "The stored application profile overrides are unreadable; the rows are withheld.")
+			return {}
+		end
+		local function commit(candidate)
+			local payload = AppProfileOverrides.encode(candidate)
+			if payload == nil or type(deps.apply_setting_transaction) ~= "function" then return false end
+			if not settle_profile_mutation_recovery(deps) then return false end
+			return deps.apply_setting_transaction({
+				key = "llm_app_profile_overrides", value = payload,
+				runtime_fn = "set_llm_app_profile_overrides", publish_setting = false,
+			}) == true
+		end
+		local clear_rows = {}
+		for _, entry in ipairs(AppProfileOverrides.rows(overrides)) do
+			local profile = llm_mod.find_profile(entry.profile)
+			clear_rows[#clear_rows + 1] = {
+				label = entry.app .. "  →  " .. (profile
+					and ProfileLabel.format(profile.label or entry.profile, state.llm_num_predictions) or entry.profile),
+				disabled = paused or nil,
+				action = not paused and function()
+					return commit(AppProfileOverrides.without(overrides, entry.app))
+				end or nil,
+			}
+		end
+		return ManifestMenu.template_rows("llm_profile_app_override_frame", {
+			[ConfigKeys.COMMAND.LLM_PROFILE_OVERRIDE_ACTIVE_APP] = function()
+				if not create_ready() then return false end
+				-- Read at click time: the focus engine is not needed to draw the menu
+				local focused = require("modules.llm.app_filter").focused_app_id()
+				local candidate = AppProfileOverrides.with(overrides, focused, state.llm_active_profile)
+				if candidate == nil then return false end
+				return commit(candidate)
+			end,
+		}, {
+			["llm_profile_overrides_present"] = function() return #clear_rows > 0 end,
+		}, {
+			["llm_profile_override_rows"] = function() return clear_rows end,
+		}) or {}
+	end
+
 	local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {
-		["llm_profile_recommend"] = recommend_profile,
-		["llm_profile_clone"] = function()
+		[ConfigKeys.COMMAND.LLM_PROFILE_RECOMMEND] = recommend_profile,
+		[ConfigKeys.COMMAND.LLM_PROFILE_CLONE] = function()
 			return clone_builtin_profile(
 				deps, state, active_builtin, activate_candidate, replace_profile, create_ready)
 		end,
-		["llm_profile_create"] = create_profile,
+		[ConfigKeys.COMMAND.LLM_PROFILE_CREATE] = create_profile,
 	}, {
 		["llm_profile_recommendation_present"] = function() return not paused end,
 		["llm_profile_recommendation_paused"] = function() return not not paused end,
@@ -1220,6 +1279,12 @@ local function build_profile_menu(
 		["llm_profile_custom_rows"] = custom_rows,
 	})
 	if not rows then return {} end
+	-- The per-application overrides end the submenu, as on Windows.
+	local override_rows = ManifestMenu.template_rows("llm_profile_lua_app_overrides", {}, {}, {
+		["llm_profile_app_overrides"] = app_override_rows,
+	})
+	if not override_rows then return {} end
+	for _, row in ipairs(override_rows) do rows[#rows + 1] = row end
 	return ManifestMenu.render_rows(rows, "llm_profile")
 end
 

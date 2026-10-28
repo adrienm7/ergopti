@@ -23,6 +23,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
 
 local LOG = "adapters.clipboard"
 
@@ -137,8 +138,7 @@ function M.save()
 
 	-- readAllData() is a UTI-string-keyed HASH table, not an array, so `#result`
 	-- always reports 0. Count with pairs() so the diagnostic is truthful (F-I3).
-	local n = 0
-	for _ in pairs(result) do n = n + 1 end
+	local n = TableUtil.count(result)
 	Logger.debug(LOG, "save(): clipboard snapshot taken (%d type(s)).", n)
 	return result, true
 end

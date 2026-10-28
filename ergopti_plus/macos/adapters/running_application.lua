@@ -11,7 +11,7 @@
 ---    no running application matches, it falls back to hs.window.find(name),
 ---    which reads every window of every running application through
 ---    Accessibility on the main thread, waiting up to six seconds for each
----    application that does not answer. The keylogger's per-flush category
+---    application that does not answer. The keystats's per-flush category
 ---    lookup of an application that had quit froze Hammerspoon for 13.4 s that
 ---    way: the event taps were disabled and the Karabiner lease lost its
 ---    heartbeats (issue #99). Every lookup here stays on the process list.

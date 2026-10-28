@@ -28,7 +28,7 @@ local OWNED_MODULES = {
 	"ui.menu.menu_llm.backend_panel",
 	"ui.menu.menu_llm.trigger_panel",
 	"ui.menu.menu_llm.api_panel",
-	"ui.menu.menu_llm.models_selector",
+	"ui.menu.menu_llm.model_selector_page",
 	"ui.menu.menu_llm.model_switcher",
 	"modules.llm.api_mlx",
 	"ui.menu.menu_llm.startup_controller",
@@ -182,7 +182,7 @@ local function build_fixture(backend, save_results, options)
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function()
 			calls.offers = calls.offers + 1
-			return options.ollama_offer_choice or "ollama.offer_website"
+			return options.ollama_offer_choice or "ollama.native_offer_keep"
 		end,
 		choose = function(title, message, choices, cancel_label, ok_label)
 			local dialog = {
@@ -263,6 +263,7 @@ local function build_fixture(backend, save_results, options)
 			llm_enabled = false,
 			llm_backend = "ollama",
 			llm_ollama_port = 11434,
+			llm_ollama_owned_port = 11435,
 			llm_model_mlx = "",
 			llm_model_ollama = "",
 			llm_num_predictions = 1,
@@ -367,12 +368,17 @@ local function build_fixture(backend, save_results, options)
 	package.loaded["ui.menu.menu_llm.trigger_panel"] = { build = function() return {} end }
 	package.loaded["ui.menu.menu_llm.api_panel"] = {
 		build = function() return nil, nil end,
-		build_model_picker = function() return {} end,
+		active_entry_caption_text = function() return nil end,
 	}
-	package.loaded["ui.menu.menu_llm.models_selector"] = {
-		build = function(ctx)
-			calls.models_selector_ctx = ctx
-			return {}
+	-- The menu binds the model selector page's context; the page builds no rows.
+	package.loaded["ui.menu.menu_llm.model_selector_page"] = {
+		bind = function(ctx) calls.model_selector_page_ctx = ctx end,
+		caption = function() return "model" end,
+		refresh = function() return false end,
+		open = function() return true end,
+		-- The page owner selects a server through the engine panel's selection.
+		use_local_server = function(id, model, on_selected)
+			return package.loaded["ui.menu.menu_llm.local_server_panel"].use_server(id, model, on_selected)
 		end,
 	}
 	if options.real_switcher then
@@ -440,7 +446,7 @@ local function build_fixture(backend, save_results, options)
 		get_array = presentation_renderer.get_array,
 		get_root = presentation_renderer.get_root,
 		render_rows = function(rows, slot)
-			if slot == "llm_profile" or slot == "llm_download_shortcut_frame" then
+			if slot == "llm_profile" or slot == "llm_backend" or slot == "llm_download_shortcut_frame" then
 				return presentation_renderer.render_rows(rows, slot)
 			end
 			if slot == "llm_generation_settings" then return native_renderer.render_rows(rows, slot) end
@@ -493,24 +499,33 @@ local function build_fixture(backend, save_results, options)
 		get_failure_cause = function() return nil end,
 	}
 	calls.ollama_installs = 0
+	--- Records one accepted Ollama install, stock or owned.
+	--- @param callback function|nil Terminal callback.
+	--- @return any receipt
+	local function ollama_install(callback)
+		calls.ollama_installs = calls.ollama_installs + 1
+		calls.bootstrap_callback = callback
+		if options.ollama_bootstrap_throw then
+			calls.ollama_bootstrap_outcome = "throw"
+			error("Ollama installation exploded")
+		end
+		local receipt = options.ollama_bootstrap_return
+		if receipt == "nil" then receipt = nil elseif receipt == nil then receipt = true end
+		calls.ollama_bootstrap_outcome = type(receipt)
+		calls.ollama_bootstrap_receipt = receipt
+		return receipt
+	end
+
 	package.loaded["modules.llm.ollama_deps_checker"] = {
 		-- An installed Ollama is reused, so enabling offers no download unless
 		-- a case sets ollama_installed = false.
 		provisioning_idle = function() return options.provisioning_debt ~= true end,
 		runtime_available = function() return options.ollama_installed ~= false end,
 		is_task_running = function() return false end,
-		install_for_selection = function(callback)
-			calls.ollama_installs = calls.ollama_installs + 1
-			calls.bootstrap_callback = callback
-			if options.ollama_bootstrap_throw then
-				calls.ollama_bootstrap_outcome = "throw"
-				error("Ollama installation exploded")
-			end
-			local receipt = options.ollama_bootstrap_return
-			if receipt == "nil" then receipt = nil elseif receipt == nil then receipt = true end
-			calls.ollama_bootstrap_outcome = type(receipt)
-			calls.ollama_bootstrap_receipt = receipt
-			return receipt
+		install_for_selection = ollama_install,
+		-- Ergopti's own Ollama is installed through the issued owned choice (issue #104).
+		install_native_for_selection = function(_, _, _, _, _, callback)
+			return ollama_install(callback)
 		end,
 		check_and_install_deps = function(callback)
 			calls.bootstrap = calls.bootstrap + 1
@@ -689,7 +704,14 @@ local function build_fixture(backend, save_results, options)
 		end
 		return strict_result(options.service_dispatch_mode, "service repair dispatch")
 	end
+	-- Installing Ergopti's own Ollama first proves no Ollama request is in flight.
+	service.migration_idle = function() return options.migration_debt ~= true end
 	package.loaded["modules.llm.api_ollama"] = service
+	package.loaded["ui.menu.menu_llm.models_manager_ollama"] = package.loaded["ui.menu.menu_llm.models_manager_ollama"]
+		or {}
+	package.loaded["ui.menu.menu_llm.models_manager_ollama"].migration_idle = function()
+		return options.migration_debt ~= true
+	end
 
 	package.loaded["ui.menu.menu_llm.runtime_install_offer"] = nil
 	calls.temperature_builder = require("ui.menu.menu_llm.temperature_panel").build

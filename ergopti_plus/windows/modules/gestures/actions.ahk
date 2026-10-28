@@ -114,9 +114,9 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => DllCall("LockWorkStation"),
 		},
 		; --- UI windows ---
-		; Each UI action follows the same three-state pattern: if the window is
-		; closed, open it; if open and focused, close it; if open but in the
-		; background, raise it to the foreground.
+		; Each UI action toggles its window (actions.toml, group "UI"): closed or
+		; hidden opens it, open but in the background raises it, open and focused
+		; closes it.
 		"open_metrics_typing", {
 				Fn: (*) => GestureToggleOrFocusUI("metrics_typing"),
 		},
@@ -128,6 +128,24 @@ global GESTURE_ACTIONS := Map(
 		},
 		"open_paths_editor", {
 				Fn: (*) => GestureToggleOrFocusUI("paths_editor"),
+		},
+		"open_hotstrings_settings", {
+				Fn: (*) => GestureToggleOrFocusUI("hotstrings_settings"),
+		},
+		"open_layout_manager", {
+				Fn: (*) => GestureToggleOrFocusUI(MenuCommand.LAYOUT_MANAGER),
+		},
+		"open_layer_editor", {
+				Fn: (*) => GestureToggleOrFocusUI("layer_editor"),
+		},
+		"open_model_browser", {
+				Fn: (*) => GestureToggleOrFocusUI("model_browser"),
+		},
+		"open_changelog", {
+				Fn: (*) => GestureToggleOrFocusUI("changelog"),
+		},
+		"open_healthcheck", {
+				Fn: (*) => GestureToggleOrFocusUI(MenuCommand.HEALTHCHECK),
 		},
 		; --- User files ---
 		"open_script_source", {
@@ -228,7 +246,7 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => GestureTeleportMouse(),
 		},
 		"spotlight_mouse", {
-				Fn: (*) => (MouseGetPos(&_Mx, &_My), SpotlightMouseAt(_Mx, _My, 5000)),
+				Fn: (*) => (SpotlightPoint := MCGetPosStrict(), SpotlightMouseAt(SpotlightPoint["x"], SpotlightPoint["y"], 5000)),
 		},
 		"toggle_capslock", {
 				Fn: (*) => ToggleCapsLock(),
@@ -438,7 +456,7 @@ GestureScreenshotInstant() {
 				GestureCaptureRegion(WX, WY, WW, WH, "save", FilePath, GestureScreenshotComplete.Bind("Instant", "save", FilePath))
 		} catch as Err {
 				LoggerError("gestures", "GestureScreenshotInstant launch failed: {1}", Err.Message)
-				try TrayTip("Screenshot could not start.", "ErgoptiPlus", "Iconx Mute")
+				try TrayTip(t("notify.screenshot_start_failed"), "ErgoptiPlus", "Iconx Mute")
 		}
 }
 
@@ -518,7 +536,7 @@ GestureOpenConfiguredURL(BindingId := "") {
 		try Run(URL)
 		catch as Err {
 				LoggerError("gestures", "open_url launch failed for binding '{1}': {2}", BindingId, Err.Message)
-				try TrayTip("Could not open the configured URL.", "ErgoptiPlus", "Iconx Mute")
+				try TrayTip(t("notify.open_url_failed"), "ErgoptiPlus", "Iconx Mute")
 		}
 }
 
@@ -544,7 +562,7 @@ GesturePickColor() {
 				TrayTip(HexColor, "ErgoptiPlus", "Iconi Mute")
 		} catch as Err {
 				LoggerError("gestures", "GesturePickColor failed: {1}", Err.Message)
-				TrayTip("Color copy failed.", "ErgoptiPlus", "Iconx Mute")
+				TrayTip(t("notify.color_copy_failed"), "ErgoptiPlus", "Iconx Mute")
 		}
 }
 
@@ -588,7 +606,8 @@ GestureTeleportMouse() {
 				Ui_MsgBox(t("shortcuts.no_other_monitor"))
 				return
 		}
-		MouseGetPos(&CurX, &CurY)
+		Point := MCGetPosStrict()
+		CurX := Point["x"], CurY := Point["y"]
 		CurrentIndex := 1
 		for I, Mon in Monitors {
 				if (CurX >= Mon.Left and CurX < Mon.Right and CurY >= Mon.Top and CurY < Mon.Bottom) {
@@ -716,7 +735,7 @@ GestureSendInput(ActionName, BindingId := "") {
 ; SetTimer so the synthetic ^v has already consumed the coerced text before the
 ; user's original (possibly non-text) clipboard is put back.
 _GesturePastePlainRestore(OldClip, OwnedSequence, OwnerToken) {
-		return CB_RestoreOwnedAllEventually(OldClip, OwnedSequence, OwnerToken,
+		return CB_RestorePlainSnapshotEventually(OldClip, OwnedSequence, OwnerToken,
 				"gesture_paste_plain")
 }
 
@@ -739,26 +758,32 @@ GesturePastePlain() {
 				}
 				; Admission precedes every read, including an empty temporary clear owned
 				; by another selection or paste. Only this owner may snapshot and coerce.
-				OldClip := CB_SaveAll()
-				if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__") {
-						try LoggerWarn("gestures", "GesturePastePlain: clipboard snapshot failed; using native paste.")
+				Captured := 0
+				if !CB_SavePlainSnapshot(OwnerToken, &Captured) {
+						try LoggerWarn("gestures", "GesturePastePlain: clipboard snapshot is unavailable or changed; using native paste.")
 						SendFinalResult("^v")
 						return
 				}
+				OldClip := Captured["saved"]
 				PlainText := CB_Read()
+				; Saving all formats can yield to a new non-text copy. Paste it intact.
+				if PlainText == "" {
+						SendFinalResult("^v")
+						return
+				}
 				OwnedSequence := 0
 				try {
-						if !CB_Write(PlainText)
+						if !CB_WritePlainSnapshot(Captured, PlainText, &OwnedSequence)
 								throw Error("clipboard write failed")
-						OwnedSequence := CB_GetSequenceNumber()
 						if !OwnedSequence
 								throw Error("clipboard sequence unavailable")
 						SendFinalResult("^v")
 						SetTimer(_GesturePastePlainRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
 						RestoreTimerArmed := true
 				} catch as Err {
-						try CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
-								OwnerToken, "gesture_paste_plain_rollback", true, !OwnedSequence)
+						if OwnedSequence
+							try CB_RestorePlainSnapshotEventually(OldClip, OwnedSequence,
+								OwnerToken, "gesture_paste_plain_rollback")
 						try LoggerError("gestures", "GesturePastePlain clipboard rollback retained: {1}.", Err.Message)
 				}
 		} finally {
@@ -853,36 +878,86 @@ GestureOpenIfExists(Path) {
 		Run('notepad.exe "' . Path . '"')
 }
 
-; Toggle / focus / open helper shared by every ui_* action above.
-; Centralising the three-state logic keeps the action map declarative
-; and the per-UI lookup table is the only piece that needs editing
-; when a new dashboard / editor lands.
+; Toggle / focus / open helper shared by every UI window action above.
+; Each page names its current HWND (0 when closed), its own opener and its
+; closer; GestureGenericToggleUI owns the three-state rule. A page without a
+; dedicated closer is closed through WM_CLOSE, which runs the same Gui Close
+; handler as its title-bar button, so no page state is duplicated here.
 GestureToggleOrFocusUI(which) {
-		; Lookup table: which → { hwnd_getter, opener, closer }.
-		; - hwnd_getter returns the current window HWND if open, 0 otherwise.
-		; - opener is the function that opens the UI from scratch.
-		; - closer destroys the UI window.
+		Page := _GestureToggleUIPage(which)
+		if !IsObject(Page) {
+				LoggerError("gestures", "GestureToggleOrFocusUI: unknown window '{1}'.", which)
+				return false
+		}
+		Close := Page.HasOwnProp("Close") ? Page.Close
+				: ((GetHwnd) => (*) => WMRequestClose(GetHwnd.Call()))(Page.Hwnd)
+		return GestureGenericToggleUI(Page.Hwnd, Page.Open, Close)
+}
+
+; The window table behind GestureToggleOrFocusUI: Hwnd, Open and optional Close
+; callbacks per page id, or "" for an unknown id.
+_GestureToggleUIPage(which) {
 		switch which {
 				case "metrics_typing":
-						GestureGenericToggleUI(
-								() => KLWV.windows.Has("typing") ? KLWV.windows["typing"]["gui"].Hwnd : 0,
-								() => KLUI_ToggleTyping(),
-								() => KLWV.windows.Has("typing") ? KLWV_Close("typing") : 0
-						)
+						return {
+								Hwnd: () => KLWV.windows.Has("typing") ? KLWV.windows["typing"]["gui"].Hwnd : 0,
+								Open: () => KLUI_ToggleTyping(),
+								Close: () => KLWV.windows.Has("typing") ? KLWV_Close("typing") : 0,
+						}
 				case "metrics_apps":
-						GestureGenericToggleUI(
-								() => KLWV.windows.Has("apps") ? KLWV.windows["apps"]["gui"].Hwnd : 0,
-								() => KLUI_ToggleApps(),
-								() => KLWV.windows.Has("apps") ? KLWV_Close("apps") : 0
-						)
+						return {
+								Hwnd: () => KLWV.windows.Has("apps") ? KLWV.windows["apps"]["gui"].Hwnd : 0,
+								Open: () => KLUI_ToggleApps(),
+								Close: () => KLWV.windows.Has("apps") ? KLWV_Close("apps") : 0,
+						}
 				case "hotstrings_editor":
-						; The TOML editor is a transient Gui — no persistent handle
-						; tracked, so we can't reliably foreground an existing one.
-						; Always open: a second call surfaces the most recent window.
-						try OpenPersonalEditor()
+						return {
+								Hwnd: () => _GestureGuiHwnd(_HsEdWeb_Gui) || _GestureGuiHwnd(_PersonalEditorGui),
+								Open: () => OpenPersonalEditor(),
+						}
 				case "paths_editor":
-						try FilePathsEditor()
+						return { Hwnd: () => _GestureGuiHwnd(_PathsEdWeb_Gui), Open: () => FilePathsEditor() }
+				case "hotstrings_settings":
+						return {
+								Hwnd: () => _GestureGuiHwnd(_HCWWeb_Gui) || _GestureGuiHwnd(_HCWGui),
+								Open: () => OpenHotstringsConfigWindow(),
+						}
+				case MenuCommand.LAYOUT_MANAGER:
+						return { Hwnd: () => _GestureGuiHwnd(_LayMgrWeb_Gui), Open: () => LayoutManager_Open() }
+				case "layer_editor":
+						return {
+								Hwnd: () => WebViewHost._Instances.Has(LAYER_EDITOR_APP_ID)
+										? _GestureGuiHwnd(WebViewHost._Instances[LAYER_EDITOR_APP_ID].Gui) : 0,
+								Open: () => LayerEditor_Open(),
+						}
+				case "model_browser":
+						return {
+								Hwnd: () => (IsSet(_LLM_MBW_Gui) ? _GestureGuiHwnd(_LLM_MBW_Gui) : 0)
+										|| (IsSet(_LLM_ModelBrowser_Gui) ? _GestureGuiHwnd(_LLM_ModelBrowser_Gui) : 0),
+								Open: () => LLM_ModelBrowser_Show(),
+						}
+				case "changelog":
+						return {
+								Hwnd: () => IsSet(_CLW_Gui) ? _GestureGuiHwnd(_CLW_Gui) : 0,
+								Open: () => Updater_ShowChangelog(),
+						}
+				case MenuCommand.HEALTHCHECK:
+						return {
+								Hwnd: () => IsSet(_HC_Gui) ? _GestureGuiHwnd(_HC_Gui) : 0,
+								Open: () => ShowHealthCheck(),
+						}
 		}
+		return ""
+}
+
+; The HWND of a page's Gui global, or 0 for the module's closed sentinel (0,
+; "" or a destroyed Gui, whose Hwnd read throws).
+_GestureGuiHwnd(GuiValue) {
+		if !IsObject(GuiValue)
+				return 0
+		try return GuiValue.Hwnd
+		catch
+				return 0
 }
 
 ; Close-if-focused, foreground-if-background, open-if-closed for any UI

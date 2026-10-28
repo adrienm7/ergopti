@@ -29,4 +29,38 @@ function M.with_admission(body, identity)
 	return err
 end
 
+--- Models the canonical writer receipts for metadata-only virtual dump consumers.
+--- Native acquisition, privacy and refusal controls remain in test_crash_privacy.
+function M.with_output(body)
+	local Writer = require("infra.regular_file_writer")
+	local previous_open, previous_execute, previous_popen = Writer.open, os.execute, io.popen
+	local parts = {}
+	Writer.open = function(_, mode)
+		assert(mode == "wx", "metadata output must retain exclusive report acquisition")
+		local closed = false
+		local file = {}
+		function file:write(text)
+			if closed then return nil end
+			parts[#parts + 1] = text
+			return self
+		end
+		function file:close()
+			if closed then return false end
+			closed = true
+			return true
+		end
+		return file, nil, nil, nil, function(expected)
+			return closed and table.concat(parts) == expected
+		end
+	end
+	os.execute = function() return true end
+	io.popen = function() return nil end
+	local ok, result = xpcall(function()
+		return M.with_admission(function(redact) return body(redact, parts) end)
+	end, debug.traceback)
+	Writer.open, os.execute, io.popen = previous_open, previous_execute, previous_popen
+	if not ok then error(result, 0) end
+	return result
+end
+
 return M

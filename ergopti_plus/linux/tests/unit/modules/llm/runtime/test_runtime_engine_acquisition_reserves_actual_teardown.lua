@@ -117,6 +117,26 @@ helpers.describe("runtime daemon pause and terminal authority", function()
 		end)
 	end)
 
+	test("(linux-ai-off) switching the AI off stops the app-started service and the model download", function()
+		with_owner(function(world)
+			local engine = owned_app(world)
+			local download = { stops = 0 }
+			local previous = package.loaded["modules.llm.model_download"]
+			package.loaded["modules.llm.model_download"] = {
+				shutdown = function() download.stops = download.stops + 1; return true end,
+			}
+			world.native_closed, world.app_closed = true, true
+			local ok, err = pcall(function()
+				helpers.assert_true(engine.disable())
+				helpers.assert_eq(world.app_stops, 1, "the Ollama the app started is stopped by the switch-off")
+				helpers.assert_eq(download.stops, 1, "a running model download is cancelled by the switch-off")
+				helpers.assert_eq(engine.runtime_pending(), false)
+			end)
+			package.loaded["modules.llm.model_download"] = previous
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	test("terminal daemon authority cannot capture fresh repair after cleanup", function()
 		with_owner(function(world)
 			local engine = owned_app(world)

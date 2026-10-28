@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger    = require("logger.shim")
 local Constants = require("infra.wpm_constants")
@@ -28,20 +29,19 @@ local Timings   = require("infra.timings")
 local Manifest  = require("infra.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
 local Model     = require("wpm_widget.model")
+local ConfigKeys = require("config_keys")
 
 local LOG = "ui.wpm.widget"
 
 local PREF_PATHS = {
-	visible = "metrics.wpm_widget_visible",
-	source_colors = "metrics.wpm_widget_colors",
-	graph = "metrics.wpm_widget_graph",
+	visible = ConfigKeys.KEY.METRICS_WPM_WIDGET_VISIBLE,
+	source_colors = ConfigKeys.KEY.METRICS_WPM_WIDGET_COLORS,
+	graph = ConfigKeys.KEY.METRICS_WPM_WIDGET_GRAPH,
 }
 
 
--- Where the choices are kept.
-local PREF_PREFIX = "wpm_widget."
-local POS_X_KEY = PREF_PREFIX .. "pos_x"
-local POS_Y_KEY = PREF_PREFIX .. "pos_y"
+-- Where the pill was left is kept in Storage under the two keys the shared
+-- canon names ([position]), the same on every driver.
 
 -- The refresh, colour hold and idle hide, from the shared timings.
 local UPDATE_S    = Timings.sec("ui", "wpm_widget_update_ms")
@@ -58,9 +58,9 @@ local function shipped(path)
 end
 
 local DEFAULTS = {
-	visible = shipped("metrics.wpm_widget_visible"),
-	source_colors = shipped("metrics.wpm_widget_colors"),
-	graph = shipped("metrics.wpm_widget_graph"),
+	visible = shipped(ConfigKeys.KEY.METRICS_WPM_WIDGET_VISIBLE),
+	source_colors = shipped(ConfigKeys.KEY.METRICS_WPM_WIDGET_COLORS),
+	graph = shipped(ConfigKeys.KEY.METRICS_WPM_WIDGET_GRAPH),
 }
 
 local _state = {
@@ -81,12 +81,7 @@ local _state = {
 local _surface = nil
 local _restore_debt = nil
 
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[key] = clone(child) end
-	return copy
-end
+local clone = TableUtil.deep_copy
 
 
 
@@ -123,11 +118,20 @@ local function store_bool(key, value)
 	return Preferences.set(assert(PREF_PATHS[key]), value)
 end
 
+--- The two Storage keys of the saved place, from the shared canon.
+--- @return string|nil x_key, string|nil y_key Nil when the canon is unusable.
+local function position_keys()
+	local canon = Constants.load()
+	if not canon then return nil, nil end
+	return canon.position.storage_x, canon.position.storage_y
+end
+
 --- The pill's saved top-left corner, or nil for the default place.
 local function stored_anchor()
 	local Storage = storage()
-	if not Storage then return nil end
-	local x, y = tonumber(Storage.get(POS_X_KEY, nil)), tonumber(Storage.get(POS_Y_KEY, nil))
+	local x_key, y_key = position_keys()
+	if not Storage or not x_key then return nil end
+	local x, y = tonumber(Storage.get(x_key, nil)), tonumber(Storage.get(y_key, nil))
 	if not x or not y then return nil end
 	return { x = x, y = y }
 end
@@ -150,7 +154,8 @@ local function on_moved(x, y)
 	if not frame or not canon then return end
 	local ax, ay = Model.anchor_from_origin(canon, frame, x, y)
 	_state.anchor = { x = ax, y = ay }
-	if not store_position({ [POS_X_KEY] = ax, [POS_Y_KEY] = ay }) then
+	local x_key, y_key = position_keys()
+	if not store_position({ [x_key] = ax, [y_key] = ay }) then
 		Logger.error(LOG, "The widget's new place could not be saved — it returns to the last one on restart.")
 		return
 	end
@@ -375,7 +380,8 @@ end
 --- @return boolean
 function M.reset_position()
 	if _restore_debt or not Preferences.admit() then return false end
-	if not store_position({}, { POS_X_KEY, POS_Y_KEY }) then
+	local x_key, y_key = position_keys()
+	if not x_key or not store_position({}, { x_key, y_key }) then
 		Logger.error(LOG, "The widget's saved place could not be cleared.")
 		return false
 	end
@@ -406,7 +412,7 @@ end
 
 --- Refreshes the widget. Called from the daemon's periodic tick; it redraws
 --- at the shared refresh rate however often it is called.
---- @param stats table|nil From keylogger.get_live_stats().
+--- @param stats table|nil From keystats.get_live_stats().
 --- @param now_s number Monotonic seconds.
 --- @return table|nil The frame drawn, for tests and diagnostics.
 function M.tick(stats, now_s)

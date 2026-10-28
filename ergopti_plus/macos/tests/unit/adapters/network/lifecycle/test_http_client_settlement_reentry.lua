@@ -13,17 +13,22 @@ local helpers = require("tests.helpers")
 --- Owns native boundary doubles while preserving both real lifecycle adapters.
 --- @param scenario function Receives client, scheduler and independent observations.
 local function with_client(scenario)
-	helpers.with_stub_scope({ "adapters.http_client", "adapters.timer_scheduler", "infra.logger" }, function()
+	helpers.with_stub_scope({ "adapters.http_client", "adapters.timer_scheduler", "infra.logger",
+		"error_description", "number_policy" }, function()
 		local h = { timers = {}, requests = {}, refused = {}, errors = {} }
 		local function native_request(url, callback)
-			h.requests[#h.requests + 1] = { url = url, callback = callback }
-			-- The pinned native HTTP entry returns no cancellation handle.
+			-- This reentry fixture requires actual cancellation acknowledgement.
+			-- Pinned Hammerspoon taskless ownership has separate terminal-only tests.
+			local task = { active = true }
+			function task:cancel() self.active = false; return true end
+			h.requests[#h.requests + 1] = { url = url, callback = callback, task = task }
+			return task
 		end
 		_G.hs = {
 			http = {
-				asyncPost = function(url, _, _, callback) native_request(url, callback) end,
-				asyncGet = function(url, _, callback) native_request(url, callback) end,
-				doAsyncRequest = function(url, _, _, _, callback) native_request(url, callback) end,
+				asyncPost = function(url, _, _, callback) return native_request(url, callback) end,
+				asyncGet = function(url, _, callback) return native_request(url, callback) end,
+				doAsyncRequest = function(url, _, _, _, callback) return native_request(url, callback) end,
 			},
 			timer = { new = function(_, callback)
 				local timer = { active = false, callback = callback }
@@ -46,13 +51,29 @@ local function with_client(scenario)
 		function h.post(id, callback)
 			return client.post("https://fixture.test/" .. id, {}, id, callback or function() end)
 		end
-		function h.complete(index) h.requests[index].callback(200, "response-" .. index, {}) end
+		function h.complete(index)
+			h.requests[index].task.active = false
+			h.requests[index].callback(200, "response-" .. index, {})
+		end
 		function h.running()
 			local count = 0
 			for _, timer in ipairs(h.timers) do if timer:running() then count = count + 1 end end
 			return count
 		end
-		scenario(client, scheduler, h)
+		local ok, err = xpcall(function() scenario(client, scheduler, h) end, debug.traceback)
+		client.cancel()
+		for _, request in ipairs(h.requests) do
+			request.task.active = false
+			request.callback(-1, "owned reentry fixture cleanup")
+		end
+		client.cancel()
+		for _, timer in ipairs(h.timers) do h.refused[timer] = nil end
+		scheduler.cancelAll()
+		helpers.assert_true(client.isSettled())
+		for _, request in ipairs(h.requests) do helpers.assert_eq(request.task.active, false) end
+		helpers.assert_eq(scheduler.activeCount(), 0)
+		helpers.assert_eq(h.running(), 0)
+		if not ok then error(err, 0) end
 	end)
 end
 

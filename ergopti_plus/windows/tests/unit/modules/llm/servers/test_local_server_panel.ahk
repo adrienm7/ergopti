@@ -522,7 +522,7 @@ _LSPN_InertStatusRows(Mode, Mutate := false) {
 	Definition := 0, Header := 0, Unavailable := 0, SavedCaption := ""
 	SavedBusy := _LLM_LocalServerPanelInitBusy
 	try {
-		Definition := _MR_FindItemById("llm_menu", "llm_backend")["status_rows"]["unavailable"]
+		Definition := _MR_FindItemById("llm_menu", "llm_model")["status_rows"]["unavailable"]
 		AssertEqual(3, Definition.Length, "the actual generated declaration must contain exactly three rows")
 		Header := Definition[2], Unavailable := Definition[3]
 		SavedCaption := Unavailable["i18n"]

@@ -24,25 +24,25 @@ local function load_menu(options)
 	package.loaded["hs.fs"] = hs_stub.fs
 
 	local defaults = {
-		keylogger_enabled = options.keylogger_enabled ~= false,
-		keylogger_disabled_apps = {}, keylogger_encrypt = false,
-		keylogger_menubar_wpm = options.keylogger_menubar_wpm == true,
-		keylogger_menubar_colors = false,
-		keylogger_float_wpm = options.keylogger_float_wpm == true,
-		keylogger_float_graph = false, keylogger_float_colors = false,
-		keylogger_private_filter_enabled = true, keylogger_secure_filter_enabled = true,
-		keylogger_system_auth_filter_enabled = true,
+		keystats_enabled = options.keystats_enabled ~= false,
+		keystats_disabled_apps = {}, keystats_encrypt = false,
+		keystats_menubar_wpm = options.keystats_menubar_wpm == true,
+		keystats_menubar_colors = false,
+		keystats_float_wpm = options.keystats_float_wpm == true,
+		keystats_float_graph = false, keystats_float_colors = false,
+		keystats_private_filter_enabled = true, keystats_secure_filter_enabled = true,
+		keystats_system_auth_filter_enabled = true,
 	}
-	local keylogger_module = setmetatable({
+	local keystats_module = setmetatable({
 		DEFAULT_STATE = defaults,
 		start = function() return true end,
 		stop = function() return true end,
 	}, { __index = function() return function() return true end end })
-	if options.keylogger_module ~= nil then
-		keylogger_module = options.keylogger_module
-		keylogger_module.DEFAULT_STATE = keylogger_module.DEFAULT_STATE or defaults
+	if options.keystats_module ~= nil then
+		keystats_module = options.keystats_module
+		keystats_module.DEFAULT_STATE = keystats_module.DEFAULT_STATE or defaults
 	end
-	package.loaded["modules.keylogger"] = keylogger_module
+	package.loaded["modules.keystats"] = keystats_module
 	package.loaded["infra.app_picker"] = { build_menu = function() return {} end }
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function() return "button.activate" end,
@@ -68,9 +68,9 @@ local function load_menu(options)
 	local original_group = renderer.group_row
 	renderer.group_row = function(key, id, rows, getters)
 		context.parent_projections = context.parent_projections + 1
-		return original_group(key, id, rows, { keylogger_enabled = function()
+		return original_group(key, id, rows, { keystats_enabled = function()
 			context.parent_getters = context.parent_getters + 1
-			return getters.keylogger_enabled()
+			return getters.keystats_enabled()
 		end })
 	end
 	if options.mutate_source then options.mutate_source(renderer.get_root()) end
@@ -134,7 +134,7 @@ helpers.describe("menu_metrics WPM lifecycle reaches persisted checkmarks", func
 			local ok, committed = pcall(context.commands.wpm_menubar)
 			helpers.assert_true(ok, case.label .. " activation refusal must not escape the menu callback")
 			helpers.assert_eq(committed, false)
-			helpers.assert_eq(context.state.keylogger_menubar_wpm, false,
+			helpers.assert_eq(context.state.keystats_menubar_wpm, false,
 				case.label .. " activation refusal must repaint an unchecked row")
 			helpers.assert_eq(context.saves, 2,
 				case.label .. " activation refusal must persist the compensating OFF state")
@@ -147,18 +147,18 @@ helpers.describe("menu_metrics WPM lifecycle reaches persisted checkmarks", func
 		local committed = context.commands.wpm_widget()
 
 		helpers.assert_eq(committed, false)
-		helpers.assert_eq(context.state.keylogger_float_wpm, false)
+		helpers.assert_eq(context.state.keystats_float_wpm, false)
 		helpers.assert_eq(context.saves, 2)
 		helpers.assert_eq(context.updates, 1)
 	end)
 
 	helpers.it("compensates a saved ON state during menu-build reconciliation", function()
 		local context = load_menu({
-			keylogger_menubar_wpm = true,
+			keystats_menubar_wpm = true,
 			menubar_start = function() return nil end,
 		})
 
-		helpers.assert_eq(context.state.keylogger_menubar_wpm, false,
+		helpers.assert_eq(context.state.keystats_menubar_wpm, false,
 			"a boot/menu rebuild must not render ON after its recurring producer refused")
 		helpers.assert_eq(context.saves, 1,
 			"build reconciliation must persist the compensating OFF preference")
@@ -168,25 +168,25 @@ helpers.describe("menu_metrics WPM lifecycle reaches persisted checkmarks", func
 		local stop_result = true
 		local context = load_menu({ menubar_stop = function() return stop_result end })
 		helpers.assert_eq(context.commands.wpm_menubar(), true)
-		helpers.assert_eq(context.state.keylogger_menubar_wpm, true)
+		helpers.assert_eq(context.state.keystats_menubar_wpm, true)
 		stop_result = false
 
 		local committed = context.commands.wpm_menubar()
 		helpers.assert_eq(committed, false)
-		helpers.assert_eq(context.state.keylogger_menubar_wpm, false,
+		helpers.assert_eq(context.state.keystats_menubar_wpm, false,
 			"the module fences callbacks before native stop, so OFF remains the truthful row")
 		helpers.assert_eq(context.saves, 2)
 	end)
 
-	helpers.it("restores ON when the keylogger stop capability is unavailable", function()
+	helpers.it("restores ON when the keystats stop capability is unavailable", function()
 		local context = load_menu({
-			keylogger_module = { start = function() return true end },
+			keystats_module = { start = function() return true end },
 		})
 		helpers.assert_nil(context.menu.action, "the Metrics parent must carry no action")
 		local committed = context.commands["metrics_toggle"]()
 
 		helpers.assert_eq(committed, false)
-		helpers.assert_eq(context.state.keylogger_enabled, true,
+		helpers.assert_eq(context.state.keystats_enabled, true,
 			"OFF must not be published while no runtime stop boundary exists")
 		helpers.assert_eq(context.saves, 0,
 			"the missing stop capability must be rejected before disk publication")
@@ -200,18 +200,18 @@ end)
 
 helpers.describe("Metrics parent refusal preserves existing WPM lifecycle reconciliation", function()
 	helpers.it("missing source still stops both paused producers without a parent getter", function()
-		local context = load_menu({ paused=true, keylogger_menubar_wpm=true, keylogger_float_wpm=true,
+		local context = load_menu({ paused=true, keystats_menubar_wpm=true, keystats_float_wpm=true,
 			mutate_source=function(root)root.metrics_menu=nil end })
 		helpers.assert_nil(context.menu)
 		helpers.assert_eq(context.menubar_starts,0);helpers.assert_eq(context.widget_starts,0)
 		helpers.assert_eq(context.menubar_stops,1);helpers.assert_eq(context.widget_stops,1)
-		helpers.assert_eq(context.state.keylogger_menubar_wpm,true)
-		helpers.assert_eq(context.state.keylogger_float_wpm,true)
+		helpers.assert_eq(context.state.keystats_menubar_wpm,true)
+		helpers.assert_eq(context.state.keystats_float_wpm,true)
 		helpers.assert_eq(context.saves,0)
 		helpers.assert_eq(context.parent_getters,0);helpers.assert_eq(context.parent_projections,0)
 	end)
 	helpers.it("source capture refusal still performs the existing paused cleanup", function()
-		local context = load_menu({source_throw=true,paused=true,keylogger_menubar_wpm=true,keylogger_float_wpm=true})
+		local context = load_menu({source_throw=true,paused=true,keystats_menubar_wpm=true,keystats_float_wpm=true})
 		helpers.assert_nil(context.menu)
 		helpers.assert_eq(context.menubar_starts,0);helpers.assert_eq(context.widget_starts,0)
 		helpers.assert_eq(context.menubar_stops,1);helpers.assert_eq(context.widget_stops,1)
@@ -220,12 +220,12 @@ helpers.describe("Metrics parent refusal preserves existing WPM lifecycle reconc
 	end)
 
 	helpers.it("malformed source retains exact failed-start compensation before parent refusal", function()
-		local context = load_menu({keylogger_menubar_wpm=true,menubar_start=function()return false end,
+		local context = load_menu({keystats_menubar_wpm=true,menubar_start=function()return false end,
 			mutate_source=function(root)root.metrics_menu=false end})
 		helpers.assert_nil(context.menu)
 		helpers.assert_eq(context.menubar_starts,1);helpers.assert_eq(context.widget_starts,0)
 		helpers.assert_eq(context.widget_stops,1)
-		helpers.assert_eq(context.state.keylogger_menubar_wpm,false)
+		helpers.assert_eq(context.state.keystats_menubar_wpm,false)
 		helpers.assert_eq(context.saves,1)
 		helpers.assert_eq(context.parent_getters,0);helpers.assert_eq(context.parent_projections,0)
 	end)
@@ -233,13 +233,13 @@ helpers.describe("Metrics parent refusal preserves existing WPM lifecycle reconc
 		require("tests.support.wpm_menubar_fixture")(function(native, observed)
 			helpers.assert_eq(native.start(),true)
 			local token = observed.timers[1]
-			local active = load_menu({native_menubar=native,keylogger_menubar_wpm=true,
+			local active = load_menu({native_menubar=native,keystats_menubar_wpm=true,
 				mutate_source=function(root)root.metrics_menu=nil end})
 			helpers.assert_nil(active.menu)
 			helpers.assert_eq(#observed.timers,1,"reconciliation must retain the existing native timer")
 			helpers.assert_true(rawequal(observed.timers[1],token))
 			helpers.assert_true(token.timer ~= nil)
-			local paused = load_menu({native_menubar=native,keylogger_menubar_wpm=true,paused=true,
+			local paused = load_menu({native_menubar=native,keystats_menubar_wpm=true,paused=true,
 				mutate_source=function(root)root.metrics_menu=nil end})
 			helpers.assert_nil(paused.menu)
 			helpers.assert_true(rawequal(observed.timers[1],token))

@@ -19,27 +19,15 @@ function openAppDrilldown(appName) {
 	const a = agg.apps[appName];
 	if (!a) return;
 
-	// Walk the filtered manifest once more to harvest hourly data for THIS app.
-	const allDates = Object.keys(manifestData)
-		.map((k) => ({ key: k, ts: parseDateKey(k) }))
-		.filter((d) => !isNaN(d.ts));
-	let targetTsStart = 0;
-	const anchorTs = currentSelectedDate
-		? parseDateKey(currentSelectedDate)
-		: allDates.length > 0
-			? Math.max(...allDates.map((d) => d.ts))
-			: 0;
-	if (currentPeriod === 'day') targetTsStart = anchorTs;
-	if (currentPeriod === 'week') targetTsStart = anchorTs - 7 * 86400000;
-	if (currentPeriod === 'month') targetTsStart = anchorTs - 30 * 86400000;
-	if (currentPeriod === 'year') targetTsStart = anchorTs - 365 * 86400000;
+	// The accepted aggregate owns the period and weekday query. Reuse its
+	// selected dates for both detail families instead of rebuilding a wider scope.
+	const selectedDates = Object.keys(agg.rich.by_date);
 
 	const hourly = {};
 	for (let h = 0; h < 24; h++) hourly[String(h).padStart(2, '0')] = { time_ms: 0, chars: 0 };
 
-	allDates.forEach((d) => {
-		if (currentPeriod !== 'all' && (d.ts > anchorTs || d.ts < targetTsStart)) return;
-		const day = manifestData[d.key];
+	selectedDates.forEach((dateKey) => {
+		const day = manifestData[dateKey];
 		if (!day) return;
 		const app_data = day[appName];
 		if (!app_data || !app_data.hourly) return;
@@ -150,11 +138,11 @@ function openAppDrilldown(appName) {
 			plugins: { legend: { display: false } },
 			scales: {
 				x: {
-					ticks: { color: '#888', font: { size: 9 } },
+					ticks: { color: ThemeTokens.color('grey-888'), font: { size: 9 } },
 					grid: { color: 'rgba(255,255,255,0.04)' }
 				},
 				y: {
-					ticks: { color: '#888', font: { size: 9 } },
+					ticks: { color: ThemeTokens.color('grey-888'), font: { size: 9 } },
 					grid: { color: 'rgba(255,255,255,0.04)' }
 				}
 			}
@@ -169,20 +157,19 @@ function openAppDrilldown(appName) {
 					.slice(0, 8)
 					.map(
 						([dest, n]) =>
-							`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(dest)}</span><span style="color:#aaa;">${n}</span></div>`
+							`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(dest)}</span><span style="color:${ThemeTokens.color('grey-aaa')};">${n}</span></div>`
 					)
 					.join('')
-			: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_backslash_out')}</div>`;
+			: `<div style="color:${ThemeTokens.color('grey-888')};font-size:12px;">${_t('ui_apps.kpi_no_backslash_out')}</div>`;
 	document.getElementById('app_modal_dests').innerHTML = dest_html;
 
 	// Layouts seen — sum from manifest for this app within the period.
 	const layouts = {};
-	allDates.forEach((d) => {
-		if (currentPeriod !== 'all' && (d.ts > anchorTs || d.ts < targetTsStart)) return;
+	selectedDates.forEach((dateKey) => {
 		const ls =
-			manifestData[d.key] &&
-			manifestData[d.key][appName] &&
-			manifestData[d.key][appName].layouts_seen;
+			manifestData[dateKey] &&
+			manifestData[dateKey][appName] &&
+			manifestData[dateKey][appName].layouts_seen;
 		if (!ls) return;
 		Object.entries(ls).forEach(([id, n]) => {
 			layouts[id] = (layouts[id] || 0) + (n || 0);
@@ -194,10 +181,10 @@ function openAppDrilldown(appName) {
 					.sort((x, y) => y[1] - x[1])
 					.map(
 						([id, n]) =>
-							`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(id)}</span><span style="color:#aaa;">${n}×</span></div>`
+							`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(id)}</span><span style="color:${ThemeTokens.color('grey-aaa')};">${n}×</span></div>`
 					)
 					.join('')
-			: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_layout')}</div>`;
+			: `<div style="color:${ThemeTokens.color('grey-888')};font-size:12px;">${_t('ui_apps.kpi_no_layout')}</div>`;
 	document.getElementById('app_modal_layouts').innerHTML = layouts_html;
 
 	// Records
@@ -223,7 +210,7 @@ function openAppDrilldown(appName) {
 	const rec_html =
 		recs.length > 0
 			? recs.map((r) => `<div style="font-size:12px;padding:3px 0;">${r}</div>`).join('')
-			: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_record')}</div>`;
+			: `<div style="color:${ThemeTokens.color('grey-888')};font-size:12px;">${_t('ui_apps.kpi_no_record')}</div>`;
 	document.getElementById('app_modal_records').innerHTML = rec_html;
 
 	// Hotstrings & IA
@@ -236,7 +223,7 @@ function openAppDrilldown(appName) {
 		`<div style="font-size:12px;padding:3px 0;">${_t('ui_apps.modal_llm_line')
 			.replace('{n}', format_int(a.llm_chars || 0))
 			.replace('{pct}', llm_pct.toFixed(1))}</div>` +
-		`<div style="font-size:12px;padding:3px 0;color:#888;">${_t('ui_apps.modal_total_chars').replace('{n}', format_int(a.chars || 0))}</div>`;
+		`<div style="font-size:12px;padding:3px 0;color:${ThemeTokens.color('grey-888')};">${_t('ui_apps.modal_total_chars').replace('{n}', format_int(a.chars || 0))}</div>`;
 
 	modal.style.display = 'flex';
 }

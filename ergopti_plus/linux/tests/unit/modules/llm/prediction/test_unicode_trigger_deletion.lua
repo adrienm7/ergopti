@@ -45,11 +45,18 @@ local function exercise(trigger, characters, raw_bytes)
 		end,
 	}
 	package.loaded["modules.llm.trigger_settings"] = {
-		get = function(key) if key == "debounce_ms" then return 0 end; return false end,
+		get = function(key)
+			if key == "debounce_ms" then return 0 end
+			if key == "min_request_interval_ms" then return 300 end
+			return false
+		end,
+		-- No application is excluded from the trigger here (llm.trigger.disabled_apps).
+		is_app_disabled = function() return false end,
 	}
 	package.loaded["modules.llm.display_settings"] = { get = function() return false end }
 	package.loaded["modules.llm.profile_settings"] = {
 		get = function(key) if key == "num_predictions" then return 1 end end,
+		resolve_for_app = function() return nil end,
 		resolve = function() return { id = "basic", system_single = "Continue the typed text." } end,
 	}
 	package.loaded["modules.llm.api_ollama"] = {

@@ -127,7 +127,7 @@ CrashReport_Build(ErrorObj) {
 	try {
 		global _HealthCheckStartMs
 		if IsSet(_HealthCheckStartMs)
-			UptimeSec := (A_TickCount - (_HealthCheckStartMs) & 0xFFFFFFFF) // 1000
+			UptimeSec := (A_TickCount - (_HealthCheckStartMs)) // 1000
 	}
 
 	; ── Active window context ─────────────────────────────────────────────────
@@ -163,9 +163,9 @@ CrashReport_Build(ErrorObj) {
 	}
 
 	; ── Module state ──────────────────────────────────────────────────────────
-	KeyloggerInit := "unknown"
+	KeystatsInit := "unknown"
 	ConfigDir     := ""
-	try KeyloggerInit := Keylogger.initialized ? "true" : "false"
+	try KeystatsInit := Keystats.initialized ? "true" : "false"
 	try {
 		global _ConfigDir
 		ConfigDir := _ConfigDir
@@ -222,7 +222,7 @@ CrashReport_Build(ErrorObj) {
 		"session_warnings",     WarnCount,
 		"session_errors",       ErrCount,
 		; ── Module state ──
-		"keylogger_initialized", KeyloggerInit,
+		"keystats_initialized", KeystatsInit,
 		"config_dir",           ConfigDir,
 		; ── The log tail, whole; redacted only where a report is shared ──
 		"log_tail",             LogLines,
@@ -252,7 +252,7 @@ CrashReport_Save(Report, WriterFn := 0) {
 	try DirCreate(ReportDir)
 
 	Ts   := Report.Has("timestamp") ? Report["timestamp"] : _CrashReport_IsoTimestamp()
-	Base := ReportDir . StrReplace(Ts, ":", "-")
+	Base := ReportDir . StrReplace(Ts, ":", "-") . "_" . _CrashReport_NextFileIdentity()
 	FName := Base . ".json"
 	n := 1
 	while FileExist(FName) {
@@ -261,7 +261,7 @@ CrashReport_Save(Report, WriterFn := 0) {
 	}
 
 	JsonStr := _CrashReport_ToJson(Report)
-	ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteDurable
+	ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteCreateDurable
 
 	try {
 		; A crash artifact is acknowledged only after its complete UTF-8 image has
@@ -310,6 +310,21 @@ CrashReport_PromptUser(Report) {
 ; ======= 3/ Helpers =======
 ; ==========================
 ; ==========================
+
+; A path probe is not a reservation. Allocate a process-local identity before
+; serialization or writers can pump a second crash; CREATE_NEW protects against
+; other processes racing the final native creation.
+_CrashReport_NextFileIdentity() {
+	static Serial := 0
+	PreviousCritical := Critical("On")
+	try {
+		Next := Serial + 1
+		if Next <= Serial
+			throw Error("Crash report file identities are exhausted.")
+		Serial := Next
+		return DllCall("GetCurrentProcessId", "UInt") . "_" . Serial
+	} finally Critical(PreviousCritical)
+}
 
 ; Returns a Map with full OS, CPU, RAM, screen, AHK, and git fields.
 ; @param Hardware {Map} The diagnostics snapshot's hardware section: its
@@ -396,7 +411,7 @@ _CrashReport_CanonicalFields() {
 		"stuck_modifiers",
 		"adapters_ok", "adapters_failed",
 		"session_warnings", "session_errors",
-		"keylogger_initialized", "config_dir",
+		"keystats_initialized", "config_dir",
 		"log_tail"
 	]
 }
@@ -423,29 +438,12 @@ _CrashReport_ToWorkerJson(Report) {
 
 _CrashReport_EncodeFields(Report, Fields) {
 	Parts := []
-	Q     := Chr(34)
-
 	for _, Key in Fields {
 		Val := Report.Has(Key) ? String(Report[Key]) : ""
-		Val := StrReplace(Val, "\",  "\\")
-		Val := StrReplace(Val, Q,   "\" . Q)
-		Val := StrReplace(Val, "`r", "\r")
-		Val := StrReplace(Val, "`n", "\n")
-		Val := StrReplace(Val, "`t", "\t")
-		; Every OTHER C0 control character must be escaped too, or the report is
-		; a file no JSON parser will read — and this is the one artifact that
-		; exists to be read after a crash. error_msg, stack_trace and log_tail
-		; all carry text the driver did not author, so a stray 0x00-0x1F is not
-		; hypothetical enough to leave unhandled.
-		Loop 32 {
-			Code := A_Index - 1
-			if (Code = 9 or Code = 10 or Code = 13)
-				continue  ; already handled above
-			Val := StrReplace(Val, Chr(Code), Format("\u{:04x}", Code))
-		}
-		Parts.Push("  " . Q . Key . Q . ": " . Q . Val . Q)
+		; Native string replacement stops at embedded NUL. The canonical encoder
+		; preserves the complete stored text for both local artifacts and IPC.
+		Parts.Push("  " . JsonStringLiteral(Key) . ": " . JsonStringLiteral(Val))
 	}
-
 	return "{`r`n" . _CrashReport_JoinParts(Parts) . "`r`n}"
 }
 

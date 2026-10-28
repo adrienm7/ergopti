@@ -8,6 +8,8 @@
 		<script defer src="../vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
 		<script defer src="../vendor/hammer.min.js"></script>
 		<script defer src="../vendor/chartjs-plugin-zoom.min.js"></script>
+		<link rel="stylesheet" href="../theme.css" />
+		<script src="../theme_tokens.js"></script>
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
@@ -23,7 +25,7 @@
 						><input
 							type="date"
 							id="date_start"
-							onchange="app_state.hour_cutoff = null; apply_date_app_filters()"
+							onchange="app_state.hour_window = null; apply_date_app_filters()"
 						/>
 					</div>
 					<div>
@@ -31,7 +33,7 @@
 						><input
 							type="date"
 							id="date_end"
-							onchange="app_state.hour_cutoff = null; apply_date_app_filters()"
+							onchange="app_state.hour_window = null; apply_date_app_filters()"
 						/>
 					</div>
 					<select
@@ -1252,6 +1254,7 @@
 		<!-- Generated from _shared/data/keycodes/azerty.json (DC-1) — must load before state.js, which reads its KEYCODE_DATA global -->
 		<script src="_generated/keycode_data.js"></script>
 		<script src="state.js"></script>
+		<script src="../metrics_calendar.js"></script>
 		<script src="format.js"></script>
 		<script src="filters.js"></script>
 		<script src="modal.js"></script>
@@ -1319,11 +1322,11 @@
 						let incoming_hist = incoming.historical || {};
 						let incoming_today = incoming.today || {};
 						// PC-scancode drivers: translate sc_kb → kc per app so
-						// the renderer keeps reading the same field.
+						// the renderer keeps reading the same field. heatmap_win.js
+						// owns both the translation and which drivers need it.
 						if (
-							window.driver_meta &&
-							(window.driver_meta.os === 'win' || window.driver_meta.os === 'linux') &&
-							typeof window.translate_win_today === 'function'
+							typeof window.translate_win_today === 'function' &&
+							is_pc_scancode_driver(window.driver_meta)
 						) {
 							incoming_today = window.translate_win_today(incoming_today);
 							incoming_hist = window.translate_win_today(incoming_hist);
@@ -1354,6 +1357,10 @@
 								'[apply_prefetch] window.process_manifest not defined — JS scripts may have failed to load'
 							);
 						}
+					} else {
+						// Keep the admitted manifest's charts and inventories current
+						// while the existing native range owner keeps its mailbox.
+						window.refresh_manifest_projection();
 					}
 					if (merged && typeof window.receive_range_data === 'function') {
 						try {
@@ -1389,7 +1396,7 @@
 				// WebKitGTK cannot receive the macOS evaluateJavaScript injection and
 				// has no file-sidecar fallback. Request the shared prefetch envelope
 				// through its native bridge, then keep the dashboard live with polling.
-				if (window.__ergopti_host === 'linux') {
+				if (hostHasCapability('document_bridge')) {
 					const request_linux_refresh = () => {
 						try {
 							window.webkit.messageHandlers.metrics_typing_bridge.postMessage({

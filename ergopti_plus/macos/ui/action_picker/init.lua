@@ -224,9 +224,11 @@ function M.open(opts, on_confirm)
 		noResults         = i18n.get("dialog.action_picker.no_results"),
 		cancelLabel       = i18n.get("button.cancel"),
 		items             = opts.items or {},
-		-- The page's own editor for send_text / send_key / send_shortcut; "hs"
-		-- makes Command the portable "primary" modifier of a captured shortcut.
-		platform          = "hs",
+		-- The page's own editor for send_text / send_key / send_shortcut: Command
+		-- is the portable "primary" modifier of a captured shortcut, and a
+		-- program parameter names a POSIX executable.
+		executableSyntax  = "posix",
+		commandIsPrimary  = true,
 		sendVocabulary    = opts.send_vocabulary,
 		parameterStrings  = opts.parameter_strings,
 		-- The llm_prompt editor's choices and the count a binding without its own uses

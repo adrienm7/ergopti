@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"modules.updater.auto_check", "modules.updater", "infra.logger", "infra.paths",
+	"modules.updater.auto_check", "modules.updater", "infra.logger", "infra.paths", "infra.timings",
 	"adapters.file_system", "adapters.json_codec", "adapters.update_launcher",
 	"infra.notifications", "infra.i18n", "json", "updater.channels", "updater.schedule",
 	"updater.release_parser", "updater.check_result", "updater.rate_limit", "updater.version",
@@ -21,6 +21,9 @@ local OWNED = {
 local function with_owner(run)
 	helpers.with_stub_scope(OWNED, function()
 		local Json = require("json")
+		-- The real registry reader, loaded before infra.paths is stubbed below:
+		-- updater.list_cache reads its bound from [limits] when auto_check loads it.
+		local Timings = require("infra.timings")
 		local function shared(relative)
 			local file = assert(io.open(helpers.shared(relative), "rb"))
 			local raw = assert(file:read("*a"))
@@ -31,6 +34,7 @@ local function with_owner(run)
 		local registry = assert(require("updater.channels").load(shared("modules/updater/channels.json")))
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.paths"] = {}
+		package.loaded["infra.timings"] = Timings
 		package.loaded["adapters.file_system"] = {}
 		package.loaded["adapters.json_codec"] = { encode = Json.encode, decode = Json.decode }
 		package.loaded["modules.updater"] = { channels = function() return registry end }
@@ -45,6 +49,7 @@ local function with_owner(run)
 		}
 		function env.owner()
 			local ctx = { channel = "dev", pending = {}, timers = {}, notified = 0 }
+			local function get(_, _, callback) ctx.pending[#ctx.pending + 1] = callback; return true end
 			ctx.owner = AutoCheck.new({
 				state = {}, save = function() return true end,
 				channel = function() return ctx.channel end, is_paused = function() return false end,
@@ -64,7 +69,7 @@ local function with_owner(run)
 					get = function(key, default) local value = env.values[key]; if value == nil then return default end; return value end,
 					set = function(key, value) env.writes = env.writes + 1; env.values[key] = value; return true end,
 				},
-				http = { get = function(_, _, callback) ctx.pending[#ctx.pending + 1] = callback; return true end },
+				http = { get = get }, manual_http = { get = get },
 				now = function() return env.now end,
 				current_version = function() return "0.0.0-dev.140" end,
 				installed_channel = function() return "dev" end,

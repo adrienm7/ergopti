@@ -23,11 +23,16 @@
 ---    daily log that explains them (Logger.crash_reports_dir()).
 --- 5. Structured output: reports are written as JSON for easy machine and human
 ---    readability, one file per incident.
+--- 6. One format and one cap with Linux: the record, its serialisation, its file
+---    names and the retention (the 20 newest reports) are the shared
+---    crash_report module's (parity audit D6, R31). After every save the oldest
+---    reports beyond the cap are deleted; nothing but report files is touched.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("infra.logger")
+local CrashReport = require("crash_report")
 local NativePath = require("native_path")
 local i18n   = require("infra.i18n")
 
@@ -121,42 +126,35 @@ local function _config_dir()
 	return ""
 end
 
---- Serialises a report table to a compact JSON string.
---- Uses hs.json.encode when available; falls back to a hand-built serialiser.
---- @param report table The report produced by M.report().
---- @return string JSON string.
-local function _to_json(report)
-	local ok, encoded = pcall(hs.json.encode, report, true)
-	if ok and type(encoded) == "string" then
-		return encoded
+--- Deletes the reports beyond the shared cap, oldest first.
+--- The shared policy selects report names only, so any other file in the folder
+--- stays. A refusal is logged and never fails the save that triggered it.
+--- @param dir string Absolute report directory ending in a separator.
+local function _enforce_retention(dir)
+	local names, listed, list_err = require("infra.fs_dir").try_entries(dir)
+	if not listed then
+		Logger.warn(LOG, "Crash report retention skipped, the folder cannot be listed: %s.", tostring(list_err))
+		return
 	end
-
-	-- Fallback serialiser for string values only
-	local order = {
-		"version", "driver", "timestamp",
-		"error_msg", "stack_trace",
-		"os_version", "hs_version", "screen_res", "locale",
-		"config_dir", "script_dir", "git_hash", "commit_source",
-		"active_app", "active_title",
-		"uptime_sec",
-		"adapters_ok", "adapters_failed",
-		"session_warnings", "session_errors",
-		"log_tail",
-	}
-	local parts = {}
-	for _, k in ipairs(order) do
-		local v = report[k]
-		if v ~= nil then
-			v = tostring(v):gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n"):gsub("\t", "\\t")
-			table.insert(parts, string.format('  "%s": "%s"', k, v))
+	local expired = CrashReport.expired(names)
+	if #expired == 0 then return end
+	local adapter_ok, FileSystem = pcall(require, "adapters.file_system")
+	if not adapter_ok or type(FileSystem) ~= "table" or type(FileSystem.remove_exact) ~= "function" then
+		Logger.error(LOG, "Crash report retention cannot delete: the file system adapter is unavailable.")
+		return
+	end
+	for _, name in ipairs(expired) do
+		local removed, detail = FileSystem.remove_exact(dir .. name)
+		if removed ~= true then
+			Logger.warn(LOG, "Crash report '%s' could not be deleted by the retention policy: %s.",
+				name, tostring(detail))
 		end
 	end
-	return "{\n" .. table.concat(parts, ",\n") .. "\n}"
 end
 
 --- Atomically creates one uniquely named report without truncating a prior file.
 --- The timestamp-only name remains canonical; collisions receive `-2`, `-3`,
---- and so on. FileSystem.create_if_absent owns the create-vs-existing race.
+--- and so on (CrashReport.file_name). FileSystem.create_if_absent owns the create-vs-existing race.
 --- @param dir string Absolute report directory ending in a separator.
 --- @param stem string Sanitised timestamp filename stem.
 --- @param json_str string Encoded report bytes.
@@ -170,8 +168,7 @@ local function _create_unique_report(dir, stem, json_str)
 	end
 
 	for attempt = 1, MAX_REPORT_FILENAME_ATTEMPTS do
-		local suffix = attempt == 1 and "" or ("-" .. tostring(attempt))
-		local path = dir .. stem .. suffix .. ".json"
+		local path = dir .. CrashReport.file_name(stem, attempt)
 		local call_ok, created, status, detail = pcall(
 			FileSystem.create_if_absent,
 			path,
@@ -286,7 +283,7 @@ function M.report(err, context)
 	local script_dir = ""
 	if type(hs) == "table" and type(hs.configdir) == "string" then script_dir = hs.configdir end
 
-	local result = {
+	local result = CrashReport.build({
 		-- Identification
 		version     = _driver_version(),
 		driver      = driver,
@@ -312,7 +309,7 @@ function M.report(err, context)
 		session_errors   = session_errors,
 		-- Full log ring buffer (up to 200 lines)
 		log_tail = log_tail,
-	}
+	})
 
 	Logger.done(LOG, "Crash report built (ts=%s).", result.timestamp)
 	return result
@@ -341,8 +338,8 @@ function M.save(report)
 		end
 	end)
 
-	local ts = (report.timestamp or os.date("!%Y-%m-%dT%H:%M:%SZ")):gsub(":", "-")
-	local json_str = _to_json(report)
+	local ts = CrashReport.stem(report.timestamp or os.date("!%Y-%m-%dT%H:%M:%SZ"))
+	local json_str = CrashReport.encode(CrashReport.build(report))
 	local fname, write_err = _create_unique_report(dir, ts, json_str)
 	if not fname then
 		Logger.error(LOG, "Crash report write failed: %s.", tostring(write_err))
@@ -350,6 +347,7 @@ function M.save(report)
 	end
 
 	Logger.success(LOG, "Crash report saved: %s.", fname)
+	_enforce_retention(dir)
 	return fname
 end
 

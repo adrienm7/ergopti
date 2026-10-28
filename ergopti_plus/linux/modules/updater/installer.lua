@@ -10,11 +10,17 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
+local TextUtils = require("text_utils")
+local Shell = require("adapters.shell_runner")
 
 local Fs = require("adapters.file_system")
 local Paths = require("infra.paths")
 local Version = require("updater.version")
 local Snapshot = require("diagnostics.snapshot")
+local NativePath = require("native_path")
+local NoReplaceMove = require("infra.no_replace_move")
+local Ownership = require("modules.updater.ownership_receipt")
 
 local WORK_PREFIX = ".ergopti-update."
 
@@ -28,11 +34,9 @@ local WORK_PREFIX = ".ergopti-update."
 -- ==========================================
 -- ==========================================
 
-local function shell_quote(value)
-	return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
-end
+local shell_quote = TextUtils.shell_quote
 
---- Normalises the variants returned by os.execute and pipe:close across LuaJIT
+--- Normalises the variants returned by os.execute across LuaJIT
 --- and Lua 5.4. A numeric non-zero status is failure even though Lua considers
 --- every number truthy.
 --- @param first any First process result.
@@ -55,11 +59,10 @@ local function run_command(command)
 end
 
 local function capture_command(command)
-	local pipe = io.popen(command)
-	if not pipe then return nil end
-	local output = pipe:read("*a")
-	local first, exit_kind, exit_code = pipe:close()
-	if not status_ok(first, exit_kind, exit_code) then return nil end
+	-- LuaJIT can acknowledge pipe closure without retaining a failed child's
+	-- status. Only the canonical checked receipt authorises captured output.
+	local ok, output = Shell.exec_checked(command)
+	if not ok then return nil end
 	return output
 end
 
@@ -86,12 +89,10 @@ end
 
 local function dirname(path)
 	if path == "/" then return nil end
-	return path:match("^(.*)/[^/]+$") or "/"
+	return NativePath.dirname(path) or "/"
 end
 
-local function basename(path)
-	return path:match("([^/]+)$")
-end
+local basename = NativePath.basename
 
 local function is_direct_child(path, parent)
 	return dirname(path) == parent and basename(path) ~= nil
@@ -109,23 +110,23 @@ end
 function M.resolve(source_path, probe)
 	probe = probe or default_probe
 	local source = normalise_path((source_path or ""):gsub("^@", ""))
-	if not source then return { kind = "unmanaged", reason = "module source path is not absolute" } end
+	if not source then return { kind = "unmanaged", reason = Errors.UPDATER_SOURCE_PATH_RELATIVE } end
 	if os.getenv("APPIMAGE") or os.getenv("APPDIR") or os.getenv("FLATPAK_ID")
 		or source:match("^/usr/") or source:match("^/app/") or source:match("^/nix/store/") then
-		return { kind = "package", reason = "system package or immutable bundle owns this path" }
+		return { kind = "package", reason = Errors.UPDATER_PACKAGE_OWNED }
 	end
 
 	local script_dir = dirname(source)
 	local driver_root = script_dir and normalise_path(script_dir .. "/../..") or nil
 	if not driver_root or basename(driver_root) ~= "linux" then
-		return { kind = "package", reason = "driver is not in the standalone linux/ sibling layout" }
+		return { kind = "package", reason = Errors.UPDATER_LAYOUT_NOT_STANDALONE }
 	end
 
 	local install_root = dirname(driver_root)
 	local lib_dir = install_root and dirname(install_root) or nil
 	local prefix = lib_dir and dirname(lib_dir) or nil
 	if not install_root or not prefix or prefix == "/" then
-		return { kind = "unmanaged", reason = "standalone install root is unsafe" }
+		return { kind = "unmanaged", reason = Errors.UPDATER_INSTALL_ROOT_UNSAFE }
 	end
 
 	local wrapper = prefix .. "/bin/ergopti-hotstrings"
@@ -133,7 +134,7 @@ function M.resolve(source_path, probe)
 		function(path) return probe(path, "file") end)
 	if not shared_root or not probe(shared_root .. "/lua", "dir")
 		or not probe(wrapper, "file") then
-		return { kind = "unmanaged", reason = "standalone wrapper or shared tree is absent" }
+		return { kind = "unmanaged", reason = Errors.UPDATER_STANDALONE_FILES_ABSENT }
 	end
 
 	return {
@@ -226,21 +227,28 @@ end
 --- @return boolean success
 function DEFAULT_OPS.record_ownership(root, previous)
 	-- The running updater owns the receipt format, not the selected release.
+	local schema = Ownership.read_schema(previous)
+	if not schema then return false end
 	if not run_command("bash " .. shell_quote(previous .. "/linux/install/ownership.sh")
 		.. " " .. shell_quote(root .. "/linux") .. " " .. shell_quote(root .. "/_shared")
 		.. " " .. shell_quote(root)) then return false end
-	local manifest = previous .. "/.ergopti-owned-files"
-	if not default_probe(manifest, "file") then return true end
-	local old = Fs.read(manifest)
-	if not old then return false end
-	local retained = {}
-	for line in old:gmatch("[^\r\n]+") do
-		local digest, kind = line:match("^(%x+)\t@(%a+)$")
-		if digest and #digest == 64 and (kind == "wrapper" or kind == "unit" or kind == "autostart") then
-			retained[#retained + 1] = line .. "\n"
-		end
-	end
-	return #retained == 0 or Fs.append(root .. "/.ergopti-owned-files", table.concat(retained))
+	local manifest = previous .. "/" .. schema.MANIFEST
+	local old, status = Ownership.read_current(manifest)
+	if status == "absent" then return true end
+	if status ~= "ok" then return false end
+	local record = Ownership.parse(old, schema)
+	if not record then return false end
+	return #record.external == 0 or Fs.append(root .. "/" .. schema.MANIFEST, table.concat(record.external))
+end
+
+--- Validates a disposable installation tree through its canonical receipt owner.
+--- @param path string Candidate, failed activation or previous backup path.
+--- @param current string Trusted installation holding the canonical receipt schema.
+--- @return boolean owned
+--- @return string|nil identity Device/inode receipt, unchanged by namespace moves.
+function DEFAULT_OPS.backup_is_owned(path, current)
+	local identity, detail = Ownership.verify(path, current)
+	return identity ~= nil, identity, detail
 end
 
 function DEFAULT_OPS.mkdir(path)
@@ -264,7 +272,9 @@ function DEFAULT_OPS.exists(path)
 end
 
 function DEFAULT_OPS.move(source, destination)
-	return run_command("mv -- " .. shell_quote(source) .. " " .. shell_quote(destination) .. " 2>/dev/null")
+	-- Every transaction step names an exact vacant destination. A concurrent
+	-- directory must never turn activation or rollback into a nested move.
+	return NoReplaceMove.move(source, destination)
 end
 
 function DEFAULT_OPS.remove_tree(path)
@@ -365,8 +375,9 @@ local function install_transaction(options, owned_current)
 	local work_dir = ops.make_work_dir(context.parent)
 	if not work_dir then return false, "could not allocate same-filesystem staging" end
 
+	local retained_work = false
 	local function fail(detail)
-		cleanup_work(work_dir, context.parent, ops)
+		if not retained_work then cleanup_work(work_dir, context.parent, ops) end
 		return false, detail
 	end
 
@@ -387,14 +398,38 @@ local function install_transaction(options, owned_current)
 	if not forward_current() or not ops.record_ownership(candidate, context.install_root) then
 		return fail("could not record the new installation's file ownership")
 	end
+	-- Namespace moves preserve this exact generation; the fixed live path
+	-- alone cannot authorize retiring a root after the smoke child returns.
+	local candidate_owned, candidate_identity = ops.backup_is_owned(candidate, context.install_root)
+	if candidate_owned ~= true or type(candidate_identity) ~= "string" then
+		return fail("could not verify the new installation's file ownership")
+	end
 
 	local backup = context.install_root .. ".old"
 	if not is_direct_child(backup, context.parent) then
 		return fail("backup path escaped the installation parent")
 	end
 	if not forward_current() then return fail("local install deadline expired") end
-	if ops.exists(backup) and not ops.remove_tree(backup) then
-		return fail("previous backup could not be retired")
+	if ops.exists(backup) then
+		local owned, identity = ops.backup_is_owned(backup, context.install_root)
+		if owned ~= true or type(identity) ~= "string" then
+			return fail("previous backup could not be retired")
+		end
+		local retired = work_dir .. "/retired-backup"
+		if not forward_current() or not ops.move(backup, retired) then
+			return fail("previous backup could not be retired")
+		end
+		local captured, captured_identity = ops.backup_is_owned(retired, context.install_root)
+		if captured ~= true or captured_identity ~= identity or not forward_current() then
+			if not ops.move(retired, backup) then
+				-- A raced foreign tree is not staging debris: retain its namespace
+				-- when a concurrent owner prevents the no-replace restoration.
+				retained_work = true
+				return fail("previous backup ownership changed; unverified tree retained at " .. retired)
+			end
+			return fail("previous backup could not be retired")
+		end
+		if not ops.remove_tree(retired) then return fail("previous backup could not be retired") end
 	end
 	if not forward_current() or not ops.move(context.install_root, backup) then
 		return fail("current installation could not be moved to backup")
@@ -409,9 +444,26 @@ local function install_transaction(options, owned_current)
 		return false, "candidate activation failed; previous installation restored"
 	end
 
-	if not forward_current() or not ops.smoke(context.wrapper) or not forward_current() then
+	local smoke_ok = forward_current() and ops.smoke(context.wrapper) and forward_current()
+	local active_owned, active_identity = ops.backup_is_owned(context.install_root, backup)
+	if active_owned ~= true or active_identity ~= candidate_identity then
+		return fail("updated installation ownership changed; rollback refused; backup remains at " .. backup)
+	end
+	if not smoke_ok or not forward_current() then
 		local failed_root = work_dir .. "/failed"
 		local displaced = ops.move(context.install_root, failed_root)
+		if displaced then
+			local captured_owned, captured_identity = ops.backup_is_owned(failed_root, backup)
+			if captured_owned ~= true or captured_identity ~= candidate_identity then
+				-- Retain an unverified namespace if another owner prevents the
+				-- no-replace restoration; staging cleanup must never erase it.
+				if not ops.move(failed_root, context.install_root) then
+					retained_work = true
+					return fail("updated installation ownership changed; unverified root retained at " .. failed_root .. "; backup remains at " .. backup)
+				end
+				return fail("updated installation ownership changed; rollback refused; backup remains at " .. backup)
+			end
+		end
 		local restored = displaced and ops.move(backup, context.install_root)
 		if restored then
 			cleanup_work(work_dir, context.parent, ops)

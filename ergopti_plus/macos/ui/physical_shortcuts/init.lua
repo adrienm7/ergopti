@@ -14,6 +14,7 @@ local I18n = require("infra.i18n")
 local ui_builder = require("ui.ui_builder")
 local Logger = require("infra.logger")
 local TimerScheduler = require("adapters.timer_scheduler")
+local ConfigKeys = require("config_keys")
 local active = nil
 
 --- Checks the native window constructor and declared geometry without input capture.
@@ -180,7 +181,7 @@ function M.open(options)
 	local scope, gestures = options.scope, options.gestures
 	-- An optional observer must already belong to the running capture owner.
 	-- Requiring it here would create a dormant producer instead of observing one.
-	local Capture = package.loaded["modules.keylogger.physical_capture"]
+	local Capture = package.loaded["modules.keystats.physical_capture"]
 	local capture_position, cancel_position, position_available
 	if type(Capture) == "table" then
 		capture_position, cancel_position, position_available = rawget(Capture, "capture_position"),
@@ -191,7 +192,7 @@ function M.open(options)
 	local function current() return active == candidate and not candidate.closing and not candidate.cancelled end
 	local function observation_current()
 		return current() and not candidate.constructing and candidate.webview ~= nil
-			and type(Capture) == "table" and rawequal(package.loaded["modules.keylogger.physical_capture"], Capture)
+			and type(Capture) == "table" and rawequal(package.loaded["modules.keystats.physical_capture"], Capture)
 			and type(capture_position) == "function" and rawget(Capture, "capture_position") == capture_position
 			and type(cancel_position) == "function" and rawget(Capture, "cancel_position") == cancel_position
 			and type(position_available) == "function" and rawget(Capture, "position_available") == position_available
@@ -230,7 +231,7 @@ function M.open(options)
 		return called and accepted ~= false and current()
 	end
 	local window_constructed, window = pcall(function()
-		return Window.new({model=model,catalogue=gestures,parameter_section="gestures.action_parameters",
+		return Window.new({model=model,catalogue=gestures,parameter_section=ConfigKeys.KEY.GESTURES_ACTION_PARAMETERS,
 			positions=positions,translate=I18n.get,label=gestures.get_action_label,page_current=current,send=send,
 				position_field="hs",position_available=available_position,
 				capture_position=function(guard, receive)

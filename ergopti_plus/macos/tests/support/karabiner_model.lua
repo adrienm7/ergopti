@@ -40,6 +40,17 @@
 --- bookkeeping are not modelled: the flags recorded for a key are the
 --- modifier_flag_manager state an application reads at that key's key_down,
 --- and Engine:held names the output keys left down, which macOS repeats.
+---
+--- OWNED RUNTIME REVISION: the owned runtime is built from revision 9312593e
+--- (ADR 011). Every file of src/share/manipulator, including its types, was
+--- compared with v16.0.0 after discarding mechanical rewrites (namespaces,
+--- override, nodiscard, (void)). Nothing modelled above changed. What did change
+--- and is not modelled: the held-down and delayed-action timers became
+--- debounced tasks that still cancel on the next key-down and at key-up; the
+--- console user server client is now a peer; power or eject with command and
+--- option, and Escape at the login window, are posted 500 ms late; a manipulated
+--- event's time stamp is rounded instead of truncated. The comparison did not
+--- cover src/share/core_configuration or the event queue.
 --- ==============================================================================
 
 local M = {}

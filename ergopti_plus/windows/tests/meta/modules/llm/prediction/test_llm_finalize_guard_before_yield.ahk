@@ -7,7 +7,7 @@
 ; _LLM_Engine_FinalizeRequest re-checked the request id immediately after its
 ; entry check. On the non-empty-slot path nothing runs between the two but an
 ; array-length read, so the second check was a no-op — while every operation the
-; guard was written for (the summary log, two WIGetFocused() calls, the keylogger
+; guard was written for (the summary log, two WIGetFocused() calls, the keystats
 ; generation write and the suggestion event) ran AFTERWARDS, in front of the
 ; render.
 ;

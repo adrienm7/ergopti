@@ -108,7 +108,7 @@ helpers.describe("Linux owned unknown-context reset boundaries", function()
 					local start = assert(source:find(marker, 1, true), "actual callback must exist") + #marker
 					local prefix = assert(source:sub(start):match("^(.-engine:reset%b())"), "callback reset must exist")
 					local compile = loadstring or load
-					local callback = assert(compile("return function(engine, privacy_owners, wrap_on_type)\nlocal keylogger = require(\"modules.keylogger.keylogger\")\nlocal _undoable, _last_offered, tooltip_preview, llm_overlay\n"
+					local callback = assert(compile("return function(engine, privacy_owners, wrap_on_type)\nlocal keystats = require(\"modules.keystats.keystats\")\nlocal _undoable, _last_offered, tooltip_preview, llm_overlay\n"
 						.. prefix .. "\nend", "@actual-unknown-reset-prefix"))()
 					local engine = Core.new()
 					helpers.assert_true(engine:load_mappings({ { trigger = "date", replacement = "owned-result", is_word = true } }))
@@ -169,7 +169,7 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 			helpers.assert_nil(source:find(marker, first + 1, true), "reviewed marker must be unique: " .. marker)
 			local prefix = assert(source:sub(first + #marker):match("^(.-engine:reset%b())"), "site must reset: " .. marker)
 			local callback = assert(compile("return function(engine, injector, Logger)\n"
-				.. "local keylogger = require(\"modules.keylogger.keylogger\")\n"
+				.. "local keystats = require(\"modules.keystats.keystats\")\n"
 				.. "local _undoable, _last_offered, tooltip_preview, llm_overlay, prediction_engine\n"
 				.. "local LOG, undo, text, publication = \"fixture\", { trigger = \"adn\" }, \"owned\", {}\n"
 				-- The marker line itself is not part of the prefix: seed what it bound.
@@ -201,7 +201,9 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 			if not first then break end
 			position = last + 1
 			local inner = argument:sub(2, -2)
-			if inner == "" then
+			-- A final_result or dynamic expansion drops the word buffer at a boundary
+			-- and tells the engine the AI context already mirrors the produced text.
+			if inner == "" or inner == 'nil, nil, "keep"' then
 				local context = source:sub(math.max(1, first - 600), first)
 				local allowed = false
 				for _, marker in ipairs(BOUNDARY_RESET_CONTEXTS) do
@@ -210,7 +212,8 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 				helpers.assert_true(allowed, "a plain reset outside a known word start, near byte " .. first)
 				plain = plain + 1
 			else
-				helpers.assert_true(inner == "false" or inner == "at_word_start",
+				helpers.assert_true(inner == "false" or inner == "at_word_start"
+					or inner == 'at_word_start, nil, "navigation"',
 					"a reset argument must be false or the click setting, got " .. inner)
 				explicit = explicit + 1
 			end
@@ -232,11 +235,16 @@ helpers.describe("Linux builtin dynamic word-start owners", function()
 			local last = assert(source:find("\n\n\n\tend\n\ton_char", first, true))
 			local slice = source:sub(first, last - 1)
 			local compile = loadstring or load
-			local actor = assert(compile("return function(engine, prediction_engine, dyn_hotstrings, keylogger)\n"
+			local actor = assert(compile("return function(engine, prediction_engine, dyn_hotstrings, keystats)\n"
 				.. "local ch, app_id, tooltip_preview, result, now_ms = '★', 'owned-fixture', nil, nil, 0\n"
 				.. "local opts = { dry_run = false }\n"
 				.. slice .. "\nend", "@actual-dynamic-daemon-parent"))()
 			local engine = require("hotstring_engine").new()
+			-- The daemon's engine wrapper also carries the AI context; this slice only
+			-- needs it to hand the prediction callback the text just typed.
+			engine.ai_context = function() return { text = function() return engine:current_buffer() end } end
+			engine.replaced = function() end
+			engine.forget_ai_context = function() end
 			engine:reset(false)
 			for _, character in ipairs({ "d", "a", "t", "e", "★" }) do engine:on_char(character) end
 			local predicted, recorded = 0, 0

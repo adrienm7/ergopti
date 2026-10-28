@@ -37,23 +37,22 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local Heredoc = require("shell.heredoc")
 local Monotonic = require("infra.monotonic")
 local RuntimeLog = require("diagnostics.runtime_log")
-local LibuvExit = require("infra.libuv_exit")
-local NativeTimer = require("infra.native_timer")
+local Perf = require("infra.perf_counters")
+local PhaseStats = require("infra.phase_stats")
 local NumberPolicy = require("number_policy")
+local OwnedProcess = nil
 local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then luv = nil end
 
 local LOG = "adapters.shell_runner"
-
--- POSIX close-escape-reopen sequence. A single-quoted shell word cannot contain
--- a single quote at all, so the quote is emitted by closing the word, escaping
--- a bare quote outside it, and reopening: 'it'\''s' reads back as "it's".
-local QUOTE_ESCAPE = "'\\''"
 
 -- os.execute() reports success as the exit code 0 under Lua 5.1/LuaJIT and as
 -- the boolean true from Lua 5.2 onwards. Both spellings must be accepted.
@@ -74,7 +73,18 @@ local _test_runner = nil
 -- Every real exit is reported through one throttled recorder: the program name,
 -- the status and the duration, never the command line, which can carry user
 -- text in a heredoc. A child that hung or failed used to leave no trace at all.
-local _record_exit = RuntimeLog.new_process_log(Logger, LOG, Monotonic.now_ms)
+local _log_exit = RuntimeLog.new_process_log(Logger, LOG, Monotonic.now_ms)
+
+--- Counts the child (the forks per key and per startup are the figure that
+--- matters), times it as the phase process.<program> exactly as the macOS
+--- driver does, then reports its exit as above. The phase name is the program
+--- basename that RuntimeLog.program_name sanitised, never the command line.
+local function _record_exit(name, status, duration_ms)
+	Perf.count("shell.spawns")
+	local program = (type(name) == "string" and name ~= "") and name or "unknown"
+	PhaseStats.add_ms("process." .. program, duration_ms)
+	return _log_exit(name, status, duration_ms)
+end
 
 
 
@@ -89,13 +99,14 @@ local _record_exit = RuntimeLog.new_process_log(Logger, LOG, Monotonic.now_ms)
 --- Turns an arbitrary value into exactly one inert POSIX shell word.
 --- Everything inside the returned word is literal: $, `, $( ), ;, &, newlines
 --- and spaces all lose their meaning to the shell. This is the ONLY quoting the
---- Linux driver may use when interpolating data into a command string.
---- @param value any Value to quote; nil and non-strings become the empty word.
+--- Linux driver may use when interpolating data into a command string; the
+--- close-escape-reopen of a single quote is text_utils.shell_quote's.
+--- @param value any Value to quote; nil becomes the empty word, any other
+--- non-string its tostring() text.
 --- @return string A single-quoted shell word, always non-empty ("''" at least).
 function M.quote(value)
 	if value == nil then return "''" end
-	local s = (type(value) == "string") and value or tostring(value)
-	return "'" .. (s:gsub("'", QUOTE_ESCAPE)) .. "'"
+	return TextUtils.shell_quote(value)
 end
 
 --- Validates an argv vector destined for luv.spawn (or any execve(2) boundary).
@@ -107,7 +118,7 @@ end
 --- exactly that -- six Integer timing constants spliced into a vector -- and the
 --- argument index was the only diagnostic that ever located it. Every driver
 --- therefore refuses by index at this boundary
---- (keylogger-worker-timings-must-be-strings).
+--- (keystats-worker-timings-must-be-strings).
 ---
 --- Numbers are refused rather than coerced on purpose: the caller knows the
 --- intended text (seconds? milliseconds? padded?), this function does not.
@@ -126,9 +137,7 @@ function M.validate_spawn_args(executable, args)
 	if type(args) ~= "table" then
 		return "args must be a table, got " .. type(args)
 	end
-	local keys = 0
-	for _ in pairs(args) do keys = keys + 1 end
-	if keys ~= #args then
+	if TableUtil.count(args) ~= #args then
 		return "args must be a pure array, not a keyed or sparse table"
 	end
 	for index = 1, #args do
@@ -233,7 +242,9 @@ end
 --- @param options table|nil { output_dir? } Native receipt staging directory.
 --- @return boolean ok
 --- @return string output Captured stdout, including the empty string.
---- @return string|nil error_message
+--- @return string|nil error_message A sentence for the log.
+--- @return string|nil reason The closed adapter_errors id to match on (command_exited_nonzero for a non-zero exit).
+--- @return integer|nil status The exit status that goes with command_exited_nonzero.
 function M.exec_checked(cmd, options)
 	local admitted, refusal = valid_shell_command(cmd, "exec_checked")
 	if not admitted then return false, "", refusal end
@@ -247,14 +258,14 @@ function M.exec_checked(cmd, options)
 		if type(result) == "table" then
 			return result.ok == true,
 				type(result.output) == "string" and result.output or "",
-				result.error
+				result.error, result.reason, result.status
 		end
 		if type(result) == "string" then return true, result, nil end
 		return result == true, "", result == true and nil or "simulated command failure"
 	end
 
 	local started_ms = Monotonic.now_ms()
-	local call_ok, command_ok, output, error_message = pcall(function()
+	local call_ok, command_ok, output, error_message, reason_id, exit_status = pcall(function()
 		-- LuaJIT's io.popen handle does not preserve a child's non-zero status on
 		-- every libc/runtime combination. Run the caller's command in a nested
 		-- shell, buffer stdout in an atomically-created file, and frame the result
@@ -310,7 +321,7 @@ function M.exec_checked(cmd, options)
 			return false, content, "checked command capture did not complete"
 		end
 		if tonumber(status) ~= EXIT_SUCCESS then
-			return false, content, "command exited with status " .. status
+			return false, content, "command exited with status " .. status, Errors.COMMAND_EXITED_NONZERO, tonumber(status)
 		end
 		return true, content, nil
 	end)
@@ -321,7 +332,7 @@ function M.exec_checked(cmd, options)
 	end
 	_record_exit(RuntimeLog.program_name(cmd), command_ok and 0 or tostring(error_message),
 		Monotonic.now_ms() - started_ms)
-	return command_ok, output, error_message
+	return command_ok, output, error_message, reason_id, exit_status
 end
 
 --- Runs a command and returns only its first line of stdout.
@@ -472,65 +483,7 @@ M.HAS_ASYNC = luv ~= nil
 
 -- What an asynchronous child may print before it is stopped: the callers read
 -- a version line or a df row, never a stream
-local ASYNC_MAX_OUTPUT_BYTES = 65536
-
---- Closes one libuv handle at most once.
---- @param handle any
-local function close_handle(handle)
-	if not handle then return end
-	local ok, closing = pcall(luv.is_closing, handle)
-	if not (ok and closing == true) then pcall(luv.close, handle) end
-end
-
---- Stops a child's whole process group.
---- @param request table
-local function stop_group(request)
-	-- A descendant can retain the pipes after libuv reaps the group leader.
-	-- The deadline and cancellation still own that group until terminal cleanup.
-	if not request.pid then return end
-	pcall(luv.kill, -request.pid, "sigterm")
-	-- A deadline must also retire children that ignore SIGTERM, or libuv keeps
-	-- their process handles alive indefinitely. The other argv runner does this too.
-	local ok, status, detail, code = pcall(luv.kill, -request.pid, "sigkill")
-	if not ok or (status == nil and code ~= "ESRCH") then
-		Logger.error(LOG, "run_async(): could not stop pid %s — %s.",
-			tostring(request.pid), tostring(detail or status))
-	end
-end
-
---- Publishes one terminal result and releases every handle.
---- @param request table
---- @param result table { ok, code, stdout, stderr, error }
-local function finish_async(request, result)
-	if request.terminal then return end
-	request.terminal = true
-	pcall(luv.timer_stop, request.timer)
-	close_handle(request.timer)
-	for _, field in ipairs({ "stdout", "stderr" }) do
-		if request[field] then
-			pcall(luv.read_stop, request[field])
-			close_handle(request[field])
-		end
-	end
-	if request.exited then close_handle(request.process) end
-	_record_exit(request.name, result.code or -1, Monotonic.now_ms() - request.started)
-	if request.silent then return end
-	local ok, err = pcall(request.callback, result)
-	if not ok then Logger.error(LOG, "run_async() callback for %s raised: %s.", request.name, tostring(err)) end
-end
-
---- Completes once the child has exited and both pipes have ended.
---- @param request table
-local function maybe_finish(request)
-	if request.terminal or not request.exited or not request.stdout_eof or not request.stderr_eof then return end
-	finish_async(request, {
-		ok     = request.code == 0,
-		code   = request.code,
-		stdout = request.stdout_text,
-		stderr = request.stderr_text,
-		error  = request.code ~= 0 and ("exit code " .. tostring(request.code)) or nil,
-	})
-end
+local ASYNC_MAX_OUTPUT_BYTES = require("llm.process_limits").defaults().max_output_bytes
 
 --- Runs a program without a shell and without blocking the event loop.
 --- @param executable string Program name or absolute path.
@@ -548,81 +501,51 @@ function M.run_async(executable, args, options, callback)
 	if not NumberPolicy.within_timer_ceiling(timeout_ms) or timeout_ms <= 0 then
 		return nil, "a positive timeout_ms within the timer ceiling is required"
 	end
-	local request = {
-		name = executable, callback = callback, started = Monotonic.now_ms(),
-		stdout_text = "", stderr_text = "", stdout_eof = false, stderr_eof = false,
-		exited = false, terminal = false, silent = false,
-	}
-	local function refuse(reason)
-		-- The caller reports synchronous admission failures from nil/error.
-		-- A reader can fail after spawn; retire that group without also delivering
-		-- a callback, while the late exit still closes its owned process handle.
-		request.silent = true
-		stop_group(request)
-		finish_async(request, { ok = false, error = reason })
-		return nil, reason
+	-- Synchronous shell consumers and cold connector shutdown own no native
+	-- process ledger. Capture it once only after an async request is admitted.
+	if not OwnedProcess then OwnedProcess = require("adapters.owned_process") end
+	local request = { name = executable, started = Monotonic.now_ms(), constructing = true, admitted = false }
+	local pending
+	local function record(result)
+		if request.recorded then return end
+		request.recorded = true
+		_record_exit(request.name, result.exit_code or -1, Monotonic.now_ms() - request.started)
 	end
-	local allocated, allocation_error = pcall(function()
-		-- Capture ownership before the next constructor can refuse or raise.
-		request.stdout = luv.new_pipe(false)
-		if not request.stdout then error("stdout allocation refused", 0) end
-		request.stderr = luv.new_pipe(false)
-		if not request.stderr then error("stderr allocation refused", 0) end
-		request.timer = luv.new_timer()
-		if not request.timer then error("timer allocation refused", 0) end
-	end)
-	if not allocated then return refuse("handle allocation failed: " .. tostring(allocation_error)) end
-	local timer_ok, timer_started, timer_error = pcall(NativeTimer.start, luv, request.timer, timeout_ms, 0, function()
-		stop_group(request)
-		finish_async(request, { ok = false, error = "timeout" })
-	end)
-	if not timer_ok or timer_started == nil or timer_started == false then
-		return refuse("timeout activation failed: " .. tostring(timer_ok and timer_error or timer_started))
+	local function publish(result)
+		if request.constructing then pending = result; return end
+		if not request.admitted then return end
+		local error_message = result.error
+		local code = result.exit_code
+		if error_message == Errors.PROCESS_DEADLINE_EXCEEDED then error_message, code = "timeout", nil
+		elseif error_message == Errors.PROCESS_OUTPUT_EXCEEDS_BOUND then
+			error_message, code = "output over " .. ASYNC_MAX_OUTPUT_BYTES .. " bytes", nil
+		elseif error_message == Errors.PROCESS_EXITED_UNSUCCESSFULLY then error_message = "exit code " .. tostring(code) end
+		local answer = { ok = result.ok, code = code, stdout = result.stdout, stderr = result.stderr, error = error_message }
+		record(result)
+		local ok, err = pcall(callback, answer)
+		if not ok then Logger.error(LOG, "run_async() callback for %s raised: %s.", request.name, tostring(err)) end
 	end
-	local spawned, process, pid = pcall(luv.spawn, executable, {
-		args = args, stdio = { nil, request.stdout, request.stderr }, detached = true,
-	}, function(code, signal)
-		request.exited = true
-		request.code = LibuvExit.status(code, signal)
-		maybe_finish(request)
-		if request.terminal then close_handle(request.process) end
-	end)
-	if not spawned or not process then
-		-- No child was dispatched. Callers handle this synchronous refusal from
-		-- the return value; invoking their completion callback would report twice.
-		local reason = "spawn failed: " .. tostring(pid or process)
-		return refuse(reason)
-	end
-	request.process, request.pid = process, pid
-	for _, stream in ipairs({ { "stdout", "stdout_text", "stdout_eof" }, { "stderr", "stderr_text", "stderr_eof" } }) do
-		local field, text, eof = stream[1], stream[2], stream[3]
-		local read_ok, read_started, read_error = pcall(luv.read_start, request[field], function(err, chunk)
-			if request.terminal then return end
-			if err then
-				stop_group(request)
-				finish_async(request, { ok = false, error = tostring(err) })
-			elseif chunk == nil then
-				request[eof] = true
-				maybe_finish(request)
-			elseif #request[text] + #chunk > ASYNC_MAX_OUTPUT_BYTES then
-				stop_group(request)
-				finish_async(request, { ok = false, error = "output over " .. ASYNC_MAX_OUTPUT_BYTES .. " bytes" })
-			else
-				request[text] = request[text] .. chunk
-			end
-		end)
-		if not read_ok or read_started == nil or read_started == false then
-			return refuse(field .. " activation failed: " .. tostring(read_ok and read_error or read_started))
+	local operation = OwnedProcess.start(executable, args, {
+		owner = "shell_runner:" .. tostring(request), timeout_ms = timeout_ms,
+		max_output_bytes = ASYNC_MAX_OUTPUT_BYTES,
+	}, publish)
+	request.constructing = false
+	-- Cancellation suppresses business delivery, not native exit diagnostics.
+	operation:on_settled(function() record(operation.result) end)
+	if not operation.started or operation.error ~= nil then
+		local error_message = operation.error or "native process admission refused"
+		if error_message == Errors.PROCESS_HANDLE_ALLOCATION_FAILED then error_message = "handle allocation failed"
+		elseif error_message == Errors.PROCESS_DEADLINE_REFUSED then error_message = "timeout activation failed"
+		elseif error_message == Errors.PROCESS_OUTPUT_WATCH_REFUSED then error_message = "pipe activation failed"
+		elseif error_message == Errors.PROCESS_DISPATCH_FAILED then
+			error_message = "spawn failed: " .. (operation.spawn_error_code or error_message)
 		end
+		return nil, error_message
 	end
-	return {
-		cancel = function()
-			if request.terminal then return end
-			request.silent = true
-			stop_group(request)
-			finish_async(request, { ok = false, error = "cancelled" })
-		end,
-	}
+	request.admitted = true
+	if pending then publish(pending) end
+	return { cancel = function() return operation:cancel() end }
+
 end
 
 

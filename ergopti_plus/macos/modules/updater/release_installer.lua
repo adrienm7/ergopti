@@ -30,6 +30,7 @@
 
 local M = {}
 
+local Identifiers = require("identifiers")
 local Logger      = require("infra.logger")
 local Paths       = require("infra.paths")
 local FileSystem  = require("adapters.file_system")
@@ -38,11 +39,12 @@ local ShellRunner = require("adapters.shell_runner")
 local Archives    = require("updater.release_assets")
 
 local LOG = "updater.release_installer"
+local ARMING_RECEIPT = "ARMED"
 
 -- The executable inside the app bundle the launcher runs from.
 local EXECUTABLE_SUFFIX = "/Contents/MacOS/ErgoptiPlus"
 -- The app folder name inside the release archive.
-local APP_NAME = "ErgoptiPlus.app"
+local APP_NAME = Identifiers.app.bundle
 
 -- Test seams.
 M._run = function(...) return ShellRunner.run(...) end
@@ -73,6 +75,8 @@ assert(type(M.STAGE_SCRIPT) == "string" and M.STAGE_SCRIPT ~= "", "The native re
 M.SWAP_SCRIPT = table.concat({
 	"set -u",
 	'pid=$1; app=$2; staged=$3; previous=$4',
+	"printf '" .. ARMING_RECEIPT .. "\\n' >&3 || exit 1",
+	"exec 3>&- || exit 1",
 	"waited=0",
 	'while /bin/kill -0 "$pid" 2>/dev/null; do',
 	'	waited=$((waited + 1))',
@@ -83,17 +87,34 @@ M.SWAP_SCRIPT = table.concat({
 	'/bin/mv -- "$app" "$previous" || { echo "The installed app could not be moved aside."; /usr/bin/open -- "$app"; exit 5; }',
 	'if /bin/mv -- "$staged" "$app"; then',
 	'	echo "Installed."',
-	'	/usr/bin/open -- "$app"',
+	'	/usr/bin/open -- "$app" || { echo "The installed app could not be opened."; exit 7; }',
 	"	exit 0",
 	"fi",
-	'/bin/mv -- "$previous" "$app"',
+	'if ! /bin/mv -- "$previous" "$app"; then',
+	'	echo "The previous app could not be restored: it remains at $previous."',
+	"	exit 8",
+	"fi",
 	'echo "The verified app could not be moved in: the previous one is back."',
 	'/usr/bin/open -- "$app"',
 	"exit 6",
 }, "\n")
 
 -- Starts the swap script detached from this process, with its output in a log.
-local DETACH_SCRIPT = 'nohup /bin/sh -c "$1" swap "$2" "$3" "$4" "$5" >>"$6" 2>&1 </dev/null &'
+local DETACH_SCRIPT = table.concat({
+	"set -u",
+	"{",
+	"\texec 3>&1",
+	'\texec >>"$6" 2>&1 || exit 1',
+	'\t/usr/bin/nohup /bin/sh -c "$1" swap "$2" "$3" "$4" "$5" </dev/null &',
+	"} | {",
+	"\tIFS= read -r receipt || exit 1",
+	'\t[ "$receipt" = ' .. ARMING_RECEIPT .. ' ] || exit 1',
+	"\textra=",
+	"\tif IFS= read -r extra; then exit 1; fi",
+	'\t[ -z "$extra" ] || exit 1',
+	"\tprintf '" .. ARMING_RECEIPT .. "\\n'",
+	"}",
+}, "\n")
 
 
 
@@ -208,25 +229,53 @@ function M.stage(asset, done)
 	return type(handle) == "table" and handle.start() == true
 end
 
---- Arms the replacement of the installed app by the verified one, to run once
---- the launcher quits.
+--- Asynchronously arms replacement after the launcher quits. Dispatch alone is
+--- never the detached worker's acknowledgement: only its exact receipt completes.
 --- @param staged_app string Verified app path from M.stage().
---- @return boolean armed
+--- @param done function fn(armed, detail) after an admitted arming request settles.
+--- @return boolean admitted
 --- @return string|nil error
-function M.arm_swap(staged_app)
+function M.arm_swap(staged_app, done)
+	if type(done) ~= "function" then return false, "an asynchronous arming observer is required" end
 	local app, pid = M.app_bundle(), M.launcher_pid()
 	if not app or not pid then return false, "not a packaged launch" end
 	if type(staged_app) ~= "string" or not staged_app:match("/" .. APP_NAME:gsub("%.", "%%.") .. "$") then
 		return false, "no verified app"
 	end
 	local log = staged_app:gsub("/app/" .. APP_NAME:gsub("%.", "%%.") .. "$", "") .. "/swap.log"
-	local started = M._run("/bin/sh", { "-c", DETACH_SCRIPT, "detach", M.SWAP_SCRIPT, pid, app, staged_app,
-		app .. ".previous", log }, function(ok, _, stderr)
-		if not ok then Logger.error(LOG, "The app replacement could not be armed: %s.", tostring(stderr)) end
-	end)
-	if started ~= true then return false, "the replacement could not start" end
-	Logger.info(LOG, "App replacement armed: %s replaces %s once ErgoptiPlus quits (log: %s).",
-		staged_app, app, log)
+	local constructing, admitted, settled, early = true, false, false, nil
+	local function completed(ok, stdout, stderr)
+		if settled then return end
+		if constructing then
+			if early == nil then early = table.pack(ok, stdout, stderr) end
+			return
+		end
+		if not admitted then return end
+		settled = true
+		if ok == true and stdout == ARMING_RECEIPT then
+			Logger.success(LOG, "App replacement armed: %s replaces %s once ErgoptiPlus quits (log: %s).",
+				staged_app, app, log)
+			done(true)
+		else
+			Logger.error(LOG, "The detached installer refused its arming receipt (completion=%s).", tostring(ok))
+			done(false, "the detached installer did not acknowledge arming")
+		end
+	end
+	Logger.start(LOG, "Arming the verified app replacement (log: %s)…", log)
+	local called, started = pcall(M._run, "/bin/sh", { "-c", DETACH_SCRIPT, "detach", M.SWAP_SCRIPT,
+		pid, app, staged_app, app .. ".previous", log }, completed)
+	admitted = called and started == true
+	constructing = false
+	if not admitted then
+		settled = true
+		if not called then
+			Logger.error(LOG, "The app replacement arming dispatch threw: %s.", tostring(started))
+		else
+			Logger.error(LOG, "The app replacement arming request could not start.")
+		end
+		return false, "the replacement could not start"
+	end
+	if early ~= nil then completed(table.unpack(early, 1, early.n)) end
 	return true
 end
 

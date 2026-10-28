@@ -45,7 +45,7 @@ local PAIRS = {
 	-- Not under adapters/, but the same relationship and the same failure mode:
 	-- four test files each carried their own literal table of writer methods, and
 	-- adding four functions to the writer broke all four at the call site.
-	{ adapter = "modules.keylogger.sqlite_writer", make = function() return Fakes.sqlite_writer() end },
+	{ adapter = "modules.keystats.sqlite_writer", make = function() return Fakes.sqlite_writer() end },
 }
 
 

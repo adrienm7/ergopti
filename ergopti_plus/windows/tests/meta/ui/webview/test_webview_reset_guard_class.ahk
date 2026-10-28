@@ -48,7 +48,9 @@ _WVRG_TeardownFunctions() {
 	Out := []
 	Seen := Map()
 	Pos := 1
-	while (Pos := RegExMatch(Src, "m)^([A-Za-z0-9_]+_Reset)\(\)\s*\{", &M, Pos)) {
+	; Resolve each name through the canonical body reader below. Requiring an
+	; empty parameter list here omits teardown owners with optional session fences.
+	while (Pos := RegExMatch(Src, "m)^([A-Za-z0-9_]+_Reset)\(", &M, Pos)) {
 		Name := M[1]
 		Pos += StrLen(M[0])
 		if Seen.Has(Name)

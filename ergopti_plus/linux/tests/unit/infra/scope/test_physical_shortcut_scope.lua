@@ -13,11 +13,11 @@ local Codec = require("toml_codec")
 local Manifest = require("infra.manifest_reader")
 
 local SOURCE = '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\nchatgpt_url = "https://old.example"\nunknown = "keep"\n'
-	.. '[shortcuts.keyboard]\nctrl_j = "open_url"\nctrl_k = "enter"\nctrl_p = "script_reload"\nforeign_slot = "keep"\n'
+	.. '[shortcuts.keyboard]\nprimary_j = "open_url"\nprimary_k = "enter"\nprimary_p = "script_reload"\nforeign_slot = "keep"\n'
 	.. '[shortcuts.tap_keys]\nnumber_row_left = "send_text"\nunknown = "keep"\n'
-	.. '[gesture_parameters]\nkeyboard__ctrl_j__open_url = "https://old.example"\ntap_key__number_row_left__send_text = "typed"\n'
+	.. '[gesture_parameters]\nkeyboard__primary_j__open_url = "https://old.example"\ntap_key__number_row_left__send_text = "typed"\n'
 	.. 'tap_3__open_url = "https://gesture.example"\ntap_hold__caps_lock__open_url = "https://hold.example"\nunknown = "keep"\n'
-	.. '[linux.action_parameters]\nkeyboard__ctrl_k__open_url = "https://legacy.example"\nunknown = "keep"\n'
+	.. '[linux.action_parameters]\nkeyboard__primary_k__open_url = "https://legacy.example"\nunknown = "keep"\n'
 	.. '[gestures]\nenabled = false\ntap_3 = "enter"\n[metrics]\nenabled = true\n[llm]\nenabled = true\n[other]\nvalue = 42\n'
 
 --- Uses real state owners and only controlled native/file publication ports.
@@ -124,7 +124,7 @@ local function with_scope(body, source, chord_j_identity)
 			end
 			local apply_parameters = gestures.apply_parameter_configuration
 			gestures.apply_parameter_configuration = function(token, state)
-				if controls.refuse_restore and state.keyboard__ctrl_j__open_url then return false end
+				if controls.refuse_restore and state.keyboard__primary_j__open_url then return false end
 				return apply_parameters(token, state)
 			end
 			local chords = require("modules.shortcuts.script_chords")
@@ -194,7 +194,7 @@ end
 
 
 helpers.describe("Linux actual physical edit scope", function()
-	local source = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nctrl_j = "open_url"\nforeign_slot = "keep"\n[gesture_parameters]\nkeyboard__ctrl_j__open_url = "https://prior.example"\nother_owner__send_text = "retain"\n[other]\nvalue = 42\n'
+	local source = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nprimary_j = "open_url"\nforeign_slot = "keep"\n[gesture_parameters]\nkeyboard__primary_j__open_url = "https://prior.example"\nother_owner__send_text = "retain"\n[other]\nvalue = 42\n'
 	local rows = {
 		{section="shortcuts.keyboard",key="physical_none_KeyJ",value="send_text"},
 		{section="gesture_parameters",key="keyboard__physical_none_KeyJ__send_text",value="★"},
@@ -219,7 +219,7 @@ helpers.describe("Linux actual physical edit scope", function()
 			local decoded=Codec.decode(Sandbox.read_bytes(path))
 			helpers.assert_eq(decoded.shortcuts.keyboard.physical_none_KeyJ,"send_text")
 			helpers.assert_eq(decoded.gesture_parameters.keyboard__physical_none_KeyJ__send_text,"★")
-			helpers.assert_eq(decoded.gesture_parameters.keyboard__ctrl_j__open_url,"https://prior.example")
+			helpers.assert_eq(decoded.gesture_parameters.keyboard__primary_j__open_url,"https://prior.example")
 			helpers.assert_eq(decoded.gesture_parameters.other_owner__send_text,"retain")
 			helpers.assert_eq(decoded.shortcuts.keyboard.foreign_slot,"keep")
 			helpers.assert_true(owners.keyboard.consume(event(),options))
@@ -237,7 +237,7 @@ helpers.describe("Linux actual physical edit scope", function()
 			helpers.assert_eq(Sandbox.read_bytes(path),source)
 			helpers.assert_eq(owners.keyboard.get_action("physical_none_KeyJ"),"none")
 			helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__physical_none_KeyJ","send_text"),"")
-			helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__ctrl_j","open_url"),"https://prior.example")
+			helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__primary_j","open_url"),"https://prior.example")
 			helpers.assert_eq(#controls.executed,0)
 			helpers.assert_eq(scope.pending(),false)
 		end,source)
@@ -253,7 +253,7 @@ helpers.describe("Linux actual physical edit scope", function()
 			local decoded=Codec.decode(Sandbox.read_bytes(path))
 			helpers.assert_eq(decoded.shortcuts.keyboard.physical_none_KeyJ,nil)
 			helpers.assert_eq(decoded.gesture_parameters.keyboard__physical_none_KeyJ__send_text,nil)
-			helpers.assert_eq(decoded.gesture_parameters.keyboard__ctrl_j__open_url,"https://prior.example")
+			helpers.assert_eq(decoded.gesture_parameters.keyboard__primary_j__open_url,"https://prior.example")
 			helpers.assert_eq(decoded.gesture_parameters.other_owner__send_text,"retain")
 			helpers.assert_eq(owners.keyboard.physical_assignments(),{})
 		end,existing)
@@ -298,9 +298,9 @@ helpers.describe("Linux actual physical edit scope", function()
 			helpers.assert_true(scope.edit({{section="shortcuts.keyboard",key="physical_ctrl_KeyJ",value="none",intent="keyboard_assignment"}}))
 			local options=ports(owners,controls)
 			local consumed,slot=owners.keyboard.consume({physical=true,code=36,key="j",mods={ctrl=true}},options)
-			helpers.assert_true(consumed);helpers.assert_eq(slot,"ctrl_j")
+			helpers.assert_true(consumed);helpers.assert_eq(slot,"primary_j")
 			for _,callback in ipairs(controls.queued) do callback() end
-			helpers.assert_eq(controls.executed,{"open_url@keyboard__ctrl_j"})
+			helpers.assert_eq(controls.executed,{"open_url@keyboard__primary_j"})
 		end,source)
 	end)
 
@@ -329,19 +329,19 @@ helpers.describe("Linux actual physical edit scope", function()
  helpers.it('(physical-source-frame) mismatched actual parameter value refuses before backup and candidate apply',function()
   with_scope(function(scope,owners,controls,path)
    local token={};helpers.assert_true(owners.gestures.acquire_parameter_configuration(token))
-   local params=owners.gestures.parameter_configuration_snapshot(token);params.keyboard__ctrl_j__open_url='https://runtime-different.example'
+   local params=owners.gestures.parameter_configuration_snapshot(token);params.keyboard__primary_j__open_url='https://runtime-different.example'
    helpers.assert_true(owners.gestures.apply_parameter_configuration(token,params));helpers.assert_true(owners.gestures.release_parameter_configuration(token))
    helpers.assert_eq(scope.edit({{section='shortcuts.keyboard',key='physical_none_KeyJ',value='none',intent='keyboard_assignment'}}),false)
    helpers.assert_eq(#controls.backups,0);helpers.assert_eq(controls.runtime_calls,0)
    helpers.assert_eq(Writer.read_classified(path),SOURCE)
    helpers.assert_eq(scope.pending(),false)
-   helpers.assert_eq(owners.gestures.get_action_parameter('keyboard__ctrl_j','open_url'),'https://runtime-different.example','Refusal preserves foreign runtime intent')
+   helpers.assert_eq(owners.gestures.get_action_parameter('keyboard__primary_j','open_url'),'https://runtime-different.example','Refusal preserves foreign runtime intent')
   end)
  end)
  helpers.it('(physical-source-frame) deleted actual parameter refuses before backup and candidate apply',function()
   with_scope(function(scope,owners,controls,path)
    local token={};helpers.assert_true(owners.gestures.acquire_parameter_configuration(token))
-   local params=owners.gestures.parameter_configuration_snapshot(token);params.keyboard__ctrl_j__open_url=nil
+   local params=owners.gestures.parameter_configuration_snapshot(token);params.keyboard__primary_j__open_url=nil
    helpers.assert_true(owners.gestures.apply_parameter_configuration(token,params));helpers.assert_true(owners.gestures.release_parameter_configuration(token))
    helpers.assert_eq(scope.edit({{section='shortcuts.keyboard',key='physical_none_KeyJ',value='none',intent='keyboard_assignment'}}),false)
    helpers.assert_eq(#controls.backups,0);helpers.assert_eq(controls.runtime_calls,0);helpers.assert_eq(Writer.read_classified(path),SOURCE)
@@ -369,7 +369,7 @@ helpers.describe("Linux actual physical edit scope", function()
     if mode=='canonical_file' then
      helpers.assert_true(Writer.publish_if_unchanged(path,SOURCE..'# foreign publisher\n',nil,{status='ok',content=SOURCE}))
     elseif mode=='runtime_parameter' then
-     helpers.assert_true(owners.gestures.set_action_parameter('keyboard__ctrl_j','open_url','https://unpublished.example'))
+     helpers.assert_true(owners.gestures.set_action_parameter('keyboard__primary_j','open_url','https://unpublished.example'))
     else receipt={} end
     local before=Writer.read_classified(path)
     helpers.assert_eq(scope.editor_source_current(receipt),false)
@@ -539,7 +539,7 @@ helpers.describe('Linux explicit physical entries preserve unrelated legacy sema
 end)
 
 helpers.describe("Linux unqualified physical delivery admission", function()
-	local source = '[shortcuts]\nenabled=true\n[shortcuts.keyboard]\nctrl_k="enter"\nforeign_slot="keep"\nphysical_none_KeyJ="send_text"\n[gesture_parameters]\nkeyboard__physical_none_KeyJ__send_text="owned"\nother_owner__send_text="keep"\n'
+	local source = '[shortcuts]\nenabled=true\n[shortcuts.keyboard]\nprimary_k="enter"\nforeign_slot="keep"\nphysical_none_KeyJ="send_text"\n[gesture_parameters]\nkeyboard__physical_none_KeyJ__send_text="owned"\nother_owner__send_text="keep"\n'
 	local function options(owners, controls)
 		controls.capture.source_generation = function() return 1 end
 		return {defer=function(fn) controls.queued[#controls.queued+1]=fn;return true end,
@@ -581,7 +581,7 @@ helpers.describe("Linux unqualified physical delivery admission", function()
 				{section="gesture_parameters",key="keyboard__physical_none_KeyJ__send_text",delete=true}}))
 			local document=Codec.decode(Sandbox.read_bytes(path))
 			helpers.assert_eq(document.shortcuts.keyboard.physical_none_KeyJ,nil)
-			helpers.assert_eq(document.shortcuts.keyboard.ctrl_k,"enter")
+			helpers.assert_eq(document.shortcuts.keyboard.primary_k,"enter")
 			helpers.assert_eq(document.shortcuts.keyboard.foreign_slot,"keep")
 			helpers.assert_eq(document.gesture_parameters.other_owner__send_text,"keep")
 		end, source)
@@ -738,13 +738,13 @@ helpers.describe("Physical preflight preserves original admission and parameter 
 		with_scope(function(scope, _, controls, path)
 			local accepted, reason = scope.edit({
 				{ section = "shortcuts.keyboard", key = "physical_none_KeyK", value = "copy" },
-				{ section = "shortcuts.keyboard", key = "ctrl_p", value = "enter" },
+				{ section = "shortcuts.keyboard", key = "primary_p", value = "enter" },
 			})
 			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "save_failed")
 			helpers.assert_eq(Sandbox.read_bytes(path), source)
 			local decoded = Codec.decode(Sandbox.read_bytes(path))
 			helpers.assert_eq(decoded.shortcuts.keyboard.physical_none_KeyK, nil)
-			helpers.assert_eq(decoded.shortcuts.keyboard.ctrl_p, nil)
+			helpers.assert_eq(decoded.shortcuts.keyboard.primary_p, nil)
 			helpers.assert_eq(controls.source_reads, 1); helpers.assert_eq(scope.pending(), false)
 			helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0)
 		end, source)

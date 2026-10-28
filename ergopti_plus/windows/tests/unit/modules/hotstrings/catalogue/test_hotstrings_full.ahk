@@ -562,6 +562,14 @@ Test("callback unicode-time-gate: supplementary final key keeps the actual prece
 	_TestHH_UnicodeTimingCallback("ab" . Chr(0x1F601), "b"))
 
 
+; A trigger ending with the magic key measures its delay from the scalar before
+; that key; these fixtures end with the magic key, as a "*" registration would.
+_UTG_MagicMeta(Replacement, Trigger) {
+	Meta := _MakeHotstringMeta(Replacement, Trigger, true, true, 1, false, "", "", 10, false, unset, unset, true)
+	Meta.Star := true
+	return Meta
+}
+
 /** Verify scalar identity independently from the exact activation deadline. */
 _UTG_ActivationMatrix() {
 	global LastSentCharacterKeyTime
@@ -573,7 +581,7 @@ _UTG_ActivationMatrix() {
 			for Elapsed in [999, 1000, 1001] {
 				Now := (Origin + Elapsed) & 0xFFFFFFFF
 				LastSentCharacterKeyTime := Map(Prior, Origin, Decoy, Now)
-				Spec := _MakeHotstringMeta("bar", "a" . Prior . "★", true, true, 1)
+				Spec := _UTG_MagicMeta("bar", "a" . Prior . "★")
 				AssertEqual(Prior, Spec.PrevCharKey, "metadata carries the complete prior scalar")
 				AssertEqual(Elapsed > 1000, IsTimeActivationExpired(Spec.PrevCharKey, 1, Now),
 					"the native callback gate preserves strict expiry across wrap")
@@ -592,11 +600,11 @@ _UTG_ActivationMatrix() {
 			}
 		}
 		LastSentCharacterKeyTime := Map(Decoy, 5000)
-		Spec := _MakeHotstringMeta("bar", "a" . Prior . "★", true, true, 1)
+		Spec := _UTG_MagicMeta("bar", "a" . Prior . "★")
 		AssertTrue(IsTimeActivationExpired(Spec.PrevCharKey, 1, 5000), "a decoy cannot supply a missing timestamp")
 		AssertEqual("", _HSE_PrepareDispatchDecision(Spec, Spec.Trigger, "", false, "bar", 5000))
 		LastSentCharacterKeyTime := Map("b", 1000)
-		Bmp := _MakeHotstringMeta("bar", "ab★", true, true, 1)
+		Bmp := _UTG_MagicMeta("bar", "ab★")
 		AssertFalse(IsTimeActivationExpired(Bmp.PrevCharKey, 1, 2000), "ordinary scalar remains live at equality")
 		AssertTrue(IsTimeActivationExpired(Bmp.PrevCharKey, 1, 2001), "ordinary scalar expires strictly afterward")
 		AssertFalse(IsTimeActivationExpired(Prior, 0, 2001), "zero disables the activation gate")
@@ -620,7 +628,7 @@ _UTG_TypedCompletionIdentity() {
 	Saved := LastSentCharacterKeyTime
 	try {
 		Completion := Chr(0x1F601)
-		Spec := _MakeHotstringMeta("bar", "ab" . Completion, true, true, 1)
+		Spec := _UTG_MagicMeta("bar", "ab" . Completion)
 		Spec.CaseConform := true
 		LastSentCharacterKeyTime := Map("B", 1000, "b", 1)
 		Decision := _HSE_PrepareDispatchDecision(Spec, "AB" . Completion, "", false, "bar", 1500)

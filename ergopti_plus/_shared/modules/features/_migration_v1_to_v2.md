@@ -46,7 +46,7 @@ Every file below references the `Features` global or uses `IniCacheGet`. The cut
 17. `modules/layout.ahk` — reads `Features["Layout"]…`
 18. `modules/shortcuts.ahk` — reads `Features["Shortcuts"]…` (~42 occurrences)
 19. `platform/remap.ahk` — reads `Features["TapHolds"]…` (~70 occurrences) — see Section 7 for the structural change
-20. `modules/keylogger/keylogger_prefetch.ahk` — reads `Features["Personal"]…`
+20. `modules/keystats/keystats_prefetch.ahk` — reads `Features["Personal"]…`
 21. `ui/tray_menu.ahk` — reads `Features[…]` extensively (~20 occurrences) + `IniCacheGet("LLM", …)`
 22. `tests/test_toml_loader.ahk`, `tests/test_config.ahk` — rewrite to test v2 loader
 
@@ -535,7 +535,7 @@ When you start the cut-over, do these in order:
    7. `modules/shortcuts.ahk` (~42 sites — the biggest single-file impact after `hotstrings.ahk`)
    8. `modules/hotstrings.ahk` (~99 sites — by far the biggest)
    9. `lib/hotstrings/personal_toml_editor.ahk` (~2 sites)
-   10. `modules/keylogger/keylogger_prefetch.ahk` (~3 sites)
+   10. `modules/keystats/keystats_prefetch.ahk` (~3 sites)
    11. `ui/tray_menu.ahk` (~20 sites + 7 `IniCacheGet`)
    12. `lib/i18n.ahk` (~1 `IniCacheGet`)
    13. `lib/onboarding.ahk` (~6 `IniCacheGet`)

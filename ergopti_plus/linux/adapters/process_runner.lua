@@ -10,15 +10,17 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local Logger = require("logger.shim")
+local Timings = require("infra.timings")
 local ShellRunner = require("adapters.shell_runner")
 local OwnedProcess = require("adapters.owned_process")
 local available, Native = pcall(require, "luv")
 if not available then Native = nil end
 
 local LOG = "adapters.process_runner"
-local DEFAULT_TIMEOUT_MS = 30000
-local DEFAULT_MAX_OUTPUT_BYTES = 65536
+local DEFAULT_TIMEOUT_MS = Timings.ms("adapters", "default_timeout_ms")
+local DEFAULT_MAX_OUTPUT_BYTES = require("llm.process_limits").defaults().max_output_bytes
 local claims = {}
 local stopping = false
 
@@ -40,27 +42,29 @@ M.HAS_ASYNC = Native ~= nil
 local function public_result(claim, result)
 	local operation = claim.operation
 	local reason = result.error
+	local message = reason
 	local code = tonumber(result.exit_code) or -1
-	if reason == "native process dispatch failed" then
-		reason = "cannot start " .. claim.program .. ": native process dispatch failed"
-	elseif reason == "native handle allocation failed" then
-		reason = "libuv handle allocation failed"
-	elseif reason == "native output watch refused" or reason == "native process deadline refused" then
-		reason = "process supervision could not start"
+	if reason == Errors.PROCESS_DISPATCH_FAILED then
+		message = "cannot start " .. claim.program .. ": native process dispatch failed"
+	elseif reason == Errors.PROCESS_HANDLE_ALLOCATION_FAILED then
+		message = "libuv handle allocation failed"
+	elseif reason == Errors.PROCESS_OUTPUT_WATCH_REFUSED or reason == Errors.PROCESS_DEADLINE_REFUSED then
+		message = "process supervision could not start"
 		code = -1
-	elseif reason == "native process group outlived leader" then
-		reason = claim.program .. " did not finish: native process group outlived leader"
-	elseif reason == "process deadline exceeded" then
-		reason = claim.program .. " did not finish within " .. tostring(claim.timeout_ms) .. " ms"
+	elseif reason == Errors.PROCESS_GROUP_OUTLIVED_LEADER then
+		message = claim.program .. " did not finish: native process group outlived leader"
+	elseif reason == Errors.PROCESS_DEADLINE_EXCEEDED then
+		message = claim.program .. " did not finish within " .. tostring(claim.timeout_ms) .. " ms"
 		code = -1
-	elseif reason == "process output exceeds its bound" then
-		reason = claim.program .. " output exceeds its limit"
+	elseif reason == Errors.PROCESS_OUTPUT_EXCEEDS_BOUND then
+		message = claim.program .. " output exceeds its limit"
 		code = -1
-	elseif reason == "process exited unsuccessfully" then
-		reason = claim.program .. " exited with code " .. tostring(code)
+	elseif reason == Errors.PROCESS_EXITED_UNSUCCESSFULLY then
+		message = claim.program .. " exited with code " .. tostring(code)
 	end
+	-- `error` keeps the public sentence callers log; `reason` is the closed id they may match.
 	return { exit_code = code, stdout = result.stdout or "", stderr = result.stderr or "",
-		error = reason, not_found = operation and operation.not_found == true or false }
+		error = message, reason = reason, not_found = operation and operation.not_found == true or false }
 end
 
 --- Releases a settled claim before any business callback can reenter.

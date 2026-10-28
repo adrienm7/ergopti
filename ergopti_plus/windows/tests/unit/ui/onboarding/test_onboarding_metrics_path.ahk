@@ -48,7 +48,7 @@ _TOMP_InitStringsCarryTheRawTemplate() {
 		"a pre-formatted warning freezes the path before the config step")
 }
 
-Test("onboarding metrics path: the keylogger rule places the store at the folder root",
+Test("onboarding metrics path: the keystats rule places the store at the folder root",
 	_TOMP_MetricsDirRule)
 Test("onboarding metrics path: a chosen folder names its own store",
 	_TOMP_ChosenFolderNamesItsStore)

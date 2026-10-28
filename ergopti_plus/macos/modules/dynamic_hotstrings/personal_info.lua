@@ -23,8 +23,8 @@ local LOG      = "personal_info"
 local ok_editor, ui_editor = pcall(require, "ui.personal_info_editor")
 if not ok_editor then ui_editor = nil end
 
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
+local ok_kl, keystats = pcall(require, "modules.keystats")
+if not ok_kl then keystats = nil end
 local FileSystem = require("adapters.file_system")
 local BasicString = require("toml_codec.basic_string")
 local TomlCodec = require("toml_codec.codec")
@@ -66,10 +66,12 @@ local _refresh_personal_data = nil
 local _active_start_token = nil
 local _starting_token = nil
 local ManifestReader = require("infra.manifest_reader")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 -- The magic key as declared in the shared feature manifest. Named once here so
 -- the three sites below cannot drift apart from each other or from the manifest.
-local DEFAULT_TRIGGER = ManifestReader.default_for("hotstrings.trigger_char")
+local DEFAULT_TRIGGER = ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR)
 
 -- Same-directory staging keeps the final rename atomic on macOS
 local SAVE_TEMP_SUFFIX = ".ergopti-save.tmp"
@@ -118,7 +120,7 @@ end
 local DEFAULT_CONFIG = {
 	-- Read from the shared manifest rather than restated: a second copy of the
 	-- magic key is a second thing to change when the user picks another one.
-	trigger_char = ManifestReader.default_for("hotstrings.trigger_char"),
+	trigger_char = ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR),
 	info = {
 		first_name            = "Prénom",
 		last_name             = "Nom",
@@ -157,10 +159,7 @@ local DEFAULT_CONFIG = {
 --- @param schema table Canonical field map.
 --- @return string[] keys Sorted schema keys.
 local function sorted_schema_keys(schema)
-	local keys = {}
-	for key in pairs(schema) do keys[#keys + 1] = key end
-	table.sort(keys)
-	return keys
+	return TableUtil.sorted_keys(schema)
 end
 
 local INFO_FIELD_KEYS = sorted_schema_keys(DEFAULT_CONFIG.info)
@@ -189,9 +188,7 @@ end
 --- @param source table
 --- @return table copy
 local function copy_config_map(source)
-	local copy = {}
-	for key, value in pairs(source or {}) do copy[key] = value end
-	return copy
+	return TableUtil.shallow_copy(source or {})
 end
 
 --- Returns a fresh default configuration with no mutable table shared with
@@ -559,7 +556,7 @@ local function do_expand(combo)
 	-- inspect physical_echo.
 	-- `echoed` is the LOGICAL text: values only, no tab. A Tab moves focus to the
 	-- next field, it inserts nothing on screen, so this is what CoreState.buffer
-	-- and the keylogger's logical record must hold.
+	-- and the keystats's logical record must hold.
 	local emitted = table.concat(parts, "\t")
 	local echoed  = table.concat(parts, "")
 
@@ -593,7 +590,7 @@ local function do_expand(combo)
 			-- personal_info.toml, which rules_engine already treats as PII in its
 			-- entirety when it registers the same data as mappings. The two paths
 			-- must agree — an @-tag expansion of the SSN is exactly as secret as
-			-- the prefix-triggered one, and only this argument tells the keylogger
+			-- the prefix-triggered one, and only this argument tells the keystats
 			-- to redact what it persists.
 			end, "personal", true)
 			assert(injected == true,
@@ -609,10 +606,10 @@ local function do_expand(combo)
 			end
 			local transaction = _keymap.arm_synthetic(n_back, "")
 			if type(_keymap.suppress_rescan) == "function" then _keymap.suppress_rescan() end
-			if keylogger and type(keylogger.notify_synthetic) == "function" then
+			if keystats and type(keystats.notify_synthetic) == "function" then
 				-- Same privacy contract as the primary path: this branch reaches
 				-- the identical sink and must carry the identical flag.
-				pcall(keylogger.notify_synthetic, emitted, "hotstring", n_back, "personal", nil, true)
+				pcall(keystats.notify_synthetic, emitted, "hotstring", n_back, "personal", nil, true)
 			end
 			local ok_emit, emit_err = pcall(_keymap.with_synthetic_transaction, transaction, function()
 				for _ = 1, n_back do

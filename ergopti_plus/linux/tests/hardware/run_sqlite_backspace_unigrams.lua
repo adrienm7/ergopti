@@ -13,7 +13,7 @@ local profile=assert(uv.fs_mkdtemp('/tmp/ergopti-backspace-native-XXXXXX'))
 for _,name in ipairs({'CONFIG','DATA','CACHE','STATE'}) do local dir=profile..'/'..name:lower(); assert(uv.fs_mkdir(dir,448)); assert(uv.os_setenv('XDG_'..name..'_HOME',dir)) end
 assert(uv.fs_mkdir(profile..'/config/ergopti',448))
 local cf=assert(io.open(profile..'/config/ergopti/config.toml','wb')); assert(cf:write('[metrics]\nenabled = true\n')); assert(cf:close())
-local K=require('modules.keylogger.keylogger'); local W=require('modules.keylogger.sqlite_writer'); local R=require('modules.keylogger.sqlite_reader'); local db=profile..'/metrics.sqlite'
+local K=require('modules.keystats.keystats'); local W=require('modules.keystats.sqlite_writer'); local R=require('modules.keystats.sqlite_reader'); local db=profile..'/metrics.sqlite'
 K.init({sqlite_path=db,log_dir=profile..'/logs'}); assert(K.is_enabled() and W.is_available())
 local day=os.date('%Y-%m-%d'); local at=math.floor(Clock.now_ms()); K.on_keydown('x',at,'manual')
 uv.sleep(40); local bs_at=math.floor(Clock.now_ms()); K.on_keydown('[BS]',bs_at,'manual'); local manual_delay=bs_at-at

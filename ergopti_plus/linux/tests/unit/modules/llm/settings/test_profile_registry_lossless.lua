@@ -3,7 +3,7 @@
 local helpers = require("tests.helpers")
 local Json = require("json")
 local Base64 = require("compat.base64")
-local Registry = require("modules.llm.profile_registry_codec")
+local Registry = require("llm.profile_registry_codec")
 
 helpers.describe("lossless profile JSON", function()
 	helpers.it("preserves opaque null objects and arrays through the actual registry envelope", function()

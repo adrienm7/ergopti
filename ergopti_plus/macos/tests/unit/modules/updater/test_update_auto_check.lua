@@ -51,6 +51,18 @@ local function build(opts)
 	if opts.record then ctx.values[ctx.state_key] = opts.record end
 	if opts.list_copy then ctx.values[ctx.list_key] = opts.list_copy end
 	ctx.timing = defaults.timing
+	local function transport()
+		return {
+			get = function(url, headers, callback)
+				ctx.requests[#ctx.requests + 1] = { url = url, headers = headers }
+				if opts.http_throw then error("transport refused") end
+				if opts.defer then ctx.pending[#ctx.pending + 1] = callback; return true end
+				local response = table.remove(ctx.responses, 1)
+				callback(response)
+				return true
+			end,
+		}
+	end
 	ctx.owner = AutoCheck.new({
 		state = ctx.state,
 		save = function() ctx.saves = ctx.saves + 1; return opts.save_refused ~= true end,
@@ -82,16 +94,7 @@ local function build(opts)
 			get = function(key, default) local v = ctx.values[key]; if v == nil then return default end; return v end,
 			set = function(key, value) ctx.values[key] = value; return true end,
 		},
-		http = {
-			get = function(url, headers, callback)
-				ctx.requests[#ctx.requests + 1] = { url = url, headers = headers }
-				if opts.http_throw then error("transport refused") end
-				if opts.defer then ctx.pending[#ctx.pending + 1] = callback; return true end
-				local response = table.remove(ctx.responses, 1)
-				callback(response)
-				return true
-			end,
-		},
+		http = transport(), manual_http = transport(),
 		now = function() return ctx.clock.now end,
 		current_version = function() return "0.0.0-dev.140" end,
 		installed_channel = function() return "dev" end,

@@ -69,6 +69,9 @@ local function with_manager(opts, body)
 	end
 	ctx.M._now = function() return ctx.clock.now end
 	ctx.M.current_version = function() return "1.0.0" end
+	-- The suite runs from a checkout, which resolves as a package layout: pin the
+	-- kind (a standalone install unless the case says otherwise).
+	ctx.M._resolve_installation = function() return { kind = opts.install_kind or "standalone" } end
 	ctx.M.check_for_updates = function(_, callback)
 		ctx.dispatches[#ctx.dispatches + 1] = callback
 		return true
@@ -119,6 +122,15 @@ helpers.describe("updater (linux): the check schedule follows the persisted reco
 		end)
 		with_manager({ now = T0 }, function(ctx)
 			helpers.assert_true(#ctx.timers > 0, "an installed build still schedules its check")
+		end)
+	end)
+
+	-- A system package is updated by its package manager and install_archive()
+	-- refuses it: the schedule used to run anyway and offer what failed to install.
+	helpers.it("a system package arms no automatic check", function()
+		with_manager({ now = T0, install_kind = "package" }, function(ctx)
+			helpers.assert_eq(#ctx.timers, 0, "no check is scheduled for a package installation")
+			helpers.assert_eq(#ctx.dispatches, 0, "and none is dispatched")
 		end)
 	end)
 

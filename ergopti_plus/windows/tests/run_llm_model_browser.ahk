@@ -53,9 +53,27 @@ LLM_OllamaListModels() {
 ; nothing invoked this file: the orphan-runner gate added alongside this fix is
 ; what stops a runner drifting out of the code again.
 LLM_SetInstalledTagsCache(tags) => ""
-_LLM_GetInstalledTagsCached()   => ["qwen3.5:2b"]
+global _MBW_Tags := ["qwen3.5:2b"]
+_LLM_GetInstalledTagsCached()   => _MBW_Tags
 LLM_GetModelIndex()    => _TestIndex
 LLM_GetModelInfo(n)    => (_TestIndex.Has(n) ? _TestIndex[n] : Map())
+; The selector payload (2026-10-27) also reads the menu's caption, port
+; defaults, brands, API rows and local servers; none of them is under test here.
+LoggerInfo(args*)      => ""
+LLM_Deps_HasFailed()   => false
+global _MBW_DepsChecking := false
+LLM_Deps_IsChecking()  => _MBW_DepsChecking
+; No managed runtime is published under this folder name on a test runner.
+AppDirsWindowsManagedOllamaFolderName() => "ErgoptiModelBrowserRunnerNoManagedOllama"
+_LLM_Menu_ModelDisplayText() => ""
+_LLM_DefaultFor(Key, Default := "") => (Key == "llm_ollama_port" ? 11434 : Default)
+_LLM_Menu_ApiEntryPageRows(Rows, Models, Listings := 0) => ""
+LLM_Menu_LocalServersLiveRows() => []
+_LLM_Menu_ConfigBlockReason() => ""
+LLM_GetBackendBrands() => Map(
+	"ollama", Map("brand", "Ollama", "emoji", "o", "kind", "local"),
+	"mlx", Map("brand", "MLX", "emoji", "m", "kind", "local"),
+	"api", Map("brand", "API", "emoji", "a", "kind", "remote"))
 
 ; Minimal WebView2 stand-in so IsSet(WebView2) resolves and the class reference in
 ; the (never-called here) ShowWeb path loads. The tests never create a webview.
@@ -98,10 +116,8 @@ _MBNum_NonNumber() {
 }
 Test("LLM_MBW_Num: non-number defaults to 0", _MBNum_NonNumber)
 
-_MBJsStr_Escapes() {
-	AssertEqual('"a\"b"', _LLM_MBW_JsStr('a"b'))
-}
-Test("LLM_MBW_JsStr: escapes double quotes", _MBJsStr_Escapes)
+; The page's own string helper is gone: every string goes through the shared
+; JsonStringLiteral (infra/json.ahk), defined once.
 
 class _MBSessionFakeWebView {
 	Executed := []
@@ -210,6 +226,9 @@ _MBInject_BuildsCatalogue() {
 	AssertContains(js, "active_b:2")        ; gemma active
 	AssertContains(js, "is_moe:true")       ; gemma is MoE
 	AssertContains(js, "installed:true")    ; Qwen tag qwen3.5:2b is in the installed list
+	; model-selector-install-button: an installed Ollama greys its install; MLX cannot run here.
+	AssertContains(js, 'install:{state:"installed"}')
+	AssertContains(js, 'install:{state:"unsupported",reason_key:"model_browser.reason_mlx_unsupported_os"}')
 }
 Test("LLM_MBW_InjectCatalogue: builds the injectModels() payload", _MBInject_BuildsCatalogue)
 
@@ -233,10 +252,37 @@ _MBInject_DisabledStillListsAllModels() {
 	js := _LLM_MBW_Queue[1].Js
 	AssertContains(js, '"Qwen3.5-2B"')        ; every model is still listed…
 	AssertContains(js, '"gemma-4-E2B-it"')
-	AssertContains(js, "installed:false")     ; …just without the installed dot
-	Assert(!InStr(js, "installed:true"), "no model may be flagged installed while the daemon is not scanned")
+	AssertContains(js, "installed:false")     ; …gemma from the async snapshot
 	AssertEqual(0, _MBW_OllamaListHits, "the blocking /api/tags probe must NOT run when the daemon is not ready")
 }
 Test("LLM_MBW_InjectCatalogue: lists all models without probing when the feature is off", _MBInject_DisabledStillListsAllModels)
+
+; model-selector-install-flow: a fresh machine (no owned runtime, no answering
+; server, no model) greys every Ollama row and offers the install; a running
+; bootstrap shows it running.
+_MBInject_FreshMachineOffersInstall() {
+	global _TestIndex, _LLM_MBW_Queue, _LLM_MBW_Ready, _MBW_DepsReady, _MBW_Tags, _MBW_DepsChecking
+	_TestIndex := Map("Qwen3.5-2B", Map("params_b", 2.0, "ram_gb", 1.8, "type", "chat", "ollama", "qwen3.5:2b"))
+	_MBW_DepsReady := false
+	_MBW_Tags := []
+	try {
+		_LLM_MBW_Ready := false
+		_LLM_MBW_Queue := []
+		_LLM_MBW_InjectCatalogue()
+		js := _LLM_MBW_Queue[1].Js
+		AssertContains(js, 'id:"ollama"')
+		AssertContains(js, 'available:false,reason_key:"model_browser.reason_ollama_missing"')
+		AssertContains(js, 'install:{state:"available"}')
+		_MBW_DepsChecking := true
+		_LLM_MBW_Queue := []
+		_LLM_MBW_InjectCatalogue()
+		AssertContains(_LLM_MBW_Queue[1].Js, 'install:{state:"running"}')
+	} finally {
+		_MBW_DepsChecking := false
+		_MBW_Tags := ["qwen3.5:2b"]
+		_MBW_DepsReady := true
+	}
+}
+Test("LLM_MBW_InjectCatalogue: a fresh machine greys Ollama and offers its install", _MBInject_FreshMachineOffersInstall)
 
 RunTests()

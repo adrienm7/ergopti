@@ -39,9 +39,17 @@ M.EXIT_ACCESS = 78
 M.TITLE_KEY = "startup.linux_input_access_title"
 M.NOTIFICATION_LABEL_KEY = "startup.linux_input_access_label"
 M.BODY_KEY = "startup.linux_input_access_body"
+-- No keyboard device at all (a sandbox hides /dev/input): the input groups are
+-- not the cause, so this body does not name them.
+M.NO_DEVICE_BODY_KEY = "startup.linux_input_access_no_device_body"
+
+M.MISSING_PROGRAM_BODY_KEY = "startup.linux_input_access_missing_program_body"
+--- Set by install/launch.sh when the permission setup exited 69 (EX_UNAVAILABLE)
+--- after printing `missing-program NAME`, so the daemon can name the program.
+M.MISSING_PROGRAM_ENV = "ERGOPTI_MISSING_PROGRAM"
 
 -- errno for a node that exists but this user may not open.
-local EACCES = 13
+local EACCES = "EACCES"
 
 --- Whether a node exists but this session is denied access to it.
 ---
@@ -49,36 +57,46 @@ local EACCES = 13
 --- --device, an unplugged keyboard) is a different problem with a different
 --- message, and telling that user to re-login would send them the wrong way.
 --- @param path string
---- @param open function|nil io.open by default; a seam for the tests.
+--- @param probe function|nil Nonblocking read-admission probe; a seam for tests.
 --- @return boolean
-function M.is_denied(path, open)
-	local handle, _, errno = (open or io.open)(path, "rb")
-	if handle then
-		handle:close()
-		return false
-	end
-	return errno == EACCES
+function M.is_denied(path, probe)
+	local readable, code = (probe or require("infra.device_access").readable)(path)
+	return not readable and code == EACCES
+end
+
+--- The program the launcher found missing, when it reported one.
+--- @param getenv function|nil os.getenv by default; a seam for the tests.
+--- @return string|nil A program name, nil when none was reported.
+function M.missing_program(getenv)
+	local value = (getenv or os.getenv)(M.MISSING_PROGRAM_ENV)
+	if value == nil or value == "" then return nil end
+	assert(value:match("^[%w._+-]+$"), "invalid " .. M.MISSING_PROGRAM_ENV)
+	return value
 end
 
 --- Reports an input-access failure to the user.
---- @param deps table i18n, notifier, print; optional script_dir for an isolated caller.
+--- @param deps table i18n, notifier, print; optional script_dir for an isolated caller;
+---   program names the missing program that fills {1} of MISSING_PROGRAM_BODY_KEY.
 --- @param detail string What exactly could not be opened, for the console.
 --- @return integer The exit status the daemon must use.
 function M.report(deps, detail)
 	deps = type(deps) == "table" and deps or {}
 	local i18n = deps.i18n
-	local title, body = M.TITLE_KEY, M.BODY_KEY
+	local body_key = deps.body_key or M.BODY_KEY
+	local title, body = M.TITLE_KEY, body_key
 	local notification_label = M.NOTIFICATION_LABEL_KEY
 	if i18n then
 		pcall(i18n.init)
 		local ok_title, translated_title = pcall(i18n.get, M.TITLE_KEY)
-		local ok_body, translated_body = pcall(i18n.get, M.BODY_KEY)
+		local ok_body, translated_body = pcall(i18n.get, body_key)
 		local ok_label, translated_label = pcall(i18n.get, M.NOTIFICATION_LABEL_KEY)
 		if ok_title and type(translated_title) == "string" then title = translated_title end
 		if ok_body and type(translated_body) == "string" then body = translated_body end
 		if ok_label and type(translated_label) == "string" then notification_label = translated_label end
 	end
-	if body:find("{1}", 1, true) then
+	if deps.program then
+		body = body:gsub("{1}", function() return deps.program end)
+	elseif body:find("{1}", 1, true) then
 		local root = deps.script_dir or require("infra.paths").driver_root()
 		local command = "bash " .. require("adapters.shell_runner").quote(root .. "/install.sh") .. " --setup-perms"
 		body = body:gsub("{1}", function() return command end)

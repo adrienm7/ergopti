@@ -90,7 +90,7 @@ helpers.describe("diagnostics corpus: GitHub issue link (issue-link-corpus)", fu
 			local templates = {}
 			for key, value in pairs(corpus.templates) do templates[key] = value end
 			templates.max_url_bytes = vector.max_url_bytes
-			local ok, url = pcall(IssueLink.build_url, templates, corpus.repository, vector.template, vector.values)
+			local ok, url = pcall(IssueLink.build_url, templates, corpus.repository, vector.template, vector.values, vector.notes)
 			if vector.expect_error then
 				helpers.assert_eq(ok, false, vector.id .. ": an error was expected, got " .. tostring(url))
 			else
@@ -184,6 +184,29 @@ helpers.describe("diagnostics corpus: page actions (page-actions-corpus)", funct
 	end
 end)
 
+helpers.describe("diagnostics corpus: issue form identity (form-identity-corpus)", function()
+	local corpus = read_corpus("tests/corpus/healthcheck/form_identity_vectors.json")
+	local Share = require("healthcheck.share")
+	local config = require("healthcheck.snapshot").load_config(function(rel) return helpers.shared(rel) end)
+
+	helpers.it("has vectors (form-identity-corpus)", function()
+		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 8,
+			"the form-identity corpus must hold its vectors")
+	end)
+
+	for _, vector in ipairs(corpus.vectors or {}) do
+		helpers.it("form fields: " .. vector.id .. " (form-identity-corpus)", function()
+			local snapshot = { schema_version = 2, driver = vector.snapshot.driver,
+				generated_at = "2026-10-27T10:00:00Z", sections = vector.snapshot.sections }
+			local document = Share.document(snapshot, config.schema, "")
+			helpers.assert_eq(document.fields.version, vector.version, vector.id .. ": version")
+			helpers.assert_eq(document.fields.os, vector.os, vector.id .. ": os")
+			helpers.assert_true(not document.fields.diagnostics:find("```json", 1, true),
+				vector.id .. ": the form report has no JSON block")
+		end)
+	end
+end)
+
 helpers.describe("diagnostics corpus: error window policy (error-policy-corpus)", function()
 	local corpus = read_corpus("tests/corpus/diagnostics/error_policy_vectors.json")
 	local Policy = require("diagnostics.error_policy")
@@ -249,6 +272,25 @@ helpers.describe("diagnostics corpus: error report (error-report-corpus)", funct
 		helpers.it("compose refuses: " .. vector.id .. " (error-report-corpus)", function()
 			local ok = pcall(ErrorReport.compose, vector.error, vector.identity)
 			helpers.assert_eq(ok, false, vector.id .. " must be refused")
+		end)
+	end
+end)
+
+helpers.describe("diagnostics corpus: day log attachment (day-log-corpus)", function()
+	local corpus = read_corpus("tests/corpus/diagnostics/day_log_vectors.json")
+	local rules = read_corpus("modules/diagnostics/redaction.json")
+	local DayLog = require("diagnostics.day_log")
+
+	helpers.it("has vectors (day-log-corpus)", function()
+		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 8,
+			"the day log corpus must hold its vectors")
+	end)
+
+	for _, vector in ipairs(corpus.vectors or {}) do
+		helpers.it("collect: " .. vector.id .. " (day-log-corpus)", function()
+			local got = DayLog.collect(vector.raw, vector.file_size, rules, corpus.context, vector.limits or corpus.limits)
+			-- An empty list decodes as an empty table in both directions
+			helpers.assert_eq(require("json").encode(got), require("json").encode(vector.expected), vector.id)
 		end)
 	end
 end)

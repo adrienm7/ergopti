@@ -207,7 +207,7 @@ local function load_inventory_context(options)
 	package.loaded["ui.tooltip"] = {
 		hide_forced = invoke("tooltip", "pause"),
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		resync_context = function() return true end,
 		log_shortcut = function() end,
 	}

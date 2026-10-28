@@ -33,10 +33,6 @@ _LLM_Regress_RecordN(n) {
 	_LLM_Regress_LastN := n
 }
 
-_LLM_Regress_Throw(*) {
-	throw Error("injected ShellExecute failure")
-}
-
 ; Production-equivalent factory (must match menu_models.ahk _LLM_Menu_MakeSetNHandler).
 _LLM_Regress_MakeSetNHandler(n) {
 	return (name, pos, menu) => _LLM_Regress_RecordN(n)
@@ -69,16 +65,60 @@ Test_LLM_Regression_FrameworkInitializesDryRun() {
 Test("LLM regression: test_framework defaults _AHK_DRY_RUN when unset",
 	Test_LLM_Regression_FrameworkInitializesDryRun)
 
+_LLM_Regress_AssertRunTestsGuard(Source) {
+	Body := _DriverExtractFunctionBody(&Source, "RunTests")
+	Assert(Body != "", "RunTests must have a real function definition")
+	Code := _DriverMaskNonCode(&Body)
+	GuardPos := RegExMatch(Code,
+		"m)^\s*if\s+!IsSet\(_AHK_DRY_RUN\)\s*\n\s*_AHK_DRY_RUN\s*:=\s*false\b")
+	Assert(GuardPos > 0, "RunTests must default an unset dry-run flag to false inside its own body")
+	UsePos := RegExMatch(Code, "m)^\s*if\s*\(_AHK_DRY_RUN\)")
+	Assert(UsePos > GuardPos, "the local dry-run guard must precede its execution branch")
+}
+
 Test_LLM_Regression_RunTestsGuardsDryRun() {
-	body := FileRead(_LLM_Regress_FrameworkPath(), "UTF-8")
-	AssertContains(body, "RunTests()",
-		"RunTests must exist")
-	; Second guard inside RunTests (run_llm_menu_persistence used to crash here).
-	Assert(InStr(body, "if !IsSet(_AHK_DRY_RUN)") >= 2,
-		"RunTests must re-check IsSet(_AHK_DRY_RUN) before use")
+	Source := FileRead(_LLM_Regress_FrameworkPath(), "UTF-8")
+	; Parse this closed framework snapshot, not the production driver census.
+	; An optional plan classifier must not disarm the isolated-runner guard.
+	_LLM_Regress_AssertRunTestsGuard(Source)
+	AssertEqual(0, RunTests.MinParams, "the canonical runner must still permit no-argument execution")
+	AssertTrue(_TestPlanClassifier(0) == _TestModuleOf,
+		"the Integer zero default must retain the canonical unit module classifier")
 }
 Test("LLM regression: RunTests re-guards _AHK_DRY_RUN",
 	Test_LLM_Regression_RunTestsGuardsDryRun)
+
+_LLM_Regress_AssertRunTestsRejection(Source, ExpectedMessage) {
+	Caught := false
+	try _LLM_Regress_AssertRunTestsGuard(Source)
+	catch as Err {
+		Caught := true
+		AssertEqual("Error", Type(Err), "a malformed guard must fail its intended assertion, never an unset variable")
+		AssertEqual(ExpectedMessage, Err.Message, "the guard must refuse the exact missing safeguard")
+	}
+	AssertTrue(Caught, "a malformed guard must be rejected")
+}
+
+Test_LLM_Regression_RunTestsGuardRejectsCounterexamples() {
+	Guard := "if !IsSet(_AHK_DRY_RUN)`n_AHK_DRY_RUN := false`n"
+	Use := "if (_AHK_DRY_RUN) {`nreturn`n}`n"
+	Good := "RunTests(PlanModuleOf := 0) {`n" . Guard . Use . "}`n"
+	_LLM_Regress_AssertRunTestsGuard(Good)
+	MissingGuard := "RunTests must default an unset dry-run flag to false inside its own body"
+	Fixtures := [
+		[Guard . "RunTests()`n", "RunTests must have a real function definition"],
+		[Guard . "RunTests(PlanModuleOf := 0) {`n" . Use . "}`n", MissingGuard],
+		["RunTests(PlanModuleOf := 0) {`n/*`n" . Guard . "*/`n" . Use . "}`n", MissingGuard],
+		[StrReplace(Good, ":= false", ":= true"), MissingGuard],
+		["RunTests(PlanModuleOf := 0) {`n" . Use . Guard . "}`n",
+			"the local dry-run guard must precede its execution branch"]
+	]
+	for Fixture in Fixtures
+		_LLM_Regress_AssertRunTestsRejection(Fixture[1], Fixture[2])
+}
+
+Test("LLM regression: RunTests guard rejects missing and misplaced defaults (runner-guard-counterexamples)",
+	Test_LLM_Regression_RunTestsGuardRejectsCounterexamples)
 
 Test_LLM_Regression_FrameworkUsesCallbackCall() {
 	body := FileRead(_LLM_Regress_FrameworkPath(), "UTF-8")
@@ -343,99 +383,6 @@ Test("LLM regression: brace substitution on real label leaves no placeholder",
 
 
 
-
-; ============================================
-; 6/ model submenu - full catalogue shown even when the feature is disabled
-; ============================================
-;
-; THE BUG: with the LLM feature toggled OFF, the model submenu collapsed to a
-; single non-clickable row (the currently selected model) instead of listing the
-; full curated catalogue. Root cause: LLM_Menu_BuildModelMenu early-returned a
-; placeholder whenever ``!_LLM_Menu["enabled"] || !LLM_Deps_IsReady()``. Because
-; the Ollama bootstrap only runs when the feature is enabled (ui/menu/menu_llm/init.ahk),
-; a disabled feature leaves _LLM_Deps_State = "pending" -> LLM_Deps_IsReady() is
-; false, so BOTH clauses fire and the catalogue was hidden. Hammerspoon never
-; gates its model submenu on the enabled flag (only on "paused"), so the two
-; drivers diverged: macOS listed everything, Windows showed one row.
-;
-; THE FIX: the curated catalogue is STATIC (_shared/modules/llm/models.json), so it is
-; always built in full regardless of enabled/ready state. Only the green
-; "installed" dot needs Ollama, so that probe is skipped (rows render dot-less)
-; until the daemon is confirmed ready - keeping the menu non-blocking while off.
-
-Test_LLM_Regression_ModelMenuNoEnabledEarlyExit() {
-	body := FileRead(_LLM_Regress_MenuModelsPath(), "UTF-8")
-	; Root cause: the model menu must never branch on the enabled flag. The
-	; bootstrap-gated Ollama-ready check made that branch collapse the whole
-	; catalogue, so the token must not appear anywhere in this file.
-	Assert(!InStr(body, '_LLM_Menu["enabled"]'),
-		"menu_models must not gate the catalogue on the enabled flag (regression: disabled hid all models)")
-	Assert(!InStr(body, 'if !_LLM_Menu["enabled"] || !LLM_Deps_IsReady()'),
-		"menu_models must not early-exit the model menu on enabled/ready (the collapsed-placeholder bug)")
-}
-Test("LLM regression: model menu never collapses on the disabled feature flag",
-	Test_LLM_Regression_ModelMenuNoEnabledEarlyExit)
-
-Test_LLM_Regression_ModelMenuAlwaysBuildsCatalogue() {
-	body := FileRead(_LLM_Regress_MenuModelsPath(), "UTF-8")
-	; The full provider catalogue is appended unconditionally, threaded with the
-	; deps-ready flag so the install probe (and only the install probe) is skipped
-	; while Ollama is not confirmed up.
-	AssertContains(body, "deps_ready := LLM_Deps_IsReady()",
-		"menu_models must resolve deps_ready once for the catalogue build")
-	AssertContains(body, "_LLM_Menu_AppendCatalogue(Rows, presets, active, deps_ready)",
-		"menu_models must always append the full catalogue, threaded with deps_ready")
-}
-Test("LLM regression: model menu always appends the full catalogue (deps_ready-threaded)",
-	Test_LLM_Regression_ModelMenuAlwaysBuildsCatalogue)
-
-Test_LLM_Regression_ModelMenuSkipsInstallProbeWhenNotReady() {
-	body := FileRead(_LLM_Regress_MenuModelsPath(), "UTF-8")
-	; The green "installed" dot is the ONLY thing that needs Ollama; its probe
-	; must be guarded by deps_ready so a disabled feature never blocks the menu
-	; on a /api/tags round-trip.
-	AssertContains(body, "installed := deps_ready ? LLM_IsModelInstalled(name) : false",
-		"row title must skip the install probe when Ollama is not confirmed ready")
-	AssertContains(body, "deps_ready and LLM_IsModelInstalled(name)",
-		"per-model submenu must skip the install probe when Ollama is not confirmed ready")
-	AssertContains(body, "installed := deps_ready ? _LLM_GetInstalledTagsCached() : []",
-		"installed-tags fallback must not probe ollama list directly (must use cached version to avoid blocking)")
-}
-Test("LLM regression: install probe is skipped (non-blocking) until deps are ready",
-	Test_LLM_Regression_ModelMenuSkipsInstallProbeWhenNotReady)
-
-Test_LLM_Regression_OpenSourceUrlReportsShellFailure() {
-	Runs := []
-	Notices := []
-	Diagnostics := []
-	SuccessRunner := (Url) => Runs.Push(Url)
-	NotifyFn := (Body, Title) => Notices.Push(Map("body", Body, "title", Title))
-	LogFn := (Url, Err) => Diagnostics.Push(Map("url", Url, "error", Err.Message))
-	Url := "https://example.invalid/model"
-
-	AssertTrue(_LLM_Menu_OpenUrl(Url, SuccessRunner, NotifyFn, LogFn),
-		"a successful ShellExecute boundary must report success")
-	AssertEqual(1, Runs.Length,
-		"the injected URL runner must be called exactly once")
-	AssertEqual(0, Notices.Length,
-		"a successful launch must not show failure feedback")
-	AssertEqual(0, Diagnostics.Length,
-		"a successful launch must not emit an error diagnostic")
-
-	ThrowingRunner := _LLM_Regress_Throw
-	AssertFalse(_LLM_Menu_OpenUrl(Url, ThrowingRunner, NotifyFn, LogFn),
-		"a ShellExecute exception must return failure")
-	AssertEqual(1, Notices.Length,
-		"a failed launch must publish exactly one native feedback message")
-	AssertEqual(1, Diagnostics.Length,
-		"a failed launch must publish exactly one central diagnostic")
-	AssertEqual(Url, Diagnostics[1]["url"],
-		"the diagnostic must retain the exact failed URL")
-	AssertTrue(Notices[1]["body"] != "" && Notices[1]["title"] != "",
-		"failure feedback must resolve localized text")
-}
-Test("[ahk-023] model source URL reports ShellExecute failures",
-	Test_LLM_Regression_OpenSourceUrlReportsShellFailure)
 
 ; An invalid persisted modifier chord used to fall back to a literal "alt"
 ; while the shared default is owned by defaults.json. The reset value must come

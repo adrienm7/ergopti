@@ -5,14 +5,11 @@ local M = {}
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.preferences")
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 local LOG = "menu_llm.scope"
 
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local result = {}
-	for key, child in pairs(value) do result[key] = clone(child) end
-	return result
-end
+local clone = TableUtil.deep_copy
 
 local function equal(left, right)
 	if type(left) ~= type(right) then return false end
@@ -30,7 +27,7 @@ function M.new(ctx)
 	local fields, native_keys = {}, {}
 	local core_keys = { llm_backend = "backend", llm_model_mlx = "llm_model_mlx",
 		llm_model_ollama = "llm_model_ollama", llm_active_profile = "active_profile_id",
-		llm_user_profiles = "user_profiles" }
+		llm_user_profiles = ConfigKeys.LEAF.USER_PROFILES }
 	local preference_only = { llm_user_models = true, llm_arrow_nav_enabled = true,
 		llm_enabled = true }
 	for _, row in ipairs(Manifest.scope_operations("llm", "clear")) do

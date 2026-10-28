@@ -7,7 +7,7 @@
 --- previous projection that covers past days. Only days after the cached
 --- watermark are read again; a changed past-data fingerprint discards the
 --- cache and rebuilds from scratch. All reads go through
---- `modules.keylogger.sqlite_reader`, the single owner of the aggregation.
+--- `modules.keystats.sqlite_reader`, the single owner of the aggregation.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Exact increments: manifest cells belong to one day, and every n-gram
@@ -30,6 +30,7 @@ local M = {}
 
 local Logger    = require("infra.logger")
 local PacedJson = require("infra.paced_json")
+local TableUtil = require("table_util")
 
 local LOG = "metrics_typing.projection"
 
@@ -110,9 +111,7 @@ end
 --- @param members table key→encoded JSON.
 --- @return string json
 local function assemble_object(members)
-	local keys = {}
-	for key in pairs(members) do keys[#keys + 1] = key end
-	table.sort(keys)
+	local keys = TableUtil.sorted_keys(members)
 	local parts = {}
 	for index, key in ipairs(keys) do
 		parts[index] = PacedJson.encode(key) .. ":" .. members[key]
@@ -139,7 +138,7 @@ end
 
 --- Opens one projection session. A session memoizes fingerprints so the
 --- manifest and range reads of one job validate against the same values.
---- @param reader table `modules.keylogger.sqlite_reader`.
+--- @param reader table `modules.keystats.sqlite_reader`.
 --- @param sqlite_path string Path to db.sqlite.
 --- @param today string Current day (YYYY-MM-DD), fixed for the whole job.
 --- @param pacer table|nil Pacer from `infra.paced_job`.

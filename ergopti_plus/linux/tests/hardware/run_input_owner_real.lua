@@ -11,6 +11,14 @@
 --- cleanup debt and a teardown seam that closes the original real native output.
 --- ==============================================================================
 
+--- Runs a shell command and reports success under either os.execute ABI:
+--- Lua 5.1 LuaJIT returns 0, a 5.2-compatible LuaJIT build (Fedora, Alpine)
+--- and stock Lua 5.2+ return true.
+local function succeeded(command)
+	local status = os.execute(command)
+	return status == true or status == 0
+end
+
 --- Compares dense native KEY/SYN_REPORT rows with an independent literal oracle.
 --- This pure classifier grants no descriptor, source, frame or output authority.
 --- @param rows table Actual decoded evdev rows.
@@ -278,7 +286,7 @@ local function wait_for_long_hold(label, code)
 	local threshold_ms = setting.threshold_ms
 	assert(type(threshold_ms) == "number" and threshold_ms > 0, "actual configured hold threshold")
 	local held_at = Monotonic.now_ms()
-	assert(os.execute(string.format("sleep %.3f", threshold_ms / 1000)) == 0, "real configured hold-duration wait")
+	assert(succeeded(string.format("sleep %.3f", threshold_ms / 1000)), "real configured hold-duration wait")
 	check(Monotonic.now_ms() - held_at >= threshold_ms, label .. " crosses the actual compiled hold threshold")
 end
 

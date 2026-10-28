@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 local SourceIdentity = require("module_source_identity")
 local source_sibling, source_same = SourceIdentity.sibling, SourceIdentity.same
 local source_directory = require("module_source_directory").capture()
@@ -46,6 +47,8 @@ local BasicString = require("toml_codec.basic_string")
 local RecordScanner = require("toml_codec.record_scanner")
 local Bom = require("toml_codec.bom")
 local SourceOpen = require("toml_codec.source_open")
+local NATIVE_WRITER = "infra.regular_file_writer"
+local has_native_writer = package.searchpath(NATIVE_WRITER, package.path) ~= nil
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec.codec")
 local inline_member_spans = Codec.inline_member_spans
@@ -106,6 +109,7 @@ M.preparation_admission = preparation_lookup
 
 local math_type = math.type
 local OperationReporter = require("diagnostics.operation_reporter")
+local ConfigKeys = require("config_keys")
 
 
 
@@ -149,6 +153,19 @@ local function publication_admitted(admission)
 	return called and admitted == true
 end
 
+--- Acquires Linux staging exclusively; other drivers keep their stdio owner.
+--- An installed native module which refuses or fails to load never falls back.
+--- @param tmp_path string Adjacent staging path.
+--- @return file*|nil stream
+--- @return string|nil detail
+--- @return number|string|nil errno
+--- @return function|nil cleanup Native creation's identity-checked removal.
+--- @return function|nil current_image Native staging's regular-path byte proof.
+local function open_staging(tmp_path)
+	if has_native_writer then return require(NATIVE_WRITER).open(tmp_path, "wx") end
+	return io.open(tmp_path, "w")
+end
+
 --- Publishes complete content through a same-directory staging file.
 --- A protected call only proves that Lua did not raise; file methods also
 --- return nil/false for ordinary I/O failures, so every terminal result is
@@ -171,26 +188,30 @@ local function publish(path, content, expected_source, admission)
 		return true
 	end
 	local tmp_path = path .. ".tmp"
-	local open_ok, fh, open_err = pcall(io.open, tmp_path, "w")
+	local open_ok, fh, open_err, _, remove_owned, current_image = pcall(open_staging, tmp_path)
 	if not open_ok or not fh then
 		return false, "cannot open staging file: " .. tostring(open_ok and open_err or fh)
+	end
+	local function discard_staging()
+		if has_native_writer then return type(remove_owned) == "function" and remove_owned() end
+		return os.remove(tmp_path)
 	end
 
 	local write_ok, wrote, write_err = pcall(fh.write, fh, content)
 	local close_ok, closed, close_err = pcall(fh.close, fh)
 	if not write_ok or wrote == nil or wrote == false then
-		pcall(os.remove, tmp_path)
+		pcall(discard_staging)
 		return false, "write failed: " .. tostring(write_ok and write_err or wrote)
 	end
 	if not close_ok or closed == nil or closed == false then
-		pcall(os.remove, tmp_path)
+		pcall(discard_staging)
 		return false, "close failed: " .. tostring(close_ok and close_err or closed)
 	end
 	if type(expected_source) == "table" then
 		local current, current_err, current_status = read_batch_source(path)
 		if current_status ~= expected_source.status
 			or (current_status == "ok" and current ~= expected_source.content) then
-			pcall(os.remove, tmp_path)
+			pcall(discard_staging)
 			return false, "source changed before publication: " .. tostring(current_err or current_status)
 		end
 	end
@@ -198,8 +219,13 @@ local function publish(path, content, expected_source, admission)
 	-- The last classified source read has completed. No logical reader or
 	-- observer runs between this captured admission and native publication.
 	if not publication_admitted(admission) then
-		pcall(os.remove, tmp_path)
+		pcall(discard_staging)
 		return false, "publication admission refused"
+	end
+	if has_native_writer then
+		local checked, current = pcall(current_image, content)
+		-- A refusal cannot prove the staging still belongs to this attempt.
+		if not checked or current ~= true then return false, "staging image verification refused" end
 	end
 	local rename_ok, renamed, rename_err = pcall(os.rename, tmp_path, path)
 	-- POSIX replaces an existing destination atomically. Windows' C runtime does
@@ -219,7 +245,7 @@ local function publish(path, content, expected_source, admission)
 		end
 	end
 	if not rename_ok or renamed ~= true then
-		pcall(os.remove, tmp_path)
+		pcall(discard_staging)
 		return false, "rename failed: " .. tostring(rename_ok and rename_err or renamed)
 	end
 	return true
@@ -824,12 +850,36 @@ function M.source_inline_scalar_parents(content, updates)
 		identities[identity] = true
 		rows[#rows + 1] = { path = path, row = row }
 	end
+	-- Two rows overlap when one case-folded path is a prefix of, or equal to,
+	-- the other. A trie of folded segments finds every such pair in one walk
+	-- per row; comparing every pair lowercased segments O(rows^2) times, about
+	-- 45 000 pairs for a 300-operation save.
 	local overlapping = {}
+	local trie = { children = {}, ends = {} }
 	for index, request in ipairs(rows) do
-		for other_index = index + 1, #rows do
-			local other = rows[other_index]
-			if has_prefix(request.path, other.path, true) or has_prefix(other.path, request.path, true) then
-				overlapping[index], overlapping[other_index] = true, true
+		local node = trie
+		for _, segment in ipairs(request.path) do
+			local folded = segment:lower()
+			local child = node.children[folded]
+			if not child then
+				child = { children = {}, ends = {} }
+				node.children[folded] = child
+			end
+			node = child
+		end
+		node.ends[#node.ends + 1] = index
+	end
+	for index, request in ipairs(rows) do
+		local node = trie
+		local depth = #request.path
+		for level, segment in ipairs(request.path) do
+			node = node.children[segment:lower()]
+			local ends = node.ends
+			if level < depth and #ends > 0 then
+				overlapping[index] = true
+				for _, other in ipairs(ends) do overlapping[other] = true end
+			elseif level == depth and #ends > 1 then
+				overlapping[index] = true
 			end
 		end
 	end
@@ -1032,7 +1082,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		else ordinary[#ordinary + 1] = row end
 	end
 	if model_row then
-		local target = { "llm", "models", "user_models" }
+		local target = { "llm", "models", ConfigKeys.LEAF.USER_MODELS }
 		for _, row in ipairs(ordinary) do
 			local path_segments = row_path(row)
 			local collides = true
@@ -1393,10 +1443,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		end
 	end
 
-	local pending_sections = {}
-	for section in pairs(pending) do pending_sections[#pending_sections + 1] = section end
-	table.sort(pending_sections)
-	for _, section in ipairs(pending_sections) do
+	for _, section in ipairs(TableUtil.sorted_keys(pending)) do
 		local entries = pending[section]
 		lines[#lines + 1] = "\n[" .. section .. "]\n"
 		for _, u in ipairs(entries) do

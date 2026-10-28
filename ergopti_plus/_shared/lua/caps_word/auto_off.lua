@@ -29,6 +29,7 @@ local M = {}
 -- depending on a global the entry point may not have installed.
 local utf8_lib = (type(utf8) == "table" and utf8.codes and utf8.char) and utf8 or require("compat.utf8")
 local Catalogue = require("keymap.terminators_catalogue")
+local TableUtil = require("table_util")
 
 local MS_PER_SECOND = 1000
 
@@ -72,8 +73,7 @@ end
 --- @return string|nil reason Stable refusal reason.
 function M.validate_terminators(value)
 	if type(value) ~= "table" then return false, "invalid_terminators" end
-	local count, seen = 0, {}
-	for _ in pairs(value) do count = count + 1 end
+	local count, seen = TableUtil.count(value), {}
 	if count ~= #value then return false, "invalid_terminators" end
 	for _, key in ipairs(value) do
 		if not M.is_terminator_key(key) then return false, "unknown_terminator" end

@@ -106,7 +106,8 @@ _Onboarding_StartGestureAuto(OnDone) {
 		return false
 	FSDelete(ResultPath)
 	FSDelete(ResultPath . ".stage")
-	if !FSWrite(ScriptPath, _Onboarding_BuildGesturePsScript(ResultPath)) {
+	; Windows PowerShell 5.1 otherwise decodes a BOMless source with the ANSI code page.
+	if !FSWrite(ScriptPath, Chr(0xFEFF) . _Onboarding_BuildGesturePsScript(ResultPath)) {
 		_Onboarding_AbortGestureAutoReservation(Epoch)
 		try LoggerError("Onboarding", "Could not write gesture PS script.")
 		return false

@@ -453,6 +453,13 @@ M.UPPER_LETTERS = {
 
 M.LOWER_LETTERS = {}
 for k, v in pairs(M.UPPER_LETTERS) do M.LOWER_LETTERS[v] = k end
+-- The ASCII fast paths of trig_lower and repl_upper are exact only while both
+-- tables hold multibyte keys alone; a new ASCII key must fail loudly here.
+local NON_ASCII_BYTE = "[\128-\255]"
+for lower, upper in pairs(M.UPPER_LETTERS) do
+	assert(upper:find(NON_ASCII_BYTE) and lower:find(NON_ASCII_BYTE),
+		"case tables must hold multibyte keys only: " .. lower)
+end
 
 M.UPPER_TRIGGERS = {}
 for k, v in pairs(M.UPPER_LETTERS) do M.UPPER_TRIGGERS[k] = v end
@@ -529,6 +536,10 @@ end
 --- @return string The lowercase string.
 function M.trig_lower(s)
 	if type(s) ~= "string" then return "" end
+	-- Every LOWER_LETTERS key is multibyte, so an ASCII-only string folds to
+	-- string.lower exactly. Most triggers and typed tails are ASCII; this skips
+	-- one Lua callback per character on the per-key path and at boot.
+	if not s:find(NON_ASCII_BYTE) then return (s:lower()) end
 	return (s:gsub("[%z\1-\127\194-\244][\128-\191]*", function(c)
 		return M.LOWER_LETTERS[c] or string.lower(c)
 	end))
@@ -612,6 +623,40 @@ function M.trig_title(s)
 	return results
 end
 
+--- Removes leading and trailing whitespace (the Lua %s class) in linear time.
+--- It returns what s:match("^%s*(.-)%s*$") returns, without that pattern's
+--- quadratic backtracking on a long value ending in spaces. Unlike the safe
+--- UTF-8 helpers above, a non-string raises at the caller, as the method call
+--- it replaces did: a nil reaching a trim is a caller bug, not empty text.
+--- @param text string Text to trim.
+--- @return string trimmed
+function M.trim(text)
+	if type(text) ~= "string" then
+		error("text_utils.trim expects a string, got " .. type(text), 2)
+	end
+	local first = text:find("%S")
+	if first == nil then return "" end
+	local last = #text
+	while text:find("^%s", last) do last = last - 1 end
+	return text:sub(first, last)
+end
+
+--- Percent-encodes every byte outside the RFC 3986 unreserved set
+--- (A-Z, a-z, 0-9, "-", ".", "_", "~") as an uppercase %HH triplet, so the
+--- result is safe as a URL path segment, query value or mailto: header. The
+--- class is spelled out because %w follows the C locale of the host.
+--- A non-string raises at the caller.
+--- @param text string Raw bytes, usually UTF-8.
+--- @return string encoded
+function M.percent_encode(text)
+	if type(text) ~= "string" then
+		error("text_utils.percent_encode expects a string, got " .. type(text), 2)
+	end
+	return (text:gsub("[^A-Za-z0-9%-%._~]", function(byte)
+		return string.format("%%%02X", byte:byte())
+	end))
+end
+
 --- Quotes a value for POSIX sh, so it can be interpolated into a shell command.
 --- Lua's string.format("%q", …) escapes for a LUA LITERAL: it handles backslashes,
 --- quotes and newlines but leaves $, backticks and ! untouched — every one of which
@@ -688,6 +733,8 @@ end
 --- @return string The uppercase string.
 function M.repl_upper(s)
 	if type(s) ~= "string" then return "" end
+	-- Same reasoning as trig_lower: UPPER_LETTERS has no ASCII key.
+	if not s:find(NON_ASCII_BYTE) then return (s:upper()) end
 	return (s:gsub("[%z\1-\127\194-\244][\128-\191]*", function(c)
 		return M.UPPER_LETTERS[c] or string.upper(c)
 	end))

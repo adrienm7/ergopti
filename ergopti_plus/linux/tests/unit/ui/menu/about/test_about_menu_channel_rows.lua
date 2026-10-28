@@ -31,6 +31,7 @@ local function fake_updater(subscribed)
 		INTERVAL_PRESETS = real.INTERVAL_PRESETS,
 		TIMING = real.TIMING,
 		current_version = function() return "0.0.0-dev.140" end,
+		repo_info = function() return { owner = "adrienm7", repo = "ergopti" } end,
 		get_channel = function() return subscribed end,
 		set_channel = function(id)
 			calls.set[#calls.set + 1] = id
@@ -294,6 +295,100 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 			helpers.assert_true(type(row.title) ~= "string" or row.title:find(head, 1, true) == nil,
 				"an installed build greys no row for this reason: " .. tostring(row.title))
 		end
+	end)
+
+	-- A system package is updated by its package manager and the updater refuses
+	-- to replace it: the frequency row is greyed with that reason (no background
+	-- check runs) and an available release offers no live Update row.
+	helpers.it("a system package greys the frequency and update rows with the package reason", function()
+		local i18n = require("infra.i18n")
+		local up, calls = fake_updater("dev")
+		up.installation_kind = function() return "package" end
+		up.get_state = function() return "available" end
+		local release = { tag = "v9.9.9" }
+		up.get_cached_release = function() return release end
+		local rows = submenu_of(build(up), "menu.about.title")
+		local reason = i18n.get("changelog_window.install_blocked_package")
+		local head = reason:match("^(.-)%s*[:：]") or reason
+		local frequency = i18n.get("menu.about.frequency_menu")
+		local update_now = i18n.get("menu.about.update_now"):gsub("{tag}", "v9.9.9")
+		local seen = 0
+		for _, row in ipairs(rows) do
+			if type(row.title) == "string" and (row.title:find(frequency, 1, true) == 1
+				or row.title:find(update_now, 1, true) == 1) then
+				seen = seen + 1
+				helpers.assert_eq(row.disabled, true, row.title .. " is greyed")
+				helpers.assert_true(row.title:find(head, 1, true) ~= nil, "it names the package reason: " .. row.title)
+				helpers.assert_nil(row.fn, "and runs nothing")
+			end
+		end
+		helpers.assert_eq(seen, 2, "both the frequency row and the update row are drawn greyed")
+		helpers.assert_eq(calls.checks, 0, "no check ran")
+	end)
+
+	-- A release found through the public feed (the API was blocked) names no asset
+	-- and no digest: its Update row is greyed with the check-only reason and the
+	-- bridge starts no download for it.
+	helpers.it("check-only: a feed-only release greys the update row and starts no download", function()
+		local i18n = require("infra.i18n")
+		local up = fake_updater("dev")
+		up.get_state = function() return "available" end
+		local release = { tag = "v9.9.9", notes = "", download_url = "", checksum_url = "", check_only = true }
+		up.get_cached_release = function() return release end
+		local rows = submenu_of(build(up), "menu.about.title")
+		local reason = i18n.get("update_check.check_only")
+		local head = reason:match("^(.-)%s*[:：]") or reason
+		local update_now = i18n.get("menu.about.update_now"):gsub("{tag}", "v9.9.9")
+		local found = nil
+		for _, row in ipairs(rows) do
+			if type(row.title) == "string" and row.title:find(update_now, 1, true) == 1 then found = row end
+		end
+		helpers.assert_true(found ~= nil, "the update row is drawn")
+		helpers.assert_eq(found.disabled, true)
+		helpers.assert_true(found.title:find(head, 1, true) ~= nil, "it names the check-only reason: " .. found.title)
+		helpers.assert_nil(found.fn, "and runs nothing")
+
+		local touched = 0
+		local manager = {
+			get_cached_release = function() return release end,
+			get_state = function() return "available" end,
+			get_channel = function() return "dev" end,
+			download_update = function() touched = touched + 1 return true end,
+			install_update_async = function() touched = touched + 1 return true end,
+		}
+		local Installation = require("infra.installation")
+		local real_is_source_run = Installation.is_source_run
+		Installation.is_source_run = function() return false end
+		local ok, started = pcall(function()
+			return helpers.load_module("ui.update_check.bridge").download_offered(manager, release, {})
+		end)
+		Installation.is_source_run = real_is_source_run
+		helpers.assert_true(ok, tostring(started))
+		helpers.assert_eq(started, false)
+		helpers.assert_eq(touched, 0, "nothing was downloaded")
+	end)
+
+	helpers.it("a system package is offered no download by the update-check bridge", function()
+		local Installation = require("infra.installation")
+		local real_is_source_run = Installation.is_source_run
+		Installation.is_source_run = function() return false end
+		local release = { tag = "v9.9.9", download_url = "https://release/archive", checksum_url = "https://release/sum" }
+		local touched = 0
+		local manager = {
+			installation_kind = function() return "package" end,
+			get_cached_release = function() return release end,
+			get_state = function() return "idle" end,
+			get_channel = function() return "main" end,
+			download_update = function() touched = touched + 1 return true end,
+			install_update_async = function() touched = touched + 1 return true end,
+		}
+		local ok, started = pcall(function()
+			return helpers.load_module("ui.update_check.bridge").download_offered(manager, release, {})
+		end)
+		Installation.is_source_run = real_is_source_run
+		helpers.assert_true(ok, "the bridge must answer: " .. tostring(started))
+		helpers.assert_eq(started, false, "the install would be refused afterwards with an ERROR")
+		helpers.assert_eq(touched, 0, "and nothing was downloaded")
 	end)
 
 	-- A menu change used to leave an open Versions page offering the channel the

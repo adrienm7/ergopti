@@ -23,10 +23,10 @@ local helpers = require("tests.helpers")
 
 helpers.describe("wpm_menubar.start() is idempotent (no redundant timer restart)", function()
 	-- Counts hs.timer:start() calls so we can prove a burst of start() calls only
-	-- arms the polling timer once. update_menubar reads keylogger stats but never
+	-- arms the polling timer once. update_menubar reads keystats stats but never
 	-- touches hs.screen, so the menubar is safe to drive headless.
 	local function load_menubar()
-		package.loaded["modules.keylogger"] = { get_live_stats = function() return {} end }
+		package.loaded["modules.keystats"] = { get_live_stats = function() return {} end }
 		package.loaded["adapters.timer_scheduler"] = nil
 		local starts = { n = 0 }
 		local Menubar = helpers.load_with_stubs("ui.wpm.wpm_menubar", {

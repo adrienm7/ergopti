@@ -1,0 +1,6 @@
+[case]
+description = "An entry whose only field was a shipped delay, then its parent table, then [tap_hold] itself, disappear."
+drivers = ["linux"]
+outcome = "migrated"
+from_version = 0
+to_version = 1

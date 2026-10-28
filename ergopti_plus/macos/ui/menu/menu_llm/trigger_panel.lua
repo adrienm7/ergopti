@@ -25,6 +25,7 @@ local PrivacyPolicy = require("llm.trigger_policy")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
 local SettingsManager = require("ui.menu.menu_llm.settings_manager")
+local ConfigKeys = require("config_keys")
 
 local LOG = "menu_llm.trigger_panel"
 
@@ -78,7 +79,7 @@ function M.build(ctx)
 	-- =====================================================
 
 	local debounce_val     = tonumber(state.llm_debounce) or llm_mod.DEFAULT_STATE.llm_debounce
-	local debounce_display = (debounce_val <= 0) and i18n.get("menu.settings.never") or (math.floor(debounce_val * 1000) .. " ms…")
+	local debounce_display = (debounce_val < 0) and i18n.get("menu.settings.never") or (math.floor(debounce_val * 1000) .. " ms…")
 
 	rows[#rows + 1] = {
 		label    = string.format(i18n.get("menu.llm.debounce_label"), debounce_display),
@@ -90,6 +91,22 @@ function M.build(ctx)
 			label    = string.format(i18n.get("menu.llm.reset_label"), math.floor(llm_mod.DEFAULT_STATE.llm_debounce * 1000) .. " ms"),
 			disabled = is_disabled or nil,
 			action   = settings_mgr.reset_debounce,
+		}
+	end
+
+
+	-- The one minimum time between two automatic requests (a shortcut is never held).
+	local floor_val = tonumber(state.llm_min_request_interval) or llm_mod.DEFAULT_STATE.llm_min_request_interval
+	rows[#rows + 1] = {
+		label    = string.format(i18n.get("menu.llm.min_interval_label"), math.floor(floor_val * 1000) .. " ms…"),
+		disabled = is_disabled or nil,
+		action   = settings_mgr.set_min_request_interval,
+	}
+	if state.llm_min_request_interval ~= llm_mod.DEFAULT_STATE.llm_min_request_interval then
+		rows[#rows + 1] = {
+			label    = string.format(i18n.get("menu.llm.reset_label"), math.floor(llm_mod.DEFAULT_STATE.llm_min_request_interval * 1000) .. " ms"),
+			disabled = is_disabled or nil,
+			action   = settings_mgr.reset_min_request_interval,
 		}
 	end
 
@@ -179,20 +196,20 @@ function M.build(ctx)
 	end
 	local shared_ctx = {
 		commands = {
-			["llm_url_bar_filter"] = function()
+			[ConfigKeys.COMMAND.LLM_URL_BAR_FILTER] = function()
 				return privacy_command(url_source, "llm_url_bar_filter_enabled", "set_llm_url_bar_filter_enabled")
 			end,
-			["llm_secure_field_filter"] = function()
+			[ConfigKeys.COMMAND.LLM_SECURE_FIELD_FILTER] = function()
 				return privacy_command(secure_source, "llm_secure_field_filter_enabled", "set_llm_secure_field_filter_enabled")
 			end,
-			["llm_instant_on_word_end"] = function()
+			[ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END] = function()
 				if not ready() then return false end
-				return apply_setting_transaction(settings_mgr, "llm_instant_on_word_end",
+				return apply_setting_transaction(settings_mgr, ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END,
 					not state.llm_instant_on_word_end, "set_llm_instant_on_word_end")
 			end,
-			["llm_after_hotstring"] = function()
+			[ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING] = function()
 				if not ready() then return false end
-				return apply_setting_transaction(settings_mgr, "llm_after_hotstring",
+				return apply_setting_transaction(settings_mgr, ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING,
 					not state.llm_after_hotstring, "set_llm_after_hotstring")
 			end,
 		},

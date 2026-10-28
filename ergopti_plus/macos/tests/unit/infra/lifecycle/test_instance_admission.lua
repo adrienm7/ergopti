@@ -4,7 +4,7 @@
 --- MODULE: Driver Instance Admission Regression Tests
 --- DESCRIPTION:
 --- On 2026-10-21 and 2026-10-22 a second embedded runtime started beside the
---- launcher's own without the launcher environment, armed its keylogger timers
+--- launcher's own without the launcher environment, armed its keystats timers
 --- and kept writing to the shared log behind a blocking fatal dialog
 --- (hs-second-instance-2026-10-22). The same refusal path ran os.exit in any
 --- Hammerspoon, so a user's own Hammerspoon pointed at Ergopti was quit

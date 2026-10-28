@@ -1,0 +1,201 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/hotstring_sequences.v1.json",
+	"description": "Cross-driver corpus for what a typed SEQUENCE leaves on screen: chaining (an expansion's output joins the next match), synthetic output (an output never matches on its own) and erase accounting (what an expansion deletes and types back). vectors.json replays one trigger per vector; these vectors register several mappings (the per-entry flags have their vectors.json meaning, absent is false) and type `typed` one character at a time, each character a key the application receives unless an expansion takes it. `expected.screen` is the text the application shows at the end, `expected.expansions` how many expansions fired.",
+	"version": "1.0.0",
+	"vectors": [
+		{
+			"id": "chain_output_completes_the_next_trigger",
+			"description": "ab gives cd and cde gives xyz: the typed e completes cde from the first output, so abe gives xyz (8172483e, 290c682a).",
+			"mappings": [
+				{
+					"trigger": "ab",
+					"replacement": "cd",
+					"auto_expand": true
+				},
+				{
+					"trigger": "cde",
+					"replacement": "xyz",
+					"auto_expand": true
+				}
+			],
+			"typed": "abe",
+			"expected": {
+				"screen": "xyz",
+				"expansions": 2
+			}
+		},
+		{
+			"id": "chain_through_three_magic_keys",
+			"description": "at★ gives att, att★ gives attention, attention★ gives ATTENTION: each magic key completes the next trigger from the previous output.",
+			"mappings": [
+				{
+					"trigger": "at★",
+					"replacement": "att",
+					"auto_expand": true
+				},
+				{
+					"trigger": "att★",
+					"replacement": "attention",
+					"auto_expand": true
+				},
+				{
+					"trigger": "attention★",
+					"replacement": "ATTENTION",
+					"auto_expand": true
+				}
+			],
+			"typed": "at★★★",
+			"expected": {
+				"screen": "ATTENTION",
+				"expansions": 3
+			}
+		},
+		{
+			"id": "output_holding_a_trigger_fires_nothing_alone",
+			"description": "ab gives cde and cde gives xyz: the output holds the whole trigger cde, which waits for a typed key, so no loop is possible.",
+			"mappings": [
+				{
+					"trigger": "ab",
+					"replacement": "cde",
+					"auto_expand": true
+				},
+				{
+					"trigger": "cde",
+					"replacement": "xyz",
+					"auto_expand": true
+				}
+			],
+			"typed": "ab",
+			"expected": {
+				"screen": "cde",
+				"expansions": 1
+			}
+		},
+		{
+			"id": "final_result_ends_the_chain",
+			"description": "A final_result output is the end of it: the buffer is dropped, so the typed e does not complete cde.",
+			"mappings": [
+				{
+					"trigger": "ab",
+					"replacement": "cd",
+					"auto_expand": true,
+					"final_result": true
+				},
+				{
+					"trigger": "cde",
+					"replacement": "xyz",
+					"auto_expand": true
+				}
+			],
+			"typed": "abe",
+			"expected": {
+				"screen": "cde",
+				"expansions": 1
+			}
+		},
+		{
+			"id": "end_char_trigger_keeps_its_terminator",
+			"description": "A trigger that waits for a terminator erases the trigger and the terminator, types the output, and types the space back.",
+			"mappings": [
+				{
+					"trigger": "adn",
+					"replacement": "ADN",
+					"is_word": true,
+					"is_case_sensitive": true
+				}
+			],
+			"typed": " adn ",
+			"expected": {
+				"screen": " ADN ",
+				"expansions": 1
+			}
+		},
+		{
+			"id": "end_char_triggers_in_a_row",
+			"description": "Two end-char expansions in a row: the replayed space after the first output is a word start for the second.",
+			"mappings": [
+				{
+					"trigger": "adn",
+					"replacement": "ADN",
+					"is_word": true,
+					"is_case_sensitive": true
+				}
+			],
+			"typed": " adn adn ",
+			"expected": {
+				"screen": " ADN ADN ",
+				"expansions": 2
+			}
+		},
+		{
+			"id": "erase_keeps_the_text_before_the_trigger",
+			"description": "An auto expansion erases the trigger only: the words typed before it stay.",
+			"mappings": [
+				{
+					"trigger": "btw",
+					"replacement": "by the way",
+					"auto_expand": true
+				}
+			],
+			"typed": "ok btw",
+			"expected": {
+				"screen": "ok by the way",
+				"expansions": 1
+			}
+		},
+		{
+			"id": "erase_counts_codepoints_not_bytes",
+			"description": "A trigger with an accented letter erases two codepoints, not three bytes.",
+			"mappings": [
+				{
+					"trigger": "cé",
+					"replacement": "ce",
+					"auto_expand": true
+				}
+			],
+			"typed": "xcé",
+			"expected": {
+				"screen": "xce",
+				"expansions": 1
+			}
+		},
+		{
+			"id": "synthetic_output_does_not_retrigger_itself",
+			"description": "ab gives xaby: the output contains the trigger, and one expansion only is typed.",
+			"mappings": [
+				{
+					"trigger": "ab",
+					"replacement": "xaby",
+					"auto_expand": true
+				}
+			],
+			"typed": "ab",
+			"expected": {
+				"screen": "xaby",
+				"expansions": 1
+			}
+		},
+		{
+			"id": "word_trigger_after_an_expansion",
+			"description": "An expansion's output ends a word: a word-only trigger typed after a terminator still fires.",
+			"mappings": [
+				{
+					"trigger": "btw",
+					"replacement": "by the way",
+					"auto_expand": true
+				},
+				{
+					"trigger": "adn",
+					"replacement": "ADN",
+					"is_word": true,
+					"is_case_sensitive": true
+				}
+			],
+			"typed": "btw adn ",
+			"expected": {
+				"screen": "by the way ADN ",
+				"expansions": 2
+			}
+		}
+	]
+}

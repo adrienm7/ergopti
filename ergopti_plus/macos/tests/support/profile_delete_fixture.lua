@@ -31,6 +31,17 @@ local MODULES = {
 	"logger.shim",
 	"menu.renderer",
 	"llm.tone",
+	-- The real profiles manager keeps per-application overrides through these
+	-- shared owners (56e8569a); the codec encodes them through compat.base64.
+	"llm.app_identity",
+	"llm.app_profile_overrides",
+	"compat.base64",
+	-- The overrides owner copies tables through this shared owner.
+	"table_util",
+	-- The real JSON codec and text helpers decode UTF-8 through this owner.
+	"compat.utf8",
+	-- The application identity owner normalizes names through these helpers.
+	"text_utils",
 	"modules.llm",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.model_switcher",
@@ -182,6 +193,9 @@ local function make_hotkey_backend()
 			if result == true then handle.enabled = enabled == true end
 			return result
 		end,
+		-- This seam's refused deletes retain their native owner; it never
+		-- acknowledges deletion before returning its scripted false/nil result.
+		release_pending = function(_) return false end,
 		unbind = function(handle)
 			local result = seam_terminal("delete")
 			if result == true then

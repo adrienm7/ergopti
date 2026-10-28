@@ -27,6 +27,7 @@ local M = {}
 local hs            = hs
 local Logger        = require("infra.logger")
 local NativePath = require("native_path")
+local FileSystem = require("adapters.file_system")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")
 local ui_restore    = require("infra.ui_restore")
@@ -34,8 +35,20 @@ local fs_dir        = require("infra.fs_dir")
 local git_status    = require("infra.git_status")
 local reload_gate   = require("reload_gate")
 local RuntimeLog    = require("diagnostics.runtime_log")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "file_watchers"
+
+--- Whether a reload or quit already owns the process. The menu watcher sees the
+--- same file burst; when its reload wins, this refusal is expected, not a fault.
+--- Required lazily: the coordinator is initialized after this module loads.
+--- @return boolean terminating
+local function reload_already_terminating()
+	local loaded, coordinator = pcall(require, "infra.termination_coordinator")
+	if not loaded or type(coordinator) ~= "table" then return false end
+	local checked, in_progress = pcall(coordinator.terminal_in_progress)
+	return checked and in_progress == true
+end
 
 -- Hard cap on how deep the recursive personal-hotstrings watcher scan descends.
 -- Same rationale as infra/personal_hotstrings.lua's SCAN_MAX_DEPTH: the scanned
@@ -61,6 +74,24 @@ local BOOT_SUPPRESS_SEC = 5
 -- (tools/test/test-file-watchers-constants-single-source.cjs).
 local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
 
+--- Whether a changed path is a hotstring source: a TOML category, an index,
+--- or the AutoHotkey path marker.
+--- @param path string Absolute changed path.
+--- @return boolean
+local function is_hotstring_source(path)
+	return path:match("%.toml$") ~= nil or path:match("_index%.json$") ~= nil
+		or path:match("%.local_ahk_path$") ~= nil
+end
+
+--- Whether a developer field run is running (infra/field_run.lua). Read
+--- through package.loaded: only a developer app ever loads that module.
+--- @return boolean
+local function field_run_holds_reload()
+	local field_run = package.loaded["infra.field_run"]
+	return type(field_run) == "table" and type(field_run.holds_reload) == "function"
+		and field_run.holds_reload() == true
+end
+
 
 
 
@@ -71,12 +102,50 @@ local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
 -- =======================================
 -- =======================================
 
---- Normalises a path for comparison: lowercased, backslashes folded to slashes.
---- @param p string|nil
---- @return string
-local function canonical_path(p)
-	if type(p) ~= "string" then return "" end
-	return (p:gsub("\\", "/"):lower())
+--- Resolves native aliases without collapsing distinct POSIX names. An absent
+--- suffix is retained only after its first missing entry is proved by the file
+--- adapter; permission errors never establish an alias or watcher coverage.
+--- @param path string|nil Native absolute pathname.
+--- @param cache table|nil Identities observed during this callback batch.
+--- @return string|nil key Native spelling, or nil when identity is unproved.
+--- @return boolean|nil absent Whether a suffix is physically absent.
+local function canonical_path(path, cache)
+	if type(path) ~= "string" or path == "" then return nil end
+	path = path == "/" and path or path:gsub("/+$", "")
+	cache = cache or {}
+	if cache[path] then return cache[path].key, cache[path].absent end
+	local observed = {}
+	cache[path] = observed
+	local ok, resolved = pcall(hs.fs.pathToAbsolute, path)
+	if ok and type(resolved) == "string" and resolved ~= "" then
+		observed.key = resolved == "/" and resolved or resolved:gsub("/+$", "")
+		observed.absent = false
+		return observed.key, false
+	end
+	if not ok or resolved ~= nil or path == "/" then
+		Logger.warn(LOG, "File-watcher path identity is unproved for '%s': %s.",
+			tostring(path), tostring(ok and "native resolution refused" or resolved))
+		return nil
+	end
+	local parent = NativePath.dirname(path)
+	if parent == "" then parent = "/" end
+	if parent == nil or parent == path then
+		Logger.warn(LOG, "File-watcher path identity requires an absolute pathname: %s.", tostring(path))
+		return nil
+	end
+	local parent_key, parent_absent = canonical_path(parent, cache)
+	if parent_key == nil then return nil end
+	if not parent_absent then
+		local status, detail = FileSystem.path_status(path)
+		if status ~= "absent" then
+			Logger.warn(LOG, "File-watcher path identity is unproved for '%s': %s.",
+				tostring(path), tostring(status == "present" and "existing path did not resolve" or detail))
+			return nil
+		end
+	end
+	observed.key = (parent_key == "/" and "" or parent_key) .. "/" .. NativePath.basename(path)
+	observed.absent = true
+	return observed.key, true
 end
 
 --- Tests whether an exact path is covered by a recursive directory watcher.
@@ -84,9 +153,10 @@ end
 --- @param root string Candidate recursive root.
 --- @return boolean covered
 local function path_is_within(path, root)
-	local key = canonical_path(path):gsub("/+$", "")
-	local prefix = canonical_path(root):gsub("/+$", "")
-	if key == "" or prefix == "" then return false end
+	local identities = {}
+	local key = canonical_path(path, identities)
+	local prefix = canonical_path(root, identities)
+	if key == nil or prefix == nil then return false end
 	return key == prefix or key:sub(1, #prefix + 1) == prefix .. "/"
 end
 
@@ -94,7 +164,9 @@ end
 --- init.lua's shutdown callback stops on quit).
 --- @param ctx table { hotstrings_dir: string, base_dir: string,
 ---   personal_hotstrings_dir: string, personal_info_path: string,
----   self_written_files: string[] } — absolute paths resolved by the boot script.
+---   self_written_files: string[], shared_source_dir: string|nil } — absolute
+---   paths resolved by the boot script; shared_source_dir is the clone's
+---   _shared/lua tree of a developer app, nil otherwise.
 --- @return boolean committed True only when both required watchers, plus the
 ---   personal watcher when available, are started and their owner is published.
 function M.start(ctx)
@@ -118,14 +190,16 @@ function M.start(ctx)
 	local self_written = {}
 	for _, p in ipairs(ctx.self_written_files or {}) do
 		local key = canonical_path(p)
-		if key ~= "" then self_written[key] = true end
+		if key then self_written[key] = true end
 	end
 
 	--- True when a changed path is one this session wrote itself.
 	--- @param path string
 	--- @return boolean
-	local function is_self_written(path)
-		return self_written[canonical_path(path)] == true
+	local function is_self_written(path, identities)
+		if next(self_written) == nil then return false end
+		local key = canonical_path(path, identities)
+		return key ~= nil and self_written[key] == true
 	end
 
 	-- Directories inside the watched trees that hold RUNTIME artefacts rather
@@ -135,15 +209,17 @@ function M.start(ctx)
 	-- the cache, which wrote again.
 	local ignored_dirs = {}
 	for _, d in ipairs(ctx.ignored_dirs or {}) do
-		local key = canonical_path(d):gsub("/+$", "")
-		if key ~= "" then ignored_dirs[#ignored_dirs + 1] = key .. "/" end
+		local key = canonical_path(d)
+		if key then ignored_dirs[#ignored_dirs + 1] = key .. "/" end
 	end
 
 	--- True when a changed path lies inside an ignored runtime directory.
 	--- @param path string
 	--- @return boolean
-	local function is_runtime_artefact(path)
-		local key = canonical_path(path)
+	local function is_runtime_artefact(path, identities)
+		if #ignored_dirs == 0 then return false end
+		local key = canonical_path(path, identities)
+		if key == nil then return false end
 		for _, prefix in ipairs(ignored_dirs) do
 			if key:sub(1, #prefix) == prefix then return true end
 		end
@@ -189,8 +265,9 @@ function M.start(ctx)
 	-- Drop FSEvents replays delivered during the post-boot suppress window (see
 	-- BOOT_SUPPRESS_SEC). Captured now because M.start runs at the tail of boot,
 	-- right where the freshly-armed watchers would otherwise catch the previous
-	-- session's buffered events.
-	local suppress_until = hs.timer.secondsSinceEpoch() + BOOT_SUPPRESS_SEC
+	-- session's buffered events. This private window measures awake duration;
+	-- change receipts below use the same awake domain for debounce.
+	local suppress_until = TimerScheduler.awake_time() + BOOT_SUPPRESS_SEC
 
 	local reload_timer = nil
 
@@ -320,7 +397,7 @@ function M.start(ctx)
 	-- Consecutive Git-hold re-polls with no new file activity; reset by an event or
 	-- committed reload. The threshold is diagnostic only: a live lock is never bypassed.
 	local defer_count = 0
-	-- Distinct source paths changed since the current burst began, and the epoch
+	-- Distinct source paths changed since the current burst began, and the awake
 	-- time (s) of the last change. Together they drive the adaptive settle: a lone
 	-- edit reloads after EDIT_SETTLE_SEC, but a BULK write — git pull, OneDrive /
 	-- Dropbox sync, rsync, mass save, any source that touches many files — is held
@@ -372,10 +449,10 @@ function M.start(ctx)
 	--- @param changed table|nil Absolute paths that changed in this event.
 	local function note_change(msg, changed)
 		if not lifecycle_active then return end
-		local now = hs.timer.secondsSinceEpoch()
+		local now = TimerScheduler.awake_time()
 		-- Ignore the FSEvents batch macOS replays right after an hs.reload(): during
 		-- the boot window these are the previous session's changes, not a new edit.
-		if now < suppress_until then return end
+		if TimerScheduler.awake_time() < suppress_until then return end
 		if type(changed) == "table" then
 			for _, p in ipairs(changed) do
 				if not burst_paths[p] then
@@ -392,6 +469,7 @@ function M.start(ctx)
 		arm_timer(msg)
 	end
 
+	local field_run_hold_logged = false
 	fire_reload = function(msg)
 		if not lifecycle_active then return end
 		-- Hold the reload while the working tree is still being written FROM ANY
@@ -402,12 +480,24 @@ function M.start(ctx)
 		--      shows up as many distinct files; hold until BULK_SETTLE_SEC of quiet.
 		--   2. Git — a git operation holds .git/index.lock for the whole update, so
 		--      it is deferred exactly even if its file events pause partway through.
-		local elapsed = hs.timer.secondsSinceEpoch() - last_change_sec
+		local elapsed = TimerScheduler.awake_time() - last_change_sec
 		if not reload_gate.is_settled(elapsed, burst_count) then
 			Logger.debug(LOG, "Reload held (filesystem settling) on '%s'.", base_dir)
 			arm_timer(msg)
 			return
 		end
+		-- A field run drives the app through downloads, removals and the config
+		-- guard: a reload would cut it short, so the burst waits for its end.
+		if field_run_holds_reload() then
+			if not field_run_hold_logged then
+				field_run_hold_logged = true
+				Logger.warn(LOG, "Source change reload held while the developer field run runs (%s).",
+					RuntimeLog.describe_paths(burst_paths))
+			end
+			arm_timer(msg)
+			return
+		end
+		field_run_hold_logged = false
 		local busy, repo = any_git_operation_in_progress()
 		if busy then
 			if defer_count < GIT_HOLD_WARN_DEFERRALS then
@@ -439,6 +529,11 @@ function M.start(ctx)
 				-- wait says nothing about the tree now. A pull that starts during the
 				-- hold would otherwise be re-exec'd into mid-write, which is the
 				-- half-updated-tree boot failure the gate exists to prevent.
+				if field_run_holds_reload() then
+					Logger.info(LOG, "Reload aborted at fire time: a developer field run started; re-arming.")
+					arm_timer(msg)
+					return
+				end
 				local busy, repo = any_git_operation_in_progress()
 				if busy then
 					Logger.info(LOG, "Reload aborted at fire time: git operation started in '%s' during the "
@@ -464,11 +559,15 @@ function M.start(ctx)
 					return hs.reload()
 				end, debug.traceback)
 				if not request_ok or accepted ~= true then
-					if not reload_refusal_logged then
+					if request_ok and reload_already_terminating() then
+						-- The menu watcher's reload of this same burst is under way
+						-- (field run 2026-10-27 19:47:04, ledger L45 sibling).
+						Logger.info(LOG, "Reload request deferred: a reload or quit is in progress.")
+					elseif not reload_refusal_logged then
 						reload_refusal_logged = true
 						Logger.warn(LOG,
-							"Reload request was refused; the source-file burst remains pending for retry: %s.",
-							tostring(request_ok and accepted or accepted))
+							"Reload request was refused (%s); the source-file burst stays pending and is retried.",
+							request_ok and ("result " .. tostring(accepted)) or tostring(accepted))
 					else
 						Logger.debug(LOG, "Reload request remains refused; retaining the source-file burst.")
 					end
@@ -484,8 +583,8 @@ function M.start(ctx)
 			if not reload_refusal_logged then
 				reload_refusal_logged = true
 				Logger.warn(LOG,
-					"Deferred reload owner refused the source-file burst; retaining it for retry: %s.",
-					tostring(defer_ok and deferred or deferred))
+					"Deferred reload owner refused the source-file burst (%s); it stays pending and is retried.",
+					defer_ok and ("result " .. tostring(deferred)) or tostring(deferred))
 			end
 			arm_timer(msg)
 		end
@@ -500,10 +599,10 @@ function M.start(ctx)
 	-- Catches file creation, deletion, and renames in the hotstrings directory
 	local function hotstrings_changed(paths)
 		if not lifecycle_active then return end
-		local hit = {}
+		local hit, identities = {}, {}
 		for _, p in ipairs(paths) do
-			if (p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$"))
-				and not is_self_written(p) and not is_runtime_artefact(p) then
+			if is_hotstring_source(p)
+				and not is_self_written(p, identities) and not is_runtime_artefact(p, identities) then
 				hit[#hit + 1] = p
 			end
 		end
@@ -528,14 +627,16 @@ function M.start(ctx)
 	local personal_root = NativePath.without_trailing_separators(personal_dir)
 	local function personal_hotstrings_changed(paths)
 		if not lifecycle_active then return end
-		local hit = {}
+		local hit, identities = {}, {}
 		for _, p in ipairs(paths) do
 			-- /tmp is excluded for the same reason the old per-directory callback
 			-- excluded it. The self-written and runtime-artefact filters are the
 			-- ones the sibling watcher already applies; the per-file watchers had
 			-- neither, so a write the driver made itself could trigger a reload.
-			if not p:match("^/tmp/")
-				and not is_self_written(p) and not is_runtime_artefact(p) then
+			-- Hotstring files only: the personal tree is often a Git repository,
+			-- and a fetch, an editor swap file or a .DS_Store is not an edit.
+			if not p:match("^/tmp/") and is_hotstring_source(p)
+				and not is_self_written(p, identities) and not is_runtime_artefact(p, identities) then
 				hit[#hit + 1] = p
 			end
 		end
@@ -559,10 +660,10 @@ function M.start(ctx)
 		local personal_info_key = canonical_path(personal_info_path)
 		local function personal_info_changed(paths)
 			if not lifecycle_active then return end
-			local hit = {}
+			local hit, identities = {}, {}
 			for _, path in ipairs(paths) do
-				if canonical_path(path) == personal_info_key
-					and not is_runtime_artefact(path) then
+				if (personal_info_key == nil or canonical_path(path, identities) == personal_info_key)
+					and not is_runtime_artefact(path, identities) then
 					hit[#hit + 1] = path
 				end
 			end
@@ -579,12 +680,12 @@ function M.start(ctx)
 	Logger.debug(LOG, "Configuring file watchers for auto-reloading…")
 	local function project_changed(paths)
 		if not lifecycle_active then return end
-		local hit = {}
+		local hit, identities = {}, {}
 		for _, p in ipairs(paths) do
 			-- Ignore temporary files (tokens, etc.); a batch may still carry a real
 			-- .lua change alongside them, so skip rather than abandon the batch.
 			if not (p:find("^/tmp/") or p:find("hs_hf_token_") or p:find("hs_hf_login_"))
-				and not is_runtime_artefact(p) and p:match("%.lua$") then
+				and p:match("%.lua$") and not is_runtime_artefact(p, identities) then
 				hit[#hit + 1] = p
 			end
 		end
@@ -594,6 +695,11 @@ function M.start(ctx)
 		end
 	end
 	if not acquire_watcher(base_dir, project_changed, "Project source watcher", false) then
+		return rollback_startup()
+	end
+	-- Only a developer app passes its clone's shared Lua tree (infra/dev_source.lua).
+	if ctx.shared_source_dir ~= nil
+		and not acquire_watcher(ctx.shared_source_dir, project_changed, "Shared source watcher", false) then
 		return rollback_startup()
 	end
 

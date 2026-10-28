@@ -735,3 +735,153 @@ helpers.describe("file watcher fixture directories", function()
 			"a fixture inside the driver tree is read by every production source walk: " .. dir)
 	end)
 end)
+
+helpers.describe("legacy watcher native retirement ownership", function()
+	if not native_ok then return end
+	local function exact(handle)
+		local count = 0
+		native_luv.walk(function(candidate) if candidate == handle then count = count + 1 end end)
+		return count
+	end
+	local function with_legacy(options, body)
+		local directory = make_non_tmp_dir()
+		local successor = directory .. "/successor"
+		assert(native_luv.fs_mkdir(successor, 448))
+		local records, state = {}, { admit = options.close == "native", now = 1000, reloads = 0 }
+		local previous = package.loaded["infra.file_watchers"]
+		local backend = setmetatable({
+			new_fs_event = function()
+				local handle = assert(native_luv.new_fs_event())
+				local record = { handle = handle, starts = 0, stops = 0, closes = 0, physical = 0, events = 0 }
+				records[#records + 1] = record
+				return handle
+			end,
+			fs_event_start = function(handle, path, flags, callback)
+				local record = records[#records]
+				helpers.assert_true(record.handle == handle and (path == directory or path == successor))
+				record.path, record.starts = path, record.starts + 1
+				if options.start == "false" then return false, "controlled refusal before native start" end
+				if options.start == "throw" then error("controlled exception before native start") end
+				return native_luv.fs_event_start(handle, path, flags, function(...)
+					record.events = record.events + 1
+					return callback(...)
+				end)
+			end,
+			fs_event_stop = function(handle)
+				for _, record in ipairs(records) do
+					if record.handle == handle then
+						record.stops = record.stops + 1
+						if options.stop == "throw" then error("controlled exception before native stop") end
+						return native_luv.fs_event_stop(handle)
+					end
+				end
+				error("foreign native stop")
+			end,
+			close = function(handle, callback)
+				for _, record in ipairs(records) do
+					if record.handle == handle then
+						record.closes = record.closes + 1
+						if not state.admit then
+							if options.close == "false" then return false end
+							if options.close == "refuse" then return nil, "controlled native close refusal" end
+							error("controlled exception before native close")
+						end
+						return native_luv.close(handle, function(...)
+							record.physical = record.physical + 1
+							if callback then callback(...) end
+						end)
+					end
+				end
+				error("foreign native close")
+			end,
+		}, { __index = native_luv })
+		local watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv", backend)
+		package.loaded["infra.file_watchers"] = previous
+		function state.start(path)
+			return watcher.start({ base_dir = path or directory, personal_dir = "", now_ms = function() return state.now end,
+				on_reload = function() state.reloads = state.reloads + 1 end })
+		end
+		local ok, detail = pcall(body, watcher, state, records, backend, directory, successor)
+		-- Independent cleanup can recover our exact handles even on the causal baseline.
+		for _, record in ipairs(records) do
+			if exact(record.handle) == 1 and not native_luv.is_closing(record.handle) then
+				native_luv.fs_event_stop(record.handle)
+				native_luv.close(record.handle, function() record.physical = record.physical + 1 end)
+			end
+		end
+		native_luv.run("nowait")
+		for _, record in ipairs(records) do
+			helpers.assert_eq(exact(record.handle), 0); helpers.assert_eq(record.physical, 1)
+		end
+		local file = directory .. "/obsolete.lua"
+		if native_luv.fs_stat(file) then assert(native_luv.fs_unlink(file)) end
+		assert(native_luv.fs_rmdir(successor)); assert(native_luv.fs_rmdir(directory))
+		if not ok then error(detail, 0) end
+	end
+	local cases = {
+		{ start = "native", stop = "native", close = "native" },
+		{ start = "native", stop = "native", close = "throw" },
+		{ start = "native", stop = "throw", close = "throw" },
+		{ start = "native", stop = "throw", close = "native" },
+		{ start = "false", stop = "native", close = "native" },
+		{ start = "false", stop = "native", close = "throw" },
+		{ start = "throw", stop = "native", close = "native" },
+		{ start = "throw", stop = "native", close = "throw" },
+		{ start = "native", stop = "native", close = "false" },
+		{ start = "native", stop = "native", close = "refuse" },
+	}
+	for _, case in ipairs(cases) do
+		helpers.it("(legacy-watch-retirement) " .. case.start .. "/" .. case.stop .. "/" .. case.close, function()
+			with_legacy(case, function(watcher, state, records, backend)
+				state.start()
+				local record = records[1]
+				helpers.assert_eq(#records, 1); helpers.assert_eq(record.starts, 1)
+				helpers.assert_eq(watcher.stop(), false, "legacy cleanup needs its exact native close acknowledgement")
+				if not state.admit then
+					helpers.assert_eq(exact(record.handle), 1)
+					helpers.assert_eq(native_luv.is_closing(record.handle), false)
+					backend.fs_event_stop = function() error("replacement stop cannot retire the original owner") end
+					backend.close = function() error("replacement close cannot retire the original owner") end
+					local closes = record.closes
+					helpers.assert_eq(watcher.stop(), false)
+					helpers.assert_eq(record.closes, closes + 1, "the captured exact native close must really retry")
+					state.admit = true
+					helpers.assert_eq(watcher.stop(), false, "accepted close still awaits its physical callback")
+				end
+				local closes, stops = record.closes, record.stops
+				helpers.assert_true(native_luv.is_closing(record.handle))
+				helpers.assert_eq(record.physical, 0)
+				helpers.assert_eq(watcher.stop(), false)
+				helpers.assert_eq(record.closes, closes, "an accepted close must never be requested twice")
+				helpers.assert_eq(record.stops, stops, "a close-pending handle must never be stopped again")
+				native_luv.run("nowait")
+				helpers.assert_eq(record.physical, 1); helpers.assert_eq(exact(record.handle), 0)
+				helpers.assert_true(watcher.stop()); helpers.assert_true(watcher.stop())
+				helpers.assert_eq(record.closes, closes); helpers.assert_eq(record.stops, stops)
+			end)
+		end)
+	end
+	helpers.it("(legacy-watch-retirement) revoked active watcher cannot reload its successor session", function()
+		with_legacy({ start = "native", stop = "throw", close = "throw" }, function(watcher, state, records, _, directory, successor)
+			state.start()
+			watcher.stop()
+			local original = records[1]
+			helpers.assert_true(native_luv.is_active(original.handle))
+			state.start(successor)
+			local file = assert(native_luv.fs_open(directory .. "/obsolete.lua", "w", 384))
+			assert(native_luv.fs_write(file, "return true\n", 0)); assert(native_luv.fs_close(file))
+			for _ = 1, 8 do
+				native_luv.run("nowait")
+				if original.events > 0 then break end
+			end
+			helpers.assert_true(original.events > 0, "the still-active original watcher must really receive its native event")
+			state.now = 10000
+			watcher.pump()
+			helpers.assert_eq(state.reloads, 0, "the retired legacy callback cannot schedule a successor reload")
+			state.admit = true
+			helpers.assert_eq(watcher.stop(), false)
+			native_luv.run("nowait")
+			helpers.assert_true(watcher.stop())
+		end)
+	end)
+end)

@@ -3,6 +3,7 @@
 --- Canonical config-backed ordered pairs. Runtime selection and publication
 --- retain separate exact leases; unknown/future pairs are never rewritten here.
 local Shared = require("tap_hold.key_combinations")
+local TableUtil = require("table_util")
 local Codec = require("toml_codec")
 local Files = require("adapters.file_system")
 local ConfigPaths = require("infra.config_paths")
@@ -11,6 +12,7 @@ local HoldOptions = require("tap_hold.hold_options")
 local Features = require("infra.manifest_reader")
 local ModuleSource = require("module_source_identity")
 local ModuleDirectory = require("module_source_directory")
+local ConfigKeys = require("config_keys")
 local original_debug_info = debug.getinfo
 local module_directory = ModuleDirectory.capture()
 local manager_source = ModuleSource.sibling(original_debug_info(1,"S").source,
@@ -18,7 +20,7 @@ local manager_source = ModuleSource.sibling(original_debug_info(1,"S").source,
 
 local original_default, original_find = Features.default_for, Features.find_entry_by_path
 local declarations = {}
-for _,path in ipairs({"mod_combos.simultaneous_threshold_ms","mod_combos.symmetric"}) do
+for _,path in ipairs({ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS,ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC}) do
 	local called,entry=pcall(original_find,path)
 	if called and type(entry)=="table" then
 		declarations[path]={entry=entry,type=entry.type,default=entry.default}
@@ -30,17 +32,17 @@ local function declared_settings()
 	if next(declarations)==nil then return nil end
 	assert(Features.default_for==original_default and Features.find_entry_by_path==original_find,"chord declaration getter changed")
 	local values={}
-	for _,path in ipairs({"mod_combos.simultaneous_threshold_ms","mod_combos.symmetric"}) do
+	for _,path in ipairs({ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS,ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC}) do
 		local captured=assert(declarations[path],"incomplete Linux chord declaration")
 		local entry=original_find(path)
 		assert(entry==captured.entry and entry.type==captured.type and entry.default==captured.default,"chord declaration changed")
 		values[path]=original_default(path)
 		assert(values[path]==captured.default,"chord default getter disagrees with declaration")
 	end
-	assert(declarations["mod_combos.simultaneous_threshold_ms"].type=="number"
-		and declarations["mod_combos.symmetric"].type=="boolean","typed Linux chord declaration required")
-	local settings=Shared.chord_settings({simultaneous_threshold_ms=values["mod_combos.simultaneous_threshold_ms"],
-		combo_symmetric=values["mod_combos.symmetric"]})
+	assert(declarations[ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS].type=="number"
+		and declarations[ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC].type=="boolean","typed Linux chord declaration required")
+	local settings=Shared.chord_settings({simultaneous_threshold_ms=values[ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS],
+		combo_symmetric=values[ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC]})
 	assert(Features.default_for==original_default and Features.find_entry_by_path==original_find,"chord declaration getter changed during read")
 	return settings
 end
@@ -48,9 +50,7 @@ local M, instance = {}, nil
 local original_pair, original_pair_separator = Shared.pair, Shared.PAIR_SEPARATOR
 local identity_receipts = setmetatable({}, { __mode = "k" })
 local buffered_settings = setmetatable({}, {__mode="k"})
-local function clone(map)
-	local result = {}; for key, value in pairs(map) do result[key] = value end; return result
-end
+local clone = TableUtil.shallow_copy
 local function equal(left, right)
 	for key, value in pairs(left) do if right[key] ~= value then return false end end
 	for key in pairs(right) do if left[key] == nil then return false end end

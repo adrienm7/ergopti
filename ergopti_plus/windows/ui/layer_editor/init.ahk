@@ -38,9 +38,9 @@
 ; The shared page's id in _shared/ui/apps.manifest.json.
 global LAYER_EDITOR_APP_ID := "layer_editor"
 global LAYER_EDITOR_OS := "windows"
-; The largest layers.toml the editor accepts, in UTF-8 bytes; the Lua hosts'
-; MAX_TEXT_BYTES (_shared/lua/keymap/layer_editor.lua), pinned by the suite.
-global LAYER_EDITOR_MAX_TEXT_BYTES := 65536
+; The largest layers.toml the editor accepts is [limits] layer_file_bytes of the
+; shared timing registry, read by LayerEditor_Validate at call time (a global
+; initializer runs before TimingsLoadShared) and by the Lua hosts.
 ; The error codes this host adds to the loader's.
 global LAYER_EDITOR_INVALID_PAYLOAD := "invalid_payload"
 global LAYER_EDITOR_WRITE_FAILED := "write_failed"
@@ -111,13 +111,14 @@ _LayerEditor_Error(Code, Detail) {
  * @returns {Array} What is wrong; empty when every OS loads it cleanly.
  */
 LayerEditor_Validate(Text, Ctx) {
-	global LAYER_EDITOR_MAX_TEXT_BYTES, LAYER_EDITOR_INVALID_PAYLOAD
+	global LAYER_EDITOR_INVALID_PAYLOAD
 	if !(Text is String)
 		return [_LayerEditor_Error(LAYER_EDITOR_INVALID_PAYLOAD, "the save carries no layer file text")]
+	MaxBytes := TimingsGet("limits", "layer_file_bytes")
 	Bytes := StrPut(Text, "UTF-8") - 1
-	if (Bytes > LAYER_EDITOR_MAX_TEXT_BYTES)
+	if (Bytes > MaxBytes)
 		return [_LayerEditor_Error(LAYER_EDITOR_INVALID_PAYLOAD,
-			"the layer file is " . Bytes . " bytes, more than " . LAYER_EDITOR_MAX_TEXT_BYTES)]
+			"the layer file is " . Bytes . " bytes, more than " . MaxBytes)]
 	return _LayerEditor_ErrorsOnEveryOs(Text, Ctx)
 }
 
@@ -129,23 +130,45 @@ LayerEditor_Validate(Text, Ctx) {
  * @returns {Map} saved (Boolean), path, errors (Array).
  */
 LayerEditor_Save(Text, Ctx, ConfigDir) {
-	global LAYER_EDITOR_WRITE_FAILED
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LayerEditor_Save(Text, Ctx, ConfigDir)
+		finally Critical(InheritedCritical)
+	}
 	Path := KeymapLayers_UserFilePath(Ctx, ConfigDir)
-	Errors := LayerEditor_Validate(Text, Ctx)
-	if (Errors.Length > 0)
-		return Map("saved", false, "path", Path, "errors", Errors)
-	Stage := Path . ".tmp"
-	if !FSWriteDurable(Stage, Text) {
-		try FSDeleteStrict(Stage)
-		return Map("saved", false, "path", Path, "errors",
-			[_LayerEditor_Error(LAYER_EDITOR_WRITE_FAILED, "'" . Stage . "' could not be written")])
-	}
-	if !FSAtomicMoveReplace(Stage, Path) {
-		try FSDeleteStrict(Stage)
-		return Map("saved", false, "path", Path, "errors",
-			[_LayerEditor_Error(LAYER_EDITOR_WRITE_FAILED, "'" . Path . "' could not be replaced")])
-	}
-	return Map("saved", true, "path", Path, "errors", [])
+	if A_IsSuspended
+		return _LayerEditor_SaveRefused(Path, "the driver is suspended")
+	Owner := _ConfigWriteLeaseTryAcquire(Path, "layer-editor")
+	if !(Owner is Object)
+		return _LayerEditor_SaveRefused(Path, "another configuration transaction owns publication")
+	; This native guard closes admission even when pause arrives during loading,
+	; validation or staging. Only the final rename uses a short Critical span.
+	Admission := () => !A_IsSuspended && _ConfigWriteLeaseOwns(Owner, Path)
+	try {
+		Errors := LayerEditor_Validate(Text, Ctx)
+		if (Errors.Length > 0)
+			return Map("saved", false, "path", Path, "errors", Errors)
+		if !Admission.Call()
+			return _LayerEditor_SaveRefused(Path, "the configuration write is no longer admitted")
+		Stage := Path . ".tmp"
+		if !FSWriteDurable(Stage, Text) {
+			try FSDeleteStrict(Stage)
+			return _LayerEditor_SaveRefused(Path, "'" . Stage . "' could not be written")
+		}
+		if !FSConfigAtomicMoveReplace(Stage, Path, , Admission) {
+			try FSDeleteStrict(Stage)
+			return _LayerEditor_SaveRefused(Path, "'" . Path . "' could not be replaced")
+		}
+		return Map("saved", true, "path", Path, "errors", [])
+	} finally _ConfigWriteLeaseRelease(Owner)
+}
+
+; Keep pre-publication refusal in the same envelope as native write failure.
+_LayerEditor_SaveRefused(Path, Detail) {
+	global LAYER_EDITOR_WRITE_FAILED
+	return Map("saved", false, "path", Path, "errors",
+		[_LayerEditor_Error(LAYER_EDITOR_WRITE_FAILED, Detail)])
 }
 
 
@@ -534,7 +557,19 @@ _LayerEditor_OnMessage(Host, Payload, ApplyFn := ReloadPreservingSuspend) {
  */
 LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn) {
 	global LAYER_EDITOR_WRITE_FAILED
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn)
+		finally Critical(InheritedCritical)
+	}
+	if A_IsSuspended
+		return _LayerEditor_SaveRefused("", "the driver is suspended")
 	LoggerStart("LayerEditor", "Saving the navigation layer…")
+	if A_IsSuspended {
+		LoggerError("LayerEditor", "The navigation layer was not saved: {1}.", "the driver is suspended")
+		return _LayerEditor_SaveRefused("", "the driver is suspended")
+	}
 	try {
 		Ctx := KeymapLayers_LoadContext(SharedDir)
 	} catch as Err {
@@ -552,7 +587,10 @@ LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn) {
 	LoggerSuccess("LayerEditor", "Navigation layer saved to '{1}'; reloading to apply it.", Result["path"])
 	; A reload that goes through never returns here; a refused one says why in
 	; its own log and leaves the saved file for the next start.
-	Result["applied"] := ApplyFn.Call() ? true : false
+	; The writer released its lease before Reload can acquire the terminal
+	; barrier. A pause during the completion log keeps the durable save but
+	; cannot authorize a fresh apply request. Never report that save as undone.
+	Result["applied"] := !A_IsSuspended && ApplyFn.Call() ? true : false
 	if !Result["applied"]
 		LoggerError("LayerEditor", "The saved navigation layer is not applied: the reload was refused.")
 	return Result

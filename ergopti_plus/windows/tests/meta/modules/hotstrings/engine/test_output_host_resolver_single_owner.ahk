@@ -21,13 +21,13 @@ _OHRSO_Count(Haystack, Needle) {
 _OHRSO_NoFunctionalMetricsReaders() {
 	AllSource := _DriverSourceNoComments()
 	Allowed := _StripFullLineComments(
-		_DriverDirConcat("modules/keylogger") . "`n"
+		_DriverDirConcat("modules/keystats") . "`n"
 		. _DriverDirConcat("infra/metrics"))
 	AssertTrue(AllSource != "" && Allowed != "",
 		"the guard must read both the full source and its nonempty allowance")
 	AssertEqual(_OHRSO_Count(Allowed, "KLHook.prev_app"),
 		_OHRSO_Count(AllSource, "KLHook.prev_app"),
-		"KLHook.prev_app must have no functional readers outside metrics/keylogger")
+		"KLHook.prev_app must have no functional readers outside metrics/keystats")
 }
 Test("output host: metrics cache has no functional readers (ahk-002)",
 	_OHRSO_NoFunctionalMetricsReaders)

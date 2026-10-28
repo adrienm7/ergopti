@@ -18,8 +18,9 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local Keylogger = require("modules.keylogger.keylogger")
-local Writer = require("modules.keylogger.sqlite_writer")
+local Keystats = require("modules.keystats.keystats")
+local Writer = require("modules.keystats.sqlite_writer")
+local Monotonic = require("infra.monotonic")
 local checks, failures = 0, 0
 local serial = 0
 local function check(name, test)
@@ -30,12 +31,31 @@ local function check(name, test)
 		io.stderr:write("FAIL " .. name .. ": " .. tostring(err) .. "\n")
 	end
 end
+--- Resets the typing session and waits for its native SQLite COMMIT.
+--- @param purpose string What the acknowledged reset must precede.
+local function await_session_reset(purpose)
+	local deadline, reset = uv.hrtime() + 10 * 1e9, Keystats.reset_session()
+	while not reset and uv.hrtime() < deadline do
+		uv.run("nowait")
+		Keystats.pump_flush()
+		reset = Keystats.reset_session()
+		if not reset then uv.sleep(1) end
+	end
+	assert(reset, "the session reset must be acknowledged before " .. purpose)
+end
 local function fresh(cursor)
+	-- The previous case's typing session is still open: close it into its own
+	-- database. Left open, the next reset wrote its session_end into the new
+	-- database before the cursor existed, and the case saw a foreign low ID.
+	if serial > 0 then await_session_reset("the database changes") end
 	Writer.close_db()
 	serial = serial + 1
-	Keylogger.init({ sqlite_path = root .. "/metrics-" .. serial .. ".sqlite", log_dir = root .. "/logs" })
-	assert(Keylogger.is_enabled())
-	Keylogger.reset_session()
+	Keystats.init({ sqlite_path = root .. "/metrics-" .. serial .. ".sqlite", log_dir = root .. "/logs" })
+	assert(Keystats.is_enabled())
+	-- A session reset is acknowledged only after its native SQLite COMMIT; the
+	-- cursor must not be written while that asynchronous reset still owns the
+	-- writer (a slower runner reached set_meta first and it was refused).
+	await_session_reset("the cursor is set")
 	assert(Writer.set_meta("linux_next_event_id", cursor))
 end
 local function number(sql)
@@ -55,9 +75,12 @@ local invalid = {
 }
 for _, item in ipairs(invalid) do
 	fresh(item[2])
-	Keylogger.on_keydown("a", 1000, "owned-cursor-app")
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
+	-- The session tracker measures silence on the monotonic clock the driver
+	-- passes here. A fixed 1000 ms made the flush end the session only on a host
+	-- up for more than the session timeout, so a freshly booted runner differed.
+	Keystats.on_keydown("a", math.floor(Monotonic.now_ms()), "owned-cursor-app")
+	require("tests.support.sqlite_flush_native").flush(Keystats)
+	require("tests.support.sqlite_flush_native").flush(Keystats)
 	check("native " .. item[1] .. " cursor refuses without mutation", function()
 		assert(assert(Writer.query_rows("SELECT hex(value) FROM meta WHERE key='linux_next_event_id';"))[1] == hex(item[2]),
 			"invalid or exhausted cursor was rewritten")
@@ -65,12 +88,18 @@ for _, item in ipairs(invalid) do
 		assert(number("SELECT count(*) FROM ngram_chars;") == 0, "refused raw stream acquired derived metrics")
 	end)
 	assert(require("tests.support.sqlite_flush_native").control(Writer, "UPDATE meta SET value='41' WHERE key='linux_next_event_id';"))
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
+	require("tests.support.sqlite_flush_native").flush(Keystats)
+	require("tests.support.sqlite_flush_native").flush(Keystats)
 	check("native " .. item[1] .. " cursor recovery retains pending typing once", function()
 		local rows = assert(Writer.query_rows("SELECT id,text FROM events_typing ORDER BY id;"))
 		assert(#rows == 1 and rows[1] == "41|a", "refusal consumed pending typing or acknowledged an unusable ID")
-		assert(Writer.get_meta("linux_next_event_id") == "42")
+		-- The retained stream also carries the typing session's start and end
+		-- rows, which take the next IDs of the same reserved range: the typing
+		-- row keeps 41 and no ID is skipped or reissued.
+		local sessions = number("SELECT count(*) FROM events_session;")
+		assert(sessions >= 1 and number("SELECT min(id) FROM events_session;") == 42)
+		assert(number("SELECT max(id) FROM events_session;") == 41 + sessions)
+		assert(Writer.get_meta("linux_next_event_id") == tostring(42 + sessions))
 		assert(number("SELECT c FROM ngram_chars WHERE token='a';") == 1)
 	end)
 end

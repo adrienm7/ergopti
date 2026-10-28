@@ -26,7 +26,7 @@
 
 local helpers = require("tests.helpers")
 local JsonCodec = require("adapters.json_codec")
-local ResponseClassifier = require("modules.llm.remote_response_classifier")
+local ResponseClassifier = require("llm.remote_response_classifier")
 
 
 

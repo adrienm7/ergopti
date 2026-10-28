@@ -13,7 +13,7 @@ helpers.describe("typing publication ordering", function()
 	helpers.it("(typing-publication-order) reentrant read cannot replace a newer pending snapshot", function()
 		with_delivery(function(dashboard, context, timers, _, _, evaluations)
 			local entered = false
-			package.loaded["modules.keylogger.log_manager"].get_sqlite_path = function()
+			package.loaded["modules.keystats.log_manager"].get_sqlite_path = function()
 				if not entered then
 					entered = true
 					dashboard.push_live_update(); timers[#timers]()

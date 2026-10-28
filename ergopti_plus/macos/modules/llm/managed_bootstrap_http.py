@@ -64,6 +64,59 @@ def _native_request(*args, **kwargs):
         raise
 
 
+# The marker and sentences network-retry.sh and the Swift download spool spell
+# too (test-managed-proxy-route-contract.cjs): one warning when an unusable
+# automatic configuration sends the download direct, then the direct outcome.
+PAC_DIRECT_FALLBACK_MARKER = "__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:"
+_PAC_FALLBACK = {"stage": None, "reported": False}
+
+
+def _report_route_fallback(stage):
+    """Name, on stderr, the lookup step after which the worker went direct.
+
+    Only a stage code from the loaded engine's closed vocabulary is printed, so
+    the company PAC address can never reach a log through this line. The first
+    fallback of the download also prints the marker and the one warning.
+    """
+    engine = sys.modules.get("_ergopti_native_http")
+    vocabulary = getattr(engine, "FAILURE_STAGES", None)
+    if type(stage) is str and type(vocabulary) is dict and stage in vocabulary:
+        print("# managed_bootstrap_route direct_fallback=" + stage, file=sys.stderr, flush=True)
+        if _PAC_FALLBACK["stage"] is None:
+            _PAC_FALLBACK["stage"] = stage
+            print(PAC_DIRECT_FALLBACK_MARKER + stage, file=sys.stderr, flush=True)
+            print(
+                "WARNING: The automatic network configuration could not be used ("
+                + stage
+                + "). Trying a direct connection.",
+                file=sys.stderr,
+                flush=True,
+            )
+
+
+def _report_pac_fallback_outcome(cause):
+    """Say once whether the direct attempt after a PAC fallback worked (cause None)."""
+    stage = _PAC_FALLBACK["stage"]
+    if stage is None or _PAC_FALLBACK["reported"]:
+        return
+    _PAC_FALLBACK["reported"] = True
+    if cause is None:
+        line = (
+            "The direct connection worked after the automatic network configuration failed ("
+            + stage
+            + ")."
+        )
+    else:
+        line = (
+            "The automatic network configuration was unreachable ("
+            + stage
+            + ") and the direct connection failed ("
+            + cause
+            + ")."
+        )
+    print(line, file=sys.stderr, flush=True)
+
+
 def _url(value, maximum):
     if (
         not isinstance(value, str)
@@ -142,6 +195,7 @@ def download(url, output, digest, size, deadline, idle_timeout, request=_native_
                     idle_timeout=idle_timeout,
                     direct=_direct_route(current),
                 ) as response:
+                    _report_route_fallback(getattr(response, "route_fallback", None))
                     if policy["status_min"] <= response.status <= policy["status_max"]:
                         locations = [
                             value for name, value in response.headers if name.lower() == "location"
@@ -178,6 +232,7 @@ def download(url, output, digest, size, deadline, idle_timeout, request=_native_
                 raise BootstrapFailure("redirect")
         _remaining(deadline)
         complete = True
+        _report_pac_fallback_outcome(None)
         return output
     finally:
         if not complete:
@@ -596,7 +651,10 @@ def _report_failure(failure, reason):
                 }:
                     fact["native_receipt_reason"] = terminal
     print("# managed_bootstrap_failure " + json.dumps(fact, sort_keys=True), file=sys.stderr)
+    _report_route_fallback(getattr(failure, "native_route_fallback", None))
+    _report_pac_fallback_outcome(reason)
     print("Managed bootstrap request failed: " + reason + ".", file=sys.stderr)
+    return fact
 
 
 if __name__ == "__main__":
@@ -621,5 +679,8 @@ if __name__ == "__main__":
             "content_encoding",
         }:
             reason = "unavailable"
-        _report_failure(failure, reason)
-        sys.exit(74)
+        fact = _report_failure(failure, reason)
+        # Status 78 is EX_CONFIG: the native client cannot apply the configured
+        # route (for example a PAC it cannot evaluate). The next attempt reads the
+        # same settings, so the shell must not retry it (issue #101).
+        sys.exit(78 if fact.get("native_child_status") == 78 else 74)

@@ -10,7 +10,7 @@
 _MOR_Refusal(StageLocked) {
 	_KLMig_Reset()
 	Original := _KLMig_WriteLedger(["synthetic open refusal"])
-	Source := Keylogger.data_sql_path
+	Source := Keystats.data_sql_path
 	Stage := Source . KL_MIG_STAGING_SUFFIX
 	Lock := 0
 	KL_Enc_SetEnabled(true)

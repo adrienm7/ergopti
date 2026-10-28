@@ -24,7 +24,7 @@ tests/
 ├── unit/
 │   ├── adapters/<family>/         contracts, file_system, keyboard, …
 │   ├── infra/<area>/              config, logger, preferences, toml, …
-│   ├── modules/<module>/<part>/   keylogger, keymap, llm, gestures, …
+│   ├── modules/<module>/<part>/   keystats, keymap, llm, gestures, …
 │   ├── platform/remap/<part>/     config, generator, lease, watchers, …
 │   └── ui/<surface>/              menu/<submenu>/, tooltip, onboarding, …
 ├── e2e/                 Stubbed virtual-keyboard and boot scenarios
@@ -92,7 +92,7 @@ constructs from `tests/helpers`.
 | `meta/`          | Invariants no runtime call can check: boot order, teardown paths, ports, Lua and Hammerspoon foot-guns, the test harness itself.   |
 | `unit/adapters/` | The OS-isolation layer, one folder per port family, plus the cross-driver contract vectors.                                        |
 | `unit/infra/`    | Infrastructure: configuration, preferences, logger, TOML, file watchers, i18n, lifecycle.                                          |
-| `unit/modules/`  | Domain modules: keymap, keylogger, llm, gestures, shortcuts, dynamic_hotstrings, hotstrings, updater, diagnostics.                 |
+| `unit/modules/`  | Domain modules: keymap, keystats, llm, gestures, shortcuts, dynamic_hotstrings, hotstrings, updater, diagnostics.                  |
 | `unit/platform/` | The Karabiner remap bridge.                                                                                                        |
 | `unit/ui/`       | Windows, dialogs, tooltips and the tray menu.                                                                                      |
 | `integration/`   | Mac-only — exercised via a "Run Self-Tests" menu item inside Hammerspoon to validate end-to-end behavior with the real `hs.*` API. |
@@ -124,7 +124,7 @@ consume the uploaded package; the final verdict checks their completeness.
 
 `lua tests/run.lua` prints the module and case totals as it runs, and that run
 is the inventory. There used to be a `COVERAGE.md` here restating them by hand;
-it was deleted once it claimed "keylogger: 0% covered" against 66 keylogger test
+it was deleted once it claimed "keystats: 0% covered" against 66 keystats test
 files and "ui/: 0% covered (intentional)" against 118. A hand-written census of
 a suite that grows every week is wrong within a fortnight and, being prose,
 fails no test when it goes wrong — see `docs/TESTING.md`, which states the rule

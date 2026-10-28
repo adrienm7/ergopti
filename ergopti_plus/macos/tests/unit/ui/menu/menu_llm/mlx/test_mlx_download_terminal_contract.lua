@@ -113,6 +113,29 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 		end)
 	end
 
+	-- Field runs 2026-10-27 21:08 and 2026-10-28 12:05: the launcher exited 0 and
+	-- its PID line reached only the termination callback's final output. That
+	-- line is the same evidence the stream carries, so the download goes on.
+	helpers.it("adopts a PID line that arrives only with the launcher's final output", function()
+		with_fixture({}, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), true)
+			fixture.controls.latest("launcher"):complete(0, "", "__DLPID__:4242\n")
+			helpers.assert_eq(#fixture.records.cancels, 0, "the download is not cancelled")
+			helpers.assert_eq(#fixture.records.errors, 0)
+			helpers.assert_type(fixture.controls.latest("tail"), "table", "the download is followed")
+		end)
+	end)
+
+	helpers.it("logs a launcher that exits 0 without any PID line", function()
+		with_fixture({}, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), true)
+			fixture.controls.latest("launcher"):complete(0, "", "")
+			assert_cancelled(fixture, "launcher_failed")
+			helpers.assert_eq(fixture.records.errors[#fixture.records.errors],
+				"MLX download launcher failed (exit=0, pid=missing, sentinel in final output=no).")
+		end)
+	end)
+
 	helpers.it("HS-024 launcher process failure settles once", function()
 		with_fixture({}, function(fixture)
 			helpers.assert_eq(fixture.controls.pull(), true)

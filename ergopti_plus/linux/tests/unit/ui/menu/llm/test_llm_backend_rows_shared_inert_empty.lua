@@ -1,88 +1,17 @@
 --- tests/unit/ui/menu/llm/test_llm_backend_rows_shared_inert_empty.lua
 
 --- ==============================================================================
---- MODULE: Choosing The AI Backend From The Tray
+--- MODULE: API Entry Publication From The Model Selector Page
 --- DESCRIPTION:
---- The Linux AI menu listed Ollama's models and nothing else: there was no way
---- to enter an API key. It now offers the backend choice and, for the API
---- backend, the entries, one "add" row per provider, a test and a removal.
+--- Adding and removing an API entry from the model selector page (2026-10-27)
+--- publishes through the one private writer: a non-chat key never selects
+--- itself, an oMLX entry keeps every field, and a refused retirement removes
+--- nothing (ui/menu/llm_backend_rows.lua api_page).
 --- ==============================================================================
 
 package.loaded["tests.support.ui.menu.llm.llm_backend_rows_fixture"] = nil
 local Fixture = require("tests.support.ui.menu.llm.llm_backend_rows_fixture")
-local helpers, setup, find, with_api_add_locale, with_empty_api_owner, empty_status_corpus, with_real_api_add =
-	Fixture.helpers, Fixture.setup, Fixture.find, Fixture.with_api_add_locale, Fixture.with_empty_api_owner, Fixture.empty_status_corpus, Fixture.with_real_api_add
-
-
-
-
-helpers.describe("Shared inert empty API status (llm-empty-status)", function()
-	helpers.it("uses the actual private empty source and canonical inert label (llm-empty-status)", function()
-		with_empty_api_owner(function(build, menu, native, observations)
-			local corpus = empty_status_corpus()
-			local definition = menu.get_array(corpus.api.section)
-			local original = definition[1]
-			local ok, err = pcall(function()
-				local rows = build()
-				helpers.assert_eq(rows[5], corpus.api.platform_rows.linux[1])
-				helpers.assert_eq(rows[6].separator, true)
-				helpers.assert_eq(rows[7].label, corpus.add_english)
-				helpers.assert_type(rows[7].items[1].action, "function")
-				definition[1] = { type = "label", id = corpus.api.rows[1].id, i18n = corpus.marker_key,
-					platforms = { "ahk", "linux" }, unavailable = "hide" }
-				local marker = build()[5]
-				helpers.assert_eq(marker.label, corpus.marker_english)
-				helpers.assert_eq(marker.disabled, true)
-				helpers.assert_nil(marker.action)
-				helpers.assert_nil(marker.items)
-				rows[7].items[1].action()
-				helpers.assert_eq(observations, { prompts = 1, changes = 0, sets = 0 })
-			end)
-			definition[1] = original
-			helpers.assert_eq(ok, true, tostring(err))
-			helpers.assert_eq(native.get(corpus.api.key), corpus.api.english)
-		end)
-	end)
-	helpers.it("refuses missing or unbound status admission and repairs the original owner (llm-empty-status)", function()
-		with_empty_api_owner(function(build, menu, _, observations)
-			local corpus = empty_status_corpus()
-			local definition = menu.get_array(corpus.api.section)
-			local original = definition[1]
-			local ok, err = pcall(function()
-				definition[1] = nil
-				helpers.assert_eq(build(), {})
-				definition[1] = { type = "command", id = "unowned_api_empty", i18n = corpus.api.key,
-					platforms = { "ahk", "linux" }, unavailable = "hide" }
-				helpers.assert_eq(build(), {})
-				helpers.assert_eq(observations, { prompts = 0, changes = 0, sets = 0 })
-			end)
-			definition[1] = original
-			helpers.assert_eq(ok, true, tostring(err))
-			helpers.assert_eq(build()[5], corpus.api.platform_rows.linux[1])
-		end)
-	end)
-	helpers.it("replays both hand fragments with the genuine three-platform renderer (llm-empty-status)", function()
-		with_api_add_locale(function(native)
-			local corpus = empty_status_corpus()
-			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(require("menu.renderer").new({ platform = platform,
-					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-					json_decode = require("json").decode, i18n = native, logger = require("logger.shim") }))
-				for _, status in ipairs({ corpus.api, corpus.agent }) do
-					helpers.assert_eq(renderer.template_rows(status.section, {}, {}, {}), status.platform_rows[platform])
-				end
-			end
-		end)
-	end)
-	helpers.it("restores actual source and module owners after a raised scenario (llm-empty-status)", function()
-		local raised = {}
-		local ok, err = pcall(function()
-			with_empty_api_owner(function() error(raised, 0) end)
-		end)
-		helpers.assert_eq(ok, false)
-		helpers.assert_eq(rawequal(err, raised), true)
-	end)
-end)
+local helpers, setup, find, with_real_api_add = Fixture.helpers, Fixture.setup, Fixture.find, Fixture.with_real_api_add
 
 
 
@@ -129,10 +58,10 @@ helpers.describe("Atomic non-chat addition (ai-menu-nonchat-add)", function()
 					return rename(from, to)
 				end
 				local answers = { "inert-key", "jev-latest" }
-				local rows = helpers.load_module("ui.menu.llm_backend_rows").rows(
+				local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(helpers.load_module("ui.menu.llm_backend_rows"),
 					{ get_backend = function() return "api" end, set_backend = function() error("non-chat addition must preserve the backend") end },
 					{ prompt = function() return table.remove(answers, 1) end, error = function() end },
-					function() changes = changes + 1 end, function() return {} end)
+					function() changes = changes + 1 end)
 				find(rows, "➕ TypeSafe (Jev)").action()
 				active, count = owner.active(), #owner.list()
 				local read = assert(io.open(path, "rb")); after = read:read("*a"); assert(read:close())

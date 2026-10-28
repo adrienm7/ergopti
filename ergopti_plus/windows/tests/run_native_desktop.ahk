@@ -44,6 +44,7 @@ OnError(_NativeDesktopStartupError)
 _TestResultsBeginRun()
 #Include ../infra/app_state.ahk
 #Include test_stubs.ahk
+#Include ../infra/hotpath_profiler.ahk
 #Include ../infra/json.ahk
 #Include ../infra/number.ahk
 #Include ../infra/wall_clock.ahk

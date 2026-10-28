@@ -42,6 +42,7 @@ local _ok_log, Logger = pcall(require, "infra.logger")
 if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("logger.shim")
 end
+local NativePath    = require("native_path")
 local TomlCodec     = require("toml_codec")
 local TomlWriter    = require("toml_codec.writer")
 local RecordScanner = require("toml_codec.record_scanner")
@@ -53,6 +54,7 @@ local BOM           = string.char(0xEF, 0xBB, 0xBF)
 local math_type     = math.type
 
 local RootCleanup = require("toml_codec.cleanup_roots")
+local ConfigKeys = require("config_keys")
 local root_receipts = setmetatable({}, { __mode = "k" })
 
 local function protected_root(root)
@@ -334,7 +336,7 @@ local function find_in_source(source, collect, whole_unread_roots, file_path)
 	local outdated = ConfigOutdated.collect_reports(function() collect(decoded, consumption.mark, shapes) end)
 
 	local record_entries, owns_records = RecordList.cleanup_entries(source, outdated, file_path)
-	if owns_records and #record_entries > 0 then consumption.mark("llm", "models", "user_models") end
+	if owns_records and #record_entries > 0 then consumption.mark("llm", "models", ConfigKeys.LEAF.USER_MODELS) end
 	local keys, whole_roots = {}, {}
 	for _, entry in ipairs(record_entries) do keys[#keys + 1] = entry end
 	local projection = whole_unread_roots and RootCleanup.scan(source)
@@ -466,8 +468,9 @@ end
 --- @param stamp string
 --- @return string
 function M.backup_path(path, stamp)
-	local dir, name = path:match("^(.*[/\\])([^/\\]+)$")
-	if not dir then dir, name = "", path end
+	local dir = NativePath.directory_prefix(path)
+	local name = dir and path:sub(#dir + 1)
+	if not name or name == "" then dir, name = "", path end
 	local stem, ext = name:match("^(.+)(%.[^%.]+)$")
 	if not stem then stem, ext = name, "" end
 	return dir .. stem .. ".backup-" .. stamp .. ext

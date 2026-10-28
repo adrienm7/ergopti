@@ -486,8 +486,8 @@ _LMT_ApiLoaderRejectsMalformedSchemaAsOneImage() {
 			_LMT_AssertApiImageRejected(_LMT_ApiImageWithFieldValue(Field, "42"),
 				"non-string required field " . Field)
 		_LMT_AssertApiImageRejected('[{"Id":"one","Name":"One",'
-			. '"Provider":"unknown","BaseUrl":"https://one.invalid",'
-			. '"Token":"secret","Model":"m1"}]', "unknown provider")
+			. '"Provider":"","BaseUrl":"https://one.invalid",'
+			. '"Token":"secret","Model":"m1"}]', "empty provider")
 		_LMT_AssertApiImageRejected('[{"Id":"one","Name":"One",'
 			. '"Provider":"openai","BaseUrl":"https://one.invalid",'
 			. '"Token":"secret"}]', "missing required field")
@@ -514,6 +514,49 @@ _LMT_ApiParserPreservesEscapedStrings() {
 	AssertEqual("https://one.invalid/{path}", Parsed["entries"][1]["BaseUrl"])
 	AssertEqual("brace{token}\tail", Parsed["entries"][1]["Token"])
 }
+_LMT_RetiredProviderRowIsKeptNotFatal() {
+	Providers := Map("openai", Map())
+	Raw := '[{"Id":"old","Name":"Old","Provider":"gone",'
+		. '"BaseUrl":"https://old.invalid","Token":"opaque-token","Model":"m0"},'
+		. '{"Id":"one","Name":"One","Provider":"openai",'
+		. '"BaseUrl":"https://one.invalid","Token":"secret","Model":"m1"}]'
+	Decrypted := []
+	Parsed := _LLM_Menu_ParseAndValidateApiEntries(Raw, Providers,
+		(Token) => (Decrypted.Push(Token), Token))
+	AssertTrue(Parsed["ok"],
+		"a row naming a retired provider must not reject the rest of the file")
+	AssertEqual(1, Parsed["entries"].Length)
+	AssertEqual("one", Parsed["entries"][1]["Id"])
+	AssertEqual(1, Parsed["retired"].Length)
+	AssertEqual("old", Parsed["retired"][1]["Id"])
+	AssertEqual(1, Decrypted.Length,
+		"a retired row must never reach token decryption")
+
+	; The retired row is written back as stored behind the live rows.
+	State := Map("api_entries", Parsed["entries"],
+		"api_entries_retired", Parsed["retired"], "api_entry_id", "one")
+	Image := _LLM_Menu_SerializeApiEntries(State, _LMT_StableEncryptToken)
+	AssertTrue(Image is String, "a state with a retired row must serialize")
+	AssertContains(Image, '"Id":"old","Name":"Old","Provider":"gone"')
+	AssertContains(Image, '"Token":"opaque-token"',
+		"the retired token must be written back unchanged, not re-encrypted")
+	Reread := _LLM_Menu_ParseAndValidateApiEntries(Image, Providers,
+		(Token) => Token)
+	AssertEqual(1, Reread["retired"].Length)
+
+	; A live id equal to a retired id would make the image ambiguous.
+	Clash := Map("api_entries", [_LMT_ApiEntry("old", "New")],
+		"api_entries_retired", Parsed["retired"], "api_entry_id", "old")
+	AssertFalse(_LLM_Menu_SerializeApiEntries(Clash, _LMT_StableEncryptToken),
+		"a live entry must not reuse a retired row's id")
+	AssertTrue(_LLM_Menu_ApiSourceOwned(Raw),
+		"a retired row is owned by the writer, so the file stays writable")
+}
+Test("LLM API entries: a retired provider row is kept and written back "
+	. "(api-entry-retired-provider-row)",
+	_LMT_RetiredProviderRowIsKeptNotFatal)
+
+
 Test("LLM API entries: strict parser preserves escaped strings and braces "
 	. "(api-entry-identity-cardinality)",
 	_LMT_ApiParserPreservesEscapedStrings)
@@ -622,43 +665,32 @@ Test("LLM API entries: unique candidate ids mutate exactly one row "
 	. "(api-entry-identity-cardinality)",
 	_LMT_UniqueApiCandidatesMutateExactlyOneRow)
 
-_LMT_SharedApiActiveCommandRows() {
-	global _LLM_Menu, _SharedDir
-	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\api_active_commands.json"))
-	Assert(Corpus is Map, "the independent active API commands corpus must be readable")
-	Root := _MM_GetManifestRoot()
-	Assert(Root is Map, "the real shared menu must be present")
-	Declarations := Root[Corpus["section"]]
-	AssertEqual(2, Declarations.Length)
-	SavedTestKey := Declarations[1]["i18n"]
+_LMT_SelectorPageActiveCommands() {
+	global _LLM_Menu
 	Previous := _LMT_InstallFixture()
 	try {
 		_LLM_Menu["api_entries"] := [_LMT_ApiEntry("active")]
 		_LLM_Menu["api_entry_id"] := "active"
-		Declarations[1]["i18n"] := "button.cancel"
-		Rows := _LLM_Menu_ApiEntriesRows()
-		AssertEqual(t("button.cancel"), Rows[Rows.Length - 2]["label"],
-			"the actual provider reads the canonical Test caption")
-		AssertEqual(t("menu.llm.api_edit_entry"), Rows[Rows.Length - 1]["label"],
-			"the existing native Edit action stays immediately before removal")
-		AssertEqual(t(Corpus["rows"][2]["i18n"]), Rows[Rows.Length]["label"])
-		for Index, Expected in Corpus["rows"] {
-			AssertEqual(Expected["id"], Declarations[Index]["id"])
-			AssertEqual(Corpus["ready"], Declarations[Index]["disabled_when"][1])
-		}
-		HeldTest := Rows[Rows.Length - 2]["action"]
-		HeldRemove := Rows[Rows.Length]["action"]
+		Rows := Map(), Models := []
+		Listed := Map("active", Map("state", "listed",
+			"ids", [_LLM_Menu_ResolveApiEntry(_LLM_Menu["api_entries"][1])["model"]]))
+		_LLM_Menu_ApiEntryPageRows(Rows, Models, Listed)
+		AssertEqual(1, Models.Length, "the active entry, listed alone, is one page row")
+		for Key, Row in Rows
+			Entry := Row
+		for Id in ["test", "edit", "remove"]
+			Assert(Entry["row_actions"].Has(Id), "the active entry row offers " . Id)
+		AssertContains(Models[1], t("menu.llm.api_edit_entry"), "Edit keeps its caption")
+		HeldTest := Entry["row_actions"]["test"]
+		HeldRemove := Entry["row_actions"]["remove"]
 		_LLM_Menu["api_entry_id"] := ""
 		AssertEqual(false, HeldTest.Call(), "a revoked active owner cannot acquire a test request")
 		AssertEqual(false, HeldRemove.Call(), "a revoked active owner cannot open the removal dialog")
 		AssertEqual(1, _LLM_Menu["api_entries"].Length)
-	} finally {
-		Declarations[1]["i18n"] := SavedTestKey
-		_LMT_RestoreFixture(Previous)
-	}
+	} finally _LMT_RestoreFixture(Previous)
 }
-Test("LLM API: actual shared active commands preserve Edit and refuse revoked owners",
-	_LMT_SharedApiActiveCommandRows)
+Test("LLM API: selector page active-entry actions keep Edit and refuse revoked owners",
+	_LMT_SelectorPageActiveCommands)
 
 ; Only the unrelated collector/JSON ports are controlled; configuration rendering
 ; and both WAL filesystem targets use their actual production implementations.

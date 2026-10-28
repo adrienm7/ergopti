@@ -4,9 +4,10 @@
 ; MODULE: Regression — every AltGr callback emits under the same serialization
 ;         contract (altgr-callbacks-serialized)
 ; DESCRIPTION:
-; SendMode is "Event" driver-wide because the hotstring cascade depends on it,
-; which means every remapped key re-sends its character through a NON-atomic,
-; interruptible SendEvent. Two fast keys can therefore start overlapping remap
+; Every remapped key re-sends its character through SendNewResult, a SendEvent
+; at the hotkey's level 2 because it stands in for the key the user struck (the
+; prefix watcher must see it), which makes the emit NON-atomic and
+; interruptible. Two fast keys can therefore start overlapping remap
 ; threads whose injections interleave in the single OS input queue and come out
 ; reordered — "comme" typed, "cmooe" produced. Critical("On") around each emit
 ; is what prevents it.

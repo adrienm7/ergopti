@@ -31,7 +31,7 @@ local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 
 local CONFIG = '[hotstrings]\nunknown = "kept"\ngroups = { rolls = false, foreign = true }\n'
-	.. 'trigger_char = "§"\npreview_ai_enabled = true\n'
+	.. 'trigger_char = "§"\npreview_ai_enabled = true\nexpansion_delay = 2\n'
 	.. '[hotstrings.dynamic.date]\nenabled = true\n[other]\nvalue = 1\n'
 -- Independently authored current runtime preimage: the former caps family is
 -- now three owned tables, each with the same explicit 9 s override.
@@ -45,7 +45,7 @@ local OVERRIDES = '[autocorrection]\ndelay = 3\ncolor = "#111111"\n\n'
 	.. '[autocorrection.names]\ndelay = 9\n\n'
 	.. '[autocorrection.abbreviations]\ndelay = 9\n\n'
 	.. '[autocorrection.technical_terms]\ndelay = 9\n\n'
-	.. '[personal]\ndelay = 7\n\n[rolls.hc]\npriority = 5\n\n[foreign]\ndelay = 4\nunknown_field = "kept"\n\n[_global]\ndelay = 2\n'
+	.. '[personal]\ndelay = 7\n\n[rolls.hc]\npriority = 5\n\n[foreign]\ndelay = 4\nunknown_field = "kept"\n'
 
 --- The catalogue the stub loader publishes: real category ids, corpus delays
 --- that differ from and agree with the manifest recommendations, and a
@@ -214,7 +214,8 @@ helpers.describe("hotstrings scope: restore recommended", function()
 			helpers.assert_eq(config.hotstrings.dynamic.enabled, true)
 			helpers.assert_nil(config.hotstrings.dynamic.date.enabled, "a family recommended off is removed")
 			helpers.assert_eq(config.hotstrings.repeat_key_enabled, true)
-			helpers.assert_eq(config.hotstrings.preview_star_enabled, true)
+			-- The recommended preview is its neutral default, so a restore stores it as absence.
+			helpers.assert_nil(config.hotstrings.preview_star_enabled)
 			helpers.assert_eq(config.hotstrings.preview_ai_enabled, true, "restore never touches AI consent")
 			helpers.assert_nil(config.hotstrings.trigger_char, "the recommended key is the neutral one")
 			helpers.assert_nil(config.hotstrings.personal, "a Windows feature row is never set here")
@@ -224,14 +225,15 @@ helpers.describe("hotstrings scope: restore recommended", function()
 			helpers.assert_nil(overrides.autocorrection.delay)
 			helpers.assert_nil(overrides.autocorrection.color)
 			for _, family in ipairs(COMMON_FAMILIES) do
-				helpers.assert_eq(overrides.autocorrection[family].delay, 0.5,
-					"deleting would inherit the corpus 1.0 s, so the recommendation is written: " .. family)
+				helpers.assert_eq(overrides.autocorrection[family].delay_offset, -0.25,
+					"deleting would inherit the corpus 1.0 s, so the recommendation is written, as an offset of the 0.75 s base: " .. family)
+				helpers.assert_nil(overrides.autocorrection[family].delay, family)
 			end
-			helpers.assert_eq(overrides.french_autocorrection.accents.delay, 0.5)
+			helpers.assert_eq(overrides.french_autocorrection.accents.delay_offset, -0.25)
 			helpers.assert_nil((overrides.rolls or {}).hc and overrides.rolls.hc.delay,
 				"an inheritance equal to the recommendation stays sparse")
 			helpers.assert_nil((overrides.rolls or {}).hc and overrides.rolls.hc.priority)
-			helpers.assert_nil(overrides._global.delay)
+			helpers.assert_nil(config.hotstrings.expansion_delay, "the recommended base delay is the neutral default, stored as absence")
 			helpers.assert_eq(overrides.foreign.delay, 4, "an unknown category override survives")
 			helpers.assert_eq(overrides.foreign.unknown_field, "kept")
 			helpers.assert_nil((overrides.personal or {}).code, "user packs receive no recommendation")
@@ -277,7 +279,9 @@ helpers.describe("hotstrings scope: clear", function()
 				end
 			end
 			helpers.assert_nil(config.hotstrings.trigger_char)
-			helpers.assert_nil(config.hotstrings.preview_ai_enabled, "clear revokes the AI preview")
+			-- An entry active by default restores its preset when its key is deleted,
+			-- so a clear writes its declared off value instead of removing it.
+			helpers.assert_eq(config.hotstrings.preview_ai_enabled, false, "clear writes the AI preview off value")
 			helpers.assert_nil(config.hotstrings.dynamic.date.enabled)
 			helpers.assert_eq(config.hotstrings.unknown, "kept")
 			local overrides = Codec.decode(read(c.override_path))
@@ -292,6 +296,7 @@ helpers.describe("hotstrings scope: clear", function()
 				helpers.assert_eq(fires(c.engine, mapping.trigger, mapping.replacement), false, "nothing fires after clear")
 			end
 			helpers.assert_eq(c.RepeatKey.is_enabled(), false)
+			-- The switch is cleared off; AI itself stays behind llm.enabled.
 			helpers.assert_eq(c.preview.ai, false)
 		end)
 	end)
@@ -364,7 +369,7 @@ helpers.describe("hotstrings scope: refusals", function()
 			helpers.assert_eq(c.Preferences.set("hotstrings.preview_star_enabled", true), false)
 			local config_bytes = read(c.config_path)
 			helpers.assert_eq(c.Config.set_override("autocorrection", nil, "delay", 5), false)
-			helpers.assert_eq(c.Config.set_global_delay(4), false)
+			helpers.assert_eq(c.Config.set_base_delay(4), false)
 			helpers.assert_eq(c.Config.clear_override("autocorrection"), false)
 			helpers.assert_eq(read(c.override_path), "[foreign]\ndelay = 7\n", "override setters wait for the inverse")
 			helpers.assert_eq(c.RepeatKey.set_enabled(not c.RepeatKey.is_enabled()), false)
@@ -608,10 +613,10 @@ end)
 
 helpers.describe("hotstrings retained native release debt", function()
 	local expected_config = { hotstrings = { unknown = "kept", groups = { rolls = false, foreign = true },
-		trigger_char = "§", preview_ai_enabled = true, dynamic = { date = { enabled = true } } }, other = { value = 1 } }
+		trigger_char = "§", preview_ai_enabled = true, expansion_delay = 2, dynamic = { date = { enabled = true } } }, other = { value = 1 } }
 	local expected_overrides = { autocorrection = { delay = 3, color = "#111111", names = { delay = 9 },
 		abbreviations = { delay = 9 }, technical_terms = { delay = 9 } }, rolls = { hc = { priority = 5 } },
-		foreign = { delay = 4, unknown_field = "kept" }, personal = { delay = 7 }, _global = { delay = 2 } }
+		foreign = { delay = 4, unknown_field = "kept" }, personal = { delay = 7 } }
 	local receipts = {
 		{ name = "nil", reply = function() return nil end },
 		{ name = "false", reply = function() return false end },

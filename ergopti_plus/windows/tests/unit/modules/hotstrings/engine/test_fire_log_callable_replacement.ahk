@@ -13,7 +13,7 @@
 ; handed the Func object straight to the metrics queue. KL_LogHotstring opens
 ; with StrLen(replacement), which throws TypeError on a Func — inside the
 ; drain's try, with no catch. The result was silent and total: every date,
-; phone, SSN and IBAN expansion vanished from the keylogger JSONL and from the
+; phone, SSN and IBAN expansion vanished from the keystats JSONL and from the
 ; WPM widget, with not one line in the error log, and the throw landed AFTER
 ; KL_FlushBuffer so the typing buffer had already been flushed without it.
 ;

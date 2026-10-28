@@ -251,6 +251,44 @@ helpers.describe("AT-SPI focus query", function()
 		helpers.assert_true(type(snapshot.app_id) == "string" and snapshot.app_id ~= "")
 	end)
 
+	for _, case in ipairs({ { "embedded LF", "owned\nother" }, { "leading LF", "\nowned" },
+		{ "trailing LF", "owned\n" }, { "CR", "owned\r" }, { "boundary spaces", " owned " } }) do
+		helpers.it("(focus-native-comm) preserves the exact native process name with " .. case[1], function()
+			local name = case[2]
+			local ffi = require("ffi")
+			ffi.cdef("int prctl(int option, ...);")
+			local file = assert(io.open("/proc/self/comm", "rb"))
+			local original = assert(file:read("*a")):gsub("\n$", "")
+			assert(file:close())
+			local function rename(value)
+				assert(ffi.C.prctl(15, ffi.cast("const char *", value), 0, 0, 0) == 0)
+			end
+			local called, detail = pcall(function()
+				rename(name)
+				local receipt = assert(io.open("/proc/self/comm", "rb"))
+				local raw = assert(receipt:read("*a"))
+				assert(receipt:close())
+				helpers.assert_eq(raw, name .. "\n", "The actual kernel preserves the task name and appends one record delimiter")
+				local field = { id = "field", focused = true, role = 61, bus = ":1.20", path = "/owned/field" }
+				local frame = { id = "frame", active = true, name = "Owned frame", bus = ":1.10", path = "/owned/frame", children = { field } }
+				local fake = backend({ id = "desktop", children = { { id = "app", children = { frame } } } })
+				fake.active = function(node) return node.active == true end
+				fake.retain = function(node) return node end
+				fake.process_id = function() return require("luv").os_getpid() end
+				fake.identity = function(node)
+					return { name = node.name or "", attributes = {}, native_bus_name = node.bus, native_object_path = node.path }
+				end
+				AtspiFocus._set_backend_for_test(fake)
+				local snapshot, conclusive = AtspiFocus._get_native_context_snapshot()
+				helpers.assert_eq(conclusive, true, "The kernel process name is a valid context source")
+				helpers.assert_eq(snapshot.app_id, name, "A native process name cannot become a different application's id")
+			end)
+			rename(original)
+			AtspiFocus._set_backend_for_test(nil)
+			if not called then error(detail, 0) end
+		end)
+	end
+
 	for _, fault in ipairs({ "none", "cross process", "scope", "bus", "frame", "pid", "app", "title" }) do
 		helpers.it("(focus-context-join) isolated context helper validates " .. fault, function()
 			local snapshot = { role = 61, attributes = {}, active_scope = true,

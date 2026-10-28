@@ -41,8 +41,8 @@ _HTRB_AdmittedGeneration() {
 		Assert(FSWriteDurable(Fixture.path, 'hotstrings = [unterminated`n'))
 		AssertTrue(HotstringsTerminatorRecordsInitBoot(BootSnapshot),
 			"the consumer must not borrow a later refused source generation")
-		AssertEqual("!¤😀", HotstringsGetWordDelimiters())
-		AssertEqual("!¤", HotstringsGetConsumedDelimiters())
+		AssertEqual(_HTR_DEFAULT_WORD . "¤😀", HotstringsGetWordDelimiters())
+		AssertEqual(_HTR_DEFAULT_CONSUMED . "¤", HotstringsGetConsumedDelimiters())
 	} finally _ScopeOwnerCleanup(Fixture)
 }
 Test("terminator-boot: real loader receipt retains the admitted generation after the source changes",
@@ -84,7 +84,7 @@ _HTRB_RefusedGeneration(ReadRefusal) {
 		AssertEqual(0, BootSnapshot, "the real refusal must clear an earlier output receipt")
 		AssertFalse(HotstringsTerminatorRecordsInitBoot(BootSnapshot))
 		AssertEqual(0, _HotstringsTerminatorRecords, "no empty record initialization may hide a refused load")
-		AssertEqual("!", HotstringsGetWordDelimiters())
+		AssertEqual(_HTR_DEFAULT_WORD, HotstringsGetWordDelimiters(), "without an owner the catalogue defaults apply")
 		AssertTrue(ReadRefusal ? _ConfigBootReadFailed : _ConfigBootRejectedOverrides > 0)
 		AssertEqual(InvalidSource, FSReadUtf8Exact(Fixture.path), "refusal cannot migrate or erase source bytes")
 	} catch as Failure {

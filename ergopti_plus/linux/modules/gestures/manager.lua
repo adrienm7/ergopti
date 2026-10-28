@@ -56,9 +56,13 @@ local AppParameter = require("app_parameter")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
 local ScriptActions = require("modules.shortcuts.script_actions")
+local AiActions = require("modules.shortcuts.ai_actions")
 local ShellRunner = require("adapters.shell_runner")
 local DesktopNavigation = require("desktop_navigation")
 local SystemActions = require("modules.gestures.system_actions")
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
+local ConfigKeys = require("config_keys")
 
 -- Retain the admitted issuer at owner construction. Later module/export swaps
 -- cannot appoint another producer or certify unavailable custody.
@@ -76,7 +80,7 @@ local function emitter_authority_current()
 		and rawequal(rawget(_emitter_owner, "can_fallback"), _emitter_certify)
 end
 local LOG = "modules.gestures.manager"
-local ENABLED_PATH = "gestures.enabled"
+local ENABLED_PATH = ConfigKeys.KEY.GESTURES_ENABLED
 local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
 
 if type(DEFAULT_ENABLED) ~= "boolean" then
@@ -372,13 +376,11 @@ local function run_background(cmd)
 end
 
 local function shell_quote(value)
-	return "'" .. tostring(value or ""):gsub("'", "'\\''") .. "'"
+	return TextUtils.shell_quote(value or "")
 end
 
 local function url_encode_query(value)
-	return (tostring(value or ""):gsub("[^%w%-%._~]", function(char)
-		return string.format("%%%02X", string.byte(char))
-	end))
+	return TextUtils.percent_encode(tostring(value or ""))
 end
 
 local function primary_selection()
@@ -422,15 +424,29 @@ local MEDIA_ACTIONS = {
 	track_prev      = { tool = "playerctl previous", key = "XF86AudioPrev" },
 }
 
---- The webview window each `open_*` action raises, by action id.
+--- The webview window each `open_*` action toggles, by action id: closed
+--- opens it, covered brings it to the front, frontmost closes it
+--- (ui/webview_manager.lua toggle()).
 ---
 --- Data rather than branches so the set can be compared against the shared
 --- catalogue by a gate: a table has a length, a chain of `elseif` does not.
 local OPEN_WINDOW = {
-	["open_metrics_typing"]    = "metrics_typing",
-	["open_metrics_apps"]      = "metrics_apps",
-	["open_hotstrings_editor"] = "hotstring_editor",
-	["open_paths_editor"]      = "paths_editor",
+	["open_metrics_typing"]      = "metrics_typing",
+	["open_metrics_apps"]        = "metrics_apps",
+	["open_hotstrings_editor"]   = "hotstring_editor",
+	["open_paths_editor"]        = "paths_editor",
+	["open_hotstrings_settings"] = ConfigKeys.COMMAND.HOTSTRINGS_CONFIG_WINDOW,
+	["open_layout_manager"]      = ConfigKeys.COMMAND.LAYOUT_MANAGER,
+	["open_layer_editor"]        = "layer_editor",
+	["open_model_browser"]       = "model_browser",
+	["open_changelog"]           = "changelog",
+	["open_healthcheck"]         = ConfigKeys.COMMAND.HEALTHCHECK,
+}
+
+--- The pages whose opener is not the manager's show(), by app name: the
+--- diagnostics window starts its probes in its bridge's open().
+local OPEN_WINDOW_OPENER = {
+	[ConfigKeys.COMMAND.HEALTHCHECK] = function() return require("ui.healthcheck.bridge").open() end,
 }
 
 --- The user-editable file each `open_*` action reveals, as a path resolver.
@@ -450,8 +466,8 @@ local OPEN_PATH = {
 --- a missing errors file is announced there and here alike.
 local OPEN_LOG = {
 	["open_logs_folder"] = "open_logs_folder",
-	["open_today_log"]   = "open_today_log",
-	["open_error_log"]   = "open_today_errors",
+	[ConfigKeys.COMMAND.OPEN_TODAY_LOG]   = ConfigKeys.COMMAND.OPEN_TODAY_LOG,
+	[ConfigKeys.COMMAND.OPEN_ERROR_LOG]   = "open_today_errors",
 }
 
 --- The screenshot command for each capture action, one shell cascade per id.
@@ -639,14 +655,17 @@ local function _execute_action(action_name, go_next, binding)
 		local window = OPEN_WINDOW[name]
 		if window then
 			local ok, Webview = pcall(require, "ui.webview_manager")
-			if not ok or type(Webview.show) ~= "function" then
+			if not ok or type(Webview.toggle) ~= "function" then
 				-- Loud, because the user asked for a window and none appeared. A
 				-- headless daemon (no GTK, no display) is the ordinary reason and it
 				-- is worth naming rather than leaving the chord looking dead.
 				Logger.error(LOG, "No webview manager — '%s' cannot open its window.", name)
 				return true
 			end
-			pcall(Webview.show, window)
+			local called, err = pcall(Webview.toggle, window, OPEN_WINDOW_OPENER[window])
+			if not called then
+				Logger.error(LOG, "Toggling the '%s' window raised: %s.", window, tostring(err))
+			end
 			return true
 		end
 
@@ -897,7 +916,7 @@ function M.get_executable_action_names()
 end
 
 --- Whether one requirement token from the catalogue holds on this machine.
---- @param token string "tool:<binary>", "session:x11" or "session:workspaces".
+--- @param token string "tool:<binary>", "session:x11", "session:workspaces" or "ai:on".
 --- @return boolean|nil True/false when proven, nil when it cannot be told —
 ---   a probe that could not read the machine must never take a binding away.
 --- @return string|nil hint Localized reason when the requirement is absent.
@@ -930,6 +949,12 @@ local function requirement_holds(token)
 		end
 		if reason == "unsupported" then return false, i18n.get("dialog.action_picker.requires_workspaces") end
 		return nil, nil
+	end
+	if token == "ai:on" then
+		-- The AI menu's switch: nothing of the AI runs while it is off, so the
+		-- row stays visible and greyed with the AI-off hint.
+		if AiActions.off() then return false, i18n.get("dialog.action_picker.requires_ai") end
+		return true, nil
 	end
 	error("unknown action requirement token '" .. tostring(token) .. "'")
 end
@@ -1018,6 +1043,9 @@ local _touchpad      = nil   -- what touchpad_finder chose, and what it can expr
 local _parameter_configuration_owner = nil
 local _parameter_delivery_epoch = 0
 local _scope_owner   = nil   -- retains refused runtime compensation
+require("infra.scope_registry").register("gesture_scope", function()
+	return _scope_owner ~= nil and _scope_owner.pending() == true
+end)
 local _scope_native = false -- admits only the scope's synchronous native inverse
 local _scope_sequence = 0
 local _program_owner = nil
@@ -1049,11 +1077,7 @@ end
 --- Copies one flat state map for a persistence-before-publication transaction.
 --- @param source table
 --- @return table
-local function copy_state(source)
-	local staged = {}
-	for key, value in pairs(source) do staged[key] = value end
-	return staged
-end
+local copy_state = TableUtil.shallow_copy
 
 -- Initialize actions with defaults.
 for k, v in pairs(M.DEFAULT_GESTURES) do
@@ -1253,7 +1277,7 @@ function M.validate_action_parameter(action_name, value)
 	if spec == "llm_language" then return require("modules.llm.translation").is_valid(value) end
 	-- Syntax only: whether the desktop entry exists is gtk-launch's to say.
 	if spec == "app" then return AppParameter.is_valid(value) end
-	if spec == "program" then return ProgramParameter.parse(value, "linux") ~= nil end
+	if spec == "program" then return ProgramParameter.parse(value, "posix") ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
@@ -1372,7 +1396,7 @@ local function binding_action(binding)
 	end
 	local descriptors = {
 		{ "keyboard__", "modules.shortcuts.keyboard_shortcuts", "keyboard" },
-		{ "script__", "modules.shortcuts.script_chords", "script_control" },
+		{ "script__", "modules.shortcuts.script_chords", ConfigKeys.LEAF.SCRIPT_CONTROL },
 		{ "tap_key__", "modules.shortcuts.tap_keys", "tap_keys" },
 		{ "combination__", "modules.shortcuts.key_combinations", "key_combination_taps" },
 	}
@@ -1400,7 +1424,7 @@ local function capture_program(binding)
 		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
 	end
 	local scalar = M.get_action_parameter(binding, "run_program")
-	if ProgramParameter.parse(scalar, "linux") == nil then return nil end
+	if ProgramParameter.parse(scalar, "posix") == nil then return nil end
 	local content, status = FileSystem.read_with_status(_config_path)
 	if status ~= "ok" or type(content) ~= "string" then return nil end
 	local decoded, config = pcall(TomlCodec.decode, content)
@@ -1558,7 +1582,7 @@ function M.get_picker_parameter_fields(items, binding)
 		prompt_choices = ProfileSettings.choices(),
 		vision_choices = require("modules.llm.vision_request").backend_choices(),
 		language_choices = require("modules.llm.translation").choices(),
-		default_count = ProfileSettings.get("num_predictions"),
+		default_count = ProfileSettings.get(ConfigKeys.LEAF.NUM_PREDICTIONS),
 		edit_current_label = i18n.get("dialog.action_picker.edit_current"),
 		parameter_strings = {
 			save = i18n.get("button.save"),
@@ -1888,6 +1912,12 @@ function M.dispatch_gesture(gesture)
 	-- user resumes; the reader keeps running so those still arrive.
 	if _is_paused() and not ScriptActions.is_script_action(action) then
 		Logger.debug(LOG, "Gesture %s → %s held back: the script is paused.", slot, action)
+		return false
+	end
+
+	-- An AI action is unarmed while the AI is off, as for the keys.
+	if AiActions.blocked(action) then
+		Logger.debug(LOG, "Gesture %s → %s held back: the AI is off.", slot, action)
 		return false
 	end
 

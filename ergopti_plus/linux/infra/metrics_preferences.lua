@@ -3,8 +3,9 @@
 --- ==============================================================================
 --- MODULE: Canonical Metrics Preferences (Linux)
 --- DESCRIPTION:
---- Owns the collector and WPM boolean choices in config.toml. Widget positions
---- and collected data retain their separate owners; legacy storage cannot grant
+--- Owns the collector and WPM choices in config.toml: the booleans and the one
+--- list of applications whose typing is never recorded. Widget positions and
+--- collected data retain their separate owners; legacy storage cannot grant
 --- consent or reactivate a preference removed by the canonical scope writer.
 --- ==============================================================================
 
@@ -40,11 +41,25 @@ function M.release(owner)
 	return true
 end
 
-local function owned(path)
+local function owned_as(path, kind)
 	local entry = type(path) == "string" and Manifest.find_entry_by_path(path) or nil
-	assert(entry and path:match("^metrics%.[^.]+$") and entry.type == "boolean",
-		"unknown boolean metrics preference: " .. tostring(path))
+	assert(entry and path:match("^metrics%.[^.]+$") and entry.type == kind,
+		"unknown " .. kind .. " metrics preference: " .. tostring(path))
 	return path:sub(#"metrics." + 1)
+end
+
+local function owned(path) return owned_as(path, "boolean") end
+
+--- Whether a decoded value is a list of strings.
+--- @param value any
+--- @return boolean
+local function string_list(value)
+	if type(value) ~= "table" then return false end
+	for index = 1, #value do if type(value[index]) ~= "string" then return false end end
+	for key in pairs(value) do
+		if type(key) ~= "number" or key < 1 or key > #value then return false end
+	end
+	return true
 end
 
 --- Resolves owned booleans from one parsed configuration without file effects.
@@ -77,6 +92,19 @@ function M.resolve(config, mark, written)
 			if mark and value ~= nil then mark("metrics", key) end
 			if value == nil then value = Manifest.default_for(entry.path) end
 			values[entry.path] = value
+		elseif entry.path:match("^metrics%.[^.]+$") and entry.type == "array" then
+			local key = owned_as(entry.path, "array")
+			local value = metrics[key]
+			if value ~= nil and not string_list(value) then
+				assert(not (written and written[entry.path]), "invalid list metrics preference: " .. entry.path)
+				ConfigOutdated.report({ "metrics", key }, "the value is not a list of strings", Logger)
+				value = nil
+			end
+			if mark and value ~= nil then mark("metrics", key) end
+			if value == nil then value = Manifest.default_for(entry.path) end
+			local copy = {}
+			for index = 1, #value do copy[index] = value[index] end
+			values[entry.path] = copy
 		end
 	end
 	return values
@@ -99,15 +127,28 @@ function M.get(path)
 	return M.snapshot()[path]
 end
 
+--- Reads one declared list of strings without creating a file.
+--- @param path string Canonical manifest path.
+--- @return table value A detached copy.
+function M.get_list(path)
+	owned_as(path, "array")
+	return M.snapshot()[path]
+end
+
 --- Publishes one sparse choice while preserving unknown configuration.
 --- @param path string Canonical manifest path.
---- @param value boolean New preference.
+--- @param value boolean|table New preference: a boolean, or a list of strings for a list path.
 --- @return boolean committed
 function M.set(path, value)
 	if not M.admit() then return false end
 	local called, committed, detail = pcall(function()
-		owned(path)
-		assert(type(value) == "boolean", "metrics preferences require boolean values")
+		if type(value) == "table" then
+			owned_as(path, "array")
+			assert(string_list(value), "metrics list preferences require strings")
+		else
+			owned(path)
+			assert(type(value) == "boolean", "metrics preferences require boolean or list values")
+		end
 		local _, source = M.snapshot()
 		local operation = Manifest.sparse_operation(path, value)
 		return Writer.batch_write(ConfigPaths.config("config.toml"), { operation }, nil, source)
@@ -116,7 +157,8 @@ function M.set(path, value)
 		Logger.error(LOG, "Metrics preference '%s' was not persisted: %s.", tostring(path), tostring(called and detail or committed))
 		return false
 	end
-	Logger.debug(LOG, "Metrics preference '%s' persisted as %s.", path, tostring(value))
+	Logger.debug(LOG, "Metrics preference '%s' persisted as %s.", path,
+		type(value) == "table" and (#value .. " entries") or tostring(value))
 	return true
 end
 

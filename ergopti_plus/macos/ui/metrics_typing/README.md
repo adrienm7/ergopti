@@ -12,4 +12,4 @@ WKWebView dashboard showing detailed typing metrics (WPM distribution, hotstring
 
 ## Data path
 
-`keylogger/db.sqlite` → `sqlite_reader` adapter → Lua query → `evaluateJavaScript` injection → rendered metrics.
+`keystats/db.sqlite` → `sqlite_reader` adapter → Lua query → `evaluateJavaScript` injection → rendered metrics.

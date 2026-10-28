@@ -26,6 +26,7 @@ local DEFAULTS = {
 	llm_show_info_bar = true,
 	llm_sequential_mode = false,
 	llm_debounce = 0.3,
+	llm_min_request_interval = 0,
 	llm_auto_raise_temp = false,
 	llm_streaming = false,
 	llm_streaming_multi = false,
@@ -44,7 +45,7 @@ local function load_fixture(streaming)
 		renders = 0,
 		hides = 0,
 		timing_paints = 0,
-		keylogger_writes = 0,
+		keystats_writes = 0,
 	}
 	local fetches = 0
 	local captured = {}
@@ -59,8 +60,6 @@ local function load_fixture(streaming)
 		sec = function(_section, key)
 			if key == "stream_watchdog_ms" then return 7 end
 			if key == "chain_fallback_ms" then return 1 end
-			if key == "prediction_debounce_min_ms" then return 0.01 end
-			if key == "prediction_debounce_max_ms" then return 2 end
 			return 0.1
 		end,
 	}
@@ -123,7 +122,6 @@ local function load_fixture(streaming)
 	package.loaded["modules.llm.api_common"] = {
 		MIN_CALL_INTERVAL_SEC = 0,
 		get_retry_policy = function() return 1, 0, 1 end,
-		get_rate_limit_min_interval_s = function() return 0 end,
 	}
 	package.loaded["modules.shortcuts.script_control"] = nil
 
@@ -144,11 +142,11 @@ local function load_fixture(streaming)
 		tint = function() return nil end,
 	}
 	package.loaded["ui.tooltip"] = tooltip
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
-		log_llm = function() effects.keylogger_writes = effects.keylogger_writes + 1 end,
-		log_llm_suggested = function() effects.keylogger_writes = effects.keylogger_writes + 1 end,
-		log_llm_dismissed = function() effects.keylogger_writes = effects.keylogger_writes + 1 end,
+		log_llm = function() effects.keystats_writes = effects.keystats_writes + 1 end,
+		log_llm_suggested = function() effects.keystats_writes = effects.keystats_writes + 1 end,
+		log_llm_dismissed = function() effects.keystats_writes = effects.keystats_writes + 1 end,
 	}
 
 	package.loaded["modules.llm.streaming_handler"] = nil
@@ -193,15 +191,15 @@ end
 
 local function effect_total(effects)
 	return effects.logs + effects.renders + effects.hides
-		+ effects.timing_paints + effects.keylogger_writes
+		+ effects.timing_paints + effects.keystats_writes
 end
 
 
 local function effect_summary(effects)
 	return string.format(
-		"logs=%d renders=%d hides=%d timing=%d keylogger=%d",
+		"logs=%d renders=%d hides=%d timing=%d keystats=%d",
 		effects.logs, effects.renders, effects.hides,
-		effects.timing_paints, effects.keylogger_writes
+		effects.timing_paints, effects.keystats_writes
 	)
 end
 

@@ -13,10 +13,10 @@ helpers.describe("llm-scope-contract", function()
 			helpers.assert_not_nil(Preferences.flat_key_for(path), path)
 			found[path] = true
 		end
-		for _, path in ipairs({ "llm.trigger.disabled_apps", "llm.navigation.nav_modifiers", "llm.models.user_models", "llm.profiles.user_profiles" }) do
+		for _, path in ipairs({ "llm.trigger.disabled_apps", "llm.navigation.nav_modifiers", "llm.models.user_models", "llm.user_profiles" }) do
 			helpers.assert_true(found[path], path)
 		end
-		helpers.assert_nil(found["llm.user_profiles"])
+		helpers.assert_nil(found["llm.profiles.user_profiles"])
 		helpers.assert_nil(found["llm.profiles.auto_profile_for_model"])
 	end)
 

@@ -21,10 +21,55 @@ HotstringsScopeApply(Mode, Options := unset) {
 		return Map("status", "refused", "scope", "hotstrings", "mode", Mode, "detail", "pending_numeric_write")
 	Owner := HotstringsScopeFiles(Options, Mode)
 	Operations() {
+		global ConfigurationFile
 		Inventory := ManifestScopeInventory("hotstrings", Map("catalogue", Owner.Inventory.Bind(Owner)))
-		return ManifestScopePlan("hotstrings", Mode, Inventory).operations
+		Rows := ManifestScopePlan("hotstrings", Mode, Inventory).operations
+		; The shipped delimiters go back to the catalogue; the user's own do not.
+		for Row in _HotstringsScopeDelimiterRows(Options.Has("path") ? Options["path"] : ConfigurationFile)
+			Rows.Push(Row)
+		return Rows
 	}
 	return ConfigScopeCommitOperations("hotstrings", Mode, Operations, Options, Owner)
+}
+
+/**
+ * Deletion rows for every built-in delimiter leaf (state and consumption) a
+ * configuration holds, read from the source as it is now. Records, their states
+ * and unknown entries are user data and are never listed.
+ * @param {String} Path The configuration file the scope rewrites.
+ * @returns {Array} Delete rows, ordered by leaf table then key.
+ */
+_HotstringsScopeDelimiterRows(Path) {
+	global HSE_Terminators
+	Rows := []
+	if !FSStrictExists(Path)
+		return Rows
+	Source := FSReadUtf8Exact(Path)
+	if !(Source is String)
+		throw Error("The admitted configuration source is unreadable.")
+	Document := TOML_ParseDocument(Source)
+	Hotstrings := Document.Get("hotstrings", 0)
+	if !(Hotstrings is Map)
+		return Rows
+	Builtin := Map()
+	Builtin.CaseSense := "On"
+	for Definition in HSE_Terminators.all() {
+		if Definition.Get("type", "") != "separator" && Definition.Has("key")
+			Builtin[Definition["key"]] := true
+	}
+	for Leaf in ["terminator_states", "terminator_consume"] {
+		Stored := Hotstrings.Get(Leaf, 0)
+		if !(Stored is Map)
+			continue
+		Keys := []
+		for Key in Stored
+			if Builtin.Has(Key)
+				Keys.Push(Key)
+		_SortStringsInPlace(Keys)
+		for Key in Keys
+			Rows.Push({ Section: "hotstrings." . Leaf, Key: Key, Delete: 1 })
+	}
+	return Rows
 }
 
 /**
@@ -196,16 +241,16 @@ HotstringsExtensionScopeApply(ExtensionId, Enabled, Options := unset) {
 			if OwnedPack
 				throw Error("Extension ownership is ambiguous.")
 			OwnedPack := true
-			for File in Pack.toml_files {
-				if Inventory.Has(File.category)
+			for PackFile in Pack.toml_files {
+				if Inventory.Has(PackFile.category)
 					throw Error("Extension category ownership is ambiguous.")
-				Inventory[File.category] := [], ExtensionGroups[File.category] := true
-				Targets.Push(File.category)
-				for Section in File.sections
-					Inventory[File.category].Push(Section["name"])
+				Inventory[PackFile.category] := [], ExtensionGroups[PackFile.category] := true
+				Targets.Push(PackFile.category)
+				for Section in PackFile.sections
+					Inventory[PackFile.category].Push(Section["name"])
 			}
-			for File in (Pack.HasOwnProp("bound_files") ? Pack.bound_files : []) {
-				Binding := File.binding
+			for PackFile in (Pack.HasOwnProp("bound_files") ? Pack.bound_files : []) {
+				Binding := PackFile.binding
 				Key := StrLower(StrReplace(Binding["category"], "_"))
 				if !NativeIds.Has(Key)
 					throw Error("An extension binding has no native category owner.")
@@ -236,8 +281,8 @@ _HotstringsScopeCatalogue() {
 			Entries.Push(Entry)
 	}
 	for Pack in HotstringExtensions_Scan(_HotstringExtensions_CurrentRoots()) {
-		for File in Pack.toml_files {
-			Entries.Push({ Key: File.category, Path: File.path, IsPersonal: false,
+		for PackFile in Pack.toml_files {
+			Entries.Push({ Key: PackFile.category, Path: PackFile.path, IsPersonal: false,
 				IsExtension: true, ExtId: Pack.id })
 		}
 	}
@@ -268,13 +313,29 @@ _HotstringsScopeSourceKey(Path) {
 }
 
 
-/** Resolves only source metadata and the shared fallback, excluding user overrides. */
+/** Resolves only source metadata and the base expansion delay, excluding user overrides. */
 _HotstringsScopeInheritedDelay(Category, Section) {
-	global GLOBAL_DEFAULT_DELAY
 	Config := ParseTomlGroupConfig(Category)
 	if Config.Sections.Has(Section) && Config.Sections[Section].Delay != ""
 		return Config.Sections[Section].Delay
-	return Config.Delay != "" ? Config.Delay : GLOBAL_DEFAULT_DELAY
+	return Config.Delay != "" ? Config.Delay : HotstringsBaseDelay()
+}
+
+/**
+ * The leaves of the override file one category or section can hold: the personal
+ * fields, with the delay in its three spellings (current offset, unlimited flag
+ * and the absolute one of earlier builds).
+ */
+_HotstringsScopeOverrideLeaves() {
+	Leaves := []
+	for Field in _PersonalTomlOverrideFields() {
+		if Field == "delay" {
+			Leaves.Push("delay", "delay_offset", "delay_unlimited")
+			continue
+		}
+		Leaves.Push(Field)
+	}
+	return Leaves
 }
 
 /**
@@ -346,7 +407,7 @@ class HotstringsScopeFiles {
 				RowsByPath[Item.Path].Push({ Section: Section, Key: Item.Field, Delete: 1 })
 			} else {
 				Section := Item.Category . (Item.Sec == "" ? "" : "." . Item.Sec)
-				for Field in _PersonalTomlOverrideFields()
+				for Field in _HotstringsScopeOverrideLeaves()
 					RowsByPath[this.overrides].Push({ Section: Section, Key: Field, Delete: 1 })
 			}
 		}
@@ -366,9 +427,10 @@ class HotstringsScopeFiles {
 			; discard the measured recommendation during transaction preparation.
 			Found := false
 			for Index, Row in RowsByPath[this.overrides] {
-				if Row.Section == Section && Row.Key == "delay" {
-					RowsByPath[this.overrides][Index] := { Section: Section, Key: "delay",
-						Value: Recommendation["seconds"] }
+				if Row.Section == Section && Row.Key == "delay_offset" {
+					; The file stores delays as offsets of the base expansion delay.
+					RowsByPath[this.overrides][Index] := { Section: Section, Key: "delay_offset",
+						Value: Float(Round(Recommendation["seconds"] - HotstringsBaseDelay(), HOTSTRINGS_DELAY_DECIMALS)) }
 					Found := true
 					break
 				}
@@ -377,27 +439,14 @@ class HotstringsScopeFiles {
 				throw Error("A recommended hotstring delay has no owned reset row.")
 		}
 		for Category in ["_global", "dynamichotstrings"] {
-			for Field in _PersonalTomlOverrideFields()
+			for Field in _HotstringsScopeOverrideLeaves()
 				RowsByPath[this.overrides].Push({ Section: Category, Key: Field, Delete: 1 })
 		}
 		; Read after admission, independently of the live engine and UI caches.
 		DelimiterSourcePresent := FSStrictExists(this.overrides)
 		DelimiterSource := DelimiterSourcePresent ? FSReadUtf8Exact(this.overrides) : ""
 		if !(DelimiterSource is String)
-			throw Error("The admitted hotstring delimiter source is unreadable.")
-		Stored := _ParseTomlFileImpl(this.overrides, false, false, DelimiterSource)
-		GlobalSettings := Stored.Get("__global__", Map())
-		Delimiters := HSE_TerminatorRestoreDefaults(
-			GlobalSettings.Get("word_delimiters", ""), GlobalSettings.Get("consumed_delimiters", ""))
-		for Field, Pair in Map("word_delimiters", [Delimiters.Word, Delimiters.DefaultWord],
-				"consumed_delimiters", [Delimiters.Consumed, Delimiters.DefaultConsumed]) {
-			Row := { Section: "__global__", Key: Field }
-			if Pair[1] == Pair[2]
-				Row.Delete := 1
-			else
-				Row.Value := Pair[1]
-			RowsByPath[this.overrides].Push(Row)
-		}
+			throw Error("The admitted hotstring override source is unreadable.")
 		Candidates := []
 		for Path, Rows in RowsByPath {
 			; Several TOML sources may share an extension override category.
@@ -414,7 +463,7 @@ class HotstringsScopeFiles {
 				if Image.Get("status", "") == "ok"
 						&& (Image["source_present"] != DelimiterSourcePresent
 						|| !(Image["source_content"] == DelimiterSource))
-					throw Error("The admitted hotstring delimiter source changed during planning.")
+					throw Error("The admitted hotstring override source changed during planning.")
 			} else {
 				Present := FSStrictExists(Path)
 				Original := Present ? FSReadUtf8Exact(Path) : ""

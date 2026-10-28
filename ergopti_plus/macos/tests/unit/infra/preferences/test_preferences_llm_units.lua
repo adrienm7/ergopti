@@ -37,7 +37,8 @@ helpers.describe("canonical LLM debounce persistence", function()
 		local prefs, observed = fixture('[llm.trigger]\ndebounce_ms = 900\ndebounce = 4\n')
 		local state = prefs.load("config")
 		helpers.assert_eq(state.llm_debounce, 0.9)
-		state.llm_debounce = 0.2
+		-- The neutral value is the shared 500 ms default (PAR-18).
+		state.llm_debounce = 0.5
 		helpers.assert_eq(prefs.save("config", state, {}, {}), true)
 		local disk = Codec.decode(observed())
 		helpers.assert_eq(disk.llm.trigger.debounce_ms, nil)
@@ -61,6 +62,41 @@ helpers.describe("canonical LLM debounce persistence", function()
 		local after, next_writes = observed()
 		helpers.assert_eq(after, prior)
 		helpers.assert_eq(next_writes, writes)
+	end)
+	helpers.it("persists the \"never\" debounce as the shared sentinel and reads it back", function()
+		-- Never (no automatic trigger) is the one negative value: the unit
+		-- conversion asserted on it, so choosing it in the menu was never saved.
+		local Debounce = require("llm.request_plan.debounce")
+		local prefs, observed = fixture('[llm.trigger]\ndebounce_ms = 350\n')
+		local state = prefs.load("config")
+		state.llm_debounce = -1
+		helpers.assert_eq(prefs.save("config", state, {}, {}), true)
+		helpers.assert_eq(Codec.decode(observed()).llm.trigger.debounce_ms, Debounce.NEVER_MS)
+		helpers.assert_eq(prefs.load("config").llm_debounce, -1)
+		-- Any other negative stays refused rather than rounded to never.
+		state.llm_debounce = -0.5
+		local _, writes = observed()
+		helpers.assert_eq(prefs.save("config", state, {}, {}), false)
+		helpers.assert_eq(select(2, observed()), writes)
+		local outdated = fixture('[llm.trigger]\ndebounce_ms = -5\n[llm.generation]\nmin_words = 3\n')
+		local loaded = outdated.load("config")
+		helpers.assert_nil(loaded.llm_debounce)
+		helpers.assert_eq(loaded.llm_min_words, 3)
+	end)
+	helpers.it("round-trips the minimum request interval in milliseconds (request-floor-setting)", function()
+		local prefs, observed = fixture('[llm.trigger]\nmin_request_interval_ms = 750\n')
+		local state = prefs.load("config")
+		helpers.assert_eq(state.llm_min_request_interval, 0.75)
+		helpers.assert_eq(prefs.flat_key_for("llm.trigger.min_request_interval_ms"), "llm_min_request_interval")
+		state.llm_min_request_interval = 0
+		helpers.assert_eq(prefs.save("config", state, {}, {}), true)
+		helpers.assert_eq(Codec.decode(observed()).llm.trigger.min_request_interval_ms, 0)
+		helpers.assert_eq(prefs.load("config").llm_min_request_interval, 0)
+		-- No never for an interval: the sentinel is the debounce's only.
+		state.llm_min_request_interval = -1
+		local _, writes = observed()
+		helpers.assert_eq(prefs.save("config", state, {}, {}), false)
+		helpers.assert_eq(select(2, observed()), writes)
 	end)
 	helpers.it("ignores one invalid persisted duration without discarding the file (config-outdated-units)", function()
 		-- The unit conversion asserted inside the load: one bad leaf made the

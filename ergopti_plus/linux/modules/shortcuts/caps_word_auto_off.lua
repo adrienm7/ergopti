@@ -25,6 +25,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local Manifest = require("infra.manifest_reader")
@@ -35,10 +36,11 @@ local ConfigOutdated = require("config_outdated")
 local Policy = require("caps_word.auto_off")
 local EvdevCodes = require("infra.evdev_codes")
 local InputEvent = require("infra.input_event")
+local ConfigKeys = require("config_keys")
 
 local LOG = "modules.shortcuts.caps_word_auto_off"
 
-local SECTION = "shortcuts.caps_word"
+local SECTION = ConfigKeys.KEY.SHORTCUTS_CAPS_WORD
 local POINTER_SECTION = "shortcuts.caps_word.pointer"
 local IDLE_PATH = SECTION .. ".idle_timeout_seconds"
 local TERMINATORS_PATH = SECTION .. ".terminators"
@@ -177,9 +179,7 @@ local function resolve_terminators(value, mark)
 		ConfigOutdated.report(TERMINATORS_PATH, "a list of delimiter keys is expected", Logger)
 		return nil
 	end
-	local count = 0
-	for _ in pairs(value) do count = count + 1 end
-	if count ~= #value then
+	if TableUtil.count(value) ~= #value then
 		ConfigOutdated.report(TERMINATORS_PATH, "a list of delimiter keys is expected", Logger)
 		return nil
 	end
@@ -210,7 +210,7 @@ local function resolve_settings(document, mark)
 	if idle ~= nil then
 		if Policy.validate_idle_timeout(idle) then
 			settings.idle_timeout_seconds = idle
-			if mark then mark("shortcuts", "caps_word", "idle_timeout_seconds") end
+			if mark then mark("shortcuts", "caps_word", ConfigKeys.LEAF.IDLE_TIMEOUT_SECONDS) end
 		else
 			ConfigOutdated.report(IDLE_PATH, "the value is not a non-negative number of seconds", Logger)
 		end

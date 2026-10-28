@@ -63,21 +63,31 @@ local function schema_read_admitted(check, content, status)
 end
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
+local MetadataCommandStats = require("adapters.metadata_command_stats")
 local Manifest = require("infra.manifest_reader")
+local LEAF = require("config_keys").LEAF
+local KEY = require("config_keys").KEY
 local HotstringLanguages = require("hotstrings.languages")
 local ConfigOutdated = require("config_outdated")
+local ChoiceCatalogue = require("infra.hotstring_choice_catalogue")
 local BindingIdentity = require("config_binding_identity")
 local BindingPublication = require("config_binding_publication")
 local PersonalFiles = require("hotstrings.personal_files")
 local PersonalAdoption = require("infra.personal_file_adoption")
 local Agent     = require("llm.agent")
+local AppProfileOverrides = require("llm.app_profile_overrides")
+local ProfileRegistry = require("llm.profile_registry_codec")
+local NEVER_MS = require("llm.request_plan.debounce").NEVER_MS
 local HotstringCore = require("infra.hotstring_engine")
 local WrapPreferences = require("menu.wrap_preferences")
 local UserModels = require("config_user_models")
 local CapsWordPolicy = require("caps_word.auto_off")
+local PauseSwitchPolicy = require("layout.pause_switch_policy")
 local RecordList = require("toml_codec.record_list")
 local LOG       = "preferences"
 local OperationReporter = require("diagnostics.operation_reporter")
+local ConfigKeys = require("config_keys")
+local MetricsState = require("infra.metrics_state_keys")
 
 
 --- Top-level TOML section names in the order they appear on disk.
@@ -88,7 +98,7 @@ local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "lay
 ---   sec:  top-level TOML section
 ---   path: optional sub-section within sec (dot-separated, e.g. "dynamic")
 ---   key:  disk key name — defaults to the flat key when absent
---- This layer lets the TOML be clean (no ``llm_``, ``keylogger_`` prefixes,
+--- This layer lets the TOML be clean (no ``llm_``, ``keystats_`` prefixes,
 --- consistent ``enabled`` flags) while the in-memory state stays unchanged.
 local KEY_MAP = {
 	-- ── Gestures ──────────────────────────────────────────────────────────
@@ -97,9 +107,10 @@ local KEY_MAP = {
 
 	-- ── Hotstrings ─────────────────────────────────────────────────────────
 	keymap                               = { sec = "hotstrings", key = "enabled"                      },
-	repeat_key_enabled                   = { sec = "hotstrings", key = "repeat_key_enabled"           },
+	repeat_key_enabled                   = { sec = "hotstrings", key = ConfigKeys.LEAF.REPEAT_KEY_ENABLED           },
 	expansion_delay                      = { sec = "hotstrings"                                        },
 	idle_reset_seconds                   = { sec = "hotstrings"                                        },
+	cascade_max_arrows                   = { sec = "hotstrings"                                        },
 	click_resets_word                    = { sec = "hotstrings"                                        },
 	arrow_resets_word                    = { sec = "hotstrings"                                        },
 	shortcut_resets_word                 = { sec = "hotstrings"                                        },
@@ -115,9 +126,11 @@ local KEY_MAP = {
 	dynamichotstrings_enabled            = { sec = "hotstrings", path = "dynamic", key = "enabled"      },
 	dynamichotstrings_user_code_enabled  = { sec = "hotstrings", path = "dynamic.user_code", key = "enabled" },
 	dynamichotstrings_user_code_time_activation_seconds = {
-		sec = "hotstrings", path = "dynamic.user_code", key = "time_activation_seconds",
+		sec = "hotstrings", path = "dynamic.user_code", key = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS,
 	},
-	dynamichotstrings_date               = { sec = "hotstrings", path = "dynamic", key = "date"         },
+	-- The manifest keeps hotstrings.dynamic.date as a feature row: mapping the
+	-- boolean onto the row itself saved a bare `date = false` (field ledger L20).
+	dynamichotstrings_date               = { sec = "hotstrings", path = "dynamic.date", key = "enabled" },
 	dynamichotstrings_datefr             = { sec = "hotstrings", path = "dynamic", key = "datefr"       },
 	dynamichotstrings_datelongfr         = { sec = "hotstrings", path = "dynamic", key = "datelongfr"   },
 	dynamichotstrings_ibanprefixes       = { sec = "hotstrings", path = "dynamic", key = "ibanprefixes" },
@@ -127,17 +140,17 @@ local KEY_MAP = {
 	custom_close_on_add                  = { sec = "hotstrings", path = "editor", key = "close_on_add"   },
 	custom_default_section               = { sec = "hotstrings", path = "editor", key = "default_section" },
 
-	-- ── Metrics (formerly Keylogger) ───────────────────────────────────────
-	keylogger_enabled                    = { sec = "metrics", key = "enabled"                       },
-	keylogger_encrypt                    = { sec = "metrics", key = "encrypt"                       },
-	keylogger_float_colors               = { sec = "metrics", key = "float_colors"                  },
-	keylogger_float_graph                = { sec = "metrics", key = "float_graph"                   },
-	keylogger_float_wpm                  = { sec = "metrics", key = "float_wpm"                     },
-	keylogger_menubar_colors             = { sec = "metrics", key = "menubar_colors"                 },
-	keylogger_menubar_wpm                = { sec = "metrics", key = "menubar_wpm"                    },
-	keylogger_private_filter_enabled     = { sec = "metrics", key = "private_filter_enabled"        },
-	keylogger_secure_filter_enabled      = { sec = "metrics", key = "secure_filter_enabled"         },
-	keylogger_system_auth_filter_enabled = { sec = "metrics", key = "system_auth_filter_enabled"   },
+	-- ── Metrics (formerly Keystats) ───────────────────────────────────────
+	[MetricsState.ENABLED]                    = { sec = "metrics", key = "enabled"                       },
+	[MetricsState.ENCRYPT]                    = { sec = "metrics", key = "encrypt"                       },
+	[MetricsState.FLOAT_COLORS]               = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_COLORS             },
+	[MetricsState.FLOAT_GRAPH]                = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_GRAPH              },
+	[MetricsState.FLOAT_WPM]                  = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_VISIBLE            },
+	[MetricsState.MENUBAR_COLORS]             = { sec = "metrics", key = ConfigKeys.LEAF.WPM_MENUBAR_COLORS            },
+	[MetricsState.MENUBAR_WPM]                = { sec = "metrics", key = ConfigKeys.LEAF.WPM_MENUBAR_VISIBLE           },
+	[MetricsState.PRIVATE_FILTER_ENABLED]     = { sec = "metrics", key = ConfigKeys.LEAF.PRIVATE_FILTER_ENABLED        },
+	[MetricsState.SECURE_FILTER_ENABLED]      = { sec = "metrics", key = ConfigKeys.LEAF.SECURE_FILTER_ENABLED         },
+	[MetricsState.SYSTEM_AUTH_FILTER_ENABLED] = { sec = "metrics", key = ConfigKeys.LEAF.SYSTEM_AUTH_FILTER_ENABLED   },
 
 	-- ── LLM ────────────────────────────────────────────────────────────────
 	llm_enabled                          = { sec = "llm", key = "enabled"                           },
@@ -145,48 +158,56 @@ local KEY_MAP = {
 	llm_model_mlx                        = { sec = "llm", path = "models", key = "mlx"            },
 	llm_model_ollama                     = { sec = "llm", path = "models", key = "ollama"         },
 	llm_active_profile                   = { sec = "llm", path = "profiles", key = "active"        },
-	llm_num_predictions                  = { sec = "llm", path = "profiles", key = "num_predictions" },
-	llm_debounce                         = { sec = "llm", path = "trigger", key = "debounce_ms", units_per_state = 1000 },
-	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = "instant_on_word_end" },
-	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = "after_hotstring" },
-	llm_url_bar_filter_enabled           = { sec = "llm", path = "trigger", key = "url_bar_filter_enabled" },
-	llm_secure_field_filter_enabled      = { sec = "llm", path = "trigger", key = "secure_filter_enabled" },
-	llm_context_length                   = { sec = "llm", path = "generation", key = "context_length" },
-	llm_min_words                        = { sec = "llm", path = "generation", key = "min_words"   },
-	llm_max_words                        = { sec = "llm", path = "generation", key = "max_words"   },
+	llm_num_predictions                  = { sec = "llm", path = "profiles", key = ConfigKeys.LEAF.NUM_PREDICTIONS },
+	llm_debounce                         = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.DEBOUNCE_MS, units_per_state = 1000, never = true },
+	llm_min_request_interval             = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.MIN_REQUEST_INTERVAL_MS, units_per_state = 1000 },
+	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.INSTANT_ON_WORD_END },
+	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.AFTER_HOTSTRING },
+	llm_url_bar_filter_enabled           = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.URL_BAR_FILTER_ENABLED },
+	llm_secure_field_filter_enabled      = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.SECURE_FILTER_ENABLED },
+	llm_context_length                   = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.CONTEXT_LENGTH },
+	llm_min_words                        = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.MIN_WORDS   },
+	llm_max_words                        = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.MAX_WORDS   },
 	llm_temperature                      = { sec = "llm", path = "generation", key = "temperature" },
-	llm_auto_raise_temp                  = { sec = "llm", path = "generation", key = "auto_raise_temp" },
-	llm_reset_on_nav                     = { sec = "llm", path = "generation", key = "reset_on_nav" },
-	llm_sequential_mode                  = { sec = "llm", path = "generation", key = "sequential_mode" },
-	llm_show_info_bar                    = { sec = "llm", path = "display", key = "show_info_bar" },
+	llm_auto_raise_temp                  = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.AUTO_RAISE_TEMP },
+	llm_reset_on_nav                     = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.RESET_ON_NAV },
+	llm_sequential_mode                  = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.SEQUENTIAL_MODE },
+	llm_show_info_bar                    = { sec = "llm", path = "display", key = ConfigKeys.LEAF.SHOW_INFO_BAR },
 	llm_streaming                        = { sec = "llm", path = "display", key = "streaming"     },
-	llm_streaming_multi                  = { sec = "llm", path = "display", key = "streaming_multi" },
-	llm_pred_indent                      = { sec = "llm", path = "display", key = "pred_indent"   },
-	llm_arrow_nav_enabled                = { sec = "llm", path = "navigation", key = "arrow_nav_enabled" },
-	llm_val_modifiers                    = { sec = "llm", path = "navigation", key = "val_modifiers" },
+	llm_streaming_multi                  = { sec = "llm", path = "display", key = ConfigKeys.LEAF.STREAMING_MULTI },
+	llm_pred_indent                      = { sec = "llm", path = "display", key = ConfigKeys.LEAF.PRED_INDENT   },
+	llm_arrow_nav_enabled                = { sec = "llm", path = "navigation", key = ConfigKeys.LEAF.ARROW_NAV_ENABLED },
+	llm_val_modifiers                    = { sec = "llm", path = "navigation", key = ConfigKeys.LEAF.VAL_MODIFIERS },
 	-- The AI agent (modules/llm/agent_runner.lua): System 1 and System 2 backends and the mode
-	llm_agent_system1                    = { sec = "llm", key = "agent_system1"                     },
-	llm_agent_system2                    = { sec = "llm", key = "agent_system2"                     },
-	llm_agent_mode                       = { sec = "llm", key = "agent_mode"                        },
+	llm_agent_system1                    = { sec = "llm", key = ConfigKeys.LEAF.AGENT_SYSTEM1                     },
+	llm_agent_system2                    = { sec = "llm", key = ConfigKeys.LEAF.AGENT_SYSTEM2                     },
+	llm_agent_mode                       = { sec = "llm", key = ConfigKeys.LEAF.AGENT_MODE                        },
+	-- Per-application prompt profiles: the v1 text of _shared/lua/llm/app_profile_overrides.lua
+	llm_app_profile_overrides            = { sec = "llm", key = LEAF.APP_PROFILE_OVERRIDES          },
+	-- User prompt profiles: the v1 envelope Windows and Linux store at the same key,
+	-- decoded into the profile list at the persistence boundary (scalar_units).
+	llm_user_profiles                    = { sec = "llm", key = LEAF.USER_PROFILES, codec = ProfileRegistry },
 
 	-- ── Layout ─────────────────────────────────────────────────────────────
-	layout_number_row_mode               = { sec = "layout", key = "direct_access_digits", enum = true },
+	layout_number_row_mode               = { sec = "layout", key = ConfigKeys.LEAF.DIRECT_ACCESS_DIGITS, enum = true },
 	-- Declared for macOS like the ordering it extends: kept, never applied here.
-	layout_number_row_reorder_edges      = { sec = "layout", key = "number_row_reorder_edges" },
-	layout_pause_switch_enabled          = { sec = "layout", key = "pause_switch_enabled"    },
-	layout_on_pause                      = { sec = "layout", key = "on_pause"                },
-	layout_on_resume                     = { sec = "layout", key = "on_resume"               },
+	layout_number_row_reorder_edges      = { sec = "layout", key = ConfigKeys.LEAF.NUMBER_ROW_REORDER_EDGES },
+	layout_pause_switch_enabled          = { sec = "layout", key = ConfigKeys.LEAF.PAUSE_SWITCH_ENABLED    },
+	layout_on_pause                      = { sec = "layout", key = ConfigKeys.LEAF.ON_PAUSE                },
+	layout_on_resume                     = { sec = "layout", key = ConfigKeys.LEAF.ON_RESUME               },
+	-- The Karabiner virtual keyboard type (auto / iso / ansi): platform/remap deploys it.
+	layout_virtual_keyboard              = { sec = "layout", key = LEAF.VIRTUAL_KEYBOARD, enum = true },
 
 	-- ── Shortcuts ──────────────────────────────────────────────────────────
 	shortcuts                            = { sec = "shortcuts", key = "enabled"              },
 	chatgpt_url                          = { sec = "shortcuts"                                },
-	script_control_enabled               = { sec = "shortcuts", path = "script_control", key = "chords_enabled" },
-	caps_word_idle_timeout_seconds       = { sec = "shortcuts", path = "caps_word", key = "idle_timeout_seconds" },
+	script_control_enabled               = { sec = "shortcuts", path = require("config_keys").LEAF.SCRIPT_CONTROL, key = "chords_enabled" },
+	caps_word_idle_timeout_seconds       = { sec = "shortcuts", path = "caps_word", key = ConfigKeys.LEAF.IDLE_TIMEOUT_SECONDS },
 	caps_word_terminators                = { sec = "shortcuts", path = "caps_word", key = "terminators" },
 
 	-- ── Updater ────────────────────────────────────────────────────────────
 	update_channel                       = { sec = "updater",  key = "channel"               },
-	update_check_interval_seconds        = { sec = "updater",  key = "check_interval_seconds" },
+	update_check_interval_seconds        = { sec = "updater",  key = ConfigKeys.LEAF.CHECK_INTERVAL_SECONDS },
 
 	-- ── Interface ──────────────────────────────────────────────────────────
 	menubar_icon                         = { sec = "ui"                                        },
@@ -215,22 +236,22 @@ local NESTED_KEY_MAP = {
 	hotstrings               = { sec = "hotstrings", key = "groups"                    },
 	section_states           = { sec = "hotstrings", key = "modules"                   },
 	terminator_states        = { sec = "hotstrings", key = "terminator_states"          },
-	sections_order_overrides = { sec = "hotstrings", key = "order_overrides"            },
+	terminator_consume       = { sec = "hotstrings", key = "terminator_consume"         },
+	sections_order_overrides = { sec = "hotstrings", key = ConfigKeys.LEAF.ORDER_OVERRIDES            },
 	custom_editor_shortcut   = { sec = "hotstrings", key = "editor.shortcut"            },
 	custom_terminators       = { sec = "hotstrings", key = "terminators"                },
 	custom_delimiters        = { sec = "hotstrings", key = "delimiters"                 },
 	-- Metrics nested tables
-	keylogger_disabled_apps  = { sec = "metrics",    key = "disabled_apps"              },
+	[MetricsState.DISABLED_APPS]  = { sec = "metrics",    key = ConfigKeys.LEAF.DISABLED_APPS              },
 	-- LLM nested tables
 	llm_disabled_apps        = { sec = "llm",        key = "trigger.disabled_apps"      },
 	llm_nav_modifiers        = { sec = "llm",        key = "navigation.nav_modifiers"   },
 	llm_profile_shortcuts    = { sec = "llm",        key = "profiles.shortcuts"         },
 	llm_user_models          = { sec = "llm",        key = "models.user_models"         },
-	llm_user_profiles        = { sec = "llm",        key = "profiles.user_profiles"     },
-	llm_agent_disabled_apps  = { sec = "llm",        key = "agent_disabled_apps"        },
+	llm_agent_disabled_apps  = { sec = "llm",        key = ConfigKeys.LEAF.AGENT_DISABLED_APPS        },
 	-- Shortcuts nested tables
 	shortcut_keys            = { sec = "shortcuts",  key = "keys"                       },
-	script_control_shortcuts = { sec = "shortcuts",  key = "script_control"             },
+	script_control_shortcuts = { sec = "shortcuts",  key = ConfigKeys.LEAF.SCRIPT_CONTROL             },
 	-- One boolean per manifest pointer kind (infra/capsword_auto_off).
 	caps_word_pointer        = { sec = "shortcuts",  key = "caps_word.pointer"          },
 	wrap_symbol_states       = WrapPreferences.locations.wrap_symbol_states,
@@ -309,8 +330,30 @@ local function delay_fits(key, value)
 	return true
 end
 
+--- The user profiles an older macOS build kept as an array at [llm.profiles]
+--- user_profiles, importable only while the shared llm.user_profiles key is
+--- absent: the shared envelope wins once it exists. The migration registry cannot
+--- carry them (its closed ops cannot re-encode a value, and the Windows engine
+--- validates the same registry), so this reader is their one migration; the save
+--- deletes the old array in the same write that stores the envelope.
+--- @param llm table|nil Decoded [llm] table.
+--- @return table|nil profiles Detached dense array, nil when there is nothing to import.
+local function legacy_user_profiles(llm)
+	if type(llm) ~= "table" or llm.user_profiles ~= nil then return nil end
+	local profiles = type(llm.profiles) == "table" and llm.profiles.user_profiles or nil
+	if type(profiles) ~= "table" or #profiles == 0 then return nil end
+	local encodable, envelope = pcall(ProfileRegistry.encode, profiles)
+	if not encodable then
+		-- Not imported means not deleted: the array stays on disk for a later build.
+		Logger.error(LOG, "Older [llm.profiles] user_profiles cannot be imported; keeping it untouched: %s",
+			tostring(envelope))
+		return nil
+	end
+	return ProfileRegistry.decode(envelope)
+end
+
 --- The prompt profile ids a document can name: the shipped built-ins and the
---- document's own [llm.profiles] user_profiles, plus the legacy ids the active
+--- document's own llm.user_profiles, plus the legacy ids the active
 --- profile's owner still migrates silently. nil when the shipped list cannot
 --- be read: nothing can then be proved gone, and every reference is kept.
 --- @param grouped table Decoded config.toml.
@@ -326,8 +369,13 @@ local function known_profile_ids(grouped)
 	end
 	for old in pairs(Selector.load_legacy_ids()) do legacy[old] = true end
 	local llm = type(grouped.llm) == "table" and grouped.llm or {}
-	local profiles = type(llm.profiles) == "table" and llm.profiles or {}
-	for _, profile in ipairs(type(profiles.user_profiles) == "table" and profiles.user_profiles or {}) do
+	-- An unreadable registry is reported by its own reader; it names no profile.
+	local stored = llm.user_profiles
+	local readable, user_profiles = false, nil
+	if type(stored) == "string" and not ProfileRegistry.is_outdated(stored) then
+		readable, user_profiles = pcall(ProfileRegistry.decode, stored)
+	end
+	for _, profile in ipairs(readable and user_profiles or legacy_user_profiles(llm) or {}) do
 		if type(profile) == "table" and type(profile.id) == "string" then ids[profile.id] = true end
 	end
 	return ids, legacy
@@ -388,6 +436,20 @@ local function terminator_state_owner(document)
 	end
 end
 
+--- Builds the owner check of [hotstrings.terminator_consume]: a consume choice
+--- belongs to a built-in terminator only; a custom one carries its choice in its
+--- own record.
+--- @return function is_known `is_known(key, consumed)`.
+local function terminator_consume_owner()
+	return function(key, consumed)
+		if not BUILTIN_TERMINATORS[key] then
+			return false, "no built-in delimiter has this key"
+		end
+		if type(consumed) ~= "boolean" then return false, "the value is not a boolean" end
+		return true
+	end
+end
+
 --- Owner check of one [hotstrings.groups] or [hotstrings.modules.<id>] choice:
 --- the hotstring projection applies true or false only.
 --- @param _ string Choice id.
@@ -397,6 +459,20 @@ end
 local function boolean_choice(_, value)
 	if type(value) == "boolean" then return true end
 	return false, "a hotstring choice takes true or false"
+end
+
+--- Owner check of one [hotstrings.groups] entry: a boolean naming a category the
+--- loaded catalogue still ships. Boot publishes the catalogue after this reader
+--- ran, so the first load judges the type only and the cleanup judges the name.
+--- @param id string Category id.
+--- @param value any Persisted value.
+--- @return boolean known
+--- @return string|nil detail
+local function category_choice(id, value)
+	local fits, detail = boolean_choice(id, value)
+	if not fits then return false, detail end
+	if ChoiceCatalogue.retired(id) then return false, "no loaded hotstring category has this id" end
+	return true
 end
 
 --- Partitions [hotstrings.modules]: each child is one category's table of
@@ -415,8 +491,15 @@ local function partition_section_choices(prefix, modules, mark)
 			ConfigOutdated.report(path, "not a text key")
 		elseif type(sections) ~= "table" or #sections > 0 then
 			ConfigOutdated.report(path, "section choices are not a table")
+		elseif ChoiceCatalogue.retired(id) then
+			ConfigOutdated.report(path, "no loaded hotstring category has this id")
 		else
-			kept[id] = ConfigOutdated.partition(path, sections, boolean_choice, mark)
+			kept[id] = ConfigOutdated.partition(path, sections, function(name, value)
+				local fits, detail = boolean_choice(name, value)
+				if not fits then return false, detail end
+				if ChoiceCatalogue.retired(id, name) then return false, "no loaded hotstring section has this name" end
+				return true
+			end, mark)
 		end
 	end
 	return kept
@@ -459,6 +542,17 @@ local function section_order_fits(value, shapes)
 	return true
 end
 
+--- Owner check of one [hotstrings.order_overrides] entry's category.
+--- @param id string Category id.
+--- @param value any Persisted section order.
+--- @param shapes table|nil Canonical document receipt.
+--- @return boolean known
+--- @return string|nil detail
+local function section_order_choice(id, value, shapes)
+	if ChoiceCatalogue.retired(id) then return false, "no loaded hotstring category has this id" end
+	return section_order_fits(value, shapes)
+end
+
 --- Set of known top-level section names for fast lookup.
 local _known_sections = {}
 for _, s in ipairs(SECTIONS) do _known_sections[s] = true end
@@ -494,7 +588,14 @@ end
 --- @param reading boolean True when reading canonical disk units.
 --- @return any converted Native or persisted representation.
 local function scalar_units(spec, value, reading)
+	if spec and spec.codec then
+		if reading then return spec.codec.decode(value) end
+		return spec.codec.encode(value)
+	end
 	if not spec or not spec.units_per_state then return value end
+	-- "Never" is stored as the shared sentinel, not scaled: its native value is
+	-- the same -1.
+	if spec.never and value == NEVER_MS then return NEVER_MS end
 	assert(type(value) == "number" and value == value and value >= 0 and value < math.huge,
 		"configuration duration must be a finite non-negative number")
 	local result = reading and value / spec.units_per_state or value * spec.units_per_state
@@ -509,7 +610,17 @@ end
 --- @return boolean fits
 --- @return string|nil detail Why the value is outdated.
 local function persisted_units_fit(spec, value)
+	if spec and spec.codec then
+		-- An older build's list or a registry this build cannot read is outdated
+		-- as a whole: decoding it at the boundary would fail the whole file.
+		if type(value) ~= "string" or spec.codec.is_outdated(value) then
+			return false, "an older build's list is stored here"
+		end
+		if not pcall(spec.codec.decode, value) then return false, "the stored list cannot be read" end
+		return true
+	end
 	if not spec or not spec.units_per_state then return true end
+	if spec.never and value == NEVER_MS then return true end
 	if type(value) ~= "number" or value ~= value or value < 0 or value >= math.huge then
 		return false, "the value is not a finite non-negative number"
 	end
@@ -532,6 +643,11 @@ local SCALAR_VALUE_RULES = {
 		if HotstringCore.valid_idle_reset_seconds(value) then return true end
 		return false, "the idle reset is not a finite non-negative number of seconds"
 	end,
+	-- The engine's own rule: a whole number from 1 (no cascade) to 10.
+	cascade_max_arrows = function(value)
+		if HotstringCore.valid_cascade_max_arrows(value) then return true end
+		return false, "the cascade arrow count is not a whole number from 1 to 10"
+	end,
 	click_resets_word = function(value)
 		if type(value) == "boolean" then return true end
 		return false, "the click reset is not a boolean"
@@ -548,12 +664,21 @@ local SCALAR_VALUE_RULES = {
 		if Agent.MODES[value] then return true end
 		return false, "'" .. tostring(value) .. "' is no longer an agent mode"
 	end,
+	llm_app_profile_overrides = function(value)
+		local overrides, reason = AppProfileOverrides.decode(value)
+		if overrides ~= nil then return true end
+		return false, "the application profile overrides are unreadable (" .. tostring(reason) .. ")"
+	end,
 }
 -- The CapsWord delay and delimiters follow the shared policy's rules.
 SCALAR_VALUE_RULES.caps_word_idle_timeout_seconds = function(value)
 	if CapsWordPolicy.validate_idle_timeout(value) then return true end
 	return false, "the CapsWord delay is not a finite non-negative number of seconds"
 end
+-- The pause and resume layouts are layout ids or "" (no change), by the
+-- shared policy; a legacy `false` from the boolean declaration is outdated.
+SCALAR_VALUE_RULES.layout_on_pause = PauseSwitchPolicy.valid_target
+SCALAR_VALUE_RULES.layout_on_resume = PauseSwitchPolicy.valid_target
 SCALAR_VALUE_RULES.caps_word_terminators = function(value)
 	local valid, reason = CapsWordPolicy.validate_terminators(value)
 	if valid then return true end
@@ -576,6 +701,32 @@ local function scalar_value_fits(flat_key, value)
 	local entry = Manifest.find_entry_by_path(path)
 	if type(entry) ~= "table" or entry.type ~= "enum" then return true end
 	return ConfigOutdated.manifest_value_fits(entry, value, "hs")
+end
+
+--- Lua type a stored value has for the manifest entry types whose name is not
+--- a Lua type: a feature row and an array both persist as TOML tables.
+local VALUE_LUA_TYPE = { array = "table", feature = "table" }
+
+--- Whether a persisted scalar has the type and value its manifest entry
+--- declares. load() and current_view() both admit values through this one
+--- rule: the view kept a second, stricter copy and refused a `date = true`
+--- load took (field ledger L20, "value_type at hotstrings.dynamic.date").
+--- A codec value was checked against its stored form by persisted_units_fit.
+--- @param flat_key string Flat state key.
+--- @param value any Persisted value.
+--- @return boolean fits
+--- @return string|nil detail Why the value is outdated.
+local function manifest_type_fits(flat_key, value)
+	local spec = KEY_MAP[flat_key]
+	if not spec or spec.codec then return true end
+	local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or flat_key)
+	local entry = Manifest.find_entry_by_path(path)
+	if not entry then return true end
+	local expected = VALUE_LUA_TYPE[entry.type] or entry.type
+	if entry.type ~= "enum" and type(value) ~= expected then
+		return false, "a " .. tostring(entry.type) .. " is expected here, not a " .. type(value)
+	end
+	return ConfigOutdated.manifest_value_fits(entry, value, "hs", SCALAR_VALUE_RULES[flat_key])
 end
 
 --- Resolves canonical defaults/operations into the units used by their native owner.
@@ -743,6 +894,24 @@ local function flatten_from_disk(grouped, mark, shapes)
 	local function take(...)
 		if mark then mark(...) end
 	end
+	-- A scalar where an owned value's table belongs (`layout = 3`, the bare
+	-- `hotstrings.dynamic.date = true` of field ledger L20) is outdated on its
+	-- own. The read-only view refused it with a second rule load never applied.
+	for _, spec in pairs(KEY_MAP) do
+		local node, segments = grouped[spec.sec], { spec.sec }
+		if node ~= nil and type(node) ~= "table" then
+			ConfigOutdated.report(segments, "a table of settings is expected here")
+		else
+			for segment in (spec.path or ""):gmatch("[^.]+") do
+				node = node and node[segment]
+				segments[#segments + 1] = segment
+				if node ~= nil and type(node) ~= "table" then
+					ConfigOutdated.report(segments, "a table of settings is expected here")
+					break
+				end
+			end
+		end
+	end
 	--- Takes one owned value, unless it cannot cross its unit boundary: such a
 	--- leaf (`debounce_ms = "fast"`) is outdated on its own, and used to make
 	--- the whole file load as corrupt.
@@ -769,6 +938,7 @@ local function flatten_from_disk(grouped, mark, shapes)
 				Manifest.find_entry_by_path(table.concat({ ... }, ".")), value, "hs")
 		end
 		if fits then fits, detail = scalar_value_fits(flat_key, value) end
+		if fits then fits, detail = manifest_type_fits(flat_key, value) end
 		if fits and flat_key == "llm_active_profile" then
 			-- A deleted or renamed profile silently ran "basic" at every prediction.
 			local ids, legacy = document_profile_ids()
@@ -846,11 +1016,14 @@ local function flatten_from_disk(grouped, mark, shapes)
 						elseif nested_fk == "terminator_states" then
 							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
 								terminator_state_owner(grouped), mark)
+						elseif nested_fk == "terminator_consume" then
+							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
+								terminator_consume_owner(), mark)
 						elseif nested_fk == "hotstrings" then
 							-- The hotstring projection asserts booleans: an old-shape
 							-- choice reaching it failed the boot hotstrings sync.
 							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
-								boolean_choice, mark)
+								category_choice, mark)
 						elseif nested_fk == "section_states" then
 							flat[nested_fk] = partition_section_choices({ sec_name, disk_key }, owned, mark)
 						elseif nested_fk == "sections_order_overrides" then
@@ -859,7 +1032,7 @@ local function flatten_from_disk(grouped, mark, shapes)
 								flat[nested_fk] = {}
 							else
 								flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
-									function(_, value) return section_order_fits(value, shapes) end, mark)
+									function(id, value) return section_order_choice(id, value, shapes) end, mark)
 							end
 						elseif nested_fk == "delays" then
 							-- A retired delay was ignored by set_delay and saved back
@@ -960,6 +1133,11 @@ local function flatten_from_disk(grouped, mark, shapes)
 			end
 		end
 	end
+	local imported = legacy_user_profiles(grouped.llm)
+	if imported then
+		flat.llm_user_profiles = ProfileRegistry.encode(imported)
+		take(KEY.LLM, LEAF.PROFILES, LEAF.USER_PROFILES)
+	end
 	for key, value in pairs(flat) do flat[key] = scalar_units(KEY_MAP[key], value, true) end
 	return flat
 end
@@ -984,6 +1162,7 @@ function M.build_initial_state(hotfiles, menu_mods, core_mods)
 		hotstrings               = {},
 		sections_order_overrides = {},
 		terminator_states        = {},
+		terminator_consume       = {},
 		delays                   = {},
 	}
 
@@ -1034,14 +1213,14 @@ local _load_outdated = {}
 --- @return table|nil snapshot Exact `ok`/`absent` source classification.
 local function classify_source(prefs_file, on_error)
 	local schema_check = capture_schema_read(prefs_file, FileSystem)
-	if schema_check == false then return nil end
+	if schema_check == false then return nil, "schema_owner_unavailable" end
 	local content, read_status = FileSystem.read_with_status(prefs_file, on_error)
-	if not schema_read_admitted(schema_check, content, read_status) then return nil end
+	if not schema_read_admitted(schema_check, content, read_status) then return nil, "schema_refused" end
 	if read_status == "ok" and type(content) == "string" then
 		return { status = "ok", content = content }
 	end
 	if read_status == "absent" then return { status = "absent" } end
-	return nil
+	return nil, "unreadable"
 end
 
 --- Compares two exact source classifications.
@@ -1190,39 +1369,37 @@ end
 --- Reads current canonical preferences without adopting overwrite authority.
 --- This view is admission evidence only; load/save alone own source snapshots.
 --- @param prefs_file string Canonical configuration path.
+--- @param tolerate_outdated boolean|nil True for a read-only consumer: an entry this build
+---   no longer knows is then left out of the view (already warned once) instead of refusing it.
+---   A transaction that writes the file back keeps the strict view, which would drop that entry.
 --- @return table|nil flat Current owned preferences, nil on a refused view.
 --- @return table|nil source Exact classified bytes read for this view.
-function M.current_view(prefs_file)
-	if type(prefs_file) ~= "string" or prefs_file == "" or _owned_publications[prefs_file] then return nil end
-	local called, values, source = pcall(function()
-		local current = classify_source(prefs_file)
-		if not current then return nil end
+--- @return string|nil reason Closed refusal cause when flat is nil: invalid_path,
+---   publication_in_flight, schema_owner_unavailable, schema_refused, unreadable,
+---   undecodable, outdated_keys or raised.
+--- @return string|nil key For outdated_keys, the first config.toml path load() leaves out
+---   ("layout.pause_switch_enabled"): the 2026-10-27 19:47 field run refused the view on
+---   every regeneration and nothing said which key held it. Never the value itself.
+function M.current_view(prefs_file, tolerate_outdated)
+	if type(prefs_file) ~= "string" or prefs_file == "" then return nil, nil, "invalid_path" end
+	if _owned_publications[prefs_file] then return nil, nil, "publication_in_flight" end
+	local called, values, source, reason, key_path = pcall(function()
+		local current, refusal = classify_source(prefs_file)
+		if not current then return nil, nil, refusal end
 		if current.status == "absent" then return {}, current end
 		local decoded, shapes = require("toml_codec.leaf_rows").decode_source(current.content)
-		if type(decoded) ~= "table" then return nil end
-		for _, spec in pairs(KEY_MAP) do
-			local node = decoded[spec.sec]
-			if node ~= nil and type(node) ~= "table" then return nil end
-			for segment in (spec.path or ""):gmatch("[^.]+") do
-				node = node and node[segment]
-				if node ~= nil and type(node) ~= "table" then return nil end
-			end
-		end
+		if type(decoded) ~= "table" then return nil, nil, "undecodable" end
+		-- The very walk and admission load() applies: a value load leaves out as
+		-- outdated is left out here too, never refused by a second rule.
 		local flat
 		local outdated = ConfigOutdated.collect_reports(function() flat = flatten_from_disk(decoded, nil, shapes) end)
-		if next(outdated) ~= nil then return nil end
-		for key, value in pairs(flat) do
-			local spec = KEY_MAP[key]
-			if spec then
-				local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or key)
-				local entry = Manifest.find_entry_by_path(path)
-				if entry and entry.type ~= "enum" and type(value) ~= (entry.type == "array" and "table" or entry.type) then return nil end
-				if entry and not ConfigOutdated.manifest_value_fits(entry, value, "hs", SCALAR_VALUE_RULES[key]) then return nil end
-			end
+		if next(outdated) ~= nil and tolerate_outdated ~= true then
+			return nil, nil, "outdated_keys", require("table_util").sorted_keys(outdated)[1]
 		end
 		return flat, current
 	end)
-	if not called then return nil end
+	if not called then return nil, nil, "raised" end
+	if values == nil then return nil, nil, reason, key_path end
 	return values, source
 end
 
@@ -1352,7 +1529,7 @@ function M.prepare_gesture_updates(source, updates)
 	local admitted_updates, retained_script_inline = {}, false
 	for _, row in ipairs(updates) do
 		local retained_script = false
-		if row.section == "gestures.action_parameters" and type(row.key) == "string" and row.key:sub(1, 8) == "script__" then
+		if row.section == ConfigKeys.KEY.GESTURES_ACTION_PARAMETERS and type(row.key) == "string" and row.key:sub(1, 8) == "script__" then
 			local parameters = disk_gestures.action_parameters
 			local prior = type(parameters) == "table" and parameters[row.key] or nil
 			if row.delete ~= true and prior ~= nil and rawequal(prior, row.value) then
@@ -1428,7 +1605,7 @@ local function prepare_inline_updates(source, updates, root)
 		for _, row in ipairs(updates) do
 			local path = require("toml_codec.key_path").parse(row.section, true)
 			if path then path[#path + 1] = row.key end
-			if path and #path == 3 and path[1] == "llm" and path[2] == "models" and path[3] == "user_models" then
+			if path and #path == 3 and path[1] == "llm" and path[2] == "models" and path[3] == require("config_keys").LEAF.USER_MODELS then
 				-- A scope's neutral list is not an explicit obsolete-entry cleanup.
 				assert(row.delete or type(row.value) == "table" and next(row.value) == nil,
 					"Obsolete user model list 'llm.models.user_models' requires manual source cleanup before replacement")
@@ -1481,7 +1658,7 @@ local function prepare_inline_updates(source, updates, root)
 				parent = #segments > 0 and require("toml_codec.key_path").render(segments) or ""
 			else parent = parent:match("^(.*)%.[^.]+$") or "" end
 		end
-		if path == "llm.profiles.shortcuts" and type(row.value) == "table" and next(row.value) == nil then
+		if path == ConfigKeys.KEY.LLM_PROFILES_SHORTCUTS and type(row.value) == "table" and next(row.value) == nil then
 			-- An empty runtime dictionary owns no unknown profile leaves on disk.
 		elseif inline[parent] and not direct_parents[parent] then
 			local candidate = candidates[parent] or clone_value(inline[parent].value)
@@ -1558,7 +1735,7 @@ local function prepare_order_updates(source, updates)
 	for _, row in ipairs(updates) do
 		local path = KeyPath.parse(row.section, true)
 		if path then path[#path + 1] = row.key end
-		if path and path[1] == "hotstrings" and path[2] == "order_overrides" then relevant = true end
+		if path and path[1] == "hotstrings" and path[2] == require("config_keys").LEAF.ORDER_OVERRIDES then relevant = true end
 	end
 	if not relevant then return updates end
 	local document, shapes = require("toml_codec.leaf_rows").decode_source(source.content or "")
@@ -1578,21 +1755,21 @@ local function prepare_order_updates(source, updates)
 	for _, row in ipairs(updates) do
 		local path = KeyPath.parse(row.section, true)
 		if path then path[#path + 1] = row.key end
-		if path and path[1] == "hotstrings" and path[2] == "order_overrides" and #path == 2 and not row.delete then
+		if path and path[1] == "hotstrings" and path[2] == require("config_keys").LEAF.ORDER_OVERRIDES and #path == 2 and not row.delete then
 			assert(section_orders_are_map(row.value), "section orders candidate is not a table of settings")
 		end
-		if not path or path[1] ~= "hotstrings" or path[2] ~= "order_overrides" then
+		if not path or path[1] ~= "hotstrings" or path[2] ~= require("config_keys").LEAF.ORDER_OVERRIDES then
 			prepared[#prepared + 1] = row
 		elseif #path == 2 and (row.delete or type(row.value) == "table" and next(row.value) == nil) then
 			if not malformed_parent and next(bad) == nil then
 				prepared[#prepared + 1] = row
 			elseif not malformed_parent then
 				for id in pairs(orders) do
-					if not bad[id] then prepared[#prepared + 1] = { section = "hotstrings.order_overrides", key = id, delete = true } end
+					if not bad[id] then prepared[#prepared + 1] = { section = ConfigKeys.KEY.HOTSTRINGS_ORDER_OVERRIDES, key = id, delete = true } end
 				end
 			end
 		elseif malformed_parent or #path == 2 and next(bad) ~= nil or bad[path[3]] then
-			if not row.delete then refuse(malformed_parent and { "hotstrings", "order_overrides" } or path) end
+			if not row.delete then refuse(malformed_parent and { "hotstrings", require("config_keys").LEAF.ORDER_OVERRIDES } or path) end
 		else
 			assert(#path <= 3, "section order mutations must address a whole text list")
 			if not row.delete then
@@ -1892,6 +2069,24 @@ local function script_parameter_admission()
 	end
 end
 
+-- A whole-snapshot save that holds the main thread this long delays event taps
+-- and the Karabiner lease heartbeat (issue #101: 300 operations, 1.7 s). The
+-- report names the phase because the batch size alone did not explain the hold.
+local SLOW_SAVE_REPORT_MS = 250
+local NANOSECONDS_PER_MILLISECOND = 1000000
+--- Prepare stages of a save, in report order (L17).
+local SAVE_PREPARE_STAGES = { "snapshot", "decode", "models", "sparse", "wrap", "rows",
+	"gestures", "llm", "shortcuts", "hotstrings" }
+
+--- Reads the monotonic clock, or nil when the host has none (headless runs).
+--- @return number|nil nanoseconds
+local function save_clock()
+	local host_timer = type(hs) == "table" and hs.timer or nil
+	if type(host_timer) ~= "table" or type(host_timer.absoluteTime) ~= "function" then return nil end
+	local ok, value = pcall(host_timer.absoluteTime)
+	return ok and type(value) == "number" and value or nil
+end
+
 --- Save the current state to the TOML configuration file. Atomic via
 --- .tmp + rename so a crash mid-write cannot leave a half-written
 --- file on disk. The sections Preferences owns come from the state; every
@@ -1925,6 +2120,18 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		return false
 	end
 	local script_admission = script_parameter_admission()
+	-- L17: prepare held 1.25 s on the Mac for 293 operations; each stage clock
+	-- names its share so the next slow-save line says which one dominates.
+	local save_started = save_clock()
+	-- The Lua heap before and after says whether a collection ran inside a
+	-- slow save: the Mac's prepare took 20 times the local CPU cost.
+	local heap_before_kb = collectgarbage("count")
+	local stage_ms, stage_last = {}, save_started
+	local function stage(name)
+		local now = save_clock()
+		if now and stage_last then stage_ms[name] = (stage_ms[name] or 0) + (now - stage_last) / NANOSECONDS_PER_MILLISECOND end
+		stage_last = now
+	end
 	local runtime = M.snapshot(state, hotfiles, core_mods)
 	local existing = runtime
 	if snapshot_view then
@@ -1950,12 +2157,15 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 	-- its default, whose sparse delete must not erase it (see _load_outdated).
 	local outdated = _load_outdated[prefs_file] or {}
 	local replaced = {}
+	stage("snapshot")
 	local model_operation
+	local proposed_count = 0
 	local ok, updates = pcall(function()
 		local document, shapes
 		if expected_source.status == "ok" then
 			document, shapes = require("toml_codec.leaf_rows").decode_source(expected_source.content)
 		end
+		stage("decode")
 		local source_parameters = document and type(document.gestures) == "table" and document.gestures.action_parameters
 		for key in pairs(type(source_parameters) == "table" and source_parameters or {}) do
 			if type(key) == "string" and key:sub(1, 8) == "script__" then has_script_parameters = true; break end
@@ -1978,30 +2188,39 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 				assert(orders == nil or section_orders_are_map(orders, shapes),
 					"Obsolete section orders in '" .. prefs_file .. "' require manual source cleanup")
 				assert(old == nil or section_order_fits(old, shapes),
-					"Obsolete section order '" .. require("toml_codec.key_path").render({ "hotstrings", "order_overrides", id })
+					"Obsolete section order '" .. require("toml_codec.key_path").render({ "hotstrings", require("config_keys").LEAF.ORDER_OVERRIDES, id })
 						.. "' in '" .. prefs_file .. "' requires manual source cleanup before replacement")
 				assert(section_order_fits(value), "section order candidate is not a text list")
 				-- Sparse array encoding omits an empty list. A user who clears an
 				-- existing order must remove it, while a carried source [] keeps its
 				-- exact kind and is not silently replaced by an empty map.
 				if old ~= nil and next(old) ~= nil and next(value) == nil then
-					cleared_orders[#cleared_orders + 1] = { section = "hotstrings.order_overrides", key = id, delete = true }
+					cleared_orders[#cleared_orders + 1] = { section = ConfigKeys.KEY.HOTSTRINGS_ORDER_OVERRIDES, key = id, delete = true }
 				end
 			end
 		end
 		if existing.llm_user_models ~= nil then
 			model_operation = RecordList.prepare(expected_source.content or "", existing.llm_user_models, prefs_file)
 		end
+		stage("models")
 		local leaves = {}
 		local proposed = sparse_updates(existing)
+		stage("sparse")
 		for _, row in ipairs(cleared_orders) do proposed[#proposed + 1] = row end
+		if document and legacy_user_profiles(document.llm) then
+			-- Imported at load: the envelope replaces the array in this very write,
+			-- or an emptied registry would import the array again at the next boot.
+			proposed[#proposed + 1] = { section = KEY.LLM_PROFILES, key = LEAF.USER_PROFILES, delete = true }
+		end
 		for _, row in ipairs(WrapPreferences.prepare(expected_source.content or "", existing)) do
 			proposed[#proposed + 1] = row
 		end
+		stage("wrap")
+		proposed_count = #proposed
 		for _, row in ipairs(proposed) do
 			local path = row.section .. "." .. row.key
 			local reset = reset_keeping_outdated(row, outdated, document)
-			if model_operation and path == "llm.models.user_models" then
+			if model_operation and path == ConfigKeys.KEY.LLM_MODELS_USER_MODELS then
 				-- The row owner is appended after ordinary parent projections.
 			elseif reset then
 				for _, child in ipairs(reset) do leaves[#leaves + 1] = child end
@@ -2010,7 +2229,15 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 				if outdated[path] then replaced[#replaced + 1] = path end
 			end
 		end
-		local prepared = M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, leaves))))
+		stage("rows")
+		local prepared = M.prepare_gesture_updates(expected_source, leaves)
+		stage("gestures")
+		prepared = M.prepare_llm_updates(expected_source, prepared)
+		stage("llm")
+		prepared = M.prepare_shortcut_updates(expected_source, prepared)
+		stage("shortcuts")
+		prepared = M.prepare_hotstring_updates(expected_source, prepared)
+		stage("hotstrings")
 		if model_operation then prepared[#prepared + 1] = model_operation end
 		return prepared
 	end)
@@ -2021,6 +2248,8 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		return false
 	end
 
+	local prepare_done = save_clock()
+	local commands_before, command_ms_before = MetadataCommandStats.snapshot()
 	local write_ok, written, detail, encoded, native, candidate = pcall(
 		TomlWriter.batch_write,
 		prefs_file,
@@ -2040,6 +2269,24 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 				tostring(prefs_file), tostring(write_ok and detail or written))
 		end
 		return false
+	end
+	local write_done = save_clock()
+	if save_started and prepare_done and write_done then
+		local total_ms = (write_done - save_started) / NANOSECONDS_PER_MILLISECOND
+		if total_ms >= SLOW_SAVE_REPORT_MS then
+			local commands_after, command_ms_after = MetadataCommandStats.snapshot()
+			local parts = {}
+			for _, name in ipairs(SAVE_PREPARE_STAGES) do
+				parts[#parts + 1] = string.format("%s=%d", name, math.floor(stage_ms[name] or 0))
+			end
+			Logger.warn(LOG, "Slow preferences save %d ms (prepare=%d write=%d ms; operations=%d; "
+				.. "prepare: %s ms; proposed=%d; metadata_commands=%d in %d ms; lua_heap=%d->%d MB).",
+				math.floor(total_ms), math.floor((prepare_done - save_started) / NANOSECONDS_PER_MILLISECOND),
+				math.floor((write_done - prepare_done) / NANOSECONDS_PER_MILLISECOND), #updates,
+				table.concat(parts, " "), proposed_count, commands_after - commands_before,
+				math.floor(command_ms_after - command_ms_before),
+				math.floor(heap_before_kb / 1024), math.floor(collectgarbage("count") / 1024))
+		end
 	end
 	if model_operation then RecordList.acknowledge(model_operation, encoded) end
 	_source_snapshots[prefs_file] = { status = "ok", content = encoded }
@@ -2089,6 +2336,9 @@ function M.merge_saved_data(state, saved)
 
 	if type(saved.terminator_states) == "table" then
 		state.terminator_states = saved.terminator_states
+	end
+	if type(saved.terminator_consume) == "table" then
+		state.terminator_consume = saved.terminator_consume
 	end
 
 	-- A stored pointer kind overlays its default; an absent one keeps it.

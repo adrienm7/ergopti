@@ -46,8 +46,8 @@
 ---    _poll_generation pattern.
 --- 8. Redirect ownership: requests carrying caller credentials, and every HTTPS
 ---    request, disable the native opaque auto-follow path. Same-origin hops
----    retain credentials; cross-origin hops strip them before dispatch, and
----    HTTPS never downgrades to HTTP.
+---    retain credentials; cross-origin hops strip them before dispatch,
+---    HTTPS never downgrades to HTTP, and a hop back to an earlier URL is refused.
 --- 9. Admission first: the URL (absolute HTTP/HTTPS, no control byte), headers
 ---    and body are validated before a replacement cancels the request in flight.
 --- ==============================================================================
@@ -55,6 +55,7 @@
 local hs             = hs
 local Logger         = require("infra.logger")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TextUtils = require("text_utils")
 
 local LOG = "adapters.http_client"
 local CACHE_POLICIES = {
@@ -96,8 +97,11 @@ end
 -- =========================================
 -- =========================================
 
--- Timeout in milliseconds; matches HttpClient.spec.js DEFAULT_TIMEOUT_MS.
-local DEFAULT_TIMEOUT_MS = 30000
+-- Timeout in milliseconds; matches HttpClient.spec.js DEFAULT_TIMEOUT_MS. A copy of
+-- [adapters] default_timeout_ms: this module is built by tests that give it no driver
+-- paths, so it cannot read the registry at load; the pin in
+-- tools/test/test-keystats-timings-single-source.cjs keeps the two equal.
+local HTTP_CLIENT_DEFAULT_TIMEOUT_MS = 30000
 
 -- Conversion factor from milliseconds to scheduler seconds
 local MS_PER_SEC = 1000
@@ -107,7 +111,10 @@ local TIMEOUT_ERROR                 = "timeout"
 local TIMEOUT_UNAVAILABLE_ERROR     = "timeout unavailable"
 local TIMEOUT_CLEANUP_PENDING_ERROR = "timeout cleanup pending"
 
-local MAX_REDIRECTS = 5
+-- The shared redirect law's buffered_get.max_hops (data/http/redirect_policy.json),
+-- pinned by tools/test/test-port-compliance.cjs. Kept literal so loading the
+-- adapter never depends on finding the shared tree.
+local MAX_REDIRECTS = 50
 
 local REDIRECT_STATUSES = {
 	[301] = true,
@@ -203,7 +210,14 @@ local function parse_http_url(url)
 	end
 	if not host or host == "" then return nil, "redirect URL has no host" end
 	if port == "" then port = scheme == "https" and "443" or "80" end
-	if not port:match("^%d+$") then return nil, "redirect URL has an invalid port" end
+	-- The shared redirect law admits ports 1 to 65535 and compares them as
+	-- numbers, so a padded spelling names the same origin.
+	port = port:match("^0*(%d+)$")
+	local number = port and #port <= 5 and tonumber(port)
+	if not number or number < 1 or number > 65535 then
+		return nil, "redirect URL has an invalid port"
+	end
+	port = tostring(number)
 	local path = tail:match("^([^?#]*)") or ""
 	if path == "" then path = "/" end
 	return {
@@ -233,6 +247,22 @@ local function request_refusal(url, headers, body)
 	if headers ~= nil and type(headers) ~= "table" then return "headers must be a table" end
 	if body ~= nil and type(body) ~= "string" then return "the body must be a string" end
 	return nil
+end
+
+--- Longest native failure reason kept in a result; the system text is one sentence.
+local NATIVE_REASON_MAX_BYTES = 240
+
+--- Names a transport failure with the system's reason. hs.http answers one with
+--- status -1 and the reason as its body; dropping it left a failed PAC download
+--- or model fetch with no cause in any log (issue #104). Control bytes are
+--- folded so the reason stays one log line.
+--- @param body any Native response body of a failed request.
+--- @return string reason
+local function native_failure_reason(body)
+	local reason = type(body) == "string" and TextUtils.trim((body:gsub("[%c]+", " "))) or ""
+	if reason == "" then return "Network request failed" end
+	if #reason > NATIVE_REASON_MAX_BYTES then reason = reason:sub(1, NATIVE_REASON_MAX_BYTES) .. "…" end
+	return "Network request failed: " .. reason
 end
 
 --- Returns whether an admitted URL is HTTPS, whatever the scheme's case.
@@ -340,7 +370,7 @@ local function new(options)
 	end
 	local timeout_ms = options.timeout_ms
 	if timeout_ms == nil then
-		timeout_ms = DEFAULT_TIMEOUT_MS
+		timeout_ms = HTTP_CLIENT_DEFAULT_TIMEOUT_MS
 	elseif type(timeout_ms) ~= "number"
 		or timeout_ms ~= timeout_ms
 		or timeout_ms == math.huge
@@ -351,9 +381,9 @@ local function new(options)
 	local inst = {}
 
 	-- Per-instance state
-	local _active_task     = nil
-	local _active_task_generation = nil
-	local _active_task_hop = nil
+	-- A logical request may supersede a native call which supplies no handle.
+	-- Keep its exact terminal receipt independently of the current generation.
+	local _native_requests = {}
 	local _timeout_timer   = nil
 	local _timeout_cleanup = {}
 	local _observed_timeout_handles = {}
@@ -373,7 +403,7 @@ local function new(options)
 	--- @return boolean settled
 	local function _fully_settled()
 		return _request_active ~= true
-			and _active_task == nil
+			and next(_native_requests) == nil
 			and _timeout_timer == nil
 			and #_timeout_cleanup == 0
 	end
@@ -476,32 +506,75 @@ local function new(options)
 		return false
 	end
 
-	--- Cancels the optional native HTTP task after the generation was fenced.
-	--- The exact handle remains owned until its cancel method returns literal true.
-	--- @return boolean settled True only after exact native settlement.
-	local function _cancel_active_task()
-		local task = _active_task
-		if not task then return true end
+	--- Retires one optional task only after cancel acknowledgement or its callback.
+	--- A nil handle cannot acknowledge native settlement.
+	--- @param receipt table Exact native dispatch receipt.
+	--- @return boolean settled
+	local function _cancel_native_request(receipt)
+		if not _native_requests[receipt] then return true end
+		local task = receipt.task
+		if task == nil then return false end
 		local ok, result_or_err = xpcall(function()
-			if type(task.cancel) ~= "function" then return true end
+			if type(task.cancel) ~= "function" then return false end
 			return task:cancel()
 		end, debug.traceback)
-		-- Some cancellable transports report their terminal callback synchronously
-		-- from cancel(). That callback is stronger settlement proof than the method's
-		-- later false/nil/throw result; never keep a capability already retired by its
-		-- exact generation callback.
-		if _active_task ~= task then return true end
+		-- A synchronous terminal callback is stronger than the later cancel result.
+		if not _native_requests[receipt] then return true end
 		if not ok or result_or_err ~= true then
 			Logger.error(LOG, "HTTP task cancellation failed after logical revocation: %s.",
 				tostring(result_or_err))
 			return false
 		end
-		if _active_task == task then
-			_active_task = nil
-			_active_task_generation = nil
-			_active_task_hop = nil
-		end
+		_native_requests[receipt] = nil
 		return true
+	end
+
+	--- Cancels exact returned tasks; taskless native requests remain receipt-owned.
+	--- @return boolean settled Whether every returned task settled.
+	local function _cancel_native_tasks()
+		local snapshot = {}
+		for receipt in pairs(_native_requests) do snapshot[#snapshot + 1] = receipt end
+		local settled = true
+		for _, receipt in ipairs(snapshot) do
+			if receipt.task ~= nil and not _cancel_native_request(receipt) then settled = false end
+		end
+		return settled
+	end
+
+	--- Reports task cleanup debt which must block immediate logical supersession.
+	--- @return boolean pending
+	local function _has_pending_tasks()
+		for receipt in pairs(_native_requests) do
+			if receipt.task ~= nil then return true end
+		end
+		return false
+	end
+
+	--- Wraps one native completion before acquisition, including synchronous calls.
+	--- Terminal entry proves this exchange finished; upstream releases its callback
+	--- reference after returning from Lua. Duplicate delivery cannot retire a sibling.
+	--- @param receipt table Exact native dispatch receipt.
+	--- @param callback function Terminal handler for this request or redirect hop.
+	--- @return function completion
+	local function _native_completion(receipt, callback)
+		_native_requests[receipt] = true
+		return function(...)
+			if not _native_requests[receipt] then return end
+			_native_requests[receipt] = nil
+			return callback(...)
+		end
+	end
+
+	--- Publishes an optional task without resurrecting a synchronously completed call.
+	--- @param receipt table Exact native dispatch receipt.
+	--- @param task any Optional native cancellation capability.
+	local function _record_native_return(receipt, task)
+		if not _native_requests[receipt] then return end
+		receipt.task = task
+		if receipt.generation ~= _generation or _cancelled or not _request_active then
+			_cancel_native_request(receipt)
+			_notify_settlement_observers()
+		end
 	end
 
 	--- Arms the timeout transaction before any network request can be dispatched.
@@ -525,7 +598,7 @@ local function new(options)
 				_retain_timeout_cleanup(timeout_handle)
 				_cancelled = true
 				_request_active = false
-				_cancel_active_task()
+				_cancel_native_tasks()
 				Logger.warn(LOG, "Request timed out after %dms.", timeout_ms)
 				invoke_callback(callback, {
 					ok = false,
@@ -562,14 +635,6 @@ local function new(options)
 
 	local function _make_cb(callback, my_generation)
 		return function(status, response_body, response_headers)
-			-- A native task callback is terminal proof for that exact task even
-			-- after logical revocation. Clear only the matching generation so a
-			-- stale completion cannot consume a successor's capability.
-			if _active_task_generation == my_generation then
-				_active_task = nil
-				_active_task_generation = nil
-				_active_task_hop = nil
-			end
 			-- Discard a stale callback from a superseded request: cancel() cannot
 			-- guarantee the underlying OS request has not already queued its
 			-- completion, so the generation check is the only reliable guard.
@@ -584,16 +649,13 @@ local function new(options)
 			end
 			_cancelled = true
 			_request_active = false
-			_active_task = nil
-			_active_task_generation = nil
-			_active_task_hop = nil
 			_stop_timeout()
 			local native_status = type(status) == "number" and status or 0
 			local public_status = native_status >= 0 and native_status or 0
 			local is_ok  = public_status >= 200 and public_status < 300
 			local err_msg = nil
 			if not is_ok then
-				err_msg = native_status < 0 and "Network request failed"
+				err_msg = native_status < 0 and native_failure_reason(response_body)
 					or string.format("HTTP %s", tostring(public_status))
 			end
 			invoke_callback(callback, {
@@ -615,13 +677,16 @@ local function new(options)
 	--- @return integer|nil generation New request generation, or nil on refusal.
 	local function _prepare_request(callback)
 		local admission_generation = _generation
-		if _request_active or _timeout_timer or _active_task then
+		if _request_active or _timeout_timer or next(_native_requests) ~= nil then
 			local cancelled = inst.cancel()
 			admission_generation = admission_generation + 1
 			-- cancel() notifies real settlement observers after its mutation.
 			-- Their newer request/cancel intent supersedes this outer admission.
 			if admission_generation ~= _generation then return nil end
-			if cancelled ~= true then
+			-- Taskless predecessors may overlap a replacement, as the public API
+			-- already permits. They still prevent physical settlement. Returned-task
+			-- and timer cleanup debt continue to block every successor.
+			if cancelled ~= true and (_has_pending_tasks() or #_timeout_cleanup > 0) then
 				Logger.error(LOG, "HTTP request refused while native cancellation remains pending.")
 				if admission_generation ~= _generation then return nil end
 				invoke_callback(callback, {
@@ -691,28 +756,29 @@ local function new(options)
 		local my_generation = _prepare_request(callback)
 		if not my_generation then return false end
 
+		local receipt = { generation = my_generation }
+		local native_callback = _native_completion(receipt, _make_cb(callback, my_generation))
 		local ok, task_or_err = pcall(function()
 			if follow_redirects == false or cache_policy ~= nil then
 				return _native_request(method, url, headers, body,
-					_make_cb(callback, my_generation), follow_redirects)
+					native_callback, follow_redirects)
 			end
 			if method == "post" then
-				return hs.http.asyncPost(url, body, headers, _make_cb(callback, my_generation))
+				return hs.http.asyncPost(url, body, headers, native_callback)
 			end
-			return hs.http.asyncGet(url, headers, _make_cb(callback, my_generation))
+			return hs.http.asyncGet(url, headers, native_callback)
 		end)
 		if not ok or task_or_err == false then
+			_native_requests[receipt] = nil
 			if my_generation ~= _generation or not _request_active then
 				Logger.error(LOG,
 					"%s(): native HTTP dispatch failed after terminal completion — %s. "
 						.. "Duplicate result suppressed.", method, tostring(task_or_err))
+				_notify_settlement_observers()
 				return false
 			end
 			_cancelled = true
 			_request_active = false
-			_active_task = nil
-			_active_task_generation = nil
-			_active_task_hop = nil
 			_stop_timeout()
 			Logger.error(LOG, "%s(): native HTTP dispatch failed — %s.", method, tostring(task_or_err))
 			invoke_callback(callback, {
@@ -726,13 +792,7 @@ local function new(options)
 			return false
 		end
 
-		-- A faithful Hammerspoon call returns nil. Activity is therefore tracked
-		-- independently, and a synchronous test completion cannot resurrect it
-		if my_generation == _generation and _request_active then
-			_active_task = task_or_err
-			_active_task_generation = task_or_err ~= nil and my_generation or nil
-			_active_task_hop = nil
-		end
+		_record_native_return(receipt, task_or_err)
 		return true
 	end
 
@@ -748,26 +808,23 @@ local function new(options)
 		local my_generation = _prepare_request(callback)
 		if not my_generation then return false end
 		local redirects = 0
-		local current_hop = 0
 		local terminal_callback = _make_cb(callback, my_generation)
+		-- Hop identities without fragment, as the shared redirect law keys them:
+		-- a chain that returns to an exact earlier URL can never terminate.
+		local visited = {}
+		local initial = parse_http_url(url)
+		if initial then visited[initial.origin .. initial.path .. initial.query] = true end
 
 		local dispatch_hop
 		dispatch_hop = function(hop_method, hop_url, hop_headers, hop_body)
-			current_hop = current_hop + 1
-			local my_hop = current_hop
+			local receipt = { generation = my_generation }
 			local ok, result_or_err = pcall(function()
 				return _native_request(
 					hop_method,
 					hop_url,
 					hop_headers,
 					hop_body,
-					function(status, response_body, response_headers)
-						if _active_task_generation == my_generation
-							and _active_task_hop == my_hop then
-							_active_task = nil
-							_active_task_generation = nil
-							_active_task_hop = nil
-						end
+					_native_completion(receipt, function(status, response_body, response_headers)
 						if my_generation ~= _generation or _cancelled or not _request_active then
 							_notify_settlement_observers()
 							return
@@ -793,6 +850,14 @@ local function new(options)
 								return
 							end
 
+							local identity = next_parts.origin .. next_parts.path .. next_parts.query
+							if visited[identity] then
+								Logger.error(LOG, "Redirect refused: the chain returns to an earlier URL.")
+								terminal_callback(status, "", response_headers)
+								return
+							end
+							visited[identity] = true
+
 							redirects = redirects + 1
 							local changes_to_get = hop_method ~= "get"
 								and (status == 301 or status == 302 or status == 303)
@@ -811,24 +876,19 @@ local function new(options)
 						end
 
 						terminal_callback(status, response_body, response_headers)
-					end, false)
+					end), false)
 			end)
 
 			if not ok or result_or_err == false then
+				_native_requests[receipt] = nil
 				if my_generation == _generation and _request_active then
 					Logger.error(LOG, "%s(): redirect-aware HTTP dispatch failed: %s.",
 						hop_method, tostring(result_or_err))
 				end
+				_notify_settlement_observers()
 				return false
 			end
-			-- Hammerspoon returns nil, but retain a cancellable handle when another
-			-- conforming native transport supplies one. The hop identity prevents a
-			-- synchronous redirect callback from resurrecting its predecessor.
-			if my_generation == _generation and _request_active and current_hop == my_hop then
-				_active_task = result_or_err
-				_active_task_generation = result_or_err ~= nil and my_generation or nil
-				_active_task_hop = result_or_err ~= nil and my_hop or nil
-			end
+			_record_native_return(receipt, result_or_err)
 			return true
 		end
 
@@ -894,22 +954,34 @@ local function new(options)
 	--- "Aborts" means the RESULT is discarded, not that the socket is torn down.
 	--- hs.http.asyncGet/asyncPost normally return nothing, so request activity is
 	--- tracked independently and the OS completion self-discards on the generation
-	--- check. Native task cancellation remains opportunistic for an implementation
-	--- that does return a cancellable handle.
+	--- check. A taskless request remains physically pending until terminal delivery.
+	--- Native task cancellation remains opportunistic for an implementation that
+	--- does return a cancellable handle. False reports pending physical settlement;
+	--- logical cancellation still fences the result synchronously.
+	--- @return boolean settled True when no native capability remains.
+	--- @return string|nil detail "pending" when only taskless requests await completion.
 	function inst.cancel()
 		_lifecycle_depth = _lifecycle_depth + 1
 		_cancelled  = true
 		_request_active = false
 		_generation = _generation + 1
-		local task_settled = _cancel_active_task() == true
+		local task_settled = _cancel_native_tasks() == true
 		_stop_timeout()
 		-- _stop_timeout retains an uncertain timer in the exact cleanup ledger.
 		-- Retry that ledger now and expose the final settlement to lifecycle owners;
 		-- legacy nil made pause publish success while native timeout debt survived.
 		local timers_settled = _retry_timeout_cleanup() == true
+		-- A settlement observer may acquire a newer generation. Preserve the
+		-- physical receipt for the revoked set before invoking that continuation;
+		-- isSettled() still reports any newly acquired request as pending.
+		local receipt_settled = task_settled and timers_settled and next(_native_requests) == nil
+		-- Only taskless receipts left: the request is revoked and its late answer
+		-- is fenced by the generation; native completion alone is still awaited.
+		local detail = (not receipt_settled and task_settled and timers_settled
+			and not _has_pending_tasks()) and "pending" or nil
 		_lifecycle_depth = _lifecycle_depth - 1
 		_notify_settlement_observers()
-		return task_settled and timers_settled
+		return receipt_settled, detail
 	end
 
 	--- Registers a continuation for exact native settlement of this instance.
@@ -957,18 +1029,7 @@ end
 --- @param value any Value to encode.
 --- @return string encoded Percent-encoded component.
 local function encode_rfc3986_component(value)
-	local raw = tostring(value or "")
-	local encoded = {}
-	for index = 1, #raw do
-		local byte = raw:byte(index)
-		local unreserved = (byte >= 0x41 and byte <= 0x5A)
-			or (byte >= 0x61 and byte <= 0x7A)
-			or (byte >= 0x30 and byte <= 0x39)
-			or byte == 0x2D or byte == 0x2E or byte == 0x5F or byte == 0x7E
-		encoded[#encoded + 1] = unreserved and string.char(byte)
-			or string.format("%%%02X", byte)
-	end
-	return table.concat(encoded)
+	return TextUtils.percent_encode(tostring(value or ""))
 end
 
 --- URL-encodes a string for safe inclusion in a query string.

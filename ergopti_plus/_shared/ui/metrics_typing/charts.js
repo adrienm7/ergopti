@@ -55,6 +55,7 @@ function render_charts() {
 	const rgb_wpm = root.getPropertyValue('--chart-wpm-rgb').trim() || '230, 140, 0';
 	const rgb_prc = root.getPropertyValue('--kpi-precision-rgb').trim() || '33, 136, 56';
 
+	// Daily points are civil dates; a local-time adapter can collapse archived days.
 	const sorted_keys = Object.keys(app_state.time_series).sort();
 	const manual_pts = [],
 		hs_pts = [],
@@ -65,7 +66,7 @@ function render_charts() {
 
 	sorted_keys.forEach((k) => {
 		const d = app_state.time_series[k];
-		const date_obj = new Date(k + 'T12:00:00');
+		const date_obj = new Date(parseDateKey(k));
 
 		manual_pts.push({ x: date_obj, y: Math.max(0, d.chars - d.hs_chars - d.llm_chars) });
 		hs_pts.push({ x: date_obj, y: d.hs_chars });
@@ -81,8 +82,8 @@ function render_charts() {
 	});
 
 	// Shared x-axis range so precision and speed charts always have identical bounds
-	const x_min = sorted_keys.length > 0 ? new Date(sorted_keys[0] + 'T12:00:00') : null;
-	const x_max = sorted_keys.length > 0 ? new Date(sorted_keys.at(-1) + 'T12:00:00') : null;
+	const x_min = sorted_keys.length > 0 ? new Date(parseDateKey(sorted_keys[0])) : null;
+	const x_max = sorted_keys.length > 0 ? new Date(parseDateKey(sorted_keys.at(-1))) : null;
 
 	// Delegation chart always uses daily points — no per-hour HS/LLM breakdown available
 	_render_delegation_chart(manual_pts, hs_pts, llm_pts, rgb_ia, rgb_hs, rgb_man);
@@ -92,7 +93,9 @@ function render_charts() {
 
 	// Single-day view: use hourly_series for precision and activity charts so the
 	// user sees an intra-day curve instead of a single meaningless dot.
-	if (sorted_keys.length === 1) {
+	if (app_state.hour_window !== null) {
+		_render_minute5_charts(rgb_wpm, rgb_prc, app_state.hour_window);
+	} else if (sorted_keys.length === 1) {
 		_render_hourly_charts(sorted_keys[0], rgb_wpm, rgb_prc);
 	} else {
 		// Restore daily titles in case they were previously changed by an hourly view
@@ -143,7 +146,7 @@ function months_fr() {
 }
 
 /**
- * Returns a two-line French day tick label for a daily x-axis value.
+ * Returns a two-line French day tick label for a canonical daily x-axis value.
  * Used with ticks.color: "transparent" so Chart.js reserves the correct two-line
  * height while the DAY_TICK_RENDERER plugin redraws the text with bold dates.
  * @param {number} value - Timestamp in milliseconds.
@@ -151,7 +154,7 @@ function months_fr() {
  */
 function _format_day_tick(value) {
 	const d = new Date(value);
-	return [days_fr()[d.getDay()], `${d.getDate()} ${months_fr()[d.getMonth()]}`];
+	return [days_fr()[d.getUTCDay()], `${d.getUTCDate()} ${months_fr()[d.getUTCMonth()]}`];
 }
 
 // Canvas IDs of daily charts that use the two-line day+date tick renderer.
@@ -165,6 +168,7 @@ const DAY_TICK_CANVAS_IDS = new Set([
 	'llm_sparkline'
 ]);
 
+// Daily axes use linear UTC day ordinals; local time axes retain their own hour labels.
 // Plugin: redraws daily x-axis tick labels as two lines — day name (normal) + date (bold).
 // Charts in DAY_TICK_CANVAS_IDS must also set ticks.color: "transparent" so Chart.js
 // reserves two-line height without drawing its own unstyled labels.
@@ -173,7 +177,7 @@ if (typeof Chart !== 'undefined') {
 		id: 'day_tick_renderer',
 		afterDraw(chart) {
 			const xScale = chart.scales.x;
-			if (!xScale || !DAY_TICK_CANVAS_IDS.has(chart.canvas?.id)) return;
+			if (!xScale || xScale.type !== 'linear' || !DAY_TICK_CANVAS_IDS.has(chart.canvas?.id)) return;
 
 			const ctx = chart.ctx;
 			const ticks = xScale.ticks;
@@ -202,11 +206,11 @@ if (typeof Chart !== 'undefined') {
 
 				// Line 1 — day name, normal weight
 				ctx.font = `${size}px sans-serif`;
-				ctx.fillText(days_fr()[d.getDay()], x, y1);
+				ctx.fillText(days_fr()[d.getUTCDay()], x, y1);
 
 				// Line 2 — "d month" in bold (e.g. "12 avr.")
 				ctx.font = `bold ${size}px sans-serif`;
-				ctx.fillText(`${d.getDate()} ${months_fr()[d.getMonth()]}`, x, y2);
+				ctx.fillText(`${d.getUTCDate()} ${months_fr()[d.getUTCMonth()]}`, x, y2);
 			});
 
 			ctx.restore();
@@ -278,12 +282,15 @@ function _render_delegation_chart(manual_pts, hs_pts, llm_pts, rgb_ia, rgb_hs, r
 			},
 			scales: {
 				x: {
-					type: 'time',
-					time: { unit: 'day' },
+					type: 'linear',
 					stacked: true,
 					grid: { color: GRID_COLOR },
 					// color: transparent hides Chart.js auto-labels; the plugin redraws them with bold dates
-					ticks: { color: 'transparent', callback: (v) => _format_day_tick(v) }
+					ticks: {
+						stepSize: METRICS_DAY_MILLISECONDS,
+						color: 'transparent',
+						callback: (v) => _format_day_tick(v)
+					}
 				},
 				y: { stacked: true, grid: { color: GRID_COLOR } }
 			}
@@ -303,10 +310,13 @@ function _render_wpm_chart(wpm_pts, rgb_wpm, x_min = null, x_max = null) {
 	if (!elem) return;
 
 	const x_opts = {
-		type: 'time',
-		time: { unit: 'day' },
+		type: 'linear',
 		grid: { color: GRID_COLOR },
-		ticks: { color: 'transparent', callback: (v) => _format_day_tick(v) }
+		ticks: {
+			stepSize: METRICS_DAY_MILLISECONDS,
+			color: 'transparent',
+			callback: (v) => _format_day_tick(v)
+		}
 	};
 	if (x_min) x_opts.min = x_min;
 	if (x_max) x_opts.max = x_max;
@@ -403,7 +413,7 @@ function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = nul
 			const total_chars = d.daily_chars + synth_hs + synth_llm;
 			const correct = d.daily_chars - filtered_errs + synth_hs + synth_llm;
 			const accuracy = total_chars > 0 ? (correct / total_chars) * 100 : 0;
-			return { x: new Date(k + 'T12:00:00'), y: Math.max(0, Math.min(100, accuracy)) };
+			return { x: new Date(parseDateKey(k)), y: Math.max(0, Math.min(100, accuracy)) };
 		})
 		.filter((pt) => pt.y >= 20);
 
@@ -440,10 +450,13 @@ function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = nul
 			scales: {
 				x: Object.assign(
 					{
-						type: 'time',
-						time: { unit: 'day' },
+						type: 'linear',
 						grid: { color: GRID_COLOR },
-						ticks: { color: 'transparent', callback: (v) => _format_day_tick(v) }
+						ticks: {
+							stepSize: METRICS_DAY_MILLISECONDS,
+							color: 'transparent',
+							callback: (v) => _format_day_tick(v)
+						}
 					},
 					x_min ? { min: x_min } : {},
 					x_max ? { max: x_max } : {}
@@ -523,10 +536,10 @@ function _render_sparkline(ctx_id, chart_ref, data_pts, color) {
 			},
 			scales: {
 				x: {
-					type: 'time',
+					type: 'linear',
 					display: true,
-					time: { unit: 'day' },
 					ticks: {
+						stepSize: METRICS_DAY_MILLISECONDS,
 						font: { size: 10 },
 						maxTicksLimit: 4,
 						color: 'transparent',
@@ -583,20 +596,13 @@ const tooltipTitleCallbackHourly = (context) => {
 /**
  * Builds the hourly data points from app_state.hourly_series and renders both
  * the activity (touches/h) and precision charts for the given single-day date.
- * Called from render_charts() when sorted_keys.length === 1.
+ * Called from render_charts() for a single day without a captured hour window.
  * @param {string} date_str - The ISO date string for the single selected day.
  * @param {string} rgb_wpm  - CSS RGB string for the activity chart color.
  * @param {string} rgb_prc  - CSS RGB string for the precision chart color.
  */
 function _render_hourly_charts(date_str, rgb_wpm, rgb_prc) {
-	// hour_cutoff: null or 0 → show all hours (hourly); N > 0 → last-hour view (5-min)
-	const cutoff = typeof app_state.hour_cutoff === 'number' ? app_state.hour_cutoff : 0;
-
-	if (cutoff > 0) {
-		// Last-hour preset: switch to 5-minute resolution for a detailed intra-hour view
-		_render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff);
-		return;
-	}
+	const cutoff = 0;
 
 	const act_pts = []; // { x: Date, y: chars_count } — typing activity per hour
 	const prec_pts = []; // { x: Date, y: accuracy_pct }
@@ -796,14 +802,13 @@ const tooltipTitleCallbackMinute5 = (context) => {
 
 /**
  * Builds the 5-minute data points and renders both the activity and precision
- * charts using app_state.minute5_series. Called by _render_hourly_charts when
- * hour_cutoff > 0 (last-hour preset).
- * @param {string} date_str - The ISO date string for the selected day.
+ * charts using date-qualified app_state.minute5_series. Called by render_charts
+ * for the captured current-and-previous-hour window.
  * @param {string} rgb_wpm  - CSS RGB string for the activity chart color.
  * @param {string} rgb_prc  - CSS RGB string for the precision chart color.
- * @param {number} cutoff   - First hour shown; the window spans cutoff to cutoff+2.
+ * @param {Object} hourWindow - Captured date-qualified current-and-previous-hour bounds.
  */
-function _render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff) {
+function _render_minute5_charts(rgb_wpm, rgb_prc, hourWindow) {
 	const act_pts = []; // { x: Date, y: chars_count } per 5-min bucket
 	const prec_pts = []; // { x: Date, y: accuracy_pct }
 	const bucket_key = pause_thresh_to_bucket_key(
@@ -813,15 +818,15 @@ function _render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff) {
 	// Iterate the 5-minute buckets sorted so the chart line is always left-to-right
 	const sorted_buckets = Object.keys(app_state.minute5_series).sort();
 	sorted_buckets.forEach((bucket) => {
-		const bh = parseInt(bucket.split(':')[0], 10);
-		// Only show buckets at or after the cutoff hour
-		if (bh < cutoff) return;
+		const [date_key, time_key] = bucket.split('T');
+		const hour = parseInt(time_key.split(':')[0], 10);
+		if (!metricsHourWindowContains(hourWindow, date_key, hour)) return;
 
 		const md = app_state.minute5_series[bucket];
 		if (!md || md.c === 0) return;
 
 		// Use the bucket start time as the data point x coordinate
-		const date_obj = new Date(`${date_str}T${bucket}:00`);
+		const date_obj = new Date(`${bucket}:00`);
 		act_pts.push({ x: date_obj, y: md.c });
 
 		const filtered_e = md.e_buckets?.[bucket_key] || 0;
@@ -835,8 +840,8 @@ function _render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff) {
 	const prc_title_el = document.getElementById('precision_chart_title');
 	if (prc_title_el) prc_title_el.textContent = _t('ui_typing.chart_title_precision_5min');
 
-	_render_minute5_activity_chart(act_pts, rgb_wpm, date_str, cutoff);
-	_render_minute5_precision_chart(prec_pts, rgb_prc, date_str, cutoff);
+	_render_minute5_activity_chart(act_pts, rgb_wpm, hourWindow);
+	_render_minute5_precision_chart(prec_pts, rgb_prc, hourWindow);
 }
 
 /**
@@ -847,15 +852,12 @@ function _render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff) {
  * @param {string}   date_str - ISO date string for the selected day.
  * @param {number}   cutoff   - First hour shown (> 0 in this path).
  */
-function _render_minute5_activity_chart(pts, color, date_str, cutoff) {
+function _render_minute5_activity_chart(pts, color, hourWindow) {
 	if (wpm_chart_instance) wpm_chart_instance.destroy();
 	const elem = document.getElementById('wpm_chart');
 	if (!elem) return;
 
-	const today_str = get_local_date_string();
-	const end_hour = date_str === today_str ? Math.min(new Date().getHours() + 1, 23) : cutoff + 1;
-	const x_min = new Date(`${date_str}T${String(cutoff).padStart(2, '0')}:00:00`);
-	const x_max = new Date(`${date_str}T${String(end_hour).padStart(2, '0')}:59:59`);
+	const { start: x_min, end: x_max } = metricsHourWindowBounds(hourWindow);
 
 	wpm_chart_instance = new Chart(elem.getContext('2d'), {
 		type: 'line',
@@ -907,15 +909,12 @@ function _render_minute5_activity_chart(pts, color, date_str, cutoff) {
  * @param {string}   date_str - ISO date string for the selected day.
  * @param {number}   cutoff   - First hour shown (> 0 in this path).
  */
-function _render_minute5_precision_chart(pts, color, date_str, cutoff) {
+function _render_minute5_precision_chart(pts, color, hourWindow) {
 	if (precision_chart_instance) precision_chart_instance.destroy();
 	const elem = document.getElementById('precision_chart');
 	if (!elem) return;
 
-	const today_str = get_local_date_string();
-	const end_hour = date_str === today_str ? Math.min(new Date().getHours() + 1, 23) : cutoff + 1;
-	const x_min = new Date(`${date_str}T${String(cutoff).padStart(2, '0')}:00:00`);
-	const x_max = new Date(`${date_str}T${String(end_hour).padStart(2, '0')}:59:59`);
+	const { start: x_min, end: x_max } = metricsHourWindowBounds(hourWindow);
 
 	precision_chart_instance = new Chart(elem.getContext('2d'), {
 		type: 'line',
@@ -991,13 +990,17 @@ function _render_activity_calendar() {
 	const PAD_TOP = 18; // space for month labels
 	const PAD_LEFT = 28; // space for weekday labels
 	const ROWS = 7; // Mon..Sun
-	const DAYS = 365; // 52*7 + 1 — covers a full year
+	const DAYS = METRICS_CALENDAR_YEAR_DAYS; // 52*7 + 1 — covers a full year
+	const today = new Date(metricsLocalDayOrdinal(new Date()));
+	const first_day = shiftMetricsDay(today.getTime(), 1 - DAYS);
 
 	// Build the full date map from the manifest so the calendar shows historical
 	// days even when they're not currently in the filter selection.
 	const date_chars = {};
 	if (window.metrics_manifest) {
 		Object.keys(window.metrics_manifest).forEach((date_str) => {
+			const ordinal = parseDateKey(date_str);
+			if (!(ordinal >= first_day && ordinal <= today.getTime())) return;
 			let total = 0;
 			Object.values(window.metrics_manifest[date_str] || {}).forEach((app) => {
 				total += app.chars || 0;
@@ -1014,12 +1017,10 @@ function _render_activity_calendar() {
 		date_chars[today] = (date_chars[today] || 0) + total;
 	}
 
-	const today = new Date();
-	today.setHours(12, 0, 0, 0);
-	const start = new Date(today.getTime() - (DAYS - 1) * 86400_000);
+	const start = new Date(first_day);
 	// Start the grid on the Monday of `start`'s week so columns align to weeks.
-	const start_dow = (start.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
-	start.setDate(start.getDate() - start_dow);
+	const start_dow = (start.getUTCDay() + 6) % 7; // 0 = Mon, 6 = Sun
+	start.setUTCDate(start.getUTCDate() - start_dow);
 
 	// Find the day max for color scale (gamma-compressed so big outliers don't
 	// flatten everything else).
@@ -1041,30 +1042,28 @@ function _render_activity_calendar() {
 			weekday: 'long',
 			day: 'numeric',
 			month: 'long',
-			year: 'numeric'
+			year: 'numeric',
+			timeZone: 'UTC'
 		});
-	const iso_date = (d) =>
-		`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 	let cells = '';
 	let month_labels = '';
 	let last_month = -1;
 	const cursor = new Date(start);
-	let col = 0;
+	let cell_count = 0;
 	while (cursor <= today) {
-		const dow = (cursor.getDay() + 6) % 7; // 0 = Mon
-		if (dow === 0 && col > 0) col++; // new column at start of each week
-		// Actually the simplest: increment column when we hit Monday OR the very first iteration
+		const dow = (cursor.getUTCDay() + 6) % 7; // 0 = Mon
+		const col = Math.floor(cell_count / ROWS);
 		const x = PAD_LEFT + col * (CELL + GAP);
 		const y = PAD_TOP + dow * (CELL + GAP);
-		const date_str = iso_date(cursor);
+		const date_str = formatMetricsDateKey(cursor.getTime());
 		const n = date_chars[date_str] || 0;
 		const fill = heat_color(n);
 		const tip = `${fr_date(cursor)} — ${n === 0 ? _t('ui_typing.calendar_no_keystrokes') : format_number(n) + ' ' + _t('ui_typing.calendar_chars')}`;
 		cells += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${tip}</title></rect>`;
 
 		// Month label appears once at the start of each new month
-		if (cursor.getMonth() !== last_month && dow === 0) {
+		if (cursor.getUTCMonth() !== last_month && dow === 0) {
 			const month_short = [
 				_t('ui_typing.calendar_month_0'),
 				_t('ui_typing.calendar_month_1'),
@@ -1078,13 +1077,13 @@ function _render_activity_calendar() {
 				_t('ui_typing.calendar_month_9'),
 				_t('ui_typing.calendar_month_10'),
 				_t('ui_typing.calendar_month_11')
-			][cursor.getMonth()];
-			month_labels += `<text x="${x}" y="${PAD_TOP - 6}" font-size="10" fill="var(--text-muted, #888)">${month_short}</text>`;
-			last_month = cursor.getMonth();
+			][cursor.getUTCMonth()];
+			month_labels += `<text x="${x}" y="${PAD_TOP - 6}" font-size="10" fill="var(--text-muted, ${ThemeTokens.color('grey-888')})">${month_short}</text>`;
+			last_month = cursor.getUTCMonth();
 		}
 
-		cursor.setDate(cursor.getDate() + 1);
-		if ((cursor.getDay() + 6) % 7 === 0) col++;
+		cursor.setUTCDate(cursor.getUTCDate() + 1);
+		cell_count++;
 	}
 
 	const weekday_labels = [
@@ -1094,11 +1093,11 @@ function _render_activity_calendar() {
 	]
 		.map(
 			(lbl, i) =>
-				`<text x="0" y="${PAD_TOP + i * 2 * (CELL + GAP) + CELL - 2}" font-size="9" fill="var(--text-muted, #888)">${lbl}</text>`
+				`<text x="0" y="${PAD_TOP + i * 2 * (CELL + GAP) + CELL - 2}" font-size="9" fill="var(--text-muted, ${ThemeTokens.color('grey-888')})">${lbl}</text>`
 		)
 		.join('');
 
-	const total_cols = col + 1;
+	const total_cols = Math.ceil(cell_count / ROWS);
 	const svg_w = PAD_LEFT + total_cols * (CELL + GAP);
 	const svg_h = PAD_TOP + ROWS * (CELL + GAP);
 
@@ -1151,10 +1150,10 @@ function _render_hour_weekday_heatmap() {
 	let max_cell = 0;
 
 	const accumulate_day = (date_str, app_data_map) => {
-		const d = new Date(date_str + 'T12:00:00');
-		const dow = (d.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
-		Object.values(app_data_map || {}).forEach((app) => {
-			if (!app || !app.hourly) return;
+		const d = new Date(parseDateKey(date_str));
+		const dow = (d.getUTCDay() + 6) % 7; // 0 = Mon, 6 = Sun
+		Object.entries(app_data_map || {}).forEach(([app_name, app]) => {
+			if (!matches_typing_app_selection(app_name) || !app || !app.hourly) return;
 			Object.entries(app.hourly).forEach(([h_str, hd]) => {
 				const h = parseInt(h_str, 10);
 				if (isNaN(h)) return;
@@ -1218,14 +1217,14 @@ function _render_hour_weekday_heatmap() {
 	const day_labels = days_fr
 		.map(
 			(lbl, i) =>
-				`<text x="0" y="${PAD_TOP + i * (CELL_H + GAP) + CELL_H - 4}" font-size="10" fill="var(--text-muted, #888)">${lbl}</text>`
+				`<text x="0" y="${PAD_TOP + i * (CELL_H + GAP) + CELL_H - 4}" font-size="10" fill="var(--text-muted, ${ThemeTokens.color('grey-888')})">${lbl}</text>`
 		)
 		.join('');
 	const hour_labels = [];
 	for (let h = 0; h < 24; h += 3) {
 		const x = PAD_LEFT + h * (CELL_W + GAP) + CELL_W / 2;
 		hour_labels.push(
-			`<text x="${x}" y="${PAD_TOP - 6}" font-size="9" fill="var(--text-muted, #888)" text-anchor="middle">${String(h).padStart(2, '0')}h</text>`
+			`<text x="${x}" y="${PAD_TOP - 6}" font-size="9" fill="var(--text-muted, ${ThemeTokens.color('grey-888')})" text-anchor="middle">${String(h).padStart(2, '0')}h</text>`
 		);
 	}
 

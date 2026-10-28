@@ -38,14 +38,16 @@ local TomlRecordEditor = require("infra.toml.record_editor")
 local FileSystem = require("adapters.file_system")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
 local PersonalFiles = require("hotstrings.personal_files")
-local BasicString = require("toml_codec.basic_string")
-local TomlCodec = require("toml_codec.codec")
+local Overrides = require("hotstrings.overrides")
 local PublicationRecovery = require("hotstrings.publication_recovery")
 -- The five-rung precedence, shared with Linux. It was written once here and
 -- once in AutoHotkey and the two had already drifted; the rule is the thing
 -- that must not differ, and where the override file lives is the thing that may.
 local DelayResolver = require("hotstrings.delay_resolver")
 local HotstringPriority = require("hotstring_priority")
+local TextUtils = require("text_utils")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 local LOG        = "hotstrings_config"
 
 
@@ -78,9 +80,12 @@ local CATEGORY_DEFAULT_COLORS = {}
 -- =================================
 -- =================================
 
--- Built-in word-delimiter set — mirrors HOTSTRINGS_DEFAULT_WORD_DELIMITERS in AHK.
--- CR and LF are always included; the rest are user-configurable.
-local DEFAULT_WORD_DELIMITERS = " \t\r\n.,;:?!'’-=()[]/\\+*"
+-- The fields of an override rung as held in memory, and the leaf each is stored
+-- as. `legacy_delay` is the absolute `delay` of earlier builds: read until the
+-- boot migration, never written, removed from the file by it.
+local OVERRIDE_FIELDS = { "delay_offset", "delay_unlimited", "legacy_delay", "color", "show_tooltip", "priority" }
+local OVERRIDE_KEYS = { delay_offset = "delay_offset", delay_unlimited = "delay_unlimited", legacy_delay = "delay",
+	color = "color", show_tooltip = "show_tooltip", priority = "priority" }
 
 local _state = nil
 local _terminal_owner = nil
@@ -156,211 +161,49 @@ end
 --- ====================================
 --- ====================================
 
---- Advances the small amount of TOML lexical state needed to identify a
---- complete assignment. This is deliberately not a second TOML parser: the
---- module only needs to know whether the next physical line is still part of
---- an array, inline table, or multiline string so it can preserve unowned raw
---- records byte-for-byte.
---- @param raw string One physical source line.
---- @param depth number Current array/inline-table nesting depth.
---- @param multiline_quote string|nil Active triple-quote delimiter.
---- @return number depth Updated nesting depth.
---- @return string|nil multiline_quote Updated triple-quote delimiter.
---- Parses the user override TOML file into two structures:
---- - overrides: { [category] = { delay = n, color = s, sections = { [name] = { delay, color } } } }
---- - global_word_delimiters: string|nil (from [__global__] word_delimiters key)
---- Unknown category keys are ignored. Unowned or unsupported [__global__]
---- records are preserved byte-for-byte because sibling drivers share the file.
+--- Collects the exact raw records of a [__global__] table. No key of it is
+--- owned (the word and consumed delimiter strings moved to config.toml leaves), so
+--- a table an earlier build or another tool wrote is preserved byte-for-byte by
+--- the serializer. This is deliberately not a second TOML parser: it only needs
+--- to know whether the next physical line is still part of an array, inline table
+--- or multiline string, to tell a continuation from a new header.
 --- @param content string Exact override source bytes.
---- @return table overrides The parsed overrides.
---- @return string|nil word_delimiters The optional word-delimiter override.
---- @return string[] global_passthrough Exact raw records for unowned [__global__] keys.
-local function parse_override_content(content)
-	local result = {}
-	local word_delimiters = nil
-	local global_passthrough = {}
-	local current_cat = nil
-	local current_sec = nil
-	local in_global   = false
-	local global_depth = 0
-	local global_multiline_quote = nil
-	local global_owned_record = false
-	local record_depth, record_quote = 0, nil
-
+--- @return string[] global_passthrough Exact raw records of the [__global__] table.
+local function global_records(content)
+	local records = {}
+	local in_global = false
+	-- Open array, inline table or multiline string of the current record, in or out of the global table.
+	local depth, multiline_quote = 0, nil
 	for raw in (content .. "\n"):gmatch("([^\n]*)\n") do
 		raw = raw:gsub("\r$", "")
-		local line = raw:match("^%s*(.-)%s*$")
-
-		if not in_global and (record_depth > 0 or record_quote ~= nil) then
-			record_depth, record_quote = TomlRecordEditor.advance_continuation(raw, record_depth, record_quote)
-			goto continue
-		end
-
-		-- A line that resembles a section header can legally occur inside an
-		-- open multiline global value. Consume continuations before interpreting
-		-- any header syntax so such data cannot reset the section state.
-		local global_record_open = in_global
-			and (global_depth > 0 or global_multiline_quote ~= nil)
-		if global_record_open then
-			if not global_owned_record then
-				global_passthrough[#global_passthrough + 1] = raw
-			end
-			global_depth, global_multiline_quote = TomlRecordEditor.advance_continuation(
-				raw,
-				global_depth,
-				global_multiline_quote
-			)
-			if global_depth == 0 and global_multiline_quote == nil then
-				global_owned_record = false
-			end
-			goto continue
-		end
-
-		-- [__global__] — script-wide settings (word_delimiters, etc.)
-		if line == "[__global__]" then
+		local line = TextUtils.trim(raw)
+		-- A header-looking line can legally occur inside an open multiline value:
+		-- consume continuations before interpreting any header syntax.
+		local open = depth > 0 or multiline_quote ~= nil
+		if open then
+			if in_global then records[#records + 1] = raw end
+			depth, multiline_quote = TomlRecordEditor.advance_continuation(raw, depth, multiline_quote)
+		elseif line == "[__global__]" then
 			in_global = true
-			current_cat, current_sec = nil, nil
-			global_depth = 0
-			global_multiline_quote = nil
-			global_owned_record = false
-			goto continue
+		elseif line:sub(1, 1) == "[" then
+			in_global = false
+		else
+			if in_global then records[#records + 1] = raw end
+			depth, multiline_quote = TomlRecordEditor.advance_continuation(raw, 0, nil)
 		end
-
-		-- This file is shared with the Windows driver. This module owns
-		-- word_delimiters, but sibling drivers may add other global assignments
-		-- such as consumed_delimiters. Retain their complete raw records, including
-		-- multiline values, comments, and blank lines, instead of silently deleting
-		-- fields this parser does not interpret. A '[' only starts a new section
-		-- when no value is open; inside an array it is continuation data.
-		if in_global then
-			if line:sub(1, 1) == "[" then
-				in_global = false
-				global_owned_record = false
-			else
-				local global_key = line:match("^([%w_%-]+)%s*=")
-				local wd = global_key == "word_delimiters"
-					and line:match("^word_delimiters%s*=%s*\"(.-)\"%s*$")
-					or nil
-				-- Ownership starts only after the value shape is understood. A
-				-- hand-edited literal string or trailing comment is valid shared TOML,
-				-- but this deliberately narrow parser cannot interpret it. Preserve
-				-- that complete record as passthrough instead of claiming and dropping
-				-- bytes during an unrelated category save.
-				local decoded = wd and BasicString.unescape_body(wd) or nil
-				global_owned_record = decoded ~= nil
-				if global_owned_record then
-					word_delimiters = decoded
-				elseif global_key == "word_delimiters" then
-					Logger.warn(LOG, "Unsupported word_delimiters representation preserved without applying it.")
-				end
-				if not global_owned_record then
-					global_passthrough[#global_passthrough + 1] = raw
-				end
-				global_depth, global_multiline_quote = TomlRecordEditor.advance_continuation(
-					raw,
-					global_depth,
-					global_multiline_quote
-				)
-				if global_depth == 0 and global_multiline_quote == nil then
-					global_owned_record = false
-				end
-				goto continue
-			end
-		end
-
-		-- Global passthrough keeps its original, narrower lexical ownership.
-		-- Standard scalar and header comments belong to the canonical codec.
-		line = TomlCodec.strip_inline_comment(raw):match("^%s*(.-)%s*$")
-		if not line or line == "" or line:sub(1, 1) == "#" then goto continue end
-
-		-- [ext.name.section] — extension section override (3 dotted segments)
-		local ext_name, ext_sec = line:match("^%[ext%.([%w_%-]+)%.([%w_%-]+)%]$")
-		if ext_name and ext_sec then
-			local key = ConfigSchema.normalize_category("ext." .. ext_name)
-			ext_sec = ConfigSchema.normalize_section(ext_sec)
-			result[key] = result[key] or { sections = {} }
-			result[key].sections = result[key].sections or {}
-			result[key].sections[ext_sec] = result[key].sections[ext_sec] or {}
-			current_cat, current_sec = key, ext_sec
-			goto continue
-		end
-
-		-- [ext.name] — extension file-level override (2 dotted segments, "ext." prefix)
-		local ext_only = line:match("^%[ext%.([%w_%-]+)%]$")
-		if ext_only then
-			local key = ConfigSchema.normalize_category("ext." .. ext_only)
-			result[key] = result[key] or { sections = {} }
-			current_cat, current_sec = key, nil
-			goto continue
-		end
-
-		-- [category.section] — standard section override (must be tested before plain [category])
-		local cat, sec = line:match("^%[([%w_%-]+)%.([%w_%-]+)%]$")
-		if cat and sec then
-			cat = ConfigSchema.normalize_category(cat)
-			sec = ConfigSchema.normalize_section(sec)
-			result[cat] = result[cat] or { sections = {} }
-			result[cat].sections = result[cat].sections or {}
-			result[cat].sections[sec] = result[cat].sections[sec] or {}
-			current_cat, current_sec = cat, sec
-			goto continue
-		end
-
-		-- [category]
-		local cat_only = line:match("^%[([%w_%-]+)%]$")
-		if cat_only then
-			cat_only = ConfigSchema.normalize_category(cat_only)
-			result[cat_only] = result[cat_only] or { sections = {} }
-			current_cat, current_sec = cat_only, nil
-			goto continue
-		end
-
-		-- Unowned headers and open values cannot lend their fields to the prior category.
-		if line:sub(1, 1) == "[" then
-			current_cat, current_sec = nil, nil
-			goto continue
-		end
-		record_depth, record_quote = TomlRecordEditor.advance_continuation(raw, 0, nil)
-
-		-- key = value (delay number, color string)
-		if current_cat then
-			local target = current_sec
-				and result[current_cat].sections[current_sec]
-				or result[current_cat]
-
-			local num = line:match("^delay%s*=%s*([%-%d%.]+)%s*$")
-			if num then
-				local n = tonumber(num)
-				if ConfigSchema.is_delay(n) then target.delay = n end
-				goto continue
-			end
-
-			local col = line:match("^color%s*=%s*\"([^\"]*)\"%s*$")
-			if col then
-				target.color = col
-				goto continue
-			end
-
-			-- Lua patterns have no alternation (|); test "true" and "false" separately.
-			local bool_val = line:match("^show_tooltip%s*=%s*(true)%s*$")
-				or line:match("^show_tooltip%s*=%s*(false)%s*$")
-			if bool_val then
-				target.show_tooltip = (bool_val == "true")
-				goto continue
-			end
-
-			local prio = line:match("^priority%s*=%s*(%d+)%s*$")
-			if prio then
-				local p = tonumber(prio)
-				if p then target.priority = p end
-				goto continue
-			end
-		end
-
-		::continue::
 	end
+	return records
+end
 
-	return result, word_delimiters, global_passthrough
+--- Parses the user override TOML file into two structures:
+--- - overrides: { [category] = { delay_offset = n, color = s, sections = { [name] = { ... } } } }
+---   read by the shared parser (hotstrings.overrides), which raises on invalid TOML;
+--- - global_passthrough: the raw records of a [__global__] table.
+--- @param content string Exact override source bytes.
+--- @return table overrides The parsed overrides.
+--- @return string[] global_passthrough Exact raw records of the [__global__] table.
+local function parse_override_content(content)
+	return Overrides.parse(content, Overrides.POLICIES.lowercase_bare), global_records(content)
 end
 
 --- Checks every captured logical field without entering a path callback.
@@ -369,8 +212,9 @@ local function same_publication_owner(captured)
 	local state = _state
 	if state.path ~= captured.path or state.epoch ~= captured.epoch
 		or state.owner_epoch ~= captured.owner_epoch or state.scope_owner ~= captured.scope_owner
-		or state.source_snapshot ~= captured.source_object or state.overrides ~= captured.overrides
-		or state.word_delimiters ~= captured.word_delimiters then return false end
+		or state.source_snapshot ~= captured.source_object or state.overrides ~= captured.overrides then
+		return false
+	end
 	local source = state.source_snapshot
 	return (source and source.status) == captured.source_status
 		and (source and source.content) == captured.source_content
@@ -382,8 +226,7 @@ local function capture_publication_owner(state)
 	local captured = { state = state, path = state.path, epoch = state.epoch,
 		owner_epoch = state.owner_epoch, scope_owner = state.scope_owner,
 		source_object = source, source_status = source and source.status,
-		source_content = source and source.content, overrides = state.overrides,
-		word_delimiters = state.word_delimiters }
+		source_content = source and source.content, overrides = state.overrides }
 	if state.current_override_path then
 		local called, current = pcall(state.current_override_path)
 		if not called or current ~= captured.path then return nil end
@@ -433,45 +276,67 @@ end
 --- Reads and parses the user override file.
 --- @param path string Absolute path to the override file.
 --- @return table overrides The parsed overrides.
---- @return string|nil word_delimiters The optional word-delimiter override.
 --- @return string status `committed`, `absent`, or `error`.
 --- @return table|nil source_snapshot Exact classified bytes used to build the result.
 --- @return string[] global_passthrough Exact raw records for unowned [__global__] keys.
 --- @return boolean|nil common_admitted Exact common activation admission after migration.
 local function parse_overrides(path)
-	if not begin_publication_attempt() then return {}, nil, "error", nil, {} end
+	if not begin_publication_attempt() then return {}, "error", nil, {} end
 	local Migration = require("hotstrings.common_autocorrection_migration")
 	local read_ok, migrated = pcall(Migration.run, path, Paths.shared(Migration.POLICY_PATH), FileSystem,
 		_state.on_publication_error, _state.recovery.publish)
 	local accepted = read_ok and type(migrated) == "table"
 		and (migrated.status == "absent" or migrated.status == "current" or migrated.status == "migrated")
-	if not finish_publication_attempt(accepted) then return {}, nil, "error", nil, {} end
+	if not finish_publication_attempt(accepted) then return {}, "error", nil, {} end
 	local content = read_ok and migrated.content or nil
 	local read_status = read_ok and migrated.status or "error"
 	local read_detail = read_ok and migrated.detail or tostring(migrated)
 	if not read_ok or read_status == "error" then
 		Logger.error(LOG, "Override source read did not commit: %s.",
 			tostring(read_ok and read_detail or content))
-		return {}, nil, "error", nil, {}
+		return {}, "error", nil, {}
 	end
 	if read_status == "absent" then
-		return {}, nil, "absent", { status = "absent" }, {}, true
+		return {}, "absent", { status = "absent" }, {}, true
 	end
 	if (read_status ~= "current" and read_status ~= "migrated") or type(content) ~= "string" then
 		Logger.error(LOG, "Override source returned an invalid read status: %s.", tostring(read_status))
-		return {}, nil, "error", nil, {}
+		return {}, "error", nil, {}
 	end
-	local result, word_delimiters, global_passthrough = parse_override_content(content)
-	return result, word_delimiters, "committed", { status = "ok", content = content }, global_passthrough, migrated.common_admitted ~= false
+	local parsed, result, global_passthrough = pcall(parse_override_content, content)
+	if not parsed then
+		Logger.error(LOG, "Override source is not valid TOML: %s.", tostring(result))
+		return {}, "error", nil, {}
+	end
+	return result, "committed", { status = "ok", content = content }, global_passthrough, migrated.common_admitted ~= false
+end
+
+--- The delay lines of one override rung: an offset of the base expansion delay,
+--- or the flag of an unlimited delay.
+--- @param rung table Override rung.
+--- @return table lines Zero, one or two lines.
+--- @return string|nil error_detail Validation failure.
+local function delay_lines(rung)
+	local lines = {}
+	if rung.delay_offset ~= nil then
+		if not ConfigSchema.is_delay_offset(rung.delay_offset) then
+			return lines, "override delay offset must be a finite number"
+		end
+		lines[#lines + 1] = string.format("delay_offset = %." .. DelayResolver.DELAY_DECIMALS .. "f", rung.delay_offset)
+	end
+	if rung.delay_unlimited ~= nil then
+		if rung.delay_unlimited ~= true then return lines, "override unlimited delay must be true when present" end
+		lines[#lines + 1] = "delay_unlimited = true"
+	end
+	return lines
 end
 
 --- Serializes the in-memory override table back to TOML.
 --- @param overrides table The override table (same shape as parse_overrides).
---- @param word_delimiters string|nil The [__global__] word_delimiters value, if set.
---- @param global_passthrough string[] Exact raw records for unowned [__global__] keys.
+--- @param global_passthrough string[] Exact raw records of the [__global__] table.
 --- @return string|nil content The serialized TOML content.
 --- @return string|nil error_detail Validation failure without untrusted bytes.
-local function serialize_overrides(overrides, word_delimiters, global_passthrough)
+local function serialize_overrides(overrides, global_passthrough)
 	if type(overrides) ~= "table" then return nil, "override root must be a table" end
 	local out = {
 		"# Hotstrings — overrides utilisateur",
@@ -482,22 +347,12 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 	}
 
 	-- [__global__] is re-emitted FIRST. parse_overrides returns it as a separate
-	-- value from the category table, and this function only ever received the
-	-- second — so every save from the delays-and-colours window rewrote the file
-	-- without it, silently discarding the word_delimiters the AutoHotkey driver
-	-- writes into the very same shared file. A round trip that reads more than it
-	-- writes destroys whatever it did not read.
-	local has_word_delimiters = type(word_delimiters) == "string" and word_delimiters ~= ""
+	-- value from the category table, so a save that only wrote the categories
+	-- would silently discard whatever the table holds. A round trip that reads
+	-- more than it writes destroys whatever it did not read.
 	local has_passthrough = type(global_passthrough) == "table" and #global_passthrough > 0
-	if has_word_delimiters or has_passthrough then
+	if has_passthrough then
 		table.insert(out, "[__global__]")
-		-- Written in the shape the PARSER reads: a plain double-quoted string with
-		-- only the quote and the backslash escaped. string.format("%q") emits LUA
-		-- escapes — a tab becomes \9 — which round-trips through Lua and not
-		-- through `word_delimiters%s*=%s*"(.-)"`.
-		if has_word_delimiters then
-			table.insert(out, "word_delimiters = " .. ConfigSchema.encode_basic_string(word_delimiters))
-		end
 		for _, assignment in ipairs(global_passthrough or {}) do
 			table.insert(out, assignment)
 		end
@@ -517,16 +372,13 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 
 	for _, cat in ipairs(cats) do
 		local entry = overrides[cat]
-		local has_file_level = entry.delay ~= nil or entry.color ~= nil or entry.show_tooltip ~= nil
-			or entry.priority ~= nil
+		local has_file_level = entry.delay_offset ~= nil or entry.delay_unlimited ~= nil or entry.color ~= nil
+			or entry.show_tooltip ~= nil or entry.priority ~= nil
 		if has_file_level then
 			table.insert(out, string.format("[%s]", cat))
-			if entry.delay ~= nil then
-				if not ConfigSchema.is_delay(entry.delay) then
-					return nil, "override delay must be a finite non-negative number"
-				end
-				table.insert(out, string.format("delay = %s", tostring(entry.delay)))
-			end
+			local delay_line, delay_error = delay_lines(entry)
+			if delay_error then return nil, delay_error end
+			for _, line in ipairs(delay_line) do table.insert(out, line) end
 			if entry.color ~= nil then
 				local encoded = ConfigSchema.encode_basic_string(entry.color)
 				if not encoded then return nil, "override color must be a string" end
@@ -558,15 +410,12 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 			table.sort(secs)
 			for _, sec in ipairs(secs) do
 				local s_entry = entry.sections[sec]
-				if s_entry.delay ~= nil or s_entry.color ~= nil or s_entry.show_tooltip ~= nil
-					or s_entry.priority ~= nil then
+				if s_entry.delay_offset ~= nil or s_entry.delay_unlimited ~= nil or s_entry.color ~= nil
+					or s_entry.show_tooltip ~= nil or s_entry.priority ~= nil then
 					table.insert(out, string.format("[%s.%s]", cat, sec))
-					if s_entry.delay ~= nil then
-						if not ConfigSchema.is_delay(s_entry.delay) then
-							return nil, "override section delay must be a finite non-negative number"
-						end
-						table.insert(out, string.format("delay = %s", tostring(s_entry.delay)))
-					end
+					local delay_line, delay_error = delay_lines(s_entry)
+					if delay_error then return nil, delay_error end
+					for _, line in ipairs(delay_line) do table.insert(out, line) end
 					if s_entry.color ~= nil then
 						local encoded = ConfigSchema.encode_basic_string(s_entry.color)
 						if not encoded then return nil, "override color must be a string" end
@@ -590,12 +439,7 @@ end
 --- Clones an override tree so a setter can build an unpublished candidate.
 --- @param value any Value to clone.
 --- @return any clone
-local function clone_value(value)
-	if type(value) ~= "table" then return value end
-	local clone = {}
-	for key, child in pairs(value) do clone[key] = clone_value(child) end
-	return clone
-end
+local clone_value = TableUtil.deep_copy
 
 --- Returns whether two classified source snapshots denote identical bytes.
 --- @param left table|nil
@@ -616,7 +460,7 @@ local function refresh_after_failed_publication()
 		_state.writes_blocked = true
 		return false
 	end
-	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough, common_admitted =
+	local overrides, read_status, source_snapshot, global_passthrough, common_admitted =
 		parse_overrides(_state.path)
 	if read_status == "error" then
 		_state.common_admitted = false
@@ -633,7 +477,6 @@ local function refresh_after_failed_publication()
 		return false
 	end
 	_state.overrides       = overrides
-	_state.word_delimiters = word_delimiters
 	_state.global_passthrough = global_passthrough
 	_state.source_snapshot = source_snapshot
 	_state.epoch = _state.epoch + 1
@@ -643,21 +486,32 @@ local function refresh_after_failed_publication()
 	Logger.warn(LOG, "Override publication lost a source race; newer external bytes were adopted.")
 end
 
+--- Removes one override field from a rung. A delay is stored as an offset, an
+--- unlimited flag or the absolute spelling of earlier builds: all three go.
+--- @param rung table Override rung.
+--- @param field string "delay", "color", "show_tooltip" or "priority".
+local function clear_override_field(rung, field)
+	if field == "delay" then
+		rung.delay_offset, rung.delay_unlimited, rung.legacy_delay = nil, nil, nil
+	else
+		rung[field] = nil
+	end
+end
+
 --- Preserves every unowned record while publishing only changed override leaves.
 --- @param overrides table Candidate known overrides.
---- @param word_delimiters string|nil Candidate global delimiter choice.
 --- @return string|nil content Prepared source bytes.
 --- @return string|nil detail Refusal reason.
-local function prepare_override_content(overrides, word_delimiters)
+local function prepare_override_content(overrides)
 	local updates = {}
 	local function leaves(source)
 		local rows = {}
 		for category, entry in pairs(source) do
-			for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
+			for _, field in ipairs(OVERRIDE_FIELDS) do
 				if entry[field] ~= nil then rows[category .. "\0" .. field] = { category, field, entry[field] } end
 			end
 			for section, values in pairs(entry.sections or {}) do
-				for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
+				for _, field in ipairs(OVERRIDE_FIELDS) do
 					if values[field] ~= nil then
 						local path = category .. "." .. section
 						rows[path .. "\0" .. field] = { path, field, values[field] }
@@ -670,15 +524,13 @@ local function prepare_override_content(overrides, word_delimiters)
 	local previous, candidate = leaves(_state.overrides), leaves(overrides)
 	for id, row in pairs(candidate) do
 		if previous[id] == nil or previous[id][3] ~= row[3] then
-			updates[#updates + 1] = { section = row[1], key = row[2], value = row[3] }
+			updates[#updates + 1] = { section = row[1], key = OVERRIDE_KEYS[row[2]], value = row[3] }
 		end
 	end
 	for id, row in pairs(previous) do
-		if candidate[id] == nil then updates[#updates + 1] = { section = row[1], key = row[2], delete = true } end
-	end
-	if word_delimiters ~= nil or word_delimiters ~= _state.word_delimiters then
-		updates[#updates + 1] = { section = "__global__", key = "word_delimiters",
-			value = word_delimiters, delete = word_delimiters == nil }
+		if candidate[id] == nil then
+			updates[#updates + 1] = { section = row[1], key = OVERRIDE_KEYS[row[2]], delete = true }
+		end
 	end
 	local snapshot = _state.source_snapshot
 	local content = snapshot.status == "ok" and snapshot.content or ""
@@ -699,7 +551,7 @@ local function prepare_override_content(overrides, word_delimiters)
 			if prefix(header.segments, target) then return nil, "override scalar is already a table" end
 			if #header.segments == #section and prefix(section, header.segments) then
 				headers = headers + 1
-				local raw = scan.lines[header.index].text:match("^%s*(.-)%s*$")
+				local raw = TextUtils.trim(scan.lines[header.index].text)
 				if raw ~= "[" .. row.section .. "]" then return nil, "override header is not reader-owned" end
 			end
 		end
@@ -713,7 +565,7 @@ local function prepare_override_content(overrides, word_delimiters)
 				for _, part in ipairs(record.header and record.header.segments or {}) do path[#path + 1] = part end
 				for _, part in ipairs(key) do path[#path + 1] = part end
 				if prefix(target, path) or prefix(path, target) then
-					if #path ~= #target or #key ~= 1 or key_text:match("^%s*(.-)%s*$") ~= row.key then
+					if #path ~= #target or #key ~= 1 or TextUtils.trim(key_text) ~= row.key then
 						return nil, "override leaf conflicts with an unowned representation"
 					end
 					fields = fields + 1
@@ -725,6 +577,7 @@ local function prepare_override_content(overrides, word_delimiters)
 		if not row.delete then
 			if type(row.value) == "string" then encoded = ConfigSchema.encode_basic_string(row.value)
 			elseif row.key == "priority" then encoded = tostring(math.floor(row.value))
+			elseif row.key == "delay_offset" then encoded = string.format("%." .. DelayResolver.DELAY_DECIMALS .. "f", row.value)
 			else encoded = tostring(row.value) end
 		end
 		local detail
@@ -738,21 +591,20 @@ end
 
 --- Persists a candidate override state through the atomic file-system adapter.
 --- @param overrides table Candidate overrides.
---- @param word_delimiters string|nil Candidate delimiter override.
 --- @return boolean True on success, false on I/O failure.
-local function save_to_disk(overrides, word_delimiters)
+local function save_to_disk(overrides)
 	if not _state then return false end
 	if _state.writes_blocked then
 		Logger.error(LOG, "Override save refused because the source read did not commit.")
 		return false
 	end
-	local content, serialize_err = serialize_overrides(overrides, word_delimiters, _state.global_passthrough)
+	local content, serialize_err = serialize_overrides(overrides, _state.global_passthrough)
 	if not content then
 		Logger.error(LOG, "Override save refused because the candidate schema is invalid: %s.",
 			tostring(serialize_err))
 		return false
 	end
-	local prepared, prepare_error = prepare_override_content(overrides, word_delimiters)
+	local prepared, prepare_error = prepare_override_content(overrides)
 	if not prepared then
 		Logger.error(LOG, "Override source preparation refused: %s.", tostring(prepare_error))
 		refresh_after_failed_publication()
@@ -879,6 +731,7 @@ function M.init(opts)
 		or (opts.delay_transaction ~= nil and type(opts.delay_transaction) ~= "function")
 		or (opts.section_sources_resolver ~= nil and type(opts.section_sources_resolver) ~= "function")
 		or (opts.current_override_path ~= nil and type(opts.current_override_path) ~= "function")
+		or (opts.base_delay ~= nil and type(opts.base_delay) ~= "function")
 	then
 		Logger.error(LOG, "M.init(): opts.override_path and opts.toml_resolver are required.")
 		return
@@ -894,6 +747,7 @@ function M.init(opts)
 		toml_resolver   = opts.toml_resolver,
 		section_sources_resolver = opts.section_sources_resolver,
 		delay_transaction = opts.delay_transaction,
+		base_delay      = opts.base_delay,
 		overrides       = {},
 		global_passthrough = {},
 		common_admitted = false,
@@ -914,7 +768,7 @@ function M.init(opts)
 	state.recovery = PublicationRecovery.new({ files = FileSystem,
 		capture = function() return capture_publication_owner(state) end,
 		current = publication_owner_current })
-	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough, common_admitted =
+	local overrides, read_status, source_snapshot, global_passthrough, common_admitted =
 		parse_overrides(opts.override_path)
 	if read_status == "error" then
 		Logger.error(LOG, "Initialization degraded: override source is unreadable and writes are blocked.")
@@ -927,7 +781,6 @@ function M.init(opts)
 		return false
 	end
 	_state.overrides = overrides
-	_state.word_delimiters = word_delimiters
 	_state.global_passthrough = global_passthrough
 	_state.source_snapshot = source_snapshot
 	_state.epoch = _state.epoch + 1
@@ -940,19 +793,6 @@ end
 --- Returns the effective delay (seconds) and color (hex string) for a group.
 --- @param category string The TOML file name without extension (e.g. "rolls").
 --- @param section string|nil Optional section name within the category.
-
---- Returns the shared global default expansion delay, in milliseconds.
----
---- Published so consumers read the canon instead of mirroring it. The hotstrings
---- config window carried its own `GLOBAL_DEFAULT_DELAY_MS = 750` with a comment
---- saying the two "must stay in sync" — which is the definition of two sources,
---- and the shared TOML is the one the AutoHotkey driver reads.
---- @return number|nil Milliseconds, or nil before init() has loaded the canon.
-function M.get_global_default_delay_ms()
-	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then return nil end
-	-- GLOBAL_DEFAULT_DELAY is held in seconds; the window speaks milliseconds.
-	return math.floor(GLOBAL_DEFAULT_DELAY * 1000 + 0.5)
-end
 
 --- Copies one cascade rung while dropping an invalid activation delay.
 --- Other independently-resolved fields must remain visible to the resolver.
@@ -968,12 +808,51 @@ local function sanitized_resolution_entry(entry)
 	}
 end
 
+--- The base expansion delay in seconds: what a hotstring waits when no rung of
+--- the cascade says otherwise, and what a delay override is an offset of. It is
+--- the user's `hotstrings.expansion_delay`, which the keymap owns at runtime;
+--- before that owner is wired it is the shared default.
+--- @return number
+local function base_delay()
+	if _state and _state.base_delay then
+		local value = _state.base_delay()
+		if type(value) == "number" and value == value and value >= 0 and value < math.huge then return value end
+	end
+	return GLOBAL_DEFAULT_DELAY
+end
+
+--- Returns the base expansion delay, in milliseconds: what a section that
+--- declares no delay waits, shown by the settings window as the placeholder of an
+--- empty field. It is the user's `hotstrings.expansion_delay`, so the window reads
+--- the canon instead of mirroring it (it once carried its own 750).
+--- @return number|nil Milliseconds, or nil before init() has loaded the canon.
+function M.get_global_default_delay_ms()
+	-- Declared below base_delay on purpose: above it, base_delay was a nil
+	-- global there and every call raised.
+	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then return nil end
+	-- The base is held in seconds; the window speaks milliseconds.
+	return math.floor(base_delay() * 1000 + 0.5)
+end
+
+--- A user override rung as the cascade reads it: its stored delay turned into
+--- effective seconds, every other field as `sanitized_resolution_entry` leaves it.
+--- @param entry table|nil Stored rung.
+--- @param base number|nil Base expansion delay to measure against; the live one by default.
+--- @return table|nil resolved
+local function user_resolution_entry(entry, base)
+	local resolved = sanitized_resolution_entry(entry)
+	if resolved == nil then return nil end
+	resolved.delay = DelayResolver.effective_delay(entry, base or base_delay())
+	return resolved
+end
+
 --- Builds a pure runtime projection from one unpublished override candidate.
 --- Corpus metadata comes from the registry's already committed parse, never I/O
 --- on the input path. The shared cascade remains the sole precedence owner.
 --- @param overrides table Candidate override tree.
+--- @param base number|nil Base expansion delay to project against; the live one by default.
 --- @return function resolve Group/section/corpus resolver in seconds.
-delay_projection = function(overrides)
+delay_projection = function(overrides, base)
 	return function(category, section, meta)
 		local extension_id = Extensions.parse_category_key(category)
 		local source_category = category
@@ -993,12 +872,12 @@ delay_projection = function(overrides)
 			meta_section = { delay = meta.section_delays[section] }
 		end
 		return DelayResolver.resolve({
-			user_category = sanitized_resolution_entry(user),
-			user_section = sanitized_resolution_entry(user_section),
+			user_category = user_resolution_entry(user, base),
+			user_section = user_resolution_entry(user_section, base),
 			meta_category = sanitized_resolution_entry(meta),
 			meta_section = sanitized_resolution_entry(meta_section),
 			default_delay = PersonalFiles.components(category) and PersonalFiles.additional_default_delay_seconds
-				or GLOBAL_DEFAULT_DELAY,
+				or base or base_delay(),
 		}).delay
 	end
 end
@@ -1064,11 +943,11 @@ function M.resolve(category, section)
 	-- category that ships `show_tooltip = false` is the common case and a rung
 	-- testing truthiness turns its preview back on.
 	local resolved = DelayResolver.resolve({
-		user_category  = sanitized_resolution_entry(user),
-		user_section   = sanitized_resolution_entry(user_sec),
+		user_category  = user_resolution_entry(user),
+		user_section   = user_resolution_entry(user_sec),
 		meta_category  = sanitized_resolution_entry(meta),
 		meta_section   = sanitized_resolution_entry(meta_sec),
-		default_delay  = personal and PersonalFiles.additional_default_delay_seconds or GLOBAL_DEFAULT_DELAY,
+		default_delay  = personal and PersonalFiles.additional_default_delay_seconds or base_delay(),
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
 		default_priority = HotstringPriority.source_priority(category),
@@ -1126,14 +1005,63 @@ function M.resolve_ext(ext_id, toml_path, section)
 	local meta_sec = requested_section and meta.sections[requested_section] or nil
 
 	return DelayResolver.resolve({
-		user_category = sanitized_resolution_entry(user),
-		user_section = sanitized_resolution_entry(user_sec),
+		user_category = user_resolution_entry(user),
+		user_section = user_resolution_entry(user_sec),
 		meta_category = sanitized_resolution_entry(meta),
 		meta_section = sanitized_resolution_entry(meta_sec),
-		default_delay = GLOBAL_DEFAULT_DELAY,
+		default_delay = base_delay(),
 		default_color = GLOBAL_DEFAULT_COLOR,
 		default_priority = HotstringPriority.source_priority(override_key),
 	})
+end
+
+--- Moves the delays of earlier builds to the stored form, once the base expansion
+--- delay is known: every absolute `delay` becomes an offset of the base, so no
+--- effective delay changes, and the file is rewritten at once. Until then the
+--- absolute delay applies as it stands. A `[_global]` record is the Windows
+--- spelling of the base: this driver keeps its base in config.toml, so the
+--- record is dropped with a warning rather than guessed.
+--- @return boolean ok False when the rewrite was refused; the next start retries.
+local function migrate_legacy_delays()
+	local candidate = clone_value(_state.overrides)
+	local global = DelayResolver.take_legacy_global(candidate)
+	local changed = DelayResolver.adopt_legacy_delays(candidate, base_delay())
+	if global == nil and not changed then return true end
+	if global ~= nil then
+		Logger.warn(LOG, "The override file holds a Windows default delay (%.3f s); the base expansion delay of this "
+			.. "driver is hotstrings.expansion_delay in config.toml, so the record is dropped.", global)
+	end
+	local committed, content = save_to_disk(candidate)
+	if not committed then
+		Logger.error(LOG, "The delay overrides could not be rewritten as offsets of the base expansion delay; "
+			.. "they apply as they were and the rewrite is retried at the next start.")
+		return false
+	end
+	_state.overrides = candidate
+	_state.source_snapshot = { status = "ok", content = content }
+	_state.epoch = _state.epoch + 1
+	_state.resolve_cache = {}
+	Logger.info(LOG, "Delay overrides migrated to offsets of the base expansion delay.")
+	return true
+end
+
+--- Applies a change of the base expansion delay: the delays of every registered
+--- group are projected again (they are offsets of it), and the delays of earlier
+--- builds are migrated the first time the base is known.
+--- @return boolean ok False when the registry refused the new delays.
+function M.refresh_delays()
+	if not _state or _terminal_owner ~= nil then return true end
+	_state.resolve_cache = {}
+	if _state.delay_transaction
+		and _state.delay_transaction(delay_projection(_state.overrides), function() return true end) ~= true then
+		Logger.error(LOG, "The registry refused the delays projected from the new base expansion delay.")
+		return false
+	end
+	if not _state.writes_blocked and not _state.operation_active and _state.scope_owner == nil
+		and not _state.recovery.has_pending() then
+		migrate_legacy_delays()
+	end
+	return true
 end
 
 --- Sets a user override for a single field. Pass section=nil for file-level.
@@ -1168,14 +1096,24 @@ function M.set_override(category, section, field, value)
 	local entry = candidate[category]
 	entry.sections = entry.sections or {}
 
+	local target = entry
 	if section then
 		entry.sections[section] = entry.sections[section] or {}
-		entry.sections[section][field] = value
+		target = entry.sections[section]
+	end
+	if field == "delay" then
+		-- The caller speaks effective seconds; the file stores an offset of the base.
+		clear_override_field(target, "delay")
+		if value == 0 then
+			target.delay_unlimited = true
+		else
+			target.delay_offset = DelayResolver.offset_for(value, base_delay())
+		end
 	else
-		entry[field] = value
+		target[field] = value
 	end
 
-	local committed, content = save_to_disk(candidate, _state.word_delimiters)
+	local committed, content = save_to_disk(candidate)
 	if not committed then return false end
 	_state.overrides = candidate
 	_state.source_snapshot = { status = "ok", content = content }
@@ -1211,15 +1149,15 @@ function M.clear_override(category, section, field)
 	if not target then return true end
 
 	if field then
-		target[field] = nil
+		clear_override_field(target, field)
 	else
-		target.delay        = nil
+		clear_override_field(target, "delay")
 		target.color        = nil
 		target.show_tooltip = nil
 		target.priority     = nil
 	end
 
-	local committed, content = save_to_disk(candidate, _state.word_delimiters)
+	local committed, content = save_to_disk(candidate)
 	if not committed then return false end
 	_state.overrides = candidate
 	_state.source_snapshot = { status = "ok", content = content }
@@ -1250,7 +1188,7 @@ end
 --- @return boolean
 function M.reload()
 	if not require_state("reload") or not scope_admits("reload") then return false end
-	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough, common_admitted =
+	local overrides, read_status, source_snapshot, global_passthrough, common_admitted =
 		parse_overrides(_state.path)
 	if read_status == "error" then
 		_state.common_admitted = false
@@ -1266,7 +1204,6 @@ function M.reload()
 		return false
 	end
 	_state.overrides       = overrides
-	_state.word_delimiters = word_delimiters
 	_state.global_passthrough = global_passthrough
 	_state.source_snapshot = source_snapshot
 	_state.epoch = _state.epoch + 1
@@ -1287,10 +1224,20 @@ end
 
 --- The delay resolver of one override tree, as the registry projection runs it.
 --- @param overrides table Reader override tree.
+--- @param base number|nil Base expansion delay to project against; the live one by default.
 --- @return function resolve (group, section, corpus metadata) -> seconds.
-function M.delay_projection(overrides)
+function M.delay_projection(overrides, base)
 	assert(type(overrides) == "table", "delay projection needs an override tree")
-	return delay_projection(overrides)
+	return delay_projection(overrides, base)
+end
+
+--- The effective delay a stored override rung describes, for the scope's proof
+--- that the reader agrees with what it planned.
+--- @param rung table|nil Reader override rung.
+--- @param base number Base expansion delay in seconds.
+--- @return number|nil seconds
+function M.effective_delay(rung, base)
+	return DelayResolver.effective_delay(rung, base)
 end
 
 --- Holds the override file for one scope transaction; ordinary mutations and
@@ -1336,6 +1283,19 @@ end
 
 --- Prepares one admitted source edit together with only its masking legacy leaves.
 --- The caller holds this override owner until publication or a verified inverse.
+--- The effective-seconds view of an override rung, the form the shared
+--- personal-metadata planner reads: the stored offsets become seconds.
+--- @param rung table|nil Stored override category or section record.
+--- @return table view Record with `delay`, the other fields and `sections`.
+local function effective_view(rung)
+	local view = { sections = {} }
+	if type(rung) ~= "table" then return view end
+	view.delay = DelayResolver.effective_delay(rung, base_delay())
+	view.color, view.show_tooltip, view.priority = rung.color, rung.show_tooltip, rung.priority
+	for name, nested in pairs(rung.sections or {}) do view.sections[name] = effective_view(nested) end
+	return view
+end
+
 function M.prepare_personal_metadata(owner, record, section, field, value)
 	if not require_state("prepare_personal_metadata") or _state.scope_owner ~= owner or _state.writes_blocked
 		or type(record) ~= "table" or record.admitted ~= true or not PersonalFiles.components(record.owner) then return nil end
@@ -1343,14 +1303,15 @@ function M.prepare_personal_metadata(owner, record, section, field, value)
 	if loader.adoption_current(record) ~= true then return nil end
 	local overrides = clone_value(_state.overrides)
 	local legacy_name = personal_override_owner(record.owner, overrides)
-	local legacy = overrides[legacy_name] or {}
+	local stored = overrides[legacy_name] or {}
+	local legacy = effective_view(stored)
 	local plan = require("hotstrings.personal_metadata").prepare(record.content, section, field, value, legacy)
 	if not plan then return nil end
-	if legacy_name and legacy then
-		if plan.remove_file then legacy[field] = nil end
-		if plan.remove_section then legacy.sections[section][field] = nil end
+	if legacy_name and stored then
+		if plan.remove_file then clear_override_field(stored, field) end
+		if plan.remove_section then clear_override_field(stored.sections[section], field) end
 	end
-	local override_content = prepare_override_content(overrides, _state.word_delimiters)
+	local override_content = prepare_override_content(overrides)
 	if not override_content then return nil end
 	plan.override_path = _state.path
 	plan.override_source = clone_value(_state.source_snapshot)
@@ -1380,8 +1341,8 @@ function M.personal_catalogue_effective(record, section)
 	local overrides = candidate and candidate.owner == _state.scope_owner and candidate.overrides or _state.overrides
 	local user = overrides[personal_override_owner(record.owner, overrides)] or {}
 	return DelayResolver.resolve({
-		user_category = sanitized_resolution_entry(user),
-		user_section = sanitized_resolution_entry(section and (user.sections or {})[section] or nil),
+		user_category = user_resolution_entry(user),
+		user_section = user_resolution_entry(section and (user.sections or {})[section] or nil),
 		meta_category = sanitized_resolution_entry(registered.metadata),
 		meta_section = sanitized_resolution_entry(section and personal_section_metadata(registered.metadata, section) or nil),
 		default_delay = PersonalFiles.additional_default_delay_seconds,
@@ -1407,7 +1368,11 @@ function M.adopt_scope_source(owner, source, publish)
 	assert(type(source) == "table" and (source.status == "absent"
 		or (source.status == "ok" and type(source.content) == "string")), "scope override source is not classified")
 	assert(type(publish) == "function", "scope override adoption needs its publication")
-	local overrides, word_delimiters, global_passthrough = parse_override_content(source.content or "")
+	local parsed, overrides, global_passthrough = pcall(parse_override_content, source.content or "")
+	if not parsed then
+		Logger.error(LOG, "Scope override source is not valid TOML: %s.", tostring(overrides))
+		return false
+	end
 	local candidate = { owner = owner, overrides = overrides }
 	_state.scope_candidate = candidate
 	local ok, committed = pcall(function()
@@ -1422,7 +1387,6 @@ function M.adopt_scope_source(owner, source, publish)
 		return false
 	end
 	_state.overrides          = overrides
-	_state.word_delimiters    = word_delimiters
 	_state.global_passthrough = global_passthrough
 	_state.source_snapshot    = source.status == "ok" and { status = "ok", content = source.content }
 		or { status = "absent" }
@@ -1499,7 +1463,7 @@ function M.get_toml_defaults(category, section)
 	local meta_sec = requested_section and meta.sections[requested_section] or nil
 	return {
 		delay = (meta_sec and meta_sec.delay) or meta.delay
-			or (personal and PersonalFiles.additional_default_delay_seconds or GLOBAL_DEFAULT_DELAY),
+			or (personal and PersonalFiles.additional_default_delay_seconds or base_delay()),
 		color = (meta_sec and meta_sec.color) or meta.color,
 		priority = (meta_sec and meta_sec.priority) or meta.priority,
 	}
@@ -1520,10 +1484,8 @@ end
 --- exact token. Only a pre-fence abort may release the same live owner.
 --- @return table|nil token Private zero-argument current/abort capabilities.
 function M.capture_terminal_admission()
-	if _terminal_owner ~= nil then return nil end
+	if M.terminal_admission_blocked() then return nil end
 	local state = _state
-	if state and (state.operation_active or state.recovery.has_pending()
-		or state.scope_owner ~= nil or state.scope_candidate ~= nil) then return nil end
 	local owner = {}
 	_terminal_owner = owner
 	local function current()
@@ -1539,6 +1501,22 @@ function M.capture_terminal_admission()
 			return true
 		end,
 	}
+end
+
+--- Whether a hotstring operation, a recovery or a scope transaction is active.
+--- The menu's Quit waits for it instead of cutting the write in half.
+--- @return boolean pending
+function M.publication_pending()
+	local state = _state
+	return state ~= nil and (state.operation_active or state.recovery.has_pending()
+		or state.scope_owner ~= nil or state.scope_candidate ~= nil)
+end
+
+--- Whether a terminal transition cannot be admitted now: another one already
+--- holds the admission, or a publication is pending.
+--- @return boolean blocked
+function M.terminal_admission_blocked()
+	return _terminal_owner ~= nil or M.publication_pending()
 end
 
 function M.common_autocorrection_admitted()
@@ -1568,104 +1546,20 @@ function M.get_user_override(category, section)
 	if not cat then return nil end
 	local target = section and (cat.sections or {})[section] or cat
 	if not target then return nil end
-	if target.delay == nil and target.color == nil and target.show_tooltip == nil
+	local delay = DelayResolver.effective_delay(target, base_delay())
+	if delay == nil and target.color == nil and target.show_tooltip == nil
 		and target.priority == nil then return nil end
-	return { delay = target.delay, color = target.color, show_tooltip = target.show_tooltip,
+	return { delay = delay, color = target.color, show_tooltip = target.show_tooltip,
 		priority = target.priority }
 end
 
--- =================================================
--- =================================================
--- ======= 7/ Word-delimiter API ===================
--- =================================================
--- =================================================
-
---- Returns the effective word-delimiter string: user override when stored,
---- otherwise the built-in DEFAULT_WORD_DELIMITERS constant (mirrors AHK default).
---- @return string
-function M.get_word_delimiters()
-	if not require_state("get_word_delimiters") then return DEFAULT_WORD_DELIMITERS end
-	return _state.word_delimiters or DEFAULT_WORD_DELIMITERS
-end
-
---- Returns the built-in default word-delimiter string.
---- @return string
-function M.get_default_word_delimiters()
-	return DEFAULT_WORD_DELIMITERS
-end
-
---- Patches only the shared global delimiter key while preserving other bytes.
---- @param existing string Complete committed source content.
---- @param delimiters string|nil Candidate delimiter value.
---- @return string content Candidate file content.
-local function patch_word_delimiters(existing, delimiters)
-	local encoded = delimiters and ConfigSchema.encode_basic_string(delimiters) or nil
-	return TomlRecordEditor.patch_table_field(
-		existing,
-		"[__global__]",
-		"word_delimiters",
-		encoded,
-		{ remove_empty_section = true }
-	)
-end
-
---- Persists a new word-delimiter string to the [__global__] section of the
---- override file and updates the in-memory value.
---- Pass nil or the default string to clear the override (removes the key).
---- @param delimiters string|nil The new delimiter string, or nil to reset.
---- @return boolean True on success.
-function M.set_word_delimiters(delimiters)
-	if not require_state("set_word_delimiters") or not scope_admits("set_word_delimiters") then return false end
-
-	local candidate
-	if delimiters == nil or delimiters == DEFAULT_WORD_DELIMITERS then
-		candidate = nil
-	else
-		candidate = delimiters
-	end
-
-	if _state.writes_blocked then
-		Logger.error(LOG, "Delimiter save refused because the source read did not commit.")
-		return false
-	end
-	-- Synchronize the complete shared file before patching one key. This keeps
-	-- both the in-memory overrides and the publication precondition on the same
-	-- exact cross-driver source version.
-	if not M.reload() then return false end
-	local snapshot = _state.source_snapshot
-	local existing = snapshot.status == "ok" and snapshot.content or ""
-	local content, patch_err = patch_word_delimiters(existing, candidate)
-	if not content then
-		Logger.error(LOG, "Failed to patch word_delimiters: %s.", tostring(patch_err))
-		return false
-	end
-	local previous_common_admission = _state.common_admitted
-	if not begin_publication_attempt() then return false end
-	local write_ok, committed = pcall(_state.recovery.publish,
-		_state.path, content, FileSystem, snapshot, _state.on_publication_error, publish_native_override)
-	local accepted = finish_publication_attempt(write_ok and committed == true)
-	if not accepted then
-		Logger.error(LOG, "Failed to commit word_delimiters against its loaded source snapshot.")
-		refresh_after_failed_publication()
-		return false
-	end
-	_state.common_admitted = previous_common_admission
-	_state.writes_blocked = false
-	_state.word_delimiters = candidate
-	_state.source_snapshot = { status = "ok", content = content }
-	_state.epoch = _state.epoch + 1
-	Logger.debug(LOG, "word_delimiters persisted: %s.", candidate and
-		('"' .. tostring(candidate) .. '"') or "(default — key removed)")
-	return true
-end
-
 
 
 
 
 -- ==========================================================
 -- ==========================================================
--- ======= 8/ Bootstrap: shared cross-driver defaults =======
+-- ======= 7/ Bootstrap: shared cross-driver defaults =======
 -- ==========================================================
 -- ==========================================================
 
@@ -1698,12 +1592,12 @@ local function load_shared_defaults()
 		return s[key]
 	end
 
-	GLOBAL_DEFAULT_DELAY             = tonumber(require_key("delays", "default_sec"))
+	GLOBAL_DEFAULT_DELAY             = tonumber(require("infra.manifest_reader").default_for(ConfigKeys.KEY.HOTSTRINGS_EXPANSION_DELAY))
 	GLOBAL_DEFAULT_COLOR             = require_key("colors", "global_default")
 	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")
 
 	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then
-		error("[hotstrings_config] [delays].default_sec must be a number in " .. toml_path)
+		error("[hotstrings_config] hotstrings.expansion_delay must be a number in the feature manifest")
 	end
 
 	Logger.done(LOG, "Shared hotstring defaults loaded (delay=%.2fs color=%s personal=%s).",

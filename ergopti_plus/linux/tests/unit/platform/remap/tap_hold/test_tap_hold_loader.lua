@@ -10,7 +10,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Config = require("platform.remap.tap_hold_loader")
+-- Loaded fresh: the cases below capture the current logger shim, and a module
+-- an earlier suite loaded under a substitute logger would report elsewhere.
+local Config = helpers.load_module("platform.remap.tap_hold_loader")
 
 local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
 
@@ -63,9 +65,9 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 		helpers.assert_true(not load('[tap_hold]\nenabled = false\n').enabled)
 	end)
 
-	helpers.it("falls back to 0.2 s for a threshold out of range", function()
+	helpers.it("falls back to the global delay for a threshold out of range", function()
 		local loaded = load('[tap_hold.keys.left_shift]\ntime_activation_seconds = 30\n')
-		helpers.assert_eq(loaded.keys.left_shift.time_activation_seconds, Config.FALLBACK_THRESHOLD_SECONDS)
+		helpers.assert_eq(loaded.keys.left_shift.time_activation_seconds, Config.GLOBAL_DEFAULT_SECONDS)
 	end)
 
 	helpers.it("disables a key with a field of the wrong type", function()
@@ -313,6 +315,23 @@ helpers.describe("tap-hold config: the wizard's report of a folder", function()
 		local result, err = report('[tap_hold.keys.left_shift\ntap_action = "paste"\n')
 		helpers.assert_nil(result)
 		helpers.assert_type(err, "string")
+	end)
+
+end)
+
+
+
+
+helpers.describe("tap-hold config: the side a hold modifier names (PAR-15)", function()
+
+	helpers.it("reads a left alias as the modifier and remembers that it forces the left key", function()
+		local loaded = load('[tap_hold.keys.right_ctrl]\nhold_modifier = "lctrl"\n'
+			.. '[tap_hold.keys.right_shift]\nhold_modifier = "shift"\n')
+		helpers.assert_eq(loaded.keys.right_ctrl.hold_modifier, "ctrl")
+		helpers.assert_eq(loaded.keys.right_ctrl.hold_left_modifiers, "ctrl")
+		helpers.assert_eq(loaded.keys.right_shift.hold_modifier, "shift")
+		helpers.assert_nil(loaded.keys.right_shift.hold_left_modifiers,
+			"a plain shift on the right Shift key holds its own side")
 	end)
 
 end)

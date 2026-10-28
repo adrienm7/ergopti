@@ -24,6 +24,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 --- The agent's modes, the same on every driver: off, action (on request) and
 --- auto (after a typing pause). A stored mode outside this set is outdated.
@@ -294,7 +295,7 @@ end
 local function check_field(name, rule, value, tools)
 	if rule.type == "text" then
 		if type(value) ~= "string" then return false, nil, name .. " is not text" end
-		value = value:match("^%s*(.-)%s*$")
+		value = TextUtils.trim(value)
 		if value == "" then return false, nil, name .. " is empty" end
 		local length = utf8_length(value)
 		if length == nil or length > rule.max then return false, nil, name .. " is too long" end
@@ -486,8 +487,7 @@ end
 --- @param text string
 --- @return string
 local function mailto_encode(text)
-	text = text:gsub("\r?\n", "\r\n")
-	return (text:gsub("[^%w%-%._~]", function(c) return string.format("%%%02X", c:byte()) end))
+	return TextUtils.percent_encode((text:gsub("\r?\n", "\r\n")))
 end
 
 --- Builds the mailto: link of a mail action. The "@" of an address stays

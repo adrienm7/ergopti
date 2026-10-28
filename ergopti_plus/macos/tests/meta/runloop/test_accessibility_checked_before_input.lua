@@ -50,5 +50,9 @@ helpers.describe("root boot: Accessibility before input owners (accessibility-be
 			"a granted permission must run the post-onboarding boot again under the boot guard")
 		helpers.assert_true(body:find("permission = AccessibilityPermission", 1, true) ~= nil,
 			"the wait must use the real permission adapter")
+		-- issue #104: the resumed run reopened its own stage and warned at every grant.
+		helpers.assert_true(body:find('Boot.stage_once("Accessibility permission")', 1, true) ~= nil
+			and body:find('Boot.stage("Accessibility permission")', 1, true) == nil,
+			"the boot that resumes inside the Accessibility stage must resume it, not open it again")
 	end)
 end)

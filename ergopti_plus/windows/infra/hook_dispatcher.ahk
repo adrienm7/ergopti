@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Central singleton that owns every low-level input hook in the process and
 ; fan-outs to registered subscriber callbacks. Before this module existed
-; each feature (keylogger, adapter contract, future modules) registered its
+; each feature (keystats, adapter contract, future modules) registered its
 ; own InputHook or Hotkey independently, which meant the OS received multiple
 ; overlapping hook requests and event ordering was undefined. Now a single
 ; InputHook and a single set of mouse Hotkeys are created once; all other
@@ -235,7 +235,7 @@ class HookDispatcher {
 	static Dispatch(event_type, args*) {
 		static _err_cache := Map()  ; Cap: .Count >= 256 triggers .Clear() before each .Has(sig) de-dup
 		; Native Suspend only disarms hotkeys/hotstrings — this InputHook fan-out
-		; keeps firing while paused, driving the LLM bridge and keylogger. Gate the
+		; keeps firing while paused, driving the LLM bridge and keystats. Gate the
 		; whole shared pipeline here so « pause = tout éteint » in one place.
 		if A_IsSuspended
 			return
@@ -250,7 +250,14 @@ class HookDispatcher {
 		; arr[0] and throws uncaught on the hot path. Clone() is a shallow copy
 		; of references, so identity Unregister still mutates the live array
 		; while this loop stays stable AND in registration order.
+		; One dispatch in eight also reports each subscriber's own time (see the counters
+		; hook.sub_us.<event>.<subscriber>), so the cost of a keystroke is attributable to a
+		; named consumer without a clock read per subscriber on every event.
+		static _sampleTick := 0
+		Sampled := (++_sampleTick & 7) == 0
 		for cb in HookDispatcher._subscribers[event_type].Clone() {
+			if Sampled
+				SubscriberStart := PerfStage_Begin()
 			try {
 				cb(args*)
 			} catch as e {
@@ -266,6 +273,12 @@ class HookDispatcher {
 					if (IsSet(_DriverBootPhase) && _DriverBootPhase == "ready")
 						try ErgoptiGlobalErrorHandler(e, "Continue")
 				}
+			}
+			if Sampled {
+				SubscriberName := "unnamed"
+				try SubscriberName := cb.Name
+				PerfCount("hook.sub_us." . event_type . "." . SubscriberName, PerfElapsedUs(SubscriberStart))
+				PerfCount("hook.sub_samples." . event_type . "." . SubscriberName)
 			}
 		}
 	}
@@ -298,6 +311,7 @@ class HookDispatcher {
 
 	; Bound to IH.OnChar — receives (ih, char) from AHK.
 	static _OnChar(ih, char) {
+		PerfCount("hook.char")
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_CHAR, ih, char)
 	}
 
@@ -310,6 +324,11 @@ class HookDispatcher {
 	; consumer. Two QPC reads; the log line is gated by the profiler floor.
 	static _OnKeyDown(ih, vk, sc) {
 		_hpKeyDown := HotPath_Now()
+		PerfCount("hook.keydown")
+		static _keyDownSample := 0
+		Sampled := (++_keyDownSample & 7) == 0
+		if Sampled
+			PreStart := PerfStage_Begin()
 		KS_RecordPhysicalKeyDown(vk, sc, "dispatcher")
 		try TapHoldTrackKeyDownByScancode(vk, sc)
 		catch as _thTrackErr
@@ -320,6 +339,11 @@ class HookDispatcher {
 		try TapHoldTrackAltGrLCtrl(vk, sc)
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackAltGrLCtrl", _thTrackErr)
+		; The physical-key bookkeeping and the three tap-hold trackers, before the fan-out.
+		if Sampled {
+			PerfCount("hook.keydown_pre_us", PerfElapsedUs(PreStart))
+			PerfCount("hook.keydown_pre_samples")
+		}
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, ih, vk, sc)
 		HotPath_LogIfSlow("Hook.KeyDown", _hpKeyDown)
 	}
@@ -327,6 +351,7 @@ class HookDispatcher {
 	; Bound to IH.OnKeyUp — receives (ih, vk, sc) from AHK.
 	static _OnKeyUp(ih, vk, sc) {
 		_hpKeyUp := HotPath_Now()
+		PerfCount("hook.keyup")
 		try TapHoldTrackKeyUpByScancode(vk, sc)
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackKeyUpByScancode", _thTrackErr)
@@ -525,7 +550,7 @@ class HookDispatcher {
 			; transient OS resource exhaustion) can throw here; the bare call from
 			; ErgoptiPlus.ahk would otherwise only be caught by the global error
 			; handler, leaving every hook-dependent feature (remap, hotstrings,
-			; keylogger, CapsWord cancel, gestures, LLM dismiss-on-click) silently
+			; keystats, CapsWord cancel, gestures, LLM dismiss-on-click) silently
 			; dead for the rest of the session with no dispatcher-specific signal.
 			try {
 				ih := InputHook(HookDispatcherConst.INPUT_HOOK_OPTS)

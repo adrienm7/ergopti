@@ -43,8 +43,8 @@ _ATO_ReapOwnedDebris(ReapFn) {
 		AssertEqual("", Unexpected, "cleanup must retain live, recent and unrecognized staging files")
 	} finally _KLRDC_Cleanup()
 }
-_ATO_KeyloggerReap(Path, MaxAgeMs) {
-	; The full keylogger installs hooks. Execute its actual helper in isolation.
+_ATO_KeystatsReap(Path, MaxAgeMs) {
+	; The full keystats installs hooks. Execute its actual helper in isolation.
 	Body := _DriverFuncBody("_KL_ReapStaleTemps")
 	AssertTrue(Body != "")
 	Script := _KLRDC_Root() . "isolated_reaper.ahk"
@@ -64,6 +64,6 @@ _ATO_KeyloggerReap(Path, MaxAgeMs) {
 		AssertEqual(0, ExitCode, "the isolated production reaper must finish")
 	} finally AssertTrue(Handle.terminate())
 }
-for Spec in [["keylogger", _ATO_KeyloggerReap], ["prefetch", _KLPF_ReapStaleTemps], ["toml", _TOML_ReapStaleTemps]]
+for Spec in [["keystats", _ATO_KeystatsReap], ["prefetch", _KLPF_ReapStaleTemps], ["toml", _TOML_ReapStaleTemps]]
 	Test("Atomic stage cleanup: " . Spec[1] . " requires a dead owner (atomic-temp-owner)",
 		_KLRDC_CheckTeardown.Bind(_ATO_ReapOwnedDebris.Bind(Spec[2])))

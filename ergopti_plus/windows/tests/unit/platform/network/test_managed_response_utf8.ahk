@@ -191,7 +191,7 @@ _MRU_Case(Mode) {
 					AssertFalse(Request.CleanupPending, "the exact request must not leave silent file cleanup debt")
 					AssertFalse(_HTTP_CURL_CLEANUP_DEBTS.Has(Request.CleanupDebtId), "only this request's cleanup debt must be absent")
 					AssertFalse(_HTTP_CURL_ABORT_DEBTS.Has(Request.CleanupDebtId), "only this request's abort debt must be absent")
-					for Path in [Request.ConfigPath, Request.BodyPath, Request.HeaderPath]
+					for Path in [Request.BodyPath, Request.HeaderPath]
 						AssertFalse(FileExist(Path), "every private request artifact must be retired")
 				}
 				if State.Has("directory")

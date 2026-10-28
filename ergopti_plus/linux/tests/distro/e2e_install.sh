@@ -145,6 +145,10 @@ if [ -n "${ERGOPTI_E2E_PREP:-}" ]; then
 	sh -c "${ERGOPTI_E2E_PREP}" || { echo "ENVIRONMENT: the image preparation failed" >&2; exit 2; }
 fi
 prepare_test_tooling || { echo "ENVIRONMENT: could not install the test tooling" >&2; exit 2; }
+# The base packages of every image (util-linux or BusyBox, the C library) ship
+# su and getent; an image without them is the image's problem, named as such.
+command -v su >/dev/null 2>&1 || { echo "ENVIRONMENT: this image has no su" >&2; exit 2; }
+command -v getent >/dev/null 2>&1 || { echo "ENVIRONMENT: this image has no getent" >&2; exit 2; }
 trust_extra_ca
 ok "sudo, D-Bus, Xvfb and PyGObject are available for the checks"
 if [ -r /etc/os-release ]; then

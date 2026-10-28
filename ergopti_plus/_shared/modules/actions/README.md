@@ -10,20 +10,27 @@ with the picker order, heading levels and locale keys resolved.
 
 ## Key files
 
-| File                   | Description                                                                 |
-| ---------------------- | --------------------------------------------------------------------------- |
-| `actions.toml`         | Every action with its platform, keystrokes, parameter kind and requirements |
-| `modifier_chords.json` | The modifier + key matrix each driver registers as chord actions            |
-| `send_keys.json`       | Named keys, modifiers and text limit of the send_key/shortcut/text actions  |
-| `script_chords.json`   | The four script chords' slots, their key on each driver, the paused actions |
+| File                   | Description                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------- |
+| `actions.toml`         | Every action with its platform, keystrokes, parameter kind and requirements      |
+| `modifier_chords.json` | The modifier + key matrix each driver registers as chord actions                 |
+| `send_keys.json`       | Named keys, modifiers and text limit of the send_key/shortcut/text actions       |
+| `script_chords.json`   | The four script chords' slots, their key on each driver, the paused actions      |
+| `slot_roles.json`      | The neutral slot grammar: modifier roles and the modifier each driver calls them |
 
 ## Generated outputs
 
-| Driver  | File                                      |
-| ------- | ----------------------------------------- |
-| macOS   | `macos/_generated/action_catalogue.lua`   |
-| Linux   | `linux/_generated/action_catalogue.lua`   |
-| Windows | `windows/_generated/action_catalogue.ahk` |
+| Driver          | File                                                                |
+| --------------- | ------------------------------------------------------------------- |
+| macOS and Linux | `_shared/lua/actions/catalogue_data.lua` (every entry names its OS) |
+| macOS           | `macos/_generated/action_catalogue.lua` (filters it, adds aliases)  |
+| Linux           | `linux/_generated/action_catalogue.lua` (filters it, adds slots)    |
+| Windows         | `windows/_generated/action_catalogue.ahk`                           |
+
+The two Lua drivers share one catalogue: `_shared/lua/actions/catalogue.lua`
+keeps the entries that name the driver when its `_generated` file loads, and
+`tools/test/test-action-catalogue-shared-projection.cjs` checks that each
+driver loads exactly the catalogue the generator's model of it holds.
 
 ## Usage
 

@@ -56,10 +56,12 @@ function M.new(opts)
 		Logger.info(LOG, "Script automation %s.", paused and "paused" or "resumed")
 		if opts.on_pause_change then
 			local ok, err = pcall(opts.on_pause_change, paused)
-			if not ok then
+			if not ok or err == false then
 				Logger.error(LOG, "Pause change listener failed: %s.", tostring(err))
+				return false
 			end
 		end
+		return true
 	end
 
 	controller.handlers = {

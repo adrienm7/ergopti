@@ -19,7 +19,7 @@ local OWNED = {
 	"infra.hotstring_engine", "infra.keystroke_integrity", "infra.logger",
 	"infra.text_utils", "infra.timings", "json",
 	"keymap.terminators", "keymap.terminators_catalogue", "keymap.utils",
-	"logger.shim", "modules.keylogger", "modules.keymap.expander",
+	"logger.shim", "modules.keystats", "modules.keymap.expander",
 	"modules.keymap.state", "modules.keymap.terminator_replay", "modules.keymap.terminators",
 	"modules.keymap.utils", "tests.stubs.hs", "text_utils",
 }
@@ -127,7 +127,7 @@ local function load_fixture(options)
 			return key == "terminal_hotstring_key_delay_ms" and 20 or 20
 		end,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		notify_synthetic = function() end,
 		set_buffer = function() end,
 		log_hotstring = function() end,
@@ -138,6 +138,8 @@ local function load_fixture(options)
 	local awake_time = 0
 	package.loaded["adapters.timer_scheduler"] = {
 		awake_time = function() return awake_time end,
+		-- The expansion's hot-path segment reads the scheduler's monotonic clock.
+		now_ns = function() return awake_time * 1e9 end,
 		after = function(delay, callback)
 			local handle = {
 				delay = delay,

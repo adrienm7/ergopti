@@ -10,7 +10,7 @@
 ---      section/key.
 ---   2. `M.sec` is exactly `M.ms / 1000`.
 ---   3. A parity tripwire on the EXACT keys the wired modules consume
----      (keylogger/init.lua, llm/prediction_engine.lua, gestures/engine.lua) —
+---      (keystats/init.lua, llm/prediction_engine.lua, gestures/engine.lua) —
 ---      a drift in constants.toml would silently change those runtime timings,
 ---      so this turns red first.
 --- ==============================================================================
@@ -30,18 +30,18 @@ local WIRED_MS = {
 	{ "debounce", "terminal_hotstring_key_delay_ms", 20 },
 	-- modules/keymap/input_sources.lua: hard deadline for mutation subprocesses.
 	{ "ui", "input_source_operation_timeout_ms", 10000 },
-	-- keylogger/init.lua
-	{ "keylogger", "micro_idle_timeout_ms",  30000 },
-	{ "keylogger", "session_timeout_ms",    300000 },
-	{ "keylogger", "wpm_window_ms",          15000 },
-	{ "keylogger", "wpm_min_duration_ms",     2000 },
-	{ "keylogger", "idle_check_interval_ms",  10000 },
-	{ "keylogger", "maintenance_interval_ms",  5000 },
-	{ "keylogger", "system_load_poll_ms",    300000 },
-	{ "keylogger", "auto_flush_idle_ms",     120000 },
+	-- ui/menu/*.lua, ui/layout_manager/init.lua: the hand-off delay before the next window opens.
+	{ "ui", "ui_handoff_ms", 50 },
+	-- keystats/init.lua
+	{ "keystats", "micro_idle_timeout_ms",  30000 },
+	{ "keystats", "session_timeout_ms",    300000 },
+	{ "keystats", "wpm_window_ms",          15000 },
+	{ "keystats", "wpm_min_duration_ms",     2000 },
+	{ "keystats", "idle_check_interval_ms",  10000 },
+	{ "keystats", "maintenance_interval_ms",  5000 },
+	{ "keystats", "system_load_poll_ms",    300000 },
+	{ "keystats", "auto_flush_idle_ms",     120000 },
 	-- llm/prediction_engine.lua
-	{ "llm", "prediction_debounce_min_ms",       50 },
-	{ "llm", "prediction_debounce_max_ms",      600 },
 	{ "llm", "chain_fallback_ms",               500 },
 	{ "llm", "dependency_bootstrap_timeout_ms", 1800000 },
 	-- gestures/engine.lua
@@ -67,13 +67,13 @@ local WIRED_MS = {
 
 helpers.describe("timings: ms / sec accessors", function()
 	helpers.it("ms returns the raw millisecond value", function()
-		helpers.assert_eq(Timings.ms("keylogger", "idle_check_interval_ms"), 10000,
+		helpers.assert_eq(Timings.ms("keystats", "idle_check_interval_ms"), 10000,
 			"idle_check_interval_ms")
 		helpers.assert_eq(Timings.ms("gestures", "tap_max_ms"), 700, "tap_max_ms")
 	end)
 
 	helpers.it("sec is exactly ms / 1000", function()
-		helpers.assert_eq(Timings.sec("llm", "prediction_debounce_max_ms"), 0.6, "debounce_max sec")
+		helpers.assert_eq(Timings.sec("llm", "chain_fallback_ms"), 0.5, "chain_fallback sec")
 		helpers.assert_eq(Timings.sec("gestures", "finger_count_stable_ms"), 0.06, "stable sec")
 	end)
 
@@ -89,7 +89,7 @@ helpers.describe("timings: ms / sec accessors", function()
 	end)
 
 	helpers.it("fails fast on an unknown key", function()
-		local ok, err = pcall(function() return Timings.ms("keylogger", "does_not_exist_ms") end)
+		local ok, err = pcall(function() return Timings.ms("keystats", "does_not_exist_ms") end)
 		helpers.assert_eq(ok, false, "ms raises on an unknown key")
 		helpers.assert_true(tostring(err):find("does_not_exist_ms", 1, true) ~= nil,
 			"and the error must name the key it refused: " .. tostring(err))

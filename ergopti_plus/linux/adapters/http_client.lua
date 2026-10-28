@@ -269,6 +269,26 @@ function M.post_stream_owned(url, headers, body, options, on_chunk, on_done)
 		options, "POST", false, on_chunk, on_done)
 end
 
+--- Sends one buffered DELETE under the same managed route and owned settlement.
+--- A DELETE removes server state, so it needs the caller's explicit source: a
+--- request whose originating menu or engine state went stale must not be sent.
+--- @param url string
+--- @param headers table
+--- @param body string|nil JSON request body (Ollama names the model there).
+--- @param options table { authorized: function, owner?, timeout_ms? }
+--- @param callback function Receives the buffered result envelope.
+--- @return table Retained colon-API operation; cancellation remains physical.
+function M.delete_owned(url, headers, body, options, callback)
+	if stopping then return rejected("HTTP client stopped", nil) end
+	local authorized = type(options) == "table" and rawget(options, "authorized") or nil
+	if type(authorized) ~= "function" then
+		return rejected("owned DELETE authorization unavailable", nil)
+	end
+	if body ~= nil and type(body) ~= "string" then return rejected("HTTP DELETE body is invalid", nil) end
+	return dispatch_owned(url, type(headers) == "table" and headers or {}, body,
+		options, "DELETE", true, nil, callback)
+end
+
 --- Receives an archive into one caller-owned private parent output target.
 --- The exact source is mandatory; lookup/preflight occurs under its reservation.
 --- This port cannot authorize path/body/ETag/native-follow or manual per-hop use.

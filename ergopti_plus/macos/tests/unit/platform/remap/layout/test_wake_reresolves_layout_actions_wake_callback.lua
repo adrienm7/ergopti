@@ -109,6 +109,38 @@ helpers.describe("karabiner wake callback lifecycle", function()
 		helpers.assert_true(deploy_at < classifier_at and classifier_at < rebind_at)
 	end)
 
+	-- Field run 2026-10-27 19:46 (ledger L44): a wake with no live generation
+	-- only warned, and remapping stayed off until a reload.
+	helpers.it("re-acquires the lease when the wake finds no live generation", function()
+		local _, calls = load_remap({ refresh_result = false, refresh_reason = "no-live-generation" })
+		calls.activate_initial()
+		calls.timers = {}
+		calls.logs = {}
+		local callback_ok, callback_err = calls.wake(SYSTEM_DID_WAKE)
+		helpers.assert_true(callback_ok, tostring(callback_err))
+		local reacquiring, warned = false, false
+		for _, item in ipairs(calls.logs) do
+			if item.level == "info" and item.message:find("re-acquiring", 1, true) then reacquiring = true end
+			if item.level == "warn" and item.message:find("could not renew", 1, true) then warned = true end
+		end
+		helpers.assert_true(reacquiring, "the wake must name the re-acquisition at INFO")
+		helpers.assert_eq(warned, false, "a missing generation is re-acquired, not only warned about")
+		helpers.assert_true(#calls.timers >= 2,
+			"the bounded recovery must arm its attempt next to the layout refresh")
+	end)
+
+	helpers.it("still warns when the refresh of a live generation fails", function()
+		local _, calls = load_remap({ refresh_result = false })
+		calls.activate_initial()
+		calls.logs = {}
+		helpers.assert_true((calls.wake(SYSTEM_DID_WAKE)))
+		local warned = false
+		for _, item in ipairs(calls.logs) do
+			if item.level == "warn" and item.message:find("could not renew", 1, true) then warned = true end
+		end
+		helpers.assert_true(warned)
+	end)
+
 	helpers.it("refreshes while paused but never redeploys", function()
 		local _, calls = load_remap({ paused = true, initial_phase = "paused" })
 		calls.sequence = {}

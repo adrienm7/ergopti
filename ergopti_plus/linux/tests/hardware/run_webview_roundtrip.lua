@@ -50,7 +50,7 @@ local Manager = require("ui.webview_manager")
 
 -- The day and app the page must end up holding: only the daemon knows them.
 local DAY, APP, CHARS = "2026-09-24", "Firefox", 4242
-Manager.set_daemon_state({ keylogger = require("tests.fakes.metrics_keylogger").synchronous({
+Manager.set_daemon_state({ keystats = require("tests.fakes.metrics_keystats").synchronous({
 	get_dashboard_payload = function()
 		return {
 			metrics_manifest = { [DAY] = { [APP] = { chars = CHARS, time = 60000 } } },

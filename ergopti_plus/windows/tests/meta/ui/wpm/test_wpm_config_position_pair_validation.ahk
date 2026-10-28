@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: WPM position pair validation guard
 ; DESCRIPTION:
-; WPMWidget_LoadConfig used to validate only CFG_X then call Integer(raw_y)
+; WPMWidget_LoadConfig used to validate only the stored X then call Integer(raw_y)
 ; unconditionally. A missing or malformed Y in a user-edited configuration
 ; raised during boot after keyboard subsystems had already registered. The
 ; position is one value: both coordinates must validate before either is used.

@@ -380,7 +380,7 @@ local function with_observer(body)
    if c.cancel_mode=='false'or c.in_frame then return false end
    c.pending=false;return true
   end,stop=function()c.stops=c.stops+1;error('Page cancellation must never stop primary metrics')end}
-  c.observer=observer;package.loaded['modules.keylogger.physical_capture']=observer
+  c.observer=observer;package.loaded['modules.keystats.physical_capture']=observer
   local host;package.loaded['ui.physical_shortcuts']=nil;host=require('ui.physical_shortcuts')
   c.host=host
   c.open=function()
@@ -439,7 +439,7 @@ helpers.describe('Mac optional observational position composition',function()
     c.open();c.request();helpers.assert_eq(c.enrollments,1)
     local foreign=0
     if kind=='export'then c.observer.capture_position=function()foreign=foreign+1;return{}end
-    elseif kind=='module'then package.loaded['modules.keylogger.physical_capture']={cancel_position=function()foreign=foreign+1;return true end}
+    elseif kind=='module'then package.loaded['modules.keystats.physical_capture']={cancel_position=function()foreign=foreign+1;return true end}
     else c.receipt={}end
     helpers.assert_eq(c.dispatch({native_code=38,mods={}}),false);helpers.assert_eq(#c.packets,0)
     c.cancel_mode='false';helpers.assert_eq(host.close(),false);helpers.assert_eq(host.open(options),false)
@@ -484,9 +484,9 @@ helpers.describe('Mac optional observational position composition',function()
  end)
  helpers.it('(physical-editor-position) absent loaded observer remains optional without constructing the producer',function()
   with_observer(function(host,c,options)
-   package.loaded['modules.keylogger.physical_capture']=nil
-   local saved=package.preload['modules.keylogger.physical_capture'];local required=0
-   package.preload['modules.keylogger.physical_capture']=function()required=required+1;error('Must not acquire producer')end
+   package.loaded['modules.keystats.physical_capture']=nil
+   local saved=package.preload['modules.keystats.physical_capture'];local required=0
+   package.preload['modules.keystats.physical_capture']=function()required=required+1;error('Must not acquire producer')end
    local called,detail=pcall(function()
     package.loaded['ui.physical_shortcuts']=nil;c.host=require('ui.physical_shortcuts')
     host=c.host
@@ -495,7 +495,7 @@ helpers.describe('Mac optional observational position composition',function()
     c.bridges[#c.bridges].callback({body={action='capture_position',request={request_id=1}}})
     helpers.assert_eq(c.enrollments,0);helpers.assert_eq(required,0);helpers.assert_true(host.close())
    end)
-   package.preload['modules.keylogger.physical_capture']=saved
+   package.preload['modules.keystats.physical_capture']=saved
    if not called then error(detail,0)end
   end)
  end)

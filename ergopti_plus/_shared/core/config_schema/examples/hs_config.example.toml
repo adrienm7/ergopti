@@ -144,9 +144,6 @@ num_predictions = 3
 [llm.profiles.shortcuts]
 # user-defined per-app profile shortcuts
 
-[llm.profiles.user_profiles]
-# user-defined prompt profiles
-
 
 
 # =======================
@@ -154,7 +151,7 @@ num_predictions = 3
 # =======================
 
 [llm.trigger]
-debounce_ms = 200
+debounce_ms = 500
 instant_on_word_end = true
 after_hotstring = true
 secure_filter_enabled = true
@@ -192,19 +189,12 @@ private_filter_enabled = true
 secure_filter_enabled = true
 system_auth_filter_enabled = true
 encrypt = false
-
-[metrics.menubar]
-show_wpm = false
-colors = true
-
-[metrics.float]
-show_wpm = true
-colors = true
-graph = true
-
-
-[metrics.disabled_apps]
-list = []
+disabled_apps = []
+wpm_menubar_visible = false
+wpm_menubar_colors = true
+wpm_widget_visible = false
+wpm_widget_colors = false
+wpm_widget_graph = false
 
 
 

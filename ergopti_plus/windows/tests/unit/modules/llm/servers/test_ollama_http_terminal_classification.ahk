@@ -101,6 +101,7 @@ _OHTC_PidReceipt_Port(State) {
 	return Map(
 		"open_process", (*) => State["handle"],
 		"terminate_process", _OHTC_PidReceipt_Terminate.Bind(State),
+		"wait_process", (*) => 0,
 		"close_process", _OHTC_PidReceipt_Close.Bind(State),
 		"read_terminal", _OHTC_PidReceipt_ReadTerminal.Bind(State))
 }
@@ -749,3 +750,5 @@ _OHTD_PingTreeCompletion(World) {
 }
 Test("Ollama enable receipt: actual tree completion delivers the structured version once (curl-tree-structured-ping)",
 	_OHTD_WithFixture.Bind(_OHTD_PingTreeCompletion))
+
+#Include %A_LineFile%/../test_ollama_terminal_utf8_decoder.ahk

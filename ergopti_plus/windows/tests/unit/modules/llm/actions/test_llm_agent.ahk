@@ -498,6 +498,7 @@ _LAG_Run(Menu, Screen, Body) {
 	global _LLM_Agent_PromptFn, _LLM_Agent_ContextProbe, _LLM_Agent_SourceProbe, _LLM_Agent_ConnectorFn
 	global _LLM_Agent_ScheduleFn, _LLM_Agent_StateReader, _LLM_Agent_StateWriter, _LLM_Agent_SecureFieldFn
 	global _LLM_Agent_CommitFn, _LLM_Agent_RebuildFn, _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_Learning
+	global _LLM_Agent_System1Revision
 	global _LLM_AgentConnector_Tools, _LLM_AgentConnector_ListFn, _LLM_AgentConnector_EnsureDirFn
 	global _Stub_LlmTooltipVisible, _Stub_LlmPresentedRecord
 	global _LLM_Remote_PostBodyFn, _LLM_Remote_BackboardAssistants
@@ -506,7 +507,7 @@ _LAG_Run(Menu, Screen, Body) {
 		Prompt: _LLM_Agent_PromptFn, Context: _LLM_Agent_ContextProbe, Source: _LLM_Agent_SourceProbe,
 		Connector: _LLM_Agent_ConnectorFn, Schedule: _LLM_Agent_ScheduleFn, Reader: _LLM_Agent_StateReader,
 		Writer: _LLM_Agent_StateWriter, Secure: _LLM_Agent_SecureFieldFn, Commit: _LLM_Agent_CommitFn,
-		Rebuild: _LLM_Agent_RebuildFn, Generation: _LLM_Agent_Generation, Auto: _LLM_Agent_Auto,
+		Rebuild: _LLM_Agent_RebuildFn, Generation: _LLM_Agent_Generation, Auto: _LLM_Agent_Auto, System1Revision: _LLM_Agent_System1Revision,
 		Learning: _LLM_Agent_Learning, Tools: _LLM_AgentConnector_Tools, List: _LLM_AgentConnector_ListFn,
 		Ensure: _LLM_AgentConnector_EnsureDirFn, Visible: _Stub_LlmTooltipVisible,
 		Presented: _Stub_LlmPresentedRecord, Post: _LLM_Remote_PostBodyFn,
@@ -517,10 +518,10 @@ _LAG_Run(Menu, Screen, Body) {
 		App: "Mail", Secure: false }
 	try {
 		_I18nLocale := "fr"
-		_LLM_Vision_RemoteTransport := (Resolved, Url, Payload, OnSuccess, OnFail) => Fx.Remote.Push(Map(
-			"resolved", Resolved, "url", Url, "body", Payload, "on_success", OnSuccess, "on_fail", OnFail))
-		_LLM_Vision_OllamaTransport := (Payload, OnSuccess, OnFail) => Fx.Ollama.Push(Map(
-			"body", Payload, "on_success", OnSuccess, "on_fail", OnFail))
+		_LLM_Vision_RemoteTransport := (Resolved, Url, Payload, OnSuccess, OnFail, CurrentFn) => Fx.Remote.Push(Map(
+			"resolved", Resolved, "url", Url, "body", Payload, "on_success", OnSuccess, "on_fail", OnFail, "requester_current", CurrentFn))
+		_LLM_Vision_OllamaTransport := (Payload, OnSuccess, OnFail, CurrentFn) => Fx.Ollama.Push(Map(
+			"body", Payload, "on_success", OnSuccess, "on_fail", OnFail, "requester_current", CurrentFn))
 		_LLM_Agent_PromptFn := _LAG_FakePrompt.Bind(Fx)
 		_LLM_Agent_ContextProbe := () => _LAG_Context(Fx)
 		_LLM_Agent_SourceProbe := () => Map("hwnd", 7, "control", 9)
@@ -556,6 +557,7 @@ _LAG_Run(Menu, Screen, Body) {
 		_LLM_Agent_CommitFn := Saved.Commit
 		_LLM_Agent_RebuildFn := Saved.Rebuild
 		_LLM_Agent_Generation := Saved.Generation
+		_LLM_Agent_System1Revision := Saved.System1Revision
 		_LLM_Agent_Auto := Saved.Auto
 		_LLM_Agent_Learning := Saved.Learning
 		_LLM_AgentConnector_Tools := Saved.Tools
@@ -704,6 +706,41 @@ _LAG_CommandDialog() {
 	}
 }
 Test("LLM agent: the command dialog sends its text; cancelling does nothing", _LAG_CommandDialog)
+
+; A native modal can admit a newer flow or commit a System 2 withdrawal.
+; Its delayed answer must retain the original requester instead of replacing it.
+_LAG_CommandModalCustody(Mode) {
+	_LAG_Run(_LAG_Menu("action", "", "cerebras"), _LTN_Screen(LAG_SELECTION), Body)
+	Body(Fx, Lines, Sent) {
+		global _LLM_Agent_PromptFn, _LLM_Agent_CommitFn
+		_LLM_Agent_PromptFn := Prompt
+		Allowed := Mode == "unchanged" || Mode == "refused-write"
+		Result := _LAG_Invoke("llm_agent_command")
+		AssertEqual(Allowed || Mode == "newer-flow" ? 1 : 0, Fx.Remote.Length,
+			"a withdrawn command dialog cannot dispatch its retained request")
+		AssertEqual(Allowed, Result, "only an unchanged requester can send the typed command")
+		AssertEqual(0, Fx.Ollama.Length)
+		AssertEqual(0, Sent.Length)
+		Prompt(Title, Text, Default) {
+			switch Mode {
+				case "mode-off": AssertTrue(LLM_Agent_SetMode("off"))
+				case "mode-aba":
+					AssertTrue(LLM_Agent_SetMode("off")), AssertTrue(LLM_Agent_SetMode("action"))
+				case "source-off": AssertTrue(_LLM_Agent_MenuSetBackend("agent_system2", ""))
+				case "source-remote": AssertTrue(_LLM_Agent_MenuSetBackend("agent_system2", "local"))
+				case "newer-flow": AssertTrue(_LAG_Invoke("llm_agent_selection"))
+				case "refused-write":
+					_LLM_Agent_CommitFn := (*) => false
+					AssertFalse(LLM_Agent_SetMode("off"))
+			}
+			return Map("ok", true, "value", "create a meeting tomorrow")
+		}
+	}
+}
+
+for Mode in ["mode-off", "mode-aba", "source-off", "source-remote", "newer-flow", "unchanged", "refused-write"]
+	Test("LLM agent: command dialog retains original requester " . Mode . " (agent-command-modal)", _LAG_CommandModalCustody.Bind(Mode))
+
 
 _LAG_Refusals() {
 	Screen := _LTN_Screen(LAG_SELECTION)

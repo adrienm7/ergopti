@@ -332,3 +332,5 @@ _TestTooltipDeferredRequest_AbaTupleAndResumeAreRejected() {
 }
 Test("tooltip deferred request: immutable B tuple survives resumed A",
 	_TestTooltipDeferredRequest_AbaTupleAndResumeAreRejected)
+
+#Include test_tooltip_native64_deadlines.ahk

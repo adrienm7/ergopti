@@ -11,13 +11,16 @@
 local helpers = require("tests.helpers")
 
 
-local function with_fake_bundle_listing(initial_name, callback)
+--- The listing is the user folder's; the system folder is empty unless
+--- `in_system` says the same bundle is there too.
+local function with_fake_bundle_listing(initial_name, callback, in_system)
 	local original_popen = io.popen
 	local listing = initial_name
 	local scans = 0
-	io.popen = function(_command)
-		scans = scans + 1
-		local delivered = false
+	io.popen = function(command)
+		local system_scan = tostring(command):find("'/Library/Keyboard Layouts", 1, true) ~= nil
+		if not system_scan then scans = scans + 1 end
+		local delivered = system_scan and in_system ~= true
 		return {
 			lines = function()
 				return function()
@@ -207,5 +210,29 @@ helpers.describe("layout_install: transactional replacement", function()
 			"the install owner must be released after the first attempt returns")
 		helpers.assert_eq(execute_calls, 2,
 			"the admitted user install must run one replacement and one cleanup")
+	end)
+end)
+
+
+-- The macOS 26 TIS probe showed that the same bundle in both folders makes macOS load both copies
+-- and renumber one; a user install must not write the second copy.
+helpers.describe("layout_install: one copy per bundle (composer-macos26)", function()
+	helpers.it("writes no user copy of a bundle the system folder already holds", function()
+		with_fake_bundle_listing("Ergopti_v1.0.0.bundle", function()
+			local commands = {}
+			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				execute = function(command)
+					commands[#commands + 1] = command
+					return "", true, "exit", 0
+				end,
+				fs = { attributes = function() return { mode = "file" } end },
+			})
+			helpers.assert_eq(install.install_user("/tmp/bundles", "Ergopti_v1.0.0.bundle"), true)
+			for _, command in ipairs(commands) do
+				helpers.assert_true(command:find("cp -R", 1, true) == nil, "no copy is staged: " .. command)
+			end
+			helpers.assert_eq(install.duplicate_bundles()[1], "Ergopti_v1.0.0.bundle",
+				"the listing sees the bundle in both folders")
+		end, true)
 	end)
 end)

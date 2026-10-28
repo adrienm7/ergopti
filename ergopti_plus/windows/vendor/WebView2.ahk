@@ -39,8 +39,8 @@ class WebView2 {
 	 */
 	static CreateEnvironmentAsync(options := 0, dataDir := '', edgeRuntime := '', dllPathOrFuncPtr := 'WebView2Loader.dll') {
 		if !(dllPathOrFuncPtr is Integer) {
-			if !FileExist(dllPathOrFuncPtr) && FileExist(t := A_LineFile '\..\' (A_PtrSize * 8) 'bit\WebView2Loader.dll')
-				dllPathOrFuncPtr := t
+			if !FileExist(dllPathOrFuncPtr) && FileExist(loaderPath := A_LineFile '\..\' (A_PtrSize * 8) 'bit\WebView2Loader.dll')
+				dllPathOrFuncPtr := loaderPath
 			dllPathOrFuncPtr .= '\CreateCoreWebView2EnvironmentWithOptions'
 		}
 		if !edgeRuntime {

@@ -44,15 +44,16 @@ let kRegisterRemapGuardianFlag = "--register-remap-guardian"
 let kUnregisterRemapGuardianFlag = "--unregister-remap-guardian"
 let kGuardianLaunchctlUnknownServiceStatus: Int32 = 113
 let kOpenRemapGuardianSettingsFlag = "--open-remap-guardian-settings"
-let kRemapGuardianLabel = "com.ergoptiplus.remap-guardian"
-let kRemapGuardianPlistName = "com.ergoptiplus.remap-guardian.plist"
+// One source: _shared/data/identifiers.json service_labels.macos_remap_guardian.
+let kRemapGuardianLabel = Identifiers.ServiceLabels.macosRemapGuardian
+let kRemapGuardianPlistName = kRemapGuardianLabel + ".plist"
 let kRemapGuardianServiceErrorDomain = "SMAppServiceErrorDomain"
 #if ERGOPTI_GUARDIAN_TEST_SUPPORT
 let kKarabinerLeaseGuardianLifetimeTestFlag =
 	"--karabiner-lease-guardian-lifetime-test"
 #endif
 
-private let kGuardianRecordHeader = "ERGOPTI_REMAP_LEASE_V1"
+private let kGuardianRecordHeader = "ERGOPTI_REMAP_LEASE_V2"
 private let kGuardianSingletonHeader = "ERGOPTI_REMAP_GUARDIAN_V1"
 private let kGuardianArmedHeader = "ARMED"
 private let kGuardianRecordSuffix = ".lease"
@@ -87,7 +88,7 @@ func lockGuardianActivationGate(_ descriptor: Int32) -> LeaseGuardianGateLockRes
 /// Serializes persistent guardian diagnostics from state, waiter, and fence
 /// queues while rate-limiting retry loops by stable failure key.
 enum RemapGuardianLog {
-	private static let queue = DispatchQueue(label: "com.ergoptiplus.remap-guardian.log")
+	private static let queue = DispatchQueue(label: kRemapGuardianLabel + ".log")
 	private static var lastWrite: [String: TimeInterval] = [:]
 
 	/// Persists one rate-limited guardian diagnostic through the launcher log.
@@ -230,6 +231,10 @@ struct LeaseGuardianRecord: Equatable {
 	let nonce: String
 	let ownerPID: Int32
 	let state: LeaseGuardianRecordState
+	/// The runtime whose command line tool revokes this token. The record names
+	/// the runtime, never a path, so the guardian only ever executes one of the
+	/// two fixed endpoints.
+	var runtime: LeaseRuntime = .shared
 
 	var encoded: Data? {
 		guard LeaseGuardianRecord.isCanonicalToken(token),
@@ -242,6 +247,7 @@ struct LeaseGuardianRecord: Equatable {
 			nonce,
 			String(ownerPID),
 			state.rawValue,
+			runtime.rawValue,
 			"",
 		].joined(separator: "\n").data(using: .utf8)
 	}
@@ -261,18 +267,20 @@ struct LeaseGuardianRecord: Equatable {
 			let text = String(data: data, encoding: .utf8)
 		else { return nil }
 		let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-		guard lines.count == 6,
+		guard lines.count == 7,
 			lines[0] == Substring(kGuardianRecordHeader),
-			lines[5].isEmpty,
+			lines[6].isEmpty,
 			let ownerPID = Int32(lines[3]),
 			ownerPID > 0,
-			let state = LeaseGuardianRecordState(rawValue: String(lines[4]))
+			let state = LeaseGuardianRecordState(rawValue: String(lines[4])),
+			let runtime = LeaseRuntime(rawValue: String(lines[5]))
 		else { return nil }
 		let record = LeaseGuardianRecord(
 			token: String(lines[1]),
 			nonce: String(lines[2]),
 			ownerPID: ownerPID,
-			state: state
+			state: state,
+			runtime: runtime
 		)
 		return record.encoded == data ? record : nil
 	}
@@ -686,7 +694,10 @@ final class LeaseGuardianRegistration: LeaseGuardianRegistering {
 			token: identity.token,
 			nonce: UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased(),
 			ownerPID: getpid(),
-			state: .live
+			state: .live,
+			// Identities admitted by LeaseIdentity.parse always name a runtime.
+			// Only a test fixture with a stand-in executable reaches the default.
+			runtime: identity.runtime ?? .shared
 		)
 		self.paths = paths
 		self.activationAuthorized = activationAuthorized
@@ -886,7 +897,8 @@ final class LeaseGuardianRegistration: LeaseGuardianRegistering {
 				token: record.token,
 				nonce: record.nonce,
 				ownerPID: record.ownerPID,
-				state: .retired
+				state: .retired,
+				runtime: record.runtime
 			)
 			if let encoded = retired.encoded {
 				_ = replaceGuardianData(encoded, descriptor: recordDescriptor)
@@ -943,7 +955,7 @@ private final class LeaseGuardianWatch {
 		self.descriptor = descriptor
 		self.identity = identity
 		self.acknowledged = acknowledged
-		queue = DispatchQueue(label: "com.ergoptiplus.remap-guardian." + token)
+		queue = DispatchQueue(label: kRemapGuardianLabel + "." + token)
 	}
 }
 
@@ -957,6 +969,7 @@ final class RemapLeaseGuardianRuntime {
 	private let paths: LeaseGuardianPaths
 	private let executor: LeaseCLIExecuting
 	private let cliPath: String
+	private let ownedCLIPath: String
 	private let acknowledgementWriter: LeaseGuardianAcknowledgementWriting
 	private let maximumUnacknowledgedRecords: Int
 	private let terminateProcess: (Int32) -> Void
@@ -966,7 +979,7 @@ final class RemapLeaseGuardianRuntime {
 	private let singletonProbeObserved: () -> Void
 	private let singletonContentionObserved: () -> Void
 	private let generation: String
-	private let stateQueue = DispatchQueue(label: "com.ergoptiplus.remap-guardian.state")
+	private let stateQueue = DispatchQueue(label: kRemapGuardianLabel + ".state")
 	private var recoveringAcknowledgements = Set<String>()
 	private var watches: [String: LeaseGuardianWatch] = [:]
 	private var isTerminating = false
@@ -983,6 +996,7 @@ final class RemapLeaseGuardianRuntime {
 		paths: LeaseGuardianPaths = LeaseGuardianPaths(),
 		executor: LeaseCLIExecuting = PosixLeaseCLIExecutor(),
 		cliPath: String = kCanonicalKarabinerCLIPath,
+		ownedCLIPath: String = kOwnedKarabinerCLIPath,
 		acknowledgementWriter: @escaping LeaseGuardianAcknowledgementWriting = {
 			data, path, directory in
 			writeGuardianFileAtomically(data: data, path: path, directory: directory)
@@ -1005,6 +1019,7 @@ final class RemapLeaseGuardianRuntime {
 		self.paths = paths
 		self.executor = executor
 		self.cliPath = cliPath
+		self.ownedCLIPath = ownedCLIPath
 		self.acknowledgementWriter = acknowledgementWriter
 		self.maximumUnacknowledgedRecords = max(0, maximumUnacknowledgedRecords)
 		self.terminateProcess = terminateProcess
@@ -1252,18 +1267,23 @@ final class RemapLeaseGuardianRuntime {
 			completion.enter()
 			let descriptors = guardianOwnedDescriptors(token: token)
 			let executor = self.executor
-			let cliPath = self.cliPath
+			let endpoints = fenceEndpoints(
+				token: token,
+				record: watches[token]?.record ?? readRecord(token: token)
+			)
 			DispatchQueue.global(qos: .userInitiated).async {
-				transportLeaseFenceUntilRepeatedSuccess(
-					identity: self.identity(token: token),
-					cliPath: cliPath,
-					executor: executor,
-					cliTimeout: kCLITimeoutSeconds,
-					fenceConfirmationGrace: kFenceConfirmationGraceSeconds,
-					uptime: { ProcessInfo.processInfo.systemUptime },
-					sleep: { usleep($0) },
-					closingDescriptors: descriptors
-				)
+				for endpoint in endpoints {
+					transportLeaseFenceUntilRepeatedSuccess(
+						identity: self.identity(token: token, cliPath: endpoint),
+						cliPath: endpoint,
+						executor: executor,
+						cliTimeout: kCLITimeoutSeconds,
+						fenceConfirmationGrace: kFenceConfirmationGraceSeconds,
+						uptime: { ProcessInfo.processInfo.systemUptime },
+						sleep: { usleep($0) },
+						closingDescriptors: descriptors
+					)
+				}
 				completion.leave()
 			}
 		}
@@ -1301,16 +1321,21 @@ final class RemapLeaseGuardianRuntime {
 	private func fenceTokensSynchronously(_ tokens: Set<String>) {
 		for token in tokens.sorted() {
 			let descriptors = guardianOwnedDescriptors(token: token)
-			transportLeaseFenceUntilRepeatedSuccess(
-				identity: identity(token: token),
-				cliPath: cliPath,
-				executor: executor,
-				cliTimeout: kCLITimeoutSeconds,
-				fenceConfirmationGrace: kFenceConfirmationGraceSeconds,
-				uptime: { ProcessInfo.processInfo.systemUptime },
-				sleep: { usleep($0) },
-				closingDescriptors: descriptors
-			)
+			for endpoint in fenceEndpoints(
+				token: token,
+				record: watches[token]?.record ?? readRecord(token: token)
+			) {
+				transportLeaseFenceUntilRepeatedSuccess(
+					identity: identity(token: token, cliPath: endpoint),
+					cliPath: endpoint,
+					executor: executor,
+					cliTimeout: kCLITimeoutSeconds,
+					fenceConfirmationGrace: kFenceConfirmationGraceSeconds,
+					uptime: { ProcessInfo.processInfo.systemUptime },
+					sleep: { usleep($0) },
+					closingDescriptors: descriptors
+				)
+			}
 		}
 	}
 
@@ -1450,18 +1475,21 @@ final class RemapLeaseGuardianRuntime {
 			guard recoveringAcknowledgements.insert(key).inserted else { continue }
 			let executor = self.executor
 			let descriptors = guardianOwnedDescriptors(token: token)
+			let endpoints = fenceEndpoints(token: token, record: readRecord(token: token))
 			DispatchQueue.global(qos: .userInitiated).async { [weak self] in
 				guard let self else { return }
-				transportLeaseFenceUntilRepeatedSuccess(
-					identity: self.identity(token: token),
-					cliPath: self.cliPath,
-					executor: executor,
-					cliTimeout: kCLITimeoutSeconds,
-					fenceConfirmationGrace: kFenceConfirmationGraceSeconds,
-					uptime: { ProcessInfo.processInfo.systemUptime },
-					sleep: { usleep($0) },
-					closingDescriptors: descriptors
-				)
+				for endpoint in endpoints {
+					transportLeaseFenceUntilRepeatedSuccess(
+						identity: self.identity(token: token, cliPath: endpoint),
+						cliPath: endpoint,
+						executor: executor,
+						cliTimeout: kCLITimeoutSeconds,
+						fenceConfirmationGrace: kFenceConfirmationGraceSeconds,
+						uptime: { ProcessInfo.processInfo.systemUptime },
+						sleep: { usleep($0) },
+						closingDescriptors: descriptors
+					)
+				}
 				self.stateQueue.async { [weak self] in
 					guard let self else { return }
 					removeGuardianAcknowledgement(
@@ -1624,16 +1652,21 @@ final class RemapLeaseGuardianRuntime {
 				message: "abandoned exact token detected; fencing token=\(watch.token)",
 				minimumInterval: 0
 			)
-			transportLeaseFenceUntilRepeatedSuccess(
-				identity: identity(token: watch.token),
-				cliPath: cliPath,
-				executor: executor,
-				cliTimeout: kCLITimeoutSeconds,
-				fenceConfirmationGrace: kFenceConfirmationGraceSeconds,
-				uptime: { ProcessInfo.processInfo.systemUptime },
-				sleep: { usleep($0) },
-				closingDescriptors: guardianOwnedDescriptors(watch)
-			)
+			for endpoint in fenceEndpoints(
+				token: watch.token,
+				record: watch.record ?? transferredRecord
+			) {
+				transportLeaseFenceUntilRepeatedSuccess(
+					identity: identity(token: watch.token, cliPath: endpoint),
+					cliPath: endpoint,
+					executor: executor,
+					cliTimeout: kCLITimeoutSeconds,
+					fenceConfirmationGrace: kFenceConfirmationGraceSeconds,
+					uptime: { ProcessInfo.processInfo.systemUptime },
+					sleep: { usleep($0) },
+					closingDescriptors: guardianOwnedDescriptors(watch)
+				)
+			}
 			RemapGuardianLog.write(
 				key: "fence-complete-\(watch.token)",
 				message: "exact token fenced twice token=\(watch.token)",
@@ -1678,8 +1711,48 @@ final class RemapLeaseGuardianRuntime {
 		return descriptors.filter { $0 >= 0 }
 	}
 
+	/// The endpoint that revokes tokens of one runtime.
+	private func endpoint(for runtime: LeaseRuntime) -> String {
+		switch runtime {
+		case .shared: return cliPath
+		case .owned: return ownedCLIPath
+		}
+	}
+
+	/// Reads the canonical record of one token, if it still names that token.
+	/// It touches no guardian state, so any queue may call it.
+	private func readRecord(token: String) -> LeaseGuardianRecord? {
+		let descriptor = Darwin.open(
+			paths.recordPath(token: token),
+			O_RDONLY | O_CLOEXEC | O_NOFOLLOW
+		)
+		guard descriptor >= 0 else { return nil }
+		defer { Darwin.close(descriptor) }
+		guard let record = readGuardianData(descriptor: descriptor)
+			.flatMap(LeaseGuardianRecord.parse),
+			record.token == token
+		else { return nil }
+		return record
+	}
+
+	/// Chooses the command line tools that must each fence one token.
+	///
+	/// A token with a readable record is fenced through the runtime that record
+	/// names. A token known only by name (a termination snapshot entry, an orphan
+	/// acknowledgement) is fenced through every endpoint that is installed: the
+	/// fence is an idempotent two-variable tombstone, and a runtime that never
+	/// held the token only stores two inert variables. With nothing installed the
+	/// shared endpoint stays the target, as before the owned runtime existed.
+	private func fenceEndpoints(token: String, record: LeaseGuardianRecord?) -> [String] {
+		if let record { return [endpoint(for: record.runtime)] }
+		let installed = [cliPath, ownedCLIPath].filter {
+			FileManager.default.isExecutableFile(atPath: $0)
+		}
+		return installed.isEmpty ? [cliPath] : installed
+	}
+
 	/// Derives the only two mutable Karabiner variable names from an exact token.
-	private func identity(token: String) -> LeaseIdentity {
+	private func identity(token: String, cliPath: String) -> LeaseIdentity {
 		return LeaseIdentity(
 			cliPath: cliPath,
 			token: token,
@@ -2121,10 +2194,96 @@ protocol RemapGuardianModernService: AnyObject {
 	var status: SMAppService.Status { get }
 	/// Requests registration through Apple's Background Items authority.
 	func register() throws
+	/// Removes this bundle's record, used only to replace a stale one.
+	func unregister() throws
 }
 
 @available(macOS 13.0, *)
 extension SMAppService: RemapGuardianModernService {}
+
+/// Names one Background Items status for launcher.log.
+@available(macOS 13.0, *)
+func remapGuardianServiceStatusName(_ status: SMAppService.Status) -> String {
+	switch status {
+	case .notRegistered: return "notRegistered"
+	case .enabled: return "enabled"
+	case .requiresApproval: return "requiresApproval"
+	case .notFound: return "notFound"
+	@unknown default: return "unknown(\(status.rawValue))"
+	}
+}
+
+/// Answers an outcome that is not a user decision. A release stays fail-closed.
+/// A developer build (issue #104) is ad hoc signed, single arch and shares the
+/// installed app's bundle identifier, so Background Items answers it with what
+/// it holds for that identifier; it takes its own per-user legacy agent instead.
+@available(macOS 13.0, *)
+private func remapGuardianUnavailable(
+	_ cause: String,
+	developerBuild: Bool,
+	legacyFallback: () -> Bool,
+	report: (String) -> Void
+) -> RemapGuardianRegistrationStatus {
+	guard developerBuild else { return .unavailable }
+	let ready = legacyFallback()
+	report("developer build: \(cause); per-user legacy agent "
+		+ (ready ? "is ready" : "is unavailable too"))
+	return ready ? .ready : .unavailable
+}
+
+/// One registration attempt and the exact outcome mapping shared by every entry state.
+@available(macOS 13.0, *)
+private func registerModernRemapGuardianOnce(
+	service: RemapGuardianModernService,
+	guardianHealth: () -> Bool,
+	legacyInvalidSignatureFallback: () -> Bool,
+	developerBuild: Bool,
+	report: (String) -> Void
+) -> RemapGuardianRegistrationStatus {
+	func unavailable(_ cause: String) -> RemapGuardianRegistrationStatus {
+		remapGuardianUnavailable(cause, developerBuild: developerBuild,
+			legacyFallback: legacyInvalidSignatureFallback, report: report)
+	}
+	do {
+		try service.register()
+		switch service.status {
+		case .enabled:
+			let healthy = guardianHealth()
+			report("remap guardian registered; guardian healthy: \(healthy)")
+			return healthy ? .ready : unavailable("registered guardian is not healthy")
+		case .requiresApproval:
+			report("remap guardian registered; Login Items approval required")
+			return .requiresApproval
+		case .notRegistered, .notFound:
+			report("remap guardian registration left status \(remapGuardianServiceStatusName(service.status))")
+			return unavailable("registration left the agent unregistered")
+		@unknown default:
+			return .unavailable
+		}
+	} catch {
+		let failure = error as NSError
+		report("remap guardian registration refused: \(failure.domain) \(failure.code)")
+		if service.status == .enabled {
+			return guardianHealth() ? .ready : unavailable("enabled guardian is not healthy")
+		}
+		if service.status == .requiresApproval
+			|| modernGuardianErrorRequiresApproval(error) {
+			return .requiresApproval
+		}
+		guard shouldUseLegacyGuardianAfterModernRegistrationError(error)
+		else { return unavailable("registration refused with \(failure.domain) \(failure.code)") }
+		// Current ZIP releases are ad-hoc signed. Only an exact invalid-
+		// signature result may use the legacy per-user bootstrap; denial,
+		// approval, authorization, and unknown failures stay fail-closed.
+		let legacy = legacyInvalidSignatureFallback()
+		report(legacy
+			? "remap guardian legacy LaunchAgent healthy"
+			: "remap guardian legacy LaunchAgent not healthy; if launchctl reports last exit code 78, "
+				+ "Background Task Management disallows it: allow ErgoptiPlus in System Settings > "
+				+ "General > Login Items & Extensions, then quit and reopen ErgoptiPlus")
+		return legacy ? .ready : .unavailable
+	}
+}
 
 /// Resolves the complete modern registration state with injectable boundaries.
 /// User denial and approval never reach the legacy launchctl compatibility path.
@@ -2138,43 +2297,53 @@ extension SMAppService: RemapGuardianModernService {}
 /// could stay inert after an update with nothing the user could do in-app. The attempt is bounded (one per launch)
 /// and keeps every fail-closed branch: denial and approval still never reach
 /// the legacy path.
+///
+/// An `.enabled` record whose guardian is not healthy is replaced once
+/// (unregister, then the same single attempt): launchd keeps such a record
+/// after a rebuild or a move and refuses to spawn it (launchctl last exit 78),
+/// which left a developer app's remapping inert (field report 2026-10-27).
+/// `report` receives one launcher.log line per decision. A developer build
+/// (`developerBuild`) then takes its own per-user legacy agent for every outcome
+/// that is not a user decision; denial and approval stay fail-closed.
 @available(macOS 13.0, *)
 func resolveModernRemapGuardianRegistration(
 	service: RemapGuardianModernService,
 	guardianHealth: () -> Bool,
-	legacyInvalidSignatureFallback: () -> Bool
+	legacyInvalidSignatureFallback: () -> Bool,
+	developerBuild: Bool = false,
+	report: (String) -> Void = { _ in }
 ) -> RemapGuardianRegistrationStatus {
+	report("remap guardian Background Items status: \(remapGuardianServiceStatusName(service.status))")
 	switch service.status {
 	case .enabled:
-		return guardianHealth() ? .ready : .unavailable
-	case .notRegistered, .notFound:
+		if guardianHealth() { return .ready }
+		// A record can stay enabled while launchd refuses to spawn what it names:
+		// the app was rebuilt (every ad hoc build is a new code identity) or
+		// moved. Replace it once, exactly as a .notFound record is retried.
 		do {
-			try service.register()
-			switch service.status {
-			case .enabled:
-				return guardianHealth() ? .ready : .unavailable
-			case .requiresApproval:
-				return .requiresApproval
-			case .notRegistered, .notFound:
-				return .unavailable
-			@unknown default:
-				return .unavailable
-			}
+			try service.unregister()
 		} catch {
-			if service.status == .enabled {
-				return guardianHealth() ? .ready : .unavailable
-			}
-			if service.status == .requiresApproval
-				|| modernGuardianErrorRequiresApproval(error) {
-				return .requiresApproval
-			}
-			guard shouldUseLegacyGuardianAfterModernRegistrationError(error)
-			else { return .unavailable }
-			// Current ZIP releases are ad-hoc signed. Only an exact invalid-
-			// signature result may use the legacy per-user bootstrap; denial,
-			// approval, authorization, and unknown failures stay fail-closed.
-			return legacyInvalidSignatureFallback() ? .ready : .unavailable
+			let failure = error as NSError
+			report("stale remap guardian record could not be removed: \(failure.domain) \(failure.code)")
+			return remapGuardianUnavailable("stale record could not be removed",
+				developerBuild: developerBuild, legacyFallback: legacyInvalidSignatureFallback, report: report)
 		}
+		report("stale remap guardian record removed; registering again")
+		return registerModernRemapGuardianOnce(
+			service: service,
+			guardianHealth: guardianHealth,
+			legacyInvalidSignatureFallback: legacyInvalidSignatureFallback,
+			developerBuild: developerBuild,
+			report: report
+		)
+	case .notRegistered, .notFound:
+		return registerModernRemapGuardianOnce(
+			service: service,
+			guardianHealth: guardianHealth,
+			legacyInvalidSignatureFallback: legacyInvalidSignatureFallback,
+			developerBuild: developerBuild,
+			report: report
+		)
 	case .requiresApproval:
 		return .requiresApproval
 	@unknown default:
@@ -2287,7 +2456,11 @@ func remapGuardianRegistrationStatus(
 			},
 			legacyInvalidSignatureFallback: {
 				ensureLegacyRemapGuardianRegistered(executablePath: executablePath)
-			}
+			},
+			developerBuild: Bundle.main.object(
+				forInfoDictionaryKey: Identifiers.DevSource.plistKey
+			) != nil,
+			report: { LauncherLog.write($0) }
 		)
 	}
 	return ensureLegacyRemapGuardianRegistered(executablePath: executablePath)

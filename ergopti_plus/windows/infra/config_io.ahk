@@ -1487,16 +1487,13 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		apps := []
 		for proc, _ in MetricsFilters.disabled_apps
 				apps.Push(proc)
-		Updates.Push({ Section: "metrics", Key: "metrics_enabled", Value: TOML_Bool(MetricsShortcuts.enabled) })
-		Updates.Push({ Section: "metrics", Key: "metrics_wpm_menubar_colors", Value: MetricsShortcuts.wpm_menubar_colors })
+		Updates.Push({ Section: "metrics", Key: "enabled", Value: TOML_Bool(MetricsShortcuts.enabled) })
 		Updates.Push({ Section: "metrics", Key: "private_filter_enabled", Value: TOML_Bool(MetricsFilters.private_browsing) })
 		Updates.Push({ Section: "metrics", Key: "secure_filter_enabled", Value: TOML_Bool(MetricsFilters.secure_field) })
 		Updates.Push({ Section: "metrics", Key: "system_auth_filter_enabled", Value: TOML_Bool(MetricsFilters.system_auth) })
 		Updates.Push({ Section: "metrics", Key: "encrypt", Value: TOML_Bool(MetricsFilters.encrypt) })
-		Updates.Push({ Section: "metrics", Key: "metrics_disabled_apps", Value: apps })
+		Updates.Push({ Section: "metrics", Key: "disabled_apps", Value: apps })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_X,       Value: WPMWidget.pos_x })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_Y,       Value: WPMWidget.pos_y })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: WPMWidget.use_colors })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH, Value: WPMWidget.show_graph })
 		; The flat [llm] keys below round-trip through _LLM_Menu DIRECTLY (not via
@@ -1595,6 +1592,7 @@ _ConfigUpdateIsNeutral(Update) {
 ; Every full-state producer, including detached candidates, shares this gate.
 ConfigFullStateCanPersist() {
 	global _ConfigBootReadFailed, _ConfigBootRejectedOverrides, ConfigurationFile
+	PerfCount("config_io.full_state_can_persist")
 	; The boot migration refused the file (a newer schema, a failed migration):
 	; the loaded tree does not describe it, so it must never be serialized over it.
 	if IsSet(ConfigurationFile) {
@@ -1664,6 +1662,15 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		}
 		; The exact requested intent survives a fresh source/schema refusal.
 		; Admission still precedes every runtime collection and physical write.
+		; A timer retry that finds the driver not ready yet can write nothing, so it does not
+		; pay the admission (a registry deep compare of about 21 ms): the 100 ms retry ran it
+		; 27 times per boot. A new request and every attempt once the driver is ready are
+		; still admitted before anything is collected or written.
+		if !RegisterRequest && !_DriverReady && !PublicationDebt {
+			PerfCount("config_io.save_retry_deferred_before_admission")
+			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+				? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
+		}
 		if !PublicationDebt && !ConfigFullStateCanPersist() {
 			return CONFIG_SAVE_FAILED
 		}
@@ -2027,9 +2034,10 @@ _ConfigResetRollbackRefusedReload(OwnerBundle) {
 ReadScriptShortcutsConfig() {
 		global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, _IniCache, GESTURE_ACTIONS
 		global ScriptShortcutChordsOn
-		; The switch of the chords: absent keeps the manifest default, anything but
-		; a TOML boolean stops the boot like a malformed category gate.
-		Raw := IniCacheGet(_IniCache, "shortcuts.script_control", "chords_enabled")
+		; Authored preferences retain the canonical manifest/source-kind decision;
+		; detached runtime candidates keep their strict Boolean contract.
+		if !ConfigTomlTryReadBootValue(_IniCache, ConfigKey.SHORTCUTS_SCRIPT_CONTROL, "chords_enabled", &Raw)
+				Raw := IniCacheGet(_IniCache, "shortcuts.script_control", "chords_enabled")
 		if (Raw != "_")
 				ScriptShortcutChordsOn := _FeatureStateValidateBoolean(Raw, "shortcuts.script_control.chords_enabled")
 		for Slot in SCRIPT_SHORTCUT_SLOTS {
@@ -2645,6 +2653,7 @@ _ConfigSchemaEntrySelected(Path) {
 }
 
 _ConfigSchemaEntryAdmitted(Path) {
+	PerfCount("config_io.schema_entry_admitted")
 	return !_ConfigSchemaEntrySelected(Path) || ConfigSchemaCanPrepareWrite(Path)
 }
 

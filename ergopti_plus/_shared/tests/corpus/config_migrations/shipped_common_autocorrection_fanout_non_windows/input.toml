@@ -1,0 +1,22 @@
+# Hand-authored legacy choices and explicit new overrides.
+owner = "foreign root"
+[_meta]
+schema_version = 10
+
+[hotstrings.autocorrection.caps]
+enabled = true
+time_activation_seconds = 0.875
+future = "retain the legacy unknown leaf"
+
+[hotstrings.autocorrection.names]
+enabled = false
+
+[hotstrings.autocorrection.abbreviations]
+time_activation_seconds = 0.2
+
+[hotstrings.modules.autocorrection]
+caps = false
+names = true
+
+[[foreign.records]]
+name = "never owned"

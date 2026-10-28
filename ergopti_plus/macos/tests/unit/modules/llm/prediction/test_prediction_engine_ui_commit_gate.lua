@@ -12,6 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local PortFakes = require("tests.support.port_fakes")
 
 local NIL_RESULT = {}
 
@@ -40,6 +41,7 @@ local DEFAULTS = {
 	llm_show_info_bar = false,
 	llm_sequential_mode = false,
 	llm_debounce = 0.2,
+	llm_min_request_interval = 0,
 	llm_auto_raise_temp = false,
 	llm_streaming = false,
 	llm_streaming_multi = false,
@@ -73,18 +75,16 @@ local function load_fixture(loading_result, options)
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.timings"] = {
 		sec = function(_section, key)
-			if key == "prediction_debounce_min_ms" then return 0.01 end
-			if key == "prediction_debounce_max_ms" then return 2 end
 			return 0.1
 		end,
 	}
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["adapters.timer_scheduler"] = PortFakes.timer_scheduler({
 		after = function(_delay, callback)
 			return { timer = { stop = function() end }, callback = callback }, true
 		end,
-	}
+	})
 
 	local core = {
 		DEFAULT_STATE = DEFAULTS,
@@ -149,11 +149,8 @@ local function load_fixture(loading_result, options)
 		reset_failure_count = function() end,
 	}
 	package.loaded["modules.llm.app_filter"] = { is_blocked = function() return false end }
-	package.loaded["modules.llm.api_common"] = {
-		get_rate_limit_min_interval_s = function() return options.min_interval or 0 end,
-	}
 	package.loaded["modules.shortcuts.script_control"] = nil
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm_dismissed = function() end,
 	}
@@ -181,11 +178,12 @@ local function load_fixture(loading_result, options)
 			return resolve_result(options.tint_result, nil)
 		end,
 	}
-	package.loaded["ui.tooltip"] = tooltip
+	package.loaded["ui.tooltip"] = PortFakes.complete_tooltip(tooltip)
 
 	package.loaded["modules.llm.prediction_engine"] = nil
 	local Engine = require("modules.llm.prediction_engine")
 	fixture.engine = Engine
+	helpers.assert_eq(Engine.set_llm_min_request_interval(options.min_interval or 0), true)
 	fixture.tooltip = tooltip
 	Engine.init({
 		buffer = "hello world",

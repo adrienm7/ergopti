@@ -12,7 +12,7 @@
 ; guards when TextSend THREW, on the theory that the callback always
 ; eventually fires on any non-throwing path. A bail-out that skipped the
 ; callback left those depth counters permanently incremented, permanently
-; suppressing normal hotstring/keylogger observation.
+; suppressing normal hotstring/keystats observation.
 ;
 ; SCOPE: source introspection of adapters/text_sender.ahk.
 ; ==============================================================================

@@ -16,6 +16,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
+local CommandLines = require("tests.support.command_lines")
 local DRIVER_ROOT = helpers.driver_root()
 
 -- Pre-existing violations present at the time this check was tightened.
@@ -25,8 +27,8 @@ local KNOWN_VIOLATIONS = {
 	["modules/dynamic_hotstrings/personal_info.lua"] = true,
 	["modules/gestures/actions.lua"]                 = true,
 	["modules/gestures/engine.lua"]                  = true,
-	["modules/keylogger/init.lua"]                   = true,
-	["modules/keylogger/rotation.lua"]               = true,
+	["modules/keystats/init.lua"]                   = true,
+	["modules/keystats/rotation.lua"]               = true,
 
 	-- Pause invariant is enforced at call sites (script_control + eventtap guards), not always inside every module's require_state.
 	-- See test_script_control.lua and gestures engine for explicit pause regression tests.
@@ -51,14 +53,16 @@ local function list_lua_files(dir)
 	else
 		cmd = string.format("find '%s' -type f -name '*.lua'", dir)
 	end
-	local pipe = io.popen(cmd) ; if not pipe then return files end
-	for raw_line in pipe:lines() do
+	local source_count = #files
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, raw_line in ipairs(inventory) do
 		local line = raw_line:gsub("\\", "/")
 		if line:match("%.lua$") and not line:match("/vendor/hs_asm/") and not line:match("/tests/") then
 			files[#files + 1] = line
 		end
 	end
-	pipe:close()
+	assert(#files > source_count, "source inventory contains no matching files")
 	return files
 end
 
@@ -67,20 +71,18 @@ helpers.describe("meta: require_state pattern", function()
 	local known_count    = 0
 
 	for _, abs in ipairs(list_lua_files(DRIVER_ROOT .. "modules")) do
-		local fh = io.open(abs, "r") ; if fh then
-			local body = fh:read("*a") ; fh:close()
-			-- Looks stateful when it declares `local _state` or `_state = nil` at module scope
-			local stateful = body:match("\nlocal%s+_state%s*=") or body:match("^local%s+_state%s*=")
-			if stateful and not body:find("require_state", 1, true) then
-				-- Relative path used as the allowlist key (forward-slash normalised)
-				local rel = abs:sub(#DRIVER_ROOT + 1)
-				if KNOWN_VIOLATIONS[rel] then
-					known_count = known_count + 1
-					print(string.format("  KNOWN: %s — pending fix (see allowlist TODO)", rel))
-				else
-					new_violations = new_violations + 1
-					print(string.format("  FAIL: %s declares _state but defines no require_state guard", rel))
-				end
+		local body = SourceFile.read(abs)
+		-- Looks stateful when it declares `local _state` or `_state = nil` at module scope
+		local stateful = body:match("\nlocal%s+_state%s*=") or body:match("^local%s+_state%s*=")
+		if stateful and not body:find("require_state", 1, true) then
+			-- Relative path used as the allowlist key (forward-slash normalised)
+			local rel = abs:sub(#DRIVER_ROOT + 1)
+			if KNOWN_VIOLATIONS[rel] then
+				known_count = known_count + 1
+				print(string.format("  KNOWN: %s — pending fix (see allowlist TODO)", rel))
+			else
+				new_violations = new_violations + 1
+				print(string.format("  FAIL: %s declares _state but defines no require_state guard", rel))
 			end
 		end
 	end

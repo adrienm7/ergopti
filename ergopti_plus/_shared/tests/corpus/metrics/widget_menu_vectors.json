@@ -1,7 +1,7 @@
 {
 	"_comment": "Shared native Metrics widget menu contract: stored checks survive disablement; dependent rows need the metrics gate and visible widget.",
 	"fields": [
-		"keylogger_enabled",
+		"keystats_enabled",
 		"wpm_widget_visible",
 		"metrics_widget_colors",
 		"metrics_widget_graph"

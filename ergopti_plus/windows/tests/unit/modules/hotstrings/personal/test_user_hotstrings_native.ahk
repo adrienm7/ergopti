@@ -541,7 +541,7 @@ _UCHNativeNotepadInvalidationBody() {
 		AssertTrue(Owner["CompletionClaimed"] && Owner["OutputOwnershipReleased"] && !Owner["Pending"],
 			"the real callback settles its retained owner exactly once")
 		AssertEqual(0, _PrefixWatcherSuppressed, "actual completion releases suppression")
-		AssertEqual(0, Keylogger.synth_active, "actual completion releases its synthetic marker")
+		AssertEqual(0, Keystats.synth_active, "actual completion releases its synthetic marker")
 		AssertEqual("xxab", HSE_Buffer, "refusal preserves the original typed buffer")
 		AssertEqual(0, _HSE_FireLogQueue.Length, "revoked output cannot report a fire")
 		AssertTrue(UserHotstringsInvalidate("native-notepad-retry"), "settled native completion permits cleanup retry")

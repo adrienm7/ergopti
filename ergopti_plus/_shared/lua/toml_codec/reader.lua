@@ -37,6 +37,7 @@ local BasicString = require("toml_codec.basic_string")
 local KeyPath = require("toml_codec.key_path")
 local RecordScanner = require("toml_codec.record_scanner")
 local SourceOpen = require("toml_codec.source_open")
+local TextUtils = require("text_utils")
 
 -- Optional disk-cache provider, injected by the host driver via
 -- M.set_cache_provider(). Stays nil in pure/test contexts so parsing is
@@ -73,18 +74,20 @@ local function parse_dq_string(s, i)
 	local n = #s
 
 	while j <= n do
+		-- Everything up to the next quote or backslash is copied in one slice.
+		local stop = s:find('[\\"]', j)
+		if stop == nil then return nil, i end
+		if stop > j then raw[#raw + 1] = s:sub(j, stop - 1) end
+		j = stop
 		local c = s:sub(j, j)
 		if c == "\\" then
 			if j == n then return nil, i end
 			raw[#raw + 1] = s:sub(j, j + 1)
 			j = j + 2
-		elseif c == "\"" then
+		else
 			local decoded = BasicString.unescape_body(table.concat(raw))
 			if decoded == nil then return nil, i end
 			return decoded, j + 1
-		else
-			raw[#raw + 1] = c
-			j = j + 1
 		end
 	end
 
@@ -97,10 +100,8 @@ end
 --- @return number The index after skipping whitespace.
 local function skip_ws(s, i)
 	if type(s) ~= "string" or type(i) ~= "number" then return i end
-	while i <= #s and s:sub(i, i):match("%s") do
-		i = i + 1
-	end
-	return i
+	if i > #s then return i end
+	return s:find("%S", i) or (#s + 1)
 end
 
 --- Parses a TOML inline array of double-quoted strings.
@@ -179,7 +180,7 @@ local function parse_entry(line)
 		if line:sub(i, i) == "}" then break end
 
 		local ks = i
-		while i <= #line and line:sub(i, i):match("[%w_]") do i = i + 1 end
+		i = line:find("[^%w_]", i) or (#line + 1)
 		local key = line:sub(ks, i - 1)
 		if key == "" then break end
 		if seen[key] then return PARSE_ERROR end
@@ -205,10 +206,8 @@ local function parse_entry(line)
 			-- next separator and coerce it. Without this an inline-table number
 			-- such as `priority = 75` would be skipped and silently lost.
 			local vs = i
-			while i <= #line and line:sub(i, i) ~= "," and line:sub(i, i) ~= "}" do
-				i = i + 1
-			end
-			local raw = line:sub(vs, i - 1):match("^%s*(.-)%s*$")
+			i = line:find("[,}]", i) or (#line + 1)
+			local raw = TextUtils.trim(line:sub(vs, i - 1))
 			result[key] = tonumber(raw) or result[key]
 		end
 	end
@@ -407,6 +406,10 @@ end
 -- ===== 3.1) Parse Method =====
 -- =============================
 
+--- Trims a physical line in linear time (the pattern form backtracks on every
+--- line of a 466 KB hotstring pack).
+local trim_line = TextUtils.trim
+
 local function empty_document()
 	return {
 		meta = { description = "", sections = {}, sections_order = {}, section_delays = {} },
@@ -469,7 +472,7 @@ local function parse_lines(lines)
 				raw_line = Bom.strip_prefix(raw_line)
 				first_line = false
 			end
-			local line = raw_line:match("^%s*(.-)%s*$")
+			local line = trim_line(raw_line)
 
 			-- A table-looking physical line inside an assignment is value data.
 			-- Share the writer's lexical state instead of interpreting it as a header.
@@ -489,7 +492,7 @@ local function parse_lines(lines)
 			if line:sub(1, 1) == "[" then
 				local _, _, comment_offset = RecordScanner.advance(line, 0, nil)
 				if comment_offset then
-					line = line:sub(1, comment_offset - 1):match("^%s*(.-)%s*$")
+					line = TextUtils.trim(line:sub(1, comment_offset - 1))
 				elseif line:sub(1, 2) == "[[" and not KeyPath.header(line, true).segments then
 					-- Historical raw names can contain an unmatched quote, so the
 					-- value scanner cannot see their trailing comment. Recover only

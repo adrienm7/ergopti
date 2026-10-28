@@ -19,7 +19,7 @@ local function fixture()
 	fields[20] = "987654"
 	return {
 		root = "/home/user's files/prefix/lib/ergopti/linux",
-		title = "Uninstall", confirmation = "Confirm", failure = "Failed",
+		title = "Uninstall", confirmation = "Confirm", failure = "Failed", missing_program = "Missing {1}",
 		run = function(command) log.commands[#log.commands + 1] = command; return true end,
 		read = function(path)
 			helpers.assert_eq(path, "/proc/self/stat")
@@ -67,8 +67,8 @@ helpers.describe("Linux menu uninstall", function()
 		local command = log.commands[3]
 		helpers.assert_true(command:find("systemd-run --user --collect", 1, true) ~= nil)
 		helpers.assert_true(command:find(" --wait-owner '123:987654'", 1, true) ~= nil)
-		helpers.assert_true(command:find(" --gui 'ErgoptiPlus — Uninstall' 'Failed'", 1, true) ~= nil,
-			"the independent worker receives composed chrome and unchanged failure body")
+		helpers.assert_true(command:find(" --gui 'ErgoptiPlus — Uninstall' 'Failed' 'Missing {1}'", 1, true) ~= nil,
+			"the independent worker receives composed chrome, unchanged failure body and the missing-program template")
 		helpers.assert_true(command:find(" --setenv='DISPLAY=:7'", 1, true) ~= nil)
 		helpers.assert_true(command:find("/home/user'\\''s files/prefix'", 1, true) ~= nil)
 		helpers.assert_eq(log.quit, 1)

@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The preview path emits two telemetry events: `log_hotstring_suggested` when a
 --- hotstring preview appears, and `log_hotstring_dismissed` when it goes away.
---- Both end in an open/write/flush on the keylogger's rotating log, and both used
+--- Both end in an open/write/flush on the keystats's rotating log, and both used
 --- to run inside the keyDown eventtap callback — the one callback whose overrun
 --- makes macOS disable the tap outright.
 ---
@@ -40,13 +40,13 @@ local ANCHOR = "last_shown_hotstring"
 
 -- Every telemetry writer the preview path reaches.
 local TELEMETRY_CALLS = {
-	"keylogger.log_hotstring_suggested",
-	"keylogger.log_hotstring_dismissed",
+	"keystats.log_hotstring_suggested",
+	"keystats.log_hotstring_dismissed",
 }
 
 -- How far back from a call the shared deferral helper may sit. The compliant form is
 --   schedule_prediction_deferred("telemetry label", function()
---       pcall(keylogger.log_hotstring_x, …)
+--       pcall(keystats.log_hotstring_x, …)
 -- so the helper is on the previous line: one short line of slack, not enough to
 -- let an unrelated deferral elsewhere in the function count.
 local DEFERRAL_LOOKBACK = 120
@@ -115,19 +115,19 @@ helpers.describe("preview telemetry: no hotstring log write runs on the HID thre
 		-- Positive control. Without it a typo in either condition would make the
 		-- assertion above pass over both sites — the vacuous absence assertion this
 		-- suite tracks as a false-green class.
-		local BARE = 'keylogger.log_hotstring_dismissed(nil, a, b, c)\n'
+		local BARE = 'keystats.log_hotstring_dismissed(nil, a, b, c)\n'
 		local COMPLIANT = 'schedule_prediction_deferred("dismiss telemetry", function()\n'
-			.. '\t\t\tpcall(keylogger.log_hotstring_dismissed, nil, a, b, c)\n'
+			.. '\t\t\tpcall(keystats.log_hotstring_dismissed, nil, a, b, c)\n'
 		-- Deferred but NOT guarded: the latency is fixed and the state corruption
 		-- is not, which is a distinct and equally real defect.
 		local HALF = 'schedule_prediction_deferred("dismiss telemetry", function()\n'
-			.. '\t\t\tkeylogger.log_hotstring_dismissed(nil, a, b, c)\n'
+			.. '\t\t\tkeystats.log_hotstring_dismissed(nil, a, b, c)\n'
 
 		--- Mirrors the classifier above on a snippet.
 		--- @param code string
 		--- @return boolean compliant
 		local function compliant(code)
-			local at = code:find("keylogger.log_hotstring_dismissed", 1, true)
+			local at = code:find("keystats.log_hotstring_dismissed", 1, true)
 			if not at then return false end
 			local guarded = code:sub(math.max(1, at - 7), at - 1):find("pcall(", 1, true) ~= nil
 			local window  = code:sub(math.max(1, at - DEFERRAL_LOOKBACK), at)

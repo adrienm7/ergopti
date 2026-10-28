@@ -15,11 +15,6 @@
 		"-",
 		"menu.hotstrings.tooltip_colored"
 	],
-	"unavailable": {
-		"platform": "ahk",
-		"mode": "grey",
-		"reason": "platform_reason.preview_bubbles_are_lua_previews"
-	},
 	"locales": [
 		"ar",
 		"cs",

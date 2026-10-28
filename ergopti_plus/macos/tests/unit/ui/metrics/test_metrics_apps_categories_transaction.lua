@@ -9,6 +9,26 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local WarningContract = require("tests.support.dialog_warning_contract")
+local CategoryStore = require("keystats.app_category_store")
+local CATEGORY_OWNERS = {
+	"hs",
+	"tests.stubs.hs",
+	"hs.fs",
+	"hs.json",
+	"ui.metrics_apps",
+	"ui.ui_builder",
+	"infra.logger",
+	"infra.dialog_util",
+	"adapters.file_system",
+	"infra.config_paths",
+	"adapters.timer_scheduler",
+	"modules.keystats.log_manager",
+	"adapters.webview_result",
+	"adapters.running_application",
+	"adapters.own_window",
+	"native_path",
+}
 
 -- The driver folder of an installed app is inside its read-only bundle, and
 -- has no data folder: the categories belong to the configuration folder.
@@ -22,7 +42,7 @@ local INITIAL_JSON = '{"Example":{"score":0,"type":"Old"}}'
 --- causal and cannot silently bypass the status stub.
 --- @param spec table Read sequence, initial bytes, and write result.
 --- @param callback function Receives module, state, chooser callbacks, logs.
-local function with_category_store(spec, callback)
+local function with_category_store_owned(spec, callback)
 	local original_open = io.open
 	local state = {
 		target = spec.initial or INITIAL_JSON,
@@ -97,12 +117,13 @@ local function with_category_store(spec, callback)
 	}
 	package.loaded["infra.dialog_util"] = {
 		text_prompt = function(_title, _prompt, _prior, confirm, _cancel)
-			return confirm, "1"
+			return confirm, spec.score_input or "1"
 		end,
 		alert = noop,
 	}
+	state.warnings = WarningContract.attach(package.loaded["infra.dialog_util"])
 	local previous_modules = {}
-	for _, name in ipairs({ "hs.fs", "adapters.timer_scheduler", "modules.keylogger.log_manager",
+	for _, name in ipairs({ "hs.fs", "adapters.timer_scheduler", "modules.keystats.log_manager",
 			"infra.config_paths" }) do
 		previous_modules[name] = { value = package.loaded[name] }
 	end
@@ -112,7 +133,7 @@ local function with_category_store(spec, callback)
 		after = function() return { timer = {} }, true end,
 		cancel = function(handle) handle.timer = nil; return true end,
 	}
-	package.loaded["modules.keylogger.log_manager"] = { on_ingest_done = function() return true end }
+	package.loaded["modules.keystats.log_manager"] = { on_ingest_done = function() return true end }
 	package.loaded["ui.ui_builder"] = {
 		show_webview = function()
 			return {
@@ -160,6 +181,22 @@ local function with_category_store(spec, callback)
 	for name, prior in pairs(previous_modules) do package.loaded[name] = prior.value end
 	if not ok then error(result, 0) end
 	return result
+end
+
+--- Owns the native/global and cache lifetime even if fixture construction fails.
+--- @param spec table Fixture controls.
+--- @param callback function Business scenario, forwarded unchanged.
+--- @return ... results Original scenario return values.
+local function with_category_store(spec, callback)
+	local incoming_open = io.open
+	local outcome = table.pack(xpcall(function()
+		return helpers.with_stub_scope(CATEGORY_OWNERS, function()
+			return with_category_store_owned(spec, callback)
+		end)
+	end, debug.traceback))
+	io.open = incoming_open
+	if not outcome[1] then error(outcome[2], 0) end
+	return table.unpack(outcome, 2, outcome.n)
 end
 
 --- Opens the real category picker and selects a replacement category when the
@@ -304,6 +341,33 @@ helpers.describe("metrics_apps categories: failed publication exposes no candida
 			end)
 	end)
 
+	helpers.it("(app-category-store) an edit upgrades the previous flat layout and keeps every other category", function()
+		local flat = '{"Example":{"score":0,"type":"Old"},"Other":{"score":2,"type":"Kept"}}'
+		with_category_store({ initial = flat }, function(metrics, state, callbacks, _logs)
+			attempt_edit(metrics, callbacks)
+			helpers.assert_eq(state.writes, 1)
+			local saved = assert(CategoryStore.decode(state.target, require("json").decode))
+			helpers.assert_eq(saved.legacy, false, "the file is rewritten in the shared versioned layout")
+			helpers.assert_eq(saved.apps, {
+				Example = { type = "New", score = 1 },
+				Other = { type = "Kept", score = 2 },
+			})
+		end)
+	end)
+
+	helpers.it("(app-category-store) a document the codec refuses is never replaced", function()
+		-- Blank category: valid JSON, invalid entry. Reading it as empty would let the next
+		-- edit overwrite every category the user has.
+		local invalid = '{"Example":{"score":0,"type":""}}'
+		with_category_store({ initial = invalid }, function(metrics, state, callbacks, logs)
+			attempt_edit(metrics, callbacks)
+			helpers.assert_eq(#callbacks, 0)
+			helpers.assert_eq(state.writes, 0)
+			helpers.assert_eq(state.target, invalid)
+			helpers.assert_true(#logs > 0)
+		end)
+	end)
+
 	helpers.it("success commits bytes before one UI refresh", function()
 		with_category_store({}, function(metrics, state, callbacks, _logs)
 			attempt_edit(metrics, callbacks)
@@ -314,6 +378,24 @@ helpers.describe("metrics_apps categories: failed publication exposes no candida
 			helpers.assert_eq(state.ui_pushes, 1,
 				"the dashboard may refresh exactly once after disk commit")
 		end)
+	end)
+end)
+
+helpers.describe("metrics warning native signature", function()
+	helpers.it("presents an invalid score warning without saving the category", function()
+		for _, input in ipairs({ "abc", "3" }) do
+			with_category_store({ score_input = input }, function(metrics, state, callbacks)
+				local before = state.target
+				attempt_edit(metrics, callbacks)
+				helpers.assert_eq(state.warnings.shown, {
+					{ "common.warning", "metrics_apps.score_error", "button.ok" },
+				}, "Invalid scores must show their warning through the native message/button contract")
+				helpers.assert_eq(state.warnings.refused, 0)
+				helpers.assert_eq(state.target, before)
+				helpers.assert_eq(state.writes, 0)
+				helpers.assert_eq(state.ui_pushes, 0)
+			end)
+		end
 	end)
 end)
 

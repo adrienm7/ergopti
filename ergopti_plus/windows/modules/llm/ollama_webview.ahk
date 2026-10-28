@@ -157,7 +157,8 @@ OllamaWV_Done(is_success, msg := "") {
 	OllamaWV_EvalJS("done(" js_bool "," OllamaWV_JSStr(msg) ")")
 	if is_success {
 		captured_epoch := _OllamaWV_Epoch
-		SetTimer(OllamaWV_CloseIfEpoch.Bind(captured_epoch), -1800)
+		SetTimer(OllamaWV_CloseIfEpoch.Bind(captured_epoch),
+			-TimingsGet("tooltip", "ollama_webview_autoclose_ms"))
 	}
 }
 

@@ -18,7 +18,7 @@
 ; dashboard cannot open at all) and LoggerWarn for the navigate failure (the
 ; window opens but stays blank).
 ;
-; This is a meta-static test because keylogger_webview.ahk instantiates a
+; This is a meta-static test because keystats_webview.ahk instantiates a
 ; WebView2/COM control and is not part of the headless run_all include graph;
 ; it scans source text so a regression that drops the central-logger call from
 ; either catch fails the suite.
@@ -51,19 +51,19 @@ _ULEM_ReadSource(RelPath) {
 ; ==================================================
 
 _ULEM_OpenLogsControllerFailure() {
-	Src := _ULEM_ReadSource("modules/keylogger/keylogger_webview.ahk")
+	Src := _ULEM_ReadSource("modules/keystats/keystats_webview.ahk")
 	Body := _DriverFuncBody("KLWV_Open")
-	Assert(Body != "", "KLWV_Open(which, metrics_dir) declaration must exist in keylogger_webview.ahk")
+	Assert(Body != "", "KLWV_Open(which, metrics_dir) declaration must exist in keystats_webview.ahk")
 	Assert(InStr(Body, "LoggerError") > 0,
 		"KLWV_Open must route the WebView2 controller-create failure through LoggerError, not only FileAppend to webview.log (ui-launch-error-msgbox-on-timer-thread)")
 }
-Test("keylogger_webview: KLWV_Open logs controller-create failure via LoggerError (ui-launch-error-msgbox-on-timer-thread)", _ULEM_OpenLogsControllerFailure)
+Test("keystats_webview: KLWV_Open logs controller-create failure via LoggerError (ui-launch-error-msgbox-on-timer-thread)", _ULEM_OpenLogsControllerFailure)
 
 _ULEM_OpenLogsNavigateFailure() {
-	Src := _ULEM_ReadSource("modules/keylogger/keylogger_webview.ahk")
+	Src := _ULEM_ReadSource("modules/keystats/keystats_webview.ahk")
 	Body := _DriverFuncBody("KLWV_Open")
-	Assert(Body != "", "KLWV_Open(which, metrics_dir) declaration must exist in keylogger_webview.ahk")
+	Assert(Body != "", "KLWV_Open(which, metrics_dir) declaration must exist in keystats_webview.ahk")
 	Assert(InStr(Body, "LoggerWarn") > 0,
 		"KLWV_Open must route the WebView2 navigate failure through LoggerWarn, not only FileAppend to webview.log (ui-launch-error-msgbox-on-timer-thread)")
 }
-Test("keylogger_webview: KLWV_Open logs navigate failure via LoggerWarn (ui-launch-error-msgbox-on-timer-thread)", _ULEM_OpenLogsNavigateFailure)
+Test("keystats_webview: KLWV_Open logs navigate failure via LoggerWarn (ui-launch-error-msgbox-on-timer-thread)", _ULEM_OpenLogsNavigateFailure)

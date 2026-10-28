@@ -108,6 +108,7 @@ local _publication_clipboards = setmetatable({}, { __mode = "k" })
 local _paste_publication_lease = nil
 local _paste_recovery_only = false
 local _paste_generation = 0
+local _paste_restore_after = nil
 -- A sealed retained synthetic transaction makes clipboard restoration part of
 -- the same process-wide drain used by pause/reload/quit. It owns no Quartz
 -- events; its sole terminal condition is restoration of the exact all-type
@@ -229,6 +230,7 @@ local function release_paste_ownership()
 	_paste_owns_clipboard = false
 	_paste_builtin_count = nil
 	_paste_recovery_only = false
+	_paste_restore_after = nil
 	_paste_generation = _paste_generation + 1
 	release_paste_debt()
 	if lease then clear_settled_publication_lease(lease) end
@@ -270,6 +272,9 @@ end
 --- @return any error_detail
 local function restore_owned_clipboard()
 	if not _paste_owns_clipboard then return true, nil end
+	if _paste_restore_after ~= nil and TimerScheduler.awake_time() < _paste_restore_after then
+		return false, "native paste is still settling"
+	end
 	local lease = _paste_publication_lease
 	if lease and (lease.count == nil or clipboard_change_count() ~= lease.count) then
 		return false, "guarded clipboard ownership changed"
@@ -355,7 +360,10 @@ queue_paste_restore_retry = function(reason)
 	if not _paste_owns_clipboard then return true end
 	local scheduled, timer_error = schedule_paste_restore(CLIPBOARD_RESTORE_SEC)
 	if scheduled then return true end
-	if type(SyntheticInput.defer_after_callback) == "function" then
+	-- Immediate lifecycle work cannot replace an unelapsed native host interval.
+	-- Retain the exact snapshot for a later retry instead of spinning in its drain.
+	local settling = _paste_restore_after ~= nil and TimerScheduler.awake_time() < _paste_restore_after
+	if not settling and type(SyntheticInput.defer_after_callback) == "function" then
 		local generation = _paste_generation
 		local callback_ran = false
 		local installing = true
@@ -403,6 +411,7 @@ end
 --- @param handoff table|nil Receives the exact paste batch handoff and settle deadline.
 --- @return boolean True only after the payload and Cmd+V were both accepted.
 local function perform_paste(value, handoff)
+	handoff = handoff or {}
 	local transaction = SyntheticInput.current_transaction()
 	if _paste_publication_lease and _paste_publication_lease.producer ~= transaction then
 		Logger.error(LOG, "Clipboard paste refused while another programmable producer retains ownership.")
@@ -547,30 +556,35 @@ local function perform_paste(value, handoff)
 
 	local ownership_generation = _paste_generation
 	local restore_armed = false
+	local receipt_pending = true
+	local terminal_status = nil
+	local function settle_paste(status)
+		if ownership_generation ~= _paste_generation or not _paste_owns_clipboard then return end
+		-- Native delivery can reenter lifecycle callbacks before emission returns
+		-- its exact batch. Adopt that receipt before deciding whether rollback is safe.
+		if receipt_pending then terminal_status = status; return end
+		if status ~= "complete" then _paste_recovery_only = true end
+		if status ~= "complete" and handoff.status ~= "dispatched" then
+			local restored, restore_error = restore_owned_clipboard()
+			if not restored then queue_paste_restore_retry("cancelled paste transaction") end
+			if not restored then
+				Logger.error(LOG, "Clipboard rollback after %s transaction failed: %s.",
+					tostring(status), tostring(restore_error))
+			end
+			return
+		end
+		local scheduled, timer_error = schedule_paste_restore(CLIPBOARD_RESTORE_SEC)
+		if not scheduled then
+			_paste_recovery_only = true
+			queue_paste_restore_retry("post-handoff restore timer refusal")
+			Logger.error(LOG, "Clipboard restore could not be armed after Cmd+V handoff: %s.",
+				tostring(timer_error))
+		end
+	end
 	if transaction then
-		-- Cmd+V may sit behind many Terminal delete turns. Starting a wall-clock
-		-- restore now lets 8 × 20 ms restore the old clipboard before Cmd+V posts.
-		-- Completion is the exact handoff boundary for both callback and paced FIFO.
+		-- Completion also preserves host grace when cancellation follows Cmd+V.
 		local registered, registration_error = pcall(SyntheticInput.on_complete,
-			transaction, function(_transaction, status)
-				if ownership_generation ~= _paste_generation or not _paste_owns_clipboard then return end
-				if status ~= "complete" then
-					local restored, restore_error = restore_owned_clipboard()
-					if not restored then queue_paste_restore_retry("cancelled paste transaction") end
-					if not restored then
-						Logger.error(LOG, "Clipboard rollback after %s transaction failed: %s.",
-							tostring(status), tostring(restore_error))
-					end
-					return
-				end
-				local scheduled, timer_error = schedule_paste_restore(CLIPBOARD_RESTORE_SEC)
-				if not scheduled then
-					_paste_recovery_only = true
-					queue_paste_restore_retry("post-handoff restore timer refusal")
-					Logger.error(LOG, "Clipboard restore could not be armed after Cmd+V handoff: %s.",
-						tostring(timer_error))
-				end
-			end)
+			transaction, function(_, status) settle_paste(status) end)
 		if not registered then
 			local restored, restore_error = restore_owned_clipboard()
 			if not restored then queue_paste_restore_retry("completion registration refusal") end
@@ -598,16 +612,21 @@ local function perform_paste(value, handoff)
 	-- delivered before the emitter returns. Admission alone is not a paste.
 	local observed = {}
 	local function record_handoff(batch, status)
+		if ownership_generation ~= _paste_generation then return end
 		if handoff.batch ~= nil and handoff.batch ~= batch then return end
-		local result = { status = status,
-			ready_at = TimerScheduler.awake_time() + CLIPBOARD_PASTE_GAP_SEC }
+		local now = TimerScheduler.awake_time()
+		local result = { status = status, ready_at = now + CLIPBOARD_PASTE_GAP_SEC,
+			restore_after = now + CLIPBOARD_PASTE_GAP_SEC }
 		if handoff.batch == batch then
 			handoff.status, handoff.ready_at = result.status, result.ready_at
+			if status == "dispatched" then
+				_paste_restore_after = result.restore_after
+			end
 		else
 			observed[batch] = result
 		end
 	end
-	if handoff and transaction then
+	if transaction then
 		local registered, registration_error = pcall(SyntheticInput.on_dispatched,
 			transaction, function(_, batch, status) record_handoff(batch, status) end)
 		if not registered then
@@ -621,16 +640,27 @@ local function perform_paste(value, handoff)
 	local ok_emit, emitted_or_error, batch = pcall(function()
 		return SyntheticInput.emit_key_stroke({ "cmd" }, "v", 0)
 	end)
-	if handoff and transaction and ok_emit and emitted_or_error == true then
+	if transaction and ok_emit and emitted_or_error == true then
 		if type(batch) ~= "table" then
 			ok_emit, emitted_or_error = false, "clipboard paste emitter returned no batch receipt"
 		else
 			handoff.batch = batch
 			local result = observed[batch]
-			if result then handoff.status, handoff.ready_at = result.status, result.ready_at end
+			if result and ownership_generation == _paste_generation and _paste_owns_clipboard then
+				handoff.status, handoff.ready_at = result.status, result.ready_at
+				if result.status == "dispatched" then
+					_paste_restore_after = result.restore_after
+				end
+			end
 		end
 
 	end
+	if ok_emit and emitted_or_error == true and ownership_generation == _paste_generation then
+		-- A reentrant terminal callback owns any recovery posture it publishes.
+		_paste_recovery_only = false
+	end
+	receipt_pending = false
+	if terminal_status ~= nil then settle_paste(terminal_status) end
 	if not ok_emit or emitted_or_error ~= true then
 		if restore_armed then stop_paste_restore_timer() end
 		local restored, restore_error = restore_owned_clipboard()
@@ -639,7 +669,6 @@ local function perform_paste(value, handoff)
 			tostring(emitted_or_error), tostring(restore_error))
 		return false
 	end
-	_paste_recovery_only = false
 	return true
 end
 
@@ -1326,6 +1355,21 @@ local function observe_ignored_win_identity(win, app_name, title)
 	_ignored_win_last_identity = identity
 end
 
+--- A probe slower than this names its stages; the Mac field log showed 1 s
+--- holds from the refresh and TTL timers without saying which AX read waited.
+local IGNORED_WIN_SLOW_PROBE_MS = 250
+--- Stage at which the last probe failed, for the prewarm warning (L23).
+local _probe_failed_stage = nil
+
+--- Logs one line naming every probe stage's milliseconds when the probe was slow.
+--- @param started number Monotonic nanoseconds at the probe start.
+--- @param stage_ms table Ordered "<stage>=<ms>" parts.
+local function report_slow_probe(started, stage_ms)
+	local total_ms = (TimerScheduler.now_ns() - started) / 1e6
+	if total_ms < IGNORED_WIN_SLOW_PROBE_MS then return end
+	Logger.warn(LOG, "Slow ignored-window probe %d ms (%s ms).", math.floor(total_ms), table.concat(stage_ms, " "))
+end
+
 --- Performs the expensive focused-window AX probe. Never call from CGEventTap.
 --- @param ignored_titles table Hash map of exact window titles to ignore.
 --- @param ignored_patterns table Array of Lua patterns matched against window titles.
@@ -1338,28 +1382,49 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	_ignored_win_cache_value = false
 	_secure_field_cache_value = nil
 	_text_destination = nil
-	if not ensure_ignored_win_watchers() then return mark_ignored_win_unknown() end
+	_probe_failed_stage = nil
+	local probe_started = TimerScheduler.now_ns()
+	local stage_ms, stage_last = {}, probe_started
+	-- Charges the time since the previous stage; a failing stage is retained so
+	-- an incomplete prewarm names it (L23).
+	local function stage(name, failed)
+		local now = TimerScheduler.now_ns()
+		stage_ms[#stage_ms + 1] = string.format("%s=%d", name, math.floor((now - stage_last) / 1e6))
+		stage_last = now
+		if failed then
+			_probe_failed_stage = name
+			report_slow_probe(probe_started, stage_ms)
+			return mark_ignored_win_unknown()
+		end
+	end
+	if not ensure_ignored_win_watchers() then return stage("watchers", true) end
+	stage("watchers")
 
 	-- Use the focused window directly rather than frontmostApplication() so that
 	-- floating-panel apps (e.g. Raycast) that accept keystrokes without becoming
 	-- the NSWorkspace frontmost app are evaluated against their own window title,
 	-- not the title of the previously active app.
 	local ok_win, win = pcall(hs.window.focusedWindow)
-	if not ok_win or not win then return mark_ignored_win_unknown() end
+	if not ok_win or not win then return stage("focused_window", true) end
+	stage("focused_window")
 
 	local ok_app, app = pcall(function() return win:application() end)
-	if not ok_app or not app then return mark_ignored_win_unknown() end
+	if not ok_app or not app then return stage("application", true) end
+	stage("application")
 
 	-- Always ignore the Hammerspoon console to prevent feedback loops;
 	-- folded here so it benefits from the event-driven cache as the rest.
 	local ok_app_name, app_name = pcall(function() return app:name() end)
 	if not ok_app_name or type(app_name) ~= "string" then
-		return mark_ignored_win_unknown()
+		return stage("app_name", true)
 	end
+	stage("app_name")
 	if app_name == "Hammerspoon" then
 		if not ensure_ignored_win_context_watchers(app, win, false) then
-			return mark_ignored_win_unknown()
+			return stage("context_watchers", true)
 		end
+		stage("context_watchers")
+		report_slow_probe(probe_started, stage_ms)
 		observe_ignored_win_identity(win, app_name, "<hammerspoon>")
 		_ignored_win_cache_value = true
 		_secure_field_cache_value = false
@@ -1367,14 +1432,17 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	end
 
 	local ok_title, title = pcall(function() return win:title() end)
-	if not ok_title or type(title) ~= "string" then return mark_ignored_win_unknown() end
+	if not ok_title or type(title) ~= "string" then return stage("title", true) end
+	stage("title")
 	if not ensure_ignored_win_context_watchers(app, win, true) then
-		return mark_ignored_win_unknown()
+		return stage("context_watchers", true)
 	end
+	stage("context_watchers")
 	observe_ignored_win_identity(win, app_name, title)
 	local secure = SecureFieldDetector.isSecureApp(app_name) == true and true
 		or SecureFieldDetector.inspectFocusedElement(app)
-	if type(secure) ~= "boolean" then return mark_ignored_win_unknown() end
+	if type(secure) ~= "boolean" then return stage("secure_field", true) end
+	stage("secure_field")
 	_secure_field_cache_value = secure
 	-- Retain an exact native destination off the HID path. Application names and
 	-- titles alone cannot distinguish two editor controls or a reused window.
@@ -1387,6 +1455,8 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 			generation = _ignored_win_context_generation }
 	end)
 	if captured then _text_destination = destination end
+	stage("destination")
+	report_slow_probe(probe_started, stage_ms)
 
 	-- Exact-title match.
 	if type(ignored_titles) == "table" and ignored_titles[title] then
@@ -1633,7 +1703,9 @@ function M.prewarm_ignored_win_watchers(ignored_titles, ignored_patterns)
 		hs.timer.secondsSinceEpoch())
 	local ttl_ready = arm_ignored_win_ttl_refresh()
 	if classification == nil or not ttl_ready then
-		Logger.warn(LOG, "Ignored-window prewarm incomplete; tracking remains fail-closed.")
+		Logger.warn(LOG, "Ignored-window prewarm incomplete (probe stage %s, TTL refresh %s); tracking remains fail-closed.",
+			classification == nil and tostring(_probe_failed_stage or "unknown") or "passed",
+			ttl_ready and "armed" or "not armed")
 		return false
 	end
 	Logger.success(LOG, "Ignored-window watchers ready (%.1f ms).",

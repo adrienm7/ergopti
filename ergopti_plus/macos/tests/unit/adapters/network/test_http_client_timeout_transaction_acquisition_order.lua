@@ -369,7 +369,7 @@ end)
 helpers.describe("HttpClient exact cancellation debt", function()
 	helpers.it("notifies settlement when an ordinary timeout owns no native task", function()
 		local timer_stub, timer_state = make_exact_stop_timer("success")
-		local http_stub = make_http_stub()
+		local http_stub, http_state = make_http_stub()
 		local client = load_client(timer_stub, http_stub)
 		local observer_calls = 0
 		local results = {}
@@ -382,8 +382,11 @@ helpers.describe("HttpClient exact cancellation debt", function()
 		timer_state.callbacks[1]()
 		helpers.assert_eq(#results, 1)
 		helpers.assert_eq(results[1].error, "timeout")
+		helpers.assert_eq(observer_calls, 0,
+			"application timeout cannot retire the held taskless native request")
+		http_state.callbacks[1](-1, "owned native terminal after timeout")
 		helpers.assert_eq(observer_calls, 1,
-			"normal timeout completion must wake composite lifecycle owners")
+			"native completion after timeout must wake composite lifecycle owners")
 		timer_state.callbacks[1]()
 		helpers.assert_eq(observer_calls, 1,
 			"duplicate native timeout delivery may not repeat settlement")
@@ -490,6 +493,10 @@ helpers.describe("HttpClient exact cancellation debt", function()
 			helpers.assert_eq(client.cancel(), false, stop_mode)
 			helpers.assert_eq(observer_calls, 0,
 				stop_mode .. " must retain the observer with the exact timer debt")
+			-- This case isolates timer retirement after its HTTP child is terminal.
+			http_state.callbacks[1](-1, "owned native terminal before timer cleanup")
+			helpers.assert_eq(observer_calls, 0,
+				stop_mode .. " terminal HTTP child cannot consume retained timer debt")
 			timer_state.stop_mode = "success"
 			timer_state.callbacks[1]()
 			helpers.assert_eq(observer_calls, 1,

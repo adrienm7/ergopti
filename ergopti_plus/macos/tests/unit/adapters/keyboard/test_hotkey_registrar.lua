@@ -107,6 +107,30 @@ helpers.describe("hotkey_registrar: bind", function()
 			"an ordinary key is not a modifier key")
 	end)
 
+	helpers.it("binds the modified Caps Lock slot chord only through its own entry (secondary-capslock-slot)", function()
+		-- The recommended secondary_capslock slot is Ctrl+Capslock. The generic
+		-- bind() refused it, which rolled back every keyboard shortcut and made
+		-- a migrated config abort at boot; the dedicated entry keeps the native
+		-- factory the retired Ctrl+CapsLock switch used.
+		local adapter, hs_stub = fresh()
+		helpers.assert_nil(adapter.bind("Ctrl+Capslock", function() end), "the generic guard still refuses it")
+		helpers.assert_eq(#hs_stub.hotkey._bound, 0)
+		local handle = adapter.bind_capslock_chord("Ctrl+Capslock", function() end)
+		helpers.assert_eq(type(handle), "string", "the Caps Lock slot chord must be bound")
+		helpers.assert_eq(hs_stub.hotkey._bound[1].key, "capslock")
+		helpers.assert_eq(table.concat(hs_stub.hotkey._bound[1].mods, ","), "ctrl")
+		for _, refused in ipairs({ "Capslock", "Ctrl+rightcmd", "Ctrl+S" }) do
+			local other, other_stub = fresh()
+			local bound = other.bind_capslock_chord(refused, function() end)
+			if refused == "Ctrl+S" then
+				helpers.assert_eq(type(bound), "string", "an ordinary key keeps its ordinary binding")
+			else
+				helpers.assert_nil(bound, refused .. " stays refused")
+				helpers.assert_eq(#other_stub.hotkey._bound, 0, refused .. " must not reach Hammerspoon")
+			end
+		end
+	end)
+
 	helpers.it("refuses a non-function callback", function()
 		local adapter, hs_stub = fresh()
 

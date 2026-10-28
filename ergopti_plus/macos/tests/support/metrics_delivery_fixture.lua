@@ -10,8 +10,8 @@ local helpers = require("tests.helpers")
 local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(cached, callback)
-	helpers.with_fresh_modules({ "adapters.file_system", "modules.keylogger.sqlite_reader",
-		"modules.keylogger.context_tracker" }, function()
+	helpers.with_fresh_modules({ "adapters.file_system", "modules.keystats.sqlite_reader",
+		"modules.keystats.context_tracker" }, function()
 		package.loaded["adapters.file_system"] = {
 			read_with_status = function(path)
 				if path:find("ergopti_metrics_apps_cache.json", 1, true) then
@@ -21,8 +21,8 @@ local function with_delivery(cached, callback)
 				return "{}", "ok"
 			end,
 		}
-		package.loaded["modules.keylogger.sqlite_reader"] = { read_manifest = function() return {}, true end }
-		package.loaded["modules.keylogger.context_tracker"] = { get_active_app_snapshot = function() end }
+		package.loaded["modules.keystats.sqlite_reader"] = { read_manifest = function() return {}, true end }
+		package.loaded["modules.keystats.context_tracker"] = { get_active_app_snapshot = function() end }
 		with_window("ui.metrics_apps", function(dashboard, state)
 			local pending, evaluations, errors, successes = {}, {}, {}, {}
 			local original_open = io.open
@@ -39,12 +39,36 @@ local function with_delivery(cached, callback)
 				package.loaded["hs.json"].decode = function(value)
 					return value == "cache" and { manifest = "{}" } or {}
 				end
-				local manager = package.loaded["modules.keylogger.log_manager"]
+				local manager = package.loaded["modules.keystats.log_manager"]
 				manager.get_sqlite_path = function() return "/virtual/db.sqlite" end
 				manager.get_db_rev = function() return 1 end
-				package.loaded["adapters.timer_scheduler"].after = function(_, fn)
+				-- A refresh is cut into bounded slices, one zero-delay timer turn
+				-- each (2f09c429): delivering a turn from the test also delivers
+				-- the zero-delay turns it arms, so one call still stands for one
+				-- refresh. Delayed retries and the fresh load stay queued.
+				local delivering, slices = false, nil
+				package.loaded["adapters.timer_scheduler"].after = function(delay, fn)
 					local handle = { timer = {} }
-					pending[#pending + 1] = function() handle.timer = nil; fn() end
+					local entry = function() handle.timer = nil; fn() end
+					if delivering and delay == 0 then
+						slices[#slices + 1] = entry
+						return handle, true
+					end
+					pending[#pending + 1] = function()
+						if delivering then return entry() end
+						delivering = true
+						slices = {}
+						local ok, detail = xpcall(function()
+							entry()
+							local index = 0
+							while index < #slices do
+								index = index + 1
+								slices[index]()
+							end
+						end, debug.traceback)
+						delivering, slices = false, nil
+						if not ok then error(detail, 0) end
+					end
 					return handle, true
 				end
 				helpers.assert_true(dashboard.show())

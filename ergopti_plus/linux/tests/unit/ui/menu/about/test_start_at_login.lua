@@ -80,11 +80,12 @@ local function with_installed_startup(mode, body)
 		local function write(path, text)
 			local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 		end
-		for _, name in ipairs({ "start_at_login.sh", "desktop_entry.sh" }) do
+		for _, name in ipairs({ "start_at_login.sh", "desktop_entry.sh", "config_home.sh" }) do
 			local file = assert(io.open(source_root .. "/install/" .. name, "rb"))
 			local text = assert(file:read("*a")); assert(file:close())
 			write(prefix .. "/lib/ergopti/linux/install/" .. name, text)
 		end
+		require("tests.support.shell_messages_fixture").provide(prefix .. "/lib/ergopti/linux/install")
 		local calls = root .. "/calls"
 		write(root .. "/commands/systemctl", [[#!/bin/bash
 printf '%s\n' "$*" >> "$ERGOPTI_TEST_CALLS"

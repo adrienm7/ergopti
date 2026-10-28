@@ -1,0 +1,194 @@
+--- tests/unit/infra/field_check/test_field_check_network.lua
+
+--- ==============================================================================
+--- MODULE: Field Check Network Definition
+--- DESCRIPTION:
+--- The one-click network check over scripted ports:
+--- 1. the proxy settings, the PAC download and the PAC verdict each have their
+---    own step, and a missing PAC skips both PAC steps;
+--- 2. the native helper's lines become the route, TLS, transfer and digest
+---    steps, and a helper that cannot run fails the transfer, not the report;
+--- 3. no step value can carry the PAC address, a host or PAC content;
+--- 4. a PAC that cannot be fetched or evaluated is information, since macOS
+---    downloads then go direct (proxy_policy.json pac_unavailable_fallback),
+---    and the transfer step proves the direct path (field report of
+---    2026-10-27 22:32: pac_download fail:failed with the host unknown off the
+---    company network while the direct transfer passed).
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths" }
+
+local PAC_URL = "http://pac.intranet.example/proxy.pac"
+local SCUTIL_PAC = "<dictionary> {\n  ProxyAutoConfigEnable : 1\n  ProxyAutoConfigURLString : " .. PAC_URL .. "\n}\n"
+local GOOD_PAC = "function FindProxyForURL(url, host) { return 'DIRECT'; }"
+local HELPER_OK = "step route_lookup pass selected\nstep tls pass trusted\nstep transfer pass http_200\nstep digest skip head_only\n"
+
+--- Runs the network check over scripted answers.
+--- @param world table { scutil, pac_status, pac_body, helper_code, helper_output }
+--- @return table steps, table result, table seen Addresses the ports received.
+local function run(world)
+	local seen = {}
+	local ports = {
+		exec = function(_, _, _, callback) callback(world.scutil_code or 0, world.scutil or "") end,
+		fetch_pac = function(url, callback)
+			seen[#seen + 1] = url
+			callback(world.pac_status, world.pac_body)
+		end,
+		network_chain = function(callback) callback(world.helper_code, world.helper_output or "") end,
+		route_plan = function(callback)
+			callback(world.plan or { entries = {
+				{ origin = "https://registry.ollama.ai", route = "direct" },
+				{ origin = "https://blob.ollama.example", route = "direct" },
+			} })
+		end,
+	}
+	local result
+	helpers.with_stub_scope(MODULES, function()
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["infra.field_check"] = nil
+		package.loaded["infra.field_check_checks"] = nil
+		local Engine = require("infra.field_check")
+		assert(Engine.run("network", ports, function(done) result = done end), "check did not start")
+	end)
+	local steps = {}
+	for _, step in ipairs(result.steps) do steps[step.id] = step end
+	return steps, result, seen
+end
+
+helpers.describe("network check", function()
+	helpers.it("passes when the PAC is usable and the helper reports a clean route", function()
+		local steps, result, seen = run({ scutil = SCUTIL_PAC, pac_status = 200, pac_body = GOOD_PAC,
+			helper_code = 0, helper_output = HELPER_OK })
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.proxy_settings.value, "pac")
+		helpers.assert_eq(steps.pac_download.value, "http_200")
+		helpers.assert_eq(steps.pac_script.value, "valid")
+		helpers.assert_eq(steps.route_lookup.value, "selected")
+		helpers.assert_eq(steps.transfer.value, "http_200")
+		helpers.assert_eq(steps.digest.state, "skip")
+		helpers.assert_eq(seen[1], PAC_URL)
+	end)
+
+	helpers.it("reports a PAC that cannot be downloaded or is not a script as the direct fallback", function()
+		local steps, result = run({ scutil = SCUTIL_PAC, pac_status = 404, pac_body = "",
+			helper_code = 0, helper_output = HELPER_OK })
+		helpers.assert_true(result.passed, "downloads go direct and the direct transfer passed")
+		helpers.assert_eq(steps.pac_download.state, "info")
+		helpers.assert_eq(steps.pac_download.value, "http_404_direct")
+		helpers.assert_eq(steps.pac_script.state, "skip")
+		helpers.assert_eq(steps.pac_script.value, "not_fetched")
+		local bad, bad_result = run({ scutil = SCUTIL_PAC, pac_status = 200, pac_body = "<html>login</html>",
+			helper_code = 0, helper_output = HELPER_OK })
+		helpers.assert_true(bad_result.passed)
+		helpers.assert_eq(bad.pac_download.state, "pass")
+		helpers.assert_eq(bad.pac_script.state, "info")
+		helpers.assert_eq(bad.pac_script.value, "invalid_direct")
+	end)
+
+	helpers.it("reports a PAC host that does not resolve as unreachable, direct", function()
+		local steps, result = run({ scutil = SCUTIL_PAC, pac_status = 0, pac_body = nil, helper_code = 0,
+			helper_output = HELPER_OK })
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.pac_download.state, "info")
+		helpers.assert_eq(steps.pac_download.value, "unreachable_direct")
+		helpers.assert_eq(steps.pac_script.value, "not_fetched")
+		helpers.assert_eq(steps.transfer.state, "pass")
+	end)
+
+	helpers.it("names the native stage that made the download go direct, and passes when direct works", function()
+		local steps, result = run({ scutil = SCUTIL_PAC, pac_status = 200, pac_body = GOOD_PAC, helper_code = 0,
+			helper_output = "step route_lookup info direct_pac_evaluation\nstep tls pass trusted\nstep transfer pass http_200\nstep digest skip head_only\n" })
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.route_lookup.state, "info")
+		helpers.assert_eq(steps.route_lookup.value, "direct_pac_evaluation")
+		helpers.assert_eq(steps.transfer.state, "pass")
+	end)
+
+	helpers.it("fails the transfer when the direct attempt after an unusable PAC fails too", function()
+		local steps, result = run({ scutil = SCUTIL_PAC, pac_status = 0, pac_body = nil, helper_code = 0,
+			helper_output = "step route_lookup info direct_pac_download\nstep tls skip not_reached\nstep transfer fail connect\nstep digest skip head_only\n" })
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(steps.pac_download.state, "info")
+		helpers.assert_eq(steps.route_lookup.value, "direct_pac_download")
+		helpers.assert_eq(steps.transfer.value, "connect")
+	end)
+
+	helpers.it("reports a route plan lookup at a fallback stage as direct, any other as failed", function()
+		local steps, result = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK,
+			plan = { failure = "native_pac_download" } })
+		helpers.assert_eq(steps.route_plan.state, "info")
+		helpers.assert_eq(steps.route_plan.value, "direct_fallback:native_pac_download")
+		helpers.assert_true(result.passed)
+		local refused = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK,
+			plan = { failure = "native_proxy_dictionary" } })
+		helpers.assert_eq(refused.route_plan.state, "fail")
+		helpers.assert_eq(refused.route_plan.value, "native_proxy_dictionary")
+	end)
+
+	helpers.it("skips both PAC steps when no PAC is configured", function()
+		local steps, result = run({ scutil = "<dictionary> {\n  HTTPEnable : 0\n}\n", helper_code = 0, helper_output = HELPER_OK })
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.proxy_settings.value, "none")
+		helpers.assert_eq(steps.pac_download.state, "skip")
+		helpers.assert_eq(steps.pac_script.state, "skip")
+	end)
+
+	helpers.it("fails the transfer, and skips the rest, when the helper cannot run", function()
+		local steps, result = run({ scutil = "", helper_code = nil })
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(steps.transfer.state, "fail")
+		helpers.assert_eq(steps.transfer.value, "helper_unavailable")
+		helpers.assert_eq(steps.route_lookup.state, "skip")
+	end)
+
+	helpers.it("ignores helper lines that add a step, repeat one or carry a bad state", function()
+		local steps = run({ scutil = "", helper_code = 0,
+			helper_output = "step transfer pass http_200\nstep transfer fail http_500\nstep extra pass x\nstep tls maybe trusted\n" })
+		helpers.assert_eq(steps.transfer.value, "http_200")
+		helpers.assert_nil(steps.extra)
+		helpers.assert_eq(steps.tls.state, "skip")
+	end)
+
+	helpers.it("shows which route each Ollama origin takes, relay addresses never", function()
+		local relay = "http://secret-proxy.corp.example:3128"
+		local steps, result = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK, plan = { entries = {
+			{ origin = "https://registry.ollama.ai", route = relay },
+			{ origin = "https://blob.ollama.example", route = "direct" },
+		} } })
+		helpers.assert_eq(steps.route_plan.state, "info")
+		helpers.assert_eq(steps.route_plan.value, "registry:relay+blob:direct")
+		helpers.assert_true(result.passed)
+		local all_direct = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK })
+		helpers.assert_eq(all_direct.route_plan.value, "registry:direct+blob:direct")
+	end)
+
+	helpers.it("fails the route plan with the reason that would stop the daemon", function()
+		local conflict, result = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK, plan = { entries = {
+			{ origin = "https://registry.ollama.ai", route = "http://a.example:3128" },
+			{ origin = "https://blob.ollama.example", route = "http://b.example:3128" },
+		} } })
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(conflict.route_plan.state, "fail")
+		helpers.assert_eq(conflict.route_plan.value, "route-plan-conflict")
+		local stage = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK, plan = { failure = "lookup_failed" } })
+		helpers.assert_eq(stage.route_plan.state, "fail")
+		helpers.assert_eq(stage.route_plan.value, "lookup_failed")
+	end)
+
+	helpers.it("names as many Ollama origins as the shared inventory holds", function()
+		local origins = assert(require("modules.llm.network_env").route_origins("ollama"))
+		helpers.assert_eq(#origins, #require("network.field_check_network").OLLAMA_ORIGIN_TOKENS)
+	end)
+
+	helpers.it("never lets the PAC address or a host reach a step value", function()
+		local steps = run({ scutil = SCUTIL_PAC, pac_status = 200, pac_body = GOOD_PAC, helper_code = 0,
+			helper_output = "step transfer fail https://intranet.example/x\nstep route_lookup pass selected\n" })
+		for _, step in pairs(steps) do
+			helpers.assert_true(step.value == nil or not step.value:find("intranet", 1, true), "leaked in " .. step.id)
+			helpers.assert_true(step.value == nil or not step.value:find("://", 1, true), "URL in " .. step.id)
+		end
+		helpers.assert_eq(steps.transfer.value, "redacted")
+	end)
+end)

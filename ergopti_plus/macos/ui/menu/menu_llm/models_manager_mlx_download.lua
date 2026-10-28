@@ -1843,7 +1843,28 @@ function M.install(ctx)
 				if encode_ok ~= true or type(encoded) ~= "string" then return false end
 				return publish_owned_file(session_file, encoded, "MLX download session PID")
 			end
-			local function finish_launcher(code, _stdout, stderr)
+			--- Adopts the download PID a launcher output names, once.
+			--- @param out string Launcher output.
+			--- @return boolean|nil adopted True when adopted, nil when absent or already
+			---   known, false when the operation was cancelled by its persistence.
+			local function adopt_launcher_pid(out)
+				if owner.partial.pid then return nil end
+				local pid_str = tostring(out or ""):match("__DLPID__:(%d+)")
+				if not pid_str then return nil end
+				owner.partial.pid = tonumber(pid_str)
+				if persist_owned_pid() ~= true then
+					if operation_closed or owner.revoked then
+						schedule_pid_cleanup()
+					else
+						do_cancel(true, "session_pid_write_failed")
+					end
+					return false
+				end
+				if not current_or_cancel() then return false end
+				return true
+			end
+
+			local function finish_launcher(code, stdout, stderr)
 				if owner.tasks.launcher ~= launcher_task then return false end
 				owner.tasks.launcher = nil
 				if deps.active_tasks and deps.active_tasks["download"] == launcher_task then
@@ -1869,9 +1890,28 @@ function M.install(ctx)
 					end
 				end
 				if not current_or_cancel() then return false end
-				-- stdout/stderr are empty when a streaming callback is active — the
-				-- owner PID was already set by the __DLPID__ stream sentinel.
+				-- stdout/stderr are empty when a streaming callback delivered every
+				-- chunk, and the owner PID was set by the __DLPID__ stream sentinel. A
+				-- launcher that exits at once can leave its last chunk, PID line
+				-- included, to the termination callback alone (field runs of
+				-- 2026-10-27 21:08 and 2026-10-28 12:05: exit 0, sentinel only in the
+				-- final output): that line is the same evidence, so it is adopted.
+				if code == 0 and not owner.partial.pid then
+					local final_output = tostring(stdout or "") .. tostring(stderr or "")
+					local adopted = adopt_launcher_pid(final_output)
+					if adopted == false then return false end
+					if adopted == true then
+						Logger.info(LOG, "MLX download PID arrived with the launcher's final output; adopted.")
+					end
+				end
 				if not owner.partial.pid or code ~= 0 then
+					-- The 2026-10-27 21:08 field run showed only "the launcher failed (code 0)"
+					-- in a notification: name the exit and whether the PID line arrived only in
+					-- the final output, after the stream had stopped, so the next report says why.
+					local final_output = tostring(stdout or "") .. tostring(stderr or "")
+					Logger.error(LOG, "MLX download launcher failed (exit=%s, pid=%s, sentinel in final output=%s).",
+						tostring(code), owner.partial.pid and "received" or "missing",
+						final_output:find("__DLPID__:%d+") and "yes" or "no")
 					-- Reset icon here: handle_download_done will not run after a launcher failure
 					update_icon("MLX launcher-failure icon reset")
 					if not current_or_cancel() then return false end
@@ -1924,21 +1964,7 @@ function M.install(ctx)
 							local out = (stdout or "") .. (stderr or "")
 							-- Resource discovery remains live after logical revocation: a queued PID
 							-- sentinel is cleanup evidence, never publication authority.
-							if not owner.partial.pid then
-								local pid_str = out:match("__DLPID__:(%d+)")
-								if pid_str then
-									owner.partial.pid = tonumber(pid_str)
-									if persist_owned_pid() ~= true then
-										if operation_closed or owner.revoked then
-											schedule_pid_cleanup()
-										else
-											do_cancel(true, "session_pid_write_failed")
-										end
-										return false
-									end
-									if not current_or_cancel() then return false end
-								end
-							end
+							if adopt_launcher_pid(out) == false then return false end
 							-- Strip the sentinel line before forwarding to the download window log
 							local clean = out:gsub("__DLPID__:%d+\n?", "")
 							if launcher_starting then

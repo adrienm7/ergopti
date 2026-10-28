@@ -584,3 +584,5 @@ TestHE_ActivateHotstringsEmitsSpaceThenBackspace() {
 }
 Test("ActivateHotstrings: emits space then backspace via SendNewResult",
 	TestHE_ActivateHotstringsEmitsSpaceThenBackspace)
+
+#Include test_sendinstant_clipboard_owner.ahk

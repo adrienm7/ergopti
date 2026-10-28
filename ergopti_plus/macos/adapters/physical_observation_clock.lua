@@ -3,7 +3,7 @@
 --- Exposes raw host samples and owns one explicit borrowed API subscription.
 local M = {}
 local native = hs
-local Lifetime = require("keylogger.physical_subscription_lifetime")
+local Lifetime = require("keystats.physical_subscription_lifetime")
 local subscription
 local getter_frames = 0
 

@@ -12,13 +12,18 @@ is compiled for real and must carry its key type.
 
 from __future__ import annotations
 
+import io
 import json
+import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 INSTALLATION_DIR = Path(__file__).resolve().parents[1]
 GENERATION_DIR = INSTALLATION_DIR.parent / "xkb_generation"
@@ -27,7 +32,8 @@ sys.path.insert(0, str(GENERATION_DIR))
 
 import keylayout_to_xkb  # noqa: E402
 import user_layout_installer as installer  # noqa: E402
-from desktop_activation import libxkbcommon_version  # noqa: E402
+import desktop_activation  # noqa: E402
+from desktop_activation import LayoutSpec, libxkbcommon_version  # noqa: E402
 
 STATIC_DIR = INSTALLATION_DIR.parents[2]
 REGISTRY_DIR = STATIC_DIR / "layouts" / "registry"
@@ -77,8 +83,34 @@ class UserInstallerTests(unittest.TestCase):
 
     def install(self, layout_id: str, name: str) -> dict:
         return installer.install(
-            layout_id, name, self.sources[layout_id], ["fr", "en"], self.root, self.home
+            layout_id, name, self.sources[layout_id], ["fr", "en"], self.root, self.home, {}
         )
+
+    def test_a_pure_xorg_session_is_refused_before_anything_is_written(self) -> None:
+        # Xorg's xkbcomp never reads the user tree: installing there would list
+        # a layout in the pickers that the session can never type.
+        with self.assertRaises(installer.InstallError) as refusal:
+            installer.install(
+                "ergol",
+                "French (Ergo-L)",
+                self.sources["ergol"],
+                ["fr"],
+                self.root,
+                self.home,
+                {"XDG_SESSION_TYPE": "x11"},
+            )
+        self.assertEqual(refusal.exception.kind, installer.KIND_XORG_SESSION)
+        self.assertEqual(refusal.exception.code, installer.EXIT_VALIDATION)
+        self.assertFalse(self.root.exists(), "the refusal comes before any write")
+        self.assertFalse((self.home / ".XCompose").exists())
+        with self.assertRaises(installer.InstallError) as activation:
+            installer.activate("ergol", self.root, {"XDG_SESSION_TYPE": "X11"})
+        self.assertEqual(activation.exception.kind, installer.KIND_XORG_SESSION)
+
+    def test_wayland_and_unknown_sessions_still_install(self) -> None:
+        for session in ({"XDG_SESSION_TYPE": "wayland"}, {}):
+            self.assertFalse(installer.is_xorg_session(session), session)
+        self.assertTrue(installer.is_xorg_session({"XDG_SESSION_TYPE": " x11 "}))
 
     def test_a_layout_owns_its_symbols_types_and_compose_files(self) -> None:
         report = self.install("ergol", "French (Ergo-L)")
@@ -274,6 +306,188 @@ class UserTreeCompilationTests(unittest.TestCase):
             self.assertTrue(report["verified"], "the compiled keymap must carry the key type")
         finally:
             shutil.rmtree(scratch, ignore_errors=True)
+
+
+X11_TOOLS = all(shutil.which(tool) for tool in ("Xvfb", "setxkbmap", "xkbcomp"))
+
+
+class XvfbServer:
+    """A throw-away X server. -noreset matters: without it the server resets, and
+    forgets an uploaded keymap, when the last client disconnects, which a one-shot
+    xkbcomp always is. -displayfd answers only once the server accepts clients."""
+
+    def __enter__(self) -> "XvfbServer":
+        read_end, write_end = os.pipe()
+        self.process = subprocess.Popen(
+            ["Xvfb", "-displayfd", str(write_end), "-noreset", "-screen", "0", "640x480x8"],
+            pass_fds=(write_end,),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        os.close(write_end)
+        with os.fdopen(read_end) as reader:
+            number = reader.readline().strip()
+        if not number:
+            self.process.wait()
+            raise AssertionError("Xvfb did not start")
+        self.display = ":" + number
+        return self
+
+    def __exit__(self, *_exc) -> None:
+        self.process.terminate()
+        self.process.wait()
+
+    def levels(self, key: str) -> list:
+        """The keysym names of one key on the server, read back from the server."""
+        dumped = subprocess.run(
+            ["xkbcomp", "-xkb", self.display, "-"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=True,
+        ).stdout
+        block = re.search(r"key <%s>\s*\{(.*?)\};" % key, dumped, re.S).group(1)
+        # The server prints the bracket list last, with or without "symbols[Group1]=".
+        symbols = re.findall(r"\[([^\]]*)\]", block)[-1]
+        return [item.strip() for item in symbols.split(",")]
+
+
+def installed_levels(root: Path, layout_id: str, key: str) -> list:
+    """The levels the installed symbols file declares for one key, by keysym name."""
+    text = (root / "symbols" / layout_id).read_text(encoding="utf-8")
+    line = re.search(r'key <%s>\s*\{[^}]*?",\s*\[([^\]]*)\]' % key, text)
+    return [item.strip() for item in line.group(1).split(",")]
+
+
+def same_levels(held: list, declared: list) -> bool:
+    """Whether the server holds the declared levels. A Unicode keysym the file spells
+    as U+XXXX is printed by the server under its legacy name (U2081 as onesubscript),
+    so only its position is compared."""
+    return len(held) == len(declared) and all(
+        re.fullmatch(r"U[0-9A-Fa-f]{4,}", wanted) or wanted == got
+        for got, wanted in zip(held, declared)
+    )
+
+
+@unittest.skipUnless(X11_TOOLS, "Xvfb, setxkbmap and xkbcomp are not installed")
+class X11LiveReplaceTests(unittest.TestCase):
+    """The layout replaces the running X server's keymap from the user tree."""
+
+    def setUp(self) -> None:
+        self.scratch = Path(tempfile.mkdtemp(prefix="ergopti-x11-live-"))
+        self.root = self.scratch / "config" / "xkb"
+        self.home = self.scratch / "home"
+        self.home.mkdir()
+        self.sources = {}
+        for layout_id in ("ergol", "ergopti"):
+            out = self.scratch / "converted" / layout_id
+            convert(layout_id, out)
+            self.sources[layout_id] = out
+            installer.install(
+                layout_id, layout_id, out, ["fr"], self.root, self.home, {}, allow_xorg=True
+            )
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.scratch, ignore_errors=True)
+
+    def environment(self, server: XvfbServer) -> dict:
+        return {"XDG_SESSION_TYPE": "x11", "DISPLAY": server.display}
+
+    def test_three_consecutive_replacements_without_a_restart(self) -> None:
+        with XvfbServer() as server:
+            environ = self.environment(server)
+            before = server.levels("AE01")
+            for layout_id in ("ergol", "ergopti", "ergol"):
+                report = installer.apply_x11(layout_id, self.root, environ)
+                self.assertTrue(report["ok"], report)
+                self.assertTrue(
+                    same_levels(
+                        server.levels("AE01"), installed_levels(self.root, layout_id, "AE01")
+                    ),
+                    layout_id,
+                )
+            self.assertEqual(len(server.levels("AE01")), 7, "the seven-level key type is held")
+            self.assertNotEqual(server.levels("AE01"), before)
+
+    def test_a_rewritten_layout_needs_no_new_name_on_x11(self) -> None:
+        source = self.sources["ergol"]
+        with XvfbServer() as server:
+            environ = self.environment(server)
+            self.assertTrue(installer.apply_x11("ergol", self.root, environ)["ok"])
+            first = server.levels("AE01")
+            symbols = source / "ergol.xkb"
+            text = symbols.read_text(encoding="utf-8")
+            self.assertIn("[1, 1, EuroSign", text)
+            symbols.write_text(
+                text.replace("[1, 1, EuroSign", "[7, 1, EuroSign", 1), encoding="utf-8"
+            )
+            installer.install(
+                "ergol", "ergol", source, ["fr"], self.root, self.home, {}, allow_xorg=True
+            )
+            self.assertTrue(installer.apply_x11("ergol", self.root, environ)["ok"])
+            self.assertEqual(first[0], "1")
+            self.assertEqual(server.levels("AE01")[0], "7")
+
+    def test_each_refusal_has_its_closed_code(self) -> None:
+        spec = LayoutSpec("ergol")
+        with XvfbServer() as server:
+            environ = self.environment(server)
+            self.assertEqual(
+                desktop_activation.apply_x11_user_tree(
+                    spec, self.root, {"XDG_SESSION_TYPE": "wayland"}
+                ),
+                (False, desktop_activation.X11_NOT_X11),
+            )
+            self.assertEqual(
+                desktop_activation.apply_x11_user_tree(
+                    spec, self.root, {"XDG_SESSION_TYPE": "x11"}
+                ),
+                (False, desktop_activation.X11_NO_DISPLAY),
+            )
+            with mock.patch.object(desktop_activation.shutil, "which", return_value=None):
+                self.assertEqual(
+                    desktop_activation.apply_x11_user_tree(spec, self.root, environ),
+                    (False, desktop_activation.X11_TOOL_MISSING),
+                )
+            self.assertEqual(
+                desktop_activation.apply_x11_user_tree(
+                    LayoutSpec("nosuchlayout"), self.root, environ
+                ),
+                (False, desktop_activation.X11_COMPILE_FAILED),
+            )
+            before = server.levels("AE01")
+            # A desktop that put its own layout back after the upload.
+            with mock.patch.object(
+                desktop_activation, "x11_loaded_symbols", return_value="pc+us+inet(evdev)"
+            ):
+                self.assertEqual(
+                    desktop_activation.apply_x11_user_tree(spec, self.root, environ),
+                    (False, desktop_activation.X11_NOT_LOADED),
+                )
+            self.assertNotEqual(server.levels("AE01"), before, "the upload itself did happen")
+
+    def test_an_uninstalled_layout_is_refused_before_any_tool_runs(self) -> None:
+        with self.assertRaises(installer.InstallError) as refusal:
+            installer.apply_x11("ergolx", self.root, {"XDG_SESSION_TYPE": "x11"})
+        self.assertEqual(refusal.exception.code, installer.EXIT_VALIDATION)
+
+    def test_the_command_line_reports_json(self) -> None:
+        with XvfbServer() as server:
+            environment = {
+                **self.environment(server),
+                installer.ENV_USER_ROOT: str(self.root),
+                installer.ENV_USER_HOME: str(self.home),
+            }
+            with mock.patch.dict(os.environ, environment):
+                captured = io.StringIO()
+                with redirect_stdout(captured):
+                    code = installer.main(["apply-x11", "--layout-id", "ergol"])
+            report = json.loads(captured.getvalue().strip().splitlines()[-1])
+            self.assertEqual(code, installer.EXIT_OK)
+            self.assertTrue(report["ok"] and report["verified"], report)
+            self.assertTrue(
+                same_levels(server.levels("AE01"), installed_levels(self.root, "ergol", "AE01"))
+            )
 
 
 if __name__ == "__main__":

@@ -13,6 +13,11 @@ local OWNERS = {
 	"compat.utf8",
 	-- The real logger and timer scheduler describe failures through this pure owner.
 	"error_description",
+	-- The real logger's shared core and the phase counters it records into.
+	"logger",
+	"infra.phase_stats",
+	-- The phase counters' bookkeeping, shared with the Linux driver.
+	"phase_stats_core",
 	-- The real paths, logger and configuration owners split paths through this pure owner,
 	-- and the timer scheduler admits delays through the number policy.
 	"native_path",
@@ -22,6 +27,9 @@ local OWNERS = {
 	"program_parameter",
 	"actions.assignable",
 	"_generated.action_catalogue",
+	-- The generated catalogue filters the shared data through this owner.
+	"actions.catalogue",
+	"actions.catalogue_data",
 	-- The shared script chords' paused actions, read by the control-plane
 	-- admission of a script chord's action.
 	"infra.script_chord_catalogue",
@@ -34,6 +42,8 @@ local OWNERS = {
 	"tap_hold.key_combinations",
 	"config_binding_publication",
 	"config_keyboard_publication",
+	-- infra.notifications names the launcher bundle id through this shared table.
+	"identifiers",
 	"_generated.gesture_emit_actions",
 	"adapters.file_system",
 	"adapters.clipboard",
@@ -53,6 +63,9 @@ local OWNERS = {
 	"infra.termination_coordinator",
 	"infra.text_utils",
 	"infra.timings",
+	-- The driver bindings of the manifest reader and the timings registry build on these.
+	"manifest_reader",
+	"timings",
 	"infra.toml.reader",
 	"json",
 	"llm.profile_selector",
@@ -89,8 +102,12 @@ local OWNERS = {
 	"toml_codec.key_path",
 	"toml_codec.reader",
 	"toml_codec.record_scanner",
+	-- The record scanner memoizes one text's scans through this owner.
+	"toml_codec.source_memo",
 	-- The real TOML reader opens its source through this shared owner.
 	"toml_codec.source_open",
+	-- The shared ordered-pair policy copies tables through this owner.
+	"table_util",
 	"wrap_pair",
 }
 
@@ -206,7 +223,7 @@ local function fresh_actions(options)
 	local function reenter_during_resume(kind, parent)
 		if controls.reenter_during_resume ~= kind then return end
 		local binding = parent == "shortcut_bindings"
-			and "keyboard__cmd_1" or "tap_3"
+			and "keyboard__primary_1" or "tap_3"
 		calls.reentrant_results[#calls.reentrant_results + 1] =
 			actions.execute_single("open_config", binding)
 	end
@@ -969,7 +986,7 @@ local function with_feature_lifecycles(actions, calls, body)
 
 	feature.keyboard_execute = function(action)
 		if feature.keyboard_started ~= true then return false end
-		return actions.execute_single(action, "keyboard__cmd_1")
+		return actions.execute_single(action, "keyboard__primary_1")
 	end
 	feature.static_screenshot = function()
 		if feature.bindings_started ~= true then return false end

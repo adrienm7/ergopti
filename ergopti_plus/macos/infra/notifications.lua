@@ -10,6 +10,7 @@
 
 local M = {}
 local hs     = hs
+local Identifiers = require("identifiers")
 local Logger = require("infra.logger")
 local NativePath = require("native_path")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -159,7 +160,7 @@ function M.notify(title_or_msg, body, kind, on_click)
 			-- hs.application.get would search every window of every application
 			-- whenever the launcher is not running.
 			run_click_step("application activation", function()
-				local app = RunningApplication.by_bundle_id("com.ergoptiplus.app")
+				local app = RunningApplication.by_bundle_id(Identifiers.bundle_ids.launcher)
 					or RunningApplication.current()
 				if app and type(app.activate) == "function" then
 					return app:activate(true)

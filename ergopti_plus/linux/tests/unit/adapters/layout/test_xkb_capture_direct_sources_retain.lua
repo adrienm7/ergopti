@@ -40,7 +40,7 @@ helpers.describe('xkb_capture: direct sources retain original native callback ow
    helpers.assert_eq(rows[2].text, ';')
    helpers.assert_true(state.requested ~= requested)
    helpers.assert_eq(state.updates, 0)
-   helpers.assert_nil(capture.capture_chord_output(rows))
+   helpers.assert_nil(capture.capture_chord_output, "no caller-less chord output receiver")
   end)
  end)
  helpers.it('preserves validated intent when a source callback changes the caller array', function()

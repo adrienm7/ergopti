@@ -139,7 +139,7 @@ _LLM_Menu_ProfileRows() {
 	seen_labels := Map()
 	FrameState := Map()
 	PausedFn := (*) => A_IsSuspended
-	return MenuRenderer_TemplateRows("llm_profile_windows_frame", Map(
+	return _LLM_Menu_GuardConfigRows(MenuRenderer_TemplateRows("llm_profile_windows_frame", Map(
 		"llm_profile_create", LLM_Menu_PromptCreateProfile,
 		"llm_profile_clone", LLM_Menu_CloneActiveBuiltinProfile,
 		"llm_profile_auto_detect", (*) => _LLM_Menu_ToggleAutoProfile()), Map(
@@ -150,7 +150,7 @@ _LLM_Menu_ProfileRows() {
 		"llm_profile_clone_ready", _LLM_Menu_CreateProfileReady.Bind(PausedFn)), Map(
 		"llm_profile_builtin_rows", _LLM_Menu_ProfileBuiltinRows.Bind(seen_labels),
 		"llm_profile_custom_rows", _LLM_Menu_ProfileCustomRows.Bind(seen_labels, FrameState),
-		"llm_profile_app_overrides", _LLM_Menu_PerAppProfileRows))
+		"llm_profile_app_overrides", _LLM_Menu_PerAppProfileRows)))
 }
 
 ; Native data reads occur only when the shared frame reaches each provider.

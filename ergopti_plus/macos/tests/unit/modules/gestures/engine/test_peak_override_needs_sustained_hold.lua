@@ -71,8 +71,12 @@ local function swipe_with_one_frame_spike()
 	-- could not tell them apart.
 	local hs          = _G.hs
 	local saved_clock = hs.timer.secondsSinceEpoch
+	local saved_absolute_clock = hs.timer.absoluteTime
+	local saved_scheduler = package.loaded["adapters.timer_scheduler"]
 	local clock       = 1000.0
 	hs.timer.secondsSinceEpoch = function() return clock end
+	hs.timer.absoluteTime = function() return clock * 1e9 end
+	package.loaded["adapters.timer_scheduler"] = nil
 
 	local Engine = require("modules.gestures.engine")
 	local fired  = {}
@@ -122,6 +126,8 @@ local function swipe_with_one_frame_spike()
 	end
 
 	hs.timer.secondsSinceEpoch = saved_clock
+	hs.timer.absoluteTime = saved_absolute_clock
+	package.loaded["adapters.timer_scheduler"] = saved_scheduler
 	package.loaded["modules.gestures.engine"] = nil
 	return fired
 end

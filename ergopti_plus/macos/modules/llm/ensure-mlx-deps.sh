@@ -76,16 +76,15 @@ set -o pipefail 2>/dev/null || true
 
 export HF_HUB_DISABLE_XET=1
 
-# The native no-Python PTY retains the admitted source as descriptor 3. Its
-# trusted source directory is derived by that native owner before executing
-# the descriptor; ordinary pathname invocations never use the override.
-case "$0" in
-	/dev/fd/3)
-		case "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" in /*) ;; *) exit 78 ;; esac
-		SCRIPT_DIR="$(cd "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" && pwd)"
-		;;
-	*) SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)" ;;
-esac
+# The native no-Python PTY runs a private, hash-verified snapshot of this file
+# at the exact path it exports. Its trusted source directory is derived by that
+# native owner; ordinary pathname invocations never use the override.
+if [ -n "${ERGOPTI_BOOTSTRAP_SNAPSHOT:-}" ] && [ "$0" = "$ERGOPTI_BOOTSTRAP_SNAPSHOT" ]; then
+	case "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" in /*) ;; *) exit 78 ;; esac
+	SCRIPT_DIR="$(cd "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" && pwd)"
+else
+	SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
 NETWORK_RETRY_LIB="$SCRIPT_DIR/network-retry.sh"
 UV_RELEASE_FILE="$SCRIPT_DIR/uv-release.sh"
 for dependency_file in "$NETWORK_RETRY_LIB" "$UV_RELEASE_FILE"; do
@@ -187,6 +186,18 @@ clear_quarantine() {
 
 # The system relay and trust store reach every child from here on.
 apply_system_network
+
+# uv reads only environment relay variables, so under a company PAC the origins
+# it contacts (the package index, its file host and the interpreter release
+# with its redirect host) are named to the route lookup before the opaque
+# admission. Only the opaque admissions use them: the native download helpers
+# resolve each request and redirect themselves and must keep the system route.
+use_uv_route_origins() {
+	if ! OPAQUE_NETWORK_PAC_PROBE_URLS="$(route_origins_for_client uv)"; then
+		OPAQUE_NETWORK_PAC_PROBE_URLS=""
+		log_info "The shared origin inventory of the package installer is unreadable."
+	fi
+}
 
 # The processor the app runs on, as the Lua caller names it
 # (adapters/python_interpreter.lua); uname answers when run by hand.
@@ -435,7 +446,7 @@ else
 	# 'uv python find' returns non-zero when no managed interpreter matching
 	# the request is available. In that case we ask uv to download one.
 	if ! "$UV_BIN" python find "$PYTHON_REQUEST" >/dev/null 2>&1; then
-		if ! native_offline_bootstrap; then apply_system_network opaque || exit $?; fi
+		if ! native_offline_bootstrap; then use_uv_route_origins; apply_system_network opaque || exit $?; fi
 		emit_marker "PYTHON_INSTALLING"
 		log_info "Téléchargement de Python $PYTHON_VERSION via uv (interpréteur managé)…"
 		# uv prints "Downloading cpython-3.11.x (45 MB)…" on stderr — we forward
@@ -492,35 +503,47 @@ fi
 # script derived, and only when it is a real folder holding a Python
 # environment (or nothing): never a link, a file, or a foreign folder.
 venv_is_removable() {
-	if [ -L "$VENV_DIR" ]; then
-		log_error "Refusing to remove '$VENV_DIR': it is a symbolic link, not Ergopti's MLX venv."
+	local target="$1"
+	if [ -L "$target" ]; then
+		log_error "Refusing to remove '$target': it is a symbolic link, not Ergopti's MLX venv."
 		return 1
 	fi
-	if [ ! -e "$VENV_DIR" ]; then
+	if [ ! -e "$target" ]; then
 		return 0
 	fi
-	if [ ! -d "$VENV_DIR" ]; then
-		log_error "Refusing to remove '$VENV_DIR': it is not a folder."
+	if [ ! -d "$target" ]; then
+		log_error "Refusing to remove '$target': it is not a folder."
 		return 1
 	fi
-	if [ -f "$VENV_DIR/pyvenv.cfg" ] || [ -e "$VENV_DIR/bin/python" ] || [ -L "$VENV_DIR/bin/python" ]; then
+	local contents
+	# Preserve newline-only entry names across command substitution; only the
+	# sentinel by itself proves that a successfully inspected folder is empty.
+	if ! contents="$(ls -A "$target" 2>/dev/null && printf '.')"; then
+		log_error "Cannot inspect MLX repair candidate contents."
+		return 1
+	fi
+	if [ -f "$target/pyvenv.cfg" ] || [ -e "$target/bin/python" ] || [ -L "$target/bin/python" ]; then
 		return 0
 	fi
-	if [ -z "$(ls -A "$VENV_DIR" 2>/dev/null)" ]; then
+	if [ "$contents" = "." ]; then
 		return 0
 	fi
-	log_error "Refusing to remove '$VENV_DIR': it holds no Python environment."
+	log_error "Refusing to remove '$target': it holds no Python environment."
 	return 1
 }
 
 if [ "$REPAIR_MODE" = "1" ]; then
 	emit_marker "VENV_SYNC_RAN"
 	emit_marker "VENV_REMOVING"
-	if ! venv_is_removable; then
-		exit 5
-	fi
-	if ! native_offline_bootstrap; then apply_system_network opaque || exit $?; fi
-	for leftover in "$VENV_DIR" "$VENV_DIR".bootstrap.* "$VENV_DIR".rollback.*; do
+	# A matching basename does not establish an environment. Inspect every
+	# candidate before deleting the live venv, so a refused neighbor leaves
+	# the previously installed runtime available as well as its own bytes.
+	REPAIR_CANDIDATES=("$VENV_DIR" "$VENV_DIR".bootstrap.* "$VENV_DIR".rollback.*)
+	for leftover in "${REPAIR_CANDIDATES[@]}"; do
+		if ! venv_is_removable "$leftover"; then exit 5; fi
+	done
+	if ! native_offline_bootstrap; then use_uv_route_origins; apply_system_network opaque || exit $?; fi
+	for leftover in "${REPAIR_CANDIDATES[@]}"; do
 		if [ ! -e "$leftover" ] && [ ! -L "$leftover" ]; then
 			continue
 		fi
@@ -579,7 +602,7 @@ fi
 
 # Admission precedes uv venv (which may fetch Python) and uv sync. A verified
 # cached environment returned above requires no opaque network capability.
-if ! native_offline_bootstrap; then apply_system_network opaque || exit $?; fi
+if ! native_offline_bootstrap; then use_uv_route_origins; apply_system_network opaque || exit $?; fi
 
 # Slow path: real work is about to happen. Emit VENV_SYNC_RAN FIRST so the
 # Hammerspoon caller surfaces a "patientez" notification immediately, then

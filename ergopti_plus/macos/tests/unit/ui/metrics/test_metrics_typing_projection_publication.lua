@@ -25,7 +25,7 @@ local TOKENS = 600
 --- @param failing table|nil set of dates whose read is incomplete
 --- @return table reader, table pacer
 local function fake_reader(per_day, failing)
-	local Real = helpers.load_with_stubs("modules.keylogger.sqlite_reader")
+	local Real = helpers.load_with_stubs("modules.keystats.sqlite_reader")
 	local pacer = { armed = false }
 	function pacer.pause()
 		if pacer.armed then

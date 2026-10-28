@@ -50,9 +50,13 @@ finish() {
 trap finish EXIT
 DRIVER="$(cd "$(dirname "$0")/../.." && pwd -P)" || exit 2
 REPO="$(cd "${DRIVER}/../../.." && pwd -P)" || exit 2
-for tool in luajit tar curl sha256sum; do
+for tool in luajit curl sha256sum; do
 	command -v "${tool}" >/dev/null 2>&1 || { CAUSE_STATUS=$?; echo "ENVIRONMENT: ${tool} is missing" >&2; exit 2; }
 done
+# Probed by name: the portable-commands gate reads a literal probe, not a loop
+# variable, and neither ships on every minimal image.
+command -v tar >/dev/null 2>&1 || { CAUSE_STATUS=$?; echo "ENVIRONMENT: tar is missing" >&2; exit 2; }
+command -v pkill >/dev/null 2>&1 || { CAUSE_STATUS=$?; echo "ENVIRONMENT: pkill is missing" >&2; exit 2; }
 luajit -e 'require("luv")' 2>/dev/null || { CAUSE_STATUS=$?; echo "ENVIRONMENT: lua-luv is missing" >&2; exit 2; }
 
 WORK="$(mktemp -d)"

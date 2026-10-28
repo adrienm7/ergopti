@@ -2,9 +2,9 @@
 --- ==============================================================================
 --- MODULE: Native SQLite Filesystem Path Regression (Linux)
 --- DESCRIPTION:
---- Exercises public keylogger initialization, dashboard reads and native writes
+--- Exercises public keystats initialization, dashboard reads and native writes
 --- against distinct owned literal and URI-decoy databases. Files, sqlite3 and
---- process exit receipts are real; explicit keylogger events are software calls,
+--- process exit receipts are real; explicit keystats events are software calls,
 --- not physical keyboard input. No CLI wrapper or filesystem adapter is mocked.
 --- ==============================================================================
 
@@ -38,11 +38,11 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 write(root .. "/config/ergopti/config.toml", "[metrics]\nenabled = true\n")
 
-local Writer = require("modules.keylogger.sqlite_writer")
-local Reader = require("modules.keylogger.sqlite_reader")
+local Writer = require("modules.keystats.sqlite_writer")
+local Reader = require("modules.keystats.sqlite_reader")
 -- Resolve and load production owners before entering the owned database cwd.
 require("infra.paths")
-require("modules.keylogger.keylogger")
+require("modules.keystats.keystats")
 
 local function check(name, fn)
 	checks = checks + 1
@@ -95,13 +95,13 @@ for index, case in ipairs(cases) do
 		assert(chars(case[2]) == 3, "relative Reader selected a decoy or a special database")
 	end)
 
-	check(case[1] .. " public keylogger dashboard keeps the admitted file identity", function()
-		package.loaded["modules.keylogger.keylogger"] = nil
-		local Keylogger = require("modules.keylogger.keylogger")
-		Keylogger.init({ sqlite_path = case[2], log_dir = directory .. "/logs" })
-		assert(Keylogger.is_enabled() and Writer.is_available(), "native public initialization refused the literal file")
+	check(case[1] .. " public keystats dashboard keeps the admitted file identity", function()
+		package.loaded["modules.keystats.keystats"] = nil
+		local Keystats = require("modules.keystats.keystats")
+		Keystats.init({ sqlite_path = case[2], log_dir = directory .. "/logs" })
+		assert(Keystats.is_enabled() and Writer.is_available(), "native public initialization refused the literal file")
 		assert(Writer.get_db_path() == case[2], "public diagnostic spelling changed")
-		local manifest = Keylogger.get_dashboard_payload({ include_prefetch = false }).metrics_manifest
+		local manifest = Keystats.get_dashboard_payload({ include_prefetch = false }).metrics_manifest
 		assert(manifest["2000-01-01"] and manifest["2000-01-01"]["owned-app"].chars == 3,
 			"dashboard read a different database from its selected filesystem path")
 	end)
@@ -153,15 +153,15 @@ end)
 seed(root .. "/file:public.sqlite", 3)
 seed(root .. "/public.sqlite", 7)
 local public_decoy_before = read(root .. "/public.sqlite")
-check("public software keylogger events flush into the selected literal database", function()
-	package.loaded["modules.keylogger.keylogger"] = nil
-	local Keylogger = require("modules.keylogger.keylogger")
-	Keylogger.init({ sqlite_path = "file:public.sqlite", log_dir = root .. "/logs" })
+check("public software keystats events flush into the selected literal database", function()
+	package.loaded["modules.keystats.keystats"] = nil
+	local Keystats = require("modules.keystats.keystats")
+	Keystats.init({ sqlite_path = "file:public.sqlite", log_dir = root .. "/logs" })
 	assert(Writer.is_available())
 	local now = require("infra.monotonic").now_ms()
-	Keylogger.on_keydown("a", now, "public-owned-app")
-	Keylogger.on_keydown("b", now + 100, "public-owned-app")
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
+	Keystats.on_keydown("a", now, "public-owned-app")
+	Keystats.on_keydown("b", now + 100, "public-owned-app")
+	require("tests.support.sqlite_flush_native").flush(Keystats)
 	Writer.close_db()
 	assert(Writer.open_db(root .. "/file:public.sqlite"))
 	local rows = assert(Writer.query_rows("SELECT text FROM events_typing WHERE app='public-owned-app';"))

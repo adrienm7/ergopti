@@ -29,6 +29,7 @@ local llm_mod   = require("modules.llm")
 local Chord     = require("chord")
 local Hotkeys   = require("adapters.hotkey_registrar")
 local shortcut_ui = require("ui.menu.shortcut_utils")
+local TableUtil = require("table_util")
 
 local LOG = "menu_llm.trigger_orchestrator"
 
@@ -74,12 +75,7 @@ function M.new(ctx)
 	--- Creates a detached shortcut snapshot for comparison and rollback.
 	--- @param value any Shortcut value.
 	--- @return any clone
-	local function clone_value(value)
-		if type(value) ~= "table" then return value end
-		local clone = {}
-		for key_name, child in pairs(value) do clone[clone_value(key_name)] = clone_value(child) end
-		return clone
-	end
+	local clone_value = TableUtil.deep_copy_with_keys
 
 	--- Compares two normalized shortcut values without relying on table identity.
 	--- @param left table|boolean|nil First shortcut.
@@ -178,8 +174,11 @@ function M.new(ctx)
 		-- A failed disable is not terminal if unbind can still release the owner
 		set_record_enabled(record, false, label .. " disable")
 		if not invoke_hotkey_boundary(label .. " delete", Hotkeys.unbind, record.handle) then
+			-- Native deletion ACK is irreversible even while restoration remains.
+			record.release_pending = Hotkeys.release_pending(record.handle) == true
 			return false
 		end
+		record.release_pending = nil
 		handle_records[record.handle] = nil
 		record.handle = nil
 		return true
@@ -264,6 +263,7 @@ function M.new(ctx)
 	--- @return boolean settled
 	local function restore_record(record, should_deliver)
 		if not record then return true end
+		if record.release_pending == true then return false end
 		if should_deliver ~= true then
 			record.committed = false
 			return set_record_enabled(record, false, "LLM shortcut rollback disable")
@@ -333,6 +333,11 @@ function M.new(ctx)
 	--- @return boolean settled
 	local function settle_recovery_debt()
 		if not recovery_debt then return true end
+		if recovery_debt.finish_release then
+			if not recovery_debt.finish_release() then return false end
+			recovery_debt = nil
+			return true
+		end
 		Logger.warn(LOG, "Retrying retained LLM shortcut rollback before a new action.")
 		return restore_transition(recovery_debt)
 	end
@@ -588,23 +593,34 @@ function M.new(ctx)
 			end
 		end
 
-		if old_record and not release_record(old_record, spec.label .. " prior-owner release") then
+		local function finish_release()
+			if old_record and not release_record(old_record, spec.label .. " prior-owner release") then
+				return false
+			end
+			debt.old_restore = false
+			if candidate then
+				spec.set_handle(candidate.handle)
+				candidate.committed = should_deliver
+				debt.candidate = nil
+			else
+				spec.set_handle(nil)
+			end
+			close_restore_fence()
+			Logger.debug(LOG, "%s committed.", spec.label)
+			return true
+		end
+		if not finish_release() then
 			recovery_debt = debt
-			restore_transition(debt)
+			if old_record.release_pending == true then
+				-- Persistence and menu already acknowledged this candidate. The old
+				-- native owner is gone, so retain completion rather than re-enable it.
+				debt.old_restore = false
+				debt.finish_release = finish_release
+			else
+				restore_transition(debt)
+			end
 			return false
 		end
-		debt.old_restore = false
-
-		if candidate then
-			spec.set_handle(candidate.handle)
-			candidate.committed = should_deliver
-			debt.candidate = nil
-		else
-			spec.set_handle(nil)
-		end
-		close_restore_fence()
-
-		Logger.debug(LOG, "%s committed.", spec.label)
 		return true
 	end
 
@@ -690,6 +706,7 @@ function M.new(ctx)
 		local active = true
 		local published = false
 		local restored = false
+		local replacement_required = false
 		local lease = {}
 
 		--- Publishes only the in-memory shortcut preference into the parent snapshot.
@@ -725,6 +742,22 @@ function M.new(ctx)
 			state.llm_profile_shortcuts = old_shortcuts
 			if type(old_shortcuts) == "table" then
 				old_shortcuts[profile_id] = old_preference
+			end
+			if old_record and old_record.release_pending == true then
+				if not release_record(old_record, "Profile shortcut rollback release settlement") then
+					return false
+				end
+				replacement_required = true
+			end
+			if replacement_required then
+				-- The parent requires rollback after an irreversible delete. Rebuild
+				-- one owner only after its exact release and staging debts settle.
+				if not settle_cleanup_debts() then return false end
+				local replacement = acquire_record(old_record.mods, old_record.key, old_record.callback)
+				if not replacement then return false end
+				old_record = replacement
+				replacement_required = false
+				set_profile_hk(profile_id, old_record.handle)
 			end
 			restored = restore_record(old_record, old_should_deliver)
 			return restored
@@ -847,9 +880,7 @@ function M.new(ctx)
 	--- saved shortcuts for the next switch-on.
 	--- @return boolean settled True when no profile hotkey remains bound.
 	function inst.disarm_shortcuts()
-		local ids = {}
-		for profile_id in pairs(get_profile_hks()) do ids[#ids + 1] = profile_id end
-		table.sort(ids)
+		local ids = TableUtil.sorted_keys(get_profile_hks())
 		local settled = true
 		local released = 0
 		for _, profile_id in ipairs(ids) do

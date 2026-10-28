@@ -84,6 +84,16 @@ for _, def in ipairs(M.TERMINATOR_DEFS) do
 end
 
 
+-- Whether a delimiter is swallowed by the expansion, by key. Seeded from the
+-- catalogue (only the magic-key slot ships consumed) and changed per delimiter
+-- from config.toml (hotstrings.terminator_consume) without touching the shipped
+-- definitions, which stay the defaults a settings reset returns to.
+local _consume = {}
+for _, def in ipairs(M.TERMINATOR_DEFS) do
+	if def.key then _consume[def.key] = (def.consume == true) end
+end
+
+
 -- Cached O(1) lookup sets for the per-keystroke hot path. Every call to
 -- is_terminator() used to walk TERMINATOR_DEFS and each def's chars list
 -- (linear scan on every keydown); terminator_is_consumed() did the same.
@@ -91,7 +101,7 @@ end
 -- path stays O(1).
 local _chars_set   = {}
 local _consume_set = {}
-local function build_cache(enabled)
+local function build_cache(enabled, consume)
 	local chars_set = {}
 	local consume_set = {}
 	for _, def in ipairs(M.TERMINATOR_DEFS) do
@@ -99,7 +109,7 @@ local function build_cache(enabled)
 			for _, c in ipairs(def.chars) do
 				if type(c) == "string" and c ~= "" then
 					chars_set[c] = true
-					if def.consume then consume_set[c] = true end
+					if consume[def.key] then consume_set[c] = true end
 				end
 			end
 		end
@@ -108,7 +118,7 @@ local function build_cache(enabled)
 end
 
 local function rebuild_cache()
-	_chars_set, _consume_set = build_cache(_enabled)
+	_chars_set, _consume_set = build_cache(_enabled, _consume)
 end
 rebuild_cache()
 
@@ -251,7 +261,7 @@ function M.set_terminators_enabled(changes)
 	end
 
 	local ok, chars_or_err, consume_set = xpcall(function()
-		return build_cache(candidate)
+		return build_cache(candidate, _consume)
 	end, debug.traceback)
 	if not ok then
 		Logger.error(LOG, "set_terminators_enabled: cache rebuild refused — %s.", tostring(chars_or_err))
@@ -263,6 +273,55 @@ function M.set_terminators_enabled(changes)
 	_consume_set = consume_set
 	Logger.debug(LOG, "Terminator batch committed (%d change(s)).", count)
 	return true
+end
+
+--- Sets whether several built-in terminators are consumed (swallowed by the
+--- expansion) as one cache publication. A user's own delimiter carries its
+--- consume choice in its record, so only shipped keys are accepted here.
+--- Invalid input leaves the consume table and the hot-path caches intact.
+--- @param changes table Map of built-in terminator key to exact boolean.
+--- @return boolean committed
+function M.set_terminators_consume(changes)
+	if type(changes) ~= "table" then
+		Logger.error(LOG, "set_terminators_consume: changes must be a table (got '%s').", type(changes))
+		return false
+	end
+	local custom = {}
+	for _, def in ipairs(M.TERMINATOR_DEFS) do
+		if def.key and def.custom == true then custom[def.key] = true end
+	end
+	local candidate = {}
+	for key, consumed in pairs(_consume) do candidate[key] = consumed end
+	for key, consumed in pairs(changes) do
+		if type(key) ~= "string" or key == "" or _consume[key] == nil or custom[key] then
+			Logger.error(LOG, "set_terminators_consume: '%s' is not a built-in terminator key.", tostring(key))
+			return false
+		end
+		if type(consumed) ~= "boolean" then
+			Logger.error(LOG, "set_terminators_consume: value for '%s' must be boolean (got '%s').",
+				key, type(consumed))
+			return false
+		end
+		candidate[key] = consumed
+	end
+	local ok, chars_set, consume_set = xpcall(function()
+		return build_cache(_enabled, candidate)
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "set_terminators_consume: cache rebuild refused — %s.", tostring(chars_set))
+		return false
+	end
+	_consume = candidate
+	_chars_set = chars_set
+	_consume_set = consume_set
+	return true
+end
+
+--- Returns whether the terminator with this key is currently consumed.
+--- @param key string The terminator key identifier.
+--- @return boolean
+function M.is_terminator_consume(key)
+	return _consume[key] == true
 end
 
 --- Enables or disables a terminator by key.
@@ -386,6 +445,7 @@ function M.add_custom_terminator(key, char, label, consume)
 			def.chars   = { char }
 			def.label   = label
 			def.consume = consume
+			_consume[key] = consume
 			rebuild_cache()
 			Logger.debug(LOG, "Custom terminator '%s' updated.", key)
 			return true
@@ -400,6 +460,7 @@ function M.add_custom_terminator(key, char, label, consume)
 		custom          = true,
 	})
 	_enabled[key] = true
+	_consume[key] = consume
 	rebuild_cache()
 	Logger.info(LOG, "Custom terminator '%s' added.", key)
 	return true
@@ -412,6 +473,7 @@ function M.remove_custom_terminator(key)
 		if def.key == key and def.custom then
 			table.remove(M.TERMINATOR_DEFS, i)
 			_enabled[key] = nil
+			_consume[key] = nil
 			rebuild_cache()
 			Logger.info(LOG, "Custom terminator '%s' removed.", key)
 			return true

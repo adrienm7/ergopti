@@ -4,7 +4,7 @@
 --- MODULE: Typing Metrics Dashboard UI
 --- DESCRIPTION:
 --- Hosts the typing-metrics WebView. Reads from `db.sqlite` (the tmpdir cache
---- rebuildable from `data.sql`) via `modules.keylogger.sqlite_reader` and
+--- rebuildable from `data.sql`) via `modules.keystats.sqlite_reader` and
 --- projects the result into the JSON shape consumed by the (unchanged)
 --- frontend JS.
 ---
@@ -53,7 +53,7 @@ local LOG = "metrics_typing"
 local _log_manager = nil
 local function _get_log_manager()
 	if not _log_manager then
-		_log_manager = require("modules.keylogger.log_manager")
+		_log_manager = require("modules.keystats.log_manager")
 	end
 	return _log_manager
 end
@@ -101,7 +101,7 @@ local _continuation_timers = {}
 local _closing_webview = nil
 local _delivery_errors = {}
 local _delivery_generation = nil
---- Running paced projection, if any; one job at a time per window.
+--- Running projection or cleanup-only job retaining exact native timers.
 M._job = nil
 --- Work waiting for the running job: a full refresh, a live manifest refresh,
 --- and the latest range request (older ones are superseded by the frontend).
@@ -177,16 +177,25 @@ local function encode_delivery(generation, webview, site, value)
 	return encoded
 end
 
+--- Settles the exact projection's timers before releasing its owner.
+--- @return boolean settled True once every acquired timer acknowledged cleanup.
+local function settle_job()
+	local job = M._job
+	if not job then return true end
+	local settled = job.cancel()
+	if settled ~= true then
+		Logger.error(LOG, "Typing metrics projection job retained timer cleanup debt.")
+		return false
+	end
+	if M._job == job then M._job = nil end
+	return true
+end
+
 --- Cancels the running projection job and forgets queued work.
 --- @return boolean settled True once no job timer remains owned.
 local function cancel_job()
 	_pending_work = { full = false, live = false, range = nil }
-	local job = M._job
-	if not job then return true end
-	M._job = nil
-	local settled = job.cancel()
-	if not settled then Logger.error(LOG, "Typing metrics projection job retained timer cleanup debt.") end
-	return settled
+	return settle_job()
 end
 
 local _cache_reset_failure_generation = nil
@@ -194,16 +203,16 @@ local _cache_reset_failure_generation = nil
 local request_work
 
 --- Forgets every cached projection, on disk and in memory, once the disk
---- snapshot is gone. The running job is cancelled in the same turn, so it can
---- neither republish nor re-save what was cleared, and a full projection is
+--- snapshot is gone. The running job must settle before any cache mutation,
+--- so it can neither republish nor re-save what was cleared. A full projection is
 --- queued again so the page leaves its refreshing state.
 --- @return boolean removed True only when the disk snapshot is gone.
 local function reset_caches(generation, webview)
 	if not delivery_is_current(generation, webview) then return false end
+	if not cancel_job() or not delivery_is_current(generation, webview) then return false end
 	local removed = Snapshot.remove()
 	if not delivery_is_current(generation, webview) then return false end
 	if removed then
-		cancel_job()
 		Projection.reset()
 		request_work(generation, webview, "full")
 		return true
@@ -460,7 +469,7 @@ local function compute_full(pacer)
 	local session = nil
 	local sqlite_path = readable_sqlite_path()
 	if sqlite_path then
-		session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path, today, pacer)
+		session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path, today, pacer)
 		manifest, manifest_json, manifest_complete = session.manifest()
 	end
 
@@ -527,7 +536,7 @@ end
 local function compute_live(pacer)
 	local sqlite_path = readable_sqlite_path()
 	if not sqlite_path then return { payload = '{"manifest":{}}', complete = true } end
-	local session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path,
+	local session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
 	local _, manifest_json, manifest_complete = session.manifest()
 	return {
@@ -545,7 +554,7 @@ local function compute_range(query, pacer)
 	local sqlite_path = readable_sqlite_path()
 	if not sqlite_path then return { payload = '{"historical":[],"today":[]}', complete = true } end
 	local apps = type(query.apps) == "table" and query.apps or nil
-	local session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path,
+	local session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
 	local payload, range_complete = session.range(query.start_date, query.end_date, apps)
 	return { payload = payload, complete = range_complete == true }
@@ -622,7 +631,7 @@ local function publish_data(generation, webview, site, payload, revision, with_a
 	local metadata = string.format('{"manifest_revision":%d%s%s}', revision,
 		with_assets and string.format(',"assets_revision":%d', revision) or "",
 		freshness and (',"freshness":' .. freshness) or "")
-	local code = "window.publishTypingMetricsData(" .. payload .. "," .. metadata .. ");"
+	local code = "window.publishTypingMetricsData(JSON.parse(" .. Json.quote(payload) .. ")," .. metadata .. ");"
 	local publication = { code = code, generation = generation, revision = revision }
 	if site == "live manifest" then
 		if _pending_live_publication and _pending_live_publication.generation == generation then
@@ -724,7 +733,12 @@ end
 --- @return boolean accepted
 local function run_next_work(generation, webview)
 	if not delivery_is_current(generation, webview) then return false end
-	if M._job then return true end
+	if M._job then
+		local state = M._job.state
+		if state ~= "done" and state ~= "failed" and state ~= "cancelled" then return true end
+		if not settle_job() or not delivery_is_current(generation, webview) then return false end
+		if M._job then return true end
+	end
 	local work
 	if _pending_work.full then
 		_pending_work.full = false
@@ -750,9 +764,9 @@ local function run_next_work(generation, webview)
 		end,
 		on_done = function(ok, result)
 			if M._job ~= job then return end
-			M._job = nil
+			local settled = settle_job()
 			deliver_work(generation, webview, work, ok, result)
-			run_next_work(generation, webview)
+			if settled then run_next_work(generation, webview) end
 		end,
 	})
 	if not job then
@@ -798,6 +812,10 @@ end
 -- ======= 5/ Public API =======
 -- =============================
 -- =============================
+
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return M._wv end
 
 --- Closes the typing metrics dashboard without losing an ambiguous native owner.
 --- @return boolean committed
@@ -848,6 +866,10 @@ function M.show()
 		return submit_javascript(generation, webview, "reopen", "window.apply_date_app_filters();")
 	end
 
+	if not cancel_job() then
+		Logger.error(LOG, "Typing metrics dashboard startup refused: prior projection cleanup remains pending.")
+		return false
+	end
 	Logger.start(LOG, "Opening typing metrics dashboard…")
 
 	local sf    = hs.screen.mainScreen():frame()
@@ -911,7 +933,7 @@ function M.show()
 		return rollback_startup_webview(webview, "prior poller cleanup remains pending")
 	end
 	local poll_ok, poll_candidate, poll_committed = xpcall(function()
-		return TimerScheduler.every(0.3, function()
+		return TimerScheduler.every(require("infra.timings").sec("ui", "metrics_typing_poll_ms"), function()
 		if generation ~= _generation or M._wv ~= webview then return end
 		pcall(function()
 			submit_javascript(generation, webview, "request poll", "window._lua_request", function(req)

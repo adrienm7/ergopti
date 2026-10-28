@@ -221,6 +221,7 @@ local function load_fixture()
 			if key == "hotstrings.trigger_char" then return "★" end
 			-- The word-reset policy stays neutral: these scenarios are not about pauses.
 			if key == "hotstrings.idle_reset_seconds" then return 0 end
+			if key == "hotstrings.cascade_max_arrows" then return 1 end
 			return false
 		end,
 	}
@@ -413,7 +414,7 @@ helpers.describe("keymap action epochs", function()
 		fixture.keymap.stop()
 	end)
 
-	helpers.it("claims older output before a focus-changing click without keylogger", function()
+	helpers.it("claims older output before a focus-changing click without keystats", function()
 		local fixture = load_fixture()
 		local older_events = { { key = "before-focus-change" } }
 		fixture.queue_fence(older_events)

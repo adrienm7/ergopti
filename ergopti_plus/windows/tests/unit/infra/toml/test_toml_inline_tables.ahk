@@ -284,14 +284,14 @@ Test("TOML: document records retain exact typed identities and owner generations
 ; The document owner skips comments in the original source. A literal token on
 ; the next physical line must not inherit that discarded comment's last byte.
 _TIT_LiteralLineBoundary(Comment) {
-	Source := '[metrics]`nmetrics_enabled = false`nmetrics_disabled_apps = [`n'
+	Source := '[metrics]`nenabled = false`ndisabled_apps = [`n'
 		. ' "CHROME#1.EXE", ' . Comment . "`n"
 		. "`t'editor#1.exe',`n]`n"
 	Document := TOML_ParseDocument(Source)
 	Section := Document["metrics"]
-	AssertTrue(Section["metrics_enabled"] is TOML_Bool)
-	AssertFalse(Section["metrics_enabled"].Value, "comments cannot invert the authored opt-out")
-	Apps := Section["metrics_disabled_apps"]
+	AssertTrue(Section["enabled"] is TOML_Bool)
+	AssertFalse(Section["enabled"].Value, "comments cannot invert the authored opt-out")
+	Apps := Section["disabled_apps"]
 	AssertTrue(Apps is Array)
 	AssertEqual(2, Apps.Length, "comment punctuation cannot create or discard array elements")
 	AssertTrue(Apps[1] is String && Apps[2] is String)
@@ -299,10 +299,10 @@ _TIT_LiteralLineBoundary(Comment) {
 	AssertEqual("editor#1.exe", Apps[2], "a hash in a literal string remains data")
 	Cache := ConfigTomlDecodeSnapshot(Source).Cache
 	Validated := _CS_ValidateMetricsSection(Cache["metrics"])
-	AssertFalse(Validated["metrics_enabled"])
-	AssertEqual(2, Validated["metrics_disabled_apps"].Count)
-	AssertTrue(Validated["metrics_disabled_apps"].Has("chrome#1.exe"))
-	AssertTrue(Validated["metrics_disabled_apps"].Has("editor#1.exe"))
+	AssertFalse(Validated["enabled"])
+	AssertEqual(2, Validated["disabled_apps"].Count)
+	AssertTrue(Validated["disabled_apps"].Has("chrome#1.exe"))
+	AssertTrue(Validated["disabled_apps"].Has("editor#1.exe"))
 }
 _TIT_LiteralBoundaryComments := [
 	"# excluded browser",
@@ -372,3 +372,47 @@ _TIT_BlankRuns() {
 	AssertEqual(9, Physical.Length)
 }
 Test("TOML: blank runs rebuild the source and keep their section (toml-blank-runs)", _TIT_BlankRuns)
+
+
+; The bare dotted fast path must answer exactly what the general scan answers,
+; and every shape it does not take must still reach the general scan.
+_TIT_KeyPathFastPathAgreesWithScan() {
+	Cases := [
+		["a", ["a"]], ["a.b.c", ["a", "b", "c"]], [" a.b ", ["a", "b"]],
+		["a_b-9.C", ["a_b-9", "C"]], ['"a.b".c', ["a.b", "c"]],
+		["a . b", ["a", "b"]], ["'x'.y", ["x", "y"]]]
+	for Item in Cases {
+		Parts := TOML_ParseKeyPath(Item[1], true)
+		AssertEqual(Item[2].Length, Parts.Length, "segments of " . Item[1])
+		for Index, Part in Item[2]
+			AssertEqual(Part, Parts[Index], "segment " . Index . " of " . Item[1])
+	}
+	for Bad in ["", "a..b", ".a", "a.", "a b", "a.b`r", "a.é"] {
+		Threw := false
+		try TOML_ParseKeyPath(Bad, true)
+		catch
+			Threw := true
+		AssertTrue(Threw, "'" . Bad . "' must stay an invalid strict key path")
+	}
+}
+Test("TOML: the bare key path fast path agrees with the general scan "
+	. "(toml-key-path-fast-path)", _TIT_KeyPathFastPathAgreesWithScan)
+
+
+; The flat writer parsed the source and the candidate a second time inside the
+; foreign-record retention it had already admitted with the first two parses.
+_TIT_FlatWriteParsesOnce() {
+	global _TOML_DocumentParses
+	Path := _CTU_NewPath()
+	try {
+		AssertTrue(FSWrite(Path, "# user note`n[sample]`nafter = 1`nkeep = 3`n"))
+		Before := _TOML_DocumentParses
+		AssertTrue(TOML_BatchWrite(Path, [{ Section: "sample", Key: "after", Value: 2 }]))
+		Spent := _TOML_DocumentParses - Before
+		AssertTrue(InStr(FSRead(Path), "# user note") > 0, "the foreign comment is retained")
+		AssertEqual(2, TOML_ParseFreshFile(Path)["sample"]["after"])
+		AssertEqual(6, Spent, "parses spent by one flat write")
+	} finally FSDelete(Path)
+}
+Test("TOML: one flat write does not tokenize its source or candidate twice "
+	. "(toml-flat-write-parse-count)", _TIT_FlatWriteParsesOnce)

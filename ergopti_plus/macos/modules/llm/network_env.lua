@@ -24,6 +24,7 @@ local M = {}
 
 local text_utils = require("infra.text_utils")
 local FileSystem = require("adapters.file_system")
+local Json = require("json")
 local Admission = require("modules.llm.opaque_network_admission")
 
 -- The shared policy, relative to the driver root.
@@ -33,7 +34,7 @@ local POLICY_RELATIVE = "modules/llm/network-retry.sh"
 --- @return string|nil root
 local function driver_root()
 	local source = debug.getinfo(1, "S").source or ""
-	source = source:sub(1, 1) == "@" and source:sub(2) or source
+	source = (source:sub(1, 1) == "@" and source:sub(2) or source):gsub("\\", "/")
 	return source:match("^(.*)/modules/llm/network_env%.lua$")
 end
 
@@ -47,6 +48,9 @@ local function locate_policy()
 	return path
 end
 
+-- The shared inventory of the origins each download client contacts.
+local ORIGINS_RELATIVE = "/../_shared/modules/network/route_origins.json"
+
 -- Located once, when the module loads: the file ships beside it in the bundle.
 local _policy_path = locate_policy()
 
@@ -56,12 +60,101 @@ function M.policy_path()
 	return _policy_path
 end
 
+--- Reads and decodes the shared route inventory.
+--- @return table|nil inventory
+--- @return string|nil err Why the inventory cannot be used.
+local function route_inventory()
+	local root = driver_root()
+	if not root then return nil, "the bundled route inventory owner is missing" end
+	local ok, bytes, status = pcall(FileSystem.read_with_status, root .. ORIGINS_RELATIVE, function() end)
+	if not ok or status ~= "ok" or type(bytes) ~= "string" then
+		return nil, "the shared route inventory is unreadable"
+	end
+	local decoded, inventory = pcall(Json.decode, bytes)
+	if not decoded or type(inventory) ~= "table" then return nil, "the shared route inventory is unreadable" end
+	return inventory, nil
+end
+
+--- Seconds one origin's route lookup may take (route_origins.json).
+--- @return number|nil seconds
+--- @return string|nil err Why the inventory cannot be used.
+function M.route_lookup_budget_seconds()
+	local inventory, err = route_inventory()
+	if not inventory then return nil, err end
+	local seconds = inventory.route_lookup_budget_seconds
+	if type(seconds) ~= "number" or seconds <= 0 then return nil, "the route inventory names no lookup budget" end
+	return seconds, nil
+end
+
+--- The origins one download client contacts, redirect targets included.
+--- @param client string Key of route_origins.json "clients".
+--- @return table|nil origins Ordered https origins.
+--- @return string|nil err Why the inventory cannot be used.
+function M.route_origins(client)
+	local inventory, inventory_error = route_inventory()
+	if not inventory then return nil, inventory_error end
+	local origins = type(inventory.clients) == "table" and inventory.clients[client] or nil
+	if type(origins) ~= "table" or #origins == 0 then
+		return nil, "the route inventory names no origin for " .. tostring(client)
+	end
+	return origins, nil
+end
+
+-- The shared proxy policy, relative to the driver root's shared tree.
+local PROXY_POLICY_RELATIVE = "/../_shared/modules/network/proxy_policy.json"
+
+--- The shell parameter expansion of the HTTPS proxy precedence, built from the
+--- shared proxy policy: one nested ${name:-...} level per variable, in order.
+--- @return string|nil expansion
+--- @return string|nil err Why the policy cannot be used.
+function M.https_route_expansion()
+	local root = driver_root()
+	if not root then return nil, "the bundled proxy policy owner is missing" end
+	-- Read directly: this runs inside prelude builders whose callers double the file system.
+	local file = io.open(root .. PROXY_POLICY_RELATIVE, "rb")
+	local bytes = file and file:read("*a")
+	if file then file:close() end
+	if type(bytes) ~= "string" then return nil, "the shared proxy policy is unreadable" end
+	local decoded, policy = pcall(Json.decode, bytes)
+	local names = decoded and type(policy) == "table" and type(policy.environment_precedence) == "table"
+		and policy.environment_precedence.https or nil
+	if type(names) ~= "table" or #names < 2 then return nil, "the shared proxy policy names no HTTPS precedence" end
+	local expansion = ""
+	for index = #names, 1, -1 do
+		local name = names[index]
+		if type(name) ~= "string" or not name:match("^[%a_][%w_]*$") then
+			return nil, "the shared proxy policy names an invalid variable"
+		end
+		expansion = "${" .. name .. ":-" .. expansion .. "}"
+	end
+	return expansion, nil
+end
+
 --- The shell lines, ending in "; ", that export the system network settings
 --- for the command that follows them.
 --- @param tag string Log prefix of the child, e.g. "MLX".
+--- @param opaque boolean Whether the client is admitted for an outgoing fetch.
+--- @param options table|nil { pac_probe_url = https origin the client downloads from,
+---   pac_probe_client = key of every origin a client contacts in route_origins.json }.
 --- @return string|nil prelude
 --- @return string|nil err Why it cannot be built.
-local function build_prelude(tag, opaque)
+local function build_prelude(tag, opaque, options)
+	local probe = options and options.pac_probe_url
+	if probe ~= nil and (type(probe) ~= "string" or not probe:match("^https://[%w%.%-]+/?$")) then
+		return nil, "the automatic-route origin is not a plain https origin"
+	end
+	local probes
+	if options and options.pac_probe_client ~= nil then
+		if probe ~= nil then return nil, "the automatic-route origin is named twice" end
+		local origins, origins_error = M.route_origins(options.pac_probe_client)
+		if not origins then return nil, origins_error end
+		for _, origin in ipairs(origins) do
+			if type(origin) ~= "string" or not origin:match("^https://[%w%.%-]+$") then
+				return nil, "an automatic-route origin is not a plain https origin"
+			end
+		end
+		probes = table.concat(origins, " ")
+	end
 	local policy = M.policy_path()
 	if not policy then return nil, "the shared network policy " .. POLICY_RELATIVE .. " is missing" end
 	local activation = opaque and "apply_system_network opaque" or "apply_system_network"
@@ -79,25 +172,33 @@ local function build_prelude(tag, opaque)
 	local label = text_utils.shell_quote("[" .. tostring(tag) .. "] %s\n")
 	return "log_info() { printf " .. label .. " \"$1\" >&2; }; "
 		.. "log_error() { printf " .. label .. " \"$1\" >&2; }; "
+		.. (probe and ("OPAQUE_NETWORK_PAC_PROBE_URL=" .. text_utils.shell_quote(probe) .. "; ") or "")
+		.. (probes and ("OPAQUE_NETWORK_PAC_PROBE_URLS=" .. text_utils.shell_quote(probes) .. "; ") or "")
 		.. ". " .. text_utils.shell_quote(policy) .. " && " .. activation .. "; "
 		.. status, nil
 end
 
 --- Exports static settings for local serving and native-aware commands.
+--- A client that reads only HTTPS_PROXY (the Ollama daemon) names the origin it
+--- downloads from in options.pac_probe_url: under an automatic (PAC, WPAD)
+--- configuration the launcher then resolves that origin and the first route
+--- becomes HTTPS_PROXY (see resolve_system_route_for_probe in network-retry.sh).
 --- @param tag string Child log prefix.
+--- @param options table|nil { pac_probe_url = string }.
 --- @return string|nil prelude
 --- @return string|nil err
-function M.prelude(tag)
-	return build_prelude(tag, false)
+function M.prelude(tag, options)
+	return build_prelude(tag, false, options)
 end
 
 --- Admits an actual outgoing fetch by an opaque client before child dispatch.
 --- Cached/local serving uses prelude() and does not require this capability.
 --- @param tag string Child log prefix.
+--- @param options table|nil { pac_probe_url = string }, as for prelude().
 --- @return string|nil prelude
 --- @return string|nil err
-function M.opaque_prelude(tag)
-	return build_prelude(tag, true)
+function M.opaque_prelude(tag, options)
+	return build_prelude(tag, true, options)
 end
 
 --- Emits the existing native receiver admission without observing a route.
@@ -153,9 +254,11 @@ function M.bootstrap_prelude(tag, python)
 	local managed = managed_receiver_prelude(tag, root)
 	local opaque, opaque_error = M.opaque_prelude(tag)
 	if not opaque then return nil, opaque_error end
+	local route, route_error = M.https_route_expansion()
+	if not route then return nil, route_error end
 	local helper = text_utils.shell_quote(root .. "/modules/llm/managed_bootstrap_http.py")
 	return "if [ -n \"${ERGOPTI_LAUNCHER_EXECUTABLE:-}\" ] "
-		.. "&& [ -z \"${https_proxy:-${HTTPS_PROXY:-${all_proxy:-${ALL_PROXY:-}}}}\" ] "
+		.. "&& [ -z \"" .. route .. "\" ] "
 		.. "&& [ -f " .. helper .. " ]; then PYTHON_BIN=" .. text_utils.shell_quote(python) .. "; "
 		.. managed .. "else " .. opaque .. "fi; ", nil
 end

@@ -34,6 +34,7 @@
 local M = {}
 
 local NativePath = require("native_path")
+local TableUtil = require("table_util")
 
 
 
@@ -81,10 +82,7 @@ local SIMPLE_ESCAPES = "btnfr\"\\"
 --- @param t table Any table.
 --- @return table keys Sorted list of the table's keys.
 local function sorted_keys(t)
-	local out = {}
-	for k in pairs(t) do out[#out + 1] = k end
-	table.sort(out, function(a, b) return tostring(a) < tostring(b) end)
-	return out
+	return TableUtil.sorted_keys(t, TableUtil.by_text)
 end
 
 --- @param list table A sequence.

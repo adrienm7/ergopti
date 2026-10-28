@@ -84,7 +84,7 @@ _HCWRA_CancelBeforeDestroy() {
 	Src := _DriverDirConcat("ui/hotstrings_config_window")
 	Body := _DriverFuncBody("_HCW_ResetAll")
 	IdxCancel := InStr(Body, "_HCW_CancelAllNumericWrites()")
-	IdxSuccess := InStr(Body, "_HCW_CompleteNativeReset.Bind()")
+	IdxSuccess := InStr(Body, "_HCW_CompleteNativeReset.Bind(_HCWGui)")
 	Assert(IdxCancel > 0 and IdxSuccess > 0 and IdxCancel < IdxSuccess,
 		"pending numeric writes must be cancelled before the success-only teardown callback (hcw-reset-all-teardown)")
 	Assert(InStr(Body, "_HCW_FlushNumericWrite()") == 0,

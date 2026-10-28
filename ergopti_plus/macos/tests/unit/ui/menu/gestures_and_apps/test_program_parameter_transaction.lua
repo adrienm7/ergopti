@@ -60,7 +60,7 @@ local function with_owner(body, options)
 				if controls.path_during_save then controls.current_path = "other-config" end
 				return receipt(controls.save)
 			end, controls)
-		local mutation = { publishes_assignment = true, section = "shortcuts.keyboard", key = "cmd_1",
+		local mutation = { publishes_assignment = true, section = "shortcuts.keyboard", key = "primary_1",
 			read = function() return action end,
 			apply = function(on_error)
 				action = selected
@@ -89,10 +89,10 @@ local function with_owner(body, options)
 			end
 		end
 		local function apply()
-			return owner.apply("keyboard__cmd_1", selected, scalar, mutation)
+			return owner.apply("keyboard__primary_1", selected, scalar, mutation)
 		end
 		controls.reinstate_action = function() action = selected end
-		controls.reinstate_parameters = function() parameters["keyboard__cmd_1__" .. selected] = scalar end
+		controls.reinstate_parameters = function() parameters["keyboard__primary_1__" .. selected] = scalar end
 		controls.restore_action = function() action = "none" end
 		controls.restore_parameters_exact = function() parameters = { retained = "unrelated" } end
 		local function inspect()
@@ -166,7 +166,7 @@ helpers.describe("private program retained compensation owner", function()
 			if mode == "durable_refusal" then
 				options.snapshot_view = function(snapshot)
 					snapshot = require("ui.menu.preferences_transaction").clone(snapshot)
-					snapshot.gesture_action_parameters.keyboard__cmd_1__run_program = SCALAR:gsub("secret%-tool", "other-tool")
+					snapshot.gesture_action_parameters.keyboard__primary_1__run_program = SCALAR:gsub("secret%-tool", "other-tool")
 					return snapshot
 				end
 			end
@@ -418,7 +418,7 @@ helpers.describe("parameterized assignment uses the retained owner", function()
 		with_owner(function(owner, apply, inspect, _, observations, global)
 			helpers.assert_eq(apply(), true)
 			helpers.assert_eq(inspect().action, "open_url")
-			helpers.assert_eq(inspect().parameters, { retained = "unrelated", keyboard__cmd_1__open_url = "https://example.com" })
+			helpers.assert_eq(inspect().parameters, { retained = "unrelated", keyboard__primary_1__open_url = "https://example.com" })
 			helpers.assert_eq(observations.saves, 1)
 			helpers.assert_eq(owner.pending(), false)
 			helpers.assert_eq(global.is_pending(), false)
@@ -451,7 +451,7 @@ helpers.describe("parameter transaction keeps physical assignments with their sc
 		local physical = require("shortcuts.physical_slots")
 		helpers.assert_eq(physical.is_namespace("physical_none_KeyA"), true)
 		helpers.assert_eq(physical.is_namespace("physical_broken"), true)
-		helpers.assert_eq(physical.is_namespace("cmd_1"), false)
+		helpers.assert_eq(physical.is_namespace("primary_1"), false)
 		helpers.assert_eq(physical.is_namespace(nil), false)
 	end)
 	for _, action in ipairs({ "run_program", "open_url" }) do
@@ -477,8 +477,8 @@ helpers.describe("parameter transaction keeps physical assignments with their sc
 							files = { read_with_status = port("source") },
 							gestures = { set_action_parameter = port("parameter"), get_all_action_parameters = port("source") },
 						})
-						local binding = route == "binding" and "keyboard__" .. slot or "keyboard__cmd_1"
-						local key = route == "mutation" and slot or "cmd_1"
+						local binding = route == "binding" and "keyboard__" .. slot or "keyboard__primary_1"
+						local key = route == "mutation" and slot or "primary_1"
 						local called, committed = pcall(owner.apply, binding, action,
 							action == "run_program" and SCALAR or "https://example.com", {
 								section = "shortcuts.keyboard", key = key,

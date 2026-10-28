@@ -12,9 +12,9 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Data-only steps, read at runtime with the driver's own TOML reader. A
-;    step is a list of ops from a closed set (rename, move_section, merge_into,
-;    map_value, delete, set_if_absent) and this file holds their only Windows
-;    semantics. The corpus under _shared/tests/corpus/config_migrations is
+;    step is a list of ops from a closed set (rename, rename_prefix,
+;    move_section, merge_into, map_value, wrap_value, delete, set_if_absent)
+;    and this file holds their only Windows semantics. The corpus under _shared/tests/corpus/config_migrations is
 ;    replayed here, by the Lua engine and by the JS reference, so the three
 ;    cannot drift; _shared/tests/corpus/config_migration_registries pins which
 ;    registries all three accept.
@@ -59,12 +59,14 @@ ConfigMigrateRegistryPath() {
 _ConfigMigrateOpFields() {
 	static Fields := Map(
 		"rename", [["section", "key"], ["to_section", "to_key"]],
+		"rename_prefix", [["section", "prefix", "to_prefix"], []],
 		"copy_if_absent", [["section", "key"], ["to_section", "to_key"]],
 		"move_ergopti_variant", [["section", "key", "to_key", "base_key", "alt_gr_key", "source_key", "false_variant", "true_variant"], ["neutral_variant"]],
 		"move_chord_action", [["section", "key", "to_section", "action", "conditional_key", "disabled_action", "platform"], []],
 		"move_section", [["section", "to_section"], []],
 		"merge_into", [["section", "to_section"], []],
 		"map_value", [["section", "key", "map"], []],
+		"wrap_value", [["section", "key", "to_key"], []],
 		"delete", [["section"], ["key"]],
 		"set_if_absent", [["section", "key", "value"], []]
 	)
@@ -129,6 +131,14 @@ _ConfigMigrateValidateOp(Op, Where) {
 	}
 	if ((Op["op"] == "rename" || Op["op"] == "copy_if_absent") && !Op.Has("to_section") && !Op.Has("to_key"))
 		throw Error(Where . ": " . Op["op"] . " needs to_section or to_key")
+	if Op["op"] == "rename_prefix" {
+		if !_ConfigMigrateIsBareKey(Op["prefix"]) || !_ConfigMigrateIsBareKey(Op["to_prefix"])
+			throw Error(Where . ": 'prefix' and 'to_prefix' must be bare key text")
+		; A prefix that extends the other would match a renamed key again on replay.
+		if SubStr(Op["prefix"], 1, StrLen(Op["to_prefix"])) == Op["to_prefix"]
+				|| SubStr(Op["to_prefix"], 1, StrLen(Op["prefix"])) == Op["prefix"]
+			throw Error(Where . ": rename_prefix prefixes must not extend each other")
+	}
 	if Op["op"] == "move_ergopti_variant" {
 		for Field in ["base_key", "alt_gr_key", "source_key", "false_variant", "true_variant"] {
 			if !_ConfigMigrateIsBareKey(Op[Field])
@@ -263,6 +273,16 @@ ConfigMigrateLoadRegistry(Path) {
 	Source := FSReadUtf8Exact(Path)
 	if !(Source is String)
 		throw Error("the registry '" . Path . "' could not be read")
+	; The shipped registry was validated from source text with a known SHA-256. The same
+	; text needs no second 38 KB parse (about 0.5 s per boot): an independent copy of that
+	; validated registry is exactly what parsing it would give. Any other content, a
+	; changed or invalid file, is parsed and validated as before; a removed file threw above.
+	Held := ConfigRegistryPristineFor(Path, CryptoSha256(Source))
+	if Held is Map {
+		PerfCount("config_migrate.registry_source_hash_match")
+		return Held
+	}
+	PerfCount("config_migrate.registry_source_parsed")
 	return ConfigMigrateValidateRegistry(_ConfigMigrateParse(Source, "the registry '" . Path . "'"))
 }
 
@@ -374,6 +394,32 @@ _ConfigMigrateMove(Model, Section, Key, ToSection, ToKey) {
 	}
 	try LoggerInfo("ConfigMigrate", "[{1}] {2} already holds a value; the old [{3}] {4} is dropped.",
 		ToSection, ToKey, Section, Key)
+}
+
+; Renames every key of one section that starts with a prefix, keeping the
+; remainder. A renamed key that would land on an occupied key or namespace
+; refuses the whole migration before any key moves: the two values cannot
+; both survive, and dropping either would lose a user's setting unseen.
+_ConfigMigrateRenamePrefix(Model, Op) {
+	Section := Op["section"]
+	if !Model.Has(Section)
+		return
+	Entries := Model[Section]
+	Prefix := Op["prefix"]
+	Moves := []
+	for Key in _ConfigMigrateKeys(Entries) {
+		if !(SubStr(Key, 1, StrLen(Prefix)) == Prefix)
+			continue
+		Target := Op["to_prefix"] . SubStr(Key, StrLen(Prefix) + 1)
+		if !_ConfigMigrateCopyDestinationAbsent(Model, Section, Target)
+			throw ConfigMigratePrefixRefusal("Prefix rename refused: [" . Section . "] " . Key
+				. " would land on the occupied " . Target)
+		Moves.Push([Key, Target])
+	}
+	for Move in Moves {
+		Entries[Move[2]] := Entries[Move[1]]
+		Entries.Delete(Move[1])
+	}
 }
 
 ; Ancestor values and child sections occupy their whole destination namespace.
@@ -499,6 +545,8 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 			_ConfigMigrateMove(Model, Section, Op["key"], ToSection, Op.Get("to_key", Op["key"]))
 			_ConfigMigrateDropIfEmpty(Model, Section)
 			_ConfigMigrateDropIfEmpty(Model, ToSection)
+		case "rename_prefix":
+			_ConfigMigrateRenamePrefix(Model, Op)
 		case "copy_if_absent":
 			if !Model.Has(Section) || !Model[Section].Has(Op["key"])
 				return
@@ -537,6 +585,16 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 					return
 				}
 			}
+		case "wrap_value":
+			; A scalar where the manifest keeps a feature row becomes that row's
+			; switch in its own [section.key] table. A table, an array or an absent
+			; key stays, so a replay is a no-op.
+			if !Model.Has(Section) || !Model[Section].Has(Op["key"])
+				return
+			if !_ConfigMigrateIsScalar(Model[Section][Op["key"]])
+				return
+			_ConfigMigrateMove(Model, Section, Op["key"], Section . "." . Op["key"], Op["to_key"])
+			_ConfigMigrateDropIfEmpty(Model, Section)
 		case "delete":
 			if !Op.Has("key") {
 				for Name in _ConfigMigrateSectionsAtOrBelow(Model, Section)
@@ -752,7 +810,7 @@ ConfigMigratePlan(Source, Registry, Driver, Context := 0) {
 		return Plan
 	}
 	try After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, Driver, Version, Context)
-	catch ConfigMigrateVariantRefusal as Err {
+	catch ConfigMigrateVariantRefusal, ConfigMigratePrefixRefusal as Err {
 		Plan["outcome"] := "invalid"
 		Plan["detail"] := Err.Message
 		return Plan
@@ -812,7 +870,6 @@ ConfigMigrateBackupPath(FilePath, Version, Stamp) {
 ; Replaces FilePath with Candidate while it still holds exactly Source,
 ; through a verified same-directory stage. Returns "" on success, else why not.
 _ConfigMigratePublish(FilePath, Candidate, Source, AdmissionFn := 0) {
-	global _ParseTomlCache
 	static Sequence := 0
 	Sequence += 1
 	StagePath := FilePath . "." . A_ScriptHwnd . "-migration-" . Sequence . ".stage"
@@ -834,8 +891,7 @@ _ConfigMigratePublish(FilePath, Candidate, Source, AdmissionFn := 0) {
 		try FSDelete(StagePath)
 		return "the atomic replace was refused"
 	}
-	if _ParseTomlCache.Has(FilePath)
-		_ParseTomlCache.Delete(FilePath)
+	_TOML_InvalidateParseCache(FilePath)
 	return ""
 }
 
@@ -928,8 +984,10 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 			return Refuse("failed", "the file is not exact UTF-8, so it cannot be backed up byte for byte")
 		Plan := ConfigMigratePlan(Source, Registry, "ahk", Context)
 		if (Plan["outcome"] != "migrated") {
+			; A typed op refusal keeps its own named detail, as on macOS and Linux.
 			VariantInvalid := Plan["outcome"] == "invalid"
-				&& SubStr(Plan["detail"], 1, StrLen("Ergopti variant migration refused:")) == "Ergopti variant migration refused:"
+				&& (SubStr(Plan["detail"], 1, StrLen("Ergopti variant migration refused:")) == "Ergopti variant migration refused:"
+				|| SubStr(Plan["detail"], 1, StrLen("Prefix rename refused:")) == "Prefix rename refused:")
 			return Refuse(VariantInvalid ? "invalid" : "failed", Plan["detail"] != "" ? Plan["detail"]
 				: "the file changed while it was classified")
 		}
@@ -1112,7 +1170,10 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 					&& Proof.shadow == Row.registry_shadow
 				return true
 			ConfigMigrateRegistryDeepCompares += 1
-			if !SameRegistry(CurrentRegistry, Row.registry_shadow)
+			CompareStarted := PerfStage_Begin()
+			Same := SameRegistry(CurrentRegistry, Row.registry_shadow)
+			PerfStage_End("ConfigMigrate.registry_deep_compare", CompareStarted)
+			if !Same
 				return false
 			if Proof.depth
 				Proof.registry := CurrentRegistry, Proof.shadow := Row.registry_shadow
@@ -1184,6 +1245,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	if !(Request is String) || !(Request == "boot" || Request == "prepare" || Request == "prepare_owned" || Request == "settle_owned"
 			|| Request == "capture_read" || Request == "capture_write" || Request == "capture_noop" || Request == "capture_reconcile_noop" || Request == "capture_transition" || Request == "capture_recovery" || Request == "known" || Request == "check_write" || Request == "consume_read_failure" || Request == "read_only_status")
 		throw ValueError("Unknown configuration journal request")
+	PerfCount("config_migrate.request." . Request)
 	if !(FilePath is String) || FilePath == "" || !NativeLive()
 		return false
 	if Request == "prepare_owned" && (!IsSet(OwnerBundle)
@@ -1343,22 +1405,32 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		try Destinations[Key] := Row
 		finally Critical(PreviousCritical)
 		try {
-			FreshRegistry := Native.load_registry.Call(Native.registry_path.Call())
+			; The live registry loads first: that load records the pristine copy the
+			; cross-check below is matched against by source content hash.
 			Row.registry := Native.registry.Call()
+			StageTicks := PerfStage_Begin()
+			FreshRegistry := Native.load_registry.Call(Native.registry_path.Call())
+			PerfStage_End("ConfigMigrate.row_load_registry", StageTicks)
+			StageTicks := PerfStage_Begin()
 			if !SameRegistry(FreshRegistry, Row.registry)
 				throw Error("The default registry differs from its native source")
 			; Rows built from the same registry source share one private shadow,
 			; so a proof scope compares the live registry with it only once.
 			if !(SharedShadow is Map) || !SameRegistry(FreshRegistry, SharedShadow)
 				SharedShadow := Native.clone.Call(FreshRegistry)
+			PerfStage_End("ConfigMigrate.row_compare_and_shadow", StageTicks)
 			Row.registry_shadow := SharedShadow
 			if !RegistryLive(Row)
 				throw Error("The default registry does not match its native source")
+			StageTicks := PerfStage_Begin()
 			Image := ReadImage()
+			PerfStage_End("ConfigMigrate.row_read_image", StageTicks)
 			if !(Image is Object)
 				throw Error("The exact configuration source could not be classified")
 			Row.image := Image
+			StageTicks := PerfStage_Begin()
 			Row.classification := ClassifyImage(Image, Row)
+			PerfStage_End("ConfigMigrate.row_classify_image", StageTicks)
 			if Row.classification == "failed"
 				throw Error("The canonical configuration source could not be classified")
 			Row.phase := "prepared"
@@ -1614,7 +1686,11 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			&& (Present is Integer) && Present == ExpectedNoopPresent
 	}
 	if Request == "check_write"
-		return RegistryLive(Row, true) && OwnerLive() && TOML_WriteRefusal(FilePath) == ""
+		; The scope opened above holds Critical and the first check of this request already
+		; compared the live registry with its private shadow; nothing between that comparison
+		; and here runs foreign code (a native read, a parse, a lookup), so the memoised proof
+		; stands. A fresh second comparison here doubled the 21 ms cost of every admission.
+		return RegistryLive(Row) && OwnerLive() && TOML_WriteRefusal(FilePath) == ""
 	if !IsSet(Candidate)
 		return false
 	if IsSet(Candidate) {
@@ -1702,6 +1778,11 @@ ConfigSchemaAcknowledgeNoop(Path, SourceAdmission, LogicalAdmission := 0) {
 
 ; This typed refusal rejects successor readiness instead of changing helper ownership.
 class ConfigMigrateVariantRefusal extends Error {
+}
+
+; A rename_prefix target is occupied: the plan is "invalid" and the file is
+; never written, so neither of the two values is dropped.
+class ConfigMigratePrefixRefusal extends Error {
 }
 
 ; A scalar participant does not authorize an ancestor or descendant namespace.

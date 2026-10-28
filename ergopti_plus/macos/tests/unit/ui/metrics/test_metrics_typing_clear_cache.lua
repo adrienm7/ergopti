@@ -21,7 +21,7 @@ helpers.describe("typing metrics cache reset", function()
 				package.loaded["hs.json"].encode = json.encode
 				package.loaded["hs.json"].decode = json.decode
 				local source_reads = 0
-				package.loaded["modules.keylogger.log_manager"].get_sqlite_path = function()
+				package.loaded["modules.keystats.log_manager"].get_sqlite_path = function()
 					source_reads = source_reads + 1
 					return nil
 				end

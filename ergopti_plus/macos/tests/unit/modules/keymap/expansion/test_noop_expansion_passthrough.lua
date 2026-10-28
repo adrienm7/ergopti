@@ -60,7 +60,7 @@ local function load_fixture(buffer)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
-			or name == "modules.keylogger"
+			or name == "modules.keystats"
 			or name:match("^adapters%.")
 			or name == "infra.logger"
 			or name == "infra.timings"
@@ -75,11 +75,16 @@ local function load_fixture(buffer)
 	package.loaded["hs"] = hs_stub
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.timings"] = {
+		-- The hot-path profiler, loaded through the expander, reads its slow threshold.
+		ms = function(_, key)
+			assert(key == "hotpath_slow_ms", "unexpected millisecond timing " .. tostring(key))
+			return 5
+		end,
 		sec = function(_, key)
 			return key == "clipboard_restore_ms" and 0.15 or 0.08
 		end,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		notify_synthetic = function() end,
 		set_buffer = function() end,
 		log_hotstring = function() end,

@@ -34,6 +34,7 @@ local notifications = require("infra.notifications")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
+local Timings       = require("infra.timings")
 local Logger        = require("infra.logger")
 local Keycodes      = require("infra.keycodes")
 local i18n          = require("infra.i18n")
@@ -41,8 +42,11 @@ local i18n          = require("infra.i18n")
 local Engine    = require("modules.gestures.engine")
 local GestActions = require("modules.gestures.actions")
 local KeyState  = require("adapters.key_state")
+local KeyEventHealth = require("infra.key_event_health")
 local ScriptChords = require("script_chords")
 local ChordCatalogue = require("infra.script_chord_catalogue")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "shortcuts.script_control"
 
@@ -56,7 +60,7 @@ local LOG = "shortcuts.script_control"
 -- ====================================
 -- ====================================
 
-local SCRIPT_CONTROL_SHORTCUT_CLAIM = "script_control"
+local SCRIPT_CONTROL_SHORTCUT_CLAIM = ConfigKeys.LEAF.SCRIPT_CONTROL
 
 -- Sentinel keycode -> script chord slot, built at the first key event.
 -- Karabiner's script-control rules (platform/remap/script_chord_rules.lua)
@@ -103,7 +107,7 @@ M.BINDING_PREFIX = "script__"
 -- osascript on that run loop (e.g. the pause/resume layout switch) can trip it.
 -- A disabled tap silently stops delivering events, stranding the un-pause
 -- shortcut, so a watchdog re-enables it on this interval as a hard safety net.
-local TAP_WATCHDOG_INTERVAL_SEC = 2
+local TAP_WATCHDOG_INTERVAL_SEC = Timings.sec("ui", "script_control_tap_watchdog_interval_ms")
 
 -- Module-level state
 local _is_paused       = false
@@ -167,7 +171,7 @@ local _pause_rollback_debt_steps = nil
 local _resume_rollback_debt_steps = nil
 
 --- An additive observer never replaces the existing pause-change singleton.
-local _physical_pause = require("keylogger.physical_lifecycle_observation").new("pause", function()
+local _physical_pause = require("keystats.physical_lifecycle_observation").new("pause", function()
 	return require("adapters.physical_observation_clock").now()
 end, function(reason) Logger.error(LOG, "Physical pause observer retired: %s.", tostring(reason)) end)
 
@@ -881,21 +885,21 @@ local function resume_all()
 	-- pinned to whatever was frontmost when the pause began. Re-sync here rather than
 	-- weakening the pause guard, so « pause = tout éteint » still holds exactly.
 	-- Lazy require, like the two warmup drivers above: script_control is not wired to
-	-- the keylogger module and does not need to be for a one-shot resume call.
+	-- the keystats module and does not need to be for a one-shot resume call.
 	-- This one-shot refresh is deliberately best-effort: metrics OFF leaves the
-	-- keylogger uninitialized, and resync_context() then returns false even though
+	-- keystats uninitialized, and resync_context() then returns false even though
 	-- resume is otherwise valid. It activates nothing and therefore needs no inverse.
-	local ok_kl, kl = pcall(require, "modules.keylogger")
+	local ok_kl, kl = pcall(require, "modules.keystats")
 	if not ok_kl then
 		Logger.warn(LOG, "Optional resume operation failed without blocking activation: %s.",
-			"require(modules.keylogger) raised: " .. tostring(kl))
+			"require(modules.keystats) raised: " .. tostring(kl))
 		kl = nil
 	end
 	if kl and type(kl.resync_context) == "function" then
 		local ok_resync, resync_result = xpcall(kl.resync_context, debug.traceback)
 		if not ok_resync or resync_result == false then
 			Logger.warn(LOG,
-				"Optional resume operation keylogger.resync_context failed without blocking activation: %s.",
+				"Optional resume operation keystats.resync_context failed without blocking activation: %s.",
 				tostring(resync_result))
 		end
 	end
@@ -1445,10 +1449,10 @@ local function dispatch_action(action, binding)
 	return true
 end
 
---- Logs a shortcut activation via the keylogger if available.
+--- Logs a shortcut activation via the keystats if available.
 --- @param label string Human-readable shortcut label for the log.
 local function log_shortcut_if_available(label)
-	local ok_kl, kl = pcall(require, "modules.keylogger")
+	local ok_kl, kl = pcall(require, "modules.keystats")
 	if ok_kl and kl and type(kl.log_shortcut) == "function" then
 		local app = hs.application.frontmostApplication()
 		Logger.callback(LOG, "Shortcut telemetry", kl.log_shortcut,
@@ -1467,7 +1471,7 @@ local function slot_runs(slot_id, paused)
 	return ScriptChords.runs(ChordCatalogue.get(), actions[slot_id], chords_on, paused)
 end
 
---- The keylogger label of a slot's chord ("Alt+Enter"), stable across the
+--- The keystats label of a slot's chord ("Alt+Enter"), stable across the
 --- slot's action so the dashboard groups every press of the chord.
 --- @param slot_id string
 --- @return string label
@@ -1493,7 +1497,7 @@ end
 --- @return boolean True to consume the keystroke, false to pass it through.
 local function handle_key(e)
 	local provenance, status, fence = EventProvenance.classify_with_fence(
-		e, "shortcuts.script_control")
+		e, ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL)
 	local fence_events = fence and fence.events or nil
 	local function finish(consume) return consume == true, fence_events end
 	if fence and fence.consume_original == true then return finish(true) end
@@ -1541,6 +1545,8 @@ local function handle_key(e)
 			defer_rejected_sentinel(sentinel_slot, code)
 			return finish(false)
 		end
+		-- A chord seen after the main thread held the tap is not acted on late.
+		if KeyEventHealth.passes_late_event(e) then return finish(false) end
 		return finish(defer_dispatch("Script chord sentinel (" .. sentinel_slot .. ") — dispatching '%s'.",
 			sentinel_slot))
 	end
@@ -1549,6 +1555,7 @@ local function handle_key(e)
 	if not is_right_cmd_only(e) then return finish(false) end
 	local physical_slot = physical_slots[code]
 	if physical_slot == nil or not slot_runs(physical_slot) then return finish(false) end
+	if KeyEventHealth.passes_late_event(e) then return finish(false) end
 	return finish(defer_dispatch(
 		"Right-cmd + " .. physical_slot .. " (KE-paused fallback) — dispatching '%s'.", physical_slot))
 end
@@ -1614,8 +1621,8 @@ M.PAUSE_OWNER_IDS = {
 	"warmup_controller",
 	"ollama_warmup",
 	"remote_warmup",
-	"wpm_menubar",
-	"wpm_widget",
+	ConfigKeys.COMMAND.WPM_MENUBAR,
+	ConfigKeys.COMMAND.WPM_WIDGET,
 	"remap_onboarding",
 	"predictions",
 	"tooltip",
@@ -2041,8 +2048,7 @@ function M.set_extras(tbl)
 		return
 	end
 	_extras = tbl
-	local count = 0
-	for _ in pairs(tbl) do count = count + 1 end
+	local count = TableUtil.count(tbl)
 	Logger.debug(LOG, "Extras table registered (%d handler(s)).", count)
 end
 

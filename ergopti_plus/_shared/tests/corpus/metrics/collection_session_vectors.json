@@ -1,0 +1,82 @@
+{
+	"contract": "docs/design/metrics-suspend-and-reset-session.md",
+	"description": "Operation sequences every driver replays against its keystats module. Operations: type records one ordinary keystroke; suspend and resume are the user's metrics pause; secure_on and secure_off are the secure-field privacy flag; reset is the session reset. Assertions: recorded is true when the preceding type was counted, suspended is the pause state, session_keystrokes is the live session count, and reset_applied is whether the reset ran.",
+	"vectors": [
+		{
+			"id": "suspend_blocks_recording_until_resume",
+			"ops": [
+				{ "op": "type", "recorded": true },
+				{ "op": "suspend" },
+				{ "op": "type", "recorded": false },
+				{ "op": "resume" },
+				{ "op": "type", "recorded": true }
+			]
+		},
+		{
+			"id": "suspend_is_a_state_not_a_counter",
+			"ops": [
+				{ "op": "suspend" },
+				{ "op": "suspend" },
+				{ "op": "resume", "suspended": false },
+				{ "op": "type", "recorded": true }
+			]
+		},
+		{
+			"id": "leaving_a_secure_field_does_not_resume_a_pause",
+			"ops": [
+				{ "op": "suspend" },
+				{ "op": "secure_on" },
+				{ "op": "secure_off" },
+				{ "op": "type", "recorded": false },
+				{ "op": "resume" },
+				{ "op": "type", "recorded": true }
+			]
+		},
+		{
+			"id": "resuming_does_not_clear_a_secure_field",
+			"ops": [
+				{ "op": "secure_on" },
+				{ "op": "suspend" },
+				{ "op": "resume" },
+				{ "op": "type", "recorded": false },
+				{ "op": "secure_off" },
+				{ "op": "type", "recorded": true }
+			]
+		},
+		{
+			"id": "a_secure_field_never_reports_a_pause",
+			"ops": [
+				{ "op": "secure_on", "suspended": false },
+				{ "op": "secure_off", "suspended": false }
+			]
+		},
+		{
+			"id": "reset_zeroes_the_live_session_count",
+			"ops": [
+				{ "op": "type", "recorded": true },
+				{ "op": "type", "recorded": true },
+				{ "op": "reset", "reset_applied": true, "session_keystrokes": 0 },
+				{ "op": "type", "recorded": true, "session_keystrokes": 1 }
+			]
+		},
+		{
+			"id": "reset_keeps_the_pause",
+			"ops": [
+				{ "op": "suspend" },
+				{ "op": "reset", "reset_applied": true, "suspended": true },
+				{ "op": "type", "recorded": false },
+				{ "op": "resume", "suspended": false }
+			]
+		},
+		{
+			"id": "reset_keeps_a_secure_field",
+			"ops": [
+				{ "op": "secure_on" },
+				{ "op": "reset", "reset_applied": true },
+				{ "op": "type", "recorded": false },
+				{ "op": "secure_off" },
+				{ "op": "type", "recorded": true }
+			]
+		}
+	]
+}

@@ -13,8 +13,8 @@ local root=assert(uv.fs_mkdtemp("/tmp/ergopti-cache-independent-XXXXXX"))
 for _, name in ipairs({"CONFIG","DATA","CACHE","STATE"}) do assert(uv.os_setenv("XDG_"..name.."_HOME",root.."/"..name:lower())) end
 assert(uv.fs_mkdir(root.."/config",448)); assert(uv.fs_mkdir(root.."/config/ergopti",448))
 local config=assert(io.open(root.."/config/ergopti/config.toml","w")); assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local K=require("modules.keylogger.keylogger")
-local W=require("modules.keylogger.sqlite_writer")
+local K=require("modules.keystats.keystats")
+local W=require("modules.keystats.sqlite_writer")
 K.init({sqlite_path=root.."/metrics.sqlite",log_dir=root.."/logs"})
 assert(K.is_enabled() and W.is_available())
 K.record_synthetic_output("owned-cache","abc","llm",1000); require("tests.support.sqlite_flush_native").flush(K)
@@ -49,7 +49,9 @@ for _,tbl in ipairs({"agg_app_day","agg_app_day_errors","agg_app_day_session"}) 
  checks=checks+1
  local ok,err=xpcall(function()
   if tbl=="agg_app_day" then
-   assert(result==nil and reason=="SQLite projection unavailable","unreadable categories must refuse the complete public dashboard")
+   -- Categories live in the app category file, so a hidden SQLite table only degrades the manifest.
+   assert(type(result)=="table" and reason==nil and partial~=nil,"a hidden primary table must keep the partial public manifest")
+   assert((partial.llm_chars or 0)==0,"a hidden primary table must not report accepted software chars")
   else
    assert(type(result)=="table" and reason==nil and partial~=nil,"derived refusal must preserve the independently available partial manifest")
    assert(partial.llm_chars==3,"derived refusal lost the independently stored software chars")

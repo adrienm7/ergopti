@@ -1,0 +1,49 @@
+{
+	"_comment": "Diversity temperature of one variant of a sequential multi-prediction, replayed through _shared/lua/llm/temperature.lua by the macOS (modules/llm/api_common.lua) and Linux (modules/llm/inference.lua) runners. The policy is a fixture with the shape of the diversity_temperature section of _shared/modules/llm/inference.json, chosen apart from the shipped tuning so a tuning change never edits these vectors. The step is step_when_base_le_0_15 for a base at or below 0.15, step_when_base_le_0_35 at or below 0.35 and step_default above, unless a vector gives one; from the second variant a base below effective_base_floor is raised to it; the result is clamped at max_temperature. An omitted step means the base chooses it. Compare with a tolerance of 1e-9. The AutoHotkey twin (LLM_ApiCommon_GetDiversityTemp) does not replay this file yet, and reads an explicit step of 0 as no step, which is why no vector passes 0.",
+	"policy": {
+		"step_when_base_le_0_15": 0.3,
+		"step_when_base_le_0_35": 0.2,
+		"step_default": 0.1,
+		"effective_base_floor": 0.25,
+		"max_temperature": 1.0
+	},
+	"vectors": [
+		{ "id": "first_variant_keeps_a_low_base", "base": 0.1, "index": 1, "expected": 0.1 },
+		{
+			"id": "second_variant_raises_a_low_base_to_the_floor",
+			"base": 0.1,
+			"index": 2,
+			"expected": 0.55
+		},
+		{ "id": "low_step_includes_0_15", "base": 0.15, "index": 2, "expected": 0.55 },
+		{ "id": "medium_step_above_0_15", "base": 0.16, "index": 2, "expected": 0.45 },
+		{ "id": "medium_step_includes_0_35", "base": 0.35, "index": 2, "expected": 0.55 },
+		{ "id": "default_step_above_0_35", "base": 0.36, "index": 2, "expected": 0.46 },
+		{ "id": "base_at_the_floor_is_kept", "base": 0.25, "index": 2, "expected": 0.45 },
+		{ "id": "third_variant_takes_two_steps", "base": 0.5, "index": 3, "expected": 0.7 },
+		{ "id": "zero_base_first_variant", "base": 0, "index": 1, "expected": 0 },
+		{
+			"id": "zero_base_third_variant_starts_at_the_floor",
+			"base": 0,
+			"index": 3,
+			"expected": 0.85
+		},
+		{ "id": "late_variant_clamps_at_the_maximum", "base": 0.5, "index": 10, "expected": 1.0 },
+		{ "id": "first_variant_above_the_maximum_clamps", "base": 1.2, "index": 1, "expected": 1.0 },
+		{
+			"id": "explicit_step_replaces_the_base_choice",
+			"base": 0.1,
+			"index": 2,
+			"step": 0.05,
+			"expected": 0.3
+		},
+		{
+			"id": "explicit_step_leaves_the_first_variant",
+			"base": 0.1,
+			"index": 1,
+			"step": 0.5,
+			"expected": 0.1
+		},
+		{ "id": "explicit_step_still_clamps", "base": 0.6, "index": 4, "step": 0.3, "expected": 1.0 }
+	]
+}

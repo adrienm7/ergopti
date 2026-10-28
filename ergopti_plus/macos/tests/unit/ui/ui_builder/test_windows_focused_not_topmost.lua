@@ -353,7 +353,7 @@ local function load_error_dialog(view, app)
 		DRIVER = "macos",
 		config = function()
 			return {
-				redaction = { home_placeholder = "~", account_placeholder = "<user>", secret_placeholder = "<secret>",
+				redaction = { home_placeholder = "~", account_placeholder = "<user>", secret_placeholder = "<secret>", email_placeholder = "<email>", foreign_home_markers = {}, shared_profile_names = {}, path_name_max_words = 3, config_placeholder = "<config>", config_name_placeholder = "<name>", config_known_names = {},
 					min_account_name_length = 3, token_prefixes = {}, bearer_min_length = 8, secret_keys = {},
 					secret_value_min_length = 6 },
 				templates = {}, repository = {},
@@ -389,7 +389,7 @@ helpers.describe("ui-focus-not-topmost: error window (macOS)", function()
 			local app = { activations = 0 }
 			local dialog, timers = load_error_dialog(view, app)
 			helpers.assert_true(dialog.init(), "the shipped policy must load")
-			dialog.on_error("keylogger", "Flush failed", "Flush failed")
+			dialog.on_error("keystats", "Flush failed", "Flush failed")
 			helpers.assert_eq(#timers, 1, "the window opens on its timer")
 			timers[1]()
 			helpers.assert_eq(calls.shows, 1, "the error window is shown")

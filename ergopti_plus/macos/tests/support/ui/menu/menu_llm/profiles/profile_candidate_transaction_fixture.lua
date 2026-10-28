@@ -91,6 +91,8 @@ local function with_fixture(options, body)
 		local timer_sequence = 0
 		local editor_calls = {}
 		local editor_open_count = 0
+		local editor_reentry = nil
+		local editor_reentrant_results = {}
 		local notification_count = 0
 		local shortcut_prompt_count = 0
 		local shortcut_apply_count = 0
@@ -233,6 +235,11 @@ local function with_fixture(options, body)
 					return result
 				end
 				if options.editor_update then
+					if options.editor_reentrant_callback then
+						editor_reentry = function()
+							return callback(options.editor_duplicate_update or options.editor_update)
+						end
+					end
 					if options.before_clone_editor_save then options.before_clone_editor_save() end
 					local result = callback(options.editor_update)
 					if options.before_clone_editor_save then options.clone_save_result = result end
@@ -309,6 +316,11 @@ local function with_fixture(options, body)
 		local preferences = {
 			save = function()
 				save_count = save_count + 1
+				if editor_reentry then
+					local reenter = editor_reentry
+					editor_reentry = nil
+					editor_reentrant_results[#editor_reentrant_results + 1] = reenter()
+				end
 				local outcome = table.remove(save_plan, 1) or {mode = "ok"}
 				if outcome.mode == "throw" then error("preference save refused", 0) end
 				if outcome.mode == "false" then return false end
@@ -450,6 +462,7 @@ local function with_fixture(options, body)
 			durable = function() return durable end,
 			editor_calls = editor_calls,
 			editor_open_count = function() return editor_open_count end,
+			editor_reentrant_results = editor_reentrant_results,
 			fire_timer = fire_timer,
 			get_runtime_profile = get_runtime_profile,
 			keymap_display_calls = keymap_display_calls,

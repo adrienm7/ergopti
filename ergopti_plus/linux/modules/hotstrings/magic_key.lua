@@ -35,12 +35,13 @@ local Preferences = require("infra.hotstring_preferences")
 local ManifestReader = require("infra.manifest_reader")
 local Terminators = require("keymap.terminators")
 local ConfigOutdated = require("config_outdated")
+local ConfigKeys = require("config_keys")
 
 local LOG = "magic_key"
 
 -- The canonical leaf the user's choice lives in and the manifest path its
 -- default comes from: one name, so the reader and the writer cannot drift apart.
-local MANIFEST_PATH = "hotstrings.trigger_char"
+local MANIFEST_PATH = ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR
 
 -- Set by M.init, so a change can rebuild the menu and re-register the dynamic
 -- rules that bake the character into their triggers.

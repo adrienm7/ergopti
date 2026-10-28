@@ -265,7 +265,7 @@ end)
 -- ===============================================================
 
 --- The event `on_trigger` hands back is what the daemon forwards to
---- `keylogger.record_hotstring`, whose seventh parameter decides whether the
+--- `keystats.record_hotstring`, whose seventh parameter decides whether the
 --- per-character synthetic record keeps the text or a placeholder. The daemon
 --- passed nothing there for the whole life of this driver, so every @-tag
 --- expansion — the single-letter ones included — persisted its resolved value
@@ -281,7 +281,7 @@ helpers.describe("dynamic expansion events carry the privacy verdict", function(
 			helpers.assert_true(fired, "'@p\\\\' must fire — the fixture maps 'p' to a filled field")
 			helpers.assert_true(event ~= nil, "a fired expansion returns its event")
 			helpers.assert_true(event.is_private == true,
-				"'@p' resolves first_name out of personal_info.toml, so the keylogger must "
+				"'@p' resolves first_name out of personal_info.toml, so the keystats must "
 					.. "receive a placeholder per character rather than the value")
 		end)
 	end)

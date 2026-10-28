@@ -17,13 +17,12 @@
 ; torn down at the start of every suspend: CapsWordEnabled is cleared, the mouse
 ; listeners are unregistered, and UpdateCapsLockLED() corrects the LED.
 ;
-; This test asserts:
-;   1. Ergopti_OnSuspendEnter calls DisableCapsWord() (with IsSet guard).
-;   2. DisableCapsWord resets CapsWordEnabled to False.
-;   3. DisableCapsWord calls HookDispatcher.Unregister for the mouse-down events.
-;   4. DisableCapsWord calls UpdateCapsLockLED to sync the physical LED.
+; This test asserts that Ergopti_OnSuspendEnter calls DisableCapsWord() with an IsSet
+; guard. What DisableCapsWord then does (clears the flag, disarms the listeners,
+; corrects the LED) is pinned by behaviour in
+; unit/modules/shortcuts/test_capsword_state.ahk.
 ;
-; SCOPE: source introspection of infra/lifecycle.ahk and modules/shortcuts/capsword.ahk.
+; SCOPE: source introspection of infra/lifecycle.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -79,48 +78,3 @@ _CWRS_SuspendEnterIsSetGuardPresent() {
 
 Test("lifecycle: DisableCapsWord call in suspend enter is IsSet-guarded (capsword-reset-on-suspend)",
 	_CWRS_SuspendEnterIsSetGuardPresent)
-
-
-_CWRS_DisableCapsWordResetsCapsWordEnabled() {
-	Src := _CWRS_ReadCapswordSrc()
-	Assert(Src != "", "modules/shortcuts/ source must be readable")
-
-	Body := _DriverFuncBody("DisableCapsWord")
-	Assert(Body != "", "DisableCapsWord must be defined in modules/shortcuts/capsword.ahk")
-
-	Assert(InStr(Body, "CapsWordEnabled") > 0 and InStr(Body, "False") > 0,
-		"DisableCapsWord must set CapsWordEnabled to False — the global flag that HotIf predicates read to decide whether to pass CapsWord keystrokes (AHK-16)")
-}
-
-Test("capsword: DisableCapsWord resets CapsWordEnabled to False (capsword-reset-on-suspend)",
-	_CWRS_DisableCapsWordResetsCapsWordEnabled)
-
-
-_CWRS_DisableCapsWordUnregistersMouseListeners() {
-	Body := _DriverFuncBody("DisableCapsWord")
-	Assert(Body != "", "DisableCapsWord must be defined — prerequisite for this test")
-
-	Assert(InStr(Body, "CapsWordAutoOffDisarm()") > 0,
-		"DisableCapsWord must disarm the CapsWord auto-off listeners — listeners that are not unregistered keep firing through Suspend and prevent other HookDispatcher subscribers from receiving the events cleanly (AHK-16)")
-	Disarm := _DriverFuncBody("CapsWordAutoOffDisarm")
-	Assert(Disarm != "", "CapsWordAutoOffDisarm must be defined")
-	Assert(InStr(Disarm, "HookDispatcher.Unregister") > 0,
-		"CapsWordAutoOffDisarm must call HookDispatcher.Unregister for every armed listener (AHK-16)")
-	Assert(InStr(Disarm, '["idle"], 0)') > 0 && InStr(Disarm, '["motion"], 0)') > 0,
-		"CapsWordAutoOffDisarm must stop the delay and pointer-motion timers, which also bypass native Suspend")
-}
-
-Test("capsword: DisableCapsWord unregisters mouse-down listeners via HookDispatcher (capsword-reset-on-suspend)",
-	_CWRS_DisableCapsWordUnregistersMouseListeners)
-
-
-_CWRS_DisableCapsWordUpdatesLED() {
-	Body := _DriverFuncBody("DisableCapsWord")
-	Assert(Body != "", "DisableCapsWord must be defined — prerequisite for this test")
-
-	Assert(InStr(Body, "UpdateCapsLockLED") > 0,
-		"DisableCapsWord must call UpdateCapsLockLED() — without this the hardware CapsLock LED stays lit while the driver is suspended, falsely signalling that CapsLock is active (AHK-16)")
-}
-
-Test("capsword: DisableCapsWord calls UpdateCapsLockLED to correct the hardware LED (capsword-reset-on-suspend)",
-	_CWRS_DisableCapsWordUpdatesLED)

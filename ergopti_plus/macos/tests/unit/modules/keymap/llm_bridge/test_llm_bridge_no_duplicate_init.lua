@@ -34,7 +34,7 @@ local STUB_MODULES = {
 	"infra.text_utils",
 	"modules.llm",
 	"infra.keycodes",
-	"modules.keylogger",
+	"modules.keystats",
 	"ui.tooltip",
 	"modules.llm.prediction_engine",
 	"modules.keymap.registry",
@@ -94,8 +94,8 @@ package.loaded["infra.keycodes"] = {
 	to_name            = function(_) return "f16" end,
 }
 
--- modules.keylogger: no-op stub.
-package.loaded["modules.keylogger"] = {
+-- modules.keystats: no-op stub.
+package.loaded["modules.keystats"] = {
 	log_hotstring_suggested = function() end,
 	log_hotstring_dismissed = function() end,
 	log_llm_accepted        = function() end,
@@ -145,6 +145,7 @@ local engine_stub = {
 	set_llm_min_words             = function() end,
 	set_llm_max_words             = function() end,
 	set_llm_debounce              = function() end,
+	set_llm_min_request_interval  = function() end,
 	set_llm_streaming             = function() end,
 	set_llm_streaming_multi       = function() end,
 	get_llm_runtime_setting       = function() return false, nil end,
@@ -204,6 +205,7 @@ local FORWARDED_ENGINE_SETTERS = {
 	"set_llm_min_words",
 	"set_llm_max_words",
 	"set_llm_debounce",
+	"set_llm_min_request_interval",
 	"set_llm_streaming",
 	"set_llm_streaming_multi",
 }
@@ -225,6 +227,7 @@ local function make_state(sentinel)
 	local state = {
 		_sentinel        = sentinel,
 		buffer           = "",
+		llm_buffer       = "",
 		mappings         = {},
 		preview_providers = {},
 		groups           = {},

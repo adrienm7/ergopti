@@ -45,8 +45,10 @@ end
 local function fresh_engine()
 	package.loaded["infra.logger"] = Logger
 	package.loaded["modules.gestures.engine"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
 	local engine = helpers.load_with_stubs("modules.gestures.engine")
 	_G.hs.timer.secondsSinceEpoch = function() return current_time end
+	_G.hs.timer.absoluteTime = function() return current_time * 1e9 end
 	return engine
 end
 

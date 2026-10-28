@@ -33,6 +33,10 @@ local LOG = "modules.llm.api_ollama"
 local Timings = require("infra.timings")
 local HttpClient = require("adapters.http_client")
 local LocalModelPolicy = require("llm.local_model_policy")
+local Json = require("json")
+
+-- The warmup's HTTP owner: a prediction's own request never waits for it.
+local WARMUP_OWNER = "ollama_model_warmup"
 
 
 -- =========================================
@@ -156,7 +160,7 @@ local function finish_request(request, err)
 	local terminal_epoch = _request_epoch
 	local admitted = runtime_current(request)
 	if admitted and terminal_epoch == _request_epoch and type(request.on_done) == "function" then
-		local ok, callback_err = pcall(request.on_done, request.full_text, err)
+		local ok, callback_err = pcall(request.on_done, request.full_text, err, request.usage)
 		if not ok then Logger.error(LOG, "chat(): terminal callback raised — %s", tostring(callback_err)) end
 	end
 end
@@ -173,6 +177,11 @@ local function consume_line(request, line)
 	if request.done_seen then request.stream_error = "Ollama returned a record after its terminal marker"; return end
 	if type(record.done) ~= "boolean" then request.stream_error = "Invalid Ollama terminal marker"; return end
 	request.done_seen = record.done
+	if record.done == true then
+		-- The counts the server reports for this request, for the metrics
+		local prompt, completion = tonumber(record.prompt_eval_count), tonumber(record.eval_count)
+		if prompt and completion then request.usage = { prompt_tokens = prompt, completion_tokens = completion } end
+	end
 	if content and request_current(request) then
 		request.full_text = request.full_text .. content
 		if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
@@ -236,18 +245,19 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 		messages = messages,
 		stream = stream,
 		keep_alive = OLLAMA_KEEP_ALIVE,
+		-- Windows and macOS disable thinking in the request; stripping the trace
+		-- afterwards would still pay its tokens and latency.
+		think = false,
+		options = { thinking_budget = 0 },
 	}
 	if type(options.temperature) == "number" then
-		payload.options = payload.options or {}
 		payload.options.temperature = options.temperature
 	end
 	if type(options.max_tokens) == "number" then
-		payload.options = payload.options or {}
 		payload.options.num_predict = options.max_tokens
 	end
 	local stop = stop_for(options.line_mode)
 	if stop then
-		payload.options = payload.options or {}
 		payload.options.stop = stop
 	end
 
@@ -309,6 +319,35 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 		end, runtime_receipt)
 	end
 	return dispatch()
+end
+
+--- Asks Ollama to load a model and keep it for the keep-alive window without
+--- generating anything: a chat request with no message only loads the weights.
+--- Its own HTTP owner, so it never cancels or waits for a prediction.
+--- @param base_url string Ollama origin.
+--- @param model string Ollama-native tag.
+--- @param runtime_receipt table|nil The engine's runtime receipt the target was read with.
+--- @param on_done function Receives (loaded, failure): a string, or the missing-model failure.
+--- @return table operation Owned transport; `started` is false when refused before sending.
+function M.warmup(base_url, model, runtime_receipt, on_done)
+	local response = { runtime_engine = ResponseEngine, runtime_capture = ResponseCapture,
+		runtime_current = ResponseCurrent, runtime_receipt = runtime_receipt, origin = base_url }
+	local url = bridge_mod.ollama_endpoint(base_url, "chat")
+	if type(on_done) ~= "function" or type(model) ~= "string" or model == "" or not url
+		or not runtime_current(response) then
+		return { started = false }
+	end
+	local body = json_encode({ model = model, messages = Json.array({}), stream = false, keep_alive = OLLAMA_KEEP_ALIVE })
+	Logger.debug(LOG, "warmup() → %s (model=%s)", url, model)
+	return HttpClient.post_stream_owned(url, { ["Content-Type"] = "application/json" }, body, {
+		owner = WARMUP_OWNER, timeout_ms = Timings.ms("llm", "warmup_post_timeout_ms"),
+		authorized = function() return runtime_current(response) end,
+	}, function() end, function(result)
+		if not runtime_current(response) then return end
+		if type(result) == "table" and result.ok == true then on_done(true); return end
+		on_done(false, LocalModelPolicy.response_failure(result, base_url)
+			or (type(result) == "table" and type(result.error) == "string" and result.error) or "HTTP transport failed")
+	end)
 end
 
 --- Cancels the in-flight request and publishes one terminal cancellation.

@@ -14,6 +14,7 @@ local i18n   = require("infra.i18n")
 local Logger = require("infra.logger")
 local SendInput = require("send_input")
 local NativePresentation = require("infra.native_presentation")
+local TextUtils = require("text_utils")
 local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 
 local LOG = "menu.shortcut_utils"
@@ -35,20 +36,10 @@ local VALID_MODS = {
 	shift = true,
 }
 
-local MOD_ORDER = {
-	shift = 1,
-	cmd = 2,
-	alt = 3,
-	ctrl = 4,
-}
+local MOD_BEFORE = require("menu.row_order").comparator("menu_chord_modifiers")
 
 local function sort_modifiers(mods)
-	table.sort(mods, function(a, b)
-		local oa = MOD_ORDER[a] or 99
-		local ob = MOD_ORDER[b] or 99
-		if oa == ob then return a < b end
-		return oa < ob
-	end)
+	table.sort(mods, MOD_BEFORE)
 end
 
 
@@ -68,13 +59,13 @@ end
 --- @return table|nil Normalized shortcut table or nil when invalid.
 function M.normalize_shortcut(mods, key, default_mods)
 	if type(key) ~= "string" then return nil end
-	local clean_key = key:match("^%s*(.-)%s*$")
+	local clean_key = TextUtils.trim(key)
 	if clean_key == "" then return nil end
 
 	local seen = {}
 	local out_mods = {}
 	for _, m in ipairs(type(mods) == "table" and mods or {}) do
-		local mod = tostring(m):lower():match("^%s*(.-)%s*$")
+		local mod = TextUtils.trim(tostring(m):lower())
 		if mod == "option" then mod = "alt" end
 		if mod == "control" then mod = "ctrl" end
 		if VALID_MODS[mod] and not seen[mod] then
@@ -104,7 +95,7 @@ end
 --- @return table|nil Parsed shortcut.
 function M.parse_shortcut_input(raw, default_mods)
 	if type(raw) ~= "string" then return nil end
-	local normalized = raw:match("^%s*(.-)%s*$"):lower()
+	local normalized = TextUtils.trim(raw):lower()
 	if normalized == "" then return nil end
 
 	local parts = {}
@@ -189,7 +180,7 @@ end
 --- @return string|nil reason Existing translated native-runner availability reason.
 function M.program_assignment_reason(value)
 	local checked, reserved = pcall(function()
-		local parsed = require("program_parameter").parse(value, "hs")
+		local parsed = require("program_parameter").parse(value, "posix")
 		if not parsed then return false end
 		local Native = require("adapters.apple_shortcuts_native")
 		return Native.is_chosen_program(parsed.executable, parsed.arguments)
@@ -249,14 +240,15 @@ function M.prompt_shortcut(opts)
 	local current = M.shortcut_to_config_string(opts.current_shortcut)
 	local prompt = dialog.text_prompt
 	local cancel_label = i18n.get("common.cancel")
+	local ok_label = i18n.get("button.ok")
 	if receipt ~= nil then
 		title = NativePresentationTitle(receipt)
 		if title == nil then return false end
 	end
-	local ok_prompt, button, raw = pcall(prompt, title, message, current, "OK", cancel_label)
-	if not ok_prompt or button ~= "OK" or type(raw) ~= "string" then return false end
+	local ok_prompt, button, raw = pcall(prompt, title, message, current, ok_label, cancel_label)
+	if not ok_prompt or button ~= ok_label or type(raw) ~= "string" then return false end
 
-	local cleaned = raw:match("^%s*(.-)%s*$")
+	local cleaned = TextUtils.trim(raw)
 	if cleaned == "" then
 		return apply_prompt_update(opts.on_apply, nil, nil)
 	end
@@ -266,7 +258,7 @@ function M.prompt_shortcut(opts)
 		return apply_prompt_update(opts.on_apply, parsed.mods, parsed.key)
 	end
 
-	pcall(dialog.alert, i18n.get("shortcut_utils.format_invalid"), i18n.get("shortcut_utils.format_hint"))
+	pcall(dialog.block_alert, i18n.get("shortcut_utils.format_invalid"), i18n.get("shortcut_utils.format_hint"), i18n.get("button.ok"))
 	return false
 end
 
@@ -370,7 +362,7 @@ local function prompt_action_parameter(gestures, binding, action, spec, picked, 
 				binding, action, value)
 		end
 		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
-			gestures.parameter_error(action), "OK", nil, "warning")
+			gestures.parameter_error(action), i18n.get("button.ok"), nil, "warning")
 		prior = value or prior
 		value = nil
 	end
@@ -393,6 +385,28 @@ function M.prompt_action_parameter(gestures, binding, action, spec, picked, muta
 		return false
 	end
 	return committed == true
+end
+
+--- Greys the picker rows whose catalogue requirement is proven absent: an
+--- action that needs the AI ("ai:on" in _shared/modules/actions/actions.toml,
+--- the agent's manual actions) stays visible and greyed, with the AI-off hint
+--- (dialog.action_picker.requires_ai) as its reason, while the AI is switched
+--- off. Read at each open, so switching the AI on offers them again without a
+--- reload.
+--- @param items table Picker items, marked in place.
+local function mark_ai_requirements(items)
+	if not require("modules.shortcuts.ai_actions").off() then return end
+	local ok, Catalogue = pcall(require, "_generated.action_catalogue")
+	if not ok or type(Catalogue) ~= "table" or type(Catalogue.actions) ~= "table" then return end
+	for _, item in ipairs(items) do
+		local meta = item.type == "action" and Catalogue.actions[item.id] or nil
+		for _, token in ipairs(meta and meta.requires or {}) do
+			if token == "ai:on" then
+				item.disabled = true
+				item.hint = i18n.get("dialog.action_picker.requires_ai")
+			end
+		end
+	end
 end
 
 -- What picker_parameter_fields reads from the gestures facade.
@@ -418,6 +432,7 @@ local PICKER_EDITOR_FACADE = {
 ---   logged, when the facade lacks what the editor needs, and every value is then
 ---   asked by the native prompt.
 function M.picker_parameter_fields(gestures, items, binding)
+	mark_ai_requirements(items)
 	for _, name in ipairs(PICKER_EDITOR_FACADE) do
 		if type(gestures) ~= "table" or type(gestures[name]) ~= "function" then
 			Logger.error(LOG, "The gestures facade has no %s — the picker cannot edit a value.", name)

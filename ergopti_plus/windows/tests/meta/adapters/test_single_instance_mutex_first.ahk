@@ -61,7 +61,7 @@ Test("boot: single-owner mutex is acquired before the message pump and hook regi
 	_SIMF_MutexEstablishedBeforeHookAndPump)
 
 ; The gate exists to stop two HOOK OWNERS coexisting. The driver also re-runs
-; this same entry on purpose, with /force and --keylogger-prefetch-worker, to
+; this same entry on purpose, with /force and --keystats-prefetch-worker, to
 ; compute a metrics projection in a detached process — a process that registers
 ; no hook, no log owner and no tray, and is therefore not what the gate is for.
 ;

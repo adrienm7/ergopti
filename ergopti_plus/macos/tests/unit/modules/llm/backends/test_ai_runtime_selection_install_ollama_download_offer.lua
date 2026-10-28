@@ -47,9 +47,6 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 				record.dialogs = record.dialogs + 1
 				record.dialog_args = table.pack(...)
 				record.dialog_history[#record.dialog_history + 1] = record.dialog_args
-				if record.dialog_args[1] == i18n.get("ollama.native_offer_title") then
-					return i18n.get("ollama.native_offer_keep")
-				end
 				return i18n.get(choice_key)
 			end,
 		}
@@ -77,84 +74,75 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 		return { dialogs = 0, dialog_history = {}, notices = {}, urls = {}, state = new_state() }
 	end
 
-	helpers.it("accepting downloads into the folder the resolver then finds", scoped(function()
+	--- Records the owned install the real router hands to the real checker.
+	--- @param checker table Real Ollama checker.
+	--- @param record table Test record.
+	local function record_native_installs(checker, record)
+		record.native = {}
+		checker.install_native_for_selection = function(decision, source_path, source_kind, target, store, done)
+			record.native[#record.native + 1] = { decision = decision, source_path = source_path,
+				source_kind = source_kind, target = target, store = store, done = done }
+			return true
+		end
+		require("modules.llm.ollama_binary").pinned_version = function() return "0.40.4" end
+	end
+
+	-- Ergopti always installs and uses its own pinned Ollama (maintainer
+	-- decision, issue #104); the official download offer and the reuse of a
+	-- user's own Ollama are gone.
+	helpers.it("accepting installs Ergopti's own pinned Ollama, never a download of the official one", scoped(function()
 		local record = new_record()
 		local checker = load_ollama_checker(record.state)
-		local Offer = load_offer("ollama.offer_download", record)
+		local Offer = load_offer("ollama.native_offer_install", record)
 		package.loaded["modules.llm.ollama_deps_checker"] = checker
-		local result
-		helpers.assert_true(Offer.select_ollama(function(ok) result = ok end))
+		record_native_installs(checker, record)
+		helpers.assert_true(Offer.select_ollama(function() end))
 		helpers.assert_eq(record.dialogs, 1)
-		helpers.assert_eq(#record.state.tasks, 1)
-		helpers.assert_eq(record.state.tasks[1].args[6], MANAGED_DIR)
-		record.state.executables[MANAGED_BIN] = true
-		record.state.tasks[1].done(0, "", "")
-		helpers.assert_eq(result, true)
-		helpers.assert_true(Offer.is_installed("ollama"))
-
-		helpers.assert_true(Offer.select_ollama())
-		helpers.assert_eq(record.dialogs, 2, "a new migration choice never reuses the stock download consent")
 		local i18n = require("infra.i18n")
-		helpers.assert_eq(record.dialog_history[1][1], i18n.get("ollama.runtime_missing_title"))
-		helpers.assert_eq(record.dialog_history[1][2], i18n.get("ollama.offer_body"))
-		helpers.assert_eq(record.dialog_history[1][3], i18n.get("ollama.offer_download"))
-		helpers.assert_eq(record.dialog_history[1][4], i18n.get("ollama.offer_website"))
-		helpers.assert_eq(record.dialog_history[2][1], i18n.get("ollama.native_offer_title"))
-		helpers.assert_eq(record.dialog_history[2][2], i18n.get("ollama.native_migration_body"))
-		helpers.assert_eq(record.dialog_history[2][3], i18n.get("ollama.native_offer_install"))
-		helpers.assert_eq(record.dialog_history[2][4], i18n.get("ollama.native_offer_keep"))
-		helpers.assert_eq(record.state.tasks[2].args[5], MANAGED_BIN)
-		helpers.assert_eq(record.state.tasks[2].args[6], "")
-		record.state.tasks[2].done(0, "", "")
-		helpers.assert_eq(record.state.daemon.calls, 0)
-		helpers.assert_eq(#record.state.daemon_tasks, 0)
-		helpers.assert_eq(checker.get_state(), "ready")
-		helpers.assert_eq(checker.get_daemon_state(), "pending")
+		helpers.assert_eq(record.dialog_history[1][1], i18n.get("ollama.native_offer_title"))
+		helpers.assert_eq(record.dialog_history[1][2], string.format(i18n.get("ollama.native_offer_body"), "0.40.4"),
+			"the offer names the version Ergopti pins")
+		helpers.assert_eq(#record.native, 1)
+		helpers.assert_eq(record.native[1].source_path, "", "no user Ollama is ever the source")
+		helpers.assert_eq(#record.state.tasks, 0, "the official on-demand download is never started")
 	end))
 
-	helpers.it("declining opens the website and keeps the AI off with a message", scoped(function()
+	helpers.it("declining keeps the AI off with a message and opens nothing", scoped(function()
 		local record = new_record()
 		local checker = load_ollama_checker(record.state)
-		local Offer = load_offer("ollama.offer_website", record)
+		local Offer = load_offer("ollama.native_offer_keep", record)
 		package.loaded["modules.llm.ollama_deps_checker"] = checker
+		record_native_installs(checker, record)
 		helpers.assert_eq(Offer.select_ollama(), false)
 		helpers.assert_eq(record.dialogs, 1)
 		helpers.assert_eq(#record.state.tasks, 0, "a decline never downloads")
-		helpers.assert_eq(record.urls[1], "https://ollama.com/download")
+		helpers.assert_eq(#record.urls, 0)
 		helpers.assert_eq(#record.notices, 1)
-		helpers.assert_eq(record.notices[1].body,
-			require("infra.i18n").get("ollama.runtime_missing_body"))
+		helpers.assert_eq(record.notices[1].body, require("infra.i18n").get("ollama.runtime_missing_body"))
 	end))
 
-	helpers.it("a found Ollama is reused after its explicit native KEEP choice", scoped(function()
+	helpers.it("a user's own Ollama is never reused, run or touched (ollama-owned-runtime)", scoped(function()
 		local record = new_record()
 		record.state.executables["/opt/homebrew/bin/ollama"] = true
+		record.state.executables["/Applications/Ollama.app/Contents/Resources/ollama"] = true
 		local checker = load_ollama_checker(record.state)
-		local Offer = load_offer("ollama.offer_download", record)
+		local Offer = load_offer("ollama.native_offer_keep", record)
 		package.loaded["modules.llm.ollama_deps_checker"] = checker
-		helpers.assert_true(Offer.select_ollama())
-		helpers.assert_eq(record.dialogs, 1)
-		local i18n = require("infra.i18n")
-		helpers.assert_eq(record.dialog_args[1], i18n.get("ollama.native_offer_title"))
-		helpers.assert_eq(record.dialog_args[2], i18n.get("ollama.native_migration_body"))
-		helpers.assert_eq(record.dialog_args[3], i18n.get("ollama.native_offer_install"))
-		helpers.assert_eq(record.dialog_args[4], i18n.get("ollama.native_offer_keep"))
-		helpers.assert_eq(record.state.tasks[1].args[5], "/opt/homebrew/bin/ollama")
-		helpers.assert_eq(record.state.tasks[1].args[6], "")
-		record.state.tasks[1].done(0, "", "")
+		record_native_installs(checker, record)
+		helpers.assert_eq(Offer.is_installed("ollama"), false, "a user's Ollama is not Ergopti's runtime")
+		helpers.assert_eq(Offer.select_ollama(), false)
+		helpers.assert_eq(#record.state.tasks, 0, "nothing is spawned for the user's Ollama")
 		helpers.assert_eq(record.state.daemon.calls, 0)
-		helpers.assert_eq(#record.state.daemon_tasks, 0)
-		helpers.assert_eq(checker.get_state(), "ready")
-		helpers.assert_eq(checker.get_daemon_state(), "pending")
-		helpers.assert_eq(checker.is_daemon_ready(), false)
+		helpers.assert_eq(#record.state.daemon_tasks, 0, "its daemon is never started or stopped")
 	end))
 
 	helpers.it("migration observes original HTTP, warmup, stream and model requirement debt", scoped(function()
 		local record = new_record()
 		record.state.executables["/opt/homebrew/bin/ollama"] = true
 		local checker = load_ollama_checker(record.state)
-		local Offer = load_offer("ollama.offer_download", record)
+		local Offer = load_offer("ollama.native_offer_install", record)
 		package.loaded["modules.llm.ollama_deps_checker"] = checker
+		record_native_installs(checker, record)
 		helpers.assert_true(rawequal(require("ui.menu.menu_llm.models_manager_ollama"), record.state.model_manager),
 			"the real router must consult this original model owner")
 		helpers.assert_eq(#record.state.http_clients, 5)
@@ -189,9 +177,9 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 		record.state.model_tasks.original = nil
 		helpers.assert_true(Offer.select_ollama())
 		helpers.assert_eq(record.dialogs, 1)
-		helpers.assert_eq(record.state.tasks[1].args[5], "/opt/homebrew/bin/ollama")
-		helpers.assert_eq(record.state.tasks[1].args[6], "")
-		record.state.tasks[1].done(0, "", "")
+		helpers.assert_eq(#record.native, 1)
+		helpers.assert_eq(record.native[1].source_path, "")
+		helpers.assert_eq(#record.state.tasks, 0, "the user's Ollama is never handed to a task")
 		helpers.assert_eq(record.state.daemon.calls, 0)
 	end))
 
@@ -205,31 +193,23 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 		helpers.assert_eq(#record.state.tasks, 0, "boot never downloads")
 	end))
 
-	helpers.it("the boot notice of a missing Ollama opens its download offer when clicked", scoped(function()
+	helpers.it("the boot notice of a missing Ollama opens its install offer when clicked", scoped(function()
 		local record = new_record()
 		local checker = load_ollama_checker(record.state)
-		local Offer = load_offer("ollama.offer_download", record)
+		local Offer = load_offer("ollama.native_offer_install", record)
 		package.loaded["modules.llm.ollama_deps_checker"] = checker
+		record_native_installs(checker, record)
 		helpers.assert_true(Offer.notify_if_missing("ollama"))
 		helpers.assert_eq(#record.notices, 1)
 		helpers.assert_eq(record.notices[1].body,
 			require("infra.i18n").get("ollama.runtime_missing_click"),
 			"the notice used to name the menu row to select, with no action of its own")
-		-- Called below: a notice without its click fails there.
 		helpers.assert_not_nil(record.notices[1].on_click,
 			"the notice carries the click that opens its fix")
 		helpers.assert_eq(record.dialogs, 0)
-		helpers.assert_eq(#record.state.tasks, 0)
 		record.notices[1].on_click()
-		helpers.assert_eq(record.dialogs, 1, "the click opens the download offer, which asks first")
-		helpers.assert_eq(#record.state.tasks, 1, "accepting the offer downloads Ollama")
-		helpers.assert_eq(record.state.tasks[1].args[6], MANAGED_DIR)
-		record.state.executables[MANAGED_BIN] = true
-		record.state.tasks[1].done(0, "", "")
-
-		record.notices[1].on_click()
-		helpers.assert_eq(record.dialogs, 1, "a runtime installed since the notice offers nothing")
-		helpers.assert_eq(#record.state.tasks, 1)
+		helpers.assert_eq(record.dialogs, 1, "the click opens the install offer, which asks first")
+		helpers.assert_eq(#record.native, 1, "accepting the offer installs Ergopti's own Ollama")
 	end))
 end)
 
@@ -244,21 +224,24 @@ end)
 -- ====================================
 
 helpers.describe("AI runtime triggers stay off the boot and typing paths (ai-runtime-triggers)", function()
-	--- Counts `.install_for_selection(` calls in code, ignoring comments and the
-	--- two checker definitions, so a new caller anywhere is visible.
+	--- Counts install grants in code (`.install_for_selection(` and Ollama's
+	--- owned `.install_native_for_selection(`), ignoring comments and the checker
+	--- definitions, so a new caller anywhere is visible.
 	local function count_calls(text)
 		local calls = 0
 		for line in text:gmatch("[^\n]+") do
 			local code = line:gsub("%-%-.*$", "")
-			if not code:find("function M.install_for_selection(", 1, true) then
+			if not code:find("function M.install_for_selection(", 1, true)
+				and not code:find("function M.install_native_for_selection(", 1, true) then
 				for _ in code:gmatch("%.install_for_selection%(") do calls = calls + 1 end
+				for _ in code:gmatch("%.install_native_for_selection%(") do calls = calls + 1 end
 			end
 		end
 		return calls
 	end
 
 	helpers.it("only the selection router grants a runtime install", function()
-		local everywhere = helpers.read_driver_source("install_for_selection(")
+		local everywhere = helpers.read_driver_source("_for_selection(")
 		helpers.assert_not_nil(everywhere)
 		local router, router_err = helpers.read_driver_unit("local function mlx_deps()")
 		helpers.assert_not_nil(router, router_err)

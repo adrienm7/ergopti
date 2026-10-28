@@ -132,7 +132,8 @@ SpotlightMouseAt(X, Y, DurationMs) {
 }
 
 _SpotlightTick() {
-	global _Spotlight_State
+	global _Spotlight_State, _SpotlightSessionCleanupDebt
+	global _SpotlightPaintCleanupDebt, _GRBitmapCleanupDebt
 	Snapshot := _SpotlightActiveSnapshot(_Spotlight_State)
 	if !(Snapshot is Map) {
 		_SpotlightSessionTimerNative.Stop()
@@ -142,10 +143,41 @@ _SpotlightTick() {
 		_SpotlightDismiss(Snapshot["Generation"])
 		return
 	}
-	MouseGetPos(&NowX, &NowY)
-	if (TickExpired(Snapshot["StartedTick"], Snapshot["DurationMs"])
-		or Abs(NowX - Snapshot["StartX"]) > 5
-		or Abs(NowY - Snapshot["StartY"]) > 5) {
+	if TickExpired(Snapshot["StartedTick"], Snapshot["DurationMs"]) {
+		_SpotlightDismiss(Snapshot["Generation"])
+		return
+	}
+	try Point := MCGetPosStrict()
+	catch Any as Failure {
+		; Keep the pointer error primary. False dismissal can mean a successor
+		; already owns the overlay; record actual facts rather than infer ACK.
+		try {
+			Cleanup := {ExpectedGeneration: Snapshot["Generation"], Returned: false, Result: false, Secondary: 0}
+			try {
+				Cleanup.Result := _SpotlightDismiss(Snapshot["Generation"])
+				Cleanup.Returned := true
+			} catch Any as CleanupFailure {
+				Cleanup.Secondary := CleanupFailure
+			}
+			PreviousCritical := Critical("On")
+			try {
+				Cleanup.CurrentGeneration := _Spotlight_State["Generation"]
+				Cleanup.Phase := _Spotlight_State["Phase"]
+				Cleanup.SessionDebt := _SpotlightSessionCleanupDebt.Length
+				Cleanup.PaintDebt := _SpotlightPaintCleanupDebt.Length
+				Cleanup.BitmapDebt := _GRBitmapCleanupDebt.Length
+				Failure.SpotlightCleanup := Cleanup
+			} finally Critical(PreviousCritical)
+			Failure.Extra .= Format("`nSpotlight cleanup: expected={1}; returned={2}; result={3}; current={4}; phase={5}; debt={6}/{7}/{8}; secondary={9}",
+				Cleanup.ExpectedGeneration, Cleanup.Returned, Cleanup.Result, Cleanup.CurrentGeneration,
+				Cleanup.Phase, Cleanup.SessionDebt, Cleanup.PaintDebt, Cleanup.BitmapDebt,
+				IsObject(Cleanup.Secondary) ? Cleanup.Secondary.Message : "none")
+		} finally {
+			throw Failure
+		}
+	}
+	if (Abs(Point["x"] - Snapshot["StartX"]) > 5
+		or Abs(Point["y"] - Snapshot["StartY"]) > 5) {
 		_SpotlightDismiss(Snapshot["Generation"])
 	}
 }

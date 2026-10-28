@@ -51,7 +51,7 @@ local MODULE_KEYS = {
 	"ui.menu.menu_about",
 	"ui.menu.menu_llm",
 	"modules.llm",
-	"modules.keylogger",
+	"modules.keystats",
 	"modules.shortcuts",
 	"modules.dynamic_hotstrings",
 	"modules.gestures",
@@ -200,7 +200,7 @@ local function with_menu_fixture(options, callback)
 		gestures = true,
 		shortcuts = true,
 		llm_enabled = true,
-		keylogger_enabled = true,
+		keystats_enabled = true,
 		script_control_enabled = true,
 		personal_info = true,
 		update_channel = "dev",
@@ -220,10 +220,10 @@ local function with_menu_fixture(options, callback)
 		initial_gestures = nil,
 		script = clone(state.script_control_shortcuts),
 		initial_script = nil,
-		keyboard = { cmd_x = "copy_selection", alt_v = "paste_plain" },
+		keyboard = { primary_x = "copy_selection", alt_v = "paste_plain" },
 		initial_keyboard = nil,
 		settings = {
-			keyboard_shortcut_cmd_x = "copy_selection",
+			keyboard_shortcut_primary_x = "copy_selection",
 			keyboard_shortcut_alt_v = "paste_plain",
 			llm_api_entries = { { id = "old", endpoint = "https://old.invalid" } },
 			llm_api_entry_id = "old",
@@ -274,6 +274,8 @@ local function with_menu_fixture(options, callback)
 				return true
 			end
 		end
+		logger.LEVELS = require("logger").LEVELS
+		logger.is_enabled = function() return false end
 		return logger
 	end
 
@@ -451,6 +453,10 @@ local function with_menu_fixture(options, callback)
 		is_pending = function()
 			return observations.termination_pending or observations.reload_abort ~= nil
 		end,
+		pending_kind = function()
+			if observations.reload_abort ~= nil then return "reload" end
+			if observations.termination_pending then return "exit" end
+		end,
 	}
 
 	local file_mover = {}
@@ -526,7 +532,7 @@ local function with_menu_fixture(options, callback)
 	end
 	package.loaded["ui.menu.menu_llm"] = { create = function() return {} end }
 	package.loaded["modules.llm"] = { set_backend = noop }
-	package.loaded["modules.keylogger"] = {}
+	package.loaded["modules.keystats"] = {}
 	package.loaded["modules.dynamic_hotstrings"] = {}
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
 	package.loaded["modules.gestures"] = {

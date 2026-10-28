@@ -400,6 +400,8 @@ helpers.describe("hotstring editor classified source admission", function()
 		assert(made == true or made == 0)
 		local path = root .. "/personal.toml"
 		local native_open, native_rename = io.open, os.rename
+		local NativeWriter = require("infra.regular_file_writer")
+		local native_stage = NativeWriter.open
 		local old_bridge = package.loaded["ui.hotstring_editor.bridge"]
 		local old_manager = package.loaded["ui.webview_manager"]
 		local writer = require("toml_codec.writer")
@@ -430,11 +432,21 @@ helpers.describe("hotstring editor classified source admission", function()
 					end
 					return fh, err, code
 				end
-				if target == path .. ".tmp" and access == "w" then
-					obs.stages = obs.stages + 1
-					if mode == "stale" or mode == "appeared" then obs.faults = obs.faults + 1; put(foreign); obs.source = foreign end
-				end
 				return native_open(target, access)
+			end
+			NativeWriter.open = function(target, access)
+				if target ~= path .. ".tmp" or access ~= "wx" then return native_stage(target, access) end
+				-- Observe the admitted stream without discarding any native receipt.
+				local function opened(stream, ...)
+					if stream then
+						obs.stages = obs.stages + 1
+						if mode == "stale" or mode == "appeared" then
+							obs.faults = obs.faults + 1; put(foreign); obs.source = foreign
+						end
+					end
+					return stream, ...
+				end
+				return opened(native_stage(target, access))
 			end
 			os.rename = function(from, to)
 				if to == path then
@@ -470,7 +482,7 @@ helpers.describe("hotstring editor classified source admission", function()
 			} }, state, context)
 		end)
 		release_source()
-		io.open, os.rename = native_open, native_rename
+		io.open, os.rename, NativeWriter.open = native_open, native_rename, native_stage
 		package.loaded["ui.hotstring_editor.bridge"] = old_bridge
 		package.loaded["ui.webview_manager"] = old_manager
 		package.loaded["toml_codec.writer"], package.loaded["toml_codec.reader"] = old_writer, old_reader
@@ -478,7 +490,7 @@ helpers.describe("hotstring editor classified source admission", function()
 		local stage = native_open(path .. ".tmp", "r"); obs.stage_left = stage ~= nil; if stage then stage:close() end
 		os.remove(path); os.remove(path .. ".tmp"); os.remove(root)
 		obs.ok, obs.problem = ok, problem
-		obs.restored = io.open == native_open and os.rename == native_rename
+		obs.restored = io.open == native_open and os.rename == native_rename and NativeWriter.open == native_stage
 			and package.loaded["ui.hotstring_editor.bridge"] == old_bridge
 			and package.loaded["toml_codec.writer"] == old_writer and package.loaded["toml_codec.reader"] == old_reader
 			and package.loaded["ui.webview_manager"] == old_manager
@@ -509,6 +521,9 @@ helpers.describe("hotstring editor classified source admission", function()
 			helpers.assert_eq(obs.bytes, obs.source, "the exact original or concurrent source must remain on disk")
 			helpers.assert_eq(obs.reloads, 0, "refused publication must not reload the catalogue")
 			helpers.assert_eq(obs.stage_left, false, "the owned stage must be retired on refusal")
+			if mode == "stale" or mode == "appeared" then
+				helpers.assert_eq(obs.stages, 1, "the admitted native staging stream must trigger the concurrent edit")
+			end
 			if mode ~= "stale" and mode ~= "appeared" and not mode:match("^rename_") then
 				helpers.assert_eq(obs.stages, 0, "source admission must refuse before opening the owned stage")
 			end

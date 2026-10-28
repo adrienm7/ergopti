@@ -177,8 +177,10 @@ local function partial_wpm_position(ctx)
 	local config = assert(read(ctx.home .. "/" .. relative))
 	local enabled, enabled_count = config:gsub("%[metrics%]\nenabled = false", "[metrics]\nenabled = true")
 	assert(enabled_count == 1, "the metrics configuration section must be present exactly once")
-	local compact, graph_count = enabled:gsub("float_graph = true", "float_graph = false")
-	assert(graph_count == 1, "the widget graph configuration must be present exactly once")
+	-- The shipped widget is hidden and compact: the scenario shows it, keeping the compact pill.
+	local compact, shown_count = enabled:gsub("wpm_widget_visible = false", "wpm_widget_visible = true")
+	assert(shown_count == 1, "the widget visibility configuration must be present exactly once")
+	assert(compact:find("wpm_widget_graph = false", 1, true), "the shipped widget must be compact")
 	write_home(ctx.home, relative, compact)
 	ctx.settings = { ["ergopti.wpm_widget.pos_x"] = 120 }
 	-- An existing Metrics user already owns its device identity and folders.
@@ -187,7 +189,8 @@ local function partial_wpm_position(ctx)
 	write_home(ctx.home, ".config/ergopti_plus/metrics/by_device/e2e-wpm/device.json",
 		'{"device_id":"e2e-wpm","name":"E2E Mac","os":"darwin",'
 		.. '"host_signature":"fallback:unknown","created_at":"2024-01-01"}\n')
-	run("mkdir -p " .. q(ctx.root .. "/tmp/ergopti_metrics/e2e-wpm"))
+	-- The SQLite mirror lives in the persistent cache folder since L64.
+	run("mkdir -p " .. q(ctx.home .. "/Library/Caches/ergopti_plus/metrics/e2e-wpm"))
 end
 
 --- A configuration folder an older release left, with its config.toml from the

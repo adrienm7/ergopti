@@ -12,8 +12,8 @@
 
 body {
 	align-items: center;
-	background: #242426;
-	color: #e8e8ea;
+	background: var(--theme-grey-242426);
+	color: var(--theme-grey-e8e8ea);
 	display: flex;
 	font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
 	justify-content: center;
@@ -50,7 +50,7 @@ h2 {
 	background: #1b1b1d;
 	border: 1px solid #3a3a3d;
 	border-radius: 6px;
-	color: #e8e8ea;
+	color: var(--theme-grey-e8e8ea);
 	font-family: 'SF Mono', ui-monospace, monospace;
 	font-size: 14px;
 	padding: 9px 11px;
@@ -87,7 +87,7 @@ button {
 	background: #333336;
 	border: 1px solid #46464a;
 	border-radius: 6px;
-	color: #e8e8ea;
+	color: var(--theme-grey-e8e8ea);
 	cursor: pointer;
 	font-size: 13px;
 	padding: 7px 15px;

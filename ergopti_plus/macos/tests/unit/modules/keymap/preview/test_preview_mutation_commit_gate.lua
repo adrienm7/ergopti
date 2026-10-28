@@ -12,7 +12,7 @@ local function fresh_runtime(effects)
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
 			or name:match("^adapters%.")
-			or name == "modules.keylogger"
+			or name == "modules.keystats"
 			or name == "modules.llm"
 			or name == "modules.llm.prediction_engine"
 			or name == "ui.tooltip"
@@ -34,7 +34,7 @@ local function fresh_runtime(effects)
 			return true
 		end,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		log_hotstring_suggested = function() end,
 		log_hotstring_dismissed = function() end,
 		log_llm_accepted = function() end,

@@ -24,6 +24,8 @@ local Paths     = require("infra.paths")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Storage = require("adapters.storage")
 local JsonCodec = require("adapters.json_codec")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "llm.core"
 
@@ -46,9 +48,11 @@ local _SHARED_SCALAR_KEYS = {
 	"llm_enabled", "llm_active_profile", "llm_temperature",
 	"llm_num_predictions", "llm_context_length", "llm_min_words",
 	"llm_max_words", "llm_pred_indent", "llm_show_info_bar",
-	"llm_streaming", "llm_streaming_multi", "llm_instant_on_word_end",
-	"llm_after_hotstring", "llm_reset_on_nav", "llm_auto_raise_temp",
-	"llm_ollama_port",
+	"llm_streaming", "llm_streaming_multi", ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END,
+	ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING, ConfigKeys.COMMAND.LLM_RESET_ON_NAV, "llm_auto_raise_temp",
+	-- llm_ollama_port names the stock Ollama port, which a user's own Ollama
+	-- keeps; Ergopti's own daemon listens on llm_ollama_owned_port.
+	"llm_ollama_port", "llm_ollama_owned_port",
 	-- Privacy gates for the prediction path. These were absent from this list AND
 	-- hardcoded to true in prediction_engine.lua, so the shared value was
 	-- unreachable and the two drivers shipped opposite defaults for the same
@@ -123,6 +127,13 @@ local function load_shared_defaults()
 		missing[#missing + 1] = "llm_debounce_ms"
 	else
 		merged.llm_debounce = parsed.llm_debounce_ms / 1000
+	end
+
+	-- llm_min_request_interval: the same unit change as the debounce.
+	if type(parsed.llm_min_request_interval_ms) ~= "number" then
+		missing[#missing + 1] = "llm_min_request_interval_ms"
+	else
+		merged.llm_min_request_interval = parsed.llm_min_request_interval_ms / 1000
 	end
 
 	if #missing > 0 then
@@ -398,14 +409,7 @@ local ApiCommon = require("modules.llm.api_common")
 --- stub's by-reference backing store or our last-known durable snapshot.
 --- @param value any Value to copy.
 --- @return any copy
-local function copy_settings_value(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do
-		copy[copy_settings_value(key)] = copy_settings_value(child)
-	end
-	return copy
-end
+local copy_settings_value = TableUtil.deep_copy_with_keys
 
 --- Structural equality for the exact settings readback contract.
 --- @param left any First value.
@@ -610,12 +614,7 @@ local function pending_id_set(state)
 	return ids
 end
 
-local function sorted_ids(ids)
-	local out = {}
-	for entry_id in pairs(ids) do out[#out + 1] = entry_id end
-	table.sort(out)
-	return out
-end
+local sorted_ids = TableUtil.sorted_keys
 
 local function validate_id_list(raw)
 	if raw == nil then return {} end
@@ -1619,6 +1618,14 @@ function M.set_llm_streaming(v)
 	Logger.debug(LOG, "Streaming: %s.", _streaming_enabled and "on" or "off")
 end
 
+--- Hands the HttpClient port to every backend's inference path (engine init).
+--- @param client table Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	ApiOllama.set_inference_client(client)
+	ApiMlx.set_inference_client(client)
+	ApiRemote.set_inference_client(client)
+end
+
 --- Cancels the in-flight streaming task on the active backend, if any.
 --- Called when a new request supersedes the current stream.
 function M.cancel_streaming()
@@ -1658,8 +1665,9 @@ local function apply_backend_identity(backend, start_service)
 		CoreState.backend_transition_generation =
 			CoreState.backend_transition_generation + 1
 		local my_transition_generation = CoreState.backend_transition_generation
-		-- Any backend transition forces a fresh Ollama readiness verdict: leaving MLX
-		-- kills `ollama serve`, and returning relaunches it async (not yet listening).
+		-- Any backend transition forces a fresh Ollama readiness verdict: switching to
+		-- MLX retires the owned `ollama serve`, and returning relaunches it async (not
+		-- yet listening).
 		-- Without this, a stale-true _is_ready would make the warmup chain self-terminate
 		-- and predictions dispatch to a cold/dead server (F-M8). ensure_running launches
 		-- the daemon but must NEVER imply readiness.
@@ -1727,12 +1735,7 @@ end
 --- Clones preference data so callers cannot mutate the live profile registry.
 --- @param value any Configuration value.
 --- @return any copy Detached configuration value.
-local function clone_configuration(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[key] = clone_configuration(child) end
-	return copy
-end
+local clone_configuration = TableUtil.deep_copy
 
 --- Captures actual configuration independently from the menu's desired values.
 --- Credentials and backend request ownership are deliberately outside this scope.
@@ -2123,7 +2126,12 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 	local profile = profile_override or M.get_active_profile()
 	local api = get_api()
 
-	if type(profile) == "table" and (not profile.batch) then
+	-- A batch profile asks once for every variant, but only above one prediction:
+	-- the rule of the shared plan and of the prompt selector, as on Windows and
+	-- Linux. A single prediction of a batch profile used to take the batch path.
+	local batching = require("llm.request_plan.batching").plan(
+		type(profile) == "table" and (profile.batch and true or false), num_predictions)
+	if type(profile) == "table" and batching.mode == "sequential" then
 		if num_predictions > 1 and not sequential_mode then
 			api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, _streaming_enabled, on_partial)
 		else

@@ -146,7 +146,12 @@ local function new_fixture()
 		.. sh_quote(driver .. "modules/llm/uv-release.sh") .. " "
 		.. sh_quote(project .. "/modules/llm/") .. " && cp "
 		.. sh_quote(driver .. "pyproject.toml") .. " " .. sh_quote(driver .. "uv.lock") .. " "
-		.. sh_quote(project .. "/"))
+		.. sh_quote(project .. "/")
+		-- network-retry.sh reads the shared origin inventory three folders up,
+		-- where the bundle and the checkout keep _shared beside the driver.
+		.. " && mkdir -p " .. sh_quote(root .. "/_shared/modules/network") .. " && cp "
+		.. sh_quote(driver .. "../_shared/modules/network/route_origins.json") .. " "
+		.. sh_quote(root .. "/_shared/modules/network/"))
 	helpers.assert_eq(made, 0, "the fixture project must be created")
 	write(home .. "/.local/bin/uv", FAKE_UV)
 	run("chmod +x " .. sh_quote(home .. "/.local/bin/uv"))
@@ -253,11 +258,90 @@ end)
 -- =====================================================
 
 helpers.describe("The MLX repair removes only Ergopti's venv (mlx-bootstrap-repair-script)", function()
+	for _, entry in ipairs({ "\n", "\n\n" }) do
+		it_runs("preserves a foreign neighbor whose only entry is " .. #entry .. " LF byte(s)"
+			.. " (mlx-repair-byte-empty)", function(fixture)
+			local output, first = bootstrap(fixture)
+			helpers.assert_eq(first, 0, output)
+			write(fixture.venv .. "/retained-before-refusal", "live environment")
+			local neighbor = fixture.venv .. ".bootstrap.12345"
+			run("mkdir -p " .. sh_quote(neighbor))
+			write(neighbor .. "/" .. entry, "precious data")
+			local repaired, status = bootstrap(fixture, "ERGOPTI_MLX_REPAIR=1")
+			helpers.assert_eq(read(fixture.venv .. "/retained-before-refusal"), "live environment",
+				"a nonempty foreign directory must refuse before the live runtime is removed: " .. repaired)
+			helpers.assert_eq(read(neighbor .. "/" .. entry), "precious data")
+			helpers.assert_eq(status, 5, repaired)
+		end)
+	end
+
+	for _, python_environment in ipairs({ false, true }) do
+		it_runs("preserves an unreadable repair neighbor, Python environment=" .. tostring(python_environment)
+			.. " (mlx-repair-inspection)", function(fixture)
+			local output, first = bootstrap(fixture)
+			helpers.assert_eq(first, 0, output)
+			write(fixture.venv .. "/retained-before-refusal", "live environment")
+			local neighbor = fixture.venv .. ".bootstrap.12345"
+			run("mkdir -p " .. sh_quote(neighbor))
+			write(neighbor .. "/private-file-name-for-inspection", "precious data")
+			if python_environment then write(neighbor .. "/pyvenv.cfg", "home = /fixture/python\n") end
+			local _, changed = run("chmod 0300 " .. sh_quote(neighbor))
+			helpers.assert_eq(changed, 0)
+			local _, inspected = run("ls -A " .. sh_quote(neighbor))
+			local repaired, status = bootstrap(fixture, "ERGOPTI_MLX_REPAIR=1")
+			run("chmod 0700 " .. sh_quote(neighbor))
+			helpers.assert_true(inspected ~= 0, "the real directory listing must refuse before repair")
+			helpers.assert_eq(read(fixture.venv .. "/retained-before-refusal"), "live environment",
+				"refused neighbor inspection must precede deletion of the live runtime: " .. repaired)
+			helpers.assert_eq(read(neighbor .. "/private-file-name-for-inspection"), "precious data")
+			helpers.assert_eq(status, 5, repaired)
+			helpers.assert_nil(repaired:find("private-file-name-for-inspection", 1, true),
+				"failed inspection cannot expose a private entry name")
+		end)
+	end
+
+	for _, kind in ipairs({ "bootstrap directory", "rollback directory", "bootstrap link", "rollback file" }) do
+		it_runs("preserves a foreign " .. kind .. " before repair (mlx-repair-neighbor-ownership)", function(fixture)
+			local output, first = bootstrap(fixture)
+			helpers.assert_eq(first, 0, output)
+			write(fixture.venv .. "/retained-before-refusal", "live environment")
+			local suffix = kind:match("^bootstrap") and ".bootstrap.12345" or ".rollback.12345"
+			local neighbor = fixture.venv .. suffix
+			if kind:match("directory$") then
+				run("mkdir -p " .. sh_quote(neighbor))
+				write(neighbor .. "/precious.txt", "foreign data")
+			elseif kind:match("link$") then
+				local outside = fixture.root .. "/foreign-environment"
+				run("mkdir -p " .. sh_quote(outside))
+				write(outside .. "/pyvenv.cfg", "home = /outside\n")
+				write(outside .. "/precious.txt", "foreign data")
+				run("ln -s " .. sh_quote(outside) .. " " .. sh_quote(neighbor))
+			else
+				write(neighbor, "foreign data")
+			end
+			local repaired, status = bootstrap(fixture, "ERGOPTI_MLX_REPAIR=1")
+			helpers.assert_true(exists(neighbor), "repair must retain the unowned neighbor: " .. repaired)
+			if kind:match("directory$") then
+				helpers.assert_eq(read(neighbor .. "/precious.txt"), "foreign data")
+			elseif kind:match("file$") then
+				helpers.assert_eq(read(neighbor), "foreign data")
+			else
+				helpers.assert_eq(read(fixture.root .. "/foreign-environment/precious.txt"), "foreign data")
+			end
+			helpers.assert_eq(status, 5, repaired)
+			helpers.assert_eq(read(fixture.venv .. "/retained-before-refusal"), "live environment",
+				"all repair candidates must be admitted before the first deletion")
+		end)
+	end
+
 	it_runs("removes the venv and its leftovers, keeps its neighbours, rebuilds it", function(fixture)
 		local _, first = bootstrap(fixture)
 		helpers.assert_eq(first, 0)
 		write(fixture.venv .. "/stale-package", "broken")
-		run("mkdir -p " .. sh_quote(fixture.venv .. ".bootstrap.12345/bin"))
+		run("mkdir -p " .. sh_quote(fixture.venv .. ".bootstrap.12345/bin") .. " "
+			.. sh_quote(fixture.venv .. ".rollback.12345"))
+		write(fixture.venv .. ".bootstrap.12345/pyvenv.cfg", "home = /fixture/python\n")
+		write(fixture.venv .. ".rollback.12345/pyvenv.cfg", "home = /fixture/python\n")
 		write(fixture.app_support .. "/keep.txt", "not the venv")
 		local output, status = bootstrap(fixture, "ERGOPTI_MLX_REPAIR=1")
 		helpers.assert_eq(status, 0, output)
@@ -265,6 +349,8 @@ helpers.describe("The MLX repair removes only Ergopti's venv (mlx-bootstrap-repa
 			"the repair removes the venv before rebuilding it")
 		helpers.assert_eq(exists(fixture.venv .. ".bootstrap.12345"), false,
 			"an interrupted run's staging folder is removed too")
+		helpers.assert_eq(exists(fixture.venv .. ".rollback.12345"), false,
+			"an admitted previous environment is removed too")
 		helpers.assert_true(exists(fixture.venv .. "/bin/python"), "the venv is rebuilt")
 		helpers.assert_true(exists(fixture.venv .. "/.last_sync_hash"))
 		helpers.assert_eq(read(fixture.app_support .. "/keep.txt"), "not the venv",
@@ -427,6 +513,19 @@ helpers.describe("The installer works on a managed network (mlx-bootstrap-manage
 				"no CA file overrides the system store (the Mozilla bundle refused every "
 					.. "download behind a TLS-inspecting relay): " .. line)
 		end
+	end)
+
+	-- Field run 2026-10-27 19:47 (ledger L41): an inherited CA file overrode the
+	-- system store; uv now never sees it, and the drop is named once.
+	it_runs("drops an inherited CA file before uv runs", function(fixture)
+		local output, status = bootstrap(fixture, "SSL_CERT_FILE=/inherited/company-bundle.pem")
+		helpers.assert_eq(status, 0, output)
+		local syncs = uv_calls(fixture, "sync")
+		helpers.assert_true(#syncs > 0, "uv sync ran")
+		for _, line in ipairs(syncs) do
+			helpers.assert_true(line:find("ca_file= ", 1, true) ~= nil, "uv saw the inherited CA file: " .. line)
+		end
+		helpers.assert_true(output:find("Inherited SSL_CERT_FILE ignored", 1, true) ~= nil, output)
 	end)
 
 	it_runs("hands the relay to uv with loopback excluded", function(fixture)

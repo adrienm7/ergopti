@@ -108,8 +108,8 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 			let program = Self.stagingProgram(source: helper.path, stage: stage, requirement: requirement, digest: digest, route: channel.path)
 			guard sourceCurrent(), channel.current(), let script = NSAppleScript(source: "do shell script " + Self.appleQuote(program) + " with administrator privileges") else { markRefused(); return }
 			lock.lock(); guard !stopped else { lock.unlock(); markRefused(); return }; adminEntered = true; lock.unlock()
-			var error: NSDictionary?; let returned = script.executeAndReturnError(&error)
-			lock.lock(); cancelled = error?[NSAppleScript.errorNumber] as? Int == -128; scriptReturned = returned != nil && error == nil; lock.unlock()
+			var error: NSDictionary?; _ = script.executeAndReturnError(&error)
+			lock.lock(); cancelled = error?[NSAppleScript.errorNumber] as? Int == -128; scriptReturned = error == nil; lock.unlock()
 		} catch { markRefused() }
 	}
 	/// A capability enquiry is data only. The original child, captures and native cleanup must all finish before admin.

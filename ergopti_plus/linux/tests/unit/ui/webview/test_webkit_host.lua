@@ -139,10 +139,25 @@ helpers.describe("ui.webkit_host", function()
       helpers.assert_true(ui_root:match("_shared/ui$") ~= nil, "ends with _shared/ui")
     end)
 
-    helpers.it("normalizes backslashes to forward slashes", function()
-      local ui_root = WH.resolve_ui_root(DRIVER_ROOT)
-      helpers.assert_true(not ui_root:find("\\"), "no backslashes in resolved path")
-    end)
+		helpers.it("preserves native path bytes after successful probes (webview-native-path)", function()
+			local driver = '/tmp/ergopti\\checkout/linux'
+			local ui = driver .. "/../_shared/ui"
+			local locales = driver .. "/../_shared/data/locales"
+			local original_open = io.open
+			io.open = function(path, mode)
+				if path == ui .. "/host_bridge.js" or path == locales .. "/fr.json" then
+					return { close = function() return true end }
+				end
+				return original_open(path, mode)
+			end
+			local ok, resolved_ui, resolved_locales = pcall(function()
+				return WH.resolve_ui_root(driver), WH.resolve_locales_dir(driver)
+			end)
+			io.open = original_open
+			if not ok then error(resolved_ui, 0) end
+			helpers.assert_eq(resolved_ui, ui, "a successful probe must return the exact admitted path")
+			helpers.assert_eq(resolved_locales, locales, "a backslash is a filename byte on Linux")
+		end)
 
     helpers.it("returns empty for nonexistent roots", function()
       helpers.assert_eq(WH.resolve_ui_root("/nonexistent/path"), "")
@@ -276,6 +291,17 @@ helpers.describe("ui.webkit_host", function()
   -- ==========================================================================
 
   helpers.describe("build_i18n_boot_script()", function()
+		helpers.it("encodes native filenames before embedding a file URI (webview-bootstrap-path)", function()
+			local script = WH.build_i18n_boot_script('/tmp/a"b\\c #?%é</script>/locales', "en", { greeting = "Hello" })
+			local literal = script:match('window%.__i18n_base=(.-);window%._i18n_locale=')
+			helpers.assert_eq(require("json").decode(literal),
+				"file:///tmp/a%22b%5Cc%20%23%3F%25%C3%A9%3C/script%3E/locales/",
+				"the URL must preserve native path bytes without breaking the boot script")
+			local _, closes = script:gsub("</script>", "")
+			helpers.assert_eq(closes, 1, "a filename must never terminate the inline script")
+			helpers.assert_contains(script, 'window._i18n_strings={"greeting":"Hello"};')
+		end)
+
     helpers.it("builds a script tag with locale and base URL", function()
       local script = WH.build_i18n_boot_script("/path/to/locales", "fr")
       helpers.assert_true(script:find("<script>"), "is script tag")
@@ -395,10 +421,12 @@ helpers.describe("ui.webkit_host", function()
       helpers.assert_true(html:find("__i18n_base"), "has i18n base")
     end)
 
-    helpers.it("marks generated pages for the Linux host bridge", function()
+    helpers.it("declares the document bridge capability on generated pages", function()
       local html = WH.build_app_html(DRIVER_ROOT, "metrics_apps", "fr")
-      helpers.assert_true(html:find('window.__ergopti_host="linux"', 1, true) ~= nil,
-        "metrics pages must select the Linux bridge instead of a file fetch")
+      helpers.assert_true(html:find('window.__ergopti_host_capabilities={"document_bridge":true};', 1, true) ~= nil,
+        "metrics pages must select the document bridge instead of a file fetch")
+      helpers.assert_true(html:find("__ergopti_host=", 1, true) == nil,
+        "the page learns a capability, never the host's platform name")
     end)
 
     -- (page-carries-strings) WebKitGTK refuses the page's file:// locale fetch

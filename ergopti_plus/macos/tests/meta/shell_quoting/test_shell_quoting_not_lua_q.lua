@@ -24,6 +24,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
+local CommandLines = require("tests.support.command_lines")
 
 local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui" }
 
@@ -113,13 +115,14 @@ local function collect(dir, out)
 	local cmd = (package.config:sub(1, 1) == "\\")
 		and ('cmd /c dir /b /s /a-d "' .. dir:gsub("/", "\\") .. '\\*.lua"')
 		or ("find '" .. dir .. "' -type f -name '*.lua'")
-	local pipe = io.popen(cmd)
-	if not pipe then return end
-	for line in pipe:lines() do
+	local source_count = #out
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, line in ipairs(inventory) do
 		local t = line:gsub("%s+$", ""):gsub("\\", "/")
 		if t:match("%.lua$") then out[#out + 1] = t end
 	end
-	pipe:close()
+	assert(#out > source_count, "source inventory contains no matching files")
 end
 
 helpers.describe("shell commands are POSIX-quoted, never %q-quoted", function()
@@ -131,14 +134,11 @@ helpers.describe("shell commands are POSIX-quoted, never %q-quoted", function()
 
 		local offenders = {}
 		for _, path in ipairs(files) do
-			local fh = io.open(path, "r")
-			if fh then
-				local src = fh:read("*a") ; fh:close()
-				for _, call_at in ipairs(lua_q_shell_calls(src)) do
-					local line_no = select(2, src:sub(1, call_at):gsub("\n", "")) + 1
-					offenders[#offenders + 1] =
-						path:gsub("^.*/macos/", "") .. ":" .. line_no
-				end
+			local src = SourceFile.read(path)
+			for _, call_at in ipairs(lua_q_shell_calls(src)) do
+				local line_no = select(2, src:sub(1, call_at):gsub("\n", "")) + 1
+				offenders[#offenders + 1] =
+					path:gsub("^.*/macos/", "") .. ":" .. line_no
 			end
 		end
 

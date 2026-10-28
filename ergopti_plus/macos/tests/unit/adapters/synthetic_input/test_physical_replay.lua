@@ -123,7 +123,7 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			if metadata and metadata.physical_replay then
 				physical_replay = event
 				replay_seen = replay_seen + 1
-				for _, consumer in ipairs({ "keymap", "keylogger", "shortcuts" }) do
+				for _, consumer in ipairs({ "keymap", "keystats", "shortcuts" }) do
 					local owned, status, replay_fence, is_replay = provenance.classify_with_fence(event, consumer)
 					helpers.assert_nil(owned)
 					helpers.assert_eq(status, provenance.STATUS_FOREIGN)
@@ -393,7 +393,7 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			local metadata = synthetic.lookup_tag(event:getProperty(USER_DATA))
 			if metadata and metadata.physical_replay then
 				replay_seen = replay_seen + 1
-				for _, consumer in ipairs({ "tooltip.mouse", "keylogger.nonkeyboard" }) do
+				for _, consumer in ipairs({ "tooltip.mouse", "keystats.nonkeyboard" }) do
 					local owned, status, replay_fence = provenance.classify_with_fence(event, consumer)
 					helpers.assert_nil(owned)
 					helpers.assert_eq(status, provenance.STATUS_FOREIGN)

@@ -2,6 +2,7 @@
 
 --- Resolves the signed native runtime's read-only switcher helper, never PATH.
 local M = {}
+local NativePath = require("native_path")
 
 --- Freezes the packaged digest and exact native file identity for admission.
 --- The normal authenticated launcher owns this executable path and signed digest.
@@ -9,7 +10,7 @@ local M = {}
 function M.descriptor()
 	local executable = os.getenv("ERGOPTI_LAUNCHER_EXECUTABLE")
 	if type(executable) ~= "string" or executable:sub(1, 1) ~= "/" then return nil end
-	local directory = executable:match("^(.*)/[^/]+$")
+	local directory = NativePath.dirname(executable)
 	if not directory or directory:sub(-15) ~= "/Contents/MacOS" then return nil end
 	local helper = directory .. "/SystemSwitcherState"
 	local attrs = hs.fs.symlinkAttributes(helper)

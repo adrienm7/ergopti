@@ -122,7 +122,7 @@ function M.build_world(options)
 	package.loaded["adapters.system_info"] = { time_zone = function() return "Europe/Paris" end }
 	package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return false end }
 	package.loaded["modules.shortcuts.script_control"] = nil
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end, log_llm_failed = function() end,
 		log_llm_suggested = function() end, log_llm_dismissed = function() end,

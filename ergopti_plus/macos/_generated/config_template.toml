@@ -22,11 +22,12 @@ idle_reset_seconds = 3
 click_resets_word = true
 arrow_resets_word = true
 shortcut_resets_word = true
+cascade_max_arrows = 3
 expansion_delay = 0.75
-preview_ai_enabled = false
-preview_autocorrect_enabled = false
-preview_colored_tooltips = false
-preview_star_enabled = false
+preview_ai_enabled = true
+preview_autocorrect_enabled = true
+preview_colored_tooltips = true
+preview_star_enabled = true
 
 
 
@@ -431,6 +432,8 @@ time_activation_seconds = 0.75
 
 [llm]
 enabled = false
+app_profile_overrides = ""
+user_profiles = ""
 agent_system1 = ""
 agent_system2 = ""
 agent_mode = "off"
@@ -466,7 +469,6 @@ mlx = "Qwen3.5-2B"
 
 
 [llm.profiles]
-user_profiles = []
 active = "basic"
 num_predictions = 3
 
@@ -474,7 +476,8 @@ num_predictions = 3
 
 [llm.trigger]
 disabled_apps = []
-debounce_ms = 200
+debounce_ms = 500
+min_request_interval_ms = 300
 instant_on_word_end = true
 after_hotstring = true
 secure_filter_enabled = true
@@ -498,11 +501,11 @@ secure_filter_enabled = true
 system_auth_filter_enabled = true
 encrypt = false
 disabled_apps = []
-menubar_wpm = false
-menubar_colors = true
-float_wpm = true
-float_graph = true
-float_colors = true
+wpm_widget_visible = false
+wpm_widget_colors = false
+wpm_widget_graph = false
+wpm_menubar_visible = false
+wpm_menubar_colors = true
 
 
 
@@ -511,6 +514,14 @@ float_colors = true
 [shortcuts]
 enabled = false
 chatgpt_url = "https://chat.openai.com"
+
+
+
+
+
+[mod_combos]
+simultaneous_threshold_ms = 100
+symmetric = false
 
 
 
@@ -577,24 +588,20 @@ swipe_2_left_down = "none"
 swipe_2_left_up = "none"
 swipe_2_right_down = "none"
 swipe_2_right_up = "none"
-swipe_2_diag = "none"
 swipe_3_left_down = "none"
 swipe_3_left_up = "none"
 swipe_3_right_down = "none"
 swipe_3_right_up = "none"
-swipe_3_diag = "none"
 swipe_3_horiz = "none"
 swipe_4_left_down = "none"
 swipe_4_left_up = "none"
 swipe_4_right_down = "none"
 swipe_4_right_up = "none"
-swipe_4_diag = "none"
 swipe_4_horiz = "none"
 swipe_5_left_down = "none"
 swipe_5_left_up = "none"
 swipe_5_right_down = "none"
 swipe_5_right_up = "none"
-swipe_5_diag = "none"
 swipe_5_horiz = "none"
 tap_2 = "none"
 tap_5 = "none"
@@ -651,8 +658,8 @@ swipe_2_right_down = 3.5
 swipe_2_right_up = 3.5
 swipe_3_left = 3.5
 swipe_3_right = 3.5
-swipe_3_up = 5
-swipe_3_down = 5
+swipe_3_up = 25
+swipe_3_down = 25
 swipe_3_left_down = 3.5
 swipe_3_left_up = 3.5
 swipe_3_right_down = 3.5
@@ -683,10 +690,11 @@ swipe_5_horiz = 3.5
 
 [layout]
 direct_access_digits = "native"
+virtual_keyboard = "auto"
 number_row_reorder_edges = false
 pause_switch_enabled = false
-on_pause = false
-on_resume = false
+on_pause = ""
+on_resume = ""
 
 
 
@@ -706,23 +714,5 @@ enabled = false
 
 [shortcuts.keys]
 wrap_text_if_selected = false
-ctrl_a = false
-ctrl_d = false
-ctrl_e = false
 ctrl_g = false
-ctrl_h = false
-ctrl_i = false
-ctrl_m = false
-ctrl_o = false
-ctrl_p = false
-ctrl_s = false
-ctrl_t = false
-ctrl_u = false
-ctrl_w = false
-ctrl_x = false
-ctrl_capslock = false
-ctrl_l = false
-ctrl_period = false
-ctrl_quote = false
-cmd_shift_v = false
 cmd_star = false

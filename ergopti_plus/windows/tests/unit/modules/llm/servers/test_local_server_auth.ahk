@@ -98,7 +98,11 @@ _LSA_ForeignSourceRefusal() {
 	Foreign := JsonParse(Image)
 	Foreign[1]["future"] := Map("nested", [7, 9])
 	AssertFalse(_LLM_Menu_SerializeApiEntries(Map("api_entries", Foreign)), "unsupported fields refuse the detached writer rather than disappear")
-	AssertFalse(_LLM_Menu_ApiSourceOwned('[{"Id":"future","Provider":"unknown","Token":"","Model":"m","Name":"Future","BaseUrl":"http://127.0.0.1:1/v1"}]'), "an unknown source row cannot be overwritten after a refused load")
+	; A row naming a provider this build no longer lists loads as retired and is
+	; written back byte-for-byte, so its source stays owned; an unknown field,
+	; which the six-field writer would drop, is still refused.
+	AssertTrue(_LLM_Menu_ApiSourceOwned('[{"Id":"future","Provider":"unknown","Token":"","Model":"m","Name":"Future","BaseUrl":"http://127.0.0.1:1/v1"}]'), "a retired-provider source row is preserved, not refused")
+	AssertFalse(_LLM_Menu_ApiSourceOwned('[{"Id":"future","Provider":"unknown","Token":"","Model":"m","Name":"Future","BaseUrl":"http://127.0.0.1:1/v1","future":"x"}]'), "an unknown source field cannot be overwritten after a refused load")
 	AssertFalse(_LLM_Menu_ApiSourceOwned("{}"), "a failed source read cannot be treated as an empty collection")
 }
 Test("local API authentication: unsupported source data refuses replacement", _LSA_ForeignSourceRefusal)

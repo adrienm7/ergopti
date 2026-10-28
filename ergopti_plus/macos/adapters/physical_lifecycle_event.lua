@@ -2,7 +2,7 @@
 
 --- Maps an actual native lifecycle callback through the existing shared event policy.
 local M = {}
-local Observation = require("keylogger.physical_lifecycle_observation")
+local Observation = require("keystats.physical_lifecycle_observation")
 
 --- Reads existing native constants only; an unknown event grants no awake facts.
 ---@param event any Existing native caffeinate callback event.

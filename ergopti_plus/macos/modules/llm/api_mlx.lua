@@ -136,9 +136,11 @@ local _active_server_pgid   = nil
 -- their declaration point; the forward reference here lets the upvalue resolve correctly.
 local kill_zombie_on_mlx_port
 
--- True from the moment a new server launch begins (reset_endpoints called) until the
--- bash script reports "[MLX] Server started with PID X PGID Y" and set_active_server_pgid
--- is called. During this window the new Python process is already alive but its PGID is
+-- True from the moment a cold server launch begins (reset_endpoints called with
+-- awaiting_pgid) until the bash script reports "[MLX] Server started with PID X PGID Y"
+-- and set_active_server_pgid is called. A stop or an adoption has no launch to wait for,
+-- so it never opens this window: opening it there left the guard pending until the
+-- 15 s timeout warned after every ordinary stop. During this window the new Python process is already alive but its PGID is
 -- unknown, so any unguarded kill -9 would massacre it. Block all zombie kills while pending.
 local _server_pgid_pending  = false
 -- Safety-timeout handle: if the Python server crashes before printing its PGID line,
@@ -235,7 +237,9 @@ kill_zombie_on_mlx_port = function()
 		return
 	end
 	_last_zombie_kill_at = now
-	Logger.warn(LOG, "Killing zombie mlx_lm Python process(es) via ps+awk (excluding PGID %s)…",
+	-- The sweep also runs as a precaution once each launch reports its PGID, so
+	-- starting it is not news; only a process it actually killed is.
+	Logger.debug(LOG, "Sweeping zombie mlx_lm Python process(es) via ps+awk (excluding PGID %s)…",
 		tostring(_active_server_pgid or "none"))
 	-- Target only real Python processes via COMM filter, never the bash wrapper.
 	-- Earlier versions used `pgrep -f 'python.*mlx_lm'`, but the wrapper argv is
@@ -273,7 +277,13 @@ kill_zombie_on_mlx_port = function()
 		"[ -n \"$ZOMBIES\" ] && echo \"$ZOMBIES\" | xargs kill -9 2>/dev/null && echo \"killed: $ZOMBIES\" || echo 'none'"
 	local kill_task = ShellRunner.spawn("/bin/bash", {"-c", cmd}, function(exit_code, stdout, _stderr)
 		if exit_code == 0 then
-			Logger.warn(LOG, "Zombie kill completed; stdout: %s", tostring(stdout):gsub("\n", " "))
+			local report = (tostring(stdout):gsub("\n", " "))
+			if report:find("killed:", 1, true) then
+				Logger.warn(LOG, "Zombie mlx_lm process(es) killed outside the active PGID %s: %s",
+					pgid_str, report)
+			else
+				Logger.debug(LOG, "Zombie sweep found no stray mlx_lm process.")
+			end
 		else
 			Logger.debug(LOG, "Zombie kill exit %d.", exit_code)
 		end
@@ -486,7 +496,7 @@ function M.mark_load_failed(model_name, notify)
 		-- Reuse the fully-translated "incompatible — choose another model" message:
 		-- it is the correct, actionable advice for any model that never becomes ready,
 		-- whether the cause is an unsupported architecture or a hung load.
-		pcall(Notifications.notify, "MLX incompatible",
+		pcall(Notifications.notify, i18n.get("mlx.model_incompatible_title"),
 			string.format(i18n.get("mlx.model_incompatible"), tostring(model_name)), "error")
 	end
 end
@@ -517,12 +527,19 @@ local function quiesce_warmup()
 	_warmup_in_flight = false
 	_warmup_active = false
 	local local_settled = settle_local_warmup_owners() == true
-	local discovery_ok, discovery_result = xpcall(function()
+	local discovery_ok, discovery_result, discovery_pending = xpcall(function()
 		if type(ApiMlxDiscovery.stop) ~= "function" then return false end
 		return ApiMlxDiscovery.stop()
 	end, debug.traceback)
 	local discovery_settled = discovery_ok == true and discovery_result == true
-	if not discovery_settled then
+	if not discovery_settled and discovery_ok == true and discovery_pending == "pending" then
+		-- The poll task got its SIGTERM and only its native exit is outstanding.
+		-- Discovery keeps that exact debt and fences resume() until it exits, so
+		-- the warmup revocation has committed. Reporting it as unsettled made a
+		-- failed MLX bootstrap log three ERRORs on every disable (issue #104).
+		Logger.debug(LOG, "Warmup discovery stop awaits the poll task's native exit.")
+		discovery_settled = true
+	elseif not discovery_settled then
 		Logger.error(LOG, "Warmup discovery cancellation retained exact cleanup debt: %s.",
 			tostring(discovery_result))
 	end
@@ -1001,8 +1018,17 @@ end
 --- Resets the endpoint discovery state so the next warmup re-probes the live
 --- server. Called after an mlx-lm upgrade, because a new wheel may expose
 --- different route paths than the previously cached ones.
+--- Only a cold launch passes `awaiting_pgid`: it blocks zombie kills until the
+--- new server reports its PGID, behind the 15 s safety timeout. A stop, an
+--- adoption or a port change clears the guard without waiting for a PGID that
+--- no launch will ever print.
+--- @param options table|nil `{ awaiting_pgid = true }` for a cold launch.
 --- @return boolean settled True only after every predecessor and new PGID guard settle.
-function M.reset_endpoints()
+function M.reset_endpoints(options)
+	if options ~= nil and type(options) ~= "table" then
+		error("reset_endpoints: options must be a table or nil, got " .. type(options), 2)
+	end
+	local awaiting_pgid = options ~= nil and options.awaiting_pgid == true
 	_warmup_settlement_recovery = nil
 	_is_ready                    = false
 	-- Invalidate any in-flight warmup POST: its 200 response is for the OLD server/
@@ -1025,7 +1051,7 @@ function M.reset_endpoints()
 		end
 	end
 	_active_server_pgid          = nil   -- cleared until the new server reports its PGID
-	_server_pgid_pending         = true  -- block zombie kills until set_active_server_pgid() fires
+	_server_pgid_pending         = awaiting_pgid  -- a cold launch blocks zombie kills until its PGID
 	_last_zombie_kill_at         = 0     -- allow an immediate kill on the first mismatch after PGID is known
 	_pgid_pending_generation = _pgid_pending_generation + 1
 	local pgid_generation = _pgid_pending_generation
@@ -1056,8 +1082,8 @@ function M.reset_endpoints()
 		end
 	end
 
-	local pgid_timeout_ready = false
-		do
+	local pgid_timeout_ready = not awaiting_pgid
+	if awaiting_pgid then
 		-- Forward-declare the handle because the callback must compare against the
 		-- exact candidate that owns this reset generation.
 		local pgid_handle
@@ -1097,7 +1123,9 @@ function M.reset_endpoints()
 	_warmup_started_at           = nil
 	_discovery_started_at        = nil
 	_warmup_fail_notified        = false
-	Logger.warn(LOG, "Endpoint discovery state reset.")
+	Logger.info(LOG, awaiting_pgid
+		and "Endpoint discovery state reset; awaiting the new server's PGID."
+		or "Endpoint discovery state reset; no server launch follows.")
 	return true
 end
 
@@ -1574,6 +1602,12 @@ function M.request_raw(model_name, system_prompt, full_text, tail_text, temperat
 	local force_chat = type(options) == "table" and options.chat == true
 	return ApiMlxInference.post_and_parse(model_name, system_prompt, full_text, tail_text,
 		temperature, max_tokens, 1, false, nil, on_fail, ApiCommon.new_dedup_stats(), false, on_raw, force_chat)
+end
+
+--- Hands the inference HttpClient to the request mechanics.
+--- @see modules.llm.api_mlx_inference M.set_inference_client
+function M.set_inference_client(client)
+	return ApiMlxInference.set_inference_client(client)
 end
 
 return M

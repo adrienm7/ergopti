@@ -6,8 +6,8 @@
 --- Restarts the running daemon so every module starts again from config.toml,
 --- the Linux counterpart of hs.reload() and the Windows Reload. It reuses the
 --- updater's restarter: under the systemd user unit, systemd restarts the
---- daemon; otherwise a detached relay starts the standalone launcher once this
---- process has exited.
+--- daemon; otherwise a detached relay starts the standalone launcher, or the
+--- developer launcher of a developer run, once this process has exited.
 --- ==============================================================================
 
 local M = {}
@@ -16,8 +16,11 @@ local Logger = require("logger.shim")
 
 local LOG = "infra.daemon_restart"
 
+--- How the restart this process requested is carried out ("systemd" or "relay"), until cancelled.
+local _pending = nil
+
 --- Requests a restart.
---- @param opts table `{ reason, args, restarter?, installation?, cgroup?, run? }`:
+--- @param opts table `{ reason, args, paused?, restarter?, installation?, cgroup?, run? }`:
 ---   `installation()` resolves the updater's installation context,
 ---   `restarter` defaults to modules.updater.restarter.
 --- @return string|nil how "systemd" or "relay" (the caller must then exit).
@@ -26,8 +29,13 @@ function M.restart(opts)
 	assert(type(opts) == "table" and type(opts.reason) == "string" and opts.reason ~= ""
 		and type(opts.args) == "table", "a daemon restart needs a reason and the daemon arguments")
 	local Restarter = opts.restarter or require("modules.updater.restarter")
+	-- A developer run is a checkout, which the updater rightly calls unmanaged;
+	-- its Reload relays the developer launcher (infra/dev_source.lua) instead.
 	local installation = opts.installation
-		or function() return require("modules.updater.manager")._resolve_installation() end
+		or function()
+			return require("infra.dev_source").restart_context()
+				or require("modules.updater.manager")._resolve_installation()
+		end
 	local under_unit = Restarter.under_unit(opts.cgroup)
 	local wrapper
 	if not under_unit then
@@ -46,6 +54,7 @@ function M.restart(opts)
 	local how = Restarter.restart({
 		wrapper = wrapper or Restarter.UNIT,
 		args = opts.args,
+		paused = opts.paused,
 		run = opts.run,
 		cgroup = opts.cgroup,
 	})
@@ -54,7 +63,31 @@ function M.restart(opts)
 		return nil, "the restart could not be requested"
 	end
 	Logger.success(LOG, "Restart for %s requested (%s).", opts.reason, how)
+	_pending = how
 	return how
+end
+
+--- Cancels the restart this process requested, for a Quit that wins over a reload.
+--- @param opts table|nil `{ restarter?, run?, pid? }`, restarter defaults to modules.updater.restarter.
+--- @return boolean cancelled
+--- @return string|nil detail Why it could not be cancelled.
+function M.cancel(opts)
+	opts = opts or {}
+	if _pending == nil then return false, "no restart is pending" end
+	local Restarter = opts.restarter or require("modules.updater.restarter")
+	local cancelled, detail = Restarter.cancel(_pending, { run = opts.run, pid = opts.pid })
+	if cancelled then
+		Logger.info(LOG, "The pending %s restart was cancelled.", _pending)
+		_pending = nil
+		return true
+	end
+	Logger.error(LOG, "The pending %s restart could not be cancelled: %s.", _pending, tostring(detail))
+	return false, detail
+end
+
+--- Test seam: forgets the pending restart.
+function M._reset_for_test()
+	_pending = nil
 end
 
 return M

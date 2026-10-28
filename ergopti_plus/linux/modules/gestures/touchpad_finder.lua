@@ -49,6 +49,7 @@
 
 local M = {}
 
+local Errors = require("adapter_errors")
 local Logger = require("logger.shim")
 
 local LOG = "gestures.touchpad_finder"
@@ -200,7 +201,7 @@ function M.describe(device)
 	}
 
 	if not out.path then
-		out.reason = "no event node"
+		out.reason = Errors.TOUCHPAD_NO_EVENT_NODE
 		return out
 	end
 
@@ -208,13 +209,13 @@ function M.describe(device)
 	-- say "Touchpad" on something that reports a single point, and a real pad can
 	-- be named after its chipset.
 	if not M.bit_set(device.abs or "", ABS_MT_SLOT) then
-		out.reason = "no ABS_MT_SLOT — cannot report per-finger positions"
+		out.reason = Errors.TOUCHPAD_NO_MULTITOUCH_SLOT
 		return out
 	end
 
 	if not (M.bit_set(device.prop or "", INPUT_PROP_POINTER)
 		or M.bit_set(device.prop or "", INPUT_PROP_BUTTONPAD)) then
-		out.reason = "not a pointing device"
+		out.reason = Errors.TOUCHPAD_NOT_POINTING_DEVICE
 		return out
 	end
 

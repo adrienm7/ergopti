@@ -7,7 +7,7 @@
  * Contract for persistent key-value and structured storage used by domain
  * modules. Every driver adapter that needs durable storage MUST satisfy this
  * interface. The port abstracts SQLite on Hammerspoon/Linux and JSON-file
- * storage on AHK behind a unified surface so domain logic (keylogger SQLite,
+ * storage on AHK behind a unified surface so domain logic (keystats SQLite,
  * app categories, config) never imports OS-specific storage APIs.
  *
  * FEATURES & RATIONALE:

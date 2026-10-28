@@ -314,10 +314,10 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 			return outcome == "true"
 		end
 		local config = fake_config({})
-		config.get_global_delay = function() return 0.4 end
+		config.get_base_delay = function() return 0.4 end
 		config.resolve = function() return { delay = 0.3 } end
 		if outcome ~= "missing" then
-			if kind == "global" then config.set_global_delay = setter else config.set_override = setter end
+			if kind == "global" then config.set_base_delay = setter else config.set_override = setter end
 		end
 		return config, calls
 	end
@@ -376,18 +376,25 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
 		local path, config_path = directory .. "/hotstrings_overrides.toml", directory .. "/config.toml"
 		local foreign = '[future]\nlabel = "independent" # unrelated future comment\nnested = { values = [2, 7], on = true }\n'
-		local original = '# hand-written delay preferences\n[_global]\ndelay = 0.4\n[magickey]\ndelay = 0.3\n' .. foreign
-		write(path, original);write(config_path, '[future]\nuser = "kept"\n')
+		-- The base expansion delay (0.4 s) is the canonical config.toml leaf; the category
+		-- delay (0.3 s) is stored as its offset, -0.1 s.
+		local original = '# hand-written delay preferences\n[magickey]\ndelay_offset = -0.1\n' .. foreign
+		local config_original = '[future]\nuser = "kept"\n[hotstrings]\nexpansion_delay = 0.4\n'
+		write(path, original);write(config_path, config_original)
 		local loaded = {};for name, value in pairs(package.loaded) do loaded[name] = value end
+		local preferences = require("infra.hotstring_preferences")
 		local called, err = pcall(function()
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
+			assert(preferences._set_file_for_test(config_path))
 			local config = require("modules.hotstrings.hotstrings_config")
 			assert(config._set_config_file_for_test(config_path))
 			assert(config._set_override_config_dir_for_test(directory))
 			assert(config.init(require("hotstring_engine").new(), directory))
 			config._set_categories_for_test({ magickey = { delay = 0.3 } })
-			body({ config = config, path = path, config_path = config_path, original = original, foreign = foreign })
+			body({ config = config, path = path, config_path = config_path, original = original, foreign = foreign,
+				config_original = config_original })
 		end)
+		preferences._set_file_for_test(nil)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end
 		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
@@ -400,9 +407,12 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 				with_native_owner(function(c)
 					local changed = 0
 					local action = delay_action(c.config, kind, function() changed = changed + 1 end)
+					-- The base delay is a config.toml leaf; a category delay lives in the override file.
+					local target = kind == "global" and c.config_path or c.path
+					local before = kind == "global" and c.config_original or c.original
 					local rename, writes = os.rename, 0
 					os.rename = function(from, to)
-						if from == c.path .. ".tmp" and to == c.path then
+						if from == target .. ".tmp" and to == target then
 							writes = writes + 1
 							if outcome == "throw" then error("inert owned delay publication refusal") end
 							if outcome == "nil" then return nil, "inert refusal" end
@@ -414,22 +424,29 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 					local called, result, asks, notices, releases = observe(action, "900")
 					os.rename = rename
 					print(string.format("DELAY_REFUSAL kind=%s outcome=%s called=%s result=%s refresh=%d writes=%d source_same=%s",
-						kind, outcome, tostring(called), tostring(result), changed, writes, tostring(read(c.path) == c.original)))
+						kind, outcome, tostring(called), tostring(result), changed, writes, tostring(read(target) == before)))
 					helpers.assert_eq(changed, 0, "a refused actual override publication cannot refresh the menu")
 					helpers.assert_true(called);helpers.assert_eq(result, false)
 					helpers.assert_eq(writes, 1, "the actual leaf writer attempted precisely its owned publication")
-					helpers.assert_eq(changed, 0);helpers.assert_eq(read(c.path), c.original)
-					helpers.assert_eq(c.config.get_global_delay(), 0.4);helpers.assert_eq(c.config.resolve("magickey", nil).delay, 0.3)
+					helpers.assert_eq(changed, 0);helpers.assert_eq(read(target), before)
+					helpers.assert_eq(c.config.get_base_delay(), 0.4);helpers.assert_eq(c.config.resolve("magickey", nil).delay, 0.3)
 					helpers.assert_eq(#asks, 1);helpers.assert_eq(#notices, 1);helpers.assert_eq(releases, 1)
 					local retry, committed, _, retry_notices = observe(action, "900")
 					helpers.assert_true(retry);helpers.assert_eq(committed, true);helpers.assert_eq(changed, 1);helpers.assert_eq(#retry_notices, 0)
-					local disk = read(c.path)
-					helpers.assert_true(disk:find(c.foreign, 1, true) ~= nil, "unknown nested data and comments retain their exact bytes")
-					helpers.assert_eq(read(c.config_path), '[future]\nuser = "kept"\n', "the unrelated canonical config was never written")
+					local disk = read(target)
 					local decoded = require("toml_codec").decode(disk)
-					helpers.assert_eq(decoded[kind == "global" and "_global" or "magickey"].delay, 0.9)
+					if kind == "global" then
+						helpers.assert_eq(decoded.hotstrings.expansion_delay, 0.9, "the base delay is the canonical leaf")
+						helpers.assert_eq(decoded.future.user, "kept", "unrelated canonical data is retained")
+						helpers.assert_eq(read(c.path), c.original, "the override file was never written")
+					else
+						helpers.assert_true(disk:find(c.foreign, 1, true) ~= nil, "unknown nested data and comments retain their exact bytes")
+						helpers.assert_eq(read(c.config_path), c.config_original, "the unrelated canonical config was never written")
+						helpers.assert_eq(decoded.magickey.delay_offset, 0.5, "the delay is stored as an offset of the 0.4 s base")
+						helpers.assert_nil(decoded.magickey.delay, "the absolute spelling is never written")
+					end
 					assert(c.config.init(require("hotstring_engine").new(), c.path:match("^(.*)/")))
-					helpers.assert_eq(kind == "global" and c.config.get_global_delay() or c.config.resolve("magickey", nil).delay, 0.9,
+					helpers.assert_eq(kind == "global" and c.config.get_base_delay() or c.config.resolve("magickey", nil).delay, 0.9,
 						"a real disk reload agrees with the acknowledged value")
 				end)
 			end)
@@ -439,10 +456,22 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 				local changed = 0
 				local action = delay_action(c.config, kind, function() changed = changed + 1 end)
 				local foreign = c.original .. '# another owner changed the physical source\n'
-				local called, result, _, notices = observe(action, "900", function() write(c.path, foreign) end)
+				local target = kind == "global" and c.config_path or c.path
+				if kind == "global" then foreign = c.config_original .. '# another owner changed the physical source\n' end
+				local called, result, _, notices = observe(action, "900", function() write(target, foreign) end)
+				if kind == "global" then
+					-- The base delay is a live config.toml leaf: the writer re-reads the file at write time,
+					-- so a concurrent foreign edit is merged instead of refused (as for the WPM settings).
+					helpers.assert_true(called);helpers.assert_eq(result, true);helpers.assert_eq(changed, 1)
+					local disk = read(target)
+					helpers.assert_true(disk:find("# another owner changed the physical source", 1, true) ~= nil,
+						"the foreign edit is kept")
+					helpers.assert_eq(require("toml_codec").decode(disk).hotstrings.expansion_delay, 0.9)
+					return
+				end
 				helpers.assert_true(called);helpers.assert_eq(result, false);helpers.assert_eq(changed, 0)
-				helpers.assert_eq(read(c.path), foreign, "the captured canonical override source refuses a stale write")
-				helpers.assert_eq(c.config.get_global_delay(), 0.4);helpers.assert_eq(c.config.resolve("magickey", nil).delay, 0.3)
+				helpers.assert_eq(read(target), foreign, "the captured canonical source refuses a stale write")
+				helpers.assert_eq(c.config.get_base_delay(), 0.4);helpers.assert_eq(c.config.resolve("magickey", nil).delay, 0.3)
 				helpers.assert_eq(#notices, 1)
 			end)
 		end)

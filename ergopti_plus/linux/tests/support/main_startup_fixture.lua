@@ -145,7 +145,7 @@ function M.run(options)
 		setFallbackMenu = function(_, _, quit) observed.tray_quit = quit end, pump = noop, destroy = noop }
 	env.TapHold = { is_active = function() return true end }
 	env.MagicKey = { get = function() return "★" end, init = noop }
-	env.keylogger = { hold_accounting_token = noop, pump_flush = noop, get_categories = function() return {} end,
+	env.keystats = { hold_accounting_token = noop, pump_flush = noop, get_categories = function() return {} end,
 		get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end }
 	env.capture_owned_scancodes = {}
 	env.script_actions = { is_paused = function() return false end }
@@ -191,9 +191,13 @@ function M.run(options)
 		elseif name == "luv" then
 			return { os_getpid = function() return 4242 end }
 		elseif name == "infra.input_access" then
-			return { report = function() observed.access_reported = true; return 1 end }
+			return { missing_program = function() return nil end, report = function() observed.access_reported = true; return 1 end }
 		elseif name == "infra.i18n" then
 			return { init = noop, set_trigger_provider = noop, get = function(key) return key end }
+		elseif name == "infra.dev_source" then
+			-- An installed daemon: no developer root, no source watchers.
+			return { root = function() return nil end, is_active = function() return false end,
+				source_dirs = function() return nil end, DRIVER_SUBPATH = "/static/ergopti_plus/linux" }
 		elseif name == "infra.config_paths" then
 			return { config = function() return "/controlled/config.toml" end }
 		elseif name == "ui.onboarding.startup" then
@@ -205,7 +209,8 @@ function M.run(options)
 		error("Unexpected startup dependency: " .. tostring(name), 0)
 	end
 	env.os = setmetatable({ exit = function(code) error("controlled process exit " .. tostring(code), 0) end }, { __index = os })
-	env.CrashReporter = { protect = function(_, callback)
+	env.CrashReporter = { remove_legacy_dumps = function() observed.legacy_dump_cleanups = (observed.legacy_dump_cleanups or 0) + 1; return 0 end,
+		protect = function(_, callback)
 		local ok, failure = pcall(callback)
 		observed.protected_error = failure
 		-- The protected Main frame, including its native constructor, has unwound.

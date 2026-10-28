@@ -10,7 +10,7 @@
 --- getter-mismatch branch a few lines below, which correctly fails CLOSED
 --- with a logged ERROR. A corrupted or typo'd manifest reference (or an id
 --- renamed on one side only) would silently un-gate a security-sensitive item
---- — e.g. a keylogger-disabled toggle rendering as always-enabled.
+--- — e.g. a keystats-disabled toggle rendering as always-enabled.
 ---
 --- Fix: a lookup miss now fails CLOSED (returns true = disabled) and logs
 --- Logger.error, matching the sibling getter-mismatch branch's pattern.

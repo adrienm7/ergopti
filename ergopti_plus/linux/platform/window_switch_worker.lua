@@ -6,6 +6,7 @@ require("compat.utf8").install()
 local Shell = require("adapters.shell_runner")
 local Policy = require("cursor_window_policy")
 local LIMIT = 65536
+local SLEEP_MS = require("infra.timings").ms("adapters", "window_switch_worker_sleep_ms")
 local Native = require("luv")
 local Constants = Native.constants
 local files, directory = {}, nil
@@ -150,7 +151,7 @@ local function request_permit(request, permit, phase)
 		local receipt = read(permit)
 		if receipt == "REVOKED\n" then return false end
 		if receipt == "PERMIT " .. phase .. "\n" then return true end
-		Native.sleep(10)
+		Native.sleep(SLEEP_MS)
 	until Native.hrtime() >= deadline
 	return false
 end

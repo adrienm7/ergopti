@@ -46,6 +46,9 @@ local DF = "/bin/df"
 -- ps prints this process's processor share (100 = one core) and resident memory (KiB)
 local PS = "/bin/ps"
 
+-- scutil prints the system proxy settings, among them the PAC URL
+local SCUTIL = "/usr/sbin/scutil"
+
 -- system_profiler lists the Bluetooth devices hs.usb cannot see
 local SYSTEM_PROFILER = "/usr/sbin/system_profiler"
 
@@ -111,7 +114,11 @@ local function start_probe(run, id, timeout_ms, body)
 			Logger.done(LOG, "Probe '%s' cancelled after %d ms.", id, result.ms)
 			return
 		end
-		Logger.done(LOG, "Probe '%s' answered: %s (%d ms).", id, result.state, result.ms)
+		-- A failed answer carries its detail into the log: the diagnostics window
+		-- closes, and a field report holds only the log (issue #104).
+		local detail = result.state ~= "ok" and type(result.detail) == "string" and result.detail ~= ""
+			and (": " .. result.detail) or ""
+		Logger.done(LOG, "Probe '%s' answered: %s (%d ms)%s.", id, result.state, result.ms, detail)
 		run.publish(id, result, sections)
 	end
 	run.finishers[#run.finishers + 1] = function()
@@ -248,6 +255,35 @@ local function run_task(executable, args, on_cancel, on_output, on_failure)
 	end)
 	on_cancel(function() handle.terminate() end)
 	if not handle.start() then on_failure(executable .. " could not start") end
+end
+
+--- The system proxy auto-config (PAC): configured, downloadable and usable by the
+--- managed downloader. The URL is read and fetched here but never reported.
+--- @return function Probe body.
+local function proxy_pac()
+	return function(done, on_cancel)
+		local PacCheck = require("network.pac_check")
+		run_task(SCUTIL, { "--proxy" }, on_cancel, function(stdout)
+			local url = PacCheck.url_from_scutil(stdout)
+			if not url then
+				done({ state = "ok" }, { network = { proxy_pac = "No PAC configured" } })
+				return
+			end
+			local client = require("adapters.http_client").new({ timeout_ms = 6000 })
+			on_cancel(function() client.cancel() end)
+			client.get(url, { ["User-Agent"] = USER_AGENT }, function(result)
+				local state, text = PacCheck.judge(result.status, result.body, result.error)
+				if state == "ok" then
+					done({ state = "ok" }, { network = { proxy_pac = text } })
+				else
+					-- The managed downloads go direct after such a failure (network-retry.sh).
+					done({ state = "error", detail = PacCheck.with_direct_fallback(text) })
+				end
+			end)
+		end, function(detail)
+			done({ state = "error", detail = detail })
+		end)
+	end
 end
 
 --- The model, processor and cores from sysctl, and the logs volume's free
@@ -407,7 +443,7 @@ end
 local function configuration(schema, overrides)
 	return function(done, on_cancel)
 		local Timers = require("adapters.timer_scheduler")
-		local handle = Timers.after(0.001, function()
+		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_yield_ms"), function()
 			local context = require("ui.healthcheck.helpers").configuration_context(schema, overrides)
 			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
 			if not ok then
@@ -474,6 +510,7 @@ function M.start(schema, snapshot, publish, options)
 		return run
 	end
 	start_probe(run, "github_api", config.github_api.timeout_ms, github_api(config.github_api))
+	start_probe(run, "proxy_pac", config.proxy_pac.timeout_ms, proxy_pac())
 	start_probe(run, "ai_health", config.ai_health.timeout_ms, ai_health(config.ai_health))
 	start_probe(run, "system_details", config.system_details.timeout_ms, system_details(sections.paths.logs_dir))
 	start_probe(run, "cpu_load", config.cpu_load.timeout_ms, cpu_load(config.cpu_load))

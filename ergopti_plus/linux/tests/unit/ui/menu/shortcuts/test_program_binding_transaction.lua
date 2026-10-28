@@ -11,7 +11,7 @@ local PRIOR = Json.encode({ version = 1, executable = "/private/prior-program", 
 local NEXT = Json.encode({ version = 1, executable = "/private/next-program", arguments = { "private-next" } })
 local CASES = {
 	{ binding = "tap_3", section = "gestures", slot = "tap_3", module = "modules.gestures.manager" },
-	{ binding = "keyboard__ctrl_j", section = "shortcuts.keyboard", slot = "ctrl_j", module = "modules.shortcuts.keyboard_shortcuts" },
+	{ binding = "keyboard__primary_j", section = "shortcuts.keyboard", slot = "primary_j", module = "modules.shortcuts.keyboard_shortcuts" },
 	{ binding = "tap_key__number_row_left", section = "shortcuts.tap_keys", slot = "number_row_left", module = "modules.shortcuts.tap_keys" },
 	{ binding = "script__script_altgr_enter", section = "shortcuts.script_control", slot = "script_altgr_enter", module = "modules.shortcuts.script_chords" },
 }
@@ -153,6 +153,111 @@ local function with_case(spec, body)
 	assert(ok, failure)
 end
 
+--- Opens the real picker and configuration writer over two private folders.
+--- @param body function Scenario using the retained native page and disk sources.
+local function with_configuration_picker(body)
+	require("tests.support.ui.menu.llm.numeric_configuration_fixture").with_configuration(function(f)
+		local suffix = "[shortcuts.keyboard]\nprimary_j = \"run_program\"\n[gesture_parameters]\n"
+			.. "keyboard__primary_j__run_program = " .. Json.encode(PRIOR) .. "\n"
+		for _, id in ipairs({ "a", "b" }) do
+			Sandbox.write_bytes(f.dirs[id] .. "/config.toml", f.bytes(id) .. suffix)
+		end
+		for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
+			"modules.shortcuts.script_chords", "modules.hotstrings.magic_key", "infra.program_binding_transaction",
+			"ui.action_picker.bridge" }) do package.loaded[name] = nil end
+		local seen = { logs = {}, changed = 0 }
+		local logger = {}
+		for _, level in ipairs({ "error", "warn", "info", "debug", "trace", "start", "success", "done" }) do
+			logger[level] = function(_, message, ...) seen.logs[#seen.logs + 1] = string.format(message, ...) end
+		end
+		package.loaded["logger.shim"] = logger
+		package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
+		package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad" }
+		package.loaded["adapters.program_providers"] = {}
+		local gestures = require("modules.gestures.manager")
+		gestures.init({ persist = true, config_path = f.paths.config("config.toml"), enabled = false })
+		local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+		local bridge = require("ui.action_picker.bridge")
+		local function find(rows, predicate)
+			for _, row in ipairs(rows or {}) do
+				if predicate(row) then return row end
+				local found = find(row.menu, predicate); if found then return found end
+			end
+		end
+		function f.open_picker()
+			local rows = menu_rows(gestures, f.paths.config("config.toml"), {
+				on_menu_changed = function() seen.changed = seen.changed + 1 end,
+			})
+			local prefix = keyboard.get_slot_label("primary_j") .. " → "
+			local slot = assert(find(rows, function(row)
+				return type(row.title) == "string" and row.title:sub(1, #prefix) == prefix
+			end), "the actual keyboard slot is rendered")
+			local title = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+			local command = assert(find(slot.menu, function(row) return row.title == title and type(row.fn) == "function" end))
+			command.fn()
+			assert(bridge.is_open() and f.host.is_visible("action_picker"), "the real picker session is open")
+		end
+		function f.change_folder(id)
+			assert(f.host.show("paths_editor"))
+			local result = require("ui.paths_editor.bridge").on_message({ action = "save", configDir = f.dirs[id] }, {
+				config_paths = f.paths, webview_manager = f.host, on_reload = function() return true end,
+			})
+			helpers.assert_eq({ result.saved, result.reloaded, result.hidden }, { true, true, true })
+			helpers.assert_eq(f.paths.config("config.toml"), f.dirs[id] .. "/config.toml")
+			helpers.assert_eq(f.host.is_visible("action_picker"), true, "saving paths does not retire another page")
+		end
+		function f.pick(action, parameter)
+			bridge.on_message({ action = "confirm", id = action, parameter = parameter }, {})
+		end
+		function f.cancel() bridge.on_message({ action = "cancel" }, {}) end
+		body(f, keyboard, bridge, seen)
+	end)
+end
+
+helpers.describe("Linux action picker opening configuration", function()
+	for _, vector in ipairs({ { action = "none", identical = false }, { action = "none", identical = true },
+		{ action = "send_text", parameter = "private picked text", identical = false } }) do
+		helpers.it("(picker-opening-config) refuses " .. vector.action .. " after switching to "
+			.. (vector.identical and "byte-identical" or "different") .. " folder", function()
+			with_configuration_picker(function(f, keyboard, bridge, seen)
+				if vector.identical then Sandbox.write_bytes(f.dirs.b .. "/config.toml", f.bytes("a")) end
+				local before = { a = f.bytes("a"), b = f.bytes("b") }
+				f.open_picker()
+				f.change_folder("b")
+				f.pick(vector.action, vector.parameter)
+				local bound_logs = 0
+				for _, line in ipairs(seen.logs) do if line:find("Bound ", 1, true) then bound_logs = bound_logs + 1 end end
+				helpers.assert_eq({ source_a = f.bytes("a"), source_b = f.bytes("b"), action = keyboard.get_action("primary_j"),
+					changed = seen.changed, picker_open = bridge.is_open(), bound_logs = bound_logs },
+					{ source_a = before.a, source_b = before.b, action = "run_program", changed = 0, picker_open = true, bound_logs = 0 },
+					"a retained A picker must refuse B publication, runtime mutation and false success together")
+				f.cancel()
+				helpers.assert_eq(bridge.is_open(), false)
+			end)
+		end)
+	end
+	for _, folder in ipairs({ "a", "b" }) do
+		for _, action in ipairs({ "none", "send_text" }) do
+			helpers.it("(picker-opening-config) commits a fresh " .. folder .. " picker for " .. action, function()
+				with_configuration_picker(function(f, keyboard, bridge, seen)
+					local before_a = f.bytes("a")
+					if folder == "b" then f.open_picker(); f.change_folder("b"); f.cancel() end
+					f.open_picker()
+					f.pick(action, action == "send_text" and "new page text" or nil)
+					helpers.assert_eq(f.document(folder).shortcuts.keyboard.primary_j, action)
+					helpers.assert_eq(keyboard.get_action("primary_j"), action)
+					helpers.assert_eq(seen.changed, 1)
+					helpers.assert_eq(bridge.is_open(), false)
+					if action == "send_text" then
+						helpers.assert_eq(f.document(folder).gesture_parameters.keyboard__primary_j__send_text, "new page text")
+					end
+					if folder == "b" then helpers.assert_eq(f.bytes("a"), before_a) end
+				end)
+			end)
+		end
+	end
+end)
+
 helpers.describe("Linux program picker transaction", function()
 	helpers.it("(program-picker) owns its real renderer independently of a previous menu fixture", function()
 		with_case(CASES[2], function(_, gestures, _, controls, path, source)
@@ -183,7 +288,7 @@ helpers.describe("Linux program picker transaction", function()
 			controls.refuse_publish = true
 			helpers.assert_eq(selected("run_program", nil, NEXT), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), source)
-			helpers.assert_eq(gestures.get_action_parameter("keyboard__ctrl_j", "run_program"), PRIOR)
+			helpers.assert_eq(gestures.get_action_parameter("keyboard__primary_j", "run_program"), PRIOR)
 		end)
 	end)
 	for _, spec in ipairs(CASES) do
@@ -343,11 +448,11 @@ helpers.describe("Linux program picker transaction", function()
 		helpers.it("(program-picker) preserves the inverse when lease release refuses " .. mode .. " mutation", function()
 			with_case(CASES[2], function(pick, gestures, provider, controls, path, source)
 				controls.refuse_release = mode
-				local function edit() return pick({ is_paused = function() return false end }, gestures, "keyboard__ctrl_j",
-					"run_program", function() return provider.set_action("ctrl_j", "run_program") end, NEXT) end
+				local function edit() return pick({ is_paused = function() return false end }, gestures, "keyboard__primary_j",
+					"run_program", function() return provider.set_action("primary_j", "run_program") end, NEXT) end
 				helpers.assert_eq(edit(), false)
 				helpers.assert_eq(Sandbox.read_bytes(path), source, "refused release cannot discard the committed publication's inverse")
-				helpers.assert_eq(gestures.get_action_parameter("keyboard__ctrl_j", "run_program"), PRIOR)
+				helpers.assert_eq(gestures.get_action_parameter("keyboard__primary_j", "run_program"), PRIOR)
 				controls.refuse_release, controls.refuse_publish = nil, true
 				helpers.assert_eq(edit(), false)
 				helpers.assert_eq(Sandbox.read_bytes(path), source)
@@ -455,11 +560,11 @@ helpers.describe("Linux program picker transaction", function()
 			local foreign = "[foreign]\nkeep = 17\n"
 			controls.refuse_release = "after"
 			controls.on_release = function() Sandbox.write_bytes(path, foreign) end
-			local function edit() return pick({ is_paused = function() return false end }, gestures, "keyboard__ctrl_j", "run_program",
-				function() return provider.set_action("ctrl_j", "run_program") end, NEXT) end
+			local function edit() return pick({ is_paused = function() return false end }, gestures, "keyboard__primary_j", "run_program",
+				function() return provider.set_action("primary_j", "run_program") end, NEXT) end
 			helpers.assert_eq(edit(), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), foreign, "ambiguous release never restores over foreign bytes")
-			helpers.assert_eq(gestures.set_action_parameter("keyboard__ctrl_j", "run_program", PRIOR), false)
+			helpers.assert_eq(gestures.set_action_parameter("keyboard__primary_j", "run_program", PRIOR), false)
 			controls.refuse_release, controls.on_release = nil, nil
 			helpers.assert_eq(edit(), false, "foreign canonical source cannot admit the retained inverse")
 			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
@@ -474,30 +579,30 @@ helpers.describe("Linux program picker transaction", function()
 				foreign = candidate .. "\n[foreign]\nkeep = 23\n"
 				Sandbox.write_bytes(path, foreign)
 			end
-			helpers.assert_eq(pick({ is_paused = function() return false end }, gestures, "keyboard__ctrl_j", "run_program",
-				function() return provider.set_action("ctrl_j", "run_program") end, NEXT), false)
+			helpers.assert_eq(pick({ is_paused = function() return false end }, gestures, "keyboard__primary_j", "run_program",
+				function() return provider.set_action("primary_j", "run_program") end, NEXT), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
 			local runner = require("adapters.program_runner")
 			local spawn, acquisitions = runner.spawn, 0
 			runner.spawn = function(...) acquisitions = acquisitions + 1; return spawn(...) end
-			local called, started = pcall(gestures.run_program, "keyboard__ctrl_j")
+			local called, started = pcall(gestures.run_program, "keyboard__primary_j")
 			runner.spawn = spawn
 			helpers.assert_eq(called, true)
 			helpers.assert_eq(started, false, "actual runtime refuses pending journal debt before native acquisition")
 			helpers.assert_eq(acquisitions, 0, "the actual native runner constructor remains uncalled")
-			helpers.assert_eq(gestures.set_action_parameter("keyboard__ctrl_j", "run_program", PRIOR), false,
+			helpers.assert_eq(gestures.set_action_parameter("keyboard__primary_j", "run_program", PRIOR), false,
 				"retained journal debt blocks ordinary parameter writes even after the last physical lease was released")
 			helpers.assert_eq(gestures.acquire_parameter_configuration({}), false, "another configuration owner cannot borrow journal debt")
-			helpers.assert_eq(pick({ is_paused = function() return false end }, gestures, "keyboard__ctrl_j", "none",
-				function() return provider.set_action("ctrl_j", "none") end), false,
+			helpers.assert_eq(pick({ is_paused = function() return false end }, gestures, "keyboard__primary_j", "none",
+				function() return provider.set_action("primary_j", "none") end), false,
 				"the native picker cannot sidestep program debt by assigning an unparameterized action")
 			helpers.assert_eq(Sandbox.read_bytes(path), foreign, "foreign bytes remain authoritative")
 			controls.refuse_parameter_release, controls.on_parameter_release, controls.refuse_candidate = false, nil, true
 			Sandbox.write_bytes(path, candidate)
-			helpers.assert_eq(pick({ is_paused = function() return false end }, gestures, "keyboard__ctrl_j", "run_program",
-				function() return provider.set_action("ctrl_j", "run_program") end, NEXT), false)
+			helpers.assert_eq(pick({ is_paused = function() return false end }, gestures, "keyboard__primary_j", "run_program",
+				function() return provider.set_action("primary_j", "run_program") end, NEXT), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), source, "an exact matching checkpoint admits the retained inverse")
-			helpers.assert_eq(gestures.get_action_parameter("keyboard__ctrl_j", "run_program"), PRIOR)
+			helpers.assert_eq(gestures.get_action_parameter("keyboard__primary_j", "run_program"), PRIOR)
 			helpers.assert_eq(require("infra.program_binding_transaction").pending(), false, "terminal recovery releases logical debt")
 		end)
 	end)
@@ -602,9 +707,9 @@ helpers.describe("Linux parameterized assignment transaction", function()
 			local confirm, notices = parameterized_confirmation(gestures, path)
 			helpers.assert_eq(confirm("none"), true)
 			helpers.assert_eq(#notices, 0)
-			helpers.assert_eq(provider.get_action("ctrl_j"), "none")
-			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).shortcuts.keyboard.ctrl_j, "none")
-			helpers.assert_eq(gestures.get_action_parameter("keyboard__ctrl_j", "run_program"), PRIOR)
+			helpers.assert_eq(provider.get_action("primary_j"), "none")
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).shortcuts.keyboard.primary_j, "none")
+			helpers.assert_eq(gestures.get_action_parameter("keyboard__primary_j", "run_program"), PRIOR)
 			helpers.assert_eq(controls.publications, 0, "None does not construct a parameter transaction")
 		end)
 	end)

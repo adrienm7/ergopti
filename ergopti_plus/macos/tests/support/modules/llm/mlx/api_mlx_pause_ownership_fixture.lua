@@ -289,7 +289,7 @@ local function install_script_control_dependencies(options)
 	package.loaded["ui.wpm.wpm_widget"] = { is_running = function() return false end }
 	package.loaded["platform.remap.onboarding"] = { stop = settled }
 	package.loaded["ui.tooltip"] = { hide_forced = settled }
-	package.loaded["modules.keylogger"] = { resync_context = settled }
+	package.loaded["modules.keystats"] = { resync_context = settled }
 end
 
 --- Initialises the real shared WarmupController without giving it a timer.

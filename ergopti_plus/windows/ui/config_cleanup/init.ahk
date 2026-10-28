@@ -23,8 +23,8 @@ class ConfigCleanupSession {
 		this.State := Map("session", this.Token, "path", Path, "status", "empty", "keys", [])
 	}
 
-	; Captures the exact source around the scanner so a racing writer cannot
-	; associate an older preview with newer confirmation bytes.
+	; Matching outer reads alone miss an ABA edit while the scanner runs.
+	; Bind the preview to the image the scanner itself actually classified.
 	Refresh(ReadFn := FSReadUtf8Exact, FindFn := ConfigUnusedKeysFind) {
 		if this.Closed
 			return 0
@@ -46,10 +46,10 @@ class ConfigCleanupSession {
 			this.State["reason_key"] := "dialog.unused_keys.reason.unreadable"
 			if (Scan["status"] != "ok")
 				this.State["status"] := "failed"
-			else if !(Before == After)
+			else if !(Before == After) || !(Scan["source"] == After)
 				this.State["status"] := "changed"
 			else {
-				this.Source := After
+				this.Source := Scan["source"]
 				this.State["status"] := Scan["keys"].Length ? "ready" : "empty"
 			}
 			return this.State

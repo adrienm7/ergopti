@@ -28,6 +28,9 @@
 
 #Requires AutoHotkey v2.0
 
+; The opt-in redacted copy of today's log the report actions may save
+#Include day_log.ahk
+
 /**
  * Projects one configuration row {setting, type, value}. A value outside the
  * grammar of its type drops the whole row: an enum is a bare identifier, a text
@@ -55,7 +58,7 @@ _HCShare_SettingRow(Value) {
 _HCShare_Project(Value, Rule, &Present) {
 	Present := true
 	Kind := Rule["kind"]
-	if !InStr("|object|array|enum|boolean|number|integer|version|hash|utc|commit|runtime|setting_row|", "|" . Kind . "|")
+	if !InStr("|object|array|enum|boolean|number|integer|version|hash|utc|commit|runtime|platform_name|setting_row|", "|" . Kind . "|")
 		throw Error("An unknown diagnostic sharing rule was refused.")
 	if Kind == "object" {
 		Result := Map()
@@ -115,6 +118,17 @@ _HCShare_Project(Value, Rule, &Present) {
 							return Projected
 					}
 			}
+			; An operating system or desktop name from the host: one of the rule's known
+			; families, then a closed set of name characters. A path, an address, a
+			; sentence or a name that is not listed never matches.
+			if Kind == "platform_name" && StrLen(Value) <= 64 {
+				for Family in Rule["families"] {
+					Rest := SubStr(Value, StrLen(Family) + 1)
+					if StrLower(SubStr(Value, 1, StrLen(Family))) == StrLower(Family)
+						&& RegExMatch(Rest, "D)^[A-Za-z0-9 .+/:(),!-]*$") && !RegExMatch(Rest, "^[A-Za-z]")
+						return Value
+				}
+			}
 			if Kind == "version" && RegExMatch(Value, "^\d+(?:\.\d+){1,3}(?:-dev\.\d+|-beta\d+)?$")
 				return Value
 			if Kind == "hash" && RegExMatch(Value, "^[a-fA-F0-9]{7,64}$")
@@ -172,8 +186,12 @@ HealthCheck_RecentErrorFacts(Entries, Source, Schema) {
 		"qualification", "log_observation_only", "examined_entries", Count, "excluded_entries", Count - Events.Length, "events", Events)
 }
 
-/** Returns a detached technical projection; unknown fields cannot be shared. */
-HealthCheck_ShareSnapshot(Snapshot, Schema) {
+/**
+ * Returns a detached technical projection; unknown fields cannot be shared.
+ * The day log record (included, bytes, lines) is part of it only when the
+ * action that saves the attachment asks for it.
+ */
+HealthCheck_ShareSnapshot(Snapshot, Schema, WithDayLog := false) {
 	Policy := Schema.Get("share_policy", 0)
 	if !(Policy is Map) || Policy.Get("version", 0) != 1 || !(Snapshot is Map)
 		throw Error("The diagnostic sharing policy is unavailable.")
@@ -181,6 +199,10 @@ HealthCheck_ShareSnapshot(Snapshot, Schema) {
 	if !(Driver == "windows" || Driver == "macos" || Driver == "linux")
 		throw Error("The diagnostic sharing identity is unavailable.")
 	Safe := _HCShare_Project(Snapshot, Policy["projection"], &Present)
+	if !WithDayLog && Safe.Has("day_log_attachment")
+		Safe.Delete("day_log_attachment")
+	if WithDayLog && !Safe.Has("day_log_attachment")
+		throw Error("The day log was asked for but the snapshot holds no record of it.")
 	Sections := Snapshot.Get("sections", 0)
 	Issues := Sections is Map ? Sections.Get("issues", 0) : 0
 	if Issues is Map
@@ -318,21 +340,64 @@ _HCShare_English(Schema, Key) {
 	return Strings[Key]
 }
 
+/**
+ * The version the issue form shows. A source run has no release version (the
+ * host reports "local"), so it is named by its commit: a true statement, where
+ * "unknown" would be false.
+ */
+_HCShare_FormVersion(Safe, Snapshot) {
+	Versions := Safe.Get("sections", Map()).Get("versions", Map())
+	if Versions.Has("ergopti_version")
+		return Versions["ergopti_version"]
+	Raw := (Snapshot is Map && Snapshot.Get("sections", 0) is Map) ? Snapshot["sections"].Get("versions", Map()) : Map()
+	RawCommit := Raw.Get("commit", "")
+	FromGit := (RawCommit is String) && RegExMatch(RawCommit, " \(git\)$")
+	if Raw.Get("ergopti_version", "") == "local" || FromGit
+		return "dev source" . (Versions.Has("commit") ? " " . Versions["commit"] : "")
+	return "unknown"
+}
+
+/**
+ * The operating system the issue form shows: the name and version the host
+ * reported, then the desktop, the session and the architecture when known.
+ */
+_HCShare_FormOs(Safe) {
+	static SESSION_NAMES := Map("wayland", "Wayland", "x11", "X11")
+	static OS_NAMES := Map("macos", "macOS", "windows", "Windows", "linux", "Linux")
+	Sections := Safe.Get("sections", Map())
+	System := Sections.Get("system", Map())
+	Details := []
+	if System.Has("desktop")
+		Details.Push(System["desktop"])
+	if System.Has("display_server") && SESSION_NAMES.Has(System["display_server"])
+		Details.Push(SESSION_NAMES[System["display_server"]])
+	Arch := Sections.Get("hardware", Map()).Get("arch", "unknown")
+	if Arch != "unknown"
+		Details.Push(Arch)
+	Name := System.Has("os") ? System["os"] : OS_NAMES.Get(Safe["driver"], Safe["driver"]) . " (version unknown)"
+	Joined := ""
+	for Detail in Details
+		Joined .= (Joined == "" ? "" : ", ") . Detail
+	return Name . (Joined == "" ? "" : " (" . Joined . ")")
+}
+
 /** Builds file and issue-form content only from the host-retained snapshot. */
-HealthCheck_ShareDocument(Snapshot, Schema) {
-	Safe := HealthCheck_ShareSnapshot(Snapshot, Schema)
+HealthCheck_ShareDocument(Snapshot, Schema, WithDayLog := false) {
+	Safe := HealthCheck_ShareSnapshot(Snapshot, Schema, WithDayLog)
 	Versions := Safe.Get("sections", Map()).Get("versions", Map())
 	Fence := Chr(96) . Chr(96) . Chr(96)
-	Text := "# ErgoptiPlus diagnostics`n`n" . _HCShare_English(Schema, Schema["share_policy"]["notice_key"])
+	Head := "# ErgoptiPlus diagnostics`n`n" . _HCShare_English(Schema, Schema["share_policy"]["notice_key"])
 		. "`n`ndriver-suites: not_run`npage-model-checks: " . (Safe.Has("page_check_observations") ? "installed_page_reported (unqualified)" : "not_collected") . "`n`n" . _HCShare_Readable(Safe, Schema)
-		. "`n" . Fence . "json`n" . _HC_ValueToJson(Safe) . "`n" . Fence . "`n"
+	Text := Head . "`n" . Fence . "json`n" . _HC_ValueToJson(Safe) . "`n" . Fence . "`n"
 	Name := Schema["report"]["name_prefix"] . Safe["driver"] . "-"
 		. RegExReplace(Safe.Get("generated_at", "unknown"), "[^A-Za-z0-9_.-]", "_") . Schema["report"]["name_suffix"]
 	Summary := "A diagnostic attachment was saved locally. Attach that file here after reviewing it; no attachment is uploaded automatically.`n"
 		. "Driver: " . Safe["driver"] . "`nVersion: " . Versions.Get("ergopti_version", "unknown")
 		. "`nCommit: " . Versions.Get("commit", "unknown") . "`nDriver suites: NOT_RUN"
 	return Map("snapshot", Safe, "text", Text, "name", Name, "summary", Summary,
-		"fields", Map("driver", Safe["driver"], "version", Versions.Get("ergopti_version", "unknown"), "os", Safe["driver"]))
+		"fields", Map("driver", Safe["driver"], "version", _HCShare_FormVersion(Safe, Snapshot),
+			"os", _HCShare_FormOs(Safe), "diagnostics", Head),
+		"notes", Map("diagnostics", _HCShare_English(Schema, Schema["share_policy"]["truncated_note_key"])))
 }
 
 
@@ -397,6 +462,16 @@ _HCReport_Notify(Title, Body, Kind) {
 	return true
 }
 
+; What identifies this machine in paths: the profile folder, the account name
+; and the configuration directory, whose folder and file names are chosen by
+; the user.
+; @returns {Map} { home, user, config_dir } (config_dir is "" before boot knows it)
+_HCReport_Identity() {
+	global _ConfigDir
+	return Map("home", EnvGet("USERPROFILE"), "user", A_UserName,
+		"config_dir", IsSet(_ConfigDir) ? RTrim(_ConfigDir, "\") : "")
+}
+
 ; The production side effects; a test replaces any of them.
 ; @param Overrides {Map|Integer} Replacement effects, or 0.
 ; @returns {Map}
@@ -410,7 +485,7 @@ _HCReport_Effects(Overrides := 0) {
 		"open",     _HCReport_Open,
 		"open_url", ExternalUrl_OpenHttp,
 		"notify",   _HCReport_Notify,
-		"identity", () => Map("home", EnvGet("USERPROFILE"), "user", A_UserName))
+		"identity", _HCReport_Identity)
 	if (Overrides is Map) {
 		for Name, Fn in Overrides
 			Effects[Name] := Fn
@@ -421,14 +496,15 @@ _HCReport_Effects(Overrides := 0) {
 ; What identifies this machine in paths and text, for redaction. Windows paths
 ; compare case-insensitively.
 ; @param Overrides {Map|Integer} Replacement side effects (tests only).
-; @returns {Map} { home, user, case_insensitive }
+; @returns {Map} { home, user, config_dir, case_insensitive }
 HealthCheck_RedactionContext(Overrides := 0) {
 	Identity := _HCReport_Effects(Overrides)["identity"].Call()
 	; Without the profile folder nothing would remove it, and every path under
 	; it would be published
 	if (Identity["home"] == "")
 		throw Error("The profile folder is unknown, so nothing could be redacted.")
-	return Map("home", Identity["home"], "user", Identity["user"], "case_insensitive", true)
+	return Map("home", Identity["home"], "user", Identity["user"],
+		"config_dir", Identity.Get("config_dir", ""), "case_insensitive", true)
 }
 
 
@@ -443,9 +519,12 @@ HealthCheck_RedactionContext(Overrides := 0) {
 
 ; Saves the report under the diagnostics folder and selects it in Explorer.
 ; @returns {String} The saved file's path.
-_HCReport_SaveAndReveal(Effects, Paths, Name, Text) {
+_HCReport_SaveAndReveal(Effects, Paths, Name, Text, LogFile := 0) {
 	if !Paths.Has("diagnostics_dir")
 		throw Error("The diagnostics folder is unknown.")
+	; The opt-in day log first, so the report is the file Explorer selects last
+	if (LogFile is Map)
+		Effects["save"].Call(Paths["diagnostics_dir"], LogFile["name"], LogFile["text"])
 	Path := Effects["save"].Call(Paths["diagnostics_dir"], Name, Text)
 	if !Effects["reveal"].Call(Path)
 		LoggerWarn("HealthCheckReport", "The saved report could not be selected in Explorer.")
@@ -453,26 +532,28 @@ _HCReport_SaveAndReveal(Effects, Paths, Name, Text) {
 }
 
 ; Reports on GitHub: copies and saves the complete approved report, then
-; reveals its local attachment before opening the bug form with stable host
-; version, OS and driver fields. Editable fields stay outside the URL; the
-; browser opens last and no attachment is uploaded automatically.
+; reveals its local attachment before opening the bug form with the host
+; version, OS and driver fields and the compact report (tables, no JSON block),
+; cut to the URL budget with a note that the complete report is on the
+; clipboard and in the saved file. The browser opens last and no attachment is
+; uploaded automatically.
 ; @param Action {Map} Host-approved report text and technical identity fields.
 ; @throws {Error} When clipboard, attachment completion or browser opening refuses.
 _HCReport_Report(Effects, Config, Action, Rules, Context, Paths) {
 	Text := Action["text"]
-	; Copy the complete approved report independently of its short metadata URL
+	; Copy the complete approved report independently of its compact URL form
 	if !Effects["copy"].Call(Text)
 		throw Error("The clipboard refused the report.")
-	; The complete approved document stays in a local attachment, never the URL.
-	Path := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text)
+	; The complete approved document stays in a local attachment; the URL carries its compact form.
+	Path := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text, Action.Get("day_log_file", 0))
 	Fields := Map()
-	; Only the host-derived technical identity is stable enough to prefill.
-	for Id in ["version", "os", "driver"]
-		Fields[Id] := Action["fields"][Id]
 	ReportField := Config["templates"]["templates"]["bug"]["report_field"]
 	if !(ReportField is String) || ReportField == ""
 		throw Error("The bug template names no report field.")
-	Url := IssueLink_BuildUrl(Config["templates"], Config["repository"], "bug", Fields)
+	; The host-derived identity and the compact report; the budget cuts the report.
+	for Id in ["version", "os", "driver", ReportField]
+		Fields[Id] := Action["fields"][Id]
+	Url := IssueLink_BuildUrl(Config["templates"], Config["repository"], "bug", Fields, Action.Get("notes", 0))
 	if !Effects["open_url"].Call(Url)
 		throw Error("The browser could not be opened.")
 	return Path
@@ -496,12 +577,25 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0, Snapshot := 0) 
 		Context := HealthCheck_RedactionContext(Overrides)
 		Rules := Config["redaction"]
 		if Name == "copy" || Name == "save" || Name == "report" {
-			Document := HealthCheck_ShareDocument(Snapshot, Config["schema"])
+			; The opt-in day log is written by save and report only, and only
+			; from the collection prepared for this very snapshot
+			WithLog := Action.Get("day_log", false) ? true : false
+			if WithLog && Name == "copy"
+				throw Error("The day log is saved with the report, never copied.")
+			Document := HealthCheck_ShareDocument(Snapshot, Config["schema"], WithLog)
 			if !Action.Has("text") || !(Action["text"] == Document["text"])
 				throw Error("The diagnostic sharing preview is stale or invalid.")
 			Action := Action.Clone()
+			if WithLog {
+				Retained := HealthCheck_DayLogRetained(Snapshot)
+				if !(Retained is Map)
+					throw Error("The day log was not prepared for this report.")
+				Action["day_log_file"] := Map("name", HealthCheck_DayLogName(Config, Document["snapshot"]),
+					"text", Retained["text"])
+			}
 			Action["text"] := Document["text"]
 			Action["fields"] := Document["fields"]
+			Action["notes"] := Document["notes"]
 			Action["name"] := Document["name"]
 			Action["summary"] := Document["summary"]
 		}
@@ -511,7 +605,7 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0, Snapshot := 0) 
 					throw Error("The clipboard refused the report.")
 			case "save":
 				Outcome["path"] := _HCReport_SaveAndReveal(Effects, Paths, Action["name"],
-					Action["text"])
+					Action["text"], Action.Get("day_log_file", 0))
 			case "report":
 				Outcome["path"] := _HCReport_Report(Effects, Config, Action, Rules, Context, Paths)
 			case "open_path":

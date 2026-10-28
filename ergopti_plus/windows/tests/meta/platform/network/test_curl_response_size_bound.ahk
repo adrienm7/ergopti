@@ -123,8 +123,12 @@ _CRSB_EveryCurlTransportDeclaresTheCap() {
 		. "\..\modules\llm\api_ollama\ollama_http.ahk", "UTF-8")
 	OllamaStreaming := FileRead(A_ScriptDir
 		. "\..\modules\llm\api_ollama\ollama_streaming.ahk", "UTF-8")
-	Assert(InStr(Http, '"max-filesize = " . HTTP_CURL_MAX_RESPONSE_BYTES') > 0,
-		"CurlAsyncRequest must stop curl at the shared response byte ceiling")
+	Transport := FileRead(A_ScriptDir . "\..\vendor\ergopti_winhttp_transport.ps1", "UTF-8")
+	Assert(RegExMatch(Http, '"max_response_bytes":.\s*\.\s*HTTP_CURL_MAX_RESPONSE_BYTES') > 0,
+		"CurlAsyncRequest must hand the shared response byte ceiling to the managed worker")
+	Assert(InStr(Transport, "result.Delivered > spec.MaxResponseBytes") > 0
+		and InStr(Transport, "declaredBytes > spec.MaxResponseBytes") > 0,
+		"the WinHTTP transport must stop a declared and an undeclared oversize body")
 	Assert(InStr(Http, "HTTP_CURL_MAX_RESPONSE_BYTES") > 0
 		and InStr(Shell, '"MaxOutputBytes"') > 0,
 		"the tree-owned stdout collector must receive and enforce the same ceiling")

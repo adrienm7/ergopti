@@ -84,6 +84,14 @@ local function world(options)
 		if w.sync_probe then probe:answer(w.receipt or {ok=true,status=200,body='{"version":"0.24.0"}'}) end
 		return probe
 	end
+	if w.with_network then
+		function p.network(budget,authorized,done)
+			w.network_budget,w.network_authorized=budget,authorized
+			local lookup=op(w,'network',done)
+			if w.sync_network then lookup:answer(w.network_answer or {ok=true,environment={}}) end
+			return lookup
+		end
+	end
 	function p.compensate()
 		w.compensation_calls=(w.compensation_calls or 0)+1
 		if w.compensation_refused then return false end
@@ -312,6 +320,38 @@ test('final observed running proof has no later source callback before promotion
 	w:ready()
 	eq(w.native_exit_observed_before_promotion,nil)
 	eq(r.result.ok,true);eq(w.completed,1)
+end)
+test('without a network port the service starts at once with no proxy rows',function()
+	local w=world();w:start()
+	eq(w:last('network'),nil);assert(w:last('service'),'service must start');eq(#w.service_options.environment,0)
+end)
+test('network stage selects the proxy before the service starts and hands it over',function()
+	local w=world({with_network=true});local r=w:start()
+	assert(w:last('network'),'proxy lookup must run');eq(w:last('service'),nil);eq(r:is_settled(),false)
+	w:last('network'):answer({ok=true,environment={'HTTPS_PROXY=http://proxy.example:3128'}})
+	assert(w:last('service'),'service must follow the lookup')
+	eq(#w.service_options.environment,1);eq(w.service_options.environment[1],'HTTPS_PROXY=http://proxy.example:3128')
+	assert(w.network_budget and w.network_authorized(),'the lookup must receive the start budget and authorization')
+	w:ready();eq(r.result.ok,true)
+end)
+test('synchronous proxy lookup is observed by the same pump',function()
+	local w=world({with_network=true,sync_network=true,network_answer={ok=true,environment={}}})
+	w:start();assert(w:last('service'),'a lookup settled before return must not stall the start')
+end)
+test('failed proxy lookup refuses the start and never launches the daemon',function()
+	local w=world({with_network=true});local r=w:start()
+	w:last('network'):answer({ok=false,error='proxy_lookup_failed'})
+	eq(w:last('service'),nil);eq(r.result.ok,false);eq(r.result.error,'runtime_proxy_unavailable');eq(r:is_settled(),true)
+end)
+test('malformed proxy answer is a refusal, not an empty environment',function()
+	local w=world({with_network=true});local r=w:start()
+	w:last('network'):answer({ok=true})
+	eq(w:last('service'),nil);eq(r.result.error,'runtime_proxy_unavailable')
+end)
+test('cancel during the proxy lookup retains it until its physical close',function()
+	local w=world({with_network=true});w.hold.network=true;local r=w:start()
+	eq(r:cancel(),false);eq(w:last('network').cancelled,true);eq(w:last('service'),nil);eq(w.controller:has_debt(),true)
+	w:last('network'):close();eq(r:is_settled(),true)
 end)
 
 end

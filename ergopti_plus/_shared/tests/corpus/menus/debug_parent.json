@@ -12,6 +12,13 @@
 			"-",
 			"System diagnostics",
 			"Show a window for every error",
+			"Test Karabiner lease",
+			"Test owned Karabiner runtime (dormant check)",
+			"Test network (PAC, proxy, download)",
+			"Test the composed layout",
+			"Test key accounting (30 s)",
+			"Test third-party tools (Shortcuts, Homebrew, timer)",
+			"Show what starts Ergopti at login",
 			"Report a bug",
 			"Suggest a feature"
 		],
@@ -23,6 +30,8 @@
 			"-",
 			"System diagnostics",
 			"Show a window for every error",
+			"Test network (PAC, proxy, download)",
+			"Test the composed layout",
 			"Report a bug",
 			"Suggest a feature"
 		]
@@ -40,6 +49,13 @@
 			"-",
 			"Diagnostic système",
 			"Afficher une fenêtre à chaque erreur",
+			"Tester le bail Karabiner",
+			"Tester le runtime Karabiner propre (contrôle dormant)",
+			"Tester le réseau (PAC, proxy, téléchargement)",
+			"Tester la disposition composée",
+			"Tester le comptage des touches (30 s)",
+			"Tester les outils tiers (Raccourcis, Homebrew, minuterie)",
+			"Afficher ce qui lance Ergopti à l’ouverture de session",
 			"Signaler un bug",
 			"Proposer une fonctionnalité"
 		],
@@ -51,6 +67,8 @@
 			"-",
 			"Diagnostic système",
 			"Afficher une fenêtre à chaque erreur",
+			"Tester le réseau (PAC, proxy, téléchargement)",
+			"Tester la disposition composée",
 			"Signaler un bug",
 			"Proposer une fonctionnalité"
 		]

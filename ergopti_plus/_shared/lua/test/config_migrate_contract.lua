@@ -20,6 +20,7 @@ local M = {}
 local Engine     = require("config_migrate")
 local TomlCodec  = require("toml_codec")
 local TomlWriter = require("toml_codec.writer")
+local NativePath = require("native_path")
 
 local STAMP = "20990101-000000"
 local MIN_CASES_PER_DRIVER = 10
@@ -39,8 +40,9 @@ local _sequence = 0
 --- The _shared/ tree, from this file's own location.
 --- @return string
 local function shared_root()
-	local source = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
-	local root = source:match("^(.*)/lua/test/config_migrate_contract%.lua$")
+	local source = debug.getinfo(1, "S").source:gsub("^@", "")
+	local sep = "[" .. NativePath.separators() .. "]"
+	local root = source:match("^(.*)" .. sep .. "lua" .. sep .. "test" .. sep .. "config_migrate_contract%.lua$")
 	if not root then error("config_migrate_contract: cannot locate _shared/ from " .. source) end
 	return root
 end
@@ -49,7 +51,7 @@ end
 --- @return string
 local function new_config_path()
 	local base = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
-	base = base:gsub("\\", "/"):gsub("/+$", "")
+	base = NativePath.without_trailing_separators(base)
 	_sequence = _sequence + 1
 	return string.format("%s/ergopti_config_migrate_%d_%d_%d.toml", base, os.time(),
 		math.random(100000, 999999), _sequence)

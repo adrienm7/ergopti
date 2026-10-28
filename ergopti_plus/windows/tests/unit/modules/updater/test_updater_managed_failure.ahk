@@ -248,8 +248,12 @@ _UMF_ActualOwnedFileReceipt() {
 				_VendorDir . "\ergopti_updater_download.ps1"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)))
 		Assert(Handle.start(), "native filesystem receipt fixture must actually start")
+		; The fixture dot-sources the download helper and compiles two Add-Type
+		; blocks in a cold PowerShell before its 43 controls; on a loaded runner
+		; that alone passed 10 s. This bounds a hang, not the fixture's speed, as
+		; the WinHTTP artifact test bounds the same helper.
 		Started := A_TickCount
-		while Observed.Length == 0 && !TickExpired64(Started, 10000) {
+		while Observed.Length == 0 && !TickExpired64(Started, 60000) {
 			_SR_TreePoll()
 			Sleep(10)
 		}
@@ -271,6 +275,8 @@ _UMF_LateReadyCannotBeatMonitor() {
 	global _UpdaterDownloadWorker, _UpdaterDownloadRequest, _UpdaterDownloadArtifacts
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
 	global _UpdaterInstallObserver, _UpdaterManagedFailureOwner, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
+	global _UpdaterInstallObserverEpoch
+	SavedObserverEpoch := _UpdaterInstallObserverEpoch
 	Saved := [_UpdaterDownloadInProgress, _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch,
 		_UpdaterDownloadWorker, _UpdaterDownloadRequest, _UpdaterDownloadArtifacts,
 		_UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation,
@@ -291,6 +297,9 @@ _UMF_LateReadyCannotBeatMonitor() {
 		_UpdaterExitInvocation := 0
 		_UpdaterManagedFailureOwner := 0
 		_UpdaterInstallObserver := (Phase, Reason) => Phases.Push(Phase)
+		; This retained worker represents a transaction already reserved and registered.
+		_UpdaterDownloadArtifacts := {InstallObservation: {
+			Observer: _UpdaterInstallObserver, Epoch: _UpdaterInstallObserverEpoch}}
 		_Updater_PollDownloadAsync(0, "READY", "", "", "", "", "v1.0.0", 8123,
 			0, 100 + UPDATER_HTTP_DOWNLOAD_DEADLINE_MS + 1,
 			_UpdaterTest_RecordDeadlineFailure.Bind(State))
@@ -312,6 +321,7 @@ _UMF_LateReadyCannotBeatMonitor() {
 		_UpdaterExitIntent := Saved[8]
 		_UpdaterExitInvocation := Saved[9]
 		_UpdaterInstallObserver := Saved[10]
+		_UpdaterInstallObserverEpoch := SavedObserverEpoch
 		_UpdaterManagedFailureOwner := Saved[11]
 	}
 }
@@ -574,3 +584,5 @@ _UMF_ActualCompletionAdmissionRestoresCriticalAndCurrentOwner() {
 
 Test("Updater managed failure: actual completion admission preserves current worker and Critical boundaries",
 	_UMF_ActualCompletionAdmissionRestoresCriticalAndCurrentOwner)
+
+#Include test_updater_install_phase_owner.ahk

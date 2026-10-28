@@ -27,6 +27,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 
 
@@ -140,7 +141,7 @@ function M.parse(str)
 	while true do
 		local separator_at = str:find(SEPARATOR, token_start, true)
 		local token = str:sub(token_start, separator_at and separator_at - 1 or #str)
-		token = token:match("^%s*(.-)%s*$")
+		token = TextUtils.trim(token)
 		if token == "" then
 			return nil, "a chord cannot contain an empty token"
 		end

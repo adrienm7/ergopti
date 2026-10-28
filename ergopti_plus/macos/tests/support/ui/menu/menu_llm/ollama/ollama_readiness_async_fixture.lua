@@ -420,6 +420,9 @@ local function with_fixture(spec, body)
 				secondsSinceEpoch = function() return 100 end,
 			},
 			json = {encode = function() return "{}" end},
+			-- A pull reads the shared route inventory through the real file
+			-- adapter: honest filesystem reads, never a synchronous execute.
+			fs = require("tests.stubs.hs").fs,
 			http = {asyncPost = function(url, body, headers, callback)
 				http_callbacks[#http_callbacks + 1] = {
 					url = url, body = body, headers = headers, callback = callback,
@@ -441,7 +444,7 @@ local function with_fixture(spec, body)
 			end,
 		})
 		package.loaded["modules.llm.api_ollama"] = daemon.api
-		local endpoint_port = spec.ollama_port or 11434
+		local endpoint_port = spec.ollama_port or 11435
 		package.loaded["modules.llm.ollama_endpoint"] = {
 			get_port = function() return endpoint_port end,
 			get_base_url = function() return "http://127.0.0.1:" .. tostring(endpoint_port) end,

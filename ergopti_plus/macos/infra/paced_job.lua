@@ -92,6 +92,7 @@ function M.start(opts)
 	local slice_started = 0
 	local started_at = now_ms()
 	local co
+	local owned_timers = {}
 
 	local pacer = {}
 	--- Yields the job once the current slice has spent its budget.
@@ -119,6 +120,10 @@ function M.start(opts)
 	local schedule
 	local function step()
 		job.timer = nil
+		-- Delivery may precede native stop; keep each refused timer retryable.
+		for handle in pairs(owned_timers) do
+			if handle.timer == nil then owned_timers[handle] = nil end
+		end
 		if job.state ~= "scheduled" and job.state ~= "running" then return end
 		job.state = "running"
 		job.slices = job.slices + 1
@@ -142,6 +147,7 @@ function M.start(opts)
 		end, debug.traceback)
 		if armed and type(handle) == "table" and committed == true then
 			job.timer = handle
+			owned_timers[handle] = true
 			return true
 		end
 		if armed and type(handle) == "table" then pcall(TimerScheduler.cancel, handle) end
@@ -158,16 +164,24 @@ function M.start(opts)
 	--- Cancels the job; a cancelled job never calls `on_done`.
 	--- @return boolean settled True once no timer remains owned.
 	function job.cancel()
-		if job.state == "done" or job.state == "failed" or job.state == "cancelled" then return true end
-		job.state = "cancelled"
+		local terminal = job.state == "done" or job.state == "failed"
+		-- Logical completion and cancellation never acknowledge native cleanup.
+		local first_cancel = not terminal and job.state ~= "cancelled"
+		if not terminal then job.state = "cancelled" end
 		local settled = true
-		if job.timer then
-			local ok, stopped = pcall(TimerScheduler.cancel, job.timer)
-			settled = ok and stopped == true
-			if settled then job.timer = nil end
+		for handle in pairs(owned_timers) do
+			local ok, stopped = pcall(TimerScheduler.cancel, handle)
+			if ok and stopped == true then
+				owned_timers[handle] = nil
+				if job.timer == handle then job.timer = nil end
+			else
+				settled = false
+			end
 		end
 		if coroutine.status(co) == "suspended" then pcall(coroutine.close, co) end
-		Logger.info(LOG, "%s cancelled after %d slice(s).", job.label, job.slices)
+		if first_cancel then
+			Logger.info(LOG, "%s cancelled after %d slice(s).", job.label, job.slices)
+		end
 		return settled
 	end
 

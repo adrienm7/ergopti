@@ -1,0 +1,161 @@
+{
+	"description": "Golden vectors for the app category store (_shared/lua/keystats/app_category_store.lua): the versioned document macOS and Linux share, the previous macOS flat layout it upgrades, the documents it refuses, and the edits applied to a model.",
+	"rule": "A document is refused whole when it is not a JSON object, names another schema version, or holds an entry whose category is blank or whose score is not a number in [-2, 2]; a refused document is never read as empty. A flat map of { type, score } records (no schema member) is read as legacy. Editing sets the category and score of one application; renaming changes every application holding the old category; importing adds only the applications the model does not already hold.",
+	"decode": [
+		{
+			"id": "versioned_document",
+			"document": "{\"schema\":\"ergopti.app_categories\",\"version\":1,\"apps\":{\"Safari\":{\"type\":\"Browsers\",\"score\":-1},\"Xcode\":{\"type\":\"Developer tools\",\"score\":2}}}",
+			"legacy": false,
+			"apps": {
+				"Safari": { "type": "Browsers", "score": -1 },
+				"Xcode": { "type": "Developer tools", "score": 2 }
+			}
+		},
+		{
+			"id": "empty_versioned_document",
+			"document": "{\"schema\":\"ergopti.app_categories\",\"version\":1,\"apps\":{}}",
+			"legacy": false,
+			"apps": {}
+		},
+		{
+			"id": "previous_macos_flat_layout",
+			"document": "{\"Safari\":{\"type\":\"Browsers\",\"score\":0},\"Xcode\":{\"type\":\"Developer tools\",\"score\":2}}",
+			"legacy": true,
+			"apps": {
+				"Safari": { "type": "Browsers", "score": 0 },
+				"Xcode": { "type": "Developer tools", "score": 2 }
+			}
+		},
+		{
+			"id": "empty_flat_layout",
+			"document": "{}",
+			"legacy": true,
+			"apps": {}
+		},
+		{
+			"id": "an_application_named_schema_is_a_record",
+			"document": "{\"schema\":{\"type\":\"Utilities\",\"score\":1}}",
+			"legacy": true,
+			"apps": { "schema": { "type": "Utilities", "score": 1 } }
+		},
+		{ "id": "not_json", "document": "{PRIVATE-CORRUPT-CATEGORY", "refused": true },
+		{ "id": "not_an_object", "document": "42", "refused": true },
+		{
+			"id": "unsupported_version",
+			"document": "{\"schema\":\"ergopti.app_categories\",\"version\":2,\"apps\":{}}",
+			"refused": true
+		},
+		{
+			"id": "missing_apps",
+			"document": "{\"schema\":\"ergopti.app_categories\",\"version\":1}",
+			"refused": true
+		},
+		{
+			"id": "blank_category",
+			"document": "{\"schema\":\"ergopti.app_categories\",\"version\":1,\"apps\":{\"Safari\":{\"type\":\"  \",\"score\":0}}}",
+			"refused": true
+		},
+		{
+			"id": "score_above_range",
+			"document": "{\"schema\":\"ergopti.app_categories\",\"version\":1,\"apps\":{\"Safari\":{\"type\":\"Browsers\",\"score\":3}}}",
+			"refused": true
+		},
+		{
+			"id": "score_as_text",
+			"document": "{\"schema\":\"ergopti.app_categories\",\"version\":1,\"apps\":{\"Safari\":{\"type\":\"Browsers\",\"score\":\"1\"}}}",
+			"refused": true
+		},
+		{
+			"id": "legacy_entry_that_is_a_string",
+			"document": "{\"chrome.exe\":\"productive\"}",
+			"refused": true
+		}
+	],
+	"edits": [
+		{
+			"id": "set_adds_an_application",
+			"start": { "Safari": { "type": "Browsers", "score": 0 } },
+			"ops": [
+				{ "op": "set", "app": "Xcode", "category": "Developer tools", "score": 2, "ok": true }
+			],
+			"apps": {
+				"Safari": { "type": "Browsers", "score": 0 },
+				"Xcode": { "type": "Developer tools", "score": 2 }
+			}
+		},
+		{
+			"id": "set_replaces_the_category_and_score_together",
+			"start": { "Safari": { "type": "Browsers", "score": 0 } },
+			"ops": [{ "op": "set", "app": "Safari", "category": "Work", "score": 1, "ok": true }],
+			"apps": { "Safari": { "type": "Work", "score": 1 } }
+		},
+		{
+			"id": "set_refuses_an_out_of_range_score_and_changes_nothing",
+			"start": { "Safari": { "type": "Browsers", "score": 0 } },
+			"ops": [{ "op": "set", "app": "Safari", "category": "Work", "score": 5, "ok": false }],
+			"apps": { "Safari": { "type": "Browsers", "score": 0 } }
+		},
+		{
+			"id": "set_refuses_a_blank_category_and_an_empty_name",
+			"start": {},
+			"ops": [
+				{ "op": "set", "app": "Safari", "category": "", "score": 0, "ok": false },
+				{ "op": "set", "app": "", "category": "Work", "score": 0, "ok": false }
+			],
+			"apps": {}
+		},
+		{
+			"id": "rename_changes_every_holder_of_the_category",
+			"start": {
+				"Safari": { "type": "Browsers", "score": 0 },
+				"Firefox": { "type": "Browsers", "score": -1 },
+				"Xcode": { "type": "Developer tools", "score": 2 }
+			},
+			"ops": [{ "op": "rename", "from": "Browsers", "to": "Web", "renamed": 2 }],
+			"apps": {
+				"Safari": { "type": "Web", "score": 0 },
+				"Firefox": { "type": "Web", "score": -1 },
+				"Xcode": { "type": "Developer tools", "score": 2 }
+			}
+		},
+		{
+			"id": "rename_to_a_blank_name_is_refused",
+			"start": { "Safari": { "type": "Browsers", "score": 0 } },
+			"ops": [{ "op": "rename", "from": "Browsers", "to": " ", "refused": true }],
+			"apps": { "Safari": { "type": "Browsers", "score": 0 } }
+		},
+		{
+			"id": "import_keeps_the_entries_already_held",
+			"start": { "Safari": { "type": "Work", "score": 2 } },
+			"ops": [
+				{
+					"op": "import",
+					"entries": {
+						"Safari": { "type": "Browsers", "score": 0 },
+						"Xcode": { "type": "Developer tools", "score": 2 }
+					},
+					"added": 1
+				}
+			],
+			"apps": {
+				"Safari": { "type": "Work", "score": 2 },
+				"Xcode": { "type": "Developer tools", "score": 2 }
+			}
+		},
+		{
+			"id": "import_refuses_an_invalid_entry_and_adds_nothing",
+			"start": {},
+			"ops": [
+				{
+					"op": "import",
+					"entries": {
+						"Safari": { "type": "Browsers", "score": 0 },
+						"Bad": { "type": "", "score": 0 }
+					},
+					"refused": true
+				}
+			],
+			"apps": {}
+		}
+	]
+}

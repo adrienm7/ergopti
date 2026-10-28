@@ -566,7 +566,8 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 				helpers.assert_eq(Scope.apply("clear", function() return false end), true)
 				helpers.assert_nil(read(s.dir .. "/layers.toml"))
 				helpers.assert_nil(s.parameters.state.owner)
-				helpers.assert_eq(Codec.decode(read(s.tap_path)), {}, "the admitted clear persists the neutral empty document")
+				helpers.assert_eq(Codec.decode(read(s.tap_path)), { _meta = { schema_version = 1 } },
+					"the admitted clear persists the neutral document, stamped with the file version")
 			end)
 			Scope._reset_for_test()
 			s.files.write_if_unchanged = publish

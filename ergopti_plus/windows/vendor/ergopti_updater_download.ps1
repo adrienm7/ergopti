@@ -13,6 +13,29 @@ public static class ErgoptiUpdaterMonotonicClock
     public static extern UInt64 GetTickCount64();
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern bool CreateDirectoryW(string path, IntPtr security);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern Microsoft.Win32.SafeHandles.SafeFileHandle CreateFileW(string path, uint access,
+        uint sharing, IntPtr security, uint disposition, uint attributes, IntPtr template);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandle(Microsoft.Win32.SafeHandles.SafeFileHandle handle, IntPtr info);
+    public static Microsoft.Win32.SafeHandles.SafeFileHandle OpenStagingDirectory(string path)
+    {
+        var handle = CreateFileW(path, 0, 3, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero);
+        if (handle.IsInvalid) { int error = Marshal.GetLastWin32Error(); handle.Dispose(); throw new System.ComponentModel.Win32Exception(error); }
+        return handle;
+    }
+    public static string StagingIdentity(Microsoft.Win32.SafeHandles.SafeFileHandle handle, bool directory)
+    {
+        IntPtr info = Marshal.AllocHGlobal(52);
+        try {
+            if (!GetFileInformationByHandle(handle, info)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            uint attributes = unchecked((uint)Marshal.ReadInt32(info, 0));
+            if ((attributes & 0x400) != 0 || ((attributes & 0x10) != 0) != directory)
+                throw new InvalidOperationException("Staged file kind was refused.");
+            return unchecked((uint)Marshal.ReadInt32(info, 28)).ToString("x8") + ":" +
+                unchecked((uint)Marshal.ReadInt32(info, 44)).ToString("x8") + unchecked((uint)Marshal.ReadInt32(info, 48)).ToString("x8");
+        } finally { Marshal.FreeHGlobal(info); }
+    }
 }
 '@ -ErrorAction Stop
 }
@@ -120,7 +143,7 @@ function Assert-ErgoptiUpdaterDestination {
 
 function New-ErgoptiUpdaterProxyCredentials {
     param([Parameter(Mandatory = $true)][Uri]$ProxyUri)
-    # Automatic .NET authentication cannot prove the guarded curl NTLM boundary.
+    # The legacy .NET path authenticates the proxy with the Negotiate package only.
     $Credentials = [System.Net.CredentialCache]::new()
     $Credentials.Add($ProxyUri, 'Negotiate', [System.Net.CredentialCache]::DefaultNetworkCredentials)
     return ,$Credentials
@@ -329,9 +352,9 @@ function Invoke-ErgoptiUpdaterDownload {
     }
 }
 
-# Release assets use the same owned curl attempt and causal authentication fence
-# as HTTP requests. The legacy .NET function remains an explicitly selected path.
-function Invoke-ErgoptiUpdaterCurlDownload {
+# Release assets use the same WinHTTP attempt engine as the managed HTTP requests.
+# The legacy .NET function remains an explicitly selected path.
+function Invoke-ErgoptiUpdaterArtifactDownload {
     param(
         [Uri]$Destination, [string]$NewExe, [int]$TimeoutMs, [hashtable]$State,
         [scriptblock]$ResolveRoutes, [int]$DeadlineMs, [int64]$StartedTick,
@@ -377,7 +400,7 @@ function Invoke-ErgoptiUpdaterCurlDownload {
                 -not [IO.Directory]::Exists($CaptureCandidate)) {
                 throw [ArgumentException]::new('Parent-owned artifact capture was refused.')
             }
-            foreach ($Name in @('artifact.bin', 'headers.bin', 'capability.json', 'transport.conf')) {
+            foreach ($Name in @('artifact.bin', 'headers.bin')) {
                 if (-not [IO.File]::Exists((Join-Path $CaptureCandidate $Name))) {
                     throw [ArgumentException]::new('Parent-owned artifact capture file was absent.')
                 }
@@ -395,12 +418,10 @@ function Invoke-ErgoptiUpdaterCurlDownload {
             max_response_bytes = $AuthenticatedSize; max_header_bytes = $Limits.max_header_bytes;
             connect_timeout_ms = $TimeoutMs; revocation_best_effort = $Limits.revocation_best_effort;
             response_path = (Join-Path $Directory 'artifact.bin'); header_path = (Join-Path $Directory 'headers.bin');
-            capability_path = (Join-Path $PSScriptRoot 'ergopti_curl_capabilities_worker.ps1');
             headers = @(); body = ''; user_agent = 'ErgoptiPlus-Updater/1.0'
         }
-        . (Join-Path $PSScriptRoot 'ergopti_curl_attempt.ps1')
-        $Engine = New-ErgoptiCurlAttemptEngine $Parameters $Answer (Join-Path $Directory 'capability.json') `
-            (Join-Path $Directory 'payload.bin') (Join-Path $Directory 'transport.conf')
+        . (Join-Path $PSScriptRoot 'ergopti_winhttp_transport.ps1')
+        $Engine = New-ErgoptiWinHttpAttemptEngine $Parameters $Answer
         $Capability = $null
         function Resolve-ErgoptiArtifactFreshSelection {
             param([Uri]$Destination)
@@ -451,49 +472,28 @@ function Invoke-ErgoptiUpdaterCurlDownload {
             if ($null -eq $Capability) {
                 $State.Stage = 'connect'
                 $Capability = $Engine.ObserveCapability()
-                if ([version]$Capability.version -lt [version]'8.7.0') { throw 'Native proxy-use evidence is unavailable.' }
                 # Capability observation may outlast a settings revision. Resolve
-                # the complete URL afresh before the first credential-bearing child.
+                # the complete URL afresh before the first transfer.
                 continue
             }
             $Metrics = $null
-            for ($DiscoveryOrdinal = 0; $DiscoveryOrdinal -lt $Selection.Routes.Count; $DiscoveryOrdinal++) {
-                $Route = $Selection.Routes[$DiscoveryOrdinal]
-                if ($Route.Kind -ceq 'proxy' -and (-not $Capability.sspi -or -not $Capability.spnego)) {
-                    throw 'The actual native proxy authentication features are unavailable.'
+            for ($RouteOrdinal = 0; $RouteOrdinal -lt $Selection.Routes.Count; $RouteOrdinal++) {
+                $Route = $Selection.Routes[$RouteOrdinal]
+                if ($Route.Kind -ceq 'proxy' -and -not $Capability.sspi) {
+                    throw 'The integrated proxy authentication providers are unavailable.'
                 }
                 $State.Stage = 'connect'
-                $State.Receipt = @{ backend = 'curl'; stage = 'connect'; failure_provenance = 'unknown'; tls_verification = 'enforced' }
-                if ($Route.Kind -ceq 'proxy' -and $Destination.Scheme -ceq 'https') {
-                    $Discovery = $Engine.DiscoverProxy($Destination, $Route, $Capability, $Selection, $DiscoveryOrdinal)
-                    if ($Discovery.ready) {
-                        $FreshSelection = Resolve-ErgoptiArtifactFreshSelection $Destination
-                        $Metrics = $Engine.InvokeDiscoveredRoute($Destination, $Route, 'GET', $false, $false, $FreshSelection)
-                    } else { $Metrics = $Discovery.metrics }
-                } else {
-                    $Metrics = $Engine.InvokeRoute($Destination, $Route, 'negotiate', 'GET', $false, $false)
-                    if ($Engine.TestNtlmChallenge($Destination, $Route, $Metrics, $Capability)) {
-                        $Metrics = $Engine.InvokeRoute($Destination, $Route, 'ntlm', 'GET', $false, $false)
-                    }
+                $State.Receipt = @{ backend = 'winhttp'; stage = 'connect'; failure_provenance = 'unknown'; tls_verification = 'enforced' }
+                $Metrics = $Engine.InvokeRoute($Destination, $Route, 'GET', $false, $false)
+                # A complete response is the origin's unless the proxy produced it
+                # (a refused tunnel or an unanswered proxy challenge).
+                if ($Metrics.completed -and -not $Metrics.proxy_answered) { break }
+                $State.Receipt = $Engine.GetFailureReceipt($Metrics, $Destination)
+                if (-not $Engine.TestFailover($Metrics, $Route)) {
+                    throw [InvalidOperationException]::new('Artifact transport was refused.')
                 }
-                $State.Receipt.failure_provenance = 'verified'
-                if ($Metrics.exit -eq 0) { break }
-                $State.Receipt.curl_exit = [int]$Metrics.exit
-                $State.Receipt.http_status = $Metrics.status
-                $State.Receipt.proxy_connect_status = $Metrics.connect
-                $State.Receipt.proxy_mode = $(if ($Metrics.proxy_used) { 'selected' } else { 'direct' })
-                $State.Receipt.http_response_source = $(if ($Metrics.connect -eq 407 -and $Metrics.status -eq 0) { 'proxy' } else { 'unavailable' })
-                if ($Metrics.connect -ge 400 -and $Metrics.connect -le 599 -and $Metrics.status -eq 0 -and $Metrics.proxy_used) {
-                    $State.Receipt.stage = 'proxy_connect'
-                }
-                if ($Metrics.exit -eq 5) { $State.Receipt.stage = 'proxy_resolve' }
-                if ($Metrics.exit -in @(35, 60, 77, 83)) { $State.Receipt.stage = 'tls' }
-                $Retry = $Route.Kind -ceq 'proxy' -and $Metrics.proxy_used -and $Metrics.child_quiesced -and
-                    $Metrics.status -eq 0 -and $Metrics.connect -eq 0 -and $Metrics.delivered -eq 0 -and
-                    ($Policy.failover.proxy_name_resolution_exits -contains $Metrics.exit -or $Policy.failover.proxy_connect_exits -contains $Metrics.exit)
-                if (-not $Retry) { throw [InvalidOperationException]::new('Artifact transport was refused.') }
             }
-            if ($null -eq $Metrics -or $Metrics.exit -ne 0 -or -not $Engine.ChildQuiesced()) {
+            if ($null -eq $Metrics -or -not $Metrics.completed -or $Metrics.proxy_answered -or -not $Engine.ChildQuiesced()) {
                 throw [InvalidOperationException]::new('All artifact routes were refused.')
             }
             if ($Metrics.status -in @(301, 302, 303, 307, 308)) {
@@ -504,7 +504,7 @@ function Invoke-ErgoptiUpdaterCurlDownload {
                 continue
             }
             if ($Metrics.status -ne 200) {
-                $State.Receipt = @{ backend = 'curl'; stage = 'http'; failure_provenance = 'verified';
+                $State.Receipt = @{ backend = 'winhttp'; stage = 'http'; failure_provenance = 'verified';
                     http_status = $Metrics.status; http_response_source = 'unavailable' }
                 throw [InvalidOperationException]::new('Artifact HTTP response was refused.')
             }
@@ -600,4 +600,26 @@ function Assert-ErgoptiOwnedArtifactOutputCurrent {
     if ($Current -isnot [bool] -or -not $Current) {
         throw [InvalidOperationException]::new('Exact artifact output authority was withdrawn.')
     }
+}
+
+# The parent retains CREATE_NEW identities before the child exists. Opening an
+# existing stream never truncates a foreign replacement; the exclusive stream
+# and the separately held directory lease prevent rename during its use.
+function Open-ErgoptiParentStagedOutput {
+    param([string]$Path, [string]$ExpectedIdentity)
+    if ($ExpectedIdentity -cnotmatch '^[0-9a-f]{8}:[0-9a-f]{16}\z') {
+        throw [ArgumentException]::new('Parent staged identity was refused.')
+    }
+    $Stream = $null
+    try {
+        $Stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        if ([ErgoptiUpdaterMonotonicClock]::StagingIdentity($Stream.SafeFileHandle, $false) -cne $ExpectedIdentity -or
+            $Stream.Position -ne 0 -or $Stream.Length -ne 0) {
+            throw [InvalidOperationException]::new('Parent staged file identity or initial bytes were refused.')
+        }
+        $Owner = @{stream=$Stream;identity=$ExpectedIdentity;is_current={param($Owner)
+            return [ErgoptiUpdaterMonotonicClock]::StagingIdentity($Owner.stream.SafeFileHandle, $false) -ceq $Owner.identity}}
+        $Stream = $null
+        return $Owner
+    } finally { if ($null -ne $Stream) { $Stream.Dispose() } }
 }

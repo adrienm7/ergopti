@@ -166,7 +166,7 @@ helpers.describe("M-8: prediction_engine wires context_window_chars (source)", f
 		-- Selected by a declaration unique to modules/llm/prediction_engine.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function compute_adaptive_debounce")
+		local src = helpers.read_driver_source("local function start_inactivity_timer")
 		helpers.assert_true(src ~= nil, "modules/llm/prediction_engine.lua source must be locatable")
 		helpers.assert_true(src:find("context_window_chars", 1, true) ~= nil,
 			"prediction_engine.lua must pass context_window_chars into PromptBuilder.build so the user setting takes effect (M-8)")

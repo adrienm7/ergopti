@@ -133,7 +133,7 @@ _TOAN_AnswersBecomeSparseRows() {
 	Hotstring := _TOAN_HotstringItem(Index)
 	Rows := OnboardingAnswerRows(Index, [
 		_TOAN_Op("gestures.enabled", true),
-		_TOAN_Op("metrics.metrics_enabled", false),
+		_TOAN_Op("metrics.enabled", false),
 		_TOAN_Op("hotstrings.trigger_char", ";"),
 		_TOAN_Op(Hotstring["gate"], true),
 		_TOAN_Op(Hotstring["item"], true)
@@ -141,7 +141,7 @@ _TOAN_AnswersBecomeSparseRows() {
 	AssertTrue(Rows is Array, "a valid payload must produce rows: " . (Rows is String ? Rows : ""))
 	AssertEqual(5, Rows.Length)
 	AssertEqual(1, _TOAN_RowFor(Rows, "gestures", "enabled").Value)
-	Metrics := _TOAN_RowFor(Rows, "metrics", "metrics_enabled")
+	Metrics := _TOAN_RowFor(Rows, "metrics", "enabled")
 	AssertTrue(Metrics.HasOwnProp("Delete") && Metrics.Delete == 1,
 		"a declined feature is deleted, so the file stays as empty as a fresh one")
 	AssertEqual(";", _TOAN_RowFor(Rows, "hotstrings", "trigger_char").Value)
@@ -323,7 +323,7 @@ _TOAN_CommitRendersOneStampedCandidate() {
 	Plan := _OnbWeb_FinishPlan(_TOAN_Answers([
 		_TOAN_Op("category_enabled.hotstrings", true),
 		_TOAN_Op("gestures.enabled", true),
-		_TOAN_Op("metrics.metrics_enabled", false),
+		_TOAN_Op("metrics.enabled", false),
 		_TOAN_Op("hotstrings.trigger_char", ";")
 	]))
 	AssertTrue(Plan is Map)
@@ -339,7 +339,7 @@ _TOAN_CommitRendersOneStampedCandidate() {
 	AssertTrue(RegExMatch(Content, "\[gestures\]\R(?:[^\[]*\R)?enabled = true") > 0,
 		"a Boolean answer is written as a TOML Boolean: " . Content)
 	AssertContains(Content, 'trigger_char = ";"')
-	AssertFalse(InStr(Content, "metrics_enabled"), "a neutral answer writes nothing")
+	AssertFalse(InStr(Content, "[metrics]"), "a neutral answer writes nothing")
 	AssertFalse(FileExist(Path), "rendering the candidate publishes nothing")
 }
 Test("onboarding answers: the commit renders one stamped candidate (onboarding-answers-windows)",
@@ -531,6 +531,14 @@ _TOAN_TapHoldReportTellsImportedFromCustomised() {
 		Json := OnboardingValuesJson(Values)
 		AssertContains(Json, '"tap_holds.keys.caps_lock":true', "an imported key shows checked")
 		AssertContains(Json, '"tap_holds.keys.left_alt":"customised"', "a customised key shows as kept")
+		; The 0.35 above is the delay an earlier build shipped for Caps Lock, copied into the
+		; file by a rewrite: it is not the user's. Flagged, the same number is theirs.
+		FileDelete(Path)
+		AssertTrue(FSWriteDurable(Path, '[tap_hold]`ninherit_defaults = false`nexplicit_delays = true`n'
+			. '[tap_hold.keys.caps_lock]`ntime_activation_seconds = 0.35`ntap_action = "enter"`n'
+			. 'hold_modifier = "ctrl"`n'))
+		AssertEqual("customised", TapHoldKeyReport(Path, Defaults).Get("caps_lock", ""),
+			"a flagged file's delay is the user's own setting")
 		FileDelete(Path)
 		AssertTrue(FSWriteDurable(Path, '[tap_hold]`ninherit_defaults = true`n'
 			. '[tap_hold.keys.tab]`ntap_action = "enter"`n'))

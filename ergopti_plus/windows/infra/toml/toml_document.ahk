@@ -258,6 +258,7 @@ TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 	if !(Source is String)
 		throw TypeError("TOML document source must be a String")
 	_TOML_DocumentParses += 1
+	PerfCount("toml.document_parse")
 	if SubStr(Source, 1, 1) == Chr(0xFEFF)
 		Source := SubStr(Source, 2)
 	Root := _TOML_DocumentTable(), Current := Root, CurrentPath := [], NativeSection := ""
@@ -346,6 +347,40 @@ TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 		Physical.Push({ Kind: "assignment", Section: NativeSection, Key: NativeKey, Text: RawRecord })
 	}
 	return Root
+}
+
+/**
+ * Parses an exact source once for READ-ONLY consumers. The memo is keyed by the
+ * whole source text, so a changed file can never be served a stale document; the
+ * returned Document, Records and Physical are shared and must not be mutated.
+ * Boot and every tray rebuild used to parse the same config.toml text more than
+ * twenty times (about 35 ms each) for lookups that only read it.
+ * @param {String} Source - Exact source text.
+ * @param {Array} Records - Receives the shared typed assignment records.
+ * @param {Array} Physical - Receives the shared physical record spans.
+ * @returns {Map} The shared, read-only semantic document; malformed input throws.
+ */
+TOML_ParseDocumentShared(Source, &Records := 0, &Physical := 0) {
+	static Entries := []
+	static MAX_ENTRIES := 4
+	static MAX_SOURCE_CHARS := 262144
+	if !(Source is String)
+		throw TypeError("TOML document source must be a String")
+	for Entry in Entries {
+		if Entry.Source == Source {
+			PerfCount("toml.document_shared_hit")
+			Records := Entry.Records, Physical := Entry.Physical
+			return Entry.Document
+		}
+	}
+	PerfCount("toml.document_shared_miss")
+	Document := TOML_ParseDocument(Source, &Records, &Physical)
+	if StrLen(Source) <= MAX_SOURCE_CHARS {
+		Entries.Push({ Source: Source, Document: Document, Records: Records, Physical: Physical })
+		while Entries.Length > MAX_ENTRIES
+			Entries.RemoveAt(1)
+	}
+	return Document
 }
 
 
@@ -464,12 +499,12 @@ TOML_AdmitWriterCandidate(Source, Before, After, Candidate, Updates, Prefixes) {
 	Document := TOML_ParseDocument(Source, &Records, &Physical)
 	Roots := _TOML_ForeignArrayRoots(Physical)
 	Projection := _TOML_FlatDocument(_TOML_ArrayProjectionSections(Before, Roots))
-	TOML_ParseDocument(Candidate)
+	TOML_ParseDocument(Candidate, , &CandidatePhysical)
 	InlineAdmitted := _TOML_AdmitInlineTerminatorParent(Source, Document, Physical, Before, After, Candidate, Updates, Prefixes)
 	if InlineAdmitted is Map
 		return InlineAdmitted
 	if TOML_SameValue(Document, Projection) {
-		Content := _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes)
+		Content := _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes, Physical, CandidatePhysical)
 		if !TOML_SameValue(TOML_ParseDocument(Content), _TOML_FlatDocument(After))
 			throw ValueError("The physical TOML candidate differs from the requested model")
 		return Map("content", Content, "preserve_source", false)
@@ -506,9 +541,13 @@ _TOML_RecordOwned(Record, Owners, Prefixes) {
 ; Unmatched physical records are user data. Keep their complete lexical spans,
 ; including comments inside multiline arrays, instead of re-encoding values.
 ; Explicitly owned rows still come from the existing canonical serializer.
-_TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes) {
-	TOML_ParseDocument(Source, , &Physical)
-	TOML_ParseDocument(Candidate, , &Canonical)
+_TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes, Physical := 0, Canonical := 0) {
+	; A caller that already parsed one side hands over its lexical records, so a
+	; transaction does not tokenize the same text twice. Both lists are only read.
+	if !(Physical is Array)
+		TOML_ParseDocument(Source, , &Physical)
+	if !(Canonical is Array)
+		TOML_ParseDocument(Candidate, , &Canonical)
 	Owners := Map(), Rows := Map(), Headers := Map(), Order := []
 	Spacing := "", Separator := ""
 	for Update in Updates {
@@ -1269,7 +1308,8 @@ _TOML_InlineTableRewriteRecord(RecordText, Changes) {
 ; assignments and literal dotted root names still lack native write authority.
 _TOML_InlineTerminatorParent(Physical, Document) {
 	ParentTable := Document.Get("hotstrings", 0)
-	if !(ParentTable is Map) || (!ParentTable.Has("terminators") && !ParentTable.Has("terminator_states"))
+	if !(ParentTable is Map) || (!ParentTable.Has("terminators") && !ParentTable.Has("terminator_states")
+			&& !ParentTable.Has("terminator_consume"))
 		return false
 	for ParentRow in Physical {
 		if ParentRow.Kind != "assignment" || ParentRow.Section != ""
@@ -1315,6 +1355,7 @@ _TOML_AdmitInlineTerminatorParent(Source, Document, Physical, Before, After, Can
 		if UpdateParts.Length != 2 || StrCompare(UpdateParts[1], "hotstrings", true) != 0
 				|| StrCompare(ParentUpdate.Key, "terminators", false) == 0
 				|| StrCompare(ParentUpdate.Key, "terminator_states", false) == 0
+				|| StrCompare(ParentUpdate.Key, "terminator_consume", false) == 0
 			throw ValueError("The record owner requires its dedicated typed editor")
 		ParentDelete := ParentUpdate.HasOwnProp("Delete") && ParentUpdate.Delete == 1
 		ParentChanges[ParentUpdate.Key] := Map("delete", ParentDelete)

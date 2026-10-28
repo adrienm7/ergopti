@@ -39,6 +39,7 @@ global HSE_RepeatEnabled := true
 #Include ..\..\infra\tick_count.ahk
 #Include ..\..\infra\wall_clock.ahk
 #Include ..\..\infra\logger.ahk
+#Include ..\..\infra\hotpath_profiler.ahk
 #Include ..\..\infra\redact.ahk
 #Include ..\..\adapters\crypto.ahk
 #Include ..\..\adapters\file_system.ahk
@@ -61,6 +62,11 @@ TapKeyAssignments["feature_state_include_once_probe"] := "none"
 #Include ..\..\modules\gestures\config.ahk
 ; LoggerInit admits the real shared privacy policy through this native codec.
 #Include ..\..\infra\json.ahk
+; Canonical classification also consults the real language/category ownership
+; registry, even when the authored file contains only script preferences.
+#Include ..\..\infra\toml\toml_loader.ahk
+#Include ..\..\infra\master_gates.ahk
+#Include ..\..\infra\hotstrings\hotstrings_cache.ahk
 
 try {
     if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate")
@@ -118,10 +124,46 @@ try {
 			_FeatureStateSmokeInvalidValue("hotstrings", "repeat_key_enabled", "false")
 		case "invalid_kana":
 			_FeatureStateSmokeInvalidValue("script", "alt_gr_is_kana_remap", "sometimes")
+		case "kana_authored_outdated_enum", "kana_authored_outdated_quoted_boolean",
+				"kana_authored_outdated_number", "kana_authored_outdated_array",
+				"kana_authored_outdated_zero", "kana_authored_outdated_one",
+				"kana_authored_outdated_signed_zero", "kana_authored_outdated_missing_marker",
+				"kana_authored_valid_auto",
+				"kana_authored_valid_true", "kana_authored_valid_false",
+				"kana_authored_valid_comment":
+			_FeatureStateSmokeAuthoredKana(A_Args[1])
 		case "kana_auto_lower", "kana_auto_upper", "kana_auto_mixed":
 			_FeatureStateSmokeKanaAutomatic(A_Args[1])
 		case "logger_dotted", "logger_inline", "logger_quoted":
 			_FeatureStateSmokeLoggerSemantic(A_Args[1])
+		case "logger_case_debug_lower", "logger_case_debug_mixed", "logger_case_debug_upper",
+				"logger_case_trace_lower", "logger_case_trace_mixed", "logger_case_trace_upper",
+				"logger_case_done_lower", "logger_case_done_mixed", "logger_case_done_upper",
+				"logger_case_info_lower", "logger_case_info_mixed", "logger_case_info_upper":
+			_FeatureStateSmokeLoggerCase(A_Args[1])
+		case "logger_case_start_lower", "logger_case_start_mixed", "logger_case_start_upper",
+				"logger_case_success_lower", "logger_case_success_mixed", "logger_case_success_upper",
+				"logger_case_warning_lower", "logger_case_warning_mixed", "logger_case_warning_upper",
+				"logger_case_error_lower", "logger_case_error_mixed", "logger_case_error_upper":
+			_FeatureStateSmokeLoggerCase(A_Args[1])
+		case "script_chords_detached_quoted", "script_chords_detached_integer", "script_chords_detached_float",
+				"script_chords_detached_array", "script_chords_detached_record", "script_chords_detached_true",
+				"script_chords_detached_false", "script_chords_detached_marker", "script_chords_detached_absent":
+			_FeatureStateSmokeDetachedChords(A_Args[1])
+		case "script_chords_authored_quoted_boolean", "script_chords_authored_integer",
+				"script_chords_authored_float", "script_chords_authored_array",
+				"script_chords_authored_record", "script_chords_authored_signed_zero",
+				"script_chords_authored_plus_zero", "script_chords_authored_true",
+				"script_chords_authored_false", "script_chords_authored_legacy_zero",
+				"script_chords_authored_legacy_one", "script_chords_authored_legacy_zero_comment",
+				"script_chords_authored_legacy_one_comment", "script_chords_authored_boolean_comment",
+				"script_chords_authored_missing_marker", "script_chords_authored_absent":
+			_FeatureStateSmokeAuthoredChords(A_Args[1])
+		case "logger_generation_deleted_error", "logger_generation_created_error":
+			_FeatureStateSmokeLoggerPresence(A_Args[1])
+		case "logger_generation_replaced_debug", "logger_generation_replaced_error",
+				"logger_generation_unchanged_debug", "logger_generation_unchanged_error":
+			_FeatureStateSmokeLoggerGeneration(A_Args[1])
 		case "outdated_source_key":
 			_FeatureStateSmokeOutdatedSourceKey()
 		case "retired_source_scan":
@@ -595,4 +637,411 @@ _FeatureStateSmokeLoggerSemantic(Fixture) {
 		}
 		DirDelete(Root, true)
 	}
+}
+
+
+; Each caller runs this full production reader in a fresh child process. Native
+; boot-owned hotstring globals therefore cannot leak into another test case.
+_FeatureStateSmokeAuthoredKana(Fixture) {
+	global ConfigurationFile, ScriptInformation
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, _ConfigBootReadFailed
+	Cases := Map(
+		"kana_authored_outdated_enum", ['"sometimes"', true],
+		"kana_authored_outdated_quoted_boolean", ['"false"', true],
+		"kana_authored_outdated_number", ["42", true],
+		"kana_authored_outdated_array", ["[]", true],
+		"kana_authored_outdated_zero", ["0", true],
+		"kana_authored_outdated_one", ["1", true],
+		"kana_authored_outdated_signed_zero", ["-0", true],
+		"kana_authored_outdated_missing_marker", ['"_"', true],
+		"kana_authored_valid_auto", ['"auto"', false],
+		"kana_authored_valid_true", ["true", false],
+		"kana_authored_valid_false", ["false", false],
+		"kana_authored_valid_comment", ["true # explicit layout choice", false])
+	FixtureCase := Cases[Fixture]
+	Path := A_Temp . "\ergopti_kana_authored_" . DllCall("GetCurrentProcessId") . ".toml"
+	SavedScript := ScriptInformation.Clone()
+	FileWasSet := IsSet(ConfigurationFile)
+	SavedFile := FileWasSet ? ConfigurationFile : ""
+	try {
+		ConfigurationFile := Path
+		Source := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+			. "`n[script]`nalt_gr_is_kana_remap = " . FixtureCase[1] . "`n"
+		if !FSWrite(Path, Source)
+			throw Error("The authored Kana fixture could not write its real native source.")
+		Before := FSReadUtf8Exact(Path)
+		Journal := ConfigMigrateBoot(Path)
+		if !(Journal is Map) || Journal.Get("status", "missing") != "current"
+			throw Error("The authored Kana source must complete the genuine current-schema boot constructor.")
+		Cache := ParseConfigTomlFile(Path)
+		if !Cache.Has(ConfigKey.SCRIPT) || !Cache[ConfigKey.SCRIPT].Has(ConfigLeaf.ALT_GR_IS_KANA_REMAP)
+			throw Error("The actual native bootstrap must expose the authored Kana setting.")
+		Snapshot := ConfigTomlReadSnapshot(Path)
+		if Snapshot.Cache != Cache || StrCompare(Snapshot.Source, Source, true) != 0
+			throw Error("The early reader fixture must retain the exact native bootstrap generation.")
+		Tree := ManifestBuildFeaturesMap()
+		Applied := ApplyConfigToml(Tree, Path, &Rejected, , &Outdated)
+		if Applied < 0 || Rejected != 0 || Outdated.Count != (FixtureCase[2] ? 1 : 0)
+			throw Error("The actual canonical loader must classify this declared Kana value before the early-reader assertion.")
+		Expected := Tree[ConfigKey.SCRIPT][ConfigLeaf.ALT_GR_IS_KANA_REMAP]
+		; Keep the actual cold-boot initialization so source admission is checked
+		; from the same live state as the driver's sole startup reader call.
+		Initial := ManifestDefaultFor(ConfigKey.SCRIPT_ALT_GR_IS_KANA_REMAP)
+		if Type(ScriptInformation["AltGrIsKanaRemap"]) != Type(Initial)
+				|| ScriptInformation["AltGrIsKanaRemap"] !== Initial
+			throw Error("The authored Kana fixture must start from its real manifest initialization.")
+		ReadScriptConfig(Cache)
+		Actual := ScriptInformation["AltGrIsKanaRemap"]
+		if Type(Actual) != Type(Expected) || Actual !== Expected
+			throw Error("The actual early script reader must keep canonical Kana admission; expected "
+				. String(Expected) . " (" . Type(Expected) . "), actual " . String(Actual) . " (" . Type(Actual) . ").")
+		if !FSUtf8ExactMatches(Path, Before) || StrCompare(Snapshot.Source, Source, true) != 0
+			throw Error("Ignoring an outdated authored Kana setting must preserve its physical and admitted source.")
+	} finally {
+		for Key, Value in SavedScript
+			ScriptInformation[Key] := Value
+		ConfigurationFile := FileWasSet ? SavedFile : unset
+		_TOML_InvalidateParseCache(Path)
+		FSDelete(Path)
+	}
+}
+
+
+; Logger initialization has a pre-journal recovery role and a later normal boot
+; role. This fixture reaches the latter with a genuine already published source
+; generation; its physical edit must not silently select unrelated settings.
+_FeatureStateSmokeLoggerGeneration(Fixture) {
+	global ConfigurationFile, _LogsDir, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL
+	global _LOGGER_FLUSH_TIMER_STARTED
+	Cases := Map(
+		"logger_generation_replaced_debug", ["DEBUG", "ERROR", true],
+		"logger_generation_replaced_error", ["ERROR", "DEBUG", true],
+		"logger_generation_unchanged_debug", ["DEBUG", "ERROR", false],
+		"logger_generation_unchanged_error", ["ERROR", "DEBUG", false])
+	FixtureCase := Cases[Fixture]
+	Root := A_Temp . "\ergopti_logger_generation_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount
+	if DirExist(Root)
+		throw Error("The logger generation fixture requires a fresh private native root.")
+	DirCreate(Root)
+	InitialDefault := LOGGER_DEFAULT_LEVEL
+	try {
+		ConfigurationFile := Root . "\config.toml"
+		_LogsDir := Root . "\logs\"
+		Header := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n[script]`n"
+		Initial := Header . "log_level = " . TOML_RenderString(FixtureCase[1])
+			. "`nshow_error_dialog = true`n"
+		Replacement := Header . "log_level = " . TOML_RenderString(FixtureCase[2])
+			. "`nshow_error_dialog = false`n"
+		if !FSWriteCreateDurable(ConfigurationFile, Initial)
+			throw Error("The actual native logger fixture source could not be created.")
+		Journal := ConfigMigrateBoot(ConfigurationFile)
+		if !(Journal is Map) || Journal.Get("status", "missing") != "current"
+			throw Error("The logger generation source must complete the genuine boot constructor.")
+		Cache := ParseConfigTomlFile(ConfigurationFile)
+		Primary := ConfigTomlReadSnapshot(ConfigurationFile)
+		if Cache != Primary.Cache || StrCompare(Primary.Source, Initial, true) != 0
+			throw Error("The logger generation fixture must retain the genuine native bootstrap cache.")
+		Tree := ManifestBuildFeaturesMap()
+		Applied := ApplyConfigToml(Tree, ConfigurationFile, &Rejected, , &Outdated)
+		if Applied < 0 || Rejected != 0 || Outdated.Count != 0
+			throw Error("The original logger source must be fully accepted by canonical configuration admission.")
+		Expected := Tree[ConfigKey.SCRIPT][ConfigLeaf.LOG_LEVEL]
+		if StrCompare(Expected, FixtureCase[1], true) != 0
+				|| Tree[ConfigKey.SCRIPT][ConfigLeaf.SHOW_ERROR_DIALOG] != true
+			throw Error("The primary settings generation must hold both original authored choices.")
+		if FixtureCase[3] && !FSWrite(ConfigurationFile, Replacement)
+			throw Error("The independent physical settings generation could not replace the native file.")
+		Physical := FixtureCase[3] ? Replacement : Initial
+		if !FSUtf8ExactMatches(ConfigurationFile, Physical)
+			throw Error("The physical source mutation must be real before logger initialization.")
+		Observed := ConfigTomlDecodeSnapshot(FSReadStrict(ConfigurationFile))
+		PhysicalLevel := Observed.Cache[ConfigKey.SCRIPT][ConfigLeaf.LOG_LEVEL]
+		PhysicalDialog := Observed.Cache[ConfigKey.SCRIPT][ConfigLeaf.SHOW_ERROR_DIALOG]
+		if StrCompare(PhysicalLevel, FixtureCase[FixtureCase[3] ? 2 : 1], true) != 0
+				|| PhysicalDialog != !FixtureCase[3]
+			throw Error("The physical file must decode into its independent complete settings generation.")
+		Retained := ConfigTomlReadSnapshot(ConfigurationFile)
+		if Retained != Primary || StrCompare(Retained.Source, Initial, true) != 0
+			throw Error("The genuine canonical producer must retain its original admitted generation.")
+		LoggerInit()
+		FileAppend("logger generation: admitted=" . Expected . ", physical=" . PhysicalLevel
+			. ", active=" . LOGGER_MIN_LEVEL . ", default=" . LOGGER_DEFAULT_LEVEL . "`n", "*")
+		if StrCompare(LOGGER_DEFAULT_LEVEL, InitialDefault, true) != 0
+			throw Error("Generation selection must never change the logger default.")
+		if StrCompare(LOGGER_MIN_LEVEL, Expected, true) != 0
+			throw Error("The actual initialized logger must retain the canonical boot generation; expected "
+				. Expected . ", actual " . LOGGER_MIN_LEVEL . ".")
+		if ConfigTomlReadSnapshot(ConfigurationFile) != Primary
+				|| !FSUtf8ExactMatches(ConfigurationFile, Physical)
+			throw Error("Logger initialization must preserve both the admitted snapshot and external source.")
+	} finally {
+		try {
+			if _LOGGER_FLUSH_TIMER_STARTED && !LoggerPrepareShutdown()
+				throw Error("The logger generation fixture could not settle its actual native writes.")
+		} finally {
+			if _LOGGER_FLUSH_TIMER_STARTED {
+				SetTimer(_LoggerFlush, 0)
+				OnExit(_LoggerOnExitFlush, 0)
+				_LoggerRepeatDisable()
+			}
+			_TOML_InvalidateParseCache(ConfigurationFile)
+			DirDelete(Root, true)
+		}
+	}
+}
+
+
+; An admitted source generation owns absence as well as present file bytes.
+; Native creation/deletion after admission must not change only the logger.
+_FeatureStateSmokeLoggerPresence(Fixture) {
+	global ConfigurationFile, _LogsDir, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL
+	global _LOGGER_FLUSH_TIMER_STARTED
+	Deleted := Fixture == "logger_generation_deleted_error"
+	Root := A_Temp . "\ergopti_logger_presence_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount
+	if DirExist(Root)
+		throw Error("The logger presence fixture requires a fresh private root.")
+	DirCreate(Root)
+	InitialDefault := LOGGER_DEFAULT_LEVEL
+	try {
+		ConfigurationFile := Root . "\config.toml"
+		_LogsDir := Root . "\logs\"
+		Authored := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+			. '[script]`nlog_level = "ERROR"`n'
+		Authored := StrReplace(Authored, "[script]", "`n[script]")
+		if Deleted && !FSWriteCreateDurable(ConfigurationFile, Authored)
+			throw Error("The original private logger source could not be created.")
+		if !Deleted && FileExist(ConfigurationFile)
+			throw Error("The absent generation requires actual native source absence.")
+		Journal := ConfigMigrateBoot(ConfigurationFile)
+		if !(Journal is Map)
+			throw Error("The actual boot constructor must admit the logger presence source.")
+		Cache := ParseConfigTomlFile(ConfigurationFile)
+		Primary := ConfigTomlReadSnapshot(ConfigurationFile)
+		if Cache != Primary.Cache || Primary.Present != Deleted
+			throw Error("The canonical snapshot must retain the exact original source presence.")
+		Tree := ManifestBuildFeaturesMap()
+		if ApplyConfigToml(Tree, ConfigurationFile, &Rejected, , &Outdated) < 0
+				|| Rejected != 0 || Outdated.Count != 0
+			throw Error("The original logger presence generation must be canonically admitted.")
+		Expected := Tree[ConfigKey.SCRIPT][ConfigLeaf.LOG_LEVEL]
+		if StrCompare(Expected, Deleted ? "ERROR" : InitialDefault, true) != 0
+			throw Error("The canonical threshold must match the real initial generation.")
+		if Deleted {
+			if !FSDelete(ConfigurationFile) || FileExist(ConfigurationFile)
+				throw Error("The independent physical source must genuinely disappear.")
+		} else if !FSWriteCreateDurable(ConfigurationFile, Authored)
+			throw Error("The independent later physical source must genuinely appear.")
+		if !Deleted && !FSUtf8ExactMatches(ConfigurationFile, Authored)
+			throw Error("The new physical source must contain the independent ERROR threshold.")
+		if ConfigTomlReadSnapshot(ConfigurationFile) != Primary
+			throw Error("The canonical owner must retain its initial native source generation.")
+		LoggerInit()
+		FileAppend("logger source presence: initial=" . Deleted . ", physical=" . !!FileExist(ConfigurationFile)
+			. ", expected=" . Expected . ", active=" . LOGGER_MIN_LEVEL . "`n", "*")
+		if StrCompare(LOGGER_MIN_LEVEL, Expected, true) != 0
+			throw Error("Logger initialization selected a threshold from another native presence generation.")
+		if StrCompare(LOGGER_DEFAULT_LEVEL, InitialDefault, true) != 0
+			throw Error("Native presence selection cannot change the logger default.")
+		if ConfigTomlReadSnapshot(ConfigurationFile) != Primary
+			throw Error("Logger initialization cannot retire the admitted generation.")
+	} finally {
+		try {
+			if _LOGGER_FLUSH_TIMER_STARTED && !LoggerPrepareShutdown()
+				throw Error("The logger presence fixture could not settle its native writes.")
+		} finally {
+			if _LOGGER_FLUSH_TIMER_STARTED {
+				SetTimer(_LoggerFlush, 0)
+				OnExit(_LoggerOnExitFlush, 0)
+				_LoggerRepeatDisable()
+			}
+			_TOML_InvalidateParseCache(ConfigurationFile)
+			DirDelete(Root, true)
+		}
+	}
+}
+
+
+; Every valid enum spelling must select the same real native severity and
+; queued-log visibility as the canonical name, with a real file as receiver.
+_FeatureStateSmokeLoggerCase(Fixture) {
+	global ConfigurationFile, _LogsDir, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, LOGGER_LOG_PATH
+	global _LOGGER_FLUSH_TIMER_STARTED, _LOGGER_PENDING, LOGGER_SEVERITY
+	if !RegExMatch(Fixture, "^logger_case_([a-z]+)_(lower|mixed|upper)$", &Parts)
+		throw Error("The logger enum fixture requires a valid threshold spelling.")
+	Expected := StrUpper(Parts[1])
+	if !LOGGER_SEVERITY.Has(Expected)
+		throw Error("The logger enum fixture must name a genuine native severity.")
+	Spelling := Parts[2] == "upper" ? Expected : Parts[1]
+	if Parts[2] == "mixed"
+		Spelling := SubStr(Parts[1], 1, 1) . StrUpper(SubStr(Parts[1], 2))
+	Root := A_Temp . "\ergopti_logger_case_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount
+	if DirExist(Root)
+		throw Error("The logger enum fixture requires a fresh private native root.")
+	DirCreate(Root)
+	InitialDefault := LOGGER_DEFAULT_LEVEL
+	try {
+		ConfigurationFile := Root . "\config.toml"
+		_LogsDir := Root . "\logs\"
+		Source := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+			. "`n[script]`nlog_level = " . TOML_RenderString(Spelling) . "`n"
+		if !FSWriteCreateDurable(ConfigurationFile, Source)
+			throw Error("The private logger enum source could not be created.")
+		if !(ConfigMigrateBoot(ConfigurationFile) is Map)
+			throw Error("The genuine boot constructor must admit the private logger source.")
+		Cache := ParseConfigTomlFile(ConfigurationFile)
+		Primary := ConfigTomlReadSnapshot(ConfigurationFile)
+		Tree := ManifestBuildFeaturesMap()
+		if ApplyConfigToml(Tree, ConfigurationFile, &Rejected, , &Outdated) < 0
+				|| Rejected != 0 || Outdated.Count != 0
+			throw Error("The authored logger enum must be fully accepted by the canonical loader.")
+		if Cache != Primary.Cache || StrCompare(Tree[ConfigKey.SCRIPT][ConfigLeaf.LOG_LEVEL], Spelling, true) != 0
+			throw Error("The actual canonical source must retain the authored accepted case.")
+		LoggerDebug("LoggerCaseFixture", "CASE_DEBUG_NATIVE_CANARY")
+		LoggerInfo("LoggerCaseFixture", "CASE_INFO_NATIVE_CANARY")
+		LoggerError("LoggerCaseFixture", "CASE_ERROR_NATIVE_CANARY")
+		QueuedDebug := false, QueuedInfo := false, QueuedError := false
+		for Line in _LOGGER_PENDING {
+			QueuedDebug := QueuedDebug || !!InStr(Line, "CASE_DEBUG_NATIVE_CANARY", true)
+			QueuedInfo := QueuedInfo || !!InStr(Line, "CASE_INFO_NATIVE_CANARY", true)
+			QueuedError := QueuedError || !!InStr(Line, "CASE_ERROR_NATIVE_CANARY", true)
+		}
+		if !QueuedDebug || !QueuedInfo || !QueuedError
+			throw Error("Every actual pre-init canary must be queued before threshold selection.")
+		LoggerInit()
+		Content := FileRead(LOGGER_LOG_PATH, "UTF-8")
+		ActualDebug := !!InStr(Content, "CASE_DEBUG_NATIVE_CANARY", true)
+		ActualInfo := !!InStr(Content, "CASE_INFO_NATIVE_CANARY", true)
+		ExpectedDebug := LOGGER_SEVERITY[Expected] <= LOGGER_SEVERITY["DEBUG"]
+		ExpectedInfo := LOGGER_SEVERITY[Expected] <= LOGGER_SEVERITY["INFO"]
+		if !InStr(Content, "CASE_ERROR_NATIVE_CANARY", true)
+			throw Error("The actual native file must receive the admitted ERROR control.")
+		FileAppend("logger enum: authored=" . Spelling . ", active=" . LOGGER_MIN_LEVEL
+			. ", debug=" . ActualDebug . ", info=" . ActualInfo . "`n", "*")
+		if ActualDebug != ExpectedDebug || ActualInfo != ExpectedInfo
+			throw Error("The native log visibility must follow the accepted enum spelling " . Spelling . ".")
+		if StrCompare(LOGGER_MIN_LEVEL, Expected, true) != 0
+			throw Error("The actual logger must publish the canonical accepted native threshold name.")
+		if StrCompare(LOGGER_DEFAULT_LEVEL, InitialDefault, true) != 0
+			throw Error("An authored case variant cannot alter the logger default.")
+		if ConfigTomlReadSnapshot(ConfigurationFile) != Primary || !FSUtf8ExactMatches(ConfigurationFile, Source)
+			throw Error("Logger enum admission cannot rewrite the authored source or retained generation.")
+	} finally {
+		try {
+			if _LOGGER_FLUSH_TIMER_STARTED && !LoggerPrepareShutdown()
+				throw Error("The logger enum fixture could not settle native writes.")
+		} finally {
+			if _LOGGER_FLUSH_TIMER_STARTED {
+				SetTimer(_LoggerFlush, 0)
+				OnExit(_LoggerOnExitFlush, 0)
+				_LoggerRepeatDisable()
+			}
+			_TOML_InvalidateParseCache(ConfigurationFile)
+			DirDelete(Root, true)
+		}
+	}
+}
+
+
+; The real late boot reader follows canonical feature admission. Rejected
+; authored preferences must not then crash startup or change the live switch.
+_FeatureStateSmokeAuthoredChords(Fixture) {
+	global ConfigurationFile, _IniCache, ScriptShortcutChordsOn, ScriptShortcutAssignments
+	Cases := Map(
+		"script_chords_authored_quoted_boolean", ['"false"', true],
+		"script_chords_authored_integer", ["2", true],
+		"script_chords_authored_float", ["0.0", true],
+		"script_chords_authored_array", ["[]", true],
+		"script_chords_authored_record", ["{}", true],
+		"script_chords_authored_signed_zero", ["-0", true],
+		"script_chords_authored_plus_zero", ["+0", true],
+		"script_chords_authored_true", ["true", false],
+		"script_chords_authored_false", ["false", false],
+		"script_chords_authored_legacy_zero", ["0", false],
+		"script_chords_authored_legacy_one", ["1", false],
+		"script_chords_authored_legacy_zero_comment", ["0 # explicit opt-out", false],
+		"script_chords_authored_legacy_one_comment", ["1 # explicit opt-in", false],
+		"script_chords_authored_boolean_comment", ["true # explicit chords", false],
+		"script_chords_authored_missing_marker", ['"_"', true],
+		"script_chords_authored_absent", [0, false])
+	FixtureCase := Cases[Fixture]
+	Root := A_Temp . "\ergopti_script_chords_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount
+	if DirExist(Root)
+		throw Error("The script chords fixture requires a fresh private native root.")
+	DirCreate(Root)
+	try {
+		ConfigurationFile := Root . "\config.toml"
+		Source := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+			. "`n[shortcuts.script_control]`n"
+		if FixtureCase[1] is String
+			Source .= "chords_enabled = " . FixtureCase[1] . "`n"
+		if !FSWriteCreateDurable(ConfigurationFile, Source)
+			throw Error("The authored script chord source could not be created.")
+		Journal := ConfigMigrateBoot(ConfigurationFile)
+		if !(Journal is Map) || Journal.Get("status", "missing") != "current"
+			throw Error("The real current-schema constructor must admit the private script chord source.")
+		_IniCache := ParseConfigTomlFile(ConfigurationFile)
+		Snapshot := ConfigTomlReadSnapshot(ConfigurationFile)
+		if _IniCache != Snapshot.Cache || StrCompare(Snapshot.Source, Source, true) != 0
+			throw Error("The script chords fixture must retain the actual bootstrap source generation.")
+		Tree := ManifestBuildFeaturesMap()
+		if ApplyConfigToml(Tree, ConfigurationFile, &Rejected, , &Outdated) < 0
+				|| Rejected != 0 || Outdated.Count != (FixtureCase[2] ? 1 : 0)
+			throw Error("The canonical loader must classify the exact authored script chord preference.")
+		Expected := Tree["shortcuts"]["script_control"]["chords_enabled"]
+		if ScriptShortcutChordsOn !== ManifestDefaultFor("shortcuts.script_control.chords_enabled")
+			throw Error("The script switch must start from its genuine cold manifest initialization.")
+		OriginalSlots := ScriptShortcutAssignments.Clone()
+		ReadScriptShortcutsConfig()
+		FileAppend("script chord admission: fixture=" . Fixture . ", expected=" . Expected
+			. ", active=" . ScriptShortcutChordsOn . ", outdated=" . Outdated.Count . "`n", "*")
+		if ScriptShortcutChordsOn !== Expected
+			throw Error("The live script chord switch must match the canonical admitted preference.")
+		if !ManifestValuesEqual(OriginalSlots, ScriptShortcutAssignments)
+			throw Error("Reading the switch cannot alter any absent script slot or recommendation.")
+		if ConfigTomlReadSnapshot(ConfigurationFile) != Snapshot || !FSUtf8ExactMatches(ConfigurationFile, Source)
+			throw Error("The live switch reader cannot mutate the retained or physical authored source.")
+	} finally {
+		_TOML_InvalidateParseCache(ConfigurationFile)
+		DirDelete(Root, true)
+	}
+}
+
+
+; Detached runtime candidates have no authored source generation and must keep
+; the existing strict Boolean contract instead of borrowing disk defaults.
+_FeatureStateSmokeDetachedChords(Fixture) {
+	global _IniCache, ScriptShortcutChordsOn, ScriptShortcutAssignments
+	Cases := Map(
+		"script_chords_detached_quoted", ["false", true],
+		"script_chords_detached_integer", [2, true],
+		"script_chords_detached_float", [0.0, true],
+		"script_chords_detached_array", [[], true],
+		"script_chords_detached_record", [Map(), true],
+		"script_chords_detached_true", [true, false],
+		"script_chords_detached_false", [false, false],
+		"script_chords_detached_marker", ["_", false],
+		"script_chords_detached_absent", ["_", false])
+	FixtureCase := Cases[Fixture]
+	Section := Map()
+	if Fixture != "script_chords_detached_absent"
+		Section["chords_enabled"] := FixtureCase[1]
+	_IniCache := Map("shortcuts.script_control", Section)
+	Initial := ManifestDefaultFor("shortcuts.script_control.chords_enabled")
+	if ScriptShortcutChordsOn !== Initial
+		throw Error("Detached candidates must begin at the genuine cold manifest switch.")
+	OriginalSlots := ScriptShortcutAssignments.Clone()
+	Rejected := false
+	try ReadScriptShortcutsConfig()
+	catch ValueError as Err {
+		Rejected := true
+		if StrCompare(Err.Message, "shortcuts.script_control.chords_enabled must be a TOML boolean", true) != 0
+			throw Error("The native strict refusal must belong to the actual script chord field.")
+	}
+	if Rejected != FixtureCase[2]
+		throw Error("The detached script chord candidate must retain strict typed admission.")
+	Expected := FixtureCase[2] || FixtureCase[1] == "_" ? Initial : FixtureCase[1]
+	if ScriptShortcutChordsOn !== Expected
+		throw Error("The detached script chord candidate published an unexpected switch.")
+	if !ManifestValuesEqual(OriginalSlots, ScriptShortcutAssignments)
+		throw Error("A detached switch candidate cannot change the absent script slots.")
 }

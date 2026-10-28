@@ -3,6 +3,7 @@
 --- Parent-only archive output. Children never receive the retained descriptor.
 --- A producer must provide actual stdout EOF and its physical settlement owner.
 --- This module does not authorize pathname reopening, publication or relay policy.
+local Identifiers = require("identifiers")
 local M = {}
 local retained_leases = {} -- Physical debt outlives dropped factories/callers.
 local MAX_CHUNK, MAX_SIZE = 65536, 9007199254740991
@@ -1314,6 +1315,11 @@ local function native_artifact(basename, pinned)
    and records[brand] == record then cleanup(record, true) end
   return record.disposed == true
  end
+ --- Byte length of the archive the adoption sealed, or nil before it (the signature record binds it).
+ function factory.sealed_size(brand)
+  local record = records[brand]
+  return record and record.staged == true and record.sealed_length or nil
+ end
  function factory.artifact_settled(brand)
   local record = records[brand]
   return record ~= nil and record.disposed == true
@@ -1578,7 +1584,7 @@ function M.native_ollama_artifact(asset)
  local names = { ["linux-amd64"] = "ollama-linux-amd64.tar.zst", ["linux-arm64"] = "ollama-linux-arm64.tar.zst" }
  if not names[selected.key] or selected.name ~= names[selected.key] or type(selected.version) ~= "string"
   or not selected.version:match("^%d+%.%d+%.%d+$")
-  or selected.url ~= "https://github.com/ollama/ollama/releases/download/v" .. selected.version .. "/" .. selected.name
+  or selected.url ~= "https://" .. Identifiers.hosts.github .. "/ollama/ollama/releases/download/v" .. selected.version .. "/" .. selected.name
   or type(selected.sha256) ~= "string" or #selected.sha256 ~= 64 or not selected.sha256:match("^[0-9a-f]+$")
   or type(selected.bytes) ~= "number" or not finite(selected.bytes) or selected.bytes <= 0
   or selected.bytes > MAX_SIZE or selected.bytes % 1 ~= 0 then return unavailable("invalid_pinned_ollama_asset") end

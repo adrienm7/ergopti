@@ -86,7 +86,7 @@ function M.start(path, sql, options)
 	-- pre-exec binding; it never substitutes an unbound SQLite process.
 	operation = OwnedProcess.start(executable, args, {
 		owner = options.owner, timeout_ms = options.timeout_ms, stdin_owner = input,
-		capture_output = false, max_output_bytes = 65536,
+		capture_output = false, max_output_bytes = require("llm.process_limits").defaults().max_output_bytes,
 		on_output = function(chunk, stream)
 			if stream ~= "stdout" or overflow then return end
 			if #output + #chunk > 256 then output, overflow = "", true else output = output .. chunk end

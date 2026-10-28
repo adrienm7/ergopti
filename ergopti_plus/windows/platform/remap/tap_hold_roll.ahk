@@ -63,7 +63,7 @@ global TAPHOLD_ROLL_REPLAY_SEND_LEVEL := 4
 _TapHoldRollState() {
 	static State := Map("key", "", "sc", 0, "name", "", "down_at", 0, "threshold_ms", 0,
 		"tap_fn", 0, "press_fn", 0, "queue", [], "waiting", false, "generation", 0,
-		"tapping", "", "outcomes", Map())
+		"tapping", "", "tap_down_at", 0, "outcomes", Map())
 	return State
 }
 
@@ -113,6 +113,14 @@ TapHoldRollUndecided() {
 ; @returns {Boolean}
 TapHoldRollTapIsRunning(KeyId) {
 	return _TapHoldRollState()["tapping"] == KeyId
+}
+
+; The tick at which the key whose tap is being typed now went down. A tap is typed
+; when the key comes up (or when the next key goes down), so a time gate on the
+; character it types would otherwise count the time the key stayed down.
+; @returns {Integer} A_TickCount of the press, 0 outside a roll tap.
+TapHoldRollTapDownTick() {
+	return _TapHoldRollState()["tap_down_at"]
 }
 
 
@@ -256,6 +264,7 @@ _TapHoldRollResolve(Decision, OnlyKeyId := "", Ports := 0) {
 		TapFn := State["tap_fn"]
 		PressFn := State["press_fn"]
 		Queue := State["queue"]
+		DownAt := State["down_at"]
 		State["key"] := ""
 		State["queue"] := []
 		Outcome := Map("decision", Decision, "pressed", false)
@@ -267,9 +276,14 @@ _TapHoldRollResolve(Decision, OnlyKeyId := "", Ports := 0) {
 		Outcome["pressed"] := PressFn.Call() ? true : false
 	} else {
 		Previous := State["tapping"]
+		PreviousDownAt := State["tap_down_at"]
 		State["tapping"] := KeyId
+		State["tap_down_at"] := DownAt
 		try TapFn.Call()
-		finally State["tapping"] := Previous
+		finally {
+			State["tapping"] := Previous
+			State["tap_down_at"] := PreviousDownAt
+		}
 	}
 	if (!A_IsSuspended && Queue.Length > 0)
 		_TapHoldRollPort(Ports, "replay", _TapHoldRollReplay).Call(Queue)

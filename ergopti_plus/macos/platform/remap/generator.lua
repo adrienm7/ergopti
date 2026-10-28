@@ -42,6 +42,7 @@ local KeyEventHealth = require("infra.key_event_health")
 local NativePath = require("native_path")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
+local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec  = require("adapters.json_codec")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
@@ -51,6 +52,8 @@ local NavLayer = require("platform.remap.nav_layer")
 local ScriptChordRules = require("platform.remap.script_chord_rules")
 local Defaults = require("platform.remap.defaults")
 local Layout = require("modules.keymap.layout")
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 
 local LOG = "karabiner"
 
@@ -162,7 +165,7 @@ local LAYER_EXIT_SENTINEL_NAME = Keycodes.to_name(Keycodes.F19_LAYER_NAV_EXITED)
 -- Command under every chord of the layer (J gives Cmd+Left).
 local SWALLOWED_ON_LAYER = { left_command = { tap = "backspace" } }
 
--- Append-only log file consumed by modules/keylogger/kc_bridge.lua.
+-- Append-only log file consumed by modules/keystats/kc_bridge.lua.
 -- Each line written by the shell_command is: "<physical_key_code_name>\n"
 -- so Hammerspoon can map the name back to a numeric kc and record true
 -- physical key frequency — bypassing the Karabiner remap layer.
@@ -172,7 +175,7 @@ local KE_PHYSICAL_KC_LOG
 do
 	local mp = require("infra.config_paths")
 	KE_PHYSICAL_KC_LOG = NativePath.with_trailing_separator(mp.get_config_dir()) .. "metrics/karabiner_kc.log"
-	-- Parent dir created lazily by deploy_json_file() or when keylogger starts;
+	-- Parent dir created lazily by deploy_json_file() or when keystats starts;
 	-- no mkdir here to avoid creating metrics/ when the feature is off
 end
 
@@ -638,14 +641,7 @@ end
 --- timing and generation gates mutate the deployed rule graph in place.
 --- @param value any Value to copy.
 --- @return any copy Structurally independent copy.
-local function deep_copy(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, nested in pairs(value) do
-		copy[deep_copy(key)] = deep_copy(nested)
-	end
-	return copy
-end
+local deep_copy = TableUtil.deep_copy_with_keys
 
 --- Copies only catalogue actions whose runtime-variable references will be
 --- rewritten or whose navigation output receives the F20 sentinel. All other
@@ -739,9 +735,7 @@ end
 --- Quotes one value for a POSIX shell command.
 --- @param value any Value to quote.
 --- @return string quoted Single-quoted shell token.
-local function sq(value)
-	return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
-end
+local sq = TextUtils.shell_quote
 
 --- Builds one physical-key ledger event for the Hammerspoon bridge.
 --- A fresh table is returned for every manipulator so Karabiner rule graphs do
@@ -1782,14 +1776,23 @@ function M.build_karabiner_json(
 		return nil, err
 	end
 	-- The layout convention the actions were resolved under must be known, or the
-	-- generation fails closed. It no longer chooses the deployed virtual
-	-- keyboard: Layout.VIRTUAL_KEYBOARD_PRODUCT does (issue #99).
+	-- generation fails closed. It does not choose the deployed virtual keyboard:
+	-- the user's choice does, as state.virtual_keyboard_product (issue #99).
 	local form_ok, keycode_form = pcall(function()
 		if state.virtual_keyboard_type ~= nil then return state.virtual_keyboard_type end
 		return Layout.keyboard_form()
 	end)
 	if not form_ok or (keycode_form ~= "ansi" and keycode_form ~= "iso") then
 		local err = "the active layout virtual keyboard convention is unavailable: " .. tostring(keycode_form)
+		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
+		return nil, err
+	end
+	-- An explicit product is deployed as chosen. Only a state that never met the
+	-- choice (no source registered yet) gets the product of the shipped default.
+	local product = state.virtual_keyboard_product
+	if product == nil then product = Layout.default_virtual_keyboard_product() end
+	if product ~= "ansi" and product ~= "iso" then
+		local err = "the virtual keyboard product must be ansi or iso, got " .. tostring(product)
 		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 		return nil, err
 	end
@@ -1938,7 +1941,7 @@ function M.build_karabiner_json(
 	local nav_layer_position = #all_rules
 	local nav_rule = nil
 	if state.nav_layer ~= nil then
-		local nav_ok, built = pcall(NavLayer.build_rule, state.nav_layer.bindings, state.nav_layer.registry)
+		local nav_ok, built = pcall(NavLayer.build_rule, state.nav_layer.bindings, state.nav_layer.registry, product)
 		if not nav_ok then
 			local err = "navigation layer: " .. tostring(built)
 			Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
@@ -1999,6 +2002,9 @@ function M.build_karabiner_json(
 			Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 			return nil, err
 		end
+		-- No key ships a delay: one without an override of its own carries no
+		-- per-manipulator threshold and follows the global parameter, so a change
+		-- of the global moves it and never moves a key that has its own.
 		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, per_key_ms)
 		if rule then
 			all_rules[#all_rules + 1] = rule
@@ -2143,7 +2149,7 @@ function M.build_karabiner_json(
 				devices              = { { identifiers = { is_keyboard = true }, simple_modifications = {} } },
 				name                 = "Default profile",
 				selected             = true,
-				virtual_hid_keyboard = { country_code = 0, keyboard_type_v2 = Layout.VIRTUAL_KEYBOARD_PRODUCT },
+				virtual_hid_keyboard = { country_code = 0, keyboard_type_v2 = product },
 			}
 		}
 	}
@@ -3405,23 +3411,101 @@ function M.merge_and_deploy_config(
 		return skip_identical("the encoded file equals the bytes on disk")
 	end
 
+	local write_started = TimerScheduler.awake_time()
 	local call_ok, deployed, deploy_detail = pcall(
 		M.deploy_string,
 		content,
 		karabiner_out,
 		source_snapshot
 	)
+	local write_ms = (TimerScheduler.awake_time() - write_started) * 1000
 	if not call_ok or deployed ~= true then
 		local detail = "write failed: " .. tostring(call_ok and deploy_detail or deployed)
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
 		return false, detail, 1
 	end
 
+	-- The write is synchronous on the Hammerspoon main thread: its duration is
+	-- the stall a typist can feel, so the log carries it next to the size.
 	Logger.info(LOG,
-		"Karabiner deploy decision: deployed (%s; %d bytes; Karabiner reloads every rule).",
+		"Karabiner deploy decision: deployed (%s; %d bytes; written in %.0f ms; Karabiner reloads every rule).",
 		source_snapshot.status == "absent" and "no karabiner.json yet"
-			or "the managed rules on disk differ", #content)
+			or "the managed rules on disk differ", #content, write_ms)
 	-- A key held across the reload is the one most likely to lose its key-up.
+	pcall(KeyEventHealth.note_transition, "a karabiner.json reload")
+	return true, deploy_detail or "ok", 1
+end
+
+--- Publishes the complete generated configuration to the file the owned
+--- runtime reads (ADR 011). Ergopti is that file's only writer, so there is
+--- nothing to merge: no personal rule, no legacy signature and no stock UI
+--- preference exists there, and the generated document is the whole file. The
+--- same validation as the shared merge applies, and bytes already on disk are
+--- never rewritten (each publication makes Karabiner reload every rule).
+--- @param hs_config table Valid generated configuration from build_karabiner_json.
+--- @param owned_out string Absolute path of the owned karabiner.json.
+--- @return boolean deployed Whether the file now holds the generated document.
+--- @return string detail Human-readable result or failure.
+--- @return integer attempts Number of publication attempts made.
+function M.deploy_owned_config(hs_config, owned_out)
+	if type(owned_out) ~= "string" or owned_out == "" then
+		local detail = "owned karabiner output path must be a non-empty string"
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 0
+	end
+	local generated_profile, index_or_err = find_unique_selected_profile(hs_config, "generated")
+	if not generated_profile then
+		Logger.error(LOG, "Owned deploy aborted: %s.", index_or_err)
+		return false, index_or_err, 0
+	end
+	local complex = generated_profile.complex_modifications
+	if type(complex) ~= "table" or type(complex.rules) ~= "table" then
+		local detail = "generated selected profile must contain complex_modifications.rules"
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 0
+	end
+	local valid_rules, rules_err = validate_incoming_managed_rules(complex.rules)
+	if not valid_rules then
+		Logger.error(LOG, "Owned deploy aborted: %s.", rules_err)
+		return false, rules_err, 0
+	end
+	local prepare_parent = FileSystem.prepare_parent_for_create
+	if type(prepare_parent) ~= "function" then
+		local detail = "parent preparation failed: filesystem capability is unavailable"
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 0
+	end
+	local prepare_ok, prepared, prepare_detail = pcall(prepare_parent, owned_out)
+	if not prepare_ok or prepared ~= true then
+		local detail = "parent preparation failed: " .. tostring(prepare_ok and prepare_detail or prepared)
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 0
+	end
+	local encode_ok, content = pcall(hs.json.encode, hs_config, true)
+	if not encode_ok or type(content) ~= "string" then
+		local detail = "JSON encode failed: " .. tostring(content)
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 0
+	end
+	local read_ok, raw, read_status, read_detail = pcall(FileSystem.read_with_status, owned_out)
+	if not read_ok or (read_status ~= "ok" and read_status ~= "absent") then
+		local detail = "owned karabiner.json could not be read: "
+			.. tostring(read_ok and (read_detail or read_status) or raw)
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 0
+	end
+	if read_status == "ok" and raw == content then
+		Logger.info(LOG, "Owned Karabiner deploy decision: skipped-identical (no reload).")
+		return true, "unchanged", 0
+	end
+	local snapshot = read_status == "ok" and { status = "ok", content = raw } or { status = "absent" }
+	local deploy_ok, deployed, deploy_detail = pcall(M.deploy_string, content, owned_out, snapshot)
+	if not deploy_ok or deployed ~= true then
+		local detail = "write failed: " .. tostring(deploy_ok and deploy_detail or deployed)
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 1
+	end
+	Logger.info(LOG, "Owned Karabiner deploy decision: deployed (%d bytes).", #content)
 	pcall(KeyEventHealth.note_transition, "a karabiner.json reload")
 	return true, deploy_detail or "ok", 1
 end
@@ -3445,7 +3529,7 @@ end
 function M.deploy_string(content, dst, expected_source)
 	Logger.trace(LOG, "Deploy: writing %d byte(s) → '%s'…", #content, dst)
 
-	local parent = dst:match("^(.*)/[^/]+$")
+	local parent = NativePath.dirname(dst)
 	local conditional = type(expected_source) == "table"
 	local writer = conditional and FileSystem.write_if_unchanged or FileSystem.write
 	if type(writer) ~= "function" then
@@ -3476,7 +3560,7 @@ function M.deploy_string(content, dst, expected_source)
 	-- S2: parent directory may not exist yet — create it then retry
 	if parent then
 		local mkdir_out, _, _, mkdir_rc = hs.execute(
-			string.format("/bin/mkdir -p '%s' 2>&1", parent:gsub("'", "'\\''"))
+			string.format("/bin/mkdir -p %s 2>&1", sq(parent))
 		)
 		Logger.debug(LOG, "Deploy S2 mkdir -p rc=%s: %s",
 			tostring(mkdir_rc), (mkdir_out or ""):gsub("%s+$", ""))

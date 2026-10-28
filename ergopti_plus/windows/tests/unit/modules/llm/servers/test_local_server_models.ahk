@@ -38,6 +38,16 @@ class _LSM_ChildReceipt {
 	}
 }
 
+; The exact request the managed transport stages, as the lines a reader of the
+; former curl config looked for: the target, then one line per header.
+_LSM_RequestImage(Request) {
+	Image := JsonParse(Request.ManagedTransportImage)
+	Text := "url = " . Request.Url . "`n"
+	for Header in Image["headers"]
+		Text .= "header = " . Header["name"] . ": " . Header["value"] . "`n"
+	return Text
+}
+
 class _LSM_Fixture {
 	__New() {
 		global _HTTP_CURL_ABORT_TIMER, _HTTP_CURL_CLEANUP_TIMER
@@ -117,13 +127,27 @@ class _LSM_Fixture {
 	Spawn(Executable, Args, OnDone, OnChunk, BeforeAdopt, MaxBytes) {
 		this.CallbackCritical.Push(A_IsCritical)
 		Request := this.Requests[this.Requests.Length]
-		this.Configs.Push(FileRead(Request.ConfigPath, "UTF-8"))
+		this.Configs.Push(_LSM_RequestImage(Request))
 		if HasMethod(this.NativeSpawn, "Call")
-			Child := this.NativeSpawn.Call(OnDone)
+			Child := this.NativeSpawn.Call(ObjBindMethod(this, "ManagedCompletion", Request, OnDone))
 		else
 			Child := _LSM_ChildReceipt()
 		this.Children.Push(Child)
 		return Child
+	}
+
+	; The controlled children report a finished transfer the way the former curl
+	; child did (the headers file, then the body on stdout). The managed worker
+	; reports a JSON receipt with the body in the response file, so this adapter
+	; publishes that exact shape to the request's real managed completion.
+	ManagedCompletion(Request, ManagedDone, Code, Body, Err) {
+		Status := 0
+		try Status := _HTTP_CurlParseHeaders(FileRead(Request.HeaderPath, "UTF-8-RAW"))["status"]
+		try FileDelete(Request.BodyPath)
+		FileAppend(Body, Request.BodyPath, "UTF-8-RAW")
+		Receipt := '{"schema_version":1,"ok":' . (Code == 0 && Status > 0 ? "true" : "false")
+			. ',"status":' . Status . ',"child_quiesced":true,"receipt":{}}'
+		return ManagedDone.Call(Code, Receipt, Err)
 	}
 
 	Done(Receipt) {
@@ -427,7 +451,7 @@ _LSM_PrivateConfigLock() {
 	try {
 		AssertTrue(Fixture.Probe())
 		Request := Fixture.Requests[1]
-		Lock := DllCall("Kernel32\CreateFileW", "WStr", Request.ConfigPath,
+		Lock := DllCall("Kernel32\CreateFileW", "WStr", Request.ManagedCapture["TmpFile"],
 			"UInt", 0x80000000, "UInt", 3, "Ptr", 0, "UInt", 3, "UInt", 0, "Ptr", 0, "Ptr")
 		AssertTrue(Lock != 0 && Lock != -1, "the fixture must hold a real non-delete-sharing config handle")
 		Fixture.Complete(1, 200, '{"data":[]}')
@@ -449,7 +473,7 @@ _LSM_PrivateConfigLock() {
 		} finally Fixture.Dispose()
 	}
 }
-Test("local models owner: real private curl config lock retains exact artifact debt", _LSM_PrivateConfigLock)
+Test("local models owner: real private request input lock retains exact artifact debt", _LSM_PrivateConfigLock)
 
 _LSM_NativeProcessCloseRefusal() {
 	static ProtectFromClose := 0x0002

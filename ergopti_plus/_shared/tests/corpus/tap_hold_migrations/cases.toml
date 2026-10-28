@@ -1,0 +1,30 @@
+# _shared/tests/corpus/tap_hold_migrations/cases.toml
+# Index of the tap_hold.toml migration corpus, replayed by the Linux driver
+# (_shared/lua/test/tap_hold_migrate_contract.lua) and by the independent
+# reference interpreter of tools/test/test-tap-hold-migrations.cjs. The Windows
+# driver replays it once it reads _shared/tap_hold/migrations.toml (its case
+# list then gains "windows" in `drivers`).
+#
+# Every case is a directory holding:
+#   case.toml      [case] description, drivers, outcome ("migrated" | "current" |
+#                  "newer" | "invalid") and, for "migrated", from_version and
+#                  to_version;
+#   input.toml     the tap_hold.toml a driver finds at boot;
+#   expected.toml  the migrated document, for outcome "migrated" only.
+# Documents are compared as decoded values, not bytes: each driver renders its
+# own file. The delays an earlier build shipped are the shared defaults'
+# [tap_hold.retired_delays], so the corpus holds no copy of them.
+# The JS gate fails when this list and the case directories differ.
+
+[corpus]
+cases = [
+	"unflagged_file_drops_shipped_delays",
+	"flagged_file_keeps_every_delay",
+	"flag_false_counts_as_absent",
+	"user_override_survives",
+	"emptied_sections_disappear",
+	"empty_file_is_only_stamped",
+	"current_file_untouched",
+	"newer_version_refused",
+	"invalid_version_refused",
+]

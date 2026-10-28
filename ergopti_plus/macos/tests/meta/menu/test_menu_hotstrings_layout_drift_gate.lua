@@ -141,6 +141,9 @@ local CANONICAL_LAYOUT_MENU = {
 	-- keyboard layout through the OS's input-source mechanism and draws a
 	-- menubar icon; neither concept exists on the other two drivers.
 	"list:layout_bundle",
+	-- UPDATED 2026-10-23: the Karabiner virtual keyboard type (Automatic, ISO,
+	-- ANSI) that menu_keyboard_layout.lua registers as a choice command.
+	"choice:virtual_keyboard",
 	-- UPDATED 2026-09-24: the menubar icon is ONE choice row, the last of the
 	-- Ergopti section, and the input sources sit under a header of their own.
 	"choice:menubar_icon",

@@ -26,6 +26,7 @@
 
 local M = {}
 
+local Errors = require("adapter_errors")
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
 
@@ -108,7 +109,7 @@ M.SCRIPT = table.concat({
 --- @param code integer|nil Exit code, nil when the child did not exit (timeout).
 --- @param stdout string|nil What the script printed.
 --- @param err string|nil The runner's error.
---- @return table { status = "ok"|"cancelled"|"failed", scaled = boolean, reason = string|nil }
+--- @return table { status = "ok"|"cancelled"|"failed", scaled = boolean, reason = string|nil (an adapter_errors id), detail = any|nil (the exit code or the runner's error) }
 function M.classify(mode, code, stdout, err)
 	if code == 0 then
 		local unscaled = type(stdout) == "string" and stdout:find(M.UNSCALED_MARKER, 1, true) ~= nil
@@ -117,17 +118,17 @@ function M.classify(mode, code, stdout, err)
 	if code == M.EXIT_CANCELLED or (code == M.EXIT_NO_FILE and mode == "region") then
 		return { status = "cancelled", scaled = false }
 	end
-	local reason
+	local reason, detail
 	if code == M.EXIT_NO_TOOL then
-		reason = "no screenshot tool is installed (grim, gnome-screenshot, spectacle or maim)"
+		reason = Errors.SCREEN_CAPTURE_NO_TOOL
 	elseif code == M.EXIT_NO_FILE then
-		reason = "the screenshot tool wrote no image"
+		reason = Errors.SCREEN_CAPTURE_NO_IMAGE
 	elseif code == nil then
-		reason = tostring(err or "the capture did not finish")
+		reason, detail = Errors.SCREEN_CAPTURE_DID_NOT_FINISH, err
 	else
-		reason = "the screenshot tool failed (exit code " .. tostring(code) .. ")"
+		reason, detail = Errors.SCREEN_CAPTURE_TOOL_FAILED, code
 	end
-	return { status = "failed", scaled = false, reason = reason }
+	return { status = "failed", scaled = false, reason = reason, detail = detail }
 end
 
 

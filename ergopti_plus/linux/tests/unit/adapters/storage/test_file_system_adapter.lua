@@ -9,6 +9,320 @@
 local helpers = require("tests.helpers")
 local fs      = helpers.load_module("adapters.file_system")
 
+--- Owns source, staging and all faulted native streams for one codec attempt.
+--- @param body function Receives codec, source path and controlled receipts.
+local function with_toml_staging(body)
+	local Shell = require("adapters.shell_runner")
+	local Writer, Native = require("toml_codec.writer"), require("infra.regular_file_writer")
+	local open, native_open, rename = io.open, Native.open, os.rename
+	local folder = os.tmpname()
+	assert(os.remove(folder)); assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))
+	local path = folder .. "/source.toml"
+	local state = { folder = folder, before = "[shortcuts]\nenabled = false\n", handles = {}, fault = true, opened = 0, closed = 0, legacy = 0 }
+	function state.read(candidate)
+		local file = open(candidate, "rb")
+		if not file then return nil end
+		local bytes = assert(file:read("*a")); assert(file:close()); return bytes
+	end
+	function state.write(candidate, bytes)
+		local file = assert(open(candidate, "wb")); assert(file:write(bytes)); assert(file:close())
+	end
+	state.write(path, state.before)
+	function state.arm(boundary, refusal, successor)
+		local wrapped, changed = {}, false
+		local function alter()
+			if successor and not changed then
+				assert(rename(path .. ".tmp", folder .. "/retained"))
+				state.write(path .. ".tmp", "borrowed successor"); changed = true
+			end
+		end
+		local function refuse()
+			if refusal == "throw" then error("controlled staging refusal") end
+			if refusal == "false" then return false, "controlled staging refusal" end
+			return nil, "controlled staging refusal"
+		end
+		local function wrap(stream, detail, errno, cleanup, current)
+			if not stream or wrapped[stream] or not state.fault then return stream, detail, errno, cleanup, current end
+			local record = { stream = stream, closed = false }
+			state.handles[#state.handles + 1] = record; state.opened = state.opened + 1
+			local proxy = {
+				write = function(_, bytes)
+					assert(stream:write(bytes))
+					if boundary == "source" then state.write(path, "# changed source\n" .. state.before) end
+					if boundary ~= "close" and boundary ~= "rename" then alter() end
+					if boundary == "write" then return refuse() end
+					return stream
+				end,
+				close = function()
+					assert(stream:close()); record.closed = true; state.closed = state.closed + 1
+					if boundary == "close" then alter(); return refuse() end
+					return true
+				end,
+			}
+			wrapped[proxy] = true
+			return proxy, detail, errno, cleanup, current
+		end
+		io.open = function(candidate, mode)
+			if candidate == path .. ".tmp" and mode == "w" then
+				state.legacy = state.legacy + 1; return wrap(open(candidate, mode))
+			end
+			return open(candidate, mode)
+		end
+		Native.open = function(candidate, mode)
+			if candidate == path .. ".tmp" and state.fault and boundary == "open" then return refuse() end
+			if candidate == path .. ".tmp" then return wrap(native_open(candidate, mode)) end
+			return native_open(candidate, mode)
+		end
+		os.rename = function(from, to)
+			if state.fault and boundary == "rename" and from == path .. ".tmp" then alter(); return refuse() end
+			return rename(from, to)
+		end
+	end
+	local okay, detail = xpcall(function() body(Writer, path, state) end, debug.traceback)
+	io.open, Native.open, os.rename = open, native_open, rename
+	for _, record in ipairs(state.handles) do if not record.closed then pcall(record.stream.close, record.stream) end end
+	for _, leaf in ipairs({ "source.toml", "source.toml.tmp", "retained", "target", "complete" }) do os.remove(folder .. "/" .. leaf) end
+	assert(os.remove(folder), "every owned staging fixture entry must be removed")
+	if not okay then error(detail, 0) end
+end
+
+helpers.describe("Linux TOML staging admission", function()
+	for _, entry in ipairs({ "direct", "adapter", "portable" }) do
+		for _, kind in ipairs(entry == "portable" and { "missing" } or { "fifo", "symlink", "hardlink", "regular", "directory", "missing" }) do
+			helpers.it("(toml-staging-admission) bounds " .. entry .. " " .. kind, function()
+				with_toml_staging(function(_, _, state)
+					local Shell = require("adapters.shell_runner")
+					local fixture = helpers.driver_root() .. "/tests/fixtures/native_toml_staging.lua"
+					helpers.assert_true(Shell.run("timeout --kill-after=2 5 " .. Shell.quote(assert(arg[-1]))
+						.. " " .. Shell.quote(fixture) .. " " .. Shell.quote(state.folder) .. " " .. Shell.quote(kind) .. " " .. Shell.quote(entry)),
+						"publication must return without borrowing or waiting on a staging endpoint")
+					helpers.assert_eq(state.read(state.folder .. "/complete"), "complete")
+				end)
+			end)
+		end
+		if entry ~= "portable" then
+			for _, refusal in ipairs({ "nil", "false", "throw" }) do
+				helpers.it("(toml-staging-admission) keeps " .. entry .. " native open " .. refusal .. " authoritative", function()
+					with_toml_staging(function(Writer, path, state)
+						state.arm("open", refusal, false)
+						local adapter = entry == "adapter" and fs or nil
+						local updates = { { section = "shortcuts", key = "enabled", value = true } }
+						helpers.assert_eq(Writer.batch_write(path, updates, adapter), false)
+						helpers.assert_eq(state.read(path), state.before)
+						helpers.assert_nil(state.read(path .. ".tmp"))
+						helpers.assert_eq(state.legacy, 0, "an available but refused native owner never falls back to stdio")
+						state.fault = false
+						helpers.assert_true(Writer.batch_write(path, updates, adapter))
+					end)
+				end)
+			end
+			local cases = {}
+			for _, boundary in ipairs({ "write", "close", "rename" }) do
+				for _, refusal in ipairs({ "nil", "false", "throw" }) do cases[#cases + 1] = { boundary, refusal, false } end
+			end
+			for _, boundary in ipairs({ "write", "close", "rename", "source", "admission" }) do cases[#cases + 1] = { boundary, "nil", true } end
+			for _, boundary in ipairs({ "source", "admission" }) do cases[#cases + 1] = { boundary, "nil", false } end
+			for _, candidate in ipairs(cases) do
+				local boundary, refusal, successor = candidate[1], candidate[2], candidate[3]
+				helpers.it("(toml-staging-admission) retains " .. entry .. " " .. boundary .. " " .. refusal .. (successor and " successor" or " owned staging"), function()
+					with_toml_staging(function(Writer, path, state)
+						state.arm(boundary, refusal, successor)
+						local adapter = entry == "adapter" and fs or nil
+						local updates = { { section = "shortcuts", key = "enabled", value = true } }
+						local admission = boundary == "admission" and function() return not state.fault end or nil
+						local called, committed = pcall(Writer.batch_write, path, updates, adapter, nil, nil, admission)
+						helpers.assert_true(called, "native receipts and refused guards cannot leak an exception")
+						helpers.assert_eq(committed, false)
+						helpers.assert_eq(state.read(path), boundary == "source" and "# changed source\n" .. state.before or state.before)
+						helpers.assert_true(state.opened > 0)
+						helpers.assert_eq(state.closed, state.opened, "every acquired stream closes after any write result")
+						if successor then
+							helpers.assert_eq(state.read(path .. ".tmp"), "borrowed successor", "cleanup cannot unlink a later inode")
+							helpers.assert_true(state.read(state.folder .. "/retained") ~= nil)
+							assert(os.remove(path .. ".tmp"))
+						else helpers.assert_nil(state.read(path .. ".tmp"), "our failed staging is removed for retry") end
+						state.fault = false
+						helpers.assert_true(Writer.batch_write(path, updates, adapter, nil, nil, admission), "a repaired attempt remains retryable")
+						helpers.assert_true(require("toml_codec").decode(state.read(path)).shortcuts.enabled)
+					end)
+				end)
+			end
+		end
+	end
+end)
+
+helpers.describe("Linux TOML staging image", function()
+	for _, entry in ipairs({ "bytes", "batch", "adapter" }) do
+		for _, mutation in ipairs({ "replace", "rewrite", "symlink", "directory", "fifo", "same-image", "healthy" }) do
+			helpers.it("(toml-staging-image) checks " .. entry .. " after " .. mutation .. " admission", function()
+				with_toml_staging(function(Writer, path, state)
+					local Shell, uv = require("adapters.shell_runner"), require("luv")
+					local before, wanted, borrowed = "[demo]\nvalue = 1\n", "[demo]\nvalue = 2\n", "[demo]\nvalue = 9\n"
+					state.write(path, before)
+					local stage, retained, target = path .. ".tmp", state.folder .. "/retained", state.folder .. "/target"
+					local calls, changed, same_inode = 0, true, false
+					local function admit()
+						calls = calls + 1
+						helpers.assert_eq(state.read(path), before)
+						helpers.assert_eq(state.read(stage), wanted)
+						if changed and mutation ~= "healthy" then
+							local initial = assert(uv.fs_lstat(stage))
+							if mutation == "rewrite" then state.write(stage, borrowed)
+							else
+								assert(os.rename(stage, retained))
+								if mutation == "symlink" then
+									state.write(target, wanted); assert(uv.fs_symlink(target, stage))
+								elseif mutation == "directory" then assert(uv.fs_mkdir(stage, 448))
+								elseif mutation == "fifo" then assert(Shell.run("mkfifo -- " .. Shell.quote(stage)))
+								else state.write(stage, mutation == "same-image" and wanted or borrowed) end
+							end
+							local final = assert(uv.fs_lstat(stage))
+							same_inode = initial.ino == final.ino and initial.dev == final.dev
+						end
+						helpers.assert_eq(state.read(path), before)
+						return true
+					end
+					local function publish()
+						if entry == "bytes" then
+							return Writer.publish_if_unchanged(path, wanted, nil, { status = "ok", content = before }, nil, admit)
+						end
+						return Writer.batch_write(path, { { section = "demo", key = "value", value = 2 } }, entry == "adapter" and fs or nil, nil, nil, admit)
+					end
+					local called, committed = pcall(publish)
+					helpers.assert_true(called, "the native image refusal stays an explicit result")
+					local accepted = mutation == "healthy" or mutation == "same-image"
+					helpers.assert_eq(committed, accepted, "only the exact candidate in a regular pathname can be published")
+					helpers.assert_eq(calls, 1)
+					helpers.assert_eq(state.read(path), accepted and wanted or before)
+					if mutation == "rewrite" then
+						helpers.assert_true(same_inode, "same-length rewrites retain the created inode")
+						helpers.assert_eq(state.read(stage), borrowed)
+					elseif mutation ~= "healthy" then helpers.assert_eq(state.read(retained), wanted) end
+					if not accepted then
+						local metadata = assert(uv.fs_lstat(stage), "a refused image is preserved")
+						if mutation == "symlink" then
+							helpers.assert_eq(metadata.type, "link"); helpers.assert_eq(state.read(target), wanted)
+						elseif mutation == "directory" then helpers.assert_eq(metadata.type, "directory")
+						elseif mutation == "fifo" then helpers.assert_eq(metadata.type, "fifo")
+						else helpers.assert_eq(state.read(stage), borrowed) end
+						assert(os.remove(stage)); changed = false
+						helpers.assert_true(publish(), "repairing our fixture permits a healthy retry")
+						helpers.assert_eq(state.read(path), wanted)
+					end
+					helpers.assert_nil(uv.fs_lstat(stage))
+				end)
+			end)
+		end
+	end
+	for _, refusal in ipairs({ "false", "throw", "missing" }) do
+		helpers.it("(toml-staging-image) preserves staging after image guard " .. refusal, function()
+			with_toml_staging(function(Writer, path, state)
+				local Native = require("infra.regular_file_writer")
+				local native, guards, cleanups, fault = Native.open, 0, 0, true
+				Native.open = function(candidate, mode)
+					local stream, detail, errno, cleanup, current = native(candidate, mode)
+					if candidate ~= path .. ".tmp" or not stream then return stream, detail, errno, cleanup, current end
+					return stream, detail, errno, function() cleanups = cleanups + 1; return cleanup() end,
+						refusal ~= "missing" and function(bytes)
+							guards = guards + 1
+							if not fault then return current(bytes) end
+							if refusal == "throw" then error("controlled image guard exception") end
+							return false
+						end or nil
+				end
+				local okay, detail = xpcall(function()
+					local updates = { { section = "shortcuts", key = "enabled", value = true } }
+					local called, committed = pcall(Writer.batch_write, path, updates)
+					helpers.assert_true(called); helpers.assert_eq(committed, false)
+					helpers.assert_eq(guards, refusal == "missing" and 0 or 1)
+					helpers.assert_eq(cleanups, 0, "unproven staging is retained even when it might still be ours")
+					helpers.assert_eq(state.read(path), state.before)
+					helpers.assert_true(require("toml_codec").decode(state.read(path .. ".tmp")).shortcuts.enabled)
+					assert(os.remove(path .. ".tmp")); fault = false; Native.open = native
+					helpers.assert_true(Writer.batch_write(path, updates))
+				end, debug.traceback)
+				Native.open = native
+				if not okay then error(detail, 0) end
+			end)
+		end)
+	end
+	helpers.it("(toml-staging-image) captures the image reader before public admission", function()
+		with_toml_staging(function(Writer, path, state)
+			local Reader = require("infra.regular_file_reader")
+			local native, forged = Reader.open, 0
+			local wanted, borrowed = "[shortcuts]\nenabled = true\n", "# borrowed image\n"
+			local okay, detail = xpcall(function()
+				local committed = Writer.batch_write(path, { { section = "shortcuts", key = "enabled", value = true } }, nil, nil, nil, function()
+					state.write(path .. ".tmp", borrowed)
+					Reader.open = function()
+						forged = forged + 1
+						return { read = function() return wanted end, close = function() return true end }
+					end
+					return true
+				end)
+				helpers.assert_eq(committed, false)
+				helpers.assert_eq(forged, 0, "the captured native port cannot be replaced by admission")
+				helpers.assert_eq(state.read(path), state.before)
+				helpers.assert_eq(state.read(path .. ".tmp"), borrowed)
+			end, debug.traceback)
+			Reader.open = native
+			if not okay then error(detail, 0) end
+		end)
+	end)
+	helpers.it("(toml-staging-image) keeps unchanged acknowledgements free of staging", function()
+		with_toml_staging(function(Writer, path, state)
+			local calls = 0
+			helpers.assert_true(Writer.publish_if_unchanged(path, state.before, nil, { status = "ok", content = state.before }, nil, function()
+				calls = calls + 1; helpers.assert_nil(state.read(path .. ".tmp")); return true
+			end))
+			helpers.assert_eq(calls, 1); helpers.assert_eq(state.read(path), state.before)
+		end)
+	end)
+	helpers.it("(toml-staging-image) captures native path classification before admission", function()
+		with_toml_staging(function(Writer, path, state)
+			local uv = require("luv")
+			local lstat, forged = uv.fs_lstat, 0
+			local wanted = "[shortcuts]\nenabled = true\n"
+			local okay, detail = xpcall(function()
+				local committed = Writer.batch_write(path, { { section = "shortcuts", key = "enabled", value = true } }, nil, nil, nil, function()
+					assert(os.rename(path .. ".tmp", state.folder .. "/retained"))
+					state.write(state.folder .. "/target", wanted)
+					assert(uv.fs_symlink(state.folder .. "/target", path .. ".tmp"))
+					uv.fs_lstat = function() forged = forged + 1; return { type = "file" } end
+					return true
+				end)
+				helpers.assert_eq(committed, false)
+				helpers.assert_eq(forged, 0)
+				helpers.assert_eq(assert(lstat(path .. ".tmp")).type, "link")
+				helpers.assert_eq(state.read(path), state.before)
+				helpers.assert_eq(state.read(state.folder .. "/target"), wanted)
+			end, debug.traceback)
+			uv.fs_lstat = lstat
+			if not okay then error(detail, 0) end
+		end)
+	end)
+	for _, id in ipairs({ 2 ^ 53, -2 ^ 63 }) do
+		helpers.it("(toml-staging-image) publishes healthy bytes with unprovable cleanup identity " .. tostring(id), function()
+			with_toml_staging(function(Writer, path, state)
+				local uv, previous = require("luv"), package.loaded.luv
+				local function metadata(port, candidate)
+					local record = assert(port(candidate)); record.dev, record.ino = id, id; return record
+				end
+				package.loaded.luv = setmetatable({
+					fs_fstat = function(fd) return metadata(uv.fs_fstat, fd) end,
+					fs_lstat = function(candidate) return metadata(uv.fs_lstat, candidate) end,
+				}, { __index = uv })
+				local okay, detail = xpcall(function()
+					helpers.assert_true(Writer.batch_write(path, { { section = "shortcuts", key = "enabled", value = true } }, nil, nil, nil, function() return true end))
+					helpers.assert_true(require("toml_codec").decode(state.read(path)).shortcuts.enabled)
+				end, debug.traceback)
+				package.loaded.luv = previous
+				if not okay then error(detail, 0) end
+			end)
+		end)
+	end
+end)
+
 helpers.describe("generic file write admission", function()
 	for _, method in ipairs({ "write", "append" }) do
 		local mode = method == "write" and "w" or "a"
@@ -181,6 +495,8 @@ end)
 --- @param body function Receives the observation record.
 local function with_toml_source(receipt, body)
 	local Reader = require("infra.regular_file_reader")
+	local Writer = require("infra.regular_file_writer")
+	local real_writer = Writer.open
 	local real_reader, real_open = Reader.open, io.open
 	local seen = { inspected = 0, opened = 0 }
 	Reader.open = function(path)
@@ -195,8 +511,13 @@ local function with_toml_source(receipt, body)
 			lines = function() return ("unclassified = 1\n"):gmatch("([^\n]*)\n") end,
 			close = function() return true end }
 	end
+	Writer.open = function(path, mode)
+		if path:sub(1, 10) ~= "/synthetic" or mode ~= "wx" then return real_writer(path, mode) end
+		-- Only staging is virtual here; the source's native refusal stays intact.
+		return io.open(path, "w"), nil, nil, function() return true end
+	end
 	local ok, err = xpcall(function() body(seen) end, debug.traceback)
-	Reader.open, io.open = real_reader, real_open
+	Reader.open, Writer.open, io.open = real_reader, real_writer, real_open
 	if not ok then error(err, 0) end
 end
 
@@ -846,3 +1167,5 @@ helpers.describe("FileSystem initializer configuration identities", function()
 		end)
 	end)
 end)
+
+require("test.file_system_ports_contract").register(helpers, "linux", 8, function() return fs end)

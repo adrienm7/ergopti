@@ -433,3 +433,5 @@ _LRF_ScreenReadingExcludesBothFormats() {
 }
 Test("LLM remote formats: Backboard and the decisions providers are no vision backend",
 	_LRF_ScreenReadingExcludesBothFormats)
+
+#Include test_llm_backboard_cancel_exchange.ahk

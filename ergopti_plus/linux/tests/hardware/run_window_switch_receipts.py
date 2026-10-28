@@ -581,6 +581,41 @@ def main():
             assert input_focus_chain() == before_focus
             assert ids["active"] in before_focus and ids["right"] not in before_focus
             env["PATH"] = os.environ["PATH"]
+            # window_info.getAll() (one wmctrl -lp plus /proc/<pid>/comm) was covered
+            # by unit tests only: prove it on a real window manager.
+            # xmessage never sets _NET_WM_PID, which most toolkits do: set it on the
+            # three owned clients so wmctrl -lp names their process, as for a real one.
+            for name, child in zip(("active", "right", "left"), children[2:5]):
+                command(
+                    "xprop",
+                    "-id",
+                    str(ids[name]),
+                    "-f",
+                    "_NET_WM_PID",
+                    "32c",
+                    "-set",
+                    "_NET_WM_PID",
+                    str(child.pid),
+                )
+            listing = subprocess.run(
+                ["luajit", str(ROOT / "tests/hardware/run_window_list_receipt.lua")],
+                cwd=ROOT,
+                env={
+                    **{k: v for k, v in env.items() if k != "WAYLAND_DISPLAY"},
+                    "XDG_SESSION_TYPE": "x11",
+                },
+                text=True,
+                capture_output=True,
+                timeout=15,
+            )
+            assert listing.returncode == 0, (listing.returncode, listing.stdout, listing.stderr)
+            listed = [line.split("\t", 1) for line in listing.stdout.splitlines() if "\t" in line]
+            for name in ("active", "right", "left"):
+                assert ["owned111_" + name, "xmessage"] in listed, (name, listed)
+            print("window_list=" + json.dumps(listed))
+            receipts.append(
+                {"case": "x11_window_list_names_owned_clients", "ack": True, "listed": len(listed)}
+            )
             focus("left")
             focus("active")
             children[3].terminate()

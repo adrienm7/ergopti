@@ -21,7 +21,7 @@
 ---    reload afterwards is the caller's business, which is the actual
 ---    difference between those two.
 --- 3. Resolution works BEFORE init(). Modules requiring this during their own
----    load — keylogger's init IIFE among them — must still get the
+---    load — keystats's init IIFE among them — must still get the
 ---    user-configured directory, so the default is computed at module load and
 ---    paths.toml is lazy-read on first use. A packaged launch exports its stable
 ---    user-writable bootstrap path; source-tree launches retain the adjacent
@@ -788,7 +788,7 @@ function M.set_config_dir(new_dir)
 end
 
 --- Metrics store directory of a configuration directory. The single rule shared
---- by the keylogger (where keystrokes are written) and the onboarding consent
+--- by the keystats (where keystrokes are written) and the onboarding consent
 --- text (where the user is told they will be written).
 --- @param dir string|nil Configuration directory; nil means the current one.
 --- @return string <dir>/metrics, without trailing slash.
@@ -798,6 +798,20 @@ function M.metrics_dir(dir)
 		error("config_paths.metrics_dir: a configuration directory is required", 2)
 	end
 	return NativePath.with_trailing_separator(dir) .. "metrics"
+end
+
+--- Persistent cache folder of the keystats SQLite mirror. The mirror lived in
+--- TMPDIR, which macOS empties at every reboot, so each reboot rebuilt it from
+--- the whole durable ledger (field ledger L64); the user's Caches folder
+--- survives a reboot and, like TMPDIR, is never synced nor shown in the
+--- metrics folder. HOME is read at each call so an owned test home applies.
+--- @return string ~/Library/Caches/<app folder>/metrics, without trailing slash.
+function M.metrics_cache_dir()
+	local home = os.getenv("HOME")
+	if type(home) ~= "string" or home:sub(1, 1) ~= "/" then
+		error("config_paths.metrics_cache_dir: an absolute HOME is required", 2)
+	end
+	return NativePath.with_trailing_separator(home) .. "Library/Caches/" .. AppDirs.folder_name .. "/metrics"
 end
 
 --- Ensures a directory exists. Exposed because the path editor creates the

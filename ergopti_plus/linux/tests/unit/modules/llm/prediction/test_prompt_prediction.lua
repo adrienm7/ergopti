@@ -104,9 +104,9 @@ local function scenario(opts, body)
 			scheduler = scheduler,
 			clock_ms = function() return scheduler.now * 1000 end,
 			engine = {
-				current_buffer = function() return world.buffer end,
 				reset = function() world.buffer = "" end,
 			},
+			context = { text = function() return world.buffer end, replaced = function() end },
 			notify = function(text) world.notices[#world.notices + 1] = text; return true end,
 			overlay = {
 				show = function(candidates, meta)
@@ -214,7 +214,7 @@ helpers.describe("prompt prediction: a rewrite from the key press to the injecte
 
 	helpers.it("llm_predict_rewrite rewrites the current sentence with the menu's count", function()
 		scenario({ buffer = "Bonjour Marc. ok pr jd 14h" }, function(world)
-			helpers.assert_eq(world.handlers.llm_predict_rewrite("keyboard__super_r", nil), true,
+			helpers.assert_eq(world.handlers.llm_predict_rewrite("keyboard__meta_r", nil), true,
 				"the preset starts a request")
 			helpers.assert_eq(#world.posts, 1, "the first variant is sent at once")
 			local post = world.posts[1]
@@ -265,7 +265,7 @@ helpers.describe("prompt prediction: a rewrite from the key press to the injecte
 
 	helpers.it("a normal prediction is unchanged: the menu's prompt, count, tail and budget", function()
 		scenario({ buffer = "Bonjour Marc, je voulais te dire" }, function(world)
-			helpers.assert_eq(world.handlers.llm_generate_prediction("keyboard__super_space", nil), true)
+			helpers.assert_eq(world.handlers.llm_generate_prediction("keyboard__meta_space", nil), true)
 			local post = world.posts[1]
 			helpers.assert_true(system_turn(post):find("REWRITE:", 1, true) == nil, "not the rewrite prompt")
 			helpers.assert_eq(user_turn(post), "Bonjour Marc, je voulais te dire", "basic sends the text alone")
@@ -326,6 +326,11 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 			helpers.assert_eq(#world.posts, 1, "a batch is one request")
 			helpers.assert_true(system_turn(world.posts[1]):find("exactly 2 different", 1, true) ~= nil,
 				"the batch template asks for the binding's two: " .. system_turn(world.posts[1]))
+			-- The shared token budget: every variant of a batch adds its numbering room
+			-- (macOS and Windows already did; Linux used to give the bare product).
+			local base = PromptBuilder.build_params("Je vous envoie ce mail pour",
+				{ max_words = require("modules.llm.settings").get("max_words") }).max_tokens
+			helpers.assert_eq(world.posts[1].body.max_tokens, 2 * (base + 5), "a batch of two budget")
 			assert_menu_untouched(world)
 		end)
 	end)
@@ -343,7 +348,7 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 
 	helpers.it("runs a custom prompt by its id", function()
 		scenario({ buffer = "Bonjour Marc", stored = {
-			["llm.user_profiles"] = require("modules.llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
 				{ id = "user_formal", label = "Formal", system_single = "Continue formally.", batch = false },
 			}),
 		} }, function(world)

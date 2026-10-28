@@ -1,6 +1,9 @@
 #!/bin/zsh
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+source "$SCRIPT_DIR/reserve_bundle.sh"
+
 name="$1"
 target="$2"
 app="$3"
@@ -36,10 +39,8 @@ if [[ "$base" != *.app ]]; then
 else
   san="$base"
 fi
-DEST="$HOME/Desktop/$san"
-if [ -e "$DEST" ]; then
-  DEST="$HOME/Desktop/${san%.app}_$(date +%s).app"
-fi
+mkdir -p "$HOME/Desktop"
+DEST="$(reserve_bundle_directory "$HOME/Desktop/$san")"
 
 CONTENTS="$DEST/Contents"
 MACOS="$CONTENTS/MacOS"

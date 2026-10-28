@@ -51,7 +51,7 @@ DriverControl_LoadSpec(Path) {
 	if !(Spec is Map)
 		throw Error("The driver control declaration is not an object.")
 	for Key in ["schema", "max_request_bytes", "token_hex_length", "request_id_pattern", "files",
-			"folders", "windows_message", "states", "reasons"]
+			"folders", "windows_message", "states", "reasons", "pending_ttl_seconds", "timeout_reason"]
 		if !Spec.Has(Key)
 			throw Error("The driver control declaration lacks " . Key . ".")
 	if Spec["schema"] != 1 || Spec["token_hex_length"] != 64
@@ -77,9 +77,13 @@ DriverControl_LoadSpec(Path) {
 		}
 		Spec[ListKey . "_set"] := Names
 	}
-	for Name in ["requested", "refused", "completed"]
+	for Name in ["requested", "claimed", "refused", "completed", "timeout"]
 		if !Spec["states_set"].Has(Name)
 			throw Error("The driver control state " . Name . " is not declared.")
+	if !(Spec["pending_ttl_seconds"] is Integer) || Spec["pending_ttl_seconds"] < 10 || Spec["pending_ttl_seconds"] > 3600
+		throw Error("The driver control pending lifetime must be an integer from 10 to 3600.")
+	if !(Spec["timeout_reason"] is String) || !Spec["reasons_set"].Has(Spec["timeout_reason"])
+		throw Error("The driver control timeout reason must be a declared reason.")
 	return Spec
 }
 
@@ -159,9 +163,10 @@ DriverControl_ParseRequest(Spec, Text, Token, &Reason, &Echoed) {
 			Reason := "malformed"
 			return ""
 		}
-	; The raw text must spell the schema as the integer itself: this parser
-	; reads true and 1.0 as the same value.
-	if !RegExMatch(Text, '"schema"\s*:\s*' . Spec["schema"] . '\s*[,}]') || Request.Get("schema", "") != Spec["schema"]
+	; Bind the integer token to the parser's decoded, last-member-wins key.
+	; Earlier duplicates cannot authorize a different authoritative value.
+	Members := JsonObjectMemberSpans(Text)
+	if !Members.Has("schema") || StrCompare(Members["schema"]["text"], String(Spec["schema"]), true) != 0
 			|| Echoed == "" || !(Request.Get("token", 0) is String) {
 		Reason := "malformed"
 		return ""
@@ -192,10 +197,13 @@ DriverControl_SessionText(Spec, Pid, Token) {
 }
 
 /**
- * Builds one result text; an inconsistent result stops the caller.
+ * Builds one result text; an inconsistent result stops the caller. A requested
+ * result either names its successor or, when a restart cannot name it
+ * beforehand, carries no successor and a deadline (Unix seconds).
  * @param {Map} Spec
  * @param {Map} Fields request_id (optional for a refusal), state, driver_pid,
- *     successor_pid (not for a refusal), reason (refusal only).
+ *     successor_pid (not for a refusal or a timeout), reason (refusal and
+ *     timeout only), deadline (a pending request and a claim).
  * @returns {String}
  */
 DriverControl_ResultText(Spec, Fields) {
@@ -207,29 +215,50 @@ DriverControl_ResultText(Spec, Fields) {
 		throw Error("Invalid driver control result request id.")
 	if !HasId && State != "refused"
 		throw Error("Only a refusal may lack its request id.")
-	DriverPid := Fields.Get("driver_pid", 0)
-	if !(DriverPid is Integer) || DriverPid <= 0
+	ResultDriverPid := Fields.Get("driver_pid", 0)
+	if !(ResultDriverPid is Integer) || ResultDriverPid <= 0
 		throw Error("The result needs the writing driver's process id.")
-	if State == "refused" {
+	HasDeadline := Fields.Has("deadline")
+	if HasDeadline && (!(Fields["deadline"] is Integer) || Fields["deadline"] <= 0)
+		throw Error("The deadline must be a positive integer.")
+	if State == "refused" || State == "timeout" {
 		if Fields.Has("successor_pid")
-			throw Error("A refusal names no successor.")
+			throw Error("A " . State . " names no successor.")
+		if HasDeadline
+			throw Error("A " . State . " carries no deadline.")
 		Reason := Fields.Get("reason", "")
 		if !Spec["reasons_set"].Has(Reason)
 			throw Error("Unknown driver control refusal reason: " . Reason)
+		; The deadline reason belongs to the timeout alone, and a timeout takes no other.
+		if (State == "timeout") != (Reason == Spec["timeout_reason"])
+			throw Error("Reason " . Reason . " does not fit a " . State . ".")
 		Tail := Format(',"reason":"{1}"', Reason)
 	} else {
-		Successor := Fields.Get("successor_pid", 0)
-		if !(Successor is Integer) || Successor <= 0
-			throw Error("A " . State . " result names its successor.")
 		if Fields.Has("reason")
 			throw Error("Only a refusal carries a reason.")
-		if State == "completed" && Successor != DriverPid
-			throw Error("Completion is written by the successor itself.")
-		Tail := Format(',"successor_pid":{1:d}', Successor)
+		if State == "requested" && !Fields.Has("successor_pid") {
+			if !HasDeadline
+				throw Error("A pending request carries its deadline.")
+			Tail := Format(',"successor_pid":null,"deadline":{1:d}', Fields["deadline"])
+		} else {
+			Successor := Fields.Get("successor_pid", 0)
+			if !(Successor is Integer) || Successor <= 0
+				throw Error("A " . State . " result names its successor.")
+			if State == "claimed" {
+				if !HasDeadline
+					throw Error("A claim keeps the deadline.")
+			} else if HasDeadline
+				throw Error("A " . State . " result carries no deadline.")
+			if (State == "completed" || State == "claimed") && Successor != ResultDriverPid
+				throw Error(State . " is written by the successor itself.")
+			Tail := Format(',"successor_pid":{1:d}', Successor)
+			if State == "claimed"
+				Tail .= Format(',"deadline":{1:d}', Fields["deadline"])
+		}
 	}
 	Id := HasId ? '"' . Fields["request_id"] . '"' : "null"
 	return Format('{"schema":{1:d},"request_id":{2},"state":"{3}","driver_pid":{4:d}{5}}`n',
-		Spec["schema"], Id, State, DriverPid, Tail)
+		Spec["schema"], Id, State, ResultDriverPid, Tail)
 }
 
 /**
@@ -247,6 +276,10 @@ DriverControl_Completion(Spec, Text, OwnPid) {
 		return ""
 	if !(Result is Map)
 		return ""
+	; AHK aliases JSON true to 1 and compares numeric strings coercively.
+	Members := JsonObjectMemberSpans(Text)
+	if !Members.Has("schema") || Members["schema"]["kind"] != "number"
+		return ""
 	for Key in Result
 		if !(Key ~= "^(schema|request_id|state|driver_pid|successor_pid|reason)$")
 			return ""
@@ -258,6 +291,78 @@ DriverControl_Completion(Spec, Text, OwnPid) {
 		"driver_pid", OwnPid, "successor_pid", OwnPid))
 }
 
+
+/**
+ * What a freshly ready driver owes the pending result, if anything. The named
+ * successor rule of DriverControl_Completion stays; a record without a
+ * successor is claimed by the first driver that reads it before its deadline,
+ * and past the deadline it becomes a timeout, never a completion.
+ * @param {Map} Spec
+ * @param {String} Text Current result bytes.
+ * @param {Integer} OwnPid
+ * @param {Integer} Now Unix time in seconds.
+ * @param {VarRef} Kind "claimed", "completed" or "timeout" when a result is owed, else "".
+ * @returns {String} The result to publish, or "".
+ */
+DriverControl_Resolve(Spec, Text, OwnPid, Now, &Kind) {
+	Kind := ""
+	if !(Text is String) || Text == "" || StrPut(Text, "UTF-8") - 1 > Spec["max_request_bytes"]
+		return ""
+	try Result := JsonParse(Text)
+	catch
+		return ""
+	if !(Result is Map)
+		return ""
+	; AHK aliases JSON true to 1 and compares numeric strings coercively.
+	Members := JsonObjectMemberSpans(Text)
+	if !Members.Has("schema") || Members["schema"]["kind"] != "number"
+		return ""
+	for Key in Result
+		if !(Key ~= "^(schema|request_id|state|driver_pid|successor_pid|reason|deadline)$")
+			return ""
+	Id := Result.Get("request_id", "")
+	if Result.Get("schema", "") != Spec["schema"] || !DriverControl_IsRequestId(Id)
+		return ""
+	Deadline := Result.Get("deadline", "")
+	State := Result.Get("state", "")
+	Successor := Result.Get("successor_pid", "")
+	if State == "requested" && Successor == JSON_NULL {
+		; Only an explicit JSON null decodes to this unique sentinel object.
+		if !(Deadline is Integer) || Deadline <= 0
+			return ""
+		if Now > Deadline {
+			Kind := "timeout"
+			return DriverControl_ResultText(Spec, Map("request_id", Id, "state", "timeout",
+				"driver_pid", OwnPid, "reason", Spec["timeout_reason"]))
+		}
+		Kind := "claimed"
+		return DriverControl_ResultText(Spec, Map("request_id", Id, "state", "claimed",
+			"driver_pid", OwnPid, "successor_pid", OwnPid, "deadline", Deadline))
+	}
+	if State == "claimed" && Successor is Integer && Successor == OwnPid && Deadline is Integer
+			&& Members.Has("driver_pid") && Members["driver_pid"]["kind"] == "number"
+			&& Result.Get("driver_pid", "") == OwnPid {
+		if Now > Deadline {
+			Kind := "timeout"
+			return DriverControl_ResultText(Spec, Map("request_id", Id, "state", "timeout",
+				"driver_pid", OwnPid, "reason", Spec["timeout_reason"]))
+		}
+		Kind := "completed"
+		return DriverControl_ResultText(Spec, Map("request_id", Id, "state", "completed",
+			"driver_pid", OwnPid, "successor_pid", OwnPid))
+	}
+	Completed := DriverControl_Completion(Spec, Text, OwnPid)
+	if Completed != "" {
+		Kind := "completed"
+		return Completed
+	}
+	return ""
+}
+
+/** Unix time in seconds. */
+DriverControl_Now() {
+	return DateDiff(A_NowUTC, "19700101000000", "Seconds")
+}
 
 
 
@@ -276,46 +381,80 @@ class DriverControlSession {
 	 * @param {Integer} Pid This process.
 	 * @param {Map} Ports "token", "endpoint" (factory taking the handler),
 	 *     "reload" (ReloadPreservingSuspend contract), "pending" (the pending
-	 *     hand-off record or false).
+	 *     hand-off record or false), "observe_refusal" (subscribes to its refusal).
 	 */
 	__New(Spec, Folder, Pid, Ports) {
-		for Name in ["token", "endpoint", "reload", "pending"]
+		for Name in ["token", "endpoint", "reload", "pending", "observe_refusal"]
 			if !(Ports is Map) || !Ports.Has(Name) || !HasMethod(Ports[Name], "Call")
 				throw TypeError("The driver control session needs its " . Name . " port.")
 		if !(Folder is String) || Folder == "" || !(Pid is Integer) || Pid <= 0
 			throw ValueError("The driver control session needs a folder and a process id.")
 		this.Spec := Spec, this.Folder := Folder, this.Pid := Pid, this.Ports := Ports
 		this.Token := "", this.Endpoint := 0, this.Started := false, this.Active := false
-		this.Handled := 0
+		this.Closed := false
+		this.Handled := 0, this.PendingReport := 0
 	}
 
 	Path(Kind) => this.Folder . "\" . this.Spec["files"][Kind]
 
 	/** Completes a pending request naming this process, then publishes the session. */
 	Start() {
-		if this.Started
-			throw Error("The driver control session cannot be started twice.")
+		if this.Started || this.Closed
+			throw Error("The driver control session cannot start twice or after retirement.")
 		this.Started := true
-		FSEnsureDirectoryStrict(this.Folder)
-		Completed := DriverControl_Completion(this.Spec,
-			FSReadUtf8ExactBounded(this.Path("result"), this.Spec["max_request_bytes"]), this.Pid)
-		if Completed != "" {
-			this.Publish("result", Completed)
-			try LoggerSuccess("DriverControl", "Reload request completed in successor pid {1}.", this.Pid)
+		try {
+			FSEnsureDirectoryStrict(this.Folder)
+			this._RequireStarting()
+			Owed := DriverControl_Resolve(this.Spec,
+				FSReadUtf8ExactBounded(this.Path("result"), this.Spec["max_request_bytes"]), this.Pid,
+				DriverControl_Now(), &Kind)
+			this._RequireStarting()
+			if Owed != "" {
+				this.Publish("result", Owed)
+				if Kind == "timeout" {
+					try LoggerWarn("DriverControl", "A pending reload request passed its deadline before this driver was ready; reported as timeout.")
+				} else if Kind == "completed" {
+					try LoggerSuccess("DriverControl", "Reload request completed in successor pid {1}.", this.Pid)
+				}
+			}
+			this._RequireStarting()
+			Token := this.Ports["token"].Call(this.Spec["token_hex_length"])
+			this._RequireStarting()
+			if !DriverControl_IsToken(this.Spec, Token)
+				throw Error("The driver control token source returned a malformed token.")
+			this.Token := Token
+			this.Endpoint := this.Ports["endpoint"].Call(ObjBindMethod(this, "Handle"))
+			this._RequireStarting()
+			this.Endpoint.Start()
+			PreviousCritical := Critical("On")
+			try {
+				; Retirement is monotonic even when an OnExit continuation resumes.
+				this.Active := !this.Closed
+				this._RequireStarting()
+			} finally Critical(PreviousCritical)
+			; The receipt advertises a ready endpoint, never in-progress registration.
+			this.Publish("session", DriverControl_SessionText(this.Spec, this.Pid, Token))
+			this._RequireStarting()
+		} catch as FirstError {
+			; A reentrant global Stop may already have withdrawn this session.
+			; The exact Start continuation still owes cleanup of any late return.
+			try this.Stop()
+			catch as CleanupError
+				FirstError.ControlRetirementError := CleanupError
+			throw FirstError
 		}
-		Token := this.Ports["token"].Call(this.Spec["token_hex_length"])
-		if !DriverControl_IsToken(this.Spec, Token)
-			throw Error("The driver control token source returned a malformed token.")
-		this.Token := Token
-		this.Publish("session", DriverControl_SessionText(this.Spec, this.Pid, Token))
-		this.Endpoint := this.Ports["endpoint"].Call(ObjBindMethod(this, "Handle"))
-		this.Endpoint.Start()
-		this.Active := true
+	}
+
+	/** Rejects late startup publication after this exact session was retired. */
+	_RequireStarting() {
+		if this.Closed
+			throw Error("The driver control session was retired during startup.")
 	}
 
 	/** Retires the endpoint, then withdraws the session file it still owns. */
 	Stop() {
-		this.Active := false
+		this.Active := false, this.Closed := true
+		this.PendingReport := 0
 		Failure := 0
 		if IsObject(this.Endpoint) {
 			try this.Endpoint.Stop()
@@ -333,7 +472,7 @@ class DriverControlSession {
 
 	/** Runs one rung request outside SendMessage; reports its outcome in the result file. */
 	Handle() {
-		if !this.Active
+		if !this.Active || this.Closed
 			return false
 		this.Handled += 1
 		RequestPath := this.Path("request")
@@ -358,8 +497,26 @@ class DriverControlSession {
 			this.Report(Fields)
 			return false
 		}
+		; A reload already in flight is joined, as on Linux and macOS for a menu
+		; click: its successor completes this request too. The result file holds
+		; one record, so the newest request takes over the report.
+		InFlight := this.InFlightSuccessor(&Pending)
+		if InFlight > 0 {
+			Request := Map("request_id", Id)
+			this.PendingReport := Request
+			if !this.ObserveRefusal(Pending, Request)
+				return false
+			try LoggerInfo("DriverControl", "Reload request {1} joined the reload in flight (successor pid {2}); no second reload.",
+				Id, InFlight)
+			if this.PendingReport != Request
+				return false
+			this.Report(Map("request_id", Id, "state", "requested", "successor_pid", InFlight))
+			return true
+		}
 		try LoggerInfo("DriverControl", "Reload request {1} admitted; the reload owner decides.", Id)
-		Started := this.Ports["reload"].Call(0, 0, ObjBindMethod(this, "Refused", Id),
+		Request := Map("request_id", Id)
+		this.PendingReport := Request
+		Started := this.Ports["reload"].Call(0, 0, ObjBindMethod(this, "Refused", Request),
 			ObjBindMethod(this, "StageRefused", Id))
 		PreviousCritical := Critical("On")
 		try {
@@ -376,15 +533,48 @@ class DriverControlSession {
 				this.Report(Map("request_id", Id, "state", "refused", "reason", "failed"))
 				return false
 			}
+			; A synchronous refusal already owns the terminal result. Never
+			; overwrite it with a requested record after the reload port returns.
+			if this.PendingReport != Request
+				return false
+			if !this.ObserveRefusal(Pending, Request)
+				return false
 			this.Report(Map("request_id", Id, "state", "requested", "successor_pid", Successor))
 			try LoggerInfo("DriverControl", "Reload request {1} requested; successor pid {2} completes it once ready.", Id, Successor)
 			return true
 		} finally Critical(PreviousCritical)
 	}
 
+	/** The pid of the successor an earlier reload already launched, 0 when none is in flight. */
+	InFlightSuccessor(&Pending) {
+		Pending := this.Ports["pending"].Call()
+		Successor := (Pending is Map) && (Pending.Get("successor", 0) is Map)
+			? Pending["successor"].Get("pid", 0) : 0
+		return (Successor is Integer) && Successor > 0 ? Successor : 0
+	}
+
+	/** Every admitted request observes the successor, including tray-origin reloads. */
+	ObserveRefusal(Pending, Request) {
+		Observed := false
+		try Observed := this.Ports["observe_refusal"].Call(Pending, this,
+			ObjBindMethod(this, "Refused", Request))
+		catch as Err
+			try LoggerError("DriverControl", "Reload refusal observation failed: {1}.", Err.Message)
+		if !((Observed is Integer) && Observed == 1) {
+			this.Report(Map("request_id", Request["request_id"], "state", "refused", "reason", "busy"))
+			return false
+		}
+		return true
+	}
+
 	/** The reload owner refused after launching the successor. */
-	Refused(Id, Reason := "") {
+	Refused(Request, Reason := "") {
+		if this.PendingReport != Request
+			return false
+		Id := Request["request_id"]
 		try LoggerWarn("DriverControl", "Reload request {1} refused by the reload owner: {2}.", Id, Reason)
+		if this.PendingReport != Request
+			return false
 		this.Report(Map("request_id", Id, "state", "refused", "reason", "refused"))
 	}
 
@@ -394,6 +584,10 @@ class DriverControlSession {
 	}
 
 	Report(Fields) {
+		; A newer terminal result revokes every earlier reload callback's write
+		; authority, even if that callback is already queued for delivery.
+		if Fields["state"] != "requested"
+			this.PendingReport := 0
 		Fields["driver_pid"] := this.Pid
 		try this.Publish("result", DriverControl_ResultText(this.Spec, Fields))
 		catch as Err
@@ -430,7 +624,8 @@ DriverControl_Start() {
 			A_ScriptHwnd, ProcessExist(), HealthCheck_ControlCreationTime())
 		Session := DriverControlSession(Spec, DriverControl_Folder(Spec, Base), ProcessExist(),
 			Map("token", DriverControl_RandomHex, "endpoint", Endpoint,
-				"reload", ReloadPreservingSuspend, "pending", ReloadTerminalHandoffPending))
+				"reload", ReloadPreservingSuspend, "pending", ReloadTerminalHandoffPending,
+				"observe_refusal", ReloadTerminalHandoffObserveRefusal))
 		_DriverControl := Session
 		Session.Start()
 	} catch as FirstError {

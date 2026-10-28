@@ -110,8 +110,8 @@ _RPA_ProgramCorpus() {
 	Count := 0
 	for Vector in Corpus["cases"] {
 		Windows := false
-		for Platform in Vector["platforms"]
-			if Platform == "ahk"
+		for Syntax in Vector["syntaxes"]
+			if Syntax == "windows"
 				Windows := true
 		if !Windows
 			continue

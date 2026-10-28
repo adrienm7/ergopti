@@ -36,7 +36,7 @@ local function load_lifecycle()
 		end,
 	}
 	local logger = {}
-	for _, level in ipairs({ "debug", "info", "warn", "error", "start", "success" }) do
+	for _, level in ipairs({ "debug", "info", "warn", "error", "start", "success", "done" }) do
 		logger[level] = function(_, message)
 			ctx.logs[#ctx.logs + 1] = level .. ":" .. tostring(message)
 		end

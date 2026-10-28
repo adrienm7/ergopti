@@ -264,7 +264,11 @@ local function command(text)
 	return bytes:gsub("\n?__STATUS__:%d+%s*$", ""), status
 end
 
-local function shell_receiving(body, refused)
+--- Runs the real native installer over a recording interpreter.
+--- @param body function fn(root, output, status).
+--- @param refused boolean The delegated Python bootstrap refuses (78).
+--- @param python_source string|nil Replaces the recording interpreter's script.
+local function shell_receiving(body, refused, python_source)
 	local output, created = command("mktemp -d " .. quote(helpers.temp_dir() .. "/ergopti-native-choice.XXXXXX"))
 	helpers.assert_eq(created, 0)
 	local root = assert(output:match("^(/[^\r\n]+)\n?$"))
@@ -275,7 +279,7 @@ local function shell_receiving(body, refused)
 		write(root .. "/source/ensure-ollama-native-deps.sh", read(driver .. "modules/llm/ensure-ollama-native-deps.sh"))
 		write(root .. "/source/network-retry.sh", read(driver .. "modules/llm/network-retry.sh"))
 		write(root .. "/foreign-python", "#!/bin/bash\nprintf inherited > \"$FIXTURE_ROOT/foreign-called\"\nexit 0\n")
-		write(root .. "/recording-python", [[#!/bin/bash
+		write(root .. "/recording-python", python_source or [[#!/bin/bash
 set -eu
 [ "$1" = "$FIXTURE_ROOT/source/managed_ollama_runtime.py" ]
 [ "$2" = install ]
@@ -302,7 +306,11 @@ printf bootstrap > "$FIXTURE_ROOT/bootstrap-called"
 		write(root .. "/source/native_python_bootstrap.sh", delegate)
 		local _, executable = command("chmod 755 " .. quote(root .. "/foreign-python") .. " " .. quote(root .. "/recording-python"))
 		helpers.assert_eq(executable, 0)
+		-- The copied network policy sits outside the checkout layout it locates
+		-- the shared route inventory from, so the fixture names the real file.
+		local origins = helpers.shared("modules/network/route_origins.json")
 		local bytes, status = command("env -u BASH_ENV -u ENV FIXTURE_ROOT=" .. quote(root)
+			.. " ROUTE_ORIGINS_FILE=" .. quote(origins)
 			.. " HOME=" .. quote(root .. "/home") .. " ERGOPTI_BOOTSTRAP_PYTHON=" .. quote(root .. "/foreign-python")
 			.. " ERGOPTI_BOOTSTRAP_TIMEOUT_MS=1000 OLLAMA_MODELS=relative-models /bin/bash "
 			.. quote(root .. "/source/ensure-ollama-native-deps.sh"))
@@ -331,6 +339,19 @@ helpers.describe("native installer source and fixed environment receiving", func
 			end
 		end)
 	end)
+	-- Field run 2026-10-27 19:47: prepare() names the installer in the driver's
+	-- own folder, which a developer build reads from its clone, while the guardian
+	-- admitted only the payload folder and refused it with exit 64. The XCTest
+	-- ManagedPTYWorkerTests covers the paths; this keeps the guardian on the
+	-- launcher's own Lua source selection on hosts without Swift.
+	helpers.it("admits the installer from the folder the launcher reads its Lua from", function()
+		local worker = read(helpers.driver_root() .. "launcher/Sources/ErgoptiPlus/ManagedPTYWorker.swift")
+		local guardian = assert(worker:match("private static func guardian%(.-\n\t}\n"))
+		helpers.assert_true(guardian:find("admittedSources(for: LuaSourceSelection.resolve(", 1, true) ~= nil)
+		helpers.assert_eq(guardian:find("Contents/Resources/static/ergopti_plus/macos/modules/llm", 1, true), nil)
+		local names = assert(worker:match("static let admittedSourceNames = (%b[])"))
+		helpers.assert_true(names:find('"ensure-ollama-native-deps.sh"', 1, true) ~= nil)
+	end)
 	helpers.it("clears executable inherited Python and delegates only to the original fixed bootstrap", function()
 		shell_receiving(function(root, output, status)
 			helpers.assert_eq(status, 78)
@@ -358,7 +379,19 @@ helpers.describe("native installer source and fixed environment receiving", func
 			helpers.assert_eq(output:find("OLLAMA_INSTALLED", 1, true), nil)
 			helpers.assert_eq(read(root .. "/home/models-sentinel"), "existing models remain at their original location")
 			helpers.assert_eq(read(root .. "/home/service-sentinel"), "existing foreign service remains untouched")
+			helpers.assert_true(output:find("[OLLAMA-DEPS] ERROR: stage python_bootstrap ended with exit 78.", 1, true) ~= nil, output)
 		end, true)
+	end)
+	-- Field run 2026-10-27 22:32: exit 137 with no output line. A child killed
+	-- by a signal ends the installer through set -e; the installer now names
+	-- the stage and the signal (ollama-bootstrap-exit-signal).
+	helpers.it("names the stage and the signal of a child killed by SIGKILL", function()
+		shell_receiving(function(_, output, status)
+			helpers.assert_eq(status, 137)
+			helpers.assert_true(output:find("[OLLAMA-DEPS] stage: runtime_install", 1, true) ~= nil, output)
+			helpers.assert_true(output:find(
+				"[OLLAMA-DEPS] ERROR: stage runtime_install ended with exit 137 (signal SIGKILL).", 1, true) ~= nil, output)
+		end, false, "#!/bin/bash\nkill -KILL $$\n")
 	end)
 end)
 
@@ -657,5 +690,48 @@ helpers.describe("original native bootstrap C getter admission", function()
 				helpers.assert_eq(choice.consume(decision, SOURCE, "app", TARGET, nil), true)
 			end)
 		end
+	end)
+end)
+
+-- Field report 2026-10-27 23:55: endpoint security killed /bin/bash /dev/fd/3,
+-- so the native guardian runs a private linked snapshot and names it in
+-- ERGOPTI_BOOTSTRAP_SNAPSHOT. The installer must then take its sources from
+-- the guardian's folder, and only for that exact path (installer-linked-snapshot).
+helpers.describe("native installer run from its private snapshot", function()
+	local function run_snapshot(snapshot_env)
+		local output, created = command("mktemp -d " .. quote(helpers.temp_dir() .. "/ergopti-snapshot.XXXXXX"))
+		helpers.assert_eq(created, 0)
+		local root = assert(output:match("^(/[^\r\n]+)\n?$"))
+		local _, made = command("mkdir " .. quote(root .. "/source") .. " " .. quote(root .. "/snapshot"))
+		helpers.assert_eq(made, 0)
+		local driver = helpers.driver_root()
+		local snapshot = root .. "/snapshot/ensure-ollama-native-deps.sh"
+		write(snapshot, read(driver .. "modules/llm/ensure-ollama-native-deps.sh"))
+		write(root .. "/source/network-retry.sh", read(driver .. "modules/llm/network-retry.sh"))
+		write(root .. "/source/native_python_bootstrap.sh",
+			'native_bootstrap_python() { printf sourced > "$FIXTURE_ROOT/delegate-called"; return 78; }\n')
+		local bytes, status = command("env -u BASH_ENV -u ENV FIXTURE_ROOT=" .. quote(root)
+			.. " ROUTE_ORIGINS_FILE=" .. quote(helpers.shared("modules/network/route_origins.json"))
+			.. " HOME=" .. quote(root) .. " ERGOPTI_BOOTSTRAP_SCRIPT_DIR=" .. quote(root .. "/source")
+			.. " ERGOPTI_BOOTSTRAP_SNAPSHOT=" .. quote(snapshot_env(snapshot))
+			.. " ERGOPTI_BOOTSTRAP_TIMEOUT_MS=1000 /bin/bash " .. quote(snapshot))
+		local delegate = io.open(root .. "/delegate-called", "rb")
+		local called = delegate ~= nil
+		if delegate then delegate:close() end
+		local _, removed = command("rm -rf " .. quote(root))
+		helpers.assert_eq(removed, 0)
+		return called, status, bytes
+	end
+
+	helpers.it("sources the guardian's folder when it runs as the named snapshot", function()
+		local called, status, bytes = run_snapshot(function(path) return path end)
+		helpers.assert_true(called, bytes)
+		helpers.assert_eq(status, 78)
+	end)
+
+	helpers.it("ignores the folder override for any other path", function()
+		local called, status = run_snapshot(function(path) return path .. ".other" end)
+		helpers.assert_eq(called, false)
+		helpers.assert_true(status ~= 0)
 	end)
 end)

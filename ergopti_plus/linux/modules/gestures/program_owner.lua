@@ -23,7 +23,7 @@ function M.new(capture, ports)
 	return Worker.new(capture, {
 		runner = ports.runner or Runner,
 		native = ports.native or Native,
-		parse = function(value) return Parameter.parse(value, "linux") end,
+		parse = function(value) return Parameter.parse(value, "posix") end,
 		timeout_ms = Timings.ms("gestures", "aux_shell_timeout_ms"),
 		retry_ms = Timings.ms("gestures", "aux_shell_cleanup_retry_ms"),
 		observed = function(code)

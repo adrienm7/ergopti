@@ -1,6 +1,6 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/hotstrings_config_resolve.v1.json",
-	"description": "Cross-driver regression corpus for the hotstrings delay/color/show_tooltip/priority resolution cascade (DL-5). Every driver resolves each field independently through the SAME four levels, first non-empty wins: user_section > user_category > toml_section > toml_category > source/shared default. The AHK-only menu-set '_global' delay tier remains outside this corpus because it has no equivalent on macOS. A level object is OMITTED entirely when not set for a vector; a field key inside a present level is OMITTED when that specific field is not set at that level (both mean 'fall through to the next level' for that field).",
+	"description": "Cross-driver regression corpus for the hotstrings delay/color/show_tooltip/priority resolution cascade (DL-5). Every driver resolves each field independently through the SAME four levels, first non-empty wins: user_section > user_category > toml_section > toml_category > source/shared default. A user delay is an offset of the base expansion delay (hotstrings.expansion_delay); base_delay_vectors.json covers that, and these vectors run at the shared default base. A level object is OMITTED entirely when not set for a vector; a field key inside a present level is OMITTED when that specific field is not set at that level (both mean 'fall through to the next level' for that field).",
 	"version": "1.1.0",
 	"vectors": [
 		{

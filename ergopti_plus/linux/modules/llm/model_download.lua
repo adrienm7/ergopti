@@ -22,6 +22,10 @@ local OWNER = "ollama_model_pull"
 local MODEL_PULL_TIMEOUT_MS = 24 * 60 * 60 * 1000
 
 local _active = nil
+-- The one observer of pull percentages (the model selector page) and the
+-- last whole percentage told, by "<attempt>|<percent>".
+local _progress_listener = nil
+local _told = nil
 -- Retain the exact creator/transport after logical progress has completed.
 local _retained = nil
 local _retry_request = nil
@@ -32,9 +36,20 @@ local function translated(key)
 	return ok and type(i18n.get) == "function" and i18n.get(key) or key
 end
 
-local function valid_tag(tag)
-	return type(tag) == "string" and tag ~= ""
-		and tag:match("^[%w%._%-%/:]+$") ~= nil
+local valid_tag = HttpBridge.valid_ollama_tag
+
+--- Tells the percentage observer a new whole percentage of one pull, or nil
+--- once the pull ended.
+--- @param request table
+--- @param percent number|nil
+local function tell(request, percent)
+	if type(_progress_listener) ~= "function" then return end
+	local whole = percent ~= nil and math.floor(percent) or nil
+	local signature = tostring(request.attempt) .. "|" .. tostring(whole)
+	if signature == _told then return end
+	_told = signature
+	local ok, err = pcall(_progress_listener, request.tag, whole)
+	if not ok then Logger.error(LOG, "Model-download percentage observer raised: %s", tostring(err)) end
 end
 
 --- Observes actual physical retirement, never a legacy cancellation signal.
@@ -74,6 +89,7 @@ local function finish(request, attempt, succeeded, message, failure_receipt)
 	request.terminal = true
 	_active = nil
 	_retry_request = not succeeded and request or nil
+	tell(request, nil)
 	DownloadWindow.complete(request.session_id, succeeded, message, failure_receipt)
 	if current(request, attempt) and type(request.on_done) == "function" then
 		local ok, err = pcall(request.on_done, succeeded, request.tag)
@@ -98,6 +114,7 @@ local function consume_line(request, line)
 	local percentage = nil
 	if completed and total and total > 0 then percentage = completed * 100 / total end
 	if not current(request, request.attempt) or _active ~= request then return end
+	if percentage then tell(request, percentage) end
 	DownloadWindow.update(request.session_id, percentage,
 		translated("ollama.downloading"), type(message.status) == "string" and message.status or nil)
 end
@@ -183,6 +200,17 @@ local function dispatch(request)
 	end
 	Logger.info(LOG, "Ollama model pull started for '%s'.", request.tag)
 	return true
+end
+
+--- Sets the one observer of pull percentages: it receives (tag, percent)
+--- at each new whole percentage of a pull, then (tag, nil) once it ended.
+--- nil removes it.
+--- @param listener function|nil
+function M.set_progress_listener(listener)
+	if listener ~= nil and type(listener) ~= "function" then
+		error("model_download.set_progress_listener requires a function or nil", 2)
+	end
+	_progress_listener = listener
 end
 
 --- Starts one model pull and its progress window.

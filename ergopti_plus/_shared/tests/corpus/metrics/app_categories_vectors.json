@@ -1,6 +1,6 @@
 {
 	"$schema": "./app_categories_vectors.schema.json",
-	"description": "Stored app_categories.json snapshots in every shipped locale, with the category id each stored spelling must resolve to. The metrics dashboard persists a LOCALISED default, so a user who switches language has an older spelling on disk; these vectors pin that none of them is orphaned.",
+	"description": "Stored app_categories.json snapshots in every shipped locale, with the category id the live dashboard (metrics_apps/helpers.js categoryToId) must resolve each stored spelling to. The dashboard persists a LOCALISED default, so a user who switches language has an older spelling on disk; these vectors pin that none of them is orphaned or shown as a custom category.",
 	"version": 1,
 	"vectors": [
 		{
@@ -18,8 +18,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -37,8 +37,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -56,8 +56,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -75,8 +75,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -94,8 +94,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -113,8 +113,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -132,8 +132,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -151,8 +151,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -170,8 +170,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -189,8 +189,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -208,8 +208,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -227,8 +227,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -246,8 +246,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -265,8 +265,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -284,8 +284,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -303,8 +303,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -322,8 +322,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -341,8 +341,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -360,8 +360,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -379,8 +379,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -398,8 +398,8 @@
 				}
 			},
 			"expected_ids": {
-				"Safari": "Unknown",
-				"Xcode": "Developer tools"
+				"Safari": "general",
+				"Xcode": "development"
 			}
 		},
 		{
@@ -414,20 +414,6 @@
 			},
 			"expected_ids": {
 				"Blender": "Mes trucs 3D"
-			}
-		},
-		{
-			"id": "historical_design_spelling",
-			"description": "The old \"Design\" colour key may be on disk from before the id migration.",
-			"locale": "fr",
-			"stored": {
-				"Figma": {
-					"type": "Design",
-					"score": 0
-				}
-			},
-			"expected_ids": {
-				"Figma": "Graphics design"
 			}
 		}
 	]

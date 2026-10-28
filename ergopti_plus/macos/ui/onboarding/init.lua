@@ -183,7 +183,7 @@ local function retitle(owner, view, title)
 end
 
 --- Metrics store path for the folder typed on the config step, from the same
---- rule the keylogger uses to place the store. An empty field keeps the current
+--- rule the keystats uses to place the store. An empty field keeps the current
 --- folder, because commit() persists no override for it.
 --- @param config_dir string|nil Folder from the wizard field.
 --- @return string Absolute metrics directory.
@@ -394,6 +394,8 @@ local function inject_init_data(owner, view, config_path)
 	Logger.debug(LOG, "Injecting initData into onboarding webview…")
 	local _, admitted = submit_data(owner, view, "initData", {
 		platform           = CATALOGUE_DRIVER,
+		-- Gesture registration with the system is a Windows host action only.
+		capabilities       = { gesture_registration = false },
 		locale             = current_locale,
 		strings            = strings,
 		-- One locale order for the wizard and every tray language menu.

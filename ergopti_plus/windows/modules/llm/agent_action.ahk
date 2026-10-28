@@ -93,6 +93,9 @@ global LLM_AGENT_TIMEZONE_KEY := "HKLM\SYSTEM\CurrentControlSet\Control\TimeZone
 ; Generation of the newest flow; a callback carrying an older one is stale
 global _LLM_Agent_Generation := 0
 
+; A System 1 source withdrawal retires only automatic requesters.
+global _LLM_Agent_System1Revision := 0
+
 ; The automatic mode: its armed pause timer, the suggestion it showed and not
 ; settled yet, and the sentences it already triaged (Map + insertion order)
 global _LLM_Agent_Auto := Map("timer", 0, "offer", "", "triaged", Map(), "order", [])
@@ -295,11 +298,13 @@ _LLM_Agent_SetCandidate(Key, Value, Candidate) {
 ; the transaction already published.
 ; @returns {Integer} True, the transaction's success contract.
 _LLM_Agent_ApplyCommitted(Key, Previous, Candidate) {
-	global _LLM_Agent_Generation
+	global _LLM_Agent_Generation, _LLM_Agent_System1Revision
 	; Durable source/mode withdrawals retire every held requester, including ABA.
 	; A no-op or a refused transaction never revokes an accepted request.
 	if (Key == "agent_system2" || Key == "agent_mode") && Candidate[Key] != Previous
 		_LLM_Agent_Generation += 1
+	if Key == ConfigLeaf.AGENT_SYSTEM1 && Candidate[Key] != Previous
+		_LLM_Agent_System1Revision += 1
 	LoggerDebug("LLM", "AI agent setting '{1}' committed.", Key)
 	return true
 }
@@ -356,11 +361,16 @@ LLM_Agent_TriggerSelection() {
  */
 LLM_Agent_TriggerCommand() {
 	global _LLM_Agent_Generation, _LLM_Agent_PromptFn, LLM_AGENT_BLANK_PATTERN
+	Generation := _LLM_Agent_Generation
 	Backend := _LLM_Agent_ManualRefusal()
 	if !(Backend is Map)
 		return false
 	Prompt := HasMethod(_LLM_Agent_PromptFn, "Call") ? _LLM_Agent_PromptFn : _LLM_Agent_NativePrompt
 	Answer := Prompt.Call(t("dialog.agent.command_title"), t("dialog.agent.command_prompt"), "")
+	; The modal may commit a withdrawal or admit a newer selection. Its
+	; delayed answer cannot acquire a fresh requester over either event.
+	if (Generation != _LLM_Agent_Generation || A_IsSuspended)
+		return false
 	if !Answer["ok"] || RegExMatch(Answer["value"], LLM_AGENT_BLANK_PATTERN) {
 		LoggerInfo("LLM", "AI agent command cancelled: the dialog was closed or left empty.")
 		return false
@@ -448,9 +458,14 @@ _LLM_Agent_NativePrompt(Title, Text, Default) {
  * @returns {Boolean} True when the request was sent.
  */
 LLM_Agent_Ask(Flow, Text) {
+	Current := _LLM_Agent_FlowRenderIsCurrent.Bind(Flow)
+	if !Current.Call()
+		return false
 	Config := LLM_Agent_Config()
 	if !Flow.Has("context")
 		Flow["context"] := _LLM_Agent_Context(Config)
+	if !Current.Call()
+		return false
 	Ctx := Flow["context"].Clone()
 	Ctx["source"] := Flow["source"]
 	Flow["config"] := Config
@@ -467,7 +482,9 @@ LLM_Agent_Ask(Flow, Text) {
 	if !Flow["auto"]
 		_LLM_Agent_ShowLoading(Flow)
 	if !LLM_Agent_System2Request(Flow["backend"], Payload, _LLM_Agent_OnActions.Bind(Flow),
-			_LLM_Agent_OnActionsFail.Bind(Flow), !Flow["auto"]) {
+			_LLM_Agent_OnActionsFail.Bind(Flow), !Flow["auto"], Current) {
+		if !Current.Call()
+			return false
 		LoggerWarn("LLM", "AI agent #{1} failed: System 2 '{2}' has no API entry with a key.",
 			Flow["generation"], Flow["backend"]["backend"])
 		_LLM_Agent_Notify(Flow, "llm.agent.failed")
@@ -484,10 +501,11 @@ LLM_Agent_Ask(Flow, Text) {
  * @param {Func} OnFail Called on failure.
  * @param {Boolean} CancelEngine Whether a pending or in-flight prediction gives
  *     way (a flow the user asked for).
- * @returns {Boolean} False, with nothing sent, when the backend cannot be reached.
+ * @param {Func|Integer} CurrentFn Original requester admission, or 0 for an unscoped call.
+ * @returns {Boolean} False when the backend or original requester is unavailable.
  */
-LLM_Agent_System2Request(Backend, Payload, OnSuccess, OnFail, CancelEngine := true) {
-	return _LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine)
+LLM_Agent_System2Request(Backend, Payload, OnSuccess, OnFail, CancelEngine := true, CurrentFn := 0) {
+	return _LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine, CurrentFn)
 }
 
 ; System 2 answered: validate its actions and offer them.
@@ -531,7 +549,7 @@ _LLM_Agent_OnActionsFail(Flow, Failure := "") {
 		Flow["generation"], _LLM_Vision_FailureReason(Failure))
 	if LLM_LocalModelIsMissing(Failure) {
 		_LLM_Agent_HideOwnTooltip(Flow)
-		LLM_LocalModelOffer(Failure, Flow["auto"], _LLM_Agent_RenderIsCurrent.Bind(Flow["generation"]))
+		LLM_LocalModelOffer(Failure, Flow["auto"], _LLM_Agent_FlowRenderIsCurrent.Bind(Flow))
 		return
 	}
 	_LLM_Agent_Notify(Flow, "llm.agent.failed")
@@ -573,7 +591,7 @@ _LLM_Agent_Show(Flow, Actions) {
 		"accept_source", Source,
 		"app_name", _LLM_Engine_AppNameForAcceptSource(Source),
 		"is_final", true,
-		"render_guard", _LLM_Agent_RenderIsCurrent.Bind(Flow["generation"])
+		"render_guard", _LLM_Agent_FlowRenderIsCurrent.Bind(Flow)
 	)
 	; Still the same sentence, no keystroke since: the actions take the place
 	; of the automatic prediction shown meanwhile
@@ -636,7 +654,7 @@ _LLM_Agent_ShowLoading(Flow) {
 		"offer_id", _LLM_Agent_OfferId(Flow),
 		"accept_source", Source,
 		"app_name", _LLM_Engine_AppNameForAcceptSource(Source),
-		"render_guard", _LLM_Agent_RenderIsCurrent.Bind(Flow["generation"])))
+		"render_guard", _LLM_Agent_FlowRenderIsCurrent.Bind(Flow)))
 }
 
 ; Hides the flow's own tooltip, never another one.
@@ -662,8 +680,19 @@ _LLM_Agent_OfferId(Flow) {
 
 ; @returns {Boolean} True when no newer flow started.
 _LLM_Agent_IsCurrent(Flow) {
-	global _LLM_Agent_Generation
+	global _LLM_Agent_Generation, _LLM_Agent_System1Revision
 	return Flow["generation"] == _LLM_Agent_Generation
+		&& (!Flow.Has("system1_revision") || Flow["system1_revision"] == _LLM_Agent_System1Revision)
+}
+
+; Manual flows own only their generation; automatic flows also own System 1.
+_LLM_Agent_FlowRenderIsCurrent(Flow) {
+	return (_LLM_Agent_IsCurrent(Flow) && !A_IsSuspended) ? true : false
+}
+
+_LLM_Agent_TriageIsCurrent(Generation, Revision) {
+	global _LLM_Agent_System1Revision
+	return (_LLM_Agent_RenderIsCurrent(Generation) && Revision == _LLM_Agent_System1Revision) ? true : false
 }
 
 ; Render guard of the candidates: a strict Boolean the tooltip checks before
@@ -795,20 +824,23 @@ LLM_Agent_InvalidateTyping() {
  * @param {String} Sentence The sentence being typed.
  * @param {Map} Ctx Map("app", "tools").
  * @param {Func} OnTriage Called with the triage Map, or "" when there is none.
+ * @param {Func} Current Original typing and System 1 admission.
  * @returns {Boolean} False, with nothing sent, when the backend cannot be reached.
  */
-LLM_Agent_System1Request(Backend, Sentence, Ctx, OnTriage, Generation := -1) {
+LLM_Agent_System1Request(Backend, Sentence, Ctx, OnTriage, Current) {
 	global LLM_AGENT_JEV_STATE
+	if !_LLM_Vision_CallbackCurrent(Current)
+		return false
 	Config := LLM_Agent_Config()
 	if _LLM_Agent_IsJev(Backend)
 		return _LLM_Agent_Decide(Backend, _LLM_Agent_Fill(LLM_AGENT_JEV_STATE,
-			Map("app", Ctx.Get("app", ""), "text", Sentence)), Config, OnTriage)
+			Map("app", Ctx.Get("app", ""), "text", Sentence)), Config, OnTriage, Current)
 	Payload := Map(
 		"system", LLM_Agent_System1Prompt(Config, Ctx),
 		"user", Sentence,
 		"max_tokens", Config["system1"]["max_tokens"])
 	return _LLM_Agent_Chat(Backend, Payload, _LLM_Agent_OnSystem1Answer.Bind(Config, OnTriage),
-		_LLM_Agent_OnSystem1Fail.Bind(OnTriage, Generation), false)
+		_LLM_Agent_OnSystem1Fail.Bind(OnTriage, Current), false, Current)
 }
 
 ; System 1 answered: hand its triage on.
@@ -829,12 +861,18 @@ _LLM_Agent_IsJev(Backend) {
 
 ; Asks Jev the triage question about a state: System 1's second transport.
 ; @returns {Boolean} False, with nothing sent, when the backend cannot be reached.
-_LLM_Agent_Decide(Backend, State, Config, OnTriage) {
+_LLM_Agent_Decide(Backend, State, Config, OnTriage, Current) {
+	if !_LLM_Vision_CallbackCurrent(Current)
+		return false
 	Target := _LLM_Vision_ResolveTarget(Backend["backend"], Backend["model"], "AI agent")
+	if !_LLM_Vision_CallbackCurrent(Current)
+		return false
 	if !(Target is Map)
 		return false
 	Questions := LLM_Agent_JevQuestions(Config)
-	OnFail := _LLM_Agent_OnSystem1Fail.Bind(OnTriage, -1)
+	if !_LLM_Vision_CallbackCurrent(Current)
+		return false
+	OnFail := _LLM_Agent_OnSystem1Fail.Bind(OnTriage, Current)
 	if (Target["format"] == "decisions") {
 		LLM_RemoteDecisions_Async(Target["resolved"], State, Questions,
 			_LLM_Agent_OnJevAnswers.Bind(Config, OnTriage), OnFail)
@@ -842,7 +880,7 @@ _LLM_Agent_Decide(Backend, State, Config, OnTriage) {
 	}
 	LLM_RemoteBackboard_Async(Target["resolved"],
 		Map("model", Backend["model"], "system", "", "text", State, "questions", Questions),
-		_LLM_Agent_OnBackboardJev.Bind(Config, OnTriage), OnFail)
+		_LLM_Agent_OnBackboardJev.Bind(Config, OnTriage), OnFail, "", 0, Current)
 	return true
 }
 
@@ -867,19 +905,20 @@ _LLM_Agent_OnBackboardJev(Config, OnTriage, Response, Usage := "") {
 }
 
 ; The System 1 request failed: there is no triage.
-_LLM_Agent_OnSystem1Fail(OnTriage, Generation, Failure := "") {
-	global _LLM_Agent_Generation
-	if Generation >= 0 && (Generation != _LLM_Agent_Generation || A_IsSuspended)
+_LLM_Agent_OnSystem1Fail(OnTriage, Current, Failure := "") {
+	if !_LLM_Vision_CallbackCurrent(Current)
 		return
-	if LLM_LocalModelIsMissing(Failure) && Generation >= 0 && LLM_Agent_WatchesTyping()
-		LLM_LocalModelOffer(Failure, true, _LLM_Agent_RenderIsCurrent.Bind(Generation))
+	if LLM_LocalModelIsMissing(Failure) && LLM_Agent_WatchesTyping()
+		LLM_LocalModelOffer(Failure, true, Current)
 	LoggerWarn("LLM", "AI agent: the System 1 request failed ({1}).", _LLM_Vision_FailureReason(Failure))
 	OnTriage.Call("")
 }
 
 ; The typing paused: triage the current sentence when everything allows it.
 _LLM_Agent_OnPause(Generation, Buffer) {
-	global _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_SecureFieldFn
+	global _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_SecureFieldFn, _LLM_Agent_System1Revision
+	Revision := _LLM_Agent_System1Revision
+	Current := _LLM_Agent_TriageIsCurrent.Bind(Generation, Revision)
 	_LLM_Agent_Auto["timer"] := 0
 	if (Generation != _LLM_Agent_Generation) || A_IsSuspended
 		return false
@@ -915,12 +954,16 @@ _LLM_Agent_OnPause(Generation, Buffer) {
 		LoggerDebug("LLM", "AI agent: no triage, the application is excluded.")
 		return false
 	}
+	; Backend, secure-field and context reads can commit a withdrawal or
+	; admit a newer flow. Retire before caching this sentence or sending it.
+	if !Current.Call()
+		return false
 	_LLM_Agent_RememberTriaged(Sentence)
 	Flow := Map("generation", Generation, "source", "typing", "backend", System2, "auto", true,
-		"context", Ctx, "sentence", Sentence)
+		"context", Ctx, "sentence", Sentence, "system1_revision", Revision)
 	LoggerInfo("LLM", "AI agent #{1}: triage of {2} character(s) by System 1 '{3}'.", Generation,
 		StrLen(Sentence), System1["backend"])
-	if !LLM_Agent_System1Request(System1, Sentence, Ctx, _LLM_Agent_OnTriage.Bind(Flow), Generation) {
+	if !LLM_Agent_System1Request(System1, Sentence, Ctx, _LLM_Agent_OnTriage.Bind(Flow), Current) {
 		LoggerWarn("LLM", "AI agent #{1}: System 1 '{2}' has no API entry with a key.", Generation,
 			System1["backend"])
 		return false
@@ -1065,10 +1108,15 @@ _LLM_Agent_Schedule(Callback, Period) {
 ; api_providers.json (a reasoning model told not to reason over a triage).
 ; @param {Boolean} CancelEngine Whether a pending or in-flight prediction must
 ;     give way (a manual flow); the automatic mode leaves it running.
-; @returns {Boolean} False, with nothing sent, when the backend cannot be reached.
-_LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine := true) {
+; @param {Func|Integer} CurrentFn Original requester admission across yielding work.
+; @returns {Boolean} False when the backend or original requester is unavailable.
+_LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine := true, CurrentFn := 0) {
 	global _LLM_Engine
+	if !_LLM_Vision_CallbackCurrent(CurrentFn)
+		return false
 	Target := _LLM_Vision_ResolveTarget(Backend["backend"], Backend["model"], "AI agent")
+	if !_LLM_Vision_CallbackCurrent(CurrentFn)
+		return false
 	if !(Target is Map)
 		return false
 	if Target.Has("resolved") && !LLM_RemoteFormatServes(Target["format"], "chat")
@@ -1077,7 +1125,9 @@ _LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine := true) {
 	if (Target["format"] == "backboard") {
 		if CancelEngine
 			_LLM_Vision_CancelEngine()
-		LLM_RemoteBackboardChat_Async(Target["resolved"], Payload["system"], Payload["user"], OnSuccess, OnFail)
+		if !_LLM_Vision_CallbackCurrent(CurrentFn)
+			return false
+		LLM_RemoteBackboardChat_Async(Target["resolved"], Payload["system"], Payload["user"], OnSuccess, OnFail, "", 0, CurrentFn)
 		return true
 	}
 	if Target.Has("resolved") {
@@ -1091,8 +1141,8 @@ _LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine := true) {
 			"text", Payload["user"],
 			"max_tokens", Payload["max_tokens"]))
 	}
-	_LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine)
-	return true
+	Result := _LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine, CurrentFn)
+	return !(Result is Integer && Result == false)
 }
 
 

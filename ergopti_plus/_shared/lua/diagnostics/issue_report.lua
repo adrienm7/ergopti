@@ -22,6 +22,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 
 
@@ -56,8 +57,7 @@ end
 --- @param value table
 --- @return boolean
 local function is_array(value)
-	local count = 0
-	for _ in pairs(value) do count = count + 1 end
+	local count = TableUtil.count(value)
 	-- Lua's length is undefined for holes; an equal key count can hide map fields.
 	for index = 1, count do
 		if rawget(value, index) == nil then return false end
@@ -69,10 +69,7 @@ end
 --- @param value table
 --- @return table
 local function sorted_keys(value)
-	local keys = {}
-	for key in pairs(value) do keys[#keys + 1] = key end
-	table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
-	return keys
+	return TableUtil.sorted_keys(value, TableUtil.by_text)
 end
 
 --- Appends one labelled value, recursing into tables.

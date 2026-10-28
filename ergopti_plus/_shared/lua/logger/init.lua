@@ -119,6 +119,17 @@ local _repeat = { enabled = false, streaks = {}, size = 0, date = nil, oldest = 
 --- very problems a diagnostic is opened to show.
 local _session = { warn_count = 0, err_count = 0, last_error = nil }
 
+--- Log-volume counters (spec § 5.3): the lines written per level, and the lines
+--- that never were. `dropped` is filtered by the severity threshold, `suppressed`
+--- is swallowed by the consecutive dedup and `collapsed` by the repeat collapser.
+--- A summary line counts as a written line of its level: the figures describe the
+--- log a user can open. `mark` holds the totals at the last interval report.
+local VOLUME_FIELDS = { "debug", "info", "warn", "error", "dropped", "suppressed", "collapsed" }
+local VOLUME_BUCKET_BY_LEVEL = { [10] = "debug", [20] = "info", [30] = "warn", [40] = "error" }
+local _volume = {}
+local _volume_mark = {}
+for _, field in ipairs(VOLUME_FIELDS) do _volume[field] = 0; _volume_mark[field] = 0 end
+
 --- Optional sink function called with every accepted formatted line.
 --- Signature: function(line: string, variant: string) → void
 local _sink = nil
@@ -271,6 +282,8 @@ end
 --- @param line string The complete formatted line.
 --- @param variant string The variant that produced it.
 local function deliver(line, variant)
+	local bucket = VOLUME_BUCKET_BY_LEVEL[LEVELS[variant]]
+	_volume[bucket] = _volume[bucket] + 1
 	local slot = (_ring_head % RING_CAPACITY) + 1
 	_ring[slot] = line
 	_ring_head  = _ring_head + 1
@@ -439,14 +452,20 @@ end
 
 --- Formats a log line per spec § 3, suppresses it per spec § 4.1 and § 4.2,
 --- and delivers it.
+--- @param exempt boolean  True for an evidence record (spec § 4.3): it skips both
+---   suppression layers, whatever its text and however recently it was written.
 --- @param variant string  One of: debug/trace/done/info/start/success/warn/error
 --- @param module_name string  Caller-supplied tag (e.g. "menu_llm")
 --- @param msg string  Format string (Lua string.format syntax)
 --- @param ... any  Variadic arguments for msg
 --- @return string|nil  The formatted line, or nil when filtered or suppressed
-local function emit(variant, module_name, msg, ...)
+local function emit_record(exempt, variant, module_name, msg, ...)
 	local level = LEVELS[variant]
-	if not level or level < _min_level then return nil end
+	if not level then return nil end
+	if level < _min_level then
+		_volume.dropped = _volume.dropped + 1
+		return nil
+	end
 
 	-- Build message body, guarding against format errors
 	local body
@@ -473,16 +492,24 @@ local function emit(variant, module_name, msg, ...)
 	-- stopped, and puts each summary before the line that found it due.
 	if _repeat.enabled then expire_repeat_streaks(now, ts) end
 
-	if body_key == _dedup.line and (now - _dedup.time) < DEDUP_WINDOW_SEC then
-		_dedup.count   = _dedup.count + 1
-		_dedup.variant = variant
-		return nil
-	end
+	-- An evidence record (spec § 4.3) is the data a person was asked to send back:
+	-- eight records sharing one template, or the same check run twice, are all
+	-- news. It is accepted like any line (it ends an open dedup streak below) but
+	-- is never itself withheld.
+	if not exempt then
+		if body_key == _dedup.line and (now - _dedup.time) < DEDUP_WINDOW_SEC then
+			_dedup.count   = _dedup.count + 1
+			_dedup.variant = variant
+			_volume.suppressed = _volume.suppressed + 1
+			return nil
+		end
 
-	-- The repeat layer only sees what the consecutive dedup let through, so a
-	-- burst is reported once, promptly, by the dedup summary and never twice.
-	if _repeat.enabled and withhold_repeat(variant, module_text, msg, body, ts, now) then
-		return nil
+		-- The repeat layer only sees what the consecutive dedup let through, so a
+		-- burst is reported once, promptly, by the dedup summary and never twice.
+		if _repeat.enabled and withhold_repeat(variant, module_text, msg, body, ts, now) then
+			_volume.collapsed = _volume.collapsed + 1
+			return nil
+		end
 	end
 
 	flush_dedup_summary()
@@ -507,6 +534,11 @@ local function emit(variant, module_name, msg, ...)
 		if not ok then end
 	end
 	return line
+end
+
+--- Emits one ordinary line, subject to both suppression layers.
+local function emit(variant, module_name, msg, ...)
+	return emit_record(false, variant, module_name, msg, ...)
 end
 
 
@@ -556,6 +588,14 @@ function M.warn(module_name, msg, ...)    return emit("warn",    module_name, ms
 --- ERROR — unrecoverable failure; execution should stop or degrade gracefully.
 --- @param module_name string  @param msg string  @param ... any
 function M.error(module_name, msg, ...)   return emit("error",   module_name, msg, ...) end
+
+--- Evidence record (spec § 4.3): an INFO line, rendered `[INFO]`, that neither
+--- suppression layer ever withholds. For the result lines of a field check or a
+--- diagnostics probe, where records share one template and differ by arguments
+--- and the same check may run again minutes later. It is not a lifecycle half and
+--- not a substitute for M.info: use it only for data a person is asked to send back.
+--- @param module_name string  @param msg string  @param ... any
+function M.evidence(module_name, msg, ...) return emit_record(true, "info", module_name, msg, ...) end
 
 
 
@@ -710,6 +750,64 @@ function M.reset_session_issues()
 	_session.warn_count = 0
 	_session.err_count  = 0
 	_session.last_error = nil
+end
+
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 10/ Log-Volume Counters (spec § 5.3) =======
+-- ====================================================
+-- ====================================================
+
+--- The counter names, in the order every report prints them.
+M.VOLUME_FIELDS = VOLUME_FIELDS
+
+--- Records one line a driver refused before it reached the core (the macOS
+--- driver filters by level in its own dispatcher), so `dropped` stays the single
+--- count of lines the severity threshold removed.
+function M.note_dropped()
+	_volume.dropped = _volume.dropped + 1
+end
+
+--- Returns the totals since the process started as a fresh table.
+--- @return table { debug, info, warn, error, dropped, suppressed, collapsed }
+function M.volume()
+	local copy = {}
+	for _, field in ipairs(VOLUME_FIELDS) do copy[field] = _volume[field] end
+	return copy
+end
+
+--- Returns what was counted since the previous call, and starts the next
+--- interval. The totals are untouched, so a periodic reporter and a diagnostic
+--- reading M.volume() never disturb each other.
+--- @return table Same fields as M.volume().
+function M.volume_interval()
+	local delta = {}
+	for _, field in ipairs(VOLUME_FIELDS) do
+		delta[field] = _volume[field] - _volume_mark[field]
+		_volume_mark[field] = _volume[field]
+	end
+	return delta
+end
+
+--- Renders counters as the text of an evidence record.
+--- @param counters table Figures from M.volume() or M.volume_interval().
+--- @return string "debug=N info=N warn=N error=N dropped=N suppressed=N collapsed=N"
+function M.volume_text(counters)
+	local parts = {}
+	for _, field in ipairs(VOLUME_FIELDS) do
+		parts[#parts + 1] = string.format("%s=%d", field, counters[field] or 0)
+	end
+	return table.concat(parts, " ")
+end
+
+--- Zeroes the counters. For tests and for a driver that restarts its session
+--- inside one process; the running drivers never call it.
+function M.reset_volume()
+	for _, field in ipairs(VOLUME_FIELDS) do _volume[field] = 0; _volume_mark[field] = 0 end
 end
 
 

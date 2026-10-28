@@ -501,8 +501,10 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false, ForceLifecycleReset := fal
 		try Unloaded := _LLM_NavEventOwnerNativeUnload()
 		catch
 			Unloaded := false
-		if ShouldStop && Unloaded
+		if ShouldStop && Unloaded {
 			try LoggerDebug("KeyboardArbiter", "stage=native_stop outcome=stopped.")
+			_LLM_NavEventOwnerLogHookOrder()
+		}
 		return Unloaded
 	} finally {
 		if StopScope is Map
@@ -1621,7 +1623,7 @@ LLM_NavEventOwner_BeginSurfaceSwap(RetiredSurface, PreparedSurface,
 		OldEntry := _LLM_NavEventOwnerRecords[OldToken]
 		if OldEntry.NativeDetached {
 			NativeOldToken := 0
-			; A successful acceptance CAS already cleared native A. Hiding its
+			; Acceptance or logical withdrawal already cleared native A. Hiding its
 			; pixels is a logical retirement only and must not open a 0-to-0 fence.
 			if NewToken == 0
 				return Transaction
@@ -1648,7 +1650,7 @@ LLM_NavEventOwner_BeginSurfaceSwap(RetiredSurface, PreparedSurface,
 	return Transaction
 }
 
-LLM_NavEventOwner_CommitSurfaceSwap(Transaction) {
+LLM_NavEventOwner_CommitSurfaceSwap(Transaction, KeepRetiredSurface := false) {
 	global _LLM_NavEventOwnerRecords
 	if !(Transaction is Map)
 		return false
@@ -1679,7 +1681,11 @@ LLM_NavEventOwner_CommitSurfaceSwap(Transaction) {
 	if OldToken > 0 && _LLM_NavEventOwnerRecords.Has(OldToken) {
 		Old := _LLM_NavEventOwnerRecords[OldToken]
 		Old.Active := false
-		Old.Retired := true
+		; Logical withdrawal precedes the exact pixel hide. Retain this token's
+		; detached state so a replacement/hide starts from native owner zero.
+		Old.Retired := !KeepRetiredSurface
+		if KeepRetiredSurface
+			Old.NativeDetached := true
 	}
 	if NewToken > 0 && _LLM_NavEventOwnerRecords.Has(NewToken) {
 		New := _LLM_NavEventOwnerRecords[NewToken]
@@ -3634,6 +3640,47 @@ _LLM_NavEventOwnerNativeStop(NativeOperation := unset) {
 	return 1
 }
 
+; Reads the counters of the native front-position reassertion. AutoHotkey puts
+; its own hook ahead of the owner's at every SendInput; the owner reinstalls
+; itself after each foreign Send burst, and these counters prove it did.
+; @returns {Map} keys_seen, injected_armed, reinstalls, reinstall_failures,
+;   last_failure_error, timer_high_resolution.
+LLM_NavEventOwner_HookOrderStats() {
+	Stats := Buffer(48, 0)
+	NumPut("UInt", 48, Stats, 0)
+	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_GetHookOrderStats"),
+		"Ptr", Stats, "Int")
+	_LLM_NavEventOwnerNativeRequireOk(Status, "Navigation owner hook order stats")
+	return Map("timer_high_resolution", NumGet(Stats, 4, "UInt"),
+		"keys_seen", NumGet(Stats, 8, "UInt64"), "injected_armed", NumGet(Stats, 16, "UInt64"),
+		"reinstalls", NumGet(Stats, 24, "UInt64"), "reinstall_failures", NumGet(Stats, 32, "UInt64"),
+		"last_failure_error", NumGet(Stats, 40, "UInt"))
+}
+
+; The same counters for the diagnostic snapshot, read only when the native owner
+; is already loaded: the snapshot must never load the DLL as a side effect.
+; @returns {Map|Integer} The HookOrderStats map, or 0 when the owner is not loaded.
+LLM_NavEventOwner_HookHealth() {
+	global _LLM_NavEventOwnerModule
+	if !_LLM_NavEventOwnerModule
+		return 0
+	return LLM_NavEventOwner_HookOrderStats()
+}
+
+; One counters-only record per native session: no key identity, no text.
+_LLM_NavEventOwnerLogHookOrder() {
+	try {
+		Counts := LLM_NavEventOwner_HookOrderStats()
+	} catch as Failure {
+		try LoggerWarn("KeyboardArbiter", "stage=hook_order outcome=unreadable detail={1}.", Failure.Message)
+		return
+	}
+	try LoggerDebug("KeyboardArbiter",
+		"stage=hook_order keys={1} injected_armed={2} reinstalls={3} failures={4} last_error={5} hires={6}.",
+		Counts["keys_seen"], Counts["injected_armed"], Counts["reinstalls"],
+		Counts["reinstall_failures"], Counts["last_failure_error"], Counts["timer_high_resolution"])
+}
+
 _LLM_NavEventOwnerNativeGetLastOsError() {
 	global _LLM_NavEventOwnerModule
 	if !_LLM_NavEventOwnerModule
@@ -4892,7 +4939,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 		"ErgoptiNav_AbortOwnerSwap", "ErgoptiNav_ClaimOwner", "ErgoptiNav_GetOwner", "ErgoptiNav_PollReceipt",
 		"ErgoptiNav_BeginProfileSwap", "ErgoptiNav_CommitProfileSwap", "ErgoptiNav_AbortProfileSwap",
 		"ErgoptiNav_ProfilePendingMask", "ErgoptiNav_CompleteReceipt", "ErgoptiNav_PendingForToken",
-		"ErgoptiNav_GetLastOsError", "ErgoptiNav_TestDispatch"]
+		"ErgoptiNav_GetLastOsError", "ErgoptiNav_GetHookOrderStats", "ErgoptiNav_TestDispatch"]
 	Exports := Map()
 	try {
 		for Name in Names {

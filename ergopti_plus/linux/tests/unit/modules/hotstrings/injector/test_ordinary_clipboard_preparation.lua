@@ -55,6 +55,7 @@ local function fixture(options, callback)
 		else
 			if options.restore_refuses then return false end
 			world.clipboard = command.text
+			if world.on_restore then world.on_restore() end
 		end
 		return true
 	end
@@ -100,6 +101,12 @@ local function fixture(options, callback)
 		local original, broker = assert(writer.capture_output()), assert(Broker.for_channel(writer))
 		world.authority_current = function()
 			return writer.output_current(original) and Broker.for_channel(writer) == broker and broker.output_current()
+		end
+		world.replace_output = function(kind)
+			if kind == "writer" then
+				assert(writer.close_owned(assert(writer.capture_output()))); assert(writer.open())
+			end
+			if kind ~= "none" then Broker.detach(writer); assert(Broker.attach(writer)) end
 		end
 		local file = assert(io.open("adapters/keyboard_hook.lua", "rb"))
 		local hook_source = file:read("*a"); file:close()
@@ -265,4 +272,59 @@ helpers.describe("ordinary clipboard preparation before erasure", function()
 			helpers.assert_true(world.authority_current(), "ACK recovery admits the same original Writer without replacement")
 		end)
 	end)
+	for _, mode in ipairs({ "ordinary", "single", "multiple" }) do
+		for _, change in ipairs({ "writer", "broker", "none" }) do
+			case(mode .. " retains its original output while cleanup acknowledges " .. change, function()
+				local options = { real_writer = true, restore_refuses = true }
+				fixture(options, function(world)
+					local first = world.inject()
+					helpers.assert_eq({ first.ok, first.cleanup_ok, first.native_cleanup_ok }, { false, false, true })
+					helpers.assert_true(world.authority_current(), "clipboard-only debt leaves the genuine output owner current")
+					local function inject()
+						if mode == "ordinary" then return world.injector.inject(3, world.payload, true) end
+						return world.injector.inject_fields(3, mode == "single" and { world.payload } or { world.payload, world.payload }, true)
+					end
+					local restored, before, document = 0, #world.calls, world.document
+					world.on_restore = function()
+						world.on_restore = nil; restored = restored + 1
+						world.replace_output(change)
+					end
+					options.restore_refuses = false
+					local result = inject()
+					helpers.assert_eq(restored, 1, "the actual pending clipboard setter must acknowledge cleanup")
+					helpers.assert_eq(world.clipboard, "saved clipboard", "old clipboard cleanup must finish despite output succession")
+					helpers.assert_eq(result.cleanup_ok, true)
+					helpers.assert_eq(world.down, {})
+					if change == "none" then
+						helpers.assert_eq(result.ok, true)
+						helpers.assert_eq(world.notifications, 1)
+						helpers.assert_true(#world.calls > before)
+					else
+						local keys = 0
+						for index = before + 1, #world.calls do
+							if world.calls[index]:match("^key:") then keys = keys + 1 end
+						end
+						helpers.assert_eq(result.ok, false, "an old request cannot adopt the successor during restoration (emitted " .. keys .. " keys)")
+						helpers.assert_eq(world.document, document)
+						helpers.assert_eq(world.notifications, 0)
+						for index = before + 1, #world.calls do
+							helpers.assert_true(not world.calls[index]:match("^key:"), "no erase or replacement through the successor")
+						end
+						helpers.assert_eq(inject().ok, true, "a new request may use the acknowledged successor")
+						helpers.assert_eq(world.notifications, 1)
+					end
+				end)
+			end)
+		end
+		case(mode .. " without clipboard debt still completes on its original output", function()
+			fixture({ real_writer = true }, function(world)
+				local result
+				if mode == "ordinary" then result = world.injector.inject(3, world.payload, true)
+				else result = world.injector.inject_fields(3, mode == "single" and { world.payload } or { world.payload, world.payload }, true) end
+				helpers.assert_eq({ result.ok, result.cleanup_ok, world.notifications }, { true, true, 1 })
+				helpers.assert_eq(world.clipboard, "saved clipboard")
+				helpers.assert_eq(world.down, {})
+			end)
+		end)
+	end
 end)

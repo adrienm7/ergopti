@@ -245,12 +245,17 @@ helpers.describe("HttpClient redirect ownership", function()
 		client.get("https://api.example.test/start", {
 			Authorization = "Bearer loop-token",
 		}, function(result) terminal = result end)
-		for index = 1, 6 do
+		-- The hop limit is the shared redirect policy's, read independently here.
+		local handle = assert(io.open(assert(helpers.shared("data/http/redirect_policy.json")), "rb"))
+		local limit = require("json").decode(handle:read("*a")).buffered_get.max_hops
+		handle:close()
+		helpers.assert_true(limit > 0, "the shared policy names a positive hop limit")
+		for index = 1, limit + 1 do
 			state.callbacks[index](302, "", { Location = "/loop-" .. tostring(index) })
 		end
 
-		helpers.assert_eq(#state.requests, 6,
-			"five followed redirects plus the initial request must be the hard limit")
+		helpers.assert_eq(#state.requests, limit + 1,
+			"the shared hop limit plus the initial request must be the hard limit")
 		helpers.assert_eq(terminal.ok, false)
 		helpers.assert_eq(terminal.status, 302)
 	end)
@@ -272,10 +277,28 @@ helpers.describe("HttpClient redirect ownership", function()
 end)
 
 helpers.describe("redirect reference resolution", function()
+	-- A fragment never reaches the server, so a fragment-only Location asks for
+	-- the exact URL that just answered with a redirect: the shared law's loop.
 	for _, case in ipairs({
-		{ location = "#section", expected = "https://api.example.test/a/b/c?base=kept#section" },
+		{ location = "#section" },
+		{ base = "https://api.example.test/a/./b?old", location = "#new" },
+	}) do
+		helpers.it("refuses " .. case.location .. " as a hop back to the same URL (http-redirect-reference)", function()
+			helpers.with_stub_scope({ "adapters.http_client", "adapters.timer_scheduler" }, function()
+				local client, state = load_fixture()
+				local terminal
+				client.get(case.base or "https://api.example.test/a/b/c?base=kept", {
+					Authorization = "Bearer same-origin-token",
+				}, function(result) terminal = result end)
+				state.callbacks[1](307, "", { location = case.location })
+				helpers.assert_eq(#state.requests, 1)
+				helpers.assert_eq(terminal.status, 307)
+			end)
+		end)
+	end
+
+	for _, case in ipairs({
 		{ base = "https://api.example.test/a/./b?old", location = "?new", expected = "https://api.example.test/a/./b?new" },
-		{ base = "https://api.example.test/a/./b?old", location = "#new", expected = "https://api.example.test/a/./b?old#new" },
 		{ location = ".", expected = "https://api.example.test/a/b/" },
 		{ location = "..", expected = "https://api.example.test/a/" },
 		{ location = "../models//latest", expected = "https://api.example.test/a/models//latest" },

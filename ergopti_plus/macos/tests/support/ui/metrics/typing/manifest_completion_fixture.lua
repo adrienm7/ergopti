@@ -7,8 +7,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Completion = require("tests.support.modules.keylogger.ngram_completion_fixture")
-local Today = require("tests.support.modules.keylogger.today_completion_fixture")
+local Publication = require("tests.support.ui.metrics.typing.publication")
+local Completion = require("tests.support.modules.keystats.ngram_completion_fixture")
+local Today = require("tests.support.modules.keystats.today_completion_fixture")
 local with_delivery = require("tests.support.typing_delivery_fixture")
 local Json = require("json")
 local M = {}
@@ -129,10 +130,10 @@ function M.with_publication(options, callback)
 					if path == "/fixture/db.sqlite" then return { mode = "file" } end
 				end
 				package.loaded["hs.sqlite3"] = state.sqlite
-				package.loaded["modules.keylogger.sqlite_reader"] = nil
-				local reader = require("modules.keylogger.sqlite_reader")
+				package.loaded["modules.keystats.sqlite_reader"] = nil
+				local reader = require("modules.keystats.sqlite_reader")
 				observe_manifest(state, reader)
-				package.loaded["modules.keylogger.log_manager"].get_sqlite_path = function() return "/fixture/db.sqlite" end
+				package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return "/fixture/db.sqlite" end
 				dashboard._app_icon_cache.Editor = false
 				state.saves, state.disk_files = {}, {}
 				local Snapshot = package.loaded["ui.metrics_typing.snapshot"]
@@ -178,10 +179,9 @@ function M.with_publication(options, callback)
 						local call = evaluations[index]
 						if not call.received then
 							call.received = true
-							local arguments = call.code:match("^window%.publishTypingMetricsData%((.*)%)%;$")
-							if arguments then
-								local values = Json.decode("[" .. arguments .. "]")
-								control.publications[#control.publications + 1] = { payload = values[1], metadata = values[2] }
+							local payload, metadata = Publication.decode(call.code)
+							if payload then
+								control.publications[#control.publications + 1] = { payload = payload, metadata = metadata }
 							end
 							call.done(call.code:sub(1, 7) == "typeof " and "function" or true, nil)
 						end

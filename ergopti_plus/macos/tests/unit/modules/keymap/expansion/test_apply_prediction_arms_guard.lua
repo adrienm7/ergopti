@@ -32,7 +32,7 @@ helpers.describe("apply_prediction: direct text uses one tagged callback batch",
 		helpers.assert_eq(result.accepted_count, 1,
 			"successful output must emit exactly one LLM acceptance record")
 		helpers.assert_eq(result.notified_count, 1,
-			"the keylogger must be notified once for the logical replacement")
+			"the keystats must be notified once for the logical replacement")
 		helpers.assert_eq(result.arm_chain_before_completion, 0,
 			"the chain must remain unarmed while the replacement transaction is pending")
 		helpers.assert_eq(result.arm_chain_count, 1,

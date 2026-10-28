@@ -60,6 +60,27 @@ helpers.describe("http_client: native POST redirect method selection", function(
 		end)
 	end
 
+	-- Ollama removes a model only on DELETE /api/delete: without the method word
+	-- curl's data option would send the body as a POST, which Ollama answers 405.
+	helpers.it("linux-http-delete-method: an owned DELETE names its method and keeps its body", function()
+		local client, state = fresh_client()
+		local result
+		local body = '{"name":"qwen:2b"}'
+		local operation = client.dispatch_owned("http://127.0.0.1:11434/api/delete", { ["Content-Type"] = "application/json" }, body,
+			{ method = "DELETE", buffered = true, owner = "ollama_model_delete", authorized = function() return true end },
+			nil, function(value) result = value end)
+		helpers.assert_true(operation.started)
+		local count = 0
+		for index, argument in ipairs(state.options.args) do
+			if argument == "--request" then count = count + 1; helpers.assert_eq(state.options.args[index + 1], "DELETE") end
+		end
+		helpers.assert_eq(count, 1)
+		helpers.assert_true(state.config:find('data-binary = "@/dev/fd/3"', 1, true) ~= nil, "the model name travels in the body")
+		helpers.assert_eq(state.body, body)
+		state.complete_request(1, "\nERGOPTI_HTTP_STATUS:200\n")
+		helpers.assert_true(result and result.ok and result.status == 200)
+	end)
+
 	for _, method in ipairs({ "post", "postStream" }) do
 		helpers.it("linux-http-redirect-method: " .. method .. " keeps the synthetic credential redirect fence", function()
 			local client, state = fresh_client()

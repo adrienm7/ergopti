@@ -4,7 +4,9 @@
 --- MODULE: Magic-Key Repeat
 --- DESCRIPTION:
 --- Doubles the character before the magic key when nothing else matched: typing
---- `po★` gives `poo`, `a★` gives `aa`.
+--- `po★` gives `poo`. A word's first letter is never doubled (`a★` stays for the
+--- text expansions), the same rule as the Windows and macOS drivers; the shared
+--- repeat_key_vectors.json corpus pins the three.
 ---
 --- WHY IT IS HERE AND NOT ONLY ON THE OTHER TWO DRIVERS:
 --- The manifest declared `hotstrings.repeat_key_enabled` and the `repeat_key`
@@ -34,10 +36,12 @@ local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Preferences = require("infra.hotstring_preferences")
 local ConfigOutdated = require("config_outdated")
+local TextUtils = require("text_utils")
+local ConfigKeys = require("config_keys")
 
 local LOG = "hotstrings.repeat_key"
 
-local FEATURE_PATH = "hotstrings.repeat_key_enabled"
+local FEATURE_PATH = ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED
 local _enabled = nil -- populated once; no preference IO on each keystroke
 
 -- One UTF-8 codepoint, as a byte pattern. LuaJIT is 5.1-based and has no `utf8`
@@ -68,7 +72,7 @@ local function resolve_setting(document, mark)
 		value = nil
 	end
 	if value == nil then value = Manifest.default_for(FEATURE_PATH)
-	elseif mark then mark("hotstrings", "repeat_key_enabled") end
+	elseif mark then mark("hotstrings", ConfigKeys.LEAF.REPEAT_KEY_ENABLED) end
 	assert(type(value) == "boolean", "the manifest default of repeat_key_enabled must be a boolean")
 	return value
 end
@@ -197,8 +201,12 @@ end
 ---
 --- @param buffer string The typed buffer INCLUDING the magic key just typed.
 --- @param magic_key string The character in effect.
+--- @param start_is_boundary boolean|nil Whether the buffer's own start abuts a word
+---   boundary (engine:buffer_starts_at_word_boundary()); nil means it does. When
+---   false the first character of the buffer may be the middle of a word, so a
+---   repeat that rests on it is refused, as on Windows and macOS.
 --- @return table|nil { backspace_count, replacement } or nil when it must not fire.
-function M.resolve(buffer, magic_key)
+function M.resolve(buffer, magic_key, start_is_boundary)
 	if type(buffer) ~= "string" or type(magic_key) ~= "string" or magic_key == "" then
 		return nil
 	end
@@ -214,6 +222,21 @@ function M.resolve(buffer, magic_key)
 	-- The magic key repeating itself is not a repeat, it is a second trigger, and
 	-- doubling it would let a user type an unbounded run of them by holding one key.
 	if previous == magic_key then return nil end
+
+	-- Only the second letter of a word or later repeats, as on Windows and macOS:
+	-- the character repeated must be a word character (a space or a newline is
+	-- never repeated) and so must the one before it. Without a word character
+	-- before it, `c★` is the start of a word, where the user typed the key to ask
+	-- for a text expansion and doubling the letter replaces it with `cc`.
+	if not TextUtils.is_hotstring_word_char(previous) then return nil end
+	local rest = before:sub(1, #before - #previous)
+	local before_previous = last_codepoint(rest)
+	if not before_previous or not TextUtils.is_hotstring_word_char(before_previous) then
+		return nil
+	end
+	-- The character before the repeated one is the buffer's first and its start
+	-- is not known to be a word start: it may be the tail of an older word.
+	if start_is_boundary == false and #rest == #before_previous then return nil end
 
 	return {
 		-- Erase the magic key only; the character before it stays and is joined by

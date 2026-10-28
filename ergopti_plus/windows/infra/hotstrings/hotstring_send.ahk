@@ -364,14 +364,22 @@ _MirrorRegistrationToHSE(TriggerSpec, Callback, Meta := unset) {
 		}
 }
 
-; Hotstrings will still be triggered downstream, so SendNewResult("a") can
-; cascade a ➜ b ➜ c (final result). OnlyText=true wraps the payload in {Text}
+; Types Text the way a key of the layout does: a SendEvent at the CALLER's
+; SendLevel. The layout and the keylayout emulation call it from their #InputLevel
+; 2 hotkeys, where the level makes the keys visible to the prefix watcher, which
+; is how a typed trigger (« ia » struck on the layout) reaches the hotstring
+; engine at all. A hotstring's OWN output must not come back that way: it goes
+; through Atomic=true, one SendInput at TEXT_SENDER_SEND_LEVEL, and the engine
+; commits its effect to its buffers itself (hotstring-output-is-final).
+; OnlyText=true wraps the payload in {Text}
 ; to avoid modifier side effects on symbols like ', ", accents. UpdateRing
 ; controls whether Text feeds the last-sent-character ring: pass false for a
 ; backspace-only call (e.g. the Notepad clipboard branch's pre-paste erase),
 ; where Text is a control sequence ("{BackSpace 5}") rather than a real
 ; emitted character — SubStr(Text, -1) on that sequence would record its
 ; trailing "}" instead of what actually landed on screen.
+; @param Atomic {Boolean} True for a hotstring's own output (SendInput at the
+;        TextSender level); false for a stand-in for a typed key (SendEvent).
 _SendVerdictSucceeded(Result) {
 		; Legacy recorder hooks return an empty string after capturing a send. Only an
 		; explicit Boolean false is a failure; type-checking first prevents the AHK v2
@@ -379,7 +387,7 @@ _SendVerdictSucceeded(Result) {
 		return !((Result is Integer) and Result = 0)
 }
 
-SendNewResult(Text, OnlyText := True, UpdateRing := True) {
+SendNewResult(Text, OnlyText := True, UpdateRing := True, Atomic := False) {
 		; Every layout/hotstring callback reaches this primitive.  A failed OS send
 		; must be contained here and must NOT advance the output ring: advancing it
 		; after a failed injection corrupts deadkey/time-gated decisions as though
@@ -389,6 +397,8 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 						Hook := _SendHook
 						if !_SendVerdictSucceeded(Hook("SendNewResult", Text, OnlyText))
 								return false
+				} else if Atomic {
+						_TextSenderAtSendLevel(_AHK_SendInput.Bind(OnlyText ? "{Text}" Text : Text))
 				} else {
 						if OnlyText {
 								SendEvent("{Text}" Text)
@@ -538,9 +548,8 @@ SendInstant(Text, Prefix := "") {
 	RestoreCallback := false
 	RestoreTimerArmed := false
 	try {
-		if !CB_Write(Text)
+		if !CB_WriteTextWithReceipt(Text, &OwnedSequence)
 			throw Error("clipboard write failed")
-		OwnedSequence := CB_GetSequenceNumber()
 		if !OwnedSequence
 			throw Error("clipboard sequence unavailable")
 		; Arm every fallible post-paste stage before the irreversible injection. If
@@ -559,9 +568,12 @@ SendInstant(Text, Prefix := "") {
 		; callback before doing the cleanup inline so ownership is ended once.
 		if RestoreTimerArmed
 			try SetTimer(RestoreCallback, 0)
-		try CB_RestoreOwnedAllEventually(OldClipboard,
-			IsSet(OwnedSequence) ? OwnedSequence : 0, OwnerToken,
-			"hotstring_send_instant_rollback", true, true)
+		if IsSet(OwnedSequence) && OwnedSequence {
+			try CB_RestoreOwnedAllEventually(OldClipboard, OwnedSequence, OwnerToken,
+				"hotstring_send_instant_rollback")
+		} else {
+			CB_EndOwnedTransaction(OwnerToken)
+		}
 		try LoggerError("Hotstrings", "SendInstant: clipboard injection failed: {1}", err.Message)
 		return false
 	}
@@ -736,7 +748,7 @@ GetSelectionAsync(OnReady, Ports := 0) {
 		if !(Ports is Map)
 				Ports := Map()
 		SaveFn := Ports.Get("save", CB_SaveAll)
-		ClearFn := Ports.Get("clear", CB_Write.Bind(""))
+		ClearFn := Ports.Get("clear", CB_ClearWithReceipt)
 		SendFn := Ports.Get("send", _SelectionSendCopy)
 		SequenceFn := Ports.Get("sequence", _SelectionClipboardSequence)
 		RestoreFn := Ports.Get("restore", CB_RestoreAll)
@@ -790,10 +802,13 @@ GetSelectionAsync(OnReady, Ports := 0) {
 				}
 				if !_SelectionCaptureStartCurrent(Job)
 						return false
-				if !ClearFn.Call()
+				Cleared := ClearFn.Call()
+				if !Cleared
 						throw Error("clipboard clear failed")
 				Job["mutated"] := true
-				Job["clear_sequence"] := SequenceFn.Call()
+				; The default clear authenticates its own generation; sampling it
+				; here could adopt a copy another program made right after it.
+				Job["clear_sequence"] := Cleared is Map ? Cleared["sequence"] : SequenceFn.Call()
 				Job["owned_sequence"] := Job["clear_sequence"]
 				if !_SelectionCaptureStartCurrent(Job)
 						return false
@@ -824,7 +839,7 @@ _SelectionCaptureForeground() {
 ; The copy chord is driver output, not a stand-in for a physical key, so it goes
 ; out at TEXT_SENDER_SEND_LEVEL. From the #InputLevel 2 Win broker it used to
 ; be sent at level 2, where the driver's own "I1" InputHooks took it for the
-; user's typing: the keylogger recorded a "Win+C", and the physical-input
+; user's typing: the keystats recorded a "Win+C", and the physical-input
 ; generation this capture is judged by advanced on its own Ctrl+C.
 _SelectionSendCopy(SendFn := SendEvent.Bind("^c")) {
 		_TextSenderAtSendLevel(SendFn)
@@ -1158,15 +1173,40 @@ _LSCResetFrom(Chars) {
 ; @param Character {String} The character that reached the screen.
 ; @param NowTick {Integer|unset} One observed tick shared by a physical chunk.
 AppState_TouchLastSentKey(Character, NowTick := unset) {
-		global LastSentCharacterKeyTime, LAST_SENT_KEY_TIME_MAX_AGE_MS, LAST_SENT_KEY_TIME_PRUNE_AT
+		global LastSentCharacterKeyTime, LastSentCharacterKeyComplex
+		global LAST_SENT_KEY_TIME_MAX_AGE_MS, LAST_SENT_KEY_TIME_PRUNE_AT
 		if !IsSet(NowTick)
 				NowTick := A_TickCount
 		LastSentCharacterKeyTime[Character] := NowTick
+		; Whether Shift, Alt or AltGr was held for this keystroke: the expansion
+		; delay widens for a complex reference key (HSE_ComplexDelayMultiplier).
+		LastSentCharacterKeyComplex[Character] := HSE_KeyIsComplex()
 		if LastSentCharacterKeyTime.Count > LAST_SENT_KEY_TIME_PRUNE_AT {
 				Now := NowTick
 				for k, ts in LastSentCharacterKeyTime.Clone() {
-						if TickExpired(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now)
+						if TickExpired(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now) {
 								LastSentCharacterKeyTime.Delete(k)
+								if LastSentCharacterKeyComplex.Has(k)
+										LastSentCharacterKeyComplex.Delete(k)
+						}
 				}
 		}
+}
+
+; Complexity of each character's last keystroke, keyed like LastSentCharacterKeyTime.
+global LastSentCharacterKeyComplex := Map()
+
+; Test seam: "" reads the keyboard, true / false forces the answer.
+global HSE_ComplexKeyOverride := ""
+
+; Whether the keystroke happening now is complex: Shift, Alt or AltGr is held.
+; On Windows AltGr is the right Alt (with a left Ctrl), so the physical state of
+; Shift, left Alt and right Alt covers the macOS Shift/Alt flags and the Linux
+; shift/alt/altgr roles.
+; @returns {Boolean}
+HSE_KeyIsComplex() {
+		global HSE_ComplexKeyOverride
+		if (HSE_ComplexKeyOverride != "")
+				return HSE_ComplexKeyOverride ? true : false
+		return GetKeyState("Shift", "P") or GetKeyState("LAlt", "P") or GetKeyState("RAlt", "P")
 }

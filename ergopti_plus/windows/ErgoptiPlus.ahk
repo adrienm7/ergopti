@@ -15,7 +15,7 @@
 #NoTrayIcon
 
 ; The driver re-runs this entry (or its compiled executable) with a worker flag
-; for the detached keylogger-prefetch and UIA-selection workers. AutoHotkey
+; for the detached keystats-prefetch and UIA-selection workers. AutoHotkey
 ; creates a script's tray icon, main window and load-time hotkeys BEFORE its
 ; first statement runs, so each worker looked like a second driver: an
 ; "ErgoptiPlus" tray icon (the default green H in source mode), the driver's
@@ -111,7 +111,7 @@ if A_IsCompiled {
 ; acquired handle is intentionally never closed: the OS releases the mutex when
 ; this process exits, so a successor's wait unblocks the instant we die.
 ;
-; EXEMPT: detached keylogger-prefetch and UIA-selection workers. The driver
+; EXEMPT: detached keystats-prefetch and UIA-selection workers. The driver
 ; deliberately re-runs this entry with /force and a worker flag; those workers
 ; register no hook and no log owner, and hide their tray icon first thing,
 ; so it is not what this gate exists to prevent. But the gate is the FIRST
@@ -328,14 +328,16 @@ A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed
 ; AHK silently DROPS new pseudo-threads (hotkey callbacks, tray-menu items,
 ; OnMessage handlers, SetTimer callbacks) once A_MaxThreads concurrent
 ; threads are already active. The default ceiling of 10 is easy to hit
-; with the keylogger's ~6 background timers + mouse/keyboard hooks. The
+; with the keystats's ~6 background timers + mouse/keyboard hooks. The
 ; menu-dispatcher bypass in infra/menu_dispatcher.ahk also relies on a free
 ; slot for its retry SetTimer, so the headroom matters even more there.
 A_MaxThreads := 64
 
 SetKeyDelay(0) ; No delay between key presses
-SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not SendInput which is the default
-; Otherwise, we can't have a hotstring triggering another hotstring, triggering another hotstring, etc.
+SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click and MouseMove. The gestures hold
+; buttons with Click, and SendInput would remove the mouse hook around them. Nothing of the hotstring layer
+; depends on it: an expansion is one SendInput at TEXT_SENDER_SEND_LEVEL, and its output is final, so it
+; completes no other hotstring (hotstring-output-is-final). The layout types with SendEvent by name.
 
 ; Logger pulled in first so every other infra/module can call it during init.
 ; ``LoggerInit()`` is invoked after the configuration file is parsed so the
@@ -369,7 +371,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 
 ; Port adapters — thin OS wrappers that isolate every DllCall, Send*, and
 ; WinGet* from the domain modules. Loaded before any infra/ or module/ file
-; that references adapter functions (e.g. NI_GetSsidHash in keylogger_network).
+; that references adapter functions (e.g. NI_GetSsidHash in keystats_network).
 #Include adapters/crypto.ahk
 #Include adapters/clipboard.ahk
 #Include adapters/timer_scheduler.ahk
@@ -392,6 +394,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/storage.ahk
 #Include adapters/process_lifecycle.ahk
 #Include adapters/key_state.ahk
+#Include adapters/keyboard_layout_switch.ahk
 #Include adapters/app_launcher.ahk
 #Include adapters/network_info.ahk
 #Include adapters/keyboard_hook.ahk
@@ -415,7 +418,7 @@ SFD_ConfigureUiaWorker(
 	UIASW_RequestPassword, UIASW_Start, UIASW_ContextMatches)
 
 ; Compiled workers reuse this executable. Exit into the minimal worker loop as
-; soon as its UIA/window dependencies exist, before loading keylogger/WebView
+; soon as its UIA/window dependencies exist, before loading keystats/WebView
 ; modules or running any normal-driver initialiser.
 if UIASW_IsWorkerInvocation()
 	UIASW_WorkerMain()
@@ -440,6 +443,7 @@ if UIASW_IsWorkerInvocation()
 #Include infra/send_input_parameter.ahk
 #Include ui/spotlight/init.ahk
 #Include infra/nav_layer_helpers.ahk
+#Include infra/capsword_state.ahk
 
 ; Core hotstring engine (send primitives, hotstring builders, text helpers)
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
@@ -497,6 +501,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include infra/start_at_login.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
+#Include infra/input_probe.ahk
 #Include infra/driver_control.ahk
 #Include ui/error_dialog/init.ahk
 #Include ui/update_check/init.ahk
@@ -514,7 +519,6 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include infra/i18n.ahk
 #Include ui/onboarding/init.ahk
 BootProfile_Stamp("Manifest, updater and locale state initialised")
-#Include ../_shared/modules/hotstrings/terminator_scope.ahk
 #Include infra/hotstrings/hotstrings_config.ahk
 #Include ui/hotstrings_config_window/init.ahk
 #Include ui/hotstrings_config_window/webview.ahk
@@ -537,6 +541,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include ../_shared/modules/features/number_row_policy.ahk
 #Include ../_shared/modules/features/layout_rows_policy.ahk
 #Include ../_shared/modules/features/caps_word_auto_off_policy.ahk
+#Include ../_shared/modules/features/pause_switch_policy.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
 #Include modules/keymap/layout/digit_row_bindings.ahk
 #Include modules/keymap/layout/number_row_send.ahk
@@ -564,21 +569,21 @@ BootProfile_Stamp("WebView and metrics UI state initialised")
 #Include ui/download_window/session.ahk
 #Include ui/download_window/init.ahk
 #Include ui/console_window.ahk
-#Include modules/keylogger/keylogger_app_categories.ahk
-#Include modules/keylogger/keylogger.ahk
-#Include modules/keylogger/keylogger_hotstring_log.ahk
-#Include modules/keylogger/keylogger_walker.ahk
-#Include modules/keylogger/keylogger_hook.ahk
-#Include modules/keylogger/keylogger_watchers.ahk
-#Include modules/keylogger/keylogger_mouse.ahk
-#Include modules/keylogger/keylogger_sensors.ahk
-#Include modules/keylogger/keylogger_ergonomics.ahk
-#Include modules/keylogger/keylogger_window_topology.ahk
-#Include modules/keylogger/keylogger_av_state.ahk
-#Include modules/keylogger/keylogger_network.ahk
-#Include modules/keylogger/keylogger_clipboard.ahk
-#Include modules/keylogger/keylogger_roi_prune.ahk
-#Include modules/keylogger/keylogger_trigger_roi.ahk
+#Include modules/keystats/keystats_app_categories.ahk
+#Include modules/keystats/keystats.ahk
+#Include modules/keystats/keystats_hotstring_log.ahk
+#Include modules/keystats/keystats_walker.ahk
+#Include modules/keystats/keystats_hook.ahk
+#Include modules/keystats/keystats_watchers.ahk
+#Include modules/keystats/keystats_mouse.ahk
+#Include modules/keystats/keystats_sensors.ahk
+#Include modules/keystats/keystats_ergonomics.ahk
+#Include modules/keystats/keystats_window_topology.ahk
+#Include modules/keystats/keystats_av_state.ahk
+#Include modules/keystats/keystats_network.ahk
+#Include modules/keystats/keystats_clipboard.ahk
+#Include modules/keystats/keystats_roi_prune.ahk
+#Include modules/keystats/keystats_trigger_roi.ahk
 
 ; Bundled extension shortcut menus — each defines BuildExtMenu_<id>().
 ; ``*i`` keeps the driver runnable if an extension is removed without
@@ -589,11 +594,11 @@ BootProfile_Stamp("WebView and metrics UI state initialised")
 ; BuildExtMenu_ergopti_demo() was never defined and the extensions submenu never
 ; rendered.
 #Include *i ..\extensions\ergopti-demo\shortcuts\menu.ahk
-#Include modules/keylogger/keylogger_reader.ahk
-#Include modules/keylogger/keylogger_prefetch.ahk
-#Include modules/keylogger/keylogger_webview.ahk
-#Include modules/keylogger/keylogger_ui.ahk
-BootProfile_Stamp("Keylogger modules initialised")
+#Include modules/keystats/keystats_reader.ahk
+#Include modules/keystats/keystats_prefetch.ahk
+#Include modules/keystats/keystats_webview.ahk
+#Include modules/keystats/keystats_ui.ahk
+BootProfile_Stamp("Keystats modules initialised")
 
 ; A detached prefetch worker shares these projection modules but must never run
 ; the normal driver boot: no hooks, timers, tray, WebView, or config mutation.
@@ -612,8 +617,10 @@ KLPF_InitializeCleanup()
 #Include modules/llm/remote_formats.ahk
 #Include ..\_shared\modules\llm\local_server_auth.ahk
 #Include ..\_shared\modules\llm\local_server_discovery.ahk
+#Include ..\_shared\modules\llm\local_server_ports.ahk
 #Include ..\_shared\modules\llm\local_server_menu.ahk
 #Include modules/llm/local_server_models.ahk
+#Include modules/llm/local_server_port_scan.ahk
 #Include modules/llm/local_servers.ahk
 #Include modules/llm/api_remote.ahk
 #Include modules/llm/models.ahk
@@ -661,6 +668,8 @@ BootProfile_Stamp("Module includes initialised")
 ; =============================================
 
 #Include infra/suspend_handoff.ahk
+; Before boot.ahk: a developer run reads the installed build's paths.toml.
+#Include infra/dev_source.ahk
 #Include infra/boot.ahk
 BootProfile_Stamp("Paths and shared configuration loaded")
 #Include infra/feature_state.ahk
@@ -675,6 +684,7 @@ try {
 		LoggerAppendBootstrapLine("ERROR", "ErgoptiPlus", "Personal shortcuts bootstrap failed: " . _epsErr.Message)
 		ExitApp(1)
 }
+BootProfile_Stamp("Personal shortcuts file ensured")
 #Include infra/tray_bootstrap.ahk
 #Include adapters/tray_startup_click.ahk
 #Include adapters/tray_startup_commands.ahk
@@ -700,9 +710,11 @@ if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectBootstrap))
 	_DriverStartupSmokeInspectBootstrap.Call()
 ; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
 ; the safe menu, never with AutoHotkey's default icon and stock items.
+BootProfile_Stamp("Safe tray and startup commands installed")
 A_IconHidden := false
 ; Read-only construction precedes the wizard; the genuine migration stays below it.
 ConfigSchemaPrepareSource(ConfigurationFile)
+BootProfile_Stamp("Configuration schema source prepared")
 if (_DriverStartupSmokeDir != "") {
 		; The real onboarding WebView pumps messages while startup is incomplete.
 		; Reproduce that hazard without an interactive window: the suspend watchdog
@@ -932,6 +944,13 @@ _HotstringExtensionPacks := HotstringExtensions_Prepare(Features,
 	HotstringExtensions_Roots(_ConfigDir, _ExtensionsDir))
 _BootConfigApplied := ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml", &_BootConfigSnapshot)
 HotstringsTerminatorRecordsInitBoot(_BootConfigSnapshot)
+; The override file stores delays as offsets of hotstrings.expansion_delay, which
+; is only known now; this also migrates the absolute delays of earlier builds.
+HotstringsOverridesBoot()
+; The delimiter strings of earlier builds sit in the same file; they move to
+; config.toml leaves and records once the owner exists. After the delays: the
+; file is rewritten from memory, which must hold the migrated delays by then.
+HotstringsDelimitersBoot()
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",
@@ -1202,11 +1221,11 @@ LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active)
 #Include ../_shared/modules/hotstrings/scope_overrides.ahk
 #Include infra/hotstrings/hotstrings_scope.ahk
 #Include infra/config_global_scope.ahk
-CS_Load()
+_BootMetricsCache := CS_Load()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()
 if MetricsShortcuts.enabled
-		WPMWidget_LoadConfig(_IniCache)
+		WPMWidget_LoadConfig(_BootMetricsCache)
 
 BootProfile_StageEnd("shortcuts", _KbBoundCount . " configurable hotkey(s) bound")
 BootProfile_Mark("Config, features & shortcuts loaded")
@@ -1290,7 +1309,7 @@ if !_ConfigWriteTerminalIsActive() && ConfigFullStateCanPersist() {
 ; HookDispatcher owns the process-wide mouse Hotkeys consumed by four independent
 ; features (hotstring prefix-watcher click-reset, CapsWord cancel, gesture
 ; click-toggle cross-release, LLM tooltip dismiss-on-click). None of those are
-; gated by the keylogger/metrics flag, so Start() must be unconditional here.
+; gated by the keystats/metrics flag, so Start() must be unconditional here.
 ; Start() is idempotent (guarded by _started), so a stray second call is harmless.
 ; HookDispatcher.Stop() is called by Ergopti_OnShutdown (already registered via
 ; OnExit) — do NOT register a second anonymous OnExit lambda here; double-Stop
@@ -1323,13 +1342,13 @@ if MetricsShortcuts.enabled {
 		; dragged back onto the critical path, AND the interruption pumps the message
 		; queue, painting a tray click queued during boot against a half-built menu.
 		; See the deferred-task block after LoggerSuccess("…ready").)
-		KeyloggerReady := false
-		try KeyloggerReady := KL_Init(KL_MetricsDirFor(_ConfigDir))
+		KeystatsReady := false
+		try KeystatsReady := KL_Init(KL_MetricsDirFor(_ConfigDir))
 		catch as Err
-			try LoggerError("Keylogger", "Initialization failed: {1}.", Err.Message)
-		if !KeyloggerReady {
+			try LoggerError("Keystats", "Initialization failed: {1}.", Err.Message)
+		if !KeystatsReady {
 			LoggerError("ErgoptiPlus",
-				"Startup aborted because keylogger persistence is unavailable.")
+				"Startup aborted because keystats persistence is unavailable.")
 			ExitApp(1)
 		}
 		; HookDispatcher is already started unconditionally above.
@@ -1344,8 +1363,8 @@ if MetricsShortcuts.enabled {
 		KL_Roi_Start()
 }
 
-BootProfile_StageEnd("metrics", MetricsShortcuts.enabled ? "keylogger and sensors started" : "metrics disabled")
-BootProfile_Mark("Metrics/keylogger started")
+BootProfile_StageEnd("metrics", MetricsShortcuts.enabled ? "keystats and sensors started" : "metrics disabled")
+BootProfile_Mark("Metrics/keystats started")
 
 
 
@@ -1363,6 +1382,9 @@ BootProfile_Mark("Metrics/keylogger started")
 #Include ui/action_picker_webview.ahk
 #Include ui/paths_editor/init.ahk
 #Include ui/layout_manager/init.ahk
+#Include ui/layout_manager/composer.ahk
+#Include ui/layout_manager/composer_check.ahk
+#Include ui/field_check/network_check.ahk
 #Include ui/personal_info_editor/init.ahk
 #Include ui/layer_editor/init.ahk
 
@@ -1462,6 +1484,16 @@ HealthCheck_StartWindowControl()
 try DriverControl_Start()
 catch as _DriverControlErr
 	LoggerError("ErgoptiPlus", "Local reload control unavailable: {1}.", _DriverControlErr.Message)
+; A developer run (tools/dev/run-windows-dev.ps1, or this script double-clicked
+; in a clone) reloads on a saved .ahk.
+try {
+	if (DevSource_Root() != "") {
+		LoggerInfo("ErgoptiPlus", "Developer source mode; the driver runs from {1} (clone root from {2}).",
+			_DriverDir, DevSource_Resolution()["origin"])
+		DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)
+	}
+} catch as _DevSourceErr
+	LoggerError("ErgoptiPlus", "Developer source mode refused: {1}.", _DevSourceErr.Message)
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
@@ -1470,6 +1502,14 @@ _BootOpenStages := BootProfile_OpenStageNames()
 if (_BootOpenStages != "")
 	LoggerWarn("BootProfile", "Boot completed with unclosed stage(s): {1}.", _BootOpenStages)
 LoggerInfo("BootProfile", "Boot complete in {1} ms (since process start).", _BootTotalMs)
+; Evidence, never collapsed: the per-stage table that boot-time comparisons need.
+LoggerEvidence("BootProfile", "Boot summary: total_ms={1} stage_ms: {2}.", _BootTotalMs,
+	BootProfile_StageSummary())
+; The counted operations of the whole boot (parses, reads, rebuilds), published as
+; their own window so the first minute's interval record starts from ready.
+PerfCount("config_migrate.registry_checks", ConfigMigrateRegistryChecks)
+PerfCount("config_migrate.registry_deep_compares", ConfigMigrateRegistryDeepCompares)
+PerfCounters_Flush()
 ; One environment summary with the same field names on every driver. A probe
 ; failure is reported and never allowed to turn a ready driver into a dead one.
 try DiagSnapshot_Emit(_BootTotalMs)
@@ -1610,7 +1650,7 @@ if (MetricsShortcuts.enabled and WPMWidget.visible) {
 }
 ; Publish the metrics dashboards' sidecars in a background worker once boot has
 ; settled, so the first open paints from disk at once instead of waiting for a
-; cold projection (keylogger_webview.ahk, background sidecar warm-up).
+; cold projection (keystats_webview.ahk, background sidecar warm-up).
 if MetricsShortcuts.enabled
 	KLWV_WarmSchedule(KL_MetricsDirFor(_ConfigDir), KLWV.WARM_START_DELAY_MS)
 
@@ -1627,6 +1667,8 @@ global _PENDING_KEYBOARD_HKL := 0
 ; registers every hotkey at load). Single source of truth — defined once there,
 ; consumed here and by tests/meta/test_layout_quiescence.ahk.
 #Include modules/keymap/layout_poll_helper.ahk
+; Layout on pause / resume: run by the lifecycle owner "keyboard-layout".
+#Include modules/keymap/pause_layout_switch.ahk
 
 ; The layout poll's seams onto the reload lifecycle (see LayoutPollTick). Its
 ; reload reports a refused stage without the "save failed" notice, and it asks

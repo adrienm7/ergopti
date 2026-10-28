@@ -59,7 +59,7 @@ TimingsLoadShared(SharedDir := "") {
 ; Fetch a required ``[Section] Key`` timing (an integer number of milliseconds)
 ; from the loaded registry. Throws when the registry is not loaded or the key is
 ; absent so a typo / truncated registry aborts loudly instead of returning "".
-; @param Section TOML section name (e.g. "keylogger").
+; @param Section TOML section name (e.g. "keystats").
 ; @param Key Key within that section (e.g. "think_pause_ms").
 ; @return Integer The value in milliseconds.
 TimingsGet(Section, Key) {

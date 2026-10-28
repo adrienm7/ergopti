@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Healthcheck Owner Snapshot Regression Tests
 ; DESCRIPTION:
-; Proves the diagnostics snapshot consumes one current Keylogger/LLM owner
+; Proves the diagnostics snapshot consumes one current Keystats/LLM owner
 ; snapshot and cannot fall back to the legacy globals that had no production
 ; writers.
 ; ==============================================================================
@@ -20,7 +20,7 @@
 ; =========================================
 ; =========================================
 
-_HCOS_KeyloggerOwner() {
+_HCOS_KeystatsOwner() {
 	return Map("enabled", true, "wpm", 87, "events_session", 41,
 		"privacy_hits", 6, "today_log", "C:\metrics\today.log")
 }
@@ -39,10 +39,10 @@ _HCOS_OwnerValuesReachTheSnapshot() {
 	AssertEqual("qwen-health", Ai["ai_model"])
 
 	Enabled := Map()
-	for Item in _HealthCheck_Features(_HCOS_LlmOwner, _HCOS_KeyloggerOwner)["items"]
+	for Item in _HealthCheck_Features(_HCOS_LlmOwner, _HCOS_KeystatsOwner)["items"]
 		Enabled[Item["id"]] := Item["enabled"]
 	AssertEqual(true, Enabled["llm"], "the AI switch comes from the LLM owner")
-	AssertEqual(true, Enabled["metrics"], "the metrics switch comes from the Keylogger owner")
+	AssertEqual(true, Enabled["metrics"], "the metrics switch comes from the Keystats owner")
 
 	Json := _HC_ValueToJson(Map("ai", Ai))
 	for Expected in ['"ai_backend":"ollama"', '"ai_profile":"work"', '"ai_model":"qwen-health"']
@@ -57,10 +57,10 @@ _HCOS_ProductionOwnersAreAtomic() {
 	global _LLM_Menu, _LLM_Menu_Loaded
 	SavedMenu := _LLM_Menu
 	SavedLoaded := _LLM_Menu_Loaded
-	SavedInitialized := Keylogger.initialized
-	SavedEvents := Keylogger.health_events_session
-	SavedPrivacy := Keylogger.health_privacy_hits
-	SavedToday := Keylogger.today_log_path
+	SavedInitialized := Keystats.initialized
+	SavedEvents := Keystats.health_events_session
+	SavedPrivacy := Keystats.health_privacy_hits
+	SavedToday := Keystats.today_log_path
 	try {
 		_LLM_Menu := Map("enabled", true, "backend", "api", "profile_id", "legal",
 			"model", "remote-model", "n_predictions", 7, "streaming", false)
@@ -70,10 +70,10 @@ _HCOS_ProductionOwnersAreAtomic() {
 		AssertEqual("api", Llm["backend"])
 		AssertEqual("legal", Llm["profile_id"])
 
-		Keylogger.initialized := true
-		Keylogger.health_events_session := 23
-		Keylogger.health_privacy_hits := 4
-		Keylogger.today_log_path := "C:\owner\today.log"
+		Keystats.initialized := true
+		Keystats.health_events_session := 23
+		Keystats.health_privacy_hits := 4
+		Keystats.today_log_path := "C:\owner\today.log"
 		Kl := KL_HealthSnapshot(() => Map("wpm", 72))
 		AssertTrue(Kl["enabled"])
 		AssertEqual(23, Kl["events_session"])
@@ -82,14 +82,14 @@ _HCOS_ProductionOwnersAreAtomic() {
 	} finally {
 		_LLM_Menu := SavedMenu
 		_LLM_Menu_Loaded := SavedLoaded
-		Keylogger.initialized := SavedInitialized
-		Keylogger.health_events_session := SavedEvents
-		Keylogger.health_privacy_hits := SavedPrivacy
-		Keylogger.today_log_path := SavedToday
+		Keystats.initialized := SavedInitialized
+		Keystats.health_events_session := SavedEvents
+		Keystats.health_privacy_hits := SavedPrivacy
+		Keystats.today_log_path := SavedToday
 	}
 }
 
-Test("healthcheck: Keylogger and LLM expose provenance-checked atomic snapshots (healthcheck-stale-globals)",
+Test("healthcheck: Keystats and LLM expose provenance-checked atomic snapshots (healthcheck-stale-globals)",
 	_HCOS_ProductionOwnersAreAtomic)
 
 
@@ -105,8 +105,8 @@ Test("healthcheck: Keylogger and LLM expose provenance-checked atomic snapshots 
 _HCOS_NoUnwrittenLegacyGlobals() {
 	Source := FileRead(A_ScriptDir . "\\..\\ui\\healthcheck\\helpers.ahk", "UTF-8")
 	AssertTrue(Source != "", "healthcheck helpers source must be readable")
-	for DeadName in ["_Keylogger_EventsToday", "_Keylogger_WPM",
-		"_Keylogger_PrivacyCount", "llm_enabled", "llm_backend",
+	for DeadName in ["_Keystats_EventsToday", "_Keystats_WPM",
+		"_Keystats_PrivacyCount", "llm_enabled", "llm_backend",
 		"llm_active_profile", "FeaturesV2", "ErgoptiBaseEnabled",
 		"AltGrActive", "ShiftActive", "CapsActive", "_AltGrPrefixLatched",
 		"PERSONAL_HOTSTRINGS", "DYNAMIC_HOTSTRINGS", "MAGIC_KEY"]

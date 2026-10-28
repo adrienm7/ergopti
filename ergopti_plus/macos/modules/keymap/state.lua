@@ -91,6 +91,9 @@ function M.new(defaults, delays_default)
 		-- hotstring buffer. Navigation always invalidates hotstring eligibility,
 		-- while the user-facing llm_reset_on_nav preference may retain this text.
 		llm_buffer                 = "",
+		-- The hotstring buffer content up to the last private (personal-information)
+		-- expansion: the AI context never shows anything of it. "" when none.
+		llm_private_mark           = "",
 		-- True when the character immediately to the LEFT of `buffer` is
 		-- known to be a word terminator (or there is no character at all
 		-- — start of input). Flipped to false whenever the cursor moves
@@ -148,6 +151,14 @@ function M.new(defaults, delays_default)
 		shortcut_resets_word       = false,
 		-- The timeout the keyDown tap applies, projected from IDLE_RESET_SEC.
 		WORD_TIMEOUT_SEC           = 0,
+		-- How many expansions a chain of hotstrings may hold
+		-- (hotstrings.cascade_max_arrows, 1 = a single expansion). Neutral here; keymap/init.lua seeds
+		-- it from the features manifest and owns its setter. The two fields below
+		-- are the current keystroke's pause and complex-key factor, published by the
+		-- tap so a further cascade step is gated by the same delay rule.
+		CASCADE_MAX_ARROWS         = 1,
+		cascade_elapsed            = 0,
+		cascade_complex_mult       = 1,
 		BASE_DELAY_SEC             = defaults.expansion_delay,
 		DELAYS                     = {},
 		-- Per-section delay overrides (seconds), keyed first by owning group and
@@ -177,6 +188,7 @@ function M.new(defaults, delays_default)
 		s.no_rescan_until = deadline
 		s.buffer = ""
 		s.llm_buffer = ""
+		s.llm_private_mark = ""
 		-- Post-expansion: the replacement just landed on screen. Treat the
 		-- new cursor position as abutting a word boundary so the next typed
 		-- char can fire word-boundary-required triggers — that mirrors the
@@ -232,7 +244,12 @@ function M.new(defaults, delays_default)
 	--- comparison; the caller supplies elapsed time so no consumer reads another
 	--- consumer's transient clock state.
 	--- @param m table Registry mapping.
-	--- @param elapsed number Seconds since the preceding physical key.
+	--- The comparison is in whole milliseconds, as on Windows (the configured seconds
+	--- rounded to milliseconds against the elapsed milliseconds) and Linux: the exact
+	--- deadline instant still fires, one millisecond later does not. A missing elapsed
+	--- time fails closed, as there. The tooltip never promises a zero-length window
+	--- (see literal_preview_allowed in llm_bridge.lua).
+	--- @param elapsed number|nil Seconds since the preceding physical key.
 	--- @param complex_mult number|nil Modifier timing multiplier (defaults to 1).
 	--- @return boolean allowed
 	--- @return number|nil remaining Nil means the mapping has no deadline.
@@ -243,12 +260,12 @@ function M.new(defaults, delays_default)
 		-- on letter combos, not modifier+letter sequences).
 		local allowed_delay = m and m.group == "autocorrection"
 			and specific_delay or (specific_delay * multiplier)
-		if allowed_delay == 0 then return true, nil end
-		local remaining = allowed_delay - math.max(0, tonumber(elapsed) or 0)
-		-- Deadlines are half-open. Tooltip dequeue expires a row when now >=
-		-- expire_at; accepting the mapping at equality would let callback order
-		-- decide whether the same timestamp still owns a visible promise.
-		return remaining > 0, math.max(0, remaining)
+		local allowed_ms = math.floor(allowed_delay * 1000 + 0.5)
+		if allowed_ms <= 0 then return true, nil end
+		if type(elapsed) ~= "number" or elapsed ~= elapsed then return false, 0 end
+		local elapsed_ms = math.floor(math.max(0, elapsed) * 1000 + 0.5)
+		local remaining_ms = allowed_ms - elapsed_ms
+		return remaining_ms >= 0, math.max(0, remaining_ms) / 1000
 	end
 
 	s.suppress_rescan_keep_buffer = function(duration)

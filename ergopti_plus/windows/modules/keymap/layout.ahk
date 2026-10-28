@@ -138,6 +138,16 @@ UpdateLastSentCharacter(Character) {
 ; drained — restoring strict per-key ordering. Same SendEvent semantics
 ; (``{Blind}`` / AltGr / modifiers unchanged); only ordering is enforced. There is
 ; NO Sleep on this path, so Critical's guarantee holds (a Sleep would yield it).
+; It stays a SendEvent rather than a SendInput on purpose. Measured on the live
+; driver (2026-10-23, several hundred keystrokes, SetKeyDelay 0): mean 2.1 to
+; 2.6 ms and worst 5.7 ms per emitted key, so SendInput could gain about 2 ms a
+; key, below what typing can feel. Against that, this emit is the only trace of
+; the key its level-2 hotkey suppresses and must reach the prefix watcher in
+; order, {Blind} and AltGr/Kana modifier handling are those of the hook path,
+; every SendInput reinstalls AutoHotkey's hook in front of the native owner, and
+; with another AutoHotkey hook it falls back to SendEvent anyway. A hotstring's
+; own output is the opposite case and already a SendInput (see
+; project-hotstring-output-is-final in docs/memory/windows-ahk.md).
 ; Profiled because this is the FIRST stage of every remapped keystroke and the
 ; only one that had no segment at all: an "OnChar" line that looked slow could
 ; equally have been a slow SendEvent that had already finished before OnChar
@@ -757,18 +767,20 @@ try {
 
 ; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
 ; The character mapping comes from modules/keymap/layout/layout_ergopti.ahk (read from the
-; .keylayout) so the keylogger heatmap reads the same source of truth without drifting.
+; .keylayout) so the keystats heatmap reads the same source of truth without drifting.
 if Features["layout"]["ergopti_base"] {
 	; A row switched off types what the OS layout types there: its keys pass
 	; through, through variants created before every built-in layer below.
 	RegisterLayoutRowPassthrough()
-	for sc_int, entry in ErgoptiBaseMapping() {
-		sc_str := Format("SC{:03X}", sc_int)
-		if (entry is String) {
-			RemapKey(sc_str, entry)
-		} else if IsObject(entry) {
-			alt := entry.HasOwnProp("alt") ? entry.alt : ""
-			RemapKey(sc_str, entry.c, alt)
+	; Script-level loop variables are globals: distinctive names keep them from
+	; shadowing the locals of functions loaded beside this file under #Warn.
+	for _BaseRemapScInt, _BaseRemapEntry in ErgoptiBaseMapping() {
+		_BaseRemapSc := Format("SC{:03X}", _BaseRemapScInt)
+		if (_BaseRemapEntry is String) {
+			RemapKey(_BaseRemapSc, _BaseRemapEntry)
+		} else if IsObject(_BaseRemapEntry) {
+			_BaseRemapAlt := _BaseRemapEntry.HasOwnProp("alt") ? _BaseRemapEntry.alt : ""
+			RemapKey(_BaseRemapSc, _BaseRemapEntry.c, _BaseRemapAlt)
 		}
 	}
 	; Dead keys (¨ and ^ on Ergopti) — their behaviour goes through DeadKey()
@@ -1024,7 +1036,7 @@ _RegisterRollsAltGrHotkeys()
 
 ; Ctrl on the QWERTY V position pastes, like Ctrl on Ergopti's own V (RemapKey).
 ; Both emit through _RemapEmit: a SendEvent at this hotkey's SendLevel 2 that the
-; keylogger's paste observer (level 1 and above) sees. SendInput removes the
+; keystats's paste observer (level 1 and above) sees. SendInput removes the
 ; script's own hook while it sends, so the paste it typed was never observed.
 ; These static contexts precede the dynamic row passthrough: each must stand
 ; down itself when its row belongs to the OS, including modified zoom chords.

@@ -8,6 +8,17 @@
 
 local helpers = require("tests.helpers")
 
+-- Stateless shared helpers that the typing metrics modules load on first use.
+-- The leak check below compares package.loaded around each scenario, so the
+-- snapshot must already hold them: they are not scenario state.
+require("table_util")
+require("native_path")
+require("text_utils")
+-- The fixtures install the real timing registry (helpers.provide_timings); it is no scenario state.
+helpers.provide_timings()
+require("toml_codec.source_memo")
+require("file_system.ports") -- the file-system owner checks itself against it when it loads
+
 --- Collects actual scoped callbacks without publishing replacement registrations.
 --- @return table scenarios Registered names and callbacks.
 local function collect_scenarios()

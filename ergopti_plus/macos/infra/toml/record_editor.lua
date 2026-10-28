@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local Scanner = require("toml_codec.record_scanner")
+local TextUtils = require("text_utils")
 
 local M = {}
 
@@ -108,7 +109,7 @@ local function scan_table(lines, target_header, field)
 			depth, multiline_quote = M.advance_continuation(raw, depth, multiline_quote)
 			if open_field_range then open_field_range.last = index end
 		else
-			local trimmed = raw:match("^%s*(.-)%s*$") or ""
+			local trimmed = TextUtils.trim(raw)
 			if trimmed:sub(1, 1) == "[" then
 				if starts_target_header(trimmed, target_header) and scan.header_line == nil then
 					scan.header_line = index
@@ -148,7 +149,7 @@ local function section_has_value(lines, header_line)
 		if depth > 0 or multiline_quote ~= nil then
 			return true
 		end
-		local trimmed = raw:match("^%s*(.-)%s*$") or ""
+		local trimmed = TextUtils.trim(raw)
 		if trimmed:sub(1, 1) == "[" then return false end
 		if trimmed ~= "" and trimmed:sub(1, 1) ~= "#" then return true end
 		depth, multiline_quote = M.advance_continuation(raw, 0, nil)

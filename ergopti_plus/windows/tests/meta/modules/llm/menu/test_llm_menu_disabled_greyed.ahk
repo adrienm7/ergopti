@@ -74,34 +74,27 @@ _LMDG_BuildGreysRowsWhenOff() {
 }
 Test("menu_main: LLM_Menu_Build greys the settings rows when the feature is off (llm-menu-disabled-greyed)", _LMDG_BuildGreysRowsWhenOff)
 
-; Guard 2b — every row emitted by _LLM_Menu_EmitRow honours the resolved greying
-; flag through the actual declared model parent, so the shared spec's policy
-; actually takes effect at render. The backend/model "stay enabled while off"
-; guarantee itself is the spec's disabled_when_off=false, pinned by
-; test_llm_menu_layout_shared — this guard just proves the renderer applies it.
-_LMDG_EmitRowAppliesGreying() {
+; Guard 3 — the model selector button greys with the spec-resolved flag: the
+; readiness predicate the shared renderer reads carries `disabled` from live
+; code, not from a comment or string.
+_LMDG_SelectorButtonGreys() {
 	Seg := _DriverFuncBody("_LLM_Menu_EmitRow")
 	Assert(Seg != "", "_LLM_Menu_EmitRow() must exist in menu_main.ahk")
-	Assert(_LMDG_BackendFrameGreyingRoute(Seg, _DriverFuncBody("_LLM_Menu_BackendParentRows")),
-		"_LLM_Menu_EmitRow must emit the actual backend frame so its greying follows the spec-resolved flag")
-	Assert(_LMDG_ModelParentGreyingRoute(Seg, _DriverFuncBody("_LLM_Menu_ModelParentRows")),
-		"the actual captured model receiver must receive and publish the spec-resolved greying flag")
-}
-Test("menu_main: _LLM_Menu_EmitRow applies the spec-resolved greying flag (llm-menu-disabled-greyed)", _LMDG_EmitRowAppliesGreying)
-
-; Guard 3 — the live declared model parent preserves native presence and greying.
-_LMDG_ModelParentHelperDisables() {
-	Seg := _DriverFuncBody("_LLM_Menu_ModelParentRows")
-	Assert(Seg != "", "the actual model parent helper must exist in menu_main.ahk")
-	Assert(_LMDG_ModelParentGreyingRoute(_DriverFuncBody("_LLM_Menu_EmitRow"), Seg),
-		"the retained actual parent must go back to MenuRenderer_Build with the completed model picker")
-	Rows := _MR_GetMenuDef("llm_model_parent_ahk")
+	Code := Seg
+	Masked := _DriverMaskNonCode(&Code)
+	Key := '"llm_model_selector_ready"', Predicate := ", (*) => !disabled"
+	Position := InStr(Code, Key . Predicate)
+	Assert(Position > 0, "the selector button's readiness must read the resolved greying flag")
+	; The mask blanks strings and comments: the key is a string, the predicate
+	; after it must survive as code.
+	AssertEqual(Predicate, SubStr(Masked, Position + StrLen(Key), StrLen(Predicate)),
+		"the readiness predicate must be live code")
+	Rows := _MR_GetMenuDef("llm_model_selector_commands")
 	Assert(Rows.Length == 1 && Rows[1]["disabled_when"].Length == 1
-		&& Rows[1]["disabled_when"][1] == "llm_model_parent_ready"
-		&& InStr(Seg, '"llm_model_parent_ready", (*) => !Disabled') > 0,
-		"the live shared parent must grey the actual native row exactly when its resolved flag is true")
+		&& Rows[1]["disabled_when"][1] == "llm_model_selector_ready",
+		"the shared declaration greys the button through llm_model_selector_ready")
 }
-Test("menu_main: the declared model parent greys the actual native row (llm-menu-disabled-greyed)", _LMDG_ModelParentHelperDisables)
+Test("menu_main: the model selector button greys with the resolved flag (llm-menu-disabled-greyed)", _LMDG_SelectorButtonGreys)
 
 ; Guard 4 — the parent IA tray check follows user intent alone. Backend
 ; readiness already owns the health dot and the install warning row; folding
@@ -172,10 +165,13 @@ _LMDG_ToggleRoute(Build, Render, Getters) {
 		return false
 	if RegExMatch(SubStr(Masked, 1, Publish - 1), '\breturn\b')
 		return false
+	; The row loop sits inside the build-memo try of MenuRenderer_Build (the
+	; write-admission memo lives for one outermost build), one block deeper
+	; than the function body.
 	Branch := _LMDG_Statement(Render,
-		'm)^[ \t]*(if) ItemType == "toggle" \{[ \t]*\n[ \t]*ItemCount \+= _MR_RenderToggle\(Result, Item, ManifestKey, Commands, StateGetters\)', 2)
+		'm)^[ \t]*(if) ItemType == "toggle" \{[ \t]*\n[ \t]*ItemCount \+= _MR_RenderToggle\(Result, Item, ManifestKey, Commands, StateGetters\)', 3)
 	Call := _LMDG_Statement(Render,
-		'm)^[ \t]*(ItemCount) \+= _MR_RenderToggle\(Result, Item, ManifestKey, Commands, StateGetters\)', 3)
+		'm)^[ \t]*(ItemCount) \+= _MR_RenderToggle\(Result, Item, ManifestKey, Commands, StateGetters\)', 4)
 	return Branch && Call && Branch < Call
 }
 
@@ -218,102 +214,3 @@ _LMDG_ToggleRouteRefusesDecoy(Kind) {
 for Kind in ["missing-command", "wrong-reader", "conditional-command", "outer-conditional", "unbraced-command", "comment-command",
 	"string-command", "string-renderer", "wrong-target", "missing-renderer", "early-return", "comment-renderer"]
 	Test("shared IA toggle route refuses " . Kind, _LMDG_ToggleRouteRefusesDecoy.Bind(Kind))
-
-; Actual backend data/GroupRow/template publication transports the same resolved greying flag.
-_LMDG_BackendFrameGreyingRoute(Emit, Helper) {
-	if Emit == "" || Helper == ""
-		return false
-	Call := _LMDG_Statement(Emit,
-		'm)^[ \t]*(BackendRows) := _LLM_Menu_BackendParentRows\(BackendMenu, BackendCaption, disabled, WarningRows\)', 3)
-	; The emitter returns the frame; MenuRenderer_Build draws it at the entry.
-	Consumer := _LMDG_Statement(Emit, 'm)^[ \t]*(return) BackendRows[ \t]*$', 2)
-	Getter := _LMDG_Statement(Helper,
-		'm)^[ \t]*(Getters) := Map\("llm_backend_parent_caption", \(\*\) => Caption,[ \t]*\n[ \t]*"llm_backend_parent_ready", \(\*\) => !Disabled,', 1)
-	Parent := _LMDG_Statement(Helper,
-		'm)^[ \t]*(Parent) := MenuRenderer_GroupRow\("llm_backend_parent_ahk", "llm_backend_parent", NativeChild, Getters\)', 1)
-	Handoff := _LMDG_Statement(Helper,
-		'm)^[ \t]*(ParentRows) := \[Parent\][ \t]*$', 1)
-	ListConsumer := _LMDG_Statement(Helper,
-		'm)^[ \t]*(Map)\("llm_backend_parent_rows", \(\*\) => ParentRows,[ \t]*$', 1)
-	Frame := _LMDG_Statement(Helper,
-		'm)^[ \t]*(Rows) := MenuRenderer_TemplateRows\("llm_backend_parent_frame_ahk", Map\(\), Getters,[ \t]*\n'
-		. '[ \t]*Map\("llm_backend_parent_rows", \(\*\) => ParentRows,[ \t]*\n'
-		. '[ \t]*"llm_backend_warning_rows", \(\*\) => Admission\["warning_rows"\]\)\)', 1)
-	ResultReturn := _LMDG_Statement(Helper, 'm)^[ \t]*(return) Rows[ \t]*$', 1)
-	return Call && Consumer && Call < Consumer && Getter && Parent && Handoff && ListConsumer && Frame && ResultReturn
-		&& Getter < Parent && Parent < Handoff && Handoff < Frame && Frame < ListConsumer && ListConsumer < ResultReturn
-}
-
-_LMDG_BackendFrameGreyingDecoy(Kind) {
-	Emit := _DriverFuncBody("_LLM_Menu_EmitRow"), Helper := _DriverFuncBody("_LLM_Menu_BackendParentRows")
-	Assert(_LMDG_BackendFrameGreyingRoute(Emit, Helper), "the genuine current backend parent consumes resolved off-state policy")
-	if Kind == "wrong-flag"
-		Emit := StrReplace(Emit, 'BackendMenu, BackendCaption, disabled, WarningRows)', 'BackendMenu, BackendCaption, false, WarningRows)')
-	else if Kind == "wrong-reader"
-		Helper := StrReplace(Helper, '"llm_backend_parent_ready", (*) => !Disabled,', '"llm_backend_parent_ready", (*) => true,')
-	else if Kind == "commented-call"
-		Emit := StrReplace(Emit, 'BackendRows := _LLM_Menu_BackendParentRows(', '; BackendRows := _LLM_Menu_BackendParentRows(')
-	else if Kind == "foreign-group"
-		Helper := StrReplace(Helper, 'Parent := MenuRenderer_GroupRow(', 'Parent := Foreign.MenuRenderer_GroupRow(')
-	else if Kind == "wrong-consumer"
-		Emit := StrReplace(Emit, 'return BackendRows', 'return ForeignRows')
-	else if Kind == "discarded-parent"
-		Helper := StrReplace(Helper, 'ParentRows := [Parent]', 'ParentRows := [Map("label", Caption, "submenu", NativeChild)]')
-	else if Kind == "foreign-parent"
-		Helper := StrReplace(Helper, 'ParentRows := [Parent]', 'ParentRows := [ForeignParent]')
-	else if Kind == "wrong-list-consumer"
-		Helper := StrReplace(Helper, '"llm_backend_parent_rows", (*) => ParentRows,', '"llm_backend_parent_rows", (*) => [],')
-	else if Kind == "commented-handoff"
-		Helper := StrReplace(Helper, 'ParentRows := [Parent]', '; ParentRows := [Parent]')
-	else if Kind == "commented-list-consumer"
-		Helper := StrReplace(Helper, 'Map("llm_backend_parent_rows", (*) => ParentRows,', '; Map("llm_backend_parent_rows", (*) => ParentRows,')
-	else if Kind == "wrong-return"
-		Helper := StrReplace(Helper, 'return Rows', 'return ForeignRows')
-	else
-		throw Error("Unknown backend parent off-state counterexample")
-	Assert(!_LMDG_BackendFrameGreyingRoute(Emit, Helper), "foreign or fixed-flag source cannot supply actual backend greying: " . Kind)
-}
-for Kind in ["wrong-flag", "wrong-reader", "commented-call", "foreign-group", "wrong-consumer", "wrong-return",
-	"discarded-parent", "foreign-parent", "wrong-list-consumer", "commented-handoff", "commented-list-consumer"]
-	Test("shared backend parent off-state route refuses " . Kind, _LMDG_BackendFrameGreyingDecoy.Bind(Kind))
-
-; Capture admission precedes actual construction; the same receiver and completed row reach native publication.
-_LMDG_ModelParentGreyingRoute(Emit, Helper) {
-	Capture := _LMDG_Statement(Emit,
-		'm)^[ \t]*(ReceiveModel) := MenuRenderer_GroupReceiver\("llm_model_parent_ahk", "llm_model"\)', 2)
-	Child := _LMDG_Statement(Emit, 'm)^[ \t]*(model_menu) := LLM_Menu_BuildModelMenu\(\)', 2)
-	Call := _LMDG_Statement(Emit,
-		'm)^[ \t]*(ModelRows) := _LLM_Menu_ModelParentRows\(ReceiveModel, model_menu, health_dot, model_shown, disabled\)', 3)
-	; The emitter returns the parent rows; MenuRenderer_Build draws them at the entry.
-	Consumer := _LMDG_Statement(Emit, 'm)^[ \t]*(return) ModelRows[ \t]*$', 2)
-	Getters := _LMDG_Statement(Helper,
-		'm)^[ \t]*(Getters) := Map\("llm_model_health_prefix", \(\*\) => HealthPrefix,[ \t]*\n'
-		. '[ \t]*"llm_model_current_caption", \(\*\) => ModelCaption,[ \t]*\n'
-		. '[ \t]*"llm_model_parent_ready", \(\*\) => !Disabled\)', 1)
-	Receive := _LMDG_Statement(Helper, 'm)^[ \t]*(Parent) := Receive\.Call\(NativeChild, Getters\)', 1)
-	ResultReturn := _LMDG_Statement(Helper, 'm)^[ \t]*(return) \[Parent\][ \t]*$', 1)
-	return Capture && Child && Call && Consumer && Capture < Child && Child < Call && Call < Consumer
-		&& Getters && Receive && ResultReturn && Getters < Receive && Receive < ResultReturn
-}
-
-_LMDG_ModelParentGreyingDecoy(Kind) {
-	Emit := _DriverFuncBody("_LLM_Menu_EmitRow"), Helper := _DriverFuncBody("_LLM_Menu_ModelParentRows")
-	Assert(_LMDG_ModelParentGreyingRoute(Emit, Helper), "the actual live model publication transports the resolved greying flag")
-	if Kind == "wrong-flag"
-		Emit := StrReplace(Emit, 'health_dot, model_shown, disabled)', 'health_dot, model_shown, false)')
-	else if Kind == "wrong-reader"
-		Helper := StrReplace(Helper, '"llm_model_parent_ready", (*) => !Disabled)', '"llm_model_parent_ready", (*) => true)')
-	else if Kind == "wrong-receiver"
-		Emit := StrReplace(Emit, '_LLM_Menu_ModelParentRows(ReceiveModel, model_menu,', '_LLM_Menu_ModelParentRows(Foreign, model_menu,')
-	else if Kind == "wrong-consumer"
-		Emit := StrReplace(Emit, 'return ModelRows', 'return ForeignRows')
-	else if Kind == "discarded-parent"
-		Helper := StrReplace(Helper, 'return [Parent]', 'return [Map("label", ModelCaption, "submenu", NativeChild)]')
-	else if Kind == "commented-capture"
-		Emit := StrReplace(Emit, 'ReceiveModel := MenuRenderer_GroupReceiver(', '; ReceiveModel := MenuRenderer_GroupReceiver(')
-	else
-		throw Error("Unknown model parent greying source counterexample")
-	Assert(!_LMDG_ModelParentGreyingRoute(Emit, Helper), "foreign or fixed-flag source cannot supply actual model greying: " . Kind)
-}
-for Kind in ["wrong-flag", "wrong-reader", "wrong-receiver", "wrong-consumer", "discarded-parent", "commented-capture"]
-	Test("shared model parent off-state route refuses " . Kind, _LMDG_ModelParentGreyingDecoy.Bind(Kind))

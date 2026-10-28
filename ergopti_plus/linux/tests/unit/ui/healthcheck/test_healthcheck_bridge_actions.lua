@@ -28,9 +28,12 @@ local HOME = "/home/jdoe"
 local function load_bridge(controls)
 	controls = controls or {}
 	local replaced = { "ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes",
-		"ui.webview_manager", "adapters.clipboard", "infra.config_paths" }
+		"ui.webview_manager", "adapters.clipboard", "infra.config_paths",
+		"adapters.keyboard_hook" }
 	local loaded = {}
 	for _, name in ipairs(replaced) do loaded[name] = package.loaded[name] end
+	-- The input section reads the real hook; a fake left by another module must not stand in.
+	package.loaded["adapters.keyboard_hook"] = nil
 	local context = { pushed = {}, copied = {}, warnings = {}, starts = 0, cancels = 0, closed = 0, epoch = 7 }
 	for _, name in ipairs({ "ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes" }) do
 		package.loaded[name] = nil
@@ -109,6 +112,8 @@ helpers.describe("diagnostics bridge (linux): the page's messages", function()
 			helpers.assert_eq(answer.config.schema.schema_version, 2)
 			helpers.assert_eq(answer.config.context.home, HOME)
 			helpers.assert_eq(answer.config.context.case_insensitive, false)
+			helpers.assert_eq(answer.config.capabilities, { diagnostic_collection = false },
+				"the page learns from the host that Linux runs no guided collection")
 			helpers.assert_eq(answer.snapshot.driver, "linux")
 			helpers.assert_eq(answer.snapshot.schema_version, 2)
 			helpers.assert_eq(context.starts, 1)

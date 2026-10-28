@@ -29,7 +29,7 @@ end
 
 
 --- Loads and drives one prediction acceptance inside a real callback collector.
---- @param options table { text, buffer?, expander_failure?, real_overlap?, prediction? };
+--- @param options table { text, buffer?, llm_private_mark?, expander_failure?, real_overlap?, prediction? };
 ---   prediction is a complete parser record the engine hands over instead of
 ---   one built from text and deletes.
 --- @return table result Captured call, event, state, and side-effect data.
@@ -42,6 +42,8 @@ function M.run(options)
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
+	local elapsed = 0
+	hs_stub.timer.absoluteTime = function() return math.floor(elapsed * 1e9) end
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 
@@ -116,14 +118,14 @@ function M.run(options)
 
 	local accepted_count = 0
 	local notified_count = 0
-	local keylogger_buffers = {}
-	package.loaded["modules.keylogger"] = {
+	local keystats_buffers = {}
+	package.loaded["modules.keystats"] = {
 		log_hotstring_suggested = noop,
 		log_hotstring_dismissed = noop,
 		notify_synthetic = function() notified_count = notified_count + 1 end,
 		log_llm_accepted = function() accepted_count = accepted_count + 1 end,
 		set_buffer = function(value)
-			keylogger_buffers[#keylogger_buffers + 1] = value
+			keystats_buffers[#keystats_buffers + 1] = value
 		end,
 	}
 
@@ -245,6 +247,7 @@ function M.run(options)
 	local state = {
 		buffer = options.buffer or "prefix ",
 		llm_buffer = options.llm_buffer or options.buffer or "prefix ",
+		llm_private_mark = options.llm_private_mark or "",
 		magic_key = "\u{2605}",
 		lifecycle_generation = 0,
 		mappings = {},
@@ -306,6 +309,8 @@ function M.run(options)
 			end
 		end
 		if selected == nil then return nil end
+		-- A fired native timer spends its interval even when the test uses no CPU.
+		elapsed = elapsed + selected.delay
 		selected:fire()
 		return selected.delay
 	end
@@ -318,7 +323,7 @@ function M.run(options)
 		buffer_before = buffer_before,
 		accepted_count = accepted_count,
 		notified_count = notified_count,
-		keylogger_buffers = keylogger_buffers,
+		keystats_buffers = keystats_buffers,
 		reset_count = reset_count,
 		arm_chain_count = arm_chain_count,
 		arm_chain_before_completion = arm_chain_before_completion,

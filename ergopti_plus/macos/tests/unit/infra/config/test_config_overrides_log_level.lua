@@ -4,12 +4,12 @@
 --- MODULE: Regression — config.toml [script] log_level override is honored
 --- DESCRIPTION:
 --- Audit finding F-M4. The documented expert override `[script] log_level = "..."`
---- (and the AHK-parity LogLevel) silently no-opped: config_overrides wrote it to a
+--- silently no-opped: config_overrides wrote it to a
 --- BARE settings key ("log_level"), but the logger restore reads only the canonical
 --- "ergopti.log_level" — and even if the key matched, Logger.set_level ran at boot
 --- BEFORE config_overrides, so nothing re-applied it.
 ---
---- Fix: config_overrides maps log_level/LogLevel onto "ergopti.log_level", and
+--- Fix: config_overrides stores log_level under "ergopti.log_level", and
 --- init.lua re-applies the level AFTER overrides. This test pins the key mapping
 --- behaviorally and the re-apply step at source.
 --- ==============================================================================
@@ -49,11 +49,12 @@ helpers.describe("config_overrides maps [script] log_level onto the canonical lo
 		os.remove(path)
 	end)
 
-	helpers.it("the AHK-parity LogLevel spelling is also mapped", function()
+	helpers.it("the retired LogLevel and loglevel spellings are not aliases of log_level", function()
 		for k in pairs(stored) do stored[k] = nil end
-		local path = write_tmp('[script]\nLogLevel = "DEBUG"\n')
+		local path = write_tmp('[script]\nLogLevel = "DEBUG"\nloglevel = "ERROR"\n')
 		Overrides.apply(path)
-		helpers.assert_eq(stored["ergopti.log_level"], "DEBUG")
+		helpers.assert_nil(stored["ergopti.log_level"],
+			"only the canonical log_level key reaches the logger setting")
 		os.remove(path)
 	end)
 end)
@@ -124,9 +125,6 @@ helpers.describe("Expert known-value admission", function()
 	local function test(name, body) helpers.it(name .. " (expert-known-value)", body) end
 	local VECTORS = {
 		{ key = "log_level", literal = "true", value = true },
-		{ key = "LogLevel", literal = "17", value = 17 },
-		{ key = "LOG_LEVEL", literal = '"TRACE"', value = "TRACE" },
-		{ key = "loglevel", literal = '"gone"', value = "gone" },
 		{ key = "log_level", literal = '["INFO"]', value = { "INFO" } },
 		{ key = "log_level", literal = '{ old = "INFO" }', value = { old = "INFO" } },
 	}
@@ -149,61 +147,37 @@ helpers.describe("Expert known-value admission", function()
 			end)
 		end)
 	end
-	for _, vector in ipairs({
-		{ literal = '"false"', value = "false" },
-		{ literal = "17", value = 17 },
-		{ literal = '[false]', value = { false } },
-		{ literal = '{ old = false }', value = { old = false } },
-	}) do
-		for _, spelling in ipairs({ 'llm.enabled', '"llm.enabled"' }) do
-			test("ignores obsolete native consent " .. spelling .. vector.literal, function()
-				local source = '[features]\n' .. spelling .. ' = ' .. vector.literal .. '\nfree = "kept"\n[future]\nkeep = 7\n'
-				with_file(source, function(f)
-					helpers.assert_eq(f.owner.apply(f.path), 1)
-					helpers.assert_eq(f.observed, { ["ergopti.free"] = "kept" }, "invalid consent never reaches native truthiness")
-					local marks = {}
-					f.owner.mark_config_reads(f.codec.decode(source), function(...) marks[#marks + 1] = { ... } end)
-					helpers.assert_eq(marks, { { "features", "free" } })
-					helpers.assert_eq(#f.warnings, 1)
-					local expected_path = spelling == 'llm.enabled' and { "features", "llm", "enabled" } or { "features", "llm.enabled" }
-					helpers.assert_contains(f.warnings[1], require("toml_codec.key_path").render(expected_path))
-					local expected = spelling == 'llm.enabled' and { features = { llm = { enabled = vector.value }, free = "kept" }, future = { keep = 7 } }
-						or { features = { ["llm.enabled"] = vector.value, free = "kept" }, future = { keep = 7 } }
-					helpers.assert_eq(f.codec.decode(f.read()), expected)
-					helpers.assert_eq(f.read(), source)
-					helpers.assert_eq(f.errors, {})
-				end)
-			end)
-		end
-	end
 	for _, threshold in ipairs({ "DEBUG", "info", "WARNING", "error" }) do
 		test("retains published threshold " .. threshold, function()
-			with_file('[script]\nLogLevel = "' .. threshold .. '"\n', function(f)
+			with_file('[script]\nlog_level = "' .. threshold .. '"\n', function(f)
 				helpers.assert_eq(f.owner.apply(f.path), 1)
 				helpers.assert_eq(f.observed, { ["ergopti.log_level"] = threshold })
 				local marks = {}
 				f.owner.mark_config_reads(f.codec.decode(f.read()), function(...) marks[#marks + 1] = { ... } end)
-				helpers.assert_eq(marks, { { "script", "LogLevel" } })
+				helpers.assert_eq(marks, { { "script", "log_level" } })
 				helpers.assert_eq(f.warnings, {})
 			end)
 		end)
 	end
-	for _, enabled in ipairs({ true, false }) do
-		test("retains Boolean native consent " .. tostring(enabled), function()
-			with_file('[features]\nllm.enabled = ' .. tostring(enabled) .. '\n', function(f)
-				helpers.assert_eq(f.owner.apply(f.path), 1)
-				helpers.assert_eq(f.observed, { ["ergopti.llm.enabled"] = enabled })
-				helpers.assert_eq(f.warnings, {})
-			end)
-		end)
-	end
-	test("reports a known manifest enum and preserves arbitrary expert compatibility", function()
-		local source = '[features]\nui.menubar_icon = "removed"\n"MagicKey.Repeat.Enabled" = false\n[script]\nKeptKey = 1\n'
+	test("a retired [features] table is neither applied nor marked as read", function()
+		local source = '[features]\nllm.enabled = false\n"MagicKey.Repeat.Enabled" = true\n[script]\nKeptKey = 1\n'
 		with_file(source, function(f)
-			helpers.assert_eq(f.owner.apply(f.path), 2)
-			helpers.assert_eq(f.observed, { ["ergopti.MagicKey.Repeat.Enabled"] = false, ["ergopti.KeptKey"] = 1 })
-			helpers.assert_eq(#f.warnings, 1)
-			helpers.assert_contains(f.warnings[1], "features.ui.menubar_icon")
+			helpers.assert_eq(f.owner.apply(f.path), 1)
+			helpers.assert_eq(f.observed, { ["ergopti.KeptKey"] = 1 },
+				"no declared feature has a second, hand-written spelling")
+			local marks = {}
+			f.owner.mark_config_reads(f.codec.decode(source), function(...) marks[#marks + 1] = { ... } end)
+			helpers.assert_eq(marks, { { "script", "KeptKey" } })
+			local cleanup = require("config_unused_keys")
+			local scan = cleanup.find_in_source(source, function(document, mark)
+				f.owner.mark_config_reads(document, mark)
+			end)
+			helpers.assert_eq(scan.status, "ok")
+			local found = {}
+			for _, row in ipairs(scan.keys) do found[#found + 1] = row.section end
+			helpers.assert_true(#found >= 1 and found[1] == "features",
+				"the unused-key scan offers the leftover [features] table")
+			helpers.assert_eq(f.warnings, {})
 			helpers.assert_eq(f.read(), source)
 		end)
 	end)
@@ -236,30 +210,16 @@ helpers.describe("Expert known-value admission", function()
 			helpers.assert_eq(#f.warnings, 1)
 		end)
 	end)
-	test("expert metadata admission does not resolve a hardware default", function()
-		with_file('[features]\nllm.models.selected = "ollama"\nllm.enabled = false\n', function(f)
-			helpers.with_stub_scope({ "modules.llm.backend_detector" }, function()
-				package.loaded["modules.llm.backend_detector"] = { auto_default = function()
-					error("expert type admission attempted to resolve hardware")
-				end }
-				helpers.assert_eq(f.owner.apply(f.path), 2)
-				helpers.assert_eq(f.observed, { ["ergopti.llm.models.selected"] = "ollama", ["ergopti.llm.enabled"] = false })
-				local marks = {}
-				f.owner.mark_config_reads(f.codec.decode(f.read()), function(...) marks[#marks + 1] = { ... } end)
-				helpers.assert_eq(marks, { { "features", "llm", "enabled" }, { "features", "llm", "models", "selected" } })
-			end)
-		end)
-	end)
 	test("retains unsupported section shapes without a new scalar-key crash", function()
-		with_file('script = ["DEBUG"]\nfeatures = [true]\n', function(f)
+		with_file('script = ["DEBUG"]\n', function(f)
 			helpers.assert_eq(f.owner.apply(f.path), 0)
 			helpers.assert_eq(f.observed, {})
 			helpers.assert_eq(f.errors, {})
-			helpers.assert_eq(f.read(), 'script = ["DEBUG"]\nfeatures = [true]\n')
+			helpers.assert_eq(f.read(), 'script = ["DEBUG"]\n')
 		end)
 	end)
 	test("keeps malformed file and native write refusals strict", function()
-		with_file('[features]\nllm.enabled = false\n', function(f)
+		with_file('[script]\nKeptKey = 1\n', function(f)
 			f.controls.refuse = true
 			helpers.assert_eq(f.owner.apply(f.path), 0)
 			helpers.assert_eq(f.observed, {})
@@ -513,7 +473,7 @@ helpers.describe("Persisted native consent admission", function()
 	end
 	helpers.it("obsolete source and native residue preserve actual source bytes and the logger's valid value", function()
 		with_native("false", function(f)
-			local source = '[script]\nlog_level = "gone"\n[features]\nllm.enabled = "false"\n[future]\nkeep = [1, "future"]\n'
+			local source = '[script]\nlog_level = "gone"\n[future]\nkeep = [1, "future"]\n'
 			local path = os.tmpname()
 			local file = assert(io.open(path, "wb")); assert(file:write(source)); assert(file:close())
 			local okay, detail = xpcall(function()
@@ -525,7 +485,7 @@ helpers.describe("Persisted native consent admission", function()
 				helpers.assert_eq(pending, false)
 				helpers.assert_eq(f.owner.apply(path), 0)
 				f.boot()
-				helpers.assert_eq(#f.warnings, 3, "source and native domains retain their independent once-only warnings")
+				helpers.assert_eq(#f.warnings, 2, "source and native domains retain their independent once-only warnings")
 				local current = assert(io.open(path, "rb"))
 				local bytes = assert(current:read("*a")); assert(current:close())
 				helpers.assert_eq(bytes, source, "source refusal and boot admission never rewrite TOML")

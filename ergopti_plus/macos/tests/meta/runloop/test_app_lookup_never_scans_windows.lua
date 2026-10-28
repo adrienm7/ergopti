@@ -10,7 +10,7 @@
 --- thread, macOS allowing each application six seconds to answer.
 ---
 --- ROOT CAUSE ENCODED (app-lookup-no-window-scan):
---- The keylogger's ingest flush resolved each batched application's category
+--- The keystats's ingest flush resolved each batched application's category
 --- with hs.application.get(name). One of them had quit; Hammerspoon printed its
 --- Spotlight hint (emitted inside find() just before the window fallback) and
 --- froze for 13.4 s. The event taps were disabled, the logger stalled and the
@@ -28,6 +28,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
+local CommandLines = require("tests.support.command_lines")
 local DRIVER_ROOT = helpers.driver_root()
 
 -- Production modules that still call hs.application.get/find directly, with
@@ -81,24 +83,22 @@ local function list_lua_files(directory)
 	else
 		command = string.format("find '%s' -type f", directory)
 	end
-	local pipe = io.popen(command)
-	if not pipe then return files end
-	for raw_line in pipe:lines() do
+	local source_count = #files
+	local inventory = CommandLines.read(command)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, raw_line in ipairs(inventory) do
 		local path = raw_line:gsub("\\", "/")
 		if path:match("%.lua$") then files[#files + 1] = path end
 	end
-	pipe:close()
+	assert(#files > source_count, "source inventory contains no matching files")
 	return files
 end
 
 --- Reads one source file exactly.
 --- @param path string Absolute path.
---- @return string|nil source File contents.
+--- @return string source File contents.
 local function read_file(path)
-	local handle = io.open(path, "rb")
-	if not handle then return nil end
-	local source = handle:read("*a")
-	handle:close()
+	local source = SourceFile.read(path)
 	return source
 end
 

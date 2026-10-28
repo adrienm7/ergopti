@@ -87,7 +87,9 @@ helpers.describe("Remote API private failure receipts: actual caller admission",
 			calls[1].done({ ok = true, status = 200, body = '{"choices":[{"message":{"content":"Synthetic success"}}]}',
 				failure_receipt = receipt() })
 			helpers.assert_eq(text, "Synthetic success")
-			helpers.assert_nil(err); helpers.assert_nil(actual)
+			helpers.assert_nil(err)
+			-- The slot holds the completion's usage, never the stray receipt.
+			helpers.assert_eq(actual, { prompt_tokens = 0, completion_tokens = 0, total_tokens = 0, est_cost_usd = 0.0 })
 		end)
 	end)
 

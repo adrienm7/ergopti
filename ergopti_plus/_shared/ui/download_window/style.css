@@ -33,8 +33,8 @@ body {
 }
 
 body {
-	background: #242426;
-	color: #e8e8ea;
+	background: var(--theme-grey-242426);
+	color: var(--theme-grey-e8e8ea);
 	font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
 	height: 100vh;
 	overflow: hidden;
@@ -47,21 +47,21 @@ body {
 }
 
 h2 {
-	color: #fff;
+	color: var(--theme-white);
 	font-size: 14px;
 	font-weight: 600;
 	margin-bottom: 4px;
 }
 
 #model {
-	color: #999;
+	color: var(--theme-grey-999);
 	font-family: 'SF Mono', monospace;
 	font-size: 11px;
 	word-break: break-all;
 }
 
 #subtitle {
-	color: #aaa;
+	color: var(--theme-grey-aaa);
 	font-size: 12px;
 	margin-top: 2px;
 }
@@ -124,7 +124,7 @@ body.mode-bootstrap .btn-row {
 /* ======================================= */
 
 #bar-bg {
-	background: #3a3a3c;
+	background: var(--theme-gray4-dark);
 	border-radius: 4px;
 	flex-shrink: 0; /* Prevent the progress bar from shrinking when logs fill up */
 	height: 12px;
@@ -133,7 +133,7 @@ body.mode-bootstrap .btn-row {
 }
 
 #bar-fill {
-	background: linear-gradient(90deg, #30d158, #34c759);
+	background: linear-gradient(90deg, var(--theme-green-dark), var(--theme-green));
 	border-radius: 4px;
 	height: 100%;
 	transition: width 0.35s ease;
@@ -141,7 +141,7 @@ body.mode-bootstrap .btn-row {
 }
 
 #bar-fill.error {
-	background: linear-gradient(90deg, #ff453a, #ff6b5f);
+	background: linear-gradient(90deg, var(--theme-red-dark), #ff6b5f);
 }
 
 #status-line {
@@ -152,7 +152,7 @@ body.mode-bootstrap .btn-row {
 }
 
 #pct {
-	color: #30d158;
+	color: var(--theme-green-dark);
 	font-size: 30px;
 	font-weight: 700;
 	letter-spacing: -1px;
@@ -169,14 +169,14 @@ body.mode-bootstrap .btn-row {
 }
 
 #stats {
-	color: #888;
+	color: var(--theme-grey-888);
 	font-size: 12px;
 	line-height: 1.8;
 	min-height: 44px;
 }
 
 #stats b {
-	color: #ccc;
+	color: var(--theme-grey-ccc);
 	font-weight: 600;
 }
 
@@ -185,7 +185,7 @@ body.mode-bootstrap .btn-row {
 }
 
 #eta {
-	color: #fff;
+	color: var(--theme-white);
 	font-size: 16px;
 }
 
@@ -210,7 +210,7 @@ body.is-error #step-line {
 }
 
 #detail-line {
-	color: #888;
+	color: var(--theme-grey-888);
 	direction: rtl; /* Truncate from the LEFT so the trailing actionable info stays visible */
 	font-family: 'SF Mono', monospace;
 	font-size: 11px;
@@ -223,7 +223,7 @@ body.is-error #step-line {
 }
 
 #bootstrap-bar-bg {
-	background: #3a3a3c;
+	background: var(--theme-gray4-dark);
 	border-radius: 2px;
 	height: 4px;
 	overflow: hidden;
@@ -252,7 +252,7 @@ body.kind-ollama_model #bootstrap-bar-fill {
 	background: #f2bf4d;
 }
 body.is-error #bootstrap-bar-fill {
-	background: #ff453a;
+	background: var(--theme-red-dark);
 }
 
 /* ===================================== */
@@ -279,7 +279,7 @@ button {
 #btn-cancel {
 	background: rgba(255, 59, 48, 0.12);
 	border-color: rgba(255, 59, 48, 0.45);
-	color: #ff453a;
+	color: var(--theme-red-dark);
 }
 
 #btn-cancel:hover {
@@ -294,7 +294,7 @@ button {
 #btn-term {
 	background: rgba(100, 100, 100, 0.15);
 	border-color: rgba(150, 150, 150, 0.35);
-	color: #aaa;
+	color: var(--theme-grey-aaa);
 	margin-left: auto; /* Pushed completely to the right */
 }
 
@@ -305,7 +305,7 @@ button {
 #btn-retry {
 	background: rgba(48, 209, 88, 0.12);
 	border-color: rgba(48, 209, 88, 0.45);
-	color: #30d158;
+	color: var(--theme-green-dark);
 }
 
 #btn-retry:hover {
@@ -327,17 +327,17 @@ button {
 }
 
 #done-msg.ok {
-	color: #30d158;
+	color: var(--theme-green-dark);
 }
 
 #done-msg.error {
-	color: #ff453a;
+	color: var(--theme-red-dark);
 }
 
 #log-area {
 	background: #1a1a1c;
 	border-radius: 6px;
-	color: #888;
+	color: var(--theme-grey-888);
 	display: none; /* Hidden by default; bootstrap mode overrides via CSS */
 	flex: 1 1 auto;
 	font-family: 'SF Mono', monospace;

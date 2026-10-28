@@ -104,7 +104,7 @@ end)
 helpers.describe("toml_codec — coexistence of scalars and sub-maps", function()
 	helpers.it("emits scalars before sub-maps in the same section", function()
 		local input = {
-			keylogger_enabled = true,
+			keystats_enabled = true,
 			trigger_char      = "★",
 			section_states    = { autocorrection = { dot = false } },
 			metrics_shortcut  = { mods = { "alt" }, key = "m" },

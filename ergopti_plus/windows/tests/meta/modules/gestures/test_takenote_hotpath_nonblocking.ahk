@@ -37,8 +37,8 @@ _TNNB_PollOwnsDeadlineAndSuspendGate() {
 		"the deferred note-window finalizer must call its terminal-state guard before and after external effects")
 	Assert(InStr(AbortBody, "Ops.IsSuspended()") > 0,
 		"the terminal-state guard must cancel the deferred note-window finalizer when the driver is suspended")
-	Assert(InStr(AbortBody, "TickExpired(Job[" . Q . "started_tick" . Q . "], Job[" . Q . "timeout_ms" . Q . "], Ops.NowTick())") > 0,
-		"the terminal-state guard must stop the deferred note-window finalizer at its finite wrap-safe launch deadline")
+	Assert(InStr(AbortBody, "TickExpired64(Job[" . Q . "started_tick" . Q . "], Job[" . Q . "timeout_ms" . Q . "], Ops.NowTick())") > 0,
+		"the terminal-state guard must stop the deferred note-window finalizer at its finite native-width launch deadline")
 	Assert(InStr(RescheduleBody, "Ops.Schedule(Job[" . Q . "timer" . Q . "], TAKE_NOTE_POLL_INTERVAL_MS)") > 0,
 		"the deferred note-window finalizer must use one-shot bounded polling rather than a blocking wait")
 	Assert(InStr(Body, "Ops.Maximize(WindowHwnd)") > 0,

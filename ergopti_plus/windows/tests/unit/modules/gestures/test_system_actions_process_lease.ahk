@@ -465,8 +465,163 @@ _SysActions_ProcessPidDomain(Pid, Valid := false) {
 	}
 }
 
-for _SysActions_InvalidProcessPid in [0, -1, 1.5, "1", 0x100000000, DllCall("Kernel32\GetCurrentProcessId", "UInt") + 0x100000000]
-	Test("system control: invalid process PID " . _SysActions_InvalidProcessPid . " (process-pid-domain)",
-		_SysActions_ProcessPidDomain.Bind(_SysActions_InvalidProcessPid))
+; Semantic identities remain stable between discovery and native execution.
+; The bound values retain all six original types and the actual self-PID offset.
+for _SysActions_InvalidProcessVector in [
+	{Label: "zero", Pid: 0},
+	{Label: "negative", Pid: -1},
+	{Label: "fractional", Pid: 1.5},
+	{Label: "numeric-string", Pid: "1"},
+	{Label: "above-dword", Pid: 0x100000000},
+	{Label: "own-pid-plus-dword-domain", Pid: DllCall("Kernel32\GetCurrentProcessId", "UInt") + 0x100000000}
+]
+	Test("system control: invalid process PID " . _SysActions_InvalidProcessVector.Label . " (process-pid-domain)",
+		_SysActions_ProcessPidDomain.Bind(_SysActions_InvalidProcessVector.Pid))
 Test("system control: owned process PID is retained without termination (process-pid-domain)",
 	_SysActions_ProcessPidDomain.Bind(DllCall("Kernel32\GetCurrentProcessId", "UInt"), true))
+
+
+#Include %A_LineFile%\..\..\..\..\support\pid_registration_receipt.ahk
+
+_SysActions_PidRegistrationDone(State, Code, Output, ErrorText) {
+	State.Done := true
+	State.Code := Code
+	State.Output := Output
+	State.ErrorText := ErrorText
+}
+
+/** Exact source registrations and bound values, observed in a live private child. */
+_SysActions_ReadPidRegistration(Path) {
+	Lines := StrSplit(FileRead(Path, "UTF-8"), "`n")
+	AssertEqual("", Lines.Pop(), "the entire UTF-8 registration receipt ends with one LF")
+	Header := StrSplit(Lines.RemoveAt(1), "`t")
+	AssertEqual(2, Header.Length, "the child reports its independent native PID and native value type")
+	AssertEqual("Integer", Header[1], "GetCurrentProcessId reports an actual integer before serialization")
+	Pid := Integer(Header[2])
+	AssertTrue(Pid > 0, "the receipt names its actual native process")
+	AssertEqual(6, Lines.Length, "all six original vectors must be observed")
+	Kinds := ["Integer", "Integer", "Float", "String", "Integer", "Integer"]
+	Values := ["0", "-1", "1.5", "1", "4294967296", String(Pid + 0x100000000)]
+	Names := []
+	Seen := Map()
+	Receipt := "RECEIPT process-pid-registration native_pid=" . Header[2] . " native_pid_type=" . Header[1] . " vectors=" . Lines.Length
+	for Index, Line in Lines {
+		Fields := StrSplit(Line, "`t")
+		AssertEqual(3, Fields.Length, "each exact name retains its independently typed callback input")
+		AssertFalse(Seen.Has(Fields[1]), "all six registrations have distinct identities")
+		Seen[Fields[1]] := true
+		Names.Push(Fields[1])
+		AssertTrue(StrCompare(Kinds[Index], Fields[2], true) == 0, "numeric-looking strings must remain distinct from numeric PID values")
+		AssertTrue(StrCompare(Values[Index], Fields[3], true) == 0, "the last actual bound value stays native PID plus one DWORD domain")
+		Receipt .= " " . Fields[2] . ":" . Fields[3]
+	}
+	_TestPrint("# " . Receipt)
+	return {Pid: Pid, Names: Names}
+}
+
+_SysActions_PidRegistrationsStayStable() {
+	static Sequence := 0
+	Identity := DllCall("kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount . "_" . ++Sequence
+	Root := A_Temp . "\ergopti_pid_registration_" . Identity
+	FSCreateDirectoryExclusiveStrict(Root)
+	EventName := "Local\ErgoptiPlus.Tests.PidRegistration." . Identity
+	Event := 0
+	Children := []
+	PriorCritical := A_IsCritical
+	try {
+		Critical("Off")
+		Event := PLC_CreateNamedManualResetEvent(EventName)
+		for Index in [1, 2] {
+			State := {Done: false, Code: -1, Output: "", ErrorText: "", Worker: 0,
+				Report: Root . "\registration-" . Index . ".tsv"}
+			Children.Push(State)
+			State.Worker := ShellRunner_SpawnTreeOwned(A_AhkPath,
+				["/ErrorStdOut", A_ScriptDir . "\fixtures\system_actions_pid_registration.ahk", State.Report, EventName],
+				_SysActions_PidRegistrationDone.Bind(State))
+			AssertTrue(State.Worker.start(), "the genuine registration observer must start in its own process tree")
+		}
+		Started := A_TickCount
+		loop {
+			Ready := true
+			for State in Children {
+				if _PidRegistrationReceiptIsReady(State.Report . ".error")
+					throw Error(FileRead(State.Report . ".error", "UTF-8"))
+				AssertFalse(State.Done, "both actual native processes remain live while their source registrations are compared")
+				if !_PidRegistrationReceiptIsReady(State.Report)
+					Ready := false
+			}
+			if Ready
+				break
+			AssertFalse(TickExpired64(Started, 10000), "both real registration observers publish complete owned receipts")
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		First := _SysActions_ReadPidRegistration(Children[1].Report)
+		Second := _SysActions_ReadPidRegistration(Children[2].Report)
+		AssertTrue(First.Pid != Second.Pid, "the live observers have independent actual native process identities")
+		for Index, Name in First.Names
+			AssertTrue(StrCompare(Name, Second.Names[Index], true) == 0,
+				"the exact registered identity cannot depend on its native PID: first=<" . Name . "> second=<" . Second.Names[Index] . ">")
+		AssertTrue(PLC_SetEventHandle(Event), "only this parent releases both owned observers")
+		Started := A_TickCount
+		while !Children[1].Done || !Children[2].Done {
+			AssertFalse(TickExpired64(Started, 10000), "both exact process trees must acknowledge terminal completion")
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		for State in Children {
+			AssertEqual(0, State.Code, State.Output . State.ErrorText)
+			AssertEqual("", State.ErrorText, "the native observer cannot hide setup diagnostics")
+		}
+	} finally {
+		try {
+			if Event
+				PLC_SetEventHandle(Event)
+			Complete := true
+			for State in Children {
+				if IsObject(State.Worker)
+					Complete := State.Worker.terminate() && Complete
+				State.Worker := 0
+			}
+			if Event
+				Complete := PLC_CloseNativeHandle(Event) && Complete
+			AssertTrue(Complete, "all actual observer process and event authority must retire before file cleanup")
+			DirDelete(Root, true)
+		} finally Critical(PriorCritical)
+	}
+}
+
+Test("system control: PID-domain registration stays stable across native processes (process-pid-registration)",
+	_SysActions_PidRegistrationsStayStable)
+
+
+_SysActions_PidReceiptPublication() {
+	Root := _SR_AcquireCaptureDirectory()
+	Target := Root . "registration.tsv"
+	Text := "Owned receipt: café / 漢"
+	Witness := {Calls: 0, NativeDiskHandle: false, ReadyWhileOpen: false}
+	Append(Content, WritingPath, Encoding) {
+		Writer := FileOpen(WritingPath, "w", Encoding)
+		AssertTrue(IsObject(Writer), "the callback owns an actual Windows file object")
+		try {
+			Witness.Calls += 1
+			Witness.NativeDiskHandle := DllCall("kernel32\GetFileType", "Ptr", Writer.Handle, "UInt") == 1
+			; Observe the exact parent's admission predicate before body writes or
+			; close. This is a native file-creation boundary, not a delayed flag.
+			Witness.ReadyWhileOpen := _PidRegistrationReceiptIsReady(Target)
+			Writer.Write(Content)
+		} finally Writer.Close()
+	}
+	try {
+		_PidRegistrationPublish(Text, Target, Append)
+		_TestPrint("# RECEIPT process-pid-publication native_disk_handle=" . Witness.NativeDiskHandle
+			. " ready_while_open=" . Witness.ReadyWhileOpen . " append_calls=" . Witness.Calls)
+		AssertEqual(1, Witness.Calls)
+		AssertTrue(Witness.NativeDiskHandle, "the publication boundary must observe an actually open native disk handle")
+		AssertFalse(Witness.ReadyWhileOpen, "the final receipt cannot be admitted while its original writer still owns an incomplete file")
+		AssertTrue(_PidRegistrationReceiptIsReady(Target), "the complete receipt becomes admitted only after the writer returns")
+		AssertTrue(StrCompare(Text, FileRead(Target, "UTF-8"), true) == 0, "the published receipt contains the complete exact Unicode body")
+	} finally DirDelete(Root, true)
+}
+Test("system control: PID registration receipts publish after writer close (process-pid-publication)",
+	_SysActions_PidReceiptPublication)

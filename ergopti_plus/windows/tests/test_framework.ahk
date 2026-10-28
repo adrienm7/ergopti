@@ -46,6 +46,8 @@
 
 ; Registry of all Test() calls. Each entry is { name, callback, interactive }.
 global TEST_REGISTRY := []
+; Once execution owns the plan, registration and nested runners must refuse.
+global _TEST_RUN_STARTED := false
 
 ; Counters updated by RunTests.
 global TEST_PASS_COUNT := 0
@@ -250,17 +252,47 @@ _DriverIsProductionSource(Path) {
 	return !RegExMatch(StrReplace(Path, "\", "/"), "i)/(tests|vendor|build|_generated)/")
 }
 
+; One native census owns the production scope for source consumers. Enumeration
+; failure cannot be represented by a successful empty scan.
+_DriverProductionSourceCensus(Root := unset) {
+	if !IsSet(Root)
+		SplitPath(A_ScriptDir, , &Root)
+	if !(Root is String) || Root == "" || !DirExist(Root)
+		throw ValueError("The production source census requires an existing directory.")
+	; Match the filesystem's full/long path before deriving relative identities.
+	; Standalone framework consumers cannot depend on a loaded filesystem adapter.
+	Size := DllCall("Kernel32\GetFullPathNameW", "Str", Root, "UInt", 0, "Ptr", 0, "Ptr", 0, "UInt")
+	if !Size
+		throw OSError()
+	Full := Buffer(Size * 2)
+	Written := DllCall("Kernel32\GetFullPathNameW", "Str", Root, "UInt", Size, "Ptr", Full, "Ptr", 0, "UInt")
+	if !Written || Written >= Size
+		throw Error("The production source root did not resolve completely.")
+	Size := DllCall("Kernel32\GetLongPathNameW", "Ptr", Full, "Ptr", 0, "UInt", 0, "UInt")
+	if !Size
+		throw OSError()
+	Long := Buffer(Size * 2)
+	Written := DllCall("Kernel32\GetLongPathNameW", "Ptr", Full, "Ptr", Long, "UInt", Size, "UInt")
+	if !Written || Written >= Size
+		throw Error("The production source long root did not resolve completely.")
+	Root := StrGet(Long)
+	Paths := []
+	Loop Files, RTrim(Root, "\") . "\*.ahk", "FR" {
+		if _DriverIsProductionSource(A_LoopFileFullPath)
+			Paths.Push(A_LoopFileFullPath)
+	}
+	if !Paths.Length
+		throw ValueError("The production source census found no authored AHK files.")
+	return { Root: Root, Paths: Paths }
+}
+
 _DriverSourceConcat() {
 	static cache := ""
 	if (cache != "")
 		return cache
-	SplitPath(A_ScriptDir, , &Root)   ; A_ScriptDir = windows/tests  ->  Root = windows
 	Combined := ""
-	Loop Files, Root . "\*.ahk", "FR" {
-		if !_DriverIsProductionSource(A_LoopFileFullPath)
-			continue
-		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
-	}
+	for Path in _DriverProductionSourceCensus().Paths
+		Combined .= "`n" . FileRead(Path, "UTF-8")
 	cache := Combined
 	return cache
 }
@@ -601,7 +633,9 @@ global _DriverDirConcatFn := _DriverDirConcat
 ; Register a test. ``Callback`` must be a 0-arg callable; it receives no
 ; setup/teardown — tests should be self-contained.
 Test(Name, Callback, Interactive := false) {
-	global TEST_REGISTRY
+	global TEST_REGISTRY, _TEST_RUN_STARTED
+	if _TEST_RUN_STARTED
+		throw Error("Tests cannot be registered after execution starts.")
 	; The registering file decides the module shard (see _TestShardGroup).
 	TEST_REGISTRY.Push({ name: Name, callback: Callback, interactive: Interactive,
 		file: Error("", -1).File })
@@ -642,8 +676,8 @@ global TEST_MODULE_GROUPS := [
 	["hotstrings-shortcuts", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
 	; Keyboard remapping, layouts and gestures.
 	["keymap-gestures", "^unit/(platform/remap|modules/(keymap|gestures))/"],
-	; Keylogger capture, storage and metrics.
-	["keylogger", "^unit/modules/keylogger/"],
+	; Keystats capture, storage and metrics.
+	["keystats", "^unit/modules/keystats/"],
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
 	["ui", "^unit/ui/"],
 	; Adapters, platform services, shared infrastructure and the test runner.
@@ -704,11 +738,27 @@ _SelectListed(Tests, ListFile) {
 			Wanted[A_LoopField] := true
 	}
 	Selected := []
+	Matched := Map()
 	for Entry in Tests {
-		if Wanted.Has(Entry.name)
+		if Wanted.Has(Entry.name) {
 			Selected.Push(Entry)
+			Matched[Entry.name] := true
+		}
+	}
+	for Name in Wanted {
+		if !Matched.Has(Name)
+			throw ValueError("Unknown test listed for replay: " . Name)
 	}
 	return Selected
+}
+
+; Admit every replay name against the full registry before applying optional
+; intersections. Known tests outside a requested module or filter remain valid.
+_SelectRunTests(Registry, Filter, Module, ListFile, AllowInteractive, Reverse, &Excluded, &UnmodularCount) {
+	Listed := _SelectListed(Registry, ListFile)
+	Selected := _SelectTests(Listed, Filter, AllowInteractive, &Excluded)
+	UnmodularCount := Selected.Length
+	return _SelectReversed(_SelectModule(Selected, Module), Reverse)
 }
 
 _SelectTests(Registry, Filter, AllowInteractive, &Excluded) {
@@ -923,19 +973,50 @@ _TestPrint(Line) {
 	try FileAppend(Line . "`r`n", "*")
 }
 
+; Resolve only the declared Integer zero default; a string zero is not an owner.
+_TestPlanClassifier(ModuleOf) {
+	if (ModuleOf is Integer) && ModuleOf == 0
+		return _TestModuleOf
+	if !HasMethod(ModuleOf, "Call")
+		throw TypeError("The test plan classifier must be callable.")
+	return ModuleOf
+}
+
+; Build all metadata before writing a plan so a refused owner leaves no partial file.
+_TestBuildPlan(Entries, ModuleOf := 0) {
+	Classifier := _TestPlanClassifier(ModuleOf)
+	Plan := ""
+	for Entry in Entries {
+		Group := Classifier.Call(Entry.file)
+		if !(Group is String) || Trim(Group) == "" || RegExMatch(Group, "[\t\r\n]")
+			throw TypeError("The test plan classifier must return one nonempty field.")
+		Plan .= Group . "`t" . Entry.file . "`t" . Entry.name . "`n"
+	}
+	return Plan
+}
+
 ; Execute every registered test, print TAP-style results and exit with
 ; code 0 (all green) or 1 (any failure). Designed to be called from the
 ; bottom of ``run_all.ahk`` after every test file has been #Included.
 ; When --dry-run is passed on the command line, exits immediately after
 ; printing the plan line so the CI warning-check step stays fast.
-RunTests() {
+; The optional callable classifies plan metadata only; Integer zero retains
+; the canonical unit shard owner, independent of any other runner profile.
+RunTests(PlanModuleOf := 0) {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _AHK_ONLY_FILTER
 	global TEST_NOT_EXECUTED_COUNT, TEST_NOT_EXECUTED_MARKER
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
 	global _AHK_INTERACTIVE, _AHK_MODULE, _AHK_LIST_FILE, _AHK_DUMP_PLAN, _AHK_REVERSE
+	global _TEST_RUN_STARTED
+	if _TEST_RUN_STARTED
+		throw Error("The test runner has already started.")
+	PlanClassifier := _TestPlanClassifier(PlanModuleOf)
     if (A_IsCritical != 0) {
         throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
     }
+	; Close registration before receipt I/O or selection can dispatch a callback.
+	_TEST_RUN_STARTED := true
+	ReplayCommand := _TestReplayCommand(A_AhkPath, A_ScriptFullPath, A_Args)
 	if !IsSet(_AHK_DRY_RUN)
 		_AHK_DRY_RUN := false
 	if !IsSet(_AHK_ONLY_FILTER)
@@ -944,14 +1025,10 @@ RunTests() {
 	; Apply the optional --only <substr> filter. The plan line (1..N) and the run
 	; loop both operate on the selected subset so a filtered run is a valid, fast
 	; replay of a single failing test.
-	ActiveTests := _SelectTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_INTERACTIVE, &Excluded)
-	UnmodularCount := ActiveTests.Length
-	ActiveTests := _SelectReversed(_SelectListed(_SelectModule(ActiveTests, _AHK_MODULE), _AHK_LIST_FILE),
-		_AHK_REVERSE)
+	ActiveTests := _SelectRunTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_MODULE, _AHK_LIST_FILE,
+		_AHK_INTERACTIVE, _AHK_REVERSE, &Excluded, &UnmodularCount)
 	if _AHK_DUMP_PLAN != "" {
-		Plan := ""
-		for Entry in ActiveTests
-			Plan .= _TestModuleOf(Entry.file) . "`t" . Entry.file . "`t" . Entry.name . "`n"
+		Plan := _TestBuildPlan(ActiveTests, PlanClassifier)
 		FileAppend(Plan, _AHK_DUMP_PLAN, "UTF-8")
 	}
 	DeferredName := _TestDevQualificationName()
@@ -975,12 +1052,12 @@ RunTests() {
 		_TestPrint("# --reverse - the selected tests run in reverse registry order.")
 	if (_AHK_DRY_RUN) {
 		_TestPrint("# dry-run - skipping execution.")
-		_CopyTestResultsForCi()
+		_TestResultsPublishOrExit()
 		ExitApp(0)
 	}
 	if (ActiveTests.Length == 0) {
 		_TestPrint("# no test matched --only " . _AHK_ONLY_FILTER . ".")
-		_CopyTestResultsForCi()
+		_TestResultsPublishOrExit()
 		ExitApp(1)
 	}
 	Index := 0
@@ -1032,12 +1109,9 @@ RunTests() {
 		; the marker keeps it out of every pass count.
 		_TestPrint((Status == "not executed" ? "ok" : Status) . " " . Index . " - " . TestEntry.name . Detail)
 		_TestPrint("# duration_ms " . Index . " " . Format("{:.3f}", DurationMs))
-		; Print the exact one-test replay command so a red test is reproducible
-		; without re-running the whole suite (the JS runner sets this bar).
+		; Preserve the actual owner's supported selection, including isolated runners.
 		if (Status == "not ok")
-			_TestPrint("#   replay: AutoHotkey64.exe tests\run_all.ahk"
-				. (TestEntry.interactive ? " --interactive" : "") . " --only "
-				. Chr(34) . TestEntry.name . Chr(34))
+			_TestPrint("#   replay: " . ReplayCommand)
 	}
 	if NotExecuted.Length {
 		_TestPrint("# NOT EXECUTED on this host: " . NotExecuted.Length . " case(s), none counted as passed:")
@@ -1046,8 +1120,26 @@ RunTests() {
 	}
 	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed"
 		. (TEST_NOT_EXECUTED_COUNT ? ", " . TEST_NOT_EXECUTED_COUNT . " not executed" : "") . ".")
-	_CopyTestResultsForCi()
+	_TestResultsPublishOrExit()
 	ExitApp(TEST_FAIL_COUNT > 0 ? 1 : 0)
+}
+
+; Build a PowerShell invocation without interpolating paths or selection values.
+_TestReplayCommand(Interpreter, Entry, Arguments) {
+	if !(Arguments is Array)
+		throw TypeError("Runner replay arguments must be an Array.")
+	if !(Interpreter is String) || Interpreter == "" || !(Entry is String) || Entry == ""
+		throw TypeError("Runner replay requires an interpreter and entry path.")
+	Operands := [Interpreter, Entry]
+	for Argument in Arguments
+		Operands.Push(Argument)
+	Command := "&"
+	for Operand in Operands {
+		if !(Operand is String)
+			throw TypeError("Runner replay operands must be strings.")
+		Command .= " '" . StrReplace(Operand, "'", "''") . "'"
+	}
+	return Command
 }
 
 ; Measure callback wall time without including TAP output or error formatting.
@@ -1070,9 +1162,29 @@ _CopyTestResultsForCi() {
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
 	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL)
 		return
+	FileCopy(TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL, true)
+}
+
+; A canonical publication refusal must terminate standalone runners headlessly.
+_TestResultsPublishOrExit(ErrorOutputFn := unset, ExitFn := unset) {
 	try {
-		if FileExist(TEST_RESULTS_FILE)
-			FileCopy(TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL, true)
+		_CopyTestResultsForCi()
+		return true
+	} catch as Failure {
+		Message := "not ok 0 - FATAL TAP PUBLICATION ERROR: " . Type(Failure)
+			. "|" . Failure.Extra . ": " . Failure.Message . "`r`n"
+		try {
+			if IsSet(ErrorOutputFn)
+				ErrorOutputFn.Call(Message)
+			else
+				FileAppend(Message, "**")
+		} finally {
+			if IsSet(ExitFn)
+				ExitFn.Call(1)
+			else
+				ExitApp(1)
+		}
+		return false
 	}
 }
 

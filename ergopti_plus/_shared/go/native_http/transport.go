@@ -44,6 +44,36 @@ func validNativeFailureStage(stage, reason string) bool {
 		case "unavailable":
 			return true
 		}
+	case "native_proxy_budget":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_proxy_candidates":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_pac_download":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_pac_evaluation":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_proxy_routes":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_wpad_discovery":
+		switch reason {
+		case "unavailable":
+			return true
+		}
 	case "native_proxy_dictionary":
 		switch reason {
 		case "proxy":
@@ -241,8 +271,9 @@ func hostPort(request *url.URL) (string, string) {
 	return host, port
 }
 
-func (p *Policy) direct(request *url.URL, environment map[string]string) bool {
-	host, port := hostPort(request)
+// loopbackName reports whether a normalized host is a loopback DNS name the
+// policy sends straight to the local machine, whatever a resolver answers.
+func (p *Policy) loopbackName(host string) bool {
 	for _, value := range p.Loopback.Hosts {
 		if host == value {
 			return true
@@ -252,6 +283,14 @@ func (p *Policy) direct(request *url.URL, environment map[string]string) bool {
 		if strings.HasSuffix(host, value) && len(host) > len(value) {
 			return true
 		}
+	}
+	return false
+}
+
+func (p *Policy) direct(request *url.URL, environment map[string]string) bool {
+	host, port := hostPort(request)
+	if p.loopbackName(host) {
+		return true
 	}
 	address := net.ParseIP(host)
 	if address != nil {

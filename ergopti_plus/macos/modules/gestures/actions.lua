@@ -43,6 +43,7 @@ local JsonCodec     = require("adapters.json_codec")
 local ChordCatalogue = require("infra.script_chord_catalogue")
 local LOG           = "gestures.actions"
 local Brightness = require("brightness_actions").load()
+local ConfigKeys = require("config_keys")
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
 -- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on the
@@ -159,7 +160,7 @@ end
 
 --- Sends a system-level media or hardware key event.
 --- NX system-defined events are deliberately outside SyntheticInput: they are
---- not keyDown/keyUp events and never enter keymap/keylogger keyboard callbacks.
+--- not keyDown/keyUp events and never enter keymap/keystats keyboard callbacks.
 --- @param key string The hardware key name (e.g. "SOUND_UP").
 local function sysKey(key)
 	local function post_phase(is_down)
@@ -228,10 +229,7 @@ local function defer_key(label, mods, key, delay)
 end
 
 local function url_encode_query(value)
-	value = tostring(value or "")
-	return (value:gsub("[^%w%-%._~]", function(char)
-		return string.format("%%%02X", string.byte(char))
-	end))
+	return text_utils.percent_encode(tostring(value or ""))
 end
 
 local function open_url(url)
@@ -390,30 +388,6 @@ end
 local function sg(name, label_or_fn, fn_arg)
 	local fn = type(fn_arg) == "function" and fn_arg or label_or_fn
 	SG[name] = { fn = fn }
-end
-
---- Calls `method` on a lazily required UI module, logging loudly on a miss.
---- The plain `pcall(function() require(mod).method() end)` shape this replaces
---- collapsed three distinct failures — module absent, method absent, method
---- raised — into the same silent no-op, so four actions stayed dead through a
---- module rename with nothing in the logs to say so.
---- @param mod string Module name to require.
---- @param method string Method to invoke on it.
---- @param ... any Arguments forwarded to the method.
-local function invoke_ui(mod, method, ...)
-	local ok_mod, m = pcall(require, mod)
-	if not ok_mod or type(m) ~= "table" then
-		Logger.error(LOG, "Action target '%s' could not be required — gesture is a no-op.", mod)
-		return
-	end
-	if type(m[method]) ~= "function" then
-		Logger.error(LOG, "Action target '%s' has no '%s' function — gesture is a no-op.", mod, method)
-		return
-	end
-	local ok_call, err = pcall(m[method], ...)
-	if not ok_call then
-		Logger.error(LOG, "Action '%s.%s' raised: %s", mod, method, tostring(err))
-	end
 end
 
 --- Activates the most recently used other application directly.
@@ -1173,10 +1147,10 @@ sg("select_word", text_action("select_word"))
 sg("paste_plain", text_action("paste_as_plain_text"))
 -- The case actions: the two toggles and the three explicit conversions, all
 -- through the shared Unicode table (unicode_case), pinned by the shared corpus.
-sg("uppercase_selection", text_action("toggle_uppercase"))
-sg("titlecase_selection", text_action("toggle_titlecase"))
+sg(ConfigKeys.COMMAND.UPPERCASE_SELECTION, text_action("toggle_uppercase"))
+sg(ConfigKeys.COMMAND.TITLECASE_SELECTION, text_action("toggle_titlecase"))
 sg("selection_uppercase", text_action("selection_uppercase"))
-sg("selection_lowercase", text_action("selection_lowercase"))
+sg(ConfigKeys.COMMAND.SELECTION_LOWERCASE, text_action(ConfigKeys.COMMAND.SELECTION_LOWERCASE))
 sg("selection_titlecase", text_action("selection_titlecase"))
 -- Wraps the current LINE (Cmd+Left, "(", Cmd+Right, ")"), like Windows.
 sg("surround_parens", text_action("surround_with_parens"))
@@ -1495,14 +1469,27 @@ sg("open_app", function(binding)
 end)
 
 -- Applications and Stats
--- These four target the same modules the menu dispatches to (ui/menu/init.lua),
--- which is the reference for the real module names: the metrics overlays were
--- never one "ui.metrics_overlay" module, the hotstring editor is singular, and
--- the paths editor lives behind the menu_paths module rather than a UI module.
-sg("open_metrics_typing",            function() invoke_ui("ui.metrics_typing", "show") end)
-sg("open_metrics_apps",        function() invoke_ui("ui.metrics_apps", "show") end)
-sg("open_hotstrings_editor",    function() invoke_ui("ui.hotstring_editor", "open") end)
-sg("open_paths_editor",            function() invoke_ui("ui.menu.menu_paths", "open_editor") end)
+-- Each window action toggles one page through ui/window_toggle: closed opens
+-- it, covered brings it to the front, focused closes it. The page ids name
+-- the modules the menu dispatches to (ui/menu/init.lua): the metrics overlays
+-- were never one "ui.metrics_overlay" module, the hotstring editor is
+-- singular, and the paths editor lives behind the menu_paths module.
+local WINDOW_ACTIONS = {
+	open_metrics_typing      = "metrics_typing",
+	open_metrics_apps        = "metrics_apps",
+	open_hotstrings_editor   = "hotstring_editor",
+	open_paths_editor        = "paths_editor",
+	open_hotstrings_settings = ConfigKeys.COMMAND.HOTSTRINGS_CONFIG_WINDOW,
+	open_layout_manager      = ConfigKeys.COMMAND.LAYOUT_MANAGER,
+	open_layer_editor        = "layer_editor",
+	open_model_browser       = "model_browser",
+	open_changelog           = "changelog",
+	open_healthcheck         = ConfigKeys.COMMAND.HEALTHCHECK,
+}
+M.WINDOW_ACTIONS = WINDOW_ACTIONS
+for action_id, page in pairs(WINDOW_ACTIONS) do
+	sg(action_id, function() return require("ui.window_toggle").toggle(page) end)
+end
 sg("open_script_source",               function()
 	return AuxOwner.open(hs.configdir, "open script source", nil, current_action_parent())
 end)
@@ -1547,10 +1534,10 @@ end
 sg("open_logs_folder",                function()
 	return require("ui.log_openers").open_logs_folder(gesture_opener("open logs folder"))
 end)
-sg("open_today_log",                   function()
+sg(ConfigKeys.COMMAND.OPEN_TODAY_LOG,                   function()
 	return require("ui.log_openers").open_today_log(gesture_opener("open today's log"))
 end)
-sg("open_error_log",                   function()
+sg(ConfigKeys.COMMAND.OPEN_ERROR_LOG,                   function()
 	return require("ui.log_openers").open_today_errors(gesture_opener("open error log"))
 end)
 
@@ -2265,7 +2252,7 @@ sg("script_quit",                         function()
 	pcall(function() hs.closeConsole() end)
 	-- Leave the gesture/eventtap stack before starting the lifecycle transaction.
 	-- The coordinator keeps every F17 consumer and classifier live until the exact
-	-- token reports STOPPED, then the root teardown owns keylogger/MLX/helpers and
+	-- token reports STOPPED, then the root teardown owns keystats/MLX/helpers and
 	-- finally calls os.exit. Shared stock/personal Karabiner remains untouched.
 	local exit_requested = false
 	local function request_controlled_exit()
@@ -2454,7 +2441,7 @@ function M.validate_action_parameter(action, value)
 	if spec == "llm_language" then return require("modules.llm.selection_translation").is_valid(value) end
 	-- Syntax only: whether the application is installed is checked when it opens
 	if spec == "app" then return AppParameter.is_valid(value) end
-	if spec == "program" then return ProgramParameter.parse(value, "hs") ~= nil end
+	if spec == "program" then return ProgramParameter.parse(value, "posix") ~= nil end
 	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
@@ -2663,7 +2650,7 @@ function M.run_program(binding)
 		local Toml = require("infra.toml.codec")
 		local path = ConfigPaths.get("ConfigTomlPath")
 		local scalar = M.get_action_parameter(binding, "run_program")
-		local parsed = ProgramParameter.parse(scalar, "hs")
+		local parsed = ProgramParameter.parse(scalar, "posix")
 		if not parsed then return false end
 		local function binding_action()
 			if type(_state.ga) == "table" and _state.ga[binding] ~= nil then
@@ -2671,7 +2658,7 @@ function M.run_program(binding)
 			end
 			if binding:match("^script__") then
 				local id = binding:sub(9)
-				return require("modules.shortcuts.script_control").get_shortcut_actions()[id], "script_control", id
+				return require("modules.shortcuts.script_control").get_shortcut_actions()[id], ConfigKeys.LEAF.SCRIPT_CONTROL, id
 			end
 			local descriptors = {
 				{ "keyboard__", "modules.shortcuts.keyboard_shortcuts", "keyboard" },
@@ -3029,8 +3016,12 @@ function M.execute_single(name, binding)
 		end
 		-- The action owns the dispatch whether or not its question could be shown
 		-- (ask logs why not): a fallback provider must never run it unasked.
+		local confirmation_scope = action_scope_lifecycle(parent)
+		local confirmation_epoch = confirmation_scope.epoch
 		ActionConfirm.ask(M.get_label(name), function(acted_from)
-			if not aux_admission_open(parent) then
+			if not aux_admission_open(parent)
+				or action_scope_lifecycle(parent) ~= confirmation_scope
+				or confirmation_scope.epoch ~= confirmation_epoch then
 				Logger.info(LOG, "'%s' was confirmed after its scope was paused — not run.", name)
 				return
 			end

@@ -1,0 +1,17 @@
+# _shared/tests/corpus/config_migrations/op_rename_prefix/input.toml
+
+[gestures.action_parameters]
+# The URL a Cmd+A slot opens.
+keyboard__cmd_a__open_url = "https://example.org/a"
+keyboard__cmd_shift_k__send_text = "signature"
+keyboard__hs_ctrl_space__run_program = "/usr/bin/true"
+keyboard__primary_b__open_url = "https://example.org/b"
+keyboard__physical_none_KeyJ__open_url = "https://example.org/j"
+tap_key__keyboard__cmd_a__send_text = "not a slot parameter"
+keyboard__cmd_ = "the bare prefix"
+
+[gestures.action_parameters.nested]
+keyboard__cmd_z__open_url = "a sub-section is not the section"
+
+[shortcuts.keyboard]
+keyboard__cmd_q = "another section"

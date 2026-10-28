@@ -11,34 +11,46 @@ local helpers = require("tests.helpers")
 local with_changelog = require("tests.support.changelog_fixture").with_changelog
 
 helpers.describe("Changelog Bridge Contract", function()
-	helpers.it("correctly handles open_url messages posted as a native table (F-MED-14)", function()
+	helpers.it("opens a repository release link posted as a native table (F-MED-14)", function()
 		with_changelog(function(changelog, state, post)
-			local builder = package.loaded["ui.ui_builder"]
-			package.loaded["ui.ui_builder"] = nil
-			builder.open_http_url = require("ui.ui_builder").open_http_url
-			package.loaded["ui.ui_builder"] = builder
-			local opened_url
-			hs.urlevent.openURL = function(url) opened_url = url return true end
 			hs.json.decode = function() error("native bridge tables must not be JSON decoded") end
 			helpers.assert_true(changelog.open())
 			helpers.assert_eq(state.creates, 1)
 			local url = "https://github.com/adrienm7/ergopti/releases/tag/v1.0.0"
 			post({ action = "open_url", url = url })
-			helpers.assert_eq(opened_url, url)
-			for _, blocked_url in ipairs({
+			helpers.assert_eq(state.urls[#state.urls], url)
+		end)
+	end)
+
+	helpers.it("refuses and logs every link outside this repository (versions-url-allowlist-macos)", function()
+		with_changelog(function(changelog, state, post)
+			helpers.assert_true(changelog.open())
+			local logged = {}
+			local Logger = package.loaded["infra.logger"]
+			local original_warn = Logger.warn
+			Logger.warn = function(_, fmt, ...) logged[#logged + 1] = string.format(fmt, ...) end
+			for _, refused in ipairs({
 				"shortcuts://run-shortcut?name=fixture",
 				"file:///tmp/fixture",
 				"javascript:alert(1)",
 				"https:///missing-host",
 				"https://safe.example/path\nshortcuts://run-shortcut",
+				"https://example.test/releases",
+				"HtTpS://github.com/adrienm7/ergopti/releases",
+				"http://github.com/adrienm7/ergopti/releases",
+				"https://github.com/adrienm7/ergopti-evil/releases",
+				"https://github.com/someone-else/ergopti/releases",
+				"https://github.com.evil.test/adrienm7/ergopti",
 			}) do
-				opened_url = nil
-				post({ action = "open_url", url = blocked_url })
-				helpers.assert_nil(opened_url, "the real allowlist must reject malformed and non-HTTP URLs")
+				local before = #state.urls
+				post({ action = "open_url", url = refused })
+				helpers.assert_eq(#state.urls, before, "not opened: " .. refused)
 			end
-			local mixed = "HtTpS://example.test/releases"
-			post({ action = "open_url", url = mixed })
-			helpers.assert_eq(opened_url, mixed)
+			post({ action = "open_url" })
+			post({ action = "open_url", url = 42 })
+			Logger.warn = original_warn
+			helpers.assert_eq(#state.urls, 0, "nothing outside the repository reaches the system handler")
+			helpers.assert_eq(#logged, 13, "each refusal is logged")
 		end)
 	end)
 

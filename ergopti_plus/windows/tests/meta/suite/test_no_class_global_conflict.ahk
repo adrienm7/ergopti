@@ -12,8 +12,8 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Regression guard: prevents the specific crash that was triggered by
-;    `global Keylogger` in crash_reporter.ahk conflicting with the
-;    `class Keylogger` definition in keylogger.ahk.
+;    `global Keystats` in crash_reporter.ahk conflicting with the
+;    `class Keystats` definition in keystats.ahk.
 ; 2. Codebase-wide: scans both infra/ and modules/ so new modules are covered
 ;    automatically without updating this file.
 ; ==============================================================================
@@ -105,7 +105,7 @@ _MetaRunClassGlobalConflictTests() {
 			Rel := SubStr(StrReplace(AbsPath, "\", "/"), StrLen(NormRoot) + 1)
 
 			; Strip full-line comments before scanning so that comment text
-			; like "; declaring `global Keylogger` here …" or
+			; like "; declaring `global Keystats` here …" or
 			; "; … the class is not yet initialized" never produces false
 			; positives in the class/global regex passes below.
 			ScanBody := RegExReplace(Body, "m)^\s*;[^\n]*\n?", "")

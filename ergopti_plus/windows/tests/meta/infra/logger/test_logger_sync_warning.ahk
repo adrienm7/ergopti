@@ -3,9 +3,9 @@
 #Requires AutoHotkey v2.0
 
 _LSW_AssertWarningFlushBehavior() {
-	; Move-resilient: locate _LoggerEmit() across the whole driver source via the
+	; Move-resilient: locate _LoggerEmitBody() (the body _LoggerEmit and LoggerEvidence share) across the whole driver source via the
 	; framework helper instead of a pinned lib path
-	EmitBody := _DriverFuncBody("_LoggerEmit")
+	EmitBody := _DriverFuncBody("_LoggerEmitBody")
 
 	; The force flush condition should check for ERROR, not WARNING
 	WarnFlushIdx := InStr(EmitBody, 'LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {`n			_LoggerFlush(true)')

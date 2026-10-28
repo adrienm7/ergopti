@@ -58,6 +58,8 @@ local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 local PythonInterpreter = require("adapters.python_interpreter")
 local NetworkEnv = require("modules.llm.network_env")
 local NetworkAdmission = require("modules.llm.opaque_network_admission")
+local TextUtils = require("text_utils")
+local NativePath = require("native_path")
 
 local LOG = "mlx_deps"
 
@@ -89,7 +91,7 @@ local TIMEOUT_EXIT_CODE = 124
 -- Delay before auto-hiding the progress UI after a successful bootstrap.
 -- Long enough for the user to register "moteur IA prêt", short enough to
 -- not feel laggy.
-local SUCCESS_AUTO_HIDE_SEC = 1.5
+local SUCCESS_AUTO_HIDE_SEC = Timings.sec("tooltip", "success_banner_autohide_ms")
 local BOOTSTRAP_TIMEOUT_SEC = Timings.sec("llm", "dependency_bootstrap_timeout_ms")
 
 -- Keep UI hidden until the script proves a real sync is running by emitting
@@ -153,7 +155,10 @@ local _active_tasks = {}
 -- Exact backend-local native owners. Timer candidates remain reachable even
 -- when activation or cancellation refuses, and the task descriptor survives
 -- until its one native terminal callback proves process settlement.
-local _owned_timers = { initial = nil, hide = nil, deadline = nil }
+-- The bootstrap's named timers (initial, hide, deadline), owned from request
+-- to native settlement by the shared slots (_shared/lua/owned_timer_slots.lua).
+local _timers = require("owned_timer_slots").new({ scheduler = TimerScheduler, logger = Logger, log = LOG })
+local _owned_timers = _timers.slots
 local _task_owner = nil
 -- A failed receipt rollback remains owned even before a native task exists.
 local _native_pty_preflight_owner = nil
@@ -276,7 +281,7 @@ function M.owned_venv_dir()
 	for segment in venv:gmatch("[^/]+") do
 		if segment == "." or segment == ".." then return nil, "relative segment" end
 	end
-	local leaf = venv:match("([^/]+)$")
+	local leaf = NativePath.basename(venv)
 	if leaf ~= "mlx-venv" and leaf ~= ".venv" then return nil, "unexpected folder name" end
 	local probed, mode = pcall(hs.fs.symlinkAttributes, venv, "mode")
 	if not probed then return nil, "link state unreadable" end
@@ -289,8 +294,7 @@ end
 --- @param value string Raw string.
 --- @return string quoted Shell-safe quoted string.
 local function shell_quote(value)
-	local s = tostring(value or "")
-	return "'" .. s:gsub("'", "'\\''") .. "'"
+	return TextUtils.shell_quote(value or "")
 end
 
 
@@ -494,9 +498,9 @@ end
 
 local function make_streaming_handler(is_current, record_output)
 	is_current = type(is_current) == "function" and is_current or function() return true end
-	-- Per-marker dedupe: stdout is line-buffered but each marker may arrive
-	-- multiple times across chunks; we want exactly one transition each.
+	-- Each marker may repeat, but only its first complete line transitions UI.
 	local shown = {}
+	local frame_output = require("modules.llm.bootstrap_output").new()
 	-- Query the shared surface before every claim. An already visible window
 	-- may belong to a model download or the sibling backend and is never ours
 	-- merely because this task produced a progress marker.
@@ -507,11 +511,12 @@ local function make_streaming_handler(is_current, record_output)
 		return not ok or visible == true
 	end
 
-	return function(_, stdout_chunk, stderr_chunk)
+	return function(_, stdout_chunk, stderr_chunk, terminal)
 		if not is_current() then return false end
 		-- The completion receives only what this callback did not take: the
 		-- failure's cause must be kept here or it is gone.
 		if type(record_output) == "function" then record_output(stdout_chunk, stderr_chunk) end
+		stdout_chunk, stderr_chunk = frame_output(stdout_chunk, stderr_chunk, terminal)
 		-- Forward stderr (uv's verbose output) so the live log AND the
 		-- progress UI's detail line both reflect real-time progress.
 		if not forward_chunk(stderr_chunk, is_current, owns_window) then return false end
@@ -604,200 +609,7 @@ end
 -- ==========================================
 -- ==========================================
 
---- Arms and retains one exact backend-local timer.
---- @param slot string Timer slot name.
---- @param delay_sec number Delay in seconds.
---- @param callback function Authorized user callback.
---- @param label string Diagnostic label.
---- @return boolean committed
-local function arm_owned_timer(slot, delay_sec, callback, label)
-	local prior = _owned_timers[slot]
-	if type(prior) == "table" and prior.settled ~= true then
-		Logger.error(LOG, "%s timer acquisition refused while its predecessor remains owned.", label)
-		return false
-	end
-	local owner = {
-		acquiring = true,
-		cancel_requested = false,
-		acquisition_valid = false,
-		delivery_requested = false,
-		delivery_seen = false,
-		delivery_during_acquisition = false,
-		native_settled = false,
-		observer_attached = false,
-		settled = false,
-		handle = nil,
-		settlement_callbacks = {},
-	}
-	-- Publish identity before crossing TimerScheduler.after(): native start may
-	-- synchronously re-enter ScriptControl PAUSE before the handle is returned.
-	_owned_timers[slot] = owner
-	local release_owner
-	local deliver_owner
-	local observe_owner
-	release_owner = function()
-		if owner.settled == true then return false end
-		owner.settled = true
-		if _owned_timers[slot] == owner then _owned_timers[slot] = nil end
-		local callbacks = owner.settlement_callbacks
-		owner.settlement_callbacks = {}
-		for _, settled_callback in ipairs(callbacks) do
-			local callback_ok, callback_error = xpcall(settled_callback, debug.traceback)
-			if callback_ok ~= true then
-				Logger.error(LOG, "%s timer settlement callback failed: %s.",
-					label, tostring(callback_error))
-			end
-		end
-		return true
-	end
-	observe_owner = function()
-		if owner.settled == true or owner.observer_attached == true then return true end
-		local handle = owner.handle
-		if type(handle) ~= "table" or handle.timer == nil then
-			owner.native_settled = true
-			if owner.delivery_requested == true then
-				return deliver_owner()
-			end
-			if owner.cancel_requested == true or owner.acquisition_valid ~= true then
-				release_owner()
-			end
-			return true
-		end
-		-- Publish observer ownership before registration because onSettled may
-		-- synchronously call back for an already-settled native handle.
-		owner.observer_attached = true
-		local observed_ok, observed = xpcall(function()
-			return TimerScheduler.onSettled(handle, function()
-				owner.observer_attached = false
-				owner.native_settled = true
-				if owner.delivery_requested == true then
-					deliver_owner()
-				elseif owner.cancel_requested == true or owner.acquisition_valid ~= true then
-					release_owner()
-				end
-			end)
-		end, debug.traceback)
-		if not observed_ok or observed ~= true then
-			owner.observer_attached = false
-			Logger.error(LOG, "%s timer settlement observer refused: %s.",
-				label, tostring(observed_ok and observed or observed))
-			return false
-		end
-		return true
-	end
-	deliver_owner = function()
-		if owner.delivery_seen == true or owner.settled == true then return false end
-		owner.delivery_requested = true
-		if owner.acquiring == true then
-			owner.delivery_during_acquisition = true
-			return false
-		end
-		local handle = owner.handle
-		if type(handle) == "table" and handle.timer ~= nil then
-			observe_owner()
-			return false
-		end
-		owner.native_settled = true
-		local authorized = owner.acquisition_valid == true
-			and owner.cancel_requested ~= true
-			and _owned_timers[slot] == owner
-		owner.delivery_seen = true
-		release_owner()
-		if not authorized then return false end
-		callback()
-		return true
-	end
-	local candidate
-	local ok, handle_or_error, committed = xpcall(function()
-		return TimerScheduler.after(delay_sec, function()
-			deliver_owner()
-		end)
-	end, debug.traceback)
-	if ok and type(handle_or_error) == "table" then candidate = handle_or_error end
-	owner.handle = candidate
-	owner.acquiring = false
-	if ok and committed == true and type(candidate) == "table"
-		and candidate.timer ~= nil and owner.delivery_during_acquisition ~= true
-		and owner.cancel_requested ~= true
-		and _owned_timers[slot] == owner then
-		owner.acquisition_valid = true
-		observe_owner()
-		return true
-	end
-	owner.acquisition_valid = false
-	owner.cancel_requested = true
-	if type(candidate) == "table" and candidate.timer ~= nil then
-		local cancel_ok, settled = xpcall(function()
-			return TimerScheduler.cancel(candidate)
-		end, debug.traceback)
-		if cancel_ok and settled == true then
-			owner.native_settled = true
-			release_owner()
-		else
-			observe_owner()
-		end
-	else
-		owner.native_settled = true
-		release_owner()
-	end
-	Logger.error(LOG, "%s timer acquisition refused: %s.",
-		label, tostring(ok and committed or handle_or_error))
-	return false
-end
-
---- Cancels one exact timer without dropping refused native cleanup debt.
---- @param slot string Timer slot name.
---- @param label string Diagnostic label.
---- @return boolean settled
-local function cancel_owned_timer(slot, label)
-	local owner = _owned_timers[slot]
-	if type(owner) == "table" and owner.acquiring == true then
-		owner.cancel_requested = true
-		owner.acquisition_valid = false
-		Logger.debug(LOG, "%s timer cancellation joined an in-flight acquisition.", label)
-		return false
-	end
-	if type(owner) ~= "table" or owner.settled == true then
-		_owned_timers[slot] = nil
-		return true
-	end
-	owner.cancel_requested = true
-	owner.acquisition_valid = false
-	local handle = owner.handle
-	if type(handle) ~= "table" or handle.timer == nil then
-		owner.native_settled = true
-		owner.settled = true
-		if _owned_timers[slot] == owner then _owned_timers[slot] = nil end
-		return true
-	end
-	local ok, settled_or_error = xpcall(function()
-		return TimerScheduler.cancel(handle)
-	end, debug.traceback)
-	if ok and settled_or_error == true then
-		owner.native_settled = true
-		owner.settled = true
-		if _owned_timers[slot] == owner then _owned_timers[slot] = nil end
-		return true
-	end
-	Logger.error(LOG, "%s timer cancellation refused; exact handle retained: %s.",
-		label, tostring(settled_or_error))
-	return false
-end
-
---- Registers one continuation behind an exact timer settlement.
---- @param slot string Timer slot name.
---- @param callback function Continuation invoked after native settlement.
---- @return boolean registered
-local function when_owned_timer_settled(slot, callback)
-	local owner = _owned_timers[slot]
-	if type(callback) ~= "function" then return false end
-	if type(owner) ~= "table" or owner.settled == true then
-		callback()
-		return true
-	end
-	owner.settlement_callbacks[#owner.settlement_callbacks + 1] = callback
-	return true
-end
+local arm_owned_timer, cancel_owned_timer, when_owned_timer_settled = _timers.arm, _timers.cancel, _timers.when_settled
 
 --- Releases one exact task only from its first native terminal delivery.
 --- @param owner table Task lifecycle descriptor.
@@ -1315,12 +1127,9 @@ function M.check_and_install_deps(on_complete, replay_token)
 	local consume_stream = make_streaming_handler(owner_is_current, record_output)
 	local function process_terminal(exit_code, stdout, stderr)
 		-- Completion callback: fires when the process exits
-		record_output(stdout, stderr)
-
 		-- Final pass: forward any residual lines the streaming callback may
 		-- have missed if the task ended before its final flush.
-		if not forward_chunk(stdout or "", owner_is_current, owns_window) then return false end
-		if not forward_chunk(stderr or "", owner_is_current, owns_window) then return false end
+		if not consume_stream(nil, stdout, stderr, true) then return false end
 
 		local ran_real_sync = chunk_marked_real_sync(stdout or "")
 

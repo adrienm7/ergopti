@@ -115,7 +115,7 @@ end
 --- @return boolean valid
 local function remap_init_returns_are_literal(body)
 	local returns, balanced = direct_init_returns(body)
-	if not balanced or #returns ~= 8 then return false end
+	if not balanced or #returns ~= 9 then return false end
 	local false_returns = 0
 	local true_returns = 0
 	for _, statement in ipairs(returns) do
@@ -123,7 +123,7 @@ local function remap_init_returns_are_literal(body)
 		if statement == "return true" then true_returns = true_returns + 1 end
 		if statement ~= "return false" and statement ~= "return true" then return false end
 	end
-	return false_returns == 7 and true_returns == 1
+	return false_returns == 8 and true_returns == 1
 end
 
 -- Mutation-sensitive regressions

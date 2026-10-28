@@ -36,6 +36,8 @@ local Timings = require("infra.timings")
 local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owner")
 local PtyProcessGroup = require("modules.llm.pty_process_group")
 local PythonInterpreter = require("adapters.python_interpreter")
+local ExitSignal = require("modules.llm.bootstrap_exit_signal")
+local DevSource = require("infra.dev_source")
 
 local LOG = "ollama_deps"
 
@@ -62,6 +64,21 @@ local FAILURE_MESSAGES = {
 	OLLAMA_ERROR_CHECKSUM = "ollama.error_checksum",
 }
 
+-- Exit codes that carry a closed cause without printing a marker. 64 (EX_USAGE)
+-- is the launcher's managed PTY worker or the managed runtime receiver refusing
+-- the installer request Ergopti built; 78 (EX_CONFIG) is the pinned runtime's
+-- catalogue or admission refusing it. Both used to reach the user as
+-- "Unknown error" (issue #104).
+local EXIT_FAILURE_MESSAGES = {
+	[64] = "ollama.error_installer_refused",
+	[78] = "ollama.error_runtime_refused",
+}
+
+-- The line modules/llm/managed_ollama_runtime.py prints before exit 78 when no
+-- managed catalogue is staged. It stays an ordinary output line, so the failure
+-- evidence keeps naming it; it only selects the words a developer app shows.
+local LINE_CATALOGUE_MISSING = "OLLAMA_MANAGED_CATALOGUE_MISSING"
+
 local KNOWN_MARKERS = {
 	[MARKER_INSTALLING] = true,
 	[MARKER_VERIFIED]   = true,
@@ -71,7 +88,9 @@ local KNOWN_MARKERS = {
 for marker, _ in pairs(FAILURE_MESSAGES) do KNOWN_MARKERS[marker] = true end
 
 local FAILURE_TAIL_CHARS    = 280
-local SUCCESS_AUTO_HIDE_SEC = 1.5
+-- Output lines a failed bootstrap logs, so the log names where it stopped.
+local FAILURE_LOG_LINES     = 12
+local SUCCESS_AUTO_HIDE_SEC = Timings.sec("tooltip", "success_banner_autohide_ms")
 local BOOTSTRAP_TIMEOUT_SEC = Timings.sec("llm", "dependency_bootstrap_timeout_ms")
 
 -- "pending" until the first check, "ready" once an executable is provisioned,
@@ -96,7 +115,10 @@ local _observed_failure_marker = nil
 -- recognised by tests/meta/lua_safety/test_gc_retention.lua; released in the callback.
 local _active_tasks = {}
 
-local _owned_timers = { initial = nil, hide = nil, deadline = nil }
+-- The bootstrap's named timers (initial, hide, deadline), owned from request
+-- to native settlement by the shared slots (_shared/lua/owned_timer_slots.lua).
+local _timers = require("owned_timer_slots").new({ scheduler = TimerScheduler, logger = Logger, log = LOG })
+local _owned_timers = _timers.slots
 local _task_owner = nil
 local _resume_intent = nil
 local _pending_callbacks = {}
@@ -186,6 +208,22 @@ local function forward_chunk(chunk, is_current, owns_ui)
 	return true
 end
 
+--- Names the real cause of a missing catalogue in a developer app.
+--- A built app seals its catalogue, so there a missing one stays a refused
+--- pinned runtime. A developer app (infra/dev_source.lua) builds it from the
+--- clone's pinned sources (tools/dev/stage-macos-dev-ollama-catalogue.py): a
+--- missing one means that build has not succeeded, not a failed integrity check.
+--- @param exit_code integer Installer exit status.
+--- @param lines table Last output lines, oldest first.
+--- @return string|nil key Locale key, or nil when another cause applies.
+local function developer_catalogue_failure(exit_code, lines)
+	if exit_code ~= 78 or not DevSource.is_active() then return nil end
+	for _, line in ipairs(lines) do
+		if line == LINE_CATALOGUE_MISSING then return "ollama.error_dev_catalogue_missing" end
+	end
+	return nil
+end
+
 local function tail_for_error(s)
 	if type(s) ~= "string" or s == "" then return "" end
 	local n = #s
@@ -253,9 +291,11 @@ local function make_streaming_handler(is_current)
 	is_current = type(is_current) == "function" and is_current or function() return true end
 	local shown    = {}
 	local ui_shown = false
+	local frame_output = require("modules.llm.bootstrap_output").new()
 
-	return function(_, stdout_chunk, stderr_chunk)
+	return function(_, stdout_chunk, stderr_chunk, terminal)
 		if not is_current() then return false end
+		stdout_chunk, stderr_chunk = frame_output(stdout_chunk, stderr_chunk, terminal)
 		if not forward_chunk(stderr_chunk, is_current, owns_window) then return false end
 		if not forward_chunk(stdout_chunk, is_current, owns_window) then return false end
 
@@ -310,188 +350,7 @@ end
 -- ==========================================
 -- ==========================================
 
-local function arm_owned_timer(slot, delay_sec, callback, label)
-	local prior = _owned_timers[slot]
-	if type(prior) == "table" and prior.settled ~= true then
-		Logger.error(LOG, "%s timer acquisition refused while its predecessor remains owned.", label)
-		return false
-	end
-	local owner = {
-		acquiring = true,
-		cancel_requested = false,
-		acquisition_valid = false,
-		delivery_requested = false,
-		delivery_seen = false,
-		delivery_during_acquisition = false,
-		native_settled = false,
-		observer_attached = false,
-		settled = false,
-		handle = nil,
-		settlement_callbacks = {},
-	}
-	-- Publish identity before crossing TimerScheduler.after(): native start may
-	-- synchronously re-enter ScriptControl PAUSE before the handle is returned.
-	_owned_timers[slot] = owner
-	local release_owner
-	local deliver_owner
-	local observe_owner
-	release_owner = function()
-		if owner.settled == true then return false end
-		owner.settled = true
-		if _owned_timers[slot] == owner then _owned_timers[slot] = nil end
-		local callbacks = owner.settlement_callbacks
-		owner.settlement_callbacks = {}
-		for _, settled_callback in ipairs(callbacks) do
-			local callback_ok, callback_error = xpcall(settled_callback, debug.traceback)
-			if callback_ok ~= true then
-				Logger.error(LOG, "%s timer settlement callback failed: %s.",
-					label, tostring(callback_error))
-			end
-		end
-		return true
-	end
-	observe_owner = function()
-		if owner.settled == true or owner.observer_attached == true then return true end
-		local handle = owner.handle
-		if type(handle) ~= "table" or handle.timer == nil then
-			owner.native_settled = true
-			if owner.delivery_requested == true then
-				return deliver_owner()
-			end
-			if owner.cancel_requested == true or owner.acquisition_valid ~= true then
-				release_owner()
-			end
-			return true
-		end
-		owner.observer_attached = true
-		local observed_ok, observed = xpcall(function()
-			return TimerScheduler.onSettled(handle, function()
-				owner.observer_attached = false
-				owner.native_settled = true
-				if owner.delivery_requested == true then
-					deliver_owner()
-				elseif owner.cancel_requested == true or owner.acquisition_valid ~= true then
-					release_owner()
-				end
-			end)
-		end, debug.traceback)
-		if not observed_ok or observed ~= true then
-			owner.observer_attached = false
-			Logger.error(LOG, "%s timer settlement observer refused: %s.",
-				label, tostring(observed_ok and observed or observed))
-			return false
-		end
-		return true
-	end
-	deliver_owner = function()
-		if owner.delivery_seen == true or owner.settled == true then return false end
-		owner.delivery_requested = true
-		if owner.acquiring == true then
-			owner.delivery_during_acquisition = true
-			return false
-		end
-		local handle = owner.handle
-		if type(handle) == "table" and handle.timer ~= nil then
-			observe_owner()
-			return false
-		end
-		owner.native_settled = true
-		local authorized = owner.acquisition_valid == true
-			and owner.cancel_requested ~= true
-			and _owned_timers[slot] == owner
-		owner.delivery_seen = true
-		release_owner()
-		if not authorized then return false end
-		callback()
-		return true
-	end
-	local candidate
-	local ok, handle_or_error, committed = xpcall(function()
-		return TimerScheduler.after(delay_sec, function()
-			deliver_owner()
-		end)
-	end, debug.traceback)
-	if ok and type(handle_or_error) == "table" then candidate = handle_or_error end
-	owner.handle = candidate
-	owner.acquiring = false
-	if ok and committed == true and type(candidate) == "table"
-		and candidate.timer ~= nil and owner.delivery_during_acquisition ~= true
-		and owner.cancel_requested ~= true
-		and _owned_timers[slot] == owner then
-		owner.acquisition_valid = true
-		observe_owner()
-		return true
-	end
-	owner.acquisition_valid = false
-	owner.cancel_requested = true
-	if type(candidate) == "table" and candidate.timer ~= nil then
-		local cancel_ok, settled = xpcall(function()
-			return TimerScheduler.cancel(candidate)
-		end, debug.traceback)
-		if cancel_ok and settled == true then
-			owner.native_settled = true
-			release_owner()
-		else
-			observe_owner()
-		end
-	else
-		owner.native_settled = true
-		release_owner()
-	end
-	Logger.error(LOG, "%s timer acquisition refused: %s.",
-		label, tostring(ok and committed or handle_or_error))
-	return false
-end
-
-local function cancel_owned_timer(slot, label)
-	local owner = _owned_timers[slot]
-	if type(owner) == "table" and owner.acquiring == true then
-		owner.cancel_requested = true
-		owner.acquisition_valid = false
-		Logger.debug(LOG, "%s timer cancellation joined an in-flight acquisition.", label)
-		return false
-	end
-	if type(owner) ~= "table" or owner.settled == true then
-		_owned_timers[slot] = nil
-		return true
-	end
-	owner.cancel_requested = true
-	owner.acquisition_valid = false
-	local handle = owner.handle
-	if type(handle) ~= "table" or handle.timer == nil then
-		owner.native_settled = true
-		owner.settled = true
-		if _owned_timers[slot] == owner then _owned_timers[slot] = nil end
-		return true
-	end
-	local ok, settled_or_error = xpcall(function()
-		return TimerScheduler.cancel(handle)
-	end, debug.traceback)
-	if ok and settled_or_error == true then
-		owner.native_settled = true
-		owner.settled = true
-		if _owned_timers[slot] == owner then _owned_timers[slot] = nil end
-		return true
-	end
-	Logger.error(LOG, "%s timer cancellation refused; exact handle retained: %s.",
-		label, tostring(settled_or_error))
-	return false
-end
-
---- Registers one continuation behind an exact timer settlement.
---- @param slot string Timer slot name.
---- @param callback function Continuation invoked after native settlement.
---- @return boolean registered
-local function when_owned_timer_settled(slot, callback)
-	local owner = _owned_timers[slot]
-	if type(callback) ~= "function" then return false end
-	if type(owner) ~= "table" or owner.settled == true then
-		callback()
-		return true
-	end
-	owner.settlement_callbacks[#owner.settlement_callbacks + 1] = callback
-	return true
-end
+local arm_owned_timer, cancel_owned_timer, when_owned_timer_settled = _timers.arm, _timers.cancel, _timers.when_settled
 
 local function release_task_owner(owner)
 	if type(owner) ~= "table" or owner.settled == true then return false end
@@ -897,17 +756,43 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 	end
 	local diagnostic_tail = require("modules.llm.mlx_bootstrap_diagnosis").new_tail({ markers = KNOWN_MARKERS })
 	local forward_stream = make_streaming_handler(owner_is_current)
+	-- Bytes received per stream and per channel: a failure with none at all
+	-- proves the output never reached the driver, not that nothing printed.
+	local received = { streamed_stdout = 0, streamed_stderr = 0, final_stdout = 0, final_stderr = 0 }
+	local function count_bytes(prefix, stdout, stderr)
+		received[prefix .. "_stdout"] = received[prefix .. "_stdout"] + (type(stdout) == "string" and #stdout or 0)
+		received[prefix .. "_stderr"] = received[prefix .. "_stderr"] + (type(stderr) == "string" and #stderr or 0)
+	end
 	local function consume_stream(native_task, stdout, stderr)
 		if not owner_is_current() then return false end
+		count_bytes("streamed", stdout, stderr)
 		diagnostic_tail.push(stdout, "stdout")
 		diagnostic_tail.push(stderr, "stderr")
 		return forward_stream(native_task, stdout, stderr)
 	end
+	--- Logs the evidence of one failed bootstrap: the signal behind a 128 + N
+	--- status, the bytes each stream delivered and the last output lines,
+	--- where the installer names the stage it reached and the failing child.
+	--- @param exit_code integer Exit status reported to the task callback.
+	--- @param signal_name string|nil Signal behind the status.
+	local function log_failure_evidence(exit_code, signal_name)
+		local lines = diagnostic_tail.lines()
+		local first = math.max(1, #lines - FAILURE_LOG_LINES + 1)
+		local kept = {}
+		for index = first, #lines do kept[#kept + 1] = lines[index] end
+		Logger.error(LOG,
+			"Ollama bootstrap ended with exit=%d (%s, path=%s); output received: streamed stdout=%d stderr=%d bytes, final stdout=%d stderr=%d bytes; last %d line(s): %s",
+			tonumber(exit_code) or -1,
+			signal_name and ("signal " .. signal_name) or "no signal",
+			native_choice ~= nil and "native_runtime_pty" or (native_pty ~= nil and "native_pty" or "python_pty"),
+			received.streamed_stdout, received.streamed_stderr, received.final_stdout, received.final_stderr,
+			#kept, #kept > 0 and table.concat(kept, " | ") or "none")
+	end
 	local function process_terminal(exit_code, stdout, stderr)
+		count_bytes("final", stdout, stderr)
 		diagnostic_tail.push(stdout, "stdout")
 		diagnostic_tail.push(stderr, "stderr")
-		if not forward_chunk(stdout or "", owner_is_current, owns_window) then return false end
-		if not forward_chunk(stderr or "", owner_is_current, owns_window) then return false end
+		if not forward_stream(nil, stdout, stderr, true) then return false end
 
 		local function publish_failure(message, failure_code, failure_domain)
 			if not owner_is_current() then return false end
@@ -954,8 +839,17 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 		end
 
 		if exit_code ~= 0 then
+			local signal_name = ExitSignal.name(exit_code)
+			log_failure_evidence(exit_code, signal_name)
 			local failure_key = FAILURE_MESSAGES[_observed_failure_marker or ""]
+				or developer_catalogue_failure(exit_code, diagnostic_tail.lines())
+				or EXIT_FAILURE_MESSAGES[exit_code]
 			if failure_key then return publish_failure(i18n.get(failure_key), exit_code) end
+			-- A signalled installer prints no cause of its own: name the signal
+			-- instead of its last line, which only says how far it got.
+			if signal_name then
+				return publish_failure(i18n.format("ollama.error_killed", signal_name), exit_code)
+			end
 			local tail = tail_for_error(table.concat(diagnostic_tail.lines(), "\n"))
 			if tail == "" then
 				tail = i18n.get("download_window.error_unknown")

@@ -9,9 +9,11 @@
 
 local M = {}
 local Json = require("json")
+local TableUtil = require("table_util")
 
 local KINDS = { object = true, array = true, enum = true, boolean = true, number = true, integer = true,
-	version = true, hash = true, utc = true, commit = true, runtime = true, setting_row = true }
+	version = true, hash = true, utc = true, commit = true, runtime = true, setting_row = true,
+	platform_name = true }
 
 -- The value grammar of one configuration row, by its type. A path or a sentence
 -- matches none of them: an enum is a bare identifier, a text or a list only a
@@ -92,6 +94,16 @@ local function project(value, rule)
 				end
 			end end
 		end
+		-- An operating system or desktop name from the host: one of the rule's known
+		-- families, then a closed set of name characters. A path, an address, a
+		-- sentence or a name that is not listed never matches.
+		if rule.kind == "platform_name" and #value <= 64 then
+			for _, family in ipairs(rule.families) do
+				local rest = value:sub(#family + 1)
+				if value:sub(1, #family):lower() == family:lower() and rest:match("^[%w %.%+/:(),!%-]*$")
+					and not rest:sub(1, 1):match("%a") then return value end
+			end
+		end
 		if rule.kind == "hash" and #value >= 7 and #value <= 64 and value:match("^[%da-fA-F]+$") then return value end
 		if rule.kind == "utc" and (value:match("^%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%dZ$")
 			or value:match("^%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%d%.%d+Z$") and #value <= 30) then return value end
@@ -162,13 +174,18 @@ end
 --- Returns a detached technical projection; no callback or native authority is exported.
 --- @param snapshot table Host-retained snapshot.
 --- @param schema table Canonical diagnostics schema.
+--- @param with_day_log boolean|nil True when the action also saves the opt-in day
+---   log: its closed record (included, bytes, lines) is then part of the report.
 --- @return table
-function M.snapshot(snapshot, schema)
+function M.snapshot(snapshot, schema, with_day_log)
 	assert(type(schema.share_policy) == "table" and schema.share_policy.version == 1,
 		"Diagnostic sharing policy unavailable")
 	assert(type(snapshot) == "table" and (snapshot.driver == "macos" or snapshot.driver == "linux"
 		or snapshot.driver == "windows"), "Diagnostic sharing identity unavailable")
 	local safe = project(snapshot, schema.share_policy.projection)
+	if not with_day_log then safe.day_log_attachment = nil end
+	assert(not with_day_log or safe.day_log_attachment ~= nil,
+		"The day log was asked for but the snapshot holds no record of it")
 	local sections = type(snapshot.sections) == "table" and snapshot.sections or {}
 	local issues = sections.issues
 	if type(issues) == "table" then
@@ -224,10 +241,7 @@ end
 
 local function rows_for(value, rule, prefix, rows)
 	if rule.kind == "object" then
-		local keys = {}
-		for key in pairs(value) do keys[#keys + 1] = key end
-		table.sort(keys)
-		for _, key in ipairs(keys) do
+		for _, key in ipairs(TableUtil.sorted_keys(value)) do
 			rows_for(value[key], rule.fields[key], prefix == "" and key or prefix .. "." .. key, rows)
 		end
 	elseif rule.kind == "array" then
@@ -266,9 +280,7 @@ local function readable(safe, schema)
 	for _, section in ipairs(schema.sections) do
 		local data = safe.sections and safe.sections[section.id]
 		if data then
-			rows, keys = {}, {}
-			for key in pairs(data) do keys[#keys + 1] = key end
-			table.sort(keys)
+			rows, keys = {}, TableUtil.sorted_keys(data)
 			for _, key in ipairs(keys) do
 				local label = key
 				for _, field in ipairs(section.fields or {}) do
@@ -287,26 +299,72 @@ local function readable(safe, schema)
 	return table.concat(lines, "\n")
 end
 
+-- The operating-system name each driver is shown as when its version is unknown
+local OS_NAMES = { macos = "macOS", windows = "Windows", linux = "Linux" }
+-- The session name shown for a display server
+local SESSION_NAMES = { wayland = "Wayland", x11 = "X11" }
+
+--- The version the issue form shows. A source run has no release version (the
+--- host reports "local"), so it is named by its commit: a true statement, where
+--- "unknown" would be false.
+--- @param safe table The projected snapshot.
+--- @param snapshot table The host snapshot, for the commit origin only.
+--- @return string
+local function form_version(safe, snapshot)
+	local versions = safe.sections and safe.sections.versions or {}
+	if versions.ergopti_version then return versions.ergopti_version end
+	local raw = type(snapshot.sections) == "table" and snapshot.sections.versions or {}
+	local from_git = type(raw.commit) == "string" and raw.commit:match(" %(git%)$") ~= nil
+	if raw.ergopti_version == "local" or from_git then
+		return "dev source" .. (versions.commit and " " .. versions.commit or "")
+	end
+	return "unknown"
+end
+
+--- The operating system the issue form shows: the name and version the host
+--- reported, then the desktop, the session and the architecture when known.
+--- @param safe table The projected snapshot.
+--- @return string
+local function form_os(safe)
+	local sections = safe.sections or {}
+	local system = sections.system or {}
+	local details = {}
+	if system.desktop then details[#details + 1] = system.desktop end
+	if system.display_server and SESSION_NAMES[system.display_server] then
+		details[#details + 1] = SESSION_NAMES[system.display_server]
+	end
+	if sections.hardware and sections.hardware.arch and sections.hardware.arch ~= "unknown" then
+		details[#details + 1] = sections.hardware.arch
+	end
+	local name = system.os or ((OS_NAMES[safe.driver] or safe.driver) .. " (version unknown)")
+	return name .. (#details > 0 and " (" .. table.concat(details, ", ") .. ")" or "")
+end
+
 --- Builds clipboard, file and issue-form content exclusively from the host snapshot.
 --- @param snapshot table Host-retained snapshot.
 --- @param schema table Canonical diagnostics schema.
 --- @param notice string Localized privacy notice from the driver's catalogue.
---- @return table { text, fields, name, snapshot }
-function M.document(snapshot, schema, notice)
-	local safe = M.snapshot(snapshot, schema)
+--- @param with_day_log boolean|nil See M.snapshot.
+--- @return table { text, fields, notes, name, snapshot }; fields.diagnostics is the
+---   compact report (tables, no JSON block) the issue form is prefilled with
+function M.document(snapshot, schema, notice, with_day_log)
+	local safe = M.snapshot(snapshot, schema, with_day_log)
 	notice = schema.export_strings and schema.export_strings[schema.share_policy.notice_key]
 	assert(type(notice) == "string" and notice ~= "", "English export notice unavailable")
+	local truncated = schema.export_strings and schema.export_strings[schema.share_policy.truncated_note_key]
+	assert(type(truncated) == "string" and truncated ~= "", "English export truncation note unavailable")
 	local versions = safe.sections and safe.sections.versions or {}
 	local stamp = safe.generated_at or "unknown"
+	local head = "# ErgoptiPlus diagnostics\n\n" .. notice
+		.. "\n\ndriver-suites: not_run\npage-model-checks: " .. (safe.page_check_observations and "installed_page_reported (unqualified)" or "not_collected") .. "\n\n" .. readable(safe, schema)
 	return {
 		snapshot = safe,
 		summary = "A diagnostic attachment was saved locally. Attach that file here after reviewing it; no attachment is uploaded automatically.\n"
 			.. "Driver: " .. safe.driver .. "\nVersion: " .. (versions.ergopti_version or "unknown")
 			.. "\nCommit: " .. (versions.commit or "unknown") .. "\nDriver suites: NOT_RUN",
-		text = "# ErgoptiPlus diagnostics\n\n" .. notice
-			.. "\n\ndriver-suites: not_run\npage-model-checks: " .. (safe.page_check_observations and "installed_page_reported (unqualified)" or "not_collected") .. "\n\n" .. readable(safe, schema)
-			.. "\n```json\n" .. Json.encode(safe) .. "\n```\n",
-		fields = { driver = safe.driver, version = versions.ergopti_version or "unknown", os = safe.driver },
+		text = head .. "\n```json\n" .. Json.encode(safe) .. "\n```\n",
+		fields = { driver = safe.driver, version = form_version(safe, snapshot), os = form_os(safe), diagnostics = head },
+		notes = { diagnostics = truncated },
 		name = schema.report.name_prefix .. safe.driver .. "-" .. stamp:gsub("[^%w.-]", "_") .. schema.report.name_suffix,
 	}
 end

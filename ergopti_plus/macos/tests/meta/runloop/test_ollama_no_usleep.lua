@@ -10,9 +10,9 @@
 --- A synchronous polling loop called hs.timer.usleep(200 * 1000) up to 20 times
 --- to wait for the Ollama API to become ready. Lua runs on Hammerspoon's main
 --- thread — any usleep call blocks the entire event loop, freezing the UI and
---- suspending all hs.eventtap callbacks (keylogger, hotstrings). A suspension
+--- suspending all hs.eventtap callbacks (keystats, hotstrings). A suspension
 --- longer than macOS's watchdog threshold permanently disables the input tap,
---- breaking the keylogger until the next full Hammerspoon reload.
+--- breaking the keystats until the next full Hammerspoon reload.
 ---
 --- The fix: no readiness shell operation runs on the Lua thread. ShellRunner
 --- owns curl/restart processes and TimerScheduler owns every retry boundary;

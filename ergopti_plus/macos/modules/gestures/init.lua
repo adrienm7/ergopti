@@ -44,6 +44,8 @@ local touchdevice = load_touchdevice_module()
 local Engine    = require("modules.gestures.engine")
 local Actions   = require("modules.gestures.actions")
 local Conflicts = require("modules.gestures.conflicts")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 
 
@@ -141,11 +143,14 @@ end
 M.DEFAULT_MODES = {
 }
 
--- Default sensitivity (step) for incremental mode
+-- Default sensitivity for incremental mode: the distance per action after the
+-- first (Geometry.incrementalSteps). Only the axis slots take it; every
+-- direction's own default, the 25 of the vertical three-finger swipe included,
+-- lives in the shared manifest.
 M.DEFAULT_SENSITIVITY = 3.5
 
 M.DEFAULT_STATE = {
-	gestures = Manifest.default_for("gestures.enabled"),
+	gestures = Manifest.default_for(ConfigKeys.KEY.GESTURES_ENABLED),
 	modes = {},
 	sensitivities = {},
 }
@@ -234,6 +239,7 @@ local gesture_primer_committed = false
 local engine_needs_init = not initial_engine_committed
 local gesture_lifecycle_epoch = 0
 local gesture_start_attempt = nil
+-- One existing replay intent covers interrupted startup and wake recovery deferred by PAUSE.
 local gesture_resume_start_required = false
 local teardown_gesture_runtime
 local release_native_runtime
@@ -318,9 +324,7 @@ local health_reported_watchers = nil
 --- Counts currently-registered watchers (diagnostic helper).
 --- @return number Watcher count.
 local function count_watchers()
-	local n = 0
-	for _ in pairs(touch_watchers) do n = n + 1 end
-	return n
+	return TableUtil.count(touch_watchers)
 end
 
 --- Safely invokes a method on the touchdevice object and stringifies the result.
@@ -457,7 +461,7 @@ local function create_watcher(deviceID)
 	local candidate
 	local token = { committed = false }
 	local callback_ok, callback_result = xpcall(function()
-		candidate = dev:frameCallback(function(_, touches, _, _)
+		candidate = dev:frameCallback(function(_, touches, frame_stamp, _)
 			if touch_watchers[deviceID] ~= candidate
 				or touch_watcher_tokens[deviceID] ~= token
 				or token.committed ~= true
@@ -485,7 +489,18 @@ local function create_watcher(deviceID)
 				Logger.debug(LOG, "Touch session started on device=%s (frame %d, touches=%d).",
 					tostring(deviceID), fc, finger_count)
 			end
-			if not Logger.pcall(LOG, Engine.process_frame, touches) then
+			-- The engine times frames on this capture stamp: frames queued behind a
+			-- busy main thread arrive in one burst. A device that reports none is a
+			-- broken contract; its frames are then timed at delivery, said once.
+			if type(frame_stamp) ~= "number" or frame_stamp ~= frame_stamp then
+				if not token.stamp_reported then
+					token.stamp_reported = true
+					Logger.error(LOG, "Touch frame from device=%s has no capture timestamp (%s); gesture timing uses delivery time.",
+						tostring(deviceID), tostring(frame_stamp))
+				end
+				frame_stamp = nil
+			end
+			if not Logger.pcall(LOG, Engine.process_frame, touches, frame_stamp) then
 				-- A failed frame may leave the native scroll blocker engaged
 				pcall(Engine.emergency_reset)
 			end
@@ -694,7 +709,7 @@ function M.get_sensitivity(slot)    return tonumber(CoreState.sensitivities[slot
 --- Stores a gesture sensitivity, failing closed to DEFAULT_SENSITIVITY when the
 --- value is not a positive number. A persisted config.toml / plist value can
 --- arrive as a string (hand edit, AHK migration, half-written plist); the engine
---- divides by this (math.floor(abs(sd) / sensitivity)) inside the gesture eventtap
+--- divides by this (Geometry.incrementalSteps(abs(sd), sensitivity)) inside the gesture eventtap
 --- and the menu runs string.format("%.1f", …) on it, so a non-number would crash
 --- the tap (swallowed to Console) and blank the gestures submenu under the
 --- menu-builder pcall. The fallback IS the single-source default (no new literal).
@@ -878,12 +893,12 @@ function M.resume()
 		return true
 	end
 	if gesture_resume_start_required == true then
-		-- A PAUSE that arrived inside start() forced exact rollback of partially
-		-- acquired native owners. Settle any refused inverse first, then rebuild
-		-- the complete previously-ON posture as one fresh guarded start attempt.
+		-- An interrupted start or a wake observed under PAUSE requires a fresh
+		-- native runtime. Settle every exact prior owner before one guarded
+		-- restart; a refusal keeps the resume intent and suspension intact.
 		if teardown_gesture_runtime(true) ~= true then
 			Logger.error(LOG,
-				"Gesture resume cannot rebuild while startup rollback debt remains.")
+				"Gesture resume cannot rebuild while native cleanup remains pending.")
 			return false
 		end
 		CoreState.suspended = false
@@ -901,7 +916,7 @@ function M.resume()
 			end
 			return false
 		end
-		Logger.debug(LOG, "Gestures resumed by rebuilding the interrupted native startup.")
+		Logger.debug(LOG, "Gestures resumed by rebuilding the required native runtime.")
 		return true
 	end
 	local ok_resume, resume_result = xpcall(
@@ -943,6 +958,7 @@ function M.is_suspended() return CoreState.suspended end
 local STARTUP_SAFETY_PROBE_SEC   = Timings.sec("gestures", "startup_safety_probe_ms")  -- One-shot retry if no frame yet
 local STARTUP_PHASE_TIMEOUT_SEC  = Timings.sec("gestures", "startup_phase_timeout_ms") -- Give up the aggressive phase after this
 local HEALTH_CHECK_INTERVAL_SEC  = Timings.sec("gestures", "health_check_interval_ms") -- Slow cadence once frames are flowing
+local STARTUP_PROBE_INTERVAL_SEC = Timings.sec("gestures", "probe_interval_ms")        -- First-frame watch during the startup phase
 -- Cooldown between primer-triggered emergency recycles, so a fast burst of
 -- gesture events at the moment of the first user contact does not retrigger
 -- the heavy recycle path several times in a row.
@@ -1045,7 +1061,7 @@ start_startup_probe_loop = function()
 
 	-- Fast poll just to detect the first-frame moment so we can hand off to
 	-- the health-check loop. The poll itself does no recycling.
-	local started = start_discovery_timer(0.5, "startup probe", function()
+	local started = start_discovery_timer(STARTUP_PROBE_INTERVAL_SEC, "startup probe", function()
 		local elapsed = hs.timer.secondsSinceEpoch() - started_at
 		if _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
 			Logger.success(LOG, "Startup phase EXIT — first frame received after %.2fs.", elapsed)
@@ -1085,23 +1101,19 @@ start_startup_probe_loop = function()
 	return true
 end
 
---- Runs the slow health-check loop once frames are flowing.
+--- Runs the slow health-check loop, entered on the first frame or when the
+--- startup phase times out on an untouched trackpad.
 --- Reattaches any watcher that died (device sleep, cable disconnect, etc.).
---- If for some reason the frame stream stops entirely, we switch back to the
---- aggressive startup probe so recovery is fast.
+--- No frame yet is the normal idle state, not a lost stream: the kernel wakes
+--- the touch device on the first physical touch, and the primer recycles the
+--- watchers if a gesture arrives before any frame. Restarting the startup probe
+--- from here re-ran its "one-shot" recycle and warned every minute of idleness.
 start_health_check_loop = function()
 	Logger.info(LOG, "ENTER slow health-check loop (cadence=%.0fs)", HEALTH_CHECK_INTERVAL_SEC)
-	-- Each entry reports its own settled count once: after a lost frame stream
-	-- or a restart, the count the recovery reached is exactly the news.
+	-- Each entry reports its own settled count once: after a restart, the
+	-- count the recovery reached is exactly the news.
 	health_reported_watchers = nil
 	return start_discovery_timer(HEALTH_CHECK_INTERVAL_SEC, "health check", function()
-		if not _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
-			-- Defensive: should not happen, but if we lost the stream entirely,
-			-- restart the aggressive probe loop so the user is not stuck waiting.
-			Logger.warn(LOG, "Health-check: frame stream lost — switching back to startup probe loop.")
-			start_startup_probe_loop()
-			return
-		end
 		-- Reattach any watcher that stopped (device sleep, USB disconnect…)
 		for id, w in pairs(touch_watchers) do
 			local ok, r = pcall(function() return w:running() end)
@@ -1143,7 +1155,7 @@ local function schedule_emergency_recycle()
 	Logger.debug(LOG, "schedule_emergency_recycle: SCHEDULED in 20ms (first_frame=%s, watchers=%d)",
 		tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME), count_watchers())
 	local emergency_generation = discovery_generation
-	hs.timer.doAfter(0.02, function()
+	hs.timer.doAfter(require("infra.timings").sec("gestures", "emergency_recycle_delay_ms"), function()
 		-- CoreState.enabled is the FEATURE flag; CoreState.suspended is the pause.
 		-- Checking only the first let kickstart_hid warp the cursor and post a
 		-- synthetic scroll while the script was paused, which the invariant
@@ -1364,9 +1376,7 @@ function M.start()
 	end
 
 	-- Dump touchdevice top-level methods so we can spot missing APIs.
-	local td_keys = {}
-	for k in pairs(touchdevice) do td_keys[#td_keys + 1] = k end
-	table.sort(td_keys)
+	local td_keys = TableUtil.sorted_keys(touchdevice)
 	Logger.info(LOG, "touchdevice top-level keys (%d): %s", #td_keys, table.concat(td_keys, ", "))
 
 	-- Enumerate devices before doing anything.
@@ -1507,6 +1517,10 @@ function M.start()
 		wake_candidate = cw_module.new(function(event)
 			if sleep_watcher ~= wake_candidate or sleep_watcher_committed ~= true then return end
 			if event == cw_module.systemDidWake or event == cw_module.screensDidUnlock then
+				if CoreState.enabled and CoreState.suspended then
+					gesture_resume_start_required = true
+					Logger.debug(LOG, "Wake recovery deferred until gestures resume.")
+				end
 				if not CoreState.enabled or CoreState.suspended then return end
 				Logger.info(LOG, "Wake-from-sleep detected (event=%d) — recycling watchers", event)
 				kickstart_hid()

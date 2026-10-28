@@ -24,6 +24,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
+local CommandLines = require("tests.support.command_lines")
 
 local DRIVER_ROOT = helpers.driver_root()
 
@@ -49,15 +51,16 @@ local function list_files(dir, ext)
 	else
 		cmd = string.format("find '%s' -type f", dir)
 	end
-	local pipe = io.popen(cmd)
-	if not pipe then return files end
-	for raw_line in pipe:lines() do
+	local source_count = #files
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, raw_line in ipairs(inventory) do
 		local line = raw_line:gsub("\\", "/")
 		if line:match("%." .. ext .. "$") then
 			files[#files + 1] = line
 		end
 	end
-	pipe:close()
+	assert(#files > source_count, "source inventory contains no matching files")
 	return files
 end
 
@@ -84,13 +87,9 @@ local function has_production_call_site(all_lua_files, adapter_name, adapter_fil
 	local pattern = 'adapters%.' .. adapter_name .. '["\']'
 	for _, path in ipairs(all_lua_files) do
 		if not is_excluded(path, adapter_file) then
-			local fh = io.open(path, "r")
-			if fh then
-				local body = fh:read("*a")
-				fh:close()
-				if body:find(pattern) then
-					return true
-				end
+			local body = SourceFile.read(path)
+			if body:find(pattern) then
+				return true
 			end
 		end
 	end
@@ -129,12 +128,10 @@ helpers.describe("meta: adapter wiring reachability (F-HIGH-10)", function()
 	-- re-reading the source file's spec block rather than reaching into module
 	-- internals, so this test does not force core.lua to export test-only state.
 	local core_src_path = DRIVER_ROOT .. "ui/healthcheck/core.lua"
-	local core_fh = io.open(core_src_path, "r")
+	local core_src = SourceFile.read(core_src_path)
 	helpers.it("ui/healthcheck/core.lua is readable", function()
-		helpers.assert_true(core_fh ~= nil, "cannot open " .. core_src_path)
+		helpers.assert_true(type(core_src) == "string", "cannot open " .. core_src_path)
 	end)
-	local core_src = core_fh and core_fh:read("*a") or ""
-	if core_fh then core_fh:close() end
 
 	--- Extracts { id = "adapters.<name>", wired = true|false } tuples straight
 	--- from the ADAPTER_SPECS literal table in core.lua's source text. Each spec

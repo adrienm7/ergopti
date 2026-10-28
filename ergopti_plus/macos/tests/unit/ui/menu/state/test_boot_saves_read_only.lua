@@ -31,14 +31,14 @@ helpers.describe("boot never writes defaults over a present file (R5)", function
 		helpers.assert_not_nil(fixture.menu,
 			"a settled rollback keeps the truthful menu available")
 		helpers.assert_eq(fixture.state.gestures, false)
-		helpers.assert_eq(fixture.state.keylogger_enabled, false,
+		helpers.assert_eq(fixture.state.keystats_enabled, false,
 			"the rollback restored the pre-load defaults")
 
-		fixture.state.keylogger_enabled = true
+		fixture.state.keystats_enabled = true
 		helpers.assert_eq(fixture.save_prefs(), false,
 			"the pre-load defaults must never be written over the valid file")
 		helpers.assert_eq(#fixture.saves, 0)
-		helpers.assert_eq(fixture.state.keylogger_enabled, false,
+		helpers.assert_eq(fixture.state.keystats_enabled, false,
 			"a refused save must roll the unsaved change back")
 		helpers.assert_true(fixture.has_error("read-only"),
 			"the refused save must say why")

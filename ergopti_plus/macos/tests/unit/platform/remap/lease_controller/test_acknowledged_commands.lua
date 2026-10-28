@@ -1141,4 +1141,28 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 		helpers.assert_eq(causes, { "a Karabiner lease fence that switched Ergopti's rules off" },
 			"the live lease's fence is the transition a held key can be lost across")
 	end)
+
+	helpers.it("accepts several short complete lines delivered in one late chunk", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n" .. string.rep("\n", 100))
+			helpers.assert_true(controller.status() ~= "fencing",
+				"a stalled main thread batches answers; only one unterminated line may exceed the cap")
+			helpers.assert_eq(level_lines(ctx, "error", "protocol line exceeded"), 0,
+				"complete lines must never be reported as one oversized line")
+		end)
+	end)
+
+	helpers.it("still fences an unterminated line longer than the protocol cap", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, string.rep("x", 100))
+			helpers.assert_eq(controller.status(), "fencing",
+				"a line that never ends is a protocol violation")
+		end)
+	end)
 end)

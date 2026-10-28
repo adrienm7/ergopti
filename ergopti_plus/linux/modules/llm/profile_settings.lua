@@ -8,30 +8,34 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
 local Selector = require("llm.profile_selector")
 local ModelProfile = require("modules.llm.model_profile")
-local RegistryCodec = require("modules.llm.profile_registry_codec")
+local RegistryCodec = require("llm.profile_registry_codec")
+local AppOverrides = require("llm.app_profile_overrides")
 local Json = require("json")
 local Codec = require("toml_codec")
+local ConfigKeys = require("config_keys")
+local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 local LOG = "modules.llm.profile_settings"
-local PREF_PREFIX = "llm.profiles."
-local USER_PROFILES_KEY = "llm.user_profiles"
+local USER_PROFILES_KEY = KEY.LLM_USER_PROFILES
+local APP_OVERRIDES_KEY = KEY.LLM_APP_PROFILE_OVERRIDES
 
 local DEFINITIONS = {
-	active = { path = "llm.profiles.active", type = "string" },
+	active = { path = KEY.LLM_PROFILES_ACTIVE, type = "string" },
 	num_predictions = {
-		path = "llm.profiles.num_predictions",
+		path = KEY.LLM_PROFILES_NUM_PREDICTIONS,
 		type = "number",
 		min = 1,
 		max = 10,
 	},
 	auto_profile_for_model = {
-		path = "llm.profiles.auto_profile_for_model",
+		path = KEY.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL,
 		type = "boolean",
 	},
 }
@@ -52,8 +56,16 @@ local _reported_profiles = {}
 -- back, so no write may replace it: the cleanup removes it first.
 local _registry_outdated = false
 local _profile_serial = 0
+-- The per-application overrides as read, and the stored text they came from. A
+-- stored text this build cannot read leaves the map empty and refuses every
+-- write, so a newer or damaged value is never replaced by an empty one.
+local _app_overrides = nil
+local _app_overrides_refused = false
+-- The mapped profiles already reported missing
+local _missing_override_profiles = {}
 
 local function forget_registry(refresh_values)
+	_app_overrides, _app_overrides_refused = nil, false
 	_user_profiles = nil
 	_registry_source = nil
 	_unreadable_profiles = {}
@@ -68,7 +80,7 @@ local function profiles()
 end
 
 local function trimmed(value)
-	return type(value) == "string" and value:match("^%s*(.-)%s*$") or nil
+	return type(value) == "string" and TextUtils.trim(value) or nil
 end
 
 local function built_in_exists(profile_id)
@@ -229,6 +241,25 @@ local function profile_exists(profile_id)
 	return false
 end
 
+--- The application-to-profile map in force, read once from llm.app_profile_overrides.
+--- An unreadable stored value is named once as outdated, leaves the map empty and
+--- refuses every write until the user removes it.
+--- @return table overrides Map of application key to profile id.
+local function load_app_overrides()
+	if _app_overrides then return _app_overrides end
+	local Storage = require("infra.llm_preferences")
+	local overrides, reason = AppOverrides.decode(Storage.get(APP_OVERRIDES_KEY, ""))
+	if not overrides then
+		ConfigOutdated.report(APP_OVERRIDES_KEY, ConfigOutdated.REFUSED, Logger)
+		Logger.error(LOG, "Stored application profile overrides are unreadable (%s); none apply and none is written.",
+			tostring(reason))
+		_app_overrides_refused = true
+		overrides = {}
+	end
+	_app_overrides = overrides
+	return overrides
+end
+
 local function definition(name)
 	local def = DEFINITIONS[name]
 	if not def then Logger.error(LOG, "Unknown profile setting '%s'.", tostring(name)) end
@@ -251,7 +282,7 @@ end
 local function valid(name, value)
 	local def = definition(name)
 	if not def or type(value) ~= def.type then return false end
-	if name == "active" then return profile_exists(value) end
+	if name == LEAF.ACTIVE then return profile_exists(value) end
 	if def.type == "number" then
 		return value == math.floor(value) and value >= def.min and value <= def.max
 	end
@@ -267,13 +298,13 @@ function M.get(name)
 	if shipped == nil then return nil end
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if ok and Storage then
-		local stored = Storage.get(PREF_PREFIX .. name, nil)
+		local stored = Storage.get(DEFINITIONS[name].path, nil)
 		if valid(name, stored) then
 			_values[name] = stored
 			return stored
 		elseif stored ~= nil then
 			-- Outdated configuration: named once, offered by the cleanup.
-			ConfigOutdated.report(PREF_PREFIX .. name, ConfigOutdated.REFUSED, Logger)
+			ConfigOutdated.report(DEFINITIONS[name].path, ConfigOutdated.REFUSED, Logger)
 		end
 	end
 	_values[name] = shipped
@@ -288,9 +319,9 @@ local function persist_one(name, value, admission)
 	local persisted
 	if admission ~= nil then
 		persisted = type(Storage.set_many) == "function"
-			and Storage.set_many({ [PREF_PREFIX .. name] = value }, nil, admission)
+			and Storage.set_many({ [DEFINITIONS[name].path] = value }, nil, admission)
 	else
-		persisted = Storage.set(PREF_PREFIX .. name, value)
+		persisted = Storage.set(DEFINITIONS[name].path, value)
 	end
 	if persisted ~= true then return false end
 	_values[name] = value
@@ -311,13 +342,13 @@ function M.set(name, value, current_model, admission)
 		Logger.error(LOG, "Refused invalid profile setting %s=%s.", tostring(name), tostring(value))
 		return false
 	end
-	if name == "active" and M.get("auto_profile_for_model") == true
+	if name == LEAF.ACTIVE and M.get(LEAF.AUTO_PROFILE_FOR_MODEL) == true
 			and value ~= ModelProfile.recommend(current_model) then
 		local ok, Storage = pcall(require, "infra.llm_preferences")
 		if not ok or not Storage or type(Storage.set_many) ~= "function"
 				or Storage.set_many({
-					[PREF_PREFIX .. "active"] = value,
-					[PREF_PREFIX .. "auto_profile_for_model"] = false,
+					[KEY.LLM_PROFILES_ACTIVE] = value,
+					[KEY.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL] = false,
 				}, nil, admission) ~= true then
 			Logger.error(LOG, "Manual profile selection could not be persisted atomically.")
 			return false
@@ -338,11 +369,11 @@ end
 --- @param current_model string|nil
 --- @return string
 function M.effective_profile(current_model)
-	if M.get("auto_profile_for_model") == true then
+	if M.get(LEAF.AUTO_PROFILE_FOR_MODEL) == true then
 		local recommended = ModelProfile.recommend(current_model)
 		if profile_exists(recommended) then return recommended end
 	end
-	return M.get("active")
+	return M.get(LEAF.ACTIVE)
 end
 
 --- Returns a built-in profile by effective ID.
@@ -395,7 +426,7 @@ end
 --- built-ins in menu order, then the user's own, each with its menu label.
 --- @return table { { value = profile_id, label = string }, ... }
 function M.choices()
-	local count = M.get("num_predictions")
+	local count = M.get(LEAF.NUM_PREDICTIONS)
 	local choices = {}
 	for _, profile in ipairs(profiles()) do
 		choices[#choices + 1] = { value = profile.id, label = M.menu_label(profile, count) }
@@ -505,8 +536,8 @@ function M.save_user_profile(candidate, activate, expected_existing, admission)
 	if not ok or not Storage or type(Storage.set_many) ~= "function" then return false end
 	local writes = { [USER_PROFILES_KEY] = RegistryCodec.encode(stored_registry(next_profiles)) }
 	if activate == true then
-		writes[PREF_PREFIX .. "active"] = profile.id
-		writes[PREF_PREFIX .. "auto_profile_for_model"] = false
+		writes[KEY.LLM_PROFILES_ACTIVE] = profile.id
+		writes[KEY.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL] = false
 	end
 	if Storage.set_many(writes, _registry_source, admission) ~= true then
 		forget_registry(true)
@@ -544,11 +575,22 @@ function M.delete_user_profile(profile_id, admission)
 	end
 	if not found then return false end
 
-	local active = M.get("active")
+	local active = M.get(LEAF.ACTIVE)
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage or type(Storage.set_many) ~= "function" then return false end
 	local writes = { [USER_PROFILES_KEY] = RegistryCodec.encode(stored_registry(next_profiles)) }
-	if active == profile_id then writes[PREF_PREFIX .. "active"] = "basic" end
+	if active == profile_id then writes[KEY.LLM_PROFILES_ACTIVE] = "basic" end
+	-- An application mapped to the deleted profile would name nothing: its
+	-- override goes in the same write, as on Windows.
+	local kept, dropped = {}, false
+	for app, mapped in pairs(load_app_overrides()) do
+		if mapped == profile_id then dropped = true else kept[app] = mapped end
+	end
+	if dropped and not _app_overrides_refused then
+		local payload = AppOverrides.encode(kept)
+		if payload == nil then return false end
+		writes[APP_OVERRIDES_KEY] = payload
+	end
 	if Storage.set_many(writes, _registry_source, admission) ~= true then
 		forget_registry(true)
 		Logger.error(LOG, "User profile '%s' could not be deleted; live registry is unchanged.",
@@ -558,7 +600,98 @@ function M.delete_user_profile(profile_id, admission)
 
 	forget_registry(false)
 	if active == profile_id then _values.active = "basic" end
+	if dropped and not _app_overrides_refused then _app_overrides = kept end
 	Logger.info(LOG, "User profile '%s' deleted.", profile_id)
+	return true
+end
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= Per-application overrides =======
+-- =========================================
+-- =========================================
+
+--- The per-application overrides, detached.
+--- @return table overrides Map of application key to profile id.
+function M.app_overrides()
+	local copy = {}
+	for app, profile in pairs(load_app_overrides()) do copy[app] = profile end
+	return copy
+end
+
+--- The profile the user mapped to an application, when it still exists.
+--- @param app any The application the request was typed in.
+--- @return table|nil profile Detached copy; nil when the application has no override.
+function M.resolve_for_app(app)
+	local profile_id = AppOverrides.resolve(load_app_overrides(), app, nil)
+	if profile_id == nil then return nil end
+	local profile = M.resolve_id(profile_id)
+	if not profile and not _missing_override_profiles[profile_id] then
+		-- Once per profile and process: a prediction asks at every request.
+		_missing_override_profiles[profile_id] = true
+		Logger.warn(LOG, "A profile mapped to an application no longer exists; the menu's profile applies there.")
+	end
+	return profile
+end
+
+--- Stores a new map atomically with the exact source it was read against.
+--- @param overrides table Map of application key to profile id.
+--- @param admission function|nil Retained menu admission checked by the writer.
+--- @return boolean committed
+local function store_app_overrides(overrides, admission)
+	if admission ~= nil and (type(admission) ~= "function" or admission() ~= true) then return false end
+	if _app_overrides_refused then
+		Logger.error(LOG, "Application profile overrides refused: the stored value is unreadable and would be erased; "
+			.. "remove it with the config cleanup first.")
+		return false
+	end
+	local payload, reason = AppOverrides.encode(overrides)
+	if payload == nil then
+		Logger.error(LOG, "Application profile overrides are not storable: %s.", tostring(reason))
+		return false
+	end
+	local Storage = require("infra.llm_preferences")
+	if Storage.set_many({ [APP_OVERRIDES_KEY] = payload }, nil, admission) ~= true then
+		Logger.error(LOG, "Application profile overrides could not be persisted; the map in force is unchanged.")
+		return false
+	end
+	_app_overrides = overrides
+	return true
+end
+
+--- Maps an application to a profile.
+--- @param app any The application identifier.
+--- @param profile_id any An existing profile id.
+--- @param admission function|nil
+--- @return boolean committed
+function M.set_app_override(app, profile_id, admission)
+	if not profile_exists(profile_id) then
+		Logger.error(LOG, "Refused an application override naming an unknown profile.")
+		return false
+	end
+	local candidate, reason = AppOverrides.with(load_app_overrides(), app, profile_id)
+	if not candidate then
+		Logger.error(LOG, "Refused an application override: %s.", tostring(reason))
+		return false
+	end
+	if not store_app_overrides(candidate, admission) then return false end
+	Logger.info(LOG, "Application profile override set (%d in force).", #AppOverrides.rows(candidate))
+	return true
+end
+
+--- Removes the override of an application.
+--- @param app any The application identifier.
+--- @param admission function|nil
+--- @return boolean committed False when the application had none.
+function M.clear_app_override(app, admission)
+	local key = AppOverrides.normalize_app(app)
+	if not key or load_app_overrides()[key] == nil then return false end
+	if not store_app_overrides(AppOverrides.without(load_app_overrides(), key), admission) then return false end
+	Logger.info(LOG, "Application profile override removed.")
 	return true
 end
 
@@ -573,6 +706,8 @@ function M._reset()
 	_registry_outdated = false
 	_reported_profiles = {}
 	_profile_serial = 0
+	_app_overrides, _app_overrides_refused = nil, false
+	_missing_override_profiles = {}
 	ModelProfile._reset()
 end
 
@@ -582,6 +717,9 @@ end
 function M.mark_config_reads(document, mark)
 	local preferences = require("infra.llm_preferences")
 	preferences.mark_config_read(document, USER_PROFILES_KEY, mark, registry_current)
+	preferences.mark_config_read(document, APP_OVERRIDES_KEY, mark, function(value)
+		return AppOverrides.decode(value) ~= nil
+	end)
 	for name, definition in pairs(DEFINITIONS) do
 		preferences.mark_config_read(document, definition.path, mark, function(value) return valid(name, value) end)
 	end
@@ -592,7 +730,8 @@ end
 --- @return table snapshot
 function M.configuration_snapshot()
 	return { values = _values, users = _user_profiles, source = _registry_source,
-		unreadable = _unreadable_profiles, outdated = _registry_outdated }
+		unreadable = _unreadable_profiles, outdated = _registry_outdated,
+		overrides = _app_overrides, overrides_refused = _app_overrides_refused }
 end
 
 --- Restores an owner-issued registry/cache snapshot without serialization.
@@ -602,6 +741,7 @@ function M.restore_configuration(snapshot)
 	_values, _user_profiles = snapshot.values, snapshot.users
 	_registry_source, _unreadable_profiles = snapshot.source, snapshot.unreadable
 	_registry_outdated = snapshot.outdated == true
+	_app_overrides, _app_overrides_refused = snapshot.overrides, snapshot.overrides_refused == true
 	return true
 end
 

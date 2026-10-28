@@ -16,8 +16,8 @@ final class OwnedRuntimeCoreServiceOwner {
 		func current() -> Bool { owner.coreRetiredObservation() }
 	}
 	private static let unknownServiceStatus: Int32 = 113
-	private static let helperIdentifier = "com.ergoptiplus.app.runtime-installer"
-	private static let label = "com.ergoptiplus.runtime.core"
+	private static let helperIdentifier = "\(Identifiers.BundleIds.launcher).runtime-installer"
+	private static let label = Identifiers.ServiceLabels.macosCore
 	private static let target = "system/" + label
 	private static let runtime = "/Library/Application Support/ErgoptiPlus/Runtime"
 	private static let core = runtime + "/ErgoptiPlus-Remap-Core.app"

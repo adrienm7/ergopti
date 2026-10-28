@@ -13,7 +13,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One log directory, resolved in one place. `M.log_dir()` is the single
----    resolver; the tray's "open logs" action and the keylogger fallback both call
+---    resolver; the tray's "open logs" action and the keystats fallback both call
 ---    it instead of re-deriving `$HOME` (three independent expressions before).
 --- 2. Dual output. The daily file is the durable record; stdout is mirrored so
 ---    `journalctl --user -u ergopti-hotstrings` shows the same lines when the
@@ -28,19 +28,30 @@
 ---    adapter, and `adapters/shell_runner.lua` itself requires the logger — so
 ---    using it here would be a load-time cycle. mkdir and mktemp quote
 ---    inline with the same POSIX idiom, and a unit test pins that quoting against
----    `shell_runner.quote()` so the two can never diverge.
+---    `shell_runner.quote()` so the two can never diverge. The retention purge
+---    lists the folder in process through infra/native_directory.lua, which
+---    needs no logger.
 --- 6. Never fatal. A directory that cannot be created degrades to stdout-only and
 ---    says so; a broken handle degrades to stdout. The daemon must not die
 ---    because logging failed.
 --- 7. Privacy admission. Canonical rules and the captured account identity are
 ---    admitted before output. A missing policy or identity refuses startup;
 ---    directory/write failure still degrades to redacted stdout, never raw text.
---- 8. The logger boot. install() is also where this driver arms the core's
+--- 8. Topical fan-out. A line that matches a pattern of _generated/
+---    logger_sub_files.lua (declared once in _shared/modules/logger/sub_files.toml
+---    for all three drivers) is also appended to that topic's file, so "what did
+---    the hotstrings do?" opens ErgoptiPlus_hotstrings.log here exactly as on the
+---    other two drivers. Topical files carry no date in their name; like macOS,
+---    the first write of a new day truncates one whose first line is from an
+---    earlier day. A refusing topical handle is retired for the day and reported
+---    once, and never starves the main file.
+--- 9. The logger boot. install() is also where this driver arms the core's
 ---    repeat collapsing (logger SPEC § 4.2), once; the daemon's periodic callback
 ---    and exit paths own its flushes.
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 
 
@@ -58,6 +69,11 @@ local M = {}
 local AppDirs = require("app_dirs")
 local Redact = require("diagnostics.redact")
 local Json = require("json")
+local NativeDirectory = require("infra.native_directory")
+
+--- Topical routing table generated from _shared/modules/logger/sub_files.toml:
+--- an array of { name = "<file name>", patterns = { ... } }.
+local SUB_FILES = require("_generated.logger_sub_files")
 
 --- Basename prefixes for the two files. The date suffix is the day the line was
 --- written, not the day the daemon started, so a long-running daemon rolls over.
@@ -67,6 +83,9 @@ local LOG_EXT       = AppDirs.files.extension
 
 --- Variants that are additionally mirrored into the errors-only file.
 local ERROR_VARIANTS = { warn = true, error = true }
+
+--- Seconds in the whole day the retention window counts in.
+local DAY_SECONDS = 86400
 
 --- How many days of rolled files are kept. From the shared registry, which the
 --- other two drivers already read for the same purpose — this driver rolled a
@@ -87,10 +106,6 @@ local function retention_days()
 	return _retention_days
 end
 
---- POSIX single-quote escape: close, insert an escaped quote, reopen.
---- Identical to `adapters/shell_runner.lua`'s QUOTE_ESCAPE; pinned by
---- `tests/unit/infra/logger/test_logger_sink.lua` so the two cannot drift.
-local QUOTE_ESCAPE = "'\\''"
 
 
 
@@ -110,6 +125,11 @@ local _date = nil
 --- Open append handles. Either may be nil after an I/O failure.
 local _main_handle   = nil
 local _errors_handle = nil
+
+--- Open topical append handles keyed by file name. `false` marks a topic whose
+--- handle was refused today: it stays retired until the next rollover, repoint
+--- or reinstall instead of failing again on every line.
+local _topical = {}
 
 --- True once M.install() has wired the sink into the shared core.
 local _installed = false
@@ -134,14 +154,15 @@ local _redact = nil
 --- @param supplied table|nil Explicit identity dependency for portable fixtures.
 --- @return function Captured immutable-context redactor.
 local function admit_redaction(supplied)
-	local context = supplied or { home = require("infra.config_paths").account_home(), user = os.getenv("USER") or os.getenv("LOGNAME") }
-	assert(type(context) == "table" and type(context.home) == "string" and context.home ~= ""
-		and type(context.user) == "string" and context.user ~= "", "logger_sink: privacy identity unavailable")
+	local context = supplied or { home = require("infra.config_paths").account_home(), user = require("infra.account_name").resolve() }
+	assert(type(context) == "table", "logger_sink: privacy identity unavailable")
+	assert(type(context.home) == "string" and context.home ~= "", "logger_sink: privacy identity unavailable: HOME is not an absolute directory")
+	assert(type(context.user) == "string" and context.user ~= "", "logger_sink: privacy identity unavailable: no account name from USER, LOGNAME or the passwd entry")
 	local captured = { home = context.home, user = context.user, case_insensitive = false }
 	local Paths = require("infra.paths")
 	local root = Paths.shared_root_from(Paths.driver_root())
 	assert(type(root) == "string" and root ~= "", "logger_sink: canonical privacy tree unavailable")
-	local file = io.open(root .. "/modules/diagnostics/redaction.json", "rb")
+	local file = require("infra.regular_file_reader").open_source(root .. "/modules/diagnostics/redaction.json")
 	assert(file, "logger_sink: canonical privacy policy unavailable")
 	local read_ok, raw = pcall(file.read, file, "*a")
 	local close_ok, closed = pcall(file.close, file)
@@ -162,13 +183,13 @@ local function admit_redaction(supplied)
 	return function(text) return Redact.apply(text, rules, captured) end
 end
 
---- Quotes a value for a POSIX shell command line.
---- @param value string Raw value.
+--- Quotes a value for a POSIX shell command line, as adapters/shell_runner's
+--- quote does (tests/unit/infra/logger/test_logger_sink.lua pins the pair).
+--- @param value string Raw value; nil becomes the empty word.
 --- @return string Single-quoted, escape-safe token.
 function M.shell_quote(value)
 	if value == nil then return "''" end
-	local s = (type(value) == "string") and value or tostring(value)
-	return "'" .. (s:gsub("'", QUOTE_ESCAPE)) .. "'"
+	return TextUtils.shell_quote(value)
 end
 
 --- Resolves the canonical log directory for this driver.
@@ -242,16 +263,79 @@ local function close_handles()
 	_errors_handle = nil
 end
 
+--- Closes every topical handle and forgets retirements, so the next matching
+--- line decides afresh whether its file starts a new day.
+local function close_topical()
+	for _, handle in pairs(_topical) do
+		if handle then pcall(function() handle:close() end) end
+	end
+	_topical = {}
+end
+
+--- io.open mode for a topical file: "a" when it is absent, empty or already
+--- carries today's lines, "w" when its first line is from an earlier day. Topical
+--- files have no date in their name, so this is what rotates them daily. An
+--- unparsable first line is kept ("a"): a stale line is recoverable, a deleted
+--- one is not.
+--- @param path string Absolute topical file path.
+--- @param date string "YYYY-MM-DD" of the line about to be written.
+--- @return string "a" or "w".
+local function topical_mode(path, date)
+	local handle = require("infra.regular_file_reader").open_source(path)
+	if not handle then return "a" end
+	local ok, first = pcall(handle.read, handle, "*l")
+	pcall(handle.close, handle)
+	if not ok or type(first) ~= "string" then return "a" end
+	local stamp = first:match("^(%d%d%d%d%-%d%d%-%d%d) ")
+	if stamp and stamp ~= date then return "w" end
+	return "a"
+end
+
+--- Reports lost optional mirroring without recursively invoking the logger sink.
+--- The main channel remains the durable owner; stderr failure cannot retire it.
+--- @param path string Refused mirror path.
+--- @param failure any Native or protected open refusal.
+local function report_mirror_refusal(path, failure)
+	local description = require("error_description").describe(failure)
+	pcall(function()
+		io.stderr:write(_redact("[logger_sink] errors channel could not be opened: " .. path
+			.. " (" .. description .. ") — mirror disabled; logging continues through main and stdout.\n"))
+	end)
+end
+
 --- Opens (or reopens) both handles for the given date.
 --- Both are repointed together: repointing only the main file leaves WARNING and
 --- ERROR lines appended to yesterday's errors file forever.
 --- @param date string "YYYY-MM-DD".
 local function open_handles(date)
 	close_handles()
+	close_topical()
 	_date = date
 	if not _dir then return end
-	_main_handle   = io.open(_dir .. "/" .. MAIN_PREFIX   .. date .. LOG_EXT, "a")
-	_errors_handle = io.open(_dir .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT, "a")
+	_main_handle = require("infra.regular_file_writer").open(_dir .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
+	local errors_path = _dir .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT
+	local failure
+	_errors_handle, failure = require("infra.regular_file_writer").open(errors_path, "a")
+	if _main_handle and not _errors_handle then report_mirror_refusal(errors_path, failure) end
+end
+
+--- Whether a basename matches the shell glob `<prefix>*<extension>`.
+--- @param name string Basename.
+--- @param prefix string Literal prefix (no glob character).
+--- @return boolean
+local function rolled_name(name, prefix)
+	return #name >= #prefix + #LOG_EXT and name:sub(1, #prefix) == prefix and name:sub(-#LOG_EXT) == LOG_EXT
+end
+
+--- Reports a purge refusal on stderr: the sink cannot log through itself.
+--- @param what string What was refused.
+--- @param path string The path concerned.
+--- @param message any The native refusal.
+local function report_purge_refusal(what, path, message)
+	pcall(function()
+		io.stderr:write(_redact("[logger_sink] retention purge could not " .. what .. " " .. path .. ": "
+			.. tostring(message) .. " — the file is kept.\n"))
+	end)
 end
 
 --- Deletes rolled files older than the retention window.
@@ -266,17 +350,45 @@ end
 --- of two constants that are free to change independently, and relying on it
 --- would make renaming one silently stop purging the other.
 ---
---- Uses `find -mtime` rather than parsing the date out of each name: the daemon
---- may have been off for a month, and a purge that only understands "yesterday"
---- leaves everything older untouched.
+--- Ages come from the modification time rather than the date in each name: the
+--- daemon may have been off for a month, and a purge that only understands
+--- "yesterday" leaves everything older untouched.
+---
+--- The sweep runs in this process. It is exactly what the two forked
+--- `find <dir> -maxdepth 1 -type f -name '<prefix>*<ext>' -mtime +N -delete`
+--- did, at every start and every rollover: a regular file directly in the
+--- folder (never a link, never a folder), named by either glob, last modified
+--- more than N + 1 whole days before the current second (-mtime +N drops the
+--- fraction of the age).
+--- A refusal the purge used to discard is now reported, and never fatal.
 local function purge_old()
 	local days = retention_days()
 	if not days or not _dir then return end
-	local quoted = M.shell_quote(_dir)
-	for _, prefix in ipairs({ MAIN_PREFIX, ERRORS_PREFIX }) do
-		os.execute(string.format(
-			"find %s -maxdepth 1 -type f -name %s -mtime +%d -delete 2>/dev/null",
-			quoted, M.shell_quote(prefix .. "*" .. LOG_EXT), math.floor(days)))
+	-- A runtime without the native directory backend raises; for the purge that
+	-- is one more refusal to report, so a log sink (and --help, which loads one
+	-- before parsing its arguments) still installs where luv is absent.
+	local listed, entries, message, code = pcall(NativeDirectory.entries, _dir)
+	if not listed then
+		report_purge_refusal("list", _dir, entries)
+		return
+	end
+	if entries == nil then
+		-- An absent folder holds nothing to purge; any other refusal is reported.
+		if code ~= "ENOENT" then report_purge_refusal("list", _dir, message) end
+		return
+	end
+	local cutoff = os.time() - (math.floor(days) + 1) * DAY_SECONDS
+	for _, entry in ipairs(entries) do
+		local name = entry.name
+		if entry.kind == "file" and (rolled_name(name, MAIN_PREFIX) or rolled_name(name, ERRORS_PREFIX)) then
+			local path = NativeDirectory.join(_dir, name)
+			local stat = NativeDirectory.stat(path)
+			-- lstat again: the entry may have been replaced since the listing.
+			if stat and stat.kind == "file" and stat.modified and stat.modified < cutoff then
+				local removed, remove_error = os.remove(path)
+				if not removed then report_purge_refusal("delete", path, remove_error) end
+			end
+		end
 	end
 end
 
@@ -320,6 +432,29 @@ local function append_line(handle, line, channel)
 	return nil
 end
 
+--- Appends the line to every topical file whose patterns match it.
+--- @param line string Redacted, formatted line.
+local function fan_out(line)
+	for _, sub in ipairs(SUB_FILES) do
+		local routed = false
+		for _, pattern in ipairs(sub.patterns) do
+			if line:find(pattern, 1, true) then routed = true; break end
+		end
+		if routed and _topical[sub.name] ~= false then
+			local handle = _topical[sub.name]
+			if not handle then
+				local path = _dir .. "/" .. sub.name
+				handle = require("infra.regular_file_writer").open(path, topical_mode(path, _date))
+				if not handle then
+					io.stderr:write(_redact("[logger_sink] topical file " .. sub.name
+						.. " could not be opened — retired for today; logging continues through other outputs.\n"))
+				end
+			end
+			_topical[sub.name] = handle and append_line(handle, line, "topical " .. sub.name) or false
+		end
+	end
+end
+
 --- Writes one formatted line to every configured output.
 --- Signature is the shared core's sink contract: (line, variant).
 --- @param line string Already-formatted log line.
@@ -345,6 +480,8 @@ local function sink(line, variant)
 	if _errors_handle and ERROR_VARIANTS[variant] then
 		_errors_handle = append_line(_errors_handle, line, "errors")
 	end
+
+	if _dir then fan_out(line) end
 end
 
 
@@ -436,7 +573,7 @@ function M.prepare_dir(dir)
 	if not created or not probe_path then
 		return false, "the logs folder '" .. dir .. "' is not writable"
 	end
-	local opened, probe = pcall(io.open, probe_path, "a")
+	local opened, probe = pcall(require("infra.regular_file_writer").open, probe_path, "a")
 	local wrote, accepted = false, false
 	local closed_ok, closed = false, false
 	if opened and probe then
@@ -470,16 +607,19 @@ function M.repoint()
 	-- Acquired descriptors may still work after their path becomes unwritable.
 	-- Keep them until the candidate is usable; reopening is not a rollback.
 	local date = today()
-	local main_ok, main = pcall(io.open, target .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
-	local errors_ok, errors = pcall(io.open, target .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT, "a")
+	local main_ok, main = pcall(require("infra.regular_file_writer").open, target .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
+	local errors_path = target .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT
+	local errors_ok, errors, errors_failure = pcall(require("infra.regular_file_writer").open, errors_path, "a")
 	if not main_ok or not main then
 		if errors_ok and errors then pcall(function() errors:close() end) end
 		return false, "the logs folder '" .. target .. "' is not writable"
 	end
 	local previous_main, previous_errors = _main_handle, _errors_handle
+	close_topical()
 	_dir, _date = target, date
 	_main_handle, _errors_handle = main, errors_ok and errors or nil
 	_stdout_only = false
+	if not _errors_handle then report_mirror_refusal(errors_path, errors_ok and errors_failure or errors) end
 	if previous_main then pcall(function() previous_main:close() end) end
 	if previous_errors then pcall(function() previous_errors:close() end) end
 	purge_old()
@@ -497,6 +637,7 @@ function M.uninstall(logger)
 		logger.disable_repeat_collapsing()
 	end
 	close_handles()
+	close_topical()
 	_dir         = nil
 	_date        = nil
 	_installed   = false

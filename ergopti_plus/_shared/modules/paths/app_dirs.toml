@@ -64,6 +64,14 @@ unified_prefix = "ErgoptiPlus_"
 errors_prefix = "ErgoptiPlus_errors_"
 topical_prefix = "ErgoptiPlus_"
 extension = ".log"
+# What happens before the configuration is read and the logger can start: a
+# yielding second instance, a refused configuration transition (Windows), a
+# refused session lock or privacy admission (Linux). It is always written to the
+# DEFAULT logs folder, whatever LogsDirPath says, and only ever carries a closed
+# vocabulary (no path, no exception text) because the privacy policy is not
+# loaded yet. macOS has the equivalent in the native launcher: launcher_log and
+# fatal_report below.
+bootstrap_log = "bootstrap.log"
 
 # ===================================
 # ===================================

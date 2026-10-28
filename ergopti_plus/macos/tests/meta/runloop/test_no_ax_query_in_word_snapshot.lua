@@ -25,8 +25,8 @@
 
 local helpers = require("tests.helpers")
 
--- This declaration is unique to the keylogger translation unit.
-local KEYLOGGER_SELECTOR = "local function ensure_browser_window_watchers"
+-- This declaration is unique to the keystats translation unit.
+local KEYSTATS_SELECTOR = "local function ensure_browser_window_watchers"
 
 -- The queries it must not make.
 local FORBIDDEN = {
@@ -35,10 +35,10 @@ local FORBIDDEN = {
 	"keycodes.currentLayout()",
 }
 
---- Reads the one keylogger translation unit for meaningful position checks.
+--- Reads the one keystats translation unit for meaningful position checks.
 --- @return string Production source without line comments.
-local function keylogger_source()
-	local source, err = helpers.read_driver_unit(KEYLOGGER_SELECTOR)
+local function keystats_source()
+	local source, err = helpers.read_driver_unit(KEYSTATS_SELECTOR)
 	helpers.assert_not_nil(source, err)
 	return source:gsub("%-%-[^\n]*", "")
 end
@@ -52,10 +52,10 @@ end
 -- ==================================================================
 -- ==================================================================
 
-helpers.describe("keylogger: the per-word snapshot makes no OS query", function()
+helpers.describe("keystats: the per-word snapshot makes no OS query", function()
 
 	helpers.it("queries neither the frontmost app, its window, nor the layout", function()
-		local code = keylogger_source()
+		local code = keystats_source()
 
 		local at = code:find("CoreState.session_app_name%s*=")
 		helpers.assert_true(at ~= nil, "the snapshot must still be findable")
@@ -77,7 +77,7 @@ helpers.describe("keylogger: the per-word snapshot makes no OS query", function(
 	end)
 
 	helpers.it("still fills all three fields", function()
-		local code = keylogger_source()
+		local code = keystats_source()
 
 		-- Without this case the assertion above would pass against a snapshot that
 		-- simply stopped recording the context, which every log row depends on.
@@ -89,7 +89,7 @@ helpers.describe("keylogger: the per-word snapshot makes no OS query", function(
 	end)
 
 	helpers.it("the layout cache is refreshed, not frozen", function()
-		local code = keylogger_source()
+		local code = keystats_source()
 
 		-- Caching without invalidation would be worse than the query: every row after
 		-- a layout switch would carry the wrong layout, silently and forever. The
@@ -98,12 +98,12 @@ helpers.describe("keylogger: the per-word snapshot makes no OS query", function(
 		local subscribe_pos = code:find(
 			"InputSourceBroker.subscribe(INPUT_SOURCE_SUBSCRIBER_ID", 1, true)
 		helpers.assert_true(subscribe_pos ~= nil,
-			"the keylogger must subscribe its layout cache to the input-source broker")
+			"the keystats must subscribe its layout cache to the input-source broker")
 		local callback_block = code:sub(subscribe_pos, subscribe_pos + 700)
 		helpers.assert_contains(callback_block, "pcall(hs.keycodes.currentLayout)")
 		helpers.assert_contains(callback_block, "_cached_layout = new_layout")
 		helpers.assert_true(not callback_block:find("inputSourceChanged", 1, true),
-			"the keylogger consumer must not replace the broker's native callback")
+			"the keystats consumer must not replace the broker's native callback")
 	end)
 
 end)

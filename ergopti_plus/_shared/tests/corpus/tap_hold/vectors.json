@@ -9,13 +9,13 @@
 			"key": "caps_lock",
 			"config": {
 				"tap_action": "enter",
-				"time_activation_seconds": 0.35,
+				"time_activation_seconds": 0.45,
 				"hold_modifier": "ctrl"
 			},
 			"expected": {
 				"configured": true,
 				"tap_action": "enter",
-				"duration": 0.35,
+				"duration": 0.45,
 				"hold_modifier": "ctrl",
 				"hold_layer": null
 			}
@@ -44,7 +44,7 @@
 			"config": {
 				"enabled": false,
 				"tap_action": "enter",
-				"time_activation_seconds": 0.35
+				"time_activation_seconds": 0.45
 			},
 			"expected": {
 				"configured": true,

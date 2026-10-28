@@ -55,7 +55,7 @@ local function transformed_by(action_name, selected)
 		event_loop = "adapters.event_loop",
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",
-		keylogger = "modules.keylogger.keylogger",
+		keystats = "modules.keystats.keystats",
 	}
 	local previous = {}
 	for key, name in pairs(names) do previous[key] = package.loaded[name] end
@@ -70,7 +70,7 @@ local function transformed_by(action_name, selected)
 	package.loaded[names.event_loop] = { sleep_ms = function() return true end }
 	package.loaded[names.combo] = { press = function() return true end }
 	package.loaded[names.injector] = { inject = function() return { ok = true } end }
-	package.loaded[names.keylogger] = { record_shortcut = function() return true end }
+	package.loaded[names.keystats] = { record_shortcut = function() return true end }
 	package.loaded[names.manager] = nil
 
 	local ok, err = pcall(function()

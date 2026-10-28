@@ -37,6 +37,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local Shell = require("adapters.shell_runner")
@@ -190,8 +191,7 @@ local function typing_cohort()
 		if not retarget_is_x11() or not selection_current() then return nil end
 		local built, _, receipt = inverse_retarget(previous.receipt)
 		if not selection_current() or type(built) ~= "table" or getmetatable(built) ~= nil or not receipt then return nil end
-		local count = 0
-		for _ in pairs(built) do count = count + 1 end
+		local count = TableUtil.count(built)
 		if count < MIN_PLAUSIBLE_ENTRIES then return nil end
 		local checked, current_receipt = pcall(inverse_current, receipt)
 		if not checked or current_receipt ~= true or not selection_current() then return nil end
@@ -225,21 +225,37 @@ local function read_file(path)
 	return text
 end
 
---- The session's layout names, from the first desktop store that has them.
+--- Admits session metadata only after its command acknowledges success.
+--- @param cmd string Static desktop query.
+--- @return string|nil Captured metadata, or nil on command refusal.
+local function checked_session_output(cmd)
+	local ok, output, err = Shell.exec_checked(cmd)
+	if ok then return output end
+	Logger.warn(LOG, "Session layout query refused via %s — %s.", cmd, tostring(err))
+	return nil
+end
+
+--- The session's layout names, from the first acknowledged desktop store.
 --- @return table|nil Descriptor from infra/xkb_rmlvo.lua.
 local function session_layout_names()
-	local options = nil
 	if Shell.has_command("gsettings") then
-		options = Shell.exec(GNOME_OPTIONS)
-		local desc = XkbRmlvo.parse_gnome(Shell.exec(GNOME_MRU), options)
-			or XkbRmlvo.parse_gnome(Shell.exec(GNOME_SOURCES), options)
-		if desc then return desc end
+		local options = checked_session_output(GNOME_OPTIONS)
+		-- Failed options are unknown, never an acknowledged empty/default set.
+		if options ~= nil then
+			local desc = XkbRmlvo.parse_gnome(checked_session_output(GNOME_MRU), options)
+				or XkbRmlvo.parse_gnome(checked_session_output(GNOME_SOURCES), options)
+			if desc then return desc end
+		end
 	end
 
 	local desc = XkbRmlvo.parse_kxkbrc(read_file(ConfigPaths.config_home() .. "/kxkbrc"))
 		or XkbRmlvo.from_env()
-		or XkbRmlvo.parse_localectl(Shell.exec(LOCALECTL))
 	if desc then return desc end
+	-- systemd-localed is absent from minimal and non-systemd systems.
+	if Shell.has_command("localectl") then
+		desc = XkbRmlvo.parse_localectl(checked_session_output(LOCALECTL))
+		if desc then return desc end
+	end
 
 	for _, path in ipairs(KEYBOARD_DEFAULTS) do
 		desc = XkbRmlvo.parse_keyboard_defaults(read_file(path))
@@ -266,8 +282,8 @@ local function dump_keymap()
 	end
 
 	for _, cmd in ipairs(candidates) do
-		local out = Shell.exec(cmd)
-		if type(out) == "string" and out:find("xkb_keymap", 1, true) then
+		local ok, out = Shell.exec_checked(cmd)
+		if ok and out:find("xkb_keymap", 1, true) then
 			return out, cmd
 		end
 	end
@@ -275,8 +291,8 @@ local function dump_keymap()
 	local desc = session_layout_names()
 	if desc then
 		local cmd = XkbRmlvo.compile_command(desc)
-		local out = Shell.exec(cmd)
-		if type(out) == "string" and out:find("xkb_keymap", 1, true) then
+		local ok, out = Shell.exec_checked(cmd)
+		if ok and out:find("xkb_keymap", 1, true) then
 			return out, cmd .. " (layout names from " .. desc.source .. ")"
 		end
 		Logger.warn(LOG, "Compiling the session layout (%s from %s) produced no keymap.",
@@ -339,9 +355,7 @@ function M.build(text)
 		end
 	end
 
-	local count = 0
-	for _ in pairs(built) do count = count + 1 end
-	return built, count
+	return built, TableUtil.count(built)
 end
 
 
@@ -376,8 +390,7 @@ function M.publish_current_capture(override_path)
 		Logger.error(LOG, "Current capture inverse publication refused — %s.", tostring(ok and reason or built))
 		return false
 	end
-	local count = 0
-	for _ in pairs(built) do count = count + 1 end
+	local count = TableUtil.count(built)
 	if count < MIN_PLAUSIBLE_ENTRIES then _table, _cohort = nil, nil; return false end
 	local checked, current = pcall(inverse_current, receipt)
 	if not checked or current ~= true or not same_selection() then return false end
@@ -445,8 +458,7 @@ function M.refresh(override_path)
 		Logger.error(LOG, "Cannot enumerate the keymap via %s — %s.", tostring(source), tostring(inverse_err))
 		return false
 	end
-	local count = 0
-	for _ in pairs(built) do count = count + 1 end
+	local count = TableUtil.count(built)
 	if count < MIN_PLAUSIBLE_ENTRIES then
 		-- A keymap that parsed to almost nothing is a parse failure wearing the
 		-- shape of a success, and the consequence is silent: every expansion

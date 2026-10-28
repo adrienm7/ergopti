@@ -70,7 +70,7 @@ local function load_real_wpm_surface(module_name)
 		end,
 	}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm = 0 } end,
 	}
 	package.loaded["ui.wpm.shared"] = {

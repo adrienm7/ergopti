@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local PortFakes = require("tests.support.port_fakes")
 
 local function load_fixture(cancel_result)
 	helpers.load_with_stubs("infra.logger")
@@ -36,6 +37,7 @@ local function load_fixture(cancel_result)
 			llm_show_info_bar = false,
 			llm_sequential_mode = false,
 			llm_debounce = 0.1,
+			llm_min_request_interval = 0,
 			llm_disable_url_bars = false,
 			llm_disable_password_fields = true,
 			llm_auto_raise_temp = false,
@@ -68,19 +70,18 @@ local function load_fixture(cancel_result)
 		reset_failure_count = function() end,
 	}
 	package.loaded["modules.llm.app_filter"] = { is_blocked = function() return false end }
-	package.loaded["modules.llm.api_common"] = { get_rate_limit_min_interval_s = function() return 0 end }
 	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["ui.tooltip"] = PortFakes.complete_tooltip({
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		mark_chain_complete = function() return true end,
 		hide_forced_silent = function() return true end,
 		get_current_index = function() return nil end,
-	}
+	})
 
 	package.loaded["modules.llm.prediction_engine"] = nil
 	local engine = require("modules.llm.prediction_engine")

@@ -13,9 +13,7 @@
 	"tail_section": "tap_hold_key_delay_tail",
 	"tail": [
 		{
-			"type": "---",
-			"platforms": ["hs"],
-			"unavailable": "hide"
+			"type": "---"
 		},
 		{
 			"type": "command",
@@ -29,23 +27,21 @@
 			"i18n": "menu.tapholds.key_tap_delay_use_global",
 			"caption_getter": "tap_hold_key_global_delay_caption",
 			"checked_when": ["tap_hold_key_delay_is_global"],
-			"disabled_when": ["tap_hold_key_delay_has_override"],
-			"platforms": ["hs"],
-			"unavailable": "hide"
+			"disabled_when": ["tap_hold_key_delay_has_override"]
 		}
 	],
 	"platforms": {
 		"ahk": {
-			"key_rows": 5,
-			"delay_index": 5
+			"key_rows": 7,
+			"delay_index": 6
 		},
 		"hs": {
 			"key_rows": 7,
 			"delay_index": 6
 		},
 		"linux": {
-			"key_rows": 5,
-			"delay_index": 5
+			"key_rows": 7,
+			"delay_index": 6
 		}
 	}
 }

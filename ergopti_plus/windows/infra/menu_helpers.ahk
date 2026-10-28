@@ -93,7 +93,7 @@ _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultChild, Disamb
 		Checked := (SecName == "") ? t("menu.hotstrings.default_none")
 				: (TomlData["sections"].Has(SecName) ? DisambiguatedLabels[SecName] : "")
 		if !MenuRenderer_RepaintTemplateChild(DefaultChild, PersonalMenu, OldCaption, NewCaption, Checked,
-			(*) => _EditorPrefSet("DefaultSection", SecName))
+			(*) => _EditorPrefSet("default_section", SecName))
 			return false
 		_PrevDefaultLabel := NewLabel
 		return true
@@ -104,7 +104,7 @@ _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultChild, Disambig
 }
 _TogglePersonalCloseOnAdd(PersonalMenu) {
 		Label  := t("menu.hotstrings.close_on_add")
-		NewVal := (_EditorPrefGet("close_on_add", "1") == "1") ? "0" : "1"
+		NewVal := _EditorCloseOnAddEnabled() ? "0" : "1"
 		_EditorPrefSet("close_on_add", NewVal)
 		if (NewVal == "1") {
 				PersonalMenu.Check(Label)

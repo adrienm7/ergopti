@@ -45,7 +45,7 @@ helpers.describe("meta: nominal startup diagnostics stay warning-free", function
 	end)
 
 	helpers.it("deferred Karabiner suppression configuration is debug-only", function()
-		local source = read_source("local function build_managed_output_set") -- modules/keylogger/kc_bridge.lua
+		local source = read_source("local function build_managed_output_set") -- modules/keystats/kc_bridge.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"Tap/hold configuration is deferred", 1, true) ~= nil)
 		helpers.assert_true(source:find("No tap_hold_config or available_actions", 1, true) == nil)
 	end)

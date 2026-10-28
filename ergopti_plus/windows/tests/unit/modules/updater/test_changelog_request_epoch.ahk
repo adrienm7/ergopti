@@ -15,6 +15,7 @@ class _CRE_Request {
 	__New(Status, Json := "[]", Ready := true, ThrowOnWait := false) {
 		this.Status := Status
 		this.ResponseText := Json
+		this.ResponseEncodingValid := true
 		this.Ready := Ready
 		this.ThrowOnWait := ThrowOnWait
 		this.AbortCount := 0

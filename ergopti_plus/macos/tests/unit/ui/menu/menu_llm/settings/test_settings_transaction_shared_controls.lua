@@ -240,6 +240,44 @@ helpers.describe("LLM shared automatic trigger controls", function()
 		end)
 	end)
 
+	helpers.it("labels only the negative debounce \"never\": a zero delay is an immediate trigger (shared-automatic-triggers)", function()
+		for _, case in ipairs({ { 0, "0 ms", "NEVER" }, { -1, "NEVER", "0 ms" } }) do
+			local translate = function(key)
+				if key == "menu.llm.debounce_label" then return "Idle %s" end
+				return key == "menu.settings.never" and "NEVER" or key
+			end
+			with_fixture({ translate = translate }, function(fixture)
+				fixture.state.llm_debounce = case[1]
+				local title = fixture.trigger_menu()[1].title
+				helpers.assert_true(title:find(case[2], 1, true) ~= nil, "debounce " .. case[1] .. " shows " .. case[2])
+				helpers.assert_eq(title:find(case[3], 1, true), nil, "debounce " .. case[1] .. " does not show " .. case[3])
+			end)
+		end
+	end)
+
+	helpers.it("shows the minimum request interval after the idle time, with a reset once it is changed (request-floor-setting)", function()
+		local translate = function(key)
+			if key == "menu.llm.min_interval_label" then return "Floor %s" end
+			if key == "menu.llm.reset_label" then return "Reset %s" end
+			return key
+		end
+		with_fixture({ translate = translate }, function(fixture)
+			fixture.state.llm_debounce = 0.35
+			fixture.state.llm_min_request_interval = 0.5
+			local rows = fixture.trigger_menu()
+			helpers.assert_true(rows[1].title:find("menu.llm.debounce_label", 1, true) ~= nil)
+			helpers.assert_true(rows[2].title:find("Floor 500 ms", 1, true) ~= nil, "the row names the current floor: " .. rows[2].title)
+			helpers.assert_true(rows[3].title:find("Reset", 1, true) == nil, "no reset while it is the default")
+		end)
+		with_fixture({ translate = translate }, function(fixture)
+			fixture.state.llm_debounce = 0.35
+			fixture.state.llm_min_request_interval = 2
+			local rows = fixture.trigger_menu()
+			helpers.assert_true(rows[2].title:find("Floor 2000 ms", 1, true) ~= nil)
+			helpers.assert_true(rows[3].title:find("Reset 500 ms", 1, true) ~= nil, "a reset row offers the default: " .. rows[3].title)
+		end)
+	end)
+
 	helpers.it("rereads current values and refuses old callbacks after pause or master withdrawal (shared-automatic-triggers)", function()
 		for _, expected in ipairs(trigger_corpus().rows) do
 			local options = {trigger_states = {false, false}, prediction_count = 2}

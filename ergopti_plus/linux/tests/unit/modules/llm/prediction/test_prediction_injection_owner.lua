@@ -20,7 +20,7 @@ local function scenario(action, phase, body)
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
 		end
-		for _, name in ipairs({ "modules.keylogger.focus_guard", "modules.keylogger.keylogger", "adapters.secure_field_detector",
+		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "adapters.secure_field_detector",
 			"adapters.clipboard", "adapters.keyboard_layout", "modules.hotstrings.injector" }) do package.loaded[name] = nil end
 		local state = { bus = ":1.23", path = "/field/original", role = 61, now = 1000,
 			rows = {}, held = {}, writes = {}, requests = {}, errors = {}, stopped = 0, resets = 0, output = 0, paused = false,
@@ -29,7 +29,7 @@ local function scenario(action, phase, body)
 		logger.set_sink(function() end)
 		logger.set_error_observer(function(_, template) state.errors[#state.errors + 1] = template end)
 		package.loaded["logger.shim"] = logger
-		local policy = require("modules.keylogger.keylogger")
+		local policy = require("modules.keystats.keystats")
 		local configuration = assert(policy.configuration_snapshot()); configuration.private_filter_enabled = false
 		assert(policy.apply_configuration(configuration))
 		package.loaded["infra.llm_preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = {
@@ -58,8 +58,8 @@ local function scenario(action, phase, body)
 			snapshot = function() return receipt end,
 			invalidate = function() receipt = nil; listener(nil) end,
 		}
-		guard = require("modules.keylogger.focus_guard").new({ watch = watch,
-			detector = require("adapters.secure_field_detector"), keylogger = policy, prediction = engine,
+		guard = require("modules.keystats.focus_guard").new({ watch = watch,
+			detector = require("adapters.secure_field_detector"), keystats = policy, prediction = engine,
 			now_ms = function() return state.now end,
 			capture_context = function() return { app_id = "owned-editor", title = "owned-field", native_identity = "owned-window" } end,
 			publish_context = function(context) return true, policy.is_context_protected(context.app_id, context.title) end,
@@ -139,7 +139,8 @@ local function scenario(action, phase, body)
 		end
 		local scheduler = require("tests.fakes").timer_scheduler()
 		engine.init({ scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
-			engine = { current_buffer = function() return "btw" end, reset = function() state.resets = state.resets + 1 end },
+			engine = { reset = function() state.resets = state.resets + 1 end },
+			context = { text = function() return "btw" end, replaced = function() end },
 			is_paused = function() return state.paused end,
 			focus_id = function() local target = guard.focused_text_identity(); transition("focus"); return target end,
 			privacy_guard = function() local blocked = guard.blocks_text(); transition("privacy"); return blocked end,
@@ -158,7 +159,7 @@ local function scenario(action, phase, body)
 			engine.predict("btw", nil, { num_predictions = 1, profile = { id = "raw", system_single = "{context}" } })
 			-- A successor observes the real canonical provider pacing; advance only
 			-- this controlled scheduler, never a native/privacy deadline.
-			scheduler.test.advance(require("modules.llm.inference").min_interval_ms("api") / 1000)
+			scheduler.test.advance(require("modules.llm.trigger_settings").get("min_request_interval_ms") / 1000)
 			assert(#state.requests == before + 1, "the real Engine dispatches one controlled provider request")
 			state.requests[#state.requests](state.text, nil)
 			assert(engine.has_suggestions(), "the real parser admits the six-word response")

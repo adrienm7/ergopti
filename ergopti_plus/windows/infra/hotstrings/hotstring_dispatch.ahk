@@ -198,6 +198,7 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 	InsertedText := Owner["OnlyText"] ? Owner["PlainInsertedText"] : ""
 	ClearAll := !Owner["OnlyText"]
 	Effect := {
+		IsPrivate: Owner["IsPrivate"],
 		ClearAll: ClearAll,
 		DeleteFromEnd: DeleteCount,
 		InsertedText: InsertedText,
@@ -273,6 +274,7 @@ _HSE_CommitTerminalRawOwner(Owner, TrailingText := "") {
 				. InsertedText
 			_HSE_TrimBufferToCapacity()
 			Effect := {
+				IsPrivate: Owner["IsPrivate"],
 				ClearAll: false,
 				DeleteFromEnd: Backspaces,
 				InsertedText: InsertedText,
@@ -697,7 +699,7 @@ _HSE_CommitNotepadOwner(Owner) {
 			|| _PrefixDeferredGeneration != Owner["LifecycleGeneration"]
 		throw Error("The Notepad canonical commit lost its original input context.")
 	InsertedText := Owner["PlainInsertedText"]
-	Effect := { ClearAll: false, DeleteFromEnd: Owner["EraseUnits"],
+	Effect := { IsPrivate: Owner["IsPrivate"], ClearAll: false, DeleteFromEnd: Owner["EraseUnits"],
 		InsertedText: InsertedText, EndCharEmitted: Owner["EndCharPart"] != "",
 		KnownBoundaryAfter: InsertedText != ""
 			&& InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1))) > 0 }
@@ -900,16 +902,20 @@ _HSE_MirrorCanonicalEffectToLlm(Effect) {
 		if !A_IsCritical
 				throw Error("_HSE_MirrorCanonicalEffectToLlm requires a Critical buffer transaction.")
 		if !(IsObject(Effect) and Effect.HasOwnProp("DeleteFromEnd")
-				and Effect.HasOwnProp("InsertedText"))
-				throw Error("Canonical hotstring effect is missing DeleteFromEnd or InsertedText.")
+				and Effect.HasOwnProp("InsertedText") and Effect.HasOwnProp("IsPrivate")
+				and Effect.IsPrivate is Integer and (Effect.IsPrivate == true or Effect.IsPrivate == false))
+				throw Error("Canonical hotstring effect requires DeleteFromEnd, InsertedText and Boolean IsPrivate.")
 		; Every canonical hotstring edit passes here with its exact inserted text,
 		; which the auto-off InputHook never sees (SendLevel 0, SendInput, paste):
 		; a checked delimiter in an expansion ends CapsWord as if typed.
 		if IsSet(CapsWordAutoOffObserveOutput)
 				CapsWordAutoOffObserveOutput(Effect.InsertedText)
+		; The screen/matcher keeps the committed replacement. AI contexts restart
+		; after private output, so no later prompt can inherit that expansion.
+		ClearContext := Effect.IsPrivate or (Effect.HasOwnProp("ClearAll") and Effect.ClearAll)
 		if (IsSet(_LLM_Bridge_Active) and _LLM_Bridge_Active
 				and IsSet(_LLM_Bridge_ApplyBufferEdit)) {
-				if (Effect.HasOwnProp("ClearAll") and Effect.ClearAll)
+				if ClearContext
 						_LLM_Bridge_ApplyBufferEdit()
 				else
 						_LLM_Bridge_ApplyBufferEdit(Effect.DeleteFromEnd, Effect.InsertedText)
@@ -919,7 +925,7 @@ _HSE_MirrorCanonicalEffectToLlm(Effect) {
 		} else if IsSet(LLM_Bridge_MirrorAgentEdit) {
 				; Predictions are off: only the AI agent's own context follows it
 				LLM_Bridge_MirrorAgentEdit(Effect.DeleteFromEnd, Effect.InsertedText,
-						Effect.HasOwnProp("ClearAll") and Effect.ClearAll)
+						ClearContext)
 		}
 }
 
@@ -978,7 +984,7 @@ _HSE_DispatchNotepadRawCallback(Spec, EndChar, OutputHost, DispatchState,
 ; transaction. Ok is true only after output succeeds; Bs chars are then removed
 ; from the buffer's right and Ins appended. A false Ok means either a deliberate
 ; decline or a contained send failure. We wrap it with the same prefix suppression +
-; keylogger synthetic-marking the Replacement path uses, and resync HSE_Buffer from
+; keystats synthetic-marking the Replacement path uses, and resync HSE_Buffer from
 ; the effect so the next keystroke matches the post-expansion screen. This is what
 ; lets those two former native AHK Hotstring() registrations live in the HSE — no
 ; A_InputLevel dependency remains, so they register on the normal (and live-rebuild)
@@ -1006,7 +1012,7 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 		} else {
 				HSE_Suppress(true)
 		}
-		; The privacy flag rides along: the keylogger's InputHook observes the
+		; The privacy flag rides along: the keystats's InputHook observes the
 		; characters this callback is about to type, and without it they land in
 		; the typing row verbatim.
 		SyntheticOwner := 0
@@ -1040,6 +1046,7 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 										; Ins can never grow the buffer unbounded or drift the boundary flag.
 										_HSE_TrimBufferToCapacity()
 										CanonicalEffect := {
+												IsPrivate: Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate,
 												ClearAll: false,
 												DeleteFromEnd: EraseUnits,
 												InsertedText: Ins,
@@ -1086,6 +1093,29 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 		return Fired
 }
 
+; The factor that widens the expansion delay for a complex keystroke (PAR-7);
+; the same rule as hotstring_engine.complex_delay_multiplier on macOS and Linux.
+; The factor and the carry are the shared timing registry's
+; [hotstrings] complex_key_delay_multiplier / complex_key_carry_ms.
+; @param ExpanderComplex {Boolean} Shift/Alt/AltGr held on the expander keystroke.
+; @param ReferenceComplex {Boolean} The same for the reference (last letter) keystroke.
+; @param GapMs {Integer} Reference-to-expander gap in milliseconds.
+; @param Widenable {Boolean} False for a category that is never widened (autocorrection).
+; @returns {Integer} The registry's multiplier, or 1.
+HSE_ComplexDelayMultiplier(ExpanderComplex, ReferenceComplex, GapMs, Widenable) {
+		Multiplier := TimingsGet("hotstrings", "complex_key_delay_multiplier")
+		CarryMs := TimingsGet("hotstrings", "complex_key_carry_ms")
+		if (Multiplier < 1 or CarryMs < 0)
+				throw ValueError("HSE_ComplexDelayMultiplier: the registry values are out of range.")
+		if !Widenable
+				return 1
+		if ExpanderComplex
+				return Multiplier
+		if (ReferenceComplex and GapMs <= CarryMs)
+				return Multiplier
+		return 1
+}
+
 ; Resolve every dispatch gate into one immutable decision shared by the preview
 ; and the fire path. Keeping time, casing and callable resolution below in one
 ; owner prevents a tooltip from advertising a matcher winner that dispatch will
@@ -1096,7 +1126,7 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 ; @return Canonical decision object, or "" when dispatch must decline.
 _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 		TypoNbspStripped := false, FrozenResolvedBase := unset, NowTick := unset) {
-		global LastSentCharacterKeyTime
+		global LastSentCharacterKeyTime, LastSentCharacterKeyComplex
 		if !IsObject(Spec) or !Spec.HasOwnProp("Replacement")
 				return ""
 		if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback)
@@ -1119,7 +1149,8 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 						TriggerStart := StrLen(BufferAfterCompletion)
 								- CompletionStripLen - Spec.Length + 1
 						TypedPrev := TriggerStart >= 1
-								? _TextPenultimateCodepoint(SubStr(BufferAfterCompletion, TriggerStart, Spec.Length))
+								? HSE_TimeGateReferenceChar(SubStr(BufferAfterCompletion, TriggerStart, Spec.Length),
+										Spec.HasOwnProp("Star") and Spec.Star)
 								: ""
 						if (TypedPrev != "")
 								PrevKey := TypedPrev
@@ -1128,6 +1159,12 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 						return ""
 				GateOriginTick := LastSentCharacterKeyTime[PrevKey]
 				ElapsedMs := TickElapsed(GateOriginTick, NowTick?)
+				; A complex keystroke widens the allowed delay, never the measured gap.
+				Widenable := !(Spec.HasOwnProp("Category") and Spec.Category = "autocorrection")
+				GateDurationMs := Min(0xFFFFFFFF, GateDurationMs * HSE_ComplexDelayMultiplier(
+						HSE_KeyIsComplex(),
+						LastSentCharacterKeyComplex.Has(PrevKey) and LastSentCharacterKeyComplex[PrevKey],
+						ElapsedMs, Widenable))
 				; Preserve the engine's existing strict comparison: equality is the last
 				; fireable instant. The renderer separately refuses RemainingMs == 0 so
 				; it never paints a promise with no usable interaction window.
@@ -1186,8 +1223,12 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 ; conform verdict). Callers use this to decide whether a fire really happened: logging
 ; a fire — or stripping the preview buffer — for a decline reports an expansion the
 ; user never saw.
+; @param GateNowTick {Integer} The A_TickCount the time-activation gate is measured
+;   at; 0 means now. A completion typed later than the user pressed its end
+;   character (a tap-hold Space is typed when it comes up) passes the press tick,
+;   so the time the key stayed down is not held against the typist.
 HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
-		ForceConsumeEndChar := false, NativeSendFn := unset) {
+		ForceConsumeEndChar := false, NativeSendFn := unset, GateNowTick := 0) {
 		global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped, HSE_Buffer
 		global _HSE_TerminalOwnerSerial, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
 		global _PrefixInputContextGeneration, _PrefixDeferredGeneration
@@ -1230,17 +1271,30 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		if IsSet(HotstringPrefixWatcherClaimVisibleDecision)
 				try VisibleDecision := HotstringPrefixWatcherClaimVisibleDecision(
 						Spec, EndChar, HSE_Buffer)
+		GateTick := GateNowTick > 0 ? GateNowTick : A_TickCount
 		Prepared := IsObject(VisibleDecision)
 				? _HSE_PrepareDispatchDecision(Spec, HSE_Buffer, EndChar,
-						HSE_TypoNbspStripped, VisibleDecision.ResolvedBase)
+						HSE_TypoNbspStripped, VisibleDecision.ResolvedBase, GateTick)
 				: _HSE_PrepareDispatchDecision(
-						Spec, HSE_Buffer, EndChar, HSE_TypoNbspStripped)
+						Spec, HSE_Buffer, EndChar, HSE_TypoNbspStripped, , GateTick)
 		HotPath_LogIfSlow("HSE.Preflight", PreflightStarted, "")
 		if !IsObject(Prepared)
 				return false
 		IsConform := Prepared.IsConform
 		Replacement := Prepared.Replacement
 		OnlyText := Prepared.OnlyText
+		; The cascade (hotstring_cascade.ahk): the text this hotstring produces may
+		; complete further hotstrings. The whole chain is resolved here and goes out
+		; as THIS burst: the same erase plus whatever typed text a later link
+		; reaches back over, and the last link's text as the replacement.
+		CascadeUnits := 0
+		CascadeCodepoints := 0
+		CascadePlan := _HSE_PlanCascade(Spec, Prepared, EndChar, GateTick)
+		if IsObject(CascadePlan) {
+				Replacement := CascadePlan.Replacement
+				CascadeUnits := CascadePlan.ExtraUnits
+				CascadeCodepoints := CascadePlan.ExtraCodepoints
+		}
 		; Sender choice and terminal ownership must share one foreground receipt.
 		; Acquire it before suppression/synthetic ownership so an ambiguous focus or
 		; title probe declines with no output-side mutation.
@@ -1271,13 +1325,13 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		} else {
 				HSE_Suppress(true)
 		}
-		; Tag the backspace+replacement burst as synthetic so the keylogger keeps
+		; Tag the backspace+replacement burst as synthetic so the keystats keeps
 		; it out of the manual `chars` count and attributes the resulting n-grams
 		; to the hotstring source (esrc). Released on the same deferred timer as
 		; the suppression below so it covers the OS message-loop flush window.
 		;
 		; The second argument is not bookkeeping: the burst below is typed through
-		; the OS, the keylogger's own InputHook sees every character of it, and the
+		; the OS, the keystats's own InputHook sees every character of it, and the
 		; typing row it writes is a SECOND sink for the same secret the fire row
 		; already redacts.
 		SyntheticOwner := 0
@@ -1292,16 +1346,18 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				; +1 for the NNBSP/NBSP that was stripped before matching when the
 				; end-char is a typographic punctuation (``:`` / `` ; ``).
 				EraseUnits := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
+						+ CascadeUnits
 				BSCount := _TextCodepointLength(Spec.Trigger . EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
+						+ CascadeCodepoints
 				BackSpaceSeq := "{BackSpace " . BSCount . "}"
 				; Replacement, casing and OnlyText were frozen by the shared decision
 				; preflight above. Never resolve a callable again here: when the tooltip
 				; supplied the visible decision, this exact value is what it promised.
 				; (KLHook global removed)
 				exe := OutputHost["Exe"]
-				WindowTitle := OutputHost["Title"]
+				HostTitle := OutputHost["Title"]
 				IsNotepadApp := OutputHostTakesTextByPaste(OutputHost)
-				IsTerminalApp := _HSE_IsTerminalInputHost(exe, WindowTitle)
+				IsTerminalApp := _HSE_IsTerminalInputHost(exe, HostTitle)
 					; The clipboard route can only paste literal text. A Send-key payload such
 					; as '""{Left}' must keep its interpreted cursor movement in Notepad;
 					; pasting it would silently put the five characters "{Left}" on screen.
@@ -1421,7 +1477,13 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 												Hook := _SendHook
 												return _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))
 										}
-										SendInput(Burst)
+										; At TEXT_SENDER_SEND_LEVEL, never the caller's: the Space
+										; tap-hold completes a trigger from its #InputLevel 2 hotkey
+										; thread, and SendInput falls back to SendEvent whenever another
+										; AutoHotkey keyboard hook runs, so a burst typed at level 2 came
+										; back through the prefix watcher as typed input and cascaded
+										; (hotstring-output-is-final).
+										_TextSenderAtSendLevel(_AHK_SendInput.Bind(Burst))
 										return true
 								}
 								Fired := _HSE_SendWithAltGrUp(SendAtomicBurst)
@@ -1469,7 +1531,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					_BufferCrit := Critical("On")
 					try {
 							ExpansionEffect := HSE_ApplyExpansion(
-									Spec, Replacement, EndChar, ForceConsumeEndChar)
+									Spec, Replacement, EndChar, ForceConsumeEndChar, CascadeUnits)
 							_HSE_MirrorCanonicalEffectToLlm(ExpansionEffect)
 							CommittedEffect := ExpansionEffect
 					} finally {

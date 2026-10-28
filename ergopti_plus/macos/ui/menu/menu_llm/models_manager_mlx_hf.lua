@@ -21,6 +21,7 @@
 
 local M = {}
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
+local Identifiers = require("identifiers")
 local RunningApplication = require("adapters.running_application")
 
 local hs            = hs
@@ -31,6 +32,7 @@ local Paths         = require("infra.paths")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Logger        = require("infra.logger")
+local TextUtils = require("text_utils")
 
 local LOG = "menu_llm.models.mlx_hf"
 
@@ -519,7 +521,7 @@ function M.install(ctx)
 		if not fh then return nil end
 		local raw = fh:read("*a")
 		fh:close()
-		local token = raw and raw:match("^%s*(.-)%s*$") or ""
+		local token = raw and TextUtils.trim(raw) or ""
 		return token ~= "" and token or nil
 	end
 
@@ -529,7 +531,7 @@ function M.install(ctx)
 				for _, m in ipairs(family.models or {}) do
 					if m.name == model_name and m.urls and m.urls.mlx then
 						local repository = m.urls.mlx:gsub(
-							"^https?://huggingface%.co/", "")
+							"^https?://" .. Identifiers.hosts.huggingface:gsub("%.", "%%.") .. "/", "")
 						if MlxRepo.is_valid(repository) then return repository end
 						Logger.error(LOG,
 							"Preset MLX repository identifier is invalid; entry refused.")
@@ -606,7 +608,7 @@ function M.install(ctx)
 			return false
 		end
 
-		local url = "https://huggingface.co/" .. repo
+		local url = "https://" .. Identifiers.hosts.huggingface .. "/" .. repo
 		local ok_open, opened = xpcall(function()
 			return hs.urlevent.openURL(url)
 		end, debug.traceback)
@@ -655,11 +657,11 @@ function M.install(ctx)
 			pcall(function() hs_app:activate(true) end)
 		end
 
-		local hf_token_url = "https://huggingface.co/settings/tokens"
+		local hf_token_url = "https://" .. Identifiers.hosts.huggingface .. "/settings/tokens"
 		local clipboard_token_raw = hs.pasteboard and hs.pasteboard.getContents
 			and hs.pasteboard.getContents() or ""
 		local clipboard_token = type(clipboard_token_raw) == "string"
-			and clipboard_token_raw:match("^%s*(.-)%s*$") or ""
+			and TextUtils.trim(clipboard_token_raw) or ""
 		local token_seed = clipboard_token:match("^hf_[%w_%-]+$")
 			and clipboard_token or ""
 		if token_seed == "" then token_seed = read_hf_token() or "" end
@@ -814,7 +816,7 @@ function M.install(ctx)
 						end
 						flow.prompt_action_consumed = true
 						local token = type(msg.body.token) == "string"
-							and msg.body.token:match("^%s*(.-)%s*$") or ""
+							and TextUtils.trim(msg.body.token) or ""
 						if token == "" and token_seed ~= "" then
 							token = token_seed
 							pcall(notifications.notify, i18n.get("mlx.token_detected"),
@@ -997,7 +999,7 @@ function M.install(ctx)
 		end
 
 		local schedule_ok, handle_or_error, committed = xpcall(function()
-			local handle, started = TimerScheduler.after(0.05, function()
+			local handle, started = TimerScheduler.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 				if owner.callback_consumed == true then return end
 				owner.callback_pending = true
 				deliver_prompt()
@@ -1092,7 +1094,7 @@ try:
 
     ctx = ssl.create_default_context()
     req = urllib.request.Request(
-        'https://huggingface.co/api/whoami-v2',
+        'https://]] .. Identifiers.hosts.huggingface .. [[/api/whoami-v2',
         headers={
             'User-Agent': 'huggingface/hub',
             'Authorization': f'Bearer {token.strip()}'
@@ -1240,11 +1242,6 @@ PY
 			flow.task_committed = true
 			if pending_completion ~= nil then
 				finish_task(pending_completion.code, true)
-			elseif task_proven_not_running(task) then
-				-- A truthy start without either a live task or an exact terminal is
-				-- not a committed native capability. Settle it as a failed launch.
-				finish_task(nil, false)
-				return false
 			elseif not flow_is_authorized(flow) then
 				-- A signal accepted while start() was still on-stack predates the
 				-- capability that start() has just committed. Signal the same exact

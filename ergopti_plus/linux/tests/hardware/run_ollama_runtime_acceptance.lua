@@ -278,7 +278,12 @@ local ok, diagnostic = xpcall(function()
 	local wrote, closed = answer:write(inference_text), answer:close()
 	assert(wrote and closed, "private inference receipt captured")
 	assert(Engine.disable() == true and not Engine.is_enabled(), "actual master disable after inference")
-	assert(native_services[1].operation:is_running() == true, "exact daemon survives disabled enable ticket")
+	-- Switching the AI off ends the Ollama the app started for it.
+	local function daemon_retired()
+		return native_services[1].operation:is_settled() == true and not Engine.runtime_pending()
+	end
+	wait_until(daemon_retired)
+	assert(daemon_retired(), "master disable retires the exact app-started daemon")
 end, debug.traceback)
 local terminal_checkpoint_ok, terminal_checkpoint_error = pcall(checkpoint, "terminal-physical-shutdown")
 -- Exercise the adopted terminal engine owner through the actual coordinator

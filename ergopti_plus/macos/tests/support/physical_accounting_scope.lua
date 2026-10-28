@@ -8,14 +8,14 @@ local M = {}
 ---@param callback function Receives events, state, core and press.
 function M.run(callback)
 	helpers.with_stub_scope({
-		"hs", "tests.stubs.hs", "infra.logger", "modules.keylogger.aggregator.events",
-		"modules.keylogger.aggregator.core", "modules.keylogger.aggregator.state",
-		"modules.keylogger.aggregator.physical",
+		"hs", "tests.stubs.hs", "infra.logger", "modules.keystats.aggregator.events",
+		"modules.keystats.aggregator.core", "modules.keystats.aggregator.state",
+		"modules.keystats.aggregator.physical",
 	}, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		local events = helpers.load_with_stubs("modules.keylogger.aggregator.events")
-		local state = require("modules.keylogger.aggregator.state")
-		local core = require("modules.keylogger.aggregator.core")
+		local events = helpers.load_with_stubs("modules.keystats.aggregator.events")
+		local state = require("modules.keystats.aggregator.state")
+		local core = require("modules.keystats.aggregator.core")
 		state.initialized = true
 		state.device_id = "physical-accounting-test"
 		core.reset_batch()

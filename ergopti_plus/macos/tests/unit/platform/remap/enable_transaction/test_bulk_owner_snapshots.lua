@@ -389,7 +389,7 @@ helpers.describe("configured navigation reservations share actual remap settings
 			local build, consumed = generator.build_karabiner_json, nil
 			generator.build_karabiner_json = function(state, ...)
 				state.nav_layer.registry.keys.KeyJ.karabiner.key_code = "g"
-				local actual = require("platform.remap.nav_layer").build_rule(state.nav_layer.bindings, state.nav_layer.registry)
+				local actual = require("platform.remap.nav_layer").build_rule(state.nav_layer.bindings, state.nav_layer.registry, "ansi")
 				consumed = actual.manipulators[1].from.key_code
 				return build(state, ...)
 			end

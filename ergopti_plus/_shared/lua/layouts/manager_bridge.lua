@@ -16,8 +16,9 @@
 ---    and select an installed one; open_homepage only opens the https homepage
 ---    the catalogue gives for that layout, never a URL the page sends.
 --- 2. One state shape for the three drivers:
----    { platform, index, source, error, installed, provided, builtin, active,
----      busy, result, record_error }, so the page decides the rows once.
+---    { platform, shortcut_menu_path, index, source, error, installed, provided,
+---      builtin, active, busy, result, record_error }, so the page decides the
+---    rows once.
 --- 3. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
@@ -34,7 +35,14 @@ M.ACTIONS = {
 	select = true,
 	open_homepage = true,
 	close = true,
+	composer_open = true,
+	composer_save = true,
+	composer_remove = true,
 }
+
+-- The extension file both Lua drivers load as a layout's shortcut menu; the
+-- page counts it and never derives it from the platform.
+M.SHORTCUT_MENU_PATH = "shortcuts/menu.lua"
 
 -- A registry id: the rule of tools/build/build-layouts-index.cjs.
 local ID_PATTERN = "^[a-z][a-z0-9_]*$"
@@ -67,6 +75,7 @@ end
 function M.page_state(snapshot, result)
 	return {
 		platform = snapshot.platform,
+		shortcut_menu_path = M.SHORTCUT_MENU_PATH,
 		index = snapshot.index,
 		source = snapshot.source,
 		error = snapshot.error,
@@ -90,9 +99,50 @@ end
 -- =============================
 -- =============================
 
+--- Handles the three composer messages of the page.
+--- @param deps table The controller's collaborators.
+--- @param controller table
+--- @param action string
+--- @param payload table
+--- @param push_state function
+--- @return boolean handled
+function M.handle_composer(deps, controller, action, payload, push_state)
+	local registry = deps.registry
+	local operation = registry[action]
+	if type(operation) ~= "function" then
+		deps.log("warn", "Refused a layout composer message: the registry has no '%s' operation.", action)
+		return false
+	end
+	local function report(ok, code, detail, used, installed)
+		deps.push("composerResult", { action = action, ok = ok == true, code = code, detail = detail and tostring(detail),
+			used = used == true,
+			pending = type(installed) == "table" and installed.pending_activation == true,
+			consent = type(installed) == "table" and installed.consent == true })
+		push_state()
+	end
+	if action == "composer_open" then
+		operation(function(data) deps.push("composerData", data) end)
+		return true
+	end
+	if action == "composer_remove" then
+		operation(report)
+		return true
+	end
+	if type(payload.declaration) ~= "string" or type(payload.keylayout) ~= "string" then
+		deps.log("warn", "Refused a layout composer save without its declaration and layout.")
+		return false
+	end
+	operation({ declaration = payload.declaration, keylayout = payload.keylayout, use = payload.use == true }, report)
+	return true
+end
+
 --- Creates the controller of one page.
 --- deps.registry: { refresh(on_done), snapshot(), install(id, on_done),
 ---   uninstall(id, on_done), select(id, on_done) }; on_done(ok, detail_or_code, detail).
+--- deps.registry also offers the composer (docs/layout-composer.md) as
+---   composer_open(on_done), composer_save(payload, on_done) and
+---   composer_remove(on_done) (_shared/lua/layouts/composer.lua); a registry
+---   without them refuses the three composer messages.
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
 --- deps.strings() returns the translated strings the page shows.
 --- deps.open_url(url) opens an https URL; deps.close() closes the window.
@@ -109,7 +159,14 @@ function M.new(deps)
 	local function operation_done(id, action)
 		return function(ok, detail_or_code, detail)
 			if ok then
-				local warning = type(detail_or_code) == "table" and detail_or_code.enabled == false and "not_enabled" or nil
+				local warning = nil
+				if type(detail_or_code) == "table" and detail_or_code.consent == true then
+					-- macOS asks the user to allow a keyboard it has not seen before.
+					warning = "macos_consent"
+				elseif type(detail_or_code) == "table" and detail_or_code.enabled == false then
+					-- macOS lists it and turns it on at the next login: not a missing step for the user.
+					warning = detail_or_code.pending_activation == true and "pending_logout" or "not_enabled"
+				end
 				controller.result = { id = id, action = action, ok = true, warning = warning }
 			else
 				controller.result = { id = id, action = action, ok = false, code = tostring(detail_or_code),
@@ -142,6 +199,9 @@ function M.new(deps)
 		if action == "close" then
 			deps.close()
 			return true
+		end
+		if action == "composer_open" or action == "composer_save" or action == "composer_remove" then
+			return M.handle_composer(deps, controller, action, payload, push_state)
 		end
 		if type(id) ~= "string" or not id:match(ID_PATTERN) then
 			deps.log("warn", "Refused a layout manager '%s' without a valid layout id.", action)

@@ -123,6 +123,7 @@ NormaliseOutput(s) {
 }
 
 global _ReadPersonalTomlCache := false
+global _PersonalTomlReadGeneration := 0
 
 ; Validate the full-model ordering contract and return one stable key for every
 ; extant section. Duplicate order tokens are benign input corruption and collapse
@@ -282,12 +283,35 @@ _PersonalTomlOpeningImageMatches(Source, FilePath, OwnerToken) {
 		&& (Observed["content"] == Expected)
 }
 
-ReadPersonalToml(Refresh := false, OpeningSource := 0, ExactContent := unset) {
-	global _ReadPersonalTomlCache
-	if (!IsSet(ExactContent) && !Refresh && !(OpeningSource is Map) && _ReadPersonalTomlCache != false)
-		return _ReadPersonalTomlCache
+; A writer can invalidate false back to false while a parse is interrupted.
+; Compare an admission generation, never only the cache's current value.
+_PersonalTomlReadCurrent(Generation, FilePath) {
+	global _PersonalTomlReadGeneration
+	CurrentPath := PersonalTomlPath()
+	return Generation == _PersonalTomlReadGeneration && FilePath is String
+		&& CurrentPath is String && _ConfigWriteLeaseKey(FilePath) == _ConfigWriteLeaseKey(CurrentPath)
+}
 
-	FilePath := PersonalTomlPath()
+ReadPersonalToml(Refresh := false, OpeningSource := 0, ExactContent := unset) {
+	global _ReadPersonalTomlCache, _PersonalTomlReadGeneration
+	PreviousCritical := Critical("On")
+	try {
+		if (!IsSet(ExactContent) && !Refresh && !(OpeningSource is Map) && _ReadPersonalTomlCache != false)
+			return _ReadPersonalTomlCache
+	} finally Critical(PreviousCritical)
+	InheritedCritical := A_IsCritical
+	if InheritedCritical && !IsSet(ExactContent) {
+		Critical("Off")
+		try return ReadPersonalToml(Refresh, OpeningSource, ExactContent?)
+		finally Critical(InheritedCritical)
+	}
+	PreviousCritical := Critical("On")
+	try {
+		FilePath := PersonalTomlPath()
+		; Detached semantic projections used by the writer do not own the live
+		; cache. Genuine reads and writer invalidations each revoke older parses.
+		ReadGeneration := IsSet(ExactContent) ? 0 : ++_PersonalTomlReadGeneration
+	} finally Critical(PreviousCritical)
 	Result := Map(
 		"sections_order", [],
 		"sections", Map(),
@@ -301,14 +325,23 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0, ExactContent := unset) {
 		for Key, Value in Image
 			OpeningSource[Key] := Value
 		if !Image["admitted"] {
-			_TomlUnreadableFiles[FilePath] := true
+			PreviousCritical := Critical("On")
+			try {
+				if _PersonalTomlReadCurrent(ReadGeneration, FilePath)
+					_TomlUnreadableFiles[FilePath] := true
+			} finally Critical(PreviousCritical)
 			return Result
 		}
 	}
 	if !IsSet(ExactContent) && (Capturing ? !Image["present"] : !FileExist(FilePath)) {
-		if Capturing && _TomlUnreadableFiles.Has(FilePath)
-			_TomlUnreadableFiles.Delete(FilePath)
-		_ReadPersonalTomlCache := Result
+		PreviousCritical := Critical("On")
+		try {
+			if _PersonalTomlReadCurrent(ReadGeneration, FilePath) {
+				if Capturing && _TomlUnreadableFiles.Has(FilePath)
+					_TomlUnreadableFiles.Delete(FilePath)
+				_ReadPersonalTomlCache := Result
+			}
+		} finally Critical(PreviousCritical)
 		return Result
 	}
 
@@ -338,7 +371,13 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0, ExactContent := unset) {
 		if (Capturing || IsSet(ExactContent)) && SubStr(Raw, 1, 1) == Chr(0xFEFF)
 			Raw := SubStr(Raw, 2)
 	} catch as Err {
-		_TomlUnreadableFiles[FilePath] := true
+		if !IsSet(ExactContent) {
+			PreviousCritical := Critical("On")
+			try {
+				if _PersonalTomlReadCurrent(ReadGeneration, FilePath)
+					_TomlUnreadableFiles[FilePath] := true
+			} finally Critical(PreviousCritical)
+		}
 		try LoggerError("PersonalToml", "Cannot read '{1}': {2}. No personal hotstrings are loaded this session, and writes to this file are blocked so the empty result cannot replace its contents.", FilePath, Err.Message)
 		return Result
 	}
@@ -349,8 +388,14 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0, ExactContent := unset) {
 	; for the rest of the session, even though this very reader had since
 	; succeeded and _ReadPersonalTomlCache held the user's real model. The reader
 	; that raises the latch has to be the reader that lowers it.
-	if (!IsSet(ExactContent) && IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
-		_TomlUnreadableFiles.Delete(FilePath)
+	if !IsSet(ExactContent) {
+		PreviousCritical := Critical("On")
+		try {
+			if _PersonalTomlReadCurrent(ReadGeneration, FilePath)
+				&& IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath)
+				_TomlUnreadableFiles.Delete(FilePath)
+		} finally Critical(PreviousCritical)
+	}
 	; Normalise to LF so every line ends cleanly — eliminates CRLF anchor bugs
 	FileContent := StrReplace(Raw, "`r`n", "`n")
 	FileContent := StrReplace(FileContent, "`r", "`n")
@@ -487,8 +532,13 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0, ExactContent := unset) {
 			Seen[SecName] := true
 		}
 	}
-	if !IsSet(ExactContent)
-		_ReadPersonalTomlCache := Result
+	if !IsSet(ExactContent) {
+		PreviousCritical := Critical("On")
+		try {
+			if _PersonalTomlReadCurrent(ReadGeneration, FilePath)
+				_ReadPersonalTomlCache := Result
+		} finally Critical(PreviousCritical)
+	}
 	return Result
 }
 
@@ -521,9 +571,17 @@ _PersonalTomlCleanupStage(StagePath, DeleteFn := 0, WarnFn := 0) {
 }
 
 _PersonalTomlInvalidateCaches(FilePath) {
-	global _ReadPersonalTomlCache, _HS_GrandTotalCache
-	_ReadPersonalTomlCache := false
-	_HS_GrandTotalCache := -1
+	global _ReadPersonalTomlCache, _HS_GrandTotalCache, _PersonalTomlReadGeneration, _HS_GrandTotalReadOwner
+	PreviousCritical := Critical("On")
+	try {
+		; Revoke older parses in the same RAM span as invalidation, including
+		; the false-to-false case before and after a completed durable rewrite.
+		_PersonalTomlReadGeneration += 1
+		_ReadPersonalTomlCache := false
+		if IsSet(_HS_GrandTotalReadOwner)
+			_HS_GrandTotalReadOwner := 0
+		_HS_GrandTotalCache := -1
+	} finally Critical(PreviousCritical)
 	; This also evicts the raw-content _TomlFileCache, group config, section
 	; counts and resolve memo shared by the engine and prefix watcher.
 	try _ParseTomlGroupConfig_InvalidatePath(FilePath)
@@ -1118,6 +1176,11 @@ ReadPersonalInfoToml(FilePath) {
 			PersonalInformationLetters := Cache["letters"].Clone()
 			return
 		}
+		; A diagnostic or native read can pump another reader or durable writer.
+		; Retain the admitted identities before I/O, not whichever maps a later
+		; callback leaves behind when this older parse resumes.
+		OpeningInformation := PersonalInformation
+		OpeningLetters := PersonalInformationLetters
 	} finally Critical(PreviousCritical)
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
@@ -1142,16 +1205,27 @@ ReadPersonalInfoToml(FilePath) {
 		; would pass. Without the latch, opening the editor once and clicking OK
 		; overwrites the user's real IBAN, card number and SSN with the shipped
 		; placeholders, unrecoverably.
-		if IsSet(_TomlUnreadableFiles)
-			_TomlUnreadableFiles[FilePath] := true
+		PreviousCritical := Critical("On")
+		try {
+			if PersonalInformation != OpeningInformation || PersonalInformationLetters != OpeningLetters
+				|| _ReadPersonalInfoTomlCache != Cache
+				return
+			if IsSet(_TomlUnreadableFiles)
+				_TomlUnreadableFiles[FilePath] := true
+		} finally Critical(PreviousCritical)
 		LoggerError("hotstrings", "Could not read personal info TOML '{1}': {2}. Writes to this file are blocked so the placeholder identity cannot replace its contents.", FilePath, e.Message)
 		return
 	}
-	; The read succeeded: the in-memory identity is the user's again, so the
-	; writer may run. Same lower-what-you-raise rule as ReadPersonalToml.
-	if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
-		_TomlUnreadableFiles.Delete(FilePath)
-	NextInformation := PersonalInformation.Clone()
+	; Only the still-current admission may clear an unreadable-source latch.
+	PreviousCritical := Critical("On")
+	try {
+		if PersonalInformation != OpeningInformation || PersonalInformationLetters != OpeningLetters
+			|| _ReadPersonalInfoTomlCache != Cache
+			return
+		if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
+			_TomlUnreadableFiles.Delete(FilePath)
+		NextInformation := OpeningInformation.Clone()
+	} finally Critical(PreviousCritical)
 	NextLetters := Map()
 	SawLetters := false
 	FileContent := StrReplace(FileContent, "`r`n", "`n")
@@ -1197,6 +1271,11 @@ ReadPersonalInfoToml(FilePath) {
 	}
 	PreviousCritical := Critical("On")
 	try {
+		; Publish maps and their source cache only while this parse still owns
+		; the original admission. A completed newer transaction stays authoritative.
+		if PersonalInformation != OpeningInformation || PersonalInformationLetters != OpeningLetters
+			|| _ReadPersonalInfoTomlCache != Cache
+			return
 		PersonalInformation := NextInformation
 		if SawLetters
 			PersonalInformationLetters := NextLetters
@@ -2327,7 +2406,7 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 	}
 	; The engine registry has just been rewritten in place. The tooltip now asks
 	; that registry directly, so this rebuild is no longer a correctness fence;
-	; it refreshes only the auxiliary near-miss catalogue used by keylogger ROI.
+	; it refreshes only the auxiliary near-miss catalogue used by keystats ROI.
 	;
 	; The resync belongs HERE rather than in the two save handlers: this is the
 	; function that mutates the engine registry, so pairing the two makes the

@@ -18,6 +18,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
+local CommandLines = require("tests.support.command_lines")
 
 --- Assignment head that installs or restores the shared shell_runner slot.
 local ASSIGN_PATTERN = 'package%.loaded%[%"adapters%.shell_runner%"%]%s*=%s*'
@@ -65,15 +67,16 @@ local function collect_test_files(abs, results)
 	else
 		cmd = string.format("find '%s' -type f -name 'test_*.lua'", abs)
 	end
-	local pipe = io.popen(cmd)
-	if not pipe then return end
-	for raw_line in pipe:lines() do
+	local source_count = #results
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, raw_line in ipairs(inventory) do
 		local line = raw_line:gsub("\\", "/")
 		if line:match("test_[^/]+%.lua$") then
 			results[#results + 1] = line
 		end
 	end
-	pipe:close()
+	assert(#results > source_count, "source inventory contains no matching files")
 end
 
 
@@ -135,13 +138,9 @@ helpers.describe("shell_runner stub hygiene across the whole suite", function()
 
 		local offenders = {}
 		for _, path in ipairs(files) do
-			local fh = io.open(path, "r")
-			if fh then
-				local content = fh:read("*a")
-				fh:close()
-				if has_dangling_install(content) then
-					offenders[#offenders + 1] = path:match("tests/.+$") or path
-				end
+			local content = SourceFile.read(path)
+			if has_dangling_install(content) then
+				offenders[#offenders + 1] = path:match("tests/.+$") or path
 			end
 		end
 

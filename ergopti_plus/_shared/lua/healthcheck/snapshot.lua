@@ -257,7 +257,7 @@ end
 
 --- Loads the three documents a diagnostics host works from.
 --- @param shared function(rel) → absolute path under _shared/.
---- @return table { schema, templates, redaction, repository }
+--- @return table { schema, templates, redaction, repository, day_log }
 function M.load_config(shared)
 	local defaults = read_json(shared("modules/updater/defaults.json"))
 	local schema = M.load_schema(shared("modules/diagnostics/schema.json"))
@@ -271,6 +271,7 @@ function M.load_config(shared)
 		templates  = read_json(shared("modules/diagnostics/issue_templates.json")),
 		redaction  = read_json(shared("modules/diagnostics/redaction.json")),
 		repository = defaults.github,
+		day_log    = require("diagnostics.day_log").check_limits(read_json(shared("modules/diagnostics/day_log.json"))),
 	}
 end
 

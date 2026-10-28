@@ -132,7 +132,7 @@ local function exercise(kind, dry_run)
 					magic = require("modules.hotstrings.magic_key"), detector = detector, focus_guard = guard,
 					capture_gate = gate, dynamic = dynamic, paused = scripts.is_paused,
 					window_info = { getFocused = function() return { appId = "owned-editor", windowTitle = "Document" } end },
-					keylogger = policy, replay_input = function(queued) h.assert_eq(#queued, 0); return true end,
+					keystats = policy, replay_input = function(queued) h.assert_eq(#queued, 0); return true end,
 				})
 				atspi = require("adapters.atspi_focus")
 				atspi._publish_resident_snapshot({ bus = state.bus, path = state.path, role = state.role })
@@ -148,11 +148,14 @@ local function exercise(kind, dry_run)
 				local metrics = setmetatable({ on_keydown = function() end,
 					record_hotstring = function() commits = commits + 1 end }, { __index = policy })
 				local environment = setmetatable({ secure_focus_guard = guard, script_actions = scripts,
+					-- Bare keys: the shared expansion delay reads the held modifiers per key.
+					keyboard_hook = { held_modifiers = function() return {} end },
 					Monotonic = require("infra.monotonic"), WordReset = require("modules.hotstrings.word_reset"),
 					terminators_mod = require("keymap.terminators"), RepeatKey = repeat_key,
 					MagicKey = require("modules.hotstrings.magic_key"), opts = { dry_run = dry_run },
-					_cached_app_id = "owned-editor", keylogger = metrics, engine_mod = engine_mod, engine = engine,
+					_cached_app_id = "owned-editor", keystats = metrics, engine_mod = engine_mod, engine = engine,
 					dyn_hotstrings = dynamic, injector = injector, Logger = require("logger.shim"), user_hotstring_native = native,
+					keyboard_hook = session.hook,
 				}, { __index = _G })
 				local main = assert(io.open(root .. "/ergopti_hotstrings.lua", "rb"))
 				local source = main:read("*a"); assert(main:close())

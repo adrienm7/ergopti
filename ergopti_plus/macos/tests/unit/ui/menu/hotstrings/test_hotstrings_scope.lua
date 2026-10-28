@@ -145,11 +145,14 @@ local function fake_keymap(controls)
 	local lua_sections = { dynamichotstrings = { { name = "datefr" } } }
 	local km = { DELAY_KEY_TO_CATEGORY = { autocorrection = "autocorrection", rolls = "rolls" },
 		delays = {}, chosen = {}, previews = {}, reloads = {}, repeat_enabled = false, base = 0.9, trigger = "§",
-		idle_reset = 5, click_resets = false, arrow_resets = false, shortcut_resets = false, projected = {} }
+		idle_reset = 5, cascade = 2, click_resets = false, arrow_resets = false, shortcut_resets = false, projected = {} }
 	km.get_terminator_defs = Terminators.get_terminator_defs
 	km.is_terminator_enabled = Terminators.is_terminator_enabled
 	km.add_custom_terminator = Terminators.add_custom_terminator
 	km.is_terminator = Terminators.is_terminator
+	km.is_terminator_consume = Terminators.is_terminator_consume
+	km.set_terminators_consume = Terminators.set_terminators_consume
+	km.terminator_is_consumed = Terminators.terminator_is_consumed
 	function km.set_terminators_enabled(changes)
 		km.terminator_calls = (km.terminator_calls or 0) + 1
 		if controls.refuse_terminators or controls.refuse_terminator_call == km.terminator_calls then
@@ -229,6 +232,8 @@ local function fake_keymap(controls)
 	function km.set_base_delay(value) km.base = value; return true end
 	function km.get_idle_reset_seconds() return km.idle_reset end
 	function km.set_idle_reset_seconds(value) km.idle_reset = value; return true end
+	function km.get_cascade_max_arrows() return km.cascade end
+	function km.set_cascade_max_arrows(value) km.cascade = value; return true end
 	function km.is_click_resets_word_enabled() return km.click_resets end
 	function km.set_click_resets_word(value) km.click_resets = value; return true end
 	function km.is_arrow_resets_word_enabled() return km.arrow_resets end
@@ -335,6 +340,14 @@ local function fixture(options)
 		end
 	end
 	assert(km.set_terminators_enabled(known))
+	state.terminator_consume = hotstrings.terminator_consume or {}
+	local consumed = {}
+	for _, entry in ipairs(km.get_terminator_defs()) do
+		if entry.key and entry.custom ~= true and type(state.terminator_consume[entry.key]) == "boolean" then
+			consumed[entry.key] = state.terminator_consume[entry.key]
+		end
+	end
+	assert(km.set_terminators_consume(consumed))
 	local hotfiles = { "autocorrection", "rolls", "personal", "dynamichotstrings" }
 	local core = { keymap = km }
 	local PT = require("ui.menu.preferences_transaction")
@@ -430,7 +443,7 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.owner.apply("recommended"), true)
 		local overrides = f.config.parse_override_content(f.files.overrides)
 		for _, family in ipairs(COMMON_FAMILIES) do
-			helpers.assert_eq(overrides.autocorrection.sections[family].delay, 0.5)
+			helpers.assert_eq(overrides.autocorrection.sections[family].delay_offset, -0.25, "stored as an offset of the 0.75 s base")
 			helpers.assert_eq(overrides.autocorrection.sections[family].color, nil)
 		end
 		assert_family_delays(f, 0.5)
@@ -455,11 +468,12 @@ helpers.describe("macOS hotstrings scope", function()
 			local f = fixture()
 			helpers.assert_eq(f.owner.apply(mode), true)
 			local overrides = f.config.parse_override_content(f.files.overrides)
-			helpers.assert_eq(overrides.futurepack.sections.section.delay, 3.0)
+			helpers.assert_eq(overrides.futurepack.sections.section.legacy_delay, 3.0, "an earlier build's absolute delay stays as written")
 			helpers.assert_true(f.files.overrides:find("# kept comment", 1, true) ~= nil, "comment kept")
 			helpers.assert_true(f.files.overrides:find('consumed_delimiters = "x"', 1, true) ~= nil,
-				"a sibling driver's global kept")
-			helpers.assert_eq(f.config.get_word_delimiters(), " .,")
+				"an old delimiter table is foreign bytes and is kept")
+			helpers.assert_true(f.files.overrides:find('word_delimiters = " .,"', 1, true) ~= nil,
+				"an old delimiter table is foreign bytes and is kept")
 			helpers.assert_eq(backup(f.files, "overrides-backup-"), ORIGINAL_OVERRIDES)
 			helpers.assert_eq(backup(f.files, "config-backup-"), ORIGINAL_CONFIG)
 		end
@@ -487,6 +501,7 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.editor.trigger, "★")
 		helpers.assert_eq(f.km.base, 0.75)
 		helpers.assert_eq(f.km.idle_reset, 3, "restore applies the recommended idle reset")
+		helpers.assert_eq(f.km.cascade, 3, "restore applies the recommended cascade arrow count (3)")
 		helpers.assert_eq(f.km.click_resets, true, "restore applies the recommended click reset")
 		helpers.assert_eq(f.km.arrow_resets, true, "restore applies the recommended arrow reset")
 		helpers.assert_eq(f.km.shortcut_resets, true, "restore applies the recommended shortcut reset")
@@ -509,7 +524,7 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_nil(saved.hotstrings.trigger_char)
 	end)
 
-	helpers.it("clears to the neutral engine: stopped, defaults, no choices, consent revoked", function()
+	helpers.it("clears to the neutral engine: stopped, defaults, no choices, previews at their shipped default", function()
 		local f = fixture()
 		helpers.assert_eq(f.owner.apply("clear"), true)
 		local decoded = Codec.decode(f.files.config)
@@ -518,11 +533,16 @@ helpers.describe("macOS hotstrings scope", function()
 		for _, family in ipairs(COMMON_FAMILIES) do
 			helpers.assert_nil(((decoded.hotstrings.modules or {}).autocorrection or {})[family])
 		end
-		helpers.assert_nil(decoded.hotstrings.preview_ai_enabled)
+		-- An entry active by default restores its preset when deleted, so the clear
+		-- writes its declared off value.
+		helpers.assert_eq(decoded.hotstrings.preview_ai_enabled, false)
 		helpers.assert_eq(decoded.hotstrings.future, { keep = 1 })
 		helpers.assert_eq(f.engine.stops, 1)
 		helpers.assert_eq(f.state.keymap, false)
-		helpers.assert_eq(f.km.previews.ai, false)
+		-- The previews ship on but a clear writes their declared off value, so the
+		-- running AI preview is switched off with the stored row.
+		helpers.assert_eq(f.km.previews.ai, false, "the cleared preview is applied off")
+		helpers.assert_eq(f.state.preview_ai_enabled, false)
 		helpers.assert_eq(f.km.is_group_enabled("autocorrection"), false)
 		for _, family in ipairs(COMMON_FAMILIES) do
 			helpers.assert_eq(f.km.is_section_enabled("autocorrection", family), false)
@@ -608,7 +628,7 @@ helpers.describe("macOS hotstrings scope", function()
 			local parse = f.config.parse_override_content
 			f.config.parse_override_content = function(content)
 				local parsed = parse(content)
-				parsed.autocorrection = { sections = { [family] = { delay = 2.0 } } }
+				parsed.autocorrection = { sections = { [family] = { delay_offset = 1.25 } } }
 				return parsed
 			end
 			helpers.assert_eq(f.owner.apply("clear"), false)
@@ -644,6 +664,7 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.km.is_group_enabled("rolls"), false)
 		helpers.assert_eq(f.km.repeat_enabled, false)
 		helpers.assert_eq(f.km.idle_reset, 5, "revert restores the idle reset")
+		helpers.assert_eq(f.km.cascade, 2, "revert restores the cascade arrow count")
 		helpers.assert_eq(f.km.click_resets, false, "revert restores the click reset")
 		helpers.assert_eq(f.km.arrow_resets, false, "revert restores the arrow reset")
 		helpers.assert_eq(f.km.shortcut_resets, false, "revert restores the shortcut reset")
@@ -716,7 +737,7 @@ helpers.describe("macOS hotstrings scope", function()
 		for _, family in ipairs(COMMON_FAMILIES) do
 			f.config.parse_override_content = function(content)
 				local parsed = parse(content)
-				parsed.autocorrection = { sections = { [family] = { delay = 2.0 } } }
+				parsed.autocorrection = { sections = { [family] = { delay_offset = 1.25 } } }
 				return parsed
 			end
 			local reason = f.owner.unavailable()
@@ -752,7 +773,7 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.owner.apply("recommended"), true)
 		local overrides = f.config.parse_override_content(f.files.overrides)
 		for _, family in ipairs(COMMON_FAMILIES) do
-			helpers.assert_eq(overrides.autocorrection.sections[family].delay, 0.5)
+			helpers.assert_eq(overrides.autocorrection.sections[family].delay_offset, -0.25, "stored as an offset of the 0.75 s base")
 		end
 		assert_family_delays(f, 0.5)
 	end)
@@ -781,6 +802,26 @@ helpers.describe("hotstrings scope: delimiter parity (hotstrings-delimiter-scope
 			helpers.assert_nil((saved.terminator_states or {}).space)
 			helpers.assert_eq(saved.terminators,
 				{ { key = "custom_¤", char = "¤", label = "¤", consume = true } })
+		end)
+	end
+
+	for _, mode in ipairs({ "recommended", "clear" }) do
+		helpers.it("resets the consumed choice of shipped delimiters and keeps a personal entry's on " .. mode, function()
+			local source = DELIMITER_CONFIG .. '\n[hotstrings.terminator_consume]\nstar = false\ncomma = true\n'
+				.. '"custom_¤" = true\nretired = true\n'
+			local f = fixture({ config = source })
+			helpers.assert_eq(f.km.terminator_is_consumed(","), true, "the configured comma is consumed")
+			helpers.assert_eq(f.km.is_terminator_consume("star"), false, "the configured star is not consumed")
+			helpers.assert_eq(f.owner.apply(mode), true)
+			local consume = Codec.decode(f.files.config).hotstrings.terminator_consume or {}
+			helpers.assert_nil(consume.star, "the file inherits the shipped star consumption")
+			helpers.assert_nil(consume.comma, "the file inherits the shipped comma consumption")
+			helpers.assert_eq(consume["custom_¤"], true, "a personal entry is user data")
+			helpers.assert_eq(consume.retired, true, "cleanup still owns the outdated entry")
+			helpers.assert_eq(f.km.terminator_is_consumed(","), false)
+			helpers.assert_eq(f.km.is_terminator_consume("star"), true)
+			helpers.assert_nil(f.state.terminator_consume.star, "the next save must not resurrect the override")
+			helpers.assert_nil(f.state.terminator_consume.comma)
 		end)
 	end
 

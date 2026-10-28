@@ -74,7 +74,7 @@ _MNW_AbortAndRetry() {
 		AssertEqual(0, KLMigration.scanned, "a refused first statement must not count as migrated")
 		AssertEqual(0, KLMigration.stageBytesWritten)
 		AssertFalse(IsObject(KLMigration.writeFh), "abort must release the refused writer")
-		AssertEqual(Original, FileRead(Keylogger.data_sql_path, "UTF-8"))
+		AssertEqual(Original, FileRead(Keystats.data_sql_path, "UTF-8"))
 		Lock.Release()
 		AssertFalse(FileExist(Stage), "abort must retire only its incomplete stage")
 		AssertTrue(KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false))
@@ -86,7 +86,7 @@ _MNW_AbortAndRetry() {
 		_KLMig_Drain()
 		; Conversion normalizes spacing around rewritten SQL literals. Compare
 		; all stored columns through SQLite, retaining whitespace inside values.
-		AssertEqual(_MNW_LedgerRows(Original), _MNW_LedgerRows(FileRead(Keylogger.data_sql_path, "UTF-8")),
+		AssertEqual(_MNW_LedgerRows(Original), _MNW_LedgerRows(FileRead(Keystats.data_sql_path, "UTF-8")),
 			"an unlocked retry must preserve every stored value through encryption and decryption")
 	} finally {
 		Lock.Release()

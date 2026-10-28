@@ -11,6 +11,10 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+; The generated menu-command constants; #Include skips a file the entry script
+; already loaded.
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -215,6 +219,7 @@ _MI_StageLayout() {
 		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
 		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
 		"magic_key_source",       (*) => MagicKeySourceMenuRows(),
+		"layout_switching",       (*) => PauseLayoutSwitch_MenuRows(),
 	)
 	; The accented-letter group stays enabled without the Ergopti emulation: the
 	; shortcuts then follow the user's own layout (accented_shortcuts.ahk).
@@ -252,6 +257,7 @@ _MI_StageHotstrings() {
 		; which the seams of these commands must never receive.
 		"idle_reset", (Seconds) => SetHotstringsIdleResetSeconds(Seconds),
 		"idle_reset_custom", (*) => PromptHotstringsIdleResetSeconds(),
+		MenuCommand.CASCADE_MAX_ARROWS, (Arrows) => SetHotstringsCascadeMaxArrows(Arrows),
 		"click_resets_word", (*) => ToggleHotstringsClickResetsWord(),
 		"arrow_resets_word", (*) => ToggleHotstringsWordResetFlag("arrow_resets_word"),
 		"shortcut_resets_word", (*) => ToggleHotstringsWordResetFlag("shortcut_resets_word"),
@@ -260,6 +266,7 @@ _MI_StageHotstrings() {
 	_HotParamGetters := Map(
 		"hotstrings_repeat_enabled", () => ReadFeatureStateV2("hotstrings.repeat_key_enabled").Get("enabled", false),
 		"hotstrings.idle_reset_seconds", () => HSE_IdleResetSecondsCurrent(),
+		ConfigKey.HOTSTRINGS_CASCADE_MAX_ARROWS, () => HSE_CascadeMaxArrowsCurrent(),
 		"hotstrings_click_resets_word", () => HSE_ClickResetsWordCurrent(),
 		"hotstrings_arrow_resets_word", () => HSE_WordResetFlagCurrent("arrow_resets_word"),
 		"hotstrings_shortcut_resets_word", () => HSE_WordResetFlagCurrent("shortcut_resets_word"),
@@ -276,6 +283,7 @@ _MI_StageHotstrings() {
 		; renderer builds the item from the data this returns.
 		"magic_key_config",              (*) => _HS_MagicKeyRows(),
 		"delays_colors",                 (*) => _HS_DelaysColorsRows(),
+		"preview_bubbles",               (*) => _HS_PreviewBubbleRows(),
 		; The five category blocks. Their ROW — label, count, checkmark and
 		; position — is the renderer's now; the submenu hanging off each one is
 		; still SubMenus[Category], assembled by a different subsystem, and is
@@ -473,7 +481,7 @@ _MI_StageReload() {
 		Map("reload", MenuStartupLifecycleDispatch.Bind("reload", ActivateReload)))
 	if Row is Map && Row.Has("action") {
 		; Keep lifecycle admission explicit after the shared provider wraps its callback.
-		TrayMenuStage_AddAction(Row["label"], MenuStartupSafeCommand(Row["action"]))
+		TrayMenuStage_AddAction(Row["label"], MenuStartupReloadCommand(Row["action"]))
 		if Row.Get("disabled", false)
 			TrayMenuStage_Disable(Row["label"])
 	}
@@ -646,6 +654,10 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 		"open_today_log", OpenTodayLog,
 		"open_error_log", OpenErrorLog,
 		"healthcheck",    MenuStartupUiCommand(ShowHealthCheck, MenuStartupDiagnosticsReady),
+		MenuCommand.SEND_PROBE, InputProbe_SendComparisonCommand,
+		MenuCommand.HOOK_PROBE, InputProbe_HookOrderCommand,
+		MenuCommand.COMPOSER_CHECK, ComposerCheck_Command,
+		MenuCommand.FIELD_CHECK_NETWORK, NetworkCheck_Command,
 		"report_bug",      (*) => HealthCheck_ReportBug(),
 		"suggest_feature", (*) => HealthCheck_SuggestFeature(),
 		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),

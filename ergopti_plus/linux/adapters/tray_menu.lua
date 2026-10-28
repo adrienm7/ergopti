@@ -43,6 +43,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Indicator = require("platform.tray.appindicator")
 local Protocol = require("tray.protocol")
+local Perf = require("infra.perf_counters")
 
 local LOG = "adapters.tray_menu"
 
@@ -131,10 +132,10 @@ function M.setIcon(opts)
 	end
 end
 
---- Replaces the menu.
---- @param items table Array of { title, fn?, menu?, checked?, disabled?, separator? }.
---- @return boolean accepted Native menu accepted; GTK events may remain queued.
-function M.setMenu(items)
+--- The native menu replacement behind setMenu, which counts and times it.
+--- @param items table Array of rows.
+--- @return boolean accepted
+local function replace_menu(items)
 	_items = type(items) == "table" and items or {}
 	if not ensure_started() then
 		Logger.debug(LOG, "setMenu() before an icon exists — kept for when one does.")
@@ -143,6 +144,17 @@ function M.setMenu(items)
 	if Indicator.set_menu(_items) ~= true then return false end
 	Logger.debug(LOG, "Tray menu set (%d top-level row(s)).", #_items)
 	return true
+end
+
+--- Replaces the menu.
+--- @param items table Array of { title, fn?, menu?, checked?, disabled?, separator? }.
+--- @return boolean accepted Native menu accepted; GTK events may remain queued.
+function M.setMenu(items)
+	local started = Perf.clock()
+	Perf.count("tray.builds")
+	local accepted = replace_menu(items)
+	Perf.span("tray.build", started)
+	return accepted
 end
 
 --- Installs a fallback menu: a name, optional action groups and a way out.

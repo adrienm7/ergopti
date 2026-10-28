@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 --- The ordered modifier and layer ids of a picker catalogue.
 --- @param catalogue table|nil The `[tap_hold.hold_picker]` table.
@@ -37,8 +38,8 @@ end
 --- The modifier id an alias of the catalogue means, or nil. The aliases live
 --- in the catalogue (`modifier_aliases`, `left_modifier_aliases`) because the
 --- Windows loader (ResolveHoldModifierKey) reads the same two tables: one file
---- must mean one hold everywhere. This driver always holds the left key, so
---- the two mean the same here.
+--- must mean one hold everywhere. Both name the same modifier id; the side a
+--- left alias forces is read by M.left_forced.
 --- @param catalogue table|nil The `[tap_hold.hold_picker]` table.
 --- @param alias string A lower-case spelling.
 --- @return string|nil
@@ -121,6 +122,32 @@ function M.canonical_modifier(value, catalogue)
 	return table.concat(ordered, "+")
 end
 
+--- The modifiers a `hold_modifier` value spells with a left-key alias (`lctrl`,
+--- `lshift`, `lalt`, `lwin`), as canonical ids. A plain `ctrl` or
+--- `shift` on the right Ctrl / right Shift key holds that key's own side; the
+--- left alias forces the left key there, as the Windows loader reads it
+--- (ResolveHoldModifierKey). Canonicalising drops the spelling, so a driver that
+--- honours the side asks here before it canonicalises.
+--- @param value string A raw `hold_modifier` value.
+--- @param catalogue table|nil The `[tap_hold.hold_picker]` table.
+--- @return string|nil forced The canonical ids joined with "+" in the picker's
+---   order ("ctrl+shift"), nil when no modifier is spelled with a left alias.
+function M.left_forced(value, catalogue)
+	local aliases = type(catalogue) == "table" and catalogue.left_modifier_aliases or nil
+	if type(value) ~= "string" or type(aliases) ~= "table" then return nil end
+	local forced = {}
+	for token in value:gmatch("[^+%s]+") do
+		local id = aliases[token:lower()]
+		if type(id) == "string" then forced[id] = true end
+	end
+	local ordered = {}
+	for _, id in ipairs((catalogue_ids(catalogue))) do
+		if forced[id] then ordered[#ordered + 1] = id end
+	end
+	if #ordered == 0 then return nil end
+	return table.concat(ordered, "+")
+end
+
 --- The canonical form of a `hold_layer` value: a declared layer id, matched
 --- without regard to case or surrounding blanks; "" is no layer.
 --- @param value string
@@ -129,7 +156,7 @@ end
 function M.canonical_layer(value, catalogue)
 	if type(value) ~= "string" then return nil, "a hold layer must be a string" end
 	local _, layers = catalogue_ids(catalogue)
-	local wanted = value:match("^%s*(.-)%s*$"):lower()
+	local wanted = TextUtils.trim(value):lower()
 	if wanted == "" then return "" end
 	for _, layer in ipairs(layers) do
 		if layer == wanted then return layer end

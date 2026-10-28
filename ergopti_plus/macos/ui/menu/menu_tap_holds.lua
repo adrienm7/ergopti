@@ -39,6 +39,7 @@ local LOG         = "menu.tap_holds"
 local i18n        = require("infra.i18n")
 local text_utils  = require("infra.text_utils")
 local WindowTitles = require("window_titles")
+local ConfigKeys = require("config_keys")
 
 
 
@@ -278,7 +279,7 @@ local _scope_generation = 0
 --- @param scope string|nil "tap_holds" by default, or "key_combinations".
 --- @return boolean accepted
 local function run_scope(karabiner, mode, update_menu, scope)
-	scope = scope or "tap_holds"
+	scope = scope or ConfigKeys.KEY.TAP_HOLDS
 	_scope_generation = _scope_generation + 1
 	local backup_path = require("infra.config_paths").get("KarabinerConfigPath") .. "." .. scope .. "-"
 		.. tostring(hs.timer.absoluteTime()) .. "-" .. _scope_generation .. ".bak"
@@ -467,8 +468,9 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 	local hold_slbl = short_action_label(action_index, current_hold)
 	local is_active = (current_tap ~= "none" or current_hold ~= "none")
 
-	-- Per-key tap/hold threshold: the effective value is the per-key override when
-	-- set, otherwise the single global timeout (no duplicated literal when unset).
+	-- Per-key tap/hold threshold: the key's own override when it has one, otherwise
+	-- the global delay (no key ships a delay of its own), so no literal is
+	-- duplicated here and a change of the global never moves an overridden key.
 	local global_ms = karabiner.get_tap_hold_timeout() or karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS
 	local ok_to, per_key_ms = pcall(karabiner.get_tap_timeout, kid)
 	if not ok_to then per_key_ms = nil end
@@ -480,16 +482,16 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		or  (tap_slbl .. "  /  " .. hold_slbl)
 
 	local key_submenu = ManifestMenu.template_rows("tap_hold_key_rows", {
-		["tap_hold_key_tap"] = function()
+		[ConfigKeys.COMMAND.TAP_HOLD_KEY_TAP] = function()
 			return open_slot_picker(karabiner, { slot = "tap", id = kid, presentation_id = "tap_hold_action",
 				suffix = key_label, getter = "get_tap_action", setter = "set_tap_action" }, update_menu)
 		end,
-		["tap_hold_key_hold_action"] = function()
+		[ConfigKeys.COMMAND.TAP_HOLD_KEY_HOLD_ACTION] = function()
 			return open_slot_picker(karabiner, { slot = "hold", id = kid, presentation_id = "tap_hold_hold_action",
 				suffix = key_label, getter = "get_hold_action", setter = "set_hold_action" }, update_menu)
 		end,
 		-- The delay row opens the native dialog itself; persistence keeps its owner.
-		["tap_hold_key_delay"] = function()
+		[ConfigKeys.COMMAND.TAP_HOLD_KEY_DELAY] = function()
 			hs.focus()
 			local prompt = string.format(
 				i18n.get("menu.tapholds.key_tap_delay_dialog_prompt"), global_ms)
@@ -509,12 +511,12 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 				return karabiner.set_tap_timeout(kid, math.floor(ms))
 			end, update_menu)
 		end,
-		["tap_hold_key_delay_use_global"] = function()
+		[ConfigKeys.COMMAND.TAP_HOLD_KEY_DELAY_USE_GLOBAL] = function()
 			return commit_menu_setting(karabiner, "Per-key timeout reset", function()
 				return karabiner.set_tap_timeout(kid, nil)
 			end, update_menu)
 		end,
-		["tap_hold_key_no_action"] = function()
+		[ConfigKeys.COMMAND.TAP_HOLD_KEY_NO_ACTION] = function()
 			return run_bulk_menu_command(
 				karabiner,
 				"clear_tap_hold_binding",
@@ -529,7 +531,11 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		["tap_hold_key_configured"] = function() return is_active end,
 		["tap_hold_key_tap_caption"] = function() return tap_slbl end,
 		["tap_hold_key_hold_caption"] = function() return hold_slbl end,
-		["tap_hold_key_delay_caption"] = function() return fmt_delay(effective_ms) end,
+		-- « global (200 ms) » while the key follows the global delay, else its own.
+		["tap_hold_key_delay_caption"] = function()
+			if per_key_ms ~= nil then return fmt_delay(per_key_ms) end
+			return string.format(i18n.get("menu.tapholds.key_tap_delay_inherited"), fmt_delay(global_ms))
+		end,
 		["tap_hold_key_global_delay_caption"] = function() return fmt_delay(global_ms) end,
 		["tap_hold_key_delay_is_global"] = function() return per_key_ms == nil end,
 		["tap_hold_key_delay_has_override"] = function() return per_key_ms ~= nil end,
@@ -646,7 +652,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 
 	local render_ctx = {
 		commands = {
-			["key_combination_clear"] = function()
+			[ConfigKeys.COMMAND.KEY_COMBINATION_CLEAR] = function()
 				return run_bulk_menu_command(karabiner, "clear_combo_binding",
 					"Clearing one modifier combo…", "Modifier combo cleared.", false, update_menu, cid)
 			end,
@@ -972,7 +978,7 @@ local GUARDIAN_STATUS_ROWS = {
 	requires_approval = {
 		rows = function(karabiner)
 			return ManifestMenu.template_rows("tap_hold_guardian_approval_rows", {
-				["tap_hold_login_items_steps"] = login_items_steps_command(karabiner),
+				[ConfigKeys.COMMAND.TAP_HOLD_LOGIN_ITEMS_STEPS] = login_items_steps_command(karabiner),
 			})
 		end,
 		opener = "open_guardian_settings",
@@ -1001,7 +1007,7 @@ local function guardian_status_rows(karabiner, tap_holds_on)
 	if not rows then return {} end
 	if type(opener) == "function" then
 		local open_rows = ManifestMenu.template_rows("tap_hold_login_items_open_rows", {
-			["tap_hold_login_items_open"] = function()
+			[ConfigKeys.COMMAND.TAP_HOLD_LOGIN_ITEMS_OPEN] = function()
 				Logger.info(LOG, "Opening Login Items for the remap guardian (%s).", state)
 				return opener(report_login_items_opened) == true
 			end,
@@ -1026,7 +1032,7 @@ local function legacy_rules_rows(karabiner)
 	end
 	if type(conflicts) ~= "table" then return {} end
 	return ManifestMenu.template_rows("tap_hold_legacy_rules_rows", {
-		["tap_hold_legacy_rules_cleanup"] = function()
+		[ConfigKeys.COMMAND.TAP_HOLD_LEGACY_RULES_CLEANUP] = function()
 			Logger.info(LOG, "Showing the legacy Karabiner rules cleanup from the Tap-Holds menu.")
 			local shown_ok, shown = xpcall(function()
 				return require("ui.legacy_rules_cleanup").open(karabiner)
@@ -1099,14 +1105,14 @@ function M.build(ctx)
 	-- rows and ids on every driver, this engine's implementation behind them.
 	-- Like there, they leave the key combinations of the Shortcuts group alone.
 	local commands = {
-		["tapholds_toggle"] = function()
+		[ConfigKeys.COMMAND.TAPHOLDS_TOGGLE] = function()
 			return M.set_feature_enabled(karabiner, not tap_holds_on, update_menu)
 		end,
-		["scope_restore"] = function() return run_scope(karabiner, "recommended", update_menu) end,
-		["scope_clear"] = function() return run_scope(karabiner, "clear", update_menu) end,
+		[ConfigKeys.COMMAND.SCOPE_RESTORE] = function() return run_scope(karabiner, "recommended", update_menu) end,
+		[ConfigKeys.COMMAND.SCOPE_CLEAR] = function() return run_scope(karabiner, "clear", update_menu) end,
 		-- Required on the click: the editor loads the layer data and its window
 		-- stack, which a menu build has no use for.
-		["edit_nav_layer"] = function()
+		[ConfigKeys.COMMAND.EDIT_NAV_LAYER] = function()
 			return require("ui.layer_editor").open({ karabiner = karabiner })
 		end,
 	}
@@ -1195,19 +1201,19 @@ function M.build_key_combinations(ctx)
 
 	local combos_on = karabiner.get_mod_combos_enabled() == true
 	local commands = {
-		["key_combinations_toggle"] = function()
+		[ConfigKeys.COMMAND.KEY_COMBINATIONS_TOGGLE] = function()
 			return M.set_key_combinations_enabled(karabiner, not combos_on, update_menu)
 		end,
-		["scope_restore"] = function()
+		[ConfigKeys.COMMAND.SCOPE_RESTORE] = function()
 			return run_scope(karabiner, "recommended", update_menu, "key_combinations")
 		end,
-		["scope_clear"] = function()
+		[ConfigKeys.COMMAND.SCOPE_CLEAR] = function()
 			return run_scope(karabiner, "clear", update_menu, "key_combinations")
 		end,
-		["combo_symmetric"] = function()
+		[ConfigKeys.COMMAND.COMBO_SYMMETRIC] = function()
 			return toggle_combo_symmetric(karabiner, update_menu)
 		end,
-		["copy_tap_to_combo"] = function()
+		[ConfigKeys.COMMAND.COPY_TAP_TO_COMBO] = function()
 			return run_bulk_menu_command(
 				karabiner,
 				"copy_tap_actions_to_combos",
@@ -1225,7 +1231,7 @@ function M.build_key_combinations(ctx)
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
 	render_ctx.state_getters["key_combinations_enabled"] = function() return combos_on end
-	render_ctx.state_getters["combo_symmetric"] = function() return karabiner.get_combo_symmetric() == true end
+	render_ctx.state_getters[ConfigKeys.COMMAND.COMBO_SYMMETRIC] = function() return karabiner.get_combo_symmetric() == true end
 
 	-- The rows ManifestMenu.build returns are already rendered: the group row
 	-- takes them as its finished submenu.

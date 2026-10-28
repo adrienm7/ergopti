@@ -61,10 +61,18 @@ server:listen(16, function(error)
 		requests[#requests + 1] = { method = method, route = route,
 			authorization = input:sub(1, boundary):match("[Aa]uthorization: ([^\r\n]+)"),
 			body = input:sub(boundary + 4) }
-		if response.pending then return end
-		local body = route:match("/chat/completions$") and '{"choices":[{"message":{"content":"native reply"}}]}' or response.body
-		local header = "HTTP/1.1 " .. response.status .. " Fixture\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: " .. #body .. "\r\n\r\n"
-		socket:write(header .. body, function() socket:shutdown(function() close(socket) end) end)
+		local held = response
+		local function respond()
+			local body = route:match("/chat/completions$") and '{"choices":[{"message":{"content":"native reply"}}]}' or held.body
+			local header = "HTTP/1.1 " .. held.status .. " Fixture\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: " .. #body .. "\r\n\r\n"
+			socket:write(header .. body, function() socket:shutdown(function() close(socket) end) end)
+		end
+		-- A held control keeps each answer until it releases them all at once.
+		if held.pending then
+			if held.held then held.held[#held.held + 1] = respond end
+			return
+		end
+		respond()
 	end)
 end)
 local entry = { id = "local", provider = "lmstudio", token = "", model = "fixture-model", base_url = base_url }
@@ -314,13 +322,17 @@ end
 local source_reader = assert(io.open(private_path, "rb"))
 local exact_source = source_reader:read("*a"); source_reader:close()
 local source_receipt = Servers.capture("configured:" .. configured_entries[1].id)
-response = { status = 200, body = '{"data":[{"id":"obsolete-after-source-drift"}]}' }
+-- The sweep starts only after the asynchronous port scan, so the premise is
+-- held explicitly: every probe reaches the server and waits, the file drifts,
+-- and only then do the six answers return.
+response = { status = 200, body = '{"data":[{"id":"obsolete-after-source-drift"}]}', pending = true, held = {} }
 discovery_done = false
 local drift_before = #requests
 Servers.rescan(function() return true end, function() discovery_done = true end)
--- Preserve this control's acquisition-before-drift premise under idle dispatch.
-EventLoop._run_idle_tick()
+check(run_until(function() return #requests == drift_before + 6 end) and not discovery_done,
+	"all six native probes are acquired and held before the private file drifts")
 local source_writer = assert(io.open(private_path, "wb")); source_writer:write(exact_source .. "\n"); source_writer:close()
+for _, release in ipairs(response.held) do release() end
 check(run_until(function() return discovery_done end) and #requests == drift_before + 6,
 	"all six acquired native probes settle across actual private-file drift")
 check(#Servers.detected() == 0, "changed physical source refuses every old native positive model response")

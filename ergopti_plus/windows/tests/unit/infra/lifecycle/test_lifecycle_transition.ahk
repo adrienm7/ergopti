@@ -117,8 +117,8 @@ _LT_SystemIntervalsOwnerIsAdmitted() {
 		_LifecycleTransitionsByPhase := Map()
 		State := { calls: [] }
 		Transaction := LifecycleTransitionBegin("suspend")
-		AssertTrue(_LifecycleRunRequiredStep(Transaction, "keylogger-system-intervals",
-			_LT_Succeed.Bind(State, "keylogger-system-intervals")))
+		AssertTrue(_LifecycleRunRequiredStep(Transaction, "keystats-system-intervals",
+			_LT_Succeed.Bind(State, "keystats-system-intervals")))
 		AssertEqual(1, State.calls.Length, "the system interval suspension action must actually run")
 		AssertTrue(LifecycleTransitionFinish(Transaction))
 	} finally {
@@ -344,3 +344,10 @@ Test("lifecycle transition: real programmable cancellation debt gates suspend ac
 #Include ../../modules/llm/servers/test_ollama_webview_pause_readiness.ahk
 
 #Include ../../modules/llm/servers/test_ollama_webview_deferred_delivery.ahk
+
+#Include test_external_suspend_program_owner.ahk
+
+#Include test_suspend_prefetch_receipt.ahk
+
+#Include test_keepawake_suspend_owner.ahk
+#Include test_uia_suspend_worker_debt.ahk

@@ -11,7 +11,7 @@
 --- SIX different answers for what to do when it is unset:
 ---
 ---     os.getenv("HOME") or "/tmp"          -- crash reporter, updater
----     os.getenv("HOME") or "~"             -- hotstrings, kanata, keylogger…
+---     os.getenv("HOME") or "~"             -- hotstrings, kanata, keystats…
 ---     os.getenv("HOME") or ""              -- gestures
 ---     os.getenv("HOME") or "."             -- logger sink
 ---     os.getenv("HOME") or "/home/user"    -- five webview bridges
@@ -40,6 +40,7 @@
 local M = {}
 
 local AppDirs = require("app_dirs")
+local NativePath = require("native_path")
 
 local CONFIG_DIR_STORAGE_KEY = "paths.config_dir"
 -- Bootstrap storage key of the LogsDirPath override, from the shared registry.
@@ -197,9 +198,9 @@ function M.data(rel)
 	return (base .. "/" .. (rel:gsub("^/+", "")))
 end
 
---- The keylogger's metrics store. It lives in the data directory, so it does not
+--- The keystats's metrics store. It lives in the data directory, so it does not
 --- move with the configuration directory; the onboarding consent text and the
---- keylogger both read it here so they cannot name different files.
+--- keystats both read it here so they cannot name different files.
 --- @return string Absolute path of metrics.sqlite.
 function M.metrics_path()
 	return M.data("metrics.sqlite")
@@ -241,7 +242,7 @@ function M.normalize_logs_dir(path)
 	if normalized:sub(1, 1) ~= "/" then
 		return nil, "the logs folder must be an absolute path"
 	end
-	if normalized ~= M.default_logs_dir() and normalized:match("([^/]+)$") ~= AppDirs.folder_name then
+	if normalized ~= M.default_logs_dir() and NativePath.basename(normalized) ~= AppDirs.folder_name then
 		normalized = normalized .. "/" .. AppDirs.folder_name
 	end
 	return normalized

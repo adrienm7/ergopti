@@ -1,5 +1,5 @@
 {
-	"_comment": "Local driver control vectors replayed by the Windows, macOS and Linux suites: request admission against the session token, the exact result texts, and the completion a freshly ready driver owes.",
+	"_comment": "Local driver control vectors replayed by the Windows, macOS and Linux suites: request admission against the session token, the exact result texts, the completion a freshly ready driver owes, and the resolution of a pending record whose successor was not known (claim, completion, timeout).",
 	"token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 	"requests": [
 		{
@@ -163,6 +163,77 @@
 				"successor_pid": 100
 			},
 			"invalid": true
+		},
+		{
+			"name": "a pending request whose successor is not known yet",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "requested",
+				"driver_pid": 100,
+				"deadline": 1700000120
+			},
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"requested\",\"driver_pid\":100,\"successor_pid\":null,\"deadline\":1700000120}\n"
+		},
+		{
+			"name": "a claim written by the successor",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "claimed",
+				"driver_pid": 200,
+				"successor_pid": 200,
+				"deadline": 1700000120
+			},
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"claimed\",\"driver_pid\":200,\"successor_pid\":200,\"deadline\":1700000120}\n"
+		},
+		{
+			"name": "a timeout",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "timeout",
+				"driver_pid": 200,
+				"reason": "deadline"
+			},
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"timeout\",\"driver_pid\":200,\"reason\":\"deadline\"}\n"
+		},
+		{
+			"name": "a pending request without its deadline",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "requested",
+				"driver_pid": 100
+			},
+			"invalid": true
+		},
+		{
+			"name": "a claim written by another process",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "claimed",
+				"driver_pid": 100,
+				"successor_pid": 200,
+				"deadline": 1700000120
+			},
+			"invalid": true
+		},
+		{
+			"name": "a refusal with the timeout reason",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "refused",
+				"driver_pid": 100,
+				"reason": "deadline"
+			},
+			"invalid": true
+		},
+		{
+			"name": "a timeout with another reason",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "timeout",
+				"driver_pid": 200,
+				"reason": "busy"
+			},
+			"invalid": true
 		}
 	],
 	"completions": [
@@ -202,6 +273,92 @@
 			"name": "no result yet",
 			"text": "",
 			"pid": 200
+		}
+	],
+	"resolutions": [
+		{
+			"name": "the first ready driver claims a pending request",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"requested\",\"driver_pid\":100,\"successor_pid\":null,\"deadline\":1700000120}\n",
+			"pid": 200,
+			"now": 1700000060,
+			"kind": "claimed",
+			"result": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"claimed\",\"driver_pid\":200,\"successor_pid\":200,\"deadline\":1700000120}\n"
+		},
+		{
+			"name": "a claim exactly at its deadline is still valid",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"requested\",\"driver_pid\":100,\"successor_pid\":null,\"deadline\":1700000120}\n",
+			"pid": 200,
+			"now": 1700000120,
+			"kind": "claimed",
+			"result": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"claimed\",\"driver_pid\":200,\"successor_pid\":200,\"deadline\":1700000120}\n"
+		},
+		{
+			"name": "the claimant completes its own claim",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"claimed\",\"driver_pid\":200,\"successor_pid\":200,\"deadline\":1700000120}\n",
+			"pid": 200,
+			"now": 1700000061,
+			"kind": "completed",
+			"result": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"completed\",\"driver_pid\":200,\"successor_pid\":200}\n"
+		},
+		{
+			"name": "a second driver cannot claim a claimed request",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"claimed\",\"driver_pid\":200,\"successor_pid\":200,\"deadline\":1700000120}\n",
+			"pid": 201,
+			"now": 1700000061
+		},
+		{
+			"name": "a stale pending request becomes a timeout, never a completion",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"requested\",\"driver_pid\":100,\"successor_pid\":null,\"deadline\":1700000120}\n",
+			"pid": 200,
+			"now": 1700000121,
+			"kind": "timeout",
+			"result": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"timeout\",\"driver_pid\":200,\"reason\":\"deadline\"}\n"
+		},
+		{
+			"name": "a claim that outlives its deadline becomes a timeout",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"claimed\",\"driver_pid\":200,\"successor_pid\":200,\"deadline\":1700000120}\n",
+			"pid": 200,
+			"now": 1700000121,
+			"kind": "timeout",
+			"result": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"timeout\",\"driver_pid\":200,\"reason\":\"deadline\"}\n"
+		},
+		{
+			"name": "a pending request without a deadline is left alone",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"requested\",\"driver_pid\":100,\"successor_pid\":null}\n",
+			"pid": 200,
+			"now": 1700000060
+		},
+		{
+			"name": "a pending request without the null successor is left alone",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"requested\",\"driver_pid\":100,\"deadline\":1700000120}\n",
+			"pid": 200,
+			"now": 1700000060
+		},
+		{
+			"name": "a named successor still completes its request",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"requested\",\"driver_pid\":100,\"successor_pid\":200}\n",
+			"pid": 200,
+			"now": 1700000060,
+			"kind": "completed",
+			"result": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"completed\",\"driver_pid\":200,\"successor_pid\":200}\n"
+		},
+		{
+			"name": "a timeout stays a timeout",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"timeout\",\"driver_pid\":200,\"reason\":\"deadline\"}\n",
+			"pid": 200,
+			"now": 1700000060
+		},
+		{
+			"name": "a completed request is not resolved twice",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"completed\",\"driver_pid\":200,\"successor_pid\":200}\n",
+			"pid": 200,
+			"now": 1700000060
+		},
+		{
+			"name": "an unreadable result is left alone",
+			"text": "{not json",
+			"pid": 200,
+			"now": 1700000060
 		}
 	]
 }

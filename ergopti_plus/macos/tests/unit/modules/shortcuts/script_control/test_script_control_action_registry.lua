@@ -166,7 +166,7 @@ end)
 -- ======= 6/ Pause invariant (regression) =======
 -- ===============================================
 -- ===============================================
--- Critical: pause must fully silence features (no LLM, keylogger, gestures, tooltips,
+-- Critical: pause must fully silence features (no LLM, keystats, gestures, tooltips,
 -- predictions, etc.). See project_suspend_pause_invariant in PROJECT_MEMORY.
 -- These tests ensure the guard is present and works for new paths.
 

@@ -1,0 +1,20 @@
+# _shared/tests/corpus/config_migrations/shipped_retired_keys_preserved_on_all_drivers/input.toml
+
+[_meta]
+schema_version = 2
+
+[gestures]
+enabled = true
+space_wrap = false
+
+[llm]
+enabled = false
+trigger_shortcut = "Ctrl+Space"
+
+[llm.trigger]
+shortcut = false
+debounce_ms = 200
+
+[shortcuts.keys]
+layer_scroll = true
+wrap_text_if_selected = true

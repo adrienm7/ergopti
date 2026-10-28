@@ -63,16 +63,32 @@ class HealthCheckWindowControl {
 		if this.Started || this.Closed
 			throw Error("Diagnostics control cannot be initialized twice or after retirement.")
 		this.Started := true
-		Message := this.MessageFn.Call()
-		if this.Closed
-			throw Error("Diagnostics control was withdrawn during message resolution.")
-		if !(Message is Integer) || Message < 0xC000 || Message > 0xFFFF
-			throw ValueError("Diagnostics control returned an invalid registered message.")
-		this.Message := Message, this.Listening := true
-		this.ListenFn.Call(Message, this.Listener, 1)
-		if this.Closed
-			throw Error("Diagnostics control was withdrawn during registration.")
-		this.Active := true
+		try {
+			Message := this.MessageFn.Call()
+			if this.Closed
+				throw Error("Diagnostics control was withdrawn during message resolution.")
+			if !(Message is Integer) || Message < 0xC000 || Message > 0xFFFF
+				throw ValueError("Diagnostics control returned an invalid registered message.")
+			this.Message := Message, this.Listening := true
+			try this.ListenFn.Call(Message, this.Listener, 1)
+			finally {
+				; A reentrant Stop may run before the native registration lands.
+				; The returning acquisition still owes its exact listener's cleanup.
+				this.Listening := true
+			}
+			PreviousCritical := Critical("On")
+			try {
+				if this.Closed
+					throw Error("Diagnostics control was withdrawn during registration.")
+				this.Active := true
+			} finally Critical(PreviousCritical)
+		} catch as FirstError {
+			; A global Stop may already have cleared its reference to this owner.
+			try this.Stop()
+			catch as CleanupError
+				FirstError.ControlRetirementError := CleanupError
+			throw FirstError
+		}
 	}
 
 	/** Invalidates callbacks before attempting both native retirement boundaries. */
@@ -306,6 +322,7 @@ HealthCheck_Config() {
 		"redaction",     JsonParse(RawRedaction),
 		"raw_redaction", RawRedaction,
 		"templates",     JsonParse(FileRead(_SharedDir . "\modules\diagnostics\issue_templates.json", "UTF-8")),
+		"day_log",       DayLog_CheckLimits(JsonParse(FSReadStrict(_SharedDir . "\modules\diagnostics\day_log.json"))),
 		"repository",    JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["github"])
 	return _HC_Config
 }
@@ -410,7 +427,7 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 	; session (about 30 ms on the first opening), before the clock starts
 	Schema := HealthCheck_Config()["schema"]
 	Started := _HealthCheck_NowMs()
-	UptimeSec := (A_TickCount - (_HealthCheckStartMs) & 0xFFFFFFFF) // 1000
+	UptimeSec := (A_TickCount - (_HealthCheckStartMs)) // 1000
 	ReportSubdir := Schema["report"]["subdir"]
 
 	; Every collector is hoisted out of the Map(...) constructor and run through
@@ -422,7 +439,7 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 	Hardware    := _HealthCheck_Collect("hardware", _HealthCheck_Hardware, Map())
 	System      := _HealthCheck_Collect("system", () => _HealthCheck_System(Detailed, UptimeSec), Map())
 	Input       := _HealthCheck_Collect("input", _HealthCheck_Input, Map())
-	Features    := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []))
+	FeatureMap  := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []))
 	Ai          := _HealthCheck_Collect("ai", _HealthCheck_Ai, Map())
 	Peripherals := _HealthCheck_Collect("peripherals", () => _HealthCheck_Peripherals(Detailed), Map("items", []))
 	Issues      := _HealthCheck_Collect("issues", _HealthCheck_Issues, Map())
@@ -435,7 +452,7 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 		"hardware",    Hardware,
 		"system",      System,
 		"input",       Input,
-		"features",    Features,
+		"features",    FeatureMap,
 		; Filled by the configuration probe: reading and parsing the files is far
 		; over the phase A budget
 		"configuration_files", Map("items", []),
@@ -1117,6 +1134,7 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 				}
 			}
 		case "close":
+			HealthCheck_DayLogDiscard(Snapshot)
 			global _HC_Gui
 			_HealthCheck_CloseGui(_HC_Gui)
 		case "export_snapshot":
@@ -1127,7 +1145,17 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 			}
 			_HC_Send(WindowEpoch, _HC_ValueToJson(Map("type", "action", "action", "export_snapshot",
 				"ok", true, "export_sequence", Action["export_sequence"], "snapshot", Snapshot,
-				"share_text", HealthCheck_ShareDocument(Snapshot, Config["schema"])["text"])))
+				"share_text", HealthCheck_ShareDocument(Snapshot, Config["schema"], Action.Get("day_log", false))["text"])))
+		case "day_log":
+			; Opt-in: ticking collects and redacts today's log; unticking drops it
+			if Action["enabled"] {
+				Reply := HealthCheck_DayLogPrepare(Snapshot, Config, HealthCheck_RedactionContext())
+			} else {
+				HealthCheck_DayLogDiscard(Snapshot)
+				Reply := Map("type", "action", "action", "day_log", "ok", true, "state", "off")
+			}
+			if _HC_SessionCurrent(WindowEpoch, Session)
+				_HC_Send(WindowEpoch, _HC_ValueToJson(Reply))
 		case "cancel":
 			HealthCheck_CancelProbes(_HC_SessionCurrent.Bind(WindowEpoch, Session))
 			if !_HC_SessionCurrent(WindowEpoch, Session)
@@ -1145,6 +1173,8 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 			_HC_ArchiveCleanupMetadata(Session)
 			if !_HC_SessionCurrent(WindowEpoch, Session)
 				return
+			; A refreshed snapshot starts without the optional day log
+			HealthCheck_DayLogDiscard(Snapshot)
 			Revision := Snapshot.Get("export_revision", 1) + 1
 			Fresh := HealthCheck_Run(Action["detailed"], Action["extensive"])
 			Fresh["export_revision"] := Revision
@@ -1173,7 +1203,8 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 
 ; The page's first message: its configuration and the first snapshot. The
 ; schema and the redaction rules go as their files are; the redaction context
-; is written by hand so its flag is a JSON true, not the 1 AHK stores.
+; is written by hand so its flag is a JSON true, not the 1 AHK stores. This
+; host runs the guided diagnostic collection, so it says so to the page.
 ; @param Session {Map}
 ; @returns {String}
 _HC_InitJson(Session) {
@@ -1184,7 +1215,8 @@ _HC_InitJson(Session) {
 	return '{"type":"init","collection":' . _HC_ValueToJson(Collection) . ',"config":{"schema":' . Config["raw_schema"]
 		. ',"redaction":' . Config["raw_redaction"]
 		. ',"context":{"home":' . _HC_JsStr(Context["home"]) . ',"user":' . _HC_JsStr(Context["user"])
-		. ',"case_insensitive":true}},"snapshot":' . _HC_ValueToJson(Session["snapshot"]) . '}'
+		. ',"config_dir":' . _HC_JsStr(Context["config_dir"]) . ',"case_insensitive":true}'
+		. ',"capabilities":{"diagnostic_collection":true}},"snapshot":' . _HC_ValueToJson(Session["snapshot"]) . '}'
 }
 
 ; Sends one message into the window's page.

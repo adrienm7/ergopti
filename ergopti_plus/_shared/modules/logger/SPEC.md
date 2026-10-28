@@ -82,6 +82,9 @@ LoggerError(Tag,   Msg, Args*)
 - `Msg` — format string using AHK `{N}` placeholders (e.g. `"Loaded {1} key(s)."`).
 - `Args` — variadic arguments substituted into `Msg`.
 
+Beside the eight variants, `LoggerEvidence(Tag, Msg, Args*)` writes an evidence
+record that is never collapsed or deduplicated (§ 4.3).
+
 ### 2.2 Hammerspoon / Lua
 
 ```lua
@@ -99,6 +102,9 @@ Logger.error(module_name,   msg, ...)
 - `msg` — format string using Lua `string.format` `%` syntax
   (e.g. `"Loaded %d key(s)."` ).
 - `...` — variadic arguments substituted into `msg`.
+
+Beside the eight variants, `Logger.evidence(module_name, msg, ...)` writes an
+evidence record that is never collapsed or deduplicated (§ 4.3).
 
 ---
 
@@ -245,6 +251,42 @@ in between, or one whose arguments change. Repeat collapsing does.
     daemon's periodic callback; terminal flush on the daemon's exit and crash
     paths.
 
+### 4.3 Evidence records
+
+Both layers above assume that a repeated line is noise. A result line of a
+field check or a diagnostics probe is the opposite: the maintainer is asked to
+send it back, a check writes several records through one template that differ
+only by arguments, and the same check may run again a minute later. Folded by
+§ 4.2 they would reach the screen and never the file.
+
+- **API.** One entry point per language, next to the eight variants and not a
+  ninth one:
+
+  ```
+  AHK:      LoggerEvidence(Tag, Msg, Args*)
+  Lua:      Logger.evidence(module_name, msg, ...)
+  ```
+
+  The shared core owns it (`M.evidence`); the macOS logger and `logger.shim`
+  expose it; Windows mirrors it.
+
+- **Rendering.** An INFO line: severity 20, label `[INFO]`, sink variant
+  `info`. It is filtered by the level threshold exactly like `info`, and it
+  reaches the same files, ring buffer and topical sub-files.
+- **Exemption.** It is never withheld by § 4.1 (not even when identical to the
+  previous line) and never opens or joins a § 4.2 streak. It is accepted like
+  any other line, so it closes an open § 4.1 streak first; the lines around it
+  keep collapsing as before, and an `info` line sharing its template still
+  opens its own streak.
+- **Scope.** Only the data a person is asked to send back. It is not a
+  lifecycle half (the `start`/`success` pair around a check stays as it is),
+  not a way to bypass collapsing for ordinary status lines, and a producer
+  that logs the same result in a loop must not use it.
+- **Pinned by** the `evidence_*` and `ordinary_lines_sharing_a_template_with_evidence_still_collapse`
+  cases of the `repeat` section of
+  `_shared/tests/corpus/logger/behaviour_vectors.json` (variant name
+  `evidence`, expected sink variant `info`), replayed by all three drivers.
+
 ---
 
 ## 5. Ring Buffer
@@ -265,6 +307,27 @@ window's counters and "Last recorded error" must not forget a problem that
 early. A line swallowed by the dedup window is not counted. The Lua core
 exposes `session_issues()` → `{ warn_count, err_count, last_error }`; the AHK
 logger feeds `HealthCheck_RecordWarn()` / `HealthCheck_RecordError(Line)`.
+
+### 5.3 Log-volume counters
+
+Every driver counts, for the whole session, the lines it wrote per level and the
+lines that never were: `debug` (DEBUG, TRACE, DONE), `info` (INFO, START,
+SUCCESS and evidence records), `warn`, `error`; `dropped` (removed by the
+severity threshold), `suppressed` (swallowed by the consecutive dedup, § 4.1)
+and `collapsed` (withheld by the repeat collapser, § 4.2). A summary line
+counts as a written line of its level, so the figures describe the log a user
+can open. The Lua core exposes `volume()` (totals), `volume_interval()` (what
+was counted since the previous call, totals untouched), `volume_text(counters)`
+(`debug=N info=N warn=N error=N dropped=N suppressed=N collapsed=N`),
+`note_dropped()` (for a driver that filters before the core) and
+`reset_volume()` (tests).
+
+The figures travel in the evidence record each driver already writes once per
+interval: macOS appends `Log volume over N s: ...` to the `Memory snapshot`
+record of `phase_stats`, Linux appends `| log: ...` to the `PerfCounters`
+interval record. Windows still has to count in `_LoggerEmit` and add the same
+seven figures, in the same order, to its phase-summary evidence record.
+Contract: `_shared/lua/test/logger_volume_contract.lua`.
 
 ### 5.2 Error window hook
 
@@ -320,8 +383,11 @@ because its reload does not restart the daemon. Crash reports go to
 `<logs>/crash_reports/`; metrics stay in the configuration folder. What is
 written before paths.toml is read stays in the default folder whatever
 `LogsDirPath` says: the macOS boot fallback log, `launcher.log` and the fatal
-report, and on Windows `bootstrap.log` (a yielding second instance, a refused
-configuration transition).
+report, and `bootstrap.log` on Windows (a yielding second instance, a refused
+configuration transition) and on Linux (a refused session lock, a refused privacy
+admission, a second start that yielded). The file name is declared once in
+`paths/app_dirs.toml`; on Linux it only ever carries the closed messages of
+`infra/bootstrap_log.lua`, because the privacy policy is not loaded yet.
 
 ### 6.2 Fan-out sub-files
 
@@ -350,12 +416,20 @@ Each entry in [`sub_files.toml`](./sub_files.toml) defines one topical sub-file:
 [[sub_files]]
 name     = "gestures"                  # suffix of ErgoptiPlus_<name>.log
 patterns = ["[gestures", "gesture"]    # substring patterns matched against the full log line
-platforms = ["ahk", "hs"]             # which drivers write this sub-file
+platforms = ["ahk", "hs", "linux"]    # Windows, macOS, Linux: which drivers write it
 ```
 
 A log line is routed to a sub-file if **any** of its `patterns` is found as a
 substring of the full formatted line (case-sensitive). The match is against the
 complete line including timestamp, level, and module tag.
+
+A topic that exists on several drivers is declared for all of them, so the same
+file name answers the same question on every OS. Each driver spells its module
+tags in its own style, hence one pattern list per topic that names every
+spelling. Topical files carry no date in their name: the first write of a new day
+truncates a file whose first line is from an earlier day (macOS by modification
+time, Linux by that first line). Only MLX and Karabiner (macOS products) and the
+Windows layout, dispatch and tray topics are single-platform.
 
 ---
 
@@ -425,8 +499,8 @@ Test-runner integration:
   `test_vectors.json` via `JsonParse()` and asserts each expected line (with timestamp
   replaced).
 - **HS**: `macos/tests/unit/infra/logger/test_logger.lua` does the same via `require("lib.json")`.
-- **Linux**: no vector replay today. The shared core it runs is therefore unpinned by
-  this spec.
+- **Linux**: `linux/tests/unit/infra/logger/test_logger_contract.lua` replays the vectors through the
+  shared core, and `linux/tests/meta/corpus/test_corpus_logger_behaviour.lua` replays the behaviour corpus.
 
 ---
 

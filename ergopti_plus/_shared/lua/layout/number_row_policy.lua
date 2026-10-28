@@ -6,6 +6,8 @@
 -- retain physical descriptors, emission, persistence and lifecycle ownership.
 -- ============================================================================
 
+local ConfigKeys = require("config_keys")
+
 local M = {}
 
 function M.mode(value)
@@ -133,27 +135,70 @@ function M.intent(expected, current, value)
 	return true
 end
 
+--- The rows of a driver that applies the options to the layout it types with.
+--- The choice and the switch read and write through `live`; where the options cannot
+--- be applied now the rows stay drawn, greyed, with the reason `live.reason_key`
+--- (the stored choice is still shown, never replaced by "native").
+--- @param renderer table Shared menu renderer (choice_row, check_row).
+--- @param choices table The declared choices, already checked.
+--- @param live table { available, reason_key, get_order(), get_edges(), set_order(value), set_edges(boolean) }
+--- @return table rows Empty when the declaration or `live` is not what this expects.
+function M.live_rows(renderer, choices, live)
+	if type(live) ~= "table" or type(live.get_order) ~= "function" or type(live.get_edges) ~= "function"
+		or type(live.set_order) ~= "function" or type(live.set_edges) ~= "function"
+		or (live.available ~= true and type(live.reason_key) ~= "string") then return {} end
+	local row = renderer.choice_row("number_row_policy_rows", ConfigKeys.COMMAND.NUMBER_ROW_MODE,
+		{ [ConfigKeys.COMMAND.NUMBER_ROW_MODE] = function(value)
+			live.set_order(value)
+			return true
+		end },
+		{ [ConfigKeys.KEY.LAYOUT_DIRECT_ACCESS_DIGITS] = live.get_order })
+	if type(row) ~= "table" or type(row.items) ~= "table" or #row.items ~= #choices then return {} end
+	for index, item in ipairs(row.items) do
+		if type(item) ~= "table" then return {} end
+		if live.available ~= true then
+			item.action = nil
+			item.disabled = true
+			if choices[index].value ~= "native" then item.disabled_reason_key = live.reason_key end
+		end
+	end
+	local check = renderer.check_row("number_row_policy_rows", ConfigKeys.COMMAND.NUMBER_ROW_EDGES,
+		{ number_row_edges = function()
+			live.set_edges(not live.get_edges())
+			return true
+		end },
+		{ number_row_edges_enabled = live.get_edges })
+	if type(check) ~= "table" then return {} end
+	if live.available ~= true then
+		check.action = nil
+		check.disabled = true
+		check.disabled_reason_key = live.reason_key
+	end
+	return { row, check }
+end
+
 --- Reports actual native posture without claiming or saving a Lua preference.
 --- Unknown personal fields remain entirely outside this read-only provider.
-function M.native_rows(renderer, commands)
+function M.native_rows(renderer, commands, live)
 	if type(renderer) ~= "table" or type(renderer.choice_row) ~= "function"
 		or type(renderer.get_array) ~= "function" or type(commands) ~= "table"
-		or type(commands["number_row_mode"]) ~= "function"
-		or type(commands["number_row_edges"]) ~= "function" then return {} end
+		or type(commands[ConfigKeys.COMMAND.NUMBER_ROW_MODE]) ~= "function"
+		or type(commands[ConfigKeys.COMMAND.NUMBER_ROW_EDGES]) ~= "function" then return {} end
 	local definitions = renderer.get_array("number_row_policy_rows")
 	local declaration = type(definitions) == "table" and #definitions == 2 and definitions[1]
 	local edges = type(definitions) == "table" and definitions[2]
-	if type(edges) ~= "table" or edges.type ~= "check" or edges.path ~= "layout.number_row_reorder_edges"
-		or edges.id ~= "number_row_edges" then return {} end
+	if type(edges) ~= "table" or edges.type ~= "check" or edges.path ~= ConfigKeys.KEY.LAYOUT_NUMBER_ROW_REORDER_EDGES
+		or edges.id ~= ConfigKeys.COMMAND.NUMBER_ROW_EDGES then return {} end
 	local choices = type(declaration) == "table" and declaration.choices
 	if type(choices) ~= "table" or #choices ~= 3
 		then return {} end
 	for index, value in ipairs({ "native", "digits", "symbols" }) do
 		if type(choices[index]) ~= "table" or choices[index].value ~= value then return {} end
 	end
-	local row = renderer.choice_row("number_row_policy_rows", "number_row_mode",
+	if live ~= nil then return M.live_rows(renderer, choices, live) end
+	local row = renderer.choice_row("number_row_policy_rows", ConfigKeys.COMMAND.NUMBER_ROW_MODE,
 		commands,
-		{ ["layout.direct_access_digits"] = function() return "native" end })
+		{ [ConfigKeys.KEY.LAYOUT_DIRECT_ACCESS_DIGITS] = function() return "native" end })
 	if type(row) ~= "table" or type(row.items) ~= "table" or #row.items ~= #choices then return {} end
 	for _, item in ipairs(row.items) do
 		if type(item) ~= "table" then return {} end
@@ -167,8 +212,8 @@ function M.native_rows(renderer, commands)
 	end
 	-- The edge keys follow the ordering, which these drivers do not apply.
 	if type(renderer.check_row) ~= "function" then return {} end
-	local check = renderer.check_row("number_row_policy_rows", "number_row_edges",
-		{ number_row_edges = commands["number_row_edges"] },
+	local check = renderer.check_row("number_row_policy_rows", ConfigKeys.COMMAND.NUMBER_ROW_EDGES,
+		{ number_row_edges = commands[ConfigKeys.COMMAND.NUMBER_ROW_EDGES] },
 		{ number_row_edges_enabled = function() return false end })
 	if type(check) ~= "table" then return {} end
 	check.action = nil

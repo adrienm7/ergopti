@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Metrics menu lifecycle commitment
 --- DESCRIPTION:
---- Drives the real top-level Metrics action with a keylogger whose strict start
+--- Drives the real top-level Metrics action with a keystats whose strict start
 --- returns false. The click must compensate the already-persisted ON preference,
 --- keep WPM producers stopped, and repaint an unchecked menu.
 --- ==============================================================================
@@ -19,13 +19,13 @@ local function load_menu(start_result)
 	package.loaded["hs.fs"] = hs_stub.fs
 
 	local defaults = {
-		keylogger_enabled = false, keylogger_disabled_apps = {}, keylogger_encrypt = false,
-		keylogger_menubar_wpm = true, keylogger_menubar_colors = false,
-		keylogger_float_wpm = true, keylogger_float_graph = false,
-		keylogger_float_colors = false, keylogger_private_filter_enabled = true,
-		keylogger_secure_filter_enabled = true, keylogger_system_auth_filter_enabled = true,
+		keystats_enabled = false, keystats_disabled_apps = {}, keystats_encrypt = false,
+		keystats_menubar_wpm = true, keystats_menubar_colors = false,
+		keystats_float_wpm = true, keystats_float_graph = false,
+		keystats_float_colors = false, keystats_private_filter_enabled = true,
+		keystats_secure_filter_enabled = true, keystats_system_auth_filter_enabled = true,
 	}
-	package.loaded["modules.keylogger"] = setmetatable({
+	package.loaded["modules.keystats"] = setmetatable({
 		DEFAULT_STATE = defaults,
 		start = function() return start_result end,
 		set_options = function() end,
@@ -81,22 +81,22 @@ local function load_menu(start_result)
 	return ctx
 end
 
-helpers.describe("menu_metrics: strict keylogger lifecycle reaches the checkmark", function()
+helpers.describe("menu_metrics: strict keystats lifecycle reaches the checkmark", function()
 	helpers.it("compensates a rejected activation before reporting Metrics enabled", function()
 		local ctx = load_menu(false)
 		local result = ctx.toggle()
 
 		helpers.assert_eq(false, result,
 			"the click must report that runtime activation did not commit")
-		helpers.assert_eq(false, ctx.state.keylogger_enabled,
+		helpers.assert_eq(false, ctx.state.keystats_enabled,
 			"the rendered and persisted switch must roll back to disabled")
 		helpers.assert_eq(2, ctx.saves,
 			"the initial ON publication needs one compensating OFF publication")
 		helpers.assert_eq(1, ctx.updates,
 			"the menu must repaint the compensating unchecked state")
 		helpers.assert_eq(0, ctx.menubar_starts,
-			"WPM menubar cannot start when the keylogger security watcher failed")
+			"WPM menubar cannot start when the keystats security watcher failed")
 		helpers.assert_eq(0, ctx.widget_starts,
-			"WPM widget cannot start when the keylogger security watcher failed")
+			"WPM widget cannot start when the keystats security watcher failed")
 	end)
 end)

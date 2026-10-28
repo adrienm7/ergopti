@@ -108,11 +108,14 @@ local function with_undo(options, body)
 			end }, { __index = injector })
 			local environment = setmetatable({ secure_focus_guard = guard,
 				script_actions = { is_paused = function() return false end },
+				-- Bare keys: the shared expansion delay reads the held modifiers per key.
+				keyboard_hook = { held_modifiers = function() return {} end },
 				Monotonic = { now_ms = function() return state.now end }, _cached_app_id = "owned-editor",
-				WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end },
+				WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end, cascade_max_arrows = function() return 0 end },
 				terminators_mod = { is_terminator = function() return false end },
 				RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false },
-				keylogger = { is_password_app = function() return false end, suppress = function() end,
+				keyboard_hook = { held_modifiers = function() return {} end },
+				keystats = { is_password_app = function() return false end, is_unrecorded_app = function() return false end, suppress = function() end,
 					unsuppress = function() end, on_keydown = function() end, record_hotstring = function() end,
 					-- The physical Backspace that requests the Undo is a manual correction.
 					record_correction = function() observations.corrections = (observations.corrections or 0) + 1 end },

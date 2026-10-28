@@ -44,6 +44,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local RuntimeGuard = require("infra.runtime_guard")
@@ -60,6 +61,7 @@ for _, name in ipairs(INPUT_READER_PORT_NAMES) do
 end
 local EvdevCodes = require("infra.evdev_codes")
 local Monotonic = require("infra.monotonic")
+local Perf = require("infra.perf_counters")
 local InputEvent = require("infra.input_event")
 local XkbCapture = require("adapters.xkb_capture")
 local ModifierBroker = require("adapters.modifier_broker")
@@ -348,7 +350,7 @@ end
 --- explicit pure-Lua test seam.
 --- @param code integer evdev keycode.
 --- @param value integer 0 release, 1 press, 2 repeat.
---- @return string|nil text, string|nil identity, string|nil error
+--- @return string|nil text, string|nil identity, string|nil error, string|nil control
 local function _capture(code, value)
 	if _test_capture_event then return _test_capture_event(code, value) end
 	return XkbCapture.process(code, value)
@@ -948,6 +950,9 @@ end
 
 local function _forward_raw(ev, source)
 	if not _intercept or not _emit_raw or ev.type ~= EVDEV_TYPE_KEY then return true end
+	-- The events written back to the desktop under the grab: what the user's
+	-- keystrokes became after the tap-hold engine and the layout.
+	Perf.count("input.forwarded_events")
 	local key = source_key(source, ev.code)
 	local prior = _forwarded_down[key]
 	local owner = _output_owners[key]
@@ -1662,11 +1667,11 @@ local function _dispatch_post_remap(ev, source)
 		or (ev.value == InputEvent.VALUE_DOWN and not aggregate_before and aggregate_after)
 		or (ev.value == InputEvent.VALUE_UP and aggregate_before and not aggregate_after)
 		or (ev.value == InputEvent.VALUE_REPEAT and held_role ~= nil)
-	local char, identity, capture_err
+	local char, identity, capture_err, captured_control
 	local row_plan = not is_modifier and _number_row.preview(ev, source) or nil
 	if not is_modifier and not row_plan and not _capture_wire_transition(ev, source) then capture_transition = false end
 	if row_plan then char, identity = row_plan.text, row_plan.identity
-	elseif capture_transition then char, identity, capture_err = _capture(ev.code, ev.value) end
+	elseif capture_transition then char, identity, capture_err, captured_control = _capture(ev.code, ev.value) end
 
 	if capture_err then
 		_xkb_failed("XKB capture failed (code=%d value=%d) — %s.", ev.code, ev.value, tostring(capture_err))
@@ -1808,7 +1813,7 @@ local function _dispatch_post_remap(ev, source)
 	-- Releases carry no meaning past modifier tracking and the hold above.
 	if not pressed then return end
 
-	local control = EvdevCodes.CONTROL_NAME_OF[ev.code]
+	local control = (not row_plan and not capture_err and captured_control) or EvdevCodes.CONTROL_NAME_OF[ev.code]
 	if control then
 		local text_char = TEXT_CONTROL_CHAR[control]
 		if text_char and not _shortcut_modifier_held() then
@@ -1838,7 +1843,7 @@ local function _dispatch_post_remap(ev, source)
 		-- The chord's IDENTITY travels with the event. Reporting only "shortcut"
 		-- told the caller that the caret had probably moved and nothing else, so
 		-- the daemon could neither record which shortcut fired nor act on one —
-		-- `keylogger.record_shortcut` had no caller at all, and the configurable
+		-- `keystats.record_shortcut` had no caller at all, and the configurable
 		-- slots had nothing to match against.
 		--
 		-- A second argument rather than a different event name: every existing
@@ -2146,7 +2151,10 @@ local function _dispatch_event(ev, source)
 			local receipt = _remapper.has_combinations and _combination_source(source) or nil
 			local previous_buffer = _buffer_dispatch
 			_buffer_dispatch = {engine=_remapper,event=ev,source=source,origin=origin,at_ms=at_ms}
+			local process_started = Perf.clock()
 			local called,rows,requested,selected,owned_frame = pcall(_remapper.process,_remapper,ev.code,ev.value,at_ms,receipt)
+			Perf.span("taphold.process", process_started)
+			Perf.count("taphold.processed")
 			_buffer_dispatch = previous_buffer
 			if not called then error(rows,0) end
 			out,tap,binding,frame=rows,requested,selected,owned_frame
@@ -2349,6 +2357,7 @@ end
 --- @param now_ms number
 _tick_remapper = function(now_ms)
 	if not (_remapper and _intercept) then return end
+	Perf.count("taphold.ticks")
 	local exact, generation, output = _remapper, _remapper_generation, _broker
 	local due_rows = exact:tick(now_ms)
 	if exact.take_custody then
@@ -2435,10 +2444,13 @@ local function _dispatch_pointer(ev)
 		local at_ms=_event_clock_now_ms(); if at_ms then _tick_remapper(at_ms) end
 	end
 	if _on_pointer_event then
+		-- The value and the frame's SYN_REPORT let the metrics measure a movement.
 		if ev.type == InputEvent.EV_REL then
-			_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code)
+			_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value)
 		elseif ev.type == EVDEV_TYPE_KEY and ev.value == InputEvent.VALUE_DOWN then
-			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code)
+			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value)
+		elseif ev.type == InputEvent.EV_SYN and ev.code == InputEvent.SYN_REPORT then
+			_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value)
 		end
 	end
 end
@@ -2519,6 +2531,7 @@ end
 function M.pump()
 	if not _running then return end
 	if _source_reconciliation then return end
+	Perf.count("input.pump_calls")
 	local open_keyboards = 0
 	local sources = {}
 	for _, path in ipairs(_devices) do
@@ -2563,9 +2576,14 @@ function M.pump()
 		end
 		local selected_event = _pending_events[selected.slot]
 		_pending_events[selected.slot] = nil
+		Perf.count("input.events")
 		if selected.keyboard then
+			local dispatch_started = Perf.clock()
+			Perf.count("input.key_events")
 			_dispatch_event(selected_event, selected.path)
+			Perf.span("input.dispatch", dispatch_started)
 		else
+			Perf.count("input.pointer_events")
 			-- The pointer is not grabbed: its events reached the desktop when
 			-- they happened, and only keep the events' clock fresh here.
 			if _remapper and _intercept then _event_time_ms(selected_event) end
@@ -2582,6 +2600,22 @@ function M.pump()
 		local now_ms = _event_clock_now_ms()
 		if now_ms then _tick_remapper(now_ms) end
 	end
+end
+
+--- Sleeps the idle loop until an input source has data, at most `timeout_ms`.
+---
+--- The daemon's event loop calls it between pumps, so an idle daemon wakes on
+--- input or on the timeout instead of spinning, and a key is pumped the moment
+--- it arrives. An event already read and not yet dispatched (a drain that hit
+--- its bound) must not sleep behind the wait, so it answers at once.
+--- @param timeout_ms integer Longest wait.
+--- @return boolean|nil ready True when a source can be read now, false after a
+---   quiet wait, nil when no wait is possible (hook stopped or reacquiring,
+---   no open source): the loop then yields a fixed millisecond.
+function M.idle_wait(timeout_ms)
+	if not _running or _reacquiring or _source_reconciliation then return nil end
+	if next(_pending_events) ~= nil then return true end
+	return EvdevReader.wait_any_readable(timeout_ms)
 end
 
 --- The text a key would type now, in the live layout and with the modifiers
@@ -3227,9 +3261,7 @@ local function _acquire(paths, force_path, tx)
 		end
 		retained[path] = nil
 	end
-	local retired = {}
-	for path in pairs(retained) do retired[#retired + 1] = path end
-	table.sort(retired)
+	local retired = TableUtil.sorted_keys(retained)
 	if _source_recovery.retire_remaps(retired) ~= true then return false, "departed source remapper retirement refused" end
 	local released, release_err = _release_forwarded_sources(retired)
 	if not released then
@@ -4090,8 +4122,8 @@ function M.while_released(fn, opts)
 
 	local results = { n = 0 }
 	local function keep(...) results = { n = select("#", ...), ... } end
+	-- An error may itself be false or nil; only pcall's status owns success.
 	local ok, err = pcall(function() keep(fn()) end)
-	if ok then err = nil end
 
 	-- Restoration can acquire one source before a later native operation raises.
 	-- Keep the entire cohort under one cleanup boundary so no grab escapes it.
@@ -4123,18 +4155,19 @@ function M.while_released(fn, opts)
 		restore_reason = restored_call and restore_reason or "restoration_failed"
 		stop_modal("could not restore keyboard capture after a dialog: " .. tostring(restore_reason))
 		observe("refused", { ok = false, reason = restore_reason })
-		if err then error(err, 0) end
+		if not ok then error(err, 0) end
 		return (table.unpack or unpack)(results, 1, results.n)
 	end
 	if not observe("before", { ok = true }) then
 		observe("refused", { ok = false, reason = "observer_failed" })
+		if not ok then error(err, 0) end
 		return (table.unpack or unpack)(results, 1, results.n)
 	end
 	local desynced = not _on_desync or _call_callback("input-desync callback", _on_desync)
-	observe("after", { ok = desynced and _running and err == nil })
-	if desynced and _running and err == nil then _number_row.construct() end
+	observe("after", { ok = desynced and _running and ok })
+	if desynced and _running and ok then _number_row.construct() end
 	Logger.debug(LOG, "Keyboard taken back after a dialog.")
-	if err then error(err, 0) end
+	if not ok then error(err, 0) end
 	return (table.unpack or unpack)(results, 1, results.n)
 end
 

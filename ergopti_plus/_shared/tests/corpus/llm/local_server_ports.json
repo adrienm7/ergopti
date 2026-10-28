@@ -1,0 +1,212 @@
+{
+	"_comment": "Independent machine readings and the address each catalogue server must be probed at (_shared/lua/llm/local_server_ports.lua). ps is 'pid command line' rows, lsof is lsof -F pn output, ss is ss -Hltnp output; files maps an absolute path to its content. Expected values are authored, not derived from the resolver.",
+	"version": 1,
+	"cases": [
+		{
+			"name": "oMLX app set to port 8181 in settings.json (field report 2026-10-27)",
+			"server": "omlx",
+			"os": "macos",
+			"ps": "51091 /Applications/Hammerspoon.app/Contents/MacOS/Hammerspoon\n77996 omlx-server\n77990 /Applications/oMLX.app/Contents/MacOS/oMLX",
+			"files": {
+				"/Users/u/.omlx/settings.json": "{\"version\":\"1.0\",\"server\":{\"host\":\"127.0.0.1\",\"port\":8181}}"
+			},
+			"expected": {
+				"running": true,
+				"pids": [77996],
+				"source": "config",
+				"port": 8181,
+				"base_url": "http://127.0.0.1:8181/v1"
+			}
+		},
+		{
+			"name": "oMLX data folder moved through the base-path pointer file",
+			"server": "omlx",
+			"os": "macos",
+			"ps": "4242 omlx-server",
+			"files": {
+				"/Users/u/Library/Application Support/oMLX/base-path": "/Volumes/Models/omlx\n",
+				"/Volumes/Models/omlx/settings.json": "{\"server\":{\"port\":8282}}",
+				"/Users/u/.omlx/settings.json": "{\"server\":{\"port\":8181}}"
+			},
+			"expected": {
+				"running": true,
+				"source": "config",
+				"port": 8282,
+				"base_url": "http://127.0.0.1:8282/v1"
+			}
+		},
+		{
+			"name": "a command-line port wins over the settings file",
+			"server": "omlx",
+			"os": "macos",
+			"ps": "300 /opt/homebrew/bin/python3 -m omlx.cli serve --base-path /Users/u/.omlx --port 9001",
+			"files": { "/Users/u/.omlx/settings.json": "{\"server\":{\"port\":8181}}" },
+			"expected": {
+				"running": true,
+				"pids": [300],
+				"source": "cli",
+				"port": 9001,
+				"base_url": "http://127.0.0.1:9001/v1"
+			}
+		},
+		{
+			"name": "no running process is never probed",
+			"server": "omlx",
+			"os": "macos",
+			"ps": "1 /sbin/launchd\n500 vim /Users/u/notes/omlx-server.txt",
+			"files": { "/Users/u/.omlx/settings.json": "{\"server\":{\"port\":8181}}" },
+			"expected": { "running": false, "pids": [] }
+		},
+		{
+			"name": "a settings file without a port falls back to the listening port",
+			"server": "omlx",
+			"os": "macos",
+			"ps": "77996 omlx-server",
+			"files": { "/Users/u/.omlx/settings.json": "{\"server\":{\"host\":\"127.0.0.1\"}}" },
+			"lsof": "p77996\nf5\nn127.0.0.1:8181\np123\nf4\nn127.0.0.1:8000",
+			"expected": {
+				"running": true,
+				"source": "listening",
+				"port": 8181,
+				"base_url": "http://127.0.0.1:8181/v1"
+			}
+		},
+		{
+			"name": "a malformed settings file falls back to the listening port",
+			"server": "omlx",
+			"os": "macos",
+			"ps": "77996 omlx-server",
+			"files": { "/Users/u/.omlx/settings.json": "{not json" },
+			"lsof": "p77996\nf5\nn*:8383",
+			"expected": {
+				"running": true,
+				"source": "listening",
+				"port": 8383,
+				"base_url": "http://127.0.0.1:8383/v1"
+			}
+		},
+		{
+			"name": "no settings file and no listening port is reported as the catalogue default",
+			"server": "omlx",
+			"os": "macos",
+			"ps": "77996 omlx-server",
+			"files": {},
+			"lsof": "",
+			"expected": {
+				"running": true,
+				"source": "default",
+				"port": 8000,
+				"base_url": "http://127.0.0.1:8000/v1"
+			}
+		},
+		{
+			"name": "the macOS settings file is not read on Linux",
+			"server": "omlx",
+			"os": "linux",
+			"ps": "77996 omlx-server",
+			"files": { "/Users/u/.omlx/settings.json": "{\"server\":{\"port\":8181}}" },
+			"ss": "LISTEN 0 2048 127.0.0.1:8484 0.0.0.0:* users:((\"python3\",pid=77996,fd=7))",
+			"expected": {
+				"running": true,
+				"source": "listening",
+				"port": 8484,
+				"base_url": "http://127.0.0.1:8484/v1"
+			}
+		},
+		{
+			"name": "LM Studio on a non-default port, found through its listening sockets",
+			"server": "lmstudio",
+			"os": "macos",
+			"ps": "800 /Applications/LM Studio.app/Contents/MacOS/LM Studio\n801 /Applications/LM Studio.app/Contents/Frameworks/LM Studio Helper.app/Contents/MacOS/LM Studio Helper --type=gpu-process",
+			"files": {},
+			"lsof": "p800\nf30\nn127.0.0.1:41343\nf31\nn127.0.0.1:2345",
+			"expected": {
+				"running": true,
+				"pids": [800, 801],
+				"source": "listening",
+				"port": 2345,
+				"base_url": "http://127.0.0.1:2345/v1"
+			}
+		},
+		{
+			"name": "the catalogue default wins among several listening ports",
+			"server": "jan",
+			"os": "macos",
+			"ps": "900 /Applications/Jan.app/Contents/MacOS/Jan",
+			"files": {},
+			"lsof": "p900\nf9\nn127.0.0.1:39291\nf10\nn127.0.0.1:1337",
+			"expected": {
+				"running": true,
+				"source": "listening",
+				"port": 1337,
+				"base_url": "http://127.0.0.1:1337/v1"
+			}
+		},
+		{
+			"name": "an IPv6-only loopback listener is probed at [::1]",
+			"server": "jan",
+			"os": "macos",
+			"ps": "900 /Applications/Jan.app/Contents/MacOS/Jan",
+			"files": {},
+			"lsof": "p900\nf9\nn[::1]:1338",
+			"expected": {
+				"running": true,
+				"source": "listening",
+				"port": 1338,
+				"base_url": "http://[::1]:1338/v1"
+			}
+		},
+		{
+			"name": "llama-server --port=N form",
+			"server": "llamacpp",
+			"os": "linux",
+			"ps": "700 /usr/local/bin/llama-server -m /models/q.gguf --port=8181",
+			"files": {},
+			"expected": {
+				"running": true,
+				"source": "cli",
+				"port": 8181,
+				"base_url": "http://127.0.0.1:8181/v1"
+			}
+		},
+		{
+			"name": "LocalAI --address host:port form",
+			"server": "llamacpp",
+			"os": "linux",
+			"ps": "710 /usr/bin/local-ai run --address 127.0.0.1:9090",
+			"files": {},
+			"expected": {
+				"running": true,
+				"source": "cli",
+				"port": 9090,
+				"base_url": "http://127.0.0.1:9090/v1"
+			}
+		},
+		{
+			"name": "a Windows executable with its .exe suffix",
+			"server": "llamacpp",
+			"os": "windows",
+			"ps": "720 C:\\llama\\llama-server.exe --port 5005",
+			"files": {},
+			"expected": {
+				"running": true,
+				"source": "cli",
+				"port": 5005,
+				"base_url": "http://127.0.0.1:5005/v1"
+			}
+		},
+		{
+			"name": "llama-server started without a port, listening ports unread",
+			"server": "llamacpp",
+			"os": "linux",
+			"ps": "730 llama-server -m /models/q.gguf",
+			"files": {},
+			"expected": {
+				"running": true,
+				"source": "default",
+				"port": 8080,
+				"base_url": "http://127.0.0.1:8080/v1"
+			}
+		}
+	]
+}

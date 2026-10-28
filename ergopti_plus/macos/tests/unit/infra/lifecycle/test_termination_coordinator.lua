@@ -41,6 +41,8 @@ local function load_coordinator(options)
 	package.loaded["infra.termination_coordinator"] = nil
 	local coordinator = require("infra.termination_coordinator")
 	helpers.assert_true(coordinator.is_initialized() == false)
+	helpers.assert_true(coordinator.terminal_in_progress() == false,
+		"before init nothing owns the process, and the query must not raise")
 	local initialized = coordinator.init({
 		capture_publication_admission = options.capture_publication_admission,
 		request_lease = function(reason, callback)
@@ -246,8 +248,11 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_eq(coordinator.request_reload_owned("sibling_reset", function() end), false,
 			"an owned handoff cannot join an older terminal transition")
 		helpers.assert_true(coordinator.is_pending())
+		helpers.assert_eq(coordinator.terminal_in_progress(), true,
+			"the watchers' quiet query must agree with is_pending")
 
 		calls.lease_callback(false, "native fence refused")
+		helpers.assert_eq(coordinator.terminal_in_progress(), false)
 		helpers.assert_eq(aborted, 1)
 		helpers.assert_eq(abort_detail, "exact Karabiner revocation was not proven: native fence refused")
 		helpers.assert_eq(calls.teardowns, 0)
@@ -490,6 +495,16 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_eq(calls.fatal_exit_code, 70)
 		helpers.assert_eq(calls.reloads, 0)
 		helpers.assert_eq(calls.marks, 0)
+	end)
+
+	helpers.it("(quit-wins-over-reload) names the kind of transition that owns the process", function()
+		local coordinator, calls = load_coordinator()
+		helpers.assert_nil(coordinator.pending_kind())
+		helpers.assert_true(coordinator.request_reload("first_reload"))
+		helpers.assert_eq(coordinator.pending_kind(), "reload")
+		helpers.assert_true(coordinator.request_user_exit("menu_quit"))
+		helpers.assert_eq(coordinator.pending_kind(), "exit", "Quit turned the reload into the exit")
+		helpers.assert_eq(calls.lease_requests, 1, "one fence serves both")
 	end)
 
 	helpers.it("preserves an emergency abort callback when exit supersedes reload", function()

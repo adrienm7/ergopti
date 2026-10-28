@@ -9,16 +9,19 @@ local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Parents = require("config_obsolete_parents")
 local Logger = require("logger.shim")
+local ConfigKeys = require("config_keys")
 local LOG = "infra.shortcuts_scope"
 local _owner, _sequence = nil, 0
 local _editor_owner, _editor_path, _editor_pause, _editor_busy = nil, nil, nil, false
+require("infra.scope_registry").register("shortcuts_scope", function() return _owner ~= nil and _owner.pending() == true end)
+require("infra.scope_registry").register("shortcuts_editor_scope", function() return _editor_owner ~= nil and _editor_owner.pending() == true end)
 
 --- The script chords' rows of the Shortcuts scope: their section and the
 --- parameters of the bindings they dispatch under. Their submenu's restore and
 --- clear narrow the scope to these rows.
 --- @param parameter_domain function Path -> parameter domain or nil.
 --- @return function select Path -> boolean.
-local SCRIPT_CHORD_SECTION = "shortcuts.script_control"
+local SCRIPT_CHORD_SECTION = ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL
 local function script_chord_rows(parameter_domain)
 	return function(path)
 		return path == SCRIPT_CHORD_SECTION
@@ -316,7 +319,7 @@ function M.new(options)
 		end,
 		validate_update = function(scope, row)
 			if scope ~= "shortcuts" or options.only ~= nil then return false end
-			if row.section == "shortcuts.keyboard" then
+			if row.section == ConfigKeys.KEY.SHORTCUTS_KEYBOARD then
 				return keyboard.physical_slot_descriptor(row.key) ~= nil
 					and (row.delete == true or parameters.is_assignable(row.value) == true)
 			end

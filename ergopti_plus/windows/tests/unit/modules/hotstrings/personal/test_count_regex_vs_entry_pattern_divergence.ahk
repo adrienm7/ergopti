@@ -61,3 +61,5 @@ _CRVEPD_CountMatchesRegistration() {
 }
 Test("toml_loader: count helpers only count registerable entry shapes (count-regex-vs-entry-pattern-divergence)",
 	_CRVEPD_CountMatchesRegistration)
+
+#Include test_toml_count_publication.ahk

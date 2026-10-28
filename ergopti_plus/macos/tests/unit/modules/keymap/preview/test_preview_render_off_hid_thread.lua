@@ -176,7 +176,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			"modules.keymap.utils",
 			"modules.llm",
 			"modules.llm.prediction_engine",
-			"modules.keylogger",
+			"modules.keystats",
 			"ui.tooltip",
 			"modules.keymap.llm_bridge",
 		}
@@ -226,7 +226,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			get_llm_enabled = function() return false end,
 			reset = function() reset_count = reset_count + 1; return true end,
 		}
-		package.loaded["modules.keylogger"] = {}
+		package.loaded["modules.keystats"] = {}
 		package.loaded["ui.tooltip"] = {
 			set_runtime_guard = function() end,
 			set_accept_callback = function() end,

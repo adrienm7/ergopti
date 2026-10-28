@@ -9,7 +9,7 @@ local function last(records) return records[#records] end
 
 local function with_context(options, callback)
 	options = options or {}
-	return helpers.with_stub_scope({"keylogger.physical_lifecycle_observation","adapters.physical_observation_clock"},function()
+	return helpers.with_stub_scope({"keystats.physical_lifecycle_observation","adapters.physical_observation_clock"},function()
 		return fixture.with_context(options,function(script,ctx)
 			local reads,records,owner,token=0,{},{}
 			hs.timer.absoluteTime=function() reads=reads+1; return reads end
@@ -161,7 +161,7 @@ describe("Actual pause writer observer ordering",function()
 	it("resync during resume is still denied until admission and pause commit",function()
 		with_context({},function(script,ctx,records)
 			commit_pause(script,ctx)
-			ctx.hooks.keylogger_resync=function()
+			ctx.hooks.keystats_resync=function()
 				denied(records);helpers.assert_eq(script.is_paused(),true)
 				helpers.assert_true(ctx.admission_fence~=nil)
 			end
@@ -348,7 +348,7 @@ end)
 describe("Shared asynchronous pause ownership",function()
 	local function actor_fixture()
 		local now,records,failures=0,{},{}
-		local actor=require("keylogger.physical_lifecycle_observation").new("pause",function() now=now+1;return now end,function(reason) failures[#failures+1]=reason end)
+		local actor=require("keystats.physical_lifecycle_observation").new("pause",function() now=now+1;return now end,function(reason) failures[#failures+1]=reason end)
 		local owner={}
 		local token=actor.bind(owner,100,function(record) records[#records+1]=record;return true end)
 		return actor,records,owner,token,failures
@@ -410,7 +410,7 @@ end)
 helpers.describe("asynchronous completion retains its outer frame",function()
 	helpers.it("same-ticket snapshot reentry cannot forge completion",function()
 		local now,records,refusals=0,{},0
-		local actor=require("keylogger.physical_lifecycle_observation").new("pause",function() now=now+1;return now end,function() refusals=refusals+1 end)
+		local actor=require("keystats.physical_lifecycle_observation").new("pause",function() now=now+1;return now end,function() refusals=refusals+1 end)
 		helpers.assert_true(actor.bind({},20,function(record) records[#records+1]=record;return true end)~=nil)
 		local ticket=actor.begin("pause")
 		local function settled() return {paused=true,transition_generation=2,admission_released=false,settled=true} end

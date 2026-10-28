@@ -20,7 +20,7 @@
 ---    operations work without leaking resources.
 --- 3. Shared HTML loading: delegates to webkit_host.build_app_html() for
 ---    asset inlining and i18n injection.
---- 4. Daemon state injection: passes engine, keylogger, hotstrings_config, and
+--- 4. Daemon state injection: passes engine, keystats, hotstrings_config, and
 ---    LLM references to bridge handlers so UIs can query/control daemon state.
 --- ==============================================================================
 
@@ -131,6 +131,7 @@ local webkit_host = require("ui.webkit_host")
 -- every object a page posted became nil and no reply reached a page, so the
 -- metrics windows stayed empty and the editors' buttons did nothing.
 local Json = require("json")
+local ConfigKeys = require("config_keys")
 
 
 -- =========================================
@@ -470,7 +471,7 @@ function M.show(app_name, active_locale, contextual_receipt)
 		local ok, I18n = pcall(require, "infra.i18n")
 		active_locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
 		if type(active_locale) ~= "string" or active_locale == "" then
-			active_locale = require("infra.manifest_reader").default_for("script.locale")
+			active_locale = require("infra.manifest_reader").default_for(ConfigKeys.KEY.SCRIPT_LOCALE)
 		end
 	end
 
@@ -486,13 +487,11 @@ function M.show(app_name, active_locale, contextual_receipt)
 			local replacement = _windows[app_name]
 			if replacement then
 				if replacement.acquiring or replacement.closing or replacement.failed or replacement.debt then return false end
-				M.bring_to_front(app_name)
-				return _windows[app_name] == replacement
+				return M.bring_to_front(app_name) == true and _windows[app_name] == replacement
 			end
 		else
 			Logger.debug(LOG, "Window '%s' already open — bringing to front.", app_name)
-			M.bring_to_front(app_name)
-			return true
+			return M.bring_to_front(app_name) == true
 		end
 	end
 
@@ -617,15 +616,16 @@ end
 
 --- Brings an existing window to the front.
 --- @param app_name string The app name.
+--- @return boolean presented The exact page survived native presentation.
 function M.bring_to_front(app_name)
-	if not _windows[app_name] then return end
-	_windows[app_name].visible = true
-	-- GTK window focus is handled by _create_gtk_window on first show;
-	-- subsequent front-bringing needs GTK API (not available in pure Lua).
-	if _gtk_available then
-		M._focus_gtk_window(app_name)
-	end
+	local owned = _windows[app_name]
+	if not owned or not M.page_current(app_name, owned.epoch) then return false end
+	if M._focus_gtk_window(app_name) ~= true then return false end
+	-- GTK presentation can synchronously close the page or open a successor.
+	if _windows[app_name] ~= owned or not M.page_current(app_name, owned.epoch) then return false end
+	owned.visible = true
 	Logger.debug(LOG, "Window '%s' brought to front.", app_name)
+	return true
 end
 
 --- Returns true if a window is currently visible.
@@ -633,6 +633,47 @@ end
 --- @return boolean
 function M.is_visible(app_name)
 	return _windows[app_name] ~= nil and _windows[app_name].visible == true
+end
+
+--- True when the app's native window holds the keyboard focus (GTK is-active).
+--- A failed lookup reads as not frontmost, so a toggle presents the window
+--- rather than closing one the user may not see.
+--- @param app_name string The app name.
+--- @return boolean
+function M.is_frontmost(app_name)
+	return M.is_visible(app_name) and M._gtk_window_active(app_name) == true
+end
+
+--- Reads GTK's is-active flag of the app's native window (Linux only).
+--- @param app_name string The app name.
+--- @return boolean
+function M._gtk_window_active(app_name)
+	local wref = _gtk_windows[app_name]
+	if not wref or not wref.window then return false end
+	local ok, active = pcall(function() return wref.window.is_active end)
+	return ok and active == true
+end
+
+--- Toggles one page window for the shared `open_*` window actions
+--- (_shared/modules/actions/actions.toml, group "UI"): closed opens and
+--- focuses it, open but hidden or behind another window brings it to the
+--- front, open and frontmost closes it. The window pool is the only state read.
+--- @param app_name string The app name.
+--- @param open_fn function|nil The page's own opener, when it is not show().
+--- @return boolean committed The requested transition committed.
+function M.toggle(app_name, open_fn)
+	local owned = _windows[app_name]
+	if owned == nil then
+		Logger.debug(LOG, "Toggle '%s': closed, opening.", app_name)
+		if open_fn ~= nil then return open_fn() == true end
+		return M.show(app_name) == true
+	end
+	if not M.is_frontmost(app_name) then
+		Logger.debug(LOG, "Toggle '%s': open but not frontmost, bringing to front.", app_name)
+		return M.bring_to_front(app_name) == true
+	end
+	Logger.debug(LOG, "Toggle '%s': frontmost, closing.", app_name)
+	return M.hide(app_name, owned.epoch) == true
 end
 
 --- Composes a native window title. The product name is added here only, so
@@ -674,7 +715,7 @@ end
 
 --- Registers daemon state that bridge handlers can access to query/control
 --- the running daemon.
---- @param state table { engine, keylogger, config, llm, layout }
+--- @param state table { engine, keystats, config, llm, layout }
 function M.set_daemon_state(state)
 	_daemon_state = type(state) == "table" and state or {}
 	Logger.debug(LOG, "Daemon state registered for bridge handlers.")
@@ -724,11 +765,23 @@ function M.eval_js(app_name, js_code)
 		Logger.debug(LOG, "eval_js: no live webview for '%s' — nothing to push to.", app_name)
 		return false
 	end
+	local owned = _windows[app_name]
+	local function current()
+		return owned ~= nil and _windows[app_name] == owned and _gtk_windows[app_name] == wref
+			and owned.epoch == wref.epoch and not owned.debt and not owned.failed
+			and not owned.closing and not owned.cancelled and not wref.cancelled
+			and not wref.retiring and not wref.settled and not wref.view_settled
+			and wref.registration == true and wref.signal_id ~= nil
+	end
+	-- A failed close retains native resources for retry, never page admission.
+	-- A live acquiring page still needs its synchronous ready response.
+	if not current() then return false end
 	local ok, err = pcall(function() wref.webview:run_javascript(js_code, nil, nil, nil) end)
 	if not ok then
 		Logger.error(LOG, "eval_js: run_javascript failed for '%s': %s", app_name, tostring(err))
 		return false
 	end
+	if not current() then return false end
 	Logger.debug(LOG, "eval_js: pushed %d char(s) to '%s'.", #js_code, app_name)
 	return true
 end
@@ -1323,19 +1376,22 @@ end
 
 --- Focuses a GTK window, bringing it to the front (Linux only).
 --- @param app_name string The app name.
+--- @return boolean presented Native presentation retained the exact window.
 function M._focus_gtk_window(app_name)
-	if not _gtk_available or not _lgi then return end
+	if not _gtk_available or not _lgi then return false end
 	local wref = _gtk_windows[app_name]
 	if not wref or not wref.window then
 		Logger.debug(LOG, "GTK window '%s' not found — cannot focus.", app_name)
-		return
+		return false
 	end
 	local ok, err = pcall(M._present_gtk_window, wref.window, true)
 	if not ok then
 		Logger.error(LOG, "GTK window '%s' could not be presented: %s.", app_name, tostring(err))
-		return
+		return false
 	end
+	if _gtk_windows[app_name] ~= wref then return false end
 	Logger.debug(LOG, "GTK window '%s' focused.", app_name)
+	return true
 end
 
 

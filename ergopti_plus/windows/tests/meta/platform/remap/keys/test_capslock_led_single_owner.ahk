@@ -45,35 +45,9 @@ _CLSO_ReadSource(RelPath) {
 ; ===================================================
 ; ===================================================
 
-; Genuine CapsLock intent must survive both navigation and CapsWord transitions.
-_CLSO_LedConsultsHardwareToggle() {
-	Src := _CLSO_ReadSource("modules/shortcuts/capsword.ahk")
-	Seg := _DriverFuncBody("UpdateCapsLockLED")
-	Assert(Seg != "", "UpdateCapsLockLED() declaration must exist in capsword.ahk")
-	Assert(InStr(Seg, "CapsWordEnabled") > 0,
-		"UpdateCapsLockLED must still consider CapsWordEnabled")
-	Assert(InStr(Seg, "NavigationLayerUpdateIndicator") > 0,
-		"navigation must retain an indicator outside the physical CapsLock toggle")
-	AssertTrue(RegExMatch(Seg, "m)^\s*LedOn := CapsWordEnabled or _HardwareCapsLockOn\s*$") > 0,
-		"only genuine CapsLock and CapsWord may change native character case")
-	; The GUARANTEE is that a genuine hardware CapsLock is part of the OR, so a
-	; real toggle is not overridden by CapsWord/layer state. This assertion used
-	; to pin the MECHANISM — GetKeyState("CapsLock", "T") — and that mechanism
-	; was the bug: it reads back the very bit SetCapsLockState writes two lines
-	; below, so once CapsWord lit the LED the next evaluation saw its own output,
-	; concluded the user wanted CapsLock, and re-asserted it. CapsLock then
-	; survived CapsWord and everything kept typing uppercase (reproduced live).
-	; The hardware intent now lives in its own variable, which satisfies the same
-	; guarantee without the feedback loop.
-	Assert(InStr(Seg, "_HardwareCapsLockOn") > 0,
-		"UpdateCapsLockLED must OR the recorded hardware CapsLock intent into its condition, "
-		. "otherwise navigation or CapsWord can overwrite genuine CapsLock intent")
-	HardwareTerm := "GetKeyState(" . Chr(34) . "CapsLock" . Chr(34) . ", " . Chr(34) . "T" . Chr(34) . ")"
-	Assert(InStr(Seg, HardwareTerm) = 0,
-		"UpdateCapsLockLED must NOT read back GetKeyState(CapsLock, T) — that is the bit it "
-		. "writes, so ORing it makes the function self-latching and CapsLock outlives CapsWord")
-}
-Test("capsword: UpdateCapsLockLED ORs the hardware CapsLock toggle (capslock-led-multiple-owners)", _CLSO_LedConsultsHardwareToggle)
+; The LED condition (CapsWord or genuine CapsLock intent, never the nav layer, never
+; a read-back of the bit it writes) is pinned by behaviour in
+; unit/modules/shortcuts/test_capsword_state.ahk and by the native probe below.
 
 ; ToggleCapsLock must delegate the LED to the single owner instead of driving it
 ; directly, so it can never leave the LED disagreeing with CapsWord/layer state.
@@ -89,7 +63,8 @@ Test("one_shot_shift: ToggleCapsLock delegates LED to UpdateCapsLockLED (capsloc
 ; Execute the actual owner, rather than a copy of its boolean expression. Every
 ; native transition is inspected before restoring the original CapsLock bit.
 _CLSO_NativeCaseMatrix() {
-	Writer := _DriverFuncBody("UpdateCapsLockLED")
+	Writer := _DriverFuncBody("CapsWordLedWanted") . "`n" . _DriverFuncBody("CapsWordSyncLed") . "`n"
+		. _DriverFuncBody("_CapsWordPort") . "`n" . _DriverFuncBody("_CapsWordDefaultPorts")
 	AssertTrue(Writer != "", "the native probe must execute the real CapsLock owner")
 	Root := A_Temp . "\ergopti-nav-case-" . A_ScriptHwnd . "-" . A_TickCount
 	DirCreate(Root)
@@ -98,6 +73,10 @@ _CLSO_NativeCaseMatrix() {
 		. 'global CapsWordEnabled := false, LayerEnabled := false, _HardwareCapsLockOn := false' . "`n"
 		. 'LoggerIsDebugEnabled() => false' . "`n"
 		. 'LoggerDebug(*) => 0' . "`n"
+		. 'UpdateCapsLockLED() => CapsWordSyncLed()' . "`n"
+		. 'global GestureLeftClickHeld := false, GestureRightClickHeld := false' . "`n"
+		. 'GestureReleaseLeftClick() => 0' . "`n" . 'GestureReleaseRightClick() => 0' . "`n"
+		. 'CapsWordAutoOffArm(*) => 0' . "`n" . 'CapsWordAutoOffDisarm(*) => 0' . "`n"
 		. 'global IndicatorRequests := []' . "`n"
 		. 'NavigationLayerUpdateIndicator(IsActive) {' . "`n"
 		. '`tIndicatorRequests.Push(IsActive)' . "`n"
@@ -115,7 +94,7 @@ _CLSO_NativeCaseMatrix() {
 		. '`t`t`t`tLayerEnabled := Nav' . "`n"
 		. '`t`t`t`tCapsWordEnabled := Word' . "`n"
 		. '`t`t`t`t_HardwareCapsLockOn := Hardware' . "`n"
-		. '`t`t`t`tUpdateCapsLockLED()' . "`n"
+		. '`t`t`t`tCapsWordSyncLed()' . "`n"
 		. '`t`t`t`tif GetKeyState("CapsLock", "T") != (Word or Hardware)' . "`n"
 		. '`t`t`t`t`tthrow Error("Navigation changed native CapsLock case: nav=" . Nav . ", word=" . Word . ", hardware=" . Hardware)' . "`n"
 		. '`t`t`t`tChecks += 1' . "`n"
@@ -124,7 +103,7 @@ _CLSO_NativeCaseMatrix() {
 		. '`tCapsWordEnabled := false' . "`n"
 		. '`t_HardwareCapsLockOn := false' . "`n"
 		. '`tSuspend(true)' . "`n"
-		. '`tUpdateCapsLockLED()' . "`n"
+		. '`tCapsWordSyncLed()' . "`n"
 		. '`tif IndicatorRequests[IndicatorRequests.Length]' . "`n"
 		. '`t`tthrow Error("A paused driver retained the navigation indicator")' . "`n"
 		. '`tSuspend(false)' . "`n"

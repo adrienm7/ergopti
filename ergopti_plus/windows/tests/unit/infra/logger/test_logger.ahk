@@ -823,7 +823,7 @@ Test("Ring buffer: snapshot is correct after double wrap-around",
 ; =======================================================================================
 ; =======================================================================================
 ; The enriched Diagnostic système (healthcheck) must be fully usable by paused users
-; for troubleshooting. It must correctly surface the dedicated errors sink, keylogger
+; for troubleshooting. It must correctly surface the dedicated errors sink, keystats
 ; summary (privacy-safe), pause_state, llm/layout/hotstrings/logs/config collectors.
 ; These tests would have caught silent diagnostic returning stale data or missing
 ; the errors log path when the user is paused and needs to debug "why is nothing working?".
@@ -1404,6 +1404,8 @@ TestLogger_CasesLeaveTheSharedLoggerAsFound() {
 }
 Test("Logger: every case leaves the shared logger as it found it (logger-test-isolation)",
 	TestLogger_CasesLeaveTheSharedLoggerAsFound)
+
+#Include test_logger_native64_dedup_owner.ahk
 
 ; Must stay the last statement: a case registered below it would run unguarded.
 _TLOG_IsolateEveryCase()

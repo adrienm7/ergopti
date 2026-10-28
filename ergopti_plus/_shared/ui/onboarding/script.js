@@ -33,6 +33,8 @@ var _strings = {};
 // Wizard state.
 var _selectedLocale = DEFAULT_LOCALE_CODE;
 var _platform = '';
+// What the host can do beyond persisting answers: { gesture_registration }.
+var _capabilities = null;
 var _pages = [];
 var _steps = [STEP_LANGUAGE, STEP_CONFIG];
 var _stepIndex = 0;
@@ -382,22 +384,19 @@ function _magicValue(page) {
  * force: off when the answer turns a category switch in force from Yes to No,
  * as that switch once turned those items off, and on when the answer imports
  * one of its items that was not on. Ordinary pages leave a first No and a Yes
- * importing nothing new unwritten. Linux ordered pairs have an independent
- * master: every No disables it, including a first run or an already-off
- * ordinary shortcuts master. A Yes importing no pair preserves the tray choice.
+ * importing nothing new unwritten. An independent sub-switch (the catalogue
+ * says so: Linux ordered pairs) is its own master: every No disables it,
+ * including a first run or an already-off category master. A Yes importing
+ * nothing preserves the tray choice.
  * @param {object} page
  * @param {object} state Page state.
  * @returns {boolean|null}
  */
 function _subSwitchValue(page, state) {
-	// Ordered Linux pairs have their own master: No also covers a first run
-	// and existing pairs while the ordinary shortcuts master is already off.
+	// An independent sub-switch is its own master: No also covers a first run
+	// and existing items while the category master is already off.
 	if (!state.answer)
-		return (_platform === 'linux' &&
-			page.sub_switch.path === 'category_enabled.key_combinations') ||
-			_currentValue(page.master) === true
-			? false
-			: null;
+		return page.sub_switch.independent || _currentValue(page.master) === true ? false : null;
 	var governed = {};
 	page.sub_switch.items.forEach(function (itemPath) {
 		governed[itemPath] = true;
@@ -703,14 +702,14 @@ function _renderControls(page, state) {
 }
 
 /**
- * Shows the Windows gesture-registration panel on the gestures page when the
- * answer is Yes.
+ * Shows the gesture-registration panel on the gestures page when the answer is
+ * Yes and the host registers gestures with the system (Windows).
  * @param {object} page
  * @param {object} state
  */
 function _renderRegister(page, state) {
 	var panel = document.getElementById('page-register');
-	var shown = _platform === 'windows' && page.id === 'gestures' && state.answer;
+	var shown = _capabilities.gesture_registration && page.id === 'gestures' && state.answer;
 	panel.classList.toggle('hidden', !shown);
 	if (!shown) return;
 	document.getElementById('register-section').textContent = _t(
@@ -964,6 +963,7 @@ window.applyStrings = function (payload) {
 /**
  * Called by the host once the page is ready.
  * @param {{locale: string, strings: Object, locales: Array, platform: string,
+ *   capabilities: {gesture_registration: boolean},
  *   default_config_dir: string, config_dir: string, empty_config_dir: string, current: Object,
  *   metrics_path: string, system_layout?: string}} data
  */
@@ -974,6 +974,10 @@ window.initData = function (data) {
 	if (typeof data.empty_config_dir !== 'string' || data.empty_config_dir.trim() === '') {
 		throw new Error('onboarding host must name the configuration folder used for an empty input');
 	}
+	if (!data.capabilities || typeof data.capabilities.gesture_registration !== 'boolean') {
+		throw new Error('onboarding host must state its gesture_registration capability');
+	}
+	_capabilities = { gesture_registration: data.capabilities.gesture_registration };
 	_platform = data.platform;
 	_pages = platform.pages;
 	_steps = [STEP_LANGUAGE, STEP_CONFIG].concat(

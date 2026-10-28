@@ -10,8 +10,9 @@
 --- duplication.
 ---
 --- FEATURES & RATIONALE:
---- 1. Native fetch proxy: hs.http.asyncGet (NSURLSession, which applies the
----    system proxy and PAC settings) is used instead of the WebKit fetch() API.
+--- 1. Native fetch proxy: adapters.http_client (hs.http over NSURLSession, which
+---    applies the system proxy and PAC settings, with the adapter's own redirect
+---    policy) is used instead of the WebKit fetch() API.
 ---    The Lua backend injects the result via evaluateJavaScript("injectReleases(…)")
 ---    so the JS never touches the network directly.
 --- 1b. Bounded sources: every request carries a deadline, and a failed GitHub
@@ -57,9 +58,11 @@ local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
+local HttpClient = require("adapters.http_client")
 local Json       = require("json")
 local JsonCodec  = require("adapters.json_codec")
 local ReleaseSources = require("updater.release_sources")
+local RepositoryUrl = require("updater.repository_url")
 local UpdateChannels = require("updater.channels")
 local DocumentCsp = require("webview.document_csp")
 local ReleaseInstall = require("updater.release_install")
@@ -119,14 +122,18 @@ local function registry_channel(channel, purpose)
 	return nil
 end
 
---- Bounded GET over hs.http. NSURLSession honours the system proxy; the
---- deadline guarantees one terminal answer even when a proxy holds the socket.
+--- Bounded GET through the HttpClient adapter. NSURLSession still honours the
+--- system proxy, but the adapter, not the opaque native auto-follow, owns the
+--- redirects: an HTTPS response never downgrades to HTTP and every hop stays
+--- inside one request. The outer deadline guarantees one terminal answer even
+--- when a proxy holds the socket.
 --- @param url string
 --- @param headers table
 --- @param timeout_ms number
 --- @param callback function Receives status, body, err exactly once.
 local function http_get(url, headers, timeout_ms, callback)
 	local settled = false
+	local client = HttpClient.new({ timeout_ms = timeout_ms })
 	local function settle(status, body, err)
 		if settled then return end
 		settled = true
@@ -134,21 +141,22 @@ local function http_get(url, headers, timeout_ms, callback)
 	end
 	-- The deadline is armed before the request so a request that raises or never
 	-- answers still ends; an unarmed deadline is itself a terminal failure.
-	if not DeferredWork.after(timeout_ms / 1000, function() settle(0, "", "timeout") end,
-		"changelog.fetch_deadline")
+	if not DeferredWork.after(timeout_ms / 1000, function()
+		settle(0, "", "timeout")
+		client.cancel()
+	end, "changelog.fetch_deadline")
 	then
 		settle(0, "", "deadline unavailable")
 		return
 	end
-	local ok = pcall(hs.http.asyncGet, url, headers, function(status, body, _)
-		status = tonumber(status) or 0
-		if status < 0 then
-			settle(0, "", "network error " .. tostring(status))
+	local ok, accepted = pcall(client.get, url, headers, function(result)
+		if result.status == 0 then
+			settle(0, "", "network error: " .. tostring(result.error))
 		else
-			settle(status, body, nil)
+			settle(result.status, result.body, nil)
 		end
 	end)
-	if not ok then settle(0, "", "request refused") end
+	if not ok or accepted == false then settle(0, "", "request refused") end
 end
 
 M._http_get = http_get
@@ -553,10 +561,10 @@ local function install_session()
 					detail, failure_receipt)
 			end) == true
 		end,
-		install = function(staged)
-			local armed, err = deps().installer.arm_swap(staged)
-			if armed == true then return true end
-			return false, ReleaseInstall.REASON.install, err
+		install_async = function(staged, release, asset, done)
+			return deps().installer.arm_swap(staged, function(armed, detail)
+				done(armed == true, ReleaseInstall.REASON.install, detail)
+			end) == true
 		end,
 		restart = function()
 			return deps().coordinator.request_user_exit("release_install") == true
@@ -773,8 +781,12 @@ local function ensure_ucc(owner)
 			end
 		elseif body.action == "restore_backup" then
 			restore_from_page(body.id)
-		elseif body.action == "open_url" and type(body.url) == "string" then
-			if ui_builder.open_http_url(body.url) then
+		elseif body.action == "open_url" then
+			-- A page message is data: only this repository's https surface opens.
+			local updater = deps().updater
+			if not RepositoryUrl.is_repository_url(body.url, updater.GH_OWNER, updater.GH_REPO) then
+				Logger.warn(LOG, "Refused a changelog link outside the repository.")
+			elseif ui_builder.open_http_url(body.url) then
 				Logger.info(LOG, "Opened changelog release URL.")
 			end
 		end
@@ -867,7 +879,7 @@ local function build_window(channel, opening_generation, focus_owner)
 			if action == "didFinishNavigation" then
 				-- Safety flush after navigation — belt-and-suspenders alongside
 				-- the "ready" message from script.js.
-				DeferredWork.after(0.15, function()
+				DeferredWork.after(require("infra.timings").sec("ui", "webview_navigation_flush_delay_ms"), function()
 					if not candidate_is_owned() then return end
 					if not _ready then flush_queue() end
 					-- Kick off the first fetch from the Lua side so the JS
@@ -906,7 +918,7 @@ local function build_window(channel, opening_generation, focus_owner)
 
 	-- Safety: if didFinishNavigation fires very fast and queues pile up,
 	-- flush after 1.5 s regardless.
-	local scheduled = DeferredWork.after(1.5, function()
+	local scheduled = DeferredWork.after(require("infra.timings").sec("ui", "webview_ready_safety_flush_ms"), function()
 		if candidate_is_owned() and not _ready then flush_queue() end
 	end, "changelog.ready_fallback")
 
@@ -998,6 +1010,10 @@ function M.open(opts)
 	Logger.success(LOG, "Changelog window created.")
 	return _focus_owner == owner and _wv_committed == true
 end
+
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _wv end
 
 --- Closes the changelog window if open.
 --- @return boolean committed

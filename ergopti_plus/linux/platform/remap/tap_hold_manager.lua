@@ -19,12 +19,14 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local NativePath = require("native_path")
 local Config = require("platform.remap.tap_hold_loader")
 local Engine = require("platform.remap.tap_hold_engine")
 local Combinations = require("modules.shortcuts.key_combinations")
+local AiActions = require("modules.shortcuts.ai_actions")
 local original_combination_constructor = Combinations.new
 local original_combination_instance_current = Combinations.instance_is_current
 local BindingIdentity = require("config_binding_identity")
@@ -197,6 +199,11 @@ local function _run_tap(action, binding)
 		end
 		if not tap_current() then return end
 	end
+	-- Re-read at delivery: the AI may be switched off between the key and its run.
+	if AiActions.blocked(action) then
+		Logger.debug(LOG, "Tap action '%s' held back: the AI is off.", action)
+		return
+	end
 	Logger.debug(LOG, "Tap action '%s'.", action)
 	if pair_current and not pair_current() then return end
 	if tap_current and not tap_current() then return end
@@ -243,7 +250,7 @@ local function _pair_thresholds(loaded)
 	local thresholds = {}
 	for _, row in ipairs(loaded.catalog) do
 		local key = loaded.keys[row.id]
-		thresholds[row.id] = math.floor((key and key.time_activation_seconds or Config.FALLBACK_THRESHOLD_SECONDS) * MS_PER_SECOND + 0.5)
+		thresholds[row.id] = math.floor((key and key.time_activation_seconds or loaded.global_seconds) * MS_PER_SECOND + 0.5)
 	end
 	return thresholds
 end
@@ -252,10 +259,7 @@ end
 -- Only this construction path records a saved/public pending configuration.
 -- SourceOwner still owns disk/state currency; it cannot enroll a caller's
 -- catalogue by merely returning a normalized options object.
-local function copy_fields(value)
- if type(value)~="table" then return value end
- local result={};for key,item in pairs(value) do result[key]=copy_fields(item) end;return result
-end
+local copy_fields = TableUtil.deep_copy
 local function fields_equal(value,captured)
  if type(value)~="table" or type(captured)~="table" then return value==captured end
  if getmetatable(value)~=nil then return false end
@@ -514,6 +518,8 @@ local function _build(loaded, boot)
 		key_text = function(code) return _hook.key_text(code) end,
 		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
 		one_shot_result = _one_shot_result,
+		-- An AI action is unarmed while the AI is off: the key keeps its own tap.
+		tap_blocked = AiActions.blocked,
 		held_modifiers = function() return _hook.held_modifiers() end,
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,
 		held_shortcut_modifier_codes = function() return _hook.held_shortcut_modifier_codes() end,
@@ -609,7 +615,7 @@ function M.init(opts)
 			error("tap-hold manager requires " .. name, 2)
 		end
 	end
-	-- Keylogger imports Manager before Hook. Select the loaded receiver at init,
+	-- Keystats imports Manager before Hook. Select the loaded receiver at init,
 	-- before callbacks; its private frame controller alone proves native rights.
 	_native_hook = package.loaded["adapters.keyboard_hook"]
 	Logger.start(LOG, "Initialising tap-holds…")
@@ -727,6 +733,25 @@ end
 function M.keys()
 	_require_init()
 	return _loaded.keys
+end
+
+--- The GLOBAL delay in seconds: what a key with no delay of its own waits before
+--- its hold fires. The user's `[tap_hold] time_activation_seconds`, else the
+--- timing registry's default.
+--- @return number
+function M.global_seconds()
+	_require_init()
+	return _loaded.global_seconds
+end
+
+--- Whether the user gave a key a delay of its own, as opposed to it following the
+--- global delay. The tray names the delay « global (N ms) » when this is false.
+--- @param key_id string Canonical shared tap-hold key id.
+--- @return boolean
+function M.has_own_delay(key_id)
+	_require_init()
+	local own = _loaded.user_fields[key_id]
+	return type(own) == "table" and own.time_activation_seconds == true
 end
 
 --- Resolves only an actual enabled key of the currently active engine.
@@ -857,10 +882,7 @@ end
 --- @return table
 function M.tap_actions()
 	_require_init()
-	local ids = {}
-	for id in pairs(_tap_action_set()) do ids[#ids + 1] = id end
-	table.sort(ids)
-	return ids
+	return TableUtil.sorted_keys(_tap_action_set())
 end
 
 --- Whether `action` is an id a tap can be set to.

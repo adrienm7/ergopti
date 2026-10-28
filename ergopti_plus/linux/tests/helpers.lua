@@ -39,6 +39,27 @@ local _fail_msg = fmt.fail_msg_for("helpers%.lua$")
 -- ===================================
 -- ===================================
 
+--- Source text in which each generated config-key reference reads as the quoted string it
+--- stands for, for tests that scan driver source for the literal a call passes. A name the
+--- generated tables do not hold is left as written, so the scan still refuses it.
+--- @param text string Lua source text.
+--- @return string expanded
+function M.expand_config_keys(text)
+	local keys = require("config_keys")
+	local function resolve(whole, root_table, name)
+		local found, tbl = pcall(function() return keys[root_table] end)
+		if not found then return whole end
+		local ok, value = pcall(function() return tbl[name] end)
+		return ok and type(value) == "string" and string.format("%q", value) or whole
+	end
+	text = text:gsub('require%("config_keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
+		return resolve('require("config_keys").' .. root_table .. "." .. name, root_table, name)
+	end)
+	return (text:gsub("ConfigKeys%.(%u+)%.([%u%d_]+)", function(root_table, name)
+		return resolve("ConfigKeys." .. root_table .. "." .. name, root_table, name)
+	end))
+end
+
 --- Returns the absolute path of the Linux driver root (no trailing slash).
 --- @return string Absolute path.
 function M.driver_root()
@@ -143,13 +164,24 @@ end
 --- io.open double keyed on the path never sees. Native classification still
 --- runs first, so a FIFO or a missing file keeps its real receipt; only the
 --- stream of an admitted regular file is reopened by name for the double.
---- A virtual path exists only inside the double, so it skips native admission.
+--- A virtual path and its staging exist only inside the double, so both skip
+--- native admission while keeping the double's own write/close/remove receipts.
+--- Physical staging image checks belong to the native file integration tests.
 --- @param path string Exact source path the test's io.open double recognises.
 --- @param virtual boolean|nil True when no file exists on disk at that path.
 --- @return function restore Reinstates the native admission.
 function M.route_source_through_stdio(path, virtual)
 	local Reader = require("infra.regular_file_reader")
 	local native = Reader.open
+	local Writer, native_write
+	if virtual then
+		Writer = require("infra.regular_file_writer"); native_write = Writer.open
+		Writer.open = function(candidate, mode)
+			if candidate ~= path .. ".tmp" or mode ~= "wx" then return native_write(candidate, mode) end
+			local stream, detail, errno = io.open(candidate, "w")
+			return stream, detail, errno, function() return os.remove(candidate) end, function() return true end
+		end
+	end
 	Reader.open = function(candidate)
 		if virtual and candidate == path then return io.open(candidate, "r") end
 		local stream, detail, errno = native(candidate)
@@ -157,7 +189,10 @@ function M.route_source_through_stdio(path, virtual)
 		assert(stream:close(), "admitted source stream must close before stdio reopens it")
 		return io.open(candidate, "r")
 	end
-	return function() Reader.open = native end
+	return function()
+		Reader.open = native
+		if Writer then Writer.open = native_write end
+	end
 end
 
 
@@ -272,6 +307,73 @@ function M.initialize_timing()
 	_timing = require("test.runner_timing").capture("linux")
 end
 
+--- Whether a package.loaded value is a test double: a table holding a function
+--- defined under tests/ or the shared test library. A real module reloaded by a
+--- test is not one, since its functions come from the product tree.
+--- @param value any Loaded value.
+--- @param roots string[] Path prefixes of test code, with a trailing slash.
+--- @return boolean
+local function is_test_double(value, roots)
+	if type(value) ~= "table" then return false end
+	for _, field in pairs(value) do
+		if type(field) == "function" then
+			local source = debug.getinfo(field, "S").source:gsub("^@", ""):gsub("\\", "/")
+			for _, root in ipairs(roots) do
+				if source:sub(1, #root) == root then return true end
+			end
+		end
+	end
+	return false
+end
+
+--- Puts back every product module left replaced by a test double since a
+--- snapshot. Without this, one fixture that failed before its restore left
+--- doubles installed for every later module: the document fixture's timings
+--- double, which refuses all keys but one, failed about 1200 Linux tests that
+--- never touched it.
+--- @param before table Shallow copy of package.loaded taken earlier.
+--- @return string[] leaked Sorted names that held a double, now restored.
+function M.restore_leaked_doubles(before)
+	local driver = M.driver_root()
+	local roots = { driver .. "/tests/", (driver:match("^(.*)/[^/]+$") or driver) .. "/_shared/lua/test/" }
+	local leaked = {}
+	for key, value in pairs(package.loaded) do
+		if type(key) == "string" and not key:match("^tests?%.") and value ~= before[key]
+			and is_test_double(value, roots) then
+			leaked[#leaked + 1] = key
+		end
+	end
+	table.sort(leaked)
+	for _, key in ipairs(leaked) do package.loaded[key] = before[key] end
+	return leaked
+end
+
+--- Restores the doubles a test module left behind and records one failure each.
+--- @param name string Test module identity.
+--- @param before table Shallow copy of package.loaded before the module ran.
+local function fail_leaked_doubles(name, before)
+	for _, key in ipairs(M.restore_leaked_doubles(before)) do
+		local err = "left a test double in package.loaded['" .. key .. "']; restore it before the module ends"
+		_suite_results.failed = _suite_results.failed + 1
+		_suite_results.failures[#_suite_results.failures + 1] = {
+			name = name, err = err, kind = "module", module = name,
+		}
+		print("  FAIL " .. name .. " — " .. err)
+	end
+end
+
+--- Records the current package.loaded entries a test module replaces, for the
+--- module to put back at its end (the runner fails a module that leaves a double).
+--- @param names string[] Module names the test module or its fixtures replace.
+--- @return function restore Puts every recorded entry back.
+function M.keep_loaded(names)
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
+	return function()
+		for name, entry in pairs(saved) do package.loaded[name] = entry.value end
+	end
+end
+
 --- Measures one module load while retaining its current case ownership.
 --- @param name string Exact test module identity.
 --- @param callback function Original require operation.
@@ -279,10 +381,13 @@ end
 --- @return any result Original protected-call result or error.
 function M.measure_module(name, callback)
 	assert(_timing ~= nil, "Lua unit timing is not initialized")
+	local before = {}
+	for key, value in pairs(package.loaded) do before[key] = value end
 	local previous = _current_module
 	_current_module = name
 	local ok, result = _timing.measure("module", name, callback, name)
 	_current_module = previous
+	fail_leaked_doubles(name, before)
 	return ok, result
 end
 

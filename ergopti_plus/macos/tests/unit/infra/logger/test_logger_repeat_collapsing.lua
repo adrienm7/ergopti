@@ -224,3 +224,102 @@ helpers.describe("logger repeat collapsing: root init.lua arms it", function()
 			"arming must precede the runtime so its periodic lines are collapsed from the start")
 	end)
 end)
+
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 5/ Evidence Records =========
+-- =====================================
+-- =====================================
+
+--- Counts the lines of `lines` containing `needle`, plain.
+--- @param lines table
+--- @param needle string
+--- @return number
+local function count_lines_with(lines, needle)
+	local count = 0
+	for _, line in ipairs(lines) do
+		if line:find(needle, 1, true) then count = count + 1 end
+	end
+	return count
+end
+
+helpers.describe("logger repeat collapsing: evidence records (spec 4.3)", function()
+	helpers.it("a burst of records sharing one template is delivered whole, an info burst is folded", function()
+		with_driven_logger(function(set_time, lines)
+			Logger.enable_repeat_collapsing(fake_scheduler())
+			set_time(0)
+			for row = 1, 8 do Logger.evidence("probe", "scenario=%d exact=1", row) end
+			helpers.assert_eq(count_lines_with(lines, "scenario="), 8,
+				"every evidence record of the burst must reach the sink")
+			helpers.assert_eq(repeat_summaries(lines), 0, "evidence records must never be summarised")
+
+			-- The control that makes the assertion above able to fail: the same burst
+			-- through info keeps only the first record.
+			local before = #lines
+			for row = 1, 8 do Logger.info("probe", "folded=%d", row) end
+			helpers.assert_eq(#lines - before, 1, "an ordinary info burst is still collapsed")
+		end)
+	end)
+
+	helpers.it("a rerun inside the repeat window writes all its records again", function()
+		with_driven_logger(function(set_time, lines)
+			Logger.enable_repeat_collapsing(fake_scheduler())
+			for _, at in ipairs({ 0, 60 }) do
+				set_time(at)
+				for row = 1, 3 do Logger.evidence("probe", "scenario=%d exact=1", row) end
+			end
+			helpers.assert_eq(count_lines_with(lines, "scenario="), 6,
+				"the second run's records are as much evidence as the first run's")
+		end)
+	end)
+
+	helpers.it("a record identical to the previous one is not deduplicated", function()
+		with_driven_logger(function(set_time, lines)
+			Logger.enable_repeat_collapsing(fake_scheduler())
+			set_time(0)
+			for _ = 1, 3 do Logger.evidence("probe", "check=network verdict=pass") end
+			helpers.assert_eq(#lines, 3)
+			helpers.assert_eq(Logger.dedup_suppressed_count(), 0)
+		end)
+	end)
+
+	helpers.it("is an INFO line that follows the level threshold", function()
+		with_driven_logger(function(set_time, lines)
+			set_time(0)
+			Logger.evidence("probe", "kept=%d", 1)
+			helpers.assert_true(lines[1]:find("[INFO] [probe] kept=1", 1, true) ~= nil, "rendered as INFO: " .. tostring(lines[1]))
+			Logger.set_level("WARNING")
+			helpers.assert_eq(Logger.evidence("probe", "dropped=%d", 2), false,
+				"below the threshold it is filtered like info")
+			helpers.assert_eq(#lines, 1)
+		end)
+	end)
+
+	helpers.it("the field check engine writes its result record as evidence, run after run", function()
+		with_driven_logger(function(set_time, lines)
+			helpers.with_stub_scope({ "infra.field_check", "infra.field_check_checks" }, function()
+				package.loaded["infra.field_check_checks"] = {
+					checks = {
+						demo = function(_, report, finish)
+							report.step("a", "pass", 1)
+							finish()
+						end,
+					},
+				}
+				package.loaded["infra.field_check"] = nil
+				local Engine = require("infra.field_check")
+				Logger.enable_repeat_collapsing(fake_scheduler())
+				for _, at in ipairs({ 0, 5, 10 }) do
+					set_time(at)
+					helpers.assert_true(Engine.run("demo", {}, function() end))
+				end
+				helpers.assert_eq(count_lines_with(lines, "Field check result: check=demo verdict=pass"), 3,
+					"a rerun of a check must log its result record every time")
+			end)
+		end)
+	end)
+end)

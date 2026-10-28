@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 --- @return table module Fresh menubar module.
 local function load_menubar(scheduler, stats_calls)
 	package.loaded["adapters.timer_scheduler"] = scheduler
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		get_live_stats = function()
 			stats_calls.count = stats_calls.count + 1
 			return {}
@@ -99,7 +99,7 @@ end)
 --- @return table module Fresh widget module.
 local function load_widget(scheduler, eventtap)
 	package.loaded["adapters.timer_scheduler"] = scheduler
-	package.loaded["modules.keylogger"] = { get_live_stats = function() return {} end }
+	package.loaded["modules.keystats"] = { get_live_stats = function() return {} end }
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	return helpers.load_with_stubs("ui.wpm.wpm_widget", {
 		timer = { absoluteTime = function() return 0 end },

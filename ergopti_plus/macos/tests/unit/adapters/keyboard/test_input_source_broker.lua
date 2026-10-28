@@ -52,13 +52,13 @@ helpers.describe("InputSourceBroker single native ownership", function()
 		helpers.assert_eq(true, context.broker.subscribe("karabiner", function()
 			calls[#calls + 1] = "karabiner"
 		end))
-		helpers.assert_eq(true, context.broker.subscribe("keylogger", function()
-			calls[#calls + 1] = "keylogger"
+		helpers.assert_eq(true, context.broker.subscribe("keystats", function()
+			calls[#calls + 1] = "keystats"
 		end))
 		helpers.assert_eq(1, context.setter_calls,
 			"two subscribers must install exactly one native callback")
 		context.fire()
-		helpers.assert_eq("karabiner,keylogger", table.concat(calls, ","))
+		helpers.assert_eq("karabiner,keystats", table.concat(calls, ","))
 	end)
 
 	helpers.it("isolates a throwing subscriber and keeps its healthy sibling", function()

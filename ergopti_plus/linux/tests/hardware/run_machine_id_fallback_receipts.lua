@@ -12,9 +12,9 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Cipher = require("modules.keylogger.text_cipher")
-local Codec = require("keylogger.text_crypto")
-local Writer = require("modules.keylogger.sqlite_writer")
+local Cipher = require("modules.keystats.text_cipher")
+local Codec = require("keystats.text_crypto")
+local Writer = require("modules.keystats.sqlite_writer")
 local Json = require("json")
 assert(uv.getuid() ~= 0, "cipher validation must run as an ordinary user")
 local function first_line(path)

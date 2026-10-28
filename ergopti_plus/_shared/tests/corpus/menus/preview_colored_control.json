@@ -5,10 +5,7 @@
 		"type": "check",
 		"i18n": "menu.hotstrings.tooltip_colored",
 		"checked_when": ["hotstrings.preview_colored_tooltips"],
-		"disabled_when": ["preview_colored_ready"],
-		"platforms": ["hs", "linux"],
-		"unavailable": "grey",
-		"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+		"disabled_when": ["preview_colored_ready"]
 	},
 	"siblings": [
 		"menu.hotstrings.tooltip_magic",

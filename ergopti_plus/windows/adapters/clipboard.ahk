@@ -117,7 +117,7 @@ CB_IsPasteTransactionActive() {
 
 ; Tries to start an out-of-order-safe clipboard transaction. PreserveProvenance is
 ; true for temporary save/write/paste/restore dances: their intermediate
-; payloads must not replace the keylogger's last genuine user-copy metadata.
+; payloads must not replace the keystats's last genuine user-copy metadata.
 ; SuppressPaste is restricted to transactions which inject Ctrl+V; selection
 ; capture and screenshots do not hide unrelated physical paste actions merely
 ; because they also happen to own a clipboard snapshot. All snapshot-owning
@@ -227,19 +227,28 @@ _CB_SettleRestoreDebt(Debt) {
 
 ; One retry attempt. The debt remains published while the OS call can yield, so
 ; no producer can snapshot or publish over the temporary payload meanwhile.
-CB_RetryRestoreDebt(*) {
+CB_RetryRestoreDebt(ExpectedDebt := 0, *) {
 	PreviousCritical := Critical("On")
 	try {
 		Debt := CBClipboardOwner.restore_debt
 		if !(Debt is Map)
 			return true
-		if Debt["attempting"]
+		; New exact handoffs must not borrow a successor after Critical restores.
+		; Timers and all existing callers retain the default global retry service.
+		if ExpectedDebt is Map && Debt != ExpectedDebt
 			return false
-		Debt["attempting"] := true
-		Debt["attempts"] += 1
+		NativePlain := Debt.Get("kind", "") == "plain_native"
+		if !NativePlain {
+			if Debt["attempting"]
+				return false
+			Debt["attempting"] := true
+			Debt["attempts"] += 1
+		}
 	} finally {
 		Critical(PreviousCritical)
 	}
+	if NativePlain
+		return _CB_PlainRetryDebt(Debt)
 
 	Settled := false
 	; Critical excludes another script thread using the same native HWND. The
@@ -366,6 +375,343 @@ _CB_ReleaseRestoreLock(Lock) {
 	} finally Critical(Lock.PreviousCritical)
 }
 
+; Binds one genuine opaque snapshot to its clipboard generation. A render or
+; foreign copy during ClipboardAll is a refusal, never a reason to bless the
+; older snapshot with a newer sequence. Callers may use the native paste path.
+CB_SavePlainSnapshot(OwnerToken, &Capture) {
+	Capture := 0
+	PreviousCritical := Critical("On")
+	try {
+		if !OwnerToken || CBClipboardOwner.paste_transaction != OwnerToken
+			|| !CBClipboardOwner.active.Has(OwnerToken) || CBClipboardOwner.restore_debt
+			return false
+		Before := DllCall("User32\GetClipboardSequenceNumber", "UInt")
+		Mutation := CBClipboardOwner.mutation_id
+		Source := CBClipboardOwner.active[OwnerToken]["source"]
+	} finally Critical(PreviousCritical)
+	if !Before
+		return false
+	Saved := CB_SaveAll()
+	if Saved is String && Saved == "__CB_SAVE_ERROR__"
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if CBClipboardOwner.paste_transaction != OwnerToken || !CBClipboardOwner.active.Has(OwnerToken)
+			|| CBClipboardOwner.restore_debt || CBClipboardOwner.mutation_id != Mutation
+			|| DllCall("User32\GetClipboardSequenceNumber", "UInt") != Before
+			return false
+		Capture := Map("saved", Saved, "sequence", Before, "mutation_id", Mutation,
+			"owner_token", OwnerToken, "source", Source)
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_CB_PlainRecordCurrent(Record) {
+	return CBClipboardOwner.restore_debt == Record
+		&& CBClipboardOwner.paste_transaction == Record["owner_token"]
+		&& CBClipboardOwner.active.Has(Record["owner_token"])
+}
+
+; Every field used after EmptyClipboard already exists here. The one registry
+; root retains the opaque snapshot and exact transaction through all failures;
+; no timer closure points back at this record.
+_CB_PlainRetain(Capture) {
+	Record := Map("kind", "plain_native", "phase", "preparing", "saved", Capture["saved"],
+		"owner_token", Capture["owner_token"], "source", Capture["source"], "release_owner", true,
+		"expected_sequence", 0, "force", false, "restore_fn", CB_RestoreAll, "sequence_fn", CB_GetSequenceNumber,
+		"attempting", false, "attempts", 0, "capture_sequence", Capture["sequence"],
+		"capture_mutation", Capture["mutation_id"], "mutation_id", 0, "mutation_sequence", 0,
+		"allocation", 0, "allocation_locked", false, "allocation_unknown", false, "expected_handle", 0, "bytes", 0,
+		"changed", false, "published", false, "lease_unknown", false, "restoration_right", true,
+		"auth_sequence", 0, "failure", 0, "retry_failure", 0)
+	PreviousCritical := Critical("On")
+	try {
+		if CBClipboardOwner.restore_debt || !CBClipboardOwner.active.Has(Capture["owner_token"])
+			|| CBClipboardOwner.paste_transaction != Capture["owner_token"]
+			|| CBClipboardOwner.mutation_id != Capture["mutation_id"]
+			return 0
+		CBClipboardOwner.restore_debt := Record
+		return Record
+	} finally Critical(PreviousCritical)
+}
+
+_CB_PlainFailure(Record, Failure) {
+	if !IsObject(Record["failure"])
+		Record["failure"] := Failure
+}
+
+; This native allocation is still ours. A transferred SetClipboardData handle
+; is removed from allocation before any later operation and is never freed here.
+_CB_PlainFreeAllocation(Record) {
+	Handle := Record["allocation"]
+	if Record["allocation_unknown"]
+		return false
+	if !Handle
+		return true
+	if Record["allocation_locked"] {
+		DllCall("Kernel32\SetLastError", "UInt", 0)
+		Unlocked := DllCall("Kernel32\GlobalUnlock", "Ptr", Handle, "Int")
+		NativeError := A_LastError
+		if !Unlocked && NativeError
+			throw OSError(NativeError, A_ThisFunc)
+		Record["allocation_locked"] := false
+	}
+	Remaining := DllCall("Kernel32\GlobalFree", "Ptr", Handle, "Ptr")
+	NativeError := A_LastError
+	if Remaining
+		throw OSError(NativeError, A_ThisFunc)
+	Record["allocation"] := 0
+	return true
+}
+
+; The return is a real unlocked publisher boundary. It restores its inherited
+; Critical before authentication, allowing an external copy to win there. No
+; AHK clipboard getter/setter, callback, wait or logger runs inside the lease.
+_CB_PlainNativeMutationCAS(Record, Text) {
+	Opened := false, PreviousCritical := 0, InCritical := false
+	try {
+		Record["bytes"] := (StrLen(Text) + 1) * 2
+		Record["allocation"] := DllCall("Kernel32\GlobalAlloc", "UInt", 0x42,
+			"UPtr", Record["bytes"], "Ptr")
+		if !Record["allocation"]
+			throw MemoryError("The native plain clipboard allocation failed.")
+		Pointer := DllCall("Kernel32\GlobalLock", "Ptr", Record["allocation"], "Ptr")
+		if !Pointer
+			throw OSError(A_LastError, A_ThisFunc)
+		Record["allocation_locked"] := true
+		StrPut(Text, Pointer, StrLen(Text) + 1, "UTF-16")
+		DllCall("Kernel32\SetLastError", "UInt", 0)
+		Unlocked := DllCall("Kernel32\GlobalUnlock", "Ptr", Record["allocation"], "Int")
+		NativeError := A_LastError
+		if !Unlocked && NativeError
+			throw OSError(NativeError, A_ThisFunc)
+		Record["allocation_locked"] := false
+
+		PreviousCritical := Critical("On"), InCritical := true
+		if !_CB_PlainRecordCurrent(Record)
+			return Record
+		; GetOpen=0 is ambiguous with Open(NULL). The real Windows control proves
+		; that a same-thread NULL borrower refuses this different HWND. A held
+		; own-HWND lease is refused BEFORE Open, since same-HWND reopen succeeds.
+		if DllCall("User32\GetOpenClipboardWindow", "Ptr") != 0
+			return Record
+		Opened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+		if !Opened
+			return Record
+		if !_CB_PlainRecordCurrent(Record) || CBClipboardOwner.mutation_id != Record["capture_mutation"]
+			|| DllCall("User32\GetClipboardSequenceNumber", "UInt") != Record["capture_sequence"]
+			return Record
+		Record["mutation_id"] := _CB_BeginOwnedMutation()
+		; A native exception with a lost return cannot turn a possibly changed
+		; clipboard into an ordinary zero-sequence debt or free a transferred handle.
+		Record["changed"] := true
+		if !DllCall("User32\EmptyClipboard", "Int") {
+			Record["changed"] := false
+			_CB_CancelOwnedMutation(Record["mutation_id"])
+			return Record
+		}
+		Record["expected_handle"] := Record["allocation"]
+		Record["allocation_unknown"] := true
+		Accepted := DllCall("User32\SetClipboardData", "UInt", 13,
+			"Ptr", Record["allocation"], "Ptr")
+		if Accepted {
+			Record["allocation"] := 0
+			Record["expected_handle"] := Accepted
+			Record["published"] := true
+		}
+		Record["allocation_unknown"] := false
+		Record["mutation_sequence"] := DllCall("User32\GetClipboardSequenceNumber", "UInt")
+		return Record
+	} catch Any as Failure {
+		_CB_PlainFailure(Record, Failure)
+		return Record
+	} finally {
+		if Opened {
+			; A missing Close ACK is not permission to close a sampled later lease.
+			Record["lease_unknown"] := true
+			try {
+				if DllCall("User32\CloseClipboard", "Int")
+					Record["lease_unknown"] := false
+			} catch Any as Failure {
+				_CB_PlainFailure(Record, Failure)
+			}
+		}
+		if InCritical
+			Critical(PreviousCritical)
+	}
+}
+
+; A successful fresh Open after GetOpen=0 witnesses that an old own-HWND lease
+; ended. The entire acquisition/metadata/Close span is short Critical; failed
+; acquisition never closes a NULL or foreign borrower and never sleeps here.
+_CB_PlainAuthenticate(Record) {
+	Opened := false, Matched := false, Closed := false
+	PreviousCritical := Critical("On")
+	try {
+		if !_CB_PlainRecordCurrent(Record) || DllCall("User32\GetOpenClipboardWindow", "Ptr") != 0
+			return false
+		Opened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+		if !Opened
+			return false
+		Record["lease_unknown"] := true
+		if !_CB_PlainRecordCurrent(Record)
+			return false
+		Sequence := DllCall("User32\GetClipboardSequenceNumber", "UInt")
+		Owner := DllCall("User32\GetClipboardOwner", "Ptr")
+		if Record["changed"] && Sequence && Owner != A_ScriptHwnd
+			&& Sequence != Record["capture_sequence"] {
+			; Retire the restore RIGHT now, but retain this same record until
+			; its NEW read lease has its own Close ACK too.
+			Record["restoration_right"] := false
+		} else if Record["changed"] && Sequence && Owner == A_ScriptHwnd
+			&& CBClipboardOwner.mutation_id == Record["mutation_id"] {
+			if Record["published"] || Record["allocation_unknown"] {
+				Handle := DllCall("User32\GetClipboardData", "UInt", 13, "Ptr")
+				Matched := Handle && Handle == Record["expected_handle"]
+					&& DllCall("Kernel32\GlobalSize", "Ptr", Handle, "UPtr") >= Record["bytes"]
+				if Matched && Record["allocation_unknown"] {
+					Record["allocation"] := 0
+					Record["published"] := true
+					Record["allocation_unknown"] := false
+				}
+			} else {
+				; A failed Set after Empty may restore only that exact owned empty
+				; generation, never an unavailable/zero-sequence publication.
+				Matched := Record["mutation_sequence"] && Sequence == Record["mutation_sequence"]
+					&& DllCall("User32\CountClipboardFormats", "Int") == 0
+			}
+			if Matched
+				Record["auth_sequence"] := Sequence
+		}
+	} catch Any as Failure {
+		_CB_PlainFailure(Record, Failure)
+	} finally {
+		if Opened {
+			try {
+				Closed := DllCall("User32\CloseClipboard", "Int") != 0
+				Record["lease_unknown"] := !Closed
+			} catch Any as Failure {
+				_CB_PlainFailure(Record, Failure)
+			}
+		}
+		Critical(PreviousCritical)
+	}
+	return Matched && Closed && _CB_PlainRecordCurrent(Record)
+}
+
+; Writes only the generation captured by CB_SavePlainSnapshot. Positive output
+; keeps a ready debt through native paste and timer arming; only the exact
+; delayed callback (or its failure rollback) may turn it into an ordinary debt.
+CB_WritePlainSnapshot(Capture, Text, &OwnedSequence) {
+	OwnedSequence := 0
+	if !(Capture is Map) || !(Text is String) || Text == "" || RegExMatch(Text, "\x00")
+		return false
+	Record := _CB_PlainRetain(Capture)
+	if !(Record is Map)
+		return false
+	Admitted := false
+	try {
+		_CB_PlainNativeMutationCAS(Record, Text)
+		if Record["changed"] && Record["published"] && !Record["lease_unknown"] && !IsObject(Record["failure"])
+			&& _CB_PlainAuthenticate(Record) {
+			PreviousCritical := Critical("On")
+			try {
+				if _CB_PlainRecordCurrent(Record) && Record["restoration_right"] && Record["auth_sequence"] {
+					Record["phase"] := "ready"
+					OwnedSequence := Record["auth_sequence"]
+					Admitted := true
+				}
+			} finally Critical(PreviousCritical)
+		}
+		if IsObject(Record["failure"])
+			throw Record["failure"]
+		return Admitted
+	} catch Any as Failure {
+		_CB_PlainFailure(Record, Failure)
+		throw Failure
+	} finally {
+		if !Admitted {
+			Record["phase"] := "recovering"
+			_CB_PlainRetryDebt(Record)
+		}
+	}
+}
+
+; Native unknown debt must never fall through to the ordinary expected=0
+; policy, which legitimately discards an unowned legacy snapshot. A single
+; global retry function avoids record/timer bound-function retention cycles.
+_CB_PlainRetryDebt(Record) {
+	PreviousCritical := Critical("On")
+	try {
+		if !_CB_PlainRecordCurrent(Record)
+			return true
+		if Record["phase"] == "preparing" || Record["phase"] == "ready" || Record["attempting"]
+			return false
+		Record["attempting"] := true
+		Record["attempts"] += 1
+	} finally Critical(PreviousCritical)
+	Settled := false, Ordinary := false
+	try {
+		if Record["lease_unknown"] || (Record["changed"] && Record["restoration_right"])
+			_CB_PlainAuthenticate(Record)
+		if !_CB_PlainRecordCurrent(Record)
+			return true
+		if Record["lease_unknown"]
+			return false
+		if !_CB_PlainFreeAllocation(Record)
+			return false
+		if !Record["changed"] || !Record["restoration_right"] {
+			Settled := _CB_SettleRestoreDebt(Record)
+			return Settled
+		}
+		if !Record["auth_sequence"]
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			if !_CB_PlainRecordCurrent(Record)
+				return true
+			Record["expected_sequence"] := Record["auth_sequence"]
+			Record["kind"] := "restore"
+			Record["attempting"] := false
+			Ordinary := true
+		} finally Critical(PreviousCritical)
+		return CB_RetryRestoreDebt(Record)
+	} catch Any as Failure {
+		_CB_PlainFailure(Record, Failure)
+		throw Record["failure"]
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			if !Settled && !Ordinary && CBClipboardOwner.restore_debt == Record {
+				Record["attempting"] := false
+				try SetTimer(CB_RetryRestoreDebt, -CB_RESTORE_RETRY_MS)
+				catch Any as Failure {
+					Record["retry_failure"] := Failure
+					_CB_PlainFailure(Record, Failure)
+					throw Record["failure"]
+				}
+			}
+		} finally Critical(PreviousCritical)
+	}
+}
+
+CB_RestorePlainSnapshotEventually(Saved, ExpectedSequence, OwnerToken, Source) {
+	PreviousCritical := Critical("On")
+	try {
+		Record := CBClipboardOwner.restore_debt
+		if !(Record is Map) || Record["owner_token"] != OwnerToken
+			|| Record["saved"] != Saved || !_CB_PlainRecordCurrent(Record)
+			return false
+		if Record.Get("kind", "") == "plain_native" {
+			if Record["phase"] != "ready" || !ExpectedSequence || Record["auth_sequence"] != ExpectedSequence
+				return false
+			Record["expected_sequence"] := ExpectedSequence
+			Record["kind"] := "restore"
+		}
+	} finally Critical(PreviousCritical)
+	return CB_RetryRestoreDebt(Record)
+}
+
 ; Mutators call this before taking a new snapshot or publishing content. It
 ; gives an existing debt one immediate chance, then refuses the new mutation if
 ; the old user clipboard still cannot be restored.
@@ -391,7 +737,7 @@ CB_PrepareShutdown() {
 }
 
 ; True only while a clipboard transaction which actually emits Ctrl+V is live.
-; The keylogger's pass-through hotkey uses this to discard the driver's paste
+; The keystats's pass-through hotkey uses this to discard the driver's paste
 ; without silencing physical pastes during non-paste clipboard jobs.
 CB_IsDriverPasteActive() {
 	PreviousCritical := Critical("On")
@@ -473,14 +819,14 @@ CB_ConsumeOwnedChange() {
 
 ; Drop notifications which predate observer registration.  Active transaction
 ; tokens deliberately survive: a deferred restore still owns its synthetic
-; paste even if the keylogger observer is restarted in the middle.
+; paste even if the keystats observer is restarted in the middle.
 CB_DiscardOwnedNotifications() {
 	PreviousCritical := Critical("On")
 	try CBClipboardOwner.pending := []
 	finally Critical(PreviousCritical)
 }
 
-; Clipboard mutation receipts exist only for the keylogger observer. When that
+; Clipboard mutation receipts exist only for the keystats observer. When that
 ; optional consumer is stopped, retaining one record per adapter assignment
 ; would grow a FIFO which no callback can ever drain.
 CB_SetOwnershipObserverActive(Active) {
@@ -530,6 +876,122 @@ CB_Write(Text) {
 		_CB_CancelOwnedMutation(MutationId)
 		return false
 	}
+}
+
+; Windows-only publication receipt; the shared write port remains Boolean-only.
+; A successful setter may already have been replaced when it returns. Authenticate
+; this exact mutation under a new native read lease before lending its sequence.
+; Empty/truncated text, native failures and lost ownership have no receipt; the
+; Boolean still reports the genuine setter result, never a promise of rollback.
+CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {
+	OwnedSequence := 0
+	PreviousCritical := Critical("On")
+	try BeforeMutation := CBClipboardOwner.mutation_id
+	finally Critical(PreviousCritical)
+	Published := CB_Write(Text)
+	if !Published
+		return false
+	Length := StrLen(Text)
+	if !Length
+		return true
+	Opened := false
+	try {
+		Opened := CB_OpenClipboardWithin(A_ScriptHwnd)
+		if !Opened || DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd
+			return true
+		Data := DllCall("User32\GetClipboardData", "UInt", 13, "Ptr")
+		if !Data || DllCall("Kernel32\GlobalSize", "Ptr", Data, "UPtr") < (Length + 1) * 2
+			return true
+		Pointer := DllCall("Kernel32\GlobalLock", "Ptr", Data, "Ptr")
+		if !Pointer
+			return true
+		try {
+			; An AHK reader may close the raw lease without changing the mutation.
+			; These HWND-only queries cannot render data; acquisition stays outside
+			; Critical. Refuse the lost lease before touching its retained pointer.
+			PreviousCritical := Critical("On")
+			try {
+				Matches := CBClipboardOwner.mutation_id == BeforeMutation + 1
+					&& DllCall("User32\GetOpenClipboardWindow", "Ptr") == A_ScriptHwnd
+					&& DllCall("User32\GetClipboardOwner", "Ptr") == A_ScriptHwnd
+					&& NumGet(Pointer, Length * 2, "UShort") == 0
+					&& StrLen(StrGet(Pointer, Length, "UTF-16")) == Length
+					&& StrGet(Pointer, -Length, "UTF-16") == Text
+			} finally Critical(PreviousCritical)
+		} finally DllCall("Kernel32\GlobalUnlock", "Ptr", Data)
+		if !Matches
+			return true
+		Sequence := CB_GetSequenceNumber()
+		if !Sequence || DllCall("User32\GetOpenClipboardWindow", "Ptr") != A_ScriptHwnd
+				|| DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd
+			return true
+		; Only RAM is inspected in this transaction. The still-open native lease
+		; excludes external writes; an extra driver mutation also invalidates it.
+		PreviousCritical := Critical("On")
+		try {
+			if CBClipboardOwner.mutation_id == BeforeMutation + 1
+				OwnedSequence := Sequence
+		} finally Critical(PreviousCritical)
+	} catch {
+		OwnedSequence := 0
+	} finally {
+		if Opened {
+			try {
+				if DllCall("User32\GetOpenClipboardWindow", "Ptr") != A_ScriptHwnd
+						|| !DllCall("User32\CloseClipboard", "Int")
+					OwnedSequence := 0
+			} catch {
+				OwnedSequence := 0
+			}
+		}
+	}
+	return true
+}
+
+; Empties the clipboard and authenticates that exact clear under a native read
+; lease, so a copy another program makes right after it can never be adopted as
+; the clear's own generation by a caller that samples the sequence later.
+; @return {Map|Boolean} False when the clear failed. Otherwise a Map whose
+;   "sequence" is the clear's generation, or 0 when it could not be proven
+;   (lost ownership, a lease refused or another mutation); 0 means "not owned".
+CB_ClearWithReceipt() {
+	PreviousCritical := Critical("On")
+	try BeforeMutation := CBClipboardOwner.mutation_id
+	finally Critical(PreviousCritical)
+	if !CB_Write("")
+		return false
+	Receipt := Map("sequence", 0)
+	Opened := false
+	try {
+		Opened := CB_OpenClipboardWithin(A_ScriptHwnd)
+		if !Opened || DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd
+				|| DllCall("User32\CountClipboardFormats", "Int") != 0
+			return Receipt
+		Sequence := CB_GetSequenceNumber()
+		if !Sequence || DllCall("User32\GetOpenClipboardWindow", "Ptr") != A_ScriptHwnd
+				|| DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd
+			return Receipt
+		; The still-open lease excludes external writers; an extra driver
+		; mutation would have advanced the counter and invalidates the receipt.
+		PreviousCritical := Critical("On")
+		try {
+			if CBClipboardOwner.mutation_id == BeforeMutation + 1
+				Receipt["sequence"] := Sequence
+		} finally Critical(PreviousCritical)
+	} catch {
+		Receipt["sequence"] := 0
+	} finally {
+		if Opened {
+			try {
+				if DllCall("User32\GetOpenClipboardWindow", "Ptr") != A_ScriptHwnd
+						|| !DllCall("User32\CloseClipboard", "Int")
+					Receipt["sequence"] := 0
+			} catch {
+				Receipt["sequence"] := 0
+			}
+		}
+	}
+	return Receipt
 }
 
 ; Snapshots the current clipboard and returns it for later restoration.
@@ -782,8 +1244,8 @@ _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap
 	}
 }
 
-; True when another process currently holds the clipboard open, i.e. reading or
-; writing it now would contend with that process.
+; True when an earlier caller holds the clipboard open, i.e. reading or
+; writing it now would contend with that native lock.
 ;
 ; OpenClipboard is the only honest test for this: it returns 0 immediately when
 ; someone else owns the handle, it does NOT wait. GetClipboardSequenceNumber
@@ -794,34 +1256,63 @@ _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap
 ; open would make THIS process the blocker, which is the exact failure the probe
 ; exists to avoid.
 CB_IsBusy() {
-	Opened := 0
-	try Opened := DllCall("User32\OpenClipboard", "Ptr", 0, "Int")
-	catch
+	PreviousCritical := Critical("On")
+	try {
+		; A distinct nonzero HWND refuses a NULL caller's borrowed lock. Keep
+		; the probe's genuine Open/Close pair on the same noninterruptible stack.
+		Opened := CB_TryOpenClipboard(A_ScriptHwnd)
+		if !Opened
+			return true
+		try DllCall("User32\CloseClipboard")
+		return false
+	} catch {
 		return true
-	if !Opened
-		return true
-	try DllCall("User32\CloseClipboard")
-	return false
+	} finally Critical(PreviousCritical)
+}
+
+/**
+ * Try one independent native acquisition without waiting or borrowing a lock.
+ * @param {Integer} Hwnd Nonzero window handle that will own the new lock.
+ * @param {VarRef} Borrowed Receives true when this HWND already owns the lock.
+ * @returns {Boolean} True grants one new Close right; false grants none.
+ */
+CB_TryOpenClipboard(Hwnd, &Borrowed := false) {
+	if !(Hwnd is Integer) || !Hwnd
+		throw ValueError("An independent clipboard lock requires a nonzero HWND.")
+	Borrowed := false
+	PreviousCritical := Critical("On")
+	try {
+		; Windows accepts a same-HWND reopen without nesting the native lock.
+		; Granting another Close right would release the interrupted caller's
+		; lease. That caller cannot finish while this stack waits, so refuse now.
+		if DllCall("User32\GetOpenClipboardWindow", "Ptr") == Hwnd {
+			Borrowed := true
+			return false
+		}
+		return DllCall("User32\OpenClipboard", "Ptr", Hwnd, "Int") != 0
+	} finally Critical(PreviousCritical)
 }
 
 ; Opens the native clipboard lock for Hwnd, waiting up to CB_NATIVE_OPEN_TIMEOUT_MS
 ; while another process holds it. A single attempt loses to the readers that open
 ; the clipboard just after every change, which is exactly when callers need it.
-; @param {Integer} Hwnd The window that will own the lock.
+; @param {Integer} Hwnd Nonzero window handle that will own the new lock.
 ; @param {Func} OnRefused Optional; called once, at the first refused attempt.
-; @returns {Boolean} True once the lock is held; false when the bound expired.
+; @returns {Boolean} True for a new lock; false for a borrowed lock or expired bound.
 CB_OpenClipboardWithin(Hwnd, OnRefused := 0) {
 	global CB_NATIVE_OPEN_TIMEOUT_MS, CB_NATIVE_OPEN_RETRY_MS
 	Started := A_TickCount
 	Refused := false
 	Loop {
-		if DllCall("User32\OpenClipboard", "Ptr", Hwnd, "Int")
+		if CB_TryOpenClipboard(Hwnd, &Borrowed)
 			return true
 		if !Refused {
 			Refused := true
 			if HasMethod(OnRefused, "Call")
 				OnRefused.Call()
 		}
+		if Borrowed
+			return false
 		if TickElapsed(Started) >= CB_NATIVE_OPEN_TIMEOUT_MS
 			return false
 		Sleep(CB_NATIVE_OPEN_RETRY_MS)

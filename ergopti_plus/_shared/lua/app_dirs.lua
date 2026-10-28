@@ -21,6 +21,7 @@ return {
 		errors_prefix = "ErgoptiPlus_errors_",
 		topical_prefix = "ErgoptiPlus_",
 		extension = ".log",
+		bootstrap_log = "bootstrap.log",
 	},
 	macos = {
 		base_env = "HOME",

@@ -176,6 +176,19 @@ local function write_backend_checked(selected_backend, text)
 	return ran and result == true
 end
 
+--- Accepts a saved snapshot only when the text writer can restore its bytes.
+--- Raw readers may return NUL, but the literal sh -c writer cannot carry it.
+--- Refuse before an owner acquires restoration debt or mutates the clipboard.
+local function read_restorable_snapshot(selected_backend)
+	local ok, contents, reason = read_backend_checked(selected_backend)
+	if not ok then return false, "", reason end
+	if contents:find("\0", 1, true) then
+		Logger.warn(LOG, "Clipboard snapshot cannot be restored through the text writer.")
+		return false, "", "clipboard_snapshot_not_restorable"
+	end
+	return true, contents, nil
+end
+
 --- Runs an injected wait and rejects both exceptions and explicit failure.
 --- @param sleep_ms function
 --- @param duration_ms number
@@ -337,7 +350,7 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 			if not current() then return false end
 			b = backend()
 			if not b or not current() then return false end
-			local read_ok, bytes = read_backend_checked(b)
+			local read_ok, bytes = read_restorable_snapshot(b)
 			if not read_ok then return false end
 			saved = bytes
 			if not current() then return false end
@@ -400,7 +413,7 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 	end
 
 	if not admitted(admission) then return false end
-	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
+	local snapshot_ok, saved, snapshot_error = read_restorable_snapshot(b)
 	if not snapshot_ok then
 		Logger.error(LOG, "paste_text(): could not snapshot the clipboard via %s — %s.",
 			b.name, tostring(snapshot_error or "command failed"))
@@ -500,7 +513,7 @@ end
 function M.read_selection(emit_combo, sleep_ms)
 	local b, why = selection_backend(emit_combo, sleep_ms)
 	if not b then return false, "", why end
-	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
+	local snapshot_ok, saved, snapshot_error = read_restorable_snapshot(b)
 	if not snapshot_ok then return false, "", snapshot_error or "clipboard_snapshot_failed" end
 	local copied, selected = copy_selection(b, emit_combo, sleep_ms)
 	if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
@@ -522,7 +535,7 @@ function M.read_selection_uri_list(emit_combo, sleep_ms)
 	local b, why = selection_backend(emit_combo, sleep_ms)
 	if not b then return false, "", why end
 	if not b.read_uri_list then return false, "", b.name .. " cannot read a text/uri-list" end
-	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
+	local snapshot_ok, saved, snapshot_error = read_restorable_snapshot(b)
 	if not snapshot_ok then return false, "", snapshot_error or "clipboard_snapshot_failed" end
 	-- A text sentinel first, as copy_selection does: files copied earlier
 	-- would otherwise still answer the uri-list read when nothing is selected.
@@ -560,7 +573,7 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 	if not b then return false, why end
 	if not current() then return false, "destination_changed" end
 
-	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
+	local snapshot_ok, saved, snapshot_error = read_restorable_snapshot(b)
 	if not snapshot_ok then return false, snapshot_error or "clipboard_snapshot_failed" end
 
 	local function restore()

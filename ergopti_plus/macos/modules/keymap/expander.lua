@@ -25,8 +25,11 @@ local text_utils = require("infra.text_utils")
 -- the buffer traversal is not — macOS slices a byte string, the core an array of
 -- codepoints, and neither has to convert for the other.
 local HotstringCore = require("infra.hotstring_engine")
+local Cascade = require("hotstring_engine.cascade")
+local InjectionPlan = require("hotstring_engine.injection_plan")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
+local HotPath    = require("infra.hotpath_profiler")
 local Timings    = require("infra.timings")
 local CoreStateM = require("modules.keymap.state")
 local TextSender = require("adapters.text_sender")
@@ -35,11 +38,12 @@ local TooltipRenderer  = require("adapters.tooltip_renderer")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
 local Terminators      = require("modules.keymap.terminators")
 local CapsWordOutput   = require("infra.capsword_output")
+local ConfigKeys = require("config_keys")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
+local ok_kl, keystats = pcall(require, "modules.keystats")
+if not ok_kl then keystats = nil end
 
 local _state    = nil  -- Shared CoreState injected via M.init().
 local _registry = nil  -- Registry module injected via M.init().
@@ -79,8 +83,8 @@ end
 --- @param buffer_action function Called to sync _state.buffer after emission.
 --- @param is_final boolean When true, suppresses re-scanning after completion.
 --- @param is_ignored boolean When true, skips tooltip and LLM side-effects.
---- @param source_type string Telemetry label passed to the keylogger.
---- @param source_variant string|nil Optional sub-type for the keylogger.
+--- @param source_type string Telemetry label passed to the keystats.
+--- @param source_variant string|nil Optional sub-type for the keystats.
 --- @param publication table|nil Retained programmable output guards.
 function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored,
 	source_type, source_variant, is_private, terminator_spec, terminal_target_override, publication)
@@ -177,6 +181,9 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		end
 	end
 
+	-- The erase + replacement output of every expansion is built here, inside the
+	-- key-down callback, so a slow one is a typing hitch.
+	local inject_started = HotPath.now()
 	local ok, emit_count, emitted_str, logical_text, order_delay = pcall(function()
 		return SyntheticInput.with_transaction(transaction, function()
 			assert(TextSender.eraseChars(deletes, 0) ~= false,
@@ -184,6 +191,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 			return emit_action()
 		end)
 	end)
+	HotPath.log_if_slow("hotstring.expand", inject_started)
 	if not ok then
 		-- Nothing in the callback collector has reached Quartz yet. Cancel removes
 		-- every already-built prefix, so a producer that emits one token and then
@@ -292,6 +300,19 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 			return false, transaction
 		end
 	end
+	if is_private == true then
+		-- The replacement is a secret that now sits in the hotstring buffer. The AI
+		-- must forget the buffer through it, and a failure to do so is the same
+		-- transaction failure as a buffer that cannot be committed: nothing may
+		-- be displayed that a prompt could later repeat.
+		local ok_mark, mark_err = pcall(_llm.mark_private_context, _state.buffer)
+		if not ok_mark then
+			if replay_owner then pcall(TerminatorReplay.cancel_prepared, replay_owner) end
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "private AI context mark failed: %s.", tostring(mark_err))
+			return false, transaction
+		end
+	end
 
 	-- From this point through ownership publication every operation is a bounded
 	-- Lua table mutation. Native clocks, timers, target lookup, callback
@@ -305,14 +326,14 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	-- Guard: skip telemetry when nothing was actually injected. This runs only
 	-- after the buffer commit succeeded, so a rolled-back replacement cannot be
 	-- persisted as output the application never received.
-	if (deletes > 0 or logical_text ~= "") and keylogger and type(keylogger.notify_synthetic) == "function" then
+	if (deletes > 0 or logical_text ~= "") and keystats and type(keystats.notify_synthetic) == "function" then
 		-- pcall-wrapped like the neighboring buffer_action call above: a truncated
 		-- LLM completion cut mid-codepoint (French accents, curly quotes, em-dashes)
 		-- can reach notify_synthetic with malformed UTF-8, and its utf8.codes loop
 		-- would otherwise raise and abort the expansion mid-flight. is_private is
 		-- forwarded so every logical persistence field is redacted; immutable event
 		-- tags exclude the later OS echoes independently of payload contents.
-		local ok_notify, notify_err = pcall(keylogger.notify_synthetic,
+		local ok_notify, notify_err = pcall(keystats.notify_synthetic,
 			logical_text, source_type or "hotstring", deletes, source_variant, emitted_str,
 			is_private)
 		if not ok_notify then
@@ -320,10 +341,10 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		end
 	end
 
-	if keylogger and type(keylogger.set_buffer) == "function" then
-		local ok_set, set_err = pcall(keylogger.set_buffer, _state.buffer)
+	if keystats and type(keystats.set_buffer) == "function" then
+		local ok_set, set_err = pcall(keystats.set_buffer, _state.buffer)
 		if not ok_set then
-			pcall(Logger.error, LOG, "keylogger.set_buffer failed: %s.", tostring(set_err))
+			pcall(Logger.error, LOG, "keystats.set_buffer failed: %s.", tostring(set_err))
 		end
 	end
 
@@ -769,6 +790,183 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 	}
 end
 
+
+
+
+
+-- ===============================
+-- ===============================
+-- ======= 2b/ The Cascade =======
+-- ===============================
+-- ===============================
+
+--- The identity of a rule for the same-spec guard: the same trigger (case aside,
+--- so the lower, Title and UPPER registrations of one rule are one spec) and the
+--- same completion kind are one spec, whichever source registered it.
+--- @param m table Registry mapping.
+--- @return string
+local function spec_key(m)
+	return text_utils.trig_lower(m.trigger) .. "\0" .. (m.auto and "auto" or "end")
+end
+
+--- Whether a mapping can be a link of a cascade. A replacement carrying key
+--- directives ({Tab}, {Enter}...) does not leave plain text on the screen, so
+--- the text the next step would read is not known; a private mapping (personal
+--- information) is never composed into another hotstring's output.
+--- @param m table Registry mapping.
+--- @return boolean
+local function is_cascade_link(m)
+	return m.plain_repl == m.repl and not m.is_private
+end
+
+--- Byte index where the last codepoint of `s` starts.
+--- @param s string
+--- @return number|nil
+local function last_cp_start(s)
+	local ok, off = pcall(utf8.offset, s, -1)
+	if ok and off then return off end
+	return nil
+end
+
+--- Whether the expansion delay of a further step allows it. A character the
+--- earlier steps produced carries the time of the physical expander, so a step
+--- whose reference character (the one before its expander) was produced is
+--- inside any delay; one that reaches back into typed text measures the real
+--- gap before the keystroke.
+--- @param m table Registry mapping.
+--- @param reference_byte number Byte index of the reference character.
+--- @param stable_bytes number Length of the untouched typed prefix.
+--- @return boolean
+local function cascade_step_allowed(m, reference_byte, stable_bytes)
+	if not mapping_group_active(m) then return false end
+	local elapsed = reference_byte <= stable_bytes and (_state.cascade_elapsed or 0) or 0
+	local allowed = _state.mapping_delay_remaining(m, elapsed, _state.cascade_complex_mult or 1)
+	return allowed == true
+end
+
+--- Picks the mapping the virtual buffer completes, the way a typed key would: an
+--- auto mapping on the last codepoint, an end-character mapping when a
+--- terminator is still waiting to be replayed, and a STRICTLY longer end-character
+--- trigger beats an auto one (the order keymap/init.lua applies).
+--- @param vbuf string The buffer the previous step produced.
+--- @param tail string|nil The terminator carried at the end of `vbuf`.
+--- @param stable_bytes number Length of the untouched typed prefix.
+--- @return table|nil step { mapping, start, text, is_end }
+local function pick_cascade_step(vbuf, tail, stable_bytes)
+	local auto_step = nil
+	local last = last_cp_start(vbuf)
+	if last then
+		-- The reference character is the one before the expander (0 = none).
+		local reference = last > 1 and last_cp_start(vbuf:sub(1, last - 1)) or 0
+		local bucket = _registry.mappings_for_tail(vbuf:sub(last))
+		for _, m in ipairs(bucket or {}) do
+			if m.auto and is_cascade_link(m) and cascade_step_allowed(m, reference, stable_bytes) then
+				local eff_plain = M.would_fire(m, vbuf)
+				if eff_plain then
+					auto_step = { mapping = m, start = #vbuf - m.trigger_bytes + 1, text = eff_plain }
+					break
+				end
+			end
+		end
+	end
+
+	local end_step = nil
+	if tail and _registry.is_terminator(tail) then
+		local body = vbuf:sub(1, #vbuf - #tail)
+		local prev = last_cp_start(body)
+		if prev then
+			local bucket = _registry.mappings_for_tail(body:sub(prev))
+			for _, m in ipairs(bucket or {}) do
+				if not m.auto and is_cascade_link(m) and (not auto_step or m.tlen > auto_step.mapping.tlen)
+					and cascade_step_allowed(m, prev, stable_bytes) then
+					local match = resolve_terminator_match(m, vbuf, tail, false)
+					if match and match.eff_plain then
+						end_step = { mapping = m, start = match.buf_start, text = match.eff_plain,
+							is_end = true }
+						break
+					end
+				end
+			end
+		end
+	end
+	if end_step then return end_step end
+	-- A step that would swallow the end character ends the chain: the character
+	-- the user typed always lands after the final text.
+	if tail then return nil end
+	return auto_step
+end
+
+--- Lets the text an expansion produced complete further hotstrings, until the
+--- chain holds the configured number of arrows (expansions), and returns ONE net
+--- edit for the whole chain.
+---
+--- The chain is resolved on a virtual copy of the buffer before anything is
+--- typed, so the application receives a single replacement transaction: no
+--- intermediate text, nothing a keystroke can land between. Each step asks the
+--- same question a typed key would. It stops at the arrow bound, at a
+--- `final_result` link, at no match, at the same spec again (the guard that makes
+--- `ab` -> `cab` terminate) or at a link whose delay refuses it.
+--- @param buffer string The buffer the first step matched against.
+--- @param first table The first step's mapping.
+--- @param start_byte number Byte index where the first step's trigger starts.
+--- @param repl string The first step's effective plain replacement.
+--- @param tail string|nil The end character that completed the first step. It is
+---   carried through the whole chain whatever its delimiter's "consumed" choice,
+---   so a chain gives the same text either way; an end step takes it as its own
+---   terminator, a step that would swallow it ends the chain.
+--- @param consume_tail boolean|nil Whether that delimiter is consumed: the carried
+---   end character is then swallowed once, at the end, exactly as for a typed key.
+--- @return table|nil plan { start, text, tail, final_result, steps }, where
+---   `tail` is the end character still to replay (nil once its
+---   delimiter is consumed); nil when the chain has no further step.
+local function plan_cascade(buffer, first, start_byte, repl, tail, consume_tail)
+	local max_arrows = _state.CASCADE_MAX_ARROWS
+	if type(max_arrows) ~= "number" or max_arrows < 2 then return nil end
+	if first.final_result or not is_cascade_link(first) then return nil end
+
+	-- The loop (virtual buffer, arrow bound, same-spec guard, carried end
+	-- character, untouched prefix, net edit) is the shared Cascade; this file only
+	-- answers which registry mapping a virtual buffer completes.
+	local buffer_cps = Cascade.codepoints(buffer)
+	local function pick(vcps, _, carried, stable)
+		local vbuf = table.concat(vcps)
+		local step = pick_cascade_step(vbuf, carried, #table.concat(vcps, "", 1, stable))
+		if not step then return nil end
+		return {
+			key             = spec_key(step.mapping),
+			backspace_count = text_utils.utf8_len(vbuf:sub(step.start)),
+			replacement     = step.text,
+			final_result    = step.mapping.final_result,
+			trigger_length  = step.mapping.tlen,
+		}
+	end
+	local net = Cascade.resolve({
+		buffer     = buffer_cps,
+		first      = {
+			key             = spec_key(first),
+			backspace_count = text_utils.utf8_len(buffer:sub(start_byte)),
+			replacement     = repl,
+			terminator      = tail,
+			final_result    = first.final_result,
+		},
+		max_arrows = max_arrows,
+		pick       = pick,
+	})
+	if not net then return nil end
+	return {
+		start        = #table.concat(buffer_cps, "", 1, net.stable) + 1,
+		text         = net.replacement,
+		-- The consumed choice of the delimiter, applied once to the chain's end.
+		tail         = (not consume_tail) and net.terminator or nil,
+		final_result = net.final_result,
+		steps        = net.steps,
+	}
+end
+
+
+
+
+
 --- Commits one automatic mapping against either the live buffer or an exact
 --- prospective buffer supplied by magic-key arbitration.
 --- @param m table Mapping entry.
@@ -793,7 +991,7 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	-- lives in M.would_fire, which the tooltip preview calls too. Keeping it in one
 	-- place is what guarantees the preview cannot promise an expansion this
 	-- function then declines to perform.
-	local eff_plain, typed, eff_repl, is_noop = M.would_fire(m, active_buffer)
+	local eff_plain, typed, _, is_noop = M.would_fire(m, active_buffer)
 
 	if not eff_plain then
 		-- No-op guard: when the plain-text expansion equals what was typed, signal
@@ -813,60 +1011,64 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	-- matched on, so the two can never disagree about where the trigger began.
 	local tstart_byte = #active_buffer - m.trigger_bytes + 1
 
-	-- Compute how many backspaces and what to type, keeping common prefix chars.
-	-- In an ignored window (char_len == 0) there is no "last char" to keep, so
-	-- we must erase the full trigger length. m.tlen is the precomputed UTF-8
-	-- length of the trigger (avoids three utf8_len calls per hot-path hit).
-	local trig_len         = m.tlen
-	local char_offset      = is_ignored and 0 or char_len
-	local screen_len       = trig_len - char_offset
-	-- Clamped at zero. A trigger shorter than the typed event's codepoint count
-	-- (a multi-codepoint composed character arriving as one event) cannot require
-	-- a negative number of on-screen deletions. Keeping the clamp at the operation
-	-- boundary also prevents malformed replacement transactions.
-	if screen_len < 0 then
-		Logger.warn(LOG, "Trigger shorter than the typed event (%d < %d) — clamping deletes to 0.",
-			trig_len, char_offset)
-		screen_len = 0
+	-- The cascade: the replacement may complete further hotstrings. The chain is
+	-- one net edit, so everything below types ONE replacement whose trigger is the
+	-- text the user really typed and whose output is the last link's. Without a
+	-- chain (one arrow, or nothing to chain) these are the first step's own values.
+	local trig_len     = m.tlen
+	local is_private   = m.is_private
+	local is_final     = m.final_result
+	local plan = plan_cascade(active_buffer, m, tstart_byte, repl_text, nil, false)
+	if plan then
+		repl_text   = plan.text
+		tstart_byte = plan.start
+		typed       = active_buffer:sub(tstart_byte)
+		trig_len    = text_utils.utf8_len(typed)
+		is_final    = plan.final_result
 	end
-	local deletes, to_type = screen_len, repl_text
 
-	if repl_text == eff_repl then
-		-- Simple text replacement: find the longest shared prefix to minimise
-		-- backspaces. Compare against the TYPED (cased) trigger, not the lowercase
-		-- canonical, so the kept on-screen prefix matches what is actually shown.
-		local screen = text_utils.utf8_sub(typed, 1, screen_len)
-		local common = text_utils.get_common_prefix_utf8(screen, repl_text)
-		deletes = screen_len - common
-		to_type = text_utils.utf8_sub(repl_text, common + 1)
+	-- What to erase and type comes from the shared injection plan: the whole
+	-- trigger is erased and the whole replacement typed, the net edit every
+	-- driver applies (no shared prefix is kept on screen). The typed event is on
+	-- screen only in an ignored window, where it is erased with the trigger.
+	-- A trigger shorter than the typed event (a multi-codepoint composed
+	-- character arriving as one event) cannot require a negative number of
+	-- on-screen deletions; the plan clamps it at zero.
+	if not is_ignored and trig_len < char_len then
+		Logger.warn(LOG, "Trigger shorter than the typed event (%d < %d) — clamping deletes to 0.",
+			trig_len, char_len)
 	end
+	local injection = InjectionPlan.build({
+		path = InjectionPlan.PATH_AUTO, trigger_len = trig_len, event_len = char_len,
+		event_on_screen = is_ignored == true, replacement = repl_text, final_result = is_final,
+	})
 
 	local replaced = M.perform_text_replacement(
-		deletes,
-		function() return emit_dispatch(m, to_type) end,
+		injection.erase,
+		function() return emit_dispatch(m, injection.text) end,
 		function()
-			_state.buffer = active_buffer:sub(1, tstart_byte - 1) .. repl_text
+			_state.buffer = active_buffer:sub(1, tstart_byte - 1) .. injection.buffer_suffix
 		end,
-		m.final_result,
+		is_final,
 		is_ignored,
 		"hotstring",
 		m.group or nil,
-		m.is_private
+		is_private
 	)
 	if not replaced then return false end
 
 	-- Private mappings carry PII sourced from personal_info.toml (phone, SSN,
-	-- IBAN). keylogger.log_hotstring writes trigger + replacement verbatim into
+	-- IBAN). keystats.log_hotstring writes trigger + replacement verbatim into
 	-- today.log, which ingest copies into events_hotstring and the export then
 	-- replicates to every other device; the DEBUG line below reaches the same
 	-- 14-day log because DEBUG is the driver's default level. Both sinks are
 	-- therefore skipped for private mappings — including the trigger, which is
 	-- itself a fragment of the secret. Non-private mappings are unaffected.
-	if m.is_private then
+	if is_private then
 		Logger.debug(LOG, "Auto-expand: private mapping fired (content withheld).")
 	else
-		if keylogger and type(keylogger.log_hotstring) == "function" then
-			pcall(keylogger.log_hotstring, trigger, repl_text)
+		if keystats and type(keystats.log_hotstring) == "function" then
+			pcall(keystats.log_hotstring, trigger, repl_text)
 		end
 		Logger.debug(LOG, "Auto-expand: '%s' → '%s'.", typed, repl_text)
 	end
@@ -891,7 +1093,6 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 	local buf_start      = match.buf_start
 	local eff_plain      = match.eff_plain
 	local typed_trigger  = match.typed_trigger
-	local eff_repl       = match.eff_repl
 	local is_noop        = match.is_noop
 	local extra_bs_bytes = match.extra_bs_bytes
 
@@ -927,39 +1128,40 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		-- The EFFECTIVE replacement, which in conform mode carries the casing the
 		-- user typed. tokens_from_repl() is only called below when we actually need
 		-- to emit tokens (replacements with {Token} directives).
-		local repl_text        = eff_plain
-		local deletes, to_type = trig_len, repl_text
-		local replay_spec = nil
-		if not consume_term then
-			if chars == "\r" or chars == "\n" then
-				replay_spec = { kind = "key", key = "return", chars = chars }
-		elseif chars == "\t" then
-				replay_spec = { kind = "key", key = "tab", chars = chars }
-		else
-				replay_spec = { kind = "text", chars = chars }
-			end
+		local repl_text   = eff_plain
+		local start_byte  = buf_start
+		local is_private  = m.is_private
+		-- The cascade: one net edit whose trigger is the text the user really
+		-- typed. Without a chain these are the first step's own values.
+		local cascade_edit = nil
+		local plan = plan_cascade(_state.buffer, m, buf_start, eff_plain, chars, consume_term)
+		if plan then
+			repl_text     = plan.text
+			start_byte    = plan.start
+			typed_trigger = _state.buffer:sub(start_byte, #_state.buffer - #chars - extra_bs_bytes)
+			trig_len      = text_utils.utf8_len(typed_trigger)
+			cascade_edit  = {
+				replacement = plan.text, trigger_len = trig_len,
+				tail = plan.tail, final_result = plan.final_result,
+			}
 		end
-
-		if repl_text == eff_repl then
-			-- Simple text: keep common prefix to reduce backspaces. Compared against
-			-- the trigger AS TYPED, not the registered canonical, so the characters
-			-- left on screen are the ones actually there — they differ for a "fold"
-			-- entry, and keeping a "matching" prefix that is cased
-			-- differently would leave the user's capital in front of the expansion.
-			local common = text_utils.get_common_prefix_utf8(typed_trigger, repl_text)
-			deletes = trig_len - common
-			to_type = text_utils.utf8_sub(repl_text, common + 1)
-		end
-
-		-- In an ignored window there is no "char" kept on screen — erase it too.
-		if is_ignored then deletes = deletes + char_len end
-
-		-- When a NNBSP/NBSP was stripped before matching (typographic ``:``/`` ; ``),
-		-- add 1 extra backspace to erase the nbsp that sits between trigger and endchar.
-		if extra_bs_bytes > 0 then deletes = deletes + 1 end
+		-- Erase, type, then replay the terminator once the text has landed. The
+		-- terminator is the typed one unless its delimiter is consumed; a cascade
+		-- keeps it after the final text and swallows it once when consumed. In an
+		-- ignored window the event is on screen and is erased too; a stripped
+		-- NNBSP/NBSP (typographic ``:``/`` ; ``) sits between trigger and
+		-- terminator and costs one more backspace.
+		local injection = InjectionPlan.build({
+			path = InjectionPlan.PATH_TERMINATOR, trigger_len = trig_len, event_len = char_len,
+			event_on_screen = is_ignored == true, nbsp_stripped = extra_bs_bytes > 0,
+			replacement = eff_plain, terminator = chars, consume_terminator = consume_term,
+			final_result = m.final_result, cascade = cascade_edit,
+		})
+		local to_type, replay_tail, replay_spec = injection.text, injection.tail, injection.replay
+		local is_final = injection.final_result
 
 		local replacement_ok = M.perform_text_replacement(
-			deletes,
+			injection.erase,
 			function()
 				local c, s, logical, order_delay = emit_dispatch(m, to_type)
 
@@ -972,8 +1174,8 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 				-- once the replacement has provably landed. order_delay is carried
 				-- through as a floor for the paste path, where there is no
 				-- per-character echo to wait on.
-				if not consume_term then
-					-- Keep the logical replacement and keylogger record aligned with
+				if replay_tail then
+					-- Keep the logical replacement and keystats record aligned with
 					-- the later owned replay.
 					s = s .. chars
 					logical = logical .. chars
@@ -984,27 +1186,25 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 			function()
 				-- buf_start is a valid byte index into _state.buffer: the buffer
 				-- is only mutated by this very closure, which runs after emit.
-				_state.buffer = _state.buffer:sub(1, buf_start - 1)
-					.. repl_text
-					.. (consume_term and "" or chars)
+				_state.buffer = _state.buffer:sub(1, start_byte - 1) .. injection.buffer_suffix
 			end,
-			m.final_result,
+			is_final,
 			is_ignored,
 			"hotstring",
 			m.group or nil,
-			m.is_private,
+			is_private,
 			replay_spec
 		)
 		if not replacement_ok then return false end
 
 		-- Same privacy contract as try_auto_expand: a private mapping's trigger
-		-- and replacement are both secrets and must reach neither the keylogger
+		-- and replacement are both secrets and must reach neither the keystats
 		-- nor the log.
-		if m.is_private then
+		if is_private then
 			Logger.debug(LOG, "Terminator-expand: private mapping fired (content withheld).")
 		else
-			if keylogger and type(keylogger.log_hotstring) == "function" then
-				pcall(keylogger.log_hotstring, trigger, repl_text)
+			if keystats and type(keystats.log_hotstring) == "function" then
+				pcall(keystats.log_hotstring, trigger, repl_text)
 			end
 			Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", typed_trigger, repl_text)
 		end
@@ -1052,6 +1252,8 @@ function M.try_repeat_feature(chars, is_ignored)
 
 	-- Refuse to repeat whitespace — repeating a space or newline is never useful.
 	if last_char == "" or last_char:match("^%s$") then return false end
+	-- Two magic keys in a row are a second trigger, not a repeat.
+	if last_char == _state.magic_key then return false end
 
 	-- Refuse to repeat the first letter of a word: the char before last_char
 	-- must itself be a non-whitespace letter. Without this guard "c★" would
@@ -1065,16 +1267,22 @@ function M.try_repeat_feature(chars, is_ignored)
 		pred_offset = ok_pred and off_pred or nil
 	end
 	local pred_char   = pred_offset and before_last:sub(pred_offset) or ""
-	if pred_char == "" or pred_char:match("^%s$") or not text_utils.is_letter_char(pred_char) then
+	-- The shared word-character rule (Windows HSE_IsWordChar, Linux repeat_key)
+	-- on both characters: a digit or "_" counts, "(" or "-" does not.
+	if pred_char == "" or not text_utils.is_hotstring_word_char(pred_char)
+		or not text_utils.is_hotstring_word_char(last_char) then
 		return false
 	end
+	-- The predecessor is the buffer's first character and its start is not known
+	-- to be a word start: it may be the tail of an older word.
+	if before_last == pred_char and _state.start_is_word_boundary == false then return false end
 
 	local next_buffer = _state.buffer:sub(1, magic_offset - 1) .. last_char
 	local replaced = M.perform_text_replacement(
 		is_ignored and char_len or 0,
 		function() return km_utils.emit_text(last_char) end,
 		function() _state.buffer = next_buffer end,
-		false, is_ignored, "hotstring", "repeat_key", false)
+		false, is_ignored, "hotstring", ConfigKeys.COMMAND.REPEAT_KEY, false)
 	if replaced ~= true then return false end
 
 	Logger.debug(LOG, "Repeat feature: repeated '%s'.", last_char)

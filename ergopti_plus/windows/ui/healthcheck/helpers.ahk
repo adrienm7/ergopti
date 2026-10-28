@@ -281,10 +281,12 @@ _HealthCheck_System(Detailed, UptimeSec) {
 ; =========================================
 ; =========================================
 
-; The keyboard state at this instant.
+; The keyboard state at this instant, and the health of the native navigation
+; hook (the macOS section's key accounting has the same role there).
+; @param HookHealthFn {Func|Integer} Reads the hook counters (tests replace it).
 ; @returns {Map}
-_HealthCheck_Input() {
-	return Map(
+_HealthCheck_Input(HookHealthFn := 0) {
+	Input := Map(
 		"paused",    A_IsSuspended ? true : false,
 		"shift",     KS_IsDown("Shift") ? true : false,
 		"ctrl",      KS_IsDown("Ctrl") ? true : false,
@@ -293,13 +295,28 @@ _HealthCheck_Input() {
 		"meta",      (KS_IsDown("LWin") || KS_IsDown("RWin")) ? true : false,
 		; The lock state, not the key: "T" is the toggle
 		"caps_lock", GetKeyState("CapsLock", "T") ? true : false)
+	if !HasMethod(HookHealthFn, "Call") && IsSet(LLM_NavEventOwner_HookHealth)
+		HookHealthFn := LLM_NavEventOwner_HookHealth
+	if !HasMethod(HookHealthFn, "Call")
+		return Input
+	Health := _HealthCheck_Read("the navigation hook counters", HookHealthFn)
+	Input["hook_installed"] := (Health is Map) ? true : false
+	if (Health is Map) {
+		; Counters only: no key identity and no text ever reach the snapshot
+		Input["hook_events_seen"] := Health["keys_seen"]
+		Input["hook_foreign_injections"] := Health["injected_armed"]
+		Input["hook_front_reinstalls"] := Health["reinstalls"]
+		Input["hook_front_reinstall_failures"] := Health["reinstall_failures"]
+		Input["hook_last_error"] := Health["last_failure_error"]
+	}
+	return Input
 }
 
 ; The feature switches this driver can answer, as { id, enabled } items.
 ; @param LlmSnapshotFn {Func|Integer} LLM owner snapshot (tests replace it).
-; @param KeyloggerSnapshotFn {Func|Integer} Keylogger owner snapshot.
+; @param KeystatsSnapshotFn {Func|Integer} Keystats owner snapshot.
 ; @returns {Map} { items: Array }
-_HealthCheck_Features(LlmSnapshotFn := 0, KeyloggerSnapshotFn := 0) {
+_HealthCheck_Features(LlmSnapshotFn := 0, KeystatsSnapshotFn := 0) {
 	global Features
 	Items := []
 	for Id, Category in Map("hotstrings", "Hotstrings", "shortcuts", "Shortcuts", "tapholds", "TapHolds",
@@ -310,10 +327,10 @@ _HealthCheck_Features(LlmSnapshotFn := 0, KeyloggerSnapshotFn := 0) {
 	Llm := _HealthCheck_LlmOwner(LlmSnapshotFn)
 	if (Llm is Map)
 		Items.Push(Map("id", "llm", "enabled", Llm["enabled"] ? true : false))
-	if !HasMethod(KeyloggerSnapshotFn, "Call") && IsSet(KL_HealthSnapshot)
-		KeyloggerSnapshotFn := KL_HealthSnapshot
-	if HasMethod(KeyloggerSnapshotFn, "Call") {
-		Owner := KeyloggerSnapshotFn.Call()
+	if !HasMethod(KeystatsSnapshotFn, "Call") && IsSet(KL_HealthSnapshot)
+		KeystatsSnapshotFn := KL_HealthSnapshot
+	if HasMethod(KeystatsSnapshotFn, "Call") {
+		Owner := KeystatsSnapshotFn.Call()
 		if (Owner is Map && Owner.Has("enabled"))
 			Items.Push(Map("id", "metrics", "enabled", Owner["enabled"] ? true : false))
 	}
@@ -430,14 +447,14 @@ _HealthCheck_Peripherals(Detailed) {
 		throw OSError(A_LastError, -1, "GetRawInputDeviceList")
 	Loop Count {
 		Offset := (A_Index - 1) * Size
-		Type := NumGet(List, Offset + A_PtrSize, "UInt")
+		DeviceType := NumGet(List, Offset + A_PtrSize, "UInt")
 		; 0 = mouse, 1 = keyboard; generic HID devices are neither
-		if (Type > 1)
+		if (DeviceType > 1)
 			continue
 		Path := _HealthCheck_RawInputName(NumGet(List, Offset, "Ptr"))
 		if (Path == "")
 			continue
-		Item := Map("bus", _HealthCheck_DeviceBus(Path), "kind", (Type = 1) ? "keyboard" : "mouse")
+		Item := Map("bus", _HealthCheck_DeviceBus(Path), "kind", (DeviceType = 1) ? "keyboard" : "mouse")
 		if RegExMatch(Path, "i)VID_([0-9A-F]{4})", &Vid)
 			Item["vendor_id"] := StrLower(Vid[1])
 		if RegExMatch(Path, "i)PID_([0-9A-F]{4})", &Pid)
@@ -515,15 +532,15 @@ _HealthCheck_ReadTail(Path, MaxBytes) {
 		return 0
 	; UTF-8-RAW: positions are bytes and no byte order mark is skipped, so the
 	; offset below is exact and the parser sees the file as written
-	File := FileOpen(Path, "r", "UTF-8-RAW")
+	Handle := FileOpen(Path, "r", "UTF-8-RAW")
 	try {
-		Size := File.Length
+		Size := Handle.Length
 		Start := Max(0, Size - MaxBytes)
-		File.Pos := Start
+		Handle.Pos := Start
 		Bytes := Buffer(Max(1, Size - Start))
-		Read := File.RawRead(Bytes, Size - Start)
+		Read := Handle.RawRead(Bytes, Size - Start)
 	} finally {
-		File.Close()
+		Handle.Close()
 	}
 	return Map("chunk", _HealthCheck_DecodeTail(Bytes, Read), "at_file_start", Start == 0)
 }

@@ -29,8 +29,8 @@ function M.register(helpers, fixture, corpus, platform)
 				if key ~= "top_level" or id ~= "metrics" then return original_group(key, id, rows, getters) end
 				observed.parents = observed.parents + 1
 				observed.retained = rows
-				local actual = getters.keylogger_enabled
-				local wrapped = { keylogger_enabled = function()
+				local actual = getters.keystats_enabled
+				local wrapped = { keystats_enabled = function()
 					observed.getters = observed.getters + 1
 					return actual()
 				end }

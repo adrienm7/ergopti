@@ -24,6 +24,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 --- The search URL the Lua drivers fall back to. The Windows driver reads the
 --- same default from the shortcuts.search feature
@@ -112,7 +113,7 @@ local function trim(text)
 	local previous
 	repeat
 		previous = text
-		text = text:gsub("^%s+", ""):gsub("%s+$", "")
+		text = TextUtils.trim(text)
 		for _, space in ipairs(UNICODE_SPACES) do
 			while starts_with(text, space) do text = text:sub(#space + 1) end
 			while ends_with(text, space) do text = text:sub(1, -#space - 1) end
