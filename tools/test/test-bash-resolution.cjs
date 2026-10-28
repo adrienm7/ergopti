@@ -292,7 +292,7 @@ if (process.platform === 'linux') {
 	// Two drivers, two provider modes, and three physical prefixes must all run.
 	const EXPECTED_NATIVE_PATH_CASES = 12;
 	const observedCases = new Set();
-	const EXPECTED_E2E_BOOTSTRAP_CASES = 6;
+	const EXPECTED_E2E_BOOTSTRAP_CASES = 18;
 	const observedE2EBootstraps = new Set();
 	// Execute only the real entrypoint bootstrap and corpus loader. The full
 	// scenario suite remains the responsibility of the existing E2E command.
@@ -306,23 +306,29 @@ local boundary = assert(source:find(anchor, 1, true), "the E2E bootstrap boundar
 assert(not source:find(anchor, boundary + #anchor, true), "the E2E bootstrap boundary must be unique")
 assert(package.loaded["tests.helpers"] == nil and package.loaded["tests.support.synthetic_input_stack"] == nil)
 local checks = [=[
-local native = require("luv")
 local expected_root = ...
-assert(native.fs_realpath(driver_root) == expected_root, "the E2E bootstrap must preserve its native driver root")
+assert(driver_root == expected_root, "the E2E bootstrap must preserve its native driver root")
 assert(helpers == package.loaded["tests.helpers"] and type(helpers.temp_dir) == "function")
 assert(SyntheticStack == package.loaded["tests.support.synthetic_input_stack"] and type(SyntheticStack.load) == "function")
 for _, name in ipairs({"tests.helpers", "tests.support.synthetic_input_stack"}) do
  local resolved = assert(package.searchpath(name, package.path))
- assert(native.fs_realpath(resolved):sub(1, #expected_root + 1) == expected_root .. "/", "the real driver module must come from this checkout")
+ assert(resolved:sub(1, #expected_root + 1) == expected_root .. "/", "the real driver module must come from this checkout")
 end
 local vectors = load_corpus()
 assert(type(package.loaded.json.decode) == "function" and #vectors > 0)
 local json_path = assert(package.searchpath("json", package.path))
-assert(native.fs_realpath(json_path) == native.fs_realpath(shared_lua .. "/json.lua"), "the real shared decoder must load")
+assert(json_path == shared_lua .. "/json.lua", "the real shared decoder must load")
 io.write("E2E_BOOTSTRAP_ONLY=", #vectors, "\n")
 ]=]
 assert(load(source:sub(1, boundary - 1) .. "\n" .. checks, "@" .. entry, "t"))(expected_root)
 `;
+	const sdkMarker = 'E2E bootstrap: actual Lua without luv or lfs';
+	const withoutSdkSource = [
+		'assert(_VERSION == "Lua 5.4", "the plain E2E interpreter must be Lua 5.4")',
+		'assert(not pcall(require, "luv"), "the plain E2E control unexpectedly resolved luv")',
+		'assert(not pcall(require, "lfs"), "the plain E2E control unexpectedly resolved lfs")',
+		'io.write(' + JSON.stringify(sdkMarker + '\n') + ')'
+	].join('\n');
 	const providerMarker = 'Native discovery: same runtime and real luv; lfs unavailable';
 	const withoutLfsSource = [
 		'local native = require("luv")',
@@ -392,6 +398,63 @@ assert(load(source:sub(1, boundary - 1) .. "\n" .. checks, "@" .. entry, "t"))(e
 		);
 		const withoutLinux = withoutLfs('linux', linuxRuntime, linuxFacts);
 		const withoutMac = withoutLfs('macos', macRuntime, macFacts);
+		const emptyCpath = path.join(temporary, 'without-sdk', '?.so');
+		const withoutSdk = {
+			...process.env,
+			LUA_PATH: macFacts.luaPath,
+			LUA_PATH_5_4: macFacts.luaPath,
+			LUA_CPATH: emptyCpath,
+			LUA_CPATH_5_4: emptyCpath,
+			LD_LIBRARY_PATH: macFacts.loaderPath
+		};
+
+		/** Run the same real bootstrap through each declared entrypoint spelling. */
+		function runE2EBootstrap({
+			mode,
+			prefix,
+			variant,
+			driver,
+			program,
+			prefixArguments,
+			env,
+			cwd = driver,
+			entry = 'tests/e2e/run_e2e.lua'
+		}) {
+			const bootstrap = spawnSync(
+				program,
+				[...prefixArguments, '-', entry, fs.realpathSync(driver)],
+				{
+					input: e2eBootstrapSource,
+					cwd,
+					encoding: 'utf8',
+					timeout: 30000,
+					env: { ...env, PWD: '/not-the-actual-checkout', CDPATH: temporary }
+				}
+			);
+			assert.ifError(bootstrap.error);
+			assert.equal(
+				bootstrap.status,
+				0,
+				'E2E bootstrap only ' +
+					JSON.stringify([mode, prefix, variant]) +
+					': ' +
+					bootstrap.stdout +
+					'\n' +
+					bootstrap.stderr
+			);
+			assert.equal((bootstrap.stdout.match(/^E2E_BOOTSTRAP_ONLY=[1-9][0-9]*$/gm) || []).length, 1);
+			if (mode === 'without-lfs')
+				assert.equal(bootstrap.stdout.split(providerMarker).length - 1, 1);
+			if (mode === 'without-sdk') assert.equal(bootstrap.stdout.split(sdkMarker).length - 1, 1);
+			const identity = JSON.stringify([mode, prefix, variant]);
+			assert.ok(!observedE2EBootstraps.has(identity), 'Duplicate E2E bootstrap case: ' + identity);
+			observedE2EBootstraps.add(identity);
+			console.log(
+				'[OK] E2E bootstrap only ' +
+					identity +
+					' loads real helpers, synthetic stack, and nonempty shared corpus.'
+			);
+		}
 		for (const prefix of ['ordinary', 'literal\\backslash', 'literal\nnewline']) {
 			const checkout = path.join(temporary, prefix);
 			for (const name of ['linux', 'macos']) {
@@ -503,49 +566,68 @@ assert(load(source:sub(1, boundary - 1) .. "\n" .. checks, "@" .. entry, "t"))(e
 							' existing case(s) without loader errors.'
 					);
 				}
-				const e2eDriver = path.join(checkout, 'static/ergopti_plus/macos');
-				const bootstrap = spawnSync(
-					isolated ? macFacts.executable : macRuntime,
-					[...prefixArguments, '-', 'tests/e2e/run_e2e.lua', fs.realpathSync(e2eDriver)],
-					{
-						input: e2eBootstrapSource,
-						cwd: e2eDriver,
-						encoding: 'utf8',
-						timeout: 30000,
-						env: { ...(isolated ? withoutMac : process.env), HOME: home }
-					}
-				);
-				assert.ifError(bootstrap.error);
-				assert.equal(
-					bootstrap.status,
-					0,
-					'E2E bootstrap only ' +
-						mode +
-						' ' +
-						JSON.stringify(prefix) +
-						': ' +
-						bootstrap.stdout +
-						'\n' +
-						bootstrap.stderr
-				);
-				assert.equal(
-					(bootstrap.stdout.match(/^E2E_BOOTSTRAP_ONLY=[1-9][0-9]*$/gm) || []).length,
-					1
-				);
-				if (isolated) assert.equal(bootstrap.stdout.split(providerMarker).length - 1, 1);
-				const bootstrapIdentity = JSON.stringify([mode, prefix]);
-				assert.ok(
-					!observedE2EBootstraps.has(bootstrapIdentity),
-					'Duplicate E2E bootstrap case: ' + bootstrapIdentity
-				);
-				observedE2EBootstraps.add(bootstrapIdentity);
-				console.log(
-					'[OK] E2E bootstrap only ' +
-						mode +
-						' ' +
-						JSON.stringify(prefix) +
-						' loads real helpers, synthetic stack, and nonempty shared corpus.'
-				);
+			}
+			const e2eDriver = path.join(checkout, 'static/ergopti_plus/macos');
+			for (const mode of ['ambient', 'without-lfs', 'without-sdk']) {
+				const isolated = mode === 'without-lfs';
+				const plain = mode === 'without-sdk';
+				const prefixArguments = plain
+					? ['-e', withoutSdkSource]
+					: isolated
+						? ['-e', withoutLfsSource]
+						: [];
+				const program = isolated || plain ? macFacts.executable : macRuntime;
+				const env = { ...(plain ? withoutSdk : isolated ? withoutMac : process.env), HOME: home };
+				runE2EBootstrap({
+					mode,
+					prefix,
+					variant: 'relative',
+					driver: e2eDriver,
+					program,
+					prefixArguments,
+					env
+				});
+				if (plain) {
+					runE2EBootstrap({
+						mode,
+						prefix,
+						variant: 'absolute',
+						driver: e2eDriver,
+						program,
+						prefixArguments,
+						env,
+						cwd: checkout,
+						entry: path.join(e2eDriver, 'tests/e2e/run_e2e.lua')
+					});
+					const link = path.join(checkout, 'driver-link');
+					fs.symlinkSync(e2eDriver, link);
+					runE2EBootstrap({
+						mode,
+						prefix,
+						variant: 'directory-symlink',
+						driver: e2eDriver,
+						program,
+						prefixArguments,
+						env,
+						cwd: checkout,
+						entry: path.join(link, 'tests/e2e/run_e2e.lua')
+					});
+					const trailingDriver = e2eDriver + "'$(touch BOOTSTRAP_PATH_EXECUTED)\n";
+					fs.renameSync(e2eDriver, trailingDriver);
+					runE2EBootstrap({
+						mode,
+						prefix,
+						variant: 'quote-and-trailing-newline',
+						driver: trailingDriver,
+						program,
+						prefixArguments,
+						env
+					});
+					assert.ok(
+						!fs.existsSync(path.join(trailingDriver, 'BOOTSTRAP_PATH_EXECUTED')),
+						'Checkout path bytes must never execute a shell substitution'
+					);
+				}
 			}
 		}
 		assert.equal(
@@ -557,6 +639,89 @@ assert(load(source:sub(1, boundary - 1) .. "\n" .. checks, "@" .. entry, "t"))(e
 			observedE2EBootstraps.size,
 			EXPECTED_E2E_BOOTSTRAP_CASES,
 			'The complete E2E bootstrap matrix must run'
+		);
+		// Only the process-I/O boundary is controlled here. The actual bootstrap,
+		// pure-Lua quoting owner, error handling, and resource retirement run.
+		const bootstrapFailureSource = String.raw`
+local entry = assert(arg[1])
+local handle = assert(io.open(entry, "rb"))
+local source = assert(handle:read("*a")); assert(handle:close())
+local anchor = "\nlocal drivers_root"
+local boundary = assert(source:find(anchor, 1, true))
+assert(not source:find(anchor, boundary + #anchor, true), "the root bootstrap boundary must be unique")
+local bootstrap = assert(load(source:sub(1, boundary - 1), "@" .. entry, "t"))
+local actual_popen = io.popen
+local cases = {
+ { name = "create", expected = "owned-create-refusal", close_count = 0 },
+ { name = "read-throw", expected = "owned-read-failure", close_count = 1 },
+ { name = "read-refusal", expected = "owned-read-refusal", close_count = 1 },
+ { name = "close-refusal", expected = "exit 17", close_count = 1 },
+ { name = "close-throw", expected = "owned-close-failure", close_count = 1 },
+ { name = "missing-newline", expected = "terminating newline", close_count = 1 },
+}
+for _, case in ipairs(cases) do
+ local opens, closes = 0, 0
+ io.popen = function(_, mode)
+  opens = opens + 1
+  assert(mode == "r", "the bootstrap owns a read-only pipe")
+  if case.name == "create" then return nil, "owned-create-refusal" end
+  return {
+   read = function(_, format)
+    assert(format == "*a", "native root bytes must be read as a complete string")
+    if case.name == "read-throw" then error("owned-read-failure") end
+    if case.name == "read-refusal" then return nil, "owned-read-refusal" end
+    return arg[2] .. (case.name == "missing-newline" and "" or "\n")
+   end,
+   close = function()
+    closes = closes + 1
+    if case.name == "close-refusal" then return nil, "exit", 17 end
+    if case.name == "close-throw" then error("owned-close-failure") end
+    return true, "exit", 0
+   end,
+  }
+ end
+ local ok, detail = pcall(bootstrap)
+ io.popen = actual_popen
+ assert(not ok and tostring(detail):find(case.expected, 1, true), tostring(detail))
+ assert(opens == 1 and closes == case.close_count, "the bootstrap must retire exactly its acquired pipe")
+ assert(package.loaded["tests.helpers"] == nil, "a failed root must not load the test stack")
+ io.write("E2E_BOOTSTRAP_FAILURE_CONTROL=", case.name, "\n")
+end
+`;
+		const failureControls = spawnSync(
+			macFacts.executable,
+			[
+				'-e',
+				withoutSdkSource,
+				'-',
+				path.join(ROOT, 'static/ergopti_plus/macos/tests/e2e/run_e2e.lua'),
+				path.join(ROOT, 'static/ergopti_plus/macos')
+			],
+			{
+				input: bootstrapFailureSource,
+				cwd: ROOT,
+				encoding: 'utf8',
+				timeout: 30000,
+				env: withoutSdk
+			}
+		);
+		assert.ifError(failureControls.error);
+		assert.equal(failureControls.status, 0, failureControls.stdout + '\n' + failureControls.stderr);
+		assert.equal(failureControls.stdout.split(sdkMarker).length - 1, 1);
+		const observedFailures = [
+			...failureControls.stdout.matchAll(/^E2E_BOOTSTRAP_FAILURE_CONTROL=(.+)$/gm)
+		].map((match) => match[1]);
+		assert.deepEqual(observedFailures, [
+			'create',
+			'read-throw',
+			'read-refusal',
+			'close-refusal',
+			'close-throw',
+			'missing-newline'
+		]);
+		assert.equal(new Set(observedFailures).size, 6);
+		console.log(
+			'[OK] Six SDK-free bootstrap failure controls reject incomplete roots and retire exactly their owned pipe.'
 		);
 		// The source contract must see a newline inside a basename too. A regular
 		// declared file is the healthy control; hiding the undeclared emission
