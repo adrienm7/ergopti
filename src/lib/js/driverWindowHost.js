@@ -68,12 +68,12 @@ function demoPerson(locale) {
  * a "#prefetch=<url>" hash makes them load the synthetic demo blob shipped
  * under static/demo/ (see tools/dev/gen-demo-metrics.cjs).
  * @param {string} id - Window id, a folder name under _shared/ui/.
- * @param {string} [base] - URL prefix under which static/ is served.
+ * @param {(file: string) => string} asset - The $app/paths static-file resolver.
  * @returns {string}
  */
-export function driverWindowSrc(id, base = '') {
-	const page = `${base}/ergopti_plus/_shared/ui/${id}/index.html`;
-	return id.startsWith('metrics_') ? `${page}#prefetch=${base}/demo/${id}_prefetch.json` : page;
+export function driverWindowSrc(id, asset) {
+	const page = asset(`ergopti_plus/_shared/ui/${id}/index.html`);
+	return id.startsWith('metrics_') ? `${page}#prefetch=${asset(`demo/${id}_prefetch.json`)}` : page;
 }
 
 // One fetch of each locale's strings, shared by every embedded window.
@@ -82,16 +82,16 @@ const stringsCache = new Map();
 
 /**
  * Fetch (once) the driver's locale strings.
- * @param {string} base
+ * @param {(file: string) => string} asset
  * @param {string} locale
  * @returns {Promise<Record<string, string>>}
  */
-function localeStrings(base, locale) {
-	const key = `${base}|${locale}`;
+function localeStrings(asset, locale) {
+	const key = asset(`ergopti_plus/_shared/data/locales/${locale}.json`);
 	if (!stringsCache.has(key)) {
 		stringsCache.set(
 			key,
-			fetch(`${base}/ergopti_plus/_shared/data/locales/${locale}.json`).then((r) => {
+			fetch(key).then((r) => {
 				if (!r.ok) throw new Error(`Locale ${locale} unavailable: HTTP ${r.status}`);
 				return r.json();
 			})
@@ -120,12 +120,12 @@ function parseParams(raw) {
  * Feed the model browser with the real catalog, exactly like the native
  * hosts do: flatten models.json into injectModels() rows.
  * @param {Window} win
- * @param {string} base
+ * @param {(file: string) => string} asset
  * @param {string} locale
  */
-async function injectModelBrowser(win, base, locale) {
-	win.i18n_apply?.(await localeStrings(base, locale));
-	const res = await fetch(`${base}/ergopti_plus/_shared/modules/llm/models.json`);
+async function injectModelBrowser(win, asset, locale) {
+	win.i18n_apply?.(await localeStrings(asset, locale));
+	const res = await fetch(asset('ergopti_plus/_shared/modules/llm/models.json'));
 	if (!res.ok) throw new Error(`Model catalog unavailable: HTTP ${res.status}`);
 	const catalog = await res.json();
 	const models = [];
@@ -223,12 +223,12 @@ export function hotstringEditorDemo(locale) {
  * its chrome labels render. Every edit is reported to onInfoChange, so the
  * caller can rebuild dynamic-hotstring examples live.
  * @param {Window} win
- * @param {string} base
+ * @param {(file: string) => string} asset
  * @param {string} locale
  * @param {((fields: Record<string, string>) => void) | null} onInfoChange
  */
-async function injectPersonalInfo(win, base, locale, onInfoChange) {
-	const strings = await localeStrings(base, locale);
+async function injectPersonalInfo(win, asset, locale, onInfoChange) {
+	const strings = await localeStrings(asset, locale);
 	const person = demoPerson(locale);
 	const values = {
 		first_name: 'Adrien',
@@ -361,27 +361,27 @@ export function settleDriverWindow(win, id) {
  * @param {Window} win - The window's contentWindow (same origin).
  * @param {string} id - Window id, a folder name under _shared/ui/.
  * @param {{
- *   base?: string,
+ *   asset: (file: string) => string,
  *   locale?: string,
  *   animate?: boolean,
  *   onInfoChange?: ((fields: Record<string, string>) => void) | null
- * }} [options]
+ * }} options
  * @returns {Promise<void>} Resolves once the window shows its data.
  */
 export async function hostDriverWindow(
 	win,
 	id,
-	{ base = '', locale = 'fr', animate = true, onInfoChange = null } = {}
+	{ asset, locale = 'fr', animate = true, onInfoChange = null }
 ) {
-	if (id === 'model_browser') return injectModelBrowser(win, base, locale);
+	if (id === 'model_browser') return injectModelBrowser(win, asset, locale);
 	if (id === 'hotstring_editor') {
-		win.i18n_apply?.(await localeStrings(base, locale));
+		win.i18n_apply?.(await localeStrings(asset, locale));
 		win.initData?.(hotstringEditorDemo(locale));
 		return;
 	}
-	if (id === 'personal_info_editor') return injectPersonalInfo(win, base, locale, onInfoChange);
+	if (id === 'personal_info_editor') return injectPersonalInfo(win, asset, locale, onInfoChange);
 	if (id.startsWith('metrics_')) {
-		win.i18n_apply?.(await localeStrings(base, locale));
+		win.i18n_apply?.(await localeStrings(asset, locale));
 		return renderMetricsCharts(win, id, { animate });
 	}
 	// changelog needs nothing: it self-bootstraps from GitHub.
