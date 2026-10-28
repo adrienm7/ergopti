@@ -16,15 +16,15 @@ class PersonalFileControls {
 
 	/** Read physical identity from an open handle, including hard-link aliases. */
 	static Physical(Path) {
-		File := FSOpenReadStrict(Path)
-		if !IsObject(File)
+		Handle := FSOpenReadStrict(Path)
+		if !IsObject(Handle)
 			throw Error("The personal hotstring file is unreadable.")
 		try {
-			Snapshot := FSHandleSnapshot(File.Handle)
+			Snapshot := FSHandleSnapshot(Handle.Handle)
 			if !Snapshot.Get("ok", false)
 				throw Error("The personal hotstring file identity is unavailable.")
 			return Snapshot["volume"] . ":" . Snapshot["index_high"] . ":" . Snapshot["index_low"]
-		} finally File.Close()
+		} finally Handle.Close()
 	}
 
 	/** Parsing excludes the UTF-8 BOM; ownership retains it in the exact source receipt. */
@@ -294,12 +294,12 @@ class PersonalFileAdoptedOwner {
 	/** Resolve source metadata after adoption; the package tier never derives from its label. */
 	Resolve(Section := "") {
 		global GLOBAL_DEFAULT_COLOR, HSE_PRIORITY_PACKAGE
-		File := this.config
-		Sec := File.Sections.Get(Section, { Delay: "", Color: "", ShowTooltip: "", Priority: "" })
-		return { Delay: Sec.Delay != "" ? Sec.Delay : (File.Delay != "" ? File.Delay : PersonalFileDefaultDelay()),
-			Color: Sec.Color != "" ? Sec.Color : (File.Color != "" ? File.Color : GLOBAL_DEFAULT_COLOR),
-			ShowTooltip: Sec.ShowTooltip != "" ? Sec.ShowTooltip : (File.ShowTooltip != "" ? File.ShowTooltip : true),
-			Priority: Sec.Priority != "" ? Sec.Priority : (File.Priority != "" ? File.Priority : HSE_PRIORITY_PACKAGE),
+		ConfigFile := this.config
+		Sec := ConfigFile.Sections.Get(Section, { Delay: "", Color: "", ShowTooltip: "", Priority: "" })
+		return { Delay: Sec.Delay != "" ? Sec.Delay : (ConfigFile.Delay != "" ? ConfigFile.Delay : PersonalFileDefaultDelay()),
+			Color: Sec.Color != "" ? Sec.Color : (ConfigFile.Color != "" ? ConfigFile.Color : GLOBAL_DEFAULT_COLOR),
+			ShowTooltip: Sec.ShowTooltip != "" ? Sec.ShowTooltip : (ConfigFile.ShowTooltip != "" ? ConfigFile.ShowTooltip : true),
+			Priority: Sec.Priority != "" ? Sec.Priority : (ConfigFile.Priority != "" ? ConfigFile.Priority : HSE_PRIORITY_PACKAGE),
 			HasOverride: false }
 	}
 
@@ -446,7 +446,7 @@ class PersonalFileAdoptedOwner {
 			throw ValueError("Invalid personal-file delay.")
 		else if Field == "priority" && !HotstringsTryPriority(Value, &Priority)
 			throw ValueError("Invalid personal-file priority.")
-		else if Field == "show_tooltip" && !HotstringsTryBooleanOverride(Value, &Tooltip)
+		else if Field == "show_tooltip" && !HotstringsTryBooleanOverride(Value, &ShowTooltip)
 			throw ValueError("Invalid personal-file tooltip preference.")
 		else if Field == "color" && (!(Value is String) || !RegExMatch(Value, "^#?[0-9A-Fa-f]{6}$"))
 			throw ValueError("Invalid personal-file color.")

@@ -109,23 +109,28 @@ ffi.cdef([[
 local UI_SET_EVBIT   = 0x40045564
 local UI_SET_KEYBIT  = 0x40045565
 local UI_SET_ABSBIT  = 0x40045567
+local UI_SET_MSCBIT  = 0x40045568
 local UI_SET_PROPBIT = 0x4004556e
 local UI_ABS_SETUP   = 0x401c5504
 local UI_DEV_SETUP   = 0x405c5503
 local UI_DEV_CREATE  = 0x5501
 local UI_DEV_DESTROY = 0x5502
 
-local EV_SYN, EV_KEY, EV_ABS = 0x00, 0x01, 0x03
+local EV_SYN, EV_KEY, EV_ABS, EV_MSC = 0x00, 0x01, 0x03, 0x04
 local SYN_REPORT = 0
+local MSC_TIMESTAMP = 0x05
+-- Microseconds between two reports, as a touchpad scanning at about 140 Hz.
+local SCAN_INTERVAL_US = 7000
 local BTN_TOUCH = 0x14a
 local INPUT_PROP_POINTER, INPUT_PROP_BUTTONPAD = 0x00, 0x02
 
 local fd = ffi.C.open(UINPUT_PATH, 1 + 2048) -- O_WRONLY | O_NONBLOCK
 if fd < 0 then abort("could not open " .. UINPUT_PATH) end
 
-for _, bit in ipairs({ EV_KEY, EV_ABS, EV_SYN }) do
+for _, bit in ipairs({ EV_KEY, EV_ABS, EV_MSC, EV_SYN }) do
 	ffi.C.ioctl(fd, UI_SET_EVBIT, ffi.cast("int", bit))
 end
+ffi.C.ioctl(fd, UI_SET_MSCBIT, ffi.cast("int", MSC_TIMESTAMP))
 for _, prop in ipairs({ INPUT_PROP_POINTER, INPUT_PROP_BUTTONPAD }) do
 	ffi.C.ioctl(fd, UI_SET_PROPBIT, ffi.cast("int", prop))
 end
@@ -173,6 +178,19 @@ local function emit(etype, code, value)
 	ev.tv_sec, ev.tv_usec = 0, 0
 	ev.type, ev.code, ev.value = etype, code, value
 	ffi.C.write(fd, ev, ffi.sizeof("struct rt_input_event"))
+end
+
+local _scan_time_us = 0
+
+--- Ends one report the way a precision touchpad does: hid-multitouch stamps
+--- every report with MSC_TIMESTAMP. The input core drops a report in which no
+--- value changed, so without the stamp fingers held still produce no frame at
+--- all, and a five-finger tap reached the decoder as one frame at five, which
+--- the finger_join_frames gate rightly refuses as a graze.
+local function sync()
+	_scan_time_us = _scan_time_us + SCAN_INTERVAL_US
+	emit(EV_MSC, MSC_TIMESTAMP, _scan_time_us)
+	emit(EV_SYN, SYN_REPORT, 0)
 end
 
 
@@ -260,7 +278,7 @@ local function play(fingers, dx, dy)
 		if index > 0 then emit(EV_KEY, tool[index], 0) end
 		emit(EV_KEY, tool[index + 1], 1)
 		if index == 0 then emit(EV_KEY, BTN_TOUCH, 1) end
-		emit(EV_SYN, SYN_REPORT, 0)
+		sync()
 	end
 
 	for step = 1, 4 do
@@ -269,7 +287,7 @@ local function play(fingers, dx, dy)
 			emit(EV_ABS, Decoder.ABS_MT_POSITION_X, base_x + index * 200 + math.floor(dx * step / 4))
 			emit(EV_ABS, Decoder.ABS_MT_POSITION_Y, base_y + math.floor(dy * step / 4))
 		end
-		emit(EV_SYN, SYN_REPORT, 0)
+		sync()
 	end
 
 	for index = fingers - 1, 0, -1 do
@@ -277,10 +295,10 @@ local function play(fingers, dx, dy)
 		emit(EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1)
 		emit(EV_KEY, tool[index + 1], 0)
 		if index > 0 then emit(EV_KEY, tool[index], 1) end
-		emit(EV_SYN, SYN_REPORT, 0)
+		sync()
 	end
 	emit(EV_KEY, BTN_TOUCH, 0)
-	emit(EV_SYN, SYN_REPORT, 0)
+	sync()
 
 	-- Drain through the driver's own reader. Several passes because the kernel
 	-- delivers asynchronously and one drain is bounded.

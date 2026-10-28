@@ -30,7 +30,7 @@ body {
 
 body {
 	background: var(--theme-page-background);
-	color: #333;
+	color: var(--theme-grey-333);
 	display: flex;
 	flex-direction: column;
 	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
@@ -48,7 +48,7 @@ h1 {
 }
 
 .subtitle {
-	color: #888;
+	color: var(--theme-grey-888);
 	flex-shrink: 0;
 	font-size: 11px;
 	margin: 0 0 12px;
@@ -70,8 +70,8 @@ h1 {
 }
 
 .row {
-	background: #fff;
-	border: 1px solid #e0e0e0;
+	background: var(--theme-white);
+	border: 1px solid var(--theme-grey-e0e0e0);
 	border-radius: 8px;
 	flex-shrink: 0;
 	padding: 8px 11px;
@@ -120,19 +120,19 @@ input[type='text'] {
 }
 
 input[type='text']:focus {
-	background: #fff;
+	background: var(--theme-white);
 	border-color: var(--theme-blue);
 	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
 }
 
 input[type='text'].is-default {
-	color: #999;
+	color: var(--theme-grey-999);
 }
 
 /* The default folder shown under each field, and the logs field's note. */
 .row-default,
 .row-hint {
-	color: #888;
+	color: var(--theme-grey-888);
 	font-size: 10.5px;
 	margin: 5px 0 0;
 }
@@ -152,7 +152,7 @@ input[type='text'].is-default {
 	background: #e8e8ed;
 	border: none;
 	border-radius: 5px;
-	color: #333;
+	color: var(--theme-grey-333);
 	cursor: pointer;
 	flex-shrink: 0;
 	font-size: 11px;
@@ -163,7 +163,7 @@ input[type='text'].is-default {
 }
 
 .btn-browse:hover {
-	background: #d8d8de;
+	background: var(--theme-grey-d8d8de);
 }
 
 .tag-default {
@@ -222,19 +222,19 @@ button:hover {
 }
 
 .cancel {
-	background: #e0e0e0;
-	color: #333;
+	background: var(--theme-grey-e0e0e0);
+	color: var(--theme-grey-333);
 }
 
 .save {
 	background: var(--theme-blue);
-	color: #fff;
+	color: var(--theme-white);
 }
 
 .reset {
 	background: transparent;
-	border: 1px solid #ccc;
-	color: #666;
+	border: 1px solid var(--theme-grey-ccc);
+	color: var(--theme-grey-666);
 	font-size: 11.5px;
 	padding: 6px 12px;
 }

@@ -23,6 +23,12 @@
 ---    HTTP status classes, native failure stages), never a URL, a host, a user
 ---    name or PAC content.
 --- 4. Settle once. finish() is called exactly once, after the last step.
+--- 5. The verdict follows what the driver's downloads do. Where the driver's
+---    PAC fallback (pac_fallback port) sends a download direct when the PAC
+---    cannot be fetched or evaluated, that PAC failure is information
+---    (unreachable_direct, http_<status>_direct, invalid_direct) and the chain
+---    steps prove whether the direct path works. A driver without that port
+---    refuses such downloads, so the failure stays a failure.
 --- ==============================================================================
 
 local M = {}
@@ -51,6 +57,40 @@ M.CHAIN_STEPS = { "route_lookup", "tls", "transfer", "digest" }
 M.CHAIN_STATES = { pass = true, fail = true, info = true, skip = true }
 
 local STATE = { pass = "pass", fail = "fail", info = "info", skip = "skip" }
+
+--- The pac_unavailable_fallback stages (proxy_policy.json) a PAC download and
+--- a PAC verdict stand for.
+M.PAC_DOWNLOAD_STAGE = "native_pac_download"
+M.PAC_EVALUATION_STAGE = "native_pac_evaluation"
+
+--- Records the PAC download and verdict steps.
+--- @param report table The run's report.
+--- @param status any HTTP status, nil or 0 when the download failed.
+--- @param body any The downloaded script.
+--- @param pac_fallback function|nil fn(stage) -> boolean, the driver's fallback policy.
+local function record_pac(report, status, body, pac_fallback)
+	local number = tonumber(status) or 0
+	local function falls_back(stage) return pac_fallback ~= nil and pac_fallback(stage) == true end
+	if number ~= 200 then
+		local token = number > 0 and ("http_" .. number) or "failed"
+		if falls_back(M.PAC_DOWNLOAD_STAGE) then
+			report.step("pac_download", STATE.info, number > 0 and (token .. "_direct") or "unreachable_direct")
+			report.step("pac_script", STATE.skip, "not_fetched")
+		else
+			report.step("pac_download", STATE.fail, token)
+			report.step("pac_script", STATE.fail, "invalid")
+		end
+		return
+	end
+	report.step("pac_download", STATE.pass, "http_200")
+	if PacCheck.judge(status, body) == "ok" then
+		report.step("pac_script", STATE.pass, "valid")
+	elseif falls_back(M.PAC_EVALUATION_STAGE) then
+		report.step("pac_script", STATE.info, "invalid_direct")
+	else
+		report.step("pac_script", STATE.fail, "invalid")
+	end
+end
 
 --- Reads the `step <id> <state> <value>` lines of a helper that ran the chain.
 --- Unknown ids, states and repeated ids are ignored: a helper cannot add a step.
@@ -89,10 +129,17 @@ end
 --- address. The daemon holds one relay, so the same refusal that stops its start
 --- (a conflict between relays, an unplanned host) fails this step by its closed reason.
 --- @param report table The run's report.
+--- A lookup that failed at a stage the driver's PAC fallback covers is not a
+--- failure of the download: it goes direct, so the step says so (info).
 --- @param answer table { entries = { { origin, route }, ... } } or { failure = token }
-local function record_route_plan(report, answer)
+--- @param pac_fallback function|nil fn(stage) -> boolean, the driver's fallback policy.
+local function record_route_plan(report, answer, pac_fallback)
 	if answer.failure then
-		report.step("route_plan", STATE.fail, answer.failure)
+		if pac_fallback and pac_fallback(answer.failure) == true then
+			report.step("route_plan", STATE.info, "direct_fallback:" .. answer.failure)
+		else
+			report.step("route_plan", STATE.fail, answer.failure)
+		end
 		return
 	end
 	local entries = answer.entries
@@ -120,6 +167,8 @@ end
 ---   route_plan(callback)      callback{ entries = { { origin, route }, ... } } with one
 ---                             entry per Ollama origin in inventory order and route
 ---                             "direct" or a relay, or callback{ failure = token }
+---   pac_fallback(stage)       optional: true when a failed lookup stage sends the
+---                             download direct (the driver's PAC fallback policy)
 --- @param ports table
 --- @param report table Report from field_check_report.new_report().
 --- @param finish function Called once, after the last step.
@@ -129,7 +178,7 @@ function M.run(ports, report, finish)
 		ports.chain(function(helper_code, steps)
 			record_chain(report, helper_code, helper_code == 0 and steps or {})
 			ports.route_plan(function(answer)
-				record_route_plan(report, answer)
+				record_route_plan(report, answer, ports.pac_fallback)
 				finish()
 			end)
 		end)
@@ -148,12 +197,7 @@ function M.run(ports, report, finish)
 			return
 		end
 		ports.fetch_pac(url, function(status, body)
-			local number = tonumber(status) or 0
-			report.step("pac_download", number == 200 and STATE.pass or STATE.fail,
-				number > 0 and ("http_" .. number) or "failed")
-			local verdict = PacCheck.judge(status, body)
-			report.step("pac_script", verdict == "ok" and STATE.pass or STATE.fail,
-				verdict == "ok" and "valid" or "invalid")
+			record_pac(report, status, body, ports.pac_fallback)
 			native_chain()
 		end)
 	end)

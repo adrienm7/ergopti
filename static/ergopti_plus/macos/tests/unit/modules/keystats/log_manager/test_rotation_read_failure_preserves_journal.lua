@@ -180,10 +180,12 @@ local function run_rollover_case(failure_mode, exercise_resume)
 				return true -- Explicitly empty durable volume admits JSONL-only startup.
 			end,
 			flush = function(...)
-				assert(select("#", ...) == 4)
-				local ledger, batch, clear, origin = ...
+				-- The fifth argument is the optional ingest stage clock (L16).
+				assert(select("#", ...) == 4 or select("#", ...) == 5)
+				local ledger, batch, clear, origin, stage = ...
 				assert(ledger == paths.data_sql_path and batch == ""
-					and type(clear) == "function" and type(origin) == "function")
+					and type(clear) == "function" and type(origin) == "function"
+					and (stage == nil or type(stage) == "function"))
 				return attempt == nil or attempt.settled == true
 			end,
 			rollover = function(...)

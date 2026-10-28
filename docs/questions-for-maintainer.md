@@ -15,6 +15,22 @@ answer once, then move the answered line below.
 
 ## Answered
 
+- **Answer of 2026-10-27 (Windows login start from a clone):** a Start at login registered from the clone's
+  `ErgoptiPlus.ahk` is a full developer run too (the user's `%APPDATA%\Ergopti\paths.toml`, auto-reload).
+- **Answer of 2026-10-27 (typing in Ergopti's own windows, ledger L31):** it counts. The event tap counts
+  it; the runtime's own refused Accessibility element is logged at INFO, not as a WARNING.
+- **Answer of 2026-10-27 (Karabiner):** when Ergopti's tap-hold feature is on, Ergopti quits the user's own
+  Karabiner-Elements and runs its own pinned runtime (the VirtualHID driver admits a single client). When the
+  feature is off and the user has their own Karabiner, Ergopti does not activate its runtime and leaves theirs
+  untouched.
+- **Answer of 2026-10-27 (WebView2 on Windows):** Ergopti keeps the system WebView2 runtime; it checks the
+  version it needs and refuses with a clear reason when the runtime is missing or too old.
+- **Answer of 2026-10-27 (every third-party runtime):** Ergopti keeps full control of each runtime it depends on
+  (Ollama, MLX, Karabiner and the like) on the three OS: it installs and runs its own pinned version whether
+  or not the user has one, never relies on the user's copy, and never stops or modifies it.
+- **Answer of 2026-10-27 (AI runtimes):** the Ollama Ergopti uses is always installed and owned by Ergopti at a
+  pinned version, the same for MLX; a user's own Ollama may or may not be installed and is never selected,
+  stopped or modified. The managed daemon must coexist with it (own port and models directory).
 - **Coordinator decisions of 2026-10-27 (the maintainer asked not to be asked; override if needed):**
   - **App Cloner folder picker on macOS:** the Cancel button keeps the system label. NSOpenPanel has no
     key-value `cancelButtonTitle`, so the wizard's guarded setter always failed silently; it is removed with

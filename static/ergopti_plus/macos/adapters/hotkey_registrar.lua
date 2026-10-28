@@ -141,7 +141,7 @@ end
 --- @param chord string Canonical chord string, e.g. "Ctrl+Shift+S".
 --- @param callback function Invoked with no arguments on each press.
 --- @return string|nil handle An opaque handle, or nil when the chord was refused.
-local function bind_native(chord, callback, native_key, conditional)
+local function bind_native(chord, callback, native_key, conditional, admit_capslock)
 	if type(callback) ~= "function" then
 		Logger.error(LOG, "bind(): callback must be a function, got %s.", type(callback))
 		return nil
@@ -152,7 +152,8 @@ local function bind_native(chord, callback, native_key, conditional)
 		Logger.error(LOG, "bind(): refusing '%s' — %s.", tostring(chord), tostring(err))
 		return nil
 	end
-	if M.key_is_modifier(parsed.key) then
+	if M.key_is_modifier(parsed.key)
+			and not (admit_capslock == true and parsed.key:lower() == "capslock" and #parsed.mods > 0) then
 		Logger.error(LOG, "bind(): refusing '%s' — its key is a modifier key, which never fires a hotkey.",
 			tostring(chord))
 		return nil
@@ -366,6 +367,18 @@ end
 --- @return string|nil handle
 function M.bind(chord, callback)
 	return bind_native(chord, callback)
+end
+
+--- Registers a modified Caps Lock chord (e.g. "Ctrl+Capslock") through the
+--- common native owner, for the secondary_capslock slot only. It is the same
+--- Hammerspoon factory the retired Ctrl+CapsLock switch used, which was kept
+--- apart from the generic guard; bind() still refuses Caps Lock as a key, and
+--- this entry still refuses a bare Caps Lock and every other modifier key.
+--- @param chord string Canonical chord whose key is Caps Lock.
+--- @param callback function Delivery callback.
+--- @return string|nil handle
+function M.bind_capslock_chord(chord, callback)
+	return bind_native(chord, callback, nil, nil, true)
 end
 
 --- Acquires a proven numeric source without resolving its displayed glyph.

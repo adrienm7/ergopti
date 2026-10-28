@@ -261,6 +261,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/suspend_handoff.ahk
 #Include ../infra/reload_terminal_handoff.ahk
 #Include ../infra/reload_successor.ahk
+#Include ../infra/dev_source.ahk
 #Include ../infra/reload_deferral.ahk
 #Include ../infra/suppressive_inputhook_ownership.ahk
 #Include ../infra/lifecycle_transition.ahk
@@ -546,6 +547,7 @@ InstallSendNoOps()
 #Include ../ui/wpm/wpm_widget.ahk
 #Include unit/ui/wpm/test_wpm_gdiplus_ownership.ahk
 #Include unit/ui/wpm/test_wpm_drag_admission.ahk
+#Include unit/ui/wpm/test_wpm_region_target.ahk
 #Include unit/ui/wpm/test_wpm_canon.ahk
 #Include unit/infra/config/persistence/test_features_manifest.ahk
 #Include unit/infra/config/persistence/test_apply_config_toml.ahk
@@ -682,9 +684,11 @@ _LLM_Deps_State := "ready"
 #Include ../modules/llm/remote_formats.ahk
 #Include ..\..\_shared\modules\llm\local_server_auth.ahk
 #Include ..\..\_shared\modules\llm\local_server_discovery.ahk
+#Include ..\..\_shared\modules\llm\local_server_ports.ahk
 #Include ../../_shared/modules/llm/local_server_menu.ahk
 #Include ../modules/llm/api_remote.ahk
 #Include ../modules/llm/local_server_models.ahk
+#Include ../modules/llm/local_server_port_scan.ahk
 #Include ../modules/llm/local_servers.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama_streaming.ahk
@@ -706,6 +710,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/servers/test_local_server_models_timer.ahk
 #Include unit/modules/llm/servers/test_local_server_menu.ahk
 #Include unit/modules/llm/servers/test_local_servers.ahk
+#Include unit/modules/llm/servers/test_local_server_ports.ahk
 #Include unit/modules/llm/servers/test_local_server_queue_timer.ahk
 #Include unit/modules/llm/servers/test_llm_crash_orphan_cleanup.ahk
 #Include unit/modules/llm/servers/test_llm_temp_artifact_terminal_ownership.ahk
@@ -730,8 +735,6 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/api/test_llm_api_entry_names.ahk
 #Include unit/modules/llm/menu/test_llm_menu_backend_model_labels.ahk
 #Include unit/modules/llm/menu/test_llm_menu_model_hardware.ahk
-#Include unit/modules/llm/menu/test_llm_menu_backend_child.ahk
-#Include unit/modules/llm/menu/test_llm_menu_model_parent.ahk
 #Include unit/modules/llm/menu/test_llm_menu_build_submenu.ahk
 #Include unit/modules/llm/menu/test_llm_menu_prediction_count.ahk
 #Include unit/modules/llm/servers/test_llm_curl_terminal_classification.ahk
@@ -966,6 +969,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/infra/lifecycle/test_reload_successor_quiescence.ahk
 #Include unit/infra/lifecycle/test_reload_worker_identity.ahk
 #Include unit/infra/lifecycle/test_reload_deferral.ahk
+#Include unit/infra/lifecycle/test_dev_source.ahk
 #Include unit/ui/menu/test_tray_menu_separator_popup.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_hold_picker_options.ahk
 #Include unit/ui/menu/test_menu_command_deferral.ahk
@@ -2167,7 +2171,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/test_keystats_shutdown_timer_durability.ahk
 #Include meta/modules/llm/prediction/test_llm_finalize_guard_before_yield.ahk
 #Include meta/modules/llm/prediction/test_llm_indexed_callbacks_never_swallowed.ahk
-#Include meta/modules/llm/menu/test_llm_model_menu_no_model_row_actionable.ahk
 #Include meta/modules/llm/profiles/test_llm_profile_menu_unique_labels.ahk
 #Include meta/infra/i18n/test_locale_tsv_atomic_write.ahk
 #Include meta/ui/menu/test_menu_manifest_single_decode.ahk

@@ -16,13 +16,17 @@
 ---    turned into a wrong answer.
 --- 2. The copy is bounded: a stored value larger than one release response can
 ---    be is not a copy this module ever wrote.
---- 3. PURE Lua (LuaJIT and 5.4): no driver imports, no io.
+--- 3. PURE Lua (LuaJIT and 5.4): no io; its one driver import is the shared
+---    timing registry reader (infra.timings), for the [limits] bound.
 --- ==============================================================================
 
 local M = {}
 
--- One response is capped at 2 MiB by the Linux transport; a larger body was not stored by it.
-M.MAX_BODY_BYTES = 2 * 1024 * 1024
+local Timings = require("infra.timings")
+
+-- One response is capped by the Linux transport ([limits] release_list_body_bytes);
+-- a larger body was not stored by it.
+M.MAX_BODY_BYTES = Timings.count("limits", "release_list_body_bytes")
 
 
 

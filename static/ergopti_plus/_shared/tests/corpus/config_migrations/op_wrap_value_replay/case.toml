@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/op_wrap_value_replay/case.toml
+
+[case]
+description = "wrap_value over switches already stored as tables changes nothing: a replay never wraps twice."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

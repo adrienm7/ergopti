@@ -98,7 +98,11 @@ for (const file of [
 	'tools/diagnostics/macos_tooltip_canvas_observer.py',
 	'tools/diagnostics/macos_tooltip_canvas_test.py',
 	'tools/diagnostics/macos_owned_process.py',
-	'tools/test/run-macos-tooltip-canvas-tests.cjs'
+	'tools/test/run-macos-tooltip-canvas-tests.cjs',
+	// The metrics apps page probe pins this page's script census: adding
+	// theme_tokens.js to it skipped these controls and failed only on macOS CI.
+	'static/ergopti_plus/_shared/ui/metrics_apps/index.html',
+	'static/ergopti_plus/macos/ui/metrics_apps/init.lua'
 ])
 	assert(
 		selectGates([file]).has('macos-tooltip-canvas'),

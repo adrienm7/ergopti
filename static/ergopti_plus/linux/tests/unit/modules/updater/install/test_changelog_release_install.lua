@@ -116,6 +116,12 @@ local function native_fixture(ctx, options)
 				end)
 			end)
 		end
+		function factory.sealed_size(brand)
+			local state = exact(brand)
+			local handle = state.adopted and io.open(state.path, "rb")
+			if not handle then return nil end
+			local size = handle:seek("end"); handle:close(); return size
+		end
 		function factory.cancel_transfer(brand)
 			local state = exact(brand)
 			if not remove_owned(state) then return false end

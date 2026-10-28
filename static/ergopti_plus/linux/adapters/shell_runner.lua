@@ -37,6 +37,7 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local TableUtil = require("table_util")
 local TextUtils = require("text_utils")
 
@@ -241,7 +242,9 @@ end
 --- @param options table|nil { output_dir? } Native receipt staging directory.
 --- @return boolean ok
 --- @return string output Captured stdout, including the empty string.
---- @return string|nil error_message
+--- @return string|nil error_message A sentence for the log.
+--- @return string|nil reason The closed adapter_errors id to match on (command_exited_nonzero for a non-zero exit).
+--- @return integer|nil status The exit status that goes with command_exited_nonzero.
 function M.exec_checked(cmd, options)
 	local admitted, refusal = valid_shell_command(cmd, "exec_checked")
 	if not admitted then return false, "", refusal end
@@ -255,14 +258,14 @@ function M.exec_checked(cmd, options)
 		if type(result) == "table" then
 			return result.ok == true,
 				type(result.output) == "string" and result.output or "",
-				result.error
+				result.error, result.reason, result.status
 		end
 		if type(result) == "string" then return true, result, nil end
 		return result == true, "", result == true and nil or "simulated command failure"
 	end
 
 	local started_ms = Monotonic.now_ms()
-	local call_ok, command_ok, output, error_message = pcall(function()
+	local call_ok, command_ok, output, error_message, reason_id, exit_status = pcall(function()
 		-- LuaJIT's io.popen handle does not preserve a child's non-zero status on
 		-- every libc/runtime combination. Run the caller's command in a nested
 		-- shell, buffer stdout in an atomically-created file, and frame the result
@@ -318,7 +321,7 @@ function M.exec_checked(cmd, options)
 			return false, content, "checked command capture did not complete"
 		end
 		if tonumber(status) ~= EXIT_SUCCESS then
-			return false, content, "command exited with status " .. status
+			return false, content, "command exited with status " .. status, Errors.COMMAND_EXITED_NONZERO, tonumber(status)
 		end
 		return true, content, nil
 	end)
@@ -329,7 +332,7 @@ function M.exec_checked(cmd, options)
 	end
 	_record_exit(RuntimeLog.program_name(cmd), command_ok and 0 or tostring(error_message),
 		Monotonic.now_ms() - started_ms)
-	return command_ok, output, error_message
+	return command_ok, output, error_message, reason_id, exit_status
 end
 
 --- Runs a command and returns only its first line of stdout.
@@ -513,10 +516,10 @@ function M.run_async(executable, args, options, callback)
 		if not request.admitted then return end
 		local error_message = result.error
 		local code = result.exit_code
-		if error_message == "process deadline exceeded" then error_message, code = "timeout", nil
-		elseif error_message == "process output exceeds its bound" then
+		if error_message == Errors.PROCESS_DEADLINE_EXCEEDED then error_message, code = "timeout", nil
+		elseif error_message == Errors.PROCESS_OUTPUT_EXCEEDS_BOUND then
 			error_message, code = "output over " .. ASYNC_MAX_OUTPUT_BYTES .. " bytes", nil
-		elseif error_message == "process exited unsuccessfully" then error_message = "exit code " .. tostring(code) end
+		elseif error_message == Errors.PROCESS_EXITED_UNSUCCESSFULLY then error_message = "exit code " .. tostring(code) end
 		local answer = { ok = result.ok, code = code, stdout = result.stdout, stderr = result.stderr, error = error_message }
 		record(result)
 		local ok, err = pcall(callback, answer)
@@ -531,10 +534,10 @@ function M.run_async(executable, args, options, callback)
 	operation:on_settled(function() record(operation.result) end)
 	if not operation.started or operation.error ~= nil then
 		local error_message = operation.error or "native process admission refused"
-		if error_message == "native handle allocation failed" then error_message = "handle allocation failed"
-		elseif error_message == "native process deadline refused" then error_message = "timeout activation failed"
-		elseif error_message == "native output watch refused" then error_message = "pipe activation failed"
-		elseif error_message == "native process dispatch failed" then
+		if error_message == Errors.PROCESS_HANDLE_ALLOCATION_FAILED then error_message = "handle allocation failed"
+		elseif error_message == Errors.PROCESS_DEADLINE_REFUSED then error_message = "timeout activation failed"
+		elseif error_message == Errors.PROCESS_OUTPUT_WATCH_REFUSED then error_message = "pipe activation failed"
+		elseif error_message == Errors.PROCESS_DISPATCH_FAILED then
 			error_message = "spawn failed: " .. (operation.spawn_error_code or error_message)
 		end
 		return nil, error_message

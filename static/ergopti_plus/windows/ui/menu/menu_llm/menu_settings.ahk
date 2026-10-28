@@ -1114,20 +1114,3 @@ _LLM_Menu_ShowNotice(Text) {
 		UI_HOTSTRING_TIMEOUT_SEC)
 }
 
-/**
- * Prompts the user to enter a custom Ollama model identifier.
- */
-LLM_Menu_PromptAddModel() {
-	InheritedCritical := A_IsCritical
-	if InheritedCritical {
-		Critical("Off")
-		try return LLM_Menu_PromptAddModel()
-		finally Critical(InheritedCritical)
-	}
-	global _LLM_Menu
-	ib := Ui_InputBox(t("menu.llm.ollama_model_hint"), t("menu.llm.add_custom_model"), "w450 h130")
-	if (ib.Result != "OK" || Trim(ib.Value) == "")
-		return
-	name := Trim(ib.Value)
-	LLM_Menu_SetModel(name)
-}

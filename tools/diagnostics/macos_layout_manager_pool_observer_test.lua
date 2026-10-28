@@ -78,6 +78,7 @@ local function dispatch_control(kind)
 	metadata.__index = methods; debug.setmetatable(controller, metadata)
 	local pool = Pool.new(function(name) assert(name == "layout_manager_bridge"); return controller end,
 		{ error = function(_, _, detail) failures[#failures+1] = detail end })
+	-- config-key-literal-ok: a controller pool name
 	local token, uc = pool.reserve("layout_manager"); assert(rawequal(uc, controller))
 	local domain = { on_message = assert(load([[local ready=true;return function()return ready end]],
 		"@" .. production .. "/macos/ui/layout_manager/init.lua"))() }

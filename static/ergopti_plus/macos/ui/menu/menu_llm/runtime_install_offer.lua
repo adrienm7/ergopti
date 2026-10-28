@@ -4,9 +4,9 @@
 --- MODULE: AI Runtime Selection
 --- DESCRIPTION:
 --- Owns what happens when the user selects a local AI backend whose runtime
---- may be absent. Ollama is reused when the resolver finds it; otherwise the
---- user is asked, never silently, whether to download the official release or
---- open the Ollama website. MLX is provisioned by its own selection.
+--- may be absent. Ollama is always Ergopti's own pinned runtime: reused when
+--- installed, otherwise installed once the user accepts, never silently. A
+--- user's own Ollama is never used. MLX is provisioned by its own selection.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One entry per backend: select_ollama() and select_mlx() are the only
@@ -76,67 +76,6 @@ end
 -- =========================================
 -- =========================================
 
-local function ask_ollama_download()
-	local download_label = i18n.get("ollama.offer_download")
-	local website_label = i18n.get("ollama.offer_website")
-	local ok, choice = pcall(dialogs().block_alert,
-		i18n.get("ollama.runtime_missing_title"), i18n.get("ollama.offer_body"),
-		download_label, website_label, "informational")
-	if not ok then
-		Logger.error(LOG, "The Ollama download offer could not be shown: %s", tostring(choice))
-		return "declined"
-	end
-	if choice == download_label then return "download" end
-	if choice == website_label then
-		local opened, open_err = pcall(hs.urlevent.openURL, OllamaBinary.DOWNLOAD_PAGE_URL)
-		if not opened then
-			Logger.error(LOG, "The Ollama website could not be opened: %s", tostring(open_err))
-		end
-	end
-	return "declined"
-end
-
---- Selects the Ollama backend's runtime: reuses an installed Ollama, or offers
---- the download once. A decline changes nothing and says what stays in place.
---- @param on_complete function|nil Receives the terminal result when accepted.
---- @param opts table|nil { keeps_current_backend = true } when the user is
----   switching from another backend, which a decline leaves running;
----   { install_consented = true } when the user already pressed an install
----   button, which is not asked again.
---- @return boolean accepted False when the user declined or the check refused.
-local function select_official_ollama(on_complete, opts)
-	if ollama_deps().runtime_available() then
-		Logger.info(LOG, "Ollama already installed; reusing it without a download.")
-		return ollama_deps().check_and_install_deps(on_complete) == true
-	end
-	if ollama_deps().is_task_running() then
-		-- The download accepted moments ago is still running: join it rather
-		-- than asking a second time.
-		Logger.debug(LOG, "Ollama provisioning already running; joining it.")
-		return ollama_deps().check_and_install_deps(on_complete) == true
-	end
-	if type(opts) == "table" and opts.install_consented == true then
-		Logger.info(LOG, "Ollama download already chosen by the user; not asking again.")
-	else
-		Logger.start(LOG, "Offering the Ollama download…")
-		if ask_ollama_download() ~= "download" then
-			-- Declining a switch leaves the previous backend running, so "the AI
-			-- stays off" would be false there; it is true when enabling the AI.
-			local keeps_backend = type(opts) == "table" and opts.keeps_current_backend == true
-			Logger.warn(LOG, keeps_backend
-				and "Ollama download declined; the current backend stays active."
-				or "Ollama download declined; the AI stays off with this backend.")
-			pcall(notifications().notify, i18n.get("ollama.runtime_missing_title"),
-				i18n.get(keeps_backend and "ollama.switch_declined_body" or "ollama.runtime_missing_body"),
-				"warning")
-			Logger.success(LOG, "Ollama download offer settled (declined).")
-			return false
-		end
-		Logger.success(LOG, "Ollama download offer settled (accepted).")
-	end
-	return ollama_deps().install_for_selection(on_complete) == true
-end
-
 local function migration_idle()
 	local api = require("modules.llm.api_ollama")
 	local manager = require("ui.menu.menu_llm.models_manager_ollama")
@@ -146,21 +85,32 @@ local function migration_idle()
 	return manager_ok == true and manager_idle == true
 end
 
---- Selects a native runtime or explicitly offers migration beside an external one.
---- Declining preserves the external client and never grants daemon stop authority.
---- Old install_consented booleans cannot authorize the separately owned target.
+--- Selects Ollama: Ergopti's own pinned runtime, installed on consent. A user's
+--- own Ollama is never selected, reused, stopped or modified, whether or not it
+--- is installed and running (maintainer decision, issue #104); it keeps its
+--- port and Ergopti's daemon listens on its own (llm_ollama_owned_port).
 --- @param on_complete function|nil Terminal provisioning callback.
---- @param opts table|nil Optional live selection predicate.
+--- @param opts table|nil { is_current = fn } live selection predicate;
+---   { install_consented = true } when the user already pressed an install
+---   button, which is that UI choice and is not asked again.
 --- @return boolean accepted
 function M.select_ollama(on_complete, opts)
-	local source_path, _, source_kind = OllamaBinary.resolve()
-	-- The existing official installation remains available while the native
-	-- runtime is unqualified. Its consent never grants migration authority.
-	if source_path == nil then return select_official_ollama(on_complete, opts) end
-	if RuntimeChoice.classify(source_kind) == "native" then
+	-- runtime_available() answers through the resolver, which names only
+	-- Ergopti's own runtime.
+	if ollama_deps().runtime_available() then
 		return ollama_deps().check_and_install_deps(on_complete) == true
 	end
-	if source_path and RuntimeChoice.classify(source_kind) ~= "foreign" then return false end
+	if ollama_deps().is_task_running() then
+		-- The install accepted moments ago is still running: join it rather
+		-- than asking a second time.
+		Logger.debug(LOG, "Ollama provisioning already running; joining it.")
+		return ollama_deps().check_and_install_deps(on_complete) == true
+	end
+	local user_path, user_source = OllamaBinary.find_user_installation()
+	if user_path then
+		Logger.info(LOG, "A user-owned Ollama (%s) is installed; Ergopti leaves it untouched and uses its own.",
+			tostring(user_source))
+	end
 	if ollama_deps().provisioning_idle() ~= true or not migration_idle() then return false end
 	local native_target = OllamaBinary.native_managed_install_dir()
 	local model_store = os.getenv("OLLAMA_MODELS")
@@ -170,28 +120,26 @@ function M.select_ollama(on_complete, opts)
 			local ok, current = pcall(caller_current)
 			if not ok or current ~= true then return false end
 		end
-		local current_path, _, current_kind = OllamaBinary.resolve()
-		return current_path == source_path and current_kind == source_kind
+		return OllamaBinary.resolve() == nil
 			and OllamaBinary.native_managed_install_dir() == native_target
 			and os.getenv("OLLAMA_MODELS") == model_store and migration_idle()
 	end
-	local decision = RuntimeChoice.new_migration(source_path or "", source_kind,
-		native_target, model_store, source_current)
+	local decision = RuntimeChoice.new_migration("", nil, native_target, model_store, source_current)
 	if not decision then return false end
 	local install_label = i18n.get("ollama.native_offer_install")
-	local keep_label = i18n.get("ollama.native_offer_keep")
-	local shown, selected = pcall(dialogs().block_alert,
-		i18n.get("ollama.native_offer_title"),
-		i18n.get(source_path and "ollama.native_migration_body" or "ollama.native_offer_body"),
-		install_label, keep_label, "informational")
+	local consented = type(opts) == "table" and opts.install_consented == true
+	local shown, selected = true, install_label
+	if consented then
+		Logger.info(LOG, "Installing Ergopti's own Ollama %s: the install button was the user's choice.",
+			OllamaBinary.pinned_version())
+	else
+		shown, selected = pcall(dialogs().block_alert,
+			i18n.get("ollama.native_offer_title"),
+			string.format(i18n.get("ollama.native_offer_body"), OllamaBinary.pinned_version()),
+			install_label, i18n.get("ollama.native_offer_keep"), "informational")
+	end
 	if not shown or selected ~= install_label then
 		RuntimeChoice.cancel(decision)
-		if source_path and source_current() then
-			pcall(notifications().notify, i18n.get("ollama.native_offer_title"),
-				i18n.get("ollama.native_install_declined_body"), "info")
-			-- Reuse is a client choice, never permission to stop an external daemon.
-			return ollama_deps().check_and_install_deps(on_complete) == true
-		end
 		pcall(notifications().notify, i18n.get("ollama.runtime_missing_title"),
 			i18n.get(type(opts) == "table" and opts.keeps_current_backend == true
 				and "ollama.switch_declined_body" or "ollama.runtime_missing_body"), "warning")
@@ -201,15 +149,15 @@ function M.select_ollama(on_complete, opts)
 		RuntimeChoice.cancel(decision)
 		return false
 	end
-	local accepted = ollama_deps().install_native_for_selection(decision, source_path or "",
-		source_kind, native_target, model_store, on_complete)
+	local accepted = ollama_deps().install_native_for_selection(decision, "", nil,
+		native_target, model_store, on_complete)
 	if accepted ~= true then RuntimeChoice.cancel(decision) end
 	return accepted == true
 end
 
---- Installs Ollama without asking again: the user pressed the install button
---- of the error that says Ollama does not answer (unreachable_backend_offer).
---- An installed Ollama is reused, as by select_ollama().
+--- The install button of the error that says Ollama does not answer
+--- (unreachable_backend_offer): that press is the user's choice to install
+--- Ergopti's own Ollama, so it is not asked again. An installed one is reused.
 --- @param on_complete function|nil Receives the terminal result.
 --- @return boolean accepted
 function M.install_ollama(on_complete)

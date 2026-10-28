@@ -18,7 +18,8 @@
  *    the release, its notes and the website refer to it.
  * 4. The catalogue's runner has GTK 3 and an XEmbed tray but no libayatana:
  *    the image bundles the tray library without GTK, and the smoke replays the
- *    catalogue's stalonetray check on a host without libayatana.
+ *    catalogue's stalonetray check on a host without libayatana. The
+ *    distribution sweep uses trayer where an image has no stalonetray.
  * 5. A musl system or an older glibc is refused in words by a plain-sh AppRun
  *    preflight, before the loader fails or bash is needed.
  * ==============================================================================
@@ -701,6 +702,54 @@ assert.ok(
 	read('.github/workflows/ci-release.yml').includes(`              ${ZSYNC} \\\n`),
 	'the release refuses to publish without the .zsync'
 );
+passed++;
+
+// Debian 12 has no stalonetray (removed from bookworm, back in trixie): the
+// distribution sweep installed it unconditionally and failed on debian:12 every
+// time. The check picks the first XEmbed tray apt can install, and finds the
+// docked icon by its WM class, since trayer's 1-pixel spacer is not 1x1.
+const distroCheck = read('tools/build/appimage-distro-check.sh');
+assert.ok(
+	!/apt-get install[^\n]* stalonetray /.test(distroCheck),
+	'no unconditional stalonetray install'
+);
+assert.ok(distroCheck.includes('"$tray" xdotool'), 'the chosen tray is the one installed');
+assert.ok(
+	distroCheck.includes(`grep '("ergopti-plus" ' | tail -n 1`),
+	'the docked icon is found by its WM class'
+);
+assert.ok(!distroCheck.includes("grep -v ' 1x1+' | tail -n 1"), 'not by its size');
+if (process.platform === 'linux') {
+	const { spawnSync } = require('node:child_process');
+	const start = distroCheck.indexOf('xembed_tray_package() {');
+	assert.ok(start >= 0, 'the tray chooser exists');
+	const chooser = distroCheck.slice(start, distroCheck.indexOf('\n}\n', start) + 3);
+	const fakeBin = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-tray-chooser-'));
+	try {
+		fs.writeFileSync(
+			path.join(fakeBin, 'apt-cache'),
+			'#!/bin/sh\necho "$2:"\ncase " $AVAILABLE " in\n\t*" $2 "*) echo "  Candidate: 1.0-1" ;;\n' +
+				'\t*) echo "  Candidate: (none)" ;;\nesac\n',
+			{ mode: 0o755 }
+		);
+		const choose = (available) =>
+			spawnSync('/bin/sh', ['-c', `${chooser}\nxembed_tray_package`], {
+				encoding: 'utf8',
+				env: { PATH: `${fakeBin}:/usr/bin:/bin`, AVAILABLE: available }
+			});
+		const both = choose('stalonetray trayer');
+		assert.equal(both.status, 0);
+		assert.equal(both.stdout.trim(), 'stalonetray', 'stalonetray where the image has it');
+		const bookworm = choose('trayer');
+		assert.equal(bookworm.status, 0);
+		assert.equal(bookworm.stdout.trim(), 'trayer', 'Debian 12 gets trayer');
+		const neither = choose('');
+		assert.notEqual(neither.status, 0, 'no tray is a refusal, not an empty install');
+		assert.equal(neither.stdout, '');
+	} finally {
+		fs.rmSync(fakeBin, { recursive: true, force: true });
+	}
+}
 passed++;
 
 console.log(`Linux AppImage portability: ${passed} checks passed.`);

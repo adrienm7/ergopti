@@ -13,6 +13,7 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local ParameterLabel = require("action_parameter_label")
 local hs = hs
 local Logger        = require("infra.logger")
@@ -272,7 +273,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 	local function mutate_wrap(mutate)
 		local committed, reason = WrapMutation.commit(state, mutate, ctx.save_prefs)
 		if committed ~= true then
-			if reason ~= "wrap mutation cancelled" then
+			if reason ~= Errors.WRAP_MUTATION_CANCELLED then
 				Logger.error(LOG, "Wrap preference mutation did not commit: %s.", reason)
 			end
 			return false
@@ -670,7 +671,7 @@ function M.build(ctx)
 										.. "store '%s' under a binding key dispatch will not read.", tostring(a))
 									return
 								end
-								DeferredWork.after(0.05, function()
+								DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 									local mutation = {
 										section = require("config_keys").KEY.SHORTCUTS_SCRIPT_CONTROL, key = slot_id,
 										read = function()

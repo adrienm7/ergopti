@@ -1,15 +1,17 @@
 --- ui/menu/llm_backend_rows.lua
 
 --- ==============================================================================
---- MODULE: AI Backend Rows (Linux tray)
+--- MODULE: AI Backend Choice (Linux)
 --- DESCRIPTION:
---- The rows of the AI "Models" list that choose who answers a prediction: the
---- local Ollama, or a hosted API (Cerebras, OpenAI, Mistral, …) entered by the
---- user. Mirrors the macOS backend and API panels, with the same translated
---- labels and the same shared connectivity probe.
+--- Who answers a prediction: the local Ollama, or a hosted API (Cerebras,
+--- OpenAI, Mistral, …) entered by the user. The tray shows one button with the
+--- backend's emoji and the model (caption); the model selector page lists the
+--- API entries and providers (api_page). Mirrors the macOS backend and API
+--- panels, with the same translated labels and the same shared probe.
 ---
 --- FEATURES & RATIONALE:
---- 1. Row data only: the shared renderer draws it, like every other list.
+--- 1. The tray builds no list (maintainer, 2026-10-27): the page offers the
+---    entries, the providers and the local servers, and runs these actions.
 --- 2. Adding an API asks for the key in a hidden zenity entry, stores it in the
 ---    private entries file, selects it, then tests it at once so a wrong key is
 ---    reported while the user is still looking, with the provider's own reason.
@@ -29,7 +31,8 @@ local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local EntryNames = require("llm.api_entry_names")
-local ManifestMenu = require("infra.manifest_menu")
+local ApiModelListing = require("llm.api_model_listing")
+local BackendBrands = require("modules.llm.backend_brands")
 
 local LOG = "ui.menu.llm_backend_rows"
 -- The characters of a test reply shown in the verdict, as on macOS.
@@ -215,154 +218,224 @@ end
 --- @return string|nil name Nil when no model is selected.
 local function selected_model_name(llm, backend, remote, entries)
 	if backend == "api" then
+		-- The button names the provider by its display name, then the model
+		-- its requests use; the page lists entries by their automatic name.
 		local active = entries and entries.active() or nil
 		if type(active) ~= "table" or not remote then return nil end
-		return entry_names(remote, entries.list())[active.id]
+		local provider = remote.provider(active.provider)
+		if type(provider) ~= "table" or type(provider.label) ~= "string" or provider.label == "" then return nil end
+		local model = (type(active.model) == "string" and active.model ~= "") and active.model or provider.default_model
+		if type(model) ~= "string" or model == "" then return provider.label end
+		return provider.label .. "/" .. model
 	end
 	local model = type(llm.get_current_model) == "function" and llm.get_current_model() or nil
 	return type(model) == "string" and model ~= "" and model or nil
 end
 
---- Rows choosing the backend, and the rows of the API backend.
---- @param llm table Prediction engine (get_backend, set_backend, get_current_model).
---- @param dialogs table { prompt(heading, text, initial, hidden), error(text, heading), info(heading, text), confirm(heading, text) }
---- @param on_changed function|nil Rebuilds the menu.
---- @param ollama_rows function Returns the Ollama model rows.
---- @return table rows
-function M.rows(llm, dialogs, on_changed, ollama_rows, context)
-	if type(llm.get_backend) ~= "function" then return ollama_rows() end
+--- The tray's model button: the backend's emoji, then the model that answers
+--- ("🦙 qwen3:4b", "🌐 OpenAI/gpt-4o-mini"), from the shared brand table.
+--- @param llm table Prediction engine (get_backend, get_current_model).
+--- @return string caption
+function M.caption(llm)
+	local backend = type(llm.get_backend) == "function" and llm.get_backend() or "ollama"
 	local ok_remote, remote = pcall(require, "modules.llm.api_remote")
 	local ok_entries, entries = pcall(require, "modules.llm.api_entries")
-	local backend = llm.get_backend()
-	local function changed() if type(on_changed) == "function" then on_changed() end end
-	local function select_backend(kind)
-		if llm.set_backend(kind) ~= true then return false end
-		changed()
-		return true
-	end
-
-	-- The selected model heads the list under the key macOS and Windows give
-	-- their model row, so the three trays name it with one wording.
 	local selected = selected_model_name(llm, backend, ok_remote and remote or nil, ok_entries and entries or nil)
-	local rows = {
-		{
-			label = string.format(tr("menu.llm.model_label"), selected or tr("menu.llm.no_model_none")),
-			disabled = true,
+	return BackendBrands.selector_caption(backend, selected or tr("menu.llm.no_model_none"))
+end
+
+--- Binds the model selector page to this tray build: the engine, the dialogs
+--- its transactions open, and the refresh after a change.
+--- @param llm table Prediction engine.
+--- @param options table { dialogs, on_changed, delete_model, context }
+function M.bind_page(llm, options)
+	require("ui.model_browser.bridge").bind({
+		llm = llm, dialogs = options.dialogs, on_changed = options.on_changed,
+		delete_model = options.delete_model, context = options.context,
+		-- Ollama's install state greys its group (modules/llm/ollama_install_state.lua).
+		ollama_state = function(engine) return require("modules.llm.ollama_install_state").capture(engine) end,
+		listing = {
+			targets = M.listing_targets,
+			list = function(entry, on_done) return require("modules.llm.api_remote").list_models(entry, on_done) end,
 		},
-		{
-			label = "Ollama 🦙 — " .. tr("menu.llm.backend_ollama_suffix"),
-			checked = backend == "ollama",
-			action = function() return select_backend("ollama") end,
-		},
-		{
-			label = "API 🌐 — " .. tr("menu.llm.backend_api_suffix"),
-			checked = backend == "api",
-			action = function() return select_backend("api") end,
-		},
-	}
-	local boundary = ManifestMenu.template_rows("llm_backend_choice_boundary", {}, {}, {})
-	if not boundary then return {} end
-	for _, row in ipairs(boundary) do rows[#rows + 1] = row end
-	if type(context) == "table" and type(context.is_paused) == "function"
-		and type(llm.can_configure_local_servers) == "function" then
-		for _, row in ipairs(require("ui.menu.local_server_rows").rows(llm, dialogs, changed, context)) do
-			rows[#rows + 1] = row
+	})
+	-- A pull's percentage reaches the page's row of that model.
+	require("modules.llm.model_download").set_progress_listener(function(tag, percent)
+		return require("ui.model_browser.bridge").on_download_progress(tag, percent)
+	end)
+end
+
+--- The API entries the page asks for their provider's models: chat entries
+--- whose provider lists models and whose key its endpoint accepts, at most
+--- api_model_listing.MAX_ENTRIES of them.
+--- @return table entries
+function M.listing_targets()
+	local ok_remote, remote = pcall(require, "modules.llm.api_remote")
+	local ok_entries, entries = pcall(require, "modules.llm.api_entries")
+	local targets = {}
+	if not ok_remote or not ok_entries then
+		Logger.error(LOG, "Remote API modules unavailable — the page lists no provider model.")
+		return targets
+	end
+	for _, entry in ipairs(entries.list()) do
+		if #targets >= ApiModelListing.MAX_ENTRIES then break end
+		local provider = remote.provider(entry.provider)
+		if provider and ApiModelListing.supported(provider.format) and remote.serves(entry.provider, "chat")
+			and remote.token_allowed(entry.provider, entry.token, entry.base_url) then
+			targets[#targets + 1] = entry
 		end
 	end
-	if backend ~= "api" then
-		for _, row in ipairs(ollama_rows()) do rows[#rows + 1] = row end
-		return rows
-	end
-	if not ok_remote or not ok_entries then
-		Logger.error(LOG, "Remote API modules unavailable — the API rows cannot be built.")
-		rows[#rows + 1] = { label = tr("menu.llm.api_providers_unavailable"), disabled = true }
-		return rows
-	end
+	return targets
+end
 
+--- The API group of the model selector page: one row per saved entry, the
+--- providers an entry can be added for, the local servers that answer, and
+--- their tools. Each `run` is this module's own transaction (the tray's former
+--- API rows); the page bridge keeps it and sends the page the rest.
+--- @param llm table Prediction engine.
+--- @param dialogs table { prompt, error, info, confirm }
+--- @param on_changed function|nil Called after a change (menu and page refresh).
+--- @param context table|nil { paused, is_paused } for the local servers.
+--- @param listings table|nil Provider listing state by entry id (llm.api_model_listing); nil when never asked.
+--- @return table api { rows, providers, tools }
+function M.api_page(llm, dialogs, on_changed, context, listings)
+	local function changed() if type(on_changed) == "function" then on_changed() end end
+	local ok_remote, remote = pcall(require, "modules.llm.api_remote")
+	local ok_entries, entries = pcall(require, "modules.llm.api_entries")
+	local api = { rows = {}, providers = {}, tools = {} }
+	if not ok_remote or not ok_entries then
+		Logger.error(LOG, "Remote API modules unavailable — the page lists no API entry.")
+		return api
+	end
+	--- Runs one API transaction under the API backend, selecting it first.
+	local function under_api(fn)
+		if llm.get_backend() ~= "api" and llm.set_backend("api") ~= true then return false end
+		return fn()
+	end
 	local active = entries.active()
 	local list = entries.list()
 	local names = entry_names(remote, list)
-	if #list == 0 then
-		local empty_rows = ManifestMenu.template_rows("llm_api_empty_status", {}, {}, {})
-		if not empty_rows then return {} end
-		for _, row in ipairs(empty_rows) do rows[#rows + 1] = row end
+	local active_name = active and names[active.id] or nil
+	--- The entry the page was drawn with is still the active one.
+	local function active_commands_ready()
+		local current = entries.active()
+		return active ~= nil and current ~= nil and current.id == active.id
+	end
+	-- Two entries of one provider and host can share a model name: each
+	-- entry's own model wins, then the first entry keeps a shared known model
+	-- or typed-id row (the bridge keys rows by name).
+	local named, later = {}, {}
+	local function push(row)
+		if named[row.name] then return end
+		named[row.name] = true
+		api.rows[#api.rows + 1] = row
+	end
+	local function queue(row)
+		if row.alternative or row.typed then later[#later + 1] = row else push(row) end
 	end
 	for _, entry in ipairs(list) do
 		local label = names[entry.id]
-		if remote.serves(entry.provider, "chat") then
-			rows[#rows + 1] = {
-				label = label,
-				checked = active ~= nil and entry.id == active.id,
-				action = function()
+		local chat = remote.serves(entry.provider, "chat")
+		local is_active = chat and active ~= nil and entry.id == active.id
+		local actions = {}
+		if is_active then
+			-- The active entry's Test and Remove, as the tray drew them: each
+			-- rechecks that the entry is still the active one, and Remove
+			-- retires the running request (set_backend) before deleting it.
+			actions[1] = { id = "test", text = tr("menu.llm.api_test_entry"), run = function()
+				if not active_commands_ready() then return false end
+				return run_test(remote, dialogs, active, active_name)
+			end }
+			actions[2] = { id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
+				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active_name end))
+				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
+				if not active_commands_ready() then return false end
+				if llm.set_backend("api") ~= true or not active_commands_ready() then return false end
+				if entries.remove(active.id) ~= true then return false end
+				changed()
+				return true
+			end }
+		elseif not chat then
+			-- Never the predictions' entry: its own test and removal instead.
+			actions[1] = { id = "test", text = tr("menu.llm.api_test_entry"),
+				run = function() return run_test(remote, dialogs, entry, label) end }
+			actions[2] = { id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
+				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
+				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
+				if entries.remove(entry.id) ~= true then return false end
+				changed()
+				return true
+			end }
+		end
+		local provider = remote.provider(entry.provider) or {}
+		local configured = entry.model ~= "" and entry.model or (provider.default_model or "")
+		local extras = {}
+		for id in pairs(type(provider.model_extras) == "table" and provider.model_extras or {}) do extras[#extras + 1] = id end
+		-- One row per model the provider listed, or its known models and a
+		-- typed-id row while that listing is pending, refused or unavailable.
+		local plan = ApiModelListing.plan({ model = configured, default_model = provider.default_model or "",
+			extras = extras, format = provider.format }, type(listings) == "table" and listings[entry.id] or nil)
+		local base, suffix = ApiModelListing.name_parts(label, configured)
+		for _, item in ipairs(plan.models) do
+			local model = item.model
+			local own = model == configured
+			queue({
+				name = own and label or (base .. "/" .. model .. suffix), runtime_name = model,
+				provider = entry.provider, installed = true, alternative = not own or nil,
+				-- A provider that is no chat model never answers predictions.
+				available = chat or false, current = is_active and own, actions = own and actions or {},
+				-- Selecting goes through set_backend("api") even under the API
+				-- backend: it retires the running request of the previous entry.
+				run = chat and function()
 					if llm.set_backend("api") ~= true then return false end
-					if entries.set_active(entry.id) ~= true then
+					local saved
+					if own then saved = entries.set_active(entry.id) else saved = entries.set_model(entry.id, model) end
+					if saved ~= true then
 						dialogs.error(tr("dialog.bulk_toggle.save_failed"), tr("common.error_title"))
 						return false
 					end
 					changed()
 					return true
-				end,
-			}
-		else
-			-- Never the predictions' entry: its own test and removal instead.
-			rows[#rows + 1] = { label = label, items = {
-				{ label = tr("menu.llm.api_test_entry"), action = function() run_test(remote, dialogs, entry, label) end },
-				{ label = "🗑️ " .. tr("menu.llm.api_remove_entry"), action = function()
-					local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
-					if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
-					if entries.remove(entry.id) ~= true then return false end
+				end or nil,
+			})
+		end
+		if plan.typed and chat then
+			-- Not a model: the place to type one the provider serves, with the
+			-- reason its list is missing; named by the provider and host.
+			queue({
+				name = base .. suffix, runtime_name = configured, provider = entry.provider, installed = true,
+				available = false, typed = true, hint_key = plan.typed.hint_key,
+				actions = { { id = "other_model", text = tr("model_browser.api_other_model"), run = function()
+					local typed = dialogs.prompt(label, tr("menu.llm.api_prompt_model"), configured)
+					typed = type(typed) == "string" and TextUtils.trim(typed) or ""
+					if typed == "" then return false end
+					if llm.set_backend("api") ~= true or entries.set_model(entry.id, typed) ~= true then
+						dialogs.error(tr("dialog.bulk_toggle.save_failed"), tr("common.error_title"))
+						return false
+					end
 					changed()
 					return true
-				end },
-			} }
+				end } },
+			})
 		end
 	end
-	local separators = ManifestMenu.template_rows("llm_api_add_separator", {}, {}, {})
-	if not separators then return {} end
-	for _, row in ipairs(separators) do rows[#rows + 1] = row end
-
-	local add_items = {}
+	for _, row in ipairs(later) do push(row) end
 	for _, provider in ipairs(remote.providers()) do
-		add_items[#add_items + 1] = {
-			label = "➕ " .. provider.label,
-			action = function() return add_entry(llm, remote, entries, dialogs, provider, on_changed) end,
-		}
+		local function add() return add_entry(llm, remote, entries, dialogs, provider, on_changed) end
+		api.providers[#api.providers + 1] = { id = provider.id, label = provider.label, run = function()
+			-- A chat key becomes the predictions' entry, under the API backend;
+			-- a System 1 key leaves the backend as it is.
+			if remote.serves(provider.id, "chat") then return under_api(add) end
+			return add()
+		end }
 	end
-	if #add_items == 0 then
-		add_items[1] = { label = tr("menu.llm.api_providers_unavailable"), disabled = true }
+	if type(context) == "table" and type(context.is_paused) == "function"
+		and type(llm.can_configure_local_servers) == "function" then
+		local rows, tools = require("ui.menu.local_server_rows").page_rows(llm, dialogs, changed, context)
+		for _, row in ipairs(rows) do api.rows[#api.rows + 1] = row end
+		for _, tool in ipairs(tools) do api.tools[#api.tools + 1] = tool end
 	end
-	local add_controls = ManifestMenu.template_rows("llm_api_add_provider_group", {}, {
-		llm_api_add_group_ready = function() return true end,
-	}, { api_add_entry = add_items })
-	if not add_controls then return {} end
-	for _, row in ipairs(add_controls) do rows[#rows + 1] = row end
-	local active_name = active and names[active.id] or nil
-	local function active_commands_ready()
-		local current = entries.active()
-		return active ~= nil and current ~= nil and current.id == active.id
-	end
-	local test_row = ManifestMenu.command_row("llm_api_active_commands", require("config_keys").COMMAND.API_TEST_ACTIVE, {
-		api_test_active = function() return run_test(remote, dialogs, active, active_name) end,
-	}, { llm_api_active_ready = active_commands_ready })
-	local remove_row = ManifestMenu.command_row("llm_api_active_commands", require("config_keys").COMMAND.API_REMOVE_ACTIVE, {
-		api_remove_active = function()
-			local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active_name end))
-			if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
-			if not active_commands_ready() then return false end
-			if llm.set_backend("api") ~= true or not active_commands_ready() then return false end
-			if entries.remove(active.id) ~= true then return false end
-			changed()
-			return true
-		end,
-	}, { llm_api_active_ready = active_commands_ready })
-	if remove_row then
-		remove_row.label = "🗑️ " .. remove_row.label .. (active and (" (" .. active_name .. ")") or "")
-	end
-	local active_rows = { api_test_active = test_row, api_remove_active = remove_row }
-	for _, declaration in ipairs(ManifestMenu.get_array("llm_api_active_commands")) do
-		if active_rows[declaration.id] then rows[#rows + 1] = active_rows[declaration.id] end
-	end
-	return rows
+	return api
 end
 
 return M

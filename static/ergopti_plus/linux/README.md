@@ -106,6 +106,15 @@ luajit ergopti_hotstrings.lua --device /dev/input/event3 \
 luajit ergopti_hotstrings.lua --dry-run --verbose
 ```
 
+## Developer mode
+
+`bash tools/dev/run-linux-dev.sh` (from the clone root, or `npm run dev:linux`)
+runs this tree through `install/launch.sh`, the packages' entry point, with the
+tray, the same config folder and the native archive backend built into `bin/`.
+It stops an installed `ergopti-hotstrings` user unit first. A saved `.lua` of
+the driver or of `_shared/lua` restarts the daemon, and so does the tray's
+Reload; the updater stays off. See `docs/design/developer-mode.md`.
+
 ## Running the tests
 
 ```bash

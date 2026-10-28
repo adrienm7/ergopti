@@ -36,6 +36,7 @@ local Timings = require("infra.timings")
 local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owner")
 local PtyProcessGroup = require("modules.llm.pty_process_group")
 local PythonInterpreter = require("adapters.python_interpreter")
+local ExitSignal = require("modules.llm.bootstrap_exit_signal")
 
 local LOG = "ollama_deps"
 
@@ -62,6 +63,16 @@ local FAILURE_MESSAGES = {
 	OLLAMA_ERROR_CHECKSUM = "ollama.error_checksum",
 }
 
+-- Exit codes that carry a closed cause without printing a marker. 64 (EX_USAGE)
+-- is the launcher's managed PTY worker or the managed runtime receiver refusing
+-- the installer request Ergopti built; 78 (EX_CONFIG) is the pinned runtime's
+-- catalogue or admission refusing it. Both used to reach the user as
+-- "Unknown error" (issue #104).
+local EXIT_FAILURE_MESSAGES = {
+	[64] = "ollama.error_installer_refused",
+	[78] = "ollama.error_runtime_refused",
+}
+
 local KNOWN_MARKERS = {
 	[MARKER_INSTALLING] = true,
 	[MARKER_VERIFIED]   = true,
@@ -71,6 +82,8 @@ local KNOWN_MARKERS = {
 for marker, _ in pairs(FAILURE_MESSAGES) do KNOWN_MARKERS[marker] = true end
 
 local FAILURE_TAIL_CHARS    = 280
+-- Output lines a failed bootstrap logs, so the log names where it stopped.
+local FAILURE_LOG_LINES     = 12
 local SUCCESS_AUTO_HIDE_SEC = Timings.sec("tooltip", "success_banner_autohide_ms")
 local BOOTSTRAP_TIMEOUT_SEC = Timings.sec("llm", "dependency_bootstrap_timeout_ms")
 
@@ -721,13 +734,40 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 	end
 	local diagnostic_tail = require("modules.llm.mlx_bootstrap_diagnosis").new_tail({ markers = KNOWN_MARKERS })
 	local forward_stream = make_streaming_handler(owner_is_current)
+	-- Bytes received per stream and per channel: a failure with none at all
+	-- proves the output never reached the driver, not that nothing printed.
+	local received = { streamed_stdout = 0, streamed_stderr = 0, final_stdout = 0, final_stderr = 0 }
+	local function count_bytes(prefix, stdout, stderr)
+		received[prefix .. "_stdout"] = received[prefix .. "_stdout"] + (type(stdout) == "string" and #stdout or 0)
+		received[prefix .. "_stderr"] = received[prefix .. "_stderr"] + (type(stderr) == "string" and #stderr or 0)
+	end
 	local function consume_stream(native_task, stdout, stderr)
 		if not owner_is_current() then return false end
+		count_bytes("streamed", stdout, stderr)
 		diagnostic_tail.push(stdout, "stdout")
 		diagnostic_tail.push(stderr, "stderr")
 		return forward_stream(native_task, stdout, stderr)
 	end
+	--- Logs the evidence of one failed bootstrap: the signal behind a 128 + N
+	--- status, the bytes each stream delivered and the last output lines,
+	--- where the installer names the stage it reached and the failing child.
+	--- @param exit_code integer Exit status reported to the task callback.
+	--- @param signal_name string|nil Signal behind the status.
+	local function log_failure_evidence(exit_code, signal_name)
+		local lines = diagnostic_tail.lines()
+		local first = math.max(1, #lines - FAILURE_LOG_LINES + 1)
+		local kept = {}
+		for index = first, #lines do kept[#kept + 1] = lines[index] end
+		Logger.error(LOG,
+			"Ollama bootstrap ended with exit=%d (%s, path=%s); output received: streamed stdout=%d stderr=%d bytes, final stdout=%d stderr=%d bytes; last %d line(s): %s",
+			tonumber(exit_code) or -1,
+			signal_name and ("signal " .. signal_name) or "no signal",
+			native_choice ~= nil and "native_runtime_pty" or (native_pty ~= nil and "native_pty" or "python_pty"),
+			received.streamed_stdout, received.streamed_stderr, received.final_stdout, received.final_stderr,
+			#kept, #kept > 0 and table.concat(kept, " | ") or "none")
+	end
 	local function process_terminal(exit_code, stdout, stderr)
+		count_bytes("final", stdout, stderr)
 		diagnostic_tail.push(stdout, "stdout")
 		diagnostic_tail.push(stderr, "stderr")
 		if not forward_stream(nil, stdout, stderr, true) then return false end
@@ -777,8 +817,16 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 		end
 
 		if exit_code ~= 0 then
+			local signal_name = ExitSignal.name(exit_code)
+			log_failure_evidence(exit_code, signal_name)
 			local failure_key = FAILURE_MESSAGES[_observed_failure_marker or ""]
+				or EXIT_FAILURE_MESSAGES[exit_code]
 			if failure_key then return publish_failure(i18n.get(failure_key), exit_code) end
+			-- A signalled installer prints no cause of its own: name the signal
+			-- instead of its last line, which only says how far it got.
+			if signal_name then
+				return publish_failure(i18n.format("ollama.error_killed", signal_name), exit_code)
+			end
 			local tail = tail_for_error(table.concat(diagnostic_tail.lines(), "\n"))
 			if tail == "" then
 				tail = i18n.get("download_window.error_unknown")

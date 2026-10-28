@@ -34,6 +34,7 @@ import { runInNewContext } from 'vm';
 import sharedPaths from '../lib/paths.cjs';
 import menuAvailability from '../lib/menu-row-availability.cjs';
 import startupProjection from '../lib/codegen-startup-tray.cjs';
+import configKeys from '../lib/_generated/config_keys.cjs';
 import { validateTiming } from '../../static/ergopti_plus/_shared/modules/updater/schedule.js';
 
 const { shared } = sharedPaths;
@@ -287,20 +288,22 @@ function cascadeMaxArrowsChoices(feature) {
 	);
 }
 
+const { KEY } = configKeys;
+
 const CHOICE_REGISTRIES = {
 	'caps_word.idle_timeout': {
-		path: 'shortcuts.caps_word.idle_timeout_seconds',
+		path: KEY.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS,
 		project: capsWordIdleTimeoutChoices
 	},
-	'hotstrings.cascade_max_arrows': {
-		path: 'hotstrings.cascade_max_arrows',
+	[KEY.HOTSTRINGS_CASCADE_MAX_ARROWS]: {
+		path: KEY.HOTSTRINGS_CASCADE_MAX_ARROWS,
 		project: cascadeMaxArrowsChoices
 	},
-	'hotstrings.idle_reset': { path: 'hotstrings.idle_reset_seconds', project: idleResetChoices },
-	'llm.indentation': { path: 'llm.display.pred_indent', project: indentationChoices },
-	'updater.channels': { path: 'updater.channel', project: updaterChannelChoices },
+	'hotstrings.idle_reset': { path: KEY.HOTSTRINGS_IDLE_RESET_SECONDS, project: idleResetChoices },
+	'llm.indentation': { path: KEY.LLM_DISPLAY_PRED_INDENT, project: indentationChoices },
+	'updater.channels': { path: KEY.UPDATER_CHANNEL, project: updaterChannelChoices },
 	'updater.check_intervals': {
-		path: 'updater.check_interval_seconds',
+		path: KEY.UPDATER_CHECK_INTERVAL_SECONDS,
 		project: updaterIntervalChoices
 	}
 };
@@ -400,7 +403,7 @@ function projectChoices(menu, raw) {
 					`${where}: choice_values must be a unique enum subset with at least two values`
 				);
 			const technical = row.choice_label_kind === 'log_level_token';
-			if (row.choice_label_kind !== undefined && (!technical || row.path !== 'script.log_level'))
+			if (row.choice_label_kind !== undefined && (!technical || row.path !== KEY.SCRIPT_LOG_LEVEL))
 				throw new Error(`${where}: choice_label_kind is reserved for the logger's enum tokens`);
 			const icons = row.choice_icons;
 			if (technical) {

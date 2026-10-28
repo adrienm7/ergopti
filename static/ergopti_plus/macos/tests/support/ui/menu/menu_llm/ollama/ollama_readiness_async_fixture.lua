@@ -444,7 +444,7 @@ local function with_fixture(spec, body)
 			end,
 		})
 		package.loaded["modules.llm.api_ollama"] = daemon.api
-		local endpoint_port = spec.ollama_port or 11434
+		local endpoint_port = spec.ollama_port or 11435
 		package.loaded["modules.llm.ollama_endpoint"] = {
 			get_port = function() return endpoint_port end,
 			get_base_url = function() return "http://127.0.0.1:" .. tostring(endpoint_port) end,

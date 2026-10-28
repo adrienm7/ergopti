@@ -405,6 +405,10 @@ function M.open(opts)
 	return true
 end
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _session and _session.webview or nil end
+
 --- Closes the editor if it is open.
 --- @return boolean committed True when no native resource remains owned.
 function M.close()

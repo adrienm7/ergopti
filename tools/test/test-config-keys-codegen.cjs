@@ -5,13 +5,15 @@
  * MODULE: Config-Key Constants Codegen Guard
  * DESCRIPTION:
  * Pins tools/codegen/codegen-config-keys.cjs to its two sources and to the
- * three committed outputs:
+ * four committed outputs:
  *
  * 1. Every schema property path and every menu `path` is a KEY, every leaf
  *    segment is a LEAF, every dispatchable menu row id is a COMMAND.
  * 2. Two values that fold to one constant name are refused, not overwritten.
- * 3. The committed Lua, JS and AHK files are byte-identical to a fresh run.
- * 4. The JS table refuses an unknown name (the Lua side is proven by the Linux
+ * 3. The committed Lua, JS, CommonJS and AHK files are byte-identical to a fresh run.
+ * 4. The JS and CommonJS tables refuse an unknown name; the CommonJS one is
+ *    what the Node tools load (the package is `type: module`, so the `.js`
+ *    UI file cannot be required). The Lua side is proven by the Linux
  *    unit test test_config_keys.lua, which runs the module itself).
  * ==============================================================================
  */
@@ -91,7 +93,12 @@ try {
 		fs.copyFileSync(path.join(ROOT, rel), path.join(privateRoot, rel));
 	}
 	Codegen.main(privateRoot);
-	for (const rel of [Codegen.LUA_OUTPUT, Codegen.JS_OUTPUT, Codegen.AHK_OUTPUT]) {
+	for (const rel of [
+		Codegen.LUA_OUTPUT,
+		Codegen.JS_OUTPUT,
+		Codegen.CJS_OUTPUT,
+		Codegen.AHK_OUTPUT
+	]) {
 		const fresh = fs.readFileSync(path.join(privateRoot, rel), 'utf8');
 		const committed = fs.readFileSync(path.join(ROOT, rel), 'utf8');
 		assert.ok(!fresh.includes('\r'), `${rel} must be LF`);
@@ -104,7 +111,12 @@ try {
 	const { GENERATORS } = require('../build/generators.cjs');
 	const entry = GENERATORS.find((g) => g.script === 'codegen/codegen-config-keys.cjs');
 	assert.ok(entry, 'codegen-config-keys.cjs is not in tools/build/generators.cjs');
-	assert.deepEqual(entry.outputs, [Codegen.LUA_OUTPUT, Codegen.JS_OUTPUT, Codegen.AHK_OUTPUT]);
+	assert.deepEqual(entry.outputs, [
+		Codegen.LUA_OUTPUT,
+		Codegen.JS_OUTPUT,
+		Codegen.CJS_OUTPUT,
+		Codegen.AHK_OUTPUT
+	]);
 	const menuBuild = GENERATORS.findIndex((g) => g.script === 'build/build-menu-manifest.js');
 	assert.ok(
 		GENERATORS.indexOf(entry) > menuBuild,
@@ -126,7 +138,14 @@ assert.throws(() => {
 	Js.KEY.METRICS_PRIVATE_FILTER_ENABLED = 'x';
 }, TypeError);
 
+// The Node tools require the CommonJS table directly; the same names, the same seal.
+const Cjs = require(path.join(ROOT, Codegen.CJS_OUTPUT));
+assert.equal(Cjs.KEY.METRICS_PRIVATE_FILTER_ENABLED, Js.KEY.METRICS_PRIVATE_FILTER_ENABLED);
+assert.equal(Cjs.COMMAND.FILTER_PRIVATE, 'filter_private');
+assert.throws(() => Cjs.KEY.METRICS_PRIVATE_FILTER_ENABLD, /has no constant/);
+assert.deepEqual(Object.keys(Cjs.LEAF), Object.keys(Js.LEAF));
+
 console.log(
 	`[OK] config-key constants: ${tables.KEY.length} key(s), ${tables.LEAF.length} leaf name(s), ` +
-		`${tables.COMMAND.length} command id(s), three outputs in sync and sealed.`
+		`${tables.COMMAND.length} command id(s), four outputs in sync and sealed.`
 );

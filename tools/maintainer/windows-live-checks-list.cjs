@@ -22,6 +22,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { KEY } = require('../lib/_generated/config_keys.cjs');
 const live = require('./windows-live-checks.cjs');
 
 const pass = (detail) => ({ state: 'PASS', detail });
@@ -322,9 +323,9 @@ const CHECKS = [
 				return fail(`the click made during startup was not delivered: ${report.join(' | ')}`);
 			const settled = await session.quiesce(pid);
 			const config = live.configSnapshot(session);
-			if (config['metrics.private_filter_enabled'] !== 'false')
+			if (config[KEY.METRICS_PRIVATE_FILTER_ENABLED] !== 'false')
 				return fail(
-					`the filter reads ${config['metrics.private_filter_enabled']} after one click, false expected`
+					`the filter reads ${config[KEY.METRICS_PRIVATE_FILTER_ENABLED]} after one click, false expected`
 				);
 			const dialogs = await session.run('dialogs');
 			if (dialogs !== 'dialogs=') return fail(`a dialog is on screen: ${dialogs}`);
@@ -348,16 +349,16 @@ const CHECKS = [
 			await session.run('click', ['re:Metrics$', 're:Ignore private browsing']);
 			await session.run('pump', ['900']);
 			const held = live.configSnapshot(session);
-			if (held['metrics.private_filter_enabled'] === 'false')
+			if (held[KEY.METRICS_PRIVATE_FILTER_ENABLED] === 'false')
 				return fail('the click was applied while the configuration write still held its lease');
 			if ((await session.run('dialogs')) !== 'dialogs=')
 				return fail('an error window opened while the write was in progress');
 			await session.run('lease_release');
 			const settled = await session.quiesce(pid);
 			const config = live.configSnapshot(session);
-			if (config['metrics.private_filter_enabled'] !== 'false')
+			if (config[KEY.METRICS_PRIVATE_FILTER_ENABLED] !== 'false')
 				return fail(
-					`after the write ended the filter reads ${config['metrics.private_filter_enabled']}, false expected`
+					`after the write ended the filter reads ${config[KEY.METRICS_PRIVATE_FILTER_ENABLED]}, false expected`
 				);
 			if (
 				session.logLines('Menu command deferred: a configuration write is in progress').length < 1
@@ -390,9 +391,9 @@ const CHECKS = [
 			if (!settled.reloaded) return fail('the startup Reload click did not reload the driver');
 			const config = live.configSnapshot(session);
 			const missing = [
-				'metrics.private_filter_enabled',
-				'metrics.secure_filter_enabled',
-				'metrics.system_auth_filter_enabled'
+				KEY.METRICS_PRIVATE_FILTER_ENABLED,
+				KEY.METRICS_SECURE_FILTER_ENABLED,
+				KEY.METRICS_SYSTEM_AUTH_FILTER_ENABLED
 			].filter((key) => config[key] !== 'false');
 			const dialogs = await session.run('dialogs');
 			const handed = session.logLines('menu command(s) handed to the reload successor');

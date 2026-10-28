@@ -76,16 +76,15 @@ set -o pipefail 2>/dev/null || true
 
 export HF_HUB_DISABLE_XET=1
 
-# The native no-Python PTY retains the admitted source as descriptor 3. Its
-# trusted source directory is derived by that native owner before executing
-# the descriptor; ordinary pathname invocations never use the override.
-case "$0" in
-	/dev/fd/3)
-		case "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" in /*) ;; *) exit 78 ;; esac
-		SCRIPT_DIR="$(cd "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" && pwd)"
-		;;
-	*) SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)" ;;
-esac
+# The native no-Python PTY runs a private, hash-verified snapshot of this file
+# at the exact path it exports. Its trusted source directory is derived by that
+# native owner; ordinary pathname invocations never use the override.
+if [ -n "${ERGOPTI_BOOTSTRAP_SNAPSHOT:-}" ] && [ "$0" = "$ERGOPTI_BOOTSTRAP_SNAPSHOT" ]; then
+	case "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" in /*) ;; *) exit 78 ;; esac
+	SCRIPT_DIR="$(cd "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" && pwd)"
+else
+	SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
 NETWORK_RETRY_LIB="$SCRIPT_DIR/network-retry.sh"
 UV_RELEASE_FILE="$SCRIPT_DIR/uv-release.sh"
 for dependency_file in "$NETWORK_RETRY_LIB" "$UV_RELEASE_FILE"; do

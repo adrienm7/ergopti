@@ -259,7 +259,11 @@ class ServeOwner:
             PROXY.ProxyPolicy(),
             expected_contract_sha256=expected_policy,
         )
-        snapshot = self.policy.capture(math.ceil(self.idle_timeout * 1000))
+        # macOS downloads use the system and keychain trust only: an inherited
+        # SSL_CERT_FILE or SSL_CERT_DIR never reaches the daemon's snapshot, the
+        # only route by which Go and the native worker would read one. The field
+        # run of 2026-10-27 19:47 inherited a bundle the worker refused.
+        snapshot = self.policy.capture(math.ceil(self.idle_timeout * 1000), inherited_trust=False)
         self.target = RUNTIME.owned_directory()
         self.expected_receipt = RUNTIME.POLICY.receipt(
             contract_bytes, catalogue_bytes, host, self.asset

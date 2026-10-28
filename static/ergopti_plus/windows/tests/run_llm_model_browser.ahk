@@ -60,6 +60,19 @@ LLM_SetInstalledTagsCache(tags) => ""
 _LLM_GetInstalledTagsCached()   => ["qwen3.5:2b"]
 LLM_GetModelIndex()    => _TestIndex
 LLM_GetModelInfo(n)    => (_TestIndex.Has(n) ? _TestIndex[n] : Map())
+; The selector payload (2026-10-27) also reads the menu's caption, port
+; defaults, brands, API rows and local servers; none of them is under test here.
+LoggerInfo(args*)      => ""
+LLM_Deps_HasFailed()   => false
+_LLM_Menu_ModelDisplayText() => ""
+_LLM_DefaultFor(Key, Default := "") => (Key == "llm_ollama_port" ? 11434 : Default)
+_LLM_Menu_ApiEntryPageRows(Rows, Models, Listings := 0) => ""
+LLM_Menu_LocalServersRows() => []
+_LLM_Menu_ConfigBlockReason() => ""
+LLM_GetBackendBrands() => Map(
+	"ollama", Map("brand", "Ollama", "emoji", "o", "kind", "local"),
+	"mlx", Map("brand", "MLX", "emoji", "m", "kind", "local"),
+	"api", Map("brand", "API", "emoji", "a", "kind", "remote"))
 
 ; Minimal WebView2 stand-in so IsSet(WebView2) resolves and the class reference in
 ; the (never-called here) ShowWeb path loads. The tests never create a webview.
@@ -102,10 +115,8 @@ _MBNum_NonNumber() {
 }
 Test("LLM_MBW_Num: non-number defaults to 0", _MBNum_NonNumber)
 
-_MBJsStr_Escapes() {
-	AssertEqual('"a\"b"', _LLM_MBW_JsStr('a"b'))
-}
-Test("LLM_MBW_JsStr: escapes double quotes", _MBJsStr_Escapes)
+; The page's own string helper is gone: every string goes through the shared
+; JsonStringLiteral (infra/json.ahk), defined once.
 
 class _MBSessionFakeWebView {
 	Executed := []
@@ -237,8 +248,7 @@ _MBInject_DisabledStillListsAllModels() {
 	js := _LLM_MBW_Queue[1].Js
 	AssertContains(js, '"Qwen3.5-2B"')        ; every model is still listed…
 	AssertContains(js, '"gemma-4-E2B-it"')
-	AssertContains(js, "installed:false")     ; …just without the installed dot
-	Assert(!InStr(js, "installed:true"), "no model may be flagged installed while the daemon is not scanned")
+	AssertContains(js, "installed:false")     ; …gemma from the async snapshot
 	AssertEqual(0, _MBW_OllamaListHits, "the blocking /api/tags probe must NOT run when the daemon is not ready")
 }
 Test("LLM_MBW_InjectCatalogue: lists all models without probing when the feature is off", _MBInject_DisabledStillListsAllModels)

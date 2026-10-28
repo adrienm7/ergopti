@@ -39,6 +39,17 @@ local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "file_watchers"
 
+--- Whether a reload or quit already owns the process. The menu watcher sees the
+--- same file burst; when its reload wins, this refusal is expected, not a fault.
+--- Required lazily: the coordinator is initialized after this module loads.
+--- @return boolean terminating
+local function reload_already_terminating()
+	local loaded, coordinator = pcall(require, "infra.termination_coordinator")
+	if not loaded or type(coordinator) ~= "table" then return false end
+	local checked, in_progress = pcall(coordinator.terminal_in_progress)
+	return checked and in_progress == true
+end
+
 -- Hard cap on how deep the recursive personal-hotstrings watcher scan descends.
 -- Same rationale as infra/personal_hotstrings.lua's SCAN_MAX_DEPTH: the scanned
 -- tree is a user-writable folder, so a self-referential symlink would make a
@@ -62,6 +73,24 @@ local BOOT_SUPPRESS_SEC = 5
 -- a cross-driver single-source gate pins it to Linux's _debounce_sec
 -- (tools/test/test-file-watchers-constants-single-source.cjs).
 local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
+
+--- Whether a changed path is a hotstring source: a TOML category, an index,
+--- or the AutoHotkey path marker.
+--- @param path string Absolute changed path.
+--- @return boolean
+local function is_hotstring_source(path)
+	return path:match("%.toml$") ~= nil or path:match("_index%.json$") ~= nil
+		or path:match("%.local_ahk_path$") ~= nil
+end
+
+--- Whether a developer field run is running (infra/field_run.lua). Read
+--- through package.loaded: only a developer app ever loads that module.
+--- @return boolean
+local function field_run_holds_reload()
+	local field_run = package.loaded["infra.field_run"]
+	return type(field_run) == "table" and type(field_run.holds_reload) == "function"
+		and field_run.holds_reload() == true
+end
 
 
 
@@ -135,7 +164,9 @@ end
 --- init.lua's shutdown callback stops on quit).
 --- @param ctx table { hotstrings_dir: string, base_dir: string,
 ---   personal_hotstrings_dir: string, personal_info_path: string,
----   self_written_files: string[] } — absolute paths resolved by the boot script.
+---   self_written_files: string[], shared_source_dir: string|nil } — absolute
+---   paths resolved by the boot script; shared_source_dir is the clone's
+---   _shared/lua tree of a developer app, nil otherwise.
 --- @return boolean committed True only when both required watchers, plus the
 ---   personal watcher when available, are started and their owner is published.
 function M.start(ctx)
@@ -438,6 +469,7 @@ function M.start(ctx)
 		arm_timer(msg)
 	end
 
+	local field_run_hold_logged = false
 	fire_reload = function(msg)
 		if not lifecycle_active then return end
 		-- Hold the reload while the working tree is still being written FROM ANY
@@ -454,6 +486,18 @@ function M.start(ctx)
 			arm_timer(msg)
 			return
 		end
+		-- A field run drives the app through downloads, removals and the config
+		-- guard: a reload would cut it short, so the burst waits for its end.
+		if field_run_holds_reload() then
+			if not field_run_hold_logged then
+				field_run_hold_logged = true
+				Logger.warn(LOG, "Source change reload held while the developer field run runs (%s).",
+					RuntimeLog.describe_paths(burst_paths))
+			end
+			arm_timer(msg)
+			return
+		end
+		field_run_hold_logged = false
 		local busy, repo = any_git_operation_in_progress()
 		if busy then
 			if defer_count < GIT_HOLD_WARN_DEFERRALS then
@@ -485,6 +529,11 @@ function M.start(ctx)
 				-- wait says nothing about the tree now. A pull that starts during the
 				-- hold would otherwise be re-exec'd into mid-write, which is the
 				-- half-updated-tree boot failure the gate exists to prevent.
+				if field_run_holds_reload() then
+					Logger.info(LOG, "Reload aborted at fire time: a developer field run started; re-arming.")
+					arm_timer(msg)
+					return
+				end
 				local busy, repo = any_git_operation_in_progress()
 				if busy then
 					Logger.info(LOG, "Reload aborted at fire time: git operation started in '%s' during the "
@@ -510,11 +559,15 @@ function M.start(ctx)
 					return hs.reload()
 				end, debug.traceback)
 				if not request_ok or accepted ~= true then
-					if not reload_refusal_logged then
+					if request_ok and reload_already_terminating() then
+						-- The menu watcher's reload of this same burst is under way
+						-- (field run 2026-10-27 19:47:04, ledger L45 sibling).
+						Logger.info(LOG, "Reload request deferred: a reload or quit is in progress.")
+					elseif not reload_refusal_logged then
 						reload_refusal_logged = true
 						Logger.warn(LOG,
-							"Reload request was refused; the source-file burst remains pending for retry: %s.",
-							tostring(request_ok and accepted or accepted))
+							"Reload request was refused (%s); the source-file burst stays pending and is retried.",
+							request_ok and ("result " .. tostring(accepted)) or tostring(accepted))
 					else
 						Logger.debug(LOG, "Reload request remains refused; retaining the source-file burst.")
 					end
@@ -530,8 +583,8 @@ function M.start(ctx)
 			if not reload_refusal_logged then
 				reload_refusal_logged = true
 				Logger.warn(LOG,
-					"Deferred reload owner refused the source-file burst; retaining it for retry: %s.",
-					tostring(defer_ok and deferred or deferred))
+					"Deferred reload owner refused the source-file burst (%s); it stays pending and is retried.",
+					defer_ok and ("result " .. tostring(deferred)) or tostring(deferred))
 			end
 			arm_timer(msg)
 		end
@@ -548,7 +601,7 @@ function M.start(ctx)
 		if not lifecycle_active then return end
 		local hit, identities = {}, {}
 		for _, p in ipairs(paths) do
-			if (p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$"))
+			if is_hotstring_source(p)
 				and not is_self_written(p, identities) and not is_runtime_artefact(p, identities) then
 				hit[#hit + 1] = p
 			end
@@ -580,7 +633,9 @@ function M.start(ctx)
 			-- excluded it. The self-written and runtime-artefact filters are the
 			-- ones the sibling watcher already applies; the per-file watchers had
 			-- neither, so a write the driver made itself could trigger a reload.
-			if not p:match("^/tmp/")
+			-- Hotstring files only: the personal tree is often a Git repository,
+			-- and a fetch, an editor swap file or a .DS_Store is not an edit.
+			if not p:match("^/tmp/") and is_hotstring_source(p)
 				and not is_self_written(p, identities) and not is_runtime_artefact(p, identities) then
 				hit[#hit + 1] = p
 			end
@@ -640,6 +695,11 @@ function M.start(ctx)
 		end
 	end
 	if not acquire_watcher(base_dir, project_changed, "Project source watcher", false) then
+		return rollback_startup()
+	end
+	-- Only a developer app passes its clone's shared Lua tree (infra/dev_source.lua).
+	if ctx.shared_source_dir ~= nil
+		and not acquire_watcher(ctx.shared_source_dir, project_changed, "Shared source watcher", false) then
 		return rollback_startup()
 	end
 

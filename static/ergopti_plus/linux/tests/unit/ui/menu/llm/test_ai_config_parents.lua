@@ -42,7 +42,8 @@ helpers.describe("Linux AI configuration guard (ai-submenus-newer-config-2026-10
 			local Logger = require("logger.shim")
 			local old_warn = Logger.warn
 			local ok, err = xpcall(function()
-				local ctx = { llm = engine, paused = false, on_quit = function() end, on_menu_changed = function() end }
+				local ctx = { llm = engine, paused = false, on_quit = function() end, on_menu_changed = function() end,
+					webview = { show = function() return true end } }
 				ctx.is_paused = function() return ctx.paused end
 				engine.init({ is_paused = ctx.is_paused })
 				-- The profile parent is live only while the category is on.
@@ -89,12 +90,15 @@ helpers.describe("Linux AI configuration guard (ai-submenus-newer-config-2026-10
 				local head = I18n.get("menu.read_only.newer_schema"):match("^([^:]+)"):gsub("%s+$", "")
 				helpers.assert_true(greyed.title:find(head, 1, true) ~= nil,
 					"the parent names the newer configuration as its cause: " .. tostring(greyed.title))
-				local cause = I18n.get("menu.read_only.newer_schema")
-				local named = false
+				-- The model selector button stays live: the page it opens greys every
+				-- backend with the same cause (model-selector-page).
+				local emoji = require("modules.llm.backend_brands").emoji(engine.get_backend())
+				local button
 				for _, row in ipairs(ai_rows) do
-					if row.title == cause and row.disabled == true then named = true end
+					if type(row.title) == "string" and row.title:sub(1, #emoji) == emoji then button = row end
 				end
-				helpers.assert_true(named, "the inline model list opens with one inert row naming the cause")
+				helpers.assert_type(button, "table", "the model selector button is built")
+				helpers.assert_true(button.disabled ~= true, "the button opens the page that names the cause")
 			end, debug.traceback)
 			Logger.warn, engine.is_enabled = old_warn, original_enabled
 			Migrate.read_only_reason, Migrate.read_only_status = old_reason, old_status

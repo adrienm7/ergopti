@@ -266,35 +266,37 @@ function update_manifest_scope() {
 	const start_input = document.getElementById('date_start');
 	const end_input = document.getElementById('date_end');
 	app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
-	const app_set = new Set();
-	app_state.manifest_dates_sorted.forEach((date) => {
-		Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
-			if (app_name !== 'Unknown' && app_name !== '_sys' && app_name !== '_system') {
-				app_set.add(app_name);
-			}
+	if (app_state.manifest_dates_sorted.length > 0) {
+		const app_set = new Set();
+		app_state.manifest_dates_sorted.forEach((date) => {
+			Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
+				if (app_name !== 'Unknown' && app_name !== '_sys' && app_name !== '_system') {
+					app_set.add(app_name);
+				}
+			});
 		});
-	});
 
-	const previous_selection = new Set(app_state.selected_apps);
-	const previous_mode = app_state.app_selection_mode || APP_SELECTION_MODE.UNINITIALIZED;
+		const previous_selection = new Set(app_state.selected_apps);
+		const previous_mode = app_state.app_selection_mode || APP_SELECTION_MODE.UNINITIALIZED;
 
-	app_state.available_apps = Array.from(app_set).sort((a, b) => a.localeCompare(b));
+		app_state.available_apps = Array.from(app_set).sort((a, b) => a.localeCompare(b));
 
-	if (
-		previous_mode === APP_SELECTION_MODE.UNINITIALIZED ||
-		previous_mode === APP_SELECTION_MODE.ALL
-	) {
-		app_state.selected_apps = new Set(app_state.available_apps);
-		app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
-	} else if (previous_mode === APP_SELECTION_MODE.NONE) {
-		app_state.selected_apps = new Set();
-	} else {
-		const next_sel = new Set();
-		app_state.available_apps.forEach((app) => {
-			if (previous_selection.has(app)) next_sel.add(app);
-		});
-		app_state.selected_apps = next_sel;
-		if (next_sel.size === 0) app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
+		if (
+			previous_mode === APP_SELECTION_MODE.UNINITIALIZED ||
+			previous_mode === APP_SELECTION_MODE.ALL
+		) {
+			app_state.selected_apps = new Set(app_state.available_apps);
+			app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
+		} else if (previous_mode === APP_SELECTION_MODE.NONE) {
+			app_state.selected_apps = new Set();
+		} else {
+			const next_sel = new Set();
+			app_state.available_apps.forEach((app) => {
+				if (previous_selection.has(app)) next_sel.add(app);
+			});
+			app_state.selected_apps = next_sel;
+			if (next_sel.size === 0) app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
+		}
 	}
 
 	if (start_input && end_input && (!start_input.value || !end_input.value)) {
@@ -2077,7 +2079,7 @@ function render_ergo_bigram_table() {
 			(d) =>
 				`<tr><td>${escape_html(d.pair)}</td>` +
 				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:center;color:#aaa;">${d.kind}</td></tr>`
+				`<td style="text-align:center;color:${ThemeTokens.color('grey-aaa')};">${d.kind}</td></tr>`
 		)
 		.join('');
 
@@ -2262,7 +2264,7 @@ function render_ergo_trigram_table() {
 			(d) =>
 				`<tr><td>${escape_html(d.seq)}</td>` +
 				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:center;color:#aaa;">${d.kind}</td></tr>`
+				`<td style="text-align:center;color:${ThemeTokens.color('grey-aaa')};">${d.kind}</td></tr>`
 		)
 		.join('');
 
@@ -2402,8 +2404,8 @@ function render_errors_table() {
 			(d) =>
 				`<tr><td>${escape_html(d.pair)}</td>` +
 				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:right;color:#f87171;">${format_number(d.errors)}</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:#f87171;"><b>${(d.rate * 100).toFixed(1)}%</b></td>` +
+				`<td style="text-align:right;color:${ThemeTokens.color('hue-f87171')};">${format_number(d.errors)}</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('hue-f87171')};"><b>${(d.rate * 100).toFixed(1)}%</b></td>` +
 				`</tr>`
 		)
 		.join('');
@@ -2624,7 +2626,7 @@ function render_lexical_kpi() {
 		const label = l === 15 ? '15+' : String(l);
 		bars_html.push(
 			`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:#aaa;width:42px;">${label} car.</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:42px;">${label} car.</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(251, 191, 36);"></div>` +
@@ -2757,7 +2759,7 @@ function render_rhythm_kpi() {
 			const label = k === '500+' ? '500+ car.' : `≤ ${k} car.`;
 			return (
 				`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:#aaa;width:78px;">${label}</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:78px;">${label}</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(56, 189, 248);"></div>` +
@@ -3263,7 +3265,7 @@ function render_apps_table() {
 				`</div>` +
 				`</td>` +
 				`<td style="text-align:right;font-variant-numeric:tabular-nums;">${d.cpm > 0 ? d.cpm.toFixed(0) : '—'}</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:#aaa;">${fmt_dur(d.time_ms)}</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};">${fmt_dur(d.time_ms)}</td>` +
 				`</tr>`
 			);
 		})
@@ -3293,6 +3295,8 @@ function sort_apps_table(col) {
 // ===================================================
 // ===================================================
 
+// [ui] metrics_typing_dispatch_delay_ms (pinned: a page script cannot read the registry)
+const DISPATCH_DELAY_MS = 50;
 const LONG_SESSION_THRESHOLD_MS = 90 * 60 * 1000; // 90 min — clinical RSI risk threshold
 
 /**
@@ -3460,7 +3464,7 @@ function render_wellness_kpi() {
 		const text_color = pct > 18 ? 'color:rgb(248,113,113);font-weight:600;' : '';
 		return (
 			`<tr>` +
-			`<td style="color:#aaa;width:90px;">${label}</td>` +
+			`<td style="color:${ThemeTokens.color('grey-aaa')};width:90px;">${label}</td>` +
 			`<td style="text-align:center;width:24px;">${f.startsWith('l') ? 'G' : 'D'}</td>` +
 			`<td style="padding:2px 6px;">` +
 			`<div style="display:flex;align-items:center;gap:6px;">` +
@@ -3674,7 +3678,7 @@ function request_range_data(show_loader = true) {
 		}
 		window._lua_request = JSON.stringify(req);
 	};
-	setTimeout(dispatch, 50);
+	setTimeout(dispatch, DISPATCH_DELAY_MS);
 }
 
 /**

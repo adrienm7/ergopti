@@ -310,33 +310,49 @@ helpers.describe("Count fixture authentic whole-frame admission", function()
 end)
 
 
-helpers.describe("Actual model picker native handoff", function()
+helpers.describe("The AI menu builds no model list (model-selector-page)", function()
 	for _, backend in ipairs({ "ollama", "mlx" }) do
-		helpers.it("completes the genuine " .. backend .. " selector DATA before native publication", function()
-			with_count_menu(function(menu, _, calls)
+		helpers.it("publishes one " .. backend .. " button that opens the page and builds no panel", function()
+			with_count_menu(function(menu, state, calls)
 				local item = menu.build_item()
-				local data = calls.real_model_selector_rows
-				helpers.assert_type(data, "table", "the actual ModelsSelector constructor must have run")
-				helpers.assert_type(data[1], "table", "the genuine declared No model row must exist")
-				helpers.assert_type(data[1].action, "function", "the selector returns genuine command DATA")
-				helpers.assert_type(data[1].label, "string", "the selector retains its canonical caption")
-				local model
+				local emoji = require("ui.menu.menu_llm.backend_labels").emoji(backend)
+				local button
 				for _, row in ipairs(item.submenu) do
-					if type(row.menu) == "table" and row.menu[1]
-						and rawequal(row.menu[1].fn, data[1].action) then model = row.menu; break end
+					if type(row.title) == "string" and row.title:find(emoji .. " ", 1, true) then button = row end
 				end
-				helpers.assert_type(model, "table", "the same command closure reaches the completed model child")
-				helpers.assert_eq(model[1].title, data[1].label, "materialization preserves the actual declared caption")
-				helpers.assert_nil(model[1].action, "provider commands never leak into completed native rows")
-				helpers.assert_nil(model[1].label, "provider captions never leak into completed native rows")
-				helpers.assert_nil(data[1].fn, "materialization does not mutate the producer's original DATA")
-				helpers.assert_nil(data[1].title, "the selector's DATA remains DATA")
+				helpers.assert_type(button, "table", "the model button names the backend's emoji")
+				helpers.assert_nil(button.menu, "the button opens the page; it carries no model submenu")
+				helpers.assert_type(button.fn, "function")
+				helpers.assert_eq(calls.panel_builds, 0, "the menu build runs neither the Backend nor the API panel")
+				for _, row in ipairs(item.submenu) do
+					helpers.assert_true(type(row.title) ~= "string" or not row.title:find("Backend", 1, true),
+						"the Backend chooser left the menu")
+				end
+				helpers.assert_eq(state.llm_backend, backend)
+				button.fn()
+				helpers.assert_eq(calls.page_opens, 1, "the button opens the selector page")
 				local renderer = require("infra.manifest_menu")
 				local compose = renderer.native_composition("macos_download_root")
-				helpers.assert_type(compose, "function", "the actual completed-native publication owner admits")
 				helpers.assert_eq(compose({ download = {}, body = item.submenu }), true,
-					"the genuine factory's complete subtree passes strict native ABI publication")
+					"the menu without the model list passes strict native ABI publication")
 			end, { real_model_selector = true, backend = backend })
 		end)
 	end
+
+	helpers.it("registers the model browser toggle at creation, before any AI menu build", function()
+		local openers = {}
+		local toggle = { set_opener = function(page, fn) openers[page] = fn end }
+		with_count_menu(function(menu, _, calls)
+			helpers.assert_type(openers.model_browser, "function",
+				"the toggle shortcut opens the page before the AI menu was ever built")
+			local Page = require("ui.menu.menu_llm.model_selector_page")
+			helpers.assert_eq(Page.is_bound(), false, "no AI menu build has bound the page yet")
+			openers.model_browser()
+			helpers.assert_eq(Page.is_bound(), true, "the first toggle builds the AI item once, which binds the page")
+			helpers.assert_eq(calls.page_opens, 1, "the toggle opens the selector page")
+			openers.model_browser()
+			helpers.assert_eq(calls.page_opens, 2)
+			helpers.assert_type(menu.build_item, "function")
+		end, { real_model_selector = true, backend = "ollama", window_toggle = toggle })
+	end)
 end)

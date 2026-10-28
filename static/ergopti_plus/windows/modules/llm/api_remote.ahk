@@ -43,6 +43,11 @@
 ; _LLMRemoteParseResponse.
 global LLM_API_PROVIDERS := Map()
 global LLM_LOCAL_API_SERVERS := Map()
+; Server id -> validated discovery descriptor of local_servers.json; a server
+; without one is never probed (local_server_ports.ahk)
+global LLM_LOCAL_SERVER_DISCOVERY := Map()
+; Server id -> where the last port scan found it (LocalServersOwner publishes it)
+global LLM_LOCAL_SERVER_SCANS := Map()
 global LLM_API_PROVIDER_ORDER := []
 
 ; The formats a catalogue provider may declare, each with what it serves:
@@ -1320,6 +1325,16 @@ _LLMRemote_TrimAsyncRegistry() {
         return
 }
 
+; The address of an entry stored without one: where the last port scan found
+; a local server, else the provider's catalogue address.
+_LLMRemote_DefaultBaseUrl(ProviderId, Provider) {
+    global LLM_LOCAL_SERVER_SCANS
+    Scan := LLM_LOCAL_SERVER_SCANS.Get(ProviderId, 0)
+    if (Scan is Map) && Scan["running"]
+        return Scan["base_url"]
+    return Provider["BaseUrl"]
+}
+
 ; Resolves an entry record to a normalised Map(Provider, Format, BaseUrl,
 ; Token, Model). Returns "" when the entry is unusable (missing token /
 ; model / unknown provider) so the caller can fail cleanly on a single
@@ -1333,7 +1348,7 @@ _LLMRemoteResolveEntry(Entry) {
     ProvFmt  := Provider["Format"]
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
     if (BaseUrl == "")
-        BaseUrl := Provider["BaseUrl"]
+        BaseUrl := _LLMRemote_DefaultBaseUrl(ProviderId, Provider)
     if !(BaseUrl is String) || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
         return ""
     Token := _LLMRemoteEntryGet(Entry, "Token", "")
@@ -1415,7 +1430,7 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
     Provider := LLM_API_PROVIDERS[ProviderId]
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
     if (BaseUrl == "")
-        BaseUrl := Provider["BaseUrl"]
+        BaseUrl := _LLMRemote_DefaultBaseUrl(ProviderId, Provider)
     Token    := _LLMRemoteEntryGet(Entry, "Token", "")
     if !_LLMRemote_ConfigScalarIsSafe(BaseUrl) || BaseUrl == ""
             || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
@@ -1577,6 +1592,18 @@ _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms, Owner := 0) {
     }
     status := 0
     try status := Http.Status
+    if (Owner is Map) && Owner.Get("listing", false) {
+        ; A model listing reads the body the probe already holds; malformed
+        ; source bytes are no listing.
+        if Http is CurlAsyncRequest && !Http.ResponseEncodingValid {
+            _LLMRemote_CompleteReady(Owner, on_result, false)
+            return
+        }
+        Body := ""
+        try Body := Http.ResponseText
+        _LLMRemote_CompleteReady(Owner, on_result, Map("status", status, "body", Body))
+        return
+    }
     if (Owner is Map) && Owner.Get("local_server", false) {
         ; Managed JSON must reject malformed source bytes before parsing the
         ; generic facade's repaired text. Legacy readiness adapters stay typed.
@@ -1918,8 +1945,8 @@ _LLMRemote_CatalogDescriptorIsValid(providerId, desc) {
     label := desc["label"]
     baseUrl := desc["base_url"]
     defaultModel := desc["default_model"]
-    format := desc["format"]
-    if (Trim(label) = "" or !LLM_REMOTE_CATALOG_FORMATS.Has(format))
+    descFormat := desc["format"]
+    if (Trim(label) = "" or !LLM_REMOTE_CATALOG_FORMATS.Has(descFormat))
         return false
 
     ; The compatibility row is a user-supplied endpoint/model template. Every
@@ -2019,7 +2046,7 @@ _LLMRemote_CatalogDecisionsTestIsValid(Section) {
 
 _LLMRemote_LoadCatalog() {
     global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
-    global LLM_LOCAL_API_SERVERS
+    global LLM_LOCAL_API_SERVERS, LLM_LOCAL_SERVER_DISCOVERY
     global LLM_REMOTE_DECISIONS_TEST
     path := _SharedDir . "\modules\llm\api_providers.json"
     if !FileExist(path)
@@ -2072,9 +2099,20 @@ _LLMRemote_LoadCatalog() {
     }
 
     LocalCatalogue := Map("order", [], "servers", Map())
-    try LocalCatalogue := LocalServerAuthCatalogue(JsonParse(FSReadUtf8Exact(_SharedDir . "\modules\llm\local_servers.json")), candidateProviders)
-    catch as Err
+    LocalRoot := 0
+    try {
+        LocalRoot := JsonParse(FSReadUtf8Exact(_SharedDir . "\modules\llm\local_servers.json"))
+        LocalCatalogue := LocalServerAuthCatalogue(LocalRoot, candidateProviders)
+    } catch as Err
         try LoggerError("LLM.remote", "The local API catalogue is unavailable; optional authentication is refused.")
+    LocalDiscovery := Map()
+    for Id in LocalCatalogue["order"] {
+        Verdict := LocalServerPortsDescriptor(Id, LocalRoot["servers"][Id].Get("discovery", 0))
+        if Verdict["descriptor"] is Map
+            LocalDiscovery[Id] := Verdict["descriptor"]
+        else
+            try LoggerError("LLM.remote", "local_servers.json: {1}; that server is never probed.", Verdict["problem"])
+    }
     for Id in LocalCatalogue["order"] {
         Desc := LocalCatalogue["servers"][Id]
         candidateProviders[Id] := Map("Label", Desc["label"], "BaseUrl", Desc["base_url"],
@@ -2082,6 +2120,7 @@ _LLMRemote_LoadCatalog() {
         candidateOrder.Push(Id)
     }
     LLM_LOCAL_API_SERVERS := LocalCatalogue["servers"]
+    LLM_LOCAL_SERVER_DISCOVERY := LocalDiscovery
 
     candidatePrices := Map()
     for model, row in prices {
@@ -2136,11 +2175,201 @@ _LLMRemote_LoadCatalog() {
 ; backend, not abort the whole driver boot. Mirror the graceful-degradation pattern
 ; used by _LLM_LoadPresets (models.ahk) and LLM_LoadProfilesJSON (profiles.ahk).
 try _LLMRemote_LoadCatalog()
-catch as _e {
+catch as _ApiProvidersLoadError {
 	LLM_API_PROVIDERS := Map()
 	LLM_API_PROVIDER_ORDER := []
 	LLM_REMOTE_MODEL_PRICES := Map()
 	LLM_REMOTE_TEST_REQUEST := Map()
 	LLM_REMOTE_DECISIONS_TEST := Map()
-	try LoggerError("LLM.remote", "api_providers.json load failed — remote API backend disabled: {1}.", _e.Message)
+	try LoggerError("LLM.remote", "api_providers.json load failed — remote API backend disabled: {1}.", _ApiProvidersLoadError.Message)
+}
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= 5/ Provider Model Listing =======
+; =========================================
+; =========================================
+
+; Bounds of the provider listings, pinned with _shared/lua/llm/api_model_listing.lua
+; by _shared/tests/corpus/llm/api_model_listing_vectors.json (max_models,
+; max_id_length, max_entries): a chosen id is written to the configuration and
+; sent, and a page open lists at most max_entries entries, one at a time.
+global LLM_API_LISTING_MAX_MODELS := 200
+global LLM_API_LISTING_MAX_ID_LENGTH := 200
+global LLM_API_LISTING_MAX_ENTRIES := 16
+
+/**
+ * Tells whether providers of one wire format list their models at <base>/models.
+ * Port of api_model_listing.supported.
+ * @param {String} Fmt Provider wire format.
+ * @returns {Boolean}
+ */
+LLM_ApiListingSupported(Fmt) {
+    return Fmt == "openai" || Fmt == "anthropic" || Fmt == "gemini"
+}
+
+/**
+ * Tells whether one model id may become a page row: a non-empty string of at
+ * most LLM_API_LISTING_MAX_ID_LENGTH UTF-8 bytes, without whitespace or
+ * control characters. Port of api_model_listing.valid_id.
+ * @param {Any} Id
+ * @returns {Boolean}
+ */
+LLM_ApiListingValidId(Id) {
+    global LLM_API_LISTING_MAX_ID_LENGTH
+    return Id is String && Id != "" && StrPut(Id, "UTF-8") - 1 <= LLM_API_LISTING_MAX_ID_LENGTH
+        && !RegExMatch(Id, "[\s\x00-\x1F\x7F]")
+}
+
+/**
+ * Extracts the model ids of a decoded listing answer, sorted, unique and at
+ * most LLM_API_LISTING_MAX_MODELS. Port of api_model_listing.model_ids.
+ * @param {String} Fmt Provider wire format.
+ * @param {Any} Decoded The JsonParse result of the answer.
+ * @returns {Map} Map("ids", Array) or Map("reason", "unsupported"|"unreadable").
+ */
+LLM_ApiListingIds(Fmt, Decoded) {
+    global LLM_API_LISTING_MAX_MODELS
+    if !LLM_ApiListingSupported(Fmt)
+        return Map("reason", "unsupported")
+    Field := Fmt == "gemini" ? "models" : "data"
+    List := Decoded is Map && Decoded.Has(Field) ? Decoded[Field] : 0
+    if !(List is Array)
+        return Map("reason", "unreadable")
+    Seen := Map(), Joined := ""
+    for Item in List {
+        if !(Item is Map)
+            continue
+        Id := Item.Has("id") ? Item["id"] : (Item.Has("name") ? Item["name"] : 0)
+        if (Fmt == "gemini" && Id is String && SubStr(Id, 1, 7) == "models/")
+            Id := SubStr(Id, 8)
+        if !LLM_ApiListingValidId(Id) || Seen.Has(Id)
+            continue
+        Seen[Id] := true
+        Joined .= (Joined == "" ? "" : "`n") . Id
+    }
+    Ids := []
+    if (Joined != "") {
+        for Id in StrSplit(Sort(Joined, "C"), "`n") {
+            if Ids.Length >= LLM_API_LISTING_MAX_MODELS
+                break
+            Ids.Push(Id)
+        }
+    }
+    return Map("ids", Ids)
+}
+
+/**
+ * Splits an entry's automatic name around its model, so each row of the entry
+ * reads "<provider>/<row model><suffix>" and its typed-id row
+ * "<provider><suffix>". Port of api_model_listing.name_parts.
+ * @param {String} Name The entry's automatic name (_LLM_ApiEntryNames).
+ * @param {String} Model The model its requests use.
+ * @returns {Array} [Base, Suffix].
+ */
+LLM_ApiListingNameParts(Name, Model) {
+    if (Model is String && Model != "") {
+        At := InStr(Name, "/" . Model, true)
+        if (At > 0) {
+            Rest := SubStr(Name, At + StrLen(Model) + 1)
+            if (Rest == "" || SubStr(Rest, 1, 2) == " (")
+                return [SubStr(Name, 1, At - 1), Rest]
+        }
+    }
+    return [Name, ""]
+}
+
+/**
+ * The rows of one API entry: its provider's listed models, or the known ones
+ * and a typed-id row with the listing's reason. Port of api_model_listing.plan.
+ * @param {Map} View Map("model", configured, "default_model", provider default, "extras", Array,
+ *     "format", provider wire format).
+ * @param {Map|Integer} Listing 0 when never asked, else Map("state", "pending"|"listed"|"failed",
+ *     "ids", Array, "reason", String).
+ * @returns {Map} Map("models", Array of Map("model", "listed"), "typed_hint", String) — "" without a typed row.
+ */
+LLM_ApiListingPlan(View, Listing) {
+    Models := [], Seen := Map()
+    Add := (Id, Listed) => (LLM_ApiListingValidId(Id) && !Seen.Has(Id)
+        ? (Seen[Id] := true, Models.Push(Map("model", Id, "listed", Listed))) : 0)
+    Configured := View.Get("model", "")
+    ; A decisions provider (Jev) answers typed questions, never a chat model.
+    if (View.Get("format", "") == "decisions") {
+        Add(Configured, false)
+        return Map("models", Models, "typed_hint", "")
+    }
+    State := Listing is Map ? Listing.Get("state", "") : ""
+    if (State == "listed" && Listing.Get("ids", 0) is Array && Listing["ids"].Length > 0) {
+        Listed := Map()
+        for Id in Listing["ids"]
+            Listed[Id] := true
+        if !(Configured is String) || !Listed.Has(Configured)
+            Add(Configured, false)
+        for Id in Listing["ids"]
+            Add(Id, true)
+        return Map("models", Models, "typed_hint", "")
+    }
+    Add(Configured, false)
+    Add(View.Get("default_model", ""), false)
+    Extras := ""
+    for Id in View.Get("extras", [])
+        if LLM_ApiListingValidId(Id)
+            Extras .= (Extras == "" ? "" : "`n") . Id
+    if (Extras != "")
+        for Id in StrSplit(Sort(Extras, "C"), "`n")
+            Add(Id, false)
+    Reason := State == "pending" ? "pending"
+        : (State == "failed" && Listing.Get("reason", "") == "refused" ? "refused" : "unavailable")
+    return Map("models", Models, "typed_hint", "model_browser.hint_api_listing_" . Reason)
+}
+
+/**
+ * Lists the models one entry's provider serves through the readiness probe's
+ * own bounded GET of <base>/models (same budget, proxy and key rules). Invokes
+ * OnDone with Map("state", "listed", "ids", Array) or Map("state", "failed",
+ * "reason", …); the key never leaves the request headers or the gemini URL.
+ * @param {Map|Object} Entry API entry record.
+ * @param {Func} OnDone Receives the listing state.
+ * @returns {Map} The auxiliary owner of the request.
+ */
+LLM_RemoteListModels_Async(Entry, OnDone) {
+    EntryId := _LLMRemoteEntryGet(Entry, "Id", "")
+    ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
+    Fmt := LLM_RemoteProviderFormat(ProviderId)
+    Owner := LLM_AuxBegin("api_listing:" . EntryId, Map("backend", "api",
+        "endpoint", _LLMRemoteEntryGet(Entry, "BaseUrl", ""), "identity", EntryId))
+    if !LLM_ApiListingSupported(Fmt) {
+        LLM_AuxFinish(Owner)
+        _LLM_InvokeCallback(OnDone, "on_listing", Map("state", "failed", "reason", "unsupported"))
+        return Owner
+    }
+    Owner["listing"] := true
+    LoggerInfo("LLM.remote", "Remote model listing requested (provider={1}).", ProviderId)
+    return LLM_RemoteIsReady_Async(Entry, _LLMRemote_ListingDone.Bind(Fmt, ProviderId, OnDone), Owner)
+}
+
+; Reads the listing answer the readiness poll delivered (false on any failure).
+_LLMRemote_ListingDone(Fmt, ProviderId, OnDone, Answer) {
+    if !(Answer is Map) {
+        LoggerInfo("LLM.remote", "Remote model listing unavailable (provider={1}).", ProviderId)
+        return _LLM_InvokeCallback(OnDone, "on_listing", Map("state", "failed", "reason", "unavailable"))
+    }
+    Status := Answer.Get("status", 0)
+    if !(Status is Integer) || Status < 200 || Status >= 300 {
+        LoggerInfo("LLM.remote", "Remote model listing refused (provider={1}, status={2}).", ProviderId, Status)
+        return _LLM_InvokeCallback(OnDone, "on_listing", Map("state", "failed", "reason", "refused"))
+    }
+    Decoded := 0
+    try Decoded := JsonParse(Answer.Get("body", ""))
+    Result := LLM_ApiListingIds(Fmt, Decoded)
+    if !Result.Has("ids") {
+        LoggerWarn("LLM.remote", "Remote model listing could not be read (provider={1}).", ProviderId)
+        return _LLM_InvokeCallback(OnDone, "on_listing", Map("state", "failed", "reason", "unreadable"))
+    }
+    LoggerInfo("LLM.remote", "Remote model listing: {1} model(s) for provider {2}.", Result["ids"].Length, ProviderId)
+    return _LLM_InvokeCallback(OnDone, "on_listing", Map("state", "listed", "ids", Result["ids"]))
 }

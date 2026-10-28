@@ -277,7 +277,7 @@ local function buildPersonalInfoItems(ctx, description)
 	local editor = template("personal_info_editor_frame", {
 		personal_info_editor_open = function()
 			if not current() then return false end
-			return DeferredWork.after(0.1,
+			return DeferredWork.after(require("infra.timings").sec("ui", "editor_open_after_click_ms"),
 				function()
 					if not current() then return false end
 					pcall(ctx.personal_info.open_editor)

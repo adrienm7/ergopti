@@ -261,7 +261,7 @@ helpers.describe("Configured local menu leases and native pause (local-configure
 		helpers.it("selects configured " .. provider .. " view and acknowledges the exact generic entry (local-configured-views)", function()
 			with_panel(function(Panel, api, LocalServers, world, ctx)
 				local id = "configured:personal"
-				local clients = get_upvalue(api.detect_local_servers, "_local_probe_clients")
+				local clients = get_upvalue(api._probe_local_target, "_local_probe_clients")
 				clients[id] = { cancel = function() return true end, isSettled = function() return true end,
 					onSettled = function(callback) callback(); return true end,
 					get = function(url, headers, callback)
@@ -349,7 +349,7 @@ helpers.describe("Local models cache source identity (local-configured-cache)", 
 	helpers.it("same view membership clears cached models before a changed configured source is shown (local-configured-cache)", function()
 		with_panel(function(Panel, api, LocalServers, world, ctx)
 			local id = "configured:personal"
-			local clients = get_upvalue(api.detect_local_servers, "_local_probe_clients")
+			local clients = get_upvalue(api._probe_local_target, "_local_probe_clients")
 			clients[id] = { cancel = function() return true end, isSettled = function() return true end,
 				onSettled = function(callback) callback(); return true end,
 				get = function(url, headers, callback)

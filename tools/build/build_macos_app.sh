@@ -28,6 +28,9 @@
 #  - All version-stamping (CFBundleVersion, BUNDLE_VERSION, Sparkle key) goes
 #    through env vars so the same script drives local dev builds and CI
 #    releases without branching.
+#  - ERGOPTI_DEV_SOURCE=1 builds a developer app whose launcher runs the Lua of
+#    this clone instead of its payload (see check_dev_source_configuration).
+#    Such an app is never archived and a release build refuses the switch.
 # ==============================================================================
 
 set -euo pipefail
@@ -46,6 +49,12 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # Hammerspoon version pinned at the source of truth here. Bump in lock-step
 # with any breaking API change observed in the Lua tree.
 HAMMERSPOON_VERSION="${HAMMERSPOON_VERSION:-1.1.1}"
+# SHA-256 of the official Hammerspoon-$HAMMERSPOON_VERSION.zip release asset. A
+# cached or downloaded zip with any other digest is refused, so a truncated or
+# tampered cache is fetched again instead of trusted. Bump it with the version;
+# tools/test/test-macos-hammerspoon-cache.cjs holds the CI and cold-bootstrap
+# copies of this pin equal to it.
+HAMMERSPOON_SHA256="${HAMMERSPOON_SHA256:-11bb1c90faf5427f37c7bd4fe7eab9774ae43e1d5cb020c5b3088dac32849efa}"
 
 # Version stamped into the .app Info.plist. CI replaces it with the
 # release-please-driven tag; local builds get a "dev" placeholder.
@@ -73,6 +82,13 @@ LAUNCHER_LOCALIZATIONS="$(python3 "$REPO_ROOT/tools/build/launcher_localizations
 # Ollama backend offers to download the pinned official release into
 # Application Support (modules/llm/ensure-ollama-deps.sh). The 79.6 MB binary
 # this build used to copy under Resources/Tools/ weighed 29.4 MB of the zip.
+
+# Developer source mode: 1 records this clone's root in the launcher Info.plist
+# (key ERGOPTI_DEV_SOURCE_PLIST_KEY), so the launcher points the embedded
+# Hammerspoon at static/ergopti_plus/macos of the clone, Reload picks up edits,
+# and Sparkle and the driver's update checks stay off. Unset or 0 builds the
+# ordinary packaged app.
+ERGOPTI_DEV_SOURCE="${ERGOPTI_DEV_SOURCE:-0}"
 
 # Sparkle EdDSA public key (base64). Empty string means "Sparkle will refuse
 # to install updates"; CI must inject the real value from a secret.
@@ -103,12 +119,17 @@ GH_REPO="${GH_REPO:-${UPDATER_REPOSITORY#*/}}"
 
 # The outer app prohibits duplicate instances. Give the embedded GUI runtime a
 # dedicated Ergopti-owned identity while keeping it isolated from stock HS.
-BUNDLE_ID="com.ergoptiplus.app"
-HAMMERSPOON_BUNDLE_ID="com.ergoptiplus.app.hammerspoon"
+# The names, bundle ids and hosts are declared once in _shared/data/identifiers.json.
+# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+BUNDLE_ID="$ERGOPTI_BUNDLE_ID_LAUNCHER"
+HAMMERSPOON_BUNDLE_ID="$ERGOPTI_BUNDLE_ID_HAMMERSPOON"
 
 BUILD_DIR="$REPO_ROOT/build/macos"
-APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
-ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
+# Outside BUILD_DIR, which every run wipes, and git-ignored with /build/.
+HAMMERSPOON_CACHE_DIR="$REPO_ROOT/build/cache/hammerspoon"
+APP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE"
+ZIP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE.zip"
 LAUNCHER_DIR="$REPO_ROOT/static/ergopti_plus/macos/launcher"
 
 # Architectures of the host executable. They must match the universal slices of
@@ -120,6 +141,12 @@ LAUNCHER_ARCH_FLAGS=()
 for arch in "${LAUNCHER_ARCHS[@]}"; do
 	LAUNCHER_ARCH_FLAGS+=(--arch "$arch")
 done
+
+# A multi-architecture `swift build` needs Xcode's XCBuild, so a Mac with the
+# Command Line Tools alone fails with "xcbuild executable ... doesn't exist".
+# ERGOPTI_LAUNCHER_ARCHS=native builds the host slice only, for a local app;
+# universal (the default) keeps both slices, and a release refuses native.
+ERGOPTI_LAUNCHER_ARCHS="${ERGOPTI_LAUNCHER_ARCHS:-universal}"
 
 
 
@@ -166,6 +193,53 @@ disarm_bundle_sparkle() {
 	done
 }
 
+# Reject an unknown developer switch value and a developer build that would
+# ship: a release or a published archive must only ever carry the payload Lua.
+check_dev_source_configuration() {
+	case "$ERGOPTI_DEV_SOURCE" in
+		0) ;;
+		1)
+			[ "${ERGOPTI_RELEASE:-false}" != true ] \
+				|| fail "ERGOPTI_DEV_SOURCE=1 is refused for a release build (ERGOPTI_RELEASE=true)."
+			[ -f "$REPO_ROOT/static/ergopti_plus/macos/init.lua" ] \
+				|| fail "Developer source mode needs the clone driver $REPO_ROOT/static/ergopti_plus/macos/init.lua"
+			;;
+		*) fail "ERGOPTI_DEV_SOURCE must be 0 or 1, not '$ERGOPTI_DEV_SOURCE'." ;;
+	esac
+}
+
+# Records the clone root in a developer build's launcher Info.plist, read back
+# exactly. It runs before codesign, so the key is covered by the signature.
+record_dev_source_root() {
+	local plist="$APP_PATH/Contents/Info.plist"
+	plutil -insert "$ERGOPTI_DEV_SOURCE_PLIST_KEY" -string "$REPO_ROOT" "$plist" \
+		|| fail "$plist refused the developer source key."
+	[ "$(plutil -extract "$ERGOPTI_DEV_SOURCE_PLIST_KEY" raw -o - "$plist")" = "$REPO_ROOT" ] \
+		|| fail "$plist did not keep the developer source root $REPO_ROOT."
+	log "Developer source mode: the launcher runs the Lua of $REPO_ROOT"
+}
+
+# Narrows the launcher to the host slice for a local build on request.
+select_launcher_archs() {
+	case "$ERGOPTI_LAUNCHER_ARCHS" in
+		universal) ;;
+		native)
+			[ "${ERGOPTI_RELEASE:-false}" != true ] \
+				|| fail "ERGOPTI_LAUNCHER_ARCHS=native is refused for a release build (ERGOPTI_RELEASE=true): a release ships arm64 and x86_64."
+			local host
+			host="$(uname -m)"
+			case "$host" in
+				arm64 | x86_64) ;;
+				*) fail "Unsupported host architecture '$host' for a native launcher build." ;;
+			esac
+			LAUNCHER_ARCHS=("$host")
+			LAUNCHER_ARCH_FLAGS=(--arch "$host")
+			log "Single-architecture launcher ($host only): this local app runs on $host Macs and is never released."
+			;;
+		*) fail "ERGOPTI_LAUNCHER_ARCHS must be universal or native, not '$ERGOPTI_LAUNCHER_ARCHS'." ;;
+	esac
+}
+
 clean_build_dir() {
 	log "Wiping $BUILD_DIR"
 	rm -rf "$BUILD_DIR"
@@ -181,20 +255,44 @@ clean_build_dir() {
 # =================================================
 # =================================================
 
+# Reports whether a zip is the pinned official release asset.
+hammerspoon_zip_matches() {
+	local actual
+	actual="$(shasum -a 256 "$1" | awk '{print $1}')" || return 1
+	[ "$actual" = "$HAMMERSPOON_SHA256" ]
+}
+
 # Download and extract the pinned Hammerspoon release. We rely on the GitHub
 # Releases asset rather than building from source: the release zip is signed
 # by the Hammerspoon maintainers, includes all native dylibs, and pins us to
-# a reproducible binary regardless of host SDK drift.
+# a reproducible binary regardless of host SDK drift. The verified zip is kept
+# in HAMMERSPOON_CACHE_DIR, so a rebuild downloads nothing.
 download_hammerspoon() {
-	local cache_dir="$BUILD_DIR/cache"
+	local cache_dir="$HAMMERSPOON_CACHE_DIR"
 	local zip="$cache_dir/Hammerspoon-$HAMMERSPOON_VERSION.zip"
-	local url="https://github.com/Hammerspoon/hammerspoon/releases/download/$HAMMERSPOON_VERSION/Hammerspoon-$HAMMERSPOON_VERSION.zip"
+	local url="https://$ERGOPTI_HOST_GITHUB/Hammerspoon/hammerspoon/releases/download/$HAMMERSPOON_VERSION/Hammerspoon-$HAMMERSPOON_VERSION.zip"
 	mkdir -p "$cache_dir"
-	if [ ! -f "$zip" ]; then
-		log "Downloading Hammerspoon $HAMMERSPOON_VERSION from $url"
-		curl -sSfL "$url" -o "$zip" || fail "Hammerspoon download failed."
+	if [ -f "$zip" ] && hammerspoon_zip_matches "$zip"; then
+		log "Using cached Hammerspoon $HAMMERSPOON_VERSION: $zip"
 	else
-		log "Using cached $zip"
+		if [ -e "$zip" ]; then
+			log "Cached $zip does not match the pinned SHA-256; downloading it again."
+			rm -f "$zip" || fail "The refused cached Hammerspoon zip could not be removed: $zip"
+		fi
+		log "Downloading Hammerspoon $HAMMERSPOON_VERSION from $url"
+		# A partial file is never published under the cached name.
+		local partial
+		partial="$(mktemp "$cache_dir/.Hammerspoon-$HAMMERSPOON_VERSION.XXXXXX")" \
+			|| fail "No temporary file for the Hammerspoon download in $cache_dir."
+		if ! curl --proto '=https' --proto-redir '=https' -sSfL "$url" -o "$partial"; then
+			rm -f "$partial"
+			fail "Hammerspoon download failed."
+		fi
+		if ! hammerspoon_zip_matches "$partial"; then
+			rm -f "$partial"
+			fail "The downloaded Hammerspoon $HAMMERSPOON_VERSION does not match the pinned SHA-256 $HAMMERSPOON_SHA256."
+		fi
+		mv -f "$partial" "$zip" || fail "The verified Hammerspoon zip could not be cached at $zip."
 	fi
 	log "Extracting Hammerspoon into $BUILD_DIR"
 	unzip -q "$zip" -d "$BUILD_DIR"
@@ -276,12 +374,12 @@ assemble_native_runtime() {
 	done
 	lipo -create "$switcher_build/arm64" "$switcher_build/x86_64" \
 		-output "$APP_PATH/Contents/MacOS/SystemSwitcherState"
-	local remap_guardian_plist="$LAUNCHER_DIR/com.ergoptiplus.remap-guardian.plist"
+	local remap_guardian_plist="$LAUNCHER_DIR/${ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN}.plist"
 	[ -f "$remap_guardian_plist" ] || fail "Remap guardian LaunchAgent plist missing."
 	cp "$remap_guardian_plist" \
-		"$APP_PATH/Contents/Library/LaunchAgents/com.ergoptiplus.remap-guardian.plist"
+		"$APP_PATH/Contents/Library/LaunchAgents/${ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN}.plist"
 	plutil -lint \
-		"$APP_PATH/Contents/Library/LaunchAgents/com.ergoptiplus.remap-guardian.plist" \
+		"$APP_PATH/Contents/Library/LaunchAgents/${ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN}.plist" \
 		>/dev/null || fail "Remap guardian LaunchAgent plist failed plutil -lint."
 
 	# Copy Sparkle.framework into Contents/Frameworks/. The launcher links
@@ -518,7 +616,7 @@ generate_info_plist() {
 			<key>CFBundleURLTypes</key>
 			<array>
 				<dict>
-					<key>CFBundleURLName</key>           <string>com.ergoptiplus.app.updater</string>
+					<key>CFBundleURLName</key>           <string>${BUNDLE_ID}.updater</string>
 					<key>CFBundleURLSchemes</key>
 					<array><string>ergoptiplus</string></array>
 				</dict>
@@ -747,9 +845,9 @@ codesign_native_runtime() {
 # versions pop an extra automation-permission dialog on first use.
 codesign_app() {
 	if [ "$SIGN_IDENTITY" = "-" ]; then
-		log "Codesigning ErgoptiPlus.app (ad hoc, identifier: $BUNDLE_ID)"
+		log "Codesigning $ERGOPTI_APP_BUNDLE (ad hoc, identifier: $BUNDLE_ID)"
 	else
-		log "Codesigning ErgoptiPlus.app (certificate $SIGN_IDENTITY, identifier: $BUNDLE_ID)"
+		log "Codesigning $ERGOPTI_APP_BUNDLE (certificate $SIGN_IDENTITY, identifier: $BUNDLE_ID)"
 	fi
 	# Sign nested code first so the host-level pass finds it already valid.
 	# bundle-macos-luasocket.sh builds it into the bundled driver tree.
@@ -787,8 +885,8 @@ build_native_helper() {
 	for cmd in swift xcrun shasum awk lipo codesign plutil zip find; do require_cmd "$cmd"; done
 	check_signing_configuration
 	BUILD_DIR="$REPO_ROOT/build/macos-native-helper"
-	APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
-	ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
+	APP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE"
+	ZIP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE.zip"
 	[ ! -e "$BUILD_DIR" ] && [ ! -L "$BUILD_DIR" ] \
 		|| fail "Native helper output already exists: $BUILD_DIR"
 	mkdir -p "$BUILD_DIR"
@@ -817,6 +915,8 @@ main() {
 		return
 	fi
 	[[ $# -eq 0 ]] || fail "Expected no arguments or --native-helper-only."
+	check_dev_source_configuration
+	select_launcher_archs
 	for cmd in curl unzip zip ditto tar swift xcrun awk lipo codesign iconutil sips plutil shasum git node; do
 		require_cmd "$cmd"
 	done
@@ -833,10 +933,17 @@ main() {
 	bash "$REPO_ROOT/tools/build/bundle-macos-luasocket.sh" "$APP_PATH" "$BUILD_DIR/luasocket-build"
 	build_icon
 	generate_info_plist
+	[ "$ERGOPTI_DEV_SOURCE" != 1 ] || record_dev_source_root
 	setup_signing_identity
 	codesign_app
 	verify_app_signature "$APP_PATH"
 	verify_app_signature "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
+	# The archive producer refuses a developer app; none is ever published.
+	if [ "$ERGOPTI_DEV_SOURCE" = 1 ]; then
+		log "Developer source app ready (no release archive): $APP_PATH"
+		log "  Lua source : $REPO_ROOT/static/ergopti_plus/macos"
+		return
+	fi
 	node "$REPO_ROOT/tools/build/macos-release-archives.cjs" "$APP_PATH" "$BUILD_DIR"
 
 	log "Done."

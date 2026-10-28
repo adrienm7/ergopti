@@ -495,6 +495,97 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 	end)
 end)
 
+helpers.describe("layout manager (Linux): number-row options, live", function()
+	local APPLIED_RUN = { exit_code = 0, stdout = '{"ok": true, "verified": true, "detail": "loaded into the running X server"}\n', stderr = "" }
+	local NOT_LOADED_RUN = { exit_code = 1, stdout = '{"ok": false, "verified": false, "detail": "not loaded: not_loaded", "code": "not_loaded"}\n', stderr = "" }
+
+	--- An installed Ergo-L and a session of the given type.
+	local function with_ergol(session, runs)
+		local LayoutRegistry, deps, state = manager({
+			files = {
+				[LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1, layouts = { ergol = entry_of("ergol") } }),
+				[LOCAL_DIR .. "ergol.keylayout"] = registry_file("ergol/ergol.keylayout"),
+			},
+			runs = runs,
+		})
+		deps.session_type = function() return session end
+		return LayoutRegistry, deps, state
+	end
+
+	--- The keysyms of one key in a symbols file, in level order.
+	local function levels_of(symbols, key)
+		local list = symbols:match("key <" .. key .. "> { type%[group1%] = \"[^\"]*\", %[([^%]]*)%]")
+		local out = {}
+		for item in (list or ""):gmatch("[^,%s]+") do out[#out + 1] = item end
+		return out
+	end
+
+	local ROWS = { order = "symbols", edges = true }
+
+	helpers.it("converts with the options, installs for Xorg and loads the layout into the running server (layout-rows-live)", function()
+		local LayoutRegistry, deps, state = with_ergol("x11", { OK_RUN, INSTALLED_RUN, OK_RUN, APPLIED_RUN })
+		local result = run(function(done) LayoutRegistry.apply_rows(nil, ROWS, done, deps) end)
+		helpers.assert_true(result.ok, tostring(result.detail) .. " " .. tostring(result.extra))
+		helpers.assert_eq(result.detail.id, "ergol")
+		helpers.assert_eq(result.detail.rows.order, "symbols")
+		helpers.assert_true(result.detail.rows.edges.applies)
+		helpers.assert_eq(state.runs[2].args[2], "install")
+		helpers.assert_eq(state.runs[2].args[#state.runs[2].args], "--allow-xorg", "Xorg is only allowed because the layout is loaded here")
+		helpers.assert_eq(state.runs[4].args[2], "apply-x11")
+		helpers.assert_eq(arg_value(state.runs[4].args, "--layout-id"), "ergol")
+		-- Ergo-L types its digits unshifted; with the options the symbol is the unshifted level.
+		local plain = levels_of(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], "AE01")
+		helpers.assert_eq(plain[1], "EuroSign", "symbols first: Ergo-L's Shift symbol of the 1 key is now unshifted")
+		helpers.assert_eq(plain[3], "1", "symbols first: the digit is on Shift")
+		helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
+	end)
+
+	helpers.it("refuses a session that cannot load a user layout live before anything is written (layout-rows-live)", function()
+		for _, session in ipairs({ "wayland", "tty", "" }) do
+			local LayoutRegistry, deps, state = with_ergol(session, {})
+			local before = {}
+			for path, text in pairs(state.files) do before[path] = text end
+			local result = run(function(done) LayoutRegistry.apply_rows("ergol", ROWS, done, deps) end)
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_SESSION, session)
+			helpers.assert_eq(#state.runs, 0, "no child runs")
+			helpers.assert_eq(state.files, before, "nothing is written")
+		end
+	end)
+
+	helpers.it("names a missing source layout and an uninstalled one (layout-rows-live)", function()
+		local LayoutRegistry, deps = manager({ files = { [LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1, layouts = {} }) } })
+		deps.session_type = function() return "x11" end
+		local none = run(function(done) LayoutRegistry.apply_rows(nil, ROWS, done, deps) end)
+		helpers.assert_eq(none.detail, LayoutRegistry.FAILURE_NO_SOURCE)
+		local missing = run(function(done) LayoutRegistry.apply_rows("ergol", ROWS, done, deps) end)
+		helpers.assert_eq(missing.detail, LayoutRegistry.FAILURE_NOT_INSTALLED)
+	end)
+
+	helpers.it("reports the closed code of a load the server did not keep, and frees the slot (layout-rows-live)", function()
+		local LayoutRegistry, deps = with_ergol("x11", { OK_RUN, INSTALLED_RUN, OK_RUN, NOT_LOADED_RUN,
+			OK_RUN, INSTALLED_RUN, OK_RUN, APPLIED_RUN })
+		local failed, code
+		LayoutRegistry.apply_rows("ergol", ROWS, function(ok, detail, _, _, live)
+			failed, code = { ok = ok, detail = detail }, live
+		end, deps)
+		helpers.assert_eq(failed.ok, false)
+		helpers.assert_eq(failed.detail, LayoutRegistry.FAILURE_LIVE)
+		helpers.assert_eq(code, "not_loaded")
+		local again = run(function(done) LayoutRegistry.apply_rows("ergol", ROWS, done, deps) end)
+		helpers.assert_true(again.ok, "the operation slot is free after a failure")
+	end)
+
+	helpers.it("keeps an inert choice and says why (layout-rows-live)", function()
+		local LayoutRegistry, deps, state = with_ergol("x11", { OK_RUN, INSTALLED_RUN, OK_RUN, APPLIED_RUN })
+		local result = run(function(done) LayoutRegistry.apply_rows("ergol", { order = "digits", edges = false }, done, deps) end)
+		helpers.assert_true(result.ok)
+		helpers.assert_eq(result.detail.rows.order, "native")
+		helpers.assert_eq(result.detail.rows.reason, "already_digits_first")
+		helpers.assert_eq(levels_of(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], "AE01")[1], "1")
+	end)
+end)
+
 helpers.describe("layout manager (Linux): what the package ships", function()
 	helpers.it("finds the conversion data, the installer and the registry where package and checkout put them (layout-registry-convert)", function()
 		local LayoutRegistry = helpers.load_module("modules.keymap.layout_registry")

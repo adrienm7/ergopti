@@ -51,6 +51,7 @@ local function with_fixture(plan, callback)
 	local outcome = table.pack(xpcall(function()
 			helpers.with_fresh_modules(MODULES, function()
 			local records = {
+				errors = {},
 				callback_labels = {},
 				download_aborts = 0,
 				download_retry_starts = 0,
@@ -390,9 +391,9 @@ local function with_fixture(plan, callback)
 					end
 					return result_value(self.behavior.terminate, self)
 				end
-				function task:complete(code, stderr)
+				function task:complete(code, stderr, stdout)
 					self.running_state = false
-					return self.done(code or 0, "", stderr or "")
+					return self.done(code or 0, stdout or "", stderr or "")
 				end
 				function task:isRunning()
 					local probe_mode = self.behavior.running_probe
@@ -435,6 +436,10 @@ local function with_fixture(plan, callback)
 					end)
 				end
 				return base_logger_callback(log_name, label, fn, ...)
+			end
+			logger_stub.error = function(_, message, ...)
+				local ok, rendered = pcall(string.format, tostring(message), ...)
+				records.errors[#records.errors + 1] = ok and rendered or tostring(message)
 			end
 			package.loaded["infra.logger"] = logger_stub
 			package.loaded["infra.i18n"] = {

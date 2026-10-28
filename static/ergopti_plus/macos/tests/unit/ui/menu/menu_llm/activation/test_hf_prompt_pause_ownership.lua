@@ -10,7 +10,7 @@ local MODULES = {
 	"infra.i18n",
 	"infra.logger",
 	"infra.notifications",
-	"infra.paths",
+	"infra.paths", "infra.timings",
 	"ui.ui_builder",
 	"ui.menu.menu_llm.models_manager_mlx_hf",
 }
@@ -152,6 +152,7 @@ local function with_fixture(options, callback)
 				return true
 			end,
 		}
+		helpers.provide_timings()
 		package.loaded["infra.paths"] = {
 			shared = function(path)
 				if options.boundary_throw == "paths" then
@@ -248,6 +249,9 @@ local function with_fixture(options, callback)
 
 		local Mixin = helpers.load_with_stubs(
 			"ui.menu.menu_llm.models_manager_mlx_hf", hs_overrides)
+		-- load_with_stubs cleared the registry reader: install the real one before the paths
+		-- boundary below is made hostile, so only the prompt crosses it.
+		helpers.provide_timings()
 		-- load_with_stubs installs its shared-path table after fixture stubs. Mutate
 		-- that same captured table here so the live prompt crosses the hostile path
 		-- boundary instead of a pre-load stand-in that production never observes.

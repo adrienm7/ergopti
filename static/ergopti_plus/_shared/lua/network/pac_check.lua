@@ -54,12 +54,16 @@ end
 --- Judges one PAC answer.
 --- @param status number|nil HTTP status, nil or 0 when the request failed.
 --- @param body string|nil Response body.
+--- @param transport_error string|nil The HTTP client's reason for a failed request.
 --- @return string state "ok" or "error"
 --- @return string text Value (ok) or detail (error), without any URL.
-function M.judge(status, body)
+function M.judge(status, body, transport_error)
 	status = tonumber(status) or 0
 	if status ~= 200 then
-		return "error", status > 0 and ("PAC download: HTTP " .. status) or "PAC download failed"
+		if status > 0 then return "error", "PAC download: HTTP " .. status end
+		-- The transport reason is the only clue a field log carries (issue #104).
+		return "error", type(transport_error) == "string" and transport_error ~= ""
+			and ("PAC download failed: " .. transport_error) or "PAC download failed"
 	end
 	if type(body) ~= "string" or body == "" then return "error", "PAC is empty" end
 	local bytes = #body
@@ -77,6 +81,15 @@ function M.judge(status, body)
 		end
 	end
 	return "ok", string.format("HTTP 200, %d bytes, %s, FindProxyForURL found", bytes, utf16 and "UTF-16" or "UTF-8")
+end
+
+--- Appends to a PAC failure detail what a driver whose downloads fall back to
+--- a direct connection (proxy_policy.json "pac_unavailable_fallback") does next,
+--- so the diagnostics do not read as "every download is refused".
+--- @param detail string The detail judge() returned.
+--- @return string
+function M.with_direct_fallback(detail)
+	return tostring(detail) .. "; downloads then try a direct connection"
 end
 
 --- Extracts the PAC URL from `scutil --proxy` text (macOS).

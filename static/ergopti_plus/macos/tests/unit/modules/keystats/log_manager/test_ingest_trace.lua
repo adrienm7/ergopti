@@ -76,4 +76,28 @@ helpers.describe("keystats: slow ingest tick names its phase", function()
 			last = pos
 		end
 	end)
+	helpers.it("names the slow sub-stage of the append phase and its metadata forks (L16)", function()
+		-- clock reads: begin, stages(), lock, publish, settle, mark(append), finish(notify), finish(total)
+		local trace, lines = scripted({ 0, 0, 2, 302, 602, 603, 603, 603 })
+		local stage = trace.stages("append", { "lock", "publish", "settle" })
+		stage("lock")
+		stage("publish")
+		stage("settle")
+		trace.mark("append")
+		trace.count("metadata_commands", 8)
+		trace.count("metadata_command_ms", 560)
+		helpers.assert_true(trace.finish(), "a 603 ms tick is reported")
+		helpers.assert_true(lines[1]:find("append=603", 1, true) ~= nil, "the phase keeps its whole time: " .. lines[1])
+		helpers.assert_true(lines[1]:find("; append: lock=2 publish=300 settle=300 ms", 1, true) ~= nil, lines[1])
+		helpers.assert_true(lines[1]:find("; metadata_commands=8 in 560 ms", 1, true) ~= nil, lines[1])
+	end)
+
+	helpers.it("ingest_once times the ledger flush stages and metadata forks", function()
+		local src = helpers.read_driver_source("local function _mark_aggregate_cache_rebuilt")
+		local body = src:sub(src:find("function M.ingest_once()", 1, true), src:find("Verifies one native ingest timer", 1, true))
+		helpers.assert_true(body:find('trace.stages("append", LedgerAppend.FLUSH_STAGES)', 1, true) ~= nil,
+			"the committed batch flush must receive the append stage clock")
+		helpers.assert_true(body:find('trace.count("metadata_commands"', 1, true) ~= nil,
+			"the append phase must count its synchronous metadata commands")
+	end)
 end)

@@ -1,0 +1,267 @@
+{
+	"_comment": "Number-row option outcomes in Windows terms: a press is the scan code of a key with the modifiers down; types is what it types. Written by hand from the Windows behaviour (docs/design/layout-option-emulation.md, section 1): base and Shift of keys SC002-SC00B (and SC029, SC00C, SC00D with the edges option) trade places, AltGr and the shortcut maps stay the layout's own, a refused choice changes nothing.",
+	"cases": [
+		{
+			"id": "azerty_native",
+			"note": "baseline",
+			"source": "azerty",
+			"rows": {
+				"order": "native",
+				"edges": false
+			},
+			"effective": {
+				"order": "native",
+				"reason": "",
+				"edges": {
+					"applies": false,
+					"reason": ""
+				}
+			},
+			"types": [
+				["SC002", "&"],
+				["shift SC002", "1"],
+				["SC003", "é"],
+				["shift SC003", "2"]
+			]
+		},
+		{
+			"id": "azerty_digits",
+			"note": "AZERTY: digits first. AltGr and Ctrl keep the layout's own cells",
+			"source": "azerty",
+			"rows": {
+				"order": "digits",
+				"edges": false
+			},
+			"effective": {
+				"order": "digits",
+				"reason": "",
+				"edges": {
+					"applies": false,
+					"reason": ""
+				}
+			},
+			"types": [
+				["SC002", "1"],
+				["shift SC002", "&"],
+				["SC003", "2"],
+				["shift SC003", "é"],
+				["SC00B", "0"],
+				["shift SC00B", "à"],
+				["altgr SC003", "~"],
+				["SC029", "²"]
+			],
+			"sends": [
+				["SC002", "ctrl", "&"],
+				["SC003", "ctrl", "é"]
+			]
+		},
+		{
+			"id": "azerty_digits_edges_refused",
+			"note": "the key left of 1 types nothing with Shift, so the edges stay",
+			"source": "azerty",
+			"rows": {
+				"order": "digits",
+				"edges": true
+			},
+			"effective": {
+				"order": "digits",
+				"reason": "",
+				"edges": {
+					"applies": false,
+					"reason": "edges_incomplete"
+				}
+			},
+			"types": [
+				["SC002", "1"],
+				["SC029", "²"],
+				["shift SC029", ""],
+				["SC00C", ")"],
+				["shift SC00C", "°"]
+			]
+		},
+		{
+			"id": "azerty_symbols_inert",
+			"note": "AZERTY already has its symbols first: the choice is kept and changes nothing",
+			"source": "azerty",
+			"rows": {
+				"order": "symbols",
+				"edges": false
+			},
+			"effective": {
+				"order": "native",
+				"reason": "already_symbols_first",
+				"edges": {
+					"applies": false,
+					"reason": ""
+				}
+			},
+			"types": [
+				["SC002", "&"],
+				["shift SC002", "1"]
+			]
+		},
+		{
+			"id": "qwerty_symbols",
+			"note": "US: symbols first, with the Caps level following the new base",
+			"source": "qwerty",
+			"rows": {
+				"order": "symbols",
+				"edges": false
+			},
+			"effective": {
+				"order": "symbols",
+				"reason": "",
+				"edges": {
+					"applies": false,
+					"reason": ""
+				}
+			},
+			"types": [
+				["SC002", "!"],
+				["shift SC002", "1"],
+				["SC003", "@"],
+				["shift SC003", "2"],
+				["SC00B", ")"],
+				["shift SC00B", "0"],
+				["caps SC002", "!"],
+				["SC029", "`"],
+				["SC00C", "-"]
+			],
+			"sends": [
+				["SC002", "ctrl", "1"],
+				["SC002", "meta", "1"],
+				["SC002", "alt", "1"]
+			]
+		},
+		{
+			"id": "qwerty_symbols_edges",
+			"note": "US: the three edge keys trade their levels too",
+			"source": "qwerty",
+			"rows": {
+				"order": "symbols",
+				"edges": true
+			},
+			"effective": {
+				"order": "symbols",
+				"reason": "",
+				"edges": {
+					"applies": true,
+					"reason": ""
+				}
+			},
+			"types": [
+				["SC002", "!"],
+				["SC029", "~"],
+				["shift SC029", "`"],
+				["SC00C", "_"],
+				["shift SC00C", "-"],
+				["SC00D", "+"],
+				["shift SC00D", "="]
+			]
+		},
+		{
+			"id": "qwerty_digits_inert",
+			"note": "US already has its digits first",
+			"source": "qwerty",
+			"rows": {
+				"order": "digits",
+				"edges": false
+			},
+			"effective": {
+				"order": "native",
+				"reason": "already_digits_first",
+				"edges": {
+					"applies": false,
+					"reason": ""
+				}
+			},
+			"types": [
+				["SC002", "1"],
+				["shift SC002", "!"]
+			]
+		},
+		{
+			"id": "qwerty_edges_without_ordering",
+			"note": "the edges only join an ordering that applies",
+			"source": "qwerty",
+			"rows": {
+				"order": "native",
+				"edges": true
+			},
+			"effective": {
+				"order": "native",
+				"reason": "",
+				"edges": {
+					"applies": false,
+					"reason": "no_ordering"
+				}
+			},
+			"types": [
+				["SC029", "`"],
+				["shift SC029", "~"],
+				["SC002", "1"]
+			]
+		},
+		{
+			"id": "qwerty_mixed_row",
+			"note": "one key that disagrees with the others: no ordering can reorder all ten",
+			"source": "qwerty",
+			"rows": {
+				"order": "symbols",
+				"edges": false
+			},
+			"overrides": {
+				"base": {
+					"Digit5": "x"
+				}
+			},
+			"effective": {
+				"order": "native",
+				"reason": "mixed",
+				"edges": {
+					"applies": false,
+					"reason": ""
+				}
+			},
+			"types": [
+				["SC006", "x"],
+				["shift SC006", "%"],
+				["SC002", "1"],
+				["shift SC002", "!"]
+			]
+		},
+		{
+			"id": "azerty_dead_key_moves_whole",
+			"note": "a dead key on a digit key moves with its state machine: circumflex then a types â",
+			"source": "azerty",
+			"rows": {
+				"order": "digits",
+				"edges": false
+			},
+			"overrides": {
+				"base": {
+					"Digit5": {
+						"copy": {
+							"source": "azerty",
+							"key": "BracketLeft",
+							"layer": "base"
+						}
+					}
+				}
+			},
+			"effective": {
+				"order": "digits",
+				"reason": "",
+				"edges": {
+					"applies": false,
+					"reason": ""
+				}
+			},
+			"types": [
+				["SC006", "5"],
+				["SC002", "1"],
+				["shift SC006,SC010", "â"]
+			]
+		}
+	]
+}

@@ -1,0 +1,16 @@
+# _shared/tests/corpus/config_migrations/op_rename_prefix_replay/migrations.toml
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: per-slot parameters follow their slot's new prefix."
+ops = [
+	{ op = "rename_prefix", section = "gestures.action_parameters", prefix = "keyboard__cmd_", to_prefix = "keyboard__primary_" },
+	{ op = "rename_prefix", section = "gestures.action_parameters", prefix = "keyboard__hs_ctrl_", to_prefix = "keyboard__secondary_" },
+	{ op = "rename_prefix", section = "never.written", prefix = "keyboard__cmd_", to_prefix = "keyboard__primary_" },
+]

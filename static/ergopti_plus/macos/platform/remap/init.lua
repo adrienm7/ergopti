@@ -6329,7 +6329,12 @@ function M.regenerate(
 		-- is the same shell-quoting rule the generator applies 150 lines away, and the
 		-- generator's own regression test covers only that file. Memoised because this
 		-- runs on every regenerate: the directory does not stop existing.
-		pcall(hs.execute, "mkdir -p " .. require("text_utils").shell_quote(kc_parent))
+		-- An existing folder needs no shell fork (about 40 ms on the Mac, inside
+		-- the boot regeneration).
+		local ok_mode, mode = pcall(hs.fs.attributes, kc_parent, "mode")
+		if not (ok_mode and mode == "directory") then
+			pcall(hs.execute, "mkdir -p " .. require("text_utils").shell_quote(kc_parent))
+		end
 		_kc_parent_ensured = true
 	end
 
@@ -7082,11 +7087,22 @@ function M.init(file_system)
 			-- This step is independent and guarded so a layout failure cannot suppress
 			-- the first post-wake liveness proof.
 			if _state.enabled == true then
+				local refresh_reason = nil
 				local refresh_ok, refreshed = run_async_step(
 					"Wake exact-lease liveness refresh",
-					LeaseController.refresh_liveness
+					function()
+						local sent, reason = LeaseController.refresh_liveness()
+						refresh_reason = reason
+						return sent
+					end
 				)
-				if not refresh_ok or refreshed ~= true then
+				if refresh_ok and refreshed ~= true and refresh_reason == "no-live-generation" then
+					-- The 2026-10-27 19:46 wake found the generation gone and only warned, so
+					-- remapping stayed off until a reload. The bounded failure recovery owns
+					-- the re-acquisition: it refuses while disabled, paused or transitioning.
+					Logger.info(LOG, "Wake found no live Karabiner lease; re-acquiring it.")
+					begin_lease_recovery(_last_failed_lease_token or "wake-without-generation")
+				elseif not refresh_ok or refreshed ~= true then
 					Logger.warn(LOG, "Wake refresh could not renew the exact Karabiner lease liveness.")
 				end
 			end
@@ -7308,6 +7324,9 @@ function M.revoke(reason, on_done)
 		invoke_public_callback("revoke", on_done, ok == true, detail)
 	end
 	local function settle_join_if_ready()
+		-- Both halves may answer inside their own calls; the join then already
+		-- settled, and the trailing join below must not report it twice.
+		if callback_fired then return end
 		if not onboarding_done or not lease_done then return end
 		if onboarding_succeeded ~= true then
 			Logger.error(LOG, "Ergopti onboarding revocation failed: %s.",

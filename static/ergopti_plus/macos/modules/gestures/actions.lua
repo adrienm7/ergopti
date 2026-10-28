@@ -390,30 +390,6 @@ local function sg(name, label_or_fn, fn_arg)
 	SG[name] = { fn = fn }
 end
 
---- Calls `method` on a lazily required UI module, logging loudly on a miss.
---- The plain `pcall(function() require(mod).method() end)` shape this replaces
---- collapsed three distinct failures — module absent, method absent, method
---- raised — into the same silent no-op, so four actions stayed dead through a
---- module rename with nothing in the logs to say so.
---- @param mod string Module name to require.
---- @param method string Method to invoke on it.
---- @param ... any Arguments forwarded to the method.
-local function invoke_ui(mod, method, ...)
-	local ok_mod, m = pcall(require, mod)
-	if not ok_mod or type(m) ~= "table" then
-		Logger.error(LOG, "Action target '%s' could not be required — gesture is a no-op.", mod)
-		return
-	end
-	if type(m[method]) ~= "function" then
-		Logger.error(LOG, "Action target '%s' has no '%s' function — gesture is a no-op.", mod, method)
-		return
-	end
-	local ok_call, err = pcall(m[method], ...)
-	if not ok_call then
-		Logger.error(LOG, "Action '%s.%s' raised: %s", mod, method, tostring(err))
-	end
-end
-
 --- Activates the most recently used other application directly.
 ---
 --- This posted Cmd+Tab. The Dock commits its switcher only when Command itself
@@ -1493,14 +1469,27 @@ sg("open_app", function(binding)
 end)
 
 -- Applications and Stats
--- These four target the same modules the menu dispatches to (ui/menu/init.lua),
--- which is the reference for the real module names: the metrics overlays were
--- never one "ui.metrics_overlay" module, the hotstring editor is singular, and
--- the paths editor lives behind the menu_paths module rather than a UI module.
-sg("open_metrics_typing",            function() invoke_ui("ui.metrics_typing", "show") end)
-sg("open_metrics_apps",        function() invoke_ui("ui.metrics_apps", "show") end)
-sg("open_hotstrings_editor",    function() invoke_ui("ui.hotstring_editor", "open") end)
-sg("open_paths_editor",            function() invoke_ui("ui.menu.menu_paths", "open_editor") end)
+-- Each window action toggles one page through ui/window_toggle: closed opens
+-- it, covered brings it to the front, focused closes it. The page ids name
+-- the modules the menu dispatches to (ui/menu/init.lua): the metrics overlays
+-- were never one "ui.metrics_overlay" module, the hotstring editor is
+-- singular, and the paths editor lives behind the menu_paths module.
+local WINDOW_ACTIONS = {
+	open_metrics_typing      = "metrics_typing",
+	open_metrics_apps        = "metrics_apps",
+	open_hotstrings_editor   = "hotstring_editor",
+	open_paths_editor        = "paths_editor",
+	open_hotstrings_settings = ConfigKeys.COMMAND.HOTSTRINGS_CONFIG_WINDOW,
+	open_layout_manager      = ConfigKeys.COMMAND.LAYOUT_MANAGER,
+	open_layer_editor        = "layer_editor",
+	open_model_browser       = "model_browser",
+	open_changelog           = "changelog",
+	open_healthcheck         = ConfigKeys.COMMAND.HEALTHCHECK,
+}
+M.WINDOW_ACTIONS = WINDOW_ACTIONS
+for action_id, page in pairs(WINDOW_ACTIONS) do
+	sg(action_id, function() return require("ui.window_toggle").toggle(page) end)
+end
 sg("open_script_source",               function()
 	return AuxOwner.open(hs.configdir, "open script source", nil, current_action_parent())
 end)

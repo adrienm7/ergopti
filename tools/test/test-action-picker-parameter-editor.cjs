@@ -230,7 +230,7 @@ function loadPage(host, current) {
 	context.__current = current || 'none';
 	vm.runInContext(
 		`init({
-			title: 'T', current: __current, noneLabel: 'Nothing',
+			title: 'T', cancelLabel: 'Cancel', current: __current, noneLabel: 'Nothing',
 			executableSyntax: __capabilities.executableSyntax,
 			commandIsPrimary: __capabilities.commandIsPrimary,
 			sendVocabulary: __vocabulary,
@@ -794,7 +794,7 @@ for (const missing of ['executableSyntax', 'commandIsPrimary']) {
 	page.context.__missing = missing;
 	const refused = vm.runInContext(
 		`(() => {
-			const data = { title: 'T', current: 'none', parameterStrings: { save: 'Save' },
+			const data = { title: 'T', cancelLabel: 'Cancel', current: 'none', parameterStrings: { save: 'Save' },
 				executableSyntax: 'posix', commandIsPrimary: false };
 			delete data[__missing];
 			try { init(data); return false; } catch (error) { return /executableSyntax/.test(error.message); }
@@ -957,7 +957,7 @@ for (const host of ['hs', 'linux', 'ahk']) {
 	});
 	page.context.__reason = 'Translated unavailable <script>日本</script>';
 	vm.runInContext(
-		`init({ title:'T', executableSyntax:'posix', commandIsPrimary:true, current:'run_program',
+		`init({ title:'T', cancelLabel:'Cancel', executableSyntax:'posix', commandIsPrimary:true, current:'run_program',
 		editCurrentLabel:'Edit current', parameterStrings:{save:'Save'},
 		items:[{type:'action',id:'run_program',label:'Run program',parameter:'program',
 			parameterValue:__stored,hint:__reason}] });`,

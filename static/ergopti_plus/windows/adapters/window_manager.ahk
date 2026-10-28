@@ -93,12 +93,36 @@ WMHandleExists(HWnd) {
 	return _WMForegroundNative.IsWindow(HWnd)
 }
 
+/**
+ * Checks that HWnd names an existing window created by this process, even while
+ * hidden. A handle Windows recycled for another process after our window closed
+ * is not ours, so callers that act on their own surface must not touch it.
+ */
+WMHandleOwnedByThisProcess(HWnd) {
+	if !_WMForegroundNative.IsWindow(HWnd)
+		return false
+	return _WMForegroundNative.GetWindowProcessId(HWnd) == ProcessExist()
+}
+
 /** Creates an invisible real HWND whose controller can retain the shared browser. */
 WMBrowserWarmHost() {
 	Host := Gui_Create("+ToolWindow")
 	Control := Host.Add("Text", "x0 y0 w600 h400", "")
 	Host.Show("Hide w600 h400")
 	return {Hwnd: Control.Hwnd, Destroy: (*) => Host.Destroy()}
+}
+
+/**
+ * Asks one of this process's windows to close through WM_CLOSE, so its own
+ * Close handler runs exactly as for the title-bar button. A handle that is not
+ * ours (closed, recycled) is refused rather than sent a message.
+ * @param HWnd {Integer} Window handle.
+ * @return {Boolean} True when the request was posted.
+ */
+WMRequestClose(HWnd) {
+	if !HWnd || !WMHandleOwnedByThisProcess(HWnd)
+		return false
+	return DllCall("PostMessageW", "Ptr", HWnd, "UInt", 0x0010, "Ptr", 0, "Ptr", 0, "Int") != 0
 }
 
 ; Forcefully terminates all windows matching Spec.
@@ -202,6 +226,12 @@ class _WMForegroundNative {
 
 	static GetWindowThreadProcessId(HWnd) {
 		return DllCall("GetWindowThreadProcessId", "Ptr", HWnd, "Ptr", 0, "UInt")
+	}
+
+	static GetWindowProcessId(HWnd) {
+		ProcessId := 0
+		DllCall("GetWindowThreadProcessId", "Ptr", HWnd, "UInt*", &ProcessId, "UInt")
+		return ProcessId
 	}
 
 	static AttachThreadInput(ForeThread, TargThread, Attach) {

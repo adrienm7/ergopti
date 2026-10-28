@@ -29,6 +29,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Timings = require("infra.timings")
 
 local LOG = "adapters.network_check_ports"
 
@@ -41,8 +42,9 @@ M.PAC_TIMEOUT_MS = 15000
 M.LOOKUP_TIMEOUT_MS = 10000
 M.REQUEST_TIMEOUT_MS = 20000
 
---- Largest answer read: a PAC is capped by the shared verdict, the feed is small.
-M.MAX_BODY_BYTES = 1048576 + 1
+--- Largest answer read: a PAC is capped by the shared verdict, the feed is small
+--- ([limits] network_check_body_bytes).
+M.MAX_BODY_BYTES = Timings.count("limits", "network_check_body_bytes")
 
 --- gsettings and kioslaverc readers, in the order their kinds are reported.
 local GNOME_MODE = "gsettings get org.gnome.system.proxy mode 2>/dev/null"
@@ -189,6 +191,10 @@ function M.new(deps)
 			follow_redirects = true,
 		}, function(result)
 			result = type(result) == "table" and result or {}
+			-- The step tokens stay fixed, so the transport reason is logged here.
+			if (tonumber(result.status) or 0) == 0 then
+				Logger.warn(LOG, "PAC download failed: %s.", tostring(result.error))
+			end
 			callback(tonumber(result.status), result.body)
 		end)
 	end

@@ -122,8 +122,8 @@ local function setup(backend)
 	}
 	local Rows = helpers.load_module("ui.menu.llm_backend_rows")
 	local function build()
-		return Rows.rows(llm, dialogs, function() state.changed = (state.changed or 0) + 1 end,
-			function() return { { label = "llama3" } } end)
+		return require("tests.support.ui.menu.llm.api_page_rows").rows(Rows, llm, dialogs,
+			function() state.changed = (state.changed or 0) + 1 end)
 	end
 	return build, state, function()
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
@@ -155,109 +155,8 @@ local function exact(rows, label)
 	return nil
 end
 
---- Holds the genuine translator/backend/renderer cohort without persisting a locale.
-local function with_api_add_locale(scenario)
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
-	local previous = {}
-	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
-	local native, owner, receipt, acquired
-	local ok, err = pcall(function()
-		native = require("infra.i18n")
-		native.init()
-		owner = { pending = function() return false end }
-		acquired = native.scope_acquire(owner)
-		helpers.assert_eq(acquired, true)
-		receipt = native.scope_capture(owner)
-		helpers.assert_not_nil(receipt)
-		helpers.assert_eq(native.scope_apply(owner, receipt, "en"), true)
-		helpers.assert_eq(native.get_locale(), "en")
-		helpers.assert_eq(require("infra.locale").current_locale(), "en")
-		scenario(native)
-	end)
-	local restored, released, forgotten = true, true, true
-	if receipt then restored = native.scope_restore(owner, receipt) == true end
-	if acquired then released = native.scope_release(owner) == true end
-	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
-	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
-	for _, name in ipairs(names) do helpers.assert_eq(rawequal(package.loaded[name], previous[name]), true, name) end
-	helpers.assert_eq(restored, true, "the genuine runtime inverse restores its previous locale")
-	helpers.assert_eq(released, true, "the temporary locale owner is released on every exit")
-	helpers.assert_eq(forgotten, true, "the temporary locale receipt is forgotten on every exit")
-	if not ok then error(err, 0) end
-end
 
---- Exercises the real tray provider over the handwritten shared frame.
-local function with_api_add_frame(scenario)
-	local path = require("infra.paths").shared("tests/corpus/menus/api_add_controls.json")
-	local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
-	local corpus = assert(require("json").decode(raw))
-	with_api_add_locale(function()
-		local restore
-		local ok, err = pcall(function()
-			local menu = require("infra.manifest_menu")
-			local build, state, cleanup = setup("api"); restore = cleanup
-			scenario(corpus, menu, build, state)
-		end)
-		if restore then restore() end
-		if not ok then error(err, 0) end
-	end)
-end
 
---- The backend boundary is a presentation row; macOS never allocates it.
-local function backend_boundary_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/backend_choice_boundary.json"), "rb"))
-	local raw = file:read("*a"); assert(file:close())
-	return assert(require("json").decode(raw))
-end
-
---- Builds the native API rows over a genuine private empty entries source.
-local function with_empty_api_owner(scenario)
-	local previous = {}
-	for name, value in pairs(package.loaded) do previous[name] = value end
-	local path = assert(os.tmpname())
-	local image = '{"version":1,"active_id":"","entries":[]}\n'
-	local file = assert(io.open(path, "wb")); assert(file:write(image)); assert(file:close())
-	local ok, err = pcall(function()
-		for _, name in ipairs({ "modules.llm.api_remote", "modules.llm.api_entries", "ui.menu.llm_backend_rows" }) do
-			package.loaded[name] = nil
-		end
-		with_api_add_locale(function(native)
-			local entries = require("modules.llm.api_entries")
-			entries._set_path_for_test(path)
-			helpers.assert_eq(entries.list(), {})
-			helpers.assert_nil(entries.active())
-			local observations = { prompts = 0, changes = 0, sets = 0 }
-			local llm = { get_backend = function() return "api" end, get_current_model = function() return nil end,
-				set_backend = function() observations.sets = observations.sets + 1; return true end }
-			local dialogs = { prompt = function() observations.prompts = observations.prompts + 1; return nil end,
-				error = function() error("empty status must not open an error") end,
-				info = function() error("empty status must not open a notice") end }
-			local rows = require("ui.menu.llm_backend_rows")
-			local function build()
-				return rows.rows(llm, dialogs, function() observations.changes = observations.changes + 1 end,
-					function() error("the API status must not query Ollama rows") end)
-			end
-			scenario(build, require("infra.manifest_menu"), native, observations)
-		end)
-	end)
-	local check = assert(io.open(path, "rb")); local retained = check:read("*a"); assert(check:close())
-	local quarantined = io.open(path .. ".corrupt", "rb")
-	if quarantined then quarantined:close() end
-	assert(os.remove(path))
-	for name in pairs(package.loaded) do if previous[name] == nil then package.loaded[name] = nil end end
-	for name, value in pairs(previous) do package.loaded[name] = value end
-	for name, value in pairs(previous) do helpers.assert_eq(rawequal(package.loaded[name], value), true, name) end
-	helpers.assert_eq(retained, image, "the genuine empty source stays byte-exact")
-	helpers.assert_nil(quarantined, "the valid private source is never quarantined")
-	if not ok then error(err, 0) end
-end
-
---- The two empty states are independent inert labels, not selectable NoModel controls.
-local function empty_status_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/llm_empty_status.json"), "rb"))
-	local raw = file:read("*a"); assert(file:close())
-	return assert(require("json").decode(raw))
-end
 
 --- Runs actual menu/catalogue/private storage/request code over authored dialogs and HTTP.
 --- @param provider_id string
@@ -314,7 +213,7 @@ local function with_real_api_add(provider_id, scenario, body)
 		add_admission_port(llm, state)
 		local Rows = helpers.load_module("ui.menu.llm_backend_rows")
 		local function changed() state.changes = state.changes + 1 end
-		local rows = Rows.rows(llm, dialogs, changed, function() return {} end)
+		local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(Rows, llm, dialogs, changed)
 		assert(exact(rows, "➕ " .. provider.label), "the actual Add action must be present").action()
 		state.entry, state.list = entries.active(), entries.list()
 		local handle = assert(io.open(path, "rb")); state.bytes = handle:read("*a"); assert(handle:close())
@@ -324,7 +223,7 @@ local function with_real_api_add(provider_id, scenario, body)
 				state.done({ ok = false, status = 401, error_body = '{"error":{"message":"inert key required"}}' })
 			else state.done({ ok = true, body = '{"choices":[{"message":{"content":"fixture answer"}}]}' }) end
 		end
-		state.rows = Rows.rows(llm, dialogs, changed, function() return {} end)
+		state.rows = require("tests.support.ui.menu.llm.api_page_rows").rows(Rows, llm, dialogs, changed)
 		body(state, original, provider)
 	end, debug.traceback)
 	os.rename = rename
@@ -338,10 +237,5 @@ return {
 	setup = setup,
 	find = find,
 	exact = exact,
-	with_api_add_locale = with_api_add_locale,
-	with_api_add_frame = with_api_add_frame,
-	backend_boundary_corpus = backend_boundary_corpus,
-	with_empty_api_owner = with_empty_api_owner,
-	empty_status_corpus = empty_status_corpus,
 	with_real_api_add = with_real_api_add,
 }

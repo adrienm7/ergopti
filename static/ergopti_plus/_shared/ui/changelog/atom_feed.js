@@ -515,7 +515,8 @@
 		if (typeof xml !== 'string' || !/<feed\b[^>]*>/.test(xml)) {
 			throw new Error('release feed is not an Atom document');
 		}
-		var prefix = 'https://github.com/' + owner + '/' + repo + '/releases/tag/';
+		var prefix =
+			'https://' + ERGOPTI_IDENTIFIERS.hosts.github + '/' + owner + '/' + repo + '/releases/tag/';
 		var releases = [];
 		var entries = xml.match(/<entry\b[^>]*>[\s\S]*?<\/entry\s*>/g) || [];
 		entries.forEach(function (entry) {

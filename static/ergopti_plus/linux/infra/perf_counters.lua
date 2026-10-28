@@ -21,13 +21,17 @@
 ---    updates; no string is built unless the span is slow. Timing used to be
 ---    gated on DEBUG, which left a production log with no latency evidence at
 ---    all and made a stall report impossible to attribute afterwards.
---- 3. Slow segments are named, not typed: the WARNING carries the span name and
----    the duration, never text, a window title or a path.
+--- 3. Slow segments are named, not typed: the WARNING carries the span name, its
+---    parent segment and the durations, never text, a window title or a path.
 --- 4. One summary per interval through Logger.evidence, which the logger never
 ---    collapses, with the Lua heap size as the memory snapshot. Per-interval
 ---    values reset; lifetime totals stay available through snapshot().
 --- 5. Explicit ownership: the event loop's periodic tick drives
 ---    maybe_flush(); nothing here owns a timer.
+--- 6. Nesting attribution (shared hotpath_segments.new_nesting): clock() opens a
+---    frame and span() closes it, so a segment is judged on its own time and a
+---    slow one is reported with the declared segment around it. A dispatch slow
+---    only because of a slow expansion yields one line, for the expansion.
 --- ==============================================================================
 
 local M = {}
@@ -92,12 +96,34 @@ end
 -- Rate limiter of the WARNING (window shared with macOS); the slow counts stay exact.
 local _admit_slow = Segments.new_slow_gate()
 
+--- The threshold of a span, or nil for a span that is not a Linux segment.
+--- @param name string
+--- @return number|nil
+local function threshold_of(name)
+	return slow_limits()[name]
+end
+
+--- Logs one slow segment, rate limited per segment.
+--- @param report table { segment, parent, total_ms, own_ms } from the nesting tracker.
+--- @param now_ms number
+local function report_slow(report, now_ms)
+	local admitted, skipped = _admit_slow(report.segment, now_ms)
+	if admitted then
+		Logger.warn(HOTPATH_LOG, "Slow %s: %.2f ms own, %.2f ms total, parent %s (%d similar since the last line).",
+			report.segment, report.own_ms, report.total_ms, report.parent, skipped)
+	end
+end
+
+-- Open spans, in nesting order; reset with the figures.
+local _nesting = Segments.new_nesting(threshold_of, report_slow)
+
 local function reset_state()
 	_counts, _totals = {}, {}
 	_span_n, _span_sum, _span_max = {}, {}, {}
 	_life_n, _life_sum, _life_max = {}, {}, {}
 	_span_slow, _life_slow = {}, {}
 	_admit_slow = Segments.new_slow_gate()
+	_nesting = Segments.new_nesting(threshold_of, report_slow)
 	for _, name in ipairs(COUNTER_NAMES) do _counts[name] = 0; _totals[name] = 0 end
 	for _, name in ipairs(SPAN_NAMES) do
 		_span_n[name], _span_sum[name], _span_max[name] = 0, 0, 0
@@ -117,14 +143,15 @@ function M.count(name, amount)
 	_counts[name] = current + (amount or 1)
 end
 
---- A start stamp for span().
---- @return number Monotonic milliseconds.
+--- Opens a span: every clock() is closed by span(), which nesting relies on.
+--- @return number Monotonic milliseconds, the stamp to pass to span().
 function M.clock()
-	return Monotonic.now_ms()
+	return _nesting.open(Monotonic.now_ms())
 end
 
---- Closes a span opened with clock(). A declared hot-path segment slower than
---- its threshold also logs one WARNING (name and duration only).
+--- Closes a span opened with clock(). A declared hot-path segment whose own
+--- time (minus the spans closed inside it) exceeds its threshold also logs one
+--- WARNING with its parent segment, names and durations only.
 --- @param name string A declared span.
 --- @param started number The stamp clock() returned.
 --- @return number elapsed_ms The measured duration.
@@ -132,19 +159,11 @@ function M.span(name, started)
 	local n = _span_n[name]
 	if n == nil then error("unknown perf span '" .. tostring(name) .. "'", 2) end
 	if type(started) ~= "number" then error("perf span '" .. name .. "' closed without a clock() stamp", 2) end
-	local now = Monotonic.now_ms()
-	local elapsed = now - started
+	local elapsed, _, slow = _nesting.close(name, started, Monotonic.now_ms())
 	_span_n[name] = n + 1
 	_span_sum[name] = _span_sum[name] + elapsed
 	if elapsed > _span_max[name] then _span_max[name] = elapsed end
-	local limit = slow_limits()[name]
-	if limit ~= nil and elapsed > limit then
-		_span_slow[name] = _span_slow[name] + 1
-		local admitted, skipped = _admit_slow(name, now)
-		if admitted then
-			Logger.warn(HOTPATH_LOG, "Slow %s: %.2f ms (%d similar since the last line).", name, elapsed, skipped)
-		end
-	end
+	if slow then _span_slow[name] = _span_slow[name] + 1 end
 	return elapsed
 end
 

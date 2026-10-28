@@ -690,6 +690,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-keylayout-canonical-parity.cjs"],
 			"repro": "npm run test:keylayout-canonical-parity"
+		},
+		{
+			"id": "xkb-row-options",
+			"ordinal": 522,
+			"name": "the number-row options: the Linux converter and the web composer type the same layout, and both match the hand-written Windows outcomes",
+			"cmd": "node",
+			"args": ["tools/test/test-xkb-row-options.cjs"],
+			"repro": "npm run test:xkb-row-options"
 		}
 	]
 }

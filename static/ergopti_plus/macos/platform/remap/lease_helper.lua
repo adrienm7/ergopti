@@ -11,7 +11,8 @@
 --- 1. Bundle-Bound Override: the launcher export is accepted only when it equals
 ---    the exact helper path derived independently from this bundled Lua tree.
 --- 2. Bundle Derivation: direct launches of the embedded Hammerspoon still find
----    Contents/MacOS/ErgoptiPlus from the bundled Lua source path.
+---    Contents/MacOS/ErgoptiPlus from the bundled Lua source path. A developer
+---    app runs a clone, so its helper is derived from the runtime's own bundle.
 --- 3. Alias Rejection: symlinks, renamed wrappers, developer build artifacts and
 ---    stock Karabiner executables are never treated as process identity.
 --- 4. Fail Closed: no shell watchdog fallback is selected when the native helper
@@ -22,6 +23,7 @@ local M = {}
 
 local hs = hs
 local NativePath = require("native_path")
+local DevSource = require("infra.dev_source")
 local HELPER_ENV = "ERGOPTI_LAUNCHER_EXECUTABLE"
 local HELPER_DEVICE_ENV = "ERGOPTI_LAUNCHER_DEVICE"
 local HELPER_INODE_ENV = "ERGOPTI_LAUNCHER_INODE"
@@ -117,8 +119,19 @@ end
 --- @return string|nil error_message Stable failure detail.
 --- @return table|nil environment Exact identity to copy into this helper process.
 function M.resolve(driver_root_override)
-	local driver_root = driver_root_override or source_driver_root()
-	local bundled = bundle_candidate(driver_root)
+	local bundled
+	-- A developer app runs a clone (infra/dev_source.lua): its helper is derived
+	-- from the native runtime bundle instead, then proved exactly as below.
+	local dev_ok, dev_root = pcall(DevSource.root)
+	if not dev_ok then return nil, "developer source root refused: " .. tostring(dev_root) end
+	if dev_root and not driver_root_override then
+		bundled = DevSource.launcher_executable(hs and hs.processInfo and hs.processInfo.bundlePath)
+		if not bundled then
+			return nil, "developer runtime is not inside an ErgoptiPlus application bundle"
+		end
+	else
+		bundled = bundle_candidate(driver_root_override or source_driver_root())
+	end
 	if not bundled then
 		return nil, "native helper requires a bundled ErgoptiPlus driver tree"
 	end

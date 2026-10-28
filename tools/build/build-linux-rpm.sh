@@ -21,7 +21,15 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-BUILD_DIR="$PROJECT_ROOT/build/linux"
+# The external hosts are declared once in _shared/data/identifiers.json.
+# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
+. "$PROJECT_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# A caller that runs several builds at once gives each its own output directory.
+BUILD_DIR="${ERGOPTI_LINUX_BUILD_DIR:-$PROJECT_ROOT/build/linux}"
+case "$BUILD_DIR" in
+  /?*) ;;
+  *) echo "[ERR] ERGOPTI_LINUX_BUILD_DIR must be an absolute path, got '$BUILD_DIR'" >&2; exit 1 ;;
+esac
 RPM_ROOT="$BUILD_DIR/rpm"
 # The release-visible tree holds one runtime artifact; keep the complete native
 # package set, including debug output, outside that publication boundary.
@@ -173,7 +181,7 @@ Version:        $VERSION
 Release:        $RELEASE%{?dist}
 Summary:        Ergonomic keyboard optimizer with AI-powered hotstrings
 License:        MIT
-URL:            https://github.com/adrienm7/ergopti
+URL:            https://$ERGOPTI_HOST_GITHUB/adrienm7/ergopti
 Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      $ARCH

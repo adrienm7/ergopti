@@ -1,0 +1,178 @@
+{
+	"_comment": "Rows of one API entry in the model selector page: the ids a provider listing yields, and the plan drawn from a listing or its fallback. _shared/lua/llm/api_model_listing.lua (macOS and Linux unit suites) and its port in windows/modules/llm/api_remote.ahk (AHK suite) each replay this corpus; tools/test/test-model-selector-page.cjs checks that all three do.",
+	"max_models": 200,
+	"max_id_length": 200,
+	"max_entries": 16,
+	"ids": [
+		{
+			"name": "openai data sorted and unique",
+			"format": "openai",
+			"body": {
+				"data": [{ "id": "gpt-4o" }, { "id": "gpt-4.1" }, { "id": "gpt-4o" }, { "object": "model" }]
+			},
+			"expect": ["gpt-4.1", "gpt-4o"]
+		},
+		{
+			"name": "anthropic data",
+			"format": "anthropic",
+			"body": {
+				"data": [{ "id": "claude-sonnet-4-6", "type": "model" }, { "id": "claude-haiku-4-5" }]
+			},
+			"expect": ["claude-haiku-4-5", "claude-sonnet-4-6"]
+		},
+		{
+			"name": "gemini names lose their models/ prefix",
+			"format": "gemini",
+			"body": {
+				"models": [{ "name": "models/gemini-2.0-flash" }, { "name": "models/gemini-1.5-pro" }]
+			},
+			"expect": ["gemini-1.5-pro", "gemini-2.0-flash"]
+		},
+		{
+			"name": "ids with whitespace, control characters or no text are dropped",
+			"format": "openai",
+			"body": {
+				"data": [{ "id": "a b" }, { "id": "" }, { "id": "ok\u0007" }, { "id": 7 }, { "id": "kept" }]
+			},
+			"expect": ["kept"]
+		},
+		{
+			"name": "a body without its list is unreadable",
+			"format": "openai",
+			"body": { "error": { "message": "invalid key" } },
+			"expect": null,
+			"reason": "unreadable"
+		},
+		{
+			"name": "decisions providers list nothing",
+			"format": "decisions",
+			"body": { "data": [{ "id": "jev" }] },
+			"expect": null,
+			"reason": "unsupported"
+		}
+	],
+	"names": [
+		{ "name": "OpenAI/gpt-4o-mini", "model": "gpt-4o-mini", "base": "OpenAI", "suffix": "" },
+		{
+			"name": "cerebras/qwen-3.8-27b (api.cerebras.ai, 2)",
+			"model": "qwen-3.8-27b",
+			"base": "cerebras",
+			"suffix": " (api.cerebras.ai, 2)"
+		},
+		{
+			"name": "OpenRouter/openai/gpt-4o-mini",
+			"model": "openai/gpt-4o-mini",
+			"base": "OpenRouter",
+			"suffix": ""
+		},
+		{
+			"name": "Mistral/other",
+			"model": "mistral-small-latest",
+			"base": "Mistral/other",
+			"suffix": ""
+		},
+		{
+			"name": "Groq/llama-3.3-70b-versatile-x",
+			"model": "llama-3.3-70b-versatile",
+			"base": "Groq/llama-3.3-70b-versatile-x",
+			"suffix": ""
+		}
+	],
+	"plans": [
+		{
+			"name": "listed ids, configured model first when the listing omits it",
+			"view": { "model": "custom-model", "default_model": "gpt-4o-mini", "extras": [] },
+			"listing": { "state": "listed", "ids": ["gpt-4.1", "gpt-4o"] },
+			"expect": {
+				"models": [
+					{ "model": "custom-model", "listed": false },
+					{ "model": "gpt-4.1", "listed": true },
+					{ "model": "gpt-4o", "listed": true }
+				],
+				"typed": null
+			}
+		},
+		{
+			"name": "listed ids holding the configured model",
+			"view": { "model": "gpt-4o", "default_model": "gpt-4o-mini", "extras": [] },
+			"listing": { "state": "listed", "ids": ["gpt-4.1", "gpt-4o"] },
+			"expect": {
+				"models": [
+					{ "model": "gpt-4.1", "listed": true },
+					{ "model": "gpt-4o", "listed": true }
+				],
+				"typed": null
+			}
+		},
+		{
+			"name": "refused listing falls back to the known models",
+			"view": {
+				"model": "qwen-3.8-27b",
+				"default_model": "qwen-3.8-27b",
+				"extras": ["zeta-1", "alpha-2"]
+			},
+			"listing": { "state": "failed", "reason": "refused" },
+			"expect": {
+				"models": [
+					{ "model": "qwen-3.8-27b", "listed": false },
+					{ "model": "alpha-2", "listed": false },
+					{ "model": "zeta-1", "listed": false }
+				],
+				"typed": { "hint_key": "model_browser.hint_api_listing_refused" }
+			}
+		},
+		{
+			"name": "pending listing",
+			"view": { "model": "gpt-4o", "default_model": "gpt-4o-mini", "extras": [] },
+			"listing": { "state": "pending" },
+			"expect": {
+				"models": [
+					{ "model": "gpt-4o", "listed": false },
+					{ "model": "gpt-4o-mini", "listed": false }
+				],
+				"typed": { "hint_key": "model_browser.hint_api_listing_pending" }
+			}
+		},
+		{
+			"name": "unreachable provider",
+			"view": { "model": "", "default_model": "mistral-small-latest", "extras": [] },
+			"listing": { "state": "failed", "reason": "unavailable" },
+			"expect": {
+				"models": [{ "model": "mistral-small-latest", "listed": false }],
+				"typed": { "hint_key": "model_browser.hint_api_listing_unavailable" }
+			}
+		},
+		{
+			"name": "never asked",
+			"view": { "model": "gpt-4o-mini", "default_model": "gpt-4o-mini", "extras": [] },
+			"listing": null,
+			"expect": {
+				"models": [{ "model": "gpt-4o-mini", "listed": false }],
+				"typed": { "hint_key": "model_browser.hint_api_listing_unavailable" }
+			}
+		},
+		{
+			"name": "a decisions entry keeps its one model and nothing to type",
+			"view": {
+				"model": "jev-latest",
+				"default_model": "jev-latest",
+				"extras": [],
+				"format": "decisions"
+			},
+			"listing": { "state": "failed", "reason": "unsupported" },
+			"expect": {
+				"models": [{ "model": "jev-latest", "listed": false }],
+				"typed": null
+			}
+		},
+		{
+			"name": "an empty listing falls back",
+			"view": { "model": "m1", "default_model": "", "extras": [] },
+			"listing": { "state": "listed", "ids": [] },
+			"expect": {
+				"models": [{ "model": "m1", "listed": false }],
+				"typed": { "hint_key": "model_browser.hint_api_listing_unavailable" }
+			}
+		}
+	]
+}

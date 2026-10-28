@@ -90,6 +90,10 @@ local TOKEN_ALLOCATION_ATTEMPTS = 8
 local MAX_PROTOCOL_BUFFER_BYTES = 64
 local MAX_PING_SEQUENCE = 2147483647
 local TOKEN_LEDGER_KEY = "karabiner.used_tokens.v1"
+-- Preferences this controller owns as runtime state rather than configuration:
+-- the used-token ledger only grows, and rewinding it would let a spent lease
+-- token be accepted again, so the field run's configuration guard skips them.
+M.RUNTIME_SETTING_KEYS = { TOKEN_LEDGER_KEY }
 local WORKER_FLAG = "--karabiner-lease-worker"
 local REVOKE_FLAG = "--karabiner-lease-revoke"
 local GUARDIAN_STATUS_FLAG = "--remap-guardian-status"
@@ -162,7 +166,8 @@ end
 --- @return boolean True when the module is initialized.
 local function require_state(func_name)
 	if not _state then
-		Logger.error(LOG, "'%s' called before M.init() — lease controller unavailable.", func_name)
+		Logger.error(LOG, "'%s' called before M.init() — lease controller unavailable: %s", func_name,
+			debug.traceback("caller", 3))
 		return false
 	end
 	return true
@@ -2153,12 +2158,14 @@ end
 
 --- Requests immediate serialized liveness recovery after wake or unlock.
 --- @return boolean True when a ping was sent or another write is already in flight.
+--- @return string|nil reason "no-live-generation" when there is nothing to renew: the
+---   caller re-acquires the lease (platform/remap/init.lua, wake handler).
 function M.refresh_liveness()
 	if not require_state("refresh_liveness") then return false end
 	local generation = _state.current
 	if not generation or generation.failed or generation.stop_requested then
-		Logger.warn(LOG, "Cannot refresh Karabiner lease liveness — no live generation exists.")
-		return false
+		Logger.info(LOG, "No live Karabiner lease generation to renew.")
+		return false, "no-live-generation"
 	end
 	return send_ping(generation, "wake")
 end

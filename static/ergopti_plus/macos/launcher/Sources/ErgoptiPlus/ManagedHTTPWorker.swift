@@ -854,6 +854,7 @@ enum ManagedHTTPWorker {
 		discoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() },
 		environment: [String: String] = ProcessInfo.processInfo.environment,
 		directFallback: Bool = true,
+		onDirectFallback: (ManagedHTTPFailureStage) -> Void = { _ in },
 		output: @escaping (Data) -> Bool) -> Int32 {
 		let certificates: [SecCertificate]
 		do { certificates = try ManagedCertificateAuthorities.load(environment: environment) }
@@ -871,13 +872,17 @@ enum ManagedHTTPWorker {
 			case .success(let selected):
 				routes = selected
 			case .failure(let failure):
-				guard directFallback else { return refuse(reason: "unavailable", status: 78, stage: failure.stage, output: output) }
+				// Only the stages proxy_policy.json "pac_unavailable_fallback" lists go direct.
+				guard directFallback,
+					ManagedNetworkBootstrapPolicy.pacUnavailableFallbackStages.contains(failure.stage.rawValue)
+				else { return refuse(reason: "unavailable", status: 78, stage: failure.stage, output: output) }
 				// A PAC that cannot be fetched or evaluated names no route at all, which is
 				// not a proxy decision: go direct like a terminal does. A PAC that selects
 				// a proxy never reaches this branch, and the transfer stays https with a
 				// pinned digest (issue #101). The reason is the closed stage code of the
 				// step that gave up, never a URL; the Python receiver forwards it to the log.
 				_ = fputs("# native_http_proxy_fallback route=direct reason=\(failure.stage.rawValue)\n", stderr)
+				onDirectFallback(failure.stage)
 				routes = [[kCFProxyTypeKey as String: kCFProxyTypeNone as String]]
 			}
 		}

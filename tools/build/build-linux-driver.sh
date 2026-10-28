@@ -44,13 +44,20 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
 copy_tree() {
 	local src="$1"; shift
 	local dst="$1"; shift
+	# The destination stays inside the build directory the caller owns (BUILD_DIR, set below).
+	ERGOPTI_COPY_DESTINATION_ROOT="${BUILD_DIR:-}" \
 	node "${SCRIPT_DIR}/copy-tracked-tree.cjs" "${REPO_ROOT}" "$src" "$dst" "$@"
 }
 
 LINUX_SRC="${REPO_ROOT}/static/ergopti_plus/linux"
 SHARED_SRC="${REPO_ROOT}/static/ergopti_plus/_shared"
 SHARED_RELATIVE="static/ergopti_plus/_shared"
-BUILD_DIR="${REPO_ROOT}/build/linux"
+# A caller that runs several builds at once gives each its own output directory.
+BUILD_DIR="${ERGOPTI_LINUX_BUILD_DIR:-${REPO_ROOT}/build/linux}"
+case "$BUILD_DIR" in
+  /?*) ;;
+  *) echo "[ERR] ERGOPTI_LINUX_BUILD_DIR must be an absolute path, got '$BUILD_DIR'" >&2; exit 1 ;;
+esac
 
 echo "=== Ergopti Linux driver assembly ==="
 echo "  Source  : ${LINUX_SRC}"
@@ -81,7 +88,7 @@ copy_tree "${LINUX_SRC}/" "${BUILD_DIR}/linux/" --exclude vendor
 # Generate the private native backend from the canonical C/header after the
 # tracked copy. Ignored local .so files and prior private fixture outputs never
 # enter this bundle. The helper refuses an already occupied destination.
-bash "${SCRIPT_DIR}/build-linux-native-output.sh"
+bash "${SCRIPT_DIR}/build-linux-native-output.sh" --output-directory "${BUILD_DIR}/linux/bin"
 
 # ============================================================================
 # 3. Copy the shared runtime tree
@@ -158,6 +165,9 @@ REQUIRED_FILES=(
 	"linux/infra/locale.lua"
 	"linux/install/config_home.sh"
 	"linux/install/ownership_schema.sh"
+	# The localized sentences of the shell scripts and their reader.
+	"linux/install/messages.sh"
+	"linux/_generated/shell_messages/en.msg"
 	"linux/modules/updater/ownership_receipt.lua"
 	"linux/infra/i18n.lua"
 	"linux/infra/timings.lua"

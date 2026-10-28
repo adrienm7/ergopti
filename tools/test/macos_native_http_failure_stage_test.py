@@ -364,8 +364,25 @@ class NativeRouteFallback(unittest.TestCase):
         self.assertEqual(response.route_fallback, "native_pac_download")
         self.assertEqual(
             self.report(self.reporter._report_route_fallback, response.route_fallback),
-            "# managed_bootstrap_route direct_fallback=native_pac_download\n",
+            "# managed_bootstrap_route direct_fallback=native_pac_download\n"
+            "__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:native_pac_download\n"
+            "WARNING: The automatic network configuration could not be used"
+            " (native_pac_download). Trying a direct connection.\n",
         )
+        self.assertEqual(
+            self.report(self.reporter._report_pac_fallback_outcome, None),
+            "The direct connection worked after the automatic network configuration"
+            " failed (native_pac_download).\n",
+        )
+        self.assertEqual(
+            self.report(self.reporter._report_pac_fallback_outcome, "connect"),
+            "",
+            "the outcome is reported once",
+        )
+
+    def test_no_fallback_reports_no_outcome(self):
+        self.assertEqual(self.report(self.reporter._report_pac_fallback_outcome, None), "")
+        self.assertEqual(self.report(self.reporter._report_pac_fallback_outcome, "connect"), "")
 
     def test_unknown_or_private_marker_text_is_never_reported(self):
         for marker in (
@@ -390,6 +407,12 @@ class NativeRouteFallback(unittest.TestCase):
         self.assertEqual(failure.native_route_fallback, "native_pac_evaluation")
         text = self.report(self.reporter._report_failure, failure, failure.reason)
         self.assertIn("# managed_bootstrap_route direct_fallback=native_pac_evaluation\n", text)
+        self.assertIn(
+            "The automatic network configuration was unreachable (native_pac_evaluation)"
+            " and the direct connection failed (connect).\n",
+            text,
+        )
+        self.assertEqual(text.count("WARNING:"), 1, text)
         self.assertNotIn("private-company", text)
 
 
@@ -419,7 +442,35 @@ class NetworkCheckHelper(unittest.TestCase):
         )
         self.assertEqual(
             self.lines(self.helper.route_step, "native_pac_download"),
-            ["step route_lookup fail direct_pac_download"],
+            ["step route_lookup info direct_pac_download"],
+        )
+
+    def test_a_refused_trust_variable_is_not_a_route_or_tls_verdict(self):
+        # Field run 2026-10-27 19:47: the worker refused SSL_CERT_FILE/SSL_CERT_DIR
+        # before any lookup, and the check read "route_lookup pass selected".
+        failure = Exception("certificate")
+        failure.reason = "certificate"
+        failure.native_diagnostic = {"stage": "native_certificate_load"}
+        self.assertEqual(
+            self.lines(self.helper.failure_steps, failure),
+            [
+                "step route_lookup skip not_reached",
+                "step tls fail ssl_cert_env",
+                "step transfer fail certificate",
+            ],
+        )
+
+    def test_a_handshake_refusal_keeps_the_certificate_verdict(self):
+        failure = Exception("certificate")
+        failure.reason = "certificate"
+        failure.native_diagnostic = {"stage": "native_session_terminal"}
+        self.assertEqual(
+            self.lines(self.helper.failure_steps, failure),
+            [
+                "step route_lookup pass selected",
+                "step tls fail certificate",
+                "step transfer fail certificate",
+            ],
         )
 
 

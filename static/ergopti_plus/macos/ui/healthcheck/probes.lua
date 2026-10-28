@@ -114,7 +114,11 @@ local function start_probe(run, id, timeout_ms, body)
 			Logger.done(LOG, "Probe '%s' cancelled after %d ms.", id, result.ms)
 			return
 		end
-		Logger.done(LOG, "Probe '%s' answered: %s (%d ms).", id, result.state, result.ms)
+		-- A failed answer carries its detail into the log: the diagnostics window
+		-- closes, and a field report holds only the log (issue #104).
+		local detail = result.state ~= "ok" and type(result.detail) == "string" and result.detail ~= ""
+			and (": " .. result.detail) or ""
+		Logger.done(LOG, "Probe '%s' answered: %s (%d ms)%s.", id, result.state, result.ms, detail)
 		run.publish(id, result, sections)
 	end
 	run.finishers[#run.finishers + 1] = function()
@@ -268,11 +272,12 @@ local function proxy_pac()
 			local client = require("adapters.http_client").new({ timeout_ms = 6000 })
 			on_cancel(function() client.cancel() end)
 			client.get(url, { ["User-Agent"] = USER_AGENT }, function(result)
-				local state, text = PacCheck.judge(result.status, result.body)
+				local state, text = PacCheck.judge(result.status, result.body, result.error)
 				if state == "ok" then
 					done({ state = "ok" }, { network = { proxy_pac = text } })
 				else
-					done({ state = "error", detail = text })
+					-- The managed downloads go direct after such a failure (network-retry.sh).
+					done({ state = "error", detail = PacCheck.with_direct_fallback(text) })
 				end
 			end)
 		end, function(detail)
@@ -438,7 +443,7 @@ end
 local function configuration(schema, overrides)
 	return function(done, on_cancel)
 		local Timers = require("adapters.timer_scheduler")
-		local handle = Timers.after(0.001, function()
+		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_yield_ms"), function()
 			local context = require("ui.healthcheck.helpers").configuration_context(schema, overrides)
 			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
 			if not ok then

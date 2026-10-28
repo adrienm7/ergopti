@@ -183,7 +183,7 @@ local function load_remap(options)
 				calls.lease_phase = "recovering"
 				if calls.phase_listener then calls.phase_listener("recovering") end
 			end
-			return options.refresh_result ~= false
+			return options.refresh_result ~= false, options.refresh_reason
 		end,
 		start = function()
 			error("fresh ACTIVE start must be unreachable")

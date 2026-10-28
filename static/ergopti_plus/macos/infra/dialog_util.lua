@@ -128,7 +128,7 @@ local function focus_hammerspoon(defer_open)
 			-- it pins the task in its own long-lived table before starting it and
 			-- releases it in the completion callback.
 			local candidate = nil
-			local handle, timer_committed = TimerScheduler.after(0.1, function()
+			local handle, timer_committed = TimerScheduler.after(require("infra.timings").sec("ui", "dialog_focus_delay_ms"), function()
 				if focus_timer_state[candidate] ~= true then return end
 				focus_timer_state[candidate] = false
 				if candidate.timer == nil then

@@ -65,6 +65,9 @@ local function load_dashboard(scheduler, subscribe, controls)
 		},
 		window = { focusedWindow = function() return controls.focused and native_window or nil end },
 	})
+	-- The dashboard reads the timing registry when it starts, after the cases stub the file
+	-- system; the real registry is installed here, once the fresh module graph is loaded.
+	helpers.provide_timings()
 	return dashboard, context
 end
 

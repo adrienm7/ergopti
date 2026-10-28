@@ -193,8 +193,8 @@ try {
 	_USWD_Main()
 	FileAppend("PASS uia-suspend-worker-debt " . A_Args[1] . "`n", "*")
 	ExitApp(0)
-} catch as Failure {
-	FileAppend("FAIL uia-suspend-worker-debt type=" . Type(Failure) . " line=" . Failure.Line
-		. " reason=" . Failure.Message . "`n", "*")
+} catch as TopLevelFailure {
+	FileAppend("FAIL uia-suspend-worker-debt type=" . Type(TopLevelFailure) . " line=" . TopLevelFailure.Line
+		. " reason=" . TopLevelFailure.Message . "`n", "*")
 	ExitApp(1)
 }

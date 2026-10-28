@@ -162,10 +162,31 @@ helpers.describe("historical rollover facts", function()
 		end)
 	end)
 
-	helpers.it("refuses ids that cross a true boundary backwards (historical-rollover-context)", function()
+	-- An id at or below the last marker's bound is the legacy id-counter restart
+	-- (issue #104). It used to be refused, and an append-only ledger never stops
+	-- containing it, so every boot re-scanned the whole ledger only to fail again.
+	-- The invariant kept: a restart can never authorize a reset; it withdraws them.
+	helpers.it("withdraws every reset when ids restart across a true boundary (issue104-id-restart)", function()
 		with_owner(function(facts)
-			helpers.assert_eq(facts(batch(insert(9)) .. marker .. batch(insert(3))), nil)
+			local ledger = batch(insert(4) .. insert(9)) .. marker .. batch(insert(3)) .. marker .. batch(insert(12))
+			local result = assert(facts(ledger))
+			helpers.assert_eq(result.cutoffs, {}, "id cutoffs cannot separate generations that share ids")
+			helpers.assert_eq(result.has_markers, true)
+			helpers.assert_eq(result.regression.id, 3)
+			helpers.assert_eq(result.regression.bound, 9)
+			helpers.assert_eq(ledger:sub(result.regression.at, result.regression.at + 9), "('device',")
 			helpers.assert_eq(assert(facts(batch(insert(9) .. insert(3)))).cutoffs, {})
+		end)
+	end)
+
+	helpers.it("names the refused shape and its byte in the refusal (issue104-id-restart)", function()
+		with_owner(function(facts)
+			local multiple = insert(1):gsub("%);\n$", "),('device',9,'2026-10-21','y');\n")
+			local ledger = batch(multiple) .. marker
+			local _, detail = facts(ledger)
+			local at = tonumber(detail:match("multi%-row typing INSERT at byte (%d+)%)$"))
+			helpers.assert_true(at ~= nil, detail)
+			helpers.assert_eq(ledger:sub(at, at + 9), "('device',")
 		end)
 	end)
 end)
@@ -182,6 +203,146 @@ helpers.describe("historical rebuild ownership", function()
 			helpers.assert_eq(cutoffs(db, "device"), nil)
 			helpers.assert_eq(rebuild(db), false)
 			helpers.assert_eq(db.deletes, 0)
+		end)
+	end)
+
+	helpers.it("rebuilds a ledger whose id counter restarted after a rollover (issue104-id-restart)", function()
+		with_rebuild(function(cutoffs, rebuild, _, db, state)
+			-- The restarted generation's duplicate ids were dropped by INSERT OR IGNORE.
+			local ledger = batch(insert(1) .. insert(5)) .. marker .. batch(insert(1) .. insert(2) .. insert(7))
+			state.ledgers["owned/device/data.sql"] = ledger
+			state.raw.device = { 1, 2, 5, 7 }
+			local walked = 0
+			value(rebuild, "Aggregator", { get_ngram_ctx = function() return {} end,
+				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
+				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				walk_typing = function() walked = walked + 1 end })
+			helpers.assert_eq(assert(cutoffs(db, "device")), {})
+			helpers.assert_eq(rebuild(db), true, "a legacy restart must not refuse the rebuild forever")
+			helpers.assert_true(db.deletes > 0, "the partition was rebuilt")
+			helpers.assert_eq(walked, 4, "every retained typing row is replayed")
+		end)
+	end)
+
+	-- The 22 s startup freeze of issue #104: the recovery ran inside the deferred
+	-- keystats start and held every event tap until it returned.
+	helpers.it("recovers in budgeted slices while ingest waits (issue104-cooperative-recovery)", function()
+		with_rebuild(function(_, rebuild, _, db, state, _, manager)
+			local start = value(value(manager.init, "_init"), "_start_aggregate_recovery")
+			local slice = value(start, "_run_recovery_slice")
+			value(value(start, "_recover_aggregate_cache"), "_sync_foreign_data_sql", function() return {} end)
+			local clock = 0
+			-- Every clock read spends a whole slice budget, so each pace point yields.
+			value(slice, "timer", { absoluteTime = function() clock = clock + 8 * 1000 * 1000; return clock end })
+			local pending, cancelled = {}, 0
+			value(slice, "TimerScheduler", {
+				after = function(_, fn)
+					local handle = { timer = {}, fn = fn }
+					pending[#pending + 1] = handle
+					return handle, true
+				end,
+				cancel = function(handle) handle.timer = nil; cancelled = cancelled + 1; return true end,
+			})
+			local walked = 0
+			value(rebuild, "Aggregator", { get_ngram_ctx = function() return {} end,
+				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
+				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				walk_typing = function() walked = walked + 1 end })
+			local ids, sql = {}, {}
+			for id = 1, 300 do ids[#ids + 1] = id; sql[#sql + 1] = insert(id) end
+			state.raw.device = ids
+			state.ledgers["owned/device/data.sql"] = batch(table.concat(sql)) .. marker
+
+			start(db)
+			helpers.assert_eq(manager.is_recovering(), true, "a large recovery must yield before init returns")
+			helpers.assert_true(walked < 300, "the first slice must not walk the whole cache")
+			helpers.assert_eq(manager.ingest_once(), false, "ingest waits while the recovery owns the aggregator")
+			local slices = 1
+			while manager.is_recovering() do
+				local handle = table.remove(pending, 1)
+				assert(handle, "a yielded recovery must own its next slice timer")
+				handle.timer = nil
+				handle.fn()
+				slices = slices + 1
+				assert(slices < 10000, "recovery never ended")
+			end
+			helpers.assert_eq(walked, 300, "every raw row is replayed across the slices")
+			helpers.assert_true(slices > 2, "the recovery ran in several slices")
+			helpers.assert_true(db.statements[#db.statements] == "COMMIT;", "the revision mark committed")
+
+			-- A stop in the middle abandons the walk and its exact timer.
+			walked = 0
+			start(db)
+			helpers.assert_eq(manager.is_recovering(), true)
+			local cancel = value(value(manager.init, "_rollback_failed_init"), "_release_failed_init_resources")
+			helpers.assert_eq(value(cancel, "_cancel_aggregate_recovery")(), true)
+			helpers.assert_eq(manager.is_recovering(), false)
+			helpers.assert_eq(cancelled, 1, "the pending slice timer is cancelled")
+		end)
+	end)
+
+	-- The 5.3 s hold of the 2026-10-27 field session: one recovery slice deleted a
+	-- whole device partition of derived rows in a single transaction.
+	helpers.it("deletes derived rows in bounded committed batches between pace points (field-recovery-delete-batches)", function()
+		with_rebuild(function(_, rebuild, _, db, state, _, manager)
+			local start = value(value(manager.init, "_init"), "_start_aggregate_recovery")
+			local slice = value(start, "_run_recovery_slice")
+			value(value(start, "_recover_aggregate_cache"), "_sync_foreign_data_sql", function() return {} end)
+			local clock = 0
+			value(slice, "timer", { absoluteTime = function() clock = clock + 8 * 1000 * 1000; return clock end })
+			local pending = {}
+			value(slice, "TimerScheduler", {
+				after = function(_, fn)
+					local handle = { timer = {}, fn = fn }
+					pending[#pending + 1] = handle
+					return handle, true
+				end,
+				cancel = function(handle) handle.timer = nil; return true end,
+			})
+			value(rebuild, "Aggregator", { get_ngram_ctx = function() return {} end,
+				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
+				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				walk_typing = function() end })
+			-- The first derived table holds more than a batch, and still does after
+			-- three batches: one probe finds it large, three find rows left over.
+			local left_over_probes = 4
+			local nrows = db.nrows
+			function db:nrows(sql)
+				if sql:find("AS left_over FROM agg_app_day ", 1, true) and left_over_probes > 0 then
+					left_over_probes = left_over_probes - 1
+					local served = false
+					return function() if served then return nil end; served = true; return { left_over = 1 } end
+				end
+				return nrows(self, sql)
+			end
+			state.raw.device = { 1 }
+			state.ledgers["owned/device/data.sql"] = batch(insert(1)) .. marker
+
+			start(db)
+			local slices = 1
+			while manager.is_recovering() do
+				local handle = table.remove(pending, 1)
+				assert(handle, "a yielded recovery must own its next slice timer")
+				handle.timer = nil
+				handle.fn()
+				slices = slices + 1
+				assert(slices < 10000, "recovery never ended")
+			end
+			local bounded, open_deletes = 0, 0
+			for _, sql in ipairs(db.statements) do
+				if sql:match("^DELETE FROM agg_app_day WHERE rowid IN") then
+					bounded = bounded + 1
+					open_deletes = open_deletes + 1
+					helpers.assert_true(sql:find("LIMIT 100)", 1, true) ~= nil, "a batch is bounded: " .. sql)
+					helpers.assert_eq(open_deletes, 1, "one bounded delete per transaction")
+				elseif sql == "COMMIT;" then
+					open_deletes = 0
+				elseif sql:match("^DELETE FROM agg_app_day WHERE device_id") then
+					helpers.assert_eq(bounded, 4, "the unbounded delete runs only once the large table is drained")
+				end
+			end
+			helpers.assert_eq(bounded, 4, "the large table is drained in four bounded batches")
+			helpers.assert_true(slices >= 4, "a pace point follows every committed batch")
 		end)
 	end)
 

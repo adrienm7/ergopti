@@ -1,39 +1,17 @@
 --- tests/unit/ui/menu/llm/test_llm_backend_rows_ai_menu_choice.lua
 
 --- ==============================================================================
---- MODULE: Choosing The AI Backend From The Tray
+--- MODULE: The API Entries Of The Model Selector Page
 --- DESCRIPTION:
 --- The Linux AI menu listed Ollama's models and nothing else: there was no way
---- to enter an API key. It now offers the backend choice and, for the API
---- backend, the entries, one "add" row per provider, a test and a removal.
+--- to enter an API key. The API entries, one "add" per provider, a test and a
+--- removal moved to the model selector page on 2026-10-27; these cases drive
+--- the page's own transactions (ui/menu/llm_backend_rows.lua api_page).
 --- ==============================================================================
 
 package.loaded["tests.support.ui.menu.llm.llm_backend_rows_fixture"] = nil
 local Fixture = require("tests.support.ui.menu.llm.llm_backend_rows_fixture")
-local helpers, setup, find, exact, with_api_add_locale, with_api_add_frame, backend_boundary_corpus =
-	Fixture.helpers, Fixture.setup, Fixture.find, Fixture.exact, Fixture.with_api_add_locale, Fixture.with_api_add_frame, Fixture.backend_boundary_corpus
-
-
-
-
-helpers.describe("AI menu: the backend choice", function()
-
-	helpers.it("shows Ollama's models under the Ollama backend", function()
-		local build, _, restore = setup("ollama")
-		local rows = build()
-		restore()
-		helpers.assert_true(find(rows, "Ollama").checked)
-		helpers.assert_true(find(rows, "llama3") ~= nil)
-	end)
-
-	helpers.it("switches to the API backend", function()
-		local build, state, restore = setup("ollama")
-		find(build(), "API 🌐").action()
-		restore()
-		helpers.assert_eq(state.backend, "api")
-	end)
-
-end)
+local helpers, setup, find, exact = Fixture.helpers, Fixture.setup, Fixture.find, Fixture.exact
 
 
 
@@ -53,21 +31,6 @@ helpers.describe("AI menu publication acknowledgement (ai-menu-selection-ack)", 
 		helpers.assert_eq(#state.tests, 0, "selection cannot start a partial provider request")
 	end)
 
-	for _, backend in ipairs({ "api", "ollama" }) do
-		for _, refused in ipairs({ false, true }) do
-			helpers.it("(ai-menu-selection-ack) returns the backend writer acknowledgement for " .. backend .. " refusal=" .. tostring(refused), function()
-				local previous = backend == "api" and "ollama" or "api"
-				local build, state, restore = setup(previous)
-				state.refuse_backend = refused
-				local rows = build()
-				local result = rows[backend == "ollama" and 2 or 3].action()
-				restore()
-				helpers.assert_eq(state.backend, refused and previous or backend)
-				helpers.assert_eq(state.changed or 0, refused and 0 or 1)
-				helpers.assert_eq(result, not refused)
-			end)
-		end
-	end
 	for _, refused in ipairs({ false, true }) do
 		helpers.it("(ai-menu-selection-ack) returns the private entry writer acknowledgement refusal=" .. tostring(refused), function()
 			local build, state, restore = setup("api")
@@ -81,53 +44,6 @@ helpers.describe("AI menu publication acknowledgement (ai-menu-selection-ack)", 
 			helpers.assert_eq(result, not refused)
 		end)
 	end
-end)
-
-
-
-
-helpers.describe("AI menu: the selected-model row (menu.llm.model_label)", function()
-
-	local i18n = require("infra.i18n")
-
-	--- The label every driver gives the selected model.
-	--- @param model string
-	--- @return string
-	local function expected(model)
-		local template = i18n.get("menu.llm.model_label")
-		helpers.assert_true(template ~= "menu.llm.model_label" and template:find("%s", 1, true) ~= nil,
-			"the shared key must resolve to a template with one %s, got: " .. tostring(template))
-		return string.format(template, model)
-	end
-
-	helpers.it("heads the list with the selected Ollama model, not clickable", function()
-		local build, state, restore = setup("ollama")
-		state.model = "qwen3.5:0.8b"
-		local rows = build()
-		restore()
-		helpers.assert_eq(rows[1].label, expected("qwen3.5:0.8b"))
-		helpers.assert_eq(rows[1].disabled, true, "an information row, never an action")
-		helpers.assert_eq(rows[1].action, nil)
-	end)
-
-	helpers.it("names the active API entry under the API backend", function()
-		local build, state, restore = setup("api")
-		state.answers = { "k", "qwen" }
-		find(build(), "➕ Cerebras").action()
-		-- A label an earlier build stored is never read (api-entry-auto-name)
-		state.active.label = "Ma clé"
-		local rows = build()
-		restore()
-		helpers.assert_eq(rows[1].label, expected("cerebras/qwen"))
-	end)
-
-	helpers.it("says so when no model is selected", function()
-		local build, _, restore = setup("ollama")
-		local rows = build()
-		restore()
-		helpers.assert_eq(rows[1].label, expected(i18n.get("menu.llm.no_model_none")))
-	end)
-
 end)
 
 
@@ -370,13 +286,13 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 					end
 					return rename(from, to)
 				end
-				local rows = helpers.load_module("ui.menu.llm_backend_rows").rows(
+				local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(helpers.load_module("ui.menu.llm_backend_rows"),
 					{ get_backend = function() return "api" end, set_backend = function(kind)
 						backend_calls = backend_calls + 1
 						return kind == "api"
 					end },
 					{ confirm = function() return true end },
-					function() changed = changed + 1 end, function() return {} end)
+					function() changed = changed + 1 end)
 				result = find(rows, "🗑️").action()
 				local read = assert(io.open(path, "rb")); after = read:read("*a"); assert(read:close())
 				count, active = #owner.list(), owner.active()
@@ -431,11 +347,11 @@ helpers.describe("AI menu selection through the private writer (ai-menu-selectio
 					end
 					return rename(from, to)
 				end
-				local rows = helpers.load_module("ui.menu.llm_backend_rows").rows(
+				local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(helpers.load_module("ui.menu.llm_backend_rows"),
 					{ get_backend = function() return "api" end,
 						set_backend = function(kind) backend_calls = backend_calls + 1; return kind == "api" end },
 					{ error = function() errors = errors + 1 end },
-					function() changes = changes + 1 end, function() return {} end)
+					function() changes = changes + 1 end)
 				result = exact(rows, "cerebras/qwen").action()
 				active = owner.active()
 				local read = assert(io.open(path, "rb")); after = read:read("*a"); assert(read:close())
@@ -471,42 +387,7 @@ end)
 
 
 
-helpers.describe("AI active API commands: shared captions and live selection", function()
-	for _, code in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it",
-		"ja", "ko", "no", "nl", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
-		helpers.it("renders the actual shared command data in " .. code, function()
-			local names = { "infra.i18n", "infra.manifest_menu" }
-			local saved = {}
-			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-			local restore, observations
-			local ok, failure = pcall(function()
-				local path = require("infra.paths").shared("data/locales/" .. code .. ".json")
-				local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
-				local labels = require("json").decode(raw)
-				package.loaded["infra.i18n"] = { get = function(key) return labels[key] or key end,
-					section = function() return {} end }
-				package.loaded["infra.manifest_menu"] = nil
-				local renderer = require("infra.manifest_menu")
-				local declaration = renderer.get_array("llm_api_active_commands")
-				declaration[1].i18n = "button.cancel"
-				local build, state, cleanup = setup("api"); restore = cleanup
-				local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "inert" }
-				state.entries, state.active = { entry }, entry
-				local rows, positions = build(), {}
-				for index, row in ipairs(rows) do
-					if row.label == labels["button.cancel"] then positions[1] = index end
-					if type(row.label) == "string" and row.label:find(labels["menu.llm.api_remove_entry"], 1, true) then positions[2] = index end
-				end
-				observations = { positions = positions, rows = rows }
-			end)
-			if restore then restore() end
-			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-			helpers.assert_eq(ok, true, tostring(failure))
-			helpers.assert_type(observations.positions[1], "number")
-			helpers.assert_eq(observations.positions[2], observations.positions[1] + 1)
-			helpers.assert_type(observations.rows[observations.positions[1]].action, "function")
-		end)
-	end
+helpers.describe("AI active API commands: live selection", function()
 	helpers.it("a retained Test refuses a revoked active entry before native request creation", function()
 		local build, state, restore = setup("api")
 		local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "inert" }
@@ -536,149 +417,4 @@ end)
 
 
 
-
-helpers.describe("Shared API Add frame (api-add-controls)", function()
-	helpers.it("uses the shared Add caption and preserves the native cancelled prompt (api-add-controls)", function()
-		with_api_add_frame(function(corpus, menu, build, state)
-			local declaration = menu.get_array(corpus.group_section)[1]
-			local original = declaration.i18n
-			local observations
-			local ok, err = pcall(function()
-				helpers.assert_not_nil(exact(build(), corpus.label))
-				declaration.i18n = corpus.mutated_key
-				local row = exact(build(), corpus.mutated_label)
-				helpers.assert_not_nil(row)
-				row.items[1].action()
-				observations = { entries = #state.entries, prompts = #state.prompts,
-					changed = state.changed or 0, probes = #state.tests }
-			end)
-			declaration.i18n = original
-			helpers.assert_eq(ok, true, tostring(err))
-			helpers.assert_eq(observations, { entries = 0, prompts = 1, changed = 0, probes = 0 })
-		end)
-	end)
-	helpers.it("uses the shared preceding separator and refuses an unowned Add group (api-add-controls)", function()
-		with_api_add_frame(function(corpus, menu, build, state)
-			local separator = menu.get_array(corpus.separator_section)
-			local group = menu.get_array(corpus.group_section)[1]
-			local original, identity = separator[1], group.id
-			local observations
-			local ok, err = pcall(function()
-				separator[1] = { type = "label", id = "api_add_marker", i18n = corpus.mutated_key }
-				local rows = build()
-				local position
-				for index, row in ipairs(rows) do if row.label == corpus.label then position = index end end
-				helpers.assert_type(position, "number")
-				observations = rows[position - 1]
-				group.id = "unowned_api_add"
-				helpers.assert_eq(#build(), 0, "shared missing child owner refuses before native effects")
-				helpers.assert_eq(#state.entries, 0)
-				helpers.assert_eq(#state.prompts, 0)
-			end)
-			separator[1], group.id = original, identity
-			helpers.assert_eq(ok, true, tostring(err))
-			helpers.assert_eq(observations.label, corpus.mutated_label)
-			helpers.assert_eq(observations.disabled, true)
-			helpers.assert_nil(observations.action)
-		end)
-	end)
-end)
-
-
-
-
-helpers.describe("API Add locale scope failure inverse (api-add-controls)", function()
-	helpers.it("restores the actual prior locale cohort after a raised case (api-add-controls)", function()
-		local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
-		local previous = {}
-		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-		local raised = {}
-		local ok, err = pcall(function()
-			with_api_add_locale(function(native)
-				helpers.assert_eq(native.get("menu.llm.api_add_entry"), "+ Add an API")
-				error(raised, 0)
-			end)
-		end)
-		helpers.assert_eq(ok, false)
-		helpers.assert_eq(rawequal(err, raised), true)
-		for _, name in ipairs(names) do helpers.assert_eq(rawequal(package.loaded[name], previous[name]), true, name) end
-	end)
-end)
-
-
-
-
-helpers.describe("Shared backend-choice boundary (backend-choice-boundary)", function()
-	helpers.it("uses the canonical boundary and retains the real backend callback (backend-choice-boundary)", function()
-		with_api_add_locale(function()
-			local corpus = backend_boundary_corpus()
-			local menu = require("infra.manifest_menu")
-			local frame = menu.get_array(corpus.section)
-			local original = frame[1]
-			local build, state, restore = setup("api")
-			local observed
-			local ok, err = pcall(function()
-				local rows = build()
-				helpers.assert_eq(rows[4], corpus.platform_rows.linux[1])
-				frame[1] = { type = "label", id = "backend_boundary_marker", i18n = corpus.marker_key,
-					platforms = { "ahk", "linux" }, unavailable = "hide" }
-				rows = build()
-				observed = rows[4]
-				helpers.assert_eq(rows[2].label, "Ollama 🦙 — " .. corpus.linux_choice_english[1])
-				helpers.assert_eq(rows[3].label, "API 🌐 — " .. corpus.linux_choice_english[2])
-				helpers.assert_eq(rows[3].checked, true)
-				helpers.assert_eq(state.backend, "api")
-				helpers.assert_eq(state.changed, nil)
-				rows[2].action()
-				helpers.assert_eq(state.backend, "ollama")
-				helpers.assert_eq(state.backend_sets, 1)
-				helpers.assert_eq(state.changed, 1)
-			end)
-			frame[1] = original
-			restore()
-			helpers.assert_eq(ok, true, tostring(err))
-			helpers.assert_eq(observed.label, corpus.marker_english)
-			helpers.assert_eq(observed.disabled, true)
-			helpers.assert_nil(observed.action)
-		end)
-	end)
-	helpers.it("refuses an unowned boundary before any native control effects (backend-choice-boundary)", function()
-		with_api_add_locale(function()
-			local corpus = backend_boundary_corpus()
-			local frame = require("infra.manifest_menu").get_array(corpus.section)
-			local original = frame[1]
-			local build, state, restore = setup("ollama")
-			local observed
-			local ok, err = pcall(function()
-				frame[1] = { type = "command", id = "unowned_backend_boundary", i18n = corpus.marker_key,
-					platforms = { "ahk", "linux" }, unavailable = "hide" }
-				observed = build()
-			end)
-			frame[1] = original
-			restore()
-			helpers.assert_eq(ok, true, tostring(err))
-			helpers.assert_eq(observed, {})
-			helpers.assert_eq(state.backend, "ollama")
-			helpers.assert_eq(state.backend_sets, nil)
-			helpers.assert_eq(state.changed, nil)
-			helpers.assert_eq(#state.prompts, 0)
-			helpers.assert_eq(#state.tests, 0)
-		end)
-	end)
-	helpers.it("projects the hand boundary on three platforms with genuine macOS absence (backend-choice-boundary)", function()
-		with_api_add_locale(function(native)
-			local corpus = backend_boundary_corpus()
-			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(require("menu.renderer").new({
-					platform = platform,
-					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-					json_decode = require("json").decode,
-					i18n = native,
-					logger = require("logger.shim"),
-				}))
-				helpers.assert_eq(renderer.template_rows(corpus.section, {}, {}, {}), corpus.platform_rows[platform])
-			end
-		end)
-	end)
-end)
 
