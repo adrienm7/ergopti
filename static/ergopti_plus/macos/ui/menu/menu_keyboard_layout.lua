@@ -476,7 +476,7 @@ function M.build(ctx)
 									end
 									-- The preference turns it on at once, but only a process started
 									-- after the write sees it (probe v5): Hammerspoon's list is stale.
-									input_sources.confirm_source_async(var.tis_id, {}, function(read, state)
+									input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)
 										if read and state.enabled == true then
 											-- macOS asks the user to allow a keyboard it has not seen before.
 											pcall(notifications.notify, string.format(i18n.get("menu.layout.add_consent"), label), nil, "success")
