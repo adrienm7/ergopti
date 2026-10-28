@@ -543,6 +543,72 @@ io.write("CENSUS_HIDDEN_ACCEPTED\n")
 		console.log(
 			'[OK] The source census rejects an undeclared emission in a newline-bearing filename.'
 		);
+		// A real child environment complements the driver's getenv-boundary unit
+		// cases. No display conversion may redirect allocations outside TMPDIR.
+		const nativeTempSource = String.raw`
+package.path = arg[1] .. "/?.lua;" .. arg[1] .. "/?/init.lua;" .. arg[2] .. "/?.lua;" .. arg[2] .. "/?/init.lua;" .. package.path
+local native = require("luv")
+local expected = assert(arg[3])
+assert(os.getenv("TMPDIR") == expected, "the child must receive the actual TMPDIR environment")
+local returned = require("tests.helpers").temp_dir()
+local expected_root = assert(native.fs_realpath(expected))
+assert(native.fs_realpath(returned) == expected_root, "the returned TMPDIR must name the exact existing owned directory")
+local allocation
+local ok, failure = xpcall(function()
+ allocation = assert(native.fs_mkdtemp(returned .. "/allocated.XXXXXX"))
+ assert(native.fs_realpath(allocation .. "/..") == expected_root, "the real allocation must stay beneath the owned TMPDIR")
+end, debug.traceback)
+if allocation then assert(native.fs_rmdir(allocation), "the exact owned allocation must retire") end
+if not ok then error(failure, 0) end
+io.write("NATIVE_TEMP_ALLOCATION_RETIRED\n")
+`;
+		const EXPECTED_TEMP_PATH_CASES = 3;
+		const tempCases = new Set();
+		for (const [label, character] of [
+			['backslash', '\\'],
+			['quote', "'"],
+			['newline', '\n']
+		]) {
+			assert.equal(character.length, 1, 'The fixture must contain the actual special character');
+			const expected = path.join(temporary, 'scratch' + character + label);
+			fs.mkdirSync(expected);
+			const child = spawnSync(
+				macFacts.executable,
+				[
+					'-e',
+					withoutLfsSource,
+					'-',
+					path.join(ROOT, 'static/ergopti_plus/macos'),
+					path.join(ROOT, 'static/ergopti_plus/_shared/lua'),
+					expected
+				],
+				{
+					input: nativeTempSource,
+					cwd: ROOT,
+					env: { ...withoutMac, TMPDIR: expected },
+					encoding: 'utf8',
+					timeout: 30000
+				}
+			);
+			assert.ifError(child.error);
+			assert.equal(
+				child.status,
+				0,
+				'Native TMPDIR ' + label + ': ' + child.stdout + '\n' + child.stderr
+			);
+			assert.equal(child.stdout.split('NATIVE_TEMP_ALLOCATION_RETIRED\n').length - 1, 1);
+			assert.equal(fs.readdirSync(expected).length, 0, 'Every actual owned allocation must retire');
+			assert.ok(!tempCases.has(label), 'A native TMPDIR case must not run twice');
+			tempCases.add(label);
+			console.log(
+				'[OK] Native TMPDIR ' + label + ' allocates and retires within the exact owned directory.'
+			);
+		}
+		assert.equal(
+			tempCases.size,
+			EXPECTED_TEMP_PATH_CASES,
+			'Every native TMPDIR path case must run'
+		);
 	} finally {
 		fs.rmSync(temporary, { recursive: true, force: true });
 	}

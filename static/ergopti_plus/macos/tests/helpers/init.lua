@@ -55,6 +55,7 @@ function M.provide_timings()
 end
 local CommandLines = require("tests.support.command_lines")
 local SourceFile = require("tests.support.source_file")
+local NativePath = require("native_path")
 
 -- Value formatting and stack-trace helpers shared with Linux (single source of truth).
 local fmt = require("test.format")
@@ -106,14 +107,14 @@ end
 --- Ordered TMPDIR first for that reason. There is deliberately no `"."` fallback
 --- and no silent default: a machine with no writable scratch directory must fail
 --- loudly here rather than quietly turn the checkout into one.
---- @return string Absolute path, no trailing slash, forward slashes only.
+--- @return string Absolute native path, no trailing separator; forward slashes on Windows.
 function M.temp_dir()
 	local candidate = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP")
 		or "/tmp"
-	candidate = candidate:gsub("\\", "/"):gsub("/+$", "")
+	if package.config:sub(1, 1) == "\\" then candidate = candidate:gsub("\\", "/") end
+	candidate = NativePath.without_trailing_separators(candidate)
 	-- A relative answer would land inside the checkout, which is the whole defect.
-	local absolute = candidate:sub(1, 1) == "/" or candidate:match("^%a:/") ~= nil
-	if candidate == "" or not absolute then
+	if candidate == "" or not NativePath.is_absolute(candidate) then
 		error("tests: no absolute scratch directory (TMPDIR/TEMP/TMP resolved to '"
 			.. candidate .. "'); refusing to write fixtures into the checkout", 2)
 	end
