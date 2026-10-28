@@ -319,3 +319,21 @@ _LBMD_Join(Items) {
 		Text .= (Text == "" ? "" : ",") . Item
 	return Text
 }
+
+; model-selector-single-json-encoder: a rename of the page's string helper
+; turned it into a second JsonStringLiteral definition, which AutoHotkey
+; refuses at load ("This function declaration conflicts with an existing
+; Func"), so the driver and the page harness could not start. One definition,
+; the shared encoder in infra/json.ahk.
+_LBMD_OneJsonStringEncoder() {
+	Source := _DriverSourceNoComments()
+	Count := 0, Pos := 1
+	while (Pos := RegExMatch(Source, "m)^JsonStringLiteral\(", &Match, Pos)) {
+		Count += 1
+		Pos += Match.Len
+	}
+	AssertEqual(1, Count, "the driver defines JsonStringLiteral exactly once (infra/json.ahk)")
+	AssertContains(_DriverFuncBody("JsonStringLiteral"), "escapeHtml", "that one is the shared encoder")
+}
+Test("model-selector-single-json-encoder: the driver defines one JSON string encoder",
+	_LBMD_OneJsonStringEncoder)

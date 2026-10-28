@@ -1161,11 +1161,6 @@ _LLM_MBW_I18nApplyScript() {
 		. ";if(typeof window.i18n_apply==='function')window.i18n_apply(window._i18n_strings);"
 }
 
-/** Escapes a string for safe injection into a JS double-quoted literal. */
-JsonStringLiteral(s) {
-	return JsonStringLiteral(s)
-}
-
 /** Formats a number as a clean JS numeric literal (integers without a decimal). */
 _LLM_MBW_Num(v) {
 	if !IsNumber(v)
