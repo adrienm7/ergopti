@@ -471,6 +471,20 @@ function M.refresh()
 	return true
 end
 
+--- Shows one row's download percentage on the open page.
+--- @param update table { backend, name, percent }.
+--- @return boolean sent False when no page is open.
+function M.inject_progress(update)
+	if not _wv or _wv_committed ~= true or type(update) ~= "table" then return false end
+	local ok, json = pcall(hs.json.encode, { backend = update.backend, name = update.name, percent = update.percent })
+	if not ok or not json then
+		Logger.warn(LOG, "Failed to encode a download percentage as JSON.")
+		return false
+	end
+	eval("injectProgress(" .. json .. ")")
+	return true
+end
+
 --- Whether the page is open.
 --- @return boolean
 function M.is_open()

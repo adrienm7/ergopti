@@ -32,6 +32,7 @@ local BackendLabels  = require("ui.menu.menu_llm.backend_labels")
 local CustomModels   = require("ui.menu.menu_llm.custom_models")
 local ModelCatalogue = require("llm.model_catalogue")
 local ModelIdentifier = require("llm.model_identifier")
+local ApiModelListing = require("llm.api_model_listing")
 local TextUtils      = require("text_utils")
 
 local LOG = "model_selector_page"
@@ -199,32 +200,62 @@ local function local_actions(ctx, backend, available, collected, probes)
 	return actions
 end
 
+--- The provider fields api_model_listing.plan reads for one entry.
+local function entry_view(api_remote, e)
+	local provider = type(api_remote.PROVIDERS) == "table" and api_remote.PROVIDERS[e.provider] or nil
+	local extras = {}
+	for id in pairs(type(provider) == "table" and type(provider.model_extras) == "table" and provider.model_extras or {}) do
+		extras[#extras + 1] = id
+	end
+	return { model = e.model, default_model = type(provider) == "table" and provider.default_model or "", extras = extras,
+		format = type(provider) == "table" and provider.format or nil }
+end
+
 --- The rows of the remote API group: one per model each entry's provider
---- lists (the configured one when it lists none), then the local servers.
+--- lists, or its known models and a typed-id row while that listing is
+--- pending, refused or unavailable (llm.api_model_listing), then the local
+--- servers. An entry without its key keeps its configured model, greyed.
 local function api_rows(ctx, collected)
-	local rows = {}
+	local rows, named, later = {}, {}, {}
+	-- Two entries of one provider and host can share a model name: each
+	-- entry's own model wins, then the first entry keeps a shared known model
+	-- or typed-id row (find_row finds one row per name).
+	local function push(row)
+		if named[row.name] then return end
+		named[row.name] = true
+		rows[#rows + 1] = row
+	end
 	local api_remote = require("modules.llm").api_remote
 	for _, e in ipairs(collected.entries) do
-		local listed = api_remote.listed_models(e.id)
-		local models = type(listed) == "table" and #listed > 0 and listed or { e.model }
-		local prefix = e.name
-		if e.model ~= "" and prefix:sub(-#e.model - 1) == "/" .. e.model then
-			prefix = prefix:sub(1, -#e.model - 2)
-		end
-		for _, model in ipairs(models) do
+		local plan = e.key_missing and { models = { { model = e.model } } }
+			or ApiModelListing.plan(entry_view(api_remote, e), api_remote.listing_state(e.id))
+		local prefix, suffix = ApiModelListing.name_parts(e.name, e.model)
+		for _, item in ipairs(plan.models) do
+			local model = item.model
 			local actions = { { id = "other_model", text = i18n.get("model_browser.api_other_model") } }
 			if e.active and model == e.model then
 				actions[#actions + 1] = { id = "test", text = i18n.get("menu.llm.api_test_entry") }
 				actions[#actions + 1] = { id = "remove", text = i18n.get("menu.llm.api_remove_entry") }
 			end
-			rows[#rows + 1] = {
-				name = prefix .. "/" .. model, runtime_name = model, provider = prefix, installed = true,
+			local row = {
+				name = prefix .. "/" .. model .. suffix, runtime_name = model, provider = prefix, installed = true,
 				entry_id = e.id, model = model, available = not e.key_missing, actions = actions,
-				hint_key = e.key_missing and "model_browser.hint_api_no_key"
-					or ((listed == nil and e.active) and "model_browser.hint_api_listing_unavailable" or nil),
+				hint_key = e.key_missing and "model_browser.hint_api_no_key" or nil,
+			}
+			if model == e.model then push(row) else later[#later + 1] = row end
+		end
+		if plan.typed then
+			-- Not a model: the place to type one the provider serves, with
+			-- the reason its list is missing. Named by the provider (and the
+			-- entry's host), it cannot collide with a "<provider>/<model>" row.
+			later[#later + 1] = {
+				name = prefix .. suffix, provider = prefix, installed = true, entry_id = e.id,
+				model = e.model, typed = true, available = false, hint_key = plan.typed.hint_key,
+				actions = { { id = "other_model", text = i18n.get("model_browser.api_other_model") } },
 			}
 		end
 	end
+	for _, row in ipairs(later) do push(row) end
 	-- Discovered local servers (oMLX, LM Studio…) are API providers: one row
 	-- per model a server that answers lists, the server alone when it wants
 	-- its key (api_remote.local_server_views, the AI menu's own source).
@@ -309,7 +340,11 @@ function M.build_payload(ctx, probes, collected)
 		backend.providers = backends[index].providers
 	end
 	for _, row in ipairs(payload.models) do
-		if _pending[pending_key(row.backend, row.name)] then row.pending = "download" end
+		local held = _pending[pending_key(row.backend, row.name)]
+		if held then
+			row.pending = "download"
+			row.progress = held.percent
+		end
 	end
 	return payload
 end
@@ -345,7 +380,7 @@ local function start_download(ctx, backend, name, custom)
 		_pending[key] = nil
 		M.refresh()
 	end
-	_pending[key] = true
+	_pending[key] = { backend = backend, name = name }
 	Logger.info(LOG, "Model download requested via the selector page: %s/%s.", backend, name)
 	local ok, accepted
 	if backend == "mlx" then
@@ -364,6 +399,28 @@ local function start_download(ctx, backend, name, custom)
 		return false
 	end
 	return true
+end
+
+-- The download window kind of each local backend's model downloads.
+local DOWNLOAD_KINDS = { ollama_model = "ollama", mlx_model = "mlx" }
+
+--- Shows a download window percentage on the page's row of that download:
+--- the window holds one download at a time, so the one pending row of its
+--- backend is the one it reports.
+--- @param kind string Download window kind.
+--- @param percent integer Whole percentage.
+function M.on_download_percent(kind, percent)
+	local backend = DOWNLOAD_KINDS[kind]
+	if not backend or type(percent) ~= "number" then return false end
+	local held, count = nil, 0
+	for _, entry in pairs(_pending) do
+		if entry.backend == backend then held, count = entry, count + 1 end
+	end
+	if count ~= 1 then return false end
+	held.percent = percent
+	local browser = package.loaded["ui.model_browser"]
+	if type(browser) ~= "table" or type(browser.inject_progress) ~= "function" then return false end
+	return browser.inject_progress({ backend = backend, name = held.name, percent = percent }) == true
 end
 
 --- Makes a local model active, switching the backend first when needed. The
@@ -551,8 +608,9 @@ function M.handle_action(ctx, body, probes, collected)
 		if body.id == "set_key" and row.local_server then
 			return require("ui.menu.menu_llm.local_server_panel").prompt_key(collected.local_ctx, row.local_server) == true
 		end
-		if row.available == false or not row.entry_id then return false end
+		if not row.entry_id or (row.available == false and not row.typed) then return false end
 		if body.id == "other_model" then return prompt_api_model(ctx, row) end
+		if row.typed then return false end
 		if body.id == "test" and type(collected.test_active) == "function" then return collected.test_active() ~= false end
 		if body.id == "remove" and type(collected.remove_active) == "function" then return collected.remove_active() ~= false end
 		return false
@@ -593,6 +651,7 @@ function M.bind(ctx)
 		on_changed = function() M.refresh() end,
 	})
 	_ctx = ctx
+	require("ui.download_window").set_percent_listener(M.on_download_percent)
 	-- The MLX repair offer proposes Ollama on a Mac that cannot run MLX: the
 	-- Ollama selection the page runs, collected when the offer is accepted.
 	require("ui.menu.menu_llm.mlx_repair_offer").set_alternative(function()
