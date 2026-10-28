@@ -116,6 +116,12 @@ function fixture(name) {
 	const runnerLog = path.join(base, 'runner.log');
 	const runner = path.join(clone, 'tools/dev/run-macos-dev-app.sh');
 	fs.writeFileSync(runner, `printf '%s\\n' "run $*" >> "${runnerLog}"\n`);
+	// The managed Ollama stager records its call; it builds nothing.
+	const stagerLog = path.join(base, 'stager.log');
+	fs.writeFileSync(
+		path.join(clone, 'tools/dev/stage-macos-dev-ollama-catalogue.py'),
+		`open(${JSON.stringify(stagerLog)}, "a").write("stage\\n")\n`
+	);
 	fs.mkdirSync(bin, { recursive: true });
 	fs.mkdirSync(home, { recursive: true });
 	const env = { ...process.env, ...GIT_IDENTITY, HOME: home };
@@ -147,7 +153,7 @@ process.stdout.write(typeof value === 'object' ? JSON.stringify(value) : String(
 		'plutil',
 		`[ "$1" = -extract ] && [ "$3" = raw ] && [ "$4" = -o ] && [ "$5" = - ] || exit 9\nexec "${process.execPath}" "${plutil}" "$2" "$6"`
 	);
-	return { clone, bin, home, env, launcherSource, runnerLog };
+	return { clone, bin, home, env, launcherSource, runnerLog, stagerLog };
 }
 
 /**
@@ -478,6 +484,13 @@ function reportFolder(paths) {
 					assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 					assert.match(result.stdout, /Reusing the running developer app/);
 					assert(!fs.existsSync(current.runnerLog), 'a current, ready app is not restarted');
+					// Field run 2026-10-28 14:16: the reused app had no managed
+					// Ollama catalogue, since only the runner staged it.
+					assert.equal(
+						fs.readFileSync(current.stagerLog, 'utf8'),
+						'stage\n',
+						'the reused app gets the managed Ollama of the current sources'
+					);
 				} finally {
 					driver.child.kill();
 				}
@@ -495,6 +508,7 @@ function reportFolder(paths) {
 						'run \n',
 						'the runner rebuilds (no --open-only) even though the stale app answers'
 					);
+					assert(!fs.existsSync(stale.stagerLog), 'the runner, not the collector, stages it');
 				} finally {
 					staleDriver.child.kill();
 				}

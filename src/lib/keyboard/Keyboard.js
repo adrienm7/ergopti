@@ -1,7 +1,7 @@
-import * as stores_infos from '$lib/stores_infos.js';
+import * as stores_infos from '#lib/stores_infos.js';
 import { get } from 'svelte/store';
 
-import characterFrequencies from '$lib/keyboard/data/characterFrequencies.json'; // Data coming from https://github.com/Nuclear-Squid/ergol/blob/main/corpus/en%2Bfr.json
+import characterFrequencies from '#lib/keyboard/data/characterFrequencies.json'; // Data coming from https://github.com/Nuclear-Squid/ergol/blob/main/corpus/en%2Bfr.json
 // Create the "max" and "min" keys containing the maximum value among the frequencies (the frequency of E) and the minimum value
 characterFrequencies.max = Math.max(...Object.values(characterFrequencies));
 characterFrequencies.min = Math.min(...Object.values(characterFrequencies));

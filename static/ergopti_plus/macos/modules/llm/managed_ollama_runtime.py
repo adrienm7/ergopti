@@ -2,6 +2,7 @@
 """Native ports for a source-qualified, runtime-only Ollama installation."""
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -293,6 +294,40 @@ def inputs():
     return contract_bytes, catalogue_bytes, host, contract, asset
 
 
+def developer_archive(catalogue_bytes, asset):
+    """Return the asset a developer clone built from its pinned sources, or None.
+
+    Only an unpublished catalogue, which names no download URL, may point here:
+    tools/dev/stage-macos-dev-ollama-catalogue.py generated it with the release
+    producer and kept the archive in the clone. A sealed bundle has no such
+    folder, so its unpublished catalogue stays unavailable. The bytes are still
+    admitted against the catalogue's SHA-256 and size before extraction.
+    """
+    if POLICY.metadata_bytes(catalogue_bytes)["publication"].get("mode") != "unpublished-ci":
+        return None
+    path = SHARED.parents[2] / POLICY.DEVELOPER_ASSET_DIRECTORY / asset["filename"]
+    if path.is_symlink() or not path.is_file():
+        return None
+    return path
+
+
+def copy_verified(source, destination, expected_sha256, expected_bytes, deadline):
+    """Copy a local asset, refusing any byte count or digest the catalogue does not pin."""
+    digest = hashlib.sha256()
+    size = 0
+    with source.open("rb") as reader, destination.open("xb") as writer:
+        while chunk := reader.read(1024 * 1024):
+            if deadline - time.monotonic() <= 0:
+                raise POLICY.RuntimeRefusal("deadline")
+            size += len(chunk)
+            if size > expected_bytes:
+                raise POLICY.RuntimeRefusal("checksum")
+            digest.update(chunk)
+            writer.write(chunk)
+    if size != expected_bytes or digest.hexdigest() != expected_sha256:
+        raise POLICY.RuntimeRefusal("checksum")
+
+
 def owned_directory():
     home = os.environ.get("HOME", "")
     if not home.startswith("/"):
@@ -385,7 +420,9 @@ def install(
 
     A manual native receiver may inject its own exact loopback fixture URL;
     hashes and source qualification always come from the unchanged catalogue.
-    The production command exposes no fixture URL option.
+    The production command exposes no fixture URL option. An unpublished
+    catalogue of a developer clone installs the archive that clone built
+    (developer_archive), admitted against the same pinned digest and size.
     """
     contract_bytes, catalogue_bytes, host, contract, asset = inputs()
     url = asset["url"]
@@ -405,8 +442,11 @@ def install(
         ):
             raise POLICY.RuntimeRefusal("unavailable")
         url = fixture_url
+    local_archive = None
     if not url:
-        raise POLICY.RuntimeRefusal("unavailable")
+        local_archive = developer_archive(catalogue_bytes, asset)
+        if local_archive is None:
+            raise POLICY.RuntimeRefusal("unavailable")
     target = owned_directory()
     expected_receipt = POLICY.receipt(contract_bytes, catalogue_bytes, host, asset)
     if target.exists() or target.is_symlink():
@@ -424,20 +464,23 @@ def install(
             or minimum_bytes_per_second <= 0
         ):
             raise POLICY.RuntimeRefusal("protocol")
-        request = functools.partial(
-            runtime_request,
-            connect_timeout=connect_timeout,
-            minimum_bytes_per_second=minimum_bytes_per_second,
-        )
-        BOOTSTRAP.download(
-            url,
-            archive,
-            asset["sha256"],
-            asset["bytes"],
-            deadline,
-            idle_timeout,
-            request=request,
-        )
+        if local_archive is not None:
+            copy_verified(local_archive, archive, asset["sha256"], asset["bytes"], deadline)
+        else:
+            request = functools.partial(
+                runtime_request,
+                connect_timeout=connect_timeout,
+                minimum_bytes_per_second=minimum_bytes_per_second,
+            )
+            BOOTSTRAP.download(
+                url,
+                archive,
+                asset["sha256"],
+                asset["bytes"],
+                deadline,
+                idle_timeout,
+                request=request,
+            )
         stage = root / "runtime"
         stage.mkdir(mode=0o700)
         with tarfile.open(archive) as source:

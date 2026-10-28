@@ -1,6 +1,6 @@
 <script>
-	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
-	import { KeyboardEmulation } from '$lib/keyboard/KeyboardEmulation.js';
+	import KeyboardBasis from '#lib/keyboard/KeyboardBasis.svelte';
+	import { KeyboardEmulation } from '#lib/keyboard/KeyboardEmulation.js';
 	import { onMount } from 'svelte';
 
 	const keyboard = new KeyboardEmulation('emulation');

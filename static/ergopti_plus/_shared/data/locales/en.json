@@ -2309,6 +2309,7 @@
 	"ollama.error_checksum": "The downloaded Ollama archive failed its SHA-256 check and was discarded. Nothing was installed.",
 	"ollama.error_installer_refused": "Ergopti's Ollama installer refused its own request, so nothing was installed. Restart Ergopti and select the Ollama backend again; if this persists, send the diagnostics report.",
 	"ollama.error_runtime_refused": "Ergopti could not verify its pinned Ollama runtime (release catalogue or integrity check), so nothing was installed. Send the diagnostics report.",
+	"ollama.error_dev_catalogue_missing": "This developer app has not built its pinned Ollama from the clone's sources yet, so nothing was installed. Run tools/dev/run-macos-dev-app.sh again and read the reason it prints (Go and the Xcode tools are required).",
 	"ollama.error_killed": "The Ollama installation was stopped by the system ({1}) before it finished, so nothing was installed. Try again; if it happens again, send the diagnostics report.",
 	"ollama.external_manual_start_body": "This Ollama installation is managed outside Ergopti. Start or stop its service yourself, or install Ergopti’s managed runtime from the Ollama setup offer.",
 	"ollama.native_offer_body": "Install Ergopti’s own Ollama %s, the version Ergopti pins and verifies. It runs on its own port beside any Ollama you installed yourself, which Ergopti never uses, stops or changes. Your models stay where they are.",

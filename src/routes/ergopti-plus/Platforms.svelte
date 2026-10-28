@@ -19,8 +19,8 @@ FEATURES & RATIONALE:
 -->
 
 <script>
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
-	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '$lib/js/getGitHubRelease.js';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
+	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '#lib/js/getGitHubRelease.js';
 	import { ui } from './state.svelte.js';
 	import { reveal } from './reveal.js';
 	import { t } from './i18n.svelte.js';
