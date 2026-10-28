@@ -405,6 +405,17 @@ function M.build(ctx)
 	local function cmd_scope_clear() return apply_scope("clear") end
 	local function cmd_scope_restore() return apply_scope("recommended") end
 
+	--- Shows the recommended-defaults rule and the macOS reason behind the
+	--- menu's « Infos… » row: several sentences do not fit a menu row.
+	--- @return boolean shown
+	local function cmd_recommended_info()
+		dialog.block_alert(i18n.get("menu.gestures.notify_title"),
+			i18n.get("menu.gestures.recommended_note") .. "\n\n"
+				.. i18n.get("menu.gestures.recommended_reason_macos"),
+			i18n.get("button.ok"), nil, "informational")
+		return true
+	end
+
 	-- Build a slot group from the manifest gesture_slots table.
 	-- One provider per finger count. The slot ids come from the manifest's own
 	-- `gesture_slots` table, so these rows were already manifest DATA appended by
@@ -427,8 +438,6 @@ function M.build(ctx)
 	}
 
 	local providers = {
-		-- The recommended-defaults note and why macOS recommends no three-finger tap.
-		["gesture_recommended_notes"] = function() return ManifestMenu.template_rows("gesture_recommended_notes", {}) end,
 		["system_gesture_status"] = function()
 			local conflicts = gestures.system_gesture_conflicts()
 			local rows = {}
@@ -485,6 +494,7 @@ function M.build(ctx)
 	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = cmd_scope_restore
 	render_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = cmd_scope_clear
 	render_ctx.commands[require("config_keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = gestures.open_system_gestures
+	render_ctx.commands[require("config_keys").COMMAND.GESTURE_RECOMMENDED_INFO] = cmd_recommended_info
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
 	local item = receive(gm, { gestures_enabled = function() return state.gestures or nil end })

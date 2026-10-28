@@ -1452,6 +1452,7 @@
 	"menu.gestures.default_sensitivity": "(일반 기본값)",
 	"menu.gestures.enabled": "️ 제스처",
 	"menu.gestures.recommended_note": "권장 제스처는 시스템이 이미 하는 동작을 피합니다. 모든 제스처는 다시 지정할 수 있습니다. 먼저 시스템의 지정을 해제하세요. 그렇지 않으면 두 동작이 모두 실행됩니다.",
+	"menu.gestures.recommended_info": "정보…",
 	"menu.gestures.recommended_reason_linux": "Linux에서는 세 손가락·네 손가락 스와이프를 권장하지 않습니다. 터치패드는 점유되지 않고 읽기만 하므로 데스크톱(GNOME, KDE, Hyprland, COSMIC)도 함께 반응합니다.",
 	"menu.gestures.recommended_reason_macos": "macOS에서는 시스템이 세 손가락 탭을 '찾아보기'에도 사용합니다. 사용하기 전에 트랙패드 설정에서 '찾아보기'를 끄세요. 그렇지 않으면 두 동작이 모두 실행됩니다.",
 	"menu.gestures.recommended_reason_windows": "Windows에서는 터치패드 설정이 제스처를 Ergopti로 보낼 때만 사용할 수 있습니다. Ergopti가 직접 설정합니다(자동 구성). 할당되지 않은 제스처는 회색으로 표시됩니다. Ergopti가 시스템 고유 동작을 대체하므로 이중 동작은 없습니다.",

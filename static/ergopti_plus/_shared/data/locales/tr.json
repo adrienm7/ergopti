@@ -1452,6 +1452,7 @@
 	"menu.gestures.default_sensitivity": "(Genel varsayılan)",
 	"menu.gestures.enabled": "️ Hareketler",
 	"menu.gestures.recommended_note": "Önerilen hareketler sisteminizin zaten yaptığı şeylerden kaçınır. Her hareket yeniden atanabilir: önce sistemin kendi atamasını kaldırın, aksi halde iki eylem de çalışır.",
+	"menu.gestures.recommended_info": "Bilgi…",
 	"menu.gestures.recommended_reason_linux": "Linux'ta üç ve dört parmakla kaydırma önerilmez: dokunmatik yüzey ele geçirilmeden okunur, bu yüzden masaüstünüz (GNOME, KDE, Hyprland, COSMIC) de bunlara tepki verir.",
 	"menu.gestures.recommended_reason_macos": "macOS'ta sistem üç parmakla dokunmayı Ara özelliği için de kullanır: kullanmadan önce izleme dörtgeni ayarlarından Ara'yı kapatın, aksi halde iki eylem de çalışır.",
 	"menu.gestures.recommended_reason_windows": "Windows'ta bir hareket, yalnızca dokunmatik yüzey ayarları onu Ergopti'ye gönderiyorsa kullanılabilir. Ergopti bunu kendisi ayarlar (Otomatik yapılandır); atanmamış hareket soluk görünür. Ergopti sistemin eylemini değiştirir: çift eylem olmaz.",

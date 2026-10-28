@@ -1452,6 +1452,7 @@
 	"menu.gestures.default_sensitivity": "(ברירת מחדל כללית)",
 	"menu.gestures.enabled": "️ מחוות",
 	"menu.gestures.recommended_note": "מחוות מומלצות נמנעות ממה שהמערכת שלך כבר עושה. אפשר להקצות מחדש כל מחווה: הסירו קודם את ההקצאה של המערכת, אחרת שתי הפעולות יופעלו.",
+	"menu.gestures.recommended_info": "מידע…",
 	"menu.gestures.recommended_reason_linux": "בלינוקס לא מומלץ להשתמש בהחלקה בשלוש וארבע אצבעות: משטח המגע נקרא ולא נתפס, ולכן גם שולחן העבודה (GNOME, KDE, Hyprland, COSMIC) מגיב אליהן.",
 	"menu.gestures.recommended_reason_macos": "ב-macOS המערכת משתמשת בהקשה בשלוש אצבעות גם לחיפוש מילה: כבו את חיפוש המילה בהגדרות משטח המגע לפני השימוש בה, אחרת שתי הפעולות יתבצעו.",
 	"menu.gestures.recommended_reason_windows": "ב-Windows אפשר להשתמש במחווה רק אם הגדרות משטח המגע שולחות אותה ל-Ergopti. Ergopti מגדיר זאת בעצמו (הגדרה אוטומטית); מחווה שלא הוקצתה מוצגת באפור. Ergopti מחליף את הפעולה של המערכת, ולכן אין פעולה כפולה.",
