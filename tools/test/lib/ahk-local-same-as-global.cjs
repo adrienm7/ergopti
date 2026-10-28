@@ -27,6 +27,9 @@
 'use strict';
 
 // AutoHotkey v2.0 built-in functions and classes: every one is a global name.
+// The list is the v2 function index (docs/v2/lib/index.htm, which includes
+// Edit, ListLines, KeyHistory, Reload, Pause and Suspend), the Is functions
+// and the built-in classes (checked against those pages on 2026-10-28).
 const BUILTINS = new Set(
 	`Abs ACos ASin ATan BlockInput Buffer CallbackCreate CallbackFree CaretGetPos Ceil Chr Click ClipboardAll
 ClipWait ComCall ComObjActive ComObjConnect ComObjFlags ComObjFromPtr ComObjGet ComObjQuery ComObjType
@@ -38,7 +41,7 @@ ControlSendText ControlSetChecked ControlSetEnabled ControlSetStyle ControlSetEx
 ControlShowDropDown CoordMode Cos Critical DateAdd DateDiff DetectHiddenText DetectHiddenWindows DirCopy
 DirCreate DirDelete DirExist DirMove DirSelect DllCall Download DriveEject DriveGetCapacity DriveGetFileSystem
 DriveGetLabel DriveGetList DriveGetSerial DriveGetSpaceFree DriveGetStatus DriveGetStatusCD DriveGetType
-DriveLock DriveRetract DriveSetLabel DriveUnlock EditGetCurrentCol EditGetCurrentLine EditGetLine
+DriveLock DriveRetract DriveSetLabel DriveUnlock Edit EditGetCurrentCol EditGetCurrentLine EditGetLine
 EditGetLineCount EditGetSelectedText EditPaste EnvGet EnvSet Exit ExitApp Exp FileAppend FileCopy
 FileCreateShortcut FileDelete FileEncoding FileExist FileGetAttrib FileGetShortcut FileGetSize FileGetTime
 FileGetVersion FileInstall FileMove FileOpen FileRead FileRecycle FileRecycleEmpty FileSelect FileSetAttrib

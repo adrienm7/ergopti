@@ -469,6 +469,8 @@ if (process.platform !== 'win32') {
 	// plus the frozen Linux receipt's refusal of the identities added since.
 	cases.push(['tools/test/managed_ollama_go_evidence_test.py', 47]);
 	cases.push(['tools/test/managed_ollama_signal_pid_publication_test.py', 2]);
+	// The developer app's catalogue stager; injected listing, no network.
+	cases.push(['tools/test/macos_dev_ollama_catalogue_test.py', 6]);
 } else {
 	process.stdout.write(
 		'SKIP actual POSIX process peers on Windows; Apple SDK receiving is separate.\n'
