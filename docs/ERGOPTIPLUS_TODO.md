@@ -116,8 +116,11 @@ a sealed Windows updater source, reseal with
   102). Run 40694886399 on 4d70b5dc47 (ninth) left Common reds fixed by CI15 (9e36b4af0b, d6a08b1e12,
   fe34691cb1, 37cebbf4be) and a runner-side checkout stall on the macOS tooltip canvas job. The tenth
   v1.0.7 release commit adds SvelteKit 3, the model selector's collapsed groups, the pgrep-based local
-  server discovery (oMLX on its configured port) and the developer app's locally built managed Ollama; a
-  new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
+  server discovery (oMLX on its configured port) and the developer app's locally built managed Ollama.
+  Run 40708798893 on 5ee230e8aa (tenth) left only runner-side reds (a macOS Intel checkout network loss and
+  a Linux GTK cold-start timeout that passed on rerun). The eleventh v1.0.7 release commit adds the gestures
+  Infos dialog and the tap_3 left-click recommendation, the Linux layout installer workflow fixes and the
+  macOS hotstring fix (synthetic text never rides a held key, 9680b2a1cc); a new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
   `CFMessagePortSendRequest FAILED(-1)` (the runner's TSM UI server), rerun that job once.
 - **Decide after v1.0.7 [CI]:** since bc09e4584c no product path calls the stock
   `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
