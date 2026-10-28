@@ -2237,7 +2237,7 @@
 	"model_browser.status_downloading": "Загрузка…",
 	"model_browser.install_runtime": "Установить %s",
 	"model_browser.hint_api_no_key": "Нет ключа API: добавьте его, чтобы использовать эту модель.",
-	"model_browser.hint_api_listing_unavailable": "Список моделей этого поставщика здесь недоступен: только настроенная модель, или введите другой идентификатор.",
+	"model_browser.hint_api_listing_unavailable": "Список моделей этого провайдера здесь недоступен: показаны известные модели; введите другой идентификатор через «Другая модель…»",
 	"model_browser.hint_api_listing_refused": "Провайдер отказался показать свои модели (проверьте ключ): известные модели или введите другой идентификатор.",
 	"model_browser.hint_api_listing_pending": "Загрузка моделей этого провайдера…",
 	"model_browser.status_downloading_percent": "Загрузка… {n} %",

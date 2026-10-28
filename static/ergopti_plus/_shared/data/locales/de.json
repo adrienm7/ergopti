@@ -2237,7 +2237,7 @@
 	"model_browser.status_downloading": "Wird heruntergeladen…",
 	"model_browser.install_runtime": "%s installieren",
 	"model_browser.hint_api_no_key": "API-Schlüssel fehlt: hinterlegen Sie ihn, um dieses Modell zu nutzen.",
-	"model_browser.hint_api_listing_unavailable": "Dieser Anbieter liefert hier keine Modellliste: nur das eingestellte Modell, oder geben Sie eine andere Kennung ein.",
+	"model_browser.hint_api_listing_unavailable": "Die Modellliste dieses Anbieters ist hier nicht verfügbar: seine bekannten Modelle werden angezeigt; geben Sie mit Anderes Modell… eine andere Kennung ein.",
 	"model_browser.hint_api_listing_refused": "Der Anbieter hat die Modellliste verweigert (Schlüssel prüfen): seine bekannten Modelle, oder geben Sie eine andere Kennung ein.",
 	"model_browser.hint_api_listing_pending": "Modelle dieses Anbieters werden geladen…",
 	"model_browser.status_downloading_percent": "Wird heruntergeladen… {n} %",

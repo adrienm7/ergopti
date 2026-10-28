@@ -2237,7 +2237,7 @@
 	"model_browser.status_downloading": "מוריד…",
 	"model_browser.install_runtime": "התקנת %s",
 	"model_browser.hint_api_no_key": "מפתח API חסר: הוסיפו אותו כדי להשתמש במודל זה.",
-	"model_browser.hint_api_listing_unavailable": "רשימת המודלים של ספק זה אינה זמינה כאן: רק המודל המוגדר, או הקלידו מזהה אחר.",
+	"model_browser.hint_api_listing_unavailable": "רשימת המודלים של ספק זה אינה זמינה כאן: מוצגים המודלים המוכרים; הקלידו מזהה אחר דרך „מודל אחר…”.",
 	"model_browser.hint_api_listing_refused": "הספק סירב להציג את המודלים שלו (בדקו את המפתח): המודלים המוכרים, או הקלידו מזהה אחר.",
 	"model_browser.hint_api_listing_pending": "טוען את המודלים של ספק זה…",
 	"model_browser.status_downloading_percent": "מוריד… {n} %",

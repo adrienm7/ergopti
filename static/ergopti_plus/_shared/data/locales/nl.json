@@ -2237,7 +2237,7 @@
 	"model_browser.status_downloading": "Downloaden…",
 	"model_browser.install_runtime": "%s installeren",
 	"model_browser.hint_api_no_key": "API-sleutel ontbreekt: voeg hem toe om dit model te gebruiken.",
-	"model_browser.hint_api_listing_unavailable": "De modellenlijst van deze aanbieder is hier niet beschikbaar: alleen het ingestelde model, of typ een andere id.",
+	"model_browser.hint_api_listing_unavailable": "De modellenlijst van deze aanbieder is hier niet beschikbaar: de bekende modellen staan erin; typ een andere id met Ander model…",
 	"model_browser.hint_api_listing_refused": "De aanbieder weigerde zijn modellen te tonen (controleer de sleutel): de bekende modellen, of typ een andere id.",
 	"model_browser.hint_api_listing_pending": "Modellen van deze aanbieder laden…",
 	"model_browser.status_downloading_percent": "Downloaden… {n} %",
