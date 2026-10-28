@@ -211,26 +211,36 @@ _CLW_BuildWindow(Channel, Request) {
 	try {
 		; Reuse the shared session environment (infra/webview_utils.ahk) so no
 		; second Chromium process boots and reopens are near-instant.
-		_CLW_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
+		CreatedController := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
 	} catch as Err {
 		try LoggerError("Changelog", "WebView2 create failed: {1}.", Err.Message)
-		try g.Destroy()
+		if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
+			return false
+		; Retire this opening before destroying its native host, which may pump.
 		_CLW_Reset()
-		; Clear the handle explicitly: the reset above short-circuits when a
-		; previous session already latched _CLW_ResetDone, and a _CLW_Gui left
-		; pointing at the Gui just destroyed would make Changelog_Open take its
-		; singleton branch forever.
-		_CLW_Gui := unset
-		; Graceful degradation to the old AHK-native changelog window.
-		_Updater_OpenChangelogWindow(Channel, Request)
-		return
-	}
-	if !_Updater_RequestMayPublish(Request) {
-		_CLW_OnClose()
+		if IsSet(_CLW_Gui) && _CLW_Gui == g
+			_CLW_Gui := unset
+		ResetEpoch := _CLW_WindowEpoch
+		try g.Destroy()
+		; A replacement owns its own renderer; a cancelled opening cannot fall back.
+		if ResetEpoch == _CLW_WindowEpoch && !IsSet(_CLW_Gui)
+			_Updater_OpenChangelogWindow(Channel, Request)
 		return false
 	}
-
-	_CLW_WebView := _CLW_Controller.CoreWebView2
+	RequestCurrent := _Updater_RequestMayPublish(Request)
+	if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g {
+		CreatedController.Close()
+		LoggerInfo("Changelog", "Changelog opening cancelled after its window was closed or replaced.")
+		return false
+	}
+	if !RequestCurrent {
+		CreatedController.Close()
+		if WindowEpoch == _CLW_WindowEpoch && IsSet(_CLW_Gui) && _CLW_Gui == g
+			_CLW_OnClose()
+		return false
+	}
+	_CLW_Controller := CreatedController
+	_CLW_WebView := CreatedController.CoreWebView2
 	; This controller/webview pair is fresh — re-arm the Reset() guard so this
 	; session's close actually tears it down instead of short-circuiting on a flag
 	; left behind by an earlier _CLW_Reset() call.
