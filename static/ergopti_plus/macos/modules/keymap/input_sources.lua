@@ -923,7 +923,8 @@ end
 -- argv: KeyboardLayout Name, the .keylayout path to register ("" for none),
 -- and comma-separated flags: "enable" calls TISEnableInputSource on a listed
 -- source that reads off, "refresh" selects another layout and back when the
--- target is selected (so a rewritten layout is reloaded). Prints one JSON object:
+-- target is selected (so a rewritten layout is reloaded), then the pause in
+-- seconds after each of those selections. Prints one JSON object:
 --   {"listed", "id", "enabled", "select_capable", "selected", "register", "enable", "refreshed"}
 -- Carbon is called through ctypes: the AppleScript ObjC bridge crashes on these
 -- calls (see ENABLED_LIST_SCRIPT), the C API does not.
@@ -933,6 +934,7 @@ import ctypes, json, sys, time
 TARGET = sys.argv[1]
 REGISTER_PATH = sys.argv[2]
 FLAGS = sys.argv[3].split(",")
+SETTLE_SEC = float(sys.argv[4])
 REFRESH = "refresh" in FLAGS
 ENABLE = "enable" in FLAGS
 UTF8 = 0x08000100
@@ -1022,9 +1024,9 @@ if target is not None and REFRESH and flag(target, K_SELECTED):
         and flag(source, K_ENABLED) and flag(source, K_SELECT_CAPABLE)), None)
     if other is not None:
         away = tis.TISSelectInputSource(other)
-        time.sleep(0.3)
+        time.sleep(SETTLE_SEC)
         back = tis.TISSelectInputSource(target)
-        time.sleep(0.3)
+        time.sleep(SETTLE_SEC)
         refreshed = {"away": away, "back": back}
     else:
         refreshed = {"away": None, "back": None}
@@ -1063,7 +1065,8 @@ local function confirm_source_async(keyboard_name, options, on_done)
 	if options.refresh == true then flags[#flags + 1] = "refresh" end
 	if options.enable == true then flags[#flags + 1] = "enable" end
 	return run_bounded_process("Confirm keyboard input source", python_bin,
-		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path, table.concat(flags, ",") },
+		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path, table.concat(flags, ","),
+			tostring(Timings.sec("ui", "input_source_reselect_settle_ms")) },
 		function(process_ok, out, reason)
 			local decoded_ok, state = pcall(require("json").decode, tostring(out or ""))
 			if process_ok ~= true or not decoded_ok or type(state) ~= "table" or type(state.listed) ~= "boolean" then
@@ -1082,7 +1085,7 @@ end
 
 -- The 12:51 field run (2026-10-28) read the composed layout 140 ms after the
 -- preference write and found it off, while probe v5 read it seconds later and
--- found it on (P5): the system needs a moment to apply the write. Fresh reads
+-- found it on: the system needs a moment to apply the write. Fresh reads
 -- are repeated with a doubling delay within one bounded window ([ui]
 -- input_source_confirm_retry_base_ms and input_source_confirm_window_ms, read
 -- when a confirmation starts, so loading this module reads only its deadline).
