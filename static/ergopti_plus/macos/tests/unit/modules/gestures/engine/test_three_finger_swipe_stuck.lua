@@ -22,6 +22,8 @@
 ---    three-finger centroid, so the centroid jump alone aborted the gesture.
 --- 4. An aborted swipe that had already fired armed the scroll guard, and
 ---    its pair tail was let through to scroll the page it had just switched to.
+--- 5. An aborted gesture stayed aborted while one finger rested, silently
+---    refusing every swipe until the whole hand lifted.
 --- The two-finger scroll guarantees of three-finger-swipe-vs-scroll still hold.
 --- ==============================================================================
 
@@ -423,6 +425,23 @@ helpers.describe("a refused gesture leaves nothing armed (three-finger-swipe-stu
 		helpers.assert_eq(aborted, nil, "the centroid jump of a cascade is not pair travel: " .. tostring(aborted))
 		helpers.assert_true(#fires == 1 and fires[1] == "app_expose",
 			"the four-finger tap must commit; fired: " .. table.concat(h.fired, ", "))
+	end)
+
+	helpers.it("an aborted gesture ends when the hand drops to one resting finger", function()
+		local h = new_harness()
+		local hand = { FINGER_A, FINGER_B, FINGER_C }
+		-- A grazing third contact, then a two-finger flick: aborted by design.
+		for _ = 1, 3 do h.frame(hand, nil, 0) end
+		for i = 1, 6 do h.frame({ FINGER_A, FINGER_B }, nil, i * 0.8) end
+		helpers.assert_true(h.line("Gesture aborted") ~= nil, "the flick must abort as before")
+		-- One finger stays on the pad for 300 ms, then three fingers swipe.
+		for _ = 1, 38 do h.frame({ FINGER_A }, nil, 0) end
+		swipe_frames(h)
+		h.lift()
+		local fires = watched(h.fired)
+		h.finish()
+		helpers.assert_true(#fires > 0 and fires[1] == "tab_next",
+			"a resting finger must not keep the aborted state; fired: " .. table.concat(h.fired, ", "))
 	end)
 
 	helpers.it("a thumb resting beside two scrolling fingers still never fires", function()
