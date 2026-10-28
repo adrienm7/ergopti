@@ -509,9 +509,16 @@ LayoutManager_Open(*) {
 	Placeholder := g.Add("Text", "x0 y0 w720 h560", "")
 	g.OnEvent("Close", _LayMgrWeb_SessionCall.Bind(SessionEpoch, _LayMgrWeb_Close))
 	g.OnEvent("Size", _LayMgrWeb_SessionCall.Bind(SessionEpoch, _LayMgrWeb_OnResize))
+	; Native Show can deliver Close before returning. Its original callback
+	; must already own this exact window so cancellation can destroy it.
+	_LayMgrWeb_Gui := g
 	; Shown before the control: a hidden Gui has a zero client rect.
 	g.Show("w720 h560 Center")
-	_LayMgrWeb_Gui := g
+	if SessionEpoch != _LayMgrWeb_SessionEpoch || _LayMgrWeb_Gui != g {
+		try g.Destroy()
+		LoggerInfo("LayoutManager", "Layout manager opening cancelled while its window was being shown.")
+		return false
+	}
 	try {
 		CreatedController := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll"))
 	} catch as Err {
