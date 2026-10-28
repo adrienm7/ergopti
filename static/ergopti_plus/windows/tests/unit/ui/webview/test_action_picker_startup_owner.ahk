@@ -122,3 +122,5 @@ for _APST_Mode in ["current", "close-create", "close-create-reject", "reopen-cre
 #Include test_action_picker_reset_owner.ahk
 
 #Include test_action_picker_confirmation_failure.ahk
+
+#Include test_action_picker_create_owner.ahk

@@ -102,8 +102,14 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 
 	; Singleton — a second open replaces the previous picker (its callback is
 	; superseded), matching the native dialog which only ever shows one.
-	if (_ActPickWeb_Gui != 0)
+	if (_ActPickWeb_Gui != 0) {
+		RetiredEpoch := _ActPickWeb_SessionEpoch + !_ActPickWeb_ResetDone
 		_ActPickWeb_Close()
+		; Native retirement can admit a newer public request. This older
+		; replacement must not publish another picker over that successor.
+		if _ActPickWeb_SessionEpoch != RetiredEpoch || _ActPickWeb_Gui != 0
+			return true
+	}
 	_ActPickWeb_SessionEpoch += 1
 	SessionEpoch := _ActPickWeb_SessionEpoch
 	_ActPickWeb_ResetDone := false
@@ -114,6 +120,12 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 	_ActPickWeb_InitJs    := _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId)
 
 	g := Gui_Create("+Resize +MinSize360x360", Title)
+	; WM_CREATE runs inside the constructor, before its Gui can be published.
+	; A public successor admitted there owns the singleton from now on.
+	if !_ActPickWeb_SessionCurrent(SessionEpoch) {
+		g.Destroy()
+		return true
+	}
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0
@@ -123,7 +135,18 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 
 	; Native Show can dispatch Close before returning. Its existing handler
 	; must already own this exact window so cancellation can destroy it.
-	_ActPickWeb_Gui := g
+	Admitted := false
+	PreviousCritical := Critical("On")
+	try {
+		if _ActPickWeb_SessionCurrent(SessionEpoch) && !_ActPickWeb_ResetDone {
+			_ActPickWeb_Gui := g
+			Admitted := true
+		}
+	} finally Critical(PreviousCritical)
+	if !Admitted {
+		g.Destroy()
+		return true
+	}
 	; Show BEFORE creating the control — a hidden Gui has a zero client rect, so
 	; the control lays out blank and never recovers.
 	g.Show("w" . ACTPICK_WIDTH . " h" . ACTPICK_HEIGHT . " Center")
