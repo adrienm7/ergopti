@@ -9,13 +9,13 @@
 
 #Requires AutoHotkey v2.0
 
-_ACED_Receive(Mode) {
+_ACED_Receive(Mode, FixtureLeaf, ExpectedCases, ExpectedCode) {
 	global _StaticDir
 	Directory := A_Temp . "\ergopti-contract-exception-" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "-" . A_TickCount
 	if !DllCall("Kernel32\CreateDirectoryW", "Str", Directory, "Ptr", 0, "Int")
 		throw OSError(A_LastError, "Cannot acquire the owned contract exception fixture")
 	Receipt := Directory . "\receipt.tap"
-	Fixture := _StaticDir . "\ergopti_plus\windows\tests\fixtures\adapter_contract_empty_message.ahk"
+	Fixture := _StaticDir . "\ergopti_plus\windows\tests\fixtures\" . FixtureLeaf
 	Observation := {Calls: 0, Code: -1, Output: "", Errors: ""}
 	Handle := 0
 	CanRetire := true
@@ -36,19 +36,17 @@ _ACED_Receive(Mode) {
 		AssertEqual(1, Observation.Calls, "the child must reach one terminal receipt")
 		AssertEqual("", Observation.Errors, "fixture warnings or parse errors cannot qualify: " . Observation.Output)
 		StrReplace(Observation.Output, "# adapter-fixture-endpoint", , , &EndpointCalls)
-		AssertEqual(2, EndpointCalls, "both actual callbacks must reach the injected adapter endpoint")
+		AssertEqual(ExpectedCases, EndpointCalls, "every actual callback must reach the injected adapter endpoint")
 		AssertTrue(FileExist(Receipt), "the actual runner must publish its owned receipt")
 		Tap := FileRead(Receipt, "UTF-8")
 		; A child transcript is diagnostic data, never additional parent TAP rows.
 		TapDetail := StrReplace(StrReplace(Tap, "`r", ""), "`n", " | ")
-		AssertContains(Tap, "1..2", "both unchanged registered contract callbacks must execute")
-		if Mode == "healthy" {
-			AssertEqual(0, Observation.Code, "healthy adapters must pass the actual callbacks: " . TapDetail)
-			AssertContains(Tap, "# 2 passed, 0 failed", "the healthy control must execute both callbacks")
-		} else {
-			AssertEqual(1, Observation.Code, "blank-message failures must fail the actual callbacks: " . TapDetail)
-			AssertContains(Tap, "# 0 passed, 2 failed", "no thrown Error may become a passing adapter contract")
-		}
+		AssertContains(Tap, "1.." . ExpectedCases, "every unchanged registered contract callback must execute")
+		AssertEqual(ExpectedCode, Observation.Code, "the actual callbacks must preserve their " . Mode . " outcome: " . TapDetail)
+		ExpectedPasses := ExpectedCode == 0 ? ExpectedCases : 0
+		ExpectedFailures := ExpectedCases - ExpectedPasses
+		AssertContains(Tap, "# " . ExpectedPasses . " passed, " . ExpectedFailures . " failed",
+			"every actual callback must retain its independent contract result")
 	} finally {
 		if IsObject(Handle) {
 			CanRetire := Handle.terminate()
@@ -62,5 +60,5 @@ _ACED_Receive(Mode) {
 	}
 }
 
-Test("adapter contract throw: healthy callbacks still pass (empty-message-contract)", _ACED_Receive.Bind("healthy"))
-Test("adapter contract throw: blank-message failures stay red (empty-message-contract)", _ACED_Receive.Bind("empty-error"))
+Test("adapter contract throw: healthy callbacks still pass (empty-message-contract)", _ACED_Receive.Bind("healthy", "adapter_contract_empty_message.ahk", 2, 0))
+Test("adapter contract throw: blank-message failures stay red (empty-message-contract)", _ACED_Receive.Bind("empty-error", "adapter_contract_empty_message.ahk", 2, 1))
