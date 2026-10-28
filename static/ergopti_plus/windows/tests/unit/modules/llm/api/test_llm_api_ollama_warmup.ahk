@@ -81,6 +81,7 @@ class _OllamaWarmupPendingRetryTransport {
 	SendCalls := 0
 	WaitCalls := 0
 	CompletedObservations := 0
+	ForbidWait := false
 	DeadlineStart := 0
 	DeadlineTimeout := 0
 
@@ -116,6 +117,8 @@ class _OllamaWarmupPendingRetryTransport {
 
 	WaitForResponse(TimeoutSeconds := 0) {
 		this.WaitCalls += 1
+		if this.ForbidWait
+			throw Error("The pending observer must consume the owned completion snapshot, not poll again.")
 		AssertEqual(0, TimeoutSeconds, "the retry must never wait for its transport")
 		if this.Completed
 			this.CompletedObservations += 1
@@ -199,6 +202,20 @@ _OllamaWarmupPendingRetryCase(Mode) {
 		OriginalWaits := OriginalRequest.WaitCalls
 		AssertFalse(_LLM_Ollama_WarmupPendingFn.Call(StrUpper(_LLM_Ollama_WarmupRetryModel)),
 			"a case-distinct model cannot borrow the pending request")
+		if Mode == "snapshot" {
+			PreviousSnapshotCritical := Critical("On")
+			try {
+				OriginalRequest.ForbidWait := true
+				AssertTrue(_LLM_Ollama_WarmupPendingFn.Call(_LLM_Ollama_WarmupRetryModel),
+					"an unfinished captured transport still defers its ordinary retry")
+				AssertEqual(OriginalWaits, OriginalRequest.WaitCalls,
+					"only the existing generic poll owns transport response observation")
+			} finally {
+				OriginalRequest.ForbidWait := false
+				Critical(PreviousSnapshotCritical)
+			}
+			return
+		}
 		if Mode == "complete" {
 			OriginalRequest.Completed := true
 			OriginalRequest.AbortAccepted := true
@@ -341,3 +358,6 @@ _OllamaWarmupPendingRetryCase(Mode) {
 for _OllamaPendingRetryMode in ["pending", "complete", "disabled", "ready", "model-refusal", "constructor-reentrant", "deadline"]
 	Test("warmup-inflight-retry: actual warmup " . _OllamaPendingRetryMode,
 		_OllamaWarmupPendingRetryCase.Bind(_OllamaPendingRetryMode))
+
+Test("warmup status snapshot: retry observes the owned completion flag (warmup-status-snapshot)",
+	_OllamaWarmupPendingRetryCase.Bind("snapshot"))

@@ -125,7 +125,7 @@ LLM_OllamaWarmup(model) {
 		global _LLM_Ollama_IsReady
 		if !(ExpectedModel == model) || !CurrentRequest() || _LLM_DeadlineExpired(Started, WarmupTimeoutBudget)
 			return false
-		Completed := Request.WaitForResponse(0)
+		Completed := Request.Completed
 		if !CurrentRequest() || _LLM_DeadlineExpired(Started, WarmupTimeoutBudget)
 			return false
 		if !Completed
