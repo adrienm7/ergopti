@@ -207,7 +207,7 @@ return function()
 				assert(file:write("# Fixture-owned user exclusion\n"))
 				assert(file:close())
 			end
-			local initialized = manager.init({ LOG_DIR = temporary .. "/metrics" })
+			local initialized = manager.init({ LOG_DIR = temporary .. "/metrics", CACHE_DIR = temporary .. "/ergopti_metrics" })
 			if phase == "reject_boot" then
 				assert(initialized == false, "unowned identity/nonprefix suffix must reject public initialization")
 				assert(writer.get_db() == nil, "failed init must close its actual SQLite connection")

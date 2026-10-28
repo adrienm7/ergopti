@@ -750,7 +750,8 @@ helpers.describe("input-source enable: the preference is not the live state (com
 	-- successful write, the script exited 1 and every enable read "process_failed"
 	-- (field runs 2026-10-27, L52). The script must end on its own write.
 	helpers.it("ends the enabled-list editor on its own write, with no agent restart", function()
-		local source = assert(helpers.read_driver_unit("local ENABLED_LIST_SCRIPT ="))
+		local source = helpers.read_driver_source("local ENABLED_LIST_SCRIPT = [[")
+		helpers.assert_not_nil(source, "the editor script's owner is found")
 		local script = source:match("local ENABLED_LIST_SCRIPT = %[%[(.-)%]%]")
 		helpers.assert_not_nil(script, "the editor script is found")
 		helpers.assert_true(script:find("launchctl", 1, true) == nil, "the editor restarts no agent")
@@ -808,5 +809,51 @@ helpers.describe("input-source confirm: a fresh process reads the state (compose
 			helpers.assert_true(answer.reason == "invalid_output" or answer.reason == "process_failed", tostring(answer.reason))
 			reset_fixture_modules()
 		end
+	end)
+end)
+
+
+helpers.describe("input-source confirm: fresh reads until the write applies (composer-macos26)", function()
+	-- Field run 2026-10-28 12:51: the composed layout was read 140 ms after the
+	-- preference write and found off; probe v5 read it seconds later and found it on.
+	local OFF = '{"listed": true, "enabled": false, "selected": false, "register": 0, "enable": 0, "refreshed": null}\n'
+	local ON = '{"listed": true, "enabled": true, "selected": false, "register": null, "enable": null, "refreshed": null}\n'
+
+	helpers.it("enables from the first child, then reads again from a new child after a delay", function()
+		local f = load_fixture()
+		local answers = {}
+		helpers.assert_eq(f.IS.confirm_enabled_async("Composer Check", { register_path = "/u/composed.keylayout" },
+			function(ok, state, reason) answers[#answers + 1] = { ok = ok, state = state, reason = reason } end), true)
+		helpers.assert_eq(f.tasks[1].args[4], "/u/composed.keylayout")
+		helpers.assert_eq(f.tasks[1].args[5], "enable", "the first child also asks TIS to enable it")
+		f.tasks[1]:complete(0, OFF, "")
+		helpers.assert_eq(#answers, 0, "an off read inside the window is not the answer")
+		helpers.assert_eq(#f.tasks, 1, "the next read waits for its delay")
+		f.timers[#f.timers]:fire()
+		helpers.assert_eq(#f.tasks, 2, "a new fresh child reads again")
+		helpers.assert_eq(f.tasks[2].args[4], "", "the later reads only read")
+		helpers.assert_eq(f.tasks[2].args[5], "")
+		f.tasks[2]:complete(0, ON, "")
+		helpers.assert_eq(#answers, 1)
+		helpers.assert_eq(answers[1].ok, true)
+		helpers.assert_eq(answers[1].state.enabled, true)
+		reset_fixture_modules()
+	end)
+
+	helpers.it("answers the last off read once the bounded window is spent", function()
+		local f = load_fixture()
+		local answers = {}
+		f.IS.confirm_enabled_async("Composer Check", {}, function(ok, state) answers[#answers + 1] = { ok = ok, state = state } end)
+		local reads = 0
+		while #answers == 0 do
+			reads = reads + 1
+			helpers.assert_true(reads <= 10, "the window must end")
+			f.tasks[#f.tasks]:complete(0, OFF, "")
+			if #answers == 0 then f.timers[#f.timers]:fire() end
+		end
+		helpers.assert_eq(reads, 5, "500 ms doubling within 8 s: reads at 0, 0.5, 1.5, 3.5 and 7.5 s")
+		helpers.assert_eq(answers[1].ok, true)
+		helpers.assert_eq(answers[1].state.enabled, false)
+		reset_fixture_modules()
 	end)
 end)

@@ -184,6 +184,8 @@ local CoreState = {
 	-- Paths — keystroke / metrics data goes under <config_dir>/metrics/.
 	-- Resolved at module-load time via the central menu_paths module
 	LOG_DIR = require("infra.config_paths").metrics_dir(),
+	-- The SQLite mirror's persistent cache root (survives a reboot, L64).
+	CACHE_DIR = require("infra.config_paths").metrics_cache_dir(),
 
 	-- Enablement
 	options    = { encrypt = false },
@@ -2413,7 +2415,7 @@ function M.start(script_control)
 		end
 	
 		-- New persistence model: data.sql is the canonical source of truth and
-		-- the SQLite cache in tmpdir is reconstructed by log_manager.M.init().
+		-- the SQLite cache in the Caches folder is reconstructed by log_manager.M.init().
 		-- No deferred rebuild dance is needed at boot — the ingest tick will
 		-- catch up on any today.log entries written by a previous keystats
 		-- session that did not get flushed before exit.

@@ -1741,9 +1741,18 @@ function M.new(deps, presets, ram_getter)
 				for line in pull_output:gmatch("[^\r\n]+") do
 					if line:match("%S") then last_line = line end
 				end
-				Logger.error(LOG, "The Ollama pull of %s failed (code %s): %s.", tostring(target_model),
-					tostring(code), last_line ~= "" and last_line:sub(1, 300) or "no output")
-				local requires_upgrade = needs_ollama_upgrade(pull_output)
+				-- An Ollama too old for the model is the user's to upgrade, and the
+				-- notice below says so: not an error window on top of it (#101). A
+				-- network report outranks it, as in the notice.
+				local requires_upgrade = network_report == nil and needs_ollama_upgrade(pull_output)
+				local pull_cause = last_line ~= "" and last_line:sub(1, 300) or "no output"
+				if requires_upgrade then
+					Logger.warn(LOG, "The Ollama pull of %s was refused: the installed Ollama is too old (code %s): %s.",
+						tostring(target_model), tostring(code), pull_cause)
+				else
+					Logger.error(LOG, "The Ollama pull of %s failed (code %s): %s.", tostring(target_model),
+						tostring(code), pull_cause)
+				end
 				local connection_error = pull_output:lower():find("could not connect") or pull_output:lower():find("connection refused")
 				
 				if network_report then
@@ -1768,7 +1777,8 @@ function M.new(deps, presets, ram_getter)
 					complete_progress_ui(owner, false, target_model)
 				end
 				if owner.retry_requested ~= true then
-					settle_cancel("process_failed")
+					settle_cancel(requires_upgrade and RequirementRegistry.CANCEL_RUNTIME_UPGRADE_REQUIRED
+						or "process_failed")
 				end
 				return finish_result(owner.retry_requested == true)
 			end

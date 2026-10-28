@@ -1272,8 +1272,8 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 		],
 		[
 			'layout_bundle_variant_add',
-			'input_sources.confirm_source_async(var.tis_id, {}, function(read, state)',
-			'Foreign.confirm_source_async(var.tis_id, {}, function(read, state)'
+			'input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)',
+			'Foreign.confirm_enabled_async(var.tis_id, {}, function(read, state)'
 		],
 		['layout_bundle_variant_add', 'if read and state.enabled == true then', 'if read then'],
 		['layout_bundle_variant_add', 'elseif read then', 'elseif true then'],

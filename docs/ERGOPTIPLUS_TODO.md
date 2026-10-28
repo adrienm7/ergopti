@@ -108,7 +108,12 @@ a sealed Windows updater source, reseal with
   loader-lifetime fixture read its factory marker before the writer closed it). The eighth v1.0.7 release
   commit adds the maintainer's last asks (owned Ollama catalogue staged for the developer app, Install
   buttons in the model selector, the Lua undefined-globals gate, the three-finger swipe fixes of L46, the
-  macOS 26 composer pending-activation route of L25/L52) and a new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
+  macOS 26 composer pending-activation route of L25/L52). Run 40677989474 on ddd150b29b (validation of
+  dev) left three Common reds, tests still pinning the pre-composer input-source code (CI14: 9f4ec14cb2,
+  a7e59fb0d1, 2e398c5c93). The ninth v1.0.7 release commit adds L66 (one refused shortcut fails alone),
+  the three-finger step of 25 (L46), the bounded composer re-read (L52), the reboot-proof keystats cache
+  (L64), the fixes for issues #99 to #101 and #103, and the Dependabot and npm audit bumps (PRs 98 and
+  102); a new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
   `CFMessagePortSendRequest FAILED(-1)` (the runner's TSM UI server), rerun that job once.
 - **Decide after v1.0.7 [CI]:** since bc09e4584c no product path calls the stock
   `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
@@ -375,12 +380,13 @@ From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their bu
   synchronous=OFF and the durable mode restored before any live write, its state (applied
   offset and cursor markers) persisted in meta after each step so a stop resumes at the last
   batch, progress every 32 MB. Measured here: 47 MB in 1439 steps, 1.3 s of Lua CPU, worst step
-  4.4 ms (no-op SQLite); real SQLite on tmpfs 3.5 ms per 64 KB. Open [CODE], needs a decision:
-  move the cache to `~/Library/Caches/ergopti_plus/metrics/<device_id>/` (it survives a reboot,
-  as Linux's `metrics.sqlite` in the XDG data folder already does), which removes the post-reboot
-  replay itself; `docs/keystats_spec.md` §1.7 names TMPDIR, and seven native fixtures own TMPDIR
-  (ledger bootstrap policy, metrics gitignore, physical history persistence and bootstrap,
-  cold and historical rollover, rollover marker recovery). Mac confirms: after a reboot,
+  4.4 ms (no-op SQLite); real SQLite on tmpfs 3.5 ms per 64 KB. Cache location fixed on `tmp/wip-keystats-cache-location` (maintainer decision): db.sqlite
+  moved to `~/Library/Caches/ergopti_plus/metrics/<device_id>/` (`config_paths.metrics_cache_dir`,
+  the one source, passed as `CoreState.CACHE_DIR`); a cache an earlier version left in
+  `$TMPDIR/ergopti_metrics/` is moved once at start, journal first, else the bounded replay
+  rebuilds it. `test_cache_survives_reboot.lua` empties TMPDIR and keeps the cache, its saved
+  offset and no replay (fails on the old path). The native fixtures keep their owned folder and
+  now pass it as CACHE_DIR; `docs/keystats_spec.md` §1.1 and §1.7 updated. Mac confirms: after a reboot,
   `Keystats engine start (deferred)` stays under 100 ms, `Local ledger replay: N of M MB` lines
   follow, and no hold over 250 ms comes from log_manager.lua.
 - **L65** Fixed on tmp/wip-field-run-hygiene-3 (1471c14782). 12_mlx_model
@@ -490,6 +496,24 @@ From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their bu
   in a row, one every half second, right after a two-finger scroll stops and while a finger rests,
   each switch a tab; a swipe landing on a still-running two-finger momentum is refused with
   `scroll guard`; two-finger scrolls with and without a resting thumb never switch tabs.
+  Third Mac test (field report `mac-2026-10-28_125123`, 12:51 to 12:53): swipes are accepted, but a
+  normal one switched two or three tabs (sd 19.84 committed 3 steps at sensitivity 5; 138
+  `INCREMENTAL FIRE` lines in about 40 s) and a small one could switch none. Causes on
+  `tmp/wip-three-finger-step`: the step was one action per 5 units and the first action needed a
+  whole step; and `INCREMENTAL FALLBACK REBASE ... diff=-1` (sd 39.78 after 8 steps, 4.91 after 1)
+  took no action back but restarted the count at the current point, so the next small move
+  forward fired the same step again (double counting). Incremental mode now fires its first
+  action after `Geometry.INCREMENTAL_FIRST_STEP` (4, or one step if shorter) and each further
+  action after one more sensitivity; a shrinking distance holds the actions fired, and a reversal
+  needs half the first step back from the last fire. `swipe_3_up`/`swipe_3_down` first defaulted
+  to 50 (4.9 and 45 one tab, 54 two); on the Mac two actions then needed far too long a swipe, so
+  the default is 25 per action: 4.9, 19.84 and 26 give one tab, 29 to 54 two, 54 and more three.
+  The menu's "Distance per action" keeps that meaning and offers 20, 25 and 30 around it. A value the user chose is kept (saves are sparse, so only
+  an explicit choice is in `config.toml`). Linux has no incremental mode (one action at the lift)
+  and Windows uses the precision touchpad driver. Mac confirms: no explicit
+  `[gestures.sensitivities]` swipe_3 value in `config.toml` (or remove it), then a normal and a
+  short deliberate vertical three-finger swipe each switch exactly one tab, a swipe past 29
+  units (the logged `sd`) two, and lifting never adds or removes one.
 
 - **L16** [CODE][PHYS-M] Slow ingest tick, `append` phase 466 to 563 ms, peaks 1531 and 1709 ms
   (new.txt 14:25:50 to 16:53:38, 20 lines, still on 228f79f2). The 1.2 to 1.8 s ticks are the
@@ -750,7 +774,7 @@ strict_only:finder_detritus`, any other cause, team or a rejection still fails. 
   or a personal file adds `reload_requested` and, after the done marker, one reload through the
   termination coordinator. Mac confirms: do not use the menus during a field run; if the guard
   restores config.toml, the driver reloads once and the menu shows the backend the file names.
-- **L52** Fixed on tmp/wip-composer-macos26-2. 06_field_composer `composer_ready fail:not_enabled`
+- **L52** Fixed on tmp/wip-composer-macos26-2. 06*field_composer `composer_ready fail:not_enabled`
   with "Failed to enable 'Composer Check' — reason=process_failed" (22:31 run): `process_failed`
   was the editor's own kickstart answering 113 after a successful write (see L25). Probe v5
   (mac-2026-10-28_114302 and \_120209) settled the route: the preference write turns a layout on
@@ -771,6 +795,15 @@ strict_only:finder_detritus`, any other cause, team or a rejection still fails. 
   duplicate ids), so the system copy is probably the one read: the driver no longer writes a user
   copy of a bundle the system folder holds and logs each duplicate at boot. Run P8 b again once
   one copy is removed before building anything on in-place bundle edits.
+  Follow-up (tmp/wip-composer-macos26-3): the 12:51 run's child read the composed layout 140 ms
+  after the write ("listed=true enabled=false"), so the check fell back to info:pending_logout;
+  the probe's fresh read came 10 s after its write, and the probe had registered the layout
+  before writing. Same entry shape (integer KeyboardLayout ID, name) and the same `defaults
+import` in both. The first child now also calls TISEnableInputSource on the listed source, and
+  new fresh children read again after 0.5, 1, 2 and 4 s (window 8 s, `[ui]
+  input_source_confirm*\*`). Mac confirms: the log shows "reads on after N fresh read(s)" and the
+check `composer_ready=pass:enabled`; "still reads off after 5 fresh read(s)" means the delay
+  is not the difference: then try registering before the write (the probe's order).
 - **L44** Fixed 6593474037. Wake at 19:46:39 (driver booted 16:54): "Cannot refresh Karabiner
   lease liveness — no live generation exists" and "Wake refresh could not renew the exact
   Karabiner lease liveness", twice each, then the layout refresh retries of L20; nothing
@@ -1918,6 +1951,9 @@ Standing checks:
       `has no capture timestamp` ERROR after a reload; ten vertical three-finger swipes half a second apart, right
       after a two-finger scroll and with a finger resting, all switch tabs; landing on a running
       two-finger momentum is still refused (`scroll guard`); scrolls never switch tabs.
+- [ ] **L46 one swipe, one tab** (`tmp/wip-three-finger-step`): with no explicit swipe_3
+      sensitivity in `config.toml`, a normal and a short deliberate vertical three-finger swipe
+      each switch exactly one tab, a swipe past 29 units (the logged `sd`) two.
 - [ ] **Issue #100 retest** (after v1.0.5: 2353a72eed, 25411ee080, e57f4cce77): with Ollama.app and
       a PAC proxy, enabling the AI downloads the model; with the Ergopti menu held open, no lease
       timeout.

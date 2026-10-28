@@ -1016,8 +1016,9 @@ function M.new(ctx)
 						offer = true,
 					})
 				end
-				-- The user closed the download prompt, or the dialog said the
-				-- disk cannot hold the model: they know, so no error window
+				-- The user closed the download prompt, the dialog said the disk
+				-- cannot hold the model, or the pull asked for a newer Ollama:
+				-- they know, so no error window
 				if reason == RequirementRegistry.CANCEL_DOWNLOAD_DECLINED then
 					return disable_llm({ backend = state.llm_backend,
 						reason = Errors.STARTUP_MODEL_DOWNLOAD_DECLINED, detail = tostring(state.llm_model) })
@@ -1025,6 +1026,11 @@ function M.new(ctx)
 				if reason == RequirementRegistry.CANCEL_DISK_INSUFFICIENT then
 					return disable_llm({ backend = state.llm_backend,
 						reason = Errors.STARTUP_MODEL_DISK_INSUFFICIENT, detail = tostring(state.llm_model) })
+				end
+				-- The pull's notice asked the user to upgrade Ollama (#101)
+				if reason == RequirementRegistry.CANCEL_RUNTIME_UPGRADE_REQUIRED then
+					return disable_llm({ backend = state.llm_backend,
+						reason = Errors.STARTUP_OLLAMA_UPGRADE_REQUIRED, detail = tostring(state.llm_model) })
 				end
 				return disable_llm(reason)
 			end)
