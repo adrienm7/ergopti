@@ -66,6 +66,10 @@ local _mode      = "download" -- "download" (model download) or "bootstrap" (eng
 -- the developer field run extends a download's deadline while it moves.
 local _progress_mark = 0
 local _progress_signature = nil
+-- The one observer of model download percentages (the model selector page)
+-- and the last whole percentage it was told, by session.
+local _percent_listener = nil
+local _told_percent = nil
 
 --- Records one visible progress state; a change is progress.
 --- @param signature string The visible state, prefixed by its session.
@@ -75,6 +79,17 @@ local function note_progress(signature)
 		_progress_signature = signature
 		_progress_mark = _progress_mark + 1
 	end
+end
+
+--- Tells the percentage observer a new whole percentage of the current
+--- model download (never a repeated one), with its kind and session.
+--- @param percent integer Whole percentage in [0, 99] while downloading.
+local function tell_percent(percent)
+	if type(_percent_listener) ~= "function" or _mode ~= "download" then return end
+	local signature = tostring(_session) .. "|" .. tostring(percent)
+	if signature == _told_percent then return end
+	_told_percent = signature
+	Logger.callback(LOG, "Download percentage observer", _percent_listener, _kind, percent, _session)
 end
 
 --- Distinguishes live presentation authority from a native cleanup capability.
@@ -453,6 +468,17 @@ function M.session_id()
 	return _session
 end
 
+--- Sets the one observer of model download percentages: it receives
+--- (kind, percent, session) at each new whole percentage of an
+--- ollama_model or mlx_model download. nil removes it.
+--- @param listener function|nil
+function M.set_percent_listener(listener)
+	if listener ~= nil and type(listener) ~= "function" then
+		error("download_window.set_percent_listener requires a function or nil", 2)
+	end
+	_percent_listener = listener
+end
+
 --- Counts how often the visible progress of the window advanced.
 --- @return integer mark Monotonic; unchanged while no operation progresses.
 function M.progress_mark()
@@ -760,6 +786,7 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
     pct = math.min(math.max(0, pct), 99)
 
     note_progress(string.format("u|%d|%s|%s", math.floor(pct), tostring(dl_str), tostring(file_count_str)))
+    tell_percent(math.floor(pct))
 
     local js = string.format("update(%d,%s,%s,%s,%s)",
         math.floor(pct), js_str(dl_str), js_str(speed_str), js_str(eta_str), js_str(file_count_str))

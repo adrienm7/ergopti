@@ -538,6 +538,98 @@ LLM_ModelBrowser_Refresh() {
 global _LLM_MBW_Rows := Map()
 ; The group tools of that payload, by "<backend>`n<id>".
 global _LLM_MBW_Tools := Map()
+; The provider model listing of each API entry for the open page, by entry id
+; (LLM_ApiListingPlan states), and the entries still to ask, one at a time.
+global _LLM_MBW_Listings := Map()
+global _LLM_MBW_ListingQueue := []
+global _LLM_MBW_ListingEpoch := 0
+
+/**
+ * Asks each API entry's provider for its models once per page session, one
+ * request at a time, and re-sends the payload after each answer. Only an entry
+ * whose key its endpoint accepts and whose provider lists models is asked; the
+ * key stays in the request (api_remote.ahk), never in the payload or a log.
+ * @param {Integer} ExpectedEpoch The page session.
+ */
+_LLM_MBW_StartListings(ExpectedEpoch) {
+	global _LLM_Menu, _LLM_MBW_Listings, _LLM_MBW_ListingQueue, _LLM_MBW_ListingEpoch
+	global LLM_API_LISTING_MAX_ENTRIES, LLM_LOCAL_API_SERVERS
+	if (_LLM_MBW_ListingEpoch == ExpectedEpoch)
+		return false
+	_LLM_MBW_ListingEpoch := ExpectedEpoch
+	_LLM_MBW_Listings := Map(), _LLM_MBW_ListingQueue := []
+	for Entry in _LLM_Menu.Get("api_entries", []) {
+		if (_LLM_MBW_ListingQueue.Length >= LLM_API_LISTING_MAX_ENTRIES)
+			break
+		Id := _LLM_MenuApiEntryGet(Entry, "Id", ""), ProviderId := _LLM_MenuApiEntryGet(Entry, "Provider", "")
+		if (Id == "" || !LLM_ApiListingSupported(LLM_RemoteProviderFormat(ProviderId))
+				|| !LocalServerAuthEntryTokenAllowed(ProviderId, _LLM_MenuApiEntryGet(Entry, "Token", ""),
+					_LLM_MenuApiEntryGet(Entry, "BaseUrl", ""), LLM_LOCAL_API_SERVERS))
+			continue
+		_LLM_MBW_Listings[Id] := Map("state", "pending")
+		_LLM_MBW_ListingQueue.Push(Entry)
+	}
+	LoggerInfo("LLM.browser", "Model selector page lists the models of {1} API entry(ies).", _LLM_MBW_ListingQueue.Length)
+	return _LLM_MBW_NextListing(ExpectedEpoch)
+}
+
+; The percentage of each running menu pull, by Ollama tag, for the open page.
+global _LLM_MBW_PullPercents := Map()
+
+/**
+ * Shows a menu pull's percentage on the open page's row of that tag, and keeps
+ * it for the next payload; "" clears it once the pull ended.
+ * @param {String} Tag Ollama tag being pulled.
+ * @param {Integer|String} Percent 0-100, or "".
+ * @returns {Boolean} True when the page was told.
+ */
+LLM_ModelBrowser_PullPercent(Tag, Percent) {
+	global _LLM_MBW_PullPercents, _LLM_MBW_Rows, _LLM_MBW_Ready, _LLM_MBW_Gui, _LLM_MBW_SessionEpoch
+	if !(Tag is String) || Tag == ""
+		return false
+	if (Percent == "") {
+		if _LLM_MBW_PullPercents.Has(Tag)
+			_LLM_MBW_PullPercents.Delete(Tag)
+		return false
+	}
+	_LLM_MBW_PullPercents[Tag] := Percent
+	if !IsSet(_LLM_MBW_Gui) || !_LLM_MBW_Ready
+		return false
+	for Key, Row in _LLM_MBW_Rows {
+		if (Row["backend"] == "ollama" && Row.Has("tag") && StrLower(Row["tag"]) == StrLower(Tag)) {
+			_LLM_MBW_Eval("injectProgress({backend:" . JsonStringLiteral("ollama") . ",name:" . JsonStringLiteral(Row["name"])
+				. ",percent:" . Integer(Percent) . "})", _LLM_MBW_SessionEpoch)
+			return true
+		}
+	}
+	return false
+}
+
+; Sends the next queued listing of this page session.
+_LLM_MBW_NextListing(ExpectedEpoch) {
+	global _LLM_MBW_ListingQueue, _LLM_MBW_SessionEpoch
+	if (ExpectedEpoch != _LLM_MBW_SessionEpoch || A_IsSuspended || _LLM_MBW_ListingQueue.Length == 0)
+		return false
+	Entry := _LLM_MBW_ListingQueue.RemoveAt(1)
+	Id := _LLM_MenuApiEntryGet(Entry, "Id", "")
+	try {
+		LLM_RemoteListModels_Async(Entry, _LLM_MBW_ListingDone.Bind(ExpectedEpoch, Id))
+	} catch as Err {
+		LoggerError("LLM.browser", "Remote model listing dispatch failed: {1}.", Err.Message)
+		_LLM_MBW_ListingDone(ExpectedEpoch, Id, Map("state", "failed", "reason", "unavailable"))
+	}
+	return true
+}
+
+; Records one entry's listing state, refreshes the page, asks the next entry.
+_LLM_MBW_ListingDone(ExpectedEpoch, EntryId, Listing) {
+	global _LLM_MBW_Listings, _LLM_MBW_SessionEpoch
+	if (ExpectedEpoch != _LLM_MBW_SessionEpoch)
+		return false
+	_LLM_MBW_Listings[EntryId] := Listing is Map ? Listing : Map("state", "failed", "reason", "unavailable")
+	LLM_ModelBrowser_Refresh()
+	return _LLM_MBW_NextListing(ExpectedEpoch)
+}
 
 /**
  * The selector payload as a JSON object literal. Ollama is the local backend,
@@ -546,7 +638,7 @@ global _LLM_MBW_Tools := Map()
  * @returns {String}
  */
 _LLM_MBW_BuildPayload() {
-	global _LLM_Menu, _LLM_MBW_Rows, _LLM_MBW_Tools
+	global _LLM_Menu, _LLM_MBW_Rows, _LLM_MBW_Tools, _LLM_MBW_Listings
 	Rows := Map(), Tools := Map(), Models := []
 	Backend := _LLM_Menu.Get("backend", "ollama")
 	Active := _LLM_Menu_ModelDisplayText()
@@ -592,7 +684,7 @@ _LLM_MBW_BuildPayload() {
 
 	; ===== API =====
 	ApiTools := [_LLM_MBW_Tool(Tools, "api", "add_api", t("menu.llm.api_add_entry"), (*) => _LLM_Menu_PromptApiEntry(""))]
-	_LLM_Menu_ApiEntryPageRows(Rows, Models)
+	_LLM_Menu_ApiEntryPageRows(Rows, Models, _LLM_MBW_Listings)
 	_LLM_MBW_LocalServerRows(Rows, Tools, Models, ApiTools)
 
 	; A config.toml that refuses writes greys every backend with that cause.
@@ -615,6 +707,7 @@ _LLM_MBW_BuildPayload() {
  * tray's delete runs only on the Ollama backend, so the page offers it there.
  */
 _LLM_MBW_LocalRow(Name, Tag, Info, IsInstalled, IsDefault, Custom, Deletable) {
+	global _LLM_MBW_PullPercents
 	Params := Info.Has("params_b") ? Info["params_b"] : 0
 	ActiveB := Info.Has("active_b") ? Info["active_b"] : 0
 	if (ActiveB <= 0)
@@ -634,6 +727,8 @@ _LLM_MBW_LocalRow(Name, Tag, Info, IsInstalled, IsDefault, Custom, Deletable) {
 		. ",is_default:" . (IsDefault ? "true" : "false")
 		. ",custom:" . (Custom ? "true" : "false")
 		. ",deletable:" . (Deletable ? "true" : "false")
+		. (_LLM_MBW_PullPercents.Has(Tag) ? ",pending:" . JsonStringLiteral("download")
+			. ",progress:" . Integer(_LLM_MBW_PullPercents[Tag]) : "")
 		. ",url:" . JsonStringLiteral(Url) . "}"
 	return Map("backend", "ollama", "name", Name, "tag", Tag, "installed", IsInstalled, "custom", Custom,
 		"url", Url, "json", Json, "row_actions", Map())
@@ -820,11 +915,14 @@ _LLM_MBW_SafetyFlush(ExpectedEpoch) {
 ; The single definition of "the page is up" — shared by the real ready message
 ; and by the safety flush, so the two can never drift apart again.
 _LLM_MBW_OnPageReady(ExpectedEpoch) {
-	global _LLM_MBW_SessionEpoch
+	global _LLM_MBW_SessionEpoch, LLM_PULL_PERCENT_LISTENER
 	if (ExpectedEpoch != _LLM_MBW_SessionEpoch)
 		return
 	_LLM_MBW_FlushQueue(ExpectedEpoch)
 	_LLM_MBW_InjectCatalogue(ExpectedEpoch)
+	_LLM_MBW_StartListings(ExpectedEpoch)
+	; A menu pull's percentage reaches this page (ollama_managed_bootstrap.ahk).
+	LLM_PULL_PERCENT_LISTENER := LLM_ModelBrowser_PullPercent
 }
 
 /**
@@ -1061,11 +1159,6 @@ _LLM_MBW_I18nApplyScript() {
 		try json_str := FileRead(json_path, "UTF-8")
 	return "window._i18n_strings=" . json_str
 		. ";if(typeof window.i18n_apply==='function')window.i18n_apply(window._i18n_strings);"
-}
-
-/** Escapes a string for safe injection into a JS double-quoted literal. */
-JsonStringLiteral(s) {
-	return JsonStringLiteral(s)
 }
 
 /** Formats a number as a clean JS numeric literal (integers without a decimal). */

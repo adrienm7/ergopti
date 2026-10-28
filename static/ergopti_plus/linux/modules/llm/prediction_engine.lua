@@ -3462,6 +3462,8 @@ function M.enable(on_changed)
 				frame.operation, frame.retire, frame.settled = request, request.cancel, request.is_settled
 				if frame.cancelled or frame.epoch ~= _runtime_app_epoch or _runtime_owner ~= owner then frame:cancel() end
 				request:on_result(function(result)
+					-- The model selector page greys Ollama after a failed repair.
+					require("modules.llm.ollama_install_state").note_repair(result)
 					if type(result) ~= "table" or result.ok ~= false or result.error == "runtime_cancelled" then return end
 					Logger.error(LOG, "Local Ollama repair refused; its native cleanup owner remains retained until acknowledgment: %s.", tostring(result.error))
 					if owner.source.diagnostic_current(handle) then
