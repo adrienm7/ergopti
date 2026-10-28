@@ -1064,3 +1064,129 @@ for Family in ["record", "layout"]
 		for Foreign in [false, true]
 			Test("layout stage ownership: " . Family . " existing=" . Existing . " collision=" . Foreign
 				. " preserves native files (layout-stage-native-ownership)", _LCT_StageCollision.Bind(Family, Existing, Foreign))
+
+
+; The actual request factory observes native files before its transport can
+; write anything. A no-write refusal isolates the driver's own pre-delete.
+class _LCT_RemoteStageRequest extends _LCT_FakeRequest {
+	__New(Served, Log, LayoutUrl, Dispatch) {
+		super.__New(Served, Log, false)
+		this.LayoutUrl := LayoutUrl
+		this.Dispatch := Dispatch
+	}
+	Send() {
+		if this.Url == this.LayoutUrl && !this.Dispatch {
+			this.Log.Push(Map("url", this.Url, "headers", this.Headers))
+			return false
+		}
+		return super.Send()
+	}
+}
+
+_LCT_RemoteStageCase(Existing, Foreign, Dispatch) {
+	Dir := _LCT_TempDir()
+	Entry := JsonParse(_LayoutCatalogueJson(LayoutCatalogue_Entry(_LCT_Index(), "ergol")))
+	Entry.Delete("extension")
+	Text := _LCT_LayoutText("ergol")
+	LayoutPath := Dir . Entry["id"] . ".keylayout"
+	RecordPath := Dir . LayoutRegistry_Settings()["installed_file"]
+	Stage := LayoutPath . LAYOUT_REGISTRY_PARTIAL_SUFFIX
+	LayoutUrl := LayoutRegistry_RawUrl(Entry["file"])
+	Served := Map(
+		LayoutRegistry_RawUrl(LayoutRegistry_Settings()["index_file"]), Map("status", 200,
+			"body", _LayoutCatalogueJson(Map("layouts", [Entry])), "etag", '"remote-stage"'),
+		LayoutUrl, Map("status", 200, "body", Text, "etag", ""))
+	Log := [], AtFactory := [], Results := []
+	Factory() {
+		AtFactory.Push(_LCT_StageSnapshot(Stage))
+		return _LCT_RemoteStageRequest(Served, Log, LayoutUrl, Dispatch)
+	}
+	Transport := Map("request", Factory,
+		"resolve_proxy", (Urls, Callback) => Callback.Call(_LCT_NoProxy(Urls)),
+		"schedule", (Fn, DelayMs) => Fn.Call())
+	try {
+		if Existing {
+			OldText := Text . "`n<!-- old remote generation -->`n"
+			OldEntry := JsonParse(_LayoutCatalogueJson(Entry))
+			OldEntry["version"] := "previous"
+			OldEntry["sha256"] := CryptoSha256(OldText)
+			OldEntry["size"] := StrPut(OldText, "UTF-8") - 1
+			_LCT_WriteRaw(LayoutPath, OldText)
+			LayoutCatalogue_WriteInstalled(Dir, Map("ergol", OldEntry))
+			LayoutRegistry_Verify(OldEntry, FSReadUtf8Exact(LayoutPath))
+		}
+		if Foreign
+			AssertTrue(FSWriteCreateDurable(Stage, "foreign remote source é`r`n"))
+		BeforeStage := _LCT_StageSnapshot(Stage)
+		BeforeRecord := _LCT_StageSnapshot(RecordPath)
+		BeforeLayout := _LCT_StageSnapshot(LayoutPath)
+		LayoutCatalogue_Install("ergol", Dir, (Args*) => Results.Push(Args), Transport, 0, "", false)
+		AssertEqual(1, Results.Length, "the real public remote installation must complete exactly once")
+		AssertEqual(0, LayoutCatalogue_Busy(), "the actual remote install lease must retire")
+		if Foreign {
+			_TestPrint("# remote-stage factory_receipts=" . AtFactory.Length . " before=" . BeforeStage
+				. " first=" . (AtFactory.Length ? AtFactory[1] : "none")
+				. " second=" . (AtFactory.Length > 1 ? AtFactory[2] : "none"))
+			AssertEqual(BeforeStage, _LCT_StageSnapshot(Stage),
+				"the driver cannot delete or borrow a foreign stage before its transport owns any file")
+		}
+		if !Foreign
+			AssertEqual(Dispatch, Results[1][1], "ordinary real remote publication follows the actual transfer result")
+		if Results[1][1] {
+			LayoutRegistry_Verify(Entry, FSReadUtf8Exact(LayoutPath))
+			AssertEqual(Entry["version"], LayoutCatalogue_ReadInstalled(Dir)["ergol"]["version"])
+		} else {
+			AssertTrue(Results[1].Length >= 3 && Results[1][2] != "", "refusal must have a visible native failure code")
+			AssertEqual(BeforeRecord, _LCT_StageSnapshot(RecordPath), "a failed install preserves the live record")
+			AssertEqual(BeforeLayout, _LCT_StageSnapshot(LayoutPath), "a failed install preserves the live layout")
+		}
+	} finally DirDelete(Dir, true)
+}
+for Existing in [false, true]
+	for Foreign in [false, true]
+		for Dispatch in [false, true]
+			Test("remote layout stage: existing=" . Existing . " foreign=" . Foreign . " dispatch=" . Dispatch
+				. " preserves native ownership (layout-remote-stage-ownership)",
+				_LCT_RemoteStageCase.Bind(Existing, Foreign, Dispatch))
+
+; Exercise the worker's actual CreateFile sharing contract independently of
+; the request facade. GENERIC_READ enforces sharing while allowing worker writes.
+_LCT_RemoteStageSharing() {
+	Dir := _LCT_TempDir(), Path := Dir . "sharing.download"
+	Pin := -1, Writer := -1
+	try {
+		Pin := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+			"UInt", 3, "Ptr", 0, "UInt", 1, "UInt", 0x80, "Ptr", 0, "Ptr")
+		AssertTrue(Pin != -1, "the initial stage must be created atomically")
+		Before := FSHandleSnapshot(Pin)
+		AssertTrue(Before.Get("ok", false))
+		Collision := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+			"UInt", 3, "Ptr", 0, "UInt", 1, "UInt", 0x80, "Ptr", 0, "Ptr")
+		if Collision != -1
+			DllCall("kernel32\CloseHandle", "Ptr", Collision)
+		AssertEqual(-1, Collision, "a second owner cannot acquire the same stage")
+		; FileMode.Create / FileAccess.Write / FileShare.Read, used by WinHTTP.
+		Writer := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x40000000,
+			"UInt", 1, "Ptr", 0, "UInt", 2, "UInt", 0x80, "Ptr", 0, "Ptr")
+		AssertTrue(Writer != -1, "the real worker's write-only sharing contract must remain compatible")
+		Bytes := Buffer(4, 0), Written := 0
+		NumPut("UInt", 0x44434241, Bytes)
+		AssertTrue(_FSNativeWrite(Writer, Bytes, Bytes.Size, &Written))
+		AssertEqual(4, Written)
+		AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Writer, "Int") != 0)
+		Writer := -1
+		AssertEqual("ABCD", FileRead(Path, "UTF-8-RAW"))
+		AssertFalse(FSDelete(Path), "no pathname deletion can detach a live pinned stage")
+		After := FSHandleSnapshot(Pin)
+		for Key in ["volume", "index_high", "index_low"]
+			AssertEqual(Before[Key], After[Key], "worker writes retain the created object")
+	} finally {
+		if Writer != -1
+			DllCall("kernel32\CloseHandle", "Ptr", Writer)
+		if Pin != -1
+			DllCall("kernel32\CloseHandle", "Ptr", Pin)
+		DirDelete(Dir, true)
+	}
+}
+Test("remote layout stage: native worker sharing preserves the creation pin (layout-remote-stage-sharing)",
+	_LCT_RemoteStageSharing)

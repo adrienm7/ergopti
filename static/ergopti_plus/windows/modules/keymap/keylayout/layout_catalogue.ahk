@@ -622,24 +622,26 @@ _LayoutCatalogueOnInstallIndex(Id, LocalDir, Transport, Bundled, BundledDir, Fin
 	Url := LayoutRegistry_RawUrl(Entry["file"])
 	LayoutRegistry_Request(Url, Partial, Map("User-Agent", LAYOUT_REGISTRY_USER_AGENT),
 		LayoutRegistry_Settings()["download_timeout_sec"] * 1000, Transport,
-		_LayoutCatalogueOnLayout.Bind(Id, LocalDir, Entry, Url, Partial, Finish, Transport, BundledDir))
+		_LayoutCatalogueOnLayout.Bind(Id, LocalDir, Entry, Url, Finish, Transport, BundledDir))
 }
 
-_LayoutCatalogueOnLayout(Id, LocalDir, Entry, Url, Partial, Finish, Transport, BundledDir, Status, Etag, Err) {
+_LayoutCatalogueOnLayout(Id, LocalDir, Entry, Url, Finish, Transport, BundledDir, Status, Etag, Err, OutputOwner) {
 	global LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, LAYOUT_CATALOGUE_SOURCE_NETWORK
 	try {
-		if (Status != 200)
-			throw Error((Status == 0) ? Err : "HTTP " . Status . " for " . Url)
-		Text := _LayoutRegistryReadText(Partial)
+		if Status != 200
+			throw Error(Status == 0 ? Err : "HTTP " . Status . " for " . Url)
+		Text := OutputOwner.ReadText(LayoutRegistry_Settings()["max_file_bytes"])
+		if !(Text is String)
+			throw Error("Cannot read the owned registry layout response.")
 		LayoutRegistry_Verify(Entry, Text)
+		; Publication uses this same sibling name. Finish the exact download
+		; first, while a foreign acquisition failure owns no cleanup authority.
+		if !OutputOwner.Remove()
+			throw Error("Cannot retire the owned registry layout response.")
 	} catch as Failure {
-		if !FSDelete(Partial)
-			LoggerWarn("LayoutCatalogue", "Cannot remove the partial download {1}.", Partial)
 		Finish.Call(false, LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, Failure.Message)
 		return
 	}
-	if !FSDelete(Partial)
-		LoggerWarn("LayoutCatalogue", "Cannot remove the partial download {1}.", Partial)
 	_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_NETWORK, Finish, Transport, BundledDir)
 }
 
