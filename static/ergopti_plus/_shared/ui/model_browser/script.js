@@ -105,6 +105,26 @@ function injectModels(payload) {
 	render();
 }
 
+/**
+ * Called by the native backend while a download of one row reports progress
+ * (Ollama pull and Hugging Face download progress, read by each driver's own
+ * progress source). The row shows the percentage until the next payload.
+ * @param {object} update - { backend, name, percent }; percent in [0, 100], or null when unknown.
+ */
+function injectProgress(update) {
+	if (!update || typeof update.name !== 'string') return;
+	var row = null;
+	for (var i = 0; i < _models.length; i++) {
+		var m = _models[i];
+		if (m.name === update.name && (m.backend || '') === (update.backend || '')) row = m;
+	}
+	if (!row) return;
+	var percent = typeof update.percent === 'number' ? update.percent : NaN;
+	row.pending = 'download';
+	row.progress = Number.isFinite(percent) ? Math.max(0, Math.min(100, Math.floor(percent))) : null;
+	render();
+}
+
 // Signal readiness so the native backend can flush its queued injectModels() call.
 if (document.readyState === 'loading') {
 	document.addEventListener('DOMContentLoaded', function () {
@@ -558,7 +578,11 @@ function rowCells(m) {
 		status:
 			m.pending === 'download'
 				? '<span class="status pending">' +
-					_escHtml(_t('model_browser.status_downloading')) +
+					_escHtml(
+						typeof m.progress === 'number'
+							? _fmt('model_browser.status_downloading_percent', { n: m.progress })
+							: _t('model_browser.status_downloading')
+					) +
 					'</span>'
 				: isRemote(m)
 					? '<span class="status remote">' + _escHtml(_t('model_browser.status_remote')) + '</span>'

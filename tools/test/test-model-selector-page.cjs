@@ -426,6 +426,29 @@ const pulling = drawnRows(page.byId).Pulling;
 assert.ok(pulling.innerHTML.includes(en['model_browser.status_downloading']));
 assert.ok(!pulling.innerHTML.includes('data-act='), 'a running download offers no other action');
 
+// model-selector-progress: a driver's download percentage reaches the row; a
+// payload row may carry it too; an unknown row or a foreign backend is ignored.
+page.context.injectProgress({ backend: 'ollama', name: 'Pulling', percent: 42.8 });
+const percentText = en['model_browser.status_downloading_percent'].replace('{n}', '42');
+assert.ok(
+	drawnRows(page.byId).Pulling.innerHTML.includes(percentText),
+	'the whole percentage is shown'
+);
+page.context.injectProgress({ backend: 'mlx', name: 'Pulling', percent: 90 });
+assert.ok(
+	drawnRows(page.byId).Pulling.innerHTML.includes(percentText),
+	'another backend changes nothing'
+);
+page.context.injectProgress({ backend: 'ollama', name: 'Ghost', percent: 10 });
+assert.ok(!('Ghost' in drawnRows(page.byId)), 'an unknown row is not invented');
+page.context.injectProgress({ backend: 'ollama', name: 'Pulling', percent: 150 });
+const bounded = drawnRows(page.byId).Pulling;
+assert.ok(
+	bounded.innerHTML.includes(en['model_browser.status_downloading_percent'].replace('{n}', '100')),
+	'a percentage is bounded'
+);
+assert.ok(!bounded.innerHTML.includes('data-act='), 'a downloading row offers no other action');
+
 // The page and the shared Lua rule accept and refuse the same identifiers.
 const corpus = JSON.parse(
 	fs.readFileSync(path.join(SP, '_shared/tests/corpus/llm/model_identifiers.json'), 'utf8')
