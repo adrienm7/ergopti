@@ -20,6 +20,11 @@
 --- 3. Only what works now is selectable: a backend whose runtime is missing,
 ---    failed or unsupported, and an API entry without its key, are sent
 ---    unavailable with their reason, read from the existing runtime owners.
+--- 4. Each local group carries "Install <backend>" (install_state): greyed
+---    once the runtime runs or where it cannot (MLX on Intel); its click runs
+---    the tray's owned-runtime install (runtime_install_offer), whose
+---    progress the download window reports into the group header, and the
+---    refresh that settles it unlocks the group's rows.
 --- ==============================================================================
 
 local M = {}
@@ -45,6 +50,10 @@ local _ctx = nil
 
 -- Downloads the page started, by "<backend>\0<name>", until they settle.
 local _pending = {}
+
+-- Runtime installs the page started, by backend, until they settle:
+-- { percent = integer|nil }.
+local _installing = {}
 
 
 
@@ -80,10 +89,38 @@ function M.backend_availability(backend, probes)
 	error("model_selector_page.backend_availability: unknown local backend " .. tostring(backend))
 end
 
+--- Where a local backend's "Install <backend>" button stands: unsupported on
+--- this Mac (MLX on Intel) or while config.toml refuses writes, running while
+--- its install runs, installed once its runtime can run, else available.
+--- @param backend string "ollama" or "mlx".
+--- @param available boolean What backend_availability answered.
+--- @param probes table The runtime probes.
+--- @param blocked string|nil The config.toml refusal reason.
+--- @return table install { state, reason_key?, percent? }
+function M.install_state(backend, available, probes, blocked)
+	if blocked ~= nil then return { state = "unsupported", reason_key = blocked } end
+	if backend == "mlx" and probes.is_apple_silicon() ~= true then
+		return { state = "unsupported", reason_key = "model_browser.reason_mlx_intel" }
+	end
+	local held = _installing[backend]
+	local deps = backend == "mlx" and probes.mlx_deps() or probes.ollama_deps()
+	if held ~= nil or deps.is_task_running() == true then
+		return { state = "running", percent = held and held.percent or nil }
+	end
+	return { state = available and "installed" or "available" }
+end
+
 local DEFAULT_PROBES = {
 	is_apple_silicon = function() return require("ui.menu.menu_llm.backend_panel").is_apple_silicon() end,
 	mlx_deps = function() return require("modules.llm.mlx_deps_checker") end,
 	ollama_deps = function() return require("modules.llm.ollama_deps_checker") end,
+	-- The owned-runtime installs the tray's own entries run: the install
+	-- button press is the user's consent, and each settles with on_complete.
+	install_runtime = function(backend, on_complete)
+		local Offer = require("ui.menu.menu_llm.runtime_install_offer")
+		if backend == "ollama" then return Offer.install_ollama(on_complete) end
+		return Offer.select_mlx(on_complete)
+	end,
 }
 
 
@@ -175,14 +212,9 @@ end
 
 local function pending_key(backend, name) return backend .. "\0" .. name end
 
---- The group tools of one local backend: install or repair, then its settings.
-local function local_actions(ctx, backend, available, collected, probes)
+--- The group tools of one local backend after its install button: its settings.
+local function local_actions(ctx, backend)
 	local actions = {}
-	local brand = BackendLabels.head(BackendLabels.brand(backend))
-	if not available and collected.select[backend] ~= nil
-			and (backend ~= "mlx" or probes.is_apple_silicon() == true) then
-		actions[#actions + 1] = { id = "install", text = string.format(i18n.get("model_browser.install_runtime"), brand) }
-	end
 	if backend == "mlx" then
 		local token_caption = ctx.hf_token_set() and i18n.get("menu.llm.hf_token_set") or i18n.get("menu.llm.hf_token_unset")
 		actions[#actions + 1] = { id = "hf_token", text = string.format(i18n.get("menu.llm.hf_token_label"), token_caption) }
@@ -302,7 +334,7 @@ function M.build_payload(ctx, probes, collected)
 			default_model = backend == "mlx" and ctx.DEFAULT_STATE.llm_model_mlx or ctx.DEFAULT_STATE.llm_model_ollama,
 			extra_rows = extra,
 			add_model = available or nil,
-			actions = local_actions(ctx, backend, available, collected, probes),
+			actions = local_actions(ctx, backend),
 		}
 	end
 	backends[#backends + 1] = {
@@ -327,6 +359,10 @@ function M.build_payload(ctx, probes, collected)
 	if blocked ~= nil then
 		for _, b in ipairs(backends) do b.available, b.reason_key = false, blocked end
 	end
+	local install = {}
+	for index, backend in ipairs(LOCAL_BACKENDS) do
+		install[backend] = M.install_state(backend, backends[index].available == true and blocked == nil, probes, blocked)
+	end
 	local payload = ModelCatalogue.build_selector(models_mgr.get_all_presets(), {
 		active_backend = state.llm_backend,
 		active_model = active_model,
@@ -336,6 +372,7 @@ function M.build_payload(ctx, probes, collected)
 	-- The page draws the group tools and provider list; it never sees closures.
 	for index, backend in ipairs(payload.backends) do
 		backend.actions = backends[index].actions
+		backend.install = install[backend.id]
 		backend.add_model = backends[index].add_model
 		backend.providers = backends[index].providers
 	end
@@ -403,6 +440,7 @@ end
 
 -- The download window kind of each local backend's model downloads.
 local DOWNLOAD_KINDS = { ollama_model = "ollama", mlx_model = "mlx" }
+local INSTALL_KINDS = { ollama_install = "ollama", mlx_install = "mlx" }
 
 --- Shows a download window percentage on the page's row of that download:
 --- the window holds one download at a time, so the one pending row of its
@@ -410,6 +448,15 @@ local DOWNLOAD_KINDS = { ollama_model = "ollama", mlx_model = "mlx" }
 --- @param kind string Download window kind.
 --- @param percent integer Whole percentage.
 function M.on_download_percent(kind, percent)
+	local installing = INSTALL_KINDS[kind]
+	if installing and type(percent) == "number" then
+		local held = _installing[installing]
+		if not held then return false end
+		held.percent = percent
+		local browser = package.loaded["ui.model_browser"]
+		if type(browser) ~= "table" or type(browser.inject_install_progress) ~= "function" then return false end
+		return browser.inject_install_progress({ backend = installing, percent = percent }) == true
+	end
 	local backend = DOWNLOAD_KINDS[kind]
 	if not backend or type(percent) ~= "number" then return false end
 	local held, count = nil, 0
@@ -488,12 +535,40 @@ local function prompt_api_model(ctx, row)
 	return require("ui.menu.menu_llm.api_panel").set_entry_model(ctx, row.entry_id, text) == true
 end
 
---- Runs one group tool through the owner that answered it in the tray.
-local function group_action(ctx, collected, backend, id)
-	if id == "install" then
-		local select = collected.select[backend]
-		return type(select) == "function" and select() ~= false
+--- Runs a local backend's owned-runtime install for its "Install" button;
+--- the page shows it running, then the outcome on the refresh that settles it.
+local function install_runtime(ctx, backend, probes)
+	if backend ~= "ollama" and backend ~= "mlx" then return false end
+	local available = M.backend_availability(backend, probes)
+	if M.install_state(backend, available, probes, ctx.config_reason()).state ~= "available" then
+		Logger.warn(LOG, "Refused installing the %s runtime from the page: it is not offered now.", backend)
+		return false
 	end
+	local held = {}
+	_installing[backend] = held
+	Logger.start(LOG, "Installing the %s runtime from the model selector page…", backend)
+	local function settle(ok)
+		if _installing[backend] ~= held then return end
+		_installing[backend] = nil
+		if ok == true then
+			Logger.success(LOG, "The %s runtime installed from the model selector page.", backend)
+		else
+			Logger.error(LOG, "The %s runtime install from the model selector page failed.", backend)
+		end
+		M.refresh()
+	end
+	local accepted = probes.install_runtime(backend, settle) == true
+	if not accepted and _installing[backend] == held then
+		_installing[backend] = nil
+		Logger.error(LOG, "The %s runtime install from the model selector page was not started.", backend)
+		M.refresh()
+	end
+	return accepted
+end
+
+--- Runs one group tool through the owner that answered it in the tray.
+local function group_action(ctx, collected, backend, id, probes)
+	if id == "install" then return install_runtime(ctx, backend, probes or DEFAULT_PROBES) end
 	if id == "hf_token" then
 		local save_prefs = ctx.save_prefs
 		return ctx.models_mgr.prompt_hf_login(function()
@@ -552,7 +627,7 @@ function M.handle_action(ctx, body, probes, collected)
 	local b = backend_entry(payload, body.backend)
 	if action == "group_action" then
 		if not b then return false end
-		return group_action(ctx, collected, b.id, body.id)
+		return group_action(ctx, collected, b.id, body.id, probes)
 	end
 	if action == "add_model" then
 		if not b or b.kind ~= "local" or not b.available then return false end
@@ -695,7 +770,7 @@ end
 --- @return boolean accepted
 function M.group_action(backend, id)
 	if not _ctx or _ctx.is_paused() ~= false or _ctx.config_reason() ~= nil then return false end
-	return group_action(_ctx, collect(_ctx), backend, id)
+	return group_action(_ctx, collect(_ctx), backend, id, DEFAULT_PROBES)
 end
 
 --- Re-sends the payload to an open page, after a runtime or model change.

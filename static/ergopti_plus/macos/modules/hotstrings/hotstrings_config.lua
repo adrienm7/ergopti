@@ -794,17 +794,6 @@ end
 --- @param category string The TOML file name without extension (e.g. "rolls").
 --- @param section string|nil Optional section name within the category.
 
---- Returns the base expansion delay, in milliseconds: what a section that
---- declares no delay waits, shown by the settings window as the placeholder of an
---- empty field. It is the user's `hotstrings.expansion_delay`, so the window reads
---- the canon instead of mirroring it (it once carried its own 750).
---- @return number|nil Milliseconds, or nil before init() has loaded the canon.
-function M.get_global_default_delay_ms()
-	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then return nil end
-	-- The base is held in seconds; the window speaks milliseconds.
-	return math.floor(base_delay() * 1000 + 0.5)
-end
-
 --- Copies one cascade rung while dropping an invalid activation delay.
 --- Other independently-resolved fields must remain visible to the resolver.
 --- @param entry table|nil Source settings rung.
@@ -830,6 +819,19 @@ local function base_delay()
 		if type(value) == "number" and value == value and value >= 0 and value < math.huge then return value end
 	end
 	return GLOBAL_DEFAULT_DELAY
+end
+
+--- Returns the base expansion delay, in milliseconds: what a section that
+--- declares no delay waits, shown by the settings window as the placeholder of an
+--- empty field. It is the user's `hotstrings.expansion_delay`, so the window reads
+--- the canon instead of mirroring it (it once carried its own 750).
+--- @return number|nil Milliseconds, or nil before init() has loaded the canon.
+function M.get_global_default_delay_ms()
+	-- Declared below base_delay on purpose: above it, base_delay was a nil
+	-- global there and every call raised.
+	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then return nil end
+	-- The base is held in seconds; the window speaks milliseconds.
+	return math.floor(base_delay() * 1000 + 0.5)
 end
 
 --- A user override rung as the cascade reads it: its stored delay turned into

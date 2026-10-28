@@ -180,9 +180,12 @@ const payload = {
 		{
 			...backend('ollama', true),
 			add_model: true,
-			actions: [{ id: 'install', text: 'Install Ollama' }]
+			install: { state: 'installed' }
 		},
-		backend('mlx', false, 'model_browser.reason_mlx_intel'),
+		{
+			...backend('mlx', false, 'model_browser.reason_mlx_intel'),
+			install: { state: 'unsupported', reason_key: 'model_browser.reason_mlx_intel' }
+		},
 		{
 			...backend('api', true),
 			providers: [
@@ -362,11 +365,19 @@ assert.deepEqual(page.messages.splice(0), [], 'a hidden capability cannot be inv
 const toolsOf = (index) =>
 	page.byId.models.querySelectorAll('tbody')[index].children[0].children[0].children[0];
 const ollamaTools = toolsOf(0).children;
-assert.equal(ollamaTools[0].textContent, 'Install Ollama');
+const installText = (id) => en['model_browser.install_runtime'].replace('%s', brands[id].brand);
+// model-selector-install-button: an installed runtime greys its install button
+// with the reason, and a click on it reaches nothing.
+assert.equal(ollamaTools[0].textContent, installText('ollama'));
+assert.equal(ollamaTools[0].disabled, true, 'an installed runtime cannot be installed again');
+assert.equal(ollamaTools[0].title, en['model_browser.install_installed']);
 ollamaTools[0].onclick();
-assert.deepEqual(page.messages.splice(0), [
-	{ action: 'group_action', backend: 'ollama', id: 'install' }
-]);
+assert.deepEqual(page.messages.splice(0), [], 'a greyed install button posts nothing');
+// A machine that cannot run the backend greys it with that reason.
+const mlxInstall = toolsOf(1).children[0];
+assert.equal(mlxInstall.textContent, installText('mlx'));
+assert.equal(mlxInstall.disabled, true);
+assert.equal(mlxInstall.title, en['model_browser.reason_mlx_intel']);
 const [, input, addButton, addError] = ollamaTools;
 input.value = 'Qwen3 4b';
 addButton.onclick();
@@ -382,7 +393,11 @@ input.onkeydown({ key: 'Enter', preventDefault() {} });
 assert.deepEqual(page.messages.splice(0), [
 	{ action: 'add_model', backend: 'ollama', name: 'qwen3:4b' }
 ]);
-assert.equal(toolsOf(1).children.length, 0, 'an unavailable backend offers no add field');
+assert.deepEqual(
+	toolsOf(1).children.map((el) => el.className),
+	['act install'],
+	'an unavailable backend offers only its greyed install, no add field'
+);
 const [select, providerButton] = toolsOf(2).children;
 select.value = 'groq';
 providerButton.onclick();
@@ -448,6 +463,70 @@ assert.ok(
 	'a percentage is bounded'
 );
 assert.ok(!bounded.innerHTML.includes('data-act='), 'a downloading row offers no other action');
+
+// model-selector-install-flow: on a fresh machine only the API rows can be
+// selected; Install runs the driver's install, shows its progress in the
+// header, and the payload that reports the runtime installed unlocks the rows.
+const fresh = {
+	...payload,
+	backends: [
+		{
+			...backend('ollama', false, 'model_browser.reason_ollama_missing'),
+			install: { state: 'available' }
+		},
+		payload.backends[1],
+		payload.backends[2]
+	]
+};
+page.context.injectModels(fresh);
+const freshRows = drawnRows(page.byId);
+for (const name of ['Qwen-Installed', 'Llama-Missing', 'my-tag', 'Mlx-Installed']) {
+	assert.ok(freshRows[name].className.includes('unavailable'), `${name} waits for its runtime`);
+	assert.ok(
+		!/data-act="(use|download|delete)"/.test(freshRows[name].innerHTML),
+		`${name} cannot be used, downloaded or deleted yet`
+	);
+}
+assert.ok(freshRows['OpenAI/gpt-4o-mini'].innerHTML.includes('data-act="use"'));
+let freshInstall = toolsOf(0).children[0];
+assert.equal(freshInstall.disabled, false, 'a missing runtime offers its install');
+assert.equal(freshInstall.title || '', '');
+freshInstall.onclick();
+assert.deepEqual(page.messages.splice(0), [
+	{ action: 'group_action', backend: 'ollama', id: 'install' }
+]);
+freshInstall = toolsOf(0).children[0];
+assert.equal(
+	freshInstall.textContent,
+	en['model_browser.install_running'].replace('{name}', brands.ollama.brand)
+);
+assert.equal(freshInstall.disabled, true, 'a running install cannot be started twice');
+freshInstall.onclick();
+assert.deepEqual(page.messages.splice(0), []);
+page.context.injectInstallProgress({ backend: 'ollama', percent: 42.6 });
+assert.equal(
+	toolsOf(0).children[0].textContent,
+	en['model_browser.install_running_percent']
+		.replace('{name}', brands.ollama.brand)
+		.replace('{n}', '42')
+);
+page.context.injectInstallProgress({ backend: 'api', percent: 10 });
+assert.ok(
+	!toolsOf(2).children.some((el) => el.className.includes('install')),
+	'the API has no install'
+);
+page.context.injectModels(payload);
+assert.ok(drawnRows(page.byId)['Qwen-Installed'].innerHTML.includes('data-act="delete"'));
+assert.equal(toolsOf(0).children[0].disabled, true, 'the installed runtime unlocks its rows');
+assert.throws(
+	() =>
+		page.context.injectModels({
+			...payload,
+			backends: [{ ...payload.backends[0], install: { state: 'maybe' } }]
+		}),
+	/Unknown install state/
+);
+page.context.injectModels(payload);
 
 // The page and the shared Lua rule accept and refuse the same identifiers.
 const corpus = JSON.parse(
@@ -537,6 +616,26 @@ const ahk = fs.readFileSync(path.join(SP, 'windows/ui/model_browser/init.ahk'), 
 for (const field of [...fields, 'backend', 'installed']) {
 	assert.ok(ahk.includes(`${field}:`) || ahk.includes(`"${field}"`), `Windows projects ${field}`);
 }
+
+// model-selector-install-button: every driver states the install of its local
+// backends, and routes the page's install click to its owned-runtime install.
+assert.ok(ahk.includes('",install:" . InstallJson'), 'Windows projects the install state');
+assert.ok(ahk.includes('Tools["ollama`ninstall"] := (*) => _LLM_MBW_InstallOllama()'));
+const macPage = fs.readFileSync(
+	path.join(SP, 'macos/ui/menu/menu_llm/model_selector_page.lua'),
+	'utf8'
+);
+assert.ok(
+	macPage.includes('backend.install = install[backend.id]'),
+	'macOS projects the install state'
+);
+assert.ok(macPage.includes('if id == "install" then return install_runtime(ctx, backend'));
+const linuxBridge = fs.readFileSync(path.join(SP, 'linux/ui/model_browser/bridge.lua'), 'utf8');
+assert.ok(
+	linuxBridge.includes('b.install = ollama_install(frame, blocked, ollama_ok)'),
+	'Linux projects it'
+);
+assert.ok(linuxBridge.includes('_bound.install_ollama(frame.llm'));
 
 // model-selector-api-listing: every driver replays the shared listing corpus.
 for (const replay of [

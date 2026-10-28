@@ -206,6 +206,23 @@ create stage that reads "unknown". Run such a client with
 `OLLAMA_CREATE_REMOTE=1` (upload through the server API) and keep every
 receiver failure code in its closed list.
 
+### project-managed-ollama-catalogue-is-a-release-output
+
+`_shared/modules/llm/managed_ollama_release.json` is never committed: the build
+generates it from the native producer and seals it in the bundle, and each
+release attaches it as an asset. The developer app runs the clone's Python and
+shared data, so without it the owned Ollama install refused at
+`runtime_install` with `OLLAMA_MANAGED_CATALOGUE_MISSING`.
+`tools/dev/run-macos-dev-app.sh` therefore runs
+`tools/dev/stage-macos-dev-ollama-catalogue.py`, which copies (Git-ignored) the
+catalogue of the newest immutable release whose `runtime_contract_sha256`
+binds the clone's contract, after checking GitHub's asset digest, the runtime
+policy for both hosts, the publication tag and each pinned native asset. A
+contract edited since the last release has no binding catalogue: the stager
+removes the stale one and warns, and the owned install stays refused until a
+release publishes it. Windows and Linux pin the official Ollama in the
+committed `ollama_release.json`, so their source modes never lack a catalogue.
+
 ### project-macos-installers-run-from-a-linked-private-snapshot
 
 Endpoint-security agents on managed Macs (Microsoft Defender, Santa, BeyondTrust,

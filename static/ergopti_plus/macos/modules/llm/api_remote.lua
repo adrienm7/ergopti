@@ -92,7 +92,7 @@ if not ok_kl then keystats = nil end
 
 --- Loaded from _shared/modules/llm/api_providers.json at require time (AHK twin loads the
 --- same file). Adding a provider = one entry in the JSON plus (optionally) a
---- new format branch in build_payload / parse_response below.
+--- new format branch in build_payload / post_and_parse_resolved below.
 --- Returns (providers_table, order_array, prices_table) on success, or three
 --- empty-catalogue equivalents on any failure so that a corrupted JSON file
 --- never aborts the full keymap-engine require chain.
@@ -2972,7 +2972,6 @@ end
 --- Exposed for regression tests only. These invariants cannot be asserted
 --- without running the exact helpers used by the production request path.
 M.__redact_url_for_test = redact_url
-M.__parse_response_for_test = parse_response
 
 
 
