@@ -255,6 +255,9 @@ local function resetGS()
 		-- Sticky: a gesture of three or more fingers dropped to two for good. The
 		-- remaining pair is scrolling, so nothing fires until every finger lifts.
 		aborted        = false,
+		-- Frames and capture time an aborted gesture spent below two contacts.
+		abortedFloorFrames = nil,
+		abortedFloorSince  = nil,
 		-- Contacts ranked across each axis when the current count was confirmed,
 		-- their latest positions, and whether they were seen moving together.
 		contactsOrigin = nil,
@@ -916,6 +919,22 @@ function M.process_frame(touches, frame_stamp)
 		if n == 0 then
 			noteGestureEnd(delivered)
 			resetGS()
+		elseif n < 2 then
+			-- One finger resting ends the aborted sequence as it ends any other
+			-- gesture; waiting for every finger to lift refused every later swipe
+			-- made with a finger left on the pad, without a line in the log.
+			gs.abortedFloorFrames = (gs.abortedFloorFrames or 0) + 1
+			gs.abortedFloorSince  = gs.abortedFloorSince or now
+			local elapsed = now - gs.abortedFloorSince
+			if gs.abortedFloorFrames >= FINGER_DROP_CONFIRM_FRAMES or elapsed >= FINGER_DROP_CONFIRM_SEC then
+				Logger.debug(LOG, "Aborted gesture ended below the ownership floor (frames=%d, %.3fs).",
+					gs.abortedFloorFrames, elapsed)
+				noteGestureEnd(delivered)
+				resetGS()
+			end
+		else
+			gs.abortedFloorFrames = nil
+			gs.abortedFloorSince  = nil
 		end
 		return
 	end
