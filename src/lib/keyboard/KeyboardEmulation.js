@@ -1,7 +1,7 @@
 import * as stores_infos from '#lib/stores_infos.js';
 import { get } from 'svelte/store';
 import { Keyboard } from '#lib/keyboard/Keyboard.js';
-import { base } from '$app/paths';
+import { asset } from '$app/paths';
 import { getMagicKeyUrls } from '#lib/js/hotstringDataUrls.js';
 
 function unescapeTomlString(s) {
@@ -70,7 +70,7 @@ function parseTomlMagic(toml) {
 /** Load both authored catalogues only for an explicitly owned initialization. */
 async function loadMagicData(signal) {
 	const texts = await Promise.all(
-		getMagicKeyUrls(base).map(async (url) => {
+		getMagicKeyUrls(asset).map(async (url) => {
 			const response = await fetch(url, { signal });
 			if (!response.ok)
 				throw new Error('Keyboard emulation catalogue refused: ' + response.status + ' ' + url);

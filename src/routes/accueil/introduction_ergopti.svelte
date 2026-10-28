@@ -6,7 +6,7 @@
 	import KeyboardBasis from '#lib/keyboard/KeyboardBasis.svelte';
 	import KeyboardControls from '#lib/keyboard/controls/KeyboardControls.svelte';
 
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 </script>
 
 <section>
@@ -81,7 +81,7 @@
 	<tiny-space></tiny-space>
 
 	<div style="text-align:center;">
-		<a href={base + '/utilisation'}>
+		<a href={resolve('/utilisation')}>
 			<button class="alt-button">➜ Essayer en ligne / Installation</button>
 		</a>
 	</div>

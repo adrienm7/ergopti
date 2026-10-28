@@ -4,7 +4,7 @@
 	import SFB from '#lib/components/SFB.svelte';
 
 	import { version } from '#lib/stores_infos.js';
-	import { base } from '$app/paths';
+	import { asset } from '$app/paths';
 	import IntroductionBenchmarks from './introduction_benchmarks.svelte';
 	import AnalyseErgoptiPlus from './analyse_ergopti_plus.svelte';
 	import CommentComparer from './comment_comparer.svelte';
@@ -71,7 +71,7 @@
 	});
 
 	function getErgolPdf() {
-		return base + `/benchmarks/ergol/v2.1/analyse_ergol_ergopti${version_1dfh}_v2.1_${ergol}.pdf`;
+		return asset(`benchmarks/ergol/v2.1/analyse_ergol_ergopti${version_1dfh}_v2.1_${ergol}.pdf`);
 	}
 	function getImagePath(clavier, corpus) {
 		return images[`/src/lib/images/benchmarks/${clavier}/${corpus}.jpg`].default;

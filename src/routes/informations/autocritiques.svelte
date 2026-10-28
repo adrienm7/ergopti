@@ -3,7 +3,7 @@
 	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
 	import SFB from '#lib/components/SFB.svelte';
 
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 </script>
 
 <section>
@@ -22,7 +22,7 @@
 		étrange, tant son apparition est incontournable dans les textes (sauf dans le livre
 		<em>La Disparition</em> qui réussit l’exploit de ne jamais l’utiliser). Le <kbd>E</kbd> est de
 		loin la lettre la plus fréquente. Elle est tellement incontournable que sur le
-		<a href={base + '/#keyboard_frequences'} class="link"
+		<a href={resolve('/') + '#keyboard_frequences'} class="link"
 			>clavier affichant la fréquence des touches</a
 		>
 		de la page d’accueil, une transformation mathématique a été nécessaire pour que les fréquences relatives
@@ -113,8 +113,8 @@
 	</p>
 	<!-- <p class="encadre">
 		<b>Note :</b> Une version 1DFH d’<Ergopti></Ergopti> a été développée. Elle est disponible sur la
-		<a href={base + '/benchmarks'} class="link">page de benchmarks</a>
-			ainsi que sur la <a href={base + '/utilisation'} class="link">page de téléchargements</a>, par
+		<a href={resolve('/benchmarks')} class="link">page de benchmarks</a>
+			ainsi que sur la <a href={resolve('/utilisation')} class="link">page de téléchargements</a>, par
 		installation via Kalamine. Elle utilise le fait qu’<Ergopti></Ergopti> ait été conçue de base pour
 		utiliser de nouvelles fonctionnalités grâce à l’emplacement réservé à la touche magique
 		<kbd>★</kbd>. Cependant, les gains apportés par cette version 1DFH sont faibles et il est donc
