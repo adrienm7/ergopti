@@ -2226,7 +2226,6 @@
 	"model_browser.reason_mlx_intel": "此 Mac 使用 Intel 处理器，无法运行 MLX。",
 	"model_browser.reason_mlx_missing": "MLX 未安装或需要修复。",
 	"model_browser.reason_ollama_missing": "Ollama 未安装或安装失败。",
-	"model_browser.reason_api_no_key": "尚未配置 API 密钥。",
 	"model_browser.add_model_placeholder_ollama": "Ollama 模型名称，例如 qwen3:4b",
 	"model_browser.add_model_placeholder_mlx": "Hugging Face 仓库，例如 mlx-community/Qwen3-4B-4bit",
 	"model_browser.add_model_button": "添加并下载",

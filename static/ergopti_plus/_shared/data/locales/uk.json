@@ -2226,7 +2226,6 @@
 	"model_browser.reason_mlx_intel": "У цього Mac процесор Intel: MLX на ньому не працює.",
 	"model_browser.reason_mlx_missing": "MLX не встановлено або воно потребує відновлення.",
 	"model_browser.reason_ollama_missing": "Ollama не встановлено або встановлення не вдалося.",
-	"model_browser.reason_api_no_key": "Ключ API не налаштовано.",
 	"model_browser.add_model_placeholder_ollama": "Назва моделі Ollama, напр. qwen3:4b",
 	"model_browser.add_model_placeholder_mlx": "Репозиторій Hugging Face, напр. mlx-community/Qwen3-4B-4bit",
 	"model_browser.add_model_button": "Додати й завантажити",

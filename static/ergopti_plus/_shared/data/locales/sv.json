@@ -2226,7 +2226,6 @@
 	"model_browser.reason_mlx_intel": "Den här Macen har en Intel-processor: MLX kan inte köras på den.",
 	"model_browser.reason_mlx_missing": "MLX är inte installerat eller behöver repareras.",
 	"model_browser.reason_ollama_missing": "Ollama är inte installerat eller så misslyckades installationen.",
-	"model_browser.reason_api_no_key": "Ingen API-nyckel är konfigurerad.",
 	"model_browser.add_model_placeholder_ollama": "Ollama-modellnamn, t.ex. qwen3:4b",
 	"model_browser.add_model_placeholder_mlx": "Hugging Face-repo, t.ex. mlx-community/Qwen3-4B-4bit",
 	"model_browser.add_model_button": "Lägg till och ladda ned",

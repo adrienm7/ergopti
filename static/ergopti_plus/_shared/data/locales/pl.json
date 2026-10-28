@@ -2226,7 +2226,6 @@
 	"model_browser.reason_mlx_intel": "Ten Mac ma procesor Intel: MLX nie może na nim działać.",
 	"model_browser.reason_mlx_missing": "MLX nie jest zainstalowane lub wymaga naprawy.",
 	"model_browser.reason_ollama_missing": "Ollama nie jest zainstalowana lub instalacja się nie powiodła.",
-	"model_browser.reason_api_no_key": "Nie skonfigurowano klucza API.",
 	"model_browser.add_model_placeholder_ollama": "Nazwa modelu Ollama, np. qwen3:4b",
 	"model_browser.add_model_placeholder_mlx": "Repozytorium Hugging Face, np. mlx-community/Qwen3-4B-4bit",
 	"model_browser.add_model_button": "Dodaj i pobierz",
