@@ -78,11 +78,36 @@ day logs to `docs/field-reports/mac-<date>/` on that branch and say so. Order:
 3. **"Maintainer checks > Mac hardware session"** and **"Maintainer checks > Mac"** below, section by
    section; report each line as pass, fail or not run.
 
+## Maintainer: remote branch cleanup (run on your machine; the cloud container's proxy refuses ref deletion and tag pushes)
+
+Run this only once the coordinator says the fix/<os> integration is on dev. Until then, `tmp/preflight-dev`,
+`tmp/wip-fix-os-int`, `tmp/wip-rpm-luv` and `tmp/wip-win-units` are still in use. The script tags the fix
+branches and the Mac field branch first, because the field branch holds the only copy of the Mac field reports
+(about 31 MB under `docs/field-reports/`). It then deletes every remote branch except `dev`, `main`,
+`sparkle-appcasts` and `gh-pages`.
+
+```sh
+git fetch origin --prune
+for b in fix/macos fix/linux fix/windows field/mac-2026-10-27; do
+  if git rev-parse -q --verify "origin/$b" >/dev/null; then
+    git tag -f "archive/${b//\//-}" "origin/$b"
+  fi
+done
+git push origin 'refs/tags/archive/*'
+git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin \
+  | grep -vxE 'HEAD|dev|main|sparkle-appcasts|gh-pages' \
+  | xargs -r -n 20 git push origin --delete
+```
+
+The resulting tags are `archive/fix-macos`, `archive/fix-linux`, `archive/fix-windows` and
+`archive/field-mac-2026-10-27`. To read an old field report later, run
+`git show archive/field-mac-2026-10-27:docs/field-reports/<folder>/<file>`.
+
 ## Next fix/<os> agent pass (read when the maintainer asks for a new fix/linux, fix/macos or fix/windows)
 
 The 28 October passes (Codex agents, one per OS) were squashed onto dev as
-`fix(macos|linux|windows): land the fix/<os> audit branch`. Their original histories are kept as tags
-`archive/fix-<os>-2026-10-28`, and the branches are deleted. Each pass left a full handover; read it first:
+`fix(macos|linux|windows): land the fix/<os> audit branch`. Their original histories are kept as tags `archive/fix-<os>` once the maintainer
+runs the branch cleanup below. Each pass left a full handover; read it first:
 
 - macOS: [docs/audits/macos/2026-10-28/](audits/macos/2026-10-28/) (`TODO.md`, `report.md`).
 - Linux: [docs/audits/linux/2026-10-28-closeout/](audits/linux/2026-10-28-closeout/) (`README.md`, "Outstanding
