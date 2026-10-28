@@ -38,6 +38,23 @@ function M.current_source_id()
 	return nil
 end
 
+--- Reads the keyboard layouts the text-input system has turned on right now, in
+--- this process. The enabled-sources preference can list a layout macOS has not
+--- turned on yet (it reads that list at login), so a write to the preference is
+--- no proof; this list is.
+--- @return table|nil layouts { names = string[], ids = string[] }.
+--- @return string|nil error Why the list could not be read.
+function M.enabled_layouts()
+	local ok, names, ids = xpcall(function()
+		return hs.keycodes.layouts(), hs.keycodes.layouts(true)
+	end, debug.traceback)
+	if not ok then return nil, tostring(names) end
+	if type(names) ~= "table" or type(ids) ~= "table" then
+		return nil, "hs.keycodes.layouts returned no list"
+	end
+	return { names = names, ids = ids }, nil
+end
+
 --- Rejects additional fields rather than accepting an unrelated JSON object.
 --- @param value any Candidate object.
 --- @param keys table Set of allowed fields.

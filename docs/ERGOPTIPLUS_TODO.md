@@ -103,7 +103,12 @@ a sealed Windows updater source, reseal with
   gate's built-in set lacked `Edit` (714e08bfbf), the page called the tray's local-server status rows in a
   child without the menu renderer (576439e0f0), and the sweep's rename broke a backtick escape in a
   `Trim` set (b4e925ce1e). ed95abafa1 fixes the selector page crash the Mac showed (missing
-  `text_utils` require). The seventh v1.0.7 release commit sits on top and a new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
+  `text_utils` require). Run 40659745019 on 1b7d792e00 (seventh) left two Windows test reds, fixed by
+  134c11c328 (the close-pause child's private shared folder lacked `backends.json`) and 0f35182d44 (the
+  loader-lifetime fixture read its factory marker before the writer closed it). The eighth v1.0.7 release
+  commit adds the maintainer's last asks (owned Ollama catalogue staged for the developer app, Install
+  buttons in the model selector, the Lua undefined-globals gate, the three-finger swipe fixes of L46, the
+  macOS 26 composer pending-activation route of L25/L52) and a new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
   `CFMessagePortSendRequest FAILED(-1)` (the runner's TSM UI server), rerun that job once.
 - **Decide after v1.0.7 [CI]:** since bc09e4584c no product path calls the stock
   `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
@@ -420,6 +425,30 @@ From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their bu
   re-enable the vertical three-finger swipes, scroll with two fingers for a few minutes (with and
   without a thumb resting), no tab switch; deliberate three-finger swipes (slow, fast flick,
   staggered landing) switch tabs every time; any miss leaves a `rejected by` line naming the gate.
+  Second Mac test (field report `mac-2026-10-28_095854`, macOS 26.6.2, built-in trackpad): swipes
+  worked, then were refused for a while in a row (09:47, 10:00 to 10:04) while scrolling kept
+  working. Causes on `tmp/wip-three-finger-stuck`: (1) frames were timed when Lua processed them,
+  and a main-thread stall (keystats tap found disabled at 10:01:31) delivered 35 queued frames in
+  2 ms, so `frames held: 2 -> 3 held 35 frame(s), 2 ms` refused a real swipe; the engine now times
+  frames by the touch device's capture stamp (`modules/gestures/frame_clock.lua`), and Linux by the
+  kernel's SYN_REPORT stamp. (2) macOS emits momentum after a swipe's last two fingers lift for
+  the scroll the blocker swallowed; that momentum armed the scroll guard
+  (`10 ms / 6 ms / 0 ms since the last scroll`), so each swipe refused the next one within its
+  momentum: the "suddenly stops" chain. Momentum now arms the guard only after a scroll phase the blocker let through.
+  (3) A 4 -> 3 -> 2 cascade measured the pair from the three-finger centroid, so the jump aborted
+  the gesture (`pair travel 9.07` at 09:47:02). (4) An aborted swipe that had already fired armed
+  the guard and let its tail scroll; it now keeps the block and arms nothing. (5) An aborted
+  gesture stayed aborted while one finger rested, refusing every swipe silently. (6) Cohesion
+  logged a false `0.00` when the direction locked on the promotion frame. The
+  `finger count unstable` lines are the intended 60 ms settle after a count change, not a refusal. Linux shares
+  only (1): its decoder commits at the lift, has no momentum source or re-tap path, and sets its
+  drop origin on the pair's own frame. Windows: unchanged, the precision touchpad driver
+  recognises the swipe. Mac confirms: after a reload no `has no capture timestamp` ERROR line,
+  and `Confirmed multi-finger join` lines still read about 8 ms per frame (the stamp is in
+  seconds, as the touchdevice frame callback documents); ten vertical three-finger swipes
+  in a row, one every half second, right after a two-finger scroll stops and while a finger rests,
+  each switch a tab; a swipe landing on a still-running two-finger momentum is refused with
+  `scroll guard`; two-finger scrolls with and without a resting thumb never switch tabs.
 
 - **L16** [CODE][PHYS-M] Slow ingest tick, `append` phase 466 to 563 ms, peaks 1531 and 1709 ms
   (new.txt 14:25:50 to 16:53:38, 20 lines, still on 228f79f2). The 1.2 to 1.8 s ticks are the
@@ -530,6 +559,18 @@ application|app_name|title|context_watchers|secure_field>, TTL refresh <armed|no
   until logout. The rollback disable right after was refused "busy": `run_bounded_process`
   (modules/keymap/input_sources.lua) published the terminal before freeing the mutation slot, so
   a mutation started from that callback was refused. Fixed af5765a659. Mac confirms: after a logout, the probe's `after-logout` mode for M5b/P6.
+  Correction (tmp/wip-composer-macos26): the "HIToolbox preference route is refused" was never
+  measured. Probe v4's restart ran `launchctl kickstart -k user/<uid>/com.apple.SystemUIServer`,
+  which answers 113 (no such service: SystemUIServer is `com.apple.SystemUIServer.agent` in
+  `gui/<uid>`), so nothing re-read the list; its bundle clone inserted "$1<name>$2" literally
+  (the "unexpected character '$'" line), so P4 d and P7 never had a valid layout. The driver's
+  editor ran the same kickstart, which is why every enable read `process_failed` (L52). Probe v5
+  decides, in one collector run plus one after a logout: P9 a-d (preferences plus synchronize and
+  TIS notification, SystemUIServer, TextInputMenuAgent, cfprefsd, each on its own layout, enabled
+  state also read in a fresh process), P8 b (new content in the enabled Ergopti layout in place,
+  select away and back), P10 and P8 a (the kept EPProbeKeep layout after the logout; the
+  collector runs `after-logout` first when the marker exists). The product follows the
+  documented behaviour until then: pending activation at the next login (L52).
 - **L26** [CODE][PHYS-M] field run 03_field_network: fail (`_164726`); the PAC host is unknown
   off the company network (new.txt 16:48:20). Sub-steps were not captured (L13). Next: read the
   sub-steps in the next report; a PAC that cannot be fetched while direct works must not fail the
@@ -538,7 +579,7 @@ application|app_name|title|context_watchers|secure_field>, TTL refresh <armed|no
   are `timer_late_ms` (main-thread hold) and the Shortcuts or Homebrew steps. Next: read the
   sub-steps in the next report. The 19:47 run names it: `karabiner_signature` exit_1, see L43;
   every other step passed (timer late 0 ms).
-- **L28** [PHYS-M] field run 06_field_composer: fail, same cause as L25. 07_key_accounting:
+- **L28** [PHYS-M] field run 06_field_composer: fail, same cause as L25 (now L52: info:pending_logout). 07_key_accounting:
   needs_typing, not a failure: the maintainer types the prompted text on the next run. The 19:47
   run is the same (composer_ready fail:not_enabled; the TIS probe again shows register 0, enable
   0, select -50 and the source still disabled): known limitation, not re-fixed.
@@ -666,11 +707,19 @@ strict_only:finder_detritus`, any other cause, team or a rejection still fails. 
   or a personal file adds `reload_requested` and, after the done marker, one reload through the
   termination coordinator. Mac confirms: do not use the menus during a field run; if the guard
   restores config.toml, the driver reloads once and the menu shows the backend the file names.
-- **L52** Open. 06_field_composer `composer_ready fail:not_enabled` with "Failed to enable 'Composer
-  Check' — reason=process_failed" (22:31 run) is the macOS 26 limitation of L25, but neither the
-  verdict nor the log names it yet: they read the generic `process_failed`. Next [CODE]: have the
-  enable path report the observed TIS state (register 0, enable 0, still disabled) as its own
-  reason and map it to a `not_enabled:macos_refused` value.
+- **L52** Fixed on tmp/wip-composer-macos26. 06_field_composer `composer_ready fail:not_enabled`
+  with "Failed to enable 'Composer Check' — reason=process_failed" (22:31 run): `process_failed`
+  was the editor's own kickstart answering 113 after a successful write (see L25). The editor now
+  ends on its write; the registry reads the live list (hs.keycodes) and a layout the preference
+  lists but macOS has not turned on is `pending_activation`, logged "reason=not_enabled:
+  macos_requires_logout", recorded, and confirmed (and selected when « save and use » was asked)
+  at the next boot (modules/keymap/pending_layout_activation.lua). The UI says macOS turns it on
+  at the next login; the field check reads `composer_ready info:pending_logout`. Mac confirms:
+  the next field run shows info:pending_logout and the log line; after a logout, the boot logs
+  "macOS turned on the 'composed' layout" (or "has not turned on", which would refute the
+  documented route: then read P10). Not done, behind the probe: composing into the enabled
+  Ergopti layout in place (route a) only if P8 b shows the new content applies without a logout,
+  and a re-read after the write only if one P9 mechanism passes.
 - **L44** Fixed 6593474037. Wake at 19:46:39 (driver booted 16:54): "Cannot refresh Karabiner
   lease liveness — no live generation exists" and "Wake refresh could not renew the exact
   Karabiner lease liveness", twice each, then the layout refresh retries of L20; nothing
@@ -1814,6 +1863,10 @@ Standing checks:
       `swipe_3_up`/`swipe_3_down`, scroll with two fingers for a few minutes, no tab switch; a
       deliberate three-finger swipe (slow, flick, staggered) switches tabs every time, and a miss
       leaves a DEBUG `Three-finger candidate rejected by <gate>` line in the day log.
+- [ ] **L46 swipes stop being accepted** (`tmp/wip-three-finger-stuck`): no
+      `has no capture timestamp` ERROR after a reload; ten vertical three-finger swipes half a second apart, right
+      after a two-finger scroll and with a finger resting, all switch tabs; landing on a running
+      two-finger momentum is still refused (`scroll guard`); scrolls never switch tabs.
 - [ ] **Issue #100 retest** (after v1.0.5: 2353a72eed, 25411ee080, e57f4cce77): with Ollama.app and
       a PAC proxy, enabling the AI downloads the model; with the Ergopti menu held open, no lease
       timeout.

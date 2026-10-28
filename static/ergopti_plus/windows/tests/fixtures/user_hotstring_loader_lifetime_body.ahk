@@ -91,7 +91,9 @@ _UHLC_Run(Observer, Retain) {
 	ExpectedEpoch := _UserHotstringsLoadEpoch
 	_UHLC.Stage := "waiting-for-native-factory"
 	Started := A_TickCount
-	while (!IsObject(Worker.task) || !FSStrictExists(_UHLC.Ready)) && TickElapsed64(Started) < 5000 {
+	; The factory's FileAppend creates the marker before it writes it: wait for
+	; its complete content, not its existence, or an empty marker reads as foreign.
+	while (!IsObject(Worker.task) || !FSUtf8ExactMatches(_UHLC.Ready, "factory-entered")) && TickElapsed64(Started) < 5000 {
 		_UHLC_Healthy()
 		Sleep(10)
 	}

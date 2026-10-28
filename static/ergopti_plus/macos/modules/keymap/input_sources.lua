@@ -726,8 +726,19 @@ end
 
 
 -- Edits the user's enabled input-source list (AppleEnabledInputSources of
--- com.apple.HIToolbox) through `defaults export` / `defaults import`, then
--- restarts SystemUIServer so the change takes effect immediately.
+-- com.apple.HIToolbox) through `defaults export` / `defaults import`. macOS
+-- reads that list at login: a layout written while the session runs is listed
+-- by the preference at once but turned on only at the next login (macOS 26
+-- field probe, docs/ERGOPTIPLUS_TODO.md L25). Whether it is on now is read
+-- separately, from the live list (is_live_enabled).
+--
+-- The script used to end with `launchctl kickstart -k user/<uid>/
+-- com.apple.SystemUIServer`. That service is not in the user domain
+-- (SystemUIServer is com.apple.SystemUIServer.agent in gui/<uid>), so launchctl
+-- answered 113 after every successful write, the script exited 1 and every
+-- enable was reported "process_failed" (L52). Nothing was ever restarted, so
+-- removing it changes no effect; whether any re-read makes the write take
+-- effect without a logout is what the probe's P9 measures.
 --
 -- The Carbon TIS ObjC-bridge approach (TISCreateInputSourceList +
 -- TISEnableInputSource called from osascript) was tried extensively but
@@ -863,10 +874,6 @@ try:
 finally:
     os.unlink(tmp)
 
-# Reload the input-source list. launchctl kickstart is safer than killall
-# on Sequoia: it re-spawns the agent cleanly without flushing the cfprefsd cache.
-uid = str(os.getuid())
-run_child(["launchctl", "kickstart", "-k", "user/" + uid + "/com.apple.SystemUIServer"])
 print("OK")
 ]]
 
@@ -907,6 +914,8 @@ end
 --- Adds an installed .keylayout to the user's enabled input sources. Its
 --- KeyboardLayout ID and Name are read from the file, so any layout works,
 --- whether it sits in a bundle or on its own in ~/Library/Keyboard Layouts.
+--- Success means the preference lists it; macOS turns it on at the next login
+--- unless it already is: callers read is_live_enabled for the state now.
 --- @param keylayout_path string Absolute path of the installed .keylayout.
 --- @param label string Human-readable label used in log messages.
 --- @param on_done function|nil fn(ok, output, reason).
@@ -934,6 +943,34 @@ local function disable_keylayout_source_async(keyboard_name, label, on_done)
 	end
 	local display = (type(label) == "string" and label ~= "") and label or keyboard_name
 	return edit_enabled_list_async("disable", keyboard_name, display, { OK = true, ABSENT = true }, on_done)
+end
+
+--- Whether the text-input system has a keyboard layout turned on right now, by
+--- its KeyboardLayout Name: a loose layout is listed under that name and as
+--- org.unknown.keylayout.<name>, an Ergopti bundle layout under its display.
+--- @param keyboard_name string KeyboardLayout Name (the .keylayout's name=).
+--- @param layouts table|nil Override of the live list, for tests.
+--- @return boolean|nil live
+--- @return string|nil error Why the live list could not be read.
+local function is_live_enabled(keyboard_name, layouts)
+	if type(keyboard_name) ~= "string" or keyboard_name == "" then return nil, "invalid_name" end
+	local err
+	-- Required here: the adapter reads its limits when loaded, and the menu
+	-- layer loads this module long before any layout is installed.
+	if layouts == nil then layouts, err = require("adapters.keyboard_source_probe").enabled_layouts() end
+	if type(layouts) ~= "table" then
+		Logger.error(LOG, "The live keyboard layouts cannot be read: %s.", tostring(err))
+		return nil, "live_state_unreadable"
+	end
+	local display = format_ergopti_display(keyboard_name)
+	for _, name in ipairs(layouts.names or {}) do
+		if name == keyboard_name or (display ~= nil and name == display) then return true, nil end
+	end
+	local suffix = "." .. keyboard_name
+	for _, id in ipairs(layouts.ids or {}) do
+		if id == keyboard_name or id:sub(-#suffix) == suffix then return true, nil end
+	end
+	return false, nil
 end
 
 --- Returns true if the given layout name looks like a legacy versioned Ergopti
@@ -1097,6 +1134,7 @@ return {
 	list_active_keyboard_layouts  = list_active_keyboard_layouts,
 	set_input_source_async        = set_input_source_async,
 	enable_keylayout_source_async = enable_keylayout_source_async,
+	is_live_enabled               = is_live_enabled,
 	disable_keylayout_source_async = disable_keylayout_source_async,
 	is_legacy_ergopti_id          = is_legacy_ergopti_id,
 	migrate_legacy_id             = migrate_legacy_id,

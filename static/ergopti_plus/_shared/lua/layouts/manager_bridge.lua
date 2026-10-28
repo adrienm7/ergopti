@@ -113,9 +113,10 @@ function M.handle_composer(deps, controller, action, payload, push_state)
 		deps.log("warn", "Refused a layout composer message: the registry has no '%s' operation.", action)
 		return false
 	end
-	local function report(ok, code, detail, used)
+	local function report(ok, code, detail, used, installed)
 		deps.push("composerResult", { action = action, ok = ok == true, code = code, detail = detail and tostring(detail),
-			used = used == true })
+			used = used == true,
+			pending = type(installed) == "table" and installed.pending_activation == true })
 		push_state()
 	end
 	if action == "composer_open" then
@@ -157,7 +158,11 @@ function M.new(deps)
 	local function operation_done(id, action)
 		return function(ok, detail_or_code, detail)
 			if ok then
-				local warning = type(detail_or_code) == "table" and detail_or_code.enabled == false and "not_enabled" or nil
+				local warning = nil
+				if type(detail_or_code) == "table" and detail_or_code.enabled == false then
+					-- macOS lists it and turns it on at the next login: not a missing step for the user.
+					warning = detail_or_code.pending_activation == true and "pending_logout" or "not_enabled"
+				end
 				controller.result = { id = id, action = action, ok = true, warning = warning }
 			else
 				controller.result = { id = id, action = action, ok = false, code = tostring(detail_or_code),

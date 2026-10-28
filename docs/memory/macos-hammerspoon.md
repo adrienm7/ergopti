@@ -1173,9 +1173,16 @@ momentum phase or a locked pair lifting. A first stricter tuning (4 frames plus
 50 ms, a 150 ms landing, half the lock distance, share 0.5, a guard after any
 scroll phase) missed deliberate swipes on the maintainer's Mac. Every refusal
 logs `Three-finger candidate rejected by <gate>: <value>` once per touch. The
-Linux `mt_decoder.lua` applies the same rules. Action: never give a pair a fast
-path, read a missed swipe from its `rejected by` line before retuning, and move endPos
-with startPos on every centroid compensation.
+Linux `mt_decoder.lua` applies the same rules. Gesture time is the frame's
+capture time (`modules/gestures/frame_clock.lua`, from the touchdevice callback's
+stamp; Linux uses the SYN_REPORT kernel stamp): a stalled main thread delivers
+queued frames in one burst, which timed at delivery read 35 held frames as 2 ms.
+Comparisons with scroll events stay on delivery time. Momentum arms the guard
+only after a scroll phase the blocker let through: macOS emits momentum after a
+swipe's last two fingers lift, and counting it made each swipe refuse the next.
+Action: never give a pair a fast path, read a missed swipe from its
+`rejected by` line before retuning, never time a frame by when Lua reads it, and
+move endPos and dropPos with startPos on every centroid compensation.
 
 ### project-hs-click-drag-is-not-a-gesture
 
@@ -1718,3 +1725,16 @@ directly, or `ai-runtime-triggers` fails. Add a new Debug field check to the
 declaration too: `test_field_run.lua` and `test-macos-field-run-contract.cjs`
 refuse a check with no step. A step that needs a person is declared with
 `person`/`reason` and reported, never driven with synthetic input.
+
+## Keyboard input sources: the preference is not the live state
+
+`AppleEnabledInputSources` (com.apple.HIToolbox) lists a layout as soon as it is
+written, but macOS 26 turns a layout written during the session on only at the
+next login: `TISEnableInputSource` answers 0 and the source stays disabled, and
+`TISSelectInputSource` answers -50. Decide "enabled" from the live list
+(`InputSources.is_live_enabled`, hs.keycodes), never from the preference; report
+the rest as pending (`modules/keymap/pending_layout_activation.lua`). SystemUIServer
+is `com.apple.SystemUIServer.agent` in `gui/<uid>`: a kickstart of
+`user/<uid>/com.apple.SystemUIServer` answers 113 and restarts nothing. The TIS
+probe (`tools/diagnostics/macos_tis_register_probe.swift`, P8 to P10) measures
+whether any re-read or an in-place content change avoids the logout.
