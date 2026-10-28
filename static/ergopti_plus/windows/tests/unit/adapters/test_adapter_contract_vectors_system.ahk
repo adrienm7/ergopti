@@ -18,13 +18,14 @@
 _RunCryptoContractVectors() {
 	; sha256 returns a string and never throws (sha256_returns_string)
 	_Result_crypto_string() {
-		Err := "", Out := ""
+		Err := "", ContractThrew := false, Out := ""
 		try {
 			Out := CryptoSha256("hello")
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "CryptoSha256 must not throw: " . Err)
+		Assert(!ContractThrew, "CryptoSha256 must not throw: " . Err)
 		Assert(Type(Out) = "String", "CryptoSha256 must return a String")
 	}
 	Test("Crypto: sha256 returns a string and never throws", _Result_crypto_string)
@@ -54,13 +55,14 @@ _RunCryptoContractVectors() {
 
 	; sha256 handles the empty string without throwing (sha256_empty_string)
 	_Result_crypto_empty() {
-		Err := ""
+		Err := "", ContractThrew := false
 		try {
 			CryptoSha256("")
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "CryptoSha256('') must not throw: " . Err)
+		Assert(!ContractThrew, "CryptoSha256('') must not throw: " . Err)
 	}
 	Test("Crypto: sha256 handles the empty string", _Result_crypto_empty)
 }
@@ -72,13 +74,14 @@ _RunCryptoContractVectors()
 _RunSecureFieldDetectorContractVectors() {
 	; isSecureField returns a boolean and never throws (isSecureField_returns_boolean)
 	_Result_sfd_field_bool() {
-		Err := "", Out := ""
+		Err := "", ContractThrew := false, Out := ""
 		try {
 			Out := SFD_IsSecureField()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "SFD_IsSecureField must not throw: " . Err)
+		Assert(!ContractThrew, "SFD_IsSecureField must not throw: " . Err)
 		Assert(Out = true || Out = false || Out = 1 || Out = 0,
 			"SFD_IsSecureField must return a boolean, got: " . Type(Out))
 	}
@@ -93,26 +96,28 @@ _RunSecureFieldDetectorContractVectors() {
 
 	; isSecureApp returns false for the empty string (isSecureApp_empty_returns_false)
 	_Result_sfd_empty_false() {
-		Err := "", Out := ""
+		Err := "", ContractThrew := false, Out := ""
 		try {
 			Out := SFD_IsSecureApp("")
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "SFD_IsSecureApp('') must not throw: " . Err)
+		Assert(!ContractThrew, "SFD_IsSecureApp('') must not throw: " . Err)
 		Assert(Out = false || Out = 0, "SFD_IsSecureApp('') must be false")
 	}
 	Test("SecureFieldDetector: isSecureApp returns false for the empty string", _Result_sfd_empty_false)
 
 	; refresh completes without throwing (refresh_does_not_throw)
 	_Result_sfd_refresh() {
-		Err := ""
+		Err := "", ContractThrew := false
 		try {
 			SFD_Refresh()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "SFD_Refresh must not throw: " . Err)
+		Assert(!ContractThrew, "SFD_Refresh must not throw: " . Err)
 	}
 	Test("SecureFieldDetector: refresh completes without throwing", _Result_sfd_refresh)
 }
@@ -124,50 +129,54 @@ _RunSecureFieldDetectorContractVectors()
 ; network round-trip.
 _RunNetworkInfoContractVectors() {
 	_Result_ni_ssid() {
-		Err := "", Out := ""
+		Err := "", ContractThrew := false, Out := ""
 		try {
 			Out := NI_GetSsidHash()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "NI_GetSsidHash must not throw: " . Err)
+		Assert(!ContractThrew, "NI_GetSsidHash must not throw: " . Err)
 		Assert(Type(Out) = "String", "NI_GetSsidHash must return a string")
 	}
 	Test("NetworkInfo: getSsidHash returns a string and never throws", _Result_ni_ssid)
 
 	_Result_ni_signal() {
-		Err := "", Out := ""
+		Err := "", ContractThrew := false, Out := ""
 		try {
 			Out := NI_GetSignalStrength()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "NI_GetSignalStrength must not throw: " . Err)
+		Assert(!ContractThrew, "NI_GetSignalStrength must not throw: " . Err)
 		Assert(Out = "" || Type(Out) = "Integer" || Type(Out) = "Float",
 			"NI_GetSignalStrength must be a number or empty")
 	}
 	Test("NetworkInfo: getSignalStrength returns a number and never throws", _Result_ni_signal)
 
 	_Result_ni_reach() {
-		Err := "", Out := ""
+		Err := "", ContractThrew := false, Out := ""
 		try {
 			Out := NI_IsInternetReachable()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "NI_IsInternetReachable must not throw: " . Err)
+		Assert(!ContractThrew, "NI_IsInternetReachable must not throw: " . Err)
 		Assert(Out = true || Out = false || Out = 1 || Out = 0, "NI_IsInternetReachable must return a boolean")
 	}
 	Test("NetworkInfo: isInternetReachable returns a boolean", _Result_ni_reach)
 
 	_Result_ni_vpn() {
-		Err := "", Out := ""
+		Err := "", ContractThrew := false, Out := ""
 		try {
 			Out := NI_IsVpnActive()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "NI_IsVpnActive must not throw: " . Err)
+		Assert(!ContractThrew, "NI_IsVpnActive must not throw: " . Err)
 		Assert(Out = true || Out = false || Out = 1 || Out = 0, "NI_IsVpnActive must return a boolean")
 	}
 	Test("NetworkInfo: isVpnActive returns a boolean", _Result_ni_vpn)
@@ -270,50 +279,54 @@ _RunProcessLifecycleContractVectors() {
 	Test("ProcessLifecycle: getForegroundApp returns {appId, windowTitle} strings", _Result_plc_foreground)
 
 	_Result_plc_start_idempotent() {
-		Err := ""
+		Err := "", ContractThrew := false
 		try {
 			PLC_Start()
 			PLC_Start()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
 		PLC_Stop()
-		Assert(Err = "", "PLC_Start() twice must not throw: " . Err)
+		Assert(!ContractThrew, "PLC_Start() twice must not throw: " . Err)
 	}
 	Test("ProcessLifecycle: start is idempotent", _Result_plc_start_idempotent)
 
 	_Result_plc_stop_idempotent() {
-		Err := ""
+		Err := "", ContractThrew := false
 		try {
 			PLC_Start()
 			PLC_Stop()
 			PLC_Stop()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "PLC_Stop() twice must not throw: " . Err)
+		Assert(!ContractThrew, "PLC_Stop() twice must not throw: " . Err)
 	}
 	Test("ProcessLifecycle: stop is idempotent", _Result_plc_stop_idempotent)
 
 	_Result_plc_stop_before_start() {
-		Err := ""
+		Err := "", ContractThrew := false
 		try {
 			PLC_Stop()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "PLC_Stop() before start must not throw: " . Err)
+		Assert(!ContractThrew, "PLC_Stop() before start must not throw: " . Err)
 	}
 	Test("ProcessLifecycle: stop before start is safe", _Result_plc_stop_before_start)
 
 	_Result_plc_on_focus() {
-		Err := ""
+		Err := "", ContractThrew := false
 		try {
 			PLC_OnFocusChange((*) => 0)
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "PLC_OnFocusChange(fn) must not throw: " . Err)
+		Assert(!ContractThrew, "PLC_OnFocusChange(fn) must not throw: " . Err)
 	}
 	Test("ProcessLifecycle: onFocusChange accepts a function", _Result_plc_on_focus)
 }
@@ -338,13 +351,14 @@ _RunAppLauncherContractVectors() {
 	Test("AppLauncher: isRunning returns a boolean", _Result_al_running_bool)
 
 	_Result_al_launch_empty_safe() {
-		Err := ""
+		Err := "", ContractThrew := false
 		try {
 			AL_Launch("")
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "AL_Launch('') must not throw: " . Err)
+		Assert(!ContractThrew, "AL_Launch('') must not throw: " . Err)
 	}
 	Test("AppLauncher: launch handles an empty path without throwing", _Result_al_launch_empty_safe)
 }
@@ -374,13 +388,14 @@ _RunWindowManagerContractVectors() {
 	Test("WindowManager: kill returns false for a missing window", _Result_wm_kill_false)
 
 	_Result_wm_getlist() {
-		Err := "", Out := ""
+		Err := "", ContractThrew := false, Out := ""
 		try {
 			Out := WMGetList()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "WMGetList must not throw: " . Err)
+		Assert(!ContractThrew, "WMGetList must not throw: " . Err)
 		Assert(IsObject(Out), "WMGetList must return an array")
 	}
 	Test("WindowManager: getList returns an array", _Result_wm_getlist)
@@ -391,13 +406,14 @@ _RunWindowManagerContractVectors() {
 	Test("WindowManager: getTitle returns empty string for a missing window", _Result_wm_gettitle_empty)
 
 	_Result_wm_getfocused() {
-		Err := "", App := ""
+		Err := "", ContractThrew := false, App := ""
 		try {
 			App := WMGetFocused()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "WMGetFocused must not throw: " . Err)
+		Assert(!ContractThrew, "WMGetFocused must not throw: " . Err)
 		Assert(IsObject(App), "WMGetFocused must return an object")
 		Assert(Type(App["hwnd"]) = "Integer" || Type(App["hwnd"]) = "Float",
 			"WMGetFocused().hwnd must be a number")
@@ -412,13 +428,14 @@ _RunWindowManagerContractVectors()
 ; immediately after.
 _RunMouseControlContractVectors() {
 	_Result_mc_getpos() {
-		Err := "", P := ""
+		Err := "", ContractThrew := false, P := ""
 		try {
 			P := MCGetPos()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "MCGetPos must not throw: " . Err)
+		Assert(!ContractThrew, "MCGetPos must not throw: " . Err)
 		Assert(IsObject(P), "MCGetPos must return an object")
 		Assert((Type(P["x"]) = "Integer" || Type(P["x"]) = "Float")
 			&& (Type(P["y"]) = "Integer" || Type(P["y"]) = "Float"),
@@ -428,25 +445,27 @@ _RunMouseControlContractVectors() {
 
 	_Result_mc_setpos() {
 		Saved := MCGetPos()
-		Err := ""
+		Err := "", ContractThrew := false
 		try {
 			MCSetPos(0, 0)
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
 		MCSetPos(Saved["x"], Saved["y"])
-		Assert(Err = "", "MCSetPos must not throw: " . Err)
+		Assert(!ContractThrew, "MCSetPos must not throw: " . Err)
 	}
 	Test("MouseControl: setPos does not throw (cursor restored)", _Result_mc_setpos)
 
 	_Result_mc_monitor_count() {
-		Err := "", N := ""
+		Err := "", ContractThrew := false, N := ""
 		try {
 			N := MCGetMonitorCount()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "MCGetMonitorCount must not throw: " . Err)
+		Assert(!ContractThrew, "MCGetMonitorCount must not throw: " . Err)
 		Assert((Type(N) = "Integer" || Type(N) = "Float") && N >= 0, "MCGetMonitorCount must be a number >= 0")
 	}
 	Test("MouseControl: getMonitorCount is a number >= 0", _Result_mc_monitor_count)
@@ -475,7 +494,7 @@ _RunMouseControlContractVectors()
 _RunClipboardContractVectors() {
 	_Result_clipboard_roundtrip() {
 		SavedAll := CB_SaveAll()
-		Err := ""
+		Err := "", ContractThrew := false
 		try {
 			; write_returns_true
 			Assert(CB_Write("test") = true || CB_Write("test") = 1, "CB_Write must return true")
@@ -490,10 +509,11 @@ _RunClipboardContractVectors() {
 			; read_empty_returns_null
 			Assert(CB_Read() = "", "CB_Read after restore(null) must be empty")
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
 		CB_RestoreAll(SavedAll)
-		Assert(Err = "", "Clipboard round-trip must not throw: " . Err)
+		Assert(!ContractThrew, "Clipboard round-trip must not throw: " . Err)
 	}
 	Test("Clipboard: write/read/save/restore round-trip (user clipboard preserved)", _Result_clipboard_roundtrip)
 }
@@ -516,16 +536,17 @@ _RunGraphicsRendererContractVectors() {
 	Test("GraphicsRenderer: createWindow returns a non-zero handle", _Result_gr_create_nonzero)
 
 	_Result_gr_zero_noops() {
-		Err := ""
+		Err := "", ContractThrew := false
 		try {
 			GR_DestroyWindow(0)
 			GR_Show(0)
 			GR_Hide(0)
 			GR_DrawBitmap(0, (*) => 0)
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "zero-handle calls must be no-ops without throwing: " . Err)
+		Assert(!ContractThrew, "zero-handle calls must be no-ops without throwing: " . Err)
 	}
 	Test("GraphicsRenderer: destroy/show/hide/drawBitmap on a zero handle are no-ops", _Result_gr_zero_noops)
 }
@@ -558,14 +579,15 @@ _RunKeyboardHookContractVectors() {
 	Test("KeyboardHook: isRunning() is false after stop()", _Result_kh_stop_running)
 
 	_Result_kh_stop_idempotent() {
-		Err := ""
+		Err := "", ContractThrew := false
 		try {
 			KHStop()
 			KHStop()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "KHStop() when not running must not throw: " . Err)
+		Assert(!ContractThrew, "KHStop() when not running must not throw: " . Err)
 	}
 	Test("KeyboardHook: stop() when not running is safe (idempotent)", _Result_kh_stop_idempotent)
 
@@ -576,13 +598,14 @@ _RunKeyboardHookContractVectors() {
 	Test("KeyboardHook: getContext() returns a Map", _Result_kh_getcontext_map)
 
 	_Result_kh_refresh_no_throw() {
-		Err := ""
+		Err := "", ContractThrew := false
 		try {
 			KHRefreshContext()
 		} catch as E {
+			ContractThrew := true
 			Err := E.Message
 		}
-		Assert(Err = "", "KHRefreshContext() must not throw: " . Err)
+		Assert(!ContractThrew, "KHRefreshContext() must not throw: " . Err)
 	}
 	Test("KeyboardHook: refreshContext() does not throw", _Result_kh_refresh_no_throw)
 
