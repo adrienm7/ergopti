@@ -203,6 +203,7 @@ function mediaFixture() {
 	});
 	context.window = context;
 	context.driver_meta = { os: 'mac' };
+	require('./support/theme-tokens.cjs').installThemeTokens(context);
 	for (const file of [
 		'dom_utils.js',
 		'host_bridge.js',

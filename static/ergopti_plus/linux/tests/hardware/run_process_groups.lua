@@ -14,6 +14,7 @@
 --- only after the native terminal error, group absence and physical close ACK.
 --- ==============================================================================
 
+local Errors = require("adapter_errors")
 local uv = require("luv")
 local ShellRunner = require("adapters.shell_runner")
 local ProcessRunner = require("adapters.process_runner")
@@ -104,7 +105,7 @@ local function check(name, dispatch, cancel)
 	local ok, err = xpcall(function()
 		handle = assert(dispatch(path, function(answer)
 			answers, result = answers + 1, answer
-			if answer.error and answer.error:find("native process group outlived leader", 1, true) then
+			if answer.error and answer.error:find(Errors.PROCESS_GROUP_OUTLIVED_LEADER, 1, true) then
 				local group = read_receipt(path)
 				retired_before_callback = group and group_absent(group) and ProcessRunner.is_settled() == true
 			end
@@ -119,7 +120,7 @@ local function check(name, dispatch, cancel)
 			handle.cancel()
 		else
 			assert(await(function() return answers > 0 end), "missing deadline callback")
-			local orphaned = result.error and result.error:find("native process group outlived leader", 1, true)
+			local orphaned = result.error and result.error:find(Errors.PROCESS_GROUP_OUTLIVED_LEADER, 1, true)
 			assert(retained_descendant or orphaned, "early retirement requires the native orphaned-group error")
 			if orphaned then
 				assert(retired_before_callback, "orphaned-group callback preceded native group absence or close ACK")

@@ -38,7 +38,7 @@ helpers.describe("stop_mlx_server_if_needed resets readiness intrinsically", fun
 		helpers.assert_true(helper_idx ~= nil and helper_end ~= nil,
 			"the shared MLX endpoint reset helper must remain bounded")
 		local helper_body = src:sub(helper_idx, helper_end - 1)
-		helpers.assert_true(helper_body:find("ApiMlx.reset_endpoints()", 1, true) ~= nil,
+		helpers.assert_true(helper_body:find("ApiMlx.reset_endpoints(options)", 1, true) ~= nil,
 			"the shared helper must force a fresh API readiness verdict")
 	end)
 end)

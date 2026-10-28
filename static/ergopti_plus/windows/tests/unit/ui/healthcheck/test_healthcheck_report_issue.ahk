@@ -81,7 +81,8 @@ _THPA_Join(Calls) {
 
 _THPA_Snapshot(Long := false) {
 	Snapshot := Map("schema_version", 2, "driver", "windows", "generated_at", "2026-09-24T10:00:00Z",
-		"sections", Map("versions", Map("ergopti_version", "2.1.0"), "issues", Map("recent", "private fixture text")),
+		"sections", Map("versions", Map("ergopti_version", "2.1.0"), "system", Map("os", "Windows 11 Pro 26100.9457"),
+			"hardware", Map("arch", "x64"), "issues", Map("recent", "private fixture text")),
 		"probes", Map("github_api", Map("state", "error", "cleanup", "pending", "ms", 1)))
 	if Long {
 		Cohorts := []
@@ -154,9 +155,12 @@ _THPA_ReportPrefillsTheReport() {
 	AssertEqual("reveal:" . Outcome["path"], Calls[3])
 	AssertTrue(InStr(Calls[4], "open_url:https://github.com/") = 1, Calls[4])
 	AssertTrue(InStr(Calls[4], "template=bug_report.yml") > 0, Calls[4])
-	AssertEqual("", _THPA_QueryValue(Calls[4], "diagnostics"),
-		"No query default can reset an edit in the form")
-	AssertEqual("windows", _THPA_QueryValue(Calls[4], "os"))
+	AssertEqual("Windows%2011%20Pro%2026100.9457%20%28x64%29", _THPA_QueryValue(Calls[4], "os"),
+		"The Windows build and architecture, not the driver name")
+	Prefilled := _THPA_QueryValue(Calls[4], "diagnostics")
+	AssertEqual(IssueLink_PercentEncode(Document["fields"]["diagnostics"]), Prefilled,
+		"The form receives the compact report, which fits the budget")
+	AssertTrue(InStr(Document["fields"]["diagnostics"], Chr(96) . Chr(96) . Chr(96) . "json") = 0, "The JSON block stays out of the URL")
 	AssertTrue(InStr(Calls[4], "JDoe") = 0, "The form carries no private fields")
 }
 Test("Diagnostics page: report copies, then opens the bug form with the whole report (report-bug-flow)",
@@ -189,11 +193,15 @@ _THPA_ReportCutsALongReport() {
 	AssertEqual("copy:" . Document["text"], Calls[1], "The clipboard preserves the complete report")
 	AssertEqual("save:" . Outcome["path"] . ":" . Document["text"], Calls[2], "The local attachment is complete")
 	Url := SubStr(Calls[4], StrLen("open_url:") + 1)
-	AssertTrue(StrLen(Url) < 1200 && StrLen(Url) <= Config["templates"]["max_url_bytes"], "The form URL stays short")
+	AssertTrue(StrLen(Url) <= Config["templates"]["max_url_bytes"], "The form URL fits its budget")
 	AssertEqual("2.1.0", _THPA_QueryValue(Url, "version"), "Only validated host identity is prefilled")
-	AssertEqual("", _THPA_QueryValue(Url, "diagnostics"))
+	Ending := IssueLink_PercentEncode(Config["templates"]["truncation_marker"] . "`n`n"
+		. Config["schema"]["export_strings"][Config["schema"]["share_policy"]["truncated_note_key"]])
+	Prefilled := _THPA_QueryValue(Url, "diagnostics")
+	AssertTrue(InStr(Prefilled, IssueLink_PercentEncode("# ErgoptiPlus diagnostics")) = 1, "The compact report prefills the form")
+	AssertEqual(Ending, SubStr(Prefilled, -StrLen(Ending)), "A cut report ends with the marker and the note saying where the complete report is")
 }
-Test("Diagnostics page: report keeps a long attachment out of the editable URL (report-bug-flow)",
+Test("Diagnostics page: report cuts a long report in the URL and keeps it whole locally (report-bug-flow)",
 	_THPA_ReportCutsALongReport)
 
 _THPA_ReportStopsOnRefusedClipboard() {
@@ -288,9 +296,10 @@ _THPA_MenuReportBug() {
 		. "/issues/new?template=bug_report.yml&"
 	AssertEqual(Prefix, SubStr(Calls[4], 1, StrLen(Prefix)), "Not a bare URL: the bug template is selected")
 	AssertEqual("windows", _THPA_QueryValue(Calls[4], "driver"))
-	AssertEqual("windows", _THPA_QueryValue(Calls[4], "os"))
+	AssertTrue(InStr(_THPA_QueryValue(Calls[4], "os"), "Windows") = 1, "The system is named, not the driver: " . Calls[4])
 	AssertTrue(_THPA_QueryValue(Calls[4], "version") != "", "The version is prefilled: " . Calls[4])
-	AssertEqual("", _THPA_QueryValue(Calls[4], "diagnostics"), "The editable report field stays out of the URL")
+	AssertTrue(_THPA_QueryValue(Calls[4], "version") != "unknown", "A source run names its commit: " . Calls[4])
+	AssertTrue(_THPA_QueryValue(Calls[4], "diagnostics") != "", "The compact report prefills the form")
 }
 Test("Report a bug (menu): copies, saves and opens the prefilled bug form (menu-report-bug)",
 	_THPA_MenuReportBug)
@@ -376,9 +385,12 @@ _THPA_TemplateOnlyReport() {
 		_THPA_Paths(), Config, _THPA_Effects(Calls))
 	AssertEqual(true, Outcome["ok"])
 	Repo := Config["repository"]
-	AssertEqual("open_url:https://github.com/" . Repo["owner"] . "/" . Repo["repo"] . "/issues/new?template=bug_report.yml&version=2.1.0&os=windows&driver=windows", Calls[4])
-	for Id in ["title", "description", "reproduction", "diagnostics", "architecture"]
-		AssertEqual("", _THPA_QueryValue(Calls[4], Id), "Editable and undeclared fields stay out of the URL")
+	Prefix := "open_url:https://github.com/" . Repo["owner"] . "/" . Repo["repo"] . "/issues/new?template=bug_report.yml&version=2.1.0&os=Windows%2011%20Pro%2026100.9457%20%28x64%29&driver=windows&diagnostics="
+	AssertEqual(Prefix, SubStr(Calls[4], 1, StrLen(Prefix)), "The page cannot change the identity")
+	AssertTrue(_THPA_QueryValue(Calls[4], "diagnostics") != IssueLink_PercentEncode("private query text"), "The host report replaces the page's text")
+	AssertTrue(InStr(Calls[4], "PRIVATE") = 0, "No page-derived text reaches the URL")
+	for Id in ["title", "description", "reproduction", "architecture"]
+		AssertEqual("", _THPA_QueryValue(Calls[4], Id), "Undeclared fields stay out of the URL")
 	AssertEqual("copy:" . Document["text"], Calls[1])
 	AssertEqual("save:" . Outcome["path"] . ":" . Document["text"], Calls[2])
 }

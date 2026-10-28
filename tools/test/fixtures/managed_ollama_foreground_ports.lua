@@ -93,6 +93,7 @@ function M.new(root, production, options)
 		["modules.llm.api_ollama"] = "macos/modules/llm/api_ollama.lua",
 		["llm.request_plan.token_budget"] = "_shared/lua/llm/request_plan/token_budget.lua",
 		["llm.request_plan.ports"] = "_shared/lua/llm/request_plan/ports.lua",
+		["adapter_errors"] = "_shared/lua/adapter_errors.lua",
 		["adapters.managed_ollama_daemon"] = "macos/adapters/managed_ollama_daemon.lua",
 		["adapters.owned_program_runner"] = "macos/adapters/owned_program_runner.lua",
 		["core.llm.ollama_runtime_choice"] = "_shared/lua/core/llm/ollama_runtime_choice.lua",
@@ -108,8 +109,11 @@ function M.new(root, production, options)
 		return value
 	end
 	state.api = environment.require("modules.llm.api_ollama")
+	-- The extracted body reads the manager's module-level `Errors` upvalue (the
+	-- closed adapter error ids); provide the same real module it requires.
 	local manager_environment = setmetatable({
 		require = environment.require, operation = state.operation,
+		Errors = environment.require("adapter_errors"),
 		owns_operation = function() return state.live end,
 		retain_current_waiters = function() return true end,
 		observe_command_settlement = function(handle) state.observed = handle; return true end,

@@ -7,6 +7,7 @@
 --- transactions. Cold range observations never hold modifier custody.
 --- ==============================================================================
 local M = {}
+local Errors = require("adapter_errors")
 local Layout = require("adapters.keyboard_layout")
 local Clipboard = require("adapters.clipboard")
 local Broker = require("adapters.modifier_broker")
@@ -90,7 +91,7 @@ function M.new(text, publication, ports)
 				-- descriptor joins B's original field, action, route and RAM source
 				-- without observing output_current while a Broker is reserved.
 				plan.seal = function()
-					if not admitted(true) then error("programmable publication is no longer current", 0) end
+					if not admitted(true) then error(Errors.PROGRAMMABLE_PUBLICATION_STALE, 0) end
 				end
 				for _, step in ipairs(plan.plan) do data_codes[step.keycode] = true end
 				route = "native"
@@ -126,7 +127,7 @@ function M.new(text, publication, ports)
 			-- This runs after admission and immediately before a data DOWN on the
 			-- original wire. A failed native ACK may already have changed text;
 			-- modifier masking/neutralisation alone never invalidates the document.
-			if data_codes[code] and (phase == "replacement key down" or phase == "clipboard paste chord") then payload_written = true end
+			if data_codes[code] and (phase == Errors.REPLACEMENT_KEY_DOWN or phase == Errors.CLIPBOARD_PASTE_CHORD) then payload_written = true end
 		end)
 		key_cleanup = ok and type(native) == "table" and native.cleanup_ok == true
 		-- Clipboard cleanup is independent of business admission and its deadline.

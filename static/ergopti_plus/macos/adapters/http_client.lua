@@ -249,6 +249,22 @@ local function request_refusal(url, headers, body)
 	return nil
 end
 
+--- Longest native failure reason kept in a result; the system text is one sentence.
+local NATIVE_REASON_MAX_BYTES = 240
+
+--- Names a transport failure with the system's reason. hs.http answers one with
+--- status -1 and the reason as its body; dropping it left a failed PAC download
+--- or model fetch with no cause in any log (issue #104). Control bytes are
+--- folded so the reason stays one log line.
+--- @param body any Native response body of a failed request.
+--- @return string reason
+local function native_failure_reason(body)
+	local reason = type(body) == "string" and TextUtils.trim((body:gsub("[%c]+", " "))) or ""
+	if reason == "" then return "Network request failed" end
+	if #reason > NATIVE_REASON_MAX_BYTES then reason = reason:sub(1, NATIVE_REASON_MAX_BYTES) .. "…" end
+	return "Network request failed: " .. reason
+end
+
 --- Returns whether an admitted URL is HTTPS, whatever the scheme's case.
 --- @param url string Admitted absolute URL.
 --- @return boolean
@@ -639,7 +655,7 @@ local function new(options)
 			local is_ok  = public_status >= 200 and public_status < 300
 			local err_msg = nil
 			if not is_ok then
-				err_msg = native_status < 0 and "Network request failed"
+				err_msg = native_status < 0 and native_failure_reason(response_body)
 					or string.format("HTTP %s", tostring(public_status))
 			end
 			invoke_callback(callback, {
@@ -942,6 +958,8 @@ local function new(options)
 	--- Native task cancellation remains opportunistic for an implementation that
 	--- does return a cancellable handle. False reports pending physical settlement;
 	--- logical cancellation still fences the result synchronously.
+	--- @return boolean settled True when no native capability remains.
+	--- @return string|nil detail "pending" when only taskless requests await completion.
 	function inst.cancel()
 		_lifecycle_depth = _lifecycle_depth + 1
 		_cancelled  = true
@@ -957,9 +975,13 @@ local function new(options)
 		-- physical receipt for the revoked set before invoking that continuation;
 		-- isSettled() still reports any newly acquired request as pending.
 		local receipt_settled = task_settled and timers_settled and next(_native_requests) == nil
+		-- Only taskless receipts left: the request is revoked and its late answer
+		-- is fenced by the generation; native completion alone is still awaited.
+		local detail = (not receipt_settled and task_settled and timers_settled
+			and not _has_pending_tasks()) and "pending" or nil
 		_lifecycle_depth = _lifecycle_depth - 1
 		_notify_settlement_observers()
-		return receipt_settled
+		return receipt_settled, detail
 	end
 
 	--- Registers a continuation for exact native settlement of this instance.

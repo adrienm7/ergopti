@@ -25,6 +25,8 @@
 --- against os.execute and io.popen directly rather than against a seam.
 --- ==============================================================================
 
+-- The cases replace these entries; the module end puts them back.
+local restore_loaded = require("tests.helpers").keep_loaded({ "adapters.keyboard_hook" })
 local helpers = require("tests.helpers")
 
 --- A recording uinput channel.
@@ -481,3 +483,5 @@ helpers.describe("linux-injector-wait-eintr", function()
 		helpers.assert_eq(requests, { { 0, 30000000 }, { 0, 20000000 } })
 	end)
 end)
+
+restore_loaded()

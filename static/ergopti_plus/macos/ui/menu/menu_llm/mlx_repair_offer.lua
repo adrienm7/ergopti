@@ -37,7 +37,9 @@ local LOG = "menu_llm.mlx_repair_offer"
 local OPEN_BIN = "/usr/bin/open"
 
 -- System Settings > Network, where the relay (proxy) of a managed Mac is set.
-local NETWORK_SETTINGS_URL = "x-apple.systempreferences:com.apple.Network-Settings.extension"
+-- Public: the Ollama pull's network failure opens the same pane.
+M.NETWORK_SETTINGS_URL = "x-apple.systempreferences:com.apple.Network-Settings.extension"
+M.OPEN_BIN = OPEN_BIN
 
 -- Immutable canonical policy, loaded once through the native shared-path owner.
 local _network_contract = nil
@@ -263,7 +265,7 @@ local function present(cause)
 		elseif action == "proxy_settings" then
 			local opened, started = pcall(function()
 				if not failure_is_current(cause) then return false end
-				local handle = require("adapters.shell_runner").spawn(OPEN_BIN, { NETWORK_SETTINGS_URL }, nil)
+				local handle = require("adapters.shell_runner").spawn(M.OPEN_BIN, { M.NETWORK_SETTINGS_URL }, nil)
 				return handle ~= nil and handle.start() == true
 			end)
 			if not opened or started ~= true then

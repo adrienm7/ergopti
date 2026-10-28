@@ -138,8 +138,8 @@ ModifyMagicKey(Window, Text) {
 
 _UNC_Identity(Hwnd) {
 	Pid := 0
-	Thread := DllCall("GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &Pid, "UInt")
-	return Map("thread", Thread, "pid", Pid)
+	ThreadId := DllCall("GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &Pid, "UInt")
+	return Map("thread", ThreadId, "pid", Pid)
 }
 
 _UNC_Admit() {
@@ -723,8 +723,8 @@ try {
 		_UNC_Run()
 	FileAppend("PASS " . (Prototype ? "native-inputhook-endchars-prototype" : (InStr(_UNC.Case, "packet-") == 1 ? "inputhook-control-packet-abi" : "native-inputhook-unicode-capture")) . "`n", "*")
 	ExitApp(0)
-} catch as Err {
-	FileAppend("FAIL " . Err.Message . "`n" . Err.Stack . "`n", "**")
+} catch as TopLevelFailure {
+	FileAppend("FAIL " . TopLevelFailure.Message . "`n" . TopLevelFailure.Stack . "`n", "**")
 	if _UNC.Debt {
 		FileAppend("RETAINED pid=" . _UNC.Pid . " case=" . _UNC.Case . " input_debt=true external_owned_retirement_required=true`n", "**")
 		Persistent()

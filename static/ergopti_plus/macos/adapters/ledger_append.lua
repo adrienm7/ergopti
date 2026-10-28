@@ -111,7 +111,8 @@ end
 local function publish_journal(path, receipt, expected)
 	local encoded = json.encode(receipt)
 	if type(encoded) ~= "string" then return false end
-	local written, _, cleanup = FileSystem.write_if_unchanged(path .. JOURNAL_SUFFIX, encoded, expected)
+	-- The journal is the driver's own file: no user metadata to carry (L16).
+	local written, _, cleanup = FileSystem.write_private_if_unchanged(path .. JOURNAL_SUFFIX, encoded, expected)
 	if cleanup ~= nil then
 		assert(type(cleanup) == "function", "ordinary ledger publication requires a cleanup capability")
 		publication_debt = cleanup
@@ -332,32 +333,50 @@ function M.rollover(path, today_path, offset, previous_date, next_date, reset, o
 	end, today_path)
 end
 
+--- Stage names reported by the optional flush mark callback, in order. The
+--- ingest trace prints them so a slow `append` phase names its sub-stage.
+M.FLUSH_STAGES = { "lock", "journal", "prepare", "publish", "write", "clear", "settle", "release" }
+
 --- Publishes or resumes a batch, then clears its SQLite outbox before settling.
 --- @param path string Canonical local ledger path.
 --- @param batch string Exact pending SQLite outbox, possibly empty after an uncertain clear.
 --- @param clear function Transactional outbox clear; must acknowledge literal true.
 --- @param origin function Validates an unjournaled legacy ledger once, never per batch.
+--- @param mark function|nil Receives each stage name of M.FLUSH_STAGES as it ends.
 --- @return boolean committed The durable journal and SQLite agree on publication.
-function M.flush(path, batch, clear, origin)
-	assert(type(batch) == "string" and type(clear) == "function" and type(origin) == "function",
-		"invalid ledger append ownership")
-	return owned(path, function(resolved)
+function M.flush(path, batch, clear, origin, mark)
+	assert(type(batch) == "string" and type(clear) == "function" and type(origin) == "function"
+		and (mark == nil or type(mark) == "function"), "invalid ledger append ownership")
+	local stage = mark or function() end
+	local committed = owned(path, function(resolved)
+		stage("lock")
 		local receipt, expected, loaded = load_journal(path)
+		stage("journal")
 		if not loaded or (receipt and receipt.version ~= 1) then return false end
 		if receipt and receipt.phase == "pending" then
 			if batch ~= "" and batch ~= receipt.batch then return false end
 		elseif batch == "" then return true
 		else
 			receipt = prepare_append(path, resolved, batch, receipt, origin)
+			stage("prepare")
 			if not receipt then return false end
 			local published, next_expected = publish_journal(path, receipt, expected)
+			stage("publish")
 			if not published then return false end
 			expected = next_expected
 		end
-		if not resume(receipt, resolved) then return false end
-		if clear() ~= true then return false end
-		return publish_journal(path, terminal(receipt), expected)
+		local resumed = resume(receipt, resolved)
+		stage("write")
+		if not resumed then return false end
+		local cleared = clear()
+		stage("clear")
+		if cleared ~= true then return false end
+		local settled = publish_journal(path, terminal(receipt), expected)
+		stage("settle")
+		return settled
 	end)
+	stage("release")
+	return committed
 end
 
 return M

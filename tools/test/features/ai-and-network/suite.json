@@ -417,6 +417,30 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-codegen-proxy-precedence.cjs"],
 			"repro": "npm run test:codegen-proxy-precedence"
+		},
+		{
+			"id": "js-ollama-termination-owned",
+			"ordinal": 523,
+			"name": "Ollama termination ownership (no driver stops Ollama by process name or by its port)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-ollama-termination-owned.cjs"],
+			"repro": "npm run test:ollama-termination-owned"
+		},
+		{
+			"id": "js-model-selector-page",
+			"ordinal": 526,
+			"name": "model selector page greys unavailable backends, downloads missing models and keeps keyboard access",
+			"cmd": "node",
+			"args": ["tools/test/test-model-selector-page.cjs"],
+			"repro": "npm run test:model-selector-page"
+		},
+		{
+			"id": "js-llm-backend-brands-single-source",
+			"ordinal": 527,
+			"name": "AI backend brand and emoji single source (backends.json, emoji-first model button)",
+			"cmd": "node",
+			"args": ["tools/test/test-llm-backend-brands-single-source.cjs"],
+			"repro": "npm run test:llm-backend-brands-single-source"
 		}
 	]
 }

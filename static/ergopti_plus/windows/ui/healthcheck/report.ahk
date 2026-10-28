@@ -58,7 +58,7 @@ _HCShare_SettingRow(Value) {
 _HCShare_Project(Value, Rule, &Present) {
 	Present := true
 	Kind := Rule["kind"]
-	if !InStr("|object|array|enum|boolean|number|integer|version|hash|utc|commit|runtime|setting_row|", "|" . Kind . "|")
+	if !InStr("|object|array|enum|boolean|number|integer|version|hash|utc|commit|runtime|platform_name|setting_row|", "|" . Kind . "|")
 		throw Error("An unknown diagnostic sharing rule was refused.")
 	if Kind == "object" {
 		Result := Map()
@@ -117,6 +117,17 @@ _HCShare_Project(Value, Rule, &Present) {
 						if HasValue
 							return Projected
 					}
+			}
+			; An operating system or desktop name from the host: one of the rule's known
+			; families, then a closed set of name characters. A path, an address, a
+			; sentence or a name that is not listed never matches.
+			if Kind == "platform_name" && StrLen(Value) <= 64 {
+				for Family in Rule["families"] {
+					Rest := SubStr(Value, StrLen(Family) + 1)
+					if StrLower(SubStr(Value, 1, StrLen(Family))) == StrLower(Family)
+						&& RegExMatch(Rest, "D)^[A-Za-z0-9 .+/:(),!-]*$") && !RegExMatch(Rest, "^[A-Za-z]")
+						return Value
+				}
 			}
 			if Kind == "version" && RegExMatch(Value, "^\d+(?:\.\d+){1,3}(?:-dev\.\d+|-beta\d+)?$")
 				return Value
@@ -329,21 +340,64 @@ _HCShare_English(Schema, Key) {
 	return Strings[Key]
 }
 
+/**
+ * The version the issue form shows. A source run has no release version (the
+ * host reports "local"), so it is named by its commit: a true statement, where
+ * "unknown" would be false.
+ */
+_HCShare_FormVersion(Safe, Snapshot) {
+	Versions := Safe.Get("sections", Map()).Get("versions", Map())
+	if Versions.Has("ergopti_version")
+		return Versions["ergopti_version"]
+	Raw := (Snapshot is Map && Snapshot.Get("sections", 0) is Map) ? Snapshot["sections"].Get("versions", Map()) : Map()
+	RawCommit := Raw.Get("commit", "")
+	FromGit := (RawCommit is String) && RegExMatch(RawCommit, " \(git\)$")
+	if Raw.Get("ergopti_version", "") == "local" || FromGit
+		return "dev source" . (Versions.Has("commit") ? " " . Versions["commit"] : "")
+	return "unknown"
+}
+
+/**
+ * The operating system the issue form shows: the name and version the host
+ * reported, then the desktop, the session and the architecture when known.
+ */
+_HCShare_FormOs(Safe) {
+	static SESSION_NAMES := Map("wayland", "Wayland", "x11", "X11")
+	static OS_NAMES := Map("macos", "macOS", "windows", "Windows", "linux", "Linux")
+	Sections := Safe.Get("sections", Map())
+	System := Sections.Get("system", Map())
+	Details := []
+	if System.Has("desktop")
+		Details.Push(System["desktop"])
+	if System.Has("display_server") && SESSION_NAMES.Has(System["display_server"])
+		Details.Push(SESSION_NAMES[System["display_server"]])
+	Arch := Sections.Get("hardware", Map()).Get("arch", "unknown")
+	if Arch != "unknown"
+		Details.Push(Arch)
+	Name := System.Has("os") ? System["os"] : OS_NAMES.Get(Safe["driver"], Safe["driver"]) . " (version unknown)"
+	Joined := ""
+	for Detail in Details
+		Joined .= (Joined == "" ? "" : ", ") . Detail
+	return Name . (Joined == "" ? "" : " (" . Joined . ")")
+}
+
 /** Builds file and issue-form content only from the host-retained snapshot. */
 HealthCheck_ShareDocument(Snapshot, Schema, WithDayLog := false) {
 	Safe := HealthCheck_ShareSnapshot(Snapshot, Schema, WithDayLog)
 	Versions := Safe.Get("sections", Map()).Get("versions", Map())
 	Fence := Chr(96) . Chr(96) . Chr(96)
-	Text := "# ErgoptiPlus diagnostics`n`n" . _HCShare_English(Schema, Schema["share_policy"]["notice_key"])
+	Head := "# ErgoptiPlus diagnostics`n`n" . _HCShare_English(Schema, Schema["share_policy"]["notice_key"])
 		. "`n`ndriver-suites: not_run`npage-model-checks: " . (Safe.Has("page_check_observations") ? "installed_page_reported (unqualified)" : "not_collected") . "`n`n" . _HCShare_Readable(Safe, Schema)
-		. "`n" . Fence . "json`n" . _HC_ValueToJson(Safe) . "`n" . Fence . "`n"
+	Text := Head . "`n" . Fence . "json`n" . _HC_ValueToJson(Safe) . "`n" . Fence . "`n"
 	Name := Schema["report"]["name_prefix"] . Safe["driver"] . "-"
 		. RegExReplace(Safe.Get("generated_at", "unknown"), "[^A-Za-z0-9_.-]", "_") . Schema["report"]["name_suffix"]
 	Summary := "A diagnostic attachment was saved locally. Attach that file here after reviewing it; no attachment is uploaded automatically.`n"
 		. "Driver: " . Safe["driver"] . "`nVersion: " . Versions.Get("ergopti_version", "unknown")
 		. "`nCommit: " . Versions.Get("commit", "unknown") . "`nDriver suites: NOT_RUN"
 	return Map("snapshot", Safe, "text", Text, "name", Name, "summary", Summary,
-		"fields", Map("driver", Safe["driver"], "version", Versions.Get("ergopti_version", "unknown"), "os", Safe["driver"]))
+		"fields", Map("driver", Safe["driver"], "version", _HCShare_FormVersion(Safe, Snapshot),
+			"os", _HCShare_FormOs(Safe), "diagnostics", Head),
+		"notes", Map("diagnostics", _HCShare_English(Schema, Schema["share_policy"]["truncated_note_key"])))
 }
 
 
@@ -478,26 +532,28 @@ _HCReport_SaveAndReveal(Effects, Paths, Name, Text, LogFile := 0) {
 }
 
 ; Reports on GitHub: copies and saves the complete approved report, then
-; reveals its local attachment before opening the bug form with stable host
-; version, OS and driver fields. Editable fields stay outside the URL; the
-; browser opens last and no attachment is uploaded automatically.
+; reveals its local attachment before opening the bug form with the host
+; version, OS and driver fields and the compact report (tables, no JSON block),
+; cut to the URL budget with a note that the complete report is on the
+; clipboard and in the saved file. The browser opens last and no attachment is
+; uploaded automatically.
 ; @param Action {Map} Host-approved report text and technical identity fields.
 ; @throws {Error} When clipboard, attachment completion or browser opening refuses.
 _HCReport_Report(Effects, Config, Action, Rules, Context, Paths) {
 	Text := Action["text"]
-	; Copy the complete approved report independently of its short metadata URL
+	; Copy the complete approved report independently of its compact URL form
 	if !Effects["copy"].Call(Text)
 		throw Error("The clipboard refused the report.")
-	; The complete approved document stays in a local attachment, never the URL.
+	; The complete approved document stays in a local attachment; the URL carries its compact form.
 	Path := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text, Action.Get("day_log_file", 0))
 	Fields := Map()
-	; Only the host-derived technical identity is stable enough to prefill.
-	for Id in ["version", "os", "driver"]
-		Fields[Id] := Action["fields"][Id]
 	ReportField := Config["templates"]["templates"]["bug"]["report_field"]
 	if !(ReportField is String) || ReportField == ""
 		throw Error("The bug template names no report field.")
-	Url := IssueLink_BuildUrl(Config["templates"], Config["repository"], "bug", Fields)
+	; The host-derived identity and the compact report; the budget cuts the report.
+	for Id in ["version", "os", "driver", ReportField]
+		Fields[Id] := Action["fields"][Id]
+	Url := IssueLink_BuildUrl(Config["templates"], Config["repository"], "bug", Fields, Action.Get("notes", 0))
 	if !Effects["open_url"].Call(Url)
 		throw Error("The browser could not be opened.")
 	return Path
@@ -539,6 +595,7 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0, Snapshot := 0) 
 			}
 			Action["text"] := Document["text"]
 			Action["fields"] := Document["fields"]
+			Action["notes"] := Document["notes"]
 			Action["name"] := Document["name"]
 			Action["summary"] := Document["summary"]
 		}

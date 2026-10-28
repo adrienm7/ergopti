@@ -42,8 +42,19 @@ helpers.describe("PAC check", function()
 		helpers.assert_eq(status, "PAC download: HTTP 407")
 		local _, failed = PacCheck.judge(nil, nil)
 		helpers.assert_eq(failed, "PAC download failed")
+		-- issue #104: the transport reason is the only clue a field log carries.
+		local _, reason = PacCheck.judge(0, "", "Network request failed: A server with the specified hostname could not be found.")
+		helpers.assert_eq(reason, "PAC download failed: Network request failed: A server with the specified hostname could not be found.")
 		local _, big = PacCheck.judge(200, string.rep("a", PacCheck.MAX_BYTES + 1))
 		helpers.assert_true(big:find("limit", 1, true) ~= nil)
+	end)
+
+	helpers.it("tells that the downloads go direct after a PAC failure", function()
+		local _, failed = PacCheck.judge(0, "", "timed out")
+		helpers.assert_eq(PacCheck.with_direct_fallback(failed),
+			"PAC download failed: timed out; downloads then try a direct connection")
+		helpers.assert_true(helpers.read_driver_source("detail = PacCheck.with_direct_fallback(text)") ~= nil,
+			"the macOS proxy_pac probe names the direct fallback")
 	end)
 
 	helpers.it("reads the PAC URL only when the system PAC is enabled", function()

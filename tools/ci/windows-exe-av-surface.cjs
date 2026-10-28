@@ -321,7 +321,8 @@ module.exports = {
 	readSourceFiles,
 	validatePolicy,
 	scanExecutable,
-	POLICY_PATH
+	POLICY_PATH,
+	TEXT_MEMBER
 };
 
 /**

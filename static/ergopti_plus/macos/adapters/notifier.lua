@@ -75,9 +75,9 @@ function M.send(title, opts)
 			informativeText = body,
 			subTitle     = subtitle,
 		})
-		local accepted = note:send()
-		note:release()
-		return accepted == note
+		-- send() is the whole lifecycle: Hammerspoon 1.1.1 notifications have
+		-- no release(), and calling it raised after every delivery (issue #104).
+		return note:send() == note
 	end)
 
 	if not ok then

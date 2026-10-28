@@ -9,6 +9,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/install/desktop_entry.sh"
+# Load the complete catalogue before uninstallation retires its owned files.
+source "$SCRIPT_DIR/install/messages.sh"
 PREFIX="${HOME}/.local"
 source "$SCRIPT_DIR/install/config_home.sh"
 ergopti_resolve_config_home CONFIG_ROOT
@@ -41,9 +43,9 @@ while [ "$#" -gt 0 ]; do
 			[ "$#" -ge 4 ] || exit 64
 			GUI_TITLE="$2"; GUI_ERROR="$3"; GUI_MISSING="$4"; shift 4 ;;
 		--prefix)
-			[ "$#" -ge 2 ] || { echo 'Missing --prefix value.' >&2; exit 64; }
+			[ "$#" -ge 2 ] || { ergopti_msg uninstall.missing_prefix_value >&2; exit 64; }
 			PREFIX="$2"; shift 2 ;;
-		*) echo "Unsupported uninstall argument: $1" >&2; exit 64 ;;
+		*) ergopti_msg uninstall.unsupported_argument "$1" >&2; exit 64 ;;
 	esac
 done
 
@@ -63,9 +65,9 @@ show_failure_dialog() {
 	fi
 	echo "$GUI_TITLE: $GUI_ERROR" >&2
 	if command -v notify-send >/dev/null 2>&1; then
-		notify-send --urgency=critical -- "$GUI_TITLE" "$GUI_ERROR" || echo 'The uninstall failure notification could not be displayed.' >&2
+		notify-send --urgency=critical -- "$GUI_TITLE" "$GUI_ERROR" || ergopti_msg uninstall.notification_failed >&2
 	else
-		echo 'No dialog tool (zenity, kdialog) or notify-send is available.' >&2
+		ergopti_msg uninstall.no_dialog_tool >&2
 	fi
 }
 
@@ -265,7 +267,7 @@ report_exit() {
 trap report_exit EXIT
 
 if ! "$CONFIRMED" && ! "$CHECK_ONLY"; then
-	echo 'Explicit --yes confirmation is required; personal data will be retained.' >&2
+	ergopti_msg uninstall.confirmation_required >&2
 	exit 64
 fi
 
@@ -284,7 +286,7 @@ if [ -n "$WAIT_OWNER" ]; then
 		if [ "${fields[0]:-}" = Z ]; then break; fi
 		sleep 0.1
 	done
-	[ "$attempt" -lt 300 ] || { echo 'The application did not finish shutting down.' >&2; exit 1; }
+	[ "$attempt" -lt 300 ] || { ergopti_msg uninstall.shutdown_timeout >&2; exit 1; }
 fi
 
 remove_native_startup() {
@@ -320,25 +322,25 @@ if [ "$SCRIPT_DIR" = /usr/lib/ergopti ]; then
 		remove_native_startup
 		exit 0
 	fi
-	echo 'The system installation has no verified package owner.' >&2
+	ergopti_msg uninstall.no_package_owner >&2
 	exit 1
 fi
 
 # Resolve before deleting and reject system roots and link aliases. The only
 # removable standalone tree is the layout created by install.sh.
-[ -d "$PREFIX" ] || { echo 'Installation prefix does not exist.' >&2; exit 1; }
+[ -d "$PREFIX" ] || { ergopti_msg uninstall.prefix_missing >&2; exit 1; }
 IFS= read -r -d '' PREFIX < <(CDPATH= cd -Pe -- "$PREFIX" && printf '%s\0' "$PWD")
 case "$PREFIX" in
-	/|/usr|/usr/local|/app|/nix|/nix/*) echo 'Refusing a system installation prefix.' >&2; exit 1 ;;
+	/|/usr|/usr/local|/app|/nix|/nix/*) ergopti_msg uninstall.system_prefix >&2; exit 1 ;;
 esac
 LIBRARY="$PREFIX/lib/ergopti"
 WRAPPER="$PREFIX/bin/ergopti-hotstrings"
 if [ -L "$LIBRARY" ] || [ -L "$WRAPPER" ] || [ ! -f "$LIBRARY/linux/ergopti_hotstrings.lua" ] \
 	|| [ ! -f "$LIBRARY/_shared/data/locales/en.json" ] || [ ! -f "$WRAPPER" ]; then
-	echo 'The prefix is not a complete owned standalone installation.' >&2
+	ergopti_msg uninstall.incomplete_installation >&2
 	exit 1
 fi
-[ "$(cd -- "$LIBRARY" && pwd -P)" = "$LIBRARY" ] || { echo 'Installation path crosses a symbolic link.' >&2; exit 1; }
+[ "$(cd -- "$LIBRARY" && pwd -P)" = "$LIBRARY" ] || { ergopti_msg uninstall.symlink_in_path >&2; exit 1; }
 if { grep -Fqx "INSTALL_ROOT=$(printf '%q' "$LIBRARY")" "$WRAPPER" \
 	&& grep -Fqx 'exec bash "${INSTALL_ROOT}/bin/ergopti-hotstrings" "$@"' "$WRAPPER"; }; then
 	:
@@ -346,7 +348,7 @@ elif ! { grep -Fqx "DRIVER_ROOT=\"$LIBRARY/linux\"" "$WRAPPER" \
 		|| grep -Fqx "DRIVER_ROOT=$(printf '%q' "$LIBRARY/linux")" "$WRAPPER"; } \
 	|| ! { grep -Fqx 'exec bash "${DRIVER_ROOT}/install/launch.sh" --service "$@"' "$WRAPPER" \
 		|| grep -Fqx 'exec luajit "${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"' "$WRAPPER"; }; then
-	echo 'The launcher belongs to a different installation.' >&2
+	ergopti_msg uninstall.foreign_launcher >&2
 	exit 1
 fi
 # Use a match only as a nonempty marker; never parse filenames as lines.
@@ -356,13 +358,13 @@ if ! checkout_marker="$(find "$LIBRARY" -name .git -print -quit)"; then
 	exit 1
 fi
 if [ -n "$checkout_marker" ]; then
-	echo 'Refusing to remove a source checkout.' >&2
+	ergopti_msg uninstall.source_checkout >&2
 	exit 1
 fi
 ancestor="$LIBRARY"
 while [ "$ancestor" != / ]; do
 	if [ -e "$ancestor/.git" ]; then
-		echo 'Refusing to remove files inside a source checkout.' >&2
+		ergopti_msg uninstall.inside_source_checkout >&2
 		exit 1
 	fi
 	ancestor="$(dirname -- "$ancestor")"
@@ -370,24 +372,24 @@ done
 MANIFEST="$LIBRARY/.ergopti-owned-files"
 UNIT="$CONFIG_ROOT/systemd/user/ergopti-hotstrings.service"
 AUTOSTART="$CONFIG_ROOT/autostart/ergopti-hotstrings.desktop"
-[ -f "$MANIFEST" ] && [ ! -L "$MANIFEST" ] && [ -s "$MANIFEST" ] || { echo 'Installation ownership manifest is missing.' >&2; exit 1; }
+[ -f "$MANIFEST" ] && [ ! -L "$MANIFEST" ] && [ -s "$MANIFEST" ] || { ergopti_msg uninstall.manifest_missing >&2; exit 1; }
 OWNED=()
 OWNED_DIGESTS=()
 REMOVE_UNIT=false
 declare -A SEEN=()
 while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
-	[[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { echo 'Invalid ownership digest.' >&2; exit 1; }
+	[[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { ergopti_msg uninstall.invalid_digest >&2; exit 1; }
 	case "$relative" in
 		linux/*|_shared/*|bin/ergopti-hotstrings) owned="$LIBRARY/$relative" ;;
 		@wrapper) owned="$WRAPPER" ;;
 		@unit) owned="$UNIT" ;;
 		@autostart) owned="$AUTOSTART" ;;
-		*) echo 'Invalid ownership path.' >&2; exit 1 ;;
+		*) ergopti_msg uninstall.invalid_path >&2; exit 1 ;;
 	esac
 	case "/$relative/" in
-		*/../*|*/./*|*//*|*\\*) echo 'Unsafe ownership path.' >&2; exit 1 ;;
+		*/../*|*/./*|*//*|*\\*) ergopti_msg uninstall.unsafe_path >&2; exit 1 ;;
 	esac
-	[ -z "${SEEN[$owned]:-}" ] || { echo 'Duplicate ownership path.' >&2; exit 1; }
+	[ -z "${SEEN[$owned]:-}" ] || { ergopti_msg uninstall.duplicate_path >&2; exit 1; }
 	SEEN[$owned]=1
 	if admit_source_path "$owned"; then :
 	else
@@ -398,7 +400,7 @@ while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
 	if "$SOURCE_PRESENT"; then
 		[ ! -L "$owned" ] && [ -f "$owned" ] \
 			&& [ "$(cd -- "$(dirname -- "$owned")" && pwd -P)" = "$(dirname -- "$owned")" ] \
-			|| { echo 'Owned file was replaced by a link or another file type.' >&2; exit 1; }
+			|| { ergopti_msg uninstall.owned_file_replaced >&2; exit 1; }
 		actual="$(sha256sum < "$owned")"
 		# A modified shipped file might contain personal data. Keep it, just as
 		# we keep files absent from the installer's payload manifest.
@@ -428,12 +430,12 @@ for entry in "$UNIT" "$AUTOSTART"; do
 	if ! grep -Fq "$WRAPPER --tray" "$entry" \
 		&& ! grep -Fxq "$(ergopti_desktop_exec "$WRAPPER")" "$entry" \
 		&& ! grep -Fxq "$(ergopti_systemd_exec "$WRAPPER")" "$entry"; then
-		echo "Startup entry belongs to a different installation: $entry" >&2
+		ergopti_msg uninstall.foreign_startup_entry "$entry" >&2
 		exit 1
 	fi
 done
 if [ -f "$UNIT" ] && ! "$REMOVE_UNIT"; then
-	echo 'The service was modified or has no ownership record; uninstall was refused.' >&2
+	ergopti_msg uninstall.service_refused >&2
 	exit 1
 fi
 if "$CHECK_ONLY"; then exit 0; fi

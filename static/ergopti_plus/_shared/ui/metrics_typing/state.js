@@ -87,9 +87,9 @@ const app_state = {
 	manifest_dates_sorted: [],
 	render_timer: null,
 	live_update_timer: null,
-	// Minimum hour (0–23) to display in hourly chart mode.
-	// null = daily mode (multi-day range); 0 = today all-day; N = last-hour view (hours ≥ N).
-	hour_cutoff: null
+	// Captured current-and-previous-hour date window for the detailed chart.
+	// null retains ordinary hourly (one day) or daily (multiple days) rendering.
+	hour_window: null
 };
 
 // Chart instance references — destroyed and recreated on each render cycle

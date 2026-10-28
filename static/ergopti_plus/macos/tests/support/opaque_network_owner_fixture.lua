@@ -68,7 +68,9 @@ function M.receive(network, bytes, code, mode, receiver, owner)
 	local admission = require("modules.llm.opaque_network_admission")
 	local calls = 0
 	local revoke
-	local port = { new = admission.new, report = function(receipt, capabilities)
+	-- The real classifier of a PAC failure that fell back to a direct try.
+	local port = { new = admission.new, pac_fallback_stage = admission.pac_fallback_stage,
+		is_pac_fallback_stage = admission.is_pac_fallback_stage, report = function(receipt, capabilities)
 		calls = calls + 1
 		if mode == "stale_during_report" and revoke then revoke() end
 		return contract.classify(receipt, capabilities)

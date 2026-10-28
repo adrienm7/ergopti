@@ -26,6 +26,27 @@ SPEC = importlib.util.spec_from_file_location("bootstrap_under_test", SOURCE)
 BOOTSTRAP = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(BOOTSTRAP)
 
+# The shell under test drops these inherited CA variables and logs one INFO
+# line per name, so a runner or developer shell that exports one would add
+# lines the shell vectors do not expect. The drop itself is received by
+# test-macos-opaque-network-admission.cjs.
+INHERITED_TRUST_VARIABLES = tuple(
+    json.loads(
+        (ROOT / "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json").read_text(
+            encoding="utf-8"
+        )
+    )["trust_environment"]
+)
+
+
+def shell_environment(**overrides):
+    """Copy the caller environment without the inherited trust variables."""
+    environment = {
+        key: value for key, value in os.environ.items() if key not in INHERITED_TRUST_VARIABLES
+    }
+    environment.update(overrides)
+    return environment
+
 
 class Response:
     def __init__(self, status=200, body=b"payload", headers=(), terminal=True):
@@ -465,8 +486,7 @@ function /usr/sbin/scutil() {
                 encoding="utf-8",
             )
             peer.chmod(0o700)
-            environment = dict(
-                os.environ,
+            environment = shell_environment(
                 ERGOPTI_LAUNCHER_EXECUTABLE=str(peer),
                 ERGOPTI_BOOTSTRAP_PYTHON="",
                 RECEIPT=str(receipt),
@@ -529,8 +549,8 @@ function /usr/sbin/scutil() {
                 "<dictionary> {\n  HTTPSEnable : 1\n  HTTPSProxy : static.invalid\n  HTTPSPort : 3333\n}\n"
             )
             for selected, expected in cases:
-                environment = dict(
-                    os.environ, SNAPSHOT_TRACE=str(trace), NO_PROXY=".bypass.invalid", no_proxy=""
+                environment = shell_environment(
+                    SNAPSHOT_TRACE=str(trace), NO_PROXY=".bypass.invalid", no_proxy=""
                 )
                 for key in (
                     "https_proxy",
@@ -588,7 +608,7 @@ printf '%s\n' "${all_proxy:-}" "${ALL_PROXY:-}" "$OPAQUE_NETWORK_INHERITED_HTTPS
                     "Automatic network settings require the native download helper or an explicit relay.",
                 ),
             ]:
-                environment = dict(os.environ)
+                environment = shell_environment()
                 for key in (
                     "https_proxy",
                     "HTTPS_PROXY",
@@ -640,8 +660,7 @@ apply_system_network
             snapshot.write_text(
                 "<dictionary> {\n  ProxyAutoConfigEnable : 1\n  ProxyAutoConfigURLString : https://pac.invalid/private?token=reserved\n}\n"
             )
-            environment = dict(
-                os.environ,
+            environment = shell_environment(
                 SNAPSHOT=str(snapshot),
                 ERGOPTI_BOOTSTRAP_PYTHON="",
                 ERGOPTI_LAUNCHER_EXECUTABLE=str(

@@ -1,6 +1,7 @@
 --- tests/unit/ui/menu/metrics/test_metrics_scope.lua
 
 local helpers = require("tests.helpers")
+local MetricsState = require("infra.metrics_state_keys")
 local Codec = require("toml_codec")
 local FS = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
@@ -38,7 +39,7 @@ local function fixture(demoted)
 	state.keystats_enabled, state.keystats_private_filter_enabled = not demoted, false
 	state.keystats_encrypt, state.keystats_float_colors = true, false
 	local demotions = require("ui.menu.session_demotions").new()
-	if demoted then demotions.record({ feature = "metrics", key = "keystats_enabled", persisted = true, demoted = false }) end
+	if demoted then demotions.record({ feature = "metrics", key = MetricsState.ENABLED, persisted = true, demoted = false }) end
 	local native = { enabled = not demoted, options = { encrypt = true }, cipher_enabled = true,
 		disabled_apps = {}, private_filter_enabled = false, secure_field_filter_enabled = true,
 		system_auth_filter_enabled = true }

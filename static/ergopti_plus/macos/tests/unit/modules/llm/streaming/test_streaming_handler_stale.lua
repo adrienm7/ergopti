@@ -141,7 +141,7 @@ local function load_fresh_handler(backend)
 		notify = {
 			new = function(_title, opts)
 				table.insert(notify_calls, opts)
-				return { send = function() end, release = function() end }
+				return { send = function() end }
 			end,
 		},
 		-- The shared hs stub's frontmostApplication() lacks a :title() method

@@ -85,6 +85,7 @@ local function with_installed_startup(mode, body)
 			local text = assert(file:read("*a")); assert(file:close())
 			write(prefix .. "/lib/ergopti/linux/install/" .. name, text)
 		end
+		require("tests.support.shell_messages_fixture").provide(prefix .. "/lib/ergopti/linux/install")
 		local calls = root .. "/calls"
 		write(root .. "/commands/systemctl", [[#!/bin/bash
 printf '%s\n' "$*" >> "$ERGOPTI_TEST_CALLS"

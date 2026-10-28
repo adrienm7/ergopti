@@ -43,16 +43,29 @@ end
 
 helpers.describe("Preferences.save reports a slow save by phase", function()
 	helpers.it("names prepare and write when the save is slow", function()
-		-- clock reads: save start, prepare done, write done
-		local lines = save_with_clock({ 0, 100, 1700 })
+		-- clock reads: save start, snapshot, decode, models, sparse, wrap, rows,
+		-- gestures, llm, shortcuts, hotstrings, prepare done, write done
+		local lines = save_with_clock({ 0, 50, 60, 70, 80, 90, 100, 900, 910, 920, 930, 930, 1700 })
 		local slow = {}
 		for _, line in ipairs(lines) do
 			if line:find("Slow preferences save", 1, true) then slow[#slow + 1] = line end
 		end
 		helpers.assert_eq(#slow, 1, "one slow-save line")
 		helpers.assert_true(slow[1]:find("1700 ms", 1, true) ~= nil, slow[1])
-		helpers.assert_true(slow[1]:find("prepare=100", 1, true) ~= nil, slow[1])
-		helpers.assert_true(slow[1]:find("write=1600", 1, true) ~= nil, slow[1])
+		helpers.assert_true(slow[1]:find("prepare=930", 1, true) ~= nil, slow[1])
+		helpers.assert_true(slow[1]:find("write=770", 1, true) ~= nil, slow[1])
+	end)
+
+	helpers.it("names the prepare stage that dominates and the metadata forks (L17)", function()
+		local lines = save_with_clock({ 0, 50, 60, 70, 80, 90, 100, 900, 910, 920, 930, 930, 1700 })
+		local slow
+		for _, line in ipairs(lines) do
+			if line:find("Slow preferences save", 1, true) then slow = line end
+		end
+		helpers.assert_true(slow ~= nil, "one slow-save line")
+		helpers.assert_true(slow:find("prepare: snapshot=50 decode=10 models=10 sparse=10 wrap=10 rows=10 "
+			.. "gestures=800 llm=10 shortcuts=10 hotstrings=10 ms", 1, true) ~= nil, slow)
+		helpers.assert_true(slow:find("; proposed=%d+; metadata_commands=%d+ in %d+ ms; lua_heap=%d+%->%d+ MB%)%.$") ~= nil, slow)
 	end)
 
 	helpers.it("stays silent for a fast save", function()

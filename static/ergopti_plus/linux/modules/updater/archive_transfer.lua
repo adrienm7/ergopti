@@ -27,6 +27,13 @@ function M.new(ports)
  if type(get) ~= "function" or type(download) ~= "function" or type(reserve) ~= "function"
   or type(bind_checksum) ~= "function" or type(adopt) ~= "function" or type(retire) ~= "function"
   or type(artifact_settled) ~= "function" or type(artifact_observe) ~= "function" then return nil end
+ -- Optional detached-signature check: { decide = function(asset, signature_text) -> ok, message,
+ -- max_body_bytes }. Without it, or without a published .sig, the transfer is the
+ -- checksum-only transfer it always was; the gate decides what a missing one means.
+ local signature = type(ports.signature) == "table" and ports.signature or nil
+ if signature and (type(signature.decide) ~= "function" or type(signature.max_body_bytes) ~= "number") then return nil end
+ local sealed_size = method(ports.artifact, "sealed_size")
+ if signature and type(sealed_size) ~= "function" then return nil end
  local clock, source, parse = ports.clock, ports.current, ports.parse_checksum
  local owner, max_archive, max_checksum = ports.owner, ports.max_download_bytes, ports.max_checksum_bytes
  local headers = {}
@@ -42,6 +49,11 @@ function M.new(ports)
    local value = rawget(release, name)
    if type(value) ~= "string" or value == "" or value:find("\0", 1, true) then return nil end
    selected[name] = value
+  end
+  local signature_url = rawget(release, "signature_url")
+  if signature_url ~= nil then
+   if type(signature_url) ~= "string" or signature_url == "" or signature_url:find("\0", 1, true) then return nil end
+   selected.signature_url = signature_url
   end
   local txn = { token = {}, phase = nil, cancelled = false, requests = {}, constructing = 0, finished = false, listeners = {} }
   local operation = { started = false }
@@ -241,44 +253,70 @@ function M.new(ports)
    if not parsed or expected == nil or not current() then fail(error_message or "checksum record refused", "verify"); return end
    local bound, admitted = pcall(bind_checksum, artifact, expected)
    if not bound or admitted ~= true or not current() then fail("authenticated checksum binding refused", "verify"); return end
-   local archive_deadline = enter("archive")
-   if not archive_deadline then fail("archive deadline expired", "download"); return end
-   dispatch(function(done)
-    return download(selected.download_url, headers, target, { owner = owner,
-     authorized = current, absolute_deadline_ms = archive_deadline,
-     timeout_ms = math.max(1, math.floor(archive_deadline - clock())),
-     max_download_bytes = max_archive, follow_redirects = true, https_only = true }, done)
-   end, function(downloaded, completion)
-    if type(downloaded) ~= "table" or downloaded.ok ~= true or type(completion) ~= "table" then
-     fail(type(downloaded) == "table" and downloaded.error or "archive request failed", "download",
-      type(downloaded) == "table" and downloaded.failure_receipt or nil); return
-    end
-    local hash_deadline = enter("hash")
-    if not hash_deadline then fail("archive hash deadline expired", "verify"); return end
-    local function adoption_current()
-     if not lineage() then return false end
-     local timed, observed = pcall(clock)
-     return timed and type(observed) == "number" and observed == observed and observed < hash_deadline
-      and active == txn and not txn.cancelled and not txn.finished
-    end
+   local function fetch_archive()
+    local archive_deadline = enter("archive")
+    if not archive_deadline then fail("archive deadline expired", "download"); return end
     dispatch(function(done)
-     return adopt(artifact, completion, expected, hash_deadline, function(path, error_message, receipt)
-      local valid_path = type(path) == "string" and path ~= "" and not path:find("\0", 1, true)
-       and error_message == nil and receipt == nil
-      done({ ok = valid_path, path = valid_path and path or nil, error = error_message, failure_receipt = receipt })
-     end)
-    end, function(adopted)
-     -- Adoption must have physically retired the original transfer owners.
-     -- The artifact lives under separate future install consent, not this phase.
-     if type(adopted) ~= "table" or adopted.ok ~= true or not physically_settled() or not adoption_current() then
-      fail(type(adopted) == "table" and adopted.error or "verified archive adoption refused", "verify",
-       type(adopted) == "table" and adopted.failure_receipt or nil); return
+     return download(selected.download_url, headers, target, { owner = owner,
+      authorized = current, absolute_deadline_ms = archive_deadline,
+      timeout_ms = math.max(1, math.floor(archive_deadline - clock())),
+      max_download_bytes = max_archive, follow_redirects = true, https_only = true }, done)
+    end, function(downloaded, completion)
+     if type(downloaded) ~= "table" or downloaded.ok ~= true or type(completion) ~= "table" then
+      fail(type(downloaded) == "table" and downloaded.error or "archive request failed", "download",
+       type(downloaded) == "table" and downloaded.failure_receipt or nil); return
      end
-     txn.finished = true; active = nil; Budget.retire(budget)
-     pcall(callback, adopted.path, nil, nil, nil, artifact)
-     notify()
-    end, adoption_current)
-   end)
+     local hash_deadline = enter("hash")
+     if not hash_deadline then fail("archive hash deadline expired", "verify"); return end
+     local function adoption_current()
+      if not lineage() then return false end
+      local timed, observed = pcall(clock)
+      return timed and type(observed) == "number" and observed == observed and observed < hash_deadline
+       and active == txn and not txn.cancelled and not txn.finished
+     end
+     dispatch(function(done)
+      return adopt(artifact, completion, expected, hash_deadline, function(path, error_message, receipt)
+       local valid_path = type(path) == "string" and path ~= "" and not path:find("\0", 1, true)
+        and error_message == nil and receipt == nil
+       done({ ok = valid_path, path = valid_path and path or nil, error = error_message, failure_receipt = receipt })
+      end)
+     end, function(adopted)
+      -- Adoption must have physically retired the original transfer owners.
+      -- The artifact lives under separate future install consent, not this phase.
+      if type(adopted) ~= "table" or adopted.ok ~= true or not physically_settled() or not adoption_current() then
+       fail(type(adopted) == "table" and adopted.error or "verified archive adoption refused", "verify",
+        type(adopted) == "table" and adopted.failure_receipt or nil); return
+      end
+      if signature then
+       local sized, size = pcall(sealed_size, artifact)
+       local accepted, message = signature.decide({ size = sized and size or nil, sha256 = expected },
+        txn.signature_text, txn.signature_fetch_error)
+       if accepted ~= true then fail(message or "update signature refused", "verify"); return end
+      end
+      txn.finished = true; active = nil; Budget.retire(budget)
+      pcall(callback, adopted.path, nil, nil, nil, artifact)
+      notify()
+     end, adoption_current)
+    end)
+   end
+   if signature and selected.signature_url then
+    -- The detached signature rides the checksum phase and its deadline. A failed
+    -- fetch is not a transfer failure: the gate decides what no signature means.
+    dispatch(function(done)
+     return get(selected.signature_url, headers, { owner = owner, authorized = current,
+      absolute_deadline_ms = checksum_deadline, timeout_ms = math.max(1, math.floor(checksum_deadline - clock())),
+      max_body_bytes = signature.max_body_bytes, follow_redirects = true, https_only = true }, done)
+    end, function(fetched)
+     if type(fetched) == "table" and fetched.ok == true and type(fetched.body) == "string" then
+      txn.signature_text = fetched.body
+     else
+      txn.signature_fetch_error = type(fetched) == "table" and fetched.error or "signature request failed"
+     end
+     fetch_archive()
+    end)
+   else
+    fetch_archive()
+   end
   end
   operation.started = dispatch(function(done)
    return get(selected.checksum_url, headers, { owner = owner, authorized = current,

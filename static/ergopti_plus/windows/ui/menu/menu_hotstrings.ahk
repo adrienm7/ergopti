@@ -58,8 +58,8 @@ _HS_ComputeGrandTotal() {
 		}
 		; ── Personal hotstrings (standard file + extensions)
 		PersonalActiveCount := 0
-		PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
-		if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
+		PersonalPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
+		if (PersonalPath != "" and FileExist(PersonalPath)) {
 			PersonalTomlData := ReadPersonalToml()
 			for _, SecName2 in PersonalTomlData["sections_order"] {
 				if (SecName2 == "-" or !PersonalTomlData["sections"].Has(SecName2))
@@ -909,8 +909,8 @@ _HS_PersonalRows(Options := unset) {
 	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
 	PersonalTomlData := false
-	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
-	if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
+	PersonalPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
+	if (PersonalPath != "" and FileExist(PersonalPath)) {
 		PersonalTomlData := ReadPersonalToml()
 	}
 
@@ -983,7 +983,7 @@ _HS_PersonalRows(Options := unset) {
 			return []
 		DefaultParent := [DefaultCaption]
 		Controls := MenuRenderer_TemplateRows("hotstring_personal_controls_frame",
-			Map("hotstring_file_open", _MakeOpenFileFn(PersonalTomlPath),
+			Map("hotstring_file_open", _MakeOpenFileFn(PersonalPath),
 				"personal_close_on_add", (*) => _TogglePersonalCloseOnAdd(PersonalMenu)),
 			Map("hotstring_file_ready", (*) => true, "personal_open_present", (*) => true,
 				"personal_controls_head_boundary", (*) => true, "personal_controls_tail_boundary", (*) => false,

@@ -11,6 +11,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+-- Only a cold launch opens the PGID window these guard cases exercise; a stop
+-- or adoption reset arms no PGID timeout (mlx-stop-no-pgid-wait).
+local COLD_LAUNCH = { awaiting_pgid = true }
 package.loaded["tests.support.modules.llm.mlx.api_mlx_pause_ownership_fixture"] = nil
 local Fixture = require("tests.support.modules.llm.mlx.api_mlx_pause_ownership_fixture")
 local init_idle_real_warmup_controller = Fixture.init_idle_real_warmup_controller
@@ -526,16 +530,16 @@ helpers.describe("HS-012 MLX endpoint reset joins predecessor owners", function(
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("retains the exact PGID guard after " .. mode .. " timer cancellation", function()
 			with_real_mlx_stack(function(env)
-				helpers.assert_true(env.api.reset_endpoints())
+				helpers.assert_true(env.api.reset_endpoints(COLD_LAUNCH))
 				local predecessor = env.state.timers[#env.state.timers]
 				local timer_count = #env.state.timers
 				env.state.timer_stop_mode = mode
-				helpers.assert_eq(env.api.reset_endpoints(), false)
+				helpers.assert_eq(env.api.reset_endpoints(COLD_LAUNCH), false)
 				helpers.assert_eq(#env.state.timers, timer_count,
 					"a refused PGID cancel must block its replacement")
 				predecessor.fire(true)
 				env.state.timer_stop_mode = "success"
-				helpers.assert_true(env.api.reset_endpoints())
+				helpers.assert_true(env.api.reset_endpoints(COLD_LAUNCH))
 				helpers.assert_eq(#env.state.timers, timer_count + 1,
 					"one successor PGID guard may arm after exact retry")
 			end)
@@ -548,12 +552,12 @@ helpers.describe("HS-012 MLX endpoint reset joins predecessor owners", function(
 				helpers.assert_true(env.discovery.discover(function() end))
 				local predecessor = env.state.timers[1]
 				env.state.timer_stop_mode = mode
-				helpers.assert_eq(env.api.reset_endpoints(), false)
+				helpers.assert_eq(env.api.reset_endpoints(COLD_LAUNCH), false)
 				helpers.assert_eq(#env.state.timers, 1,
 					"discovery debt must block the new PGID timeout")
 				predecessor.fire(true)
 				env.state.timer_stop_mode = "success"
-				helpers.assert_true(env.api.reset_endpoints())
+				helpers.assert_true(env.api.reset_endpoints(COLD_LAUNCH))
 				helpers.assert_eq(#env.state.timers, 2)
 				helpers.assert_eq(#env.state.tasks, 0,
 					"late predecessor poll must remain inert after reset generation change")
@@ -571,7 +575,7 @@ helpers.describe("HS-012 MLX endpoint reset joins predecessor owners", function(
 				local timer_count = #env.state.timers
 				env.state.http_cancel_mode = mode
 
-				helpers.assert_eq(env.api.reset_endpoints(), false)
+				helpers.assert_eq(env.api.reset_endpoints(COLD_LAUNCH), false)
 				helpers.assert_eq(#env.state.timers, timer_count,
 					"reset refusal must not arm the new PGID timeout over old HTTP debt")
 				old_request.deliver(200, [[{"choices":[{"text":"late"}]}]])
@@ -579,7 +583,7 @@ helpers.describe("HS-012 MLX endpoint reset joins predecessor owners", function(
 					"late predecessor POST must remain generation-fenced")
 
 				env.state.http_cancel_mode = "success"
-				helpers.assert_true(env.api.reset_endpoints())
+				helpers.assert_true(env.api.reset_endpoints(COLD_LAUNCH))
 				helpers.assert_eq(#env.state.timers, timer_count + 1,
 					"one PGID guard may arm only after every predecessor joined")
 				env.discovery.is_discovered = original_is_discovered

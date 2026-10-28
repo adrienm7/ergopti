@@ -3,6 +3,18 @@
 --- Software input calls use the actual module's default layout label; they do
 --- not claim physical input or active desktop layout selection. No provider,
 --- clock, SQL or process doubles. Historical metadata fixtures are explicit.
+
+--- Returns a typing time on the driver's own clock (ergopti_hotstrings passes
+--- Monotonic.now_ms()). A fixed 1000 ms made the session tracker's verdict
+--- depend on the host's uptime; one origin keeps the scripted gaps exact.
+--- @param offset_ms number Scripted time of the keystroke.
+--- @return number typed_ms
+local typing_origin_ms
+local function typed_at(offset_ms)
+	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	return typing_origin_ms + offset_ms
+end
+
 local uv = require("luv")
 require("compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-layouts-seen-XXXXXX"))
@@ -44,8 +56,8 @@ check("healthy empty native manifest retains its existing shape and completion",
 	assert(next(manifest) == nil and complete == true)
 end)
 local active_metadata = assert(Hook.get_layout())
-K.on_keydown("a", 1000, "owned-layout-app")
-K.on_keydown("b", 2000, "owned-layout-app")
+K.on_keydown("a", typed_at(1000), "owned-layout-app")
+K.on_keydown("b", typed_at(2000), "owned-layout-app")
 require("tests.support.sqlite_flush_native").flush(K)
 local before, raw = layout_bytes(), raw_bytes()
 print("native module metadata=" .. active_metadata .. "; layout rows:\n" .. before)

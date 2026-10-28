@@ -154,10 +154,10 @@ end)
 check("defer preserves fractional native elapsed delay", function()
 	local loop = fresh("adapters.event_loop")
 	local calls = 0
-	assert(loop.defer(function() calls = calls + 1 end, 8.5))
+	assert(loop.defer(function() calls = calls + 1 end, 250.5)) -- far above any scheduling stall between defer and tick
 	loop._run_idle_tick()
 	assert(calls == 0, "positive delay was delivered immediately")
-	uv.sleep(12)
+	uv.sleep(260)
 	loop._run_idle_tick()
 	assert(calls == 1, "native elapsed time failed to release due work")
 end)

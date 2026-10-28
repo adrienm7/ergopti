@@ -102,4 +102,23 @@ helpers.describe("keymap.M.start prepares ownership before key capture", functio
 		helpers.assert_true(tap_start_pos ~= nil and prewarm_pos < tap_start_pos,
 			"scoped watcher preparation must settle before the keyDown tap is armed")
 	end)
+	helpers.it("an incomplete prewarm names the probe stage that failed (L23)", function()
+		package.loaded["modules.keymap.utils"] = nil
+		local KU = helpers.load_with_stubs("modules.keymap.utils")
+		install_scoped_watcher_fixture()
+		hs.window.focusedWindow = function() return nil end
+		local Logger = require("infra.logger")
+		local original_warn, warnings = Logger.warn, {}
+		Logger.warn = function(_, format, ...) warnings[#warnings + 1] = string.format(format, ...) end
+		KU.start_ignored_win_tracking({}, {})
+		local ok, prepared = pcall(KU.prewarm_ignored_win_watchers, {}, {})
+		Logger.warn = original_warn
+		helpers.assert_true(ok, tostring(prepared))
+		helpers.assert_true(prepared == false, "no focused window leaves tracking fail-closed")
+		local named = false
+		for _, line in ipairs(warnings) do
+			if line:find("probe stage focused_window", 1, true) then named = true end
+		end
+		helpers.assert_true(named, "the warning must name the failed stage: " .. table.concat(warnings, " | "))
+	end)
 end)

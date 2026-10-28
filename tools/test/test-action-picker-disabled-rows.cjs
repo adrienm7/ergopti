@@ -153,7 +153,7 @@ posted.length = 0;
 
 vm.runInContext(
 	`init({
-		title: 'T', current: 'none', noneLabel: 'Nothing',
+		title: 'T', cancelLabel: 'Cancel', current: 'none', noneLabel: 'Nothing',
 		items: [
 			{ type: 'heading', level: 1, text: 'Mouse' },
 			{ type: 'action', id: 'left_click_toggle', label: 'Hold left click', disabled: true, hint: 'X11 session only' },
@@ -202,7 +202,7 @@ check(
 // Native-unavailable programs retain the same visible/inert DATA contract.
 posted.length = 0;
 vm.runInContext(
-	`init({ title: 'T', current: 'none', noneLabel: 'Nothing', items: [
+	`init({ title: 'T', cancelLabel: 'Cancel', current: 'none', noneLabel: 'Nothing', items: [
  {type:'action', id:'run_program', label:'Run a program [configurable]', parameter:'program', disabled:true, hint:'Unavailable: Native runner'}
 ] })`,
 	context

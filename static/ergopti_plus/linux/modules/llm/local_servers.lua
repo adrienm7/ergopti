@@ -4,6 +4,7 @@
 --- sweeps; every catalogue server retains a separate HTTP physical cleanup owner.
 local M = {}
 local Catalogue = require("modules.llm.local_server_catalogue")
+local Ports = require("modules.llm.local_server_ports")
 local Discovery = require("llm.local_server_discovery")
 local Auth = require("llm.local_server_auth")
 local Entries = require("modules.llm.api_entries")
@@ -14,7 +15,10 @@ local Clock = require("infra.monotonic")
 local EventLoop = require("adapters.event_loop")
 local Logger = require("logger.shim")
 local LOG = "llm.local_servers"
-local catalogue_order, catalogue_servers = Catalogue.load({})
+local catalogue_order, catalogue_servers, _, catalogue_discovery = Catalogue.load({})
+-- Server id -> the last port scan result (llm.local_server_ports); the callbacks
+-- of the rescans waiting for the running scan, nil when none runs
+local port_scans, scan_waiters = {}, nil
 local order, servers = catalogue_order, catalogue_servers
 local requests, pending, view_receipts = {}, {}, setmetatable({}, { __mode = "k" })
 local queued = {}
@@ -22,8 +26,18 @@ local closed, view_generation, configuration_generation = false, 0, 0
 local cached_source, source_initialized = nil, false
 local controller = Discovery.new({ order = order, clock = Clock.now_ms,
 	max_age = function() return Timings.ms("llm", "local_server_detection_max_age_ms") end,
-	on_publish = function(_, changed)
+	on_publish = function(results, changed)
 		if changed then view_generation = view_generation + 1 end
+		local found = {}
+		for _, id in ipairs(order) do
+			local result = results[id]
+			if result and result.status ~= Discovery.STATUS_DOWN then
+				local scan = port_scans[id]
+				found[#found + 1] = string.format("%s=%s at %s%s", id, result.status, tostring(result.base_url),
+					scan and scan.source and scan.base_url == result.base_url and (" (port from " .. scan.source .. ")") or "")
+			end
+		end
+		Logger.info(LOG, "Local servers swept: %s.", #found > 0 and table.concat(found, ", ") or "none answers")
 		-- A joint negative source refusal may publish while no physical source
 		-- receipt is admitted. It never authorizes a model for that source.
 		cached_source, source_initialized = Entries.capture_source(), true
@@ -81,16 +95,37 @@ function M.target(id)
 			for _, candidate in ipairs(Entries.list()) do if matches(candidate) then entry = candidate; break end end
 		end
 		if entry then
-			return { id = id, entry_id = entry.id, provider = entry.provider,
-				base_url = entry.base_url ~= "" and entry.base_url or server.base_url, token = entry.token }
+			-- An entry at the catalogue address follows the scan, as one stored
+			-- without an address; any other address is the user's
+			local scan = port_scans[id]
+			local default = entry.base_url == "" or entry.base_url == server.base_url
+			local base_url = entry.base_url ~= "" and entry.base_url or server.base_url
+			if default and scan and scan.running then base_url = scan.base_url end
+			return { id = id, entry_id = entry.id, provider = entry.provider, base_url = base_url, token = entry.token,
+				port_source = default and (scan and scan.source or nil) or "user" }
 		end
 	end
 	local fields = pending[id] or {}
-	return { id = id, base_url = fields.base_url or server.base_url, token = fields.token or "" }
+	if fields.base_url then return { id = id, base_url = fields.base_url, token = fields.token or "", port_source = "user" } end
+	local scan = port_scans[id]
+	return { id = id, base_url = scan and scan.running and scan.base_url or server.base_url, token = fields.token or "",
+		port_source = scan and scan.source or nil }
 end
 
 local function same_target(a, b)
 	return a and b and a.id == b.id and a.entry_id == b.entry_id and a.provider == b.provider and a.base_url == b.base_url and a.token == b.token
+end
+
+--- Returns where the last scan found a catalogue server.
+--- @param id string Server id.
+--- @return table|nil { running, pids, base_url, port, source, detail }; nil before any scan.
+function M.port_scan(id)
+	local result = port_scans[id]
+	if not result then return nil end
+	local pids = {}
+	for index, pid in ipairs(result.pids or {}) do pids[index] = pid end
+	return { running = result.running, pids = pids, base_url = result.base_url, port = result.port,
+		source = result.source, detail = result.detail }
 end
 
 local function admitted(admit)
@@ -247,17 +282,28 @@ local function queue_acquisition(id, job)
 	return true
 end
 
---- Starts an asynchronous catalogue sweep with source/admission fences.
-function M.rescan(admit, on_done)
-	if closed or type(admit) ~= "function" or not admitted(admit) then return false end
+--- Sweeps once the port scan settled: a catalogue server whose process does
+--- not run, at its default address, is not probed.
+--- @param admit function
+--- @param on_done function Receives changed.
+--- @return boolean started
+local function sweep(admit, on_done)
+	if closed or not admitted(admit) then return false end
 	local source = Entries.capture_source()
 	if not source then return false end
 	refresh_views()
 	local targets, private_targets = {}, {}
 	for _, id in ipairs(order) do
 		local target = M.target(id)
-		private_targets[id] = target
-		targets[#targets + 1] = { id = id, base_url = target.base_url }
+		local scan = catalogue_servers[id] and port_scans[id] or nil
+		if target and target.port_source ~= "user" and scan and scan.running == false then
+			Logger.debug(LOG, "Local server '%s' is not probed: %s.", id, tostring(scan.detail))
+		elseif target then
+			Logger.debug(LOG, "Local server '%s' probed at %s (%s).", id, Remote.redact_url(target.base_url),
+				target.port_source == "user" and "address set by the user" or ("port from " .. tostring(target.port_source)))
+			private_targets[id] = target
+			targets[#targets + 1] = { id = id, base_url = target.base_url }
+		end
 	end
 	return controller.sweep(targets, function(target, settle, ticket)
 		local captured = private_targets[target.id]
@@ -267,6 +313,91 @@ function M.rescan(admit, on_done)
 		end
 		return queue_acquisition(target.id, { target = captured, settle = settle, current = current })
 	end, on_done)
+end
+
+--- Starts an asynchronous catalogue sweep with source/admission fences, after
+--- scanning where each catalogue server runs (modules/llm/local_server_ports.lua).
+--- A rescan asked during the scan joins it.
+--- @param admit function Current admission.
+--- @param on_done function|nil Receives changed when the sweep published.
+--- @return boolean started
+function M.rescan(admit, on_done)
+	if closed or type(admit) ~= "function" or not admitted(admit) then return false end
+	if not Entries.capture_source() then return false end
+	if scan_waiters then
+		scan_waiters[#scan_waiters + 1] = { admit = admit, on_done = on_done }
+		return true
+	end
+	scan_waiters = { { admit = admit, on_done = on_done } }
+	local entries, undescribed = {}, {}
+	for _, id in ipairs(catalogue_order) do
+		local server = catalogue_servers[id]
+		if catalogue_discovery[id] then
+			entries[#entries + 1] = { id = id, descriptor = catalogue_discovery[id], base_url = server.base_url }
+		else
+			undescribed[id] = { id = id, running = false, pids = {}, base_url = server.base_url,
+				detail = "no discovery descriptor in local_servers.json" }
+		end
+	end
+	local ok, err = pcall(Ports.scan, entries, function(results)
+		for id, result in pairs(undescribed) do results[id] = result end
+		port_scans = results
+		local waiters = scan_waiters or {}
+		scan_waiters = nil
+		local function done(changed)
+			for _, waiter in ipairs(waiters) do
+				if waiter.on_done then
+					local called, raised = pcall(waiter.on_done, changed)
+					if not called then Logger.error(LOG, "Local server rescan callback raised: %s", tostring(raised)) end
+				end
+			end
+		end
+		-- The newest admission decides; an expired one publishes nothing
+		local last = waiters[#waiters]
+		if not last or sweep(last.admit, done) ~= true then
+			Logger.warn(LOG, "Local server sweep was not admitted after its port scan.")
+			done(false)
+		end
+	end)
+	if not ok then
+		scan_waiters = nil
+		Logger.error(LOG, "The local server port scan could not start: %s", tostring(err))
+		return false
+	end
+	return true
+end
+
+--- Lists every local server view with where it was looked for and what it
+--- answered, in menu order: the stable shape the menu and the model selector
+--- page read (the same as the macOS api_remote.local_server_views).
+--- @return table views Array of { id, display_name, port, port_source, base_url,
+---        models, status, reason }.
+function M.views()
+	refresh_views()
+	local views = {}
+	for _, id in ipairs(order) do
+		local target, server = M.target(id), servers[id]
+		if target and server then
+			local scan = catalogue_servers[id] and port_scans[id] or nil
+			local verdict = controller.result(id)
+			local view = { id = id, display_name = server.label, base_url = target.base_url,
+				port = tonumber(target.base_url:match("^%a[%w+.-]*://[^/]-:(%d+)")), port_source = target.port_source }
+			if target.port_source ~= "user" and scan and scan.running == false then
+				view.reason = "not_running"
+			elseif not verdict then
+				view.reason = "not_swept"
+			elseif verdict.status == Discovery.STATUS_UP then
+				view.status, view.models = verdict.status, {}
+				for index, model in ipairs(verdict.models or {}) do view.models[index] = model end
+			else
+				view.status = verdict.status
+				view.reason = verdict.status == Discovery.STATUS_NEEDS_KEY and "needs_key"
+					or verdict.status == Discovery.STATUS_UNAVAILABLE and "unavailable" or "no_answer"
+			end
+			views[#views + 1] = view
+		end
+	end
+	return views
 end
 
 --- Logical fencing precedes physical cancellation; unresolved owners stay retained.
@@ -288,5 +419,5 @@ function M.servers() refresh_views(); return servers end
 function M.result(id) refresh_views(); return controller.result(id) end
 function M.detected() refresh_views(); return controller.detected() end
 function M.is_stale() refresh_views(); return controller.is_stale() end
-function M.is_sweeping() return controller.is_sweeping() end
+function M.is_sweeping() return scan_waiters ~= nil or controller.is_sweeping() end
 return M

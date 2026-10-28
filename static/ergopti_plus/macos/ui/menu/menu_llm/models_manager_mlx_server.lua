@@ -369,13 +369,15 @@ function M.install(ctx)
 	--- Joins the complete API/discovery owner before a server identity is retired
 	--- or replaced. Only literal true authorizes successor publication.
 	--- @param operation string Diagnostic context.
+	--- @param options table|nil `{ awaiting_pgid = true }` only before a cold launch,
+	--- whose bash wrapper reports the PGID that stop and adoption never print.
 	--- @return boolean settled
-	local function reset_mlx_endpoints(operation)
+	local function reset_mlx_endpoints(operation, options)
 		local ok_reset, reset_result = xpcall(function()
 			if type(ApiMlx) ~= "table" or type(ApiMlx.reset_endpoints) ~= "function" then
 				return false
 			end
-			return ApiMlx.reset_endpoints()
+			return ApiMlx.reset_endpoints(options)
 		end, debug.traceback)
 		if not ok_reset or reset_result ~= true then
 			Logger.error(LOG, "%s refused MLX endpoint reset: %s.",
@@ -933,7 +935,7 @@ function M.install(ctx)
 		-- causing the task to never be created and predictions to stay locked indefinitely.
 		do
 			if not current_or_cancel() then return false end
-			if reset_mlx_endpoints("Cold server launch") ~= true then
+			if reset_mlx_endpoints("Cold server launch", { awaiting_pgid = true }) ~= true then
 				settle_cancel("endpoint_reset_refused")
 				return false
 			end
@@ -1506,7 +1508,7 @@ function M.install(ctx)
 					tostring(target_model), tostring(reason_line))
 				dump_mlx_server_log("MLX crash for ‘" .. tostring(target_model) .. "’")
 				if not silent_notifications then
-					pcall(notifications.notify, "MLX incompatible",
+					pcall(notifications.notify, i18n.get("mlx.model_incompatible_title"),
 						string.format(i18n.get("mlx.model_incompatible"), tostring(target_model)), "error")
 				end
 				-- Flip api_mlx into the failed state so the status dot turns RED at once

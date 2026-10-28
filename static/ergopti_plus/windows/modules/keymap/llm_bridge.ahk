@@ -1180,14 +1180,14 @@ LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unse
 		}
 		LLM_Bridge_MirrorAgentEdit(0, ch)
 	}
-	Buffer := Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
-	if Buffer != "" && _TextCompleteTailScalar(Buffer) == "" {
+	BridgeBuffer := Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
+	if BridgeBuffer != "" && _TextCompleteTailScalar(BridgeBuffer) == "" {
 		_LLM_Bridge_InvalidateIncompleteTyping(false)
 		return false
 	}
 	ObservedChar := ch
-	if StrLen(ch) == 1 && StrLen(_TextCompleteTailScalar(Buffer)) == 2
-		ObservedChar := _TextCompleteTailScalar(Buffer)
+	if StrLen(ch) == 1 && StrLen(_TextCompleteTailScalar(BridgeBuffer)) == 2
+		ObservedChar := _TextCompleteTailScalar(BridgeBuffer)
 	return _LLM_Bridge_SchedulePrefixObserver(ObservedChar,
 		ScheduleFn, IsSet(FocusFn) ? FocusFn : _LLM_Bridge_ReadLiveFocus)
 }
@@ -1249,8 +1249,8 @@ _LLM_Bridge_RunPrefixObserver(Owner) {
 		; Read the canonical buffer after any expansion, never the original trigger.
 		ContentGeneration := _LLM_Bridge_ContentGeneration
 		CurrentFn := _LLM_Bridge_PrefixObserverStillCurrent.Bind(Owner, ContentGeneration)
-		Buffer := Owner.Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
-		if Buffer != "" && _TextCompleteTailScalar(Buffer) == ""
+		BridgeBuffer := Owner.Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
+		if BridgeBuffer != "" && _TextCompleteTailScalar(BridgeBuffer) == ""
 			return false
 		if Owner.Active {
 			LLM_Engine_CancelInflight(CurrentFn)

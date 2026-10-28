@@ -1389,9 +1389,9 @@ _MR_TranslatedCountPolicy(Item) {
 	for Field in ["value_getter", "present_getter"]
 		if Type(Policy[Field]) != "String" || Policy[Field] == ""
 			return false
-	Maximum := Policy["maximum"], Format := Policy["format"]
+	Maximum := Policy["maximum"], CountFormat := Policy["format"]
 	if !IsNumber(Maximum) || Type(Maximum) == "String" || Maximum != Maximum || Maximum < 0 || Maximum > 2**53 - 1 || Mod(Maximum, 1) != 0
-		|| Type(Format) != "String" || !_MR_PlainUnicodeCaption(Format) || !_MR_CaptionValues(Format, ["", ""], &Probe)
+		|| Type(CountFormat) != "String" || !_MR_PlainUnicodeCaption(CountFormat) || !_MR_CaptionValues(CountFormat, ["", ""], &Probe)
 		return false
 	for Field in ["visibility", "style"] {
 		Values := Policy[Field]
@@ -1474,9 +1474,9 @@ _MR_ReadNativeCaption(Item, Getters, &Caption) {
 		return false
 	if Item.Has("caption_count_getter") || Item.Has("caption_count_format") {
 		CountGetter := _MR_Get(Item, "caption_count_getter")
-		Format := _MR_Get(Item, "caption_count_format")
+		CountFormat := _MR_Get(Item, "caption_count_format")
 		if _MR_Get(Item, "type") != "group" || Type(CountGetter) != "String" || CountGetter == ""
-			|| Type(Format) != "String" || !_MR_PlainUnicodeCaption(Format)
+			|| Type(CountFormat) != "String" || !_MR_PlainUnicodeCaption(CountFormat)
 			|| !Getters.Has(CountGetter) || !HasMethod(Getters[CountGetter], "Call")
 			return false
 		try Count := Getters[CountGetter].Call()
@@ -1484,7 +1484,7 @@ _MR_ReadNativeCaption(Item, Getters, &Caption) {
 			return false
 		if Type(Count) != "String" || Count == "" || !_MR_PlainUnicodeCaption(Count)
 			return false
-		return _MR_CaptionValues(Format, [Caption, Count], &Caption)
+		return _MR_CaptionValues(CountFormat, [Caption, Count], &Caption)
 	}
 	return true
 }
@@ -1646,9 +1646,9 @@ MenuRenderer_PersonalFolderParentRow(Receipt, Positive, FolderName, Count, Child
 	if !Root.Has("hotstring_personal_folder_caption") || Root["hotstring_personal_folder_caption"] != Receipt["policy"]
 		|| !Receipt["current"].Call(Receipt["source"])
 		return false
-	Format := Receipt["policy"][Positive ? "positive_format" : "nonpositive_format"]
+	CountFormat := Receipt["policy"][Positive ? "positive_format" : "nonpositive_format"]
 	Values := Positive ? [FolderName, Count] : [FolderName]
-	if !Receipt["formatter"].Call(Format, Values, &Label)
+	if !Receipt["formatter"].Call(CountFormat, Values, &Label)
 		return false
 	if Guard != _MR_DeclaredParentCallable || Object.Prototype.HasOwnProp.Call(Guard, "Call")
 		return false

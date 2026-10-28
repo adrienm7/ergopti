@@ -464,7 +464,7 @@ end
 function M.menu_order(names, hotstring_groups)
 	local rank, count = {}, 0
 	local classes = type(hotstring_groups) == "table" and hotstring_groups or {}
-	for _, class in ipairs({ "standard", "ergopti", "dynamic" }) do
+	for _, class in ipairs(require("menu.row_order").list("hotstring_group_classes")) do
 		for _, id in ipairs(type(classes[class]) == "table" and classes[class] or {}) do
 			count = count + 1
 			if type(id) == "string" then

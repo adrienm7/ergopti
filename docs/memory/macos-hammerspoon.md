@@ -143,7 +143,16 @@ Every macOS download child now sources `apply_system_network` from
 `modules/llm/network-retry.sh` (the scripts directly, the Ollama service and
 the MLX model download through `modules/llm/network_env.lua`): relay from
 `scutil --proxy`, loopback always in NO_PROXY, `UV_SYSTEM_CERTS=1`, and never
-a CA file. uv comes from its pinned PyPI wheel (`uv-release.sh`), and a native
+a CA file: an inherited `SSL_CERT_FILE` or `SSL_CERT_DIR` is unset with one INFO
+line, the launcher's `--managed-http` and `--managed-bootstrap-download` roles
+unset both in `main.swift` before reading their environment, and the managed
+daemon owner (`managed_ollama_serve.py`) seals its network snapshot with
+`capture(..., inherited_trust=False)`. The Go `native_http` package reads trust
+only from that sealed snapshot and stays policy-neutral: a GOOS-wide ignore in
+Go also closed the anchor channel of the native model receiver, whose fixture
+registry pull then failed with `certificate`. Only fixtures that own their
+anchor (the wire-test entry point, `macos_managed_ollama_receiving.py`) pass
+`inherited_trust=True`. uv comes from its pinned PyPI wheel (`uv-release.sh`), and a native
 Python 3.11–3.14 builds the venv without the managed interpreter download from
 GitHub. Failures use the shared classes (certificate, proxy, host_blocked,
 offline) and `network.failure.*` sentences with their actions. Never log the
@@ -152,8 +161,14 @@ Ollama daemon Ergopti starts reads only HTTPS_PROXY, so under a PAC-only
 network `network-retry.sh` asks the launcher role `--managed-proxy-route` for
 the registry origin (`resolve_system_route_for_probe`, enabled by
 `pac_probe_url` of the prelude) and exports the first route, or nothing for
-DIRECT; the pull is admitted only then, and a daemon start whose lookup fails
-still starts. Only the failing stage code is logged, never the route.
+DIRECT. A lookup that fails at a stage of `proxy_policy.json`
+`pac_unavailable_fallback` (the PAC or WPAD could not be fetched or evaluated)
+goes direct with one WARNING and a `__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:<stage>`
+marker the Lua callers read to name both causes if direct fails too; any other
+stage, a PAC-named relay that fails, or an unnamed failure stays refused, and an
+inherited relay never reaches the lookup. The Swift worker, the spool and the
+Python receiver gate on the same generated list. Only the failing stage code
+is logged, never the route.
 
 ### project-managed-ollama-native-hooks-follow-the-pinned-source
 
@@ -190,6 +205,23 @@ that runs the client in an empty home then fails its empty-store check with a
 create stage that reads "unknown". Run such a client with
 `OLLAMA_CREATE_REMOTE=1` (upload through the server API) and keep every
 receiver failure code in its closed list.
+
+### project-macos-installers-run-from-a-linked-private-snapshot
+
+Endpoint-security agents on managed Macs (Microsoft Defender, Santa, BeyondTrust,
+Symantec, Trellix on the maintainer's work Mac) kill fileless script execution:
+`/bin/bash /dev/fd/3` over an unlinked file died with SIGKILL about 10 s after it
+started, before any output, while the same script ran from a path (field report
+2026-10-27 23:55, `fileless_bash_probe.txt`). The native PTY guardian
+(`ManagedPTYWorker.swift`) therefore runs its installer from a linked copy:
+`~/Library/Application Support/ErgoptiPlus/pty-sources/op.<guardian pid>.XXXXXX/<name>`,
+folders 0700 and owned by the user, file created O_EXCL at 0400, its identity
+(inode, size, mode, mtime, ctime) and SHA-256 proved through the retained
+read-only descriptor after the copy and again right before bash is activated, and
+removed after the group retires; folders of dead guardians are swept at start.
+The installer recognises its own snapshot by `ERGOPTI_BOOTSTRAP_SNAPSHOT`. Never
+reintroduce `/dev/fd`, `bash -s` or stdin scripts for a child that must run on a
+managed Mac, and keep a field probe of the exact exec shape when changing it.
 
 ### project-macos-ai-runtimes-install-on-selection
 
@@ -1003,7 +1035,10 @@ admits no other `hswindow()` caller and ratchets every global enumeration.
 ### project-touchdevice-dormancy-is-kernel
 
 macOS touch-device readiness is gated by the kernel until first physical touch.
-Do not add repeated user-space probes that cannot change readiness.
+Do not add repeated user-space probes that cannot change readiness. "No frame
+yet" is therefore the normal idle state, not a lost stream: the gesture health
+loop must never re-arm the startup probe for it (it warned and recycled every
+minute of idleness until 2026-10-27).
 
 ### project-karabiner-unlisted-held-modifier-blocks-the-rule
 
@@ -1104,6 +1139,26 @@ preference sync does it. Before 2026-09, boot started it unconditionally and OFF
 only cleared a flag, so the taps and "Health-check tick" lines kept running with
 Gestures off; such a line now proves Gestures was ON. Test doubles:
 `tests/support/gesture_runtime_fixture.lua`.
+
+### project-hs-two-fingers-are-a-scroll
+
+A pair of contacts is the native scroll. Until 2026-10 the engine promoted a
+third contact joining a pair on ONE frame, and a count drop shifted startPos
+without endPos, so a palm touching below two scrolling fingers committed a
+vertical three-finger swipe (tab switching). `modules/gestures/engine.lua` now
+lets a third finger join a pair only before the pair has scrolled (direction
+locked, `Geometry.SWIPE_MIN_2` travelled, a macOS scroll phase) and within
+`multi_finger_landing_ms`, once it held `pair_join_confirm_ms`; checks that every
+contact covered `Geometry.COHESION_MIN_SHARE` of the travel since the promotion;
+aborts a three-finger gesture that continues as a moving pair; and holds
+three-or-more finger actions back for `scroll_momentum_guard_ms` after a native
+momentum phase or a locked pair lifting. A first stricter tuning (4 frames plus
+50 ms, a 150 ms landing, half the lock distance, share 0.5, a guard after any
+scroll phase) missed deliberate swipes on the maintainer's Mac. Every refusal
+logs `Three-finger candidate rejected by <gate>: <value>` once per touch. The
+Linux `mt_decoder.lua` applies the same rules. Action: never give a pair a fast
+path, read a missed swipe from its `rejected by` line before retuning, and move endPos
+with startPos on every centroid compensation.
 
 ### project-hs-click-drag-is-not-a-gesture
 
@@ -1632,3 +1687,17 @@ covers other user sessions, not `open -n`, a direct exec or a racing update
 relaunch. A modal `hs.dialog.blockAlert` keeps the run loop turning, so any
 producer armed at require time (the KC ledger bridge) must be stopped before a
 fatal dialog.
+
+### project-macos-field-run-drives-the-developer-app
+
+`tools/dev/collect-macos-field-report.sh` asks a developer ErgoptiPlus.app to
+run every Debug field check, the diagnostics snapshot and the Ollama and MLX
+flows through `infra/field_run.lua`: a request file in the clone folder that
+`static/ergopti_plus/macos/data/field_run.json` names, one JSON result per
+step, then a done marker. It starts only behind `infra/dev_source.lua`; a
+packaged runtime never loads it. Runtime installs go through
+`runtime_install_offer` (the only grantor), never `install_for_selection()`
+directly, or `ai-runtime-triggers` fails. Add a new Debug field check to the
+declaration too: `test_field_run.lua` and `test-macos-field-run-contract.cjs`
+refuse a check with no step. A step that needs a person is declared with
+`person`/`reason` and reported, never driven with synthetic input.

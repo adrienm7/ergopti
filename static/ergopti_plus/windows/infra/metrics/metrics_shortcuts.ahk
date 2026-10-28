@@ -62,12 +62,12 @@ _MS_PreferenceConfigKey(Prop) {
 }
 
 _MS_BuildPreferencePlan(Prop, Target) {
-		ConfigKey := _MS_PreferenceConfigKey(Prop)
-		if (ConfigKey = "")
+		PreferenceConfigKey := _MS_PreferenceConfigKey(Prop)
+		if (PreferenceConfigKey = "")
 				throw ValueError("Unknown metrics preference '" . Prop . "'.")
 		Candidate := !!Target
 		return {
-				updates: [{ Section: "metrics", Key: ConfigKey, Value: Candidate }],
+				updates: [{ Section: "metrics", Key: PreferenceConfigKey, Value: Candidate }],
 				publish: _MS_PublishPreferenceCandidate.Bind(Prop, Candidate)
 		}
 }

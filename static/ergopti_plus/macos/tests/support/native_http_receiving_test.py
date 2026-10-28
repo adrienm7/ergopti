@@ -63,7 +63,7 @@ if mode=='hold-before-header': time.sleep(30)
 frame(b'H',{'version':1,'status':status,'headers':headers})
 if mode=='hold': time.sleep(30)
 if mode=='progress':
-    for _ in range(30): frame(b'D',b'x');time.sleep(.03)
+    for _ in range(300): frame(b'D',b'x');time.sleep(.03)
 elif mode not in ('redirect','truncated'): frame(b'D',b'N\x00LF')
 if mode=='truncated': sys.exit(0)
 if mode=='invalid-terminal':
@@ -76,6 +76,14 @@ frame(b'C',{'version':1,'success':True,'reason':'complete'})
 if mode=='trailing': os.write(1,b'x')
 sys.exit(3 if mode=='bad-exit' else 0)
 """
+
+
+# The fixture worker is a fresh interpreter per case, so its start-up (and the
+# header it writes) can be delayed by seconds on a loaded host. Cases that only
+# need a healthy response use a bound far above that delay; the two cases that
+# wait for a deadline to expire pay it once with a similarly generous bound.
+HEALTHY_IDLE_BOUND = 30
+EXPIRING_BOUND = 3
 
 
 class NativePipeReceiving(unittest.TestCase):
@@ -92,7 +100,9 @@ class NativePipeReceiving(unittest.TestCase):
         self.temporary.cleanup()
 
     def open(self, mode, **kwargs):
-        return NATIVE.open_request("https://fixture.example/" + mode, idle_timeout=1, **kwargs)
+        return NATIVE.open_request(
+            "https://fixture.example/" + mode, idle_timeout=HEALTHY_IDLE_BOUND, **kwargs
+        )
 
     def test_split_frames_and_binary_body_require_terminal_and_physical_reap(self):
         with self.open("split") as response:
@@ -146,6 +156,10 @@ class NativePipeReceiving(unittest.TestCase):
         def spawn(*arguments, **keywords):
             child = original_spawn(*arguments, **keywords)
             spawned.append(child)
+            # Armed only once the peer exists: an alarm racing the spawn on a
+            # loaded host would cancel before there was anything to reap.
+            if native_signal:
+                signal.setitimer(signal.ITIMER_REAL, 0.1)
             return child
 
         def cancelled(*_):
@@ -156,7 +170,6 @@ class NativePipeReceiving(unittest.TestCase):
         try:
             with mock.patch.object(NATIVE.subprocess, "Popen", side_effect=spawn):
                 if native_signal:
-                    signal.setitimer(signal.ITIMER_REAL, 0.1)
                     with self.assertRaises(OwnerCancelled):
                         self.open("hold-before-header")
                 else:
@@ -175,7 +188,9 @@ class NativePipeReceiving(unittest.TestCase):
         self.assertIsNotNone(spawned[0].poll())
 
     def test_idle_timeout_physically_closes_peer(self):
-        with NATIVE.open_request("https://fixture.example/hold", idle_timeout=0.1) as response:
+        with NATIVE.open_request(
+            "https://fixture.example/hold", idle_timeout=EXPIRING_BOUND
+        ) as response:
             process = response._process
             with self.assertRaises(NATIVE.NativeHTTPError) as failure:
                 response.read()
@@ -184,14 +199,15 @@ class NativePipeReceiving(unittest.TestCase):
 
     def test_progress_does_not_renew_an_existing_absolute_budget(self):
         started = time.monotonic()
-        with self.open("progress", timeout=0.2) as response:
+        with self.open("progress", timeout=EXPIRING_BOUND) as response:
             process = response._process
             with self.assertRaises(NATIVE.NativeHTTPError) as failure:
                 while response.read():
                     pass
             self.assertEqual(failure.exception.reason, "deadline")
             self.assertIsNotNone(process.poll())
-        self.assertLess(time.monotonic() - started, 1)
+        # The worker keeps sending for 9 s; a renewed budget would run to its end.
+        self.assertLess(time.monotonic() - started, 9)
 
     def test_bad_input_does_not_resolve_or_launch_a_native_child(self):
         for arguments in ({"timeout": True}, {"idle_timeout": None}, {"method": "POST"}):

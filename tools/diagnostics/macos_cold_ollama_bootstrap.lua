@@ -107,8 +107,15 @@ guarded(function()
 	assert(owner.checker.install_for_selection(guarded(function(success)
 		result.success = success == true
 		result.state = owner.checker.get_state()
-		local resolved, _, kind = binary.resolve()
-		result.runtime_installed = resolved == config.install_dir .. "/ollama" and kind == binary.SOURCE_MANAGED
+		-- This lane qualifies the official archive installer. Since bc09e4584c the
+		-- resolver selects only Ergopti's native runtime (ollama-native-http), so
+		-- the installed official binary is proved where the installer publishes
+		-- it, the managed executable path, as a real executable file (no link).
+		local managed = binary.managed_executable_path()
+		local attributes = managed and hs.fs.symlinkAttributes(managed) or nil
+		result.runtime_installed = managed == config.install_dir .. "/ollama"
+			and attributes ~= nil and attributes.mode == "file"
+			and type(attributes.permissions) == "string" and attributes.permissions:sub(3, 3) == "x"
 		publish()
 	end)) == true, "Cold selection refused")
 end)()

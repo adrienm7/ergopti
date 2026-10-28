@@ -386,6 +386,31 @@ final class ManagedBootstrapSpool {
 	}
 }
 
+/// The lines a download writes when an unusable automatic configuration (PAC,
+/// WPAD) sent it direct. The same three sentences and the marker are spelled by
+/// network-retry.sh and managed_bootstrap_http.py (test-managed-proxy-route-contract.cjs):
+/// one warning when the fallback starts, then whether the direct route worked.
+/// Only the closed stage code is written, never a PAC address or a route.
+enum ManagedPACFallbackLog {
+	static let marker = "__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:"
+
+	static func started(_ stage: String) -> String {
+		return "WARNING: The automatic network configuration could not be used (\(stage)). Trying a direct connection."
+	}
+
+	static func succeeded(_ stage: String) -> String {
+		return "The direct connection worked after the automatic network configuration failed (\(stage))."
+	}
+
+	static func failed(_ stage: String, cause: String) -> String {
+		return "The automatic network configuration was unreachable (\(stage)) and the direct connection failed (\(cause))."
+	}
+
+	static func write(_ line: String) {
+		FileHandle.standardError.write(Data((line + "\n").utf8))
+	}
+}
+
 enum ManagedBootstrapDownload {
 	static let flag = "--managed-bootstrap-download"
 	static func handles(arguments: [String]) -> Bool { arguments.dropFirst().first == flag }
@@ -401,13 +426,22 @@ enum ManagedBootstrapDownload {
 		var url = request.url
 		var hops = 0
 		var result = "unavailable"
+		var fallbackStage: String?
 		while remaining() > 0 {
 			let collector = ManagedBootstrapCollector(maximumBytes: request.size, remaining: remaining,
 				writeBody: { spool.write($0, remaining: remaining) })
 			let native = ManagedHTTPRequest(url: url, method: "GET", headers: [("Accept-Encoding", "identity")],
 				timeout: budget, idleTimeout: budget, direct: policy.direct(url, environment: environment))
 			let status = ManagedHTTPWorker.execute(native, maximumSelections: policy.maximumSelections,
-				started: started, settingsProvider: settingsProvider, environment: environment, output: collector.consume)
+				started: started, settingsProvider: settingsProvider, environment: environment,
+				onDirectFallback: { stage in
+					// One warning per download, even when every redirect hop goes direct.
+					guard fallbackStage == nil else { return }
+					fallbackStage = stage.rawValue
+					ManagedPACFallbackLog.write(ManagedPACFallbackLog.marker + stage.rawValue)
+					ManagedPACFallbackLog.write(ManagedPACFallbackLog.started(stage.rawValue))
+				},
+				output: collector.consume)
 			guard remaining() > 0 else { result = "deadline"; break }
 			if let failure = collector.failure { result = failure; break }
 			if collector.redirectCancelled {
@@ -431,7 +465,13 @@ enum ManagedBootstrapDownload {
 			break
 		}
 		if remaining() <= 0 { result = "deadline" }
-		return spool.close(success: result == "complete") ? result : "cleanup"
+		let settled = spool.close(success: result == "complete") ? result : "cleanup"
+		if let fallbackStage {
+			ManagedPACFallbackLog.write(settled == "complete"
+				? ManagedPACFallbackLog.succeeded(fallbackStage)
+				: ManagedPACFallbackLog.failed(fallbackStage, cause: settled))
+		}
+		return settled
 	}
 
 	static func run(arguments: [String]) -> Int32 {

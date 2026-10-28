@@ -61,6 +61,36 @@ local _is_hiding = false
 local _session   = 0
 local _kind      = nil      -- Active kind, if any (mlx_install, ollama_install, mlx_model, ollama_model)
 local _mode      = "download" -- "download" (model download) or "bootstrap" (engine install)
+-- Bumped whenever the visible progress of the current operation advances (a
+-- new percentage, byte count, file count or step), never by a repeated frame:
+-- the developer field run extends a download's deadline while it moves.
+local _progress_mark = 0
+local _progress_signature = nil
+-- The one observer of model download percentages (the model selector page)
+-- and the last whole percentage it was told, by session.
+local _percent_listener = nil
+local _told_percent = nil
+
+--- Records one visible progress state; a change is progress.
+--- @param signature string The visible state, prefixed by its session.
+local function note_progress(signature)
+	signature = tostring(_session) .. "|" .. signature
+	if signature ~= _progress_signature then
+		_progress_signature = signature
+		_progress_mark = _progress_mark + 1
+	end
+end
+
+--- Tells the percentage observer a new whole percentage of the current
+--- model download (never a repeated one), with its kind and session.
+--- @param percent integer Whole percentage in [0, 99] while downloading.
+local function tell_percent(percent)
+	if type(_percent_listener) ~= "function" or _mode ~= "download" then return end
+	local signature = tostring(_session) .. "|" .. tostring(percent)
+	if signature == _told_percent then return end
+	_told_percent = signature
+	Logger.callback(LOG, "Download percentage observer", _percent_listener, _kind, percent, _session)
+end
 
 --- Distinguishes live presentation authority from a native cleanup capability.
 --- @return boolean
@@ -405,7 +435,7 @@ local function ensure_webview(title)
 		if owner.loaded then flush() end
 
 		-- Safety: even if didFinishNavigation never fires, flush queued JS after 1s
-		DeferredWork.after(1.0, function()
+		DeferredWork.after(require("infra.timings").sec("ui", "download_window_flush_safety_ms"), function()
 				if not _ready then flush() end
 		end, "download_window.ready_fallback")
 		return true
@@ -436,6 +466,23 @@ end
 --- @return number Monotonic session identifier.
 function M.session_id()
 	return _session
+end
+
+--- Sets the one observer of model download percentages: it receives
+--- (kind, percent, session) at each new whole percentage of an
+--- ollama_model or mlx_model download. nil removes it.
+--- @param listener function|nil
+function M.set_percent_listener(listener)
+	if listener ~= nil and type(listener) ~= "function" then
+		error("download_window.set_percent_listener requires a function or nil", 2)
+	end
+	_percent_listener = listener
+end
+
+--- Counts how often the visible progress of the window advanced.
+--- @return integer mark Monotonic; unchanged while no operation progresses.
+function M.progress_mark()
+	return _progress_mark
 end
 
 --- Brings the window to the front and focuses it.
@@ -738,6 +785,9 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
     -- Cap at 99% during download: 100% is reserved exclusively for done()
     pct = math.min(math.max(0, pct), 99)
 
+    note_progress(string.format("u|%d|%s|%s", math.floor(pct), tostring(dl_str), tostring(file_count_str)))
+    tell_percent(math.floor(pct))
+
     local js = string.format("update(%d,%s,%s,%s,%s)",
         math.floor(pct), js_str(dl_str), js_str(speed_str), js_str(eta_str), js_str(file_count_str))
 
@@ -776,7 +826,7 @@ function M.complete(success, _model_name, error_kind)
         -- the window when it fires. The session identity exists for exactly this
         -- and was applied to one deferred-hide site; these two never got it.
         local sid = M.session_id()
-        DeferredWork.after(4, function()
+        DeferredWork.after(require("infra.timings").sec("ui", "download_window_hide_delay_ms"), function()
             if M.session_id() ~= sid then
                 Logger.debug(LOG, "Auto-hide skipped: the window now belongs to a newer operation.")
                 return
@@ -798,6 +848,7 @@ function M.set_step(label)
     if not require_active_operation() then return false end
     if type(label) ~= "string" then return end
     Logger.debug(LOG, "Step: %s", label)
+    note_progress("s|" .. label)
     eval(string.format("setStep(%s)", js_str(label)), "setStep")
 end
 
@@ -818,6 +869,7 @@ end
 function M.append_log(text)
     if not require_active_operation() then return false end
     if type(text) ~= "string" or text == "" then return end
+    note_progress("l|" .. text)
     eval(string.format("addLog(%s)", js_str(text)), "addLog")
 end
 
@@ -826,6 +878,7 @@ end
 function M.set_progress(pct)
     if not require_active_operation() then return false end
     if pct ~= nil and type(pct) ~= "number" then return end
+    note_progress("p|" .. tostring(pct))
     eval(string.format("setProgress(%s)", pct == nil and "null" or tostring(pct)), "setProgress")
 end
 

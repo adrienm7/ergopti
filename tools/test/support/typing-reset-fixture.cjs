@@ -13,6 +13,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { installHostCapabilities } = require('./host-capabilities.cjs');
+const { installThemeTokens } = require('./theme-tokens.cjs');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../../../static/ergopti_plus/_shared/ui/metrics_typing');
@@ -52,6 +53,8 @@ function frontend(host = 'macos') {
 	});
 	context.window = context;
 	installHostCapabilities(context);
+	// data.js draws its colours through ThemeTokens, as the page loads it first.
+	installThemeTokens(context);
 	if (host === 'windows')
 		context.chrome = { webview: { postMessage: (raw) => requests.push(JSON.parse(raw)) } };
 	if (host === 'linux') {

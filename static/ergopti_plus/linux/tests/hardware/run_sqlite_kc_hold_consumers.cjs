@@ -16,7 +16,6 @@ const path = require('path');
 const assert = require('assert');
 const vm = require('vm');
 const root = path.resolve(__dirname, '../../../../../');
-const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const os = require('os');
 const childProcess = require('child_process');
 const ownedProof =
@@ -48,14 +47,28 @@ if (
 	process.exit(1);
 }
 const manifest = JSON.parse(fs.readFileSync(path.join(ownedProof, 'manifest.json'), 'utf8'));
-const context = vm.createContext({ window: { ManifestData: manifest } });
-for (const source of [
-	'host_bridge.js',
-	'_generated/metrics_general_category_aliases.js',
-	'metrics_apps/helpers.js',
-	'metrics_apps/state.js'
-])
-	vm.runInContext(read('static/ergopti_plus/_shared/ui/' + source), context, { filename: source });
+// The real page declaration owns the Apps consumer's dependency order.
+const { loadMetricsAppsPage } = require(
+	path.join(root, 'tools/test/support/metrics-apps-page.cjs')
+);
+const appsPage = loadMetricsAppsPage('linux');
+const context = appsPage.context;
+context.__hostBridgeResponse(
+	'metrics_apps_bridge',
+	false,
+	encodeURIComponent(
+		JSON.stringify({
+			metrics_manifest: manifest,
+			user_categories: {},
+			app_icons: {}
+		})
+	)
+);
+assert.strictEqual(
+	appsPage.diagnostics.some((entry) => entry.level === 'error'),
+	false,
+	'the actual Linux publication must initialize its declared script closure'
+);
 vm.runInContext(
 	"currentSelectedDate='2026-10-03';currentPeriod='all';currentCountAwake=true;",
 	context

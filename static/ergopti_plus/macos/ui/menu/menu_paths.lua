@@ -587,6 +587,17 @@ local function open_editor_impl()
 	return true
 end
 
+--- The open paths editor window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.editor_window() return _webview end
+
+--- Closes the paths editor window, for ui/window_toggle.
+--- @return boolean committed
+function M.close_editor()
+	if _webview == nil then return true end
+	return close_webview() == true
+end
+
 --- Opens the paths editor as a webview form.
 --- @return boolean opened
 function M.open_editor()

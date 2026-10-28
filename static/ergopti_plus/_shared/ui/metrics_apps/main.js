@@ -264,12 +264,12 @@ function updateCharts(appsArray, aggregatedData) {
 					y: {
 						beginAtZero: true,
 						grid: { color: 'rgba(255,255,255,0.1)' },
-						ticks: { color: '#ccc', callback: (val) => val + 'h' }
+						ticks: { color: ThemeTokens.color('grey-ccc'), callback: (val) => val + 'h' }
 					},
 					x: {
 						grid: { display: false },
 						ticks: {
-							color: '#ccc',
+							color: ThemeTokens.color('grey-ccc'),
 							maxRotation: 30,
 							minRotation: 0,
 							padding: 4
@@ -308,7 +308,7 @@ function updateCharts(appsArray, aggregatedData) {
 				responsive: true,
 				maintainAspectRatio: false,
 				plugins: {
-					legend: { position: 'right', labels: { color: '#ccc' } },
+					legend: { position: 'right', labels: { color: ThemeTokens.color('grey-ccc') } },
 					tooltip: { callbacks: { label: HHMM_TOOLTIP } }
 				}
 			}
@@ -362,11 +362,15 @@ function updateCharts(appsArray, aggregatedData) {
 				maintainAspectRatio: false,
 				plugins: { legend: { display: false }, tooltip: { callbacks: { label: HHMM_TOOLTIP } } },
 				scales: {
-					x: { stacked: true, grid: { display: false }, ticks: { color: '#ccc' } },
+					x: {
+						stacked: true,
+						grid: { display: false },
+						ticks: { color: ThemeTokens.color('grey-ccc') }
+					},
 					y: {
 						stacked: true,
 						grid: { color: 'rgba(255,255,255,0.1)' },
-						ticks: { color: '#ccc', callback: (val) => val + 'h' }
+						ticks: { color: ThemeTokens.color('grey-ccc'), callback: (val) => val + 'h' }
 					}
 				}
 			}
@@ -677,7 +681,10 @@ function renderDashboard() {
 		// ── Typing × Temps (#40-43, 49) ───────────────────────────────────
 		const fl = r.focus_latency || { sum_ms: 0, count: 0 };
 		const flMs = (fl.count || 0) > 0 ? fl.sum_ms / fl.count : 0;
-		setText('kpi-tx-focus-lat', flMs > 0 ? `${flMs.toFixed(0)} ms` : '—');
+		setText(
+			'kpi-tx-focus-lat',
+			flMs > 0 ? _t('ui_apps.value_ms').replace('{n}', flMs.toFixed(0)) : '—'
+		);
 		setText(
 			'kpi-tx-focus-lat-detail',
 			(fl.count || 0) > 0
@@ -777,11 +784,11 @@ function renderDashboard() {
 					maintainAspectRatio: false,
 					plugins: { legend: { display: false } },
 					scales: {
-						x: { grid: { display: false }, ticks: { color: '#ccc' } },
+						x: { grid: { display: false }, ticks: { color: ThemeTokens.color('grey-ccc') } },
 						y: {
 							beginAtZero: true,
 							grid: { color: 'rgba(255,255,255,0.08)' },
-							ticks: { color: '#ccc' }
+							ticks: { color: ThemeTokens.color('grey-ccc') }
 						}
 					}
 				}
@@ -798,9 +805,9 @@ function renderDashboard() {
 				const pNeu = (ps.neutral_ms / psSum) * 100;
 				const pNeg = (ps.negative_ms / psSum) * 100;
 				elProdBar.innerHTML =
-					`<div title="Productif" style="background:#30D158;width:${pPos}%"></div>` +
-					`<div title="Neutre"    style="background:#8e8e93;width:${pNeu}%"></div>` +
-					`<div title="Distraction" style="background:#FF453A;width:${pNeg}%"></div>`;
+					`<div title="${escapeHtml(_t('ui_apps.prod_positive'))}" style="background:${ThemeTokens.color('green-dark')};width:${pPos}%"></div>` +
+					`<div title="${escapeHtml(_t('ui_apps.prod_neutral'))}" style="background:${ThemeTokens.color('gray')};width:${pNeu}%"></div>` +
+					`<div title="${escapeHtml(_t('ui_apps.prod_negative'))}" style="background:${ThemeTokens.color('red-dark')};width:${pNeg}%"></div>`;
 				setText(
 					'kpi-prod-bar-detail',
 					_t('ui_apps.kpi_productive')
@@ -1098,7 +1105,7 @@ function renderDashboard() {
 
 			const tdCat = document.createElement('td');
 			tdCat.className = 'app-cat-cell';
-			tdCat.innerHTML = `<span style="font-size: 0.85em; color: var(--text-muted); cursor: pointer;" title="Modifier la catégorie">${escapeHtml(app.category)} ✎</span>`;
+			tdCat.innerHTML = `<span style="font-size: 0.85em; color: var(--text-muted); cursor: pointer;" title="${escapeHtml(_t('ui_apps.cat_edit_tooltip'))}">${escapeHtml(app.category)} ✎</span>`;
 			tdCat.addEventListener('click', (ev) => {
 				ev.stopPropagation();
 				postBridge({ action: 'edit', app: app.name, cat: app.category, score: app.score });
@@ -1117,7 +1124,8 @@ function renderDashboard() {
 
 			const tdDensity = document.createElement('td');
 			tdDensity.className = 'app-time-cell';
-			tdDensity.textContent = app.density > 0 ? `${app.density.toFixed(0)} c/min` : '—';
+			tdDensity.textContent =
+				app.density > 0 ? _t('ui_apps.value_cpm').replace('{n}', app.density.toFixed(0)) : '—';
 			tr.appendChild(tdDensity);
 
 			const tdSessions = document.createElement('td');
@@ -1127,7 +1135,10 @@ function renderDashboard() {
 
 			const tdLat = document.createElement('td');
 			tdLat.className = 'app-time-cell';
-			tdLat.textContent = app.focus_lat_mean > 0 ? `${Math.round(app.focus_lat_mean)} ms` : '—';
+			tdLat.textContent =
+				app.focus_lat_mean > 0
+					? _t('ui_apps.value_ms').replace('{n}', Math.round(app.focus_lat_mean))
+					: '—';
 			tr.appendChild(tdLat);
 
 			const tdHsPct = document.createElement('td');
@@ -1148,7 +1159,8 @@ function renderDashboard() {
 			tdHold.style.textAlign = 'right';
 			const _hSum = _sfbApp.kc_hold_sum_ms || 0;
 			const _hCnt = _sfbApp.kc_hold_count || 0;
-			tdHold.textContent = _hCnt > 0 ? `${Math.round(_hSum / _hCnt)} ms` : '—';
+			tdHold.textContent =
+				_hCnt > 0 ? _t('ui_apps.value_ms').replace('{n}', Math.round(_hSum / _hCnt)) : '—';
 			tr.appendChild(tdHold);
 
 			const tdDest = document.createElement('td');
@@ -1166,10 +1178,15 @@ function renderDashboard() {
 			banner = document.createElement('div');
 			banner.id = 'render-error-banner';
 			banner.style.cssText =
-				'position:fixed;bottom:8px;left:8px;right:8px;z-index:9999;background:rgba(255,69,58,0.95);color:#fff;font:12px/1.4 system-ui;padding:8px 12px;border-radius:6px;white-space:pre-wrap;max-height:160px;overflow:auto;';
+				'position:fixed;bottom:8px;left:8px;right:8px;z-index:9999;background:rgba(255,69,58,0.95);color:' +
+				ThemeTokens.color('white') +
+				';font:12px/1.4 system-ui;padding:8px 12px;border-radius:6px;white-space:pre-wrap;max-height:160px;overflow:auto;';
 			document.body.appendChild(banner);
 		}
-		banner.textContent = `[render error] ${err && err.stack ? err.stack : err}`;
+		banner.textContent = _t('ui_apps.render_error').replace(
+			'{detail}',
+			String(err && err.stack ? err.stack : err)
+		);
 	}
 }
 

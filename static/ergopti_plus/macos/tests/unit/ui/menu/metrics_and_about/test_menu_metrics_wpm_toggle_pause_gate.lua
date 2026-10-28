@@ -13,6 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local MetricsState = require("infra.metrics_state_keys")
 
 helpers.describe("menu_metrics WPM toggle handlers gate start() on pause", function()
 	local function read_src()
@@ -41,9 +42,9 @@ helpers.describe("menu_metrics WPM toggle handlers gate start() on pause", funct
 		-- the click-time pause fence and delegation of each visibility key to it.
 		helpers.assert_true(src:find("if desired and not paused_now() then", 1, true) ~= nil,
 			"the lifecycle transaction must gate activation on the live pause state")
-		helpers.assert_true(src:find('toggle_wpm_visibility("keystats_float_wpm"', 1, true) ~= nil,
+		helpers.assert_true(src:find('toggle_wpm_visibility(MetricsState.FLOAT_WPM', 1, true) ~= nil,
 			"the interactive widget row must delegate to the pause-gated transaction")
-		helpers.assert_true(src:find('toggle_wpm_visibility("keystats_menubar_wpm"', 1, true) ~= nil,
+		helpers.assert_true(src:find('toggle_wpm_visibility(MetricsState.MENUBAR_WPM', 1, true) ~= nil,
 			"the interactive menubar row must delegate to the pause-gated transaction")
 	end)
 end)

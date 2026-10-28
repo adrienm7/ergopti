@@ -76,15 +76,25 @@ class UninstallTransactionTests(unittest.TestCase):
         self.manifest = self.library / ".ergopti-owned-files"
         self.installed = self.library / "linux/uninstall.sh"
         source = self.root / "source"
-        for relative in ["uninstall.sh", "install/config_home.sh", "install/desktop_entry.sh"]:
+        for relative in [
+            "uninstall.sh",
+            "install/config_home.sh",
+            "install/desktop_entry.sh",
+            "install/messages.sh",
+        ]:
             destination = source / "linux" / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(DRIVER / relative, destination)
+        shutil.copytree(
+            DRIVER / "_generated/shell_messages", source / "linux/_generated/shell_messages"
+        )
         (source / "linux/ergopti_hotstrings.lua").write_bytes(b"-- shipped runtime\n")
         (source / "linux/ergopti_hotstrings.lua").chmod(0o751)
         (source / "linux/modified.lua").write_bytes(b"-- original shipped bytes\n")
         (source / "_shared/data/locales").mkdir(parents=True)
-        (source / "_shared/data/locales/en.json").write_bytes(b'{"en":"English"}\n')
+        shutil.copy2(
+            DRIVER.parent / "_shared/data/locales/en.json", source / "_shared/data/locales/en.json"
+        )
         shutil.copytree(source / "linux", self.library / "linux")
         shutil.copytree(source / "_shared", self.library / "_shared")
         self.wrapper.parent.mkdir(parents=True)
@@ -206,8 +216,14 @@ class UninstallTransactionTests(unittest.TestCase):
                 self.installed,
                 self.library / "linux/install/config_home.sh",
                 self.library / "linux/install/desktop_entry.sh",
+                self.library / "linux/install/messages.sh",
             ]
         }
+        expected_paths.update(
+            os.fsencode(self.library / "linux/_generated/shell_messages" / path.name)
+            for path in (DRIVER / "_generated/shell_messages").iterdir()
+            if path.is_file()
+        )
         self.assertEqual(
             set(paths), expected_paths, "recovery paths must match independently known originals"
         )

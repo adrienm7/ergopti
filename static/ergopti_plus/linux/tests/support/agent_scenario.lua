@@ -140,7 +140,9 @@ function M.run(opts, body)
 				exec_checked = function(command)
 					world.model_offers[#world.model_offers + 1] = { command = command }
 					if type(opts.on_model_confirm) == "function" then opts.on_model_confirm(world) end
-					return opts.download_choice == true, "", opts.download_choice == true and nil or "command exited with status 1"
+					return opts.download_choice == true, "", opts.download_choice == true and nil or "command exited with status 1",
+						opts.download_choice == true and nil or require("adapter_errors").COMMAND_EXITED_NONZERO,
+						opts.download_choice == true and nil or 1
 				end,
 			}
 		end

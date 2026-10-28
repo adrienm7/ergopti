@@ -24,6 +24,14 @@
 --- 4. Off the event tap: recording is table writes, never a timer or a file
 ---    write; the keymap tap watchdog (every second) and a lease failure call
 ---    flush(), which writes the queued lines, coalesced, with the totals.
+--- 5. Sleep: a key held when the Mac sleeps is released while the taps cannot
+---    see it, and the lock screen's secure input keeps the key-up from them, so
+---    it is not a lost key-up. The awake clock stops during sleep and the wall
+---    clock does not: when the wall clock ran SLEEP_CLOCK_DRIFT_MS further than the
+---    awake clock between two events, every key still held is retired and
+---    counted at INFO, and a key-up without key-down in the next STUCK_MS is the
+---    release of a key pressed before the sleep. Field run 2026-10-27 19:46:46
+---    warned "stayed down 589.8 s" for keys pressed at 16:55, before a sleep.
 --- ==============================================================================
 
 local M = {}
@@ -49,6 +57,10 @@ M.STUCK_MS = 3000
 -- Only this many keys can be down at once on a keyboard; a bounded table.
 M.MAX_HELD = 32
 
+-- The wall clock running this much further than the awake clock between two
+-- key events means the Mac slept in between; clock skew is milliseconds.
+M.SLEEP_CLOCK_DRIFT_MS = 5000
+
 local NS_PER_MS = 1e6
 
 local _held = {}
@@ -56,6 +68,11 @@ local _held_count = 0
 local _counts = {}
 local _lease_failures = {}
 local _pending = {}
+-- Awake and wall clocks at the previous event, and the awake time of the last
+-- detected wake; a sleep is the difference between the two clocks' advances.
+local _last_awake_ms = nil
+local _last_wall_ms = nil
+local _woke_ms = nil
 
 --- Clears every counter and held key; tests and a full driver stop use it.
 function M.reset()
@@ -66,9 +83,11 @@ function M.reset()
 		ups_without_down = 0, downs_without_up = 0, stuck = 0,
 		long_holds = 0, long_holds_across_transition = 0,
 		late_downs = 0, late_ups = 0, max_late_ms = 0, unclocked = 0, stale_passed = 0,
+		held_across_sleep = 0, ups_after_sleep = 0,
 	}
 	_lease_failures = {}
 	_pending = {}
+	_last_awake_ms, _last_wall_ms, _woke_ms = nil, nil, nil
 end
 
 M.reset()
@@ -98,12 +117,14 @@ function M.summary()
 		.. " %d key-down(s) without key-up, %d key(s) stuck over %.1f s,"
 		.. " %d character key(s) held %d ms or more (%d across a rule switch),"
 		.. " %d key-down(s) and %d key-up(s) seen %d ms or more late (max %.0f ms),"
-		.. " %d late key event(s) passed untouched, %d Karabiner lease failure(s)%s",
+		.. " %d late key event(s) passed untouched, %d key(s) held across a sleep"
+		.. " (%d released after it), %d Karabiner lease failure(s)%s",
 		_counts.downs, _counts.ups, _counts.ups_without_down,
 		_counts.downs_without_up, _counts.stuck, M.STUCK_MS / 1000,
 		_counts.long_holds, M.LONG_HOLD_MS, _counts.long_holds_across_transition,
 		_counts.late_downs, _counts.late_ups, M.LATE_CALLBACK_MS, _counts.max_late_ms,
-		_counts.stale_passed, lease_total, #lease_parts > 0 and (" (" .. table.concat(lease_parts, ", ") .. ")") or "")
+		_counts.stale_passed, _counts.held_across_sleep, _counts.ups_after_sleep,
+		lease_total, #lease_parts > 0 and (" (" .. table.concat(lease_parts, ", ") .. ")") or "")
 end
 
 --- Writes every line queued since the last flush. Never call it from an event
@@ -155,6 +176,28 @@ local function sweep_stuck(now_ms)
 	end
 end
 
+--- Retires every held key when the Mac slept since the previous event: its
+--- key-up went to a lock screen or happened while nothing could see it.
+--- @param now_ms number Awake clock.
+--- @param wall_ms number|nil Wall clock, nil when it could not be read.
+local function note_sleep(now_ms, wall_ms)
+	if wall_ms == nil then return end
+	local last_awake, last_wall = _last_awake_ms, _last_wall_ms
+	_last_awake_ms, _last_wall_ms = now_ms, wall_ms
+	if last_awake == nil then return end
+	if (wall_ms - last_wall) - (now_ms - last_awake) < M.SLEEP_CLOCK_DRIFT_MS then return end
+	_woke_ms = now_ms
+	local retired = 0
+	for _, entry in pairs(_held) do
+		if not entry.stuck then retired = retired + 1 end
+	end
+	_held = {}
+	_held_count = 0
+	if retired == 0 then return end
+	_counts.held_across_sleep = _counts.held_across_sleep + retired
+	queue("info", "Keys held when the Mac slept were released while the keymap taps could not see it")
+end
+
 --- Records how late one event reached the taps.
 --- @param phase string "down" or "up".
 --- @param lateness_ms number|nil Callback lateness from adapters/event_clock.lua.
@@ -188,6 +231,8 @@ function M.observe(phase, key, autorepeat, character, lateness_ms, stamp)
 		"infra.key_event_health.observe: phase must be 'down' or 'up'")
 	if key == nil then return end
 	local now_ms = Timer.now_ns() / NS_PER_MS
+	local wall_ok, wall_s = pcall(Timer.now)
+	note_sleep(now_ms, wall_ok and type(wall_s) == "number" and wall_s * 1000 or nil)
 	note_lateness(phase, lateness_ms)
 	local entry = _held[key]
 	if phase == "down" then
@@ -221,8 +266,13 @@ function M.observe(phase, key, autorepeat, character, lateness_ms, stamp)
 	end
 	_counts.ups = _counts.ups + 1
 	if not entry then
-		_counts.ups_without_down = _counts.ups_without_down + 1
-		queue("warn", "A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream")
+		if _woke_ms ~= nil and now_ms - _woke_ms < M.STUCK_MS then
+			-- The release of a key pressed before the sleep, retired above.
+			_counts.ups_after_sleep = _counts.ups_after_sleep + 1
+		else
+			_counts.ups_without_down = _counts.ups_without_down + 1
+			queue("warn", "A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream")
+		end
 		sweep_stuck(now_ms)
 		return
 	end

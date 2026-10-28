@@ -626,15 +626,40 @@ end
 --- @param element table|userdata AX element being attached or detached.
 --- @param label string Diagnostic operation label.
 --- @return boolean committed
+--- Element states macOS reports through the AX error of a watcher mutation.
+--- A destroyed element ("AXUIElementRef is invalid", kAXErrorInvalidUIElement)
+--- takes its watchers with it, so its removal has nothing left to undo. An
+--- element that refuses value notifications (a secure text field answers
+--- "Illegal argument", others "Notification unsupported") is simply not
+--- watchable. Both are ordinary focus traffic, not driver faults (issue #104).
+local AX_DEAD_ELEMENT = "AXUIElementRef is invalid"
+local AX_UNWATCHABLE_ELEMENT = { ["Illegal argument"] = true, ["Notification unsupported"] = true,
+	[AX_DEAD_ELEMENT] = true }
+
+--- Returns the AX message of a watcher error, without its location or traceback.
+--- @param detail any xpcall error value.
+--- @return string|nil message
+local function ax_watcher_error(detail)
+	local first = tostring(detail):match("^[^\n]*")
+	return first:match(":%d+: (.+)$") or first
+end
+
 local function mutate_ax_value_watcher(observer, method, element, label)
 	local ok, result = xpcall(function()
 		return observer[method](observer, element, "AXValueChanged")
 	end, debug.traceback)
-	if not ok or result == false then
-		Logger.error(LOG, "%s failed: %s.", label, tostring(result))
+	if ok and result ~= false then return true end
+	local message = not ok and ax_watcher_error(result) or nil
+	if method == "removeWatcher" and message == AX_DEAD_ELEMENT then
+		Logger.debug(LOG, "%s: the element no longer exists, so its watcher is already gone.", label)
+		return true
+	end
+	if method == "addWatcher" and AX_UNWATCHABLE_ELEMENT[message] then
+		Logger.debug(LOG, "%s skipped: the element cannot be watched (%s).", label, message)
 		return false
 	end
-	return true
+	Logger.error(LOG, "%s failed: %s.", label, tostring(result))
+	return false
 end
 
 --- Rejects one observer candidate while retaining ambiguous cleanup debt.
@@ -695,6 +720,20 @@ function M.update_ax_observer(app_pid)
 
 	local ok_app, app_element = pcall(hs.axuielement.applicationElement, app_pid)
 	if not ok_app or not app_element then
+		-- The runtime's own windows (menus, dialogs, pages) refuse an AX element of
+		-- their own process. Their typing still counts (the event tap sees it, as
+		-- decided on 27 October); only the secure-field and autocorrect hints are
+		-- unavailable there, which is this process's state, not a fault.
+		if hs.processInfo and app_pid == hs.processInfo.processID then
+			mark_context("secure", false)
+			Logger.info(LOG,
+				"Accessibility observer not attached to Ergopti's own windows (PID %s): their typing is counted from the event tap, without secure-field or autocorrect hints.",
+				tostring(app_pid))
+			if stop_ax_observer("Accessibility observer rollback") ~= true then
+				Logger.error(LOG, "Accessibility observer cleanup remains pending.")
+			end
+			return false
+		end
 		return reject_ax_observer_candidate(
 			"failed to get AX application element for PID " .. tostring(app_pid))
 	end

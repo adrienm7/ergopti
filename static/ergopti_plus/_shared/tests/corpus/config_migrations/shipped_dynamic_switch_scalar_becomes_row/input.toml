@@ -1,0 +1,14 @@
+# _shared/tests/corpus/config_migrations/shipped_dynamic_switch_scalar_becomes_row/input.toml
+
+[_meta]
+schema_version = 15
+
+[hotstrings.dynamic]
+enabled = true
+date = true
+date_fr = false
+user_code = true
+datefr = false
+
+[hotstrings.dynamic.phone_prefixes]
+enabled = true

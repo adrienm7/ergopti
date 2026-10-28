@@ -17,6 +17,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
+const { provideShellMessages } = require('./lib/shell-messages-fixture.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const sourcePath = path.join(ROOT, 'static/ergopti_plus/linux/install/setup_permissions.sh');
@@ -50,9 +51,12 @@ show-session) case "$2" in
 	for (const name of ['groupadd', 'usermod', 'modprobe', 'udevadm']) {
 		stub(name, 'printf "%s %s\\n" "${0##*/}" "$*" >> "$CALL_LOG"');
 	}
-	const script = path.join(sandbox, 'setup.sh');
+	// The script reads its rules and its message catalogue beside it, as in the driver tree.
+	const installDirectory = path.join(sandbox, 'install');
+	provideShellMessages(installDirectory);
+	const script = path.join(installDirectory, 'setup.sh');
 	for (const name of ['99-ergopti-uinput.rules', 'ergopti-uinput.conf']) {
-		fs.copyFileSync(path.join(path.dirname(sourcePath), name), path.join(sandbox, name));
+		fs.copyFileSync(path.join(path.dirname(sourcePath), name), path.join(installDirectory, name));
 	}
 	fs.writeFileSync(
 		script,
@@ -120,7 +124,7 @@ show-session) case "$2" in
 	}
 	assert.doesNotMatch(busyboxCalls, /usermod|groupadd/);
 	const launcher = path.join(sandbox, 'installed/install/launch.sh');
-	fs.mkdirSync(path.dirname(launcher), { recursive: true });
+	provideShellMessages(path.dirname(launcher));
 	fs.writeFileSync(
 		launcher,
 		fs
@@ -229,7 +233,7 @@ else echo "users input uinput"; fi`
 			);
 		}
 	}
-	const stopScript = path.join(sandbox, 'stop-sessions.sh');
+	const stopScript = path.join(sandbox, 'install', 'stop-sessions.sh');
 	const runtimeRoot = path.join(sandbox, 'run/user');
 	for (const uid of ['1000', '1001']) {
 		fs.mkdirSync(path.join(runtimeRoot, uid), { recursive: true });

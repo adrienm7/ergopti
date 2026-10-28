@@ -9,8 +9,9 @@
 #     preflight's exit status and a sentence on stderr;
 #   - glibc at or above the ceiling: --help exits 0, and on an apt-based image
 #     the argument-free desktop launch, as an unprivileged user under Xvfb,
-#     maps its status window, docks its icon in stalonetray and quits from the
-#     tray menu with no process left behind.
+#     maps its status window, docks its icon in an XEmbed tray (stalonetray,
+#     or trayer where the image has no stalonetray) and quits from the tray
+#     menu with no process left behind.
 # The container has no keyboard, so the desktop launch is the no-keyboard
 # state the AppImage catalogue also sees.
 #
@@ -27,6 +28,21 @@ LOG_DIR="$(mktemp -d)"
 fail() {
 	echo "[ERR] $*" >&2
 	exit 1
+}
+
+# The XEmbed tray this image's apt can install. stalonetray was removed from
+# Debian 12 (it is back in Debian 13), so bookworm has no candidate for it and
+# an unconditional install failed there every time; trayer implements the same
+# freedesktop system-tray protocol and bookworm carries it. Needs an updated
+# apt cache; prints nothing when neither tray has a candidate.
+xembed_tray_package() {
+	for candidate in stalonetray trayer; do
+		if apt-cache policy "$candidate" 2> /dev/null | grep -q 'Candidate: [^(]'; then
+			echo "$candidate"
+			return 0
+		fi
+	done
+	return 1
 }
 
 # ----------------------------------------------------------------------
@@ -84,7 +100,9 @@ if ! command -v apt-get > /dev/null 2>&1; then
 fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q > "$LOG_DIR/apt.log" 2>&1 || fail "ENVIRONMENT: apt-get update failed."
-apt-get install -y -q --no-install-recommends xvfb libgtk-3-0 x11-utils stalonetray xdotool \
+tray="$(xembed_tray_package)" || fail "ENVIRONMENT: apt has neither stalonetray nor trayer."
+echo "XEmbed tray: $tray."
+apt-get install -y -q --no-install-recommends xvfb libgtk-3-0 x11-utils "$tray" xdotool \
 	dbus procps >> "$LOG_DIR/apt.log" 2>&1 || {
 	tail -n 5 "$LOG_DIR/apt.log" >&2
 	fail "ENVIRONMENT: the desktop packages did not install."
@@ -100,14 +118,28 @@ for _ in $(seq 1 40); do [ -s "$LOG_DIR/display" ] && break; sleep 0.25; done
 [ -s "$LOG_DIR/display" ] || fail "ENVIRONMENT: Xvfb never started."
 DISPLAY=":$(cat "$LOG_DIR/display")"
 export DISPLAY
-stalonetray --geometry 1x1+0+0 --icon-size 48 --window-type dock > /dev/null 2>&1 &
+# Each tray names its own top-level window: stalonetray after itself, trayer
+# "panel". The docked icon is found by its own WM class, not by size: trayer
+# adds a 1-pixel-wide spacer beside each icon, which a "not 1x1" test took for
+# the icon and right-clicked.
+case "$tray" in
+	stalonetray)
+		stalonetray --geometry 1x1+0+0 --icon-size 48 --window-type dock > /dev/null 2>&1 &
+		tray_name=stalonetray
+		;;
+	trayer)
+		trayer --edge top --align left --widthtype pixel --width 200 --heighttype pixel --height 48 \
+			--SetDockType true > /dev/null 2>&1 &
+		tray_name=panel
+		;;
+esac
 tray_window=""
 for _ in $(seq 1 40); do
-	tray_window="$(xwininfo -name stalonetray 2> /dev/null | awk '/Window id:/ { print $4 }' || true)"
+	tray_window="$(xwininfo -name "$tray_name" 2> /dev/null | awk '/Window id:/ { print $4 }' || true)"
 	[ -n "$tray_window" ] && break
 	sleep 0.25
 done
-[ -n "$tray_window" ] || fail "ENVIRONMENT: stalonetray never started."
+[ -n "$tray_window" ] || fail "ENVIRONMENT: $tray never started."
 
 su tester -s /bin/sh -c "cd && export DISPLAY=$DISPLAY USER=tester XDG_RUNTIME_DIR=\$(mktemp -d) &&
 	exec dbus-run-session -- ./ErgoptiPlus.AppImage --appimage-extract-and-run" > "$LOG_DIR/app.log" 2>&1 &
@@ -132,11 +164,11 @@ echo "[OK] The status window is on screen."
 
 icon=""
 for _ in $(seq 1 20); do
-	icon="$(xwininfo -tree -id "$tray_window" | grep -E '^ +0x' | grep -v ' 1x1+' | tail -n 1 || true)"
+	icon="$(xwininfo -tree -id "$tray_window" | grep -E '^ +0x' | grep '("ergopti-plus" ' | tail -n 1 || true)"
 	[ -n "$icon" ] && break
 	sleep 0.5
 done
-[ -n "$icon" ] || stop "No icon docked in stalonetray."
+[ -n "$icon" ] || stop "No icon docked in $tray."
 echo "[OK] The icon docks in an XEmbed tray."
 
 # Quit is the last row of the tray menu: Up from no selection reaches it.

@@ -18,7 +18,7 @@ local MODULES = {
 local ORIGINS = { "https://registry.ollama.ai", "https://blob.ollama.example" }
 
 --- Runs the port over a scripted launcher.
---- @param script function fn(origin) -> exit code, output
+--- @param script function fn(origin) -> exit code, stdout, stderr
 --- @param launcher string|nil The resolved launcher (nil: none).
 --- @return table answer, table calls
 local function run(script, launcher)
@@ -66,8 +66,10 @@ helpers.describe("network check route plan port", function()
 		})
 	end)
 
+	-- Field run 2026-10-27 19:47 read "lookup_failed" for an unreachable PAC:
+	-- the role writes STAGE on stderr and the port only read stdout.
 	helpers.it("stops at the first origin the system settings cannot route, naming the native stage", function()
-		local answer, calls = run(function() return 1, "STAGE native_pac_evaluation\n" end, "/launcher")
+		local answer, calls = run(function() return 78, "", "STAGE native_pac_evaluation\n" end, "/launcher")
 		helpers.assert_eq(answer, { failure = "native_pac_evaluation" })
 		helpers.assert_eq(#calls, 1)
 		helpers.assert_eq(run(function() return nil, "" end, "/launcher").failure, "lookup_failed")

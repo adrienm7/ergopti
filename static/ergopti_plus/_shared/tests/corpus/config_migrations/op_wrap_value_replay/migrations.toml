@@ -1,0 +1,19 @@
+# _shared/tests/corpus/config_migrations/op_wrap_value_replay/migrations.toml
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: a bare switch becomes its feature row."
+ops = [
+	{ op = "wrap_value", section = "hotstrings.dynamic", key = "date", to_key = "enabled" },
+	{ op = "wrap_value", section = "hotstrings.dynamic", key = "date_fr", to_key = "enabled" },
+	{ op = "wrap_value", section = "hotstrings.dynamic", key = "date_long_fr", to_key = "enabled" },
+	{ op = "wrap_value", section = "hotstrings.dynamic", key = "iban_prefixes", to_key = "enabled" },
+	{ op = "wrap_value", section = "hotstrings.dynamic", key = "phone_prefixes", to_key = "enabled" },
+	{ op = "wrap_value", section = "never.written", key = "date", to_key = "enabled" },
+]

@@ -265,7 +265,11 @@ function H.collect_input()
 		end),
 	}
 	local phase = read("the remapping lease", function()
-		return (require("platform.remap.lease_controller").status())
+		-- A boot that stopped before the lease init still collects diagnostics:
+		-- asking status() then logged an ERROR for an answer already known.
+		local LeaseController = require("platform.remap.lease_controller")
+		if LeaseController.is_initialized() ~= true then return "uninitialized" end
+		return (LeaseController.status())
 	end)
 	input.remap_phase = phase and tostring(phase) or nil
 	-- The session's key-event counters: how the taps saw the keys pair up, how

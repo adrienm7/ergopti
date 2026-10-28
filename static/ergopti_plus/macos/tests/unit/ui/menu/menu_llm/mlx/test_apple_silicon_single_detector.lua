@@ -47,6 +47,19 @@ helpers.describe("backend_panel.lua: is_apple_silicon is a single exported sourc
 		)
 	end)
 
+	helpers.it("asks the native process architecture before forking uname", function()
+		-- The menu module calls the detector while it loads at boot; each fork
+		-- cost about 40 ms on the Mac (23:33 field run).
+		local src = read_src("M.is_apple_silicon = is_apple_silicon")
+		local fn_start = src:find("local function is_apple_silicon()", 1, true)
+		local fn_end = src:find("\nend", fn_start, true)
+		local body = src:sub(fn_start, fn_end)
+		local native = body:find("hs.processInfo.arch", 1, true)
+		local fork = body:find('hs.execute("uname -m")', 1, true)
+		helpers.assert_true(native ~= nil and fork ~= nil and native < fork,
+			"is_apple_silicon must read hs.processInfo.arch first and fork uname only without it")
+	end)
+
 	helpers.it("uses uname -m, not a /opt/homebrew filesystem heuristic", function()
 		-- Scope to the is_apple_silicon FUNCTION BODY only, not the whole file —
 		-- the doc comment right above it legitimately mentions the OLD

@@ -125,8 +125,8 @@ check(
 );
 
 // 6. Scores still win over any colour lookup.
-check(getCategoryColor('productivity', 1) === '#30D158', 'a positive score must render green');
-check(getCategoryColor('productivity', -1) === '#FF453A', 'a negative score must render red');
+check(getCategoryColor('productivity', 1) === '#30d158', 'a positive score must render green');
+check(getCategoryColor('productivity', -1) === '#ff453a', 'a negative score must render red');
 
 // 6b. Every stored spelling of the default category, in every shipped language, folds
 //     into the canonical id, and the corpus vectors resolve as the file on disk of
@@ -196,7 +196,9 @@ check(
 
 function loadedPage(host) {
 	const page = loadMetricsAppsPage(host);
-	assert.equal(page.scripts.filter((name) => name !== '#inline').length, 12);
+	assert.equal(page.scripts.filter((name) => name !== '#inline').length, 14);
+	assert.ok(page.scripts.includes('../metrics_calendar.js'));
+	assert.ok(page.scripts.indexOf('../metrics_calendar.js') < page.scripts.indexOf('helpers.js'));
 	assert.equal(
 		page.scripts.includes('script.js'),
 		false,
@@ -360,7 +362,7 @@ for (const host of ['macos', 'linux', 'windows']) {
 					{ type: 'Productivité', score: 0 }
 				);
 				assert.equal(typeof page.context.getAppColor(name, 0), 'string');
-				assert.equal(page.context.getAppColor(name, 1), '#30D158');
+				assert.equal(page.context.getAppColor(name, 1), '#30d158');
 			}
 			page.context.bootstrapMetricsAppsData(manifest, {}, {});
 			const aggregate = page.context.getAggregatedData();
@@ -657,12 +659,12 @@ for (const host of ['macos', 'linux', 'windows']) {
 			for (const spelling of ['Productivity', 'Productivité', 'productivity']) {
 				assert.equal(page.context.categoryToId(spelling), 'productivity');
 				assert.equal(page.context.translateCategory(spelling), 'Productivité');
-				assert.equal(page.context.getCategoryColor(spelling, 0), '#0A84FF');
+				assert.equal(page.context.getCategoryColor(spelling, 0), '#0a84ff');
 			}
 			for (const value of ['', ' \t ', null, undefined, false, true, 42, {}, []]) {
 				assert.equal(page.context.categoryToId(value), 'utility');
 				assert.equal(page.context.translateCategory(value), 'Utilitaires');
-				assert.equal(page.context.getCategoryColor(value, 0), '#64D2FF');
+				assert.equal(page.context.getCategoryColor(value, 0), '#64d2ff');
 			}
 			page.context.updateUserCategories({
 				Empty: { type: '', score: 1 },
@@ -702,8 +704,8 @@ for (const host of ['macos', 'linux', 'windows']) {
 				const color = page.evaluate(`CHART_PALETTE[paletteIndex(${JSON.stringify(label)})]`);
 				assert.equal(page.context.getCategoryColor(label, 0), color);
 				assert.equal(page.context.getCategoryColor(label, 0), color);
-				assert.equal(page.context.getCategoryColor(label, 1), '#30D158');
-				assert.equal(page.context.getCategoryColor(label, -1), '#FF453A');
+				assert.equal(page.context.getCategoryColor(label, 1), '#30d158');
+				assert.equal(page.context.getCategoryColor(label, -1), '#ff453a');
 			}
 		}
 	]);

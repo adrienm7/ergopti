@@ -36,7 +36,11 @@ try {
 	const calls = path.join(scratch, 'calls');
 	for (const directory of [srcdir, pkgdir, stubs]) fs.mkdirSync(directory);
 	fs.symlinkSync(ROOT, path.join(srcdir, 'ergopti'), 'dir');
+	// The recipe builds the bundle below $srcdir/ergopti, which is the real checkout here: the test
+	// owns the build directory instead, so packaging tests that run at once never share build/linux.
+	const build = path.join(scratch, 'build');
 	const staged = spawnSync(bashExecutable(), ['-s', '--', recipe, srcdir, pkgdir, scratch], {
+		env: { ...process.env, ERGOPTI_LINUX_BUILD_DIR: build },
 		input:
 			'set -euo pipefail\nCARCH="$(uname -m)"\nsource "$1"\nsrcdir="$2"\npkgdir="$3"\n' +
 			'printf "%s\\0" "${depends[@]}" > "$4/dependencies"\n' +

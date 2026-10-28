@@ -261,7 +261,7 @@ helpers.describe("LLM API persistence transaction", function()
 					package.loaded["infra.dialog_util"] = {
 						text_prompt = function()
 							prompts = prompts + 1
-							return "OK", ({ "http://127.0.0.1:8000/v1", "inert-form-secret", "selected-model" })[prompts]
+							return "button.ok", ({ "http://127.0.0.1:8000/v1", "inert-form-secret", "selected-model" })[prompts]
 						end,
 						block_alert = function() return "button.cancel" end,
 					}

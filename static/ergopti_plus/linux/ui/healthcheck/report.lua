@@ -15,8 +15,10 @@
 ---    policy. Free text, paths and unknown fields are excluded regardless of
 ---    the page or details checkbox. Only approved technical content leaves.
 --- 2. The clipboard and attachment hold the complete approved report.
----    GitHub receives stable host version, OS and driver metadata. Editable
----    fields stay out of the URL; the browser opens after attachment reveal.
+---    The form is prefilled with the host version, OS and driver and the compact
+---    report (tables, no JSON block), cut to the URL budget with a note that the
+---    complete report is on the clipboard and in the saved file. The browser opens
+---    after attachment reveal.
 --- 3. Paths come from the snapshot the host collected, by field id; a folder
 ---    that does not exist yet is created before it is opened; a file that does
 ---    not exist yet (today's errors file before the day's first warning) is

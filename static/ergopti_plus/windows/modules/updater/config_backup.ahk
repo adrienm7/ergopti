@@ -221,7 +221,8 @@ ConfigBackup_Create(ConfigDir, Kind, Tag := "", FromVersion := "", Rules := 0, C
 	; Collision numbers retain creation order even after older copies are removed.
 	Id := _ConfigBackup_NextId(Folder, Id)
 	BackupPath := Folder . "\" . Id
-	FSEnsureDirectoryStrict(BackupPath)
+	; The allocator's absence check does not acquire a racing producer's path.
+	FSCreateDirectoryExclusiveStrict(BackupPath)
 	FilesJson := []
 	for _, Relative in Files {
 		Copy := _ConfigBackup_Join(BackupPath, "config/" . Relative)
@@ -272,10 +273,17 @@ _ConfigBackup_Load(ConfigDir, Id, Rules) {
 	ManifestPath := BackupPath . "\" . Rules["manifest"]
 	if !FSExists(ManifestPath)
 		return 0
-	try Record := JsonParse(FSReadStrict(ManifestPath))
-	catch
+	try {
+		Source := FSReadStrict(ManifestPath)
+		Record := JsonParse(Source)
+	} catch
 		return 0
-	if !(Record is Map) || !Record.Has("schema_version") || Record["schema_version"] != CONFIG_BACKUP_SCHEMA_VERSION
+	if !(Record is Map) || !Record.Has("schema_version")
+		return 0
+	; The same validated source owns the decoded member and its exact kind.
+	; Native true and numeric strings cannot acquire numeric schema authority.
+	SchemaKind := JsonObjectMemberSpans(Source)["schema_version"]["kind"]
+	if SchemaKind != "number" || Record["schema_version"] != CONFIG_BACKUP_SCHEMA_VERSION
 			|| !Record.Has("id") || Record["id"] != Id || !Record.Has("kind") || !Rules["kinds"].Has(Record["kind"])
 			|| !Record.Has("files") || !(Record["files"] is Array)
 		return 0
@@ -287,11 +295,11 @@ _ConfigBackup_Load(ConfigDir, Id, Rules) {
 			return 0
 	}
 	Files := []
-	for _, File in Record["files"] {
-		if !(File is Map) || !File.Has("root") || File["root"] != "config" || !File.Has("path")
-				|| !ConfigBackup_IsContained(File["path"])
+	for _, BackupFile in Record["files"] {
+		if !(BackupFile is Map) || !BackupFile.Has("root") || BackupFile["root"] != "config" || !BackupFile.Has("path")
+				|| !ConfigBackup_IsContained(BackupFile["path"])
 			return 0
-		Files.Push(File["path"])
+		Files.Push(BackupFile["path"])
 	}
 	return Map("id", Id, "path", BackupPath, "kind", Record["kind"],
 		"created_at", Record["created_at"],

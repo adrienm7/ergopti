@@ -18,6 +18,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { createHash } = require('node:crypto');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const { provideShellMessages } = require('./lib/shell-messages-fixture.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-login-startup-'));
@@ -41,6 +42,7 @@ try {
 			path.join(installed, helper)
 		);
 	}
+	provideShellMessages(installed);
 	// Git Bash cannot reliably chmod NTFS directories; permission semantics are
 	// exercised by the unchanged helper on Linux CI.
 	if (process.platform === 'win32') {

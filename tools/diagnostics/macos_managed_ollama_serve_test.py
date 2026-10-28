@@ -239,7 +239,7 @@ class ProductionServeControls(unittest.TestCase):
             self.assertEqual(owner.operation.request["models_path"], "")
             self.assertFalse((self.home / ".ollama/models").exists())
 
-    def test_explicit_proxy_certificate_and_bypass_original_case_and_bytes_survive(self):
+    def test_explicit_proxy_and_bypass_survive_and_inherited_trust_is_dropped(self):
         settings = {
             "HTTPS_PROXY": "http://user:synthetic-secret@relay.invalid:8080",
             "all_proxy": "socks5://other.invalid:1080",
@@ -254,7 +254,17 @@ class ProductionServeControls(unittest.TestCase):
                     owner.bootstrap._written, owner.session._written, owner.session.data["token"]
                 )
             )
-            self.assertEqual(dict(payload["environment"]), settings)
+            # macOS downloads use the system and keychain trust only: the
+            # daemon owner never seals an inherited CA bundle or folder.
+            self.assertEqual(
+                dict(payload["environment"]),
+                {
+                    name: value
+                    for name, value in settings.items()
+                    if name not in ("SSL_CERT_FILE", "SSL_CERT_DIR")
+                },
+            )
+            self.assertEqual(os.environ["SSL_CERT_FILE"], settings["SSL_CERT_FILE"])
             public = json.dumps(owner.operation.request)
             self.assertNotIn("synthetic-secret", public)
             self.assertNotIn("account.pem", public)

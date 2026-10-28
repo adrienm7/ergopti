@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_dynamic_switch_row_replay_unchanged/case.toml
+
+[case]
+description = "Replaying the v16 step on rows it already wrote changes nothing but the stamp: a feature row stored as a table is never wrapped again."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 15
+to_version = 16

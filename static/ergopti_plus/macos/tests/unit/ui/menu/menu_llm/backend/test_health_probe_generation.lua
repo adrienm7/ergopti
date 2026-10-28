@@ -28,7 +28,8 @@ local MODULES = {
 	"ui.menu.menu_llm.warmup_controller",
 	"ui.menu.menu_llm.trigger_panel",
 	"ui.menu.menu_llm.api_panel",
-	"ui.menu.menu_llm.models_selector",
+	"ui.menu.menu_llm.model_selector_page",
+	"ui.menu.menu_llm.custom_models",
 	"ui.menu.menu_llm.model_switcher",
 	"ui.menu.menu_llm.activation_pause_owner",
 	"ui.menu.menu_llm.prediction_lock_registry",
@@ -193,10 +194,7 @@ local function build_fixture(callback, options)
 		}
 		package.loaded["ui.menu.menu_llm.api_panel"] = {
 			build = function() return nil, nil end,
-			build_model_picker = function() return {} end,
-		}
-		package.loaded["ui.menu.menu_llm.models_selector"] = {
-			build = function() return {} end,
+			active_entry_caption_text = function() return nil end,
 		}
 		package.loaded["ui.menu.menu_llm.model_switcher"] = {
 			new = function()
@@ -406,18 +404,32 @@ local function find_row(rows, identity)
 	return nil
 end
 
-local function find_nested_action(item, parent_identity, action_identity)
-	local parent = find_row(item and item.submenu, parent_identity)
-	helpers.assert_type(parent, "table")
-	local row = find_row(parent.menu, action_identity)
-	helpers.assert_type(row, "table")
-	helpers.assert_type(row.action, "function")
-	return row.action
+--- The Backend selection the model selector page runs (the Backend submenu
+--- left the tray on 2026-10-27; its rows' actions are collected by the page).
+local function backend_action(target)
+	local collected = require("ui.menu.menu_llm.model_selector_page").collected()
+	helpers.assert_type(collected, "table")
+	helpers.assert_type(collected.select[target], "function")
+	return collected.select[target]
+end
+
+--- The MLX port tool of the page's MLX group.
+local function port_action()
+	return function() return require("ui.menu.menu_llm.model_selector_page").group_action("mlx", "mlx_port") end
+end
+
+--- The tray's model button: health dot, then the backend's emoji.
+local function model_button(item, fixture)
+	local emoji = require("ui.menu.menu_llm.backend_labels").emoji(fixture.state.llm_backend)
+	for _, row in ipairs(item and item.submenu or {}) do
+		if type(row.title) == "string" and row.title:find(emoji .. " ", 1, true) then return row end
+	end
+	return nil
 end
 
 local function build_and_assert_red(fixture)
 	local item = fixture.handler.build_item()
-	local model_row = find_row(item.submenu, "menu.llm.model_label")
+	local model_row = model_button(item, fixture)
 	helpers.assert_type(model_row, "table")
 	helpers.assert_true(model_row.title:find("🔴 ", 1, true) == 1,
 		"an invalidated health cache must render the current backend as unprobed")
@@ -430,9 +442,7 @@ helpers.describe("LLM health probe ownership", function()
 			with_fixture(function(fixture)
 				local item = fixture.handler.build_item()
 				helpers.assert_eq(#fixture.probes, 1)
-				local target_identity = target == "api" and "API 🌐" or "Ollama 🦙"
-				find_nested_action(
-					item, "MLX 🚀", target_identity)()
+				backend_action(target)()
 				local updates_before_stale = fixture.updates()
 				fixture.probes[1].completion(200)
 				helpers.assert_eq(fixture.updates(), updates_before_stale,
@@ -468,7 +478,7 @@ helpers.describe("LLM health probe ownership", function()
 
 		with_fixture(function(fixture)
 			local item = build_and_assert_red(fixture)
-			local model_row = find_row(item.submenu, "menu.llm.model_label")
+			local model_row = model_button(item, fixture)
 			helpers.assert_type(model_row, "table")
 			helpers.assert_true(model_row.title:find("🔴 ", 1, true) == 1)
 			local updates_before_current = fixture.updates()
@@ -476,8 +486,7 @@ helpers.describe("LLM health probe ownership", function()
 			helpers.assert_eq(fixture.updates(), updates_before_current + 1,
 				"the current MLX probe must commit and repaint exactly once")
 			local refreshed = fixture.handler.build_item()
-			local refreshed_model = find_row(
-				refreshed.submenu, "menu.llm.model_label")
+			local refreshed_model = model_button(refreshed, fixture)
 			helpers.assert_type(refreshed_model, "table")
 			helpers.assert_true(refreshed_model.title:find("🟡 ", 1, true) == 1,
 				"a committed current MLX response must render the reachable state")
@@ -546,17 +555,14 @@ helpers.describe("LLM health probe ownership", function()
 			fixture.state.llm_model_mlx = "A"
 			fixture.set_stop_mode("deferred")
 			local item = fixture.handler.build_item()
-			local port_action = find_nested_action(
-				item, "menu.llm.model_label", "MLX server port")
-			local backend_action = find_nested_action(
-				item, "MLX 🚀", "API 🌐")
-			helpers.assert_eq(type(port_action), "function")
-			helpers.assert_eq(type(backend_action), "function")
+			helpers.assert_type(item, "table")
+			local port = port_action()
+			local backend = backend_action("api")
 
-			helpers.assert_eq(port_action(), true)
+			helpers.assert_eq(port(), true)
 			helpers.assert_eq(fixture.pending_stop_kind(), "port")
 			helpers.assert_eq(fixture.port(), 3460)
-			helpers.assert_eq(backend_action(), true)
+			helpers.assert_eq(backend(), true)
 			helpers.assert_eq(fixture.pending_stop_kind(), "backend")
 			helpers.assert_eq(fixture.state.llm_backend, "mlx")
 			helpers.assert_eq(fixture.settle_stop(), true)
@@ -573,14 +579,13 @@ helpers.describe("LLM health probe ownership", function()
 			fixture.state.llm_model_mlx = "A"
 			fixture.set_stop_mode("deferred")
 			local item = fixture.handler.build_item()
-			local port_action = find_nested_action(
-				item, "menu.llm.model_label", "MLX server port")
-			local backend_action = find_nested_action(
-				item, "MLX 🚀", "API 🌐")
+			helpers.assert_type(item, "table")
+			local port = port_action()
+			local backend = backend_action("api")
 
-			helpers.assert_eq(backend_action(), true)
+			helpers.assert_eq(backend(), true)
 			helpers.assert_eq(fixture.pending_stop_kind(), "backend")
-			helpers.assert_eq(port_action(), true)
+			helpers.assert_eq(port(), true)
 			helpers.assert_eq(fixture.pending_stop_kind(), "port")
 			helpers.assert_eq(fixture.settle_stop(), true)
 			helpers.assert_eq(fixture.state.llm_backend, "mlx",
@@ -607,20 +612,14 @@ helpers.describe("API active commands: actual native pause context", function()
 				get_entries = function() return { entry } end,
 				get_active_entry = function() return entry end,
 				get_active_entry_id = function() return entry.id end,
+				entry_key_missing = function() return false end,
 				get_test_request_spec = function() return {} end,
 				test_request = function() requests = requests + 1; return true end,
 			}
 			fixture.state.llm_backend = "api"
-			local item = fixture.handler.build_item()
-			local native_label = package.loaded["infra.manifest_menu"].command_row(
-				"llm_api_active_commands", "api_test_active", { api_test_active = function() end },
-				{ llm_api_active_ready = function() return true end }).label
-			local held
-			for _, parent in ipairs(item.submenu or {}) do
-				for _, row in ipairs(parent.menu or {}) do
-					if row.label == native_label then held = row.action end
-				end
-			end
+			fixture.handler.build_item()
+			-- The page collects the real API panel's Test action.
+			local held = require("ui.menu.menu_llm.model_selector_page").collected().test_active
 			helpers.assert_type(held, "function", "the real native API provider supplies the active Test row")
 			paused = true
 			local observed = held()

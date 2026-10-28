@@ -15,25 +15,26 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local MetricsState = require("infra.metrics_state_keys")
 
 -- id -> canonical disabled_when key array (order matches the manifest).
 local CANON = {
-	{ id = "show_typing",        keys = { "keystats_enabled" } },
-	{ id = "show_apps",          keys = { "keystats_enabled" } },
-	{ id = "wpm_menubar",        keys = { "keystats_enabled" } },
-	{ id = "menubar_colors",     keys = { "keystats_enabled", "wpm_menubar_visible" } },
-	{ id = "wpm_widget",         keys = { "keystats_enabled" } },
-	{ id = "widget_colors",      keys = { "keystats_enabled", "wpm_widget_visible" } },
-	{ id = "include_realtime",   keys = { "keystats_enabled", "wpm_widget_visible" } },
-	{ id = "reset_wpm_position", keys = { "keystats_enabled", "wpm_widget_visible" } },
-	{ id = "filter_private",     keys = { "keystats_enabled" } },
-	{ id = "filter_secure",      keys = { "keystats_enabled" } },
-	{ id = "filter_sysauth",     keys = { "keystats_enabled" } },
-	{ id = "exclude_apps",       keys = { "keystats_enabled" } },
-	{ id = "encryption",         keys = { "keystats_enabled" } },
+	{ id = "show_typing",        keys = { MetricsState.ENABLED } },
+	{ id = "show_apps",          keys = { MetricsState.ENABLED } },
+	{ id = "wpm_menubar",        keys = { MetricsState.ENABLED } },
+	{ id = "menubar_colors",     keys = { MetricsState.ENABLED, "wpm_menubar_visible" } },
+	{ id = "wpm_widget",         keys = { MetricsState.ENABLED } },
+	{ id = "widget_colors",      keys = { MetricsState.ENABLED, "wpm_widget_visible" } },
+	{ id = "include_realtime",   keys = { MetricsState.ENABLED, "wpm_widget_visible" } },
+	{ id = "reset_wpm_position", keys = { MetricsState.ENABLED, "wpm_widget_visible" } },
+	{ id = "filter_private",     keys = { MetricsState.ENABLED } },
+	{ id = "filter_secure",      keys = { MetricsState.ENABLED } },
+	{ id = "filter_sysauth",     keys = { MetricsState.ENABLED } },
+	{ id = "exclude_apps",       keys = { MetricsState.ENABLED } },
+	{ id = "encryption",         keys = { MetricsState.ENABLED } },
 }
 
-local ALL_KEYS = { "keystats_enabled", "wpm_widget_visible", "wpm_menubar_visible" }
+local ALL_KEYS = { MetricsState.ENABLED, "wpm_widget_visible", "wpm_menubar_visible" }
 
 local function all_true_getters()
 	local g = {}
@@ -248,5 +249,33 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 			"STATE_GETTERS must map wpm_widget_visible to state.keystats_float_wpm")
 		helpers.assert_true(src:find("wpm_menubar_visible%s*=%s*function%(%) return state%.keystats_menubar_wpm end") ~= nil,
 			"STATE_GETTERS must map wpm_menubar_visible to state.keystats_menubar_wpm")
+	end)
+	helpers.it("every flat metrics state name the manifest reads is declared once and owned by a preference", function()
+		local declared = {}
+		for _, value in pairs(MetricsState) do declared[value] = true end
+		local file = assert(io.open(helpers.shared("modules/menu/menu_manifest.json"), "rb"))
+		local manifest_text = file:read("*a"); file:close()
+		local used, named = {}, 0
+		for name in manifest_text:gmatch('"(keystats_[%w_]+)"') do
+			used[name] = true
+			named = named + 1
+		end
+		helpers.assert_true(named > 0, "the manifest must still name its metrics state")
+		for name in pairs(used) do
+			helpers.assert_true(declared[name] == true,
+				name .. " is read by the manifest but not declared in infra/metrics_state_keys.lua")
+		end
+		local Preferences = require("infra.preferences")
+		local owned = {}
+		for _, path in pairs(require("config_keys").KEY) do
+			if path:sub(1, 8) == "metrics." then
+				local flat = Preferences.flat_key_for(path)
+				if flat then owned[flat] = true end
+			end
+		end
+		for name in pairs(declared) do
+			helpers.assert_true(owned[name] == true,
+				name .. " is declared but the preference map owns no metrics path under it")
+		end
 	end)
 end)

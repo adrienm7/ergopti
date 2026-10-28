@@ -55,7 +55,7 @@ body {
 	:root {
 		--surface: #242424;
 		--hint: #a2a2a2;
-		--accent2: #bf5af2;
+		--accent2: var(--theme-purple-dark);
 		--row-sep: var(--theme-gray4-dark);
 		--shadow: none;
 		--tag-bg: var(--theme-gray4-dark);
@@ -355,7 +355,7 @@ body {
 	background: var(--accent);
 	border: 1px solid var(--accent);
 	border-radius: 3px;
-	color: #fff;
+	color: var(--theme-white);
 	display: inline-block;
 	font-family: 'SF Mono', Menlo, monospace;
 	font-size: 10.5px;
@@ -411,7 +411,7 @@ body {
 	background: var(--accent);
 	border: none;
 	border-radius: 7px;
-	color: #fff;
+	color: var(--theme-white);
 	cursor: pointer;
 	display: flex;
 	font-size: 13px;
@@ -506,7 +506,7 @@ body {
 
 .btn-p {
 	background: var(--accent);
-	color: #fff;
+	color: var(--theme-white);
 }
 
 .btn-s {
@@ -625,7 +625,7 @@ body {
 /* Distinct accent fill so the priority chip reads apart from the boolean flags. */
 .tag-prio {
 	background: var(--accent, var(--theme-blue));
-	color: #fff;
+	color: var(--theme-white);
 }
 
 .cbs {
@@ -988,7 +988,7 @@ body {
 .token-chip[data-trig-char] {
 	background: var(--accent);
 	border-color: var(--accent);
-	color: #fff;
+	color: var(--theme-white);
 }
 
 #ac-popup {
@@ -1204,7 +1204,7 @@ details.cmd-help[open] summary::before {
 	background: var(--theme-gray6-dark);
 	border-radius: 8px;
 	bottom: 14px;
-	color: #fff;
+	color: var(--theme-white);
 	font-size: 12px;
 	left: 50%;
 	opacity: 0;

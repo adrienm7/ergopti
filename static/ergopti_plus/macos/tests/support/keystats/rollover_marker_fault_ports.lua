@@ -16,7 +16,7 @@ function M.install(options)
 	local open, remove, native_type = io.open, os.remove, io.type
 	local underlying = setmetatable({}, { __mode = "k" })
 	io.type = function(value) return native_type(underlying[value] or value) end
-	local publish, release = adapter.write_if_unchanged, adapter.release_write_locks
+	local publish, release = adapter.write_private_if_unchanged, adapter.release_write_locks
 	local function once(name)
 		if not state.armed or state.faults ~= 0 or case ~= name then return false end
 		state.faults = 1
@@ -31,7 +31,7 @@ function M.install(options)
 		local value = status == "ok" and receipt(content)
 		return value and value.version == 2 and value.kind == "rollover"
 	end
-	adapter.write_if_unchanged = function(path, content, expected, ...)
+	adapter.write_private_if_unchanged = function(path, content, expected, ...)
 		if path == ledger .. ".append-journal.json" then
 			local value = receipt(content)
 			if value and value.version == 2 then
@@ -130,7 +130,7 @@ function M.install(options)
 	function state.restore()
 		state.armed = false
 		io.open, os.remove, io.type = open, remove, native_type
-		adapter.write_if_unchanged, adapter.release_write_locks = publish, release
+		adapter.write_private_if_unchanged, adapter.release_write_locks = publish, release
 	end
 	return state
 end

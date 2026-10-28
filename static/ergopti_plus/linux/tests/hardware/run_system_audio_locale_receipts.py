@@ -14,11 +14,24 @@ import time
 
 
 WORKER = r"""
+local Calendar = require("modules.keystats.calendar")
 local Metrics = require("modules.keystats.system_metrics")
 local interval = Metrics._sample_interval_ms()
 local date = "2026-01-02"
-Metrics.sample(0, date)
-local day = assert(Metrics.sample(interval, date))
+-- The sampler reads its own producer clock and needs the collector's
+-- recording-policy authority; both are explicit fixture inputs here.
+Metrics.bind_event_capture(function() return true end)
+local wall = os.time({ year = 2026, month = 1, day = 2, hour = 12 })
+local function sample(mono_ms)
+    Calendar.capture = function()
+        local at = wall + mono_ms / 1000
+        return { wall_ms = at * 1000, mono_ms = mono_ms, date = date,
+            ts = os.date("!%Y-%m-%d %H:%M:%S", math.floor(at)) }
+    end
+    return Metrics.sample()
+end
+sample(0)
+local day = assert(sample(interval))
 local expected = os.getenv("ERGOPTI_NATIVE_AUDIO_MUTED") == "true" and interval or 0
 assert(day.audio_muted_ms == expected, "localized native mute state lost or invented elapsed time")
 assert(day.awake_ms == interval and day.sleep_ms == 0)

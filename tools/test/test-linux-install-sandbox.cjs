@@ -484,9 +484,7 @@ const errors = [];
 				errors.push(`install.sh never asked the package manager for ${pkg}`);
 			}
 		}
-		if (
-			!/icône de la barre système \(libayatana-appindicator\) — capacité vérifiée/.test(run.output)
-		) {
+		if (!/system tray icon \(libayatana-appindicator\) — capability verified/.test(run.output)) {
 			errors.push('the tray backend was not re-probed after its package was installed');
 		}
 	} finally {
@@ -511,7 +509,15 @@ const errors = [];
 		if (!fs.existsSync(path.join(run.home, '.local', 'bin', 'ergopti-hotstrings'))) {
 			errors.push('no launcher was installed after an optional Lua package failed');
 		}
-		if (!/posix \(signaux SIGTERM\/SIGHUP\) indisponible pour LuaJIT/.test(run.output)) {
+		// The installer prints in the session's language (C.UTF-8 here: English), so the
+		// expected line is built from the catalogue rather than spelled in one locale.
+		const catalogue = JSON.parse(
+			fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/locales/en.json'), 'utf8')
+		);
+		const degraded = catalogue['linux_shell.install.lua_module_degraded']
+			.replace('{1}', 'posix')
+			.replace('{2}', catalogue['linux_shell.install.label_posix']);
+		if (!run.output.includes(degraded)) {
 			errors.push('an optional Lua module that stayed unavailable was not reported');
 		}
 	} finally {

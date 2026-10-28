@@ -6,8 +6,10 @@
 # account in passwd. A graphical launcher may explicitly enroll its own UID.
 
 set -euo pipefail
+# The sentences this script prints, in the user's language (install/messages.sh).
+source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-[ "$(id -u)" = 0 ] || { echo 'Input setup requires administrator privileges.' >&2; exit 77; }
+[ "$(id -u)" = 0 ] || { ergopti_msg permissions.requires_admin >&2; exit 77; }
 # Accounts and groups resolve through NSS (LDAP, sssd), so through getent;
 # without it nothing is changed (EX_UNAVAILABLE). The stderr line is a
 # machine-readable token, not a sentence: the Lua caller localizes it
@@ -23,10 +25,10 @@ esac
 resolve_user() {
 	local uid="$1" entry name password resolved_uid rest
 	[[ "$uid" =~ ^[0-9]+$ ]] && [ "$uid" -ge 1000 ] && [ "$uid" -ne 65534 ] \
-		|| { echo 'Refusing a non-desktop account.' >&2; return 1; }
+		|| { ergopti_msg permissions.non_desktop_account >&2; return 1; }
 	entry="$(getent passwd "$uid")"
 	IFS=: read -r name password resolved_uid rest <<< "$entry"
-	[ "$resolved_uid" = "$uid" ] && [ -n "$name" ] || { echo 'Account identity mismatch.' >&2; return 1; }
+	[ "$resolved_uid" = "$uid" ] && [ -n "$name" ] || { ergopti_msg permissions.identity_mismatch >&2; return 1; }
 	printf '%s\n' "$name"
 }
 
@@ -68,7 +70,7 @@ elif command -v loginctl >/dev/null 2>&1; then
 			# A user can log out between enumeration and inspection. Read one
 			# snapshot; the launcher owns enrollment if this session disappears.
 			if ! properties="$(loginctl show-session "$session" -p Type -p Remote -p Class -p Active -p User)"; then
-				echo "Session $session could not be inspected; enrollment is deferred to graphical launch." >&2
+				ergopti_msg permissions.session_uninspectable "$session" >&2
 				continue
 			fi
 			type= remote= class= active= uid=
@@ -83,16 +85,16 @@ elif command -v loginctl >/dev/null 2>&1; then
 			esac
 		done <<< "$sessions"
 	else
-		echo 'No login manager is running; user enrollment is deferred to graphical launch.' >&2
+		ergopti_msg permissions.no_login_manager >&2
 	fi
 fi
 
 if ! modprobe uinput; then
-	echo 'The current kernel could not load uinput; its next-boot configuration is installed.' >&2
+	ergopti_msg permissions.uinput_next_boot >&2
 fi
 if [ -S /run/udev/control ]; then
 	udevadm control --reload-rules
 	udevadm trigger --subsystem-match=misc --sysname-match=uinput
 else
-	echo 'udev is not running; the installed rule will apply when it starts.' >&2
+	ergopti_msg permissions.udev_not_running >&2
 fi

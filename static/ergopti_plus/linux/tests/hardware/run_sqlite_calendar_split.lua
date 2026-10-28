@@ -21,6 +21,9 @@ assert(config:write("[metrics]\nenabled = true\n") and config:close())
 local Keystats = require("modules.keystats.keystats")
 local Writer = require("modules.keystats.sqlite_writer")
 local Reader = require("modules.keystats.sqlite_reader")
+local Calendar = require("modules.keystats.calendar")
+local Monotonic = require("infra.monotonic")
+local native_capture = Calendar.capture
 local fixtures = {
 	{ name = "25-hour DST end late evening", year = 2026, month = 10, day = 25, hour = 23, min = 30, previous = "2026-10-24" },
 	{ name = "midnight after 23-hour DST start", year = 2026, month = 3, day = 30, hour = 0, min = 30, previous = "2026-03-29" },
@@ -42,6 +45,12 @@ for i, fixture in ipairs(fixtures) do
 	local instant = native_time({ year = fixture.year, month = fixture.month, day = fixture.day, hour = fixture.hour, min = fixture.min, sec = 0 })
 	os.date = function(format, timestamp) return native_date(format, timestamp or instant) end
 	os.time = function(date) return date and native_time(date) or instant end
+	-- Capture reads the native wall clock (uv.gettimeofday), not os.time, so the
+	-- owned instant must reach the collector through its calendar observation.
+	Calendar.capture = function()
+		return { wall_ms = instant * 1000, mono_ms = math.floor(Monotonic.now_ms()),
+			date = native_date("%Y-%m-%d", instant), ts = native_date("!%Y-%m-%d %H:%M:%S", instant) }
+	end
 	local path = root .. "/owned-" .. i .. ".sqlite"
 	Writer.close_db()
 	local ok, err = xpcall(function()
@@ -62,7 +71,7 @@ for i, fixture in ipairs(fixtures) do
 		assert(Writer.get_revision() == revision)
 		assert(table.concat(assert(Writer.query_rows("SELECT date,app,token,c FROM ngram_chars ORDER BY date,token;")), "\n") == before)
 	end, debug.traceback)
-	os.date, os.time = native_date, native_time
+	os.date, os.time, Calendar.capture = native_date, native_time, native_capture
 	if ok then print("PASS " .. fixture.name) else
 		failures = failures + 1
 		io.stderr:write("FAIL " .. fixture.name .. ": " .. tostring(err) .. "\n")
