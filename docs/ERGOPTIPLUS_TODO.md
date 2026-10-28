@@ -92,8 +92,10 @@ a sealed Windows updater source, reseal with
 - **Last full preflight:** run 40629486396 on 970dabee78 (third v1.0.7 release commit) had 110 green of
   112, the two reds fixed by 46c71708e0 (two AHK locals shadowing the built-ins `Any` and `IsAlnum` under
   `#Warn All`) and 793e4afe8f (the cold official-Ollama receiver now checks the binary at
-  `binary.managed_executable_path()`). The fourth v1.0.7 release commit sits on top and a new full run
-  qualifies it before `main`. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
+  `binary.managed_executable_path()`). Run 40635488254 on ba241a2ef6 (fourth release commit) had one red,
+  Windows ui (4 cases): the error-startup child now loads the diagnostics owners and three locals shadowed
+  the `File` and `Type` built-ins under `#Warn All`, renamed by 649070a6f4. The fifth v1.0.7 release commit
+  sits on top and a new full run qualifies it before `main`. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
   `CFMessagePortSendRequest FAILED(-1)` (the runner's TSM UI server), rerun that job once.
 - **Decide after v1.0.7 [CI]:** since bc09e4584c no product path calls the stock
   `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
