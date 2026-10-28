@@ -166,6 +166,8 @@
 		"test:windows-dev-script": "node ./tools/test/test-windows-dev-script.cjs",
 		"test:windows-control-cli": "node ./tools/test/test-windows-control-cli.cjs",
 		"test:macos-field-run-contract": "node ./tools/test/test-macos-field-run-contract.cjs",
+		"test:linux-field-report-contract": "node ./tools/test/test-linux-field-report-contract.cjs",
+		"test:windows-field-report-contract": "node ./tools/test/test-windows-field-report-contract.cjs",
 		"test:macos-bundle-payload": "node ./tools/test/test-macos-bundle-payload.cjs",
 		"test:macos-keyboard-layout-bundle": "node ./tools/test/test-macos-keyboard-layout-bundle.cjs",
 		"test:macos-launcher-universal": "node ./tools/test/test-macos-launcher-universal.cjs",

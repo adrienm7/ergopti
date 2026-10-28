@@ -568,6 +568,23 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-control-cli.cjs", "--phase=result"],
 			"repro": "node tools/test/test-windows-control-cli.cjs --phase=result"
+		},
+		{
+			"id": "js-linux-field-report-contract",
+			"ordinal": 532,
+			"name": "the Linux field report collector derives its field branch, names its base and commits its logs like the macOS one",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-linux-field-report-contract.cjs"],
+			"repro": "npm run test:linux-field-report-contract",
+			"platforms": ["linux", "darwin"]
+		},
+		{
+			"id": "js-windows-field-report-contract",
+			"ordinal": 533,
+			"name": "the Windows field report collector derives its field branch, names its base and commits its logs like the macOS one",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-field-report-contract.cjs"],
+			"repro": "npm run test:windows-field-report-contract"
 		}
 	]
 }
