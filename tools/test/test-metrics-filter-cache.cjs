@@ -3470,7 +3470,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 			const selection = JSON.stringify(Array.from(page.context.get_app_selection_request_apps()));
 			const posts = page.posts.length;
 			for (const locale of typingCaptionCatalogues) {
-				for (const key of ['ui_typing.apps_none', 'ui_typing.apps_all'])
+				for (const key of ['ui_typing.apps_none', 'ui_typing.apps_all', 'ui_typing.apps_some'])
 					assert.equal(
 						typeof locale.strings[key],
 						'string',
@@ -3478,7 +3478,12 @@ for (const host of ['windows', 'macos', 'linux']) {
 					);
 				page.context._i18n_locale = locale.name.slice(0, -5);
 				page.context.i18n_apply(locale.strings);
-				if (mode === 'subset') assert.ok(button.innerText.includes('(1/2)'));
+				if (mode === 'subset')
+					assert.equal(
+						button.innerText,
+						locale.strings['ui_typing.apps_some'].replace('{n}', 1).replace('{total}', 2),
+						`${locale.name} keeps the selected count in its declared caption`
+					);
 				else
 					assert.equal(
 						button.innerText,
