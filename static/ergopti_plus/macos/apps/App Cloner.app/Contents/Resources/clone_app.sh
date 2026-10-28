@@ -25,7 +25,13 @@ if [[ "$DIAG" != /dev/null ]]; then
 fi
 
 log() {
-	echo "$@" >> "$DIAG" || { local log_status=$?; exit "$log_status"; }
+	(
+		trap - EXIT
+		trap '' PIPE
+		trap 'exit "$LOG_XFSZ_STATUS"' XFSZ
+		IFS=' '
+		printf '%s\n' "$*" >> "$DIAG"
+	) || { local log_status=$?; exit "$log_status"; }
 }
 
 # Mirror clone_app.sh stdout/stderr only into this run's owned log.
@@ -43,6 +49,19 @@ PWA_MODE="${7:-0}"        # 1 = clone is a WKWebView PWA pointing at OPEN_ARG (U
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 QUOTE_HELPER="$SCRIPT_DIR/quote_launcher_values.py"
 source "$SCRIPT_DIR/reserve_bundle.sh"
+
+LOG_XFSZ_SIGNAL="$(kill -l XFSZ)" || {
+	log_signal_status=$?
+	printf 'Error: cannot determine the log file-size signal number\n' >&2
+	exit "$log_signal_status"
+}
+case "$LOG_XFSZ_SIGNAL" in
+	''|0|0*|*[!0-9]*)
+		printf 'Error: invalid log file-size signal number: %s\n' "$LOG_XFSZ_SIGNAL" >&2
+		exit 1
+		;;
+esac
+LOG_XFSZ_STATUS=$((128 + LOG_XFSZ_SIGNAL))
 
 [[ -f "$QUOTE_HELPER" ]] || { echo "Error: launcher literal helper missing"; exit 1; }
 
@@ -1351,4 +1370,4 @@ DOCKEOF
 # return value, so we end with just the bundle path. The diagnostic file
 # location is in the log itself if needed.
 CLONE_COMPLETE=1
-echo "$DEST"
+printf '%s\n' "$DEST"

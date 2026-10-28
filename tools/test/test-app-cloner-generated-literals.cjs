@@ -16,6 +16,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const { pythonExecutable } = require('../lib/python.cjs');
 const {
 	resolvePython,
 	resolvePythonForBash,
@@ -71,6 +72,7 @@ const hostile = [
 	"apostrophe ' plus backslash \\\ and $HOME `uname`",
 	'first line\nsecond line\\'
 ];
+let fixtureCanRetire = true;
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launcher-literals-'));
 
 try {
@@ -103,6 +105,146 @@ try {
 		fixtureRoot,
 		toBashPath
 	});
+	if (process.platform !== 'win32') {
+		const physicalPython = pythonExecutable();
+		fixtureCanRetire = false;
+		const physicalRun = spawnSync(
+			physicalPython,
+			[
+				path.join(ROOT, 'tools/test/lib/app-cloner-log-cleanup-probe.py'),
+				'--palette',
+				path.join(ROOT, 'static/ergopti_plus/_shared/data/native_theme.toml'),
+				'--resources',
+				path.dirname(portedCloneScript),
+				'--shell',
+				bash,
+				'--fixture',
+				path.join(fixtureRoot, 'physical-log-cleanup')
+			],
+			{
+				encoding: 'utf8',
+				timeout: 15000,
+				env: {
+					...process.env,
+					REAL_PYTHON: physicalPython,
+					OWNED_STAT_QUERY: statQuery,
+					OWNED_STAT_FAULT: ''
+				}
+			}
+		);
+		if (physicalRun.error)
+			throw new Error(
+				`Physical CLI probe failed: ${physicalRun.error.message}; ${physicalRun.stderr}; retain ${fixtureRoot}`
+			);
+		const physical = JSON.parse(physicalRun.stdout);
+		fixtureCanRetire = physical.ownership_closed === true;
+		if (!fixtureCanRetire)
+			throw new Error(
+				`Physical CLI ownership is unknown; retain ${fixtureRoot}: ${physicalRun.stdout}`
+			);
+		const signalExit = 128 + os.constants.signals.SIGXFSZ;
+		const expectedPhysical = {
+			'clone:healthy': 0,
+			'clone:finite': signalExit,
+			'clone:foreign': signalExit,
+			'clone:refusal': signalExit,
+			'clone:deadpipe': signalExit,
+			'clone:deadpipe-foreign': signalExit,
+			'clone:deadpipe-refusal': signalExit,
+			'clone:child-default': signalExit,
+			'clone:backslash-c': 0,
+			'clone:backslash-t': 0,
+			'clone:result-backslash-c': 0,
+			'clone:result-backslash-t': 0,
+			'shortcut:healthy': 0,
+			'shortcut:finite': signalExit,
+			'shortcut:result-backslash-c': 0,
+			'shortcut:result-backslash-t': 0,
+			'owner:refusal-zero': 1,
+			'owner:refusal-primary': 74
+		};
+		const physicalCases = Array.isArray(physical.cases) ? physical.cases : [];
+		const keys = physicalCases.map((row) => `${row.caller}:${row.mode}`);
+		const completePhysical =
+			physicalCases.length === Object.keys(expectedPhysical).length &&
+			new Set(keys).size === keys.length &&
+			keys.every((key) => Object.hasOwn(expectedPhysical, key));
+		test(
+			'the actual CLI physical probe executes its exact eighteen owned POSIX cases',
+			physicalRun.status === 0 &&
+				physical.state === 'PASSED' &&
+				completePhysical &&
+				physical.source_kind === 'actual-cli-source-with-explicit-prefix-scopes' &&
+				physicalCases.every(
+					(row) => row.ownership_closed === true && row.workspace_created === true
+				),
+			physicalRun.stdout
+		);
+		test(
+			'finite log writes preserve primary failures, foreign bundles and independent workspace retirement',
+			completePhysical &&
+				physicalCases.every((row) => {
+					const foreign = row.mode.endsWith('foreign');
+					const refusal =
+						row.mode.endsWith('refusal') ||
+						row.caller === 'owner' ||
+						row.mode.startsWith('result-backslash-');
+					return (
+						row.normalized_status === expectedPhysical[`${row.caller}:${row.mode}`] &&
+						row.workspace_exists === (row.caller === 'owner') &&
+						row.destination_exists === (foreign || refusal) &&
+						(!foreign || row.foreign_marker === 'foreign') &&
+						(row.caller !== 'clone' ||
+							row.limit === null ||
+							(row.limit === row.healthy_prefix_bytes + 1 && row.actual_log_bytes === row.limit))
+					);
+				}),
+			physicalRun.stdout
+		);
+		test(
+			'actual logging preserves literal backslash-c and backslash-t source paths byte for byte',
+			completePhysical &&
+				['backslash-c', 'backslash-t'].every((mode) => {
+					const row = physicalCases.find((item) => item.caller === 'clone' && item.mode === mode);
+					const name = mode === 'backslash-c' ? 'Source\\c.app' : 'Source\\t.app';
+					return (
+						path.basename(row.source_app) === name &&
+						row.source_line_hex ===
+							Buffer.from(`=== SOURCE=${row.source_app}`, 'utf8').toString('hex')
+					);
+				}),
+			physicalRun.stdout
+		);
+		test(
+			'both actual CLI success formatters return literal backslash HOME paths exactly',
+			completePhysical &&
+				physicalCases
+					.filter((row) => row.mode.startsWith('result-backslash-'))
+					.every(
+						(row) =>
+							row.result_path_exact === true &&
+							row.output === row.result_path + '\n' &&
+							row.result_path.includes(row.mode.endsWith('-c') ? 'home\\c' : 'home\\t') &&
+							row.execution_scope ===
+								(row.caller === 'clone'
+									? 'actual-clone-prefix-and-success-tail'
+									: 'actual-full-shortcut-generator')
+					),
+			physicalRun.stdout
+		);
+		test(
+			'a real external child keeps the default file-size signal after actual healthy logging',
+			completePhysical &&
+				physicalCases.some(
+					(row) =>
+						row.caller === 'clone' &&
+						row.mode === 'child-default' &&
+						row.normalized_status === signalExit &&
+						row.child_survived === false
+				),
+			physicalRun.stdout
+		);
+	}
 	const shellEmission = spawnSync(
 		python,
 		[EMITTER, 'shell', 'VALUE_ONE', hostile[0], 'VALUE_TWO', hostile[1], 'VALUE_THREE', hostile[2]],
@@ -115,12 +257,19 @@ try {
 			'printf \'%s\\0\' "$VALUE_ONE" "$VALUE_TWO" "$VALUE_THREE"\n',
 		'utf8'
 	);
-	const shellSyntax = spawnSync(bash, ['-n', toBashPath(shellFile)], { encoding: 'utf8' });
-	const shellRoundtrip = spawnSync(bash, [toBashPath(shellFile)], { encoding: null });
+	const shellSyntax = spawnSync(bash, ['-n', toBashPath(shellFile)], {
+		encoding: 'utf8'
+	});
+	const shellRoundtrip = spawnSync(bash, [toBashPath(shellFile)], {
+		encoding: null
+	});
 	test(
 		'shell literals compile after quotes, substitutions, backslashes, and newlines',
 		shellEmission.status === 0 && shellSyntax.status === 0,
-		JSON.stringify({ emission: shellEmission.stderr, syntax: shellSyntax.stderr })
+		JSON.stringify({
+			emission: shellEmission.stderr,
+			syntax: shellSyntax.stderr
+		})
 	);
 	test(
 		'shell literals round-trip byte-exact without executing their contents',
@@ -150,7 +299,9 @@ try {
 			'print(json.dumps([VALUE_ONE, VALUE_TWO, VALUE_THREE], ensure_ascii=False))\n',
 		'utf8'
 	);
-	const pythonCompile = spawnSync(python, ['-m', 'py_compile', pythonFile], { encoding: 'utf8' });
+	const pythonCompile = spawnSync(python, ['-m', 'py_compile', pythonFile], {
+		encoding: 'utf8'
+	});
 	const pythonRoundtrip = spawnSync(python, [pythonFile], { encoding: 'utf8' });
 	let pythonValues = [];
 	try {
@@ -161,7 +312,10 @@ try {
 	test(
 		'Python literals compile after quotes, substitutions, backslashes, and newlines',
 		pythonEmission.status === 0 && pythonCompile.status === 0,
-		JSON.stringify({ emission: pythonEmission.stderr, compile: pythonCompile.stderr })
+		JSON.stringify({
+			emission: pythonEmission.stderr,
+			compile: pythonCompile.stderr
+		})
 	);
 	test(
 		'Python literals round-trip byte-exact',
@@ -180,7 +334,9 @@ try {
 	);
 
 	const plistName = 'A&B <Clone> "quoted" \'single\'';
-	const xmlEmission = spawnSync(python, [EMITTER, 'xml', plistName], { encoding: 'utf8' });
+	const xmlEmission = spawnSync(python, [EMITTER, 'xml', plistName], {
+		encoding: 'utf8'
+	});
 	test(
 		'XML literals escape every plist metacharacter through the production emitter',
 		xmlEmission.status === 0 &&
@@ -253,7 +409,9 @@ try {
 			(shellBody ? `${shellBody[1]}\n` : ''),
 		'utf8'
 	);
-	const cloneSyntax = spawnSync(bash, ['-n', toBashPath(cloneLauncher)], { encoding: 'utf8' });
+	const cloneSyntax = spawnSync(bash, ['-n', toBashPath(cloneLauncher)], {
+		encoding: 'utf8'
+	});
 	test(
 		'the actual generated clone launcher body compiles with hostile assignments',
 		actualShellEmission.status === 0 && shellBody !== null && cloneSyntax.status === 0,
@@ -274,7 +432,9 @@ try {
 		`${actualPythonEmission.stdout || ''}` + (pythonBody ? `${pythonBody[1]}\n` : ''),
 		'utf8'
 	);
-	const pwaCompile = spawnSync(python, ['-m', 'py_compile', pwaLauncher], { encoding: 'utf8' });
+	const pwaCompile = spawnSync(python, ['-m', 'py_compile', pwaLauncher], {
+		encoding: 'utf8'
+	});
 	test(
 		'the actual generated PWA launcher body compiles with hostile assignments',
 		actualPythonEmission.status === 0 && pythonBody !== null && pwaCompile.status === 0,
@@ -359,14 +519,21 @@ printf icns > "$out"
 	test(
 		'the production shortcut generator emits a syntactically valid hostile launcher',
 		generator.status === 0 && generatedSyntax.status === 0,
-		JSON.stringify({ generator: generator.stderr, syntax: generatedSyntax.stderr })
+		JSON.stringify({
+			generator: generator.stderr,
+			syntax: generatedSyntax.stderr
+		})
 	);
 	test(
 		'the generated shortcut preserves arguments without command substitution',
 		generatedRun.status === 0 &&
 			!fs.existsSync(marker) &&
 			JSON.stringify(captured) === JSON.stringify(['-n', maliciousTarget]),
-		JSON.stringify({ status: generatedRun.status, captured, stderr: generatedRun.stderr })
+		JSON.stringify({
+			status: generatedRun.status,
+			captured,
+			stderr: generatedRun.stderr
+		})
 	);
 	writeExecutable(path.join(fakeBin, 'date'), "#!/usr/bin/env bash\nprintf '%s\\n' 1700000000\n");
 	const setupEnd = cloneSource.indexOf('# Resolve source app');
@@ -431,7 +598,10 @@ printf icns > "$out"
 					path.basename(profile) === path.basename(cloneDestinations[index], '.app') &&
 					fs.readFileSync(path.join(profile, 'profile-marker'), 'utf8') === String(index)
 			),
-		JSON.stringify({ destinations: cloneDestinations, profiles: cloneProfiles })
+		JSON.stringify({
+			destinations: cloneDestinations,
+			profiles: cloneProfiles
+		})
 	);
 	test(
 		'the first clone keeps its original unsuffixed data profile',
@@ -449,7 +619,9 @@ printf icns > "$out"
 	fs.symlinkSync(preserved, preservedLink, 'junction');
 	const rollbackBin = path.join(fixtureRoot, 'rollback-bin');
 	fs.mkdirSync(rollbackBin);
-	const realMktemp = spawnSync(bash, ['-c', 'command -v mktemp'], { encoding: 'utf8' });
+	const realMktemp = spawnSync(bash, ['-c', 'command -v mktemp'], {
+		encoding: 'utf8'
+	});
 
 	writeExecutable(
 		path.join(rollbackBin, 'python3'),
@@ -582,7 +754,11 @@ printf icns > "$out"
 			) === 'foreign' &&
 			fs.statSync(`${nativeFixturePath(replacedDestination)}.held`).isDirectory() &&
 			!fs.existsSync(nativeFixturePath(replacedTemporary)),
-		JSON.stringify({ status: replaced.status, stdout: replaced.stdout, stderr: replaced.stderr })
+		JSON.stringify({
+			status: replaced.status,
+			stdout: replaced.stdout,
+			stderr: replaced.stderr
+		})
 	);
 	const symlinkReplacement = runCloneSetup(
 		'mv "$DEST" "$DEST.held"; ln -s "$DEST.held" "$DEST"; printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; exit 76'
@@ -685,7 +861,11 @@ exec '${realRm.stdout.trim().replaceAll("'", "'\\''")}' "$@"
 			completedTemporary &&
 			fs.statSync(nativeFixturePath(completedDestination)).isDirectory() &&
 			!fs.existsSync(nativeFixturePath(completedTemporary)),
-		JSON.stringify({ status: completed.status, stdout: completed.stdout, stderr: completed.stderr })
+		JSON.stringify({
+			status: completed.status,
+			stdout: completed.stdout,
+			stderr: completed.stderr
+		})
 	);
 	const receiptFailure = runCloneSetup(
 		'printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; CLONE_COMPLETE=1; exec 1>&-; printf unavailable-output'
@@ -851,7 +1031,10 @@ exec '${realRm.stdout.trim().replaceAll("'", "'\\''")}' "$@"
 					launcher
 			),
 		JSON.stringify(
-			collisionRuns.map(({ destination, run }) => ({ destination, status: run.status }))
+			collisionRuns.map(({ destination, run }) => ({
+				destination,
+				status: run.status
+			}))
 		)
 	);
 	const reserveHelper = toBashPath(path.join(RESOURCES, 'reserve_bundle.sh'));
@@ -898,7 +1081,11 @@ exec '${realRm.stdout.trim().replaceAll("'", "'\\''")}' "$@"
 			refused.stdout === '' &&
 			refused.stderr.includes('cannot reserve bundle directory') &&
 			fs.readFileSync(occupied, 'utf8') === 'unrelated original file',
-		JSON.stringify({ status: refused.status, stdout: refused.stdout, stderr: refused.stderr })
+		JSON.stringify({
+			status: refused.status,
+			stdout: refused.stdout,
+			stderr: refused.stderr
+		})
 	);
 	const reservationRaceRoot = path.join(fixtureRoot, 'reservation-retirement-race');
 	fs.mkdirSync(reservationRaceRoot);
@@ -1086,7 +1273,8 @@ exec '${realRm.stdout.trim().replaceAll("'", "'\\''")}' "$@"
 		JSON.stringify(routing.cases.filter((row) => !uriCases.has(row.name)))
 	);
 } finally {
-	fs.rmSync(fixtureRoot, { recursive: true, force: true });
+	if (fixtureCanRetire) fs.rmSync(fixtureRoot, { recursive: true, force: true });
+	else console.error(`Retaining the exact CLI fixture with unresolved ownership: ${fixtureRoot}`);
 }
 
 console.log('TAP version 14');
