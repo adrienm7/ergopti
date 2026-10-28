@@ -1,0 +1,64 @@
+2026-10-28 00:00:00:360 [WARNING] [llm.api_mlx] Endpoint discovery state reset.
+2026-10-28 00:00:03:606 [WARNING] [llm.api_mlx] Killing zombie mlx_lm Python process(es) via ps+awk (excluding PGID 49884)…
+2026-10-28 00:00:03:749 [WARNING] [llm.api_mlx] Zombie kill completed; stdout: none 
+2026-10-28 00:00:05:251 [WARNING] [adapters.field_run_ports] The field run changed ConfigTomlPath; putting it back.
+2026-10-28 00:00:05:371 [ERROR] [field_run] A field run step changed the configuration: restored_ConfigTomlPath.
+2026-10-28 00:00:20:226 [WARNING] [llm.api_mlx] PGID pending timeout (15s) — unblocking zombie kills.
+2026-10-28 00:01:05:415 [WARNING] [llm.api_mlx] ↑ "Endpoint discovery state reset." repeated 1 more time between 2026-10-28 00:00:05:226 and 2026-10-28 00:00:05:226.
+2026-10-28 00:06:31:312 [WARNING] [keystats.log_manager] Slow ingest tick 561 ms (drain=0 foreign=0 outbox=2 read=0 build=0 apply=1 commit=2 append=552 notify=0 ms; append: lock=0 journal=1 prepare=0 publish=364 write=0 clear=1 settle=183 release=0 ms; metadata_commands=8 in 536 ms; entries=1 statements=1).
+2026-10-28 03:44:26:355 [WARNING] [keystats.log_manager] Slow ingest tick 523 ms (drain=0 foreign=0 outbox=1 read=0 build=0 apply=2 commit=1 append=515 notify=0 ms; append: lock=0 journal=0 prepare=0 publish=298 write=3 clear=2 settle=209 release=0 ms; metadata_commands=8 in 492 ms; entries=1 statements=1).
+2026-10-28 07:23:26:519 [WARNING] [keystats.log_manager] Slow ingest tick 505 ms (drain=0 foreign=0 outbox=1 read=1 build=0 apply=2 commit=1 append=497 notify=0 ms; append: lock=0 journal=0 prepare=0 publish=245 write=4 clear=2 settle=243 release=0 ms; metadata_commands=8 in 474 ms; entries=1 statements=1).
+2026-10-28 08:53:37:298 [ERROR] [keystats.context_tracker] Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:649: Messaging failed
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:649: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:648>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:648: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:796: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:789>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:787: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:781>.
+2026-10-28 08:53:38:694 [WARNING] [keystats.log_manager] Slow ingest tick 1114 ms (drain=0 foreign=0 outbox=2 read=5 build=0 apply=10 commit=3 append=1091 notify=0 ms; append: lock=0 journal=1 prepare=0 publish=807 write=5 clear=1 settle=275 release=0 ms; metadata_commands=8 in 1060 ms; entries=3 statements=3).
+2026-10-28 08:53:38:694 [WARNING] [runtime] An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1948) held the main thread for 1114 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-28 08:54:44:603 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-28 08:55:11:031 [WARNING] [menu.keyboard_layout] Failed to enable 'Composer Check' — reason=process_failed.
+2026-10-28 08:55:11:031 [WARNING] [layout_registry] The composed 'composed' layout is installed but not enabled: process_failed.
+2026-10-28 08:55:11:154 [WARNING] [menu.keyboard_layout] Failed to disable 'Composer Check' — reason=process_failed.
+2026-10-28 08:55:11:154 [WARNING] [layout_registry] The 'composed' layout could not be removed from the input sources: process_failed.
+2026-10-28 08:56:44:932 [ERROR] [adapters.timer_scheduler] after() callback raised: ...opti/static/ergopti_plus/macos/ui/menu/menu_llm/init.lua:1160: attempt to index a nil value (global 'TextUtils')
+stack traceback:
+	...opti/static/ergopti_plus/macos/ui/menu/menu_llm/init.lua:1160: in field 'hf_token_set'
+	...opti_plus/macos/ui/menu/menu_llm/model_selector_page.lua:187: in upvalue 'local_actions'
+	...opti_plus/macos/ui/menu/menu_llm/model_selector_page.lua:305: in function 'ui.menu.menu_llm.model_selector_page.build_payload'
+	(...tail calls...)
+	...opti/static/ergopti_plus/macos/ui/model_browser/init.lua:165: in upvalue 'inject_catalogue'
+	...opti/static/ergopti_plus/macos/ui/model_browser/init.lua:378: in function <...opti/static/ergopti_plus/macos/ui/model_browser/init.lua:373>
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:107: in upvalue 'invoke_callback'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:222: in function <...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:198>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1949: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1941>
+2026-10-28 08:56:56:275 [ERROR] [ollama_deps] Ollama bootstrap ended with exit=78 (no signal, path=native_runtime_pty); output received: streamed stdout=8177 stderr=0 bytes, final stdout=0 stderr=0 bytes; last 12 line(s): {"success":true,"version":1,"reason":"complete"} | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | {"version":1,"success":true,"reason":"complete"} | [NATIVE-BOOTSTRAP] stage: python_install | Installed Python 3.11.16 in 1.36s | + cpython-3.11.16-macos-aarch64-none (python3.11) | warning: `~/Library/Application Support/Ergopti/native-bootstrap/python-bin` is not on your PATH. To use installed Python executables, run `export PATH="~/Library/Application Support/Ergopti/native-bootstrap/python-bin:$PATH"` or `uv python update-shell`. | [NATIVE-BOOTSTRAP] stage: python_find | [OLLAMA-DEPS] stage: runtime_install | OLLAMA_MANAGED_CATALOGUE_MISSING | [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit 78.
+2026-10-28 08:56:56:275 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=78) — Ergopti n'a pas pu vérifier sa version épinglée d'Ollama (catalogue de publication ou contrôle d'intégrité) : rien n'a été installé. Envoyez le rapport de diagnostic.
+2026-10-28 08:56:56:275 [WARNING] [download_window] Progress UI flipped to error state: Ergopti n'a pas pu vérifier sa version épinglée d'Ollama (catalogue de publication ou contrôle d'intégrité) : rien n'a été installé. Envoyez le rapport de diagnostic.
+2026-10-28 09:48:17:855 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 10 key-down(s), 10 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-28 09:48:40:855 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 11 key-down(s), 11 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 1 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-28 09:48:40:855 [WARNING] [key_event_health] A character key stayed down 22.9 s with no further event: its key-up was lost before the keymap taps; session totals: 11 key-down(s), 11 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 1 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-28 09:49:09:683 [WARNING] [HotPath] Slow preview.rebuild: 12.70 ms own, 12.70 ms total, parent keydown (0 similar since the last line).
+2026-10-28 09:49:09:854 [WARNING] [key_event_health] A character key stayed down 29.4 s with no further event: its key-up was lost before the keymap taps; session totals: 14 key-down(s), 13 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-28 09:49:46:566 [WARNING] [HotPath] Slow preview.rebuild: 5.09 ms own, 5.09 ms total, parent keydown (1 similar since the last line).
+2026-10-28 09:58:58:395 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-28 09:59:21:521 [WARNING] [menu.keyboard_layout] Failed to enable 'Composer Check' — reason=process_failed.
+2026-10-28 09:59:21:521 [WARNING] [layout_registry] The composed 'composed' layout is installed but not enabled: process_failed.
+2026-10-28 09:59:21:667 [WARNING] [menu.keyboard_layout] Failed to disable 'Composer Check' — reason=process_failed.
+2026-10-28 09:59:21:667 [WARNING] [layout_registry] The 'composed' layout could not be removed from the input sources: process_failed.
+2026-10-28 09:59:39:668 [ERROR] [ollama_deps] Ollama bootstrap ended with exit=78 (no signal, path=native_runtime_pty); output received: streamed stdout=463 stderr=0 bytes, final stdout=0 stderr=0 bytes; last 10 line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | {"version":1,"success":true,"reason":"complete"} | [NATIVE-BOOTSTRAP] stage: python_install | cpython-3.11.16-macos-aarch64-none is already installed | [NATIVE-BOOTSTRAP] stage: python_find | [OLLAMA-DEPS] stage: runtime_install | OLLAMA_MANAGED_CATALOGUE_MISSING | [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit 78.
+2026-10-28 09:59:39:668 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=78) — Ergopti n'a pas pu vérifier sa version épinglée d'Ollama (catalogue de publication ou contrôle d'intégrité) : rien n'a été installé. Envoyez le rapport de diagnostic.
+2026-10-28 09:59:39:668 [WARNING] [download_window] Progress UI flipped to error state: Ergopti n'a pas pu vérifier sa version épinglée d'Ollama (catalogue de publication ou contrôle d'intégrité) : rien n'a été installé. Envoyez le rapport de diagnostic.
+2026-10-28 10:01:31:897 [WARNING] [keystats] Keystats event tap found disabled — restarting.
+2026-10-28 11:43:06:833 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-28 11:43:30:233 [WARNING] [layout_registry] The 'composed' layout is installed and listed in the enabled sources, but macOS turns it on only at the next login (reason=not_enabled:macos_requires_logout).
+2026-10-28 11:45:09:625 [ERROR] [ollama_deps] Ollama bootstrap ended with exit=78 (no signal, path=native_runtime_pty); output received: streamed stdout=463 stderr=0 bytes, final stdout=0 stderr=0 bytes; last 10 line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | {"version":1,"success":true,"reason":"complete"} | [NATIVE-BOOTSTRAP] stage: python_install | cpython-3.11.16-macos-aarch64-none is already installed | [NATIVE-BOOTSTRAP] stage: python_find | [OLLAMA-DEPS] stage: runtime_install | OLLAMA_MANAGED_CATALOGUE_MISSING | [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit 78.
+2026-10-28 11:45:09:625 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=78) — Ergopti n'a pas pu vérifier sa version épinglée d'Ollama (catalogue de publication ou contrôle d'intégrité) : rien n'a été installé. Envoyez le rapport de diagnostic.
+2026-10-28 11:45:09:625 [WARNING] [download_window] Progress UI flipped to error state: Ergopti n'a pas pu vérifier sa version épinglée d'Ollama (catalogue de publication ou contrôle d'intégrité) : rien n'a été installé. Envoyez le rapport de diagnostic.
