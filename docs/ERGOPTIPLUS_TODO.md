@@ -94,8 +94,13 @@ a sealed Windows updater source, reseal with
   `#Warn All`) and 793e4afe8f (the cold official-Ollama receiver now checks the binary at
   `binary.managed_executable_path()`). Run 40635488254 on ba241a2ef6 (fourth release commit) had one red,
   Windows ui (4 cases): the error-startup child now loads the diagnostics owners and three locals shadowed
-  the `File` and `Type` built-ins under `#Warn All`, renamed by 649070a6f4. The fifth v1.0.7 release commit
-  sits on top and a new full run qualifies it before `main`. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
+  the `File` and `Type` built-ins under `#Warn All`, renamed by 649070a6f4. Run 40640748766 on ce983aecc1
+  (fifth) showed the next ones, because AutoHotkey prints only the first few: bb18649e30 renames every local
+  that shadows a global across the 495 production files and the 94 `#Warn All` children, with the new
+  static gate `test-ahk-local-same-as-global`; c887b89fc5 stops the model selector from building its
+  catalogue for a page that is not ready yet; 389f589bf9 fixes the UIA selection snapshot that was never
+  invalidated (a missing `global`). The sixth v1.0.7 release commit sits on top and a new full run
+  qualifies it before `main`. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
   `CFMessagePortSendRequest FAILED(-1)` (the runner's TSM UI server), rerun that job once.
 - **Decide after v1.0.7 [CI]:** since bc09e4584c no product path calls the stock
   `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
