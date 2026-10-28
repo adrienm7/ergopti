@@ -4033,4 +4033,68 @@ assert.equal(
 	'native case-boundary regressions and Unicode scalar policy controls must execute'
 );
 
+const nativeAppPairsProjection = JSON.parse(
+	fs.readFileSync(
+		path.resolve(root, '../../windows/tests/fixtures/metrics_app_pairs_projection.json'),
+		'utf8'
+	)
+);
+assert.deepEqual(
+	nativeAppPairsProjection.snapshots.map((snapshot) => snapshot.days),
+	[1, 2]
+);
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const days of [1, 2]) {
+		for (const scope of ['all', 'first-pair', 'last-pair']) {
+			test(`${host} native workflow pairs retain endpoint identity, days ${days}, scope ${scope}`, () => {
+				const page = loadMetricsTypingPage(host),
+					snapshot = nativeAppPairsProjection.snapshots[days - 1];
+				freezePageClock(page, '2026-10-28T12:00:00');
+				page.elements.get('app_search').focus = () => {};
+				publishTypingPage(page, host, snapshot.manifest);
+				if (scope !== 'all') {
+					page.context.open_app_modal();
+					page.context.deselect_all_apps();
+					const indices = scope === 'first-pair' ? [0, 1] : [2, 3];
+					for (const index of indices)
+						page.context.toggle_app_selection({
+							value: nativeAppPairsProjection.names[index],
+							checked: true
+						});
+					page.context.close_app_modal();
+				}
+				const assertPair = (expectedDays) => {
+					page.context.render_apps_kpi();
+					const count = (scope === 'first-pair' ? 3 : 5) * expectedDays;
+					const names =
+						scope === 'first-pair'
+							? nativeAppPairsProjection.names.slice(0, 2)
+							: nativeAppPairsProjection.names.slice(2, 4);
+					assert.equal(
+						page.elements.get('apps_top_pair').innerHTML,
+						`${names.sort().join(' ↔ ')} (${count}×)`,
+						'distinct native endpoint tuples never merge through a human-readable label'
+					);
+					assert.equal(
+						vm.runInContext('app_state.app_selection_mode', page.context),
+						scope === 'all' ? 'all' : 'subset'
+					);
+				};
+				assertPair(days);
+				deliverTypingManifest(page, host, nativeAppPairsProjection.snapshots[1].manifest);
+				assertPair(2);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			});
+		}
+	}
+}
+assert.equal(
+	passed,
+	1214,
+	'all native structured endpoint, subset and refresh controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);

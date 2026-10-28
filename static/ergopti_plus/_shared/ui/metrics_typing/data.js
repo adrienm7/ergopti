@@ -3161,17 +3161,22 @@ function render_apps_kpi() {
 	);
 
 	// Build symmetric app-pair affinity: both directions of switching count.
-	const pair_count = {};
+	const pair_count = new Map();
 	_apps_data.forEach((d) => {
 		Object.entries(d.switches_out).forEach(([other, n]) => {
-			const key = [d.name, other].sort().join(' ↔ ');
-			pair_count[key] = (pair_count[key] || 0) + n;
+			const endpoints = [d.name, other].sort();
+			const key = JSON.stringify(endpoints);
+			const pair = pair_count.get(key);
+			if (pair) pair.count += n;
+			else pair_count.set(key, { endpoints, count: n });
 		});
 	});
-	const top_pair = Object.entries(pair_count).sort((a, b) => b[1] - a[1])[0];
+	const top_pair = Array.from(pair_count.values()).sort((a, b) => b.count - a.count)[0];
 	set(
 		'apps_top_pair',
-		top_pair ? `${escape_html(top_pair[0])} (${format_number(top_pair[1])}×)` : '—'
+		top_pair
+			? `${escape_html(top_pair.endpoints.join(' ↔ '))} (${format_number(top_pair.count)}×)`
+			: '—'
 	);
 
 	// Layouts seen — sorted by usage, top 3 to keep the value compact
