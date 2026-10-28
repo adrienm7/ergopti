@@ -850,7 +850,7 @@ _HCW_GetSections(Entry, ReadFn := ReadTomlFile) {
 	SectionsOrderRaw := ""
 	FileContent := ReadFn.Call(Path)
 	loop parse, FileContent, "`n", "`r" {
-		Line := Trim(A_LoopField, " `TokenLower")
+		Line := Trim(A_LoopField, " `t")
 		if (Line == "" or SubStr(Line, 1, 1) == "#") {
 			continue
 		}

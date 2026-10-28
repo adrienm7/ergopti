@@ -603,7 +603,7 @@ end
 
 -- The usual shortcut modifier keys, counted when no live layout names them.
 local USUAL_SHORTCUT_KEYS = {
-	KEY_LEFTCTRL, EvdevCodes.KEY_RIGHTCTRL, KEY_LEFTALT, KEY_LEFTMETA, EvdevCodes.KEY_RIGHTMETA,
+	KEY_LEFTCTRL, EvdevCodes.KEY_RIGHTCTRL, KEY_LEFTALT, EvdevCodes.KEY_LEFTMETA, EvdevCodes.KEY_RIGHTMETA,
 }
 
 --- Every modifier key down now: the level keys (held_level_keys) and the

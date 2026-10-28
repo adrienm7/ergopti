@@ -360,19 +360,19 @@ _KLWAE_NativeDialog(Entry, Epoch, Request, Prompt, Title, Default := unset) {
 		} finally Critical(PreviousCritical)
 		NativeGui.SetFont("s10")
 		NativeGui.AddText("w420", Prompt)
-		Edit := IsSet(Default) ? NativeGui.AddEdit("w420", Default) : 0
+		InputEdit := IsSet(Default) ? NativeGui.AddEdit("w420", Default) : 0
 		Accept := NativeGui.AddButton("w90 Default", t("button.ok"))
 		Buttons := [Accept]
 		if IsSet(Default) {
 			Cancel := NativeGui.AddButton("x+8 w90", t("common.cancel"))
 			Buttons.Push(Cancel)
 			Cancel.OnEvent("Click", _KLWAE_Choose.Bind(Entry, Epoch, Request,
-				NativeGui, Edit, Result, false))
+				NativeGui, InputEdit, Result, false))
 		}
 		Gui_HarmoniseButtonWidths(Buttons)
 		Accept.OnEvent("Click", _KLWAE_Choose.Bind(Entry, Epoch, Request,
-			NativeGui, Edit, Result, true))
-		CancelFn := _KLWAE_Choose.Bind(Entry, Epoch, Request, NativeGui, Edit, Result, false)
+			NativeGui, InputEdit, Result, true))
+		CancelFn := _KLWAE_Choose.Bind(Entry, Epoch, Request, NativeGui, InputEdit, Result, false)
 		NativeGui.OnEvent("Close", CancelFn)
 		NativeGui.OnEvent("Escape", CancelFn)
 		if !_KLWAE_Current(Entry, Epoch, Request)
