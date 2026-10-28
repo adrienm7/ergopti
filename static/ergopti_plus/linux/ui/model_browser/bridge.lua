@@ -27,6 +27,7 @@ local _projection, _page_epoch = nil, nil
 local _bound = nil
 local ModelIdentifier = require("llm.model_identifier")
 local BackendBrands = require("modules.llm.backend_brands")
+local ApiModelListing = require("llm.api_model_listing")
 
 -- Borrowed, never re-implemented: ModelCatalogue.build decides which row is
 -- ACTIVE with this exact rule, and the lookup below decides which rows are
@@ -114,18 +115,23 @@ local function build_payload(frame)
 		end
 	end
 	local api = _bound and require("ui.menu.llm_backend_rows").api_page(frame.llm, _bound.dialogs,
-		_bound.on_changed, _bound.context) or { rows = {}, providers = {}, tools = {} }
+		_bound.on_changed, _bound.context, frame.listings) or { rows = {}, providers = {}, tools = {} }
 	local api_active = nil
 	for _, row in ipairs(api.rows) do if row.current then api_active = row.name end end
 	local blocked = require("ui.menu.llm_config_guard").reason()
+	-- A config.toml that refuses writes wins; else Ollama's own install state.
+	local ollama_ok, ollama_reason = true, nil
+	if blocked == nil and _bound and type(_bound.ollama_state) == "function" then
+		ollama_ok, ollama_reason = _bound.ollama_state(frame.llm)
+	end
 	local payload = ModelCatalogue.build_selector(catalogue, {
 		active_backend = backend,
 		active_model = backend == "api" and (api_active or "") or current,
 		backends = {
-			backend_entry("ollama", { available = blocked == nil, reason_key = blocked,
+			backend_entry("ollama", { available = blocked == nil and ollama_ok, reason_key = blocked or ollama_reason,
 				is_installed = function(_display_name, runtime_name)
 					return installed[normalise_name(runtime_name)] == true
-				end, extra_rows = custom, add_model = blocked == nil or nil }),
+				end, extra_rows = custom, add_model = (blocked == nil and ollama_ok) or nil }),
 			backend_entry("mlx", { available = false, reason_key = "model_browser.reason_mlx_unsupported_os" }),
 			backend_entry("api", { available = blocked == nil, reason_key = blocked,
 				extra_rows = strip(api.rows, runs, "api"), actions = strip(api.tools, runs, "tool") }),
@@ -138,11 +144,14 @@ local function build_payload(frame)
 			b.actions = strip(api.tools, runs, "tool")
 			b.providers = providers
 		elseif b.id == "ollama" then
-			b.add_model = blocked == nil or nil
+			b.add_model = (blocked == nil and ollama_ok) or nil
 		end
 	end
 	local rows, urls = {}, {}
 	for _, row in ipairs(payload.models) do
+		-- A pull still running keeps its percentage across a new payload.
+		local percent = row.backend == "ollama" and frame.progress[row.runtime_name] or nil
+		if percent ~= nil then row.pending, row.progress = "download", percent end
 		rows[(row.backend or "") .. "\0" .. row.name] = row
 		if type(row.url) == "string" and row.url ~= "" then urls[row.url] = true end
 	end
@@ -180,13 +189,54 @@ local function push_payload(frame)
 	return pushed, payload
 end
 
+--- Asks the next queued API entry's provider for its models; each answer
+--- re-sends the payload to this page only, then asks the next entry.
+--- @param frame table The page projection.
+--- @param list function The bound listing port (api_remote.list_models).
+local function next_listing(frame, list)
+	local queue = frame.listing_queue
+	if type(queue) ~= "table" or #queue == 0 or not projection_current(frame) then return false end
+	local entry = table.remove(queue, 1)
+	local called, err = pcall(list, entry, function(listing)
+		if not projection_current(frame) then return end
+		frame.listings[entry.id] = type(listing) == "table" and listing or { state = "failed", reason = "unavailable" }
+		push_payload(frame)
+		next_listing(frame, list)
+	end)
+	if not called then
+		Logger.error(LOG, "Remote model listing dispatch failed: %s", tostring(err))
+		frame.listings[entry.id] = { state = "failed", reason = "unavailable" }
+		return next_listing(frame, list)
+	end
+	return true
+end
+
+--- Lists each chat API entry's models once per page, at most
+--- ApiModelListing.MAX_ENTRIES of them, one request at a time, through the
+--- ports the menu bound (llm_backend_rows.bind_page).
+--- @param frame table The page projection.
+local function start_listings(frame)
+	local port = _bound and _bound.listing
+	if frame.listing_queue ~= nil or type(port) ~= "table" or type(port.targets) ~= "function"
+		or type(port.list) ~= "function" then return false end
+	frame.listing_queue = {}
+	for _, entry in ipairs(port.targets()) do
+		if #frame.listing_queue >= ApiModelListing.MAX_ENTRIES then break end
+		frame.listings[entry.id] = { state = "pending" }
+		frame.listing_queue[#frame.listing_queue + 1] = entry
+	end
+	Logger.info(LOG, "Model selector page lists the models of %d API entry(ies).", #frame.listing_queue)
+	return next_listing(frame, port.list)
+end
+
 local function capture_projection(state, context)
 	if type(state) ~= "table" or type(state.llm) ~= "table" or type(context) ~= "table"
 		or context.app_name ~= APP_NAME or context.epoch ~= _page_epoch or context.document_owner == nil then return nil end
 	local manager = package.loaded["ui.webview_manager"]
 	if type(manager) ~= "table" then return nil end
 	local frame = { state = state, llm = state.llm, manager = manager, document = context.document_owner,
-		epoch = context.epoch, manager_ports = {}, llm_ports = {}, rows = {}, urls = {}, runs = {} }
+		epoch = context.epoch, manager_ports = {}, llm_ports = {}, rows = {}, urls = {}, runs = {},
+		listings = {}, listing_queue = nil, progress = {} }
 	for _, name in ipairs({ "capture_document_owner", "document_owner_current", "document_owner_retained",
 		"eval_owned_js", "get_daemon_state", "current_epoch" }) do
 		if type(manager[name]) ~= "function" then return nil end
@@ -226,6 +276,7 @@ function M.on_message(payload, state, context)
 		frame.llm_ports.refresh_models()
 		local pushed, data = push_payload(frame)
 		if not pushed then Logger.error(LOG, "Model catalogue could not reach the page.") end
+		if pushed then start_listings(frame) end
 		return { pushed = pushed, data = data }
 	end
 	if type(payload) ~= "table" then return nil end
@@ -261,11 +312,20 @@ function M.on_message(payload, state, context)
 	if payload.action == "add_provider" and type(payload.provider) == "string" then
 		return { accepted = run("provider\0" .. payload.provider) }
 	end
+	-- An Ollama that is absent or whose repair failed runs no model action.
+	local function ollama_ready()
+		if not _bound or type(_bound.ollama_state) ~= "function" or _bound.ollama_state(frame.llm) == true then
+			return true
+		end
+		Logger.warn(LOG, "Model selector action '%s' refused: Ollama cannot run now.", tostring(payload.action))
+		return false
+	end
 	if payload.action == "add_model" and type(payload.name) == "string" then
 		if backend ~= "ollama" or not ModelIdentifier.valid("ollama", payload.name) then
 			Logger.warn(LOG, "Refused adding '%s': not a valid Ollama name.", payload.name)
 			return { downloading = false }
 		end
+		if not ollama_ready() then return { downloading = false } end
 		local downloading = type(frame.llm_ports.download_model) == "function" and projection_current(frame)
 			and frame.llm_ports.download_model(payload.name, payload.name, function(succeeded)
 				if succeeded then changed() end
@@ -288,6 +348,7 @@ function M.on_message(payload, state, context)
 		return { selected = selected, closed = selected and close_owned(context) or false }
 	end
 	if backend ~= "ollama" then return { selected = false } end
+	if payload.action ~= "open_url" and not ollama_ready() then return { selected = false } end
 
 	if payload.action == "select_model" then
 		-- Only an installed model can be made active; a missing one offers its download.
@@ -326,6 +387,27 @@ function M.on_message(payload, state, context)
 
 	Logger.debug(LOG, "Unknown action: %s", tostring(payload.action))
 	return nil
+end
+
+--- Shows a pull's percentage on the open page's row of that model.
+--- @param tag string Ollama model tag being pulled.
+--- @param percent number|nil Whole percentage; nil once the pull ended.
+--- @return boolean shown
+function M.on_download_progress(tag, percent)
+	local frame = _projection
+	if type(tag) ~= "string" or not projection_current(frame) then return false end
+	frame.progress[tag] = percent
+	if percent == nil then return false end
+	for _, row in pairs(frame.rows) do
+		if row.backend == "ollama" and row.runtime_name == tag then
+			local ok_json, encoded = pcall(Json.encode, { backend = "ollama", name = row.name, percent = percent })
+			if not ok_json or type(encoded) ~= "string" then return false end
+			local called, accepted = pcall(frame.manager_ports.eval_owned_js, APP_NAME, frame.document,
+				"if(window.injectProgress)window.injectProgress(" .. encoded .. ")")
+			return called and accepted == true
+		end
+	end
+	return false
 end
 
 --- Reprojects the contemporary service cache into only its current document.
