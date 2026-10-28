@@ -36,6 +36,7 @@ SHARED = "static/ergopti_plus/_shared"
 CONTRACT = SHARED + "/modules/llm/managed_ollama_runtime.json"
 OUTPUT = SHARED + "/modules/llm/managed_ollama_release.json"
 DEFAULTS = SHARED + "/modules/updater/defaults.json"
+IDENTIFIERS = SHARED + "/data/identifiers.json"
 POLICY_SOURCE = SHARED + "/python/managed_ollama_runtime.py"
 CATALOGUE = "managed_ollama_release.json"
 HOSTS = ("macos-arm64", "macos-amd64")
@@ -96,7 +97,7 @@ def asset_digest(asset):
     return digest[len("sha256:") :]
 
 
-def admit(policy, contract_bytes, repository, release, catalogue_bytes):
+def admit(policy, contract_bytes, repository, github_host, release, catalogue_bytes):
     """Return the catalogue bytes when every admission link holds, else raise."""
     tag = release.get("tag_name")
     if release.get("draft") is not False or release.get("immutable") is not True:
@@ -119,7 +120,8 @@ def admit(policy, contract_bytes, repository, release, catalogue_bytes):
                 "catalogue of %s refused for %s: %s" % (tag, host, error)
             ) from error
         native = assets.get(pinned["filename"])
-        expected_url = "https://github.com/%s/releases/download/%s/%s" % (
+        expected_url = "https://%s/%s/releases/download/%s/%s" % (
+            github_host,
             repository,
             tag,
             pinned["filename"],
@@ -141,10 +143,11 @@ def binding_catalogue(root, fetch, policy):
     contract_sha256 = hashlib.sha256(contract_bytes).hexdigest()
     github = json.loads((root / DEFAULTS).read_text(encoding="utf-8"))["github"]
     repository = github["owner"] + "/" + github["repo"]
+    hosts = json.loads((root / IDENTIFIERS).read_text(encoding="utf-8"))["hosts"]
     listing = json.loads(
         fetch(
-            "https://api.github.com/repos/%s/releases?per_page=%d"
-            % (repository, RELEASES_PER_PAGE),
+            "https://%s/repos/%s/releases?per_page=%d"
+            % (hosts["github_api"], repository, RELEASES_PER_PAGE),
             "application/vnd.github+json",
         )
     )
@@ -166,7 +169,7 @@ def binding_catalogue(root, fetch, policy):
         # The newest binding release decides; a refusal there is an error, never
         # a reason to fall back to an older catalogue.
         return release["tag_name"], admit(
-            policy, contract_bytes, repository, release, catalogue_bytes
+            policy, contract_bytes, repository, hosts["github"], release, catalogue_bytes
         )
     return None
 
