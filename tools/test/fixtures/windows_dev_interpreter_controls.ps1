@@ -11,6 +11,14 @@ function Write-ControlReceipt([string]$Path, $Value) {
 	[IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
 }
 
+# Pipeline exhaustion can carry a null-like engine value rather than literal
+# null. The receipt owns its JSON representation independently of that wrapper.
+function New-ControlSelectionReceipt([string]$Name, $Interpreter) {
+	$row = @{name=$Name;selected=$null}
+	if ($null -ne $Interpreter) { $row.selected = $Interpreter }
+	return $row
+}
+
 if ($Mode -eq 'selection') {
 	$tokens = $null
 	$errors = $null
@@ -54,9 +62,27 @@ if ($Mode -eq 'selection') {
 		$expectedRefusal = $choice -eq 'explicit-missing' -or $choice -eq 'explicit-directory'
 		$expected = $(if ($choice -eq 'default-user') { $user } elseif ($choice -eq 'explicit-existing') { $explicit } else { $machine })
 		$passed = $(if ($expectedRefusal) { $refused -and $null -eq $Interpreter } else { -not $refused -and $Interpreter -ceq $expected })
-		$rows += @{name=$choice;passed=$passed;refused=$refused;expected_refusal=$expectedRefusal;selected=$Interpreter;expected=$expected}
+		$row = New-ControlSelectionReceipt $choice $Interpreter
+		$row.passed = $passed
+		$row.refused = $refused
+		$row.expected_refusal = $expectedRefusal
+		$row.expected = $expected
+		$rows += $row
 	}
 	Write-ControlReceipt (Join-Path $Scratch 'selection.json') $rows
+	# Exercise real empty-pipeline and AutomationNull values through the exact
+	# producer used above; no host-specific substitute certifies their encoding.
+	$values = @(
+		@{name='literal-null';value=$null},
+		@{name='empty-pipeline';value=(@() | Select-Object -First 1)},
+		@{name='automation-null';value=[Management.Automation.Internal.AutomationNull]::Value},
+		@{name='selected-path';value=$explicit}
+	)
+	$controls = @()
+	foreach ($value in $values) {
+		$controls += New-ControlSelectionReceipt $value.name $value.value
+	}
+	Write-ControlReceipt (Join-Path $Scratch 'selection-values.json') $controls
 	return
 }
 

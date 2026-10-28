@@ -142,6 +142,23 @@ try {
 			assert.equal(row.refused, row.expected_refusal, JSON.stringify(row));
 			assert.equal(row.selected, row.expected_refusal ? null : row.expected, JSON.stringify(row));
 		});
+	const values = JSON.parse(
+		fs.readFileSync(path.join(selectionDirectory, 'selection-values.json'), 'utf8')
+	);
+	assert.deepEqual(
+		values.map((row) => row.name),
+		['literal-null', 'empty-pipeline', 'automation-null', 'selected-path']
+	);
+	for (const row of values)
+		check(`actual selection receipt: ${row.name}`, () => {
+			assert.equal(
+				row.selected,
+				row.name === 'selected-path'
+					? path.join(selectionDirectory, 'explicit-directory', 'requested interpreter.exe')
+					: null,
+				JSON.stringify(row)
+			);
+		});
 	{
 		for (const scenario of [
 			'default-machine',
