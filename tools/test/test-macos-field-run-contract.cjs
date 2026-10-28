@@ -15,7 +15,11 @@
  *    request of the declared shape, waits for done, copies the results and
  *    records the step, and reports a refusal without losing the other steps;
  * 4. Ctrl-C during the field run still copies the partial results and the
- *    logs, then commits them, marked interrupted.
+ *    logs, then commits them, marked interrupted;
+ * 5. acceptance survives a developer app that reloads or restarts between its
+ *    readiness and the request, and a request never accepted is withdrawn, so
+ *    no run starts after the collector gave up (2026-10-28 12:02 run: the
+ *    collector quit at 60 s and the app then ran every step unobserved).
  * ==============================================================================
  */
 
@@ -191,6 +195,59 @@ const timer = setInterval(() => {
 	});
 	const readyPath = path.join(folder, spec.files.ready);
 	return { child, record, readyPath };
+}
+
+/**
+ * Starts a stand-in app that never takes the request, or one that drops its
+ * readiness, publishes a new one under another live pid, then takes the
+ * request and completes it.
+ * @param {object} paths Fixture paths.
+ * @param {'never'|'restart'} mode
+ */
+function startScriptedDriver(paths, mode) {
+	const folder = path.join(paths.clone, spec.folder);
+	fs.mkdirSync(path.join(folder, spec.files.results), { recursive: true });
+	const program = `
+const fs = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
+const [folder, mode] = process.argv.slice(1);
+const spec = JSON.parse(process.env.FIELD_RUN_SPEC);
+const readyPath = path.join(folder, spec.files.ready);
+const requestPath = path.join(folder, spec.files.request);
+fs.writeFileSync(readyPath, JSON.stringify({ schema: 1, driver: 'macos', pid: process.pid }));
+setTimeout(() => process.exit(0), 60000);
+if (mode === 'restart') {
+	const waitRequest = setInterval(() => {
+		if (!fs.existsSync(requestPath)) return;
+		clearInterval(waitRequest);
+		setTimeout(() => fs.rmSync(readyPath, { force: true }), 2000);
+		setTimeout(() => {
+			const successor = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore' });
+			fs.writeFileSync(readyPath, JSON.stringify({ schema: 1, driver: 'macos', pid: successor.pid }));
+			setTimeout(() => {
+				const request = JSON.parse(fs.readFileSync(requestPath, 'utf8'));
+				fs.rmSync(requestPath);
+				const dir = path.join(folder, spec.files.results, request.request_id);
+				fs.mkdirSync(dir, { recursive: true });
+				fs.writeFileSync(path.join(dir, spec.files.accepted), JSON.stringify({ schema: 1, request_id: request.request_id }));
+				fs.writeFileSync(path.join(dir, '01_field_lease.json'), JSON.stringify({ schema: 1, step: 'field_lease', verdict: 'pass', codes: [] }));
+				fs.writeFileSync(path.join(dir, spec.files.done), JSON.stringify({ schema: 1, request_id: request.request_id, interrupted: false, verdicts: { field_lease: 'pass' } }));
+				successor.kill();
+			}, 2000);
+		}, 4000);
+	}, 100);
+}
+`;
+	const child = spawn(process.execPath, ['-e', program, folder, mode], {
+		env: { ...process.env, FIELD_RUN_SPEC: JSON.stringify(spec) },
+		stdio: 'ignore'
+	});
+	return {
+		child,
+		readyPath: path.join(folder, spec.files.ready),
+		requestPath: path.join(folder, spec.files.request)
+	};
 }
 
 /** Waits until a file exists. */
@@ -516,6 +573,62 @@ function reportFolder(paths) {
 					} finally {
 						driver.child.kill();
 					}
+				}
+			}
+		);
+
+		await check(
+			'a request the app never takes is withdrawn when the collector gives up',
+			async () => {
+				const paths = fixture('never-accepted');
+				paths.env.FIELD_RUN_ACCEPT_SECONDS_OVERRIDE = '2';
+				const driver = startScriptedDriver(paths, 'never');
+				try {
+					await waitFor(driver.readyPath);
+					const result = await runCollector(paths);
+					assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+					const folder = reportFolder(paths);
+					assert.match(
+						fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+						/^field_run\s+exit=1$/m
+					);
+					assert.match(
+						fs.readFileSync(path.join(folder, 'field_run.txt'), 'utf8'),
+						/request withdrawn/
+					);
+					assert.equal(
+						fs.existsSync(driver.requestPath),
+						false,
+						'no request is left for the app to run unobserved'
+					);
+				} finally {
+					driver.child.kill();
+				}
+			}
+		);
+
+		await check(
+			'acceptance waits across a developer app that restarts after its readiness',
+			async () => {
+				const paths = fixture('restarted');
+				// Shorter than the time the stand-in takes from the request to its acceptance:
+				// only a budget that restarts with the new readiness lets the run through.
+				paths.env.FIELD_RUN_ACCEPT_SECONDS_OVERRIDE = '4';
+				const driver = startScriptedDriver(paths, 'restart');
+				try {
+					await waitFor(driver.readyPath);
+					const result = await runCollector(paths);
+					assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+					const folder = reportFolder(paths);
+					assert.match(
+						fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+						/^field_run\s+exit=0$/m
+					);
+					const text = fs.readFileSync(path.join(folder, 'field_run.txt'), 'utf8');
+					assert.match(text, /published its readiness again/);
+					assert(fs.existsSync(path.join(folder, 'field_run', '01_field_lease.json')));
+				} finally {
+					driver.child.kill();
 				}
 			}
 		);
