@@ -1027,9 +1027,7 @@ function M.bind_pending(final)
 	if not started or not admission_open() or start_attempt ~= nil then
 		return next(pending_refusals) == nil
 	end
-	local names = {}
-	for name in pairs(pending_refusals) do names[#names + 1] = name end
-	table.sort(names)
+	local names = TableUtil.sorted_keys(pending_refusals)
 	local epoch = lifecycle_epoch
 	layout_fallback_admitted = final == true
 	for _, name in ipairs(names) do

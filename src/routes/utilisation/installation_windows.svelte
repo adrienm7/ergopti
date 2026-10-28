@@ -1,8 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
-	import Ergopti from '$lib/components/Ergopti.svelte';
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
-	import { getRelease } from '$lib/js/getGitHubRelease.js';
+	import Ergopti from '#lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
+	import { getRelease } from '#lib/js/getGitHubRelease.js';
 
 	/** @type {Awaited<ReturnType<typeof getRelease>>} */
 	let release = null;
@@ -47,7 +47,7 @@
 <enhanced:img
 	class="no-upscale"
 	style="width: min(400px, 100%)!important;"
-	src="$lib/images/windows_installation_1.jpg"
+	src="../../lib/images/windows_installation_1.jpg"
 	alt="Screenshot d'installation du pilote KbdEdit"
 />
 
@@ -59,7 +59,7 @@
 	la langue installée (ici <code>Français (France)</code>) :
 </p>
 <enhanced:img
-	src="$lib/images/windows_installation_2.jpg"
+	src="../../lib/images/windows_installation_2.jpg"
 	alt="Screenshot 1/2 des paramètres Windows 11 pour changer sa disposition de clavier"
 />
 
@@ -69,7 +69,7 @@
 	par l'installateur de KbdEdit :
 </p>
 <enhanced:img
-	src="$lib/images/windows_installation_3.jpg"
+	src="../../lib/images/windows_installation_3.jpg"
 	alt="Screenshot 2/2 des paramètres Windows 11 pour changer sa disposition de clavier"
 />
 <p>
@@ -84,7 +84,7 @@
 <enhanced:img
 	class="no-upscale"
 	style="width: min(400px, 100%)!important;"
-	src="$lib/images/windows_installation_4.jpg"
+	src="../../lib/images/windows_installation_4.jpg"
 	alt="Screenshot du menu menu linguistique de la barre des tâches"
 />
 
