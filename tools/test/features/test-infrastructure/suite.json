@@ -506,6 +506,15 @@
 			"args": ["tools/test/test-wine-runner-process-guard.cjs"],
 			"repro": "node tools/test/test-wine-runner-process-guard.cjs",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-linux-private-runner-output",
+			"ordinal": 530,
+			"name": "Linux private helper failures stay private while canonical failures remain reportable",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-linux-runner-private-output.cjs"],
+			"repro": "node tools/test/test-linux-runner-private-output.cjs",
+			"platforms": ["linux"]
 		}
 	]
 }
