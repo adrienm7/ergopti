@@ -170,9 +170,8 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             cache_dir=self.cache_dir,
             sandboxed=True,
         )
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(Path, "mkdir", side_effect=OSError(30, "Read-only file system")),
+        with mock.patch("builtins.print"), mock.patch.object(
+            Path, "mkdir", side_effect=OSError(30, "Read-only file system")
         ):
             with self.assertRaises(SystemExit) as caught:
                 clean_installer.install_clean(
@@ -194,9 +193,8 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             cache_dir=self.cache_dir,
             sandboxed=False,
         )
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(clean_installer, "libxkbcommon_version", return_value=(1, 6, 0)),
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer, "libxkbcommon_version", return_value=(1, 6, 0)
         ):
             with self.assertRaises(SystemExit) as caught:
                 clean_installer.enforce_clean_prerequisites(roots)
@@ -232,13 +230,10 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             self.assertTrue((extensions_root / "ergopti" / "symbols" / layout_id).is_file())
             return False
 
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(
-                clean_installer,
-                "compile_validation",
-                side_effect=reject_staged_package,
-            ),
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer,
+            "compile_validation",
+            side_effect=reject_staged_package,
         ):
             with self.assertRaises(SystemExit):
                 clean_installer.install_clean(
@@ -327,17 +322,14 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             cache_dir=self.cache_dir,
             sandboxed=True,
         )
-        with (
-            mock.patch.dict(os.environ, self.env, clear=False),
-            mock.patch("builtins.print"),
-            mock.patch.object(
-                clean_installer, "write_user_text", side_effect=OSError("read-only home")
-            ),
-            mock.patch.object(
-                clean_installer,
-                "deactivate_desktop_entries",
-                return_value=clean_installer.CleanupStatus.ABSENT,
-            ),
+        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch(
+            "builtins.print"
+        ), mock.patch.object(
+            clean_installer, "write_user_text", side_effect=OSError("read-only home")
+        ), mock.patch.object(
+            clean_installer,
+            "deactivate_desktop_entries",
+            return_value=clean_installer.CleanupStatus.ABSENT,
         ):
             self.assertFalse(clean_installer.uninstall_clean(roots))
         self.assertTrue(self.package_dir.exists())
@@ -356,17 +348,15 @@ class CleanInstallerSandboxTests(unittest.TestCase):
                 return SimpleNamespace(returncode=0, stdout="[('xkb', 'ergopti')]")
             return SimpleNamespace(returncode=1, stdout="refused")
 
-        with (
-            mock.patch.dict(os.environ, self.env, clear=False),
-            mock.patch("builtins.print"),
-            mock.patch.object(
-                clean_installer,
-                "remove_user_xcompose_include",
-                return_value=clean_installer.CleanupStatus.ABSENT,
-            ),
-            mock.patch.object(clean_installer, "running_as_root", return_value=False),
-            mock.patch.object(activation.subprocess, "run", side_effect=fake_run),
-        ):
+        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch(
+            "builtins.print"
+        ), mock.patch.object(
+            clean_installer,
+            "remove_user_xcompose_include",
+            return_value=clean_installer.CleanupStatus.ABSENT,
+        ), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(activation.subprocess, "run", side_effect=fake_run):
             self.assertFalse(clean_installer.uninstall_clean(roots))
         self.assertTrue(self.package_dir.exists())
 
@@ -382,17 +372,15 @@ class CleanInstallerSandboxTests(unittest.TestCase):
                 )
             raise FileNotFoundError(command[0])
 
-        with (
-            mock.patch.dict(os.environ, self.env, clear=False),
-            mock.patch("builtins.print"),
-            mock.patch.object(
-                clean_installer,
-                "remove_user_xcompose_include",
-                return_value=clean_installer.CleanupStatus.ABSENT,
-            ),
-            mock.patch.object(clean_installer, "running_as_root", return_value=False),
-            mock.patch.object(activation.subprocess, "run", side_effect=fake_run),
-        ):
+        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch(
+            "builtins.print"
+        ), mock.patch.object(
+            clean_installer,
+            "remove_user_xcompose_include",
+            return_value=clean_installer.CleanupStatus.ABSENT,
+        ), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(activation.subprocess, "run", side_effect=fake_run):
             self.assertEqual(
                 clean_installer.main(["--uninstall"]),
                 clean_installer.EXIT_INSTALL_ABORTED,
