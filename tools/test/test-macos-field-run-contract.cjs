@@ -227,6 +227,34 @@ function runCollector(paths, onStart) {
 	});
 }
 
+/**
+ * Gives a fixture a stand-in input-source probe: swiftc copies a script that
+ * records each invocation's arguments and names its marker file.
+ * @param {object} paths Fixture paths.
+ * @param {boolean} withMarker Whether an earlier run left the after-logout marker.
+ * @returns {string} The file the stand-in records its invocations in.
+ */
+function addProbe(paths, withMarker) {
+	const source = path.join(paths.clone, 'tools/diagnostics/macos_tis_register_probe.swift');
+	fs.mkdirSync(path.dirname(source), { recursive: true });
+	fs.writeFileSync(source, '// probe\n');
+	const log = path.join(paths.home, 'probe.log');
+	const marker = path.join(paths.home, 'keep.plist');
+	if (withMarker) fs.writeFileSync(marker, '<plist/>\n');
+	const standIn = path.join(paths.home, 'probe-stand-in.sh');
+	fs.writeFileSync(
+		standIn,
+		`#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\n[ "$1" = marker-path ] && printf '%s\\n' "${marker}"\nexit 0\n`,
+		{ mode: 0o755 }
+	);
+	shim(
+		paths.bin,
+		'swiftc',
+		`while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done\ncp "${standIn}" "$out" && chmod +x "$out"`
+	);
+	return log;
+}
+
 /** The single report folder a collector run committed. */
 function reportFolder(paths) {
 	const reports = path.join(paths.clone, 'docs/field-reports');
@@ -342,6 +370,47 @@ function reportFolder(paths) {
 		});
 
 		await check(
+			'the input-source probe answers every question it declares, without the v4 defects',
+			() => {
+				const probe = fs.readFileSync(
+					path.join(ROOT, 'tools/diagnostics/macos_tis_register_probe.swift'),
+					'utf8'
+				);
+				for (const question of [
+					'P0',
+					'P1',
+					'P2',
+					'P3',
+					'P4',
+					'P5',
+					'P6',
+					'P7',
+					'P8',
+					'P9',
+					'P10'
+				]) {
+					assert.match(probe, new RegExp(`^ \\* {3}${question} `, 'm'), `${question} is declared`);
+					assert.match(
+						probe,
+						new RegExp(`verdict\\("${question}"|\\("${question}", `),
+						`${question} is answered`
+					);
+				}
+				// v4 inserted "$1<name>$2" literally, so the cloned layout was invalid XML
+				assert.match(
+					probe,
+					/expression\.replacementString\(for: match, in: text, offset: 0, template: template\)/
+				);
+				// v4 kickstarted a label of the user domain: launchctl answered 113 and nothing restarted
+				assert.doesNotMatch(probe, /kickstart", "-k", "user\//);
+				assert.match(probe, /"kickstart", "-k", "\\\(guiDomain\)\/\\\(label\)"/);
+				for (const mode of ['after-logout', 'marker-path', 'query', 'select']) {
+					assert.match(probe, new RegExp(`mode == "${mode}"`), `the ${mode} mode exists`);
+				}
+			}
+		);
+
+		await check(
 			'a ready app built from the current launcher is reused, a newer launcher rebuilds it',
 			async () => {
 				const current = fixture('current');
@@ -410,6 +479,43 @@ function reportFolder(paths) {
 					assert.match(committed, /field_run\/done\.json/);
 				} finally {
 					driver.child.kill();
+				}
+			}
+		);
+
+		await check(
+			'the probe runs after-logout first when an earlier run left its marker, and says why it skipped otherwise',
+			async () => {
+				for (const withMarker of [true, false]) {
+					const paths = fixture(withMarker ? 'probe-marker' : 'probe-no-marker');
+					const log = addProbe(paths, withMarker);
+					const driver = startDriver(paths, 'done');
+					try {
+						await waitFor(driver.readyPath);
+						const result = await runCollector(paths);
+						assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+						const runs = fs.readFileSync(log, 'utf8').split('\n').slice(0, -1);
+						const expected = withMarker
+							? [
+									'marker-path',
+									'after-logout',
+									'',
+									'--write-prefs',
+									'--replace-ergopti --write-prefs'
+								]
+							: ['marker-path', '', '--write-prefs', '--replace-ergopti --write-prefs'];
+						assert.deepEqual(runs, expected);
+						const steps = fs.readFileSync(path.join(reportFolder(paths), 'steps.txt'), 'utf8');
+						assert.match(
+							steps,
+							withMarker
+								? /^probe_after_logout\s+exit=0$/m
+								: /^probe_after_logout\s+skipped \(no marker from an earlier run\)$/m
+						);
+						assert.match(steps, /^probe_replace_ergopti\s+exit=0$/m);
+					} finally {
+						driver.child.kill();
+					}
 				}
 			}
 		);
