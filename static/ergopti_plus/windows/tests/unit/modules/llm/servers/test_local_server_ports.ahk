@@ -95,13 +95,14 @@ _LSP_RegisterCorpus()
 ; =====================================
 
 class _LSP_ScanFixture {
-	__New() {
+	__New(Files := Map()) {
 		this.Spawns := []
 		this.Timers := []
 		this.Terminated := 0
 		this.Results := 0
 		this.Scanner := LocalServerPortScan(Map("spawn", ObjBindMethod(this, "Spawn"),
-			"timer", ObjBindMethod(this, "Timer"), "read_file", (*) => 0, "home", "C:\Users\u"))
+			"timer", ObjBindMethod(this, "Timer"), "read_file", (Path) => Files.Has(Path) ? Files[Path] : 0,
+			"home", "C:\Users\u"))
 	}
 
 	Spawn(Executable, Args, OnDone) {
@@ -163,6 +164,25 @@ _LSP_ScanDeadline() {
 	AssertTrue(ObjPtr(Late) == ObjPtr(Fixture.Results), "a late answer cannot settle the scan twice")
 }
 Test("local server ports: the Windows scan is bounded by its deadline", _LSP_ScanDeadline)
+
+; ROOT CAUSE ENCODED: a sweep without a process list went straight to the
+; catalogue port, logged as an error, though a settings file still named the
+; port the server listens on (omlx-ps-timeout-config).
+_LSP_ScanUnlistedReadsConfig() {
+	Fixture := _LSP_ScanFixture(Map("C:/Users/u/.fixture/settings.json", '{"server":{"port":8181}}'))
+	Config := Map("os", ["windows"], "dir", "~/.fixture", "file", "settings.json", "port_key", "server.port")
+	Descriptor := LocalServerPortsDescriptor("fixture", Map("process_names", ["fixture-server"],
+		"config_files", [Config]))["descriptor"]
+	AssertTrue(Descriptor is Map, "the fixture descriptor is valid")
+	Entries := [Map("id", "fixture", "descriptor", Descriptor, "base_url", "http://127.0.0.1:8000/v1")]
+	Fixture.Scanner.Scan(Entries, (Value) => Fixture.Results := Value)
+	Fixture.Timers[1]["callback"].Call()
+	AssertTrue(Fixture.Results is Map, "the overdue scan settles")
+	AssertEqual("config", Fixture.Results["fixture"]["source"], "the settings file does not depend on the process list")
+	AssertEqual("http://127.0.0.1:8181/v1", Fixture.Results["fixture"]["base_url"])
+	AssertTrue(Fixture.Results["fixture"]["running"], "a server without a process list is probed")
+}
+Test("local server ports: a Windows scan without a process list still reads the settings port", _LSP_ScanUnlistedReadsConfig)
 
 
 
