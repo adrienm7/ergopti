@@ -5025,7 +5025,7 @@ jobs:
               echo "::error::the AppImage bundles no runnable luajit at usr/bin/luajit — it would depend on the target having one."
               exit 1
           fi
-          export LUA_PATH="$root/?.lua;$root/?/init.lua;$root/_shared/lua/?.lua;$root/_shared/lua/?/init.lua;;"
+          source "$root/network-runtime-env.sh" "$(pwd)/squashfs-root/usr" "$root"
           "$luajit_bin" static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               "$root/_shared"
 
