@@ -1045,6 +1045,12 @@ function M.process_frame(touches, frame_stamp)
 				if gs.lastFirePos then
 					gs.lastFirePos = {x = gs.lastFirePos.x + jumpX, y = gs.lastFirePos.y + jumpY}
 				end
+				-- The pair-travel origin of a pending drop moves with it too: a 4 -> 3
+				-- -> 2 cascade measured the pair from the three-finger centroid, and
+				-- the jump alone aborted a gesture whose fingers were lifting still.
+				if gs.dropPos then
+					gs.dropPos = {x = gs.dropPos.x + jumpX, y = gs.dropPos.y + jumpY}
+				end
 				-- Move endPos with it. A frame in a tentative drop leaves endPos
 				-- frozen, so shifting startPos alone turned the jump itself into a
 				-- displacement: a palm touching below two scrolling fingers for one
