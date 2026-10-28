@@ -14,6 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { installHostCapabilities } = require('./support/host-capabilities.cjs');
+const { installThemeTokens } = require('./support/theme-tokens.cjs');
 const root = path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui');
 const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
 let passed = 0;
@@ -36,8 +37,10 @@ function appsFixture() {
 		console
 	});
 	const index = read('metrics_apps/index.html');
+	installThemeTokens(context);
 	vm.runInContext(read('host_bridge.js'), context);
 	vm.runInContext(read('_generated/metrics_general_category_aliases.js'), context);
+	vm.runInContext(read('metrics_calendar.js'), context);
 	for (const name of ['helpers.js', 'state.js', 'main.js']) {
 		assert.ok(index.includes(`src="${name}"`), `${name} must be loaded by the actual page`);
 		vm.runInContext(read(`metrics_apps/${name}`), context);
@@ -447,9 +450,11 @@ assert.equal(passed, 12, 'all original seven and five selection regressions must
 			document: { addEventListener() {}, getElementById: (id) => elements[id] || null },
 			console
 		});
+		installThemeTokens(context);
 		vm.runInContext(read('host_bridge.js'), context);
 		vm.runInContext(read('dom_utils.js'), context);
 		vm.runInContext(read('_generated/metrics_general_category_aliases.js'), context);
+		vm.runInContext(read('metrics_calendar.js'), context);
 		for (const name of ['helpers.js', 'state.js', 'main.js', 'charts.js', 'modal.js']) {
 			assert.ok(read('metrics_apps/index.html').includes(`src="${name}"`));
 			vm.runInContext(read(`metrics_apps/${name}`), context);
@@ -552,7 +557,8 @@ assert.equal(passed, 15, 'the orphan script check must execute');
 const { loadMetricsAppsPage } = require('./support/metrics-apps-page.cjs');
 
 /** Delivers through each actual host handler; it never computes metrics. */
-function publishLoadedAppsData(page, host, manifest, icons = {}, revision = 1) {
+function publishLoadedAppsData(page, host, manifest, icons = {}, revision = 1, categories = {}) {
+	const blob = { metrics_manifest: manifest, user_categories: categories, app_icons: icons };
 	if (host === 'windows') {
 		assert.equal(Object.keys(icons).length, 0, 'the actual Windows producer emits empty icon maps');
 		const listener = page.messageListeners.find((entry) => entry.name === 'message');
@@ -560,19 +566,17 @@ function publishLoadedAppsData(page, host, manifest, icons = {}, revision = 1) {
 		listener.callback({
 			data: {
 				type: 'prefetch',
-				blob: { metrics_manifest: manifest, user_categories: {}, app_icons: icons }
+				blob
 			}
 		});
 	} else if (host === 'linux') {
 		page.context.__hostBridgeResponse(
 			'metrics_apps_bridge',
 			false,
-			encodeURIComponent(
-				JSON.stringify({ metrics_manifest: manifest, user_categories: {}, app_icons: icons })
-			)
+			encodeURIComponent(JSON.stringify(blob))
 		);
 	} else {
-		page.context.publishMetricsAppsData(manifest, {}, icons, {
+		page.context.publishMetricsAppsData(manifest, categories, icons, {
 			manifest_revision: revision,
 			categories_revision: 1
 		});
@@ -1375,4 +1379,1858 @@ for (const host of ['windows', 'macos', 'linux']) {
 }
 assert.equal(windowTitleCases.length, 4);
 assert.equal(passed, 228, 'all native title dictionary and rendering controls must execute');
+const { loadMetricsTypingPage } = require('./support/metrics-apps-page.cjs');
+function publishTypingPage(page, host, manifest) {
+	assert.equal(
+		page.scripts.filter((name) => name === '../metrics_calendar.js').length,
+		1,
+		'both pages load one canonical calendar owner'
+	);
+	assert.ok(
+		page.scripts.indexOf('../metrics_calendar.js') < page.scripts.indexOf('format.js'),
+		'the shared calendar owner loads before typing consumers'
+	);
+	const initial = { historical: {}, today: {} };
+	if (host === 'macos') {
+		page.context.publishTypingMetricsData(
+			{ manifest, initial_data: initial, app_icons: {}, kc_layout: {} },
+			{ manifest_revision: 1, assets_revision: 1 }
+		);
+	} else {
+		const blob = {
+			metrics_manifest: manifest,
+			_prefetch_data: initial,
+			app_icons: {},
+			keycode_layout: {},
+			driver_meta: { os: host, heatmap_id: 'sc' }
+		};
+		if (host === 'windows')
+			page.messageListeners
+				.filter((entry) => entry.name === 'message')
+				.at(-1)
+				.callback({ data: { type: 'prefetch', blob } });
+		else
+			page.context.__hostBridgeResponse(
+				'metrics_typing_bridge',
+				false,
+				encodeURIComponent(JSON.stringify(blob))
+			);
+	}
+}
+function freezePageClock(page, timestamp) {
+	const fixedNow = Date.parse(timestamp);
+	page.context.Date = class ClockPort extends Date {
+		constructor(...args) {
+			super(...(args.length ? args : [fixedNow]));
+		}
+		static now() {
+			return fixedNow;
+		}
+	};
+}
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of streakCases) {
+		test(`${host} loaded typing streak retains ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone;
+			try {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, vector.dates.slice().sort().at(-1) + 'T12:00:00Z');
+				const manifest = Object.fromEntries(
+					vector.dates.map((date) => [
+						date,
+						{
+							Editor: {
+								chars: vector.empty || vector.ineligible === date ? 0 : 10,
+								time: 10000,
+								wpm_chars: 10
+							}
+						}
+					])
+				);
+				publishTypingPage(page, host, manifest);
+				assert.equal(
+					page.elements.get('records_streak').innerHTML,
+					vector.expected ? `${vector.expected} jour${vector.expected > 1 ? 's' : ''}` : '—'
+				);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false,
+					'real declared scripts and native-handler ingress must finish without fixture errors'
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+	for (const vector of annualCases) {
+		test(`${host} loaded typing calendar preserves civil days in ${vector.zone}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone;
+			try {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, vector.now);
+				publishTypingPage(page, host, {
+					'2011-12-30': { Editor: { chars: 20, time: 10000, hourly: { '09': { c: 20 } } } }
+				});
+				const svg = page.elements.get('activity_calendar_container').innerHTML;
+				const label = (key) => {
+					const [day, month, year] = key.split('/').map(Number);
+					const date = new Date(0);
+					date.setUTCFullYear(year, month - 1, day);
+					return date.toLocaleDateString('fr-FR', {
+						weekday: 'long',
+						day: 'numeric',
+						month: 'long',
+						year: 'numeric',
+						timeZone: 'UTC'
+					});
+				};
+				assert.ok(
+					svg.includes(`<title>${label(vector.today)} — `),
+					'the real local today remains visible'
+				);
+				assert.ok(
+					!svg.includes(`<title>${label(vector.future)} — `),
+					'UTC conversion must not insert local tomorrow'
+				);
+				if (vector.archived) {
+					assert.ok(
+						svg.includes(`<title>${label(vector.archived)} — 20 `),
+						'archived skipped dates remain distinct cells'
+					);
+					assert.ok(page.elements.get('records_best_day').innerHTML.includes('30 déc. 11'));
+					assert.ok(
+						page.elements
+							.get('hour_weekday_heatmap_container')
+							.innerHTML.includes(
+								`<title>${page.context._t('ui_typing.heatmap_day_fri')} 09h — 20 `
+							),
+						'archived dates retain their recorded Gregorian weekday'
+					);
+				}
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(
+	passed,
+	279,
+	'all apps controls and full loaded typing-page calendar controls must execute'
+);
+
+const typingGridDates = ['2026-10-26T12:00:00Z', '2026-10-25T12:00:00Z', '2026-10-28T12:00:00Z'];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const now of typingGridDates) {
+		test(`${host} typing calendar packs consecutive weeks at ${now.slice(0, 10)}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = 'UTC';
+			try {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, now);
+				publishTypingPage(page, host, { '2026-10-20': { Editor: { chars: 10, time: 10000 } } });
+				const html = page.elements.get('activity_calendar_container').innerHTML;
+				const cells = Array.from(
+					html.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g),
+					(match) => ({ x: +match[1], y: +match[2], width: +match[3], height: +match[4] })
+				);
+				assert.ok(
+					cells.length >= 365 && cells.length <= 371,
+					'the real calendar renders a year and its leading week alignment'
+				);
+				const xs = [...new Set(cells.map((cell) => cell.x))].sort((a, b) => a - b);
+				const ys = [...new Set(cells.map((cell) => cell.y))].sort((a, b) => a - b);
+				assert.equal(ys.length, 7);
+				const step = ys[1] - ys[0];
+				assert.ok(step > cells[0].height);
+				assert.equal(xs.length, Math.ceil(cells.length / ys.length));
+				for (let index = 1; index < xs.length; index++)
+					assert.equal(
+						xs[index] - xs[index - 1],
+						step,
+						'weeks use the same cell gap as consecutive weekdays'
+					);
+				const svgWidth = Number(html.match(/<svg width="(\d+)"/)[1]);
+				assert.equal(
+					svgWidth,
+					xs[0] + xs.length * step,
+					'the SVG width includes exactly the visible week columns'
+				);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(typingGridDates.length, 3);
+assert.equal(passed, 288, 'all weekday-boundary calendar grid controls must execute');
+const typingWindowCases = [
+	{ name: 'older archive', extra: '2020-01-01' },
+	{ name: 'future day', extra: '2026-10-29' },
+	{ name: 'leading week padding', extra: '2025-10-28' },
+	{ name: 'first included day', extra: '2025-10-29', included: true },
+	{ name: 'local today', extra: '2026-10-28', included: true },
+	{ name: 'invalid recorded key', extra: 'not-a-recorded-date' },
+	{
+		name: 'local tomorrow before UTC midnight',
+		zone: 'America/Los_Angeles',
+		now: '2026-01-01T00:30:00Z',
+		recent: '2025-12-30',
+		extra: '2026-01-01'
+	},
+	{
+		name: 'Apia archived date identity',
+		zone: 'Pacific/Apia',
+		now: '2011-12-31T00:00:00Z',
+		recent: '2011-12-30',
+		extra: '2010-01-01'
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingWindowCases) {
+		test(`${host} typing annual normalization scopes ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone || 'UTC';
+			try {
+				const paint = (extra) => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(page, vector.now || '2026-10-28T12:00:00Z');
+					publishTypingPage(page, host, {
+						[vector.recent || '2026-10-20']: { Editor: { chars: 20, time: 10000 } },
+						...extra
+					});
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+					const html = page.elements.get('activity_calendar_container').innerHTML;
+					const cells = Array.from(
+						html.matchAll(/<rect[^>]*fill="([^"]+)"[^>]*><title>([^<]+)<\/title>/g)
+					);
+					const recentColour = cells.find((match) => match[2].includes(' — 20 '))?.[1];
+					assert.ok(recentColour, 'the baseline recorded day has a real rendered cell');
+					return { page, html, recentColour };
+				};
+				const baseline = paint({});
+				const withOutlier = paint({ [vector.extra]: { Editor: { chars: 100000, time: 10000 } } });
+				if (vector.included) {
+					assert.notEqual(withOutlier.recentColour, baseline.recentColour);
+					assert.ok(
+						withOutlier.html.includes(
+							`2 ${withOutlier.page.context._t('ui_typing.calendar_active_days')} · ${withOutlier.page.context.format_number(100020)} ${withOutlier.page.context._t('ui_typing.calendar_chars')}`
+						),
+						'included boundaries contribute to the actual annual summary'
+					);
+				} else {
+					assert.equal(
+						withOutlier.recentColour,
+						baseline.recentColour,
+						'out-of-window rows cannot flatten visible calendar intensity'
+					);
+					assert.equal(
+						withOutlier.html,
+						baseline.html,
+						'out-of-window rows cannot change the annual summary or padding cells'
+					);
+				}
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(typingWindowCases.length, 8);
+assert.equal(passed, 312, 'all annual summary, normalization and date-edge controls must execute');
+const typingMonthCases = [
+	{
+		name: 'three months into ordinary February',
+		now: '2026-05-31T12:00:00Z',
+		preset: '3m',
+		start: '2026-02-28',
+		end: '2026-05-31'
+	},
+	{
+		name: 'six months into ordinary February',
+		now: '2026-08-31T12:00:00Z',
+		preset: '6m',
+		start: '2026-02-28',
+		end: '2026-08-31'
+	},
+	{
+		name: 'three months into leap February',
+		now: '2024-05-31T12:00:00Z',
+		preset: '3m',
+		start: '2024-02-29',
+		end: '2024-05-31'
+	},
+	{
+		name: 'six months across the year boundary',
+		now: '2026-03-31T12:00:00Z',
+		preset: '6m',
+		start: '2025-09-30',
+		end: '2026-03-31'
+	},
+	{
+		name: 'three months into a thirty-day month',
+		now: '2026-07-31T12:00:00Z',
+		preset: '3m',
+		start: '2026-04-30',
+		end: '2026-07-31'
+	},
+	{
+		name: 'valid day retained across months',
+		now: '2026-03-30T12:00:00Z',
+		preset: '3m',
+		start: '2025-12-30',
+		end: '2026-03-30'
+	},
+	{
+		name: 'local month end after UTC midnight',
+		zone: 'America/Los_Angeles',
+		now: '2026-06-01T00:30:00Z',
+		preset: '3m',
+		start: '2026-02-28',
+		end: '2026-05-31'
+	},
+	{
+		name: 'local month end before UTC midnight',
+		zone: 'Pacific/Kiritimati',
+		now: '2026-05-30T13:00:00Z',
+		preset: '3m',
+		start: '2026-02-28',
+		end: '2026-05-31'
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingMonthCases) {
+		test(`${host} quick date range retains ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone || 'UTC';
+			try {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, vector.now);
+				publishTypingPage(page, host, { '2020-01-01': { Editor: { chars: 10, time: 10000 } } });
+				page.elements.get('quick_range').value = vector.preset;
+				const tag = page.html.match(/<select\b[^>]*\bid="quick_range"[^>]*>/)[0];
+				const handler = tag.match(/\bonchange="([^"]+)"/)[1];
+				assert.ok(handler, 'the real HTML owns the quick-range change handler');
+				vm.runInContext(handler, page.context);
+				assert.equal(page.elements.get('date_start').value, vector.start);
+				assert.equal(page.elements.get('date_end').value, vector.end);
+				const selection = JSON.parse(
+					vm.runInContext('app_state.range_request_selection', page.context)
+				);
+				assert.deepEqual(
+					selection,
+					[vector.start, vector.end, ['Editor']],
+					'the actual native query owns the clamped local date interval'
+				);
+				assert.equal(vm.runInContext('app_state.hour_window', page.context), null);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(typingMonthCases.length, 8);
+assert.equal(passed, 336, 'all quick-range month boundary controls must execute');
+const quickRangeTag = read('metrics_typing/index.html').match(
+	/<select\b[^>]*\bid="quick_range"[^>]*>([\s\S]*?)<\/select>/
+)[0];
+const quickPresets = Array.from(
+	quickRangeTag.matchAll(/<option\b[^>]*\bvalue="([^"]*)"/g),
+	(match) => match[1]
+).filter(Boolean);
+function runTypingControlChange(page, id) {
+	const tag = page.html.match(new RegExp('<(?:select|input)\\b[^>]*\\bid="' + id + '"[^>]*>'))?.[0];
+	assert.ok(tag, `the real page declares control ${id}`);
+	const handler = tag.match(/\bonchange="([^"]+)"/)?.[1];
+	assert.ok(handler, `the real HTML owns control ${id}'s change handler`);
+	vm.runInContext(handler, page.context);
+}
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const preset of quickPresets) {
+		test(`${host} quick preset ${preset} releases its action selection`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = 'UTC';
+			try {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, '2026-10-28T12:00:00Z');
+				publishTypingPage(page, host, { '2020-01-01': { Editor: { chars: 10, time: 10000 } } });
+				const quick = page.elements.get('quick_range');
+				quick.value = preset;
+				runTypingControlChange(page, 'quick_range');
+				const start = page.elements.get('date_start').value;
+				const cutoff = JSON.parse(
+					vm.runInContext('JSON.stringify(app_state.hour_window)', page.context)
+				);
+				assert.equal(
+					quick.value,
+					'',
+					'a completed quick action returns to the actual placeholder option'
+				);
+				page.elements.get('date_start').value = '2026-10-01';
+				runTypingControlChange(page, 'date_start');
+				assert.equal(quick.value, '', 'manual date edits cannot retain a false preset label');
+				quick.value = preset;
+				runTypingControlChange(page, 'quick_range');
+				assert.equal(quick.value, '');
+				assert.equal(
+					page.elements.get('date_start').value,
+					start,
+					'the same action remains selectable after a manual date edit'
+				);
+				assert.equal(page.elements.get('date_end').value, '2026-10-28');
+				assert.deepEqual(
+					JSON.parse(vm.runInContext('JSON.stringify(app_state.hour_window)', page.context)),
+					cutoff
+				);
+				assert.deepEqual(
+					JSON.parse(vm.runInContext('app_state.range_request_selection', page.context)),
+					[start, '2026-10-28', ['Editor']]
+				);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+	test(`${host} empty quick placeholder does not issue a query`, () => {
+		const page = loadMetricsTypingPage(host);
+		freezePageClock(page, '2026-10-28T12:00:00Z');
+		publishTypingPage(page, host, { '2020-01-01': { Editor: { chars: 10, time: 10000 } } });
+		const before = vm.runInContext('app_state.range_request_sequence', page.context);
+		const start = page.elements.get('date_start').value;
+		page.elements.get('quick_range').value = '';
+		runTypingControlChange(page, 'quick_range');
+		assert.equal(vm.runInContext('app_state.range_request_sequence', page.context), before);
+		assert.equal(page.elements.get('date_start').value, start);
+		assert.equal(
+			page.diagnostics.some((entry) => entry.level === 'error'),
+			false
+		);
+	});
+}
+assert.equal(quickPresets.length, 8, 'all actual quick actions must participate');
+assert.equal(passed, 363, 'all quick-action, manual-edit and placeholder controls must execute');
+const typingHourWindows = [
+	{
+		name: 'UTC year midnight',
+		now: '2026-01-01T00:30:00Z',
+		start: '2025-12-31',
+		first: '23:35',
+		end: '2026-01-01',
+		second: '00:05'
+	},
+	{
+		name: 'UTC month midnight',
+		now: '2026-05-01T00:30:00Z',
+		start: '2026-04-30',
+		first: '23:35',
+		end: '2026-05-01',
+		second: '00:05'
+	},
+	{
+		name: 'first full hour of the day',
+		now: '2026-01-01T01:30:00Z',
+		start: '2026-01-01',
+		first: '00:35',
+		end: '2026-01-01',
+		second: '01:05'
+	},
+	{
+		name: 'same-day detailed hour',
+		now: '2026-01-01T12:30:00Z',
+		start: '2026-01-01',
+		first: '11:35',
+		end: '2026-01-01',
+		second: '12:05'
+	},
+	{
+		name: 'Los Angeles local midnight',
+		zone: 'America/Los_Angeles',
+		now: '2026-01-01T08:30:00Z',
+		start: '2025-12-31',
+		first: '23:35',
+		end: '2026-01-01',
+		second: '00:05'
+	},
+	{
+		name: 'Kiritimati local midnight',
+		zone: 'Pacific/Kiritimati',
+		now: '2025-12-31T10:30:00Z',
+		start: '2025-12-31',
+		first: '23:35',
+		end: '2026-01-01',
+		second: '00:05'
+	},
+	{
+		name: 'Havana midnight DST',
+		zone: 'America/Havana',
+		now: '2026-03-08T05:30:00Z',
+		start: '2026-03-07',
+		first: '23:35',
+		end: '2026-03-08',
+		second: '01:05'
+	},
+	{
+		name: 'Paris skipped spring hour',
+		zone: 'Europe/Paris',
+		now: '2026-03-29T01:30:00Z',
+		start: '2026-03-29',
+		first: '01:35',
+		end: '2026-03-29',
+		second: '03:05'
+	},
+	{
+		name: 'Apia skipped local date',
+		zone: 'Pacific/Apia',
+		now: '2011-12-30T10:30:00Z',
+		start: '2011-12-29',
+		first: '23:35',
+		end: '2011-12-31',
+		second: '00:05'
+	}
+];
+function typingChartPage(host, now, owners = ['wpm_chart', 'precision_chart']) {
+	const page = loadMetricsTypingPage(host);
+	freezePageClock(page, now);
+	page.elements.get('pause_threshold').value = '1000';
+	const charts = [];
+	for (const id of owners) {
+		const canvas = page.context.document.createElement('canvas');
+		canvas.getContext = () => ({ owner: id });
+		page.elements.set(id, canvas);
+	}
+	page.dayTickPlugin = page.context.Chart.registry.plugins.get('day_tick_renderer');
+	page.linearScale = page.context.Chart.registry.getScale('linear');
+	const chartDefaults = page.context.Chart.defaults;
+	page.context.Chart = class ChartPort {
+		constructor(port, config) {
+			charts.push({ owner: port.owner, config });
+		}
+		destroy() {}
+	};
+	page.context.Chart.defaults = chartDefaults;
+	page.lastChart = (owner) => charts.filter((chart) => chart.owner === owner).at(-1).config;
+	return page;
+}
+function typingHourManifest(vector) {
+	const manifest = {};
+	for (const [date, bucket, chars, errors] of [
+		[vector.start, vector.first, 7, 1],
+		[vector.end, vector.second, 3, 0]
+	]) {
+		const app = ((manifest[date] ||= {}).Editor ||= {
+			chars: 0,
+			time: 0,
+			hourly: {},
+			hourly_min5: {}
+		});
+		app.chars += chars;
+		app.time += chars * 1000;
+		const hour = bucket.slice(0, 2);
+		app.hourly[hour] = { c: chars, e_buckets: { 1000: errors } };
+		app.hourly_min5[bucket] = { c: chars, e_buckets: { 1000: errors } };
+	}
+	// A date-qualified window must not merge yesterday's same-clock bucket
+	// into today's point, or expose later clock buckets from imported data.
+	if (vector.start !== vector.end) {
+		const app = manifest[vector.start].Editor;
+		app.hourly_min5[vector.second] = { c: 999, e_buckets: { 1000: 999 } };
+		app.chars += 999;
+		app.time += 999000;
+	}
+	const later = manifest[vector.end].Editor;
+	later.hourly_min5['23:55'] = { c: 997, e_buckets: { 1000: 997 } };
+	later.chars += 997;
+	later.time += 997000;
+	return manifest;
+}
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingHourWindows) {
+		test(`${host} last-hour query and chart preserve ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone || 'UTC';
+			try {
+				const page = typingChartPage(host, vector.now);
+				publishTypingPage(page, host, typingHourManifest(vector));
+				const oldRequest = vm.runInContext('app_state.range_request_sequence', page.context);
+				page.elements.get('quick_range').value = 'last_hour';
+				runTypingControlChange(page, 'quick_range');
+				const selection = JSON.parse(
+					vm.runInContext('app_state.range_request_selection', page.context)
+				);
+				assert.deepEqual(
+					selection,
+					[vector.start, vector.end, ['Editor']],
+					'the native range admits both date-qualified hours'
+				);
+				page.timers.at(-1)(); // The actual paced native dispatch, after its UI loader turn.
+				const rawRequest = host === 'macos' ? page.context._lua_request : page.posts.at(-1);
+				const request = typeof rawRequest === 'string' ? JSON.parse(rawRequest) : rawRequest;
+				if (host === 'macos')
+					assert.equal(
+						Object.hasOwn(request, 'action'),
+						false,
+						'the actual macOS poll mailbox keeps its native request shape'
+					);
+				else assert.equal(request.action, 'range');
+				assert.equal(request.start_date, vector.start);
+				assert.equal(request.end_date, vector.end);
+				const activity = page.lastChart('wpm_chart');
+				const precision = page.lastChart('precision_chart');
+				const expectedTimes = [
+					new Date(`${vector.start}T${vector.first}:00`).getTime(),
+					new Date(`${vector.end}T${vector.second}:00`).getTime()
+				];
+				assert.deepEqual(
+					Array.from(activity.data.datasets[0].data, (point) => point.x.getTime()),
+					expectedTimes
+				);
+				assert.deepEqual(
+					Array.from(activity.data.datasets[0].data, (point) => point.y),
+					[7, 3]
+				);
+				assert.deepEqual(
+					Array.from(precision.data.datasets[0].data, (point) => point.x.getTime()),
+					expectedTimes
+				);
+				assert.deepEqual(
+					Array.from(precision.data.datasets[0].data, (point) => point.y),
+					[600 / 7, 100]
+				);
+				assert.equal(
+					page.elements.get('wpm_chart_title').textContent,
+					page.context._t('ui_typing.chart_title_activity_5min')
+				);
+				assert.equal(activity.options.scales.x.time.unit, 'minute');
+				assert.ok(activity.options.scales.x.min.getTime() <= expectedTimes[0]);
+				assert.ok(activity.options.scales.x.max.getTime() >= expectedTimes[1]);
+				const retainedHistory = vm.runInContext(
+					'JSON.stringify(app_state.historical_cache)',
+					page.context
+				);
+				const stale = { historical: { c: { stale: { count: 999 } } }, today: {} };
+				if (host === 'windows')
+					page.messageListeners
+						.filter((entry) => entry.name === 'message')
+						.at(-1)
+						.callback({ data: { type: 'range_data', request_id: oldRequest, payload: stale } });
+				else if (host === 'linux')
+					page.context.__hostBridgeResponse(
+						'metrics_typing_bridge',
+						false,
+						encodeURIComponent(
+							JSON.stringify({
+								metrics_manifest: {},
+								_prefetch_data: stale,
+								range_request_id: oldRequest
+							})
+						)
+					);
+				else assert.equal(page.context.receive_range_data(stale, oldRequest), false);
+				assert.equal(
+					vm.runInContext('JSON.stringify(app_state.historical_cache)', page.context),
+					retainedHistory,
+					'a late older query cannot change the selected hour window data'
+				);
+				assert.equal(page.lastChart('wpm_chart'), activity);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+	test(`${host} last-hour ownership clears for ordinary date modes`, () => {
+		const previousTimezone = process.env.TZ;
+		process.env.TZ = 'UTC';
+		try {
+			const page = typingChartPage(host, typingHourWindows[0].now);
+			publishTypingPage(page, host, typingHourManifest(typingHourWindows[0]));
+			const choose = (preset) => {
+				page.elements.get('quick_range').value = preset;
+				runTypingControlChange(page, 'quick_range');
+			};
+			choose('last_hour');
+			choose('today');
+			assert.equal(vm.runInContext('app_state.hour_window', page.context), null);
+			assert.equal(
+				page.elements.get('wpm_chart_title').textContent,
+				page.context._t('ui_typing.h3_activity_hourly')
+			);
+			choose('last_hour');
+			page.elements.get('date_start').value = '2026-01-01';
+			runTypingControlChange(page, 'date_start');
+			assert.equal(vm.runInContext('app_state.hour_window', page.context), null);
+			assert.equal(
+				page.elements.get('wpm_chart_title').textContent,
+				page.context._t('ui_typing.h3_activity_hourly')
+			);
+			choose('last_hour');
+			choose('week');
+			assert.equal(vm.runInContext('app_state.hour_window', page.context), null);
+			assert.equal(
+				page.elements.get('wpm_chart_title').textContent,
+				page.context._t('ui_typing.h3_speed')
+			);
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		} finally {
+			if (previousTimezone === undefined) delete process.env.TZ;
+			else process.env.TZ = previousTimezone;
+		}
+	});
+}
+assert.equal(typingHourWindows.length, 9);
+assert.equal(
+	passed,
+	393,
+	'all date-qualified hour-window, precision and stale-response controls must execute'
+);
+
+function deliverTypingManifest(page, host, manifest, { revision = 2, range, requestId } = {}) {
+	if (host === 'macos') {
+		const admitted = page.context.publishTypingMetricsData(
+			{ manifest },
+			{ manifest_revision: revision }
+		);
+		if (admitted && range !== undefined) {
+			const id = vm.runInContext('app_state.active_range_request_id', page.context);
+			assert.equal(page.context.receive_range_data(range, id), true);
+		}
+		return admitted;
+	}
+	const blob = { metrics_manifest: manifest };
+	if (range !== undefined) blob._prefetch_data = range;
+	if (requestId !== undefined) blob.range_request_id = requestId;
+	if (host === 'windows')
+		page.messageListeners
+			.filter((entry) => entry.name === 'message')
+			.at(-1)
+			.callback({ data: { type: 'prefetch', blob } });
+	else
+		page.context.__hostBridgeResponse(
+			'metrics_typing_bridge',
+			false,
+			encodeURIComponent(JSON.stringify(blob))
+		);
+}
+function liveTypingApp(chars) {
+	return {
+		chars,
+		wpm_chars: chars,
+		time: 60000,
+		hourly: { 12: { c: chars, e_buckets: { 1000: chars / 10 } } },
+		hourly_min5: { '12:05': { c: chars, e_buckets: { 1000: chars / 10 } } }
+	};
+}
+const typingLiveCases = [
+	'manifest-only update',
+	'new recorded day',
+	'new application',
+	'cleared manifest',
+	'live range update',
+	'retained hour window',
+	'explicit NONE selection',
+	'retained subset selection'
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const scenario of typingLiveCases) {
+		test(`${host} admitted live manifest refreshes ${scenario}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = 'UTC';
+			try {
+				const page = typingChartPage(host, '2026-01-01T12:30:00Z');
+				const initial = {
+					[scenario === 'new recorded day' ? '2025-12-31' : '2026-01-01']: {
+						Editor: liveTypingApp(30)
+					}
+				};
+				publishTypingPage(page, host, initial);
+				if (scenario === 'explicit NONE selection')
+					vm.runInContext(
+						"app_state.app_selection_mode='none'; app_state.selected_apps=new Set(); apply_date_app_filters();",
+						page.context
+					);
+				if (scenario === 'retained subset selection')
+					vm.runInContext(
+						"app_state.app_selection_mode='subset'; app_state.selected_apps=new Set(['Editor']); apply_date_app_filters();",
+						page.context
+					);
+				if (scenario === 'retained hour window') {
+					page.elements.get('quick_range').value = 'last_hour';
+					runTypingControlChange(page, 'quick_range');
+				}
+				const beforeSequence = vm.runInContext('app_state.range_request_sequence', page.context);
+				const beforeOwner = vm.runInContext('app_state.active_range_request_id', page.context);
+				const beforeWindow = vm.runInContext('app_state.hour_window', page.context);
+				const beforeSelection = vm.runInContext('app_state.range_request_selection', page.context);
+				let updated = { '2026-01-01': { Editor: liveTypingApp(70) } };
+				let expectedPoints = [70],
+					expectedTotal = 70;
+				if (scenario === 'new recorded day') {
+					updated['2025-12-31'] = { Editor: liveTypingApp(30) };
+					expectedPoints = [6, 14];
+					expectedTotal = 100;
+				}
+				if (scenario === 'new application')
+					updated['2026-01-01'] = { Editor: liveTypingApp(30), NewApp: liveTypingApp(40) };
+				if (scenario === 'retained subset selection')
+					updated['2026-01-01'].NewApp = liveTypingApp(40);
+				if (scenario === 'cleared manifest') {
+					updated = {};
+					expectedPoints = [];
+					expectedTotal = 0;
+				}
+				if (scenario === 'explicit NONE selection') {
+					expectedPoints = [];
+					expectedTotal = 0;
+				}
+				const range =
+					scenario === 'live range update'
+						? { historical: {}, today: { Editor: { c: { a: { c: 1, o: 1, t: 1000 } } } } }
+						: undefined;
+				deliverTypingManifest(page, host, updated, { range });
+				assert.deepEqual(
+					Array.from(page.lastChart('wpm_chart').data.datasets[0].data, (point) => point.y),
+					expectedPoints,
+					'the visible chart must use the admitted manifest rather than first-paint data'
+				);
+				assert.ok(
+					page.elements.get('global_details').innerHTML.includes(`>${expectedTotal}</strong>`),
+					'the displayed raw-character KPI and chart share the admitted manifest'
+				);
+				assert.deepEqual(
+					JSON.parse(
+						vm.runInContext('JSON.stringify(app_state.manifest_dates_sorted)', page.context)
+					),
+					Object.keys(updated).sort()
+				);
+				if (host !== 'macos')
+					assert.equal(
+						vm.runInContext('app_state.range_request_sequence', page.context),
+						beforeSequence,
+						'metadata refresh cannot create a new loader/query'
+					);
+				assert.equal(vm.runInContext('app_state.hour_window', page.context), beforeWindow);
+				if (beforeOwner) {
+					assert.equal(
+						vm.runInContext('app_state.active_range_request_id', page.context),
+						beforeOwner
+					);
+					assert.equal(
+						vm.runInContext('app_state.range_request_selection', page.context),
+						beforeSelection
+					);
+					const retainedManifest = JSON.stringify(page.context.metrics_manifest);
+					deliverTypingManifest(
+						page,
+						host,
+						{ '2026-01-01': { Editor: liveTypingApp(999) } },
+						{ revision: 1, range: { historical: {}, today: {} }, requestId: beforeOwner - 1 }
+					);
+					assert.equal(
+						JSON.stringify(page.context.metrics_manifest),
+						retainedManifest,
+						'an older tagged/native revision cannot replace the fresh manifest'
+					);
+					assert.deepEqual(
+						Array.from(page.lastChart('wpm_chart').data.datasets[0].data, (point) => point.y),
+						expectedPoints
+					);
+				}
+				if (scenario === 'new application')
+					assert.deepEqual(
+						JSON.parse(
+							vm.runInContext(
+								'JSON.stringify(Array.from(app_state.selected_apps).sort())',
+								page.context
+							)
+						),
+						['Editor', 'NewApp']
+					);
+				if (scenario === 'retained subset selection')
+					assert.deepEqual(
+						JSON.parse(
+							vm.runInContext('JSON.stringify(Array.from(app_state.selected_apps))', page.context)
+						),
+						['Editor']
+					);
+				if (scenario === 'explicit NONE selection')
+					assert.equal(vm.runInContext('app_state.app_selection_mode', page.context), 'none');
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(typingLiveCases.length, 8);
+assert.equal(
+	passed,
+	417,
+	'all fresh-manifest chart, metadata and native-query ownership controls must execute'
+);
+
+const typingHeatmapCases = [
+	{ name: 'ALL selection', action: 'all', monday: 23 },
+	{ name: 'editor subset and Unknown policy', action: 'editor', monday: 12 },
+	{ name: 'browser subset and Unknown policy', action: 'browser', monday: 16 },
+	{ name: 'explicit NONE selection', action: 'none', monday: 0 },
+	{ name: 'ALL restored after NONE', action: 'restore', monday: 23 },
+	{ name: 'date and app selection together', action: 'date-editor', monday: 12 }
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingHeatmapCases) {
+		test(`${host} hour-weekday heatmap retains ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = 'UTC';
+			try {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, '2026-01-06T12:00:00Z');
+				const app = (chars) => ({ chars, time: 60000, hourly: { '09': { c: chars } } });
+				const manifest = { '2026-01-05': { Editor: app(7), Browser: app(11), Unknown: app(5) } };
+				if (vector.action === 'date-editor')
+					manifest['2026-01-06'] = { Editor: app(13), Browser: app(17), Unknown: app(19) };
+				publishTypingPage(page, host, manifest);
+				if (['editor', 'browser', 'date-editor'].includes(vector.action)) {
+					const checkbox = page.context.document.createElement('input');
+					checkbox.value = vector.action === 'browser' ? 'Editor' : 'Browser';
+					checkbox.checked = false;
+					page.context.toggle_app_selection(checkbox);
+				} else if (vector.action === 'none') page.context.deselect_all_apps();
+				else if (vector.action === 'restore') {
+					page.context.deselect_all_apps();
+					page.context.select_all_apps();
+				}
+				if (vector.action === 'date-editor') {
+					page.elements.get('date_start').value = '2026-01-05';
+					page.elements.get('date_end').value = '2026-01-05';
+					runTypingControlChange(page, 'date_start');
+				}
+				page.context.close_app_modal();
+				const heatmap = page.elements.get('hour_weekday_heatmap_container').innerHTML;
+				assert.equal(
+					(heatmap.match(/<title>/g) || []).length,
+					7 * 24,
+					'the production heatmap renders its complete real grid'
+				);
+				const mondayCount = vector.monday
+					? `${vector.monday} ${page.context._t('ui_typing.heatmap_hour_chars_abbrev')}`
+					: page.context._t('ui_typing.heatmap_hour_no_keystrokes');
+				assert.ok(
+					heatmap.includes(
+						`<title>${page.context._t('ui_typing.heatmap_day_mon')} 09h — ${mondayCount}</title>`
+					),
+					'selected-scope cells follow the canonical app selection policy'
+				);
+				assert.ok(
+					heatmap.includes(
+						`<title>${page.context._t('ui_typing.heatmap_day_tue')} 09h — ${page.context._t('ui_typing.heatmap_hour_no_keystrokes')}</title>`
+					),
+					'a different or excluded date cannot populate the selected cell'
+				);
+				assert.ok(
+					heatmap.includes(`${vector.monday} ${page.context._t('ui_typing.heatmap_hour_total')}`)
+				);
+				assert.ok(
+					page.elements.get('global_details').innerHTML.includes(`>${vector.monday}</strong>`),
+					'the raw-character KPI and heatmap agree on the selected apps/dates'
+				);
+				assert.equal(page.elements.get('app_modal').style.display, 'none');
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(typingHeatmapCases.length, 6);
+assert.equal(passed, 435, 'all app-modal, Unknown-policy and scoped heatmap controls must execute');
+
+const typingDailyDateCases = [
+	{
+		name: 'archived skipped civil day',
+		timezone: 'Pacific/Apia',
+		dates: ['2011-12-29', '2011-12-30', '2011-12-31']
+	},
+	{
+		name: 'spring daylight saving',
+		timezone: 'Europe/Paris',
+		dates: ['2026-03-28', '2026-03-29', '2026-03-30']
+	},
+	{
+		name: 'fall daylight saving',
+		timezone: 'America/Havana',
+		dates: ['2026-10-31', '2026-11-01', '2026-11-02']
+	},
+	{
+		name: 'negative timezone',
+		timezone: 'America/Los_Angeles',
+		dates: ['2026-01-01', '2026-01-02', '2026-01-04']
+	},
+	{
+		name: 'positive timezone',
+		timezone: 'Pacific/Kiritimati',
+		dates: ['2026-01-01', '2026-01-02', '2026-01-04']
+	},
+	{ name: 'UTC control', timezone: 'UTC', dates: ['2026-01-01', '2026-01-02', '2026-01-04'] },
+	{
+		name: 'accepted early Gregorian year',
+		timezone: 'Pacific/Apia',
+		dates: ['0001-01-01', '0001-01-02', '0001-01-03']
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingDailyDateCases) {
+		test(`${host} daily charts retain ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.timezone;
+			try {
+				const owners = [
+					'wpm_chart',
+					'precision_chart',
+					'delegation_chart',
+					'hs_sparkline',
+					'llm_sparkline'
+				];
+				const page = typingChartPage(host, `${vector.dates.at(-1)}T12:00:00Z`, owners);
+				const manifest = Object.fromEntries(
+					vector.dates.map((date, i) => [date, { Editor: liveTypingApp((i + 1) * 20) }])
+				);
+				publishTypingPage(page, host, manifest);
+				for (const owner of owners) {
+					const config = page.lastChart(owner);
+					const points = config.data.datasets[0].data;
+					const expected = vector.dates.map((date) => Date.parse(`${date}T00:00:00Z`));
+					assert.deepEqual(
+						Array.from(points, (point) => Number(point.x)),
+						expected,
+						'recorded day identities must retain distinct canonical civil-day coordinates'
+					);
+					const axis = config.options.scales.x;
+					assert.equal(
+						axis.type,
+						'linear',
+						'daily ticks must not pass through the local-time adapter'
+					);
+					if (['wpm_chart', 'precision_chart'].includes(owner)) {
+						assert.equal(Number(axis.min), expected[0]);
+						assert.equal(Number(axis.max), expected.at(-1));
+					}
+					const scale = new page.linearScale({
+						id: 'x',
+						type: 'linear',
+						ctx: {},
+						chart: { getContext: () => ({}) }
+					});
+					scale.width = 640;
+					scale.min = expected[0];
+					scale.max = expected.at(-1);
+					scale.options = {
+						...axis,
+						axis: 'x',
+						bounds: 'data',
+						min: expected[0],
+						max: expected.at(-1),
+						ticks: {
+							...axis.ticks,
+							setContext() {
+								return { font: { size: 12, lineHeight: 14 } };
+							}
+						}
+					};
+					const ticks = scale.buildTicks();
+					const dayCount = (expected.at(-1) - expected[0]) / 86400000 + 1;
+					assert.deepEqual(
+						Array.from(ticks, (tick) => tick.value),
+						Array.from({ length: dayCount }, (_, i) => expected[0] + i * 86400000),
+						'the shipped Chart.js scale generates one distinct tick per civil day'
+					);
+					const drawn = [];
+					const drawing = {
+						save() {},
+						restore() {},
+						fillText(text) {
+							drawn.push(text);
+						}
+					};
+					const chart = {
+						canvas: { id: owner },
+						ctx: drawing,
+						scales: {
+							x: {
+								type: 'linear',
+								top: 0,
+								options: axis,
+								ticks,
+								getPixelForTick: (i) => i * 10
+							}
+						}
+					};
+					page.dayTickPlugin.afterDraw(chart);
+					assert.equal(drawn.length, ticks.length * 2);
+					for (let i = 0; i < ticks.length; i++) {
+						const date = new Date(ticks[i].value);
+						const day = page.context._t(`ui_typing.day_${date.getUTCDay()}`);
+						assert.equal(drawn[i * 2], day);
+						assert.equal(
+							drawn[i * 2 + 1],
+							`${date.getUTCDate()} ${page.context.months_fr()[date.getUTCMonth()]}`
+						);
+						assert.deepEqual(
+							Array.from(axis.ticks.callback(ticks[i].value)),
+							drawn.slice(i * 2, i * 2 + 2)
+						);
+						assert.equal(
+							config.options.plugins.tooltip.callbacks.title([{ parsed: { x: ticks[i].value } }]),
+							`${day} ${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`
+						);
+					}
+					chart.scales.x.type = 'time';
+					drawn.length = 0;
+					page.dayTickPlugin.afterDraw(chart);
+					assert.equal(
+						drawn.length,
+						0,
+						'hourly and five-minute instant labels must not be reinterpreted as UTC days'
+					);
+				}
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(typingDailyDateCases.length, 7);
+assert.equal(
+	passed,
+	456,
+	'all archived-day, daylight-saving and timezone daily chart controls must execute'
+);
+
+const ribbonCategoryCases = [
+	{
+		name: 'plain control',
+		label: 'Research',
+		escaped: 'Research'
+	},
+	{
+		name: 'literal ampersand',
+		label: 'Research & Development',
+		escaped: 'Research &amp; Development'
+	},
+	{
+		name: 'balanced SVG markup',
+		label: 'Label </title><rect data-category-marker="1"/><title>',
+		escaped: 'Label &lt;/title&gt;&lt;rect data-category-marker=&quot;1&quot;/&gt;&lt;title&gt;'
+	},
+	{
+		name: 'literal attribute quotes',
+		label: '"quoted" & \'apostrophe\'',
+		escaped: '&quot;quoted&quot; &amp; &#039;apostrophe&#039;'
+	},
+	{
+		name: 'Unicode category',
+		label: 'Développement 🧪',
+		escaped: 'Développement 🧪'
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of ribbonCategoryCases) {
+		test(`${host} native category remains literal ribbon text: ${vector.name}`, () => {
+			const page = loadMetricsAppsPage(host);
+			for (const id of ['ribbon_container', 'ribbon_legend'])
+				page.elements.set(id, page.context.document.createElement('div'));
+			const manifest = {
+				'2026-10-27': {
+					Editor: {
+						app_time_ms: 60000,
+						chars: 10,
+						time: 1000,
+						hourly: { '09': { c: 10, time_ms: 60000 } }
+					}
+				}
+			};
+			publishLoadedAppsData(page, host, manifest, {}, 1, {
+				Editor: { type: vector.label, score: 0 }
+			});
+			const svg = page.elements.get('ribbon_container').innerHTML;
+			assert.equal(
+				(svg.match(/<rect /g) || []).length,
+				24,
+				'one native day renders its24 real hourly cells'
+			);
+			assert.ok(
+				svg.includes(`09h — ${vector.escaped} (`),
+				'custom native categories remain escaped literal tooltip text'
+			);
+			assert.ok(page.elements.get('ribbon_legend').innerHTML.includes(vector.escaped));
+			assert.equal(
+				svg.includes('<rect data-category-marker='),
+				false,
+				'native text cannot introduce SVG elements'
+			);
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(ribbonCategoryCases.length, 5);
+assert.equal(passed, 471, 'all native ribbon category literal-text controls must execute');
+
+/** Supplies DOM traversal/mutation ports over text from the actual native app table. */
+function typingFindPage(host) {
+	const page = loadMetricsTypingPage(host);
+	freezePageClock(page, '2026-10-27T12:00:00Z');
+	const document = page.context.document;
+	const createElement = document.createElement;
+	const body = document.body;
+	body.tagName = 'DIV';
+	body.closest = () => null;
+	const reparent = () => {
+		for (const child of body.children) {
+			child.parentNode = body;
+			child.parentElement = body;
+		}
+	};
+	body.replaceChild = (replacement, node) => {
+		const index = body.children.indexOf(node);
+		assert.notEqual(index, -1, 'production may only replace an attached text or highlight node');
+		body.children.splice(
+			index,
+			1,
+			...(replacement.fragment ? replacement.children : [replacement])
+		);
+		reparent();
+	};
+	body.normalize = () => {
+		const normalized = [];
+		for (const node of body.children) {
+			if (node.nodeType === 3 && normalized.at(-1)?.nodeType === 3)
+				normalized.at(-1).textContent += node.textContent;
+			else normalized.push(node);
+		}
+		body.children = normalized;
+		reparent();
+	};
+	document.createElement = (tag) => {
+		const node = createElement(tag);
+		node.tagName = tag.toUpperCase();
+		const classes = new Set();
+		node.classList = {
+			add: (name) => classes.add(name),
+			remove: (name) => classes.delete(name),
+			contains: (name) => classes.has(name),
+			toggle(name, force) {
+				const next = force === undefined ? !classes.has(name) : force;
+				if (next) classes.add(name);
+				else classes.delete(name);
+				return next;
+			}
+		};
+		node.scrollIntoView = () => {};
+		return node;
+	};
+	document.createTextNode = (text) => ({ nodeType: 3, textContent: text });
+	document.createDocumentFragment = () => ({
+		fragment: true,
+		children: [],
+		appendChild(node) {
+			this.children.push(node);
+		}
+	});
+	document.querySelectorAll = (selector) =>
+		selector === 'span.find-highlight'
+			? body.children.filter((node) => node.className === 'find-highlight')
+			: [];
+	document.contains = (node) => body.children.includes(node);
+	page.context.NodeFilter = { SHOW_TEXT: 4, FILTER_REJECT: 2, FILTER_ACCEPT: 1 };
+	page.findScans = 0;
+	document.createTreeWalker = (root, show, filter) => {
+		assert.strictEqual(root, body);
+		assert.equal(show, page.context.NodeFilter.SHOW_TEXT);
+		page.findScans++;
+		let index = 0;
+		const nodes = body.children.filter(
+			(node) => node.nodeType === 3 && filter.acceptNode(node) === 1
+		);
+		return { nextNode: () => nodes[index++] || null };
+	};
+	page.admitTableText = () => {
+		const html = page.elements.get('apps_table_container').innerHTML;
+		// These vectors use plain app names. Only the browser's text-node boundary
+		// is supplied; native publication and app-table projection run unchanged.
+		const text = Array.from(html.matchAll(/<tr><td>([^<]*)<\/td>/g), (match) => match[1]).join(' ');
+		body.children = [document.createTextNode(text)];
+		reparent();
+		return text;
+	};
+	page.highlights = () =>
+		body.children
+			.filter((node) => node.className === 'find-highlight')
+			.map((node) => node.textContent);
+	return page;
+}
+const typingFindRecoveryCases = [
+	'new native row',
+	'repeated missing search',
+	'stale match then missing',
+	'backward recovery'
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const scenario of typingFindRecoveryCases) {
+		test(`${host} unchanged find query recovers after ${scenario}`, () => {
+			const page = typingFindPage(host);
+			const manifest = (include) => ({
+				'2026-10-27': {
+					'Editor.exe': liveTypingApp(20),
+					...(include ? { 'RemoteTarget.exe': liveTypingApp(30) } : {})
+				}
+			});
+			let revision = 1;
+			publishTypingPage(page, host, manifest(scenario === 'stale match then missing'));
+			page.elements.get('find_input').value = 'RemoteTarget';
+			page.admitTableText();
+			page.context.find_in_page(true);
+			if (scenario === 'stale match then missing') {
+				assert.deepEqual(page.highlights(), ['RemoteTarget']);
+				deliverTypingManifest(page, host, manifest(false), {
+					revision: ++revision,
+					range: { historical: {}, today: {} }
+				});
+				page.admitTableText();
+				page.context.find_in_page(true);
+			}
+			assert.equal(
+				page.elements.get('find_status').textContent,
+				page.context._t('ui_typing.not_found')
+			);
+			if (scenario === 'repeated missing search') page.context.find_in_page(true);
+			deliverTypingManifest(page, host, manifest(true), {
+				revision: ++revision,
+				range: { historical: {}, today: {} }
+			});
+			assert.ok(
+				page.admitTableText().includes('RemoteTarget'),
+				'the actual newly admitted native table contains the sought row'
+			);
+			const scansBeforeRecovery = page.findScans;
+			page.context.find_in_page(scenario !== 'backward recovery');
+			assert.equal(
+				page.findScans,
+				scansBeforeRecovery + 1,
+				'an empty match cache must be rescanned against the current DOM'
+			);
+			assert.equal(page.elements.get('find_status').textContent, '1\u202f/\u202f1');
+			assert.deepEqual(page.highlights(), ['RemoteTarget']);
+			page.context.find_in_page(true);
+			assert.equal(page.elements.get('find_status').textContent, '1\u202f/\u202f1');
+			assert.deepEqual(
+				page.highlights(),
+				['RemoteTarget'],
+				'normal repeated navigation does not duplicate highlights'
+			);
+			page.elements.get('find_input').value = '';
+			page.context.find_in_page(true);
+			assert.equal(page.elements.get('find_status').textContent, '');
+			assert.deepEqual(page.highlights(), []);
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(typingFindRecoveryCases.length, 4);
+assert.equal(
+	passed,
+	483,
+	'all missing-search, stale-DOM and navigation recovery controls must execute'
+);
+
+const typingFindUnicodeCases = [
+	{
+		name: 'one expanded prefix',
+		app: 'İTarget.exe',
+		query: 'Target',
+		matches: ['Target']
+	},
+	{
+		name: 'two expanded prefixes',
+		app: 'İİTarget.exe',
+		query: 'target',
+		matches: ['Target']
+	},
+	{
+		name: 'expansion after match',
+		app: 'Targetİ.exe',
+		query: 'TARGET',
+		matches: ['Target']
+	},
+	{
+		name: 'multiple later matches',
+		app: 'İTargetTarget.exe',
+		query: 'target',
+		matches: ['Target', 'Target']
+	},
+	{
+		name: 'full expanded fold query',
+		app: 'İTarget.exe',
+		query: 'i̇',
+		matches: ['İ']
+	},
+	{
+		name: 'partial expanded fold query',
+		app: 'İTarget.exe',
+		query: 'i',
+		matches: ['İ']
+	},
+	{
+		name: 'contextual Greek lowercasing',
+		app: 'İΟΣ-Target.exe',
+		query: 'ος',
+		matches: ['ΟΣ']
+	},
+	{
+		name: 'surrogate pair prefix control',
+		app: '🧪Target.exe',
+		query: 'Target',
+		matches: ['Target']
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingFindUnicodeCases) {
+		test(`${host} find preserves source offsets for ${vector.name}`, () => {
+			const page = typingFindPage(host);
+			publishTypingPage(page, host, { '2026-10-27': { [vector.app]: liveTypingApp(30) } });
+			assert.equal(
+				page.admitTableText(),
+				vector.app,
+				'the actual native table retains the valid Unicode process name'
+			);
+			page.elements.get('find_input').value = vector.query;
+			page.context.find_in_page(true);
+			assert.deepEqual(
+				page.highlights(),
+				vector.matches,
+				'case-folded match positions must map back to original text spans'
+			);
+			assert.equal(
+				page.elements.get('find_status').textContent,
+				`1\u202f/\u202f${vector.matches.length}`
+			);
+			assert.equal(
+				page.context.document.body.children.map((node) => node.textContent).join(''),
+				vector.app,
+				'highlighting preserves every original character'
+			);
+			page.context.find_in_page(true);
+			assert.equal(
+				page.elements.get('find_status').textContent,
+				`${vector.matches.length === 1 ? 1 : 2}\u202f/\u202f${vector.matches.length}`
+			);
+			assert.deepEqual(page.highlights(), vector.matches);
+			page.context.close_find_bar();
+			assert.deepEqual(page.highlights(), []);
+			assert.equal(
+				page.context.document.body.children.map((node) => node.textContent).join(''),
+				vector.app
+			);
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(typingFindUnicodeCases.length, 8);
+assert.equal(
+	passed,
+	507,
+	'all Unicode expansion, context and unchanged-offset controls must execute'
+);
+
+const typingHeaderSearchCases = [
+	{ query: 'A', sensitive: false, key: 'a', count: 12 },
+	{ query: 'a', sensitive: false, key: 'a', count: 12 },
+	{ query: 'É', sensitive: false, key: 'é', count: 6 },
+	{ query: 'é', sensitive: false, key: 'é', count: 6 },
+	{ query: 'A', sensitive: true, key: 'A', count: 5 },
+	{ query: 'a', sensitive: true, key: 'a', count: 7 },
+	{ query: 'Z', sensitive: false, key: null },
+	{ query: 'É', sensitive: true, key: null }
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingHeaderSearchCases) {
+		test(`${host} table search honors case mode for ${vector.query}/${vector.sensitive}`, () => {
+			const page = loadMetricsTypingPage(host);
+			freezePageClock(page, '2026-10-27T12:00:00Z');
+			const manifest = { '2026-10-26': { 'Editor.exe': { chars: 18, time: 1800 } } };
+			publishTypingPage(page, host, manifest);
+			deliverTypingManifest(page, host, manifest, {
+				range: {
+					historical: { c: { a: { c: 7, t: 700 }, A: { c: 5, t: 500 }, é: { c: 6, t: 600 } } },
+					today: {}
+				}
+			});
+			// The browser toggle changes the projected rows before searching them.
+			if (vector.sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+			else page.elements.get('btn_case_sensitive').classList.remove('active');
+			page.context.apply_local_filters();
+			assert.ok(vm.runInContext('app_state.rendered_list.length', page.context) >= 2);
+			page.elements.get('search_input').value = vector.query;
+			page.context.handle_search();
+			page.timers.at(-1)();
+			const html = page.elements.get('metrics_table_body').innerHTML;
+			assert.equal(
+				vm.runInContext('app_state.search_query', page.context),
+				vector.query,
+				'the input and retained query preserve the user text'
+			);
+			if (vector.key === null) {
+				assert.ok(html.includes(page.context._t('ui_typing.no_data')));
+				assert.equal(page.elements.get('total_rows').innerHTML, '');
+			} else {
+				assert.ok(
+					html.includes(`<span class="mono-space">${vector.key}</span>`),
+					'the actual table must render the matching native character'
+				);
+				assert.ok(html.includes(`<td>${vector.count}</td>`));
+				assert.equal(page.elements.get('total_rows').innerHTML, '1 ligne');
+			}
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(typingHeaderSearchCases.length, 8);
+assert.equal(passed, 531, 'all case-mode, Unicode and absent-query table controls must execute');
+
+const nativeWordTokens = ['ordinary', 'constructor', 'toString', '__proto__', 'hasOwnProperty'];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const sensitive of [true, false]) {
+			for (const token of nativeWordTokens) {
+				test(`${host} ${source} words retain literal ${token}/${sensitive}`, () => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(page, '2026-10-27T12:00:00Z');
+					const manifest = {
+						[source === 'historical' ? '2026-10-26' : '2026-10-27']: {
+							'Editor.exe': { chars: token.length * 7, time: 7000 }
+						}
+					};
+					publishTypingPage(page, host, manifest);
+					if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+					else page.elements.get('btn_case_sensitive').classList.remove('active');
+					const prototypeShape = () =>
+						vm.runInContext(
+							`JSON.stringify(
+						Object.getOwnPropertyNames(Object.prototype).map(key => [key,
+							typeof Object.prototype[key] === 'function'
+								? Object.getOwnPropertyNames(Object.prototype[key]) : []]))`,
+							page.context
+						);
+					const beforePrototype = prototypeShape();
+					const words = { w: Object.fromEntries([[token, { c: 7, t: 0 }]]) };
+					deliverTypingManifest(page, host, manifest, {
+						range:
+							source === 'historical'
+								? { historical: words, today: {} }
+								: { historical: {}, today: { 'Editor.exe': words } }
+					});
+					const key = sensitive ? token : token.toLowerCase();
+					assert.deepEqual(
+						Array.from(vm.runInContext('Object.keys(app_state.data.w)', page.context)),
+						[key],
+						'every native word remains an own dictionary entry'
+					);
+					assert.equal(
+						vm.runInContext(`app_state.data.w[${JSON.stringify(key)}].count`, page.context),
+						7
+					);
+					assert.equal(
+						prototypeShape(),
+						beforePrototype,
+						'native text must never mutate prototypes or inherited built-in functions'
+					);
+					const projection = vm.runInContext('app_state.data', page.context);
+					page.context.apply_local_filters();
+					assert.strictEqual(
+						vm.runInContext('app_state.data', page.context),
+						projection,
+						'the retained projection keeps valid token keys on cache hits'
+					);
+					vm.runInContext("app_state.current_tab = 'w';", page.context);
+					page.context.render_current_tab();
+					page.timers.at(-1)();
+					const html = page.elements.get('metrics_table_body').innerHTML;
+					assert.ok(html.includes(`<span class="mono-space">${key}</span>`));
+					assert.ok(html.includes('<td>7</td>'));
+					assert.ok(
+						page.context.build_searchable_key('[BS]', false).includes('backspace'),
+						'declared control markers retain their actual search aliases'
+					);
+					assert.equal(
+						page.context.build_searchable_key(token, sensitive),
+						key,
+						'ordinary word text cannot acquire inherited control-key aliases'
+					);
+					page.elements.get('search_input').value = token;
+					page.context.handle_search();
+					page.timers.at(-1)();
+					assert.ok(
+						page.elements
+							.get('metrics_table_body')
+							.innerHTML.includes(`<span class="mono-space">${key}</span>`)
+					);
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+				});
+			}
+		}
+	}
+}
+assert.equal(nativeWordTokens.length, 5);
+assert.equal(
+	passed,
+	591,
+	'all historical/live native token identity and prototype controls must execute'
+);
+
+const typingTokenPresentationCases = [
+	{ tab: 'w_bg', token: 'one two', words: ['one', 'two'], modifiers: 0, controls: 0, arrows: 1 },
+	{
+		tab: 'w_bg',
+		token: 'ctrl shift',
+		words: ['ctrl', 'shift'],
+		modifiers: 0,
+		controls: 0,
+		arrows: 1
+	},
+	{ tab: 'w_bg', token: 'été œuf', words: ['été', 'œuf'], modifiers: 0, controls: 0, arrows: 1 },
+	{
+		tab: 'w_bg',
+		token: 'fish&chips served',
+		words: ['fish&amp;chips', 'served'],
+		modifiers: 0,
+		controls: 0,
+		arrows: 1
+	},
+	{ tab: 'sc', token: 'Ctrl+C', words: [], modifiers: 1, controls: 0, arrows: 0 },
+	{ tab: 'sc', token: 'Ctrl+Enter', words: [], modifiers: 1, controls: 1, arrows: 0 },
+	{ tab: 'sc_bg', token: 'Ctrl+C→Ctrl+V', words: [], modifiers: 2, controls: 0, arrows: 1 },
+	{ tab: 'mods', token: 'Ctrl+C', words: [], modifiers: 1, controls: 0, arrows: 0 }
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const vector of typingTokenPresentationCases) {
+			test(`${host} ${source} table renders native ${vector.tab}/${vector.token}`, () => {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, '2026-10-27T12:00:00Z');
+				const manifest = {
+					[source === 'historical' ? '2026-10-26' : '2026-10-27']: {
+						'Editor.exe': { chars: 70, time: 7000 }
+					}
+				};
+				publishTypingPage(page, host, manifest);
+				const tokenData = {
+					[vector.tab === 'mods' ? 'sc' : vector.tab]: {
+						[vector.token]: { c: 7, t: 0 }
+					}
+				};
+				deliverTypingManifest(page, host, manifest, {
+					range:
+						source === 'historical'
+							? { historical: tokenData, today: {} }
+							: { historical: {}, today: { 'Editor.exe': tokenData } }
+				});
+				vm.runInContext(`app_state.current_tab = ${JSON.stringify(vector.tab)};`, page.context);
+				page.context.render_current_tab();
+				page.timers.at(-1)();
+				const html = page.elements.get('metrics_table_body').innerHTML;
+				assert.equal(
+					vm.runInContext('app_state.rendered_list.length', page.context),
+					1,
+					'the real native range must reach the selected table'
+				);
+				assert.ok(html.includes('<td>7</td>'));
+				assert.equal(
+					(html.match(/class="mono-space"/g) || []).length,
+					vector.words.length,
+					'word sequences keep one literal chip per recorded word'
+				);
+				for (const word of vector.words)
+					assert.ok(html.includes(`<span class="mono-space">${word}</span>`));
+				assert.equal(
+					(html.match(/class="shortcut-chip shortcut-mod-/g) || []).length,
+					vector.modifiers,
+					'only actual shortcut modifiers receive modifier chips'
+				);
+				assert.equal(
+					(html.match(/class="shortcut-chip shortcut-key-control"/g) || []).length,
+					vector.controls
+				);
+				assert.equal((html.match(/>→<\/span>/g) || []).length, vector.arrows);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			});
+		}
+	}
+}
+assert.equal(typingTokenPresentationCases.length, 8);
+assert.equal(
+	passed,
+	639,
+	'all native word, shortcut and modifier presentation controls must execute'
+);
+
+const ordinaryControlWords = ['space', 'enter', 'Tab', 'return', 'escape', 'left'];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const sensitive of [true, false]) {
+			for (const word of ordinaryControlWords) {
+				test(`${host} ${source} words distinguish literal ${word}/${sensitive}`, () => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(page, '2026-10-27T12:00:00Z');
+					const manifest = {
+						[source === 'historical' ? '2026-10-26' : '2026-10-27']: {
+							'Editor.exe': { chars: (word.length + 1) * 7, time: 7000 }
+						}
+					};
+					publishTypingPage(page, host, manifest);
+					if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+					else page.elements.get('btn_case_sensitive').classList.remove('active');
+					const chars = Object.fromEntries(
+						Array.from(new Set(word + ' '), (char) => [
+							char,
+							{
+								c: Array.from(word + ' ').filter((value) => value === char).length * 7,
+								t: 0
+							}
+						])
+					);
+					const tokenData = { w: { [word]: { c: 7, t: 0 } }, c: chars };
+					deliverTypingManifest(page, host, manifest, {
+						range:
+							source === 'historical'
+								? { historical: tokenData, today: {} }
+								: { historical: {}, today: { 'Editor.exe': tokenData } }
+					});
+					vm.runInContext("app_state.current_tab = 'w';", page.context);
+					page.context.render_current_tab();
+					page.timers.at(-1)();
+					const key = sensitive ? word : word.toLowerCase();
+					const html = page.elements.get('metrics_table_body').innerHTML;
+					assert.equal(vm.runInContext('app_state.rendered_list.length', page.context), 1);
+					assert.ok(
+						html.includes(`<span class="mono-space">${key}</span>`),
+						'ordinary words keep literal text instead of a keyboard control label'
+					);
+					assert.ok(html.includes('<td>7</td>'));
+					assert.equal(
+						page.context.build_searchable_key(word, sensitive),
+						key,
+						'words do not acquire keyboard-only aliases'
+					);
+					page.elements.get('search_input').value = word;
+					page.context.handle_search();
+					page.timers.at(-1)();
+					assert.ok(
+						page.elements
+							.get('metrics_table_body')
+							.innerHTML.includes(`<span class="mono-space">${key}</span>`)
+					);
+					const controlCase = word[0].toUpperCase() + word.slice(1).toLowerCase();
+					const differentCase = word === controlCase ? word.toLowerCase() : controlCase;
+					page.elements.get('search_input').value = differentCase;
+					page.context.handle_search();
+					page.timers.at(-1)();
+					const searched = page.elements.get('metrics_table_body').innerHTML;
+					assert.equal(
+						searched.includes(page.context._t('ui_typing.no_data')),
+						sensitive,
+						'word searches follow only the selected case mode'
+					);
+					// The same real range also contains the physical spaces ending these words.
+					vm.runInContext(
+						"app_state.current_tab = 'c'; app_state.search_query = '';",
+						page.context
+					);
+					page.context.render_current_tab();
+					page.timers.at(-1)();
+					assert.ok(
+						page.elements
+							.get('metrics_table_body')
+							.innerHTML.includes('shortcut-key-control">Space</span>'),
+						'the characters tab retains the actual keyboard Space marker'
+					);
+					assert.ok(page.context.build_searchable_key(' ', true).includes('Space'));
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+				});
+			}
+		}
+	}
+}
+assert.equal(ordinaryControlWords.length, 6);
+assert.equal(
+	passed,
+	711,
+	'all literal-word versus physical-control display and search controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);

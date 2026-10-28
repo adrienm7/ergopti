@@ -17,6 +17,7 @@ Contract.run_batching(helpers, CORPUS .. "request_plan_batching_vectors.json")
 Contract.run_token_budget(helpers, CORPUS .. "request_plan_token_budget_vectors.json")
 Contract.run_info_bar(helpers, CORPUS .. "request_plan_info_bar_vectors.json")
 Contract.run_live(helpers, CORPUS .. "request_plan_live_vectors.json")
+Contract.run_agent(helpers, CORPUS .. "request_plan_agent_vectors.json")
 Contract.run_ports(helpers, {
 	HttpClient = require("adapters.http_client"),
 	TimerScheduler = require("adapters.timer_scheduler"),

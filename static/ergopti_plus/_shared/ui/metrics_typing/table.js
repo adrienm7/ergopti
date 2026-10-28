@@ -967,7 +967,7 @@ function render_kc_heatmap(kc_data_arr) {
 
 	// Heat colour: dark blue (cold) → orange (mid) → bright red (hot)
 	const heat_color = (count) => {
-		if (count === 0) return '#1e1e2e';
+		if (count === 0) return ThemeTokens.color('hue-1e1e2e');
 		const t = Math.pow(count / max_count, 0.4);
 		if (t < 0.5) {
 			const tt = t * 2;
@@ -1072,7 +1072,7 @@ function render_kc_heatmap(kc_data_arr) {
 		const cx = sx + key_w / 2;
 		const cy = sy + key_h / 2;
 
-		const text_color = count === 0 ? '#555' : '#fff';
+		const text_color = count === 0 ? ThemeTokens.color('grey-555') : ThemeTokens.color('white');
 
 		// Label: user's layout label, uppercase. Force a few well-known wide-key
 		// short forms so they render clearly (Esc, Ret, Tab, Bksp, Caps, Shft).
@@ -1181,7 +1181,7 @@ function render_kc_heatmap(kc_data_arr) {
 				.sort((a, b) => b[1] - a[1])
 				.slice(0, 4);
 			if (mod_sorted.length > 0) {
-				tip_lines.push(`<hr style="border-color:#444;margin:3px 0">`);
+				tip_lines.push(`<hr style="border-color:${ThemeTokens.color('grey-444')};margin:3px 0">`);
 				tip_lines.push(`Combos modificateurs :`);
 				mod_sorted.forEach(([mod, mc]) => {
 					tip_lines.push(`&nbsp;&nbsp;${escape_html(mod)} : <b>${format_number(mc)}</b>`);
@@ -1197,7 +1197,7 @@ function render_kc_heatmap(kc_data_arr) {
 					.sort((a, b) => b[1] - a[1])
 					.slice(0, 3);
 				if (top3.length > 0) {
-					tip_lines.push(`<hr style="border-color:#444;margin:3px 0">`);
+					tip_lines.push(`<hr style="border-color:${ThemeTokens.color('grey-444')};margin:3px 0">`);
 					tip_lines.push(`Top lettres suivantes :`);
 					top3.forEach(([ch, n]) => {
 						const disp =
@@ -1251,7 +1251,7 @@ function render_kc_heatmap(kc_data_arr) {
 				`L ${wing_lx} ${top_y + R}`,
 				'Z'
 			].join(' ');
-			rects += `<path d="${d}" fill="${fill}" stroke="#0d0d1a" stroke-width="1.5" paint-order="stroke fill"
+			rects += `<path d="${d}" fill="${fill}" stroke="${ThemeTokens.color('hue-0d0d1a')}" stroke-width="1.5" paint-order="stroke fill"
 				data-tip="${tip_id}" class="hm-key"
 				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
 			// Label centred in the wing portion (wider area, more legible than the narrow stem)
@@ -1265,7 +1265,7 @@ function render_kc_heatmap(kc_data_arr) {
 		} else {
 			// Standard or half-height rounded rect
 			rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${key_h}" rx="${R}"
-				fill="${fill}" stroke="#0d0d1a" stroke-width="1.5" paint-order="stroke fill"
+				fill="${fill}" stroke="${ThemeTokens.color('hue-0d0d1a')}" stroke-width="1.5" paint-order="stroke fill"
 				data-tip="${tip_id}" class="hm-key"
 				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
 		}
@@ -1281,8 +1281,8 @@ function render_kc_heatmap(kc_data_arr) {
 		// Tooltip div — absolutely positioned, hidden by default
 		tooltips +=
 			`<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
-			`background:#1a1a2e;border:1px solid #444;border-radius:6px;padding:7px 10px;` +
-			`font-size:12px;line-height:1.5;color:#ddd;pointer-events:none;max-width:220px;white-space:nowrap;text-align:left;">` +
+			`background:#1a1a2e;border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
+			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:220px;white-space:nowrap;text-align:left;">` +
 			tip_html +
 			`</div>`;
 	});
@@ -1542,7 +1542,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 			half_slot === 'bottom' ? base_sy + Math.round(KH / 2) + Math.round(GAP / 2) : base_sy;
 		const cx = sx + key_w / 2;
 		const cy = sy + key_h / 2;
-		const text_color = count === 0 ? '#555' : '#fff';
+		const text_color = count === 0 ? ThemeTokens.color('grey-555') : ThemeTokens.color('white');
 		const label_raw = kc_name_map[kc_str] ?? KEYCODE_NAMES[kc_str] ?? '';
 		let label_disp;
 		if (SHORT_LABELS[kc_str] !== undefined) {
@@ -1566,13 +1566,13 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 			key_occurrences > 0 ? ((sfb_key_count / key_occurrences) * 100).toFixed(1) : '0.0';
 
 		const tip_lines = [
-			`<b>${escape_html(label_raw || kc_str)}</b> <span style="color:#888;font-size:10px;">(kc ${kc_str})</span><br>`,
+			`<b>${escape_html(label_raw || kc_str)}</b> <span style="color:${ThemeTokens.color('grey-888')};font-size:10px;">(kc ${kc_str})</span><br>`,
 			`Occurrences : <b>${format_number(key_occurrences)}</b>`
 		];
 
 		if (sfb_key_count > 0) {
 			tip_lines.push(
-				`<br>SFBs : ${format_number(sfb_key_count)} — taux : <b style="color:#f87171;">${sfb_key_rate}%</b>`
+				`<br>SFBs : ${format_number(sfb_key_count)} — taux : <b style="color:${ThemeTokens.color('hue-f87171')};">${sfb_key_rate}%</b>`
 			);
 		}
 
@@ -1607,16 +1607,16 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		const sfb_total_all = grand_total;
 
 		if (all_rows.length > 0) {
-			tip_lines.push(`<hr style="border-color:#555;margin:4px 0">`);
+			tip_lines.push(`<hr style="border-color:${ThemeTokens.color('grey-555')};margin:4px 0">`);
 			// Table header
 			tip_lines.push(
 				`<table style="border-collapse:collapse;width:100%;font-size:11px;">` +
-					`<tr style="color:#888;">` +
+					`<tr style="color:${ThemeTokens.color('grey-888')};">` +
 					`<td style="padding:1px 6px 1px 0;">Paire</td>` +
 					`<td style="padding:1px 4px;text-align:right;">nb</td>` +
-					`<td style="padding:1px 4px;text-align:right;" title="Part de ce SFB parmi les SFBs de la touche">% /SFBs touche</td>` +
+					`<td style="padding:1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_key_tooltip'))}">% /SFBs touche</td>` +
 					`<td style="padding:1px 4px;text-align:right;" title="${_t('ui_typing.tooltip_sfb_rate')}">taux</td>` +
-					`<td style="padding:1px 0 1px 4px;text-align:right;" title="Part de ce SFB parmi tous les SFBs">% SFBs tot.</td>` +
+					`<td style="padding:1px 0 1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_total_tooltip'))}">% SFBs tot.</td>` +
 					`</tr>`
 			);
 
@@ -1633,15 +1633,21 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 					key_occurrences > 0 ? ((p_count / key_occurrences) * 100).toFixed(1) : '0.0';
 				const pct_sfb_total =
 					sfb_total_all > 0 ? ((p_count / sfb_total_all) * 100).toFixed(2) : '0.00';
-				const row_color = p_count === 0 ? 'color:#555;' : 'color:#ddd;';
-				const val_color = p_count === 0 ? 'color:#555;' : 'color:#ddd;';
+				const row_color =
+					p_count === 0
+						? 'color:' + ThemeTokens.color('grey-555') + ';'
+						: 'color:' + ThemeTokens.color('grey-ddd') + ';';
+				const val_color =
+					p_count === 0
+						? 'color:' + ThemeTokens.color('grey-555') + ';'
+						: 'color:' + ThemeTokens.color('grey-ddd') + ';';
 				tip_lines.push(
 					`<tr>` +
 						`<td style="padding:1px 6px 1px 0;${row_color}">${pair_str}</td>` +
 						`<td style="padding:1px 4px;text-align:right;${val_color}"><b>${p_count > 0 ? format_number(p_count) : '—'}</b></td>` +
-						`<td style="padding:1px 4px;text-align:right;color:#aaa;">${p_count > 0 ? pct_of_key_sfb + '%' : '—'}</td>` +
-						`<td style="padding:1px 4px;text-align:right;color:#aaa;">${p_count > 0 ? pct_key_use + '%' : '—'}</td>` +
-						`<td style="padding:1px 0 1px 4px;text-align:right;color:#aaa;">${p_count > 0 ? pct_sfb_total + '%' : '—'}</td>` +
+						`<td style="padding:1px 4px;text-align:right;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_of_key_sfb + '%' : '—'}</td>` +
+						`<td style="padding:1px 4px;text-align:right;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_key_use + '%' : '—'}</td>` +
+						`<td style="padding:1px 0 1px 4px;text-align:right;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_sfb_total + '%' : '—'}</td>` +
 						`</tr>`
 				);
 			});
@@ -1683,7 +1689,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 				`L ${wing_lx} ${top_y + R}`,
 				'Z'
 			].join(' ');
-			rects += `<path d="${d}" fill="${fill}" stroke="#0d1a0d" stroke-width="1.5" paint-order="stroke fill"
+			rects += `<path d="${d}" fill="${fill}" stroke="${ThemeTokens.color('hue-0d1a0d')}" stroke-width="1.5" paint-order="stroke fill"
 				data-tip="${tip_id}" class="hm-key"
 				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
 			const ret_font = 15;
@@ -1695,7 +1701,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 				pointer-events="none">${escape_html(label_disp)}</text>`;
 		} else {
 			rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${key_h}" rx="${R}"
-				fill="${fill}" stroke="#0d1a0d" stroke-width="1.5" paint-order="stroke fill"
+				fill="${fill}" stroke="${ThemeTokens.color('hue-0d1a0d')}" stroke-width="1.5" paint-order="stroke fill"
 				data-tip="${tip_id}" class="hm-key"
 				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
 		}
@@ -1709,9 +1715,9 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 		tooltips +=
 			`<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
-			`background:#1a2e1a;border:1px solid #444;border-radius:6px;padding:7px 10px;` +
-			`font-size:12px;line-height:1.5;color:#ddd;pointer-events:none;max-width:280px;white-space:nowrap;text-align:left;">` +
-			`<style scoped>.hm-tooltip hr{margin:4px 0;border-color:#555;}</style>` +
+			`background:#1a2e1a;border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
+			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:280px;white-space:nowrap;text-align:left;">` +
+			`<style scoped>.hm-tooltip hr{margin:4px 0;border-color:${ThemeTokens.color('grey-555')};}</style>` +
 			tip_html +
 			`</div>`;
 	});
@@ -1767,7 +1773,10 @@ function build_searchable_key(raw_key, case_sensitive) {
 	}
 	// Add the text label for the exact key (lowercased for case-insensitive search)
 	// so that typing "backspace", "left", "space", etc. finds the matching entries.
-	const exact_sym = CONTROL_KEY_SYMBOLS[raw_key.toLowerCase()];
+	const exact_sym =
+		app_state.current_tab !== 'w' && Object.hasOwn(CONTROL_KEY_SYMBOLS, raw_key.toLowerCase())
+			? CONTROL_KEY_SYMBOLS[raw_key.toLowerCase()]
+			: null;
 	if (exact_sym) {
 		const candidate = case_sensitive ? exact_sym : exact_sym.toLowerCase();
 		if (!s.includes(candidate)) s += ' ' + candidate;
@@ -1803,7 +1812,9 @@ function render_table() {
 			?.classList.contains('active');
 		const match_positions = new Map();
 		if (app_state.search_query) {
-			const q = app_state.search_query;
+			const q = case_sensitive_search
+				? app_state.search_query
+				: app_state.search_query.toLowerCase();
 			arr = arr.filter((i) => {
 				const haystack = build_searchable_key(i.key, case_sensitive_search);
 				const idx = haystack.indexOf(q);
@@ -1876,6 +1887,7 @@ function render_table() {
 				// Regular space (code 32) is printable but must still render as a "Space" chip so
 				// the cell is not blank. CONTROL_KEY_LABELS includes " " for this reason.
 				const is_ctrl_display =
+					app_state.current_tab !== 'w' &&
 					!is_shortcut_tab &&
 					!is_kc_tab &&
 					(CONTROL_KEY_LABELS.has(raw_lower) || CONTROL_KEY_LABELS.has(item.key) || is_nonprint);
@@ -1920,6 +1932,7 @@ function render_table() {
 							)
 							.join('') +
 						`</span>`;
+				} else if (is_shortcut_tab) {
 					key_html = `<span class="shortcut-seq">${format_shortcut_key(item.key)}</span>`;
 				} else if (is_ctrl_display) {
 					// Resolve the best label: pretty symbol > ASCII abbreviation > uppercase name
@@ -1969,7 +1982,11 @@ function render_table() {
 					rep_html = `0`;
 				} else {
 					const rep_color =
-						item.rep_rate >= 20 ? '#ff3b30' : item.rep_rate >= 10 ? '#ffcc00' : 'inherit';
+						item.rep_rate >= 20
+							? ThemeTokens.color('red')
+							: item.rep_rate >= 10
+								? ThemeTokens.color('yellow')
+								: 'inherit';
 					const rate_str = format_number(item.rep_rate.toFixed(1)) + ' %';
 					rep_html = `<span style="color:${rep_color}">${format_number(item.rep)} (${rate_str})</span>`;
 				}

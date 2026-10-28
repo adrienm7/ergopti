@@ -84,7 +84,7 @@ local function choose_action_for(id, name, ctx)
 		-- Asked after the picker window has closed, unless the picker's editor
 		-- collected it, under the binding the key dispatches with, and bound only
 		-- once the value is stored.
-		DeferredWork.after(0.05, function()
+		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 			local committed = ShortcutUtils.prompt_action_parameter(ctx.gestures, TapKeys.binding_id(id), action_id, spec,
 				picked, {
 					publishes_assignment = true, section = require("config_keys").KEY.SHORTCUTS_TAP_KEYS, key = id,

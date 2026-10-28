@@ -312,6 +312,19 @@ _ConfigMigrateRecordValidateSources(Scan, Before, Registry, Driver, FromVersion)
 		for Op in Step["ops"] {
 			if Op["op"] == "set_if_absent" || Op["op"] == "delete"
 				continue
+			if Op["op"] == "rename_prefix" {
+				; Only the prefixed keys of the one named section are read.
+				if !Before.Has(Op["section"])
+					continue
+				Prefix := Op["prefix"]
+				for Key in Before[Op["section"]] {
+					if !(SubStr(Key, 1, StrLen(Prefix)) == Prefix)
+						continue
+					if !(Addressable.Has(Op["section"]) && Addressable[Op["section"]].Has(Key))
+						throw Error("the migration source is not an addressable physical TOML record")
+				}
+				continue
+			}
 			for Section, Entries in Before {
 				if Op.Has("key") ? !(Section == Op["section"]) : !_ConfigMigrateRecordUnder(Section, Op["section"])
 					continue

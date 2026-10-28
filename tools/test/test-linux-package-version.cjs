@@ -17,13 +17,14 @@ const { createHash } = require('node:crypto');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
-const BUILD = path.join(ROOT, 'build/linux');
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-version-'));
+// The test owns its build directory: packaging tests that run at the same time never share one folder.
+const BUILD = path.join(scratch, 'build');
 const shared = path.join(BUILD, '_shared');
 const writer = path.join(ROOT, 'tools/build/write_build_stamp.sh');
 const projector = path.join(ROOT, 'tools/build/linux-package-version.cjs');
 const sourcePackage = path.join(ROOT, 'package.json');
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ergopti-version-' "));
-const env = { ...process.env, DPKG_DEB_COMPRESSOR_TYPE: 'none' };
+const env = { ...process.env, DPKG_DEB_COMPRESSOR_TYPE: 'none', ERGOPTI_LINUX_BUILD_DIR: BUILD };
 delete env.ERGOPTI_BUILD_VERSION;
 let refused = 0;
 let archives = 0;

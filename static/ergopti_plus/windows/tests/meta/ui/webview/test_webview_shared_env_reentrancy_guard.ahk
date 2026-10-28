@@ -534,3 +534,76 @@ _WSERG_WarmupControllerProfileRetirement() {
 }
 Test("webview_utils: controller profiling retirement fences closed native visibility (webview-warmup-controller-profile-retirement)",
 	_WSERG_WarmupControllerProfileRetirement)
+
+_WSERG_RefusingClose(State, *) {
+	State.CloseCalls += 1
+	if State.FailClose
+		throw State.Failure
+	State.Closed := true
+	State.Calls.Push("close")
+}
+
+_WSERG_WarmupCloseRefusalRetry(Phase) {
+	State := {Phase: "close-refusal", Owner: 0, NativeHost: 0, Hwnd: 0,
+		Env: _WSERG_NeverCompletes(), ControllerPromise: _WSERG_NeverCompletes(),
+		EnvironmentCalls: 0, ControllerCalls: 0, Calls: [], CloseCalls: 0,
+		Closed: false, FailClose: true, Failure: Error("Injected native controller close refusal")}
+	Controller := {IsVisible: true, Close: _WSERG_RefusingClose.Bind(State)}
+	Owner := WebViewBrowserWarmup(_WSERG_FactoryEnvironment.Bind(State),
+		_WSERG_ProfileController.Bind(State), _WSERG_FactoryHost.Bind(State))
+	State.Owner := Owner
+	try {
+		Owner.Begin()
+		State.Env.Resolve({})
+		Failure := 0
+		if Phase == "late-completion" {
+			AssertTrue(Owner.Stop())
+			AssertTrue(WMHandleExists(State.Hwnd), "the actual parent must survive pending acquisition")
+			try State.ControllerPromise.Resolve(Controller)
+			catch as Err
+				Failure := Err
+		} else {
+			State.ControllerPromise.Resolve(Controller)
+			AssertTrue(Owner.Controller == Controller)
+			AssertFalse(Controller.IsVisible)
+			try Owner.Stop()
+			catch as Err
+				Failure := Err
+		}
+		AssertTrue(Failure == State.Failure, "the exact native refusal must survive retirement")
+		AssertTrue(Owner.Stopped)
+		AssertTrue(WMHandleExists(State.Hwnd),
+			"an uncertain controller close still owns its real native parent")
+		AssertEqual(1, State.CloseCalls)
+		State.FailClose := false
+		AssertFalse(Owner.Stop(), "an already retired owner may still finish its cleanup debt")
+		AssertFalse(WMHandleExists(State.Hwnd),
+			"retrying retirement must release the actual parent after the controller acknowledges close")
+		AssertTrue(State.Closed)
+		AssertEqual(2, State.CloseCalls, "the exact failed controller close must be retried once")
+		AssertEqual(0, Owner.Controller)
+		AssertEqual(0, Owner.Host)
+		AssertEqual(2, State.Calls.Length)
+		AssertEqual("close", State.Calls[1])
+		AssertEqual("destroy", State.Calls[2])
+		AssertFalse(Owner.Stop())
+		AssertEqual(2, State.CloseCalls)
+	} finally {
+		State.FailClose := false
+		try Owner.Stop()
+		finally {
+			; Retire only this fixture's external capability and actual private GUI.
+			; Never clear SUT fields or replay an already settled external promise.
+			if !State.Closed
+				Controller.Close()
+			if State.Hwnd && WMHandleExists(State.Hwnd)
+				State.NativeHost.Destroy.Call()
+			State.Env.SuccessFn := 0, State.Env.FailureFn := 0
+			State.ControllerPromise.SuccessFn := 0, State.ControllerPromise.FailureFn := 0
+			State.Owner := 0
+		}
+	}
+}
+for _WSERG_ClosePhase in ["fully-owned", "late-completion"]
+	Test("webview_utils: " . _WSERG_ClosePhase . " close refusal retains exact native parent retry ownership (webview-warmup-close-refusal-retry)",
+		_WSERG_WarmupCloseRefusalRetry.Bind(_WSERG_ClosePhase))

@@ -320,6 +320,7 @@ function checkChoiceProjection() {
 				(code) => `static/ergopti_plus/_shared/data/locales/${code}.json`
 			),
 			'tools/lib/paths.cjs',
+			'tools/lib/_generated/config_keys.cjs',
 			'tools/lib/menu-row-availability.cjs',
 			'static/ergopti_plus/_shared/data/locales/en.json',
 			'static/ergopti_plus/_shared/modules/updater/channels.json',
@@ -450,7 +451,7 @@ function checkChoiceProjection() {
 			);
 		}
 
-		const backendStatus = menu.llm_menu.find((row) => row.id === 'llm_backend').status_rows;
+		const backendStatus = menu.llm_menu.find((row) => row.id === 'llm_model').status_rows;
 		assert.deepEqual(
 			backendStatus.unavailable,
 			[
@@ -2484,7 +2485,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		[
 			'linux',
 			'ui/menu/menu_builder.lua',
-			'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands)'
+			// Linux passes its live owner: the rows apply where the session can.
+			'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands, {'
 		]
 	]) {
 		const source = readFileSync(
@@ -4897,7 +4899,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'utf8'
 		)
 	);
-	assert.deepEqual(manifest[corpus.command_section], [corpus.command]);
+	assert.equal(manifest.llm_api_add_command, undefined, 'the Windows Add row left the tray');
 	assert.deepEqual(manifest[corpus.group_section], [corpus.group]);
 	assert.deepEqual(manifest[corpus.separator_section], [corpus.separator]);
 	for (const code of [
@@ -4941,14 +4943,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		}
 	}
 	for (const [driver, relative, call, section] of [
-		[
-			'windows',
-			'ui/menu/menu_llm/menu_api_entries.ahk',
-			'MenuRenderer_TemplateRows',
-			corpus.command_section
-		],
-		['macos', 'ui/menu/menu_llm/api_panel.lua', 'ManifestMenu.template_rows', corpus.group_section],
-		['linux', 'ui/menu/llm_backend_rows.lua', 'ManifestMenu.template_rows', corpus.group_section]
+		['macos', 'ui/menu/menu_llm/api_panel.lua', 'ManifestMenu.template_rows', corpus.group_section]
 	]) {
 		const source = readFileSync(
 			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
@@ -4961,169 +4956,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		);
 	}
 	console.log(
-		'API Add: independent declarations, 21 existing captions, authentic native dialog/provider and separator owners.'
-	);
-}
-
-// Backend choices retain their native controls; only two drivers allocate this boundary.
-{
-	const assert = require('node:assert/strict');
-	const corpus = JSON.parse(
-		readFileSync(resolve(SHARED, 'tests/corpus/menus/backend_choice_boundary.json'), 'utf8')
-	);
-	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	assert.deepEqual(manifest[corpus.section], corpus.rows);
-	assert.deepEqual(corpus.platform_rows, {
-		ahk: [{ separator: true }],
-		hs: [],
-		linux: [{ separator: true }]
-	});
-	for (const code of [
-		'ar',
-		'cs',
-		'da',
-		'de',
-		'en',
-		'es',
-		'fr',
-		'he',
-		'hi',
-		'it',
-		'ja',
-		'ko',
-		'no',
-		'nl',
-		'pl',
-		'pt',
-		'ru',
-		'sv',
-		'tr',
-		'uk',
-		'zh'
-	]) {
-		const labels = JSON.parse(
-			readFileSync(resolve(SHARED, 'data/locales/' + code + '.json'), 'utf8')
-		);
-		for (const key of [corpus.marker_key, corpus.windows_next_key, ...corpus.linux_choice_keys]) {
-			assert.equal(typeof labels[key], 'string', code + ': existing control key ' + key);
-			assert(labels[key].trim().length > 0);
-		}
-		if (code === 'en') {
-			assert.equal(labels[corpus.marker_key], corpus.marker_english);
-			assert.equal(labels[corpus.windows_next_key], corpus.windows_next_english);
-			assert.deepEqual(
-				corpus.linux_choice_keys.map((key) => labels[key]),
-				corpus.linux_choice_english
-			);
-		}
-	}
-	for (const [driver, relative, call] of [
-		['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
-		['linux', 'ui/menu/llm_backend_rows.lua', 'ManifestMenu.template_rows']
-	]) {
-		const source = readFileSync(
-			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
-			'utf8'
-		);
-		assert(source.includes(call + '("llm_backend_choice_boundary"'));
-	}
-	const mac = readFileSync(
-		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_llm/backend_panel.lua'),
-		'utf8'
-	);
-	assert(!mac.includes('"llm_backend_choice_boundary"'));
-	assert(mac.includes('ctx.local_server_rows(activate_api)'));
-	console.log(
-		'Backend boundary: independent two-driver rows, genuine macOS absence and21 existing captions.'
-	);
-}
-
-// Independent per-model frame declarations retain bare Windows and decorated Mac headings.
-{
-	const assert = require('node:assert/strict');
-	const corpus = JSON.parse(
-		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_readout_frames.json'), 'utf8')
-	);
-	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	for (const key of ['specs', 'caps']) {
-		const expected = corpus[key];
-		assert.deepEqual(manifest[expected.section], expected.rows);
-		assert.deepEqual(expected.platform_rows, {
-			ahk: [{ separator: true }, { label: expected.english, disabled: true }],
-			hs: [{ separator: true }, { label: '— ' + expected.english + ' —', disabled: true }],
-			linux: []
-		});
-		for (const code of [
-			'ar',
-			'cs',
-			'da',
-			'de',
-			'en',
-			'es',
-			'fr',
-			'he',
-			'hi',
-			'it',
-			'ja',
-			'ko',
-			'no',
-			'nl',
-			'pl',
-			'pt',
-			'ru',
-			'sv',
-			'tr',
-			'uk',
-			'zh'
-		]) {
-			const strings = JSON.parse(
-				readFileSync(resolve(SHARED, 'data/locales/' + code + '.json'), 'utf8')
-			);
-			for (const caption of [expected.key, corpus.selection_key, corpus.marker_key]) {
-				assert.equal(typeof strings[caption], 'string', code + ': existing caption ' + caption);
-				assert(strings[caption].trim().length > 0);
-			}
-			if (code === 'en') {
-				assert.equal(strings[expected.key], expected.english);
-				assert.equal(strings[corpus.selection_key], corpus.selection_english);
-				assert.equal(strings[corpus.marker_key], corpus.marker_english);
-			}
-		}
-		for (const [driver, relative, call] of [
-			['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
-			['macos', 'ui/menu/menu_llm/models_selector.lua', 'ManifestMenu.template_rows']
-		]) {
-			const source = readFileSync(
-				resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
-				'utf8'
-			);
-			assert(
-				source.includes(call + '("' + expected.section + '"'),
-				driver + ': genuine per-model frame owner'
-			);
-		}
-		const linux = readFileSync(
-			resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
-			'utf8'
-		);
-		assert(
-			!linux.includes('"' + expected.section + '"'),
-			'Linux has no per-model detail sheet to populate'
-		);
-	}
-	const providers = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
-	const actual = providers
-		.flatMap((p) => p.families.flatMap((f) => f.models))
-		.filter((m) => m.name === corpus.native_model);
-	assert.equal(
-		actual.length,
-		1,
-		'the hand-pinned native model must exist exactly once in the shipped catalogue'
-	);
-	assert.equal(typeof actual[0].urls.ollama, 'string');
-	assert.equal(typeof actual[0].capabilities, 'object');
-	console.log(
-		'Model readouts: authentic two-driver frames, genuine Linux absence and21 unchanged captions.'
+		'API Add: macOS-only declarations, 21 existing captions, authentic native provider and separator owners.'
 	);
 }
 
@@ -5233,50 +5066,6 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 }
 
-// Independently pinned catalogue boundaries retain the real native family/sheet order.
-{
-	const assert = require('node:assert/strict');
-	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	const corpus = JSON.parse(
-		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_catalogue_boundaries.json'), 'utf8')
-	);
-	for (const key of ['family', 'origin']) {
-		const expected = corpus.boundaries[key];
-		assert.deepEqual(manifest[expected.section], expected.rows);
-		assert.deepEqual(expected.projections.linux, []);
-		for (const [driver, relative, call] of [
-			['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
-			['macos', 'ui/menu/menu_llm/models_selector.lua', 'ManifestMenu.template_rows']
-		]) {
-			const source = readFileSync(
-				resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
-				'utf8'
-			);
-			assert.ok(
-				source.includes(call + '("' + expected.section + '"'),
-				driver + ': actual catalogue boundary owner'
-			);
-		}
-	}
-	const providers = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
-	const provider = providers.filter((item) => item.label === corpus.provider_caption);
-	assert.equal(provider.length, 1);
-	for (const [index, name] of [corpus.first_family_model, corpus.second_family_model].entries()) {
-		const admitted = provider[0].families[index].models.filter(
-			(model) => typeof model.urls.ollama === 'string' && model.urls.ollama.length > 0
-		);
-		assert.equal(admitted.length, 1);
-		assert.equal(admitted[0].name, name);
-	}
-	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
-		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
-		for (const key of corpus.caption_keys) {
-			assert.equal(typeof locale[key], 'string');
-			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
-		}
-	}
-}
-
 // Independent absent-module messages are disabled presentation, with native ownership untouched.
 {
 	const assert = require('node:assert/strict');
@@ -5306,42 +5095,6 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				assert.equal(typeof locale[row.i18n], 'string');
 				assert.ok(locale[row.i18n].trim().length > 0 && locale[row.i18n] !== row.i18n);
 			}
-		}
-	}
-}
-
-// Actual hardware data and distinct native availability remain outside the inert boundary policy.
-{
-	const assert = require('node:assert/strict');
-	const expected = JSON.parse(
-		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_hardware_boundary.json'), 'utf8')
-	);
-	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	assert.deepEqual(menu[expected.section], expected.rows);
-	assert.deepEqual(expected.projections.linux, []);
-	const catalogue = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
-	const actual = catalogue
-		.flatMap((provider) => provider.families.flatMap((family) => family.models))
-		.filter((model) => model.name === expected.native_model);
-	assert.equal(actual.length, 1);
-	assert.deepEqual(actual[0].hardware_requirements.ollama, expected.hardware_ollama);
-	assert.equal(typeof actual[0].urls.ollama, 'string');
-	assert.ok(actual[0].urls.ollama.length > 0);
-	for (const [driver, relative, call] of [
-		['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
-		['macos', 'ui/menu/menu_llm/models_selector.lua', 'ManifestMenu.template_rows']
-	]) {
-		const source = readFileSync(
-			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
-			'utf8'
-		);
-		assert.ok(source.includes(call + '("' + expected.section + '"'));
-	}
-	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
-		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
-		for (const key of expected.caption_keys) {
-			assert.equal(typeof locale[key], 'string');
-			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
 		}
 	}
 }
@@ -5516,25 +5269,19 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readFileSync(resolve(SHARED, 'tests/corpus/menus/llm_empty_status.json'), 'utf8')
 	);
 	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	for (const status of [expected.api, expected.agent]) {
+	// The API entries moved to the model selector page (2026-10-27); the agent keeps its status.
+	for (const status of [expected.agent]) {
 		assert.deepEqual(menu[status.section], status.rows);
 		assert.equal(status.rows[0].type, 'label');
 		assert.equal(status.rows[0].i18n, status.key);
 	}
 	for (const [driver, path, call, section] of [
 		[
-			'windows',
-			'ui/menu/menu_llm/menu_api_entries.ahk',
-			'MenuRenderer_TemplateRows',
-			expected.api.section
-		],
-		[
 			'macos',
 			'ui/menu/menu_llm/agent_panel.lua',
 			'ManifestMenu.template_rows',
 			expected.agent.section
-		],
-		['linux', 'ui/menu/llm_backend_rows.lua', 'ManifestMenu.template_rows', expected.api.section]
+		]
 	]) {
 		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', driver, path), 'utf8');
 		assert.ok(source.includes(call + '("' + section + '"'));
@@ -5570,9 +5317,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		assert.equal(declared[0].health_dot, false);
 		assert.deepEqual(declared[0].platforms, ['ahk', 'hs', 'linux']);
 	}
-	for (const row of menu.llm_menu.filter((row) =>
-		['llm_backend', 'llm_model', 'llm_profile'].includes(row.id)
-	))
+	for (const row of menu.llm_menu.filter((row) => ['llm_model', 'llm_profile'].includes(row.id)))
 		assert.equal(row.type, 'dynamic', 'other dynamic child families keep their existing API');
 	for (const id of ['llm_generation_settings']) {
 		const rows = menu.llm_menu.filter((row) => row.id === id);
@@ -5904,79 +5649,6 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 console.log(
 	'Fixed LLM parents: three canonical groups, actual three-driver child owners, complete hand hierarchies and thirteen source-identity refusals.'
 );
-
-// The selectable model header stays native; its inert boundary has one shared policy.
-{
-	const assert = require('node:assert/strict');
-	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
-	const expected = JSON.parse(
-		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_header_boundary.json'), 'utf8')
-	);
-	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	assert.deepEqual(menu[expected.section], expected.rows);
-	assert.deepEqual(expected.platform_rows, {
-		ahk: [{ separator: true }],
-		hs: [{ separator: true }],
-		linux: []
-	});
-	assert.deepEqual(expected.header_controls, {
-		empty_default: ['no_model', 'boundary'],
-		populated_default: ['no_model', 'backend_default', 'boundary']
-	});
-	const catalogue = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
-	assert.ok(catalogue.length > 0);
-	assert.equal(
-		catalogue
-			.flatMap((provider) => provider.families.flatMap((family) => family.models))
-			.filter(
-				(model) =>
-					model.name === expected.default_name &&
-					typeof model.urls.ollama === 'string' &&
-					model.urls.ollama.length > 0
-			).length,
-		1
-	);
-	for (const [relative, extension, call] of [
-		['windows/ui/menu/menu_llm/menu_models.ahk', '.ahk', 'MenuRenderer_TemplateRows'],
-		['macos/ui/menu/menu_llm/models_selector.lua', '.lua', 'ManifestMenu.template_rows']
-	]) {
-		const source = readFileSync(resolve(SHARED, '..', relative), 'utf8');
-		const needle = call + '("' + expected.section + '"';
-		assert.equal(
-			source.split(needle).length,
-			2,
-			'one genuine native constructor consumes the boundary'
-		);
-		assert.ok(publishesMenuTemplate(source, extension, expected.section));
-		for (const replacement of [
-			'Foreign.' + needle,
-			(extension === '.lua' ? '-- ' : '; ') + needle
-		]) {
-			const withdrawn = source.replace(needle, replacement);
-			assert.notEqual(withdrawn, source);
-			assert.equal(
-				publishesMenuTemplate(withdrawn, extension, expected.section),
-				false,
-				'comments and foreign receivers cannot publish this boundary'
-			);
-		}
-	}
-	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
-		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
-		for (const key of expected.caption_keys) {
-			assert.equal(typeof locale[key], 'string');
-			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
-		}
-		if (file === 'en.json') {
-			assert.equal(locale['menu.llm.no_model'], expected.english_no_model);
-			assert.equal(
-				locale['menu.llm.backend_default_model'].replace('%s', expected.default_name),
-				expected.english_default
-			);
-		}
-		if (file === 'fr.json') assert.equal(locale['menu.llm.no_model'], expected.french_no_model);
-	}
-}
 
 // Personal shortcut descriptions and switches remain native data; their frame is shared.
 {
@@ -8167,15 +7839,7 @@ console.log(
 			'utf8'
 		)
 	);
-	const apiManagement = expected.api_management;
 	const declaredFrames = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	assert.deepEqual(declaredFrames[apiManagement.section], apiManagement.declaration);
-	assert.equal(apiManagement.edit_ready_guard, false);
-	const actualLocales = loadLocaleKeys();
-	assert.equal(Object.keys(actualLocales).length, 21);
-	for (const [locale, keys] of Object.entries(actualLocales))
-		for (const key of apiManagement.keys)
-			assert(keys.has(key), 'the genuine management caption is published in ' + locale);
 	const canonicalLoopSource = readFileSync(
 		resolve(REPO_ROOT, 'tools/test/test-ahk-loop-capture.cjs'),
 		'utf8'
@@ -8397,7 +8061,7 @@ console.log(
 	const linuxIndex = declaredFrames[outerBoundary.section].findIndex(
 		(row) => row.id === linuxBoundary.preceding_id
 	);
-	assert(linuxIndex >= 0, 'the actual Linux model list retains its adjacent boundary');
+	assert(linuxIndex >= 0, 'the actual Linux model button retains its adjacent boundary');
 	function assertOnlyLinuxPresentationBoundary(row) {
 		assert.deepEqual(
 			row,
@@ -9786,14 +9450,14 @@ console.log(
 			assert(
 				hasStatement(
 					native,
-					'sync_wpm_visibility("keystats_menubar_wpm", "WPM menubar", WpmMenubar)',
+					'sync_wpm_visibility(MetricsState.MENUBAR_WPM, "WPM menubar", WpmMenubar)',
 					1
 				)
 			);
 			assert(
 				hasStatement(
 					native,
-					'sync_wpm_visibility("keystats_float_wpm", "WPM widget", WpmWidget, state.keystats_float_graph)',
+					'sync_wpm_visibility(MetricsState.FLOAT_WPM, "WPM widget", WpmWidget, state.keystats_float_graph)',
 					1
 				)
 			);
@@ -9898,6 +9562,7 @@ console.log(
 			'static/ergopti_plus/_shared/modules/updater/defaults.json',
 			'static/ergopti_plus/_shared/ui/update_channels.js',
 			'tools/lib/paths.cjs',
+			'tools/lib/_generated/config_keys.cjs',
 			'static/ergopti_plus/_shared/modules/updater/schedule.js',
 			'static/ergopti_plus/_shared/data/locales/en.json'
 		]) {
@@ -11421,360 +11086,6 @@ console.log(
 	}
 	console.log(
 		'[OK] complete Windows profile parent: original child, whole frame, 21 independent captions and typed source withdrawal.'
-	);
-}
-
-// Complete Windows backend choice/port/reset presentation consumes genuine native data.
-{
-	const assert = require('node:assert/strict');
-	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
-	const { scriptTokens } = require('../lib/script-source.cjs');
-	const records = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
-	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	const frame = 'llm_backend_child_frame_ahk';
-	const listBlocks = [
-		['llm_backend_child_choices_ahk', 'llm_backend_child_choices', 'ChoiceRows'],
-		['llm_backend_child_port_rows_ahk', 'llm_backend_child_port_rows', 'PortRows'],
-		['llm_backend_child_local_rows_ahk', 'llm_backend_child_local_rows', 'LocalRows']
-	];
-	const expected = [
-		{ type: 'include', section: 'llm_backend_child_choices_ahk' },
-		{ type: 'include', section: 'llm_backend_choice_boundary' },
-		{ type: 'include', section: 'llm_backend_child_port_rows_ahk' },
-		{ type: 'include', section: 'llm_backend_child_local_rows_ahk' }
-	];
-	assert.deepEqual(records[frame], expected);
-	assert.deepEqual(generated[frame], expected);
-	assert.deepEqual(records.llm_backend_option_caption_frame_ahk, [
-		{
-			type: 'include',
-			section: 'llm_backend_ollama_option_caption_ahk',
-			present_when: 'llm_backend_option_is_ollama'
-		},
-		{
-			type: 'include',
-			section: 'llm_backend_api_option_caption_ahk',
-			present_when: 'llm_backend_option_is_api'
-		}
-	]);
-	assert.deepEqual(
-		generated.llm_backend_option_caption_frame_ahk,
-		records.llm_backend_option_caption_frame_ahk
-	);
-	for (const id of ['ollama', 'api']) {
-		const section = 'llm_backend_' + id + '_option_caption_ahk';
-		const caption = [
-			{
-				type: 'label',
-				id: 'llm_backend_' + id + '_option_caption',
-				i18n: 'menu.llm.backend_' + id + '_suffix',
-				caption_getter: 'llm_backend_option_brand',
-				caption_layout: 'suffix',
-				caption_joiner: ' — ',
-				platforms: ['ahk'],
-				unavailable: 'hide'
-			}
-		];
-		assert.deepEqual(records[section], caption);
-		assert.deepEqual(generated[section], caption);
-	}
-	assert.deepEqual(records.llm_backend_ollama_port_control_ahk, [
-		{
-			type: 'command',
-			id: 'llm_backend_ollama_port',
-			i18n: 'menu.llm.ollama_port_label',
-			caption_getter: 'llm_backend_ollama_port_caption',
-			platforms: ['ahk'],
-			unavailable: 'hide'
-		}
-	]);
-	assert.deepEqual(
-		generated.llm_backend_ollama_port_control_ahk,
-		records.llm_backend_ollama_port_control_ahk
-	);
-	assert.deepEqual(records.llm_backend_ollama_port_frame_ahk, [
-		{ type: 'include', section: 'llm_backend_ollama_port_control_ahk' },
-		{
-			type: 'include',
-			section: 'llm_native_numeric_reset',
-			present_when: 'llm_backend_ollama_port_customized'
-		}
-	]);
-	assert.deepEqual(
-		generated.llm_backend_ollama_port_frame_ahk,
-		records.llm_backend_ollama_port_frame_ahk
-	);
-	const source = readFileSync(
-		resolve(SHARED, '../windows/ui/menu/menu_llm/menu_models.ahk'),
-		'utf8'
-	);
-	const signature = '_LLM_Menu_BackendChildFrameRows(ChoiceRows, PortRows, LocalRows) {';
-	const start = source.indexOf('\n' + signature);
-	assert(start >= 0, 'the actual complete native frame owner has a source floor');
-	const owner = source.slice(start + 1);
-	for (const [section, key, datum] of listBlocks) {
-		const row = [{ type: 'list', id: key, platforms: ['ahk'], unavailable: 'hide' }];
-		assert.deepEqual(records[section], row);
-		assert.deepEqual(generated[section], row);
-		const binds = (native, definition = generated, port = 3) =>
-			nativeTemplateBinding(
-				native,
-				'.ahk',
-				section,
-				key,
-				port,
-				[{ src: native }],
-				definition,
-				'ahk'
-			);
-		assert.equal(
-			binds(owner),
-			true,
-			'the actual native row cohort reaches its transitive typed list'
-		);
-		assert.equal(
-			binds(owner, generated, 1),
-			false,
-			'native row data cannot supply the callback port'
-		);
-		for (const candidate of [
-			owner.replace('"' + key + '", (*) => ' + datum, '"' + key + '", false'),
-			owner.replace(
-				'Rows := MenuRenderer_TemplateRows("' + frame + '"',
-				'Rows := Foreign.MenuRenderer_TemplateRows("' + frame + '"'
-			)
-		]) {
-			assert.notEqual(candidate, owner);
-			assert.equal(
-				binds(candidate),
-				false,
-				'a foreign or uncallable source cannot own the complete native row cohort'
-			);
-		}
-		for (const defect of ['missing', 'cycle', 'redirected']) {
-			const changed = structuredClone(generated);
-			if (defect === 'missing') delete changed[section];
-			if (defect === 'cycle') changed[section] = [{ type: 'include', section: frame }];
-			if (defect === 'redirected')
-				changed[frame] = changed[frame].map((row) =>
-					row.section === section ? { ...row, section: 'foreign_backend_child_block' } : row
-				);
-			assert.equal(
-				binds(owner, changed),
-				false,
-				'a missing, cyclic or redirected physical owner grants no typed evidence'
-			);
-		}
-	}
-	const tokens = (text) =>
-		scriptTokens(text, '.ahk').map((token) => token.kind + ':' + token.value);
-	const contains = (text, statement) => {
-		const actual = tokens(text),
-			wanted = tokens(statement);
-		return actual.some((_, at) => wanted.every((token, offset) => actual[at + offset] === token));
-	};
-	for (const statement of [
-		'CaptionRows := _LLM_Menu_BackendOptionCaptionRows(BackendId, Brands[BackendId])',
-		'return CaptionRows[1]["label"]',
-		'BoundaryRows := MenuRenderer_TemplateRows("llm_backend_choice_boundary", Map(), Map(), Map())',
-		'PortRows := _LLM_Menu_BackendPortRows(port_display, _LLM_DefaultFor("llm_ollama_port"))',
-		'LocalRows := LLM_Menu_LocalServersRows()',
-		'Rows := _LLM_Menu_BackendChildFrameRows(ChoiceRows, PortRows, LocalRows)',
-		'Prompt := IsSet(PromptCallback) ? PromptCallback : (*) => LLM_Menu_PromptOllamaPort()',
-		'Reset := IsSet(ResetCallback) ? ResetCallback : (*) => LLM_Menu_ResetOllamaPort(_LLM_DefaultFor("llm_ollama_port"))',
-		'Customized := !(CurrentPort = DefaultPort)',
-		'Map("llm_backend_ollama_port", Prompt, "llm_native_numeric_reset", Reset)'
-	]) {
-		assert(
-			contains(source, statement),
-			'actual original producer/callback receipt reaches the declared frame'
-		);
-		const candidate = source.replace(statement, '; ' + statement);
-		assert.notEqual(candidate, source);
-		assert.equal(
-			contains(candidate, statement),
-			false,
-			'commented source cannot supply the actual transport'
-		);
-	}
-	const corpus = JSON.parse(
-		readFileSync(resolve(SHARED, 'tests/corpus/menus/windows_backend_child_captions.json'), 'utf8')
-	);
-	assert.equal(Object.keys(corpus).length, 21);
-	for (const [language, subject] of Object.entries(corpus)) {
-		const locale = JSON.parse(
-			readFileSync(resolve(SHARED, 'data/locales/' + language + '.json'), 'utf8')
-		);
-		for (const [key, value] of Object.entries(subject.sources)) assert.equal(locale[key], value);
-		assert.equal(subject.api, 'API 🌐 — ' + subject.sources['menu.llm.backend_api_suffix']);
-		assert.equal(
-			subject.ollama,
-			'Ollama 🦙 — ' + subject.sources['menu.llm.backend_ollama_suffix']
-		);
-		assert.equal(
-			subject.port_default,
-			subject.sources['menu.llm.ollama_port_label'].replaceAll('%s', '11434')
-		);
-		assert.equal(
-			subject.port_custom,
-			subject.sources['menu.llm.ollama_port_label'].replaceAll('%s', '11555')
-		);
-		assert.equal(
-			subject.reset_default,
-			subject.sources['menu.llm.reset_label'].replaceAll('%s', '11434')
-		);
-		assert.equal(
-			subject.port_literal,
-			subject.sources['menu.llm.ollama_port_label'].replaceAll('%s', subject.literal_subject)
-		);
-	}
-	console.log(
-		'[OK] actual Windows backend child: original brands/catalogue/callbacks, complete shared numeric/order frame, 21 frozen caption images and genuine typed source refusal.'
-	);
-}
-
-// Native backend data remains a datum while the manifest owns the complete warning/parent frame.
-{
-	const assert = require('node:assert/strict');
-	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
-	const { publishesSelectedMenuGroup } = require('../lib/menu-shared-delegation.cjs');
-	const { scriptTokens } = require('../lib/script-source.cjs');
-	const records = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
-	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	const frame = 'llm_backend_parent_frame_ahk';
-	const group = 'llm_backend_parent_ahk';
-	const parent = {
-		type: 'group',
-		id: 'llm_backend_parent',
-		caption_source: 'native',
-		caption_getter: 'llm_backend_parent_caption',
-		disabled_when: ['llm_backend_parent_ready'],
-		platforms: ['ahk'],
-		unavailable: 'hide'
-	};
-	const expected = [
-		{ type: 'include', section: 'llm_backend_warning_rows_ahk' },
-		{ type: 'list', id: 'llm_backend_parent_rows', platforms: ['ahk'], unavailable: 'hide' }
-	];
-	assert.deepEqual(records[frame], expected);
-	assert.deepEqual(records[group], [parent]);
-	assert.deepEqual(generated[frame], expected);
-	assert.deepEqual(generated[group], [parent]);
-	const source = readFileSync(resolve(SHARED, '../windows/ui/menu/menu_llm/menu_main.ahk'), 'utf8');
-	const signature = '_LLM_Menu_BackendParentRows(NativeChild, Caption, Disabled, WarningRows) {';
-	const owner = (candidate) => {
-		const at = candidate.indexOf('\n' + signature);
-		assert(at >= 0, 'actual backend provider has an executable source floor');
-		return candidate.slice(at + 1);
-	};
-	const binds = (candidate, port = 3) =>
-		nativeTemplateBinding(owner(candidate), '.ahk', frame, 'llm_backend_parent_rows', port);
-	assert.equal(
-		binds(source),
-		true,
-		'actual finished parent reaches the typed native child-list port'
-	);
-	assert.equal(binds(source, 1), false, 'a native Menu parent is not a command port');
-	for (const candidate of [
-		source.replaceAll(
-			'"llm_backend_parent_rows", (*) => ParentRows',
-			'"llm_backend_parent_rows", false'
-		),
-		source.replaceAll(
-			'MenuRenderer_TemplateRows("' + frame + '"',
-			'MenuRenderer_TemplateRows("foreign_backend_frame"'
-		)
-	]) {
-		assert.notEqual(candidate, source);
-		assert.equal(
-			binds(candidate),
-			false,
-			'withdrawn or uncallable native parent publication refuses'
-		);
-	}
-	const proof = {
-		row: parent,
-		owner_signature: signature,
-		call: 'Parent := MenuRenderer_GroupRow("llm_backend_parent_ahk", "llm_backend_parent", NativeChild, Getters)',
-		handoff: 'ParentRows := [Parent]',
-		consumer:
-			'Map("llm_backend_parent_rows", (*) => ParentRows,\n\t\t\t"llm_backend_warning_rows", (*) => Admission["warning_rows"])'
-	};
-	const authentic = (candidate) =>
-		publishesSelectedMenuGroup(candidate, '.ahk', group, [parent], proof);
-	assert.equal(
-		authentic(source),
-		true,
-		'actual GroupRow native caption retains the finished original Menu child'
-	);
-	for (const candidate of [
-		source.replace(proof.call, '; ' + proof.call),
-		source.replace(
-			proof.call,
-			proof.call.replace('MenuRenderer_GroupRow', 'Foreign.MenuRenderer_GroupRow')
-		),
-		source.replaceAll('ParentRows := [Parent]', 'ParentRows := []'),
-		source.replace(proof.consumer, 'Map("foreign_backend_rows", (*) => ParentRows)'),
-		source.replace(
-			signature,
-			'_Unused_BackendParentRows(NativeChild, Caption, Disabled, WarningRows) {'
-		)
-	]) {
-		assert.notEqual(candidate, source);
-		assert.equal(
-			authentic(candidate),
-			false,
-			'commented, foreign or discarded GroupRow results cannot claim the real backend'
-		);
-	}
-	const tokens = (text) =>
-		scriptTokens(text, '.ahk').map((token) => token.kind + ':' + token.value);
-	const contains = (text, statement) => {
-		const actual = tokens(text),
-			expected = tokens(statement);
-		return actual.some((_, at) => expected.every((token, i) => actual[at + i] === token));
-	};
-	for (const statement of [
-		'_LLM_Menu_EmitRow(TargetMenu, Id, Disabled, Operational, HealthDot, WarningRows)',
-		'BackendCaption := _LLM_Menu_BackendRowLabel()',
-		'BackendMenu := LLM_Menu_BuildBackendMenu()',
-		'BackendRows := _LLM_Menu_BackendParentRows(BackendMenu, BackendCaption, disabled, WarningRows)',
-		// The emitter returns the admitted frame; MenuRenderer_Build draws it.
-		'return BackendRows'
-	]) {
-		assert(
-			contains(source, statement),
-			'actual original provider/captured warning/native child publication is executable'
-		);
-		const candidate = source.replace(statement, '; ' + statement);
-		assert.notEqual(candidate, source);
-		assert.equal(
-			contains(candidate, statement),
-			false,
-			'a commented native handoff is not execution evidence'
-		);
-	}
-	const corpus = JSON.parse(
-		readFileSync(
-			resolve(SHARED, 'tests/corpus/menus/windows_llm_backend_parent_captions.json'),
-			'utf8'
-		)
-	);
-	assert.equal(Object.keys(corpus).length, 21);
-	for (const [language, subject] of Object.entries(corpus)) {
-		const locale = JSON.parse(
-			readFileSync(resolve(SHARED, 'data/locales/' + language + '.json'), 'utf8')
-		);
-		for (const [key, value] of Object.entries(subject.sources))
-			assert.equal(locale[key], value, 'all original translated warning/option sources stay exact');
-		assert.equal(subject.warning, subject.sources['menu.llm.warning_install_ollama']);
-		assert.equal(subject.selected.unknown, subject.sources['menu.llm.backend_unknown']);
-		assert.equal(subject.selected.api, 'API 🌐');
-		assert.equal(subject.selected.ollama, 'Ollama 🦙');
-		assert.equal(subject.literal_native, 'Local %s & café — literal');
-	}
-	console.log(
-		'[OK] actual Windows backend complete frame: genuine native datum, warning order, original callback/Menu and all21 old captions.'
 	);
 }
 
@@ -13797,66 +13108,6 @@ console.log(
 	}
 	console.log(
 		'Windows Agent: declared fixed provider captions retain 21 original locale projections and native ports.'
-	);
-}
-
-// Original Windows model captions are independent of the new two-scalar declaration.
-{
-	const assert = require('node:assert/strict');
-	const corpus = JSON.parse(
-		readFileSync(
-			resolve(SHARED, 'tests/corpus/menus/windows_llm_model_health_parent_original.json'),
-			'utf8'
-		)
-	);
-	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	assert.equal(Object.keys(corpus.locales).length, 21);
-	assert.deepEqual(corpus.health, [
-		{ id: 'none', prefix: '' },
-		{ id: 'ok', prefix: '🟢 ' },
-		{ id: 'ko', prefix: '🔴 ' }
-	]);
-	assert.deepEqual(corpus.models, ['', 'qwen2.5:7b', 'cerebras/qwen-3.8-27b', 'Native% && {1}']);
-	assert.deepEqual(manifest.llm_model_parent_ahk, [
-		{
-			type: 'group',
-			id: 'llm_model',
-			i18n: 'menu.llm.model_parent_with_health',
-			caption_getters: ['llm_model_health_prefix', 'llm_model_current_caption'],
-			disabled_when: ['llm_model_parent_ready'],
-			platforms: ['ahk'],
-			unavailable: 'hide'
-		}
-	]);
-	for (const [code, old] of Object.entries(corpus.locales)) {
-		const values = JSON.parse(
-			readFileSync(resolve(SHARED, 'data/locales/' + code + '.json'), 'utf8')
-		);
-		assert.match(old.locale_blob_sha256, /^[a-f0-9]{64}$/);
-		assert.equal(
-			values['menu.llm.model_label'],
-			old.format,
-			'the original localized model format is retained'
-		);
-		assert.equal(
-			values['menu.llm.model_parent_with_health'],
-			'%s' + old.format,
-			'health stays before the complete original label'
-		);
-		assert.equal(old.format.split('%s').length - 1, 1);
-		for (const health of corpus.health)
-			for (const [index, model] of corpus.models.entries()) {
-				assert.equal(health.prefix + old.format.replace('%s', model), old.titles[health.id][index]);
-				assert.equal(
-					values['menu.llm.model_parent_with_health']
-						.replace('%s', health.prefix)
-						.replace('%s', model),
-					old.titles[health.id][index]
-				);
-			}
-	}
-	console.log(
-		'Windows model parent: compiled two-scalar caption declaration preserves the independent 21-locale health projections; native receiving remains separately required.'
 	);
 }
 

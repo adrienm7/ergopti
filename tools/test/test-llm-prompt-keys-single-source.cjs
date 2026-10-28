@@ -93,14 +93,17 @@ check('the shared port row label', () => {
 				`${locale} lost ${key}, which a driver still reads`
 			);
 	}
-	const manifest = read(`${PLUS}/_shared/modules/features/manifest.toml`);
+	// The MLX and Ollama ports are tools of the model selector page since
+	// 2026-10-27, not tray rows; the page owners read the same labels.
 	assert(
-		manifest.includes(`i18n = "${PORT_LABEL}"`),
-		'the macOS MLX port row reads the shared label'
+		read(`${PLUS}/macos/ui/menu/menu_llm/model_selector_page.lua`).includes(
+			`i18n.get("${PORT_LABEL}")`
+		),
+		'the macOS MLX port tool reads the shared label'
 	);
 	assert(
-		manifest.includes(`i18n = "${WINDOWS_PORT_LABEL}"`),
-		'the Windows Ollama port row keeps its label'
+		read(`${PLUS}/windows/ui/model_browser/init.ahk`).includes(`t("${WINDOWS_PORT_LABEL}")`),
+		'the Windows Ollama port tool keeps its label'
 	);
 	assert(
 		read(`${PLUS}/windows/ui/menu/menu_llm/menu_settings.ahk`).includes(

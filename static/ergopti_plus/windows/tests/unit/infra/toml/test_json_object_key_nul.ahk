@@ -120,3 +120,38 @@ _JsonArraySpans_RefuseWholeDocumentAndNonArrays() {
 }
 Test("JSON: array source spans retain whole-document and root refusals (json-array-spans)",
 	_JsonArraySpans_RefuseWholeDocumentAndNonArrays)
+
+
+_R7JK_ExactSourceKinds() {
+	global JSON_NULL
+	Source := '{"object":{"leaf":false},"array":[false,1,"x"],"string":"1","number":1.0,"true":true,"false":false,"null":null}'
+	Members := JsonObjectMemberSpans(Source)
+	Expected := Map("object", "object", "array", "array", "string", "string", "number", "number",
+		"true", "boolean", "false", "boolean", "null", "null")
+	AssertEqual(Expected.Count, Members.Count, "every independent JSON kind fixture must be present")
+	for Name, Kind in Expected
+		AssertEqual(Kind, Members[Name]["kind"], "the parser owns the original kind of " . Name)
+	AssertTrue(JsonParse(Members["string"]["text"]) is String, "ordinary decoding preserves numeric strings")
+	AssertTrue(JsonParse(Members["true"]["text"]) is Integer, "ordinary decoding keeps the existing native Boolean representation")
+	AssertEqual(true, JsonParse(Members["true"]["text"]))
+	AssertEqual(false, JsonParse(Members["false"]["text"]))
+	AssertTrue(JsonParse(Members["null"]["text"]) == JSON_NULL, "the null sentinel remains unchanged")
+}
+Test("JSON source kinds: canonical spans distinguish scalar aliases and nested containers (json-member-source-kind)",
+	_R7JK_ExactSourceKinds)
+
+_R7JK_DecodedMemberKinds() {
+	for KindCase in [
+		['{"schema_version":1,"\u0073chema_version":true}', "boolean", "true"],
+		['{"schema_version":true,"\u0073chema_version":1e0}', "number", "1e0"],
+		['{"schema_version":0,"\u0073chema_version":"1"}', "string", '"1"']
+	] {
+		Member := JsonObjectMemberSpans(KindCase[1])["schema_version"]
+		AssertEqual(KindCase[2], Member["kind"], "the last decoded member owns its actual JSON kind")
+		AssertEqual(KindCase[3], Member["text"], "kind and source span must name the same decoded member")
+	}
+	Nested := JsonObjectMemberSpans('{"outer":{"schema_version":"1"}}', ["outer"])["schema_version"]
+	AssertEqual("string", Nested["kind"], "selected nested objects use the same canonical dispatch kind")
+}
+Test("JSON source kinds: escaped duplicates retain exact decoded ownership (json-member-source-kind)",
+	_R7JK_DecodedMemberKinds)

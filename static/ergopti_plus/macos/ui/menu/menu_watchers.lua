@@ -18,7 +18,18 @@ local git_status  = require("infra.git_status")
 local reload_gate = require("reload_gate")
 local Timings     = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TableUtil   = require("table_util")
 local LOG         = "menu_watchers"
+
+--- Whether a reload or quit is already under way, which makes a refused reload
+--- request expected rather than a fault.
+--- @return boolean terminating
+local function reload_already_terminating()
+	local loaded, coordinator = pcall(require, "infra.termination_coordinator")
+	if not loaded or type(coordinator) ~= "table" then return false end
+	local checked, in_progress = pcall(coordinator.terminal_in_progress)
+	return checked and in_progress == true
+end
 
 
 
@@ -40,6 +51,15 @@ local DEBOUNCE_SEC = Timings.sec("ui", "hs_reload_debounce_ms")
 -- index.lock remains authoritative regardless of elapsed time: bypassing it can
 -- reload a half-checked-out tree. Kept identical to infra/file_watchers.
 local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
+
+--- Whether a developer field run is running (infra/field_run.lua), read through
+--- package.loaded: only a developer app ever loads that module.
+--- @return boolean
+local function field_run_holds_reload()
+	local field_run = package.loaded["infra.field_run"]
+	return type(field_run) == "table" and type(field_run.holds_reload) == "function"
+		and field_run.holds_reload() == true
+end
 
 --- Checks the complete lifecycle surface before any native activation.
 --- @param candidate any Constructor result.
@@ -103,6 +123,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 	-- while ``fire_reload`` itself re-arms through ``arm_reload`` (the Lua
 	-- local-after-closure trap: a closure only captures a local declared above it).
 	local fire_reload
+	local field_run_hold_logged = false
 
 	--- Stops one exact native capability without dropping it after uncertainty.
 	--- @param handle table|userdata Native pathwatcher or timer.
@@ -161,6 +182,18 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 			arm_reload()
 			return
 		end
+		-- A field run must not reload itself: the burst waits for its end.
+		if field_run_holds_reload() then
+			if not field_run_hold_logged then
+				field_run_hold_logged = true
+				local names = TableUtil.sorted_keys(burst_paths)
+				Logger.warn(LOG, "Menu source reload held while the developer field run runs (%d file(s): %s).",
+					#names, table.concat(names, ", ", 1, math.min(#names, 5)))
+			end
+			arm_reload()
+			return
+		end
+		field_run_hold_logged = false
 		if git_status.operation_in_progress(base_dir) then
 			if defer_count < GIT_HOLD_WARN_DEFERRALS then
 				defer_count = defer_count + 1
@@ -184,6 +217,11 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 			return ui_restore.defer_reload(function()
 				callback_invoked = true
 				if not _lifecycle_active or reload_generation ~= _lifecycle_generation then return end
+				if field_run_holds_reload() then
+					Logger.info(LOG, "Reload aborted at fire time: a developer field run started; re-arming.")
+					arm_reload()
+					return
+				end
 				if git_status.operation_in_progress(base_dir) then
 					Logger.info(LOG,
 						"Reload aborted at fire time: a Git operation started during the UI hold; re-arming.")
@@ -192,11 +230,15 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 				end
 				local request_ok, accepted = xpcall(on_reload, debug.traceback)
 				if not request_ok or accepted ~= true then
-					if not reload_refusal_logged then
+					if request_ok and reload_already_terminating() then
+						-- Expected: the reload this burst triggered is already under way
+						-- (field run 2026-10-27 19:47:04, ledger L45); the burst stays owned.
+						Logger.info(LOG, "Menu reload request deferred: a reload or quit is in progress.")
+					elseif not reload_refusal_logged then
 						reload_refusal_logged = true
 						Logger.warn(LOG,
-							"Menu reload request was refused; the source-file burst remains pending for retry: %s.",
-							tostring(request_ok and accepted or accepted))
+							"Menu reload request was refused (%s); the source-file burst stays pending and is retried.",
+							request_ok and ("result " .. tostring(accepted)) or tostring(accepted))
 					else
 						Logger.debug(LOG, "Menu reload request remains refused; retaining the source-file burst.")
 					end
@@ -212,8 +254,8 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 			if not reload_refusal_logged then
 				reload_refusal_logged = true
 				Logger.warn(LOG,
-					"Deferred menu reload owner refused the source-file burst; retaining it for retry: %s.",
-					tostring(defer_ok and deferred or deferred))
+					"Deferred menu reload owner refused the source-file burst (%s); it stays pending and is retried.",
+					defer_ok and ("result " .. tostring(deferred)) or tostring(deferred))
 			end
 			arm_reload()
 		end

@@ -1018,6 +1018,7 @@
 				'utc',
 				'commit',
 				'runtime',
+				'platform_name',
 				'setting_row'
 			].indexOf(rule.kind) < 0
 		)
@@ -1080,6 +1081,22 @@
 		}
 		if (rule.kind === 'version')
 			return /^\d+(?:\.\d+){1,3}(?:-dev\.\d+|-beta\d+)?$/.test(value) ? value : undefined;
+		// An operating system or desktop name from the host: one of the rule's known
+		// families, then a closed set of name characters. A path, an address, a
+		// sentence or a name that is not listed never matches.
+		if (rule.kind === 'platform_name') {
+			if (value.length > 64) return undefined;
+			for (var family of rule.families) {
+				var rest = value.slice(family.length);
+				if (
+					value.slice(0, family.length).toLowerCase() === family.toLowerCase() &&
+					/^[A-Za-z0-9 .+/:(),!-]*$/.test(rest) &&
+					!/^[A-Za-z]/.test(rest)
+				)
+					return value;
+			}
+			return undefined;
+		}
 		if (rule.kind === 'hash') return /^[a-fA-F0-9]{7,64}$/.test(value) ? value : undefined;
 		if (rule.kind === 'utc')
 			return /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(value) ? value : undefined;

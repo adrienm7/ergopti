@@ -531,7 +531,7 @@ function M.install(ctx)
 				for _, m in ipairs(family.models or {}) do
 					if m.name == model_name and m.urls and m.urls.mlx then
 						local repository = m.urls.mlx:gsub(
-							"^https?://huggingface%.co/", "")
+							"^https?://" .. Identifiers.hosts.huggingface:gsub("%.", "%%.") .. "/", "")
 						if MlxRepo.is_valid(repository) then return repository end
 						Logger.error(LOG,
 							"Preset MLX repository identifier is invalid; entry refused.")
@@ -999,7 +999,7 @@ function M.install(ctx)
 		end
 
 		local schedule_ok, handle_or_error, committed = xpcall(function()
-			local handle, started = TimerScheduler.after(0.05, function()
+			local handle, started = TimerScheduler.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 				if owner.callback_consumed == true then return end
 				owner.callback_pending = true
 				deliver_prompt()
@@ -1094,7 +1094,7 @@ try:
 
     ctx = ssl.create_default_context()
     req = urllib.request.Request(
-        'https://huggingface.co/api/whoami-v2',
+        'https://]] .. Identifiers.hosts.huggingface .. [[/api/whoami-v2',
         headers={
             'User-Agent': 'huggingface/hub',
             'Authorization': f'Bearer {token.strip()}'

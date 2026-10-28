@@ -4,8 +4,10 @@
 --- MODULE: Model Catalogue Projection
 --- DESCRIPTION:
 --- Projects the shared model catalogue into the exact rows consumed by the
---- shared model-browser page. macOS and Linux use this module so parameter,
---- hardware, URL, runtime-name, and installed-state rules cannot drift.
+--- shared model selector page. macOS and Linux use this module so parameter,
+--- hardware, URL, runtime-name, and installed-state rules cannot drift; the
+--- Windows twin (ui/model_browser/init.ahk) is pinned to the same row fields by
+--- tools/test/test-model-selector-page.cjs.
 --- ==============================================================================
 
 local M = {}
@@ -94,6 +96,9 @@ function M.build(catalogue, backend, active_model, is_installed)
 						active_b = active_parameters,
 						is_moe = active_parameters > 0 and active_parameters < total,
 						ram_gb = tonumber(type(requirements) == "table" and requirements.ram_gb) or 0,
+						-- The weights' download is what the model occupies on disk.
+						disk_gb = tonumber(type(requirements) == "table" and requirements.download_gb) or 0,
+						backend = backend,
 						speed_tok_s = tonumber(capabilities.speed_tok_s) or 0,
 						type = type(model.type) == "string" and model.type or "chat",
 						installed = installed,
@@ -109,6 +114,62 @@ function M.build(catalogue, backend, active_model, is_installed)
 		end
 	end
 	return { backend = backend, active = active, models = rows }
+end
+
+--- Builds the selector page payload: every backend the driver offers, each
+--- with its availability, and the rows of each in one list.
+--- @param catalogue table Decoded models.json.
+--- @param spec table {
+---   active_backend = string, active_model = string|nil,
+---   backends = { { id, brand, emoji, kind, available = boolean, reason_key = string|nil,
+---                  is_installed = function|nil, extra_rows = table|nil, default_model = string|nil } },
+---   capabilities = table|nil }
+--- @return table { backend, active, backends, models, capabilities }
+function M.build_selector(catalogue, spec)
+	if type(spec) ~= "table" or type(spec.backends) ~= "table" then
+		error("model_catalogue.build_selector: spec.backends is required")
+	end
+	local active_backend = spec.active_backend
+	local models, backends, active = {}, {}, ""
+	for _, backend in ipairs(spec.backends) do
+		if type(backend.id) ~= "string" or backend.id == "" then
+			error("model_catalogue.build_selector: a backend has no id")
+		end
+		backends[#backends + 1] = {
+			id = backend.id, brand = backend.brand, emoji = backend.emoji, kind = backend.kind,
+			available = backend.available == true, reason_key = backend.reason_key,
+		}
+		local is_active = backend.id == active_backend
+		local rows
+		if backend.kind == "local" then
+			local payload = M.build(catalogue, backend.id, is_active and spec.active_model or nil, backend.is_installed)
+			rows = payload.models
+			if is_active then active = payload.active end
+			local default_key = normalise_name(backend.default_model)
+			for _, row in ipairs(rows) do
+				if default_key ~= "" and (normalise_name(row.name) == default_key
+						or normalise_name(row.runtime_name) == default_key) then
+					row.is_default = true
+				end
+			end
+		else
+			rows = {}
+		end
+		for _, extra in ipairs(type(backend.extra_rows) == "table" and backend.extra_rows or {}) do
+			extra.backend = backend.id
+			rows[#rows + 1] = extra
+			if is_active and type(spec.active_model) == "string" and spec.active_model ~= ""
+					and normalise_name(extra.name) == normalise_name(spec.active_model) then
+				active = extra.name
+			end
+		end
+		for _, row in ipairs(rows) do models[#models + 1] = row end
+	end
+	if active == "" and type(spec.active_model) == "string" then active = spec.active_model end
+	return {
+		backend = active_backend, active = active, backends = backends, models = models,
+		capabilities = type(spec.capabilities) == "table" and spec.capabilities or {},
+	}
 end
 
 return M

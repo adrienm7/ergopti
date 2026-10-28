@@ -64,6 +64,9 @@ local OWNERS = {
 	{ key = require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS, setter = "set_preview_colored_tooltips" },
 	{ key = require("config_keys").LEAF.PREVIEW_AI_ENABLED, setter = "set_preview_ai_enabled" },
 	{ key = "dynamichotstrings_enabled" },
+	-- The date feature row's enabled leaf (hotstrings.dynamic.date.enabled since
+	-- the L20 fix); dynamic hotstrings read it from the menu state.
+	{ key = "dynamichotstrings_date" },
 	{ key = "dynamichotstrings_user_code_time_activation_seconds", native = "dynamic",
 		setter = "set_user_code_time_activation", getter = "user_code_time_activation" },
 	{ key = "dynamichotstrings_user_code_enabled", native = "dynamic",

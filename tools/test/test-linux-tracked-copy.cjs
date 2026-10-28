@@ -85,6 +85,38 @@ try {
 	assert.notEqual(escaped.status, 0, 'an out-of-repository source must fail');
 	assert.match(escaped.stderr, /not strictly inside/);
 	assert.equal(fs.existsSync(path.join(scratch, 'escaped')), false);
+	// A caller that owns its build directory may copy outside the repository, and only there.
+	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-owned-build-'));
+	try {
+		const refused = spawnSync(
+			process.execPath,
+			[helper, scratch, path.join(scratch, 'source'), path.join(owned, 'out')],
+			{ encoding: 'utf8' }
+		);
+		assert.notEqual(refused.status, 0, 'a destination outside the repository needs an owner');
+		const accepted = spawnSync(
+			process.execPath,
+			[
+				helper,
+				scratch,
+				path.join(scratch, 'source'),
+				path.join(owned, 'out'),
+				'--exclude',
+				'corpus'
+			],
+			{ encoding: 'utf8', env: { ...process.env, ERGOPTI_COPY_DESTINATION_ROOT: owned } }
+		);
+		assert.equal(accepted.status, 0, accepted.stderr);
+		const stray = spawnSync(
+			process.execPath,
+			[helper, scratch, path.join(scratch, 'source'), path.join(scratch, 'stray-output')],
+			{ encoding: 'utf8', env: { ...process.env, ERGOPTI_COPY_DESTINATION_ROOT: owned } }
+		);
+		assert.notEqual(stray.status, 0, 'the owner replaces the repository as the allowed tree');
+		assert.equal(fs.existsSync(path.join(scratch, 'stray-output')), false);
+	} finally {
+		fs.rmSync(owned, { recursive: true, force: true });
+	}
 	const absent = spawnSync(
 		process.execPath,
 		[helper, scratch, path.join(scratch, 'empty'), path.join(scratch, 'empty-output')],

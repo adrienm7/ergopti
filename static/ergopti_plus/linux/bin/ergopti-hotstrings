@@ -16,6 +16,10 @@
 
 set -euo pipefail
 
+# The sentences this script prints, in the user's language (install/messages.sh).
+# shellcheck source=../install/messages.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/../install/messages.sh"
+
 
 # ========================================
 # ========================================
@@ -52,9 +56,9 @@ _check_deps() {
 	fi
 
 	if [ "${#missing[@]}" -gt 0 ]; then
-		echo "Erreur : dépendances manquantes — ${missing[*]}" >&2
-		echo "  Lancez : ergopti-hotstrings --install-deps" >&2
-		echo "  Ou installez manuellement : apt-get install ${missing[*]}" >&2
+		ergopti_msg launcher.missing_dependencies "${missing[*]}" >&2
+		ergopti_msg_with "  " launcher.install_deps_hint >&2
+		ergopti_msg_with "  " launcher.manual_install_hint "${missing[*]}" >&2
 		exit 1
 	fi
 }
@@ -67,7 +71,7 @@ _check_deps() {
 # ====================================
 
 _install_deps() {
-	echo "Installation des dépendances requises…"
+	ergopti_msg launcher.installing_dependencies
 
 	# Same list as _check_deps, and for the same reason ydotool is absent from
 	# both: installing a package the driver stopped using only teaches the user
@@ -81,11 +85,11 @@ _install_deps() {
 	elif _has pacman; then
 		sudo pacman -Sy --noconfirm luajit libnotify
 	else
-		echo "Erreur : gestionnaire de paquets introuvable (apt, dnf ou pacman requis)." >&2
+		ergopti_msg launcher.no_package_manager >&2
 		exit 1
 	fi
 
-	echo "Dépendances installées avec succès."
+	ergopti_msg launcher.dependencies_installed
 }
 
 
@@ -123,7 +127,7 @@ DRIVER_ROOT="${ERGOPTI_ROOT}/linux"
 SHARED_LUA="${ERGOPTI_ROOT}/_shared/lua"
 
 if [ ! -d "${DRIVER_ROOT}" ]; then
-	echo "Erreur : répertoire du driver Linux introuvable : ${DRIVER_ROOT}" >&2
+	ergopti_msg launcher.driver_missing "${DRIVER_ROOT}" >&2
 	exit 1
 fi
 

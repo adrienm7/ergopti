@@ -95,8 +95,7 @@ function setKind(kind, title, subtitle, session) {
 
 	const titleEl = document.getElementById('title');
 	const kindTitle = KIND_TITLE_KEYS[kind] ? _t(KIND_TITLE_KEYS[kind]) || kind : kind;
-	if (titleEl)
-		titleEl.textContent = title || kindTitle || _t('download_window.title') || 'Progression';
+	if (titleEl) titleEl.textContent = title || kindTitle || _t('download_window.title');
 
 	const subtitleEl = document.getElementById('subtitle');
 	if (subtitleEl) subtitleEl.textContent = subtitle || '';
@@ -147,7 +146,7 @@ function setProgress(pct) {
 function setError(text) {
 	document.body.classList.add('is-error');
 	const el = document.getElementById('step-line');
-	if (el) el.textContent = text || _t('download_window.error_unknown') || 'Unknown error.';
+	if (el) el.textContent = text || _t('download_window.error_unknown');
 }
 
 // ========================================
@@ -163,7 +162,7 @@ function doCancel() {
 	const cancelButton = document.getElementById('btn-cancel');
 	if (cancelButton) {
 		cancelButton.disabled = true;
-		cancelButton.textContent = _t('download_window.cancelling') || 'Cancelling…';
+		cancelButton.textContent = _t('download_window.cancelling');
 	}
 
 	postAction('cancel');
@@ -208,7 +207,7 @@ function resetUI() {
 
 	const pctEl = document.getElementById('pct');
 	pctEl.textContent = '0 %';
-	pctEl.style.color = '#30d158';
+	pctEl.style.color = ThemeTokens.color('green-dark');
 
 	document.getElementById('file-count').style.display = 'none';
 	document.getElementById('file-count').textContent = '';
@@ -363,7 +362,7 @@ function done(isSuccess, message, errorKind) {
 		progressBar.classList.add('error');
 		progressBar.style.width = '100%';
 		document.getElementById('pct').textContent = '❌';
-		document.getElementById('pct').style.color = '#ff453a';
+		document.getElementById('pct').style.color = ThemeTokens.color('red-dark');
 	} // Hide specific stats, files count and ETA to make room for the final message
 
 	document.getElementById('file-count').style.display = 'none';
@@ -373,10 +372,7 @@ function done(isSuccess, message, errorKind) {
 
 	const doneMessageElement = document.getElementById('done-msg');
 	doneMessageElement.textContent =
-		message ||
-		(isSuccess
-			? _t('download_window.done_success') || '✅ Done'
-			: _t('download_window.done_failed') || 'Download failed');
+		message || (isSuccess ? _t('download_window.done_success') : _t('download_window.done_failed'));
 	doneMessageElement.className = isSuccess ? 'ok' : 'error'; // Show it inline inside the status-line
 
 	doneMessageElement.style.display = 'block';

@@ -9,8 +9,9 @@
 # (company) Mac: the system relay of `scutil --proxy` as HTTPS_PROXY,
 # HTTP_PROXY and NO_PROXY (loopback always excluded), and the system trust
 # store, where a company installs its inspection certificate. No CA file is
-# ever handed to a child: uv loads the keychain's roots (UV_SYSTEM_CERTS),
-# Apple's curl and Python's truststore read it already. Callers provide
+# ever handed to a child, and an inherited SSL_CERT_FILE or SSL_CERT_DIR is
+# dropped: uv loads the keychain's roots (UV_SYSTEM_CERTS), Apple's curl and
+# Python's truststore read it already. Callers provide
 # log_info() and log_error() before invoking retry_network() or
 # apply_system_network().
 # ============================================================================
@@ -30,6 +31,59 @@ CURL_RETRY_COUNT=5
 CURL_RETRY_DELAY_SEC=5
 CURL_RETRY_MAX_TIME_SEC=300
 
+# The stages of the native route lookup after which a download goes direct
+# instead of refusing: the automatic configuration (PAC, WPAD) could not be
+# fetched or evaluated, which is not a route decision. Projected from
+# proxy_policy.json "pac_unavailable_fallback" (test-managed-proxy-route-contract.cjs
+# pins the copy). An explicit inherited relay never reaches the lookup, and a
+# relay the PAC names that then fails is never retried direct.
+PAC_UNAVAILABLE_FALLBACK_STAGES="native_proxy_lookup native_proxy_budget native_proxy_candidates native_pac_download native_pac_evaluation native_proxy_routes native_wpad_discovery native_route_empty"
+# Read by the Lua callers before the admission line, to name both causes when
+# the direct attempt fails too (modules/llm/opaque_network_admission.lua).
+PAC_DIRECT_FALLBACK_MARKER="__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:"
+# Set to the stage once this script went direct after an unusable PAC.
+OPAQUE_NETWORK_PAC_FALLBACK_STAGE=""
+PAC_FALLBACK_OUTCOME_REPORTED=""
+
+# Whether a failed lookup stage lets the download go direct.
+pac_unavailable_fallback_applies() {
+	local stage="$1" candidate
+	[ -n "$stage" ] || return 1
+	for candidate in $PAC_UNAVAILABLE_FALLBACK_STAGES; do
+		[ "$candidate" = "$stage" ] && return 0
+	done
+	return 1
+}
+
+# Sends this script's downloads direct after an unusable automatic configuration,
+# with one warning naming the stage that gave up. Nothing the system named is
+# exported, so no relay variable survives; loopback stays excluded by the caller.
+apply_pac_direct_fallback() {
+	local stage="$1"
+	unset HTTPS_PROXY https_proxy
+	export OPAQUE_NETWORK_PAC_FALLBACK_STAGE="$stage"
+	printf '%s%s\n' "$PAC_DIRECT_FALLBACK_MARKER" "$stage" >&2
+	# A caller without log_warn gets the level spelled in the line itself.
+	if declare -F log_warn >/dev/null; then
+		log_warn "The automatic network configuration could not be used ($stage). Trying a direct connection."
+	else
+		log_info "WARNING: The automatic network configuration could not be used ($stage). Trying a direct connection."
+	fi
+}
+
+# Reports, once, whether the direct attempt that replaced an unusable automatic
+# configuration worked. A no-op when no fallback happened.
+report_pac_fallback_outcome() {
+	local outcome="$1" cause="${2:-}"
+	[ -n "$OPAQUE_NETWORK_PAC_FALLBACK_STAGE" ] && [ -z "$PAC_FALLBACK_OUTCOME_REPORTED" ] || return 0
+	PAC_FALLBACK_OUTCOME_REPORTED=1
+	if [ "$outcome" = success ]; then
+		log_info "The direct connection worked after the automatic network configuration failed ($OPAQUE_NETWORK_PAC_FALLBACK_STAGE)."
+	else
+		log_error "The automatic network configuration was unreachable ($OPAQUE_NETWORK_PAC_FALLBACK_STAGE) and the direct connection failed ($cause)."
+	fi
+}
+
 # Runs an exact command with bounded exponential backoff.
 retry_network() {
 	local attempt=1
@@ -37,6 +91,7 @@ retry_network() {
 	local rc=1
 	while [ "$attempt" -le "$NETWORK_MAX_RETRIES" ]; do
 		if "$@"; then
+			report_pac_fallback_outcome success
 			return 0
 		else
 			rc=$?
@@ -44,10 +99,12 @@ retry_network() {
 		if [ "$rc" -eq "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE" ]; then
 			# The same settings would be refused again: retrying only delays the error.
 			log_error "Network attempt $attempt/$NETWORK_MAX_RETRIES refused by the configured network route (code $rc) -- not retrying."
+			report_pac_fallback_outcome failure "code $rc"
 			return "$rc"
 		fi
 		if [ "$attempt" -ge "$NETWORK_MAX_RETRIES" ]; then
 			log_error "Network attempt $attempt/$NETWORK_MAX_RETRIES failed (code $rc) -- giving up."
+			report_pac_fallback_outcome failure "code $rc"
 			return "$rc"
 		fi
 		log_info "Network attempt $attempt/$NETWORK_MAX_RETRIES failed (code $rc) -- retrying in ${backoff}s."
@@ -220,11 +277,14 @@ route_plan_from_entries() {
 # HTTPS_PROXY: the plan cannot see a redirect that leaves the inventory.
 # Neither a route nor a PAC is ever logged: only the step that gave up by its
 # closed stage code, or the closed reason of a refused plan.
-# Returns 0 when a route was settled, 1 otherwise (nothing is exported then).
+# Returns 0 when a route was settled, 1 otherwise (nothing is exported then);
+# OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE then names the launcher stage that gave up,
+# empty when no lookup ran or the plan refused the answers.
 resolve_system_route_for_probe() {
 	local origins="${OPAQUE_NETWORK_PAC_PROBE_URLS:-${OPAQUE_NETWORK_PAC_PROBE_URL:-}}"
 	local origin output status stage route entries="" plan kind first second existing
 	local tab=$'\t' newline=$'\n'
+	OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE=""
 	[ -n "$origins" ] || return 1
 	managed_bootstrap_launcher_available || return 1
 	for origin in $origins; do
@@ -233,6 +293,7 @@ resolve_system_route_for_probe() {
 		status=$?
 		if [ "$status" -ne 0 ]; then
 			stage="$(printf '%s\n' "$output" | sed -n 's/^STAGE \(native_[a-z_]*\)$/\1/p' | head -n 1)"
+			OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE="${stage:-}"
 			log_info "The automatic network settings named no route (${stage:-unknown step})."
 			return 1
 		fi
@@ -314,9 +375,29 @@ managed_bootstrap_download() {
 # sends the local Ollama and MLX servers to the company's.
 LOOPBACK_NO_PROXY="localhost,127.0.0.1,::1"
 
+# Names of the CA-file variables a download child never inherits: they override
+# uv's and Python's system trust, and the signed native worker ignores them.
+INHERITED_TRUST_VARIABLES="SSL_CERT_FILE SSL_CERT_DIR"
+
+# Drops an inherited CA file or folder so every child uses the system and
+# keychain trust only, where the policy puts a company root. Ergopti never sets
+# either; the field run of 2026-10-27 19:47 inherited one the worker could not
+# read, and every download stopped. One INFO line per dropped name: once unset,
+# a later activation in the same child has nothing left to report.
+drop_inherited_trust_variables() {
+	local name
+	for name in $INHERITED_TRUST_VARIABLES; do
+		if [ -n "${!name:-}" ]; then
+			log_info "Inherited $name ignored: downloads use the system and keychain trust."
+		fi
+		unset "$name"
+	done
+}
+
 # Repeated admission checks keep the same child environment. Never append a CA
 # file: uv's native trust selection is the same Boolean activation every time.
 apply_client_network_environment() {
+	drop_inherited_trust_variables
 	local exclusions="${NO_PROXY:-${no_proxy:-}}" host
 	local IFS=,
 	for host in $LOOPBACK_NO_PROXY; do
@@ -524,11 +605,20 @@ apply_opaque_system_network() {
 			log_error "The system network configuration could not be read. No download was started."
 			return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
 		fi
-		if { [ "$mode" = pac ] || [ "$mode" = wpad ]; } && resolve_system_route_for_probe; then
-			# The launcher evaluated the automatic configuration for the origin the
-			# caller downloads from; its route is exported, so the client is admitted.
-			apply_client_network_environment
-			return 0
+		if [ "$mode" = pac ] || [ "$mode" = wpad ]; then
+			if resolve_system_route_for_probe; then
+				# The launcher evaluated the automatic configuration for the origin the
+				# caller downloads from; its route is exported, so the client is admitted.
+				apply_client_network_environment
+				return 0
+			fi
+			if pac_unavailable_fallback_applies "${OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE:-}"; then
+				# The configuration could not be fetched or evaluated: a terminal goes
+				# direct and works, so the download tries the same (issue #101).
+				apply_pac_direct_fallback "$OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE"
+				apply_client_network_environment
+				return 0
+			fi
 		fi
 		if [ "$mode" != none ]; then
 			OPAQUE_NETWORK_FAILURE_PROVENANCE=verified
@@ -578,8 +668,11 @@ apply_system_network() {
 				HTTP_PROXY=*) export HTTP_PROXY="${line#HTTP_PROXY=}" http_proxy="${line#HTTP_PROXY=}" ;;
 				NO_PROXY=*) export NO_PROXY="${line#NO_PROXY=}" ;;
 				PAC_URL=*)
-					if [ -n "${OPAQUE_NETWORK_PAC_PROBE_URL:-}" ] && resolve_system_route_for_probe; then
+					if [ -n "${OPAQUE_NETWORK_PAC_PROBE_URL:-}${OPAQUE_NETWORK_PAC_PROBE_URLS:-}" ] && resolve_system_route_for_probe; then
 						:
+					elif pac_unavailable_fallback_applies "${OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE:-}"; then
+						# The daemon starts either way; say that its downloads go direct.
+						apply_pac_direct_fallback "$OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE"
 					elif managed_bootstrap_launcher_available; then
 						log_info "Automatic network settings will be evaluated by the native download helper."
 					else

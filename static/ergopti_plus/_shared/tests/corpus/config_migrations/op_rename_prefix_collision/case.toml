@@ -1,0 +1,6 @@
+# _shared/tests/corpus/config_migrations/op_rename_prefix_collision/case.toml
+
+[case]
+description = "A rename_prefix target that already holds a value refuses the migration: neither value is dropped and the file is never written."
+drivers = ["ahk", "hs", "linux"]
+outcome = "invalid"

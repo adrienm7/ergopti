@@ -33,6 +33,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('child_process');
 
@@ -110,6 +111,49 @@ function violations(file, text) {
 
 const canonicalUrl = `https://github.com/${owner}/${repo}`;
 const foreignUrl = `https://github.com/${owner}-other/${repo}`;
+
+// Classify complete fixture roots, never a filename that production can inherit.
+const TEST_ROOT_CASES = [
+	'static/ergopti_plus/windows/tests/',
+	'static/ergopti_plus/macos/tests/',
+	'static/ergopti_plus/linux/tests/',
+	'static/ergopti_plus/_shared/tests/',
+	'static/ergopti_plus/_shared/lua/test/'
+];
+const repeatedForeignUrl = `https://github.com/foreign-${owner}/${repo}-fork`;
+const probeText = `${canonicalUrl}\n${canonicalUrl}\n${repeatedForeignUrl} ${repeatedForeignUrl}`;
+for (const root of TEST_ROOT_CASES) {
+	for (const suffix of ['repository_url_contract.lua', 'renamed/deep/url_probe.lua']) {
+		const file = root + suffix;
+		assert.deepEqual(violations(file, probeText), [], `${file} is test data`);
+	}
+}
+for (const file of [
+	'static/ergopti_plus/_shared/lua/repository_url_contract.lua',
+	'static/ergopti_plus/_shared/lua/test_support/url_probe.lua',
+	'static/ergopti_plus/windows/modules/tests/url_probe.lua',
+	'static/ergopti_plus/linux/platform/test/url_probe.lua',
+	'.github/scripts/tests/url_probe.js'
+]) {
+	assert.deepEqual(
+		violations(file, probeText),
+		[
+			`${file}:1: a typed repository URL — derive it from ${DEFAULTS}`,
+			`${file}:2: a typed repository URL — derive it from ${DEFAULTS}`,
+			`${file}:3: github.com/foreign-${owner}/${repo}-fork is not the repository ${owner}/${repo}`,
+			`${file}:3: github.com/foreign-${owner}/${repo}-fork is not the repository ${owner}/${repo}`
+		],
+		`${file} must retain both production rules and every occurrence`
+	);
+}
+const extension = 'static/ergopti_plus/extensions/example.lua';
+assert.deepEqual(violations(extension, canonicalUrl), []);
+assert.equal(
+	violations(extension, repeatedForeignUrl).length,
+	1,
+	'standalone examples may copy the canonical URL but still reject a foreign repository'
+);
+
 for (const [name, file, text, count] of [
 	[
 		'shared contract fixture',
@@ -205,9 +249,12 @@ assert.throws(
 	/controlled read refusal/
 );
 
-const { failures, scanned } = scanTrackedFiles(files, (file) =>
-	fs.readFileSync(path.join(ROOT, file), 'utf8')
-);
+/** Reads an indexed text source without hiding filesystem failures. */
+function readTrackedSource(file) {
+	return fs.readFileSync(path.join(ROOT, file), 'utf8');
+}
+
+const { failures, scanned } = scanTrackedFiles(files, readTrackedSource);
 
 // ==================================================
 // ======= 1/ Hosts, Bundle Ids and App Names =======
@@ -220,7 +267,7 @@ const IDENTIFIER_SOURCE = /\.(lua|js|cjs|mjs|ahk|swift|sh|py|ps1|go|mm|hpp|cpp)$
 // Tests, vendored code, generated copies and the maintainer's diagnostics may
 // spell identifiers; so may the example extension users copy as one file.
 const IDENTIFIER_EXEMPT =
-	/(^|\/)(tests?|vendor|node_modules|_generated|diagnostics)\/|^static\/ergopti_plus\/(extensions|_shared\/lua\/identifiers\.lua)|^tools\/test\/|_test\.(py|go)$|\.generated\.swift$/;
+	/(^|\/)(tests?|vendor|node_modules|_generated|diagnostics)\/|^static\/ergopti_plus\/(extensions|_shared\/lua\/identifiers\.lua|_shared\/data\/identifiers\.(py|sh))|^tools\/test\/|_test\.(py|go)$|\.generated\.swift$/;
 const COMMENT_LINE = /^\s*(--|;|\/\/|#|\*|\/\*)/;
 
 const KIND_PATTERNS = {
@@ -314,6 +361,50 @@ if (process.argv.includes('--shrink')) {
 				'node tools/test/test-repo-url-single-source.cjs --shrink'
 		);
 }
+
+// Execute the genuine scanner body with real filesystem reads, then replace
+// only that native read boundary with an exact refusal. A skipped source can
+// never count as a completed repository check.
+const readProbe = files.find(
+	(file) =>
+		CODE_EXTENSIONS.has(path.extname(file)) &&
+		!FIXTURE_PATH.test(file) &&
+		!EXAMPLE_EXTENSION.test(file)
+);
+assert.ok(readProbe, 'the tracked census must contain production code for the read regression');
+const readProbePath = path.join(ROOT, readProbe);
+const scanSource = `${readTrackedSource.toString()}; (${scanTrackedFiles.toString()})(probeFiles, readTrackedSource)`;
+const scanWorld = { ROOT, path, violations, probeFiles: [readProbe] };
+const normalRead = vm.runInNewContext(scanSource, { ...scanWorld, fs });
+assert.equal(normalRead.scanned, 1, 'a real readable tracked source must be counted');
+assert.equal(normalRead.failures.length, 0, 'the actual production control must be valid');
+const readDenied = Object.assign(new Error('Controlled tracked production read refusal.'), {
+	code: 'EACCES',
+	path: readProbePath
+});
+let refusedReads = 0;
+assert.throws(
+	() =>
+		vm.runInNewContext(scanSource, {
+			...scanWorld,
+			fs: {
+				...fs,
+				readFileSync(file, encoding) {
+					assert.equal(
+						file,
+						readProbePath,
+						'the refusal targets the exact tracked production source'
+					);
+					assert.equal(encoding, 'utf8', 'the read retains its original text decoding');
+					refusedReads++;
+					throw readDenied;
+				}
+			}
+		}),
+	(error) => error === readDenied,
+	'a tracked read refusal must escape instead of certifying partial coverage'
+);
+assert.equal(refusedReads, 1, 'the scanner must actually reach the refused filesystem boundary');
 
 if (scanned < 500)
 	failures.push(`only ${scanned} file(s) scanned — the tracked-file listing is broken`);

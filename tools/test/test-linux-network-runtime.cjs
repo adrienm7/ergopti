@@ -11,6 +11,9 @@ const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const generator = require('../codegen/codegen-linux-native-runtime.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const DRIVER = 'static/ergopti_plus/linux';
+// The installer's functions print through its message reader; a harness that
+// runs them sources the genuine one, as install.sh does.
+const MESSAGES_READER = require('./lib/shell-messages-fixture.cjs').readerSource();
 const SHARED = 'static/ergopti_plus/_shared';
 const source = JSON.parse(fs.readFileSync(path.join(ROOT, generator.SOURCE), 'utf8'));
 const read = (name) => fs.readFileSync(path.join(ROOT, name), 'utf8');
@@ -73,6 +76,7 @@ function portable() {
 					const result = spawnSync(bashExecutable(), ['-s'], {
 						input:
 							'set -eu\n' +
+							MESSAGES_READER +
 							functions +
 							'\nSRC_DRIVER=' +
 							JSON.stringify(sourceRoot) +
@@ -238,6 +242,7 @@ function portable() {
 						const result = spawnSync(bashExecutable(), ['-s'], {
 							input:
 								'set -u\n' +
+								MESSAGES_READER +
 								`SRC_DRIVER='${bashPath(path.join(ROOT, DRIVER))}'\n` +
 								'NATIVE_PROBE_COUNT=0\nnative_source_compile_probe() { NATIVE_PROBE_COUNT=$((NATIVE_PROBE_COUNT + 1)); [ "$NATIVE_PROBE_COUNT" -gt 1 ]; }\n' +
 								functions +
@@ -366,6 +371,7 @@ function portable() {
 			const result = spawnSync(bashExecutable(), ['-s'], {
 				input:
 					'set -u\n' +
+					MESSAGES_READER +
 					actualHarness +
 					'\n' +
 					`_detect_pkg_manager() { echo ${manager}; }\n` +
@@ -485,6 +491,12 @@ function native() {
 			path.join(ROOT, SHARED, 'lua/compat/utf8.lua'),
 			path.join(shared, 'lua/compat/utf8.lua')
 		);
+		// The installed lookup helper bounds its receipt by the shared policy's limits.
+		fs.mkdirSync(path.join(shared, 'modules/network'), { recursive: true });
+		fs.copyFileSync(
+			path.join(ROOT, SHARED, 'modules/network/proxy_policy.json'),
+			path.join(shared, 'modules/network/proxy_policy.json')
+		);
 		fs.writeFileSync(
 			path.join(driver, '_generated/native_runtime.lua'),
 			outputs[generator.LUA_OUTPUT]
@@ -567,10 +579,13 @@ function native() {
 					assert.equal(helper.status, 0);
 					return JSON.parse(helper.stdout);
 				};
-				assert.deepEqual(runHelper(), { ok: false, error: 'proxy-policy-unavailable' });
+				// Withhold only the staged canonical policy, then restore the same file:
+				// a missing policy and missing schema must remain independent refusals.
 				const policy = path.join(shared, 'modules/network/proxy_policy.json');
-				fs.mkdirSync(path.dirname(policy), { recursive: true });
-				fs.copyFileSync(path.join(ROOT, SHARED, 'modules/network/proxy_policy.json'), policy);
+				const withheldPolicy = path.join(root, 'withheld-proxy-policy.json');
+				fs.renameSync(policy, withheldPolicy);
+				assert.deepEqual(runHelper(), { ok: false, error: 'proxy-policy-unavailable' });
+				fs.renameSync(withheldPolicy, policy);
 				assert.deepEqual(runHelper(), { ok: false, error: 'proxy-backend-unavailable' });
 			}
 		);

@@ -4,6 +4,7 @@
 const { scriptTokens } = require('./script-source.cjs');
 const { publishesMenuTemplate } = require('./menu-shared-delegation.cjs');
 const { commandConstantId } = require('./menu-command-constant.cjs');
+const { COMMAND } = require('./_generated/config_keys.cjs');
 
 /** Necessary typed command/list port evidence, never live publication authority. */
 function nativeTemplateBinding(
@@ -29,7 +30,7 @@ function nativeTemplateBinding(
 	if (
 		!ahk &&
 		section === 'personal_info_editor_frame' &&
-		(retainedPersonalInfo < 0 || key !== 'personal_info_editor_open' || port !== 1)
+		(retainedPersonalInfo < 0 || key !== COMMAND.PERSONAL_INFO_EDITOR_OPEN || port !== 1)
 	)
 		return false;
 	const retainedDownload =

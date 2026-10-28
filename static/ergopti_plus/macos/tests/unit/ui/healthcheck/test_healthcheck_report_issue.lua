@@ -384,7 +384,8 @@ end
 
 local function host_snapshot(long)
 	local snapshot = { schema_version = 2, driver = "macos", generated_at = "2026-09-24T10:00:00Z",
-		sections = { versions = { ergopti_version = "2.4.0" }, issues = { recent = REPORT } },
+		sections = { versions = { ergopti_version = "2.4.0" }, system = { os = "macOS 15.1" },
+			hardware = { arch = "arm64" }, issues = { recent = REPORT } },
 		probes = { github_api = { state = "error", cleanup = "pending", ms = 1 } } }
 	if long then
 		snapshot.retired_probes = {}
@@ -429,12 +430,15 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_eq(result.path, calls.reveal[1], "the complete local attachment is returned")
 
 		local url = calls.open_url[1]
-		helpers.assert_eq(query_value(url, "diagnostics"), nil,
-			"the form receives no query default that could reset an edit")
-		helpers.assert_eq(query_value(url, "os"), "macos")
+		helpers.assert_eq(query_value(url, "os"), "macOS 15.1 (arm64)", "the real system name, version and architecture")
 		local repo = documents().repository
-		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macos&driver=macos"
-		helpers.assert_eq(url, prefix, "the canonical bug URL contains only stable host metadata")
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macOS%2015.1%20%28arm64%29&driver=macos&diagnostics="
+		helpers.assert_eq(url:sub(1, #prefix), prefix, "the canonical bug URL: identity, then the compact report")
+		local prefilled = query_value(url, "diagnostics")
+		helpers.assert_eq(prefilled, Share.document(host_snapshot(false), documents().schema, "").fields.diagnostics,
+			"the form receives the compact report, which fits the budget")
+		helpers.assert_true(prefilled:find("# ErgoptiPlus diagnostics", 1, true) == 1, "it is the report")
+		helpers.assert_true(not prefilled:find("```json", 1, true), "the JSON block stays out of the URL")
 		helpers.assert_eq(query_value(url, "driver"), "macos")
 		helpers.assert_true(not url:find("jdoe", 1, true), "the URL carries no account name: " .. url)
 		helpers.assert_true(not url:find("%2FUsers%2F", 1, true), "the URL carries no home folder: " .. url)
@@ -461,8 +465,11 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_true(#url <= templates.max_url_bytes, "the URL fits its budget")
 		helpers.assert_eq(query_value(url, "version"), "2.4.0", "only validated host identity is prefilled")
 		local prefilled = query_value(url, "diagnostics")
-		helpers.assert_eq(prefilled, nil, "long output never prefills or resets the issue form")
-		helpers.assert_true(#url < 1200, "the editable URL stays short independently of report length")
+		local note = documents().schema.export_strings[documents().schema.share_policy.truncated_note_key]
+		helpers.assert_true(prefilled ~= nil and prefilled:find("# ErgoptiPlus diagnostics", 1, true) == 1, "the compact report prefills the form")
+		helpers.assert_true(prefilled:sub(-#(documents().templates.truncation_marker .. "\n\n" .. note)) == documents().templates.truncation_marker .. "\n\n" .. note,
+			"a cut report ends with the marker and the note saying where the complete report is")
+		helpers.assert_true(not prefilled:find("```json", 1, true), "the JSON block stays out of the URL")
 		helpers.assert_eq(calls.save[1].text, calls.copy[1], "the saved attachment preserves the whole report")
 	end)
 
@@ -575,9 +582,9 @@ helpers.describe("healthcheck debug menu reports (report-bug-flow)", function()
 			.. "/issues/new?template=bug_report.yml&"
 		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix, "not a bare URL: the bug template is selected")
 		helpers.assert_eq(query_value(calls.open_url[1], "version"), "2.4.0")
-		helpers.assert_eq(query_value(calls.open_url[1], "os"), "macos")
+		helpers.assert_eq(query_value(calls.open_url[1], "os"), "macOS 15.1 (arm64)")
 		helpers.assert_eq(query_value(calls.open_url[1], "driver"), "macos")
-		helpers.assert_eq(query_value(calls.open_url[1], "diagnostics"), nil, "the editable field stays out of the URL")
+		helpers.assert_true(query_value(calls.open_url[1], "diagnostics") ~= nil, "the compact report prefills the form")
 		helpers.assert_true(not calls.open_url[1]:find("jdoe", 1, true), "the URL carries no account name")
 	end)
 
@@ -610,7 +617,7 @@ helpers.describe("healthcheck debug menu reports (report-bug-flow)", function()
 			.. "/issues/new?template=feature_request.yml&"
 		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix)
 		helpers.assert_contains(calls.open_url[1], "version=2.4.0")
-		helpers.assert_contains(calls.open_url[1], "os=macos")
+		helpers.assert_contains(calls.open_url[1], "os=macOS%2015.1")
 		helpers.assert_contains(calls.open_url[1], "driver=macos")
 		helpers.assert_eq(#calls.copy, 0, "a feature request copies nothing")
 	end)
@@ -716,8 +723,11 @@ helpers.describe("stable-metadata report URL", function()
 			fields = { diagnostics = "private query text", title = "PRIVATE_TITLE", description = "PRIVATE_DESCRIPTION", reproduction = "PRIVATE_REPRODUCTION", version = "9.9.9", os = "private host", driver = "foreign" } })
 		helpers.assert_eq(result.ok, true)
 		local repo = documents().repository
-		helpers.assert_eq(calls.open_url[1], "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macos&driver=macos")
-		for _, id in ipairs({ "title", "description", "reproduction", "diagnostics", "architecture" }) do helpers.assert_nil(query_value(calls.open_url[1], id)) end
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macOS%2015.1%20%28arm64%29&driver=macos&diagnostics="
+		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix, "the page cannot change the identity")
+		helpers.assert_true(query_value(calls.open_url[1], "diagnostics") ~= "private query text", "the host report replaces the page's text")
+		helpers.assert_true(not calls.open_url[1]:find("PRIVATE", 1, true), "no page-derived text reaches the URL")
+		for _, id in ipairs({ "title", "description", "reproduction", "architecture" }) do helpers.assert_nil(query_value(calls.open_url[1], id)) end
 		helpers.assert_eq(calls.save[1].text, calls.copy[1])
 		helpers.assert_eq(calls.copy[1], approved_text(false))
 		helpers.assert_eq(calls.order, { "copy", "save", "reveal", "open_url" })

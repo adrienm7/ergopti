@@ -150,7 +150,7 @@ function M.new(ports)
 				local document = Share.document(snapshot, documents.schema,
 					require("infra.i18n").get(documents.schema.share_policy.notice_key), with_log)
 				assert(action.text == document.text, "Diagnostic sharing preview is stale or invalid")
-				action = { action = action.action, text = document.text, fields = document.fields, name = document.name,
+				action = { action = action.action, text = document.text, fields = document.fields, notes = document.notes, name = document.name,
 					day_log_file = with_log and require("healthcheck.day_log").file(snapshot, documents, document.snapshot) or nil }
 			end
 			if not current() then return end
@@ -164,9 +164,10 @@ function M.new(ports)
 			elseif action.action == "report" then
 				save_then(function(path)
 					local fields = {}
-					for _, id in ipairs({ "version", "os", "driver" }) do fields[id] = action.fields[id] end
-					assert(type(documents.templates.templates.bug.report_field) == "string", "the bug template names no report field")
-					local url = IssueLink.build_url(documents.templates, documents.repository, "bug", fields)
+					local report_field = documents.templates.templates.bug.report_field
+					assert(type(report_field) == "string", "the bug template names no report field")
+					for _, id in ipairs({ "version", "os", "driver", report_field }) do fields[id] = action.fields[id] end
+					local url = IssueLink.build_url(documents.templates, documents.repository, "bug", fields, action.notes)
 					launch("open_url", url, function(receipt) opened(receipt, path) end)
 				end)
 			elseif action.action == "open_path" then

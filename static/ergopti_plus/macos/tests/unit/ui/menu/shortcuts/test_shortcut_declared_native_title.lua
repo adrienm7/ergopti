@@ -32,13 +32,14 @@ local function fixture(body, secondary)
 			"ui.menu.shortcut_utils", "infra.text_utils", "send_input", "hs", "tests.stubs.hs",
 		}, function()
 			local policy, lookup, dialog, prompt, scheduler
-			local state = { calls = {}, applies = {}, button = "OK", raw = "ctrl+k", focus_calls = 0 }
+			local state = { calls = {}, applies = {}, raw = "ctrl+k", focus_calls = 0 }
 			local completed, failure = xpcall(function()
 				scheduler = helpers.load_with_stubs("adapters.timer_scheduler", {
 					focus = function() state.focus_calls = state.focus_calls + 1; return true end,
 					dialog = { textPrompt = function(...)
 						state.calls[#state.calls + 1] = { ... }
-						return state.button, state.raw
+						-- The user presses the accept button, whatever its label.
+						return select(4, ...), state.raw
 					end },
 				})
 				package.loaded["infra.i18n"] = nil
@@ -99,9 +100,9 @@ helpers.describe("actual shortcut prompt declared-title and legacy dispatch rece
 			end)
 			local options = state.options(false)
 			helpers.assert_eq(shortcuts.prompt_shortcut(options), true)
-			helpers.assert_eq(reads, 1, "Only the original cancel label translation runs")
+			helpers.assert_eq(reads, 2, "Only the original cancel and accept label translations run")
 			helpers.assert_eq(foreign, 0, "A replacement installed by cancel translation cannot intercept the held method")
-			helpers.assert_eq(state.calls, {{ "Original legacy caption", "Original shortcut body", "shift+ctrl+a", "OK", cancel }})
+			helpers.assert_eq(state.calls, {{ "Original legacy caption", "Original shortcut body", "shift+ctrl+a", i18n.get("button.ok"), cancel }})
 			helpers.assert_eq(state.applies, {{ { "ctrl" }, "k" }})
 			helpers.assert_eq(options.current_shortcut, { mods = { "shift", "ctrl" }, key = "a" })
 			helpers.assert_eq(options.title, "Original legacy caption")
@@ -119,7 +120,7 @@ helpers.describe("actual shortcut prompt declared-title and legacy dispatch rece
 				local options = state.options(true)
 				helpers.assert_eq(shortcuts.prompt_shortcut(options), true)
 				helpers.assert_eq(state.calls, {{ expected.captions.profile_shortcut_dialog.original_bare_caption,
-					"Original shortcut body", "shift+ctrl+a", "OK", i18n.get("common.cancel") }})
+					"Original shortcut body", "shift+ctrl+a", i18n.get("button.ok"), i18n.get("common.cancel") }})
 				helpers.assert_eq(state.applies, {{ { "ctrl" }, "k" }})
 				helpers.assert_eq(options.current_shortcut, { mods = { "shift", "ctrl" }, key = "a" })
 				helpers.assert_nil(options.title)
@@ -136,7 +137,7 @@ helpers.describe("actual shortcut prompt declared-title and legacy dispatch rece
 			end)
 			local options = state.options(true)
 			helpers.assert_eq(shortcuts.prompt_shortcut(options), false)
-			helpers.assert_eq(reads, 2, "Declared title and original cancel label each translate once")
+			helpers.assert_eq(reads, 3, "Declared title, original cancel and accept labels each translate once")
 			helpers.assert_eq(state.calls, {}); helpers.assert_eq(state.applies, {}); helpers.assert_eq(foreign, 0)
 			policy.native_presentation = held
 			locale.set_trigger_provider(function() return "★" end)
@@ -153,7 +154,7 @@ helpers.describe("actual shortcut prompt declared-title and legacy dispatch rece
 				return "★"
 			end)
 			helpers.assert_eq(shortcuts.prompt_shortcut(state.options(true)), true)
-			helpers.assert_eq(reads, 2); helpers.assert_eq(foreign, 0)
+			helpers.assert_eq(reads, 3); helpers.assert_eq(foreign, 0)
 			helpers.assert_eq(#state.calls, 1); helpers.assert_eq(state.applies, {{ { "ctrl" }, "k" }})
 		end)
 	end)

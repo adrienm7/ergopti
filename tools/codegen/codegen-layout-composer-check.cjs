@@ -24,6 +24,7 @@ const path = require('path');
 const { shared } = require('../lib/paths.cjs');
 const { loadComposer } = require('../lib/layout-composer.cjs');
 
+// config-key-literal-ok: a folder name that happens to spell a leaf
 const CHECK_DIR = shared('modules', 'layouts', 'composer_check');
 const DECLARATION_PATH = path.join(CHECK_DIR, 'composition.json');
 const OUT_PATH = path.join(CHECK_DIR, 'composed.keylayout');

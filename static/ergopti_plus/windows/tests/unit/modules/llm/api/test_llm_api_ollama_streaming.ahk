@@ -369,7 +369,8 @@ _OllamaStream_CompletedNativeOwner() {
 	Owner := 0
 	try {
 		Pid := 0
-		Command := _SR_BuildDirectCommandLine(A_ComSpec, ["/D", "/C", "exit", "/b", "0"])
+		; cmd consumes a command expression after /C, not separately quoted argv.
+		Command := _Q(A_ComSpec) . ' /D /C "exit /b 0"'
 		_LLM_CurlArtifactRun(Command, "", "Hide", &Pid, &Owner)
 		Start := A_TickCount
 		while !_LLM_CurlProcessExited(Owner) && TickElapsed(Start) < 5000
@@ -691,3 +692,101 @@ Test("Ollama streaming: truncated transfer exit rejects done (ollama-native-stre
 Test("Ollama streaming: timeout exit rejects done (ollama-native-stream-exit)", _OllamaStream_NativeExitStatus.Bind(28))
 Test("Ollama streaming: signaled exit 259 rejects done (ollama-native-stream-exit)", _OllamaStream_NativeExitStatus.Bind(259))
 Test("Ollama streaming: unavailable native exit receipt fails closed (ollama-native-stream-exit)", _OllamaStream_NativeExitStatus.Bind(0, false))
+
+; The provider's terminal marker is a JSON boolean, independent of AHK coercion.
+_OllamaStream_DoneLiteral(SourceTail, ExpectedSuccess) {
+	Source := '{"message":{"content":"typed answer"}' . SourceTail . '}'
+	Parsed := _LLM_Ollama_ParseStreamLine(Source)
+	State := Map("acc", "")
+	Observed := Map("partials", 0)
+	_LLM_Ollama_ConsumeStreamChunk(Source . "`n", State, (*) => Observed["partials"] += 1)
+	Result := _LLM_Ollama_StreamTerminalResult(State)
+	AssertEqual(ExpectedSuccess, Result["ok"],
+		"only the last decoded JSON boolean true may authorize terminal completion")
+	if ExpectedSuccess {
+		AssertTrue(Parsed["ok"], "the literal-true control is parsed through the genuine envelope owner")
+		AssertTrue(Parsed["done"], "the valid marker is actually admitted")
+		AssertEqual("typed answer", Result["text"], "the completed provider text stays byte-exact")
+		AssertEqual(1, Observed["partials"], "the valid control reaches the actual consumer callback")
+	}
+}
+for _OllamaDoneVector in [
+	["literal true", ',"done":true', true],
+	["literal false", ',"done":false', false],
+	["missing marker", '', false],
+	["integer one", ',"done":1', false],
+	["decimal one", ',"done":1.0', false],
+	["exponent one", ',"done":1e0', false],
+	["quoted one", ',"done":"1"', false],
+	["quoted true", ',"done":"true"', false],
+	["null marker", ',"done":null', false],
+	["array marker", ',"done":[true]', false],
+	["object marker", ',"done":{"value":true}', false],
+	["last true duplicate", ',"done":"1","done":true', true],
+	["last quoted duplicate", ',"done":true,"done":"1"', false],
+	["escaped last true", ',"done":"1","d\u006fne":true', true],
+	["escaped last quoted", ',"done":true,"d\u006fne":"1"', false]]
+	Test("Ollama done marker: " . _OllamaDoneVector[1] . " keeps JSON type (ollama-stream-done-kind)",
+		_OllamaStream_DoneLiteral.Bind(_OllamaDoneVector[2], _OllamaDoneVector[3]))
+
+; curl creates its stdout file after CreateProcessW returns; absence is pending,
+; whereas a sharing refusal remains a genuine I/O failure.
+_OllamaStream_InitialOutput(Mode) {
+	Directory := A_Temp . "\ergopti_stream_start_" . A_TickCount . "_" . Random(1, 1000000)
+	Path := Directory . (Mode == "missing-parent" ? "\absent\response.jsonl" : "\response.jsonl")
+	Lock := 0
+	try {
+		DirCreate(Directory)
+		if Mode == "empty" || Mode == "locked"
+			FileAppend("", Path, "UTF-8-RAW")
+		if Mode == "locked" {
+			Lock := DllCall("Kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+				"UInt", 0, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+			AssertTrue(Lock != -1 && Lock != 0, "the real exclusive fixture handle must be owned")
+		}
+		NativeError := 0
+		try {
+			NativeFile := FileOpen(Path, "r")
+			NativeFile.Close()
+		} catch OSError as Err
+			NativeError := Err.Number
+		AssertEqual(Mode == "missing" ? 2 : Mode == "missing-parent" ? 3 : Mode == "locked" ? 32 : 0, NativeError,
+			"the genuine Windows open must establish the requested file-state prerequisite")
+		State := Map("last_pos", 0, "stream_bytes_pending", true)
+		ReadError := 0, Chunk := "unexpected"
+		try Chunk := _LLM_Ollama_ReadStreamText(Path, State)
+		catch OSError as Err
+			ReadError := Err.Number
+		AssertEqual(Mode == "locked" ? 32 : Mode == "missing-parent" ? 3 : 0, ReadError,
+			"a not-yet-created curl output remains pending while a sharing refusal stays visible")
+		if Mode == "missing" || Mode == "empty" {
+			AssertEqual("", Chunk, "pending and empty output deliver zero provider bytes")
+			AssertEqual(0, State["last_pos"], "pending output never advances the stream cursor")
+			AssertFalse(State["stream_bytes_pending"], "the next tick receives no stale drain claim")
+		}
+	} finally {
+		if Lock && Lock != -1
+			DllCall("Kernel32\CloseHandle", "Ptr", Lock)
+		if DirExist(Directory)
+			DirDelete(Directory, true)
+	}
+}
+for _OllamaStartMode in ["missing", "empty", "locked", "missing-parent"]
+	Test("Ollama initial output: " . _OllamaStartMode . " preserves file state (ollama-stream-initial-output)",
+		_OllamaStream_InitialOutput.Bind(_OllamaStartMode))
+
+; Keep the fixture's successful native child independent from provider bytes.
+_OllamaStream_CompletedNativeOwnerControl() {
+	Owner := _OllamaStream_CompletedNativeOwner()
+	try {
+		AssertTrue(Owner is Map && Owner.Get("handle", 0) != 0,
+			"the exit-only control retains the actual completed process handle")
+		AssertEqual(0, DllCall("Kernel32\WaitForSingleObject", "Ptr", Owner["handle"], "UInt", 0, "UInt"),
+			"native acknowledgement independently confirms the fixture process completed")
+		AssertTrue(_LLM_CurlReleaseProcess(Owner), "the completed native owner releases normally")
+		AssertTrue(Owner.Get("released", false), "the real release acknowledgement is retained")
+		AssertEqual(0, Owner.Get("handle", 0), "the exact completed handle is retired")
+	} finally _LLM_CurlReleaseProcess(Owner, true)
+}
+Test("Ollama live fixture: completed native owner starts from exit zero (ollama-live-native-owner)",
+	_OllamaStream_CompletedNativeOwnerControl)

@@ -48,6 +48,10 @@ helpers.describe("modules/updater/manager.lua", function()
 		)
 		helpers.assert_eq(package_install.kind, "package",
 			".deb, RPM, Flatpak, AppImage and Nix layouts must keep their update owner")
+		helpers.assert_eq(package_install.reason, require("adapter_errors").UPDATER_PACKAGE_OWNED,
+			"a package refusal names its closed reason id, not a sentence")
+		helpers.assert_eq(Installer.resolve(nil, function() return true end).reason,
+			require("adapter_errors").UPDATER_SOURCE_PATH_RELATIVE)
 	end)
 
 	helpers.it("linux-native-cwd: updater shares the actual cwd owner for a relative source", function()

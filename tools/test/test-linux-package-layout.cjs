@@ -247,7 +247,7 @@ const packageUiCopies = new Map([
 	['tools/build/build-linux-rpm.sh', '$BUILD_DIR/_shared/.'],
 	['tools/build/build-linux-appimage.sh', '$BUILD_DIR/_shared/.'],
 	['tools/build/build-linux-flatpak.sh', '$BUILD_DIR/_shared/.'],
-	['tools/build/PKGBUILD', 'build/linux/_shared/.']
+	['tools/build/PKGBUILD', '$bundle/_shared/.']
 ]);
 for (const [rel, copySource] of packageUiCopies) {
 	if (!read(rel).includes(copySource)) {
@@ -546,8 +546,16 @@ for (const line of pkgbuildSrc.split('\n')) {
 	}
 }
 
+// The bundle location must default to the builder's own output directory.
+if (!pkgbuildSrc.includes('local bundle="${ERGOPTI_LINUX_BUILD_DIR:-build/linux}"')) {
+	errors.push(
+		`${PKGBUILD}: the bundle directory must default to build/linux and honor ` +
+			`ERGOPTI_LINUX_BUILD_DIR, the directory build-linux-driver.sh writes to.`
+	);
+}
+
 // The driver tree, from where the builder actually puts it.
-if (!/cp -r build\/linux\/linux\/\.\s/.test(pkgbuildSrc)) {
+if (!/cp -r \"\$bundle\/linux\/\.\"\s/.test(pkgbuildSrc)) {
 	errors.push(
 		`${PKGBUILD}: must copy the driver from build/linux/linux/ — the builder nests it ` +
 			`one level deeper than build/linux/, and copying the wrong path ships no driver.`
@@ -557,7 +565,7 @@ if (!/cp -r build\/linux\/linux\/\.\s/.test(pkgbuildSrc)) {
 // The shared tree, whole. _shared/lua alone is not enough: the keycode tables,
 // the hotstring packs, the locales and the resolver defaults live in
 // _shared/data and _shared/modules, and the resolver fails fast without them.
-if (!/cp -r build\/linux\/_shared\/\.\s/.test(pkgbuildSrc)) {
+if (!/cp -r \"\$bundle\/_shared\/\.\"\s/.test(pkgbuildSrc)) {
 	errors.push(
 		`${PKGBUILD}: must copy the whole _shared tree — _shared/lua alone omits the ` +
 			`keycode tables, the hotstring packs, the locales and defaults.toml, and the ` +

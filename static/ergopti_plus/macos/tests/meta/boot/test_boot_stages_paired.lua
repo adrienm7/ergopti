@@ -23,7 +23,9 @@ end
 --- Lists boot profiler calls in source order.
 local function boot_calls(code)
 	local calls = {}
-	for at, kind, name in code:gmatch('()Boot%.(%a+)%("([^"]*)"%)') do
+	for at, kind, name in code:gmatch('()Boot%.([%a_]+)%("([^"]*)"%)') do
+		-- stage_once opens a stage exactly like stage (it only resumes its own).
+		if kind == "stage_once" then kind = "stage" end
 		if kind == "stage" or kind == "mark" then
 			calls[#calls + 1] = { at = at, kind = kind, name = name }
 		end

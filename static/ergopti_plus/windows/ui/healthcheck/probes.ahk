@@ -58,26 +58,26 @@ HealthCheck_StartProbes(Epoch, Schema, Publish, LocalOnly := false, Overrides :=
 	if HasOwner && !CurrentFn.Call()
 		return false
 	HealthCheck_CancelProbes(CurrentFn)
-	Run := { Epoch: Epoch, Cancelled: false, Requests: [], Publish: Publish }
+	ProbeRun := { Epoch: Epoch, Cancelled: false, Requests: [], Publish: Publish }
 	; Abort and terminal retirement can dispatch native messages. Publish only
 	; while the initiating window still owns the request, never over its successor.
 	PreviousCritical := Critical("On")
 	try {
 		if HasOwner && !CurrentFn.Call()
 			return false
-		_HC_ProbeRun := Run
+		_HC_ProbeRun := ProbeRun
 	} finally Critical(PreviousCritical)
 	Probes := Schema["probes"]
-	_HC_ProbeConfiguration(Run, Probes["configuration"], Overrides)
+	_HC_ProbeConfiguration(ProbeRun, Probes["configuration"], Overrides)
 	if LocalOnly
 		return true
 	Github := Probes["github_api"]
-	_HC_ProbeHttp(Run, "github_api", Github["url"],
+	_HC_ProbeHttp(ProbeRun, "github_api", Github["url"],
 		Map("User-Agent", HC_PROBE_USER_AGENT, "Accept", "application/vnd.github+json"),
 		Github["timeout_ms"], _HC_GithubAnswer)
-	_HC_ProbePac(Run, Probes["proxy_pac"])
-	_HC_ProbeAi(Run, Probes["ai_health"])
-	_HC_ProbeCpu(Run, Probes["cpu_load"])
+	_HC_ProbePac(ProbeRun, Probes["proxy_pac"])
+	_HC_ProbeAi(ProbeRun, Probes["ai_health"])
+	_HC_ProbeCpu(ProbeRun, Probes["cpu_load"])
 	return true
 }
 
@@ -97,11 +97,11 @@ HealthCheck_CancelProbes(CurrentFn := 0) {
 			return false
 		if !IsObject(_HC_ProbeRun)
 			return true
-		Run := _HC_ProbeRun
+		ProbeRun := _HC_ProbeRun
 		_HC_ProbeRun := 0
-		Run.Cancelled := true
+		ProbeRun.Cancelled := true
 	} finally Critical(PreviousCritical)
-	for Request in Run.Requests {
+	for Request in ProbeRun.Requests {
 		if !Request.Abort()
 			LoggerError("Healthcheck", "A diagnostics probe child refused to stop; its cleanup is retained.")
 	}

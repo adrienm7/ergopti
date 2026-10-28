@@ -222,10 +222,6 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 				"_active_chooser%s*=%s*chooser",
 				"_active_chooser%s*==%s*chooser%s+then%s+_active_chooser%s*=%s*nil",
 			},
-			[module_source("ui.menu.menu_llm.models_selector")] = {
-				"_model_browser_chooser%s*=%s*chooser",
-				"_model_browser_chooser%s*==%s*chooser%s+then%s+_model_browser_chooser%s*=%s*nil",
-			},
 			[module_source("ui.metrics_apps.init")] = {
 				"_chooser_owners%s*%[%s*owner_id%s*%]%s*=%s*chooser_or_err",
 				"_chooser_owners%s*%[%s*owner_id%s*%]%s*=%s*nil",
@@ -250,7 +246,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 			end
 			constructions = constructions + count
 		end
-		helpers.assert_eq(constructions, 3,
+		helpers.assert_eq(constructions, 2,
 			"the chooser construction floor must change deliberately with the owner inventory")
 	end)
 

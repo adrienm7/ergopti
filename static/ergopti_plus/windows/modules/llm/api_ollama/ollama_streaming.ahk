@@ -559,6 +559,16 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 				Terminal["exit"], Terminal["status"], StrLen(body))
 			Failure := entry.Get("presence_admitted", false)
 				? LLM_LocalModelResponseFailure(Terminal, entry["base_url"]) : 0
+			if Failure is Map {
+				RequestedModel := entry["presence_model"]
+				if LLM_LocalModelNormalize(Failure["model"]) != LLM_LocalModelNormalize(RequestedModel) {
+					try LoggerWarn("LLM.ollama", "Rejected an Ollama missing-model response for an unrequested model (request={1}).", req_id)
+					Failure := Map("reason", "model_identity_mismatch")
+				} else {
+					; The admitted request owns recovery identity and spelling.
+					Failure := LLM_LocalModelFailure(RequestedModel, entry["base_url"])
+				}
+			}
 			if Failure is Map
 				_LLM_InvokeCallback(on_fail, "on_fail", Failure)
 			else
@@ -947,7 +957,7 @@ _LLM_Ollama_StreamOriginCurrent(Handle) {
 ; remainder in bounded slices, accepting one valid short final record without a
 ; newline.
 _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
-	global LLM_OLLAMA_STREAM_MAX_READ_BYTES
+	global LLM_OLLAMA_STREAM_MAX_READ_BYTES, SR_ERROR_FILE_NOT_FOUND
 	ReadLimit := MaxReadBytes
 	if (ReadLimit = 0)
 		ReadLimit := LLM_OLLAMA_STREAM_MAX_READ_BYTES
@@ -957,9 +967,14 @@ _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
 	; previous slice's value before any early return (missing/empty file included)
 	; so it cannot re-arm indefinitely from stale state.
 	State["stream_bytes_pending"] := false
-	Fh := FileOpen(Path, "r")
-	if !IsObject(Fh)
-		return ""
+	try Fh := FileOpen(Path, "r")
+	catch OSError as Err {
+		; curl creates its output after launch. Only file-not-found is pending;
+		; invalid directories, sharing refusals and other I/O failures propagate.
+		if Err.Number == SR_ERROR_FILE_NOT_FOUND
+			return ""
+		throw Err
+	}
 	try {
 		Offset := State["last_pos"]
 		Fh.Pos := Offset

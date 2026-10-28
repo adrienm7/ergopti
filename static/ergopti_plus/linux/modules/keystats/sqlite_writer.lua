@@ -32,6 +32,7 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local TextUtils = require("text_utils")
 
 local Logger        = require("logger.shim")
@@ -164,8 +165,8 @@ local function _exec(sql, media_owned)
 		pipe:close()
 	end
 	local accepted, err_out, receipt_error = SqliteCommand.read_exit_receipt(output)
-	if media_owned and ((not accepted and (receipt_error == "missing SQLite exit receipt"
-		or receipt_error == "invalid SQLite exit receipt")) or (accepted and err_out ~= "")) then
+	if media_owned and ((not accepted and (receipt_error == Errors.SQLITE_EXIT_RECEIPT_MISSING
+		or receipt_error == Errors.SQLITE_EXIT_RECEIPT_INVALID)) or (accepted and err_out ~= "")) then
 		_media_terminal_debt = { pipe = pipe, close_acknowledged = true }
 		_db_path = nil
 	end

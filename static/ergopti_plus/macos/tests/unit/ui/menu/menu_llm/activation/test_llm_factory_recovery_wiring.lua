@@ -74,7 +74,7 @@ helpers.describe("LLM Factory Recovery Wiring", function()
 				return gate_result
 			end,
 		}, function(_, _, calls)
-			local selector = calls.models_selector_ctx
+			local selector = calls.model_selector_page_ctx
 			helpers.assert_type(selector and selector.switch_model, "function")
 			helpers.assert_type(selector and selector.disable_model, "function")
 			local runtime_before = #calls.runtime_models
@@ -102,7 +102,7 @@ helpers.describe("LLM Factory Recovery Wiring", function()
 			state.llm_enabled = true
 			helpers.assert_eq(calls.root_deps.keymap.set_llm_enabled(true), true)
 			helpers.assert_eq(calls.get_runtime_enabled(), true)
-			local selector = calls.models_selector_ctx
+			local selector = calls.model_selector_page_ctx
 			local runtime_before = #calls.runtime_models
 			local display_before = #calls.display_models
 			helpers.assert_eq(selector.switch_model("replacement"), true)

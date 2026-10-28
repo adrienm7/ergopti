@@ -1263,13 +1263,6 @@ local _tc_dt           = 0
 local _tc_complex_mult = 1
 local _tc_is_ignored   = false
 
--- Hot-path sub-segment timings (milliseconds) for the slow-keystroke log line.
--- Populated only when Perf sampling is enabled (DEBUG builds) so steady-state
--- typing pays nothing; nil means "not measured this keystroke". They let a slow
--- keydown be attributed to trigger matching vs. LLM/tooltip preview rebuild.
-local _tc_dbg_checks_ms  = nil
-local _tc_dbg_preview_ms = nil
-
 --- Per-mapping delay + group-enable gate, module-level to avoid closure allocation.
 --- @param m table The mapping entry.
 --- @return boolean True when the current timing/group state allows m to fire.
@@ -1944,11 +1937,11 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	CoreState.cascade_complex_mult = complex_mult
 
 	-- Sub-segment timing, always on: it feeds the phase counters summarised
-	-- every interval and attributes a slow keystroke to trigger matching vs.
-	-- preview rebuild in the HotPath warning line.
+	-- every interval, and the nesting tracker reports a slow match or preview
+	-- rebuild with keydown as its parent instead of billing keydown for it.
 	local ck0 = HotPath.now()
 	local fired = run_trigger_checks()
-	_tc_dbg_checks_ms = HotPath.log_if_slow("hotstring.match", ck0, "trigger checks")
+	HotPath.log_if_slow("hotstring.match", ck0)
 	if fired then return true end
 
 	-- No trigger fired — the buffer is still the one we appended `chars` to,
@@ -1956,7 +1949,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- when an expansion happens, which we just ruled out).
 	local pv0 = HotPath.now()
 	update_preview_with_action_recovery(CoreState.buffer)
-	_tc_dbg_preview_ms = HotPath.log_if_slow("preview.rebuild", pv0, "preview refresh")
+	HotPath.log_if_slow("preview.rebuild", pv0)
 
 	-- Enter / Tab with no predictions visible clears prediction state.
 	-- When predictions ARE visible, Tab is consumed upstream by handle_llm_keys
@@ -2025,15 +2018,14 @@ end
 local function onKeyDown(e)
 	-- Always-on latency tripwire (ported from the AHK hot-path profiler): two
 	-- monotonic clock reads per keystroke, logging a WARNING only when a keystroke
-	-- exceeds the slow threshold. Normal typing stays silent; a real hitch surfaces
-	-- with the offending char + buffer tail so "typing feels slow" is diagnosable
-	-- from the log alone. Opt-in Perf.sample below adds the p50/p99 distribution.
+	-- exceeds the slow threshold on its own time. Normal typing stays silent; a
+	-- real hitch surfaces with the segment that spent the time, never the typed
+	-- text. Opt-in Perf.sample below adds the p50/p99 distribution.
 	local t0_hot = HotPath.now()
 	local t0 = Perf.is_enabled() and Perf.now() or nil
-	-- Clear last keystroke's sub-segment timings so a slow line never reports
-	-- stale figures from an earlier keystroke that took a different branch.
+	-- Clear last keystroke's characters so trigger matching never reads stale
+	-- input from an earlier keystroke that took a different branch.
 	_tc_chars = ""
-	_tc_dbg_checks_ms, _tc_dbg_preview_ms = nil, nil
 
 	-- Classify once before any physical-input state mutation. Action-epoch
 	-- reconciliation deliberately runs from this immutable provenance result.
@@ -2077,7 +2069,7 @@ local function onKeyDown(e)
 		end
 	end
 	if fence_consumes_original then
-		HotPath.log_if_slow("keydown", t0_hot, _tc_chars)
+		HotPath.log_if_slow("keydown", t0_hot)
 		return true, fence_events
 	end
 	if provenance_status ~= EventProvenance.STATUS_OWNED then _user_hotstring_input = {} end
@@ -2089,7 +2081,7 @@ local function onKeyDown(e)
 	local entered, enter_err = pcall(SyntheticInput.enter_callback)
 	if not entered then
 		Logger.error(LOG, "Synthetic callback collector failed to start: %s.", tostring(enter_err))
-		HotPath.log_if_slow("keydown", t0_hot, _tc_chars)
+		HotPath.log_if_slow("keydown", t0_hot)
 		return (provenance and (provenance.loopback or provenance.stale_loopback)) == true,
 			fence_events
 	end
@@ -2128,13 +2120,7 @@ local function onKeyDown(e)
 		end
 	end
 	if t0 then Perf.sample("keymap_keydown", t0) end
-	-- Enrich the slow-keystroke detail with the per-stage breakdown when measured.
-	local hot_detail = _tc_chars
-	if _tc_dbg_checks_ms or _tc_dbg_preview_ms then
-		hot_detail = string.format("%s | match=%.2fms preview=%.2fms",
-			tostring(_tc_chars), _tc_dbg_checks_ms or 0, _tc_dbg_preview_ms or 0)
-	end
-	HotPath.log_if_slow("keydown", t0_hot, hot_detail)
+	HotPath.log_if_slow("keydown", t0_hot)
 	-- Owned echoes are the driver's own output; only physical presses (replays
 	-- included) enter the integrity ring.
 	if provenance_status ~= EventProvenance.STATUS_OWNED then

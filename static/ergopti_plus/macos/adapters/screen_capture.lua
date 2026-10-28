@@ -26,8 +26,11 @@
 
 local M = {}
 
-M.SETTINGS_URL =
-	"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+--- The Screen Recording pane URL for the running macOS (adapters/privacy_settings.lua).
+--- @return string url
+function M.settings_url()
+	return require("adapters.privacy_settings").url("screen_recording")
+end
 
 
 
@@ -112,7 +115,7 @@ end
 function M.open_permission_settings()
 	local fn, missing = native("urlevent", "openURL")
 	if not fn then return false, missing end
-	local ok, accepted = pcall(fn, M.SETTINGS_URL)
+	local ok, accepted = pcall(fn, M.settings_url())
 	if not ok then return false, tostring(accepted) end
 	if accepted ~= true then return false, "openURL returned " .. tostring(accepted) end
 	return true

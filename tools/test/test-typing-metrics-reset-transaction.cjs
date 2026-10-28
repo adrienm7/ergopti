@@ -75,11 +75,11 @@ for (const host of ['linux', 'windows']) {
 			// HTML seam, then leave its handler undispatched while editing the DOM.
 			assert.equal(
 				f.dateChangeHandler('date_start'),
-				'app_state.hour_cutoff = null; apply_date_app_filters()'
+				'app_state.hour_window = null; apply_date_app_filters()'
 			);
 			assert.equal(
 				f.dateChangeHandler('date_end'),
-				'app_state.hour_cutoff = null; apply_date_app_filters()'
+				'app_state.hour_window = null; apply_date_app_filters()'
 			);
 			if (edited !== 'end') f.elements.date_start.value = '2026-09-02';
 			if (edited !== 'start') f.elements.date_end.value = '2026-09-04';

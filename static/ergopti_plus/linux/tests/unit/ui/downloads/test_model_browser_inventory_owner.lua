@@ -95,6 +95,30 @@ helpers.describe("model browser inventory document", function()
 		end)
 	end)
 
+	helpers.it("(model-selector-progress) a pull's percentage reaches its row and survives a new payload", function()
+		with_browser(function(f, bridge)
+			f.handshake()
+			local before = #f.effects
+			helpers.assert_eq(bridge.on_download_progress("unknown:tag", 10), false, "no row, nothing sent")
+			helpers.assert_true(bridge.on_download_progress("qwen3.5:0.8b", 42))
+			helpers.assert_eq(#f.effects, before + 1)
+			helpers.assert_true(f.effects[#f.effects].code:find("injectProgress", 1, true) ~= nil)
+			local _, data = bridge.reproject_current()
+			local row
+			for _, candidate in ipairs(data.models) do
+				if candidate.runtime_name == "qwen3.5:0.8b" then row = candidate end
+			end
+			helpers.assert_eq(row.pending, "download")
+			helpers.assert_eq(row.progress, 42)
+			helpers.assert_eq(bridge.on_download_progress("qwen3.5:0.8b", nil), false, "the end clears it")
+			_, data = bridge.reproject_current()
+			for _, candidate in ipairs(data.models) do
+				if candidate.runtime_name == "qwen3.5:0.8b" then row = candidate end
+			end
+			helpers.assert_nil(row.progress)
+		end)
+	end)
+
 	helpers.it("(linux-model-browser-owner) installed selection and available download retain their own page", function()
 		with_browser(function(f, _, seen)
 			local ready = f.handshake()
@@ -105,14 +129,19 @@ helpers.describe("model browser inventory document", function()
 			end
 			helpers.assert_not_nil(installed); helpers.assert_not_nil(available)
 			helpers.assert_true(installed.installed)
-			local selected = f.send({ action = "select_model", name = installed.name })
+			local selected = f.send({ action = "select_model", backend = "ollama", name = installed.name })
 			helpers.assert_eq(seen.selected, { installed.runtime_name })
 			helpers.assert_eq(f.manager.is_visible("model_browser"), false)
 			-- Native close consumes the old response's document authority.
 			helpers.assert_eq(selected, nil)
 			helpers.assert_true(f.manager.show("model_browser"))
 			f.handshake()
-			f.send({ action = "select_model", name = available.name })
+			-- model-selector-page: a model not downloaded offers its download,
+			-- never its activation.
+			f.send({ action = "select_model", backend = "ollama", name = available.name })
+			helpers.assert_eq(seen.selected, { installed.runtime_name }, "selecting a missing model selects nothing")
+			helpers.assert_eq(seen.downloads, {}, "selecting a missing model downloads nothing")
+			f.send({ action = "download_model", backend = "ollama", name = available.name })
 			helpers.assert_eq(seen.downloads, { { available.runtime_name, available.name } })
 		end)
 	end)

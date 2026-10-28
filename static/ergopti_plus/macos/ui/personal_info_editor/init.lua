@@ -288,7 +288,7 @@ function M.open(current_info, save_callback)
 			end,
 			on_navigation = function(action)
 				if action == "didFinishNavigation" and owner_is_current(owner) then
-					DeferredWork.after(0.05, function() inject_init_data(owner) end, "personal_info_editor.navigation")
+					DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function() inject_init_data(owner) end, "personal_info_editor.navigation")
 				end
 				return true
 			end,

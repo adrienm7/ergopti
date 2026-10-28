@@ -39,6 +39,7 @@ local RECEIVER_MODULES = {
 	gestures = "modules.gestures",
 	shortcuts = "modules.shortcuts",
 	Storage = "adapters.storage",
+	TerminationCoordinator = "infra.termination_coordinator",
 }
 
 -- Receivers that are not module facades (local objects or the step's own guard)

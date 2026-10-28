@@ -721,3 +721,24 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		reset_fixture_modules()
 	end)
 end)
+
+
+helpers.describe("input-source mutations: a terminal callback may start the next one", function()
+	-- The composer's failed enable ran its rollback disable from its own terminal
+	-- callback, which the slot still owned, so the rollback was refused "busy"
+	-- (field session 2026-10-27). The slot is released before the terminal.
+	status_test("(tis-slot-release) admits a mutation started from the previous terminal callback", function()
+		local f = load_fixture()
+		local second_accepted, second_reason = nil, nil
+		helpers.assert_eq(f.IS.set_input_source_async(LOCALISED_NAME, KL_NAME, function()
+			second_accepted = f.IS.set_input_source_async(LOCALISED_NAME, KL_NAME, function(_, _, reason)
+				second_reason = reason
+			end)
+		end), true)
+		f.tasks[1]:complete(0, "-50\n", "")
+		helpers.assert_eq(second_accepted, true, "the follow-up mutation must not be refused as busy")
+		helpers.assert_true(second_reason ~= "busy", "the follow-up mutation must not be refused as busy")
+		f.tasks[2]:complete(0, "0\n", "")
+		reset_fixture_modules()
+	end)
+end)

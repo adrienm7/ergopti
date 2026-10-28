@@ -23,7 +23,7 @@ local function with_world(body)
 			return nil
 		end
 		function world.port(port)
-			helpers.assert_true(Storage.set("llm.ollama_port", port))
+			helpers.assert_true(Storage.set("llm.ollama_owned_port", port))
 		end
 		function world.answer(index)
 			world.posts[index].callback(200, '{"done":true,"message":{"content":""}}', {})

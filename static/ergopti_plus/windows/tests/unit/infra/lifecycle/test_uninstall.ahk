@@ -136,3 +136,185 @@ for Started in [100, 0x100000064]
 	for Elapsed in [0x100000000, 0x10000270F, 0x100002710, 0x100002711]
 		Test("Uninstall ready-clock-native64: long pending origin=" . Started . " elapsed=" . Elapsed,
 			_TestUninstallClock.Bind(Started, "pending", Elapsed))
+
+
+; A real native READY result is not a capability after its owner retires.
+; Only the Wait port observes the actual native return and then triggers the
+; same public cancellation called by every shutdown-refusal gate.
+
+_R7UR_RevokedReadyReturn() {
+	State := UninstallState()
+	AssertFalse(State.Has("Owner"), "a foreign uninstall transaction cannot be detached by this fixture")
+	PreviousCritical := Critical("On")
+	Event := 0, Owner := 0, Observed := 0, WaitReturned := false, Result := false, Caught := 0
+	try {
+		Name := "Local\ErgoptiPlus.Uninstall.ReadyRetirement." . PLC_CurrentProcessId() . "." . A_TickCount
+		Event := PLC_CreateNamedManualResetEvent(Name)
+		AssertTrue(PLC_SetEventHandle(Event), "the actual private kernel READY event must be signaled")
+		Info := Buffer(A_PtrSize * 2 + 8, 0)
+		Owner := Map("Phase", "Preparing", "Ready", Event, "ProcessInfo", Info)
+		State["Owner"] := Owner
+		Wait(Handle, Milliseconds) {
+			NativeResult := PLC_WaitHandle(Handle, Milliseconds)
+			if Handle == Event && NativeResult == 0 {
+				Observed += 1
+				UninstallCancel()
+				WaitReturned := true
+			}
+			return NativeResult
+		}
+		try Result := _UninstallAwaitReady(Owner, Info, () => A_TickCount, Wait)
+		catch as Err
+			Caught := Err
+		AssertEqual(1, Observed, "the real wait must have observed the actual READY event before cancellation")
+		AssertTrue(WaitReturned, "cancellation must return normally instead of manufacturing the expected refusal")
+		AssertFalse(State.Has("Owner"), "public cancellation consumes the original transaction identity")
+		AssertEqual(0, Owner.Get("Ready", 0), "public cancellation withdraws the exact native READY capability")
+		AssertTrue(IsObject(Caught), "a revoked native READY receipt must refuse instead of admitting continuation")
+		AssertFalse(Result, "withdrawn removal ownership cannot become ready")
+	} finally {
+		if State.Get("Owner", 0) == Owner
+			UninstallCancel()
+		else if IsObject(Owner)
+			_UninstallClose(Owner, true)
+		else if Event
+			PLC_CloseNativeHandle(Event)
+		Critical(PreviousCritical)
+	}
+}
+Test("Uninstall: retirement after native READY return cannot admit continuation (uninstall-ready-retirement)",
+	_R7UR_RevokedReadyReturn)
+
+
+; Node prints its assertion header after bootstrap frames; surface its actual
+; message in the single-line failure annotation and retain the bounded capture.
+_R7NB_FailureHeadline(Output) {
+	static MAX_HEADLINE_CHARS := 768
+	Lines := StrSplit(StrReplace(Output, "`r", ""), "`n")
+	Headline := "", FoundAssertion := false
+	for _, Line in Lines {
+		if !FoundAssertion {
+			if RegExMatch(Line, "^\s*AssertionError(?:\s+\[[^\]]+\])?:") {
+				Headline := Trim(Line)
+				FoundAssertion := true
+			}
+			continue
+		}
+		if RegExMatch(Line, "^\s+at\s")
+			break
+		if Trim(Line) != ""
+			Headline .= " " . Trim(Line)
+		if StrLen(Headline) >= MAX_HEADLINE_CHARS
+			break
+	}
+	if !FoundAssertion {
+		for _, Line in Lines {
+			if Trim(Line) != "" {
+				Headline := Trim(Line)
+				break
+			}
+		}
+	}
+	return SubStr(Headline, 1, MAX_HEADLINE_CHARS)
+}
+
+_R7NB_DiagnosticAssertionHeadline() {
+	Output := "node:assert:150`n  throw new AssertionError(obj);`n  ^`n`n"
+		. "AssertionError [ERR_ASSERTION]: The native worker refused cleanup.`n"
+		. "Foreign startup shortcut removed`n    at Object.<anonymous> (native-policy.cjs:149:9)`n"
+	Headline := _R7NB_FailureHeadline(Output)
+	AssertEqual("AssertionError [ERR_ASSERTION]: The native worker refused cleanup. Foreign startup shortcut removed", Headline)
+	Caught := 0
+	try AssertEqual(0, 1, "native uninstall policy output: " . Headline)
+	catch as Err
+		Caught := Err
+	AssertTrue(IsObject(Caught), "the real status assertion must remain a failure")
+	FirstLine := StrSplit(Caught.Message, "`n")[1]
+	AssertTrue(InStr(FirstLine, "Foreign startup shortcut removed"), "the actual cause must survive the annotation's first-line boundary")
+	AssertFalse(InStr(FirstLine, "node:assert:150"), "bootstrap frames cannot hide the actual assertion message")
+}
+Test("Uninstall native policy diagnostics: assertion cause survives the first-line annotation (uninstall-native-policy-diagnostic)",
+	_R7NB_DiagnosticAssertionHeadline)
+
+_R7NB_DiagnosticRuntimeHeadline() {
+	AssertEqual("Error: native policy process could not start", _R7NB_FailureHeadline("`nError: native policy process could not start`n    at start (native-policy.cjs:1:1)`n"))
+	LongOutput := "AssertionError [ERR_ASSERTION]: "
+	Loop 2000
+		LongOutput .= "x"
+	Headline := _R7NB_FailureHeadline(LongOutput)
+	AssertTrue(StrLen(Headline) > 0 && StrLen(Headline) < StrLen(LongOutput), "the annotation must remain bounded without losing the assertion identity")
+	AssertTrue(InStr(Headline, "AssertionError [ERR_ASSERTION]: ") == 1)
+}
+Test("Uninstall native policy diagnostics: runtime errors remain visible and bounded (uninstall-native-policy-diagnostic)",
+	_R7NB_DiagnosticRuntimeHeadline)
+
+; The common JavaScript lane is Linux. Register its Windows-only policy CLI in
+; the native driver suite so an OS skip cannot certify native uninstall policy.
+_R7NB_NativeUninstallPolicy() {
+	global _DriverDir, _SR_TreeOwnedTasks, _SR_TreeCaptureDebts
+	Repo := FSResolveDirectoryPath(_DriverDir . "\..\..\..")
+	Script := Repo . "\tools\test\test-windows-uninstall.cjs"
+	AssertTrue(FileExist(Script), "the actual native uninstall policy CLI must be present")
+	Observed := [], Control := Map(), Handle := 0
+	Capture(State, Native) {
+		Control["state"] := State
+		Control["capture_file"] := State["TmpFile"]
+		Control["capture_directory"] := State["CaptureDir"]
+	}
+	try {
+		Handle := ShellRunner_SpawnTreeOwned("node.exe", [Script],
+			(Code, Out, Err) => Observed.Push(Map("exit", Code, "output", Out)), , Capture, 16384)
+		AssertTrue(Handle.start(), "the actual Windows Node policy process must start")
+		Started := A_TickCount
+		while !TickExpired64(Started, 45000) {
+			_SR_TreePoll()
+			if Observed.Length == 1 && Control.Has("state") {
+				Claim := Control["state"]["TerminalClaim"]
+				if Claim is Map && Claim["TreeQuiesced"]
+						&& !FileExist(Claim["TmpFile"]) && !DirExist(Claim["CaptureDir"])
+					break
+			}
+			Sleep(10)
+		}
+		AssertEqual(1, Observed.Length, "the actual native uninstall policy must settle within its bound")
+		if Observed[1]["exit"] != 0 {
+			for _, Line in StrSplit(StrReplace(Observed[1]["output"], "`r", ""), "`n")
+				_TestPrint("# native uninstall policy output: " . Line)
+		}
+		AssertEqual(0, Observed[1]["exit"], "native uninstall policy output: " . _R7NB_FailureHeadline(Observed[1]["output"]))
+		Marker := "[OK] Windows uninstall requires confirmation, exact process exit and an unchanged owned executable."
+		Markers := 0
+		for Line in StrSplit(StrReplace(Observed[1]["output"], "`r`n", "`n"), "`n")
+			if Line == Marker
+				Markers += 1
+		AssertEqual(1, Markers, "a platform SKIP or missing native policy cannot replace the actual Windows success receipt")
+		AssertTrue(Control.Has("state"), "the real native construction observer must retain its exact owner")
+		State := Control["state"], Claim := State["TerminalClaim"]
+		AssertTrue(Control["capture_file"] != "" && Control["capture_directory"] != "", "the native CLI must own its actual bounded capture")
+		AssertEqual(Control["capture_file"], Claim["TmpFile"], "completion cannot erase capture identity instead of retiring its file")
+		AssertEqual(Control["capture_directory"], Claim["CaptureDir"], "completion retains the original capture directory identity")
+		AssertTrue(Claim is Map && Claim["TreeQuiesced"], "the exact Node and PowerShell process tree must be physically retired")
+		AssertFalse(State["FinalizationPending"], "native finalization cannot remain pending after policy success")
+		for Key in ["ProcessHandle", "ThreadHandle", "JobHandle"] {
+			AssertEqual(0, State[Key], "the original construction owner must release " . Key)
+			AssertEqual(0, Claim[Key], "the terminal owner must release " . Key)
+		}
+		AssertEqual(0, Claim["NativeErrors"].Length, "the actual native retirement must acknowledge all resources")
+		AssertFalse(_SR_TreeOwnedTasks.Has(State["TaskId"]), "the completed policy cannot retain an active native owner")
+		AssertFalse(_SR_TreeCaptureDebts.Has(ObjPtr(Claim)), "the completed policy cannot retain private capture cleanup debt")
+		AssertFalse(FileExist(Claim["TmpFile"]), "the private native policy capture must be removed")
+		AssertFalse(DirExist(Claim["CaptureDir"]), "the private native policy capture directory must be removed")
+	} finally {
+		if IsObject(Handle) {
+			Acknowledged := Handle.terminate()
+			if !Acknowledged {
+				AssertTrue(Control.Has("state"), "an unacknowledged task cannot lose its exact cleanup owner")
+				State := Control["state"]
+				AssertTrue(State["TreeQuiesced"] && !State["FinalizationPending"],
+					"an already completed task must retain its genuine physical retirement receipt")
+			}
+		}
+	}
+}
+Test("Uninstall native policy: actual Windows CLI executes the removal and startup controls (uninstall-native-policy-cli)",
+	_R7NB_NativeUninstallPolicy)

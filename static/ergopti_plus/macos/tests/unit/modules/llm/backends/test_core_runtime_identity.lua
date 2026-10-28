@@ -78,7 +78,7 @@ helpers.describe("llm-core-runtime-identity", function()
 
 	helpers.it("reads the loaded canonical endpoint default instead of the emergency port", function()
 		with_runtime(function(live)
-			live.DEFAULT_STATE.llm_ollama_port = 12456
+			live.DEFAULT_STATE.llm_ollama_owned_port = 12456
 			helpers.assert_eq(require("modules.llm.ollama_endpoint").get_default_port(), 12456)
 			helpers.assert_nil(package.loaded["modules.llm.init"])
 		end)

@@ -230,7 +230,7 @@ main {
 }
 
 .swatch {
-	background: #888;
+	background: var(--theme-grey-888);
 	border: 1px solid var(--border);
 	border-radius: 4px;
 	display: inline-block;

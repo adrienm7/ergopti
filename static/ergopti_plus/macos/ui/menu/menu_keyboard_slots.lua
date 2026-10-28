@@ -126,7 +126,7 @@ function M.warn_if_input_source_conflict(slot_id)
 		if #ids == 0 then return end
 		Logger.warn(LOG, "Slot '%s' is also macOS's input-source shortcut (symbolic hotkey %s) — it will not fire.",
 			slot_id, table.concat(ids, ", "))
-		DeferredWork.after(0.3, function()
+		DeferredWork.after(require("infra.timings").sec("ui", "slot_conflict_notice_delay_ms"), function()
 			local open_label = i18n.get("button.open_settings")
 			local ok, clicked = pcall(dialog.block_alert,
 				i18n.get("dialog.keyboard_shortcut.input_source_conflict_title"),
@@ -181,7 +181,7 @@ local function choose_action_for(slot_id, ctx)
 		local spec = type(gestures) == "table" and type(gestures.get_action_parameter_spec) == "function"
 			and gestures.get_action_parameter_spec(action_id) or nil
 		if not spec then return bind() end
-		DeferredWork.after(0.05, function()
+		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 			local committed = ShortcutUtils.prompt_action_parameter(gestures,
 				KbShortcuts.keyboard_binding_id(slot_id), action_id, spec, picked, {
 					publishes_assignment = true, section = require("config_keys").KEY.SHORTCUTS_KEYBOARD, key = slot_id,
@@ -218,7 +218,7 @@ local function add_binding_to(prefix, ctx)
 		-- The second picker is opened on the next tick: the shared webview needs
 		-- the first window torn down before it will build another, and chaining
 		-- them synchronously leaves the user staring at nothing.
-		DeferredWork.after(0.05,
+		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
 			function() choose_action_for(slot_id, ctx) end,
 			"menu_keyboard_slots.action_picker")
 	end)

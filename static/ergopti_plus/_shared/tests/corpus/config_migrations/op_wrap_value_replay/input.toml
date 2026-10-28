@@ -1,0 +1,18 @@
+# _shared/tests/corpus/config_migrations/op_wrap_value_replay/input.toml
+
+[hotstrings.dynamic]
+enabled = true
+iban_prefixes = ["FR", "DE"]
+datefr = true
+
+[hotstrings.dynamic.date]
+enabled = true
+
+[hotstrings.dynamic.date_fr]
+enabled = false
+
+[hotstrings.dynamic.date_long_fr]
+enabled = true
+
+[layout]
+variant = "custom"

@@ -155,10 +155,21 @@ _LLM_Ollama_ParseStreamLine(line) {
 			Result["error"] := "Stream message is missing string content."
 			return Result
 		}
+		; AHK aliases JSON true and numeric one. Preserve the canonical parser's
+		; last decoded member identity before admitting a terminal marker.
+		Done := false
+		if obj.Has("done") {
+			Marker := JsonObjectMemberSpans(line)["done"]["text"]
+			if Marker != "true" && Marker != "false" {
+				Result["error"] := "Stream envelope has a non-Boolean done marker."
+				return Result
+			}
+			Done := Marker == "true"
+		}
 		content := msg["content"]
 		Result["ok"] := true
 		Result["token"] := content
-		Result["done"] := obj.Has("done") && obj["done"] = true
+		Result["done"] := Done
 		return Result
 	} catch as e {
 		Result["error"] := "Malformed stream JSON: " . e.Message

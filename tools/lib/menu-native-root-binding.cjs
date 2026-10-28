@@ -4,6 +4,7 @@
 
 const { isDeepStrictEqual } = require('node:util');
 const { scriptTokens } = require('./script-source.cjs');
+const { COMMAND } = require('./_generated/config_keys.cjs');
 const { nativeTemplateBinding } = require('./menu-template-binding.cjs');
 const {
 	nativeTopLevelProjection,
@@ -17,7 +18,7 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		llm_download_shortcut_frame: [
 			{
 				type: 'command',
-				id: 'llm_download_shortcut',
+				id: COMMAND.LLM_DOWNLOAD_SHORTCUT,
 				i18n: 'menu.llm.show_download_window',
 				platforms: ['hs'],
 				unavailable: 'hide'

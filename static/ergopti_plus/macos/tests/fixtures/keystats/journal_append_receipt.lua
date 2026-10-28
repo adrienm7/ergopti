@@ -56,7 +56,10 @@ package.loaded['infra.logger']=logger
 package.loaded['modules.keystats.export']={sync_foreign_data_sql=function()return{}end, get_native_app_category=function() return nil end}
 -- This proof isolates raw-row ingest. SQL outbox publication writes real Lua bytes
 -- and acknowledges its actual cache clear, but does not qualify LedgerAppend recovery.
-package.loaded['adapters.ledger_append']={flush=function(path,batch,ack)
+-- The stage names stay the real module's, so the ingest trace receives the
+-- order log_manager hands it and the stub cannot drift from LedgerAppend.
+local flush_stages=assert(require('adapters.ledger_append').FLUSH_STAGES)
+package.loaded['adapters.ledger_append']={FLUSH_STAGES=flush_stages,flush=function(path,batch,ack)
  if batch~='' then local h=assert(io.open(path,'ab'));assert(h:write(batch));assert(h:close()) end
  return ack()
 end}

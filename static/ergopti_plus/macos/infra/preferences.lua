@@ -63,6 +63,7 @@ local function schema_read_admitted(check, content, status)
 end
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
+local MetadataCommandStats = require("adapters.metadata_command_stats")
 local Manifest = require("infra.manifest_reader")
 local LEAF = require("config_keys").LEAF
 local KEY = require("config_keys").KEY
@@ -86,6 +87,7 @@ local RecordList = require("toml_codec.record_list")
 local LOG       = "preferences"
 local OperationReporter = require("diagnostics.operation_reporter")
 local ConfigKeys = require("config_keys")
+local MetricsState = require("infra.metrics_state_keys")
 
 
 --- Top-level TOML section names in the order they appear on disk.
@@ -126,7 +128,9 @@ local KEY_MAP = {
 	dynamichotstrings_user_code_time_activation_seconds = {
 		sec = "hotstrings", path = "dynamic.user_code", key = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS,
 	},
-	dynamichotstrings_date               = { sec = "hotstrings", path = "dynamic", key = "date"         },
+	-- The manifest keeps hotstrings.dynamic.date as a feature row: mapping the
+	-- boolean onto the row itself saved a bare `date = false` (field ledger L20).
+	dynamichotstrings_date               = { sec = "hotstrings", path = "dynamic.date", key = "enabled" },
 	dynamichotstrings_datefr             = { sec = "hotstrings", path = "dynamic", key = "datefr"       },
 	dynamichotstrings_datelongfr         = { sec = "hotstrings", path = "dynamic", key = "datelongfr"   },
 	dynamichotstrings_ibanprefixes       = { sec = "hotstrings", path = "dynamic", key = "ibanprefixes" },
@@ -137,16 +141,16 @@ local KEY_MAP = {
 	custom_default_section               = { sec = "hotstrings", path = "editor", key = "default_section" },
 
 	-- ── Metrics (formerly Keystats) ───────────────────────────────────────
-	keystats_enabled                    = { sec = "metrics", key = "enabled"                       },
-	keystats_encrypt                    = { sec = "metrics", key = "encrypt"                       },
-	keystats_float_colors               = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_COLORS             },
-	keystats_float_graph                = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_GRAPH              },
-	keystats_float_wpm                  = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_VISIBLE            },
-	keystats_menubar_colors             = { sec = "metrics", key = ConfigKeys.LEAF.WPM_MENUBAR_COLORS            },
-	keystats_menubar_wpm                = { sec = "metrics", key = ConfigKeys.LEAF.WPM_MENUBAR_VISIBLE           },
-	keystats_private_filter_enabled     = { sec = "metrics", key = ConfigKeys.LEAF.PRIVATE_FILTER_ENABLED        },
-	keystats_secure_filter_enabled      = { sec = "metrics", key = ConfigKeys.LEAF.SECURE_FILTER_ENABLED         },
-	keystats_system_auth_filter_enabled = { sec = "metrics", key = ConfigKeys.LEAF.SYSTEM_AUTH_FILTER_ENABLED   },
+	[MetricsState.ENABLED]                    = { sec = "metrics", key = "enabled"                       },
+	[MetricsState.ENCRYPT]                    = { sec = "metrics", key = "encrypt"                       },
+	[MetricsState.FLOAT_COLORS]               = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_COLORS             },
+	[MetricsState.FLOAT_GRAPH]                = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_GRAPH              },
+	[MetricsState.FLOAT_WPM]                  = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_VISIBLE            },
+	[MetricsState.MENUBAR_COLORS]             = { sec = "metrics", key = ConfigKeys.LEAF.WPM_MENUBAR_COLORS            },
+	[MetricsState.MENUBAR_WPM]                = { sec = "metrics", key = ConfigKeys.LEAF.WPM_MENUBAR_VISIBLE           },
+	[MetricsState.PRIVATE_FILTER_ENABLED]     = { sec = "metrics", key = ConfigKeys.LEAF.PRIVATE_FILTER_ENABLED        },
+	[MetricsState.SECURE_FILTER_ENABLED]      = { sec = "metrics", key = ConfigKeys.LEAF.SECURE_FILTER_ENABLED         },
+	[MetricsState.SYSTEM_AUTH_FILTER_ENABLED] = { sec = "metrics", key = ConfigKeys.LEAF.SYSTEM_AUTH_FILTER_ENABLED   },
 
 	-- ── LLM ────────────────────────────────────────────────────────────────
 	llm_enabled                          = { sec = "llm", key = "enabled"                           },
@@ -238,7 +242,7 @@ local NESTED_KEY_MAP = {
 	custom_terminators       = { sec = "hotstrings", key = "terminators"                },
 	custom_delimiters        = { sec = "hotstrings", key = "delimiters"                 },
 	-- Metrics nested tables
-	keystats_disabled_apps  = { sec = "metrics",    key = ConfigKeys.LEAF.DISABLED_APPS              },
+	[MetricsState.DISABLED_APPS]  = { sec = "metrics",    key = ConfigKeys.LEAF.DISABLED_APPS              },
 	-- LLM nested tables
 	llm_disabled_apps        = { sec = "llm",        key = "trigger.disabled_apps"      },
 	llm_nav_modifiers        = { sec = "llm",        key = "navigation.nav_modifiers"   },
@@ -699,6 +703,32 @@ local function scalar_value_fits(flat_key, value)
 	return ConfigOutdated.manifest_value_fits(entry, value, "hs")
 end
 
+--- Lua type a stored value has for the manifest entry types whose name is not
+--- a Lua type: a feature row and an array both persist as TOML tables.
+local VALUE_LUA_TYPE = { array = "table", feature = "table" }
+
+--- Whether a persisted scalar has the type and value its manifest entry
+--- declares. load() and current_view() both admit values through this one
+--- rule: the view kept a second, stricter copy and refused a `date = true`
+--- load took (field ledger L20, "value_type at hotstrings.dynamic.date").
+--- A codec value was checked against its stored form by persisted_units_fit.
+--- @param flat_key string Flat state key.
+--- @param value any Persisted value.
+--- @return boolean fits
+--- @return string|nil detail Why the value is outdated.
+local function manifest_type_fits(flat_key, value)
+	local spec = KEY_MAP[flat_key]
+	if not spec or spec.codec then return true end
+	local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or flat_key)
+	local entry = Manifest.find_entry_by_path(path)
+	if not entry then return true end
+	local expected = VALUE_LUA_TYPE[entry.type] or entry.type
+	if entry.type ~= "enum" and type(value) ~= expected then
+		return false, "a " .. tostring(entry.type) .. " is expected here, not a " .. type(value)
+	end
+	return ConfigOutdated.manifest_value_fits(entry, value, "hs", SCALAR_VALUE_RULES[flat_key])
+end
+
 --- Resolves canonical defaults/operations into the units used by their native owner.
 --- @param path string Canonical configuration path.
 --- @param value any Value expressed in persisted units.
@@ -864,6 +894,24 @@ local function flatten_from_disk(grouped, mark, shapes)
 	local function take(...)
 		if mark then mark(...) end
 	end
+	-- A scalar where an owned value's table belongs (`layout = 3`, the bare
+	-- `hotstrings.dynamic.date = true` of field ledger L20) is outdated on its
+	-- own. The read-only view refused it with a second rule load never applied.
+	for _, spec in pairs(KEY_MAP) do
+		local node, segments = grouped[spec.sec], { spec.sec }
+		if node ~= nil and type(node) ~= "table" then
+			ConfigOutdated.report(segments, "a table of settings is expected here")
+		else
+			for segment in (spec.path or ""):gmatch("[^.]+") do
+				node = node and node[segment]
+				segments[#segments + 1] = segment
+				if node ~= nil and type(node) ~= "table" then
+					ConfigOutdated.report(segments, "a table of settings is expected here")
+					break
+				end
+			end
+		end
+	end
 	--- Takes one owned value, unless it cannot cross its unit boundary: such a
 	--- leaf (`debounce_ms = "fast"`) is outdated on its own, and used to make
 	--- the whole file load as corrupt.
@@ -890,6 +938,7 @@ local function flatten_from_disk(grouped, mark, shapes)
 				Manifest.find_entry_by_path(table.concat({ ... }, ".")), value, "hs")
 		end
 		if fits then fits, detail = scalar_value_fits(flat_key, value) end
+		if fits then fits, detail = manifest_type_fits(flat_key, value) end
 		if fits and flat_key == "llm_active_profile" then
 			-- A deleted or renamed profile silently ran "basic" at every prediction.
 			local ids, legacy = document_profile_ids()
@@ -1164,14 +1213,14 @@ local _load_outdated = {}
 --- @return table|nil snapshot Exact `ok`/`absent` source classification.
 local function classify_source(prefs_file, on_error)
 	local schema_check = capture_schema_read(prefs_file, FileSystem)
-	if schema_check == false then return nil end
+	if schema_check == false then return nil, "schema_owner_unavailable" end
 	local content, read_status = FileSystem.read_with_status(prefs_file, on_error)
-	if not schema_read_admitted(schema_check, content, read_status) then return nil end
+	if not schema_read_admitted(schema_check, content, read_status) then return nil, "schema_refused" end
 	if read_status == "ok" and type(content) == "string" then
 		return { status = "ok", content = content }
 	end
 	if read_status == "absent" then return { status = "absent" } end
-	return nil
+	return nil, "unreadable"
 end
 
 --- Compares two exact source classifications.
@@ -1317,10 +1366,6 @@ function M.load(prefs_file)
 	return values, "ok"
 end
 
---- Lua type a stored value has for the manifest entry types whose name is not
---- a Lua type: a feature row and an array both persist as TOML tables.
-local VALUE_LUA_TYPE = { array = "table", feature = "table" }
-
 --- Reads current canonical preferences without adopting overwrite authority.
 --- This view is admission evidence only; load/save alone own source snapshots.
 --- @param prefs_file string Canonical configuration path.
@@ -1329,38 +1374,32 @@ local VALUE_LUA_TYPE = { array = "table", feature = "table" }
 ---   A transaction that writes the file back keeps the strict view, which would drop that entry.
 --- @return table|nil flat Current owned preferences, nil on a refused view.
 --- @return table|nil source Exact classified bytes read for this view.
+--- @return string|nil reason Closed refusal cause when flat is nil: invalid_path,
+---   publication_in_flight, schema_owner_unavailable, schema_refused, unreadable,
+---   undecodable, outdated_keys or raised.
+--- @return string|nil key For outdated_keys, the first config.toml path load() leaves out
+---   ("layout.pause_switch_enabled"): the 2026-10-27 19:47 field run refused the view on
+---   every regeneration and nothing said which key held it. Never the value itself.
 function M.current_view(prefs_file, tolerate_outdated)
-	if type(prefs_file) ~= "string" or prefs_file == "" or _owned_publications[prefs_file] then return nil end
-	local called, values, source = pcall(function()
-		local current = classify_source(prefs_file)
-		if not current then return nil end
+	if type(prefs_file) ~= "string" or prefs_file == "" then return nil, nil, "invalid_path" end
+	if _owned_publications[prefs_file] then return nil, nil, "publication_in_flight" end
+	local called, values, source, reason, key_path = pcall(function()
+		local current, refusal = classify_source(prefs_file)
+		if not current then return nil, nil, refusal end
 		if current.status == "absent" then return {}, current end
 		local decoded, shapes = require("toml_codec.leaf_rows").decode_source(current.content)
-		if type(decoded) ~= "table" then return nil end
-		for _, spec in pairs(KEY_MAP) do
-			local node = decoded[spec.sec]
-			if node ~= nil and type(node) ~= "table" then return nil end
-			for segment in (spec.path or ""):gmatch("[^.]+") do
-				node = node and node[segment]
-				if node ~= nil and type(node) ~= "table" then return nil end
-			end
-		end
+		if type(decoded) ~= "table" then return nil, nil, "undecodable" end
+		-- The very walk and admission load() applies: a value load leaves out as
+		-- outdated is left out here too, never refused by a second rule.
 		local flat
 		local outdated = ConfigOutdated.collect_reports(function() flat = flatten_from_disk(decoded, nil, shapes) end)
-		if next(outdated) ~= nil and tolerate_outdated ~= true then return nil end
-		for key, value in pairs(flat) do
-			local spec = KEY_MAP[key]
-			-- A codec value was checked against its stored form while it was read.
-			if spec and not spec.codec then
-				local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or key)
-				local entry = Manifest.find_entry_by_path(path)
-				if entry and entry.type ~= "enum" and type(value) ~= (VALUE_LUA_TYPE[entry.type] or entry.type) then return nil end
-				if entry and not ConfigOutdated.manifest_value_fits(entry, value, "hs", SCALAR_VALUE_RULES[key]) then return nil end
-			end
+		if next(outdated) ~= nil and tolerate_outdated ~= true then
+			return nil, nil, "outdated_keys", require("table_util").sorted_keys(outdated)[1]
 		end
 		return flat, current
 	end)
-	if not called then return nil end
+	if not called then return nil, nil, "raised" end
+	if values == nil then return nil, nil, reason, key_path end
 	return values, source
 end
 
@@ -2035,6 +2074,9 @@ end
 -- report names the phase because the batch size alone did not explain the hold.
 local SLOW_SAVE_REPORT_MS = 250
 local NANOSECONDS_PER_MILLISECOND = 1000000
+--- Prepare stages of a save, in report order (L17).
+local SAVE_PREPARE_STAGES = { "snapshot", "decode", "models", "sparse", "wrap", "rows",
+	"gestures", "llm", "shortcuts", "hotstrings" }
 
 --- Reads the monotonic clock, or nil when the host has none (headless runs).
 --- @return number|nil nanoseconds
@@ -2078,6 +2120,18 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		return false
 	end
 	local script_admission = script_parameter_admission()
+	-- L17: prepare held 1.25 s on the Mac for 293 operations; each stage clock
+	-- names its share so the next slow-save line says which one dominates.
+	local save_started = save_clock()
+	-- The Lua heap before and after says whether a collection ran inside a
+	-- slow save: the Mac's prepare took 20 times the local CPU cost.
+	local heap_before_kb = collectgarbage("count")
+	local stage_ms, stage_last = {}, save_started
+	local function stage(name)
+		local now = save_clock()
+		if now and stage_last then stage_ms[name] = (stage_ms[name] or 0) + (now - stage_last) / NANOSECONDS_PER_MILLISECOND end
+		stage_last = now
+	end
 	local runtime = M.snapshot(state, hotfiles, core_mods)
 	local existing = runtime
 	if snapshot_view then
@@ -2103,13 +2157,15 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 	-- its default, whose sparse delete must not erase it (see _load_outdated).
 	local outdated = _load_outdated[prefs_file] or {}
 	local replaced = {}
-	local save_started = save_clock()
+	stage("snapshot")
 	local model_operation
+	local proposed_count = 0
 	local ok, updates = pcall(function()
 		local document, shapes
 		if expected_source.status == "ok" then
 			document, shapes = require("toml_codec.leaf_rows").decode_source(expected_source.content)
 		end
+		stage("decode")
 		local source_parameters = document and type(document.gestures) == "table" and document.gestures.action_parameters
 		for key in pairs(type(source_parameters) == "table" and source_parameters or {}) do
 			if type(key) == "string" and key:sub(1, 8) == "script__" then has_script_parameters = true; break end
@@ -2146,8 +2202,10 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		if existing.llm_user_models ~= nil then
 			model_operation = RecordList.prepare(expected_source.content or "", existing.llm_user_models, prefs_file)
 		end
+		stage("models")
 		local leaves = {}
 		local proposed = sparse_updates(existing)
+		stage("sparse")
 		for _, row in ipairs(cleared_orders) do proposed[#proposed + 1] = row end
 		if document and legacy_user_profiles(document.llm) then
 			-- Imported at load: the envelope replaces the array in this very write,
@@ -2157,6 +2215,8 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		for _, row in ipairs(WrapPreferences.prepare(expected_source.content or "", existing)) do
 			proposed[#proposed + 1] = row
 		end
+		stage("wrap")
+		proposed_count = #proposed
 		for _, row in ipairs(proposed) do
 			local path = row.section .. "." .. row.key
 			local reset = reset_keeping_outdated(row, outdated, document)
@@ -2169,7 +2229,15 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 				if outdated[path] then replaced[#replaced + 1] = path end
 			end
 		end
-		local prepared = M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, leaves))))
+		stage("rows")
+		local prepared = M.prepare_gesture_updates(expected_source, leaves)
+		stage("gestures")
+		prepared = M.prepare_llm_updates(expected_source, prepared)
+		stage("llm")
+		prepared = M.prepare_shortcut_updates(expected_source, prepared)
+		stage("shortcuts")
+		prepared = M.prepare_hotstring_updates(expected_source, prepared)
+		stage("hotstrings")
 		if model_operation then prepared[#prepared + 1] = model_operation end
 		return prepared
 	end)
@@ -2181,6 +2249,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 	end
 
 	local prepare_done = save_clock()
+	local commands_before, command_ms_before = MetadataCommandStats.snapshot()
 	local write_ok, written, detail, encoded, native, candidate = pcall(
 		TomlWriter.batch_write,
 		prefs_file,
@@ -2205,9 +2274,18 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 	if save_started and prepare_done and write_done then
 		local total_ms = (write_done - save_started) / NANOSECONDS_PER_MILLISECOND
 		if total_ms >= SLOW_SAVE_REPORT_MS then
-			Logger.warn(LOG, "Slow preferences save %d ms (prepare=%d write=%d ms; operations=%d).",
+			local commands_after, command_ms_after = MetadataCommandStats.snapshot()
+			local parts = {}
+			for _, name in ipairs(SAVE_PREPARE_STAGES) do
+				parts[#parts + 1] = string.format("%s=%d", name, math.floor(stage_ms[name] or 0))
+			end
+			Logger.warn(LOG, "Slow preferences save %d ms (prepare=%d write=%d ms; operations=%d; "
+				.. "prepare: %s ms; proposed=%d; metadata_commands=%d in %d ms; lua_heap=%d->%d MB).",
 				math.floor(total_ms), math.floor((prepare_done - save_started) / NANOSECONDS_PER_MILLISECOND),
-				math.floor((write_done - prepare_done) / NANOSECONDS_PER_MILLISECOND), #updates)
+				math.floor((write_done - prepare_done) / NANOSECONDS_PER_MILLISECOND), #updates,
+				table.concat(parts, " "), proposed_count, commands_after - commands_before,
+				math.floor(command_ms_after - command_ms_before),
+				math.floor(heap_before_kb / 1024), math.floor(collectgarbage("count") / 1024))
 		end
 	end
 	if model_operation then RecordList.acknowledge(model_operation, encoded) end

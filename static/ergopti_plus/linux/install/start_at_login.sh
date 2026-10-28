@@ -5,6 +5,8 @@
 # daemon must remain alive while its menu reports the result.
 
 set -euo pipefail
+# Load localized user-facing messages before any mutation.
+source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
 DRIVER_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "$DRIVER_ROOT/install/desktop_entry.sh"
 source "$DRIVER_ROOT/install/config_home.sh"
@@ -19,7 +21,7 @@ elif [[ "$DRIVER_ROOT" = */lib/ergopti/linux ]]; then
 	DESKTOP_NAME=ergopti-hotstrings.desktop
 	LAUNCHER="${DRIVER_ROOT%/lib/ergopti/linux}/bin/ergopti-hotstrings"
 else
-	echo 'Automatic startup requires an installed application.' >&2
+	ergopti_msg startup.requires_installed >&2
 	exit 78
 fi
 DESKTOP_FILE="$CONFIG_ROOT/autostart/$DESKTOP_NAME"
@@ -54,13 +56,14 @@ startup_record() {
 
 if { [ -e "$DESKTOP_FILE" ] || [ -L "$DESKTOP_FILE" ]; } \
 	&& { [ -L "$DESKTOP_FILE" ] || [ ! -f "$DESKTOP_FILE" ]; }; then
+	if [ -L "$DESKTOP_FILE" ]; then ergopti_msg startup.linked_setting >&2; fi
 	startup_record invalid-source desktop "$DESKTOP_FILE"
 	exit 78
 fi
 if [ -f "$DESKTOP_FILE" ] && ! grep -Fxq "Exec=$LAUNCHER --tray" "$DESKTOP_FILE" \
 	&& ! grep -Fxq "Exec=$LAUNCHER --session-start --tray" "$DESKTOP_FILE" \
 	&& ! grep -Fxq "$(ergopti_desktop_exec "$LAUNCHER")" "$DESKTOP_FILE"; then
-	echo 'The startup entry belongs to another command.' >&2
+	ergopti_msg startup.foreign_entry >&2
 	exit 78
 fi
 
@@ -70,7 +73,10 @@ manifest="$DRIVER_ROOT/../.ergopti-owned-files"
 receipt_present=false
 if [ -e "$manifest" ] || [ -L "$manifest" ]; then
 	[ ! -L "$manifest" ] && [ -f "$manifest" ] \
-		|| { startup_record invalid-source receipt "$manifest"; exit 78; }
+		|| {
+			if [ -L "$manifest" ]; then ergopti_msg startup.linked_receipt >&2; fi
+			startup_record invalid-source receipt "$manifest"; exit 78;
+		}
 	receipt_present=true
 fi
 

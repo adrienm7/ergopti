@@ -24,8 +24,10 @@ _JSLSS_AllWebViewStringHelpers() {
 
 _JSLSS_EveryWebViewHelperDelegates() {
 	Names := _JSLSS_AllWebViewStringHelpers()
-	; Twelve helpers exist today; a lower count means the discovery broke.
-	Assert(Names.Count >= 12,
+	; Eleven helpers exist today (the model browser's wrapper was retired in
+	; ffa804be0e: the page calls JsonStringLiteral directly); a lower count
+	; means the discovery broke.
+	Assert(Names.Count >= 11,
 		"the discovery must find every JsStr/JSStr helper, including generic and Ollama variants")
 	for Name, _ in Names {
 		Body := _DriverFuncBody(Name)

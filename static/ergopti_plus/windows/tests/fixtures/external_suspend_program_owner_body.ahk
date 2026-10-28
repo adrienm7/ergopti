@@ -148,8 +148,8 @@ try {
 	_ESPO_Main()
 	FileAppend("PASS external-suspend-program " . A_Args[1] . "`n", "*")
 	ExitApp(0)
-} catch as Failure {
-	FileAppend("FAIL external-suspend-program type=" . Type(Failure) . " line=" . Failure.Line
-		. " reason=" . Failure.Message . "`n", "*")
+} catch as TopLevelFailure {
+	FileAppend("FAIL external-suspend-program type=" . Type(TopLevelFailure) . " line=" . TopLevelFailure.Line
+		. " reason=" . TopLevelFailure.Message . "`n", "*")
 	ExitApp(1)
 }

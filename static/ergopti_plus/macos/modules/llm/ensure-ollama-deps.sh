@@ -17,7 +17,10 @@
 set -eu
 set -o pipefail 2>/dev/null || true
 
-if [ "$0" = "/dev/fd/3" ] && [ -n "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" ]; then
+# The native PTY guardian runs a private snapshot of this file; its sources
+# stay in the folder the guardian names. Any other path is its own folder.
+if [ -n "${ERGOPTI_BOOTSTRAP_SNAPSHOT:-}" ] && [ "$0" = "$ERGOPTI_BOOTSTRAP_SNAPSHOT" ] \
+	&& [ -n "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" ]; then
 	SCRIPT_DIR="$ERGOPTI_BOOTSTRAP_SCRIPT_DIR"
 else
 	SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -49,6 +52,13 @@ log_error() {
 }
 
 cleanup_install() {
+	local status=$? signal_name=""
+	# A child killed by a signal ends the script through set -e with 128 + N
+	# and prints nothing itself; name the signal for the driver's log.
+	if [ "$status" -gt 128 ]; then
+		signal_name="$(kill -l $((status - 128)) 2>/dev/null || true)"
+		log_error "The installer stopped with exit $status${signal_name:+ (signal SIG${signal_name#SIG})}."
+	fi
 	if [ -n "$DOWNLOAD_PID" ]; then
 		kill "$DOWNLOAD_PID" 2>/dev/null || true
 		wait "$DOWNLOAD_PID" 2>/dev/null || true

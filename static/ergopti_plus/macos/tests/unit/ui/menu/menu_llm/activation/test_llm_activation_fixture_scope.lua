@@ -24,7 +24,7 @@ local OWNED_MODULES = {
 	"ui.menu.menu_llm.backend_panel",
 	"ui.menu.menu_llm.trigger_panel",
 	"ui.menu.menu_llm.api_panel",
-	"ui.menu.menu_llm.models_selector",
+	"ui.menu.menu_llm.model_selector_page",
 	"ui.menu.menu_llm.model_switcher",
 	"modules.llm.api_mlx",
 	"ui.menu.menu_llm.startup_controller",

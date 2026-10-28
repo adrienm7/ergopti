@@ -4,8 +4,9 @@
 ; MODULE: LLM Tray — Remote API entries
 ; DESCRIPTION:
 ; Manages the user-defined list of remote API endpoints (OpenAI, Anthropic,
-; Google Gemini, OpenAI-compatible). When backend = "api", the model picker
-; becomes an "API endpoints" picker built from this list. Includes the
+; Google Gemini, OpenAI-compatible). The model selector page lists them and
+; runs their selection, test, edit and removal (ui/model_browser/init.ahk);
+; the tray builds no list of them since 2026-10-27. Includes the
 ; create/edit dialog flow, the JSON persistence layer (api_entries.json
 ; alongside config.toml), DPAPI token encryption, and complete schema
 ; validation before publication.
@@ -32,93 +33,11 @@
 
 
 
-; ======================================
-; ======================================
-; ======= 1/ API Entries Submenu =======
-; ======================================
-; ======================================
-
-; Build the "API endpoints" submenu shown when backend == "api". When the user
-; has no entries yet, the menu carries a single greyed-out hint plus the
-; "+ Add" action so the next click takes them straight to the entry dialog.
-_LLM_Menu_BuildApiEntriesMenu() {
-	m := Menu()
-	MenuRenderer_FillFromList(m, "llm_menu", "llm_model", (*) => _LLM_Menu_ApiEntriesRows())
-	return m
-}
-
-; The same list as row DATA. It stands in for the model picker's rows when the
-; backend is remote, which is why it renders under that same list id.
-_LLM_Menu_ApiEntriesRows() {
-	global _LLM_Menu
-	Rows := []
-	entries := _LLM_Menu["api_entries"]
-	if (Type(entries) != "Array" or entries.Length == 0) {
-		EmptyRows := MenuRenderer_TemplateRows("llm_api_empty_status", Map(), Map(), Map())
-		if !(EmptyRows is Array)
-			return []
-		for Row in EmptyRows
-			Rows.Push(Row)
-	} else {
-		active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
-		Names := _LLM_Menu_ApiEntryNameList(entries)
-		for Index, entry in entries {
-			id   := _LLM_MenuApiEntryGet(entry, "Id",   "")
-			Rows.Push(Map(
-				"label",   Names[Index],
-				"checked", (id == active_id),
-				"action",  _LLM_Menu_MakeSelectApiEntryHandler(entry)))
-		}
-	}
-	; Add sits before the separator so creating an entry is one glance
-	; away; the separator only appears with the management rows, never
-	; dangling when no entry exists.
-	AddRows := MenuRenderer_TemplateRows("llm_api_add_command",
-		Map("api_add_entry", (*) => _LLM_Menu_PromptApiEntry("")), Map(), Map())
-	if !(AddRows is Array)
-		return []
-	for Row in AddRows
-		Rows.Push(Row)
-	if (Type(entries) == "Array" and entries.Length > 0) {
-		; Management rows: most frequent first, destructive delete last.
-		Separators := MenuRenderer_TemplateRows("llm_api_add_separator", Map(), Map(), Map())
-		if !(Separators is Array)
-			return []
-		for Row in Separators
-			Rows.Push(Row)
-		Commands := Map("api_test_active", (*) => _LLM_Menu_TestActiveApiEntry(),
-			"api_remove_active", (*) => _LLM_Menu_RemoveActiveApiEntry())
-		Getters := Map("llm_api_active_ready", _LLM_Menu_ActiveApiCommandsReady)
-		for Declaration in _MR_GetMenuDef("llm_api_active_commands") {
-			; Keep the existing lazy Edit owner immediately before removal.
-			if Declaration["id"] == "api_remove_active" {
-				EditRows := MenuRenderer_TemplateRows("llm_api_edit_command",
-					Map("api_edit_entry", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])), Map(), Map())
-				if !(EditRows is Array)
-					return []
-				for EditRow in EditRows
-					Rows.Push(EditRow)
-			}
-			Row := MenuRenderer_CommandRow("llm_api_active_commands", Declaration["id"], Commands, Getters)
-			if Row is Map
-				Rows.Push(Row)
-		}
-	}
-	return _LLM_Menu_GuardConfigRows(Rows)
-}
-
-/**
- * Reads the existing active API owner before a retained menu command runs.
- * @returns {Boolean} Whether the current entry is available to the configuration command.
- */
-_LLM_Menu_ActiveApiCommandsReady() {
-	global _LLM_Menu
-	if !_LLM_Menu.Has("api_entry_id") || !(_LLM_Menu["api_entry_id"] is String)
-			|| _LLM_Menu["api_entry_id"] == ""
-			|| !_LLM_Menu.Has("api_entries") || !(_LLM_Menu["api_entries"] is Array)
-		return false
-	return _LLM_Menu_ApiEntryIdCount(_LLM_Menu["api_entries"], _LLM_Menu["api_entry_id"]) == 1
-}
+; ==================================
+; ==================================
+; ======= 1/ API Entry Names =======
+; ==================================
+; ==================================
 
 ; The host an entry sends to, with its port, lowercase: "https://api.x.ai/v1"
 ; gives "api.x.ai". Port of api_entry_names.lua's M.host.
@@ -2311,4 +2230,198 @@ _LLM_Menu_ShowApiManagedFailure(Owner, Info, NotifyFn := 0, PresentFn := 0) {
 	return ManagedNetworkTerminalFailure.Publish("api_test", Info.Get("network_report", 0),
 		() => _LLM_Menu_ApiFailureCurrent(Owner), "menu.llm.api_unreachable_title",
 		() => _LLM_Menu_TestActiveApiEntry(NotifyFn, EntryId), PresentFn)
+}
+
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 6/ Model Selector Page Rows =======
+; ===========================================
+; ===========================================
+
+/**
+ * The model selector page's API rows: one per model the entry's provider
+ * listed, or, while that listing is pending, refused or unavailable, the
+ * provider's known models and a typed-id row with the reason as its hint
+ * (LLM_ApiListingPlan, the port of _shared/lua/llm/api_model_listing.lua). An
+ * entry without its key keeps one greyed row that offers the edit setting it.
+ * @param {Map} Rows Page rows by "<backend>`n<name>", filled.
+ * @param {Array} Models Row JSON, filled.
+ * @param {Map|Integer} Listings Listing state by entry id; 0 when never asked.
+ */
+_LLM_Menu_ApiEntryPageRows(Rows, Models, Listings := 0) {
+	global _LLM_Menu, LLM_LOCAL_API_SERVERS, LLM_API_PROVIDERS
+	Entries := _LLM_Menu.Has("api_entries") && _LLM_Menu["api_entries"] is Array ? _LLM_Menu["api_entries"] : []
+	ActiveId := _LLM_Menu.Get("api_entry_id", "")
+	if Entries.Length == 0
+		return
+	Names := _LLM_Menu_ApiEntryNameList(Entries)
+	; Two entries of one provider and host can share a model name: each entry's
+	; own model wins, then the first entry keeps a shared known model or
+	; typed-id row (_LLM_Menu_ApiPageRow keeps the first name).
+	Later := []
+	for Index, Entry in Entries {
+		Id := _LLM_MenuApiEntryGet(Entry, "Id", "")
+		ProviderId := _LLM_MenuApiEntryGet(Entry, "Provider", "")
+		; The same token rule as the request path: an entry its endpoint
+		; would refuse is greyed and offers only the edit that sets the key.
+		KeyMissing := !LocalServerAuthEntryTokenAllowed(ProviderId,
+			_LLM_MenuApiEntryGet(Entry, "Token", ""), _LLM_MenuApiEntryGet(Entry, "BaseUrl", ""),
+			LLM_LOCAL_API_SERVERS)
+		Configured := _LLM_Menu_ResolveApiEntry(Entry)["model"]
+		if KeyMissing {
+			RowActions := Map("set_key", _LLM_Menu_PromptApiEntry.Bind(Id))
+			_LLM_Menu_ApiPageRow(Rows, Models, Names[Index], Configured, ProviderId, RowActions,
+				"{id:" . JsonStringLiteral("set_key") . ",text:" . JsonStringLiteral(t("menu.llm.api_edit_entry")) . "}",
+				0, ",available:false,hint_key:" . JsonStringLiteral("model_browser.hint_api_no_key"))
+			continue
+		}
+		Provider := LLM_API_PROVIDERS.Has(ProviderId) ? LLM_API_PROVIDERS[ProviderId] : Map()
+		Extras := []
+		for ExtraId in Provider.Get("ModelExtras", Map())
+			Extras.Push(ExtraId)
+		Plan := LLM_ApiListingPlan(Map("model", Configured, "default_model", Provider.Get("DefaultModel", ""),
+			"extras", Extras, "format", Provider.Get("Format", "")),
+			Listings is Map ? Listings.Get(Id, 0) : 0)
+		Parts := LLM_ApiListingNameParts(Names[Index], Configured)
+		for Item in Plan["models"] {
+			Model := Item["model"]
+			RowActions := Map(), ActionsJson := ""
+			if (Id == ActiveId && Model == Configured) {
+				for Pair in [["test", t("menu.llm.api_test_entry"), (*) => _LLM_Menu_TestActiveApiEntry()],
+						["edit", t("menu.llm.api_edit_entry"), (*) => _LLM_Menu_PromptApiEntry(ActiveId)],
+						["remove", t("menu.llm.api_remove_entry"), (*) => _LLM_Menu_RemoveActiveApiEntry()]] {
+					RowActions[Pair[1]] := _LLM_Menu_ApiActiveEntryAction.Bind(ActiveId, Pair[3])
+					ActionsJson .= (ActionsJson == "" ? "" : ",") . "{id:" . JsonStringLiteral(Pair[1]) . ",text:" . JsonStringLiteral(Pair[2]) . "}"
+				}
+			}
+			Select := Model == Configured ? _LLM_Menu_ApiPageSelectAction(Entry) : _LLM_Menu_ApiPageModelAction(Id, Model)
+			Args := [Parts[1] . "/" . Model . Parts[2], Model, ProviderId, RowActions, ActionsJson, Select, ""]
+			if (Model == Configured)
+				_LLM_Menu_ApiPageRow(Rows, Models, Args*)
+			else
+				Later.Push(Args)
+		}
+		if (Plan["typed_hint"] != "") {
+			; Not a model: the place to type one the provider serves, with the
+			; reason its list is missing. Named by the provider (and the entry's
+			; host), it cannot collide with a "<provider>/<model>" row.
+			Later.Push([Parts[1] . Parts[2], Configured, ProviderId,
+				Map("other_model", _LLM_Menu_PromptApiPageModel.Bind(Id, Configured)),
+				"{id:" . JsonStringLiteral("other_model") . ",text:" . JsonStringLiteral(t("model_browser.api_other_model")) . "}",
+				0, ",available:false,typed:true,hint_key:" . JsonStringLiteral(Plan["typed_hint"])])
+		}
+	}
+	for Args in Later
+		_LLM_Menu_ApiPageRow(Rows, Models, Args*)
+}
+
+; Registers one API row of the page and its JSON. Two entries of one provider
+; can share a known model or the typed-id row: the first entry keeps that name.
+_LLM_Menu_ApiPageRow(Rows, Models, Name, Model, ProviderId, RowActions, ActionsJson, Select, ExtraJson) {
+	if Rows.Has("api`n" . Name)
+		return false
+	Row := Map("backend", "api", "name", Name, "installed", true, "row_actions", RowActions)
+	if HasMethod(Select, "Call")
+		Row["select"] := Select
+	Row["json"] := "{backend:" . JsonStringLiteral("api") . ",name:" . JsonStringLiteral(Name)
+		. ",runtime_name:" . JsonStringLiteral(Model) . ",provider:" . JsonStringLiteral(ProviderId)
+		. ExtraJson . ",installed:true,actions:[" . ActionsJson . "]}"
+	Models.Push(Row["json"])
+	Rows["api`n" . Name] := Row
+}
+
+/** A listed model other than the entry's own: the entry takes it, then the API backend. */
+_LLM_Menu_ApiPageModelAction(EntryId, Model) {
+	return (*) => _LLM_Menu_SetApiEntryModel(EntryId, Model)
+}
+
+/**
+ * Asks for a model id the provider serves but did not list, then makes it the
+ * entry's model.
+ * @returns {Boolean|Integer} The selection's result, false when cancelled or refused.
+ */
+_LLM_Menu_PromptApiPageModel(EntryId, Configured, InputFn := Ui_InputBox) {
+	ib := InputFn.Call(t("menu.llm.api_prompt_model"), t("menu.llm.api_window_title"), "w420 h130", Configured)
+	if !IsObject(ib) || ib.Result != "OK"
+		return false
+	return _LLM_Menu_SetApiEntryModel(EntryId, Trim(ib.Value))
+}
+
+/**
+ * Makes one model the entry's own and the entry the active one, in one
+ * private-entries transaction, then selects the API backend.
+ * @param {String} EntryId The entry.
+ * @param {String} Model A model id LLM_ApiListingValidId admits.
+ * @returns {Boolean|Integer} 1 or true when committed, false when refused.
+ */
+_LLM_Menu_SetApiEntryModel(EntryId, Model) {
+	global _LLM_Menu
+	if !LLM_ApiListingValidId(Model) {
+		try LoggerWarn("LLM", "Refused an API model id from the selector page: it is not a model id.")
+		return false
+	}
+	Owner := LLM_Menu_ApiPrivateSourceOwner(Map())
+	Receipt := Owner.Capture()
+	if !(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry model", 0,
+			"the originating private configuration is unavailable")
+	Committed := LLM_Menu_CommitApiEntriesMutation("the LLM API-entry model",
+		(Candidate) => _LLM_Menu_SetApiEntryModelCandidate(Candidate, EntryId, Model),
+		_LLM_Menu_ApplyApiEntriesCommitted, Owner.Port, 0, 0, 0, 0, 0, 0, 0, Receipt, Owner, (*) => true)
+	if !((Committed is Integer) && Committed == 1)
+		return false
+	try LoggerInfo("LLM", "API entry '{1}' model set from the selector page: {2}.", EntryId, Model)
+	if (_LLM_Menu.Get("backend", "") != "api")
+		return LLM_Menu_SetBackend("api")
+	return true
+}
+
+_LLM_Menu_SetApiEntryModelCandidate(Candidate, EntryId, Model) {
+	if !_LLM_Menu_SelectApiEntryCandidate(Candidate, EntryId)
+		return false
+	for Index, Entry in Candidate["api_entries"] {
+		if _LLM_MenuApiEntryGet(Entry, "Id", "") != EntryId
+			continue
+		if !(Entry is Map)
+			return false
+		Copy := LLM_Menu_DeepClone(Entry)
+		Copy["Model"] := Model
+		if !_LLM_Menu_ApiEntryFieldsAreSafe(Copy)
+			return false
+		Candidate["api_entries"][Index] := Copy
+		return true
+	}
+	return false
+}
+
+/**
+ * Runs an active-entry action only while that entry is still the active one:
+ * a page drawn before a switch or removal cannot act on its successor.
+ * @returns {Boolean|Integer} The action's result, false when refused.
+ */
+_LLM_Menu_ApiActiveEntryAction(EntryId, Action, *) {
+	global _LLM_Menu
+	if (_LLM_Menu.Get("api_entry_id", "") != EntryId) {
+		try LoggerWarn("LLM", "Refused an action on API entry '{1}': it is no longer active.", EntryId)
+		return false
+	}
+	return Action.Call()
+}
+
+/** The API entry selection, after the API backend when another one is active. */
+_LLM_Menu_ApiPageSelectAction(Entry) {
+	return (*) => _LLM_Menu_ApiPageSelect(Entry)
+}
+
+_LLM_Menu_ApiPageSelect(Entry) {
+	global _LLM_Menu
+	if !_LLM_Menu_SelectApiEntry(Entry)
+		return false
+	if (_LLM_Menu.Get("backend", "") != "api")
+		return LLM_Menu_SetBackend("api")
+	return true
 }

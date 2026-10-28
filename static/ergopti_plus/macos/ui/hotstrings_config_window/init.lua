@@ -114,10 +114,7 @@ end
 local ASSETS_DIR = (Paths.shared("ui/hotstrings_config_window") or "") .. "/"
 
 -- Display order for the built-in categories — matches the menu and the AHK driver.
-local CATEGORY_ORDER = {
-	"magickey", "autocorrection", "rolls",
-	"sfbsreduction", "distancesreduction", "personal",
-}
+local CATEGORY_ORDER = require("menu.row_order").list("hotstring_config_categories")
 
 -- Friendly labels for each built-in category. Falls back to the TOML's [_meta]
 -- description when this table has no entry for a given key.
@@ -944,6 +941,13 @@ function M.open()
 	_webview = webview
 	Logger.info(LOG, "Hotstrings config window opened.")
 	return owner_is_current(owner)
+end
+
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window()
+	if _webview ~= nil and owner_is_current(_owner) then return _webview end
+	return nil
 end
 
 --- Close and destroy the window.

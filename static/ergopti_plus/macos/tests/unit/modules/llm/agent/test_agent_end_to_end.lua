@@ -235,7 +235,7 @@ helpers.describe("AI agent end to end (llm_agent_selection, llm_agent_command)",
 		trigger(world, "llm_agent_selection")
 		answer(world.posts[2], TWO_ACTIONS)
 		accept(world, 2)
-		world.runs[2].on_done(false, { reason = "automation refused", permission = "Mail" })
+		world.runs[2].on_done(false, { reason = require("adapter_errors").CONNECTOR_AUTOMATION_REFUSED, permission = "Mail" })
 		helpers.assert_eq(world.notices[#world.notices], world.i18n.format("llm.agent.permission_needed", "Mail"))
 		helpers.assert_eq(world.settings_opened, true, "System Settings opens at Automation")
 	end)

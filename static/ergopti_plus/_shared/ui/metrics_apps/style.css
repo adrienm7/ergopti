@@ -68,7 +68,7 @@
 		--llm-bg: rgba(var(--kpi-llm-rgb), 0.1);
 		--global-bg: rgba(var(--kpi-wpm-rgb), 0.1);
 
-		--score-pos-color: #32d74b;
+		--score-pos-color: var(--theme-hue-32d74b);
 		--score-neg-color: var(--theme-red-dark);
 		--score-neutral-color: #bdbdbd;
 		--score-pos-bg: rgba(50, 215, 75, 0.08);
@@ -167,7 +167,7 @@ h1 {
 .filter-btn.active {
 	background: var(--accent);
 	border-color: var(--accent);
-	color: #fff;
+	color: var(--theme-white);
 	font-weight: bold;
 }
 
@@ -201,7 +201,7 @@ h1 {
 	text-transform: uppercase;
 }
 .stats-grid-secondary .stat-value {
-	color: #fff;
+	color: var(--theme-white);
 	font-size: 1.4em;
 	font-weight: 600;
 }
@@ -227,7 +227,7 @@ h1 {
 	background: #1a1a1a;
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	border-radius: 12px;
-	color: #ddd;
+	color: var(--theme-grey-ddd);
 	max-width: 920px;
 	padding: 20px 24px;
 	width: 100%;
@@ -241,21 +241,21 @@ h1 {
 	padding-bottom: 10px;
 }
 .app-modal-header h2 {
-	color: #fff;
+	color: var(--theme-white);
 	font-size: 18px;
 	margin: 0;
 }
 .app-modal-close {
 	background: transparent;
 	border: 0;
-	color: #888;
+	color: var(--theme-grey-888);
 	cursor: pointer;
 	font-size: 24px;
 	line-height: 1;
 	padding: 0 8px;
 }
 .app-modal-close:hover {
-	color: #fff;
+	color: var(--theme-white);
 }
 .app-modal-tiles {
 	display: grid;
@@ -270,19 +270,19 @@ h1 {
 	padding: 10px 12px;
 }
 .app-modal-tile-label {
-	color: #888;
+	color: var(--theme-grey-888);
 	font-size: 10px;
 	letter-spacing: 0.5px;
 	text-transform: uppercase;
 }
 .app-modal-tile-value {
-	color: #fff;
+	color: var(--theme-white);
 	font-size: 16px;
 	font-weight: 600;
 	margin-top: 2px;
 }
 .app-modal-tile-detail {
-	color: #888;
+	color: var(--theme-grey-888);
 	font-size: 10px;
 	margin-top: 2px;
 }
@@ -290,7 +290,7 @@ h1 {
 	margin-top: 14px;
 }
 .app-modal-section h3 {
-	color: #888;
+	color: var(--theme-grey-888);
 	font-size: 12px;
 	letter-spacing: 0.5px;
 	margin: 0 0 8px 0;

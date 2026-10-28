@@ -170,11 +170,7 @@ local function get_model_info_logic(model_name, presets)
 
 	local tag_list = {}
 	for em, _ in pairs(seen_emojis) do table.insert(tag_list, em) end
-	local EMOJI_ORDER = { ["🏆"]=1, ["⚡"]=2, ["🧠💭"]=3, ["🧠"]=4, ["💻"]=5, ["🌐"]=6, ["🖼️"]=7, ["⭐"]=8 }
-	table.sort(tag_list, function(a, b)
-		local oa = EMOJI_ORDER[a] or 99; local ob = EMOJI_ORDER[b] or 99
-		if oa == ob then return a < b end; return oa < ob
-	end)
+	table.sort(tag_list, require("menu.row_order").comparator("model_tag_emoji"))
 
 	local tag_str = #tag_list > 0 and (" " .. table.concat(tag_list, "")) or ""
 	return {
@@ -602,7 +598,7 @@ function M.new(deps)
 			end
 
 			local schedule_ok, handle_or_error, timer_committed = xpcall(function()
-				return TimerScheduler.after(0.1, timer_callback)
+				return TimerScheduler.after(require("infra.timings").sec("ui", "model_manager_retry_ms"), timer_callback)
 			end, debug.traceback)
 			if schedule_ok == true and type(handle_or_error) == "table" then
 				owner.handle = handle_or_error
@@ -784,6 +780,11 @@ function M.new(deps)
 		return filtered
 	end
 	
+	--- The whole catalogue, whatever the active backend: the model selector
+	--- page lists every backend's rows side by side.
+	--- @return table presets
+	function obj.get_all_presets() return presets end
+
 	function obj.get_mlx_repo(name) return mlx.get_mlx_repo(name) end
 	function obj.get_model_info(name) return get_model_info_logic(name, presets) end
 	
@@ -821,6 +822,46 @@ function M.new(deps)
 		else
 			return ollama.get_installed_models() or {}
 		end
+	end
+
+	--- The installed models of one local backend, whatever backend is active:
+	--- the model selector page shows Ollama and MLX side by side.
+	--- @param backend string "ollama" or "mlx".
+	--- @return table installed Model name -> true.
+	function obj.backend_installed_models(backend)
+		if backend == "mlx" then return mlx.get_installed_models() or {} end
+		if backend == "ollama" then return ollama.get_installed_models() or {} end
+		error("models_manager.backend_installed_models: unknown local backend " .. tostring(backend))
+	end
+
+	--- Whether one backend holds a model, by display name or native name.
+	--- @param backend string "ollama" or "mlx".
+	--- @param display_name string Display name or backend-native identifier.
+	--- @return boolean installed
+	function obj.backend_model_installed(backend, display_name)
+		local installed = obj.backend_installed_models(backend)
+		if installed[display_name] then return true end
+		local actual_name = get_actual_model_name(display_name, presets, backend == "mlx")
+		return (installed[actual_name] or installed[actual_name .. ":latest"]) == true
+	end
+
+	--- The backend-native name of a catalogue model for one backend.
+	--- @param backend string "ollama" or "mlx".
+	--- @param display_name string Display name.
+	--- @return string
+	function obj.backend_actual_model_name(backend, display_name)
+		return get_actual_model_name(display_name, presets, backend == "mlx")
+	end
+
+	--- Downloads a Hugging Face repository the user added for MLX, through the
+	--- MLX download window catalogue models use.
+	--- @param repo string Validated owner/name repository id.
+	--- @param on_success function|nil
+	--- @param on_cancel function|nil
+	--- @param opts table|nil
+	--- @return boolean accepted
+	function obj.pull_mlx_repo(repo, on_success, on_cancel, opts)
+		return mlx.pull_model(repo, repo, on_success, on_cancel, opts) ~= false
 	end
 
 	function obj.check_requirements(target_model, on_success, on_cancel, opts)
@@ -949,6 +990,49 @@ function M.new(deps)
 		end
 		return ollama.pull_model(model, model, on_success, on_cancel, opts) == true
 	end
+
+	--- Removes a model from the local Ollama server, whatever backend the AI
+	--- menu uses for predictions (the developer field run's cleanup).
+	--- @param model string Ollama model name.
+	--- @return boolean accepted
+	function obj.delete_ollama_model(model)
+		return ollama.delete_model(model) == true
+	end
+
+	--- Downloads a catalogue model through the MLX download window, whatever
+	--- backend the AI menu uses. Its owner starts the model's server once the
+	--- download completes, as selecting the model does.
+	--- @param display_name string Display name from _shared/modules/llm/models.json.
+	--- @param on_success function|nil Called once the model is downloaded and served.
+	--- @param on_cancel function|nil Receives the reason of a failed or cancelled download.
+	--- @param opts table|nil Freshness and ownership options.
+	--- @return boolean accepted
+	function obj.pull_mlx_model(display_name, on_success, on_cancel, opts)
+		local repo = mlx.get_mlx_repo(display_name)
+		if not repo then
+			Logger.error(LOG, "MLX download refused: %s names no MLX repository.", tostring(display_name))
+			if type(on_cancel) == "function" then
+				Logger.callback(LOG, "MLX download repository refusal", on_cancel, "unavailable")
+			end
+			return false
+		end
+		return mlx.pull_model(display_name, repo, on_success, on_cancel, opts) ~= false
+	end
+
+	--- Reports whether the MLX cache holds a catalogue model.
+	--- @param display_name string Display name.
+	--- @return boolean installed
+	function obj.mlx_model_installed(display_name)
+		return (mlx.get_installed_models() or {})[display_name] == true
+	end
+
+	--- Removes a catalogue model from the MLX cache, whatever the active backend.
+	--- @param display_name string Display name.
+	--- @return boolean accepted
+	function obj.delete_mlx_model(display_name)
+		return mlx.delete_model(display_name) == true
+	end
+
 	function obj.delete_model(name) return get_active().delete_model(name) end
 	function obj.force_mlx_check(target_model, on_success, on_cancel, opts)
 		return mlx.check_requirements(target_model, on_success, on_cancel,

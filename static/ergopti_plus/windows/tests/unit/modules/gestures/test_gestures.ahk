@@ -255,6 +255,53 @@ TestGestures_ToggleUIRejectsLiveActivationRefusal() {
 Test("Gestures: toggle surfaces a live activation refusal (gesture-toggle-activation-race)",
 	TestGestures_ToggleUIRejectsLiveActivationRefusal)
 
+; The toggle behind every UI window action (actions.toml, group "UI"): closed
+; opens, open in the background is raised and never closed, focused closes.
+TestGestures_ToggleUIThreeStates() {
+	Open := _GTUI_CallRecorder()
+	Close := _GTUI_CallRecorder()
+	Activate := _GTUI_CallRecorder(true)
+	_GestureGenericToggleUIWith((*) => 0, Open, Close, (*) => false, (*) => 0, Activate)
+	AssertEqual(1, Open.calls, "a closed window opens")
+	_GestureGenericToggleUIWith((*) => 123, Open, Close, (*) => true, (*) => 456, Activate)
+	AssertEqual(1, Activate.calls, "a background window is raised")
+	AssertEqual(0, Close.calls, "a background window is never closed")
+	_GestureGenericToggleUIWith((*) => 123, Open, Close, (*) => true, (*) => 123, Activate)
+	AssertEqual(1, Close.calls, "a focused window closes")
+	AssertEqual(1, Open.calls, "neither raise nor close opens a second window")
+}
+Test("Gestures: a UI window toggles open, raise, close (webview-toggle-actions)",
+	TestGestures_ToggleUIThreeStates)
+
+; Every catalogue window action names a page of the toggle table whose HWND
+; probe reads the page owner's own global (0 while closed) and whose opener is
+; the page's existing open function.
+TestGestures_EveryWindowActionHasATogglePage() {
+	Expected := Map(
+		"open_metrics_typing", "metrics_typing", "open_metrics_apps", "metrics_apps",
+		"open_hotstrings_editor", "hotstrings_editor", "open_paths_editor", "paths_editor",
+		"open_hotstrings_settings", "hotstrings_settings", "open_layout_manager", "layout_manager",
+		"open_layer_editor", "layer_editor", "open_model_browser", "model_browser",
+		"open_changelog", "changelog", "open_healthcheck", "healthcheck")
+	Listed := Map()
+	for ActionName in GestureActionPickerIds()
+		Listed[ActionName] := true
+	for ActionName, Page in Expected {
+		AssertTrue(Listed.Has(ActionName), ActionName . " is in the Windows catalogue")
+		AssertTrue(GESTURE_ACTIONS.Has(ActionName), ActionName . " has a handler")
+		Entry := _GestureToggleUIPage(Page)
+		AssertTrue(IsObject(Entry), Page . " is a toggle page")
+		AssertTrue(HasMethod(Entry.Hwnd, "Call") && HasMethod(Entry.Open, "Call"),
+			Page . " names its HWND probe and opener")
+		if (Page != "metrics_typing" && Page != "metrics_apps")
+			AssertEqual(0, Entry.Hwnd.Call(), Page . " reads as closed under the harness")
+	}
+	AssertEqual("", _GestureToggleUIPage("no_such_page"), "an unknown page has no entry")
+	AssertFalse(WMRequestClose(0), "no close request is posted without a window")
+}
+Test("Gestures: every UI window action has a toggle page (webview-toggle-actions)",
+	TestGestures_EveryWindowActionHasATogglePage)
+
 ; Catalogue <-> registry parity, both directions. A listed id with no handler
 ; is a binding that does nothing when it fires; a registered handler the
 ; catalogue does not list is a feature nobody can bind. The generated catalogue

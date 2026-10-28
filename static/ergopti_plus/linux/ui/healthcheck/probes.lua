@@ -74,7 +74,11 @@ local function start_probe(run, id, body)
 		if settled then return end
 		settled = true
 		result.ms = math.floor(now_ms() - started + 0.5)
-		Logger.done(LOG, "Probe '%s' answered: %s (%d ms).", id, result.state, result.ms)
+		-- A failed answer carries its detail into the log: the diagnostics window
+		-- closes, and a field report holds only the log (issue #104).
+		local detail = result.state ~= "ok" and type(result.detail) == "string" and result.detail ~= ""
+			and (": " .. result.detail) or ""
+		Logger.done(LOG, "Probe '%s' answered: %s (%d ms)%s.", id, result.state, result.ms, detail)
 		if run.cancelled then return end
 		run.publish(id, result, sections)
 	end
@@ -170,7 +174,7 @@ local function proxy_pac(config, run)
 			run.cancellers[#run.cancellers + 1] = function() HttpClient.cancel(PAC_OWNER) end
 			HttpClient.get(url, { ["User-Agent"] = USER_AGENT },
 				{ timeout_ms = config.timeout_ms, owner = PAC_OWNER }, function(result)
-					local state, text = PacCheck.judge(result.status, result.body)
+					local state, text = PacCheck.judge(result.status, result.body, result.error)
 					if state == "ok" then
 						done({ state = "ok" }, { network = { proxy_pac = text } })
 					else
@@ -361,7 +365,7 @@ local function configuration(schema, run, overrides)
 			done({ state = "unsupported" })
 			return
 		end
-		local handle = Timers.after(0.001, function()
+		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_defer_ms"), function()
 			local context = require("ui.healthcheck.bridge").configuration_context(schema, overrides)
 			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
 			if not ok then

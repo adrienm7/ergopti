@@ -1,5 +1,6 @@
 --- tests/unit/adapters/processes/test_owned_process.lua
 
+local Errors = require("adapter_errors")
 local helpers = require("tests.helpers")
 
 --- Creates a controllable native backend with independently acknowledged handles.
@@ -128,7 +129,7 @@ test("(context-async-private-output) counts cumulative streamed bytes even witho
 	state.absent = true; state.finish(0); state.acknowledge()
 	assert(operation:is_settled() and result and not result.ok)
 	assert(chunks == 1 and result.stdout == "" and result.stderr == "")
-	assert(result.error == "process output exceeds its bound")
+	assert(result.error == Errors.PROCESS_OUTPUT_EXCEEDS_BOUND)
 end)
 
 test("(context-async-private-output) rejects ambiguous retention and preserves legacy defaults", function(owner, _, state)
@@ -204,7 +205,7 @@ test("a leader with closed pipes cannot hide a remaining descendant group", func
 	end
 	state.acknowledge()
 	assert(operation:is_settled() and callbacks == 1)
-	assert(result and not result.ok and result.error == "native process group outlived leader")
+	assert(result and not result.ok and result.error == Errors.PROCESS_GROUP_OUTLIVED_LEADER)
 end)
 
 test("a refused cleanup monitor can be rearmed by the exact owner", function(owner, native, state)
@@ -269,7 +270,7 @@ test("partial allocation preserves its first handle until close acknowledgement"
 	end
 	local operation = owner.start("program", {}, { owner = "owner" }, function() end)
 	assert(not operation.started and state.spawns == 0 and not operation:is_settled())
-	assert(operation.error == "native handle allocation failed")
+	assert(operation.error == Errors.PROCESS_HANDLE_ALLOCATION_FAILED)
 	state.acknowledge()
 	assert(operation:is_settled())
 end)
@@ -340,7 +341,7 @@ test("output bound preserves prior bytes and requires physical teardown", functi
 	state.absent = true
 	state.exit(0, 9)
 	state.acknowledge()
-	assert(operation:is_settled() and result.error == "process output exceeds its bound" and result.stdout == "four")
+	assert(operation:is_settled() and result.error == Errors.PROCESS_OUTPUT_EXCEEDS_BOUND and result.stdout == "four")
 end)
 
 test("explicit daemon tail capture remains bounded without killing ordinary output", function(owner, _, state)
@@ -380,7 +381,7 @@ test("native spawn refusal waits for handles and completes exactly once", functi
 	assert(not operation.started and not operation:is_settled() and callbacks == 0)
 	state.acknowledge()
 	assert(operation:is_settled() and callbacks == 1)
-	assert(result and not result.ok and result.error == "native process dispatch failed")
+	assert(result and not result.ok and result.error == Errors.PROCESS_DISPATCH_FAILED)
 end)
 
 -- These exercise the actual existing supervisor against fixed independent bytes.
@@ -390,7 +391,7 @@ test("default process limit still refuses the measured archive names output", fu
  state.output(string.rep("n", 117004))
  assert(result == nil and not operation:is_settled())
  state.absent = true; state.finish(0); state.acknowledge()
- assert(operation:is_settled() and result and not result.ok and result.error == "process output exceeds its bound")
+ assert(operation:is_settled() and result and not result.ok and result.error == Errors.PROCESS_OUTPUT_EXCEEDS_BOUND)
 end)
 
 test("captured updater limit admits both measured listing outputs", function(owner, _, state)
@@ -419,7 +420,7 @@ test("explicit updater listing ceiling still rejects one byte beyond its cap", f
  state.output(string.rep("x", cap)); state.output("y")
  assert(result == nil and not operation:is_settled())
  state.absent = true; state.finish(0); state.acknowledge()
- assert(operation:is_settled() and result and not result.ok and result.error == "process output exceeds its bound")
+ assert(operation:is_settled() and result and not result.ok and result.error == Errors.PROCESS_OUTPUT_EXCEEDS_BOUND)
  assert(#result.stdout == cap and result.stdout:sub(-1) == "x")
 end)
 

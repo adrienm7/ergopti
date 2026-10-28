@@ -78,6 +78,21 @@ helpers.describe("HttpClient taskless native settlement", function()
 		end)
 	end)
 
+	-- hs.http answers a transport failure with status -1 and the system's reason
+	-- as the body. The adapter kept only "Network request failed", so the PAC
+	-- probe of issue #104 reported an error with no cause anywhere.
+	helpers.it("keeps the native transport reason of a failed request (issue104-transport-reason)", function()
+		isolated(function(client, state)
+			local result
+			helpers.assert_true(client.get("http://owned.invalid/pac", {}, function(r) result = r end))
+			state.requests[1].callback(-1, "The resource could not be loaded because the App Transport Security policy requires the use of a secure connection.\n")
+			helpers.assert_eq(result.status, 0)
+			helpers.assert_eq(result.body, "")
+			helpers.assert_eq(result.error, "Network request failed: The resource could not be loaded because the App"
+				.. " Transport Security policy requires the use of a secure connection.")
+		end)
+	end)
+
 	helpers.it("keeps superseded taskless native generations independently pending (http-native-request-settlement)", function()
 		isolated(function(client, state)
 			local first, second, settlements = 0, 0, 0

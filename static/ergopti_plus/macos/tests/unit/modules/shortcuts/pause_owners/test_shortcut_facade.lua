@@ -369,11 +369,10 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			"ui.menu.menu_llm.streaming_panel",
 			"ui.menu.menu_llm.trigger_panel",
 			"ui.menu.menu_llm.api_panel",
-			"ui.menu.menu_llm.models_selector",
 		}) do
 			package.loaded[name] = { build = function() return {} end }
 		end
-		package.loaded["ui.menu.menu_llm.api_panel"].build_model_picker = function() return {} end
+		package.loaded["ui.menu.menu_llm.api_panel"].active_entry_caption_text = function() return nil end
 		package.loaded["ui.menu.menu_llm.warmup_controller"] = {}
 		package.loaded["ui.menu.menu_llm.backend_panel"] = {
 			is_apple_silicon = function() return false end,

@@ -38,6 +38,21 @@
 		}
 	},
 	"max_proxy_bytes": 65536,
+	"pac_unavailable_fallback": {
+		"route": "direct",
+		"stages": [
+			"native_proxy_lookup",
+			"native_proxy_budget",
+			"native_proxy_candidates",
+			"native_pac_download",
+			"native_pac_evaluation",
+			"native_proxy_routes",
+			"native_wpad_discovery",
+			"native_route_empty"
+		],
+		"explicit_environment_relay": "no_fallback",
+		"pac_selected_relay_failure": "no_fallback"
+	},
 	"selected_proxy_bypass": "environment",
 	"missing_native_capability": "environment",
 	"unavailable_native_errors": ["proxy-native-unavailable", "proxy-backend-unavailable"],

@@ -22,6 +22,7 @@ local M = {}
 local hs      = hs
 local llm_mod = require("modules.llm")
 local Logger  = require("infra.logger")
+local Errors  = require("adapter_errors")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
@@ -798,8 +799,8 @@ function M.new(ctx)
 		---   manager's reason for an unexplained failure, which stays an error.
 		local function disable_llm(cause)
 			if type(cause) == "table" then
-				Logger.warn(LOG, "Disabling LLM: the %s backend %s.", tostring(cause.backend),
-					tostring(cause.reason))
+				Logger.warn(LOG, "Disabling LLM: the %s backend (%s%s).", tostring(cause.backend),
+					tostring(cause.reason), cause.detail ~= nil and ": " .. tostring(cause.detail) or "")
 			else
 				Logger.error(LOG, "Disabling LLM (requirements check failed: %s).",
 					tostring(cause or "no reason given"))
@@ -876,9 +877,11 @@ function M.new(ctx)
 		end
 
 		if keymap and type(keymap.set_llm_backend_name) == "function" then
+			-- The shared brand table names local backends; the API's label is its own.
 			local backend_label = ""
-			if state.llm_backend == "mlx"    then backend_label = "MLX 🚀"    end
-			if state.llm_backend == "ollama" then backend_label = "Ollama 🦙" end
+			if state.llm_backend == "mlx" or state.llm_backend == "ollama" then
+				backend_label = require("ui.menu.menu_llm.backend_labels").brand(state.llm_backend)
+			end
 			pcall(keymap.set_llm_backend_name, backend_label)
 		end
 
@@ -922,7 +925,7 @@ function M.new(ctx)
 			if presence_ok ~= true or runtime_present ~= true then
 				return disable_llm({
 					backend = state.llm_backend,
-					reason = "runtime is not installed",
+					reason = Errors.STARTUP_RUNTIME_NOT_INSTALLED,
 					offer = state.llm_backend == "ollama",
 				})
 			end
@@ -1008,7 +1011,8 @@ function M.new(ctx)
 				if reason == OllamaEndpoint.UNREACHABLE then
 					return disable_llm({
 						backend = state.llm_backend,
-						reason = "does not answer at " .. OllamaEndpoint.get_base_url(),
+						reason = Errors.STARTUP_OLLAMA_UNREACHABLE,
+						detail = OllamaEndpoint.get_base_url(),
 						offer = true,
 					})
 				end
@@ -1016,13 +1020,11 @@ function M.new(ctx)
 				-- disk cannot hold the model: they know, so no error window
 				if reason == RequirementRegistry.CANCEL_DOWNLOAD_DECLINED then
 					return disable_llm({ backend = state.llm_backend,
-						reason = "lacks the model '" .. tostring(state.llm_model)
-							.. "' and its download was declined" })
+						reason = Errors.STARTUP_MODEL_DOWNLOAD_DECLINED, detail = tostring(state.llm_model) })
 				end
 				if reason == RequirementRegistry.CANCEL_DISK_INSUFFICIENT then
 					return disable_llm({ backend = state.llm_backend,
-						reason = "lacks the model '" .. tostring(state.llm_model)
-							.. "' and the disk cannot hold it" })
+						reason = Errors.STARTUP_MODEL_DISK_INSUFFICIENT, detail = tostring(state.llm_model) })
 				end
 				return disable_llm(reason)
 			end)

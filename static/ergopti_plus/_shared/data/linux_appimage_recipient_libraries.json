@@ -34,6 +34,11 @@
 			]
 		},
 		{
+			"id": "glib-closure",
+			"reason": "The libraries the recipient's GLib loads itself (libgio needs libz, libgobject needs libffi). stage-linux-network-runtime.py recipient_dependencies leaves them out so the image never shadows the recipient's newer copies, so the bundled curl, libcurl, librtmp, libssh and libp11-kit use the recipient's: every system that runs the tray has them.",
+			"sonames": ["libz.so.1", "libffi.so.8"]
+		},
+		{
 			"id": "gtk3-stack",
 			"reason": "The tray library and the webview windows load the recipient's GTK 3 into the daemon's process; the image bundles only the tray's own libraries without GTK.",
 			"sonames": [

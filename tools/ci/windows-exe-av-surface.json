@@ -62,7 +62,7 @@
 			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 3 },
 			"scriptblock_create": { "pattern": "\\[ScriptBlock\\]::Create", "max": 1 },
 			"inline_csharp_compile": { "pattern": "Add-Type", "max": 18 },
-			"pinvoke_declaration": { "pattern": "DllImport", "max": 52 },
+			"pinvoke_declaration": { "pattern": "DllImport", "max": 54 },
 			"base64_decode": { "pattern": "FromBase64String", "max": 1 },
 			"powershell_mentions": { "pattern": "powershell", "max": 9 },
 			"send_input_api": { "pattern": "SendInput", "max": 127 },

@@ -1,0 +1,12 @@
+# _shared/tests/corpus/config_migration_registries/rename_prefix_not_bare.toml
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Defect: a prefix is bare key text."
+ops = [{ op = "rename_prefix", section = "gestures.action_parameters", prefix = "keyboard.cmd_", to_prefix = "keyboard__primary_" }]

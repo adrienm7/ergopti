@@ -36,20 +36,10 @@ local VALID_MODS = {
 	shift = true,
 }
 
-local MOD_ORDER = {
-	shift = 1,
-	cmd = 2,
-	alt = 3,
-	ctrl = 4,
-}
+local MOD_BEFORE = require("menu.row_order").comparator("menu_chord_modifiers")
 
 local function sort_modifiers(mods)
-	table.sort(mods, function(a, b)
-		local oa = MOD_ORDER[a] or 99
-		local ob = MOD_ORDER[b] or 99
-		if oa == ob then return a < b end
-		return oa < ob
-	end)
+	table.sort(mods, MOD_BEFORE)
 end
 
 
@@ -250,12 +240,13 @@ function M.prompt_shortcut(opts)
 	local current = M.shortcut_to_config_string(opts.current_shortcut)
 	local prompt = dialog.text_prompt
 	local cancel_label = i18n.get("common.cancel")
+	local ok_label = i18n.get("button.ok")
 	if receipt ~= nil then
 		title = NativePresentationTitle(receipt)
 		if title == nil then return false end
 	end
-	local ok_prompt, button, raw = pcall(prompt, title, message, current, "OK", cancel_label)
-	if not ok_prompt or button ~= "OK" or type(raw) ~= "string" then return false end
+	local ok_prompt, button, raw = pcall(prompt, title, message, current, ok_label, cancel_label)
+	if not ok_prompt or button ~= ok_label or type(raw) ~= "string" then return false end
 
 	local cleaned = TextUtils.trim(raw)
 	if cleaned == "" then
@@ -371,7 +362,7 @@ local function prompt_action_parameter(gestures, binding, action, spec, picked, 
 				binding, action, value)
 		end
 		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
-			gestures.parameter_error(action), "OK", nil, "warning")
+			gestures.parameter_error(action), i18n.get("button.ok"), nil, "warning")
 		prior = value or prior
 		value = nil
 	end

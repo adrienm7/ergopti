@@ -12,6 +12,8 @@
 --- row and its cleanup WebView.
 --- ==============================================================================
 
+-- The cases replace these entries; the module end puts them back.
+local restore_loaded = require("tests.helpers").keep_loaded({ "modules.gestures.manager" })
 local helpers   = require("tests.helpers")
 local Contract  = require("test.config_unused_keys_contract")
 local Engine    = require("config_unused_keys")
@@ -469,3 +471,5 @@ end)
 require("test.config_cleanup_roots_contract").register(helpers, {
 	driver = "linux", collect = Cleanup.collect, find = Cleanup.find,
 })
+
+restore_loaded()

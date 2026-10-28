@@ -63,16 +63,32 @@ class HealthCheckWindowControl {
 		if this.Started || this.Closed
 			throw Error("Diagnostics control cannot be initialized twice or after retirement.")
 		this.Started := true
-		Message := this.MessageFn.Call()
-		if this.Closed
-			throw Error("Diagnostics control was withdrawn during message resolution.")
-		if !(Message is Integer) || Message < 0xC000 || Message > 0xFFFF
-			throw ValueError("Diagnostics control returned an invalid registered message.")
-		this.Message := Message, this.Listening := true
-		this.ListenFn.Call(Message, this.Listener, 1)
-		if this.Closed
-			throw Error("Diagnostics control was withdrawn during registration.")
-		this.Active := true
+		try {
+			Message := this.MessageFn.Call()
+			if this.Closed
+				throw Error("Diagnostics control was withdrawn during message resolution.")
+			if !(Message is Integer) || Message < 0xC000 || Message > 0xFFFF
+				throw ValueError("Diagnostics control returned an invalid registered message.")
+			this.Message := Message, this.Listening := true
+			try this.ListenFn.Call(Message, this.Listener, 1)
+			finally {
+				; A reentrant Stop may run before the native registration lands.
+				; The returning acquisition still owes its exact listener's cleanup.
+				this.Listening := true
+			}
+			PreviousCritical := Critical("On")
+			try {
+				if this.Closed
+					throw Error("Diagnostics control was withdrawn during registration.")
+				this.Active := true
+			} finally Critical(PreviousCritical)
+		} catch as FirstError {
+			; A global Stop may already have cleared its reference to this owner.
+			try this.Stop()
+			catch as CleanupError
+				FirstError.ControlRetirementError := CleanupError
+			throw FirstError
+		}
 	}
 
 	/** Invalidates callbacks before attempting both native retirement boundaries. */
@@ -423,7 +439,7 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 	Hardware    := _HealthCheck_Collect("hardware", _HealthCheck_Hardware, Map())
 	System      := _HealthCheck_Collect("system", () => _HealthCheck_System(Detailed, UptimeSec), Map())
 	Input       := _HealthCheck_Collect("input", _HealthCheck_Input, Map())
-	Features    := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []))
+	FeatureMap  := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []))
 	Ai          := _HealthCheck_Collect("ai", _HealthCheck_Ai, Map())
 	Peripherals := _HealthCheck_Collect("peripherals", () => _HealthCheck_Peripherals(Detailed), Map("items", []))
 	Issues      := _HealthCheck_Collect("issues", _HealthCheck_Issues, Map())
@@ -436,7 +452,7 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 		"hardware",    Hardware,
 		"system",      System,
 		"input",       Input,
-		"features",    Features,
+		"features",    FeatureMap,
 		; Filled by the configuration probe: reading and parsing the files is far
 		; over the phase A budget
 		"configuration_files", Map("items", []),
