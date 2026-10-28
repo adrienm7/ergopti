@@ -767,7 +767,7 @@ _LLM_MBW_LocalServerRows(Rows, Tools, Models, ApiTools) {
 	KeyLabel := t("menu.llm.local_servers.api_key")
 	RescanLabel := t("menu.llm.local_servers.rescan")
 	OtherLabel := t("menu.llm.local_servers.other_address")
-	for Top in LLM_Menu_LocalServersRows() {
+	for Top in LLM_Menu_LocalServersLiveRows() {
 		if !(Top is Map) || Top.Get("separator", false)
 			continue
 		Label := Top.Get("label", "")

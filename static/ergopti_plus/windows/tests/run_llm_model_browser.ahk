@@ -63,7 +63,7 @@ LLM_Deps_HasFailed()   => false
 _LLM_Menu_ModelDisplayText() => ""
 _LLM_DefaultFor(Key, Default := "") => (Key == "llm_ollama_port" ? 11434 : Default)
 _LLM_Menu_ApiEntryPageRows(Rows, Models, Listings := 0) => ""
-LLM_Menu_LocalServersRows() => []
+LLM_Menu_LocalServersLiveRows() => []
 _LLM_Menu_ConfigBlockReason() => ""
 LLM_GetBackendBrands() => Map(
 	"ollama", Map("brand", "Ollama", "emoji", "o", "kind", "local"),
