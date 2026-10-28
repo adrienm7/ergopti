@@ -103,7 +103,12 @@ a sealed Windows updater source, reseal with
   gate's built-in set lacked `Edit` (714e08bfbf), the page called the tray's local-server status rows in a
   child without the menu renderer (576439e0f0), and the sweep's rename broke a backtick escape in a
   `Trim` set (b4e925ce1e). ed95abafa1 fixes the selector page crash the Mac showed (missing
-  `text_utils` require). The seventh v1.0.7 release commit sits on top and a new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
+  `text_utils` require). Run 40659745019 on 1b7d792e00 (seventh) left two Windows test reds, fixed by
+  134c11c328 (the close-pause child's private shared folder lacked `backends.json`) and 0f35182d44 (the
+  loader-lifetime fixture read its factory marker before the writer closed it). The eighth v1.0.7 release
+  commit adds the maintainer's last asks (owned Ollama catalogue staged for the developer app, Install
+  buttons in the model selector, the Lua undefined-globals gate, the three-finger swipe fixes of L46, the
+  macOS 26 composer pending-activation route of L25/L52) and a new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
   `CFMessagePortSendRequest FAILED(-1)` (the runner's TSM UI server), rerun that job once.
 - **Decide after v1.0.7 [CI]:** since bc09e4584c no product path calls the stock
   `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
