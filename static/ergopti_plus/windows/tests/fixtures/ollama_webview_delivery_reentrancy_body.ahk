@@ -176,8 +176,8 @@ try {
 	_OCSD_Finish()
 	FileAppend("PASS ollama-delivery-reentrancy " . A_Args[1] . "`n", "*", "UTF-8")
 	ExitApp(0)
-} catch as Failure {
+} catch as TopLevelFailure {
 	try _OCSD_Finish()
-	FileAppend("FAIL ollama-delivery-reentrancy: " . Failure.Message . "`n" . Failure.Stack . "`n", "*", "UTF-8")
+	FileAppend("FAIL ollama-delivery-reentrancy: " . TopLevelFailure.Message . "`n" . TopLevelFailure.Stack . "`n", "*", "UTF-8")
 	ExitApp(1)
 }

@@ -126,8 +126,8 @@ HotstringExtensions_Prepare(Target, Roots) {
 HotstringExtensions_RouteBound(Packs) {
 	Routes := Map()
 	for Pack in Packs {
-		for File in (Pack.HasOwnProp("bound_files") ? Pack.bound_files : []) {
-			Binding := File.binding
+		for PackFile in (Pack.HasOwnProp("bound_files") ? Pack.bound_files : []) {
+			Binding := PackFile.binding
 			Category := Binding["category"]
 			Key := StrLower(StrReplace(Category, "_"))
 			if !Routes.Has(Key)
@@ -353,20 +353,20 @@ HotstringExtensions_Source(Packs, Category, Section := "") {
 	Owner := ""
 	for Pack in Packs {
 		for Files in [Pack.toml_files, Pack.HasOwnProp("bound_files") ? Pack.bound_files : []] {
-			for File in Files {
+			for PackFile in Files {
 				if Namespaced {
-					if File.category == Category
-						return File.path
+					if PackFile.category == Category
+						return PackFile.path
 					continue
 				}
-				Binding := File.HasOwnProp("binding") ? File.binding : 0
+				Binding := PackFile.HasOwnProp("binding") ? PackFile.binding : 0
 				if !(Binding is Map) || Binding["category"] !== Category
 					|| !_HotstringExtensions_Covers(Binding, Section)
 					continue
 				if Owner != ""
 					throw ValueError("Two extensions bind the same historical hotstring source: "
 						. Category . (Section == "" ? "" : "." . Section))
-				Owner := File.path
+				Owner := PackFile.path
 			}
 		}
 	}
@@ -399,13 +399,13 @@ HotstringExtensions_Seed(Target, Packs, DefaultFor) {
 	if !Hotstrings.Has("modules")
 		Hotstrings["modules"] := Map()
 	for Pack in Packs {
-		for File in Pack.toml_files {
-			Category := File.category
+		for PackFile in Pack.toml_files {
+			Category := PackFile.category
 			if !Hotstrings["groups"].Has(Category)
 				Hotstrings["groups"][Category] := DefaultFor.Call("hotstrings.groups." . Category)
 			if !Hotstrings["modules"].Has(Category)
 				Hotstrings["modules"][Category] := Map()
-			for Section in File.sections {
+			for Section in PackFile.sections {
 				Name := Section["name"]
 				if !Hotstrings["modules"][Category].Has(Name)
 					Hotstrings["modules"][Category][Name] := DefaultFor.Call("hotstrings.modules." . Category . "." . Name)
@@ -427,12 +427,12 @@ HotstringExtensions_RegistrationPlan(Target, Packs, MasterOn) {
 		return Plan
 	Hotstrings := Target["hotstrings"]
 	for Pack in Packs {
-		for File in Pack.toml_files {
-			if !_HotstringExtensions_Boolean(Hotstrings["groups"][File.category])
+		for PackFile in Pack.toml_files {
+			if !_HotstringExtensions_Boolean(Hotstrings["groups"][PackFile.category])
 				continue
-			for Section in File.sections {
-				if _HotstringExtensions_Boolean(Hotstrings["modules"][File.category][Section["name"]])
-					Plan.Push({ category: File.category, section: Section["name"], path: File.path })
+			for Section in PackFile.sections {
+				if _HotstringExtensions_Boolean(Hotstrings["modules"][PackFile.category][Section["name"]])
+					Plan.Push({ category: PackFile.category, section: Section["name"], path: PackFile.path })
 			}
 		}
 	}
@@ -463,11 +463,11 @@ HotstringExtensions_SetEnabled(Path, Value, Options := unset) {
 		; Rescan under the configuration lease: a menu opened before uninstall
 		; cannot persist activation for content which is no longer owned.
 		for Pack in HotstringExtensions_Scan(RootsFn.Call()) {
-			for File in Pack.toml_files {
-				if Path == "hotstrings.groups." . File.category
+			for PackFile in Pack.toml_files {
+				if Path == "hotstrings.groups." . PackFile.category
 					return [ManifestSparseOperation(Path, Value)]
-				for Section in File.sections {
-					if Path == "hotstrings.modules." . File.category . "." . Section["name"]
+				for Section in PackFile.sections {
+					if Path == "hotstrings.modules." . PackFile.category . "." . Section["name"]
 						return [ManifestSparseOperation(Path, Value)]
 				}
 			}
@@ -496,12 +496,12 @@ HotstringExtensions_SetCategoryEnabled(Category, Value, Options := unset) {
 		; Resolve current ownership under the configuration lease, including a
 		; file removed since the tray was built. No cached menu metadata can write.
 		for Pack in HotstringExtensions_Scan(RootsFn.Call()) {
-			for File in Pack.toml_files {
-				if Inventory.Has(File.category)
+			for PackFile in Pack.toml_files {
+				if Inventory.Has(PackFile.category)
 					throw ValueError("Extension category ownership is ambiguous.")
-				Inventory[File.category] := []
-				for Section in File.sections
-					Inventory[File.category].Push(Section["name"])
+				Inventory[PackFile.category] := []
+				for Section in PackFile.sections
+					Inventory[PackFile.category].Push(Section["name"])
 			}
 		}
 		Changes := HotstringsCategoryScopePlan(Inventory, [Category], Value, &Reason)
@@ -534,9 +534,9 @@ _HotstringExtensions_CurrentRoots() {
 HotstringExtensions_Count(Target, Packs, MasterOn) {
 	Counts := Map()
 	for Pack in Packs {
-		for File in Pack.toml_files {
-			for Section in File.sections
-				Counts[File.category . "." . Section["name"]] := Section["count"]
+		for PackFile in Pack.toml_files {
+			for Section in PackFile.sections
+				Counts[PackFile.category . "." . Section["name"]] := Section["count"]
 		}
 	}
 	Total := 0

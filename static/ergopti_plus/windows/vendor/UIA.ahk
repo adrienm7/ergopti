@@ -481,12 +481,12 @@ static EncodePath(path) {
         path := [path]
     out := ""
     for cond in path {
-        t := cond.HasOwnProp("T") ? cond.t : cond.HasOwnProp("Type") ? cond.Type : cond.HasOwnProp("ControlType") ? cond.ControlType : -1
-        if t = -1
+        condType := cond.HasOwnProp("T") ? cond.t : cond.HasOwnProp("Type") ? cond.Type : cond.HasOwnProp("ControlType") ? cond.ControlType : -1
+        if condType = -1
             throw ValueError("Encodable path requires a Type", -1)
-        if !(IsInteger(t) && t < 50)
-            t := this.TypeValidation.Type(t) - 50000
-        out .= Base64IntToChar[t]
+        if !(IsInteger(condType) && condType < 50)
+            condType := this.TypeValidation.Type(condType) - 50000
+        out .= Base64IntToChar[condType]
         i := cond.HasOwnProp("i") ? cond.i : cond.HasOwnProp("index") ? cond.index : 1
         if i != 0 && i != 1 {
             ; 50 = index 2
@@ -3632,8 +3632,8 @@ class IUIAutomationElement extends UIA.IUIAutomationBase {
                         if not v is Array {
                             if k = 30000 {
                                 local v := StrSplit(v, ".")
-                                for t in v
-                                    v[A_Index] := Integer("0x" t)
+                                for condItem in v
+                                    v[A_Index] := Integer("0x" condItem)
                             } else
                                 throw ValueError("Invalid PropertyId " k, -1)
                         }

@@ -439,7 +439,7 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 	Hardware    := _HealthCheck_Collect("hardware", _HealthCheck_Hardware, Map())
 	System      := _HealthCheck_Collect("system", () => _HealthCheck_System(Detailed, UptimeSec), Map())
 	Input       := _HealthCheck_Collect("input", _HealthCheck_Input, Map())
-	Features    := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []))
+	FeatureMap  := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []))
 	Ai          := _HealthCheck_Collect("ai", _HealthCheck_Ai, Map())
 	Peripherals := _HealthCheck_Collect("peripherals", () => _HealthCheck_Peripherals(Detailed), Map("items", []))
 	Issues      := _HealthCheck_Collect("issues", _HealthCheck_Issues, Map())
@@ -452,7 +452,7 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 		"hardware",    Hardware,
 		"system",      System,
 		"input",       Input,
-		"features",    Features,
+		"features",    FeatureMap,
 		; Filled by the configuration probe: reading and parsing the files is far
 		; over the phase A budget
 		"configuration_files", Map("items", []),

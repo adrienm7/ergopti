@@ -282,11 +282,11 @@ WPMWidget_Calc() {
     RingCritical := Critical("On")
     try {
         for _, ev in WPMWidget._ring {
-            t := ev["t"]
+            EventTick := ev["t"]
             ; A producer may run after this frame sampled now. Such a future
             ; row is not yet part of this calculation; malformed ticks refuse.
-            if (!(t is Integer) || t < 0 || t > now
-                    || _WPMWidget_TickDelta(now, t) > WPMWidgetConst.WINDOW_MS)
+            if (!(EventTick is Integer) || EventTick < 0 || EventTick > now
+                    || _WPMWidget_TickDelta(now, EventTick) > WPMWidgetConst.WINDOW_MS)
                 continue
             count++
             if ev["hs"]
@@ -295,10 +295,10 @@ WPMWidget_Calc() {
                 has_ai := true
             if ev["ac"]
                 has_ac := true
-            if (t < earliest)
-                earliest := t
-            if (t > latest)
-                latest := t
+            if (EventTick < earliest)
+                earliest := EventTick
+            if (EventTick > latest)
+                latest := EventTick
         }
     } finally {
         Critical(RingCritical)

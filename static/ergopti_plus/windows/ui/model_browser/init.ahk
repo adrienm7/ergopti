@@ -378,7 +378,11 @@ _LLM_ModelBrowser_ShowWeb() {
 	if IsSet(_LLM_MBW_Gui) {
 		Window := _LLM_MBW_Gui, SessionEpoch := _LLM_MBW_SessionEpoch
 		WMPresentWindow(Window)
-		if _LLM_MBW_StartupCurrent(SessionEpoch, Window)
+		; A page still loading gets its catalogue from _LLM_MBW_OnPageReady, as
+		; LLM_ModelBrowser_Refresh assumes: injecting here would only queue a
+		; payload the ready handler rebuilds, and a failure to build it would send
+		; the caller to the native fallback beside the open page.
+		if _LLM_MBW_Ready && _LLM_MBW_StartupCurrent(SessionEpoch, Window)
 			_LLM_MBW_InjectCatalogue(SessionEpoch)
 		return Window
 	}
