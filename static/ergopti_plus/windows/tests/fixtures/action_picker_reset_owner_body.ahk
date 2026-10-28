@@ -90,7 +90,7 @@ _APRC_Reopen() {
 	global _APRC
 	try ShowActionPicker("Private successor picker", "none", _APRC_Confirm.Bind("next"))
 	catch Any as Failure
-		_APRC.Failure := Failure
+		_APRC.Failure := Failure is Error ? Failure : Error("The public reopen callback threw a " . Type(Failure) . " value.")
 	finally _APRC.Delivered += 1
 }
 
@@ -172,8 +172,10 @@ _APRC_Main() {
 		} else
 			_APRC_Require(_APRC.Windows.Length == 1 && !IsObject(_ActPickWeb_Gui) && _ActPickWeb_ResetDone
 				&& !IsSet(_ActPickWeb_Controller) && !IsSet(_ActPickWeb_WebView), "A healthy native close must retire all original singleton state.")
+		if _APRC.Mode == "throw-scalar"
+			throw "Controlled completed-callback scalar refusal"
 	} catch Any as Failure {
-		Primary := Failure
+		Primary := Failure is Error ? Failure : Error("The native picker child threw a " . Type(Failure) . " value.")
 	} finally {
 		_APRC.Triggered := true
 		try {
@@ -188,7 +190,7 @@ _APRC_Main() {
 					Window.Destroy()
 		} catch Any as Failure {
 			if !IsObject(Primary)
-				Primary := Failure
+				Primary := Failure is Error ? Failure : Error("The native picker child threw a " . Type(Failure) . " value.")
 		}
 		OnError(_APRC_OnError, 0)
 	}
