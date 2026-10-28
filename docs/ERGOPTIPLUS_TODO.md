@@ -2,8 +2,9 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-27 evening (read "Handover of 2026-10-27 evening" first). Latest stable: v1.0.7 (released 2026-10-27 from dev; previous [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6),
-tag 950979d19c). **Next step: issue #101 follow-ups on the Mac (Backlog).** Open work only: a finished item is removed, its lessons go to
+Updated: 2026-10-28 evening. Latest stable: [v1.0.7](https://github.com/adrienm7/ergopti/releases/tag/v1.0.7)
+(released 2026-10-28 from main 18d69a24c0). **Next step: the two machine lists below, the PC one on the
+Windows PC and the Mac one on the Mac.** Open work only: a finished item is removed, its lessons go to
 [docs/memory](memory/README.md), and the history stays in Git
 (`git log -p -- docs/ERGOPTIPLUS_TODO.md`). Item numbers are stable and never reused. Open
 questions are in [questions-for-maintainer.md](questions-for-maintainer.md); per-work handoff files
@@ -28,6 +29,54 @@ ruff 0.15.8 and Prettier before every commit. After touching
 a sealed Windows updater source, reseal with
 `node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`. Procedures:
 [COORDINATOR-MEMORY](todo-agents/COORDINATOR-MEMORY.md).
+
+## PC Windows todo (run by the agent on the Windows PC)
+
+Start from a fresh `dev` and work on a `fix/windows-pc-<date>` branch; build and run the AutoHotkey driver live
+on the PC; push the branch and say so, dev integration stays with the coordinator. Order:
+
+1. **Privacy first:** the "PRIVACY: private hotstring text reaches AI prompts on Windows" item of "Windows
+   side to do on the PC" below.
+2. **v1.0.7 parity on Windows** (macOS and Linux shipped it, Windows still lacks it):
+   - Gestures: the menu shows one « Infos… » row (`MenuCommand.GESTURE_RECOMMENDED_INFO`) that opens the
+     reason dialog. Check on the PC that the dialog opens and that the menu has no long text row.
+   - Local AI servers: when the process scan fails, the oMLX or Ollama port now comes from the server's
+     settings file. Check that an oMLX or Ollama server on a non-default port is found.
+   - Hotstrings: Windows sends text with `{Text}` (VK_PACKET), so the macOS bug where `axa` turned into `XA`
+     cannot happen here. Type `axa` and Space fast twenty times; every one must give `AXA`.
+3. **Every remaining item of "Windows side to do on the PC (from October 25)"** below, in its order.
+4. **"Windows counterparts of the 26 October work"** in the handover below (hotpath_slow_ms, crash kind,
+   palette, requires_ai, request_plan port, tap_hold v1 migration, Quit refusals, config_migrate op).
+5. **Antivirus surface ceilings:** the "Review the Windows antivirus surface ceilings" item in the handover
+   below. Lower them once a Windows build confirms the counts.
+6. **Physical checks:** "Maintainer checks > Windows PC" below; report each line as pass, fail or not run.
+
+Every commit keeps the AHK UTF-8 BOM (repository encoding gate), reseals a touched updater source and
+passes the Windows CI lane (`gh workflow run ci.yml --ref <branch> -f os_lanes=windows`).
+
+## Mac todo (run by the agent on the Mac)
+
+Start from a fresh `dev` on a `field/mac-<date>` branch, then run the developer app
+(`bash tools/dev/run-macos-dev-app.sh`). Its managed Ollama is built locally from the repository pins and
+needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG, push the
+day logs to `docs/field-reports/mac-<date>/` on that branch and say so. Order:
+
+1. **v1.0.7 fixes to confirm:**
+   - **Hotstrings (axa):** type `axa` and Space fast twenty times, also holding the `a` while pressing
+     Space; every one must give `AXA`. The day log should show `Synthetic text moved off a held key` next
+     to `Terminator-expand: 'axa'`. Then check ordinary hotstrings in Edge, VS Code and a terminal.
+   - **oMLX:** oMLX on port 8181 is found in API mode, with no `ps` deadlock.
+   - **Composer (L52):** the composer is enabled after a single re-read, and `06_field_composer` passes.
+   - **Keystats cache:** it now lives in `~/Library/Caches/ergopti_plus/metrics`. Check the one-time move
+     line from TMPDIR.
+   - **Gestures:** the menu shows one « Infos… » row that opens the dialog, and `tap_3` recommends left
+     click.
+   - **Three-finger swipe (L46):** each step of 25 units (4, 29, 54, 79…) gives one more action, and two-finger
+     scrolls never switch tabs.
+2. **Open [PHYS-M] items of "Mac field session 2026-10-27: problem ledger > Open TODO"** below: L16, L17,
+   L24, L26, L27, L28, L42, L43, then the [CODE]-only L18, L23 and L34 once a day log measures them.
+3. **"Maintainer checks > Mac hardware session"** and **"Maintainer checks > Mac"** below, section by
+   section; report each line as pass, fail or not run.
 
 ## Handover of 2026-10-27 evening (read first)
 
