@@ -601,6 +601,17 @@ check('the result line reports success, a translated failure and its detail', ()
 		shortcut_menu_path: SHORTCUT_MENU.macos,
 		index,
 		installed: {},
+		result: { id: 'ergol', action: 'install', ok: true, warning: 'macos_consent' }
+	});
+	assert.equal(
+		byId.get('result').textContent,
+		strings['layout_manager.result_installed_consent'].replace('%s', 'Ergo-L')
+	);
+	window.updateState({
+		platform: 'macos',
+		shortcut_menu_path: SHORTCUT_MENU.macos,
+		index,
+		installed: {},
 		result: {
 			id: 'ergol',
 			action: 'install',

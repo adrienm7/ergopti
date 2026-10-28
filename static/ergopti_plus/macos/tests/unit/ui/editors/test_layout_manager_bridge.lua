@@ -84,6 +84,10 @@ helpers.describe("layout manager bridge: what the page may ask", function()
 		helpers.assert_true(instance.on_message({ action = "install", id = "ergol" }))
 		state.pending[1](true, { entry = INDEX.layouts[1], enabled = false, pending_activation = true })
 		helpers.assert_eq(state.pushes[#state.pushes].payload.result.warning, "pending_logout")
+		helpers.assert_true(instance.on_message({ action = "update", id = "ergol" }))
+		-- macOS asks to allow a keyboard it has not seen: the page says so.
+		state.pending[2](true, { entry = INDEX.layouts[1], enabled = true, consent = true })
+		helpers.assert_eq(state.pushes[#state.pushes].payload.result.warning, "macos_consent")
 	end)
 
 	helpers.it("installs a catalogue layout and reports the result once it settles (layout-manager-bridge)", function()
