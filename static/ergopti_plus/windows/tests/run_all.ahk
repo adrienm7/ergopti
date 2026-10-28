@@ -1231,6 +1231,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/reader/test_klr_cache_sql_read_failure.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_timings.ahk
 #Include unit/modules/keystats/reader/test_klr_append_compensation.ahk
+#Include unit/modules/keystats/reader/test_klr_closed_comment_refresh.ahk
 #Include unit/modules/keystats/reader/test_klr_stream_writer_interleaving.ahk
 #Include unit/modules/keystats/metrics/test_metrics_full_retry_cadence.ahk
 #Include meta/modules/keystats/metrics/test_metrics_committed_ingest_signal.ahk
