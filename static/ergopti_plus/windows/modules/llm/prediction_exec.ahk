@@ -1264,9 +1264,9 @@ _LLM_Engine_ParseSlots(raw, state) {
 	; later duplicate is dropped by the dedup and must not replace its edit.
 	if !state.Has("rewrite_edits")
 		state["rewrite_edits"] := Map()
-	for text, edit in edits {
+	for text, slot_edit in edits {
 		if !state["rewrite_edits"].Has(text)
-			state["rewrite_edits"][text] := edit
+			state["rewrite_edits"][text] := slot_edit
 	}
 	return result
 }
@@ -1381,13 +1381,13 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; and carries its erasure like a rewrite.
 	display_slots := []
 	for _, s in slots {
-		Edit := (HasRewrites and s != "" and rewrite_edits.Has(s)) ? rewrite_edits[s] : 0
-		if !(Edit is Map)
+		SlotEdit := (HasRewrites and s != "" and rewrite_edits.Has(s)) ? rewrite_edits[s] : 0
+		if !(SlotEdit is Map)
 			display_slots.Push(_LLM_Engine_DisplaySlot(s, ctx))
-		else if Edit.Get("rewrite", true)
-			display_slots.Push(_LLM_Engine_RewriteDisplaySlot(s, Edit))
+		else if SlotEdit.Get("rewrite", true)
+			display_slots.Push(_LLM_Engine_RewriteDisplaySlot(s, SlotEdit))
 		else
-			display_slots.Push(_LLM_Engine_CorrectionDisplaySlot(s, ctx, Edit))
+			display_slots.Push(_LLM_Engine_CorrectionDisplaySlot(s, ctx, SlotEdit))
 	}
 
 	_LLM_Engine_ApplyTooltipDisplayOpts(slots.Length)
