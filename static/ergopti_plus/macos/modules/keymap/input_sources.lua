@@ -921,9 +921,10 @@ end
 -- enabled loose layout applies once the file is registered again.
 --
 -- argv: KeyboardLayout Name, the .keylayout path to register ("" for none),
--- and "refresh" to select another layout and back when the target is selected
--- (so a rewritten layout is reloaded). Prints one JSON object:
---   {"listed", "id", "enabled", "select_capable", "selected", "register", "refreshed"}
+-- and comma-separated flags: "enable" calls TISEnableInputSource on a listed
+-- source that reads off, "refresh" selects another layout and back when the
+-- target is selected (so a rewritten layout is reloaded). Prints one JSON object:
+--   {"listed", "id", "enabled", "select_capable", "selected", "register", "enable", "refreshed"}
 -- Carbon is called through ctypes: the AppleScript ObjC bridge crashes on these
 -- calls (see ENABLED_LIST_SCRIPT), the C API does not.
 local CONFIRM_SOURCE_SCRIPT = [[
@@ -931,7 +932,9 @@ import ctypes, json, sys, time
 
 TARGET = sys.argv[1]
 REGISTER_PATH = sys.argv[2]
-REFRESH = sys.argv[3] == "refresh"
+FLAGS = sys.argv[3].split(",")
+REFRESH = "refresh" in FLAGS
+ENABLE = "enable" in FLAGS
 UTF8 = 0x08000100
 
 cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
@@ -957,6 +960,8 @@ tis.TISSelectInputSource.argtypes = [P]
 tis.TISSelectInputSource.restype = ctypes.c_int32
 tis.TISRegisterInputSource.argtypes = [P]
 tis.TISRegisterInputSource.restype = ctypes.c_int32
+tis.TISEnableInputSource.argtypes = [P]
+tis.TISEnableInputSource.restype = ctypes.c_int32
 
 def key(name):
     return P.in_dll(tis, name).value
@@ -1004,6 +1009,11 @@ if REGISTER_PATH:
 
 listed, everything = sources()
 target = next((source for source in everything if is_target(source)), None)
+enable = None
+if target is not None and ENABLE and not flag(target, K_ENABLED):
+    # The preference already lists it; this asks the text-input system too. The
+    # answer of this process can stay stale: the caller reads again, fresh.
+    enable = tis.TISEnableInputSource(target)
 refreshed = None
 if target is not None and REFRESH and flag(target, K_SELECTED):
     layout_type = "TISTypeKeyboardLayout"
@@ -1019,7 +1029,7 @@ if target is not None and REFRESH and flag(target, K_SELECTED):
     else:
         refreshed = {"away": None, "back": None}
 
-state = {"listed": target is not None, "register": register, "refreshed": refreshed}
+state = {"listed": target is not None, "register": register, "enable": enable, "refreshed": refreshed}
 if target is not None:
     state.update({
         "id": string_property(target, K_ID),
@@ -1033,7 +1043,7 @@ print(json.dumps(state))
 
 --- Reads one keyboard layout's state from a fresh process (CONFIRM_SOURCE_SCRIPT).
 --- @param keyboard_name string KeyboardLayout Name (the .keylayout's name=).
---- @param options table|nil { register_path = string|nil, refresh = boolean|nil }.
+--- @param options table|nil { register_path = string|nil, refresh = boolean|nil, enable = boolean|nil }.
 --- @param on_done function fn(ok, state, reason): state is the decoded JSON object.
 --- @return boolean accepted True only when the child start commits.
 local function confirm_source_async(keyboard_name, options, on_done)
@@ -1049,8 +1059,11 @@ local function confirm_source_async(keyboard_name, options, on_done)
 		return false
 	end
 	local register_path = type(options.register_path) == "string" and options.register_path or ""
+	local flags = {}
+	if options.refresh == true then flags[#flags + 1] = "refresh" end
+	if options.enable == true then flags[#flags + 1] = "enable" end
 	return run_bounded_process("Confirm keyboard input source", python_bin,
-		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path, options.refresh == true and "refresh" or "" },
+		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path, table.concat(flags, ",") },
 		function(process_ok, out, reason)
 			local decoded_ok, state = pcall(require("json").decode, tostring(out or ""))
 			if process_ok ~= true or not decoded_ok or type(state) ~= "table" or type(state.listed) ~= "boolean" then
@@ -1060,11 +1073,57 @@ local function confirm_source_async(keyboard_name, options, on_done)
 				invoke_mutation_done("confirm_source.done", on_done, false, nil, failure_reason)
 				return
 			end
-			Logger.info(LOG, "Input source '%s' seen by a fresh process: listed=%s enabled=%s selected=%s register=%s.",
+			Logger.info(LOG, "Input source '%s' seen by a fresh process: listed=%s enabled=%s selected=%s register=%s enable=%s.",
 				keyboard_name, tostring(state.listed), tostring(state.enabled), tostring(state.selected),
-				tostring(state.register))
+				tostring(state.register), tostring(state.enable))
 			invoke_mutation_done("confirm_source.done", on_done, true, state, nil)
 		end)
+end
+
+-- The 12:51 field run (2026-10-28) read the composed layout 140 ms after the
+-- preference write and found it off, while probe v5 read it seconds later and
+-- found it on (P5): the system needs a moment to apply the write. Fresh reads
+-- are repeated with a doubling delay within one bounded window ([ui]
+-- input_source_confirm_retry_base_ms and input_source_confirm_window_ms, read
+-- when a confirmation starts, so loading this module reads only its deadline).
+
+--- Registers and enables a layout from a fresh process, then reads it again from
+--- new fresh processes until it is on or the window ends.
+--- @param keyboard_name string KeyboardLayout Name (the .keylayout's name=).
+--- @param options table|nil { register_path, refresh } for the first child, which also enables.
+--- @param on_done function fn(ok, state, reason): the last state read.
+--- @return boolean accepted True only when the first child start commits.
+local function confirm_enabled_async(keyboard_name, options, on_done)
+	options = options or {}
+	local window = Timings.sec("ui", "input_source_confirm_window_ms")
+	local waited, delay, reads = 0, Timings.sec("ui", "input_source_confirm_retry_base_ms"), 0
+	local function settle(ok, state, reason)
+		reads = reads + 1
+		if not ok or state.enabled == true or state.listed ~= true or waited + delay > window then
+			if ok and state.enabled ~= true then
+				Logger.warn(LOG, "Input source '%s' still reads off after %d fresh read(s) over %.1f s.",
+					keyboard_name, reads, waited)
+			elseif ok and reads > 1 then
+				Logger.info(LOG, "Input source '%s' reads on after %d fresh read(s) over %.1f s.",
+					keyboard_name, reads, waited)
+			end
+			invoke_mutation_done("confirm_enabled.done", on_done, ok, state, reason)
+			return
+		end
+		local wait = delay
+		waited = waited + wait
+		delay = delay * 2
+		local _, committed = TimerScheduler.after(wait, function()
+			confirm_source_async(keyboard_name, {}, settle)
+		end)
+		if committed ~= true then
+			Logger.error(LOG, "The next fresh read of '%s' could not be scheduled.", keyboard_name)
+			invoke_mutation_done("confirm_enabled.done", on_done, false, nil, "deadline_unavailable")
+		end
+	end
+	return confirm_source_async(keyboard_name, {
+		register_path = options.register_path, refresh = options.refresh, enable = true,
+	}, settle)
 end
 
 --- Adds an installed .keylayout to the user's enabled input sources. Its
@@ -1292,6 +1351,7 @@ return {
 	enable_keylayout_source_async = enable_keylayout_source_async,
 	is_live_enabled               = is_live_enabled,
 	confirm_source_async          = confirm_source_async,
+	confirm_enabled_async         = confirm_enabled_async,
 	disable_keylayout_source_async = disable_keylayout_source_async,
 	is_legacy_ergopti_id          = is_legacy_ergopti_id,
 	migrate_legacy_id             = migrate_legacy_id,
