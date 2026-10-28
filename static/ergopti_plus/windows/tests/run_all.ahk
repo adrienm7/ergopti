@@ -782,6 +782,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/hotstrings/magic_key/test_magic_key_source_hotkeys.ahk
 #Include unit/modules/keymap/test_layout_catalogue.ahk
 #Include unit/modules/keymap/test_layout_registry_download_custody.ahk
+#Include unit/modules/keymap/test_layout_registry_late_poll.ahk
 #Include unit/modules/keymap/test_layout_installed_record_corpora.ahk
 #Include unit/modules/keymap/test_layout_extension_runtime.ahk
 #Include unit/modules/keymap/test_layout_extension_menu.ahk
