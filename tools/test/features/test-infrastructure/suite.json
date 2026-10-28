@@ -509,7 +509,7 @@
 		},
 		{
 			"id": "js-linux-private-runner-output",
-			"ordinal": 530,
+			"ordinal": 534,
 			"name": "Linux private helper failures stay private while canonical failures remain reportable",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-runner-private-output.cjs"],
