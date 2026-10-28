@@ -566,7 +566,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 		end
 
 		local sd = signedDistAxis(pos, axis)
-		local targetSteps = math.floor(math.abs(sd) / sensitivity)
+		local targetSteps = Geometry.incrementalSteps(math.abs(sd), sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
 
 		if diff > 0 then
@@ -765,7 +765,7 @@ local function commitGesture(now)
 
 	if mode == "incremental" then
 		local sd = signedDistAxis(gs.endPos, dir)
-		local targetSteps = math.floor(math.abs(sd) / sensitivity)
+		local targetSteps = Geometry.incrementalSteps(math.abs(sd), sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
 		Logger.info(LOG, "commitGesture INCREMENTAL: sd=%.2f targetSteps=%d prevSteps=%d diff=%d",
 			sd, targetSteps, gs.stepsCommitted, diff)
