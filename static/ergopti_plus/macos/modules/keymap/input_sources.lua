@@ -1090,7 +1090,7 @@ end
 
 -- The 12:51 field run (2026-10-28) read the composed layout 140 ms after the
 -- preference write and found it off, while probe v5 read it seconds later and
--- found it on (P5): the system needs a moment to apply the write. Fresh reads
+-- found it on: the system needs a moment to apply the write. Fresh reads
 -- are repeated with a doubling delay within one bounded window ([ui]
 -- input_source_confirm_retry_base_ms and input_source_confirm_window_ms, read
 -- when a confirmation starts, so loading this module reads only its deadline).
