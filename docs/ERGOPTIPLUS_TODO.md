@@ -365,7 +365,24 @@ From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their bu
   consumed request as the app's run, and withdraws an unconsumed request when it gives up. Open
   [CODE]: the 138 s startup replay itself (every tap, the lease heartbeat and typed keys waited);
   slice it like the aggregate recovery. Mac confirms: a run started right after a reboot is
-  collected.
+  collected. Replay fixed on `tmp/wip-keystats-reboot-replay` (33926562dc). Cause: db.sqlite lives
+  in TMPDIR (`/var/folders/.../T/ergopti_metrics`), which macOS empties at every reboot, so the
+  first start after a reboot finds a fresh cache whose saved today.log offset went with it, and
+  rebuilt it by reading the whole data.sql into one string and executing it in one call; every
+  ledger batch is its own transaction, so with synchronous=FULL each waited for a flush. The replay
+  is now the first stage of the sliced aggregate recovery (`modules/keystats/ledger_replay.lua`):
+  32 KB blocks, complete batches only, a stop at the 8 ms slice deadline, batches committed with
+  synchronous=OFF and the durable mode restored before any live write, its state (applied
+  offset and cursor markers) persisted in meta after each step so a stop resumes at the last
+  batch, progress every 32 MB. Measured here: 47 MB in 1439 steps, 1.3 s of Lua CPU, worst step
+  4.4 ms (no-op SQLite); real SQLite on tmpfs 3.5 ms per 64 KB. Open [CODE], needs a decision:
+  move the cache to `~/Library/Caches/ergopti_plus/metrics/<device_id>/` (it survives a reboot,
+  as Linux's `metrics.sqlite` in the XDG data folder already does), which removes the post-reboot
+  replay itself; `docs/keystats_spec.md` §1.7 names TMPDIR, and seven native fixtures own TMPDIR
+  (ledger bootstrap policy, metrics gitignore, physical history persistence and bootstrap,
+  cold and historical rollover, rollover marker recovery). Mac confirms: after a reboot,
+  `Keystats engine start (deferred)` stays under 100 ms, `Local ledger replay: N of M MB` lines
+  follow, and no hold over 250 ms comes from log_manager.lua.
 - **L65** Fixed on tmp/wip-field-run-hygiene-3 (1471c14782). 12_mlx_model
   `download_launcher_failed` at 12:05:42 ("exit=0, pid=missing, sentinel in final output=yes"),
   as on the 21:08 run: the launcher's `__DLPID__` line reached only the termination callback. It
