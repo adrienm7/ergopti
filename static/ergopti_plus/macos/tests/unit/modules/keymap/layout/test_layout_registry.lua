@@ -355,7 +355,7 @@ helpers.describe("layout manager (macOS): installing", function()
 		helpers.assert_nil(state.pending.ergol, "an uninstalled layout is no longer pending")
 	end)
 
-	-- Probe v5 (P5): the preference turns the layout on at once, seen by a process
+	-- Probe v5: the preference turns the layout on at once, seen by a process
 	-- started after the write; P8 a: a rewritten enabled file applies once registered again.
 	helpers.it("confirms a new layout from a fresh process and asks the user to expect the consent (composer-macos26)", function()
 		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files() })
