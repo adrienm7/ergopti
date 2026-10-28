@@ -683,9 +683,11 @@ _LLM_Deps_State := "ready"
 #Include ../modules/llm/remote_formats.ahk
 #Include ..\..\_shared\modules\llm\local_server_auth.ahk
 #Include ..\..\_shared\modules\llm\local_server_discovery.ahk
+#Include ..\..\_shared\modules\llm\local_server_ports.ahk
 #Include ../../_shared/modules/llm/local_server_menu.ahk
 #Include ../modules/llm/api_remote.ahk
 #Include ../modules/llm/local_server_models.ahk
+#Include ../modules/llm/local_server_port_scan.ahk
 #Include ../modules/llm/local_servers.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama_streaming.ahk
@@ -707,6 +709,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/servers/test_local_server_models_timer.ahk
 #Include unit/modules/llm/servers/test_local_server_menu.ahk
 #Include unit/modules/llm/servers/test_local_servers.ahk
+#Include unit/modules/llm/servers/test_local_server_ports.ahk
 #Include unit/modules/llm/servers/test_local_server_queue_timer.ahk
 #Include unit/modules/llm/servers/test_llm_crash_orphan_cleanup.ahk
 #Include unit/modules/llm/servers/test_llm_temp_artifact_terminal_ownership.ahk
