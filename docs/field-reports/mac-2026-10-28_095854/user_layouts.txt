@@ -1,0 +1,6 @@
+total 16
+drwx------+  5 <user>  staff   160 28 oct.  09:04 .
+drwx------@ 94 <user>  staff  3008 27 oct.  14:21 ..
+-rw-r--r--@  1 <user>  staff  6148 27 oct.   2025 .DS_Store
+-rw-r--r--@  1 <user>  staff     0 27 oct.  14:31 composed.keylayout.ergoptiplus-write-lock-v1
+drwxr-xr-x@  3 <user>  staff    96  9 mai   15:13 Ergopti_v2.2.2.bundle
