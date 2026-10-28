@@ -20,10 +20,9 @@ local Calendar = require("modules.keystats.calendar")
 local System = require("modules.keystats.system_metrics")
 local original_has, original_line = Shell.has_command, Shell.exec_line
 local original_capture, original_now = Calendar.capture, Clock.now_ms
--- A whole-millisecond base keeps the declared gaps exact: hrtime-derived
--- milliseconds carry a fraction, and mono + 4n - (mono + 2n) then differed
--- from 2n in the last bits on some hosts ("wake|120000.000000004").
-local wall, mono = os.time() * 1000, math.floor(original_now())
+-- Keep the actual Calendar coordinate contract: raw clock fractions can lose a
+-- millisecond when an exact observation gap reaches SQLite integer persistence.
+local wall, mono = os.time() * 1000, original_capture().mono_ms
 local elapsed, network, locked = 0, "allowed-initial-network", false
 local calls = { network = 0, lock = 0, mute = 0 }
 -- Existing documented sensor command boundaries return controlled software data.

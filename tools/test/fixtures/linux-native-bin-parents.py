@@ -27,14 +27,103 @@ for name in ("_native_output_ordinary_directory", "_native_output_bin_parents"):
     assert observed, "Actual guard function required: " + name
     functions.append(observed.group())
 assert source.index("_native_output_bin_parents || exit 1") < source.index('NATIVE_OUTPUT_STAGE=""')
-copy = source.index('tar -C "$SRC_DRIVER"')
-write = source.index('install -m 755 "$NATIVE_OUTPUT_SOURCE"')
-assert "_native_output_bin_parents || exit 1" in source[copy:write]
+PAYLOAD_START = 'NATIVE_LUV_RETAINED_DIGEST=""'
+BIN_MKDIR = 'install -d "${LIB_DIR}/linux/bin"'
+BIN_INSTALL = 'install -m 755 "$NATIVE_OUTPUT_SOURCE"'
+GUARD = re.compile(r"^_native_output_bin_parents \|\| exit 1[ \t]*$", re.M)
+
+
+def payload_guards(text):
+    for marker in (PAYLOAD_START, BIN_MKDIR, BIN_INSTALL):
+        assert text.count(marker) == 1, "Actual payload boundary must be unique: " + marker
+    start = text.index(PAYLOAD_START)
+    mkdir = text.index(BIN_MKDIR)
+    write = text.index(BIN_INSTALL)
+    assert start < mkdir < write, "Native publication boundaries must retain their order"
+    guards = list(GUARD.finditer(text, start))
+    assert guards, "Actual post-payload guard required"
+    first = guards[0]
+    assert start + len(PAYLOAD_START) < first.start() < mkdir, (
+        "The payload must retire before a guard admits native bin creation"
+    )
+    second = [guard for guard in guards if mkdir < guard.start() < write]
+    assert second, "A second guard must re-admit the created bin before native publication"
+    return start, first, second[0]
+
+
+def payload_copied(text):
+    start, first, _ = payload_guards(text)
+    with tempfile.TemporaryDirectory(prefix="native-bin-copy-") as directory:
+        root = Path(directory)
+        src = root / "source"
+        lib = root / "destination"
+        (src / "bin").mkdir(parents=True)
+        (lib / "linux").mkdir(parents=True)
+        original = b"actual payload bytes\n\0tail"
+        (src / "payload").write_bytes(original)
+        (src / "bin/libergopti_archive_publication.so").write_bytes(b"ignored, never executed")
+        script = (
+            "set -euo pipefail\n"
+            + "\n".join(functions)
+            + "\nSRC_DRIVER="
+            + quote(src)
+            + "\nLIB_DIR="
+            + quote(lib)
+            + '\nNATIVE_LUV_STAGE=""\n'
+            + text[start : first.start()]
+        )
+        observed = subprocess.run(
+            [str(canonical_bash), "-s"], input=script, text=True, capture_output=True, timeout=5
+        )
+        assert observed.returncode >= 0, "A signalled copy probe is not a refusal witness"
+        assert (src / "payload").read_bytes() == original
+        copied = lib / "linux/payload"
+        return (
+            observed.returncode == 0
+            and copied.is_file()
+            and copied.read_bytes() == original
+            and not (lib / "linux/bin/libergopti_archive_publication.so").exists()
+        )
+
+
+def validate_payload(text):
+    payload_guards(text)
+    assert payload_copied(text), "The exact bounded owner must actually copy the admitted payload"
+
+
+def rejects_payload(text):
+    try:
+        validate_payload(text)
+    except AssertionError:
+        return True
+    return False
+
+
 checks = 0
 
 
 def quote(value):
     return "'" + str(value).replace("'", "'\\''") + "'"
+
+
+validate_payload(source)
+start, first_guard, second_guard = payload_guards(source)
+for guard in (first_guard, second_guard):
+    removed = source[: guard.start()] + source[guard.end() :]
+    assert rejects_payload(removed), "Removing either publication guard must refuse"
+    insertion = removed.index(PAYLOAD_START) + len(PAYLOAD_START) + 1
+    moved = removed[:insertion] + guard.group() + "\n" + removed[insertion:]
+    assert rejects_payload(moved), "A guard before the copy cannot acknowledge payload retirement"
+# A comment alone owns no filesystem authority, wherever it is placed.
+comment = "# Inert owner-position witness.\n"
+for position in (source.index(PAYLOAD_START), source.index(BIN_MKDIR)):
+    commented = source[:position] + comment + source[position:]
+    validate_payload(commented)
+for marker in (PAYLOAD_START, BIN_MKDIR, BIN_INSTALL):
+    assert rejects_payload(source.replace(marker, "", 1)), "An absent owner boundary must refuse"
+    assert rejects_payload(source.replace(marker, marker + "\n" + marker, 1)), (
+        "A duplicate owner boundary must refuse"
+    )
 
 
 with tempfile.TemporaryDirectory(prefix="native-bin-parent-") as directory:

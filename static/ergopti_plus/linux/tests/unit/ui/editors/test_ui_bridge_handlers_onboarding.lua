@@ -570,13 +570,19 @@ helpers.describe("ui.bridge_handlers", function()
 
 		-- The page exposes Linux trigger selection, but forged common characters
 		-- must not turn an ordinary word into a destructive hotstring trigger.
+		-- Keep the malformed bytes in the subject, with readable labels in the
+		-- human output and structured UTF-8 timing frames.
 		for _, case in ipairs({
-			{ ";", "dialog.magic_key.error_common" }, { "ù", "dialog.magic_key.error_common" },
-			{ "e", "dialog.magic_key.error_common" }, { "א", "dialog.magic_key.error_common" },
-			{ "ab", "dialog.magic_key.error_length" }, { "\255", "dialog.magic_key.error_length" },
-			{ "\192\175", "dialog.magic_key.error_length" }, { "", "dialog.magic_key.error_empty" },
+			{ ";", "dialog.magic_key.error_common", "semicolon" },
+			{ "ù", "dialog.magic_key.error_common", "accented letter" },
+			{ "e", "dialog.magic_key.error_common", "ASCII letter" },
+			{ "א", "dialog.magic_key.error_common", "Hebrew letter" },
+			{ "ab", "dialog.magic_key.error_length", "multiple characters" },
+			{ "\255", "dialog.magic_key.error_length", "invalid leading byte" },
+			{ "\192\175", "dialog.magic_key.error_length", "overlong sequence" },
+			{ "", "dialog.magic_key.error_empty", "empty input" },
 		}) do
-			helpers.it("(onboarding-linux-trigger) refuses unsafe answer " .. case[2] .. " " .. string.format("%q", case[1]), function()
+			helpers.it("(onboarding-linux-trigger) refuses unsafe answer " .. case[2] .. " " .. case[3], function()
 				local state, values, captured = onboarding_state()
 				local previous = values.config_dir
 				local changes = 0

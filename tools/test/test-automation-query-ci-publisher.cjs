@@ -59,7 +59,7 @@ assert(
 // Replay the shipped signing function with controlled tools. This exercises the
 // actual optional branch order, without claiming any macOS codesign execution.
 const os = require('node:os');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'query-ci-signing-order-'));
 try {
 	for (const relative of [
@@ -99,7 +99,7 @@ ${sign}
 codesign_native_runtime
 `,
 			'controlled',
-			fixture.replaceAll('\\', '/')
+			bashPath(fixture)
 		],
 		{ encoding: 'utf8', timeout: 10000 }
 	);

@@ -47,6 +47,21 @@ layout names (`infra/xkb_rmlvo.lua`). Action: a keymap source must be proven on
 the runner's own libxkbcommon through `refresh()`, never through a fallback the
 test writes itself.
 
+### project-linux-xkb-data-tests-need-a-real-missing-include
+
+A serialized, self-contained keymap is not a negative control for XKB data.
+libxkbcommon 1.13.1 admits a context with no include paths and compiles that
+input; 1.7 requires an existing path, even an empty directory. Also, on 1.13.1
+an absent `XKB_CONFIG_ROOT` override does not remove the compiled system path.
+Environment variables alone therefore do not prove data absence.
+
+Action: give the native keymap a unique required include, copied from genuine
+`evdev` data found through the native context's search paths. Omit that file,
+then restore only it with the same argv, environment and include paths: require
+exact native compiler refusal followed by successful capture. Keep the
+self-contained positive and the independent Compose-table negative. Never
+change production context flags or accept either capture result by version.
+
 ### project-linux-injection-table-comes-from-libxkbcommon
 
 The char → keystroke table is probed on the validated keymap

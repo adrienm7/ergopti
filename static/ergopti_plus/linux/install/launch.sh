@@ -20,7 +20,14 @@ if [ "${1:-}" = --session-start ]; then
 fi
 for arg in "$@"; do if [ "$arg" = --tray ]; then SESSION_START=true; fi; done
 
-if "$SESSION_START" && ! "$SERVICE_MODE" && command -v systemctl >/dev/null 2>&1 \
+# Match the daemon's argument-wide help scan before acquiring session state.
+# Help neither starts a user service nor needs input permissions or a lock.
+DAEMON_LAUNCH=true
+for arg in "$@"; do
+	if [ "$arg" = --help ] || [ "$arg" = -h ]; then DAEMON_LAUNCH=false; fi
+done
+
+if "$DAEMON_LAUNCH" && "$SESSION_START" && ! "$SERVICE_MODE" && command -v systemctl >/dev/null 2>&1 \
 	&& systemctl --user show-environment >/dev/null 2>&1; then
 	# The packaged unit remains the sole startup owner when systemd is present.
 	# XDG only starts the daemon directly on non-systemd desktops.
@@ -30,7 +37,7 @@ if "$SESSION_START" && ! "$SERVICE_MODE" && command -v systemctl >/dev/null 2>&1
 fi
 
 for arg in "$@"; do
-	if [ "$arg" = --tray ]; then
+	if "$DAEMON_LAUNCH" && [ "$arg" = --tray ]; then
 		uid="$(id -u)"
 		groups=" $(id -nG "$uid") "
 		if [[ "$groups" != *' input '* || "$groups" != *' uinput '* ]]; then
@@ -74,14 +81,7 @@ for arg in "$@"; do
 	fi
 done
 
-# Every daemon launch takes the instance lock, not only the graphical ones: a
-# terminal launch next to the tray daemon would otherwise start a second grab
-# of the keyboard. --help starts no daemon and stays lock-free.
-DAEMON_LAUNCH=true
-for arg in "$@"; do
-	if [ "$arg" = --help ] || [ "$arg" = -h ]; then DAEMON_LAUNCH=false; fi
-done
-
+# Every daemon launch, including a terminal launch, takes the instance lock.
 if "$DAEMON_LAUNCH"; then
 	lock_root="${XDG_RUNTIME_DIR:-$HOME/.cache}/ergopti"
 	install -d -m 700 "$lock_root"

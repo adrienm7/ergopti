@@ -19,7 +19,9 @@ function ownsCheck(inventory, file, command = 'node') {
 const assert = require('node:assert/strict');
 const { assertLinuxQualifiedRun } = require('./ci-linux-qualified-run.cjs');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { run } = require('./run-linux-network-runtime.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const read = (name) => fs.readFileSync(path.join(ROOT, name), 'utf8');
@@ -77,28 +79,164 @@ const receipts = [
 		''
 	].join('\n')
 ];
+/** Preserve genuine rejected-child bytes without exposing their contents in logs. */
+function exercisePrivateFailure(mode) {
+	const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-network-evidence-test-'));
+	const exported = [];
+	const captures = [];
+	const stdout = Buffer.concat([Buffer.from('NETWORK_STDOUT_SECRET'), Buffer.from([0, 255, 254])]);
+	const stderr = Buffer.concat([Buffer.from('NETWORK_STDERR_SECRET'), Buffer.from([128, 0, 253])]);
+	const previousMask = mode === 'restrictive-umask' ? process.umask(0o777) : undefined;
+	try {
+		const result = run({
+			platform: 'linux',
+			evidenceRoot,
+			log: (line) => exported.push(line),
+			error: (line) => exported.push(line),
+			spawn: (command, args, options) => {
+				const index = captures.length;
+				const body =
+					index === 0
+						? `process.stdout.write(${JSON.stringify(receipts[0])});`
+						: [
+								"const fs = require('node:fs');",
+								mode === 'empty'
+									? ''
+									: `fs.writeSync(1, Buffer.from(${JSON.stringify([...stdout])}));`,
+								mode === 'empty'
+									? ''
+									: `fs.writeSync(2, Buffer.from(${JSON.stringify([...stderr])}));`,
+								mode === 'signal'
+									? "process.kill(process.pid, 'SIGTERM');"
+									: mode === 'buffer-error'
+										? 'process.stdout.write(Buffer.alloc(128 * 1024, 97));'
+										: `process.exit(${mode === 'wrong-receipt' ? 0 : 73});`
+							].join('\n');
+				const actual = spawnSync(
+					index === 1 && mode === 'missing-program'
+						? path.join(evidenceRoot, 'absent-program')
+						: process.execPath,
+					['-e', body],
+					options
+				);
+				captures.push({ command, args, options, actual });
+				return actual;
+			}
+		});
+		assert.equal(result, 1, 'a retained failure must still block qualification');
+		assert.equal(captures.length, 2);
+		assert.equal(captures[0].actual.status, 0, 'the real independent model control must pass');
+		if (mode === 'exit73') {
+			assert.equal(captures[1].actual.status, 73);
+			assert.ok(captures[1].actual.stdout.includes('NETWORK_STDOUT_SECRET'));
+			assert.ok(captures[1].actual.stderr.includes('NETWORK_STDERR_SECRET'));
+		}
+		const failures = exported.filter((line) => line.includes('actual-native'));
+		assert.equal(failures.length, 1);
+		const location = / evidence=(".*")$/.exec(failures[0]);
+		assert.ok(
+			location,
+			'(network-diagnostic-retention) a rejected child must retain private evidence'
+		);
+		const directory = JSON.parse(location[1]);
+		assert.equal(path.dirname(directory), evidenceRoot);
+		assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
+		const metadata = JSON.parse(fs.readFileSync(path.join(directory, 'result.json'), 'utf8'));
+		const child = captures[1].actual;
+		assert.equal(metadata.phase, 'actual-native');
+		assert.equal(metadata.command, captures[1].command);
+		assert.deepEqual(metadata.args, captures[1].args);
+		assert.equal(metadata.pid, child.pid);
+		assert.equal(metadata.status, child.status);
+		assert.equal(metadata.signal, child.signal);
+		assert.equal(captures[0].options.timeout, 10000);
+		assert.equal(captures[1].options.timeout, undefined);
+		assert.equal(captures[1].options.maxBuffer, 65536);
+		for (const name of ['stdout', 'stderr']) {
+			if (child[name] === null || child[name] === undefined) {
+				assert.deepEqual(metadata[name], { kind: child[name] === null ? 'null' : 'undefined' });
+				assert.equal(fs.existsSync(path.join(directory, name + '.bin')), false);
+			} else {
+				assert.ok(Buffer.isBuffer(child[name]), 'native capture must preserve raw bytes');
+				assert.equal(metadata[name].kind, 'buffer');
+				assert.equal(metadata[name].bytes, child[name].length);
+				assert.deepEqual(fs.readFileSync(path.join(directory, name + '.bin')), child[name]);
+			}
+		}
+		if (mode === 'missing-program') {
+			assert.equal(child.error.code, 'ENOENT');
+			assert.equal(metadata.error.code, 'ENOENT');
+		} else if (mode === 'buffer-error') {
+			assert.equal(child.error.code, 'ENOBUFS');
+			assert.equal(metadata.error.code, 'ENOBUFS');
+		} else if (mode === 'signal') {
+			assert.equal(child.signal, 'SIGTERM');
+			assert.equal(metadata.error, null);
+		} else {
+			assert.equal(child.status, mode === 'wrong-receipt' ? 0 : 73);
+			assert.equal(metadata.error, null);
+			assert.deepEqual(child.stdout, mode === 'empty' ? Buffer.alloc(0) : stdout);
+			assert.deepEqual(child.stderr, mode === 'empty' ? Buffer.alloc(0) : stderr);
+		}
+		for (const file of fs.readdirSync(directory))
+			assert.equal(fs.statSync(path.join(directory, file)).mode & 0o777, 0o600);
+		assert.ok(
+			exported.every(
+				(line) => !line.includes('NETWORK_STDOUT_SECRET') && !line.includes('NETWORK_STDERR_SECRET')
+			)
+		);
+	} finally {
+		if (previousMask !== undefined) process.umask(previousMask);
+		fs.rmSync(evidenceRoot, { recursive: true, force: true });
+	}
+}
+let diagnosticControls = 0;
+if (process.platform === 'linux') {
+	for (const mode of [
+		'exit73',
+		'signal',
+		'buffer-error',
+		'missing-program',
+		'wrong-receipt',
+		'empty',
+		'restrictive-umask'
+	]) {
+		exercisePrivateFailure(mode);
+		diagnosticControls++;
+	}
+	console.log(
+		`Linux private network diagnostics: ${diagnosticControls} physical controls passed; 0 skipped.`
+	);
+}
 let passed = 0;
 function exercise(transform = (result) => result) {
 	const calls = [];
-	const result = run({
-		platform: 'linux',
-		log: () => {},
-		error: () => {},
-		spawn: (command, args, options) => {
-			const index = calls.length;
-			calls.push({ command, args, options });
-			return transform(
-				{
-					status: 0,
-					signal: null,
-					stdout: receipts[index],
-					stderr: 'private witness not for export'
-				},
-				index
-			);
-		}
-	});
-	return { result, calls };
+	const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-network-model-evidence-'));
+	try {
+		const result = run({
+			platform: 'linux',
+			evidenceRoot,
+			log: () => {},
+			error: () => {},
+			spawn: (command, args, options) => {
+				const index = calls.length;
+				calls.push({ command, args, options });
+				return transform(
+					{
+						pid: 4242,
+						status: 0,
+						signal: null,
+						stdout: Buffer.from(receipts[index]),
+						stderr: Buffer.from('private witness not for export')
+					},
+					index
+				);
+			}
+		});
+		return { result, calls };
+	} finally {
+		fs.rmSync(evidenceRoot, { recursive: true, force: true });
+	}
 }
 const positive = exercise();
 assert.equal(positive.result, 0);
@@ -118,10 +256,19 @@ for (const refusal of [
 	(result) => ({ ...result, status: 1 }),
 	(result) => ({ ...result, error: new Error('private raw error') }),
 	(result) => ({ ...result, signal: 'SIGKILL' }),
-	(result) => ({ ...result, stdout: '' }),
-	(result) => ({ ...result, stdout: result.stdout.replace('4 passed', '0 passed') }),
-	(result) => ({ ...result, stdout: result.stdout.replace('0 skipped', '1 skipped') }),
-	(result) => ({ ...result, stdout: result.stdout + 'foreign output\n' })
+	(result) => ({ ...result, stdout: Buffer.alloc(0) }),
+	(result) => ({
+		...result,
+		stdout: Buffer.from(result.stdout.toString().replace('4 passed', '0 passed'))
+	}),
+	(result) => ({
+		...result,
+		stdout: Buffer.from(result.stdout.toString().replace('0 skipped', '1 skipped'))
+	}),
+	(result) => ({
+		...result,
+		stdout: Buffer.concat([result.stdout, Buffer.from('foreign output\n')])
+	})
 ]) {
 	for (const phase of [0, 1]) {
 		const attempt = exercise((result, index) => (index === phase ? refusal(result) : result));
@@ -149,18 +296,32 @@ assert.equal(
 assert.equal(spawned, 0);
 passed++;
 const exported = [];
-run({
-	platform: 'linux',
-	log: (line) => exported.push(line),
-	error: (line) => exported.push(line),
-	spawn: () => ({
-		status: 1,
-		stdout: 'private credential',
-		stderr: 'private recipient',
-		error: new Error('private raw error')
-	})
-});
-assert.ok(exported.every((line) => !line.includes('private')));
+const privacyEvidence = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-network-private-evidence-'));
+try {
+	run({
+		platform: 'linux',
+		evidenceRoot: privacyEvidence,
+		log: (line) => exported.push(line),
+		error: (line) => exported.push(line),
+		spawn: () => ({
+			pid: 4242,
+			status: 1,
+			signal: null,
+			stdout: Buffer.from('private credential'),
+			stderr: Buffer.from('private recipient'),
+			error: new Error('private raw error')
+		})
+	});
+	assert.ok(
+		exported.every((line) =>
+			['private credential', 'private recipient', 'private raw error'].every(
+				(secret) => !line.includes(secret)
+			)
+		)
+	);
+} finally {
+	fs.rmSync(privacyEvidence, { recursive: true, force: true });
+}
 passed++;
 console.log(`Linux network runtime registration: ${passed} passed; 0 skipped.`);
 

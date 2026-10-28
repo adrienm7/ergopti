@@ -51,3 +51,15 @@ helpers.describe("runtime guard: recurring callback failures", function()
 		helpers.assert_contains(err, "primary")
 	end)
 end)
+
+helpers.describe("Main watcher runtime cleanup ownership", function()
+	for _, receipt in ipairs({ "native", "false", "nil", "zero", "one", "throw" }) do
+		helpers.it("runtime-watcher-owner: retains " .. receipt .. " retirement until exact acknowledgement", function()
+			local executable = assert(arg and arg[-1], "the running interpreter must be identifiable")
+			local quote = require("text_utils").shell_quote
+			local fixture = helpers.driver_root() .. "/tests/hardware/run_watcher_runtime_retirement.lua"
+			local status = os.execute(quote(executable) .. " " .. quote(fixture) .. " " .. quote(helpers.driver_root()) .. " " .. quote(receipt))
+			helpers.assert_true(status == true or status == 0, "actual Main must preserve failed watcher cleanup ownership")
+		end)
+	end
+end)

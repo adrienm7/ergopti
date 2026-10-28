@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const pipeline = require('./ci-pipeline.cjs');
 const linuxInstall = require('./fixtures/linux-install-source.cjs');
 const generator = require('../codegen/codegen-linux-native-runtime.cjs');
@@ -16,8 +16,6 @@ const driver = path.join(root, 'static/ergopti_plus/linux');
 const installer = fs.readFileSync(process.argv[2] || path.join(driver, 'install.sh'), 'utf8');
 const helper = path.join(driver, 'install/native_source_build.sh');
 const data = JSON.parse(fs.readFileSync(path.join(root, generator.SOURCE), 'utf8'));
-const posix = (value) =>
-	value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => '/' + drive.toLowerCase());
 const quote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
 function shellFunction(name) {
 	const start = installer.indexOf(name + '() {\n');
@@ -75,20 +73,20 @@ try {
 			calls = path.join(owned, 'packages'),
 			args = path.join(owned, 'args');
 		const compilerBody =
-			'#!/usr/bin/env bash\nprintf "%s\\n" "$@" > ' + quote(posix(args)) + '\nexit 0\n';
+			'#!/usr/bin/env bash\nprintf "%s\\n" "$@" > ' + quote(bashPath(args)) + '\nexit 0\n';
 		if (ready) {
 			fs.writeFileSync(compiler, compilerBody);
 			fs.chmodSync(compiler, 0o755);
 		}
 		const script = `set -euo pipefail
-source ${quote(posix(helper))}
+source ${quote(bashPath(helper))}
 ${functions}
-SRC_DRIVER=${quote(posix(selectedDriver))}
+SRC_DRIVER=${quote(bashPath(selectedDriver))}
 SKIP_DEPS=${skip}
-CC=${quote(posix(compiler))}
+CC=${quote(bashPath(compiler))}
 _detect_pkg_manager() { echo ${manager}; }
 _install_required_package() {
- printf '%s\\n' "$2" >> ${quote(posix(calls))}
+ printf '%s\\n' "$2" >> ${quote(bashPath(calls))}
  if [ ${packageStatus} -ne 0 ]; then return ${packageStatus}; fi
  if [ "$2" = linux-libc-dev ] && ${repair}; then
   printf '%s' ${quote(compilerBody)} > "$CC"
@@ -113,7 +111,9 @@ ${acquisition}`;
 		if (ready || (repair && packageStatus === 0 && selectedDriver === sourceDriver && !skip)) {
 			const receivedArgs = fs.readFileSync(args, 'utf8').trim().split('\n');
 			assert.ok(receivedArgs.includes('-fsyntax-only'));
-			assert.ok(receivedArgs.includes(posix(path.join(sourceDirectory, 'archive_publication.c'))));
+			assert.ok(
+				receivedArgs.includes(bashPath(path.join(sourceDirectory, 'archive_publication.c')))
+			);
 		}
 		assert.ok(
 			!fs.existsSync(path.join(sourceDriver, 'bin/libergopti_archive_publication.so')),

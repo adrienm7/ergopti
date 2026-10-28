@@ -5098,8 +5098,7 @@ local function _frequency_picker(ctx, up)
 	return ManifestMenu.choice_row("about_update_frequency_menu", require("config_keys").COMMAND.UPDATE_CHECK_INTERVAL, {
 		update_check_interval = function(seconds)
 			if up.set_check_interval(seconds) ~= true then return false end
-			up.stop_background_checks()
-			up.start_background_checks()
+			if up.start_background_checks() ~= true then return false end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end,

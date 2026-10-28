@@ -17,7 +17,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const pipeline = require('./ci-pipeline.cjs');
 const MacStage = require('./fixtures/macos-stage-source.cjs');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const workflow = pipeline.text();
@@ -305,10 +305,9 @@ try {
 		`sparkle:edSignature="${signature}" length="${archive.length}"\n`
 	);
 
-	const toPosix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
 	const generated = spawnSync(
 		bashExecutable(),
-		[toPosix(path.join(root, 'tools', 'build', 'generate_appcast.sh'))],
+		[bashPath(path.join(root, 'tools', 'build', 'generate_appcast.sh'))],
 		{
 			encoding: 'utf8',
 			env: {
@@ -316,11 +315,11 @@ try {
 				ERGOPTI_VERSION: '0.0.0-dev.117',
 				ERGOPTI_BUILD: '117',
 				ERGOPTI_CHANNEL: 'dev',
-				SPARKLE_SIG_FILE: toPosix(signaturePath),
-				ZIP_PATH: toPosix(archivePath),
+				SPARKLE_SIG_FILE: signaturePath,
+				ZIP_PATH: archivePath,
 				GH_OWNER: 'adrienm7',
 				GH_REPO: 'ergopti',
-				OUTPUT_PATH: toPosix(outputPath)
+				OUTPUT_PATH: outputPath
 			}
 		}
 	);
@@ -2317,7 +2316,7 @@ try {
 			['invalid-repository', { ...alternate, repo: 'foreign/repository' }, {}, null],
 			['missing-identity', null, {}, null]
 		];
-		const toPosix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
+
 		for (const [name, github, overrides, expected] of scenarios) {
 			fs.writeFileSync(defaultsPath, JSON.stringify({ github }));
 			const output = path.join(temporary, name);
@@ -2325,12 +2324,16 @@ try {
 			delete env.GH_OWNER;
 			delete env.GH_REPO;
 			Object.assign(env, overrides);
-			const run = spawnSync(bashExecutable(), ['-s', '--', toPosix(repository), toPosix(output)], {
-				input: replay,
-				encoding: 'utf8',
-				env,
-				timeout: 15000
-			});
+			const run = spawnSync(
+				bashExecutable(),
+				['-s', '--', bashPath(repository), bashPath(output)],
+				{
+					input: replay,
+					encoding: 'utf8',
+					env,
+					timeout: 15000
+				}
+			);
 			assert.equal(run.error, undefined, name + ': the real build input declarations must execute');
 			const plist = path.join(output, 'Contents/Info.plist');
 			if (expected === null) {

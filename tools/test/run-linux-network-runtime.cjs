@@ -10,6 +10,9 @@
  */
 'use strict';
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
+const { createHash } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '../..');
 const DRIVER = path.join(ROOT, 'static/ergopti_plus/linux');
@@ -25,12 +28,58 @@ const NATIVE_OUTPUT = [
 	''
 ].join('\n');
 
+/** Retains rejected native results without placing private child text in logs. */
+function retainFailure(phase, result, evidenceRoot) {
+	const directory = fs.mkdtempSync(path.join(evidenceRoot, 'ergopti-network-runtime-failure-'));
+	fs.chmodSync(directory, 0o700);
+	const writePrivate = (name, value) => {
+		const file = path.join(directory, name);
+		fs.writeFileSync(file, value, { flag: 'wx', mode: 0o600 });
+		fs.chmodSync(file, 0o600);
+	};
+	const capture = (name) => {
+		const value = result[name];
+		if (value === null) return { kind: 'null' };
+		if (value === undefined) return { kind: 'undefined' };
+		if (!Buffer.isBuffer(value))
+			throw new TypeError('Native stream capture must be a Buffer, null or undefined.');
+		writePrivate(name + '.bin', value);
+		return {
+			kind: 'buffer',
+			bytes: value.length,
+			sha256: createHash('sha256').update(value).digest('hex')
+		};
+	};
+	const metadata = {
+		phase: phase.name,
+		command: phase.command,
+		args: phase.args,
+		cwd: ROOT,
+		pid: result.pid,
+		status: result.status,
+		signal: result.signal,
+		error: result.error
+			? {
+					name: result.error.name,
+					...Object.fromEntries(
+						Object.getOwnPropertyNames(result.error).map((name) => [name, result.error[name]])
+					)
+				}
+			: null,
+		stdout: capture('stdout'),
+		stderr: capture('stderr')
+	};
+	writePrivate('result.json', JSON.stringify(metadata, null, 2) + '\n');
+	return directory;
+}
+
 /** Qualifies exact completed child receipts or explicitly defers on another OS. */
 function run({
 	platform = process.platform,
 	spawn = spawnSync,
 	log = console.log,
-	error = console.error
+	error = console.error,
+	evidenceRoot = os.tmpdir()
 } = {}) {
 	if (platform !== 'linux') {
 		log('[DEFERRED] Actual Linux network runtime admission requires its Linux lane.');
@@ -59,13 +108,20 @@ function run({
 		const result = spawn(phase.command, phase.args, {
 			cwd: ROOT,
 			env,
-			encoding: 'utf8',
 			maxBuffer: 65536,
 			...(phase.timeout ? { timeout: phase.timeout } : {})
 		});
-		if (result.error || result.signal || result.status !== 0 || result.stdout !== phase.receipt) {
-			// Native streams stay private; status and a fixed phase identify refusal.
-			error(`[FAIL] Linux network runtime ${phase.name}: completed execution receipt refused.`);
+		if (
+			result.error ||
+			result.signal ||
+			result.status !== 0 ||
+			!Buffer.isBuffer(result.stdout) ||
+			!result.stdout.equals(Buffer.from(phase.receipt))
+		) {
+			const directory = retainFailure(phase, result, evidenceRoot);
+			error(
+				`[FAIL] Linux network runtime ${phase.name}: completed execution receipt refused; status=${JSON.stringify(result.status)} evidence=${JSON.stringify(directory)}`
+			);
 			failed = 1;
 		} else {
 			log(

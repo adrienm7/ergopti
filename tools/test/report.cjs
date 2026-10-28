@@ -16,8 +16,10 @@
  * On GitHub Actions it emits one ::error:: annotation per failing test and a
  * ::notice:: summary plus bounded failure details outside the error quota; always
  * writes a JSON summary (--json) and a step summary
- * if GITHUB_STEP_SUMMARY is set. Exits with the wrapped command's exit code so
- * CI gating is unchanged. Counts read by people (annotations, step summary,
+ * if GITHUB_STEP_SUMMARY is set. Preserves a failing child status; incomplete
+ * Lua timing elevates a successful child to exit 1. Only machine timing rows
+ * require valid UTF-8; human output and stderr remain byte-preserving.
+ * Counts read by people (annotations, step summary,
  * final line) group thousands; the JSON keeps plain numbers for tools.
  *
  * USAGE:
@@ -30,6 +32,7 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const { StringDecoder } = require('node:string_decoder');
+const { TextDecoder } = require('node:util');
 const { NOT_EXECUTED_MARKER } = require('./validate-ahk-suite-manifest.cjs');
 
 // =====================================
@@ -57,6 +60,7 @@ function parseArgs(argv) {
 /**
  * Parses failures + counts from combined runner output, format-agnostic.
  * @param {string} out The runner's full stdout/stderr.
+ * @param {string|Buffer} timingOutput The stdout/capture bytes owning timing rows.
  * @returns {{failures: string[], passed: number|null, failed: number|null, format: string, counts_available: boolean}}
  */
 function parseResults(out, timingOutput = out) {
@@ -71,11 +75,19 @@ function parseResults(out, timingOutput = out) {
 		luaPassedCounts = [],
 		luaFailedCounts = [];
 
-	for (const [index, line] of timingOutput.split(/\r?\n/).entries()) {
+	const timingBytes = Buffer.isBuffer(timingOutput)
+		? timingOutput
+		: Buffer.from(timingOutput, 'utf8');
+	const strict = new TextDecoder('utf-8', { fatal: true });
+	// Latin-1 preserves every original byte while locating ASCII row boundaries.
+	// Decode only selected machine rows, after complete child chunks are joined.
+	for (const [index, line] of timingBytes.toString('latin1').split(/\r?\n/).entries()) {
 		if (line.startsWith('# lua_timing ')) {
-			let reason = 'malformed JSON';
+			let reason = 'invalid UTF-8';
 			try {
-				const row = JSON.parse(line.slice('# lua_timing '.length));
+				const text = strict.decode(Buffer.from(line, 'latin1'));
+				reason = 'malformed JSON';
+				const row = JSON.parse(text.slice('# lua_timing '.length));
 				reason = 'invalid timing record';
 				if (
 					row.schema !== 1 ||
@@ -410,8 +422,8 @@ function main() {
 	// PARSE_ONLY mode (for self-tests): read pre-captured output from a file
 	// instead of spawning, so the parser can be exercised hermetically.
 	if (opts.cmd[0] === 'PARSE_FILE') {
-		const out = fs.readFileSync(opts.cmd[1], 'utf8');
-		const res = parseResults(out);
+		const out = fs.readFileSync(opts.cmd[1]);
+		const res = parseResults(out.toString('utf8'), out);
 		const code =
 			!res.counts_available || res.failed > 0 || res.failures.length || res.timing_errors.length
 				? 1
@@ -423,14 +435,14 @@ function main() {
 
 	const child = spawn(opts.cmd[0], opts.cmd.slice(1), { shell: false });
 	let buf = '';
-	let timingOutput = '';
+	const timingChunks = [];
 	const stdoutDecoder = new StringDecoder('utf8');
 	const stderrDecoder = new StringDecoder('utf8');
 	let spawnFailed = false;
 	child.stdout.on('data', (d) => {
 		const text = stdoutDecoder.write(d);
 		buf += text;
-		timingOutput += text;
+		timingChunks.push(d);
 		process.stdout.write(d);
 	});
 	child.stderr.on('data', (d) => {
@@ -441,8 +453,7 @@ function main() {
 		if (spawnFailed) return;
 		const stdoutEnd = stdoutDecoder.end();
 		buf += stdoutEnd + stderrDecoder.end();
-		timingOutput += stdoutEnd;
-		const res = parseResults(buf, timingOutput);
+		const res = parseResults(buf, Buffer.concat(timingChunks));
 		const finalCode = code === null ? 1 : code || (res.timing_errors.length ? 1 : 0);
 		if (signal)
 			process.stderr.write(`[report:${opts.name}] child terminated by signal ${signal}\n`);

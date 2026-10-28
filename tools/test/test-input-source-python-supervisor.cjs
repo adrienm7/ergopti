@@ -20,6 +20,14 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
+const MODEL_TIMEOUT_MS = require('smol-toml').parse(
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/modules/timings/constants.toml'),
+		'utf8'
+	)
+).ui.input_source_operation_timeout_ms;
+if (!Number.isSafeInteger(MODEL_TIMEOUT_MS) || MODEL_TIMEOUT_MS <= 0)
+	throw new Error('The input-source model requires its positive native operation deadline.');
 const INPUT_SOURCES = path.join(
 	ROOT,
 	'static',
@@ -209,7 +217,9 @@ function runMode(python, supervisor, fixtureDir, mode) {
 	fs.writeFileSync(harnessPath, buildHarness(supervisor), 'utf8');
 	const run = spawnSync(python, [harnessPath, mode, path.join(fixtureDir, 'Ergopti.keylayout')], {
 		cwd: ROOT,
-		encoding: 'utf8'
+		encoding: 'utf8',
+		timeout: MODEL_TIMEOUT_MS,
+		killSignal: 'SIGKILL'
 	});
 	if (run.error || run.status !== 0) {
 		throw new Error(`harness ${mode} failed: status=${run.status}\n${run.stdout}${run.stderr}`);
@@ -390,6 +400,45 @@ try {
 		'mutation guard rejects the SIGTERM ownership publication window',
 		!signalRaceContract(runMode(python, raceWindow, fixtureDir, 'race'))
 	);
+	const confirmMatch = source.match(/^local CONFIRM_SOURCE_SCRIPT = \[\[([\s\S]*?)\n\]\]$/m);
+	if (!confirmMatch) throw new Error('input-source confirmation worker block not found');
+	const confirmPath = path.join(fixtureDir, 'confirm-source.py');
+	fs.writeFileSync(confirmPath, confirmMatch[1], 'utf8');
+	const confirmModel = path.join(__dirname, 'fixtures', 'input-source-confirm-refresh.py');
+	const confirm = (duration) => {
+		const run = spawnSync(python, [confirmModel, confirmPath, ...duration], {
+			cwd: ROOT,
+			encoding: 'utf8',
+			timeout: MODEL_TIMEOUT_MS,
+			killSignal: 'SIGKILL'
+		});
+		if (run.error || run.status !== 0) throw new Error(`confirmation model failed: ${run.stderr}`);
+		return JSON.parse(run.stdout);
+	};
+	for (const duration of ['0.3', '0.125', '0.875']) {
+		const result = confirm([duration]);
+		const effect = result.events.filter((event) => ['select', 'sleep'].includes(event[0]));
+		test(
+			`confirmation refresh receives both settle delays from its required argument: ${duration}`,
+			result.error === null &&
+				JSON.stringify(effect) ===
+					JSON.stringify([
+						['select', 'Other'],
+						['sleep', Number(duration)],
+						['select', 'Target'],
+						['sleep', Number(duration)]
+					]),
+			JSON.stringify(result)
+		);
+	}
+	for (const duration of [[], ['invalid'], ['0'], ['-0.1'], ['nan'], ['inf']]) {
+		const result = confirm(duration);
+		test(
+			`confirmation refresh refuses an absent or invalid required duration: ${JSON.stringify(duration)}`,
+			result.error !== null && result.events.length === 0,
+			JSON.stringify(result)
+		);
+	}
 } finally {
 	fs.rmSync(fixtureDir, { recursive: true, force: true });
 }

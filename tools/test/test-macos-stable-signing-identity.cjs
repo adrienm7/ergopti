@@ -40,7 +40,7 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BUILD = fs.readFileSync(path.join(ROOT, 'tools/build/build_macos_app.sh'), 'utf8');
@@ -103,9 +103,8 @@ function replay(source, options) {
 		shellFunction(source, 'select_launcher_archs')
 	].join('\n');
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-signing-'));
-	const posix = tmp.replaceAll('\\', '/');
-	const checksumNode =
-		"'" + process.execPath.replaceAll('\\', '/').replaceAll("'", "'\"'\"'") + "'";
+	const posix = bashPath(tmp);
+	const checksumNode = "'" + bashPath(process.execPath).replaceAll("'", "'\"'\"'") + "'";
 	try {
 		const script = `
 set -euo pipefail
@@ -611,7 +610,7 @@ try {
 	delete env.CI;
 	delete env.GITHUB_ACTIONS;
 	const run = (target, extraEnv = {}) =>
-		spawnSync(bashExecutable(), [CREATE.replaceAll('\\', '/'), target.replaceAll('\\', '/')], {
+		spawnSync(bashExecutable(), [bashPath(CREATE), bashPath(target)], {
 			encoding: 'utf8',
 			timeout: 60000,
 			env: { ...env, ...extraEnv }

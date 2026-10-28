@@ -80,15 +80,17 @@ end
 local function with_probe_receipts(failure, test)
 	local Sink = helpers.load_module("infra.logger_sink")
 	local saved_writer = package.loaded["infra.regular_file_writer"]
-	local previous_open, previous_popen = io.open, io.popen
+	local shell = require("adapters.shell_runner")
+	local previous_capture = shell.exec_checked
 	local previous_execute, previous_remove = os.execute, os.remove
 	local state = { opened = {}, removed = {}, written = 0, flushed = 0, closed = 0 }
 	local path = "/logger-receipts/.ergopti-log-probe-a1B2C3d4E5"
 	os.execute = function() return 0 end
-	io.popen = function(command)
+	shell.exec_checked = function(command, options)
 		helpers.assert_contains(command, "mktemp --", "probe creation must be exclusive")
-		if failure == "create" then return nil, "refused" end
-		return { read = function() return path .. "\n" end, close = function() return true end }
+		helpers.assert_eq(options.output_dir, "/logger-receipts", "capture must use the selected directory")
+		if failure == "create" then return false, "", "refused" end
+		return true, path .. "\n", nil
 	end
 	local open_file = function(name)
 		state.opened[#state.opened + 1] = name
@@ -119,13 +121,23 @@ local function with_probe_receipts(failure, test)
 	end
 	package.loaded["infra.regular_file_writer"] = { open = open_file }
 	local ok, err = xpcall(function() test(Sink, state, path) end, debug.traceback)
-	io.open, io.popen = previous_open, previous_popen
+	shell.exec_checked = previous_capture
 	os.execute, os.remove = previous_execute, previous_remove
 	package.loaded["infra.regular_file_writer"] = saved_writer
 	if not ok then error(err, 0) end
 end
 
 helpers.describe("linux-logger-probe-receipts", function()
+	helpers.it("logger-probe-exit: failed native allocation preserves unrelated files and links", function()
+		local shell = require("adapters.shell_runner")
+		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit") and shell.has_command("mktemp"),
+			"native logger probe receipts require Python, LuaJIT and the real mktemp")
+		local quote = require("text_utils").shell_quote
+		local runtime = assert(shell.exec_line("command -v luajit"))
+		local fixture = helpers.driver_root() .. "/tests/hardware/test_logger_probe_exit.py"
+		local status = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime))
+		helpers.assert_true(status == true or status == 0, "failed native allocation cannot authorize file mutation")
+	end)
 	for _, failure in ipairs({ "create", "open", "write", "throw", "flush", "close", "remove" }) do
 		helpers.it("linux-logger-probe-receipts: refuses " .. failure .. " and retires only its owned probe", function()
 			with_probe_receipts(failure, function(Sink, state, path)
