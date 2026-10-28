@@ -53,6 +53,12 @@ end
 --- @return string
 function M.emoji(backend) return entry(backend).emoji end
 
+--- The brand alone, without its emoji: "Ollama". The model selector page
+--- writes the emoji itself, before the brand.
+--- @param backend string
+--- @return string
+function M.brand(backend) return entry(backend).brand end
+
 --- The brand and emoji, as the Backend choice names it: "Ollama 🦙".
 --- @param backend string
 --- @return string

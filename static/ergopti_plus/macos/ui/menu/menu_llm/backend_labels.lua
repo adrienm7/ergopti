@@ -81,6 +81,17 @@ function M.brand(backend)
 	return option and option.brand or nil
 end
 
+--- The brand alone, without its emoji: "MLX", "Ollama" or "API". The model
+--- selector page writes the emoji itself, before the brand; handing it brand()
+--- drew « 🦙 Ollama 🦙 ».
+--- @param backend string Backend identifier.
+--- @return string brand
+function M.name(backend)
+	local entry = BRANDS[backend]
+	if not entry then error("backend_labels.name: unknown backend " .. tostring(backend)) end
+	return entry.brand
+end
+
 --- The emoji of a backend: "🚀", "🦙" or "🌐".
 --- @param backend string Backend identifier.
 --- @return string|nil emoji Nil for a backend the shared table does not name.
