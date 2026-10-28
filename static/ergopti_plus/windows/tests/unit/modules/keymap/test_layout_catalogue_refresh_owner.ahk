@@ -76,8 +76,11 @@ class _LCR_Request {
 	GetResponseHeader(Name) {
 		return StrLower(Name) == "etag" ? this.Etag : ""
 	}
+	; The real CurlAsyncRequest acknowledges Abort only once its writer is
+	; quiescent, then reports completion; no managed write can follow the ACK.
 	Abort() {
 		this.Aborted := true
+		this.Ready := true
 		return true
 	}
 }
@@ -117,6 +120,12 @@ class _LCR_World {
 		this.Results.Push(Outcome)
 	}
 	Complete(Request, Status, Etag) {
+		; A native completion queued after an acknowledged Abort only publishes
+		; readiness: the retired writer never recreates the response pathname.
+		if Request.Aborted {
+			Request.Ready := true
+			return
+		}
 		Request.Status := Status
 		Request.Etag := Etag
 		if Status == 200
@@ -163,15 +172,35 @@ class _LCR_World {
 		AssertEqual(this.Bodies[Etag], Body, "the durable cache never pairs one response with another ETag")
 	}
 	Retire() {
+		; Abort before discarding any retained poll: each real poll must observe
+		; its acknowledged retirement and release its exact download owner, or a
+		; live successor would leak global read activity into later tests.
+		Failure := 0
+		Loop 64 {
+			for Request in this.Requests
+				if !Request.Aborted
+					AssertTrue(Request.Abort(), "the private logical transport retires")
+			if this.Tasks.Length == 0
+				break
+			Task := this.Tasks.RemoveAt(1)
+			try Task.Fn.Call()
+			catch as Err {
+				if !IsObject(Failure)
+					Failure := Err
+			}
+		}
+		Remaining := this.Tasks.Length
 		this.Tasks.Length := 0
 		this.LastPolled := 0
-		for Request in this.Requests {
-			AssertTrue(Request.Abort(), "the private logical transport retires")
+		for Request in this.Requests
 			Request.World := 0
-		}
 		this.Requests.Length := 0
 		this.Transport.Clear()
 		this.Transport := 0
+		if IsObject(Failure)
+			throw Failure
+		AssertEqual(0, Remaining, "every retained real poll settles after its acknowledged abort")
+		AssertTrue(LayoutRegistry_PrepareShutdown(), "teardown retires every exact registry download owner")
 	}
 }
 
