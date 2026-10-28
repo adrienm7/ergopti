@@ -2333,6 +2333,10 @@ end)
 local PendingLayoutActivation = require("modules.keymap.pending_layout_activation")
 PendingLayoutActivation.init(PendingLayoutActivation.production_deps())
 hs.timer.doAfter(require("infra.timings").sec("ui", "pending_layout_activation_delay_ms"), function()
+	local reported, report_err = xpcall(require("modules.keymap.layout_install").report_duplicate_bundles, debug.traceback)
+	if not reported then
+		Logger.error(LOG, "The duplicate keyboard-layout bundles could not be listed: %s", tostring(report_err))
+	end
 	local resumed, resume_err = xpcall(PendingLayoutActivation.resume, debug.traceback)
 	if not resumed then
 		Logger.error(LOG, "The pending keyboard layouts could not be checked: %s", tostring(resume_err))

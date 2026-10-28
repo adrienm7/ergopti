@@ -40,7 +40,8 @@ local PASS, FAIL, INFO, SKIP = Report.STATE_PASS, Report.STATE_FAIL, Report.STAT
 ---   deps (what the registry takes as its last argument, or nil), snapshot() ->
 ---   { installed, active, record_error }, read_fixture() -> { declaration,
 ---   keylayout } | nil, err, exists(path), read_copy() -> text | nil, sha256(text,
----   callback), host_ready(installed_info, entry) -> state, value, log(level,
+---   callback), host_ready(installed_info, entry) -> state, value (or
+---   host_ready_async(installed_info, entry, ready(state, value))), log(level,
 ---   message, ...).
 --- @param env table
 --- @param report table From field_check_report.new_report.
@@ -111,6 +112,23 @@ function M.run(env, report, finish)
 				return
 			end
 			step("composer_copy", PASS)
+			-- A host whose readiness is read by another process answers later
+			-- (macOS reads it from a fresh process): host_ready_async.
+			if env.host_ready_async ~= nil then
+				local answered = false
+				local function ready(state, value)
+					if answered then return end
+					answered = true
+					step("composer_ready", state, value)
+					cleanup()
+				end
+				local ok, err = pcall(env.host_ready_async, info, entry, ready)
+				if not ok then
+					env.log("error", "The readiness probe raised: %s", tostring(err))
+					ready(FAIL, "probe_raised")
+				end
+				return
+			end
 			local ok, state, value = pcall(env.host_ready, info, entry)
 			if ok then
 				step("composer_ready", state, value)

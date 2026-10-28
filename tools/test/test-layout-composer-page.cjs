@@ -410,6 +410,12 @@ check('host results are worded, and a failure code gets its own sentence', () =>
 		locale('en')['layout_composer.result_saved_pending_logout']
 	);
 	assert.equal(loaded.byId.get('composer-active').hidden, true);
+	// macOS asks to allow a keyboard it has not seen before: the page says so
+	loaded.window.composerResult({ action: 'composer_save', ok: true, used: false, consent: true });
+	assert.equal(
+		loaded.byId.get('composer-result').textContent,
+		locale('en')['layout_composer.result_saved_consent']
+	);
 	loaded.window.composerResult({ action: 'composer_remove', ok: true });
 	assert.equal(
 		loaded.byId.get('composer-result').textContent,
