@@ -9,8 +9,9 @@
 --- asynchronously and injects their text and a file reader.
 ---
 --- FEATURES & RATIONALE:
---- 1. No process, no probe: a catalogue server whose process is not running
----    is not probed, so a user-configurable port is never guessed blindly.
+--- 1. No process, no probe: a catalogue server whose process the process list
+---    does not show is not probed, so a user-configurable port is never
+---    guessed blindly.
 --- 2. The port comes from the first source that gives one, in this order:
 ---    the process's command-line flag (what the server was started with), the
 ---    server's settings file (what it reads at start), the listening TCP ports
@@ -19,6 +20,14 @@
 ---    stores it in settings.json; a sweep that probed 8000 only found nothing.
 --- 3. Every result names its source and detail, so the log says which port
 ---    was tried and why.
+--- 4. The process lookup asks only for the catalogue's processes (pgrep with
+---    M.process_pattern), never for every argument of every process: a full
+---    listing of a managed Mac outgrew the pipe hs.task drains only at exit,
+---    so ps blocked until its deadline and the sweep read nothing.
+--- 5. The settings files and the listening ports do not depend on the process
+---    list: when it is unreadable, a server is still probed at its settings
+---    port, else at a port a process of its name listens on, and only then at
+---    its catalogue default.
 --- ==============================================================================
 
 local TableUtil = require("table_util")
@@ -33,6 +42,11 @@ M.SOURCE_DEFAULT   = "default"
 
 -- The operating-system names a settings-file descriptor may restrict itself to
 local OS_NAMES = { macos = true, linux = true, windows = true }
+
+-- The detail every result of a sweep without a process list carries
+local UNLISTED = "process list unreadable"
+
+local resolve_config
 
 
 
@@ -128,17 +142,19 @@ local function split_address(address)
 	return host, port
 end
 
---- Parses lsof -F pn output (macOS): a "p<pid>" line, then its "n<address>" lines.
+--- Parses lsof -F pn (or -F pcn) output (macOS): a "p<pid>" line, its
+--- optional "c<command name>" line, then its "n<address>" lines.
 --- @param text string
---- @return table listeners Array of { pid, host, port }.
+--- @return table listeners Array of { pid, host, port, command|nil }.
 function M.parse_lsof(text)
-	local listeners, pid = {}, nil
+	local listeners, pid, command = {}, nil, nil
 	for line in tostring(text or ""):gmatch("[^\r\n]+") do
 		local tag, value = line:sub(1, 1), line:sub(2)
-		if tag == "p" then pid = tonumber(value)
+		if tag == "p" then pid, command = tonumber(value), nil
+		elseif tag == "c" and pid then command = value ~= "" and value or nil
 		elseif tag == "n" and pid then
 			local host, port = split_address(value:match("^(%S+)"))
-			if port then listeners[#listeners + 1] = { pid = pid, host = host, port = port } end
+			if port then listeners[#listeners + 1] = { pid = pid, host = host, port = port, command = command } end
 		end
 	end
 	return listeners
@@ -147,7 +163,7 @@ end
 --- Parses ss -Hltnp output (Linux): local address in column 4, owners as
 --- users:(("name",pid=N,fd=M),…).
 --- @param text string
---- @return table listeners Array of { pid, host, port }.
+--- @return table listeners Array of { pid, host, port, command }.
 function M.parse_ss(text)
 	local listeners = {}
 	for line in tostring(text or ""):gmatch("[^\r\n]+") do
@@ -155,12 +171,39 @@ function M.parse_ss(text)
 		for column in line:gmatch("%S+") do columns[#columns + 1] = column end
 		local host, port = split_address(columns[4] or "")
 		if port then
-			for pid in line:gmatch("pid=(%d+)") do
-				listeners[#listeners + 1] = { pid = tonumber(pid), host = host, port = port }
+			for name, pid in line:gmatch('"([^"]*)",pid=(%d+)') do
+				listeners[#listeners + 1] = { pid = tonumber(pid), host = host, port = port, command = name }
 			end
 		end
 	end
 	return listeners
+end
+
+--- Escapes the extended regular expression operators of a literal.
+--- @param text string
+--- @return string
+local function regex_literal(text)
+	return (text:gsub("[%^%$%.%[%]|%(%)%*%+%?{}\\]", "\\%0"))
+end
+
+--- Builds the extended regular expression a process lookup (pgrep -f -i)
+--- matches the command lines with: each process name as the executable's file
+--- name, each command-line fragment as a substring. M.matches decides on the
+--- rows it returns; the pattern only keeps the listing to those candidates.
+--- @param entries table Array of { descriptor } (catalogue order).
+--- @return string pattern
+function M.process_pattern(entries)
+	local alternatives = {}
+	for _, entry in ipairs(entries) do
+		for _, name in ipairs(entry.descriptor.process_names) do
+			alternatives[#alternatives + 1] = "(^|/)" .. regex_literal(name) .. "(\\.exe)?( |$)"
+		end
+		for _, fragment in ipairs(entry.descriptor.command_lines) do
+			alternatives[#alternatives + 1] = regex_literal(fragment)
+		end
+	end
+	assert(#alternatives > 0, "local server process lookup has no process name")
+	return table.concat(alternatives, "|")
 end
 
 
@@ -298,6 +341,32 @@ function M.default_port(base_url)
 	return port
 end
 
+--- Reads the port of the first applicable settings file that gives one.
+--- @param result table A result whose process runs or may run.
+--- @param descriptor table From M.descriptor.
+--- @param base_url string The catalogue base URL.
+--- @param context table { os, home, read_file, decode_json }.
+--- @return table result With source config, or needs_listeners and the problems met.
+resolve_config = function(result, descriptor, base_url, context)
+	local problems = {}
+	for _, config in ipairs(descriptor.config_files) do
+		local applies = false
+		for _, os_name in ipairs(config.os) do applies = applies or os_name == context.os end
+		if applies then
+			local port, path, problem = port_from_config(config, context)
+			if port then
+				result.port, result.source, result.detail = port, M.SOURCE_CONFIG, path
+				result.base_url = M.with_port(base_url, port)
+				return result
+			end
+			problems[#problems + 1] = path .. (problem and (": " .. problem) or ": no port")
+		end
+	end
+	result.needs_listeners = true
+	result.detail = #problems > 0 and table.concat(problems, "; ") or nil
+	return result
+end
+
 --- Resolves one server from the process list and its settings files.
 --- @param id string Server id.
 --- @param descriptor table From M.descriptor.
@@ -325,22 +394,26 @@ function M.resolve(id, descriptor, base_url, processes, context)
 		result.base_url = M.with_port(base_url, cli_port)
 		return result
 	end
-	local problems = {}
-	for _, config in ipairs(descriptor.config_files) do
-		local applies = false
-		for _, os_name in ipairs(config.os) do applies = applies or os_name == context.os end
-		if applies then
-			local port, path, problem = port_from_config(config, context)
-			if port then
-				result.port, result.source, result.detail = port, M.SOURCE_CONFIG, path
-				result.base_url = M.with_port(base_url, port)
-				return result
-			end
-			problems[#problems + 1] = path .. (problem and (": " .. problem) or ": no port")
-		end
+	return resolve_config(result, descriptor, base_url, context)
+end
+
+--- Resolves one server without a process list: its settings file, else it
+--- asks for every listening port (M.apply_unlisted_listeners). The process
+--- is not known to run, so the result is probed, its pids unknown.
+--- @param id string Server id.
+--- @param descriptor table From M.descriptor.
+--- @param base_url string The catalogue base URL.
+--- @param context table { os, home, read_file(path) -> string|nil, decode_json }.
+--- @return table result As M.resolve, with needs_all_listeners instead of needs_listeners.
+function M.resolve_unlisted(id, descriptor, base_url, context)
+	local result = { id = id, running = true, pids = {}, base_url = base_url, port = M.default_port(base_url) }
+	resolve_config(result, descriptor, base_url, context)
+	if result.needs_listeners then
+		result.needs_listeners, result.needs_all_listeners = nil, true
+		result.detail = UNLISTED .. (result.detail and ("; " .. result.detail) or "")
+	else
+		result.detail = result.detail .. "; " .. UNLISTED
 	end
-	result.needs_listeners = true
-	result.detail = #problems > 0 and table.concat(problems, "; ") or nil
 	return result
 end
 
@@ -390,6 +463,37 @@ end
 
 
 
+--- Completes a result of M.resolve_unlisted from every listening socket: the
+--- sockets of a process whose command line (processes, read for the listening
+--- pids) or command name (the listener's) is the server's, then falls back to
+--- the catalogue default as M.apply_listeners does.
+--- @param result table From M.resolve_unlisted with needs_all_listeners.
+--- @param descriptor table From M.descriptor.
+--- @param listeners table|nil Every listener { pid, host, port, command|nil }; nil when unread.
+--- @param processes table|nil From M.parse_processes for the listening pids; nil when unread.
+--- @return table result
+function M.apply_unlisted_listeners(result, descriptor, listeners, processes)
+	if not result.needs_all_listeners then return result end
+	result.needs_all_listeners, result.needs_listeners = nil, true
+	local commands, seen = {}, {}
+	for _, process in ipairs(processes or {}) do commands[process.pid] = process.command end
+	for _, listener in ipairs(listeners or {}) do
+		local named = (commands[listener.pid] and M.matches(descriptor, commands[listener.pid]))
+			or (listener.command and M.matches(descriptor, listener.command))
+		if named and not seen[listener.pid] then
+			seen[listener.pid] = true
+			result.pids[#result.pids + 1] = listener.pid
+		end
+	end
+	M.apply_listeners(result, listeners)
+	if result.source == M.SOURCE_LISTENING then result.detail = result.detail .. "; " .. UNLISTED end
+	return result
+end
+
+
+
+
+
 -- =====================================
 -- =====================================
 -- ======= 4/ Scan =====================
@@ -410,14 +514,22 @@ end
 --- Scans every catalogue server through the driver's asynchronous readers.
 --- @param entries table Array of { id, descriptor, base_url } in catalogue order.
 --- @param ports table { os, home, decode_json, read_file(path) -> string|nil,
----        list_processes(on_text), list_listeners(pids, on_listeners), logger,
----        log }: list_processes calls on_text once with "pid command" rows,
----        list_listeners calls on_listeners once with parsed { pid, host, port }
----        rows of those pids; either passes nil when it could not read.
+---        list_processes(pattern, on_text), list_listeners(pids, on_listeners),
+---        list_all_listeners(on_listeners), describe_processes(pids, on_text),
+---        logger, log }: list_processes calls on_text once with the "pid
+---        command" rows of the processes M.process_pattern matches,
+---        describe_processes with the rows of the given pids, list_listeners
+---        and list_all_listeners call on_listeners once with parsed { pid,
+---        host, port, command|nil } rows of those pids or of every process;
+---        each passes nil (and a cause) when it could not read.
 --- @param on_done function Receives results: id -> M.resolve result.
 function M.scan(entries, ports, on_done)
+	for _, name in ipairs({ "list_processes", "list_listeners", "list_all_listeners", "describe_processes" }) do
+		if type(ports[name]) ~= "function" then error("local_server_ports.scan: ports." .. name .. " is required") end
+	end
 	local Logger, LOG = ports.logger, ports.log
 	Logger.trace(LOG, "Scanning %d local server process(es)…", #entries)
+	local context = { os = ports.os, home = ports.home or "", read_file = ports.read_file, decode_json = ports.decode_json }
 	local function report(results, how)
 		local summary = {}
 		for _, entry in ipairs(entries) do
@@ -430,19 +542,37 @@ function M.scan(entries, ports, on_done)
 		Logger.done(LOG, "Local server process scan settled%s.", how)
 		on_done(results)
 	end
-	ports.list_processes(function(listing)
-		local results = {}
-		if listing == nil then
-			Logger.error(LOG, "The process list is unreadable: local servers are probed at their catalogue port.")
-			for _, entry in ipairs(entries) do
-				results[entry.id] = { id = entry.id, running = true, pids = {}, base_url = entry.base_url,
-					port = M.default_port(entry.base_url), source = M.SOURCE_DEFAULT, detail = "process list unreadable" }
-			end
-			report(results, " without a process list")
-			return
+	--- Resolves every server from its settings file, then every listening port.
+	--- @param cause string Why the process list is missing.
+	local function scan_unlisted(cause)
+		-- A warning, not an error: the next readings still find a moved port
+		Logger.warn(LOG, "The process list is unreadable (%s): local servers are probed at the port of their "
+			.. "settings file, else of a listening process of their name, else of the catalogue.", cause)
+		local results, pending = {}, {}
+		for _, entry in ipairs(entries) do
+			results[entry.id] = M.resolve_unlisted(entry.id, entry.descriptor, entry.base_url, context)
+			if results[entry.id].needs_all_listeners then pending[#pending + 1] = entry end
 		end
+		if #pending == 0 then report(results, " without a process list"); return end
+		ports.list_all_listeners(function(listeners)
+			local function complete(processes)
+				for _, entry in ipairs(pending) do
+					M.apply_unlisted_listeners(results[entry.id], entry.descriptor, listeners, processes)
+				end
+				report(results, " without a process list")
+			end
+			local pids, seen = {}, {}
+			for _, listener in ipairs(listeners or {}) do
+				if not seen[listener.pid] then seen[listener.pid] = true; pids[#pids + 1] = listener.pid end
+			end
+			if #pids == 0 then complete(nil); return end
+			ports.describe_processes(pids, function(text) complete(text and M.parse_processes(text) or nil) end)
+		end)
+	end
+	ports.list_processes(M.process_pattern(entries), function(listing, cause)
+		if listing == nil then scan_unlisted(cause or "no reading"); return end
+		local results = {}
 		local processes = M.parse_processes(listing)
-		local context = { os = ports.os, home = ports.home or "", read_file = ports.read_file, decode_json = ports.decode_json }
 		local wanted, seen = {}, {}
 		for _, entry in ipairs(entries) do
 			local result = M.resolve(entry.id, entry.descriptor, entry.base_url, processes, context)

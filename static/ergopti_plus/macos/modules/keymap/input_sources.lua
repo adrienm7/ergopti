@@ -48,10 +48,6 @@ local ACTIVE_LAYOUTS_REFRESH_THROTTLE_SEC = 5
 local INPUT_SOURCE_OPERATION_TIMEOUT_SEC =
 	Timings.sec("ui", "input_source_operation_timeout_ms")
 
--- Both reselect legs consume the same admitted settling interval.
-local INPUT_SOURCE_REFRESH_SETTLE_SEC =
-	Timings.sec("ui", "input_source_refresh_settle_ms")
-
 -- Records from the (expensive) HIToolbox active-layout probe. nil until first
 -- computed; refreshed asynchronously so menu opens never pay a subprocess.
 local _active_layouts_cache = nil
@@ -927,8 +923,8 @@ end
 -- argv: KeyboardLayout Name, the .keylayout path to register ("" for none),
 -- and comma-separated flags: "enable" calls TISEnableInputSource on a listed
 -- source that reads off, "refresh" selects another layout and back when the
--- target is selected (so a rewritten layout is reloaded). The final argument is
--- the admitted settling delay in seconds. Prints one JSON object:
+-- target is selected (so a rewritten layout is reloaded), then the pause in
+-- seconds after each of those selections. Prints one JSON object:
 --   {"listed", "id", "enabled", "select_capable", "selected", "register", "enable", "refreshed"}
 -- Carbon is called through ctypes: the AppleScript ObjC bridge crashes on these
 -- calls (see ENABLED_LIST_SCRIPT), the C API does not.
@@ -938,9 +934,9 @@ import ctypes, json, sys, time
 TARGET = sys.argv[1]
 REGISTER_PATH = sys.argv[2]
 FLAGS = sys.argv[3].split(",")
+SETTLE_SEC = float(sys.argv[4])
 REFRESH = "refresh" in FLAGS
 ENABLE = "enable" in FLAGS
-REFRESH_SETTLE_SEC = float(sys.argv[4])
 UTF8 = 0x08000100
 
 cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
@@ -1028,9 +1024,9 @@ if target is not None and REFRESH and flag(target, K_SELECTED):
         and flag(source, K_ENABLED) and flag(source, K_SELECT_CAPABLE)), None)
     if other is not None:
         away = tis.TISSelectInputSource(other)
-        time.sleep(REFRESH_SETTLE_SEC)
+        time.sleep(SETTLE_SEC)
         back = tis.TISSelectInputSource(target)
-        time.sleep(REFRESH_SETTLE_SEC)
+        time.sleep(SETTLE_SEC)
         refreshed = {"away": away, "back": back}
     else:
         refreshed = {"away": None, "back": None}
@@ -1069,8 +1065,8 @@ local function confirm_source_async(keyboard_name, options, on_done)
 	if options.refresh == true then flags[#flags + 1] = "refresh" end
 	if options.enable == true then flags[#flags + 1] = "enable" end
 	return run_bounded_process("Confirm keyboard input source", python_bin,
-		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path,
-			table.concat(flags, ","), tostring(INPUT_SOURCE_REFRESH_SETTLE_SEC) },
+		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path, table.concat(flags, ","),
+			tostring(Timings.sec("ui", "input_source_reselect_settle_ms")) },
 		function(process_ok, out, reason)
 			local decoded_ok, state = pcall(require("json").decode, tostring(out or ""))
 			if process_ok ~= true or not decoded_ok or type(state) ~= "table" or type(state.listed) ~= "boolean" then

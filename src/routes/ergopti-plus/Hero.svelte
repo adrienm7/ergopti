@@ -19,9 +19,9 @@ FEATURES & RATIONALE:
 <script>
 	import { onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
 	import WindowChrome from './WindowChrome.svelte';
-	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '$lib/js/getGitHubRelease.js';
+	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '#lib/js/getGitHubRelease.js';
 	import { ui, setOS } from './state.svelte.js';
 	import { t } from './i18n.svelte.js';
 

@@ -792,6 +792,8 @@ helpers.describe("input-source confirm: a fresh process reads the state (compose
 		helpers.assert_eq(args[3], "Composer Check")
 		helpers.assert_eq(args[4], "/u/composed.keylayout")
 		helpers.assert_eq(args[5], "refresh")
+		helpers.assert_eq(args[6], tostring(require("infra.timings").sec("ui", "input_source_reselect_settle_ms")),
+			"the refresh pause comes from the timing registry")
 		f.tasks[1]:complete(0, '{"listed": true, "enabled": true, "selected": false, "register": 0, "refreshed": null}\n', "")
 		helpers.assert_eq(#answers, 1)
 		helpers.assert_eq(answers[1].ok, true)
@@ -867,7 +869,7 @@ helpers.describe("input-source refresh: one admitted settling delay", function()
 		local admitted, reads = {}, 0
 		for key, value in pairs(real) do admitted[key] = value end
 		admitted.sec = function(section, key)
-			if section == "ui" and key == "input_source_refresh_settle_ms" then
+			if section == "ui" and key == "input_source_reselect_settle_ms" then
 				reads = reads + 1
 				return 0.417
 			end

@@ -302,6 +302,31 @@ LocalServerPortsResolve(Id, Descriptor, BaseUrl, Processes, Context) {
 		Result["base_url"] := LocalServerPortsWithPort(BaseUrl, Cli["port"])
 		return Result
 	}
+	return _LocalServerPortsResolveConfig(Result, Descriptor, BaseUrl, Context)
+}
+
+/**
+ * Resolves one server without a process list: the port of its settings file,
+ * else its catalogue default, both probed with the pids unknown. The Windows
+ * scan reads the processes and the listening sockets in one child, so a
+ * missing process list has no listening ports either.
+ * @param {Map} Context Map("os", "home", "read_file", "decode_json").
+ * @returns {Map} As LocalServerPortsResolve, never needing listeners.
+ */
+LocalServerPortsResolveUnlisted(Id, Descriptor, BaseUrl, Context) {
+	Result := Map("id", Id, "running", true, "pids", [], "base_url", BaseUrl,
+		"port", LocalServerPortsDefaultPort(BaseUrl), "source", "", "detail", "", "needs_listeners", false)
+	_LocalServerPortsResolveConfig(Result, Descriptor, BaseUrl, Context)
+	if Result["needs_listeners"] {
+		Result["needs_listeners"] := false, Result["source"] := "default"
+		Result["detail"] := "process list unreadable" (Result["detail"] != "" ? "; " Result["detail"] : "")
+	} else
+		Result["detail"] .= "; process list unreadable"
+	return Result
+}
+
+/** Reads the port of the first applicable settings file, else marks the result as needing listeners. */
+_LocalServerPortsResolveConfig(Result, Descriptor, BaseUrl, Context) {
 	Problems := []
 	for Config in Descriptor["config_files"] {
 		Applies := false

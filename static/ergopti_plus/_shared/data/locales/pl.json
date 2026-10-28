@@ -2309,6 +2309,7 @@
 	"ollama.error_checksum": "Pobrane archiwum Ollama nie przeszło weryfikacji SHA-256 i zostało odrzucone. Niczego nie zainstalowano.",
 	"ollama.error_installer_refused": "Instalator Ollama w Ergopti odrzucił własne żądanie, więc nic nie zostało zainstalowane. Uruchom ponownie Ergopti i ponownie wybierz silnik Ollama; jeśli problem się powtarza, wyślij raport diagnostyczny.",
 	"ollama.error_runtime_refused": "Ergopti nie mógł zweryfikować swojej przypiętej wersji Ollama (katalog wydań lub kontrola integralności), więc nic nie zostało zainstalowane. Wyślij raport diagnostyczny.",
+	"ollama.error_dev_catalogue_missing": "Ta aplikacja deweloperska nie zbudowała jeszcze przypiętej wersji Ollama ze źródeł klonu, więc niczego nie zainstalowano. Uruchom ponownie tools/dev/run-macos-dev-app.sh i przeczytaj podany powód (wymagane są Go i narzędzia Xcode).",
 	"ollama.error_killed": "System zatrzymał instalację Ollamy ({1}) przed jej zakończeniem, więc nic nie zostało zainstalowane. Spróbuj ponownie; jeśli to się powtórzy, wyślij raport diagnostyczny.",
 	"ollama.external_manual_start_body": "Ta instalacja Ollama jest zarządzana poza Ergopti. Samodzielnie uruchom lub zatrzymaj jej usługę albo zainstaluj środowisko zarządzane przez Ergopti z propozycji konfiguracji Ollama.",
 	"ollama.native_offer_body": "Zainstaluj własną Ollamę Ergopti %s, wersję, którą Ergopti przypina i weryfikuje. Działa na własnym porcie obok każdej Ollamy zainstalowanej przez Ciebie, której Ergopti nigdy nie używa, nie zatrzymuje ani nie zmienia. Twoje modele zostają tam, gdzie są.",
