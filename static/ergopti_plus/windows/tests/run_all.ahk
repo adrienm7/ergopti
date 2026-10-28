@@ -783,6 +783,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/keymap/test_layout_catalogue.ahk
 #Include unit/modules/keymap/test_layout_registry_download_custody.ahk
 #Include unit/modules/keymap/test_layout_registry_late_poll.ahk
+#Include unit/modules/keymap/test_layout_registry_inline_callback.ahk
 #Include unit/modules/keymap/test_layout_installed_record_corpora.ahk
 #Include unit/modules/keymap/test_layout_extension_runtime.ahk
 #Include unit/modules/keymap/test_layout_extension_menu.ahk

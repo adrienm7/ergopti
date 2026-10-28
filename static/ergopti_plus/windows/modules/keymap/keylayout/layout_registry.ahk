@@ -463,8 +463,13 @@ _LayoutRegistryPoll(Job, Req, Polls) {
 			return
 		}
 		try Job.Transport["schedule"].Call(_LayoutRegistryPoll.Bind(Job, Req, Polls + 1), LAYOUT_REGISTRY_POLL_MS)
-		catch as Err
+		catch as Err {
+			; Inline delivery may have completed the business callback. Its
+			; failure is not permission to retire or silence an already settled job.
+			if Job.Settled
+				throw Err
 			_LayoutRegistryRetire(Job, Req, "cannot schedule a poll for " . Job.Url . ": " . Err.Message)
+		}
 		return
 	}
 	Status := Req.Status
