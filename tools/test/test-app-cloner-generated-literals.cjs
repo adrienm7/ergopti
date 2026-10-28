@@ -974,6 +974,117 @@ exec '${realRm.stdout.trim().replaceAll("'", "'\\''")}' "$@"
 			stderr: missingParentRefusal.stderr
 		})
 	);
+	const routingRoot = path.join(fixtureRoot, 'url-routing');
+	fs.mkdirSync(routingRoot);
+	const routingRun = spawnSync(
+		python,
+		[
+			path.join(ROOT, 'tools', 'test', 'lib', 'app-cloner-url-routing-probe.py'),
+			CLONE_SCRIPT,
+			routingRoot,
+			bash,
+			toBashPath(routingRoot)
+		],
+		{ encoding: 'utf8', timeout: 20000 }
+	);
+	if (routingRun.error || routingRun.status !== 0) {
+		throw new Error(
+			`Actual launcher routing probe did not execute: ${routingRun.error?.message || routingRun.stderr}`
+		);
+	}
+	const routing = JSON.parse(routingRun.stdout);
+	const expectedRoutingInputs = {
+		empty: '',
+		folder: '/fixture/project',
+		'colon-file': '/fixture/report:2026.txt',
+		'tilde-file': '~/Documents',
+		https: 'https://example.invalid/path?q=1',
+		http: 'http://example.invalid/',
+		'teams-double': 'msteams://l/chat/0',
+		'teams-chat': 'msteams:/l/chat/0',
+		'teams-calendar': 'msteams:/calendar',
+		opaque: 'mailto:fixture@example.invalid',
+		custom: 'A+B.C-1:opaque',
+		'non-scheme': '1invalid:filename'
+	};
+	const routingFamilies = {
+		native: () => [],
+		electron: (root) => ['--user-data-dir', `${root}/profile`],
+		vscode: (root) => [
+			'--user-data-dir',
+			`${root}/profile`,
+			'--extensions-dir',
+			`${root}/extensions`,
+			'--new-window'
+		]
+	};
+	const expectedRoutingCount =
+		Object.keys(expectedRoutingInputs).length * Object.keys(routingFamilies).length;
+	const completeRouting =
+		routing.cases.length === expectedRoutingCount &&
+		new Set(routing.cases.map((row) => `${row.family}:${row.name}`)).size ===
+			expectedRoutingCount &&
+		routing.cases.every(
+			(row) =>
+				Object.hasOwn(routingFamilies, row.family) &&
+				Object.hasOwn(expectedRoutingInputs, row.name) &&
+				row.input === expectedRoutingInputs[row.name]
+		);
+	const actualRoutingRow = (row) =>
+		row.status === 0 &&
+		row.stdout === '' &&
+		row.stderr === '' &&
+		row.executions.length === 1 &&
+		['-arm64', '-x86_64'].includes(row.executions[0][0]) &&
+		row.executions[0][1] === 'fixture-executable';
+	test(
+		'the complete production launcher executes every URI and file routing case in every app family',
+		completeRouting && routing.cases.every(actualRoutingRow),
+		JSON.stringify(routing)
+	);
+	const uriCases = new Set([
+		'https',
+		'http',
+		'teams-double',
+		'teams-chat',
+		'teams-calendar',
+		'opaque',
+		'custom'
+	]);
+	test(
+		'accepted single-slash Teams and RFC scheme URIs dispatch through actual open-a once without positional URL arguments',
+		completeRouting &&
+			routing.cases
+				.filter((row) => uriCases.has(row.name))
+				.every(
+					(row) =>
+						actualRoutingRow(row) &&
+						JSON.stringify(row.executions[0].slice(2)) ===
+							JSON.stringify(routingFamilies[row.family](row.owned_shell)) &&
+						JSON.stringify(row.opens) ===
+							JSON.stringify([['-a', 'fixture-application', row.input]]) &&
+						JSON.stringify(row.sleeps) === JSON.stringify([['1']])
+				),
+		JSON.stringify(routing.cases.filter((row) => uriCases.has(row.name)))
+	);
+	test(
+		'empty and file arguments preserve their actual positional data and never dispatch a URL',
+		completeRouting &&
+			routing.cases
+				.filter((row) => !uriCases.has(row.name))
+				.every(
+					(row) =>
+						actualRoutingRow(row) &&
+						JSON.stringify(row.executions[0].slice(2)) ===
+							JSON.stringify([
+								...routingFamilies[row.family](row.owned_shell),
+								...(row.input ? [row.input] : [])
+							]) &&
+						row.opens.length === 0 &&
+						row.sleeps.length === 0
+				),
+		JSON.stringify(routing.cases.filter((row) => !uriCases.has(row.name)))
+	);
 } finally {
 	fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }

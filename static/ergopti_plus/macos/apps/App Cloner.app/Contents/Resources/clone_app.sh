@@ -1021,7 +1021,7 @@ esac
 #                            a URL as positional argv to Electron silently
 #                            no-ops because the app isn't yet a registered
 #                            URL handler in this process tree.
-URL_SCHEME_RE='^[a-zA-Z][a-zA-Z0-9+.-]*://'
+URL_SCHEME_RE='^[a-zA-Z][a-zA-Z0-9+.-]*:'
 if [[ -n "$OPEN_ARG" && ! "$OPEN_ARG" =~ $URL_SCHEME_RE ]]; then
 	ARGS+=("$OPEN_ARG")
 fi

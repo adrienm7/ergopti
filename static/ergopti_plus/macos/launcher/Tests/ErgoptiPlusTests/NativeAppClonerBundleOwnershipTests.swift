@@ -375,4 +375,80 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 			XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: denied.path).isEmpty)
 		}
 	}
+
+	func testActualZshDispatchesTheTeamsURIsAcceptedByTheActualUIHandler() throws {
+		try fixture { root in
+			let probe = Self.repositoryURL.appendingPathComponent("tools/test/lib/app-cloner-url-routing-probe.py")
+			let source = Self.resourcesURL.appendingPathComponent("clone_app.sh")
+			let wizard = Self.resourcesURL.appendingPathComponent("ShortcutBuilder.applescript")
+			let result = try run(["-c", #"exec /usr/bin/env python3 "$1" "$2" "$3" /bin/zsh "$3" "$4""#,
+				"native-url-routing", probe.path, source.path, root.path, wizard.path], root: root)
+			XCTAssertEqual(result.status, 0, result.stderr)
+			XCTAssertTrue(result.stderr.isEmpty)
+			let receipt = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.output.utf8)) as? [String: Any])
+			let validation = try XCTUnwrap(receipt["ui_validation"] as? [String: String])
+			XCTAssertEqual(validation, ["teams-chat": "", "teams-calendar": ""], "The actual AppleScript handler admits both single-slash forms")
+			let cases = try XCTUnwrap(receipt["cases"] as? [[String: Any]])
+			XCTAssertEqual(cases.count, 36)
+			XCTAssertEqual(Set(cases.compactMap { row -> String? in
+				guard let family = row["family"] as? String, let name = row["name"] as? String else { return nil }
+				return family + ":" + name
+			}).count, 36, "Every native app-family case must execute exactly once")
+			let expectedInputs = [
+				"empty": "", "folder": "/Users/fixture/project", "colon-file": "/Users/fixture/report:2026.txt",
+				"tilde-file": "~/Documents", "https": "https://example.invalid/path?q=1", "http": "http://example.invalid/",
+				"teams-double": "msteams://l/chat/0", "teams-chat": "msteams:/l/chat/0", "teams-calendar": "msteams:/calendar",
+				"opaque": "mailto:fixture@example.invalid", "custom": "A+B.C-1:opaque", "non-scheme": "1invalid:filename"
+			]
+			let expectedFamilies: Set<String> = ["native", "electron", "vscode"]
+			let expectedCases = Set(expectedFamilies.flatMap { family in expectedInputs.keys.map { family + ":" + $0 } })
+			var actualCases = Set<String>()
+			for entry in cases {
+				let family = try XCTUnwrap(entry["family"] as? String)
+				let name = try XCTUnwrap(entry["name"] as? String)
+				let input = try XCTUnwrap(entry["input"] as? String)
+				XCTAssertTrue(expectedFamilies.contains(family))
+				let expectedInput = try XCTUnwrap(expectedInputs[name], "Every native input must belong to the exact fixture census")
+				XCTAssertEqual(input, expectedInput)
+				actualCases.insert(family + ":" + name)
+			}
+			XCTAssertEqual(actualCases, expectedCases, "Native routing must execute the exact twelve inputs in all three app families")
+			let uriNames: Set<String> = ["https", "http", "teams-double", "teams-chat", "teams-calendar", "opaque", "custom"]
+			for entry in cases {
+				let name = try XCTUnwrap(entry["name"] as? String)
+				let family = try XCTUnwrap(entry["family"] as? String)
+				let input = try XCTUnwrap(entry["input"] as? String)
+				let owned = try XCTUnwrap(entry["owned_shell"] as? String)
+				XCTAssertEqual(entry["status"] as? Int, 0, "Actual zsh routing must complete for \(family):\(name)")
+				XCTAssertEqual(entry["stdout"] as? String, "")
+				XCTAssertEqual(entry["stderr"] as? String, "")
+				let executions = try XCTUnwrap(entry["executions"] as? [[String]])
+				let opens = try XCTUnwrap(entry["opens"] as? [[String]])
+				let sleeps = try XCTUnwrap(entry["sleeps"] as? [[String]])
+				XCTAssertEqual(executions.count, 1)
+				guard executions.count == 1 else { throw CocoaError(.fileReadCorruptFile) }
+				XCTAssertGreaterThanOrEqual(executions[0].count, 2)
+				let architecture = try XCTUnwrap(executions[0].first)
+				let executable = try XCTUnwrap(executions[0].dropFirst().first)
+				XCTAssertTrue(["-arm64", "-x86_64"].contains(architecture))
+				XCTAssertEqual(executable, "fixture-executable")
+				var arguments: [String]
+				switch family {
+				case "native": arguments = []
+				case "electron": arguments = ["--user-data-dir", owned + "/profile"]
+				case "vscode": arguments = ["--user-data-dir", owned + "/profile", "--extensions-dir", owned + "/extensions", "--new-window"]
+				default: throw CocoaError(.fileReadCorruptFile)
+				}
+				if uriNames.contains(name) {
+					XCTAssertEqual(opens, [["-a", "fixture-application", input]])
+					XCTAssertEqual(sleeps, [["1"]])
+				} else {
+					if !input.isEmpty { arguments.append(input) }
+					XCTAssertTrue(opens.isEmpty)
+					XCTAssertTrue(sleeps.isEmpty)
+				}
+				XCTAssertEqual(Array(executions[0].dropFirst(2)), arguments)
+			}
+		}
+	}
 }
