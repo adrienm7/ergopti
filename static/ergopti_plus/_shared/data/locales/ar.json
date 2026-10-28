@@ -2226,7 +2226,6 @@
 	"model_browser.reason_mlx_intel": "هذا الـ Mac يعمل بمعالج Intel: لا يمكن تشغيل MLX عليه.",
 	"model_browser.reason_mlx_missing": "لم يُثبَّت MLX أو يحتاج إلى إصلاح.",
 	"model_browser.reason_ollama_missing": "لم يُثبَّت Ollama أو فشل تثبيته.",
-	"model_browser.reason_api_no_key": "لم يتم إعداد مفتاح API.",
 	"model_browser.add_model_placeholder_ollama": "اسم نموذج Ollama، مثل qwen3:4b",
 	"model_browser.add_model_placeholder_mlx": "مستودع Hugging Face، مثل mlx-community/Qwen3-4B-4bit",
 	"model_browser.add_model_button": "إضافة وتنزيل",
