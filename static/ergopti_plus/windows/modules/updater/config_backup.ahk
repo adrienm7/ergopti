@@ -347,7 +347,8 @@ ConfigBackup_Latest(ConfigDir, Kind, Rules := 0) {
 }
 
 ; Puts a backup back: backs the current configuration up first, checks every
-; copy is present, then replaces each file atomically.
+; copy is present, then replaces each file atomically. This disk-only operation
+; borrows its caller's terminal restore/reload authority; it never settles RAM.
 ; @returns {Map} ok (Boolean), reason ("missing", "backup", "write" or ""),
 ;   pre (the pre-restore record, or 0).
 ConfigBackup_Restore(ConfigDir, Id, Rules := 0, ClockFn := 0) {

@@ -982,35 +982,137 @@ _CLW_ReportInstall(Message) {
 }
 
 /**
- * Restores a pre-install backup and reloads the driver on it.
+ * Restores a pre-install backup and reloads while old RAM cannot regain disk authority.
  * @param {string} Id - Backup id posted by the page.
  */
 _CLW_RestoreBackup(Id) {
-	global _ConfigDir
+	global _ConfigDir, ConfigurationFile
 	if ReleaseInstall_Busy() {
-		_CLW_Eval("setRestoreProgress(" . ReleaseInstall_MessageJson(Map("phase", "failed",
-			"reason_key", "changelog_window.restore_error_unexpected")) . ")")
-		return
+		_CLW_RestoreReportFailure()
+		return false
 	}
-	_CLW_Eval("setRestoreProgress(" . ReleaseInstall_MessageJson(Map("phase", "restoring")) . ")")
-	try Result := ConfigBackup_Restore(_ConfigDir, Id)
+	Bundle := ConfigWriteAcquireLifecycleBundle()
+	if !(Bundle is Object) {
+		try LoggerError("Changelog", "Configuration restore refused because another configuration transaction owns admission.")
+		_CLW_RestoreReportFailure()
+		return false
+	}
+	Attempt := {bundle: Bundle, path: ConfigurationFile, state: "preparing", publication_possible: false, pre_path: ""}
+	try {
+		; The pre-restore backup must include every earlier accepted RAM edit.
+		; Keep the same terminal barrier until its replacement process takes over.
+		if !_ConfigFullSaveSettleTerminal(Bundle) {
+			try LoggerError("Changelog", "Configuration restore refused because an earlier accepted full save remains non-durable.")
+			_CLW_RestoreReportFailure()
+			return false
+		}
+		_CLW_Eval("setRestoreProgress(" . ReleaseInstall_MessageJson(Map("phase", "restoring")) . ")")
+		Attempt.publication_possible := true
+		Result := ConfigBackup_Restore(_ConfigDir, Id)
+		Attempt.pre_path := IsObject(Result["pre"]) ? Result["pre"]["path"] : ""
+		if !Result["ok"] {
+			; These two results precede every restore write; a write refusal may
+			; already have published earlier files and must retain disk authority.
+			if Result["reason"] == "missing" || Result["reason"] == "backup"
+				Attempt.publication_possible := false
+			Key := (Result["reason"] == "missing") ? "changelog_window.restore_error_missing"
+				: (Result["reason"] == "backup") ? "changelog_window.restore_error_backup"
+				: "changelog_window.restore_error_unexpected"
+			_CLW_RestoreReportFailure(Attempt.pre_path, Key)
+			return false
+		}
+		_CLW_Eval("setRestoreProgress(" . ReleaseInstall_MessageJson(Map("phase", "restored",
+			"backup_path", Attempt.pre_path)) . ")")
+		Attempt.state := "waiting"
+		try Armed := TimerArmOneShotMs(_CLW_ReloadRestoredConfiguration.Bind(Attempt), 400)
+		catch as Err {
+			if Attempt.state == "handed_off" {
+				try LoggerWarn("Changelog", "The restore timer raised after its exact reload handoff: {1}.", Err.Message)
+				return true
+			}
+			_CLW_RestoreReloadRefused(Attempt, "The restore reload timer failed: " . Err.Message)
+			return false
+		}
+		if Attempt.state == "handed_off"
+			return true
+		if !((Armed is Integer) && Armed == 1) {
+			_CLW_RestoreReloadRefused(Attempt, "The restore reload timer did not acknowledge admission.")
+			return false
+		}
+		return Attempt.state == "waiting"
+	} catch as Err {
+		try LoggerError("Changelog", "Configuration restore raised: {1}.", Err.Message)
+		_CLW_RestoreReportFailure(Attempt.pre_path)
+		return false
+	} finally {
+		if Attempt.state == "preparing" {
+			if Attempt.publication_possible
+				_CLW_RestoreReloadRefused(Attempt, "A configuration restore write did not complete.")
+			else
+				_ConfigWriteTerminalRelease(Bundle)
+		}
+	}
+}
+
+/** Reports an existing localized restore failure without inventing new text. */
+_CLW_RestoreReportFailure(PrePath := "", Key := "changelog_window.restore_error_unexpected") {
+	_CLW_Eval("setRestoreProgress(" . ReleaseInstall_MessageJson(Map("phase", "failed",
+		"reason_key", Key, "backup_path", PrePath)) . ")")
+}
+
+/** Transfers one exact terminal owner; replayed native callbacks are inert. */
+_CLW_ReloadRestoredConfiguration(Attempt, *) {
+	PreviousCritical := Critical("On")
+	try {
+		if Attempt.state != "waiting"
+			return false
+		Attempt.state := "launching"
+	} finally Critical(PreviousCritical)
+	if !_ConfigWriteTerminalOwnsExact(Attempt.bundle, Attempt.path) {
+		Attempt.state := "retired"
+		try LoggerWarn("Changelog", "A queued restore reload no longer owns its exact terminal bundle.")
+		return false
+	}
+	try Accepted := ReloadPreservingSuspend(0, Attempt.bundle, _CLW_RestoreReloadRefused.Bind(Attempt))
 	catch as Err {
-		try LoggerError("Changelog", "The configuration restore raised: {1}.", Err.Message)
-		Result := Map("ok", false, "reason", "backup", "pre", 0)
+		_CLW_RestoreReloadRefused(Attempt, "The restored configuration reload raised: " . Err.Message)
+		return false
 	}
-	PrePath := IsObject(Result["pre"]) ? Result["pre"]["path"] : ""
-	if !Result["ok"] {
-		Key := (Result["reason"] == "missing") ? "changelog_window.restore_error_missing"
-			: (Result["reason"] == "backup") ? "changelog_window.restore_error_backup"
-			: "changelog_window.restore_error_unexpected"
-		_CLW_Eval("setRestoreProgress(" . ReleaseInstall_MessageJson(Map("phase", "failed",
-			"reason_key", Key, "backup_path", PrePath)) . ")")
-		return
+	if !((Accepted is Integer) && Accepted == 1) {
+		_CLW_RestoreReloadRefused(Attempt, "The restored configuration reload was refused before handoff.")
+		return false
 	}
-	_CLW_Eval("setRestoreProgress(" . ReleaseInstall_MessageJson(Map("phase", "restored",
-		"backup_path", PrePath)) . ")")
-	; The page shows the answer first; every module reads the files at start.
-	TimerArmOneShotMs((*) => ReloadPreservingSuspend(), 400)
+	PreviousCritical := Critical("On")
+	try {
+		if Attempt.state == "launching"
+			Attempt.state := "handed_off"
+		return Attempt.state == "handed_off"
+	} finally Critical(PreviousCritical)
+}
+
+/** Keeps restored disk authoritative when the live old runtime survives. */
+_CLW_RestoreReloadRefused(Attempt, Reason) {
+	Stale := false
+	PreviousCritical := Critical("On")
+	try {
+		if Attempt.state == "refused"
+			return false
+		if !_ConfigWriteTerminalOwnsExact(Attempt.bundle, Attempt.path)
+			Stale := true
+		else {
+			if !ConfigTransitionRetainBarrier(Attempt.bundle)
+				throw Error("The restored configuration terminal barrier could not be retained.")
+			Attempt.state := "refused"
+		}
+	} finally Critical(PreviousCritical)
+	if Stale {
+		try LoggerDebug("Changelog", "A stale restore refusal cannot retain another configuration transition.")
+		return false
+	}
+	try LoggerError("Changelog", "The restored configuration remains protected until Reload or Exit succeeds ({1}).", Reason)
+	try _CLW_RestoreReportFailure(Attempt.pre_path)
+	finally ReloadRefusedNotify()
+	return true
 }
 
 
