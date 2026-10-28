@@ -119,3 +119,16 @@ reserve_owned_bundle_directory() {
 		exit "$identity_status"
 	}
 }
+
+# Publish exact path bytes and one protocol newline through a checked writer.
+# BSD printf can lose buffered stdout without returning a failure status.
+# Callers propagate failure outside the function so zsh runs their EXIT cleanup.
+write_bundle_receipt() {
+	if [[ "$#" != 1 ]]; then
+		printf 'Error: one bundle receipt path is required\n' >&2
+		return 1
+	fi
+	/bin/cat <<ERGOPTI_BUNDLE_RECEIPT
+$1
+ERGOPTI_BUNDLE_RECEIPT
+}

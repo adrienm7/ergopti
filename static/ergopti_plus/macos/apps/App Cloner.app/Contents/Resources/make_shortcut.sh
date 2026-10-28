@@ -172,4 +172,4 @@ chmod +x "$MACOS/open_target"
 touch "$DEST"
 
 CLONE_COMPLETE=1
-/usr/bin/printf '%s\n' "$DEST"
+write_bundle_receipt "$DEST" || exit "$?"

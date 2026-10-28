@@ -97,6 +97,19 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 
 	func testActualNativeOwnershipPreservesCompletedAndForeignBundles() throws {
 		try fixture { root in
+			let receiptValues = [
+				"/fixture/plain.app", "/fixture/backslash\\c\\t.app",
+				"/fixture/first\nsecond.app", "/fixture/trailing\n",
+				"/fixture/\nERGOPTI_BUNDLE_RECEIPT\nlast.app",
+				"/fixture/'\"$HOME`literal`.app", "/fixture/$(not-a-command).app",
+			]
+			let receiptScript = #"set -euo pipefail; source "$1"; write_bundle_receipt "$2""#
+			for value in receiptValues {
+				let result = try run(["-c", receiptScript, "native-receipt-bytes", Self.resourcesURL.appendingPathComponent("reserve_bundle.sh").path, value], root: root)
+				XCTAssertEqual(result.status, 0, result.stderr)
+				XCTAssertTrue(result.stderr.isEmpty)
+				XCTAssertEqual(Array(result.output.utf8), Array((value + "\n").utf8), "The receipt preserves every path byte and exactly one protocol newline")
+			}
 			let original = root.appendingPathComponent("Reserved.app")
 			try FileManager.default.createDirectory(at: original, withIntermediateDirectories: false)
 			try Data("existing".utf8).write(to: original.appendingPathComponent("marker"))
@@ -117,7 +130,7 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 				replacement) mv "$DEST" "$DEST.held"; mkdir "$DEST"; printf foreign > "$DEST/marker"; exit 75 ;;
 				symlink) mv "$DEST" "$DEST.held"; ln -s "$DEST.held" "$DEST"; exit 76 ;;
 				completed) CLONE_COMPLETE=1 ;;
-				receipt) CLONE_COMPLETE=1; exec 1>&-; /usr/bin/printf '%s' unavailable-output ;;
+				receipt) CLONE_COMPLETE=1; exec 1>&-; write_bundle_receipt unavailable-output || exit "$?" ;;
 			esac
 			"""#
 			for mode in ["failure", "term", "replacement", "symlink", "completed", "receipt"] {

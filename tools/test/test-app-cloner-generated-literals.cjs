@@ -106,6 +106,63 @@ try {
 		fixtureRoot,
 		toBashPath
 	});
+	const receiptHelper = toBashPath(path.join(path.dirname(portedCloneScript), 'reserve_bundle.sh'));
+	const receiptValues = [
+		'/fixture/plain.app',
+		'/fixture/backslash\\c\\t.app',
+		'/fixture/first\nsecond.app',
+		'/fixture/trailing\n',
+		'/fixture/\nERGOPTI_BUNDLE_RECEIPT\nlast.app',
+		'/fixture/\'"$HOME`literal`.app',
+		'/fixture/$(not-a-command).app'
+	];
+	const receiptRuns = receiptValues.map((value) => {
+		const result = spawnSync(
+			bash,
+			[
+				'-c',
+				'set -euo pipefail; source "$1"; write_bundle_receipt "$2"',
+				'receipt-bytes',
+				receiptHelper,
+				value
+			],
+			{ encoding: null }
+		);
+		return { value, status: result.status, output: result.stdout, diagnostic: result.stderr };
+	});
+	test(
+		'the shared receipt writer preserves exact path bytes and one protocol newline',
+		receiptRuns.every(
+			(row) =>
+				row.status === 0 &&
+				row.diagnostic.length === 0 &&
+				row.output.equals(Buffer.from(row.value + '\n', 'utf8'))
+		),
+		JSON.stringify(receiptRuns)
+	);
+	const invalidReceipts = [[], ['one', 'two']].map((values) =>
+		spawnSync(
+			bash,
+			[
+				'-c',
+				'set -euo pipefail; source "$1"; shift; write_bundle_receipt "$@"',
+				'receipt-arity',
+				receiptHelper,
+				...values
+			],
+			{ encoding: 'utf8' }
+		)
+	);
+	test(
+		'the shared receipt writer rejects invalid argument counts before publishing bytes',
+		invalidReceipts.every(
+			(row) =>
+				row.status === 1 &&
+				row.stdout === '' &&
+				row.stderr.includes('one bundle receipt path is required')
+		),
+		JSON.stringify(invalidReceipts)
+	);
 	if (process.platform !== 'win32') {
 		const physicalPython = pythonExecutable();
 		fixtureCanRetire = false;
@@ -1017,7 +1074,7 @@ exec '${realRm.stdout.trim().replaceAll("'", "'\\''")}' "$@"
 		})
 	);
 	const receiptFailure = runCloneSetup(
-		'printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; CLONE_COMPLETE=1; exec 1>&-; printf unavailable-output'
+		'printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; CLONE_COMPLETE=1; exec 1>&-; write_bundle_receipt unavailable-output || exit "$?"'
 	);
 	const [publishedDestination, retiredTemporary] = decodeNulFields(
 		Buffer.from(receiptFailure.stdout)
