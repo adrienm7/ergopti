@@ -68,6 +68,9 @@ LLM_NavEventOwner_PrepareShutdown(*) {
 LLM_NavEventOwner_CancelShutdown(*) {
 	return _RPA_EnvelopeCount("nav-cancel")
 }
+LayoutRegistry_PrepareShutdown(*) {
+	return _RPA_EnvelopeCount("registry")
+}
 ReloadTerminalHandoffClaim(*) {
 	_RPA_EnvelopeCount("claim")
 	return false
@@ -142,6 +145,8 @@ _RPA_EnvelopeRun() {
 					_RPA_EnvelopeRequire((Result is Integer)
 						&& Result == (A_Index < LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS ? 1 : 0),
 						"actual shutdown must spend its finite veto budget")
+					_RPA_EnvelopeRequire(_RPA_EnvelopeState.Get("registry", 0) == 1,
+						"the genuine shutdown must ask the registry owner exactly once")
 					_RPA_EnvelopeRequire(_UserProgramGeneration == BeforeGeneration + 1,
 						"actual program retirement runs on each shutdown attempt")
 					_RPA_EnvelopeRequire(_UserProgramPaused == Paused && A_IsSuspended == Paused,
