@@ -104,6 +104,18 @@ recorded="$(plutil -extract "$ERGOPTI_DEV_SOURCE_PLIST_KEY" raw -o - "$APP_PATH/
 	|| fail "$APP_PATH is not a developer build; run without --open-only."
 [ "$recorded" = "$REPO_ROOT" ] || fail "$APP_PATH runs the Lua of $recorded, not this clone; rebuild here."
 
+# A built app carries the managed Ollama catalogue in its sealed bundle; this
+# app reads the shared data of the clone, where no catalogue is committed. Stage
+# the verified catalogue of the release that binds this clone's contract, or say
+# why the owned Ollama install will refuse; neither outcome blocks the driver.
+catalogue_status=0
+python3 "$REPO_ROOT/tools/dev/stage-macos-dev-ollama-catalogue.py" || catalogue_status=$?
+case "$catalogue_status" in
+	0) ;;
+	3) log "WARNING: no published managed Ollama catalogue binds this clone; the owned Ollama install stays unavailable in this developer app." ;;
+	*) log "WARNING: the managed Ollama catalogue was not staged (exit $catalogue_status, reason above); the owned Ollama install stays unavailable until this runs again." ;;
+esac
+
 open "$APP_PATH"
 log "Opened $APP_PATH; its Lua runs from $REPO_ROOT/static/ergopti_plus/macos."
 log "A saved .lua edit reloads the driver; the menu's Reload does it on demand."

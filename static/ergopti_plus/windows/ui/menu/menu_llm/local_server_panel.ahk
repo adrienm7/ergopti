@@ -70,6 +70,18 @@ LLM_Menu_LocalServersRows() {
 	return _LLM_LocalServerPanel.Rows()
 }
 
+/**
+ * Returns the live panel's rows for the model selector page, or none before the
+ * panel exists: the page lists only servers that answer, and the tray's status
+ * rows (LLM_Menu_LocalServersRows) carry no server for it to list.
+ */
+LLM_Menu_LocalServersLiveRows() {
+	global _LLM_LocalServerPanel
+	if !IsSet(_LLM_LocalServerPanel) || !(_LLM_LocalServerPanel is LLM_LocalServerPanel)
+		return []
+	return _LLM_LocalServerPanel.Rows()
+}
+
 /** Resolves the precise checked provider without probing or invalidating a view. */
 LLM_Menu_LocalServersBackendLabel(Fallback) {
 	global _LLM_LocalServerPanel

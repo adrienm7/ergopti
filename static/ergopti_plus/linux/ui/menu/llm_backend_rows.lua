@@ -254,6 +254,13 @@ function M.bind_page(llm, options)
 		delete_model = options.delete_model, context = options.context,
 		-- Ollama's install state greys its group (modules/llm/ollama_install_state.lua).
 		ollama_state = function(engine) return require("modules.llm.ollama_install_state").capture(engine) end,
+		-- The page's "Install Ollama" runs the AI enable, which offers Ergopti's
+		-- own Ollama download when it is missing (prediction_engine.enable).
+		ollama_install_phase = function(engine)
+			if engine.runtime_pending() == true then return "running" end
+			return engine.is_enabled() == true and "ai_on" or "idle"
+		end,
+		install_ollama = function(engine, on_changed) return engine.enable(on_changed) == true end,
 		listing = {
 			targets = M.listing_targets,
 			list = function(entry, on_done) return require("modules.llm.api_remote").list_models(entry, on_done) end,

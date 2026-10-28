@@ -155,6 +155,18 @@ function M.new(opts)
 		local ok_mono, Monotonic = pcall(require, "infra.monotonic")
 		now_sec = ok_mono and Monotonic.now_sec or os.time
 	end
+
+	--- When a frame happened: the kernel's stamp on its SYN_REPORT. A busy
+	--- daemon drains a backlog of queued events at once, and timing them when
+	--- read measured a 400 ms landing or a one-second rest as no time at all.
+	--- An event without a stamp (a replay) is timed when it is read.
+	--- @param event table The SYN_REPORT event.
+	--- @return number seconds
+	local function frame_time(event)
+		local stamp = event.timestamp_us
+		if type(stamp) == "number" and stamp > 0 then return stamp / 1e6 end
+		return now_sec()
+	end
 	local tap_max_sec = tonumber(opts.tap_max_sec) or M.TAP_MAX_SEC
 	local stable_frames = tonumber(opts.stable_frames) or M.STABLE_FRAMES
 	local landing_sec = tonumber(opts.landing_sec) or M.LANDING_SEC
@@ -319,7 +331,7 @@ function M.new(opts)
 
 		if _touching then
 			if cx and cy then
-				local now = now_sec()
+				local now = frame_time(event)
 				if not _origin_x then
 					_origin_x, _origin_y = cx, cy
 					_started_at = now
@@ -393,7 +405,7 @@ function M.new(opts)
 		local fingers = _peak_fingers
 		local dx, dy = _travel_x, _travel_y
 		local direction = direction_of(dx, dy)
-		local now = now_sec()
+		local now = frame_time(event)
 		local elapsed = (_started_at and now - _started_at) or 0
 		local started_at = _started_at
 		local aborted = _aborted
