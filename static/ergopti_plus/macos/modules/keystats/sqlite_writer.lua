@@ -29,6 +29,7 @@ local sqlite3 = require("hs.sqlite3")
 local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
 local Literal = require("sqlite.literal")
+local Queries = require("keystats.queries")
 -- At-rest encryption of the typed-text columns. Hard require: the setting must
 -- never silently degrade into "stored in clear".
 local TextCipher = require("modules.keystats.text_cipher")
@@ -164,6 +165,10 @@ local function _read_schema_file(path, label)
 	return body
 end
 
+--- Indexes schema.sql gained after caches already existed; the migration in
+--- _initialize_db creates them from the schema's own statement.
+local LATE_SCHEMA_INDEXES = { "idx_events_typing_device_ts_id" }
+
 --- Read the canonical schema.sql from disk.
 --- @return string|nil The full DDL text, or nil on IO error.
 local function _read_schema_sql()
@@ -276,6 +281,30 @@ local function _initialize_db(db, existed)
 		return false
 	end
 
+	-- schema.sql applies only to fresh caches. An index it gained later is
+	-- created on an existing cache from the schema's own statement (L19).
+	local index_schema = nil
+	for _, name in ipairs(LATE_SCHEMA_INDEXES) do
+		local present = false
+		for _ in db:nrows("SELECT name FROM sqlite_master WHERE type='index' AND name='" .. name .. "'") do
+			present = true
+		end
+		if not present then
+			index_schema = index_schema or _read_schema_sql()
+			if not index_schema then return false end
+			local statement = index_schema:match("CREATE INDEX IF NOT EXISTS " .. name .. " ON [^;]+;")
+			if not statement then
+				Logger.error(LOG, "schema.sql has no statement for index %s.", name)
+				return false
+			end
+			if db:exec(statement) ~= sqlite3.OK then
+				Logger.error(LOG, "Cannot create index %s: %s.", name, db:errmsg())
+				return false
+			end
+			Logger.info(LOG, "Created cache index %s on an existing db.sqlite.", name)
+		end
+	end
+
 	-- schema.sql applies only to fresh caches. Keep older caches writable when
 	-- optional LLM accounting columns are introduced; duplicate-column errors are
 	-- avoided by inspecting the published table shape first.
@@ -308,9 +337,8 @@ local function _initialize_db(db, existed)
 		{ "rev",              "0"  },
 		{ "last_applied_data_sql_off", "0" },
 	}) do
-		_exec_startup_sql(db, string.format(
-			"INSERT OR IGNORE INTO meta (key, value) VALUES ('%s', '%s');",
-			kv[1], kv[2]), "meta seed " .. kv[1])
+		_exec_startup_sql(db, Queries.render("meta.seed", "native", { key = kv[1], value = kv[2] }),
+			"meta seed " .. kv[1])
 	end
 
 	local next_event_id = 1
@@ -318,7 +346,7 @@ local function _initialize_db(db, existed)
 	-- silent restart at 1 would make INSERT OR IGNORE drop every colliding new
 	-- event, and a float would raise later in the insert builders.
 	local cursor_refused = false
-	for r in db:nrows("SELECT value FROM meta WHERE key='next_event_id'") do
+	for r in db:nrows(Queries.render("meta.get", "native", { key = "next_event_id" })) do
 		local text = math.type(r.value) == "integer" and tostring(r.value) or r.value
 		local value = type(text) == "string" and text:match("^[1-9]%d*$")
 			and math.tointeger(tonumber(text)) or nil
@@ -333,36 +361,18 @@ local function _initialize_db(db, existed)
 		return false
 	end
 
-	-- Upsert the local device row so name / os_version stay fresh.
-	local stmt = db:prepare(
-		"INSERT OR REPLACE INTO devices "
-		.. "(device_id, name, os, os_version, host_signature, created_at, updated_at) "
-		.. "VALUES (?, ?, ?, ?, ?, ?, ?)")
-	if not stmt then
-		Logger.error(LOG, "Cannot prepare local device startup row: %s.", db:errmsg())
+	-- Upsert the local device row so name / os_version stay fresh. The conflict
+	-- clause keeps created_at and the imported ledger watermark: a REPLACE here
+	-- deleted the watermark at every start and made the foreign import begin again.
+	local device_rc = db:exec(Queries.render("devices.upsert", "native", {
+		device_id = _device_obj.device_id, name = _device_obj.name, os = _device_obj.os,
+		os_version = _device_obj.os_version or "", host_signature = _device_obj.host_signature,
+		created_at = _device_obj.created_at, updated_at = _now_ts(),
+	}))
+	if device_rc ~= sqlite3.OK then
+		Logger.error(LOG, "Local device startup failed: %s.", tostring(db:errmsg()))
 		return false
 	end
-	local device_ok, device_result = xpcall(function()
-		local bound = stmt:bind_values(
-			_device_obj.device_id, _device_obj.name, _device_obj.os,
-			_device_obj.os_version or "", _device_obj.host_signature,
-			_device_obj.created_at, _now_ts())
-		if bound ~= sqlite3.OK then
-			error("Cannot bind local device startup row: " .. tostring(bound), 0)
-		end
-		local stepped = stmt:step()
-		if stepped ~= sqlite3.DONE then
-			error("Cannot write local device startup row: " .. tostring(stepped), 0)
-		end
-	end, debug.traceback)
-	-- SQLite finalize consumes the statement even when it reports the previous
-	-- step's error. Always attempt it once, including after a bind/step failure.
-	local finalized, finalize_result = pcall(stmt.finalize, stmt)
-	if not device_ok then Logger.error(LOG, "Local device startup failed: %s.", tostring(device_result)) end
-	if not finalized or finalize_result ~= sqlite3.OK then
-		Logger.error(LOG, "Local device startup finalization failed: %s.", tostring(finalize_result))
-	end
-	if not device_ok or not finalized or finalize_result ~= sqlite3.OK then return false end
 
 	return true, next_event_id
 end
@@ -548,33 +558,41 @@ function _builders.typing(e, id)
 		_sql_str(enc_text), _sql_str(e.rich_text), _sql_str(enc_json))
 end
 
+--- A value as the text of a nullable text column: nil stays absent (NULL), anything else is its text.
+local function _opt_text(value)
+	if value == nil then return nil end
+	return tostring(value)
+end
+
 function _builders.app_switch(e, id)
-	return string.format(
-		"INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES (%s, %d, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.prev_app), _sql_str(e.next_app), _sql_num(e.duration_ms or 0))
+	return Queries.render("events.app_switch", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		prev_app = _opt_text(e.prev_app), next_app = _opt_text(e.next_app),
+		duration_ms = tonumber(e.duration_ms) or 0,
+	})
 end
 
 function _builders.window_switch(e, id)
-	return string.format(
-		"INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES (%s, %d, %s, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
+	return Queries.render("events.window_switch", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
 		-- events_window_switch.app is TEXT NOT NULL; a nil would make INSERT OR
 		-- IGNORE drop the whole row. Same "Unknown" fallback the typing builder uses.
-		_sql_str(e.app or "Unknown"), _sql_str(e.prev_title), _sql_str(e.next_title),
-		_sql_num(e.duration_ms or 0))
+		app = tostring(e.app or "Unknown"),
+		prev_title = _opt_text(e.prev_title), next_title = _opt_text(e.next_title),
+		duration_ms = tonumber(e.duration_ms) or 0,
+	})
 end
 
 function _builders.shortcut(e, id)
-	return string.format(
-		"INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES (%s, %d, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
+	return Queries.render("events.shortcut", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
 		-- Both columns are TEXT NOT NULL. Losing the key name degrades one field;
 		-- emitting NULL loses the entire shortcut event to INSERT OR IGNORE.
-		_sql_str(e.app or "Unknown"), _sql_str(e.key or ""))
+		app = tostring(e.app or "Unknown"), key = tostring(e.key or ""),
+	})
 end
 
 --- Build the events_system INSERT for an entry.
@@ -591,26 +609,26 @@ function _builders.system(e, id, action_override)
 			meta[k] = v
 		end
 	end
-	return string.format(
-		"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES (%s, %d, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
+	return Queries.render("events.system", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
 		-- The override covers the types that carry no `action` of their own, but a
 		-- bare "system_event" entry still relies on e.action being present — and the
 		-- column is NOT NULL, the exact swallow this function's docstring warns
 		-- about. Fall back to a sentinel so the event survives as an anomaly rather
 		-- than vanishing entirely.
-		_sql_str(action_override or e.action or "unknown"), _sql_json(meta))
+		action = tostring(action_override or e.action or "unknown"), metadata_json = _json_text(meta),
+	})
 end
 
 function _builders.hotstring(e, id, kind)
-	return string.format(
-		"INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.app or "Unknown"), _sql_str(kind),
-		_sql_str(e.trigger or ""), _sql_str(e.replacement or ""),
-		_sql_str(e.h_type), _sql_num(e.net_saved_chars))
+	return Queries.render("events.hotstring", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		app = tostring(e.app or "Unknown"), kind = tostring(kind),
+		trigger = tostring(e.trigger or ""), replacement = tostring(e.replacement or ""),
+		h_type = _opt_text(e.h_type), net_saved_chars = tonumber(e.net_saved_chars),
+	})
 end
 
 function _builders.llm(e, id, kind)
@@ -637,11 +655,11 @@ function _builders.llm(e, id, kind)
 end
 
 function _builders.session(e, id, kind)
-	return string.format(
-		"INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES (%s, %d, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(kind), _sql_num(e.duration_ms))
+	return Queries.render("events.session", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		kind = tostring(kind), duration_ms = tonumber(e.duration_ms),
+	})
 end
 
 
@@ -840,7 +858,7 @@ end
 function M.get_meta(key)
 	if not _db or type(key) ~= "string" or key == "" then return nil end
 	local value = nil
-	for row in _db:nrows(string.format("SELECT value FROM meta WHERE key=%s;", _sql_str(key))) do
+	for row in _db:nrows(Queries.render("meta.get", "native", { key = key })) do
 		value = row.value
 	end
 	return value
@@ -852,8 +870,7 @@ end
 --- @return boolean True on success.
 function M.set_meta(key, value)
 	if not _db or type(key) ~= "string" or key == "" then return false end
-	return _db:exec(string.format("INSERT OR REPLACE INTO meta (key, value) VALUES (%s, %s);",
-		_sql_str(key), _sql_str(tostring(value)))) == sqlite3.OK
+	return _db:exec(Queries.render("meta.set", "native", { key = key, value = tostring(value) })) == sqlite3.OK
 end
 
 return M

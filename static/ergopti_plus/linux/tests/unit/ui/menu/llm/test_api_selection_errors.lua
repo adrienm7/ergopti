@@ -76,7 +76,8 @@ local function isolated(body)
 			confirm = function() error("selection must not request confirmation") end,
 		}
 		local function select()
-			local rows = Rows.rows(Engine, dialogs, function() seen.changed = seen.changed + 1 end, function() return {} end)
+			local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(Rows, Engine, dialogs,
+				function() seen.changed = seen.changed + 1 end)
 			for _, row in ipairs(rows) do
 				if row.label == "cerebras/after-model" then return row.action end
 			end

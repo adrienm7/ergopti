@@ -55,6 +55,17 @@ do
 			end
 		end)
 	end
+
+	-- A developer app (infra/dev_source.lua) runs this clone, which holds no
+	-- LuaSocket: the build stages it into the app payload only. A root that does
+	-- not name this driver is left to the instance admission below, which
+	-- refuses the process.
+	local dev_ok, dev_root = pcall(function() return require("infra.dev_source").root() end)
+	if dev_ok and dev_root and searchers then
+		local DevSource = require("infra.dev_source")
+		local payload = DevSource.payload_driver_dir(hs.processInfo and hs.processInfo.bundlePath)
+		table.insert(searchers, 2, DevSource.payload_searcher(payload, loadfile, package.loadlib))
+	end
 end
 
 
@@ -184,7 +195,7 @@ Storage.set(HS_BOOT_READY_SETTING_KEY, false)
 
 -- Restore persisted log level from settings, or default to DEBUG
 do
-	local saved_level = Storage.get("log_level")
+	local saved_level = Storage.get(require("config_keys").LEAF.LOG_LEVEL)
 	local valid = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
 	if type(saved_level) == "string" and valid[saved_level] then
 		Logger.set_level(saved_level)
@@ -369,7 +380,7 @@ local ManifestReader     = require("infra.manifest_reader")
 -- trap as project-lua-closure-before-local-nil-global.
 locale_mod.set_trigger_provider(function()
 	return keymap.get_trigger_char and keymap.get_trigger_char()
-		or ManifestReader.default_for("hotstrings.trigger_char")
+		or ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
 end)
 -- Expose keymap in the global table so the Hammerspoon console can call
 -- keymap.perf_report_all() / perf_enable() / perf_reset() without
@@ -957,6 +968,16 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		end,
 	}
 	steps[#steps + 1] = {
+		name = "field-run",
+		run = function()
+			local module = package.loaded["infra.field_run"]
+			if module == nil then return true end
+			-- A run this teardown cuts short is closed with what cut it short
+			return module.stop({ kind = TerminationCoordinator.pending_kind(),
+				reason = TerminationCoordinator.pending_reason() })
+		end,
+	}
+	steps[#steps + 1] = {
 		name = "menu-watchers",
 		run = function()
 			local module = package.loaded["ui.menu"]
@@ -1373,7 +1394,9 @@ end
 -- cleanup, LLM bootstrap, TOML loading and the keymap engine startup have all
 -- completed (F-MED-19).
 local function finish_boot_after_onboarding()
-Boot.stage("Accessibility permission")
+-- stage_once: when the wait below grants trust, this function runs again from
+-- inside this very stage, which must resume rather than open twice.
+Boot.stage_once("Accessibility permission")
 -- Every input owner below is an eventtap, and an untrusted process gets taps
 -- that never enable. The packaged runtime is its own app identity, so a user
 -- whose onboarding was skipped (config.toml already present) may never have
@@ -1477,7 +1500,7 @@ end
 local config_overrides = require("infra.config_overrides")
 config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
-local mlx_cleanup_enabled = config_overrides.read_native_value("llm.enabled") == true
+local mlx_cleanup_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED) == true
 local mlx_cleanup_settled = not mlx_cleanup_enabled
 local pending_llm_bootstrap = nil
 
@@ -1552,7 +1575,7 @@ Boot.stage("LLM backend bootstrap")
 -- otherwise be written but never consumed. Re-derive and apply it here so the
 -- documented expert override actually takes effect on a reload.
 do
-	local lvl = Storage.get("log_level")
+	local lvl = Storage.get(require("config_keys").LEAF.LOG_LEVEL)
 	local valid_levels = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
 	if type(lvl) == "string" and valid_levels[lvl:upper()] then
 		Logger.set_level(lvl:upper())
@@ -1562,7 +1585,7 @@ end
 local Preferences = require("infra.preferences")
 local ok_core_llm, core_llm = pcall(require, "modules.llm")
 local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
-local boot_llm_enabled = config_overrides.read_native_value("llm.enabled")
+local boot_llm_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED)
 if boot_llm_enabled == nil then
 	if type(boot_saved_prefs.llm_enabled) == "boolean" then
 		boot_llm_enabled = boot_saved_prefs.llm_enabled
@@ -1805,7 +1828,7 @@ end
 -- Magic key (the hotstring trigger character) defaults here; a user's custom
 -- value and per-section enabled states are restored from config.toml by
 -- menu_state during menu start (the v2 config is TOML, not the legacy config.json).
-local magic_key = ManifestReader.default_for("hotstrings.trigger_char")
+local magic_key = ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
 
 -- Pass the trigger char to keymap before loading files so magic-key hotstrings
 -- register against the right character.
@@ -2140,11 +2163,14 @@ end
 -- the one the next deploy writes. An unreadable file refuses the deploy instead
 -- of guessing a product.
 do
-	local virtual_keyboard_default = require("infra.manifest_reader").default_for("layout.virtual_keyboard")
+	local virtual_keyboard_default = require("infra.manifest_reader").default_for(require("config_keys").KEY.LAYOUT_VIRTUAL_KEYBOARD)
 	local registered = type(karabiner) == "table" and karabiner.set_virtual_keyboard_source(function()
 		-- Read-only: a retired key an older release left is warned and ignored, never a refusal.
-		local flat = Preferences.current_view(config_paths.get("ConfigTomlPath"), true)
-		if flat == nil then error("config.toml cannot be read, so the virtual keyboard choice is unknown") end
+		local flat, _, reason, key_path = Preferences.current_view(config_paths.get("ConfigTomlPath"), true)
+		if flat == nil then
+			error("config.toml cannot be read (" .. tostring(reason) .. (key_path and (" at " .. key_path) or "")
+				.. "), so the virtual keyboard choice is unknown")
+		end
 		if flat.layout_virtual_keyboard == nil then return virtual_keyboard_default end
 		return flat.layout_virtual_keyboard
 	end)
@@ -2254,6 +2280,8 @@ local file_watchers_committed = require("infra.file_watchers").start({
 	ignored_dirs            = { TOML_CACHE_DIR },
 	-- The personal hotstrings tree is usually a SEPARATE git repository from the
 	-- driver, so a pull there must be gated by its own .git, not the driver's.
+	-- A developer app also reloads on shared Lua edits; a packaged tree never changes.
+	shared_source_dir       = require("infra.dev_source").is_active() and (logger_shared_root .. "/lua") or nil,
 	git_roots               = {
 		base_dir,
 		require("native_path").without_trailing_separators(config_paths.get("HotstringsDirPath") or ""),
@@ -2316,6 +2344,14 @@ require("infra.driver_control").start({
 		return TerminationCoordinator.request_reload_owned(reason, on_aborted)
 	end,
 })
+-- The developer field run (tools/dev/collect-macos-field-report.sh): only a
+-- developer app runs it, so a packaged runtime never even loads the module.
+if require("infra.dev_source").is_active() then
+	require("infra.field_run").start({
+		root = require("infra.dev_source").root(),
+		pid = assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable"),
+	})
+end
 -- Trigger the first Karabiner deploy HERE, after init.lua fully completes.
 -- hs.timer callbacks scheduled during module init do not fire reliably;
 -- calling regenerate() from this top-level context guarantees the event loop

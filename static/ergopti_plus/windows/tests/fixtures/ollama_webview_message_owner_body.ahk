@@ -140,7 +140,7 @@ Critical("On")
 try {
 	_OWMB_Run(A_Args[1])
 	ExitApp(0)
-} catch as Failure {
-	FileAppend("FAIL ollama-message-owner " . A_Args[1] . ": " . Failure.Message . "`n" . Failure.Stack . "`n", "*", "UTF-8")
+} catch as TopLevelFailure {
+	FileAppend("FAIL ollama-message-owner " . A_Args[1] . ": " . TopLevelFailure.Message . "`n" . TopLevelFailure.Stack . "`n", "*", "UTF-8")
 	ExitApp(1)
 }

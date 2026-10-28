@@ -56,8 +56,8 @@ function parseToNodes(text) {
 		} else if (
 			tokenName === 'context' ||
 			tokenName === 'n' ||
-			tokenName === 'min_words' ||
-			tokenName === 'max_words' ||
+			tokenName === 'min_words' || // config-key-literal-ok: prompt template token, not a configuration key
+			tokenName === 'max_words' || // config-key-literal-ok: prompt template token, not a configuration key
 			tokenName === 'language'
 		) {
 			nodes.push(makeChip(tokenName));
@@ -243,6 +243,7 @@ function tryConvertToken(editorElement) {
 
 var acItems = [];
 var acIdx = 0;
+// config-key-literal-ok: prompt template tokens, not configuration keys
 var TOKEN_NAMES = ['context', 'n', 'min_words', 'max_words', 'language'];
 
 /**
@@ -606,9 +607,8 @@ function doSave() {
 	var promptMode = document.getElementById('p-mode').value;
 	var promptContent = serializeEditor(editorElement).trim();
 
-	// UI text remains in French as requested
 	if (!promptName || !promptContent) {
-		return alert('Le nom et le prompt sont requis.');
+		return alert(window._i18n_strings['prompt_editor.required_fields']);
 	}
 
 	post({

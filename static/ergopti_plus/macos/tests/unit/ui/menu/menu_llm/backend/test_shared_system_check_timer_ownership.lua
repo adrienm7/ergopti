@@ -11,7 +11,7 @@ local MODULES = {
 	"infra.dialog_util",
 	"infra.i18n",
 	"infra.logger",
-	"infra.paths",
+	"infra.paths", "infra.timings",
 	"modules.llm",
 	"ui.menu.menu_llm.models_manager",
 	"ui.menu.menu_llm.models_manager_mlx",
@@ -134,6 +134,7 @@ local function with_fixture(callback)
 			end
 			return key
 		end }
+		helpers.provide_timings()
 		package.loaded["infra.paths"] = {
 			shared_llm_path = function(name)
 				return helpers.shared("modules/llm/" .. tostring(name))

@@ -1355,6 +1355,21 @@ local function observe_ignored_win_identity(win, app_name, title)
 	_ignored_win_last_identity = identity
 end
 
+--- A probe slower than this names its stages; the Mac field log showed 1 s
+--- holds from the refresh and TTL timers without saying which AX read waited.
+local IGNORED_WIN_SLOW_PROBE_MS = 250
+--- Stage at which the last probe failed, for the prewarm warning (L23).
+local _probe_failed_stage = nil
+
+--- Logs one line naming every probe stage's milliseconds when the probe was slow.
+--- @param started number Monotonic nanoseconds at the probe start.
+--- @param stage_ms table Ordered "<stage>=<ms>" parts.
+local function report_slow_probe(started, stage_ms)
+	local total_ms = (TimerScheduler.now_ns() - started) / 1e6
+	if total_ms < IGNORED_WIN_SLOW_PROBE_MS then return end
+	Logger.warn(LOG, "Slow ignored-window probe %d ms (%s ms).", math.floor(total_ms), table.concat(stage_ms, " "))
+end
+
 --- Performs the expensive focused-window AX probe. Never call from CGEventTap.
 --- @param ignored_titles table Hash map of exact window titles to ignore.
 --- @param ignored_patterns table Array of Lua patterns matched against window titles.
@@ -1367,28 +1382,49 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	_ignored_win_cache_value = false
 	_secure_field_cache_value = nil
 	_text_destination = nil
-	if not ensure_ignored_win_watchers() then return mark_ignored_win_unknown() end
+	_probe_failed_stage = nil
+	local probe_started = TimerScheduler.now_ns()
+	local stage_ms, stage_last = {}, probe_started
+	-- Charges the time since the previous stage; a failing stage is retained so
+	-- an incomplete prewarm names it (L23).
+	local function stage(name, failed)
+		local now = TimerScheduler.now_ns()
+		stage_ms[#stage_ms + 1] = string.format("%s=%d", name, math.floor((now - stage_last) / 1e6))
+		stage_last = now
+		if failed then
+			_probe_failed_stage = name
+			report_slow_probe(probe_started, stage_ms)
+			return mark_ignored_win_unknown()
+		end
+	end
+	if not ensure_ignored_win_watchers() then return stage("watchers", true) end
+	stage("watchers")
 
 	-- Use the focused window directly rather than frontmostApplication() so that
 	-- floating-panel apps (e.g. Raycast) that accept keystrokes without becoming
 	-- the NSWorkspace frontmost app are evaluated against their own window title,
 	-- not the title of the previously active app.
 	local ok_win, win = pcall(hs.window.focusedWindow)
-	if not ok_win or not win then return mark_ignored_win_unknown() end
+	if not ok_win or not win then return stage("focused_window", true) end
+	stage("focused_window")
 
 	local ok_app, app = pcall(function() return win:application() end)
-	if not ok_app or not app then return mark_ignored_win_unknown() end
+	if not ok_app or not app then return stage("application", true) end
+	stage("application")
 
 	-- Always ignore the Hammerspoon console to prevent feedback loops;
 	-- folded here so it benefits from the event-driven cache as the rest.
 	local ok_app_name, app_name = pcall(function() return app:name() end)
 	if not ok_app_name or type(app_name) ~= "string" then
-		return mark_ignored_win_unknown()
+		return stage("app_name", true)
 	end
+	stage("app_name")
 	if app_name == "Hammerspoon" then
 		if not ensure_ignored_win_context_watchers(app, win, false) then
-			return mark_ignored_win_unknown()
+			return stage("context_watchers", true)
 		end
+		stage("context_watchers")
+		report_slow_probe(probe_started, stage_ms)
 		observe_ignored_win_identity(win, app_name, "<hammerspoon>")
 		_ignored_win_cache_value = true
 		_secure_field_cache_value = false
@@ -1396,14 +1432,17 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	end
 
 	local ok_title, title = pcall(function() return win:title() end)
-	if not ok_title or type(title) ~= "string" then return mark_ignored_win_unknown() end
+	if not ok_title or type(title) ~= "string" then return stage("title", true) end
+	stage("title")
 	if not ensure_ignored_win_context_watchers(app, win, true) then
-		return mark_ignored_win_unknown()
+		return stage("context_watchers", true)
 	end
+	stage("context_watchers")
 	observe_ignored_win_identity(win, app_name, title)
 	local secure = SecureFieldDetector.isSecureApp(app_name) == true and true
 		or SecureFieldDetector.inspectFocusedElement(app)
-	if type(secure) ~= "boolean" then return mark_ignored_win_unknown() end
+	if type(secure) ~= "boolean" then return stage("secure_field", true) end
+	stage("secure_field")
 	_secure_field_cache_value = secure
 	-- Retain an exact native destination off the HID path. Application names and
 	-- titles alone cannot distinguish two editor controls or a reused window.
@@ -1416,6 +1455,8 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 			generation = _ignored_win_context_generation }
 	end)
 	if captured then _text_destination = destination end
+	stage("destination")
+	report_slow_probe(probe_started, stage_ms)
 
 	-- Exact-title match.
 	if type(ignored_titles) == "table" and ignored_titles[title] then
@@ -1662,7 +1703,9 @@ function M.prewarm_ignored_win_watchers(ignored_titles, ignored_patterns)
 		hs.timer.secondsSinceEpoch())
 	local ttl_ready = arm_ignored_win_ttl_refresh()
 	if classification == nil or not ttl_ready then
-		Logger.warn(LOG, "Ignored-window prewarm incomplete; tracking remains fail-closed.")
+		Logger.warn(LOG, "Ignored-window prewarm incomplete (probe stage %s, TTL refresh %s); tracking remains fail-closed.",
+			classification == nil and tostring(_probe_failed_stage or "unknown") or "passed",
+			ttl_ready and "armed" or "not armed")
 		return false
 	end
 	Logger.success(LOG, "Ignored-window watchers ready (%.1f ms).",

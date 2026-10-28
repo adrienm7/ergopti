@@ -457,7 +457,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/test/macos_bootstrap_tls_numeric_binding_test.py', 8]);
 	cases.push(['tools/test/owned_suspended_image_portable_test.py', 3]);
 	cases.push(['tools/diagnostics/macos_suspended_image_owner_test.py', 39]);
-	cases.push(['tools/diagnostics/macos_ollama_bootstrap_owner_test.py', 22]);
+	cases.push(['tools/diagnostics/macos_ollama_bootstrap_owner_test.py', 24]);
 	cases.push(['tools/diagnostics/macos_trusted_native_guardian_test.py', 10]);
 	cases.push(['tools/diagnostics/macos_guardian_retirement_order_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_test.py', 14]);
@@ -721,7 +721,7 @@ for (const [script, expectedCases, expectedAssertions] of [
 // New command composers receive both candidate and canonical source roots.
 for (const [script, expectedCases, expectedAssertions] of [
 	['tools/test/managed_ollama_restart_envelope_test.lua', 5, 83],
-	['tools/test/managed_ollama_serve_command_test.lua', 7, 47],
+	['tools/test/managed_ollama_serve_command_test.lua', 7, 50],
 	['tools/test/managed_ollama_serve_kind_forwarding_test.lua', 6, 47],
 	['tools/test/managed_ollama_hint_task_test.lua', 29, 361]
 ]) {

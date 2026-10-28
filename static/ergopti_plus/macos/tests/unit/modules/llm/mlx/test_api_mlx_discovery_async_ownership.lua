@@ -92,6 +92,8 @@ local function make_env(options)
 			end
 			task.terminate = function()
 				env.terminate_calls = env.terminate_calls + 1
+				-- ShellRunner's real answer while SIGTERM awaits the native exit.
+				if options.terminate_pending then return true, "pending" end
 				return true
 			end
 			env.tasks[#env.tasks + 1] = task
@@ -214,6 +216,22 @@ end
 
 
 helpers.describe("MLX discovery async ownership", function()
+	-- issue #104: disabling the AI after a failed MLX bootstrap logged three
+	-- ERRORs because a SIGTERM awaiting its native exit read as a refused stop.
+	helpers.it("reports a pending poll exit apart from a refusal (mlx-discovery-pending-stop)", function()
+		with_env({ terminate_pending = true }, function(env)
+			env.discovery.discover(function() end)
+			helpers.assert_true(env.fire_next_timer())
+			helpers.assert_eq(env.start_calls, 1, "a poll task is in flight")
+			local settled, reason = env.discovery.stop()
+			helpers.assert_eq(settled, false, "the exact task still owns its native exit")
+			helpers.assert_eq(reason, "pending", "a pending native exit is not a refusal")
+			helpers.assert_eq(env.discovery.resume(), false, "discovery stays fenced until the task exits")
+			helpers.assert_true(env.complete_task(1, 143, ""))
+			helpers.assert_eq(env.discovery.resume(), true, "the native exit settles the pending stop")
+		end)
+	end)
+
 	helpers.it("counts only awake time toward the discovery give-up budget", function()
 		with_env({}, function(env)
 			local callbacks = 0

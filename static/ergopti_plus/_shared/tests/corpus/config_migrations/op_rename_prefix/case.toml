@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/op_rename_prefix/case.toml
+
+[case]
+description = "rename_prefix renames every key of its section that starts with the prefix and keeps the remainder; other keys, other sections and sub-sections are untouched."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

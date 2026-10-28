@@ -28,12 +28,17 @@
 
 local M = {}
 
+-- The HttpClient port of the request plan: the client that sends and cancels inference
+-- requests. The engine hands it in at init; every other request keeps the adapter.
+local InferenceClient = nil
+
 local Logger = require("logger.shim")
 local ErrorDescription = require("error_description")
 local Json = require("json")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local HttpClient = require("adapters.http_client")
+local Ports = require("llm.request_plan.ports")
 local PromptBuilder = require("llm.prompt_builder")
 local TextUtils = require("text_utils")
 local LlmBridge = require("infra.llm_bridge")
@@ -41,6 +46,7 @@ local Monotonic = require("infra.monotonic")
 local Formats = require("llm.remote_formats")
 local Classifier = require("llm.remote_response_classifier")
 local AuthPolicy = require("llm.local_server_auth")
+local ApiModelListing = require("llm.api_model_listing")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local ProviderConfig = require("llm.provider_config_policy")
 
@@ -50,6 +56,9 @@ local LOG = "modules.llm.api_remote"
 -- A non-chat connection test also keeps the active prediction's owner intact.
 local OWNER = "llm_remote"
 local PROBE_OWNER = "llm_remote_probe"
+-- The model selector page's provider listings: their own owner, so a listing
+-- never cancels a prediction or a test.
+local LISTING_OWNER = "llm_remote_listing"
 local ANTHROPIC_VERSION = "2023-06-01"
 -- What each format serves: "chat" (predictions, tone, translation, the screen
 -- answers' text step, the agent's System 2 and chat triage), "vision" (an image
@@ -359,6 +368,14 @@ function M.endpoint(entry, model)
 	local provider = M.provider(entry.provider)
 	if not provider then return nil, "unknown provider " .. tostring(entry.provider) end
 	local base_raw = (type(entry.base_url) == "string" and entry.base_url ~= "") and entry.base_url or provider.base_url
+	-- A local server entry at its catalogue address goes where the last scan
+	-- found the server (modules/llm/local_servers.lua); discovery loads that
+	-- module, so an unloaded one has no scan to follow
+	local Servers = package.loaded["modules.llm.local_servers"]
+	if base_raw == provider.base_url and type(Servers) == "table" and type(Servers.port_scan) == "function" then
+		local scan = Servers.port_scan(entry.provider)
+		if scan and scan.running and type(scan.base_url) == "string" then base_raw = scan.base_url end
+	end
 	local base, reason = M.normalize_base_url(base_raw)
 	if not base then return nil, reason end
 	local token = entry.token
@@ -511,7 +528,7 @@ local function cancel_exchange(scope, expected_epoch)
 	-- An earlier cancellation may have synchronously admitted another scope's
 	-- successor. Its new epoch does not belong to the original cancel-all call.
 	if scope.epoch ~= expected_epoch then return true, false end
-	if HttpClient.cancel(scope.owner) ~= true then return false, false end
+	if (InferenceClient or HttpClient).cancel(scope.owner) ~= true then return false, false end
 	if scope.epoch ~= expected_epoch then return true, false end
 	scope.epoch, scope.active = expected_epoch + 1, nil
 	return true, true
@@ -614,7 +631,7 @@ local function post_json(scope, epoch, url, headers, payload, fail, on_answer, a
 		fail("request could not be encoded")
 		return
 	end
-	local dispatched = HttpClient.post(url, headers, body, function(result)
+	local dispatched = (InferenceClient or HttpClient).post(url, headers, body, function(result)
 		if epoch ~= scope.epoch then return end
 		if authorized and not authorized() then return end
 		if type(result) ~= "table" or result.ok ~= true then
@@ -756,7 +773,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	local request, reason = M.build_request(entry, messages, opts)
 	if not request then return refuse(reason) end
 	Logger.debug(LOG, "chat() → %s (model=%s)", M.redact_url(request.url), request.model)
-	local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
+	local dispatched = (InferenceClient or HttpClient).post(request.url, request.headers, request.body, function(result)
 		if epoch ~= scope.epoch then return end
 		if authorized and not authorized() then return end
 		if type(result) ~= "table" or result.ok ~= true then
@@ -892,6 +909,73 @@ function M.models(entry, on_done)
 	return true
 end
 
+--- The model listing address of an entry: its provider's <base>/models, with
+--- the key in the headers (openai, anthropic) or the URL (gemini).
+--- @param entry table
+--- @return string|nil url, table|nil headers, string|nil format
+local function listing_endpoint(entry)
+	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
+	if not provider or not ApiModelListing.supported(provider.format) then return nil end
+	local endpoint = M.endpoint(entry, model_of(entry, provider))
+	if not endpoint then return nil end
+	local url
+	if endpoint.format == "anthropic" then
+		url = endpoint.url:gsub("/messages$", "/models")
+	elseif endpoint.format == "gemini" then
+		local base = endpoint.url:match("^(.-)/models/")
+		url = base and (base .. "/models?key=" .. percent_encode(entry.token)) or nil
+	else
+		url = endpoint.url:gsub("/chat/completions$", "/models")
+	end
+	return url, endpoint.headers, endpoint.format
+end
+
+--- Lists the models an entry's provider serves, for the model selector page,
+--- through the HTTP adapter with the request timeout. Never logs the address
+--- (a gemini key rides in it) nor the key.
+--- @param entry table Provider, base URL, token and model.
+--- @param on_done function Receives the api_model_listing state:
+---   { state = "listed", ids } or { state = "failed", reason }.
+--- @return boolean dispatched
+function M.list_models(entry, on_done)
+	if type(on_done) ~= "function" then error("api_remote.list_models requires on_done", 2) end
+	local url, headers, format = listing_endpoint(entry)
+	local provider_id = type(entry) == "table" and tostring(entry.provider) or "?"
+	local function finish(state)
+		local ok, err = pcall(on_done, state)
+		if not ok then Logger.error(LOG, "Remote model listing callback raised — %s", ErrorDescription.describe(err)) end
+	end
+	if not url then
+		finish({ state = "failed", reason = "unsupported" })
+		return false
+	end
+	Logger.info(LOG, "Remote model listing requested (provider=%s).", provider_id)
+	local dispatched = HttpClient.get(url, headers,
+		{ owner = LISTING_OWNER, timeout_ms = Timings.ms("llm", "request_timeout_ms"), follow_redirects = false },
+		function(result)
+			if type(result) ~= "table" or result.ok ~= true then
+				local status = type(result) == "table" and tonumber(result.status) or 0
+				Logger.info(LOG, "Remote model listing unavailable (provider=%s, status=%s).", provider_id, tostring(status))
+				finish({ state = "failed", reason = (status or 0) > 0 and "refused" or "unavailable" })
+				return
+			end
+			local decoded_ok, decoded = pcall(Json.decode, type(result.body) == "string" and result.body or "")
+			local ids = decoded_ok and ApiModelListing.model_ids(format, decoded) or nil
+			if type(ids) ~= "table" then
+				Logger.warn(LOG, "Remote model listing could not be read (provider=%s).", provider_id)
+				finish({ state = "failed", reason = "unreadable" })
+				return
+			end
+			Logger.info(LOG, "Remote model listing: %d model(s) for provider %s.", #ids, provider_id)
+			finish({ state = "listed", ids = ids })
+		end)
+	if dispatched ~= true then
+		finish({ state = "failed", reason = "unavailable" })
+		return false
+	end
+	return true
+end
+
 --- Sends the connectivity probe with one entry: the shared test_request as a
 --- chat (a Backboard entry as one message), or decisions_test to a decisions
 --- provider, which passes when the answer holds answers.
@@ -960,6 +1044,13 @@ function M._reset_for_test()
 		scope.epoch, scope.active, scope.used = scope.epoch + 1, nil, nil
 	end
 	_assistants = {}
+end
+
+--- Hands in the HttpClient that sends and cancels inference requests (engine init).
+--- nil restores the adapter.
+--- @param client table|nil Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	InferenceClient = client ~= nil and Ports.check("HttpClient", client) or nil
 end
 
 return M

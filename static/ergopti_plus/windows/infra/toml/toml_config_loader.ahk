@@ -583,6 +583,23 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 	return ExpectedType
 }
 
+; The schema owns a string list at metrics.disabled_apps. One strict domain
+; validator serves canonical source admission and live metrics publication, so
+; cleanup cannot accept an item shape that later aborts startup.
+TomlConfigMetricsDisabledApps(Value) {
+	if !(Value is Array)
+		throw TypeError("metrics.disabled_apps must be a TOML array")
+	Result := Map()
+	for AppName in Value {
+		if !(AppName is String)
+			throw TypeError("metrics.disabled_apps items must be TOML strings")
+		Normalized := Trim(AppName)
+		if (Normalized != "")
+			Result[StrLower(Normalized)] := true
+	}
+	return Result
+}
+
 TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 		RawValue := unset) {
 	ExpectedType := TomlConfigExpectedType(CurrentSection, Key, &Entry)
@@ -618,8 +635,14 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 			return (!IsSet(RawValue) || LiteralKind == "string")
 				&& Value is String
 		case "array":
-			return (!IsSet(RawValue) || LiteralKind == "array")
-				&& Value is Array
+			if (IsSet(RawValue) && LiteralKind != "array") || !(Value is Array)
+				return false
+			if CurrentSection == ConfigKey.METRICS && Key == ConfigLeaf.DISABLED_APPS {
+				try TomlConfigMetricsDisabledApps(Value)
+				catch TypeError
+					return false
+			}
+			return true
 		case "feature":
 			return Value is Map
 		case "enum":

@@ -1,9 +1,10 @@
 <!-- docs/design/one-shortcut-model.md -->
 
-# One shortcut data model (plan for PAR-41, not started)
+# One shortcut data model (plan for PAR-41, in progress)
 
-Status: plan only. No code changes belong to this note. Audit rows C12 and C13
-of `docs/audits/2026-10-24-cross-os-parity.md` are the evidence.
+Status: steps 1, 2 and the shared part of step 7 are done (see "Progress").
+Audit rows C12 and C13 of `docs/audits/2026-10-24-cross-os-parity.md` are the
+evidence.
 
 ## What exists today
 
@@ -35,11 +36,19 @@ One slot, one action, one neutral id, on every driver:
 - Personal shortcuts stay a separate surface (a script on Windows and macOS, a
   set of slots on Linux, see the reason text of `edit_shortcuts`).
 
-## Why no migration
+## Why saved bindings are migrated (supersedes "no migration")
 
-The repository has no users (memory note `project-no-users-no-backcompat`).
-Old keys are not read, not converted and not aliased. A leftover key is
-reported by the unused-key scan and offered for removal.
+The first draft of this note said the repository has no users, so old keys
+would be neither read nor converted. That is superseded (maintainer's
+decision, 2026-10-27): a setting a user chose is kept. The retired slot ids and
+the redundant booleans of macOS and Linux are converted into the neutral slot
+ids by one step of the shared config migration registry
+(`_shared/core/config_schema/migrations.toml`, the same closed op set the
+Windows engine already runs: `rename`, `copy_if_absent`, `map_value`,
+`delete`, `set_if_absent`, plus `rename_prefix`, which carries the per-slot
+action parameters `keyboard__<slot>__<action>` to the new slot ids). No runtime
+alias exists: after the step, only neutral ids are read. A leftover key that no slot owns is reported
+through `ConfigOutdated` and offered by the cleanup, on macOS and Linux.
 
 ## Steps
 
@@ -72,3 +81,60 @@ reported by the unused-key scan and offered for removal.
   list change together. Land the manifest and the three drivers in one series.
 - Size: the Windows legacy readers are the largest part; plan several atomic
   commits, one per driver, each green on its own suite.
+
+## Progress
+
+- Step 1 done: `docs/audits/2026-10-27-shortcut-inventory.json` lists every
+  legacy boolean, keyboard slot, personal toggle and slot prefix family;
+  `tools/test/test-shortcut-inventory-matches-sources.cjs` re-derives it from the
+  manifest and the driver sources.
+- Step 2 done: `_shared/modules/actions/slot_roles.json` holds the roles
+  (`primary`, `secondary`, `alt`, `meta`, `shift`), generated to
+  `_shared/lua/shortcuts/slot_roles_data.lua` and resolved by
+  `_shared/lua/shortcuts/slot_roles.lua`. `secondary` is the Mac's Ctrl next to
+  Cmd; `meta` is the Win/Super key and has no Mac equivalent.
+  `tools/test/test-slot-roles-single-source.cjs` holds the table to
+  `modifier_chords.json` and to the slot prefix families.
+- Step 7, shared part done: `_shared/tests/corpus/shortcuts/neutral_slots.json`
+  is replayed by the macOS and Linux unit gates through
+  `_shared/lua/test/slot_roles_contract.lua`. Windows replays it when it adopts.
+- Key catalogue gap: Win+', Win+CapsLock, Ctrl+CapsLock, Ctrl+' and Cmd+\* use keys
+  (`quote`, `capslock`, `star`, `sc029`) that `modifier_chords.json` lacks; add
+  them in step 3 before those chords become slots.
+
+## Status after the macOS and Linux adoption
+
+- Step 3 done for macOS and Linux: the 18 macOS Ctrl-letter switches
+  (`ctrl_a` ... `ctrl_quote`, `cmd_shift_v`) are declared as
+  `shortcuts.keyboard` slots (`secondary_a` ... `secondary_quote`,
+  `primary_shift_v`) with their catalogue action as the recommendation; the
+  shipped slots are `secondary_space` (macOS), `primary_g` and `meta_space`
+  (Linux). Windows keeps its ids until step 4.
+- Steps 5 and 6 done: macOS and Linux build their slot prefixes from
+  `shortcuts.slot_roles` (families in menu order, longest prefix matched
+  first). macOS also accepts Caps Lock and the apostrophe in slots
+  (`extra_keys`), which `modifier_chords.json` does not carry because it also
+  feeds every driver's chord actions.
+- Step 8 done for macOS and Linux: the 18 hotkey factories and their menu rows
+  are deleted. `ctrl_g` (open ChatGPT with `shortcuts.chatgpt_url`), `cmd_star`
+  and `wrap_text_if_selected` stay as fixed switches: ChatGPT needs a per-binding
+  URL parameter and a shared `chatgpt_url` retirement, the other two are not
+  catalogue actions.
+- Migration: schema v15 (`migrations.toml`, `v14_to_v15`). Every retired slot
+  id is renamed, each switch becomes its slot and action (`false` becomes
+  `none`), and a slot the user set wins over the switch of the same chord. Only
+  the closed op set is used. Not converted: the per-slot action parameters
+  (`gestures.action_parameters` keys `keyboard__<slot>__<action>`), because a
+  rename op names one key and there are about 3,000 slot-and-action pairs per
+  driver; a parameter of a renamed slot stays under its old name, is reported as
+  outdated and offered by the cleanup, and the user re-enters it.
+- Known edge: a user who cleared a slot to `none` and kept the switch of the
+  same chord on had the switch win in the old runtime; after the step the
+  cleared slot wins. This is the "existing target keeps its value" rule of
+  `copy_if_absent`.
+- A key under `[shortcuts.keyboard]` that no slot owns is reported through
+  `ConfigOutdated` at boot on macOS and Linux. (The cleanup already listed it;
+  only the boot warning was missing.)
+- Chord action ids (`cmd_a`, `hs_ctrl_a`, `ctrl_a` ... the modifier chords of
+  `modifier_chords.json`) are actions, not slots, and keep their names; the
+  macOS `shortcut_groups` prefixes of that file build them.

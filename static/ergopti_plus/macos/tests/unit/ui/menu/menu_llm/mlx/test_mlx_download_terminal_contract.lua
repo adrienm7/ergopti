@@ -113,6 +113,18 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 		end)
 	end
 
+	-- Field run 2026-10-27 21:08: "the launcher failed (code 0)" reached only a
+	-- notification; the log must name the exit and where the PID line went.
+	helpers.it("logs a launcher that exits 0 without a streamed PID line", function()
+		with_fixture({}, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), true)
+			fixture.controls.latest("launcher"):complete(0, "", "__DLPID__:4242\n")
+			assert_cancelled(fixture, "launcher_failed")
+			helpers.assert_eq(fixture.records.errors[#fixture.records.errors],
+				"MLX download launcher failed (exit=0, pid=missing, sentinel in final output=yes).")
+		end)
+	end)
+
 	helpers.it("HS-024 launcher process failure settles once", function()
 		with_fixture({}, function(fixture)
 			helpers.assert_eq(fixture.controls.pull(), true)

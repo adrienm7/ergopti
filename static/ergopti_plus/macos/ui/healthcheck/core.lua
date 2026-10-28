@@ -276,6 +276,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.field_run_ports",
+		contract = { "new" },
+		-- Built by infra/field_run.lua, which starts only in developer source mode.
+		wired    = true,
+	},
+	{
 		id       = "adapters.runtime_owner_ports",
 		contract = { "new", "unpinned_count" },
 		-- Required only by the remap bridge after the hidden `runtime = "owned"` opt-in.
@@ -370,6 +376,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.prediction_tooltip_port",
+		contract = { "wrap" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.program_providers",
 		contract = { "create" },
 		wired    = true,
@@ -403,6 +414,11 @@ local ADAPTER_SPECS = {
 		id       = "adapters.screen_capture",
 		contract = { "permission_state", "request_permission", "open_permission_settings",
 			"clipboard_change_count", "clipboard_has_image", "copy_image_file_to_clipboard" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.privacy_settings",
+		contract = { "url", "url_for", "os_major" },
 		wired    = true,
 	},
 	{
@@ -477,6 +493,12 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.ledger_append",
 		contract = { "cleanup", "recover", "flush" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.metadata_command_stats",
+		contract = { "clock", "record", "snapshot" },
+		-- Slow ingest and slow preferences save reports count the metadata forks.
 		wired    = true,
 	},
 	{
@@ -1034,6 +1056,17 @@ local function inject_strings(webview)
 		webview:evaluateJavaScript("if(window.i18n_apply){window.i18n_apply(" .. json .. ");}")
 	end)
 	if not ok then Logger.error(LOG, "The diagnostics page's strings were refused: %s.", tostring(err)) end
+end
+
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _window end
+
+--- Closes the open diagnostics window, for ui/window_toggle.
+--- @return boolean committed
+function M.close_window()
+	if _window == nil then return true end
+	return close_owned_window(_window, "toggle close")
 end
 
 --- Opens the diagnostics window. Replaces any existing window (singleton).

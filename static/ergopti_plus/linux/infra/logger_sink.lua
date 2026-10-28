@@ -154,9 +154,10 @@ local _redact = nil
 --- @param supplied table|nil Explicit identity dependency for portable fixtures.
 --- @return function Captured immutable-context redactor.
 local function admit_redaction(supplied)
-	local context = supplied or { home = require("infra.config_paths").account_home(), user = os.getenv("USER") or os.getenv("LOGNAME") }
-	assert(type(context) == "table" and type(context.home) == "string" and context.home ~= ""
-		and type(context.user) == "string" and context.user ~= "", "logger_sink: privacy identity unavailable")
+	local context = supplied or { home = require("infra.config_paths").account_home(), user = require("infra.account_name").resolve() }
+	assert(type(context) == "table", "logger_sink: privacy identity unavailable")
+	assert(type(context.home) == "string" and context.home ~= "", "logger_sink: privacy identity unavailable: HOME is not an absolute directory")
+	assert(type(context.user) == "string" and context.user ~= "", "logger_sink: privacy identity unavailable: no account name from USER, LOGNAME or the passwd entry")
 	local captured = { home = context.home, user = context.user, case_insensitive = false }
 	local Paths = require("infra.paths")
 	local root = Paths.shared_root_from(Paths.driver_root())

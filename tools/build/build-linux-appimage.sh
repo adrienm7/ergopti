@@ -56,7 +56,12 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-BUILD_DIR="$PROJECT_ROOT/build/linux"
+# A caller that runs several builds at once gives each its own output directory.
+BUILD_DIR="${ERGOPTI_LINUX_BUILD_DIR:-$PROJECT_ROOT/build/linux}"
+case "$BUILD_DIR" in
+  /?*) ;;
+  *) echo "[ERR] ERGOPTI_LINUX_BUILD_DIR must be an absolute path, got '$BUILD_DIR'" >&2; exit 1 ;;
+esac
 APPDIR="$BUILD_DIR/AppDir"
 APPDIR_LIB="$APPDIR/usr/lib/ergopti"
 PACKAGE_NAME="ergopti"
@@ -122,6 +127,8 @@ REQUIRED_PAYLOAD=(
   "adapters/tray_menu.lua"
   "ui/webkit_host.lua"
   "_shared/lua/hotstring_engine/init.lua"
+  "_shared/lua/hotstring_engine/cascade.lua"
+  "_shared/lua/layouts/keylayout.lua"
   "_shared/lua/json.lua"
   "_shared/data/keycodes/evdev.json"
   "_shared/data/locales/fr.json"
@@ -161,6 +168,13 @@ python3 "$SCRIPT_DIR/stage-linux-network-runtime.py" \
 # must load on the oldest supported LTS. A newer build host fails here rather
 # than on the user's machine.
 node "$SCRIPT_DIR/check-elf-glibc-ceiling.cjs" "$APPDIR"
+
+# And every library an ELF file needs is in the image or on the documented
+# recipient list (_shared/data/linux_appimage_recipient_libraries.json): the C
+# library and its loader are the recipient's by design, the baseline being the
+# oldest supported glibc above; anything else the build host linked by accident
+# fails here rather than on a machine that lacks it.
+node "$SCRIPT_DIR/check-elf-needed-closure.cjs" "$APPDIR"
 
 # ----------------------------------------------------------------------
 # 5. AppRun — the single entry point

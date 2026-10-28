@@ -42,7 +42,7 @@ local function with_real_shortcut_prompt_owned(raw, body)
 	local saved_shortcuts = package.loaded["ui.menu.shortcut_utils"]
 	local ok, err = xpcall(function()
 		package.loaded["infra.dialog_util"] = {
-			text_prompt = function() return "OK", raw end,
+			text_prompt = function() return "button.ok", raw end,
 			alert = function() return true end,
 		}
 		local warnings = WarningContract.attach(package.loaded["infra.dialog_util"])

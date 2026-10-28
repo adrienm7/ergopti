@@ -32,7 +32,7 @@ end
 function M.register(helpers, driver)
 	local native = "modules.shortcuts.keyboard_shortcuts"
 	local policy = require("config_binding_identity")
-	local known = driver == "macos" and "hs_ctrl_k" or "ctrl_k"
+	local known = driver == "macos" and "secondary_k" or "primary_k"
 	local current = "keyboard__" .. known
 	local current_key = current .. "__open_url"
 	local retired = "keyboard__removed_keyboard_slot"
@@ -43,7 +43,7 @@ function M.register(helpers, driver)
 	end
 	local function publish(owner)
 		assert(owner.physical_slot_descriptor("physical_none_KeyJ"), "the genuine physical source must initialize")
-		return owner.available_slots(driver == "macos" and "hs_ctrl_" or "ctrl_")
+		return owner.available_slots(driver == "macos" and "secondary_" or "primary_")
 	end
 	local function with_file(published, body, physical_rows)
 		scope(function()

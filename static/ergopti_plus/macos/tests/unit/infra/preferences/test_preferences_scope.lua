@@ -9,8 +9,8 @@ local function fixture(source)
 	local Actions = helpers.load_with_stubs("modules.gestures.actions")
 	local Gestures = helpers.load_with_stubs("modules.gestures")
 	Actions.set_action_parameter("tap_4", "open_url", "https://apple.com")
-	Actions.set_action_parameter("keyboard__cmd_k", "open_url", "https://example.com")
-	local original = source or '[gestures]\nenabled = true\naction_parameters = { tap_4__open_url = "https://apple.com", keyboard__cmd_k__open_url = "https://example.com", unknown = { value = 7 } }\n[future]\nvalue = "preserve"\n'
+	Actions.set_action_parameter("keyboard__primary_k", "open_url", "https://example.com")
+	local original = source or '[gestures]\nenabled = true\naction_parameters = { tap_4__open_url = "https://apple.com", keyboard__primary_k__open_url = "https://example.com", unknown = { value = 7 } }\n[future]\nvalue = "preserve"\n'
 	local files, writes, runtime, controls = { config = original }, {}, { marker = "original" }, {}
 	local options = {
 		path = "config", backup_path = "backup", gestures = Gestures,
@@ -60,13 +60,13 @@ helpers.describe("macOS scoped preference table owner", function()
 			helpers.assert_eq(ok, true, detail)
 			local decoded = Codec.decode(files.config)
 			helpers.assert_eq(decoded.gestures.action_parameters.tap_4__open_url, nil)
-			helpers.assert_eq(decoded.gestures.action_parameters.keyboard__cmd_k__open_url, "https://example.com")
+			helpers.assert_eq(decoded.gestures.action_parameters.keyboard__primary_k__open_url, "https://example.com")
 			helpers.assert_eq(decoded.gestures.action_parameters.unknown.value, 7)
 			helpers.assert_eq(decoded.future.value, "preserve")
 			helpers.assert_eq(files.backup, original)
 			helpers.assert_eq(#writes, 2)
 			helpers.assert_eq(Actions.get_action_parameter("tap_4", "open_url"), "")
-			helpers.assert_eq(Actions.get_action_parameter("keyboard__cmd_k", "open_url"), "https://example.com")
+			helpers.assert_eq(Actions.get_action_parameter("keyboard__primary_k", "open_url"), "https://example.com")
 		end
 	end)
 	helpers.it("handles the equivalent nested parameter table without rewriting its unknown siblings", function()
@@ -155,7 +155,7 @@ helpers.describe("macOS scoped preference table owner", function()
 		controls.reenter = true
 		helpers.assert_eq(owner.apply("gestures", "clear"), true)
 		helpers.assert_eq(controls.reentered, false)
-		helpers.assert_eq(Actions.get_action_parameter("keyboard__cmd_k", "open_url"), "https://example.com")
+		helpers.assert_eq(Actions.get_action_parameter("keyboard__primary_k", "open_url"), "https://example.com")
 		local second, _, writes = fixture()
 		helpers.assert_eq(second.apply("global", "clear"), false)
 		helpers.assert_eq(#writes, 0)

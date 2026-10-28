@@ -327,6 +327,19 @@ end)
 helpers.describe("Remote provider error envelopes", function()
 	local contract = require("test.response_error_contract")
 	assert(#contract.vectors == 23, "every independent Lua response vector executes")
+	helpers.it("keeps the full error-envelope matrix for every completion format", function()
+		helpers.assert_eq(table.concat(contract.shape_gaps(contract.vectors), ", "), "")
+		-- Mutation control: dropping one vector or reusing a healthy body as an
+		-- error case leaves a named gap.
+		local without_null, relabelled = {}, {}
+		for _, vector in ipairs(contract.vectors) do
+			if vector.name ~= "openai top-level null error" then without_null[#without_null + 1] = vector end
+			relabelled[#relabelled + 1] = vector.name == "gemini healthy retry"
+				and { name = vector.name, format = vector.format, body = vector.body } or vector
+		end
+		helpers.assert_eq(table.concat(contract.shape_gaps(without_null), ", "), "openai error:null")
+		helpers.assert_eq(table.concat(contract.shape_gaps(relabelled), ", "), "gemini healthy")
+	end)
 	for _, vector in ipairs(contract.vectors) do
 		helpers.it("provider response: " .. vector.name, function()
 			local remote = load_remote()

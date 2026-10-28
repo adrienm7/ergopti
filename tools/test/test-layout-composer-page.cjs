@@ -481,6 +481,7 @@ check('every composer string exists in the page list and in the 21 locales', () 
 		'unknown_source',
 		'spec_invalid',
 		'shortcuts_invalid',
+		'rows_invalid',
 		'unknown_shortcut',
 		'overrides_invalid',
 		'unknown_target',

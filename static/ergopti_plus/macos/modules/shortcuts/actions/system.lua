@@ -68,6 +68,7 @@ local text_acts = require("modules.shortcuts.actions.text")
 
 local Keycodes               = require("infra.keycodes")
 local ControlSentinels       = require("modules.keymap.control_sentinels")
+local ConfigKeys = require("config_keys")
 
 -- The control-sentinel listener slot the wheel bindings track the layer with.
 local LAYER_WHEEL_LISTENER = "shortcuts.layer_wheel"
@@ -879,7 +880,7 @@ function M.bind_tap_keys(admission_guard, decide)
 	local owner = acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
 		if not raw_binding_admitted(admission_guard) then return false end
 		local is_physical, fence_events = classify_physical_event(
-			e, "shortcuts.tap_keys")
+			e, ConfigKeys.KEY.SHORTCUTS_TAP_KEYS)
 		if not is_physical then return finish_tap(false, fence_events) end
 
 		local ok_key, keycode = pcall(e.getKeyCode, e)

@@ -131,6 +131,7 @@ local webkit_host = require("ui.webkit_host")
 -- every object a page posted became nil and no reply reached a page, so the
 -- metrics windows stayed empty and the editors' buttons did nothing.
 local Json = require("json")
+local ConfigKeys = require("config_keys")
 
 
 -- =========================================
@@ -470,7 +471,7 @@ function M.show(app_name, active_locale, contextual_receipt)
 		local ok, I18n = pcall(require, "infra.i18n")
 		active_locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
 		if type(active_locale) ~= "string" or active_locale == "" then
-			active_locale = require("infra.manifest_reader").default_for("script.locale")
+			active_locale = require("infra.manifest_reader").default_for(ConfigKeys.KEY.SCRIPT_LOCALE)
 		end
 	end
 
@@ -632,6 +633,47 @@ end
 --- @return boolean
 function M.is_visible(app_name)
 	return _windows[app_name] ~= nil and _windows[app_name].visible == true
+end
+
+--- True when the app's native window holds the keyboard focus (GTK is-active).
+--- A failed lookup reads as not frontmost, so a toggle presents the window
+--- rather than closing one the user may not see.
+--- @param app_name string The app name.
+--- @return boolean
+function M.is_frontmost(app_name)
+	return M.is_visible(app_name) and M._gtk_window_active(app_name) == true
+end
+
+--- Reads GTK's is-active flag of the app's native window (Linux only).
+--- @param app_name string The app name.
+--- @return boolean
+function M._gtk_window_active(app_name)
+	local wref = _gtk_windows[app_name]
+	if not wref or not wref.window then return false end
+	local ok, active = pcall(function() return wref.window.is_active end)
+	return ok and active == true
+end
+
+--- Toggles one page window for the shared `open_*` window actions
+--- (_shared/modules/actions/actions.toml, group "UI"): closed opens and
+--- focuses it, open but hidden or behind another window brings it to the
+--- front, open and frontmost closes it. The window pool is the only state read.
+--- @param app_name string The app name.
+--- @param open_fn function|nil The page's own opener, when it is not show().
+--- @return boolean committed The requested transition committed.
+function M.toggle(app_name, open_fn)
+	local owned = _windows[app_name]
+	if owned == nil then
+		Logger.debug(LOG, "Toggle '%s': closed, opening.", app_name)
+		if open_fn ~= nil then return open_fn() == true end
+		return M.show(app_name) == true
+	end
+	if not M.is_frontmost(app_name) then
+		Logger.debug(LOG, "Toggle '%s': open but not frontmost, bringing to front.", app_name)
+		return M.bring_to_front(app_name) == true
+	end
+	Logger.debug(LOG, "Toggle '%s': frontmost, closing.", app_name)
+	return M.hide(app_name, owned.epoch) == true
 end
 
 --- Composes a native window title. The product name is added here only, so

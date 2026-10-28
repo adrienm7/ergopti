@@ -216,7 +216,7 @@ const permissionCompleted = {
 };
 const metricsPageCompleted = {
 	...completed,
-	stderr: 'Ran 23 tests in 0.01s\n\nOK\n'
+	stderr: 'Ran 24 tests in 0.01s\n\nOK\n'
 };
 const observerCompleted = {
 	status: 0,
@@ -340,7 +340,7 @@ for (const [offset, script] of [
 for (const [script, count] of [
 	['macos_layout_manager_pool_test.py', 22],
 	['macos_permission_dialog_pool_test.py', 23],
-	['macos_metrics_apps_page_test.py', 23]
+	['macos_metrics_apps_page_test.py', 24]
 ]) {
 	for (const receipt of [
 		{ ...completed, status: 1 },

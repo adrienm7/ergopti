@@ -51,27 +51,27 @@ _Redact_CharIs(Text, Index, Class) {
 	if (Index < 1 || Index > StrLen(Text))
 		return false
 	Code := Ord(SubStr(Text, Index, 1))
-	IsAlnum := (Code >= 0x30 && Code <= 0x39) || (Code >= 0x41 && Code <= 0x5A)
+	Alphanumeric := (Code >= 0x30 && Code <= 0x39) || (Code >= 0x41 && Code <= 0x5A)
 		|| (Code >= 0x61 && Code <= 0x7A)
 	switch Class, true {
 		case "alnum":
-			return IsAlnum
+			return Alphanumeric
 		case "word":
-			return IsAlnum || Code = 0x5F
+			return Alphanumeric || Code = 0x5F
 		case "word_dash":
-			return IsAlnum || Code = 0x5F || Code = 0x2D
+			return Alphanumeric || Code = 0x5F || Code = 0x2D
 		case "path":
-			return IsAlnum || Code = 0x5F || Code = 0x2E || Code = 0x2D
+			return Alphanumeric || Code = 0x5F || Code = 0x2E || Code = 0x2D
 		case "bearer":
-			return IsAlnum || InStr("._~+/=-", Chr(Code), true) > 0
+			return Alphanumeric || InStr("._~+/=-", Chr(Code), true) > 0
 		case "email_local":
-			return IsAlnum || InStr("._%+-", Chr(Code), true) > 0
+			return Alphanumeric || InStr("._%+-", Chr(Code), true) > 0
 		case "email_domain":
-			return IsAlnum || Code = 0x2E || Code = 0x2D
+			return Alphanumeric || Code = 0x2E || Code = 0x2D
 		case "url_userinfo":
-			return IsAlnum || InStr("._~%+:=!*-", Chr(Code), true) > 0
+			return Alphanumeric || InStr("._~%+:=!*-", Chr(Code), true) > 0
 		case "name":
-			return IsAlnum || Code = 0x5F || Code = 0x2E || Code = 0x2D || (Code >= 0x80 && Code != 0x2026)
+			return Alphanumeric || Code = 0x5F || Code = 0x2E || Code = 0x2D || (Code >= 0x80 && Code != 0x2026)
 		case "name_end":
 			return Code = 0x5C || Code = 0x2F || Code = 0x22 || Code = 0x27 || Code = 0x0D || Code = 0x0A
 		case "name_end_line":

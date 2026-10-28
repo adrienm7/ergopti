@@ -89,6 +89,8 @@ function loadModules() {
 	const sandbox = { console, URL };
 	sandbox.window = sandbox;
 	vm.createContext(sandbox);
+	const generated = path.join(CHANGELOG_UI, '..', '_generated', 'identifiers.js');
+	vm.runInContext(fs.readFileSync(generated, 'utf8'), sandbox, { filename: 'identifiers.js' });
 	for (const file of ['release_body.js', 'atom_feed.js']) {
 		vm.runInContext(fs.readFileSync(path.join(CHANGELOG_UI, file), 'utf8'), sandbox, {
 			filename: file

@@ -81,6 +81,27 @@ function render(bootstrapBytes, proxyBytes) {
 		proxy.redirects.max_hops > 2147483647
 	)
 		throw new Error('Invalid native PAC source policy.');
+	const fallback = proxy.pac_unavailable_fallback;
+	const knownStages = new Set(
+		JSON.parse(
+			fs.readFileSync(path.join(shared, 'network/native_http_failure_stages.json'), 'utf8')
+		).stages.map((row) => row.code)
+	);
+	if (
+		!fallback ||
+		typeof fallback !== 'object' ||
+		Array.isArray(fallback) ||
+		Object.keys(fallback).sort().join() !==
+			'explicit_environment_relay,pac_selected_relay_failure,route,stages' ||
+		fallback.route !== 'direct' ||
+		fallback.explicit_environment_relay !== 'no_fallback' ||
+		fallback.pac_selected_relay_failure !== 'no_fallback' ||
+		!Array.isArray(fallback.stages) ||
+		fallback.stages.length === 0 ||
+		new Set(fallback.stages).size !== fallback.stages.length ||
+		fallback.stages.some((stage) => !knownStages.has(stage))
+	)
+		throw new Error('Invalid PAC-unavailable fallback policy.');
 	const fields = [
 		'schema_version',
 		'maximum_metadata_bytes',
@@ -152,6 +173,7 @@ function render(bootstrapBytes, proxyBytes) {
 		`\tstatic let pacSourceEncodings = ${literal(source.encodings)}\n` +
 		`\tstatic let pacSourceStrictDecoding = ${source.strict_decoding}\n` +
 		`\tstatic let pacSourceForbidsDowngrade = ${source.forbid_https_downgrade}\n` +
+		`\tstatic let pacUnavailableFallbackStages: Set<String> = ${literal(fallback.stages)}\n` +
 		'}\n'
 	);
 }

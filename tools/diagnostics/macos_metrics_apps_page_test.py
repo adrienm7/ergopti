@@ -216,20 +216,9 @@ class MetricsAppsPageControls(unittest.TestCase):
         repo = self.root / "repo"
         page = repo / probe.PAGE
         page.parent.mkdir(parents=True)
-        scripts = [
-            "../vendor/chart.umd.js",
-            "../host_bridge.js",
-            "../dom_utils.js",
-            "../i18n.js",
-            "../metrics_rebuild_banner.js",
-            "../metrics_freshness.js",
-            "../_generated/metrics_general_category_aliases.js",
-            "helpers.js",
-            "state.js",
-            "main.js",
-            "charts.js",
-            "modal.js",
-        ]
+        # The probe's ordered census is the one admission contract; the actual
+        # page test below proves it still matches the shipped HTML.
+        scripts = list(probe.PAGE_SCRIPTS)
         page.write_text(
             "".join(f'<script src="{name}"></script>' for name in scripts)
             + '<link rel="stylesheet" href="style.css">'
@@ -450,6 +439,16 @@ class MetricsAppsPageControls(unittest.TestCase):
             with self.subTest(page=changed), self.assertRaises(ValueError):
                 probe.source_identity(repo)
         page.write_text(declared)
+
+    def test_actual_repository_page_is_admitted(self):
+        # The fixture above is a copy; the census must also hold for the real page,
+        # which gained the generated category aliases in 81635a815a.
+        repo = Path(__file__).resolve().parents[2]
+        sources, digest = probe.source_identity(repo)
+        self.assertEqual(len(digest), 64)
+        self.assertTrue(
+            any(name.endswith("metrics_general_category_aliases.js") for name in sources)
+        )
 
     def test_missing_or_remote_asset_cannot_be_accepted(self):
         repo = self.source_fixture()

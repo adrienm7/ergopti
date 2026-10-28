@@ -2,11 +2,12 @@
 -- Native level selection never turns an action or a dead state into text.
 
 local Policy = require("layout.number_row_policy")
+local Timings = require("infra.timings")
 local utf8_lib = (type(utf8) == "table" and type(utf8.len) == "function") and utf8 or require("compat.utf8")
 local M = {}
 M.POSITIONS = 10
 M.LEVELS = 40
-M.MAX_TEXT_BYTES = 1024
+M.MAX_TEXT_BYTES = Timings.count("limits", "number_row_level_text_bytes")
 
 local function integer(value, maximum)
 	return type(value) == "number" and value >= 0 and value <= maximum and value % 1 == 0

@@ -80,17 +80,17 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 	helpers.it("keeps Ctrl+Space native on a fresh install", function()
 		local observed = with_subject({}, function(subject)
 			helpers.assert_eq(subject.start(), true, "the shipped bindings must start")
-			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "none",
+			helpers.assert_eq(subject.get_action("secondary_space"), "none",
 				"the neutral manifest default must be the live choice")
 		end)
 		helpers.assert_eq(#observed.bound, 0, "no absent shortcut may acquire a native owner")
 	end)
 
 	helpers.it("binds an explicitly saved Ctrl+Space action", function()
-		local observed = with_subject({ ["hs_ctrl_space"] = "llm_generate_prediction" },
+		local observed = with_subject({ ["secondary_space"] = "llm_generate_prediction" },
 			function(subject)
 				helpers.assert_eq(subject.start(), true)
-				helpers.assert_eq(subject.get_action("hs_ctrl_space"), "llm_generate_prediction")
+				helpers.assert_eq(subject.get_action("secondary_space"), "llm_generate_prediction")
 			end)
 		helpers.assert_eq(#observed.bound, 1, "the explicitly assigned chord owns a native hotkey")
 		helpers.assert_true(tostring(observed.bound[1]):lower():find("space", 1, true) ~= nil,
@@ -98,27 +98,27 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 	end)
 
 	helpers.it("keeps a binding the user cleared cleared after a restart", function()
-		local store = { ["hs_ctrl_space"] = "none" }
+		local store = { ["secondary_space"] = "none" }
 		local observed = with_subject(store, function(subject)
 			helpers.assert_eq(subject.start(), true)
-			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "none",
+			helpers.assert_eq(subject.get_action("secondary_space"), "none",
 				"a stored 'none' must override the manifest default")
 		end)
 		helpers.assert_eq(#observed.bound, 0, "a cleared slot must not own a native hotkey")
 	end)
 
 	helpers.it("clears an explicit assignment and keeps it native after reload", function()
-		local store = { ["hs_ctrl_space"] = "llm_generate_prediction" }
+		local store = { ["secondary_space"] = "llm_generate_prediction" }
 		with_subject(store, function(subject)
 			helpers.assert_eq(subject.start(), true)
-			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "llm_generate_prediction")
-			helpers.assert_eq(subject.set_action("hs_ctrl_space", "none"), true)
+			helpers.assert_eq(subject.get_action("secondary_space"), "llm_generate_prediction")
+			helpers.assert_eq(subject.set_action("secondary_space", "none"), true)
 		end)
-		helpers.assert_eq(store["hs_ctrl_space"], "none",
+		helpers.assert_eq(store["secondary_space"], "none",
 			"choosing None persists explicit personal intent across reload")
 		local restarted = with_subject(store, function(subject)
 			helpers.assert_eq(subject.start(), true)
-			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "none")
+			helpers.assert_eq(subject.get_action("secondary_space"), "none")
 		end)
 		helpers.assert_eq(#restarted.bound, 0, "the cleared shortcut remains native after reload")
 	end)

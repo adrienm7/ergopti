@@ -68,6 +68,49 @@ function M.run(helpers)
 			helpers.assert_eq(select(2, Home.isolate(env)), false, "TMPDIR counts as a temporary root")
 		end)
 
+		helpers.it("Lua home: a shell child of an interpreter that cannot setenv gets the scratch home", function()
+			local env = environment({ HOME = "/home/someone", XDG_DATA_HOME = "/home/someone/.local/share",
+				XDG_STATE_HOME = "/tmp/own-state" })
+			local seen = {}
+			env.popen = function(command, mode) seen[#seen + 1] = { command = command, mode = mode }; return "handle" end
+			env.execute = function(command) seen[#seen + 1] = { command = command }; return true end
+			local home = Home.isolate(env)
+			helpers.assert_eq(env.popen("echo $HOME", "r"), "handle")
+			local command = seen[1].command
+			helpers.assert_eq(seen[1].mode, "r", "the mode passes through")
+			helpers.assert_true(command:find("export HOME='" .. home .. "'; ", 1, true) == 1,
+				"the child must start with the scratch HOME: " .. command)
+			helpers.assert_true(command:find("unset XDG_CACHE_HOME XDG_CONFIG_HOME XDG_DATA_HOME; ", 1, true) ~= nil,
+				"a real or unset XDG directory is hidden from the child")
+			helpers.assert_true(command:find("XDG_STATE_HOME", 1, true) == nil, "a scratch XDG directory stays visible")
+			helpers.assert_true(command:sub(-#"echo $HOME") == "echo $HOME", "the command itself is unchanged")
+			env.execute("true")
+			helpers.assert_true(seen[2].command:find("export HOME=", 1, true) == 1, "os.execute is wrapped too")
+			env.execute()
+			helpers.assert_eq(#seen, 3)
+			helpers.assert_nil(seen[3].command, "the shell probe os.execute() stays a bare probe")
+			env.exit(0)
+		end)
+
+		helpers.it("Lua home: a child interpreter that exports its environment is not wrapped", function()
+			local env = environment({ HOME = "/home/someone" })
+			local seen
+			env.popen = function(command) seen = command end
+			env.execute = function() end
+			env.exports_environment = true
+			Home.isolate(env)
+			env.popen("echo $HOME")
+			helpers.assert_eq(seen, "echo $HOME")
+			env.exit(0)
+		end)
+
+		helpers.it("Lua home: a shell child sees the scratch home, never the account's", function()
+			local pipe = assert(io.popen("printf %s \"$HOME\"", "r"))
+			local child_home = pipe:read("*a")
+			pipe:close()
+			helpers.assert_eq(child_home, os.getenv("HOME"), "io.popen must inherit the runner's HOME")
+		end)
+
 		helpers.it("Lua home: the runner itself resolves a scratch home, never the account's own", function()
 			helpers.assert_true(Home.is_scratch(os.getenv("HOME"), os.getenv),
 				"tests/run.lua must isolate HOME before loading any test: " .. tostring(os.getenv("HOME")))

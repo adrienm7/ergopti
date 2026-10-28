@@ -39,6 +39,10 @@ local function deps(overrides)
 		end,
 		has_command = function() return false end,
 		feed_url = function() return FEED_URL end,
+		ollama_origins = function()
+			return { "https://registry.ollama.ai", "https://blob.ollama.example" }
+		end,
+		selection = function(receipt) return require("infra.proxy_policy").load().selection(receipt) end,
 		lookup = function(url, options, callback)
 			calls.lookups[#calls.lookups + 1] = { url = url, options = options }
 			callback({ ok = true, proxies = { "direct://" } })
@@ -84,7 +88,10 @@ helpers.describe("network field check: the shared steps", function()
 		})
 		local order = {}
 		for _, step in ipairs(result.steps) do order[#order + 1] = step.id end
-		helpers.assert_eq(order, Shared.STEP_IDS)
+		local expected = {}
+		for _, id in ipairs(Shared.STEP_IDS) do expected[#expected + 1] = id end
+		for _, id in ipairs(Shared.PLAN_STEPS) do expected[#expected + 1] = id end
+		helpers.assert_eq(order, expected, "the Windows list, then the macOS and Linux route plan")
 		helpers.assert_true(result.passed)
 	end)
 
@@ -181,6 +188,60 @@ helpers.describe("network field check: the Linux ports", function()
 		helpers.assert_eq(#calls.requests, 1, "the request runs after a refused lookup")
 		local refused = run({ lookup = function() return nil, "proxy-owner-busy" end })
 		helpers.assert_eq(refused.route_lookup.value, "proxy-owner-busy", "a dispatch refusal is a closed name too")
+	end)
+
+	helpers.it("(linux-network-check) shows which route each Ollama origin takes without naming an address", function()
+		local relay = "http://secret-proxy.corp.example:3128"
+		local function answers(by_origin)
+			return { lookup = function(url, _, callback)
+				if url == FEED_URL then callback({ ok = true, proxies = { "direct://" } }); return {} end
+				callback(by_origin[url]())
+				return {}
+			end }
+		end
+		local direct = run(answers({
+			["https://registry.ollama.ai"] = function() return { ok = true, proxies = { "direct://" } } end,
+			["https://blob.ollama.example"] = function() return { ok = true, proxies = { "direct://" } } end,
+		}))
+		helpers.assert_eq(direct.route_plan.state, "info")
+		helpers.assert_eq(direct.route_plan.value, "registry:direct+blob:direct")
+		local mixed, result = run(answers({
+			["https://registry.ollama.ai"] = function() return { ok = true, proxies = { relay } } end,
+			["https://blob.ollama.example"] = function() return { ok = true, proxies = { "direct://" } } end,
+		}))
+		helpers.assert_eq(mixed.route_plan.value, "registry:relay+blob:direct")
+		helpers.assert_true(result.passed)
+		helpers.assert_true(not tostring(mixed.route_plan.value):find("secret", 1, true), "no relay address in the report")
+	end)
+
+	helpers.it("(linux-network-check) names as many Ollama origins as the shared inventory holds", function()
+		local origins = assert(require("infra.route_origins").client("ollama"))
+		helpers.assert_eq(#origins, #Shared.OLLAMA_ORIGIN_TOKENS)
+	end)
+
+	helpers.it("(linux-network-check) fails the route plan with the closed reason that would stop the daemon", function()
+		local function two_relays(url, _, callback)
+			if url == FEED_URL then callback({ ok = true, proxies = { "direct://" } }); return {} end
+			callback({ ok = true, proxies = { url:find("registry", 1, true) and "http://a.example:3128" or "http://b.example:3128" } })
+			return {}
+		end
+		local conflict, result = run({ lookup = two_relays })
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(conflict.route_plan.state, "fail")
+		helpers.assert_eq(conflict.route_plan.value, "route-plan-conflict")
+		local failed = run({ lookup = function(url, _, callback)
+			if url == FEED_URL then callback({ ok = true, proxies = { "direct://" } }) else callback({ ok = false, error = "proxy-native-failed" }) end
+			return {}
+		end })
+		helpers.assert_eq(failed.route_plan.state, "fail")
+		helpers.assert_eq(failed.route_plan.value, "proxy-native-failed")
+		local refused = run({ lookup = function(url, _, callback)
+			if url == FEED_URL then callback({ ok = true, proxies = { "direct://" } }); return {} end
+			return nil, "proxy-owner-busy"
+		end })
+		helpers.assert_eq(refused.route_plan.value, "proxy-owner-busy")
+		local unreadable = run({ ollama_origins = function() return nil, "route-origins-invalid" end })
+		helpers.assert_eq(unreadable.route_plan.value, "route-origins-unavailable")
 	end)
 
 	helpers.it("(linux-network-check) turns each request failure into a closed token", function()
@@ -295,9 +356,10 @@ helpers.describe("network field check window (Linux)", function()
 		with_window(Ports.new((deps())), function(Window, world)
 			helpers.assert_true(Window.run(world.services))
 			helpers.assert_eq(#world.evidence, 1)
-			helpers.assert_eq(world.evidence[1], "Network check result: check=network verdict=pass steps=7 "
+			helpers.assert_eq(world.evidence[1], "Network check result: check=network verdict=pass steps=8 "
 				.. "proxy_settings=info:none pac_download=skip:no_pac pac_script=skip:no_pac "
-				.. "route_lookup=pass:selected_direct tls=pass:trusted transfer=pass:http_200 digest=skip:get_only")
+				.. "route_lookup=pass:selected_direct tls=pass:trusted transfer=pass:http_200 digest=skip:get_only "
+				.. "route_plan=info:registry:direct+blob:direct")
 			helpers.assert_eq(#world.dialogs, 0, "the dialog opens from a fresh turn of the loop")
 			world.flush()
 			helpers.assert_eq(world.dialogs[1].title, "[menu.debug.field_check_network]")

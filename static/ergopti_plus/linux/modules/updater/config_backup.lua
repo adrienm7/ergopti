@@ -15,9 +15,9 @@
 ---    from the config_backup block of _shared/modules/updater/defaults.json.
 --- 2. Exact bytes: copies are created and restored through toml_codec.writer's
 ---    classified read and compare-and-publish, never through a plain write.
---- 3. A link to a folder is neither followed nor copied (following it could
----    loop), and only a regular file is read: a FIFO, a socket or a device node
----    is "other", because opening one can block forever.
+--- 3. Native directory entries preserve every filename byte. Links to folders
+---    are not traversed, and special endpoints are never opened. Proven dangling
+---    links are omitted; other target metadata failures refuse the backup.
 --- ==============================================================================
 
 local M = {}
@@ -30,6 +30,7 @@ local Shell       = require("adapters.shell_runner")
 local NativeDirectory = require("infra.native_directory")
 local Writer      = require("toml_codec.writer")
 local Binding     = require("updater.config_backup_binding")
+local ErrorDescription = require("error_description")
 
 local LOG = "modules.updater.config_backup"
 
@@ -75,11 +76,11 @@ local function list(dir)
 	local target, message, code = NativeDirectory.target_kind(dir)
 	if target == nil then
 		if code == "ENOENT" then return nil, "absent" end
-		return nil, tostring(message)
+		return nil, ErrorDescription.describe(message or code)
 	end
 	if target ~= "directory" then return nil, "not a folder" end
 	local listed, list_message = NativeDirectory.entries(dir)
-	if not listed then return nil, tostring(list_message or "cannot list") end
+	if not listed then return nil, ErrorDescription.describe(list_message or "cannot list") end
 	local entries = {}
 	for _, entry in ipairs(listed) do
 		local kind, refusal = classify(NativeDirectory.join(dir, entry.name), entry.kind)

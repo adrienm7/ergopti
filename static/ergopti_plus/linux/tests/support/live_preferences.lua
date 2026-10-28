@@ -27,7 +27,7 @@ function M.daemon()
 	-- without it the daemon holds the chord back as it does during a pause.
 	if os.getenv("ERGOPTI_LIVE_LLM_PORT") then
 		config = config .. "\n[shortcuts]\nenabled = true\n"
-			.. "\n[shortcuts.keyboard]\nsuper_space = \"llm_predict_rewrite\"\n"
+			.. "\n[shortcuts.keyboard]\nmeta_space = \"llm_predict_rewrite\"\n"
 	end
 	assert(Files.write(Paths.config("config.toml"), config), "live configuration must be created")
 	local Hotstrings = require("modules.hotstrings.hotstrings_config")

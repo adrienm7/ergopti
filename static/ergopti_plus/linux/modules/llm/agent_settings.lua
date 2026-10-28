@@ -37,6 +37,7 @@ local Json = require("json")
 local Vision = require("llm.vision")
 local Agent = require("llm.agent")
 local Manifest = require("infra.manifest_reader")
+local ConfigKeys = require("config_keys")
 
 local LOG = "modules.llm.agent_settings"
 
@@ -44,11 +45,11 @@ local LOG = "modules.llm.agent_settings"
 local CONFIG_FILE = "modules/llm/agent.json"
 
 -- The setting of each system
-M.SYSTEM_PATHS = { system1 = "llm.agent_system1", system2 = "llm.agent_system2" }
+M.SYSTEM_PATHS = { system1 = ConfigKeys.KEY.LLM_AGENT_SYSTEM1, system2 = ConfigKeys.KEY.LLM_AGENT_SYSTEM2 }
 -- What each system asks of a provider (api_remote.serves)
 local SYSTEM_USES = { system1 = "system1", system2 = "chat" }
-local MODE_PATH = "llm.agent_mode"
-local DISABLED_APPS_PATH = "llm.agent_disabled_apps"
+local MODE_PATH = ConfigKeys.KEY.LLM_AGENT_MODE
+local DISABLED_APPS_PATH = ConfigKeys.KEY.LLM_AGENT_DISABLED_APPS
 
 -- The agent's modes, in menu order
 M.MODES = { "off", "action", "auto" }

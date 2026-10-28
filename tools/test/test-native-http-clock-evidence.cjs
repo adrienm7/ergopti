@@ -161,6 +161,64 @@ const OWNERS = [
 ];
 const RECEIVER = 'static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py';
 const INPUTS = [...SWIFT, ...HEADERS, ...RUNTIME, ...OWNERS, RECEIVER];
+const DIAGNOSTIC_FILE_LIMIT = 4096;
+const DIAGNOSTIC_TOTAL_LIMIT = 16384;
+/**
+ * Bounded text of the small diagnostic files a failed run leaves behind.
+ * A control tree can hold hundreds of megabytes of copied sources; only
+ * JSON and log files under the file limit are quoted, up to the total limit.
+ */
+function diagnosticDigest(directory) {
+	const lines = [];
+	let total = 0;
+	const walk = (current) => {
+		for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+			const full = path.join(current, entry.name);
+			if (entry.isDirectory()) walk(full);
+			else if (entry.isFile() && /\.(json|log|txt)$/.test(entry.name)) {
+				const size = fs.statSync(full).size;
+				if (size > DIAGNOSTIC_FILE_LIMIT || total + size > DIAGNOSTIC_TOTAL_LIMIT) continue;
+				total += size;
+				lines.push(`--- ${path.relative(directory, full)}\n${fs.readFileSync(full, 'utf8')}`);
+			}
+		}
+	};
+	walk(directory);
+	return lines.join('\n');
+}
+/**
+ * Removes the control tree whatever the outcome. A failed run keeps its
+ * bounded digest in the message instead of the tree itself, since a retained
+ * tree of this size filled the disk of the shared host twice.
+ * @returns {string} The failure message, empty after a complete run.
+ */
+function retireTemporary(directory, completed) {
+	const digest = completed ? '' : diagnosticDigest(directory);
+	fs.rmSync(directory, { recursive: true, force: true });
+	return completed
+		? ''
+		: `Clock controls failed; ${directory} removed. Small diagnostic files:\n${digest}\n`;
+}
+const forcedFailure = process.env.ERGOPTI_CLOCK_EVIDENCE_FORCE_FAILURE === '1';
+if (!forcedFailure) {
+	// Self-test of the cleanup: a forced failure leaves no directory and keeps its digest.
+	const probe = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'ergopti-clock-receive-'));
+	fs.writeFileSync(path.join(probe, 'verdict.json'), '{"probe":"kept-in-message"}\n');
+	fs.writeFileSync(path.join(probe, 'large.json'), 'x'.repeat(DIAGNOSTIC_FILE_LIMIT + 1));
+	const message = retireTemporary(probe, false);
+	assert.equal(fs.existsSync(probe), false, 'A failed run must not retain its directory.');
+	assert.match(message, /kept-in-message/);
+	assert.doesNotMatch(message, /xxxx/);
+	const forced = childProcess.spawnSync(process.execPath, [__filename], {
+		encoding: 'utf8',
+		env: { ...process.env, ERGOPTI_CLOCK_EVIDENCE_FORCE_FAILURE: '1' }
+	});
+	assert.notEqual(forced.status, 0, 'The forced failure must fail the run.');
+	const named = /Clock controls failed; (\S+) removed/.exec(forced.stderr);
+	assert.ok(named, 'The failure must name the removed directory: ' + forced.stderr);
+	assert.equal(fs.existsSync(named[1]), false, 'The forced failure retained its directory.');
+	assert.match(forced.stderr, /forced-failure-probe/);
+}
 const temporary = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'ergopti-clock-receive-'));
 let received = 0;
 function control(name, body) {
@@ -294,10 +352,10 @@ function modeledPayload() {
 }
 const { execFileSync } = require('node:child_process');
 const repository = path.resolve(__dirname, '../..');
-function git(root, args, input) {
+function git(root, args, input, stdio = 'pipe') {
 	return execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], {
 		cwd: root,
-		stdio: 'pipe',
+		stdio,
 		input
 	});
 }
@@ -566,6 +624,10 @@ exit "$CLOCK_MODEL_CAPTURE_STATUS"
 	};
 }
 try {
+	if (forcedFailure) {
+		fs.writeFileSync(path.join(temporary, 'probe.json'), '{"probe":"forced-failure-probe"}\n');
+		throw new Error('Forced failure after the control tree exists.');
+	}
 	control('complete fixed independently modeled closure preserves explicit limits', () => {
 		assert.deepEqual(evidence.INPUTS, INPUTS);
 		const vector = modeledPayload(),
@@ -1009,7 +1071,44 @@ try {
 			if (previousGlobalConfig === undefined) delete process.env.GIT_CONFIG_GLOBAL;
 			else process.env.GIT_CONFIG_GLOBAL = previousGlobalConfig;
 		}
+		const oid = git(fixture.root, ['rev-parse', `${fixture.epoch.candidate}:${SWIFT[0]}`])
+			.toString()
+			.trim();
+		const loose = path.join(fixture.root, '.git/objects', oid.slice(0, 2), oid.slice(2));
+		git(fixture.root, ['repack', '-ad']);
+		assert.equal(fs.existsSync(loose), false, 'The packed source control must own no loose copy.');
+		const packedReceipt = evidence.sourceReceipt(fixture.root, fixture.epoch);
+
+		// Fresh commits need not write loose blobs. Receive the actual Git graph
+		// into a private loose store before testing exact object loss and corruption.
+		const archive = path.join(temporary, 'committed-source-objects.pack');
+		const packOutput = fs.openSync(archive, 'wx');
+		try {
+			git(fixture.root, ['pack-objects', '--revs', '--all', '--stdout'], undefined, [
+				'ignore',
+				packOutput,
+				'pipe'
+			]);
+		} finally {
+			fs.closeSync(packOutput);
+		}
+		const objects = path.join(fixture.root, '.git/objects');
+		const retained = fs.mkdtempSync(path.join(temporary, 'packed-source-objects-'));
+		fs.renameSync(objects, path.join(retained, 'objects'));
+		fs.mkdirSync(objects);
+		const packInput = fs.openSync(archive, 'r');
+		try {
+			git(fixture.root, ['unpack-objects', '--strict'], undefined, [packInput, 'pipe', 'pipe']);
+		} finally {
+			fs.closeSync(packInput);
+		}
+		assert.ok(fs.statSync(loose).isFile(), 'The corruption control must own its exact loose blob.');
 		const receipt = evidence.sourceReceipt(fixture.root, fixture.epoch);
+		assert.deepEqual(
+			receipt,
+			packedReceipt,
+			'Git object storage must not change source authority.'
+		);
 		const originalSource = structuredClone(receipt);
 		assert.deepEqual(
 			withNativeGit(() => evidence.sourceReceipt(fixture.root, fixture.epoch)),
@@ -1054,10 +1153,6 @@ try {
 			originalSource,
 			'Real unpacking must preserve the complete source receipt before one blob is mutated.'
 		);
-		const oid = git(fixture.root, ['rev-parse', `${fixture.epoch.candidate}:${SWIFT[0]}`])
-			.toString()
-			.trim();
-		const loose = path.join(fixture.root, '.git/objects', oid.slice(0, 2), oid.slice(2));
 		const objectBytes = fs.readFileSync(loose),
 			objectMode = fs.statSync(loose).mode;
 		const heldObject = path.join(temporary, 'held-committed-source-object');
@@ -1461,6 +1556,6 @@ try {
 	assert.equal(received, 32, 'Every fixed independently authored control must execute.');
 	process.stdout.write('CLOCK_RECEIVER controls=32 native=false official=false\n');
 } finally {
-	if (received === 32) fs.rmSync(temporary, { recursive: true, force: true });
-	else process.stderr.write('Retained failed clock controls: ' + temporary + '\n');
+	const failure = retireTemporary(temporary, received === 32);
+	if (failure) process.stderr.write(failure);
 }

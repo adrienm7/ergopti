@@ -49,7 +49,6 @@ local PLATFORM = "hs"
 --- only so a missing/corrupt manifest still yields a correctly-greyed menu.
 --- false = stays usable while OFF (configure before enabling); true = greyed while OFF.
 local FALLBACK_GREYS_WHEN_OFF = {
-	llm_backend             = false,
 	llm_model               = false,
 	llm_profile             = true,
 	llm_trigger             = true,
@@ -61,7 +60,6 @@ local FALLBACK_GREYS_WHEN_OFF = {
 --- Built-in fallback — mirrors which row carries the backend-health dot. Same
 --- role as FALLBACK_GREYS_WHEN_OFF above, and pinned the same way.
 local FALLBACK_HEALTH_DOT = {
-	llm_backend             = false,
 	llm_model               = true,
 	llm_profile             = false,
 	llm_trigger             = false,
@@ -71,15 +69,7 @@ local FALLBACK_HEALTH_DOT = {
 }
 
 --- Built-in fallback row ORDER — the order the two tables above cannot express.
-local FALLBACK_ROW_ORDER = {
-	"llm_backend",
-	"llm_model",
-	"llm_profile",
-	"llm_trigger",
-	"llm_generation_settings",
-	"llm_display",
-	"llm_navigation",
-}
+local FALLBACK_ROW_ORDER = require("menu.row_order").list("llm_menu_rows")
 
 -- Map of row id -> disabled_when_off (bool). nil until first load.
 local _policy = nil

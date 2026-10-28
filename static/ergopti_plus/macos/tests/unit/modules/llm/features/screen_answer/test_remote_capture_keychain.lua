@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local PortFakes = require("tests.support.port_fakes")
 local Json = require("json")
 
 -- Keep the process-wide shared logger identity outside native fixture scopes.
@@ -64,10 +65,9 @@ local function with_capture(callback)
 		package.loaded["adapters.mouse_control"] = {
 			screen_frame_under_cursor = function() return { x = 0, y = 0, w = 640, h = 480 } end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
-			cancel = function() return true end,
+		package.loaded["adapters.timer_scheduler"] = PortFakes.timer_scheduler({
 			now = function() return 0 end,
-		}
+		})
 		package.loaded["modules.llm"] = {
 			DEFAULT_STATE = { llm_enabled = true, llm_min_words = 1, llm_max_words = 0, llm_debounce = 0, llm_min_request_interval = 0 },
 			get_current_model = function() return "text-model" end,
@@ -121,7 +121,7 @@ local function with_capture(callback)
 				return true
 			end,
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["ui.tooltip"] = PortFakes.complete_tooltip({
 			set_navigate_callback = function() end,
 			set_enter_validates = function() end,
 			set_llm_timeout = function() end,
@@ -134,7 +134,7 @@ local function with_capture(callback)
 				return true
 			end,
 			show = function(text) f.notices[#f.notices + 1] = text; return true end,
-		}
+		})
 		local flow = helpers.load_with_stubs("modules.llm.screen_answer")
 		package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 		local remote = require("modules.llm.api_remote")

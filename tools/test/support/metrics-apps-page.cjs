@@ -1,7 +1,7 @@
 /**
  * tools/test/support/metrics-apps-page.cjs
  * ==============================================================================
- * MODULE: Loaded Metrics Apps Page Fixture
+ * MODULE: Loaded Metrics Dashboard Page Fixture
  * DESCRIPTION:
  * Executes every script declared by the real HTML with explicit browser ports.
  * ==============================================================================
@@ -12,17 +12,17 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const page = path.resolve(
-	__dirname,
-	'../../../static/ergopti_plus/_shared/ui/metrics_apps/index.html'
-);
+const uiRoot = path.resolve(__dirname, '../../../static/ergopti_plus/_shared/ui');
+const { themeProperties } = require('./theme-tokens.cjs');
 
 /**
  * Loads the real page declarations; timers, network and canvas remain browser ports.
  * @param {string} host Host transport to expose.
  * @param {function(string, object): void} [afterScript] Read-only observer after each real script.
  */
-function loadMetricsAppsPage(host = 'macos', afterScript) {
+function loadMetricsPage(app, host, afterScript) {
+	const page = path.join(uiRoot, app, 'index.html');
+	const bridge = `${app}_bridge`;
 	const listeners = [];
 	const timers = [];
 	const posts = [];
@@ -124,12 +124,16 @@ function loadMetricsAppsPage(host = 'macos', afterScript) {
 			return timers.length;
 		},
 		cancelAnimationFrame() {},
+		// The theme's custom properties, as the browser answers them for the light look.
+		getComputedStyle() {
+			return { getPropertyValue: (name) => themeProperties().get(name) ?? '' };
+		},
 		fetch() {
 			return Promise.resolve({ ok: false });
 		},
 		webkit: {
 			messageHandlers: {
-				metrics_apps_bridge: {
+				[bridge]: {
 					postMessage(body) {
 						posts.push(body);
 					}
@@ -165,7 +169,42 @@ function loadMetricsAppsPage(host = 'macos', afterScript) {
 		vm.runInContext(code, context, { filename, timeout: 1000 });
 		if (afterScript) afterScript(scripts[scripts.length - 1], context);
 	}
-	return { context, scripts, elements, listeners, timers, posts, diagnostics, messageListeners };
+	return {
+		context,
+		scripts,
+		elements,
+		listeners,
+		timers,
+		posts,
+		diagnostics,
+		messageListeners,
+		html
+	};
 }
 
-module.exports = { loadMetricsAppsPage };
+function loadMetricsAppsPage(host = 'macos', afterScript) {
+	return loadMetricsPage('metrics_apps', host, afterScript);
+}
+
+/** Loads the real typing page; node values and classes come from its HTML. */
+function loadMetricsTypingPage(host = 'macos') {
+	const page = loadMetricsPage('metrics_typing', host);
+	for (const match of page.html.matchAll(/<([a-z][a-z0-9]*)\b([^>]*\bid="([^"]+)"[^>]*)>/gi)) {
+		// Chart drawing remains an optional browser boundary. The SVG calendar
+		// and all text controls are actual production renderers, not replacements.
+		if (match[1] === 'canvas') continue;
+		const node = page.context.document.createElement(match[1]);
+		node.value = match[2].match(/\bvalue="([^"]*)"/)?.[1] || '';
+		const classes = new Set((match[2].match(/\bclass="([^"]*)"/)?.[1] || '').split(/\s+/));
+		node.classList = {
+			contains: (name) => classes.has(name),
+			add: (name) => classes.add(name),
+			remove: (name) => classes.delete(name),
+			toggle: (name) => (classes.has(name) ? classes.delete(name) : classes.add(name))
+		};
+		page.elements.set(match[3], node);
+	}
+	return page;
+}
+
+module.exports = { loadMetricsAppsPage, loadMetricsTypingPage };

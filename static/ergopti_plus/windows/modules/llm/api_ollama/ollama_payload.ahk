@@ -155,10 +155,21 @@ _LLM_Ollama_ParseStreamLine(line) {
 			Result["error"] := "Stream message is missing string content."
 			return Result
 		}
+		; AHK aliases JSON true and numeric one. Preserve the canonical parser's
+		; last decoded member identity before admitting a terminal marker.
+		Done := false
+		if obj.Has("done") {
+			Marker := JsonObjectMemberSpans(line)["done"]["text"]
+			if Marker != "true" && Marker != "false" {
+				Result["error"] := "Stream envelope has a non-Boolean done marker."
+				return Result
+			}
+			Done := Marker == "true"
+		}
 		content := msg["content"]
 		Result["ok"] := true
 		Result["token"] := content
-		Result["done"] := obj.Has("done") && obj["done"] = true
+		Result["done"] := Done
 		return Result
 	} catch as e {
 		Result["error"] := "Malformed stream JSON: " . e.Message
@@ -168,12 +179,19 @@ _LLM_Ollama_ParseStreamLine(line) {
 
 /**
  * Extracts assistant text from a /api/chat JSON reply (non-streaming).
+ * @param {String} raw Original response body.
+ * @param {Boolean} Redact Keep private response bytes out of diagnostics and errors.
+ * @returns {String|Map} Assistant text or a typed failure.
  */
-LLM_ParseOllamaChatResponse(raw) {
+LLM_ParseOllamaChatResponse(raw, Redact := false) {
 	if (raw == "")
 		return ""
 	try obj := JsonParse(raw)
 	catch as e {
+		if Redact {
+			try LoggerError("LLM.ollama", "JSON parse failed in ChatResponse ({1} chars).", StrLen(raw))
+			return Map("error", true, "message", "JSON parse failed.")
+		}
 		err_substr := TextHeadWithinUnits(raw, 200)
 		try LoggerError("LLM.ollama", "JSON parse failed in ChatResponse: {1}. Raw (200c): {2}", e.Message, err_substr)
 		return Map("error", true, "message", "JSON parse failed: " . e.Message)
@@ -182,7 +200,7 @@ LLM_ParseOllamaChatResponse(raw) {
 		return ""
 	if obj.Has("error") {
 		ProviderError := obj["error"]
-		return Map("error", true, "message", ProviderError is String && ProviderError != ""
+		return Map("error", true, "message", !Redact && ProviderError is String && ProviderError != ""
 			? "Ollama error: " . TextHeadWithinUnits(ProviderError, 200) : "Ollama reported an error.")
 	}
 	; A canonical chat message owns an empty result too. Reasoning is not an

@@ -314,4 +314,16 @@ final class ManagedNetworkBootstrapTests: XCTestCase {
 		}
 		XCTAssertThrowsError(try ManagedCertificateAuthorities.load(environment: ["SSL_CERT_FILE": fixture.root.appendingPathComponent("missing.pem").path]))
 	}
+	/// Field run 2026-10-27 19:47 (ledger L41): an inherited CA bundle the loader
+	/// refused stopped every download. A release role drops both names first.
+	func testReleaseRolesDropInheritedTrustVariables() throws {
+		let names = ManagedNetworkBootstrapPolicy.trustEnvironment
+		let saved = names.map { ($0, ProcessInfo.processInfo.environment[$0]) }
+		defer { for (name, value) in saved { if let value { setenv(name, value, 1) } else { unsetenv(name) } } }
+		for name in names { XCTAssertEqual(setenv(name, "/nonexistent/inherited-ca.pem", 1), 0) }
+		XCTAssertThrowsError(try ManagedCertificateAuthorities.load(environment: ProcessInfo.processInfo.environment))
+		XCTAssertTrue(ManagedCertificateAuthorities.dropInheritedTrustVariables())
+		for name in names { XCTAssertNil(ProcessInfo.processInfo.environment[name]) }
+		XCTAssertTrue(try ManagedCertificateAuthorities.load(environment: ProcessInfo.processInfo.environment).isEmpty)
+	}
 }

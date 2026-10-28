@@ -14,6 +14,7 @@ local I18n = require("infra.i18n")
 local ui_builder = require("ui.ui_builder")
 local Logger = require("infra.logger")
 local TimerScheduler = require("adapters.timer_scheduler")
+local ConfigKeys = require("config_keys")
 local active = nil
 
 --- Checks the native window constructor and declared geometry without input capture.
@@ -230,7 +231,7 @@ function M.open(options)
 		return called and accepted ~= false and current()
 	end
 	local window_constructed, window = pcall(function()
-		return Window.new({model=model,catalogue=gestures,parameter_section="gestures.action_parameters",
+		return Window.new({model=model,catalogue=gestures,parameter_section=ConfigKeys.KEY.GESTURES_ACTION_PARAMETERS,
 			positions=positions,translate=I18n.get,label=gestures.get_action_label,page_current=current,send=send,
 				position_field="hs",position_available=available_position,
 				capture_position=function(guard, receive)

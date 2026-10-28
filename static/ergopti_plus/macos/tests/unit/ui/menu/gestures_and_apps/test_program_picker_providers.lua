@@ -69,7 +69,7 @@ local function with_provider(kind, options, body)
 		llm_vision_choices = function() return {} end,
 		llm_language_choices = function() return {} end,
 	}
-	local binding = kind == "keyboard" and "keyboard__cmd_1" or kind == "tap" and "tap_key__number_row_left" or "script__script_altgr_enter"
+	local binding = kind == "keyboard" and "keyboard__primary_1" or kind == "tap" and "tap_key__number_row_left" or "script__script_altgr_enter"
 	local picker_callback, rows, state
 	local ok, failure = xpcall(function()
 		package.loaded["infra.i18n"] = { get = function(key) return key end,
@@ -110,8 +110,8 @@ local function with_provider(kind, options, body)
 		}
 		package.loaded["modules.shortcuts"] = {
 			DEFAULT_STATE = { shortcuts = true },
-			get_keyboard_slot_groups = function() return { { prefix = "cmd_", fixed = true } } end,
-			assigned_keyboard_slots = function() return { { id = "cmd_1", action = fixture.action } } end,
+			get_keyboard_slot_groups = function() return { { prefix = "primary_", fixed = true } } end,
+			assigned_keyboard_slots = function() return { { id = "primary_1", action = fixture.action } } end,
 			get_keyboard_action = function() return fixture.action end, set_keyboard_action = set_action,
 			keyboard_binding_id = function(id) return "keyboard__" .. id end,
 			get_keyboard_slot_label = function(id) return id end,
@@ -177,7 +177,7 @@ local function with_provider(kind, options, body)
 end
 
 for _, kind in ipairs({ "keyboard", "tap", "script" }) do
-	local binding = kind == "keyboard" and "keyboard__cmd_1" or kind == "tap" and "tap_key__number_row_left" or "script__script_altgr_enter"
+	local binding = kind == "keyboard" and "keyboard__primary_1" or kind == "tap" and "tap_key__number_row_left" or "script__script_altgr_enter"
 	helpers.describe("program transaction through actual " .. kind .. " provider", function()
 		for _, stage in ipairs({ "parameter", "assign", "save" }) do
 			for _, mode in ipairs({ "false", "nil", "throw" }) do
@@ -318,7 +318,7 @@ end
 
 
 for _, kind in ipairs({ "keyboard", "tap", "script" }) do
-	local binding = kind == "keyboard" and "keyboard__cmd_1" or kind == "tap" and "tap_key__number_row_left" or "script__script_altgr_enter"
+	local binding = kind == "keyboard" and "keyboard__primary_1" or kind == "tap" and "tap_key__number_row_left" or "script__script_altgr_enter"
 	helpers.describe("non-program transaction through actual " .. kind .. " provider", function()
 		for _, stage in ipairs({ "parameter", "assign", "save" }) do
 			for _, mode in ipairs({ "false", "nil", "throw" }) do

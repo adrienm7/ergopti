@@ -1,11 +1,17 @@
 """SQLite startup must classify native files without waiting on special paths."""
 
+import argparse
 import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
+
+
+NATIVE_RUNTIME = None
+NATIVE_CPATH = None
 
 
 PROBE = """
@@ -75,10 +81,12 @@ class SqliteFileAdmissionTests(unittest.TestCase):
         script = root / "probe.lua"
         script.write_text(PROBE, encoding="utf-8")
         environment = dict(os.environ)
-        # A LuaJIT runner exports its 5.1 module paths to children. Each native
-        # ABI must use its own loader defaults instead of that inherited ABI.
+        # A suite row supplies its exact interpreter and admitted native ABI.
+        # Standalone cross-ABI runs must not lend one runtime's paths to another.
         environment.pop("LUA_PATH", None)
         environment.pop("LUA_CPATH", None)
+        if NATIVE_RUNTIME is not None and os.path.samefile(runtime, NATIVE_RUNTIME):
+            environment["LUA_CPATH"] = NATIVE_CPATH
         return subprocess.run(
             [runtime, str(script), mode, str(database), str(resource), str(driver)],
             env=environment,
@@ -89,7 +97,11 @@ class SqliteFileAdmissionTests(unittest.TestCase):
         )
 
     def test_native_startup_admission_and_recovery(self):
-        for runtime_name in ("luajit", "lua5.4"):
+        # A suite row replays only the interpreter it runs on: the distribution
+        # and Ubuntu integration rows install no lua5.4. Run standalone, as the
+        # platform-metrics E2E shard does, the file covers both ABIs.
+        runtimes = (NATIVE_RUNTIME,) if NATIVE_RUNTIME is not None else ("luajit", "lua5.4")
+        for runtime_name in runtimes:
             runtime = shutil.which(runtime_name)
             self.assertIsNotNone(runtime, "Native file admission requires " + runtime_name)
             for mode in (
@@ -112,7 +124,20 @@ class SqliteFileAdmissionTests(unittest.TestCase):
                         "native admission" if mode in ("absent", "empty") else "classified refusal"
                     )
                     self.assertIn(expected, result.stdout)
+                    print(
+                        f"Native SQLite admission: runtime={runtime_name} mode={mode}", flush=True
+                    )
 
 
 if __name__ == "__main__":
-    unittest.main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--runtime", help="Exact interpreter admitted by the calling suite row")
+    parser.add_argument("--cpath", help="Native module search path admitted for that interpreter")
+    arguments, remaining = parser.parse_known_args()
+    if (arguments.runtime is None) != (arguments.cpath is None):
+        parser.error("--runtime and --cpath must be supplied together")
+    NATIVE_RUNTIME = shutil.which(arguments.runtime) if arguments.runtime is not None else None
+    if arguments.runtime is not None and NATIVE_RUNTIME is None:
+        parser.error("the admitted native runtime must be executable")
+    NATIVE_CPATH = arguments.cpath
+    unittest.main(argv=[sys.argv[0], *remaining])

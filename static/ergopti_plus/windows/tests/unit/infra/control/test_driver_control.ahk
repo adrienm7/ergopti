@@ -137,7 +137,7 @@ _TDC_SessionPublishes() {
 	Body(World) {
 		World.Session.Start()
 		AssertEqual('{"schema":1,"driver":"windows","pid":1000,"token":"' . World.Token . '"}`n', _TDC_Read(World, "session"))
-		AssertEqual(1, World.Started, "the endpoint is rung only after the session exists")
+		AssertEqual(1, World.Started, "the endpoint is activated exactly once")
 		AssertTrue(HasMethod(World.Endpoint, "Call"), "the endpoint runs the session's own handler")
 		AssertThrows(() => World.Session.Start(), "a second start is refused")
 		World.Session.Stop()
@@ -145,7 +145,7 @@ _TDC_SessionPublishes() {
 		AssertFalse(FileExist(World.Folder . "\session.json"), "the session withdraws its own file")
 	}
 }
-Test("driver-control: a session publishes its token, then rings its endpoint", _TDC_SessionPublishes)
+Test("driver-control: a session publishes its token for an active endpoint", _TDC_SessionPublishes)
 
 _TDC_AuthenticatedRequest() {
 	_TDC_World(Body)
@@ -298,3 +298,275 @@ _TDC_MenuReloadRefusalIsReported() {
 }
 Test("driver-control: a tray-origin reload refusal settles its joined request (control-joined-refusal)",
 	_TDC_MenuReloadRefusalIsReported)
+
+
+_TDCR_RetireDuringStart(Phase) {
+	_TDC_World(_TDCR_RetireDuringStartBody.Bind(Phase))
+}
+
+_TDCR_RetireDuringStartBody(Phase, World) {
+	State := {Phase: Phase, World: World, FactoryCalls: 0, StartCalls: 0,
+		StopCalls: 0, RetiredInPort: false}
+	World.Session.Ports["token"] := _TDCR_Token.Bind(State)
+	World.Session.Ports["endpoint"] := _TDCR_Endpoint.Bind(State)
+	Failure := 0
+	try World.Session.Start()
+	catch Any as Err
+		Failure := Err
+	AssertTrue(State.RetiredInPort, "the genuine session must be stopped while its startup collaborator is running")
+	AssertFalse(World.Session.Active, "startup cannot publish an active session after its exact owner retired")
+	AssertFalse(FileExist(World.Session.Path("session")),
+		"startup cannot republish its withdrawn session token after retirement")
+	AssertEqual(Phase == "token" ? 0 : 1, State.FactoryCalls,
+		"retirement fences later startup phases")
+	AssertEqual(Phase == "start" ? 1 : 0, State.StartCalls,
+		"a late endpoint factory cannot start its native listener after retirement")
+	AssertTrue(IsObject(Failure), "retired startup must fail fast instead of reporting a completed start")
+}
+
+_TDCR_Stop(State) {
+	State.World.Session.Stop()
+	State.RetiredInPort := true
+}
+
+_TDCR_Token(State, Length) {
+	AssertEqual(StrLen(State.World.Token), Length)
+	if State.Phase == "token"
+		_TDCR_Stop(State)
+	return State.World.Token
+}
+
+_TDCR_Endpoint(State, Handler) {
+	State.FactoryCalls += 1
+	AssertTrue(HasMethod(Handler, "Call"), "the actual session owns its native endpoint callback")
+	if State.Phase == "factory"
+		_TDCR_Stop(State)
+	return {Start: _TDCR_EndpointStart.Bind(State), Stop: _TDCR_EndpointStop.Bind(State)}
+}
+
+_TDCR_EndpointStart(State, *) {
+	State.StartCalls += 1
+	if State.Phase == "start"
+		_TDCR_Stop(State)
+}
+
+_TDCR_EndpointStop(State, *) {
+	State.StopCalls += 1
+}
+
+for _TDCR_Phase in ["token", "factory", "start"]
+	Test("driver-control: retirement during " . _TDCR_Phase . " startup cannot resurrect the session (driver-control-start-retirement)",
+		_TDCR_RetireDuringStart.Bind(_TDCR_Phase))
+
+
+; Bound only this fixture's native deferred-delivery observation.
+global _TDCR_NATIVE_WAIT_MS := 2000
+
+_TDCR_ReadinessListen(State, Message, Callback, Threads) {
+	if Threads == 1 {
+		State["session_visible_at_registration"] := FileExist(State["world"].Session.Path("session")) != ""
+		State["registrations"] += 1
+		if State["session_visible_at_registration"]
+			State["premature_ack"] := DllCall("SendMessageW", "Ptr", A_ScriptHwnd,
+				"UInt", Message, "UPtr", State["world"].Session.Pid, "Ptr", State["creation"], "Ptr")
+	}
+	return OnMessage(Message, Callback, Threads)
+}
+
+_TDCR_ReadinessEndpoint(State, Handler) {
+	World := State["world"]
+	Endpoint := HealthCheckWindowControl(() => State["message"],
+		_TDCR_ReadinessListen.Bind(State), HealthCheck_ControlTimer, Handler,
+		() => true, A_ScriptHwnd, World.Session.Pid, State["creation"])
+	State["endpoint"] := Endpoint
+	return Endpoint
+}
+
+_TDCR_ReadinessAfterNativeActivation() {
+	_TDC_World(_TDCR_ReadinessAfterNativeActivationBody)
+}
+
+_TDCR_ReadinessAfterNativeActivationBody(World) {
+	global _TDCR_NATIVE_WAIT_MS
+	AssertFalse(A_IsCritical, "native control delivery needs an interruptible fixture")
+	World.Session.Pid := ProcessExist()
+	Creation := HealthCheck_ControlCreationTime()
+	Message := DriverControl_RegisterMessage(World.Spec["windows_message"] . "-fixture-" . ProcessExist())
+	State := Map("world", World, "message", Message, "creation", Creation,
+		"endpoint", 0, "registrations", 0, "session_visible_at_registration", false, "premature_ack", -1)
+	World.Session.Ports["endpoint"] := _TDCR_ReadinessEndpoint.Bind(State)
+	World.Session.Start()
+	AssertEqual(1, State["registrations"], "the genuine native listener must be installed")
+	if State["session_visible_at_registration"]
+		AssertEqual(0, State["premature_ack"],
+			"an actual early requester sees the token while the native endpoint still refuses it")
+	AssertFalse(State["session_visible_at_registration"],
+		"a control token cannot announce readiness before the native endpoint is registered")
+	AssertTrue(State["endpoint"].Active && World.Session.Active)
+	AssertTrue(FileExist(World.Session.Path("session")) != "",
+		"the fully active native endpoint must publish its actual readiness receipt")
+	_TDC_Request(World, World.Token, "native-ready")
+	Ack := DllCall("SendMessageW", "Ptr", A_ScriptHwnd, "UInt", Message,
+		"UPtr", World.Session.Pid, "Ptr", Creation, "Ptr")
+	AssertEqual(1, Ack, "the actual private native message is admitted after token publication")
+	Started := A_TickCount
+	while World.Calls.Length == 0 && !TickExpired64(Started, _TDCR_NATIVE_WAIT_MS)
+		Sleep(1)
+	AssertEqual(1, World.Calls.Length, "the actual native one-shot must dispatch the authenticated request")
+	World.Session.Stop()
+	AssertFalse(State["endpoint"].Active || World.Session.Active)
+	AssertFalse(FileExist(World.Session.Path("session")))
+	Ack := DllCall("SendMessageW", "Ptr", A_ScriptHwnd, "UInt", Message,
+		"UPtr", World.Session.Pid, "Ptr", Creation, "Ptr")
+	AssertEqual(0, Ack, "the retired native listener cannot accept another control request")
+}
+Test("driver-control: token publication follows actual native endpoint activation (driver-control-endpoint-readiness)",
+	_TDCR_ReadinessAfterNativeActivation)
+
+_TDC_RequestSchemaToken(Fields, Expected) {
+	Spec := _TDC_Spec(), Corpus := _TDC_Corpus()
+	Text := '{' . Fields . ',"token":"' . Corpus["token"] . '","request_id":"schema-token"}'
+	Decoded := JsonParse(Text)
+	AssertTrue(Decoded is Map, "every candidate must be genuine valid JSON")
+	AssertEqual(Corpus["token"], Decoded["token"])
+	AssertEqual("schema-token", Decoded["request_id"])
+	Id := DriverControl_ParseRequest(Spec, Text, Corpus["token"], &Reason, &Echoed)
+	if Expected {
+		AssertEqual("schema-token", Id, "the authoritative JSON member must admit the canonical schema token")
+		AssertEqual("", Reason)
+		AssertEqual("", Echoed)
+	} else {
+		AssertEqual("", Id, "an earlier numeric member cannot bless a noncanonical authoritative schema token")
+		AssertEqual("malformed", Reason)
+		AssertEqual("schema-token", Echoed, "the malformed request keeps its own valid diagnostic identity")
+	}
+}
+for _TDC_SchemaCase in [
+	["canonical integer", '"schema":1', true],
+	["whitespace integer", '"schema" : 1 ', true],
+	["escaped schema key", '"sc\u0068ema":1', true],
+	["last canonical integer", '"schema":true,"schema":1', true],
+	["last escaped canonical integer", '"schema":true,"sc\u0068ema":1', true],
+	["boolean", '"schema":true', false],
+	["numeric string", '"schema":"1"', false],
+	["decimal", '"schema":1.0', false],
+	["exponent", '"schema":1e0', false],
+	["last boolean", '"schema":1,"schema":true', false],
+	["last numeric string", '"schema":1,"schema":"1"', false],
+	["last decimal", '"schema":1,"schema":1.0', false],
+	["last exponent", '"schema":1,"schema":1e0', false],
+	["last escaped boolean", '"schema":1,"sc\u0068ema":true', false]
+]
+	Test("driver-control: " . _TDC_SchemaCase[1] . " follows the decoded schema member (driver-control-schema-token-identity)",
+		_TDC_RequestSchemaToken.Bind(_TDC_SchemaCase[2], _TDC_SchemaCase[3]))
+
+_TDC_ResultSchemaToken(Phase, Fields, Expected) {
+	Spec := _TDC_Spec()
+	Text := '{' . Fields . ',"request_id":"result-kind","state":"requested","driver_pid":100,"successor_pid":200}'
+	Decoded := JsonParse(Text)
+	AssertTrue(Decoded is Map)
+	AssertTrue(DriverControl_IsRequestId(Decoded["request_id"]))
+	AssertEqual("requested", Decoded["state"])
+	AssertTrue(Decoded["successor_pid"] is Integer)
+	AssertEqual(200, Decoded["successor_pid"])
+	Kind := ""
+	if Phase == "completion"
+		Result := DriverControl_Completion(Spec, Text, 200)
+	else
+		Result := DriverControl_Resolve(Spec, Text, 200, 1700000000, &Kind)
+	if Expected {
+		AssertEqual('{"schema":1,"request_id":"result-kind","state":"completed","driver_pid":200,"successor_pid":200}`n', Result,
+			"a genuine numeric schema keeps the named successor completion contract")
+		if Phase == "resolution"
+			AssertEqual("completed", Kind)
+	} else {
+		AssertEqual("", Result, "only a JSON number schema may authorize a completion")
+		AssertEqual("", Kind, "a nonnumeric schema cannot claim a pending result")
+	}
+}
+for _TDC_ResultPhase in ["completion", "resolution"]
+	for _TDC_ResultCase in [
+		["integer", '"schema":1', true],
+		["decimal number", '"schema":1.0', true],
+		["exponent number", '"schema":1e0', true],
+		["escaped key", '"sc\u0068ema":1', true],
+		["boolean", '"schema":true', false],
+		["numeric string", '"schema":"1"', false],
+		["last boolean", '"schema":1,"schema":true', false],
+		["last numeric string", '"schema":1,"schema":"1"', false],
+		["last decimal number", '"schema":true,"sc\u0068ema":1.0', true]
+	]
+		Test("driver-control: " . _TDC_ResultPhase . " " . _TDC_ResultCase[1] . " preserves schema kind (driver-control-result-schema-kind)",
+			_TDC_ResultSchemaToken.Bind(_TDC_ResultPhase, _TDC_ResultCase[2], _TDC_ResultCase[3]))
+
+_TDC_PendingSuccessorToken(Fields, HasDeadline, ExpectedKind) {
+	Spec := _TDC_Spec()
+	Text := '{"schema":1,"request_id":"pending-key","state":"requested","driver_pid":100'
+		. (Fields == "" ? "" : "," . Fields)
+		. (HasDeadline ? ',"deadline":1700000120}' : "}")
+	Decoded := JsonParse(Text)
+	AssertTrue(Decoded is Map)
+	AssertEqual("pending-key", Decoded["request_id"])
+	AssertEqual("requested", Decoded["state"])
+	Result := DriverControl_Resolve(Spec, Text, 200, 1700000000, &Kind)
+	AssertEqual(ExpectedKind, Kind, "the authoritative decoded successor member owns pending admission")
+	if ExpectedKind == "claimed"
+		AssertEqual('{"schema":1,"request_id":"pending-key","state":"claimed","driver_pid":200,"successor_pid":200,"deadline":1700000120}`n', Result)
+	else if ExpectedKind == "completed"
+		AssertEqual('{"schema":1,"request_id":"pending-key","state":"completed","driver_pid":200,"successor_pid":200}`n', Result)
+	else
+		AssertEqual("", Result, "a missing or non-null unassigned successor cannot claim the pending record")
+}
+for _TDC_PendingCase in [
+	["canonical null", '"successor_pid":null', true, "claimed"],
+	["escaped null", '"successor_\u0070id":null', true, "claimed"],
+	["last escaped null", '"successor_pid":200,"successor_\u0070id":null', true, "claimed"],
+	["last literal null", '"successor_\u0070id":200,"successor_pid":null', true, "claimed"],
+	["missing successor", "", true, ""],
+	["string null", '"successor_pid":"null"', true, ""],
+	["boolean successor", '"successor_pid":false', true, ""],
+	["last assigned successor", '"successor_pid":null,"successor_pid":200', false, "completed"],
+	["assigned successor", '"successor_pid":200', false, "completed"],
+	["escaped assigned successor", '"successor_\u0070id":200', false, "completed"],
+	["string assigned successor", '"successor_pid":"200"', false, ""]
+]
+	Test("driver-control: " . _TDC_PendingCase[1] . " preserves successor source identity (driver-control-pending-successor-source)",
+		_TDC_PendingSuccessorToken.Bind(_TDC_PendingCase[2], _TDC_PendingCase[3], _TDC_PendingCase[4]))
+
+_TDC_ClaimedDriverPidKind(TokenKind, Expected) {
+	Spec := _TDC_Spec(), Pid := ProcessExist()
+	AssertTrue(Pid is Integer && Pid > 1, "the claimed identity must be a genuine native driver process id")
+	switch TokenKind {
+		case "native": Fields := '"driver_pid":' . Pid
+		case "decimal": Fields := '"driver_pid":' . Pid . ".0"
+		case "exponent": Fields := '"driver_pid":' . Pid . "e0"
+		case "string": Fields := '"driver_pid":"' . Pid . '"'
+		case "duplicate-string": Fields := '"driver_pid":' . Pid . ',"driver_pid":"' . Pid . '"'
+		case "escaped": Fields := '"driver_\u0070id":' . Pid
+		case "boolean": Fields := '"driver_pid":true'
+		case "missing": Fields := ""
+		default: throw Error("Unknown claimed driver identity fixture")
+	}
+	Text := '{"schema":1,"request_id":"claimed-kind","state":"claimed","successor_pid":' . Pid
+		. ',"deadline":1700000120' . (Fields == "" ? "" : "," . Fields) . "}"
+	Decoded := JsonParse(Text)
+	AssertEqual("claimed", Decoded["state"])
+	AssertEqual(Pid, Decoded["successor_pid"])
+	AssertTrue(Decoded["successor_pid"] is Integer)
+	AssertEqual(1700000120, Decoded["deadline"])
+	Result := DriverControl_Resolve(Spec, Text, Pid, 1700000000, &Kind)
+	if Expected {
+		AssertEqual("completed", Kind)
+		AssertEqual('{"schema":1,"request_id":"claimed-kind","state":"completed","driver_pid":'
+			. Pid . ',"successor_pid":' . Pid . '}`n', Result)
+	} else {
+		AssertEqual("", Result, "a nonnumeric claimant cannot own the actual native process identity")
+		AssertEqual("", Kind)
+	}
+}
+for _TDC_ClaimedPidCase in [
+	["native", true], ["decimal", true], ["exponent", true], ["string", false],
+	["duplicate-string", false], ["escaped", true], ["boolean", false], ["missing", false]
+]
+	Test("driver-control: claimed " . _TDC_ClaimedPidCase[1] . " keeps numeric process identity (driver-control-claimed-pid-kind)",
+		_TDC_ClaimedDriverPidKind.Bind(_TDC_ClaimedPidCase[1], _TDC_ClaimedPidCase[2]))

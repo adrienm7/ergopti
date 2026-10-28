@@ -2,6 +2,7 @@
 
 --- Retains exact synthetic buttons and bounded native helpers through retirement.
 local M = {}
+local Errors = require("adapter_errors")
 local Process = require("adapters.owned_process")
 local Timings = require("infra.timings")
 local Clock = require("infra.monotonic")
@@ -37,13 +38,13 @@ function M.new(active)
 		if claim.child.not_found == true then return "unavailable" end
 		if claim.child.started == false then return "dispatch_refused" end
 		if type(result) ~= "table" then return "receipt_unknown" end
-		if result.error == "process deadline exceeded" then return "deadline" end
+		if result.error == Errors.PROCESS_DEADLINE_EXCEEDED then return "deadline" end
 		if type(result.exit_code) == "number" and result.exit_code ~= 0 then return "exit_failed" end
 		return "native_refused"
 	end
 	local function diagnose(button, state, claim, result)
 		local intentional = claim.press and not state.wanted and type(result) == "table"
-			and (result.error == "cancelled" or result.error == "process source admission refused")
+			and (result.error == "cancelled" or result.error == Errors.PROCESS_SOURCE_ADMISSION_REFUSED)
 		if not intentional then report(button, state, claim.press, failure_category(claim, result)) end
 	end
 	local function dispatch(button, state, press)

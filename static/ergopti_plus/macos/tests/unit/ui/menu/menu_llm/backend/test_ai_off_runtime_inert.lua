@@ -461,7 +461,7 @@ local function with_ollama_manager(enabled, body)
 		package.loaded["adapters.managed_ollama_pull"] = {}
 		package.loaded["modules.llm.opaque_network_admission"] = {}
 		package.loaded["modules.llm.ollama_endpoint"] = {
-			get_base_url = function() return "http://127.0.0.1:11434" end,
+			get_base_url = function() return "http://127.0.0.1:11435" end,
 		}
 		package.loaded["adapters.shell_runner"] = {}
 		package.loaded["adapters.http_client"] = {}

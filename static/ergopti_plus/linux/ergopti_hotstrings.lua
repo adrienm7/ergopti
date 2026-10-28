@@ -68,6 +68,33 @@ package.path = SCRIPT_DIR .. "/?.lua;" ..
                SHARED_LUA_DIR .. "/?/init.lua;" ..
                package.path
 
+--- Prints the CLI usage. Deliberately ENGLISH, not translated.
+---
+--- This runs before the session lock, the logger and i18n.init() — which cannot move
+--- earlier, because the config directory it reads the persisted locale from is
+--- itself settable with --config. So at this point the user's chosen language is
+--- genuinely unknown, and routing the text through i18n would render it in the
+--- default locale rather than theirs. Every other pre-i18n surface in this file
+--- (the two startup error prints) is English for the same reason.
+local function print_usage()
+	print("Usage: luajit ergopti_hotstrings.lua [OPTIONS]")
+	print("")
+	print("  --config <path>     TOML file or directory of definitions.")
+	print("                      Default: ~/.config/ergopti/hotstrings/")
+	print("  --device <path>     evdev device (e.g. /dev/input/event3).")
+	print("                      Default: auto-detected.")
+	print("  --layout <name>     Keyboard layout: qwerty | azerty.")
+	print("                      Default: $XKBLAYOUT, else qwerty.")
+	print("  --tray              Enable the system tray icon.")
+	print("  --no-grab           Do NOT take an exclusive grab on the device.")
+	print("                      Physical keys then reach the application while an")
+	print("                      expansion is being typed, which can scramble it.")
+	print("                      Use only if the grab misbehaves on your hardware.")
+	print("  --dry-run           Log matches without injecting.")
+	print("  --verbose           Log at debug level for this run.")
+	print("  --help              Show this message.")
+end
+
 -- Retain the launcher's lock here, while preventing any later external process
 -- from holding it after this daemon stops or crashes.
 -- The fatal outcomes that precede the logger sink leave one closed-vocabulary
@@ -78,6 +105,18 @@ if not lock_protected then
 	io.stderr:write("[session_lock] " .. lock_error .. "\n")
 	BootstrapLog.append("session_lock_refused")
 	os.exit(78)
+end
+
+-- `--help` asks nothing of the session: no logger, no privacy identity. It stays
+-- behind the launcher's lock check above, which refuses a corrupt lock marker
+-- whatever the arguments are (tests/hardware/test_session_lock.py).
+-- It used to run after all three, so a start without $USER (a container, `env -i`)
+-- refused to even print its usage.
+for _, argument in ipairs(arg or {}) do
+	if argument == "--help" or argument == "-h" then
+		print_usage()
+		os.exit(0)
+	end
 end
 
 
@@ -103,9 +142,13 @@ local RuntimeGuard = require("infra.runtime_guard")
 local LoggerSink = require("infra.logger_sink")
 -- A privacy admission failure must not let Lua print the unredacted exception.
 -- A false durability result remains a successfully admitted stdout-only sink.
-local privacy_admitted, _, privacy_refusal = pcall(function() return LoggerSink.install(Logger) end)
+local privacy_admitted, privacy_failure, privacy_refusal = pcall(function() return LoggerSink.install(Logger) end)
 if not privacy_admitted or privacy_refusal then
-	io.stderr:write("[logger_sink] Privacy initialization refused; daemon not started.\n")
+	-- Only the sink's own closed wording is repeated ("logger_sink: <letters>"); any
+	-- other exception text may carry a path or a name and stays unprinted.
+	local cause = tostring(privacy_admitted and privacy_refusal or privacy_failure):match("logger_sink: ([%a%s,:]+)$")
+	io.stderr:write("[logger_sink] Privacy initialization refused" .. (cause and (" (" .. cause .. ")") or "")
+		.. "; daemon not started.\n")
 	BootstrapLog.append("privacy_admission_refused")
 	os.exit(1)
 end
@@ -530,7 +573,6 @@ local function parse_args()
 		layout  = default_layout,
 		dry_run = false,
 		verbose = false,
-		help    = false,
 		tray    = false,
 		-- Grab the device by default. Observe mode lets every physical keystroke
 		-- reach the application while the daemon is mid-expansion, which is the
@@ -542,8 +584,7 @@ local function parse_args()
 	local i = 1
 	while i <= #arg do
 		local a = arg[i]
-		if     a == "--help"    or a == "-h"  then opts.help    = true
-		elseif a == "--dry-run"               then opts.dry_run = true
+		if     a == "--dry-run"               then opts.dry_run = true
 		elseif a == "--verbose" or a == "-v"  then opts.verbose = true
 		elseif a == "--tray"                  then opts.tray    = true
 		elseif a == "--no-grab"               then opts.grab    = false
@@ -558,34 +599,6 @@ local function parse_args()
 	end
 	return opts
 end
-
---- Prints the CLI usage. Deliberately ENGLISH, not translated.
----
---- This runs from parse_args, long before i18n.init() — which cannot move
---- earlier, because the config directory it reads the persisted locale from is
---- itself settable with --config. So at this point the user's chosen language is
---- genuinely unknown, and routing the text through i18n would render it in the
---- default locale rather than theirs. Every other pre-i18n surface in this file
---- (the two startup error prints) is English for the same reason.
-local function print_usage()
-	print("Usage: luajit ergopti_hotstrings.lua [OPTIONS]")
-	print("")
-	print("  --config <path>     TOML file or directory of definitions.")
-	print("                      Default: ~/.config/ergopti/hotstrings/")
-	print("  --device <path>     evdev device (e.g. /dev/input/event3).")
-	print("                      Default: auto-detected.")
-	print("  --layout <name>     Keyboard layout: qwerty | azerty.")
-	print("                      Default: $XKBLAYOUT, else qwerty.")
-	print("  --tray              Enable the system tray icon.")
-	print("  --no-grab           Do NOT take an exclusive grab on the device.")
-	print("                      Physical keys then reach the application while an")
-	print("                      expansion is being typed, which can scramble it.")
-	print("                      Use only if the grab misbehaves on your hardware.")
-	print("  --dry-run           Log matches without injecting.")
-	print("  --verbose           Log at debug level for this run.")
-	print("  --help              Show this message.")
-end
-
 
 -- =========================================
 -- =========================================
@@ -788,11 +801,6 @@ local function main()
 	local PREVIEW_MAX_CANDIDATES = 8
 	local opts = parse_args()
 
-	if opts.help then
-		print_usage()
-		os.exit(0)
-	end
-
 	-- A start outside launch.sh (AppRun, Nix wrapper, manual luajit) holds no lock
 	-- yet; a second keyboard grab next to a running daemon is refused here.
 	local lock_acquired, lock_refusal, lock_contended = require("infra.session_lock").acquire()
@@ -815,6 +823,15 @@ local function main()
 		tostring(opts.grab), tostring(opts.tray), tostring(opts.dry_run), tostring(opts.verbose),
 		opts.device and "pinned" or "auto", tostring(opts.layout),
 		opts.keymap and "override" or "server", opts.config and "custom" or "default")
+	-- Resolved here so a launcher root naming another clone stops the boot
+	-- (infra/dev_source.lua) before any watcher or restart relies on it.
+	do
+		local DevSource = require("infra.dev_source")
+		local dev_root = DevSource.root()
+		if dev_root then
+			Logger.info(LOG, "Developer source mode; Lua runs from %s%s.", dev_root, DevSource.DRIVER_SUBPATH)
+		end
+	end
 
 	if opts.dry_run then
 		Logger.info(LOG, "Dry-run mode: matches will be logged but not injected.")
@@ -1190,10 +1207,10 @@ local function main()
 		end
 		local user_preferences = require("infra.hotstring_preferences")
 		if dyn_hotstrings.set_user_code_time_activation(
-			user_preferences.get("hotstrings.dynamic.user_code.time_activation_seconds")) ~= true then
+			user_preferences.get(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS)) ~= true then
 			error("canonical programmable-hotstring interval did not commit before hook startup")
 		end
-		if dyn_hotstrings.set_user_code_enabled(user_preferences.get("hotstrings.dynamic.user_code.enabled")) ~= true then
+		if dyn_hotstrings.set_user_code_enabled(user_preferences.get(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED)) ~= true then
 			Logger.error(LOG, "Programmable hotstrings remain closed after source admission refusal.")
 		end
 	end
@@ -1344,7 +1361,7 @@ local function main()
 					trigger         = MagicKey.get(),
 					replacement     = repeated.replacement,
 					backspace_count = repeated.backspace_count,
-					group           = "repeat_key",
+					group           = require("config_keys").COMMAND.REPEAT_KEY,
 					final_result    = true,
 				}
 			end
@@ -1375,8 +1392,7 @@ local function main()
 			local expansion_committed = opts.dry_run
 			if not opts.dry_run then
 				injector._begin_injection()
-				local replay_terminator = result.end_char
-					and not result.consume_terminator and result.terminator or nil
+				local replay_terminator = result.replay_terminator
 				local ok_delivery, delivery = pcall(
 					injector.inject,
 					result.backspace_count,
@@ -1423,7 +1439,7 @@ local function main()
 					_undoable = nil
 					engine:reset(false)
 					local report = ok_delivery and type(delivery) == "table" and delivery.cleanup_ok == true
-						and delivery_error == "programmable publication is no longer current" and Logger.warn or Logger.error
+						and delivery_error == require("adapter_errors").PROGRAMMABLE_PUBLICATION_STALE and Logger.warn or Logger.error
 					report(LOG, "Expansion output did not commit — logical state invalidated: %s.",
 						tostring(delivery_error))
 				end
@@ -2430,7 +2446,7 @@ local function main()
 					-- "hotstrings_config": that name has a bridge in BRIDGE_MODULES but
 					-- no page on disk, so the window opened and rendered
 					-- "Error: app 'hotstrings_config' not found".
-					webview_manager.show("hotstrings_config_window")
+					webview_manager.show(require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW)
 				else
 					Logger.warn(LOG, "No settings window available — a custom delimiter cannot be added.")
 				end
@@ -2772,6 +2788,9 @@ local function main()
 	-- When luv is available, uses native inotify; otherwise falls back
 	-- to mtime polling driven by the event loop's onPeriodic callback.
 	if file_watchers then
+		-- A developer run (tools/dev/run-linux-dev.sh) also restarts on a saved
+		-- .lua of the clone, as the macOS developer app reloads on one.
+		local DevSource = require("infra.dev_source")
 		file_watchers.start({
 			hotstrings_dir = config_path,
 			base_dir       = SCRIPT_DIR,
@@ -2781,6 +2800,8 @@ local function main()
 				local reloaded = require("infra.reload_outcome").run(function() return hotstrings_config.reload() end)
 				if reloaded and privacy_owners.menu_rebuild then privacy_owners.menu_rebuild.note_reload() end
 			end,
+			source_dirs      = DevSource.source_dirs(),
+			on_source_change = DevSource.is_active() and function() perform_reload("a saved source file") end or nil,
 		})
 		Logger.info(LOG, "File watchers armed (%s).",
 			file_watchers.has_inotify() and "inotify" or "mtime poll")

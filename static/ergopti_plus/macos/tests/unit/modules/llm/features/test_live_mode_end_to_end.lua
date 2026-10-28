@@ -516,6 +516,20 @@ helpers.describe("live mode end to end (llm-live-mode)", function()
 		helpers.assert_eq(#world.posts, 3, "the chain dispatches outside live mode")
 	end)
 
+	helpers.it("a prompt deleted while live mode runs stops it and asks for nothing (shared live plan)", function()
+		local world = build_world()
+		world.core_state.user_profiles = {
+			{ id = "custom_7", label = "My translator", system_single = "Translate TAIL. REWRITE: <text>" },
+		}
+		helpers.assert_true(toggle(world, "custom_7"))
+		helpers.assert_eq(world.engine.get_live_prompt().profile_id, "custom_7")
+		world.core_state.user_profiles = {}
+		keystroke(world, "on se voit")
+		fire_debounce(world, LIVE.debounce_sec, "the live debounce")
+		helpers.assert_nil(world.engine.get_live_prompt(), "live mode stopped")
+		helpers.assert_eq(#world.posts, 0, "no request, not even with the menu's prompt")
+	end)
+
 	helpers.it("runs every retained rewrite shortcut without a second profile chooser", function()
 		local world = build_world()
 		world.core_state.user_profiles = {

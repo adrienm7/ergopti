@@ -41,6 +41,7 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local PrivacyPolicy = require("infra.sqlite_privacy_policy")
 
 local Shell = require("adapters.shell_runner")
@@ -174,10 +175,10 @@ end
 --- @return string diagnostics Output preceding the shell's terminal receipt.
 --- @return string|nil error_message Missing or refused terminal status.
 function M.read_exit_receipt(output)
-	if type(output) ~= "string" then return false, "", "missing SQLite exit receipt" end
+	if type(output) ~= "string" then return false, "", Errors.SQLITE_EXIT_RECEIPT_MISSING end
 	local diagnostics, status = output:match("^(.*)\n" .. EXIT_STATUS_PREFIX .. "(%d+)\n$")
 	status = tonumber(status)
-	if not status or status > 255 then return false, "", "invalid SQLite exit receipt" end
+	if not status or status > 255 then return false, "", Errors.SQLITE_EXIT_RECEIPT_INVALID end
 	if status ~= 0 then return false, diagnostics, "SQLite CLI exited with status " .. status end
 	return true, diagnostics, nil
 end

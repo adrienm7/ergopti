@@ -8,7 +8,7 @@ local OWNED = {
 	"ui.download_window", "ui.download_window.javascript",
 	"ui.download_window.pending_queue", "adapters.webview_result",
 	"infra.deferred_work", "adapters.timer_scheduler", "error_description", "number_policy",
-	"infra.logger", "infra.paths", "infra.i18n", "infra.text_utils",
+	"infra.logger", "infra.paths", "infra.timings", "infra.i18n", "infra.text_utils",
 	"adapters.shell_runner", "adapters.own_window", "ui.ui_builder",
 }
 
@@ -24,6 +24,7 @@ local function with_window(scenario)
 		end
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.paths"] = { shared = function() return "/virtual/download-assets" end }
+		helpers.provide_timings()
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.text_utils"] = {}
 		package.loaded["adapters.shell_runner"] = {}
@@ -160,6 +161,37 @@ helpers.describe("download progress uses the active operation awake duration", f
 			w.ready()
 			window.update(33, 5000000, 15000000)
 			helpers.assert_eq(#w.codes, 0, "retired timer/navigation cannot publish queued progress")
+		end)
+	end)
+
+	helpers.it("advances the progress mark on new bytes only, never on a repeated frame", function()
+		with_window(function(window, w)
+			w.show(); w.ready(); w.sample(3)
+			local before = window.progress_mark()
+			window.update(10, 1000000, 10000000)
+			local moved = window.progress_mark()
+			helpers.assert_true(moved > before, "new bytes are progress")
+			window.update(10, 1000000, 10000000)
+			helpers.assert_eq(window.progress_mark(), moved, "the same frame again is no progress")
+			window.update(10, 2000000, 10000000)
+			helpers.assert_true(window.progress_mark() > moved, "more bytes are progress")
+		end)
+	end)
+
+	helpers.it("tells the percentage observer each new whole percentage once (model-selector-progress)", function()
+		with_window(function(window, w)
+			local told = {}
+			window.set_percent_listener(function(kind, percent) told[#told + 1] = tostring(kind) .. ":" .. percent end)
+			w.show(); w.ready(); w.sample(3)
+			window.update(10, 1000000, 10000000)
+			window.update(10, 1500000, 10000000)
+			window.update(42.7, 4270000, 10000000)
+			window.update(100, 10000000, 10000000)
+			window.set_percent_listener(nil)
+			window.update(50, 5000000, 10000000)
+			helpers.assert_eq(#told, 3, "a repeated percentage is not told again; a removed observer hears nothing")
+			helpers.assert_true(told[1]:match(":10$") ~= nil and told[2]:match(":42$") ~= nil, table.concat(told, ","))
+			helpers.assert_true(told[3]:match(":99$") ~= nil, "100 % is reserved for the completion")
 		end)
 	end)
 end)

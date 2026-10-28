@@ -28,6 +28,7 @@ local LoggerSink    = require("infra.logger_sink")
 local Paths         = require("infra.paths")
 local DisplayServer = require("infra.display_server")
 local FileSystem    = require("adapters.file_system")
+local ConfigKeys = require("config_keys")
 
 M.DRIVER = "linux"
 
@@ -229,7 +230,7 @@ function M.prepare(ctx, env)
 		emitted = true -- Reserve before any logger callback can reenter.
 		if final_ctx ~= nil then
 			assert(type(final_ctx) == "table", "Diagnostic snapshot metadata must be a table")
-			for _, name in ipairs({ "locale", "keyboard_layout", "log_level" }) do
+			for _, name in ipairs({ "locale", "keyboard_layout", ConfigKeys.LEAF.LOG_LEVEL }) do
 				if final_ctx[name] ~= nil then values[name] = final_ctx[name] end
 			end
 			if final_ctx.features_enabled ~= nil or final_ctx.features_total ~= nil then

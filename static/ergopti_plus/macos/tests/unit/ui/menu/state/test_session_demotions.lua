@@ -11,6 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local MetricsState = require("infra.metrics_state_keys")
 
 --- Loads a fresh registry module with a silent logger.
 --- @return table SessionDemotions
@@ -97,8 +98,8 @@ helpers.describe("session demotions keep config.toml values", function()
 
 	helpers.it("keeps the first saved value when the same key is demoted again", function()
 		local registry = load_subject().new()
-		registry.record({ feature = "metrics", key = "keystats_enabled", persisted = true, demoted = false })
-		registry.record({ feature = "metrics", key = "keystats_enabled", persisted = false, demoted = false })
+		registry.record({ feature = "metrics", key = MetricsState.ENABLED, persisted = true, demoted = false })
+		registry.record({ feature = "metrics", key = MetricsState.ENABLED, persisted = false, demoted = false })
 		helpers.assert_eq(registry.persisted_view({ keystats_enabled = false }).keystats_enabled, true)
 
 		registry.record({ feature = "hotstrings", key = "keymap", persisted = false, demoted = true })

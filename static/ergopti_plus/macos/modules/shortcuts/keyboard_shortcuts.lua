@@ -4,7 +4,7 @@
 --- MODULE: Keyboard Shortcuts
 --- DESCRIPTION:
 --- Manages configurable keyboard shortcuts for Cmd+, Ctrl+, and Option+ combos.
---- Each slot (e.g. "cmd_a", "hs_ctrl_0") maps to any action in the gesture
+--- Each slot (e.g. "primary_a", "secondary_0") maps to any action in the gesture
 --- registry, allowing the user to customise every modifier+key combination
 --- via the tray menu — identical in concept to the AHK system.
 ---
@@ -40,12 +40,14 @@ local KeyboardPublication = require("config_keyboard_publication")
 local KeyboardComposition = KeyboardPublication.compose
 local KeyboardOwnerCurrent = KeyboardPublication.owner_is_current
 local Assignment = require("shortcuts.assignment")
+local SlotRoles = require("shortcuts.slot_roles")
 local PhysicalSlots = require("shortcuts.physical_slots")
 local PhysicalSlotConstructor = PhysicalSlots.new
 local PhysicalAvailability = require("shortcuts.physical_availability")
 local i18n = require("infra.i18n")
 local AiActions = require("modules.shortcuts.ai_actions")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "shortcuts.keyboard_shortcuts"
 
@@ -116,11 +118,11 @@ local SPECIAL_KEYS = nil
 -- the contextual group owns one logical slot whose numeric source is measured.
 M.SLOT_GROUPS = {
 	{ prefix = "contextual", fixed = true, group_key = "menu.shortcuts.group_contextual", add_key = "menu.shortcuts.add_contextual" },
-	{ prefix = "hs_option_",     group_key = "menu.shortcuts.alt_group",       add_key = "menu.shortcuts.alt_add" },
-	{ prefix = "hs_ctrl_",       group_key = "menu.shortcuts.ctrl_group",      add_key = "menu.shortcuts.ctrl_add" },
-	{ prefix = "hs_ctrl_shift_", group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
-	{ prefix = "cmd_",           group_key = "menu.shortcuts.cmd_group",       add_key = "menu.shortcuts.cmd_add" },
-	{ prefix = "cmd_shift_",     group_key = "menu.shortcuts.cmd_shift_group",  add_key = "menu.shortcuts.cmd_shift_add" },
+	{ prefix = "alt_",              group_key = "menu.shortcuts.alt_group",        add_key = "menu.shortcuts.alt_add" },
+	{ prefix = "secondary_",        group_key = "menu.shortcuts.ctrl_group",       add_key = "menu.shortcuts.ctrl_add" },
+	{ prefix = "secondary_shift_",  group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
+	{ prefix = "primary_",          group_key = "menu.shortcuts.cmd_group",        add_key = "menu.shortcuts.cmd_add" },
+	{ prefix = "primary_shift_",    group_key = "menu.shortcuts.cmd_shift_group",  add_key = "menu.shortcuts.cmd_shift_add" },
 }
 
 -- Path to the shared key catalogue. The slot space is prefix × key, and the keys
@@ -130,7 +132,7 @@ local KEY_CATALOGUE_PATH = Paths.shared("modules/actions/modifier_chords.json")
 
 -- The manifest section whose entries are this driver's shipped slot bindings.
 -- tools/test/test-keyboard-slot-recommended-bindings.cjs pins what it holds.
-local KEYBOARD_SECTION = "shortcuts.keyboard"
+local KEYBOARD_SECTION = ConfigKeys.KEY.SHORTCUTS_KEYBOARD
 
 --- The shipped bindings: every manifest shortcuts.keyboard entry for macOS (the
 --- generated manifest lists only this driver's entries with their defaults).
@@ -177,19 +179,24 @@ local function catalogue_keys()
 		end
 		local platform = assert(decoded.platforms and decoded.platforms.macos,
 			"keyboard modifier catalogue lacks macOS metadata")
-		assert(type(platform.shortcut_groups) == "table" and type(platform.modifiers) == "table",
-			"keyboard modifier catalogue lacks ordinary shortcut groups")
+		assert(type(platform.modifiers) == "table", "keyboard modifier catalogue lacks the native modifiers")
 		local aliases, groups, keys = {}, {}, {}
 		for _, modifier in ipairs(platform.modifiers) do
 			aliases[modifier.id] = assert(modifier.hammerspoon, "native modifier alias unavailable")
 		end
-		for _, group in ipairs(platform.shortcut_groups) do
+		-- The prefixes are the role-named families of the shared table; matching
+		-- tries the longest first because "secondary_shift_x" also starts with "secondary_".
+		for _, family in ipairs(SlotRoles.families("macos")) do
 			local mods = {}
-			for _, modifier in ipairs(group.modifiers) do
-				mods[#mods + 1] = assert(aliases[modifier], "ordinary modifier is not owned")
+			for _, native in ipairs(family.native) do
+				mods[#mods + 1] = assert(aliases[native], "ordinary modifier is not owned")
 			end
-			groups[#groups + 1] = { group.prefix, mods }
+			groups[#groups + 1] = { family.prefix, mods }
 		end
+		table.sort(groups, function(a, b) return #a[1] > #b[1] end)
+		-- Keys a slot accepts that the shared chord catalogue (which also feeds
+		-- every driver's chord actions) does not carry.
+		for _, key in ipairs(SlotRoles.extra_keys("macos")) do decoded.keys[#decoded.keys + 1] = key end
 		for _, key in ipairs(decoded.keys) do keys[key.id] = key.chord_key or key.id end
 		SLOT_MODS, SPECIAL_KEYS = groups, keys
 		_catalogue = decoded
@@ -287,6 +294,10 @@ local function walk_assignments(decoded, consume, candidate)
 		elseif PhysicalSlots.is_namespace(slot) then
 			assert(not candidate, "physical keyboard candidate contains an invalid slot")
 			ConfigOutdated.report({ "shortcuts", "keyboard", slot }, "invalid physical shortcut identity", Logger)
+		else
+			-- A key no slot owns (an id a past build used, a typo) used to vanish
+			-- without a word. It is named once and offered by the cleanup.
+			ConfigOutdated.report({ "shortcuts", "keyboard", slot }, ConfigOutdated.UNKNOWN_SLOT, Logger)
 		end
 	end
 end
@@ -563,7 +574,7 @@ function M.validate_physical_edits(rows, claim)
 		return called and accepted == true and current()
 	end
 	for _, row in ipairs(rows) do
-		if row.section == "shortcuts.keyboard" and row.delete ~= true then
+		if row.section == ConfigKeys.KEY.SHORTCUTS_KEYBOARD and row.delete ~= true then
 			local descriptor = M.physical_slot_descriptor(row.key)
 			if not current() then return false, "source_changed" end
 			if not descriptor then return false, "unavailable" end
@@ -730,7 +741,12 @@ local function bind_slot(slot_id, action_id)
 	end
 	local acquisition_epoch = _lifecycle_epoch
 	_native_acquisition_depth = _native_acquisition_depth + 1
-	local ok_bind, handle = xpcall(Registrar.bind, debug.traceback, chord, function()
+	-- The Caps Lock slot keeps the native factory the retired Ctrl+CapsLock
+	-- switch used; the registrar refuses Caps Lock as a key on every other path.
+	local parsed_chord = Chord.parse(chord)
+	local bind = (parsed_chord and parsed_chord.key:lower() == "capslock")
+		and Registrar.bind_capslock_chord or Registrar.bind
+	local ok_bind, handle = xpcall(bind, debug.traceback, chord, function()
 		if _delivery_enabled ~= true or _lifecycle_paused == true then return false end
 		local current_action = _actions[slot_id] or "none"
 		if current_action == "none" then

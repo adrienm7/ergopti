@@ -30,6 +30,9 @@ local WarmupController = require("modules.llm.warmup_controller")
 local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
+local InfoBar = require("llm.request_plan.info_bar")
+local PredictionTooltipPort = require("adapters.prediction_tooltip_port")
+local LivePlan = require("llm.request_plan.live")
 local AppProfileOverrides = require("llm.app_profile_overrides")
 local Rewrite          = require("llm.rewrite")
 local PromptAction     = require("llm.prompt_action")
@@ -44,7 +47,7 @@ local i18n             = require("infra.i18n")
 local Keycodes         = require("infra.keycodes")
 local tooltip          = require("ui.tooltip")
 local keystats        = require("modules.keystats")
-local TextUtils = require("text_utils")
+local ConfigKeys = require("config_keys")
 
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
@@ -115,13 +118,11 @@ local function load_live_config()
 	local path = Paths.shared("modules/llm/live.json")
 	local raw = path and FileSystem.read(path) or nil
 	local decoded = raw and JsonCodec.decode(raw) or nil
-	local debounce_ms = type(decoded) == "table" and tonumber(decoded.debounce_ms) or nil
-	local live_min_words = type(decoded) == "table" and tonumber(decoded.min_words) or nil
-	if not debounce_ms or debounce_ms < 0 or not live_min_words or live_min_words < 0 then
-		error("prediction_engine: " .. tostring(path)
-			.. " is unreadable or lacks a non-negative debounce_ms and min_words.")
+	local config, reason = LivePlan.config(decoded)
+	if not config then
+		error("prediction_engine: " .. tostring(path) .. " is unusable: " .. tostring(reason))
 	end
-	return { debounce_sec = debounce_ms / 1000, min_words = math.floor(live_min_words) }
+	return { debounce_sec = config.debounce_ms / 1000, min_words = config.min_words }
 end
 local LIVE_CONFIG = load_live_config()
 
@@ -990,7 +991,7 @@ function M.get_llm_runtime_setting(key)
 	if key == "llm_pred_indent" then return true, prediction_indent end
 	if key == "llm_nav_modifiers" then return true, navigation_mods end
 	if key == "llm_val_modifiers" then return true, validation_mods end
-	if key == "llm_instant_on_word_end" then return true, instant_on_word_end end
+	if key == ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END then return true, instant_on_word_end end
 	if key == "llm_url_bar_filter_enabled" then return true, url_bar_filter_enabled end
 	if key == "llm_secure_field_filter_enabled" then
 		return true, secure_field_filter_enabled
@@ -1088,22 +1089,6 @@ local function format_validation_shortcut(mods)
 	return table.concat(mods, "+")
 end
 
---- Strips the em-dash suffix from a profile label for compact info-bar display.
---- "Mon profil — texte long" → "Mon profil"
---- @param label string|nil The raw profile label.
---- @return string|nil The trimmed label, or nil if it was blank.
-local function trim_profile_label(label)
-	if type(label) ~= "string" then return nil end
-	local clean = TextUtils.trim(label)
-	if clean == "" then return nil end
-	local head = clean:match("^(.-)%s*—")
-	-- head:match("%S") guards against a bare "— foo" where head="" falling through to clean
-	local picked = (head and head:match("%S")) and head or clean
-	picked = TextUtils.trim(picked):gsub("%s*—%s*$", "")
-	if picked == "" then return nil end
-	return picked
-end
-
 --- Assembles the info-bar text displayed beneath the prediction list.
 --- Returns nil when model_name is absent, which hides the info bar entirely.
 --- @param model_name string Display name of the active model.
@@ -1114,10 +1099,11 @@ end
 local function build_info_bar_text(model_name, elapsed_ms, backend, profile_name)
 	if not model_name or model_name == "" then return nil end
 
-	local pieces = { model_name }
-	if type(backend) == "string" and backend ~= "" then pieces[#pieces + 1] = backend end
-	local short_profile = trim_profile_label(profile_name)
-	if short_profile and short_profile ~= "" then pieces[#pieces + 1] = short_profile end
+	-- The pieces and the short prompt name are the shared plan's; the separator is macOS's.
+	local pieces = InfoBar.parts({
+		model = model_name, backend = backend, profile_label = profile_name, require_model = true,
+	})
+	if not pieces then return nil end
 	local text = table.concat(pieces, " — ")
 	-- elapsed_ms intentionally discarded — tooltip_llm owns the timing zone to avoid duplication
 	local _ = elapsed_ms
@@ -1733,15 +1719,19 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 			return
 		end
 		if not predispatch_is_current() then return end
-		if type(live_profile) ~= "table" then
+		local decision = LivePlan.decide(
+			{ debounce_ms = LIVE_CONFIG.debounce_sec * 1000, min_words = LIVE_CONFIG.min_words },
+			live, num_predictions, type(live_profile) == "table" and live_profile or nil)
+		if decision.action == "stop" then
+			-- The shared rule: live typing never falls back to the menu's prompt, so the
+			-- keystroke asks for nothing (it used to run once with the menu's prompt).
 			Logger.warn(LOG, "Live prompt '%s' no longer exists — live mode turned off.", live.profile_id)
-			M.stop_live_prompt("prompt deleted", true)
-			live = nil
-		else
-			request_profile   = live_profile
-			request_count     = live.num_predictions or num_predictions
-			request_min_words = LIVE_CONFIG.min_words
+			M.stop_live_prompt(decision.cause, true)
+			return
 		end
+		request_profile   = decision.profile
+		request_count     = decision.num_predictions
+		request_min_words = decision.min_words
 	end
 	-- The profile the user mapped to the focused application wins over the menu's; a live
 	-- prompt or a request that names its own keeps its own.
@@ -2508,12 +2498,15 @@ function M.show_answers(session, answers, expected, on_accept, on_dismiss)
 	end
 	local waiting = #answers < expected
 	local shown_ok, shown = xpcall(function()
-		return tooltip.show_predictions(
-			predictions, 1, is_ai_preview_enabled, nil,
-			format_validation_shortcut(normalize_mods(validation_mods)), prediction_indent,
-			normalize_mods(navigation_mods), tooltip.tint("ai_prediction"),
-			waiting and i18n.get("llm.generating") or nil, waiting and expected or #predictions,
-			session, function() return runtime_available() and fetch_request_counter == session end)
+		return PredictionTooltipPort.wrap(tooltip).show({
+			predictions = predictions, current_index = 1, enabled = is_ai_preview_enabled,
+			shortcut_modifier = format_validation_shortcut(normalize_mods(validation_mods)),
+			indent = prediction_indent, navigation_modifiers = normalize_mods(navigation_mods),
+			background_color = tooltip.tint("ai_prediction"),
+			loading_text = waiting and i18n.get("llm.generating") or nil,
+			reserved_count = waiting and expected or #predictions, session_id = session,
+			commit_guard = function() return runtime_available() and fetch_request_counter == session end,
+		})
 	end, debug.traceback)
 	if not shown_ok or shown ~= true then
 		Logger.error(LOG, "Answers did not paint (result: %s).", tostring(shown))
@@ -2925,8 +2918,11 @@ end
 --- Initializes the engine by injecting the shared keymap core state.
 --- Must be called exactly once before any other engine function in this module.
 --- @param core_state table The shared state object from modules/keymap/init.lua.
+--- @param ports table|nil { TimerScheduler?, HttpClient? } replace the real owners; each is
+---   checked against its contract in llm.request_plan.ports. The tooltip is checked as the
+---   TooltipRenderer it is drawn through.
 --- @return boolean committed True only when every dependency is ready.
-function M.init(core_state)
+function M.init(core_state, ports)
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): invalid core_state (expected table, got %s).", type(core_state))
 		return false
@@ -2939,6 +2935,19 @@ function M.init(core_state)
 		Logger.error(LOG, "M.init(): a different state is already active — replacement refused.")
 		return false
 	end
+
+	-- The three ports of the request plan, checked once here so a missing method fails at
+	-- wiring and not inside a timer or a network callback.
+	ports = ports or {}
+	if type(ports) ~= "table" then
+		Logger.error(LOG, "M.init(): ports must be a table (got %s).", type(ports))
+		return false
+	end
+	local Ports = require("llm.request_plan.ports")
+	local timer_port = Ports.check("TimerScheduler", ports.TimerScheduler or TimerScheduler)
+	-- The backends build their own HTTP clients; only an injected one is checked here.
+	local http_port = ports.HttpClient ~= nil and Ports.check("HttpClient", ports.HttpClient) or nil
+	Ports.check("TooltipRenderer", PredictionTooltipPort.wrap(tooltip))
 
 	-- A parent may only publish this engine after every child reports an exact
 	-- commitment. Children treat a duplicate with the same retained binding as
@@ -2959,6 +2968,8 @@ function M.init(core_state)
 		return false
 	end
 
+	TimerScheduler = timer_port
+	if http_port ~= nil then core_llm.set_inference_client(http_port) end
 	_state = core_state
 	Logger.debug(LOG, "Prediction engine state injected (%d mapping(s)).", #(core_state.mappings or {}))
 	return true

@@ -19,6 +19,7 @@ local result = { passed = 0, failed = 0, failures = {} }
 local filter
 local reporter = {
 	initialize_timing = function() end,
+	warm_timings = function() end,
 	reset_results = function() end,
 	get_results = function() return result end,
 	timing_failed = function() return false end,

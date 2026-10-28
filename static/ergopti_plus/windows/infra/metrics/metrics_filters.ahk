@@ -141,12 +141,12 @@ _MF_PublishFlagCandidate(Prop, Target) {
 }
 
 _MF_BuildFilterTogglePlan(Prop) {
-	ConfigKey := _MF_FilterConfigKey(Prop)
-	if (ConfigKey = "")
+	FilterConfigKey := _MF_FilterConfigKey(Prop)
+	if (FilterConfigKey = "")
 		throw ValueError("Unknown metrics-filter property '" . Prop . "'.")
 	Target := !MetricsFilters.%Prop%
 	return {
-		updates: [{ Section: "metrics", Key: ConfigKey, Value: Target }],
+		updates: [{ Section: "metrics", Key: FilterConfigKey, Value: Target }],
 		publish: _MF_PublishFlagCandidate.Bind(Prop, Target)
 	}
 }

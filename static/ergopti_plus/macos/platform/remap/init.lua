@@ -4144,7 +4144,7 @@ end
 --- @return boolean accepted True when accepted or settled successfully.
 function M.remove_from_karabiner(on_done)
 	Logger.info(LOG, "Remove Ergopti from Karabiner requested.")
-	if not require_state("remove_from_karabiner") then
+	if not require_state(require("config_keys").COMMAND.REMOVE_FROM_KARABINER) then
 		invoke_public_callback("remove from Karabiner", on_done, false, "not-initialized", 0)
 		return false
 	end
@@ -5047,7 +5047,7 @@ function M.set_tap_hold_timeout(ms)
 	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_hold_timeout_ms = value
-	end, nil, "tap_holds.timeout_ms")
+	end, nil, require("config_keys").KEY.TAP_HOLDS_TIMEOUT_MS)
 	if committed then Logger.debug(LOG, "Tap/hold timeout: %d ms.", value) end
 	return committed
 end
@@ -5072,7 +5072,7 @@ function M.set_sticky_timeout(ms)
 	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.sticky_timeout_ms = value
-	end, nil, "tap_holds.sticky_timeout_ms")
+	end, nil, require("config_keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
 	if committed then Logger.debug(LOG, "Sticky timeout: %d ms.", value) end
 	return committed
 end
@@ -5097,7 +5097,7 @@ function M.set_simultaneous_threshold(ms)
 	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.simultaneous_threshold_ms = value
-	end, nil, "mod_combos.simultaneous_threshold_ms")
+	end, nil, require("config_keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 	if committed then Logger.debug(LOG, "Simultaneous threshold: %d ms.", value) end
 	return committed
 end
@@ -5119,7 +5119,7 @@ function M.set_combo_symmetric(value)
 	local normalized = value == true
 	local committed = commit_state_mutation(function(candidate)
 		candidate.combo_symmetric = normalized
-	end, nil, "mod_combos.symmetric")
+	end, nil, require("config_keys").KEY.MOD_COMBOS_SYMMETRIC)
 	if committed then Logger.debug(LOG, "Combo symmetric: %s.", tostring(normalized)) end
 	return committed
 end
@@ -5147,7 +5147,7 @@ function M.set_tap_holds_enabled(value)
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_holds_enabled = value
-	end, nil, "tap_holds.enabled")
+	end, nil, require("config_keys").KEY.TAP_HOLDS_ENABLED)
 	if committed then Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off") end
 	return committed
 end
@@ -5174,7 +5174,7 @@ function M.set_mod_combos_enabled(value)
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.mod_combos_enabled = value
-	end, nil, "mod_combos.enabled")
+	end, nil, require("config_keys").KEY.MOD_COMBOS_ENABLED)
 	if committed then Logger.info(LOG, "Key combinations: %s.", value and "on" or "off") end
 	return committed
 end
@@ -5797,7 +5797,7 @@ end
 -- The bulk scope of the Tap-Hold submenu. The key combinations are drawn in
 -- the Shortcuts group with a switch of their own, so the Tap-Hold restore and
 -- clear rows must leave them, and that switch, as the user set them.
-local BULK_SCOPE_TAP_HOLDS = "tap_holds"
+local BULK_SCOPE_TAP_HOLDS = require("config_keys").KEY.TAP_HOLDS
 
 --- Resolves a bulk command's scope, refusing an unknown one through its callback.
 --- @param label string Stable operation label.
@@ -5871,7 +5871,7 @@ end
 
 --- The remap file's top-level tables, each owned by the manifest scope whose
 --- prefixes declare it: the keys by tap_holds, the chords by shortcuts.
-local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos", key_combinations = "mod_combos" }
+local REMAP_SCOPE_SECTIONS = { tap_holds = require("config_keys").KEY.TAP_HOLDS, shortcuts = require("config_keys").KEY.MOD_COMBOS, key_combinations = require("config_keys").KEY.MOD_COMBOS }
 
 --- Applies the remap part of a manifest scope as one exact transaction: a
 --- verified backup of config_karabiner.toml, a save that only replaces those
@@ -5904,13 +5904,13 @@ function M.apply_scope(request, on_done)
 		return false
 	end
 	Logger.debug(LOG, "Remap scope %s '%s' transaction requested.", request.scope, request.mode)
-	local sibling = request.scope == "tap_holds" and request.mode == "recommended"
+	local sibling = request.scope == require("config_keys").KEY.TAP_HOLDS and request.mode == "recommended"
 		and require("platform.remap.scope_layer").import() or nil
 	return apply_bulk_settings_transaction(label, function(candidate)
 		local target = request.mode == "recommended"
 			and Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 			or Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
-		if section == "mod_combos" then
+		if section == require("config_keys").KEY.MOD_COMBOS then
 			-- The shared combination scope keeps its switch on clear, including
 			-- when composed into Shortcuts; restore imports the neutral-on gate.
 			if request.mode ~= "clear" then
@@ -5923,7 +5923,7 @@ function M.apply_scope(request, on_done)
 		end
 		for _, row in ipairs(Manifest.scope_plan(request.scope, request.mode).operations) do
 			local path = row.section .. "." .. row.key
-			assert(path == "tap_holds.enabled", "tap-hold scope row has no remap owner: " .. path)
+			assert(path == require("config_keys").KEY.TAP_HOLDS_ENABLED, "tap-hold scope row has no remap owner: " .. path)
 			if row.delete then
 				candidate.tap_holds_enabled = Manifest.default_for(path)
 			else
@@ -6329,7 +6329,12 @@ function M.regenerate(
 		-- is the same shell-quoting rule the generator applies 150 lines away, and the
 		-- generator's own regression test covers only that file. Memoised because this
 		-- runs on every regenerate: the directory does not stop existing.
-		pcall(hs.execute, "mkdir -p " .. require("text_utils").shell_quote(kc_parent))
+		-- An existing folder needs no shell fork (about 40 ms on the Mac, inside
+		-- the boot regeneration).
+		local ok_mode, mode = pcall(hs.fs.attributes, kc_parent, "mode")
+		if not (ok_mode and mode == "directory") then
+			pcall(hs.execute, "mkdir -p " .. require("text_utils").shell_quote(kc_parent))
+		end
 		_kc_parent_ensured = true
 	end
 
@@ -7082,11 +7087,22 @@ function M.init(file_system)
 			-- This step is independent and guarded so a layout failure cannot suppress
 			-- the first post-wake liveness proof.
 			if _state.enabled == true then
+				local refresh_reason = nil
 				local refresh_ok, refreshed = run_async_step(
 					"Wake exact-lease liveness refresh",
-					LeaseController.refresh_liveness
+					function()
+						local sent, reason = LeaseController.refresh_liveness()
+						refresh_reason = reason
+						return sent
+					end
 				)
-				if not refresh_ok or refreshed ~= true then
+				if refresh_ok and refreshed ~= true and refresh_reason == "no-live-generation" then
+					-- The 2026-10-27 19:46 wake found the generation gone and only warned, so
+					-- remapping stayed off until a reload. The bounded failure recovery owns
+					-- the re-acquisition: it refuses while disabled, paused or transitioning.
+					Logger.info(LOG, "Wake found no live Karabiner lease; re-acquiring it.")
+					begin_lease_recovery(_last_failed_lease_token or "wake-without-generation")
+				elseif not refresh_ok or refreshed ~= true then
 					Logger.warn(LOG, "Wake refresh could not renew the exact Karabiner lease liveness.")
 				end
 			end
@@ -7308,6 +7324,9 @@ function M.revoke(reason, on_done)
 		invoke_public_callback("revoke", on_done, ok == true, detail)
 	end
 	local function settle_join_if_ready()
+		-- Both halves may answer inside their own calls; the join then already
+		-- settled, and the trailing join below must not report it twice.
+		if callback_fired then return end
 		if not onboarding_done or not lease_done then return end
 		if onboarding_succeeded ~= true then
 			Logger.error(LOG, "Ergopti onboarding revocation failed: %s.",

@@ -157,7 +157,7 @@ try {
 	_SIC_Run()
 	FileAppend("PASS suppressive-capture-settlement", "*")
 	ExitApp(0)
-} catch as Err {
-	FileAppend(Err.Message . "`n" . Err.Stack, "**")
+} catch as TopLevelFailure {
+	FileAppend(TopLevelFailure.Message . "`n" . TopLevelFailure.Stack, "**")
 	ExitApp(1)
 }

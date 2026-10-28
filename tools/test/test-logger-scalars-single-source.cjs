@@ -620,6 +620,26 @@ function vocabularyViolations(hits, enums, baseline) {
 		);
 }
 
+// The matcher detector must fail on a sentence and accept an id, in both operand orders.
+{
+	const sentence = LogVocabulary.freeFormMatchers(
+		['if result.error == "process deadline exceeded" then', 'if "bad thing" ~= reason then'].join(
+			'\n'
+		)
+	);
+	const ids = LogVocabulary.freeFormMatchers(
+		[
+			'if result.error == Errors.X then',
+			'if reason == "process_deadline_exceeded" then',
+			'if reason == "" then'
+		].join('\n')
+	);
+	if (sentence.length !== 2 || ids.length !== 0)
+		errors.push(
+			'the free-form matcher detector no longer reports a sentence comparison and accepts an id'
+		);
+}
+
 {
 	const contracts = JSON.parse(read('_shared/core/ports/contracts.json'));
 	const vocabulary = JSON.parse(read('_shared/modules/logger/vocabulary.json'));
@@ -630,10 +650,26 @@ function vocabularyViolations(hits, enums, baseline) {
 				`contracts.json enums.${kind} differs from _shared/modules/logger/vocabulary.json — run npm run codegen:contracts`
 			);
 	}
-	const { hits, missingFormatters } = LogVocabulary.scanTree(ROOT, {
+	// Every declared hot-path segment is a phase the profiler records (`hotpath.<segment>`).
+	const segmentNames = [
+		...read('_shared/lua/hotpath_segments.lua').matchAll(/\{ name = "([a-z._]+)", drivers/g)
+	].map((m) => m[1]);
+	if (segmentNames.length < 10)
+		errors.push('the hot-path segment declaration was not found; the phase check stopped matching');
+	for (const name of segmentNames)
+		if (!vocabulary.phase.includes(`hotpath.${name}`))
+			errors.push(
+				`vocabulary.json phase lacks hotpath.${name}, the phase of a declared hot-path segment`
+			);
+	const { hits, missingFormatters, matchers } = LogVocabulary.scanTree(ROOT, {
 		generated: new Set(allOutputs()),
 		formatters: vocabulary.evidence_record_formatters
 	});
+	// No baseline: code that branches on a sentence breaks silently when the sentence is reworded.
+	for (const m of matchers)
+		errors.push(
+			`${m.file}:${m.line}: code compares a reason, error or phase with the sentence ${JSON.stringify(m.value)} — compare an id of _shared/lua/adapter_errors.lua (add it to vocabulary.json adapter_errors)`
+		);
 	for (const m of missingFormatters)
 		errors.push(`declared evidence-record formatter ${m} was not found or writes no field`);
 	if (hits.length < 500)

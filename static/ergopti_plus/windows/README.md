@@ -29,6 +29,15 @@ includes.
 > can hide a test. Edit with tooling that preserves both; never append via a POSIX
 > `cat >>`. The suite enforces it (`npm run test:ahk-encoding`).
 
+## Developer mode
+
+`powershell -ExecutionPolicy Bypass -File tools\dev\run-windows-dev.ps1` (from
+the clone root, or `npm run dev:windows`) asks a running ErgoptiPlus to close,
+then runs this `ErgoptiPlus.ahk` with AutoHotkey v2 x64 and the same `vendor\`
+helpers, AI runtimes and `%APPDATA%\Ergopti\paths.toml` as the exe. A saved
+driver `.ahk` reloads it (`infra/dev_source.ahk`), as does the tray's Reload; the
+updater stays off. See `docs/design/developer-mode.md`.
+
 ## Layout
 
 | Path                 | Role                                                                                                                                                                                             |

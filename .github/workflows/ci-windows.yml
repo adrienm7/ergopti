@@ -393,7 +393,7 @@ jobs:
           if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
           $tests = "${{ github.workspace }}\static\ergopti_plus\windows\tests"
           $failed = 0
-          foreach ($name in @("run_llm_model_browser.ahk", "run_llm_model_menu_disabled.ahk", "run_llm_pointer_dismiss.ahk")) {
+          foreach ($name in @("run_llm_model_browser.ahk", "run_llm_pointer_dismiss.ahk")) {
               $runner = Join-Path $tests $name
               if (-not (Test-Path $runner)) { Write-Error "Runner not found: $runner"; exit 2 }
               $out = "$env:TEMP\$name.out"

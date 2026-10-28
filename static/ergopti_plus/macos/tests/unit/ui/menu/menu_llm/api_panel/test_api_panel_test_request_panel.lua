@@ -369,10 +369,12 @@ helpers.describe("API panel test request", function()
 			end
 			helpers.assert_eq(title, "API — openai/m1 (api.example.invalid)",
 				"the parent row names the active entry without repeating its provider")
-			local picker = panel.build_model_picker(fixture_context())
+			-- The model selector page lists the same automatic names, in order.
+			local context = fixture_context()
+			context.collect = {}
+			panel.build(context)
 			for index, name in ipairs(expected) do
-				-- The picker opens with « No model » and a separator
-				helpers.assert_eq(picker[index + 2].label, name, "picker row " .. index)
+				helpers.assert_eq(context.collect.entries[index].name, name, "page row " .. index)
 			end
 			helpers.assert_eq(panel.active_entry_display_name(), expected[1])
 		end)

@@ -61,6 +61,8 @@ const nativeRuntimeGenerator = require('../codegen/codegen-linux-native-runtime.
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
+// The installer's functions print through its message reader.
+const MESSAGES_READER = require('./lib/shell-messages-fixture.cjs').readerSource();
 const LAUNCHER = path.join(DRIVER, 'bin', 'ergopti-hotstrings');
 const INSTALLER = path.join(DRIVER, 'install.sh');
 const DEB_BUILDER = path.join(ROOT, 'tools', 'build', 'build-linux-deb.sh');
@@ -268,6 +270,7 @@ if (
 		fs.chmodSync(fakeManager, 0o755);
 		const harness =
 			'set -u\n' +
+			MESSAGES_READER +
 			'_detect_pkg_manager() { echo apk; }\n' +
 			'sudo() { "$@"; }\n' +
 			dependencyFunctions +
@@ -328,7 +331,7 @@ if (
 					fs.rmSync(log, { force: true });
 					const result = spawnSync(bash, ['-s'], {
 						input:
-							`set -u\n_detect_pkg_manager() { echo ${manager}; }\nsudo() { "$@"; }\n` +
+							`set -u\n${MESSAGES_READER}_detect_pkg_manager() { echo ${manager}; }\nsudo() { "$@"; }\n` +
 							dependencyFunctions +
 							`\n_check_or_install_library ${soname}\n`,
 						encoding: 'utf8',

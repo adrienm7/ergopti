@@ -749,9 +749,16 @@ function M.create(deps)
 			deps.terminal_pending, debug.traceback)
 		if not pending_ok or type(terminal_pending) ~= "boolean" or terminal_pending then
 			if external_writer == token then external_writer = nil end
-			Logger.warn(LOG,
-				"Global external writer '%s' refused because terminal quiescence was not proved: %s.",
-				tostring(label), tostring(terminal_pending))
+			if pending_ok and terminal_pending == true then
+				-- Expected: a file burst that arrives while the reload or quit it
+				-- triggered is under way (field run 2026-10-27 19:47:04, ledger L45).
+				Logger.info(LOG, "Global external writer '%s' deferred: a reload or quit is in progress.",
+					tostring(label))
+			else
+				Logger.warn(LOG,
+					"Global external writer '%s' refused because terminal quiescence was not proved: %s.",
+					tostring(label), tostring(terminal_pending))
+			end
 			return false
 		end
 		local ok, result = xpcall(callback, debug.traceback)

@@ -171,7 +171,7 @@ helpers.describe("API panel prompt cancellation", function()
 					if index % 2 == 0 then return "ignored", "button.cancel" end
 					return "button.cancel", "ignored"
 				end
-				return "OK", values[index]
+				return "button.ok", values[index]
 			end)
 
 			helpers.assert_eq(got.prompt_calls, cancel_index,
@@ -190,7 +190,7 @@ helpers.describe("API panel prompt cancellation", function()
 	helpers.it("keeps accepted empty optional fields distinct from Cancel", function()
 		local values = { "", "secret", "" }
 		local got = run_add_fixture(function(index)
-			return "OK", values[index]
+			return "button.ok", values[index]
 		end)
 
 		helpers.assert_eq(got.prompt_calls, 3, "URL, key and model: no name is asked (api-entry-auto-name)")
@@ -206,7 +206,7 @@ helpers.describe("API panel prompt cancellation", function()
 	helpers.it("names a new entry apart from one of the same provider and model (api-entry-auto-name)", function()
 		local values = { "", "secret", "" }
 		local got = run_add_fixture(function(index)
-			return "OK", values[index]
+			return "button.ok", values[index]
 		end, "button.cancel", {
 			{ id = "old", provider = "openai", model = "default-model", label = "Mon nom" },
 		})
@@ -221,7 +221,7 @@ helpers.describe("API panel prompt cancellation", function()
 	helpers.it("offers a probe after add when confirmed", function()
 		local values = { "", "secret", "" }
 		local got = run_add_fixture(function(index)
-			return "OK", values[index]
+			return "button.ok", values[index]
 		end, "button.ok")
 
 		helpers.assert_eq(#got.probe_calls, 1,
@@ -233,7 +233,7 @@ helpers.describe("API panel prompt cancellation", function()
 	helpers.it("skips the probe after add when declined", function()
 		local values = { "", "secret", "" }
 		local got = run_add_fixture(function(index)
-			return "OK", values[index]
+			return "button.ok", values[index]
 		end, "button.cancel")
 
 		helpers.assert_eq(#got.probe_calls, 0,

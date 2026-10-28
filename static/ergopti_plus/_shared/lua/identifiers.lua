@@ -23,6 +23,7 @@ return {
 	},
 	service_labels = {
 		macos_core = "com.ergoptiplus.runtime.core",
+		macos_remap_guardian = "com.ergoptiplus.remap-guardian",
 		macos_virtual_hid = "com.ergoptiplus.runtime.vhid",
 	},
 	hosts = {
@@ -31,5 +32,9 @@ return {
 		huggingface = "huggingface.co",
 		ollama = "ollama.com",
 		ollama_registry = "registry.ollama.ai",
+	},
+	dev_source = {
+		plist_key = "ErgoptiDevSourceRoot",
+		environment = "ERGOPTI_DEV_SOURCE_ROOT",
 	},
 }

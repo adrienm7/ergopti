@@ -318,6 +318,7 @@ end
 --- @param task table ShellRunner handle.
 --- @param label string Stable diagnostic label.
 --- @return boolean stopped True only when task termination committed.
+--- @return string|nil pending "pending" while a delivered SIGTERM awaits native exit.
 local function terminate_task(task, label)
 	if type(task) ~= "table" or type(task.terminate) ~= "function" then
 		Logger.error(LOG, "Cannot terminate %s task; terminate() is unavailable.", tostring(label))
@@ -335,7 +336,7 @@ local function terminate_task(task, label)
 	-- that proves native exit. Retain the exact task across that pending interval
 	if settlement == "pending" then
 		Logger.debug(LOG, "%s task termination is pending native completion.", tostring(label))
-		return false
+		return false, "pending"
 	end
 	return true
 end
@@ -343,6 +344,8 @@ end
 --- Cancels every exact asynchronous capability owned by discovery.
 --- @param label string Stable diagnostic operation.
 --- @return boolean settled True only when no timer, task, or HTTP owner remains.
+--- @return string|nil pending "pending" when the only remaining owner is a poll
+--- task whose delivered SIGTERM awaits its native exit; nil for a refusal.
 local function settle_async_owners(label)
 	local poll_timer_settled = true
 	local cooldown_settled = true
@@ -357,8 +360,11 @@ local function settle_async_owners(label)
 		cooldown_settled = cancel_timer(_cooldown_timer, label .. " cooldown") == true
 		if cooldown_settled then _cooldown_timer = nil end
 	end
+	local poll_task_pending = false
 	if _poll_task then
-		poll_task_settled = terminate_task(_poll_task, label .. " poll") == true
+		local stopped, pending = terminate_task(_poll_task, label .. " poll")
+		poll_task_settled = stopped == true
+		poll_task_pending = pending == "pending"
 		if poll_task_settled then _poll_task = nil end
 	end
 
@@ -372,8 +378,11 @@ local function settle_async_owners(label)
 			tostring(label), tostring(cancel_result))
 	end
 
-	return poll_timer_settled and cooldown_settled
-		and poll_task_settled and probe_settled
+	local settled = poll_timer_settled and cooldown_settled and poll_task_settled and probe_settled
+	if not settled and poll_timer_settled and cooldown_settled and probe_settled and poll_task_pending then
+		return false, "pending"
+	end
+	return settled
 end
 
 --- Attaches one discovery waiter to an exact timer debt.
@@ -502,6 +511,8 @@ function M.stop()
 	_active_cycle = nil
 	_discovery_pending_callbacks = {}
 	_last_cycle_finished_at = nil
+	-- A pending native exit is logical revocation already committed: resume()
+	-- stays fenced until that exact task's completion settles it.
 	return settle_async_owners("Discovery stop")
 end
 

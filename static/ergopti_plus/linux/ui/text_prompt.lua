@@ -17,6 +17,7 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
@@ -49,10 +50,10 @@ function M.ask(title, prompt, initial, hidden, choices)
 		command = command .. " " .. shell_quote(choice)
 	end
 	command = command .. " 2>/dev/null"
-	local ok, value, reason = Modal.run(function() return Shell.exec_checked(command) end)
+	local ok, value, message, reason, status = Modal.run(function() return Shell.exec_checked(command) end)
 	if ok ~= true then
-		if reason ~= "command exited with status 1" then
-			Logger.error(LOG, "Zenity could not prompt for '%s': %s.", tostring(title), tostring(reason))
+		if not (reason == Errors.COMMAND_EXITED_NONZERO and status == 1) then
+			Logger.error(LOG, "Zenity could not prompt for '%s': %s.", tostring(title), tostring(message))
 		end
 		return nil
 	end

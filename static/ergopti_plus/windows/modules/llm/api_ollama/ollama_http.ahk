@@ -422,12 +422,14 @@ _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 _LLM_CurlReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 	if !(ProcessOwner is Map)
 		return true
-	; Keep failure-to-debt transfer atomic against another AHK thread. Native
-	; operations here are non-blocking: TerminateProcess, zero-time wait and close.
+	; The inner owner serializes native attempts. Job termination can yield,
+	; so only fresh release/debt publication belongs inside this Critical.
+	Released := _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate, Port)
 	NewDebt := false
 	PreviousCritical := Critical("On")
 	try {
-		if _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate, Port) {
+		; Another thread may finish the exact owner after our attempt returns.
+		if Released || ProcessOwner.Get("released", false) {
 			_LLM_CurlRetireProcessCleanupDebt(ProcessOwner)
 			return true
 		}
@@ -462,6 +464,31 @@ _LLM_CurlProcessExited(ProcessOwner, Port := 0) {
 		return false
 	; WAIT_OBJECT_0 is the sole proof that this exact retained process exited.
 	return Result = 0
+}
+
+
+; Read the terminal status while custody still retains the exact native object.
+; A signaled exit code 259 is a failed exit, not a process-liveness verdict.
+_LLM_CurlProcessExitCode(ProcessOwner) {
+	PreviousCritical := Critical("On")
+	try {
+		if !(ProcessOwner is Map) || ProcessOwner.Get("released", false)
+				|| ProcessOwner.Get("releasing", false)
+			throw Error("The curl process owner cannot provide a terminal exit receipt.")
+		if !_LLM_CurlProcessExited(ProcessOwner)
+			throw Error("The exact curl process has not acknowledged exit.")
+		if ProcessOwner.Has("tree") {
+			ExitCode := ProcessOwner["terminal"].Get("exit", "")
+			if !(ExitCode is Integer)
+				throw Error("The curl process tree returned an invalid exit receipt.")
+			return ExitCode
+		}
+		ExitCode := 0
+		Diagnostic := ""
+		if !_SR_TreeReadExitCode(ProcessOwner["handle"], &ExitCode, &Diagnostic)
+			throw Error(Diagnostic)
+		return ExitCode
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_CurlMaxFileSizeArg(CurlExe := "", VersionFn := 0) {

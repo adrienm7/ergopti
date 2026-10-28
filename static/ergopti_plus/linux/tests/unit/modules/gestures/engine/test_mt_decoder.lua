@@ -507,3 +507,159 @@ helpers.describe("mt decoder: lost queue recovery", function()
 		if not ok then error(detail, 0) end
 	end)
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 6/ A two-finger scroll is never a three-finger swipe ====
+-- =================================================================
+-- =================================================================
+
+--- Builds a frame player over explicit contacts, for the scroll cases below.
+--- Each frame names its contacts as { slot, x, y }; the finger-count bits and
+--- tracking ids follow the contacts the way the kernel publishes them.
+--- @return table player { frame, lift, decoder, result }
+local function scroll_player()
+	local clock = 100.0
+	local player = {}
+	player.decoder = Decoder.new({ now_sec = function() return clock end, tap_max_sec = 0.7 })
+	local live = {}
+	local count = 0
+	local function send(t, c, v)
+		local out = player.decoder:feed({ type = t, code = c, value = v })
+		if out then player.result = out end
+	end
+
+	--- Plays one SYN frame with exactly these contacts down.
+	--- @param contacts table Array of { slot, x, y }.
+	function player.frame(contacts)
+		local seen = {}
+		for _, c in ipairs(contacts) do
+			local slot, x, y = c[1], c[2], c[3]
+			seen[slot] = true
+			send(EV_ABS, Decoder.ABS_MT_SLOT, slot)
+			if not live[slot] then
+				send(EV_ABS, Decoder.ABS_MT_TRACKING_ID, 700 + slot)
+				live[slot] = true
+			end
+			send(EV_ABS, Decoder.ABS_MT_POSITION_X, x)
+			send(EV_ABS, Decoder.ABS_MT_POSITION_Y, y)
+		end
+		for slot in pairs(live) do
+			if not seen[slot] then
+				send(EV_ABS, Decoder.ABS_MT_SLOT, slot)
+				send(EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1)
+				live[slot] = nil
+			end
+		end
+		if #contacts ~= count then
+			if count > 0 then send(EV_KEY, BTN_TOOL[count], 0) end
+			send(EV_KEY, BTN_TOOL[#contacts], 1)
+			if count == 0 then send(EV_KEY, BTN_TOUCH, 1) end
+			count = #contacts
+		end
+		send(EV_SYN, SYN_REPORT, 0)
+		clock = clock + 0.008
+	end
+
+	--- Lifts every contact.
+	function player.lift()
+		for slot in pairs(live) do
+			send(EV_ABS, Decoder.ABS_MT_SLOT, slot)
+			send(EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1)
+		end
+		live = {}
+		if count > 0 then send(EV_KEY, BTN_TOOL[count], 0) end
+		count = 0
+		send(EV_KEY, BTN_TOUCH, 0)
+		send(EV_SYN, SYN_REPORT, 0)
+		clock = clock + 0.008
+	end
+
+	--- Lets time pass with no contact.
+	--- @param seconds number
+	function player.wait(seconds) clock = clock + seconds end
+
+	return player
+end
+
+-- Two fingers side by side, a third beside them, a thumb resting below.
+local function pair_at(y) return { { 0, 1000, y }, { 1, 1200, y } } end
+local function hand_at(y) return { { 0, 1000, y }, { 1, 1200, y }, { 2, 1400, y } } end
+local function pair_and_thumb(y) return { { 0, 1000, y }, { 1, 1200, y }, { 2, 1100, 2000 } } end
+
+helpers.describe("mt decoder: a two-finger scroll is never a three-finger swipe (three-finger-swipe-vs-scroll)", function()
+	helpers.it("a one-frame third contact keeps the scroll at two fingers", function()
+		local p = scroll_player()
+		p.frame(pair_at(900))
+		p.frame(pair_and_thumb(880))
+		for i = 2, 20 do p.frame(pair_at(900 - i * 20)) end
+		p.lift()
+		helpers.assert_true(p.result ~= nil and p.result.fingers == 2,
+			"a contact seen for a single frame must not become the gesture's finger count; got "
+				.. tostring(p.result and p.result.fingers))
+	end)
+
+	helpers.it("a thumb resting beside a moving pair keeps it at two fingers", function()
+		local p = scroll_player()
+		for i = 0, 8 do p.frame(pair_at(900 - i * 20)) end
+		for i = 9, 30 do p.frame(pair_and_thumb(900 - i * 20)) end
+		p.lift()
+		helpers.assert_true(p.result ~= nil and p.result.fingers == 2,
+			"a finger joining a pair that is already scrolling is not a third finger; got "
+				.. tostring(p.result and p.result.fingers))
+	end)
+
+	helpers.it("three contacts that continue as a moving pair fire nothing", function()
+		local p = scroll_player()
+		for _ = 1, 5 do p.frame(hand_at(900)) end
+		for i = 1, 20 do p.frame(pair_at(900 - i * 20)) end
+		p.lift()
+		helpers.assert_nil(p.result,
+			"a three-finger touch that becomes a scrolling pair is neither a swipe nor a tap")
+	end)
+
+	helpers.it("a three-finger touch right after a scroll fires nothing", function()
+		local p = scroll_player()
+		for i = 0, 20 do p.frame(pair_at(900 - i * 20)) end
+		p.lift()
+		p.result = nil
+		p.wait(0.1)
+		for i = 0, 20 do p.frame(hand_at(900 - i * 20)) end
+		p.lift()
+		helpers.assert_nil(p.result,
+			"fingers landing to stop a scroll are not a three-finger swipe")
+	end)
+
+	helpers.it("fingers landing over 200 ms still report three fingers", function()
+		local p = scroll_player()
+		p.frame({ { 0, 1000, 900 } })
+		for _ = 1, 25 do p.frame(pair_at(900)) end
+		for i = 0, 20 do p.frame(hand_at(900 - i * 20)) end
+		p.lift()
+		helpers.assert_true(p.result ~= nil and p.result.fingers == 3 and p.result.direction == "up",
+			"a still pair joined 200 ms later is a three-finger swipe; got "
+				.. tostring(p.result and p.result.fingers))
+	end)
+
+	helpers.it("a fast short three-finger flick reports three fingers", function()
+		local p = scroll_player()
+		p.frame(pair_at(900))
+		for i = 0, 4 do p.frame(hand_at(900 - i * 60)) end
+		p.lift()
+		helpers.assert_true(p.result ~= nil and p.result.fingers == 3 and p.result.direction == "up",
+			"two frames confirm the third finger before a flick lifts; got "
+				.. tostring(p.result and p.result.fingers))
+	end)
+
+	helpers.it("a deliberate three-finger swipe still reports three fingers up", function()
+		local p = scroll_player()
+		p.frame(pair_at(900))
+		for i = 0, 20 do p.frame(hand_at(900 - i * 20)) end
+		p.lift()
+		helpers.assert_true(p.result ~= nil and p.result.fingers == 3 and p.result.direction == "up",
+			"a staggered three-finger landing that swipes up is still swipe_3_up")
+	end)
+end)

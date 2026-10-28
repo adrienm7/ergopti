@@ -46,11 +46,12 @@ local EvdevCodes  = require("infra.evdev_codes")
 local Timings     = require("infra.timings")
 local InputEvent  = require("infra.input_event")
 local Shared      = require("keymap.magic_key_source")
+local ConfigKeys = require("config_keys")
 
 local LOG = "magic_key_source"
 
 -- The canonical configuration path of the setting, and its automatic value.
-M.PATH = "hotstrings.magic_key_source"
+M.PATH = ConfigKeys.KEY.HOTSTRINGS_MAGIC_KEY_SOURCE
 local AUTOMATIC = Manifest.default_for(M.PATH)
 
 -- How long a capture waits for a key (shared with macOS and Windows).
@@ -347,7 +348,7 @@ end
 function M.init(deps)
 	if _deps ~= nil then error("magic_key_source: already initialized", 2) end
 	if type(deps) ~= "table" then error("magic_key_source.init needs its collaborators", 2) end
-	for _, name in ipairs({ "is_active", "replace_on", "magic_key", "can_type", "type_text", "dispatch_char",
+	for _, name in ipairs({ "is_active", "replace_on", ConfigKeys.LEAF.MAGIC_KEY, "can_type", "type_text", "dispatch_char",
 		"end_selection", "can_capture", "key_text", "defer" }) do
 		if type(deps[name]) ~= "function" then error("magic_key_source.init needs " .. name, 2) end
 	end
@@ -573,7 +574,7 @@ local preference_ports = { get = Preferences.get, generation = Preferences.gener
 local collision_methods = { get = M.get, evdev_code = M.evdev_code, resolver = M.resolver,
 	on_key = M.on_key, capture = M.capture, cancel_capture = M.cancel_capture, init = M.init,
 	_reset_for_test = M._reset_for_test }
-local collision_callback_names = { "is_active", "replace_on", "magic_key", "can_type", "type_text",
+local collision_callback_names = { "is_active", "replace_on", ConfigKeys.LEAF.MAGIC_KEY, "can_type", "type_text",
 	"dispatch_char", "end_selection", "can_capture", "key_text", "defer",
 	"input_source_receipt", "typing_plan", "direct_source_admitted" }
 local collision_factory
@@ -625,7 +626,7 @@ collision_factory = function()
 	end
 	local function private_current()
 		if not rawequal(package.loaded["modules.hotstrings.magic_key_source"], M)
-			or M.PATH ~= "hotstrings.magic_key_source" or M.capture_collision_inventory ~= collision_factory
+			or M.PATH ~= ConfigKeys.KEY.HOTSTRINGS_MAGIC_KEY_SOURCE or M.capture_collision_inventory ~= collision_factory
 			or _deps ~= deps or _capture ~= nil or _capture_epoch ~= capture_epoch
 			or _pending_choices ~= pending or next(pending) ~= nil
 			or preference_ports.generation() ~= preference_epoch or preference_ports.is_acquired()

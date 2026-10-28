@@ -226,6 +226,7 @@ for (const [file, members] of [
 		'ManagedCertificateAuthorities.swift',
 		[
 			'trustEnvironment',
+			'trustEnvironment',
 			'maximumCertificateFiles',
 			'maximumCertificateBytes',
 			'maximumCertificateFiles'
@@ -361,5 +362,20 @@ const nativeContract = JSON.parse(
 const shipping = /^go(\d+)\.(\d+)\.\d+$/.exec(nativeContract.go_version);
 assert.ok(shipping && (Number(shipping[1]) > 1 || Number(shipping[2]) >= 22));
 controls += 5;
+
+// Field run 2026-10-27 19:47 (ledger L41): the release download roles drop an
+// inherited SSL_CERT_FILE/SSL_CERT_DIR before they read their environment. The
+// XCTest ManagedNetworkBootstrapTests proves the drop; this pins the dispatch.
+const launcherMain = fs.readFileSync(
+	path.join(root, 'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift'),
+	'utf8'
+);
+for (const role of ['ManagedBootstrapDownload', 'ManagedHTTPWorker']) {
+	const dispatch = new RegExp(
+		`if ${role}\\.handles\\(arguments: CommandLine\\.arguments\\) \\{\\n\\tguard ManagedCertificateAuthorities\\.dropInheritedTrustVariables\\(\\) else \\{ Darwin\\.exit\\(78\\) \\}\\n\\tDarwin\\.exit\\(${role}\\.run\\(`
+	);
+	assert.match(launcherMain, dispatch, `${role} drops the inherited trust variables first`);
+	controls++;
+}
 
 console.log(`Managed bootstrap policy: ${controls} controls passed; native SDK not executed.`);

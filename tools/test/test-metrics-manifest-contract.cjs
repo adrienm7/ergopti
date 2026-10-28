@@ -148,6 +148,8 @@ vm.runInContext(
 	read('static/ergopti_plus/_shared/ui/_generated/metrics_general_category_aliases.js'),
 	appsContext
 );
+vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_calendar.js'), appsContext);
+require('./support/theme-tokens.cjs').installThemeTokens(appsContext);
 vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_apps/helpers.js'), appsContext);
 vm.runInContext(appsSource, appsContext);
 vm.runInContext(
@@ -242,7 +244,7 @@ assert.deepStrictEqual(
 	'the real Typing consumer must produce non-empty hourly error buckets'
 );
 assert.deepStrictEqual(
-	plain(typingState.minute5_series['09:00'].e_buckets),
+	plain(typingState.minute5_series['2025-05-01T09:00'].e_buckets),
 	{ 250: 3, 500: 3 },
 	'the real Typing consumer must produce non-empty five-minute error buckets'
 );
@@ -257,7 +259,7 @@ const selectionState = {
 	did_apply_initial_reset: true,
 	app_selection_mode: 'all'
 };
-const processManifest = compileFunction(typingSource, 'process_manifest', {
+const selectionContext = {
 	window: { metrics_manifest: manifest },
 	app_state: selectionState,
 	APP_SELECTION_MODE: { ALL: 'all', NONE: 'none', UNINITIALIZED: 'initial' },
@@ -266,7 +268,13 @@ const processManifest = compileFunction(typingSource, 'process_manifest', {
 	compute_manifest_metrics() {},
 	request_range_data() {},
 	ensure_live_refresh() {}
-});
+};
+selectionContext.update_manifest_scope = compileFunction(
+	typingSource,
+	'update_manifest_scope',
+	selectionContext
+);
+const processManifest = compileFunction(typingSource, 'process_manifest', selectionContext);
 processManifest();
 assert.deepStrictEqual(
 	plain(selectionState.available_apps),

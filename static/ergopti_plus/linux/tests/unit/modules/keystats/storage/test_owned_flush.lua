@@ -8,6 +8,342 @@ local Fakes = require("tests.fakes")
 local function assert_false(value) helpers.assert_eq(value, false) end
 require("infra.monotonic") -- Load the genuine clock before temporary native ports.
 
+local function read_committed_input(database)
+	local shell = require("adapters.shell_runner")
+	assert(shell.has_command("sqlite3"), "SQLite CLI is required for the independent native COMMIT assertion")
+	local ok, retained, failure = shell.exec_checked("sqlite3 -init /dev/null -bail -readonly "
+		.. shell.quote(database) .. " " .. shell.quote("SELECT COUNT(*) FROM events_typing;"))
+	assert(ok, failure)
+	return retained
+end
+
+helpers.describe("native metrics fixture SQLite admission", function()
+	it("native-fixture-sqlite-admission: a missing CLI refuses before opening the independent query", function()
+		local shell = require("adapters.shell_runner")
+		helpers.assert_eq(type(shell.has_command), "function", "the probe must mirror the real shell API")
+		helpers.assert_eq(type(shell.exec_checked), "function", "the query must mirror the real checked shell API")
+		local original_probe, original_checked = shell.has_command, shell.exec_checked
+		local probes, executions = 0, 0
+		shell.has_command = function(program)
+			helpers.assert_eq(program, "sqlite3")
+			probes = probes + 1
+			return false
+		end
+		shell.exec_checked = function()
+			executions = executions + 1
+			return false, "", "the independent query must not launch without SQLite"
+		end
+		local ok, detail = pcall(read_committed_input, "/nonexistent/ergopti-fixture-admission/metrics.sqlite")
+		shell.has_command, shell.exec_checked = original_probe, original_checked
+		helpers.assert_eq(ok, false, "missing mandatory SQLite must never skip its native assertion")
+		helpers.assert_eq(executions, 0, "the mandatory CLI must be admitted before any independent query")
+		helpers.assert_eq(probes, 1, "the real required-tool boundary must be exercised")
+		helpers.assert_contains(detail, "SQLite CLI is required for the independent native COMMIT assertion")
+	end)
+	it("native-fixture-sqlite-exit: expected-looking rows from a failed real CLI cannot certify COMMIT", function()
+		local uv = require("luv")
+		for _, name in ipairs({ "fs_mkdtemp", "os_getenv", "os_setenv", "os_unsetenv", "fs_open", "fs_write", "fs_close", "kill", "walk" }) do
+			helpers.assert_eq(debug.getinfo(uv[name], "S").what, "C", "the regression requires the actual native " .. name)
+		end
+		helpers.assert_eq(debug.getinfo(io.popen, "S").what, "C", "the real native child pipe must execute")
+		local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-sqlite-witness-XXXXXX"))
+		local original_path = assert(uv.os_getenv("PATH"), "the test runner must declare PATH")
+		local original_tmp = uv.os_getenv("TMPDIR")
+		local shell = require("adapters.shell_runner")
+		local before = {}
+		uv.walk(function(handle) before[handle] = true end)
+		local accepted, detail, pid
+		local ok, failure = xpcall(function()
+			local script = table.concat({
+				"#!/bin/sh",
+				"printf '%s\\n' \"$$\" > " .. shell.quote(directory .. "/pid"),
+				"printf '1\\n'",
+				"exit 73",
+				"",
+			}, "\n")
+			local fd = assert(uv.fs_open(directory .. "/sqlite3", "wx", 448))
+			local written, write_error = uv.fs_write(fd, script, 0)
+			local closed, close_error = uv.fs_close(fd)
+			helpers.assert_eq(written, #script, write_error)
+			helpers.assert_true(closed, close_error)
+			assert(uv.os_setenv("PATH", directory .. ":" .. original_path))
+			assert(uv.os_setenv("TMPDIR", directory))
+			accepted, detail = pcall(read_committed_input, directory .. "/unused.sqlite")
+			local file = assert(io.open(directory .. "/pid", "rb"))
+			pid = tonumber(file:read("*a"))
+			assert(file:close())
+		end, debug.traceback)
+		assert(uv.os_setenv("PATH", original_path))
+		if original_tmp then assert(uv.os_setenv("TMPDIR", original_tmp)) else assert(uv.os_unsetenv("TMPDIR")) end
+		local absent, _, absence_code
+		if pid then absent, _, absence_code = uv.kill(pid, 0) end
+		local residual = 0
+		uv.walk(function(handle) if not before[handle] then residual = residual + 1 end end)
+		for name in uv.fs_scandir_next, assert(uv.fs_scandir(directory)) do assert(uv.fs_unlink(directory .. "/" .. name)) end
+		assert(uv.fs_rmdir(directory))
+		helpers.assert_true(ok, failure)
+		helpers.assert_true(type(pid) == "number" and pid > 0, "the exact private native CLI must execute")
+		helpers.assert_eq(absent, nil)
+		helpers.assert_eq(absence_code, "ESRCH", "the failed native CLI must be reaped before accepting a witness")
+		helpers.assert_eq(residual, 0, "the independent query must leave no new native handles")
+		helpers.assert_eq(accepted, false, "stdout alone cannot certify a native COMMIT witness")
+		helpers.assert_contains(detail, "command exited with status 73")
+	end)
+end)
+
+helpers.describe("native metrics fixture construction deadlines", function()
+	for _, action in ipairs({ "stop", "reset", "flush" }) do
+		for _, constructor in ipairs({ 1, 2 }) do
+			it("native-fixture-deadline: " .. action .. " observes constructor " .. constructor .. " after blocking work", function()
+				local uv = require("luv")
+				helpers.assert_eq(debug.getinfo(uv.fs_stat, "S").what, "C", "the actual native provider is required")
+				local native = require("tests.support.keystats_native_fixture")
+				local batch = require("infra.sqlite_batch_process")
+				local original_start = assert(batch.start)
+				local operation_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+				local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-fixture-deadline-XXXXXX"))
+				local database = directory .. "/metrics.sqlite"
+				local armed, delayed, starts, collector = false, 0, 0, nil
+				batch.start = function(...)
+					helpers.assert_eq(select(3, ...).timeout_ms, operation_ms, "every real child keeps its canonical deadline")
+					if armed and starts + 1 == constructor then
+						armed, delayed = false, delayed + 1
+						-- Construction can block before the genuine operation starts its
+						-- own unchanged deadline. No native receipt is synthesized here.
+						uv.sleep(operation_ms)
+					end
+					starts = starts + 1
+					return original_start(...)
+				end
+				local ok, failure = xpcall(function()
+					native.with(function(owner)
+						collector = owner
+						owner.init({ sqlite_path = database })
+						require("tests.support.metrics_consent_fixture").enable(owner)
+						owner.on_keydown("x", 1000, "fixture-deadline")
+						armed = true
+						if action == "reset" then
+							native.reset(owner)
+							helpers.assert_eq(owner.get_session_stats().keystrokes, 0, "only actual COMMIT resets the session")
+						elseif action == "flush" then
+							native.flush(owner)
+							helpers.assert_eq(owner.get_session_stats().keystrokes, 1, "a COMMIT must preserve the live session")
+						end
+					end)
+				end, debug.traceback)
+				batch.start = original_start
+				-- Keep the regression's negative run from abandoning its real child
+				-- when the unfixed fixture rejects a freshly acquired operation.
+				local until_ns = uv.hrtime() + operation_ms * 1000000
+				local settled = collector and collector.stop()
+				while not settled and collector and uv.hrtime() < until_ns do
+					uv.run("nowait"); uv.sleep(1); settled = collector.stop()
+				end
+				local retained
+				if settled then
+					retained = read_committed_input(database)
+				end
+				for name in uv.fs_scandir_next, assert(uv.fs_scandir(directory)) do
+					assert(uv.fs_unlink(directory .. "/" .. name))
+				end
+				assert(uv.fs_rmdir(directory))
+				helpers.assert_true(settled, "the actual native owner must retire even in the negative regression run")
+				helpers.assert_true(ok, failure)
+				helpers.assert_eq(delayed, 1, "exactly one real constructor must exercise the blocked interval")
+				helpers.assert_true(starts >= 1, "the real native transport must execute")
+				helpers.assert_eq(collector.has_flush_debt(), false)
+				helpers.assert_eq(collector.get_flush_status().committed, true)
+				helpers.assert_eq(retained, "1\n", "independent SQLite must observe the exact committed input once")
+			end)
+		end
+	end
+end)
+
+helpers.describe("native metrics fixture retirement observation", function()
+	it("native-fixture-retirement: observes a real timed-out child until physical retirement", function()
+		local uv = require("luv")
+		local native = require("tests.support.keystats_native_fixture")
+		local batch = require("infra.sqlite_batch_process")
+		local operation_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+		local original_spawn, original_timer_start, original_start = uv.spawn, uv.timer_start, batch.start
+		for _, name in ipairs({ "spawn", "timer_start", "run", "sleep", "new_check", "check_start", "walk" }) do
+			helpers.assert_eq(debug.getinfo(uv[name], "S").what, "C", "the regression requires the actual native " .. name)
+		end
+		local before = {}
+		uv.walk(function(handle) before[handle] = true end)
+		local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-fixture-retirement-XXXXXX"))
+		local collector, child, pid, check
+		local armed, deadline_fired, blocked, exited = false, false, false, false
+		uv.timer_start = function(handle, timeout, repeat_ms, callback)
+			if armed and not pid and timeout == operation_ms and repeat_ms == 0 then
+				return original_timer_start(handle, timeout, repeat_ms, function(...)
+					deadline_fired = true
+					return callback(...)
+				end)
+			end
+			return original_timer_start(handle, timeout, repeat_ms, callback)
+		end
+		uv.spawn = function(executable, options, callback)
+			if armed and not pid and options.args and tostring(options.args[1]):find("sqlite_process_worker.lua", 1, true) then
+				local handle, actual_pid, code = original_spawn(executable, options, function(...)
+					exited = true
+					return callback(...)
+				end)
+				if handle then
+					pid = actual_pid
+					assert(uv.kill(pid, "sigstop") == 0)
+				end
+				return handle, actual_pid, code
+			end
+			return original_spawn(executable, options, callback)
+		end
+		batch.start = function(...)
+			helpers.assert_eq(select(3, ...).timeout_ms, operation_ms, "the real execution deadline must remain canonical")
+			local request = original_start(...)
+			if armed and pid and not child then
+				child = assert(request)
+				check = assert(uv.new_check())
+				assert(uv.check_start(check, function()
+					assert(uv.check_stop(check) == 0)
+					uv.close(check)
+					blocked = true
+					-- A real callback can cross the execution deadline before native
+					-- exit and close receipts get their next observation turn.
+					uv.sleep(operation_ms)
+				end) == 0)
+			end
+			return request
+		end
+		local ok, failure = xpcall(function()
+			native.with(function(owner)
+				collector = owner
+				owner.init({ sqlite_path = directory .. "/metrics.sqlite" })
+				require("tests.support.metrics_consent_fixture").enable(owner)
+				owner.on_keydown("x", 1000, "fixture-retirement")
+				armed = true
+			end)
+		end, debug.traceback)
+		uv.spawn, uv.timer_start, batch.start = original_spawn, original_timer_start, original_start
+		if check and not uv.is_closing(check) then uv.check_stop(check); uv.close(check) end
+		-- The negative baseline must also retire its exact real child. Preserve
+		-- its failed assertion while independently draining the acquired owner.
+		local until_ns = uv.hrtime() + operation_ms * 1000000
+		local retired = collector and collector.stop()
+		while not retired and collector and uv.hrtime() < until_ns do
+			uv.sleep(1); uv.run("nowait"); retired = collector.stop()
+		end
+		for _ = 1, 4 do uv.run("nowait") end
+		local residual = 0
+		uv.walk(function(handle) if not before[handle] then residual = residual + 1 end end)
+		local status = collector and collector.get_flush_status()
+		local result = child and child:poll()
+		local absent, _, absence_code
+		if pid then absent, _, absence_code = uv.kill(pid, 0) end
+		for name in uv.fs_scandir_next, assert(uv.fs_scandir(directory)) do assert(uv.fs_unlink(directory .. "/" .. name)) end
+		assert(uv.fs_rmdir(directory))
+		helpers.assert_true(retired, "even the negative baseline must physically retire its child")
+		helpers.assert_true(blocked and deadline_fired and exited, "the actual callback, unchanged execution timeout and native exit must execute")
+		helpers.assert_eq(absent, nil)
+		helpers.assert_eq(absence_code, "ESRCH", "the exact owned native PID must be gone")
+		helpers.assert_eq(residual, 0, "no newly acquired native handle may survive the scenario")
+		helpers.assert_true(child:is_settled(), "the real batch must acknowledge physical settlement")
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(result.exit_code, 137, "the real execution timeout must terminate the stopped child")
+		helpers.assert_eq(status.committed, false, "physical retirement cannot invent a COMMIT")
+		helpers.assert_eq(status.has_debt, true, "failed persistence must retain its logical source")
+		helpers.assert_true(ok, failure)
+	end)
+	for _, phase in ipairs({ "reservation", "commit", "resolve", "cleanup", "idle", "reservation_retry", "compose_retry",
+		"commit_retry", "resolve_retry", "cleanup_retry", "uncertain" }) do
+		it("native-fixture-retirement-model: frozen " .. phase .. " has a finite observation limit", function()
+			local budget = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
+			local now, calls = 0, 0
+			local modeled = {
+				reset_session = function() calls = calls + 1; return false end,
+				pump_flush = function() end,
+				get_flush_status = function() return { phase = phase, generation = 1 } end,
+			}
+			local modeled_uv = {
+				hrtime = function() return now end,
+				run = function(mode) helpers.assert_eq(mode, "nowait"); return false end,
+				sleep = function(ms) helpers.assert_eq(ms, 1); now = now + budget / 4 end,
+			}
+			local module_name = "tests.support.keystats_native_fixture"
+			local previous = package.loaded[module_name]
+			local called, ok, detail = pcall(function()
+				local fixture = helpers.load_module_with_dependency(module_name, "luv", modeled_uv)
+				return pcall(fixture.reset, modeled)
+			end)
+			package.loaded[module_name] = previous
+			helpers.assert_true(called, ok)
+			helpers.assert_eq(ok, false, "an unchanged phase must never renew indefinitely")
+			helpers.assert_contains(detail, "native COMMIT and cleanup must acknowledge the reset")
+			local physical = phase == "reservation" or phase == "commit" or phase == "resolve" or phase == "cleanup"
+			local windows = physical and 2 or 1
+			helpers.assert_eq(now, windows * budget, "only a physical phase receives one bounded retirement observation window")
+			helpers.assert_eq(calls, 1 + windows * 4, "each bounded observation must drive its original public owner")
+		end)
+	end
+end)
+
+helpers.describe("native metrics fixture finite observation contract", function()
+	for _, scenario in ipairs({
+		{ name = "stable ownership expires", frozen = true, phases = { "reservation", "reservation", "reservation" }, generations = { 1, 1, 1 },
+			error = "native COMMIT and cleanup must acknowledge the reset" },
+		{ name = "a phase cannot be revisited", phases = { "reservation", "commit", "reservation" }, generations = { 1, 1, 1 },
+			error = "revisited an acknowledged phase" },
+		{ name = "only one closing generation is admitted", phases = { "reservation", "reservation", "reservation" }, generations = { 1, 2, 3 },
+			error = "more than one closing generation" },
+		{ name = "an unknown phase cannot renew its budget", phases = { "unpublished" }, generations = { 1 },
+			error = "Unknown native fixture phase" },
+		{ name = "one closing snapshot advances through real phase names", phases = { "reservation", "reservation", "commit" }, generations = { 1, 2, 2 } },
+	}) do
+		it("native-fixture-deadline-model: " .. scenario.name, function()
+			local real = require("modules.keystats.keystats")
+			for _, name in ipairs({ "reset_session", "pump_flush", "get_flush_status" }) do
+				helpers.assert_eq(type(real[name]), "function", "the model must mirror the real public methods")
+			end
+			local uv = require("luv")
+			for _, name in ipairs({ "hrtime", "run", "sleep" }) do
+				helpers.assert_eq(type(uv[name]), "function", "the model must mirror the real native methods")
+			end
+			local budget = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
+			local now, calls = 0, 0
+			local modeled = {
+				reset_session = function() calls = calls + 1; return not scenario.frozen and calls > #scenario.phases end,
+				pump_flush = function() end,
+				get_flush_status = function()
+					local index = scenario.frozen and math.min(calls, #scenario.phases) or calls
+					return { phase = assert(scenario.phases[index]), generation = assert(scenario.generations[index]) }
+				end,
+			}
+			-- These finite protocol controls acquire and pump no real process. A canonical
+			-- budget, split by the declared observations, detects renewal on an
+			-- unchanged state without waiting on wall-clock scheduling.
+			local modeled_uv = {
+				hrtime = function() now = now + budget / #scenario.phases; return now end,
+				run = function(mode) helpers.assert_eq(mode, "nowait"); return false end,
+				sleep = function(ms) helpers.assert_eq(ms, 1) end,
+			}
+			local module_name = "tests.support.keystats_native_fixture"
+			local previous = package.loaded[module_name]
+			local called, ok, detail = pcall(function()
+				local native = helpers.load_module_with_dependency(module_name, "luv", modeled_uv)
+				return pcall(native.reset, modeled)
+			end)
+			package.loaded[module_name] = previous
+			helpers.assert_true(called, ok)
+			if scenario.error then
+				helpers.assert_eq(ok, false, "invalid observation progress must never acquire an acknowledgement")
+				helpers.assert_contains(detail, scenario.error)
+			else
+				helpers.assert_true(ok, detail)
+				helpers.assert_eq(detail, true)
+			end
+		end)
+	end
+end)
+
 local function with_collector(body, launch)
 	local writer_name, keystats_name = "modules.keystats.sqlite_writer", "modules.keystats.keystats"
 	local old_writer, old_keystats = package.loaded[writer_name], package.loaded[keystats_name]
@@ -1071,7 +1407,15 @@ helpers.describe("native sampled reset acknowledgement", function()
 		local quote = require("text_utils").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_keystats_reset_ack.lua"
-		local status = os.execute("env -u LUA_PATH luajit " .. quote(fixture) .. " " .. quote(root))
+		local runtime, provider = "luajit", ""
+		if rawget(_G, "jit") then
+			-- Distribution suites compile real luv outside the default C search path.
+			runtime = assert(require("process.interpreter").from_arguments(arg))
+			provider = " LUA_CPATH=" .. quote(package.cpath)
+		end
+		-- A stock-Lua parent cannot lend its native-module ABI to the JIT child.
+		local status = os.execute("env -u LUA_PATH -u LUA_CPATH" .. provider .. " " .. quote(runtime) .. " "
+			.. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "actual sampled reset must finish once after COMMIT and cleanup")
 	end)
 end)

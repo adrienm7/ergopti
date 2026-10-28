@@ -23,6 +23,14 @@
 ---    on Windows, because an override without evidence hides a regression.
 --- 3. Names and numbers only. A segment name is a source constant; typed text,
 ---    paths and window titles never enter a segment, a threshold or a log line.
+--- 4. Nesting attribution (new_nesting). A segment's slowness is judged on its
+---    own time: the wall clock minus the segments that opened and closed inside
+---    it. A slow segment is reported with its nearest enclosing declared
+---    segment, so a 12 ms expansion inside a keystroke reads as the expansion's
+---    cost, not as two slow lines that bill the same 12 ms twice. Vectors:
+---    _shared/tests/corpus/diagnostics/hotpath_nesting_vectors.json. The Windows
+---    profiler (infra/hotpath_profiler.ahk, _HotPathNestedMs) prints the
+---    exclusive time but still judges and reports on the wall clock.
 --- ==============================================================================
 
 local M = {}
@@ -109,6 +117,122 @@ function M.new_slow_gate()
 		last_logged[name], withheld[name] = now_ms, 0
 		return true, skipped
 	end
+end
+
+-- Deepest nesting a tracker follows. Segments nest a few levels deep (loop tick,
+-- dispatch, character, match); a deeper stack is a clock read never closed.
+M.MAX_NESTING_DEPTH = 32
+
+-- Parent token of a slow segment that no declared segment encloses.
+M.NO_PARENT = "none"
+
+--- Creates a nesting tracker for one driver.
+---
+--- Every measured span opens a frame with open() and closes it with close().
+--- Spans that are not declared segments (an idle wait, a tray build) are
+--- transparent: their time counts as their enclosing segment's own time and
+--- the slow segments inside them are reported with that enclosing segment.
+--- A frame left open by a raise is closed with its enclosing frame: everything
+--- opened after a closing span's start ended before it, in a single thread.
+--- Reports are delivered once the parent is known, at the latest when the
+--- outermost frame closes, children before their parent.
+--- @param threshold_of function(name) -> number|nil Slow threshold in ms, nil for a span that is not a declared segment.
+--- @param emit function(report, now_ms) Receives { segment, parent, total_ms, own_ms } of each slow segment.
+--- @return table tracker { open(now_ms) -> now_ms, close(name, started_ms, now_ms) -> total_ms, own_ms, slow }
+function M.new_nesting(threshold_of, emit)
+	assert(type(threshold_of) == "function" and type(emit) == "function",
+		"new_nesting needs a threshold reader and a report sink")
+	local starts, nested, pending = {}, {}, {}
+	local depth = 0
+
+	-- Hands the waiting reports of a frame to the frame below, or emits them
+	-- without a parent when no frame is left.
+	local function hand_down(reports, parent, now_ms)
+		if reports == nil then return end
+		if parent ~= nil then
+			for _, report in ipairs(reports) do
+				report.parent = parent
+				emit(report, now_ms)
+			end
+		elseif depth == 0 then
+			for _, report in ipairs(reports) do
+				report.parent = M.NO_PARENT
+				emit(report, now_ms)
+			end
+		else
+			local below = pending[depth]
+			if below == nil then pending[depth] = reports
+			else for _, report in ipairs(reports) do below[#below + 1] = report end end
+		end
+	end
+
+	-- Pops the top frame; its measured children count against the frame below.
+	local function pop()
+		local child_ms, reports = nested[depth], pending[depth]
+		pending[depth] = nil
+		depth = depth - 1
+		return child_ms, reports
+	end
+
+	local tracker = {}
+
+	--- Opens a frame.
+	--- @param now_ms number Monotonic milliseconds.
+	--- @return number now_ms The stamp to pass to close().
+	function tracker.open(now_ms)
+		if depth >= M.MAX_NESTING_DEPTH then
+			error("hot-path nesting deeper than " .. M.MAX_NESTING_DEPTH .. ": a span was opened and never closed", 2)
+		end
+		depth = depth + 1
+		starts[depth], nested[depth], pending[depth] = now_ms, 0, nil
+		return now_ms
+	end
+
+	--- Closes the frame opened at started_ms.
+	--- @param name string Span name.
+	--- @param started_ms number The stamp open() returned.
+	--- @param now_ms number Monotonic milliseconds.
+	--- @return number total_ms, number own_ms, boolean slow
+	function tracker.close(name, started_ms, now_ms)
+		-- Frames opened after this span started and still open were abandoned.
+		while depth > 0 and starts[depth] > started_ms do
+			local child_ms, reports = pop()
+			if depth > 0 then nested[depth] = nested[depth] + child_ms end
+			hand_down(reports, nil, now_ms)
+		end
+		local child_ms, reports = 0, nil
+		if depth > 0 and starts[depth] == started_ms then child_ms, reports = pop() end
+		local total_ms = now_ms - started_ms
+		local own_ms = total_ms - child_ms
+		local limit = threshold_of(name)
+		if limit == nil then
+			if depth > 0 then nested[depth] = nested[depth] + child_ms end
+			hand_down(reports, nil, now_ms)
+			return total_ms, own_ms, false
+		end
+		if depth > 0 then nested[depth] = nested[depth] + total_ms end
+		hand_down(reports, name, now_ms)
+		local slow = own_ms > limit
+		if slow then hand_down({ { segment = name, total_ms = total_ms, own_ms = own_ms } }, nil, now_ms) end
+		return total_ms, own_ms, slow
+	end
+
+	--- Current number of open frames, for tests.
+	--- @return integer
+	function tracker.depth() return depth end
+
+	return tracker
+end
+
+--- The phase name a segment's timings are recorded under (PhaseStats and the
+--- closed phase enum of the log vocabulary list `hotpath.<segment>` for each
+--- declared segment). An undeclared name raises: a measurement under an unlisted
+--- phase would escape the vocabulary gate.
+--- @param name string Declared segment name.
+--- @return string phase
+function M.phase(name)
+	if _by_name[name] == nil then error("undeclared hot-path segment: " .. tostring(name), 2) end
+	return "hotpath." .. name
 end
 
 --- Returns whether a name is a declared segment of any driver.

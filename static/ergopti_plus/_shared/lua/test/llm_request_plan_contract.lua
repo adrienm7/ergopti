@@ -14,6 +14,11 @@ local M = {}
 local Json = require("json")
 local Debounce = require("llm.request_plan.debounce")
 local Batching = require("llm.request_plan.batching")
+local TokenBudget = require("llm.request_plan.token_budget")
+local InfoBar = require("llm.request_plan.info_bar")
+local Live = require("llm.request_plan.live")
+local AgentPlan = require("llm.request_plan.agent")
+local Ports = require("llm.request_plan.ports")
 
 --- Reads and decodes one corpus file.
 --- @param path string Absolute path.
@@ -114,6 +119,147 @@ function M.run_batching(helpers, corpus_path)
 				end
 			end)
 		end
+	end)
+end
+
+--- Registers the token budget transcripts.
+--- @param helpers table Driver assertions and case registration.
+--- @param corpus_path string Canonical shared token budget corpus path.
+function M.run_token_budget(helpers, corpus_path)
+	local corpus = read_json(corpus_path)
+	helpers.describe("Shared request plan token budget transcripts", function()
+		for _, vector in ipairs(corpus.vectors) do
+			helpers.it("transcript '" .. vector.id .. "'", function()
+				local ok, result
+				if vector.retry then
+					ok, result = pcall(TokenBudget.for_retry, vector.retry.call_tokens, vector.retry.extra_tokens)
+				else
+					ok, result = pcall(TokenBudget.for_call, vector.base_tokens, vector.per_call)
+				end
+				if vector.expect_error then
+					helpers.assert_eq(ok, false, "must raise")
+					helpers.assert_contains(tostring(result), vector.expect_error)
+				else
+					helpers.assert_eq(ok, true, tostring(result))
+					helpers.assert_eq(result, vector.expect)
+				end
+			end)
+		end
+	end)
+end
+
+--- Registers the info bar transcripts.
+--- @param helpers table Driver assertions and case registration.
+--- @param corpus_path string Canonical shared info bar corpus path.
+function M.run_info_bar(helpers, corpus_path)
+	local corpus = read_json(corpus_path)
+	helpers.describe("Shared request plan info bar transcripts", function()
+		for _, vector in ipairs(corpus.vectors) do
+			helpers.it("transcript '" .. vector.id .. "'", function()
+				local ok, result = pcall(InfoBar.parts, vector.spec)
+				if vector.expect_error then
+					helpers.assert_eq(ok, false, "must raise")
+					helpers.assert_contains(tostring(result), vector.expect_error)
+				else
+					helpers.assert_eq(ok, true, tostring(result))
+					if vector.expect_none then
+						helpers.assert_eq(result, nil)
+					else
+						helpers.assert_eq(result, vector.expect)
+					end
+				end
+			end)
+		end
+	end)
+end
+
+--- Registers the live prompt transcripts.
+--- @param helpers table Driver assertions and case registration.
+--- @param corpus_path string Canonical shared live corpus path.
+function M.run_live(helpers, corpus_path)
+	local corpus = read_json(corpus_path)
+	helpers.describe("Shared request plan live prompt transcripts", function()
+		for _, vector in ipairs(corpus.vectors) do
+			helpers.it("transcript '" .. vector.id .. "'", function()
+				if vector.expect_reason then
+					local config, reason = Live.config(not vector.config_missing and vector.config or nil)
+					helpers.assert_eq(config, nil, "must refuse")
+					helpers.assert_eq(reason, vector.expect_reason)
+				elseif vector.config then
+					local config, reason = Live.config(vector.config)
+					helpers.assert_eq(reason, nil)
+					helpers.assert_eq(config, vector.expect)
+				else
+					local profile = vector.profile_found and { id = vector.receipt.profile_id } or nil
+					local ok, result = pcall(Live.decide, vector.live_config, vector.receipt, vector.menu_count, profile)
+					if vector.expect_error then
+						helpers.assert_eq(ok, false, "must raise")
+						helpers.assert_contains(tostring(result), vector.expect_error)
+					else
+						helpers.assert_eq(ok, true, tostring(result))
+						helpers.assert_eq(result.action, vector.expect.action)
+						helpers.assert_eq(result.cause, vector.expect.cause)
+						helpers.assert_eq(result.num_predictions, vector.expect.num_predictions)
+						helpers.assert_eq(result.min_words, vector.expect.min_words)
+						helpers.assert_eq(result.profile, profile)
+					end
+				end
+			end)
+		end
+	end)
+end
+
+--- Replays the agent admission vectors through the shared plan.
+--- @param helpers table Driver assertions and case registration.
+--- @param corpus_path string Canonical shared agent corpus path.
+function M.run_agent(helpers, corpus_path)
+	local corpus = read_json(corpus_path)
+	helpers.describe("Shared request plan agent admission", function()
+		for _, vector in ipairs(corpus.vectors) do
+			helpers.it("vector '" .. vector.id .. "'", function()
+				if vector.kind == "admit" then
+					local decision = AgentPlan.admit(vector.facts)
+					helpers.assert_eq(decision.allowed, vector.expect.allowed)
+					helpers.assert_eq(decision.step, vector.expect.step)
+					helpers.assert_eq(decision.notice, vector.expect.notice)
+				elseif vector.kind == "auto_blocker" then
+					helpers.assert_eq(AgentPlan.auto_blocker(vector.facts), vector.expect.blocker)
+				elseif vector.kind == "triage_skip" then
+					helpers.assert_eq(AgentPlan.triage_skip(vector.facts), vector.expect.skip)
+				else
+					error("unknown agent vector kind: " .. tostring(vector.kind))
+				end
+			end)
+		end
+	end)
+end
+
+--- Registers the port contract checks against a driver's real owners.
+--- @param helpers table Driver assertions and case registration.
+--- @param owners table { HttpClient?, TimerScheduler?, TooltipRenderer? } the driver's adapters;
+---   a port a driver has no owner for yet is left out and its absence is the driver's to explain.
+function M.run_ports(helpers, owners)
+	helpers.describe("Shared request plan ports", function()
+		for port_name in pairs(Ports.CONTRACTS) do
+			if owners[port_name] ~= nil then
+				helpers.it("the driver's " .. port_name .. " owner satisfies the contract", function()
+					helpers.assert_eq(Ports.check(port_name, owners[port_name]), owners[port_name])
+				end)
+			end
+		end
+		helpers.it("refuses an owner that lacks a method, naming it", function()
+			local ok, err = pcall(Ports.check, "TimerScheduler", { after = function() end })
+			helpers.assert_eq(ok, false, "must raise")
+			helpers.assert_contains(tostring(err), "TimerScheduler lacks: cancel")
+		end)
+		helpers.it("refuses an unknown port and a non-table owner", function()
+			local ok, err = pcall(Ports.check, "Nope", {})
+			helpers.assert_eq(ok, false)
+			helpers.assert_contains(tostring(err), "unknown port: Nope")
+			ok, err = pcall(Ports.check, "HttpClient", nil)
+			helpers.assert_eq(ok, false)
+			helpers.assert_contains(tostring(err), "HttpClient must be a table")
+		end)
 	end)
 end
 

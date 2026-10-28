@@ -58,6 +58,8 @@
 
 'use strict';
 
+require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a generated config-key constant
+
 const fs = require('fs');
 const path = require('path');
 const { scriptTokens } = require('../lib/script-source.cjs');
@@ -844,135 +846,23 @@ const OPENS_SUBMENU = {
 	],
 	// Custom entries expose this head nested on Windows/macOS and inline on Linux.
 	word_expander_entries: 'word_expander_custom_menu',
-	// The model provider publishes its fixed browser command on every driver.
-	llm_models: [
-		'llm_model_commands',
-		{
-			menu: 'llm_api_empty_status',
-			platforms: ['linux'],
-			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
-		},
-		{
-			menu: 'llm_api_add_provider_group',
-			platforms: ['linux'],
-			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
-		},
-		{
-			menu: 'llm_api_add_separator',
-			platforms: ['linux'],
-			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
-		},
-		{
-			menu: 'llm_backend_choice_boundary',
-			platforms: ['linux'],
-			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
-		}
-	],
-	// The backend/model providers render the active API-entry command head.
-	llm_backend: [
-		'llm_api_active_commands',
-		{
-			menu: 'llm_api_add_provider_group',
-			platforms: ['hs'],
-			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
-		},
-		{
-			menu: 'llm_api_add_separator',
-			platforms: ['hs'],
-			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
-		},
-		{
-			menu: 'llm_backend_choice_boundary',
-			platforms: ['ahk'],
-			kind: 'compose',
-			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_models.ahk' }
-		}
-	],
+	// The model button opens the model selector page (2026-10-27): the page
+	// runs the macOS API panel's actions in collection mode, so its frames
+	// compose through that panel; Windows and Linux draw the shared button.
 	llm_model: [
+		{ menu: 'llm_api_active_commands', platforms: ['hs'] },
+		{ menu: 'llm_model_selector_commands', platforms: ['ahk', 'linux'] },
 		{
-			menu: 'llm_model_header_boundary',
-			platforms: ['ahk', 'hs'],
+			menu: 'llm_api_add_provider_group',
+			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: {
-				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-			}
-		},
-		{
-			menu: 'llm_api_empty_status',
-			platforms: ['ahk'],
-			kind: 'compose',
-			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_api_entries.ahk' }
-		},
-		{
-			menu: 'llm_model_hardware_boundary',
-			platforms: ['ahk', 'hs'],
-			kind: 'compose',
-			native_sources: {
-				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-			}
-		},
-		{
-			menu: 'llm_model_family_boundary',
-			platforms: ['ahk', 'hs'],
-			kind: 'compose',
-			native_sources: {
-				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-			}
-		},
-		{
-			menu: 'llm_model_origin_boundary',
-			platforms: ['ahk', 'hs'],
-			kind: 'compose',
-			native_sources: {
-				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-			}
-		},
-		'llm_api_active_commands',
-		{
-			menu: 'llm_api_add_command',
-			platforms: ['ahk'],
-			kind: 'compose',
-			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_api_entries.ahk' }
+			native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
 		},
 		{
 			menu: 'llm_api_add_separator',
-			platforms: ['ahk'],
-			kind: 'compose',
-			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_api_entries.ahk' }
-		},
-		{
-			menu: 'llm_user_model_controls',
 			platforms: ['hs'],
-			kind: 'submenu',
-			native_sources: { hs: 'macos/ui/menu/menu_llm/models_selector.lua' }
-		},
-		{
-			menu: 'llm_model_specs_frame',
-			platforms: ['ahk', 'hs'],
 			kind: 'compose',
-			native_sources: {
-				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-			}
-		},
-		{
-			menu: 'llm_model_caps_frame',
-			platforms: ['ahk', 'hs'],
-			kind: 'compose',
-			native_sources: {
-				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-			}
+			native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
 		}
 	],
 	// All three profile providers render the shared Create/Clone command head.
@@ -1130,91 +1020,6 @@ const OPENS_SUBMENU = {
 	]
 };
 
-// Complete finite LLM frames consume actual native children; the graph admits only their genuine calls.
-OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_model_action_rows',
-	platforms: ['ahk', 'hs'],
-	kind: 'compose',
-	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-	}
-});
-OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_model_identity_rows',
-	platforms: ['ahk', 'hs'],
-	kind: 'compose',
-	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-	}
-});
-OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_model_spec_rows',
-	platforms: ['ahk', 'hs'],
-	kind: 'compose',
-	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-	}
-});
-OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_model_capability_rows',
-	platforms: ['ahk', 'hs'],
-	kind: 'compose',
-	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-	}
-});
-OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_model_hardware_rows',
-	platforms: ['ahk', 'hs'],
-	kind: 'compose',
-	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-	}
-});
-OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_model_picker_head',
-	platforms: ['ahk', 'hs'],
-	kind: 'compose',
-	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-	}
-});
-OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_model_picker_default',
-	platforms: ['ahk', 'hs'],
-	kind: 'compose',
-	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-	}
-});
-OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_model_add_command',
-	platforms: ['ahk', 'hs'],
-	kind: 'compose',
-	native_sources: {
-		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
-		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
-	}
-});
-OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_model_hf_token_command',
-	platforms: ['hs'],
-	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_llm/models_selector.lua' }
-});
-OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_saved_models_frame',
-	platforms: ['hs'],
-	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_llm/models_selector.lua' }
-});
 OPENS_SUBMENU.llm_model.push({
 	menu: 'llm_thinking_info',
 	platforms: ['ahk', 'hs'],
@@ -1231,12 +1036,6 @@ OPENS_SUBMENU.llm_model.push({
 	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' }
 });
 OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_mlx_port_frame',
-	platforms: ['hs'],
-	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' }
-});
-OPENS_SUBMENU.llm_backend.push({
 	menu: 'llm_install_warning_frame',
 	platforms: ['ahk'],
 	kind: 'compose',
@@ -1292,29 +1091,17 @@ OPENS_SUBMENU.llm_navigation = [
 		native_sources: { hs: 'macos/ui/menu/menu_llm/settings_manager.lua' }
 	}
 ];
-OPENS_SUBMENU.llm_backend.push({
-	menu: 'llm_api_selection_frame',
-	platforms: ['hs'],
-	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
-});
-OPENS_SUBMENU.llm_backend.push({
+OPENS_SUBMENU.llm_model.push({
 	menu: 'llm_api_active_boundary',
 	platforms: ['hs'],
 	kind: 'compose',
 	native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
 });
-OPENS_SUBMENU.llm_backend.push({
+OPENS_SUBMENU.llm_model.push({
 	menu: 'llm_api_system1_frame',
 	platforms: ['hs'],
 	kind: 'compose',
 	native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
-});
-OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_api_edit_command',
-	platforms: ['ahk'],
-	kind: 'compose',
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_api_entries.ahk' }
 });
 OPENS_SUBMENU.llm_generation_settings.push({
 	menu: 'llm_generation_count_control',
@@ -1542,82 +1329,6 @@ OPENS_SUBMENU.llm_profile_parent = [
 		platforms: ['ahk'],
 		kind: 'compose',
 		native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk' }
-	}
-];
-
-// The captured receiver publishes this real parent around the completed native model picker.
-OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_model_parent_ahk',
-	platforms: ['ahk'],
-	kind: 'compose',
-	selected_group: {
-		ahk: {
-			transport: 'retained_model_receiver',
-			row: {
-				type: 'group',
-				id: 'llm_model',
-				i18n: 'menu.llm.model_parent_with_health',
-				caption_getters: ['llm_model_health_prefix', 'llm_model_current_caption'],
-				disabled_when: ['llm_model_parent_ready'],
-				platforms: ['ahk'],
-				unavailable: 'hide'
-			}
-		}
-	},
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
-});
-
-// Existing native catalogue data owns brands and choices; the consumed shared frames own presentation.
-for (const menu of [
-	'llm_backend_option_caption_frame_ahk',
-	'llm_backend_ollama_port_frame_ahk',
-	'llm_backend_child_frame_ahk'
-]) {
-	OPENS_SUBMENU.llm_backend.push({
-		menu,
-		platforms: ['ahk'],
-		kind: 'compose',
-		native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_models.ahk' }
-	});
-}
-
-// Actual native selected provider parent and its complete warning publication frame.
-OPENS_SUBMENU.llm_backend.push({
-	menu: 'llm_backend_parent_frame_ahk',
-	platforms: ['ahk'],
-	kind: 'compose',
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
-});
-OPENS_SUBMENU.llm_backend.push({
-	menu: 'llm_backend_parent_ahk',
-	platforms: ['ahk'],
-	kind: 'compose',
-	selected_group: {
-		ahk: {
-			row: {
-				type: 'group',
-				id: 'llm_backend_parent',
-				caption_source: 'native',
-				caption_getter: 'llm_backend_parent_caption',
-				disabled_when: ['llm_backend_parent_ready'],
-				platforms: ['ahk'],
-				unavailable: 'hide'
-			},
-			owner_signature: '_LLM_Menu_BackendParentRows(NativeChild, Caption, Disabled, WarningRows) {',
-			call: 'Parent := MenuRenderer_GroupRow("llm_backend_parent_ahk", "llm_backend_parent", NativeChild, Getters)',
-			handoff: 'ParentRows := [Parent]',
-			consumer:
-				'Map("llm_backend_parent_rows", (*) => ParentRows,\n\t\t\t"llm_backend_warning_rows", (*) => Admission["warning_rows"])'
-		}
-	},
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
-});
-OPENS_SUBMENU.llm_backend_parent = [
-	{
-		menu: 'llm_backend_choice_boundary',
-		platforms: ['ahk'],
-		kind: 'compose',
-		native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_models.ahk' }
 	}
 ];
 
@@ -2729,391 +2440,6 @@ const {
 		native_sources: { hs: 'macos/ui/menu/menu_hotstrings_custom.lua' }
 	});
 	require('./fixtures/personal-section-owner-counterexamples.cjs')(SP, manifest);
-}
-
-// A captured parent receiver earns credit only for the real returned native parent.
-{
-	const assert = require('node:assert/strict');
-	const file = 'windows/ui/menu/menu_llm/menu_main.ahk',
-		key = 'llm_model_parent_ahk';
-	const source = fs.readFileSync(path.join(SP, file), 'utf8');
-	const edges = OPENS_SUBMENU.llm_model.filter((edge) => edge.menu === key);
-	assert.equal(edges.length, 1, 'one actual model parent edge');
-	const edge = edges[0],
-		selected = edge.selected_group.ahk;
-	assert.deepEqual(edge.platforms, ['ahk'], 'retained model route stays Windows-only');
-	assert.equal(edge.kind, 'compose', 'the returned parent is an actual native composition');
-	assert.deepEqual(
-		edge.native_sources,
-		{ ahk: file },
-		'the route belongs to the real model emitter'
-	);
-	assert.equal(selected.transport, 'retained_model_receiver');
-	assert.deepEqual(manifest[key], [selected.row]);
-	const credits = (
-		candidate = source,
-		definition = manifest[key],
-		proof = selected,
-		section = key,
-		extension = '.ahk'
-	) => publishesSelectedMenuGroup(candidate, extension, section, definition, proof);
-	assert.equal(
-		credits(),
-		true,
-		'the real receiver, completed child and returned parent go back to MenuRenderer_Build'
-	);
-	for (const [definition, proof, section, extension] of [
-		[[], selected, key, '.ahk'],
-		[[selected.row, selected.row], selected, key, '.ahk'],
-		[
-			[{ ...selected.row, platforms: ['ahk', 'hs'] }],
-			{ ...selected, row: { ...selected.row, platforms: ['ahk', 'hs'] } },
-			key,
-			'.ahk'
-		],
-		[
-			[{ ...selected.row, caption_getters: ['foreign_health', 'llm_model_current_caption'] }],
-			{
-				...selected,
-				row: { ...selected.row, caption_getters: ['foreign_health', 'llm_model_current_caption'] }
-			},
-			key,
-			'.ahk'
-		],
-		[manifest[key], { ...selected, transport: 'foreign_receiver' }, key, '.ahk'],
-		[manifest[key], selected, 'foreign_parent', '.ahk'],
-		[manifest[key], selected, key, '.lua']
-	])
-		assert.equal(
-			credits(source, definition, proof, section, extension),
-			false,
-			'scope, kind, platform and independently owned row remain mandatory'
-		);
-	const capture = 'ReceiveModel := MenuRenderer_GroupReceiver("llm_model_parent_ahk", "llm_model")';
-	const refusal =
-		'if !ReceiveModel\n\t\t\tthrow Error("Declared model parent admission was refused.")';
-	const build = 'model_menu := LLM_Menu_BuildModelMenu()';
-	const handoff =
-		'ModelRows := _LLM_Menu_ModelParentRows(ReceiveModel, model_menu, health_dot, model_shown, disabled)';
-	// The emitter returns the rows; MenuRenderer_Build draws them at the entry.
-	const consume = 'return ModelRows';
-	const helper =
-		'_LLM_Menu_ModelParentRows(Receive, NativeChild, HealthPrefix, ModelCaption, Disabled) {';
-	const controls = [
-		[capture, 'ReceiveModel := false', 'receiver capture withdrawn'],
-		[capture, '; ' + capture + '\nReceiveModel := false', 'comment witness'],
-		[
-			capture,
-			"AuditText := '\n(\n" + capture + "\n)\n'\nReceiveModel := false",
-			'continuation data witness'
-		],
-		[
-			capture,
-			'ReceiveModel := Foreign.MenuRenderer_GroupReceiver("llm_model_parent_ahk", "llm_model")',
-			'foreign receiver owner'
-		],
-		[
-			capture,
-			capture.replace('"llm_model_parent_ahk"', '"foreign_parent"'),
-			'foreign admitted section'
-		],
-		[capture, capture.replace('"llm_model"', '"foreign_model"'), 'foreign admitted row'],
-		[capture, 'if false {\n' + capture + '\n}', 'dead nested receiver'],
-		[
-			refusal,
-			'if false\n\t\t\tthrow Error("Declared model parent admission was refused.")',
-			'early refusal withdrawn'
-		],
-		[
-			capture + '\n\t\t' + refusal + '\n\t\t' + build,
-			build + '\n\t\t' + capture + '\n\t\t' + refusal,
-			'admission moved after actual child'
-		],
-		[build, '_LLM_Menu_FireHealthProbe(true)\n\t\t' + build, 'probe before captured-child route'],
-		[build, 'model_menu := Foreign.LLM_Menu_BuildModelMenu()', 'foreign child builder'],
-		[handoff, 'ReceiveModel := Foreign\n\t\t\t' + handoff, 'receiver rebind'],
-		[
-			handoff,
-			'ReceiveModel.DefineProp("Call", {Call: Foreign})\n\t\t\t' + handoff,
-			'receiver Call replacement'
-		],
-		[handoff, 'model_menu := Foreign\n\t\t\t' + handoff, 'completed child replaced'],
-		[
-			handoff,
-			handoff.replace('(ReceiveModel, model_menu', '(Foreign, model_menu'),
-			'foreign handed receiver'
-		],
-		[
-			handoff,
-			handoff.replace('model_menu, health_dot', 'Foreign, health_dot'),
-			'foreign handed child'
-		],
-		[
-			handoff,
-			handoff.replace('health_dot, model_shown', 'model_shown, health_dot'),
-			'caption scalar positions swapped'
-		],
-		[handoff, handoff.replace(', disabled)', ', !disabled)'), 'resolved state inverted'],
-		[
-			handoff,
-			'ModelRows := Foreign(ReceiveModel, model_menu, health_dot, model_shown, disabled)',
-			'actual helper disconnected'
-		],
-		[consume, 'return []', 'returned rows discarded'],
-		[consume, 'return ForeignRows', 'foreign rows returned'],
-		['ModelRows := ModelRows.Clone()', 'ModelRows := Foreign.Clone()', 'foreign array extended'],
-		['ModelRows.Push(Row)', 'ModelRows.Push(Foreign)', 'foreign row appended'],
-		[
-			'InfoRows := MenuRenderer_TemplateRows("llm_thinking_info"',
-			'InfoRows := MenuRenderer_TemplateRows("foreign_info"',
-			'appended rows lose their declared template'
-		],
-		['if !(TargetMenu is Menu)', 'if false', 'native target type admission withdrawn'],
-		[
-			'_LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset) {',
-			'_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset) {',
-			'explicit native target parameter withdrawn'
-		],
-		[consume, 'ModelRows := []\n\t\t' + consume, 'returned row array replaced'],
-		[consume, 'ModelRows[1] := Foreign\n\t\t' + consume, 'actual returned parent replaced'],
-		[consume, 'return\n\t\t' + consume, 'unreachable publication'],
-		[consume, 'if false {\n' + consume + '\n}', 'dead nested publication'],
-		['if !_MR_DeclaredParentCallable(Receive)', 'if false', 'canonical callable guard withdrawn'],
-		['(*) => HealthPrefix', '(*) => Foreign()', 'health getter is no longer a scalar read'],
-		['(*) => ModelCaption', '(*) => (Receive := Foreign)', 'constructor callback changes receiver'],
-		[
-			'"llm_model_parent_ready", (*) => !Disabled',
-			'"llm_model_parent_ready", (*) => Disabled',
-			'ready getter inverted'
-		],
-		[
-			'"llm_model_current_caption", (*) => ModelCaption',
-			'"foreign_caption", (*) => ModelCaption',
-			'foreign caption getter key'
-		],
-		[
-			'Parent := Receive.Call(NativeChild, Getters)',
-			'Parent := Foreign.Call(NativeChild, Getters)',
-			'foreign parent receiver'
-		],
-		[
-			'Parent := Receive.Call(NativeChild, Getters)',
-			'Alias := Receive\n\tParent := Alias.Call(NativeChild, Getters)',
-			'receiver alias supplies parent'
-		],
-		[
-			'Parent := Receive.Call(NativeChild, Getters)',
-			'Parent := Receive.Call(Foreign, Getters)',
-			'foreign child supplies parent'
-		],
-		[
-			'Parent := Receive.Call(NativeChild, Getters)',
-			'Parent := Receive.Call(NativeChild, Foreign)',
-			'foreign getters supply parent'
-		],
-		[
-			'Parent.Get("submenu", false) != NativeChild',
-			'false',
-			'real child identity refusal withdrawn'
-		],
-		['return [Parent]', 'return [Foreign]', 'actual parent discarded'],
-		['return [Parent]', 'Parent := Foreign\n\treturn [Parent]', 'actual parent rebound'],
-		[helper, helper + '\n\tlocal Receive := Foreign', 'local receiver shadow'],
-		[helper, helper + '\n\tglobal Getters', 'getter storage loses local ownership'],
-		[helper, helper + '\n\tstatic Parent := Foreign', 'parent storage loses local ownership'],
-		[helper, helper + '\n\tReceive["Call"] := Foreign', 'indexed receiver mutation'],
-		[
-			helper,
-			helper + '\n\tIgnored := {Call: (*) => (Receive := Foreign)}',
-			'nested constructor authority write'
-		],
-		[helper, helper + '\n\tGetters := "{"', 'quoted brace cannot delimit helper grammar'],
-		[helper, helper + '\n\treturn [Foreign]', 'premature helper return'],
-		['case "llm_model":', 'case "foreign_model":', 'real producer case withdrawn'],
-		[
-			'case "llm_backend":',
-			'case "llm_backend", "llm_model":',
-			'earlier literal list steals model dispatch'
-		],
-		[
-			'case "llm_backend":',
-			'case "LLM_MODEL":',
-			'earlier case-folded selector steals model dispatch'
-		],
-		[
-			'case "llm_backend":',
-			'case "llm_backend", "LLM_MODEL":',
-			'earlier case-folded list steals model dispatch'
-		],
-		[
-			'case "llm_backend":',
-			'case "llm_" . "model":',
-			'earlier expression can claim model dispatch'
-		],
-		[
-			'case "llm_backend":',
-			'case ForeignSelector():',
-			'earlier executed selector can mutate or claim dispatch'
-		],
-		[
-			'case "llm_profile":',
-			'case "llm_profile", "llm_model":',
-			'later selector still duplicates the actual producer domain'
-		],
-		[
-			'default:',
-			'default ForeignSelector():',
-			'unsupported default grammar cannot supply branch credit'
-		]
-	];
-	for (const [before, after, reason] of controls) {
-		assert.equal(source.split(before).length - 1, 1, reason + ': actual unique preimage');
-		assert.equal(
-			credits(source.replace(before, after)),
-			false,
-			reason + ': no selected-group publication'
-		);
-		assert.equal(credits(), true, reason + ': exact source inverse');
-	}
-	for (const candidate of [
-		'MenuRenderer_GroupReceiver := Foreign\n' + source,
-		'MENURENDERER_GROUPRECEIVER := Foreign\n' + source,
-		'Alias := MenuRenderer_GroupReceiver\n' + source,
-		'Map := Foreign\n' + source,
-		'global Getters\n' + source,
-		'global Ignored, ReceiveModel\n' + source,
-		'_LLM_Menu_EmitRow := Foreign\n' + source,
-		source + '\n' + helper + '\nreturn [Foreign]\n}\n',
-		source.replace('case "llm_profile":', 'case "llm_model":\n\t\treturn\n\tcase "llm_profile":'),
-		source.replace(capture, 'ReceiveModel := false') +
-			'\n_UnusedModelReceiver() {\n' +
-			capture +
-			'\n}\n',
-		source.replace(capture, 'ReceiveModel := false') +
-			'\n_UnusedModelGroup() {\nParent := MenuRenderer_GroupRow("llm_model_parent_ahk", "llm_model", Child, Getters)\n}\n'
-	])
-		assert.equal(
-			credits(candidate),
-			false,
-			'duplicate, shadowed, aliased or decorative owners do not replace the actual receiver route'
-		);
-	const helperStart = source.indexOf(helper),
-		helperEnd = source.indexOf('\n}', helperStart) + 2;
-	assert(helperStart >= 0 && helperEnd > helperStart, 'actual finite helper is present');
-	const actualHelper = source.slice(helperStart, helperEnd);
-	const renamed =
-		source.slice(0, helperStart) +
-		actualHelper.replace(/\bGetters\b/g, 'ModelGetters').replace(/\bParent\b/g, 'ModelParent') +
-		source.slice(helperEnd);
-	assert.notEqual(renamed, source, 'actual fresh-local rename changes the original helper');
-	assert.equal(
-		credits(renamed),
-		true,
-		'fresh helper-local names preserve actual parameter/getter/parent relationships'
-	);
-	const originalGetterOrder =
-		'"llm_model_health_prefix", (*) => HealthPrefix,\n\t\t"llm_model_current_caption", (*) => ModelCaption';
-	assert.equal(
-		source.split(originalGetterOrder).length - 1,
-		1,
-		'actual scalar getter-order preimage'
-	);
-	const reordered = source.replace(
-		originalGetterOrder,
-		'"llm_model_current_caption", (*) => ModelCaption,\n\t\t"llm_model_health_prefix", (*) => HealthPrefix'
-	);
-	assert.notEqual(reordered, source, 'actual getter-order control changes the helper');
-	assert.equal(
-		credits(reordered),
-		true,
-		'getter map insertion order does not change scalar ownership'
-	);
-	const caseStart = source.indexOf('case "llm_model":'),
-		caseEnd = source.indexOf('case "llm_profile":', caseStart);
-	assert(caseStart >= 0 && caseEnd > caseStart, 'actual model producer case is present');
-	const actualCase = source.slice(caseStart, caseEnd);
-	const renamedCase = actualCase
-		.replace(/\bReceiveModel\b/g, 'ModelReceiver')
-		.replace(/\bmodel_menu\b/g, 'ModelChild')
-		.replace(/\blast_status\b/g, 'ModelStatus')
-		.replace(/\bhealth_dot\b/g, 'ModelPrefix')
-		.replace(/\bmodel_shown\b/g, 'ModelShown')
-		.replace(/\bModelRows\b/g, 'ReturnedModelRows');
-	assert.notEqual(
-		renamedCase,
-		actualCase,
-		'actual model case alpha control changes physical local roles'
-	);
-	assert.equal(
-		credits(source.slice(0, caseStart) + renamedCase + source.slice(caseEnd)),
-		true,
-		'fresh capture, child, scalar and result names preserve the actual transport relationships'
-	);
-	const originalBackendSelector = 'case "llm_backend":';
-	assert.equal(
-		source.split(originalBackendSelector).length - 1,
-		1,
-		'actual unrelated sibling selector preimage'
-	);
-	const unrelatedAlias = source.replace(
-		originalBackendSelector,
-		'case "llm_backend", "llm_backend_native_alias":'
-	);
-	assert.notEqual(unrelatedAlias, source, 'actual unrelated literal selector list changes source');
-	assert.equal(
-		credits(unrelatedAlias),
-		true,
-		'unrelated literal selector lists do not claim or execute model dispatch'
-	);
-	assert.equal(
-		publishesTemplate(source, '.ahk', key),
-		false,
-		'generic whole-template publication is not widened for retained receivers'
-	);
-	const actualArrayConstructor = 'return [\n\t\tMap("id", "llm_backend",';
-	const actualTernaryConstructor = 'OwnedOptions := IsSet(Options) ? Options : Map()';
-	for (const [before, after, reason] of [
-		[
-			actualArrayConstructor,
-			'return [ Map("id", "llm_backend",',
-			'the genuine fallback Array contains a direct Map constructor'
-		],
-		[
-			actualTernaryConstructor,
-			'OwnedOptions := IsSet(Options) ? Options :  Map()',
-			'the genuine ternary fallback contains a direct Map constructor'
-		]
-	]) {
-		assert.equal(source.split(before).length - 1, 1, reason + ': actual unique preimage');
-		const changed = source.replace(before, after);
-		assert.notEqual(changed, source, reason + ': actual value-context change');
-		assert.equal(credits(changed), true, reason + ': canonical constructor retains route');
-		assert.equal(credits(), true, reason + ': exact source inverse');
-	}
-	for (const prefix of [
-		'Unused := Foreign[Map]\n',
-		'Unused := Foreign[Map()]()\n',
-		'Unused := Foreign[Map]()\n',
-		'Unused := Foreign.return[Map()]()\n',
-		'Unused := Foreign[Flag ? Options : Map()]()\n',
-		'Unused := Foreign[[Map()]]()\n',
-		'Unused := [Map]\n',
-		'Unused := Foreign.Map()\n',
-		'Map := Foreign\n',
-		'Map["Call"] := Foreign\n',
-		'Menu := Foreign\n',
-		'Menu["Call"] := Foreign\n',
-		'TypeError := Foreign\n',
-		'Unused := Foreign[MenuRenderer_GroupReceiver]\n'
-	]) {
-		assert.equal(
-			credits(prefix + source),
-			false,
-			'indexed callable, bare alias, member or class write remains refused'
-		);
-		assert.equal(credits(), true, 'exact constructor authority inverse');
-	}
-	assert.equal(credits(), true, 'actual inverse retains the real selected parent transport');
 }
 
 // An inert readout is admissible only through composition. A clicked parent,
@@ -6410,11 +5736,59 @@ function numberRowGetterSource(source) {
 			'symbol:,',
 			'identifier:render_ctx',
 			'symbol:.',
-			'identifier:commands',
-			'symbol:)'
+			'identifier:commands'
 		])
 	)
 		return '';
+	const callTail = (tail) =>
+		contains(source, [
+			'identifier:NumberRowPolicy',
+			'symbol:.',
+			'identifier:native_rows',
+			'symbol:(',
+			'identifier:ManifestMenu',
+			'symbol:,',
+			'identifier:render_ctx',
+			'symbol:.',
+			'identifier:commands',
+			...tail
+		]);
+	// A driver that applies the rows live (Linux) passes its owner as a third
+	// argument; the shared policy then answers the choice from that owner's getter.
+	if (callTail(['symbol:,', 'symbol:{'])) {
+		const shared = fs.readFileSync(
+			path.join(SP, '_shared/lua/layout/number_row_policy.lua'),
+			'utf8'
+		);
+		if (
+			!contains(source, ['identifier:get_order', 'symbol:=', 'identifier:function']) ||
+			!contains(shared, [
+				'identifier:return',
+				'identifier:M',
+				'symbol:.',
+				'identifier:live_rows',
+				'symbol:(',
+				'identifier:renderer',
+				'symbol:,',
+				'identifier:choices',
+				'symbol:,',
+				'identifier:live',
+				'symbol:)'
+			]) ||
+			!contains(shared, [
+				'symbol:[',
+				'string:layout.direct_access_digits',
+				'symbol:]',
+				'symbol:=',
+				'identifier:live',
+				'symbol:.',
+				'identifier:get_order'
+			])
+		)
+			return '';
+		return shared;
+	}
+	if (!callTail(['symbol:)'])) return '';
 	if (
 		!contains(source, [
 			'identifier:render_ctx',
@@ -6447,6 +5821,8 @@ function numberRowGetterSource(source) {
 			'identifier:renderer',
 			'symbol:,',
 			'identifier:commands',
+			'symbol:,',
+			'identifier:live',
 			'symbol:)'
 		]) ||
 		!contains(sharedSource, [
@@ -6506,6 +5882,23 @@ function numberRowGetterSource(source) {
 			numberRowGetterSource(source),
 			'',
 			'a missing actual shared port cannot borrow its getter'
+		);
+	}
+	// The live provider borrows the shared getter only with its own get_order.
+	const live = 'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands, {';
+	assert(
+		numberRowGetterSource(
+			binding + '\n' + live + ' get_order = function() return 1 end })'
+		).includes('layout.direct_access_digits')
+	);
+	for (const source of [
+		live + ' get_order = function() return 1 end })',
+		binding + '\n' + live + ' })'
+	]) {
+		assert.equal(
+			numberRowGetterSource(source),
+			'',
+			'a live provider without its owner borrows nothing'
 		);
 	}
 }
@@ -7667,14 +7060,14 @@ function languageParentSource(source, driver) {
 			assert(
 				hasStatement(
 					native,
-					'sync_wpm_visibility("keystats_menubar_wpm", "WPM menubar", WpmMenubar)',
+					'sync_wpm_visibility(MetricsState.MENUBAR_WPM, "WPM menubar", WpmMenubar)',
 					1
 				)
 			);
 			assert(
 				hasStatement(
 					native,
-					'sync_wpm_visibility("keystats_float_wpm", "WPM widget", WpmWidget, state.keystats_float_graph)',
+					'sync_wpm_visibility(MetricsState.FLOAT_WPM, "WPM widget", WpmWidget, state.keystats_float_graph)',
 					1
 				)
 			);
@@ -8445,9 +7838,12 @@ module.exports.receivingParser = luaPublicationParser;
 	const actualRequire = Module.createRequire(bindingFile);
 	receivingModule.require = (name) => {
 		assert(
-			['./script-source.cjs', './menu-native-personal-info-binding.cjs', 'node:util'].includes(
-				name
-			),
+			[
+				'./script-source.cjs',
+				'./_generated/config_keys.cjs',
+				'./menu-native-personal-info-binding.cjs',
+				'node:util'
+			].includes(name),
 			'producer receiving refuses an unreviewed import: ' + name
 		);
 		return actualRequire(name);

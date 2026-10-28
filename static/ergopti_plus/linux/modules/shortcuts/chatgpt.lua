@@ -28,9 +28,10 @@ local Shell = require("adapters.shell_runner")
 local Paths = require("infra.config_paths")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
+local ConfigKeys = require("config_keys")
 
 local LOG = "modules.shortcuts.chatgpt"
-local FEATURE_PATH = "shortcuts.chatgpt_url"
+local FEATURE_PATH = ConfigKeys.KEY.SHORTCUTS_CHATGPT_URL
 local _configuration_owner = nil
 
 M.DEFAULT_URL = Manifest.default_for(FEATURE_PATH)
@@ -62,10 +63,10 @@ local function resolve(document, mark)
 	local stored = section and section.chatgpt_url
 	if stored == nil then return M.DEFAULT_URL end
 	if not M.is_valid(stored) then
-		ConfigOutdated.report({ "shortcuts", "chatgpt_url" }, "the value is not an HTTP(S) URL", Logger)
+		ConfigOutdated.report({ "shortcuts", ConfigKeys.LEAF.CHATGPT_URL }, "the value is not an HTTP(S) URL", Logger)
 		return M.DEFAULT_URL
 	end
-	if mark then mark("shortcuts", "chatgpt_url") end
+	if mark then mark("shortcuts", ConfigKeys.LEAF.CHATGPT_URL) end
 	return stored
 end
 

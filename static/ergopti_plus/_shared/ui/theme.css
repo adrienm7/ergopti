@@ -46,6 +46,48 @@
 	--theme-gray5-dark: #2c2c2e;
 	--theme-gray6-dark: #1c1c1e;
 	--theme-page-background: #f5f5f7;
+
+	/* White and the neutral greys that three or more page sheets spelled. They are
+	   static, like the rest of the palette: a page that wants a grey in one
+	   appearance only writes it in the matching rule. Added because no Apple
+	   system colour holds these exact values. */
+	--theme-white: #ffffff;
+	--theme-grey-333: #333333;
+	--theme-grey-555: #555555;
+	--theme-grey-888: #888888;
+	--theme-grey-999: #999999;
+	--theme-grey-aaa: #aaaaaa;
+	--theme-grey-ccc: #cccccc;
+	--theme-grey-ddd: #dddddd;
+	--theme-grey-e0e0e0: #e0e0e0;
+	--theme-grey-e8e8ea: #e8e8ea;
+	--theme-grey-d8d8de: #d8d8de;
+	--theme-grey-2a2a2c: #2a2a2c;
+	--theme-grey-242426: #242426;
+	--theme-grey-444: #444444;
+	--theme-grey-666: #666666;
+
+	/* More Apple system colours, then the hues the metrics dashboards and the
+	   colour pickers spell more than once. The hue-* names carry their value:
+	   no system colour holds them. */
+	--theme-yellow: #ffcc00;
+	--theme-yellow-dark: #ffd60a;
+	--theme-purple-dark: #bf5af2;
+	--theme-pink-dark: #ff375f;
+	--theme-cyan-dark: #64d2ff;
+	--theme-indigo-dark: #5e5ce6;
+	--theme-hue-1e1e2e: #1e1e2e;
+	--theme-hue-30b0c7: #30b0c7;
+	--theme-hue-5ac8fa: #5ac8fa;
+	--theme-hue-f59e0b: #f59e0b;
+	--theme-hue-32d74b: #32d74b;
+	--theme-hue-ff6b35: #ff6b35;
+	--theme-hue-00c7be: #00c7be;
+	--theme-hue-e588f8: #e588f8;
+	--theme-hue-f87171: #f87171;
+	--theme-hue-0d0d1a: #0d0d1a;
+	--theme-hue-0d1a0d: #0d1a0d;
+	--theme-hue-f4a460: #f4a460;
 }
 
 /* ======================================= */

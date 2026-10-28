@@ -18,6 +18,7 @@ local dialog  = require("infra.dialog_util")
 local Notifications = require("infra.notifications")
 local ManifestMenu = require("infra.manifest_menu")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "menu_llm.settings"
 
@@ -492,6 +493,8 @@ function M.new(deps)
 		local display_val = current_val < 0 and i18n.get("menu.settings.never") or math.floor(current_val * 1000)
 		local display_def = math.floor(llm_mod.DEFAULT_STATE.llm_debounce * 1000)
 
+		-- Not menu.llm.debounce_prompt: this dialog accepts a blank (reset to the default) and
+		-- "Never"/-1 on top of milliseconds, the Windows one a plain integer of milliseconds.
 		local full_msg = string.format(i18n.get("menu.settings.delay_prompt"), display_def)
 
 		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.delay_title"), full_msg, tostring(display_val), i18n.get("button.ok"), i18n.get("common.cancel"))
@@ -770,8 +773,8 @@ function M.new(deps)
 			}
 		end
 		local rows = ManifestMenu.template_rows("llm_modifier_picker_frame", {
-			["llm_modifier_disabled"] = function() return apply_modifiers({"none"}) end,
-			["llm_modifier_none"] = function() return apply_modifiers({}) end,
+			[ConfigKeys.COMMAND.LLM_MODIFIER_DISABLED] = function() return apply_modifiers({"none"}) end,
+			[ConfigKeys.COMMAND.LLM_MODIFIER_NONE] = function() return apply_modifiers({}) end,
 		}, {
 			llm_modifier_disabled_checked = function() return current_str == "none" end,
 			llm_modifier_none_checked = function() return current_str == "" end,

@@ -96,6 +96,7 @@ function fixture(fullPage = false) {
 		}
 	});
 	if (fullPage) {
+		require('./support/theme-tokens.cjs').installThemeTokens(context);
 		vm.runInContext(hostBridge, context);
 		vm.runInContext(pageScript, context);
 	}

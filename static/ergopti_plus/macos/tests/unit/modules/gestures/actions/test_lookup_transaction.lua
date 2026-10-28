@@ -13,7 +13,7 @@ local it = Fixture.it
 helpers.describe("gesture Actions lookup transaction", function()
 	for _, case in ipairs({
 		{ binding = "tap_3", parent = "gestures", sibling = "shortcut_bindings" },
-		{ binding = "keyboard__cmd_1", parent = "shortcut_bindings", sibling = "gestures" },
+		{ binding = "keyboard__primary_1", parent = "shortcut_bindings", sibling = "gestures" },
 	}) do
 		it("normalizes lookup binding provenance to " .. case.parent, function(fresh_actions, with_feature_lifecycles)
 			local actions, calls = fresh_actions()

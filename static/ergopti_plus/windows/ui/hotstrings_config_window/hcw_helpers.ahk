@@ -850,7 +850,7 @@ _HCW_GetSections(Entry, ReadFn := ReadTomlFile) {
 	SectionsOrderRaw := ""
 	FileContent := ReadFn.Call(Path)
 	loop parse, FileContent, "`n", "`r" {
-		Line := Trim(A_LoopField, " `t")
+		Line := Trim(A_LoopField, " `TokenLower")
 		if (Line == "" or SubStr(Line, 1, 1) == "#") {
 			continue
 		}
@@ -929,10 +929,10 @@ _HCW_GetSections(Entry, ReadFn := ReadTomlFile) {
 		Ordered := Map()
 		Pos := 1
 		while (RegExMatch(SectionsOrderRaw, '"([^"]*)"', &Tok, Pos)) {
-			T := StrLower(Tok[1])
-			if (T != "-" and Seen.Has(T)) {
-				Order.Push(T)
-				Ordered[T] := true
+			TokenLower := StrLower(Tok[1])
+			if (TokenLower != "-" and Seen.Has(TokenLower)) {
+				Order.Push(TokenLower)
+				Ordered[TokenLower] := true
 			}
 			Pos := Tok.Pos + Tok.Len
 		}

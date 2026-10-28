@@ -104,26 +104,26 @@ end
 
 helpers.describe("keyboard shortcuts: unknown action ids", function()
 	helpers.it("set_action refuses an id the catalogue does not offer", function()
-		local store = { ["cmd_a"] = "lookup" }
+		local store = { ["primary_a"] = "lookup" }
 		local observed = with_subject(store, function(subject)
 			helpers.assert_eq(subject.start(), true, "a valid assignment must start")
-			helpers.assert_eq(subject.set_action("cmd_a", "no_such_action"), false,
+			helpers.assert_eq(subject.set_action("primary_a", "no_such_action"), false,
 				"an id no handler runs must be refused, as Windows refuses it")
-			helpers.assert_eq(subject.get_action("cmd_a"), "lookup", "a refused id must not replace the binding")
+			helpers.assert_eq(subject.get_action("primary_a"), "lookup", "a refused id must not replace the binding")
 		end)
-		helpers.assert_eq(store["cmd_a"], "lookup", "nothing may be persisted")
+		helpers.assert_eq(store["primary_a"], "lookup", "nothing may be persisted")
 		helpers.assert_true(names(observed.warnings, "no_such_action"), "the refused id must be named in a warning")
 	end)
 
 	helpers.it("leaves a stored id the catalogue does not offer unbound, and says so", function()
 		local store = {
-			["cmd_a"] = "lookup",
-			["cmd_b"] = "no_such_action",
+			["primary_a"] = "lookup",
+			["primary_b"] = "no_such_action",
 		}
 		local observed = with_subject(store, function(subject)
 			helpers.assert_eq(subject.start(), true, "a valid assignment must still start")
-			helpers.assert_eq(subject.get_action("cmd_a"), "lookup", "a catalogue id still loads")
-			helpers.assert_eq(subject.get_action("cmd_b"), "none",
+			helpers.assert_eq(subject.get_action("primary_a"), "lookup", "a catalogue id still loads")
+			helpers.assert_eq(subject.get_action("primary_b"), "none",
 				"an id the catalogue does not offer must not be bound")
 		end)
 		helpers.assert_eq(#observed.bound, 1, "only the valid slot may own a native hotkey")

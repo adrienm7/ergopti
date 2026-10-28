@@ -544,9 +544,52 @@ _LLV_MenuListsRewritePrompts() {
 	AssertTrue(Declared is Array && Declared.Length > 0, "the shared AI menu must be readable")
 	for Row in Declared
 		Assert(!(Row is Map) || _MR_Get(Row, "id", "") != Retired, "the shared AI menu declares no live selector")
-	Assert(_LMNM_GenerationRoute(_DriverFuncBody("_LLM_Menu_GroupBuilders"), _DriverFuncBody("LLM_Menu_BuildSubmenu")),
+	Assert(_LLV_GenerationRoute(_DriverFuncBody("_LLM_Menu_GroupBuilders"), _DriverFuncBody("LLM_Menu_BuildSubmenu")),
 		"the native generation group keeps the same typed renderer")
 }
+/**
+ * Finds a statement as executable code at an exact brace depth, never inside a
+ * comment, a string or a conditional branch. Kept with its one caller when the
+ * model selector page retired run_llm_model_menu_disabled.ahk.
+ * @param {String} Source Function body.
+ * @param {String} Pattern Regex whose first group is the statement's token.
+ * @param {Integer} Depth Required brace depth of that token.
+ * @returns {Integer} The token position, or 0.
+ */
+_LLV_ExecutableStatement(Source, Pattern, Depth) {
+	Masked := _DriverMaskNonCode(&Source)
+	if !RegExMatch(Source, Pattern, &Found)
+		return 0
+	Position := Found.Pos(1), Token := Found[1]
+	if SubStr(Masked, Position, StrLen(Token)) != Token
+		return 0
+	Prefix := SubStr(Masked, 1, Position - 1), CurrentDepth := 0
+	if RegExMatch(RTrim(Prefix, " `t`r`n"), 'i)(?:^|\n)[ \t]*(?:if|else|for|while|loop|catch|try|finally)\b[^\r\n{]*$')
+		return 0
+	Loop Parse Prefix {
+		if A_LoopField == "{"
+			CurrentDepth++
+		else if A_LoopField == "}"
+			CurrentDepth--
+	}
+	return CurrentDepth == Depth ? Position : 0
+}
+
+/**
+ * Tells whether the generation group keeps its typed renderer: the group
+ * builders bind llm_generation_settings and the AI menu draws through them.
+ * @param {String} Groups Body of _LLM_Menu_GroupBuilders.
+ * @param {String} Build Body of LLM_Menu_BuildSubmenu.
+ * @returns {Boolean}
+ */
+_LLV_GenerationRoute(Groups, Build) {
+	Bound := _LLV_ExecutableStatement(Groups,
+		'm)^[ \t]*(return) Map\([^)]*"llm_generation_settings", LLM_Menu_BuildGenerationMenu\)', 1)
+	Draw := _LLV_ExecutableStatement(Build,
+		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*"", Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
+	return Bound && Draw
+}
+
 Test("LLM live mode: retained prompt chooser and shortcut owners preserve state (retired-live-menu)",
 	_LLV_MenuListsRewritePrompts)
 

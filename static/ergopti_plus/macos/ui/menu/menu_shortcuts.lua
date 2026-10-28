@@ -13,6 +13,7 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local ParameterLabel = require("action_parameter_label")
 local hs = hs
 local Logger        = require("infra.logger")
@@ -86,14 +87,14 @@ M.DEFAULT_STATE = {
 local function pretty_key(id, state)
 	-- Any symbol the layout types wraps the selection, AltGr or not: Ergopti puts
 	-- them on AltGr, other layouts elsewhere, so the trigger names no key.
-	if id == "wrap_text_if_selected" then return i18n.get("menu.shortcuts.selection_symbol") end
+	if id == require("config_keys").LEAF.WRAP_TEXT_IF_SELECTED then return i18n.get("menu.shortcuts.selection_symbol") end
 
 	local parts = {}
 	for p in id:gmatch("[^_]+") do table.insert(parts, p) end
 	if #parts == 0 then return id end
 
 	local key = parts[#parts]
-	if key == "star" or key == "asterisk" then key = (state and state.trigger_char) or ManifestReader.default_for("hotstrings.trigger_char") end
+	if key == "star" or key == "asterisk" then key = (state and state.trigger_char) or ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR) end
 	if key == "period"   then key = "." end
 	if key == "quote"    then key = "'" end
 	if key == "capslock" then key = "CapsLock" end
@@ -198,7 +199,7 @@ local function make_shortcut_item(s, shortcuts, ctx)
 	-- The wrap row reads as its behaviour alone, « Taper un symbole encadre la
 	-- sélection », as on Windows and Linux: its trigger is any typed symbol, so
 	-- a trigger prefix only repeated it (the maintainer's wording, 2026-09-30).
-	if s.id == "wrap_text_if_selected" and desc ~= "" then pk, desc = desc, "" end
+	if s.id == require("config_keys").LEAF.WRAP_TEXT_IF_SELECTED and desc ~= "" then pk, desc = desc, "" end
 	-- Provider data since 2026-08-07: the shared renderer's `group` branch
 	-- materialises `items` the same way a `list` row's provider rows are, so a
 	-- group builder no longer has to assemble the driver's own tree.
@@ -272,7 +273,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 	local function mutate_wrap(mutate)
 		local committed, reason = WrapMutation.commit(state, mutate, ctx.save_prefs)
 		if committed ~= true then
-			if reason ~= "wrap mutation cancelled" then
+			if reason ~= Errors.WRAP_MUTATION_CANCELLED then
 				Logger.error(LOG, "Wrap preference mutation did not commit: %s.", reason)
 			end
 			return false
@@ -284,19 +285,19 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 		return not paused and not WrapMutation.pending(state)
 	end }
 	local sub = ManifestMenu.template_rows("wrap_symbols_global_controls", {
-		["wrap_symbols_enable_all"] = function()
+		[require("config_keys").COMMAND.WRAP_SYMBOLS_ENABLE_ALL] = function()
 			return mutate_wrap(function(candidate)
 				for _, pair in ipairs(_BUILTIN_SYMBOLS) do candidate.wrap_symbol_states[pair.left] = true end
 				return true
 			end)
 		end,
-		["wrap_symbols_disable_all"] = function()
+		[require("config_keys").COMMAND.WRAP_SYMBOLS_DISABLE_ALL] = function()
 			return mutate_wrap(function(candidate)
 				for _, pair in ipairs(_BUILTIN_SYMBOLS) do candidate.wrap_symbol_states[pair.left] = false end
 				return true
 			end)
 		end,
-		["wrap_symbols_restore"] = function()
+		[require("config_keys").COMMAND.WRAP_SYMBOLS_RESTORE] = function()
 			return mutate_wrap(function(candidate)
 				candidate.wrap_symbol_states, candidate.custom_wrap_symbols = {}, {}
 				return true
@@ -319,7 +320,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 		end
 
 		local group_items = ManifestMenu.template_rows("wrap_symbols_group_controls", {
-			["wrap_symbols_enable_group"] = (function(lefts)
+			[require("config_keys").COMMAND.WRAP_SYMBOLS_ENABLE_GROUP] = (function(lefts)
 				return function()
 					return mutate_wrap(function(candidate)
 						for _, k in ipairs(lefts) do candidate.wrap_symbol_states[k] = true end
@@ -327,7 +328,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 					end)
 				end
 			end)(group_lefts),
-			["wrap_symbols_disable_group"] = (function(lefts)
+			[require("config_keys").COMMAND.WRAP_SYMBOLS_DISABLE_GROUP] = (function(lefts)
 				return function()
 					return mutate_wrap(function(candidate)
 						for _, k in ipairs(lefts) do candidate.wrap_symbol_states[k] = false end
@@ -383,7 +384,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 				local cs_lbl  = (cs.left == right) and cs.left or (cs.left .. " … " .. right)
 				cs_lbl = cs_lbl .. " : " .. i18n.get("menu.shortcuts.wrap_symbols_custom_label")
 				local del_sub = ManifestMenu.template_rows("wrap_symbols_custom_controls", {
-					["wrap_symbols_delete_custom"] = (function(i) return function()
+					[require("config_keys").COMMAND.WRAP_SYMBOLS_DELETE_CUSTOM] = (function(i) return function()
 						return mutate_wrap(function(candidate)
 							if i > #candidate.custom_wrap_symbols then return false end
 							table.remove(candidate.custom_wrap_symbols, i)
@@ -399,7 +400,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 
 	-- Add custom symbol button
 	local add_controls = ManifestMenu.template_rows("wrap_symbols_add_controls", {
-		["wrap_symbols_add_custom"] = function()
+		[require("config_keys").COMMAND.WRAP_SYMBOLS_ADD_CUSTOM] = function()
 			return mutate_wrap(function(candidate)
 				-- 1. Ask for opening symbol
 				local left_char
@@ -559,7 +560,7 @@ function M.build(ctx)
 			for _, s in ipairs(list) do
 				if type(s) == "table" and s.id then
 					local mi = make_shortcut_item(s, shortcuts, ctx)
-					if s.id == "wrap_text_if_selected" then
+					if s.id == require("config_keys").LEAF.WRAP_TEXT_IF_SELECTED then
 						wrap_item = mi
 					elseif s.id:sub(1, 5) == "ctrl_" then
 						table.insert(ctrl_items, mi)
@@ -580,7 +581,7 @@ function M.build(ctx)
 									end
 								end or nil
 							local editor_rows = ManifestMenu.template_rows("shortcut_chatgpt_editor_frame", {
-								["shortcut_chatgpt_editor"] = function(...)
+								[require("config_keys").COMMAND.SHORTCUT_CHATGPT_EDITOR] = function(...)
 									if type(chatgpt_action) ~= "function" then return false end
 									return chatgpt_action(...)
 								end,
@@ -670,9 +671,9 @@ function M.build(ctx)
 										.. "store '%s' under a binding key dispatch will not read.", tostring(a))
 									return
 								end
-								DeferredWork.after(0.05, function()
+								DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 									local mutation = {
-										section = "shortcuts.script_control", key = slot_id,
+										section = require("config_keys").KEY.SHORTCUTS_SCRIPT_CONTROL, key = slot_id,
 										read = function()
 											if type(script_control.get_shortcut_actions) ~= "function" then return nil end
 											local actions = script_control.get_shortcut_actions()
@@ -726,17 +727,17 @@ function M.build(ctx)
 		local render_ctx = {}
 		for key, value in pairs(ctx) do render_ctx[key] = value end
 		render_ctx.commands = {
-			["script_control_toggle"] = function()
+			[require("config_keys").COMMAND.SCRIPT_CONTROL_TOGGLE] = function()
 				if type(ctx.commit_script_chords) ~= "function"
 					or ctx.commit_script_chords() ~= true then return false end
 				ctx.updateMenu()
 				return true
 			end,
-			["scope_restore"] = function()
+			[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
 				return type(ctx.apply_script_chords_scope) == "function"
 					and ctx.apply_script_chords_scope("recommended") == true
 			end,
-			["scope_clear"] = function()
+			[require("config_keys").COMMAND.SCOPE_CLEAR] = function()
 				return type(ctx.apply_script_chords_scope) == "function"
 					and ctx.apply_script_chords_scope("clear") == true
 			end,
@@ -842,7 +843,7 @@ function M.build(ctx)
 		["key_combinations"] = function()
 			return require("ui.menu.menu_tap_holds").build_key_combinations(ctx)
 		end,
-		["script_control"] = script_control_group,
+		[require("config_keys").LEAF.SCRIPT_CONTROL] = script_control_group,
 		-- « CapsWord : désactivation automatique », the [shortcuts.caps_word] settings.
 		["caps_word_auto_off"] = function() return require("ui.menu.menu_caps_word").build(ctx) end,
 	}
@@ -876,8 +877,8 @@ function M.build(ctx)
 			-- modifier: as groups of their own they drew a second "Ctrl" and
 			-- "Cmd" submenu beside the configurable one.
 			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or paused or nil, {
-				hs_ctrl_ = ctrl_items,
-				cmd_     = cmd_items,
+				secondary_ = ctrl_items,
+				primary_   = cmd_items,
 			})
 		end,
 		-- The number-row tap keys, named by what each types under the current
@@ -896,8 +897,8 @@ function M.build(ctx)
 	for key, value in pairs(ctx) do sc_ctx[key] = value end
 	sc_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
-	sc_ctx.commands["shortcuts_toggle"] = toggle_shortcuts
-	sc_ctx.commands["edit_shortcuts"] = cmd_edit_shortcuts
+	sc_ctx.commands[require("config_keys").COMMAND.SHORTCUTS_TOGGLE] = toggle_shortcuts
+	sc_ctx.commands[require("config_keys").COMMAND.EDIT_SHORTCUTS] = cmd_edit_shortcuts
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	local physical_editor = require("shortcuts.physical_editor_menu").new({
@@ -916,7 +917,7 @@ function M.build(ctx)
 				i18n.get("physical_shortcuts.window_unavailable"), i18n.get("button.ok"))
 		end,
 	})
-	sc_ctx.commands["physical_shortcuts_editor"] = physical_editor.open
+	sc_ctx.commands[require("config_keys").COMMAND.PHYSICAL_SHORTCUTS_EDITOR] = physical_editor.open
 	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return state.shortcuts and true or false end
 	-- Ticks « Raccourcis de gestion du script » while its switch is on.

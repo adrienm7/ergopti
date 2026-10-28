@@ -6,65 +6,49 @@
 
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
-const { installHostCapabilities } = require('./host-capabilities.cjs');
+const { loadMetricsTypingPage } = require('./metrics-apps-page.cjs');
 
-module.exports = function checkPrefetchHistory(html, data) {
+module.exports = function checkPrefetchHistory(html) {
 	const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
 		.map((match) => match[1])
 		.filter((source) => source.includes('let cached_historical'));
 	assert.equal(scripts.length, 1, 'exactly one actual prefetch bootstrap must run');
 	for (const host of ['windows', 'linux']) {
-		let listener;
+		const page = loadMetricsTypingPage(host);
+		assert.equal(page.html, html, 'the transport cases use the actual declared page');
+		assert.equal(
+			page.diagnostics.some((entry) => entry.level === 'error'),
+			false
+		);
+		const context = page.context;
+		context.app_state = vm.runInContext('app_state', context);
 		const received = [];
 		const errors = [];
-		const context = vm.createContext({
-			app_state: { active_range_request_id: 0, range_request_watchdog: null },
-			clearTimeout() {},
-			location: { search: '' },
-			URLSearchParams,
-			console: {
-				log() {},
-				error(...args) {
-					errors.push(args);
-				}
-			},
-			process_manifest() {},
-			apply_local_filters() {},
-			createVisibilityPoller() {},
-			decodeHostBridgeResponse(base64, payload) {
-				assert.equal(base64, false);
-				return JSON.parse(payload);
-			}
-		});
-		context.window = context;
-		installHostCapabilities(context);
-		vm.runInContext(data, context);
+		context.console.error = (...args) => errors.push(args);
+		// This unit measures one inline cache admission at a time. Keep only
+		// the existing initial-view isolation; later manifest projections and
+		// their DOM dependencies execute the real loaded-page implementation.
 		context.process_manifest = () => {};
-		context.apply_local_filters = () => {};
+
 		const receive = context.receive_range_data;
 		context.receive_range_data = (value, request) => {
 			const accepted = receive(value, request);
 			if (accepted) received.push(JSON.parse(JSON.stringify(value)));
 			return accepted;
 		};
-		if (host === 'windows') {
-			context.chrome = {
-				webview: {
-					addEventListener(type, callback) {
-						assert.equal(type, 'message');
-						listener = callback;
-					},
-					postMessage() {}
-				}
-			};
-		} else {
-			context.__ergopti_host_capabilities = { document_bridge: true };
-			context.webkit = { messageHandlers: { metrics_typing_bridge: { postMessage() {} } } };
-		}
-		vm.runInContext(scripts[0], context);
+
 		const push = (blob) => {
-			if (host === 'windows') listener({ data: JSON.stringify({ type: 'prefetch', blob }) });
-			else context.__hostBridgeResponse('metrics_typing_bridge', false, JSON.stringify(blob));
+			if (host === 'windows')
+				page.messageListeners
+					.filter((entry) => entry.name === 'message')
+					.at(-1)
+					.callback({ data: JSON.stringify({ type: 'prefetch', blob }) });
+			else
+				context.__hostBridgeResponse(
+					'metrics_typing_bridge',
+					false,
+					encodeURIComponent(JSON.stringify(blob))
+				);
 			assert.equal(errors.length, 0, `${host}: bootstrap must not swallow a fixture error`);
 		};
 		const history = { c: { a: { c: 7 } } };
@@ -97,7 +81,7 @@ module.exports = function checkPrefetchHistory(html, data) {
 		const state = context.app_state;
 		const historyFor = (name, count) => ({ c: { [name]: { c: count } } });
 		const snapshot = (name, count, request) => ({
-			metrics_manifest: { [name]: { chars: count } },
+			metrics_manifest: { '2026-09-01': { [name]: { chars: count } } },
 			app_icons: { [name]: 'icon' },
 			driver_meta: { os: host === 'windows' ? 'win' : 'linux', receipt: name },
 			keycode_layout: { 1: name },

@@ -187,6 +187,30 @@ function testPrivateSyncEncoding() {
 			input: '\uFEFF' + otherDate + body,
 			existing: '\uFEFF' + date + body,
 			expected: '\uFEFF' + date + body
+		},
+		{
+			name: 'half-hour east timezone retains minutes',
+			input: '\uFEFF' + body,
+			timezone: 'Asia/Kolkata',
+			offset: '+05:30'
+		},
+		{
+			name: 'quarter-hour east timezone retains minutes',
+			input: '\uFEFF' + body,
+			timezone: 'Asia/Kathmandu',
+			offset: '+05:45'
+		},
+		{
+			name: 'half-hour west timezone retains sign and minutes',
+			input: '\uFEFF' + body,
+			timezone: 'Pacific/Marquesas',
+			offset: '-09:30'
+		},
+		{
+			name: 'UTC timezone retains both zero components',
+			input: '\uFEFF' + body,
+			timezone: 'Etc/UTC',
+			offset: '+00:00'
 		}
 	];
 	const failures = [];
@@ -200,9 +224,12 @@ function testPrivateSyncEncoding() {
 			fs.writeFileSync(privateFile, test.input);
 			fs.writeFileSync(path.join(directory, '.local_ahk_path'), privateFile);
 			if (test.existing !== undefined) fs.writeFileSync(publicFile, test.existing);
+			const environment = { ...process.env };
+			if (test.timezone) environment.TZ = test.timezone;
 			const run = () => {
 				const result = spawnSync(process.execPath, [path.join(DEV, 'sync-private-ahk.js')], {
 					cwd: temporary,
+					env: environment,
 					encoding: 'utf8',
 					timeout: 10000,
 					windowsHide: true
@@ -229,6 +256,12 @@ function testPrivateSyncEncoding() {
 				body,
 				'the entire Unicode source body must remain byte-for-byte exact'
 			);
+			if (test.offset !== undefined)
+				assert.equal(
+					text.slice(0, text.indexOf('\n')).endsWith(`(UTC${test.offset})`),
+					true,
+					'the generated driver date must retain the exact timezone offset'
+				);
 			if (test.expected !== undefined)
 				assert.equal(
 					text,

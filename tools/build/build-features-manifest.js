@@ -28,6 +28,9 @@ import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import sharedPaths from '../lib/paths.cjs';
 import scopeMetadata from '../lib/configuration-scopes.cjs';
+import configKeys from '../lib/_generated/config_keys.cjs';
+
+const { KEY } = configKeys;
 
 const { shared } = sharedPaths;
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -335,7 +338,7 @@ function validate(features) {
 				throw new Error(`feature ${f.path} has an invalid superseded_reason_key`);
 			}
 			const helperVariant =
-				f.path === 'layout.ergopti_variant' &&
+				f.path === KEY.LAYOUT_ERGOPTI_VARIANT &&
 				f.type === 'enum' &&
 				Array.isArray(f.enum_values) &&
 				f.enum_values.join(',') === 'none,ergopti,ergopti_plus' &&
@@ -806,7 +809,7 @@ function renderConfigTemplate(manifest, sections, features, platform) {
 			// Presence reserves a personal chord, including an explicit none. Fresh
 			// templates leave neutral ordinary slots absent instead of fabricating
 			// personal intent that would block the physical contextual default.
-			if (sectionPath === 'shortcuts.keyboard' && def === 'none') return false;
+			if (sectionPath === KEY.SHORTCUTS_KEYBOARD && def === 'none') return false;
 			return typeof def !== 'object' || def === null || Array.isArray(def);
 		});
 		const tableEntries = entries.filter((e) => {

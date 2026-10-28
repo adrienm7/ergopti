@@ -27,6 +27,8 @@ helpers.describe("infra.key_event_health (key-event-pairing)", function()
 	local lines = {}
 	local deferred = {}
 	local host_ns = 0
+	-- The wall clock follows the awake clock, plus the time the Mac slept.
+	local slept_s = 0
 	package.loaded["infra.logger"] = {
 		warn = function(_, fmt, ...) lines[#lines + 1] = { level = "warn", text = string.format(fmt, ...) } end,
 		info = function(_, fmt, ...) lines[#lines + 1] = { level = "info", text = string.format(fmt, ...) } end,
@@ -35,7 +37,10 @@ helpers.describe("infra.key_event_health (key-event-pairing)", function()
 	package.loaded["infra.deferred_work"] = {
 		after = function(_, callback) deferred[#deferred + 1] = callback; return true end,
 	}
-	package.loaded["adapters.timer_scheduler"] = { now_ns = function() return host_ns end }
+	package.loaded["adapters.timer_scheduler"] = {
+		now_ns = function() return host_ns end,
+		now = function() return host_ns / 1e9 + slept_s end,
+	}
 	_G.hs = { timer = { absoluteTime = function() return host_ns end } }
 	package.loaded["adapters.event_clock"] = nil
 	package.loaded["infra.key_event_health"] = nil
@@ -69,6 +74,7 @@ helpers.describe("infra.key_event_health (key-event-pairing)", function()
 		EventClock.reset()
 		lines, deferred = {}, {}
 		host_ns = UPTIME_NS
+		slept_s = 0
 	end
 
 	helpers.it("reads lateness under the clock scale that makes the age plausible", function()
@@ -182,6 +188,42 @@ helpers.describe("infra.key_event_health (key-event-pairing)", function()
 		helpers.assert_true(math.abs(counts.max_late_ms - 899) < 0.01, "measured from the freshest recent event")
 		helpers.assert_eq(#lines, 1, "one line per turn for a burst of late events")
 		helpers.assert_true(lines[1].text:find("(2 times)", 1, true) ~= nil, lines[1].text)
+	end)
+
+	-- Field run 2026-10-27 19:46:46: two keys pressed at 16:55 were reported
+	-- "stayed down 589.8 s ... its key-up was lost" on the first key after a
+	-- wake from a three-hour sleep; the awake clock had advanced 590 s.
+	helpers.it("retires a key held across a sleep instead of calling it stuck (key-held-across-sleep)", function()
+		reset()
+		observe("down", KEY_A, 1)
+		slept_s = 10200
+		host_ns = host_ns + 590 * 1e9
+		observe("down", KEY_E, 1)
+		host_ns = host_ns + 80 * 1e6
+		observe("up", KEY_E, 1)
+		observe("up", KEY_A, 1)
+		flush()
+		local counts = Health.counts()
+		helpers.assert_eq(counts.stuck, 0, "a key held when the Mac slept is not a stuck key")
+		helpers.assert_eq(counts.held_across_sleep, 1)
+		helpers.assert_eq(counts.ups_without_down, 0,
+			"its release right after the wake is not a lost key-down")
+		helpers.assert_eq(counts.ups_after_sleep, 1)
+		for _, line in ipairs(lines) do
+			helpers.assert_eq(line.level, "info", "nothing was lost: " .. line.text)
+		end
+		helpers.assert_eq(#lines, 1, "the sleep is reported once")
+	end)
+
+	helpers.it("still warns for a key stuck while the Mac stayed awake (key-stuck-awake)", function()
+		reset()
+		observe("down", KEY_A, 1)
+		host_ns = host_ns + 590 * 1e9
+		observe("down", KEY_E, 1)
+		flush()
+		helpers.assert_eq(Health.counts().stuck, 1)
+		helpers.assert_eq(Health.counts().held_across_sleep, 0)
+		helpers.assert_eq(lines[1].level, "warn")
 	end)
 
 	helpers.it("counts lease failures by kind in the session totals", function()

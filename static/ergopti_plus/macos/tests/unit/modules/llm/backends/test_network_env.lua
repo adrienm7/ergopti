@@ -56,7 +56,7 @@ helpers.describe("managed-network-children", function()
 		local prelude = assert(NetworkEnv.prelude("TEST"))
 		helpers.assert_true(prelude:find(". '" .. policy .. "' && apply_system_network; ", 1, true) ~= nil, prelude)
 		if POSIX then
-			local output = run("env -u https_proxy -u all_proxy -u ALL_PROXY HTTPS_PROXY=http://relay.corp:3129 NO_PROXY= no_proxy= bash -c "
+			local output = run("env -u https_proxy -u all_proxy -u ALL_PROXY -u SSL_CERT_FILE -u SSL_CERT_DIR HTTPS_PROXY=http://relay.corp:3129 NO_PROXY= no_proxy= bash -c "
 				.. sh_quote(prelude .. 'printf "%s|%s|%s" "$HTTPS_PROXY" "$NO_PROXY" "$UV_SYSTEM_CERTS"'))
 			helpers.assert_eq(output, "http://relay.corp:3129|localhost,127.0.0.1,::1|1")
 		end

@@ -146,7 +146,7 @@ helpers.describe("Linux manual prediction trigger (llm-manual-prediction-feedbac
 			local handlers = engine.action_handlers()
 			helpers.assert_eq(type(handlers.llm_generate_prediction), "function",
 				"the engine provides the handler the daemon injects into the executor")
-			handlers.llm_generate_prediction("keyboard__super_space", nil)
+			handlers.llm_generate_prediction("keyboard__meta_space", nil)
 			helpers.assert_eq(#seen.fired, 1, "the action runs the manual trigger")
 		end)
 		restore()

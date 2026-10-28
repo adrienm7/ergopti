@@ -207,14 +207,14 @@ NetworkCheck_Run(OnDone, Deps := 0) {
 	if (Deps is Map)
 		for Name, Value in Deps
 			Merged[Name] := Value
-	Run := NetworkCheckRun(OnDone, Merged)
+	CheckRun := NetworkCheckRun(OnDone, Merged)
 	try {
-		_NetworkCheck_Settings(Run)
+		_NetworkCheck_Settings(CheckRun)
 	} catch as Err {
 		LoggerError(NETWORK_CHECK_TAG, "Network check raised: {1}", Err.Message)
-		if !Run.Report["seen"].Has("internal_error")
-			ComposerCheck_Step(Run.Report, "internal_error", "fail", "raised")
-		_NetworkCheck_Finish(Run)
+		if !CheckRun.Report["seen"].Has("internal_error")
+			ComposerCheck_Step(CheckRun.Report, "internal_error", "fail", "raised")
+		_NetworkCheck_Finish(CheckRun)
 	}
 	return true
 }

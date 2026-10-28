@@ -67,9 +67,18 @@ const ALLOWED_TOP_LEVEL = new Set(['ergopti_plus', 'img', 'ergopti', 'layouts'])
 const CURATED_READS = [
 	{
 		reader: 'repo:static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift',
-		needles: ['/Contents/Resources/static/ergopti_plus/macos"', 'bundledConfigDir() + "/init.lua"'],
+		needles: ['bundledConfigDir() + "/init.lua"'],
 		targets: ['ergopti_plus/macos/init.lua'],
 		why: 'the launcher points MJConfigFile at the bundled init.lua'
+	},
+	{
+		reader: 'repo:static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LuaSourceSelection.swift',
+		needles: [
+			'"\\(bundlePath)/Contents/Resources/\\(driverSubpath)"',
+			'static let driverSubpath = "static/ergopti_plus/macos"'
+		],
+		targets: ['ergopti_plus/macos/init.lua'],
+		why: 'a packaged launcher selects the bundled driver folder'
 	},
 	{
 		reader: 'ergopti_plus/macos/ui/menu/init.lua',

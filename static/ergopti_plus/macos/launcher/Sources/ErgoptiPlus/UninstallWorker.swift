@@ -29,8 +29,8 @@ enum OwnedRuntimeUninstall {
 	static let runtimeDirectory = "/Library/Application Support/ErgoptiPlus/Runtime"
 	/// Label and property list of each job the owned installer registers.
 	static let jobs: [(label: String, plist: String)] = [
-		("com.ergoptiplus.runtime.core", "/Library/LaunchDaemons/com.ergoptiplus.runtime.core.plist"),
-		("com.ergoptiplus.runtime.vhid", "/Library/LaunchDaemons/com.ergoptiplus.runtime.vhid.plist"),
+		(Identifiers.ServiceLabels.macosCore, "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist"),
+		(Identifiers.ServiceLabels.macosVirtualHid, "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosVirtualHid).plist"),
 	]
 
 	/// True when any owned runtime file is present, however partly.

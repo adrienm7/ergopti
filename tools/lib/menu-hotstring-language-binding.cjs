@@ -5,13 +5,14 @@
 
 const { isDeepStrictEqual } = require('node:util');
 const { scriptTokens } = require('./script-source.cjs');
+const { COMMAND } = require('./_generated/config_keys.cjs');
 
 // Independent presentation contract: the former native checkbox and language heads.
 const declarations = {
 	hotstring_scope_checkbox: [
 		{
 			type: 'check',
-			id: 'hotstring_scope_all_sections',
+			id: COMMAND.HOTSTRING_SCOPE_ALL_SECTIONS,
 			i18n: 'menu.hotstrings.enable_all_sections',
 			checked_when: ['hotstring_scope_all_on']
 		}
@@ -1746,8 +1747,10 @@ const PERSONAL_DEFAULT_CHOICES = {
 		init: 'DefaultRows := []',
 		append: 'DefaultRows.Push(DefaultChoice)',
 		refusal: 'if !(DefaultChoice is Map)\n\t\t\t\treturn []',
+		// config-key-literal-ok: quotes the driver source this gate pins
 		call: 'DefaultChoice := MenuRenderer_CheckRow("hotstring_personal_default_choice", "personal_default_section",\n\t\t\t\tMap("personal_default_section", _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels)),\n\t\t\t\tMap("personal_default_section_label", ((Label) => (*) => Label)(SecLabel),\n\t\t\t\t\t"personal_default_section_selected", ((Selected) => (*) => Selected)(CurDefaultSec == SecName)))',
 		frame:
+			// config-key-literal-ok: quotes the driver source this gate pins
 			'DefaultCommands := Map("personal_default_none", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels))\n\t\tDefaultGetters := Map("personal_default_unset", (*) => CurDefaultSec == "", "personal_default_boundary", (*) => true)\n\t\tDefaultProviders := Map("personal_default_choices", (*) => DefaultRows)\n\t\tDefaultFrame := MenuRenderer_TemplateRows("hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders)',
 		prefix:
 			'DefaultRows := []\n\t\tfor _, SecName in TomlData["sections_order"] {\n\t\t\tif (SecName == "-")\n\t\t\t\tcontinue\n\t\t\tif !TomlData["sections"].Has(SecName)\n\t\t\t\tcontinue\n\t\t\tSecLabel := DisambiguatedLabels[SecName]',
@@ -1765,8 +1768,10 @@ const PERSONAL_DEFAULT_CHOICES = {
 		init: 'local cat_choices = {}',
 		append: 'table.insert(cat_choices, choice)',
 		refusal: 'if type(choice) ~= "table" then return nil end',
+		// config-key-literal-ok: quotes the driver source this gate pins
 		call: 'local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {\n\t\t\t\t\t\t["personal_default_section"] = function()\n\t\t\t\t\t\t\tstate.custom_default_section = sname\n\t\t\t\t\t\t\tif ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then\n\t\t\t\t\t\t\t\tpcall(ctx.hotstring_editor.set_default_section, sname)\n\t\t\t\t\t\t\tend\n\t\t\t\t\t\t\tif ctx.save_prefs() ~= true then return false end\n\t\t\t\t\t\t\tctx.updateMenu()\n\t\t\t\t\t\tend,\n\t\t\t\t\t}, {\n\t\t\t\t\t\tpersonal_default_section_label = function() return lbl end,\n\t\t\t\t\t\tpersonal_default_section_selected = function() return selected end,\n\t\t\t\t\t})',
 		frame:
+			// config-key-literal-ok: quotes the driver source this gate pins
 			'local cat_menu = ManifestMenu.template_rows("hotstring_personal_default_frame", {\n\t\t["personal_default_none"] = none_action,\n\t}, {\n\t\t["personal_default_unset"] = function() return not state.custom_default_section end,\n\t\t["personal_default_boundary"] = function() return #cat_choices > 0 end,\n\t}, { ["personal_default_choices"] = function() return cat_choices end })',
 		prefix:
 			'local cat_choices = {}\n\tif type(personal_secs) == "table" then\n\t\tlocal has_real = false\n\t\tfor _, sec in ipairs(personal_secs) do\n\t\t\tif type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then\n\t\t\t\thas_real = true; break\n\t\t\tend\n\t\tend\n\t\tif has_real then\n\t\t\tfor _, sec in ipairs(personal_secs) do\n\t\t\t\tif type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then\n\t\t\t\t\tlocal lbl   = (type(sec.description) == "string" and sec.description ~= "")\n\t\t\t\t\t\tand sec.description or tostring(sec.name):gsub("_", " ")\n\t\t\t\t\tlbl = ctx.applyTriggerChar(lbl)\n\t\t\t\t\tlocal sname = sec.name\n\t\t\t\t\tlocal selected = (state.custom_default_section == sname) or nil',
@@ -1783,8 +1788,10 @@ const PERSONAL_DEFAULT_CHOICES = {
 		append: 'choices[#choices + 1] = choice',
 		refusal:
 			'if type(choice) ~= "table" then\n\t\t\t\t\t\tpersonal_choices_admitted = false\n\t\t\t\t\t\treturn {}\n\t\t\t\t\tend',
+		// config-key-literal-ok: quotes the driver source this gate pins
 		call: 'local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {\n\t\t\t\t\t\t["personal_default_section"] = function()\n\t\t\t\t\t\t\tEditor.set_pref("default_section", name)\n\t\t\t\t\t\t\tif type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end\n\t\t\t\t\t\tend,\n\t\t\t\t\t}, {\n\t\t\t\t\t\tpersonal_default_section_label = function() return name end,\n\t\t\t\t\t\tpersonal_default_section_selected = function() return selected end,\n\t\t\t\t\t})',
 		frame:
+			// config-key-literal-ok: quotes the driver source this gate pins
 			'local sub = ManifestMenu.template_rows("hotstring_personal_default_frame", {\n\t\t\t\t\t["personal_default_none"] = none_action,\n\t\t\t\t}, {\n\t\t\t\t\t["personal_default_unset"] = function() return current == nil or current == "" end,\n\t\t\t\t\t["personal_default_boundary"] = function() return false end,\n\t\t\t\t}, { ["personal_default_choices"] = function() return choices end })',
 		prefix:
 			'local choices = {}\n\n\t\t\t\tfor _, name in ipairs(personal and personal.sections_order or {}) do\n\t\t\t\t\tlocal selected = (current == name)',
@@ -1923,7 +1930,7 @@ function personalDefaultChoicePublication(source, platform, manifest) {
 		if (!Object.hasOwn(PERSONAL_DEFAULT_CHOICES, platform)) return false;
 		const expected = [['ahk', 'hs'], ['linux']].map((platforms) => ({
 			type: 'check',
-			id: 'personal_default_section',
+			id: COMMAND.PERSONAL_DEFAULT_SECTION,
 			caption_source: 'native',
 			caption_getter: 'personal_default_section_label',
 			checked_when: ['personal_default_section_selected'],
@@ -2167,7 +2174,7 @@ function personalSectionChoicePublication(source, platform, manifest) {
 			!isDeepStrictEqual(manifest?.hotstring_personal_section_choice, [
 				{
 					type: 'check',
-					id: 'personal_section_toggle',
+					id: COMMAND.PERSONAL_SECTION_TOGGLE,
 					caption_source: 'native',
 					caption_getter: 'personal_section_label',
 					checked_when: ['personal_section_selected'],
@@ -2366,7 +2373,7 @@ function personalSectionChoicePublication(source, platform, manifest) {
 			row.value.callee.object.binding !== facade
 		)
 			return false;
-		const command = luaField(row.value.args[2], 'personal_section_toggle');
+		const command = luaField(row.value.args[2], COMMAND.PERSONAL_SECTION_TOGGLE);
 		if (
 			row.value.args[2]?.fields.length !== 1 ||
 			command.length !== 1 ||
@@ -2714,6 +2721,7 @@ module.exports.personalSectionChoicePublication = personalSectionChoicePublicati
 function personalFileCaptionPublication(source) {
 	try {
 		const donor =
+			// config-key-literal-ok: quotes the driver source this gate pins
 			'\n\tTFMenu := Menu(), HandedOff := false\n\tPrimaryFailure := 0\n\ttry {\n\tControlRows := [], SectionRows := []\n\tOwner := PersonalFileControls.ForPath(TF.path)\n\tif Owner is PersonalFileAdoptedOwner {\n\t\tfor Row in _HS_PersonalFileControlRows(Owner, "")\n\t\t\tControlRows.Push(Row)\n\t\tfor Section in Owner.sectionNames {\n\t\t\tSectionRows.Push(Map("label", Section . " (" . FmtCount(Owner.counts[Section]) . ")",\n\t\t\t\t"items", _HS_PersonalFileControlRows(Owner, Section), "checked", Owner.Selected(Section)))\n\t\t}\n\t} else {\n\t\tUnavailable := _HS_PersonalUnavailableRow("file")\n\t\tif Unavailable is Map\n\t\t\tControlRows.Push(Unavailable)\n\t\tfor _, ES in TF.sections\n\t\t\tSectionRows.Push(Map("label", ES["description"] . " (" . FmtCount(ES["count"]) . ")"))\n\t}\n\tCommands := Map("hotstring_file_open", _MakeOpenFileFn(TF.path))\n\tGetters := Map("hotstring_file_ready", (*) => true, "personal_file_open_present", (*) => true,\n\t\t"personal_file_boundary", (*) => Owner is PersonalFileAdoptedOwner)\n\tProviders := Map("personal_file_controls", (*) => ControlRows, "personal_file_sections", (*) => SectionRows)\n\tFileRows := MenuRenderer_TemplateRows("hotstring_personal_file_frame", Commands, Getters, Providers)\n\tif !(FileRows is Array)\n\t\treturn false\n\tif MenuRenderer_AppendTemplate(TFMenu, "hotstring_personal_file_frame", Commands, Getters, Providers, &WholeTreeAdmitted) != 1 + ControlRows.Length + SectionRows.Length || !WholeTreeAdmitted\n\t\treturn false\n\tResult := Map(\n\t\t"label", TF.stem . " (" . FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . ")",\n\t\t"submenu", TFMenu)\n\tHandedOff := true\n\treturn Result\n\t} catch as ErrorInfo {\n\t\tPrimaryFailure := ErrorInfo\n\t\tthrow ErrorInfo\n\t} finally {\n\t\tif !HandedOff {\n\t\t\ttry _HS_PersonalReleaseMenus([TFMenu])\n\t\t\tcatch as CleanupFailure {\n\t\t\t\tif !PrimaryFailure\n\t\t\t\t\tthrow CleanupFailure\n\t\t\t\ttry LoggerError("Hotstrings", "Personal menu cleanup failed after construction refusal: {1}", CleanupFailure.Message)\n\t\t\t}\n\t\t}\n\t}\n';
 		const edits = [
 			[

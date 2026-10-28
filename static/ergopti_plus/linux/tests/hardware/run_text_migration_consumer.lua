@@ -4,7 +4,19 @@
 --- DESCRIPTION:
 --- Exercises the real collector, SQLite backend and AES provider. The setting
 --- acknowledges future-write posture; migration acceptance is a separate receipt.
+--- An owned machine identity keeps the proof independent of the host's ID.
 --- ==============================================================================
+
+--- Returns a typing time on the driver's own clock (ergopti_hotstrings passes
+--- Monotonic.now_ms()). A fixed 1000 ms made the session tracker's verdict
+--- depend on the host's uptime; one origin keeps the scripted gaps exact.
+--- @param offset_ms number Scripted time of the keystroke.
+--- @return number typed_ms
+local typing_origin_ms
+local function typed_at(offset_ms)
+	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	return typing_origin_ms + offset_ms
+end
 
 local root = assert(arg[1])
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
@@ -12,7 +24,14 @@ require("compat.utf8").install()
 local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
 local TextCrypto = require("keystats.text_crypto")
-local path = os.tmpname()
+local uv = require("luv")
+local cipher = require("modules.keystats.text_cipher")
+local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-migration-consumer-XXXXXX"))
+local path, machine_id = directory .. "/metrics.sqlite", directory .. "/machine-id"
+local machine = assert(io.open(machine_id, "wb"))
+assert(machine:write("0123456789abcdef0123456789abcdef\n"))
+assert(machine:close())
+cipher._set_machine_id_path(machine_id)
 local Logger = require("logger.shim")
 local original_error, failures = Logger.error, 0
 local original_success, completions = Logger.success, 0
@@ -30,8 +49,8 @@ local ok, failure = xpcall(function()
 			k.init({ sqlite_path = path })
 			require("tests.support.metrics_consent_fixture").enable(k)
 			local writer = require("modules.keystats.sqlite_writer")
-			local cipher = require("modules.keystats.text_cipher")
-			assert(cipher.is_available(), "This public-consumer proof requires native AES")
+			assert(require("infra.openssl_cipher").available, "This public-consumer proof requires native AES")
+			assert(cipher.is_available(), "The owned machine identity must derive a real encryption key")
 			local device = assert(writer.query_rows("SELECT device_id FROM devices LIMIT 1;"))[1]
 			assert(writer.insert_typing_events(device, { { app = "owned-app", text = "historical-original" } }))
 			local key = require("keystats.text_migration_runner").CURSOR_META_KEY
@@ -46,7 +65,7 @@ local ok, failure = xpcall(function()
 			assert(preferences.snapshot()[require("config_keys").KEY.METRICS_ENCRYPT] == true)
 			assert(completions == 0, "refusing historical work must never announce its success")
 			assert(not k.get_migration_progress().running and writer.get_meta(key) == nil and failures == 1)
-			k.on_keydown("b", 1000, "owned-app")
+			k.on_keydown("b", typed_at(1000), "owned-app")
 			Fixture.flush(k)
 			local rows = assert(writer.query_rows("SELECT text FROM events_typing ORDER BY id;"))
 			assert(#rows == 2)
@@ -78,5 +97,12 @@ local ok, failure = xpcall(function()
 end, debug.traceback)
 Logger.error = original_error
 Logger.success = original_success
-os.remove(path)
+local cleaned, cleanup_error = pcall(function()
+	cipher._set_machine_id_path(nil)
+	for name in uv.fs_scandir_next, assert(uv.fs_scandir(directory)) do
+		assert(uv.fs_unlink(directory .. "/" .. name))
+	end
+	assert(uv.fs_rmdir(directory))
+end)
 assert(ok, failure)
+assert(cleaned, cleanup_error)

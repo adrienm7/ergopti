@@ -241,16 +241,16 @@ HotstringsExtensionScopeApply(ExtensionId, Enabled, Options := unset) {
 			if OwnedPack
 				throw Error("Extension ownership is ambiguous.")
 			OwnedPack := true
-			for File in Pack.toml_files {
-				if Inventory.Has(File.category)
+			for PackFile in Pack.toml_files {
+				if Inventory.Has(PackFile.category)
 					throw Error("Extension category ownership is ambiguous.")
-				Inventory[File.category] := [], ExtensionGroups[File.category] := true
-				Targets.Push(File.category)
-				for Section in File.sections
-					Inventory[File.category].Push(Section["name"])
+				Inventory[PackFile.category] := [], ExtensionGroups[PackFile.category] := true
+				Targets.Push(PackFile.category)
+				for Section in PackFile.sections
+					Inventory[PackFile.category].Push(Section["name"])
 			}
-			for File in (Pack.HasOwnProp("bound_files") ? Pack.bound_files : []) {
-				Binding := File.binding
+			for PackFile in (Pack.HasOwnProp("bound_files") ? Pack.bound_files : []) {
+				Binding := PackFile.binding
 				Key := StrLower(StrReplace(Binding["category"], "_"))
 				if !NativeIds.Has(Key)
 					throw Error("An extension binding has no native category owner.")
@@ -281,8 +281,8 @@ _HotstringsScopeCatalogue() {
 			Entries.Push(Entry)
 	}
 	for Pack in HotstringExtensions_Scan(_HotstringExtensions_CurrentRoots()) {
-		for File in Pack.toml_files {
-			Entries.Push({ Key: File.category, Path: File.path, IsPersonal: false,
+		for PackFile in Pack.toml_files {
+			Entries.Push({ Key: PackFile.category, Path: PackFile.path, IsPersonal: false,
 				IsExtension: true, ExtId: Pack.id })
 		}
 	}

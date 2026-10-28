@@ -14,6 +14,18 @@ ownership_directory="$(cd -- "$(dirname -- "$0")" && pwd -P)"
 # Canonical receipt constants are also read by the native rollback verifier.
 source "$ownership_directory/ownership_schema.sh"
 
+# Refuses with one closed developer record and exits. This helper prints no
+# prose: the installer and the updater that call it report the failure in the
+# user's language, and the updater may run an earlier installation's copy of
+# it, so it cannot depend on that copy's message catalogue.
+# @param $1 Refusal code.
+# @param $2 Exit status.
+ownership_refuse() {
+	local record="[ownership] code=$1"
+	printf '%s\n' "$record" >&2
+	exit "$2"
+}
+
 valid_owned_relative() {
 	local relative="$1"
 	case "$relative" in ''|*$'\n'*|*$'\r'*|*$'\t'*|*\\*) return 1 ;; esac
@@ -25,8 +37,7 @@ valid_owned_relative() {
 	return 1
 }
 [ "$#" -eq 3 ] || [ "$#" -eq 5 ] || {
-	echo 'Expected driver source, shared source, installation root, then optionally an extra source and its installed path.' >&2
-	exit 64
+	ownership_refuse usage 64
 }
 DRIVER_SOURCE="$1"
 SHARED_SOURCE="$2"
@@ -34,18 +45,18 @@ INSTALL_ROOT="$3"
 EXTRA_SOURCE="${4:-}"
 EXTRA_PREFIX="${5:-}"
 [ -f "$DRIVER_SOURCE/$OWNERSHIP_DRIVER_SENTINEL" ] && [ -f "$SHARED_SOURCE/$OWNERSHIP_SHARED_SENTINEL" ] \
-	&& [ -d "$INSTALL_ROOT" ] || { echo 'Invalid ownership source or destination.' >&2; exit 1; }
+	&& [ -d "$INSTALL_ROOT" ] || ownership_refuse invalid_source 1
 if [ "$#" -eq 5 ]; then
 	# Only below the driver tree, which is all uninstall.sh accepts, and never
 	# outside it.
 	case "/$EXTRA_PREFIX/" in
 		/"$OWNERSHIP_DRIVER_TREE"/*/) ;;
-		*) echo 'Invalid extra ownership path.' >&2; exit 1 ;;
+		*) ownership_refuse invalid_extra_path 1 ;;
 	esac
 	case "/$EXTRA_PREFIX/" in
-		*/../*|*/./*|*//*|*\\*) echo 'Invalid extra ownership path.' >&2; exit 1 ;;
+		*/../*|*/./*|*//*|*\\*) ownership_refuse invalid_extra_path 1 ;;
 	esac
-	[ -d "$EXTRA_SOURCE" ] || { echo 'Invalid extra ownership source.' >&2; exit 1; }
+	[ -d "$EXTRA_SOURCE" ] || ownership_refuse invalid_extra_source 1
 fi
 manifest="$(mktemp "$INSTALL_ROOT/$OWNERSHIP_MANIFEST.XXXXXX")"
 trap 'rm -f -- "$manifest"' EXIT
