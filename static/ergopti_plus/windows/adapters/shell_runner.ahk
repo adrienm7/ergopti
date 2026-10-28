@@ -316,6 +316,27 @@ ShellRunner_Exec(Cmd) {
 ; ===================================
 
 /**
+ * Windows PowerShell's executable: the one spelling a PowerShell stage shares,
+ * since the antivirus surface of the compiled script counts every copy.
+ * @returns {String} Absolute path under the Windows directory.
+ */
+ShellRunner_WinPsPath() {
+	return A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
+}
+
+/**
+ * The arguments a PowerShell stage starts with: no profile, no prompt, and
+ * the execution policy its scripts and modules need, followed by Args.
+ * @param {String} Args The stage's own arguments (-File or -Command first).
+ * @returns {Array}
+ */
+ShellRunner_WinPsArgs(Args*) {
+	Out := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass"]
+	Out.Push(Args*)
+	return Out
+}
+
+/**
  * Spawns an async subprocess and returns an opaque handle.
  * The handle exposes start(), terminate(), and the optional Windows-only
  * processId()/detach()/terminateAsync(); all are safe on a not-yet-started or

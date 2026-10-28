@@ -3,12 +3,12 @@
 --- ==============================================================================
 --- MODULE: Pending Layout Activation (macOS)
 --- DESCRIPTION:
---- Remembers the installed layouts macOS has not turned on yet. The enabled
---- input-source preference lists a layout at once, but macOS 26 turns it on
---- only at the next login (field probe, docs/ERGOPTIPLUS_TODO.md L25): the
---- install then reports « pending », and at the next boot of the driver this
---- module checks whether macOS turned the layout on and, when the user asked to
---- use it, selects it.
+--- Remembers the installed layouts macOS has not turned on yet: the fallback
+--- of the install. Writing the enabled input-source preference normally turns
+--- a layout on at once, as a fresh process sees it (probe v5, P5); when that
+--- fresh read still finds it off, the install reports « pending », and at the
+--- next boot of the driver (after a login, P10) this module checks whether
+--- macOS turned the layout on and, when the user asked to use it, selects it.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Honest states: a pending layout is never called enabled. At boot each one
@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
 
 local M = {}
 
@@ -168,10 +169,7 @@ function M.resume()
 		summary.unreadable = 1
 		return summary
 	end
-	local ids = {}
-	for id in pairs(entries) do ids[#ids + 1] = id end
-	table.sort(ids)
-	for _, id in ipairs(ids) do
+	for _, id in ipairs(TableUtil.sorted_keys(entries)) do
 		local entry = entries[id]
 		local live, live_err = _deps.is_live(entry.keyboard_name)
 		if live == nil then
