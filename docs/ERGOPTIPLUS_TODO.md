@@ -375,12 +375,13 @@ From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their bu
   synchronous=OFF and the durable mode restored before any live write, its state (applied
   offset and cursor markers) persisted in meta after each step so a stop resumes at the last
   batch, progress every 32 MB. Measured here: 47 MB in 1439 steps, 1.3 s of Lua CPU, worst step
-  4.4 ms (no-op SQLite); real SQLite on tmpfs 3.5 ms per 64 KB. Open [CODE], needs a decision:
-  move the cache to `~/Library/Caches/ergopti_plus/metrics/<device_id>/` (it survives a reboot,
-  as Linux's `metrics.sqlite` in the XDG data folder already does), which removes the post-reboot
-  replay itself; `docs/keystats_spec.md` §1.7 names TMPDIR, and seven native fixtures own TMPDIR
-  (ledger bootstrap policy, metrics gitignore, physical history persistence and bootstrap,
-  cold and historical rollover, rollover marker recovery). Mac confirms: after a reboot,
+  4.4 ms (no-op SQLite); real SQLite on tmpfs 3.5 ms per 64 KB. Cache location fixed on `tmp/wip-keystats-cache-location` (maintainer decision): db.sqlite
+  moved to `~/Library/Caches/ergopti_plus/metrics/<device_id>/` (`config_paths.metrics_cache_dir`,
+  the one source, passed as `CoreState.CACHE_DIR`); a cache an earlier version left in
+  `$TMPDIR/ergopti_metrics/` is moved once at start, journal first, else the bounded replay
+  rebuilds it. `test_cache_survives_reboot.lua` empties TMPDIR and keeps the cache, its saved
+  offset and no replay (fails on the old path). The native fixtures keep their owned folder and
+  now pass it as CACHE_DIR; `docs/keystats_spec.md` §1.1 and §1.7 updated. Mac confirms: after a reboot,
   `Keystats engine start (deferred)` stays under 100 ms, `Local ledger replay: N of M MB` lines
   follow, and no hold over 250 ms comes from log_manager.lua.
 - **L65** Fixed on tmp/wip-field-run-hygiene-3 (1471c14782). 12_mlx_model
