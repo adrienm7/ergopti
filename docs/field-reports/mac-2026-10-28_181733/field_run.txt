@@ -1,0 +1,7 @@
+[field-report] Reusing the running developer app: it was built from the current launcher.
+[field-report] Waiting for the developer app to publish its readiness...
+[field-report] Developer app ready (pid 34729); requesting every step within 4800 s.
+[field-report]   field run 01_field_lease: pass
+[field-report]   field run 02_field_owned_runtime: pass
+[field-report] Field run done: {"cause":{"kind":"reload","reason":"hammerspoon_reload","step":"field_network"},"finished_at":"2026-10-28T17:17:38Z","interrupted":true,"order":["field_lease","field_owned_runtime"],"pid":34729,"request_id":"mac-2026-10-28_181733","schema":1,"started_at":"2026-10-28T17:17:37Z","verdicts":{"field_lease":"pass","field_owned_runtime":"pass"}}
+[field-report] The field run was cut short in the app (see its log); the results so far are kept.

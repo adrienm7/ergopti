@@ -1,0 +1,1 @@
+{"deadline_seconds":4800,"pid":34729,"request_id":"mac-2026-10-28_181733","schema":1,"started_at":"2026-10-28T17:17:37Z","steps":["field_lease","field_owned_runtime","field_network","field_toolchain","field_login_items","field_composer","key_accounting","diagnostics","ollama_runtime","ollama_model","mlx_runtime","mlx_model"]}
