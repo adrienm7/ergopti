@@ -23,6 +23,7 @@ local json = require("json")
 
 local hs     = hs
 local Logger = require("infra.logger")
+local ConfigKeys = require("config_keys")
 
 local _owned_writer = nil
 
@@ -40,7 +41,7 @@ local MIGRATION_MARKER = PHYSICAL_PREFIX .. "settings_namespace_migration_v1"
 
 local LEGACY_FIXED_KEYS = {
 	"i18n_locale",
-	"llm.enabled",
+	ConfigKeys.KEY.LLM_ENABLED,
 	"llm_backend",
 	"llm_debounce",
 	"llm_max_words",

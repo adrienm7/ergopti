@@ -52,6 +52,9 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
    Tap-Hold off or unticking the option. This deliberately overrides R3 for that
    explicit, default-on option only. With the option off, the owned runtime does
    not fight another grabber: it reports an explicit, named unavailable state.
+   Confirmed by the maintainer on 2026-10-27 under the owned-runtimes rule
+   (`docs/design/owned-runtimes.md`): Tap-Hold on quits the user's Karabiner;
+   Tap-Hold off never activates the owned runtime beside theirs.
 4. **Branding and signing (question 2).** The pqrs branding of the
    VirtualHIDDevice (hidden manager application, notification, Driver
    Extensions entry) is acceptable. Ergopti does not get an Apple Developer ID:

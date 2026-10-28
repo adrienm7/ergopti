@@ -228,6 +228,8 @@ helpers.describe("process_runner: asynchronous argv processes", function()
 		state.finish(3)
 		helpers.assert_eq(results[1].exit_code, 3)
 		helpers.assert_contains(results[1].error, "exited with code 3")
+		helpers.assert_eq(results[1].reason, require("adapter_errors").PROCESS_EXITED_UNSUCCESSFULLY,
+			"the public result carries the closed id beside its sentence")
 		helpers.assert_eq(results[1].stderr, "Traceback\n")
 		helpers.assert_true(results[1].not_found ~= true)
 	end)

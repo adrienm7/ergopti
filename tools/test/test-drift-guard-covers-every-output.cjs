@@ -178,7 +178,23 @@ function runIsolatedCoverage({ files, probe = runCoverage } = {}) {
 			const destination = path.resolve(temporary, relative);
 			if (!source.startsWith(ROOT + path.sep) || !destination.startsWith(temporary + path.sep))
 				throw new Error('Drift fixture path escapes its source or private tree');
-			if (!fs.existsSync(source)) continue;
+			let entry;
+			try {
+				entry = fs.lstatSync(source);
+			} catch {
+				continue; // listed by git but deleted in the working tree
+			}
+			// A directory link (an untracked node_modules, a worktree-shared cache)
+			// is never followed: copyFileSync on it fails EISDIR and a deep copy
+			// would duplicate a tree the guard does not read. File links are kept
+			// as links so a tracked link still resolves inside the copy.
+			if (entry.isSymbolicLink()) {
+				if (fs.statSync(source, { throwIfNoEntry: false })?.isDirectory() ?? true) continue;
+				fs.mkdirSync(path.dirname(destination), { recursive: true });
+				fs.symlinkSync(fs.readlinkSync(source), destination);
+				continue;
+			}
+			if (!entry.isFile()) continue;
 			fs.mkdirSync(path.dirname(destination), { recursive: true });
 			fs.copyFileSync(source, destination);
 		}

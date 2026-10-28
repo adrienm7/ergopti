@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"modules.updater.auto_check", "modules.updater", "infra.paths", "infra.logger",
+	"modules.updater.auto_check", "modules.updater", "infra.paths", "infra.logger", "infra.timings",
 	"adapters.http_client", "adapters.timer_scheduler", "adapters.file_system",
 	"adapters.json_codec", "adapters.update_launcher", "infra.notifications", "infra.i18n",
 }
@@ -23,6 +23,9 @@ local BODY = '[{"tag_name":"v0.0.0-dev.150","prerelease":true,"published_at":"20
 local function with_owner(run)
 	helpers.with_stub_scope(OWNED, function()
 		local Json = require("json")
+		-- The real registry reader, loaded before infra.paths is stubbed below:
+		-- updater.list_cache reads its bound from [limits] when auto_check loads it.
+		local Timings = require("infra.timings")
 		local function shared(path)
 			local file = assert(io.open(helpers.shared(path), "rb"))
 			local raw = assert(file:read("*a"))
@@ -47,6 +50,7 @@ local function with_owner(run)
 		})
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.paths"] = {}
+		package.loaded["infra.timings"] = Timings
 		package.loaded["adapters.file_system"] = {}
 		package.loaded["adapters.json_codec"] = { encode = Json.encode, decode = Json.decode }
 		package.loaded["modules.updater"] = { channels = function() return registry end, GH_OWNER = "adrienm7", GH_REPO = "ergopti" }

@@ -100,9 +100,10 @@ const pad = (n) => String(n).padStart(2, '0');
 const offsetMin = -now.getTimezoneOffset();
 const sign = offsetMin >= 0 ? '+' : '-';
 const offsetH = Math.floor(Math.abs(offsetMin) / 60);
+const offsetM = Math.abs(offsetMin) % 60;
 const datePart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 const timePart = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-const dateLine = `; Last modified on ${datePart} at ${timePart} (UTC${sign}${offsetH})`;
+const dateLine = `; Last modified on ${datePart} at ${timePart} (UTC${sign}${pad(offsetH)}:${pad(offsetM)})`;
 
 // Replace or insert date line
 const lines = privateContent.split('\n');

@@ -317,7 +317,13 @@ _EDOS_Main() {
 		WEBVIEW_SHARED_UDIR := _EDOS_Root . "\profile"
 		WebView2.DefineProp("CreateEnvironmentAsync", {Call: _EDOS_EnvironmentFactory})
 		_EDOS_Phase("before LoggerInit")
+		_EDOS_Require(ConfigKey.SCRIPT is String && ConfigLeaf.LOG_LEVEL is String,
+			"The real generated logger key classes must be available.")
+		_EDOS_Require(!FileExist(ConfigurationFile) && !ConfigMigrateBoot(ConfigurationFile, "known"),
+			"The absent error-dialog configuration must remain outside the constructor journal.")
 		LoggerInit()
+		_EDOS_Require(!FileExist(ConfigurationFile) && !ConfigMigrateBoot(ConfigurationFile, "known"),
+			"Logging must preserve the genuine absent pre-journal component role.")
 		_EDOS_Phase("after LoggerInit")
 		LoggerSetTestSink(_EDOS_Log)
 		Cache := Map("script", Map("show_error_dialog", 1))

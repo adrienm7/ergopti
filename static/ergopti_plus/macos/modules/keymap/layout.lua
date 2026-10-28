@@ -31,6 +31,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local Manifest = require("infra.manifest_reader")
+local ConfigKeys = require("config_keys")
 
 local LOG = "layout"
 
@@ -77,7 +78,7 @@ end
 --- before the user's choice is registered.
 --- @return string product "ansi" or "iso".
 function M.default_virtual_keyboard_product()
-	return M.virtual_keyboard_product(Manifest.default_for("layout.virtual_keyboard"))
+	return M.virtual_keyboard_product(Manifest.default_for(ConfigKeys.KEY.LAYOUT_VIRTUAL_KEYBOARD))
 end
 
 --- The keycode convention a key arrives in once Karabiner delivered it through

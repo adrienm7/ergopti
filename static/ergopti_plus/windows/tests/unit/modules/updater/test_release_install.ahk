@@ -631,3 +631,143 @@ for _RIT_CaseKind in ["file", "directory"] {
 		Test("Config backup: case-variant " . _RIT_CaseKind . " at " . _RIT_CasePosition . " preserves foreign ownership (config-backup-case-collision)",
 			_RIT_BackupAllocationPreservesCaseVariant.Bind(_RIT_CaseKind, _RIT_CasePosition))
 }
+
+
+; The manifest schema version is numeric; AHK's Boolean/string coercion cannot
+; grant a malformed backup the current schema's restore authority.
+
+_R7BS_ManifestSchema(Token, Accepted) {
+	global CONFIG_BACKUP_SCHEMA_VERSION
+	static Sequence := 0
+	Sequence += 1
+	Root := A_Temp . "\ergopti_r7_backup_schema_" . PLC_CurrentProcessId() . "_" . A_TickCount . "_" . Sequence
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		FirstClock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		LaterClock := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Valid := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, FirstClock)
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Candidate := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, LaterClock)
+		ManifestPath := Candidate["path"] . "\" . Rules["manifest"]
+		Original := FSReadUtf8Exact(ManifestPath)
+		Member := '"schema_version":' . CONFIG_BACKUP_SCHEMA_VERSION
+		Changed := StrReplace(Original, Member, '"schema_version":' . Token, , &ChangedCount)
+		AssertEqual(1, ChangedCount, "the actual completed manifest must own exactly one schema-version token")
+		AssertTrue(FSWriteDurable(ManifestPath, Changed))
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 3`n"))
+		Loaded := _ConfigBackup_Load(Cfg, Candidate["id"], Rules)
+		Latest := ConfigBackup_Latest(Cfg, "pre_install", Rules)
+		if Accepted {
+			AssertTrue(Loaded is Map, "supported numeric schema versions retain their genuine restore authority")
+			AssertEqual(Candidate["id"], Latest["id"])
+			Result := ConfigBackup_Restore(Cfg, Candidate["id"], Rules, LaterClock)
+			AssertTrue(Result["ok"])
+			AssertEqual("generation = 2`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+		} else {
+			AssertEqual(0, Loaded, "a Boolean or string cannot impersonate the numeric backup schema")
+			AssertEqual(Valid["id"], Latest["id"], "a malformed schema cannot hide an earlier supported backup")
+			Result := ConfigBackup_Restore(Cfg, Candidate["id"], Rules, LaterClock)
+			AssertFalse(Result["ok"])
+			AssertEqual("missing", Result["reason"])
+			AssertEqual("generation = 3`n", FSReadUtf8Exact(Cfg . "\config.toml"), "rejected metadata cannot replace live configuration")
+		}
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+for _R7BS_Case in [["1", true], ["1.0", true], ["1e0", true], ["true", false], ['"1"', false], ["false", false], ["0", false]]
+	Test("Config backup schema kind: " . _R7BS_Case[1] . " retains only numeric version authority (backup-schema-json-kind)",
+		_R7BS_ManifestSchema.Bind(_R7BS_Case[1], _R7BS_Case[2]))
+
+
+; A fixed stage basename is not authority over an existing private sidecar.
+_R7RS_RestorePreservesForeignStage() {
+	Root := A_Temp . "\ergopti_r7_restore_stage_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Later := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Original := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Control := ConfigBackup_Restore(Cfg, Original["id"], Rules, Later)
+		AssertTrue(Control["ok"], "the actual restore must first succeed on the same native paths")
+		AssertEqual("generation = 1`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 3`n"))
+		Foreign := Cfg . "\config.toml.ergopti-restore.tmp"
+		Sentinel := "foreign pending editor bytes`n"
+		AssertTrue(FSWriteCreateDurable(Foreign, Sentinel), "the colliding sidecar has its own exact preexisting bytes")
+		Result := ConfigBackup_Restore(Cfg, Original["id"], Rules, Later)
+		AssertTrue(FileExist(Foreign), "restore must never consume a stage pathname it did not create")
+		AssertEqual(Sentinel, FSReadUtf8Exact(Foreign), "unrelated sidecar bytes must survive unchanged")
+		if Result["ok"] {
+			AssertEqual("generation = 1`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+		} else {
+			AssertEqual("write", Result["reason"], "an occupied stage may explicitly refuse publication")
+			AssertEqual("generation = 3`n", FSReadUtf8Exact(Cfg . "\config.toml"), "refusal keeps the live destination intact")
+		}
+		if Result["pre"] is Map
+			AssertEqual("generation = 3`n", FSReadUtf8Exact(Result["pre"]["path"] . "\config\config.toml"))
+		else
+			AssertFalse(Result["ok"], "only an explicit pre-write refusal may omit the recovery snapshot")
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config restore: preexisting sidecar bytes retain their own stage identity (restore-foreign-stage)",
+	_R7RS_RestorePreservesForeignStage)
+
+
+; A backup pathname becomes owned only through exclusive native creation.
+_R7BA_AllocationRace(Race) {
+	static Sequence := 0
+	Sequence += 1
+	Root := A_Temp . "\ergopti_r7_backup_race_" . PLC_CurrentProcessId() . "_" . A_TickCount . "_" . Sequence
+	Cfg := Root . "\cfg", Foreign := "", ObserverCompleted := false, Caught := 0, Result := 0
+	Allocator := _ConfigBackup_NextId
+	AssertFalse(Allocator.HasOwnProp("Call"), "a foreign allocator observer cannot be detached")
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Observe(Self, Folder, Base) {
+			Allocator.DeleteProp("Call")
+			Id := Allocator.Call(Folder, Base)
+			Foreign := Folder . "\" . Id
+			AssertFalse(FileExist(Foreign), "the real allocator must initially return an absent identity")
+			DirCreate(Foreign)
+			AssertTrue(FSWriteCreateDurable(Foreign . "\foreign.txt", "foreign directory owner`n"))
+			ObserverCompleted := true
+			return Id
+		}
+		if Race
+			Allocator.DefineProp("Call", {Call: Observe})
+		try Result := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		catch as Err
+			Caught := Err
+		if Race {
+			AssertTrue(ObserverCompleted, "the transparent observer must complete the actual allocation and foreign native creation")
+			AssertEqual("foreign directory owner`n", FSReadUtf8Exact(Foreign . "\foreign.txt"))
+			AssertFalse(FileExist(Foreign . "\" . Rules["manifest"]), "a racing directory cannot acquire this backup transaction's manifest")
+			AssertFalse(FileExist(Foreign . "\config\config.toml"), "the backup cannot write payloads inside a foreign directory")
+			AssertTrue(Caught is OSError, "the actual native collision must refuse backup publication with its native error")
+		} else {
+			AssertEqual(0, Caught, "the same genuine backup path must succeed without a foreign producer")
+			AssertTrue(Result is Map)
+			AssertTrue(FileExist(Result["path"] . "\" . Rules["manifest"]))
+			AssertEqual("generation = 1`n", FSReadUtf8Exact(Result["path"] . "\config\config.toml"))
+		}
+	} finally {
+		if Allocator.HasOwnProp("Call")
+			Allocator.DeleteProp("Call")
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config backup allocation: genuine absence permits publication (backup-exclusive-allocation)", _R7BA_AllocationRace.Bind(false))
+Test("Config backup allocation: real racing directory retains exclusive ownership (backup-exclusive-allocation)", _R7BA_AllocationRace.Bind(true))

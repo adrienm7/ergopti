@@ -8,6 +8,7 @@ local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local KeyPath = require("toml_codec.key_path")
 local Updates = require("shortcuts.physical_availability")
+local ConfigKeys = require("config_keys")
 local M = {}
 local retained, sequence, session_busy = nil, 0, false
 require("infra.scope_registry").register("key_combinations_scope", function() return session_busy or (retained ~= nil and retained.pending() == true) end)
@@ -32,8 +33,8 @@ function M.new(options)
 	local chord_operations, no_op_frame
 	local function chord_declared()
 		if type(manifest.find_entry_by_path) ~= "function" or type(manifest.sparse_operation) ~= "function" then return false end
-		local delay = manifest.find_entry_by_path("mod_combos.simultaneous_threshold_ms")
-		local symmetry = manifest.find_entry_by_path("mod_combos.symmetric")
+		local delay = manifest.find_entry_by_path(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
+		local symmetry = manifest.find_entry_by_path(ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC)
 		return type(delay) == "table" and delay.type == "number"
 			and type(symmetry) == "table" and symmetry.type == "boolean"
 	end
@@ -163,7 +164,7 @@ function M.new(options)
 			for _,entry in ipairs(combinations.configuration_entries()) do
 				dynamic(Shared.TAP_SECTION.."."..entry.id)
 				dynamic(Shared.HOLD_SECTION.."."..entry.id)
-				dynamic(KeyPath.render({"mod_combos","config",entry.id,"combo"}))
+				dynamic(KeyPath.render({ConfigKeys.KEY.MOD_COMBOS,"config",entry.id,"combo"}))
 			end
 			local params = parameters.parameter_configuration_snapshot(owner)
 			for key in pairs(params or {}) do
@@ -191,7 +192,7 @@ function M.new(options)
 				return row.delete == true or combinations.validate_slot(kind,row.key,row.value) == true
 			end
 			local parts=KeyPath.parse(row.section,true)
-			if parts and #parts==3 and parts[1]=="mod_combos" and parts[2]=="config" and row.key=="combo" then
+			if parts and #parts==3 and parts[1]==ConfigKeys.KEY.MOD_COMBOS and parts[2]=="config" and row.key=="combo" then
 				return chord_declared() and combinations.configuration_domain(Shared.BINDING_SCOPE.."__"..parts[3]) == "combination"
 					and (row.delete == true or combinations.validate_slot("combo",parts[3],row.value) == true)
 			end
@@ -267,13 +268,13 @@ function M.new(options)
 	--- Neutral defaults remain sparse; no operation changes either master switch.
 	function owner.set_chord_settings(values)
 		if not chord_declared() or type(values) ~= "table" or getmetatable(values) ~= nil then return false end
-		for key in pairs(values) do if key ~= "simultaneous_threshold_ms" and key ~= "combo_symmetric" then return false end end
+		for key in pairs(values) do if key ~= ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS and key ~= ConfigKeys.COMMAND.COMBO_SYMMETRIC then return false end end
 		local called, settings = pcall(Shared.chord_settings,values)
 		if not called then return false end
 		return perform(function()
 			chord_operations = {
-				manifest.sparse_operation("mod_combos.simultaneous_threshold_ms",settings.simultaneous_threshold_ms),
-				manifest.sparse_operation("mod_combos.symmetric",settings.combo_symmetric),
+				manifest.sparse_operation(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS,settings.simultaneous_threshold_ms),
+				manifest.sparse_operation(ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC,settings.combo_symmetric),
 			}
 			return transaction.apply("key_combinations_chord","configured")
 		end)
@@ -399,7 +400,7 @@ function M.set_enabled(enabled,is_paused,expected_source)
 end
 function M.set_chord_settings(values,is_paused,expected_source)
 	if type(values)~="table" or getmetatable(values)~=nil then return false end
-	for key in pairs(values) do if key~="simultaneous_threshold_ms" and key~="combo_symmetric" then return false end end
+	for key in pairs(values) do if key~=ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS and key~=ConfigKeys.COMMAND.COMBO_SYMMETRIC then return false end end
 	local called,detached=pcall(Shared.chord_settings,values);if not called then return false end
 	values=detached
 	return operate(is_paused,expected_source,function(owner) return owner.set_chord_settings(values) end)

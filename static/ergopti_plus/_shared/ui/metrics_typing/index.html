@@ -9,6 +9,7 @@
 		<script defer src="../vendor/hammer.min.js"></script>
 		<script defer src="../vendor/chartjs-plugin-zoom.min.js"></script>
 		<link rel="stylesheet" href="../theme.css" />
+		<script src="../theme_tokens.js"></script>
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
@@ -24,7 +25,7 @@
 						><input
 							type="date"
 							id="date_start"
-							onchange="app_state.hour_cutoff = null; apply_date_app_filters()"
+							onchange="app_state.hour_window = null; apply_date_app_filters()"
 						/>
 					</div>
 					<div>
@@ -32,7 +33,7 @@
 						><input
 							type="date"
 							id="date_end"
-							onchange="app_state.hour_cutoff = null; apply_date_app_filters()"
+							onchange="app_state.hour_window = null; apply_date_app_filters()"
 						/>
 					</div>
 					<select
@@ -1253,6 +1254,7 @@
 		<!-- Generated from _shared/data/keycodes/azerty.json (DC-1) — must load before state.js, which reads its KEYCODE_DATA global -->
 		<script src="_generated/keycode_data.js"></script>
 		<script src="state.js"></script>
+		<script src="../metrics_calendar.js"></script>
 		<script src="format.js"></script>
 		<script src="filters.js"></script>
 		<script src="modal.js"></script>
@@ -1355,6 +1357,10 @@
 								'[apply_prefetch] window.process_manifest not defined — JS scripts may have failed to load'
 							);
 						}
+					} else {
+						// Keep the admitted manifest's charts and inventories current
+						// while the existing native range owner keeps its mailbox.
+						window.refresh_manifest_projection();
 					}
 					if (merged && typeof window.receive_range_data === 'function') {
 						try {

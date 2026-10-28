@@ -80,7 +80,14 @@ function validateAhkSuiteManifest(source) {
 	if (plans.length !== 1) errors.push(`expected one TAP plan, found ${plans.length}`);
 	if (footers.length !== 1) errors.push(`expected one terminal footer, found ${footers.length}`);
 	const planned = plans.length === 1 ? plans[0] : 0;
-	for (let index = 1; index <= planned; index += 1) {
+	if (!Number.isSafeInteger(planned)) errors.push('The TAP plan is not a safe integer.');
+	// No valid plan can exceed the transcript's actual start/result records.
+	// Bound refusal work by those records, never by an untrusted declared total.
+	const availableRecords = running.size + results.size;
+	const inspectedPlan = Math.min(planned, availableRecords);
+	if (inspectedPlan !== planned)
+		errors.push(`TAP plan ${planned} exceeds ${availableRecords} available execution records`);
+	for (let index = 1; index <= inspectedPlan; index += 1) {
 		const started = running.get(index);
 		if (!started) errors.push(`planned test ${index}/${planned} never started`);
 		else if (started.total !== planned)

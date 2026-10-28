@@ -338,7 +338,15 @@ _HCPO_Main() {
 		WEBVIEW_SHARED_UDIR := _EDOS_Root . "\profile"
 		WebView2.DefineProp("CreateEnvironmentAsync", {Call: _HCPO_EnvironmentFactory})
 		_EDOS_Phase("before genuine LoggerInit")
+		_HCPO_Require(ConfigKey.SCRIPT is String && ConfigLeaf.LOG_LEVEL is String,
+			"The genuine generated logger key classes must be available.")
+		_HCPO_Require(FileExist(ConfigurationFile) && !ConfigMigrateBoot(ConfigurationFile, "known"),
+			"The private DEBUG source must remain a genuine pre-journal recovery input.")
+		BeforeLoggerSource := CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile))
 		LoggerInit()
+		_HCPO_Require(!ConfigMigrateBoot(ConfigurationFile, "known")
+			&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == BeforeLoggerSource,
+			"Logging must not admit or change the private DEBUG recovery source.")
 		_HCPO_Require(_LOGGER_DEBUG_ENABLED, "The genuine configured DEBUG level must enable the terminal logger.")
 		LoggerSetTestSink(_HCPO_Log)
 		_EDOS_Phase("before public HealthCheck_ShowWindow")

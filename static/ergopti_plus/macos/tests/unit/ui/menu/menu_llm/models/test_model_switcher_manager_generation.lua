@@ -545,7 +545,7 @@ helpers.describe("model manager generation fences", function()
 	helpers.it("(HS-007-delayed-prompt-yield) drops a hardware prompt after its generation expires", function()
 		local modules = {
 			"hs", "adapters.shell_runner", "adapters.timer_scheduler", "infra.logger", "infra.i18n",
-			"infra.dialog_util", "infra.paths",
+			"infra.dialog_util", "infra.paths", "infra.timings",
 			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
 		}
@@ -588,6 +588,7 @@ helpers.describe("model manager generation fences", function()
 				prompts = prompts + 1
 				return "menu.llm.btn_download"
 			end}
+			helpers.provide_timings()
 			package.loaded["infra.paths"] = {
 				shared_llm_path = function() return helpers.shared("modules/llm/models.json") end,
 			}

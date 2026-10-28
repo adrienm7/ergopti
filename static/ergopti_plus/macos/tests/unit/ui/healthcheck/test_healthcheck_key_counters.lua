@@ -29,6 +29,7 @@ local function with_collector(body)
 	local ok, err = xpcall(function()
 		helpers.load_with_stubs("infra.logger")
 		package.loaded["platform.remap.lease_controller"] = {
+			is_initialized = function() return true end,
 			status = function() return "running", { phase = "running" } end,
 		}
 		package.loaded["infra.key_event_health"] = nil

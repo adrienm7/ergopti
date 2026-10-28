@@ -86,7 +86,7 @@ local function with_recorded_shell(body, native_webview)
 	os.execute = function() return true end
 	io.popen = function() return nil end
 	local saved_webview = package.loaded["ui.webview_manager"]
-	package.loaded["ui.webview_manager"] = native_webview or { show = function() return true end }
+	package.loaded["ui.webview_manager"] = native_webview or { show = function() return true end, toggle = function() return true end }
 	local ok, err = pcall(body)
 	os.execute, io.popen = real_execute, real_popen
 	package.loaded["ui.webview_manager"] = saved_webview

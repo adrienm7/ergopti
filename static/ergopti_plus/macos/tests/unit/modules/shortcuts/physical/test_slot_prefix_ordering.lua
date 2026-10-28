@@ -61,14 +61,14 @@ helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 				is_assignable = function(action) return action == "send_text" or action == "none" end,
 			}
 			require("tests.support.keyboard_config_fixture").install({
-				cmd_shift_a="send_text", cmd_a="send_text", hs_ctrl_shift_a="send_text", hs_ctrl_a="send_text",
+				primary_shift_a="send_text", primary_a="send_text", secondary_shift_a="send_text", secondary_a="send_text",
 			})
 			package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 			local subject = require("modules.shortcuts.keyboard_shortcuts")
 			helpers.assert_eq(subject.start(), true)
 			helpers.assert_eq(observed, { ["Cmd+Shift+A"]=1, ["Cmd+A"]=1, ["Ctrl+Shift+A"]=1, ["Ctrl+A"]=1 })
-			helpers.assert_eq(subject.get_slot_label("cmd_shift_a"), "⌘ ⇧ A")
-			helpers.assert_eq(subject.get_slot_label("hs_ctrl_shift_a"), "^ ⇧ A")
+			helpers.assert_eq(subject.get_slot_label("primary_shift_a"), "⌘ ⇧ A")
+			helpers.assert_eq(subject.get_slot_label("secondary_shift_a"), "^ ⇧ A")
 			helpers.assert_eq(subject.stop(), true)
 		end)
 	end)

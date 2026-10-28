@@ -165,24 +165,47 @@ function M.native_candidate()
 	return is_executable_file(hint.candidate) and hint.candidate or nil, hint.budgets
 end
 
---- Resolve stock candidates live, or receive an asynchronously invalidated hint.
+--- Resolves the one Ollama Ergopti uses: its own pinned runtime. A user's own
+--- Ollama (the app, Homebrew, PATH, or the former on-demand copy) is never
+--- selected, started, stopped or modified, even when it is installed and
+--- running: Ergopti installs and pins its own version (maintainer decision,
+--- issue #104). candidates() still names those locations for diagnostics only.
 --- @return string|nil executable_path
 --- @return string|nil error_message
---- @return string|nil source One of the SOURCE_* identifiers.
+--- @return string|nil source SOURCE_NATIVE_MANAGED, or nil.
 function M.resolve()
 	local native, _, state = M.native_candidate()
 	if native then return native, nil, M.SOURCE_NATIVE_MANAGED end
 	if state == "pending" then return nil, "managed runtime metadata is pending", nil end
-	local seen = {}
+	return nil, "Ergopti's own Ollama runtime is not installed", nil
+end
+
+--- Returns the Ollama version Ergopti pins for its own runtime, from the one
+--- source the native installer verifies (managed_ollama_runtime.json).
+--- @return string version
+function M.pinned_version()
+	local source = debug.getinfo(1, "S").source:sub(2)
+	local driver = assert(source:match("^(.*)/modules/llm/ollama_binary%.lua$"), "driver root unavailable")
+	local text, status = require("adapters.file_system").read_with_status(
+		driver .. "/../_shared/modules/llm/managed_ollama_runtime.json")
+	assert(status == "ok" and type(text) == "string", "managed Ollama runtime contract is unreadable")
+	local decoded = require("json").decode(text)
+	assert(type(decoded) == "table" and type(decoded.version) == "string"
+		and decoded.version:match("^%d+%.%d+%.%d+$"), "managed Ollama runtime contract names no version")
+	return decoded.version
+end
+
+--- Names the first user-owned Ollama found, for a log line only. Nothing ever
+--- executes, signals or reads from what it returns.
+--- @return string|nil path
+--- @return string|nil source
+function M.find_user_installation()
 	for _, candidate in ipairs(M.candidates()) do
-		if not seen[candidate.path] then
-			seen[candidate.path] = true
-			if is_executable_file(candidate.path) then
-				return candidate.path, nil, candidate.source
-			end
+		if candidate.source ~= M.SOURCE_MANAGED and is_executable_file(candidate.path) then
+			return candidate.path, candidate.source
 		end
 	end
-	return nil, "no executable Ollama binary was found", nil
+	return nil
 end
 
 return M

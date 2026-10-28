@@ -879,7 +879,7 @@ local function build_window(channel, opening_generation, focus_owner)
 			if action == "didFinishNavigation" then
 				-- Safety flush after navigation — belt-and-suspenders alongside
 				-- the "ready" message from script.js.
-				DeferredWork.after(0.15, function()
+				DeferredWork.after(require("infra.timings").sec("ui", "webview_navigation_flush_delay_ms"), function()
 					if not candidate_is_owned() then return end
 					if not _ready then flush_queue() end
 					-- Kick off the first fetch from the Lua side so the JS
@@ -918,7 +918,7 @@ local function build_window(channel, opening_generation, focus_owner)
 
 	-- Safety: if didFinishNavigation fires very fast and queues pile up,
 	-- flush after 1.5 s regardless.
-	local scheduled = DeferredWork.after(1.5, function()
+	local scheduled = DeferredWork.after(require("infra.timings").sec("ui", "webview_ready_safety_flush_ms"), function()
 		if candidate_is_owned() and not _ready then flush_queue() end
 	end, "changelog.ready_fallback")
 
@@ -1010,6 +1010,10 @@ function M.open(opts)
 	Logger.success(LOG, "Changelog window created.")
 	return _focus_owner == owner and _wv_committed == true
 end
+
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _wv end
 
 --- Closes the changelog window if open.
 --- @return boolean committed

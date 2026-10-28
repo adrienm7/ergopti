@@ -175,3 +175,70 @@ _OCEA_Case(Mode) {
 for _OCEA_Mode in ["termination-pending", "already-exited", "termination-refused"]
 	Test("Ollama curl process exit: " . _OCEA_Mode . " retains its exact capability until exit (ollama-process-exit-ack)",
 		_OCEA_Case.Bind(_OCEA_Mode))
+
+
+; The native ports observe thread state while the real release owners run.
+; A known Critical call qualifies the observer; the public deferred path must
+; then preserve a non-critical native boundary for both handle and Job owners.
+_CRNC_Native(State, Kind, Arguments*) {
+	if Kind != "tree" {
+		AssertEqual(1, Arguments.Length, "the exact-handle port retains its native arity")
+		AssertEqual(State["handle"], Arguments[1], "native release cannot borrow another capability")
+	}
+	State["calls"].Push(Map("kind", Kind, "critical", A_IsCritical))
+	return Kind == "wait" ? 0 : true
+}
+
+_CRNC_State() {
+	; This opaque capability is admitted only by the controlled native ports.
+	return Map("handle", 953123, "calls", [])
+}
+
+_CRNC_Owner(Mode, State) {
+	Owner := Map("pid", 53123, "handle", Mode == "direct" ? State["handle"] : 0,
+		"released", false, "releasing", false, "cleanup_debt_id", 0)
+	if Mode == "tree"
+		Owner["tree"] := {requestTerminate: _CRNC_Native.Bind(State, "tree")}
+	return Owner
+}
+
+_CRNC_Ports(State) {
+	return Map("terminate_process", _CRNC_Native.Bind(State, "terminate"),
+		"wait_process", _CRNC_Native.Bind(State, "wait"),
+		"close_process", _CRNC_Native.Bind(State, "close"))
+}
+
+_CRNC_ReleaseKeepsNativeBoundaryInterruptible(Mode) {
+	ControlState := _CRNC_State(), State := _CRNC_State()
+	Control := _CRNC_Owner(Mode, ControlState), Owner := _CRNC_Owner(Mode, State)
+	ControlPorts := _CRNC_Ports(ControlState), Ports := _CRNC_Ports(State)
+	ExpectedCalls := Mode == "tree" ? 1 : 3
+	PreviousCritical := Critical("On")
+	try {
+		AssertTrue(_LLM_CurlTryReleaseProcess(Control, true, ControlPorts))
+		AssertEqual(ExpectedCalls, ControlState["calls"].Length)
+		for Receipt in ControlState["calls"]
+			AssertTrue(Receipt["critical"] > 0, "the observer must detect a genuinely critical caller")
+		Critical("Off")
+		AssertTrue(_LLM_CurlReleaseProcess(Owner, true, Ports))
+		AssertTrue(Owner["released"], "the exact owner must still complete physical retirement")
+		AssertEqual(0, Owner["handle"])
+		AssertEqual(0, Owner["cleanup_debt_id"], "successful release must not manufacture a retry debt")
+		AssertEqual(ExpectedCalls, State["calls"].Length, "every native boundary must actually execute")
+		for Receipt in State["calls"] {
+			FileAppend("RECEIPT curl-native-release-critical mode=" . Mode . " boundary=" . Receipt["kind"]
+				. " critical=" . Receipt["critical"] . "`n", "*")
+			AssertEqual(0, Receipt["critical"],
+				"deferred curl retirement must not suppress keyboard dispatch inside " . Receipt["kind"])
+		}
+	} finally {
+		try {
+			AssertTrue(_LLM_CurlTryReleaseProcess(Control, true, ControlPorts), "the control capability must retire")
+			AssertTrue(_LLM_CurlTryReleaseProcess(Owner, true, Ports), "the exact fixture capability must retire")
+		} finally Critical(PreviousCritical)
+	}
+}
+
+for _CRNC_Mode in ["direct", "tree"]
+	Test("Ollama curl native release: " . _CRNC_Mode . " preserves the message pump (curl-native-release-critical)",
+		_CRNC_ReleaseKeepsNativeBoundaryInterruptible.Bind(_CRNC_Mode))

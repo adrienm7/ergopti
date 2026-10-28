@@ -1,0 +1,220 @@
+{
+	"description": "Hand-checked .keylayout fixtures and the canonical form (schema 1, documented in _shared/lua/layouts/keylayout.lua) every parser must produce from them. 'error' fixtures must be refused. Replayed by the macOS and Linux Lua suites and by the Python converter tests; the web composer and the AutoHotkey parser replay it when they adopt the form. Real layouts: composed.canonical.json (the composer corpus layout) and, for every registry layout, tools/test/test-keylayout-canonical-parity.cjs.",
+	"vectors": [
+		{
+			"name": "everything: modifiers, bases, duplicates, entities, comments",
+			"keylayout": "<?xml version=\"1.1\" encoding=\"UTF-8\"?>\n<!DOCTYPE keyboard SYSTEM \"file://localhost/System/Library/DTDs/KeyboardLayout.dtd\">\n<keyboard group=\"126\" id=\"-1\" name=\"Edge &amp; Co\">\n  <!-- <keyMapSet id=\"ghost\"><keyMap index=\"0\"><key code=\"0\" output=\"no\"/></keyMap></keyMapSet> -->\n  <layouts>\n    <layout first=\"1\" last=\"1\" mapSet=\"other\" modifiers=\"m1\"/>\n    <layout first=\"0\" last=\"0\" mapSet=\"set1\" modifiers=\"m1\"/>\n  </layouts>\n  <modifierMap id=\"old\" defaultIndex=\"9\"/>\n  <modifierMap id=\"m1\" defaultIndex=\"0\">\n    <keyMapSelect mapIndex=\"1\"><modifier keys=\"anyShift caps?\"/></keyMapSelect>\n    <keyMapSelect mapIndex=\"2\"><modifier keys=\"rightOption\"/><modifier keys=\"option shift? control?\"/></keyMapSelect>\n    <keyMapSelect mapIndex=\"3\"><modifier keys=\"\"/></keyMapSelect>\n  </modifierMap>\n  <keyMapSet id=\"set1\">\n    <keyMap index=\"0\">\n      <key code=\"0\" output=\"a\"/>\n      <key code=\"0\" output=\"shadowed\"/>\n      <key code=\"1\" action=\"dead_acute\"/>\n      <key code=\"2\" output=\"&#x00E9;&#233;\"/>\n      <key code=\"3\" output=\"&quot;&lt;&gt;&amp;&apos;\"/>\n      <key code=\"4\"/>\n      <key code=\"4\" action=\"a_grave\"/>\n    </keyMap>\n    <keyMap index=\"1\" baseMapSet=\"set1\" baseIndex=\"0\"/>\n    <keyMap index=\"2\" baseIndex=\"0\">\n      <key code=\"0\" output=\"A\"/>\n    </keyMap>\n    <keyMap index=\"2\" baseIndex=\"1\">\n      <key code=\"9\" output=\"z\"/>\n    </keyMap>\n  </keyMapSet>\n  <keyMapSet id=\"other\"><keyMap index=\"0\"><key code=\"0\" output=\"o\"/></keyMap></keyMapSet>\n  <actions>\n    <action id=\"dead_acute\">\n      <when state=\"none\" next=\"acute\"/>\n      <when state=\"acute\" output=\"&#x00E9;\"/>\n      <when state=\"acute\" output=\"ignored\"/>\n    </action>\n    <action id=\"a_grave\">\n      <when state=\"none\" output=\"a\"/>\n      <when state=\"acute\" output=\"\" next=\"\"/>\n    </action>\n    <action id=\"a_grave\"><when state=\"none\" output=\"duplicate action is dropped\"/></action>\n    <action id=\"empty\"/>\n  </actions>\n  <terminators>\n    <when state=\"acute\" output=\"&#xB4;\"/>\n    <when state=\"acute\" output=\"ignored\"/>\n    <when state=\"grave\"/>\n  </terminators>\n</keyboard>\n",
+			"canonical": {
+				"schema": 1,
+				"name": "Edge & Co",
+				"map_set": "set1",
+				"default_index": 0,
+				"selects": [
+					{
+						"index": 1,
+						"modifiers": [
+							{
+								"required": ["shift"],
+								"optional": ["caps"]
+							}
+						]
+					},
+					{
+						"index": 2,
+						"modifiers": [
+							{
+								"required": ["option"],
+								"optional": []
+							},
+							{
+								"required": ["option"],
+								"optional": ["control", "shift"]
+							}
+						]
+					},
+					{
+						"index": 3,
+						"modifiers": [
+							{
+								"required": [],
+								"optional": []
+							}
+						]
+					}
+				],
+				"key_map_sets": [
+					{
+						"id": "set1",
+						"key_maps": [
+							{
+								"index": 0,
+								"keys": [
+									{
+										"code": 0,
+										"output": "a"
+									},
+									{
+										"code": 1,
+										"action": "dead_acute"
+									},
+									{
+										"code": 2,
+										"output": "éé"
+									},
+									{
+										"code": 3,
+										"output": "\"<>&'"
+									},
+									{
+										"code": 4,
+										"action": "a_grave"
+									}
+								]
+							},
+							{
+								"index": 1,
+								"base": {
+									"set": "set1",
+									"index": 0
+								},
+								"keys": []
+							},
+							{
+								"index": 2,
+								"base": {
+									"set": "set1",
+									"index": 1
+								},
+								"keys": [
+									{
+										"code": 0,
+										"output": "A"
+									},
+									{
+										"code": 9,
+										"output": "z"
+									}
+								]
+							}
+						]
+					},
+					{
+						"id": "other",
+						"key_maps": [
+							{
+								"index": 0,
+								"keys": [
+									{
+										"code": 0,
+										"output": "o"
+									}
+								]
+							}
+						]
+					}
+				],
+				"actions": [
+					{
+						"id": "dead_acute",
+						"whens": [
+							{
+								"state": "none",
+								"next": "acute"
+							},
+							{
+								"state": "acute",
+								"output": "é"
+							}
+						]
+					},
+					{
+						"id": "a_grave",
+						"whens": [
+							{
+								"state": "none",
+								"output": "a"
+							},
+							{
+								"state": "acute",
+								"next": ""
+							}
+						]
+					},
+					{
+						"id": "empty",
+						"whens": []
+					}
+				],
+				"terminators": [
+					{
+						"state": "acute",
+						"output": "´"
+					},
+					{
+						"state": "grave",
+						"output": ""
+					}
+				]
+			}
+		},
+		{
+			"name": "minimal layout",
+			"keylayout": "<?xml version=\"1.1\" encoding=\"UTF-8\"?>\n<!DOCTYPE keyboard SYSTEM \"file://localhost/System/Library/DTDs/KeyboardLayout.dtd\">\n<keyboard name=\"Mini\"><layouts><layout first=\"0\" last=\"0\" mapSet=\"s\" modifiers=\"m\"/></layouts><modifierMap id=\"m\" defaultIndex=\"0\"><keyMapSelect mapIndex=\"1\"><modifier keys=\"shift\"/></keyMapSelect></modifierMap><keyMapSet id=\"s\"><keyMap index=\"0\"><key code=\"0\" output=\"x\"/></keyMap></keyMapSet></keyboard>\n",
+			"canonical": {
+				"schema": 1,
+				"name": "Mini",
+				"map_set": "s",
+				"default_index": 0,
+				"selects": [
+					{
+						"index": 1,
+						"modifiers": [
+							{
+								"required": ["shift"],
+								"optional": []
+							}
+						]
+					}
+				],
+				"key_map_sets": [
+					{
+						"id": "s",
+						"key_maps": [
+							{
+								"index": 0,
+								"keys": [
+									{
+										"code": 0,
+										"output": "x"
+									}
+								]
+							}
+						]
+					}
+				],
+				"actions": [],
+				"terminators": []
+			}
+		},
+		{
+			"name": "no layout with first=0",
+			"keylayout": "<?xml version=\"1.1\" encoding=\"UTF-8\"?>\n<!DOCTYPE keyboard SYSTEM \"file://localhost/System/Library/DTDs/KeyboardLayout.dtd\">\n<keyboard name=\"Mini\"><layouts><layout first=\"1\" last=\"1\" mapSet=\"s\" modifiers=\"m\"/></layouts><modifierMap id=\"m\" defaultIndex=\"0\"><keyMapSelect mapIndex=\"1\"><modifier keys=\"shift\"/></keyMapSelect></modifierMap><keyMapSet id=\"s\"><keyMap index=\"0\"><key code=\"0\" output=\"x\"/></keyMap></keyMapSet></keyboard>\n",
+			"error": true
+		},
+		{
+			"name": "keyMapSet of the default layout is undefined",
+			"keylayout": "<?xml version=\"1.1\" encoding=\"UTF-8\"?>\n<!DOCTYPE keyboard SYSTEM \"file://localhost/System/Library/DTDs/KeyboardLayout.dtd\">\n<keyboard name=\"Mini\"><layouts><layout first=\"0\" last=\"0\" mapSet=\"nope\" modifiers=\"m\"/></layouts><modifierMap id=\"m\" defaultIndex=\"0\"><keyMapSelect mapIndex=\"1\"><modifier keys=\"shift\"/></keyMapSelect></modifierMap><keyMapSet id=\"s\"><keyMap index=\"0\"><key code=\"0\" output=\"x\"/></keyMap></keyMapSet></keyboard>\n",
+			"error": true
+		},
+		{
+			"name": "modifierMap of the default layout is undefined",
+			"keylayout": "<?xml version=\"1.1\" encoding=\"UTF-8\"?>\n<!DOCTYPE keyboard SYSTEM \"file://localhost/System/Library/DTDs/KeyboardLayout.dtd\">\n<keyboard name=\"Mini\"><layouts><layout first=\"0\" last=\"0\" mapSet=\"s\" modifiers=\"nope\"/></layouts><modifierMap id=\"m\" defaultIndex=\"0\"><keyMapSelect mapIndex=\"1\"><modifier keys=\"shift\"/></keyMapSelect></modifierMap><keyMapSet id=\"s\"><keyMap index=\"0\"><key code=\"0\" output=\"x\"/></keyMap></keyMapSet></keyboard>\n",
+			"error": true
+		},
+		{
+			"name": "unknown modifier token",
+			"keylayout": "<?xml version=\"1.1\" encoding=\"UTF-8\"?>\n<!DOCTYPE keyboard SYSTEM \"file://localhost/System/Library/DTDs/KeyboardLayout.dtd\">\n<keyboard name=\"Mini\"><layouts><layout first=\"0\" last=\"0\" mapSet=\"s\" modifiers=\"m\"/></layouts><modifierMap id=\"m\" defaultIndex=\"0\"><keyMapSelect mapIndex=\"1\"><modifier keys=\"hyper\"/></keyMapSelect></modifierMap><keyMapSet id=\"s\"><keyMap index=\"0\"><key code=\"0\" output=\"x\"/></keyMap></keyMapSet></keyboard>\n",
+			"error": true
+		}
+	]
+}

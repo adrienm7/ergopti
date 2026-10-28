@@ -656,13 +656,67 @@ M.features = {
 		path = "shortcuts.keyboard.win_space", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.hs_ctrl_space", id = "hs_ctrl_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.hs_ctrl_space", platforms = { "hs" }, recommended = "llm_generate_prediction", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+		path = "shortcuts.keyboard.secondary_space", id = "secondary_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.hs_ctrl_space", platforms = { "hs" }, recommended = "llm_generate_prediction", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
-		path = "shortcuts.keyboard.ctrl_g", id = "ctrl_g", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_g", platforms = { "linux" }, recommended = "open_chatgpt", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+		path = "shortcuts.keyboard.secondary_a", id = "secondary_a", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_a", platforms = { "hs" }, recommended = "select_line", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
-		path = "shortcuts.keyboard.super_space", id = "super_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.super_space", platforms = { "linux" }, recommended = "llm_generate_prediction", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+		path = "shortcuts.keyboard.secondary_d", id = "secondary_d", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_d", platforms = { "hs" }, recommended = "open_downloads", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_e", id = "secondary_e", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_e", platforms = { "hs" }, recommended = "open_file_manager", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_h", id = "secondary_h", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_h", platforms = { "hs" }, recommended = "screenshot_region_clipboard", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_i", id = "secondary_i", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_i", platforms = { "hs" }, recommended = "open_system_settings", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_m", id = "secondary_m", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_m", platforms = { "hs" }, recommended = "activity_simulation", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_o", id = "secondary_o", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_o", platforms = { "hs" }, recommended = "surround_parens", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_p", id = "secondary_p", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_p", platforms = { "hs" }, recommended = "display_mirror_toggle", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_s", id = "secondary_s", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_s", platforms = { "hs" }, recommended = "copy_selected_path", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_t", id = "secondary_t", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_t", platforms = { "hs" }, recommended = "teleport_mouse", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_u", id = "secondary_u", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_u", platforms = { "hs" }, recommended = "uppercase_selection", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_w", id = "secondary_w", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_w", platforms = { "hs" }, recommended = "titlecase_selection", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_x", id = "secondary_x", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_x", platforms = { "hs" }, recommended = "pick_color", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_capslock", id = "secondary_capslock", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_capslock", platforms = { "hs" }, recommended = "toggle_capslock", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_l", id = "secondary_l", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_l", platforms = { "hs" }, recommended = "lock_screen", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_period", id = "secondary_period", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_period", platforms = { "hs" }, recommended = "open_emoji_picker", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_quote", id = "secondary_quote", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_quote", platforms = { "hs" }, recommended = "spotlight_mouse", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.primary_shift_v", id = "primary_shift_v", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_cmd_shift_v", platforms = { "hs" }, recommended = "paste_plain", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.primary_g", id = "primary_g", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_g", platforms = { "linux" }, recommended = "open_chatgpt", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.meta_space", id = "meta_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.super_space", platforms = { "linux" }, recommended = "llm_generate_prediction", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.tap_keys.number_row_left", id = "number_row_left", section = "shortcuts.tap_keys", default = "none", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_left", platforms = { "ahk", "hs", "linux" }, recommended = "screenshot_fullscreen_save", input_altering = true,
@@ -1088,61 +1142,7 @@ M.features = {
 		path = "shortcuts.keys.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
-		path = "shortcuts.keys.ctrl_a", id = "ctrl_a", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_a", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_d", id = "ctrl_d", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_d", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_e", id = "ctrl_e", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_e", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
 		path = "shortcuts.keys.ctrl_g", id = "ctrl_g", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_g", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_h", id = "ctrl_h", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_h", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_i", id = "ctrl_i", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_i", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_m", id = "ctrl_m", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_m", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_o", id = "ctrl_o", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_o", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_p", id = "ctrl_p", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_p", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_s", id = "ctrl_s", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_s", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_t", id = "ctrl_t", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_t", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_u", id = "ctrl_u", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_u", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_w", id = "ctrl_w", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_w", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_x", id = "ctrl_x", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_x", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_capslock", id = "ctrl_capslock", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_capslock", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_l", id = "ctrl_l", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_l", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_period", id = "ctrl_period", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_period", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.ctrl_quote", id = "ctrl_quote", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_ctrl_quote", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.cmd_shift_v", id = "cmd_shift_v", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_cmd_shift_v", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.keys.cmd_star", id = "cmd_star", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_cmd_star", platforms = { "hs" }, recommended = true, input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",

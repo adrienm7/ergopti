@@ -289,9 +289,9 @@ try {
 	_OCSD_Note("before-exit-success")
 	_OCSD_Finish()
 	ExitApp(0)
-} catch as Failure {
+} catch as TopLevelFailure {
 	_OCSD_Note("before-exit-failure")
 	try _OCSD_Finish()
-	FileAppend("FAIL ollama-paused-readiness: " . Failure.Message . "`n" . Failure.Stack . "`n", "*", "UTF-8")
+	FileAppend("FAIL ollama-paused-readiness: " . TopLevelFailure.Message . "`n" . TopLevelFailure.Stack . "`n", "*", "UTF-8")
 	ExitApp(1)
 }

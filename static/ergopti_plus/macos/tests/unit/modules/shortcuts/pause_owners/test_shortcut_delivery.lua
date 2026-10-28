@@ -192,6 +192,12 @@ local function load_real_shortcut_delivery_owner()
 		is_paused = "is_apps_actions_paused",
 		has_pending = "has_pending_apps_action",
 	})
+	-- Ctrl+G (open ChatGPT) is the delivery probe: the one fixed Ctrl chord the
+	-- bindings owner still hosts. It counts as the former lock-screen probe did.
+	inert_actions.open_chatgpt = function()
+		lock_calls = lock_calls + 1
+		return true
+	end
 	package.loaded["modules.shortcuts.actions.system"] = system_actions
 	package.loaded["modules.shortcuts.actions.text"] = inert_actions
 	package.loaded["modules.shortcuts.actions.apps"] = inert_actions
@@ -256,7 +262,7 @@ helpers.describe("HS-012 real shortcut delivery fence", function()
 		helpers.it("keeps a retained native hotkey inert after rollback delete " .. mode, function()
 			local ctx = load_real_shortcut_delivery_owner()
 			helpers.assert_true(ctx.bindings.start())
-			local initial_callback = ctx.latest_callback("l")
+			local initial_callback = ctx.latest_callback("g")
 			helpers.assert_not_nil(initial_callback)
 			initial_callback()
 			helpers.assert_eq(ctx.get_lock_calls(), 1,
@@ -280,7 +286,7 @@ helpers.describe("HS-012 real shortcut delivery fence", function()
 			helpers.assert_eq(script_control.resume_all(), false,
 				"a later resume refusal must roll the real bindings owner back")
 			helpers.assert_true(script_control.is_paused())
-			local retained_callback = ctx.latest_callback("l")
+			local retained_callback = ctx.latest_callback("g")
 			helpers.assert_not_nil(retained_callback)
 			retained_callback()
 			helpers.assert_eq(ctx.get_lock_calls(), 1,
@@ -289,7 +295,7 @@ helpers.describe("HS-012 real shortcut delivery fence", function()
 			ctx.set_delete_mode("true")
 			helpers.assert_true(script_control.resume_all())
 			helpers.assert_eq(script_control.is_paused(), false)
-			local resumed_callback = ctx.latest_callback("l")
+			local resumed_callback = ctx.latest_callback("g")
 			helpers.assert_not_nil(resumed_callback)
 			resumed_callback()
 			helpers.assert_eq(ctx.get_lock_calls(), 2,

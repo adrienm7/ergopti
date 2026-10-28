@@ -206,11 +206,20 @@ helpers.describe("sqlite_writer", function()
     end)
 
     it("seeds every app-time and hotstring metric on the initial upsert", function()
-      local path = helpers.driver_root() .. "/modules/keystats/sqlite_writer.lua"
-      local fh = assert(io.open(path, "r"))
-      local src = fh:read("*a"); fh:close()
-      helpers.assert_true(src:find("app_time_ms, hs_chars, hs_triggers, hs_input_chars", 1, true) ~= nil,
-        "initial INSERT must retain every field, not only the conflict-update path")
+      -- The statement is the catalogue's agg.app_day; the writer passes 0 for a counter it
+      -- does not track, so the initial INSERT carries every field and not only the conflict update.
+      local Queries = require("keystats.queries")
+      local values = {}
+      for _, slot in ipairs(Queries.slots("agg.app_day")) do
+        values[slot.name] = slot.kind == "s" and "x" or 0
+      end
+      local sql = Queries.render("agg.app_day", "cli_json", values)
+      local columns = sql:match("^INSERT INTO agg_app_day %(([^)]*)%)")
+      for _, field in ipairs({ "chars", "time_ms", "app_time_ms", "hs_chars", "hs_triggers", "hs_input_chars",
+        "llm_chars", "llm_triggers", "llm_input_chars", "hs_suggested", "llm_suggested" }) do
+        helpers.assert_true((", " .. columns .. ","):find(", " .. field .. ",", 1, true) ~= nil,
+          "initial INSERT must retain " .. field .. ", not only the conflict-update path")
+      end
     end)
 
 	it("persists generated-output sources and physical scancodes independently", function()
@@ -237,8 +246,8 @@ helpers.describe("sqlite_writer", function()
 			helpers.assert_contains(sql,
 				"esrc_json = (SELECT COALESCE('{' || group_concat(json_quote(k) || ':' || v, ',') || '}', '{}')")
 			helpers.assert_contains(sql, "SELECT key AS k, SUM(value) AS v")
-			helpers.assert_contains(sql, "SELECT key, value FROM json_each(esrc_json)")
-			helpers.assert_contains(sql, "UNION ALL SELECT key, value FROM json_each(excluded.esrc_json)")
+			helpers.assert_contains(sql, "SELECT key, value FROM json_each(COALESCE(esrc_json, '{}'))")
+			helpers.assert_contains(sql, "UNION ALL SELECT key, value FROM json_each(COALESCE(excluded.esrc_json, '{}'))")
 			helpers.assert_contains(sql, "GROUP BY key")
 			for _, scalar in ipairs({ "c", "td", "cd", "e" }) do
 				helpers.assert_contains(sql, scalar .. " = " .. scalar .. " + excluded." .. scalar .. ", ")
@@ -629,7 +638,11 @@ helpers.describe("linux-sqlite-local-event-days", function()
 							helpers.assert_true(writer[method]("owned", { event }))
 							local ts = explicit and event.ts or "2026-01-01 23:59:59"
 							local date = explicit and event.date or "2026-01-02"
-							helpers.assert_contains(commands[#commands], "'" .. ts .. "','" .. date .. "'")
+							-- The typing batch writes its values list compact, the catalogue events with a space.
+                            local statement = commands[#commands]
+                            helpers.assert_true(statement:find("'" .. ts .. "','" .. date .. "'", 1, true) ~= nil
+                                or statement:find("'" .. ts .. "', '" .. date .. "'", 1, true) ~= nil,
+                                "the event carries its own timestamp and local day")
 							helpers.assert_eq(require("json").encode(event), original)
 						end, debug.traceback)
 						io.popen = previous_popen

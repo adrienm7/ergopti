@@ -60,11 +60,10 @@ function M.policy_path()
 	return _policy_path
 end
 
---- The origins one download client contacts, redirect targets included.
---- @param client string Key of route_origins.json "clients".
---- @return table|nil origins Ordered https origins.
+--- Reads and decodes the shared route inventory.
+--- @return table|nil inventory
 --- @return string|nil err Why the inventory cannot be used.
-function M.route_origins(client)
+local function route_inventory()
 	local root = driver_root()
 	if not root then return nil, "the bundled route inventory owner is missing" end
 	local ok, bytes, status = pcall(FileSystem.read_with_status, root .. ORIGINS_RELATIVE, function() end)
@@ -72,8 +71,29 @@ function M.route_origins(client)
 		return nil, "the shared route inventory is unreadable"
 	end
 	local decoded, inventory = pcall(Json.decode, bytes)
-	local origins = decoded and type(inventory) == "table" and type(inventory.clients) == "table"
-		and inventory.clients[client] or nil
+	if not decoded or type(inventory) ~= "table" then return nil, "the shared route inventory is unreadable" end
+	return inventory, nil
+end
+
+--- Seconds one origin's route lookup may take (route_origins.json).
+--- @return number|nil seconds
+--- @return string|nil err Why the inventory cannot be used.
+function M.route_lookup_budget_seconds()
+	local inventory, err = route_inventory()
+	if not inventory then return nil, err end
+	local seconds = inventory.route_lookup_budget_seconds
+	if type(seconds) ~= "number" or seconds <= 0 then return nil, "the route inventory names no lookup budget" end
+	return seconds, nil
+end
+
+--- The origins one download client contacts, redirect targets included.
+--- @param client string Key of route_origins.json "clients".
+--- @return table|nil origins Ordered https origins.
+--- @return string|nil err Why the inventory cannot be used.
+function M.route_origins(client)
+	local inventory, inventory_error = route_inventory()
+	if not inventory then return nil, inventory_error end
+	local origins = type(inventory.clients) == "table" and inventory.clients[client] or nil
 	if type(origins) ~= "table" or #origins == 0 then
 		return nil, "the route inventory names no origin for " .. tostring(client)
 	end

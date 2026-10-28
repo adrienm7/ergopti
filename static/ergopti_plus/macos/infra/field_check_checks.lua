@@ -29,10 +29,14 @@
 --- ==============================================================================
 
 local Identifiers = require("identifiers")
+local Logger = require("infra.logger")
 local KePaths = require("platform.remap.ke_paths")
+local RuntimeVhid = require("platform.remap.runtime_vhid")
 local TextUtils = require("text_utils")
 
 local M = {}
+
+local LOG = "field_check"
 
 local STATE = { pass = "pass", fail = "fail", info = "info", skip = "skip" }
 
@@ -86,9 +90,52 @@ end
 --- Phases in which the lease is not usable.
 local BAD_PHASES = { failed = true, fencing = true, recovering = true, uninitialized = true }
 
+--- Seconds the lease check waits for this lifecycle's first guardian answer.
+--- The driver registers the guardian when the Karabiner integration starts,
+--- and a developer build took 6.5 s (field run 2026-10-27 22:32: the check ran
+--- 1.5 s after boot and read "unknown" while the answer was "ready"). It stays
+--- below the field run's 45 s step deadline.
+M.GUARDIAN_SETTLE_SECONDS = 30
+
+-- Seconds between two reads of the remap facts while the guardian is unknown.
+local GUARDIAN_SETTLE_POLL_SECONDS = 0.5
+
+--- Calls back with the remap facts once the guardian state is observed, or
+--- with the last read after M.GUARDIAN_SETTLE_SECONDS. Unknown means "not yet
+--- observed in this lifecycle", so reading it at once judged a registration
+--- still in flight instead of the guardian.
+--- @param ports table Check ports (remap_facts, after).
+--- @param callback function fn(remap, waited_seconds).
+local function settled_remap_facts(ports, callback)
+	local waited = 0
+	local function poll()
+		local remap = ports.remap_facts()
+		if remap.enabled ~= true or remap.guardian ~= "unknown" or waited >= M.GUARDIAN_SETTLE_SECONDS then
+			return callback(remap, waited)
+		end
+		if type(ports.after) ~= "function" then
+			error("field check lease: the after port is required to wait for the guardian", 0)
+		end
+		waited = waited + GUARDIAN_SETTLE_POLL_SECONDS
+		ports.after(GUARDIAN_SETTLE_POLL_SECONDS, poll)
+	end
+	poll()
+end
+
 --- Karabiner lease health.
 function M.lease(ports, report, finish)
-	local remap = ports.remap_facts()
+	settled_remap_facts(ports, function(remap, waited)
+		M.lease_with_facts(ports, report, finish, remap, waited)
+	end)
+end
+
+--- Karabiner lease health over remap facts already read.
+--- @param ports table Check ports.
+--- @param report table Step reporter.
+--- @param finish function Settles the check.
+--- @param remap table Remap facts { enabled, phase, guardian }.
+--- @param waited number Seconds spent waiting for the guardian answer.
+function M.lease_with_facts(ports, report, finish, remap, waited)
 	local enabled = remap.enabled == true
 	local cli = ports.path_exists(KePaths.CLI)
 	report.step("cli_present", (cli or not enabled) and STATE.pass or STATE.fail, yes_no(cli))
@@ -96,6 +143,7 @@ function M.lease(ports, report, finish)
 	if enabled then
 		report.step("lease_phase", BAD_PHASES[remap.phase] and STATE.fail or STATE.pass, remap.phase)
 		report.step("guardian_state", remap.guardian == "ready" and STATE.pass or STATE.fail, remap.guardian)
+		if waited > 0 then report.step("guardian_wait", STATE.info, string.format("%.1fs", waited)) end
 	else
 		report.step("lease_phase", STATE.skip, remap.phase)
 		report.step("guardian_state", STATE.skip, remap.guardian)
@@ -134,7 +182,7 @@ function M.owned_runtime(ports, report, finish)
 	report.step("stock_app", STATE.info, yes_no(ports.path_exists(STOCK_APP)))
 	ports.exec("/bin/launchctl", { "print", OWNED_JOB }, COMMAND_TIMEOUT, function(code)
 		report.step("job_loaded", STATE.info, code == 0 and "loaded" or (code == nil and "timeout" or "not_loaded"))
-		ports.exec("/usr/sbin/systemextensionsctl", { "list" }, COMMAND_TIMEOUT, function(ext_code, ext_out)
+		ports.exec("/usr/bin/systemextensionsctl", { "list" }, COMMAND_TIMEOUT, function(ext_code, ext_out)
 			report.step("driver_state", STATE.info, ext_code == 0 and M.parse_driver_state(ext_out) or "unreadable")
 			ports.exec("/usr/bin/pgrep", { "-f", "org.pqrs/Karabiner" }, COMMAND_TIMEOUT, function(stock_code, stock_out)
 				report.step("stock_running", STATE.info, stock_code == nil and "timeout" or count_lines(stock_out))
@@ -220,11 +268,17 @@ function M.network(ports, report, finish)
 				callback(helper_code, helper_code == 0 and M.parse_network_helper(helper_output) or {})
 			end)
 		end,
+		route_plan = ports.route_plan,
+		-- The shared policy, not a platform call: a lookup the PAC fallback covers goes direct.
+		pac_fallback = function(stage)
+			return require("modules.llm.opaque_network_admission").is_pac_fallback_stage(stage)
+		end,
 	}, report, finish)
 end
 
 local SHORTCUTS = "/usr/bin/shortcuts"
 local CODESIGN = "/usr/bin/codesign"
+local SPCTL = "/usr/sbin/spctl"
 local BREW_PATHS = { "/opt/homebrew/bin/brew", "/usr/local/bin/brew" }
 
 -- A shortcut name no Mac can hold: running it must be refused at once, which
@@ -245,13 +299,121 @@ local function failure_token(code)
 	return code == nil and "timeout" or "exit_" .. tostring(code)
 end
 
+-- codesign and spctl messages, in the order a cause is looked for on a line,
+-- with the closed token a step value carries for each (Security framework
+-- error strings, stable across macOS releases).
+local SIGNATURE_CAUSES = {
+	{ "resource fork, Finder information, or similar detritus not allowed", "finder_detritus" },
+	{ "Disallowed xattr com.apple.FinderInfo", "finder_detritus" },
+	{ "a sealed resource is missing or invalid", "sealed_resource_invalid" },
+	{ "nested code is modified or invalid", "nested_code_invalid" },
+	{ "code object is not signed at all", "not_signed" },
+	{ "code or signature have been modified", "signature_modified" },
+	{ "no resources but signature indicates they must be present", "resources_missing" },
+	{ "resource envelope is obsolete", "envelope_obsolete" },
+	{ "unsealed contents present in the bundle root", "unsealed_root_contents" },
+	{ "invalid Info.plist", "info_plist_invalid" },
+	{ "main executable or Info.plist must be a regular file", "main_not_regular" },
+	{ "invalid resource directory", "resource_dir_invalid" },
+	{ "failed to satisfy specified code requirement", "requirement_unsatisfied" },
+	{ "unsupported format for signature", "unsupported_format" },
+	{ "CSSMERR_TP_CERT_REVOKED", "certificate_revoked" },
+	{ "CSSMERR_TP_CERT_EXPIRED", "certificate_expired" },
+	{ "CSSMERR_TP_NOT_TRUSTED", "certificate_not_trusted" },
+	{ "No such file or directory", "no_such_file" },
+}
+
+-- Lines and characters per line of a tool's diagnostic copied into the log.
+M.DIAGNOSTIC_MAX_LINES = 12
+M.DIAGNOSTIC_MAX_LINE_CHARS = 200
+
+--- Names the first known cause in a codesign or spctl diagnostic.
+--- @param text any The tool's stderr.
+--- @return string|nil token A closed token from SIGNATURE_CAUSES.
+function M.signature_cause(text)
+	for line in tostring(text or ""):gmatch("[^\r\n]+") do
+		for _, cause in ipairs(SIGNATURE_CAUSES) do
+			if line:find(cause[1], 1, true) then return cause[2] end
+		end
+	end
+	return nil
+end
+
+-- The strict-only cause a notarized app may carry without being altered: a
+-- Finder extended attribute on the bundle (Mac of 2026-10-27 22:55, Karabiner
+-- 16.0.0 from the pqrs package). --strict refuses it, Gatekeeper does not.
+local BENIGN_STRICT_CAUSE = "finder_detritus"
+
+--- Reports whether a failed strict verification names only the Finder
+--- detritus, and no other known cause, on any line.
+--- @param text any The tool's stderr.
+--- @return boolean benign
+function M.only_finder_detritus(text)
+	local found = false
+	for line in tostring(text or ""):gmatch("[^\r\n]+") do
+		for _, cause in ipairs(SIGNATURE_CAUSES) do
+			if line:find(cause[1], 1, true) then
+				if cause[2] ~= BENIGN_STRICT_CAUSE then return false end
+				found = true
+			end
+		end
+	end
+	return found
+end
+
+--- Reads Gatekeeper's answer from `spctl --assess -vv` output.
+--- @param text any The tool's stderr.
+--- @return boolean accepted, string|nil source Closed token of its source= line,
+---   string|nil team The Developer ID team of its origin= line.
+function M.parse_assessment(text)
+	text = tostring(text or "")
+	local accepted = text:match(": accepted%s*\n") ~= nil or text:match(": accepted%s*$") ~= nil
+	local source = text:match("source=([^\r\n]+)")
+	if source then
+		source = source:lower():gsub("[^%w]+", "_"):gsub("^_+", ""):gsub("_+$", ""):sub(1, 30)
+		if source == "" then source = nil end
+	end
+	local team = text:match("origin=[^\r\n]*%((%w+)%)")
+	return accepted, source, team
+end
+
+--- Bounds a tool's diagnostic for the log: a few lines, each cut short, with
+--- the checked app's path shortened to <app>.
+--- @param text any The tool's stderr.
+--- @param app string The path the tool was given.
+--- @return string excerpt Lines joined by " | ", or "none".
+function M.diagnostic_excerpt(text, app)
+	local lines = {}
+	for line in tostring(text or ""):gmatch("[^\r\n]+") do
+		if line:match("%S") then
+			if #lines == M.DIAGNOSTIC_MAX_LINES then
+				lines[#lines + 1] = "…"
+				break
+			end
+			local start = line:find(app, 1, true)
+			while start do
+				line = line:sub(1, start - 1) .. "<app>" .. line:sub(start + #app)
+				start = line:find(app, start + 5, true)
+			end
+			if #line > M.DIAGNOSTIC_MAX_LINE_CHARS then line = line:sub(1, M.DIAGNOSTIC_MAX_LINE_CHARS) .. "…" end
+			lines[#lines + 1] = line
+		end
+	end
+	return #lines > 0 and table.concat(lines, " | ") or "none"
+end
+
 --- The Apple Shortcuts command line tool, the Homebrew install of Karabiner and
 --- the timer service, each isolated so that one failure names itself:
 --- a timer that fires late, the Shortcuts tool listing, and refusing a missing
 --- shortcut inside a bound (the same bound a cancelled invocation relies on),
---- then Homebrew itself, the Karabiner-Elements cask, and the code signature of
---- the installed app (package provenance). Read-only: nothing is installed,
---- run or changed.
+--- then Homebrew itself, the Karabiner-Elements cask, the code signature of
+--- the installed app (package provenance) and Gatekeeper's assessment of it.
+--- The strict deep verification and the assessment each log their bounded
+--- diagnostic and carry its first known cause in the step value. Gatekeeper
+--- decides: the app passes when it accepts it from the pqrs Developer ID team.
+--- A strict failure whose only cause is Finder detritus is then information;
+--- any other strict failure stays a failure with its cause. Read-only:
+--- nothing is installed, run or changed.
 function M.toolchain(ports, report, finish)
 	local function brew_stage()
 		local brew
@@ -268,11 +430,43 @@ function M.toolchain(ports, report, finish)
 				finish()
 				return
 			end
-			ports.exec(CODESIGN, { "--verify", "--deep", "--strict", STOCK_APP }, COMMAND_TIMEOUT, function(code)
-				report.step("karabiner_signature", code == 0 and STATE.pass or STATE.fail,
-					code == 0 and "valid" or failure_token(code))
+			local function record(code, text, gatekeeper_code, gatekeeper_text)
+				local accepted, source, team = M.parse_assessment(gatekeeper_text)
+				local trusted = gatekeeper_code == 0 and accepted and team == RuntimeVhid.TEAM_ID
+				if code == 0 then
+					report.step("karabiner_signature", STATE.pass, "valid")
+				elseif code ~= nil and trusted and M.only_finder_detritus(text) then
+					report.step("karabiner_signature", STATE.info, "strict_only:" .. BENIGN_STRICT_CAUSE)
+				else
+					report.step("karabiner_signature", STATE.fail, code == nil and "timeout"
+						or failure_token(code) .. ":" .. (M.signature_cause(text) or "unclassified"))
+				end
+				local value
+				if trusted then
+					value = "accepted" .. (source and ":" .. source or "")
+				elseif gatekeeper_code == nil then
+					value = "timeout"
+				elseif gatekeeper_code == 0 and accepted then
+					value = "accepted:other_team"
+				else
+					value = "rejected:" .. (M.signature_cause(gatekeeper_text) or source or failure_token(gatekeeper_code))
+				end
+				report.step("karabiner_gatekeeper", trusted and STATE.pass or STATE.fail, value)
 				finish()
-			end)
+			end
+			ports.exec(CODESIGN, { "--verify", "--deep", "--strict", "--verbose=4", STOCK_APP }, COMMAND_TIMEOUT,
+				function(code, output, errors)
+					local text = tostring(output or "") .. "\n" .. tostring(errors or "")
+					Logger.evidence(LOG, "Karabiner-Elements strict signature verification: exit=%s, %s", tostring(code),
+						M.diagnostic_excerpt(text, STOCK_APP))
+					ports.exec(SPCTL, { "--assess", "-vv", STOCK_APP }, COMMAND_TIMEOUT,
+						function(gatekeeper_code, gatekeeper_output, gatekeeper_errors)
+							local gatekeeper_text = tostring(gatekeeper_output or "") .. "\n" .. tostring(gatekeeper_errors or "")
+							Logger.evidence(LOG, "Karabiner-Elements Gatekeeper assessment: exit=%s, %s",
+								tostring(gatekeeper_code), M.diagnostic_excerpt(gatekeeper_text, STOCK_APP))
+							record(code, text, gatekeeper_code, gatekeeper_text)
+						end)
+				end)
 		end
 		if not brew then
 			report.step("brew_version", STATE.skip, "no_brew")

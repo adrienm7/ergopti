@@ -34,8 +34,16 @@ helpers.describe("API panel runtime identity transaction", function()
 
 		local api_remote = {
 			PROVIDERS = { openai = { label = "OpenAI" } },
+			PROVIDER_ORDER = {},
+			entry_key_missing = function() return false end,
 			get_entries = function() return entries end,
 			get_active_entry_id = function() return active_id end,
+			get_active_entry = function()
+				for _, entry in ipairs(entries) do
+					if entry.id == active_id then return entry end
+				end
+				return nil
+			end,
 			set_active_entry_id = function(id)
 				active_id = id
 				events[#events + 1] = "set:" .. id
@@ -96,8 +104,7 @@ helpers.describe("API panel runtime identity transaction", function()
 				update_menu = function() events[#events + 1] = "update" end,
 			}
 
-			local rows = ApiPanel.build_model_picker(context)
-			helpers.assert_eq(rows[1].action(), true)
+			helpers.assert_eq(ApiPanel.clear_active_entry(context), true)
 			helpers.assert_eq(events, { "reset", "set:", "persist", "update" },
 				"No Model must revoke the old tooltip before clearing remote identity")
 			helpers.assert_eq(active_id, "")
@@ -106,13 +113,11 @@ helpers.describe("API panel runtime identity transaction", function()
 				"an explicit No Model identity has nothing to warm")
 
 			events = {}
-			rows = ApiPanel.build_model_picker(context)
-			local entry_b_action
-			for _, row in ipairs(rows) do
-				if row.label == "openai/model-b" then
-					entry_b_action = row.action
-				end
-			end
+			-- The model selector page runs the entry selection the API panel builds.
+			local collected = {}
+			context.collect = collected
+			ApiPanel.build(context)
+			local entry_b_action = collected.select["entry-b"]
 			helpers.assert_type(entry_b_action, "function")
 			helpers.assert_eq(entry_b_action(), true)
 			helpers.assert_eq(events,
@@ -123,13 +128,10 @@ helpers.describe("API panel runtime identity transaction", function()
 
 			reset_commits = false
 			events = {}
-			rows = ApiPanel.build_model_picker(context)
-			local entry_a_action
-			for _, row in ipairs(rows) do
-				if row.label == "openai/model-a" then
-					entry_a_action = row.action
-				end
-			end
+			collected = {}
+			context.collect = collected
+			ApiPanel.build(context)
+			local entry_a_action = collected.select["entry-a"]
 			helpers.assert_eq(entry_a_action(), false)
 			helpers.assert_eq(events, { "reset" },
 				"failed old-identity teardown must abort persistence, warmup and selection")
@@ -140,7 +142,7 @@ helpers.describe("API panel runtime identity transaction", function()
 		if not ok then error(err) end
 	end)
 
-	-- api-entry-auto-name: the picker names an entry <provider>/<model>; the
+	-- api-entry-auto-name: the page names an entry <provider>/<model>; the
 	-- label an earlier build stored is not read.
 	helpers.it("lists entries by their automatic name only", function()
 		local module_names = {
@@ -155,8 +157,11 @@ helpers.describe("API panel runtime identity transaction", function()
 		package.loaded["modules.llm"] = {
 			api_remote = {
 				PROVIDERS = { openai = { label = "OpenAI" } },
+				PROVIDER_ORDER = {},
+				entry_key_missing = function() return false end,
 				get_entries = function() return entries end,
 				get_active_entry_id = function() return "entry-a" end,
+				get_active_entry = function() return entries[1] end,
 			},
 		}
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
@@ -176,25 +181,36 @@ helpers.describe("API panel runtime identity transaction", function()
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			template_rows = command_renderer.template_rows,
+			command_row = command_renderer.command_row,
+			get_array = command_renderer.get_array,
 			render_rows = function(rows) return rows end,
 		}
 		package.loaded["ui.menu.menu_llm.api_panel"] = nil
 		local ok, err = xpcall(function()
 			local ApiPanel = require("ui.menu.menu_llm.api_panel")
-			local rows = ApiPanel.build_model_picker({
+			local collected = {}
+			ApiPanel.build({
 				state = { llm_backend = "api", llm_model = "model-a" },
 				paused = false,
 				is_paused = function() return false end,
 				keymap = { reset_predictions_for_configuration = function() return true end },
 				WarmupCtrl = { warmup = function() end },
 				update_menu = function() end,
+				collect = collected,
 			})
 			local found = false
-			for _, row in ipairs(rows) do
-				helpers.assert_true(row.label ~= "Entry A", "the stored label is never shown")
-				if row.label == "openai/model-a" then found = true end
+			for _, entry in ipairs(collected.entries) do
+				helpers.assert_true(entry.name ~= "Entry A", "the stored label is never shown")
+				if entry.name == "openai/model-a" then found = true end
 			end
 			helpers.assert_true(found, "the entry row must list provider/model")
+			-- model-button-emoji-first: the tray button names the provider by its
+			-- display name, never the stored label nor the provider id.
+			helpers.assert_eq(ApiPanel.active_entry_caption_text(), "OpenAI/model-a")
+			entries[1].model = ""
+			package.loaded["modules.llm"].api_remote.PROVIDERS.openai.default_model = "gpt-4o-mini"
+			helpers.assert_eq(ApiPanel.active_entry_caption_text(), "OpenAI/gpt-4o-mini",
+				"an entry without a model is named after the model its requests use")
 		end, debug.traceback)
 		for _, name in ipairs(module_names) do package.loaded[name] = saved_modules[name] end
 		if not ok then error(err) end

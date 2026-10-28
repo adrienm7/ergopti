@@ -22,9 +22,10 @@
 
 local Logger = require("infra.logger")
 local NativePath = require("native_path")
+local ConfigKeys = require("config_keys")
 
 -- The backend default is hardware-derived: resolved on the first read that includes it.
-local BACKEND_PATH = "llm.models.selected"
+local BACKEND_PATH = ConfigKeys.KEY.LLM_MODELS_SELECTED
 local platform_resolved = false
 
 --- Resolves the platform backend into its manifest entry before a read that

@@ -18,8 +18,20 @@ local Loop = require("adapters.event_loop")
 local scenario = assert(arg[1])
 local bad_calls, sibling_calls, watchdog_calls, formatter_calls = 0, 0, 0, 0
 local object = arg[2] == "string" and "owned ordinary callback failure" or setmetatable({}, { __tostring = function() formatter_calls = formatter_calls + 1; error("owned error formatter failure", 0) end })
-local bad_token, sibling, watchdog
+local bad_token, sibling, watchdog, admission
+local watchdog_armed = false
+local function arm_watchdog()
+	if watchdog_armed then return end
+	watchdog_armed = true
+	uv.update_time()
+	assert(uv.timer_start(watchdog, 30, 0, function()
+		watchdog_calls = watchdog_calls + 1
+		Scheduler.cancelAll()
+		if Loop.isRunning() then Loop.stop() else uv.stop() end
+	end) == 0)
+end
 local function bad()
+	arm_watchdog()
 	bad_calls = bad_calls + 1
 	if bad_calls == 1 then
 		-- A timer armed before run admission can stop the loop before any idle
@@ -46,15 +58,22 @@ elseif scenario == "periodic" then options.onPeriodic, options.periodSec = bad, 
 elseif scenario == "registered idle" then Loop.add_idle_handler(bad); options.onIdle = function() end
 elseif scenario == "deferred" then assert(Loop.defer(bad)); options.onIdle = function() end
 else error("unknown scenario") end
--- Setup is outside the watchdog budget. libuv caches loop time until a
--- native admission refresh, so arm this independent oracle only when ready.
-uv.update_time()
-assert(uv.timer_start(watchdog, 30, 0, function()
-	watchdog_calls = watchdog_calls + 1
-	Scheduler.cancelAll()
-	if Loop.isRunning() then Loop.stop() else uv.stop() end
+-- Native admission, including Loop.run() handle construction, is outside the
+-- callback budget. A real prepare handle bounds missing callbacks as well.
+-- Timers may run before prepare; bad() arms first in that ordering so the
+-- blocked-callback control still makes both successor and watchdog overdue.
+admission = assert(uv.new_prepare())
+assert(uv.prepare_start(admission, function()
+	assert(uv.prepare_stop(admission) == 0)
+	uv.close(admission)
+	arm_watchdog()
 end) == 0)
+if arg[3] == "no_callback" then
+	assert(scenario == "periodic", "missing callback control requires the periodic path")
+	options.onPeriodic = function() end
+end
 local ok, err
+if arg[4] == "delayed_admission" then uv.sleep(40) end
 if scenario == "after" or scenario == "every" then ok, err = pcall(uv.run)
 else ok, err = pcall(Loop.run, options) end
 if sibling then
@@ -72,4 +91,8 @@ for _ = 1, 4 do uv.run("nowait") end
 local count = 0
 uv.walk(function() count = count + 1 end)
 print(string.format("RETURN ok=%s bad=%d sibling=%d watchdog=%d active=%d residual=%d formatter=%d", tostring(ok), bad_calls, sibling_calls, watchdog_calls, Scheduler.activeCount(), count, formatter_calls))
-assert(ok and bad_calls > 0 and sibling_calls == 1 and watchdog_calls == 0 and count == 0 and Scheduler.activeCount() == 0 and formatter_calls == 0)
+if arg[3] == "no_callback" then
+	assert(ok and bad_calls == 0 and sibling_calls == 0 and watchdog_calls == 1 and count == 0 and Scheduler.activeCount() == 0 and formatter_calls == 0)
+else
+	assert(ok and bad_calls > 0 and sibling_calls == 1 and watchdog_calls == 0 and count == 0 and Scheduler.activeCount() == 0 and formatter_calls == 0)
+end

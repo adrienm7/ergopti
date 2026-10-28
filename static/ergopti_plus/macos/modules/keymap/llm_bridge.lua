@@ -47,6 +47,7 @@ local TimerScheduler   = require("adapters.timer_scheduler")
 local ManifestReader = require("infra.manifest_reader")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 local Timings          = require("infra.timings")
+local ConfigKeys = require("config_keys")
 local ContextBuffer    = require("llm.context_buffer")  -- shared navigation rule of the AI context
 
 local LOG    = "keymap.llm_bridge"
@@ -635,8 +636,8 @@ end
 --- @return boolean found True when the runtime owner recognizes the key.
 --- @return any value Current runtime value.
 function M.get_llm_runtime_setting(key)
-	if key == "llm_after_hotstring" then return true, fire_llm_after_hotstring end
-	if key == "llm_reset_on_nav" then return true, reset_buffer_on_navigation end
+	if key == ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING then return true, fire_llm_after_hotstring end
+	if key == ConfigKeys.COMMAND.LLM_RESET_ON_NAV then return true, reset_buffer_on_navigation end
 	local found, value = engine.get_llm_runtime_setting(key)
 	if found then return found, value end
 	return AgentRunner.get_runtime_setting(key)
@@ -923,7 +924,7 @@ local function update_preview_body(buf)
 		-- character their layout no longer produces. The literal remains only as
 		-- the fallback for a state that has not resolved one yet.
 		local magic_key = (_state and _state.magic_key ~= nil and _state.magic_key ~= "")
-			and _state.magic_key or ManifestReader.default_for("hotstrings.trigger_char")
+			and _state.magic_key or ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR)
 		local rows          = {}
 		local any_enabled   = false
 		local min_timeout   = nil

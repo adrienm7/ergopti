@@ -74,8 +74,9 @@ local function isolated(scenario)
 			read_with_status = function(path) return SourceFile.read(path), "ok" end,
 		}
 		local api = require("modules.llm.api_remote")
+		require("tests.support.modules.llm.backends.local_server_scan_fake").install(api)
 		local servers = require("modules.llm.local_servers")
-		local clients = upvalue(api.detect_local_servers, "_local_probe_clients")
+		local clients = upvalue(api._probe_local_target, "_local_probe_clients")
 		local scheduler = package.loaded["adapters.timer_scheduler"]
 		local ok, err = xpcall(function() scenario(api, servers, clients, state) end, debug.traceback)
 		-- A terminal can release a waiting successor. Drain appended requests too.

@@ -236,7 +236,7 @@ function M.open()
 		end,
 		on_navigation = function(action)
 			if action == "didFinishNavigation" and candidate ~= nil and candidate == _webview and _controller then
-				DeferredWork.after(0.05, function()
+				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 					if candidate == _webview and _controller then _controller.on_message({ action = "ready" }) end
 				end, "layout_manager.navigation")
 			end
@@ -281,11 +281,19 @@ function M.open()
 	return true
 end
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _webview end
+
+--- Closes the window this module created, for ui/window_toggle.
+--- @return boolean committed
+function M.close() return close_window() end
+
 --- Builds the "Manage layouts…" menu command.
 --- @return function
 function M.menu_command()
 	return function()
-		DeferredWork.after(0.05, M.open, "layout_manager.open")
+		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), M.open, "layout_manager.open")
 	end
 end
 

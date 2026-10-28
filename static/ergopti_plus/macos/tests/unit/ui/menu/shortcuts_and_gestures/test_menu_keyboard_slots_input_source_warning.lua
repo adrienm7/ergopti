@@ -56,7 +56,7 @@ end
 helpers.describe("keyboard slot input-source warning (input-source-conflict)", function()
 	helpers.it("warns about a chord macOS still owns and opens the settings on request", function()
 		with_menu({ "60" }, "open", function(ui, seen)
-			ui.warn_if_input_source_conflict("hs_ctrl_space")
+			ui.warn_if_input_source_conflict("secondary_space")
 			helpers.assert_eq(#seen.dialogs, 1, "the conflict must be shown once")
 			helpers.assert_eq(seen.opened[1], "x-apple.systempreferences:test",
 				"the button must open the Keyboard settings")
@@ -65,7 +65,7 @@ helpers.describe("keyboard slot input-source warning (input-source-conflict)", f
 
 	helpers.it("shows nothing for a chord macOS does not own", function()
 		with_menu({}, "open", function(ui, seen)
-			ui.warn_if_input_source_conflict("hs_ctrl_space")
+			ui.warn_if_input_source_conflict("secondary_space")
 			helpers.assert_eq(#seen.dialogs, 0)
 			helpers.assert_eq(#seen.opened, 0)
 		end)
@@ -73,7 +73,7 @@ helpers.describe("keyboard slot input-source warning (input-source-conflict)", f
 
 	helpers.it("opens nothing when the user only acknowledges", function()
 		with_menu({ "60" }, nil, function(ui, seen)
-			ui.warn_if_input_source_conflict("hs_ctrl_space")
+			ui.warn_if_input_source_conflict("secondary_space")
 			helpers.assert_eq(#seen.dialogs, 1)
 			helpers.assert_eq(#seen.opened, 0)
 		end)

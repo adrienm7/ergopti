@@ -780,7 +780,7 @@ end
 --- @return table Set of ids.
 local function registered_providers(omitted_delegate)
 	local handle = assert(io.open(helpers.driver_root() .. "/ui/menu/menu_builder.lua", "r"))
-	local source = handle:read("*a")
+	local source = helpers.expand_config_keys(handle:read("*a"))
 	handle:close()
 	-- Providers may be owned by a directly required native menu module. Scan
 	-- those actual delegates, rather than every source file in the tree.
@@ -791,7 +791,7 @@ local function registered_providers(omitted_delegate)
 			if not visited[name] and name ~= omitted_delegate then
 				visited[name] = true
 				local delegate = assert(io.open(helpers.driver_root() .. "/" .. name:gsub("%.", "/") .. ".lua", "r"))
-				sources[#sources + 1] = assert(delegate:read("*a")); assert(delegate:close())
+				sources[#sources + 1] = helpers.expand_config_keys(assert(delegate:read("*a"))); assert(delegate:close())
 			end
 		end
 		index = index + 1

@@ -54,7 +54,7 @@ local function load_subject()
 	package.loaded["adapters.storage"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
-	require("tests.support.keyboard_config_fixture").install({ cmd_a = "script_pause_toggle", cmd_b = "script_pause_toggle" })
+	require("tests.support.keyboard_config_fixture").install({ primary_a = "script_pause_toggle", primary_b = "script_pause_toggle" })
 	local subject = require("modules.shortcuts.keyboard_shortcuts")
 	return subject, controls, counters
 end

@@ -544,7 +544,7 @@ helpers.describe("gesture parameter binding publication", function()
 [linux.action_parameters]
 removed_gesture_slot__open_url = "https://retired-legacy.example"
 tap_3__open_url = "https://legacy.example"
-keyboard__ctrl_k__open_url = "https://keyboard.example"
+keyboard__primary_k__open_url = "https://keyboard.example"
 [gesture_parameters]
 removed_gesture_slot__open_url = "https://retired-canonical.example"
 tap_3__open_url = "https://canonical.example"
@@ -558,7 +558,7 @@ script__script_altgr_enter__open_url = "https://script.example"
 			helpers.assert_nil(manager.get_all_action_parameters().removed_gesture_slot__open_url)
 			helpers.assert_eq(manager.get_action_parameter("tap_3", "open_url"), "https://canonical.example")
 			helpers.assert_eq(manager.get_action_parameter("swipe_3_horiz", "open_url"), "https://axis.example")
-			helpers.assert_eq(manager.get_action_parameter("keyboard__ctrl_k", "open_url"), "https://keyboard.example")
+			helpers.assert_eq(manager.get_action_parameter("keyboard__primary_k", "open_url"), "https://keyboard.example")
 			helpers.assert_eq(manager.get_action_parameter("script__script_altgr_enter", "open_url"), "https://script.example")
 			helpers.assert_eq(read(), source)
 		end)
@@ -585,7 +585,7 @@ script__script_altgr_enter__open_url = "https://script.example"
 		})
 		helpers.assert_eq(marks, {
 			["linux.action_parameters.tap_3__open_url"] = true,
-			["linux.action_parameters.keyboard__ctrl_k__open_url"] = true,
+			["linux.action_parameters.keyboard__primary_k__open_url"] = true,
 			["gesture_parameters.tap_3__open_url"] = true,
 			["gesture_parameters.swipe_3_horiz__open_url"] = true,
 			["gesture_parameters.script__script_altgr_enter__open_url"] = true,
@@ -626,7 +626,7 @@ script__script_altgr_enter__open_url = "https://script.example"
 	helpers.it("binding-identity: current and qualified domains retain ordinary setters and exact compensation", function()
 		local manager = helpers.load_module("modules.gestures.manager")
 		manager.init({ persist = false, enabled = false })
-		for _, binding in ipairs({ "tap_3", "swipe_3_horiz", "keyboard__ctrl_k", "tap_hold__caps_lock", "script__script_altgr_enter" }) do
+		for _, binding in ipairs({ "tap_3", "swipe_3_horiz", "keyboard__primary_k", "tap_hold__caps_lock", "script__script_altgr_enter" }) do
 			helpers.assert_true(manager.set_action_parameter(binding, "open_url", "https://valid.example"))
 		end
 		local owner = {}; helpers.assert_true(manager.acquire_parameter_configuration(owner))
@@ -684,7 +684,7 @@ tap_3__open_url = "https://current-legacy.example"
 [gesture_parameters]
 removed_gesture_slot__open_url = "https://canonical-retired.example"
 swipe_3_horiz__open_url = "https://current-axis.example"
-keyboard__ctrl_k__open_url = "https://other-owner.example"
+keyboard__primary_k__open_url = "https://other-owner.example"
 ]]
 		binding_source_fixture(source, function(manager, path, read)
 			local cleanup = require("config_unused_keys")
@@ -698,7 +698,7 @@ keyboard__ctrl_k__open_url = "https://other-owner.example"
 			local cleaned = cleanup.remove_from_source(source, scan.keys)
 			helpers.assert_eq(TomlCodec.decode(cleaned), {
 				linux = { action_parameters = { tap_3__open_url = "https://current-legacy.example" } },
-				gesture_parameters = { swipe_3_horiz__open_url = "https://current-axis.example", keyboard__ctrl_k__open_url = "https://other-owner.example" },
+				gesture_parameters = { swipe_3_horiz__open_url = "https://current-axis.example", keyboard__primary_k__open_url = "https://other-owner.example" },
 			})
 		end)
 	end)

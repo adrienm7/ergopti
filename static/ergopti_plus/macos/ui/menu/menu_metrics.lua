@@ -23,6 +23,7 @@ local M = {}
 local hs = hs
 local fs = require("hs.fs")
 local text_utils = require("infra.text_utils")
+local MetricsState = require("infra.metrics_state_keys")
 
 local AppPickerLib  = require("infra.app_picker")
 local dialog        = require("infra.dialog_util")
@@ -277,13 +278,13 @@ function M.build(ctx)
 		if type(WpmMenubar.set_use_source_colors) == "function" then
 			WpmMenubar.set_use_source_colors(state.keystats_menubar_colors)
 		end
-		sync_wpm_visibility("keystats_menubar_wpm", "WPM menubar", WpmMenubar)
+		sync_wpm_visibility(MetricsState.MENUBAR_WPM, "WPM menubar", WpmMenubar)
 
 		local WpmWidget = require("ui.wpm.wpm_widget")
 		if type(WpmWidget.set_use_source_colors) == "function" then
 			WpmWidget.set_use_source_colors(state.keystats_float_colors)
 		end
-		sync_wpm_visibility("keystats_float_wpm", "WPM widget", WpmWidget,
+		sync_wpm_visibility(MetricsState.FLOAT_WPM, "WPM widget", WpmWidget,
 			state.keystats_float_graph)
 	end
 
@@ -351,21 +352,21 @@ function M.build(ctx)
 	--- Flips the private filter. The ROW is built by the shared renderer from
 	--- the manifest (`type = "check"`); this is only what the row DOES.
 	local function cmd_filter_private()
-		return toggle_metrics_filter("keystats_private_filter_enabled",
+		return toggle_metrics_filter(MetricsState.PRIVATE_FILTER_ENABLED,
 			"set_private_filter_enabled", "Private filter")
 	end
 
 	--- Flips the secure filter. The ROW is built by the shared renderer from
 	--- the manifest (`type = "check"`); this is only what the row DOES.
 	local function cmd_filter_secure()
-		return toggle_metrics_filter("keystats_secure_filter_enabled",
+		return toggle_metrics_filter(MetricsState.SECURE_FILTER_ENABLED,
 			"set_secure_field_filter_enabled", "Secure-field filter")
 	end
 
 	--- Flips the sysauth filter. The ROW is built by the shared renderer from
 	--- the manifest (`type = "check"`); this is only what the row DOES.
 	local function cmd_filter_sysauth()
-		return toggle_metrics_filter("keystats_system_auth_filter_enabled",
+		return toggle_metrics_filter(MetricsState.SYSTEM_AUTH_FILTER_ENABLED,
 			"set_system_auth_filter_enabled", "System-auth filter")
 	end
 
@@ -402,7 +403,7 @@ function M.build(ctx)
 		if type(WpmMenubar.set_use_source_colors) == "function" then
 			WpmMenubar.set_use_source_colors(state.keystats_menubar_colors)
 		end
-		return toggle_wpm_visibility("keystats_menubar_wpm", "WPM menubar", WpmMenubar)
+		return toggle_wpm_visibility(MetricsState.MENUBAR_WPM, "WPM menubar", WpmMenubar)
 	end
 
 	local function cmd_menubar_colors()
@@ -416,7 +417,7 @@ function M.build(ctx)
 		-- item that is not there would start it as a side effect.
 		if state.keystats_menubar_wpm and not paused_now()
 			and not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
-			compensate_rejected_wpm_start("keystats_menubar_wpm", "WPM menubar")
+			compensate_rejected_wpm_start(MetricsState.MENUBAR_WPM, "WPM menubar")
 		end
 		updateMenu()
 	end
@@ -426,7 +427,7 @@ function M.build(ctx)
 		if type(WpmWidget.set_use_source_colors) == "function" then
 			WpmWidget.set_use_source_colors(state.keystats_float_colors)
 		end
-		return toggle_wpm_visibility("keystats_float_wpm", "WPM widget", WpmWidget,
+		return toggle_wpm_visibility(MetricsState.FLOAT_WPM, "WPM widget", WpmWidget,
 			state.keystats_float_graph)
 	end
 
@@ -440,7 +441,7 @@ function M.build(ctx)
 		if state.keystats_float_wpm and not paused_now()
 			and not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
 				state.keystats_float_graph) then
-			compensate_rejected_wpm_start("keystats_float_wpm", "WPM widget")
+			compensate_rejected_wpm_start(MetricsState.FLOAT_WPM, "WPM widget")
 		end
 		updateMenu()
 	end
@@ -455,7 +456,7 @@ function M.build(ctx)
 		if state.keystats_float_wpm and not paused_now()
 			and not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
 				state.keystats_float_graph) then
-			compensate_rejected_wpm_start("keystats_float_wpm", "WPM widget")
+			compensate_rejected_wpm_start(MetricsState.FLOAT_WPM, "WPM widget")
 		end
 		updateMenu()
 	end
@@ -587,14 +588,14 @@ function M.build(ctx)
 			local wpm_committed = true
 			if state.keystats_menubar_wpm and not paused_now() then
 				if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
-					compensate_rejected_wpm_start("keystats_menubar_wpm", "WPM menubar")
+					compensate_rejected_wpm_start(MetricsState.MENUBAR_WPM, "WPM menubar")
 					wpm_committed = false
 				end
 			end
 			if state.keystats_float_wpm and not paused_now() then
 				if not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
 					state.keystats_float_graph) then
-					compensate_rejected_wpm_start("keystats_float_wpm", "WPM widget")
+					compensate_rejected_wpm_start(MetricsState.FLOAT_WPM, "WPM widget")
 					wpm_committed = false
 				end
 			end
@@ -631,25 +632,25 @@ function M.build(ctx)
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.state_getters = STATE_GETTERS
 	render_ctx.commands = {
-		["metrics_toggle"] = toggle_metrics,
-		["wpm_widget"] = cmd_wpm_widget,
-		["widget_colors"] = cmd_widget_colors,
-		["include_realtime"] = cmd_include_realtime,
-		["filter_private"] = cmd_filter_private,
-		["filter_secure"]  = cmd_filter_secure,
-		["filter_sysauth"] = cmd_filter_sysauth,
+		[require("config_keys").COMMAND.METRICS_TOGGLE] = toggle_metrics,
+		[require("config_keys").COMMAND.WPM_WIDGET] = cmd_wpm_widget,
+		[require("config_keys").COMMAND.WIDGET_COLORS] = cmd_widget_colors,
+		[require("config_keys").COMMAND.INCLUDE_REALTIME] = cmd_include_realtime,
+		[require("config_keys").COMMAND.FILTER_PRIVATE] = cmd_filter_private,
+		[require("config_keys").COMMAND.FILTER_SECURE]  = cmd_filter_secure,
+		[require("config_keys").COMMAND.FILTER_SYSAUTH] = cmd_filter_sysauth,
 		["encryption"]     = cmd_encryption,
-		["reset_wpm_position"] = cmd_reset_wpm_position,
-		["show_typing"]    = cmd_show_typing,
-		["show_apps"]      = cmd_show_apps,
-		["metrics_suspend"] = cmd_metrics_suspend,
-		["metrics_reset_session"] = cmd_metrics_reset_session,
-		["wpm_menubar"]    = cmd_wpm_menubar,
-		["menubar_colors"] = cmd_menubar_colors,
+		[require("config_keys").COMMAND.RESET_WPM_POSITION] = cmd_reset_wpm_position,
+		[require("config_keys").COMMAND.SHOW_TYPING]    = cmd_show_typing,
+		[require("config_keys").COMMAND.SHOW_APPS]      = cmd_show_apps,
+		[require("config_keys").COMMAND.METRICS_SUSPEND] = cmd_metrics_suspend,
+		[require("config_keys").COMMAND.METRICS_RESET_SESSION] = cmd_metrics_reset_session,
+		[require("config_keys").COMMAND.WPM_MENUBAR]    = cmd_wpm_menubar,
+		[require("config_keys").COMMAND.MENUBAR_COLORS] = cmd_menubar_colors,
 	}
 	-- The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
 	-- The Configuration clear still composes the metrics scope owner.
-	render_ctx.commands["scope_restore"] = function()
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
 		if paused_now() or type(ctx.apply_preference_scope) ~= "function" then return false end
 		return ctx.apply_preference_scope("metrics", "recommended")
 	end

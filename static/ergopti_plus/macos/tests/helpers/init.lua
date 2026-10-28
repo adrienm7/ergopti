@@ -17,6 +17,42 @@
 --- ==============================================================================
 
 local M = {}
+
+--- English formats of the keys a caption with several getters (caption_getters) reads.
+--- Such a caption refuses a format without its placeholders, so a stub that echoes
+--- the key (the usual one) would drop the whole row; a stub that replaces the
+--- baseline starts from these.
+M.I18N_PLACEHOLDER_FORMATS = { ["menu.llm.server_port_label"] = "%s server port: %s" }
+
+--- The shared timing registry, built from the real file on first use. A fixture that virtualises
+--- the file system or the shared paths calls M.provide_timings() before it does, so a call-time
+--- read of the registry (`require("infra.timings").sec(...)`) answers with the real values
+--- instead of failing on a missing virtual constants.toml.
+local REAL_TIMINGS = nil
+
+--- Builds the real timing registry reader once, while the file system is real. The runner calls it
+--- before any test; M.provide_timings() builds it on demand when a suite runs without the runner.
+local function real_timings()
+	if REAL_TIMINGS == nil then
+		local silent = setmetatable({}, { __index = function() return function() end end })
+		REAL_TIMINGS = require("timings").new({
+			logger = silent, log = "timings", loaded_level = "done",
+			shared_path = function(rel) return M.shared(rel) end,
+			parse = require("infra.toml.reader").parse,
+		})
+	end
+	return REAL_TIMINGS
+end
+
+--- Reads the registry now, before a fixture replaces the file system.
+function M.warm_timings()
+	real_timings()
+end
+
+--- Installs the real timing registry reader as the module the code under test requires.
+function M.provide_timings()
+	package.loaded["infra.timings"] = real_timings()
+end
 local CommandLines = require("tests.support.command_lines")
 local SourceFile = require("tests.support.source_file")
 
@@ -439,8 +475,11 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
 	-- canonical "— … —" decoration, so the stub must expose them or any builder
 	-- that renders a section header crashes with a nil-field call.
+	-- A caption that takes several getters (caption_getters) refuses a format without its
+	-- placeholders, so the keys the AI menu builds that way carry their English format.
+	local PLACEHOLDER_FORMATS = M.I18N_PLACEHOLDER_FORMATS
 	loaded["infra.i18n"] = {
-		get             = function(key) return key end,
+		get             = function(key) return PLACEHOLDER_FORMATS[key] or key end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
 		decorate_section = function(text) return "— " .. text .. " —" end,
@@ -557,6 +596,27 @@ local _production_sources = nil
 
 --- Loads (once) every production Lua file under the driver root.
 --- @return table Array of file bodies, tests/ excluded.
+--- Source text in which each generated config-key reference reads as the quoted string it
+--- stands for, for tests that scan driver source for the literal a call passes. A name the
+--- generated tables do not hold is left as written, so the scan still refuses it.
+--- @param text string Lua source text.
+--- @return string expanded
+function M.expand_config_keys(text)
+	local keys = require("config_keys")
+	local function resolve(whole, root_table, name)
+		local found, tbl = pcall(function() return keys[root_table] end)
+		if not found then return whole end
+		local ok, value = pcall(function() return tbl[name] end)
+		return ok and type(value) == "string" and string.format("%q", value) or whole
+	end
+	text = text:gsub('require%("config_keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
+		return resolve('require("config_keys").' .. root_table .. "." .. name, root_table, name)
+	end)
+	return (text:gsub("ConfigKeys%.(%u+)%.([%u%d_]+)", function(root_table, name)
+		return resolve("ConfigKeys." .. root_table .. "." .. name, root_table, name)
+	end))
+end
+
 local function production_sources()
 	if _production_sources then return _production_sources end
 
@@ -585,7 +645,7 @@ local function production_sources()
 
 	local bodies = {}
 	for _, path in ipairs(paths) do
-		bodies[#bodies + 1] = SourceFile.read(path)
+		bodies[#bodies + 1] = M.expand_config_keys(SourceFile.read(path))
 	end
 
 	-- A completed but empty inventory is not reusable source evidence. Leaving

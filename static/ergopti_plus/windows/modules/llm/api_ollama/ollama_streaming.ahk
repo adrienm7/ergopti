@@ -559,6 +559,16 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 				Terminal["exit"], Terminal["status"], StrLen(body))
 			Failure := entry.Get("presence_admitted", false)
 				? LLM_LocalModelResponseFailure(Terminal, entry["base_url"]) : 0
+			if Failure is Map {
+				RequestedModel := entry["presence_model"]
+				if LLM_LocalModelNormalize(Failure["model"]) != LLM_LocalModelNormalize(RequestedModel) {
+					try LoggerWarn("LLM.ollama", "Rejected an Ollama missing-model response for an unrequested model (request={1}).", req_id)
+					Failure := Map("reason", "model_identity_mismatch")
+				} else {
+					; The admitted request owns recovery identity and spelling.
+					Failure := LLM_LocalModelFailure(RequestedModel, entry["base_url"])
+				}
+			}
 			if Failure is Map
 				_LLM_InvokeCallback(on_fail, "on_fail", Failure)
 			else
@@ -626,7 +636,8 @@ _LLM_Ollama_CleanupCurlFiles(entry) {
 _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 	if entry is Map && !_LLM_Ollama_PresenceStillCurrent(entry)
 		return
-	text := LLM_ParseOllamaChatResponse(body)
+	Redact := (entry is Map) && entry.Get("redact", false)
+	text := LLM_ParseOllamaChatResponse(body, Redact)
 	; LLM_ParseOllamaChatResponse returns a structured Map("error", true, ...)
 	; on a JSON parse failure (malformed body) instead of an empty string, so
 	; that case must be checked before the empty-string "parse miss" branch —
@@ -637,17 +648,20 @@ _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 		return
 	}
 	if (text == "") {
-		snip := StrLen(body) > 120 ? SubStr(body, 1, 120) . "…" : body
-		payload_hint := ""
-		if (entry is Map) and entry.Has("payload_snip")
-			payload_hint := " Payload: «" . entry["payload_snip"] . "»."
-		try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss). Body: «{1}».{2}", snip, payload_hint)
+		if Redact {
+			try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss; body_chars={1}).", StrLen(body))
+		} else {
+			snip := StrLen(body) > 120 ? SubStr(body, 1, 120) . "…" : body
+			payload_hint := ""
+			if (entry is Map) and entry.Has("payload_snip")
+				payload_hint := " Payload: «" . entry["payload_snip"] . "»."
+			try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss). Body: «{1}».{2}", snip, payload_hint)
+		}
 		_LLM_InvokeCallback(on_fail, "on_fail", Map("error", true, "message", "empty prediction"))
 		return
 	}
 	; A caller-written body (the screen reading) answers with what is on the
 	; user's screen: its size is logged, never its text
-	Redact := (entry is Map) && entry.Get("redact", false)
 	snip := Redact ? "…" : (StrLen(text) > 60 ? SubStr(text, 1, 60) . "…" : text)
 	try LoggerInfo("LLM.ollama", "Prediction received ({1} chars): «{2}».", StrLen(text), snip)
 	if entry is Map && !_LLM_Ollama_PresenceStillCurrent(entry)
@@ -943,7 +957,7 @@ _LLM_Ollama_StreamOriginCurrent(Handle) {
 ; remainder in bounded slices, accepting one valid short final record without a
 ; newline.
 _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
-	global LLM_OLLAMA_STREAM_MAX_READ_BYTES
+	global LLM_OLLAMA_STREAM_MAX_READ_BYTES, SR_ERROR_FILE_NOT_FOUND
 	ReadLimit := MaxReadBytes
 	if (ReadLimit = 0)
 		ReadLimit := LLM_OLLAMA_STREAM_MAX_READ_BYTES
@@ -953,9 +967,14 @@ _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
 	; previous slice's value before any early return (missing/empty file included)
 	; so it cannot re-arm indefinitely from stale state.
 	State["stream_bytes_pending"] := false
-	Fh := FileOpen(Path, "r")
-	if !IsObject(Fh)
-		return ""
+	try Fh := FileOpen(Path, "r")
+	catch OSError as Err {
+		; curl creates its output after launch. Only file-not-found is pending;
+		; invalid directories, sharing refusals and other I/O failures propagate.
+		if Err.Number == SR_ERROR_FILE_NOT_FOUND
+			return ""
+		throw Err
+	}
 	try {
 		Offset := State["last_pos"]
 		Fh.Pos := Offset
@@ -1052,6 +1071,18 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 	if !_LLM_CurlProcessExited(handle.ProcessOwner) {
 		SetTimer(() => _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail), -LLM_OLLAMA_POLL_MS)
 		return
+	}
+	; A provider done frame cannot authorize success after a failed transfer.
+	; Capture status before release retires the only exact native query handle.
+	try {
+		ExitCode := _LLM_CurlProcessExitCode(handle.ProcessOwner)
+		if ExitCode != 0 {
+			state["failed"] := true
+			state["stream_error"] := "Streaming curl exited with code " . ExitCode . "."
+		}
+	} catch as Err {
+		state["failed"] := true
+		state["stream_error"] := "Streaming process exit receipt failed: " . Err.Message
 	}
 	_LLM_CurlReleaseProcess(handle.ProcessOwner)
 	; Process exited: flush whatever is left on disk before declaring the

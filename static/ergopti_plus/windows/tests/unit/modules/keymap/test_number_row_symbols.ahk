@@ -741,7 +741,7 @@ _NRP_RowScopes() {
 		AssertFalse(Criteria["*SC010"].Call(), "without the built-in emulation nothing passes through")
 		Source := _NRP_LayoutSource()
 		Passthrough := InStr(Source, "RegisterLayoutRowPassthrough()")
-		Remaps := InStr(Source, "for sc_int, entry in ErgoptiBaseMapping()")
+		Remaps := InStr(Source, "for _BaseRemapScInt, _BaseRemapEntry in ErgoptiBaseMapping()")
 		Shift := InStr(Source, "`nRegisterShiftLayer()")
 		AssertTrue(Passthrough > 0 && Passthrough < Remaps && Remaps < Shift,
 			"the pass-through variants are created before the base remaps and the built-in layers")

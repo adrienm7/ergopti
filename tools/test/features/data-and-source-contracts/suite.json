@@ -513,6 +513,78 @@
 			"cmd": "node",
 			"args": ["tools/test/test-duplicate-constant-names.cjs"],
 			"repro": "npm run test:duplicate-constant-names"
+		},
+		{
+			"id": "js-0500",
+			"ordinal": 500,
+			"name": "source-shape gates read a generated config-key constant as the literal it stands for",
+			"cmd": "node",
+			"args": ["tools/test/test-config-key-tokens.cjs"],
+			"repro": "npm run test:config-key-tokens"
+		},
+		{
+			"id": "js-0501",
+			"ordinal": 501,
+			"name": "drift guard isolation skips directory links and keeps file links",
+			"cmd": "node",
+			"args": ["tools/test/test-drift-guard-isolation-skips-directory-links.cjs"],
+			"repro": "node tools/test/test-drift-guard-isolation-skips-directory-links.cjs"
+		},
+		{
+			"id": "js-0502",
+			"ordinal": 503,
+			"name": "shortcut inventory matches the manifest, handler chords and slot prefix tables",
+			"cmd": "node",
+			"args": ["tools/test/test-shortcut-inventory-matches-sources.cjs"],
+			"repro": "npm run test:shortcut-inventory"
+		},
+		{
+			"id": "js-0503",
+			"ordinal": 505,
+			"name": "slot roles resolve on every driver and the crosswalk equals the inventory",
+			"cmd": "node",
+			"args": ["tools/test/test-slot-roles-single-source.cjs"],
+			"repro": "npm run test:slot-roles-single-source"
+		},
+		{
+			"id": "js-contract-vector-ledger",
+			"ordinal": 508,
+			"name": "Contract vector ledger (every case moved into a JSON vector corpus is accounted for once)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-contract-vector-ledger.cjs"],
+			"repro": "npm run test:contract-vector-ledger"
+		},
+		{
+			"id": "js-menu-row-order-single-source",
+			"ordinal": 513,
+			"name": "Menu row order single source (no driver spells a display order of row_order.json)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-menu-row-order-single-source.cjs"],
+			"repro": "npm run test:menu-row-order-single-source"
+		},
+		{
+			"id": "js-file-system-port-wired",
+			"ordinal": 515,
+			"name": "FileSystem port spec wiring (both Lua owners check the lease and atomic write spec at load)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-file-system-port-wired.cjs"],
+			"repro": "npm run test:file-system-port-wired"
+		},
+		{
+			"id": "js-linux-shell-messages",
+			"ordinal": 519,
+			"name": "Linux shell messages (catalogue reader contract and every printed key in the generated catalogue)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-linux-shell-messages.cjs"],
+			"repro": "npm run test:linux-shell-messages"
+		},
+		{
+			"id": "js-ahk-local-same-as-global",
+			"ordinal": 528,
+			"name": "AHK #Warn LocalSameAsGlobal replay (no local shadows a global in the library or any #Warn All child)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-ahk-local-same-as-global.cjs"],
+			"repro": "npm run test:ahk-local-same-as-global"
 		}
 	]
 }

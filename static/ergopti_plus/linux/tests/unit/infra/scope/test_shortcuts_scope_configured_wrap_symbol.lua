@@ -124,7 +124,7 @@ helpers.describe("Linux genuine configured prediction collision preflight", func
 
 	for _, known in ipairs({ false, true }) do
 		helpers.it("(prediction-configured-preflight) unknown disabled AI plus " .. (known and "known collision" or "otherwise free input"), function()
-			local source = COLLISION_BASE .. (known and 'ctrl_j = "copy"\n' or "") .. '[llm]\nenabled = false\n'
+			local source = COLLISION_BASE .. (known and 'primary_j = "copy"\n' or "") .. '[llm]\nenabled = false\n'
 			with_prediction_preflight(source, function(scope, owners, controls, path)
 				local before = Sandbox.read_bytes(path)
 				helpers.assert_eq(owners.prediction.capture_collision_inventory(), nil)

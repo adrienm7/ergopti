@@ -36,6 +36,7 @@ local Manifest = require("infra.manifest_reader")
 local TomlCodec = require("toml_codec")
 local TomlWriter = require("toml_codec.writer")
 local ShortcutCatalogue = require("shortcuts.catalogue")
+local ConfigKeys = require("config_keys")
 
 local LOG = "modules.shortcuts.tap_keys"
 
@@ -236,7 +237,7 @@ function M.set_action(id, action_id)
 	end
 	local path = require("infra.config_paths").config("config.toml")
 	local committed, detail = TomlWriter.batch_write(path, {
-		{ section = "shortcuts.tap_keys", key = id, value = action_id },
+		{ section = ConfigKeys.KEY.SHORTCUTS_TAP_KEYS, key = id, value = action_id },
 	})
 	if committed ~= true then
 		Logger.error(LOG, "set_action(): could not persist tap key '%s': %s.", id, tostring(detail))

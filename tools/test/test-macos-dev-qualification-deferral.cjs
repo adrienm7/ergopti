@@ -99,11 +99,11 @@ const SDK_FILTER =
 	"--filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests|ManagedImageAliasTests|OwnedSuspendedImageTests|ManagedListenerPathIdentityTests|ManagedNetworkBootstrapTests'";
 const DAEMON_LOG_FILTER = "--filter '(^|[.])SuspendedImageLogCaptureTests([/.]|$)'";
 const DAEMON_LOG_BLOCK =
-	'          # Independent logging cohort; historical49 above supplies no seven-case credit.\n          log_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-xctest.log"\n          log_source="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-source.json"\n          node tools/diagnostics/native_daemon_log_xctest_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$log_source"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])SuspendedImageLogCaptureTests([/.]|$)\' 2>&1 | tee "$log_transcript"\n          log_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#log_statuses[@]}" -eq 2\n          node tools/diagnostics/native_daemon_log_xctest_evidence.cjs judge "$log_transcript" "${log_statuses[0]}" "${log_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$log_source" "$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-verdict.json"\n';
+	'          # Independent logging cohort; historical52 above supplies no seven-case credit.\n          log_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-xctest.log"\n          log_source="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-source.json"\n          node tools/diagnostics/native_daemon_log_xctest_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$log_source"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])SuspendedImageLogCaptureTests([/.]|$)\' 2>&1 | tee "$log_transcript"\n          log_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#log_statuses[@]}" -eq 2\n          node tools/diagnostics/native_daemon_log_xctest_evidence.cjs judge "$log_transcript" "${log_statuses[0]}" "${log_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$log_source" "$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-verdict.json"\n';
 const LOGGER_42_FILTER =
 	"--filter '(^|[.])(LoggerDatagramWorkerTests|OwnedLogDirectoryTests)([/.]|$)'";
 const LOGGER_42_BLOCK =
-	'          # Unchanged original logger29+directory13; neither SDK49 nor daily-log7 supplies this credit.\n          logger_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-xctest.log"\n          logger_source="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-source.json"\n          node tools/diagnostics/native_logger_regression_xctest_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])(LoggerDatagramWorkerTests|OwnedLogDirectoryTests)([/.]|$)\' 2>&1 | tee "$logger_transcript"\n          logger_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#logger_statuses[@]}" -eq 2\n          node tools/diagnostics/native_logger_regression_xctest_evidence.cjs judge "$logger_transcript" "${logger_statuses[0]}" "${logger_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source" "$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-verdict.json"\n';
+	'          # Unchanged original logger29+directory13; neither SDK52 nor daily-log7 supplies this credit.\n          logger_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-xctest.log"\n          logger_source="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-source.json"\n          node tools/diagnostics/native_logger_regression_xctest_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])(LoggerDatagramWorkerTests|OwnedLogDirectoryTests)([/.]|$)\' 2>&1 | tee "$logger_transcript"\n          logger_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#logger_statuses[@]}" -eq 2\n          node tools/diagnostics/native_logger_regression_xctest_evidence.cjs judge "$logger_transcript" "${logger_statuses[0]}" "${logger_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source" "$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-verdict.json"\n';
 const LOGGER_NUMERIC_COMMAND =
 	'          bash tools/diagnostics/run_logger_numeric_native.sh "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$ERGOPTI_OLLAMA_BUILD_ROOT"\n';
 const LOGGER_NUMERIC_STEP = guardedStep(
@@ -142,7 +142,7 @@ function admitNativeSdkSelector(mac) {
 		step.split(DAEMON_LOG_BLOCK).length !== 2 ||
 		mac.split(DAEMON_LOG_FILTER).length !== 2 ||
 		!step.endsWith(
-			'          grep -Fq \'Executed 49 tests, with 0 failures\' "$transcript"\n' +
+			'          grep -Fq \'Executed 54 tests, with 0 failures\' "$transcript"\n' +
 				DAEMON_LOG_BLOCK +
 				LOGGER_42_BLOCK +
 				'        timeout-minutes: 10\n'
@@ -179,7 +179,7 @@ function admitNativeSdkSelector(mac) {
 		'          grep -Fq "Test Suite \'ManagedOllamaAPIWorkerTests\' passed" "$transcript"',
 		'          grep -Fq \'Executed 12 tests, with 0 failures\' "$transcript"',
 		'          grep -Fq "Test Suite \'ManagedPTYWorkerTests\' passed" "$transcript"',
-		'          grep -Fq \'Executed 11 tests, with 0 failures\' "$transcript"',
+		'          grep -Fq \'Executed 15 tests, with 0 failures\' "$transcript"',
 		'          grep -Fq "Test Suite \'ManagedImageAliasTests\' passed" "$transcript"',
 		'          grep -Fq \'Executed 4 tests, with 0 failures\' "$transcript"',
 		'          grep -Fq "Test Suite \'OwnedSuspendedImageTests\' passed" "$transcript"',
@@ -187,8 +187,8 @@ function admitNativeSdkSelector(mac) {
 		'          grep -Fq "Test Suite \'ManagedListenerPathIdentityTests\' passed" "$transcript"',
 		'          grep -Fq \'Executed 2 tests, with 0 failures\' "$transcript"',
 		'          grep -Fq "Test Suite \'ManagedNetworkBootstrapTests\' passed" "$transcript"',
-		'          test "$(grep -Fc \'Executed 6 tests, with 0 failures\' "$transcript")" -eq 1',
-		'          grep -Fq \'Executed 49 tests, with 0 failures\' "$transcript"',
+		'          test "$(grep -Fc \'Executed 7 tests, with 0 failures\' "$transcript")" -eq 1',
+		'          grep -Fq \'Executed 54 tests, with 0 failures\' "$transcript"',
 		'        timeout-minutes: 10'
 	]) {
 		if (step.split('\n').filter((actual) => actual === line).length !== 1) return null;
@@ -788,7 +788,7 @@ function run({ includeLeafControls = true } = {}) {
 		],
 		[
 			'sdk-missing-pty-transcript-is-red',
-			'Executed 11 tests, with 0 failures',
+			'Executed 15 tests, with 0 failures',
 			'Executed 10 tests, with 0 failures'
 		],
 		[
@@ -848,12 +848,12 @@ function run({ includeLeafControls = true } = {}) {
 		],
 		[
 			'sdk-incomplete-network-bootstrap-census-is-red',
-			'          test "$(grep -Fc \'Executed 6 tests, with 0 failures\' "$transcript")" -eq 1',
+			'          test "$(grep -Fc \'Executed 7 tests, with 0 failures\' "$transcript")" -eq 1',
 			'          true'
 		],
 		[
 			'sdk-incomplete-total-is-red',
-			'Executed 49 tests, with 0 failures',
+			'Executed 54 tests, with 0 failures',
 			'Executed 34 tests, with 0 failures'
 		],
 		['sdk-ignored-swift-status-is-red', '          test "${statuses[0]}" -eq 0', '          true'],

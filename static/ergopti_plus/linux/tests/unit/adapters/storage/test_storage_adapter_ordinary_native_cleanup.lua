@@ -571,6 +571,17 @@ helpers.describe("first owned native storage publication", function()
 			if not ok then error(err, 0) end
 		end)
 	end
+	helpers.it("owned-storage-parent: the created parent is private to the user (0700)", function()
+		missing_parent(function(storage, _, path)
+			local directory = path:match("^(.*)/[^/]+$")
+			helpers.assert_true(storage.set("private-parent", true))
+			local handle = assert(io.popen("stat -c %a " .. require("adapters.shell_runner").quote(directory)))
+			local mode = handle:read("*l")
+			handle:close()
+			helpers.assert_eq(mode, "700", "restart markers beside the store need a directory only the user can write")
+		end)
+	end)
+
 	helpers.it("owned-storage-parent: first native effect creates the real parent and restores exact absence", function()
 		missing_parent(function(storage, files, path, backup, _, read, commands, inject)
 			local owner = { pending = function() return false end }

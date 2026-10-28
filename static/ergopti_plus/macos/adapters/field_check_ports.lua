@@ -42,18 +42,18 @@ local LOG = "adapters.field_check_ports"
 --- @param executable string Absolute path.
 --- @param args table Argument array.
 --- @param timeout_s number Seconds before the child is terminated.
---- @param callback function fn(exit_code|nil, stdout).
+--- @param callback function fn(exit_code|nil, stdout, stderr).
 --- @param environment table|nil Explicit child environment (the launcher's identity).
 local function exec(executable, args, timeout_s, callback, environment)
 	local settled, timer, handle = false, nil, nil
-	local function settle(code, stdout)
+	local function settle(code, stdout, stderr)
 		if settled then return end
 		settled = true
 		if timer then Timer.cancel(timer) end
-		callback(code, stdout)
+		callback(code, stdout, stderr or "")
 	end
-	handle = ShellRunner.spawn(executable, args, function(code, stdout)
-		settle(code, stdout)
+	handle = ShellRunner.spawn(executable, args, function(code, stdout, stderr)
+		settle(code, stdout, stderr)
 	end, nil, environment)
 	if handle.isSettled() or not handle.start() then
 		Logger.warn(LOG, "Could not start %s.", NativePath.basename(executable) or "a command")
@@ -128,10 +128,18 @@ end
 
 --- Downloads the PAC the way the diagnostics probe does; the address is never logged.
 --- @param url string PAC address from the system proxy settings.
+--- The step tokens stay fixed, so a transport failure's reason is logged here:
+--- it is the only clue a field report carries (issue #104).
 --- @param callback function fn(status|nil, body|nil).
 local function fetch_pac(url, callback)
 	local client = require("adapters.http_client").new({ timeout_ms = 6000 })
 	client.get(url, {}, function(result)
+		if (tonumber(result.status) or 0) == 0 then
+			-- The transport's error text ends with the request URL: the company PAC
+			-- address reached the field report of 2026-10-27 19:47 through it.
+			local reason = tostring(result.error):gsub("%s*%-?%s*%a[%w+.-]*://%S*", ""):gsub("[%s.]+$", "")
+			Logger.warn(LOG, "PAC download failed: %s.", reason)
+		end
 		callback(result.status, result.body)
 	end)
 end
@@ -150,6 +158,34 @@ local function network_chain(callback)
 	exec(python, { "-B", root .. "/modules/llm/managed_network_check.py" }, 40, callback)
 end
 
+
+--- The route the system settings name for each origin of the managed Ollama daemon,
+--- looked up one after the other through the launcher's route command, the lookup the
+--- daemon's own start performs (network-retry.sh).
+--- @param callback function fn({ entries = {{ origin, route }} } | { failure = token }).
+local function route_plan(callback)
+	local NetworkEnv = require("modules.llm.network_env")
+	local origins = NetworkEnv.route_origins("ollama")
+	local budget = NetworkEnv.route_lookup_budget_seconds()
+	local launcher, _, environment = require("platform.remap.lease_helper").resolve()
+	if not origins or not budget then return callback({ failure = "route-origins-unavailable" }) end
+	if not launcher then return callback({ failure = "launcher_unavailable" }) end
+	local entries = {}
+	local function dispatch(index)
+		exec(launcher, { "--managed-proxy-route", origins[index], tostring(budget) }, budget + 5, function(code, output, errors)
+			local route = code == 0 and tostring(output):match("ROUTE ([^\r\n]+)") or nil
+			if not route then
+				-- The role writes its STAGE line on stderr (ManagedProxyRouteWorker):
+				-- reading stdout lost every stage, so the PAC fallback never applied.
+				local stage = tostring(errors):match("STAGE (native_[a-z_]+)")
+				return callback({ failure = stage or "lookup_failed" })
+			end
+			entries[index] = { origin = origins[index], route = route }
+			if index == #origins then callback({ entries = entries }) else dispatch(index + 1) end
+		end, environment)
+	end
+	dispatch(1)
+end
 
 --- Measures how late the timer service fires.
 --- @param seconds number Delay asked of the timer.
@@ -218,7 +254,12 @@ function M.new()
 		count_keys = count_keys,
 		fetch_pac = fetch_pac,
 		network_chain = network_chain,
+		route_plan = route_plan,
 		timer_probe = timer_probe,
+		after = function(seconds, callback)
+			local _, committed = Timer.after(seconds, callback)
+			if committed ~= true then error("field check: the wait timer could not be armed", 0) end
+		end,
 		owned_readiness = owned_readiness,
 		app_path = app_path,
 		login_startup_status = login_startup_status,

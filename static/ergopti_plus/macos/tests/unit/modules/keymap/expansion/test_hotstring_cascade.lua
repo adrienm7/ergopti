@@ -156,7 +156,13 @@ helpers.describe("keymap: the hotstring cascade", function()
 		helpers.assert_true(type_string(state, expander, "chatg"), "chatg must fire")
 		helpers.assert_eq("chatgpt", state.buffer, "the output waits for a keystroke at one arrow")
 		helpers.assert_eq(1, #log.transactions, "one transaction")
-		helpers.assert_eq("gpt", log.transactions[1].typed, "only the missing tail is typed")
+		-- Old vs new: before the shared net edit, macOS kept the on-screen prefix the
+		-- trigger and the output share, so it erased nothing and typed only "pt"-style
+		-- tails ("gpt" here). The plan every driver executes erases the whole trigger
+		-- and types the whole output, exactly as Linux and Windows do.
+		helpers.assert_eq("chatgpt", log.transactions[1].typed, "the whole output is typed")
+		helpers.assert_eq(4, log.transactions[1].deletes,
+			"the four characters of 'chat' already on screen are erased, the fifth was never shown")
 	end)
 
 	helpers.it("two arrows complete the second hotstring in the same transaction", function()

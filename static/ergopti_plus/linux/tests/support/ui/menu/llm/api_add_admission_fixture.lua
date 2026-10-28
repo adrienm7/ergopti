@@ -118,10 +118,11 @@ function M.run(body)
 			info = function(_, text) state.infos[#state.infos + 1] = text end,
 			confirm = function() return true end,
 		}
-		local rows = require("ui.menu.llm_backend_rows").rows(Engine, dialogs, function()
-			state.changed = state.changed + 1
-			if state.on_changed then state.on_changed() end
-		end, function() return {} end)
+		local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(require("ui.menu.llm_backend_rows"),
+			Engine, dialogs, function()
+				state.changed = state.changed + 1
+				if state.on_changed then state.on_changed() end
+			end)
 		local function find(records)
 			for _, row in ipairs(records) do
 				if row.label == "➕ Cerebras" then return row.action end

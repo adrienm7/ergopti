@@ -25,12 +25,13 @@ local BindingPublication = require("config_binding_publication")
 local Paths        = require("infra.paths")
 local Json         = require("json")
 local ScriptChords = require("script_chords")
+local ConfigKeys = require("config_keys")
 
 -- The shared catalogue, relative to the shared tree.
 local CATALOGUE_REL_PATH = "modules/actions/script_chords.json"
 
 -- The manifest section holding the slots and the switch.
-local SECTION = "shortcuts.script_control"
+local SECTION = ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL
 
 -- The validated catalogue; nil until the first read.
 local _catalogue = nil

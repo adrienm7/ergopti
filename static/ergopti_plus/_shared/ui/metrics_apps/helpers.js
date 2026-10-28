@@ -24,6 +24,13 @@ let userCategories = window.UserCategories || {};
 let appIcons = window.AppIcons || {};
 let currentSelectedDate = null;
 let currentPeriod = 'day';
+// One calendar-length owner for period queries and their previous-period comparison.
+const METRICS_PERIOD_DAYS = Object.freeze({
+	day: 1,
+	week: 7,
+	month: 30,
+	year: METRICS_CALENDAR_YEAR_DAYS
+});
 // #53 — null means "all categories enabled"; otherwise a Set of allowed cats.
 let currentCategoryFilter = null;
 // #54 — null means "all weekdays enabled"; otherwise a Set of allowed dows (0=Mon..6=Sun).
@@ -126,45 +133,45 @@ const _FRENCH_LEGACY_LABELS = {
 
 // Perceptually distinct palette — spread across hue wheel to avoid blue clustering
 const CHART_PALETTE = [
-	'#FF375F', // Red-Pink
-	'#FF9F0A', // Orange
-	'#FFD60A', // Yellow
-	'#32D74B', // Green
-	'#64D2FF', // Sky Blue
-	'#0A84FF', // Blue
-	'#5E5CE6', // Indigo
-	'#BF5AF2', // Purple
-	'#FF6B35', // Burnt Orange
-	'#00C7BE', // Teal
-	'#E588F8', // Lavender
-	'#F4A460', // Sandy
-	'#30B0C7', // Cyan-Teal
-	'#FF453A', // Deep Red
-	'#34C759', // Leaf Green
-	'#5AC8FA' // Light Blue
+	ThemeTokens.color('pink-dark'), // Red-Pink
+	ThemeTokens.color('orange-dark'), // Orange
+	ThemeTokens.color('yellow-dark'), // Yellow
+	ThemeTokens.color('hue-32d74b'), // Green
+	ThemeTokens.color('cyan-dark'), // Sky Blue
+	ThemeTokens.color('blue-dark'), // Blue
+	ThemeTokens.color('indigo-dark'), // Indigo
+	ThemeTokens.color('purple-dark'), // Purple
+	ThemeTokens.color('hue-ff6b35'), // Burnt Orange
+	ThemeTokens.color('hue-00c7be'), // Teal
+	ThemeTokens.color('hue-e588f8'), // Lavender
+	ThemeTokens.color('hue-f4a460'), // Sandy
+	ThemeTokens.color('hue-30b0c7'), // Cyan-Teal
+	ThemeTokens.color('red-dark'), // Deep Red
+	ThemeTokens.color('green'), // Leaf Green
+	ThemeTokens.color('hue-5ac8fa') // Light Blue
 ];
 
 // Fixed aesthetic mappings for standard categories keyed on stable i18n ids —
 // each hue is deliberately distant from the others on the colour wheel.
 const FIXED_CAT_COLORS = {
-	productivity: '#0A84FF',
-	development: '#5E5CE6',
-	social: '#FF375F',
-	games: '#FF453A',
-	entertainment: '#BF5AF2',
-	utility: '#64D2FF',
-	education: '#FF9F0A',
-	business: '#FFD60A',
-	finance: '#30B0C7',
-	graphics_design: '#E588F8',
-	photography: '#FF6B35',
-	video: '#FF375F',
-	music: '#32D74B',
-	health: '#34C759',
-	news: '#F4A460',
-	weather: '#5AC8FA',
-	travel: '#00C7BE',
-	general: '#8E8E93'
+	productivity: ThemeTokens.color('blue-dark'),
+	development: ThemeTokens.color('indigo-dark'),
+	social: ThemeTokens.color('pink-dark'),
+	games: ThemeTokens.color('red-dark'),
+	entertainment: ThemeTokens.color('purple-dark'),
+	utility: ThemeTokens.color('cyan-dark'),
+	education: ThemeTokens.color('orange-dark'),
+	business: ThemeTokens.color('yellow-dark'),
+	finance: ThemeTokens.color('hue-30b0c7'),
+	graphics_design: ThemeTokens.color('hue-e588f8'),
+	photography: ThemeTokens.color('hue-ff6b35'),
+	video: ThemeTokens.color('pink-dark'),
+	music: ThemeTokens.color('hue-32d74b'),
+	health: ThemeTokens.color('green'),
+	news: ThemeTokens.color('hue-f4a460'),
+	weather: ThemeTokens.color('hue-5ac8fa'),
+	travel: ThemeTokens.color('hue-00c7be'),
+	general: ThemeTokens.color('gray')
 };
 
 // Every localised spelling of the default category, from the generated alias
@@ -225,8 +232,8 @@ function paletteIndex(str) {
 }
 
 function getCategoryColor(catName, score) {
-	if (score > 0) return '#30D158';
-	if (score < 0) return '#FF453A';
+	if (score > 0) return ThemeTokens.color('green-dark');
+	if (score < 0) return ThemeTokens.color('red-dark');
 	const id = categoryToId(catName);
 	if (Object.prototype.hasOwnProperty.call(FIXED_CAT_COLORS, id)) return FIXED_CAT_COLORS[id];
 	return CHART_PALETTE[paletteIndex(catName)];
@@ -237,8 +244,8 @@ const postBridge = makeHostBridge('metrics_apps_bridge');
 function getAppColor(appName, score) {
 	// Always prefer the dominant icon colour — score is reflected in the score column, not the bar
 	if (_dominantColorCache[appName]) return _dominantColorCache[appName];
-	if (score > 0) return '#30D158';
-	if (score < 0) return '#FF453A';
+	if (score > 0) return ThemeTokens.color('green-dark');
+	if (score < 0) return ThemeTokens.color('red-dark');
 	return CHART_PALETTE[paletteIndex(appName)];
 }
 
@@ -332,39 +339,11 @@ function formatDurationDecimal(ms) {
 	return Number((ms / 3600000).toFixed(2));
 }
 
-function parseDateKey(dateStr) {
-	if (!dateStr || (typeof dateStr !== 'string' && typeof dateStr !== 'number')) return NaN;
-	if (/^\d+$/.test(String(dateStr))) {
-		const n = Number(dateStr);
-		if (String(dateStr).length <= 10) return n * 1000;
-		return n;
-	}
-	const s = String(dateStr);
-	const isoMatch = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
-	if (isoMatch)
-		return new Date(
-			parseInt(isoMatch[1], 10),
-			parseInt(isoMatch[2], 10) - 1,
-			parseInt(isoMatch[3], 10)
-		).getTime();
-
-	const frMatch = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-	if (frMatch)
-		return new Date(
-			parseInt(frMatch[3], 10),
-			parseInt(frMatch[2], 10) - 1,
-			parseInt(frMatch[1], 10)
-		).getTime();
-
-	const t = Date.parse(s);
-	return isNaN(t) ? NaN : t;
-}
-
 function formatDisplayDate(dateStr) {
 	const ts = parseDateKey(dateStr);
 	if (isNaN(ts)) return dateStr;
 	const d = new Date(ts);
-	return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+	return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
 }
 
 // ===================================

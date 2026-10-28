@@ -163,9 +163,10 @@ DriverControl_ParseRequest(Spec, Text, Token, &Reason, &Echoed) {
 			Reason := "malformed"
 			return ""
 		}
-	; The raw text must spell the schema as the integer itself: this parser
-	; reads true and 1.0 as the same value.
-	if !RegExMatch(Text, '"schema"\s*:\s*' . Spec["schema"] . '\s*[,}]') || Request.Get("schema", "") != Spec["schema"]
+	; Bind the integer token to the parser's decoded, last-member-wins key.
+	; Earlier duplicates cannot authorize a different authoritative value.
+	Members := JsonObjectMemberSpans(Text)
+	if !Members.Has("schema") || StrCompare(Members["schema"]["text"], String(Spec["schema"]), true) != 0
 			|| Echoed == "" || !(Request.Get("token", 0) is String) {
 		Reason := "malformed"
 		return ""
@@ -214,8 +215,8 @@ DriverControl_ResultText(Spec, Fields) {
 		throw Error("Invalid driver control result request id.")
 	if !HasId && State != "refused"
 		throw Error("Only a refusal may lack its request id.")
-	DriverPid := Fields.Get("driver_pid", 0)
-	if !(DriverPid is Integer) || DriverPid <= 0
+	ResultDriverPid := Fields.Get("driver_pid", 0)
+	if !(ResultDriverPid is Integer) || ResultDriverPid <= 0
 		throw Error("The result needs the writing driver's process id.")
 	HasDeadline := Fields.Has("deadline")
 	if HasDeadline && (!(Fields["deadline"] is Integer) || Fields["deadline"] <= 0)
@@ -248,7 +249,7 @@ DriverControl_ResultText(Spec, Fields) {
 					throw Error("A claim keeps the deadline.")
 			} else if HasDeadline
 				throw Error("A " . State . " result carries no deadline.")
-			if (State == "completed" || State == "claimed") && Successor != DriverPid
+			if (State == "completed" || State == "claimed") && Successor != ResultDriverPid
 				throw Error(State . " is written by the successor itself.")
 			Tail := Format(',"successor_pid":{1:d}', Successor)
 			if State == "claimed"
@@ -257,7 +258,7 @@ DriverControl_ResultText(Spec, Fields) {
 	}
 	Id := HasId ? '"' . Fields["request_id"] . '"' : "null"
 	return Format('{"schema":{1:d},"request_id":{2},"state":"{3}","driver_pid":{4:d}{5}}`n',
-		Spec["schema"], Id, State, DriverPid, Tail)
+		Spec["schema"], Id, State, ResultDriverPid, Tail)
 }
 
 /**
@@ -274,6 +275,10 @@ DriverControl_Completion(Spec, Text, OwnPid) {
 	catch
 		return ""
 	if !(Result is Map)
+		return ""
+	; AHK aliases JSON true to 1 and compares numeric strings coercively.
+	Members := JsonObjectMemberSpans(Text)
+	if !Members.Has("schema") || Members["schema"]["kind"] != "number"
 		return ""
 	for Key in Result
 		if !(Key ~= "^(schema|request_id|state|driver_pid|successor_pid|reason)$")
@@ -308,6 +313,10 @@ DriverControl_Resolve(Spec, Text, OwnPid, Now, &Kind) {
 		return ""
 	if !(Result is Map)
 		return ""
+	; AHK aliases JSON true to 1 and compares numeric strings coercively.
+	Members := JsonObjectMemberSpans(Text)
+	if !Members.Has("schema") || Members["schema"]["kind"] != "number"
+		return ""
 	for Key in Result
 		if !(Key ~= "^(schema|request_id|state|driver_pid|successor_pid|reason|deadline)$")
 			return ""
@@ -317,9 +326,9 @@ DriverControl_Resolve(Spec, Text, OwnPid, Now, &Kind) {
 	Deadline := Result.Get("deadline", "")
 	State := Result.Get("state", "")
 	Successor := Result.Get("successor_pid", "")
-	if State == "requested" && (Successor == JSON_NULL || !Result.Has("successor_pid")) {
-		; The raw text must say null: an absent field is a malformed record.
-		if !RegExMatch(Text, '"successor_pid"\s*:\s*null') || !(Deadline is Integer) || Deadline <= 0
+	if State == "requested" && Successor == JSON_NULL {
+		; Only an explicit JSON null decodes to this unique sentinel object.
+		if !(Deadline is Integer) || Deadline <= 0
 			return ""
 		if Now > Deadline {
 			Kind := "timeout"
@@ -331,6 +340,7 @@ DriverControl_Resolve(Spec, Text, OwnPid, Now, &Kind) {
 			"driver_pid", OwnPid, "successor_pid", OwnPid, "deadline", Deadline))
 	}
 	if State == "claimed" && Successor is Integer && Successor == OwnPid && Deadline is Integer
+			&& Members.Has("driver_pid") && Members["driver_pid"]["kind"] == "number"
 			&& Result.Get("driver_pid", "") == OwnPid {
 		if Now > Deadline {
 			Kind := "timeout"
@@ -381,6 +391,7 @@ class DriverControlSession {
 			throw ValueError("The driver control session needs a folder and a process id.")
 		this.Spec := Spec, this.Folder := Folder, this.Pid := Pid, this.Ports := Ports
 		this.Token := "", this.Endpoint := 0, this.Started := false, this.Active := false
+		this.Closed := false
 		this.Handled := 0, this.PendingReport := 0
 	}
 
@@ -388,34 +399,61 @@ class DriverControlSession {
 
 	/** Completes a pending request naming this process, then publishes the session. */
 	Start() {
-		if this.Started
-			throw Error("The driver control session cannot be started twice.")
+		if this.Started || this.Closed
+			throw Error("The driver control session cannot start twice or after retirement.")
 		this.Started := true
-		FSEnsureDirectoryStrict(this.Folder)
-		Owed := DriverControl_Resolve(this.Spec,
-			FSReadUtf8ExactBounded(this.Path("result"), this.Spec["max_request_bytes"]), this.Pid,
-			DriverControl_Now(), &Kind)
-		if Owed != "" {
-			this.Publish("result", Owed)
-			if Kind == "timeout" {
-				try LoggerWarn("DriverControl", "A pending reload request passed its deadline before this driver was ready; reported as timeout.")
-			} else if Kind == "completed" {
-				try LoggerSuccess("DriverControl", "Reload request completed in successor pid {1}.", this.Pid)
+		try {
+			FSEnsureDirectoryStrict(this.Folder)
+			this._RequireStarting()
+			Owed := DriverControl_Resolve(this.Spec,
+				FSReadUtf8ExactBounded(this.Path("result"), this.Spec["max_request_bytes"]), this.Pid,
+				DriverControl_Now(), &Kind)
+			this._RequireStarting()
+			if Owed != "" {
+				this.Publish("result", Owed)
+				if Kind == "timeout" {
+					try LoggerWarn("DriverControl", "A pending reload request passed its deadline before this driver was ready; reported as timeout.")
+				} else if Kind == "completed" {
+					try LoggerSuccess("DriverControl", "Reload request completed in successor pid {1}.", this.Pid)
+				}
 			}
+			this._RequireStarting()
+			Token := this.Ports["token"].Call(this.Spec["token_hex_length"])
+			this._RequireStarting()
+			if !DriverControl_IsToken(this.Spec, Token)
+				throw Error("The driver control token source returned a malformed token.")
+			this.Token := Token
+			this.Endpoint := this.Ports["endpoint"].Call(ObjBindMethod(this, "Handle"))
+			this._RequireStarting()
+			this.Endpoint.Start()
+			PreviousCritical := Critical("On")
+			try {
+				; Retirement is monotonic even when an OnExit continuation resumes.
+				this.Active := !this.Closed
+				this._RequireStarting()
+			} finally Critical(PreviousCritical)
+			; The receipt advertises a ready endpoint, never in-progress registration.
+			this.Publish("session", DriverControl_SessionText(this.Spec, this.Pid, Token))
+			this._RequireStarting()
+		} catch as FirstError {
+			; A reentrant global Stop may already have withdrawn this session.
+			; The exact Start continuation still owes cleanup of any late return.
+			try this.Stop()
+			catch as CleanupError
+				FirstError.ControlRetirementError := CleanupError
+			throw FirstError
 		}
-		Token := this.Ports["token"].Call(this.Spec["token_hex_length"])
-		if !DriverControl_IsToken(this.Spec, Token)
-			throw Error("The driver control token source returned a malformed token.")
-		this.Token := Token
-		this.Publish("session", DriverControl_SessionText(this.Spec, this.Pid, Token))
-		this.Endpoint := this.Ports["endpoint"].Call(ObjBindMethod(this, "Handle"))
-		this.Endpoint.Start()
-		this.Active := true
+	}
+
+	/** Rejects late startup publication after this exact session was retired. */
+	_RequireStarting() {
+		if this.Closed
+			throw Error("The driver control session was retired during startup.")
 	}
 
 	/** Retires the endpoint, then withdraws the session file it still owns. */
 	Stop() {
-		this.Active := false
+		this.Active := false, this.Closed := true
 		this.PendingReport := 0
 		Failure := 0
 		if IsObject(this.Endpoint) {
@@ -434,7 +472,7 @@ class DriverControlSession {
 
 	/** Runs one rung request outside SendMessage; reports its outcome in the result file. */
 	Handle() {
-		if !this.Active
+		if !this.Active || this.Closed
 			return false
 		this.Handled += 1
 		RequestPath := this.Path("request")

@@ -37,11 +37,12 @@ local Manifest = require("infra.manifest_reader")
 local ScriptChords = require("script_chords")
 local TomlCodec = require("toml_codec")
 local TomlWriter = require("toml_codec.writer")
+local ConfigKeys = require("config_keys")
 
 local LOG = "modules.shortcuts.script_chords"
 
 -- The manifest section of the slots and of the switch.
-local SECTION = "shortcuts.script_control"
+local SECTION = ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL
 local SWITCH_KEY = "chords_enabled"
 
 -- The binding a slot's action runs under and stores its parameter under, the
@@ -165,7 +166,7 @@ local function walk_values(decoded, consume)
 	-- Another shape is outdated configuration: reported once, walked as empty.
 	local shortcuts = ConfigOutdated.settings_table(decoded.shortcuts, { "shortcuts" }, Logger) or {}
 	local section = ConfigOutdated.settings_table(shortcuts.script_control,
-		{ "shortcuts", "script_control" }, Logger) or {}
+		{ "shortcuts", ConfigKeys.LEAF.SCRIPT_CONTROL }, Logger) or {}
 	for _, slot in ipairs(M.slots()) do
 		if section[slot.id] ~= nil then consume(slot.id, section[slot.id]) end
 	end
@@ -182,13 +183,13 @@ end
 local function stored_value_known(key, value, catalogue)
 	if key == SWITCH_KEY then
 		if type(value) == "boolean" then return true end
-		ConfigOutdated.report({ "shortcuts", "script_control", key }, "the switch is not a boolean", Logger)
+		ConfigOutdated.report({ "shortcuts", ConfigKeys.LEAF.SCRIPT_CONTROL, key }, "the switch is not a boolean", Logger)
 		return false
 	end
 	if value == "none" or (type(value) == "string" and catalogue and catalogue.is_assignable(value)) then
 		return true
 	end
-	ConfigOutdated.report({ "shortcuts", "script_control", key },
+	ConfigOutdated.report({ "shortcuts", ConfigKeys.LEAF.SCRIPT_CONTROL, key },
 		"action '" .. tostring(value) .. "' no longer exists", Logger)
 	return false
 end
@@ -202,7 +203,7 @@ function M.mark_config_reads(decoded, mark)
 	walk_values(decoded, function(key, value)
 		-- Without a catalogue no action can be proved outdated: keep every slot.
 		if (key ~= SWITCH_KEY and not catalogue) or stored_value_known(key, value, catalogue) then
-			mark("shortcuts", "script_control", key)
+			mark("shortcuts", ConfigKeys.LEAF.SCRIPT_CONTROL, key)
 		end
 	end)
 end

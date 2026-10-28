@@ -31,12 +31,13 @@ local ConfigPaths = require("infra.config_paths")
 local Shell     = require("adapters.shell_runner")
 local Model     = require("wpm_widget.model")
 local Widget    = require("ui.wpm.widget")
+local ConfigKeys = require("config_keys")
 
 local LOG = "ui.wpm.tray_readout"
 
 local PREF_PATHS = {
-	visible = "metrics.wpm_menubar_visible",
-	colors = "metrics.wpm_menubar_colors",
+	visible = ConfigKeys.KEY.METRICS_WPM_MENUBAR_VISIBLE,
+	colors = ConfigKeys.KEY.METRICS_WPM_MENUBAR_COLORS,
 }
 
 
@@ -59,8 +60,8 @@ local function shipped(path)
 end
 
 local DEFAULTS = {
-	visible = shipped("metrics.wpm_menubar_visible"),
-	colors = shipped("metrics.wpm_menubar_colors"),
+	visible = shipped(ConfigKeys.KEY.METRICS_WPM_MENUBAR_VISIBLE),
+	colors = shipped(ConfigKeys.KEY.METRICS_WPM_MENUBAR_COLORS),
 }
 
 local _state = {

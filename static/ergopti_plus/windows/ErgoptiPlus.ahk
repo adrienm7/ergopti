@@ -617,8 +617,10 @@ KLPF_InitializeCleanup()
 #Include modules/llm/remote_formats.ahk
 #Include ..\_shared\modules\llm\local_server_auth.ahk
 #Include ..\_shared\modules\llm\local_server_discovery.ahk
+#Include ..\_shared\modules\llm\local_server_ports.ahk
 #Include ..\_shared\modules\llm\local_server_menu.ahk
 #Include modules/llm/local_server_models.ahk
+#Include modules/llm/local_server_port_scan.ahk
 #Include modules/llm/local_servers.ahk
 #Include modules/llm/api_remote.ahk
 #Include modules/llm/models.ahk
@@ -666,6 +668,8 @@ BootProfile_Stamp("Module includes initialised")
 ; =============================================
 
 #Include infra/suspend_handoff.ahk
+; Before boot.ahk: a developer run reads the installed build's paths.toml.
+#Include infra/dev_source.ahk
 #Include infra/boot.ahk
 BootProfile_Stamp("Paths and shared configuration loaded")
 #Include infra/feature_state.ahk
@@ -1217,11 +1221,11 @@ LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active)
 #Include ../_shared/modules/hotstrings/scope_overrides.ahk
 #Include infra/hotstrings/hotstrings_scope.ahk
 #Include infra/config_global_scope.ahk
-CS_Load()
+_BootMetricsCache := CS_Load()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()
 if MetricsShortcuts.enabled
-		WPMWidget_LoadConfig(_IniCache)
+		WPMWidget_LoadConfig(_BootMetricsCache)
 
 BootProfile_StageEnd("shortcuts", _KbBoundCount . " configurable hotkey(s) bound")
 BootProfile_Mark("Config, features & shortcuts loaded")
@@ -1480,6 +1484,16 @@ HealthCheck_StartWindowControl()
 try DriverControl_Start()
 catch as _DriverControlErr
 	LoggerError("ErgoptiPlus", "Local reload control unavailable: {1}.", _DriverControlErr.Message)
+; A developer run (tools/dev/run-windows-dev.ps1, or this script double-clicked
+; in a clone) reloads on a saved .ahk.
+try {
+	if (DevSource_Root() != "") {
+		LoggerInfo("ErgoptiPlus", "Developer source mode; the driver runs from {1} (clone root from {2}).",
+			_DriverDir, DevSource_Resolution()["origin"])
+		DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)
+	}
+} catch as _DevSourceErr
+	LoggerError("ErgoptiPlus", "Developer source mode refused: {1}.", _DevSourceErr.Message)
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()

@@ -1,0 +1,366 @@
+{
+	"schema": 1,
+	"description": "What each hotstring engine erases, types and replays, per completed match. Both drivers replay it through hotstring_engine.injection_plan. event_on_screen is the one driver-dependent input: Linux is always true; macOS is false unless the window is ignored. A divergence between drivers would be recorded in `divergence` (none today).",
+	"vectors": [
+		{
+			"id": "auto-held-event",
+			"input": {
+				"path": "auto",
+				"trigger_len": 3,
+				"event_len": 1,
+				"event_on_screen": false,
+				"replacement": "xyz"
+			},
+			"expect": {
+				"erase": 2,
+				"text": "xyz",
+				"tail": null,
+				"replay": null,
+				"buffer_suffix": "xyz",
+				"final_result": false
+			}
+		},
+		{
+			"id": "auto-event-on-screen",
+			"input": {
+				"path": "auto",
+				"trigger_len": 3,
+				"event_len": 1,
+				"event_on_screen": true,
+				"replacement": "xyz"
+			},
+			"expect": {
+				"erase": 3,
+				"text": "xyz",
+				"tail": null,
+				"replay": null,
+				"buffer_suffix": "xyz",
+				"final_result": false
+			}
+		},
+		{
+			"id": "auto-composed-event-clamps-at-zero",
+			"input": {
+				"path": "auto",
+				"trigger_len": 1,
+				"event_len": 2,
+				"event_on_screen": false,
+				"replacement": "é"
+			},
+			"expect": {
+				"erase": 0,
+				"text": "é",
+				"tail": null,
+				"replay": null,
+				"buffer_suffix": "é",
+				"final_result": false
+			}
+		},
+		{
+			"id": "auto-ignores-a-stray-terminator",
+			"input": {
+				"path": "auto",
+				"trigger_len": 2,
+				"event_len": 1,
+				"event_on_screen": true,
+				"replacement": "ab",
+				"terminator": " ",
+				"consume_terminator": false
+			},
+			"expect": {
+				"erase": 2,
+				"text": "ab",
+				"tail": null,
+				"replay": null,
+				"buffer_suffix": "ab",
+				"final_result": false
+			}
+		},
+		{
+			"id": "terminator-held-event",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 4,
+				"event_len": 1,
+				"event_on_screen": false,
+				"replacement": "word",
+				"terminator": " ",
+				"consume_terminator": false
+			},
+			"expect": {
+				"erase": 4,
+				"text": "word",
+				"tail": " ",
+				"replay": { "kind": "text", "chars": " " },
+				"buffer_suffix": "word ",
+				"final_result": false
+			}
+		},
+		{
+			"id": "terminator-ignored-window-erases-the-event",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 4,
+				"event_len": 1,
+				"event_on_screen": true,
+				"replacement": "word",
+				"terminator": " ",
+				"consume_terminator": false
+			},
+			"expect": {
+				"erase": 5,
+				"text": "word",
+				"tail": " ",
+				"replay": { "kind": "text", "chars": " " },
+				"buffer_suffix": "word ",
+				"final_result": false
+			}
+		},
+		{
+			"id": "terminator-extra-nbsp-held",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 2,
+				"event_len": 1,
+				"event_on_screen": false,
+				"nbsp_stripped": true,
+				"replacement": "ok",
+				"terminator": ";",
+				"consume_terminator": false
+			},
+			"expect": {
+				"erase": 3,
+				"text": "ok",
+				"tail": ";",
+				"replay": { "kind": "text", "chars": ";" },
+				"buffer_suffix": "ok;",
+				"final_result": false
+			}
+		},
+		{
+			"id": "terminator-extra-nbsp-on-screen",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 2,
+				"event_len": 1,
+				"event_on_screen": true,
+				"nbsp_stripped": true,
+				"replacement": "ok",
+				"terminator": ":",
+				"consume_terminator": false
+			},
+			"expect": {
+				"erase": 4,
+				"text": "ok",
+				"tail": ":",
+				"replay": { "kind": "text", "chars": ":" },
+				"buffer_suffix": "ok:",
+				"final_result": false
+			}
+		},
+		{
+			"id": "terminator-consumed-replays-nothing",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 3,
+				"event_len": 1,
+				"event_on_screen": true,
+				"replacement": "abc",
+				"terminator": " ",
+				"consume_terminator": true
+			},
+			"expect": {
+				"erase": 4,
+				"text": "abc",
+				"tail": null,
+				"replay": null,
+				"buffer_suffix": "abc",
+				"final_result": false
+			}
+		},
+		{
+			"id": "terminator-return-travels-as-a-key",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 3,
+				"event_len": 1,
+				"event_on_screen": false,
+				"replacement": "abc",
+				"terminator": "\r",
+				"consume_terminator": false
+			},
+			"expect": {
+				"erase": 3,
+				"text": "abc",
+				"tail": "\r",
+				"replay": { "kind": "key", "key": "return", "chars": "\r" },
+				"buffer_suffix": "abc\r",
+				"final_result": false
+			}
+		},
+		{
+			"id": "terminator-newline-travels-as-return",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 3,
+				"event_len": 1,
+				"event_on_screen": false,
+				"replacement": "abc",
+				"terminator": "\n",
+				"consume_terminator": false
+			},
+			"expect": {
+				"erase": 3,
+				"text": "abc",
+				"tail": "\n",
+				"replay": { "kind": "key", "key": "return", "chars": "\n" },
+				"buffer_suffix": "abc\n",
+				"final_result": false
+			}
+		},
+		{
+			"id": "terminator-tab-travels-as-a-key",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 3,
+				"event_len": 1,
+				"event_on_screen": false,
+				"replacement": "abc",
+				"terminator": "\t",
+				"consume_terminator": false
+			},
+			"expect": {
+				"erase": 3,
+				"text": "abc",
+				"tail": "\t",
+				"replay": { "kind": "key", "key": "tab", "chars": "\t" },
+				"buffer_suffix": "abc\t",
+				"final_result": false
+			}
+		},
+		{
+			"id": "terminator-final-result-is-carried",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 2,
+				"event_len": 1,
+				"event_on_screen": false,
+				"replacement": "ab",
+				"terminator": " ",
+				"consume_terminator": false,
+				"final_result": true
+			},
+			"expect": {
+				"erase": 2,
+				"text": "ab",
+				"tail": " ",
+				"replay": { "kind": "text", "chars": " " },
+				"buffer_suffix": "ab ",
+				"final_result": true
+			}
+		},
+		{
+			"id": "cascade-terminator-widens-the-erase",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 2,
+				"event_len": 1,
+				"event_on_screen": false,
+				"replacement": "cab",
+				"terminator": " ",
+				"consume_terminator": false,
+				"cascade": { "replacement": "cZ", "trigger_len": 3, "tail": " ", "final_result": false }
+			},
+			"expect": {
+				"erase": 3,
+				"text": "cZ",
+				"tail": " ",
+				"replay": { "kind": "text", "chars": " " },
+				"buffer_suffix": "cZ ",
+				"final_result": false
+			}
+		},
+		{
+			"id": "cascade-consumed-swallows-the-terminator-once",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 2,
+				"event_len": 1,
+				"event_on_screen": true,
+				"replacement": "cab",
+				"terminator": " ",
+				"consume_terminator": true,
+				"cascade": { "replacement": "cZ", "trigger_len": 3, "tail": null, "final_result": false }
+			},
+			"expect": {
+				"erase": 4,
+				"text": "cZ",
+				"tail": null,
+				"replay": null,
+				"buffer_suffix": "cZ",
+				"final_result": false
+			}
+		},
+		{
+			"id": "cascade-final-link-ends-the-chain",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 2,
+				"event_len": 1,
+				"event_on_screen": false,
+				"nbsp_stripped": true,
+				"replacement": "cab",
+				"terminator": ",",
+				"consume_terminator": false,
+				"cascade": { "replacement": "Q", "trigger_len": 4, "tail": ",", "final_result": true }
+			},
+			"expect": {
+				"erase": 5,
+				"text": "Q",
+				"tail": ",",
+				"replay": { "kind": "text", "chars": "," },
+				"buffer_suffix": "Q,",
+				"final_result": true
+			}
+		},
+		{
+			"id": "cascade-auto-held-event",
+			"input": {
+				"path": "auto",
+				"trigger_len": 2,
+				"event_len": 1,
+				"event_on_screen": false,
+				"replacement": "cab",
+				"cascade": { "replacement": "cZ", "trigger_len": 4, "final_result": false }
+			},
+			"expect": {
+				"erase": 3,
+				"text": "cZ",
+				"tail": null,
+				"replay": null,
+				"buffer_suffix": "cZ",
+				"final_result": false
+			}
+		},
+		{
+			"id": "multi-codepoint-event-and-replacement",
+			"input": {
+				"path": "terminator",
+				"trigger_len": 2,
+				"event_len": 2,
+				"event_on_screen": true,
+				"replacement": "→ ★",
+				"terminator": "★",
+				"consume_terminator": false
+			},
+			"expect": {
+				"erase": 4,
+				"text": "→ ★",
+				"tail": "★",
+				"replay": { "kind": "text", "chars": "★" },
+				"buffer_suffix": "→ ★★",
+				"final_result": false
+			}
+		}
+	]
+}

@@ -241,7 +241,7 @@ ReadScriptConfig(Cache) {
 		RawKana := _FeatureStateIniGet(Cache, "script", "alt_gr_is_kana_remap")
 		if RawKana != "_"
 				ScriptInformation["AltGrIsKanaRemap"] :=
-					_FeatureStateValidateKanaOverride(RawKana)
+					_FeatureStateReadKanaOverride(Cache, RawKana)
 		; Missing repeat-key intent restores the same neutral baseline as first boot.
 		global HSE_RepeatEnabled
 		RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", "repeat_key_enabled")
@@ -331,6 +331,12 @@ _FeatureStateCascadeMaxArrows(Raw) {
 	try LoggerWarn("Config", "hotstrings.cascade_max_arrows '{1}' is not a whole number from 1 to 10 — using {2}.",
 		Raw is Object ? Type(Raw) : String(Raw), Default)
 	return Default
+}
+
+_FeatureStateReadKanaOverride(Cache, Value) {
+	if ConfigTomlTryReadBootValue(Cache, ConfigKey.SCRIPT, ConfigLeaf.ALT_GR_IS_KANA_REMAP, &Admitted)
+		Value := Admitted
+	return _FeatureStateValidateKanaOverride(Value)
 }
 
 _FeatureStateValidateKanaOverride(Value) {

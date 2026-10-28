@@ -1843,7 +1843,7 @@ function M.install(ctx)
 				if encode_ok ~= true or type(encoded) ~= "string" then return false end
 				return publish_owned_file(session_file, encoded, "MLX download session PID")
 			end
-			local function finish_launcher(code, _stdout, stderr)
+			local function finish_launcher(code, stdout, stderr)
 				if owner.tasks.launcher ~= launcher_task then return false end
 				owner.tasks.launcher = nil
 				if deps.active_tasks and deps.active_tasks["download"] == launcher_task then
@@ -1872,6 +1872,13 @@ function M.install(ctx)
 				-- stdout/stderr are empty when a streaming callback is active — the
 				-- owner PID was already set by the __DLPID__ stream sentinel.
 				if not owner.partial.pid or code ~= 0 then
+					-- The 2026-10-27 21:08 field run showed only "the launcher failed (code 0)"
+					-- in a notification: name the exit and whether the PID line arrived only in
+					-- the final output, after the stream had stopped, so the next report says why.
+					local final_output = tostring(stdout or "") .. tostring(stderr or "")
+					Logger.error(LOG, "MLX download launcher failed (exit=%s, pid=%s, sentinel in final output=%s).",
+						tostring(code), owner.partial.pid and "received" or "missing",
+						final_output:find("__DLPID__:%d+") and "yes" or "no")
 					-- Reset icon here: handle_download_done will not run after a launcher failure
 					update_icon("MLX launcher-failure icon reset")
 					if not current_or_cancel() then return false end

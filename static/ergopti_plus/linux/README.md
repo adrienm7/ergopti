@@ -106,6 +106,15 @@ luajit ergopti_hotstrings.lua --device /dev/input/event3 \
 luajit ergopti_hotstrings.lua --dry-run --verbose
 ```
 
+## Developer mode
+
+`bash tools/dev/run-linux-dev.sh` (from the clone root, or `npm run dev:linux`)
+runs this tree through `install/launch.sh`, the packages' entry point, with the
+tray, the same config folder and the native archive backend built into `bin/`.
+It stops an installed `ergopti-hotstrings` user unit first. A saved `.lua` of
+the driver or of `_shared/lua` restarts the daemon, and so does the tray's
+Reload; the updater stays off. See `docs/design/developer-mode.md`.
+
 ## Running the tests
 
 ```bash
@@ -229,6 +238,16 @@ which version it found. Distributions built on **musl** instead of glibc
 (Alpine Linux, the musl editions of Void Linux) cannot run programs built for
 glibc at all, so neither the AppImage nor the `.deb`/`.rpm` packages run there;
 the AppImage refuses with a message saying so.
+
+The image is self-contained except for the C library, its loader, GLib, the
+C++ runtime and GTK 3, which a program that draws a tray icon and web views
+must share with the desktop it runs on: bundling a second glibc or GTK next to
+the host's graphics and NSS modules breaks them. Instead the image is built and
+launched on the oldest supported glibc (Ubuntu 22.04), a symbol-version check
+refuses anything newer, and a closure check refuses any other library an ELF
+file needs that the image does not carry. The list of what the recipient
+supplies, with the reason for each group, is
+`_shared/data/linux_appimage_recipient_libraries.json`.
 
 Requirements:
 

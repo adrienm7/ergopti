@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local MetricsState = require("infra.metrics_state_keys")
 
 local MODULES = {
 	"hs.fs",
@@ -25,17 +26,17 @@ local MODULES = {
 local FILTERS = {
 	{
 		command = "filter_private",
-		field = "keystats_private_filter_enabled",
+		field = MetricsState.PRIVATE_FILTER_ENABLED,
 		setter = "set_private_filter_enabled",
 	},
 	{
 		command = "filter_secure",
-		field = "keystats_secure_filter_enabled",
+		field = MetricsState.SECURE_FILTER_ENABLED,
 		setter = "set_secure_field_filter_enabled",
 	},
 	{
 		command = "filter_sysauth",
-		field = "keystats_system_auth_filter_enabled",
+		field = MetricsState.SYSTEM_AUTH_FILTER_ENABLED,
 		setter = "set_system_auth_filter_enabled",
 	},
 }

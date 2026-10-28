@@ -44,9 +44,10 @@ local PERSONAL_CATEGORY = "personal"
 local ScopeFile = require("config_scope_file")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
+local ConfigKeys = require("config_keys")
 
 local LOG = "infra.hotstrings_scope"
-local REPEAT_PATH = "hotstrings.repeat_key_enabled"
+local REPEAT_PATH = ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED
 local BASE_DELAY_PATH = require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY
 local NativePath = require("native_path")
 local TableUtil = require("table_util")

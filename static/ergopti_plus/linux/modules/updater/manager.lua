@@ -50,6 +50,7 @@ local M = {}
 local Identifiers = require("identifiers")
 local Logger    = require("logger.shim")
 local Paths     = require("infra.paths")
+local Timings   = require("infra.timings")
 local NoReplaceMove = require("infra.no_replace_move")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
@@ -79,6 +80,7 @@ M._file_digest = FileDigest
 -- Single source of the driver version.
 local DriverVersion = require("infra.version")
 local NativePath = require("native_path")
+local ConfigKeys = require("config_keys")
 
 -- =========================================
 -- =========================================
@@ -166,13 +168,13 @@ M.CHANNELS = CHANNELS
 -- interval, as on the other drivers.
 local CONFIG_SECTION = "updater"
 local CONFIG_CHANNEL_KEY = "channel"
-local CONFIG_INTERVAL_KEY = "check_interval_seconds"
+local CONFIG_INTERVAL_KEY = ConfigKeys.LEAF.CHECK_INTERVAL_SECONDS
 
 -- User-Agent header required by GitHub API.
 local USER_AGENT = "ErgoptiPlus-Updater-Linux/1.0"
 local REQUEST_OWNER = "updater"
 local RELEASE_TIMEOUT_MS = 15000
-local MAX_RELEASE_BODY_BYTES = 2 * 1024 * 1024
+local MAX_RELEASE_BODY_BYTES = Timings.count("limits", "release_list_body_bytes")
 -- Transport pages fit the existing 2 MiB ceiling; the canonical URL still
 -- determines the total candidate count (100), independently of page size.
 local RELEASE_PAGE_SIZE = 20
@@ -922,6 +924,38 @@ end
 
 M._select_checksum_asset = _select_checksum_asset
 
+--- The detached-signature gate (policy: _shared/modules/updater/asset_signing.json).
+--- Built on first use; M._signature_gate is a test seam.
+--- @return table gate
+local function get_signature_gate()
+	if M._signature_gate then return M._signature_gate end
+	M._signature_gate = require("modules.updater.signature_gate").new({
+		verifier = require("infra.asset_signature"),
+		read_policy = function()
+			local text = Fs.read(Paths.shared("modules/updater/asset_signing.json"))
+			if type(text) ~= "string" then return nil, "bad_policy" end
+			local decoded_ok, decoded = pcall(Json.decode, text)
+			if not decoded_ok or type(decoded) ~= "table" then return nil, "bad_policy" end
+			return decoded
+		end,
+		asset_name = LINUX_ASSET_NAME,
+		logger = Logger,
+		tag = LOG,
+	})
+	return M._signature_gate
+end
+
+--- Exact URL of the bundle's detached signature in a release object, or "" when the
+--- release publishes none (or the policy cannot name it).
+--- @param body string Raw release object JSON.
+--- @return string url
+local function _select_signature_asset(body)
+	local name = get_signature_gate().signature_name()
+	return name and Parser.parse_asset_url(body, name) or ""
+end
+
+M._select_signature_asset = _select_signature_asset
+
 --- The installable record of one release object of the release list: its tag
 --- and the canonical Linux bundle with its checksum, or nil when the release
 --- lacks either (it cannot be installed on this system).
@@ -933,11 +967,13 @@ function M.release_record(body)
 	local asset_url = _select_update_asset(body)
 	local checksum_url = _select_checksum_asset(body)
 	if tag == "" or asset_url == "" or checksum_url == "" then return nil end
+	local signature_url = _select_signature_asset(body)
 	return {
 		tag          = tag,
 		notes        = Parser.parse_notes(body),
 		download_url = asset_url,
 		checksum_url = checksum_url,
+		signature_url = signature_url ~= "" and signature_url or nil,
 		published_at = Parser.parse_published_at(body),
 		prerelease   = Parser.parse_prerelease_flag(body),
 	}
@@ -992,6 +1028,8 @@ local function _process_release_response(body, channel, check_only)
 
 	local current = M.current_version()
 
+	local signature_url = _select_signature_asset(body)
+
 	if current == "local" then
 		-- Running from source — always show the latest as available for dev.
 		Logger.info(LOG, "Local source — latest release: %s.", latest_tag)
@@ -1000,6 +1038,7 @@ local function _process_release_response(body, channel, check_only)
 			notes        = Parser.parse_notes(body),
 			download_url = _select_update_asset(body),
 			checksum_url = _select_checksum_asset(body),
+			signature_url = signature_url ~= "" and signature_url or nil,
 			published_at = Parser.parse_published_at(body),
 			prerelease   = Parser.parse_prerelease_flag(body),
 			check_only   = check_only == true or nil,
@@ -1050,6 +1089,7 @@ local function _process_release_response(body, channel, check_only)
 		notes        = Parser.parse_notes(body),
 		download_url = asset_url,
 		checksum_url = checksum_url,
+		signature_url = signature_url ~= "" and signature_url or nil,
 		published_at = Parser.parse_published_at(body),
 		prerelease   = Parser.parse_prerelease_flag(body),
 	}
@@ -1444,6 +1484,10 @@ local function release_snapshot(release)
   if type(value) ~= "string" or value == "" or value:find("\0", 1, true) then return nil end
   copy[name] = value
  end
+ local signature_url = rawget(release, "signature_url")
+ if type(signature_url) == "string" and signature_url ~= "" and not signature_url:find("\0", 1, true) then
+  copy.signature_url = signature_url
+ end
  return copy
 end
 local function retire_verified_artifact()
@@ -1601,7 +1645,8 @@ local function start_native_download(release, download_url, callback, failure_st
     return rawequal(record.transaction, token) and native_source(record)
    end,
    parse_checksum = parse_checksum, owner = REQUEST_OWNER, headers = { ["User-Agent"] = USER_AGENT },
-   max_download_bytes = MAX_DOWNLOAD_BYTES, max_checksum_bytes = MAX_CHECKSUM_BODY_BYTES })
+   max_download_bytes = MAX_DOWNLOAD_BYTES, max_checksum_bytes = MAX_CHECKSUM_BODY_BYTES,
+   signature = get_signature_gate() })
  end)
  local started, operation
  if initialized and type(flow) == "table" and type(rawget(flow, "start")) == "function" then

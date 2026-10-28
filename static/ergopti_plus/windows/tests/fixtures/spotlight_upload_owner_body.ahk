@@ -165,8 +165,8 @@ _SPBR_Main() {
 try {
 	_SPBR_Main()
 	ExitApp(0)
-} catch Any as Failure {
-	FileAppend("FAIL spotlight-upload-owner " . Failure.Message . " file=" . Failure.File
-		. " line=" . Failure.Line . "`n", "*", "UTF-8")
+} catch Any as TopLevelFailure {
+	FileAppend("FAIL spotlight-upload-owner " . TopLevelFailure.Message . " file=" . TopLevelFailure.File
+		. " line=" . TopLevelFailure.Line . "`n", "*", "UTF-8")
 	ExitApp(1)
 }

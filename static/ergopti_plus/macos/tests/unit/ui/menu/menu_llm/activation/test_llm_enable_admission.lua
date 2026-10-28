@@ -48,7 +48,7 @@ helpers.describe("LLM enable requires an owned fresh version receipt", function(
 		with_activation("ollama", { true }, { version_deferred = true }, function(action, state, calls)
 			helpers.assert_eq(action(), true)
 			assert_off(state, calls)
-			helpers.assert_eq(calls.version_requests, { "http://127.0.0.1:11434/api/version" })
+			helpers.assert_eq(calls.version_requests, { "http://127.0.0.1:11435/api/version" })
 			calls.version_callback(GOOD)
 			helpers.assert_eq(state.llm_enabled, true)
 			helpers.assert_eq(calls.saves, 1)
@@ -107,7 +107,7 @@ helpers.describe("LLM enable requires an owned fresh version receipt", function(
 				elseif changed == "scope" then options.scope_blocked = true
 				elseif changed == "actual_backend" then require("modules.llm").set_backend("api")
 				elseif changed == "actual_model" then require("modules.llm").set_llm_model_ollama("replacement-native-model")
-				else require("modules.llm.ollama_endpoint").get_base_url = function() return "http://127.0.0.1:11435" end end
+				else require("modules.llm.ollama_endpoint").get_base_url = function() return "http://127.0.0.1:11436" end end
 				calls.version_callback(GOOD)
 				assert_off(state, calls)
 				helpers.assert_eq(#calls.offer_dialogs, 0)

@@ -277,7 +277,7 @@ local function buildPersonalInfoItems(ctx, description)
 	local editor = template("personal_info_editor_frame", {
 		personal_info_editor_open = function()
 			if not current() then return false end
-			return DeferredWork.after(0.1,
+			return DeferredWork.after(require("infra.timings").sec("ui", "editor_open_after_click_ms"),
 				function()
 					if not current() then return false end
 					pcall(ctx.personal_info.open_editor)
@@ -425,7 +425,7 @@ function M.build_extension_bulk_actions(ctx, groups, bound)
 		end
 	end
 	local rows = ManifestMenu.template_rows("hotstring_extension_bulk_controls", {
-		["extension_all_sections"] = function()
+		[require("config_keys").COMMAND.EXTENSION_ALL_SECTIONS] = function()
 			return M.commit_extension_selection(ctx, groups, bound, not all_on)
 		end,
 	}, {
@@ -560,8 +560,8 @@ function M.build_groups(ctx, only, counts)
 			local render_ctx = { commands = {
 				-- The submenu's own sections: an extension's bound ones are drawn,
 				-- and switched, in that extension's submenu (2026-10-17).
-				["hotstring_category_enable_all"] = Custom.category_scope_fn(ctx, { name }, true, nil, bound_by_group),
-				["hotstring_category_disable_all"] = Custom.category_scope_fn(ctx, { name }, false, nil, bound_by_group),
+				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = Custom.category_scope_fn(ctx, { name }, true, nil, bound_by_group),
+				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = Custom.category_scope_fn(ctx, { name }, false, nil, bound_by_group),
 			} }
 			-- The renderer owns the head and separator order. A rendered child is
 			-- attached as `submenu` so its native commands are not rendered twice.
@@ -569,7 +569,7 @@ function M.build_groups(ctx, only, counts)
 				render_ctx, {
 					["hotstring_category_file"] = function()
 						if not toml_path then return {} end
-						local row = ManifestMenu.command_row("hotstring_file_commands", "hotstring_file_open",
+						local row = ManifestMenu.command_row("hotstring_file_commands", require("config_keys").COMMAND.HOTSTRING_FILE_OPEN,
 							{ hotstring_file_open = function() return open_toml_path(toml_path) end },
 							{ hotstring_file_ready = function() return type(hs.execute) == "function" end })
 						return row and { row } or {}

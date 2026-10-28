@@ -76,14 +76,14 @@ end
 
 helpers.describe("contextual keyboard slot: ordinary persistence owner", function()
 	helpers.it("owns one editable logical slot and preserves physical explicit none", function()
-		with_subject({ hs_ctrl_c = "none" }, function(subject, observed)
+		with_subject({ secondary_c = "none" }, function(subject, observed)
 			helpers.assert_eq(subject.get_action("magic_editor"), "open_hotstrings_editor")
 			helpers.assert_eq(subject.available_slots("contextual")[1].id, "magic_editor")
 			helpers.assert_eq(subject.assigned_slots("contextual")[1].action, "open_hotstrings_editor")
 			helpers.assert_eq(observed.latest.action, nil, "canonical absence remains the shared conditional default")
 			helpers.assert_eq(observed.binds, 0, "the logical slot never binds a displayed glyph")
 			helpers.assert_eq(observed.claims, {
-				{ chord = "Ctrl+C", action = "none", binding_id = "keyboard__hs_ctrl_c" },
+				{ chord = "Ctrl+C", action = "none", binding_id = "keyboard__secondary_c" },
 			})
 		end)
 	end)
@@ -106,17 +106,17 @@ helpers.describe("contextual keyboard slot: ordinary persistence owner", functio
 	end)
 
 	helpers.it("persists a user-selected physical none through real sparse normalization and restart", function()
-		local assignments = { hs_ctrl_c = "script_pause_toggle" }
+		local assignments = { secondary_c = "script_pause_toggle" }
 		with_subject(assignments, function(subject, observed)
-			helpers.assert_eq(subject.set_action("hs_ctrl_c", "none"), true)
-			helpers.assert_eq(assignments.hs_ctrl_c, "none", "explicit None remains durable personal intent")
+			helpers.assert_eq(subject.set_action("secondary_c", "none"), true)
+			helpers.assert_eq(assignments.secondary_c, "none", "explicit None remains durable personal intent")
 			local actions, claims = subject.get_configuration_intent()
-			helpers.assert_eq(actions.hs_ctrl_c, "none")
-			helpers.assert_eq(claims.hs_ctrl_c, true)
+			helpers.assert_eq(actions.secondary_c, "none")
+			helpers.assert_eq(claims.secondary_c, true)
 			helpers.assert_eq(subject.stop(), true)
 			helpers.assert_eq(subject.start(), true)
 			helpers.assert_eq(observed.claims, {
-				{ chord = "Ctrl+C", action = "none", binding_id = "keyboard__hs_ctrl_c" },
+				{ chord = "Ctrl+C", action = "none", binding_id = "keyboard__secondary_c" },
 			})
 		end)
 	end)

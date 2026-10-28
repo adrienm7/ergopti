@@ -8,6 +8,7 @@
 --- remain individually unavailable without closing authoritative file gates.
 --- ==============================================================================
 
+local ConfigKeys = require("config_keys")
 local M = {}
 local FIELDS = { personal_file_delay = "delay", personal_file_priority = "priority",
 	personal_file_color = "color", personal_file_tooltip = "show_tooltip" }
@@ -29,18 +30,18 @@ function M.build(ports)
 		end
 	end
 	local commands = {
-		["personal_file_enabled"] = mutation(nil, function() return ports.enable(not ports.enabled()) end),
-		["personal_file_delay"] = mutation("delay", function() return ports.edit("delay") end),
-		["personal_file_priority"] = mutation("priority", function() return ports.edit("priority") end),
-		["personal_file_color"] = mutation("color", function() return ports.edit("color") end),
-		["personal_file_tooltip"] = mutation("show_tooltip", function() return ports.tooltip(not ports.tooltip_enabled()) end),
+		[ConfigKeys.COMMAND.PERSONAL_FILE_ENABLED] = mutation(nil, function() return ports.enable(not ports.enabled()) end),
+		[ConfigKeys.COMMAND.PERSONAL_FILE_DELAY] = mutation("delay", function() return ports.edit("delay") end),
+		[ConfigKeys.COMMAND.PERSONAL_FILE_PRIORITY] = mutation("priority", function() return ports.edit("priority") end),
+		[ConfigKeys.COMMAND.PERSONAL_FILE_COLOR] = mutation("color", function() return ports.edit("color") end),
+		[ConfigKeys.COMMAND.PERSONAL_FILE_TOOLTIP] = mutation("show_tooltip", function() return ports.tooltip(not ports.tooltip_enabled()) end),
 	}
 	local rows = ports.manifest.build("personal_file_controls", "Hotstrings", nil, nil, {
 		commands = commands,
 		state_getters = {
 			["personal_file_owner_ready"] = function() return ready() end,
-			["personal_file_enabled"] = ports.enabled,
-			["personal_file_tooltip"] = ports.tooltip_enabled,
+			[ConfigKeys.COMMAND.PERSONAL_FILE_ENABLED] = ports.enabled,
+			[ConfigKeys.COMMAND.PERSONAL_FILE_TOOLTIP] = ports.tooltip_enabled,
 		},
 	})
 	for index, declared in ipairs(ports.manifest.get_array("personal_file_controls")) do
@@ -60,8 +61,8 @@ end
 --- @param manifest table Actual driver-bound renderer.
 --- @return table rows Native disabled rows.
 function M.unavailable(manifest)
-	return manifest.build("personal_file_unavailable", "Hotstrings", nil, nil, {
-		commands = { ["personal_file_unavailable"] = function() return false end },
+	return manifest.build(ConfigKeys.COMMAND.PERSONAL_FILE_UNAVAILABLE, "Hotstrings", nil, nil, {
+		commands = { [ConfigKeys.COMMAND.PERSONAL_FILE_UNAVAILABLE] = function() return false end },
 		state_getters = { ["personal_file_owner_ready"] = function() return false end },
 	})
 end
@@ -70,8 +71,8 @@ end
 --- @param manifest table Actual driver-bound renderer.
 --- @return table rows Native disabled rows.
 function M.directory_unavailable(manifest)
-	return manifest.build("personal_directory_unavailable", "Hotstrings", nil, nil, {
-		commands = { ["personal_directory_unavailable"] = function() return false end },
+	return manifest.build(ConfigKeys.COMMAND.PERSONAL_DIRECTORY_UNAVAILABLE, "Hotstrings", nil, nil, {
+		commands = { [ConfigKeys.COMMAND.PERSONAL_DIRECTORY_UNAVAILABLE] = function() return false end },
 		state_getters = { ["personal_directory_ready"] = function() return false end },
 	})
 end
@@ -86,7 +87,7 @@ function M.apply_category_admission(rows, ports)
 	if ports.readonly ~= true and (ports.current == nil or ports.current() == true) then return rows end
 	local scope_titles = {}
 	for _, declared in ipairs(ports.manifest.get_array("hotstring_category_menu")) do
-		if declared.id == "hotstring_category_enable_all" or declared.id == "hotstring_category_disable_all" then
+		if declared.id == ConfigKeys.COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL or declared.id == ConfigKeys.COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL then
 			scope_titles[ports.translate(declared.i18n)] = true
 		end
 	end

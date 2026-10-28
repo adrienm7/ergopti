@@ -7,6 +7,7 @@ local Runtime = require("script_scope_runtime")
 local Transaction = require("config_scope_transaction")
 local Fenced = require("config_scope_fenced_transaction")
 local Logger = require("logger.shim")
+local ConfigKeys = require("config_keys")
 local _owner, _sequence = nil, 0
 require("infra.scope_registry").register("script_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
@@ -14,9 +15,9 @@ require("infra.scope_registry").register("script_scope", function() return _owne
 --- @return table aliases Canonical path -> native alias/field owner.
 local function aliases()
 	return {
-		["script.locale"] = { alias = "locale", native = require("infra.i18n") },
-		["script.log_level"] = { alias = "script.log_level", native = require("infra.script_settings") },
-		["script.show_error_dialog"] = { alias = "script.show_error_dialog", native = require("ui.error_dialog.bridge") },
+		[ConfigKeys.KEY.SCRIPT_LOCALE] = { alias = "locale", native = require("infra.i18n") },
+		[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = { alias = ConfigKeys.KEY.SCRIPT_LOG_LEVEL, native = require("infra.script_settings") },
+		[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = { alias = ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG, native = require("ui.error_dialog.bridge") },
 	}
 end
 

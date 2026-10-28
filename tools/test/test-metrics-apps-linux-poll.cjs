@@ -94,6 +94,7 @@ const actual = vm.createContext({
 });
 actual.window = actual;
 installHostCapabilities(actual);
+require('./support/theme-tokens.cjs').installThemeTokens(actual);
 actual.__ergopti_host_capabilities = { document_bridge: true };
 actual.webkit = { messageHandlers: { metrics_apps_bridge: { postMessage() {} } } };
 vm.runInContext(
@@ -103,7 +104,7 @@ vm.runInContext(
 	),
 	actual
 );
-for (const file of ['helpers.js', 'state.js', 'main.js']) {
+for (const file of ['../metrics_calendar.js', 'helpers.js', 'state.js', 'main.js']) {
 	vm.runInContext(fs.readFileSync(path.join(path.dirname(PAGE), file), 'utf8'), actual, {
 		filename: file
 	});

@@ -18,6 +18,10 @@ local uv = require("luv")
 local original_capture, original_now = Calendar.capture, Monotonic.now_ms
 local original_date, original_time = os.date, os.time
 local checks = 0
+-- The DST days below need real zone data: without it (Alpine ships none by
+-- default) os.date falls back to UTC and every day silently lasts 24 hours.
+assert(os.getenv("TZ") == "Europe/Paris" and original_date("%z", 1782864000) == "+0200",
+	"the capture calendar contract needs TZ=Europe/Paris zone data")
 
 --- Compares real native rows, retaining informative failures in child output.
 local function equal(actual, expected)

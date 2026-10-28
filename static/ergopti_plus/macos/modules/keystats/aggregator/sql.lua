@@ -7,7 +7,7 @@
 --- aggregate tables using ON CONFLICT … DO UPDATE (UPSERT) statements. All
 --- writes are expected to run inside a transaction opened by the caller.
 ---
---- SQL helpers (exec, json_lit, sq, i) are intentionally private to this
+--- SQL helpers (exec, json_text, sq, i) are intentionally private to this
 --- module — they are pure formatting utilities with no need for external access.
 ---
 --- MIRRORS: windows/modules/keystats/keystats_walker_sql.ahk
@@ -24,6 +24,7 @@ local SqliteWriter = require("modules.keystats.sqlite_writer")
 local Export       = require("modules.keystats.export")
 local AggHelper    = require("keystats.aggregator_helpers")
 local Literal      = require("sqlite.literal")
+local Queries      = require("keystats.queries")
 
 local S = require("modules.keystats.aggregator.state")
 local C = require("modules.keystats.aggregator.core")
@@ -76,60 +77,14 @@ local function exec(sql)
 	return true
 end
 
-local function json_lit(tbl)
-	if type(tbl) ~= "table" then return "'{}'" end
-	local ok, s = pcall(json.encode, tbl)
-	if not ok then return "'{}'" end
-	return "'" .. Literal.escape(s) .. "'"
-end
-
-local NUMBER_MAP_JSON_COLUMNS = {
-	esrc_json = true,
-	e_buckets_json = true,
-	length_buckets_json = true,
-}
-
---- Builds a SQLite expression that merges an incoming JSON number map into the
---- stored map by summing every key present in the current batch delta.
----
---- These maps are per-tick deltas: every successful flush deletes the batch row.
---- Assigning `excluded.<column>` therefore leaves only the latest window while
---- the scalar totals keep accumulating and make the loss hard to notice.
----
---- MIRRORS the Windows driver's KLW_EsrcMergeExpr (keystats_walker_sql.ahk),
---- generalized to every number-map distribution owned by this writer.
---- @param column string One of NUMBER_MAP_JSON_COLUMNS.
---- @param delta table|nil The per-tick number-map delta.
---- @return string A SQL expression usable as the column assignment.
-local function number_map_merge_expr(column, delta)
-	if not NUMBER_MAP_JSON_COLUMNS[column] then
-		error("unsupported JSON number-map column: " .. tostring(column))
-	end
-	if type(delta) ~= "table" or next(delta) == nil then
-		return string.format("COALESCE(%s,'{}')", column)
-	end
-	local parts = { string.format("json_set(COALESCE(%s,'{}')", column) }
-	for k in pairs(delta) do
-		-- The result is spliced into a string.format template, so "%" must be
-		-- doubled as well as the SQL quote escaped.
-		local path = Literal.escape("$." .. tostring(k)):gsub("%%", "%%%%")
-		parts[#parts + 1] = string.format(
-			",'%s',COALESCE(json_extract(%s,'%s'),0)+COALESCE(json_extract(excluded.%s,'%s'),0)",
-			path, column, path, column, path)
-	end
-	parts[#parts + 1] = ")"
-	return table.concat(parts)
-end
-
---- Builds the bounded append expression for the session-duration JSON array.
---- Stored samples come first, so once the shared cap is reached later flushes
---- cannot displace earlier samples and every driver observes the same bound.
---- @return string A SQL expression usable as the durations_json assignment.
-local function session_durations_merge_expr()
-	return "(SELECT json_group_array(duration) FROM ("
-		.. "SELECT value AS duration FROM json_each(COALESCE(durations_json,'[]')) "
-		.. "UNION ALL SELECT value FROM json_each(COALESCE(excluded.durations_json,'[]')) "
-		.. "LIMIT " .. AggHelper.SESSION_DURATIONS_CAP .. "))"
+--- Encodes a number map or a list as the compact JSON text a statement stores.
+--- @param value table|nil The map, or nil.
+--- @return string The JSON text, "{}" for anything that is not a table or cannot be encoded.
+local function json_text(value)
+	if type(value) ~= "table" then return "{}" end
+	local ok, encoded = pcall(json.encode, value)
+	if not ok then return "{}" end
+	return encoded
 end
 
 --- Quotes one SQL text literal through the shared C-string-safe encoder.
@@ -174,50 +129,36 @@ function M.flush()
 
 	for key, row in pairs(S.agg_batch.app_day) do
 		local cat = Export.get_native_app_category(row.app)
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms, hs_chars, llm_chars, hs_triggers, llm_triggers, hs_suggested, llm_suggested, hs_input_chars, llm_input_chars, category) "
-			.. "VALUES (%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s) "
-			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-			.. "chars=chars+excluded.chars,pauses=pauses+excluded.pauses,"
-			.. "time_ms=time_ms+excluded.time_ms,think_time_ms=think_time_ms+excluded.think_time_ms,"
-			.. "hs_chars=hs_chars+excluded.hs_chars,llm_chars=llm_chars+excluded.llm_chars,"
-			.. "hs_triggers=hs_triggers+excluded.hs_triggers,llm_triggers=llm_triggers+excluded.llm_triggers,"
-			.. "hs_suggested=hs_suggested+excluded.hs_suggested,llm_suggested=llm_suggested+excluded.llm_suggested,"
-			.. "hs_input_chars=hs_input_chars+excluded.hs_input_chars,"
-			.. "llm_input_chars=llm_input_chars+excluded.llm_input_chars,"
-			.. "category=COALESCE(agg_app_day.category, excluded.category)",
-			d, sq(row.date), sq(row.app),
-			i(row.chars), i(row.pauses), i(row.time_ms), i(row.think_time_ms),
-			i(row.hs_chars), i(row.llm_chars),
-			i(row.hs_triggers), i(row.llm_triggers),
-			i(row.hs_suggested), i(row.llm_suggested),
-			i(row.hs_input_chars), i(row.llm_input_chars), sq(cat)))
+		local ok = exec(Queries.render("agg.app_day", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			chars = i(row.chars), pauses = i(row.pauses), time_ms = i(row.time_ms),
+			think_time_ms = i(row.think_time_ms), hs_chars = i(row.hs_chars), llm_chars = i(row.llm_chars),
+			hs_triggers = i(row.hs_triggers), llm_triggers = i(row.llm_triggers),
+			hs_suggested = i(row.hs_suggested), llm_suggested = i(row.llm_suggested),
+			hs_input_chars = i(row.hs_input_chars), llm_input_chars = i(row.llm_input_chars),
+			app_time_ms = 0, category = cat,
+		}))
 		if ok then S.agg_batch.app_day[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.app_time) do
 		local cat = Export.get_native_app_category(row.app)
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day (device_id, date, app, app_time_ms, category) VALUES (%s,%s,%s,%d,%s) "
-			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-			.. "app_time_ms=app_time_ms+excluded.app_time_ms,"
-			.. "category=COALESCE(agg_app_day.category, excluded.category)",
-			d, sq(row.date), sq(row.app), i(row.ms), sq(cat)))
+		local ok = exec(Queries.render("agg.app_day", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			chars = 0, pauses = 0, time_ms = 0, think_time_ms = 0, hs_chars = 0, llm_chars = 0,
+			hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0,
+			hs_input_chars = 0, llm_input_chars = 0, app_time_ms = i(row.ms), category = cat,
+		}))
 		if ok then S.agg_batch.app_time[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.app_buckets) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited, hs_input_time_sum, hs_input_credited, llm_input_time_sum, llm_input_credited) VALUES (%s,%s,%s,%d,%d,%d,%d,%d,%d,%d) "
-			.. "ON CONFLICT(device_id, date, app, bucket_ms) DO UPDATE SET "
-			.. "time_sum=time_sum+excluded.time_sum,credited=credited+excluded.credited,"
-			.. "hs_input_time_sum=hs_input_time_sum+excluded.hs_input_time_sum,"
-			.. "hs_input_credited=hs_input_credited+excluded.hs_input_credited,"
-			.. "llm_input_time_sum=llm_input_time_sum+excluded.llm_input_time_sum,"
-			.. "llm_input_credited=llm_input_credited+excluded.llm_input_credited",
-			d, sq(row.date), sq(row.app), i(row.bucket_ms),
-			i(row.time_sum), i(row.credited),
-			i(row.hs_in_t), i(row.hs_in_c), i(row.llm_in_t), i(row.llm_in_c)))
+		local ok = exec(Queries.render("agg.buckets", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			bucket_ms = i(row.bucket_ms), time_sum = i(row.time_sum), credited = i(row.credited),
+			hs_input_time_sum = i(row.hs_in_t), hs_input_credited = i(row.hs_in_c),
+			llm_input_time_sum = i(row.llm_in_t), llm_input_credited = i(row.llm_in_c),
+		}))
 		if ok then S.agg_batch.app_buckets[key] = nil end
 	end
 
@@ -229,14 +170,11 @@ function M.flush()
 			local s2, e2 = rest:find("\1")
 			local app = rest:sub(1, s2 - 1)
 			local token = rest:sub(e2 + 1)
-			local ok = exec(string.format(
-				"INSERT INTO %s (device_id, date, app, token, c, td, cd, e, esrc_json) VALUES (%s,%s,%s,%s,%d,%d,%d,%d,%s) "
-				.. "ON CONFLICT(device_id, date, app, token) DO UPDATE SET "
-				.. "c=c+excluded.c, td=td+excluded.td, cd=cd+excluded.cd, e=e+excluded.e, "
-				.. "esrc_json=" .. number_map_merge_expr("esrc_json", item.esrc),
-				tbl_name, d, sq(date_str), sq(app), sq(token),
-				i(item.c), i(item.td), i(item.cd), i(item.e),
-				json_lit(item.esrc)))
+			local ok = exec(Queries.render("agg.ngram", "native", {
+				table = tbl_name, device_id = tostring(S.device_id), date = date_str, app = app, token = token,
+				c = i(item.c), td = i(item.td), cd = i(item.cd), e = i(item.e),
+				esrc_json = json_text(item.esrc),
+			}))
 			if ok then tbl[key] = nil end
 		end
 	end
@@ -263,14 +201,11 @@ function M.flush()
 	end
 
 	for key, row in pairs(S.agg_batch.kc_hold) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_kc_hold (device_id, date, app, keycode, sum_ms, count, max_ms, tap_count, hold_count) VALUES (%s,%s,%s,%d,%d,%d,%d,%d,%d) "
-			.. "ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET "
-			.. "sum_ms=sum_ms+excluded.sum_ms,count=count+excluded.count,"
-			.. "max_ms=MAX(max_ms, excluded.max_ms),"
-			.. "tap_count=tap_count+excluded.tap_count,hold_count=hold_count+excluded.hold_count",
-			d, sq(row.date), sq(row.app), i(row.keycode),
-			i(row.sum_ms), i(row.count), i(row.max_ms), i(row.tap_count), i(row.hold_count)))
+		local ok = exec(Queries.render("agg.kc_hold", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			keycode = i(row.keycode), sum_ms = i(row.sum_ms), count = i(row.count), max_ms = i(row.max_ms),
+			tap_count = i(row.tap_count), hold_count = i(row.hold_count),
+		}))
 		if ok then S.agg_batch.kc_hold[key] = nil end
 	end
 
@@ -289,17 +224,16 @@ function M.flush()
 	end
 	local title_cleanup_ok = {}
 	for ad_key, ad in pairs(title_app_days_seen) do
-		title_cleanup_ok[ad_key] = exec(string.format(
-			"DELETE FROM agg_app_day_titles WHERE device_id=%s AND date=%s AND app=%s AND title NOT IN ("
-			.. "SELECT title FROM agg_app_day_titles WHERE device_id=%s AND date=%s AND app=%s "
-			.. "ORDER BY (c + ms) DESC LIMIT %d)",
-			d, sq(ad.date), sq(ad.app), d, sq(ad.date), sq(ad.app), C.TITLE_CAP_PER_APP_DAY))
+		title_cleanup_ok[ad_key] = exec(Queries.render("agg.title_prune", "native", {
+			device_id = tostring(S.device_id), date = ad.date, app = ad.app,
+			cap = C.TITLE_CAP_PER_APP_DAY,
+		}))
 	end
 	for key, row in pairs(S.agg_batch.titles) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_titles (device_id, date, app, title, c, ms) VALUES (%s,%s,%s,%s,%d,%d) "
-			.. "ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=c+excluded.c, ms=ms+excluded.ms",
-			d, sq(row.date), sq(row.app), sq(row.title), i(row.c), i(row.ms)))
+		local ok = exec(Queries.render("agg.title", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			title = tostring(row.title), c = i(row.c), ms = i(row.ms),
+		}))
 		-- Only drop the row once BOTH the insert and this app-day's cleanup
 		-- DELETE succeeded — otherwise a failed cleanup would silently stop
 		-- enforcing the per-app-day title cap for this row's app-day forever.
@@ -310,116 +244,88 @@ function M.flush()
 	end
 
 	for key, row in pairs(S.agg_batch.hourly) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es, e_buckets_json) VALUES (%s,%s,%s,%s,%d,%d,%d,%d,%s) "
-			.. "ON CONFLICT(device_id, date, app, hour) DO UPDATE SET "
-			.. "c=c+excluded.c, e=e+excluded.e, em=em+excluded.em, es=es+excluded.es, "
-			.. "e_buckets_json=" .. number_map_merge_expr("e_buckets_json", row.e_buckets),
-			d, sq(row.date), sq(row.app), sq(row.hour),
-			i(row.c), i(row.e), i(row.em), i(row.es), json_lit(row.e_buckets)))
+		local ok = exec(Queries.render("agg.hourly", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			hour = tostring(row.hour), c = i(row.c), e = i(row.e), em = i(row.em), es = i(row.es),
+			e_buckets_json = json_text(row.e_buckets),
+		}))
 		if ok then S.agg_batch.hourly[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.hourly_min5) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es, e_buckets_json) VALUES (%s,%s,%s,%s,%d,%d,%d,%s) "
-			.. "ON CONFLICT(device_id, date, app, slot) DO UPDATE SET "
-			.. "c=c+excluded.c, e=e+excluded.e, es=es+excluded.es, "
-			.. "e_buckets_json=" .. number_map_merge_expr("e_buckets_json", row.e_buckets),
-			d, sq(row.date), sq(row.app), sq(row.slot),
-			i(row.c), i(row.e), i(row.es), json_lit(row.e_buckets)))
+		local ok = exec(Queries.render("agg.hourly_min5", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			slot = tostring(row.slot), c = i(row.c), e = i(row.e), es = i(row.es),
+			e_buckets_json = json_text(row.e_buckets),
+		}))
 		if ok then S.agg_batch.hourly_min5[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.layouts) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_layouts (device_id, date, app, layout, count) VALUES (%s,%s,%s,%s,%d) "
-			.. "ON CONFLICT(device_id, date, app, layout) DO UPDATE SET count=count+excluded.count",
-			d, sq(row.date), sq(row.app), sq(row.layout), i(row.count)))
+		local ok = exec(Queries.render("agg.layouts", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			layout = tostring(row.layout), count = i(row.count),
+		}))
 		if ok then S.agg_batch.layouts[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.chars_class) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_chars_class (device_id, date, app, letter, digit, punct, space, other, first_typed_min, last_typed_min) VALUES (%s,%s,%s,%d,%d,%d,%d,%d,%s,%s) "
-			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-			.. "letter=letter+excluded.letter,digit=digit+excluded.digit,"
-			.. "punct=punct+excluded.punct,space=space+excluded.space,other=other+excluded.other,"
-			.. "first_typed_min=COALESCE(agg_app_day_chars_class.first_typed_min, excluded.first_typed_min),"
-			.. "last_typed_min=COALESCE(excluded.last_typed_min, agg_app_day_chars_class.last_typed_min)",
-			d, sq(row.date), sq(row.app),
-			i(row.letter), i(row.digit), i(row.punct), i(row.space), i(row.other),
-			row.first_typed_min and sq(row.first_typed_min) or "NULL",
-			row.last_typed_min  and sq(row.last_typed_min)  or "NULL"))
+		local ok = exec(Queries.render("agg.chars_class", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			letter = i(row.letter), digit = i(row.digit), punct = i(row.punct), space = i(row.space),
+			other = i(row.other),
+			first_typed_min = row.first_typed_min and tostring(row.first_typed_min) or nil,
+			last_typed_min = row.last_typed_min and tostring(row.last_typed_min) or nil,
+		}))
 		if ok then S.agg_batch.chars_class[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.errors) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_errors (device_id, date, app, bs_total, cascade_count, cascade_max_len, recovery_sum_ms, recovery_count) VALUES (%s,%s,%s,%d,%d,%d,%d,%d) "
-			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-			.. "bs_total=bs_total+excluded.bs_total,cascade_count=cascade_count+excluded.cascade_count,"
-			.. "cascade_max_len=MAX(cascade_max_len, excluded.cascade_max_len),"
-			.. "recovery_sum_ms=recovery_sum_ms+excluded.recovery_sum_ms,"
-			.. "recovery_count=recovery_count+excluded.recovery_count",
-			d, sq(row.date), sq(row.app),
-			i(row.bs_total), i(row.cascade_count), i(row.cascade_max_len),
-			i(row.recovery_sum_ms), i(row.recovery_count)))
+		local ok = exec(Queries.render("agg.errors", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			bs_total = i(row.bs_total), cascade_count = i(row.cascade_count),
+			cascade_max_len = i(row.cascade_max_len), recovery_sum_ms = i(row.recovery_sum_ms),
+			recovery_count = i(row.recovery_count),
+		}))
 		if ok then S.agg_batch.errors[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.ergo) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, same_hand_streak_max, auto_repeat_count, focus_to_first_key_sum_ms, focus_to_first_key_count) VALUES (%s,%s,%s,%d,%d,%d,%d,%d) "
-			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-			.. "same_finger_streak_max=MAX(same_finger_streak_max, excluded.same_finger_streak_max),"
-			.. "same_hand_streak_max=MAX(same_hand_streak_max, excluded.same_hand_streak_max),"
-			.. "auto_repeat_count=auto_repeat_count+excluded.auto_repeat_count,"
-			.. "focus_to_first_key_sum_ms=focus_to_first_key_sum_ms+excluded.focus_to_first_key_sum_ms,"
-			.. "focus_to_first_key_count=focus_to_first_key_count+excluded.focus_to_first_key_count",
-			d, sq(row.date), sq(row.app),
-			i(row.same_finger_streak_max), i(row.same_hand_streak_max), i(row.auto_repeat_count),
-			i(row.focus_to_first_key_sum_ms), i(row.focus_to_first_key_count)))
+		local ok = exec(Queries.render("agg.ergo", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			same_finger_streak_max = i(row.same_finger_streak_max),
+			same_hand_streak_max = i(row.same_hand_streak_max), auto_repeat_count = i(row.auto_repeat_count),
+			focus_to_first_key_sum_ms = i(row.focus_to_first_key_sum_ms),
+			focus_to_first_key_count = i(row.focus_to_first_key_count),
+		}))
 		if ok then S.agg_batch.ergo[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.bursts) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_burst (device_id, date, app, count_total, max_cpm, max_chars, length_buckets_json, inter_delay_count, inter_delay_sum, inter_delay_sumsq) VALUES (%s,%s,%s,%d,%f,%d,%s,%d,%d,%d) "
-			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-			.. "count_total=count_total+excluded.count_total,"
-			.. "max_cpm=MAX(max_cpm, excluded.max_cpm),max_chars=MAX(max_chars, excluded.max_chars),"
-			.. "length_buckets_json=" .. number_map_merge_expr("length_buckets_json", row.length_buckets) .. ","
-			.. "inter_delay_count=inter_delay_count+excluded.inter_delay_count,"
-			.. "inter_delay_sum=inter_delay_sum+excluded.inter_delay_sum,"
-			.. "inter_delay_sumsq=inter_delay_sumsq+excluded.inter_delay_sumsq",
-			d, sq(row.date), sq(row.app),
-			i(row.count_total), row.max_cpm, i(row.max_chars),
-			json_lit(row.length_buckets),
-			i(row.inter_count), i(row.inter_sum), i(row.inter_sumsq)))
+		local ok = exec(Queries.render("agg.burst", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			count_total = i(row.count_total), max_cpm = tonumber(row.max_cpm) or 0, max_chars = i(row.max_chars),
+			length_buckets_json = json_text(row.length_buckets), inter_delay_count = i(row.inter_count),
+			inter_delay_sum = i(row.inter_sum), inter_delay_sumsq = i(row.inter_sumsq),
+		}))
 		if ok then S.agg_batch.bursts[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.sessions) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_session (device_id, date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json) VALUES (%s,%s,%s,%d,%d,%d,%d,%s) "
-			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-			.. "count_total=count_total+excluded.count_total,"
-			.. "longest_ms=MAX(longest_ms, excluded.longest_ms),"
-			.. "longest_chars=MAX(longest_chars, excluded.longest_chars),"
-			.. "total_active_ms=total_active_ms+excluded.total_active_ms,"
-			.. "durations_json=" .. session_durations_merge_expr(),
-			d, sq(row.date), sq(row.app),
-			i(row.count_total), i(row.longest_ms), i(row.longest_chars), i(row.total_active_ms),
-			json_lit(row.durations)))
+		local ok = exec(Queries.render("agg.session", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			count_total = i(row.count_total), longest_ms = i(row.longest_ms),
+			longest_chars = i(row.longest_chars), total_active_ms = i(row.total_active_ms),
+			durations_json = json_text(row.durations), duration_cap = AggHelper.SESSION_DURATIONS_CAP,
+		}))
 		if ok then S.agg_batch.sessions[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.switches_to) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) VALUES (%s,%s,%s,%s,%d) "
-			.. "ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count=count+excluded.count",
-			d, sq(row.date), sq(row.app_from), sq(row.app_to), i(row.count)))
+		local ok = exec(Queries.render("agg.switches_to", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date),
+			app_from = tostring(row.app_from), app_to = tostring(row.app_to), count = i(row.count),
+		}))
 		if ok then S.agg_batch.switches_to[key] = nil end
 	end
 

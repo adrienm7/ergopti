@@ -74,9 +74,9 @@ local MENU_REFRESH_COALESCE_SEC = 0.05
 
 -- config.toml [ui] menubar_icon: its variants and its default are the
 -- manifest's. v1 draws the simple glyph, v2 the detailed Ergopti logo.
-local MENUBAR_ICON_DEFAULT = Manifest.default_for("ui.menubar_icon")
+local MENUBAR_ICON_DEFAULT = Manifest.default_for(require("config_keys").KEY.UI_MENUBAR_ICON)
 local MENUBAR_ICON_VARIANTS = {}
-for _, variant in ipairs(Manifest.find_entry_by_path("ui.menubar_icon").enum_values) do
+for _, variant in ipairs(Manifest.find_entry_by_path(require("config_keys").KEY.UI_MENUBAR_ICON).enum_values) do
 	MENUBAR_ICON_VARIANTS[variant] = true
 end
 
@@ -187,7 +187,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- and must be initialized here even when ConfigPaths is already ready.
 	if not MenuPaths.is_initialized() then
 		MenuPaths.init(base_dir, function()
-			return DeferredWork.after(0.25,
+			return DeferredWork.after(require("infra.timings").sec("ui", "config_editor_reload_delay_ms"),
 				function() pcall(hs.reload) end,
 				"menu.reload_after_paths")
 		end)
@@ -1043,7 +1043,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return require("ui.menu.unused_keys_cleanup").run_from_menu()
 		end,
 		open_paths                = function()
-			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths")
+			return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths")
 		end,
 		reload                    = function()
 			return do_reload("menu")
@@ -1111,7 +1111,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		open_logs                 = function() return LogOpeners.open_logs_folder(open_async) end,
 		open_console              = function() return require("ui.console_window").open() end,
 		open_paths_editor         = function()
-			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths_editor")
+			return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths_editor")
 		end,
 		open_hotstrings_editor    = function()
 			local ok, ed = pcall(require, "ui.hotstring_editor")
@@ -1146,7 +1146,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		set_log_level             = function(level)
 			local L = require("infra.logger")
-			local ok, committed = pcall(Storage.set, "log_level", level)
+			local ok, committed = pcall(Storage.set, require("config_keys").LEAF.LOG_LEVEL, level)
 			if not ok or committed ~= true then
 				L.warn("menu", "Log level %s was refused by settings; the live level was left unchanged.", level)
 				return false
@@ -1574,6 +1574,20 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		update_checks            = update_checks,
 	}
 
+	-- The window toggles (ui/window_toggle) open these pages with the same
+	-- session context as their menu rows: the remap facade, the update channel
+	-- owner and the menu state exist only here.
+	local WindowToggle = require("ui.window_toggle")
+	WindowToggle.set_opener("layer_editor", function()
+		return require("ui.layer_editor").open({ karabiner = karabiner })
+	end)
+	WindowToggle.set_opener("changelog", function()
+		return require("ui.changelog").open({ channel_owner = channel_owner })
+	end)
+	WindowToggle.set_opener("healthcheck", function()
+		return require("ui.healthcheck").show_window({ state = state })
+	end)
+
 	-- updateMenu refreshes the menubar icon and re-wires script_control extras,
 	-- then marks the cached menu tree dirty so the NEXT open reflects the change.
 	-- It does NOT rebuild synchronously — the rebuild happens lazily, once, on the
@@ -1676,8 +1690,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	schedule_menu_refresh = function()
 		PhaseStats.count("menu.refresh_requested")
 		if _menu_refresh_timer then return end
+		-- Each refresh is a full rebuild of 0.5 s or more on the Mac; naming the
+		-- code that asked for it says which state change cost a second one.
+		local caller = debug.getinfo(3, "Sl")
+		local requester = caller and (tostring(caller.short_src):match("[^/]+/[^/]+$") or tostring(caller.short_src))
+			.. ":" .. tostring(caller.currentline) or "?"
 		_menu_refresh_timer = hs.timer.doAfter(MENU_REFRESH_COALESCE_SEC, function()
 			_menu_refresh_timer = nil
+			Logger.debug(LOG, "Menu refresh requested by %s.", requester)
 			pcall(refresh_menu_now)
 		end)
 	end
@@ -1716,6 +1736,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	updateMenu()
 
+	-- Ask the login item state now, before the prime build below: answered only
+	-- by that build, an enabled login item flipped the baked state and forced a
+	-- second full rebuild at every boot (two 0.5 to 0.6 s holds on the Mac, 23:34).
+	-- Before priming its answer only marks the menu dirty.
+	require("ui.menu.start_at_login").request("status", function()
+		if type(updateMenu) == "function" then updateMenu() end
+	end)
+
 	-- Warm the expensive menu-discovery caches off the boot path so the FIRST
 	-- click renders instantly. Without this, building the keyboard-layout and
 	-- apps submenus on first open would synchronously spawn python3 plus several
@@ -1725,7 +1753,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		function()
 			-- A failed prime only costs a slower first open, but it used to cost it
 			-- silently; the submenu then looked empty with nothing in the log.
-			for _prime_index, name in ipairs({ "keyboard_layout", "apps", "tap_holds" }) do
+			for _prime_index, name in ipairs({ "keyboard_layout", "apps", require("config_keys").KEY.TAP_HOLDS }) do
 				local mod = menu_mods[name]
 				if mod and type(mod.prime) == "function" then
 					local primed, prime_err = pcall(mod.prime, ctx)

@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Raw Config-Key and Command-Id Literal Ratchet
  * DESCRIPTION:
- * Counts, per driver source file, the string literals that spell a
+ * Counts, per driver or tool source file, the string literals that spell a
  * configuration key or a menu command id by hand instead of reading the
  * generated constant (`config_keys.lua`, `_generated/config_keys.js`,
  * `_generated/config_keys.ahk`). The committed baseline records today's
@@ -43,13 +43,28 @@ const { allOutputs } = require('../build/generators.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BASELINE = 'tools/lint/config-key-literal-baseline.json';
-const SCANNED_EXTENSIONS = /\.(lua|ahk|js)$/;
+const SCANNED_EXTENSIONS = /\.(lua|ahk|js|cjs|mjs)$/;
+// The drivers and the Node tools: a tool that spells a key by hand drifts from the schema the same way.
+const SCANNED_ROOTS = ['static/ergopti_plus', 'tools'];
 // Tests spell keys on purpose (they assert the spelling); vendored code is not ours.
 const EXCLUDED = /(^|\/)(tests|test|vendor|node_modules)\//;
 const COMMENT_LINE = /^\s*(--|;|\/\/|\*|\/\*)/;
+// A line (or the line below a whole-line marker comment) that spells a homonym of a key on
+// purpose, such as a prompt template token, says so and is not counted.
+const EXEMPT_MARKER = 'config-key-literal-ok';
 const STRING_LITERAL = /"([^"\\\n]*)"|'([^'\\\n]*)'/g;
 // A module path is not a config key even when it is spelt like one
 // (`require("llm.app_profile_overrides")`).
+// A string that names a log channel, a window or a stop label is a homonym of a key, found by
+// the syntax around it: `LOG = "x"`, `get_app_geometry("x")`, `Logger.info("x", ...)`,
+// `label = "x"`, `name = "x"`.
+// A menu GROUP or MODULE id is spelt like a section or a command too: `group_receiver("top_level", "x")`,
+// `module_rows("x")`, and the dispatch tables keyed by module name (`["x"] = _build_x`,
+// `["x"] = function() return module_rows("x") end`). A list of METHOD or DEPENDENCY names a
+// participant must provide (`for _, method in ipairs({ ... })`) is not a key list either.
+const HOMONYM_BEFORE =
+	/(?:\b(?:LOG|APP_NAME|MODULE_NAME|TAG)\s*=|\b(?:label|name)\s*=|\b(?:get_app_geometry|ControllerPool\.reserve|Logger\.\w+|module_rows)\s*\(|\bgroup_receiver\(\s*"[^"]*"\s*,|\b(?:method|dependency)\s+in\s+ipairs\(\{[^}]*)\s*$/;
+const HOMONYM_AFTER = /^\]\s*=\s*(?:_build_\w+\s*,|function\(\)\s*return module_rows\()/;
 const REQUIRE_BEFORE = /\brequire\s*(?:\(\s*|,\s*)?$/;
 
 // ==========================================
@@ -68,9 +83,24 @@ function vocabulary(tables) {
 	const metaLeaves = new Set(
 		tables.KEY.filter(([, key]) => key.startsWith('_meta.')).map(([, key]) => key.split('.').pop())
 	);
+	// A section's own name (`tap_keys`, `caps_word`) is also a module name: only a leaf that
+	// some declared property carries counts.
+	const sectionOnly = new Set(tables.SECTION.map((key) => key.split('.').pop()));
+	const declaredLeaf = new Set(
+		tables.KEY.map(([, key]) => key)
+			.filter((key) => !tables.SECTION.includes(key))
+			.map((key) => key.split('.').pop())
+	);
+	for (const leaf of declaredLeaf) sectionOnly.delete(leaf);
 	for (const [, key] of tables.KEY) if (key.includes('.')) words.add(key);
 	for (const [, leaf] of tables.LEAF)
-		if (leaf.includes('_') && !leaf.startsWith('_') && !metaLeaves.has(leaf)) words.add(leaf);
+		if (
+			leaf.includes('_') &&
+			!leaf.startsWith('_') &&
+			!metaLeaves.has(leaf) &&
+			!sectionOnly.has(leaf)
+		)
+			words.add(leaf);
 	for (const [, id] of tables.COMMAND) if (id.includes('_')) words.add(id);
 	return words;
 }
@@ -83,11 +113,16 @@ function vocabulary(tables) {
  */
 function countLiterals(text, words) {
 	let count = 0;
+	let exemptNext = false;
 	for (const line of text.split('\n')) {
-		if (COMMENT_LINE.test(line)) continue;
+		const exempt = exemptNext || line.includes(EXEMPT_MARKER);
+		exemptNext = COMMENT_LINE.test(line) && line.includes(EXEMPT_MARKER);
+		if (COMMENT_LINE.test(line) || exempt) continue;
 		for (const m of line.matchAll(STRING_LITERAL)) {
 			if (!words.has(m[1] ?? m[2])) continue;
 			if (REQUIRE_BEFORE.test(line.slice(0, m.index))) continue;
+			if (HOMONYM_BEFORE.test(line.slice(0, m.index))) continue;
+			if (HOMONYM_AFTER.test(line.slice(m.index + m[0].length))) continue;
 			count++;
 		}
 	}
@@ -101,7 +136,7 @@ function countLiterals(text, words) {
  */
 function scan(words) {
 	const generated = new Set(allOutputs());
-	const files = execFileSync('git', ['ls-files', '-z', 'static/ergopti_plus'], { cwd: ROOT })
+	const files = execFileSync('git', ['ls-files', '-z', ...SCANNED_ROOTS], { cwd: ROOT })
 		.toString('utf8')
 		.split('\0')
 		.filter((f) => SCANNED_EXTENSIONS.test(f) && !EXCLUDED.test(f) && !generated.has(f))
@@ -182,10 +217,29 @@ function selfTest(words) {
 		'local s = "enabled" .. "schema_version"',
 		'local m = "metrics.private_filter_enabled is the key"',
 		'local Overrides = require("llm.app_profile_overrides")',
-		'local ok, mod = pcall(require, "llm.app_profile_overrides")'
+		'local ok, mod = pcall(require, "llm.app_profile_overrides")',
+		'local LOG = "shortcuts.tap_keys"',
+		'local geo = ui_builder.get_app_geometry("layout_manager")',
+		'Logger.info("scope_restore", "x")',
+		'{ name = "tap_holds", stop = f }',
+		'x = "min_words" -- config-key-literal-ok: a prompt token',
+		'-- config-key-literal-ok: the next line is a homonym',
+		'local tokens = { "max_words" }',
+		'local again = "max_words"',
+		'local receive = Menu.group_receiver("top_level", "tap_holds")',
+		'return module_rows("tap_holds")',
+		'["tap_holds"]       = _build_tap_holds,',
+		'["tap_holds"]       = function() return module_rows("tap_holds") end,',
+		'for _, method in ipairs({ "scope_acquire", "scope_restore" }) do',
+		'for _, field in ipairs({ "private_filter_enabled" }) do'
 	].join('\n');
 	const n = countLiterals(probe, words);
-	if (n !== 3) throw new Error(`self-test: expected 3 counted literals in the probe, got ${n}`);
+	if (n !== 5) throw new Error(`self-test: expected 5 counted literals in the probe, got ${n}`);
+	if (
+		!SCANNED_ROOTS.includes('tools') ||
+		!['tools/x.cjs', 'tools/x.mjs'].every((f) => SCANNED_EXTENSIONS.test(f))
+	)
+		throw new Error('self-test: the Node tools must stay under the ratchet');
 	const { grown, stale } = compare({ 'a.lua': 2, 'b.lua': 1 }, { 'a.lua': 1, 'c.lua': 4 });
 	if (grown.length !== 2 || stale.length !== 1)
 		throw new Error('self-test: compare() no longer reports a rise, a new file and headroom');

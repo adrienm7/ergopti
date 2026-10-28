@@ -45,6 +45,7 @@ local Engine    = require("modules.gestures.engine")
 local Actions   = require("modules.gestures.actions")
 local Conflicts = require("modules.gestures.conflicts")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 
 
@@ -146,7 +147,7 @@ M.DEFAULT_MODES = {
 M.DEFAULT_SENSITIVITY = 3.5
 
 M.DEFAULT_STATE = {
-	gestures = Manifest.default_for("gestures.enabled"),
+	gestures = Manifest.default_for(ConfigKeys.KEY.GESTURES_ENABLED),
 	modes = {},
 	sensitivities = {},
 }
@@ -1086,23 +1087,19 @@ start_startup_probe_loop = function()
 	return true
 end
 
---- Runs the slow health-check loop once frames are flowing.
+--- Runs the slow health-check loop, entered on the first frame or when the
+--- startup phase times out on an untouched trackpad.
 --- Reattaches any watcher that died (device sleep, cable disconnect, etc.).
---- If for some reason the frame stream stops entirely, we switch back to the
---- aggressive startup probe so recovery is fast.
+--- No frame yet is the normal idle state, not a lost stream: the kernel wakes
+--- the touch device on the first physical touch, and the primer recycles the
+--- watchers if a gesture arrives before any frame. Restarting the startup probe
+--- from here re-ran its "one-shot" recycle and warned every minute of idleness.
 start_health_check_loop = function()
 	Logger.info(LOG, "ENTER slow health-check loop (cadence=%.0fs)", HEALTH_CHECK_INTERVAL_SEC)
-	-- Each entry reports its own settled count once: after a lost frame stream
-	-- or a restart, the count the recovery reached is exactly the news.
+	-- Each entry reports its own settled count once: after a restart, the
+	-- count the recovery reached is exactly the news.
 	health_reported_watchers = nil
 	return start_discovery_timer(HEALTH_CHECK_INTERVAL_SEC, "health check", function()
-		if not _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
-			-- Defensive: should not happen, but if we lost the stream entirely,
-			-- restart the aggressive probe loop so the user is not stuck waiting.
-			Logger.warn(LOG, "Health-check: frame stream lost — switching back to startup probe loop.")
-			start_startup_probe_loop()
-			return
-		end
 		-- Reattach any watcher that stopped (device sleep, USB disconnect…)
 		for id, w in pairs(touch_watchers) do
 			local ok, r = pcall(function() return w:running() end)
@@ -1144,7 +1141,7 @@ local function schedule_emergency_recycle()
 	Logger.debug(LOG, "schedule_emergency_recycle: SCHEDULED in 20ms (first_frame=%s, watchers=%d)",
 		tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME), count_watchers())
 	local emergency_generation = discovery_generation
-	hs.timer.doAfter(0.02, function()
+	hs.timer.doAfter(require("infra.timings").sec("gestures", "emergency_recycle_delay_ms"), function()
 		-- CoreState.enabled is the FEATURE flag; CoreState.suspended is the pause.
 		-- Checking only the first let kickstart_hid warp the cursor and post a
 		-- synthetic scroll while the script was paused, which the invariant

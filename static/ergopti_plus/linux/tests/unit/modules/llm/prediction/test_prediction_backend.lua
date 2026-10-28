@@ -390,7 +390,7 @@ helpers.describe("backend publication rechecks actual admission after dismissal"
 					local observations = {dismissals = 0, admissions = 0, changed = false}
 					local foreign = initial:gsub("value = 42", "value = 73")
 					engine.init({scheduler = scheduler, is_paused = function() return paused end,
-						overlay = {hide = function()
+						overlay = {show = function() return true end, hide = function()
 							if not armed then return end
 							observations.dismissals = observations.dismissals + 1
 							if condition == "pause" then paused = true end

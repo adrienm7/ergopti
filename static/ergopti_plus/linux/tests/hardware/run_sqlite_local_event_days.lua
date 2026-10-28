@@ -26,6 +26,9 @@ local Keystats = require("modules.keystats.keystats")
 local Writer = require("modules.keystats.sqlite_writer")
 local Reader = require("modules.keystats.sqlite_reader")
 local Json = require("json")
+local Calendar = require("modules.keystats.calendar")
+local Monotonic = require("infra.monotonic")
+local native_capture = Calendar.capture
 local checks, failures = 0, 0
 local function check(name, body)
 	checks = checks + 1
@@ -52,12 +55,34 @@ local fixtures = {
 	{ name = "UTC midnight east", tz = "OWN-2", utc = { year = 2026, month = 1, day = 2, hour = 0 } },
 	{ name = "UTC midnight between record and flush", tz = "OWN-2", utc = { year = 2026, month = 1, day = 1, hour = 23, min = 59, sec = 59 }, advance = 2 },
 }
+-- Each fixture jumps to an unrelated instant and timezone. The collector keeps
+-- its last calendar observation and refuses a day change without a midnight,
+-- so every fixture gets fresh owners after the previous ones retire.
+local OWNERS = { "modules.keystats.keystats", "modules.keystats.metrics_collector", "modules.keystats.sqlite_writer" }
+local function fresh_owners()
+	local deadline = uv.hrtime() + 10 * 1e9
+	local settled = Keystats.stop()
+	while not settled and uv.hrtime() < deadline do
+		uv.run("nowait"); uv.sleep(1); settled = Keystats.stop()
+	end
+	assert(settled, "the previous fixture's collector must retire")
+	for _, name in ipairs(OWNERS) do package.loaded[name] = nil end
+	Keystats = require("modules.keystats.keystats")
+	Writer = require("modules.keystats.sqlite_writer")
+end
 for index, fixture in ipairs(fixtures) do
+	if index > 1 then fresh_owners() end
 	assert(uv.os_setenv("TZ", "OWN0")); ffi.C.tzset()
 	local instant = native_time(fixture.utc)
 	assert(uv.os_setenv("TZ", fixture.tz)); ffi.C.tzset()
 	os.date = function(format, timestamp) return native_date(format, timestamp or instant) end
 	os.time = function(date) return date and native_time(date) or instant end
+	-- Capture reads the native wall clock (uv.gettimeofday), not os.time, so the
+	-- owned instant must reach the collector through its calendar observation.
+	Calendar.capture = function()
+		return { wall_ms = instant * 1000, mono_ms = math.floor(Monotonic.now_ms()),
+			date = native_date("%Y-%m-%d", instant), ts = native_date("!%Y-%m-%d %H:%M:%S", instant) }
+	end
 	Writer.close_db()
 	local path = root .. "/owned-" .. index .. ".sqlite"
 	Keystats.init({ sqlite_path = path, log_dir = root .. "/logs" })
@@ -78,7 +103,9 @@ for index, fixture in ipairs(fixtures) do
 		assert(#hotstrings == 1 and #shortcuts == 1 and #typing == 1)
 		assert(hotstrings[1] == "2|" .. local_day .. "|" .. recorded_ts)
 		assert(shortcuts[1] == "3|" .. local_day .. "|" .. recorded_ts)
-		assert(typing[1] == "1|" .. local_day .. "|" .. os.date("!%Y-%m-%d %H:%M:%S"))
+		-- Since 2368c17013 the typing row keeps its capture instant, like the
+		-- other raw rows, rather than the later flush instant.
+		assert(typing[1] == "1|" .. local_day .. "|" .. recorded_ts)
 		assert(manifest[local_day]["owned-events"].hs_chars == 3 and dashboard[local_day]["owned-events"].hs_chars == 3)
 		assert(assert(Writer.query_rows("SELECT trigger||'|'||replacement||'|'||h_type||'|'||net_saved_chars FROM events_hotstring;"))[1] == "q|abc|static|2")
 		assert(assert(Writer.query_rows("SELECT key FROM events_shortcut;"))[1] == "owned-action")

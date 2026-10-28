@@ -25,6 +25,7 @@ local PrivacyPolicy = require("llm.trigger_policy")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
 local SettingsManager = require("ui.menu.menu_llm.settings_manager")
+local ConfigKeys = require("config_keys")
 
 local LOG = "menu_llm.trigger_panel"
 
@@ -195,20 +196,20 @@ function M.build(ctx)
 	end
 	local shared_ctx = {
 		commands = {
-			["llm_url_bar_filter"] = function()
+			[ConfigKeys.COMMAND.LLM_URL_BAR_FILTER] = function()
 				return privacy_command(url_source, "llm_url_bar_filter_enabled", "set_llm_url_bar_filter_enabled")
 			end,
-			["llm_secure_field_filter"] = function()
+			[ConfigKeys.COMMAND.LLM_SECURE_FIELD_FILTER] = function()
 				return privacy_command(secure_source, "llm_secure_field_filter_enabled", "set_llm_secure_field_filter_enabled")
 			end,
-			["llm_instant_on_word_end"] = function()
+			[ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END] = function()
 				if not ready() then return false end
-				return apply_setting_transaction(settings_mgr, "llm_instant_on_word_end",
+				return apply_setting_transaction(settings_mgr, ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END,
 					not state.llm_instant_on_word_end, "set_llm_instant_on_word_end")
 			end,
-			["llm_after_hotstring"] = function()
+			[ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING] = function()
 				if not ready() then return false end
-				return apply_setting_transaction(settings_mgr, "llm_after_hotstring",
+				return apply_setting_transaction(settings_mgr, ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING,
 					not state.llm_after_hotstring, "set_llm_after_hotstring")
 			end,
 		},

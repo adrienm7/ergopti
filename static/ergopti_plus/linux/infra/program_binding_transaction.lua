@@ -7,6 +7,7 @@ local TableUtil = require("table_util")
 local Writer = require("toml_codec.writer")
 local PhysicalSlots = require("shortcuts.physical_slots")
 local Logger = require("logger.shim")
+local ConfigKeys = require("config_keys")
 local LOG = "infra.program_binding_transaction"
 local _current, _sequence = nil, 0
 local _constructing = false
@@ -30,9 +31,9 @@ function M.new(options)
 	local binding, slot, section, provider = options.binding
 	local action = options.action == nil and "run_program" or options.action
 	local families = {
-		{ "keyboard__", "shortcuts.keyboard", "modules.shortcuts.keyboard_shortcuts" },
-		{ "tap_key__", "shortcuts.tap_keys", "modules.shortcuts.tap_keys" },
-		{ "script__", "shortcuts.script_control", "modules.shortcuts.script_chords" },
+		{ "keyboard__", ConfigKeys.KEY.SHORTCUTS_KEYBOARD, "modules.shortcuts.keyboard_shortcuts" },
+		{ "tap_key__", ConfigKeys.KEY.SHORTCUTS_TAP_KEYS, "modules.shortcuts.tap_keys" },
+		{ "script__", ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL, "modules.shortcuts.script_chords" },
 	}
 	if type(binding) == "string" and parameters.DEFAULT_GESTURES[binding] ~= nil then
 		slot, section = binding, "gestures"
@@ -47,7 +48,7 @@ function M.new(options)
 		end
 	end
 	-- These leases own logical configuration, not physical source/capture/output.
-	assert(section ~= "shortcuts.keyboard" or not PhysicalSlots.is_namespace(slot),
+	assert(section ~= ConfigKeys.KEY.SHORTCUTS_KEYBOARD or not PhysicalSlots.is_namespace(slot),
 		"physical assignments require their physical publication owner")
 	assert(type(slot) == "string" and type(action) == "string"
 		and type(parameters.get_action_parameter_spec(action)) == "string"

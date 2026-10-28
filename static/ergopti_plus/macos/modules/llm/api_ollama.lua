@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local Logger  = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local Notifications = require("infra.notifications")
@@ -14,6 +15,8 @@ local i18n    = require("infra.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
+local Ports = require("llm.request_plan.ports")
+local TokenBudget = require("llm.request_plan.token_budget")
 -- Independent inference, availability, and warmup owners prevent one semantic
 -- operation from superseding another merely because both use HTTP
 local _infer_client  = require("adapters.http_client").new()
@@ -37,7 +40,7 @@ local LOG            = "llm.api_ollama"
 local LocalModelPolicy = require("llm.local_model_policy")
 
 -- Ollama bind address. The default port is the single source in
--- _shared/modules/llm/defaults.json (llm_ollama_port, surfaced via DEFAULT_STATE); a user
+-- _shared/modules/llm/defaults.json (llm_ollama_owned_port, surfaced via DEFAULT_STATE); a user
 -- override owned by OllamaEndpoint wins so a port collision can be resolved
 -- without editing any file. Host stays loopback.
 --- Reads a valid user port override from persistent storage, or nil when unset.
@@ -47,7 +50,7 @@ local function read_ollama_port_override()
 end
 
 --- Resolves the Ollama port: a valid user override wins, otherwise the canonical
---- default from _shared/modules/llm/defaults.json (DEFAULT_STATE.llm_ollama_port). init is
+--- default from _shared/modules/llm/defaults.json (DEFAULT_STATE.llm_ollama_owned_port). init is
 --- required lazily to avoid the init <-> api_ollama require cycle.
 --- @return integer
 local function resolve_ollama_port()
@@ -76,7 +79,6 @@ local _ollama_started = false
 local _ollama_starting = false
 local _ollama_start_generation = 0
 local _ollama_start_transaction = nil
-local _ollama_kill_task = nil
 local _ollama_launch_timer = nil
 local _ollama_serve_task = nil
 local _ollama_ambiguous_task = nil
@@ -438,7 +440,7 @@ end
 
 --- Clears the readiness flag so the NEXT warmup must re-confirm the backend.
 --- _is_ready is only ever set true by a 200 warmup; nothing else cleared it, so a
---- backend round-trip (MLX kills `ollama serve`, then back to Ollama) or a model
+--- backend round-trip (MLX retires the owned `ollama serve`, then back to Ollama) or a model
 --- switch left it stale-true. The warmup retry chain then self-terminates on the
 --- stale flag and perform_check dispatches to a dead/cold server. Mirrors the MLX
 --- reset_endpoints() invariant: a fresh server/model deserves a fresh verdict (F-M8).
@@ -480,8 +482,7 @@ end
 --- A published daemon deliberately remains outside pause ownership.
 --- @return boolean pending
 has_pending_ollama_start_owner = function()
-	return _ollama_kill_task ~= nil
-		or _ollama_launch_timer ~= nil
+	return _ollama_launch_timer ~= nil
 		or _ollama_ambiguous_task ~= nil
 		or (_ollama_serve_task ~= nil and _ollama_started ~= true)
 end
@@ -560,11 +561,6 @@ end
 --- @return boolean settled
 local function settle_ollama_start_cleanup()
 	if _ollama_start_acquisition_depth > 0 then return false end
-	local kill_task = _ollama_kill_task
-	local kill_settled = settle_ollama_start_task(
-		"Ollama stale-process task", kill_task,
-		function() return _ollama_kill_task == kill_task end,
-		function() if _ollama_kill_task == kill_task then _ollama_kill_task = nil end end)
 	local timer_settled = settle_ollama_launch_timer()
 	local serve_settled = true
 	if _ollama_started ~= true then
@@ -579,7 +575,7 @@ local function settle_ollama_start_cleanup()
 		"Ollama ambiguous startup task", ambiguous_task,
 		function() return _ollama_ambiguous_task == ambiguous_task end,
 		function() if _ollama_ambiguous_task == ambiguous_task then _ollama_ambiguous_task = nil end end)
-	local settled = kill_settled and timer_settled and serve_settled
+	local settled = timer_settled and serve_settled
 		and ambiguous_settled and not has_pending_ollama_start_owner()
 	if settled then _ollama_start_cleanup_pending = false end
 	return settled
@@ -613,9 +609,17 @@ local function quiesce_warmup()
 	_warmup_gen = _warmup_gen + 1
 	_warmup_active = false
 	local timer_settled = cancel_warmup_resume_timer() == true
-	local ok, result = xpcall(function() return _warmup_client.cancel() end, debug.traceback)
+	local detail
+	local ok, result = xpcall(function()
+		local settled, cancel_detail = _warmup_client.cancel()
+		detail = cancel_detail
+		return settled
+	end, debug.traceback)
 	local client_settled = ok == true and result == true
 	if client_settled then _warmup_client_recovery_token = nil end
+	-- hs.http.asyncPost returns no task: a POST in flight is revoked logically and
+	-- its answer is fenced by _warmup_gen, so the stop has happened (as for MLX).
+	if ok == true and result == false and detail == "pending" then client_settled = true end
 	if not client_settled then
 		Logger.error(LOG, "stop_warmup() could not retire its HTTP owner: %s.", tostring(result))
 	end
@@ -684,9 +688,6 @@ function M.pause_warmup()
 	return daemon_settled and warmup_settled
 end
 
--- Delay before launching Ollama after killing a stale instance (seconds)
-local OLLAMA_KILL_SETTLE_SEC = 0.1
-
 -- curl --max-time ceiling for streaming requests (seconds).
 -- STREAM_TMPFILE_CLEANUP_SEC is the safety-net delay before removing the
 -- payload temp file; it must be strictly greater than STREAM_MAX_TIME_SEC so
@@ -753,8 +754,7 @@ local function ensure_ollama_running(options)
 		if my_generation ~= _ollama_start_generation then
 			settle_ollama_start_transaction(my_generation, false, "startup superseded")
 			if ambiguous_task ~= nil
-				and (_ollama_kill_task == ambiguous_task
-					or _ollama_serve_task == ambiguous_task) then
+				and _ollama_serve_task == ambiguous_task then
 				_ollama_start_cleanup_pending = true
 			end
 			if _ollama_start_acquisition_depth == 0
@@ -765,7 +765,6 @@ local function ensure_ollama_running(options)
 			return false
 		end
 		if ambiguous_task then
-			if _ollama_kill_task == ambiguous_task then _ollama_kill_task = nil end
 			if _ollama_serve_task == ambiguous_task then _ollama_serve_task = nil end
 			_ollama_ambiguous_task = ambiguous_task
 		end
@@ -796,7 +795,7 @@ local function ensure_ollama_running(options)
 		return fail_start("server executable resolution", binary_err)
 	end
 	if RuntimeChoice.classify(source_kind) ~= "native" then
-		return fail_start("external runtime requires manual service management", false)
+		return fail_start(Errors.OLLAMA_EXTERNAL_RUNTIME_MANUAL, false)
 	end
 	if my_generation ~= _ollama_start_generation or not _ollama_starting
 		or ollama_start_authorized(my_generation) ~= true then
@@ -827,7 +826,7 @@ local function ensure_ollama_running(options)
 			return
 		end
 		if _ollama_started ~= true or _ollama_starting == true then
-			fail_start("server task exited before publication", false)
+			fail_start(Errors.OLLAMA_SERVER_EXITED_BEFORE_PUBLICATION, false)
 			return
 		end
 		_ollama_started = false
@@ -1930,7 +1929,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 
 	local effective_temp = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	local system_prompt  = Profiles.resolve_system_prompt(profile, num_predictions)
-	local tokens         = tonumber(max_predict) * num_predictions + (num_predictions * 5)
+	local tokens         = TokenBudget.for_call(tonumber(max_predict), num_predictions)
 	local is_batch       = profile.batch
 	local dedup_stats    = ApiCommon.new_dedup_stats()
 	local post_fn        = streaming and post_and_parse_streaming or post_and_parse
@@ -2263,6 +2262,13 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 	end
 
 	do_next()
+end
+
+--- Hands in the HttpClient that sends inference requests (engine init, the
+--- HttpClient port of the shared request plan). The default stays this module's own client.
+--- @param client table Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	_infer_client = Ports.check("HttpClient", client)
 end
 
 return M

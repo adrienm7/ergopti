@@ -109,6 +109,25 @@ helpers.describe("Ollama model download: streaming transaction", function()
 		restore()
 	end)
 
+	helpers.it("(model-selector-progress) tells the page each new whole percentage, then the end", function()
+		local Download, transport = load_fixture()
+		local told = {}
+		local ok, err = xpcall(function()
+			Download.set_progress_listener(function(tag, percent) told[#told + 1] = tag .. ":" .. tostring(percent) end)
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			transport.starts[1].on_chunk('{"status":"pulling","completed":25,"total":100}\n')
+			transport.starts[1].on_chunk('{"status":"pulling","completed":255,"total":1000}\n')
+			transport.starts[1].on_chunk('{"status":"pulling manifest"}\n')
+			transport.starts[1].on_chunk('{"status":"pulling","completed":426,"total":1000}\n{"status":"success"}\n')
+			transport.starts[1].on_done({ ok = true })
+			helpers.assert_eq(table.concat(told, ","), "qwen:2b:25,qwen:2b:42,qwen:2b:nil",
+				"a repeated whole percentage or a frame without one is not told; the end is")
+		end, debug.traceback)
+		Download.set_progress_listener(nil)
+		restore()
+		if not ok then error(err) end
+	end)
+
 	helpers.it("keeps a failed request retryable and cancels only its named owner", function()
 		local Download, transport, window, shown = load_fixture()
 		helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))

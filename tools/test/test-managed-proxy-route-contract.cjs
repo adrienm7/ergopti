@@ -187,13 +187,19 @@ function admission(options) {
 	const script = [
 		`log_info() { printf '[T] %s\\n' "$1" >&2; }`,
 		`log_error() { printf '[T] %s\\n' "$1" >&2; }`,
-		options.probe === false ? '' : `OPAQUE_NETWORK_PAC_PROBE_URL='https://registry.ollama.ai'`,
+		options.probe === false
+			? ''
+			: options.probeUrls
+				? `OPAQUE_NETWORK_PAC_PROBE_URLS='https://registry.ollama.ai'`
+				: `OPAQUE_NETWORK_PAC_PROBE_URL='https://registry.ollama.ai'`,
+		options.before ?? '',
 		`. '${posix(path.join(driver, 'modules', 'llm', 'network-retry.sh'))}'`,
 		`managed_bootstrap_launcher_available() { return ${options.launcherAvailable === false ? 1 : 0}; }`,
 		`opaque_system_proxy_snapshot() { ${snapshot}; }`,
 		`ERGOPTI_LAUNCHER_EXECUTABLE='${posix(launcher)}'`,
 		options.mode === 'opaque' ? 'apply_system_network opaque' : 'apply_system_network',
 		'status=$?',
+		options.after ?? '',
 		'printf "RESULT|%s|%s|%s|%s\\n" "$status" "${HTTPS_PROXY-unset}" "${https_proxy-unset}" "${NO_PROXY-unset}"',
 		'exit "$status"'
 	].join('\n');
@@ -256,12 +262,22 @@ try {
 		assert.equal(run.result[4], 'localhost,127.0.0.1,::1');
 	});
 
-	check('a lookup that fails keeps the refusal and names only the stage', () => {
+	check('a PAC that cannot be fetched goes direct with one warning naming the stage', () => {
 		const run = admission({ mode: 'opaque', status: 78, output: 'STAGE native_pac_download' });
-		assert.equal(run.code, 78);
-		assert.ok(run.stderr.includes('native_pac_download'), run.stderr);
-		assert.ok(run.stderr.includes(REFUSAL), run.stderr);
-		assert.ok(!run.stdout.includes('RESULT|0'));
+		assert.equal(run.code, 0, run.stderr);
+		assert.equal(run.result[2], 'unset', 'no relay is exported');
+		assert.equal(run.result[3], 'unset');
+		assert.equal(run.result[4], 'localhost,127.0.0.1,::1', 'loopback exclusions are kept');
+		assert.ok(!run.stderr.includes(REFUSAL), run.stderr);
+		const warnings = run.stderr.split('\n').filter((line) => line.includes('WARNING'));
+		assert.equal(warnings.length, 1, run.stderr);
+		assert.ok(warnings[0].includes('(native_pac_download)'), warnings[0]);
+		assert.ok(warnings[0].includes('Trying a direct connection.'), warnings[0]);
+		assert.ok(
+			run.stderr.includes('__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:native_pac_download\n'),
+			'the Lua caller reads the stage from the marker'
+		);
+		assert.ok(!/proxy/i.test(warnings[0]), 'the warning never carries the classifier word');
 	});
 
 	check('without a named origin the launcher is never asked and the pull stays refused', () => {
@@ -286,6 +302,13 @@ try {
 		assert.equal(run.code, 0, run.stderr);
 		assert.equal(run.result[2], 'http://explicit.corp:8080');
 		assert.equal(run.calls, '');
+	});
+
+	check('a route the PAC names but that cannot be exported is refused, never sent direct', () => {
+		const run = admission({ mode: 'opaque', status: 78, output: 'STAGE native_proxy_dictionary' });
+		assert.equal(run.code, 78, run.stderr);
+		assert.ok(run.stderr.includes(REFUSAL), run.stderr);
+		assert.ok(!run.stderr.includes('WARNING'), run.stderr);
 	});
 
 	check('a route that cannot be exported is refused, not guessed', () => {
@@ -314,6 +337,9 @@ try {
 		assert.equal(run.code, 0, run.stderr);
 		assert.equal(run.result[2], 'unset');
 		assert.ok(run.stderr.includes('native_pac_evaluation'), run.stderr);
+		const warnings = run.stderr.split('\n').filter((line) => line.includes('WARNING'));
+		assert.equal(warnings.length, 1, 'its downloads are announced as direct');
+		assert.ok(warnings[0].includes('(native_pac_evaluation)'), warnings[0]);
 	});
 
 	check('the daemon start without a named origin never calls the launcher', () => {
@@ -535,6 +561,153 @@ try {
 			environment
 		);
 		assert.equal(run.stdout, 'internal.corp,b.example');
+	});
+	// ===========================================================
+	// ===== 4/ PAC unavailable: the download goes direct ========
+	// ===========================================================
+
+	const fallback = proxyPolicy.pac_unavailable_fallback;
+	const fallbackStages = fallback.stages;
+
+	check('the shell fallback stages are the shared policy, in order', () => {
+		const line = /^PAC_UNAVAILABLE_FALLBACK_STAGES="([^"]*)"$/m.exec(policyText);
+		assert.ok(line, 'the shell names the stages in one constant');
+		assert.deepEqual(line[1].split(' '), fallbackStages);
+		assert.equal(fallback.route, 'direct');
+		assert.equal(fallback.explicit_environment_relay, 'no_fallback');
+		assert.equal(fallback.pac_selected_relay_failure, 'no_fallback');
+		for (const stage of fallbackStages) {
+			assert.ok(
+				stages.some((row) => row.code === stage),
+				`${stage} is in the closed inventory`
+			);
+		}
+		assert.ok(
+			!fallbackStages.includes('native_proxy_dictionary'),
+			'a PAC-named relay never goes direct'
+		);
+		assert.ok(
+			!fallbackStages.includes('native_session_terminal'),
+			'a failed transfer never goes direct'
+		);
+	});
+
+	check('the Swift worker reads the same stages from its generated policy', () => {
+		const generated = read(path.join(sources, 'ManagedBootstrapPolicy.generated.swift'));
+		assert.ok(
+			generated.includes(
+				`static let pacUnavailableFallbackStages: Set<String> = ${JSON.stringify(fallbackStages)}`
+			)
+		);
+		const http = read(path.join(sources, 'ManagedHTTPWorker.swift'));
+		assert.match(
+			http,
+			/guard directFallback,\s+ManagedNetworkBootstrapPolicy\.pacUnavailableFallbackStages\.contains\(failure\.stage\.rawValue\)/
+		);
+	});
+
+	check('every fallback stage goes direct, every other stage keeps the refusal', () => {
+		for (const row of stages) {
+			const run = admission({ mode: 'opaque', status: 78, output: `STAGE ${row.code}` });
+			if (fallbackStages.includes(row.code)) {
+				assert.equal(run.code, 0, `${row.code}: ${run.stderr}`);
+				assert.equal(run.result[2], 'unset', row.code);
+			} else {
+				assert.equal(run.code, 78, `${row.code}: ${run.stderr}`);
+				assert.ok(run.stderr.includes(REFUSAL), row.code);
+				assert.ok(!run.stderr.includes('WARNING'), row.code);
+			}
+		}
+		const unknown = admission({ mode: 'opaque', status: 78, output: 'no stage at all' });
+		assert.equal(unknown.code, 78, 'an unnamed failure is not proof of an unusable PAC');
+	});
+
+	check('an explicit relay wins over a failing lookup and never falls back', () => {
+		const run = admission({
+			mode: 'opaque',
+			relay: 'http://explicit.corp:8080',
+			status: 78,
+			output: 'STAGE native_pac_download'
+		});
+		assert.equal(run.code, 0, run.stderr);
+		assert.equal(run.result[2], 'http://explicit.corp:8080');
+		assert.equal(run.calls, '');
+		assert.ok(!run.stderr.includes('WARNING'), run.stderr);
+	});
+
+	check('a direct attempt that works is logged once', () => {
+		const run = admission({
+			mode: 'opaque',
+			status: 78,
+			output: 'STAGE native_pac_evaluation',
+			after: 'retry_network true; retry_network true'
+		});
+		assert.equal(run.code, 0, run.stderr);
+		const lines = run.stderr
+			.split('\n')
+			.filter((line) => line.includes('The direct connection worked'));
+		assert.deepEqual(lines, [
+			'[T] The direct connection worked after the automatic network configuration failed (native_pac_evaluation).'
+		]);
+	});
+
+	check('a direct attempt that fails names both causes', () => {
+		const run = admission({
+			mode: 'opaque',
+			status: 78,
+			output: 'STAGE native_pac_download',
+			after: 'NETWORK_MAX_RETRIES=1; retry_network false; [ $? -eq 1 ] || exit 9'
+		});
+		assert.equal(run.code, 0, run.stderr);
+		assert.ok(
+			run.stderr.includes(
+				'[T] The automatic network configuration was unreachable (native_pac_download) and the direct connection failed (code 1).'
+			),
+			run.stderr
+		);
+	});
+
+	check('a download without a PAC fallback logs no fallback outcome', () => {
+		const run = admission({
+			mode: 'opaque',
+			output: 'ROUTE direct',
+			after: 'NETWORK_MAX_RETRIES=1; retry_network false; retry_network true'
+		});
+		assert.ok(!/direct connection (worked|failed)/.test(run.stderr), run.stderr);
+	});
+
+	check('the daemon start resolves every origin the client inventory names', () => {
+		// The server prelude names pac_probe_client "ollama" (OPAQUE_NETWORK_PAC_PROBE_URLS):
+		// the start used to read only the single-origin variable and never looked up.
+		const run = admission({
+			mode: 'static',
+			probeUrls: true,
+			output: 'ROUTE http://relay.corp:3128'
+		});
+		assert.equal(run.code, 0, run.stderr);
+		assert.equal(run.result[2], 'http://relay.corp:3128');
+		assert.equal(run.calls.trim(), '--managed-proxy-route https://registry.ollama.ai 20');
+	});
+
+	check('the shell, the Swift spool and the Python receiver spell the same lines', () => {
+		const swift = read(path.join(sources, 'ManagedBootstrapDownload.swift'));
+		const python = read(path.join(driver, 'modules', 'llm', 'managed_bootstrap_http.py'));
+		for (const fragment of [
+			'__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:',
+			'The automatic network configuration could not be used (',
+			'). Trying a direct connection.',
+			'The direct connection worked after the automatic network configuration failed (',
+			'The automatic network configuration was unreachable (',
+			') and the direct connection failed ('
+		]) {
+			for (const [name, text] of [
+				['network-retry.sh', policyText],
+				['ManagedBootstrapDownload.swift', swift],
+				['managed_bootstrap_http.py', python]
+			]) {
+				assert.ok(text.includes(fragment), `${name} spells ${JSON.stringify(fragment)}`);
+			}
+		}
 	});
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });

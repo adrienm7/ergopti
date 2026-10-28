@@ -1,0 +1,130 @@
+{
+	"_comment": "The pieces of the info bar under the predictions, replayed through _shared/lua/llm/request_plan/info_bar.lua by the macOS and Linux runners. Pieces come in the order model, backend, the prompt's short name, position i/n; a prompt label is cut at its first em dash on every OS (Linux used to keep a label that begins with the dash). Deliberate differences stay in the options: require_model is macOS (no model, no bar), position is Linux (it cycles candidates and shows i/n; macOS lists them all). The separator is the driver's: macOS joins with an em dash, Linux with a middle dot.",
+	"drivers": {
+		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
+		"linux": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
+		"windows": "Not ported yet: the AutoHotkey tooltip builds its own info line; it must use the same order (model, backend, short prompt name) and the em dash cut of the label, and replay every vector."
+	},
+	"differences": {
+		"separator": "macOS joins with an em dash, Linux with a middle dot. Deliberate: each matches its tooltip's typography and existing screenshots; the pieces and their order are shared.",
+		"position": "Linux cycles candidates and shows i/n; macOS lists every candidate and shows none. Deliberate: the position only means something where one candidate is active.",
+		"backend": "Linux has no backend label (one local HTTP stack); macOS names Ollama or MLX. Deliberate: the caller passes none.",
+		"require_model": "macOS hides the whole bar without a model; Linux still names the prompt. Deliberate, kept to avoid changing what either shows.",
+		"label_cut": "Linux used to cut only the built-in prompts' translated labels and showed a user prompt's label whole, and kept a label that begins with the dash. Convergence to the macOS rule on both counts."
+	},
+	"vectors": [
+		{
+			"id": "model-backend-and-short-profile",
+			"spec": {
+				"model": "qwen3:4b",
+				"backend": "MLX",
+				"profile_label": "Basic — Simple prediction"
+			},
+			"expect": ["qwen3:4b", "MLX", "Basic"]
+		},
+		{
+			"id": "no-backend",
+			"spec": {
+				"model": "qwen3:4b",
+				"profile_label": "Advanced"
+			},
+			"expect": ["qwen3:4b", "Advanced"]
+		},
+		{
+			"id": "position-is-shown-above-one-candidate",
+			"spec": {
+				"model": "m",
+				"profile_label": "Basic",
+				"position": {
+					"index": 2,
+					"count": 3
+				}
+			},
+			"expect": ["m", "Basic", "2/3"]
+		},
+		{
+			"id": "position-is-hidden-for-one-candidate",
+			"spec": {
+				"model": "m",
+				"profile_label": "Basic",
+				"position": {
+					"index": 1,
+					"count": 1
+				}
+			},
+			"expect": ["m", "Basic"]
+		},
+		{
+			"id": "required-model-missing-hides-the-bar",
+			"spec": {
+				"profile_label": "Basic",
+				"require_model": true
+			},
+			"expect_none": true
+		},
+		{
+			"id": "empty-required-model-hides-the-bar",
+			"spec": {
+				"model": "",
+				"backend": "MLX",
+				"require_model": true
+			},
+			"expect_none": true
+		},
+		{
+			"id": "optional-model-missing-still-names-the-prompt",
+			"spec": {
+				"profile_label": "Basic — Simple"
+			},
+			"expect": ["Basic"]
+		},
+		{
+			"id": "a-label-starting-with-the-dash-is-kept-whole",
+			"spec": {
+				"model": "m",
+				"profile_label": "— foo"
+			},
+			"expect": ["m", "— foo"]
+		},
+		{
+			"id": "a-label-that-is-only-a-dash-is-blank",
+			"spec": {
+				"model": "m",
+				"profile_label": "—"
+			},
+			"expect": ["m"]
+		},
+		{
+			"id": "a-blank-label-is-dropped",
+			"spec": {
+				"model": "m",
+				"profile_label": "   "
+			},
+			"expect": ["m"]
+		},
+		{
+			"id": "surrounding-spaces-are-trimmed",
+			"spec": {
+				"model": "m",
+				"profile_label": "  Mon profil  —  texte long "
+			},
+			"expect": ["m", "Mon profil"]
+		},
+		{
+			"id": "nothing-to-show",
+			"spec": {},
+			"expect_none": true
+		},
+		{
+			"id": "a-malformed-position-is-refused",
+			"spec": {
+				"model": "m",
+				"position": {
+					"index": "1",
+					"count": 2
+				}
+			},
+			"expect_error": "position must be { index, count } numbers"
+		}
+	]
+}

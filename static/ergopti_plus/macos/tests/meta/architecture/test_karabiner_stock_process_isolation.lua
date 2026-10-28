@@ -45,6 +45,8 @@ local syntax = require("tests.support.karabiner_isolation.syntax")
 local detector = require("tests.support.karabiner_isolation.detector")
 local without_comments = syntax.without_comments
 local find_offenders = detector.find_offenders
+local generated_swift_identifiers = syntax.generated_swift_identifiers
+local fold_generated_identifiers = syntax.fold_generated_identifiers
 local mask_explicit_open_gui_capability = detector.mask_explicit_open_gui_capability
 
 helpers.describe("Karabiner isolation: runtime", function()
@@ -73,7 +75,18 @@ helpers.describe("Karabiner isolation: runtime", function()
 		helpers.assert_eq(explicit_capabilities, 1,
 			"only ke_lifecycle.M.open_gui may contain stock Karabiner launch APIs")
 
+		local identifier_values
+		for _, unit in ipairs(units) do
+			if unit.path:gsub("\\", "/"):match("/launcher/Sources/ErgoptiPlus/Identifiers%.generated%.swift$") then
+				assert(identifier_values == nil, "the generated Swift identifiers must be one unit")
+				identifier_values = generated_swift_identifiers(unit.body)
+			end
+		end
+		helpers.assert_true(identifier_values ~= nil,
+			"the runtime scan must include the launcher's generated Swift identifiers")
+
 		local offenders = {}
+		local folded_swift_units = 0
 		local lifecycle_units = 0
 		local exact_owned_task_terminations = 0
 		for _, unit in ipairs(units) do
@@ -96,10 +109,19 @@ helpers.describe("Karabiner isolation: runtime", function()
 					offenders[#offenders + 1] = unit.path .. ": explicit open_gui also contains " .. label
 				end
 			end
+			-- Swift names its owned labels through the generated enum; judge the
+			-- value each reference holds, as the launcher does at run time.
+			if normalized_path:match("%.swift$") then
+				local folded = fold_generated_identifiers(guarded_body, identifier_values)
+				if folded ~= guarded_body then folded_swift_units = folded_swift_units + 1 end
+				guarded_body = folded
+			end
 			for _, label in ipairs(find_offenders(guarded_body)) do
 				offenders[#offenders + 1] = unit.path .. ": " .. label
 			end
 		end
+		helpers.assert_true(folded_swift_units > 0,
+			"the launcher's generated identifier references must be folded before the scan")
 		helpers.assert_eq(lifecycle_units, 1,
 			"the runtime unit scan must include ke_lifecycle exactly once")
 		helpers.assert_eq(exact_owned_task_terminations, 1,

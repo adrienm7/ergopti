@@ -971,6 +971,31 @@ printf '%s|%s|%s|%s|%s\\n' "$NO_PROXY" "$no_proxy" "$UV_SYSTEM_CERTS" "\${SSL_CE
 		);
 		console.log(`ok - ${sequence.id}`);
 	}
+	// Field run 2026-10-27 19:47 (ledger L41): an inherited CA file stopped every
+	// download. Every activation drops both names, with one INFO line per name.
+	for (const mode of ['', 'opaque']) {
+		const env = fixtureHostEnvironment();
+		env.HTTPS_PROXY = 'http://chosen.invalid:3128';
+		env.SSL_CERT_FILE = '/literal/inherited-ca';
+		env.SSL_CERT_DIR = '/literal/inherited-dir';
+		const script = `log_info() { printf 'INFO %s\\n' "$1"; }; log_error() { :; }; . ${quote(shellPath(policy))};
+apply_system_network ${mode} || exit $?; apply_system_network ${mode} || exit $?;
+printf '%s|%s|%s\\n' "\${SSL_CERT_FILE-unset}" "\${SSL_CERT_DIR-unset}" "$UV_SYSTEM_CERTS"`;
+		const received = spawnSync(bash, ['-c', script], { env, encoding: 'utf8', timeout: 10000 });
+		assert.ifError(received.error);
+		assert.equal(received.status, 0, `inherited-trust-${mode || 'static'}`);
+		const lines = received.stdout.trim().split('\n');
+		assert.deepEqual(
+			lines.filter((line) => line.startsWith('INFO Inherited')),
+			[
+				'INFO Inherited SSL_CERT_FILE ignored: downloads use the system and keychain trust.',
+				'INFO Inherited SSL_CERT_DIR ignored: downloads use the system and keychain trust.'
+			],
+			`inherited-trust-${mode || 'static'}`
+		);
+		assert.equal(lines[lines.length - 1], 'unset|unset|1', `inherited-trust-${mode || 'static'}`);
+		console.log(`ok - inherited-trust-${mode || 'static'}`);
+	}
 	const phaseVectors = [
 		{
 			id: 'exact-chunked-refusal',

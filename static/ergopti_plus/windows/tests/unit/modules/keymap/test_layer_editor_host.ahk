@@ -262,8 +262,15 @@ Test("layer editor host: save, cancel and unknown messages", _LEH_MessagesRouteT
 ; must refuse the same sizes and name its refusals with the same codes.
 _LEH_ContractMatchesTheLuaHosts() {
 	Source := FileRead(_LEH_SharedDir() . "\lua\keymap\layer_editor.lua", "UTF-8")
-	AssertTrue(RegExMatch(Source, "m)^M\.MAX_TEXT_BYTES = (\d+)\r?$", &Found), "the Lua hosts declare MAX_TEXT_BYTES")
-	AssertEqual(Integer(Found[1]), LAYER_EDITOR_MAX_TEXT_BYTES, "one size limit on every OS")
+	AssertTrue(InStr(Source, 'M.MAX_TEXT_BYTES = Timings.count("limits", "layer_file_bytes")') > 0,
+		"the Lua hosts read [limits] layer_file_bytes")
+	Registry := ParseTomlFile(_LEH_SharedDir() . "\modules\timings\constants.toml")
+	MaxBytes := Integer(IniCacheGet(Registry, "limits", "layer_file_bytes"))
+	AssertEqual(TimingsGet("limits", "layer_file_bytes"), MaxBytes, "the host reads the registry value")
+	Refused := LayerEditor_Validate(Format("{:" . (MaxBytes + 1) . "}", ""), Map())
+	AssertEqual(Refused.Length, 1, "one byte over [limits] layer_file_bytes is refused")
+	AssertEqual(Refused[1]["code"], LAYER_EDITOR_INVALID_PAYLOAD, "the size refusal is an invalid payload")
+	AssertTrue(InStr(Refused[1]["detail"], "more than " . MaxBytes) > 0, "the refusal names the registry limit")
 	Codes := Map("INVALID_PAYLOAD", LAYER_EDITOR_INVALID_PAYLOAD, "WRITE_FAILED", LAYER_EDITOR_WRITE_FAILED,
 		"FILE_UNREADABLE", LAYER_EDITOR_FILE_UNREADABLE)
 	for Name, Code in Codes {

@@ -22,6 +22,7 @@ local StartupTransaction = require("infra.startup_transaction")
 local Logger             = require("infra.logger")
 local Manifest           = require("infra.manifest_reader")
 local ChordCatalogue     = require("infra.script_chord_catalogue")
+local ConfigKeys = require("config_keys")
 
 local M = {}
 
@@ -109,7 +110,7 @@ end)
 local _script_chord_defaults, _script_chords_on = ChordCatalogue.defaults()
 
 M.DEFAULT_STATE = {
-	shortcuts                = Manifest.default_for("shortcuts.enabled"),
+	shortcuts                = Manifest.default_for(ConfigKeys.KEY.SHORTCUTS_ENABLED),
 	script_control_enabled   = _script_chords_on,
 	script_control_shortcuts = _script_chord_defaults,
 	chatgpt_url              = Bindings.DEFAULT_CHATGPT_URL,

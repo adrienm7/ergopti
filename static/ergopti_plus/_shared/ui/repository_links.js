@@ -39,7 +39,7 @@
 		var root = '/' + owner + '/' + repo;
 		return (
 			parsed.protocol === 'https:' &&
-			parsed.hostname === 'github.com' &&
+			parsed.hostname === ERGOPTI_IDENTIFIERS.hosts.github &&
 			parsed.username === '' &&
 			parsed.password === '' &&
 			parsed.port === '' &&

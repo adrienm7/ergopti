@@ -27,6 +27,12 @@ helpers.describe("linux/infra/timings.lua", function()
 		helpers.assert_eq(one_shot, 2000, "one_shot_shift_timeout_ms = 2000")
 	end)
 
+	helpers.it("Timings.ms returns the waits the accessibility pump and the health check read", function()
+		local Timings = require("infra.timings")
+		helpers.assert_eq(Timings.ms("privacy", "focus_pump_sleep_ms"), 1, "atspi_focus_watch pump sleep")
+		helpers.assert_eq(Timings.sec("ui", "healthcheck_probe_defer_ms"), 0.001, "health check probe defer")
+	end)
+
 	helpers.it("Timings.sec converts ms to seconds", function()
 		local Timings = require("infra.timings")
 		local sec = Timings.sec("keystats", "session_timeout_ms")

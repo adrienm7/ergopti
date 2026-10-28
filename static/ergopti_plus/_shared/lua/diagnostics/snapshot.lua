@@ -26,6 +26,7 @@ local M = {}
 local reload_gate = require("reload_gate")
 local NativePath = require("native_path")
 local TextUtils = require("text_utils")
+local ConfigKeys = require("config_keys")
 
 
 
@@ -62,7 +63,7 @@ M.FIELDS = {
 	"display",
 	"config_dir",
 	"logs_dir",
-	"log_level",
+	ConfigKeys.LEAF.LOG_LEVEL,
 	"features_enabled",
 	"boot_ms",
 }

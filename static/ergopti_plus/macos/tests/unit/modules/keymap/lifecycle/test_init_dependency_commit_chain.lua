@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local PortFakes = require("tests.support.port_fakes")
 
 local function noop() end
 
@@ -344,13 +345,13 @@ local function with_prediction_results(warmup_result, streaming_result, callback
 		["modules.llm.api_common"] = {},
 		["infra.logger"] = LOGGER_STUB,
 		["infra.timings"] = { sec = function() return 0.1 end },
-		["adapters.timer_scheduler"] = {},
+		["adapters.timer_scheduler"] = PortFakes.timer_scheduler(),
 		["infra.i18n"] = {},
 		["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 },
-		["ui.tooltip"] = {
+		["ui.tooltip"] = PortFakes.complete_tooltip({
 			set_navigate_callback = noop,
 			set_enter_validates = noop,
-		},
+		}),
 		["modules.keystats"] = {},
 	}, function(engine)
 		callback(engine, calls)

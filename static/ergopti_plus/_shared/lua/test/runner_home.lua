@@ -18,11 +18,15 @@
 ---    point back at the real tree, unless they lie in a temporary directory.
 ---    LuaJIT also exports the redirect to the process environment through the
 ---    FFI, so a child started with io.popen inherits it. Lua 5.4 cannot change
----    the environment: a test that spawns a child there passes its own HOME.
+---    its own environment, so io.popen and os.execute are wrapped there: every
+---    shell command starts by exporting the scratch HOME and unsetting the
+---    real XDG directories, which a command that sets its own HOME still
+---    overrides.
 --- 3. The scratch directory is removed when the runner exits.
 --- ==============================================================================
 
 local M = {}
+local NativePath = require("native_path")
 
 local XDG_VARIABLES = {
 	XDG_CONFIG_HOME = true, XDG_DATA_HOME = true, XDG_STATE_HOME = true, XDG_CACHE_HOME = true,
@@ -31,7 +35,9 @@ local XDG_VARIABLES = {
 local TEMPORARY_ROOTS = { "/tmp", "/private/tmp", "/var/folders", "/private/var/folders" }
 
 local function normalised(path)
-	return (tostring(path):gsub("\\", "/"):gsub("/+$", ""))
+	local spelling = tostring(path)
+	if package.config:sub(1, 1) == "\\" then spelling = spelling:gsub("\\", "/") end
+	return NativePath.without_trailing_separators(spelling)
 end
 
 local function inside(path, root)
@@ -100,8 +106,46 @@ local function export_to_children(scratch, getenv)
 	end
 end
 
+local function shell_quote(text)
+	return "'" .. text:gsub("'", "'\\''") .. "'"
+end
+
+--- The shell command that runs `command` with the scratch environment.
+--- @param scratch string The scratch home.
+--- @param command string The shell command a test asked for.
+--- @param getenv function The original environment reader.
+--- @return string
+function M.child_command(scratch, command, getenv)
+	local hidden = {}
+	for name in pairs(XDG_VARIABLES) do
+		if not M.is_scratch(getenv(name), getenv) then hidden[#hidden + 1] = name end
+	end
+	table.sort(hidden)
+	local prefix = "export HOME=" .. shell_quote(scratch) .. "; "
+	if #hidden > 0 then prefix = prefix .. "unset " .. table.concat(hidden, " ") .. "; " end
+	return prefix .. command
+end
+
+--- Makes io.popen and os.execute start their shell with the scratch
+--- environment, for an interpreter that cannot change its own.
+--- @param target table { popen = function, execute = function } to wrap in place.
+--- @param scratch string The scratch home.
+--- @param getenv function The original environment reader.
+local function wrap_children(target, scratch, getenv)
+	local popen, execute = target.popen, target.execute
+	target.popen = function(command, ...)
+		return popen(M.child_command(scratch, command, getenv), ...)
+	end
+	-- os.execute() with no command only asks whether a shell exists.
+	target.execute = function(command, ...)
+		if command == nil then return execute() end
+		return execute(M.child_command(scratch, command, getenv), ...)
+	end
+end
+
 --- Redirects HOME when it is a real home. Call once, before any module loads.
---- @param env table|nil Test seam: { getenv, exit } replacing os.getenv and os.exit.
+--- @param env table|nil Test seam: { getenv, exit, popen, execute, exports_environment } replacing
+---   os.getenv, os.exit, io.popen and os.execute; exports_environment = true skips the child wrappers.
 --- @return string home The HOME the process now resolves.
 --- @return boolean redirected Whether a scratch home replaced the real one.
 function M.isolate(env)
@@ -121,11 +165,23 @@ function M.isolate(env)
 		end
 		return getenv(name)
 	end
+	local posix = package.config:sub(1, 1) == "/"
 	if env then
 		env.getenv, env.exit = wrapped_getenv, function(...) remove_tree(scratch); return previous_exit(...) end
+		if posix and env.exports_environment ~= true and env.popen and env.execute then
+			wrap_children(env, scratch, getenv)
+		end
 	else
 		-- A POSIX-only call: the Windows test mode emulates its own environment.
-		if package.config:sub(1, 1) == "/" then export_to_children(scratch, getenv) end
+		if posix then
+			if type(jit) == "table" then
+				export_to_children(scratch, getenv)
+			else
+				local shell = { popen = io.popen, execute = os.execute }
+				wrap_children(shell, scratch, getenv)
+				io.popen, os.execute = shell.popen, shell.execute
+			end
+		end
 		os.getenv = wrapped_getenv
 		os.exit = function(...) remove_tree(scratch); return previous_exit(...) end
 	end

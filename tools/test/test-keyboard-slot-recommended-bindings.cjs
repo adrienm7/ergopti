@@ -13,12 +13,14 @@
 
 'use strict';
 
+require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a generated config-key constant
+
 const fs = require('fs');
 const path = require('path');
 const toml = require('smol-toml');
 const { stripComments } = require('../lib/script-source.cjs');
 const SP = path.resolve(__dirname, '../../static/ergopti_plus');
-const PREDICTION_SLOTS = { ahk: 'win_space', hs: 'hs_ctrl_space', linux: 'super_space' };
+const PREDICTION_SLOTS = { ahk: 'win_space', hs: 'secondary_space', linux: 'meta_space' };
 const read = (file) => fs.readFileSync(path.join(SP, file), 'utf8').replace(/^\uFEFF/, '');
 
 /**

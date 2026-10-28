@@ -6,10 +6,10 @@ import Foundation
 import Security
 
 final class OwnedRuntimeCoreProvisionOwner {
-	private static let identifier = "com.ergoptiplus.app.runtime-installer"
+	private static let identifier = "\(Identifiers.BundleIds.launcher).runtime-installer"
 	private static let runtimeURL = URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus/Runtime", isDirectory: true)
 	private static let dataURL = URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus/RemapRuntime", isDirectory: true)
-	private static let target = "system/com.ergoptiplus.runtime.core"
+	private static let target = "system/\(Identifiers.ServiceLabels.macosCore)"
 	private let creator = getpid()
 	private let publisher: OwnedRuntimePublisherIdentity
 	private let principal: SecCode, leaf: Data, helper: OwnedRuntimeInstallTree, runtime: OwnedRuntimeInstallTree, payload: OwnedRuntimeInstallTree
@@ -79,7 +79,7 @@ final class OwnedRuntimeCoreProvisionOwner {
 		return true
 	}
 	private static func plistBytes() throws -> Data {
-		let fields: [String: Any] = ["Label": "com.ergoptiplus.runtime.core", "ProgramArguments": [runtimeURL.path + "/ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core"],
+		let fields: [String: Any] = ["Label": Identifiers.ServiceLabels.macosCore, "ProgramArguments": [runtimeURL.path + "/ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core"],
 			"UserName": "root", "RunAtLoad": false, "KeepAlive": false]
 		return try PropertyListSerialization.data(fromPropertyList: fields, format: .xml, options: 0)
 	}
@@ -155,7 +155,7 @@ final class OwnedRuntimeCoreProvisionOwner {
 		try verifyForPlistCustody(); try requireConfigurationAbsence()
 		guard custody.current() else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		serviceTouched = true
-		let bootstrap = try OwnedRuntimeCoreLaunchctl.run(arguments: ["bootstrap", "system", "/Library/LaunchDaemons/com.ergoptiplus.runtime.core.plist"])
+		let bootstrap = try OwnedRuntimeCoreLaunchctl.run(arguments: ["bootstrap", "system", "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist"])
 		guard bootstrap.status == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		try verifyForPlistCustody(); try requireConfigurationAbsence()
 		guard custody.current() else { throw OwnedRuntimeInstallFailure.cleanupPending }

@@ -7,10 +7,37 @@ answer once, then move the answered line below.
 
 ## Open
 
-None. The next batch goes here, each line naming the default taken meanwhile.
+- **"Sticky" in French and Latin-script locales:** the sticky-modifier labels keep the English "Sticky", as
+  the existing `menu.tapholds.sticky_*` strings do. Default meanwhile: kept. Use a French term such as
+  "rémanent" instead?
+- **Dutch "Rolls":** `category.rolls` and `hs_config.cat_rolls` keep "Rolls" (the Dutch "Rollen" means
+  "roles"). Default meanwhile: kept. Another Dutch word?
 
 ## Answered
 
+- **Answer of 2026-10-27 (Windows login start from a clone):** a Start at login registered from the clone's
+  `ErgoptiPlus.ahk` is a full developer run too (the user's `%APPDATA%\Ergopti\paths.toml`, auto-reload).
+- **Answer of 2026-10-27 (typing in Ergopti's own windows, ledger L31):** it counts. The event tap counts
+  it; the runtime's own refused Accessibility element is logged at INFO, not as a WARNING.
+- **Answer of 2026-10-27 (Karabiner):** when Ergopti's tap-hold feature is on, Ergopti quits the user's own
+  Karabiner-Elements and runs its own pinned runtime (the VirtualHID driver admits a single client). When the
+  feature is off and the user has their own Karabiner, Ergopti does not activate its runtime and leaves theirs
+  untouched.
+- **Answer of 2026-10-27 (WebView2 on Windows):** Ergopti keeps the system WebView2 runtime; it checks the
+  version it needs and refuses with a clear reason when the runtime is missing or too old.
+- **Answer of 2026-10-27 (every third-party runtime):** Ergopti keeps full control of each runtime it depends on
+  (Ollama, MLX, Karabiner and the like) on the three OS: it installs and runs its own pinned version whether
+  or not the user has one, never relies on the user's copy, and never stops or modifies it.
+- **Answer of 2026-10-27 (AI runtimes):** the Ollama Ergopti uses is always installed and owned by Ergopti at a
+  pinned version, the same for MLX; a user's own Ollama may or may not be installed and is never selected,
+  stopped or modified. The managed daemon must coexist with it (own port and models directory).
+- **Coordinator decisions of 2026-10-27 (the maintainer asked not to be asked; override if needed):**
+  - **App Cloner folder picker on macOS:** the Cancel button keeps the system label. NSOpenPanel has no
+    key-value `cancelButtonTitle`, so the wizard's guarded setter always failed silently; it is removed with
+    its assertion instead of hiding the error.
+  - **AppImage:** no bundled glibc or loader (the host GTK, GL and NSS modules must match the loader that
+    starts them); built on ubuntu:22.04, glibc 2.35 or newer, musl refused in words; a build gate refuses a
+    foreign loader or a staged C library.
 - **Answers of 2026-10-26 (QCM):**
   - **Slow-segment threshold:** 5 ms on the three OS (macOS and Linux were at 20 ms).
   - **Tap-hold delay migration marker:** a versioned migrator for `tap_hold.toml` on the three OS replaces the
@@ -39,6 +66,10 @@ None. The next batch goes here, each line naming the default taken meanwhile.
     `[tap_hold.retired_delays]` is kept forever.
   - **Quit:** Quit wins on the three OS: during a reload it abandons the reload and exits, once a write
     already in progress has finished. A pending per-category scope write blocks Linux Quit, as macOS.
+  - **PAR-41 (coordinator decisions, overridable):** the "no migration" of the design note is superseded by a
+    real config migration (schema v15) so no saved binding is lost, in line with the PAR-40 answer; the
+    parameters of renamed slots wait for a `rename_prefix` op (release blocker in the TODO); macOS `ctrl_g`
+    becomes an `open_url` slot with its URL later, with Windows `gpt`; the role name `secondary` is kept.
   - **Localized "general" metrics category:** the live dashboard folds its 19 spellings into one id, from the
     generated alias file.
 

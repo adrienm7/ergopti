@@ -32,6 +32,7 @@ local function observe(schedule, check)
 				if sql:find("PRAGMA encoding", 1, true) then return phase("encoding") end
 				if sql:find("INSERT OR IGNORE INTO meta", 1, true) then return phase("meta") end
 				if sql:find("ALTER TABLE events_llm", 1, true) then return phase("migration") end
+				if sql:find("INSERT INTO devices", 1, true) then return phase("device") end
 				return 0
 			end,
 			nrows = function(_, sql)
@@ -41,18 +42,6 @@ local function observe(schedule, check)
 					phase("counter")
 				end
 				return function() return nil end
-			end,
-			prepare = function()
-				if phase("device") ~= 0 then return nil end
-				state.statement_open = true
-				return { bind_values = function() return phase("bind") end,
-					step = function() return phase("step") == 0 and 101 or 19 end,
-					finalize = function()
-						helpers.assert_true(state.statement_open, "statement must be finalized exactly once")
-						state.finalizes = state.finalizes + 1
-						state.statement_open = false
-						return phase("finalize")
-					end }
 			end,
 			close = function()
 				helpers.assert_true(not state.closed, "consumed SQLite wrapper cannot be closed again")
@@ -151,30 +140,18 @@ helpers.describe("sqlite-startup-transaction", function()
 		end)
 	end)
 
-	for _, phase in ipairs({ "journal", "synchronous", "encoding", "meta", "device", "bind", "step", "finalize" }) do
+	for _, phase in ipairs({ "journal", "synchronous", "encoding", "meta", "device" }) do
 		helpers.it("sqlite-startup-refusal: rejects native " .. phase .. " refusal", function()
 			local schedule = { phase = phase, failure = "refuse" }
 			observe(schedule, function(writer, state)
 				helpers.assert_eq(writer.open_db(), false)
 				helpers.assert_nil(writer.get_db(), "refused startup cannot publish a writer")
 				helpers.assert_eq(state.closes, 1)
-				local statement_acquired = phase == "bind" or phase == "step" or phase == "finalize"
-				helpers.assert_eq(state.finalizes, statement_acquired and 1 or 0)
+				helpers.assert_eq(state.finalizes, 0, "the device row is one exec: no statement is ever open")
 				helpers.assert_true(#state.logs > 0, "native refusal must be diagnosed")
 				schedule.phase = nil
 				helpers.assert_true(writer.open_db(), "cleanly retired refusal must permit retry")
 				helpers.assert_true(writer.close_db())
-			end)
-		end)
-	end
-
-	for _, phase in ipairs({ "bind", "step", "finalize" }) do
-		helpers.it("sqlite-startup-statement: retires statement after " .. phase .. " exception", function()
-			observe({ phase = phase, failure = "throw" }, function(writer, state)
-				helpers.assert_eq(writer.open_db(), false)
-				helpers.assert_nil(writer.get_db())
-				helpers.assert_eq(state.finalizes, 1, "statement finalization is attempted exactly once")
-				helpers.assert_eq(state.closes, 1)
 			end)
 		end)
 	end

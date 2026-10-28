@@ -19,6 +19,7 @@ class TrayStartupCommands {
 		this.CommandFn := CommandFn
 		this.ScheduleFn := HasMethod(ScheduleFn, "Call") ? ScheduleFn : SetTimer
 		this.Pending := ""
+		this.RequestSerial := 0
 		this.Active := true
 		this.ReadyObserved := false
 		this.DispatchFn := ObjBindMethod(this, "Dispatch")
@@ -43,12 +44,22 @@ class TrayStartupCommands {
 		if Id != "suspend" && Id != "reload" && Id != "quit"
 			throw ValueError("Unknown startup command", -1, Id)
 		this.Pending := Id
-		Ready := this.InputReady()
-		try LoggerInfo("BootProfile", Format("Native startup command '{1}' admitted (input_ready={2}).",
-			Id, Ready))
-		; Reload uses its ordinary guarded owner to recover a stalled startup.
-		if Id = "reload" || Ready
-			this.ScheduleFn.Call(this.DispatchFn, -1)
+		this.RequestSerial += 1
+		Serial := this.RequestSerial
+		try {
+			Ready := this.InputReady()
+			try LoggerInfo("BootProfile", Format("Native startup command '{1}' admitted (input_ready={2}).",
+				Id, Ready))
+			; Reload uses its ordinary guarded owner to recover a stalled startup.
+			if Id = "reload" || Ready
+				this.ScheduleFn.Call(this.DispatchFn, -1)
+		} catch as Err {
+			; An unadmitted request cannot block recovery forever. A callback
+			; delivered before refusal may already have admitted a new same-id request.
+			if this.RequestSerial == Serial && this.Pending == Id
+				this.Pending := ""
+			throw Err
+		}
 		return true
 	}
 

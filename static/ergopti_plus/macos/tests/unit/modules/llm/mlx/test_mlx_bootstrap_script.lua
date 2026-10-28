@@ -515,6 +515,19 @@ helpers.describe("The installer works on a managed network (mlx-bootstrap-manage
 		end
 	end)
 
+	-- Field run 2026-10-27 19:47 (ledger L41): an inherited CA file overrode the
+	-- system store; uv now never sees it, and the drop is named once.
+	it_runs("drops an inherited CA file before uv runs", function(fixture)
+		local output, status = bootstrap(fixture, "SSL_CERT_FILE=/inherited/company-bundle.pem")
+		helpers.assert_eq(status, 0, output)
+		local syncs = uv_calls(fixture, "sync")
+		helpers.assert_true(#syncs > 0, "uv sync ran")
+		for _, line in ipairs(syncs) do
+			helpers.assert_true(line:find("ca_file= ", 1, true) ~= nil, "uv saw the inherited CA file: " .. line)
+		end
+		helpers.assert_true(output:find("Inherited SSL_CERT_FILE ignored", 1, true) ~= nil, output)
+	end)
+
 	it_runs("hands the relay to uv with loopback excluded", function(fixture)
 		local output, status = bootstrap(fixture, "HTTPS_PROXY=http://relay.corp:3129 NO_PROXY=intranet.corp")
 		helpers.assert_eq(status, 0, output)

@@ -18,7 +18,8 @@
  *    the release, its notes and the website refer to it.
  * 4. The catalogue's runner has GTK 3 and an XEmbed tray but no libayatana:
  *    the image bundles the tray library without GTK, and the smoke replays the
- *    catalogue's stalonetray check on a host without libayatana.
+ *    catalogue's stalonetray check on a host without libayatana. The
+ *    distribution sweep uses trayer where an image has no stalonetray.
  * 5. A musl system or an older glibc is refused in words by a plain-sh AppRun
  *    preflight, before the loader fails or bash is needed.
  * ==============================================================================
@@ -116,6 +117,99 @@ try {
 	assert.equal(Ceiling.checkTree([empty], readVersions).checked.length, 0);
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });
+}
+passed++;
+
+// 1b. The image uses the recipient's glibc AND loader: an executable must ask for
+// the standard loader, and no copy of the C library or its loader may be staged.
+{
+	assert.equal(Ceiling.STANDARD_INTERPRETER, '/lib64/ld-linux-x86-64.so.2');
+	assert.equal(
+		Ceiling.parseInterpreter(
+			'      [Requesting program interpreter: /nix/store/abc-glibc/lib/ld-linux-x86-64.so.2]'
+		),
+		'/nix/store/abc-glibc/lib/ld-linux-x86-64.so.2'
+	);
+	assert.equal(Ceiling.parseInterpreter('There is no dynamic section in this file.'), null);
+	for (const name of [
+		'libc.so.6',
+		'libm.so.6',
+		'libpthread.so.0',
+		'ld-linux-x86-64.so.2',
+		'libnss_dns.so.2',
+		'ld-musl-x86_64.so.1'
+	]) {
+		assert.ok(Ceiling.isHostLibcFile(name), `${name} is the recipient's, never staged`);
+	}
+	for (const name of [
+		'libluv.so.1',
+		'libcurl.so.4',
+		'libayatana-appindicator3.so.1',
+		'libcrypt.so.1'
+	]) {
+		assert.ok(!Ceiling.isHostLibcFile(name), `${name} may be staged`);
+	}
+	const tree = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-loader-'));
+	try {
+		const elf = Buffer.concat([Buffer.from([0x7f, 0x45, 0x4c, 0x46]), Buffer.alloc(16)]);
+		fs.mkdirSync(path.join(tree, 'usr/bin'), { recursive: true });
+		fs.mkdirSync(path.join(tree, 'usr/lib'), { recursive: true });
+		fs.writeFileSync(path.join(tree, 'usr/bin/luajit'), elf);
+		fs.writeFileSync(path.join(tree, 'usr/bin/helper'), elf);
+		fs.writeFileSync(path.join(tree, 'usr/lib/libluv.so.1'), elf);
+		const noNeeds = () => '';
+		const loaders = {
+			luajit: Ceiling.STANDARD_INTERPRETER,
+			helper: '/lib/ld-musl-x86_64.so.1',
+			'libluv.so.1': null
+		};
+		const readInterpreter = (file) => loaders[path.basename(file)];
+		let result = Ceiling.checkTree([tree], noNeeds, readInterpreter);
+		assert.deepEqual(
+			result.loaders.map((loader) => [path.basename(loader.path), loader.interpreter]),
+			[['helper', '/lib/ld-musl-x86_64.so.1']],
+			'a musl loader is refused, a library without one is not'
+		);
+		loaders.helper = '/nix/store/xyz/lib/ld-linux-x86-64.so.2';
+		assert.equal(
+			Ceiling.checkTree([tree], noNeeds, readInterpreter).loaders.length,
+			1,
+			'a Nix loader is refused'
+		);
+		loaders.helper = Ceiling.STANDARD_INTERPRETER;
+		result = Ceiling.checkTree([tree], noNeeds, readInterpreter);
+		assert.deepEqual([result.loaders, result.bundledLibc], [[], []]);
+		assert.equal(
+			Ceiling.checkTree([tree], noNeeds).loaders.length,
+			0,
+			'the loader is only read when asked'
+		);
+		fs.writeFileSync(path.join(tree, 'usr/lib/libc.so.6'), elf);
+		fs.writeFileSync(path.join(tree, 'usr/lib/ld-linux-x86-64.so.2'), elf);
+		assert.deepEqual(
+			Ceiling.checkTree([tree], noNeeds, readInterpreter).bundledLibc.map((file) =>
+				path.basename(file)
+			),
+			['ld-linux-x86-64.so.2', 'libc.so.6'],
+			'a staged C library or loader is refused'
+		);
+	} finally {
+		fs.rmSync(tree, { recursive: true, force: true });
+	}
+	// The plain statement a user reads: the minimum glibc and the musl refusal, in the
+	// docs and in the locale text AppRun prints.
+	const readme = read('static/ergopti_plus/linux/README.md');
+	assert.ok(
+		readme.includes(`**glibc ${Ceiling.GLIBC_CEILING} or newer**`),
+		'the README states the minimum glibc'
+	);
+	assert.ok(
+		/\*\*musl\*\*[\s\S]{0,200}cannot run programs built for\s+glibc/.test(readme),
+		'the README says musl hosts cannot run it'
+	);
+	const english = JSON.parse(read('static/ergopti_plus/_shared/data/locales/en.json'));
+	assert.match(english['startup.linux_appimage_musl_body'], /musl/i);
+	assert.match(english['startup.linux_appimage_musl_body'], /cannot|can't|not/i);
 }
 passed++;
 
@@ -320,7 +414,7 @@ assert.deepEqual(Preflight.MESSAGE_KEYS, {
 });
 // The distribution matrix keeps a musl image, an image below the ceiling and
 // the catalogue's LTS, and takes its expectations from the same two sources.
-const matrix = read('tools/build/appimage-distro-matrix.sh');
+const matrix = read('tools/build/appimage-distro-sweep.sh');
 const matrixImages = matrix.slice(matrix.indexOf('DEFAULT_IMAGES=('), matrix.indexOf('\n)\n'));
 for (const image of ['alpine:latest', 'ubuntu:20.04', 'debian:11', Ceiling.OLDEST_LTS_IMAGE]) {
 	assert.ok(matrixImages.includes(` ${image}`) || matrixImages.includes(`\t${image}`), image);
@@ -608,6 +702,54 @@ assert.ok(
 	read('.github/workflows/ci-release.yml').includes(`              ${ZSYNC} \\\n`),
 	'the release refuses to publish without the .zsync'
 );
+passed++;
+
+// Debian 12 has no stalonetray (removed from bookworm, back in trixie): the
+// distribution sweep installed it unconditionally and failed on debian:12 every
+// time. The check picks the first XEmbed tray apt can install, and finds the
+// docked icon by its WM class, since trayer's 1-pixel spacer is not 1x1.
+const distroCheck = read('tools/build/appimage-distro-check.sh');
+assert.ok(
+	!/apt-get install[^\n]* stalonetray /.test(distroCheck),
+	'no unconditional stalonetray install'
+);
+assert.ok(distroCheck.includes('"$tray" xdotool'), 'the chosen tray is the one installed');
+assert.ok(
+	distroCheck.includes(`grep '("ergopti-plus" ' | tail -n 1`),
+	'the docked icon is found by its WM class'
+);
+assert.ok(!distroCheck.includes("grep -v ' 1x1+' | tail -n 1"), 'not by its size');
+if (process.platform === 'linux') {
+	const { spawnSync } = require('node:child_process');
+	const start = distroCheck.indexOf('xembed_tray_package() {');
+	assert.ok(start >= 0, 'the tray chooser exists');
+	const chooser = distroCheck.slice(start, distroCheck.indexOf('\n}\n', start) + 3);
+	const fakeBin = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-tray-chooser-'));
+	try {
+		fs.writeFileSync(
+			path.join(fakeBin, 'apt-cache'),
+			'#!/bin/sh\necho "$2:"\ncase " $AVAILABLE " in\n\t*" $2 "*) echo "  Candidate: 1.0-1" ;;\n' +
+				'\t*) echo "  Candidate: (none)" ;;\nesac\n',
+			{ mode: 0o755 }
+		);
+		const choose = (available) =>
+			spawnSync('/bin/sh', ['-c', `${chooser}\nxembed_tray_package`], {
+				encoding: 'utf8',
+				env: { PATH: `${fakeBin}:/usr/bin:/bin`, AVAILABLE: available }
+			});
+		const both = choose('stalonetray trayer');
+		assert.equal(both.status, 0);
+		assert.equal(both.stdout.trim(), 'stalonetray', 'stalonetray where the image has it');
+		const bookworm = choose('trayer');
+		assert.equal(bookworm.status, 0);
+		assert.equal(bookworm.stdout.trim(), 'trayer', 'Debian 12 gets trayer');
+		const neither = choose('');
+		assert.notEqual(neither.status, 0, 'no tray is a refusal, not an empty install');
+		assert.equal(neither.stdout, '');
+	} finally {
+		fs.rmSync(fakeBin, { recursive: true, force: true });
+	}
+}
 passed++;
 
 console.log(`Linux AppImage portability: ${passed} checks passed.`);

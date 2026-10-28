@@ -46,6 +46,7 @@ local KeyEventHealth = require("infra.key_event_health")
 local ScriptChords = require("script_chords")
 local ChordCatalogue = require("infra.script_chord_catalogue")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "shortcuts.script_control"
 
@@ -59,7 +60,7 @@ local LOG = "shortcuts.script_control"
 -- ====================================
 -- ====================================
 
-local SCRIPT_CONTROL_SHORTCUT_CLAIM = "script_control"
+local SCRIPT_CONTROL_SHORTCUT_CLAIM = ConfigKeys.LEAF.SCRIPT_CONTROL
 
 -- Sentinel keycode -> script chord slot, built at the first key event.
 -- Karabiner's script-control rules (platform/remap/script_chord_rules.lua)
@@ -1496,7 +1497,7 @@ end
 --- @return boolean True to consume the keystroke, false to pass it through.
 local function handle_key(e)
 	local provenance, status, fence = EventProvenance.classify_with_fence(
-		e, "shortcuts.script_control")
+		e, ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL)
 	local fence_events = fence and fence.events or nil
 	local function finish(consume) return consume == true, fence_events end
 	if fence and fence.consume_original == true then return finish(true) end
@@ -1620,8 +1621,8 @@ M.PAUSE_OWNER_IDS = {
 	"warmup_controller",
 	"ollama_warmup",
 	"remote_warmup",
-	"wpm_menubar",
-	"wpm_widget",
+	ConfigKeys.COMMAND.WPM_MENUBAR,
+	ConfigKeys.COMMAND.WPM_WIDGET,
 	"remap_onboarding",
 	"predictions",
 	"tooltip",

@@ -9,6 +9,9 @@
 
 #Requires AutoHotkey v2.0
 
+; Bound real scheduler and native release observation without changing driver deadlines.
+global _UER_NATIVE_WAIT_MS := 2000
+
 _UER_ExitReentry(RequestFn, ReplaceWorker := false, ReenterClose := false) {
 	Fields := ["handle", "worker_hwnd", "worker_process_handle", "worker_generation",
 		"request_generation", "pending", "start_deadline_fn", "start_failure_tick",
@@ -139,10 +142,52 @@ Test("UIA: exit preserves a reentrant successor (uia-exit-reentry)",
 Test("UIA: native close reentry retains one terminal and fences admission (uia-exit-reentry)",
 	_UER_ExitReentry.Bind(UIASW_Request, true, true))
 
+; A completed task cannot grant a second termination ownership win. Require
+; the exact terminal owner's physical release receipts instead of a later win.
+_UER_NativeTaskRetired(Task) {
+	if !(Task is Map) || Task.Get("Phase", "") != SR_LEGACY_PHASE_TERMINAL
+		return false
+	Claim := Task.Get("TerminalClaim", 0)
+	if !(Claim is Map) || Claim.Get("Identity", 0) != ObjPtr(Task)
+			|| Claim.Get("ClaimIdentity", 0) != ObjPtr(Claim)
+			|| Claim.Get("TaskId", 0) != Task["TaskId"]
+		return false
+	if Claim["Owner"] != Task["TerminalOwner"] || !Claim["Finished"]
+			|| Claim["Native"] != 0 || Claim["CapturePending"]
+			|| _SR_ActiveTasks.Has(Task["TaskId"])
+			|| _SR_LegacyReleaseOwners.Has(ObjPtr(Claim))
+		return false
+	return Claim["Owner"] == "completion"
+		|| (Claim["Owner"] == "terminate" && Claim["TeardownComplete"])
+}
+
+_UER_RetireNativeHandle(Handle, Record) {
+	global _UER_NATIVE_WAIT_MS
+	if Record["start_calls"] == 0
+		return Handle.terminate() == true && Record["started_pid"] == 0
+			&& Handle.processId() == 0
+	if Record["started_pid"] <= 0 || !(Record["task"] is Map)
+		return false
+	Started := A_TickCount
+	loop {
+		Handle.terminate()
+		if _UER_NativeTaskRetired(Record["task"])
+			return true
+		if TickExpired64(Started, _UER_NATIVE_WAIT_MS)
+			return false
+		; Native termination is asynchronous; pump the actual owners until they
+		; publish release, preserving failure if capture or HANDLE debt remains.
+		_SR_Poll()
+		_SR_LegacyDrainReleases()
+		Sleep(10)
+	}
+}
+
 ; A timer retires startup while the actual shell handle is still being built.
 ; The late constructor must never publish over a newer worker or start a
 ; process after cancellation. Every handle remains in the fixture ledger.
-_UER_ConstructorReentry(Mode) {
+_UER_ConstructorReentry(Mode, CompleteBeforeCleanup := false) {
+	global _UER_NATIVE_WAIT_MS
 	Fields := ["starting_generation", "handle", "worker_hwnd", "worker_process_handle", "worker_generation",
 		"request_generation", "pending", "start_deadline_fn", "start_failure_tick",
 		"start_diagnostic", "handlers_registered", "spawn_fn", "post_fn", "open_process_fn",
@@ -181,7 +226,7 @@ _UER_ConstructorReentry(Mode) {
 		if State["constructors"] == 1 {
 			SetTimer(Reenter, -1)
 			Started := A_TickCount
-			while State["timer_calls"] == 0 && !TickExpired64(Started, 2000)
+			while State["timer_calls"] == 0 && !TickExpired64(Started, _UER_NATIVE_WAIT_MS)
 				Sleep(10)
 			AssertEqual(1, State["timer_calls"],
 				"the real scheduler must deliver reentry outside any publication Critical")
@@ -192,12 +237,22 @@ _UER_ConstructorReentry(Mode) {
 		}
 		local Handle := ShellRunner_Spawn(Executable, Args, Done)
 		local NativeStart := Handle.start
-		local Record := Map("start_calls", 0, "started_pid", 0)
+		local Record := Map("start_calls", 0, "started_pid", 0, "task", 0)
 		ObserveStart(*) {
 			Record["start_calls"] += 1
 			Result := NativeStart.Call()
-			if Result
-				Record["started_pid"] := Handle.processId()
+			if Result {
+				PreviousCritical := Critical("On")
+				try {
+					Record["started_pid"] := Handle.processId()
+					for NativeTaskId, NativeTask in _SR_ActiveTasks {
+						if NativeTask["Pid"] == Record["started_pid"] {
+							Record["task"] := NativeTask
+							break
+						}
+					}
+				} finally Critical(PreviousCritical)
+			}
 			return Result
 		}
 		; Passive observation of the genuine boundary catches start-then-kill
@@ -252,6 +307,20 @@ _UER_ConstructorReentry(Mode) {
 			}
 			AssertTrue(UIASW_IsReady(), "the retained actual worker must complete its native ready handshake")
 		}
+		if CompleteBeforeCleanup {
+			Task := State["records"][1]["task"]
+			AssertTrue(Task is Map, "the observer must retain the actual native ShellRunner owner")
+			AssertTrue(UIASW_Stop("canceled"), "native UIA retirement must be acknowledged")
+			Started := A_TickCount
+			while Task["Phase"] != SR_LEGACY_PHASE_TERMINAL && !TickExpired64(Started, _UER_NATIVE_WAIT_MS) {
+				_SR_Poll()
+				Sleep(10)
+			}
+			AssertEqual("completion", Task["TerminalOwner"],
+				"the genuine poller must win before fixture cleanup")
+			AssertFalse(State["handles"][1].terminate(),
+				"a completed task cannot grant a second termination ownership win")
+		}
 	} catch Any as Failure {
 		PrimaryFailure := Failure
 	} finally {
@@ -259,10 +328,10 @@ _UER_ConstructorReentry(Mode) {
 		try UIASW_Stop("canceled")
 		for Deadline in State["deadlines"]
 			SetTimer(Deadline, 0)
-		for Handle in State["handles"] {
+		for Index, Handle in State["handles"] {
 			try {
-				if !Handle.terminate()
-					CleanupFailures.Push("Native shell termination was not acknowledged.")
+				if !_UER_RetireNativeHandle(Handle, State["records"][Index])
+					CleanupFailures.Push("Native shell process, capture or HANDLE release remains unacknowledged.")
 			} catch as Err {
 				CleanupFailures.Push(Err.Message)
 			}
@@ -278,8 +347,45 @@ _UER_ConstructorReentry(Mode) {
 	}
 	if IsObject(PrimaryFailure)
 		throw PrimaryFailure
-	AssertEqual(0, CleanupFailures.Length, "the fixture must acknowledge every exact native handle retirement")
+	CleanupDiagnostic := ""
+	for Detail in CleanupFailures
+		CleanupDiagnostic .= (CleanupDiagnostic == "" ? "" : " | ") . Detail
+	AssertEqual(0, CleanupFailures.Length,
+		"the fixture must acknowledge every exact native handle retirement: " . CleanupDiagnostic)
 }
 for Mode in ["replace", "stop", "throw", "invalid", "noop", "busy"]
 	Test("UIA: constructor " . Mode . " preserves native startup ownership (uia-start-constructor-reentry)",
 		_UER_ConstructorReentry.Bind(Mode))
+
+Test("UIA: completed constructor worker retains exact cleanup receipts (uia-start-constructor-completion)",
+	_UER_ConstructorReentry.Bind("throw", true))
+
+_UER_RejectIncompleteCleanupReceipts() {
+	; These inert negative records qualify the predicate only. The positive
+	; receipt comes from the real worker and poller in the preceding case.
+	Task := Map("TaskId", 0, "Phase", SR_LEGACY_PHASE_TERMINAL,
+		"TerminalOwner", "completion", "TerminalClaim", 0)
+	Claim := Map("TaskId", 0, "Identity", 0, "ClaimIdentity", 0,
+		"Owner", "completion", "Finished", true, "Native", 0,
+		"CapturePending", false, "TeardownComplete", false)
+	for Field, Value in Map("Finished", false, "Native", Map("ProcessHandle", 1),
+			"CapturePending", true, "Identity", 0, "ClaimIdentity", 0, "TaskId", 1) {
+		IncompleteTask := Task.Clone()
+		IncompleteClaim := Claim.Clone()
+		IncompleteTask["TerminalClaim"] := IncompleteClaim
+		IncompleteClaim["Identity"] := ObjPtr(IncompleteTask)
+		IncompleteClaim["ClaimIdentity"] := ObjPtr(IncompleteClaim)
+		IncompleteClaim[Field] := Value
+		AssertFalse(_UER_NativeTaskRetired(IncompleteTask),
+			"native fixture cleanup must reject an invalid " . Field . " receipt")
+	}
+	Task["TerminalClaim"] := Claim
+	Claim["Identity"] := ObjPtr(Task)
+	Claim["ClaimIdentity"] := ObjPtr(Claim)
+	Task["TerminalOwner"] := "terminate"
+	Claim["Owner"] := "terminate"
+	AssertFalse(_UER_NativeTaskRetired(Task),
+		"an unfinished native teardown cannot borrow a completion receipt")
+}
+Test("UIA: incomplete native cleanup receipts remain failures (uia-native-cleanup-receipt)",
+	_UER_RejectIncompleteCleanupReceipts)

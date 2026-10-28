@@ -92,7 +92,9 @@ function init(data) {
 	el('title').textContent = data.title || '';
 	el('subtitle').textContent = data.label || '';
 	el('search').placeholder = data.searchPlaceholder || '';
-	el('btn-cancel').textContent = data.cancelLabel || 'Cancel';
+	if (typeof data.cancelLabel !== 'string' || data.cancelLabel === '')
+		throw new Error('action picker init needs the translated cancelLabel');
+	el('btn-cancel').textContent = data.cancelLabel;
 
 	currentId = data.current;
 	if (currentId === '' || currentId === undefined || currentId === null) {

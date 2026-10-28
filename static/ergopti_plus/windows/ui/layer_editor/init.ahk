@@ -38,9 +38,9 @@
 ; The shared page's id in _shared/ui/apps.manifest.json.
 global LAYER_EDITOR_APP_ID := "layer_editor"
 global LAYER_EDITOR_OS := "windows"
-; The largest layers.toml the editor accepts, in UTF-8 bytes; the Lua hosts'
-; MAX_TEXT_BYTES (_shared/lua/keymap/layer_editor.lua), pinned by the suite.
-global LAYER_EDITOR_MAX_TEXT_BYTES := 65536
+; The largest layers.toml the editor accepts is [limits] layer_file_bytes of the
+; shared timing registry, read by LayerEditor_Validate at call time (a global
+; initializer runs before TimingsLoadShared) and by the Lua hosts.
 ; The error codes this host adds to the loader's.
 global LAYER_EDITOR_INVALID_PAYLOAD := "invalid_payload"
 global LAYER_EDITOR_WRITE_FAILED := "write_failed"
@@ -111,13 +111,14 @@ _LayerEditor_Error(Code, Detail) {
  * @returns {Array} What is wrong; empty when every OS loads it cleanly.
  */
 LayerEditor_Validate(Text, Ctx) {
-	global LAYER_EDITOR_MAX_TEXT_BYTES, LAYER_EDITOR_INVALID_PAYLOAD
+	global LAYER_EDITOR_INVALID_PAYLOAD
 	if !(Text is String)
 		return [_LayerEditor_Error(LAYER_EDITOR_INVALID_PAYLOAD, "the save carries no layer file text")]
+	MaxBytes := TimingsGet("limits", "layer_file_bytes")
 	Bytes := StrPut(Text, "UTF-8") - 1
-	if (Bytes > LAYER_EDITOR_MAX_TEXT_BYTES)
+	if (Bytes > MaxBytes)
 		return [_LayerEditor_Error(LAYER_EDITOR_INVALID_PAYLOAD,
-			"the layer file is " . Bytes . " bytes, more than " . LAYER_EDITOR_MAX_TEXT_BYTES)]
+			"the layer file is " . Bytes . " bytes, more than " . MaxBytes)]
 	return _LayerEditor_ErrorsOnEveryOs(Text, Ctx)
 }
 

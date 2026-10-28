@@ -5,6 +5,7 @@ local driver_root = assert(self_path:match("^(.*)/tests/hardware/[^/]+$"),
 	"launch with an absolute script path")
 local shared_root = driver_root .. "/../_shared/lua"
 package.path = driver_root .. "/?.lua;" .. shared_root .. "/?.lua;" .. package.path
+local Errors = require("adapter_errors")
 
 local uv = require("luv")
 local callbacks = {}
@@ -64,6 +65,6 @@ test("real native output terminal loses running authority before retained close 
 	assert(await(function() return not op:is_running() and #callbacks > before end))
 	assert(op:is_current() and not op:is_settled() and result == nil, "terminal receipt is not running or settlement")
 	assert(await(function() release(); return op:is_settled() end))
-	assert(result and not result.ok and result.error == "process output exceeds its bound", "actual overflow refusal retained")
+	assert(result and not result.ok and result.error == Errors.PROCESS_OUTPUT_EXCEEDS_BOUND, "actual overflow refusal retained")
 end)
 print(string.format("Actual service running controls: %d passed, 0 failed.", passed))

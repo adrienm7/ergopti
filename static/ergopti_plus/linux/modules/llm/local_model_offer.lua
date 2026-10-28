@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local Policy = require("llm.local_model_policy")
 local Logger = require("logger.shim")
 local I18n = require("infra.i18n")
@@ -55,9 +56,9 @@ local function confirm(title, text, opts)
 	else
 		return nil
 	end
-	local ok, _, reason = require("ui.modal").run(function() return Shell.exec_checked(command) end, { observer = type(opts) == "table" and opts.modal_observer or nil })
+	local ok, _, _, reason, status = require("ui.modal").run(function() return Shell.exec_checked(command) end, { observer = type(opts) == "table" and opts.modal_observer or nil })
 	if ok == true then return true end
-	if reason == "command exited with status 1" then return false end
+	if reason == Errors.COMMAND_EXITED_NONZERO and status == 1 then return false end
 	return nil
 end
 

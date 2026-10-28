@@ -15,7 +15,8 @@
  *      touchpad is read without being grabbed, so the desktop also acts.
  *   2. macOS recommends "none" for the three-finger tap (system Look up).
  *   3. The Gestures menu declares the shared note and both platform reasons,
- *      and the English locale carries their text.
+ *      and the English locale carries their text. Each row Windows shows fits
+ *      AutoHotkey's 260-unit menu item name in every locale.
  *   4. llm.trigger.debounce_ms is declared once: no per-platform override, the
  *      default and recommended equal _shared defaults.json, and every driver's
  *      generated config template carries that value.
@@ -99,6 +100,25 @@ assert.deepEqual(platformsOf('gesture_recommended_note'), ['hs', 'linux']);
 assert.deepEqual(platformsOf('gesture_recommended_reason_windows'), ['ahk']);
 assert.match(en['menu.gestures.recommended_reason_windows'], /greyed out/i);
 assert.match(en['menu.gestures.recommended_reason_windows'], /no double action/i);
+// AutoHotkey's Menu.Add refuses a name longer than MAX_PATH (260 UTF-16 units)
+// with "Menu item name too long", and the row never appears. The French Windows
+// note was 263 units: the tray lost it and startup logged an error. Every row of
+// these notes that Windows shows must fit in every locale.
+const AHK_MENU_ITEM_MAX_UNITS = 260;
+const localeDir = path.join(SP, '_shared', 'data', 'locales');
+const localeFiles = fs.readdirSync(localeDir).filter((name) => name.endsWith('.json'));
+assert.ok(localeFiles.length >= 21, 'every locale is checked');
+for (const row of templateRows) {
+	if (row.type !== 'label' || (row.platforms && !row.platforms.includes('ahk'))) continue;
+	for (const file of localeFiles) {
+		const text = JSON.parse(fs.readFileSync(path.join(localeDir, file), 'utf8'))[row.i18n];
+		assert.equal(typeof text, 'string', `${file} translates ${row.i18n}`);
+		assert.ok(
+			text.length <= AHK_MENU_ITEM_MAX_UNITS,
+			`${file} ${row.i18n} is ${text.length} UTF-16 units; AutoHotkey menus refuse more than ${AHK_MENU_ITEM_MAX_UNITS}`
+		);
+	}
+}
 
 // 4. One debounce.
 const defaults = JSON.parse(read('_shared/modules/llm/defaults.json'));
@@ -121,7 +141,7 @@ for (const driver of ['windows', 'macos', 'linux']) {
 assert.equal(recommended('llm.models', 'selected', 'hs'), 'mlx');
 assert.match(
 	read('macos/ui/menu/menu_llm/backend_labels.lua'),
-	/mlx\s*=\s*\{[^}]*description_key\s*=\s*"menu\.llm\.backend_mlx_suffix"/
+	/\bmlx\s*=\s*"menu\.llm\.backend_mlx_suffix"/
 );
 assert.match(en['menu.llm.backend_mlx_suffix'], /Apple Silicon/);
 

@@ -2552,6 +2552,12 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 		const destination = path.join(privateRoot, 'destination');
 		for (const directory of [app, output, input, destination]) fs.mkdirSync(directory);
 		fs.writeFileSync(path.join(app, 'independent.txt'), 'Independent bundle bytes.');
+		// The CLI entry refuses a developer source build, so its bundle needs a plist.
+		fs.mkdirSync(path.join(app, 'Contents'));
+		fs.writeFileSync(
+			path.join(app, 'Contents', 'Info.plist'),
+			'<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict/></plist>\n'
+		);
 		for (const binding of bindings)
 			fs.writeFileSync(path.join(input, binding.name), 'Independent input bytes.');
 		function native(primary, refused) {

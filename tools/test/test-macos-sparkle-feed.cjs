@@ -9,6 +9,8 @@
 
 'use strict';
 
+require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a generated config-key constant
+
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -2280,6 +2282,7 @@ try {
 	try {
 		for (const relative of [
 			'tools/build/launcher_localizations.py',
+			'static/ergopti_plus/_shared/data/identifiers.sh',
 			'static/ergopti_plus/_shared/data/locale_order.json'
 		]) {
 			const destination = path.join(repository, relative);

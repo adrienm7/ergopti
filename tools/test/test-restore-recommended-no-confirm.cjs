@@ -32,8 +32,11 @@
 
 'use strict';
 
+require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a generated config-key constant
+
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('node:child_process');
 const assert = require('node:assert/strict');
 const { stripComments } = require('../lib/script-source.cjs');
 
@@ -170,25 +173,33 @@ function checkQuestions(rel, source, ext) {
 }
 
 /**
- * Every source file of one tree, tests and vendored code excluded.
+ * Every tracked source file of one tree, tests and vendored code excluded.
+ * The list comes from the index, not a directory walk: other tests create and
+ * remove files under this tree while they run, and a walk that lists a file
+ * just before it disappears fails with ENOENT.
  * @param {string} dir
  * @param {string} ext
  * @returns {string[]}
  */
 function sourceFiles(dir, ext) {
-	const files = [];
-	(function walk(current) {
-		for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
-			const full = path.join(current, entry.name);
-			if (entry.isDirectory()) {
-				if (!['tests', 'test', 'vendor', 'node_modules', '_generated'].includes(entry.name))
-					walk(full);
-			} else if (full.endsWith(ext)) {
-				files.push(full);
-			}
-		}
-	})(dir);
-	return files;
+	const listed = execFileSync('git', ['-C', ROOT, 'ls-files', '-z', '--', dir], {
+		encoding: 'utf8',
+		maxBuffer: 64 * 1024 * 1024
+	});
+	const skipped = ['tests', 'test', 'vendor', 'node_modules', '_generated'];
+	return listed
+		.split('\0')
+		.filter(Boolean)
+		.map((relative) => path.join(ROOT, relative))
+		.filter(
+			(full) =>
+				full.endsWith(ext) &&
+				!path
+					.relative(dir, full)
+					.split(path.sep)
+					.slice(0, -1)
+					.some((name) => skipped.includes(name))
+		);
 }
 
 /**

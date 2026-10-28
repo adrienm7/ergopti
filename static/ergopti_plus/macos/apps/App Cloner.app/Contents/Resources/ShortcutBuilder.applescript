@@ -82,7 +82,6 @@ on load_ui(loc, locales_dir)
 	set catalogue to my load_catalogue(loc, locales_dir)
 	-- Keep each record within the native compiler's line-continuation limit.
 	set controls_ui to {¬
-		btn_cancel: my ui_string(catalogue, "button.cancel"), ¬
 		btn_ok: my ui_string(catalogue, "common.ok"), ¬
 		btn_back: my ui_string(catalogue, "apps.cloner.btn_back"), ¬
 		btn_choose: my ui_string(catalogue, "apps.cloner.btn_choose"), ¬
@@ -1007,10 +1006,10 @@ on run argv
 	repeat
 		-- ===== 1) Pick the source application =====
 		if step = 1 then
-			-- Use NSOpenPanel directly so the action button reads "Choisir"
-			-- and the cancel button reads "Annuler". AppleScript's built-in
-			-- `choose file` exposes Cancel via the osascript bundle which
-			-- often falls back to English even on a French system.
+			-- Use NSOpenPanel directly so the action button carries the
+			-- catalogue's "Choose" label. Its Cancel button keeps the system
+			-- label: NSOpenPanel has no key-value accessor for that title,
+			-- and a guarded setter here always failed silently.
 			set panel to current application's NSOpenPanel's openPanel
 			panel's setMessage:(msg_choose_source of u)
 			panel's setPrompt:(btn_choose of u)
@@ -1018,12 +1017,6 @@ on run argv
 			panel's setCanChooseDirectories:false
 			panel's setAllowsMultipleSelection:false
 			panel's setAllowedFileTypes:{"app"}
-			-- Override the cancel button label via KVC. The property is private
-			-- on NSSavePanel (NSOpenPanel's superclass) but the KVC accessor
-			-- works on Tahoe; if it does not, the system label is shown.
-			try
-				panel's setValue:(btn_cancel of u) forKey:"cancelButtonTitle"
-			end try
 			set appsFolder to path to applications folder
 			try
 				panel's setDirectoryURL:(current application's NSURL's fileURLWithPath:(POSIX path of appsFolder))
@@ -1312,7 +1305,11 @@ on run argv
 	set resultPath to runDir & "/result"
 	set statusPath to runDir & "/status"
 	set donePath to runDir & "/done"
-	set bgCmd to "(" & cmd ¬
+	-- The worker ignores SIGXFSZ: under a file-size limit the status write
+	-- then fails with EFBIG instead of killing the worker before it creates
+	-- donePath, which left the progress loop below waiting forever. An empty
+	-- status still reaches the error dialog, because it is not "0".
+	set bgCmd to "(trap '' XFSZ; " & cmd ¬
 		& " > " & quoted form of resultPath & " 2>&1 ; " ¬
 		& "run_status=$?; echo \"$run_status\" > " & quoted form of statusPath & " ; " ¬
 		& "touch " & quoted form of donePath & ") >/dev/null 2>&1 &"

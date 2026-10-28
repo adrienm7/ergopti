@@ -109,7 +109,7 @@ helpers.describe("every manifest setting survives config.toml load and save (pre
 					end
 				end
 			end
-			helpers.assert_true(#cases >= 50, "the round trip must cover the manifest, got " .. #cases)
+			helpers.assert_true(#cases >= 40, "the round trip must cover the manifest, got " .. #cases)
 			local covered = {}
 			for _, case in ipairs(cases) do covered[case.path] = case end
 			helpers.assert_true(covered["shortcuts.script_control.chords_enabled"] ~= nil

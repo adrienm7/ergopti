@@ -60,9 +60,12 @@ end
 local function with_backend(scenario)
 	helpers.with_fresh_modules({ "modules.llm.local_servers", "modules.llm.api_remote" }, function()
 		local api = helpers.load_with_stubs("modules.llm.api_remote")
+		-- A test changes where the fake scan finds a server through world.scan_overrides
+		local scan_overrides = {}
+		local scans = require("tests.support.modules.llm.backends.local_server_scan_fake").install(api, scan_overrides)
 		local LocalServers = require("modules.llm.local_servers")
-		local world = { probes = {}, posts = {} }
-		local probe_clients = get_upvalue(api.detect_local_servers, "_local_probe_clients")
+		local world = { probes = {}, posts = {}, scan_overrides = scan_overrides, scans = scans }
+		local probe_clients = get_upvalue(api._probe_local_target, "_local_probe_clients")
 		assert(type(probe_clients) == "table", "the probe clients must be reachable")
 		for _, id in ipairs(LocalServers.ORDER) do
 			probe_clients[id] = {

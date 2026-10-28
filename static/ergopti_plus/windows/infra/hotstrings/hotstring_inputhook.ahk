@@ -1423,7 +1423,7 @@ _PrefixCommitPostFireEffect(Effect) {
 _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 	global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed, HSE_Buffer
 	global _PrefixPrivateResidue
-	global _HSE_TerminalOwner
+	global _HSE_TerminalOwner, _UIA_SelectionCache
 	; Serialize from admission, before any observer can yield and reorder ★.
 	; LLM mirroring is RAM-only; its ancillary work owns a deferred callback.
 	PreviousCritical := Critical("On")
