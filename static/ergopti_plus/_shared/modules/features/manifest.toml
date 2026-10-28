@@ -2802,9 +2802,11 @@ description_key = "menu.caps_word.pointer.other_buttons"
 #   are recommended "none" (menu.gestures.recommended_reason_linux). The taps
 #   have no desktop default and keep their binding.
 # - macOS: the three-finger tap is the system's « Look up & data detectors »
-#   (on by default), so it is recommended "none"
-#   (menu.gestures.recommended_reason_macos). The three-finger swipes are off in
-#   a default macOS install, and the four-finger swipes already recommend "none".
+#   (on by default), yet tap_3 stays recommended "left_click_toggle", as on
+#   Windows and Linux, by the maintainer's choice (2026-10-28); the menu's info
+#   dialog says to turn Look up off first (menu.gestures.recommended_reason_macos).
+#   The three-finger swipes are off in a default macOS install, and the
+#   four-finger swipes already recommend "none".
 # - Windows: every slot is a system gesture, but the driver writes the touchpad
 #   registry itself (modules/gestures/touchpad_registry.ahk, backed up first),
 #   so Windows runs only Ergopti's action: no double action, the recommendation
@@ -2894,7 +2896,7 @@ description_key = "menu.gestures.swipe_4_up"
 id = "tap_3"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "left_click_toggle", hs = "none", linux = "left_click_toggle" }
+recommended_per_platform = { ahk = "left_click_toggle", hs = "left_click_toggle", linux = "left_click_toggle" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.tap_3"
