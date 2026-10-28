@@ -273,14 +273,9 @@ LayoutComposer_Entry(Declaration, Keylayout) {
 
 ; Replaces a file atomically: the text lands under a partial name first.
 _LayoutComposer_WriteText(Path, Text) {
-	global LAYOUT_REGISTRY_PARTIAL_SUFFIX
-	Partial := Path . LAYOUT_REGISTRY_PARTIAL_SUFFIX
 	SplitPath(Path, , &Parent)
 	DirCreate(Parent)
-	if !FSWrite(Partial, Text)
-		throw Error("Cannot write " . Partial)
-	if !FSAtomicMoveReplace(Partial, Path)
-		throw Error("Cannot publish " . Path)
+	_LayoutCatalogueWriteText(Path, Text)
 }
 
 ; The result the page shows, and the refreshed list behind it.
