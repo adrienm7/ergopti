@@ -227,7 +227,7 @@ TestLogger_FanOutQueueSurvivesFlushSwap() {
 	SavedFiles := LOGGER_SUB_FILES
 	SavedPaths := _LOGGER_SUB_PATHS
 	SavedPending := _LOGGER_SUB_PENDING
-	ErrorText := ""
+	ErrorText := "", ContractThrew := false
 	DetachedCount := 0
 	CurrentCount := 0
 	try {
@@ -237,8 +237,10 @@ TestLogger_FanOutQueueSurvivesFlushSwap() {
 		_LOGGER_FANOUT_RACE_DETACHED := Map()
 		_LOGGER_FANOUT_RACE_SWAPPED := false
 		try _LoggerFanOut("Race", "2026-08-30 [Race] line", _LoggerFanOutRaceQueue)
-		catch as Err
+		catch as Err {
+			ContractThrew := true
 			ErrorText := Err.Message
+		}
 		Sleep(20)
 		DetachedCount := _LoggerFanOutRaceLineCount(
 			_LOGGER_FANOUT_RACE_DETACHED, "race.log")
@@ -252,8 +254,8 @@ TestLogger_FanOutQueueSurvivesFlushSwap() {
 
 	AssertTrue(_LOGGER_FANOUT_RACE_SWAPPED,
 		"the regression must actually detach the pending-map owner")
-	AssertEqual("", ErrorText,
-		"a flush swap between queue lookup and push must not crash logger fan-out")
+	AssertFalse(ContractThrew,
+		"a flush swap between queue lookup and push must not crash logger fan-out: " . ErrorText)
 	AssertEqual(1, DetachedCount + CurrentCount,
 		"the routed line must belong to exactly one pre- or post-swap snapshot")
 }

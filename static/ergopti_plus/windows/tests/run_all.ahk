@@ -1311,6 +1311,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_assertions_are_case_sensitive.ahk
 #Include meta/suite/test_adapter_contract_exception_delivery.ahk
 #Include meta/suite/test_adapter_contract_boolean_types.ahk
+#Include meta/suite/test_no_throw_sentinel_delivery.ahk
 #Include meta/modules/hotstrings/personal/test_personal_hotstring_node_shape.ahk
 #Include meta/modules/hotstrings/personal/test_personal_hotstring_seed.ahk
 #Include meta/modules/hotstrings/personal/test_personal_hotstring_new_section_seed.ahk

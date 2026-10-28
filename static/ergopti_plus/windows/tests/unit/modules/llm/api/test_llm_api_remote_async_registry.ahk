@@ -461,14 +461,16 @@ _RemoteTrimRegistry_DetachesBeforeReentrantCallback() {
 		77011, Map("cancelled", false,
 			"on_fail", _RemoteTrimRegistry_ReentrantSuccessor.Bind(State)),
 		77012, Map("cancelled", false, "on_fail", (*) => 0))
-	Err := ""
+	Err := "", ContractThrew := false
 	try _LLMRemote_TrimAsyncRegistry()
-	catch as Caught
+	catch as Caught {
+		ContractThrew := true
 		Err := Caught.Message
+	}
 	finally LLM_REMOTE_MAX_INFLIGHT := OldMax
 	try {
-		AssertEqual("", Err,
-			"remote trim must not delete an owner already detached by reentrant work")
+		AssertFalse(ContractThrew,
+			"remote trim must not delete an owner already detached by reentrant work: " . Err)
 		AssertEqual(1, State["callbacks"],
 			"the displaced remote owner must emit exactly one terminal callback")
 		AssertFalse(_LLM_Remote_Async.Has(77011),
