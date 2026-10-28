@@ -356,6 +356,30 @@ From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their bu
   "Secure text field detected"), a key-down consumed by an earlier tap, or a main-thread hold.
   Mac confirms: a sleep with a key held logs only the INFO line; an orphan key-up WARNING without a
   sleep names the next lead.
+- **L64** Fixed on tmp/wip-field-run-hygiene-3 (ba872e65eb). The 12:02 collector run of
+  2026-10-28 (first after a reboot) quit with "The app did not accept the request within 60 s"
+  and the app then ran every step (12:03:41 to 12:05:42) unobserved. Not a reload: right after its
+  readiness the app held its main thread 138 s (`Keystats engine start (deferred): 138130 ms`,
+  replaying 320 MB of the durable keystats ledger, menu_state.lua:532). The collector now waits
+  300 s for acceptance, restarts that budget when the app publishes a new readiness, treats a
+  consumed request as the app's run, and withdraws an unconsumed request when it gives up. Open
+  [CODE]: the 138 s startup replay itself (every tap, the lease heartbeat and typed keys waited);
+  slice it like the aggregate recovery. Mac confirms: a run started right after a reboot is
+  collected.
+- **L65** Fixed on tmp/wip-field-run-hygiene-3 (1471c14782). 12_mlx_model
+  `download_launcher_failed` at 12:05:42 ("exit=0, pid=missing, sentinel in final output=yes"),
+  as on the 21:08 run: the launcher's `__DLPID__` line reached only the termination callback. It
+  is now adopted from the final output like a streamed one. Mac confirms: 12_mlx_model passes
+  (`downloaded_and_served`).
+- **L66** [CODE] diagnostics `errors_4` on the 12:02 run, all after the 12:01 boot: (1) 12:03:41
+  "Active keyboard-layout probe timed out after 10.0 seconds" is a consequence of the 138 s hold of
+  L64 (its timer fired when the thread came back), not a probe fault; (2-4) 12:03:56 "Shortcuts
+  bindings startup rejected: factory 'ctrl_g' returned nil", then the rebind and the startup step
+  `bindings_rebind` did not commit, and `keyboard_shortcuts_rebind_recovery` keeps failing
+  (12:04:16 to 12:06:49). Real: hs.keycode found no 'g' in the active keymap (stable=0/4 legacy=2
+  after the reboot) and RegisterEventHotKey refused Ctrl+G with -9878 (already registered by
+  another owner), and one refused hotkey aborts the whole shortcuts rebind. Next: find what holds
+  Ctrl+G after a reboot, and let one refused hotkey fail alone instead of every shortcut.
 
 ### Model selector page on tmp/wip-model-selector-page (to land on dev)
 
