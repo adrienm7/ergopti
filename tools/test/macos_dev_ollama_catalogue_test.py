@@ -24,6 +24,7 @@ INPUTS = (
     "static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json",
     "static/ergopti_plus/_shared/modules/updater/defaults.json",
     "static/ergopti_plus/_shared/python/managed_ollama_runtime.py",
+    "static/ergopti_plus/_shared/data/identifiers.json",
 )
 CATALOGUE = "managed_ollama_release.json"
 

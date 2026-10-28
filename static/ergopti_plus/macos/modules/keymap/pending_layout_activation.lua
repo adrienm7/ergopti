@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
 
 local M = {}
 
@@ -168,10 +169,7 @@ function M.resume()
 		summary.unreadable = 1
 		return summary
 	end
-	local ids = {}
-	for id in pairs(entries) do ids[#ids + 1] = id end
-	table.sort(ids)
-	for _, id in ipairs(ids) do
+	for _, id in ipairs(TableUtil.sorted_keys(entries)) do
 		local entry = entries[id]
 		local live, live_err = _deps.is_live(entry.keyboard_name)
 		if live == nil then

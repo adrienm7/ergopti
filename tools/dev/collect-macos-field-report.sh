@@ -52,9 +52,13 @@ FIELD_RUN_SPEC="static/ergopti_plus/macos/data/field_run.json"
 # deadline (the declared default, which covers every step at its bound): the
 # app needs a moment to settle the last step, run the guard and write done.
 FIELD_RUN_GRACE_SECONDS=120
-# How long the developer app may take to publish its readiness, and to accept.
+# How long the developer app may take to publish its readiness, and then to
+# accept the request it was sent. Right after a reboot the 12:02 run of
+# 2026-10-28 saw the ready app hold its main thread 138 s (keystats ledger
+# replay) before it took the request, past the former 60 s. A field run test
+# shortens the acceptance budget through FIELD_RUN_ACCEPT_SECONDS_OVERRIDE.
 FIELD_RUN_READY_SECONDS=240
-FIELD_RUN_ACCEPT_SECONDS=60
+FIELD_RUN_ACCEPT_SECONDS="${FIELD_RUN_ACCEPT_SECONDS_OVERRIDE:-300}"
 FIELD_RUN_POLL_SECONDS=5
 
 fail() { printf '[field-report] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -252,6 +256,47 @@ report_new_results() {
 	done
 }
 
+# Waits until the app accepts the request, across a reload or a restart of the
+# developer app: a readiness that goes away gets the readiness budget again, a
+# new readiness the acceptance budget again, both within their sum since the
+# request. A request the app consumed is its run: the caller waits for done. A
+# request still unconsumed at the end is withdrawn, so no run starts after the
+# collector gave up (and loses its results).
+# Returns 0 once accepted, consumed, refused or done; 1 when it gave up.
+wait_for_acceptance() {
+	local now current app_pid="${pid}" waited_from="${sent_at}" budget
+	while [ ! -f "${results_dir}/${accepted_name}" ]; do
+		[ -f "${run_folder}/${refused_name}" ] && return 0
+		[ -f "${results_dir}/${done_name}" ] && return 0
+		[ -f "${run_folder}/${request_name}" ] || return 0
+		now="$(date +%s)"
+		if current="$(ready_pid)"; then
+			if [ "${current}" != "${app_pid}" ]; then
+				log "The developer app published its readiness again (pid ${current}); waiting for it to accept the request."
+				app_pid="${current}"
+				waited_from="${now}"
+			fi
+		elif [ -n "${app_pid}" ]; then
+			log "The developer app (pid ${app_pid}) is reloading or gone; waiting for its readiness again."
+			app_pid=""
+			waited_from="${now}"
+		fi
+		budget="${FIELD_RUN_ACCEPT_SECONDS}"
+		[ -n "${app_pid}" ] || budget="${FIELD_RUN_READY_SECONDS}"
+		if [ $((now - waited_from)) -ge "${budget}" ] \
+			|| [ $((now - sent_at)) -ge $((FIELD_RUN_READY_SECONDS + FIELD_RUN_ACCEPT_SECONDS)) ]; then
+			if rm "${run_folder}/${request_name}" 2>/dev/null; then
+				log "The app did not accept the request within $((now - sent_at)) s; request withdrawn so no run starts without the collector."
+				return 1
+			fi
+			# The app took it between the check and the withdrawal: the run is its.
+			return 0
+		fi
+		sleep "${FIELD_RUN_POLL_SECONDS}"
+	done
+	return 0
+}
+
 # Opens the developer app, sends the request, waits for done and copies it.
 run_field_run() {
 	local request_name accepted_name done_name refused_name deadline_seconds
@@ -310,6 +355,7 @@ run_field_run() {
 	local sent_at last_note
 	sent_at="$(date +%s)"
 	last_note="${sent_at}"
+	wait_for_acceptance || return 1
 
 	while [ ! -f "${results_dir}/${done_name}" ]; do
 		if [ -f "${run_folder}/${refused_name}" ]; then
@@ -318,10 +364,6 @@ run_field_run() {
 			return 1
 		fi
 		now="$(date +%s)"
-		if [ ! -f "${results_dir}/${accepted_name}" ] && [ $((now - sent_at)) -ge "${FIELD_RUN_ACCEPT_SECONDS}" ]; then
-			log "The app did not accept the request within ${FIELD_RUN_ACCEPT_SECONDS} s."
-			return 1
-		fi
 		if [ $((now - sent_at)) -ge $((deadline_seconds + FIELD_RUN_GRACE_SECONDS)) ]; then
 			log "No done marker $((deadline_seconds + FIELD_RUN_GRACE_SECONDS)) s after the request; keeping the partial results."
 			report_new_results
