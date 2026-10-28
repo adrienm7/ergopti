@@ -1,0 +1,96 @@
+{
+	"document_status": "Actual terminal hosted CI result; no local run substituted.",
+	"recorded_paris": "2026-10-28T22:48:32.945319+01:00",
+	"repository": "adrienm7/ergopti",
+	"branch": "fix/linux",
+	"workflow": ".github/workflows/ci.yml",
+	"workflow_id": 284301090,
+	"event": "workflow_dispatch",
+	"os_lanes": "linux",
+	"run_id": 40766890057,
+	"run_attempt": 1,
+	"run_url": "https://github.com/adrienm7/ergopti/actions/runs/40766890057",
+	"tested_source_sha": "55a50835be9e027ec9cbe43ac5d1c693c6ff711f",
+	"status": "completed",
+	"conclusion": "failure",
+	"qualified_green": false,
+	"created_paris": "2026-10-28T21:50:51+01:00",
+	"run_started_paris": "2026-10-28T21:50:51+01:00",
+	"run_updated_paris": "2026-10-28T22:39:37+01:00",
+	"terminal_observed_paris": "2026-10-28T22:39:49.316975+01:00",
+	"last_job_completed_paris": "2026-10-28T22:39:37+01:00",
+	"job_count": 69,
+	"job_conclusion_counts": {
+		"success": 62,
+		"skipped": 3,
+		"failure": 4
+	},
+	"required_verdicts": {
+		"Common / Verdict (All mandatory results)": [
+			{
+				"id": 123106310563,
+				"status": "completed",
+				"conclusion": "success"
+			}
+		],
+		"Linux / Verdict (All mandatory results)": [
+			{
+				"id": 123117191122,
+				"status": "completed",
+				"conclusion": "failure"
+			}
+		],
+		"Release / Verify all lanes and original plan": [
+			{
+				"id": 123117363050,
+				"status": "completed",
+				"conclusion": "failure"
+			}
+		]
+	},
+	"jobs_pagination": "The archived monitor uses paginated attempt-specific jobs, rejects duplicate IDs and requires every page total_count to equal the combined job count. The complete combined collection is retained in terminal.json.",
+	"evidence_archive": "ci-evidence.tar.gz",
+	"evidence_manifest": "ci-evidence-manifest.json",
+	"qualification_bound": "This actual CI run validates published 55a50835be9e027ec9cbe43ac5d1c693c6ff711f. A later closing-documentation-only commit is not claimed to have a new hosted execution. The full non-closeout source mode/type/blob mapping is archived.",
+	"linux_install_and_launch": {
+		"job_count": 19,
+		"conclusions": {
+			"success": 17,
+			"failure": 2
+		}
+	},
+	"closeout_decision": {
+		"recorded_paris": "2026-10-28T22:47:24.990733+01:00",
+		"scope": "Close the existing audit and preserve remaining findings, as the user expressly permits TODO handoff before container deletion.",
+		"new_production_changes_after_ci": false,
+		"new_workflow_changes_after_ci": false,
+		"final_ci_run": 40766890057,
+		"final_ci_conclusion": "failure",
+		"atomic_fix_count": 30,
+		"appimage_ci_exception": {
+			"question": "Autorises-tu le patch AppImage CI d\u2019une ligne pr\u00e9sent\u00e9 dans le document de revue : charger l\u2019environnement natif existant d\u2019AppRun au lieu de d\u00e9finir seulement LUA_PATH ? Il conserve l\u2019interpr\u00e9teur livr\u00e9 et toutes les assertions. Sans cette exception \u00e0 ta zone r\u00e9serv\u00e9e `.github/workflows/*`, je le sauvegarderai en TODO et la CI restera rouge.",
+			"suggested_answers": [
+				"Autoriser cette correction CI cibl\u00e9e",
+				"Conserver le patch en TODO sans modifier le workflow"
+			],
+			"status_as_recorded": "No answer received; patch remains unapplied.",
+			"authority": "The user explicitly reserves .github/workflows/* and requests reporting its bugs without correcting them. The earlier exception concerned gesture captions and a Windows command constant only."
+		},
+		"rpm_disposition": "Confirmed mandatory LuaJIT binding packaging/bootstrap gap, preserved with native CI evidence, source hashes and canonical correction options. A coordinated packaging/bootstrap and reserved receiver change remains TODO rather than an unqualified new closeout phase."
+	},
+	"unfixed_linux_causes": [
+		{
+			"kind": "RPM packaging dependency/publication gap",
+			"job_id": 123113887312,
+			"proof": "ci-evidence/rpm-fix/diagnosis.json",
+			"disposition": "TODO; no production change or new CI batch introduced."
+		},
+		{
+			"kind": "AppImage installed-layout CI receiving environment",
+			"job_id": 123113887327,
+			"proof": "ci-evidence/appimage-ci-review/review.md",
+			"patch": "ci-evidence/appimage-ci-review/canonical-native-env-unapplied.patch",
+			"disposition": "Protected workflow exception unanswered; patch remains unapplied."
+		}
+	]
+}

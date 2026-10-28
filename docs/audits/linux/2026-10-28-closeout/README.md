@@ -95,17 +95,18 @@ status and the dependency cohort were unchanged. The archived terminal
 receipt, full raw output and before/after inventories preserve this result.
 One existing native-AHK host case was explicitly **NOT EXECUTED** on Linux;
 it is not counted as a native Windows success. There is no remaining pending
-local Common run. Hosted CI is a separate post-publication step, and its status
-is not inferred from these local results.
+local Common run. Hosted CI is recorded separately below from its actual terminal API result,
+rather than inferred from these local results.
 
 Before publication, the latest dev guard correction was merged normally as
 `adccf8b5dc4b55dafc21dda1d1fe7a3f20b9d7ff`. Its complete source tree is
 exactly `66d7a8744e68726c860b7c7d63ed962d485f5ef4`, identical to the corrected
 Common-tested b49 tree: upstream independently made the same one-line test
 repair. The archive includes both the pre-commit merge comparison and the
-post-commit Git verification. The future archive-documentation commit adds
-these reports; no full local test execution at that documentation commit is
-claimed. Hosted CI will test the published composition.
+post-commit Git verification. The initial archive-documentation commit
+`55a50835be9e027ec9cbe43ac5d1c693c6ff711f` added these reports and was then
+pushed and tested by the hosted workflow recorded below. No new full local
+test execution at that documentation commit is claimed.
 
 Historical qualified Linux source `13f2d9b584a40f0ba226eb973a3a885cd639f245`
 completed 14 canonical commands at 18:24:45 Paris: 19,841 tests passed, zero
@@ -122,16 +123,103 @@ captions and the Windows command literal, subsequently fixed in dev. Its npm
 wrapper was killed during an environment restart; the surviving Node body and
 shell supplied the actual failure. No killed wrapper is credited as successful.
 
-The last hosted CI known before closeout publication was
-[40424391590](https://github.com/adrienm7/ergopti/actions/runs/40424391590),
-completed **failure**, at old published SHA
-`fe2413797f34653c93d0ed0ad10252cae043994b`, 27 October 01:07:55–01:28:32 Paris.
-It does not qualify the current fixes. The final workflow dispatch follows the
-archive commit and push; consult the recorded final run or the
-[fix/linux workflow history](https://github.com/adrienm7/ergopti/actions/workflows/ci.yml?query=branch%3Afix%2Flinux)
-for its actual SHA, run ID and outcome. No current CI success is implied here.
+## Actual hosted CI and publication
+
+Run [40766890057](https://github.com/adrienm7/ergopti/actions/runs/40766890057), attempt **1**, completed
+**failure** on published commit
+`55a50835be9e027ec9cbe43ac5d1c693c6ff711f`. It was dispatched exactly once using
+`ci.yml`, branch `fix/linux`, `os_lanes=linux`. Created:
+**2026-10-28T21:50:51+01:00**; last job completed:
+**2026-10-28T22:39:37+01:00**; terminal observation:
+**2026-10-28T22:39:49.316975+01:00**, all Europe/Paris.
+
+Required aggregate results:
+
+- Common / Verdict (All mandatory results): success.
+- Linux / Verdict (All mandatory results): failure.
+- Release / Verify all lanes and original plan: failure.
+
+The full attempt-specific job collection contains **69 jobs**.
+[CI.json](CI.json) records the terminal result, counts and precise source bound.
+[ci-evidence.tar.gz](ci-evidence.tar.gz) preserves the dispatch intent,
+preflight/admission, actual run and all paginated jobs, source blob mapping,
+documentation gates, normal push receipt and completed worktree retirement.
+[Its manifest](ci-evidence-manifest.json) supplies archive paths and hashes.
+The original audit archive remains immutable at SHA-256
+`72b9f3b17ef4efe6bd074f3e44fbed5829b4d299acc775cabec040182c194313`.
+
+The initial normal push completed at **21:49:14.806841 Paris** on 28 October.
+The later closing commit adds only report and CI-evidence documentation; this
+run validates **55a50835be9e027ec9cbe43ac5d1c693c6ff711f**, rather than claiming
+a hosted execution for that later documentation-only SHA. The archived mapping
+proves all **12,841** other tracked modes, types and blob IDs match the locally
+Common-tested source. No product, test, workflow or default was changed by
+closing documentation. Only `fix/linux` was pushed; no PR was opened.
+
+The completed JS validation worktree was removed normally at
+**21:52:19.630893 Paris**, after its proof was archived and no readers remained.
+Its small tested-commit bundle and cleanup receipt are preserved. The original
+user checkout and canonical dependency cohorts were kept.
+
+Historical run [40424391590](https://github.com/adrienm7/ergopti/actions/runs/40424391590)
+failed on old published source fe241 on 27 October. Its result remains
+historical; it is superseded for the current published composition by the
+actual run above.
+
+This final run remains **red**. Common's mandatory verdict succeeded. Linux
+completed all Unit, Integration, E2E and Build stages, and **17 of 19** install
+jobs passed. The RPM and AppImage installed-data checks are the two original
+failures; their failed receipts propagate into the Linux and Release verdicts.
+Those aggregate failures are not two additional root causes. No test was
+weakened, skipped, quarantined or retried to obtain success.
+
+At the user's bounded closeout instruction, the two remaining Linux findings
+are preserved below as TODO. The catalogue stays at **30 atomic commits**.
+No further production fix, workflow change or CI run is promised in this
+container. The proposed AppImage workflow patch is **unapplied**: the user
+reserved `.github/workflows/*`, and no answer to that separate exception was
+received at the recorded closeout decision. The earlier approval concerned
+gesture captions and a Windows command constant. The exact question and its
+recorded disposition are archived in `ci-evidence/closeout-decision.json`.
+The historical AppImage review predates this stop decision; its sentence about
+RPM work in progress is superseded by this final TODO disposition.
 
 ## Outstanding TODO and maintainer questions
+
+### Confirmed Linux install blockers
+
+1. **RPM: missing mandatory LuaJIT native luv publication.** CI job
+   `123113887312` failed in the actual installed-data probe:
+   `i18n.list_locales()` could not obtain the genuine directory-capable luv
+   binding. The RPM publishes no owned LuaJIT 5.1 binding, only recommends
+   generic `lua-luv`, and its wrapper/common launcher sets no native CPATH.
+   A generic Fedora Lua 5.4 module is not proof of a usable LuaJIT binding.
+   A proper change must publish the admitted native binding using the pinned
+   source-build recipe or shared trusted-build-host staging, declare build
+   prerequisites, and share the native environment owner with the launcher.
+   It must prove missing-module refusal and installed native enumeration,
+   remain offline-capable, then receive packaging/integration qualification.
+   The installed probe is proven; a healthy `--help` is not proof that every
+   RPM daemon launch path works. Source blob hashes, the decoded failure and
+   the concrete plan are in `ci-evidence/rpm-fix/README.md` and `diagnosis.json`.
+   No speculative production correction was introduced at this closeout.
+2. **AppImage: protected CI receiver bypasses its production environment.**
+   CI job `123113887327` invoked the bundled LuaJIT with only `LUA_PATH` and
+   failed the same native-directory check. The AppImage carries its genuine
+   binding: its normal tray start/quit and all **11** distribution/ABI
+   controls passed earlier (eight supported glibc help controls, three
+   expected refusals). Production AppRun sources the canonical
+   `network-runtime-env.sh`; the CI receiver bypasses that owner and loses
+   `LUA_CPATH` plus its native environment. This is distinct from RPM's absent
+   publication. The one-line proposed owner reuse preserves the interpreter
+   and every assertion, but touches reserved `.github/workflows/ci-linux.yml`.
+   It remains unapplied with the unanswered exception recorded above.
+   Preserve `ci-evidence/appimage-ci-review/canonical-native-env-unapplied.patch`
+   and `review.md`; the decoded log's provenance and hashes remain explicit.
+   These RPM/AppImage formats and receivers are Linux-only; no Windows/macOS
+   production change was made or native success inferred.
+
+### Other retained TODOs and questions
 
 1. **Confirmed Mac production path bug:**
    `macos/modules/llm/network_env.lua` normalizes POSIX backslashes into slashes

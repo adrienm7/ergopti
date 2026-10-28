@@ -1,0 +1,315 @@
+{
+	"recorded_paris": "2026-10-28T22:48:32.945319+01:00",
+	"file_count": 50,
+	"files": [
+		{
+			"archive_path": "ci-evidence/appimage-ci-review/canonical-native-env-unapplied.patch",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/appimage-ci-review/canonical-native-env-unapplied.patch",
+			"bytes": 592,
+			"sha256": "f83b861e452dab0ae90e7d049b53d89122386777d5eddfb303dfd1b7ae102a84"
+		},
+		{
+			"archive_path": "ci-evidence/appimage-ci-review/review.md",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/appimage-ci-review/review.md",
+			"bytes": 1761,
+			"sha256": "8262ee5d50ea47257d86db7a256a48844a763deacd93d249b43613e0164dbe5f"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/admitted-run.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/admitted-run.json",
+			"bytes": 15413,
+			"sha256": "687e0cdec2dbeb89320b29a5c6175ec7b79c98bce542dd26152101c3f62f5517"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/decoded-failure-logs.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/decoded-failure-logs.json",
+			"bytes": 796,
+			"sha256": "86c5bc3b2d00bc5f79588923fdbac99e0ea6afdda6aca596f13687b64dd893d2"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/discovery-latest.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/discovery-latest.json",
+			"bytes": 15760,
+			"sha256": "10b4db65d3e4a3e3ac491aa30eb780454f353503d81d8f5f794306ef1b343c50"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/dispatch-intent.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/dispatch-intent.json",
+			"bytes": 806,
+			"sha256": "869297786961d0e345355ed83b69280e00fdc857e73b500f220594ea1ee5c0c0"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/dispatch-preflight.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/dispatch-preflight.json",
+			"bytes": 847,
+			"sha256": "f918487b4d2feb5f1bcb16b003776f6d7e25f648cea8d646dea896bf1b318563"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/dispatch.stderr",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/dispatch.stderr",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/dispatch.stdout",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/dispatch.stdout",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887312-cli-log.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887312-cli-log.json",
+			"bytes": 361,
+			"sha256": "6000164ea8e5152231966f078f7a1c5b297e97bd3ed2afba632451d509da9866"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887312.cli.log.gz",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887312.cli.log.gz",
+			"bytes": 45,
+			"sha256": "472a261f9bf35d3201d69fc7f7db8c0da879bdb214be9052e66a0c6f40be553d"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887312.cli.stderr",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887312.cli.stderr",
+			"bytes": 81,
+			"sha256": "11b71aeb2f7a0c8321a7a6b4910046c7a4041f2bdbf2e7ba0fb1e173016dd272"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887312.decoded.log",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887312.decoded.log",
+			"bytes": 183746,
+			"sha256": "6b246faf4668cf14817b87e2d48b0367a33a63442673134857f278f080b62c3e"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887327-cli-log.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887327-cli-log.json",
+			"bytes": 361,
+			"sha256": "d78063d78eb52c6fa97873c0da9f43aec6cac15c4a30c6e88227f7268eb06507"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887327.cli.log.gz",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887327.cli.log.gz",
+			"bytes": 45,
+			"sha256": "52b34429a65f3a940b66c26d8aed500364a3eb3e4d10192e512ca93d2ff1c363"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887327.cli.stderr",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887327.cli.stderr",
+			"bytes": 81,
+			"sha256": "11b71aeb2f7a0c8321a7a6b4910046c7a4041f2bdbf2e7ba0fb1e173016dd272"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887327.decoded.log",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123113887327.decoded.log",
+			"bytes": 156378,
+			"sha256": "0a9c193842b78d9efbacb4a0a1ddc139b71ccf67a48d59b04c7d1889aae6487c"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123117191122-cli-log.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123117191122-cli-log.json",
+			"bytes": 361,
+			"sha256": "d781eb2dc2bb62bfcb86bc92f64df65989e7ccac4e4ed76234071abe4172a923"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123117191122.cli.log.gz",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123117191122.cli.log.gz",
+			"bytes": 45,
+			"sha256": "c99fc59eaa5fa76fdd11007a3c95e304a8a7295bfdd6bc8b818db00ce8dbc8b6"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123117191122.cli.stderr",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123117191122.cli.stderr",
+			"bytes": 81,
+			"sha256": "11b71aeb2f7a0c8321a7a6b4910046c7a4041f2bdbf2e7ba0fb1e173016dd272"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123117363050-cli-log.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123117363050-cli-log.json",
+			"bytes": 361,
+			"sha256": "948f8d0ada3194dc0371678016bcb386f71f66210eba8f861abb14f51d80bbbd"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123117363050.cli.log.gz",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123117363050.cli.log.gz",
+			"bytes": 45,
+			"sha256": "4793251f2b7bb791763b94c8d71904effaaa58b24c3b8dd7d8a3642bd4d8a08a"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123117363050.cli.stderr",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/job-123117363050.cli.stderr",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/monitor-launch.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/monitor-launch.json",
+			"bytes": 534,
+			"sha256": "13e87f67379ed3de8ba782fbcc8028fbcf133962f0c7faf4afcd1e7f4950c755"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/preflight.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/preflight.json",
+			"bytes": 847,
+			"sha256": "d9b518b118462d0dec1e51262deaf6da80c3b5ccaea8b26da464c8b88793df12"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/terminal.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/55a50835be9e027ec9cbe43ac5d1c693c6ff711f/terminal.json",
+			"bytes": 814023,
+			"sha256": "3f2286bd179a40fe3c796072eaa8c0a81592471ca1bdb7389267978d737294c9"
+		},
+		{
+			"archive_path": "ci-evidence/ci-preparation/dispatch-monitor.py",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/ci-preparation/dispatch-monitor.py",
+			"bytes": 11986,
+			"sha256": "69939f9e62b95d0bffbac3599dfc39ed053fe272cef1933f2e0a1dd468928fde"
+		},
+		{
+			"archive_path": "ci-evidence/closeout-decision.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/closeout-decision.json",
+			"bytes": 1511,
+			"sha256": "9d488a6353f459d3fe2fafee1e2c6bd961721cf1d0790b0b69fb94d075d107d2"
+		},
+		{
+			"archive_path": "ci-evidence/docs-checks/format.raw.log",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/docs-checks/format.raw.log",
+			"bytes": 28,
+			"sha256": "c3b7b7e8c0604b05f2d03964544e3354d9bdd80a25d4900069e3c8634d2ee250"
+		},
+		{
+			"archive_path": "ci-evidence/docs-checks/gen-check.raw.log",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/docs-checks/gen-check.raw.log",
+			"bytes": 104,
+			"sha256": "1f249fc78ab5a2256bea46f675ba91a98146354b6f76aea31610c21860414591"
+		},
+		{
+			"archive_path": "ci-evidence/docs-checks/report.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/docs-checks/report.json",
+			"bytes": 539,
+			"sha256": "538c6fa1f94ad3798ef697d2893a220002edd7c45212672e5bc01bd689faf6a9"
+		},
+		{
+			"archive_path": "ci-evidence/docs-checks/strict.raw.log",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/docs-checks/strict.raw.log",
+			"bytes": 134,
+			"sha256": "d3d4537787fb7300f90d2be887aab375a2ad5fbe34bd24e588aa94429badee63"
+		},
+		{
+			"archive_path": "ci-evidence/docs-checks/verify-plan.raw.log",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/docs-checks/verify-plan.raw.log",
+			"bytes": 723,
+			"sha256": "e0ec611374ff73c4e03e33e4516246bbd6a866dd938bae067158a5e35b30c852"
+		},
+		{
+			"archive_path": "ci-evidence/js-worktree-retirement/admission.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/js-worktree-retirement/admission.json",
+			"bytes": 1055,
+			"sha256": "4a391066fb583c5f5fea7ac414b229998c4ff69ea3283fa44dfa0186c5095b9e"
+		},
+		{
+			"archive_path": "ci-evidence/js-worktree-retirement/bundle-verify.stderr",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/js-worktree-retirement/bundle-verify.stderr",
+			"bytes": 129,
+			"sha256": "25377ef3896a5a2ea4bc6e317d9765525167a8571bd96327cb0ec1d847ffa0b3"
+		},
+		{
+			"archive_path": "ci-evidence/js-worktree-retirement/bundle-verify.stdout",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/js-worktree-retirement/bundle-verify.stdout",
+			"bytes": 270,
+			"sha256": "43bc1b1bc36013cd086d958782a326dbf51ef2b75a367b02ea96826540b5e7c6"
+		},
+		{
+			"archive_path": "ci-evidence/js-worktree-retirement/completed-common-d802.bundle",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/js-worktree-retirement/completed-common-d802.bundle",
+			"bytes": 1111,
+			"sha256": "218fc33bb88e9bb778d18bbeb62aa61ed7a67b80609c88cd54c3e2de4615d01d"
+		},
+		{
+			"archive_path": "ci-evidence/js-worktree-retirement/normal-remove.stderr",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/js-worktree-retirement/normal-remove.stderr",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"archive_path": "ci-evidence/js-worktree-retirement/normal-remove.stdout",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/js-worktree-retirement/normal-remove.stdout",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"archive_path": "ci-evidence/js-worktree-retirement/receipt.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/js-worktree-retirement/receipt.json",
+			"bytes": 736,
+			"sha256": "5de7051e3fc5cd6b75fe59b2281ffab25d5837fd0cb19ecf3358c33c22bdd059"
+		},
+		{
+			"archive_path": "ci-evidence/post-ci-docs/final-code-blob-mapping.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/post-ci-docs/final-code-blob-mapping.json",
+			"bytes": 1805828,
+			"sha256": "fb80bde8d23d70e74476652af6a04c625a89bbcd9a5481c7069b05da0cc9a097"
+		},
+		{
+			"archive_path": "ci-evidence/post-ci-docs/historical-407-failure-log-verification.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/post-ci-docs/historical-407-failure-log-verification.json",
+			"bytes": 907,
+			"sha256": "c22ca370c9d1ebfd08c037f0f897251ecf7359d6d6ea0c9453f1160a67b14412"
+		},
+		{
+			"archive_path": "ci-evidence/push/intent.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/push/intent.json",
+			"bytes": 195,
+			"sha256": "29735dff258a697ebdb944b063fe0aef572b28b3ef39d8c78bea8b3985c9a885"
+		},
+		{
+			"archive_path": "ci-evidence/push/push.raw.log",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/push/push.raw.log",
+			"bytes": 363,
+			"sha256": "17e0b0d5a2710b3d303c4b9d858b222d39dac9b44d51dd50051fc517e7d4a1d6"
+		},
+		{
+			"archive_path": "ci-evidence/push/result.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/push/result.json",
+			"bytes": 261,
+			"sha256": "0ce1af34417e013e9df46a563f62ffde06668b4eabe5376f884a3ddd735f9b5e"
+		},
+		{
+			"archive_path": "ci-evidence/rpm-fix/README.md",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/rpm-fix/README.md",
+			"bytes": 4187,
+			"sha256": "3da8edab600f545085182a46e75a274679498d708bb8ef28b5befff836f85d96"
+		},
+		{
+			"archive_path": "ci-evidence/rpm-fix/diagnosis.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/rpm-fix/diagnosis.json",
+			"bytes": 4639,
+			"sha256": "7182a45c0be5d0af2f87f3863f6fb26c8b833e8582d6ee5bd5b9218d73a66cda"
+		},
+		{
+			"archive_path": "ci-evidence/rpm-fix/retirement.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/rpm-fix/retirement.json",
+			"bytes": 58964,
+			"sha256": "3c25c3d7aface3665bcbe6557588ce6974f626267bb3a51e44907794a176c219"
+		},
+		{
+			"archive_path": "ci-evidence/rpm-fix/rpm-failure-excerpt.txt",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/rpm-fix/rpm-failure-excerpt.txt",
+			"bytes": 196,
+			"sha256": "da01364fac0c18cec2327a6534bc642e71ae58dda7270239ee062e61eb4c6567"
+		},
+		{
+			"archive_path": "ci-evidence/tracked-copy-receipt.json",
+			"original_provenance_path": "/workspace/linux-audit-evidence/dev-merge-20261028/closeout-20261028/tracked-copy-receipt.json",
+			"bytes": 855,
+			"sha256": "9de0fd7becf53dc802ffbecb3d29f1c34162075fcc46817d001a3cf24875e2b0"
+		}
+	],
+	"archive_bytes": 611524,
+	"archive_sha256": "92cec5439da375e683877b5bae4daf71dd78cceb4b5f10c073cf5ec57788d309",
+	"scope": "Actual terminal CI and pre-publication proof, with all combined paginated jobs. Original audit evidence.tar.gz remains unchanged.",
+	"validation": {
+		"actual_GNU_tar_extract_exit": 0,
+		"verified_extracted_files": 50,
+		"all_extracted_hashes_verified": true,
+		"original_audit_archive_unchanged": true
+	}
+}
