@@ -93,6 +93,23 @@ local function backend_entry(id, fields)
 	return entry
 end
 
+--- Where the Ollama group's "Install Ollama" button stands. Linux installs
+--- Ergopti's own Ollama through the AI enable, which offers its download when
+--- Ollama is missing, so the button acts only while the AI is off.
+--- @param frame table The page projection.
+--- @param blocked string|nil The config.toml refusal reason.
+--- @param ollama_ok boolean Whether Ollama can run a model now.
+--- @return table|nil install { state, reason_key? }; nil before a menu bound the page.
+local function ollama_install(frame, blocked, ollama_ok)
+	if not _bound then return nil end
+	if blocked ~= nil then return { state = "unsupported", reason_key = blocked } end
+	local phase = _bound.ollama_install_phase(frame.llm)
+	if phase == "running" then return { state = "running" } end
+	if ollama_ok then return { state = "installed" } end
+	if phase == "ai_on" then return { state = "unsupported", reason_key = "model_browser.reason_install_ai_on" } end
+	return { state = "available" }
+end
+
 local function build_payload(frame)
 	local installed = installed_lookup(frame)
 	local current = frame.llm_ports.get_current_model() or ""
@@ -145,6 +162,9 @@ local function build_payload(frame)
 			b.providers = providers
 		elseif b.id == "ollama" then
 			b.add_model = (blocked == nil and ollama_ok) or nil
+			b.install = ollama_install(frame, blocked, ollama_ok)
+		elseif b.id == "mlx" then
+			b.install = { state = "unsupported", reason_key = "model_browser.reason_mlx_unsupported_os" }
 		end
 	end
 	local rows, urls = {}, {}
@@ -306,6 +326,22 @@ function M.on_message(payload, state, context)
 		if done then changed() end
 		return { selected = done, closed = done and close_owned(context) or false }
 	end
+	if payload.action == "group_action" and backend == "ollama" and payload.id == "install" then
+		local ollama_ok = not _bound or _bound.ollama_state(frame.llm) == true
+		local install = ollama_install(frame, nil, ollama_ok)
+		if not install or install.state ~= "available" then
+			Logger.warn(LOG, "Refused installing Ollama from the page: it is not offered now.")
+			return { accepted = false }
+		end
+		Logger.info(LOG, "Installing Ollama from the model selector page through the AI enable.")
+		local accepted = _bound.install_ollama(frame.llm, function()
+			changed()
+			M.reproject_current()
+		end) == true
+		if not accepted then Logger.error(LOG, "The Ollama install from the model selector page was not started.") end
+		push_payload(frame)
+		return { accepted = accepted }
+	end
 	if payload.action == "group_action" and type(payload.id) == "string" then
 		return { accepted = run("tool\0" .. payload.id) }
 	end
@@ -436,10 +472,14 @@ end
 
 --- Binds the menu's transactions and dialogs the page runs. The menu builder
 --- binds them on every build, so the page acts with the current ones.
---- @param options table { llm, dialogs, on_changed, delete_model, context }
+--- @param options table { llm, dialogs, on_changed, delete_model, context,
+---   ollama_state, ollama_install_phase, install_ollama }
 function M.bind(options)
 	if type(options) ~= "table" or type(options.dialogs) ~= "table" or type(options.delete_model) ~= "function" then
 		error("model_browser bridge bind requires dialogs and delete_model", 2)
+	end
+	for _, name in ipairs({ "ollama_state", "ollama_install_phase", "install_ollama" }) do
+		if type(options[name]) ~= "function" then error("model_browser bridge bind requires " .. name, 2) end
 	end
 	_bound = options
 end

@@ -69,6 +69,7 @@ function M.with_fixture(options, scenario)
 
 	local runtime = {
 		engine_process_calls = 0,
+		engine_frame_stamps = {},
 		engine_stop_calls = 0,
 		action_cleanup_calls = 0,
 		action_resume_calls = 0,
@@ -123,7 +124,10 @@ function M.with_fixture(options, scenario)
 	}, { __index = function() return noop end })
 	package.loaded["modules.gestures.engine"] = setmetatable({
 		init = function() return true end,
-		process_frame = function() runtime.engine_process_calls = runtime.engine_process_calls + 1 end,
+		process_frame = function(_, frame_stamp)
+			runtime.engine_process_calls = runtime.engine_process_calls + 1
+			runtime.engine_frame_stamps[runtime.engine_process_calls] = frame_stamp or false
+		end,
 		stop = function()
 			runtime.engine_stop_calls = runtime.engine_stop_calls + 1
 			return true
