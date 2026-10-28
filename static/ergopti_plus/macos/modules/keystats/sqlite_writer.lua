@@ -21,6 +21,10 @@
 
 local M = {}
 
+--- The cache's durable commit mode. The fresh-cache ledger replay turns it off
+--- for its own batches and restores this value (log_manager, L64).
+M.SYNCHRONOUS_PRAGMA = "PRAGMA synchronous = FULL;"
+
 local hs      = hs
 local fs      = require("hs.fs")
 local json    = require("hs.json")
@@ -248,7 +252,7 @@ end
 --- @return number|nil next_event_id Persisted counter, published with the handle.
 local function _initialize_db(db, existed)
 	_exec_startup_sql(db, "PRAGMA journal_mode = DELETE;", "journal mode")
-	_exec_startup_sql(db, "PRAGMA synchronous = FULL;", "synchronous mode")
+	_exec_startup_sql(db, M.SYNCHRONOUS_PRAGMA, "synchronous mode")
 	_exec_startup_sql(db, "PRAGMA encoding = \"UTF-8\";", "encoding")
 
 	if not existed or not _schema_bootstrap_completed(db) then
