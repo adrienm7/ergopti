@@ -556,10 +556,10 @@
 		{
 			"id": "js-windows-control-cli-session",
 			"ordinal": 529,
-			"name": "Windows control CLI rejects malformed session identities through the actual PowerShell entrypoint",
+			"name": "Windows control CLI runs both session and result admissions through its standalone entrypoint",
 			"cmd": "$NODE_EXECUTABLE",
-			"args": ["tools/test/test-windows-control-cli.cjs", "--phase=session"],
-			"repro": "node tools/test/test-windows-control-cli.cjs --phase=session"
+			"args": ["tools/test/test-windows-control-cli.cjs"],
+			"repro": "npm run test:windows-control-cli"
 		},
 		{
 			"id": "js-windows-control-cli-result",

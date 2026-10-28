@@ -14,7 +14,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
-const { spawnSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SOURCE = path.join(ROOT, 'tools/control/request_driver_reload.ps1');
@@ -26,10 +26,19 @@ for (const argument of process.argv.slice(2)) {
 	argumentsByName.set(match[1], match[2]);
 }
 const phase = argumentsByName.get('phase');
+const PHASES = ['session', 'result'];
 assert.ok(
-	['session', 'result'].includes(phase),
-	'a known admission phase must be selected explicitly'
+	phase === undefined || PHASES.includes(phase),
+	'an explicit admission phase must be session or result'
 );
+// Bare npm aliases run both phases; every child retains its own native assertions.
+if (phase === undefined) {
+	assert.equal(argumentsByName.size, 0, 'a receipt path requires an explicit admission phase');
+	for (const selectedPhase of PHASES)
+		execFileSync(process.execPath, [__filename, `--phase=${selectedPhase}`], { stdio: 'inherit' });
+	console.log(`WINDOWS_CONTROL_CLI phases=${PHASES.length}`);
+	process.exit(0);
+}
 const runtime =
 	process.platform === 'win32'
 		? path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe')

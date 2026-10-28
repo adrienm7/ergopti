@@ -164,6 +164,7 @@
 		"test:macos-dev-app-script": "node ./tools/test/test-macos-dev-app-script.cjs",
 		"test:linux-dev-script": "node ./tools/test/test-linux-dev-script.cjs",
 		"test:windows-dev-script": "node ./tools/test/test-windows-dev-script.cjs",
+		"test:windows-control-cli": "node ./tools/test/test-windows-control-cli.cjs",
 		"test:macos-field-run-contract": "node ./tools/test/test-macos-field-run-contract.cjs",
 		"test:macos-bundle-payload": "node ./tools/test/test-macos-bundle-payload.cjs",
 		"test:macos-keyboard-layout-bundle": "node ./tools/test/test-macos-keyboard-layout-bundle.cjs",
