@@ -1,0 +1,23 @@
+[field-report] Reusing the running developer app: it was built from the current launcher.
+[field-report] Waiting for the developer app to publish its readiness...
+[field-report] Developer app ready (pid 3106); requesting every step within 4800 s.
+[field-report]   field run 01_field_lease: pass
+[field-report]   field run 02_field_owned_runtime: pass
+[field-report]   field run 03_field_network: pass
+[field-report]   field run 04_field_toolchain: pass
+[field-report]   field run 05_field_login_items: pass
+[field-report]   field run 06_field_composer: pass
+[field-report]   field run 07_key_accounting: needs_typing
+[field-report]   field run 08_diagnostics: pass
+[field-report]   field run still running, 61 s since the request...
+[field-report]   field run 09_ollama_runtime: fail
+[field-report]   field run 10_ollama_model: skip
+[field-report]   field run 11_mlx_runtime: pass
+[field-report]   field run still running, 122 s since the request...
+[field-report]   field run still running, 183 s since the request...
+[field-report]   field run still running, 244 s since the request...
+[field-report]   field run still running, 305 s since the request...
+[field-report]   field run still running, 367 s since the request...
+[field-report]   field run 12_mlx_model: pass
+[field-report]   field run 13_config_guard: pass
+[field-report] Field run done: {"counts":{"fail":1,"needs_typing":1,"pass":10,"skip":1},"elapsed_ms":403256,"finished_at":"2026-10-28T12:53:52Z","interrupted":false,"order":["field_lease","field_owned_runtime","field_network","field_toolchain","field_login_items","field_composer","key_accounting","diagnostics","ollama_runtime","ollama_model","mlx_runtime","mlx_model","config_guard"],"pid":3106,"request_id":"mac-2026-10-28_134705","schema":1,"started_at":"2026-10-28T12:47:08Z","verdicts":{"config_guard":"pass","diagnostics":"pass","field_composer":"pass","field_lease":"pass","field_login_items":"pass","field_network":"pass","field_owned_runtime":"pass","field_toolchain":"pass","key_accounting":"needs_typing","mlx_model":"pass","mlx_runtime":"pass","ollama_model":"skip","ollama_runtime":"fail"}}
