@@ -700,6 +700,11 @@ input_source_confirm_retry_base_ms = 500
 # HS: keymap/input_sources.lua CONFIRM_WINDOW_SEC.
 input_source_confirm_window_ms = 8000
 
+# Pause after each selection of the layout refresh (another layout, then the
+# rewritten one again), so the text-input system loads the new copy.
+# HS: keymap/input_sources.lua CONFIRM_SOURCE_SCRIPT (passed as its fourth argument).
+input_source_reselect_settle_ms = 300
+
 # Hard deadline for a native keyboard input-source mutation subprocess.
 # HS: keymap/input_sources.lua INPUT_SOURCE_OPERATION_TIMEOUT_SEC.
 # Linux: adapters/input_source_switch.lua (each gsettings or setxkbmap child).
