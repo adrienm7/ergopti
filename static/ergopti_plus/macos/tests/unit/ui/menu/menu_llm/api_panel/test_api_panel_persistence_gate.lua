@@ -133,14 +133,8 @@ helpers.describe("API panel durable persistence gate", function()
 						"selection and delete siblings must share the mutation lease")
 				end
 			end
-			local busy_picker = panel.build_model_picker(context)
-			for _, row in ipairs(busy_picker) do
-				if row.separator ~= true then
-					helpers.assert_eq(row.disabled, true,
-						"No Model and picker selection must share the mutation lease")
-					helpers.assert_eq(row.action, nil)
-				end
-			end
+			helpers.assert_eq(panel.clear_active_entry(context), false,
+				"No Model must share the mutation lease")
 
 			persist_callback(false, "keychain_encrypt_failed", false)
 			helpers.assert_eq(#entries, 0, "failed persistence must restore the prior entry list")

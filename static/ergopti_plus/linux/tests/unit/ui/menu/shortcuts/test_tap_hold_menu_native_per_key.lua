@@ -83,7 +83,7 @@ end)
 helpers.describe("inert existing-provider status data", function()
 	local function status_definition(Menu)
 		for _, item in ipairs(Menu.get_array("llm_menu")) do
-			if item.id == "llm_backend" then return item.status_rows.unavailable end
+			if item.id == "llm_model" then return item.status_rows.unavailable end
 		end
 		error("Canonical backend status declaration is missing")
 	end
@@ -97,7 +97,7 @@ helpers.describe("inert existing-provider status data", function()
 				unavailable.i18n = "menu.llm.local_servers.rescan"
 				definition[2], definition[3] = unavailable, header
 			end
-			local rows = Menu.status_rows("llm_menu", "llm_backend", "unavailable")
+			local rows = Menu.status_rows("llm_menu", "llm_model", "unavailable")
 			helpers.assert_type(rows, "table")
 			helpers.assert_eq(#rows, 3)
 			helpers.assert_true(rows[1].separator)
@@ -128,7 +128,7 @@ helpers.describe("inert existing-provider status data", function()
 		local saved = item.i18n
 		item.i18n = ""
 		local ok, err = pcall(function()
-			helpers.assert_nil(Menu.status_rows("llm_menu", "llm_backend", "unavailable"))
+			helpers.assert_nil(Menu.status_rows("llm_menu", "llm_model", "unavailable"))
 		end)
 		item.i18n = saved
 		if not ok then error(err, 0) end

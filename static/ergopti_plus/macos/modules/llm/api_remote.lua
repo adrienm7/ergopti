@@ -330,6 +330,12 @@ local function key_missing(entry)
 	return not AuthPolicy.entry_token_allowed(entry.provider, entry.token, entry.base_url, servers)
 end
 
+--- Whether an entry lacks the key its endpoint requires (the model selector
+--- page greys such an entry and asks for its key).
+--- @param entry table API entry.
+--- @return boolean missing
+function M.entry_key_missing(entry) return key_missing(entry) end
+
 --- Lists the providers that serve one use (modules/llm/provider_uses.lua), in
 --- the catalogue's order.
 --- @param use string A use of provider_uses ("prediction", "system1", "system2", "vision").
@@ -1931,6 +1937,91 @@ function M.check_availability(_model_name, on_available, on_missing, on_cancelle
 		return false
 	end
 	return accepted
+end
+
+
+-- The model ids each entry's provider listed, by entry id: the model selector
+-- page shows one row per listed model, and the configured one when absent.
+local _listed_models = {}
+
+--- Extracts the model ids of a provider-shaped models response.
+--- @param format string Provider wire format.
+--- @param body string Response body already validated by models_response_is_valid.
+--- @return table ids Sorted, unique.
+local function model_ids_from_body(format, body)
+	local decoded = JsonCodec.decode(body)
+	local list = decoded[format == "gemini" and "models" or "data"]
+	local ids, seen = {}, {}
+	for _, item in ipairs(type(list) == "table" and list or {}) do
+		local id = type(item) == "table" and (item.id or item.name) or nil
+		if type(id) == "string" then
+			if format == "gemini" and id:sub(1, 7) == "models/" then id = id:sub(8) end
+			if id ~= "" and not seen[id] then
+				seen[id] = true
+				ids[#ids + 1] = id
+			end
+		end
+	end
+	table.sort(ids)
+	return ids
+end
+
+--- The ids the active entry's provider listed at its last successful listing.
+--- @param entry_id string Entry identifier.
+--- @return table|nil ids Nil before a listing succeeded for this entry.
+function M.listed_models(entry_id)
+	return _listed_models[entry_id]
+end
+
+--- Lists the models the active entry's provider serves, through the same
+--- authenticated models endpoint the availability check reads.
+--- @param on_done function Receives (ok, ids_or_reason).
+--- @return boolean dispatched
+function M.list_active_models(on_done)
+	if type(on_done) ~= "function" then error("api_remote.list_active_models requires on_done") end
+	local paused, _, pause_state_ok = read_script_pause_state()
+	if pause_state_ok ~= true or paused == true then return false end
+	local my_identity = _identity_generation
+	local lease = M.resolve_active_entry(function(resolved, entry)
+		if resolved ~= true or not entry then
+			Logger.callback(LOG, "Remote model listing", on_done, false, "no_active_entry")
+			return
+		end
+		local provider = M.PROVIDERS[entry.provider]
+		local base = provider and resolve_base_url(entry, provider) or nil
+		if not provider or not base or key_missing(entry) or provider.format == "backboard"
+				or provider.format == "decisions" then
+			Logger.callback(LOG, "Remote model listing", on_done, false, "listing_unsupported")
+			return
+		end
+		local format = provider.format
+		local dispatched = dispatch_probe(_check_client, base, format, entry.token, function(r)
+			if my_identity ~= _identity_generation then
+				Logger.callback(LOG, "Remote model listing", on_done, false, "stale_identity")
+				return
+			end
+			local valid, reason = models_response_is_valid(format, r)
+			if not valid then
+				Logger.info(LOG, "Remote model listing unavailable (provider=%s, status=%s, reason=%s).",
+					tostring(entry.provider), tostring(type(r) == "table" and r.status or nil), tostring(reason))
+				Logger.callback(LOG, "Remote model listing", on_done, false, "listing_refused")
+				return
+			end
+			local ok, ids = pcall(model_ids_from_body, format, r.body)
+			if not ok then
+				Logger.warn(LOG, "Remote model listing could not be read: %s.", tostring(ids))
+				Logger.callback(LOG, "Remote model listing", on_done, false, "listing_unreadable")
+				return
+			end
+			_listed_models[entry.id] = ids
+			Logger.info(LOG, "Remote model listing: %d model(s) for provider %s.", #ids, tostring(entry.provider))
+			Logger.callback(LOG, "Remote model listing", on_done, true, ids)
+		end)
+		if dispatched ~= true then
+			Logger.callback(LOG, "Remote model listing", on_done, false, "dispatch_refused")
+		end
+	end)
+	return type(lease) == "table"
 end
 
 

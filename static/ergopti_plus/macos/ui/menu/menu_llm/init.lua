@@ -30,10 +30,9 @@ local TriggerPanel     = require("ui.menu.menu_llm.trigger_panel")
 local AgentPanel       = require("ui.menu.menu_llm.agent_panel")
 local ApiPanel         = require("ui.menu.menu_llm.api_panel")
 local ConfigGuard      = require("ui.menu.menu_llm.config_guard")
-local LocalServerPanel = require("ui.menu.menu_llm.local_server_panel")
 local UnreachableOffer = require("ui.menu.menu_llm.unreachable_backend_offer")
 local OllamaEndpoint   = require("modules.llm.ollama_endpoint")
-local ModelsSelector   = require("ui.menu.menu_llm.models_selector")
+local ModelSelectorPage = require("ui.menu.menu_llm.model_selector_page")
 local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
 local ActivationPauseOwner = require("ui.menu.menu_llm.activation_pause_owner")
@@ -982,7 +981,7 @@ local function create_menu(deps)
 						actions = {
 								-- Switching to a server that answers is the user's confirmed choice
 								use_server = function(id, model)
-										return LocalServerPanel.use_server(id, model, function(selected)
+										return ModelSelectorPage.use_local_server(id, model, function(selected)
 												if selected then enable_ai(nil) end
 										end)
 								end,
@@ -1064,73 +1063,13 @@ local function create_menu(deps)
 				end
 
 
-				local backend_title, backend_menu = BackendPanel.build({
-						state                = state,
-						keymap               = keymap,
-						paused               = paused,
-						models_mgr           = models_mgr,
-						get_display_model_name = get_display_model_name,
-						switch_model         = switch_model,
-						disable_model        = disable_model,
-						save_prefs           = save_prefs,
-						update_menu          = update_menu,
-						WarmupCtrl           = WarmupCtrl,
-						-- So the API-backend switch can clear a stale MLX/Ollama health
-						-- reading instead of leaking it into the API backend's status
-						-- dot display (F-LOW-6).
-						reset_llm_health_status = M.reset_llm_health_status,
-						-- The local OpenAI-compatible servers that answer, below the API row
-						local_server_rows = function(activate_api)
-								return LocalServerPanel.rows({
-										state = state, paused = paused, keymap = keymap, update_menu = update_menu,
-										is_paused = deps.script_control and deps.script_control.is_paused,
-										WarmupCtrl = WarmupCtrl, activate_api = activate_api,
-								})
-						end,
-				})
-
-				if type(backend_title) == "string" and type(backend_menu) == "table" then
-						local backend_row = config_parent("llm_backend", backend_title, backend_menu,
-								MenuLayout.row_disabled("llm_backend", is_disabled, paused))
-						if not backend_row then return {} end
-						row_for("llm_backend", backend_row)
-				else
-						row_for("llm_backend", {
-								title    = backend_title,
-								disabled = MenuLayout.row_disabled("llm_backend", is_disabled, paused),
-								menu     = backend_menu
-						})
-				end
-
-				-- API entries CRUD — delegates entirely to ApiPanel.
-				do
-						local api_title, api_menu = ApiPanel.build({
-								state       = state,
-								paused      = paused,
-								is_paused   = deps.script_control and deps.script_control.is_paused,
-								keymap      = keymap,
-								update_menu = update_menu,
-								WarmupCtrl  = WarmupCtrl,
-						})
-						if api_title and api_menu then
-								-- Anchored to the backend row: it configures the backend the row
-								-- above selects, and the manifest declares no row of its own for
-								-- it because Windows has no API-entry CRUD to declare.
-								local api_row = config_parent("llm_backend", api_title, api_menu, paused or nil)
-								if not api_row then return {} end
-								row_for("llm_backend", api_row)
-						end
-				end
+				-- The Backend chooser, the API entries and the local servers moved to
+				-- the model selector page with the model list (maintainer, 2026-10-27):
+				-- the page collects the panels' actions when it opens, the menu builds
+				-- none of them.
 				local active_display_model = get_display_model_name(state.llm_model)
 				local info = models_mgr.get_model_info(active_display_model) or {}
-				local ram = models_mgr.get_model_ram(active_display_model) or 0
-				local type_str = " [" .. i18n.get((info.type == "completion")
-						and "menu.llm.model_type_completion"
-						or  "menu.llm.model_type_chat") .. "]"
-				local params_ram_str = (info.params and info.params > 0)
-						and string.format(" (%gB params, ~%d Go RAM)", info.params, math.ceil(ram))
-						or string.format(" (~%d Go RAM)", math.ceil(ram))
-				
+
 				-- Trigger a fresh async probe on every menu open so the indicator stays accurate.
 				-- The result arrives after the menu is shown; the next open will display it.
 				-- Pass a guarded callback that only calls update_menu when _llm_health_status
@@ -1187,103 +1126,55 @@ local function create_menu(deps)
 						end
 				end
 
-				-- The row's label is the manifest's own key (menu.llm.model_label), the
-				-- one Windows and Linux draw too: one wording in every driver.
-				local model_text
+				-- One button replaces the model list (maintainer, 2026-10-27): the
+				-- backend's emoji, then the model it runs; the page it opens is where
+				-- the model is chosen. Building no list keeps the rebuild cheap.
+				local api_entry_name = nil
 				if state.llm_backend == "api" then
-						-- The local llm_model slot is stale on this backend: show the
-						-- active API entry's automatic name instead, without
-						-- local-model badges.
-						local entry_name = nil
-						if type(ApiPanel.active_entry_display_name) == "function" then
-							entry_name = ApiPanel.active_entry_display_name()
-						end
-						model_text = entry_name or i18n.get("menu.llm.no_model_none")
-				elseif not state.llm_model or state.llm_model == "" then
-						model_text = i18n.get("menu.llm.no_model_none")
-				else
-						model_text = string.format("%s%s%s", active_display_model, type_str, params_ram_str)
+						api_entry_name = ApiPanel.active_entry_caption_text()
 				end
-				local rich_model_title = health_dot .. string.format(i18n.get("menu.llm.model_label"), model_text)
+				local rich_model_title = health_dot .. ModelSelectorPage.caption(state, active_display_model, api_entry_name)
 
-				local model_submenu
-				if state.llm_backend == "api" then
-						model_submenu = ApiPanel.build_model_picker({
-								state       = state,
-								paused      = paused,
-								keymap      = keymap,
-								update_menu = update_menu,
-								WarmupCtrl  = WarmupCtrl,
-						})
-				else
-						model_submenu = ModelsSelector.build({
-								state         = state,
-								models_mgr    = models_mgr,
-								switch_model  = switch_model,
-								disable_model = disable_model,
-								save_prefs    = save_prefs,
-								update_menu   = update_menu,
-								DEFAULT_STATE = M.DEFAULT_STATE,
-								paused        = paused,   -- gate model rows while paused (M-16)
-								is_paused     = deps.script_control and deps.script_control.is_paused,
-						})
-
-						-- The selector owns provider DATA. Complete that child once before
-						-- appending this owner's already-rendered native port controls.
-						local native_model_submenu = ManifestMenu.render_rows(model_submenu, "llm_model")
-
-						-- MLX server port — Ergopti's own server, so let the user move it off
-						-- the default if it collides with another local server they run. Changing
-						-- it persists (api_mlx → hs.settings), then relaunches the server on the
-						-- new port for the current model so the change takes effect immediately.
-						local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
-						if ok_api and type(ApiMlx.get_port) == "function" then
-								-- Row DATA appended to the selector's finished tree: the rows
-								-- above it are ModelsSelector's, these three are this file's,
-								-- and the renderer materialises this file's.
-								local port_rows = ManifestMenu.template_rows("llm_mlx_port_frame", {
-									[require("config_keys").COMMAND.LLM_MLX_PORT] = function()
-										return settings_mgr.set_mlx_port(restart_mlx_for_current_port)
-									end,
-									[require("config_keys").COMMAND.LLM_MLX_PORT_RESET] = function()
-										return settings_mgr.reset_mlx_port(restart_mlx_for_current_port)
-									end,
-								}, {
-									llm_mlx_port_provider = function() return "MLX" end,
-									llm_mlx_port_caption = function() return tostring(ApiMlx.get_port()) end,
-									llm_mlx_port_reset_caption = function() return tostring(ApiMlx.get_default_port()) end,
-									llm_mlx_port_reset_present = function()
-										return type(ApiMlx.get_default_port) == "function" and ApiMlx.get_port() ~= ApiMlx.get_default_port()
-									end,
-									llm_mlx_port_ready = function() return not paused end,
-								}, {})
-								if not port_rows then return {} end
-								-- Use the actual terminal row DATA as context without rebuilding completed
-								-- catalogue trees. The original row object remains in the selector data.
-								local tail = model_submenu[#model_submenu]
-								if tail ~= nil and (type(tail) ~= "table" or getmetatable(tail) ~= nil
-										or (rawget(tail, "separator") ~= true
-											and (type(rawget(tail, "label")) ~= "string" or rawget(tail, "label") == ""))) then return {} end
-								local context = tail and { tail } or {}
-								for _, row in ipairs(port_rows) do context[#context + 1] = row end
-								local rendered = ManifestMenu.render_rows(context, "llm_model")
-								local first_new = tail and tail.separator ~= true and 2 or 1
-								if first_new == 2 and (rendered[1] == nil
-										or rendered[1].title ~= tail.label
-										or not rawequal(rendered[1].fn,
-											(type(tail.items) ~= "table" and type(tail.submenu) ~= "table") and tail.action or nil)
-										or not rawequal(rendered[1].image, tail.image)) then return {} end
-								for index = first_new, #rendered do
-										table.insert(native_model_submenu, rendered[index])
-								end
-						end
-						model_submenu = native_model_submenu
-				end
-
+				ModelSelectorPage.bind({
+						state                   = state,
+						keymap                  = keymap,
+						models_mgr              = models_mgr,
+						settings_mgr            = settings_mgr,
+						WarmupCtrl              = WarmupCtrl,
+						DEFAULT_STATE           = M.DEFAULT_STATE,
+						switch_model            = switch_model,
+						disable_model           = disable_model,
+						save_prefs              = save_prefs,
+						update_menu             = update_menu,
+						get_display_model_name  = get_display_model_name,
+						reset_llm_health_status = M.reset_llm_health_status,
+						restart_mlx_for_current_port = restart_mlx_for_current_port,
+						-- Every page action writes config.toml: the page names the same cause.
+						config_reason           = config_reason,
+						-- Only MLX downloads from Hugging Face; the token lives in its CLI's file.
+						hf_token_set            = function()
+								local fh = io.open((os.getenv("HOME") or "") .. "/.huggingface/token", "r")
+								if not fh then return false end
+								local raw = fh:read("*a")
+								fh:close()
+								return type(raw) == "string" and TextUtils.trim(raw) ~= ""
+						end,
+						-- The local server rows keep the native pause port itself, as the
+						-- tray handed it to them before the page.
+						native_is_paused        = deps.script_control and deps.script_control.is_paused,
+						is_paused               = function()
+								local control = deps.script_control
+								if not control or type(control.is_paused) ~= "function" then return paused end
+								local ok, live = xpcall(control.is_paused, debug.traceback)
+								return not ok or live ~= false
+						end,
+				})
+				-- An open page follows the state this rebuild publishes.
+				ModelSelectorPage.refresh()
 				row_for("llm_model", {
 						title    = rich_model_title,
 						disabled = MenuLayout.row_disabled("llm_model", is_disabled, paused),
-						menu     = model_submenu,
+						fn       = function() return ModelSelectorPage.open() end,
 				})
 
 				-- Anchored to the model row it describes. It used to be inserted BEFORE
@@ -2208,6 +2099,14 @@ local function create_menu(deps)
 		end)
 		-- The llm_agent_auto_toggle action persists the mode it switches to
 		-- through the same transaction as the menu.
+		-- The open_model_browser toggle opens the model selector page. It is
+		-- registered at creation so the shortcut works before the AI menu was
+		-- ever opened: the first open builds the AI item once, which binds the
+		-- page to this session's context.
+		require("ui.window_toggle").set_opener("model_browser", function()
+				if not ModelSelectorPage.is_bound() then build_item() end
+				return ModelSelectorPage.open()
+		end)
 		require("modules.llm.agent_runner").set_mode_persister(function(mode)
 				return settings_mgr.apply_setting_transaction({
 						key = "llm_agent_mode", value = mode, runtime_fn = "set_llm_agent_mode", publish_setting = false,

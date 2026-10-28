@@ -734,8 +734,6 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/api/test_llm_api_entry_names.ahk
 #Include unit/modules/llm/menu/test_llm_menu_backend_model_labels.ahk
 #Include unit/modules/llm/menu/test_llm_menu_model_hardware.ahk
-#Include unit/modules/llm/menu/test_llm_menu_backend_child.ahk
-#Include unit/modules/llm/menu/test_llm_menu_model_parent.ahk
 #Include unit/modules/llm/menu/test_llm_menu_build_submenu.ahk
 #Include unit/modules/llm/menu/test_llm_menu_prediction_count.ahk
 #Include unit/modules/llm/servers/test_llm_curl_terminal_classification.ahk
@@ -2166,7 +2164,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/test_keystats_shutdown_timer_durability.ahk
 #Include meta/modules/llm/prediction/test_llm_finalize_guard_before_yield.ahk
 #Include meta/modules/llm/prediction/test_llm_indexed_callbacks_never_swallowed.ahk
-#Include meta/modules/llm/menu/test_llm_model_menu_no_model_row_actionable.ahk
 #Include meta/modules/llm/profiles/test_llm_profile_menu_unique_labels.ahk
 #Include meta/infra/i18n/test_locale_tsv_atomic_write.ahk
 #Include meta/ui/menu/test_menu_manifest_single_decode.ahk

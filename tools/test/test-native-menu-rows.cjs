@@ -155,7 +155,9 @@ function admittedSourceRetirements(driver, traversed) {
 	if (driver !== 'macos' || traversed.has(retired)) return new Set();
 	// An incomplete remaining view receives no retirement exception. The
 	// unchanged coverage assertions below retain their original refusal path.
-	const remaining = LEGACY.drivers.macos.sourceFiles.filter((rel) => rel !== retired);
+	const remaining = LEGACY.drivers.macos.sourceFiles.filter(
+		(rel) => !CURRENT_SOURCE_RETIREMENTS.macos.includes(rel)
+	);
 	if (traversed.size < remaining.length || remaining.some((rel) => !traversed.has(rel)))
 		return new Set();
 	const symbols = new Set([
@@ -234,6 +236,25 @@ function admittedSourceRetirements(driver, traversed) {
 					`retired live-menu executable owner reappeared: ${path.relative(SP, file)}: ${token.value}`
 				);
 	}
+	return new Set([retired, ...admittedSelectorRetirement()]);
+}
+
+/**
+ * The tray model list (models_selector.lua) retired when the model selector
+ * page took the choice over on 2026-10-27. Its retirement is admitted only
+ * while no macOS menu source names the module again.
+ * @returns {Set<string>}
+ */
+function admittedSelectorRetirement() {
+	const retired = 'macos/ui/menu/menu_llm/models_selector.lua';
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	for (const file of sourceFiles(path.join(SP, 'macos/ui'), '.lua'))
+		for (const token of scriptTokens(fs.readFileSync(file, 'utf8'), '.lua'))
+			assert.ok(
+				token.value !== 'ModelsSelector' &&
+					!(token.kind === 'string' && /(?:^|[./])models_selector$/.test(token.value)),
+				`retired model list owner reappeared: ${path.relative(SP, file)}: ${token.value}`
+			);
 	return new Set([retired]);
 }
 
@@ -356,7 +377,11 @@ const LEGACY = JSON.parse(legacyBytes.toString('utf8'));
 // Explicit current retirement keeps every historical excerpt and floor intact.
 // Any other absent source, or resurrection of this removed provider, refuses.
 const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
-	macos: Object.freeze(['macos/ui/menu/menu_llm/live_mode_panel.lua'])
+	// models_selector.lua retired with the tray model list (model selector page, 2026-10-27).
+	macos: Object.freeze([
+		'macos/ui/menu/menu_llm/live_mode_panel.lua',
+		'macos/ui/menu/menu_llm/models_selector.lua'
+	])
 });
 
 // The frozen oracle keeps the pre-rename spelling; the current tree uses the new one.

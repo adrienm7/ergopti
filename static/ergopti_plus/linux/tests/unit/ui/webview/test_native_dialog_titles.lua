@@ -142,7 +142,10 @@ h.describe("native menu dialog captions", function()
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local original_execute = os.execute
 		local commands, accepted, modals, dialogs = {}, nil, 0, nil
-		package.loaded["ui.menu.llm_backend_rows"] = { rows = function(_, ports) dialogs = ports; return {} end }
+		package.loaded["ui.menu.llm_backend_rows"] = {
+			bind_page = function(_, options) dialogs = options.dialogs end,
+			caption = function() return "model button" end,
+		}
 		package.loaded["infra.installation"] = { is_source_run = function() return false end }
 		package.loaded["ui.modal"] = { run = function(fn) modals = modals + 1; return fn() end }
 		package.loaded["ui.menu.uninstall"] = { run = function(opts)
@@ -173,7 +176,7 @@ h.describe("native menu dialog captions", function()
 				.. " --cancel-label=" .. Shell.quote(i18n.get("button.cancel")) .. " 2>/dev/null")
 			h.assert_eq(commands[2], "zenity --error --title=" .. title
 				.. " --text='Preserved &lt;failure&gt;' 2>/dev/null")
-			h.assert_type(dialogs, "table", "real model provider receives its native dialog ports")
+			h.assert_type(dialogs, "table", "the model selector page receives the native dialog ports")
 			dialogs.info("Native information", "Preserved information body")
 			h.assert_eq(commands[3], "zenity --info --title='ErgoptiPlus — Native information'"
 				.. " --text='Preserved information body' 2>/dev/null")
