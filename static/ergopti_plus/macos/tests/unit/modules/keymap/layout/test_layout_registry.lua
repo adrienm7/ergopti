@@ -75,7 +75,7 @@ local function manager(options)
 		for _, file in ipairs(entry.extension.files) do digests[registry_file(file.file)] = file.sha256 end
 	end
 	local state = { requests = {}, files = {}, enabled = {}, disabled = {}, selected = {}, deleted = {},
-		live_reads = {}, pending = {} }
+		live_reads = {}, confirms = {}, pending = {} }
 	for path, text in pairs(options.files or {}) do state.files[path] = text end
 	local served = options.served or {}
 	if type(served) == "table" and served[INDEX_URL] then
@@ -123,11 +123,14 @@ local function manager(options)
 			return true
 		end,
 		active_sources = function() return options.active or {} end,
-		-- macOS turns a listed layout on at once unless the case says otherwise.
-		live_enabled = function(name)
+		-- A fresh process sees a listed layout on at once (probe v5, P5) unless
+		-- the case says otherwise.
+		confirm_source = function(name, confirm_options, on_done)
 			state.live_reads[#state.live_reads + 1] = name
-			if options.live_unreadable then return nil, "live_state_unreadable" end
-			return options.pending_logout ~= true, nil
+			state.confirms[#state.confirms + 1] = confirm_options
+			if options.live_unreadable then on_done(false, nil, "live_state_unreadable") return true end
+			on_done(true, { listed = true, enabled = options.pending_logout ~= true }, nil)
+			return true
 		end,
 		pending = {
 			record = function(id, name) state.pending[id] = { keyboard_name = name, select = false }; return true end,
@@ -350,6 +353,23 @@ helpers.describe("layout manager (macOS): installing", function()
 		helpers.assert_not_nil(state.pending.ergol, "the boot checks it again")
 		run(function(done) LayoutRegistry.uninstall("ergol", done, deps) end)
 		helpers.assert_nil(state.pending.ergol, "an uninstalled layout is no longer pending")
+	end)
+
+	-- Probe v5 (P5): the preference turns the layout on at once, seen by a process
+	-- started after the write; P8 a: a rewritten enabled file applies once registered again.
+	helpers.it("confirms a new layout from a fresh process and asks the user to expect the consent (composer-macos26)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files() })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_eq(result.detail.enabled, true)
+		helpers.assert_eq(result.detail.pending_activation, false)
+		helpers.assert_eq(result.detail.consent, true, "macOS asks to allow a keyboard it has not seen")
+		helpers.assert_eq(state.confirms[1].register_path, LAYOUTS_DIR .. "ergol.keylayout")
+		helpers.assert_eq(state.confirms[1].refresh, false)
+		local update = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_eq(update.detail.enabled, true)
+		helpers.assert_eq(update.detail.consent, false, "an update of an allowed keyboard asks nothing")
+		helpers.assert_eq(state.confirms[2].refresh, true, "an update re-registers and reselects the rewritten file")
+		helpers.assert_nil(state.pending.ergol)
 	end)
 
 	helpers.it("neither enables nor records a layout whose live state cannot be read (composer-macos26)", function()

@@ -911,6 +911,162 @@ local function edit_enabled_list_async(mode, target, display, accepted, on_done)
 		end)
 end
 
+-- Reads, and optionally registers or refreshes, one keyboard layout from a
+-- FRESH process. The macOS 26 field probe (v5, P5 and P9) showed that the
+-- enabled-sources preference turns a layout on at once, but a process that
+-- already used TIS keeps its stale list (it answers enabled=false and select
+-- -50), while a process started after the write sees enabled=true and selects
+-- it. Hammerspoon's own list (hs.keycodes) is such a stale cache, so the state
+-- is read here, in a child started after the write. P8 a: new content of an
+-- enabled loose layout applies once the file is registered again.
+--
+-- argv: KeyboardLayout Name, the .keylayout path to register ("" for none),
+-- and "refresh" to select another layout and back when the target is selected
+-- (so a rewritten layout is reloaded). Prints one JSON object:
+--   {"listed", "id", "enabled", "select_capable", "selected", "register", "refreshed"}
+-- Carbon is called through ctypes: the AppleScript ObjC bridge crashes on these
+-- calls (see ENABLED_LIST_SCRIPT), the C API does not.
+local CONFIRM_SOURCE_SCRIPT = [[
+import ctypes, json, sys, time
+
+TARGET = sys.argv[1]
+REGISTER_PATH = sys.argv[2]
+REFRESH = sys.argv[3] == "refresh"
+UTF8 = 0x08000100
+
+cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+tis = ctypes.CDLL("/System/Library/Frameworks/Carbon.framework/Carbon")
+P = ctypes.c_void_p
+cf.CFArrayGetCount.argtypes = [P]
+cf.CFArrayGetCount.restype = ctypes.c_long
+cf.CFArrayGetValueAtIndex.argtypes = [P, ctypes.c_long]
+cf.CFArrayGetValueAtIndex.restype = P
+cf.CFStringGetCString.argtypes = [P, ctypes.c_char_p, ctypes.c_long, ctypes.c_uint32]
+cf.CFStringGetCString.restype = ctypes.c_bool
+cf.CFBooleanGetValue.argtypes = [P]
+cf.CFBooleanGetValue.restype = ctypes.c_bool
+cf.CFRelease.argtypes = [P]
+cf.CFRelease.restype = None
+cf.CFURLCreateFromFileSystemRepresentation.argtypes = [P, ctypes.c_char_p, ctypes.c_long, ctypes.c_bool]
+cf.CFURLCreateFromFileSystemRepresentation.restype = P
+tis.TISCreateInputSourceList.argtypes = [P, ctypes.c_bool]
+tis.TISCreateInputSourceList.restype = P
+tis.TISGetInputSourceProperty.argtypes = [P, P]
+tis.TISGetInputSourceProperty.restype = P
+tis.TISSelectInputSource.argtypes = [P]
+tis.TISSelectInputSource.restype = ctypes.c_int32
+tis.TISRegisterInputSource.argtypes = [P]
+tis.TISRegisterInputSource.restype = ctypes.c_int32
+
+def key(name):
+    return P.in_dll(tis, name).value
+
+K_ID = key("kTISPropertyInputSourceID")
+K_NAME = key("kTISPropertyLocalizedName")
+K_TYPE = key("kTISPropertyInputSourceType")
+K_ENABLED = key("kTISPropertyInputSourceIsEnabled")
+K_SELECT_CAPABLE = key("kTISPropertyInputSourceIsSelectCapable")
+K_SELECTED = key("kTISPropertyInputSourceIsSelected")
+
+def text(ref):
+    if not ref:
+        return None
+    buffer = ctypes.create_string_buffer(1024)
+    return buffer.value.decode("utf-8") if cf.CFStringGetCString(ref, buffer, 1024, UTF8) else None
+
+def string_property(source, name):
+    return text(tis.TISGetInputSourceProperty(source, name))
+
+def flag(source, name):
+    ref = tis.TISGetInputSourceProperty(source, name)
+    return bool(ref) and bool(cf.CFBooleanGetValue(ref))
+
+def sources():
+    listed = tis.TISCreateInputSourceList(None, True)
+    if not listed:
+        print(json.dumps({"error": "TISCreateInputSourceList returned nothing"}))
+        sys.exit(1)
+    return listed, [cf.CFArrayGetValueAtIndex(listed, i) for i in range(cf.CFArrayGetCount(listed))]
+
+def is_target(source):
+    source_id = string_property(source, K_ID) or ""
+    return string_property(source, K_NAME) == TARGET or source_id == TARGET or source_id.endswith("." + TARGET)
+
+register = None
+if REGISTER_PATH:
+    raw = REGISTER_PATH.encode("utf-8")
+    url = cf.CFURLCreateFromFileSystemRepresentation(None, raw, len(raw), False)
+    if not url:
+        print(json.dumps({"error": "the layout path is not a URL"}))
+        sys.exit(1)
+    register = tis.TISRegisterInputSource(url)
+    cf.CFRelease(url)
+
+listed, everything = sources()
+target = next((source for source in everything if is_target(source)), None)
+refreshed = None
+if target is not None and REFRESH and flag(target, K_SELECTED):
+    layout_type = "TISTypeKeyboardLayout"
+    other = next((source for source in everything if source != target
+        and string_property(source, K_TYPE) == layout_type
+        and flag(source, K_ENABLED) and flag(source, K_SELECT_CAPABLE)), None)
+    if other is not None:
+        away = tis.TISSelectInputSource(other)
+        time.sleep(0.3)
+        back = tis.TISSelectInputSource(target)
+        time.sleep(0.3)
+        refreshed = {"away": away, "back": back}
+    else:
+        refreshed = {"away": None, "back": None}
+
+state = {"listed": target is not None, "register": register, "refreshed": refreshed}
+if target is not None:
+    state.update({
+        "id": string_property(target, K_ID),
+        "enabled": flag(target, K_ENABLED),
+        "select_capable": flag(target, K_SELECT_CAPABLE),
+        "selected": flag(target, K_SELECTED),
+    })
+cf.CFRelease(listed)
+print(json.dumps(state))
+]]
+
+--- Reads one keyboard layout's state from a fresh process (CONFIRM_SOURCE_SCRIPT).
+--- @param keyboard_name string KeyboardLayout Name (the .keylayout's name=).
+--- @param options table|nil { register_path = string|nil, refresh = boolean|nil }.
+--- @param on_done function fn(ok, state, reason): state is the decoded JSON object.
+--- @return boolean accepted True only when the child start commits.
+local function confirm_source_async(keyboard_name, options, on_done)
+	options = options or {}
+	if type(keyboard_name) ~= "string" or keyboard_name == "" then
+		invoke_mutation_done("confirm_source.reject", on_done, false, nil, "invalid_name")
+		return false
+	end
+	local python_bin, python_state = PythonInterpreter.resolve()
+	if not python_bin then
+		require("ui.python_runtime_offer").offer(python_state)
+		invoke_mutation_done("confirm_source.done", on_done, false, nil, "python_unavailable")
+		return false
+	end
+	local register_path = type(options.register_path) == "string" and options.register_path or ""
+	return run_bounded_process("Confirm keyboard input source", python_bin,
+		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path, options.refresh == true and "refresh" or "" },
+		function(process_ok, out, reason)
+			local decoded_ok, state = pcall(require("json").decode, tostring(out or ""))
+			if process_ok ~= true or not decoded_ok or type(state) ~= "table" or type(state.listed) ~= "boolean" then
+				local failure_reason = reason or "invalid_output"
+				Logger.warn(LOG, "The state of '%s' could not be read from a fresh process (reason=%s, output=%s).",
+					keyboard_name, failure_reason, tostring(out))
+				invoke_mutation_done("confirm_source.done", on_done, false, nil, failure_reason)
+				return
+			end
+			Logger.info(LOG, "Input source '%s' seen by a fresh process: listed=%s enabled=%s selected=%s register=%s.",
+				keyboard_name, tostring(state.listed), tostring(state.enabled), tostring(state.selected),
+				tostring(state.register))
+			invoke_mutation_done("confirm_source.done", on_done, true, state, nil)
+		end)
+end
+
 --- Adds an installed .keylayout to the user's enabled input sources. Its
 --- KeyboardLayout ID and Name are read from the file, so any layout works,
 --- whether it sits in a bundle or on its own in ~/Library/Keyboard Layouts.
@@ -1135,6 +1291,7 @@ return {
 	set_input_source_async        = set_input_source_async,
 	enable_keylayout_source_async = enable_keylayout_source_async,
 	is_live_enabled               = is_live_enabled,
+	confirm_source_async          = confirm_source_async,
 	disable_keylayout_source_async = disable_keylayout_source_async,
 	is_legacy_ergopti_id          = is_legacy_ergopti_id,
 	migrate_legacy_id             = migrate_legacy_id,

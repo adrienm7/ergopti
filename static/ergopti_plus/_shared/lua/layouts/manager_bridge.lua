@@ -116,7 +116,8 @@ function M.handle_composer(deps, controller, action, payload, push_state)
 	local function report(ok, code, detail, used, installed)
 		deps.push("composerResult", { action = action, ok = ok == true, code = code, detail = detail and tostring(detail),
 			used = used == true,
-			pending = type(installed) == "table" and installed.pending_activation == true })
+			pending = type(installed) == "table" and installed.pending_activation == true,
+			consent = type(installed) == "table" and installed.consent == true })
 		push_state()
 	end
 	if action == "composer_open" then
@@ -159,7 +160,10 @@ function M.new(deps)
 		return function(ok, detail_or_code, detail)
 			if ok then
 				local warning = nil
-				if type(detail_or_code) == "table" and detail_or_code.enabled == false then
+				if type(detail_or_code) == "table" and detail_or_code.consent == true then
+					-- macOS asks the user to allow a keyboard it has not seen before.
+					warning = "macos_consent"
+				elseif type(detail_or_code) == "table" and detail_or_code.enabled == false then
 					-- macOS lists it and turns it on at the next login: not a missing step for the user.
 					warning = detail_or_code.pending_activation == true and "pending_logout" or "not_enabled"
 				end
