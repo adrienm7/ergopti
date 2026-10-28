@@ -112,3 +112,72 @@ require("test.runner_timing_contract").run(helpers)
 require("test.runner_home_contract").run(helpers)
 
 require("test.runner_replay_contract").run(helpers, "linux")
+
+helpers.describe("linux test runner: UTF-8 timing frames", function()
+	helpers.it("(runner-output-utf8) retains valid diagnostic names for malformed byte inputs", function()
+		local quote = require("text_utils").shell_quote
+		local root = helpers.driver_root()
+		local command = "cd " .. quote(root)
+			.. " && luajit tests/run.lua --only onboarding-linux-trigger 2>&1"
+		helpers.assert_eq(debug.getinfo(io.popen, "S").what, "C", "the capture must use native process I/O")
+		-- A private load cannot inherit another fixture's _set_runner seam.
+		local Shell = assert(loadfile(root .. "/adapters/shell_runner.lua"))()
+		local Errors = require("adapter_errors")
+		local function validate_output(output)
+			helpers.assert_type(output, "string")
+			helpers.assert_true(#output > 0, "an empty capture cannot prove timing coverage")
+			local utf8 = require("compat.utf8")
+			helpers.assert_true(utf8.len(output) ~= nil, "the whole canonical output must be valid UTF-8")
+			local Json = require("json")
+			local prefix = "# lua_timing "
+			local case_count, module_count, unsafe_names = 0, 0, {}
+			for line in output:gmatch("[^\n]+") do
+				if line:sub(1, #prefix) == prefix then
+					helpers.assert_true(utf8.len(line) ~= nil, "each timing frame must be valid UTF-8")
+					local row = Json.decode(line:sub(#prefix + 1))
+					helpers.assert_type(row, "table")
+					helpers.assert_eq(row.schema, 1)
+					helpers.assert_eq(row.driver, "linux")
+					helpers.assert_eq(row.status, "pass")
+					helpers.assert_eq(row.timing_error, "")
+					if row.kind == "case" then
+						case_count = case_count + 1
+						helpers.assert_eq(row.module, "tests.unit.ui.editors.test_ui_bridge_handlers_onboarding")
+						if row.name:find("refuses unsafe answer", 1, true) then
+							unsafe_names[row.name] = (unsafe_names[row.name] or 0) + 1
+						end
+					else
+						helpers.assert_eq(row.kind, "module")
+						module_count = module_count + 1
+					end
+				end
+			end
+			helpers.assert_eq(case_count, 20, "all actual onboarding subject assertions must run")
+			helpers.assert_true(module_count > 0, "the canonical module loader must also emit timings")
+			local expected = {}
+			for _, case in ipairs({
+				{ "dialog.magic_key.error_common", "semicolon" },
+				{ "dialog.magic_key.error_common", "accented letter" },
+				{ "dialog.magic_key.error_common", "ASCII letter" },
+				{ "dialog.magic_key.error_common", "Hebrew letter" },
+				{ "dialog.magic_key.error_length", "multiple characters" },
+				{ "dialog.magic_key.error_length", "invalid leading byte" },
+				{ "dialog.magic_key.error_length", "overlong sequence" },
+				{ "dialog.magic_key.error_empty", "empty input" },
+			}) do
+				expected["(onboarding-linux-trigger) refuses unsafe answer " .. case[1] .. " " .. case[2]] = 1
+			end
+			helpers.assert_eq(unsafe_names, expected, "every malformed-input vector retains its distinct authored label")
+		end
+		local ok, output, failure = Shell.exec_checked(command)
+		helpers.assert_true(ok, "the actual canonical child must complete: " .. tostring(failure))
+		validate_output(output)
+		-- Complete valid frames cannot conceal a later failing process teardown.
+		local late_status = 73
+		local accepted, late_output, _, reason, status = Shell.exec_checked(command .. "; exit " .. late_status)
+		helpers.assert_eq(accepted, false, "late child failure must refuse the complete capture")
+		helpers.assert_eq(reason, Errors.COMMAND_EXITED_NONZERO)
+		helpers.assert_eq(status, late_status)
+		validate_output(late_output)
+	end)
+end)
