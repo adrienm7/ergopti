@@ -142,6 +142,32 @@ _KL_JournalEndsWithNewline(Path, Length) {
 	}
 }
 
+; Malformed JSON may be skipped by the generic line reader. A complete typed
+; event with a nonnumeric reserved identity must instead retain its checkpoint
+; The refusal stays outside that decoder's deliberately contained exceptions
+_KL_JournalDecodeIdentity(Refusal, Line) {
+	Entry := KL_JsonDecode(Line)
+	if Entry is Map && Entry.Has("type") && Entry.Has("_event_id") {
+		Numeric := false
+		try Numeric := JsonObjectMemberSpans(Line)["_event_id"]["kind"] = "number"
+		finally {
+			if !Numeric
+				Refusal["invalid"] := true
+		}
+	}
+	return Entry
+}
+
+_KL_ReadJournalEvents(Path, Offset, MaxLines) {
+	Refusal := Map("invalid", false)
+	Read := _KL_JournalReadLines(Path, Offset, MaxLines, _KL_JournalDecodeIdentity.Bind(Refusal))
+	if Refusal["invalid"] {
+		LoggerError("Keystats", "Journal reserved event identity is not a JSON number; checkpoint unchanged.")
+		return Map("ok", false, "offset", Offset, "entries", [], "eof", false)
+	}
+	return Read
+}
+
 ; Reads only newline-owned JSONL records. A final unterminated record may still
 ; be in flight, so its starting offset remains the checkpoint until a later read
 ; observes the delimiter. Malformed interior records are already complete and
