@@ -129,17 +129,17 @@ show-session) case "$2" in
 		launcher,
 		fs
 			.readFileSync(path.join(ROOT, 'static/ergopti_plus/linux/install/launch.sh'), 'utf8')
-			.replace('set -euo pipefail', 'set -euo pipefail\nexport PATH="$TEST_STUBS:/usr/bin:/bin"')
+			.replace('set -euo pipefail', 'set -euo pipefail\nexport PATH="$TEST_PATH"')
 	);
 	const logCall = 'printf "%s %s\\n" "${0##*/}" "$*" >> "$CALL_LOG"';
 	stub(
 		'id',
 		`if [ "$1" = -u ]; then echo 1000
-elif [ "$TEST_CASE" = cancel ]; then echo users
+elif [ "$TEST_CASE" = cancel ] || [[ "$TEST_CASE" = help-no-groups-* ]]; then echo users
 elif [ "$TEST_CASE" = stale ] && [ "$#" = 1 ]; then echo "users \${ACQUIRED_GROUPS:-}"
 else echo "users input uinput"; fi`
 	);
-	stub('systemctl', logCall + '\nexit 0');
+	stub('systemctl', logCall + '\n[[ "$TEST_CASE" = help-no-bus-* ]] && exit 1\nexit 0');
 	stub('luajit', logCall + '\nexit 0');
 	stub('pkexec', logCall + '\nexit 126');
 	stub(
@@ -158,6 +158,16 @@ else echo "users input uinput"; fi`
 		// install command; this seam changes only its filesystem mode operation.
 		stub('install', '[[ "$1 $2 $3" = "-d -m 700" ]] || exit 64\nmkdir -p -- "$4"');
 	}
+	const noSystemdStubs = path.join(sandbox, 'no-systemd-stubs');
+	fs.cpSync(stubs, noSystemdStubs, { recursive: true });
+	fs.rmSync(path.join(noSystemdStubs, 'systemctl'));
+	fs.writeFileSync(
+		path.join(noSystemdStubs, 'dirname'),
+		'#!/bin/bash\nexec /usr/bin/dirname "$@"\n',
+		{
+			mode: 0o755
+		}
+	);
 	for (const [scenario, args, status, expected, forbidden] of [
 		[
 			'desktop',
@@ -178,6 +188,26 @@ else echo "users input uinput"; fi`
 		['lock-error', ['--service', '--tray'], 1, /flock /, /luajit|pkexec/],
 		['help', ['--help'], 0, /luajit .* --help/, /flock|pkexec|systemctl/],
 		['help-short', ['--verbose', '-h'], 0, /luajit .* --verbose -h/, /flock|pkexec|systemctl/],
+		// Help is interpreted by the daemon before every option, including tray
+		// and service options. No combination may start a unit or ask for access.
+		...['--help', '-h'].flatMap((help) =>
+			['available', 'no-bus', 'no-systemd', 'no-groups'].flatMap((environment) =>
+				[
+					['tray-before', ['--tray', help]],
+					['tray-after', [help, '--tray']],
+					['session-start', ['--session-start', help]],
+					['service', ['--service', '--tray', help]],
+					['refreshed-tray', ['--groups-refreshed', '--tray', help]],
+					['refreshed-service', ['--groups-refreshed', '--service', '--tray', help]]
+				].map(([name, args]) => [
+					`help-${environment}-${name}-${help}`,
+					args,
+					0,
+					new RegExp(`luajit .* ${help}(?: |$)`, 'm'),
+					/flock|pkexec|systemctl|sg /
+				])
+			)
+		),
 		// A terminal launch is a daemon too: it takes the same instance lock.
 		[
 			'direct',
@@ -201,7 +231,9 @@ else echo "users input uinput"; fi`
 			timeout: 15000,
 			env: {
 				HOME: bashPath(sandbox),
-				TEST_STUBS: bashPath(stubs),
+				TEST_PATH: scenario.startsWith('help-no-systemd-')
+					? bashPath(noSystemdStubs)
+					: `${bashPath(stubs)}:/usr/bin:/bin`,
 				CALL_LOG: bashPath(callLog),
 				TEST_CASE: scenario
 			}
