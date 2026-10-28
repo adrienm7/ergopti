@@ -35,7 +35,7 @@ helpers.describe("Runner refuses incomplete discovery", function()
 	local scenarios = {
 		{ mode = "empty", diagnostic = "no test modules discovered" },
 		{ mode = "native-empty", diagnostic = "no test modules discovered" },
-		{ mode = "failed", diagnostic = "command output did not complete: exit 23" },
+		{ mode = "failed", diagnostic = "controlled discovery iteration refusal" },
 		{ mode = "refused", diagnostic = "controlled discovery refusal" },
 		{ mode = "group-empty", diagnostic = 'no test modules discovered for group "ui"' },
 	}
@@ -48,8 +48,8 @@ helpers.describe("Runner refuses incomplete discovery", function()
 			helpers.assert_nil(output:find("[OK] All Lua unit tests passed.", 1, true),
 				"an incomplete inventory must never produce the success receipt")
 			if scenario.mode == "failed" then
-				helpers.assert_true(output:find("DISCOVERY PIPE CLOSED failed", 1, true) ~= nil,
-					"a failed enumeration must still release its process handle")
+				helpers.assert_true(output:find("DISCOVERY ITERATOR REFUSED failed", 1, true) ~= nil,
+					"a partial native enumeration must expose its failure")
 			end
 			if scenario.mode == "failed" or scenario.mode == "group-empty" then
 				helpers.assert_nil(output:find(">>> Loading", 1, true),

@@ -22,6 +22,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Discovery = require("test.runner_discovery")
 
 
 
@@ -34,16 +35,16 @@ local helpers = require("tests.helpers")
 -- ================================================
 
 helpers.describe("read_driver_source: the production tree is scanned once per process", function()
-	helpers.it("two reads do not shell out twice", function()
+	helpers.it("two reads do not enumerate twice", function()
 		-- Counted rather than asserted equal to 1: by the time this file runs the
 		-- cache may already be primed by an earlier test, in which case the honest
 		-- answer is 0. Both 0 and 1 are correct; an uncached implementation scores
 		-- 2 and fails, which is what makes this falsifiable in either state.
-		local real_popen = io.popen
+		local real_discover = Discovery.files
 		local calls = 0
-		io.popen = function(...)
+		Discovery.files = function(...)
 			calls = calls + 1
-			return real_popen(...)
+			return real_discover(...)
 		end
 
 		local ok, err = pcall(function()
@@ -51,7 +52,7 @@ helpers.describe("read_driver_source: the production tree is scanned once per pr
 			helpers.read_driver_source("local function")
 		end)
 
-		io.popen = real_popen
+		Discovery.files = real_discover
 		helpers.assert_true(ok, "read_driver_source must not raise: " .. tostring(err))
 		helpers.assert_true(calls <= 1,
 			"the production tree must be scanned at most once per process, not once per call "

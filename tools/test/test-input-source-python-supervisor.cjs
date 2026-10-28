@@ -7,7 +7,8 @@
  * Executes the exact Python program passed by the Hammerspoon input-source
  * adapter under deterministic process, clock, and signal doubles.  This proves
  * that every nested child consumes one global deadline and that timeout or
- * parent termination kills and reaps the exact process group.
+ * parent termination kills and reaps the exact process group. The confirmation
+ * delay validation and sleep expressions execute without loading Carbon.
  * ==============================================================================
  */
 
@@ -54,6 +55,49 @@ function extractSupervisor(source) {
 	return match[1];
 }
 
+/** Executes the real confirmation preamble and sleep expressions, without loading Carbon. */
+function confirmTiming(python, program, delay) {
+	const harness = `
+import ast, json, sys, types
+source = ${JSON.stringify(program)}
+value = json.loads(sys.argv[1])
+tree = ast.parse(source)
+prefix = []
+for node in tree.body:
+    if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "UTF8" for target in node.targets):
+        break
+    prefix.append(node)
+else:
+    raise AssertionError("confirmation preamble boundary missing")
+assert not any(isinstance(node, ast.Attribute) and node.attr == "CDLL" for statement in prefix for node in ast.walk(statement))
+sleeps = sorted((node for node in ast.walk(tree) if isinstance(node, ast.Call)
+    and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name)
+    and node.func.value.id == "time" and node.func.attr == "sleep"), key=lambda node: node.lineno)
+assert len(sleeps) == 2, "both native selection edges must settle"
+sys.argv = ["-c", "fixture-layout", "", "refresh"] + ([] if value is None else [value])
+namespace = {}
+try:
+    exec(compile(ast.Module(body=prefix, type_ignores=[]), "actual-confirm-preamble", "exec"), namespace)
+except ValueError as error:
+    print(json.dumps({"accepted": False, "error": str(error)}))
+else:
+    observed = []
+    namespace["time"] = types.SimpleNamespace(sleep=observed.append)
+    for call in sleeps:
+        eval(compile(ast.Expression(body=call), "actual-confirm-sleep", "eval"), namespace)
+    print(json.dumps({"accepted": True, "sleeps": observed}))
+`;
+	const run = spawnSync(python, ['-c', harness, JSON.stringify(delay)], {
+		cwd: ROOT,
+		encoding: 'utf8'
+	});
+	if (run.error || run.status !== 0)
+		throw new Error(
+			`confirmation timing harness failed: ${run.status}\n${run.stdout}${run.stderr}`
+		);
+	return JSON.parse(run.stdout.trim());
+}
+
 function buildHarness(supervisor) {
 	return `
 import builtins, json, os, plistlib, signal, subprocess, sys, time
@@ -68,7 +112,7 @@ PENDING_TERM = False
 REAL_PRINT = builtins.print
 
 clock_values = {
-    "budget": [100.0, 101.0, 104.0, 108.0],
+    "budget": [100.0, 101.0, 104.0],
     "timeout": [100.0, 101.0],
     "race": [100.0, 101.0],
 }[MODE]
@@ -228,6 +272,26 @@ if (!python) {
 
 const source = fs.readFileSync(INPUT_SOURCES, 'utf8');
 const supervisor = extractSupervisor(source);
+const confirm = source.match(/^local CONFIRM_SOURCE_SCRIPT = \[\[([\s\S]*?)\n\]\]$/m);
+if (!confirm) throw new Error('input-source confirmation program not found');
+for (const delay of ['0.137', '0.291']) {
+	const observed = confirmTiming(python, confirm[1], delay);
+	test(
+		`both fresh-process settle calls consume their explicit ${delay} second argument`,
+		observed.accepted === true &&
+			observed.sleeps.length === 2 &&
+			observed.sleeps.every((value) => value === Number(delay)),
+		JSON.stringify(observed)
+	);
+}
+for (const delay of [null, 'not-a-delay', 'nan', 'inf', '-inf', '0', '-1']) {
+	const observed = confirmTiming(python, confirm[1], delay);
+	test(
+		`confirmation refuses invalid settle argument ${String(delay)}`,
+		observed.accepted === false && typeof observed.error === 'string' && observed.error.length > 0,
+		JSON.stringify(observed)
+	);
+}
 const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-input-source-'));
 
 try {

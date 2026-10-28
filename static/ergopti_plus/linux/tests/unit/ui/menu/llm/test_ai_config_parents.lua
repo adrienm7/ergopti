@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 local Preferences = require("tests.support.llm_preferences_fixture")
-local ConfigGuard = require("ui.menu.llm_config_guard")
+local ConfigGuard = helpers.load_module("ui.menu.llm_config_guard")
 
 helpers.describe("Linux AI configuration guard (ai-submenus-newer-config-2026-10-23)", function()
 	helpers.it("greys the actionable rows of a list with the cause and wraps nothing when writable", function()

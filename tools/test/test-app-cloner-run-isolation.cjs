@@ -13,6 +13,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('node:child_process');
+const { pythonExecutable } = require('../lib/python.cjs');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SOURCE_PATH = path.join(
@@ -80,71 +83,163 @@ test(
 	JSON.stringify(mutant)
 );
 
-// Execute the actual worker command under a zero file-size limit with the
-// default SIGXFSZ disposition. The status write must fail without killing the
-// worker, so the completion file still appears and the wizard stops waiting.
-function shellQuote(value) {
-	return "'" + value.replace(/'/g, "'\\''") + "'";
-}
-function renderWorker(candidate, paths) {
-	const match = /^\tset bgCmd to (.+?)\n\tdo shell script bgCmd$/ms.exec(candidate);
-	if (!match) return null;
-	return match[1]
-		.replace(/¬\s*/g, ' ')
-		.split(/\s&\s/)
-		.map((piece) => {
-			const part = piece.trim();
-			const literal = /^"((?:[^"\\]|\\.)*)"$/.exec(part);
-			if (literal) return literal[1].replace(/\\(.)/g, '$1');
-			if (part === 'cmd') return paths.command;
-			const quoted = /^quoted form of (resultPath|statusPath|donePath)$/.exec(part);
-			if (quoted) return shellQuote(paths[quoted[1]]);
-			throw new Error('unexpected worker command piece: ' + part);
-		})
-		.join('');
-}
-function workerCompletes(candidate) {
-	const { spawnSync } = require('child_process');
-	const os = require('os');
-	const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-appcloner-worker-'));
-	try {
-		const paths = {
-			command: 'true',
-			resultPath: path.join(runDir, 'result'),
-			statusPath: path.join(runDir, 'status'),
-			donePath: path.join(runDir, 'done')
-		};
-		const worker = renderWorker(candidate, paths);
-		if (!worker) return { completed: false, detail: 'worker command not found' };
-		// trap - restores the default disposition the wizard's shell inherits.
-		const run = spawnSync('/bin/sh', ['-c', 'trap - XFSZ; ulimit -f 0; ' + worker], {
-			encoding: 'utf8',
-			timeout: 5000
-		});
-		const deadline = Date.now() + 5000;
-		while (!fs.existsSync(paths.donePath) && Date.now() < deadline)
-			spawnSync('/bin/sleep', ['0.05']);
-		return {
-			completed: fs.existsSync(paths.donePath),
-			status: fs.existsSync(paths.statusPath) ? fs.readFileSync(paths.statusPath, 'utf8') : null,
-			shell: run.status
-		};
-	} finally {
-		fs.rmSync(runDir, { recursive: true, force: true });
-	}
-}
 if (process.platform !== 'win32') {
-	const limited = workerCompletes(source);
+	const bash = bashExecutable();
+	const produced = spawnSync(
+		pythonExecutable(),
+		[
+			path.join(ROOT, 'tools', 'test', 'lib', 'app-cloner-worker-signal-probe.py'),
+			SOURCE_PATH,
+			bash
+		],
+		{ encoding: 'utf8', timeout: 30000 }
+	);
+	if (produced.error || produced.status !== 0) {
+		throw new Error(
+			`The actual worker signal probe did not execute: ${produced.error?.message || ''}\n${produced.stderr || ''}`
+		);
+	}
+	const report = JSON.parse(produced.stdout);
+	const names = [
+		'success',
+		'failure',
+		'limited-success',
+		'limited-failure',
+		'child-signal',
+		'limited-child-signal'
+	];
+	const shells = ['/bin/sh', bash];
+	const expected = new Set(shells.flatMap((shell) => names.map((name) => `${shell}:${name}`)));
+	const complete =
+		report.cases.length === expected.size &&
+		new Set(report.cases.map((row) => `${row.shell}:${row.name}`)).size === expected.size &&
+		report.cases.every((row) => expected.has(`${row.shell}:${row.name}`));
+	const completion = report.cases.filter((row) => row.name === 'limited-success');
 	test(
 		'the worker publishes completion when a file-size limit refuses its status write',
-		limited.completed === true && limited.status === '',
-		JSON.stringify(limited)
+		complete &&
+			completion.length === shells.length &&
+			completion.every(
+				(row) =>
+					row.ownership_closed === true &&
+					row.wait_status === 0 &&
+					row.done &&
+					row.status_text === ''
+			),
+		JSON.stringify(completion)
 	);
-	const killedMutant = workerCompletes(source.replace('"(trap \'\' XFSZ; " & cmd', '"(" & cmd'));
+	const uncaught = report.uncaught_supervisor_mutant;
+	const signalStatus = 128 + require('node:os').constants.signals.SIGXFSZ;
 	test(
 		'the guard rejects a worker that SIGXFSZ can kill before completion',
-		killedMutant.completed === false,
-		JSON.stringify(killedMutant)
+		uncaught.length === shells.length &&
+			new Set(uncaught.map((row) => row.shell)).size === shells.length &&
+			uncaught.every(
+				(row) =>
+					shells.includes(row.shell) &&
+					row.name === 'uncaught-supervisor-mutant' &&
+					row.ownership_closed === true &&
+					row.wait_status === signalStatus &&
+					!row.done &&
+					row.status_present &&
+					row.status_text === ''
+			),
+		JSON.stringify(uncaught)
+	);
+	const negatives = [
+		'missing-block',
+		'ambiguous-block',
+		'unknown-operand',
+		'missing-operand',
+		'duplicate-operand',
+		'unquoted-path',
+		'missing-binding',
+		'trailing-operand',
+		'trailing-concatenation',
+		'unsupported-escape'
+	];
+	test(
+		'the actual worker expression parser rejects every incomplete or ambiguous source boundary',
+		report.parser_negatives.length === negatives.length &&
+			new Set(report.parser_negatives.map((row) => row.name)).size === negatives.length &&
+			report.parser_negatives.every(
+				(row) => negatives.includes(row.name) && row.rejected && row.error.length > 0
+			),
+		JSON.stringify(report.parser_negatives)
+	);
+	const ordinary = report.cases.filter((row) => row.name === 'success' || row.name === 'failure');
+	test(
+		'the actual background worker preserves ordinary success and nonzero helper status',
+		complete &&
+			ordinary.length === shells.length * 2 &&
+			ordinary.every(
+				(row) =>
+					row.ownership_closed === true &&
+					row.wait_status === 0 &&
+					row.done &&
+					row.result_present &&
+					row.status_present &&
+					row.status_text === (row.name === 'success' ? '0\n' : '7\n') &&
+					!row.survived
+			),
+		JSON.stringify(ordinary)
+	);
+	const limited = report.cases.filter((row) => row.limited);
+	test(
+		'a real zero file-size limit cannot kill supervisor completion or falsely publish success',
+		complete &&
+			limited.length === shells.length * 3 &&
+			limited.every(
+				(row) =>
+					row.ownership_closed === true &&
+					row.wait_status === 0 &&
+					row.done &&
+					row.result_present &&
+					row.status_present &&
+					row.status_text === '' &&
+					!row.survived
+			),
+		JSON.stringify(limited)
+	);
+	const ignored = report.before_child_mutant;
+	const ignoredExpected = new Set(
+		shells.flatMap((shell) => [false, true].map((limited) => `${shell}:${limited}`))
+	);
+	const ignoredComplete =
+		ignored.length === ignoredExpected.size &&
+		new Set(ignored.map((row) => `${row.shell}:${row.limited}`)).size === ignoredExpected.size &&
+		ignored.every(
+			(row) =>
+				row.name === 'before-child-mutant' &&
+				typeof row.limited === 'boolean' &&
+				ignoredExpected.has(`${row.shell}:${row.limited}`)
+		);
+	const signalled = report.cases.filter((row) => row.kind === 'signal');
+
+	test(
+		'the helper retains default SIGXFSZ behavior and the before-child ignore mutant is rejected',
+		complete &&
+			signalled.length === shells.length * 2 &&
+			signalled.every(
+				(row) =>
+					row.ownership_closed === true &&
+					row.wait_status === 0 &&
+					row.done &&
+					row.result_present &&
+					row.status_present &&
+					!row.survived &&
+					row.status_text === (row.limited ? '' : `${signalStatus}\n`)
+			) &&
+			ignoredComplete &&
+			ignored.every(
+				(row) =>
+					row.ownership_closed === true &&
+					row.wait_status === 0 &&
+					row.done &&
+					row.survived &&
+					row.status_text === (row.limited ? '' : '0\n')
+			),
+		JSON.stringify({ actual: signalled, mutant: report.before_child_mutant })
 	);
 }
 

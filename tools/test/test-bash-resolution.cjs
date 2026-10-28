@@ -280,57 +280,194 @@ console.log(
 		`or ${npmScripts.length} npm script(s).\x1b[0m`
 );
 
-// A native cwd is data: POSIX backslashes and newlines cannot become separators
-// or shell record boundaries before the actual Linux test loader starts.
+// Native cwd bytes must survive both real unit runners and complete discovery.
+// The ambient and actual same-runtime-without-lfs controls use the same native
+// luv file; an optional installed module cannot hide a broken discovery branch.
 if (process.platform === 'linux') {
+	const { REQUIRED_LUA_SERIES } = require('./lib/host-toolchain.cjs');
+	const linuxRuntime = require('./run-linux-lua.cjs').findRuntime();
+	const macRuntime = 'lua';
+	assert.ok(linuxRuntime, 'The existing native Linux Lua runner is required');
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runner-path-'));
+	// Two drivers, two provider modes, and three physical prefixes must all run.
+	const EXPECTED_NATIVE_PATH_CASES = 12;
+	const observedCases = new Set();
+	const EXPECTED_E2E_BOOTSTRAP_CASES = 18;
+	const observedE2EBootstraps = new Set();
+	// Execute only the real entrypoint bootstrap and corpus loader. The full
+	// scenario suite remains the responsibility of the existing E2E command.
+	const e2eBootstrapSource = String.raw`
+local entry = assert(arg[1])
+local expected_root = assert(arg[2])
+local handle = assert(io.open(entry, "rb"))
+local source = assert(handle:read("*a")); assert(handle:close())
+local anchor = "\nlocal function make_vkb("
+local boundary = assert(source:find(anchor, 1, true), "the E2E bootstrap boundary must exist")
+assert(not source:find(anchor, boundary + #anchor, true), "the E2E bootstrap boundary must be unique")
+assert(package.loaded["tests.helpers"] == nil and package.loaded["tests.support.synthetic_input_stack"] == nil)
+local checks = [=[
+local expected_root = ...
+assert(driver_root == expected_root, "the E2E bootstrap must preserve its native driver root")
+assert(helpers == package.loaded["tests.helpers"] and type(helpers.temp_dir) == "function")
+assert(SyntheticStack == package.loaded["tests.support.synthetic_input_stack"] and type(SyntheticStack.load) == "function")
+for _, name in ipairs({"tests.helpers", "tests.support.synthetic_input_stack"}) do
+ local resolved = assert(package.searchpath(name, package.path))
+ assert(resolved:sub(1, #expected_root + 1) == expected_root .. "/", "the real driver module must come from this checkout")
+end
+local vectors = load_corpus()
+assert(type(package.loaded.json.decode) == "function" and #vectors > 0)
+local json_path = assert(package.searchpath("json", package.path))
+assert(json_path == shared_lua .. "/json.lua", "the real shared decoder must load")
+io.write("E2E_BOOTSTRAP_ONLY=", #vectors, "\n")
+]=]
+assert(load(source:sub(1, boundary - 1) .. "\n" .. checks, "@" .. entry, "t"))(expected_root)
+`;
+	const sdkMarker = 'E2E bootstrap: actual Lua without luv or lfs';
+	const withoutSdkSource = [
+		'assert(_VERSION == "Lua 5.4", "the plain E2E interpreter must be Lua 5.4")',
+		'assert(not pcall(require, "luv"), "the plain E2E control unexpectedly resolved luv")',
+		'assert(not pcall(require, "lfs"), "the plain E2E control unexpectedly resolved lfs")',
+		'io.write(' + JSON.stringify(sdkMarker + '\n') + ')'
+	].join('\n');
+	const providerMarker = 'Native discovery: same runtime and real luv; lfs unavailable';
+	const withoutLfsSource = [
+		'local native = require("luv")',
+		'assert(native.exepath() == os.getenv("ERGOPTI_TEST_NATIVE_LUA"), "the native Lua executable changed")',
+		'local library = assert(package.searchpath("luv", package.cpath))',
+		'assert(native.fs_realpath(library) == os.getenv("ERGOPTI_TEST_NATIVE_LUV"), "the native luv library changed")',
+		'assert(not pcall(require, "lfs"), "the without-lfs control unexpectedly resolved lfs")',
+		'io.write(' + JSON.stringify(providerMarker + '\n') + ')'
+	].join('\n');
+
+	/** Observe the actual interpreter and library selected by the ordinary host. */
+	function nativeFacts(program) {
+		const source = [
+			'local native = require("luv")',
+			'assert(debug.getinfo(native.fs_stat,"S").what=="C", "the native provider must be real")',
+			'local library = assert(package.searchpath("luv", package.cpath))',
+			'local values = {assert(native.exepath()), assert(native.fs_realpath(library)), _VERSION, package.path, os.getenv("LD_LIBRARY_PATH") or ""}',
+			'io.write(table.concat(values, string.char(0)), string.char(0))'
+		].join('\n');
+		const observed = spawnSync(program, ['-e', source], {
+			cwd: ROOT,
+			encoding: 'utf8',
+			timeout: 30000
+		});
+		assert.ifError(observed.error);
+		assert.equal(observed.status, 0, observed.stderr);
+		const fields = observed.stdout.split(String.fromCharCode(0));
+		assert.equal(fields.pop(), '');
+		assert.equal(fields.length, 5);
+		const [executable, library, version, luaPath, loaderPath] = fields;
+		assert.ok(path.isAbsolute(executable) && path.isAbsolute(library));
+		assert.ok(fs.statSync(executable).isFile() && fs.statSync(library).isFile());
+		return { executable, library, version, luaPath, loaderPath };
+	}
+
+	/** Isolate a real native provider, bypassing environment-setting shell aliases. */
+	function withoutLfs(name, program, facts) {
+		const directory = path.join(temporary, 'native-providers', name);
+		const binaries = path.join(directory, 'bin');
+		fs.mkdirSync(binaries, { recursive: true, mode: 0o700 });
+		fs.symlinkSync(facts.library, path.join(directory, 'luv.so'));
+		fs.symlinkSync(facts.executable, path.join(binaries, program));
+		const cpath = path.join(directory, '?.so');
+		const abi = facts.version.match(/^Lua (\d+)\.(\d+)$/);
+		assert.ok(abi, 'The actual interpreter must acknowledge its Lua ABI');
+		const env = {
+			...process.env,
+			PATH: binaries + path.delimiter + (process.env.PATH || ''),
+			LUA_CPATH: cpath,
+			LUA_PATH: facts.luaPath,
+			LD_LIBRARY_PATH: facts.loaderPath,
+			ERGOPTI_TEST_NATIVE_LUA: facts.executable,
+			ERGOPTI_TEST_NATIVE_LUV: facts.library
+		};
+		env['LUA_CPATH_' + abi[1] + '_' + abi[2]] = cpath;
+		env['LUA_PATH_' + abi[1] + '_' + abi[2]] = facts.luaPath;
+		return env;
+	}
+
 	try {
-		const runtime = require('./run-linux-lua.cjs').findRuntime();
-		assert.ok(runtime, 'the native Linux runner needs its declared Lua runtime');
-		const probe = spawnSync(
-			runtime,
-			[
-				'-e',
-				[
-					'local uv=require("luv"); assert(debug.getinfo(uv.fs_stat,"S").what=="C")',
-					'local library=assert(package.searchpath("luv",package.cpath))',
-					'io.write(library,"\\0",tostring(pcall(require,"lfs")),"\\0")'
-				].join(';')
-			],
-			{ cwd: ROOT, encoding: 'utf8' }
+		const linuxFacts = nativeFacts(linuxRuntime);
+		const macFacts = nativeFacts(macRuntime);
+		assert.equal(
+			macFacts.version,
+			'Lua ' + REQUIRED_LUA_SERIES,
+			'The macOS runner uses the canonical pinned Lua series, never the Linux LuaJIT preference'
 		);
-		assert.ifError(probe.error);
-		assert.equal(probe.status, 0, probe.stderr);
-		const [library, ambientLfs] = probe.stdout.split('\0');
-		assert.ok(library);
-		const nativeModules = path.join(temporary, 'native-modules');
-		fs.mkdirSync(nativeModules);
-		fs.symlinkSync(path.resolve(ROOT, library), path.join(nativeModules, 'luv.so'));
-		const withoutLfs = { ...process.env, LUA_CPATH: `${nativeModules}/?.so`, LUA_PATH: ';;' };
-		const absence = spawnSync(
-			runtime,
-			[
-				'-e',
-				'local uv=require("luv"); assert(debug.getinfo(uv.fs_stat,"S").what=="C"); assert(not pcall(require,"lfs"))'
-			],
-			{ cwd: ROOT, env: withoutLfs, encoding: 'utf8' }
-		);
-		assert.ifError(absence.error);
-		assert.equal(absence.status, 0, absence.stderr);
-		console.log(
-			`[OK] Genuine native luv; ambient lfs=${ambientLfs}; isolated C module search refuses lfs.`
-		);
+		const withoutLinux = withoutLfs('linux', linuxRuntime, linuxFacts);
+		const withoutMac = withoutLfs('macos', macRuntime, macFacts);
+		const emptyCpath = path.join(temporary, 'without-sdk', '?.so');
+		const withoutSdk = {
+			...process.env,
+			LUA_PATH: macFacts.luaPath,
+			LUA_PATH_5_4: macFacts.luaPath,
+			LUA_CPATH: emptyCpath,
+			LUA_CPATH_5_4: emptyCpath,
+			LD_LIBRARY_PATH: macFacts.loaderPath
+		};
+
+		/** Run the same real bootstrap through each declared entrypoint spelling. */
+		function runE2EBootstrap({
+			mode,
+			prefix,
+			variant,
+			driver,
+			program,
+			prefixArguments,
+			env,
+			cwd = driver,
+			entry = 'tests/e2e/run_e2e.lua'
+		}) {
+			const bootstrap = spawnSync(
+				program,
+				[...prefixArguments, '-', entry, fs.realpathSync(driver)],
+				{
+					input: e2eBootstrapSource,
+					cwd,
+					encoding: 'utf8',
+					timeout: 30000,
+					env: { ...env, PWD: '/not-the-actual-checkout', CDPATH: temporary }
+				}
+			);
+			assert.ifError(bootstrap.error);
+			assert.equal(
+				bootstrap.status,
+				0,
+				'E2E bootstrap only ' +
+					JSON.stringify([mode, prefix, variant]) +
+					': ' +
+					bootstrap.stdout +
+					'\n' +
+					bootstrap.stderr
+			);
+			assert.equal((bootstrap.stdout.match(/^E2E_BOOTSTRAP_ONLY=[1-9][0-9]*$/gm) || []).length, 1);
+			if (mode === 'without-lfs')
+				assert.equal(bootstrap.stdout.split(providerMarker).length - 1, 1);
+			if (mode === 'without-sdk') assert.equal(bootstrap.stdout.split(sdkMarker).length - 1, 1);
+			const identity = JSON.stringify([mode, prefix, variant]);
+			assert.ok(!observedE2EBootstraps.has(identity), 'Duplicate E2E bootstrap case: ' + identity);
+			observedE2EBootstraps.add(identity);
+			console.log(
+				'[OK] E2E bootstrap only ' +
+					identity +
+					' loads real helpers, synthetic stack, and nonempty shared corpus.'
+			);
+		}
 		for (const prefix of ['ordinary', 'literal\\backslash', 'literal\nnewline']) {
 			const checkout = path.join(temporary, prefix);
-			const driver = path.join(checkout, 'static/ergopti_plus/linux');
-			fs.mkdirSync(driver, { recursive: true });
-			for (const entry of fs.readdirSync(path.join(ROOT, 'static/ergopti_plus/linux'), {
-				withFileTypes: true
-			})) {
-				const source = path.join(ROOT, 'static/ergopti_plus/linux', entry.name);
-				const target = path.join(driver, entry.name);
-				if (entry.name === 'tests') fs.cpSync(source, target, { recursive: true });
-				else fs.symlinkSync(source, target);
+			for (const name of ['linux', 'macos']) {
+				const driver = path.join(checkout, 'static/ergopti_plus', name);
+				fs.mkdirSync(driver, { recursive: true });
+				for (const entry of fs.readdirSync(path.join(ROOT, 'static/ergopti_plus', name), {
+					withFileTypes: true
+				})) {
+					const source = path.join(ROOT, 'static/ergopti_plus', name, entry.name);
+					const target = path.join(driver, entry.name);
+					if (entry.name === 'tests') fs.cpSync(source, target, { recursive: true });
+					else fs.symlinkSync(source, target);
+				}
 			}
 			fs.symlinkSync(
 				path.join(ROOT, 'static/ergopti_plus/_shared'),
@@ -345,39 +482,377 @@ if (process.platform === 'linux') {
 			fs.symlinkSync(path.join(TOOLS, 'control'), path.join(tools, 'control'));
 			const home = path.join(checkout, 'home');
 			fs.mkdirSync(home);
-			for (const [mode, environment] of [
-				['ambient', process.env],
-				['without-lfs', withoutLfs]
-			]) {
-				const launched = spawnSync(
-					process.execPath,
-					[
-						path.join(tools, 'test/run-linux-lua.cjs'),
-						'tests/run.lua',
-						'--module=infra',
-						'--only=keeps the POSIX request tool'
-					],
+			for (const mode of ['ambient', 'without-lfs']) {
+				const isolated = mode === 'without-lfs';
+				const prefixArguments = isolated ? ['-e', withoutLfsSource] : [];
+				const commands = [
 					{
+						name: 'Linux',
+						program: process.execPath,
+						args: [
+							path.join(tools, 'test/run-linux-lua.cjs'),
+							...prefixArguments,
+							'tests/run.lua',
+							'--module=infra',
+							'--only=keeps the POSIX request tool'
+						],
 						cwd: checkout,
+						count: 1,
+						marker: /ok   keeps the POSIX request tool/,
+						env: isolated ? withoutLinux : process.env
+					},
+					{
+						name: 'macOS',
+						program: isolated ? macFacts.executable : macRuntime,
+						args: [
+							...prefixArguments,
+							'tests/run.lua',
+							'--only=tests.unit.infra.text_and_paths.paths.test_native_path'
+						],
+						cwd: path.join(checkout, 'static/ergopti_plus/macos'),
+						count: 5,
+						marker: /ok   posix-backslash-separator-owner/,
+						env: isolated ? withoutMac : process.env
+					}
+				];
+				for (const command of commands) {
+					const launched = spawnSync(command.program, command.args, {
+						cwd: command.cwd,
 						encoding: 'utf8',
 						timeout: 30000,
 						maxBuffer: 8 * 1024 * 1024,
-						env: { ...environment, HOME: home }
+						env: { ...command.env, HOME: home }
+					});
+					assert.ifError(launched.error);
+					assert.equal(
+						launched.status,
+						0,
+						command.name +
+							' ' +
+							mode +
+							' ' +
+							JSON.stringify(prefix) +
+							': ' +
+							launched.stdout +
+							'\n' +
+							launched.stderr
+					);
+					assert.match(launched.stdout, command.marker);
+					if (isolated) assert.equal(launched.stdout.split(providerMarker).length - 1, 1);
+					if (command.name === 'Linux') {
+						const group = launched.stdout.match(/Module group "infra": (\d+) of (\d+) module\(s\)/);
+						assert.ok(group, 'The complete declared infrastructure group must be loaded');
+						assert.ok(Number(group[1]) > 0 && Number(group[2]) >= Number(group[1]));
+						assert.match(launched.stdout, new RegExp('Total modules:\\s+' + group[1] + '\\n'));
+					} else {
+						assert.match(launched.stdout, /Total modules:\s+1\n/);
 					}
-				);
-				assert.ifError(launched.error);
-				assert.equal(
-					launched.status,
-					0,
-					`${JSON.stringify(prefix)}/${mode}: ${launched.stdout}\n${launched.stderr}`
-				);
-				assert.match(launched.stdout, /ok   keeps the POSIX request tool/);
-				assert.match(launched.stdout, /Passed tests:\s+1\nFailed tests:\s+0/);
-				console.log(
-					`[OK] Linux native prefix ${JSON.stringify(prefix)}/${mode} executes one existing case without loader errors.`
-				);
+					assert.match(
+						launched.stdout,
+						new RegExp('Passed tests:\\s+' + command.count + '\\nFailed tests:\\s+0')
+					);
+					const identity = JSON.stringify([command.name, mode, prefix]);
+					assert.ok(!observedCases.has(identity), 'Duplicate native path matrix case: ' + identity);
+					observedCases.add(identity);
+					console.log(
+						'[OK] ' +
+							command.name +
+							' ' +
+							mode +
+							' native prefix ' +
+							JSON.stringify(prefix) +
+							' executes ' +
+							command.count +
+							' existing case(s) without loader errors.'
+					);
+				}
+			}
+			const e2eDriver = path.join(checkout, 'static/ergopti_plus/macos');
+			for (const mode of ['ambient', 'without-lfs', 'without-sdk']) {
+				const isolated = mode === 'without-lfs';
+				const plain = mode === 'without-sdk';
+				const prefixArguments = plain
+					? ['-e', withoutSdkSource]
+					: isolated
+						? ['-e', withoutLfsSource]
+						: [];
+				const program = isolated || plain ? macFacts.executable : macRuntime;
+				const env = { ...(plain ? withoutSdk : isolated ? withoutMac : process.env), HOME: home };
+				runE2EBootstrap({
+					mode,
+					prefix,
+					variant: 'relative',
+					driver: e2eDriver,
+					program,
+					prefixArguments,
+					env
+				});
+				if (plain) {
+					runE2EBootstrap({
+						mode,
+						prefix,
+						variant: 'absolute',
+						driver: e2eDriver,
+						program,
+						prefixArguments,
+						env,
+						cwd: checkout,
+						entry: path.join(e2eDriver, 'tests/e2e/run_e2e.lua')
+					});
+					const link = path.join(checkout, 'driver-link');
+					fs.symlinkSync(e2eDriver, link);
+					runE2EBootstrap({
+						mode,
+						prefix,
+						variant: 'directory-symlink',
+						driver: e2eDriver,
+						program,
+						prefixArguments,
+						env,
+						cwd: checkout,
+						entry: path.join(link, 'tests/e2e/run_e2e.lua')
+					});
+					const trailingDriver = e2eDriver + "'$(touch BOOTSTRAP_PATH_EXECUTED)\n";
+					fs.renameSync(e2eDriver, trailingDriver);
+					runE2EBootstrap({
+						mode,
+						prefix,
+						variant: 'quote-and-trailing-newline',
+						driver: trailingDriver,
+						program,
+						prefixArguments,
+						env
+					});
+					assert.ok(
+						!fs.existsSync(path.join(trailingDriver, 'BOOTSTRAP_PATH_EXECUTED')),
+						'Checkout path bytes must never execute a shell substitution'
+					);
+				}
 			}
 		}
+		assert.equal(
+			observedCases.size,
+			EXPECTED_NATIVE_PATH_CASES,
+			'The complete native path matrix must run'
+		);
+		assert.equal(
+			observedE2EBootstraps.size,
+			EXPECTED_E2E_BOOTSTRAP_CASES,
+			'The complete E2E bootstrap matrix must run'
+		);
+		// Only the process-I/O boundary is controlled here. The actual bootstrap,
+		// pure-Lua quoting owner, error handling, and resource retirement run.
+		const bootstrapFailureSource = String.raw`
+local entry = assert(arg[1])
+local handle = assert(io.open(entry, "rb"))
+local source = assert(handle:read("*a")); assert(handle:close())
+local anchor = "\nlocal drivers_root"
+local boundary = assert(source:find(anchor, 1, true))
+assert(not source:find(anchor, boundary + #anchor, true), "the root bootstrap boundary must be unique")
+local bootstrap = assert(load(source:sub(1, boundary - 1), "@" .. entry, "t"))
+local actual_popen = io.popen
+local cases = {
+ { name = "create", expected = "owned-create-refusal", close_count = 0 },
+ { name = "read-throw", expected = "owned-read-failure", close_count = 1 },
+ { name = "read-refusal", expected = "owned-read-refusal", close_count = 1 },
+ { name = "close-refusal", expected = "exit 17", close_count = 1 },
+ { name = "close-throw", expected = "owned-close-failure", close_count = 1 },
+ { name = "missing-newline", expected = "terminating newline", close_count = 1 },
+}
+for _, case in ipairs(cases) do
+ local opens, closes = 0, 0
+ io.popen = function(_, mode)
+  opens = opens + 1
+  assert(mode == "r", "the bootstrap owns a read-only pipe")
+  if case.name == "create" then return nil, "owned-create-refusal" end
+  return {
+   read = function(_, format)
+    assert(format == "*a", "native root bytes must be read as a complete string")
+    if case.name == "read-throw" then error("owned-read-failure") end
+    if case.name == "read-refusal" then return nil, "owned-read-refusal" end
+    return arg[2] .. (case.name == "missing-newline" and "" or "\n")
+   end,
+   close = function()
+    closes = closes + 1
+    if case.name == "close-refusal" then return nil, "exit", 17 end
+    if case.name == "close-throw" then error("owned-close-failure") end
+    return true, "exit", 0
+   end,
+  }
+ end
+ local ok, detail = pcall(bootstrap)
+ io.popen = actual_popen
+ assert(not ok and tostring(detail):find(case.expected, 1, true), tostring(detail))
+ assert(opens == 1 and closes == case.close_count, "the bootstrap must retire exactly its acquired pipe")
+ assert(package.loaded["tests.helpers"] == nil, "a failed root must not load the test stack")
+ io.write("E2E_BOOTSTRAP_FAILURE_CONTROL=", case.name, "\n")
+end
+`;
+		const failureControls = spawnSync(
+			macFacts.executable,
+			[
+				'-e',
+				withoutSdkSource,
+				'-',
+				path.join(ROOT, 'static/ergopti_plus/macos/tests/e2e/run_e2e.lua'),
+				path.join(ROOT, 'static/ergopti_plus/macos')
+			],
+			{
+				input: bootstrapFailureSource,
+				cwd: ROOT,
+				encoding: 'utf8',
+				timeout: 30000,
+				env: withoutSdk
+			}
+		);
+		assert.ifError(failureControls.error);
+		assert.equal(failureControls.status, 0, failureControls.stdout + '\n' + failureControls.stderr);
+		assert.equal(failureControls.stdout.split(sdkMarker).length - 1, 1);
+		const observedFailures = [
+			...failureControls.stdout.matchAll(/^E2E_BOOTSTRAP_FAILURE_CONTROL=(.+)$/gm)
+		].map((match) => match[1]);
+		assert.deepEqual(observedFailures, [
+			'create',
+			'read-throw',
+			'read-refusal',
+			'close-refusal',
+			'close-throw',
+			'missing-newline'
+		]);
+		assert.equal(new Set(observedFailures).size, 6);
+		console.log(
+			'[OK] Six SDK-free bootstrap failure controls reject incomplete roots and retire exactly their owned pipe.'
+		);
+		// The source contract must see a newline inside a basename too. A regular
+		// declared file is the healthy control; hiding the undeclared emission
+		// would turn the second actual contract run into a false green.
+		const censusRoot = path.join(temporary, 'source-census\nfixture');
+		fs.mkdirSync(censusRoot);
+		const censusSource = String.raw`
+local function read(path)
+ local handle = assert(io.open(path, "rb"))
+ local value = assert(handle:read("*a")); assert(handle:close()); return value
+end
+local function write(path, text)
+ local handle = assert(io.open(path, "wb")); assert(handle:write(text)); assert(handle:close())
+end
+package.path = arg[4] .. "/?.lua;" .. arg[4] .. "/?/init.lua;" .. package.path
+local inventory = require("hotpath_segments")
+local registry = assert(require("toml_codec").decode(read(arg[3])))
+local contract = assert(loadfile(arg[1]))()
+local declarations = {}
+for name in pairs(inventory.for_driver("macos")) do
+ declarations[#declarations + 1] = string.format('HotPath.log_if_slow(%q)\n', name)
+end
+write(arg[2] .. "/declared.lua", table.concat(declarations))
+local cases = 0
+local helpers = {
+ describe = function(_, body) body() end,
+ it = function(_, body) body(); cases = cases + 1 end,
+ assert_true = function(value, detail) assert(value, detail) end,
+ assert_eq = function(value, expected, detail) assert(value == expected, detail) end,
+}
+local options = { driver = "macos", root = arg[2],
+ call_pattern = 'HotPath%.log_if_slow%(%s*"([^"]+)"',
+ default_slow_ms = assert(registry.logger.hotpath_slow_ms),
+}
+contract.register(helpers, options)
+assert(cases > 0); io.write("CENSUS_CONTROL_PASSED=", cases, "\n")
+write(arg[2] .. "/hidden\nemission.lua", 'HotPath.log_if_slow("source-census-newline-undeclared")\n')
+contract.register(helpers, options)
+io.write("CENSUS_HIDDEN_ACCEPTED\n")
+`;
+		const census = spawnSync(
+			macFacts.executable,
+			[
+				'-e',
+				withoutLfsSource,
+				'-',
+				path.join(ROOT, 'static/ergopti_plus/_shared/lua/test/hotpath_segments_contract.lua'),
+				censusRoot,
+				path.join(ROOT, 'static/ergopti_plus/_shared/modules/timings/constants.toml'),
+				path.join(ROOT, 'static/ergopti_plus/_shared/lua')
+			],
+			{ input: censusSource, env: withoutMac, cwd: ROOT, encoding: 'utf8', timeout: 30000 }
+		);
+		assert.ifError(census.error);
+		assert.match(census.stdout, /CENSUS_CONTROL_PASSED=[1-9][0-9]*\n/);
+		assert.notEqual(
+			census.status,
+			0,
+			'The complete source census must reject the hidden undeclared emission'
+		);
+		assert.match(census.stderr, /source-census-newline-undeclared/);
+		assert.ok(!census.stdout.includes('CENSUS_HIDDEN_ACCEPTED'));
+		console.log(
+			'[OK] The source census rejects an undeclared emission in a newline-bearing filename.'
+		);
+		// A real child environment complements the driver's getenv-boundary unit
+		// cases. No display conversion may redirect allocations outside TMPDIR.
+		const nativeTempSource = String.raw`
+package.path = arg[1] .. "/?.lua;" .. arg[1] .. "/?/init.lua;" .. arg[2] .. "/?.lua;" .. arg[2] .. "/?/init.lua;" .. package.path
+local native = require("luv")
+local expected = assert(arg[3])
+assert(os.getenv("TMPDIR") == expected, "the child must receive the actual TMPDIR environment")
+local returned = require("tests.helpers").temp_dir()
+local expected_root = assert(native.fs_realpath(expected))
+assert(native.fs_realpath(returned) == expected_root, "the returned TMPDIR must name the exact existing owned directory")
+local allocation
+local ok, failure = xpcall(function()
+ allocation = assert(native.fs_mkdtemp(returned .. "/allocated.XXXXXX"))
+ assert(native.fs_realpath(allocation .. "/..") == expected_root, "the real allocation must stay beneath the owned TMPDIR")
+end, debug.traceback)
+if allocation then assert(native.fs_rmdir(allocation), "the exact owned allocation must retire") end
+if not ok then error(failure, 0) end
+io.write("NATIVE_TEMP_ALLOCATION_RETIRED\n")
+`;
+		const EXPECTED_TEMP_PATH_CASES = 3;
+		const tempCases = new Set();
+		for (const [label, character] of [
+			['backslash', '\\'],
+			['quote', "'"],
+			['newline', '\n']
+		]) {
+			assert.equal(character.length, 1, 'The fixture must contain the actual special character');
+			const expected = path.join(temporary, 'scratch' + character + label);
+			fs.mkdirSync(expected);
+			const child = spawnSync(
+				macFacts.executable,
+				[
+					'-e',
+					withoutLfsSource,
+					'-',
+					path.join(ROOT, 'static/ergopti_plus/macos'),
+					path.join(ROOT, 'static/ergopti_plus/_shared/lua'),
+					expected
+				],
+				{
+					input: nativeTempSource,
+					cwd: ROOT,
+					env: { ...withoutMac, TMPDIR: expected },
+					encoding: 'utf8',
+					timeout: 30000
+				}
+			);
+			assert.ifError(child.error);
+			assert.equal(
+				child.status,
+				0,
+				'Native TMPDIR ' + label + ': ' + child.stdout + '\n' + child.stderr
+			);
+			assert.equal(child.stdout.split('NATIVE_TEMP_ALLOCATION_RETIRED\n').length - 1, 1);
+			assert.equal(fs.readdirSync(expected).length, 0, 'Every actual owned allocation must retire');
+			assert.ok(!tempCases.has(label), 'A native TMPDIR case must not run twice');
+			tempCases.add(label);
+			console.log(
+				'[OK] Native TMPDIR ' + label + ' allocates and retires within the exact owned directory.'
+			);
+		}
+		assert.equal(
+			tempCases.size,
+			EXPECTED_TEMP_PATH_CASES,
+			'Every native TMPDIR path case must run'
+		);
 	} finally {
 		fs.rmSync(temporary, { recursive: true, force: true });
 	}

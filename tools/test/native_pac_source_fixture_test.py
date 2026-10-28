@@ -28,10 +28,11 @@ class PACSourcePeerTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.fixture.close()
-        assert cls.fixture.closed
-        assert all(not thread.is_alive() for thread in cls.fixture.threads)
-        assert all(not thread.is_alive() for thread in cls.fixture.request_threads)
-        assert all(not thread.is_alive() for thread in cls.fixture.shutdown_threads)
+        if not cls.fixture.closed:
+            raise AssertionError("The PAC peer fixture did not acknowledge closure")
+        for name in ("threads", "request_threads", "shutdown_threads"):
+            if any(thread.is_alive() for thread in getattr(cls.fixture, name)):
+                raise AssertionError("The PAC peer fixture retained an owner: " + name)
 
     def request(self, path, tls=False, host="127.0.0.1", context=None):
         port = self.fixture.https.server_port if tls else self.fixture.http.server_port
@@ -93,7 +94,8 @@ class PACSourcePeerTests(unittest.TestCase):
     def test_owned_anchor_preserves_hostname_verification(self):
         context = ssl.create_default_context(cafile=str(self.fixture.root / "ca.pem"))
         self.assertEqual(
-            self.request("utf8", tls=True, context=context).read(), PEERS.SCRIPT.encode()
+            self.request("utf8", tls=True, context=context).read(),
+            PEERS.SCRIPT.encode(),
         )
         with self.assertRaises(ssl.SSLCertVerificationError):
             self.request("utf8", tls=True, host="localhost", context=context)
@@ -209,10 +211,14 @@ class PACSourcePeerTests(unittest.TestCase):
             if owner in PEERS.RETAINED_DEBT:
                 PEERS.RETAINED_DEBT.remove(owner)
 
-    def test_actual_serving_start_acquisition_without_acknowledgement_retains_debt(self):
+    def test_actual_serving_start_acquisition_without_acknowledgement_retains_debt(
+        self,
+    ):
         self.interrupted_start_control(serving=True)
 
-    def test_actual_shutdown_start_acquisition_without_acknowledgement_retains_debt(self):
+    def test_actual_shutdown_start_acquisition_without_acknowledgement_retains_debt(
+        self,
+    ):
         self.interrupted_start_control(serving=False)
 
     def test_actual_listener_close_then_exception_never_retries_closed_reference(self):
@@ -313,7 +319,9 @@ class PACSourcePeerTests(unittest.TestCase):
             if owner in PEERS.RETAINED_DEBT:
                 PEERS.RETAINED_DEBT.remove(owner)
 
-    def test_actual_request_start_without_acknowledgement_retains_worker_and_socket(self):
+    def test_actual_request_start_without_acknowledgement_retains_worker_and_socket(
+        self,
+    ):
         original_thread = threading.Thread
         entered = threading.Event()
         release = threading.Event()
@@ -358,7 +366,9 @@ class PACSourcePeerTests(unittest.TestCase):
                 with (
                     mock.patch.object(PEERS.threading, "Thread", HeldRequest),
                     mock.patch.object(
-                        threading, "excepthook", lambda args: errors.append(args.exc_value)
+                        threading,
+                        "excepthook",
+                        lambda args: errors.append(args.exc_value),
                     ),
                 ):
                     connection = socket.create_connection(("127.0.0.1", owner.http.server_port), 2)
@@ -381,6 +391,7 @@ class PACSourcePeerTests(unittest.TestCase):
                     self.assertTrue(owner.root.exists())
                     self.assertTrue(all(server.socket.fileno() >= 0 for server in owner.servers))
                     self.assertEqual(len(owner.connections), 1)
+                    self.assertTrue(all(not thread.is_alive() for thread in owner.threads))
                     release.set()
                     self.assertTrue(held[0]._started.wait(2))
                     original_thread.join(held[0], 2)
@@ -408,6 +419,90 @@ class PACSourcePeerTests(unittest.TestCase):
                 if owner in PEERS.RETAINED_DEBT:
                     PEERS.RETAINED_DEBT.remove(owner)
 
+    def test_completed_request_waits_for_actual_start_outcome_before_close(self):
+        original_thread = threading.Thread
+        original_wait = threading.Event.wait
+        acquired = threading.Event()
+        release = threading.Event()
+        close_decision = threading.Event()
+        close_waiting = threading.Event()
+        close_finished = threading.Event()
+        failures = []
+        closer = None
+
+        class HeldAcknowledgement(original_thread):
+            def start(self):
+                request = self._target.__name__ == "process_request_thread"
+                result = super().start()
+                if request:
+                    acquired.set()
+                    if not release.wait(2):
+                        raise AssertionError("Owned post-acquisition barrier was not released")
+                return result
+
+        owner = PEERS.SourceFixture()
+        connection = http.client.HTTPConnection("127.0.0.1", owner.http.server_port, timeout=2)
+
+        def close_owned():
+            try:
+                owner.close()
+            except BaseException as failure:
+                failures.append(failure)
+            finally:
+                close_finished.set()
+                close_decision.set()
+
+        def observe_outcome_wait(event, *arguments, **options):
+            if threading.current_thread() is closer:
+                close_waiting.set()
+                close_decision.set()
+            return original_wait(event, *arguments, **options)
+
+        try:
+            with mock.patch.object(PEERS.threading, "Thread", HeldAcknowledgement):
+                connection.request("GET", "/source/utf8")
+                self.assertEqual(connection.getresponse().read(), PEERS.SCRIPT.encode())
+                self.assertTrue(acquired.wait(2))
+                self.assertFalse(owner.request_starts[0]["started"])
+                with mock.patch.object(threading.Event, "wait", observe_outcome_wait):
+                    closer = original_thread(target=close_owned)
+                    closer.start()
+                    self.assertTrue(close_decision.wait(2))
+                    self.assertTrue(close_waiting.is_set(), str(failures))
+                    self.assertFalse(close_finished.is_set())
+                    self.assertFalse(owner.closed)
+                    release.set()
+                    original_thread.join(closer, 2)
+                self.assertFalse(closer.is_alive())
+                self.assertEqual(failures, [])
+                self.assertTrue(owner.closed)
+                self.assertFalse(owner.root.exists())
+                self.assertTrue(all(not thread.is_alive() for thread in owner.request_threads))
+                self.assertTrue(all(not thread.is_alive() for thread in owner.threads))
+                self.assertTrue(all(not thread.is_alive() for thread in owner.shutdown_threads))
+        finally:
+            release.set()
+            connection.close()
+            if closer is not None:
+                original_thread.join(closer, 2)
+                self.assertFalse(closer.is_alive())
+            if not owner.closed:
+                # This control owns the held acknowledgement. Releasing and
+                # joining the accept loops also publishes its actual outcome.
+                for state in owner.server_starts:
+                    if state["worker"].is_alive():
+                        state["server"].shutdown()
+                    original_thread.join(state["worker"], 2)
+                    self.assertFalse(state["worker"].is_alive())
+                for thread in owner.request_threads + owner.shutdown_threads:
+                    original_thread.join(thread, 2)
+                    self.assertFalse(thread.is_alive())
+                for server in owner.servers:
+                    server.server_close()
+                owner.directory.cleanup()
+                if owner in PEERS.RETAINED_DEBT:
+                    PEERS.RETAINED_DEBT.remove(owner)
+
     def test_numeric_listener_binding_never_acquires_unused_reverse_dns(self):
         with mock.patch.object(
             PEERS.socket, "getfqdn", side_effect=RuntimeError("reverse DNS refused")
@@ -425,5 +520,5 @@ class PACSourcePeerTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    print("Planned cases: 15", flush=True)
+    print("Planned cases: 16", flush=True)
     unittest.main()

@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import resource
+import shlex
 import signal
 import subprocess
 import sys
@@ -166,7 +167,7 @@ def native_child(arguments, environment):
     return json.loads(output), errors
 
 
-def run_case(snapshot, case_root, name, refused, restore_signals):
+def run_case(snapshot, case_root, name, refused, restore_signals, signalled=False):
     """Execute the actual Python entry and replace only its native UI boundary."""
     launcher = snapshot / CONTENTS / "MacOS/AppCloner"
     script = snapshot / CONTENTS / "Resources/ShortcutBuilder.applescript"
@@ -176,7 +177,12 @@ def run_case(snapshot, case_root, name, refused, restore_signals):
     observer.write_text(program, encoding="utf-8")
     helper = snapshot / CONTENTS.parent / clone_suffix.lstrip("/")
     helper.parent.mkdir(parents=True, exist_ok=True)
-    helper.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    survived = case_root / "helper-survived"
+    if signalled:
+        helper_body = "#!/bin/sh\nkill -XFSZ $$\ntouch " + shlex.quote(str(survived)) + "\nexit 1\n"
+    else:
+        helper_body = "#!/bin/sh\nexit 1\n"
+    helper.write_text(helper_body, encoding="utf-8")
     helper.chmod(0o755)
     source_app = case_root / "Source.app"
     source_app.mkdir()
@@ -268,6 +274,8 @@ def run_case(snapshot, case_root, name, refused, restore_signals):
         os.environ.clear()
         os.environ.update(original_environment)
         os.umask(original_umask)
+    if signalled:
+        result["helper_survived"] = survived.exists()
     result["actual_main_dispatches"] = events
     result["actual_main_warnings"] = warning.getvalue()
     return result
@@ -305,6 +313,11 @@ def main():
         directory = root / name
         directory.mkdir(mode=0o700)
         cases.append(run_case(snapshot, directory, name, refused, restore))
+    signalled_root = root / "refused-default-signaled"
+    signalled_root.mkdir(mode=0o700)
+    cases.append(
+        run_case(snapshot, signalled_root, "refused-default-signaled", True, True, signalled=True)
+    )
     violations = []
     for case in cases:
         native = case.get("native")
@@ -330,6 +343,19 @@ def main():
             violations.append(
                 case["name"] + ": ordinary clone refusal acquired a false successful status"
             )
+        if case["name"] == "refused-default-signaled":
+            if case.get("helper_survived") is not False:
+                violations.append(
+                    case["name"]
+                    + ": the actual helper did not retain its default SIGXFSZ disposition"
+                )
+            if native is not None and (
+                native["worker_wait_status"] != 0 or native["files"].get("status") != ""
+            ):
+                violations.append(
+                    case["name"]
+                    + ": refused diagnostic persistence did not retire through the invalid-status path"
+                )
     report = {
         "state": "NATIVE_COMPLETION_REGRESSION_PASSED"
         if not violations
