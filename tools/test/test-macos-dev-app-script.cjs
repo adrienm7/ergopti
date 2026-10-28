@@ -129,22 +129,22 @@ try {
 	// The developer app reads the clone's shared data, where no managed Ollama
 	// catalogue is committed: without the stager its owned Ollama install
 	// refused with OLLAMA_MANAGED_CATALOGUE_MISSING on the maintainer's Mac.
-	check('stages the managed Ollama catalogue before opening, and names a missing one', () => {
+	check('stages the managed Ollama catalogue before opening, and names a failed build', () => {
 		const paths = fixture('catalogue');
 		const staged = run(paths, []);
 		assert.equal(staged.status, 0, staged.stderr);
 		assert.match(calls(paths), /^catalogue\nopen /m);
 		assert.doesNotMatch(staged.stdout, /WARNING: .*managed Ollama/);
-		for (const [code, reason] of [
-			['3', /no published managed Ollama catalogue binds this clone/],
-			['1', /managed Ollama catalogue was not staged \(exit 1/]
-		]) {
-			fs.rmSync(paths.log);
-			const result = run(paths, ['--open-only'], { FIXTURE_CATALOGUE_EXIT: code });
-			assert.equal(result.status, 0, result.stderr);
-			assert.match(calls(paths), /^catalogue\nopen /m);
-			assert.match(result.stdout, reason);
-		}
+		fs.rmSync(paths.log);
+		const result = run(paths, ['--open-only'], { FIXTURE_CATALOGUE_EXIT: '1' });
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(calls(paths), /^catalogue\nopen /m);
+		assert.match(
+			result.stdout,
+			/managed Ollama was not built from this clone's pinned sources \(exit 1/
+		);
+		// The build no longer waits for a published release to name.
+		assert.doesNotMatch(result.stdout, /published/);
 	});
 
 	check('--open-only opens a recorded developer app without building', () => {
