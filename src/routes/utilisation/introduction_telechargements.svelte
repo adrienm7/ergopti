@@ -4,7 +4,7 @@
 	import SFB from '#lib/components/SFB.svelte';
 
 	import KeyboardEmulation from '#lib/keyboard/KeyboardEmulation.svelte';
-	import { base } from '$app/paths';
+	import { asset } from '$app/paths';
 	import { getMagicKeyUrls, getFrenchMagicKeyUrl } from '#lib/js/hotstringDataUrls.js';
 
 	import magicSampleToml from './magic_sample.toml?raw';
@@ -41,7 +41,7 @@
 	remplacementsSample = parseTomlSimple(magicSampleToml);
 
 	if (typeof window !== 'undefined') {
-		fetch(getFrenchMagicKeyUrl(base))
+		fetch(getFrenchMagicKeyUrl(asset))
 			.then((response) => response.text())
 			.then((text) => {
 				remplacements = parseTomlSimple(text);
@@ -111,7 +111,7 @@
 	onMount(async () => {
 		try {
 			const parsed = await Promise.all(
-				getMagicKeyUrls(base).map(async (url) => {
+				getMagicKeyUrls(asset).map(async (url) => {
 					const res = await fetch(url);
 					return parseTomlSections(await res.text());
 				})

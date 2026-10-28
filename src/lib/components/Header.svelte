@@ -3,7 +3,7 @@
 	import ErgoptiPlus from '../components/ErgoptiPlus.svelte';
 
 	import { page } from '$app/state';
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 
 	import { getKeyboardData } from '#lib/keyboard/data/getKeyboardData.js';
 	import { version, layoutData, versionsList, discordLink } from '#lib/stores_infos.js';
@@ -48,7 +48,7 @@
 	});
 
 	function isCurrent(path) {
-		return page.url.pathname === path || page.url.pathname === base + path;
+		return page.url.pathname === path || page.url.pathname === resolve(path);
 	}
 
 	$effect(() => {
