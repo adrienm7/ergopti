@@ -393,6 +393,7 @@ M.COMMAND = strict("COMMAND", {
 	GESTURES_TOGGLE = "gestures_toggle",
 	GESTURE_MODE_INCREMENTAL = "gesture_mode_incremental",
 	GESTURE_MODE_SINGLE = "gesture_mode_single",
+	GESTURE_RECOMMENDED_INFO = "gesture_recommended_info",
 	GESTURE_SLOT_CHANGE_ACTION = "gesture_slot_change_action",
 	GESTURE_SYSTEM_OPEN_DISABLED_PINCH = "gesture_system_open_disabled_pinch",
 	GESTURE_SYSTEM_OPEN_ENABLED_PINCH = "gesture_system_open_enabled_pinch",

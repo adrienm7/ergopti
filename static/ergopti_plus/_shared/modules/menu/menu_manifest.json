@@ -2933,8 +2933,9 @@
 			"type": "---"
 		},
 		{
-			"type": "list",
-			"id": "gesture_recommended_notes"
+			"type": "command",
+			"id": "gesture_recommended_info",
+			"i18n": "menu.gestures.recommended_info"
 		},
 		{
 			"type": "list",
@@ -5427,45 +5428,6 @@
 			"disabled_when": [
 				"keyboard_group_ready"
 			],
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
-		}
-	],
-	"gesture_recommended_notes": [
-		{
-			"type": "label",
-			"id": "gesture_recommended_note",
-			"i18n": "menu.gestures.recommended_note",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
-		},
-		{
-			"type": "label",
-			"id": "gesture_recommended_reason_windows",
-			"i18n": "menu.gestures.recommended_reason_windows",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "hide"
-		},
-		{
-			"type": "label",
-			"id": "gesture_recommended_reason_linux",
-			"i18n": "menu.gestures.recommended_reason_linux",
-			"platforms": [
-				"linux"
-			],
-			"unavailable": "hide"
-		},
-		{
-			"type": "label",
-			"id": "gesture_recommended_reason_macos",
-			"i18n": "menu.gestures.recommended_reason_macos",
 			"platforms": [
 				"hs"
 			],
