@@ -234,7 +234,7 @@ local function api_rows(ctx, collected)
 				rows[#rows + 1] = { name = view.display_name .. "/" .. model, runtime_name = model,
 					provider = view.display_name, installed = true, local_server = view.id, model = model }
 			end
-		elseif view.reason == "needs_key" then
+		elseif view.status == "needs_key" then
 			rows[#rows + 1] = { name = view.display_name, provider = view.display_name, installed = true,
 				local_server = view.id, available = false, hint_key = "model_browser.hint_api_no_key",
 				actions = { { id = "set_key", text = i18n.get("menu.llm.local_servers.api_key") } } }

@@ -888,13 +888,14 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 	; Gui — all synchronously on the callback stack. That is the
 	; access-violation class ui/onboarding/webview.ahk documents and solves
 	; with SetTimer(-1); an SEH fault of this kind is uncatchable.
+	Deferred := _LLM_MBW_RunAction.Bind(Payload, ExpectedEpoch)
 	if (Action == "select_model" && !Payload.Has("backend")) {
 		Name := Payload.Has("name") ? Payload["name"] : ""
-		if _LLM_MBW_IsCatalogueModelName(Name)
-			SetTimer(_LLM_MBW_ApplyModel.Bind(Name, ExpectedEpoch), -1)
-		return
+		if !_LLM_MBW_IsCatalogueModelName(Name)
+			return
+		Deferred := _LLM_MBW_ApplyModel.Bind(Name, ExpectedEpoch)
 	}
-	SetTimer(_LLM_MBW_RunAction.Bind(Payload, ExpectedEpoch), -1)
+	SetTimer(Deferred, -1)
 }
 
 /**
