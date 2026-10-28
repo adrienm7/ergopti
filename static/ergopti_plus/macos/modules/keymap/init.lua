@@ -43,6 +43,7 @@ local Perf       = require("infra.perf")
 local HotPath    = require("infra.hotpath_profiler")
 local KeystrokeIntegrity = require("infra.keystroke_integrity")
 local KeyEventHealth = require("infra.key_event_health")
+local UnicodeCarrier = require("adapters.unicode_carrier")
 local EventClock = require("adapters.event_clock")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 local ConfigKeys = require("config_keys")
@@ -1989,8 +1990,9 @@ end
 local AUTOREPEAT_PROPERTY = eventtap.event.properties.keyboardEventAutorepeat
 
 --- Feeds one physical key event to the session's pairing counters
---- (infra/key_event_health.lua). Never changes what the key does: every read
---- is protected and the counters only write tables.
+--- (infra/key_event_health.lua) and to the held keys synthetic text avoids
+--- (adapters/unicode_carrier.lua). Never changes what the key does: every read
+--- is protected and both only write tables.
 --- @param e table Physical keyDown or keyUp event.
 --- @param phase string "down" or "up".
 --- @param lateness_ms number|nil Callback lateness from adapters/event_clock.lua.
@@ -2006,6 +2008,8 @@ local function observe_key_health(e, phase, lateness_ms, stamp)
 	end
 	local ok_char, character = pcall(Keycodes.character_for, keycode)
 	KeyEventHealth.note(phase, keycode, autorepeat, ok_char and character ~= nil, lateness_ms, stamp)
+	-- Synthetic text must not ride a key the user still holds (hsfix-held-carrier).
+	if type(keycode) == "number" then UnicodeCarrier.note_physical_key(phase, keycode) end
 	return keycode
 end
 
