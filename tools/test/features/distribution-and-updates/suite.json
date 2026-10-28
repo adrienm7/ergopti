@@ -555,7 +555,7 @@
 		},
 		{
 			"id": "js-windows-control-cli-session",
-			"ordinal": 529,
+			"ordinal": 530,
 			"name": "Windows control CLI runs both session and result admissions through its standalone entrypoint",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-control-cli.cjs"],
@@ -563,7 +563,7 @@
 		},
 		{
 			"id": "js-windows-control-cli-result",
-			"ordinal": 530,
+			"ordinal": 531,
 			"name": "Windows control CLI accepts only typed matching result records and exact protocol states",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-control-cli.cjs", "--phase=result"],
