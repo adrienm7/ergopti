@@ -11,7 +11,7 @@
 --- FEATURES & RATIONALE:
 --- 1. Read-only: the managed runtime is read through the owned resolver and
 ---    ollama_installed_runtime.capture, which spawn nothing, write nothing and
----    acquire no descriptor; a system Ollama is a PATH lookup.
+---    acquire no descriptor; a system Ollama is a PATH directory lookup.
 --- 2. A server that answers is never greyed: models in the inventory, or an
 ---    Ollama the user points at elsewhere than this computer, are available
 ---    whatever this computer has installed.
@@ -62,10 +62,31 @@ local function managed_status()
 	return ok and type(verdict) == "table" and type(verdict.status) == "string" and verdict.status or "unavailable"
 end
 
+--- Whether an executable of that name is in a PATH directory: a directory
+--- lookup, never a program launch (a minimal image may lack every probe).
+--- @param name string
+--- @return boolean
+local function executable_on_path(name)
+	local ok, native = pcall(require, "luv")
+	for directory in (os.getenv("PATH") or ""):gmatch("[^:]+") do
+		local candidate = directory .. "/" .. name
+		if ok and type(native.fs_access) == "function" then
+			if native.fs_access(candidate, "X") == true then return true end
+		else
+			local handle = io.open(candidate, "rb")
+			if handle then
+				handle:close()
+				return true
+			end
+		end
+	end
+	return false
+end
+
 local DEFAULT_PORTS = {
 	failure = M.failure,
 	managed = managed_status,
-	system_command = function() return require("adapters.shell_runner").has_command("ollama") == true end,
+	system_command = function() return executable_on_path("ollama") end,
 	loopback = function(origin) return require("llm.runtime_repair").loopback_origin(origin) ~= nil end,
 }
 
