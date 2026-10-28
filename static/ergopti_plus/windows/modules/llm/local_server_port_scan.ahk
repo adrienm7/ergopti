@@ -80,10 +80,13 @@ class LocalServerPortScan {
 		return true
 	}
 
-	_Timer(Callback, Period) {
+	; One-shot by construction: the deadline must never become a repeating
+	; poller on the keystroke thread, and the fast-timer inventory reads the
+	; sign of the period where SetTimer is called.
+	_Timer(Callback, DelayMs) {
 		if this.Options.Has("timer")
-			return this.Options["timer"].Call(Callback, Period)
-		SetTimer(Callback, Period)
+			return this.Options["timer"].Call(Callback, -Abs(DelayMs))
+		SetTimer(Callback, -Abs(DelayMs))
 	}
 
 	_Expire(State, Finish, Deadline) {

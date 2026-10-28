@@ -448,8 +448,12 @@ function assertNativeFileFilterBehavior(source) {
 		'"shell32\\SHCreateItemFromParsingName"',
 		'ComCall(5, ObserverItem, "UInt", 0, "Ptr*", &ObserverDisplay)',
 		'return ObserverName == ObserverTypedName ? [ObserverName] : [ObserverName, ObserverTypedName]',
-		'OwnerItems := OwnerElement.FindElements([{Type: "ListItem"}, {Type: "DataItem"}])',
-		'ObserverRestoredItems := ObserverElement.FindElements([{Type: "ListItem"}, {Type: "DataItem"}])',
+		'OwnerItems := _NFO_Census(OwnerElement)',
+		'ObserverRestoredItems := _NFO_Census(ObserverElement)',
+		'return OwnerElement.FindElements([{Type: "ListItem"}, {Type: "DataItem"}])',
+		'catch OSError as OwnerQueryFailure {',
+		'if (OwnerQueryFailure.Number & 0xFFFFFFFF) != 0x80131505',
+		'throw OwnerQueryFailure',
 		'ObserverInitialItems := 0',
 		'_NFO_Visible(OwnerItems, OwnerNames, OwnerProcess) {',
 		'for OwnerCandidate in OwnerItems {',
@@ -478,10 +482,17 @@ function assertNativeFileFilterBehavior(source) {
 		assert.ok(observer.includes(invariant), `the separate native client retains ${invariant}`);
 	// Each settling poll owns one fresh census; exact names and custody are
 	// checked locally so provider traversal is not repeated for every spelling.
+	// One census owner traverses the shell view; a UIA provider timeout there
+	// is an empty census polled again, any other native failure stays primary.
 	assert.equal(
 		(observer.match(/\.FindElements\(/g) || []).length,
+		1,
+		'only the one census owner traverses the shell view'
+	);
+	assert.equal(
+		(observer.match(/:= _NFO_Census\((?:Owner|Observer)Element\)/g) || []).length,
 		2,
-		'only the initial/all-files poll and restored-filter poll traverse the shell view'
+		'only the initial/all-files poll and restored-filter poll take a census'
 	);
 	assert.ok(
 		observer.includes(
@@ -637,9 +648,14 @@ const nativeBehaviorMutations = [
 		'ObserverInitialItems := ObserverRestoredItems'
 	),
 	nativePolicySource.replace(
-		'ObserverRestoredItems := ObserverElement.FindElements([{Type: "ListItem"}, {Type: "DataItem"}])',
+		'ObserverRestoredItems := _NFO_Census(ObserverElement)',
 		'ObserverRestoredItems := ObserverInitialItems'
 	),
+	nativePolicySource.replace(
+		'if (OwnerQueryFailure.Number & 0xFFFFFFFF) != 0x80131505',
+		'if false'
+	),
+	nativePolicySource.replace('throw OwnerQueryFailure', 'return []'),
 	nativePolicySource.replace(
 		'OwnerMatches := []',
 		'OwnerMatches := OwnerElement.FindElements([{Type: "ListItem"}, {Type: "DataItem"}])'

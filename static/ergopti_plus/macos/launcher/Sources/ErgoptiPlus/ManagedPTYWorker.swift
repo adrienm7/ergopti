@@ -146,9 +146,16 @@ enum ManagedPTYSource {
 
 	/// Creates the root on first use, owner-only, and refuses a symlink, a
 	/// foreign owner or a folder group or others may write, at every level
-	/// from the application data folder down.
+	/// from the application data folder down. A home that has no Library or
+	/// Application Support folder yet (a fresh account, the cold CI homes)
+	/// gets them owner-only; existing ones are used as they are.
 	private static func preparedRoot(_ root: String) -> Bool {
 		let parent = URL(fileURLWithPath: root).deletingLastPathComponent().path
+		let support = URL(fileURLWithPath: parent).deletingLastPathComponent().path
+		let library = URL(fileURLWithPath: support).deletingLastPathComponent().path
+		for ancestor in [library, support] where Darwin.mkdir(ancestor, 0o700) != 0 && errno != EEXIST {
+			return false
+		}
 		if Darwin.mkdir(parent, 0o700) != 0 && errno != EEXIST { return false }
 		guard ownedPrivateFolder(parent, privateMode: false) else { return false }
 		if Darwin.mkdir(root, 0o700) != 0 && errno != EEXIST { return false }
