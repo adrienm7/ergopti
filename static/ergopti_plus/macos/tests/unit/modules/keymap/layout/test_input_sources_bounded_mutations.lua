@@ -777,6 +777,48 @@ end)
 
 
 helpers.describe("input-source confirm: a fresh process reads the state (composer-macos26)", function()
+	status_test("passes the canonical settle delay to every refresh child (input-source-refresh-timing)", function()
+		local previous_timings = require("infra.timings")
+		local previous_loader = package.preload["infra.timings"]
+		local original_sec = previous_timings.sec
+		local injected, reads = 0.137, 0
+		local deadline = original_sec("ui", "input_source_operation_timeout_ms")
+		local timing_port = setmetatable({}, { __index = previous_timings })
+		timing_port.sec = function(section, key)
+			if section == "ui" and key == "input_source_refresh_settle_ms" then
+				reads = reads + 1
+				return injected
+			end
+			return original_sec(section, key)
+		end
+		local ok, detail = xpcall(function()
+			-- The normal loader clears timings; the preload owns this one injection
+			package.preload["infra.timings"] = function() return timing_port end
+			local f = load_fixture()
+			package.preload["infra.timings"] = previous_loader
+			timing_port.sec = original_sec
+			local answers = 0
+			for _, refresh in ipairs({ true, false }) do
+				helpers.assert_eq(f.IS.confirm_source_async("Composer Check", { refresh = refresh }, function(confirmed)
+					helpers.assert_eq(confirmed, true)
+					answers = answers + 1
+				end), true)
+				local task = f.tasks[#f.tasks]
+				helpers.assert_eq(task.args[6], tostring(injected),
+					"the real child argv must carry the injected timing, not a Python default")
+				helpers.assert_eq(#task.args, 6)
+				task:complete(0, '{"listed":true,"enabled":true}', "")
+			end
+			helpers.assert_eq(reads, 1, "read the shared duration once when its Lua owner loads")
+			helpers.assert_eq(answers, 2)
+			helpers.assert_eq(f.timers[1].delay, deadline, "the overall operation deadline is independent")
+		end, debug.traceback)
+		package.preload["infra.timings"] = previous_loader
+		package.loaded["infra.timings"] = previous_timings
+		reset_fixture_modules()
+		if not ok then error(detail, 0) end
+	end)
+
 	-- Probe v5 (P5, P9): after the preference write, the writing process and
 	-- Hammerspoon keep a stale list (enabled=false, select -50) while a process
 	-- started after the write sees the layout on and selects it.

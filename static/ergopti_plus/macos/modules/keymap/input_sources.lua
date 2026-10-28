@@ -47,6 +47,8 @@ local ACTIVE_LAYOUTS_REFRESH_THROTTLE_SEC = 5
 -- Hammerspoon runloop. Every mutating child is owned through this deadline.
 local INPUT_SOURCE_OPERATION_TIMEOUT_SEC =
 	Timings.sec("ui", "input_source_operation_timeout_ms")
+local INPUT_SOURCE_REFRESH_SETTLE_SEC =
+	Timings.sec("ui", "input_source_refresh_settle_ms")
 
 -- Records from the (expensive) HIToolbox active-layout probe. nil until first
 -- computed; refreshed asynchronously so menu opens never pay a subprocess.
@@ -928,13 +930,18 @@ end
 -- Carbon is called through ctypes: the AppleScript ObjC bridge crashes on these
 -- calls (see ENABLED_LIST_SCRIPT), the C API does not.
 local CONFIRM_SOURCE_SCRIPT = [[
-import ctypes, json, sys, time
+import ctypes, json, math, sys, time
 
 TARGET = sys.argv[1]
 REGISTER_PATH = sys.argv[2]
 FLAGS = sys.argv[3].split(",")
 REFRESH = "refresh" in FLAGS
 ENABLE = "enable" in FLAGS
+if len(sys.argv) != 5:
+    raise ValueError("input-source confirmation requires an explicit settle delay")
+SETTLE_SECONDS = float(sys.argv[4])
+if not math.isfinite(SETTLE_SECONDS) or SETTLE_SECONDS <= 0:
+    raise ValueError("input-source settle delay must be finite and positive")
 UTF8 = 0x08000100
 
 cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
@@ -1022,9 +1029,9 @@ if target is not None and REFRESH and flag(target, K_SELECTED):
         and flag(source, K_ENABLED) and flag(source, K_SELECT_CAPABLE)), None)
     if other is not None:
         away = tis.TISSelectInputSource(other)
-        time.sleep(0.3)
+        time.sleep(SETTLE_SECONDS)
         back = tis.TISSelectInputSource(target)
-        time.sleep(0.3)
+        time.sleep(SETTLE_SECONDS)
         refreshed = {"away": away, "back": back}
     else:
         refreshed = {"away": None, "back": None}
@@ -1063,7 +1070,8 @@ local function confirm_source_async(keyboard_name, options, on_done)
 	if options.refresh == true then flags[#flags + 1] = "refresh" end
 	if options.enable == true then flags[#flags + 1] = "enable" end
 	return run_bounded_process("Confirm keyboard input source", python_bin,
-		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path, table.concat(flags, ",") },
+		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path,
+			table.concat(flags, ","), tostring(INPUT_SOURCE_REFRESH_SETTLE_SEC) },
 		function(process_ok, out, reason)
 			local decoded_ok, state = pcall(require("json").decode, tostring(out or ""))
 			if process_ok ~= true or not decoded_ok or type(state) ~= "table" or type(state.listed) ~= "boolean" then
