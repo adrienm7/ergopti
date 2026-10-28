@@ -1,0 +1,4 @@
+bash: line 10: 82477 Killed: 9               /bin/bash /dev/fd/3 > "$dir/fd.out" 2>&1
+path script: exit=0 output=started survived 
+unlinked /dev/fd/3 script: exit=137 output=
+both finished after 12s

@@ -1,0 +1,6 @@
+System-wide memory free percentage: 53%
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                    12880.
+Pages active:                                 808507.
+Pages inactive:                               814564.
+Pages speculative:                             14272.
