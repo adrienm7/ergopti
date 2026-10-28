@@ -347,8 +347,10 @@ LayoutRegistry_Request(Url, Partial, Headers, TimeoutMs, Transport, OnSettled) {
 		else
 			Transport["resolve_proxy"].Call([Url], (Resolved) => _LayoutRegistrySend(Job, Resolved[Url]))
 	} catch as Err {
-		; A synchronous subscriber may throw after the exact job already settled.
-		if Job.Settled
+		; A synchronous subscriber may throw after settlement, or the exact
+		; retirement owner may already retain a refused scheduling boundary.
+		; Neither failure authorizes another dispatch-layer retirement attempt.
+		if Job.Settled || Job.Retiring
 			throw Err
 		if IsObject(Job.Request)
 			_LayoutRegistryRetire(Job, Job.Request, "cannot download " . Url . ": " . Err.Message)
@@ -460,7 +462,9 @@ _LayoutRegistryPoll(Job, Req, Polls) {
 			_LayoutRegistryRetire(Job, Req, "download of " . Job.Url . " did not finish in time")
 			return
 		}
-		Job.Transport["schedule"].Call(_LayoutRegistryPoll.Bind(Job, Req, Polls + 1), LAYOUT_REGISTRY_POLL_MS)
+		try Job.Transport["schedule"].Call(_LayoutRegistryPoll.Bind(Job, Req, Polls + 1), LAYOUT_REGISTRY_POLL_MS)
+		catch as Err
+			_LayoutRegistryRetire(Job, Req, "cannot schedule a poll for " . Job.Url . ": " . Err.Message)
 		return
 	}
 	Status := Req.Status
