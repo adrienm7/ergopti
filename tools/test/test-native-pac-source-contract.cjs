@@ -703,20 +703,48 @@ if (process.platform === 'win32') {
 	});
 }
 
-if (process.platform !== 'win32') {
-	const result = spawnSync(pythonExecutable(), ['tools/test/native_pac_source_fixture_test.py'], {
-		cwd: root,
-		encoding: 'utf8',
-		timeout: 60000
-	});
+function assertPortablePACFixtureResult(result, output = process.stdout) {
+	// A timed-out peer can already have reported its active case or traceback.
+	// Relay those diagnostics before a verdict assertion throws.
+	if (typeof result.stdout === 'string') output.write(result.stdout);
+	if (typeof result.stderr === 'string') output.write(result.stderr);
 	assert.equal(result.error, undefined);
 	assert.equal(result.signal, null);
 	assert.equal(result.status, 0, result.stderr || result.stdout);
-	assert.ok(result.stdout.includes('Planned cases: 15'));
-	assert.match(result.stderr, /Ran 15 tests in/);
+	assert.ok(result.stdout.includes('Planned cases: 16'));
+	assert.match(result.stderr, /Ran 16 tests in/);
 	assert.match(result.stderr, /\bOK\b/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
-	process.stdout.write(result.stdout + result.stderr);
+}
+
+check('portable peer timeout diagnostics survive the refusing verdict', () => {
+	const refusal = Object.assign(new Error('Controlled PAC peer timeout'), { code: 'ETIMEDOUT' });
+	const captured = {
+		error: refusal,
+		signal: 'SIGTERM',
+		status: null,
+		stdout: 'Planned cases: 16\ncontrolled active peer case\n',
+		stderr: 'controlled peer traceback before timeout\n'
+	};
+	const observed = [];
+	assert.throws(
+		() => assertPortablePACFixtureResult(captured, { write: (chunk) => observed.push(chunk) }),
+		(error) => error instanceof assert.AssertionError && error.actual === refusal
+	);
+	assert.equal(observed.join(''), captured.stdout + captured.stderr);
+});
+
+if (process.platform !== 'win32') {
+	const result = spawnSync(
+		pythonExecutable(),
+		['tools/test/native_pac_source_fixture_test.py', '-v'],
+		{
+			cwd: root,
+			encoding: 'utf8',
+			timeout: 60000
+		}
+	);
+	assertPortablePACFixtureResult(result);
 }
 // The policy admits an http PAC, but App Transport Security refuses plain http
 // from the launcher bundle unless its generated Info.plist opts out (issue #101).

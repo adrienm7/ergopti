@@ -33,6 +33,7 @@ class SourceFixture:
         self.server_shutdowns = []
         self.request_starts = []
         self.cleanup_failure = None
+        self.retirement_failures = []
         self.connections = set()
         self.lock = threading.Lock()
         self.records = []
@@ -160,6 +161,7 @@ class SourceFixture:
                     "attempted": False,
                     "started": False,
                     "failure": None,
+                    "outcome": threading.Event(),
                 }
                 with owner.lock:
                     owner.request_threads.append(thread)
@@ -171,6 +173,11 @@ class SourceFixture:
                 except BaseException as failure:
                     state["failure"] = failure
                     raise
+                finally:
+                    # A real request can finish before its accepting thread
+                    # publishes Thread.start's outcome. Publish only that
+                    # public acknowledgement, never a liveness observation.
+                    state["outcome"].set()
 
             def shutdown_request(self, request):
                 with owner.lock:
@@ -252,7 +259,13 @@ class SourceFixture:
                     data = b"x" * (MAXIMUM + 1)
                 elif mode == "unavailable":
                     status = 503
-                elif mode in ("redirect", "foreign", "downgrade", "loop", "foreign-auth"):
+                elif mode in (
+                    "redirect",
+                    "foreign",
+                    "downgrade",
+                    "loop",
+                    "foreign-auth",
+                ):
                     status = 302
                     if mode == "redirect":
                         headers["Location"] = "/source/utf8"
@@ -317,7 +330,11 @@ class SourceFixture:
 
     def stats(self):
         with self.lock:
-            return {"version": 1, "records": list(self.records), "active": len(self.connections)}
+            return {
+                "version": 1,
+                "records": list(self.records),
+                "active": len(self.connections),
+            }
 
     def _uncertain_cleanup(self, failure):
         with self.lock:
@@ -335,6 +352,62 @@ class SourceFixture:
             self._uncertain_cleanup(failure)
             raise
 
+    def _await_start_outcome(self, state, deadline):
+        if not state["started"] and state["failure"] is None:
+            outcome = state.get("outcome")
+            if outcome is not None:
+                outcome.wait(max(0, deadline - time.monotonic()))
+        if not state["started"]:
+            if state["failure"] is not None:
+                raise state["failure"]
+            raise RuntimeError("PAC source thread start acknowledgement refused")
+
+    def _retire_acknowledged_servers(self, deadline):
+        # Shutdown acknowledgement is itself retained and bounded; failure
+        # never releases temporary keys under a still-running native owner.
+        for state in self.server_starts:
+            if not state["started"]:
+                continue
+            server = state["server"]
+            if any(owned["server"] is server for owned in self.server_shutdowns):
+                continue
+            owned = {
+                "server": server,
+                "attempted": False,
+                "started": False,
+                "returned": False,
+                "failure": None,
+            }
+
+            def shutdown(owned=owned):
+                try:
+                    owned["server"].shutdown()
+                    owned["returned"] = True
+                except BaseException as failure:
+                    owned["failure"] = failure
+
+            thread = threading.Thread(target=shutdown)
+            owned["worker"] = thread
+            self.server_shutdowns.append(owned)
+            self.shutdown_threads.append(thread)
+            try:
+                owned["attempted"] = True
+                thread.start()
+                owned["started"] = True
+            except BaseException as failure:
+                owned["failure"] = failure
+                raise
+        for state in self.server_shutdowns:
+            self._join(state["worker"], deadline)
+            if state["failure"] is not None:
+                raise state["failure"]
+            if not state["returned"] or state["worker"].is_alive():
+                raise RuntimeError("PAC source shutdown retirement refused")
+        for state in self.server_starts:
+            self._join(state["worker"], deadline)
+            if state["worker"].is_alive():
+                raise RuntimeError("PAC source serving retirement refused")
+
     def close(self):
         if self.cleanup_failure is not None:
             raise self.cleanup_failure
@@ -345,10 +418,7 @@ class SourceFixture:
             # A public start exception can follow actual native acquisition.
             # Missing ident/is_alive is never evidence that no child exists.
             for state in self.server_starts + self.server_shutdowns + self.request_starts:
-                if not state["started"]:
-                    if state["failure"] is not None:
-                        raise state["failure"]
-                    raise RuntimeError("PAC source thread start acknowledgement refused")
+                self._await_start_outcome(state, deadline)
             self.stop.set()
             with self.lock:
                 connections = list(self.connections)
@@ -360,53 +430,11 @@ class SourceFixture:
                 except BaseException as failure:
                     self._uncertain_cleanup(failure)
                     raise
-            # Shutdown acknowledgement is itself retained and bounded; failure
-            # never releases temporary keys under a still-running native owner.
-            for state in self.server_starts:
-                server = state["server"]
-                if any(owned["server"] is server for owned in self.server_shutdowns):
-                    continue
-                owned = {
-                    "server": server,
-                    "attempted": False,
-                    "started": False,
-                    "returned": False,
-                    "failure": None,
-                }
-
-                def shutdown(owned=owned):
-                    try:
-                        owned["server"].shutdown()
-                        owned["returned"] = True
-                    except BaseException as failure:
-                        owned["failure"] = failure
-
-                thread = threading.Thread(target=shutdown)
-                owned["worker"] = thread
-                self.server_shutdowns.append(owned)
-                self.shutdown_threads.append(thread)
-                try:
-                    owned["attempted"] = True
-                    thread.start()
-                    owned["started"] = True
-                except BaseException as failure:
-                    owned["failure"] = failure
-                    raise
-            for state in self.server_shutdowns:
-                self._join(state["worker"], deadline)
-                if state["failure"] is not None:
-                    raise state["failure"]
-                if not state["returned"] or state["worker"].is_alive():
-                    raise RuntimeError("PAC source shutdown retirement refused")
-            for state in self.server_starts:
-                self._join(state["worker"], deadline)
-                if state["worker"].is_alive():
-                    raise RuntimeError("PAC source serving retirement refused")
+            self._retire_acknowledged_servers(deadline)
             with self.lock:
                 requests = list(self.request_starts)
             for state in requests:
-                if not state["started"]:
-                    raise state["failure"] or RuntimeError("PAC source request start refused")
+                self._await_start_outcome(state, deadline)
                 thread = state["worker"]
                 self._join(thread, deadline)
                 if thread.is_alive():
@@ -425,9 +453,19 @@ class SourceFixture:
             except BaseException as failure:
                 self._uncertain_cleanup(failure)
                 raise
-        except BaseException:
-            if self not in RETAINED_DEBT:
-                RETAINED_DEBT.append(self)
+        except BaseException as failure:
+            can_retire_servers = self.cleanup_failure is None and all(
+                state["started"] for state in self.server_starts + self.server_shutdowns
+            )
+            self._uncertain_cleanup(failure)
+            if can_retire_servers:
+                # Stop only acknowledged server owners. An uncertain request
+                # still owns its socket, keys and debt; do not claim it retired.
+                self.stop.set()
+                try:
+                    self._retire_acknowledged_servers(deadline)
+                except BaseException as retirement_failure:
+                    self.retirement_failures.append(retirement_failure)
             raise
         self.closed = True
         if self in RETAINED_DEBT:
