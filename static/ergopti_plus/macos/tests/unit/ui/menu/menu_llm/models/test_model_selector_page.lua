@@ -30,6 +30,7 @@ local function deps(fields)
 		runtime_available = function() return fields.installed ~= false end,
 		has_failed = function() return fields.failed == true end,
 		is_runtime_broken = function() return fields.broken == true end,
+		is_task_running = function() return fields.running == true end,
 	}
 end
 
@@ -39,6 +40,11 @@ local function probes(opts)
 		is_apple_silicon = function() return opts.apple ~= false end,
 		mlx_deps = function() return deps(opts.mlx or {}) end,
 		ollama_deps = function() return deps(opts.ollama or {}) end,
+		install_runtime = function(backend, on_complete)
+			opts.installs = opts.installs or {}
+			opts.installs[#opts.installs + 1] = { backend = backend, on_complete = on_complete }
+			return opts.install_refused ~= true
+		end,
 	}
 end
 
@@ -65,6 +71,10 @@ local function with_page(opts, body)
 		package.loaded["ui.model_browser"] = { inject_progress = function(update)
 			calls.progress = calls.progress or {}
 			calls.progress[#calls.progress + 1] = update
+			return true
+		end, inject_install_progress = function(update)
+			calls.install_progress = calls.install_progress or {}
+			calls.install_progress[#calls.install_progress + 1] = update
 			return true
 		end }
 		package.loaded["modules.llm.api_mlx"] = { get_port = function() return 3460 end, get_default_port = function() return 3460 end }
@@ -160,16 +170,66 @@ helpers.describe("model selector page owner", function()
 		end
 	end)
 
-	helpers.it("offers the install of a missing runtime, never on an Intel Mac", function()
-		with_page({ mlx = { installed = false } }, function(Page, ctx, _, collected, p)
-			local ids = {}
-			for _, a in ipairs(backend_of(Page.build_payload(ctx, p, collected), "mlx").actions) do ids[a.id] = true end
-			helpers.assert_true(ids.install == true)
+	-- model-selector-install-button: each local group carries its install
+	-- button, greyed once installed or where it cannot run, running while it runs.
+	helpers.it("states each local backend's install: installed, available, unsupported or running", function()
+		local cases = {
+			{ opts = {}, backend = "ollama", install = { state = "installed" } },
+			{ opts = {}, backend = "mlx", install = { state = "installed" } },
+			{ opts = { ollama = { installed = false } }, backend = "ollama", install = { state = "available" } },
+			{ opts = { ollama = { failed = true } }, backend = "ollama", install = { state = "available" } },
+			{ opts = { mlx = { broken = true } }, backend = "mlx", install = { state = "available" } },
+			{ opts = { apple = false }, backend = "mlx",
+				install = { state = "unsupported", reason_key = "model_browser.reason_mlx_intel" } },
+			{ opts = { read_only = "menu.read_only.newer_schema" }, backend = "ollama",
+				install = { state = "unsupported", reason_key = "menu.read_only.newer_schema" } },
+			{ opts = { ollama = { installed = false, running = true } }, backend = "ollama", install = { state = "running" } },
+		}
+		for _, case in ipairs(cases) do
+			with_page(case.opts, function(Page, ctx, _, collected, p)
+				local payload = Page.build_payload(ctx, p, collected)
+				helpers.assert_eq(backend_of(payload, case.backend).install, case.install, case.backend)
+				for _, a in ipairs(backend_of(payload, case.backend).actions) do
+					helpers.assert_true(a.id ~= "install", "the install is the page's own button, not a tool")
+				end
+				helpers.assert_nil(backend_of(payload, "api").install, "the API installs nothing")
+			end)
+		end
+	end)
+
+	helpers.it("installs a missing runtime from its button, shows its progress and unlocks the rows", function()
+		local opts = { ollama = { installed = false } }
+		with_page(opts, function(Page, ctx, calls, collected, p)
+			local payload = Page.build_payload(ctx, p, collected)
+			helpers.assert_eq(backend_of(payload, "ollama").available, false, "no row is usable before the install")
+			helpers.assert_true(Page.handle_action(ctx, { action = "group_action", backend = "ollama", id = "install" }, p, collected))
+			helpers.assert_eq(#opts.installs, 1)
+			helpers.assert_eq(opts.installs[1].backend, "ollama")
+			helpers.assert_eq(#calls.select, 0, "the install switches no backend")
+			helpers.assert_eq(backend_of(Page.build_payload(ctx, p, collected), "ollama").install, { state = "running" })
+			helpers.assert_eq(Page.handle_action(ctx, { action = "group_action", backend = "ollama", id = "install" }, p, collected), false,
+				"a running install is not started twice")
+			helpers.assert_true(calls.percent_listener("ollama_install", 37))
+			helpers.assert_eq(calls.install_progress, { { backend = "ollama", percent = 37 } })
+			helpers.assert_eq(backend_of(Page.build_payload(ctx, p, collected), "ollama").install,
+				{ state = "running", percent = 37 })
+			opts.ollama.installed = true
+			opts.installs[1].on_complete(true)
+			payload = Page.build_payload(ctx, p, collected)
+			helpers.assert_eq(backend_of(payload, "ollama").install, { state = "installed" })
+			helpers.assert_eq(backend_of(payload, "ollama").available, true, "the installed runtime unlocks its rows")
+			helpers.assert_eq(Page.handle_action(ctx, { action = "group_action", backend = "ollama", id = "install" }, p, collected), false,
+				"an installed runtime is not installed again")
 		end)
 		with_page({ apple = false }, function(Page, ctx, _, collected, p)
-			for _, a in ipairs(backend_of(Page.build_payload(ctx, p, collected), "mlx").actions) do
-				helpers.assert_true(a.id ~= "install", "Intel Macs cannot install MLX")
-			end
+			helpers.assert_eq(Page.handle_action(ctx, { action = "group_action", backend = "mlx", id = "install" }, p, collected), false,
+				"an Intel Mac cannot install MLX")
+		end)
+		local refused = { mlx = { installed = false }, install_refused = true }
+		with_page(refused, function(Page, ctx, _, collected, p)
+			helpers.assert_eq(Page.handle_action(ctx, { action = "group_action", backend = "mlx", id = "install" }, p, collected), false)
+			helpers.assert_eq(backend_of(Page.build_payload(ctx, p, collected), "mlx").install, { state = "available" },
+				"an install that did not start is offered again")
 		end)
 	end)
 

@@ -85,6 +85,15 @@ LLM_Deps_HasFailed() {
 }
 
 /**
+ * Returns true while a bootstrap check or install runs.
+ * @returns {boolean}
+ */
+LLM_Deps_IsChecking() {
+	global _LLM_Deps_Checking
+	return _LLM_Deps_Checking
+}
+
+/**
  * Returns the last failure message captured from the installer, or "".
  * @returns {string}
  */
