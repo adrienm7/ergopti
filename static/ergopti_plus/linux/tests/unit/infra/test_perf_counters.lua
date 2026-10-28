@@ -8,7 +8,7 @@
 --- above DEBUG, and report one never-collapsed evidence line per interval.
 --- ==============================================================================
 
-local helpers = require("tests.helpers")
+local helpers = require("tests.support.logger_fixture").helpers({ "infra.perf_counters", "infra.paths", "toml_codec.reader" })
 
 --- Loads fresh counters and a logger capturing every delivered line.
 --- @param level number Logger minimum level.
