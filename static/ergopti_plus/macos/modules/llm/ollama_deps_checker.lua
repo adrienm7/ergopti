@@ -37,6 +37,7 @@ local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owne
 local PtyProcessGroup = require("modules.llm.pty_process_group")
 local PythonInterpreter = require("adapters.python_interpreter")
 local ExitSignal = require("modules.llm.bootstrap_exit_signal")
+local DevSource = require("infra.dev_source")
 
 local LOG = "ollama_deps"
 
@@ -72,6 +73,11 @@ local EXIT_FAILURE_MESSAGES = {
 	[64] = "ollama.error_installer_refused",
 	[78] = "ollama.error_runtime_refused",
 }
+
+-- The line modules/llm/managed_ollama_runtime.py prints before exit 78 when no
+-- managed catalogue is staged. It stays an ordinary output line, so the failure
+-- evidence keeps naming it; it only selects the words a developer app shows.
+local LINE_CATALOGUE_MISSING = "OLLAMA_MANAGED_CATALOGUE_MISSING"
 
 local KNOWN_MARKERS = {
 	[MARKER_INSTALLING] = true,
@@ -200,6 +206,22 @@ local function forward_chunk(chunk, is_current, owns_ui)
 		end
 	end
 	return true
+end
+
+--- Names the real cause of a missing catalogue in a developer app.
+--- A built app seals its catalogue, so there a missing one stays a refused
+--- pinned runtime. A developer app (infra/dev_source.lua) builds it from the
+--- clone's pinned sources (tools/dev/stage-macos-dev-ollama-catalogue.py): a
+--- missing one means that build has not succeeded, not a failed integrity check.
+--- @param exit_code integer Installer exit status.
+--- @param lines table Last output lines, oldest first.
+--- @return string|nil key Locale key, or nil when another cause applies.
+local function developer_catalogue_failure(exit_code, lines)
+	if exit_code ~= 78 or not DevSource.is_active() then return nil end
+	for _, line in ipairs(lines) do
+		if line == LINE_CATALOGUE_MISSING then return "ollama.error_dev_catalogue_missing" end
+	end
+	return nil
 end
 
 local function tail_for_error(s)
@@ -820,6 +842,7 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 			local signal_name = ExitSignal.name(exit_code)
 			log_failure_evidence(exit_code, signal_name)
 			local failure_key = FAILURE_MESSAGES[_observed_failure_marker or ""]
+				or developer_catalogue_failure(exit_code, diagnostic_tail.lines())
 				or EXIT_FAILURE_MESSAGES[exit_code]
 			if failure_key then return publish_failure(i18n.get(failure_key), exit_code) end
 			-- A signalled installer prints no cause of its own: name the signal
