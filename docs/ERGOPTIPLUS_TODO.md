@@ -78,6 +78,76 @@ day logs to `docs/field-reports/mac-<date>/` on that branch and say so. Order:
 3. **"Maintainer checks > Mac hardware session"** and **"Maintainer checks > Mac"** below, section by
    section; report each line as pass, fail or not run.
 
+## Next fix/<os> agent pass (read when the maintainer asks for a new fix/linux, fix/macos or fix/windows)
+
+The 28 October passes (Codex agents, one per OS) were squashed onto dev as
+`fix(macos|linux|windows): land the fix/<os> audit branch`. Their original histories are kept as tags
+`archive/fix-<os>-2026-10-28`, and the branches are deleted. Each pass left a full handover; read it first:
+
+- macOS: [docs/audits/macos/2026-10-28/](audits/macos/2026-10-28/) (`TODO.md`, `report.md`).
+- Linux: [docs/audits/linux/2026-10-28-closeout/](audits/linux/2026-10-28-closeout/) (`README.md`, "Outstanding
+  TODO").
+- Windows: [docs/audits/windows-2026-10-28/](audits/windows-2026-10-28/) (`README.md` "Remaining findings",
+  `POST_VALIDATION.md` "Resume from a fresh checkout").
+
+**How a pass must run, so no time is lost:**
+
+1. Branch `fix/<os>` from the current `dev`, never from an old fix branch. Keep it linear: rebase onto dev, and
+   never run `git merge dev` into it. The 28 October passes merged dev a dozen times each, so they could not be
+   replayed commit by commit and had to be squashed.
+2. Push every hour and dispatch `gh workflow run ci.yml --ref fix/<os> -f os_lanes=<os>`. A pass is done only
+   when its lane and Common are green.
+   - On 28 October the Windows pass stopped with 3 unit groups red.
+   - The Linux pass stopped with the RPM and AppImage installed-data checks red.
+   - The coordinator had to fix both before the release.
+3. Stay in the OS's own files. Shared tests (`tools/test/*.cjs`) touched by two passes conflicted: the macOS and
+   Linux passes rewrote the same App Cloner, bash-resolution and PAC source tests in different ways. Leave
+   shared files to the coordinator, or announce them first.
+4. Workflows (`.github/workflows/*`) may be edited when a fix needs it; say so in the commit.
+5. Evidence goes into one `docs/audits/<os>/<date>/` folder: a README with the remaining work at the top, then
+   any archives. Keep each archive under 10 MB.
+6. Host notes:
+   - Run as a normal user with `USER` and `LOGNAME` set; the JS suite refuses root.
+   - Use Node 22.22.2 and Ruff 0.15.8, and PowerShell 7 for the Windows host checks.
+   - AutoHotkey under Wine is narrower evidence only; it does not replace Windows CI.
+
+**Left open by the 28 October passes:**
+
+- Windows (from its README, "Remaining findings"):
+  1. A crash-torn SQL ingest can acknowledge an unreadable ledger. The admission prototype is in the evidence
+     archive (`windows-ledger-admission-r19`); its lifecycle cases are not qualified.
+  2. Configuration restore can publish a substituted staging file, through a pathname race. It needs a native
+     design that owns destination creation; test it on a real Windows.
+  3. Uninstall can recycle a foreign replacement, through an unregister race. It needs an identity-preserving
+     quarantine.
+  4. Stored n-grams cannot tell literal bracket text from control markers. This needs a versioned token format
+     and a policy for the existing history.
+  5. The native builder validation has literal-path and schema defects. Its review patches are archived; an
+     official MSVC regeneration is required.
+  6. The diagnostic archive acknowledgement fails intermittently (run 40709098135); the cause is unknown.
+  7. Developer interpreter selection still needs native PowerShell 5.1 qualification, and three Ollama DELETE
+     cases failed under Wine, cause unknown.
+- Linux (from its closeout):
+  1. Physical acceptance (evdev/uinput grabs, polkit, autostart, Wayland/X11) still needs a real machine.
+  2. The Python 3.8 floor checks were structural only; a native 3.8 run is still owed.
+- macOS (from its TODO, plus Mac bugs the Linux pass proved):
+  1. `native_python_bootstrap` in `macos/modules/llm/native_python_bootstrap.sh` leaves its uv-wheel and
+     Python-archive temp workspaces behind on SIGTERM. Give it operation-local cleanup; the proof is in the
+     archive.
+  2. `macos/modules/llm/network_env.lua` turns POSIX backslashes into slashes while locating the driver root.
+  3. `ensure-mlx-deps.sh` takes the first awk field of `shasum`, which gives a wrong digest for names that
+     contain a backslash.
+  4. Two native leads are unconfirmed: the `OwnedProgramWorker.runBridge` receipt write refusal and the
+     `InstalledPhysicalSourceBridge` early cancellation. Reproduce both before fixing.
+  5. The macOS optional-callback regression accepts a genuine `error(nil)`, because it checks the payload and
+     not the `pcall` status. This is a test defect, found by the Windows pass.
+  6. The `test_ledger_replay_bounded` CPU budget (20 ms) failed at 71 ms in one full portable run. The cause is
+     unknown, so the test was neither weakened nor blamed.
+- CI: the macOS 26 "Run Swift launcher tests" step hit its 10-minute limit twice on 28 October, in main run
+  40764020578 and fix/macos run 40765470617. `HomebrewArchiveAcceptanceTests` alone took 289 s, and a real PAC
+  trust test was still running at the limit. Move the real-network cases into their own job, or raise the step
+  budget with a measured reason.
+
 ## Handover of 2026-10-27 evening (read first)
 
 - **Focus decided by the maintainer (27 Oct afternoon):** fix every macOS problem while their Mac is
@@ -175,9 +245,7 @@ day logs to `docs/field-reports/mac-<date>/` on that branch and say so. Order:
   `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
   `runtime_install_offer.lua`), so the macOS "official cold Ollama without stock Python" lane only proves
   the official installer still works cold. Repoint it at the native install or retire it.
-- **The ChatGPT fix branches** fix/linux, fix/macos and fix/windows are fully on dev. The container proxy
-  refuses remote deletion, so the maintainer deletes them: `git push origin --delete fix/linux fix/macos
-fix/windows`.
+- **The fix branches of 28 October** are squashed onto dev; see "Next fix/<os> agent pass" above.
 - **Host-only reds on the Linux container** (not bugs): JS `test-ahk-tap-follower`, `test-linux-install-sandbox`,
   `test-linux-runtime-native-registration`, `test-macos-managed-bootstrap-http`, `test-managed-ollama-protocol`,
   `test-managed-remote-retirement` (no pwsh), `test-linux-deb-package-owner` (refuses root),
