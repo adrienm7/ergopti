@@ -20,15 +20,20 @@ _KLRTR_Body(Name) {
 
 _KLRTR_ReadDoesNotOwnEpoch() {
     Body := _KLRTR_Body("KL_ReadNewTodayLog")
+	AdmissionBody := _KLRTR_Body("_KL_ReadJournalEvents")
 	JournalBody := _KLRTR_Body("_KL_JournalReadLines")
 
-    Assert(!RegExMatch(Body, "Keystats\.today_log_date\s*:="),
-        "KL_ReadNewTodayLog must not advance today_log_date — only KL_DayRollover owns the date transition")
-    Assert(!RegExMatch(Body, "Keystats\.today_log_offset\s*:="),
-        "KL_ReadNewTodayLog must not reset/advance today_log_offset — its result must be committed by the ingest transaction")
-    Assert(InStr(Body, "_KL_JournalReadLines(") > 0
+	for ReaderBody in [Body, AdmissionBody, JournalBody] {
+		Assert(!RegExMatch(ReaderBody, "Keystats\.today_log_date\s*:="),
+			"only KL_DayRollover owns the date transition, including through reader delegates")
+		Assert(!RegExMatch(ReaderBody, "Keystats\.today_log_offset\s*:="),
+			"the ingest transaction owns the committed offset, including through reader delegates")
+	}
+	Assert(InStr(Body, "_KL_ReadJournalEvents(") > 0
+		&& InStr(AdmissionBody, "_KL_JournalReadLines(") > 0
+		&& InStr(AdmissionBody, "return Read") > 0
 		&& InStr(JournalBody, '"ok"') > 0 && InStr(JournalBody, '"eof"') > 0,
-        "KL_ReadNewTodayLog must return explicit ok/eof evidence so rollover cannot confuse a read failure with an empty file")
+		"the actual admission and framing owners must retain explicit ok/eof evidence")
 }
 
 Test("meta keystats rollover: reader cannot steal date/offset ownership",
@@ -83,3 +88,47 @@ _KLRTR_DeleteRequiresCommittedEOF() {
 
 Test("meta keystats rollover: no delete before complete durable ingest",
     _KLRTR_DeleteRequiresCommittedEOF)
+
+
+_KLRTR_ReaderEvidence(Spec) {
+	Path := _FSWL_Path()
+	Owned := false
+	HadDate := Keystats.HasOwnProp("today_log_date")
+	HadOffset := Keystats.HasOwnProp("today_log_offset")
+	SavedDate := HadDate ? Keystats.today_log_date : ""
+	SavedOffset := HadOffset ? Keystats.today_log_offset : 0
+	try {
+		AssertFalse(FileExist(Path))
+		AssertTrue(FSWriteCreateDurable(Path, Spec.Source))
+		Owned := true
+		Keystats.today_log_date := "rollover-owned-date"
+		Keystats.today_log_offset := 37
+		Result := _KL_ReadJournalEvents(Path, 0, 10)
+		AssertEqual(Spec.Ok, Result["ok"])
+		AssertEqual(Spec.Eof, Result["eof"], "a refused record must never authorize rollover EOF")
+		AssertEqual(Spec.Entries, Result["entries"].Length)
+		AssertEqual(Spec.Ok ? FileGetSize(Path) : 0, Result["offset"])
+		AssertEqual("rollover-owned-date", Keystats.today_log_date)
+		AssertEqual(37, Keystats.today_log_offset)
+		AssertEqual(Spec.Source, FSReadUtf8Exact(Path))
+	} finally {
+		if HadDate
+			Keystats.today_log_date := SavedDate
+		else if Keystats.HasOwnProp("today_log_date")
+			Keystats.DeleteProp("today_log_date")
+		if HadOffset
+			Keystats.today_log_offset := SavedOffset
+		else if Keystats.HasOwnProp("today_log_offset")
+			Keystats.DeleteProp("today_log_offset")
+		if Owned && FileExist(Path)
+			FileDelete(Path)
+	}
+}
+
+for _KLRTR_ReaderSpec in [
+	{Name: "empty", Source: "", Ok: true, Eof: true, Entries: 0},
+	{Name: "numeric", Source: '{"type":"mouse_click","_event_id":2}' . "`n", Ok: true, Eof: true, Entries: 1},
+	{Name: "refused", Source: '{"type":"mouse_click","_event_id":true}' . "`n", Ok: false, Eof: false, Entries: 0}
+]
+	Test("meta keystats rollover: actual " . _KLRTR_ReaderSpec.Name . " reader evidence preserves epoch (rollover-reader-evidence)",
+		_KLRTR_ReaderEvidence.Bind(_KLRTR_ReaderSpec))
