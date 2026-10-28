@@ -554,6 +554,18 @@ application|app_name|title|context_watchers|secure_field>, TTL refresh <armed|no
   until logout. The rollback disable right after was refused "busy": `run_bounded_process`
   (modules/keymap/input_sources.lua) published the terminal before freeing the mutation slot, so
   a mutation started from that callback was refused. Fixed af5765a659. Mac confirms: after a logout, the probe's `after-logout` mode for M5b/P6.
+  Correction (tmp/wip-composer-macos26): the "HIToolbox preference route is refused" was never
+  measured. Probe v4's restart ran `launchctl kickstart -k user/<uid>/com.apple.SystemUIServer`,
+  which answers 113 (no such service: SystemUIServer is `com.apple.SystemUIServer.agent` in
+  `gui/<uid>`), so nothing re-read the list; its bundle clone inserted "$1<name>$2" literally
+  (the "unexpected character '$'" line), so P4 d and P7 never had a valid layout. The driver's
+  editor ran the same kickstart, which is why every enable read `process_failed` (L52). Probe v5
+  decides, in one collector run plus one after a logout: P9 a-d (preferences plus synchronize and
+  TIS notification, SystemUIServer, TextInputMenuAgent, cfprefsd, each on its own layout, enabled
+  state also read in a fresh process), P8 b (new content in the enabled Ergopti layout in place,
+  select away and back), P10 and P8 a (the kept EPProbeKeep layout after the logout; the
+  collector runs `after-logout` first when the marker exists). The product follows the
+  documented behaviour until then: pending activation at the next login (L52).
 - **L26** [CODE][PHYS-M] field run 03_field_network: fail (`_164726`); the PAC host is unknown
   off the company network (new.txt 16:48:20). Sub-steps were not captured (L13). Next: read the
   sub-steps in the next report; a PAC that cannot be fetched while direct works must not fail the
@@ -562,7 +574,7 @@ application|app_name|title|context_watchers|secure_field>, TTL refresh <armed|no
   are `timer_late_ms` (main-thread hold) and the Shortcuts or Homebrew steps. Next: read the
   sub-steps in the next report. The 19:47 run names it: `karabiner_signature` exit_1, see L43;
   every other step passed (timer late 0 ms).
-- **L28** [PHYS-M] field run 06_field_composer: fail, same cause as L25. 07_key_accounting:
+- **L28** [PHYS-M] field run 06_field_composer: fail, same cause as L25 (now L52: info:pending_logout). 07_key_accounting:
   needs_typing, not a failure: the maintainer types the prompted text on the next run. The 19:47
   run is the same (composer_ready fail:not_enabled; the TIS probe again shows register 0, enable
   0, select -50 and the source still disabled): known limitation, not re-fixed.
@@ -690,11 +702,19 @@ strict_only:finder_detritus`, any other cause, team or a rejection still fails. 
   or a personal file adds `reload_requested` and, after the done marker, one reload through the
   termination coordinator. Mac confirms: do not use the menus during a field run; if the guard
   restores config.toml, the driver reloads once and the menu shows the backend the file names.
-- **L52** Open. 06_field_composer `composer_ready fail:not_enabled` with "Failed to enable 'Composer
-  Check' — reason=process_failed" (22:31 run) is the macOS 26 limitation of L25, but neither the
-  verdict nor the log names it yet: they read the generic `process_failed`. Next [CODE]: have the
-  enable path report the observed TIS state (register 0, enable 0, still disabled) as its own
-  reason and map it to a `not_enabled:macos_refused` value.
+- **L52** Fixed on tmp/wip-composer-macos26. 06_field_composer `composer_ready fail:not_enabled`
+  with "Failed to enable 'Composer Check' — reason=process_failed" (22:31 run): `process_failed`
+  was the editor's own kickstart answering 113 after a successful write (see L25). The editor now
+  ends on its write; the registry reads the live list (hs.keycodes) and a layout the preference
+  lists but macOS has not turned on is `pending_activation`, logged "reason=not_enabled:
+  macos_requires_logout", recorded, and confirmed (and selected when « save and use » was asked)
+  at the next boot (modules/keymap/pending_layout_activation.lua). The UI says macOS turns it on
+  at the next login; the field check reads `composer_ready info:pending_logout`. Mac confirms:
+  the next field run shows info:pending_logout and the log line; after a logout, the boot logs
+  "macOS turned on the 'composed' layout" (or "has not turned on", which would refute the
+  documented route: then read P10). Not done, behind the probe: composing into the enabled
+  Ergopti layout in place (route a) only if P8 b shows the new content applies without a logout,
+  and a re-read after the write only if one P9 mechanism passes.
 - **L44** Fixed 6593474037. Wake at 19:46:39 (driver booted 16:54): "Cannot refresh Karabiner
   lease liveness — no live generation exists" and "Wake refresh could not renew the exact
   Karabiner lease liveness", twice each, then the layout refresh retries of L20; nothing
