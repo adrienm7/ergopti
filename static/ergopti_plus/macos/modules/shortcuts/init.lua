@@ -268,7 +268,13 @@ local function recover_layout_rebind()
 		},
 		{
 			name = "keyboard_shortcuts_rebind_recovery",
-			start = KeyboardShortcuts.resume_after_pause or KeyboardShortcuts.start,
+			-- The transaction hands every start its attempt guard. Passed straight
+			-- through, that function reached resume_after_pause() as its config
+			-- candidate, which start() refuses as malformed: every recovery after a
+			-- refused rebind failed and left every shortcut dead (2026-10-28).
+			start = function()
+				return (KeyboardShortcuts.resume_after_pause or KeyboardShortcuts.start)()
+			end,
 			stop = KeyboardShortcuts.pause or KeyboardShortcuts.stop,
 		},
 	})
@@ -422,19 +428,25 @@ function M.rebind_for_layout()
 		return recover_layout_rebind()
 	end
 	if not Bindings.is_started() then return false end
+	-- Break before make across BOTH children: every old-layout registration is
+	-- released before the first new-layout one. A configurable chord still bound
+	-- at its old physical key can hold the very keycode a static chord resolves
+	-- to in the new layout: on 2026-10-28 Ctrl+. (Ergopti '.', keycode 5) was
+	-- still registered when Ctrl+G resolved to keycode 5, and macOS refused it.
 	local committed = run_binding_start_transaction({
 		{
+			name = "keyboard_shortcuts_release",
+			start = function() return KeyboardShortcuts.stop() end,
+			stop = KeyboardShortcuts.pause or KeyboardShortcuts.stop,
+		},
+		{
 			name = "bindings_rebind",
-			start = Bindings.rebind,
+			start = function() return Bindings.rebind() end,
 			stop = Bindings.pause_hotkeys_only or Bindings.pause or Bindings.stop,
 		},
 		{
 			name = "keyboard_shortcuts_rebind",
-			start = function(attempt_is_current)
-				if KeyboardShortcuts.stop() ~= true then return false end
-				if not attempt_is_current() then return false end
-				return KeyboardShortcuts.start()
-			end,
+			start = function() return KeyboardShortcuts.start() end,
 			stop = KeyboardShortcuts.pause or KeyboardShortcuts.stop,
 		},
 	})
