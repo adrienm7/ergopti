@@ -1677,3 +1677,46 @@ helpers.describe("actual Linux top-level boundary facade custody (declared-top-l
 		end
 	end
 end)
+
+-- The recommended-defaults explanation was a group of menu rows: a whole
+-- paragraph in the tray. The Gestures submenu now shows « Infos… », and the click
+-- opens the existing zenity info dialog with the shared note and the Linux reason.
+helpers.describe("Gestures Infos row opens the explanation in a dialog", function()
+	helpers.it("shows no explanation row and opens the zenity info dialog on click", function()
+		local note = i18n.get("menu.gestures.recommended_note")
+		local reason = i18n.get("menu.gestures.recommended_reason_linux")
+		local gestures = nil
+		local label = i18n.get("menu.gestures.title")
+		for _, item in ipairs(build_full_menu(full_context())) do
+			if type(item.title) == "string" and item.title:find(label, 1, true) then gestures = item end
+		end
+		helpers.assert_true(gestures ~= nil and type(gestures.menu) == "table", "the Gestures submenu is built")
+		for _, title in ipairs(all_titles(gestures.menu)) do
+			helpers.assert_true(title ~= note and title ~= reason, "no menu row carries the explanation")
+		end
+		local info = find_item(gestures.menu, i18n.get("menu.gestures.recommended_info"))
+		helpers.assert_true(info ~= nil, "the Infos row is rendered")
+		helpers.assert_type(info.fn, "function")
+
+		-- build_fixture_menu restores the global i18n_safe the builder defines once
+		-- the tray is built; a click runs later, as in production, so it needs one.
+		local commands = {}
+		local real_execute, real_i18n_safe = os.execute, rawget(_G, "i18n_safe")
+		os.execute = function(command)
+			commands[#commands + 1] = command
+			return true
+		end
+		rawset(_G, "i18n_safe", function(key) return i18n.get(key) end)
+		local ok, err = pcall(info.fn)
+		os.execute = real_execute
+		rawset(_G, "i18n_safe", real_i18n_safe)
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(#commands, 1, "one click opens one dialog")
+		helpers.assert_true(commands[1]:find("zenity --info", 1, true) == 1, "the existing info dialog: " .. commands[1])
+		-- shell_quote closes and reopens the quotes around an apostrophe.
+		local unquoted = commands[1]:gsub("'\\''", "'")
+		for _, expected in ipairs({ note, reason, i18n.get("menu.gestures.notify_title") }) do
+			helpers.assert_true(unquoted:find(expected, 1, true) ~= nil, "the dialog shows: " .. expected)
+		end
+	end)
+end)

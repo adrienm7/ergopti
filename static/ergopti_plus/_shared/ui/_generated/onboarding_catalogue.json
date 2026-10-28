@@ -3565,6 +3565,22 @@
 									]
 								},
 								{
+									"path": "gestures.tap_3",
+									"value": "left_click_toggle",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"key": "menu.gestures.tap_3"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.left_click_toggle"
+										}
+									]
+								},
+								{
 									"path": "gestures.tap_4",
 									"value": "win_app_next",
 									"default": "none",

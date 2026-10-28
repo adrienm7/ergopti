@@ -1,15 +1,15 @@
 <script>
-	import Ergopti from '$lib/components/Ergopti.svelte';
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
-	import SFB from '$lib/components/SFB.svelte';
+	import Ergopti from '#lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
+	import SFB from '#lib/components/SFB.svelte';
 
 	import IntroductionTelechargements from './introduction_telechargements.svelte';
 	import InstallationWindows from './installation_windows.svelte';
 	import InstallationMac from './installation_macos.svelte';
 	import InstallationLinux from './installation_linux.svelte';
 
-	import { discordLink } from '$lib/stores_infos.js';
-	import { version } from '$lib/stores_infos.js';
+	import { discordLink } from '#lib/stores_infos.js';
+	import { version } from '#lib/stores_infos.js';
 	import PageWrapper from '../PageWrapper.svelte';
 
 	let versionValue;

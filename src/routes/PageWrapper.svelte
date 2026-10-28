@@ -1,5 +1,5 @@
 <script>
-	import { discordLink } from '$lib/stores_infos.js';
+	import { discordLink } from '#lib/stores_infos.js';
 </script>
 
 <slot name="introduction" />
