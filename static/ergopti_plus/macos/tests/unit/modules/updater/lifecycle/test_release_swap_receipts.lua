@@ -59,14 +59,14 @@ local function with_swap(options, check)
 			local move = dir .. "/move"
 			write(move, "#!/bin/sh\n" .. '[ "$2" = ' .. quote(previous)
 				.. ' ] && ' .. (options.rollback_refused and 'exit 44' or ':') .. "\n"
-				.. '[ \"$2\" = ' .. quote(staged) .. ' ] && exit 45' .. "\n" .. 'exec /bin/mv \"$@\"' .. "\n")
+				.. '[ \"$2\" = ' .. quote(staged) .. ' ] && exit 45' .. "\n" .. 'exec ' .. require("tests.support.release_swap_ports").command() .. ' --release-rename move \"$2\" \"$3\"' .. "\n")
 			assert(shell("chmod +x " .. quote(move)) == 0)
-			script = script:gsub("/bin/mv", function() return move end)
+			script = script:gsub('%"%$launcher%" %"%$rename_flag%" move', function() return move .. " --" end)
 		end
 		local acknowledgement = dir .. "/arming-receipt"
 		local receipt_route = options.arming_refused and " 3>&-" or " 3>" .. quote(acknowledgement)
-		local status, output = shell("/bin/sh -c " .. quote(script) .. " swap 999999999 "
-			.. quote(app) .. " " .. quote(staged) .. " " .. quote(previous) .. receipt_route)
+		local status, output = shell(require("tests.support.release_swap_ports").command() .. " --release-rename lock " .. quote(app)
+			.. " " .. quote(script) .. " 999999999 " .. quote(staged) .. " " .. quote(previous) .. receipt_route)
 		if not options.arming_refused then
 			helpers.assert_eq(read(acknowledgement), "ARMED\n", "the actual worker must acknowledge before moving any app")
 		end

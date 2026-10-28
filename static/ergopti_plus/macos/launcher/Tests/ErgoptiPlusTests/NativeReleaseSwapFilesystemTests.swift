@@ -74,6 +74,16 @@ final class NativeReleaseSwapFilesystemTests: XCTestCase {
 			stderr: try String(contentsOf: errorURL, encoding: .utf8))
 	}
 
+	private func nativeExecutable() throws -> URL {
+		let directory = Bundle(for: NativeReleaseSwapFilesystemTests.self).bundleURL.deletingLastPathComponent()
+		for candidate in [directory.appendingPathComponent("ErgoptiPlus"),
+			directory.deletingLastPathComponent().appendingPathComponent("ErgoptiPlus")] {
+			if FileManager.default.isExecutableFile(atPath: candidate.path) { return candidate }
+		}
+		XCTFail("The exact SwiftPM-built release rename launcher is unavailable")
+		throw CocoaError(.executableNotLoadable)
+	}
+
 	private func canonical(_ path: String) -> String {
 		URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
 	}
@@ -146,6 +156,38 @@ final class NativeReleaseSwapFilesystemTests: XCTestCase {
 	}
 
 
+	func testActualReleaseSwapRefusesConcurrentDestinationsAndSerializesBeforeArming() throws {
+		let root = FileManager.default.temporaryDirectory.appendingPathComponent("ErgoptiConcurrentRelease-" + UUID().uuidString)
+		try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+		var observerRetired = false
+		defer {
+			if fixtureCanRetire && observerRetired {
+				do { try FileManager.default.removeItem(at: root) }
+				catch { XCTFail("The exact concurrent release fixture did not retire") }
+			}
+		}
+		let driver = Self.payloadURL.appendingPathComponent("macos")
+		let probe = driver.appendingPathComponent("tests/support/release_swap_concurrent_probe.py")
+		let executable = try nativeExecutable()
+		let result = try run("/usr/bin/env", arguments: ["python3", "-B", probe.path,
+			driver.path, root.appendingPathComponent("controls").path, "--native-launcher", executable.path], root: root)
+		XCTAssertEqual(result.status, 0, "Every native concurrent publication contract must pass: \(String(decoding: result.output, as: UTF8.self)); \(result.stderr)")
+		guard result.status == 0 else { throw CocoaError(.executableRuntimeMismatch) }
+		observerRetired = true
+		let report = try XCTUnwrap(JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+		XCTAssertEqual(report["native_launcher"] as? String, executable.path)
+		let cases = try XCTUnwrap(report["cases"] as? [[String: Any]])
+		XCTAssertEqual(cases.compactMap { $0["name"] as? String },
+			["backup", "publish", "rollback", "two-installers-before-arming"])
+		for scenario in cases.prefix(3) {
+			XCTAssertEqual(scenario["foreign_identity_preserved"] as? Bool, true)
+			XCTAssertEqual(scenario["nested_source"] as? Bool, false)
+		}
+		let transaction = try XCTUnwrap(cases.last)
+		XCTAssertEqual(transaction["original_restored"] as? Bool, true)
+		XCTAssertEqual(transaction["second_candidate_preserved"] as? Bool, true)
+	}
+
 	func testActualReleaseSwapKeepsSameFilesystemPublicationAndSafeRollback() throws {
 		let root = FileManager.default.temporaryDirectory.appendingPathComponent("ErgoptiReleaseSwap-" + UUID().uuidString)
 		try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
@@ -191,7 +233,7 @@ final class NativeReleaseSwapFilesystemTests: XCTestCase {
 		let controls = root.appendingPathComponent("controls")
 		// A failed observer may have left a descendant or stage: retain the image and root.
 		observerOwnershipUnproven = true
-		let result = try run("/usr/bin/env", arguments: ["python3", "-B", probe.path, "native", source.path, controls.path, mount.path], root: root)
+		let result = try run("/usr/bin/env", arguments: ["python3", "-B", probe.path, "native", source.path, controls.path, mount.path, try nativeExecutable().path], root: root)
 		XCTAssertEqual(result.status, 0, "Every physical swap contract must pass: \(String(decoding: result.output, as: UTF8.self)); \(result.stderr)")
 		guard result.status == 0 else { throw CocoaError(.executableRuntimeMismatch) }
 		let report = try XCTUnwrap(JSONSerialization.jsonObject(with: result.output) as? [String: Any])

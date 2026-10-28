@@ -133,6 +133,10 @@ def run_case(driver, temporary, mode, lua):
         app.mkdir()
         staged.mkdir(parents=True)
         (app / "marker").write_text("installed")
+        sys.path.insert(0, str(driver / "tests/support"))
+        from release_swap_physical_probe import install_launcher
+
+        install_launcher(app)
         (staged / "marker").write_text("chosen")
         opened = root / "opened"
         native_open = root / "open"
