@@ -412,6 +412,7 @@
 		"test:linux-appimage-portability": "node ./tools/test/test-linux-appimage-portability.cjs",
 		"test:linux-install-sandbox": "node ./tools/test/test-linux-install-sandbox.cjs",
 		"test:linux-source-toolchain": "node ./tools/test/test-linux-source-toolchain.cjs",
+		"test:linux-runner-private-output": "node ./tools/test/test-linux-runner-private-output.cjs",
 		"test:opensuse-first-install-tooling": "node ./tools/test/test-opensuse-first-install-tooling.cjs",
 		"test:linux-package-setup": "node ./tools/test/test-linux-package-setup.cjs",
 		"test:linux-start-at-login": "node ./tools/test/test-linux-start-at-login.cjs",

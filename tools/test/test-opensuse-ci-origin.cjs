@@ -64,7 +64,7 @@ console.log('[OK] openSUSE CI package installs use the coherent download origin.
 // must exist uniquely, so this controlled fixture cannot mutate the host.
 const os = require('os');
 const { spawnSync } = require('child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const toolingHarness = fs.readFileSync(
 	path.join(ROOT, 'static/ergopti_plus/linux/tests/distro/e2e_install.sh'),
 	'utf8'
@@ -90,13 +90,6 @@ assert.strictEqual(
 	'the real tooling call exists uniquely'
 );
 const toolingFunctions = toolingPhase.slice(0, toolingPhase.indexOf(setupBoundary));
-
-function bashPath(value) {
-	const normalized = value.replaceAll('\\', '/');
-	return process.platform === 'win32'
-		? normalized.replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`)
-		: normalized;
-}
 
 const expectedArguments = [
 	'--non-interactive',

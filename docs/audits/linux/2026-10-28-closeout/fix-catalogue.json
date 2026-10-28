@@ -1,0 +1,591 @@
+{
+	"historical_catalogue_source_sha256": "f790874fb1d8d4896001c8a5001c36528b4f342df6340f9debb01031fc467541",
+	"atomic_fix_count": 30,
+	"records": [
+		{
+			"sha": "c110df89a4bc9de2d3fc4a085ec1382aeb7d7336",
+			"subject": "test(linux): discover native source trees without LuaFileSystem",
+			"parents": ["85c18592349fe77c3ad891c98dae7f6727963337"],
+			"tree": "ebee39ff19e1df6aff81b227e272cac2213d4654",
+			"committed_paris": "2026-10-27T06:40:34+01:00",
+			"changed_paths": ["tools/test/test-bash-resolution.cjs"],
+			"test_files_changed": ["tools/test/test-bash-resolution.cjs"],
+			"bug": "Native source discovery dropped POSIX backslashes and LF without LuaFileSystem.",
+			"root_cause": "Line-oriented find and separator rewriting treated opaque filenames as text.",
+			"regression_proof": "Ordinary/backslash/LF real trees with and without lfs; complete native inventory and manifest.",
+			"os_scope": "Common Bash fixture; Linux POSIX execution, Windows canonical conversion retained."
+		},
+		{
+			"sha": "4f7f3ca6c8cae064bd1ac571aadf132dd62be9f5",
+			"subject": "fix(linux): retain watcher ownership through runtime cleanup",
+			"parents": ["c110df89a4bc9de2d3fc4a085ec1382aeb7d7336"],
+			"tree": "ae051072fa1fed814595c563299e9329af5e23f2",
+			"committed_paris": "2026-10-27T06:40:35+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/tests/hardware/run_watcher_runtime_retirement.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/lifecycle/test_runtime_guard.lua"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/linux/tests/hardware/run_watcher_runtime_retirement.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/lifecycle/test_runtime_guard.lua"
+			],
+			"bug": "Runtime shutdown claimed completion with two watcher handles still open after a pump error.",
+			"root_cause": "Main dropped the watcher reference before native close acknowledgment.",
+			"regression_proof": "Six stop return/exception cases retain ownership until native retirement and handle drain.",
+			"os_scope": "Linux runtime and watcher lifecycle only."
+		},
+		{
+			"sha": "5385e896fe152304e53cdf540913e878501024f9",
+			"subject": "test(linux): use the canonical system capture clock origin",
+			"parents": ["4f7f3ca6c8cae064bd1ac571aadf132dd62be9f5"],
+			"tree": "9eb2548dc3337f76f71e60ff3793a773e191299d",
+			"committed_paris": "2026-10-27T06:40:35+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/tests/hardware/run_system_event_capture.lua",
+				"static/ergopti_plus/linux/tests/hardware/run_system_event_capture_origin.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keystats/storage/test_sqlite_first_open.lua"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/linux/tests/hardware/run_system_event_capture.lua",
+				"static/ergopti_plus/linux/tests/hardware/run_system_event_capture_origin.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keystats/storage/test_sqlite_first_open.lua"
+			],
+			"bug": "A fixture turned a 120000 ms capture into 119999 ms in SQLite.",
+			"root_cause": "A fabricated fractional monotonic origin violated the canonical Calendar contract.",
+			"regression_proof": "Use Calendar.capture().mono_ms; preserve native duration and existing assertions.",
+			"os_scope": "Linux capture and SQLite fixtures only."
+		},
+		{
+			"sha": "31c063fc73f587a71c4cc0bfa5547ed2acd7db27",
+			"subject": "fix(linux): require successful logger probe allocation",
+			"parents": ["5385e896fe152304e53cdf540913e878501024f9"],
+			"tree": "3c3d9478a423256dd2e682a7da0e5fadbc2f2b94",
+			"committed_paris": "2026-10-27T06:40:35+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/infra/logger_sink.lua",
+				"static/ergopti_plus/linux/tests/hardware/test_logger_probe_exit.py",
+				"static/ergopti_plus/linux/tests/unit/infra/logger/test_logger_sink.lua"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/linux/tests/hardware/test_logger_probe_exit.py",
+				"static/ergopti_plus/linux/tests/unit/infra/logger/test_logger_sink.lua"
+			],
+			"bug": "A failed mktemp probe could write or remove a foreign file or symlink.",
+			"root_cause": "Output was accepted as exclusive ownership without checking allocation success.",
+			"regression_proof": "Real exit-73 child leaves foreign file/symlink intact; successful real allocation is the positive control.",
+			"os_scope": "Linux logger allocation only."
+		},
+		{
+			"sha": "3d1a82dfdccab1ec63863fbcc83f1d555c0893ff",
+			"subject": "fix(linux): derive locale availability from native files",
+			"parents": ["31c063fc73f587a71c4cc0bfa5547ed2acd7db27"],
+			"tree": "09eea961d91b343a6bbb246c9dfffb727ca16873",
+			"committed_paris": "2026-10-27T06:40:35+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/infra/i18n.lua",
+				"static/ergopti_plus/linux/tests/hardware/test_i18n_catalog.py",
+				"static/ergopti_plus/linux/tests/unit/infra/i18n/test_i18n_persistence.lua"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/linux/tests/hardware/test_i18n_catalog.py",
+				"static/ergopti_plus/linux/tests/unit/infra/i18n/test_i18n_persistence.lua"
+			],
+			"bug": "Locale discovery admitted directories, invented LF-delimited languages and partial catalogues.",
+			"root_cause": "Unchecked shell output substituted for native file evidence.",
+			"regression_proof": "Real file enumeration, observation refusal, LF names and file-type controls.",
+			"os_scope": "Linux runtime locale catalogue only."
+		},
+		{
+			"sha": "bad7d74317990e89c3afea002549fb8ff1bd4d9f",
+			"subject": "fix(linux): restore startup preferences after publication failures",
+			"parents": ["3d1a82dfdccab1ec63863fbcc83f1d555c0893ff"],
+			"tree": "bc54ff9b271584762ad28e7ad05c05a9306eb27c",
+			"committed_paris": "2026-10-27T06:40:35+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/install/start_at_login.sh",
+				"tools/test/no-hardcoded-ui-strings-baseline.json",
+				"tools/test/test-linux-start-at-login.cjs"
+			],
+			"test_files_changed": [
+				"tools/test/no-hardcoded-ui-strings-baseline.json",
+				"tools/test/test-linux-start-at-login.cjs"
+			],
+			"bug": "A failed startup publication could leave preferences changed.",
+			"root_cause": "Publication preceded admission and rollback did not restore late refusals.",
+			"regression_proof": "15 source/mode/publication/service-order/recovery scenarios, reconciled with dev i18n.",
+			"os_scope": "Linux installation and start_at_login only."
+		},
+		{
+			"sha": "034e4973696b4aa7dfa625152f18c50536c2896c",
+			"subject": "test(linux): preserve rejected native fixture diagnostics",
+			"parents": ["bad7d74317990e89c3afea002549fb8ff1bd4d9f"],
+			"tree": "32f44b511c8dbd0702ab9caffd5f0c04b6673d23",
+			"committed_paris": "2026-10-27T06:40:35+01:00",
+			"changed_paths": ["tools/test/test-native-pac-source-contract.cjs"],
+			"test_files_changed": ["tools/test/test-native-pac-source-contract.cjs"],
+			"bug": "Native PAC failure diagnostics could disappear before an assertion returned.",
+			"root_cause": "Evidence was emitted after assertions instead of before propagating failure.",
+			"regression_proof": "Real exit-73 and ENOBUFS children retain complete stdout/stderr.",
+			"os_scope": "Common native PAC fixture executed on Linux; no native Mac/Windows claim."
+		},
+		{
+			"sha": "f6bd75fcd2173a70e1b8b091c063348e14680c8e",
+			"subject": "test(linux): isolate missing native XKB includes",
+			"parents": ["034e4973696b4aa7dfa625152f18c50536c2896c"],
+			"tree": "569627ff16fd8c3e31a21473d47c9f6b873faa2f",
+			"committed_paris": "2026-10-27T06:41:19+01:00",
+			"changed_paths": [
+				"docs/memory/linux-web-release.md",
+				"static/ergopti_plus/linux/tests/hardware/test_xkb_native_data.py",
+				"static/ergopti_plus/linux/tests/hardware/test_xkb_source_exit.py",
+				"static/ergopti_plus/linux/tests/unit/adapters/layout/test_keyboard_layout_sources.lua"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/linux/tests/hardware/test_xkb_native_data.py",
+				"static/ergopti_plus/linux/tests/hardware/test_xkb_source_exit.py",
+				"static/ergopti_plus/linux/tests/unit/adapters/layout/test_keyboard_layout_sources.lua"
+			],
+			"bug": "The missing-XKB-data negative control failed on newer libxkbcommon.",
+			"root_cause": "A self-contained keymap needed no include; compiled search paths invalidated the premise.",
+			"regression_proof": "Unique genuinely required include omitted then restored alone; native 1.7/1.13 and positives preserved.",
+			"os_scope": "Linux XKB data and distro controls only."
+		},
+		{
+			"sha": "269ae28451c3bbe2441c236d589ca3708f93a88d",
+			"subject": "test(linux): retain private native network failure evidence",
+			"parents": ["f6bd75fcd2173a70e1b8b091c063348e14680c8e"],
+			"tree": "2baec0ac7f71c4ed0950a95c1f7ea9eb618b59f1",
+			"committed_paris": "2026-10-27T06:41:20+01:00",
+			"changed_paths": [
+				"tools/test/run-linux-network-runtime.cjs",
+				"tools/test/test-linux-network-runtime-registration.cjs"
+			],
+			"test_files_changed": [
+				"tools/test/run-linux-network-runtime.cjs",
+				"tools/test/test-linux-network-runtime-registration.cjs"
+			],
+			"bug": "Native network failures lost status, signal, PID, errors and captured bytes.",
+			"root_cause": "The gate replaced child receipts with a fixed generic message.",
+			"regression_proof": "Seven actual controls: exit73, SIGTERM, ENOBUFS, ENOENT, false receipt, empty buffer and umask.",
+			"os_scope": "Linux native network evidence only."
+		},
+		{
+			"sha": "469dd7e8d1e5853a2f5a8fb445be930c47d0db92",
+			"subject": "test(linux): stage native proxy policy before schema admission",
+			"parents": ["269ae28451c3bbe2441c236d589ca3708f93a88d"],
+			"tree": "088b735c411ec814685fa649c2b302ca392d10cd",
+			"committed_paris": "2026-10-27T06:41:20+01:00",
+			"changed_paths": ["tools/test/test-linux-network-runtime.cjs"],
+			"test_files_changed": ["tools/test/test-linux-network-runtime.cjs"],
+			"bug": "The schema-absence control failed at an unrelated prerequisite.",
+			"root_cause": "The fixture omitted the canonical proxy policy before schema/backend admission.",
+			"regression_proof": "Real policy absence followed by canonical copy reaches the original backend refusal; four native groups retained.",
+			"os_scope": "Linux native network fixture only."
+		},
+		{
+			"sha": "4a0ded6869281587d98a1160af006446294c90d6",
+			"subject": "test(linux): preserve native paths across Bash fixture boundaries",
+			"parents": ["469dd7e8d1e5853a2f5a8fb445be930c47d0db92"],
+			"tree": "6e7e3d9f0886b1f73320d955f2949614d09fde62",
+			"committed_paris": "2026-10-27T06:41:20+01:00",
+			"changed_paths": [
+				"tools/lib/git-bash.cjs",
+				"tools/test/fixtures/linux-native-bin-parents.py",
+				"tools/test/test-bash-resolution.cjs",
+				"tools/test/test-linux-canonical-pack-upgrade.cjs",
+				"tools/test/test-linux-install-layout-registry.cjs",
+				"tools/test/test-linux-launcher-deps.cjs",
+				"tools/test/test-linux-network-runtime.cjs",
+				"tools/test/test-linux-package-setup.cjs",
+				"tools/test/test-linux-portable-network-runtime.cjs",
+				"tools/test/test-linux-source-toolchain.cjs",
+				"tools/test/test-linux-tracked-copy.cjs",
+				"tools/test/test-linux-tray-icon-assets.cjs",
+				"tools/test/test-linux-uninstall-sandbox.cjs"
+			],
+			"test_files_changed": [
+				"tools/test/fixtures/linux-native-bin-parents.py",
+				"tools/test/test-bash-resolution.cjs",
+				"tools/test/test-linux-canonical-pack-upgrade.cjs",
+				"tools/test/test-linux-install-layout-registry.cjs",
+				"tools/test/test-linux-launcher-deps.cjs",
+				"tools/test/test-linux-network-runtime.cjs",
+				"tools/test/test-linux-package-setup.cjs",
+				"tools/test/test-linux-portable-network-runtime.cjs",
+				"tools/test/test-linux-source-toolchain.cjs",
+				"tools/test/test-linux-tracked-copy.cjs",
+				"tools/test/test-linux-tray-icon-assets.cjs",
+				"tools/test/test-linux-uninstall-sandbox.cjs"
+			],
+			"bug": "Ten Bash fixture callers corrupted valid POSIX paths.",
+			"root_cause": "Callers duplicated conversion and rewrote backslashes before real producers.",
+			"regression_proof": "Old-red/new-green ordinary/backslash/LF paths, canonical Bash owner and original assertions.",
+			"os_scope": "Common path boundary; POSIX bytes and Windows conversion each retain their native contract."
+		},
+		{
+			"sha": "ad48b02839496bcb2010a1c9cb849725021fda8a",
+			"subject": "fix(linux): preserve native paths when copying tar payloads",
+			"parents": ["4a0ded6869281587d98a1160af006446294c90d6"],
+			"tree": "88d271ec9579b471dedb166d3e243762a072a14e",
+			"committed_paris": "2026-10-27T06:41:20+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/install.sh",
+				"static/ergopti_plus/linux/tests/hardware/run_updater_live.sh"
+			],
+			"test_files_changed": ["static/ergopti_plus/linux/tests/hardware/run_updater_live.sh"],
+			"bug": "Tar payload copying failed on backslash paths and could proceed after archive refusal.",
+			"root_cause": "GNU tar interpreted backslashes in -C and the live wrapper did not enforce the pipeline receipt.",
+			"regression_proof": "Native chdir before tar; creation/extraction/redirection refusals stop before install; genuine payload witnesses.",
+			"os_scope": "Linux payload copy and live wrapper only."
+		},
+		{
+			"sha": "7aa55a1e2d7b2ebc0a5ab04a7bd6ad621032547f",
+			"subject": "fix(linux): restore owned files after failed uninstall",
+			"parents": ["ad48b02839496bcb2010a1c9cb849725021fda8a"],
+			"tree": "540011e7d48c016c5c868fca46ab8a2c3c333045",
+			"committed_paris": "2026-10-27T06:41:20+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/uninstall.sh",
+				"tools/test/linux_uninstall_transaction_test.py",
+				"tools/test/test-linux-uninstall-sandbox.cjs"
+			],
+			"test_files_changed": [
+				"tools/test/linux_uninstall_transaction_test.py",
+				"tools/test/test-linux-uninstall-sandbox.cjs"
+			],
+			"bug": "Late uninstall refusal could remove runtime files and the uninstaller itself.",
+			"root_cause": "Owned files were not retained through transaction completion; incomplete observation was treated as absence.",
+			"regression_proof": "13 native EACCES/inaccessible-source/snapshot/restoration/retry tests using the installed worker.",
+			"os_scope": "Linux uninstaller transaction only."
+		},
+		{
+			"sha": "c3a0f409ffb9c2672c2413995457b1af6b9d5475",
+			"subject": "test(linux): isolate instrumentation logger identities",
+			"parents": ["643c443247eff5118df4a8584394b52bda3ea30f"],
+			"tree": "49dc2c9ffd3f19e4a6e56b2df57b3660af297a08",
+			"committed_paris": "2026-10-28T11:54:22+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/tests/meta/harness/test_logger_fixture_identity.lua",
+				"static/ergopti_plus/linux/tests/support/logger_fixture.lua",
+				"static/ergopti_plus/linux/tests/test_manifest.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/lifecycle/test_boot_profiler_summary.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/test_perf_counters.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/test_phase_stats.lua"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/linux/tests/meta/harness/test_logger_fixture_identity.lua",
+				"static/ergopti_plus/linux/tests/support/logger_fixture.lua",
+				"static/ergopti_plus/linux/tests/test_manifest.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/lifecycle/test_boot_profiler_summary.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/test_perf_counters.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/test_phase_stats.lua"
+			],
+			"bug": "Instrumentation tests depended on execution order and observed a different logger from the real guard.",
+			"root_cause": "Three fixtures replaced logger identities without restoring private consumers.",
+			"regression_proof": "Original full suite 19811 pass/1 fail; three causal reproductions; seven cold/warm/exception regressions.",
+			"os_scope": "Linux instrumentation fixtures; production unchanged."
+		},
+		{
+			"sha": "a40f6e93f7bfd368b4f6501076c2367b193e4ff2",
+			"subject": "fix(linux): handle help before acquiring launcher resources",
+			"parents": ["b44fe2a6a757a3eb1d90972d31c740b382473c0c"],
+			"tree": "5172d95c6078822af3c8dead4fd0119babf75bb6",
+			"committed_paris": "2026-10-28T12:39:52+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/install/launch.sh",
+				"tools/test/test-linux-package-setup.cjs"
+			],
+			"test_files_changed": ["tools/test/test-linux-package-setup.cjs"],
+			"bug": "Requesting help with tray could start systemd or request privilege.",
+			"root_cause": "Help classification occurred after service/polkit/group acquisition.",
+			"regression_proof": "Old launcher starts service or calls pkexec then exits78; 48 added scenarios and 12 real Bash-to-LuaJIT help paths.",
+			"os_scope": "Linux launcher only; help requires no system resource acquisition."
+		},
+		{
+			"sha": "eaa1337e2c27b40cc5cf23ca741a569bdf56f4ba",
+			"subject": "test(linux): preserve managed Python fixture path bytes",
+			"parents": ["a40f6e93f7bfd368b4f6501076c2367b193e4ff2"],
+			"tree": "b105bd97b86344bda40e05d927130e6411f2ec8b",
+			"committed_paris": "2026-10-28T12:45:14+01:00",
+			"changed_paths": ["tools/test/test-managed-python-release.cjs"],
+			"test_files_changed": ["tools/test/test-managed-python-release.cjs"],
+			"bug": "Managed-Python fixtures rejected valid backslash paths.",
+			"root_cause": "Three local conversions bypassed the canonical Bash path owner.",
+			"regression_proof": "Old real Bash exit127; 18 corrected ordinary/backslash/LF calls with architecture/refusal assertions retained.",
+			"os_scope": "Common Bash fixture; POSIX preservation and Windows conversion retained."
+		},
+		{
+			"sha": "da169ee7baa2a5db525c041e3a8a7ad8b130491e",
+			"subject": "fix(linux): propagate updater cadence scheduling refusals",
+			"parents": ["eaa1337e2c27b40cc5cf23ca741a569bdf56f4ba"],
+			"tree": "c5dc31db916b44dc1bc34707409690338b21b42d",
+			"committed_paris": "2026-10-28T12:46:35+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/tests/unit/ui/menu/about/test_about_menu_channel_rows.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_builder.lua"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/linux/tests/unit/ui/menu/about/test_about_menu_channel_rows.lua"
+			],
+			"bug": "Update cadence menus reported success after timer retirement/replacement refusal.",
+			"root_cause": "The callback ignored stop/start receipts and duplicated cancellation already owned by start.",
+			"regression_proof": "Four old-red/new-green false/nil/text stop and unarmed replacement controls; durable preference receipt retained.",
+			"os_scope": "Linux timer/menu owner; analogous Mac source remains an unproved candidate."
+		},
+		{
+			"sha": "1435f10cc82c44ca02aef26b6ee8354a0ef689d5",
+			"subject": "fix(linux): preserve source watcher path boundaries",
+			"parents": ["da169ee7baa2a5db525c041e3a8a7ad8b130491e"],
+			"tree": "e8395d195ad04d8a8d36fc15427435e45e2ccba5",
+			"committed_paris": "2026-10-28T12:50:27+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/infra/file_watchers.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/config/test_file_watchers_dev_source.lua"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/linux/tests/unit/infra/config/test_file_watchers_dev_source.lua"
+			],
+			"bug": "Nested source edits did not restart a daemon under an LF-containing root.",
+			"root_cause": "find -print and line readers split filenames and discarded child status.",
+			"regression_proof": "Polling and genuine inotify reproduction; nine regressions, eight old-red; Lua5.4 targeted 9/9.",
+			"os_scope": "Linux source watcher only."
+		},
+		{
+			"sha": "31a22b607a9ef32897e13a21e09c620c6e32262b",
+			"subject": "test(linux): preserve native paths across Bash fixture consumers",
+			"parents": ["6a1bd2aa2d019e6a517647f69317ce0fb927e254"],
+			"tree": "a14802ec5a963716d12caffae1992c26c890d397",
+			"committed_paris": "2026-10-28T13:26:39+01:00",
+			"changed_paths": [
+				"tools/test/test-app-cloner-generated-literals.cjs",
+				"tools/test/test-app-cloner-shortcut-maximize.cjs",
+				"tools/test/test-automation-query-ci-publisher.cjs",
+				"tools/test/test-bash-resolution.cjs",
+				"tools/test/test-layouts-defaults-single-source.cjs",
+				"tools/test/test-macos-keyboard-layout-bundle.cjs",
+				"tools/test/test-macos-launcher-universal.cjs",
+				"tools/test/test-macos-remap-launchagent.cjs",
+				"tools/test/test-macos-sparkle-disarmed-bundles.cjs",
+				"tools/test/test-macos-sparkle-feed.cjs",
+				"tools/test/test-macos-stable-signing-identity.cjs",
+				"tools/test/test-ollama-bootstrap-network-hardening.cjs",
+				"tools/test/test-opensuse-ci-origin.cjs",
+				"tools/test/test-opensuse-first-install-tooling.cjs",
+				"tools/test/test-swift-xctest-evidence.cjs"
+			],
+			"test_files_changed": [
+				"tools/test/test-app-cloner-generated-literals.cjs",
+				"tools/test/test-app-cloner-shortcut-maximize.cjs",
+				"tools/test/test-automation-query-ci-publisher.cjs",
+				"tools/test/test-bash-resolution.cjs",
+				"tools/test/test-layouts-defaults-single-source.cjs",
+				"tools/test/test-macos-keyboard-layout-bundle.cjs",
+				"tools/test/test-macos-launcher-universal.cjs",
+				"tools/test/test-macos-remap-launchagent.cjs",
+				"tools/test/test-macos-sparkle-disarmed-bundles.cjs",
+				"tools/test/test-macos-sparkle-feed.cjs",
+				"tools/test/test-macos-stable-signing-identity.cjs",
+				"tools/test/test-ollama-bootstrap-network-hardening.cjs",
+				"tools/test/test-opensuse-ci-origin.cjs",
+				"tools/test/test-opensuse-first-install-tooling.cjs",
+				"tools/test/test-swift-xctest-evidence.cjs"
+			],
+			"bug": "Fourteen more Common fixtures corrupted POSIX path bytes.",
+			"root_cause": "Local Bash conversion also confused the native path grammars consumed by Node, CPython and Lua.",
+			"regression_proof": "14 actual targets: old ordinary passes/backslash fails; all28 corrected paths pass, physical guards and Windows/POSIX boundary models.",
+			"os_scope": "Common fixtures; Windows grammar modeled, no native Windows/Mac run claimed."
+		},
+		{
+			"sha": "de95505f346667dcf06f18f00ec08ad4185f3fdd",
+			"subject": "fix(linux): preserve native digest fixture root paths",
+			"parents": ["db4ab02502a86296741684913090dab8d61f78cf"],
+			"tree": "6663543b11f44783147ce4f2abf39f6bf7cc0f66",
+			"committed_paris": "2026-10-28T13:44:02+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/tests/hardware/run_fd_sha256_native.lua",
+				"tools/test/run-linux-fd-sha256-native.cjs"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/linux/tests/hardware/run_fd_sha256_native.lua",
+				"tools/test/run-linux-fd-sha256-native.cjs"
+			],
+			"bug": "The native digest helper failed standalone and on valid backslash checkouts.",
+			"root_cause": "It normalized POSIX root bytes and relied on caller LUA_PATH to hide missing bootstrap.",
+			"regression_proof": "Old standalone red; canonical bootstrap; three real ordinary/backslash/LF roots before12 unchanged native NIST/retirement controls,29 contract/model controls.",
+			"os_scope": "Linux native digest helper only."
+		},
+		{
+			"sha": "7c3b188d71bceb44a101989fd1c3a82249d29a92",
+			"subject": "chore(macos): clarify layout field probe comments",
+			"parents": ["3c512a1d115130844998770a8f6903da6d5b4997"],
+			"tree": "91403495633e6287cc6cc672cc8bc355444fbf4c",
+			"committed_paris": "2026-10-28T15:01:41+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/macos/modules/keymap/input_sources.lua",
+				"static/ergopti_plus/macos/modules/keymap/layout_registry.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_install_transaction.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_registry.lua"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_install_transaction.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_registry.lua"
+			],
+			"bug": "Four valid Mac probe comments failed the Common plan-reference guard.",
+			"root_cause": "Opaque P0/P5/P10 labels resembled forbidden planning references.",
+			"regression_proof": "Unchanged guard old-red/new-green; comments-only edit and80 layout/install Lua cases.",
+			"os_scope": "Mac comments scanned by Common; no product behavior changed."
+		},
+		{
+			"sha": "8047bd4aae5aa179cfe236966d0400b603b1922a",
+			"subject": "refactor(macos): share sorted pending shortcut keys",
+			"parents": ["7c3b188d71bceb44a101989fd1c3a82249d29a92"],
+			"tree": "fac1b86527f27eeb25172b6cbef1617143c3eda5",
+			"committed_paris": "2026-10-28T15:06:44+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/macos/modules/shortcuts/bindings.lua",
+				"static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua"
+			],
+			"test_files_changed": [],
+			"bug": "Two shortcut retry owners failed the Common single-use helper gate.",
+			"root_cause": "Each duplicated pairs-plus-sort despite importing TableUtil.",
+			"regression_proof": "Unchanged gate old-red/new-green;8192 differential comparisons and6+3+18 owner cases plus8 helper contracts.",
+			"os_scope": "Mac call sites only; shared helper already used by Linux unchanged."
+		},
+		{
+			"sha": "43ef681018f2813878616182649b1d00624f60b8",
+			"subject": "test(linux): separate Arch daemon and help launch contracts",
+			"parents": ["8047bd4aae5aa179cfe236966d0400b603b1922a"],
+			"tree": "40b631ff0165d51eb5134ef38918f8fd46975fc6",
+			"committed_paris": "2026-10-28T15:10:48+01:00",
+			"changed_paths": ["tools/test/test-linux-arch-package.cjs"],
+			"test_files_changed": ["tools/test/test-linux-arch-package.cjs"],
+			"bug": "The Arch fixture demanded daemon side effects while asking only for help.",
+			"root_cause": "It conflated pure help with real startup and left three relocation shell boundaries unquoted.",
+			"regression_proof": "Old ordinary3/backslash4 failures; old launcher fails new help assertion;20 corrected executions and12 packaged help paths.",
+			"os_scope": "Linux Arch install/launcher fixture, no real pacman or keyboard claim."
+		},
+		{
+			"sha": "58cee83b629416a77cc9343382bf68270da6e32e",
+			"subject": "fix(timings): centralize input-source refresh waits",
+			"parents": ["43ef681018f2813878616182649b1d00624f60b8"],
+			"tree": "6fc405ace0c550316e332cae8dbd3ae7ff51f8cd",
+			"committed_paris": "2026-10-28T15:14:39+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/_shared/modules/timings/constants.toml",
+				"static/ergopti_plus/macos/modules/keymap/input_sources.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_input_sources_bounded_mutations.lua",
+				"tools/test/fixtures/input-source-confirm-refresh.py",
+				"tools/test/test-input-source-python-supervisor.cjs"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_input_sources_bounded_mutations.lua",
+				"tools/test/fixtures/input-source-confirm-refresh.py",
+				"tools/test/test-input-source-python-supervisor.cjs"
+			],
+			"bug": "Two literal TIS refresh waits failed the Common timer gate.",
+			"root_cause": "The Python worker duplicated a duration rather than accepting the shared timing registry.",
+			"regression_proof": "Unchanged gate catches both literals; new argv assertion red on old worker; exact0.3s retained; Lua receipt and19 Python models.",
+			"os_scope": "Only Mac loads Carbon; Common registry checks apply across hosts; no threshold raised."
+		},
+		{
+			"sha": "c8469be95413cea2e43132a29adff76b9ef6e36c",
+			"subject": "test(linux): keep malformed onboarding labels valid UTF-8",
+			"parents": ["febebe3b7fff5acb9f541dd229bbe09d9d1a32e8"],
+			"tree": "e60f5ead164cb27518e9c0f99395d9ea738cc930",
+			"committed_paris": "2026-10-28T15:37:19+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/tests/meta/harness/test_runner_integrity.lua",
+				"static/ergopti_plus/linux/tests/unit/ui/editors/test_ui_bridge_handlers_onboarding.lua"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/linux/tests/meta/harness/test_runner_integrity.lua",
+				"static/ergopti_plus/linux/tests/unit/ui/editors/test_ui_bridge_handlers_onboarding.lua"
+			],
+			"bug": "Malformed onboarding subjects leaked invalid UTF-8 through their diagnostic names.",
+			"root_cause": "LuaJIT percent-q preserved invalid bytes in timing labels; an initial pclose check also missed late failure.",
+			"regression_proof": "Old output fails strict UTF-8;20 cases/825 frames pass; genuine825-frame child exiting73 is rejected.",
+			"os_scope": "Linux tests only; eight malformed test subjects and assertion bodies retained."
+		},
+		{
+			"sha": "d216ef460479a3289f023d119b43906ff9659a3e",
+			"subject": "test(menu): follow the enabled layout confirmation owner",
+			"parents": ["7d5f77ae40c426161cebe04644e77dfd74100ef0"],
+			"tree": "08ae102466c331cd556bf8664d7b8076d45a5bb4",
+			"committed_paris": "2026-10-28T16:00:43+01:00",
+			"changed_paths": [
+				"tools/lib/menu-native-layout-binding.cjs",
+				"tools/test/test-menu-action-handler-bijection.cjs",
+				"tools/test/test-menu-category-coverage.cjs"
+			],
+			"test_files_changed": [
+				"tools/test/test-menu-action-handler-bijection.cjs",
+				"tools/test/test-menu-category-coverage.cjs"
+			],
+			"bug": "Two Common menu guards rejected the current valid enabled-layout confirmation owner.",
+			"root_cause": "The finite publication model still expected confirm_source_async instead of confirm_enabled_async.",
+			"regression_proof": "Both actual old guards red/new green; seven source mutations per guard plus14 existing negatives retained.",
+			"os_scope": "Common tests inspect all drivers; production unchanged."
+		},
+		{
+			"sha": "b726aab8f76da1579411c6987c18862f0731f699",
+			"subject": "fix(test): reject malformed UTF-8 timing records",
+			"parents": ["c1b3fbe1db2669442033530ecbbadb05270960f0"],
+			"tree": "46b872b0d2f63c1732575d2ba38e2f482e7553a2",
+			"committed_paris": "2026-10-28T17:20:38+01:00",
+			"changed_paths": ["tools/test/report.cjs", "tools/test/test-report.cjs"],
+			"test_files_changed": ["tools/test/report.cjs", "tools/test/test-report.cjs"],
+			"bug": "Malformed UTF-8 lua_timing records were silently counted as valid machine receipts.",
+			"root_cause": "StringDecoder/file UTF-8 decoding replaced bytes before JSON admission.",
+			"regression_proof": "Original825-frame capture now admits823 and reports2 errors/exit1; identical50 vectors expose25 old violations and zero new;469 assertions.",
+			"os_scope": "Shared Lua reporter; actual Windows TAP, human bytes and stderr contract retained."
+		},
+		{
+			"sha": "13f2d9b584a40f0ba226eb973a3a885cd639f245",
+			"subject": "fix(linux): isolate private runner fixture output",
+			"parents": ["b726aab8f76da1579411c6987c18862f0731f699"],
+			"tree": "c8f360eae9e5b7601c01c2f5706118400217ebc7",
+			"committed_paris": "2026-10-28T18:02:00+01:00",
+			"changed_paths": [
+				"static/ergopti_plus/linux/tests/meta/harness/test_runner_integrity.lua",
+				"tools/test/features/test-infrastructure/suite.json",
+				"tools/test/test-linux-runner-private-output.cjs"
+			],
+			"test_files_changed": [
+				"static/ergopti_plus/linux/tests/meta/harness/test_runner_integrity.lua",
+				"tools/test/features/test-infrastructure/suite.json",
+				"tools/test/test-linux-runner-private-output.cjs"
+			],
+			"bug": "A deliberately failing private helper contaminated successful canonical runner output.",
+			"root_cause": "Fresh private helper shared global print, leaking FAIL and nested headers despite a green outer tally.",
+			"regression_proof": "Old real runner0 but receiver1; three canonical controls/seven child-receiver observations including genuine Lua5.4+compiled luv only; real outer failure remains fatal.",
+			"os_scope": "Linux fixture only; no parser or product semantics changed."
+		},
+		{
+			"sha": "5d0bf5fbb44f972b40494d99672b2c34a32e3f3f",
+			"subject": "test(linux): expose the runner output gate through npm",
+			"parents": ["fe6bf82f1d4f12e575217f8838e4315e66b6e0ac"],
+			"tree": "f4d4b20f41934bb76615062ad405e5e0b5443d8f",
+			"committed_paris": "2026-10-28T18:47:23+01:00",
+			"changed_paths": ["package.json"],
+			"test_files_changed": [],
+			"bug": "The new runner-output gate was registered without its mandatory npm alias.",
+			"root_cause": "Suite registration and package script parity diverged.",
+			"regression_proof": "Existing parity gate old1/new0; seven targeted gates and actual npm execution of three controls pass.",
+			"os_scope": "Linux npm gate entry only."
+		},
+		{
+			"sha": "b49ab43c850467e914ddebf0b8259c57b3590451",
+			"subject": "test(menu): follow the generated gesture information command",
+			"parents": ["9b3f03f3ba9a202f69e4f7dcc248541b9092fad2"],
+			"tree": "66d7a8744e68726c860b7c7d63ed962d485f5ef4",
+			"committed_paris": "2026-10-28T21:23:13+01:00",
+			"changed_paths": ["tools/test/test-recommended-defaults-rule.cjs"],
+			"test_files_changed": ["tools/test/test-recommended-defaults-rule.cjs"],
+			"bug": "The Common recommended-defaults guard rejected the valid Windows gesture information registration inherited from dev.",
+			"root_cause": "A source-pattern assertion still required the retired raw string after production moved to the existing generated MenuCommand.GESTURE_RECOMMENDED_INFO constant.",
+			"regression_proof": "Actual whole Common check487 and direct old-source target failed with registration assertion/exit1. The one-line expected registration pattern now follows the generated constant; the unchanged target passes. Seven targeted verification commands and normal hooks passed. No defaults, gesture processing, thresholds or production code changed.",
+			"os_scope": "Common source-contract test for Windows registration; Mac and Linux registration assertions retained. No native Windows execution claimed."
+		}
+	]
+}

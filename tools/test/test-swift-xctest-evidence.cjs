@@ -24,7 +24,7 @@ const validateTIS = (root, session) =>
 		: nativeValidateTIS(root, session);
 const pipeline = require('./ci-full-default.cjs');
 const macRole = require('./fixtures/macos-stage-source.cjs');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const repository = path.resolve(__dirname, '../..');
 const file = path.join(
@@ -472,21 +472,19 @@ try {
 			env: {
 				...process.env,
 				SWIFT_FIXTURE_PLATFORM: process.platform,
-				SWIFT_FIXTURE_NODE: process.execPath.replaceAll('\\', '/'),
-				SWIFT_FIXTURE_TIS_PORT: path
-					.join(__dirname, 'fixtures/tis_fixture_metadata_port.cjs')
-					.replaceAll('\\', '/'),
-				SWIFT_FIXTURE_PYTHON_PORT: path
-					.join(__dirname, 'fixtures/swift_workflow_checkpoint_port.py')
-					.replaceAll('\\', '/'),
-				SWIFT_FIXTURE_PYTHON_BODY: path
-					.join(fixture, 'workflow-publisher.py')
-					.replaceAll('\\', '/'),
-				SWIFT_FIXTURE_PYTHON: pythonExecutable.replaceAll('\\', '/'),
-				RUNNER_TEMP: fixture.replaceAll('\\', '/'),
-				GITHUB_OUTPUT: path.join(fixture, 'step-outputs').replaceAll('\\', '/'),
-				SWIFT_FIXTURE_PUBLISHER: fixturePublisher.replaceAll('\\', '/'),
-				SWIFT_FIXTURE_LOG: log.replaceAll('\\', '/'),
+				SWIFT_FIXTURE_NODE: bashPath(process.execPath),
+				SWIFT_FIXTURE_TIS_PORT: bashPath(
+					path.join(__dirname, 'fixtures/tis_fixture_metadata_port.cjs')
+				),
+				SWIFT_FIXTURE_PYTHON_PORT: bashPath(
+					path.join(__dirname, 'fixtures/swift_workflow_checkpoint_port.py')
+				),
+				SWIFT_FIXTURE_PYTHON_BODY: path.join(fixture, 'workflow-publisher.py'),
+				SWIFT_FIXTURE_PYTHON: bashPath(pythonExecutable),
+				RUNNER_TEMP: fixture.split(path.sep).join('/'),
+				GITHUB_OUTPUT: path.join(fixture, 'step-outputs').split(path.sep).join('/'),
+				SWIFT_FIXTURE_PUBLISHER: bashPath(fixturePublisher),
+				SWIFT_FIXTURE_LOG: bashPath(log),
 				SWIFT_FIXTURE_SCRIPT_STATUS: String(script),
 				SWIFT_FIXTURE_TEE_STATUS: String(tee)
 			},
@@ -747,19 +745,19 @@ try {
 			env: {
 				...process.env,
 				SWIFT_FIXTURE_PLATFORM: process.platform,
-				SWIFT_FIXTURE_NODE: process.execPath.replaceAll('\\', '/'),
-				SWIFT_FIXTURE_TIS_PORT: path
-					.join(__dirname, 'fixtures/tis_fixture_metadata_port.cjs')
-					.replaceAll('\\', '/'),
-				SWIFT_FIXTURE_PYTHON_PORT: path
-					.join(__dirname, 'fixtures/swift_workflow_checkpoint_port.py')
-					.replaceAll('\\', '/'),
-				SWIFT_FIXTURE_PYTHON_BODY: path.join(runner, 'workflow-publisher.py').replaceAll('\\', '/'),
-				SWIFT_FIXTURE_PYTHON: pythonExecutable.replaceAll('\\', '/'),
-				RUNNER_TEMP: runner.replaceAll('\\', '/'),
-				GITHUB_OUTPUT: path.join(runner, 'outputs').replaceAll('\\', '/'),
-				SWIFT_FIXTURE_PUBLISHER: producer.replaceAll('\\', '/'),
-				SWIFT_FIXTURE_LOG: transcript.replaceAll('\\', '/')
+				SWIFT_FIXTURE_NODE: bashPath(process.execPath),
+				SWIFT_FIXTURE_TIS_PORT: bashPath(
+					path.join(__dirname, 'fixtures/tis_fixture_metadata_port.cjs')
+				),
+				SWIFT_FIXTURE_PYTHON_PORT: bashPath(
+					path.join(__dirname, 'fixtures/swift_workflow_checkpoint_port.py')
+				),
+				SWIFT_FIXTURE_PYTHON_BODY: path.join(runner, 'workflow-publisher.py'),
+				SWIFT_FIXTURE_PYTHON: bashPath(pythonExecutable),
+				RUNNER_TEMP: runner.split(path.sep).join('/'),
+				GITHUB_OUTPUT: path.join(runner, 'outputs').split(path.sep).join('/'),
+				SWIFT_FIXTURE_PUBLISHER: bashPath(producer),
+				SWIFT_FIXTURE_LOG: bashPath(transcript)
 			},
 			encoding: 'utf8'
 		});

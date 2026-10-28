@@ -1,0 +1,253 @@
+{
+	"recorded_paris": "2026-10-28T21:04:46+01:00",
+	"source_observed": "d80243b30d3647e07e1290e7430c0a18eea8afeb",
+	"dev_merged": "18d69a24c06586186a221c1afb5ce703732ac4a1",
+	"atomic_fix_count": 30,
+	"reserved_repairs": "already inherited from dev; no duplicate patch applied",
+	"final_linux": {
+		"status": "completed",
+		"passed": true,
+		"head": "d80243b30d3647e07e1290e7430c0a18eea8afeb",
+		"tree": "2521d1ab5297f82342a6be9546391346bd3c63c5",
+		"ended_paris": "2026-10-28T21:12:01.951995+01:00",
+		"command_count": 14,
+		"all_commands_exit_zero": true,
+		"source_integrity": true,
+		"tracked_files": 12841,
+		"unit_passed": 19841,
+		"unit_failed": 0,
+		"e2e_passed": 302,
+		"reporter_exit_code": 0,
+		"reporter_failures": 0,
+		"reporter_timing_errors": 0,
+		"native_http_controls": [18, 30],
+		"native_descriptor_controls": 12,
+		"native_descriptor_real_path_controls": 3,
+		"archive_receipt": "evidence/dev-merge-20261028/closeout-20261028/linux-final/report.json"
+	},
+	"final_common": {
+		"status": "terminal",
+		"passed": true,
+		"head": "b49ab43c850467e914ddebf0b8259c57b3590451",
+		"tree": "66d7a8744e68726c860b7c7d63ed962d485f5ef4",
+		"ended_paris": "2026-10-28T21:44:03.989111+01:00",
+		"exit_code": 0,
+		"registered_checks": 530,
+		"completed_checks": 530,
+		"passed_checks": 530,
+		"failed_checks": 0,
+		"source_integrity": true,
+		"explicit_unexecuted_lines": [
+			"1 case(s) in 1 check(s) were NOT EXECUTED on this host:",
+			"  - AHK cases the host cannot run are reported as not executed, never passed (npm run test:ahk-not-executed)"
+		],
+		"raw_stdout_sha256": "4c65d43e410ceadd62c88855b7316ba71b7d0e7d31f99038e5faf0d28e645cbe",
+		"archive_receipt": "evidence/dev-merge-20261028/closeout-20261028/common-corrected-final/terminal-receipt.json",
+		"no_native_windows_success_claimed": true
+	},
+	"hosted_ci": {
+		"document_status": "Actual terminal hosted CI result; no local run substituted.",
+		"recorded_paris": "2026-10-28T22:48:32.945319+01:00",
+		"repository": "adrienm7/ergopti",
+		"branch": "fix/linux",
+		"workflow": ".github/workflows/ci.yml",
+		"workflow_id": 284301090,
+		"event": "workflow_dispatch",
+		"os_lanes": "linux",
+		"run_id": 40766890057,
+		"run_attempt": 1,
+		"run_url": "https://github.com/adrienm7/ergopti/actions/runs/40766890057",
+		"tested_source_sha": "55a50835be9e027ec9cbe43ac5d1c693c6ff711f",
+		"status": "completed",
+		"conclusion": "failure",
+		"qualified_green": false,
+		"created_paris": "2026-10-28T21:50:51+01:00",
+		"run_started_paris": "2026-10-28T21:50:51+01:00",
+		"run_updated_paris": "2026-10-28T22:39:37+01:00",
+		"terminal_observed_paris": "2026-10-28T22:39:49.316975+01:00",
+		"last_job_completed_paris": "2026-10-28T22:39:37+01:00",
+		"job_count": 69,
+		"job_conclusion_counts": {
+			"success": 62,
+			"skipped": 3,
+			"failure": 4
+		},
+		"required_verdicts": {
+			"Common / Verdict (All mandatory results)": [
+				{
+					"id": 123106310563,
+					"status": "completed",
+					"conclusion": "success"
+				}
+			],
+			"Linux / Verdict (All mandatory results)": [
+				{
+					"id": 123117191122,
+					"status": "completed",
+					"conclusion": "failure"
+				}
+			],
+			"Release / Verify all lanes and original plan": [
+				{
+					"id": 123117363050,
+					"status": "completed",
+					"conclusion": "failure"
+				}
+			]
+		},
+		"jobs_pagination": "The archived monitor uses paginated attempt-specific jobs, rejects duplicate IDs and requires every page total_count to equal the combined job count. The complete combined collection is retained in terminal.json.",
+		"evidence_archive": "ci-evidence.tar.gz",
+		"evidence_manifest": "ci-evidence-manifest.json",
+		"qualification_bound": "This actual CI run validates published 55a50835be9e027ec9cbe43ac5d1c693c6ff711f. A later closing-documentation-only commit is not claimed to have a new hosted execution. The full non-closeout source mode/type/blob mapping is archived.",
+		"linux_install_and_launch": {
+			"job_count": 19,
+			"conclusions": {
+				"success": 17,
+				"failure": 2
+			}
+		},
+		"closeout_decision": {
+			"recorded_paris": "2026-10-28T22:47:24.990733+01:00",
+			"scope": "Close the existing audit and preserve remaining findings, as the user expressly permits TODO handoff before container deletion.",
+			"new_production_changes_after_ci": false,
+			"new_workflow_changes_after_ci": false,
+			"final_ci_run": 40766890057,
+			"final_ci_conclusion": "failure",
+			"atomic_fix_count": 30,
+			"appimage_ci_exception": {
+				"question": "Autorises-tu le patch AppImage CI d\u2019une ligne pr\u00e9sent\u00e9 dans le document de revue : charger l\u2019environnement natif existant d\u2019AppRun au lieu de d\u00e9finir seulement LUA_PATH ? Il conserve l\u2019interpr\u00e9teur livr\u00e9 et toutes les assertions. Sans cette exception \u00e0 ta zone r\u00e9serv\u00e9e `.github/workflows/*`, je le sauvegarderai en TODO et la CI restera rouge.",
+				"suggested_answers": [
+					"Autoriser cette correction CI cibl\u00e9e",
+					"Conserver le patch en TODO sans modifier le workflow"
+				],
+				"status_as_recorded": "No answer received; patch remains unapplied.",
+				"authority": "The user explicitly reserves .github/workflows/* and requests reporting its bugs without correcting them. The earlier exception concerned gesture captions and a Windows command constant only."
+			},
+			"rpm_disposition": "Confirmed mandatory LuaJIT binding packaging/bootstrap gap, preserved with native CI evidence, source hashes and canonical correction options. A coordinated packaging/bootstrap and reserved receiver change remains TODO rather than an unqualified new closeout phase."
+		},
+		"unfixed_linux_causes": [
+			{
+				"kind": "RPM packaging dependency/publication gap",
+				"job_id": 123113887312,
+				"proof": "ci-evidence/rpm-fix/diagnosis.json",
+				"disposition": "TODO; no production change or new CI batch introduced."
+			},
+			{
+				"kind": "AppImage installed-layout CI receiving environment",
+				"job_id": 123113887327,
+				"proof": "ci-evidence/appimage-ci-review/review.md",
+				"patch": "ci-evidence/appimage-ci-review/canonical-native-env-unapplied.patch",
+				"disposition": "Protected workflow exception unanswered; patch remains unapplied."
+			}
+		]
+	},
+	"previous_hosted_run": {
+		"id": 40424391590,
+		"sha": "fe2413797f34653c93d0ed0ad10252cae043994b",
+		"conclusion": "failure"
+	},
+	"remaining_todos": "README.md",
+	"updated_paris": "2026-10-28T22:48:32.945319+01:00",
+	"metadata_only_merge_amendment": {
+		"head": "9b3f03f3ba9a202f69e4f7dcc248541b9092fad2",
+		"tree": "2521d1ab5297f82342a6be9546391346bd3c63c5",
+		"scope": "Full source tree equality; future archive documentation commit is not this test source.",
+		"same_tree_as_actual_linux_and_first_common_test_source": true
+	},
+	"current_code_source": "adccf8b5dc4b55dafc21dda1d1fe7a3f20b9d7ff",
+	"current_code_tree": "66d7a8744e68726c860b7c7d63ed962d485f5ef4",
+	"linux_result_reuse_bound": {
+		"actual_run_head": "d80243b30d3647e07e1290e7430c0a18eea8afeb",
+		"corrected_composition_head": "b49ab43c850467e914ddebf0b8259c57b3590451",
+		"only_changed_path": "tools/test/test-recommended-defaults-rule.cjs",
+		"linux_subtree_same_object": "eff5229a8c4ad8bb7b214e5c6f83ca1e7eed77ef",
+		"no_new_full_linux_run_claimed": true
+	},
+	"first_closeout_common": {
+		"head": "d80243b30d3647e07e1290e7430c0a18eea8afeb",
+		"tree": "2521d1ab5297f82342a6be9546391346bd3c63c5",
+		"ended_paris": "2026-10-28T21:23:29.426741+01:00",
+		"exit_code": 1,
+		"passed_checks": 529,
+		"failed_checks": 1,
+		"total_checks": 530,
+		"failed_ordinal": 487,
+		"source_integrity": true,
+		"archive_receipt": "evidence/dev-merge-20261028/closeout-20261028/common-final/report.json"
+	},
+	"local_linux_and_common_qualification_complete": true,
+	"latest_same_tree_dev_merge": {
+		"recorded_paris": "2026-10-28T21:46:37.062880+01:00",
+		"integrated_head": "adccf8b5dc4b55dafc21dda1d1fe7a3f20b9d7ff",
+		"integrated_subject": "chore(linux): merge the matching upstream menu guard repair",
+		"integrated_parents": [
+			"b49ab43c850467e914ddebf0b8259c57b3590451",
+			"18d69a24c06586186a221c1afb5ce703732ac4a1"
+		],
+		"latest_merged_origin_dev": "18d69a24c06586186a221c1afb5ce703732ac4a1",
+		"actual_common_test_head": "b49ab43c850467e914ddebf0b8259c57b3590451",
+		"actual_common_test_tree": "66d7a8744e68726c860b7c7d63ed962d485f5ef4",
+		"integrated_full_tree": "66d7a8744e68726c860b7c7d63ed962d485f5ef4",
+		"full_tree_exactly_equal": true,
+		"working_tree_clean": true,
+		"upstream_is_ancestor_of_integrated_head": true,
+		"scope": "Read-only Git comparison after the normal merge. No new test execution is claimed for the same-tree merge."
+	},
+	"closeout_decision": {
+		"recorded_paris": "2026-10-28T22:47:24.990733+01:00",
+		"scope": "Close the existing audit and preserve remaining findings, as the user expressly permits TODO handoff before container deletion.",
+		"new_production_changes_after_ci": false,
+		"new_workflow_changes_after_ci": false,
+		"final_ci_run": 40766890057,
+		"final_ci_conclusion": "failure",
+		"atomic_fix_count": 30,
+		"appimage_ci_exception": {
+			"question": "Autorises-tu le patch AppImage CI d\u2019une ligne pr\u00e9sent\u00e9 dans le document de revue : charger l\u2019environnement natif existant d\u2019AppRun au lieu de d\u00e9finir seulement LUA_PATH ? Il conserve l\u2019interpr\u00e9teur livr\u00e9 et toutes les assertions. Sans cette exception \u00e0 ta zone r\u00e9serv\u00e9e `.github/workflows/*`, je le sauvegarderai en TODO et la CI restera rouge.",
+			"suggested_answers": [
+				"Autoriser cette correction CI cibl\u00e9e",
+				"Conserver le patch en TODO sans modifier le workflow"
+			],
+			"status_as_recorded": "No answer received; patch remains unapplied.",
+			"authority": "The user explicitly reserves .github/workflows/* and requests reporting its bugs without correcting them. The earlier exception concerned gesture captions and a Windows command constant only."
+		},
+		"rpm_disposition": "Confirmed mandatory LuaJIT binding packaging/bootstrap gap, preserved with native CI evidence, source hashes and canonical correction options. A coordinated packaging/bootstrap and reserved receiver change remains TODO rather than an unqualified new closeout phase."
+	},
+	"unfixed_linux_causes": [
+		{
+			"kind": "RPM packaging dependency/publication gap",
+			"job_id": 123113887312,
+			"proof": "ci-evidence/rpm-fix/diagnosis.json",
+			"disposition": "TODO; no production change or new CI batch introduced."
+		},
+		{
+			"kind": "AppImage installed-layout CI receiving environment",
+			"job_id": 123113887327,
+			"proof": "ci-evidence/appimage-ci-review/review.md",
+			"patch": "ci-evidence/appimage-ci-review/canonical-native-env-unapplied.patch",
+			"disposition": "Protected workflow exception unanswered; patch remains unapplied."
+		}
+	],
+	"initial_archive_publication": {
+		"head": "55a50835be9e027ec9cbe43ac5d1c693c6ff711f",
+		"push_ended_paris": "2026-10-28T21:49:14.806841+01:00",
+		"branch": "fix/linux",
+		"normal_push_exit": 0
+	},
+	"completed_JS_worktree_retirement": {
+		"completed_paris": "2026-10-28T21:52:19.630893+01:00",
+		"worktree": "/workspace/ergopti-linux-merge-js",
+		"normal_remove_exit": 0,
+		"removed": true,
+		"bundle_sha256": "218fc33bb88e9bb778d18bbeb62aa61ed7a67b80609c88cd54c3e2de4615d01d",
+		"bundle_bytes": 1111,
+		"bundle_heads": "d80243b30d3647e07e1290e7430c0a18eea8afeb refs/heads/linux/final-common-20261028\n",
+		"ignored_file_count": 5601,
+		"ignored_logical_bytes": 67008173,
+		"canonical_dependency_inode_after": 335966,
+		"original_dependency_inode_after": 544447,
+		"retained_branch": "d80243b30d3647e07e1290e7430c0a18eea8afeb refs/heads/linux/final-common-20261028",
+		"source_remote_reachable": "55a50835be9e027ec9cbe43ac5d1c693c6ff711f",
+		"readers_at_admission": []
+	},
+	"closing_documentation_bound": "A later docs-only commit records this actual hosted result; the hosted tested head remains55a50835be9e027ec9cbe43ac5d1c693c6ff711f."
+}

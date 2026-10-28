@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const pipeline = require('./ci-pipeline.cjs');
 const linuxInstall = require('./fixtures/linux-install-source.cjs');
 const root = path.resolve(__dirname, '../..');
@@ -63,13 +63,12 @@ for (const [label, from, to] of [
 	assert.equal(workflow.split(from).length, 2, label + ': unique real owner');
 	assert.throws(() => wiring(workflow.replace(from, to)), assert.AssertionError, label);
 }
-const posix = (value) =>
-	value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => '/' + drive.toLowerCase());
+
 const parent = fs.realpathSync(os.tmpdir());
 const scratch = fs.mkdtempSync(path.join(parent, 'ergopti-opensuse-first-tooling-'));
 let childrenTerminal = true;
 const run = (file, env, cwd = root) => {
-	const result = spawnSync(bashExecutable(), [posix(file)], {
+	const result = spawnSync(bashExecutable(), [bashPath(file)], {
 		cwd,
 		env,
 		encoding: 'utf8',
@@ -102,11 +101,11 @@ try {
 	fs.writeFileSync(launch, expanded + '\n');
 	const env = {
 		...process.env,
-		PATH: posix(scratch) + ':/usr/bin:/bin',
+		PATH: bashPath(scratch) + ':/usr/bin:/bin',
 		ERGOPTI_E2E_PREP: originPrep,
-		RUNNER_TEMP: posix(scratch),
-		OWNED_DOCKER_ARGS: posix(dockerArgs),
-		OWNED_DOCKER_PREP: posix(prep)
+		RUNNER_TEMP: bashPath(scratch),
+		OWNED_DOCKER_ARGS: bashPath(dockerArgs),
+		OWNED_DOCKER_PREP: bashPath(prep)
 	};
 	const launched = run(launch, env);
 	assert.equal(launched.status, 0, 'actual hosted entry reaches the controlled Docker boundary');
@@ -192,12 +191,12 @@ try {
 		fs.chmodSync(zypper, 0o755);
 		const nativeEnv = {
 			...process.env,
-			BASH_ENV: posix(files.environment),
-			TOOLING_STUBS: posix(owned),
-			TOOLING_CALLS: posix(files.calls),
-			TOOLING_ARGUMENTS: posix(files.arguments),
-			TOOLING_STDOUT: posix(files.stdout),
-			TOOLING_STDERR: posix(files.stderr),
+			BASH_ENV: bashPath(files.environment),
+			TOOLING_STUBS: bashPath(owned),
+			TOOLING_CALLS: bashPath(files.calls),
+			TOOLING_ARGUMENTS: bashPath(files.arguments),
+			TOOLING_STDOUT: bashPath(files.stdout),
+			TOOLING_STDERR: bashPath(files.stderr),
 			TOOLING_EXIT: String(exit),
 			ERGOPTI_E2E_PREP: '',
 			ERGOPTI_E2E_EXTRA_CA: '',

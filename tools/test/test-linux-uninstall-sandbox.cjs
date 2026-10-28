@@ -17,15 +17,14 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { createHash } = require('crypto');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
+const { pythonExecutable } = require('../lib/python.cjs');
 const { provideShellMessages } = require('./lib/shell-messages-fixture.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const script = path.join(ROOT, 'static/ergopti_plus/linux/uninstall.sh');
 assert.ok(fs.existsSync(script), 'Linux must ship an uninstaller beside install.sh');
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-uninstall-'));
-const bashPath = (value) =>
-	value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
 
 try {
 	const home = path.join(sandbox, 'home');
@@ -167,6 +166,18 @@ try {
 		{ encoding: 'utf8' }
 	);
 	assert.equal(desktopExec.status, 0, desktopExec.stderr);
+	const systemdExec = spawnSync(
+		bashExecutable(),
+		[
+			'-c',
+			'source "$1"; ergopti_systemd_exec "$2"',
+			'service-owner',
+			bashPath(path.join(ROOT, 'static/ergopti_plus/linux/install/desktop_entry.sh')),
+			bashPath(wrapper)
+		],
+		{ encoding: 'utf8' }
+	);
+	assert.equal(systemdExec.status, 0, systemdExec.stderr);
 	fs.writeFileSync(
 		desktop,
 		`[Desktop Entry]\nType=Application\nName=Ergopti\n${desktopExec.stdout}Hidden=true\n`
@@ -187,7 +198,7 @@ try {
 		wrapper,
 		`#!/bin/bash\nDRIVER_ROOT=${quotedRoot.stdout}\nexec bash "\${DRIVER_ROOT}/install/launch.sh" --service "$@"\n`
 	);
-	fs.writeFileSync(unit, `[Service]\nExecStart=/bin/bash "${bashPath(wrapper)}" --tray\n`);
+	fs.writeFileSync(unit, `[Service]\n${systemdExec.stdout}`);
 	const newWrapperHash = createHash('sha256').update(fs.readFileSync(wrapper)).digest('hex');
 	const unitHash = createHash('sha256').update(fs.readFileSync(unit)).digest('hex');
 	fs.writeFileSync(
@@ -257,7 +268,7 @@ try {
 			wrapper,
 			`#!/bin/bash\nDRIVER_ROOT="${bashPath(library)}/linux"\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`
 		],
-		['@unit', customUnit, `[Service]\nExecStart=/bin/bash "${bashPath(wrapper)}" --tray\n`]
+		['@unit', customUnit, `[Service]\n${systemdExec.stdout}`]
 	];
 	let customManifest = '';
 	for (const [relative, file, contents] of ownedFiles) {
@@ -289,11 +300,20 @@ try {
 		);
 	}
 	provideShellMessages(path.join(packaged, 'install'));
+	const packagedQuote = spawnSync(
+		bashExecutable(),
+		['-c', 'printf "%q" "$1"', 'package-owner', bashPath(packaged)],
+		{ encoding: 'utf8' }
+	);
+	assert.equal(packagedQuote.status, 0, packagedQuote.stderr);
 	fs.writeFileSync(
 		path.join(packaged, 'uninstall.sh'),
 		fs
 			.readFileSync(script, 'utf8')
-			.replace('[ "$SCRIPT_DIR" = /usr/lib/ergopti ]', `[ "$SCRIPT_DIR" = ${bashPath(packaged)} ]`)
+			.replace(
+				'[ "$SCRIPT_DIR" = /usr/lib/ergopti ]',
+				`[ "$SCRIPT_DIR" = ${packagedQuote.stdout} ]`
+			)
 			.replace(
 				"'ergopti: /usr/lib/ergopti/uninstall.sh'",
 				`'ergopti: ${bashPath(packaged)}/uninstall.sh'`
@@ -899,7 +919,37 @@ assert results[2].get('status') == 0, 'a reused PID cannot retain a previous own
 	assert.equal(packagedRun('--yes').status, 0);
 	assert.ok(!fs.existsSync(nativeStartup), 'confirmed RPM removal retires its own startup entry');
 	assert.ok(fs.existsSync(path.join(packaged, 'uninstall.sh')), 'RPM alone owns its package files');
-	console.log('[OK] Linux uninstaller removes only the validated standalone installation.');
 } finally {
 	fs.rmSync(sandbox, { recursive: true, force: true });
+}
+
+const reportSuccess = () =>
+	console.log('[OK] Linux uninstaller removes only the validated standalone installation.');
+
+if (process.platform === 'linux') {
+	const transaction = spawnSync(
+		pythonExecutable(),
+		[path.join(ROOT, 'tools/test/linux_uninstall_transaction_test.py'), ROOT],
+		{ encoding: 'utf8', timeout: 60000 }
+	);
+	const diagnostics = [transaction.stdout, transaction.stderr]
+		.filter((value) => typeof value === 'string')
+		.join('');
+	// Complete diagnostic forwarding before an assertion can terminate Node.
+	process.stdout.write(diagnostics, (error) => {
+		assert.ifError(error);
+		assert.equal(
+			transaction.error,
+			undefined,
+			'the native uninstall transaction fixture must finish'
+		);
+		assert.equal(transaction.signal, null, 'the native fixture must finish without a signal');
+		assert.equal(transaction.status, 0, diagnostics);
+		assert.match(diagnostics, /Ran 13 tests in /, 'every native transaction case must execute');
+		assert.match(diagnostics, /\nOK\s*$/, 'the native transaction fixture must pass');
+		assert.doesNotMatch(diagnostics, /\bskipped\b/i, 'native transaction cases cannot be skipped');
+		reportSuccess();
+	});
+} else {
+	reportSuccess();
 }

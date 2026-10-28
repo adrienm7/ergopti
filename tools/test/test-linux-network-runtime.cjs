@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const generator = require('../codegen/codegen-linux-native-runtime.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const DRIVER = 'static/ergopti_plus/linux';
@@ -243,10 +243,7 @@ function portable() {
 							input:
 								'set -u\n' +
 								MESSAGES_READER +
-								`SRC_DRIVER='${path
-									.join(ROOT, DRIVER)
-									.replaceAll('\\', '/')
-									.replace(/^([A-Za-z]):/, (_, drive) => '/' + drive.toLowerCase())}'\n` +
+								`SRC_DRIVER='${bashPath(path.join(ROOT, DRIVER))}'\n` +
 								'NATIVE_PROBE_COUNT=0\nnative_source_compile_probe() { NATIVE_PROBE_COUNT=$((NATIVE_PROBE_COUNT + 1)); [ "$NATIVE_PROBE_COUNT" -gt 1 ]; }\n' +
 								functions +
 								'\n' +
@@ -322,7 +319,6 @@ function portable() {
 	});
 	const installer = outputs[`${DRIVER}/install.sh`];
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-network-runtime-'));
-	const posix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
 	try {
 		const bin = path.join(root, 'bin');
 		fs.mkdirSync(bin);
@@ -388,14 +384,14 @@ function portable() {
 				timeout: 5000,
 				env: {
 					...process.env,
-					PATH: posix(bin),
+					PATH: bashPath(bin),
 					SRC_DRIVER: '/private driver/linux',
 					SRC_SHARED: '/private shared/_shared',
 					EXPECTED_PROBE: '/private driver/linux/platform/network/runtime_probe.lua',
 					EXPECTED_SHARED: '/private shared/_shared',
-					PRESENT: posix(present),
-					INSTALLS: posix(installs),
-					PROBES: posix(probes),
+					PRESENT: bashPath(present),
+					INSTALLS: bashPath(installs),
+					PROBES: bashPath(probes),
 					PROVIDE: provide ? '1' : '0'
 				}
 			});
@@ -565,25 +561,32 @@ function native() {
 					path.join(ROOT, DRIVER, 'platform/network/system_proxy_probe.lua'),
 					path.join(driver, 'platform/network/system_proxy_probe.lua')
 				);
-				const helper = spawnSync(
-					'luajit',
-					[path.join(driver, 'platform/network/system_proxy_probe.lua'), shared],
-					{
-						cwd,
-						encoding: 'utf8',
-						timeout: 10000,
-						maxBuffer: 1024,
-						input: JSON.stringify({ url: 'https://owned-probe.invalid/' }),
-						env: nativeEnvironment(isolated)
-					}
-				);
-				assert.ifError(helper.error);
-				assert.equal(helper.signal, null);
-				assert.equal(helper.status, 0);
-				assert.deepEqual(JSON.parse(helper.stdout), {
-					ok: false,
-					error: 'proxy-backend-unavailable'
-				});
+				const runHelper = () => {
+					const helper = spawnSync(
+						'luajit',
+						[path.join(driver, 'platform/network/system_proxy_probe.lua'), shared],
+						{
+							cwd,
+							encoding: 'utf8',
+							timeout: 10000,
+							maxBuffer: 1024,
+							input: JSON.stringify({ url: 'https://owned-probe.invalid/' }),
+							env: nativeEnvironment(isolated)
+						}
+					);
+					assert.ifError(helper.error);
+					assert.equal(helper.signal, null);
+					assert.equal(helper.status, 0);
+					return JSON.parse(helper.stdout);
+				};
+				// Withhold only the staged canonical policy, then restore the same file:
+				// a missing policy and missing schema must remain independent refusals.
+				const policy = path.join(shared, 'modules/network/proxy_policy.json');
+				const withheldPolicy = path.join(root, 'withheld-proxy-policy.json');
+				fs.renameSync(policy, withheldPolicy);
+				assert.deepEqual(runHelper(), { ok: false, error: 'proxy-policy-unavailable' });
+				fs.renameSync(withheldPolicy, policy);
+				assert.deepEqual(runHelper(), { ok: false, error: 'proxy-backend-unavailable' });
 			}
 		);
 		check('actual installed runtime locates native and shared sources independently of CWD', () => {

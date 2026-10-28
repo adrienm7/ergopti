@@ -1340,6 +1340,41 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 			'layout_bundle_variant_add',
 			'local enable_keylayout_source_async = input_sources.enable_keylayout_source_async',
 			'local enable_keylayout_source_async = false'
+		],
+		[
+			'layout_bundle_variant_add',
+			'input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)',
+			'input_sources.confirm_source_async(var.tis_id, {}, function(read, state)'
+		],
+		[
+			'layout_bundle_variant_add',
+			'input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)',
+			'Foreign.confirm_enabled_async(var.tis_id, {}, function(read, state)'
+		],
+		[
+			'layout_bundle_variant_add',
+			'if read and state.enabled == true then',
+			'if state.enabled == true then'
+		],
+		[
+			'layout_bundle_variant_add',
+			'if read and state.enabled == true then',
+			'if read and state.enabled ~= true then'
+		],
+		[
+			'layout_bundle_variant_add',
+			'Logger.warn(LOG, "Layout \'%s\' is listed but not turned on (reason=not_enabled:macos_requires_logout).", label)',
+			'Logger.info(LOG, "Layout \'%s\' is listed but not turned on (reason=not_enabled:macos_requires_logout).", label)'
+		],
+		[
+			'layout_bundle_variant_add',
+			'end,\n\t\t\t\t}, {\n\t\t\t\t\tlayout_variant_label = function() return label end,',
+			'end,\n\t\t\t\t}, {\n\t\t\t\t\tlayout_variant_label = function() return latest_str end,'
+		],
+		[
+			'layout_bundle_variant_add',
+			'add_sub[#add_sub + 1] = layout_declared_row("layout_bundle_variant_add", {',
+			'local discarded = layout_declared_row("layout_bundle_variant_add", {'
 		]
 	]) {
 		const native = source.replace(from, to),

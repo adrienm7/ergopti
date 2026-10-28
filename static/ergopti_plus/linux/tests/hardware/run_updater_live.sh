@@ -66,8 +66,10 @@ mkdir -p "${WORK}/home/.cache" "${WORK}/unpacked"
 PHASE=build
 ERGOPTI_BUILD_VERSION=0.0.0-dev.1 bash "${REPO}/tools/build/build-linux-driver.sh" --skip-smoke \
 	> "${WORK}/build.log" 2>&1 || { CAUSE_STATUS=$?; tail -20 "${WORK}/build.log"; echo "FAIL the build failed"; exit 1; }
-tar -czf "${WORK}/old.tar.gz" -C "${REPO}/build/linux" linux _shared bin install.sh
-tar -xzf "${WORK}/old.tar.gz" -C "${WORK}/unpacked"
+(cd -- "${REPO}/build/linux" && tar -czf - linux _shared bin install.sh) > "${WORK}/old.tar.gz" \
+	|| { CAUSE_STATUS=$?; echo "FAIL the release archive could not be created"; exit 1; }
+(cd -- "${WORK}/unpacked" && tar -xzf -) < "${WORK}/old.tar.gz" \
+	|| { CAUSE_STATUS=$?; echo "FAIL the release archive could not be unpacked"; exit 1; }
 
 export HOME="${WORK}/home"
 export XDG_CONFIG_HOME="${HOME}/.config" XDG_DATA_HOME="${HOME}/.local/share" XDG_CACHE_HOME="${HOME}/.cache"
