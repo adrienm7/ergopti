@@ -93,8 +93,12 @@ _APRT_Case(Mode) {
 	AssertTrue(Retired, "The exact child must retire before its private source is removed")
 	AssertEqual(1, AtDeadline.Calls, "The exact picker child must settle once: " . State.ErrorText . State.Output)
 	AssertEqual("", AtDeadline.ErrorText, "Parser/runtime diagnostics cannot qualify as cancellation: " . State.Output)
-	AssertEqual(0, AtDeadline.Code, "The real picker violated startup ownership: " . State.Output)
-	AssertContains(AtDeadline.Output, "PASS action-picker-reset-owner " . Mode)
+	ExpectedCode := Mode == "throw-scalar" ? 1 : 0
+	AssertEqual(ExpectedCode, AtDeadline.Code, "The real picker violated teardown ownership: " . State.Output)
+	if Mode == "throw-scalar"
+		AssertContains(AtDeadline.Output, "FAIL action-picker-reset-owner The native picker child threw a String value.")
+	else
+		AssertContains(AtDeadline.Output, "PASS action-picker-reset-owner " . Mode)
 	; A capture-export refusal cannot hide an earlier timeout/business failure,
 	; nor can a successful child silently turn that refusal into a passing test.
 	if IsObject(ExportFailure)
@@ -104,3 +108,6 @@ _APRT_Case(Mode) {
 for _APRT_Mode in ["current", "reopen"]
 	Test("Action picker reset: " . _APRT_Mode . " retains only its exact session (action-picker-reset-owner)",
 		_APRT_Case.Bind(_APRT_Mode))
+
+Test("Action picker reset fixture: scalar failures cannot pass (action-picker-reset-scalar)",
+	_APRT_Case.Bind("throw-scalar"))
