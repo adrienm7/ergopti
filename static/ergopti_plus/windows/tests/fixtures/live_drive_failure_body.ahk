@@ -37,14 +37,25 @@ _LDF_Unhandled(Observation, Failure, *) {
 	return 1
 }
 
+_LDF_Deleted(Observation, Self) {
+	Observation.Deleted += 1
+}
+
 _LDF_Run(Mode) {
 	Window := Gui("-DPIScale", "Owned live drive failure fixture")
-	Observation := {Calls: 0, Matches: 0, Hwnd: 0, Unhandled: 0,
+	Observation := {Calls: 0, Matches: 0, Hwnd: 0, Unhandled: 0, Deleted: 0,
 		Failure: Error("Owned live matcher refusal"), State: 0}
 	ErrorObserver := _LDF_Unhandled.Bind(Observation)
 	Drive := 0
 	Code := 1
 	try {
+		if Mode == "cycle" {
+			Control := {}
+			Control.DefineProp("__Delete", {Call: _LDF_Deleted.Bind(Observation)})
+			Control := 0
+			_LDF_Require(Observation.Deleted == 1, "The independent native destructor control must execute.")
+			Observation.Deleted := 0
+		}
 		Window.Show("Hide w150 h100")
 		Missing := Mode == "optional" || Mode == "required"
 		Matcher := Mode == "matcher-error" ? _LDF_Matcher.Bind(Observation)
@@ -66,7 +77,7 @@ _LDF_Run(Mode) {
 			Threw := true
 			Diagnostic := Refusal.Message
 		}
-		ExpectedFailure := Mode != "healthy" && Mode != "optional"
+		ExpectedFailure := Mode != "healthy" && Mode != "optional" && Mode != "cycle"
 		_LDF_Require(Threw == ExpectedFailure, "The public await must preserve every action, matcher and timeout failure.")
 		_LDF_Require(Drive.Done, "The real timer must acknowledge terminal state.")
 		_LDF_Require(Observation.Unhandled == 0, "The live timer must contain and retain its own callback failure.")
@@ -84,13 +95,20 @@ _LDF_Run(Mode) {
 			_LDF_Require(InStr(Diagnostic, "the owned live window", true), "An empty error must retain its live-check context.")
 		Sleep(100)
 		_LDF_Require(Observation.Calls == ExpectedCalls, "A retired timer must not replay its native action.")
+		if Mode == "cycle" {
+			Drive.DefineProp("__Delete", {Call: _LDF_Deleted.Bind(Observation)})
+			Observation.State := 0
+			Drive := 0
+			Sleep(100)
+			_LDF_Require(Observation.Deleted == 1, "A completed live timer must release its state after the last caller reference.")
+		}
 		FileAppend("PASS live-drive-failure " . Mode . "`n", "*", "UTF-8-RAW")
 		Code := 0
 	} catch Error as Failure {
 		FileAppend("FAIL live-drive-failure " . Mode . ": " . Failure.Message . "`n", "*", "UTF-8-RAW")
 	} finally {
 		OnError(ErrorObserver, 0)
-		if IsObject(Drive)
+		if IsObject(Drive) && HasMethod(Drive.Tick, "Call")
 			SetTimer(Drive.Tick, 0)
 		Window.Destroy()
 	}

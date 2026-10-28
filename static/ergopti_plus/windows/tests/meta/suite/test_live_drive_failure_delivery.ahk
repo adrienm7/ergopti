@@ -71,5 +71,5 @@ _LDF_Case(Mode) {
 	}
 }
 
-for _LDF_Mode in ["healthy", "empty-error", "message-error", "matcher-error", "optional", "required"]
+for _LDF_Mode in ["healthy", "empty-error", "message-error", "matcher-error", "optional", "required", "cycle"]
 	Test("live drive failure: " . _LDF_Mode . " preserves the real timer outcome (live-drive-failure)", _LDF_Case.Bind(_LDF_Mode))
