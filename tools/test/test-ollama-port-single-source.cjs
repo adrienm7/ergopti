@@ -40,7 +40,8 @@ const SSOT_FILE = path.join(ROOT, 'static/ergopti_plus/_shared/modules/llm/defau
 const FILES = [
 	'static/ergopti_plus/windows/modules/llm/api_ollama/init.ahk',
 	'static/ergopti_plus/windows/ui/menu/menu_llm/_index.ahk',
-	'static/ergopti_plus/windows/ui/menu/menu_llm/menu_models.ahk',
+	// The Ollama port tool moved from the tray's model list to the selector page.
+	'static/ergopti_plus/windows/ui/model_browser/init.ahk',
 	'static/ergopti_plus/windows/ui/menu/menu_llm/menu_settings.ahk',
 	'static/ergopti_plus/_shared/modules/llm/install/ollama_install.sh',
 	'static/ergopti_plus/_shared/modules/llm/install/ollama_install.ps1'

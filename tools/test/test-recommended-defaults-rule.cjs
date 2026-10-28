@@ -141,7 +141,7 @@ for (const driver of ['windows', 'macos', 'linux']) {
 assert.equal(recommended('llm.models', 'selected', 'hs'), 'mlx');
 assert.match(
 	read('macos/ui/menu/menu_llm/backend_labels.lua'),
-	/mlx\s*=\s*\{[^}]*description_key\s*=\s*"menu\.llm\.backend_mlx_suffix"/
+	/\bmlx\s*=\s*"menu\.llm\.backend_mlx_suffix"/
 );
 assert.match(en['menu.llm.backend_mlx_suffix'], /Apple Silicon/);
 
