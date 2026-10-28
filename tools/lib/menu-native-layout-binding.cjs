@@ -510,7 +510,7 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 										schedule_menu_refresh(update_menu)
 										return
 									end
-									input_sources.confirm_source_async(var.tis_id, {}, function(read, state)
+									input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)
 										if read and state.enabled == true then
 											pcall(notifications.notify, string.format(i18n.get("menu.layout.add_consent"), label), nil, "success")
 										elseif read then
