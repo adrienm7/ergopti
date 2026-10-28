@@ -871,7 +871,16 @@ local INPUT_SOURCE_CALLBACK = nil
 --- from __reset() so that tests which assign `hs.keycodes.map = { ... }` to
 --- a stripped-down literal table cannot leak that state into later tests.
 M.keycodes.__rebuild_map = function()
-	M.keycodes.map = setmetatable({}, {
+	-- The printable ASCII keys are raw entries, as in the real active keymap,
+	-- so rawget-based layout probes see them; their values are the ones the
+	-- fallback below always served. A test models a layout lacking a key by
+	-- clearing that raw entry.
+	local raw = {}
+	for byte = 33, 126 do
+		local name = string.char(byte)
+		if name == name:lower() then raw[name] = tonumber(name) or 0 end
+	end
+	M.keycodes.map = setmetatable(raw, {
 		__index = function(_, k)
 			local hit = DEFAULT_KEYCODES_MAP[k]
 			if hit then return hit end

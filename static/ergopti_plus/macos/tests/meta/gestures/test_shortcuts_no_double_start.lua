@@ -63,7 +63,7 @@ helpers.describe("shortcuts/keyboard_shortcuts.lua: double-start guard (shortcut
 		local start_body = src:sub(start_pos, stop_pos)
 		local guard_pos = start_body:find("if _started then", 1, true)
 		local return_pos = guard_pos and start_body:find("return true", guard_pos, true) or nil
-		local bind_pos = start_body:find("bind_slot(slot, action)", 1, true)
+		local bind_pos = start_body:find("acquire_slot(slot, action)", 1, true)
 		helpers.assert_true(
 			guard_pos ~= nil and return_pos ~= nil and bind_pos ~= nil
 				and guard_pos < return_pos and return_pos < bind_pos,
