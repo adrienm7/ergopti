@@ -315,12 +315,24 @@ _LLM_AuxRunScheduled(Owner, TimerFn, Callback) {
 	return true
 }
 
+; A callable object supplies its own exact timer identity without a closure
+; capturing the variable that stores that same closure indefinitely.
+class _LLM_AuxScheduledCallback {
+	__New(Owner, Callback) {
+		this.Owner := Owner
+		this.Callback := Callback
+	}
+
+	Call(*) {
+		return _LLM_AuxRunScheduled(this.Owner, this, this.Callback)
+	}
+}
+
 LLM_AuxSchedule(Owner, Callback, Period, ScheduleFn := 0, RetainOnFailure := false) {
 	if !HasMethod(Callback, "Call")
 		throw TypeError("An auxiliary LLM timer requires a callable callback.")
 	DelayMs := Max(1, Abs(Period))
-	TimerFn := 0
-	TimerFn := (*) => _LLM_AuxRunScheduled(Owner, TimerFn, Callback)
+	TimerFn := _LLM_AuxScheduledCallback(Owner, Callback)
 	PredecessorError := 0
 	ScheduleError := 0
 	PreviousCritical := Critical("On")

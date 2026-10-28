@@ -891,3 +891,302 @@ Test("layout catalogue: raw preservation compares exact JSON string identities (
 	_LCT_RecordValueStringIdentity)
 
 #Include test_layout_catalogue_refresh_owner.ahk
+
+
+#Include ../../../support/layout_schema_kind_fixtures.ahk
+
+; Real native installed metadata must not publish an incompatible source kind
+; as a valid empty catalogue. The read leaves its exact private file untouched.
+_LCT_SchemaSourceKind(Fixture) {
+	Dir := _LCT_TempDir()
+	Path := Dir . LayoutRegistry_Settings()["installed_file"]
+	Source := "{" . Fixture.Members . ',"layouts":{},"future":true}'
+	AssertTrue(JsonParse(Source) is Map, "the metadata control must be actual valid JSON")
+	try {
+		_LCT_WriteRaw(Path, Source)
+		Rejected := false
+		try Installed := LayoutCatalogue_ReadInstalled(Dir)
+		catch as Err {
+			Rejected := true
+			AssertEqual("The installed-layouts record has an unknown schema version: " . Path, Err.Message,
+				"metadata refusal must come from the actual schema gate")
+		}
+		AssertEqual(Fixture.Refused, Rejected,
+			"native installed metadata must preserve its declared schema source kind: " . Fixture.Label)
+		if !Fixture.Refused {
+			AssertTrue(Installed is Map)
+			AssertEqual(0, Installed.Count)
+			AssertTrue(Installed.HasOwnProp("_LayoutCatalogueRecordSource"))
+			AssertEqual(Source, Installed._LayoutCatalogueRecordSource.text)
+		}
+		AssertEqual(Source, FSReadUtf8Exact(Path), "reading schema metadata cannot rewrite the private source")
+	} finally DirDelete(Dir, true)
+}
+
+for Fixture in _LayoutSchemaKindFixtures(LAYOUT_CATALOGUE_INSTALLED_SCHEMA)
+	Test("layout schema: installed " . Fixture.Label . " retains native kind (layout-schema-kind)",
+		_LCT_SchemaSourceKind.Bind(Fixture))
+
+
+; Installed-record membership requires usable text identity fields. Wrong
+; types remain opaque outdated source data while a valid sibling can still
+; update through the actual native writer without deleting the stale entry.
+_LCT_InstalledEntryTypes(Field, Raw, Accepted) {
+	Dir := _LCT_TempDir()
+	Path := Dir . LayoutRegistry_Settings()["installed_file"]
+	Sha := Field == "sha256" ? Raw : JsonStringLiteral("sample-digest")
+	Version := Field == "version" ? Raw : JsonStringLiteral("1")
+	Sample := '{"id":"sample","sha256":' . Sha . ',"version":' . Version
+		. ',"size":1,"future":{"boolean":true,"null":null}}'
+	Good := '{"id":"good","sha256":"good-digest","version":"1","size":1}'
+	Source := '{"schema_version":' . LAYOUT_CATALOGUE_INSTALLED_SCHEMA
+		. ',"layouts":{"sample":' . Sample . ',"good":' . Good . '},"future":true}'
+	AssertTrue(JsonParse(Source) is Map, "installed entry controls must be real valid JSON")
+	try {
+		_LCT_WriteRaw(Path, Source)
+		Installed := LayoutCatalogue_ReadInstalled(Dir)
+		AssertTrue(Installed.Has("good"), "an incompatible sibling must not hide a valid installed entry")
+		AssertEqual(Accepted, Installed.Has("sample"),
+			"only checksum/version strings are usable installed layout metadata")
+		AssertEqual(Accepted ? 2 : 1, Installed.Count)
+		AssertEqual(Sample, Installed._LayoutCatalogueRecordSource.layout_members["sample"]["text"],
+			"both accepted and outdated entries retain exact native source spans")
+		Installed["good"]["version"] := "2"
+		LayoutCatalogue_WriteInstalled(Dir, Installed)
+		Written := FSReadUtf8Exact(Path)
+		Members := JsonObjectMemberSpans(Written, ["layouts"])
+		AssertTrue(Members.Has("sample"), "publishing a valid sibling cannot delete the outdated opaque entry")
+		AssertEqual(Sample, Members["sample"]["text"], "the unchanged sibling keeps every exact source token")
+		Again := LayoutCatalogue_ReadInstalled(Dir)
+		AssertEqual("2", Again["good"]["version"], "the real native writer must publish the valid update")
+		AssertEqual(Accepted, Again.Has("sample"), "a sibling update cannot admit or lose the target entry")
+	} finally DirDelete(Dir, true)
+}
+
+for Field in ["sha256", "version"]
+	for Token in ["true", "1", "[]", "{}", "null"]
+		Test("layout entry types: " . Field . " rejects " . Token . " and preserves source (layout-entry-source-types)",
+			_LCT_InstalledEntryTypes.Bind(Field, Token, false))
+
+for Fixture in [
+	["ordinary text", "", ""], ["empty checksum", "sha256", '""'],
+	["empty version", "version", '""'], ["numeric checksum text", "sha256", '"123"'],
+	["numeric version text", "version", '"2"']
+]
+	Test("layout entry types: " . Fixture[1] . " remains compatible (layout-entry-source-types)",
+		_LCT_InstalledEntryTypes.Bind(Fixture[2], Fixture[3], true))
+
+
+; A stage is acquired by native CREATE_NEW, never inferred from its pathname.
+; Drive actual public publishers with a foreign binary sidecar and retain exact
+; before/after receipts for every user-visible target and opaque record token.
+_LCT_StageSnapshot(Path) {
+	if !FileExist(Path)
+		return "absent"
+	Bytes := FSReadBytesStrict(Path)
+	return Bytes.Size . ":" . CryptoSha256Bytes(Bytes)
+}
+
+_LCT_StageCollision(Family, Existing, Foreign) {
+	Dir := _LCT_TempDir()
+	Settings := LayoutRegistry_Settings()
+	RecordPath := Dir . Settings["installed_file"]
+	Entry := JsonParse(_LayoutCatalogueJson(LayoutCatalogue_Entry(_LCT_Index(), "ergol")))
+	Text := _LCT_LayoutText("ergol")
+	LayoutPath := Dir . Entry["id"] . ".keylayout"
+	Target := Family == "record" ? RecordPath : LayoutPath
+	Stage := Target . LAYOUT_REGISTRY_PARTIAL_SUFFIX
+	Opaque := '{ "id":"retired", "future":true, "nothing":null, "number":1.00 }'
+	try {
+		if Existing {
+			OldText := Text . "`n<!-- previous installed generation -->`n"
+			OldEntry := JsonParse(_LayoutCatalogueJson(Entry))
+			OldEntry["sha256"] := CryptoSha256(OldText)
+			OldEntry["size"] := StrPut(OldText, "UTF-8") - 1
+			OldEntry["version"] := "previous"
+			_LCT_WriteRaw(LayoutPath, OldText)
+			_LCT_WriteRaw(RecordPath, '{"schema_version":' . LAYOUT_CATALOGUE_INSTALLED_SCHEMA
+				. ',"layouts":{"ergol":' . _LayoutCatalogueJson(OldEntry) . ',"retired":' . Opaque
+				. '},"future_header":{"enabled":true,"nothing":null}}')
+			AssertTrue(LayoutCatalogue_ReadInstalled(Dir).Has("ergol"), "the existing native record is usable")
+			LayoutRegistry_Verify(OldEntry, FSReadUtf8Exact(LayoutPath))
+		}
+		if Foreign {
+			Bytes := Buffer(9, 0)
+			for Index, Value in [0xFF, 0x00, 0x7F, 0xC3, 0xA9, 0x0D, 0x0A, 0x42, 0x80]
+				NumPut("UChar", Value, Bytes, Index - 1)
+			File := FileOpen(Stage, "w")
+			try AssertEqual(Bytes.Size, File.RawWrite(Bytes), "the foreign binary stage is authored completely")
+			finally File.Close()
+		}
+		BeforeStage := _LCT_StageSnapshot(Stage)
+		BeforeRecord := _LCT_StageSnapshot(RecordPath)
+		BeforeLayout := _LCT_StageSnapshot(LayoutPath)
+		if Family == "record" {
+			Installed := LayoutCatalogue_ReadInstalled(Dir)
+			Installed["ergol"] := _LayoutCatalogueRecordEntry(Entry)
+			Refused := false
+			try LayoutCatalogue_WriteInstalled(Dir, Installed)
+			catch Error
+				Refused := true
+		} else {
+			Results := []
+			LayoutCatalogue_InstallLocal(Entry, Dir, Text, (Args*) => Results.Push(Args))
+			AssertEqual(1, Results.Length, "the actual verified local install completes exactly once")
+			AssertEqual(0, LayoutCatalogue_Busy(), "the actual install lease retires even on collision")
+		}
+		if Foreign {
+			AssertEqual(BeforeStage, _LCT_StageSnapshot(Stage), "foreign stage bytes and path remain exact")
+			AssertEqual(BeforeRecord, _LCT_StageSnapshot(RecordPath), "the complete live record stays untouched")
+			AssertEqual(BeforeLayout, _LCT_StageSnapshot(LayoutPath), "the live layout stays untouched")
+		} else {
+			AssertEqual("absent", _LCT_StageSnapshot(Stage), "a successful native publication retires only its stage")
+			AssertEqual(Entry["version"], LayoutCatalogue_ReadInstalled(Dir)["ergol"]["version"], "the new record is genuinely readable")
+			if Family == "layout"
+				LayoutRegistry_Verify(Entry, FSReadUtf8Exact(LayoutPath))
+			if Existing {
+				Written := FSReadUtf8Exact(RecordPath)
+				AssertEqual(Opaque, JsonObjectMemberSpans(Written, ["layouts"])["retired"]["text"], "outdated source tokens remain exact")
+				AssertTrue(JsonParse(Written)["future_header"]["enabled"], "the native writer retains the future header")
+			}
+		}
+		if Family == "record"
+			AssertEqual(Foreign, Refused, "a foreign stage must refuse the actual public record write")
+		else {
+			AssertEqual(!Foreign, Results[1][1], "a foreign stage must refuse the actual verified local install")
+			if Foreign
+				AssertEqual(LAYOUT_CATALOGUE_FAILURE_WRITE, Results[1][2], "the refusal belongs to native publication")
+		}
+	} finally DirDelete(Dir, true)
+}
+for Family in ["record", "layout"]
+	for Existing in [false, true]
+		for Foreign in [false, true]
+			Test("layout stage ownership: " . Family . " existing=" . Existing . " collision=" . Foreign
+				. " preserves native files (layout-stage-native-ownership)", _LCT_StageCollision.Bind(Family, Existing, Foreign))
+
+
+; The actual request factory observes native files before its transport can
+; write anything. A no-write refusal isolates the driver's own pre-delete.
+class _LCT_RemoteStageRequest extends _LCT_FakeRequest {
+	__New(Served, Log, LayoutUrl, Dispatch) {
+		super.__New(Served, Log, false)
+		this.LayoutUrl := LayoutUrl
+		this.Dispatch := Dispatch
+	}
+	Send() {
+		if this.Url == this.LayoutUrl && !this.Dispatch {
+			this.Log.Push(Map("url", this.Url, "headers", this.Headers))
+			return false
+		}
+		return super.Send()
+	}
+}
+
+_LCT_RemoteStageCase(Existing, Foreign, Dispatch) {
+	Dir := _LCT_TempDir()
+	Entry := JsonParse(_LayoutCatalogueJson(LayoutCatalogue_Entry(_LCT_Index(), "ergol")))
+	Entry.Delete("extension")
+	Text := _LCT_LayoutText("ergol")
+	LayoutPath := Dir . Entry["id"] . ".keylayout"
+	RecordPath := Dir . LayoutRegistry_Settings()["installed_file"]
+	Stage := LayoutPath . LAYOUT_REGISTRY_PARTIAL_SUFFIX
+	LayoutUrl := LayoutRegistry_RawUrl(Entry["file"])
+	Served := Map(
+		LayoutRegistry_RawUrl(LayoutRegistry_Settings()["index_file"]), Map("status", 200,
+			"body", _LayoutCatalogueJson(Map("layouts", [Entry])), "etag", '"remote-stage"'),
+		LayoutUrl, Map("status", 200, "body", Text, "etag", ""))
+	Log := [], AtFactory := [], Results := []
+	Factory() {
+		AtFactory.Push(_LCT_StageSnapshot(Stage))
+		return _LCT_RemoteStageRequest(Served, Log, LayoutUrl, Dispatch)
+	}
+	Transport := Map("request", Factory,
+		"resolve_proxy", (Urls, Callback) => Callback.Call(_LCT_NoProxy(Urls)),
+		"schedule", (Fn, DelayMs) => Fn.Call())
+	try {
+		if Existing {
+			OldText := Text . "`n<!-- old remote generation -->`n"
+			OldEntry := JsonParse(_LayoutCatalogueJson(Entry))
+			OldEntry["version"] := "previous"
+			OldEntry["sha256"] := CryptoSha256(OldText)
+			OldEntry["size"] := StrPut(OldText, "UTF-8") - 1
+			_LCT_WriteRaw(LayoutPath, OldText)
+			LayoutCatalogue_WriteInstalled(Dir, Map("ergol", OldEntry))
+			LayoutRegistry_Verify(OldEntry, FSReadUtf8Exact(LayoutPath))
+		}
+		if Foreign
+			AssertTrue(FSWriteCreateDurable(Stage, "foreign remote source é`r`n"))
+		BeforeStage := _LCT_StageSnapshot(Stage)
+		BeforeRecord := _LCT_StageSnapshot(RecordPath)
+		BeforeLayout := _LCT_StageSnapshot(LayoutPath)
+		LayoutCatalogue_Install("ergol", Dir, (Args*) => Results.Push(Args), Transport, 0, "", false)
+		AssertEqual(1, Results.Length, "the real public remote installation must complete exactly once")
+		AssertEqual(0, LayoutCatalogue_Busy(), "the actual remote install lease must retire")
+		if Foreign {
+			_TestPrint("# remote-stage factory_receipts=" . AtFactory.Length . " before=" . BeforeStage
+				. " first=" . (AtFactory.Length ? AtFactory[1] : "none")
+				. " second=" . (AtFactory.Length > 1 ? AtFactory[2] : "none"))
+			AssertEqual(BeforeStage, _LCT_StageSnapshot(Stage),
+				"the driver cannot delete or borrow a foreign stage before its transport owns any file")
+		}
+		if !Foreign
+			AssertEqual(Dispatch, Results[1][1], "ordinary real remote publication follows the actual transfer result")
+		if Results[1][1] {
+			LayoutRegistry_Verify(Entry, FSReadUtf8Exact(LayoutPath))
+			AssertEqual(Entry["version"], LayoutCatalogue_ReadInstalled(Dir)["ergol"]["version"])
+		} else {
+			AssertTrue(Results[1].Length >= 3 && Results[1][2] != "", "refusal must have a visible native failure code")
+			AssertEqual(BeforeRecord, _LCT_StageSnapshot(RecordPath), "a failed install preserves the live record")
+			AssertEqual(BeforeLayout, _LCT_StageSnapshot(LayoutPath), "a failed install preserves the live layout")
+		}
+	} finally DirDelete(Dir, true)
+}
+for Existing in [false, true]
+	for Foreign in [false, true]
+		for Dispatch in [false, true]
+			Test("remote layout stage: existing=" . Existing . " foreign=" . Foreign . " dispatch=" . Dispatch
+				. " preserves native ownership (layout-remote-stage-ownership)",
+				_LCT_RemoteStageCase.Bind(Existing, Foreign, Dispatch))
+
+; Exercise the worker's actual CreateFile sharing contract independently of
+; the request facade. GENERIC_READ enforces sharing while allowing worker writes.
+_LCT_RemoteStageSharing() {
+	Dir := _LCT_TempDir(), Path := Dir . "sharing.download"
+	Pin := -1, Writer := -1
+	try {
+		Pin := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+			"UInt", 3, "Ptr", 0, "UInt", 1, "UInt", 0x80, "Ptr", 0, "Ptr")
+		AssertTrue(Pin != -1, "the initial stage must be created atomically")
+		Before := FSHandleSnapshot(Pin)
+		AssertTrue(Before.Get("ok", false))
+		Collision := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+			"UInt", 3, "Ptr", 0, "UInt", 1, "UInt", 0x80, "Ptr", 0, "Ptr")
+		if Collision != -1
+			DllCall("kernel32\CloseHandle", "Ptr", Collision)
+		AssertEqual(-1, Collision, "a second owner cannot acquire the same stage")
+		; FileMode.Create / FileAccess.Write / FileShare.Read, used by WinHTTP.
+		Writer := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x40000000,
+			"UInt", 1, "Ptr", 0, "UInt", 2, "UInt", 0x80, "Ptr", 0, "Ptr")
+		AssertTrue(Writer != -1, "the real worker's write-only sharing contract must remain compatible")
+		Bytes := Buffer(4, 0), Written := 0
+		NumPut("UInt", 0x44434241, Bytes)
+		AssertTrue(_FSNativeWrite(Writer, Bytes, Bytes.Size, &Written))
+		AssertEqual(4, Written)
+		AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Writer, "Int") != 0)
+		Writer := -1
+		AssertEqual("ABCD", FileRead(Path, "UTF-8-RAW"))
+		AssertFalse(FSDelete(Path), "no pathname deletion can detach a live pinned stage")
+		After := FSHandleSnapshot(Pin)
+		for Key in ["volume", "index_high", "index_low"]
+			AssertEqual(Before[Key], After[Key], "worker writes retain the created object")
+	} finally {
+		if Writer != -1
+			DllCall("kernel32\CloseHandle", "Ptr", Writer)
+		if Pin != -1
+			DllCall("kernel32\CloseHandle", "Ptr", Pin)
+		DirDelete(Dir, true)
+	}
+}
+Test("remote layout stage: native worker sharing preserves the creation pin (layout-remote-stage-sharing)",
+	_LCT_RemoteStageSharing)

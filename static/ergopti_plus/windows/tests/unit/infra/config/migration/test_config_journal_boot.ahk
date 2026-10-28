@@ -351,12 +351,7 @@ _CMJ_GenuinePublishedGenerationSurvivesMutationAndRetirement() {
 Test("config source journal: native published source survives mutation/deletion until genuine cache retirement", _CMJ_GenuinePublishedGenerationSurvivesMutationAndRetirement)
 
 
-; Native fixtures author their own metadata instead of forging journal READY.
-; Read-only legacy corpus bytes remain exact; this helper never migrates them.
-_CMJFixtureReadonly(Path) {
-	if !ConfigMigrateBoot(Path, "known")
-		ConfigSchemaPrepareSource(Path)
-}
+#Include ../../../../support/config_journal_fixtures.ahk
 
 _CMJFixtureCurrentSource(Source) {
 	HadBom := SubStr(Source, 1, 1) == Chr(0xFEFF)

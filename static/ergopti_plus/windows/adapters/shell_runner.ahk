@@ -1009,7 +1009,7 @@ _SR_LegacyFinishCompletion(Claim, ExitCode, ReadFn := 0) {
 		try {
 			try {
 				local tmp_file := Claim["TmpFile"]
-				if FileExist(tmp_file) {
+				if tmp_file != "" {
 					local output := IsObject(ReadFn) ? ReadFn.Call(tmp_file) : FileRead(tmp_file)
 					stdout := Trim(output, "`r`n")
 				}
@@ -2379,10 +2379,10 @@ _SR_TreeFinishClaim(Claim, ReadFn := 0, DeleteFn := 0) {
 		return false
 	try {
 		_SR_TreeLogNativeDebt(Claim)
-		local stdout := ""
+		local stdout := "", stderr := ""
 		local tmp_file := Claim["TmpFile"]
 		try {
-			if tmp_file != "" && FileExist(tmp_file) {
+			if tmp_file != "" {
 				local max_output_bytes := Claim.Get("MaxOutputBytes", 0)
 				local output_bytes := FileGetSize(tmp_file)
 				if max_output_bytes > 0 && output_bytes > max_output_bytes {
@@ -2395,6 +2395,7 @@ _SR_TreeFinishClaim(Claim, ReadFn := 0, DeleteFn := 0) {
 				}
 			}
 		} catch as Err {
+			stderr := Err.Message
 			if (Claim is Map) && Claim.Get("PrivateDiagnostics", false) == true
 				_SR_TreeLogError(Claim, "tree-owned task {1} output cleanup failed: {2}",
 					Claim["TaskId"], Err.Message)
@@ -2404,7 +2405,7 @@ _SR_TreeFinishClaim(Claim, ReadFn := 0, DeleteFn := 0) {
 		} finally {
 			_SR_TreeCleanupCapture(Claim, DeleteFn)
 		}
-		_SR_CompletionQueue(Claim, Claim["ExitCode"], stdout, "")
+		_SR_CompletionQueue(Claim, Claim["ExitCode"], stdout, stderr)
 	} finally {
 		Claim["CompletionBusy"] := false
 	}

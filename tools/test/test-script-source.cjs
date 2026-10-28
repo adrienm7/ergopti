@@ -87,6 +87,39 @@ assert.equal(masked.includes('block'), false);
 assert.equal(masked.includes('tail'), false);
 assert.equal(masked.includes('"a\\"b"'), true);
 
+// A native Include path is directive data: its apostrophe cannot open a string.
+const includePathSource = [
+	"#Include O'Brien.ahk",
+	'/*',
+	'#Include never_loaded.ahk',
+	'*/',
+	'visible_after_include := 7'
+].join('\n');
+const includePathMasked = stripComments(includePathSource, '.ahk');
+assert.equal(includePathMasked.length, includePathSource.length);
+assert.equal(
+	includePathMasked.includes('never_loaded'),
+	false,
+	'a literal include operand must not hide the following real block comment'
+);
+assert.ok(
+	scriptTokens(includePathSource, '.ahk').some(
+		(token) => token.kind === 'identifier' && token.value === 'visible_after_include'
+	),
+	'a real statement after a valid apostrophe path remains executable code'
+);
+const includeTrailingComment =
+	"#Include O'Brien.ahk ; trailing directive comment\nnext_statement := 1";
+assert.equal(
+	stripComments(includeTrailingComment, '.ahk').includes('trailing directive comment'),
+	false
+);
+assert.ok(
+	scriptTokens(includeTrailingComment, '.ahk').some(
+		(token) => token.kind === 'identifier' && token.value === 'next_statement'
+	)
+);
+
 // Eviction: far more distinct source than the cache keeps, then the first again.
 const filler = 'local value = 1\n'.repeat(64 * 1024);
 for (let index = 0; index < 12; index++) scriptTokens(filler + '-- ' + index, '.lua');

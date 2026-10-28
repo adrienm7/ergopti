@@ -203,6 +203,9 @@ LayoutComposer_Check(DeclarationText, Keylayout) {
 	catch
 		Refuse("The composition is not valid JSON.")
 	if !(Declaration is Map) || !Declaration.Has("schema_version")
+		Refuse("The composition has an unknown schema version.")
+	Members := JsonObjectMemberSpans(DeclarationText)
+	if Members["schema_version"]["kind"] != "number"
 			|| Declaration["schema_version"] != LAYOUT_COMPOSER_SCHEMA_VERSION
 		Refuse("The composition has an unknown schema version.")
 	Name := Declaration.Get("name", "")
@@ -270,14 +273,9 @@ LayoutComposer_Entry(Declaration, Keylayout) {
 
 ; Replaces a file atomically: the text lands under a partial name first.
 _LayoutComposer_WriteText(Path, Text) {
-	global LAYOUT_REGISTRY_PARTIAL_SUFFIX
-	Partial := Path . LAYOUT_REGISTRY_PARTIAL_SUFFIX
 	SplitPath(Path, , &Parent)
 	DirCreate(Parent)
-	if !FSWrite(Partial, Text)
-		throw Error("Cannot write " . Partial)
-	if !FSAtomicMoveReplace(Partial, Path)
-		throw Error("Cannot publish " . Path)
+	_LayoutCatalogueWriteText(Path, Text)
 }
 
 ; The result the page shows, and the refreshed list behind it.
@@ -391,8 +389,14 @@ _LayoutComposer_OnInstalled(Deps, Use, Ok, CodeOrDetail := "", Detail := "") {
 	}
 	if Selected {
 		; The layout in use changed: reload so the emulation reads the new file.
-		Reloaded(Accepted) {
-			_LayoutComposer_Report(Deps, Action, Accepted, Accepted ? "" : LAYOUT_COMPOSER_FAILURE_USE, "", Accepted)
+		; Prelaunch refusal completes the callback and returns false; both signals
+		; must settle this save through the same terminal owner.
+		Completed := false
+		Reloaded(Accepted, FailureDetail := "") {
+			if Completed
+				return
+			Completed := true
+			_LayoutComposer_Report(Deps, Action, Accepted, Accepted ? "" : LAYOUT_COMPOSER_FAILURE_USE, FailureDetail, Accepted)
 		}
 		try Started := Deps["after"].Call(Id, "install", Reloaded)
 		catch as Err {
@@ -400,7 +404,7 @@ _LayoutComposer_OnInstalled(Deps, Use, Ok, CodeOrDetail := "", Detail := "") {
 			Started := false
 		}
 		if !(Started is Integer) || Started != 1
-			_LayoutComposer_Report(Deps, Action, false, LAYOUT_COMPOSER_FAILURE_USE, "the driver could not reload")
+			Reloaded(false, "the driver could not reload")
 		return
 	}
 	_LayoutComposer_Report(Deps, Action, true)

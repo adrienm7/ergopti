@@ -776,9 +776,13 @@ _LLM_OllamaPingDeliver(Owner, Callback, Result, Structured, ScheduleFn := 0) {
 					|| _LLM_CurlCleanupDebt.Count != 0 || !_LLM_AuxCommitPreparedFinish(Owner)
 				return false
 			Ticket["delivered"] := true
+			; Consume the callback with the exact committed ticket. Its caller
+			; may retain this owner, so a delivered callback must not point back.
+			DeliveryCallback := Ticket["callback"]
+			Ticket["callback"] := 0
 			Committed := true
 		} finally Critical(PreviousCritical)
-		_LLM_InvokeCallback(Ticket["callback"], "on_result", Ticket["result"])
+		_LLM_InvokeCallback(DeliveryCallback, "on_result", Ticket["result"])
 		return true
 	} finally {
 		PreviousCritical := Critical("On")
@@ -952,8 +956,14 @@ _LLM_OllamaTagsOrigin(Owner, Strict) {
 
 _LLM_Ollama_TagsFinalize(Paths, Owner) {
 	_LLM_OllamaAuxDeletePaths(Paths)
-	if HasMethod(Owner.Get("on_retired", 0), "Call")
-		Owner["on_retired"].Call()
+	OnRetired := Owner.Get("on_retired", 0)
+	if HasMethod(OnRetired, "Call") {
+		OnRetired.Call()
+		; The request retains its auxiliary owner. Release the reverse bound
+		; callback only after acknowledgement so failed finalizers remain retryable.
+		if Owner.Get("on_retired", 0) == OnRetired
+			Owner["on_retired"] := 0
+	}
 }
 
 /**

@@ -1,0 +1,9 @@
+{
+	"source_head": "0d524fa308358dc54fcca497686ce90411ef2d21",
+	"historical_commits_preserved": 160,
+	"new_integrated_fix_count": 3,
+	"manifest_files_verified": 182,
+	"credential_pattern_hits": [],
+	"initial_artifact_bytes_unchanged": true,
+	"native_windows_ci_for_corrected_head": "not run; explicit urgent stop"
+}

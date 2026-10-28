@@ -1,0 +1,16 @@
+{
+	"snapshot_at_paris": "2026-10-28T21:50:26.751635+01:00",
+	"integration_head_at_snapshot": "fe3d8b010779a2666ef9307305c68f1bc9d92428",
+	"proof_files": 3336,
+	"wip_snapshots": 11,
+	"commit_snapshots": 170,
+	"archive_bytes": 11174894,
+	"archive_sha256": "519cc2ac9c2fcde16effda1fb3abd4fe5a2bfbc15fef7c4aa48944a8e7adb0c7",
+	"omissions": [
+		{
+			"path": "/workspace/scratch/windows-ci-followup/MinGit-2.56.0.4-64-bit.zip",
+			"reason": "exceeds compact packet ceiling",
+			"bytes": 39846926
+		}
+	]
+}

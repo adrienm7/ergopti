@@ -36,7 +36,7 @@ _LCR_Directory() {
 
 _LCR_Write(Path, Text) {
 	File := FileOpen(Path, "w", "UTF-8-RAW")
-	try AssertEqual(StrLen(Text), File.Write(Text), "the controlled response is physically written")
+	try AssertEqual(StrPut(Text, "UTF-8") - 1, File.Write(Text), "the controlled response writes every UTF-8 byte")
 	finally File.Close()
 	AssertEqual(Text, FileRead(Path, "UTF-8-RAW"), "the physical response equals its independent golden")
 }
@@ -278,3 +278,15 @@ _LCR_Case(Mode) {
 for _LCR_Mode in ["sequential-304", "http-fallback", "older-poll-first", "newer-poll-first"]
 	Test("layout-refresh-owner: cache bytes and ETag stay coherent across " . _LCR_Mode,
 		_LCR_Case.Bind(_LCR_Mode))
+
+_LCR_UnicodeWrite() {
+	Dir := _LCR_Directory()
+	Wire := "réel 中文 " . Chr(0x1F642) . "`r`n"
+	try {
+		_LCR_Write(Dir . "unicode-response.txt", Wire)
+		AssertEqual(Wire, FSReadUtf8Exact(Dir . "unicode-response.txt"),
+			"the fixture must admit real UTF-8 byte counts and preserve the independently read Unicode response")
+	} finally DirDelete(Dir, true)
+}
+Test("layout refresh fixture: actual Unicode writes use UTF-8 byte counts (layout-refresh-unicode-fixture)",
+	_LCR_UnicodeWrite)

@@ -826,15 +826,15 @@ SQLite_ExecReturnCarry(db, sql) {
 						; NUL hole follows, so resume there and let the skip above consume
 						; it. Otherwise these bytes are the buffer's trailing whitespace or
 						; a « -- » comment whose closing newline is in the next chunk, and
-						; they must be carried: advancing to the tail would delete the
-						; comment's head and hand its remainder to SQLite as SQL.
+						; an unfinished comment must be carried. Closed trivia is consumed:
+						; retaining it would reject every otherwise complete refresh.
 						if (ptail && ptail > cur && ptail < end_) {
 								cur := ptail
 								continue
 						}
 						remaining := StrGet(cur, end_ - cur, "UTF-8")
 						return Map("ok", true,
-								"carry", Trim(remaining, " `t`r`n") = "" ? "" : remaining,
+								"carry", _SQLite_TriviaCarry(remaining),
 								"error", "", "nul_bytes", nul_bytes)
 				}
 				Loop {
@@ -864,6 +864,22 @@ SQLite_ExecReturnCarry(db, sql) {
 				cur  := ptail
 		}
 		return Map("ok", true, "carry", "", "error", "", "nul_bytes", nul_bytes)
+}
+
+; SQLite has already classified this remainder as containing no statement.
+; Retain only potentially unfinished input: closed comments cannot prevent an
+; incremental publication, but losing an open comment head corrupts the next chunk.
+_SQLite_TriviaCarry(Text) {
+	SearchFrom := 1
+	while (CommentAt := RegExMatch(Text, "--|/\*", &CommentMatch, SearchFrom)) {
+		LineComment := CommentMatch[0] == "--"
+		; SQLite ends a line comment on LF, not on a standalone CR.
+		CommentEnd := InStr(Text, LineComment ? "`n" : "*/", true, CommentAt + 2)
+		if !CommentEnd
+			return Text
+		SearchFrom := CommentEnd + (LineComment ? 1 : 2)
+	}
+	return ""
 }
 
 ; Read from a byte boundary that was observed on the FileObject itself.  The

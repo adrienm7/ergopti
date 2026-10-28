@@ -232,6 +232,7 @@ function main() {
 			'tools/test/validate-ahk-e2e-manifest.cjs',
 			'static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json',
 			'tools/test/test-ahk-test-coverage.cjs',
+			'tools/lib/script-source.cjs',
 			'tools/lint/format.cjs',
 			'tools/test/run-js-suite.cjs',
 			'tools/test/test-npm-aliases-match-the-suite.cjs'

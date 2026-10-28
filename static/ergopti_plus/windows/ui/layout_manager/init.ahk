@@ -509,17 +509,33 @@ LayoutManager_Open(*) {
 	Placeholder := g.Add("Text", "x0 y0 w720 h560", "")
 	g.OnEvent("Close", _LayMgrWeb_SessionCall.Bind(SessionEpoch, _LayMgrWeb_Close))
 	g.OnEvent("Size", _LayMgrWeb_SessionCall.Bind(SessionEpoch, _LayMgrWeb_OnResize))
+	; Native Show can deliver Close before returning. Its original callback
+	; must already own this exact window so cancellation can destroy it.
+	_LayMgrWeb_Gui := g
 	; Shown before the control: a hidden Gui has a zero client rect.
 	g.Show("w720 h560 Center")
-	_LayMgrWeb_Gui := g
-	try {
-		_LayMgrWeb_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll"))
-	} catch as Err {
-		LoggerError("LayoutManager", "WebView2 create failed: {1}", Err.Message)
-		_LayMgrWeb_Close()
+	if SessionEpoch != _LayMgrWeb_SessionEpoch || _LayMgrWeb_Gui != g {
+		try g.Destroy()
+		LoggerInfo("LayoutManager", "Layout manager opening cancelled while its window was being shown.")
 		return false
 	}
-	_LayMgrWeb_WebView := _LayMgrWeb_Controller.CoreWebView2
+	try {
+		CreatedController := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll"))
+	} catch as Err {
+		LoggerError("LayoutManager", "WebView2 create failed: {1}", Err.Message)
+		if SessionEpoch == _LayMgrWeb_SessionEpoch && _LayMgrWeb_Gui == g
+			_LayMgrWeb_Close()
+		return false
+	}
+	; SDK creation pumps messages while awaiting COM. The exact opening window
+	; may have closed or been replaced before the controller becomes available.
+	if SessionEpoch != _LayMgrWeb_SessionEpoch || _LayMgrWeb_Gui != g {
+		CreatedController.Close()
+		LoggerInfo("LayoutManager", "Layout manager opening cancelled after its window was closed or replaced.")
+		return false
+	}
+	_LayMgrWeb_Controller := CreatedController
+	_LayMgrWeb_WebView := CreatedController.CoreWebView2
 	try {
 		s := _LayMgrWeb_WebView.Settings
 		s.AreDevToolsEnabled := false

@@ -875,3 +875,117 @@ Test_LLM_Persist_OnboardingBooleanIsTyped() {
 Test("LLM persist: onboarding boolean uses the typed saved-options path "
 	. "(llm-persisted-option-type-boundary-onboarding)",
 	Test_LLM_Persist_OnboardingBooleanIsTyped)
+
+
+; The tray consumes the primary boot cache after canonical feature admission.
+; Wrong authored source kinds must not regain runtime intent through its old
+; INI scalar coercions. Genuine source and detached candidates have different
+; ownership; this cohort exercises only the real native bootstrap owner.
+_LLM_Persist_AssertBootOption(Value, Expected) {
+	if Expected is Array {
+		AssertTrue(Value is Array, "the native disabled-app option must retain its admitted array type")
+		AssertEqual(Expected.Length, Value.Length)
+		for Index, Item in Expected
+			AssertEqual(Item, Value[Index])
+	} else
+		AssertEqual(Expected, Value)
+}
+
+_LLM_Persist_BootSourceKind(Section, Key, Raw, Outdated, OptionKey, Kind) {
+	static Sequence := 0
+	Sequence += 1
+	global Features, ConfigurationFile, _BootConfigSnapshot
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, _ConfigBootReadFailed
+	SavedFeatures := Features
+	FileWasSet := IsSet(ConfigurationFile), SavedFile := FileWasSet ? ConfigurationFile : ""
+	SnapshotWasSet := IsSet(_BootConfigSnapshot)
+	SavedSnapshot := SnapshotWasSet ? _BootConfigSnapshot : 0
+	SavedRejected := _ConfigBootRejectedOverrides, SavedOutdated := _ConfigBootOutdatedEntries
+	SavedReadFailed := _ConfigBootReadFailed
+	Root := A_Temp . "\ergopti_llm_source_kind_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Sequence
+	AssertFalse(DirExist(Root), "the LLM native source fixture requires a private fresh root")
+	DirCreate(Root)
+	try {
+		ConfigurationFile := Root . "\config.toml"
+		Source := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+			. "`n[" . Section . "]`n" . Key . " = " . Raw . "`n"
+		AssertTrue(FSWriteCreateDurable(ConfigurationFile, Source))
+		Journal := ConfigMigrateBoot(ConfigurationFile)
+		AssertTrue(Journal is Map, "the actual native constructor must admit the private current source")
+		AssertEqual("current", Journal.Get("status", "missing"))
+		Cache := ParseConfigTomlFile(ConfigurationFile)
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		_ConfigBootReadFailed := false
+		Features := ManifestBuildFeaturesMap()
+		AssertTrue(ApplyBootConfigToml(Features, ConfigurationFile, &_BootConfigSnapshot) >= 0)
+		AssertEqual(0, _ConfigBootRejectedOverrides)
+		AssertFalse(_ConfigBootReadFailed)
+		AssertEqual(Outdated ? 1 : 0, _ConfigBootOutdatedEntries.Count,
+			"the actual primary loader must classify this authored source kind")
+		AssertTrue(Cache == _BootConfigSnapshot.Cache,
+			"the actual tray fixture must receive the retained native bootstrap cache")
+		AssertEqual(Source, _BootConfigSnapshot.Source)
+		Node := Features
+		for Part in StrSplit(Section, ".")
+			Node := Node[Part]
+		; Foreign-owned valid keys deliberately do not enter Features. Their
+		; admitted typed row is the receiving owner's intent; an outdated row
+		; instead keeps the feature manifest default already classified above.
+		Found := 0
+		for Row in _BootConfigSnapshot.Rows {
+			if Row.Section != Section || Row.Key != Key
+				continue
+			Found += 1
+			Admitted := Outdated ? ManifestDefaultFor(Section . "." . Key) : Row.Value
+		}
+		AssertEqual(1, Found, "the real native snapshot must contain exactly the authored target row")
+		if Outdated {
+			AssertTrue(_ConfigBootOutdatedEntries.Has(Section . "`n" . Key),
+				"the canonical outdated decision must belong to the actual receiving field")
+			_LLM_Persist_AssertBootOption(Node[Key], Admitted)
+		}
+		Expected := Kind == "modifiers" ? _LLM_Menu_ModifiersArrayToString(Admitted) : Admitted
+		if Kind == "modifiers"
+			AssertTrue(Expected is String, "the admitted typed modifier vector must have a valid native representation")
+		Opts := LLM_Menu_BuildSavedOpts(Cache)
+		AssertTrue(Opts.Has(OptionKey), "the actually authored native option must be published")
+		_LLM_Persist_AssertBootOption(Opts[OptionKey], Expected)
+		AssertTrue(ConfigTomlReadSnapshot(ConfigurationFile) == _BootConfigSnapshot,
+			"building the actual tray options must retain the canonical source generation")
+		AssertTrue(FSUtf8ExactMatches(ConfigurationFile, Source),
+			"ignored and accepted authored settings must keep all physical native source bytes")
+	} finally {
+		Features := SavedFeatures
+		_TOML_InvalidateParseCache(ConfigurationFile)
+		ConfigurationFile := FileWasSet ? SavedFile : unset
+		_BootConfigSnapshot := SnapshotWasSet ? SavedSnapshot : unset
+		_ConfigBootRejectedOverrides := SavedRejected, _ConfigBootOutdatedEntries := SavedOutdated
+		_ConfigBootReadFailed := SavedReadFailed
+		DirDelete(Root, true)
+	}
+}
+
+for Field in [
+	["llm.navigation", "nav_modifiers", "nav_modifiers", "alt", "modifiers"],
+	["llm.navigation", "val_modifiers", "val_modifiers", "shift", "modifiers"],
+	["llm.trigger", "disabled_apps", "disabled_apps", "private.exe", "apps"]
+] {
+	for Fixture in [
+		["quoted-scalar", TOML_RenderString(Field[4]), true],
+		["quoted-array", TOML_RenderString(TOML_RenderValue([Field[4]])), true],
+		["typed-empty-array", "[]", false],
+		["typed-array", TOML_RenderValue([Field[4]]), false]
+	]
+		Test("LLM boot source kind: " . Field[2] . " " . Fixture[1] . " (llm-boot-source-kind-admission)",
+			_LLM_Persist_BootSourceKind.Bind(Field[1], Field[2], Fixture[2], Fixture[3], Field[3], Field[5]))
+}
+
+for Fixture in [
+	["quoted-true", '"true"', true], ["quoted-one", '"1"', true],
+	["quoted-false-control", '"false"', true],
+	["typed-true", "true", false], ["typed-false", "false", false],
+	["legacy-one", "1", false], ["legacy-zero", "0", false]
+]
+	Test("LLM boot source kind: onboarding " . Fixture[1] . " (llm-boot-source-kind-admission)",
+		_LLM_Persist_BootSourceKind.Bind("llm", "onboarding_seen", Fixture[2], Fixture[3], "onboarding_seen", "boolean"))

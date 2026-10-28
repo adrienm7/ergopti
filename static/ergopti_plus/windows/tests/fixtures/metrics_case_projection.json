@@ -1,0 +1,835 @@
+{
+	"description": "Native scalar histories and SQLite snapshots. Fixed character-token casing preserves event arity; word keys retain full-text lowercase.",
+	"app": "expanding-case.exe",
+	"timestamp": "2026-10-26 12:00:00.000",
+	"delay_ms": 100,
+	"cases": [
+		{
+			"manifest": {
+				"2026-10-26": {
+					"expanding-case.exe": {
+						"chars": 2,
+						"time": 200
+					}
+				}
+			},
+			"range": {
+				"historical": {
+					"bg": {
+						"İa": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"c": {
+						"a": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"İ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"hp": {},
+					"hx": {},
+					"kc": {},
+					"pg": {},
+					"qg": {},
+					"sc": {},
+					"sc_bg": {},
+					"sc_kb": {},
+					"tg": {},
+					"w": {},
+					"w_bg": {}
+				},
+				"today": {}
+			},
+			"id": "capital-i-dot",
+			"events": ["İ", "a"],
+			"expected_rows": {
+				"case_sensitive": {
+					"c": [
+						{
+							"key": "a",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "İ",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"bg": [
+						{
+							"key": "İa",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"tg": [],
+					"qg": [],
+					"pg": [],
+					"hx": [],
+					"hp": [],
+					"w": []
+				},
+				"case_folded": {
+					"c": [
+						{
+							"key": "a",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "İ",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"bg": [
+						{
+							"key": "İa",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"tg": [],
+					"qg": [],
+					"pg": [],
+					"hx": [],
+					"hp": [],
+					"w": []
+				}
+			}
+		},
+		{
+			"manifest": {
+				"2026-10-26": {
+					"expanding-case.exe": {
+						"chars": 3,
+						"time": 300
+					}
+				}
+			},
+			"range": {
+				"historical": {
+					"bg": {
+						"i̇": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"̇a": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"c": {
+						"a": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"i": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"̇": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"hp": {},
+					"hx": {},
+					"kc": {},
+					"pg": {},
+					"qg": {},
+					"sc": {},
+					"sc_bg": {},
+					"sc_kb": {},
+					"tg": {
+						"i̇a": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"w": {},
+					"w_bg": {}
+				},
+				"today": {}
+			},
+			"id": "separate-combining-dot",
+			"events": ["i", "̇", "a"],
+			"expected_rows": {
+				"case_sensitive": {
+					"c": [
+						{
+							"key": "a",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "i",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "̇",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"bg": [
+						{
+							"key": "i̇",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "̇a",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"tg": [
+						{
+							"key": "i̇a",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"qg": [],
+					"pg": [],
+					"hx": [],
+					"hp": [],
+					"w": []
+				},
+				"case_folded": {
+					"c": [
+						{
+							"key": "a",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "i",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "̇",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"bg": [
+						{
+							"key": "i̇",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "̇a",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"tg": [
+						{
+							"key": "i̇a",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"qg": [],
+					"pg": [],
+					"hx": [],
+					"hp": [],
+					"w": []
+				}
+			}
+		},
+		{
+			"id": "corrected-i-dot",
+			"events": ["İ", "[BS]"],
+			"manifest": {
+				"2026-10-26": {
+					"expanding-case.exe": {
+						"chars": 2,
+						"time": 200
+					}
+				}
+			},
+			"range": {
+				"historical": {
+					"bg": {
+						"İ[BS]": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"c": {
+						"[BS]": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"İ": {
+							"c": 1,
+							"t": 100,
+							"e": 1,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"hp": {},
+					"hx": {},
+					"kc": {},
+					"pg": {},
+					"qg": {},
+					"sc": {},
+					"sc_bg": {},
+					"sc_kb": {},
+					"tg": {},
+					"w": {},
+					"w_bg": {}
+				},
+				"today": {}
+			},
+			"expected_rows": {
+				"case_sensitive": {
+					"c": [
+						{
+							"key": "[BS]",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "İ",
+							"count": 1,
+							"accuracy": 0
+						}
+					],
+					"bg": [
+						{
+							"key": "İ[BS]",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"tg": [],
+					"qg": [],
+					"pg": [],
+					"hx": [],
+					"hp": [],
+					"w": []
+				},
+				"case_folded": {
+					"c": [
+						{
+							"key": "[BS]",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "İ",
+							"count": 1,
+							"accuracy": 0
+						}
+					],
+					"bg": [
+						{
+							"key": "İ[bs]",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"tg": [],
+					"qg": [],
+					"pg": [],
+					"hx": [],
+					"hp": [],
+					"w": []
+				}
+			}
+		},
+		{
+			"id": "greek-word-context",
+			"events": ["İ", "Ο", "Σ", " "],
+			"manifest": {
+				"2026-10-26": {
+					"expanding-case.exe": {
+						"chars": 4,
+						"time": 400
+					}
+				}
+			},
+			"range": {
+				"historical": {
+					"bg": {
+						"İΟ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"ΟΣ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"Σ ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"c": {
+						" ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"İ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"Ο": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"Σ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"hp": {},
+					"hx": {},
+					"kc": {},
+					"pg": {},
+					"qg": {
+						"İΟΣ ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"sc": {},
+					"sc_bg": {},
+					"sc_kb": {},
+					"tg": {
+						"İΟΣ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"ΟΣ ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"w": {
+						"İΟΣ": {
+							"c": 1,
+							"t": 0,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"w_bg": {}
+				},
+				"today": {}
+			},
+			"expected_rows": {
+				"case_sensitive": {
+					"c": [
+						{
+							"key": " ",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "İ",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "Ο",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "Σ",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"bg": [
+						{
+							"key": "İΟ",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "ΟΣ",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "Σ ",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"tg": [
+						{
+							"key": "İΟΣ",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "ΟΣ ",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"qg": [
+						{
+							"key": "İΟΣ ",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"pg": [],
+					"hx": [],
+					"hp": [],
+					"w": [
+						{
+							"key": "İΟΣ",
+							"count": 1,
+							"accuracy": 100
+						}
+					]
+				},
+				"case_folded": {
+					"c": [
+						{
+							"key": " ",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "İ",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "ο",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "σ",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"bg": [
+						{
+							"key": "İο",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "ος",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "σ ",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"tg": [
+						{
+							"key": "İος",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "ος ",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"qg": [
+						{
+							"key": "İος ",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"pg": [],
+					"hx": [],
+					"hp": [],
+					"w": [
+						{
+							"key": "i̇ος",
+							"count": 1,
+							"accuracy": 100
+						}
+					]
+				}
+			}
+		},
+		{
+			"id": "dotless-i",
+			"events": ["ı", "I", "İ"],
+			"manifest": {
+				"2026-10-26": {
+					"expanding-case.exe": {
+						"chars": 3,
+						"time": 300
+					}
+				}
+			},
+			"range": {
+				"historical": {
+					"bg": {
+						"Iİ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"ıI": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"c": {
+						"I": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"İ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"ı": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"hp": {},
+					"hx": {},
+					"kc": {},
+					"pg": {},
+					"qg": {},
+					"sc": {},
+					"sc_bg": {},
+					"sc_kb": {},
+					"tg": {
+						"ıIİ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"w": {},
+					"w_bg": {}
+				},
+				"today": {}
+			},
+			"expected_rows": {
+				"case_sensitive": {
+					"c": [
+						{
+							"key": "I",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "İ",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "ı",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"bg": [
+						{
+							"key": "Iİ",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "ıI",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"tg": [
+						{
+							"key": "ıIİ",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"qg": [],
+					"pg": [],
+					"hx": [],
+					"hp": [],
+					"w": []
+				},
+				"case_folded": {
+					"c": [
+						{
+							"key": "i",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "İ",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "ı",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"bg": [
+						{
+							"key": "iİ",
+							"count": 1,
+							"accuracy": 100
+						},
+						{
+							"key": "ıi",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"tg": [
+						{
+							"key": "ıiİ",
+							"count": 1,
+							"accuracy": 100
+						}
+					],
+					"qg": [],
+					"pg": [],
+					"hx": [],
+					"hp": [],
+					"w": []
+				}
+			}
+		}
+	]
+}

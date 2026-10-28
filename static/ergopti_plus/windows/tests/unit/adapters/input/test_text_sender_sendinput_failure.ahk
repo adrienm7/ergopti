@@ -35,15 +35,16 @@ _TSSIF_AdapterMethodsContainSendInputFailure() {
     Previous := _AHK_SendInput
     try {
         _AHK_SendInput := _TSSIF_AlwaysFail
-        Err := ""
+        Err := "", ContractThrew := false
         try {
             TextEraseChars(1)
             TextPressKey("Tab", "Shift")
         } catch as Failure {
+            ContractThrew := true
             Err := Failure.Message
         }
-        AssertEqual("", Err,
-            "TextEraseChars/TextPressKey must contain injected SendInput failures")
+        AssertFalse(ContractThrew,
+            "TextEraseChars/TextPressKey must contain injected SendInput failures: " . Err)
     } finally {
         _AHK_SendInput := Previous
     }

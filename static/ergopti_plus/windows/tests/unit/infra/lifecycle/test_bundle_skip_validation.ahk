@@ -354,3 +354,83 @@ _BundleAdapter_NativeSuccess() {
 	} finally DirDelete(Root, true)
 }
 Test("bundle: native adapters grant only successful exclusive ownership (bundle-adapter)", _BundleAdapter_NativeSuccess)
+
+
+; A scanner can release its genuine read lease between a refused unlink and a write.
+_BundleMarker_ExactPublication(Mode) {
+	global BUNDLE_VERSION, BUNDLE_COMMIT
+	PreviousVersion := BUNDLE_VERSION
+	PreviousCommit := BUNDLE_COMMIT
+	Root := _BundleAcquire_Fixture()
+	MarkerDirectory := Mode == "missing-parent" ? Root . "\missing" : Root
+	MarkerPath := MarkerDirectory . "\.bundle-version"
+	Handle := 0
+	ObservedDeletes := 0
+	DeleteError := 0
+	ReleaseAfterNativeDelete(Identity, Path) {
+		AssertEqual(FileDelete, Identity, "only the exact builtin deletion is observed")
+		AssertEqual(MarkerPath, Path, "only the owned marker reaches this observation")
+		Identity.DeleteProp("Call")
+		ObservedDeletes += 1
+		try Identity.Call(Path)
+		catch as Failure {
+			AssertTrue(Failure is OSError, "the real deletion raises its genuine native error")
+			AssertEqual(32, Failure.Number, "the genuine held read lease denies removal")
+			DeleteError := Failure.Number
+			throw Failure
+		} finally {
+			AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int"),
+				"the scanner releases the actual exact lease after the failed native operation")
+			Handle := 0
+		}
+	}
+	try {
+		AssertFalse(FileDelete.HasOwnProp("Call"), "the builtin starts without a foreign observer")
+		BUNDLE_VERSION := "marker-publication-current"
+		BUNDLE_COMMIT := "cccccccccccccccccccccccccccccccccccccccc"
+		if Mode != "fresh" && Mode != "missing-parent"
+			FileAppend("previous-build`nold-commit", MarkerPath, "UTF-8")
+		if Mode == "scanner-release" {
+			Handle := DllCall("Kernel32\CreateFileW", "WStr", MarkerPath,
+				"UInt", 0x80000000, "UInt", 3, "Ptr", 0, "UInt", 3, "UInt", 0, "Ptr", 0, "Ptr")
+			AssertTrue(Handle != -1, "the actual scanner must acquire a genuine read lease")
+			AssertFalse(DllCall("Kernel32\DeleteFileW", "WStr", MarkerPath, "Int"),
+				"the real read lease denies unlink before production publication")
+			AssertEqual(32, A_LastError, "the initial refusal is the actual native sharing boundary")
+			FileDelete.DefineProp("Call", {Call: ReleaseAfterNativeDelete})
+		} else if Mode == "writer-denied" {
+			Handle := DllCall("Kernel32\CreateFileW", "WStr", MarkerPath,
+				"UInt", 0x80000000, "UInt", 1, "Ptr", 0, "UInt", 3, "UInt", 0, "Ptr", 0, "Ptr")
+			AssertTrue(Handle != -1, "the actual reader must refuse incompatible writes")
+		}
+		Result := _Bundle_WriteMarker(MarkerDirectory)
+		if Mode == "writer-denied" || Mode == "missing-parent" {
+			AssertFalse(Result, "a refused native write cannot publish a successful marker receipt")
+			if Mode == "writer-denied"
+				AssertEqual("previous-build`nold-commit", _Bundle_ReadMarker(Root), "refused admission preserves the existing marker")
+			else
+				AssertFalse(DirExist(MarkerDirectory), "refused publication must not silently create a missing parent")
+			return
+		}
+		if ObservedDeletes {
+			AssertEqual(1, ObservedDeletes, "the observer follows exactly one original deletion")
+			AssertEqual(32, DeleteError, "the original deletion really failed at the native sharing boundary")
+		}
+		if Mode == "scanner-release"
+			FileAppend("# bundle-marker-native-delete-observed " . ObservedDeletes . " error=" . DeleteError . "`n", "*")
+		AssertTrue(Result, "a complete admitted marker write reports its real publication")
+		AssertEqual(_Bundle_BuildMarker(), _Bundle_ReadMarker(Root),
+			"successful marker publication must replace previous bytes with exactly this build identity")
+	} finally {
+		if FileDelete.HasOwnProp("Call") && FileDelete.GetOwnPropDesc("Call").Call == ReleaseAfterNativeDelete
+			FileDelete.DeleteProp("Call")
+		if Handle && Handle != -1
+			DllCall("Kernel32\CloseHandle", "Ptr", Handle)
+		BUNDLE_VERSION := PreviousVersion
+		BUNDLE_COMMIT := PreviousCommit
+		DirDelete(Root, true)
+	}
+}
+for _BundleMarker_Mode in ["fresh", "replace", "scanner-release", "writer-denied", "missing-parent"]
+	Test("bundle marker: " . _BundleMarker_Mode . " publishes one exact identity (bundle-marker-publication)",
+		_BundleMarker_ExactPublication.Bind(_BundleMarker_Mode))

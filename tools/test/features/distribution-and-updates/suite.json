@@ -552,6 +552,22 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-dev-script.cjs"],
 			"repro": "npm run test:windows-dev-script"
+		},
+		{
+			"id": "js-windows-control-cli-session",
+			"ordinal": 530,
+			"name": "Windows control CLI runs both session and result admissions through its standalone entrypoint",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-control-cli.cjs"],
+			"repro": "npm run test:windows-control-cli"
+		},
+		{
+			"id": "js-windows-control-cli-result",
+			"ordinal": 531,
+			"name": "Windows control CLI accepts only typed matching result records and exact protocol states",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-control-cli.cjs", "--phase=result"],
+			"repro": "node tools/test/test-windows-control-cli.cjs --phase=result"
 		}
 	]
 }

@@ -6,11 +6,11 @@
  * DESCRIPTION:
  * tools/dev/run-windows-dev.ps1 starts ErgoptiPlus.ahk from this clone with
  * AutoHotkey v2 and names the clone in the shared developer variable, which
- * infra/dev_source.ahk checks. This host has no PowerShell, so the contract is
- * read from the script: the variable comes from identifiers.json and never as a
- * literal, the entry point and the x64 interpreter are the built exe's, and a
- * running ErgoptiPlus is asked to close, never killed. When pwsh is on PATH
- * the script is also parsed.
+ * infra/dev_source.ahk checks. Actual PowerShell AST selection runs against real
+ * private files on every host. Entry-body controls observe only process effects;
+ * non-Windows hosts omit the unique platform guard in a private copy. Windows
+ * executes the complete unmodified entry with Windows PowerShell 5.1. No installed
+ * app is closed or launched, and explicit choices must never fall back.
  * ==============================================================================
  */
 
@@ -19,6 +19,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -65,23 +66,162 @@ check('the driver reads the same variable name it is handed', () => {
 	assert.match(driver, /Data\["dev_source"\]\["environment"\]/);
 });
 
-const pwsh = spawnSync('pwsh', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.Major'], {
-	encoding: 'utf8'
-});
-if (pwsh.status === 0) {
-	check('parses under PowerShell', () => {
-		const parsed = spawnSync(
-			'pwsh',
-			[
-				'-NoProfile',
-				'-Command',
-				`$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile('${SCRIPT}',[ref]$t,[ref]$e);exit $e.Count`
-			],
-			{ encoding: 'utf8' }
-		);
-		assert.equal(parsed.status, 0, parsed.stdout + parsed.stderr);
-	});
-} else {
-	console.log('[SKIP] PowerShell parse: pwsh is not on PATH.');
+const interpreter =
+	process.platform === 'win32'
+		? path.join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+		: 'pwsh';
+const fixture = path.join(ROOT, 'tools/test/fixtures/windows_dev_interpreter_controls.ps1');
+const version = spawnSync(
+	interpreter,
+	['-NoProfile', '-NonInteractive', '-Command', '$PSVersionTable.PSVersion.ToString()'],
+	{ encoding: 'utf8', timeout: 10000, windowsHide: true }
+);
+assert.ifError(version.error);
+assert.equal(version.status, 0, version.stdout + version.stderr);
+const versionText = version.stdout.trim();
+assert.match(
+	versionText,
+	/^\d+\.\d+\.\d+(?:\.\d+)?$/,
+	'an actual PowerShell must answer its full version'
+);
+assert.ok(Number.parseInt(versionText, 10) >= 5, 'the fixture needs a supported PowerShell parser');
+if (process.platform === 'win32')
+	assert.match(versionText, /^5\.1\./, 'native entry controls qualify Windows PowerShell 5.1');
+console.log(`[runtime] PowerShell ${versionText}`);
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-windows-dev-runner-'));
+let nativeEntryCases = 0;
+let hostEntryBodyCases = 0;
+
+/** Execute the actual checked script against one private filesystem. */
+function runFixture(mode, directory, scenario = '') {
+	fs.mkdirSync(directory, { recursive: true });
+	const result = spawnSync(
+		interpreter,
+		[
+			'-NoProfile',
+			'-NonInteractive',
+			'-ExecutionPolicy',
+			'Bypass',
+			'-File',
+			fixture,
+			'-Mode',
+			mode,
+			'-Launcher',
+			SCRIPT,
+			'-Scratch',
+			directory,
+			'-Case',
+			scenario
+		],
+		{ encoding: 'utf8', timeout: 30000, windowsHide: true }
+	);
+	assert.ifError(result.error);
+	assert.equal(result.signal, null, 'the actual child must settle within its bound');
+	return result;
 }
-console.log(`[OK] Windows developer driver runner (${checks} checks).`);
+
+try {
+	const selectionDirectory = path.join(scratch, 'selection');
+	const selected = runFixture('selection', selectionDirectory);
+	assert.equal(selected.status, 0, selected.stdout + selected.stderr);
+	const rows = JSON.parse(fs.readFileSync(path.join(selectionDirectory, 'selection.json'), 'utf8'));
+	assert.deepEqual(
+		rows.map((row) => row.name),
+		[
+			'default-machine',
+			'default-user',
+			'explicit-existing',
+			'explicit-missing',
+			'explicit-directory'
+		],
+		'every real candidate-selection case must execute in order'
+	);
+	for (const row of rows)
+		check(`actual interpreter selection: ${row.name}`, () => {
+			assert.equal(row.passed, true, JSON.stringify(rows));
+			assert.equal(row.refused, row.expected_refusal, JSON.stringify(row));
+			assert.equal(row.selected, row.expected_refusal ? null : row.expected, JSON.stringify(row));
+		});
+	const values = JSON.parse(
+		fs.readFileSync(path.join(selectionDirectory, 'selection-values.json'), 'utf8')
+	);
+	assert.deepEqual(
+		values.map((row) => row.name),
+		['literal-null', 'empty-pipeline', 'automation-null', 'selected-path']
+	);
+	for (const row of values)
+		check(`actual selection receipt: ${row.name}`, () => {
+			assert.equal(
+				row.selected,
+				row.name === 'selected-path'
+					? path.join(selectionDirectory, 'explicit-directory', 'requested interpreter.exe')
+					: null,
+				JSON.stringify(row)
+			);
+		});
+	{
+		for (const scenario of [
+			'default-machine',
+			'default-user',
+			'explicit-existing',
+			'explicit-missing',
+			'explicit-directory',
+			'environment-existing',
+			'environment-missing',
+			'default-none'
+		])
+			check(
+				`${process.platform === 'win32' ? 'native complete' : 'host body'} developer launcher: ${scenario}`,
+				() => {
+					const directory = path.join(scratch, scenario);
+					const result = runFixture(
+						process.platform === 'win32' ? 'entry' : 'host-entry',
+						directory,
+						scenario
+					);
+					const refused = [
+						'explicit-missing',
+						'explicit-directory',
+						'environment-missing',
+						'default-none'
+					].includes(scenario);
+					assert.equal(result.status, refused ? 1 : 0, result.stdout + result.stderr);
+					const receiptPath = path.join(directory, 'launch.json');
+					const effectsPath = path.join(directory, 'effects.txt');
+					if (refused) {
+						assert.equal(fs.existsSync(receiptPath), false, 'refusal precedes any process launch');
+						assert.equal(
+							fs.existsSync(effectsPath),
+							false,
+							'refusal precedes discovery of running apps'
+						);
+						assert.match(result.stderr, /AutoHotkey v2 .*not found/);
+					} else {
+						const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+						const clone = path.join(directory, 'clone space é');
+						const driver = path.join(clone, 'static/ergopti_plus/windows');
+						const expected = ['explicit-existing', 'environment-existing'].includes(scenario)
+							? path.join(directory, 'requested interpreter.exe')
+							: scenario === 'default-user'
+								? path.join(directory, 'local-appdata/Programs/AutoHotkey/v2/AutoHotkey64.exe')
+								: path.join(directory, 'program-files/AutoHotkey/v2/AutoHotkey64.exe');
+						assert.equal(receipt.interpreter, expected);
+						assert.equal(receipt.working_directory, driver);
+						assert.equal(receipt.developer_root, clone);
+						assert.deepEqual(receipt.arguments, [`"${path.join(driver, IDENTIFIERS.app.ahk)}"`]);
+						assert.equal(
+							fs.readFileSync(effectsPath, 'utf8'),
+							`observe:${IDENTIFIERS.app.name}${process.platform === 'win32' ? '\r\n' : '\n'}`
+						);
+					}
+					if (process.platform === 'win32') nativeEntryCases++;
+					else hostEntryBodyCases++;
+				}
+			);
+	}
+} finally {
+	fs.rmSync(scratch, { recursive: true, force: true });
+}
+console.log(
+	`[OK] Windows developer driver runner (${checks} checks; native_entry_cases=${nativeEntryCases}; host_entry_body_cases=${hostEntryBodyCases}).`
+);

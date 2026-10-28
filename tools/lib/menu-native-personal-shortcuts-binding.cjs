@@ -25,6 +25,9 @@ function executable(source) {
 		if (token.kind === 'string')
 			return source.slice(token.start, token.end) === JSON.stringify(token.value);
 		const column = token.start - starts[line];
+		// Include operands are literal paths. Authenticate the directive head in
+		// native code; the lexer owns its complete operand rather than a string.
+		if (token.kind === 'include') return lines[line]?.[column] === '#';
 		return lines[line]?.slice(column, column + token.value.length) === token.value;
 	});
 }
@@ -881,7 +884,7 @@ function personalConstructorAuthority(unit) {
 		throw Error('Actual constructor bootstrap must precede renderer declarations');
 	const initializer = reader(unit.tokens.slice(0, entry.index));
 	initializer.take(
-		'#Include menu_population.ahk if !_MR_FrameNativeConstructorCurrent(Menu) throw Error('
+		'#Include menu_population.ahk\nif !_MR_FrameNativeConstructorCurrent(Menu) throw Error('
 	);
 	initializer.refusal();
 	initializer.take(')');

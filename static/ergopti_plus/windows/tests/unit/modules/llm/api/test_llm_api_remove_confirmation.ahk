@@ -66,11 +66,14 @@ _WAR_RemovalRetainsSource(Mode) {
 		SourceOptions["notify"] := _WAR_Notify.Bind(State)
 		SourceOptions["collect"] := _WAR_Collect.Bind(State)
 		Port := Map("confirm", _WAR_Confirm.Bind(State), "source_options", SourceOptions)
-		ErrorMessage := ""
+		ErrorMessage := "", ContractThrew := false
 		Committed := false
 		try Committed := _LLM_Menu_RemoveActiveApiEntry(Port)
-		catch as Err
+		catch as Err {
+			ContractThrew := true
 			ErrorMessage := Err.Message
+		}
+		AssertEqual(Mode == "throw", ContractThrew, "Unexpected callback failures cannot pass as a refused action.")
 		AssertEqual(Mode == "throw" ? "Independent removal confirmation failure" : "", ErrorMessage,
 			"Unexpected fixture failures cannot masquerade as a refused or cancelled write.")
 		AssertEqual(1, State.ConfirmCalls, "Every scenario must reach the actual removal question.")

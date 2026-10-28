@@ -5,6 +5,7 @@
 ; DESCRIPTION:
 ; Genuine native tree completion precedes a passive acyclic destruction marker.
 ; The publication donor supplies unchanged owners, assets and passive SDK ABI.
+; Namespace controls cover existing foreign data and fresh-profile admission.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -90,3 +91,10 @@ Test("Diagnostics collection lifetime: current terminal owner remains retained (
 	_HCLT_Case.Bind("current-retained"))
 Test("Diagnostics collection lifetime: public successor releases retired owner (healthcheck-collection-lifetime)",
 	_HCLT_Case.Bind("successor-releases"))
+
+Test("Diagnostics collection admission: preserve a foreign request (healthcheck-session-namespace)",
+	_HCLT_Case.Bind("namespace-request"))
+Test("Diagnostics collection admission: refuse an existing empty namespace (healthcheck-session-namespace)",
+	_HCLT_Case.Bind("namespace-empty"))
+Test("Diagnostics collection admission: create a fresh diagnostics parent (healthcheck-session-namespace)",
+	_HCLT_Case.Bind("namespace-fresh"))

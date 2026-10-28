@@ -118,3 +118,9 @@ _APST_Case(Mode) {
 for _APST_Mode in ["current", "close-create", "close-create-reject", "reopen-create", "reopen-create-reject"]
 	Test("Action picker startup: " . _APST_Mode . " retains only its current owner (action-picker-startup-owner)",
 		_APST_Case.Bind(_APST_Mode))
+
+#Include test_action_picker_reset_owner.ahk
+
+#Include test_action_picker_confirmation_failure.ahk
+
+#Include test_action_picker_create_owner.ahk

@@ -1,0 +1,97 @@
+{
+	"app": "precision-probe.exe",
+	"timestamp": "2026-10-26 12:00:00.000",
+	"delay_ms": 100,
+	"cases": [
+		{
+			"id": "backspace-bg",
+			"tab": "bg",
+			"table": "ngram_bigrams",
+			"token": "[BS]a",
+			"events": ["[BS]", "a", "[BS]"],
+			"c": 1,
+			"e": 1,
+			"accuracy": 100
+		},
+		{
+			"id": "backspace-tg",
+			"tab": "tg",
+			"table": "ngram_trigrams",
+			"token": "a[BS]b",
+			"events": ["a", "[BS]", "b", "[BS]"],
+			"c": 1,
+			"e": 1,
+			"accuracy": 100
+		},
+		{
+			"id": "backspace-qg",
+			"tab": "qg",
+			"table": "ngram_quadgrams",
+			"token": "ab[BS]c",
+			"events": ["a", "b", "[BS]", "c", "[BS]"],
+			"c": 1,
+			"e": 1,
+			"accuracy": 100
+		},
+		{
+			"id": "backspace-pg",
+			"tab": "pg",
+			"table": "ngram_pentagrams",
+			"token": "abc[BS]d",
+			"events": ["a", "b", "c", "[BS]", "d", "[BS]"],
+			"c": 1,
+			"e": 1,
+			"accuracy": 100
+		},
+		{
+			"id": "backspace-hx",
+			"tab": "hx",
+			"table": "ngram_hexagrams",
+			"token": "abcd[BS]e",
+			"events": ["a", "b", "c", "d", "[BS]", "e", "[BS]"],
+			"c": 1,
+			"e": 1,
+			"accuracy": 100
+		},
+		{
+			"id": "backspace-hp",
+			"tab": "hp",
+			"table": "ngram_heptagrams",
+			"token": "abcde[BS]f",
+			"events": ["a", "b", "c", "d", "e", "[BS]", "f", "[BS]"],
+			"c": 1,
+			"e": 1,
+			"accuracy": 100
+		},
+		{
+			"id": "literal-bracket",
+			"tab": "pg",
+			"table": "ngram_pentagrams",
+			"token": "[bs]a",
+			"events": ["[", "b", "s", "]", "a", "[BS]"],
+			"c": 1,
+			"e": 1,
+			"accuracy": 0
+		},
+		{
+			"id": "ordinary-bigram",
+			"tab": "bg",
+			"table": "ngram_bigrams",
+			"token": "ab",
+			"events": ["a", "b", "[BS]"],
+			"c": 1,
+			"e": 1,
+			"accuracy": 0
+		},
+		{
+			"id": "ordinary-char",
+			"tab": "c",
+			"table": "ngram_chars",
+			"token": "a",
+			"events": ["a", "[BS]"],
+			"c": 1,
+			"e": 1,
+			"accuracy": 0
+		}
+	]
+}

@@ -53,6 +53,7 @@ class _ORTD_Fixture {
 		this.Deliveries := 0
 		this.TimerCalls := 0
 		this.TimerFailure := ""
+		this.TimerFailed := false
 		this.CancelTimer := ObjBindMethod(this, "Revoke")
 	}
 	Start() {
@@ -70,8 +71,10 @@ class _ORTD_Fixture {
 				case "withdraw": this.Bootstrap.CurrentValue := false
 				case "epoch": _LLM_Deps_Epoch += 1
 			}
-		} catch as Err
+		} catch as Err {
+			this.TimerFailed := true
 			this.TimerFailure := Err.Message
+		}
 	}
 	Close() {
 		global _LLM_Deps_FailureMessage
@@ -102,7 +105,7 @@ _ORTD_Delivery(Mode, ExitCode) {
 		F.Start()
 		Critical("Off")
 		F.Runtime.Done.Call(ExitCode, "", "")
-		AssertEqual("", F.TimerFailure, "the real revocation timer must finish normally")
+		AssertFalse(F.TimerFailed, "the real revocation timer must finish normally: " . F.TimerFailure)
 		AssertEqual(1, F.Deliveries, "the callback must be captured by the actual runtime terminal path")
 		AssertFalse(F.Runtime.Owner.HasOwner(), "the true terminal path must retire physical ownership")
 		AssertEqual(1, F.Runtime.RetireCalls, "exact file retirement is acknowledged once")

@@ -1852,7 +1852,8 @@ if (ahkIndex !== -1) {
 			'tools/test/support/file-backed-native-runner.cjs',
 			'tools/test/support/ahk-local-shadow-output.cjs',
 			'tools/test/validate-ahk-suite-manifest.cjs',
-			'tools/test/test-ahk-test-coverage.cjs'
+			'tools/test/test-ahk-test-coverage.cjs',
+			'tools/lib/script-source.cjs'
 		]);
 		for (const entry of trackedEntries.split('\0').filter(Boolean)) {
 			const match = /^(100644|100755) blob ([a-f0-9]{40})\t(.+)$/.exec(entry);
@@ -1872,7 +1873,8 @@ if (ahkIndex !== -1) {
 			'tools/test/support/file-backed-native-runner.cjs',
 			'tools/test/support/ahk-local-shadow-output.cjs',
 			'tools/test/validate-ahk-suite-manifest.cjs',
-			'tools/test/test-ahk-test-coverage.cjs'
+			'tools/test/test-ahk-test-coverage.cjs',
+			'tools/lib/script-source.cjs'
 		])
 			files.add(file);
 		const changed = snapshot16Git(['diff', '--name-only', '--no-ext-diff', '-z', head]).split('\0');

@@ -1043,7 +1043,7 @@ for _LPP_CustodyBoundary in ["context", "payload", "before_launch", "after_acqui
 }
 
 
-_LPP_LocalQueuedCustody(Boundary, Mode) {
+_LPP_LocalQueuedCustody(Boundary, Mode, CompletedRetry := false, WithdrawCompleted := false) {
 	global _LLM_Ollama_Async, _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending
 	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_Epoch, _LLM_LOCAL_DEFAULTS
 	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupGeneration, _LLM_Ollama_WarmupHttp
@@ -1055,6 +1055,7 @@ _LPP_LocalQueuedCustody(Boundary, Mode) {
 		_LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupRetryModel]
 	Menu := _LPP_Menu(), Menu["backend"] := "ollama", Menu["model"] := _LLM_LOCAL_DEFAULTS["llm_model"]
 	Origin := LLM_OllamaCaptureOriginCustody, Spawn := _LLM_Ollama_DoSpawn, Constructor := CurlAsyncRequest
+	Reader := LLM_OllamaRequestOrigin
 	AssertFalse(Origin.HasOwnProp("Call")), AssertFalse(Spawn.HasOwnProp("Call")), AssertFalse(Constructor.HasOwnProp("Call"))
 	State := Map("runs", [], "paths", [], "closed", [], "id", 0, "seen", false)
 	Warm := _ManagedCurlControlState()
@@ -1062,10 +1063,14 @@ _LPP_LocalQueuedCustody(Boundary, Mode) {
 		"terminate_process", (*) => true, "wait_process", (*) => 0,
 		"close_process", (Handle) => (State["closed"].Push(Handle), true))
 	try {
+		if WithdrawCompleted
+			AssertFalse(Reader.HasOwnProp("Call"), "the origin observation must start from its genuine reader")
 		_LLM_Ollama_Async := Map(), _LLM_Ollama_Pending := ""
 		_LLM_Ollama_WarmupHttp := 0, _LLM_Ollama_WarmupPendingFn := 0, _LLM_Ollama_IsReady := false
 		_LPP_Run(Menu, LPP_BUFFER, Body, true)
 	} finally {
+		if WithdrawCompleted && Reader.HasOwnProp("Call")
+			Reader.DeleteProp("Call")
 		if Origin.HasOwnProp("Call")
 			Origin.DeleteProp("Call")
 		if Spawn.HasOwnProp("Call")
@@ -1097,14 +1102,58 @@ _LPP_LocalQueuedCustody(Boundary, Mode) {
 			_LLM_Deps_DoCheck_Result(true, A_TickCount, _LLM_Deps_Epoch, Menu["model"])
 			AssertTrue(LLM_Deps_IsReady(), "controlled reachability must enter the actual dependency owner")
 			Constructor.DefineProp("Call", {Call: WarmupConstructor})
-			AssertTrue(LLM_OllamaWarmup(Menu["model"]), "the actual warmup owner must send through its real facade")
+			if CompletedRetry {
+				LLM_OllamaScheduleWarmupRetry(Menu["model"])
+				AssertTrue(Warm.Has("request") && Warm["starts"] == 1,
+					"the shipped scheduler must acquire the actual controlled facade once")
+				AssertTrue(IsSet(_LLM_Ollama_WarmupRetryFn) && HasMethod(_LLM_Ollama_WarmupRetryFn, "Call"),
+					"the real scheduler must own its retry timer before completion")
+			} else
+				AssertTrue(LLM_OllamaWarmup(Menu["model"]), "the actual warmup owner must send through its real facade")
+			Warm["generation"] := _LLM_Ollama_WarmupGeneration
+			Warm["aux_generation"] := LLM_AuxGeneration()
 			if Constructor.HasOwnProp("Call")
 				Constructor.DeleteProp("Call")
 			_ManagedCurlControlAck(Warm)
 			Warm["request"]._PollManagedAdmission()
+			AssertTrue(Warm["request"].ManagedPayloadPublished && !Warm["request"].Aborted,
+				"the owned native admission must publish its original transport input before response completion")
 			AssertTrue(FSWrite(Warm["request"].BodyPath, '{"done":true}'))
 			AssertTrue(FSWrite(Warm["request"].HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
-			Warm["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+			CompletionCritical := CompletedRetry ? Critical("On") : A_IsCritical
+			try {
+				Warm["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+				SuccessfulRequest := Warm["request"]
+				AssertTrue(SuccessfulRequest.Completed && !SuccessfulRequest.Aborted && SuccessfulRequest.Status == 200,
+					"the actual facade must own its completed HTTP200 before readiness publication")
+				if CompletedRetry {
+					AssertTrue(SuccessfulRequest.ManagedPayloadPublished && Warm["current"].Call(),
+						"only the original current transport may qualify completed-success retry handling")
+					AssertFalse(LLM_OllamaIsReady(), "the independent generic poll has not published readiness yet")
+					; Model one valid event order: the existing retry callback reaches
+					; the completed response before its separate generic ready poll.
+					Constructor.DefineProp("Call", {Call: WarmupConstructor})
+					if WithdrawCompleted
+						Reader.DefineProp("Call", {Call: WithdrawOrigin})
+					_LLM_Ollama_WarmupRetryFn.Call()
+					if Constructor.HasOwnProp("Call")
+						Constructor.DeleteProp("Call")
+					FileAppend("RECEIPT completed-warmup-retry http_status=" . SuccessfulRequest.Status
+						. " transport_spawns=" . Warm["spawns"] . " ready=" . LLM_OllamaIsReady() . "`n", "*")
+					AssertEqual(1, Warm["spawns"], "a due retry cannot replace successful completed transport before readiness publication")
+					if !WithdrawCompleted {
+						AssertTrue(LLM_OllamaIsReady(), "the retry consumes its original success synchronously")
+						AssertEqual(5000, _LLM_Ollama_WarmupRetryIntervalMs, "success restores the existing base backoff")
+						AssertFalse(IsSet(_LLM_Ollama_WarmupRetryFn), "success ends the actual retry chain")
+					}
+				}
+			} finally Critical(CompletionCritical)
+			if WithdrawCompleted {
+				AssertFalse(LLM_OllamaIsReady(), "cancelled captured-origin observation cannot publish readiness")
+				AssertEqual(0, _LLM_Ollama_WarmupHttp, "withdrawal must retain its exact retired request state")
+				AssertFalse(IsSet(_LLM_Ollama_WarmupRetryFn), "a stale observation cannot recreate the cancelled retry timer")
+				return
+			}
 			WaitUntil(LLM_OllamaIsReady, "the real warmup poll must accept its actual owned HTTP 200 response")
 			AssertTrue(LLM_OllamaAllowInference(), "no direct ready=true assignment may admit the public prediction")
 			if Mode == "bridge" {
@@ -1169,6 +1218,13 @@ _LPP_LocalQueuedCustody(Boundary, Mode) {
 			Critical(Prior)
 		}
 	}
+	WithdrawOrigin(Self, Args*) {
+		Self.DeleteProp("Call")
+		Result := Self.Call(Args*)
+		LLM_OllamaCancelWarmupRetry()
+		return Result
+	}
+
 	WarmupConstructor(Self, Args*) {
 		Constructor.DeleteProp("Call")
 		Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(Warm)))
@@ -1178,6 +1234,7 @@ _LPP_LocalQueuedCustody(Boundary, Mode) {
 	}
 	Routing(Request, Reader := 0, CurrentFn := 0) {
 		Request.DeleteProp("SetManagedRouting")
+		Warm["current"] := CurrentFn
 		return Request.SetManagedRouting((*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""), CurrentFn)
 	}
 	Invoke(Profile) {
@@ -1237,7 +1294,15 @@ _LPP_LocalQueuedCustody(Boundary, Mode) {
 		Started := A_TickCount
 		while !Check.Call() && TickElapsed64(Started) < LLM_ApiCommon_GetRateLimitMs("ollama") + 2000
 			Sleep(1)
-		AssertTrue(Check.Call(), Message)
+		Passed := Check.Call()
+		if !Passed && InStr(Message, "real warmup poll") && Warm.Has("request") {
+			Request := Warm["request"]
+			Message .= Format(" (completed={1}, aborted={2}, status={3}, published={4}, same_request={5}, current={6}, generation={7}/{8}, aux={9}/{10})",
+				Request.Completed, Request.Aborted, Request.Status, Request.ManagedPayloadPublished,
+				_LLM_Ollama_WarmupHttp == Request, Warm["current"].Call(), _LLM_Ollama_WarmupGeneration,
+				Warm["generation"], LLM_AuxGeneration(), Warm["aux_generation"])
+		}
+		AssertTrue(Passed, Message)
 	}
 }
 for _LPP_LocalBoundary in ["origin", "queue"] {
@@ -1245,3 +1310,9 @@ for _LPP_LocalBoundary in ["origin", "queue"] {
 		Test("LLM prompt prediction: local custody " . _LPP_LocalBoundary . " " . _LPP_LocalMode . " (local-prediction-custody)",
 			_LPP_LocalQueuedCustody.Bind(_LPP_LocalBoundary, _LPP_LocalMode))
 }
+
+Test("LLM warmup completed retry: owned HTTP200 keeps its completed request (warmup-completed-success-retry)",
+	_LPP_LocalQueuedCustody.Bind("origin", "unchanged", true))
+
+Test("LLM warmup completed retry: origin withdrawal preserves cancellation (warmup-completed-success-retry)",
+	_LPP_LocalQueuedCustody.Bind("origin", "unchanged", true, true))

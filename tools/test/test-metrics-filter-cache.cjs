@@ -3233,4 +3233,868 @@ assert.equal(
 	'all literal-word versus physical-control display and search controls must execute'
 );
 
+const typingReplacementAppScopes = [
+	{ name: 'empty history', apps: null, names: [] },
+	{ name: 'system-only day', apps: { _system: { awake_ms: 1000 } }, names: [] },
+	{
+		name: 'retained selected app',
+		apps: { 'Editor.exe': { chars: 9, time: 900 } },
+		names: ['Editor.exe']
+	},
+	{ name: 'new app only', apps: { 'Fresh.exe': { chars: 9, time: 900 } }, names: ['Fresh.exe'] }
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const mode of ['all', 'none', 'subset']) {
+		for (const vector of typingReplacementAppScopes) {
+			test(`${host} ${mode} app scope reconciles ${vector.name}`, () => {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, '2026-10-27T12:00:00Z');
+				page.elements.get('app_search').focus = () => {};
+				publishTypingPage(page, host, {
+					'2026-10-27': {
+						'Editor.exe': { chars: 5, time: 500 },
+						'Browser.exe': { chars: 6, time: 600 }
+					}
+				});
+				if (mode !== 'all') {
+					page.context.open_app_modal();
+					page.context.deselect_all_apps();
+					if (mode === 'subset')
+						page.context.toggle_app_selection({ checked: true, value: 'Editor.exe' });
+					page.context.close_app_modal();
+				}
+				assert.equal(vm.runInContext('app_state.app_selection_mode', page.context), mode);
+				const replacement = vector.apps === null ? {} : { '2026-10-27': vector.apps };
+				deliverTypingManifest(page, host, replacement);
+				const selected =
+					mode === 'all'
+						? vector.names
+						: mode === 'subset' && vector.names.includes('Editor.exe')
+							? ['Editor.exe']
+							: [];
+				const expectedMode = mode === 'subset' && selected.length === 0 ? 'none' : mode;
+				assert.deepEqual(
+					Array.from(vm.runInContext('app_state.available_apps', page.context)),
+					vector.names,
+					'a full native replacement retires every unavailable app identity'
+				);
+				assert.deepEqual(
+					Array.from(vm.runInContext('[...app_state.selected_apps]', page.context)),
+					selected
+				);
+				assert.equal(vm.runInContext('app_state.app_selection_mode', page.context), expectedMode);
+				assert.deepEqual(
+					Array.from(page.context.get_app_selection_request_apps()),
+					selected,
+					'future native queries use only the reconciled application scope'
+				);
+				page.context.open_app_modal();
+				const list = page.elements.get('app_list').innerHTML;
+				for (const retired of [
+					'Browser.exe',
+					...(!vector.names.includes('Editor.exe') ? ['Editor.exe'] : [])
+				])
+					assert.equal(list.includes(`value="${retired}"`), false);
+				for (const available of vector.names) assert.ok(list.includes(`value="${available}"`));
+				page.context.close_app_modal();
+				deliverTypingManifest(
+					page,
+					host,
+					{
+						'2026-10-27': { 'Future.exe': { chars: 10, time: 1000 } }
+					},
+					{ revision: 3 }
+				);
+				assert.deepEqual(Array.from(vm.runInContext('app_state.available_apps', page.context)), [
+					'Future.exe'
+				]);
+				assert.deepEqual(
+					Array.from(page.context.get_app_selection_request_apps()),
+					mode === 'all' ? ['Future.exe'] : [],
+					'ALL follows new apps while explicit NONE and subset intent remain restrictive'
+				);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			});
+		}
+	}
+}
+assert.equal(typingReplacementAppScopes.length, 4);
+assert.equal(
+	passed,
+	747,
+	'all native empty/replaced app-scope and later discovery controls must execute'
+);
+
+const typingEmptySelectionStarts = ['empty', 'application', 'system-only'];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const initial of typingEmptySelectionStarts) {
+		test(`${host} app-filter caption follows explicit selection after ${initial}`, () => {
+			const page = loadMetricsTypingPage(host);
+			freezePageClock(page, '2026-10-27T12:00:00Z');
+			page.elements.get('app_search').focus = () => {};
+			const manifest =
+				initial === 'empty'
+					? {}
+					: {
+							'2026-10-27':
+								initial === 'application'
+									? { 'Editor.exe': { chars: 5, time: 500 } }
+									: { _system: { awake_ms: 1000 } }
+						};
+			publishTypingPage(page, host, manifest);
+			const button = page.elements.get('app_filter_btn');
+			const choose = (all) => {
+				page.context.open_app_modal();
+				if (all) page.context.select_all_apps();
+				else page.context.deselect_all_apps();
+				page.context.close_app_modal();
+			};
+			const assertCaption = (all) => {
+				assert.equal(
+					button.innerText,
+					page.context._t(all ? 'ui_typing.apps_all' : 'ui_typing.apps_none'),
+					'the native filter caption distinguishes explicit NONE from ALL at zero apps'
+				);
+				assert.equal(button.classList.contains('active'), all);
+				assert.equal(
+					vm.runInContext('app_state.app_selection_mode', page.context),
+					all ? 'all' : 'none'
+				);
+			};
+			assertCaption(true);
+			choose(false);
+			assertCaption(false);
+			assert.deepEqual(Array.from(page.context.get_app_selection_request_apps()), []);
+			choose(true);
+			assertCaption(true);
+			deliverTypingManifest(page, host, {
+				'2026-10-27': {
+					'Fresh.exe': { chars: 8, time: 800 },
+					'Other.exe': { chars: 9, time: 900 }
+				}
+			});
+			assertCaption(true);
+			page.context.open_app_modal();
+			page.context.toggle_app_selection({ value: 'Other.exe', checked: false });
+			page.context.close_app_modal();
+			assert.ok(button.innerText.includes('(1/2)'), 'nonempty subset captions retain their count');
+			assert.equal(button.classList.contains('active'), false);
+			choose(false);
+			assertCaption(false);
+			deliverTypingManifest(page, host, {}, { revision: 3 });
+			assert.deepEqual(Array.from(vm.runInContext('app_state.available_apps', page.context)), []);
+			assertCaption(false);
+			choose(true);
+			assertCaption(true);
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(typingEmptySelectionStarts.length, 3);
+assert.equal(
+	passed,
+	756,
+	'all explicit empty NONE/ALL, subset and native-clear caption controls must execute'
+);
+
+// This browser port links the two real DOM text properties and declared attributes.
+function typingAppFilterLocalePorts(page) {
+	const button = page.elements.get('app_filter_btn');
+	let caption = button.innerText || button.textContent || '';
+	for (const property of ['innerText', 'textContent']) {
+		Object.defineProperty(button, property, {
+			get: () => caption,
+			set: (value) => {
+				caption = String(value);
+			},
+			configurable: true
+		});
+	}
+	const declaration = page.html.match(/<button\b([^>]*\bid="app_filter_btn"[^>]*)>/);
+	assert.ok(declaration, 'the actual page declares its application filter control');
+	const key = declaration[1].match(/data-i18n="([^"]+)"/)?.[1] || null;
+	button.getAttribute = (name) => (name === 'data-i18n' ? key : null);
+	page.context.document.querySelectorAll = (selector) =>
+		selector === '[data-i18n]' && key ? [button] : [];
+	page.context.CustomEvent = class CustomEvent {
+		constructor(type) {
+			this.type = type;
+		}
+	};
+	page.context.document.dispatchEvent = (event) => {
+		for (const listener of page.listeners.filter((entry) => entry.name === event.type))
+			listener.callback(event);
+		return true;
+	};
+	return button;
+}
+const typingCaptionLocaleRoot = path.resolve(root, '../data/locales');
+const typingCaptionCatalogues = fs
+	.readdirSync(typingCaptionLocaleRoot)
+	.filter((name) => name.endsWith('.json'))
+	.sort()
+	.map((name) => ({
+		name,
+		strings: JSON.parse(fs.readFileSync(path.join(typingCaptionLocaleRoot, name), 'utf8'))
+	}));
+assert.ok(typingCaptionCatalogues.some((locale) => locale.name === 'en.json'));
+assert.ok(typingCaptionCatalogues.some((locale) => locale.name === 'fr.json'));
+let typingCaptionLocaleApplications = 0;
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const mode of ['none', 'all', 'subset']) {
+		test(`${host} ${mode} app-filter caption survives every locale application`, () => {
+			const page = loadMetricsTypingPage(host);
+			freezePageClock(page, '2026-10-27T12:00:00Z');
+			const button = typingAppFilterLocalePorts(page);
+			page.elements.get('app_search').focus = () => {};
+			publishTypingPage(page, host, {
+				'2026-10-27': {
+					'Editor.exe': { chars: 5, time: 500 },
+					'Browser.exe': { chars: 6, time: 600 }
+				}
+			});
+			if (mode !== 'all') {
+				page.context.open_app_modal();
+				page.context.deselect_all_apps();
+				if (mode === 'subset')
+					page.context.toggle_app_selection({ value: 'Editor.exe', checked: true });
+				page.context.close_app_modal();
+			}
+			assert.equal(vm.runInContext('app_state.app_selection_mode', page.context), mode);
+			const selection = JSON.stringify(Array.from(page.context.get_app_selection_request_apps()));
+			const posts = page.posts.length;
+			for (const locale of typingCaptionCatalogues) {
+				for (const key of ['ui_typing.apps_none', 'ui_typing.apps_all', 'ui_typing.apps_some'])
+					assert.equal(
+						typeof locale.strings[key],
+						'string',
+						`${locale.name} declares the existing dynamic key`
+					);
+				page.context._i18n_locale = locale.name.slice(0, -5);
+				page.context.i18n_apply(locale.strings);
+				if (mode === 'subset')
+					assert.equal(
+						button.innerText,
+						locale.strings['ui_typing.apps_some'].replace('{n}', 1).replace('{total}', 2),
+						`${locale.name} keeps the selected count in its declared caption`
+					);
+				else
+					assert.equal(
+						button.innerText,
+						locale.strings[mode === 'all' ? 'ui_typing.apps_all' : 'ui_typing.apps_none'],
+						`${locale.name} keeps the real native selection in the visible caption`
+					);
+				assert.equal(button.classList.contains('active'), mode === 'all');
+				assert.equal(vm.runInContext('app_state.app_selection_mode', page.context), mode);
+				assert.equal(
+					JSON.stringify(Array.from(page.context.get_app_selection_request_apps())),
+					selection
+				);
+				assert.equal(
+					page.posts.length,
+					posts,
+					'a locale repaint must not restart a native range query'
+				);
+				typingCaptionLocaleApplications++;
+			}
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(typingCaptionLocaleApplications, typingCaptionCatalogues.length * 9);
+assert.equal(passed, 765, 'all native app-filter modes and every locale transition must execute');
+
+const nativeWordProjection = JSON.parse(
+	fs.readFileSync(
+		path.resolve(root, '../../windows/tests/fixtures/metrics_word_projection.json'),
+		'utf8'
+	)
+);
+assert.equal(nativeWordProjection.cases.length, 10);
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const sensitive of [false, true]) {
+			for (const vector of nativeWordProjection.cases) {
+				test(`${host} ${source} completed word ${vector.id}, case-sensitive ${sensitive}`, () => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(
+						page,
+						source === 'historical' ? '2026-10-27T12:00:00' : '2026-10-26T12:00:00'
+					);
+					publishTypingPage(page, host, vector.snapshot.manifest);
+					if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+					else page.elements.get('btn_case_sensitive').classList.remove('active');
+					const raw = vector.snapshot.range.historical;
+					deliverTypingManifest(page, host, vector.snapshot.manifest, {
+						range:
+							source === 'historical'
+								? vector.snapshot.range
+								: {
+										historical: {},
+										today: { [nativeWordProjection.app]: raw }
+									}
+					});
+					page.context.apply_local_filters();
+					const caption = page.elements.get('wpm_words_sub').innerHTML;
+					assert.ok(
+						caption.includes(`>${vector.snapshot.expected_words}</strong>`),
+						'total words includes every completed word, including corrected completions'
+					);
+					assert.ok(caption.includes(page.context._t('ui_typing.unit_words_typed')));
+					const expected = vector.expected_rows[sensitive ? 'case_sensitive' : 'case_folded'];
+					for (const tab of ['w', 'w_bg']) {
+						vm.runInContext(`app_state.current_tab = ${JSON.stringify(tab)}`, page.context);
+						page.context.render_current_tab();
+						page.timers.at(-1)();
+						const rows = JSON.parse(
+							vm.runInContext(
+								'JSON.stringify(app_state.rendered_list.map(row => ({key: row.key, count: row.count, accuracy: row.acc})))',
+								page.context
+							)
+						);
+						const sort = (items) => items.sort((a, b) => a.key.localeCompare(b.key));
+						assert.deepEqual(sort(rows), sort(structuredClone(expected[tab])));
+					}
+					for (const tab of ['c', 'bg', 'tg', 'qg', 'pg', 'hx', 'hp']) {
+						const counts = new Map();
+						for (const [key, value] of Object.entries(raw[tab] || {})) {
+							const folded = sensitive ? key : key.toLowerCase();
+							counts.set(folded, (counts.get(folded) || 0) + value.c);
+						}
+						const projected = vm.runInContext(
+							`app_state.data[${JSON.stringify(tab)}]`,
+							page.context
+						);
+						for (const [key, count] of counts)
+							if (count > 0)
+								assert.equal(
+									projected[key]?.count,
+									count,
+									'character occurrence counts never add error counts'
+								);
+					}
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+				});
+			}
+		}
+	}
+}
+assert.equal(
+	passed,
+	885,
+	'all native completed-word histories, case modes and host ingress paths must execute'
+);
+
+const nativeAccuracyProjection = JSON.parse(
+	fs.readFileSync(
+		path.resolve(root, '../../windows/tests/fixtures/metrics_accuracy_projection.json'),
+		'utf8'
+	)
+);
+assert.equal(nativeAccuracyProjection.cases.length, 9);
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const sensitive of [false, true]) {
+			for (const vector of nativeAccuracyProjection.cases) {
+				test(`${host} ${source} original token precision ${vector.id}, case-sensitive ${sensitive}`, () => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(
+						page,
+						source === 'historical' ? '2026-10-27T12:00:00' : '2026-10-26T12:00:00'
+					);
+					const app = nativeAccuracyProjection.app;
+					const manifest = { '2026-10-26': { [app]: { chars: vector.events.length, time: 1000 } } };
+					publishTypingPage(page, host, manifest);
+					if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+					else page.elements.get('btn_case_sensitive').classList.remove('active');
+					const raw = { [vector.tab]: { [vector.token]: { c: vector.c, e: vector.e, t: 100 } } };
+					deliverTypingManifest(page, host, manifest, {
+						range:
+							source === 'historical'
+								? { historical: raw, today: {} }
+								: { historical: {}, today: { [app]: raw } }
+					});
+					vm.runInContext(`app_state.current_tab = ${JSON.stringify(vector.tab)}`, page.context);
+					page.context.render_current_tab();
+					page.timers.at(-1)();
+					// Flat bracket strings have an independent, reported token-boundary ambiguity.
+					// Pin their projection policy without claiming the current tokenizer can render them.
+					if (vector.id !== 'literal-bracket') {
+						const rows = vm.runInContext('app_state.rendered_list', page.context);
+						assert.equal(rows.length, 1);
+						assert.equal(
+							rows[0].acc,
+							vector.accuracy,
+							'case folding retains the original native correction policy'
+						);
+						assert.equal(rows[0].count, vector.c);
+					}
+					const key = sensitive ? vector.token : vector.token.toLowerCase();
+					const item = vm.runInContext(
+						`app_state.data[${JSON.stringify(vector.tab)}][${JSON.stringify(key)}]`,
+						page.context
+					);
+					assert.equal(
+						item.errors,
+						vector.e,
+						'raw error counters remain available to correction metrics'
+					);
+					assert.equal(
+						item.accuracy_errors,
+						vector.accuracy === 100 ? 0 : vector.e,
+						'only the original native uppercase control marker receives the existing exemption'
+					);
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+				});
+			}
+		}
+	}
+}
+assert.equal(passed, 993, 'all original-marker and ordinary-error precision controls must execute');
+
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const sensitive of [false, true]) {
+		test(`${host} derived modifier precision remains finite, case-sensitive ${sensitive}`, () => {
+			const page = loadMetricsTypingPage(host);
+			freezePageClock(page, '2026-10-27T12:00:00');
+			const snapshot = nativeWordProjection.cases.find(
+				(vector) => vector.id === 'case-mixed'
+			).snapshot;
+			publishTypingPage(page, host, snapshot.manifest);
+			if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+			else page.elements.get('btn_case_sensitive').classList.remove('active');
+			const historical = structuredClone(snapshot.range.historical);
+			// Ctrl+S is produced and replayed by the native shortcut-projection contract.
+			historical.sc = { 'Ctrl+S': { c: 1, t: 0 } };
+			deliverTypingManifest(page, host, snapshot.manifest, { range: { historical, today: {} } });
+			vm.runInContext("app_state.current_tab = 'mods'", page.context);
+			page.context.render_current_tab();
+			page.timers.at(-1)();
+			const rows = JSON.parse(
+				vm.runInContext(
+					'JSON.stringify(app_state.rendered_list.map(row => ({key:row.key, count:row.count, accuracy:row.acc})))',
+					page.context
+				)
+			);
+			assert.deepEqual(
+				rows.sort((a, b) => a.key.localeCompare(b.key)),
+				[
+					{ key: 'ctrl', count: 1, accuracy: 100 },
+					{ key: 'shift', count: 1, accuracy: 100 }
+				]
+			);
+		});
+	}
+}
+assert.equal(passed, 999, 'all native and derived precision ownership paths must execute');
+
+const nativeAppIdentityNames = [
+	'Editor.exe',
+	'__proto__',
+	'constructor',
+	'toString',
+	'hasOwnProperty'
+];
+const nativeAppIdentityFlows = ['source', 'destination', 'reciprocal'];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const name of nativeAppIdentityNames) {
+		for (const flow of nativeAppIdentityFlows) {
+			test(`${host} app KPI retains native ${name} as ${flow}`, () => {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, '2026-10-27T12:00:00');
+				const before = vm.runInContext(
+					'JSON.stringify(Object.getOwnPropertyNames(Object.prototype))',
+					page.context
+				);
+				const manifest = (factor) => ({
+					'2026-10-26':
+						flow === 'source'
+							? {
+									[name]: { chars: 300 * factor, time: 30000 * factor, app_time_ms: 60000 * factor }
+								}
+							: flow === 'destination'
+								? {
+										'Other.exe': {
+											chars: 300 * factor,
+											time: 30000 * factor,
+											app_time_ms: 60000 * factor,
+											switches_to: { [name]: 3 * factor }
+										}
+									}
+								: {
+										[name]: {
+											chars: 300 * factor,
+											time: 30000 * factor,
+											app_time_ms: 60000 * factor,
+											switches_to: { 'Other.exe': 3 * factor }
+										},
+										'Other.exe': {
+											chars: 200 * factor,
+											time: 20000 * factor,
+											app_time_ms: 40000 * factor,
+											switches_to: { [name]: 7 * factor }
+										}
+									}
+				});
+				publishTypingPage(page, host, manifest(1));
+				for (const factor of [1, 2]) {
+					if (factor === 2) deliverTypingManifest(page, host, manifest(factor));
+					page.context.render_apps_kpi();
+					const rows = JSON.parse(vm.runInContext('JSON.stringify(_apps_data)', page.context));
+					const expected =
+						flow === 'destination'
+							? [{ name: 'Other.exe', chars: 300 * factor }]
+							: [{ name, chars: 300 * factor }];
+					if (flow === 'reciprocal') expected.push({ name: 'Other.exe', chars: 200 * factor });
+					const sort = (items) => items.sort((a, b) => a.name.localeCompare(b.name));
+					assert.deepEqual(
+						sort(rows.map((row) => ({ name: row.name, chars: row.chars }))),
+						sort(expected),
+						'every real native app owns a numeric activity row'
+					);
+					for (const row of rows) {
+						assert.equal(row.cpm, 600);
+						assert.ok(
+							page.elements.get('apps_table_container').innerHTML.includes(`<td>${row.name}</td>`)
+						);
+					}
+					assert.ok(page.elements.get('apps_val').innerHTML.startsWith(String(expected.length)));
+					if (flow !== 'source') {
+						assert.equal(
+							page.elements.get('apps_top_pair').innerHTML,
+							`${['Other.exe', name].sort().join(' ↔ ')} (${(flow === 'reciprocal' ? 10 : 3) * factor}×)`
+						);
+						for (const row of rows)
+							for (const count of Object.values(row.switches_out))
+								assert.equal(typeof count, 'number');
+					}
+					assert.equal(
+						vm.runInContext(
+							'JSON.stringify(Object.getOwnPropertyNames(Object.prototype))',
+							page.context
+						),
+						before,
+						'native app identities never mutate the shared object prototype'
+					);
+				}
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			});
+		}
+	}
+}
+assert.equal(nativeAppIdentityNames.length, 5);
+assert.equal(nativeAppIdentityFlows.length, 3);
+assert.equal(
+	passed,
+	1044,
+	'all native app identity, switch direction and refresh controls must execute'
+);
+
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const name of nativeAppIdentityNames) {
+		for (const selection of ['all', 'none']) {
+			test(`${host} native empty icon map keeps ${name} badge in ${selection} scope`, () => {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, '2026-10-27T12:00:00');
+				page.elements.get('app_search').focus = () => {};
+				const manifest = { '2026-10-26': { [name]: { chars: 5, time: 500 } } };
+				publishTypingPage(page, host, manifest);
+				page.context.open_app_modal();
+				if (selection === 'none') page.context.deselect_all_apps();
+				for (const refreshed of [false, true]) {
+					if (refreshed) {
+						page.context.close_app_modal();
+						deliverTypingManifest(page, host, {
+							'2026-10-26': {
+								[name]: { chars: 6, time: 600 },
+								'Other.exe': { chars: 7, time: 700 }
+							}
+						});
+						page.context.open_app_modal();
+					}
+					assert.deepEqual(
+						Object.keys(page.context.window.app_icons),
+						[],
+						'Windows supplies this actual empty icon map'
+					);
+					const html = page.elements.get('app_list').innerHTML;
+					assert.ok(
+						html.includes('class="app-icon-div"'),
+						'absence of a native icon keeps the existing deterministic badge'
+					);
+					assert.equal((html.match(/class="app-icon-div"/g) || []).length, refreshed ? 2 : 1);
+					assert.equal(
+						html.includes('<img '),
+						false,
+						'inherited object members never become native image URLs'
+					);
+					assert.ok(html.includes(`<span class="app-name">${name}</span>`));
+					assert.equal(html.includes(`value="${name}" checked`), selection === 'all');
+					assert.equal(vm.runInContext('app_state.app_selection_mode', page.context), selection);
+				}
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			});
+		}
+	}
+}
+assert.equal(passed, 1074, 'all native-empty-map badge, scope and refresh controls must execute');
+
+const nativeUnicodeProjection = JSON.parse(
+	fs.readFileSync(
+		path.resolve(root, '../../windows/tests/fixtures/metrics_unicode_projection.json'),
+		'utf8'
+	)
+);
+assert.deepEqual(
+	nativeUnicodeProjection.cases.map((vector) => vector.id),
+	['nbsp-only', 'nnbsp-only', 'ordinary-nbsp', 'literal-capital-a-nbsp', 'literal-c1-sequence']
+);
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const sensitive of [true, false]) {
+			for (const vector of nativeUnicodeProjection.cases) {
+				test(`${host} ${source} preserves native Unicode ${vector.id}, case-sensitive ${sensitive}`, () => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(
+						page,
+						source === 'historical' ? '2026-10-27T12:00:00' : '2026-10-26T12:00:00'
+					);
+					publishTypingPage(page, host, vector.manifest);
+					if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+					else page.elements.get('btn_case_sensitive').classList.remove('active');
+					const raw = vector.range.historical;
+					deliverTypingManifest(page, host, vector.manifest, {
+						range:
+							source === 'historical'
+								? vector.range
+								: { historical: {}, today: { [nativeUnicodeProjection.app]: raw } }
+					});
+					for (const tab of ['c', 'bg', 'tg']) {
+						vm.runInContext(`app_state.current_tab=${JSON.stringify(tab)}`, page.context);
+						page.context.render_current_tab();
+						page.timers.at(-1)();
+						const rows = JSON.parse(
+							vm.runInContext(
+								'JSON.stringify(app_state.rendered_list.map(row=>({key:row.key,count:row.count,accuracy:row.acc})))',
+								page.context
+							)
+						);
+						const expected = Object.entries(raw[tab]).map(([key, item]) => ({
+							key: sensitive ? key : key.toLowerCase(),
+							count: item.c,
+							accuracy: 100
+						}));
+						const sort = (items) => items.sort((a, b) => a.key.localeCompare(b.key));
+						assert.deepEqual(
+							sort(rows),
+							sort(expected),
+							'native Unicode text remains data rather than a byte-repair instruction'
+						);
+					}
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+				});
+			}
+		}
+	}
+}
+assert.equal(
+	passed,
+	1134,
+	'all native Unicode, case mode, host and history/live controls must execute'
+);
+
+const nativeCaseProjection = JSON.parse(
+	fs.readFileSync(
+		path.resolve(root, '../../windows/tests/fixtures/metrics_case_projection.json'),
+		'utf8'
+	)
+);
+assert.deepEqual(
+	nativeCaseProjection.cases.map((vector) => vector.id),
+	['capital-i-dot', 'separate-combining-dot', 'corrected-i-dot', 'greek-word-context', 'dotless-i']
+);
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const sensitive of [true, false]) {
+			for (const vector of nativeCaseProjection.cases) {
+				test(`${host} ${source} keeps native case boundaries ${vector.id}, case-sensitive ${sensitive}`, () => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(
+						page,
+						source === 'historical' ? '2026-10-27T12:00:00' : '2026-10-26T12:00:00'
+					);
+					publishTypingPage(page, host, vector.manifest);
+					if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+					else page.elements.get('btn_case_sensitive').classList.remove('active');
+					deliverTypingManifest(page, host, vector.manifest, {
+						range:
+							source === 'historical'
+								? vector.range
+								: { historical: {}, today: { [nativeCaseProjection.app]: vector.range.historical } }
+					});
+					for (const tab of ['c', 'bg', 'tg', 'qg', 'pg', 'hx', 'hp', 'w']) {
+						vm.runInContext(`app_state.current_tab=${JSON.stringify(tab)}`, page.context);
+						page.context.render_current_tab();
+						page.timers.at(-1)();
+						const rows = JSON.parse(
+							vm.runInContext(
+								'JSON.stringify(app_state.rendered_list.map(row=>({key:row.key,count:row.count,accuracy:row.acc})))',
+								page.context
+							)
+						);
+						const expected = structuredClone(
+							vector.expected_rows[sensitive ? 'case_sensitive' : 'case_folded'][tab]
+						);
+						const sort = (items) => items.sort((a, b) => a.key.localeCompare(b.key));
+						assert.deepEqual(
+							sort(rows),
+							sort(expected),
+							'case mode preserves native scalar counts, errors and n-gram boundaries'
+						);
+					}
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+				});
+			}
+		}
+	}
+}
+assert.equal(
+	passed,
+	1194,
+	'all native case-boundary and unchanged word-fold histories must execute'
+);
+
+test('fixed-token lowercase preserves every Unicode scalar arity', () => {
+	const fixture = typingFixture();
+	assert.equal(typeof fixture.context.lowercase_metric_key, 'function');
+	const maxCodepoint = 0x10ffff,
+		surrogateStart = 0xd800,
+		surrogateEnd = 0xdfff;
+	let checked = 0;
+	for (let codepoint = 0; codepoint <= maxCodepoint; codepoint++) {
+		if (codepoint >= surrogateStart && codepoint <= surrogateEnd) continue;
+		const scalar = String.fromCodePoint(codepoint);
+		assert.equal(
+			Array.from(fixture.context.lowercase_metric_key(scalar, 'c')).length,
+			1,
+			`U+${codepoint.toString(16)} retains one native scalar`
+		);
+		checked++;
+	}
+	assert.equal(checked, maxCodepoint + 1 - (surrogateEnd - surrogateStart + 1));
+});
+test('metric-key case policy preserves Greek context, dotless I and full-text word keys', () => {
+	const fixture = typingFixture(),
+		lower = fixture.context.lowercase_metric_key;
+	assert.equal(typeof lower, 'function');
+	for (const tab of ['c', 'bg', 'tg', 'qg', 'pg', 'hx', 'hp']) {
+		assert.equal(lower('İΟΣ', tab), 'İος');
+		assert.equal(lower('ΟΣİ', tab), 'οσİ');
+		assert.equal(lower('AİΣ', tab), 'aİς');
+		assert.equal(lower('ıIİ', tab), 'ıiİ');
+		assert.equal(lower('𐐀', tab), '𐐨');
+	}
+	for (const tab of ['w', 'w_bg', 'w_tg', 'w_qg', 'w_pg']) {
+		assert.equal(lower('İΟΣ', tab), 'i̇ος');
+		assert.equal(lower('ΟΣİ', tab), 'οσi̇');
+	}
+	assert.equal(lower('Ctrl+S', 'sc'), 'ctrl+s');
+});
+assert.equal(
+	passed,
+	1196,
+	'native case-boundary regressions and Unicode scalar policy controls must execute'
+);
+
+const nativeAppPairsProjection = JSON.parse(
+	fs.readFileSync(
+		path.resolve(root, '../../windows/tests/fixtures/metrics_app_pairs_projection.json'),
+		'utf8'
+	)
+);
+assert.deepEqual(
+	nativeAppPairsProjection.snapshots.map((snapshot) => snapshot.days),
+	[1, 2]
+);
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const days of [1, 2]) {
+		for (const scope of ['all', 'first-pair', 'last-pair']) {
+			test(`${host} native workflow pairs retain endpoint identity, days ${days}, scope ${scope}`, () => {
+				const page = loadMetricsTypingPage(host),
+					snapshot = nativeAppPairsProjection.snapshots[days - 1];
+				freezePageClock(page, '2026-10-28T12:00:00');
+				page.elements.get('app_search').focus = () => {};
+				publishTypingPage(page, host, snapshot.manifest);
+				if (scope !== 'all') {
+					page.context.open_app_modal();
+					page.context.deselect_all_apps();
+					const indices = scope === 'first-pair' ? [0, 1] : [2, 3];
+					for (const index of indices)
+						page.context.toggle_app_selection({
+							value: nativeAppPairsProjection.names[index],
+							checked: true
+						});
+					page.context.close_app_modal();
+				}
+				const assertPair = (expectedDays) => {
+					page.context.render_apps_kpi();
+					const count = (scope === 'first-pair' ? 3 : 5) * expectedDays;
+					const names =
+						scope === 'first-pair'
+							? nativeAppPairsProjection.names.slice(0, 2)
+							: nativeAppPairsProjection.names.slice(2, 4);
+					assert.equal(
+						page.elements.get('apps_top_pair').innerHTML,
+						`${names.sort().join(' ↔ ')} (${count}×)`,
+						'distinct native endpoint tuples never merge through a human-readable label'
+					);
+					assert.equal(
+						vm.runInContext('app_state.app_selection_mode', page.context),
+						scope === 'all' ? 'all' : 'subset'
+					);
+				};
+				assertPair(days);
+				deliverTypingManifest(page, host, nativeAppPairsProjection.snapshots[1].manifest);
+				assertPair(2);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			});
+		}
+	}
+}
+assert.equal(
+	passed,
+	1214,
+	'all native structured endpoint, subset and refresh controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);

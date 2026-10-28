@@ -1,0 +1,12 @@
+{
+	"patterns": [
+		"github-token",
+		"openai-token",
+		"jwt",
+		"authorization",
+		"url-userinfo",
+		"private-key"
+	],
+	"hits": [],
+	"bundle_introduced_text_patch_bytes_scanned": 6350534
+}

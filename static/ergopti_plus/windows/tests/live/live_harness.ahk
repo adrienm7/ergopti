@@ -211,12 +211,13 @@ LivePump(Ms) {
  * @param {Func} Action Called with the window's hwnd once it exists.
  * @param {Integer} TimeoutMs How long to wait for the window; the default when 0.
  * @param {Boolean} Optional True when the window may never come (not an error).
- * @returns {Object} State whose Done and Error members the caller waits on.
+ * @returns {Object} State with terminal Done, independent Failed and Error diagnosis.
  */
 LiveDriveWindow(Match, Action, TimeoutMs := 0, Optional := false) {
 	global LIVE_DEFAULT_TIMEOUT_MS
-	State := {Done: false, Error: "", Hwnd: 0, Started: A_TickCount, Optional: Optional,
+	State := {Done: false, Failed: false, Error: "", Hwnd: 0, Started: A_TickCount, Optional: Optional,
 		Limit: TimeoutMs ? TimeoutMs : LIVE_DEFAULT_TIMEOUT_MS}
+	; Every terminal path drops this reverse reference to the state-owning timer.
 	Tick := _LiveDriveTick.Bind(State, Match, Action)
 	State.Tick := Tick
 	SetTimer(Tick, 40)
@@ -224,33 +225,39 @@ LiveDriveWindow(Match, Action, TimeoutMs := 0, Optional := false) {
 }
 
 _LiveDriveTick(State, Match, Action, *) {
-	if State.Done {
-		SetTimer(State.Tick, 0)
+	if State.Done
 		return
-	}
 	if A_TickCount - State.Started > State.Limit {
-		if !State.Optional
+		if !State.Optional {
+			State.Failed := true
 			State.Error := "no window matched '" . (HasMethod(Match, "Call") ? "the watched window" : Match)
 				. "' within " . State.Limit . " ms"
-		State.Done := true
+		}
 		SetTimer(State.Tick, 0)
+		State.Tick := 0
+		State.Done := true
 		return
 	}
-	Hwnd := HasMethod(Match, "Call") ? Match.Call() : WinExist(Match)
-	if !Hwnd
-		return
-	SetTimer(State.Tick, 0)
-	State.Hwnd := Hwnd
-	try Action.Call(Hwnd)
-	catch as Err
+	try {
+		Hwnd := HasMethod(Match, "Call") ? Match.Call() : WinExist(Match)
+		if !Hwnd
+			return
+		SetTimer(State.Tick, 0)
+		State.Hwnd := Hwnd
+		Action.Call(Hwnd)
+	} catch as Err {
+		SetTimer(State.Tick, 0)
+		State.Failed := true
 		State.Error := Err.Message
+	}
+	State.Tick := 0
 	State.Done := true
 }
 
 /** Waits for a LiveDriveWindow state to finish and throws what it recorded. */
 LiveAwaitDrive(State, What) {
 	LiveWaitFor(() => State.Done, What, State.Limit + 5000)
-	if State.Error != ""
+	if State.Failed
 		throw Error(What . ": " . State.Error)
 }
 
