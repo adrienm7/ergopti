@@ -18,6 +18,14 @@ OPERATION_SECONDS = 5
 RETIREMENT_SECONDS = 5
 PR_SET_CHILD_SUBREAPER = 36
 OWNERSHIP_CLOSED = True
+CLONE_LOG_FAULT_MODES = (
+    "finite",
+    "foreign",
+    "refusal",
+    "deadpipe",
+    "deadpipe-foreign",
+    "deadpipe-refusal",
+)
 
 
 def executable(path, text):
@@ -136,6 +144,7 @@ def observation(resources, shell, root, caller, mode, color):
         PATH=str(binary) + os.pathsep + environment["PATH"],
         LC_ALL="C",
         OWNED_LOG=str(log),
+        OWNED_LOG_PREFIX=str(case / "log-prefix.bin"),
         OWNED_SOURCE=str(app),
         OWNED_DEST=str(destination),
         OWNED_CASE=str(case),
@@ -256,6 +265,23 @@ printf icon > "$5"
             actual_tail = source[source.index(tail_marker) :]
             script_text = script_text[: -len("exit 0\n")] + receipt_boundary(mode) + actual_tail
 
+        if limited:
+            # XNU checks the descriptor offset before IO_APPEND, so an aggregate
+            # EOF quota does not constrain a freshly opened append descriptor.
+            # Arm zero only after admission: both kernels now refuse the actual
+            # post-reservation writer, while the already-started tee stays free
+            # to publish genuine failure diagnostics.
+            boundary = 'log "SRC_EXE=$SRC_EXE"'
+            if script_text.count(boundary) != 1:
+                raise ValueError("The actual post-reservation log boundary must be unique")
+            admission = """if [[ "$OWNED_MODE" != healthy ]]; then
+    cp "$OWNED_LOG" "$OWNED_LOG_PREFIX"
+    ulimit -f 0
+    [[ "$(ulimit -f)" == 0 ]]
+fi
+"""
+            script_text = script_text.replace(boundary, admission + boundary)
+
         if mode == "child-default":
             signal_child = case / "signal-child"
             executable(
@@ -327,18 +353,18 @@ exit "$2"
                     "The actual healthy log must end at the post-reservation source boundary"
                 )
             healthy_bytes = len(data) - len(suffix)
-            limit = healthy_bytes + 1
+            limit = 0
         else:
             healthy_bytes = int((case / "healthy-prefix-size").read_text(encoding="ascii"))
             limit = healthy_bytes - 1
-        if limit <= 0:
-            raise ValueError("The actual healthy prefix must establish a finite positive quota")
+        if healthy_bytes <= 0 or (caller == "shortcut" and limit <= 0):
+            raise ValueError("The actual healthy control must establish the pre-fault bytes")
         log.write_bytes(b"")
         created.unlink()
         if (case / "tee.pid").exists():
             (case / "tee.pid").unlink()
     status, output, errors = execute(
-        shell, script, arguments, environment, limit if limited else None
+        shell, script, arguments, environment, limit if limited and caller != "clone" else None
     )
     workspace = Path(created.read_text(encoding="utf-8"))
     if workspace.parent != case or not workspace.name.startswith("workspace."):
@@ -351,6 +377,10 @@ exit "$2"
             tee_closed = False
         except ProcessLookupError:
             pass
+    log_data = log.read_bytes()
+    prefix_file = case / "log-prefix.bin"
+    admitted_prefix = prefix_file.read_bytes() if prefix_file.exists() else None
+    refused_source = ("SRC_EXE=" + str(app / "Contents/MacOS/Source") + "\n").encode("utf-8")
     marker = destination / "marker"
     actual_source_line = next(
         (line for line in log.read_bytes().split(b"\n") if line.startswith(b"=== SOURCE=")),
@@ -380,6 +410,16 @@ exit "$2"
         limit=limit if limited else None,
         healthy_prefix_bytes=healthy_bytes,
         actual_log_bytes=log.stat().st_size,
+        log_fault_armed=admitted_prefix is not None,
+        log_prefix_bytes=len(admitted_prefix) if admitted_prefix is not None else None,
+        log_exact_after_fault=(
+            log_data == admitted_prefix + output.encode("utf-8")
+            if admitted_prefix is not None
+            else None
+        ),
+        source_record_refused=refused_source not in log_data
+        if admitted_prefix is not None
+        else None,
         workspace_created=True,
         log_source_exact=("=== SOURCE=" + str(app) + "\n").encode("utf-8") in log.read_bytes(),
         workspace_exists=workspace.exists(),
@@ -433,12 +473,7 @@ def main():
             "clone",
             [
                 "healthy",
-                "finite",
-                "foreign",
-                "refusal",
-                "deadpipe",
-                "deadpipe-foreign",
-                "deadpipe-refusal",
+                *CLONE_LOG_FAULT_MODES,
                 "child-default",
                 "backslash-c",
                 "backslash-t",
@@ -502,8 +537,14 @@ def main():
             or (row["mode"].startswith("result-closed-") and row["result_path_exact"])
             or (
                 row["caller"] == "clone"
-                and row["limit"] is not None
-                and row["actual_log_bytes"] != row["limit"]
+                and row["mode"] in CLONE_LOG_FAULT_MODES
+                and (
+                    row["limit"] != 0
+                    or not row["log_fault_armed"]
+                    or row["log_prefix_bytes"] != row["healthy_prefix_bytes"]
+                    or not row["log_exact_after_fault"]
+                    or not row["source_record_refused"]
+                )
             )
             or (
                 row["mode"] in ["healthy", "backslash-c", "backslash-t"]
