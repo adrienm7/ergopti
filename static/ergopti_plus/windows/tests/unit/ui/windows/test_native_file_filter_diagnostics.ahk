@@ -170,3 +170,83 @@ Test("native file filter: a view census preserves exact filename visibility (fil
 	_NDT_FileFilterViewPredicate.Bind("matching"))
 Test("native file filter: a view census refuses duplicates and foreign owners (file-filter-view-census)",
 	_NDT_FileFilterViewPredicate.Bind("fences"))
+
+/**
+ * Executes the actual generated census against a scripted UIA element.
+ * Preflight 40615470853 failed in restricted-txt with 0x80131505 after 235 ms:
+ * one provider traversal outlasted its 500 ms UIA transaction while the shell
+ * view was still populating, and the wait loop let it escape. A provider
+ * timeout is an empty census polled again inside the same wall-clock window;
+ * any other native failure stays the primary failure.
+ * @param {string} CensusCase - "timeout" or "other".
+ */
+_NDT_FileFilterCensusTimeout(CensusCase) {
+	Root := A_Temp . "\ergopti_filter_census_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the census fixture has one private root")
+	DirCreate(Root)
+	Ownership := {CanRetire: true}
+	try {
+		ObserverSource := _NDT_FileFilterObserverSource("unused-observer-library.ahk")
+		Start := InStr(ObserverSource, "`n_NFO_Census(")
+		Finish := InStr(ObserverSource, "`n_NFO_Error(", , Start)
+		AssertTrue(Start > 0 && Finish > Start, "the actual generated census must exist")
+		CensusSource := SubStr(ObserverSource, Start + 1, Finish - Start)
+		Program := [
+			'#Requires AutoHotkey v2.0',
+			'#SingleInstance Off',
+			'#NoTrayIcon',
+			'#Warn All, StdOut',
+			'class ScriptedElement {',
+			'__New(Failures) {',
+			'this.Failures := Failures',
+			'this.Calls := 0',
+			'}',
+			'FindElements(Conditions) {',
+			'this.Calls += 1',
+			'if this.Calls <= this.Failures.Length',
+			'throw this.Failures[this.Calls]',
+			'return [{Name: "owned.txt", ProcessId: 41, IsOffscreen: 0}]',
+			'}',
+			'}',
+			'try {',
+			'if A_Args[1] == "timeout" {',
+			'Element := ScriptedElement([OSError(0x80131505), OSError(-2146233083)])',
+			'Check(_NFO_Census(Element).Length == 0, "a UIA provider timeout is an empty census")',
+			'Check(_NFO_Census(Element).Length == 0, "the signed HRESULT spelling is the same timeout")',
+			'Check(_NFO_Census(Element).Length == 1, "the next poll returns the provider items")',
+			'} else if A_Args[1] == "other" {',
+			'Element := ScriptedElement([OSError(5)])',
+			'Rethrown := false',
+			'try _NFO_Census(Element)',
+			'catch OSError as NativeFailure',
+			'Rethrown := NativeFailure.Number == 5',
+			'Check(Rethrown, "any other native failure stays the primary failure")',
+			'} else throw ValueError("Unknown census control")',
+			'FileAppend("census-observed", "*", "UTF-8-RAW")',
+			'ExitApp(0)',
+			'} catch as CensusFailure {',
+			'FileAppend(Type(CensusFailure) . ": " . CensusFailure.Message, "**", "UTF-8-RAW")',
+			'ExitApp(2)',
+			'}',
+			'Check(Value, Message) {',
+			'if !Value',
+			'throw Error(Message)',
+			'}'
+		]
+		ProbeSource := ""
+		for Statement in Program
+			ProbeSource .= Statement . "`n"
+		Harness := Root . "\census_timeout.ahk"
+		FileAppend(ProbeSource . CensusSource, Harness, "UTF-8")
+		AssertEqual("census-observed",
+			_NDT_RunChild(A_AhkPath, ["/ErrorStdOut", Harness, CensusCase], Ownership),
+			"the actual generated census polls through a provider timeout and keeps other failures")
+	} finally {
+		if Ownership.CanRetire
+			DirDelete(Root, true)
+	}
+}
+Test("native file filter: a UIA provider timeout is polled again (file-filter-census-timeout)",
+	_NDT_FileFilterCensusTimeout.Bind("timeout"))
+Test("native file filter: another native census failure stays primary (file-filter-census-timeout)",
+	_NDT_FileFilterCensusTimeout.Bind("other"))
