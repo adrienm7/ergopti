@@ -152,6 +152,7 @@ local function ensure_initialized()
 	if Rotation.is_initialized() then return end
 	helpers.assert_true(LM.init({
 		LOG_DIR = SCRATCH_DIR,
+		CACHE_DIR = SCRATCH_DIR .. "/cache",
 		buffer_events = {}, buffer_text = "", rich_chunks = {},
 		session_mouse_clicks = 0, session_mouse_scrolls = 0,
 		mouse_distance_px = 0, last_flush_time = 0,
