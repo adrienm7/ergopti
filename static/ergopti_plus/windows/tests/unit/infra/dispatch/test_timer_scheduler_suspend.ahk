@@ -19,15 +19,6 @@
 #Requires AutoHotkey v2.0
 
 
-_TS_ResetRegistrySuspend() {
-	global _TIMER_ADAPTER_REGISTRY
-	for _, H in _TIMER_ADAPTER_REGISTRY {
-		if (H is Map and H.Has("Fn") and H["Fn"] != 0)
-			try SetTimer(H["Fn"], 0)
-	}
-	_TIMER_ADAPTER_REGISTRY := Map()
-}
-
 ; A real native delivery proves the requeue callback is armed before cancellation.
 _TSSuspTest_NativePulse(Ledger) {
 	Ledger.Calls += 1
@@ -70,7 +61,9 @@ _TSSuspTest_NativeRequeueCancellation(Mode) {
 				Owner.Handle["RequeuedFn"] := Owner.Callback
 				SetTimer(Owner.Callback, -NativePeriodMs)
 			}
-			if Mode == "all"
+			if Mode == "reset"
+				_TS_ResetRegistry()
+			else if Mode == "all"
 				AssertTrue(TimerCancelAll(), "cancelAll acknowledges the genuine native requests")
 			else {
 				AssertTrue(TimerCancel(Owners[1].Handle, _TSSuspTest_ObservedNativeCancel.Bind(Cancelled)),
@@ -98,7 +91,7 @@ _TSSuspTest_NativeRequeueCancellation(Mode) {
 		for Owner in Owners
 			AssertEqual(0, Owner.Ledger.Calls, "a cancelled native requeue must not dispatch after its due time")
 		AssertEqual(0, Original.Calls, "cancellation cannot dispatch the original user callback")
-		if Mode != "all" {
+		if Mode != "all" && Mode != "reset" {
 			AssertEqual(2, Cancelled.Length, "the actual native cancellation retires primary and requeue exactly once")
 			AssertEqual(ObjPtr(Owners[1].Primary), ObjPtr(Cancelled[1]), "native cancellation targets the exact primary")
 			AssertEqual(ObjPtr(Owners[1].Callback), ObjPtr(Cancelled[2]), "native cancellation targets the exact armed requeue")
@@ -156,7 +149,7 @@ _TSSuspTest_NativeRequeueCancellation(Mode) {
 ; re-queued closure under handle["RequeuedFn"]. Simulate this by manually
 ; populating the key and verify TimerCancel reads and clears it.
 _TSSuspTest_CancelClearsRequeuedFn() {
-	_TS_ResetRegistrySuspend()
+	_TS_ResetRegistry()
 	Called := false
 	H := TimerAfter(10, () => (Called := true))
 	; Simulate the suspend-requeue path: store a sentinel closure as RequeuedFn
@@ -178,7 +171,7 @@ Test("TimerScheduler/suspend F25 -- cancel sets Fired even when RequeuedFn is pr
 ; Verify that TimerCancel succeeds (no exception) when RequeuedFn is set to 0.
 ; Handles with RequeuedFn absent or 0 must follow the normal cancel path.
 _TSSuspTest_CancelSafeWithRequeuedFnZero() {
-	_TS_ResetRegistrySuspend()
+	_TS_ResetRegistry()
 	H := TimerAfter(10, () => 0)
 	H["RequeuedFn"] := 0
 	TimerCancel(H)
@@ -189,7 +182,7 @@ Test("TimerScheduler/suspend F25 -- cancel is safe when RequeuedFn is 0", _TSSus
 
 ; Idempotent cancel with RequeuedFn: calling cancel twice must not throw.
 _TSSuspTest_CancelIdempotentWithRequeuedFn() {
-	_TS_ResetRegistrySuspend()
+	_TS_ResetRegistry()
 	H := TimerAfter(10, () => 0)
 	Sentinel := () => 0
 	H["RequeuedFn"] := Sentinel
@@ -212,7 +205,7 @@ Test("TimerScheduler/suspend F25 -- cancel is idempotent when RequeuedFn is set"
 ; When the one-shot fires normally (not suspended), it must clear RequeuedFn
 ; from the handle so a stale reference is never left dangling.
 _TSSuspTest_RequeuedFnClearedOnNormalFire() {
-	_TS_ResetRegistrySuspend()
+	_TS_ResetRegistry()
 	Fired := false
 	H := TimerAfter(10, () => (Fired := true))
 	; Pre-populate RequeuedFn as if a prior suspend cycle set it, but the
@@ -230,7 +223,7 @@ Test("TimerScheduler/suspend F25 -- RequeuedFn is removed when the one-shot fire
 
 ; TimerCancelAll must also reach RequeuedFn on every handle in the registry.
 _TSSuspTest_CancelAllDrainsRequeuedFn() {
-	_TS_ResetRegistrySuspend()
+	_TS_ResetRegistry()
 	H1 := TimerAfter(10, () => 0)
 	H2 := TimerAfter(20, () => 0)
 	H1["RequeuedFn"] := () => 0
@@ -270,3 +263,7 @@ _TSSuspTest_SourceContainsRequeuedFnWrite() {
 		"TimerCancel must check Handle.Has(RequeuedFn) (F25 cancel path absent)")
 }
 Test("TimerScheduler/suspend F25 -- adapter source contains RequeuedFn fix (structural guard)", _TSSuspTest_SourceContainsRequeuedFnWrite)
+
+; A reset must physically and logically retire its owner before the next case.
+Test("TimerScheduler/suspend F25 -- fixture reset retires native requeue ownership (timer-fixture-native-requeue-cleanup)",
+	_TSSuspTest_NativeRequeueCancellation.Bind("reset"))
