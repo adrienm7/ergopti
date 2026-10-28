@@ -123,7 +123,7 @@ local function manager(options)
 			return true
 		end,
 		active_sources = function() return options.active or {} end,
-		-- A fresh process sees a listed layout on at once (probe v5, P5) unless
+		-- A fresh process sees a listed layout enabled at once unless
 		-- the case says otherwise.
 		confirm_source = function(name, confirm_options, on_done)
 			state.live_reads[#state.live_reads + 1] = name
@@ -355,8 +355,8 @@ helpers.describe("layout manager (macOS): installing", function()
 		helpers.assert_nil(state.pending.ergol, "an uninstalled layout is no longer pending")
 	end)
 
-	-- Probe v5 (P5): the preference turns the layout on at once, seen by a process
-	-- started after the write; P8 a: a rewritten enabled file applies once registered again.
+	-- macOS 26 field probes: the preference enables the layout at once, seen by a process
+	-- started after the write; a rewritten enabled file applies once registered again.
 	helpers.it("confirms a new layout from a fresh process and asks the user to expect the consent (composer-macos26)", function()
 		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files() })
 		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
