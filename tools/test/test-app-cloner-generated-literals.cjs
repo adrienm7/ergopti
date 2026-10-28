@@ -875,6 +875,80 @@ exec '${realRm.stdout.trim().replaceAll("'", "'\\''")}' "$@"
 			fs.readFileSync(occupied, 'utf8') === 'unrelated original file',
 		JSON.stringify({ status: refused.status, stdout: refused.stdout, stderr: refused.stderr })
 	);
+	const reservationRaceRoot = path.join(fixtureRoot, 'reservation-retirement-race');
+	fs.mkdirSync(reservationRaceRoot);
+	const retirementRace = spawnSync(
+		bash,
+		[
+			toBashPath(path.join(ROOT, 'tools', 'test', 'lib', 'app-cloner-reservation-race.sh')),
+			reserveHelper,
+			toBashPath(reservationRaceRoot)
+		],
+		{ encoding: 'utf8', timeout: 20000 }
+	);
+	test(
+		'a genuine EEXIST still chooses a suffix after the previous owner retires its path',
+		retirementRace.status === 0 &&
+			!retirementRace.error &&
+			retirementRace.stdout ===
+				`${toBashPath(path.join(reservationRaceRoot, 'Contended_1.app'))}\0` &&
+			fs.statSync(path.join(reservationRaceRoot, 'Contended_1.app')).isDirectory() &&
+			!fs.existsSync(path.join(reservationRaceRoot, 'Contended.app')),
+		JSON.stringify({
+			status: retirementRace.status,
+			error: retirementRace.error?.message,
+			stdout: retirementRace.stdout,
+			stderr: retirementRace.stderr
+		})
+	);
+	const literalReservation = path.join(fixtureRoot, "Équipe ' $HOME `not-executed`.app");
+	const literalReserved = spawnSync(
+		bash,
+		[
+			'-c',
+			'set -eu; source "$1"; reserve_bundle_directory "$2"',
+			'reservation',
+			reserveHelper,
+			toBashPath(literalReservation)
+		],
+		{ encoding: 'utf8' }
+	);
+	test(
+		'errno-aware reservation preserves literal shell metacharacters as path data',
+		literalReserved.status === 0 &&
+			literalReserved.stdout === `${toBashPath(literalReservation)}\n` &&
+			fs.statSync(literalReservation).isDirectory(),
+		JSON.stringify({
+			status: literalReserved.status,
+			stdout: literalReserved.stdout,
+			stderr: literalReserved.stderr
+		})
+	);
+	const missingParent = path.join(fixtureRoot, 'missing-parent', 'Refused.app');
+	const missingParentRefusal = spawnSync(
+		bash,
+		[
+			'-c',
+			'set -eu; source "$1"; reserve_bundle_directory "$2"',
+			'reservation',
+			reserveHelper,
+			toBashPath(missingParent)
+		],
+		{ encoding: 'utf8', timeout: 10000 }
+	);
+	test(
+		'a genuine missing-parent errno remains fatal without guessing a suffix',
+		missingParentRefusal.status === 1 &&
+			!missingParentRefusal.error &&
+			missingParentRefusal.stdout === '' &&
+			missingParentRefusal.stderr.includes('cannot reserve bundle directory') &&
+			!fs.existsSync(path.dirname(missingParent)),
+		JSON.stringify({
+			status: missingParentRefusal.status,
+			stdout: missingParentRefusal.stdout,
+			stderr: missingParentRefusal.stderr
+		})
+	);
 } finally {
 	fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }

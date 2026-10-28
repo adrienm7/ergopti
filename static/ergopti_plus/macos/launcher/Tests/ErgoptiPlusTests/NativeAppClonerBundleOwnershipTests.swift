@@ -3,6 +3,7 @@
 // Executes the shipped ownership helper with actual Darwin zsh and BSD stat.
 // Shortcut icon tools are controlled; no generated application is launched.
 
+import Darwin
 import Foundation
 import XCTest
 @testable import ErgoptiPlus
@@ -12,10 +13,14 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 	private static let retirementDeadline: DispatchTimeInterval = .seconds(5)
 	private var fixtureCanRetire = true
 
-	private static var resourcesURL: URL {
+	private static var repositoryURL: URL {
 		var root = URL(fileURLWithPath: #filePath)
 		for _ in 0..<7 { root.deleteLastPathComponent() }
-		return root.appendingPathComponent("static/ergopti_plus/macos/apps/App Cloner.app/Contents/Resources")
+		return root
+	}
+
+	private static var resourcesURL: URL {
+		Self.repositoryURL.appendingPathComponent("static/ergopti_plus/macos/apps/App Cloner.app/Contents/Resources")
 	}
 
 	private struct Result {
@@ -307,6 +312,67 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 					XCTAssertTrue(bundles.isEmpty)
 				}
 			}
+		}
+	}
+
+	func testActualNativeReservationUsesKernelErrnoDuringOwnerRetirement() throws {
+		try fixture { root in
+			XCTAssertNotEqual(geteuid(), 0, "Physical EACCES evidence requires the actual non-root runner")
+			guard geteuid() != 0 else { throw CocoaError(.executableRuntimeMismatch) }
+			let helper = Self.resourcesURL.appendingPathComponent("reserve_bundle.sh")
+			let raceRoot = root.appendingPathComponent("race")
+			try FileManager.default.createDirectory(at: raceRoot, withIntermediateDirectories: false)
+			let probe = Self.repositoryURL.appendingPathComponent("tools/test/lib/app-cloner-reservation-race.sh")
+			let race = try run([probe.path, helper.path, raceRoot.path], root: root)
+			XCTAssertEqual(race.status, 0, "The actual native Perl must retain the kernel EEXIST: \(race.stderr)")
+			XCTAssertEqual(race.output, raceRoot.appendingPathComponent("Contended_1.app").path + "\0")
+			XCTAssertTrue(race.stderr.isEmpty)
+			XCTAssertTrue(FileManager.default.fileExists(atPath: raceRoot.appendingPathComponent("Contended_1.app").path))
+			XCTAssertFalse(FileManager.default.fileExists(atPath: raceRoot.appendingPathComponent("Contended.app").path))
+
+			let reserve = #"""
+			set -euo pipefail
+			umask 077
+			source "$1"
+			reserve_bundle_directory "$2"
+			"""#
+			let occupied = root.appendingPathComponent("Occupied.app")
+			try FileManager.default.createDirectory(at: occupied, withIntermediateDirectories: false)
+			let stable = try run(["-c", reserve, "reservation", helper.path, occupied.path], root: root)
+			let suffixed = root.appendingPathComponent("Occupied_1.app")
+			XCTAssertEqual(stable.status, 0, stable.stderr)
+			XCTAssertEqual(stable.output, suffixed.path + "\n")
+			let attributes = try FileManager.default.attributesOfItem(atPath: suffixed.path)
+			let mode = try XCTUnwrap(attributes[.posixPermissions] as? NSNumber)
+			XCTAssertEqual(mode.intValue & 0o777, 0o700, "Native mkdir must preserve the caller's umask")
+
+			let literal = root.appendingPathComponent("Équipe ' \"$HOME `not-executed`\\\nName.app")
+			let data = try run(["-c", reserve, "reservation", helper.path, literal.path], root: root)
+			XCTAssertEqual(data.status, 0, data.stderr)
+			XCTAssertEqual(Array(data.output.utf8), Array((literal.path + "\n").utf8), "Quotes, backslashes and newlines remain exact path data")
+			XCTAssertTrue(FileManager.default.fileExists(atPath: literal.path))
+
+			let missing = root.appendingPathComponent("missing-parent/Refused.app")
+			let absent = try run(["-c", reserve, "reservation", helper.path, missing.path], root: root)
+			XCTAssertEqual(absent.status, 1)
+			XCTAssertTrue(absent.output.isEmpty)
+			XCTAssertTrue(absent.stderr.contains("errno=\(ENOENT)"), absent.stderr)
+			XCTAssertFalse(FileManager.default.fileExists(atPath: missing.deletingLastPathComponent().path))
+
+			let denied = root.appendingPathComponent("denied-parent")
+			try FileManager.default.createDirectory(at: denied, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o555])
+			defer {
+				do { try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: denied.path) }
+				catch {
+					fixtureCanRetire = false
+					XCTFail("The exact permission-refusal fixture did not regain owned cleanup access")
+				}
+			}
+			let permission = try run(["-c", reserve, "reservation", helper.path, denied.appendingPathComponent("Refused.app").path], root: root)
+			XCTAssertEqual(permission.status, 1)
+			XCTAssertTrue(permission.output.isEmpty)
+			XCTAssertTrue(permission.stderr.contains("errno=\(EACCES)"), permission.stderr)
+			XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: denied.path).isEmpty)
 		}
 	}
 }
