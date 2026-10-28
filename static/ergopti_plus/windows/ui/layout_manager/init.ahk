@@ -513,13 +513,22 @@ LayoutManager_Open(*) {
 	g.Show("w720 h560 Center")
 	_LayMgrWeb_Gui := g
 	try {
-		_LayMgrWeb_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll"))
+		CreatedController := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll"))
 	} catch as Err {
 		LoggerError("LayoutManager", "WebView2 create failed: {1}", Err.Message)
-		_LayMgrWeb_Close()
+		if SessionEpoch == _LayMgrWeb_SessionEpoch && _LayMgrWeb_Gui == g
+			_LayMgrWeb_Close()
 		return false
 	}
-	_LayMgrWeb_WebView := _LayMgrWeb_Controller.CoreWebView2
+	; SDK creation pumps messages while awaiting COM. The exact opening window
+	; may have closed or been replaced before the controller becomes available.
+	if SessionEpoch != _LayMgrWeb_SessionEpoch || _LayMgrWeb_Gui != g {
+		CreatedController.Close()
+		LoggerInfo("LayoutManager", "Layout manager opening cancelled after its window was closed or replaced.")
+		return false
+	}
+	_LayMgrWeb_Controller := CreatedController
+	_LayMgrWeb_WebView := CreatedController.CoreWebView2
 	try {
 		s := _LayMgrWeb_WebView.Settings
 		s.AreDevToolsEnabled := false
