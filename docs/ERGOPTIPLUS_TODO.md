@@ -89,16 +89,16 @@ a sealed Windows updater source, reseal with
   `vendor/ergopti_updater_download.ps1` (`CreateFileW`, `GetFileInformationByHandle`, from bdfa026d16). Check
   whether a bundled type already declaring them could be reused, then lower it back. The same build log notes
   `key_state_polling` dropped to 59: lower its script ceiling from 62 once a Windows build confirms 59.
-- **Last full preflight:** runs 40615470853 (b5101cb55f) and 40620562365 (2c374728f7) on the night of
-  27 to 28 October were red; every root cause is fixed by the CI7 and CI8 batches (stale pinned counts,
-  closed log vocabulary, path-pinned reads, the duplicate Windows `JsonStringLiteral`, the fast-timer seam,
-  the UIA census timeout, the Linux network-ai harness ordering, the Hammerspoon cache path of the cold
-  receiver, the PTY snapshot creating `Library/Application Support` in a cold home, the model selector
-  translation keys). One red was the runner: macOS 15 Intel `NumberRowSourceProbeTests` lost the TSM
-  UI server port (`CFMessagePortSendRequest FAILED(-1)`); rerun that job once if it repeats. The third
-  v1.0.7 release commit sits on top of all of tonight's work (Mac field fixes, model selector page on the
-  three OS, web-view toggle actions, local server discovery, log truth, slowness) and a new full run
-  qualifies it before `main`.
+- **Last full preflight:** run 40629486396 on 970dabee78 (third v1.0.7 release commit) had 110 green of
+  112, the two reds fixed by 46c71708e0 (two AHK locals shadowing the built-ins `Any` and `IsAlnum` under
+  `#Warn All`) and 793e4afe8f (the cold official-Ollama receiver now checks the binary at
+  `binary.managed_executable_path()`). The fourth v1.0.7 release commit sits on top and a new full run
+  qualifies it before `main`. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
+  `CFMessagePortSendRequest FAILED(-1)` (the runner's TSM UI server), rerun that job once.
+- **Decide after v1.0.7 [CI]:** since bc09e4584c no product path calls the stock
+  `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
+  `runtime_install_offer.lua`), so the macOS "official cold Ollama without stock Python" lane only proves
+  the official installer still works cold. Repoint it at the native install or retire it.
 - **The ChatGPT fix branches** fix/linux, fix/macos and fix/windows are fully on dev. The container proxy
   refuses remote deletion, so the maintainer deletes them: `git push origin --delete fix/linux fix/macos
 fix/windows`.
