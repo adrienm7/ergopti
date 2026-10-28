@@ -5,6 +5,7 @@
 ; DESCRIPTION:
 ; Actual workers and native tree acknowledgements precede lifetime observations.
 ; An acyclic marker observes destruction after public successor replacement.
+; Namespace admission preserves foreign bytes before acquiring any worker.
 ; The passive SDK records submissions; no RSS, physical input or DOM is certified.
 ; ==============================================================================
 
@@ -298,6 +299,63 @@ _HCLT_Cleanup() {
 		. " errors=" . IsObject(_HCPO.Failure) . "`n", "*", "UTF-8")
 }
 
+global _HCNS_Admission := 0
+
+/** Seeds only the namespace boundary after the genuine GUID constructor returns. */
+_HCNS_Construct(Owner) {
+	global _HCNS_Admission
+	_HCNS_Admission.Original.Call.Call(Owner)
+	_HCNS_Admission.Calls += 1
+	SplitPath(Owner.Directory, , &Parent)
+	_HCNS_Admission.Parent := Parent
+	if _HCNS_Admission.Mode == "namespace-fresh" {
+		_HCPO_Require(!DirExist(Parent), "The fresh control must start without the diagnostics parent.")
+		return
+	}
+	FSEnsureDirectoryStrict(Parent)
+	FSCreateDirectoryExclusiveStrict(Owner.Directory)
+	if _HCNS_Admission.Mode == "namespace-request" {
+		Path := Owner.Directory . "\request.json"
+		_HCPO_Require(FSWriteCreateDurable(Path, "foreign request — Ω`n"), "Foreign request bytes must precede public admission.")
+		_HCNS_Admission.Digest := CryptoSha256Bytes(FSReadBytesStrict(Path))
+	}
+}
+
+/** Exercises public admission; fresh worker acquisition does not qualify its PowerShell scenarios. */
+_HCNS_Admit(Mode) {
+	global _HCNS_Admission, _HC_Collection, _HCPO
+	Original := DiagnosticCollectionWindows.Prototype.GetOwnPropDesc("__New")
+	_HCNS_Admission := {Original: Original, Mode: Mode, Calls: 0}
+	DiagnosticCollectionWindows.Prototype.DefineProp("__New", {Call: _HCNS_Construct})
+	try Admitted := HealthCheck_CollectWindows()
+	finally DiagnosticCollectionWindows.Prototype.DefineProp("__New", Original)
+	Owner := _HC_Collection
+	_HCPO.RetirementTask := IsObject(Owner.Task) ? Owner.Task : 0
+	_HCPO_Require(_HCNS_Admission.Calls == 1, "The genuine GUID constructor must run exactly once.")
+	if Mode == "namespace-fresh" {
+		_HCPO_Require(Admitted && IsObject(Owner.Task) && Owner.Task.processId() > 0,
+			"A fresh profile must still acquire the actual native task.")
+		_HCPO_Require(DirExist(_HCNS_Admission.Parent), "Fresh admission must create the shared diagnostics parent.")
+		Request := JsonParse(FSReadStrict(Owner.Directory . "\request.json"))
+		_HCPO_Require(Request["schema_version"] == 1 && Request["contract_path"] == Owner.ContractPath,
+			"Fresh admission must publish the genuine bounded worker request.")
+	} else {
+		if Mode == "namespace-request"
+			_HCPO_Require(CryptoSha256Bytes(FSReadBytesStrict(Owner.Directory . "\request.json")) == _HCNS_Admission.Digest,
+				"Public admission must preserve the exact pre-existing foreign request bytes.")
+		else {
+			Count := 0
+			loop files Owner.Directory . "\*", "FD"
+				Count += 1
+			_HCPO_Require(Count == 0, "A foreign empty namespace must remain empty.")
+		}
+		_HCPO_Require(!Admitted && !IsObject(Owner.Task) && Owner.Terminal,
+			"A foreign namespace must be refused before native worker acquisition.")
+	}
+	FileAppend("RECEIPT collection-namespace mode=" . Mode . " constructor_calls=" . _HCNS_Admission.Calls
+		. " admitted=" . Admitted . " task_acquired=" . IsObject(Owner.Task) . "`n", "*", "UTF-8")
+}
+
 _HCLT_Main() {
 	global _HCPO, _EDOS_Root, Features, WEBVIEW_SHARED_UDIR, _HC_Collection, _LOGGER_DEBUG_ENABLED
 	if A_Args.Length != 2 || A_Args[2] != _EDOS_Root
@@ -312,7 +370,8 @@ _HCLT_Main() {
 	Thread("Interrupt", 0), Suspend(false)
 	OnError(_HCPO_OnError)
 	try {
-		_HCPO_Require(_HCPO.Mode == "current-retained" || _HCPO.Mode == "successor-releases", "Unknown lifetime mode.")
+		Namespace := _HCPO.Mode == "namespace-request" || _HCPO.Mode == "namespace-empty" || _HCPO.Mode == "namespace-fresh"
+		_HCPO_Require(Namespace || _HCPO.Mode == "current-retained" || _HCPO.Mode == "successor-releases", "Unknown lifetime mode.")
 		EnvSet("LOCALAPPDATA", _EDOS_Root . "\localappdata")
 		Features := ManifestBuildFeaturesMap()
 		WEBVIEW_SHARED_UDIR := _EDOS_Root . "\profile"
@@ -329,28 +388,33 @@ _HCLT_Main() {
 		_HCPO_Require(_LOGGER_DEBUG_ENABLED, "The genuine private configured logger must initialize.")
 		HealthCheck_ShowWindow()
 		_HCPO_Require(_HCPO_Ready(), "The real native host and passive SDK must initialize before worker admission.")
-		_HCLT_Disposable(Observer)
-		_HCPO_Require(Observer.ControlDeleted == 1, "An ordinary acyclic marker must genuinely receive __Delete after helper return.")
-		_HCLT_CompleteA(Observer)
-		_HCPO_Require(_HC_Collection.Id == Observer.AId && _HC_Collection.Terminal && Observer.OwnerDeleted == 0
-			&& !IsObject(_HCPO.RetirementTask),
-			"Terminal A must remain retained while the real global current owner still names it.")
-		if _HCPO.Mode == "successor-releases"
-			_HCLT_ReplaceA(Observer)
-		_HCLT_Turn()
-		if IsObject(_HCPO.Failure)
-			throw _HCPO.Failure
-		_HCPO_Require(Observer.ControlDeleted == 1 && Observer.AAck == 1 && Observer.AArchive == 1
-			&& _HCPO.EnvironmentCalls == 1 && !A_IsCritical, "Actual completion, archive and acyclic-control prerequisites must precede business observation.")
-		_HCLT_Observe(Observer), Observed := true
-		if _HCPO.Mode == "current-retained"
-			_HCPO_Require(_HC_Collection.Id == Observer.AId && Observer.OwnerDeleted == 0,
-				"A current terminal collection must retain its marker after native task retirement.")
-		else {
-			_HCPO_Require(_HC_Collection.Id == Observer.BId && Observer.BPid > 0,
-				"The genuine public successor must still be current at the release observation.")
-			_HCPO_Require(Observer.OwnerDeleted == 1,
-				"A terminal collection replaced by public B must release its acyclic marker after all helper and completion frames return.")
+		if Namespace {
+			_HCNS_Admit(_HCPO.Mode)
+			Observed := true
+		} else {
+			_HCLT_Disposable(Observer)
+			_HCPO_Require(Observer.ControlDeleted == 1, "An ordinary acyclic marker must genuinely receive __Delete after helper return.")
+			_HCLT_CompleteA(Observer)
+			_HCPO_Require(_HC_Collection.Id == Observer.AId && _HC_Collection.Terminal && Observer.OwnerDeleted == 0
+				&& !IsObject(_HCPO.RetirementTask),
+				"Terminal A must remain retained while the real global current owner still names it.")
+			if _HCPO.Mode == "successor-releases"
+				_HCLT_ReplaceA(Observer)
+			_HCLT_Turn()
+			if IsObject(_HCPO.Failure)
+				throw _HCPO.Failure
+			_HCPO_Require(Observer.ControlDeleted == 1 && Observer.AAck == 1 && Observer.AArchive == 1
+				&& _HCPO.EnvironmentCalls == 1 && !A_IsCritical, "Actual completion, archive and acyclic-control prerequisites must precede business observation.")
+			_HCLT_Observe(Observer), Observed := true
+			if _HCPO.Mode == "current-retained"
+				_HCPO_Require(_HC_Collection.Id == Observer.AId && Observer.OwnerDeleted == 0,
+					"A current terminal collection must retain its marker after native task retirement.")
+			else {
+				_HCPO_Require(_HC_Collection.Id == Observer.BId && Observer.BPid > 0,
+					"The genuine public successor must still be current at the release observation.")
+				_HCPO_Require(Observer.OwnerDeleted == 1,
+					"A terminal collection replaced by public B must release its acyclic marker after all helper and completion frames return.")
+			}
 		}
 	} catch Any as Failure {
 		try _EDOS_Phase("lifetime Main first exception", Failure)
