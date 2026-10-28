@@ -389,7 +389,7 @@ local function acquire_slot(id, action, on_done)
 end
 
 --- What an installed layout's enable came to, read from a fresh process. The
---- macOS 26 field probes showed that writing the enabled-sources
+--- macOS 26 field probe (v5) showed that writing the enabled-sources
 --- preference turns a layout on at once, but only a process started after the
 --- write sees it: Hammerspoon's own list stays stale. A layout the fresh process
 --- does not see on is the fallback: pending until the next login. An

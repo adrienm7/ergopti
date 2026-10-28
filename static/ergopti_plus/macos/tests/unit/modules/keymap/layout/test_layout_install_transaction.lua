@@ -214,7 +214,7 @@ helpers.describe("layout_install: transactional replacement", function()
 end)
 
 
--- macOS 26 field probes: the same bundle in both folders loads both copies
+-- The macOS 26 TIS probe showed that the same bundle in both folders makes macOS load both copies
 -- and renumber one; a user install must not write the second copy.
 helpers.describe("layout_install: one copy per bundle (composer-macos26)", function()
 	helpers.it("writes no user copy of a bundle the system folder already holds", function()
