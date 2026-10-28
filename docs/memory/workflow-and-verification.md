@@ -78,6 +78,13 @@ another live process, never download runtimes or models without authorization,
 and keep large artifacts on owned D: storage (C: ran out of space during site
 and runtime checks).
 
+### project-field-report-collectors-share-one-git-contract
+
+The three `tools/dev/collect-*-field-report` collectors take their branch prefix,
+report folder and base config key from `identifiers.json` `field_report`; the two
+shell ones share `tools/dev/field-report-git.sh`, which the PowerShell one
+mirrors by hand, so change a git step in both.
+
 ## Communication
 
 ### feedback-times-in-paris
