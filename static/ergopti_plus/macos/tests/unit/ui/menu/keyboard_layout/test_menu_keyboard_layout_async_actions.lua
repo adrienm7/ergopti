@@ -146,7 +146,10 @@ local function exercise_bundle_action(operation, business_ok, live)
 			return true
 		end
 		-- Whether macOS turned the added variant on now (macOS 26: at the next login).
-		input_sources.is_live_enabled = function() return live ~= false end
+		input_sources.confirm_source_async = function(_name, _options, on_done)
+			on_done(true, { listed = true, enabled = live ~= false })
+			return true
+		end
 		input_sources.enable_keylayout_source_async = function(keylayout, label, on_done)
 			helpers.assert_contains(keylayout, "/Contents/Resources/Ergopti_v2_2_2_plus.keylayout")
 			helpers.assert_eq(label, "Ergopti+")

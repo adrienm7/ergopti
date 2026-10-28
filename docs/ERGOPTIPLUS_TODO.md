@@ -594,7 +594,9 @@ application|app_name|title|context_watchers|secure_field>, TTL refresh <armed|no
   state also read in a fresh process), P8 b (new content in the enabled Ergopti layout in place,
   select away and back), P10 and P8 a (the kept EPProbeKeep layout after the logout; the
   collector runs `after-logout` first when the marker exists). The product follows the
-  documented behaviour until then: pending activation at the next login (L52).
+  documented behaviour until then: pending activation at the next login (L52). Probe v5 then
+  showed the preference route works at once from a fresh process (L52, tmp/wip-composer-macos26-2):
+  the "limitation" was a stale TIS list in the writing process, not macOS.
 - **L26** [CODE][PHYS-M] field run 03_field_network: fail (`_164726`); the PAC host is unknown
   off the company network (new.txt 16:48:20). Sub-steps were not captured (L13). Next: read the
   sub-steps in the next report; a PAC that cannot be fetched while direct works must not fail the
@@ -731,19 +733,27 @@ strict_only:finder_detritus`, any other cause, team or a rejection still fails. 
   or a personal file adds `reload_requested` and, after the done marker, one reload through the
   termination coordinator. Mac confirms: do not use the menus during a field run; if the guard
   restores config.toml, the driver reloads once and the menu shows the backend the file names.
-- **L52** Fixed on tmp/wip-composer-macos26. 06_field_composer `composer_ready fail:not_enabled`
+- **L52** Fixed on tmp/wip-composer-macos26-2. 06_field_composer `composer_ready fail:not_enabled`
   with "Failed to enable 'Composer Check' — reason=process_failed" (22:31 run): `process_failed`
-  was the editor's own kickstart answering 113 after a successful write (see L25). The editor now
-  ends on its write; the registry reads the live list (hs.keycodes) and a layout the preference
-  lists but macOS has not turned on is `pending_activation`, logged "reason=not_enabled:
-  macos_requires_logout", recorded, and confirmed (and selected when « save and use » was asked)
-  at the next boot (modules/keymap/pending_layout_activation.lua). The UI says macOS turns it on
-  at the next login; the field check reads `composer_ready info:pending_logout`. Mac confirms:
-  the next field run shows info:pending_logout and the log line; after a logout, the boot logs
-  "macOS turned on the 'composed' layout" (or "has not turned on", which would refute the
-  documented route: then read P10). Not done, behind the probe: composing into the enabled
-  Ergopti layout in place (route a) only if P8 b shows the new content applies without a logout,
-  and a re-read after the write only if one P9 mechanism passes.
+  was the editor's own kickstart answering 113 after a successful write (see L25). Probe v5
+  (mac-2026-10-28_114302 and \_120209) settled the route: the preference write turns a layout on
+  at once, no logout and no re-read needed (P5, P9 a-d pass), but only a process started after
+  the write sees it; the writing process and Hammerspoon keep a stale list (enabled=false, select
+  -50). New content of an enabled loose layout applies once the file is registered again (P8 a,
+  fresh process). The driver now: writes the preference, then reads, registers and (for an
+  update of a selected layout) reselects it from a fresh child (`InputSources.confirm_source_async`,
+  Carbon through ctypes); a layout the child sees on is enabled and the composer check reads
+  `composer_ready pass:enabled`; `pending_logout` (with the boot follow-up of
+  modules/keymap/pending_layout_activation.lua) is only the fallback when the child still sees
+  it off. macOS asks the user to allow a keyboard it has not seen (the maintainer clicked that
+  dialog): the manager, the composer and the menu now say so after a new install. Mac confirms:
+  the next field run reads `composer_ready=pass:enabled` and the log "seen by a fresh process:
+  listed=true enabled=true"; saving a changed composition while it is selected types the new
+  keys without a logout. Open: P8 b (the Ergopti bundle edited in place) still types the old
+  content after a re-register; that Mac has the same bundle in ~/Library and /Library (P0
+  duplicate ids), so the system copy is probably the one read: the driver no longer writes a user
+  copy of a bundle the system folder holds and logs each duplicate at boot. Run P8 b again once
+  one copy is removed before building anything on in-place bundle edits.
 - **L44** Fixed 6593474037. Wake at 19:46:39 (driver booted 16:54): "Cannot refresh Karabiner
   lease liveness — no live generation exists" and "Wake refresh could not renew the exact
   Karabiner lease liveness", twice each, then the layout refresh retries of L20; nothing
