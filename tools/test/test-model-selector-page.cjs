@@ -538,6 +538,18 @@ for (const field of [...fields, 'backend', 'installed']) {
 	assert.ok(ahk.includes(`${field}:`) || ahk.includes(`"${field}"`), `Windows projects ${field}`);
 }
 
+// model-selector-api-listing: every driver replays the shared listing corpus.
+for (const replay of [
+	'macos/tests/unit/modules/llm/vectors/test_api_model_listing_vectors.lua',
+	'linux/tests/meta/corpus/test_corpus_api_model_listing.lua',
+	'windows/tests/unit/modules/llm/menu/test_llm_menu_backend_model_labels.ahk'
+]) {
+	assert.ok(
+		fs.readFileSync(path.join(SP, replay), 'utf8').includes('api_model_listing_vectors.json'),
+		`${replay} replays the API listing corpus`
+	);
+}
+
 console.log(
 	'[OK] model selector page: groups, greying, download-only rows, keyboard, filter and catalogue columns.'
 );

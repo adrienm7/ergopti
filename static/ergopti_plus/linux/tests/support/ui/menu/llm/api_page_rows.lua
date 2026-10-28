@@ -8,7 +8,9 @@
 --- the tray rows read labels and actions; this adapter lays the page's real
 --- closures out in that shape — each entry (chat: selectable; other: its Test
 --- and Remove), the active entry's Test and Remove, and one "➕ provider" row
---- per provider — so they keep driving the very same transactions.
+--- per provider — so they keep driving the very same transactions. The
+--- provider's other models and the typed-id row (llm.api_model_listing) were
+--- never tray rows: the page tests drive them directly.
 --- ==============================================================================
 
 local M = {}
@@ -23,7 +25,11 @@ local M = {}
 function M.rows(Rows, llm, dialogs, changed, context)
 	local api = Rows.api_page(llm, dialogs, changed, context)
 	local rows, active = {}, nil
+	local former = {}
 	for _, row in ipairs(api.rows) do
+		if not row.alternative and not row.typed then former[#former + 1] = row end
+	end
+	for _, row in ipairs(former) do
 		if row.available ~= false and type(row.run) == "function" then
 			rows[#rows + 1] = { label = row.name, checked = row.current == true, action = row.run }
 			if row.current then active = row end

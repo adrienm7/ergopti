@@ -95,6 +95,30 @@ helpers.describe("model browser inventory document", function()
 		end)
 	end)
 
+	helpers.it("(model-selector-progress) a pull's percentage reaches its row and survives a new payload", function()
+		with_browser(function(f, bridge)
+			f.handshake()
+			local before = #f.effects
+			helpers.assert_eq(bridge.on_download_progress("unknown:tag", 10), false, "no row, nothing sent")
+			helpers.assert_true(bridge.on_download_progress("qwen3.5:0.8b", 42))
+			helpers.assert_eq(#f.effects, before + 1)
+			helpers.assert_true(f.effects[#f.effects].code:find("injectProgress", 1, true) ~= nil)
+			local _, data = bridge.reproject_current()
+			local row
+			for _, candidate in ipairs(data.models) do
+				if candidate.runtime_name == "qwen3.5:0.8b" then row = candidate end
+			end
+			helpers.assert_eq(row.pending, "download")
+			helpers.assert_eq(row.progress, 42)
+			helpers.assert_eq(bridge.on_download_progress("qwen3.5:0.8b", nil), false, "the end clears it")
+			_, data = bridge.reproject_current()
+			for _, candidate in ipairs(data.models) do
+				if candidate.runtime_name == "qwen3.5:0.8b" then row = candidate end
+			end
+			helpers.assert_nil(row.progress)
+		end)
+	end)
+
 	helpers.it("(linux-model-browser-owner) installed selection and available download retain their own page", function()
 		with_browser(function(f, _, seen)
 			local ready = f.handshake()
