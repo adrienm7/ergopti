@@ -1043,6 +1043,16 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return _LifecycleRefuseShutdown("native keyboard receipts or holds remain owned")
 		}
+		RegistryDownloadsReady := false
+		try RegistryDownloadsReady := LayoutRegistry_PrepareShutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Registry download shutdown preflight failed: {1}.", Err.Message)
+		if !RegistryDownloadsReady {
+			try LoggerError("Lifecycle", "Shutdown refused because a registry download still owns native cleanup.")
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return _LifecycleRefuseShutdown("a registry download still owns native cleanup")
+		}
 		ShutdownTerminal := false
 		try {
 		TerminalHandoff := ReloadTerminalHandoffClaim(reason)

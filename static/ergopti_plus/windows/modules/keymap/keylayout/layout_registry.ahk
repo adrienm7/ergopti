@@ -31,6 +31,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include layout_registry_download.ahk
+
 
 
 
@@ -317,16 +319,16 @@ _LayoutRegistryDefaultTransport() {
 /**
  * Downloads one URL of the registry into ``Partial`` in a native WinHTTP child polled
  * from a timer, never on the keyboard thread, and calls
- * OnSettled(Status, Etag, Error) exactly once: Status 0 when no HTTP response
+ * OnSettled(Status, Etag, Error, OutputOwner) exactly once: Status 0 when no HTTP response
  * arrived, Error then saying why; Etag is the response's, "" when none.
  * @param {string} Url
- * @param {string} Partial - Output file; a stale one is removed first.
+ * @param {string} Partial - Stage path acquired exclusively; an occupied path is refused.
  * @param {Map} Headers - Request headers.
  * @param {Integer} TimeoutMs - Budget of the whole transfer, connection included.
  * @param {Map} Transport - "request" (a CurlAsyncRequest-like object),
  *   "resolve_proxy" (SystemProxy_ResolveAsync) and "schedule" (Fn, DelayMs);
  *   the managed transport when 0.
- * @param {Func} OnSettled
+ * @param {Func} OnSettled - Receives the retired download owner, or 0 if acquisition failed.
  */
 LayoutRegistry_Request(Url, Partial, Headers, TimeoutMs, Transport, OnSettled) {
 	Started := A_TickCount
@@ -334,12 +336,25 @@ LayoutRegistry_Request(Url, Partial, Headers, TimeoutMs, Transport, OnSettled) {
 		Transport := _LayoutRegistryDefaultTransport()
 	Job := { Url: Url, Partial: Partial, Headers: Headers, TimeoutMs: TimeoutMs, Transport: Transport,
 		OnSettled: OnSettled, Settled: false, Started: Started, Request: 0,
-		Retiring: false, RetirementError: "" }
+		Retiring: false, RetirementError: "", OutputOwner: 0 }
 	LoggerDebug("LayoutRegistry", "Fetching {1}", Url)
-	if Transport.Get("managed", false)
-		_LayoutRegistrySend(Job)
-	else
-		Transport["resolve_proxy"].Call([Url], (Resolved) => _LayoutRegistrySend(Job, Resolved[Url]))
+	try {
+		if !LayoutRegistry_RetireDownloads()
+			throw Error("A previous registry download still owns native cleanup.")
+		Job.OutputOwner := _LayoutRegistryDownload(Partial)
+		if Transport.Get("managed", false)
+			_LayoutRegistrySend(Job)
+		else
+			Transport["resolve_proxy"].Call([Url], (Resolved) => _LayoutRegistrySend(Job, Resolved[Url]))
+	} catch as Err {
+		; A synchronous subscriber may throw after the exact job already settled.
+		if Job.Settled
+			throw Err
+		if IsObject(Job.Request)
+			_LayoutRegistryRetire(Job, Job.Request, "cannot download " . Url . ": " . Err.Message)
+		else
+			_LayoutRegistrySettle(Job, 0, "", "cannot download " . Url . ": " . Err.Message)
+	}
 	return Job
 }
 
@@ -348,15 +363,27 @@ _LayoutRegistrySettle(Job, Status, Etag, Err) {
 		return
 	Job.Settled := true
 	Job.Request := 0
-	Job.OnSettled.Call(Status, Etag, Err)
+	OutputOwner := Job.OutputOwner
+	if IsObject(OutputOwner) {
+		; Publish delivery admission before retirement: a reentrant request must
+		; never mistake this callback's response for abandoned cleanup debt.
+		OutputOwner.Delivering := true
+		OutputOwner.Retired := true
+	}
+	try Job.OnSettled.Call(Status, Etag, Err, OutputOwner)
+	finally {
+		if IsObject(OutputOwner) {
+			OutputOwner.Delivering := false
+			if !OutputOwner.Remove()
+				LoggerError("LayoutRegistry", "The retired download still owns native cleanup: {1}.", OutputOwner.Path)
+		}
+	}
 }
 
 _LayoutRegistrySend(Job, Proxy := unset) {
 	if Job.Settled
 		return
 	try {
-		if !FSDelete(Job.Partial)
-			throw Error("Cannot remove the stale partial download " . Job.Partial)
 		Req := Job.Transport["request"].Call()
 		Job.Request := Req
 		if Job.Transport.Get("managed", false) {
@@ -370,7 +397,7 @@ _LayoutRegistrySend(Job, Proxy := unset) {
 			Req.SetProxy(Proxy)
 		; One budget for the whole transfer, connection included.
 		Req.SetTimeouts(0, Job.TimeoutMs, 0, 0)
-		Req.SetOutputFile(Job.Partial)
+		Req.SetOutputFile(Job.OutputOwner.Path)
 		if !Req.Send()
 			throw Error("The managed registry request refused dispatch.")
 	} catch as Err {
@@ -395,6 +422,7 @@ _LayoutRegistryRetire(Job, Req, Failure) {
 		if !Job.Retiring {
 			Job.RetirementError := Failure
 			Job.Retiring := true
+			Job.OutputOwner.RequestRetirement := _LayoutRegistryRetire.Bind(Job, Req, Failure)
 		}
 	} finally Critical(PreviousCritical)
 	Retired := false

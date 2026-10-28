@@ -117,7 +117,7 @@ LayoutCatalogue_Refresh(LocalDir, OnDone, Transport := 0, Bundled := unset, Loca
 			. "." . A_ScriptHwnd . "_" . Owner.Sequence
 		LayoutRegistry_Request(LayoutRegistry_RawUrl(Settings["index_file"]), Partial, Headers,
 			Settings["download_timeout_sec"] * 1000, Transport,
-			_LayoutCatalogueOnIndex.Bind(Owner, LocalDir, Partial, Cached, Bundled))
+			_LayoutCatalogueOnIndex.Bind(Owner, LocalDir, Cached, Bundled))
 	} catch as Err {
 		; A synchronous terminal callback can throw after retiring this owner.
 		; Never consume that error by completing a later refresh a second time.
@@ -128,27 +128,27 @@ LayoutCatalogue_Refresh(LocalDir, OnDone, Transport := 0, Bundled := unset, Loca
 	}
 }
 
-_LayoutCatalogueOnIndex(Owner, LocalDir, Partial, Cached, Bundled, Status, Etag, Err) {
+_LayoutCatalogueOnIndex(Owner, LocalDir, Cached, Bundled, Status, Etag, Err, OutputOwner) {
 	global LAYOUT_CATALOGUE_ERROR_TOO_LARGE
-	if !_LayoutCatalogueRefreshCurrent(Owner) {
-		; Only this response owns this partial; a later directory owner has a
-		; different path and must not be published or retired by this callback.
-		if !FSDelete(Partial)
-			LoggerWarn("LayoutCatalogue", "Cannot remove the partial download {1}.", Partial)
+	if !_LayoutCatalogueRefreshCurrent(Owner)
 		return
-	}
 	Settings := LayoutRegistry_Settings()
-	Body := ""
-	if (Status == 200)
-		Body := FSReadBounded(Partial, Settings["max_file_bytes"])
+	Body := "", ReadFailure := ""
+	if Status == 200 {
+		try Body := OutputOwner.ReadText(Settings["max_file_bytes"])
+		catch as ReadError {
+			Body := false
+			ReadFailure := "cannot consume the owned registry index: " . ReadError.Message
+		}
+	}
 	if (Body is String)
 		Outcome := LayoutCatalogue_ResolveIndex(Status, Body, Etag, Err, Cached, Bundled, Settings["max_file_bytes"])
 	else
 		Outcome := LayoutCatalogue_Fallback(Map("code", LAYOUT_CATALOGUE_ERROR_TOO_LARGE,
-			"detail", "the registry index exceeds the download bound or cannot be read"), Cached, Bundled)
+			"detail", ReadFailure != "" ? ReadFailure : "the registry index exceeds the download bound or cannot be read"), Cached, Bundled)
 	if Outcome["store"] {
 		try {
-			if !FSAtomicMoveReplace(Partial, LocalDir . Settings["index_file"])
+			if !OutputOwner.Publish(LocalDir . Settings["index_file"])
 				throw Error("cannot publish the downloaded index in " . LocalDir)
 			EtagPath := LocalDir . Settings["etag_file"]
 			if (Outcome["etag"] != "")
@@ -159,9 +159,10 @@ _LayoutCatalogueOnIndex(Owner, LocalDir, Partial, Cached, Bundled, Status, Etag,
 			LoggerError("LayoutCatalogue", "The refreshed layout index could not be cached: {1}", Err.Message)
 		}
 	}
-	if !FSDelete(Partial)
-		LoggerWarn("LayoutCatalogue", "Cannot remove the partial download {1}.", Partial)
-	_LayoutCatalogueCompleteRefresh(Owner, Outcome)
+	try {
+		if IsObject(OutputOwner) && !OutputOwner.Remove()
+			LoggerError("LayoutCatalogue", "The registry index response still owns native cleanup: {1}.", OutputOwner.Path)
+	} finally _LayoutCatalogueCompleteRefresh(Owner, Outcome)
 }
 
 _LayoutCatalogueFinishRefresh(Outcome, OnDone) {
