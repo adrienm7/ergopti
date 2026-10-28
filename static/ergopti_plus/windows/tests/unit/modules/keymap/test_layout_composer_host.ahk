@@ -327,3 +327,42 @@ _LCH_SchemaSourceKind(Fixture) {
 for Fixture in _LayoutSchemaKindFixtures(LAYOUT_COMPOSER_SCHEMA_VERSION)
 	Test("layout schema: composition " . Fixture.Label . " retains native kind (layout-schema-kind)",
 		_LCH_SchemaSourceKind.Bind(Fixture))
+
+
+; A prelaunch reload refusal is delivered by the real manager through both its
+; completion callback and its Boolean return. One public save owns one result.
+_LCH_RefreshRefusal(Selected, Use := false) {
+	Dir := _LCH_TempDir()
+	try {
+		Log := [], Reloads := []
+		Id := LayoutRegistry_Composer()["id"]
+		Deps := _LCH_Deps(Dir, Log, Selected ? Id : "")
+		RefuseReload(*) {
+			Reloads.Push(true)
+			return false
+		}
+		Options := Map("local_dir", Deps["local_dir"], "selected", Deps["selected"],
+			"packs", () => [], "reload", RefuseReload)
+		Deps["after"] := (LayoutId, Action, Completed) => _LayMgrWeb_After(LayoutId, Action, Completed, Options)
+		AssertTrue(LayoutComposer_Handle("composer_save",
+			Map("declaration", _LCH_Declaration(), "keylayout", _LCH_Text(), "use", Use), Deps))
+		AssertEqual(_LCH_Declaration(), LayoutComposer_ReadDeclaration(Dir))
+		AssertEqual(_LCH_Text(), LayoutRegistry_ReadLocal(Id, Deps["local_dir"])["Text"])
+		AssertEqual(Selected ? 1 : 0, Reloads.Length, "the actual manager reload boundary must be reached only for the selected layout")
+		Results := []
+		for Row in Log
+			if Row.Has("push") && Row["push"] == "composerResult"
+				Results.Push(Row["payload"])
+		AssertEqual(1, Results.Length, "one save must publish exactly one terminal composer result")
+		AssertEqual(Selected ? 0 : 1, Results[1]["ok"])
+		if Selected
+			AssertEqual(LAYOUT_COMPOSER_FAILURE_USE, Results[1]["code"])
+	} finally DirDelete(Dir, true)
+}
+Test("layout composer: a selected save publishes one result when the real manager refuses reload (composer-refresh-refusal)",
+	_LCH_RefreshRefusal.Bind(true))
+Test("layout composer: an unselected save does not reload and publishes one successful result (composer-refresh-refusal)",
+	_LCH_RefreshRefusal.Bind(false))
+
+Test("layout composer: an already selected save-use publishes one refused result (composer-refresh-refusal)",
+	_LCH_RefreshRefusal.Bind(true, true))
