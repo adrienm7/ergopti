@@ -1450,9 +1450,12 @@ end
 local function build_key_pair(batch, modifiers, key, unicode, loopback)
 	local tx = batch.tx
 	local ordinal = tx.next_ordinal + 1
-	local down = assert(new_key_event(modifiers, unicode and 0 or key, true),
+	-- Unicode text rides a carrier key the user is not holding: a key-down of a
+	-- key still down is lost, and with it the replacement's first character.
+	local code = unicode and require("adapters.unicode_carrier").keycode() or key
+	local down = assert(new_key_event(modifiers, code, true),
 		"adapters.synthetic_input: newKeyEvent returned nil for keyDown")
-	local up = assert(new_key_event(modifiers, unicode and 0 or key, false),
+	local up = assert(new_key_event(modifiers, code, false),
 		"adapters.synthetic_input: newKeyEvent returned nil for keyUp")
 	if unicode then
 		assert(type(down.setUnicodeString) == "function" and type(up.setUnicodeString) == "function",
@@ -2204,6 +2207,11 @@ function M.keyStrokes(batch, value)
 	local observable_start = batch.has_observable_action
 	local first_observable_start = batch.first_observable_ordinal
 	local ok, err = xpcall(function()
+		if select(2, require("adapters.unicode_carrier").keycode()) then
+			defer_diagnostic("debug",
+				"Synthetic text moved off a held key (%d byte(s)); its first character would have been lost.",
+				#value)
+		end
 		for _, codepoint in utf8.codes(value) do
 			append_pair(batch, {}, utf8.char(codepoint), true, batch.collector)
 		end
