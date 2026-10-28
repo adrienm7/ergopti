@@ -469,18 +469,25 @@ function M.build(ctx)
 						defer_tis_call(function()
 							enable_keylayout_source_async(var.keylayout, label,
 								function(ok)
-									-- The preference lists it at once; macOS 26 turns it on at the next login.
-									local live = nil
-									if ok then live = input_sources.is_live_enabled(var.name) end
-									if ok and live == true then
-										pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), label), nil, "success")
-									elseif ok and live == false then
-										Logger.warn(LOG, "Layout '%s' is listed but not turned on (reason=not_enabled:macos_requires_logout).", label)
-										pcall(notifications.notify, string.format(i18n.get("menu.layout.add_pending_logout"), label), nil, "info")
-									else
+									if not ok then
 										pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error")
+										schedule_menu_refresh(update_menu)
+										return
 									end
-									schedule_menu_refresh(update_menu)
+									-- The preference turns it on at once, but only a process started
+									-- after the write sees it (probe v5): Hammerspoon's list is stale.
+									input_sources.confirm_source_async(var.tis_id, {}, function(read, state)
+										if read and state.enabled == true then
+											-- macOS asks the user to allow a keyboard it has not seen before.
+											pcall(notifications.notify, string.format(i18n.get("menu.layout.add_consent"), label), nil, "success")
+										elseif read then
+											Logger.warn(LOG, "Layout '%s' is listed but not turned on (reason=not_enabled:macos_requires_logout).", label)
+											pcall(notifications.notify, string.format(i18n.get("menu.layout.add_pending_logout"), label), nil, "info")
+										else
+											pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error")
+										end
+										schedule_menu_refresh(update_menu)
+									end)
 								end)
 						end)
 					end,
