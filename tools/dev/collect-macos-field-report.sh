@@ -333,6 +333,11 @@ run_field_run() {
 			|| { log "The developer app could not be opened."; return 1; }
 	else
 		log "Reusing the running developer app: it was built from the current launcher."
+		# The runner stages the managed Ollama only when it opens the app. The
+		# installer reads the catalogue at each install, so staging it here gives
+		# the ollama_runtime step the build of this clone's current sources.
+		python3 "${REPO_ROOT}/tools/dev/stage-macos-dev-ollama-catalogue.py" \
+			|| log "WARNING: the managed Ollama was not built from this clone's pinned sources (reason above); the ollama_runtime step will fail."
 	fi
 
 	log "Waiting for the developer app to publish its readiness..."
