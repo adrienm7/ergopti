@@ -212,6 +212,7 @@
 		"startup_model_disk_insufficient",
 		"startup_model_download_declined",
 		"startup_ollama_unreachable",
+		"startup_ollama_upgrade_required",
 		"startup_runtime_not_installed",
 		"state_failed",
 		"string",
@@ -619,6 +620,10 @@
 		"startup_ollama_unreachable": {
 			"kind": "reason",
 			"description": "Nothing answers at the Ollama address."
+		},
+		"startup_ollama_upgrade_required": {
+			"kind": "reason",
+			"description": "The installed Ollama is too old to pull the selected model."
 		},
 		"startup_runtime_not_installed": {
 			"kind": "reason",

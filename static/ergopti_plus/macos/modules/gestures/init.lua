@@ -145,7 +145,7 @@ M.DEFAULT_MODES = {
 
 -- Default sensitivity for incremental mode: the distance per action after the
 -- first (Geometry.incrementalSteps). Only the axis slots take it; every
--- direction's own default, the 50 of the vertical three-finger swipe included,
+-- direction's own default, the 25 of the vertical three-finger swipe included,
 -- lives in the shared manifest.
 M.DEFAULT_SENSITIVITY = 3.5
 

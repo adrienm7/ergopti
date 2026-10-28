@@ -500,14 +500,15 @@ From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their bu
   forward fired the same step again (double counting). Incremental mode now fires its first
   action after `Geometry.INCREMENTAL_FIRST_STEP` (4, or one step if shorter) and each further
   action after one more sensitivity; a shrinking distance holds the actions fired, and a reversal
-  needs half the first step back from the last fire. `swipe_3_up`/`swipe_3_down` default to 50 in
-  the manifest: 4.9 and 45 give one tab, 54 and more two. The menu's "Distance per action" keeps
-  that meaning and offers 40, 50 and 60. A value the user chose is kept (saves are sparse, so only
+  needs half the first step back from the last fire. `swipe_3_up`/`swipe_3_down` first defaulted
+  to 50 (4.9 and 45 one tab, 54 two); on the Mac two actions then needed far too long a swipe, so
+  the default is 25 per action: 4.9, 19.84 and 26 give one tab, 29 to 54 two, 54 and more three.
+  The menu's "Distance per action" keeps that meaning and offers 20, 25 and 30 around it. A value the user chose is kept (saves are sparse, so only
   an explicit choice is in `config.toml`). Linux has no incremental mode (one action at the lift)
   and Windows uses the precision touchpad driver. Mac confirms: no explicit
   `[gestures.sensitivities]` swipe_3 value in `config.toml` (or remove it), then a normal and a
-  short deliberate vertical three-finger swipe each switch exactly one tab, a swipe across the
-  whole pad two, and lifting never adds or removes one.
+  short deliberate vertical three-finger swipe each switch exactly one tab, a swipe past 29
+  units (the logged `sd`) two, and lifting never adds or removes one.
 
 - **L16** [CODE][PHYS-M] Slow ingest tick, `append` phase 466 to 563 ms, peaks 1531 and 1709 ms
   (new.txt 14:25:50 to 16:53:38, 20 lines, still on 228f79f2). The 1.2 to 1.8 s ticks are the
@@ -1947,7 +1948,7 @@ Standing checks:
       two-finger momentum is still refused (`scroll guard`); scrolls never switch tabs.
 - [ ] **L46 one swipe, one tab** (`tmp/wip-three-finger-step`): with no explicit swipe_3
       sensitivity in `config.toml`, a normal and a short deliberate vertical three-finger swipe
-      each switch exactly one tab, a swipe across the whole pad two.
+      each switch exactly one tab, a swipe past 29 units (the logged `sd`) two.
 - [ ] **Issue #100 retest** (after v1.0.5: 2353a72eed, 25411ee080, e57f4cce77): with Ollama.app and
       a PAC proxy, enabling the AI downloads the model; with the Ergopti menu held open, no lease
       timeout.
