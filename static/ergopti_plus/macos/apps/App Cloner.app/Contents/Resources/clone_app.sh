@@ -1374,4 +1374,4 @@ DOCKEOF
 # return value, so we end with just the bundle path. The diagnostic file
 # location is in the log itself if needed.
 CLONE_COMPLETE=1
-printf '%s\n' "$DEST"
+/usr/bin/printf '%s\n' "$DEST"

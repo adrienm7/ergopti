@@ -92,6 +92,18 @@ def prefix(source, boundary):
     return source[: source.index(boundary) + len(boundary)]
 
 
+def receipt_boundary(mode):
+    """Refuse the actual final writer through an owned descriptor or pipe."""
+    if mode == "result-closed-fd":
+        return "exec 1>&-\n"
+    if mode == "result-closed-pipe":
+        return """exec 1> >(exec 0<&-; printf 'closed\\n' > "$OWNED_RECEIPT_CLOSED")
+IFS= read -r receipt_closed < "$OWNED_RECEIPT_CLOSED"
+[[ "$receipt_closed" == closed ]]
+"""
+    return ""
+
+
 def observation(resources, shell, root, caller, mode, color):
     case = root / (caller + "-" + mode)
     case.mkdir(mode=0o700)
@@ -224,6 +236,8 @@ printf icon > "$5"
         "backslash-t",
         "result-backslash-c",
         "result-backslash-t",
+        "result-closed-fd",
+        "result-closed-pipe",
     ]
     if caller == "clone":
         source = (resources / "clone_app.sh").read_text(encoding="utf-8")
@@ -235,12 +249,12 @@ printf icon > "$5"
         )
         limit = None
         arguments = [str(app), "Log Limit", "", "", "tint", "", "0", str(log)]
-        if mode.startswith("result-backslash-"):
+        if mode.startswith("result-"):
             tail_marker = "CLONE_COMPLETE=1\n"
             if source.count(tail_marker) != 1:
                 raise ValueError("Actual CLI success tail must be unique")
             actual_tail = source[source.index(tail_marker) :]
-            script_text = script_text[: -len("exit 0\n")] + actual_tail
+            script_text = script_text[: -len("exit 0\n")] + receipt_boundary(mode) + actual_tail
 
         if mode == "child-default":
             signal_child = case / "signal-child"
@@ -266,8 +280,12 @@ printf icon > "$5"
         )
         limit = None
         arguments = ["Log Limit", "target", "app", color, "label"]
-        if mode.startswith("result-backslash-"):
-            script_text = source
+        if mode.startswith("result-"):
+            tail_marker = "CLONE_COMPLETE=1\n"
+            if source.count(tail_marker) != 1:
+                raise ValueError("Actual shortcut success tail must be unique")
+            point = source.index(tail_marker)
+            script_text = source[:point] + receipt_boundary(mode) + source[point:]
 
     else:
         script_text = """set -euo pipefail
@@ -286,6 +304,9 @@ exit "$2"
             str(resources / "reserve_bundle.sh"),
             "74" if mode == "refusal-primary" else "0",
         ]
+    if mode == "result-closed-pipe":
+        os.mkfifo(case / "receipt-closed", 0o600)
+        environment["OWNED_RECEIPT_CLOSED"] = str(case / "receipt-closed")
     # Keep the shipped resource directory as SCRIPT_DIR while controlling the actual native boundary.
     script = resources / ("probe-" + case.name + ".sh")
     executable(script, script_text)
@@ -340,11 +361,11 @@ exit "$2"
         termination_kind="signal" if status < 0 else "exit",
         execution_scope=(
             "actual-clone-prefix-and-success-tail"
-            if caller == "clone" and mode.startswith("result-backslash-")
+            if caller == "clone" and mode.startswith("result-")
             else "actual-clone-prefix"
             if caller == "clone"
             else "actual-full-shortcut-generator"
-            if caller == "shortcut" and mode.startswith("result-backslash-")
+            if caller == "shortcut" and mode.startswith("result-")
             else "actual-shortcut-svg-prefix"
             if caller == "shortcut"
             else "actual-owned-cleanup-api"
@@ -423,9 +444,21 @@ def main():
                 "backslash-t",
                 "result-backslash-c",
                 "result-backslash-t",
+                "result-closed-fd",
+                "result-closed-pipe",
             ],
         ),
-        ("shortcut", ["healthy", "finite", "result-backslash-c", "result-backslash-t"]),
+        (
+            "shortcut",
+            [
+                "healthy",
+                "finite",
+                "result-backslash-c",
+                "result-backslash-t",
+                "result-closed-fd",
+                "result-closed-pipe",
+            ],
+        ),
         ("owner", ["refusal-zero", "refusal-primary"]),
     ]:
         for mode in modes:
@@ -433,7 +466,11 @@ def main():
     failures = []
     for row in cases:
         expected = (
-            0
+            1
+            if row["mode"] == "result-closed-fd"
+            else 128 + signal.SIGPIPE
+            if row["mode"] == "result-closed-pipe"
+            else 0
             if row["mode"]
             in [
                 "healthy",
@@ -452,7 +489,7 @@ def main():
         refusal = (
             row["mode"].endswith("refusal")
             or row["caller"] == "owner"
-            or row["mode"].startswith("result-backslash-")
+            or row["mode"].startswith("result-")
         )
         if (
             row["normalized_status"] != expected
@@ -462,6 +499,7 @@ def main():
             or (foreign and row["foreign_marker"] != "foreign")
             or row["child_survived"]
             or (row["mode"].startswith("result-backslash-") and not row["result_path_exact"])
+            or (row["mode"].startswith("result-closed-") and row["result_path_exact"])
             or (
                 row["caller"] == "clone"
                 and row["limit"] is not None

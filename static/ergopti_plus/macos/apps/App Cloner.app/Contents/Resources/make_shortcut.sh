@@ -172,4 +172,4 @@ chmod +x "$MACOS/open_target"
 touch "$DEST"
 
 CLONE_COMPLETE=1
-printf '%s\n' "$DEST"
+/usr/bin/printf '%s\n' "$DEST"

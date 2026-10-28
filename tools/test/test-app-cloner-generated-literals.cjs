@@ -161,6 +161,10 @@ try {
 			'shortcut:finite': signalExit,
 			'shortcut:result-backslash-c': 0,
 			'shortcut:result-backslash-t': 0,
+			'clone:result-closed-fd': 1,
+			'clone:result-closed-pipe': 128 + os.constants.signals.SIGPIPE,
+			'shortcut:result-closed-fd': 1,
+			'shortcut:result-closed-pipe': 128 + os.constants.signals.SIGPIPE,
 			'owner:refusal-zero': 1,
 			'owner:refusal-primary': 74
 		};
@@ -171,7 +175,7 @@ try {
 			new Set(keys).size === keys.length &&
 			keys.every((key) => Object.hasOwn(expectedPhysical, key));
 		test(
-			'the actual CLI physical probe executes its exact eighteen owned POSIX cases',
+			'the actual CLI physical probe executes its exact twenty-two owned POSIX cases',
 			physicalRun.status === 0 &&
 				physical.state === 'PASSED' &&
 				completePhysical &&
@@ -189,7 +193,7 @@ try {
 					const refusal =
 						row.mode.endsWith('refusal') ||
 						row.caller === 'owner' ||
-						row.mode.startsWith('result-backslash-');
+						row.mode.startsWith('result-');
 					return (
 						row.normalized_status === expectedPhysical[`${row.caller}:${row.mode}`] &&
 						row.workspace_exists === (row.caller === 'owner') &&
@@ -200,6 +204,25 @@ try {
 							(row.limit === row.healthy_prefix_bytes + 1 && row.actual_log_bytes === row.limit))
 					);
 				}),
+			physicalRun.stdout
+		);
+		test(
+			'the actual final receipt writers report closed descriptors and pipes while retiring owned workspaces',
+			completePhysical &&
+				['clone', 'shortcut'].every((caller) =>
+					['result-closed-fd', 'result-closed-pipe'].every((mode) => {
+						const row = physicalCases.find((item) => item.caller === caller && item.mode === mode);
+						return (
+							row &&
+							row.normalized_status === expectedPhysical[`${caller}:${mode}`] &&
+							row.termination_kind === 'exit' &&
+							row.workspace_exists === false &&
+							row.destination_exists === true &&
+							row.result_path_exact === false &&
+							row.ownership_closed === true
+						);
+					})
+				),
 			physicalRun.stdout
 		);
 		test(

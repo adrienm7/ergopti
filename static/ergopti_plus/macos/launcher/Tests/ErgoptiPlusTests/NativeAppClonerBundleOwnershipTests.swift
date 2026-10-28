@@ -117,7 +117,7 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 				replacement) mv "$DEST" "$DEST.held"; mkdir "$DEST"; printf foreign > "$DEST/marker"; exit 75 ;;
 				symlink) mv "$DEST" "$DEST.held"; ln -s "$DEST.held" "$DEST"; exit 76 ;;
 				completed) CLONE_COMPLETE=1 ;;
-				receipt) CLONE_COMPLETE=1; exec 1>&-; printf unavailable-output ;;
+				receipt) CLONE_COMPLETE=1; exec 1>&-; /usr/bin/printf '%s' unavailable-output ;;
 			esac
 			"""#
 			for mode in ["failure", "term", "replacement", "symlink", "completed", "receipt"] {
@@ -275,7 +275,10 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 				"clone:refusal": signalStatus, "clone:deadpipe": signalStatus, "clone:deadpipe-foreign": signalStatus,
 				"clone:deadpipe-refusal": signalStatus, "clone:child-default": signalStatus,
 				"clone:backslash-c": 0, "clone:backslash-t": 0, "clone:result-backslash-c": 0, "clone:result-backslash-t": 0, "shortcut:healthy": 0,
-				"shortcut:finite": signalStatus, "shortcut:result-backslash-c": 0, "shortcut:result-backslash-t": 0, "owner:refusal-zero": 1, "owner:refusal-primary": 74]
+				"shortcut:finite": signalStatus, "shortcut:result-backslash-c": 0, "shortcut:result-backslash-t": 0,
+				"clone:result-closed-fd": 1, "clone:result-closed-pipe": 128 + Int(SIGPIPE),
+				"shortcut:result-closed-fd": 1, "shortcut:result-closed-pipe": 128 + Int(SIGPIPE),
+				"owner:refusal-zero": 1, "owner:refusal-primary": 74]
 			let cases = try XCTUnwrap(report["cases"] as? [[String: Any]])
 			let keys = cases.compactMap { row -> String? in
 				guard let caller = row["caller"] as? String, let mode = row["mode"] as? String else { return nil }
@@ -296,10 +299,15 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 				XCTAssertEqual(row["workspace_created"] as? Bool, true)
 				XCTAssertEqual(row["workspace_exists"] as? Bool, caller == "owner")
 				let foreign = mode.hasSuffix("foreign")
-				let refusal = mode.hasSuffix("refusal") || caller == "owner" || mode.hasPrefix("result-backslash-")
+				let refusal = mode.hasSuffix("refusal") || caller == "owner" || mode.hasPrefix("result-")
 				XCTAssertEqual(row["destination_exists"] as? Bool, foreign || refusal)
 				if foreign { XCTAssertEqual(row["foreign_marker"] as? String, "foreign") }
 				XCTAssertEqual(row["child_survived"] as? Bool, false)
+				if mode.hasPrefix("result-closed-") {
+					XCTAssertEqual(row["termination_kind"] as? String, "exit", "Only the final writer may receive SIGPIPE; its shell must retire its workspace")
+					XCTAssertEqual(row["result_path_exact"] as? Bool, false)
+					XCTAssertEqual(row["execution_scope"] as? String, caller == "clone" ? "actual-clone-prefix-and-success-tail" : "actual-full-shortcut-generator")
+				}
 				if mode.hasPrefix("result-backslash-") {
 					let destination = try XCTUnwrap(row["result_path"] as? String)
 					XCTAssertTrue(destination.contains(mode.hasSuffix("-c") ? "home\\c" : "home\\t"))
