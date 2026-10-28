@@ -11,6 +11,16 @@ const { parse } = require('acorn');
 const { parse: parseToml } = require('smol-toml');
 
 const root = path.resolve(__dirname, '../..');
+
+/**
+ * Build the $app/paths asset() port of a site served under base, the way
+ * SvelteKit resolves a static file on the client.
+ * @param {string} base - The configured base path, empty at the site root.
+ * @returns {(file: string) => string}
+ */
+function staticAsset(base) {
+	return (file) => `${base}/${file}`;
+}
 const keyboard = fs.readFileSync(path.join(root, 'src/lib/keyboard/KeyboardEmulation.js'), 'utf8');
 const keyboardProgram = parse(keyboard, { ecmaVersion: 'latest', sourceType: 'module' });
 const parserOwners = keyboardProgram.body.filter(
@@ -73,7 +83,7 @@ async function checkLayoutDataRoutes() {
 		const requests = [];
 		const layout = { keys: [] };
 		const realm = vm.createContext({
-			base,
+			asset: staticAsset(base),
 			console: { info() {}, debug() {}, error() {} },
 			fetch: async (url) => {
 				requests.push(url);
@@ -126,7 +136,7 @@ async function checkHotstringSources() {
 			});
 		}
 		const keyboardContext = vm.createContext({
-			base,
+			asset: staticAsset(base),
 			window: {},
 			fetch: fetchStatic,
 			AbortController
@@ -163,7 +173,7 @@ async function checkHotstringSources() {
 			errors = [];
 		const pageContext = vm.createContext({
 			parseToml,
-			base,
+			asset: staticAsset(base),
 			window: {},
 			fetch: fetchStatic,
 			onMount: (callback) => mounts.push(callback),
@@ -408,7 +418,7 @@ function emulationRealm(fetchPort, base = '') {
 		}
 	});
 	const realm = vm.createContext({
-		base,
+		asset: staticAsset(base),
 		window: {},
 		AbortController,
 		get: (value) => value.value,
