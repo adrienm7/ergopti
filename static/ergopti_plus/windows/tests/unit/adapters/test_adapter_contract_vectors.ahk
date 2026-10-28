@@ -494,7 +494,7 @@ _RunHttpClientContractVectors() {
 	; isActive returns false when no request is in flight
 	_Result_is_active_idle() {
 		Result := HTTPIsActive()
-		Assert(Result = false or Result = 0,
+		Assert(Result is Integer && Result == false,
 			"HTTPIsActive must be false when idle")
 	}
 	Test("HttpClient: isActive returns false when idle", _Result_is_active_idle)
