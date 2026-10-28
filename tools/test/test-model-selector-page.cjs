@@ -14,6 +14,15 @@
  * selected; a model that is not installed offers its download, never its
  * activation. Its columns read the catalogue fields the shared projection
  * emits (disk_gb, ram_gb, params_b), which the Windows twin must emit too.
+ *
+ * model-selector-collapsed-groups: the Ollama group came first and listed
+ * every Ollama model, burying MLX and the API (maintainer, 2026-10-28). The
+ * page opens on three collapsed headers (local backends by name, a separator,
+ * then the API), each with one emoji before its brand, its model count and a
+ * chevron; the header of the group holding the active model names it; the
+ * header toggles by mouse, Enter or Space (aria-expanded); a filter or a
+ * search opens the groups it matches in. Rows sort case-insensitively, API
+ * rows by provider then model.
  * ==============================================================================
  */
 
@@ -237,12 +246,172 @@ function button(act) {
 	return { closest: () => ({ getAttribute: (name) => (name === 'data-act' ? act : null) }) };
 }
 
+/** The group bodies the page drew, the separator included, in order. */
+function bodies(p) {
+	return p.byId.models.querySelectorAll('tbody');
+}
+
+function groupHead(p, id) {
+	const body = bodies(p).find((tb) => tb.getAttribute('data-group') === id);
+	assert.ok(body, `group ${id} is drawn`);
+	return body.children[0];
+}
+
+/** A group's toggle: the first child of its header cell, the tools the second. */
+function toggleOf(p, id) {
+	return groupHead(p, id).children[0].children[0];
+}
+
+function rowNames(p) {
+	return Object.keys(drawnRows(p.byId));
+}
+
+const keyEvent = (key) => ({ key, preventDefault() {} });
+
 // =========================================
-// ======= 3/ Behaviour ====================
+// ======= 3/ Collapsed Groups =============
 // =========================================
 
 const page = loadPage(en);
 page.context.injectModels(payload);
+
+// Order: the local backends by name (MLX, Ollama), a separator, then the API.
+assert.deepEqual(
+	bodies(page).map((tb) => tb.getAttribute('data-group') || tb.className),
+	['mlx', 'ollama', 'group-separator', 'api'],
+	'local groups alphabetically, then a separator, then the API'
+);
+// Three header rows and no model row until the user opens a group.
+assert.deepEqual(rowNames(page), [], 'every group opens collapsed');
+for (const id of ['mlx', 'ollama', 'api']) {
+	const toggle = toggleOf(page, id);
+	assert.equal(toggle.getAttribute('role'), 'button');
+	assert.equal(toggle.getAttribute('tabindex'), '0', `${id} header is focusable`);
+	assert.equal(toggle.getAttribute('aria-expanded'), 'false', `${id} starts collapsed`);
+	assert.ok(toggle.innerHTML.includes('class="chevron"'), `${id} header has a chevron`);
+	// model-selector-single-emoji: the emoji once, before the brand.
+	const title = toggle.innerHTML.match(/<span class="group-title">([^<]*)<\/span>/)[1];
+	assert.ok(title.startsWith(`${brands[id].emoji} ${brands[id].brand}`), `${id} title: ${title}`);
+	assert.equal(title.split(brands[id].emoji).length - 1, 1, `${id} title has one emoji`);
+}
+const countText = (n, total) =>
+	en['model_browser.count_label'].replace('{n}', n).replace('{total}', total);
+assert.ok(
+	toggleOf(page, 'ollama').innerHTML.includes(countText(3, 3)),
+	'the header counts its models'
+);
+assert.ok(toggleOf(page, 'api').innerHTML.includes(countText(1, 1)));
+// The collapsed group of the active model names it on its header.
+const activeHint = en['model_browser.current_label'].replace('{model}', 'Qwen-Installed');
+assert.ok(
+	toggleOf(page, 'ollama').innerHTML.includes(activeHint),
+	'the active model shows collapsed'
+);
+assert.ok(!toggleOf(page, 'mlx').innerHTML.includes('group-active'));
+assert.ok(!toggleOf(page, 'api').innerHTML.includes('group-active'));
+// A brand that carries its emoji would read "🦙 Ollama 🦙": the page refuses it.
+assert.throws(
+	() =>
+		page.context.injectModels({
+			...payload,
+			backends: [{ ...payload.backends[0], brand: `${brands.ollama.brand} ${brands.ollama.emoji}` }]
+		}),
+	/must not carry its emoji/
+);
+page.context.injectModels(payload);
+// The backend filter lists the same order, the API after its own separator.
+const filterHtml = page.byId['backend-filter'].innerHTML;
+const filterOrder = [...filterHtml.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]);
+assert.deepEqual(filterOrder, ['', 'mlx', 'ollama', 'api']);
+assert.ok(
+	filterHtml.indexOf(`<optgroup label="${en['model_browser.kind_remote']}">`) <
+		filterHtml.indexOf('value="api"') &&
+		filterHtml.indexOf('value="ollama"') <
+			filterHtml.indexOf(`<optgroup label="${en['model_browser.kind_remote']}">`),
+	'a separator stands before the API option'
+);
+for (const [, label] of filterHtml.matchAll(/<option value="[^"]+"[^>]*>([^<]*)</g)) {
+	const id = Object.keys(brands).find((k) => label.endsWith(brands[k].brand));
+	assert.equal(label, `${brands[id].emoji} ${brands[id].brand}`, 'one emoji, before the brand');
+}
+
+// Mouse: a click opens the group, hides the active hint, keeps the focus.
+toggleOf(page, 'ollama').onclick();
+assert.equal(toggleOf(page, 'ollama').getAttribute('aria-expanded'), 'true');
+assert.ok(groupHead(page, 'ollama').className.includes('expanded'));
+assert.deepEqual(
+	rowNames(page),
+	['Llama-Missing', 'my-tag', 'Qwen-Installed'],
+	'rows sort by name, case-insensitive'
+);
+assert.ok(!toggleOf(page, 'ollama').innerHTML.includes('group-active'));
+assert.equal(page.doc.activeElement, toggleOf(page, 'ollama'), 'the toggle keeps the focus');
+// Keyboard: Enter opens, Space closes, another key does nothing.
+toggleOf(page, 'mlx').onkeydown(keyEvent('Enter'));
+assert.equal(toggleOf(page, 'mlx').getAttribute('aria-expanded'), 'true');
+assert.ok(rowNames(page).includes('Mlx-Installed'));
+toggleOf(page, 'mlx').onkeydown(keyEvent(' '));
+assert.equal(toggleOf(page, 'mlx').getAttribute('aria-expanded'), 'false');
+toggleOf(page, 'mlx').onkeydown(keyEvent('a'));
+assert.equal(toggleOf(page, 'mlx').getAttribute('aria-expanded'), 'false');
+// The header's empty space toggles; a click inside its tools does not.
+const apiCell = groupHead(page, 'api').children[0];
+apiCell.onclick({ target: apiCell.children[1] });
+assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'false');
+apiCell.onclick({ target: apiCell });
+assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'true');
+toggleOf(page, 'api').onclick();
+// The open groups survive a new payload while the page lives.
+page.context.injectModels(payload);
+assert.equal(toggleOf(page, 'ollama').getAttribute('aria-expanded'), 'true');
+assert.equal(toggleOf(page, 'api').getAttribute('aria-expanded'), 'false');
+toggleOf(page, 'ollama').onclick();
+assert.deepEqual(rowNames(page), []);
+
+// A search opens the collapsed groups it matches in, and only while it narrows.
+page.byId.search.value = 'GPT';
+page.byId.search.dispatch('input');
+assert.equal(
+	toggleOf(page, 'api').getAttribute('aria-expanded'),
+	'true',
+	'a match opens its group'
+);
+assert.deepEqual(rowNames(page), ['OpenAI/gpt-4o-mini']);
+toggleOf(page, 'api').onclick();
+assert.deepEqual(rowNames(page), [], 'the user can close it again');
+page.byId.search.value = '';
+page.byId.search.dispatch('input');
+assert.deepEqual(rowNames(page), [], 'clearing the search restores the collapsed groups');
+// The backend filter opens its group the same way.
+page.byId['backend-filter'].value = 'mlx';
+page.byId['backend-filter'].dispatch('change');
+assert.equal(toggleOf(page, 'mlx').getAttribute('aria-expanded'), 'true');
+assert.deepEqual(rowNames(page), ['Mlx-Installed']);
+page.byId['backend-filter'].value = '';
+page.byId['backend-filter'].dispatch('change');
+assert.deepEqual(rowNames(page), []);
+
+// API rows sort by provider, then model, case-insensitive.
+page.context.injectModels({
+	...payload,
+	models: [
+		{ backend: 'api', name: 'b/z', provider: 'b', model: 'z', installed: true },
+		{ backend: 'api', name: 'A-B/x', provider: 'A-B', model: 'x', installed: true },
+		{ backend: 'api', name: 'A/y', provider: 'A', model: 'y', installed: true }
+	]
+});
+toggleOf(page, 'api').onclick();
+assert.deepEqual(rowNames(page), ['A/y', 'A-B/x', 'b/z'], 'provider first, then model');
+toggleOf(page, 'api').onclick();
+
+// The cases below read every row: open the three groups.
+page.context.injectModels(payload);
+for (const id of ['mlx', 'ollama', 'api']) toggleOf(page, id).onclick();
+
+// =========================================
+// ======= 4/ Behaviour ====================
+// =========================================
+
 const rows = drawnRows(page.byId);
 
 // Columns: one header per declared column, translated, in the declared order.
@@ -259,10 +428,12 @@ assert.ok(
 );
 
 // Groups: one header per backend, emoji first, the unavailable one with its reason.
-const groups = page.byId.models
-	.querySelectorAll('tbody')
-	.map((tb) => tb.children[0].children[0].innerHTML);
-assert.equal(groups.length, 3, 'one group per backend with rows');
+const groups = ['ollama', 'mlx', 'api'].map((id) => toggleOf(page, id).innerHTML);
+assert.equal(
+	bodies(page).filter((tb) => tb.getAttribute('data-group')).length,
+	3,
+	'one group per backend with rows'
+);
 assert.ok(groups[0].includes(`${brands.ollama.emoji} ${brands.ollama.brand}`));
 assert.ok(
 	groups[1].includes(en['model_browser.reason_mlx_intel']),
@@ -325,7 +496,8 @@ rows['Qwen-Installed'].onkeydown({
 assert.deepEqual(page.messages.splice(0), [
 	{ action: 'delete_model', name: 'Qwen-Installed', backend: 'ollama' }
 ]);
-// Rows sort by name inside their group, so Qwen-Installed closes the Ollama group.
+// Rows sort by name inside their group, so Qwen-Installed closes the Ollama
+// group, which the API group follows.
 rows['Qwen-Installed'].onkeydown({
 	key: 'ArrowDown',
 	target: rows['Qwen-Installed'],
@@ -333,7 +505,7 @@ rows['Qwen-Installed'].onkeydown({
 });
 assert.equal(
 	page.doc.activeElement,
-	rows['Mlx-Installed'],
+	rows['OpenAI/gpt-4o-mini'],
 	'ArrowDown crosses into the next group'
 );
 assert.equal(String(custom.tabIndex), '0', 'every row is focusable');
@@ -362,9 +534,8 @@ page.byId['btn-disable'].dispatch('click');
 assert.deepEqual(page.messages.splice(0), [], 'a hidden capability cannot be invoked');
 
 // Group tools: a driver action, the add-a-model field and the provider list.
-const toolsOf = (index) =>
-	page.byId.models.querySelectorAll('tbody')[index].children[0].children[0].children[0];
-const ollamaTools = toolsOf(0).children;
+const toolsOf = (id) => groupHead(page, id).children[0].children[1];
+const ollamaTools = toolsOf('ollama').children;
 const installText = (id) => en['model_browser.install_runtime'].replace('%s', brands[id].brand);
 // model-selector-install-button: an installed runtime greys its install button
 // with the reason, and a click on it reaches nothing.
@@ -374,7 +545,7 @@ assert.equal(ollamaTools[0].title, en['model_browser.install_installed']);
 ollamaTools[0].onclick();
 assert.deepEqual(page.messages.splice(0), [], 'a greyed install button posts nothing');
 // A machine that cannot run the backend greys it with that reason.
-const mlxInstall = toolsOf(1).children[0];
+const mlxInstall = toolsOf('mlx').children[0];
 assert.equal(mlxInstall.textContent, installText('mlx'));
 assert.equal(mlxInstall.disabled, true);
 assert.equal(mlxInstall.title, en['model_browser.reason_mlx_intel']);
@@ -394,11 +565,11 @@ assert.deepEqual(page.messages.splice(0), [
 	{ action: 'add_model', backend: 'ollama', name: 'qwen3:4b' }
 ]);
 assert.deepEqual(
-	toolsOf(1).children.map((el) => el.className),
+	toolsOf('mlx').children.map((el) => el.className),
 	['act install'],
 	'an unavailable backend offers only its greyed install, no add field'
 );
-const [select, providerButton] = toolsOf(2).children;
+const [select, providerButton] = toolsOf('api').children;
 select.value = 'groq';
 providerButton.onclick();
 assert.deepEqual(page.messages.splice(0), [
@@ -488,14 +659,14 @@ for (const name of ['Qwen-Installed', 'Llama-Missing', 'my-tag', 'Mlx-Installed'
 	);
 }
 assert.ok(freshRows['OpenAI/gpt-4o-mini'].innerHTML.includes('data-act="use"'));
-let freshInstall = toolsOf(0).children[0];
+let freshInstall = toolsOf('ollama').children[0];
 assert.equal(freshInstall.disabled, false, 'a missing runtime offers its install');
 assert.equal(freshInstall.title || '', '');
 freshInstall.onclick();
 assert.deepEqual(page.messages.splice(0), [
 	{ action: 'group_action', backend: 'ollama', id: 'install' }
 ]);
-freshInstall = toolsOf(0).children[0];
+freshInstall = toolsOf('ollama').children[0];
 assert.equal(
 	freshInstall.textContent,
 	en['model_browser.install_running'].replace('{name}', brands.ollama.brand)
@@ -505,19 +676,23 @@ freshInstall.onclick();
 assert.deepEqual(page.messages.splice(0), []);
 page.context.injectInstallProgress({ backend: 'ollama', percent: 42.6 });
 assert.equal(
-	toolsOf(0).children[0].textContent,
+	toolsOf('ollama').children[0].textContent,
 	en['model_browser.install_running_percent']
 		.replace('{name}', brands.ollama.brand)
 		.replace('{n}', '42')
 );
 page.context.injectInstallProgress({ backend: 'api', percent: 10 });
 assert.ok(
-	!toolsOf(2).children.some((el) => el.className.includes('install')),
+	!toolsOf('api').children.some((el) => el.className.includes('install')),
 	'the API has no install'
 );
 page.context.injectModels(payload);
 assert.ok(drawnRows(page.byId)['Qwen-Installed'].innerHTML.includes('data-act="delete"'));
-assert.equal(toolsOf(0).children[0].disabled, true, 'the installed runtime unlocks its rows');
+assert.equal(
+	toolsOf('ollama').children[0].disabled,
+	true,
+	'the installed runtime unlocks its rows'
+);
 assert.throws(
 	() =>
 		page.context.injectModels({
@@ -563,7 +738,7 @@ assert.ifError(luaCorpus.error);
 assert.equal(luaCorpus.status, 0, luaCorpus.stderr);
 
 // =========================================
-// ======= 4/ Catalogue Columns ============
+// ======= 5/ Catalogue Columns ============
 // =========================================
 
 // The shared projection emits every field a column reads, from the real catalogue.
@@ -617,6 +792,10 @@ for (const field of [...fields, 'backend', 'installed']) {
 	assert.ok(ahk.includes(`${field}:`) || ahk.includes(`"${field}"`), `Windows projects ${field}`);
 }
 
+// model-selector-single-emoji: every driver sends the bare brand, the page
+// writes the emoji before it.
+assert.ok(ahk.includes(',brand:" . JsonStringLiteral(Brands[Id]["brand"])'), 'Windows: bare brand');
+
 // model-selector-install-button: every driver states the install of its local
 // backends, and routes the page's install click to its owned-runtime install.
 assert.ok(ahk.includes('",install:" . InstallJson'), 'Windows projects the install state');
@@ -625,12 +804,15 @@ const macPage = fs.readFileSync(
 	path.join(SP, 'macos/ui/menu/menu_llm/model_selector_page.lua'),
 	'utf8'
 );
+assert.ok(!macPage.includes('BackendLabels.brand('), 'macOS: no "<brand> <emoji>" in the payload');
+assert.ok(macPage.includes('brand = BackendLabels.name(backend)'), 'macOS: bare brand');
 assert.ok(
 	macPage.includes('backend.install = install[backend.id]'),
 	'macOS projects the install state'
 );
 assert.ok(macPage.includes('if id == "install" then return install_runtime(ctx, backend'));
 const linuxBridge = fs.readFileSync(path.join(SP, 'linux/ui/model_browser/bridge.lua'), 'utf8');
+assert.ok(linuxBridge.includes('brand = BackendBrands.brand(id)'), 'Linux: bare brand');
 assert.ok(
 	linuxBridge.includes('b.install = ollama_install(frame, blocked, ollama_ok)'),
 	'Linux projects it'
@@ -650,5 +832,5 @@ for (const replay of [
 }
 
 console.log(
-	'[OK] model selector page: groups, greying, download-only rows, keyboard, filter and catalogue columns.'
+	'[OK] model selector page: collapsed groups, order, greying, download-only rows, keyboard, filter and catalogue columns.'
 );

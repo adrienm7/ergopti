@@ -40,6 +40,7 @@ helpers.describe("the model button reads the backend emoji first", function()
 			for _, id in ipairs({ "ollama", "mlx", "api" }) do
 				helpers.assert_eq(Labels.brand(id), shared[id].brand .. " " .. shared[id].emoji)
 				helpers.assert_eq(Labels.emoji(id), shared[id].emoji)
+				helpers.assert_eq(Labels.name(id), shared[id].brand, "the page's bare brand")
 			end
 		end)
 	end)
