@@ -113,6 +113,7 @@ package.loaded["adapters.file_system"] = {
 	package.loaded["adapters.file_system"] = saved_file_system
 	lm.init({
 		LOG_DIR = "/tmp/test_ingest_stop_start",
+		CACHE_DIR = "/tmp/test_ingest_stop_start/cache",
 		buffer_events = {}, buffer_text = "", rich_chunks = {},
 		session_mouse_clicks = 0, session_mouse_scrolls = 0, mouse_distance_px = 0,
 		last_flush_time = 0, last_time = 0, pending_keyup = {},

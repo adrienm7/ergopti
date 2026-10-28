@@ -819,6 +819,21 @@ binds it. The boot and Disable All syncs replay saved keys in that window. Test
 doubles must keep both axes and the admission fence
 (`tests/support/shortcut_bindings_fixture.lua`).
 
+### project-hs-shortcut-refusals-fail-alone
+
+Every static or configurable shortcut is its own `RegisterEventHotKey`; one
+refusal (-9878, chord already held) must never abort its siblings. Bindings and
+KeyboardShortcuts record a refused one with its cause, log a WARNING naming it,
+and retry it through `modules/shortcuts/refusal_retry.lua`; only a lifecycle
+change mid-start still rolls the whole child back. hs.hotkey resolves a key the
+active keymap lacks through a silent US-ANSI fallback, so
+`Registrar.layout_key_refusal` probes `rawget(hs.keycodes.map, key)` and the key
+waits for the layout until the final retry. A layout rebind releases BOTH
+children before binding either: on 2026-10-28 the Ergopti Ctrl+. (keycode 5)
+still held the keycode Ctrl+G resolved to under a probe layout. Action: keep
+break-before-make across children and never hand a transaction guard to a start
+that takes a config candidate.
+
 ### project-hs-boot-sync-never-saves-runtime-refusals
 
 `MenuState.sync_state_to_modules` never persists and isolates failures per

@@ -143,7 +143,10 @@ end
 M.DEFAULT_MODES = {
 }
 
--- Default sensitivity (step) for incremental mode
+-- Default sensitivity for incremental mode: the distance per action after the
+-- first (Geometry.incrementalSteps). Only the axis slots take it; every
+-- direction's own default, the 25 of the vertical three-finger swipe included,
+-- lives in the shared manifest.
 M.DEFAULT_SENSITIVITY = 3.5
 
 M.DEFAULT_STATE = {
@@ -706,7 +709,7 @@ function M.get_sensitivity(slot)    return tonumber(CoreState.sensitivities[slot
 --- Stores a gesture sensitivity, failing closed to DEFAULT_SENSITIVITY when the
 --- value is not a positive number. A persisted config.toml / plist value can
 --- arrive as a string (hand edit, AHK migration, half-written plist); the engine
---- divides by this (math.floor(abs(sd) / sensitivity)) inside the gesture eventtap
+--- divides by this (Geometry.incrementalSteps(abs(sd), sensitivity)) inside the gesture eventtap
 --- and the menu runs string.format("%.1f", …) on it, so a non-number would crash
 --- the tap (swallowed to Console) and blank the gestures submenu under the
 --- menu-builder pcall. The fallback IS the single-source default (no new literal).

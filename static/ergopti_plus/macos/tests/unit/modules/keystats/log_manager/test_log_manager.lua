@@ -320,6 +320,7 @@ helpers.describe("log_manager — M.init()", function()
 		local lm = EmptyLedger.load(hs_overrides)
 		lm.init({
 				LOG_DIR              = "/tmp/test_ergopti_metrics",
+				CACHE_DIR            = "/tmp/test_ergopti_metrics/cache",
 				buffer_events        = {},
 				buffer_text          = "",
 				rich_chunks          = {},
@@ -344,6 +345,7 @@ helpers.describe("log_manager — M.init()", function()
 		local lm = EmptyLedger.load(hs_overrides)
 		local state = {
 			LOG_DIR = "/tmp/test2",
+			CACHE_DIR = "/tmp/test2/cache",
 			buffer_events = {}, buffer_text = "", rich_chunks = {},
 			session_mouse_clicks = 0, session_mouse_scrolls = 0,
 			mouse_distance_px = 0, last_flush_time = 0,
@@ -376,6 +378,7 @@ helpers.describe("log_manager — flush_buffer WPM formula", function()
 		local lm = EmptyLedger.load(hs_overrides)
 		local state = {
 			LOG_DIR = "/tmp/wpm_test",
+			CACHE_DIR = "/tmp/wpm_test/cache",
 			buffer_events        = events or {},
 			buffer_text          = "hello",
 			rich_chunks          = {},
@@ -497,6 +500,7 @@ helpers.describe("log_manager — flush_buffer WPM formula", function()
 		local events = { { "a", 300, {} } }
 		local state_ref = {
 			LOG_DIR = "/tmp/clear_test",
+			CACHE_DIR = "/tmp/clear_test/cache",
 			buffer_events = events, buffer_text = "a", rich_chunks = {},
 			session_mouse_clicks = 0, session_mouse_scrolls = 0,
 			mouse_distance_px = 0, last_flush_time = 0, last_time = 0,
@@ -527,6 +531,7 @@ helpers.describe("log_manager — log delegate entry points", function()
 		local lm = EmptyLedger.load(hs_overrides)
 		lm.init({
 			LOG_DIR = "/tmp/delegate_test",
+			CACHE_DIR = "/tmp/delegate_test/cache",
 			buffer_events = {}, buffer_text = "", rich_chunks = {},
 			session_mouse_clicks = 0, session_mouse_scrolls = 0,
 			mouse_distance_px = 0, last_flush_time = 0,
@@ -633,6 +638,7 @@ local hs_tracking_overrides = {
 local function make_lm_lifecycle_state()
 	return {
 		LOG_DIR              = "/tmp/test_ergopti_lifecycle",
+		CACHE_DIR            = "/tmp/test_ergopti_lifecycle/cache",
 		buffer_events        = {},
 		buffer_text          = "",
 		rich_chunks          = {},

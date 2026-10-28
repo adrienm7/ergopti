@@ -75,6 +75,8 @@ local ids = {
 	STARTUP_MODEL_DOWNLOAD_DECLINED = "startup_model_download_declined",
 	-- reason: Nothing answers at the Ollama address.
 	STARTUP_OLLAMA_UNREACHABLE = "startup_ollama_unreachable",
+	-- reason: The installed Ollama is too old to pull the selected model.
+	STARTUP_OLLAMA_UPGRADE_REQUIRED = "startup_ollama_upgrade_required",
 	-- reason: The runtime of the selected AI backend is not installed.
 	STARTUP_RUNTIME_NOT_INSTALLED = "startup_runtime_not_installed",
 	-- reason: The input device has no event node.
