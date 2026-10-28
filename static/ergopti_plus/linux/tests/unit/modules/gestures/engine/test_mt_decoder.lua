@@ -520,16 +520,27 @@ end)
 --- Builds a frame player over explicit contacts, for the scroll cases below.
 --- Each frame names its contacts as { slot, x, y }; the finger-count bits and
 --- tracking ids follow the contacts the way the kernel publishes them.
+--- @param opts table|nil { queued = true }: every SYN_REPORT carries its kernel
+---   stamp while the daemon's own clock stands still, as when a busy daemon
+---   drains a backlog of queued events at once.
 --- @return table player { frame, lift, decoder, result }
-local function scroll_player()
+local function scroll_player(opts)
+	local queued = type(opts) == "table" and opts.queued == true
 	local clock = 100.0
+	local kernel = 1761645000.0
 	local player = {}
 	player.decoder = Decoder.new({ now_sec = function() return clock end, tap_max_sec = 0.7 })
 	local live = {}
 	local count = 0
 	local function send(t, c, v)
-		local out = player.decoder:feed({ type = t, code = c, value = v })
+		local event = { type = t, code = c, value = v }
+		if queued then event.timestamp_us = math.floor(kernel * 1e6 + 0.5) end
+		local out = player.decoder:feed(event)
 		if out then player.result = out end
+	end
+	local function advance(seconds)
+		kernel = kernel + seconds
+		if not queued then clock = clock + seconds end
 	end
 
 	--- Plays one SYN frame with exactly these contacts down.
@@ -561,7 +572,7 @@ local function scroll_player()
 			count = #contacts
 		end
 		send(EV_SYN, SYN_REPORT, 0)
-		clock = clock + 0.008
+		advance(0.008)
 	end
 
 	--- Lifts every contact.
@@ -575,12 +586,12 @@ local function scroll_player()
 		count = 0
 		send(EV_KEY, BTN_TOUCH, 0)
 		send(EV_SYN, SYN_REPORT, 0)
-		clock = clock + 0.008
+		advance(0.008)
 	end
 
 	--- Lets time pass with no contact.
 	--- @param seconds number
-	function player.wait(seconds) clock = clock + seconds end
+	function player.wait(seconds) advance(seconds) end
 
 	return player
 end
@@ -661,5 +672,35 @@ helpers.describe("mt decoder: a two-finger scroll is never a three-finger swipe 
 		p.lift()
 		helpers.assert_true(p.result ~= nil and p.result.fingers == 3 and p.result.direction == "up",
 			"a staggered three-finger landing that swipes up is still swipe_3_up")
+	end)
+end)
+
+helpers.describe("mt decoder: gestures are timed by the kernel's event stamps (three-finger-swipe-stuck)", function()
+	helpers.it("a thumb landing after the landing window is refused when the backlog is drained at once", function()
+		local p = scroll_player({ queued = true })
+		-- The pair rests 400 ms, longer than the landing window, before a thumb
+		-- lands and the hand moves; the daemon reads all of it in one drain.
+		for _ = 1, 50 do p.frame(pair_at(900)) end
+		for i = 1, 20 do p.frame(hand_at(900 - i * 20)) end
+		p.lift()
+		helpers.assert_true(p.result ~= nil and p.result.fingers ~= 3,
+			"the landing window is measured on kernel time; got "
+				.. tostring(p.result and p.result.fingers))
+	end)
+
+	helpers.it("a hand resting a second is not a tap when its events are drained at once", function()
+		local p = scroll_player({ queued = true })
+		for _ = 1, 125 do p.frame(hand_at(900)) end
+		p.lift()
+		helpers.assert_nil(p.result, "a one-second rest is longer than any tap, however late it is read")
+	end)
+
+	helpers.it("a staggered three-finger swipe drained at once still reports three fingers up", function()
+		local p = scroll_player({ queued = true })
+		p.frame(pair_at(900))
+		for i = 0, 20 do p.frame(hand_at(900 - i * 20)) end
+		p.lift()
+		helpers.assert_true(p.result ~= nil and p.result.fingers == 3 and p.result.direction == "up",
+			"a backlog keeps the swipe the user made")
 	end)
 end)
