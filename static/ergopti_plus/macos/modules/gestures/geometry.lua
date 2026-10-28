@@ -45,6 +45,13 @@ M.SWIPE_MIN   = 1.5    -- 3/4/5 fingers: minimum distance to validate a swipe
 M.SWIPE_MIN_2 = 3.0    -- 2 fingers horiz/vert (left to macOS, diagonal only)
 M.DIAG_MIN_2  = 5.0    -- 2 fingers: minimum total distance to validate a diagonal
 
+-- Incremental mode: the first action fires once the swipe has travelled this
+-- far, and each further action needs one more `sensitivity` (the slot's
+-- distance per action). A short deliberate swipe therefore still fires once,
+-- while a large step keeps a normal swipe to exactly one action. A slot whose
+-- step is smaller than this fires its first action after one step, as before.
+M.INCREMENTAL_FIRST_STEP = 4.0
+
 -- Least share of the centroid's travel along the swipe axis that EVERY contact
 -- of a three-or-more-finger gesture must cover itself, in the same direction.
 -- Two scrolling fingers beside a resting thumb move the centroid two thirds of
@@ -122,6 +129,17 @@ function M.movedTogether(origin, current, axis)
 		share = math.min(share, (current[i][along] - origin[i][along]) * sign / math.abs(total))
 	end
 	return share >= M.COHESION_MIN_SHARE, share
+end
+
+--- Counts the incremental actions a swipe has earned over a distance.
+--- @param distance number Absolute travel along the swipe axis.
+--- @param step number Distance per action after the first (the sensitivity).
+--- @return integer steps
+function M.incrementalSteps(distance, step)
+	if type(step) ~= "number" or step <= 0 then error("incremental step must be a positive number") end
+	local first = math.min(M.INCREMENTAL_FIRST_STEP, step)
+	if distance < first then return 0 end
+	return 1 + math.floor((distance - first) / step)
 end
 
 --- Infers the action configuration slot ID given fingers count and direction.
