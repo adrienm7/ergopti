@@ -168,6 +168,14 @@ try {
 			'owner:refusal-zero': 1,
 			'owner:refusal-primary': 74
 		};
+		const limitedCloneModes = new Set([
+			'finite',
+			'foreign',
+			'refusal',
+			'deadpipe',
+			'deadpipe-foreign',
+			'deadpipe-refusal'
+		]);
 		const physicalCases = Array.isArray(physical.cases) ? physical.cases : [];
 		const keys = physicalCases.map((row) => `${row.caller}:${row.mode}`);
 		const completePhysical =
@@ -200,8 +208,30 @@ try {
 						row.destination_exists === (foreign || refusal) &&
 						(!foreign || row.foreign_marker === 'foreign') &&
 						(row.caller !== 'clone' ||
-							row.limit === null ||
-							(row.limit === row.healthy_prefix_bytes + 1 && row.actual_log_bytes === row.limit))
+							(!limitedCloneModes.has(row.mode) && row.limit === null) ||
+							(limitedCloneModes.has(row.mode) &&
+								row.limit === 0 &&
+								row.log_fault_armed === true &&
+								row.log_prefix_bytes === row.healthy_prefix_bytes &&
+								row.log_exact_after_fault === true &&
+								row.source_record_refused === true &&
+								(() => {
+									const caseRoot = path.join(
+										fixtureRoot,
+										'physical-log-cleanup',
+										`${row.caller}-${row.mode}`
+									);
+									const admitted = fs.readFileSync(path.join(caseRoot, 'log-prefix.bin'));
+									const actual = fs.readFileSync(path.join(caseRoot, 'owned.log'));
+									return (
+										admitted.length === row.healthy_prefix_bytes &&
+										actual.length === row.actual_log_bytes &&
+										actual.equals(Buffer.concat([admitted, Buffer.from(row.output, 'utf8')])) &&
+										!actual.includes(
+											Buffer.from(`SRC_EXE=${row.source_app}/Contents/MacOS/Source\n`, 'utf8')
+										)
+									);
+								})()))
 					);
 				}),
 			physicalRun.stdout

@@ -279,6 +279,7 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 				"clone:result-closed-fd": 1, "clone:result-closed-pipe": 128 + Int(SIGPIPE),
 				"shortcut:result-closed-fd": 1, "shortcut:result-closed-pipe": 128 + Int(SIGPIPE),
 				"owner:refusal-zero": 1, "owner:refusal-primary": 74]
+			let limitedCloneModes: Set<String> = ["finite", "foreign", "refusal", "deadpipe", "deadpipe-foreign", "deadpipe-refusal"]
 			let cases = try XCTUnwrap(report["cases"] as? [[String: Any]])
 			let keys = cases.compactMap { row -> String? in
 				guard let caller = row["caller"] as? String, let mode = row["mode"] as? String else { return nil }
@@ -321,10 +322,23 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 					XCTAssertEqual(URL(fileURLWithPath: app).lastPathComponent, name)
 					let expectedHex = Data(("=== SOURCE=" + app).utf8).map { String(format: "%02x", $0) }.joined()
 					XCTAssertEqual(row["source_line_hex"] as? String, expectedHex)
-					if let limit = row["limit"] as? Int {
-						XCTAssertGreaterThan(limit, 0)
-						XCTAssertEqual(row["actual_log_bytes"] as? Int, limit)
-						XCTAssertEqual(limit, try XCTUnwrap(row["healthy_prefix_bytes"] as? Int) + 1)
+					if limitedCloneModes.contains(mode) {
+						let limit = try XCTUnwrap(row["limit"] as? Int, "Every named log fault must publish its admitted quota")
+						XCTAssertEqual(limit, 0, "The actual writer is refused only after bundle and workspace admission")
+						XCTAssertEqual(row["log_fault_armed"] as? Bool, true)
+						XCTAssertEqual(row["log_prefix_bytes"] as? Int, row["healthy_prefix_bytes"] as? Int)
+						XCTAssertEqual(row["log_exact_after_fault"] as? Bool, true)
+						XCTAssertEqual(row["source_record_refused"] as? Bool, true)
+						let ownedCase = root.appendingPathComponent("physical-cases").appendingPathComponent(caller + "-" + mode)
+						let admitted = try Data(contentsOf: ownedCase.appendingPathComponent("log-prefix.bin"))
+						let actual = try Data(contentsOf: ownedCase.appendingPathComponent("owned.log"))
+						let forwarded = Data(try XCTUnwrap(row["output"] as? String).utf8)
+						XCTAssertEqual(admitted.count, try XCTUnwrap(row["healthy_prefix_bytes"] as? Int))
+						XCTAssertEqual(actual.count, try XCTUnwrap(row["actual_log_bytes"] as? Int))
+						XCTAssertEqual(actual, admitted + forwarded, "Account exactly for the admitted prefix and the unlimited tee's actual diagnostics")
+						XCTAssertNil(actual.range(of: Data(("SRC_EXE=" + app + "/Contents/MacOS/Source\n").utf8)))
+					} else {
+						XCTAssertTrue(row["limit"] is NSNull)
 					}
 				}
 			}
