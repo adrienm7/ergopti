@@ -27,7 +27,7 @@
 --- 5. Sleep: a key held when the Mac sleeps is released while the taps cannot
 ---    see it, and the lock screen's secure input keeps the key-up from them, so
 ---    it is not a lost key-up. The awake clock stops during sleep and the wall
----    clock does not: when the wall clock ran SLEEP_GAP_MS further than the
+---    clock does not: when the wall clock ran SLEEP_CLOCK_DRIFT_MS further than the
 ---    awake clock between two events, every key still held is retired and
 ---    counted at INFO, and a key-up without key-down in the next STUCK_MS is the
 ---    release of a key pressed before the sleep. Field run 2026-10-27 19:46:46
@@ -59,7 +59,7 @@ M.MAX_HELD = 32
 
 -- The wall clock running this much further than the awake clock between two
 -- key events means the Mac slept in between; clock skew is milliseconds.
-M.SLEEP_GAP_MS = 5000
+M.SLEEP_CLOCK_DRIFT_MS = 5000
 
 local NS_PER_MS = 1e6
 
@@ -185,7 +185,7 @@ local function note_sleep(now_ms, wall_ms)
 	local last_awake, last_wall = _last_awake_ms, _last_wall_ms
 	_last_awake_ms, _last_wall_ms = now_ms, wall_ms
 	if last_awake == nil then return end
-	if (wall_ms - last_wall) - (now_ms - last_awake) < M.SLEEP_GAP_MS then return end
+	if (wall_ms - last_wall) - (now_ms - last_awake) < M.SLEEP_CLOCK_DRIFT_MS then return end
 	_woke_ms = now_ms
 	local retired = 0
 	for _, entry in pairs(_held) do
