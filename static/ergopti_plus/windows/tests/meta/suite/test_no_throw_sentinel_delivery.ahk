@@ -65,7 +65,11 @@ _AMSG_Vectors := [
 	["Ollama trim", _OllamaTrimRegistry_DetachesBeforeReentrantCallback, _LLM_Ollama_TrimAsyncRegistry],
 	["LLM containment", _AMSG_MetaCallback.Bind(_LCS_ThrowingCallbackIsLoggedNotSwallowed), _LLM_InvokeCallback],
 	["LLM optional callback", _AMSG_MetaCallback.Bind(_LCS_MissingCallbackIsANoOp), _LLM_InvokeCallback],
-	["shell runner logger", _AMSG_MetaCallback.Bind(_SRIL_HelperReachesTheLogger), _SR_LogError]
+	["shell runner logger", _AMSG_MetaCallback.Bind(_SRIL_HelperReachesTheLogger), _SR_LogError],
+	["runtime terminal cancellation", _ORTD_Delivery.Bind("cancel", 71), OllamaManagedBootstrap.Prototype.GetOwnPropDesc("Cancel").Call],
+	["save fixture cleanup", _CBRF_SaveFixtureRestoresPendingCaller, _CBRF_SaveDeclinesWhileFlagged],
+	["API removal cancellation", _WAR_RemovalRetainsSource.Bind("no"), _LLM_Menu_RemoveActiveApiEntry],
+	["model deletion cancellation", _LDCO_ConfirmationRetainsOwner.Bind("no"), _LLM_Menu_PromptDeleteCachedModel]
 ]
 for _AMSG_Vector in _AMSG_Vectors {
 	Test("no-throw sentinel: " . _AMSG_Vector[1] . " healthy control (empty-message-owner)",
