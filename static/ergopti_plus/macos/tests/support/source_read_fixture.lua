@@ -18,22 +18,12 @@ local Discovery = require("test.runner_discovery")
 function M.with_fault(root, mode, callback)
 	local state = { paths = { root .. "a_source.lua", root .. "z_source.lua" },
 		opens = {}, closes = 0, enumerations = 0, repaired = false }
-	local open, popen, discover = io.open, io.popen, Discovery.files
+	local open, discover = io.open, Discovery.files
 	Discovery.files = function()
 		state.enumerations = state.enumerations + 1
 		return state.paths
 	end
-	io.popen = function()
-		state.enumerations = state.enumerations + 1
-		local index = 0
-		return {
-			lines = function() return function()
-				index = index + 1
-				return state.paths[index]
-			end end,
-			close = function() return true, "exit", 0 end,
-		}
-	end
+
 	io.open = function(path)
 		assert(path == state.paths[1] or path == state.paths[2], "unexpected source fixture path")
 		state.opens[path] = (state.opens[path] or 0) + 1
@@ -57,7 +47,7 @@ function M.with_fault(root, mode, callback)
 		}
 	end
 	local outcome = table.pack(pcall(callback, state))
-	io.open, io.popen, Discovery.files = open, popen, discover
+	io.open, Discovery.files = open, discover
 	if not outcome[1] then error(outcome[2], 0) end
 	return table.unpack(outcome, 2, outcome.n)
 end
