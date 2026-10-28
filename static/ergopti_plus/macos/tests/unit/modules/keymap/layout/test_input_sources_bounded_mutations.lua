@@ -775,3 +775,40 @@ helpers.describe("input-source enable: the preference is not the live state (com
 		reset_fixture_modules()
 	end)
 end)
+
+
+helpers.describe("input-source confirm: a fresh process reads the state (composer-macos26)", function()
+	-- Probe v5 (P5, P9): after the preference write, the writing process and
+	-- Hammerspoon keep a stale list (enabled=false, select -50) while a process
+	-- started after the write sees the layout on and selects it.
+	helpers.it("reads, registers and refreshes through its own owned child", function()
+		local f = load_fixture()
+		local answers = {}
+		helpers.assert_eq(f.IS.confirm_source_async("Composer Check", { register_path = "/u/composed.keylayout", refresh = true },
+			function(ok, state, reason) answers[#answers + 1] = { ok = ok, state = state, reason = reason } end), true)
+		local args = f.tasks[1].args
+		helpers.assert_eq(f.tasks[1].executable, helpers.HEALTHY_PYTHON)
+		helpers.assert_eq(args[1], "-c")
+		helpers.assert_true(args[2]:find("TISRegisterInputSource", 1, true) ~= nil)
+		helpers.assert_eq(args[3], "Composer Check")
+		helpers.assert_eq(args[4], "/u/composed.keylayout")
+		helpers.assert_eq(args[5], "refresh")
+		f.tasks[1]:complete(0, '{"listed": true, "enabled": true, "selected": false, "register": 0, "refreshed": null}\n', "")
+		helpers.assert_eq(#answers, 1)
+		helpers.assert_eq(answers[1].ok, true)
+		helpers.assert_eq(answers[1].state.enabled, true)
+		reset_fixture_modules()
+	end)
+
+	helpers.it("refuses output that is not the child's JSON state", function()
+		for _, case in ipairs({ { 0, "OK\n" }, { 0, '{"enabled": true}' }, { 1, '{"listed": true}' } }) do
+			local f = load_fixture()
+			local answer
+			f.IS.confirm_source_async("Composer Check", {}, function(ok, _state, reason) answer = { ok = ok, reason = reason } end)
+			f.tasks[1]:complete(case[1], case[2], "")
+			helpers.assert_eq(answer.ok, false)
+			helpers.assert_true(answer.reason == "invalid_output" or answer.reason == "process_failed", tostring(answer.reason))
+			reset_fixture_modules()
+		end
+	end)
+end)

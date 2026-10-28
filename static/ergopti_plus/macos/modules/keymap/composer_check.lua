@@ -10,12 +10,12 @@
 --- again; a user's own composition is only read.
 ---
 --- FEATURES & RATIONALE:
---- 1. "Ready" means the text-input system has the layout turned on now: right
----    after an install, the install's own result; for a composition that
----    already exists, the live list. A layout the enabled-sources preference
----    lists but macOS turns on only at the next login (macOS 26, field probe)
----    is reported as info "pending_logout", not as a failure: the install did
----    what macOS allows and the next login finishes it. Not listed at all is
+--- 1. "Ready" means the text-input system has the layout turned on now, as a
+---    fresh process reads it (Hammerspoon's own list stays stale after a write,
+---    probe v5): right after an install, the install's own result; for a
+---    composition that already exists, a fresh read. A layout the fresh read still finds off
+---    although the preference lists it is reported as info "pending_logout"
+---    (the fallback, finished by the next login), not as a failure. Not listed at all is
 ---    "not_enabled", a failure. This check says only what the system reports.
 --- 2. Every collaborator is injectable (the registry, its deps, the reads and
 ---    the source list), so the portable suite replays the wiring without
@@ -58,9 +58,8 @@ function M.env(overrides)
 	if settings == nil then settings, settings_err = Registry.composer_settings() end
 	if not settings then return nil, settings_err end
 	local deps = overrides.deps
-	local live_enabled = overrides.live_enabled or (type(deps) == "table" and deps.live_enabled) or function(name)
-		return require("modules.keymap.input_sources").is_live_enabled(name)
-	end
+	local confirm_source = overrides.confirm_source or (type(deps) == "table" and deps.confirm_source)
+		or require("modules.keymap.input_sources").confirm_source_async
 	local read = overrides.read or FileSystem.read
 	local exists = overrides.exists or FileSystem.exists
 	local config_dir = overrides.config_dir or require("infra.config_paths").get_config_dir()
@@ -97,20 +96,22 @@ function M.env(overrides)
 	--- @param info table|nil The install's result ({ enabled, pending_activation }), nil for
 	---   an existing composition.
 	--- @param entry table The installed record entry.
-	function env.host_ready(info, entry)
+	--- @param ready function ready(state, value).
+	function env.host_ready_async(info, entry, ready)
 		if type(info) == "table" and info.enabled ~= nil then
-			if info.enabled == true then return Report.STATE_PASS, "enabled" end
-			if info.pending_activation == true then return Report.STATE_INFO, "pending_logout" end
-			return Report.STATE_FAIL, "not_enabled"
+			if info.enabled == true then return ready(Report.STATE_PASS, "enabled") end
+			if info.pending_activation == true then return ready(Report.STATE_INFO, "pending_logout") end
+			return ready(Report.STATE_FAIL, "not_enabled")
 		end
-		local live = live_enabled(entry.keyboard_name)
-		if live == true then return Report.STATE_PASS, "enabled" end
-		if live == nil then return Report.STATE_FAIL, "live_unreadable" end
-		local sources = (overrides.active_sources or require("modules.keymap.input_sources").list_active_keyboard_layouts)()
-		if lists(type(sources) == "table" and sources or {}, entry.keyboard_name) then
-			return Report.STATE_INFO, "pending_logout"
-		end
-		return Report.STATE_FAIL, "not_enabled"
+		confirm_source(entry.keyboard_name, {}, function(was_read, state)
+			if not was_read then return ready(Report.STATE_FAIL, "live_unreadable") end
+			if state.enabled == true then return ready(Report.STATE_PASS, "enabled") end
+			local sources = (overrides.active_sources or require("modules.keymap.input_sources").list_active_keyboard_layouts)()
+			if lists(type(sources) == "table" and sources or {}, entry.keyboard_name) then
+				return ready(Report.STATE_INFO, "pending_logout")
+			end
+			return ready(Report.STATE_FAIL, "not_enabled")
+		end)
 	end
 
 	return env, nil
