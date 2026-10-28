@@ -403,6 +403,13 @@ check('host results are worded, and a failure code gets its own sentence', () =>
 		locale('en')['layout_composer.result_saved_used']
 	);
 	assert.equal(loaded.byId.get('composer-active').hidden, false);
+	// macOS 26 turns the saved layout on at the next login: said, not shown as in use
+	loaded.window.composerResult({ action: 'composer_save', ok: true, used: false, pending: true });
+	assert.equal(
+		loaded.byId.get('composer-result').textContent,
+		locale('en')['layout_composer.result_saved_pending_logout']
+	);
+	assert.equal(loaded.byId.get('composer-active').hidden, true);
 	loaded.window.composerResult({ action: 'composer_remove', ok: true });
 	assert.equal(
 		loaded.byId.get('composer-result').textContent,

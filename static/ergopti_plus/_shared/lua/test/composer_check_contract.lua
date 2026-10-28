@@ -206,6 +206,26 @@ return function(helpers, Json, ports)
 			helpers.assert_eq(calls, 0)
 		end)
 
+		-- A driver whose system turns a new layout on only at the next login
+		-- (macOS 26) reports that as info, never as enabled nor as a failure.
+		if ports.pending_activation then
+			helpers.it("reports a layout the system turns on at the next login as info (composer-macos26)", function()
+				local registry, deps, state = ports.pending_activation(fresh)
+				local steps, result = run_check(registry, deps, state)
+				helpers.assert_true(steps:find(ports.pending_activation_step, 1, true) ~= nil, steps)
+				helpers.assert_true(result.passed, "a pending layout is not a failed check: " .. steps)
+				helpers.assert_true(steps:find("composer_cleanup=pass", 1, true) ~= nil, steps)
+			end)
+
+			helpers.it("reports a stored composition the system has not turned on yet as info (composer-macos26)", function()
+				local registry, deps, state = ports.pending_activation(fresh)
+				save_fixture(registry, deps)
+				local steps, result = run_check(registry, deps, state)
+				helpers.assert_true(steps:find(ports.pending_activation_step, 1, true) ~= nil, steps)
+				helpers.assert_true(result.passed, steps)
+			end)
+		end
+
 		if ports.readiness_failure then
 			helpers.it("fails the readiness step when the host cannot use the layout (composer-check)", function()
 				local registry, deps, state = ports.readiness_failure(fresh)

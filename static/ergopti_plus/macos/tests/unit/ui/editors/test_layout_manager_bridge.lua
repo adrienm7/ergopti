@@ -78,6 +78,14 @@ helpers.describe("layout manager bridge: what the page may ask", function()
 		helpers.assert_true(#state.logs >= 8, "every refusal is logged")
 	end)
 
+	-- macOS 26 lists the layout and turns it on at the next login (composer-macos26).
+	helpers.it("reports a layout macOS turns on at the next login as pending, not as a missing step", function()
+		local instance, state = controller()
+		helpers.assert_true(instance.on_message({ action = "install", id = "ergol" }))
+		state.pending[1](true, { entry = INDEX.layouts[1], enabled = false, pending_activation = true })
+		helpers.assert_eq(state.pushes[#state.pushes].payload.result.warning, "pending_logout")
+	end)
+
 	helpers.it("installs a catalogue layout and reports the result once it settles (layout-manager-bridge)", function()
 		local instance, state = controller()
 		helpers.assert_true(instance.on_message({ action = "install", id = "ergol" }))

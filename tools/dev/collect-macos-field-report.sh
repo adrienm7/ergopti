@@ -416,9 +416,21 @@ if [ -f "${probe_src}" ]; then
 	log "Compiling and running the input-source probe (a few minutes, silent)..."
 	step probe_compile swiftc -O -o "${probe_bin}" "${probe_src}"
 	if [ -x "${probe_bin}" ]; then
-		# Plain run, then the driver's own enabling route (writes and restores
-		# com.apple.HIToolbox, restarts SystemUIServer), then a layout added
-		# inside the enabled Ergopti bundle (backed up and restored).
+		# A previous --write-prefs run kept one enabled layout and a marker for
+		# the after-logout questions (P10, P8 a, P6). The probe names its own
+		# marker; that run goes first, before a new run could keep another
+		# layout, and it only says so when no logout happened since.
+		probe_marker="$("${probe_bin}" marker-path)"
+		if [ -n "${probe_marker}" ] && [ -f "${probe_marker}" ]; then
+			step probe_after_logout "${probe_bin}" after-logout
+		else
+			printf '%-28s skipped (no marker from an earlier run)\n' "probe_after_logout" >> "${steps}"
+		fi
+		# Plain run, then the preferences route alone and with each re-read
+		# mechanism (writes and restores com.apple.HIToolbox, keeps one layout
+		# for the next run), then a layout added inside the enabled Ergopti
+		# bundle and that bundle's content replaced in place (both backed up
+		# and restored).
 		step probe_run "${probe_bin}"
 		step probe_write_prefs "${probe_bin}" --write-prefs
 		step probe_replace_ergopti "${probe_bin}" --replace-ergopti --write-prefs

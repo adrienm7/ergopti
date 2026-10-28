@@ -2326,6 +2326,19 @@ hs.timer.doAfter(require("infra.timings").sec("ui", "unused_keys_warning_delay_m
 	end
 end)
 
+-- A layout installed while the session ran is turned on by macOS only at the
+-- next login (macOS 26): its record is owned from here, and once the boot
+-- settles each recorded layout is confirmed on (and selected when the user
+-- asked to use it) or logged as still off.
+local PendingLayoutActivation = require("modules.keymap.pending_layout_activation")
+PendingLayoutActivation.init(PendingLayoutActivation.production_deps())
+hs.timer.doAfter(require("infra.timings").sec("ui", "pending_layout_activation_delay_ms"), function()
+	local resumed, resume_err = xpcall(PendingLayoutActivation.resume, debug.traceback)
+	if not resumed then
+		Logger.error(LOG, "The pending keyboard layouts could not be checked: %s", tostring(resume_err))
+	end
+end)
+
 Boot.mark("Boot complete (post-init deferrals scheduled)")
 Boot.complete()
 -- Permanent phase counters (hot path, menu, boot sub-stages, config parses,

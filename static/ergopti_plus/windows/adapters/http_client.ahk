@@ -423,9 +423,9 @@ class CurlAsyncRequest {
 			this._Cleanup()
 			return false
 		}
-		Executable := A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
-		Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-			_VendorDir . "\ergopti_managed_http_worker.ps1", "-InputPath", this.ManagedCapture["TmpFile"]]
+		Executable := ShellRunner_WinPsPath()
+		Args := ShellRunner_WinPsArgs("-File",
+			_VendorDir . "\ergopti_managed_http_worker.ps1", "-InputPath", this.ManagedCapture["TmpFile"])
 		SpawnFn := this._DispatchPortFn("spawn")
 		Handle := IsObject(SpawnFn)
 			? SpawnFn.Call(Executable, Args, ObjBindMethod(this, "_OnManagedDone"), 0, 0, 8192)

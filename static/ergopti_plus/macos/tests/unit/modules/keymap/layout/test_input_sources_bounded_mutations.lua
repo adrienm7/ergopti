@@ -742,3 +742,36 @@ helpers.describe("input-source mutations: a terminal callback may start the next
 		reset_fixture_modules()
 	end)
 end)
+
+
+helpers.describe("input-source enable: the preference is not the live state (composer-macos26)", function()
+	-- The editor ended with `launchctl kickstart -k user/<uid>/com.apple.SystemUIServer`,
+	-- a service that is not in the user domain: launchctl answered 113 after every
+	-- successful write, the script exited 1 and every enable read "process_failed"
+	-- (field runs 2026-10-27, L52). The script must end on its own write.
+	helpers.it("ends the enabled-list editor on its own write, with no agent restart", function()
+		local handle = assert(io.open(helpers.driver_root() .. "/modules/keymap/input_sources.lua", "rb"))
+		local source = handle:read("*a")
+		handle:close()
+		local script = source:match("local ENABLED_LIST_SCRIPT = %[%[(.-)%]%]")
+		helpers.assert_not_nil(script, "the editor script is found")
+		helpers.assert_true(script:find("launchctl", 1, true) == nil, "the editor restarts no agent")
+		helpers.assert_true(script:find('run_child(["defaults", "import", DOMAIN, tmp])', 1, true) ~= nil)
+		helpers.assert_true(script:find('os.unlink(tmp)\n\nprint("OK")', 1, true) ~= nil,
+			"OK follows the import directly")
+	end)
+
+	helpers.it("reads a layout as on only from the live list", function()
+		local f = load_fixture()
+		local live = { names = { "French", "Composer Check", f.IS.format_ergopti_display(KL_NAME) },
+			ids = { "com.apple.keylayout.French", "org.unknown.keylayout.Loose Name" } }
+		helpers.assert_eq(f.IS.is_live_enabled("Composer Check", live), true)
+		helpers.assert_eq(f.IS.is_live_enabled("Loose Name", live), true, "a loose layout's id carries its name")
+		helpers.assert_eq(f.IS.is_live_enabled(KL_NAME, live), true, "an Ergopti layout is listed by its display")
+		helpers.assert_eq(f.IS.is_live_enabled("Ergo-L", live), false)
+		local unreadable, reason = f.IS.is_live_enabled("Ergo-L", false)
+		helpers.assert_nil(unreadable)
+		helpers.assert_eq(reason, "live_state_unreadable")
+		reset_fixture_modules()
+	end)
+end)
