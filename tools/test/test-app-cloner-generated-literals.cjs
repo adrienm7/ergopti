@@ -16,6 +16,11 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const {
+	resolvePython,
+	resolvePythonForBash,
+	createNativeStatResources
+} = require('./lib/app-cloner-native-stat-port.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const RESOURCES = path.join(
@@ -31,19 +36,10 @@ const RESOURCES = path.join(
 const EMITTER = path.join(RESOURCES, 'quote_launcher_values.py');
 const CLONE_SCRIPT = path.join(RESOURCES, 'clone_app.sh');
 const SHORTCUT_SCRIPT = path.join(RESOURCES, 'make_shortcut.sh');
-const PY_CANDIDATES = ['python3', 'python'];
 const results = [];
 
 function test(name, ok, detail = '') {
 	results.push({ name, ok, detail });
-}
-
-function resolveProgram(candidates) {
-	for (const candidate of candidates) {
-		const probe = spawnSync(candidate, ['--version'], { encoding: 'utf8' });
-		if (!probe.error && probe.status === 0) return candidate;
-	}
-	return null;
 }
 
 function toBashPath(filePath) {
@@ -65,19 +61,9 @@ function decodeNulFields(buffer) {
 	return fields;
 }
 
-const python = resolveProgram(PY_CANDIDATES);
+const python = resolvePython();
 const bash = bashExecutable();
-if (!python) {
-	console.error(`Required interpreter unavailable: python=${python}`);
-	process.exit(1);
-}
-
-const realPython = spawnSync(bash, ['-c', 'command -v "$1"', 'python-runtime', python], {
-	encoding: 'utf8'
-});
-if (realPython.status !== 0 || !realPython.stdout.trim()) {
-	throw new Error(`Required Python unavailable in Bash: ${realPython.stderr}`);
-}
+const realPython = resolvePythonForBash(bash, python);
 
 const hostile = [
 	'He said "hi" and $(touch should-not-run)',
@@ -87,6 +73,11 @@ const hostile = [
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launcher-literals-'));
 
 try {
+	const { statQuery, portedCloneScript, portedShortcutScript } = createNativeStatResources({
+		resources: RESOURCES,
+		fixtureRoot,
+		toBashPath
+	});
 	const shellEmission = spawnSync(
 		python,
 		[EMITTER, 'shell', 'VALUE_ONE', hostile[0], 'VALUE_TWO', hostile[1], 'VALUE_THREE', hostile[2]],
@@ -311,14 +302,16 @@ printf icns > "$out"
 	const maliciousTarget = `target "$(touch '${markerBash}')"\\\nnext`;
 	const generator = spawnSync(
 		bash,
-		[toBashPath(SHORTCUT_SCRIPT), 'Shortcut', maliciousTarget, maliciousApp, '#123456', 'S'],
+		[toBashPath(portedShortcutScript), 'Shortcut', maliciousTarget, maliciousApp, '#123456', 'S'],
 		{
 			cwd: fixtureRoot,
 			encoding: 'utf8',
 			env: {
 				...process.env,
 				HOME: toBashPath(home),
+				OWNED_STAT_FAULT: '',
 				REAL_PYTHON: realPython.stdout.trim(),
+				OWNED_STAT_QUERY: toBashPath(statQuery),
 				PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
 			}
 		}
@@ -372,7 +365,7 @@ printf icns > "$out"
 			[
 				'-c',
 				`${cloneSetup}\n${profileSetup}\nCLONE_COMPLETE=1\nprintf '%s\\0' "$DEST" "$USER_DATA_DIR"\n`,
-				toBashPath(CLONE_SCRIPT),
+				toBashPath(portedCloneScript),
 				toBashPath(fixtureRoot),
 				'Clone collision'
 			],
@@ -381,7 +374,9 @@ printf icns > "$out"
 				env: {
 					...process.env,
 					HOME: toBashPath(home),
+					OWNED_STAT_FAULT: '',
 					REAL_PYTHON: realPython.stdout.trim(),
+					OWNED_STAT_QUERY: toBashPath(statQuery),
 					PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
 				}
 			}
@@ -444,13 +439,13 @@ printf icns > "$out"
 		path.join(rollbackBin, 'mktemp'),
 		'#!/usr/bin/env bash\nset -eu\nexec "$REAL_MKTEMP" -d "$OWNED_TMP_TEMPLATE"\n'
 	);
-	const runCloneSetup = (tail, prefixBin = rollbackBin) =>
+	const runCloneSetup = (tail, prefixBin = rollbackBin, statFault = '') =>
 		spawnSync(
 			bash,
 			[
 				'-c',
 				`${cloneSetup}\n${tail}`,
-				toBashPath(CLONE_SCRIPT),
+				toBashPath(portedCloneScript),
 				toBashPath(fixtureRoot),
 				'Rollback'
 			],
@@ -460,8 +455,10 @@ printf icns > "$out"
 				env: {
 					...process.env,
 					HOME: toBashPath(rollbackHome),
+					OWNED_STAT_FAULT: statFault,
 					REAL_MKTEMP: realMktemp.stdout.trim(),
 					REAL_PYTHON: realPython.stdout.trim(),
+					OWNED_STAT_QUERY: toBashPath(statQuery),
 					OWNED_TMP_TEMPLATE: `${toBashPath(fixtureRoot)}/rollback-work.XXXXXX`,
 					PATH: `${toBashPath(prefixBin)}:${process.env.PATH || ''}`
 				}
@@ -592,7 +589,17 @@ printf icns > "$out"
 	);
 	writeExecutable(
 		path.join(cleanupFailureBin, 'python3'),
-		'#!/usr/bin/env bash\nif [[ "$#" == 3 ]]; then echo owned-bundle-cleanup-failure >&2; exit 77; fi\nexec "$REAL_PYTHON" "$@"\n'
+		'#!/usr/bin/env bash\nexec "$REAL_PYTHON" "$@"\n'
+	);
+
+	const realRm = spawnSync(bash, ['-c', 'command -v rm'], { encoding: 'utf8' });
+	if (realRm.status !== 0 || !realRm.stdout.trim()) throw new Error('Required rm unavailable');
+	writeExecutable(
+		path.join(cleanupFailureBin, 'rm'),
+		`#!/usr/bin/env bash
+if [[ "$3" == *.app ]]; then echo owned-bundle-cleanup-failure >&2; exit 77; fi
+exec '${realRm.stdout.trim().replaceAll("'", "'\\''")}' "$@"
+`
 	);
 	const cleanupFailure = runCloneSetup(
 		'printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; exit 74',
@@ -619,18 +626,20 @@ printf icns > "$out"
 	fs.mkdirSync(identityFailureBin);
 	writeExecutable(
 		path.join(identityFailureBin, 'python3'),
-		'#!/usr/bin/env bash\nif [[ "$1" == "-" && "$#" == 2 ]]; then echo owned-identity-capture-failure >&2; exit 78; fi\nexec "$REAL_PYTHON" "$@"\n'
+		'#!/usr/bin/env bash\nexec "$REAL_PYTHON" "$@"\n'
 	);
 	const beforeIdentityFailure = fs.readdirSync(path.dirname(preserved));
-	const identityFailure = runCloneSetup('printf unexpected-success', identityFailureBin);
+	const identityFailure = runCloneSetup('printf unexpected-success', identityFailureBin, 'capture');
 	const uncertainBundles = fs
 		.readdirSync(path.dirname(preserved))
 		.filter((name) => !beforeIdentityFailure.includes(name));
 	test(
 		'an identity capture failure reports the error and preserves an unadmitted destination',
-		identityFailure.status === 78 &&
+		identityFailure.status !== 0 &&
 			identityFailure.stdout.includes('cannot capture reserved bundle ownership') &&
-			identityFailure.stdout.includes('reserved bundle ownership changed; refusing cleanup') &&
+			identityFailure.stdout.includes(
+				'cannot inspect reserved bundle ownership; refusing cleanup'
+			) &&
 			uncertainBundles.length === 1 &&
 			fs.statSync(path.join(path.dirname(preserved), uncertainBundles[0])).isDirectory() &&
 			!identityFailure.stdout.includes('unexpected-success'),
@@ -681,12 +690,107 @@ printf icns > "$out"
 		JSON.stringify(fs.readdirSync(path.dirname(preserved)))
 	);
 
+	const runShortcut = (prefixBin) =>
+		spawnSync(
+			bash,
+			[
+				toBashPath(portedShortcutScript),
+				'Shortcut rollback',
+				'target',
+				'/Applications/Editor.app',
+				'#123456',
+				'S'
+			],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: {
+					...process.env,
+					HOME: toBashPath(rollbackHome),
+					OWNED_STAT_FAULT: '',
+					REAL_PYTHON: realPython.stdout.trim(),
+					OWNED_STAT_QUERY: toBashPath(statQuery),
+					REAL_MKTEMP: realMktemp.stdout.trim(),
+					OWNED_TMP_TEMPLATE: `${toBashPath(fixtureRoot)}/shortcut-work.XXXXXX`,
+					PATH: `${toBashPath(prefixBin)}:${toBashPath(fakeBin)}:${process.env.PATH || ''}`
+				}
+			}
+		);
+	fs.mkdirSync(path.join(rollbackHome, 'Desktop'));
+	const existingShortcut = path.join(rollbackHome, 'Desktop', 'Shortcut Rollback.app');
+	fs.mkdirSync(existingShortcut);
+	fs.writeFileSync(path.join(existingShortcut, 'owned-marker'), 'existing shortcut');
+	const shortcutAllocationFailure = runShortcut(failureBin);
+	test(
+		'the full shortcut helper rolls back its reservation when temporary allocation fails',
+		shortcutAllocationFailure.status === 73 &&
+			shortcutAllocationFailure.stderr.includes('owned-allocation-failure') &&
+			fs.readdirSync(path.dirname(existingShortcut)).length === 1,
+		JSON.stringify({
+			status: shortcutAllocationFailure.status,
+			stdout: shortcutAllocationFailure.stdout,
+			stderr: shortcutAllocationFailure.stderr
+		})
+	);
+	const shortcutFailureBin = path.join(fixtureRoot, 'shortcut-write-failure-bin');
+	fs.mkdirSync(shortcutFailureBin);
+	writeExecutable(
+		path.join(shortcutFailureBin, 'mktemp'),
+		'#!/usr/bin/env bash\nexec "$REAL_MKTEMP" -d "$OWNED_TMP_TEMPLATE"\n'
+	);
+	writeExecutable(
+		path.join(shortcutFailureBin, 'cat'),
+		'#!/usr/bin/env bash\necho owned-shortcut-write-failure >&2\nexit 79\n'
+	);
+	const shortcutWriteFailure = runShortcut(shortcutFailureBin);
+	test(
+		'the full shortcut helper rolls back a later write error and retires its temporary workspace',
+		shortcutWriteFailure.status === 79 &&
+			shortcutWriteFailure.stderr.includes('owned-shortcut-write-failure') &&
+			fs.readdirSync(path.dirname(existingShortcut)).length === 1 &&
+			!fs.readdirSync(fixtureRoot).some((name) => name.startsWith('shortcut-work.')),
+		JSON.stringify({
+			status: shortcutWriteFailure.status,
+			stdout: shortcutWriteFailure.stdout,
+			stderr: shortcutWriteFailure.stderr
+		})
+	);
+	const shortcutSuccess = runShortcut(rollbackBin);
+	const shortcutDestination = nativeFixturePath(shortcutSuccess.stdout.trim());
+	test(
+		'the full shortcut helper keeps its successful bundle and preserves the existing shortcut',
+		shortcutSuccess.status === 0 &&
+			fs.statSync(path.join(shortcutDestination, 'Contents', 'Info.plist')).isFile() &&
+			fs.readFileSync(path.join(existingShortcut, 'owned-marker'), 'utf8') ===
+				'existing shortcut' &&
+			!fs.readdirSync(fixtureRoot).some((name) => name.startsWith('shortcut-work.')),
+		JSON.stringify({
+			status: shortcutSuccess.status,
+			stdout: shortcutSuccess.stdout,
+			stderr: shortcutSuccess.stderr
+		})
+	);
+
+	writeExecutable(path.join(unavailablePythonBin, 'python'), '#!/usr/bin/env bash\nexit 127\n');
+	const shortcutUnavailablePython = runShortcut(unavailablePythonBin);
+	const shortcutWithoutPython = nativeFixturePath(shortcutUnavailablePython.stdout.trim());
+	test(
+		'the full shortcut helper preserves its healthy standalone path without Python commands',
+		shortcutUnavailablePython.status === 0 &&
+			fs.statSync(path.join(shortcutWithoutPython, 'Contents', 'Info.plist')).isFile() &&
+			fs.readFileSync(path.join(existingShortcut, 'owned-marker'), 'utf8') === 'existing shortcut',
+		JSON.stringify({
+			status: shortcutUnavailablePython.status,
+			stdout: shortcutUnavailablePython.stdout,
+			stderr: shortcutUnavailablePython.stderr
+		})
+	);
 	const collisionRuns = [];
 	for (const target of ['first-target', 'second-target', 'third-target']) {
 		const run = spawnSync(
 			bash,
 			[
-				toBashPath(SHORTCUT_SCRIPT),
+				toBashPath(portedShortcutScript),
 				'Collision',
 				target,
 				'/Applications/Editor.app',
@@ -698,7 +802,9 @@ printf icns > "$out"
 				env: {
 					...process.env,
 					HOME: toBashPath(home),
+					OWNED_STAT_FAULT: '',
 					REAL_PYTHON: realPython.stdout.trim(),
+					OWNED_STAT_QUERY: toBashPath(statQuery),
 					PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
 				}
 			}
