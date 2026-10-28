@@ -48,6 +48,7 @@ local i18n = require("infra.i18n")
 local AiActions = require("modules.shortcuts.ai_actions")
 local TableUtil = require("table_util")
 local ConfigKeys = require("config_keys")
+local RefusalRetry = require("modules.shortcuts.refusal_retry")
 
 local LOG = "shortcuts.keyboard_shortcuts"
 
@@ -80,6 +81,15 @@ local _physical_assignments = {}
 local _magic_context = nil
 local _magic_owner = nil
 local _configuration_generation = 0
+-- Configured slots whose own registration was refused (slot -> why). Each slot
+-- is an independent OS hotkey: one refusal is retried alone while the other
+-- slots stay bound (2026-10-28: one refused chord left every shortcut dead).
+local _pending_slots = {}
+-- Set only by the last bounded retry: a key the active layout still cannot
+-- resolve is then bound at its US-ANSI position.
+local _layout_fallback_admitted = false
+-- Bounded retry series of _pending_slots, created once M.bind_pending exists.
+local _refusal_retry
 
 local function invalidate_lifecycle()
 	_lifecycle_epoch = _lifecycle_epoch + 1
@@ -708,6 +718,7 @@ end
 --- @param slot_id string
 --- @param action_id string
 --- @return boolean committed True when no binding is needed or one is owned.
+--- @return string|nil refusal Why the slot could not be registered, when known.
 local function bind_slot(slot_id, action_id)
 	if PhysicalSlots.is_namespace(slot_id) then return true end
 	if action_id == "none" then return true end
@@ -736,8 +747,8 @@ local function bind_slot(slot_id, action_id)
 	end
 	local chord = slot_to_chord(slot_id)
 	if not chord then
-		Logger.error(LOG, "Slot '%s' has no valid chord mapping — startup refused.", slot_id)
-		return false
+		Logger.error(LOG, "Slot '%s' has no valid chord mapping.", slot_id)
+		return false, "it has no valid chord mapping"
 	end
 	local acquisition_epoch = _lifecycle_epoch
 	_native_acquisition_depth = _native_acquisition_depth + 1
@@ -746,7 +757,7 @@ local function bind_slot(slot_id, action_id)
 	local parsed_chord = Chord.parse(chord)
 	local bind = (parsed_chord and parsed_chord.key:lower() == "capslock")
 		and Registrar.bind_capslock_chord or Registrar.bind
-	local ok_bind, handle = xpcall(bind, debug.traceback, chord, function()
+	local ok_bind, handle, refusal = xpcall(bind, debug.traceback, chord, function()
 		if _delivery_enabled ~= true or _lifecycle_paused == true then return false end
 		local current_action = _actions[slot_id] or "none"
 		if current_action == "none" then
@@ -764,7 +775,7 @@ local function bind_slot(slot_id, action_id)
 			return false
 		end
 		return true
-	end)
+	end, { require_layout_key = not _layout_fallback_admitted })
 	_native_acquisition_depth = _native_acquisition_depth - 1
 	if ok_bind and handle then
 		_hotkeys[slot_id] = handle
@@ -788,11 +799,29 @@ local function bind_slot(slot_id, action_id)
 		end
 		Logger.done(LOG, "Bound %s → %s.", slot_label(slot_id), action_id)
 		return true
-	else
-		Logger.error(LOG, "Failed to bind slot '%s' (chord: %s): %s.",
-			slot_id, chord, tostring(handle))
-		return false
 	end
+	if not ok_bind then
+		Logger.error(LOG, "Binding slot '%s' (chord: %s) raised: %s.", slot_id, chord, tostring(handle))
+		return false, "its registration raised"
+	end
+	return false, tostring(refusal or "the registrar returned no handle")
+end
+
+--- Binds one slot on its own and records a refusal for a later retry.
+--- @param slot_id string
+--- @param action_id string
+--- @return boolean bound
+local function acquire_slot(slot_id, action_id)
+	local bound, refusal = bind_slot(slot_id, action_id)
+	if bound == true then
+		_pending_slots[slot_id] = nil
+		return true
+	end
+	_pending_slots[slot_id] = tostring(refusal or "its binding was refused")
+	Logger.warn(LOG,
+		"Shortcut %s (slot '%s') could not be registered (%s); the other shortcuts stay active and it is retried.",
+		tostring(slot_to_chord(slot_id)), slot_id, _pending_slots[slot_id])
+	return false
 end
 
 --- Changes whether an exact retained slot handle may deliver callbacks.
@@ -1148,11 +1177,22 @@ function M.start(candidate, raw_claims)
 		return false
 	end
 	if refresh_claims() ~= true then M.stop(); return false end
+	-- Restarting the saved configuration (boot, layout rebind, recovery) binds
+	-- each slot on its own: a slot refused alone (chord held elsewhere, key
+	-- missing from the layout) waits for a retry while its siblings commit. A
+	-- candidate is a configuration edit still being validated: it stays
+	-- all-or-nothing so a refused chord refuses the edit instead of saving it
+	-- half-bound. A lifecycle change mid-start rolls every slot back either way.
+	_pending_slots = {}
 	for slot, action in pairs(_actions) do
-		if slot ~= MagicPolicy.SLOT_ID and action ~= "none" and bind_slot(slot, action) ~= true then
-			Logger.error(LOG, "Keyboard shortcuts startup rolled back after slot '%s'.", slot)
-			M.stop()
-			return false
+		if slot ~= MagicPolicy.SLOT_ID and action ~= "none" then
+			if candidate == nil then
+				acquire_slot(slot, action)
+			elseif bind_slot(slot, action) ~= true then
+				Logger.error(LOG, "Keyboard shortcuts candidate refused after slot '%s'.", slot)
+				M.stop()
+				return false
+			end
 		end
 		if not start_is_current(attempt) then
 			Logger.error(LOG,
@@ -1172,7 +1212,9 @@ function M.start(candidate, raw_claims)
 	_delivery_enabled = true
 	_start_attempt = nil
 	local count = TableUtil.count(_hotkeys)
-	Logger.success(LOG, "Keyboard shortcuts started (%d active binding(s)).", count)
+	Logger.success(LOG, "Keyboard shortcuts started (%d active binding(s), %d waiting for a retry).",
+		count, TableUtil.count(_pending_slots))
+	if next(_pending_slots) ~= nil then _refusal_retry.schedule() end
 	return true
 end
 
@@ -1182,6 +1224,8 @@ function M.stop()
 	_delivery_enabled = false
 	invalidate_lifecycle()
 	_start_attempt = nil
+	_pending_slots = {}
+	_refusal_retry.cancel()
 	local physical_settled = _physical_owner == nil or _physical_owner.stop() == true
 	local conditional_settled = _magic_owner == nil or _magic_owner.stop() == true
 	if not _started and next(_hotkeys) == nil and _native_acquisition_depth == 0 and conditional_settled and physical_settled then
@@ -1202,6 +1246,43 @@ function M.stop()
 	end
 	Logger.success(LOG, "Keyboard shortcuts stopped.")
 	return true
+end
+
+--- Retries every configured slot whose registration the last start refused,
+--- each on its own.
+--- @param final boolean|nil True on the last bounded retry: a key the layout
+---   still cannot resolve is then bound at its US-ANSI position.
+--- @return boolean settled True when no refused slot remains.
+function M.bind_pending(final)
+	if not _started or _lifecycle_paused == true or _start_attempt ~= nil then
+		return next(_pending_slots) == nil
+	end
+	local slots = {}
+	for slot in pairs(_pending_slots) do slots[#slots + 1] = slot end
+	table.sort(slots)
+	local epoch = _lifecycle_epoch
+	_layout_fallback_admitted = final == true
+	for _, slot in ipairs(slots) do
+		local action = _actions[slot]
+		if action == nil or action == "none" or _hotkeys[slot] then
+			_pending_slots[slot] = nil
+		else
+			acquire_slot(slot, action)
+		end
+		if _lifecycle_epoch ~= epoch or _lifecycle_paused == true then break end
+	end
+	_layout_fallback_admitted = false
+	return next(_pending_slots) == nil
+end
+
+_refusal_retry = RefusalRetry.new(LOG, M.bind_pending)
+
+--- Lists the configured slots whose registration is waiting for a retry.
+--- @return table refusals Slot id to the cause of its refusal (a copy).
+function M.pending_slots()
+	local copy = {}
+	for slot, refusal in pairs(_pending_slots) do copy[slot] = refusal end
+	return copy
 end
 
 --- Admission-authoritative PAUSE edge used by the aggregate shortcuts owner.
