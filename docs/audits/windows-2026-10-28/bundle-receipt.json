@@ -1,0 +1,286 @@
+{
+	"created_at_paris": "2026-10-28T21:50:37.013290+01:00",
+	"bundle_sha256": "04fc656ca60e1387d76a0a3d7e8b2b94ba53c1596a8d9680b7b23bd022e66212",
+	"bytes": 718937,
+	"verify_exit_code": 0,
+	"selected_references": {
+		"refs/heads/fix/windows": "fe3d8b010779a2666ef9307305c68f1bc9d92428",
+		"refs/heads/windows/bootstrap-fixture": "ac5f797a62f97f93f06a2b684e3d0caee02ac287",
+		"refs/heads/windows/ci-browser-diagnostic": "9e2c52a32726c39827b2f30dfa4d998f73d4feee",
+		"refs/heads/windows/content-custody": "5d2750395b5d04173c1a2baecf090b5aa02650ba",
+		"refs/heads/windows/crash-collision-mutant": "6d86f2960e0f4d6e674eded2cea21622bf8c0315",
+		"refs/heads/windows/editor-show": "7a78e6aa25c8532e22adb764efb86967404586fb",
+		"refs/heads/windows/false-greens": "8d0cec5f33642b44807bc657421671705169a2e3",
+		"refs/heads/windows/final-shared-helpers": "1d53275666272c05639f634bf03eaf4eb0786cd3",
+		"refs/heads/windows/geometry": "ac9387ff7777bb3076074870c0d9df8a53b857cb",
+		"refs/heads/windows/hcw-show": "6f52290d537160d05bc3e5b929360a7dbfa86329",
+		"refs/heads/windows/lifecycle": "ce1f7580e3129e2e6a2690a03edf609fee5df187",
+		"refs/heads/windows/loop-gate": "bcc6075bd7010a2f299b737b0c887a1cfdd0b1f8",
+		"refs/heads/windows/metrics": "7f31dd33d76e88dc2b96682298467c362ea4d816",
+		"refs/heads/windows/native-qualification": "3a8e022a85eeed627bf5e0e935a9638d37217f72",
+		"refs/heads/windows/network": "e4bd0acd1a24f4a555ac70d59b1937c13c465935",
+		"refs/heads/windows/packaging": "2be33bff08e67c9af8761aaeffa7e6eb3bc0b242",
+		"refs/heads/windows/packet-census": "390e68432d6dd4710adeb965f0f11037c4bef129",
+		"refs/heads/windows/pending-publication": "0dd44c3cbbf621ac7b2222afe5db62fbee22462f",
+		"refs/heads/windows/prediction-custody": "a4b333b3b52f213931a5134ded046f2880091467",
+		"refs/heads/windows/private-context-proof": "9ed02e8a73c920fb4f72e8ccb76bb85c90a15e08",
+		"refs/heads/windows/r10-rollover": "b1af9eaa82497bb6c956f216a5f764c97a6b218c",
+		"refs/heads/windows/r11-timers": "e58a647f22647fc2bf5f02fb1bd0eac60e49b927",
+		"refs/heads/windows/r12-composer": "86934881cdd128460aa84b4368bd7aea4532198c",
+		"refs/heads/windows/r13-warmup": "a7f2ecd0e3d7d551db68d146b8721c74629b0a03",
+		"refs/heads/windows/r14-webview": "bc46df31df667553a0e40c70f96b761a92128cc7",
+		"refs/heads/windows/r16-diagnostics": "4ff597f085e9dc627a7d1cf5d3531896305659c1",
+		"refs/heads/windows/r17-changelog": "375fe16ef638fd726b606424bc0d16be310c3f91",
+		"refs/heads/windows/r19-ledger": "4c37c6e5c6ac520b8118d7cceab9a1cafe1c1fb2",
+		"refs/heads/windows/r19-ledger-baseline": "4c37c6e5c6ac520b8118d7cceab9a1cafe1c1fb2",
+		"refs/heads/windows/r20-baseline": "d051ac79d8991c3f6443387fec9c7f3796bba2f1",
+		"refs/heads/windows/r20-catalogue": "b9ab0b9ecef01aa3094891cdb46b626df1778c54",
+		"refs/heads/windows/r21-diagnostic-namespace": "32a6913c11b4e8f57cfdb733440aeb6a2aac008c",
+		"refs/heads/windows/r22-restore": "d051ac79d8991c3f6443387fec9c7f3796bba2f1",
+		"refs/heads/windows/r23-harness": "cd7f6ec82b59f2e983b893115da4c306f2cb1f43",
+		"refs/heads/windows/r23-harness-current": "a56e151b91926b8d0fd4e115770d9f1a700186af",
+		"refs/heads/windows/r24-ui": "b16af1a958412b4a1e2d0b7fc868952f9f3abb91",
+		"refs/heads/windows/r25-ui": "e6f3cb5f450d7eef7fd9eef5df95a35201a9a05b",
+		"refs/heads/windows/r28-restore-authority": "f3a8f57b0e478413fb51d65769ea23eee8572dbf",
+		"refs/heads/windows/r3-config": "ea9b59cba1de2008fc03b67ef33cfbce5d6d6c41",
+		"refs/heads/windows/r3-lifecycle": "94b52ebe8ab54dda248c1a2a80dd83d7fe171e3d",
+		"refs/heads/windows/r3-metrics": "9c2972c33cdfbc161894b2b480356bb367afbacd",
+		"refs/heads/windows/r3-network": "55112dec3a380e88502f545877798f8d58d3f14e",
+		"refs/heads/windows/r3-packaging": "67b6ec40981aa2d53cc168e33bfbc2c76854e82f",
+		"refs/heads/windows/r3-rebase": "6ea9564ac9e1f6596d7779e88a7268ff41169861",
+		"refs/heads/windows/r3-runner": "507a1be3eede810c033a5c418ebc3d822d98e734",
+		"refs/heads/windows/r3-ui": "5d451aaa74ac3820d7609d73857b9df3778a7f04",
+		"refs/heads/windows/r30-packaging": "c9ed538cb4f6373aa16b250cde80aec4fb26f455",
+		"refs/heads/windows/r31-ui": "2b553eb9b40cf1d624ac5791c39b7ea99ae71416",
+		"refs/heads/windows/r32-custody-followup": "d4931c707f0eec110f8974f625a653b0af74f9c0",
+		"refs/heads/windows/r34-install": "acb28a70bf83fdaa4962fbafdc13dc01643c88f7",
+		"refs/heads/windows/r35-dev-launcher": "79beeb9732fcdfd660f02a25d59bc1356552cfe5",
+		"refs/heads/windows/r36-reader": "8348f4435b5edd8aaee623f6bbd525c20b4bbcc8",
+		"refs/heads/windows/r38-source-contracts": "9d434d0f9998fb90bb9495d485293f3bc3dd7aea",
+		"refs/heads/windows/r4-toml-scalar": "9e15da50346e94cd1bd7b7e3bb20cc9d74082c09",
+		"refs/heads/windows/r5-common": "ff3bb0c7694075a006a8281fefc8322cbff95529",
+		"refs/heads/windows/r5-lifecycle": "ff3bb0c7694075a006a8281fefc8322cbff95529",
+		"refs/heads/windows/r5-metrics": "ff3bb0c7694075a006a8281fefc8322cbff95529",
+		"refs/heads/windows/r5-ui": "ff3bb0c7694075a006a8281fefc8322cbff95529",
+		"refs/heads/windows/r6-config": "b7b6bf9b159d6cf1c572dfb64381e57997c7f968",
+		"refs/heads/windows/r6-installer": "923d2270060269215e72f5d740a5803503dd5650",
+		"refs/heads/windows/r6-lifecycle": "99c137098691b9c2f5885067fa33e74a4f727473",
+		"refs/heads/windows/r6-network": "f79a2d4cb22482b9031361a98d22f397d86c4b5c",
+		"refs/heads/windows/r6-tests": "cd7f6ec82b59f2e983b893115da4c306f2cb1f43",
+		"refs/heads/windows/r6-ui-metrics": "3a558c93277c73a8298b7f36abebacd26ec90887",
+		"refs/heads/windows/r7-installer": "3bd8adf6c43a1534a8248402a4ac3d69b0f5ba7d",
+		"refs/heads/windows/r8-common": "0fc07cefbe5522f4ece22bbce585bd5052b5514c",
+		"refs/heads/windows/r8-keystats": "0325b40a8c65bc8f05df9717352e440ea944c4f4",
+		"refs/heads/windows/r8-metrics": "3de16be0899f65e7d38a3559282195457e652a0c",
+		"refs/heads/windows/r8-test-harness": "d054bf097b4514379387243129a2aaa88162fe40",
+		"refs/heads/windows/r9-layout": "45955b60e5cfdd2f2dd93fd0371d4a47f153dcd1",
+		"refs/heads/windows/round2-baseline": "74791913ddd41478189aaecfbb7fcc0eea0dc298",
+		"refs/heads/windows/round2-config": "210060f565c20c7e1aa909431788215ab4cb5604",
+		"refs/heads/windows/round2-config-control": "b5230c1414b94b125642b075ba82e7aa9700fbaf",
+		"refs/heads/windows/round2-lifecycle": "257bebad2982a5a6c2066572a727ce1b36e2f4c8",
+		"refs/heads/windows/round2-metrics": "26a476f8727a423d64ad6fbc07934c9b7ce53f6e",
+		"refs/heads/windows/round2-network": "bc4c7b27a3c7294c48b038a99f528f8f1e5a53e2",
+		"refs/heads/windows/round2-packaging": "c32d005ad9c0c4dccf00519ffc818918eaa1fb26",
+		"refs/heads/windows/round2-test-gates": "6cb7f055a92616ec95a86d6cc27718e696be1317",
+		"refs/heads/windows/round2-ui": "518578c4e716cfa5a8a117a5f05aee78e4b1c0a1",
+		"refs/heads/windows/runner-guard": "ddf681d63fb1b5c01f17db4b36f06166857f71b7",
+		"refs/heads/windows/scanner-fixtures": "c0439cb1a9d0bed5c09fe2d009ecf36170f30f42",
+		"refs/heads/windows/test-gates": "58443eeae630b6ecf71e585a987e52f900b03346",
+		"refs/heads/windows/ui": "42ca24a34df1cad7d4e458a2f4a4eb25000b4df1",
+		"refs/heads/windows/updater-cleanup": "79c41cb96d1511f4a83c9ba3326b83e89c4f7ecd",
+		"refs/heads/windows/updater-closure": "d5c36f29f38b4431802b3ddfee82442d19a2db8b",
+		"refs/heads/windows/url-gate": "17aa03c0932d9607babffcad638aef0cd91001ec"
+	},
+	"heads": [
+		"fe3d8b010779a2666ef9307305c68f1bc9d92428 refs/heads/fix/windows",
+		"ac5f797a62f97f93f06a2b684e3d0caee02ac287 refs/heads/windows/bootstrap-fixture",
+		"5d2750395b5d04173c1a2baecf090b5aa02650ba refs/heads/windows/content-custody",
+		"6d86f2960e0f4d6e674eded2cea21622bf8c0315 refs/heads/windows/crash-collision-mutant",
+		"7a78e6aa25c8532e22adb764efb86967404586fb refs/heads/windows/editor-show",
+		"8d0cec5f33642b44807bc657421671705169a2e3 refs/heads/windows/false-greens",
+		"ac9387ff7777bb3076074870c0d9df8a53b857cb refs/heads/windows/geometry",
+		"6f52290d537160d05bc3e5b929360a7dbfa86329 refs/heads/windows/hcw-show",
+		"ce1f7580e3129e2e6a2690a03edf609fee5df187 refs/heads/windows/lifecycle",
+		"bcc6075bd7010a2f299b737b0c887a1cfdd0b1f8 refs/heads/windows/loop-gate",
+		"7f31dd33d76e88dc2b96682298467c362ea4d816 refs/heads/windows/metrics",
+		"3a8e022a85eeed627bf5e0e935a9638d37217f72 refs/heads/windows/native-qualification",
+		"e4bd0acd1a24f4a555ac70d59b1937c13c465935 refs/heads/windows/network",
+		"2be33bff08e67c9af8761aaeffa7e6eb3bc0b242 refs/heads/windows/packaging",
+		"390e68432d6dd4710adeb965f0f11037c4bef129 refs/heads/windows/packet-census",
+		"0dd44c3cbbf621ac7b2222afe5db62fbee22462f refs/heads/windows/pending-publication",
+		"a4b333b3b52f213931a5134ded046f2880091467 refs/heads/windows/prediction-custody",
+		"9ed02e8a73c920fb4f72e8ccb76bb85c90a15e08 refs/heads/windows/private-context-proof",
+		"b1af9eaa82497bb6c956f216a5f764c97a6b218c refs/heads/windows/r10-rollover",
+		"e58a647f22647fc2bf5f02fb1bd0eac60e49b927 refs/heads/windows/r11-timers",
+		"86934881cdd128460aa84b4368bd7aea4532198c refs/heads/windows/r12-composer",
+		"a7f2ecd0e3d7d551db68d146b8721c74629b0a03 refs/heads/windows/r13-warmup",
+		"bc46df31df667553a0e40c70f96b761a92128cc7 refs/heads/windows/r14-webview",
+		"4ff597f085e9dc627a7d1cf5d3531896305659c1 refs/heads/windows/r16-diagnostics",
+		"375fe16ef638fd726b606424bc0d16be310c3f91 refs/heads/windows/r17-changelog",
+		"4c37c6e5c6ac520b8118d7cceab9a1cafe1c1fb2 refs/heads/windows/r19-ledger",
+		"4c37c6e5c6ac520b8118d7cceab9a1cafe1c1fb2 refs/heads/windows/r19-ledger-baseline",
+		"d051ac79d8991c3f6443387fec9c7f3796bba2f1 refs/heads/windows/r20-baseline",
+		"b9ab0b9ecef01aa3094891cdb46b626df1778c54 refs/heads/windows/r20-catalogue",
+		"32a6913c11b4e8f57cfdb733440aeb6a2aac008c refs/heads/windows/r21-diagnostic-namespace",
+		"d051ac79d8991c3f6443387fec9c7f3796bba2f1 refs/heads/windows/r22-restore",
+		"cd7f6ec82b59f2e983b893115da4c306f2cb1f43 refs/heads/windows/r23-harness",
+		"a56e151b91926b8d0fd4e115770d9f1a700186af refs/heads/windows/r23-harness-current",
+		"b16af1a958412b4a1e2d0b7fc868952f9f3abb91 refs/heads/windows/r24-ui",
+		"e6f3cb5f450d7eef7fd9eef5df95a35201a9a05b refs/heads/windows/r25-ui",
+		"f3a8f57b0e478413fb51d65769ea23eee8572dbf refs/heads/windows/r28-restore-authority",
+		"ea9b59cba1de2008fc03b67ef33cfbce5d6d6c41 refs/heads/windows/r3-config",
+		"94b52ebe8ab54dda248c1a2a80dd83d7fe171e3d refs/heads/windows/r3-lifecycle",
+		"9c2972c33cdfbc161894b2b480356bb367afbacd refs/heads/windows/r3-metrics",
+		"55112dec3a380e88502f545877798f8d58d3f14e refs/heads/windows/r3-network",
+		"67b6ec40981aa2d53cc168e33bfbc2c76854e82f refs/heads/windows/r3-packaging",
+		"6ea9564ac9e1f6596d7779e88a7268ff41169861 refs/heads/windows/r3-rebase",
+		"507a1be3eede810c033a5c418ebc3d822d98e734 refs/heads/windows/r3-runner",
+		"5d451aaa74ac3820d7609d73857b9df3778a7f04 refs/heads/windows/r3-ui",
+		"c9ed538cb4f6373aa16b250cde80aec4fb26f455 refs/heads/windows/r30-packaging",
+		"2b553eb9b40cf1d624ac5791c39b7ea99ae71416 refs/heads/windows/r31-ui",
+		"d4931c707f0eec110f8974f625a653b0af74f9c0 refs/heads/windows/r32-custody-followup",
+		"acb28a70bf83fdaa4962fbafdc13dc01643c88f7 refs/heads/windows/r34-install",
+		"79beeb9732fcdfd660f02a25d59bc1356552cfe5 refs/heads/windows/r35-dev-launcher",
+		"8348f4435b5edd8aaee623f6bbd525c20b4bbcc8 refs/heads/windows/r36-reader",
+		"9d434d0f9998fb90bb9495d485293f3bc3dd7aea refs/heads/windows/r38-source-contracts",
+		"9e15da50346e94cd1bd7b7e3bb20cc9d74082c09 refs/heads/windows/r4-toml-scalar",
+		"ff3bb0c7694075a006a8281fefc8322cbff95529 refs/heads/windows/r5-common",
+		"ff3bb0c7694075a006a8281fefc8322cbff95529 refs/heads/windows/r5-lifecycle",
+		"ff3bb0c7694075a006a8281fefc8322cbff95529 refs/heads/windows/r5-metrics",
+		"ff3bb0c7694075a006a8281fefc8322cbff95529 refs/heads/windows/r5-ui",
+		"b7b6bf9b159d6cf1c572dfb64381e57997c7f968 refs/heads/windows/r6-config",
+		"923d2270060269215e72f5d740a5803503dd5650 refs/heads/windows/r6-installer",
+		"99c137098691b9c2f5885067fa33e74a4f727473 refs/heads/windows/r6-lifecycle",
+		"f79a2d4cb22482b9031361a98d22f397d86c4b5c refs/heads/windows/r6-network",
+		"cd7f6ec82b59f2e983b893115da4c306f2cb1f43 refs/heads/windows/r6-tests",
+		"3a558c93277c73a8298b7f36abebacd26ec90887 refs/heads/windows/r6-ui-metrics",
+		"3bd8adf6c43a1534a8248402a4ac3d69b0f5ba7d refs/heads/windows/r7-installer",
+		"0fc07cefbe5522f4ece22bbce585bd5052b5514c refs/heads/windows/r8-common",
+		"0325b40a8c65bc8f05df9717352e440ea944c4f4 refs/heads/windows/r8-keystats",
+		"3de16be0899f65e7d38a3559282195457e652a0c refs/heads/windows/r8-metrics",
+		"45955b60e5cfdd2f2dd93fd0371d4a47f153dcd1 refs/heads/windows/r9-layout",
+		"74791913ddd41478189aaecfbb7fcc0eea0dc298 refs/heads/windows/round2-baseline",
+		"210060f565c20c7e1aa909431788215ab4cb5604 refs/heads/windows/round2-config",
+		"b5230c1414b94b125642b075ba82e7aa9700fbaf refs/heads/windows/round2-config-control",
+		"257bebad2982a5a6c2066572a727ce1b36e2f4c8 refs/heads/windows/round2-lifecycle",
+		"26a476f8727a423d64ad6fbc07934c9b7ce53f6e refs/heads/windows/round2-metrics",
+		"bc4c7b27a3c7294c48b038a99f528f8f1e5a53e2 refs/heads/windows/round2-network",
+		"c32d005ad9c0c4dccf00519ffc818918eaa1fb26 refs/heads/windows/round2-packaging",
+		"6cb7f055a92616ec95a86d6cc27718e696be1317 refs/heads/windows/round2-test-gates",
+		"518578c4e716cfa5a8a117a5f05aee78e4b1c0a1 refs/heads/windows/round2-ui",
+		"ddf681d63fb1b5c01f17db4b36f06166857f71b7 refs/heads/windows/runner-guard",
+		"c0439cb1a9d0bed5c09fe2d009ecf36170f30f42 refs/heads/windows/scanner-fixtures",
+		"58443eeae630b6ecf71e585a987e52f900b03346 refs/heads/windows/test-gates",
+		"42ca24a34df1cad7d4e458a2f4a4eb25000b4df1 refs/heads/windows/ui",
+		"79c41cb96d1511f4a83c9ba3326b83e89c4f7ecd refs/heads/windows/updater-cleanup",
+		"d5c36f29f38b4431802b3ddfee82442d19a2db8b refs/heads/windows/updater-closure",
+		"17aa03c0932d9607babffcad638aef0cd91001ec refs/heads/windows/url-gate"
+	],
+	"excluded_heads": {
+		"origin/dev": "18d69a24c06586186a221c1afb5ce703732ac4a1",
+		"origin/fix/windows": "f8d42b99ee8d53100647224b005534cd8b0fd75c"
+	},
+	"verified_remote_prerequisites": [
+		{
+			"sha": "644517f78766830fa365236c70ef8eada718f747",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "1370d7540414de79c4769a69a119eeea4fb121c5",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "d46d48694061a94d159f692e68c76c1fa78be9ae",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "0746b18c863cce7357cd0a7852c2bc9ecd7ef830",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "e2aa642f8c922258f28b42c99d99737a4179389f",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "33ff515e568d33203d92717cba262da2105759c0",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "78bdb27d66161a65e7b3ccff0ab7dfcd42b351e8",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "a873bf7d05ec2969b2c4088cd05a6bc5b05c01b7",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "1c7fcd3711175dfb5704b240209fe8936379c429",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "5f4a8be89b3c3ed6ad06b1e8e3634b035d3658cc",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "1cebdc150b44bafafdab32f935fafa7c4d08049e",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "81635a815afef83ead635a19a58a2522b4dc78e0",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "a0aa51fd825879c414b9751b42b5eed1a1c6fe21",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "66d446f5708f46c3ae43f4407fcb4e77dbfe5b56",
+			"reachable_from": ["origin/fix/windows"]
+		},
+		{
+			"sha": "7fbcfc3727e586c16224de957d7deab7a57bc318",
+			"reachable_from": ["origin/fix/windows"]
+		},
+		{
+			"sha": "96746f234e55ded53721b823ca646d0c742c742e",
+			"reachable_from": ["origin/fix/windows"]
+		},
+		{
+			"sha": "1d53275666272c05639f634bf03eaf4eb0786cd3",
+			"reachable_from": ["origin/fix/windows"]
+		},
+		{
+			"sha": "eab84fb852050dbe4e2fc76485aaef25f3ceaa87",
+			"reachable_from": ["origin/fix/windows"]
+		},
+		{
+			"sha": "5ee230e8aa062f0a9f61827b126808029be17f8e",
+			"reachable_from": ["origin/dev", "origin/fix/windows"]
+		},
+		{
+			"sha": "f4e3eb5eced266169d51d59ab7e40f3b64e2f85b",
+			"reachable_from": ["origin/dev"]
+		},
+		{
+			"sha": "f8d42b99ee8d53100647224b005534cd8b0fd75c",
+			"reachable_from": ["origin/fix/windows"]
+		},
+		{
+			"sha": "463352a2d49d0fbe3fc9d7db3c8a425547b8a012",
+			"reachable_from": ["origin/dev"]
+		},
+		{
+			"sha": "18d69a24c06586186a221c1afb5ce703732ac4a1",
+			"reachable_from": ["origin/dev"]
+		},
+		{
+			"sha": "42acb5cdcf2c027925a672b94b30bcbc79bccc34",
+			"reachable_from": ["origin/dev"]
+		},
+		{
+			"sha": "6d67374daeb70f3699a2266fd8118e77ca9658f3",
+			"reachable_from": ["origin/dev"]
+		}
+	],
+	"prerequisite_note": "Excluded histories remain reachable from origin/dev or the final pushed fix/windows descendant of the previous delivered head."
+}
