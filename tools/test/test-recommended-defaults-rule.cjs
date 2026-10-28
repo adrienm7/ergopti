@@ -126,7 +126,7 @@ for (const file of localeFiles) {
 const DIALOG_OWNERS = [
 	{
 		file: 'windows/ui/menu/menu_gestures.ahk',
-		register: /"gesture_recommended_info", \(\*\) => GestureShowRecommendedInfo\(\)/,
+		register: /MenuCommand\.GESTURE_RECOMMENDED_INFO, \(\*\) => GestureShowRecommendedInfo\(\)/,
 		body: /\nGestureShowRecommendedInfo\(\) \{\n([\s\S]*?)\n\}/,
 		helper: 'Ui_MsgBox(',
 		keys: ['menu.gestures.recommended_reason_windows'],
