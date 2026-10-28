@@ -228,6 +228,19 @@ function findRow(key) {
  * with _shared/lua/llm/model_identifier.lua or its AHK twin; all three pass
  * _shared/tests/corpus/llm/model_identifiers.json.
  */
+// The add-model texts of each backend that can add a model, named literally so
+// the translation audit sees every key this page shows.
+var ADD_MODEL_TEXT_KEYS = {
+	ollama: {
+		placeholder: 'model_browser.add_model_placeholder_ollama',
+		invalid: 'model_browser.invalid_identifier_ollama'
+	},
+	mlx: {
+		placeholder: 'model_browser.add_model_placeholder_mlx',
+		invalid: 'model_browser.invalid_identifier_mlx'
+	}
+};
+
 function validModelIdentifier(backend, id) {
 	if (typeof id !== 'string' || id === '' || id.length > 200) return false;
 	var lower = /^[a-z0-9][a-z0-9._-]*$/;
@@ -474,12 +487,14 @@ function buildGroupHead(b) {
 	});
 
 	if (b.add_model && b.available !== false) {
+		var texts = ADD_MODEL_TEXT_KEYS[b.id];
+		if (!texts) throw new Error('No add-model text for backend ' + b.id);
 		var input = document.createElement('input');
 		input.type = 'text';
 		input.className = 'add-input';
 		input.setAttribute('spellcheck', 'false');
 		input.setAttribute('autocomplete', 'off');
-		var hint = _t('model_browser.add_model_placeholder_' + b.id);
+		var hint = _t(texts.placeholder);
 		input.setAttribute('placeholder', hint);
 		input.setAttribute('aria-label', hint);
 		var addBtn = document.createElement('button');
@@ -493,7 +508,7 @@ function buildGroupHead(b) {
 			if (_catalogueOwner !== catalogueOwner) return;
 			var name = String(input.value || '').trim();
 			if (!validModelIdentifier(b.id, name)) {
-				error.textContent = _t('model_browser.invalid_identifier_' + b.id);
+				error.textContent = _t(texts.invalid);
 				input.setAttribute('aria-invalid', 'true');
 				return;
 			}
