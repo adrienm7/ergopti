@@ -208,7 +208,8 @@ final class NativeReleaseSwapFilesystemTests: XCTestCase {
 		}
 		try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: false)
 		imageOperationAttempted = true
-		let created = try run("/usr/bin/hdiutil", arguments: ["create", "-size", "64m", "-fs", "HFS+", "-volname", "ErgoptiReleaseSwapFixture", "-format", "UDRW", image.path], root: root)
+		// Blank images default to writable UDIF; -format belongs to source-backed creation.
+		let created = try run("/usr/bin/hdiutil", arguments: ["create", "-size", "64m", "-fs", "HFS+", "-volname", "ErgoptiReleaseSwapFixture", image.path], root: root)
 		XCTAssertEqual(created.status, 0, "The exact writable fixture image must be created: \(created.stderr)")
 		guard created.status == 0 else { throw CocoaError(.executableRuntimeMismatch) }
 		let attached = try run("/usr/bin/hdiutil", arguments: ["attach", "-nobrowse", "-mountpoint", mount.path, "-plist", image.path], root: root)
