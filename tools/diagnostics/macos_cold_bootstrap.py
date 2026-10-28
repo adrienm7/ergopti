@@ -39,6 +39,9 @@ SOURCE_PATHS = (
 
 HAMMERSPOON_ARCHIVE_SHA256 = "11bb1c90faf5427f37c7bd4fe7eab9774ae43e1d5cb020c5b3088dac32849efa"
 HAMMERSPOON_ARCHIVE_BYTES = 9704557
+# Where tools/build/build_macos_app.sh keeps the verified zip across builds
+# (HAMMERSPOON_CACHE_DIR): outside build/macos, which every build wipes.
+HAMMERSPOON_CACHE = REPOSITORY / "build/cache/hammerspoon"
 
 
 def isolated_runtime_paths(environment):
@@ -271,7 +274,7 @@ def receive_owned(app, output, expected_sha):
     stamp = resources / PREFIX / "_shared/build_stamp.txt"
     if stamp.read_text(encoding="utf-8").splitlines().count("commit=" + expected_sha) != 1:
         raise RuntimeError("Cold signed application build stamp differs from CI source")
-    archive = app.parent / "cache/Hammerspoon-1.1.1.zip"
+    archive = HAMMERSPOON_CACHE / "Hammerspoon-1.1.1.zip"
     if (
         archive.stat().st_size != HAMMERSPOON_ARCHIVE_BYTES
         or digest(archive) != HAMMERSPOON_ARCHIVE_SHA256

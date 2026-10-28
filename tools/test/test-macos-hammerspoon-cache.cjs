@@ -65,6 +65,15 @@ check('the cache lives outside the directory every build wipes', () => {
 	assert.match(BUILD, /^HAMMERSPOON_CACHE_DIR="\$REPO_ROOT\/build\/cache\/hammerspoon"$/m);
 	assert.match(shellFunction('clean_build_dir'), /rm -rf "\$BUILD_DIR"/);
 	assert.match(shellFunction('download_hammerspoon'), /local cache_dir="\$HAMMERSPOON_CACHE_DIR"/);
+	// The cold receiver verifies the zip the build kept, so it reads the same
+	// folder: fc39ea4b95 moved the cache and the receiver still read the old one.
+	const cold = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/macos_cold_bootstrap.py'),
+		'utf8'
+	);
+	assert.match(cold, /^HAMMERSPOON_CACHE = REPOSITORY \/ "build\/cache\/hammerspoon"$/m);
+	assert.match(cold, /^ {4}archive = HAMMERSPOON_CACHE \/ "Hammerspoon-1\.1\.1\.zip"$/m);
+	assert.doesNotMatch(cold, /app\.parent \/ "cache\//, 'the wiped build folder holds no cache');
 	const ignore = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
 	assert.match(ignore, /^\/build\/$/m, 'the cache must stay out of Git');
 });

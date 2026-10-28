@@ -34,7 +34,8 @@ a sealed Windows updater source, reseal with
 - **Focus decided by the maintainer (27 Oct afternoon):** fix every macOS problem while their Mac is
   available. The general TODO and cross-OS parity work are paused until then (they resume afterwards).
 - **State.** dev is linear and pushed; every dev push had its CI cancelled at once (a dev push builds a
-  release; the maintainer allows pushing dev as long as that CI is cancelled). Latest stable: v1.0.6. A full
+  release; the maintainer allows pushing dev as long as that CI is cancelled). Latest stable: v1.0.6; the
+  v1.0.7 release commit is on dev and waits for a green full preflight before `main`. A full
   CI of the head is dispatched on `tmp/preflight-dev` with `os_lanes=all`: read it first and fix its reds.
 - **The maintainer's Mac field branch** is `field/mac-2026-10-27` (macOS 26.6.2, arm64, Swift Command Line
   Tools only, behind a company PAC proxy at work). It carries their logs under `docs/field-reports/` and must
@@ -88,12 +89,15 @@ a sealed Windows updater source, reseal with
   `vendor/ergopti_updater_download.ps1` (`CreateFileW`, `GetFileInformationByHandle`, from bdfa026d16). Check
   whether a bundled type already declaring them could be reused, then lower it back. The same build log notes
   `key_state_polling` dropped to 59: lower its script ceiling from 62 once a Windows build confirms 59.
-- **Last full preflight:** run 40584261575 on 54d1c70415 (the first v1.0.7 release commit) had 6 red jobs,
-  fixed by a884588fb9 (bootstrap shell vectors keep inherited CA variables out), f51d970387 (PTY worker test
-  derives the bundle name), 92b2e93ae6 (XCTest census derived from the launcher test sources), 8b24d4e11f
-  (inherited trust dropped at the daemon snapshot, not in Go, so the receiver's own registry certificate
-  reaches Go) and 7dadf0b84d (uinput reports stamped so a still tap reaches the decoder). The second v1.0.7
-  release commit sits on top of them and of the Mac field fixes of 27 October evening; a new full run
+- **Last full preflight:** runs 40615470853 (b5101cb55f) and 40620562365 (2c374728f7) on the night of
+  27 to 28 October were red; every root cause is fixed by the CI7 and CI8 batches (stale pinned counts,
+  closed log vocabulary, path-pinned reads, the duplicate Windows `JsonStringLiteral`, the fast-timer seam,
+  the UIA census timeout, the Linux network-ai harness ordering, the Hammerspoon cache path of the cold
+  receiver, the PTY snapshot creating `Library/Application Support` in a cold home, the model selector
+  translation keys). One red was the runner: macOS 15 Intel `NumberRowSourceProbeTests` lost the TSM
+  UI server port (`CFMessagePortSendRequest FAILED(-1)`); rerun that job once if it repeats. The third
+  v1.0.7 release commit sits on top of all of tonight's work (Mac field fixes, model selector page on the
+  three OS, web-view toggle actions, local server discovery, log truth, slowness) and a new full run
   qualifies it before `main`.
 - **The ChatGPT fix branches** fix/linux, fix/macos and fix/windows are fully on dev. The container proxy
   refuses remote deletion, so the maintainer deletes them: `git push origin --delete fix/linux fix/macos
@@ -361,6 +365,11 @@ From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their bu
   owned repair failed (`modules/llm/ollama_install_state.lua`). A download shows its
   percentage: macOS from the download window (Ollama and MLX), Linux from the /api/pull
   NDJSON, Windows from the managed pull's own output (the unmanaged cmd-window pull shows none).
+  Follow-ups (maintainer, 2026-10-28): macOS lists only the active entry's provider, so an
+  inactive entry shows its known models with the "unavailable" hint, accepted for this release;
+  listing every macOS entry needs their Keychain keys resolved. The known models are the
+  configured, default and model_extras ones; a per-provider known-model list in
+  `api_providers.json` (read by all three drivers) would offer more without a listing.
   Mac confirms: the AI menu shows one button with the emoji and the model; the page
   opens from it and from the toggle shortcut before the AI menu was ever opened; choosing an
   MLX model while Ollama is active switches the backend; a model not downloaded offers only
