@@ -37,6 +37,7 @@ const RESOURCES = path.join(
 const EMITTER = path.join(RESOURCES, 'quote_launcher_values.py');
 const CLONE_SCRIPT = path.join(RESOURCES, 'clone_app.sh');
 const SHORTCUT_SCRIPT = path.join(RESOURCES, 'make_shortcut.sh');
+const PHYSICAL_CLI_PROBE_TIMEOUT_MS = 15000;
 const results = [];
 
 function test(name, ok, detail = '') {
@@ -123,7 +124,7 @@ try {
 			],
 			{
 				encoding: 'utf8',
-				timeout: 15000,
+				timeout: PHYSICAL_CLI_PROBE_TIMEOUT_MS,
 				env: {
 					...process.env,
 					REAL_PYTHON: physicalPython,
@@ -243,6 +244,101 @@ try {
 						row.child_survived === false
 				),
 			physicalRun.stdout
+		);
+		fixtureCanRetire = false;
+		const identityRun = spawnSync(
+			physicalPython,
+			[
+				path.join(ROOT, 'tools/test/lib/app-cloner-identity-probe.py'),
+				'--resources',
+				RESOURCES,
+				'--shell',
+				bash,
+				'--fixture',
+				path.join(fixtureRoot, 'identity'),
+				'--palette',
+				path.join(ROOT, 'static/ergopti_plus/_shared/data/native_theme.toml')
+			],
+			{ encoding: 'utf8', timeout: PHYSICAL_CLI_PROBE_TIMEOUT_MS }
+		);
+		if (identityRun.error)
+			throw new Error(
+				`Identity probe did not complete; retain ${fixtureRoot}: ${identityRun.error.message}`
+			);
+		const identity = JSON.parse(identityRun.stdout);
+		fixtureCanRetire = identity.ownership_closed === true;
+		if (!fixtureCanRetire)
+			throw new Error(
+				`Identity process custody is unknown; retain ${fixtureRoot}: ${identityRun.stdout}`
+			);
+		const identifierPattern =
+			/^fr\.b519hs\.(clone|shortcut)\.[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
+		test(
+			'actual same-second shortcut creations reserve distinct native identities',
+			identityRun.status === 0 &&
+				identity.state === 'PASSED' &&
+				identity.failures.length === 0 &&
+				identity.positive.length === 1 &&
+				identity.positive[0].caller === 'shortcut' &&
+				identity.positive[0].execution_scope === 'actual-full-shortcut-generator' &&
+				identity.positive[0].distinct_destinations === true &&
+				identity.positive[0].distinct_identifiers === true &&
+				identity.positive[0].creations.length === 2 &&
+				identity.positive[0].creations.every(
+					(row) =>
+						identifierPattern.test(row.identifier) &&
+						row.identifier.startsWith('fr.b519hs.shortcut.') &&
+						row.uuid_calls === 1 &&
+						row.workspace_retired === true
+				),
+			identityRun.stdout
+		);
+		const helperKinds = Object.keys(identity.helper_generations).sort();
+		test(
+			'both identity namespaces call the native generator once and reject unknown arguments before it',
+			helperKinds.join(',') === 'clone,shortcut' &&
+				helperKinds.every(
+					(kind) =>
+						identity.helper_generations[kind].length === 2 &&
+						new Set(identity.helper_generations[kind]).size === 2 &&
+						identity.helper_generations[kind].every(
+							(value) => identifierPattern.test(value) && value.startsWith(`fr.b519hs.${kind}.`)
+						)
+				) &&
+				identity.admission.length === 3 &&
+				JSON.stringify(identity.admission.map((row) => row.arguments)) ===
+					JSON.stringify([[], ['unknown'], ['clone', 'extra']]) &&
+				identity.admission.every((row) => row.status === 1 && row.uuid_calls === 0),
+			identityRun.stdout
+		);
+		const uuidFaults = [
+			'nonzero',
+			'valid-nonzero',
+			'empty',
+			'malformed',
+			'missing-newline',
+			'extra-newline',
+			'multiple-records',
+			'nul'
+		];
+		const expectedFaults = new Set(
+			['clone', 'shortcut'].flatMap((caller) => uuidFaults.map((mode) => `${caller}:${mode}`))
+		);
+		const actualFaults = identity.faults.map((row) => `${row.caller}:${row.mode}`);
+		test(
+			'both callers reject failed or malformed native UUID receipts before any bundle or workspace allocation',
+			actualFaults.length === expectedFaults.size &&
+				new Set(actualFaults).size === expectedFaults.size &&
+				actualFaults.every((key) => expectedFaults.has(key)) &&
+				identity.faults.every(
+					(row) =>
+						row.status === (['nonzero', 'valid-nonzero'].includes(row.mode) ? 73 : 1) &&
+						row.uuid_calls === 1 &&
+						row.bundle_parent_created === false &&
+						row.workspace_created === false &&
+						row.owned_group_retired === true
+				),
+			identityRun.stdout
 		);
 	}
 	const shellEmission = spawnSync(

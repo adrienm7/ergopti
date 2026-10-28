@@ -1,5 +1,46 @@
 # apps/App Cloner.app/Contents/Resources/reserve_bundle.sh
 
+# A wall-clock second can be shared by independently reserved bundles. Keep
+# their native identity independent of their name and creation time.
+new_bundle_identifier() (
+	if [[ "$#" != "1" ]]; then
+		printf 'Error: one bundle identifier kind is required\n' >&2
+		return 1
+	fi
+	case "$1" in
+		clone|shortcut) ;;
+		*) printf 'Error: invalid bundle identifier kind\n' >&2; return 1 ;;
+	esac
+	local bundle_prefix='fr.b519hs'
+	# Validate bytes before command substitution can discard trailing newlines
+	# or NULs. A valid receipt cannot conceal a failed native generator.
+	set -o pipefail
+	{
+		if /usr/bin/uuidgen; then generator_status=0; else generator_status=$?; fi
+		printf '\0%s' "$generator_status"
+	} | /usr/bin/perl -e '
+		use strict;
+		use warnings;
+		my ($prefix, $kind) = @ARGV;
+		local $/;
+		my $framed = <STDIN>;
+		if (!defined($framed) || $framed !~ /\A(.*)\0([0-9]+)\z/s) {
+			print STDERR "Error: native bundle identifier status is unavailable\n";
+			exit 1;
+		}
+		my ($receipt, $status) = ($1, $2);
+		if ($status != 0) {
+			print STDERR "Error: native bundle identifier generation failed (exit=$status)\n";
+			exit $status;
+		}
+		if ($receipt !~ /\A([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\n\z/) {
+			print STDERR "Error: invalid native bundle identifier receipt\n";
+			exit 1;
+		}
+		print "$prefix.$kind.$1\n";
+	' "$bundle_prefix" "$1"
+)
+
 # Reserve a new bundle before any writer can touch its contents. A prior
 # existence check alone lets repeated or concurrent runs merge their bundles.
 reserve_bundle_directory() {

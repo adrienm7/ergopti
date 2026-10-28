@@ -517,4 +517,83 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 			}
 		}
 	}
+
+	func testActualNativeUUIDsKeepSameSecondBundlesAndCloneConsumersDistinct() throws {
+		try fixture { root in
+			let probe = Self.repositoryURL.appendingPathComponent("tools/test/lib/app-cloner-identity-probe.py")
+			let palette = Self.repositoryURL.appendingPathComponent("static/ergopti_plus/_shared/data/native_theme.toml")
+			fixtureCanRetire = false
+			let result = try run(["-c", #"exec /usr/bin/env python3 "$1" --resources "$2" --shell /bin/zsh --fixture "$3" --palette "$4""#,
+				"native-bundle-identity", probe.path, Self.resourcesURL.path,
+				root.appendingPathComponent("identity").path, palette.path], root: root)
+			let receipt = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.output.utf8)) as? [String: Any])
+			let owned = receipt["ownership_closed"] as? Bool == true
+			fixtureCanRetire = owned
+			XCTAssertTrue(owned, "Unknown native identity custody retains the exact fixture")
+			guard owned else { throw CocoaError(.executableRuntimeMismatch) }
+			XCTAssertEqual(result.status, 0, result.output + result.stderr)
+			XCTAssertTrue(result.stderr.isEmpty)
+			XCTAssertEqual(receipt["state"] as? String, "PASSED")
+			XCTAssertEqual(receipt["native_uuidgen"] as? String, "/usr/bin/uuidgen")
+			XCTAssertEqual(receipt["native_clone_scope"] as? String, "actual-zsh-profile-and-writers")
+			XCTAssertEqual(receipt["failures"] as? [String], [])
+			let pattern = #"\Afr\.b519hs\.(clone|shortcut)\.[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\z"#
+			let positive = try XCTUnwrap(receipt["positive"] as? [[String: Any]])
+			XCTAssertEqual(positive.count, 2)
+			XCTAssertEqual(Set(positive.compactMap { $0["caller"] as? String }), Set(["clone", "shortcut"]))
+			for row in positive {
+				let caller = try XCTUnwrap(row["caller"] as? String)
+				XCTAssertEqual(row["distinct_destinations"] as? Bool, true)
+				XCTAssertEqual(row["distinct_identifiers"] as? Bool, true)
+				XCTAssertEqual(row["distinct_profiles"] as? Bool, true)
+				let creations = try XCTUnwrap(row["creations"] as? [[String: Any]])
+				XCTAssertEqual(creations.count, 2)
+				let identifiers = try creations.map { try XCTUnwrap($0["identifier"] as? String) }
+				XCTAssertEqual(Set(identifiers).count, 2)
+				for creation in creations {
+					let identifier = try XCTUnwrap(creation["identifier"] as? String)
+					XCTAssertNotNil(identifier.range(of: pattern, options: .regularExpression))
+					XCTAssertTrue(identifier.hasPrefix("fr.b519hs." + caller + "."))
+					XCTAssertEqual(creation["uuid_calls"] as? Int, 1)
+					XCTAssertEqual(creation["workspace_retired"] as? Bool, true)
+					if caller == "clone" { XCTAssertEqual(creation["launcher_identifier"] as? String, identifier) }
+				}
+				if caller == "clone" {
+					XCTAssertEqual(Set(creations.compactMap { $0["profile"] as? String }).count, 2)
+					XCTAssertEqual(row["execution_scope"] as? String, "actual-zsh-clone-family/profile-prefix-and-actual-Info.plist/launcher-writers")
+				} else { XCTAssertEqual(row["execution_scope"] as? String, "actual-full-shortcut-generator") }
+			}
+			let kinds = try XCTUnwrap(receipt["helper_generations"] as? [String: [String]])
+			XCTAssertEqual(Set(kinds.keys), Set(["clone", "shortcut"]))
+			for (kind, identifiers) in kinds {
+				XCTAssertEqual(identifiers.count, 2)
+				XCTAssertEqual(Set(identifiers).count, 2)
+				for identifier in identifiers {
+					XCTAssertNotNil(identifier.range(of: pattern, options: .regularExpression))
+					XCTAssertTrue(identifier.hasPrefix("fr.b519hs." + kind + "."))
+				}
+			}
+			let admission = try XCTUnwrap(receipt["admission"] as? [[String: Any]])
+			XCTAssertEqual(admission.count, 3)
+			XCTAssertEqual(try admission.map { try XCTUnwrap($0["arguments"] as? [String]) }, [[], ["unknown"], ["clone", "extra"]])
+			for entry in admission {
+				XCTAssertEqual(entry["status"] as? Int, 1)
+				XCTAssertEqual(entry["uuid_calls"] as? Int, 0)
+			}
+			let modes = ["nonzero", "valid-nonzero", "empty", "malformed", "missing-newline", "extra-newline", "multiple-records", "nul"]
+			let expected = Set(["clone", "shortcut"].flatMap { caller in modes.map { caller + ":" + $0 } })
+			let faults = try XCTUnwrap(receipt["faults"] as? [[String: Any]])
+			let actual = try faults.map { try XCTUnwrap($0["caller"] as? String) + ":" + XCTUnwrap($0["mode"] as? String) }
+			XCTAssertEqual(faults.count, expected.count)
+			XCTAssertEqual(Set(actual), expected)
+			for fault in faults {
+				let mode = try XCTUnwrap(fault["mode"] as? String)
+				XCTAssertEqual(fault["status"] as? Int, ["nonzero", "valid-nonzero"].contains(mode) ? 73 : 1)
+				XCTAssertEqual(fault["uuid_calls"] as? Int, 1)
+				XCTAssertEqual(fault["bundle_parent_created"] as? Bool, false)
+				XCTAssertEqual(fault["workspace_created"] as? Bool, false)
+				XCTAssertEqual(fault["owned_group_retired"] as? Bool, true)
+			}
+		}
+	}
 }

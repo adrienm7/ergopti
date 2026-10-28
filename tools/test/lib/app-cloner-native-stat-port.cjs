@@ -1,6 +1,6 @@
 // tools/test/lib/app-cloner-native-stat-port.cjs
 
-/** Shared fixture for the App Cloner's native BSD stat command boundary. */
+/** Shared fixture for the App Cloner's native BSD stat and UUID command boundaries. */
 'use strict';
 
 const fs = require('node:fs');
@@ -51,15 +51,24 @@ print(f'{entry.st_dev}:{entry.st_ino}')
 	const statPort = path.join(fixtureRoot, 'native-stat-port');
 	fs.writeFileSync(statPort, '#!/bin/sh\nexec "$REAL_PYTHON" "$OWNED_STAT_QUERY" "$@"\n');
 	fs.chmodSync(statPort, 0o755);
+	const uuidgenPort = path.join(fixtureRoot, 'native-uuidgen-port');
+	fs.writeFileSync(
+		uuidgenPort,
+		'#!/bin/sh\n[ "$#" = 0 ] || exit 1\nexec "$REAL_PYTHON" -c \'import uuid; print(uuid.uuid4())\'\n'
+	);
+	fs.chmodSync(uuidgenPort, 0o755);
 	const source = fs.readFileSync(path.join(resources, 'reserve_bundle.sh'), 'utf8');
 	// Port only the command: real filesystem identity, guards and cleanup stay
 	// owned by the shipped source. Unexpected flags fail instead of falling back.
 	fs.writeFileSync(
 		path.join(portResources, 'reserve_bundle.sh'),
-		source.replaceAll('/usr/bin/stat', `'${toBashPath(statPort).replaceAll("'", "'\\''")}'`)
+		source
+			.replaceAll('/usr/bin/stat', `'${toBashPath(statPort).replaceAll("'", "'\\''")}'`)
+			.replaceAll('/usr/bin/uuidgen', `'${toBashPath(uuidgenPort).replaceAll("'", "'\\''")}'`)
 	);
 	return {
 		statQuery,
+		uuidgenPort,
 		portedCloneScript: path.join(portResources, 'clone_app.sh'),
 		portedShortcutScript: path.join(portResources, 'make_shortcut.sh')
 	};

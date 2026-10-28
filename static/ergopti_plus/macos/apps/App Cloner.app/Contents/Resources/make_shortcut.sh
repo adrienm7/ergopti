@@ -39,6 +39,11 @@ if [[ "$base" != *.app ]]; then
 else
   san="$base"
 fi
+UNIQUE_ID="$(new_bundle_identifier shortcut)" || {
+	identity_status=$?
+	printf 'Error: shortcut bundle identity generation failed\n' >&2
+	exit "$identity_status"
+}
 mkdir -p "$HOME/Desktop"
 initialize_bundle_creation
 trap cleanup_bundle_creation EXIT
@@ -96,7 +101,7 @@ cat > "$CONTENTS/Info.plist" <<PLIST
   <key>CFBundleExecutable</key>
   <string>open_target</string>
   <key>CFBundleIdentifier</key>
-  <string>fr.b519hs.shortcut.$(date +%s)</string>
+  <string>${UNIQUE_ID}</string>
   <key>CFBundleName</key>
   <string>${san%.app}</string>
   <key>CFBundleDisplayName</key>

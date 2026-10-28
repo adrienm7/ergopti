@@ -90,6 +90,12 @@ safe_name="$(printf '%s' "$CLONE_NAME" | tr ':/' '-' | sed -e 's/^[[:space:]]*//
 # Launcher generation needs Python; fail before reserving its destination.
 python3 -c 'import sys'
 
+UNIQUE_ID="$(new_bundle_identifier clone)" || {
+	identity_status=$?
+	printf 'Error: clone bundle identity generation failed\n' >&2
+	exit "$identity_status"
+}
+
 APPS_DIR="$HOME/Applications"
 mkdir -p "$APPS_DIR"
 initialize_bundle_creation
@@ -102,8 +108,6 @@ RES="$CONTENTS/Resources"
 mkdir -p "$MACOS" "$RES"
 
 TMPDIR_WORK=$(mktemp -d "/tmp/appcloner.XXXXXX")
-
-UNIQUE_ID="fr.b519hs.clone.$(date +%s)"
 
 # Resolve source app's main executable name once, up front — needed by both
 # the family-detection and the launcher generation.
