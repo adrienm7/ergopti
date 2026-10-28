@@ -461,7 +461,7 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 				return family + ":" + name
 			}).count, 36, "Every native app-family case must execute exactly once")
 			let expectedInputs = [
-				"empty": "", "folder": "/Users/fixture/project", "colon-file": "/Users/fixture/report:2026.txt",
+				"empty": "", "folder": "/fixture/project", "colon-file": "/fixture/report:2026.txt",
 				"tilde-file": "~/Documents", "https": "https://example.invalid/path?q=1", "http": "http://example.invalid/",
 				"teams-double": "msteams://l/chat/0", "teams-chat": "msteams:/l/chat/0", "teams-calendar": "msteams:/calendar",
 				"opaque": "mailto:fixture@example.invalid", "custom": "A+B.C-1:opaque", "non-scheme": "1invalid:filename"
