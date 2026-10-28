@@ -1,0 +1,4 @@
+[field-report] Reusing the running developer app: it was built from the current launcher.
+[field-report] Waiting for the developer app to publish its readiness...
+[field-report] Developer app ready (pid 3106); requesting every step within 4800 s.
+[field-report] The app did not accept the request within 60 s.

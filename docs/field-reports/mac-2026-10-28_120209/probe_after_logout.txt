@@ -1,0 +1,16 @@
+probe v5 after-logout
+P6 PASS after a logout, EPProbe sources still listed: none
+P10 PASS EPProbeKeep72040, enabled through the preferences before the logout (2026-10-28T10:51:54Z): selectCapable=true enableCapable=true enabled=true selected=false category=TISCategoryKeyboardInputSource type=TISTypeKeyboardLayout name='EPProbeKeep72040' id=org.unknown.keylayout.EPProbeKeep72040; fresh process: enabled=true selectCapable=true selected=false Q='K' id=org.unknown.keylayout.EPProbeKeep72040
+P10 PASS EPProbeKeep72040: select 0, current org.unknown.keylayout.EPProbeKeep72040, Q types 'K'
+P8 FAIL content of org.unknown.keylayout.EPProbeKeep72040 replaced in place (name EPProbeKeep72040, id -772049, Q typed 'K', now meant to type 'Y'), select away and back: away to com.apple.keylayout.French 0, back 0, current org.unknown.keylayout.EPProbeKeep72040, Q types 'K' here; fresh process: enabled=true selectCapable=true selected=true Q='K' id=org.unknown.keylayout.EPProbeKeep72040
+Keyboard Layouts: duplicate keyboard layout identifier -2605092.
+Keyboard Layouts: keyboard layout identifier -2605092 has been replaced with -28676.
+Keyboard Layouts: duplicate keyboard layout identifier -2605093.
+Keyboard Layouts: keyboard layout identifier -2605093 has been replaced with -28677.
+Keyboard Layouts: duplicate keyboard layout identifier -2605094.
+Keyboard Layouts: keyboard layout identifier -2605094 has been replaced with -28678.
+Keyboard Layouts: duplicate keyboard layout identifier -2605091.
+Keyboard Layouts: keyboard layout identifier -2605091 has been replaced with -28679.
+P8 PASS then registered again (status 0), select away and back: away to com.apple.keylayout.French 0, back 0, current org.unknown.keylayout.EPProbeKeep72040, Q types 'K' here; fresh process: enabled=true selectCapable=true selected=true Q='Y' id=org.unknown.keylayout.EPProbeKeep72040
+P8 INFO a. above: the kept loose layout, enabled since the login
+END INFO probe v5 after-logout: EPProbeKeep72040 removed (import status 0 (entries named EPProbeKeep72040 removed)), marker removed, current com.apple.keyboardlayout.ergopti.plus
