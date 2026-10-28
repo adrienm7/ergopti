@@ -17,9 +17,10 @@ Toutes les références à des numéros de ligne renvoient à
 
 Le **format sur disque** est exclusivement `data.sql`. SQLite reste
 utilisé en interne pour les performances, mais son fichier `.sqlite`
-vit dans le **tmpdir système** (`%TEMP%` Windows, `$TMPDIR` macOS), pas
-dans le dossier metrics. C'est un cache transparent, pas un artefact
-de configuration.
+vit dans un dossier de cache local (`%TEMP%` Windows,
+`~/Library/Caches/ergopti_plus/metrics/` macOS, dossier de données XDG
+Linux), pas dans le dossier metrics. C'est un cache transparent, pas un
+artefact de configuration.
 
 ```
 <config_dir>/metrics/                 ← dossier user-visible, syncable
@@ -32,7 +33,8 @@ de configuration.
                                         append-only texte SQL
       today.log                       ← LOCAL only, JSONL hot-path
 
-<tmpdir>/ergopti_metrics/             ← invisible utilisateur, jamais syncé
+<cache>/                              ← invisible utilisateur, jamais syncé
+                                        (macOS : ~/Library/Caches/ergopti_plus/metrics/)
   <device_id>/
     db.sqlite                         ← cache interne, recréé à la demande
     db.sqlite-journal                 ← rollback journal de SQLite
@@ -46,8 +48,11 @@ de configuration.
   « faut-il sync le binaire ».
 - Dossier `metrics/` lisible : l'utilisateur voit `device.json` et
   `data.sql`, c'est tout.
-- Si le tmpdir est wipé (reboot OS sur Windows / cleanup macOS), le
-  cache se reconstruit transparentement au prochain boot du keystats.
+- Si le cache disparaît (nettoyage du dossier temporaire sous Windows,
+  purge du dossier Caches macOS), il se reconstruit au prochain boot du
+  keystats, par étapes bornées qui ne bloquent pas la saisie. Sur macOS
+  il ne vit plus dans `$TMPDIR`, vidé à chaque redémarrage : un
+  redémarrage relisait tout le registre (320 Mo, 138 s le 2026-10-28).
 
 ### 1.2 `.gitignore` shippé out-of-the-box
 
@@ -98,14 +103,18 @@ un journal append-only par construction.
 
 Format détaillé en §15.5.
 
-### 1.7 `db.sqlite` (cache tmpdir, jamais syncé)
+### 1.7 `db.sqlite` (cache local, jamais syncé)
 
 Mode `journal_mode = DELETE`, `synchronous = FULL`. Single-writer (le
 keystats). Reconstruit depuis tous les `data.sql` (le local + ceux des
 autres devices) au premier démarrage ou si le watermark interne est en
 retard. Voir §15 pour le pipeline.
 
-Chemin : `<tmpdir>/ergopti_metrics/<device_id>/db.sqlite`.
+Chemin : `<cache>/<device_id>/db.sqlite`. Sur macOS `<cache>` vaut
+`~/Library/Caches/ergopti_plus/metrics` (`config_paths.metrics_cache_dir`,
+seule source) ; un cache laissé dans `$TMPDIR/ergopti_metrics/` par une
+version antérieure y est déplacé une fois au démarrage. Windows garde
+`%TEMP%\ergopti_metrics\`.
 
 Le keystats crée ce dossier au démarrage. Le sqlite cumule les données
 de TOUS les devices (le local et les autres trouvés sous

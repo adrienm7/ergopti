@@ -243,6 +243,7 @@ local function load_fixture(options)
 	package.loaded["infra.config_paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_eventtap_deferred" end,
 		metrics_dir = function() return "/tmp/ergopti_eventtap_deferred/metrics" end,
+		metrics_cache_dir = function() return "/tmp/ergopti_eventtap_deferred/cache" end,
 	}
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.dialog_util"] = { alert = function() end }

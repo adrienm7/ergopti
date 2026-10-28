@@ -189,7 +189,8 @@ local function partial_wpm_position(ctx)
 	write_home(ctx.home, ".config/ergopti_plus/metrics/by_device/e2e-wpm/device.json",
 		'{"device_id":"e2e-wpm","name":"E2E Mac","os":"darwin",'
 		.. '"host_signature":"fallback:unknown","created_at":"2024-01-01"}\n')
-	run("mkdir -p " .. q(ctx.root .. "/tmp/ergopti_metrics/e2e-wpm"))
+	-- The SQLite mirror lives in the persistent cache folder since L64.
+	run("mkdir -p " .. q(ctx.home .. "/Library/Caches/ergopti_plus/metrics/e2e-wpm"))
 end
 
 --- A configuration folder an older release left, with its config.toml from the

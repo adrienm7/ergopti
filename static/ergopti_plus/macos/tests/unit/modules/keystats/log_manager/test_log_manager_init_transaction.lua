@@ -169,7 +169,7 @@ helpers.describe("log_manager — initialization transaction", function()
 			}
 
 			lm = EmptyLedger.load(hs_overrides)
-			local state = { LOG_DIR = "/tmp/ergopti-log-manager-transaction" }
+			local state = { LOG_DIR = "/tmp/ergopti-log-manager-transaction", CACHE_DIR = "/tmp/ergopti-log-manager-transaction/cache" }
 			local first_call_ok, first_result = pcall(lm.init, state)
 			helpers.assert_true(first_call_ok,
 				"a post-publication dependency throw must be contained by M.init()")
