@@ -27,9 +27,10 @@ end
 local function isolated(scenario)
 	helpers.with_fresh_modules({ "modules.llm.local_servers", "modules.llm.api_remote" }, function()
 		local api = helpers.load_with_stubs("modules.llm.api_remote")
+		require("tests.support.modules.llm.backends.local_server_scan_fake").install(api)
 		local servers = require("modules.llm.local_servers")
 		local probes = {}
-		local clients = upvalue(api.detect_local_servers, "_local_probe_clients")
+		local clients = upvalue(api._probe_local_target, "_local_probe_clients")
 		for _, id in ipairs(servers.ORDER) do
 			clients[id] = { cancel = function() return true end, isSettled = function() return true end,
 				onSettled = function(callback) callback(); return true end, get = function(url, headers, callback)
@@ -37,9 +38,9 @@ local function isolated(scenario)
 				return true
 			end }
 		end
-		local crypto = upvalue(api.detect_local_servers, "TokenCrypto")
+		local crypto = upvalue(api._probe_local_target, "TokenCrypto")
 		local original_decrypt = crypto.decrypt_async
-		local http = upvalue(api.detect_local_servers, "_http_adapter")
+		local http = upvalue(api._probe_local_target, "_http_adapter")
 		local original_new = http.new
 		local ok, err = xpcall(function() scenario(api, servers, probes, crypto, clients, http) end, debug.traceback)
 		crypto.decrypt_async = original_decrypt

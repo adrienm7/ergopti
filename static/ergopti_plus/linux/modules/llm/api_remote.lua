@@ -364,6 +364,14 @@ function M.endpoint(entry, model)
 	local provider = M.provider(entry.provider)
 	if not provider then return nil, "unknown provider " .. tostring(entry.provider) end
 	local base_raw = (type(entry.base_url) == "string" and entry.base_url ~= "") and entry.base_url or provider.base_url
+	-- A local server entry at its catalogue address goes where the last scan
+	-- found the server (modules/llm/local_servers.lua); discovery loads that
+	-- module, so an unloaded one has no scan to follow
+	local Servers = package.loaded["modules.llm.local_servers"]
+	if base_raw == provider.base_url and type(Servers) == "table" and type(Servers.port_scan) == "function" then
+		local scan = Servers.port_scan(entry.provider)
+		if scan and scan.running and type(scan.base_url) == "string" then base_raw = scan.base_url end
+	end
 	local base, reason = M.normalize_base_url(base_raw)
 	if not base then return nil, reason end
 	local token = entry.token

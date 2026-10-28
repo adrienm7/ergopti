@@ -127,7 +127,7 @@ LLM_Menu_LocalServersPrepareShutdown() {
 
 class LLM_LocalServerPanel {
 	__New(Options := unset) {
-		global LLM_LOCAL_API_SERVERS, LLM_API_PROVIDER_ORDER
+		global LLM_LOCAL_API_SERVERS, LLM_API_PROVIDER_ORDER, LLM_LOCAL_SERVER_DISCOVERY
 		if !(LLM_LOCAL_API_SERVERS is Map) || LLM_LOCAL_API_SERVERS.Count == 0
 				|| !(LLM_API_PROVIDER_ORDER is Array)
 			throw Error("The local AI server catalogue is unavailable.")
@@ -144,6 +144,8 @@ class LLM_LocalServerPanel {
 		for Name in ["format", "notify", "build", "timer"]
 			if this.Options.Has(Name) && !HasMethod(this.Options[Name], "Call")
 				throw TypeError("Local server panel observer port must be callable.", -1, Name)
+		if this.Options.Has("port_scan") && !(this.Options["port_scan"] is LocalServerPortScan)
+			throw TypeError("Local server panel port scan must be a LocalServerPortScan.")
 		this.Source := this.Options.Get("source_owner", 0)
 		if (this.Source is Integer) && this.Source == 0
 			this.Source := LLM_Menu_ApiPrivateSourceOwner()
@@ -178,6 +180,10 @@ class LLM_LocalServerPanel {
 		Ports["max_age"] := (*) => TimingsGet("llm", "local_server_detection_max_age_ms")
 		Ports["on_publish"] := ObjBindMethod(this, "_Published")
 		Ports["on_error"] := ObjBindMethod(this, "_Error")
+		; A sweep first finds where each catalogue server runs (no process, no
+		; probe; its configured or listening port before the catalogue default)
+		Ports["scan_ports"] := ObjBindMethod(this.Options.Get("port_scan", LocalServerPortScan()), "Scan")
+		Ports["discovery"] := LLM_LOCAL_SERVER_DISCOVERY
 		if !(this.Models is LocalServerModelsOwner)
 			throw TypeError("Local server panel requires the owned native models transport.")
 		this.Native := this.Options.Get("native_owner", 0)
