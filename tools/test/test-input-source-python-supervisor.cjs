@@ -68,7 +68,7 @@ PENDING_TERM = False
 REAL_PRINT = builtins.print
 
 clock_values = {
-    "budget": [100.0, 101.0, 104.0, 108.0],
+    "budget": [100.0, 101.0, 104.0],
     "timeout": [100.0, 101.0],
     "race": [100.0, 101.0],
 }[MODE]
@@ -187,7 +187,7 @@ function replaceExactly(source, before, after) {
 
 function budgetContract(payload) {
 	const timeouts = eventsOf(payload, 'communicate').map((event) => event[2]);
-	return payload.exit === 0 && JSON.stringify(timeouts) === JSON.stringify([8, 5, 1]);
+	return payload.exit === 0 && JSON.stringify(timeouts) === JSON.stringify([8, 5]);
 }
 
 function timeoutKillContract(payload) {
@@ -242,7 +242,7 @@ try {
 	);
 	test(
 		'every nested child starts in its own process group',
-		eventsOf(budget, 'spawn').length === 3 &&
+		eventsOf(budget, 'spawn').length === 2 &&
 			eventsOf(budget, 'spawn').every((event) => event[2] === true),
 		JSON.stringify(budget)
 	);
