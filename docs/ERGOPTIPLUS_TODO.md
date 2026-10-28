@@ -32,6 +32,12 @@ a sealed Windows updater source, reseal with
 
 ## PC Windows todo (run by the agent on the Windows PC)
 
+For a field report, check out a branch and run
+`powershell -ExecutionPolicy Bypass -File tools/dev/collect-windows-field-report.ps1`. It creates
+`field/win-<today>-<branch>` derived from that branch, collects the system facts, today's logs and their
+digest, writes the report (with `base.txt` naming the base and commit) under `docs/field-reports/`, commits and
+pushes. The Linux PC runs `bash tools/dev/collect-linux-field-report.sh` the same way.
+
 Start from a fresh `dev` and work on a `fix/windows-pc-<date>` branch; build and run the AutoHotkey driver live
 on the PC; push the branch and say so, dev integration stays with the coordinator. Order:
 
