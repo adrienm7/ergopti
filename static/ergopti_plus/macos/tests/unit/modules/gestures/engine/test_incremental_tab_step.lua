@@ -12,7 +12,8 @@
 --- ROOT CAUSES ENCODED:
 --- 1. The step was one action every 5 units, far below a normal swipe's 15 to
 ---    45, and the first action needed a full step. The slot's default is now
----    50 per action, the first one after Geometry.INCREMENTAL_FIRST_STEP.
+---    25 per action, the first one after Geometry.INCREMENTAL_FIRST_STEP: the
+---    actions land at 4, 29, 54 and so on.
 --- 2. When the distance shrank below a step boundary (sd 39.78 after 8 steps,
 ---    4.91 after 1) the engine rebased its origin and step count on the current
 ---    point, so the next small move forward fired the same step again.
@@ -170,12 +171,16 @@ helpers.describe("a three-finger swipe switches one tab (three-finger-tab-step)"
 		assert_fires(swipe({ -4.9 }), 1, "tab_prev", "a short swipe must not be lost")
 	end)
 
-	helpers.it("a 45-unit swipe switches exactly one tab", function()
-		assert_fires(swipe({ 45 }), 1, "tab_next", "the longest normal swipe")
+	helpers.it("a 26-unit swipe switches exactly one tab", function()
+		assert_fires(swipe({ 26 }), 1, "tab_next", "a normal swipe below the second action")
 	end)
 
-	helpers.it("a very long 60-unit swipe switches two tabs", function()
-		assert_fires(swipe({ 60 }), 2, "tab_next", "a very long swipe")
+	helpers.it("a 32-unit swipe switches two tabs", function()
+		assert_fires(swipe({ 32 }), 2, "tab_next", "a long swipe past 29")
+	end)
+
+	helpers.it("a very long 60-unit swipe switches three tabs", function()
+		assert_fires(swipe({ 60 }), 3, "tab_next", "a very long swipe past 54")
 	end)
 end)
 
