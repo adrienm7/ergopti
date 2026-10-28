@@ -5,7 +5,7 @@
 # MODULE: macOS field report collector
 # DESCRIPTION:
 # One command for a maintainer session on a real Mac: it updates the field
-# branch from dev, gathers the evidence the coordinator reads (system and
+# branch from its base (dev unless it was derived from another branch), gathers the evidence the coordinator reads (system and
 # toolchain facts, the field run of the developer app, the input-source probe,
 # today's ErgoptiPlus logs and their digest), stores it under
 # docs/field-reports/, then commits and pushes the branch. The logs are
@@ -21,7 +21,9 @@
 # static/ergopti_plus/macos/data/field_run.json), waits for its done marker
 # until the request's own deadline plus a grace, and copies its results.
 #
-# USAGE:
+# USAGE (from any branch: outside a field/ branch the collector switches to
+# field/mac-<today>-<branch>, derived from that branch and created when
+# missing; base.txt in the report names the base and the commit):
 #   bash tools/dev/collect-macos-field-report.sh            update, collect, commit, push
 #   bash tools/dev/collect-macos-field-report.sh --no-push  same, without the push
 #
@@ -75,38 +77,62 @@ esac
 cd "${REPO_ROOT}" || fail "Cannot enter the repository root."
 git rev-parse --git-dir >/dev/null 2>&1 || fail "Not inside the Ergopti clone."
 
-branch="$(git branch --show-current)"
-case "${branch}" in
-	"${FIELD_BRANCH_PREFIX}"*) ;;
-	*) fail "Switch to your field branch first (git switch -c ${FIELD_BRANCH_PREFIX}mac-$(date +%Y-%m-%d)); current: '${branch:-detached}'." ;;
-esac
 [ -z "$(git status --porcelain --untracked-files=no)" ] || fail "Commit or discard the tracked changes first: the collector commits only its own folder."
+branch="$(git branch --show-current)"
+# The base is the branch the field branch derives from and is updated from on
+# every run; git config remembers it so later runs on the field branch keep it.
+case "${branch}" in
+	"${FIELD_BRANCH_PREFIX}"*)
+		base="$(git config --get "branch.${branch}.ergoptiFieldBase" || printf 'dev')"
+		;;
+	# From dev, main or any other branch (or a detached commit) the report goes
+	# to a new field branch derived from it, so a maintainer only has to run
+	# this script. Today's branch for the same base is reused when it exists.
+	*)
+		base="${branch:-$(git rev-parse --short HEAD)}"
+		branch="${FIELD_BRANCH_PREFIX}mac-$(date +%Y-%m-%d)-${base//\//-}"
+		if git rev-parse -q --verify "refs/heads/${branch}" >/dev/null; then
+			git switch -q "${branch}" || fail "Cannot switch to ${branch}."
+		else
+			git switch -q -c "${branch}" || fail "Cannot create ${branch}."
+		fi
+		git config "branch.${branch}.ergoptiFieldBase" "${base}" || fail "Cannot record the base of ${branch}."
+		log "Collecting on ${branch}, derived from ${base}."
+		;;
+esac
 
 # ===========================================
-# ======= 1/ Update from dev ================
+# ======= 1/ Update from the base ===========
 # ===========================================
 
-# A shallow clone (--depth 1) holds no common ancestor of dev and the field
-# branch, so a plain merge refuses "unrelated histories". Deepen both until the
-# merge base is known; full history is never downloaded.
-log "Fetching dev and bringing it into ${branch}..."
-depth=50
-while :; do
-	git fetch -q --depth "${depth}" origin dev || fail "git fetch of dev failed."
-	dev_head="$(git rev-parse FETCH_HEAD)" || fail "Cannot read the fetched dev head."
-	git merge-base HEAD "${dev_head}" >/dev/null 2>&1 && break
-	[ "${depth}" -lt 3200 ] || fail "No common history with dev within ${depth} commits; re-clone with --depth 1."
-	depth=$((depth * 4))
-done
-git merge --ff-only "${dev_head}" >/dev/null 2>&1 \
-	|| git merge --no-edit "${dev_head}" \
-	|| fail "Could not bring dev into ${branch}; resolve the merge and run again."
+# A shallow clone (--depth 1) holds no common ancestor of the base and the
+# field branch, so a plain merge refuses "unrelated histories". Deepen both
+# until the merge base is known; full history is never downloaded. A base that
+# is not a branch on origin (a local branch or a commit) is not updated.
+if git ls-remote --exit-code --heads origin "${base}" >/dev/null 2>&1; then
+	log "Fetching ${base} and bringing it into ${branch}..."
+	depth=50
+	while :; do
+		git fetch -q --depth "${depth}" origin "${base}" || fail "git fetch of ${base} failed."
+		base_head="$(git rev-parse FETCH_HEAD)" || fail "Cannot read the fetched ${base} head."
+		git merge-base HEAD "${base_head}" >/dev/null 2>&1 && break
+		[ "${depth}" -lt 3200 ] || fail "No common history with ${base} within ${depth} commits; re-clone with --depth 1."
+		depth=$((depth * 4))
+	done
+	git merge --ff-only "${base_head}" >/dev/null 2>&1 \
+		|| git merge --no-edit "${base_head}" \
+		|| fail "Could not bring ${base} into ${branch}; resolve the merge and run again."
+else
+	log "${base} is not a branch on origin: ${branch} is not updated."
+fi
 
 stamp="$(date +%Y-%m-%d_%H%M%S)"
 out="docs/field-reports/mac-${stamp}"
 mkdir -p "${out}" || fail "Cannot create ${out}."
 steps="${out}/steps.txt"
 : > "${steps}"
+# The coordinator reads which code the report ran on before anything else.
+printf 'field_branch: %s\nbase: %s\ncommit: %s\n' "${branch}" "${base}" "$(git rev-parse --short HEAD)" > "${out}/base.txt"
 # Set by the INT/TERM trap; the remaining evidence is still collected.
 interrupted=false
 finalized=false
@@ -182,7 +208,7 @@ finalize() {
 	log "Collected into ${out}:"
 	ls -1 "${out}" | sed 's/^/  /'
 	git add -f -- "${out}" || fail "git add of ${out} failed."
-	subject="docs(field): macOS field report ${stamp}"
+	subject="docs(field): macOS field report ${stamp} on ${base}"
 	"${interrupted}" && subject="${subject} (interrupted)"
 	git commit -q -m "${subject}" -- "${out}" || fail "git commit failed."
 	if [ "${push}" = true ]; then

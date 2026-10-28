@@ -56,10 +56,11 @@ passes the Windows CI lane (`gh workflow run ci.yml --ref <branch> -f os_lanes=w
 
 ## Mac todo (run by the agent on the Mac)
 
-Start from a fresh `dev` on a `field/mac-<date>` branch, then run the developer app
-(`bash tools/dev/run-macos-dev-app.sh`). Its managed Ollama is built locally from the repository pins and
-needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG, push the
-day logs to `docs/field-reports/mac-<date>/` on that branch and say so. Order:
+Check out `dev` (or the branch to test) and run `bash tools/dev/collect-macos-field-report.sh`. It creates
+`field/mac-<today>-<branch>` derived from that branch, runs the field checks in the developer app, writes the
+report (with `base.txt` naming the base and commit) under `docs/field-reports/`, commits and pushes. The
+developer app's managed Ollama is built locally from the repository pins and needs Go, the Xcode Command Line
+Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
 
 1. **v1.0.7 fixes to confirm:**
    - **Hotstrings (axa):** type `axa` and Space fast twenty times, also holding the `a` while pressing

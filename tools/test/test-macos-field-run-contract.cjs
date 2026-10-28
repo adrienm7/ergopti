@@ -86,8 +86,11 @@ const GIT_IDENTITY = {
 	GIT_CONFIG_NOSYSTEM: '1'
 };
 
-/** Builds a fixture clone on a field branch whose origin holds dev. */
-function fixture(name) {
+/**
+ * Builds a fixture clone whose origin holds dev, on a field branch unless
+ * `onDev` leaves it on dev.
+ */
+function fixture(name, { onDev = false } = {}) {
 	const base = path.join(scratch, name);
 	const clone = path.join(base, 'clone');
 	const origin = path.join(base, 'origin.git');
@@ -135,7 +138,7 @@ function fixture(name) {
 	spawnSync('git', ['init', '-q', '--bare', origin], { encoding: 'utf8', env });
 	run('remote', 'add', 'origin', `file://${origin}`);
 	run('push', '-q', 'origin', 'dev');
-	run('switch', '-q', '-c', 'field/mac-fixture');
+	if (!onDev) run('switch', '-q', '-c', 'field/mac-fixture');
 	shim(bin, 'uname', 'echo Darwin');
 	// The app is running: the collector must not try to start it
 	shim(bin, 'pgrep', 'exit 0');
@@ -641,6 +644,42 @@ function reportFolder(paths) {
 					const text = fs.readFileSync(path.join(folder, 'field_run.txt'), 'utf8');
 					assert.match(text, /published its readiness again/);
 					assert(fs.existsSync(path.join(folder, 'field_run', '01_field_lease.json')));
+				} finally {
+					driver.child.kill();
+				}
+			}
+		);
+
+		await check(
+			'started on dev, the collector reports on a field branch derived from dev and names its base',
+			async () => {
+				const paths = fixture('from-dev', { onDev: true });
+				const driver = startDriver(paths, 'done');
+				try {
+					await waitFor(driver.readyPath);
+					const devBefore = git(paths.clone, 'rev-parse', 'dev').trim();
+					const result = await runCollector(paths);
+					assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+					const today = git(
+						paths.clone,
+						'log',
+						'-1',
+						'--format=%cd',
+						'--date=format:%Y-%m-%d'
+					).trim();
+					const expected = `field/mac-${today}-dev`;
+					assert.equal(git(paths.clone, 'branch', '--show-current').trim(), expected);
+					assert.equal(git(paths.clone, 'rev-parse', 'dev').trim(), devBefore, 'dev must not move');
+					assert.equal(
+						git(paths.clone, 'config', '--get', `branch.${expected}.ergoptiFieldBase`),
+						'dev'
+					);
+					const folder = reportFolder(paths);
+					assert(fs.existsSync(path.join(folder, 'field_run', spec.files.done)));
+					assert.match(
+						fs.readFileSync(path.join(folder, 'base.txt'), 'utf8'),
+						/^field_branch: field\/mac-.*-dev\nbase: dev\ncommit: \w+\n$/
+					);
 				} finally {
 					driver.child.kill();
 				}
