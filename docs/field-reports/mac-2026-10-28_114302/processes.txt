@@ -1,0 +1,16 @@
+572 /Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon
+573 /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service
+693 /Library/SystemExtensions/9EFC2659-31E3-451D-8D2C-CE38E09D8183/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice.dext/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice org.pqrs.Karabiner-DriverKit-VirtualHIDDevice 0x1000011c0 org.pqrs.Karabiner-DriverKit-VirtualHIDDevice
+2113 /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-NotificationWindow.app/Contents/MacOS/Karabiner-NotificationWindow
+21732 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
+21801 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon
+21877 ErgoptiPlus --karabiner-lease-guardian
+57384 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus --karabiner-lease-worker /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli ergopti_mode_c9e98d33c40648cf8e12a2d4f064369b ergopti_revoked_c9e98d33c40648cf8e12a2d4f064369b 2 5
+57389 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus --karabiner-lease-inner /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli ergopti_mode_c9e98d33c40648cf8e12a2d4f064369b ergopti_revoked_c9e98d33c40648cf8e12a2d4f064369b 5.0 16777233 120698446
+65321 /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_console_user_server
+65322 /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_session_monitor
+65323 /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service
+70132 /Applications/Ollama.app/Contents/Resources/ollama serve
+76032 /Applications/Ollama.app/Contents/MacOS/Ollama
+77985 /Applications/oMLX.app/Contents/MacOS/oMLX
+77996 omlx-server ptr_munge= main_stack= executable_file=0x1a01000011,0x41d62a9 dyld_file=0x1a01000011,0xfffffff000a9547 executable_cdhash=3af32e98331491c46756a22efea3fabda03bb2f9 executable_boothash=e6b167276deed627ca09a870a78ecdcee6d200a6 th_port=
