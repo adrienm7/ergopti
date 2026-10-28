@@ -392,6 +392,7 @@ local function load_real_day_rollover(stall, ingest_error)
 	local lm = helpers.load_with_stubs("modules.keystats.log_manager", hs_overrides)
 	local initialized = lm.init({
 		LOG_DIR              = "/tmp/test_day_rollover",
+		CACHE_DIR            = "/tmp/test_day_rollover/cache",
 		buffer_events        = {},
 		buffer_text          = "",
 		rich_chunks          = {},

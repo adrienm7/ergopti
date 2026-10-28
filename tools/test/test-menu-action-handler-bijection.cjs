@@ -831,13 +831,18 @@ function nativeFunctionReferenceKeys(source) {
 		],
 		[
 			'layout_bundle_variant_add',
-			'input_sources.confirm_source_async(var.tis_id, {}, function(read, state)',
-			'Foreign.confirm_source_async(var.tis_id, {}, function(read, state)'
+			'input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)',
+			'Foreign.confirm_enabled_async(var.tis_id, {}, function(read, state)'
 		],
 		[
 			'layout_bundle_variant_add',
-			'input_sources.confirm_source_async(var.tis_id, {}, function(read, state)',
-			'input_sources.confirm_source_async(var.name, {}, function(read, state)'
+			'input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)',
+			'input_sources.confirm_source_async(var.tis_id, {}, function(read, state)'
+		],
+		[
+			'layout_bundle_variant_add',
+			'input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)',
+			'input_sources.confirm_enabled_async(var.name, {}, function(read, state)'
 		],
 		[
 			'layout_bundle_variant_add',

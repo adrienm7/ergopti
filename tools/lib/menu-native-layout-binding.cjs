@@ -502,20 +502,16 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 					!one(
 						build,
 						`add_sub[#add_sub + 1] = layout_declared_row("layout_bundle_variant_add", {
-					layout_enable_variant = function()
-						defer_tis_call(function()
-							enable_keylayout_source_async(var.keylayout, label,
-								function(ok)
+						layout_enable_variant = function()
+							defer_tis_call(function()
+								enable_keylayout_source_async(var.keylayout, label, function(ok)
 									if not ok then
 										pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error")
 										schedule_menu_refresh(update_menu)
 										return
 									end
-									-- The preference turns it on at once, but only a process started
-									-- after the write sees it (probe v5): Hammerspoon's list is stale.
-									input_sources.confirm_source_async(var.tis_id, {}, function(read, state)
+									input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)
 										if read and state.enabled == true then
-											-- macOS asks the user to allow a keyboard it has not seen before.
 											pcall(notifications.notify, string.format(i18n.get("menu.layout.add_consent"), label), nil, "success")
 										elseif read then
 											Logger.warn(LOG, "Layout '%s' is listed but not turned on (reason=not_enabled:macos_requires_logout).", label)
@@ -526,12 +522,12 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 										schedule_menu_refresh(update_menu)
 									end)
 								end)
-						end)
-					end,
-				}, {
-					layout_variant_label = function() return label end,
-					layout_bundle_version = function() return latest_str end,
-				})`
+							end)
+						end,
+					}, {
+						layout_variant_label = function() return label end,
+						layout_bundle_version = function() return latest_str end,
+					})`
 					)
 				)
 					return false;

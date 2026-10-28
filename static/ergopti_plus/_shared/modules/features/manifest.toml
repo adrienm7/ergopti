@@ -3547,11 +3547,16 @@ description_key = "menu.gestures.modes.swipe_5_right_up"
 # ===== 3.6.2 gestures.sensitivities =====
 # ========================================
 
-# Activation threshold per direction (travel distance in centimetres).
+# Distance per action of an incremental swipe, in touch-device units (the `sd`
+# the gesture log prints; a deliberate three-finger swipe on the built-in
+# trackpad travels about 15 to 45). The first action fires after
+# Geometry.INCREMENTAL_FIRST_STEP (4) or one step if that is shorter, and each
+# further action after one more step; an x1 slot ignores it.
 
-# Directions default to 3.5 cm of trackpad travel before firing, except the
-# three-finger vertical swipe (previous/next tab): at 3.5 cm it switched tabs
-# on almost any vertical drift, so it waits for 5 cm.
+# Directions default to 3.5, one action per short stretch (words, spaces),
+# except the three-finger vertical swipe (previous/next tab): with 5 a normal
+# swipe switched two or three tabs (19.84 gave 3 on 2026-10-28), so its step is
+# 25: up to 29 is one tab (a short 4.9 included), 29 to 54 two, 54 and more three.
 [[features.gestures.sensitivities]]
 id = "swipe_2_left"
 platforms = ["hs"]
@@ -3645,8 +3650,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_right"
 [[features.gestures.sensitivities]]
 id = "swipe_3_up"
 platforms = ["hs"]
-default = 5
-recommended = 5
+default = 25
+recommended = 25
 input_altering = false
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_up"
@@ -3654,8 +3659,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_up"
 [[features.gestures.sensitivities]]
 id = "swipe_3_down"
 platforms = ["hs"]
-default = 5
-recommended = 5
+default = 25
+recommended = 25
 input_altering = false
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_down"

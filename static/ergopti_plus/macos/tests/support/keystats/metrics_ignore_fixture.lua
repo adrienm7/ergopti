@@ -70,14 +70,14 @@ function M.run(callback)
 			context.files = require("adapters.file_system")
 			package.loaded["modules.keystats.sqlite_writer"] = { init = function(options)
 				context.cache_path = options.paths.sqlite_path
-				assert(context.cache_path:sub(1, #root + 5) == root .. "/tmp/", "cache escaped owned TMPDIR")
+				assert(context.cache_path:sub(1, #root + 7) == root .. "/cache/", "cache escaped the owned cache root")
 			end, open_db = function() return false end,
 				get_db = function() return nil end, close_db = function() return true end }
 			package.loaded["modules.keystats.aggregator"] = { init = function() end }
 			package.loaded["modules.keystats.export"] = { init = function() end, cleanup = function() return true end }
 			package.loaded["adapters.ledger_append"] = { recover = function() return true end, cleanup = function() return true end }
 			local manager = require("modules.keystats.log_manager")
-			context.init = function(metrics) return manager.init({ LOG_DIR = metrics or context.metrics }) end
+			context.init = function(metrics) return manager.init({ LOG_DIR = metrics or context.metrics, CACHE_DIR = root .. "/cache" }) end
 			local actual_open, actual_getenv, opened = io.open, os.getenv, {}
 			-- Bind only this process-local native port; preserve every other env
 			-- lookup and restore it before leaving either success or failure.
