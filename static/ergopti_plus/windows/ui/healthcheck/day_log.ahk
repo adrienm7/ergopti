@@ -208,12 +208,12 @@ HealthCheck_DayLogPrepare(Snapshot, Config, Context, Reader := 0) {
 	LoggerStart("HealthCheckDayLog", "Collecting today's log for the report…")
 	HealthCheck_DayLogDiscard(Snapshot)
 	Limits := Config["day_log"]
-	File := (Reader is Func) ? Reader.Call(Limits["max_bytes"]) : _DayLog_ReadToday(Limits["max_bytes"])
-	if !File["found"] {
+	DayLog := (Reader is Func) ? Reader.Call(Limits["max_bytes"]) : _DayLog_ReadToday(Limits["max_bytes"])
+	if !DayLog["found"] {
 		LoggerWarn("HealthCheckDayLog", "Today's log does not exist yet; nothing to attach.")
 		return _DayLog_Reply(Map("ok", false, "reason", "missing"))
 	}
-	Result := DayLog_Collect(File["text"], File["size"], Config["redaction"], Context, Limits)
+	Result := DayLog_Collect(DayLog["text"], DayLog["size"], Config["redaction"], Context, Limits)
 	if !Result["ok"] {
 		LoggerWarn("HealthCheckDayLog", "Today's log is not attachable: {1} ({2} of {3} bytes).",
 			Result["reason"], Result["bytes"], Result["cap_bytes"])
