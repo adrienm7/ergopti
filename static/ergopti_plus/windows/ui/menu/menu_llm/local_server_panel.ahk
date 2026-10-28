@@ -325,12 +325,12 @@ class LLM_LocalServerPanel {
 
 	_ActiveSnapshot(Snapshot) {
 		global _LLM_Menu
-		Menu := _LLM_Menu
-		if !(Menu is Map)
+		LlmMenu := _LLM_Menu
+		if !(LlmMenu is Map)
 			return false
-		Snapshot["backend"] := Menu.Get("backend", "")
-		Snapshot["menu_owner"] := Menu
-		EntryId := Menu.Get("api_entry_id", "")
+		Snapshot["backend"] := LlmMenu.Get("backend", "")
+		Snapshot["menu_owner"] := LlmMenu
+		EntryId := LlmMenu.Get("api_entry_id", "")
 		Snapshot["active_id"] := EntryId
 		Snapshot["entry_ids"] := Map()
 		for Id in this.Order {

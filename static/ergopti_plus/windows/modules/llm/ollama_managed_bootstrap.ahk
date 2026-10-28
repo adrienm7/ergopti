@@ -388,9 +388,9 @@ class OllamaManagedBootstrap {
 				|| !(Expected is Map) || !(Expected.Get("bytes", 0) is Buffer)
 				|| Expected.Get("path", "") != Source["path"] || IsObject(this.EnableHandoff)
 			return 0
-		Menu := this.MenuIntent.Clone()
-		Menu["enabled"] := true
-		Token := Map("source", Expected, "menu", Menu, "generation", this.AuxGeneration)
+		MenuIntent := this.MenuIntent.Clone()
+		MenuIntent["enabled"] := true
+		Token := Map("source", Expected, "menu", MenuIntent, "generation", this.AuxGeneration)
 		this.EnableHandoff := Token
 		return Token
 	}
@@ -400,12 +400,12 @@ class OllamaManagedBootstrap {
 				|| !this._Current()
 			return false
 		if this.Port is Map
-			Source := this.Port["read_source"].Call(), Menu := this.Port["menu_intent"].Call()
+			Source := this.Port["read_source"].Call(), MenuIntent := this.Port["menu_intent"].Call()
 		else {
 			global _LLM_Menu
-			Source := _LLM_Menu_EnableReadSource(), Menu := _LLM_Menu
+			Source := _LLM_Menu_EnableReadSource(), MenuIntent := _LLM_Menu
 		}
-		if !_LLM_Menu_EnableSourceMatches(Token["source"], Source) || !this._IntentMatches(Token["menu"], Menu)
+		if !_LLM_Menu_EnableSourceMatches(Token["source"], Source) || !this._IntentMatches(Token["menu"], MenuIntent)
 			return false
 		this.Source := Token["source"]
 		this.MenuIntent := Token["menu"]

@@ -447,14 +447,14 @@ _HealthCheck_Peripherals(Detailed) {
 		throw OSError(A_LastError, -1, "GetRawInputDeviceList")
 	Loop Count {
 		Offset := (A_Index - 1) * Size
-		Type := NumGet(List, Offset + A_PtrSize, "UInt")
+		DeviceType := NumGet(List, Offset + A_PtrSize, "UInt")
 		; 0 = mouse, 1 = keyboard; generic HID devices are neither
-		if (Type > 1)
+		if (DeviceType > 1)
 			continue
 		Path := _HealthCheck_RawInputName(NumGet(List, Offset, "Ptr"))
 		if (Path == "")
 			continue
-		Item := Map("bus", _HealthCheck_DeviceBus(Path), "kind", (Type = 1) ? "keyboard" : "mouse")
+		Item := Map("bus", _HealthCheck_DeviceBus(Path), "kind", (DeviceType = 1) ? "keyboard" : "mouse")
 		if RegExMatch(Path, "i)VID_([0-9A-F]{4})", &Vid)
 			Item["vendor_id"] := StrLower(Vid[1])
 		if RegExMatch(Path, "i)PID_([0-9A-F]{4})", &Pid)
@@ -532,15 +532,15 @@ _HealthCheck_ReadTail(Path, MaxBytes) {
 		return 0
 	; UTF-8-RAW: positions are bytes and no byte order mark is skipped, so the
 	; offset below is exact and the parser sees the file as written
-	File := FileOpen(Path, "r", "UTF-8-RAW")
+	Handle := FileOpen(Path, "r", "UTF-8-RAW")
 	try {
-		Size := File.Length
+		Size := Handle.Length
 		Start := Max(0, Size - MaxBytes)
-		File.Pos := Start
+		Handle.Pos := Start
 		Bytes := Buffer(Max(1, Size - Start))
-		Read := File.RawRead(Bytes, Size - Start)
+		Read := Handle.RawRead(Bytes, Size - Start)
 	} finally {
-		File.Close()
+		Handle.Close()
 	}
 	return Map("chunk", _HealthCheck_DecodeTail(Bytes, Read), "at_file_start", Start == 0)
 }

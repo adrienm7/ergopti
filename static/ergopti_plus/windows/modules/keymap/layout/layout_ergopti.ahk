@@ -289,7 +289,7 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
 	PlusLevels := KeylayoutTables_Levels(PlusModel, KeyCodes)
 
 	DeadKeys := Map()
-	Terminators := Map()
+	TerminatorMap := Map()
 	for State, Dead in Tables["DeadKeys"] {
 		if !ERGOPTI_DEAD_KEY_NAMES.Has(State)
 			throw ValueError("The Ergopti .keylayout has a dead key the emulation does not name.", -1, State)
@@ -306,7 +306,7 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
 			for Input, Output in DeadKeyDeviations[Name]
 				Table[Input] := Output
 		DeadKeys[Name] := Table
-		Terminators[Name] := Dead["Terminator"]
+		TerminatorMap[Name] := Dead["Terminator"]
 	}
 	for Name in DeadKeyDeviations
 		if !DeadKeys.Has(Name)
@@ -387,7 +387,7 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
 			Spec[Table][Sc] := Descriptor.Clone()
 		}
 	}
-	return Map("levels", Spec, "dead_keys", DeadKeys, "terminators", Terminators,
+	return Map("levels", Spec, "dead_keys", DeadKeys, "terminators", TerminatorMap,
 		"number_row_base", BaseNumberRow)
 }
 

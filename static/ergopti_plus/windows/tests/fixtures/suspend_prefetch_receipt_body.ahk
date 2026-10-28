@@ -228,8 +228,8 @@ try {
 	_LCPC_Main()
 	FileAppend("PASS suspend-prefetch " . A_Args[1] . " " . A_Args[2] . "`n", "*")
 	ExitApp(0)
-} catch as Failure {
-	FileAppend("FAIL suspend-prefetch type=" . Type(Failure) . " line=" . Failure.Line
-		. " reason=" . Failure.Message . "`n", "*")
+} catch as TopLevelFailure {
+	FileAppend("FAIL suspend-prefetch type=" . Type(TopLevelFailure) . " line=" . TopLevelFailure.Line
+		. " reason=" . TopLevelFailure.Message . "`n", "*")
 	ExitApp(1)
 }

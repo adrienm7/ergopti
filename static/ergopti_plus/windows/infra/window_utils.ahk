@@ -105,8 +105,8 @@ _AltTabCycle(MonitorNum, Label) {
 			; Skip windows with no title — often tooltips, overlays, or hidden UI
 			; elements, windows shown during drag operations, and file-operation dialogs
 			; Cache the title once to avoid a TOCTOU race if the window title changes between calls
-			WindowTitle := WinGetTitle(WindowId)
-			if WindowTitle == "" or WindowTitle == "Drag" or WinGetClass(WindowId) == "OperationStatusWindow" {
+			TargetTitle := WinGetTitle(WindowId)
+			if TargetTitle == "" or TargetTitle == "Drag" or WinGetClass(WindowId) == "OperationStatusWindow" {
 				continue
 			}
 

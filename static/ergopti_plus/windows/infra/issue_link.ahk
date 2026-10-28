@@ -155,7 +155,7 @@ IssueLink_BuildUrl(Templates, Repository, TemplateId, Values, Notes := 0) {
 	if !(Repository is Map) || Repository.Get("owner", "") == "" || Repository.Get("repo", "") == ""
 		throw ValueError("issue_link: the repository needs an owner and a repo.")
 	Template := Templates["templates"][TemplateId]
-	Max := Templates["max_url_bytes"]
+	MaxUrlBytes := Templates["max_url_bytes"]
 	Marker := Templates["truncation_marker"]
 	Base := Templates["issue_new_url"]
 	if !InStr(Base, "{owner}", true) || !InStr(Base, "{repo}", true)
@@ -175,7 +175,7 @@ IssueLink_BuildUrl(Templates, Repository, TemplateId, Values, Notes := 0) {
 
 	Index := Params.Length
 	while (Index >= 2) {
-		Over := StrLen(_IssueLink_JoinUrl(Base, Params)) - Max
+		Over := StrLen(_IssueLink_JoinUrl(Base, Params)) - MaxUrlBytes
 		if (Over <= 0)
 			break
 		Note := (Notes is Map) ? Notes.Get(Params[Index][1], "") : ""
@@ -192,7 +192,7 @@ IssueLink_BuildUrl(Templates, Repository, TemplateId, Values, Notes := 0) {
 	}
 
 	Url := _IssueLink_JoinUrl(Base, Params)
-	if (StrLen(Url) > Max)
-		throw Error("issue_link: " . StrLen(Url) . " bytes left after every cut, budget " . Max . ".")
+	if (StrLen(Url) > MaxUrlBytes)
+		throw Error("issue_link: " . StrLen(Url) . " bytes left after every cut, budget " . MaxUrlBytes . ".")
 	return Url
 }

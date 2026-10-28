@@ -795,9 +795,9 @@ _DigitRowBuiltinLevels(Sc, Caps) {
 	PlainTable := Caps ? Levels["caps"] : ERGOPTI_SPEC["number_row_base"]
 	if !PlainTable.Has(Name) || !Levels["shift"].Has(Name)
 		return 0
-	Terminators := ERGOPTI_SPEC["terminators"]
-	return Map("plain", _DigitRowBuiltinDescriptor(PlainTable[Name], Terminators),
-		"shift", _DigitRowBuiltinDescriptor(Levels["shift"][Name], Terminators))
+	SpecTerminators := ERGOPTI_SPEC["terminators"]
+	return Map("plain", _DigitRowBuiltinDescriptor(PlainTable[Name], SpecTerminators),
+		"shift", _DigitRowBuiltinDescriptor(Levels["shift"][Name], SpecTerminators))
 }
 
 ; A built-in Ergopti descriptor (_ErgoptiDescribe) in the registry shape. The
