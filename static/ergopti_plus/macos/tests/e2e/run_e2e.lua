@@ -34,11 +34,28 @@
 -- ---------------------------------------------------------------------------
 local self_path = debug.getinfo(1, "S").source
 assert(self_path:sub(1, 1) == "@", "the E2E runner needs its native source file")
-local native_path, root_error = require("luv").fs_realpath(self_path:sub(2))
-assert(type(native_path) == "string" and native_path ~= "", root_error or "the E2E source path is unavailable")
-if package.config:sub(1, 1) == "\\" then native_path = native_path:gsub("\\", "/") end
-local driver_root = assert(native_path:match("^(.*)/tests/e2e/run_e2e%.lua$"),
+local entry_path = self_path:sub(2)
+if entry_path:sub(1, 1) ~= "/" then entry_path = "./" .. entry_path end
+local driver_root = assert(entry_path:match("^(.*)/tests/e2e/run_e2e%.lua$"),
 	"the E2E source path must belong to its driver root")
+
+-- This standalone replay needs only standard Lua, including on its CI host.
+-- Load the existing pure-Lua quoting owner before canonicalizing the directory.
+local bootstrap_lua = driver_root .. "/../_shared/lua"
+package.path = bootstrap_lua .. "/?.lua;" .. bootstrap_lua .. "/?/init.lua;" .. package.path
+local shell_quote = require("text_utils").shell_quote
+local pipe = assert(io.popen("CDPATH= cd -P -- " .. shell_quote(driver_root) .. " && pwd -P", "r"))
+local read = table.pack(pcall(pipe.read, pipe, "*a"))
+local closed = table.pack(pcall(pipe.close, pipe))
+assert(read[1], read[2])
+assert(type(read[2]) == "string", read[3] or "the E2E root could not be read")
+assert(closed[1], closed[2])
+assert(closed[2] == true,
+	"the E2E root command did not complete: " .. tostring(closed[3]) .. " " .. tostring(closed[4]))
+assert(read[2]:sub(-1) == "\n", "the E2E root command did not publish its terminating newline")
+-- Remove only pwd's protocol byte; every preceding byte belongs to the path.
+driver_root = read[2]:sub(1, -2)
+assert(driver_root:sub(1, 1) == "/", "the E2E root must be an absolute POSIX directory")
 
 local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
 -- Single shared-tree root for this bootstrap harness; everything below derives
