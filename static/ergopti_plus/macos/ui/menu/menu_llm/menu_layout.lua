@@ -49,7 +49,6 @@ local PLATFORM = "hs"
 --- only so a missing/corrupt manifest still yields a correctly-greyed menu.
 --- false = stays usable while OFF (configure before enabling); true = greyed while OFF.
 local FALLBACK_GREYS_WHEN_OFF = {
-	llm_backend             = false,
 	llm_model               = false,
 	llm_profile             = true,
 	llm_trigger             = true,
@@ -61,7 +60,6 @@ local FALLBACK_GREYS_WHEN_OFF = {
 --- Built-in fallback — mirrors which row carries the backend-health dot. Same
 --- role as FALLBACK_GREYS_WHEN_OFF above, and pinned the same way.
 local FALLBACK_HEALTH_DOT = {
-	llm_backend             = false,
 	llm_model               = true,
 	llm_profile             = false,
 	llm_trigger             = false,

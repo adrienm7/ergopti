@@ -680,6 +680,18 @@ helpers.describe("menu certification: no empty submenu", function()
 end)
 
 
+--- The model selector button, at any depth: its title starts with the API
+--- emoji of the shared brand table (the full context selects the API backend).
+local function selector_button(items)
+	local emoji = require("modules.llm.backend_brands").emoji("api")
+	for _, item in ipairs(items or {}) do
+		if type(item.title) == "string" and item.title:sub(1, #emoji) == emoji then return item end
+		local nested = selector_button(item.menu)
+		if nested then return nested end
+	end
+	return nil
+end
+
 helpers.describe("menu certification: actual API context reachability", function()
 
 	helpers.it("reaches the genuine provider children without running mutation callbacks", function()
@@ -692,19 +704,23 @@ helpers.describe("menu certification: actual API context reachability", function
 			local menu = mb.build(context)
 			local remote = require("modules.llm.api_remote")
 			local entries = require("modules.llm.api_entries")
-			local add = find_item(menu, i18n.get("menu.llm.api_add_entry"))
-			helpers.assert_not_nil(add, "the complete context must reach the real API provider group")
-			helpers.assert_type(add.menu, "table")
+			-- model-selector-page: the tray holds the one button; the providers
+			-- an entry is added for are the page's.
+			helpers.assert_nil(find_item(menu, i18n.get("menu.llm.api_add_entry")), "the tray lists no API provider")
+			helpers.assert_not_nil(selector_button(menu), "the complete context must reach the model selector button")
+			local page = require("ui.menu.llm_backend_rows").api_page(context.llm,
+				{ prompt = function() end, error = function() end, info = function() end, confirm = function() end },
+				function() end, { paused = false, is_paused = function() return false end })
 			local providers = remote.providers()
 			helpers.assert_true(#providers >= 16, "the actual shipped cloud catalogue must be reached")
-			helpers.assert_eq(#add.menu, #providers)
+			helpers.assert_eq(#page.providers, #providers)
 			for index, provider in ipairs(providers) do
-				helpers.assert_eq(add.menu[index].title, "➕ " .. provider.label)
-				helpers.assert_type(add.menu[index].fn, "function")
+				helpers.assert_eq(page.providers[index].label, provider.label)
+				helpers.assert_type(page.providers[index].run, "function")
 			end
-			helpers.assert_eq(add.menu[1].title, "➕ OpenAI")
-			helpers.assert_eq(add.menu[2].title, "➕ Anthropic")
-			helpers.assert_eq(add.menu[3].title, "➕ Google Gemini")
+			helpers.assert_eq(page.providers[1].label, "OpenAI")
+			helpers.assert_eq(page.providers[2].label, "Anthropic")
+			helpers.assert_eq(page.providers[3].label, "Google Gemini")
 			helpers.assert_true(rawequal(remote, package.loaded["modules.llm.api_remote"]))
 			helpers.assert_true(rawequal(entries, package.loaded["modules.llm.api_entries"]))
 			helpers.assert_eq(mutations, 0, "building the whole tray must not change the runtime backend")
@@ -740,14 +756,14 @@ helpers.describe("menu certification: private API source lifecycle", function()
 					rawset(package.loaded, name, expected[name])
 				end
 				local menu = build_full_menu(full_context())
-				helpers.assert_not_nil(find_item(menu, i18n.get("menu.llm.api_add_entry")))
+				helpers.assert_not_nil(selector_button(menu))
 				local private_path
 				local succeeded, raised = pcall(function()
 					with_api_source(function(builder, entries, path)
 						private_path = path
 						helpers.assert_eq(entries.path(), path)
 						helpers.assert_eq(#entries.list(), 0)
-						helpers.assert_not_nil(find_item(builder.build(full_context()), i18n.get("menu.llm.api_add_entry")))
+						helpers.assert_not_nil(selector_button(builder.build(full_context())))
 						error("private API scope sentinel")
 					end)
 				end)

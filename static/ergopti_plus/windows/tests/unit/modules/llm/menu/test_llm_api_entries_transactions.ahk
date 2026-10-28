@@ -665,43 +665,30 @@ Test("LLM API entries: unique candidate ids mutate exactly one row "
 	. "(api-entry-identity-cardinality)",
 	_LMT_UniqueApiCandidatesMutateExactlyOneRow)
 
-_LMT_SharedApiActiveCommandRows() {
-	global _LLM_Menu, _SharedDir
-	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\api_active_commands.json"))
-	Assert(Corpus is Map, "the independent active API commands corpus must be readable")
-	Root := _MM_GetManifestRoot()
-	Assert(Root is Map, "the real shared menu must be present")
-	Declarations := Root[Corpus["section"]]
-	AssertEqual(2, Declarations.Length)
-	SavedTestKey := Declarations[1]["i18n"]
+_LMT_SelectorPageActiveCommands() {
+	global _LLM_Menu
 	Previous := _LMT_InstallFixture()
 	try {
 		_LLM_Menu["api_entries"] := [_LMT_ApiEntry("active")]
 		_LLM_Menu["api_entry_id"] := "active"
-		Declarations[1]["i18n"] := "button.cancel"
-		Rows := _LLM_Menu_ApiEntriesRows()
-		AssertEqual(t("button.cancel"), Rows[Rows.Length - 2]["label"],
-			"the actual provider reads the canonical Test caption")
-		AssertEqual(t("menu.llm.api_edit_entry"), Rows[Rows.Length - 1]["label"],
-			"the existing native Edit action stays immediately before removal")
-		AssertEqual(t(Corpus["rows"][2]["i18n"]), Rows[Rows.Length]["label"])
-		for Index, Expected in Corpus["rows"] {
-			AssertEqual(Expected["id"], Declarations[Index]["id"])
-			AssertEqual(Corpus["ready"], Declarations[Index]["disabled_when"][1])
-		}
-		HeldTest := Rows[Rows.Length - 2]["action"]
-		HeldRemove := Rows[Rows.Length]["action"]
+		Rows := Map(), Models := []
+		_LLM_Menu_ApiEntryPageRows(Rows, Models)
+		AssertEqual(1, Models.Length, "the active entry is one page row")
+		for Key, Row in Rows
+			Entry := Row
+		for Id in ["test", "edit", "remove"]
+			Assert(Entry["row_actions"].Has(Id), "the active entry row offers " . Id)
+		AssertContains(Models[1], t("menu.llm.api_edit_entry"), "Edit keeps its caption")
+		HeldTest := Entry["row_actions"]["test"]
+		HeldRemove := Entry["row_actions"]["remove"]
 		_LLM_Menu["api_entry_id"] := ""
 		AssertEqual(false, HeldTest.Call(), "a revoked active owner cannot acquire a test request")
 		AssertEqual(false, HeldRemove.Call(), "a revoked active owner cannot open the removal dialog")
 		AssertEqual(1, _LLM_Menu["api_entries"].Length)
-	} finally {
-		Declarations[1]["i18n"] := SavedTestKey
-		_LMT_RestoreFixture(Previous)
-	}
+	} finally _LMT_RestoreFixture(Previous)
 }
-Test("LLM API: actual shared active commands preserve Edit and refuse revoked owners",
-	_LMT_SharedApiActiveCommandRows)
+Test("LLM API: selector page active-entry actions keep Edit and refuse revoked owners",
+	_LMT_SelectorPageActiveCommands)
 
 ; Only the unrelated collector/JSON ports are controlled; configuration rendering
 ; and both WAL filesystem targets use their actual production implementations.

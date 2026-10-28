@@ -28,7 +28,7 @@ local OWNED_MODULES = {
 	"ui.menu.menu_llm.backend_panel",
 	"ui.menu.menu_llm.trigger_panel",
 	"ui.menu.menu_llm.api_panel",
-	"ui.menu.menu_llm.models_selector",
+	"ui.menu.menu_llm.model_selector_page",
 	"ui.menu.menu_llm.model_switcher",
 	"modules.llm.api_mlx",
 	"ui.menu.menu_llm.startup_controller",
@@ -368,12 +368,17 @@ local function build_fixture(backend, save_results, options)
 	package.loaded["ui.menu.menu_llm.trigger_panel"] = { build = function() return {} end }
 	package.loaded["ui.menu.menu_llm.api_panel"] = {
 		build = function() return nil, nil end,
-		build_model_picker = function() return {} end,
+		active_entry_caption_text = function() return nil end,
 	}
-	package.loaded["ui.menu.menu_llm.models_selector"] = {
-		build = function(ctx)
-			calls.models_selector_ctx = ctx
-			return {}
+	-- The menu binds the model selector page's context; the page builds no rows.
+	package.loaded["ui.menu.menu_llm.model_selector_page"] = {
+		bind = function(ctx) calls.model_selector_page_ctx = ctx end,
+		caption = function() return "model" end,
+		refresh = function() return false end,
+		open = function() return true end,
+		-- The page owner selects a server through the engine panel's selection.
+		use_local_server = function(id, model, on_selected)
+			return package.loaded["ui.menu.menu_llm.local_server_panel"].use_server(id, model, on_selected)
 		end,
 	}
 	if options.real_switcher then

@@ -338,6 +338,30 @@ From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their bu
   Mac confirms: a sleep with a key held logs only the INFO line; an orphan key-up WARNING without a
   sleep names the next lead.
 
+### Model selector page on tmp/wip-model-selector-page (to land on dev)
+
+- **MS1** Maintainer decision of 2026-10-27: the AI menu lists no model any more. One button,
+  "<emoji> <model>" ("🦙 qwen3:4b", "🚀 Qwen3-4B", "🌐 OpenAI/gpt-4o-mini"), opens the model
+  browser page, which became the selector: one table grouped and filterable by backend (Ollama,
+  MLX, API), where the user picks the model and its backend together, downloads or deletes a
+  local model, adds a custom one (validated against
+  `_shared/tests/corpus/llm/model_identifiers.json`), and adds, tests or removes an API entry.
+  The Backend chooser, the model list, the API entries and the custom-model dialog left the
+  tray on all three OS. The emojis come from `_shared/modules/llm/backends.json`. A row that
+  cannot work right now is greyed with its reason: MLX on Windows, Linux or an Intel Mac or
+  with its runtime absent or broken, Ollama with its install failed, an API entry without the
+  key its endpoint requires, a read-only config.toml. A model that is not downloaded offers the
+  download, never the activation. Known gaps: progress is a "downloading" status, not a
+  percentage; Windows and Linux list only the configured model of an API entry (macOS lists
+  the provider's /v1/models); Linux has no Ollama install state, so its Ollama group is never
+  greyed. Mac confirms: the AI menu shows one button with the emoji and the model; the page
+  opens from it and from the toggle shortcut before the AI menu was ever opened; choosing an
+  MLX model while Ollama is active switches the backend; a model not downloaded offers only
+  the download; an API entry without a key is greyed and offers its key; the menu rebuild
+  feels faster. PC confirms: the same button; the page lists the Ollama catalogue and the
+  installed tags, greys MLX with its reason, adds an Ollama model by name and pulls it with
+  the usual progress window; an API entry without a key is greyed with Edit offered.
+
 ### Open TODO
 
 - **L46** [CODE][PHYS-M] Two-finger scrolls switched tabs through the vertical three-finger swipe

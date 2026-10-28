@@ -413,7 +413,8 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			end
 		end
 		if llm_committed then
-			local backend_labels = { mlx = "MLX 🚀", ollama = "Ollama 🦙", api = "API 🌐" }
+			local BackendLabels = require("ui.menu.menu_llm.backend_labels")
+			local backend_labels = { mlx = BackendLabels.brand("mlx"), ollama = BackendLabels.brand("ollama"), api = BackendLabels.brand("api") }
 			local map = {
 			{ fn = "set_preview_ai_enabled",          val = state.preview_ai_enabled },
 			{ fn = "set_llm_after_hotstring",         val = state.llm_after_hotstring },

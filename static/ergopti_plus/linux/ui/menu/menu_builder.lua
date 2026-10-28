@@ -3012,124 +3012,74 @@ local function _build_llm(ctx)
 		return { items = child_rows, disabled = not enabled or nil }
 	end
 
-	-- The models this machine actually has. A `list`, because the rows are
-	-- whatever Ollama reports and no static entry can enumerate them.
-	local function ollama_model_rows()
-		if type(llm.get_models) ~= "function" then return {} end
-		-- With the AI off no tray build may ask Ollama for its models: the
-		-- inventory GET (/api/tags) is a probe, and the AI is inert until the
-		-- switch-on, as on Windows and macOS (ai-off-inert-linux-2026-10-22)
-		local ai_on = type(llm.is_enabled) == "function" and llm.is_enabled() == true
-		local models = ai_on and llm.get_models() or {}
-		if type(models) ~= "table" then return {} end
-		local current = llm.get_current_model and llm.get_current_model() or nil
-		local function changed()
+	-- The dialogs the model selector page's transactions open: the menu owns
+	-- them, so they never fight the keyboard grab (ui/modal.lua).
+	local page_dialogs = {
+		prompt = prompt_text,
+		error = show_error,
+		info = show_info,
+		confirm = function(title, text)
+			return ask_yes_no(title, zenity_plain(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
+		end,
+	}
+	--- Tells the user how a model removal ended: it runs after the page acted.
+	--- @param succeeded boolean
+	--- @param tag string
+	--- @param reason string|nil
+	local function deletion_notice(succeeded, tag, reason)
+		local Notifier = require("adapters.application_notifier")
+		-- A notification caption, not a menu row: it never reaches the renderer.
+		local delivered
+		if succeeded then
+			local caption = i18n_safe("ollama.deleted_title")
+			delivered = Notifier.send(string.format(i18n_safe("ollama.model_deleted"), tag),
+				{ title = caption, level = "success" })
+		else
+			local caption = i18n_safe("ollama.delete_fail_title")
+			delivered = Notifier.send(string.format(i18n_safe("ollama.delete_error"), tag, tostring(reason)),
+				{ title = caption, level = "error" })
+		end
+		if delivered ~= true then Logger.warn(LOG, "The model-deletion notice for '%s' was not delivered.", tag) end
+	end
+	--- Removes one installed model after the same confirmation Windows and macOS ask.
+	--- @param model string Ollama-native tag.
+	--- @return boolean dispatched
+	local function delete_model(model)
+		if ctx.paused == true then return false end
+		if type(llm.delete_model) ~= "function" then
+			Logger.error(LOG, "The AI engine cannot delete models — '%s' was kept.", model)
+			return false
+		end
+		local confirmed = ask_yes_no(i18n_safe("menu.llm.delete_model_title"),
+			zenity_plain(string.format(i18n_safe("menu.llm.delete_model_body"), model)),
+			i18n_safe("button.delete"), i18n_safe("button.cancel"))
+		if confirmed ~= true then return false end
+		return llm.delete_model(model, function(succeeded, tag, reason)
+			deletion_notice(succeeded, tag, reason)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		end
-		--- Tells the user how the removal ended: it runs after the menu closed.
-		--- @param succeeded boolean
-		--- @param tag string
-		--- @param reason string|nil
-		local function deletion_notice(succeeded, tag, reason)
-			local Notifier = require("adapters.application_notifier")
-			-- A notification caption, not a menu row: it never reaches the renderer.
-			local delivered
-			if succeeded then
-				local caption = i18n_safe("ollama.deleted_title")
-				delivered = Notifier.send(string.format(i18n_safe("ollama.model_deleted"), tag),
-					{ title = caption, level = "success" })
-			else
-				local caption = i18n_safe("ollama.delete_fail_title")
-				delivered = Notifier.send(string.format(i18n_safe("ollama.delete_error"), tag, tostring(reason)),
-					{ title = caption, level = "error" })
-			end
-			if delivered ~= true then Logger.warn(LOG, "The model-deletion notice for '%s' was not delivered.", tag) end
-		end
-		--- Removes one installed model after the same confirmation Windows and macOS ask.
-		--- @param model string Ollama-native tag.
-		--- @return boolean dispatched
-		local function delete_model(model)
-			if ctx.paused == true then return false end
-			if type(llm.delete_model) ~= "function" then
-				Logger.error(LOG, "The AI engine cannot delete models — '%s' was kept.", model)
-				return false
-			end
-			local confirmed = ask_yes_no(i18n_safe("menu.llm.delete_model_title"),
-				zenity_plain(string.format(i18n_safe("menu.llm.delete_model_body"), model)),
-				i18n_safe("button.delete"), i18n_safe("button.cancel"))
-			if confirmed ~= true then return false end
-			return llm.delete_model(model, function(succeeded, tag, reason)
-				deletion_notice(succeeded, tag, reason)
-				changed()
-			end) == true
-		end
-		local rows = {}
-		for _, model in ipairs(models) do
-			-- Each installed model opens the submenu the other two drivers draw:
-			-- Select, then Delete. The parent keeps the tick of the selected one.
-			local action_rows = ManifestMenu.template_rows("llm_model_action_rows", {
-				[COMMAND.MODEL_SELECT] = function()
-					if llm.set_model then llm.set_model(model) end
-					changed()
-				end,
-				[COMMAND.MODEL_DELETE] = function() return delete_model(model) end,
-			}, {
-				["model_selected"] = function() return model == current end,
-				["model_select_ready"] = function() return ctx.paused ~= true end,
-				-- Ollama reported it, so it is installed: there is nothing to download.
-				["model_delete_present"] = function() return true end,
-				["model_download_present"] = function() return false end,
-			}, {})
-			if type(action_rows) ~= "table" then
-				Logger.error(LOG, "The model action rows were refused — the model list cannot be drawn.")
-				return {}
-			end
-			rows[#rows + 1] = {
-				label = model,
-				-- `checked`, not a "✓" glued to the label: the tray draws its own
-				-- mark, and the glued form puts one platform's convention inside a
-				-- string twenty other languages also read.
-				checked = model == current,
-				items = action_rows,
-			}
-		end
-		if #rows > 0 then
-			for _, row in ipairs(ManifestMenu.status_rows("llm_menu", "llm_models", "model_picker_tail") or {}) do
-				rows[#rows + 1] = row
-			end
-		end
-		local browser_row = ManifestMenu.command_row("llm_model_commands", require("config_keys").COMMAND.LLM_BROWSE_MODELS, {
-			[require("config_keys").COMMAND.LLM_BROWSE_MODELS] = function()
-				return ctx.webview.show("model_browser") == true
-			end,
+		end) == true
+	end
+	-- One button opens the model selector page, where the backend and the model
+	-- are chosen together (maintainer, 2026-10-27): the backend's emoji, then
+	-- the model. The menu lists no model and no API entry. Drawing the button
+	-- binds the page to this build's engine, dialogs and refresh.
+	dynamic_handlers["llm_model"] = function(target)
+		LlmBackendRows.bind_page(llm, {
+			dialogs = page_dialogs, on_changed = ctx.on_menu_changed, delete_model = delete_model,
+			context = { paused = ctx.paused, is_paused = ctx.is_paused },
+		})
+		local row = ManifestMenu.command_row("llm_model_selector_commands", COMMAND.LLM_MODEL_SELECTOR, {
+			[COMMAND.LLM_MODEL_SELECTOR] = function() return ctx.webview.show("model_browser") == true end,
 		}, {
-			["llm_model_browser_ready"] = function()
+			["llm_model_selector_caption"] = function() return LlmBackendRows.caption(llm) end,
+			["llm_model_selector_ready"] = function()
 				return type(ctx.webview) == "table" and type(ctx.webview.show) == "function"
 			end,
 		})
-		if browser_row then rows[#rows + 1] = browser_row end
-		return rows
-	end
-
-	-- Who answers: Ollama's models above, or the API entries (Cerebras, …).
-	providers["llm_models"] = function()
-		local rows = LlmBackendRows.rows(llm, {
-			prompt = prompt_text,
-			error = show_error,
-			info = show_info,
-			confirm = function(title, text)
-				return ask_yes_no(title, zenity_plain(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
-			end,
-		}, ctx.on_menu_changed, ollama_model_rows, { paused = ctx.paused, is_paused = ctx.is_paused })
-		-- These rows write config.toml: name the cause when it refuses writes and
-		-- recheck it when a retained row is clicked.
-		if type(rows) == "table" then
-			local ConfigGuard = require("ui.menu.llm_config_guard")
-			local blocked = ConfigGuard.reason()
-			ConfigGuard.protect(rows)
-			ConfigGuard.grey_list(rows, blocked, blocked and i18n_safe(blocked) or "")
-		end
-		return rows
+		if not row then return end
+		-- The button stays enabled when config.toml refuses writes: the page it
+		-- opens greys every backend with that cause, as on Windows and macOS.
+		append_rendered_row(target, row, "llm_model")
 	end
 
 	--- The suggestion count row: a generation parameter, the first one on every

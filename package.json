@@ -510,6 +510,8 @@
 		"test:managed-network-failure-ui": "node ./tools/test/test-managed-network-failure-ui.cjs",
 		"test:managed-remote-retirement": "node ./tools/test/test-managed-remote-retirement.cjs",
 		"test:model-browser-session": "node ./tools/test/test-model-browser-session.cjs",
+		"test:model-selector-page": "node ./tools/test/test-model-selector-page.cjs",
+		"test:llm-backend-brands-single-source": "node ./tools/test/test-llm-backend-brands-single-source.cjs",
 		"test:onboarding-wizard-page": "node ./tools/test/test-onboarding-wizard-page.cjs",
 		"test:compact-data-sql": "node ./tools/test/test-compact-data-sql.cjs",
 		"test:compact-data-sql-protocol": "node ./tools/test/test-compact-data-sql-protocol.cjs",

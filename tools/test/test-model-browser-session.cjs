@@ -47,8 +47,18 @@ vm.runInContext(fs.readFileSync(path.join(shared, 'host_bridge.js'), 'utf8'), co
 vm.runInContext(fs.readFileSync(path.join(shared, 'model_browser/script.js'), 'utf8'), context);
 assert.deepEqual(messages.splice(0), ['ready']);
 
+// The row's source button, as the page draws it.
+const sourceButton = {
+	getAttribute: (name) =>
+		name === 'data-act' ? 'source' : name === 'data-url' ? 'https://huggingface.co/model-A' : null
+};
+
 function inject(session) {
-	const payload = { models: [], backend: 'mlx' };
+	// Only an installed model can be made active, so the replayed row is installed.
+	const payload = {
+		models: [{ name: 'model-A', installed: true, url: 'https://huggingface.co/model-A' }],
+		backend: 'mlx'
+	};
 	if (arguments.length) payload.session = session;
 	context.injectModels(payload);
 }
@@ -56,9 +66,13 @@ function inject(session) {
 function actions() {
 	context.selectRow('model-A');
 	context.useSelected();
-	const row = context.buildRow({ name: 'model-A', url: 'https://huggingface.co/model-A' });
+	const row = context.buildRow({
+		name: 'model-A',
+		installed: true,
+		url: 'https://huggingface.co/model-A'
+	});
 	row.onclick({
-		target: { closest: () => ({ getAttribute: () => 'https://huggingface.co/model-A' }) },
+		target: { closest: () => sourceButton },
 		stopPropagation() {}
 	});
 	return messages.splice(0);
@@ -69,7 +83,11 @@ const legacy = [
 	{ action: 'open_url', url: 'https://huggingface.co/model-A' }
 ];
 inject(1);
-const oldRow = context.buildRow({ name: 'model-A', url: 'https://huggingface.co/model-A' });
+const oldRow = context.buildRow({
+	name: 'model-A',
+	installed: true,
+	url: 'https://huggingface.co/model-A'
+});
 const oldMessages = actions();
 assert.deepEqual(
 	oldMessages,
@@ -80,7 +98,7 @@ oldRow.onclick({ target: {}, stopPropagation() {} });
 context.useSelected();
 oldRow.ondblclick();
 oldRow.onclick({
-	target: { closest: () => ({ getAttribute: () => 'https://huggingface.co/model-A' }) },
+	target: { closest: () => sourceButton },
 	stopPropagation() {}
 });
 assert.deepEqual(

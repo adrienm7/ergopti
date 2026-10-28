@@ -257,10 +257,10 @@ _LLM_Menu_GreyParentForConfig(Parent, Disabled) {
 }
 
 /**
- * Names the configuration cause on the parent an emitted AI row returned: the
- * backend (servers), the model parent while it lists the API entries, and the
- * profile parent. The emitters stay pinned to their declared frames; the cause
- * is applied to what they hand back.
+ * Names the configuration cause on the profile parent an emitted AI row
+ * returned. The model selector button is left enabled: the page it opens greys
+ * every backend with that same cause. The emitters stay pinned to their
+ * declared frames; the cause is applied to what they hand back.
  * @param {String} Id Row id from the manifest's llm_menu.
  * @param {Array} Rows Row data the emitter returned.
  * @param {Boolean} Disabled Whether the row is already greyed for another reason.
@@ -270,7 +270,7 @@ _LLM_Menu_GreyConfigParents(Id, Rows, Disabled) {
 	global _LLM_Menu
 	if !(Rows is Array)
 		return Rows
-	if Id != "llm_backend" && Id != "llm_profile" && !(Id == "llm_model" && _LLM_Menu["backend"] == "api")
+	if Id != "llm_profile"
 		return Rows
 	for Row in Rows {
 		; Warnings, separators and info rows carry no submenu; the parent does.
@@ -386,66 +386,6 @@ LLM_Menu_Build() {
 
 
 
-/** Supplies the actual admitted model parent around its completed native picker. */
-_LLM_Menu_ModelParentRows(Receive, NativeChild, HealthPrefix, ModelCaption, Disabled) {
-	if !_MR_DeclaredParentCallable(Receive)
-		throw Error("The admitted model parent receiver was withdrawn.")
-	Getters := Map("llm_model_health_prefix", (*) => HealthPrefix,
-		"llm_model_current_caption", (*) => ModelCaption,
-		"llm_model_parent_ready", (*) => !Disabled)
-	Parent := Receive.Call(NativeChild, Getters)
-	if !(Parent is Map) || Parent.Get("submenu", false) != NativeChild
-		throw Error("Declared model parent was refused.")
-	return [Parent]
-}
-
-; A refused model parent owns its unpublished picker and every returned native descendant.
-; Capture descendants before removing any parent; a detached live owner must not retain callbacks.
-_LLM_Menu_ReleaseModelMenu(RootMenu) {
-	global _MenuDispatchOwnerHandles
-	Failure := 0, Seen := Map()
-	Release(Child) {
-		Children := [], Handle := 0
-		try {
-			Handle := Child.Handle
-			if Seen.Has(Handle)
-				return
-			Seen[Handle] := true
-			Count := TrayMenuHandleItemCount(Handle)
-			if Count < 0
-				throw Error("The owned model menu handle is unavailable during release.")
-			loop Count {
-				ChildHandle := TrayMenuSubmenuHandle(Handle, A_Index - 1)
-				if ChildHandle {
-					OwnedChild := MenuFromHandle(ChildHandle)
-					if !(OwnedChild is Menu)
-						throw Error("The owned model child menu is unavailable during release.")
-					Children.Push(OwnedChild)
-				}
-			}
-		} catch as ErrorInfo {
-			if !Failure
-				Failure := ErrorInfo
-		}
-		for OwnedChild in Children
-			Release(OwnedChild)
-		try {
-			try Child.Delete()
-			finally {
-				if Handle && TrayMenuHandleItemCount(Handle) == 0
-					&& _MenuDispatchOwnerHandles.Has(Handle)
-					_MenuDispatchOwnerHandles.Delete(Handle)
-				MenuDispatcher_PruneMenu(Child)
-			}
-		} catch as ErrorInfo {
-			if !Failure
-				Failure := ErrorInfo
-		}
-	}
-	Release(RootMenu)
-	if Failure
-		throw Failure
-}
 
 
 
@@ -511,7 +451,6 @@ _LLM_MenuLayout_Rows() {
  */
 _LLM_MenuLayout_Fallback() {
 	return [
-		Map("id", "llm_backend",             "disabled_when_off", false, "health_dot", false),
 		Map("id", "llm_model",               "disabled_when_off", false, "health_dot", true),
 		Map("id", "llm_profile",             "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_trigger",             "disabled_when_off", true,  "health_dot", false),
@@ -543,77 +482,53 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot :
 	if !(TargetMenu is Menu)
 		throw TypeError("An LLM settings row requires its native target.")
 	switch id {
-	case "llm_backend":
-		WarningRows := IsSet(CapturedWarningRows) ? CapturedWarningRows : []
-		; This nonpublished structural witness admits the genuine native-caption contract.
-		; It is never a selected backend datum and never reaches the actual native UI.
-		AdmissionChild := Menu()
-		try ParentAdmission := MenuRenderer_GroupRow("llm_backend_parent_ahk", "llm_backend_parent", AdmissionChild,
-			Map("llm_backend_parent_caption", (*) => "structural admission", "llm_backend_parent_ready", (*) => !disabled))
-		finally {
-			try AdmissionChild.Delete()
-			finally MenuDispatcher_PruneMenu(AdmissionChild)
-		}
-		if !(ParentAdmission is Map) || ParentAdmission.Get("submenu", false) != AdmissionChild
-			throw Error("Declared backend parent frame was refused.")
-		Admission := _LLM_Menu_BackendFrameAdmission(WarningRows)
-		if !(Admission is Map)
-			throw Error("Declared backend parent frame was refused.")
-		BackendCaption := _LLM_Menu_BackendRowLabel()
-		BackendMenu := LLM_Menu_BuildBackendMenu()
-		try {
-			BackendRows := _LLM_Menu_BackendParentRows(BackendMenu, BackendCaption, disabled, WarningRows)
-			if !(BackendRows is Array)
-				throw Error("Declared backend parent frame was withdrawn.")
-		} catch as Err {
-			BackendMenu.Delete()
-			MenuDispatcher_PruneMenu(BackendMenu)
-			throw Err
-		}
-		return BackendRows
 	case "llm_model":
-		; Build the submenu, fire the async probes (backend health + installed-tags
-		; list), then prefix the label with the cached backend-health dot (🟢
-		; reachable / 🔴 down / "" when off) — mirrors HS's build_model_item
-		; health_dot block. BOTH probes are non-blocking and paint on the next pass:
-		; the submenu reads only the in-memory caches, never a synchronous /api/tags
-		; or reachability round-trip, so opening the tray can never freeze the thread.
-		ReceiveModel := MenuRenderer_GroupReceiver("llm_model_parent_ahk", "llm_model")
-		if !ReceiveModel
-			throw Error("Declared model parent admission was refused.")
-		model_menu := LLM_Menu_BuildModelMenu()
-		try {
-			; Force past the idle gate: this row is only painted while the tray menu is
-			; actually being built, i.e. for a user looking at it right now, so the dot
-			; must refresh even when A_TimeIdlePhysical claims the machine has been
-			; unattended. That counter only notices the tray click because AHK's mouse
-			; hook happens to be installed (nav_layer.ahk declares wheel hotkeys) — far
-			; too incidental a dependency to hang the on-demand refresh on. The 3 s
-			; throttle inside the helper is NOT bypassed, so a rebuild storm still costs
-			; a single ping.
-			_LLM_Menu_FireHealthProbe(true)
-			_LLM_Menu_FireInstalledTagsProbe()
-			last_status := _LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""
-			health_dot := (has_health_dot && llm_is_operational)
-				? ((last_status == "ok") ? "🟢 " : (last_status == "ko") ? "🔴 " : "")
-				: ""
-			; The shown model follows the active backend (an API entry's model
-			; with backend api, never the preserved Ollama slot) — the
-			; thinking-model row below must agree with the same text.
-			model_shown := _LLM_Menu_ModelDisplayText()
-			ModelRows := _LLM_Menu_ModelParentRows(ReceiveModel, model_menu, health_dot, model_shown, disabled)
-		} catch as Err {
-			try _LLM_Menu_ReleaseModelMenu(model_menu)
-			catch as CleanupError
-				try LoggerError("LLM", "Model menu cleanup failed after parent refusal: {1}", CleanupError.Message)
-			throw Err
-		}
+		; One button opens the model selector page (maintainer, 2026-10-27): the
+		; cached health dot, the backend's emoji and the model. The Backend
+		; chooser, the model list and the API entries left the menu; the menu
+		; builds none of them. BOTH probes are non-blocking and paint on the next
+		; pass, so opening the tray can never freeze the thread.
+		; Force past the idle gate: this row is only painted while the tray menu is
+		; actually being built, i.e. for a user looking at it right now, so the dot
+		; must refresh even when A_TimeIdlePhysical claims the machine has been
+		; unattended. The 3 s throttle inside the helper is NOT bypassed, so a
+		; rebuild storm still costs a single ping.
+		_LLM_Menu_FireHealthProbe(true)
+		_LLM_Menu_FireInstalledTagsProbe()
+		last_status := _LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""
+		health_dot := (has_health_dot && llm_is_operational)
+			? ((last_status == "ok") ? "🟢 " : (last_status == "ko") ? "🔴 " : "")
+			: ""
+		; The shown model follows the active backend (an API entry's name with
+		; backend api, never the preserved Ollama slot) — the thinking-model row
+		; below must agree with the same text.
+		model_shown := _LLM_Menu_ModelDisplayText()
+		caption_text := _LLM_Menu_ModelCaptionText()
+		Caption := health_dot . LLM_ModelSelectorCaption(_LLM_Menu.Get("backend", "ollama"),
+			caption_text != "" ? caption_text : t("menu.llm.no_model_none"))
+		; The definitions-only test graph loads no WebView page: the button is
+		; then drawn greyed instead of calling a missing owner.
+		OpenPage := IsSet(LLM_ModelBrowser_Show) ? LLM_ModelBrowser_Show : 0
+		Row := MenuRenderer_CommandRow("llm_model_selector_commands", "llm_model_selector",
+			Map("llm_model_selector", (*) => OpenPage.Call()),
+			Map("llm_model_selector_caption", (*) => Caption,
+				"llm_model_selector_ready", (*) => !disabled && IsObject(OpenPage)))
+		if !(Row is Map)
+			throw Error("Declared model selector button was refused.")
+		; The "Ollama not installed" warning heads the button it concerns.
+		ModelRows := []
+		if IsSet(CapturedWarningRows) && (CapturedWarningRows is Array)
+			for Warning in CapturedWarningRows
+				ModelRows.Push(Warning)
+		ModelRows.Push(Row)
+		; An open selector page follows the state this rebuild publishes.
+		if IsSet(LLM_ModelBrowser_Refresh)
+			LLM_ModelBrowser_Refresh.Call()
 		; Thinking-model info row — conditional, native-only (mirrors HS thinking-info).
 		if _LLM_Menu_IsThinkingModel(model_shown) {
 			InfoRows := MenuRenderer_TemplateRows("llm_thinking_info", Map(), Map(), Map())
 			if !(InfoRows is Array)
 				throw Error("Declared thinking-model information was refused.")
-			ModelRows := ModelRows.Clone()
 			for Row in InfoRows
 				ModelRows.Push(Row)
 		}
@@ -704,60 +619,3 @@ _LLM_Menu_ProfileParentRows(NativeChild, Caption, Disabled) {
 	return Rows
 }
 
-; Captured warning state is native data; its actual callback and shared caption stay paired.
-_LLM_Menu_BackendFrameAdmission(WarningRows) {
-	if !(WarningRows is Array) || WarningRows.Length > 1 || (WarningRows.Length == 1 && !WarningRows.Has(1))
-		return false
-	Present := WarningRows.Length == 1
-	if Present && (!(WarningRows[1] is Map) || !WarningRows[1].Has("label")
-		|| !WarningRows[1].Has("action") || !HasMethod(WarningRows[1]["action"], "Call")
-		|| WarningRows[1].Has("submenu") || WarningRows[1].Get("separator", false))
-		return false
-	Root := _MR_GetManifestRoot(), Definitions := Map()
-	for Key in ["llm_backend_parent_frame_ahk", "llm_backend_warning_rows_ahk", "llm_install_warning_frame"]
-		Definitions[Key] := Root.Get(Key, false)
-	; A nonpublished current-declaration witness validates caption/readiness even when absent.
-	; Captured guarded records, not this new witness action, reach the typed list.
-	Witness := MenuRenderer_CommandRow("llm_install_warning_frame", "llm_install_warning",
-		Map("llm_install_warning", _LLM_Menu_OnWarningInstallClick), Map())
-	if !(Witness is Map) || (Present && WarningRows[1]["label"] != Witness["label"])
-		return false
-	Rows := MenuRenderer_TemplateRows("llm_backend_parent_frame_ahk", Map(), Map(),
-		Map("llm_backend_parent_rows", (*) => [], "llm_backend_warning_rows", (*) => WarningRows))
-	if !(Rows is Array) || Rows.Length != WarningRows.Length || _MR_GetManifestRoot() != Root
-		|| (Present && Rows[1] != WarningRows[1])
-		return false
-	for Key, Definition in Definitions
-		if Root.Get(Key, false) != Definition
-			return false
-	return Map("warning_rows", WarningRows, "present", Present)
-}
-
-; The complete declared frame owns warning placement and the finished native parent.
-_LLM_Menu_BackendParentRows(NativeChild, Caption, Disabled, WarningRows) {
-	Root := _MR_GetManifestRoot()
-	ParentDefinition := Root.Get("llm_backend_parent_ahk", false)
-	FrameDefinition := Root.Get("llm_backend_parent_frame_ahk", false)
-	WarningDefinition := Root.Get("llm_install_warning_frame", false)
-	WarningRowsDefinition := Root.Get("llm_backend_warning_rows_ahk", false)
-	Admission := _LLM_Menu_BackendFrameAdmission(WarningRows)
-	if !(Admission is Map)
-		return false
-	Getters := Map("llm_backend_parent_caption", (*) => Caption,
-		"llm_backend_parent_ready", (*) => !Disabled,
-		"llm_backend_warning_present", (*) => Admission["present"])
-	Parent := MenuRenderer_GroupRow("llm_backend_parent_ahk", "llm_backend_parent", NativeChild, Getters)
-	if !(Parent is Map)
-		return false
-	ParentRows := [Parent]
-	Rows := MenuRenderer_TemplateRows("llm_backend_parent_frame_ahk", Map(), Getters,
-		Map("llm_backend_parent_rows", (*) => ParentRows,
-			"llm_backend_warning_rows", (*) => Admission["warning_rows"]))
-	if !(Rows is Array) || Rows.Length != (Admission["present"] ? 2 : 1) || _MR_GetManifestRoot() != Root
-		|| Root.Get("llm_backend_parent_ahk", false) != ParentDefinition
-		|| Root.Get("llm_backend_parent_frame_ahk", false) != FrameDefinition
-		|| Root.Get("llm_install_warning_frame", false) != WarningDefinition
-		|| Root.Get("llm_backend_warning_rows_ahk", false) != WarningRowsDefinition
-		return false
-	return Rows
-}

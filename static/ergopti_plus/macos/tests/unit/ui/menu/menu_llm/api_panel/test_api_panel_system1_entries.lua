@@ -44,6 +44,7 @@ local function install(args)
 	world.api_remote = {
 		PROVIDER_ORDER = CATALOGUE.provider_order,
 		PROVIDERS = CATALOGUE.providers,
+		entry_key_missing = function() return false end,
 		get_entries = function() return world.entries end,
 		set_entries = function(value) world.entries = value end,
 		get_active_entry_id = function() return world.active_id end,
@@ -201,8 +202,13 @@ helpers.describe("API panel: providers and System 1-only entries (macOS)", funct
 			-- Every entry is named after its provider and model (api-entry-auto-name)
 			helpers.assert_nil(row_starting(rows, "typesafe/jev-latest"), "not selectable as the prediction backend")
 			helpers.assert_true(row_starting(rows, "openai/gpt-4o-mini") ~= nil)
-			for _, row in ipairs(world.panel.build_model_picker(world.ctx)) do
-				helpers.assert_true(row.label ~= "typesafe/jev-latest", "absent from the model picker")
+			-- The model selector page selects through the panel's collected entries.
+			local collected = {}
+			world.ctx.collect = collected
+			world.panel.build(world.ctx)
+			world.ctx.collect = nil
+			for _, entry in ipairs(collected.entries) do
+				helpers.assert_true(entry.name ~= "typesafe/jev-latest", "absent from the model selector page")
 			end
 
 			local test = row_starting(rows, "menu.llm.api_test_entry (typesafe/jev-latest)")
@@ -237,7 +243,7 @@ end)
 
 
 helpers.describe("complete API presentation frames", function()
-	for _, section in ipairs({ "llm_api_selection_frame", "llm_api_active_boundary", "llm_api_system1_frame" }) do
+	for _, section in ipairs({ "llm_api_active_boundary", "llm_api_system1_frame" }) do
 		helpers.it("refuses an unowned declared API frame and repairs the same genuine entries: " .. section, function()
 			helpers.with_fresh_modules(FRESH, function()
 				local world = install({ entries = { OPENAI, JEV }, active_id = "chat" })
@@ -245,7 +251,6 @@ helpers.describe("complete API presentation frames", function()
 				local frame = assert(owner.get_array(section))
 				local original = frame[1]
 				local function build()
-					if section == "llm_api_selection_frame" then return world.panel.build_model_picker(world.ctx) end
 					local _, rows = world.panel.build(world.ctx)
 					return rows
 				end

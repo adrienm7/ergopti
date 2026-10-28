@@ -4,8 +4,9 @@
 ; MODULE: LLM Tray — Remote API entries
 ; DESCRIPTION:
 ; Manages the user-defined list of remote API endpoints (OpenAI, Anthropic,
-; Google Gemini, OpenAI-compatible). When backend = "api", the model picker
-; becomes an "API endpoints" picker built from this list. Includes the
+; Google Gemini, OpenAI-compatible). The model selector page lists them and
+; runs their selection, test, edit and removal (ui/model_browser/init.ahk);
+; the tray builds no list of them since 2026-10-27. Includes the
 ; create/edit dialog flow, the JSON persistence layer (api_entries.json
 ; alongside config.toml), DPAPI token encryption, and complete schema
 ; validation before publication.
@@ -32,93 +33,11 @@
 
 
 
-; ======================================
-; ======================================
-; ======= 1/ API Entries Submenu =======
-; ======================================
-; ======================================
-
-; Build the "API endpoints" submenu shown when backend == "api". When the user
-; has no entries yet, the menu carries a single greyed-out hint plus the
-; "+ Add" action so the next click takes them straight to the entry dialog.
-_LLM_Menu_BuildApiEntriesMenu() {
-	m := Menu()
-	MenuRenderer_FillFromList(m, "llm_menu", "llm_model", (*) => _LLM_Menu_ApiEntriesRows())
-	return m
-}
-
-; The same list as row DATA. It stands in for the model picker's rows when the
-; backend is remote, which is why it renders under that same list id.
-_LLM_Menu_ApiEntriesRows() {
-	global _LLM_Menu
-	Rows := []
-	entries := _LLM_Menu["api_entries"]
-	if (Type(entries) != "Array" or entries.Length == 0) {
-		EmptyRows := MenuRenderer_TemplateRows("llm_api_empty_status", Map(), Map(), Map())
-		if !(EmptyRows is Array)
-			return []
-		for Row in EmptyRows
-			Rows.Push(Row)
-	} else {
-		active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
-		Names := _LLM_Menu_ApiEntryNameList(entries)
-		for Index, entry in entries {
-			id   := _LLM_MenuApiEntryGet(entry, "Id",   "")
-			Rows.Push(Map(
-				"label",   Names[Index],
-				"checked", (id == active_id),
-				"action",  _LLM_Menu_MakeSelectApiEntryHandler(entry)))
-		}
-	}
-	; Add sits before the separator so creating an entry is one glance
-	; away; the separator only appears with the management rows, never
-	; dangling when no entry exists.
-	AddRows := MenuRenderer_TemplateRows("llm_api_add_command",
-		Map("api_add_entry", (*) => _LLM_Menu_PromptApiEntry("")), Map(), Map())
-	if !(AddRows is Array)
-		return []
-	for Row in AddRows
-		Rows.Push(Row)
-	if (Type(entries) == "Array" and entries.Length > 0) {
-		; Management rows: most frequent first, destructive delete last.
-		Separators := MenuRenderer_TemplateRows("llm_api_add_separator", Map(), Map(), Map())
-		if !(Separators is Array)
-			return []
-		for Row in Separators
-			Rows.Push(Row)
-		Commands := Map("api_test_active", (*) => _LLM_Menu_TestActiveApiEntry(),
-			"api_remove_active", (*) => _LLM_Menu_RemoveActiveApiEntry())
-		Getters := Map("llm_api_active_ready", _LLM_Menu_ActiveApiCommandsReady)
-		for Declaration in _MR_GetMenuDef("llm_api_active_commands") {
-			; Keep the existing lazy Edit owner immediately before removal.
-			if Declaration["id"] == "api_remove_active" {
-				EditRows := MenuRenderer_TemplateRows("llm_api_edit_command",
-					Map("api_edit_entry", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])), Map(), Map())
-				if !(EditRows is Array)
-					return []
-				for EditRow in EditRows
-					Rows.Push(EditRow)
-			}
-			Row := MenuRenderer_CommandRow("llm_api_active_commands", Declaration["id"], Commands, Getters)
-			if Row is Map
-				Rows.Push(Row)
-		}
-	}
-	return _LLM_Menu_GuardConfigRows(Rows)
-}
-
-/**
- * Reads the existing active API owner before a retained menu command runs.
- * @returns {Boolean} Whether the current entry is available to the configuration command.
- */
-_LLM_Menu_ActiveApiCommandsReady() {
-	global _LLM_Menu
-	if !_LLM_Menu.Has("api_entry_id") || !(_LLM_Menu["api_entry_id"] is String)
-			|| _LLM_Menu["api_entry_id"] == ""
-			|| !_LLM_Menu.Has("api_entries") || !(_LLM_Menu["api_entries"] is Array)
-		return false
-	return _LLM_Menu_ApiEntryIdCount(_LLM_Menu["api_entries"], _LLM_Menu["api_entry_id"]) == 1
-}
+; ==================================
+; ==================================
+; ======= 1/ API Entry Names =======
+; ==================================
+; ==================================
 
 ; The host an entry sends to, with its port, lowercase: "https://api.x.ai/v1"
 ; gives "api.x.ai". Port of api_entry_names.lua's M.host.
@@ -2311,4 +2230,88 @@ _LLM_Menu_ShowApiManagedFailure(Owner, Info, NotifyFn := 0, PresentFn := 0) {
 	return ManagedNetworkTerminalFailure.Publish("api_test", Info.Get("network_report", 0),
 		() => _LLM_Menu_ApiFailureCurrent(Owner), "menu.llm.api_unreachable_title",
 		() => _LLM_Menu_TestActiveApiEntry(NotifyFn, EntryId), PresentFn)
+}
+
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 6/ Model Selector Page Rows =======
+; ===========================================
+; ===========================================
+
+/**
+ * The saved API entries as page rows, by their automatic name. An entry whose
+ * endpoint would refuse its token is greyed and offers the edit that sets it.
+ * @param {Map} Rows - Receives each row by "api`n<name>".
+ * @param {Array} Models - Receives each row's JSON, in entry order.
+ */
+_LLM_Menu_ApiEntryPageRows(Rows, Models) {
+	global _LLM_Menu, LLM_LOCAL_API_SERVERS
+	Entries := _LLM_Menu.Has("api_entries") && _LLM_Menu["api_entries"] is Array ? _LLM_Menu["api_entries"] : []
+	ActiveId := _LLM_Menu.Get("api_entry_id", "")
+	if Entries.Length > 0 {
+		Names := _LLM_Menu_ApiEntryNameList(Entries)
+		for Index, Entry in Entries {
+			Id := _LLM_MenuApiEntryGet(Entry, "Id", "")
+			RowActions := Map()
+			ActionsJson := ""
+			; The same token rule as the request path: an entry its endpoint
+			; would refuse is greyed and offers only the edit that sets the key.
+			KeyMissing := !LocalServerAuthEntryTokenAllowed(_LLM_MenuApiEntryGet(Entry, "Provider", ""),
+				_LLM_MenuApiEntryGet(Entry, "Token", ""), _LLM_MenuApiEntryGet(Entry, "BaseUrl", ""),
+				LLM_LOCAL_API_SERVERS)
+			if KeyMissing {
+				RowActions["set_key"] := _LLM_Menu_PromptApiEntry.Bind(Id)
+				ActionsJson := "{id:" . JsonStringLiteral("set_key") . ",text:" . JsonStringLiteral(t("menu.llm.api_edit_entry")) . "}"
+			} else if (Id == ActiveId) {
+				for Pair in [["test", t("menu.llm.api_test_entry"), (*) => _LLM_Menu_TestActiveApiEntry()],
+						["edit", t("menu.llm.api_edit_entry"), (*) => _LLM_Menu_PromptApiEntry(ActiveId)],
+						["remove", t("menu.llm.api_remove_entry"), (*) => _LLM_Menu_RemoveActiveApiEntry()]] {
+					RowActions[Pair[1]] := _LLM_Menu_ApiActiveEntryAction.Bind(ActiveId, Pair[3])
+					ActionsJson .= (ActionsJson == "" ? "" : ",") . "{id:" . JsonStringLiteral(Pair[1]) . ",text:" . JsonStringLiteral(Pair[2]) . "}"
+				}
+			}
+			Row := Map("backend", "api", "name", Names[Index], "installed", true, "row_actions", RowActions)
+			if !KeyMissing
+				Row["select"] := _LLM_Menu_ApiPageSelectAction(Entry)
+			Row["json"] := "{backend:" . JsonStringLiteral("api") . ",name:" . JsonStringLiteral(Names[Index])
+				. ",runtime_name:" . JsonStringLiteral(_LLM_MenuApiEntryGet(Entry, "Model", ""))
+				. ",provider:" . JsonStringLiteral(_LLM_MenuApiEntryGet(Entry, "Provider", ""))
+				. (KeyMissing ? ",available:false,hint_key:" . JsonStringLiteral("model_browser.hint_api_no_key") : "")
+				. ",installed:true,actions:[" . ActionsJson . "]}"
+			Models.Push(Row["json"])
+			Rows["api`n" . Names[Index]] := Row
+		}
+	}
+}
+
+/**
+ * Runs an active-entry action only while that entry is still the active one:
+ * a page drawn before a switch or removal cannot act on its successor.
+ * @returns {Boolean|Integer} The action's result, false when refused.
+ */
+_LLM_Menu_ApiActiveEntryAction(EntryId, Action, *) {
+	global _LLM_Menu
+	if (_LLM_Menu.Get("api_entry_id", "") != EntryId) {
+		try LoggerWarn("LLM", "Refused an action on API entry '{1}': it is no longer active.", EntryId)
+		return false
+	}
+	return Action.Call()
+}
+
+/** The API entry selection, after the API backend when another one is active. */
+_LLM_Menu_ApiPageSelectAction(Entry) {
+	return (*) => _LLM_Menu_ApiPageSelect(Entry)
+}
+
+_LLM_Menu_ApiPageSelect(Entry) {
+	global _LLM_Menu
+	if !_LLM_Menu_SelectApiEntry(Entry)
+		return false
+	if (_LLM_Menu.Get("backend", "") != "api")
+		return LLM_Menu_SetBackend("api")
+	return true
 }

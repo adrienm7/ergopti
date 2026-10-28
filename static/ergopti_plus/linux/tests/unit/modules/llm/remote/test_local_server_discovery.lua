@@ -159,8 +159,8 @@ helpers.describe("Linux local server discovery ownership", function()
 				set_backend=function() error("an inert row cannot select a backend") end}
 			local dialogs={prompt=function() error("an inert row cannot prompt") end,error=function() end}
 			local context={is_paused=function() return false end}
-			local BackendRows=require("ui.menu.llm_backend_rows")
-			local function build() return BackendRows.rows(llm,dialogs,function() end,function() return {} end,context) end
+			local ServerRows=require("ui.menu.local_server_rows")
+			local function build() return ServerRows.rows(llm,dialogs,function() end,context) end
 			local rows=build()
 			helpers.assert_eq(#calls,0,"no local server is probed while the AI is off")
 			local rescan=find(rows,require("infra.i18n").get("menu.llm.local_servers.rescan"))
@@ -184,8 +184,8 @@ helpers.describe("Linux local server discovery ownership", function()
 				set_backend=function() setters=setters+1;allowed=false;return false end}
 			local dialogs={prompt=function() return nil end,error=function() end}
 			local context={is_paused=function() return false end}
-			local BackendRows=require("ui.menu.llm_backend_rows")
-			local function build() return BackendRows.rows(llm,dialogs,function() changes=changes+1 end,function() return {} end,context) end
+			local ServerRows=require("ui.menu.local_server_rows")
+			local function build() return ServerRows.rows(llm,dialogs,function() changes=changes+1 end,context) end
 			build()
 			helpers.assert_eq(#calls,4,"actual backend provider starts catalogue probes")
 			for _,call in ipairs(calls) do call.finish(models("local-choice")) end

@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 -- Selected by a declaration unique to ui/menu/menu_llm/api_panel.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
-local src = helpers.read_driver_source("function M.build_model_picker")
+local src = helpers.read_driver_source("function M.set_entry_model")
 helpers.assert_true(src ~= nil, "ui/menu/menu_llm/api_panel.lua source must be locatable")
 
 -- Test 1: _add_gen counter must be declared.

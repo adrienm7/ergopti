@@ -278,7 +278,8 @@ helpers.describe("LLM user profiles: tray reachability", function()
 		end
 
 		local menu = menu_builder.build(context)
-		local browse = find(menu, require("infra.i18n").get("menu.llm.browse_models_entry"))
+		-- The model button opens the model selector page (2026-10-27).
+		local browse = find(menu, require("modules.llm.backend_brands").emoji("ollama") .. " small")
 		helpers.assert_not_nil(browse,
 			"the registered model-browser bridge needs a production menu caller")
 		helpers.assert_eq(browse.fn(), true)
