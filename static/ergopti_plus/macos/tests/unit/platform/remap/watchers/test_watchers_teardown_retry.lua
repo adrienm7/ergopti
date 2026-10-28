@@ -40,6 +40,7 @@ local function fresh_harness()
 		fail_once = false,
 		fail_read_start = false,
 		fail_read_terminate_once = false,
+		read_exit_pending_on_terminate = false,
 		fail_callback_unset_once = false,
 		poll_timer_failure = nil,
 		poll_timer_stop_refuse_once = false,
@@ -117,6 +118,10 @@ local function fresh_harness()
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_module, format_string, ...)
 		h.logged_errors[#h.logged_errors + 1] = string.format(format_string, ...)
+	end
+	h.logged_warnings = {}
+	logger.warn = function(_module, format_string, ...)
+		h.logged_warnings[#h.logged_warnings + 1] = string.format(format_string, ...)
 	end
 	logger.pcall = function(module, fn, ...)
 		local results = table.pack(pcall(fn, ...))
@@ -201,11 +206,22 @@ local function fresh_harness()
 					return false
 				end
 				h.read_lifecycle[#h.read_lifecycle + 1] = "terminate-true-" .. tostring(read_index)
+				-- SIGTERM accepted while the exit is still queued: settlement
+				-- arrives later, through deliver_exit
+				if h.read_exit_pending_on_terminate then return true end
 				handle.terminated = true
 				local observers = handle.settlement_observers
 				handle.settlement_observers = {}
 				for _, observer in ipairs(observers) do observer() end
 				return true, "settled"
+			end
+			--- Delivers the queued exit of a read whose termination was accepted.
+			function handle.deliver_exit(exit_code)
+				handle.terminated = true
+				local observers = handle.settlement_observers
+				handle.settlement_observers = {}
+				for _, observer in ipairs(observers) do observer() end
+				handle.callback(exit_code, "", "")
 			end
 			h.reads[#h.reads + 1] = handle
 			return handle
@@ -661,6 +677,41 @@ helpers.describe("watchers input-source teardown is exact and retryable", functi
 		helpers.assert_eq(#h.reads, 2,
 			"a live successor still owns the one in-flight slot")
 		h.fail_read_terminate_once = false
+		helpers.assert_eq(h.watchers.stop_input_source_watcher(), true)
+	end)
+
+	helpers.it("(layout-read-exit-pending) reports an accepted timeout termination as a warning", function()
+		-- #99 09:40:25: a 13 s main-thread hold let the watchdog fire after the read
+		-- had finished; SIGTERM was accepted and the exit arrived 2 ms later, yet the
+		-- watchdog logged an ERROR "termination failed".
+		local h = fresh_harness()
+		h.read_exit_pending_on_terminate = true
+		helpers.assert_eq(h.watchers.start_input_source_watcher(function() end), true)
+		local poll_timer = h.raw_timers[1]
+
+		poll_timer.callback()
+		local abandoned_read = h.reads[1]
+		h.scheduled_timers[1].callback()
+		helpers.assert_eq(abandoned_read.terminate_attempts, 1)
+		helpers.assert_eq(#h.logged_errors, 0,
+			"an accepted termination whose exit is queued is not a failure: "
+				.. table.concat(h.logged_errors, " | "))
+		local warned = false
+		for _, line in ipairs(h.logged_warnings) do
+			if line:find("termination requested", 1, true) then warned = true end
+		end
+		helpers.assert_true(warned, "the timed-out read must still be reported as a warning")
+
+		poll_timer.callback()
+		helpers.assert_eq(#h.reads, 1,
+			"no successor read may start while the terminated read's exit is pending")
+		abandoned_read.deliver_exit(143)
+		poll_timer.callback()
+		helpers.assert_eq(#h.reads, 2, "the delivered exit must release the guard for one successor")
+		helpers.assert_eq(#h.logged_errors, 1,
+			"an exit still missing one poll period later stays an error")
+		h.read_exit_pending_on_terminate = false
+		h.reads[2].callback(0, '({ "KeyboardLayout Name" = "ABC"; })', "")
 		helpers.assert_eq(h.watchers.stop_input_source_watcher(), true)
 	end)
 
