@@ -5,11 +5,12 @@
  * MODULE: Model Selector Page Script
  * DESCRIPTION:
  * The place where the user picks the active AI model: one table, grouped by
- * backend (Ollama and MLX on this machine, then the remote API), with the
- * size on disk, the RAM required, whether the model is installed and which one
- * is current. Shared verbatim by the macOS (hs.webview), Windows (WebView2)
- * and Linux (WebKitGTK) drivers: each injects one payload via injectModels()
- * and receives the user's actions through postBridgeMessage().
+ * backend (the local ones, MLX and Ollama, in alphabetical order, then the
+ * remote API), with the size on disk, the RAM required, whether the model is
+ * installed and which one is current. Shared verbatim by the macOS
+ * (hs.webview), Windows (WebView2) and Linux (WebKitGTK) drivers: each injects
+ * one payload via injectModels() and receives the user's actions through
+ * postBridgeMessage().
  *
  * FEATURES & RATIONALE:
  * 1. One projection: the rows come from the shared model catalogue and the
@@ -25,6 +26,12 @@
  *    path the tray used (validation, persistence, warmup).
  * 4. Keyboard first: rows are focusable, arrows move, Enter uses the focused
  *    model, Delete removes an installed one, and every action is a button.
+ * 5. Three rows first: every group opens collapsed to its header (chevron,
+ *    emoji, name, model count, tools), so the API and MLX groups are not
+ *    buried below the long Ollama list. A collapsed group holding the active
+ *    model names it on its header. A filter or a search opens every group it
+ *    finds a match in; the groups the user opened stay open while the page
+ *    lives, never in a setting.
  * ==============================================================================
  */
 
@@ -37,6 +44,10 @@ var _sortKey = 'name';
 var _sortDir = 1;
 var _filter = ''; // Backend id the table is narrowed to; '' shows every backend.
 var _capabilities = {}; // { disable: bool }.
+var _expanded = {}; // Group id -> true while the user keeps it open; lives as long as the page.
+var _narrowKey = ''; // The filter and search the narrowed groups were opened for.
+var _narrowCollapsed = {}; // Group id -> true when the user closed a group a narrowing opened.
+var _toggles = {}; // Group id -> its header toggle in the last render, to keep focus across renders.
 
 // Which column reads which row field. The numeric fields are the catalogue's
 // own (models.json hardware_requirements.<backend>.download_gb / ram_gb and
@@ -99,6 +110,7 @@ function injectModels(payload) {
 	_backend = payload.backend || '';
 	_active = payload.active || '';
 	_backends = Array.isArray(payload.backends) ? payload.backends : [];
+	_backends.forEach(checkBrand);
 	_capabilities =
 		payload.capabilities && typeof payload.capabilities === 'object' ? payload.capabilities : {};
 	if (_filter && !backendById(_filter)) _filter = '';
@@ -185,6 +197,40 @@ window.i18n_apply = function (strings) {
 // ======= 3/ Row Model ================
 // =====================================
 // =====================================
+
+/**
+ * The page writes each backend's emoji once, before its brand; a brand that
+ * carries the emoji itself (the menu's "<brand> <emoji>" option label) would
+ * read "<emoji> <brand> <emoji>", so a driver sending one is refused.
+ */
+function checkBrand(b) {
+	if (b && typeof b.brand === 'string' && b.emoji && b.brand.indexOf(b.emoji) !== -1) {
+		throw new TypeError('Backend ' + b.id + ' brand must not carry its emoji');
+	}
+}
+
+/** Whether a backend runs on this computer; every kind but "remote" does. */
+function isLocalBackend(b) {
+	return b.kind !== 'remote';
+}
+
+/**
+ * The backends in display order: the local ones by brand, case-insensitive,
+ * then the remote ones in payload order.
+ */
+function orderedBackends() {
+	var name = function (b) {
+		return String(b.brand || b.id).toLowerCase();
+	};
+	var local = _backends.filter(isLocalBackend).sort(function (a, b) {
+		return name(a) < name(b) ? -1 : name(a) > name(b) ? 1 : 0;
+	});
+	return local.concat(
+		_backends.filter(function (b) {
+			return !isLocalBackend(b);
+		})
+	);
+}
 
 function backendById(id) {
 	for (var i = 0; i < _backends.length; i++) if (_backends[i].id === id) return _backends[i];
@@ -367,17 +413,39 @@ function buildHead() {
 function buildFilter() {
 	var select = document.getElementById('backend-filter');
 	if (!select) return;
-	var html = '<option value="">' + _escHtml(_t('model_browser.filter_all')) + '</option>';
-	_backends.forEach(function (b) {
-		html +=
+	var option = function (b) {
+		return (
 			'<option value="' +
 			_escHtml(b.id) +
 			'"' +
 			(b.id === _filter ? ' selected' : '') +
 			'>' +
 			_escHtml((b.emoji ? b.emoji + ' ' : '') + (b.brand || b.id)) +
-			'</option>';
+			'</option>'
+		);
+	};
+	var ordered = orderedBackends();
+	var local = ordered.filter(isLocalBackend);
+	var remote = ordered.filter(function (b) {
+		return !isLocalBackend(b);
 	});
+	var html = '<option value="">' + _escHtml(_t('model_browser.filter_all')) + '</option>';
+	if (local.length && remote.length) {
+		// The table's split: an optgroup draws its own separator in WebKit
+		// (macOS, Linux) and WebView2 (Windows) alike.
+		html +=
+			'<optgroup label="' +
+			_escHtml(_t('model_browser.kind_local')) +
+			'">' +
+			local.map(option).join('') +
+			'</optgroup><optgroup label="' +
+			_escHtml(_t('model_browser.kind_remote')) +
+			'">' +
+			remote.map(option).join('') +
+			'</optgroup>';
+	} else {
+		html += ordered.map(option).join('');
+	}
 	select.innerHTML = html;
 	select.value = _filter;
 	if ('hidden' in select) select.hidden = _backends.length < 2;
@@ -404,6 +472,7 @@ function compareRows(a, b) {
 	}
 	if (_sortKey === 'installed') return ((b.installed ? 1 : 0) - (a.installed ? 1 : 0)) * _sortDir;
 	if (NUMERIC_SORT[_sortKey]) return (_num(a[_sortKey]) - _num(b[_sortKey])) * _sortDir;
+	if (_sortKey === 'name') return compareNames(nameSortKey(a), nameSortKey(b)) * _sortDir;
 	va = String(a[_sortKey] == null ? '' : a[_sortKey]).toLowerCase();
 	vb = String(b[_sortKey] == null ? '' : b[_sortKey]).toLowerCase();
 	if (va < vb) return -1 * _sortDir;
@@ -411,11 +480,35 @@ function compareRows(a, b) {
 	return 0;
 }
 
-/** The groups the table draws: one per backend in payload order, then legacy rows. */
+/**
+ * What the name sort reads, case-insensitive: the name of a local row; the
+ * provider then the model of an API row, so each provider's models stay together.
+ */
+function nameSortKey(m) {
+	var name = String(m.name || '');
+	if (!isRemote(m)) return [name.toLowerCase(), ''];
+	var slash = name.indexOf('/');
+	var provider = m.provider || (slash === -1 ? name : name.slice(0, slash));
+	var model = m.model || (slash === -1 ? '' : name.slice(slash + 1));
+	return [
+		String(provider).toLowerCase(),
+		String(model).toLowerCase() + '\u0000' + name.toLowerCase()
+	];
+}
+
+function compareNames(ka, kb) {
+	for (var i = 0; i < ka.length; i++) {
+		if (ka[i] < kb[i]) return -1;
+		if (ka[i] > kb[i]) return 1;
+	}
+	return 0;
+}
+
+/** The groups the table draws: one per backend in display order, then legacy rows. */
 function groupRows(rows, query) {
 	var groups = [];
 	var byId = {};
-	_backends.forEach(function (b) {
+	orderedBackends().forEach(function (b) {
 		byId[b.id] = { backend: b, rows: [] };
 		groups.push(byId[b.id]);
 	});
@@ -459,18 +552,79 @@ function render() {
 			table.removeChild(tb);
 		});
 	}
+	var narrowed = !!(_filter || query);
+	var narrowKey = narrowed ? _filter + '\u0000' + query : '';
+	if (narrowKey !== _narrowKey) {
+		_narrowKey = narrowKey;
+		_narrowCollapsed = {};
+	}
+	_toggles = {};
+	var sawLocal = false;
 	groupRows(rows, query).forEach(function (g) {
+		if (g.backend && !isLocalBackend(g.backend) && sawLocal) {
+			table.appendChild(buildSeparator());
+			sawLocal = false;
+		}
+		if (g.backend && isLocalBackend(g.backend)) sawLocal = true;
 		var tbody = document.createElement('tbody');
-		if (g.backend) tbody.appendChild(buildGroupHead(g.backend));
-		g.rows.forEach(function (m) {
-			tbody.appendChild(buildRow(m));
-		});
+		var expanded = true;
+		if (g.backend) {
+			expanded = groupExpanded(g, narrowed);
+			tbody.setAttribute('data-group', g.backend.id);
+			tbody.appendChild(buildGroupHead(g.backend, g.rows, expanded, narrowed));
+		}
+		if (expanded) {
+			g.rows.forEach(function (m) {
+				tbody.appendChild(buildRow(m));
+			});
+		}
 		table.appendChild(tbody);
 	});
 
 	if (empty) empty.style.display = rows.length === 0 ? 'block' : 'none';
 	updateCount(rows.length, _models.length);
 	updateCurrent();
+}
+
+/**
+ * Whether a group shows its rows. A filter or a search opens every group it
+ * matches in, unless the user closes it again under that same narrowing;
+ * otherwise a group is open only while the user keeps it open.
+ */
+function groupExpanded(g, narrowed) {
+	var id = g.backend.id;
+	if (narrowed && g.rows.length > 0) return _narrowCollapsed[id] !== true;
+	return _expanded[id] === true;
+}
+
+/** Opens or closes one group, then gives its toggle the focus back. */
+function toggleGroup(id, narrowedWithRows) {
+	if (narrowedWithRows) _narrowCollapsed[id] = _narrowCollapsed[id] !== true;
+	else _expanded[id] = _expanded[id] !== true;
+	render();
+	var toggle = _toggles[id];
+	if (toggle && typeof toggle.focus === 'function') toggle.focus();
+}
+
+/** The thin line between the local backends and the remote ones. */
+function buildSeparator() {
+	var tbody = document.createElement('tbody');
+	tbody.className = 'group-separator';
+	tbody.setAttribute('aria-hidden', 'true');
+	var tr = document.createElement('tr');
+	var td = document.createElement('td');
+	td.setAttribute('colspan', String(COLUMNS.length));
+	tr.appendChild(td);
+	tbody.appendChild(tr);
+	return tbody;
+}
+
+/** The active model when it belongs to this backend, for its collapsed header. */
+function activeIn(b) {
+	for (var i = 0; i < _models.length; i++) {
+		if (_models[i].backend === b.id && isCurrent(_models[i])) return _models[i];
+	}
+	return null;
 }
 
 // The install states a local backend's payload names (b.install.state).
@@ -519,23 +673,66 @@ function buildInstallButton(b, catalogueOwner) {
 }
 
 /**
- * One backend's header: its emoji and name, why it cannot run now, and its
- * tools — the driver's own actions (install, port, token…), the field that
- * adds a model by identifier, and the provider list that adds an API.
+ * One backend's header: the toggle that shows or hides its rows (chevron,
+ * emoji and name, model count, the active model while collapsed, why it
+ * cannot run now), then its tools — the driver's own actions (install,
+ * port, token…), the field that adds a model by identifier, and the
+ * provider list that adds an API.
+ * @param {object} b - The backend.
+ * @param {Array} rows - Its rows the filters keep.
+ * @param {boolean} expanded - Whether its rows are shown.
+ * @param {boolean} narrowed - Whether a filter or a search narrows the table.
  */
-function buildGroupHead(b) {
+function buildGroupHead(b, rows, expanded, narrowed) {
 	var catalogueOwner = _catalogueOwner;
 	var head = document.createElement('tr');
-	head.className = 'group' + (b.available === false ? ' unavailable' : '');
+	head.className =
+		'group' + (b.available === false ? ' unavailable' : '') + (expanded ? ' expanded' : '');
 	var th = document.createElement('th');
 	th.setAttribute('scope', 'rowgroup');
 	th.setAttribute('colspan', String(COLUMNS.length));
 	var reason = b.available === false && b.reason_key ? _t(b.reason_key) : '';
-	th.innerHTML =
+	var total = _models.filter(function (m) {
+		return m.backend === b.id;
+	}).length;
+	var active = expanded ? null : activeIn(b);
+	var toggle = document.createElement('span');
+	toggle.className = 'group-toggle';
+	toggle.setAttribute('role', 'button');
+	toggle.setAttribute('tabindex', '0');
+	toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+	toggle.setAttribute('data-group', b.id);
+	toggle.innerHTML =
+		'<span class="chevron" aria-hidden="true">▸</span> ' +
 		'<span class="group-title">' +
 		_escHtml(backendHeading(b)) +
 		'</span>' +
+		' <span class="group-count">' +
+		_escHtml(_fmt('model_browser.count_label', { n: rows.length, total: total })) +
+		'</span>' +
+		(active
+			? ' <span class="group-active">' +
+				_escHtml(_fmt('model_browser.current_label', { model: active.name })) +
+				'</span>'
+			: '') +
 		(reason ? ' <span class="reason">' + _escHtml(reason) + '</span>' : '');
+	var narrowedWithRows = narrowed && rows.length > 0;
+	var toggleHere = function () {
+		if (_catalogueOwner === catalogueOwner) toggleGroup(b.id, narrowedWithRows);
+	};
+	toggle.onclick = toggleHere;
+	toggle.onkeydown = function (ev) {
+		if (ev.key === 'Enter' || ev.key === ' ') {
+			ev.preventDefault();
+			toggleHere();
+		}
+	};
+	// The header's empty space toggles too; its tools keep their own clicks.
+	th.onclick = function (ev) {
+		if (ev && ev.target === th) toggleHere();
+	};
+	_toggles[b.id] = toggle;
+	th.appendChild(toggle);
 	var tools = document.createElement('div');
 	tools.className = 'group-tools';
 

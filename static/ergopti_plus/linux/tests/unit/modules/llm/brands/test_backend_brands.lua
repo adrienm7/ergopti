@@ -30,6 +30,9 @@ helpers.describe("Linux AI backend brands", function()
 		for _, id in ipairs({ "ollama", "mlx", "api" }) do
 			assert(Brands.emoji(id) == shared[id].emoji, id .. " emoji")
 			assert(Brands.label(id) == shared[id].brand .. " " .. shared[id].emoji, id .. " label")
+			-- model-selector-single-emoji: the page writes the emoji itself.
+			assert(Brands.brand(id) == shared[id].brand, id .. " bare brand")
+			assert(not Brands.brand(id):find(shared[id].emoji, 1, true), id .. " brand carries no emoji")
 		end
 	end)
 
