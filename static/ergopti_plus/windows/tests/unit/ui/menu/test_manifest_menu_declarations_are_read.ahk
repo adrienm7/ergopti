@@ -305,9 +305,58 @@ _MM_WithCaptionLayout(Body) {
 	}
 }
 
+/** Captures each genuine translation owner without cloning its cache identity. */
+_MM_HardwareLocaleState() {
+	global _I18nLocale, _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity, _I18nMissWarned
+	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	global _I18nFallbacksWarmed, _I18nFlagExistsCache
+	return [_I18nLocale, _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity, _I18nMissWarned,
+		_I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded,
+		_I18nFallbacksWarmed, _I18nFlagExistsCache]
+}
+
+/** Restores the exact translation objects and flags retained before the fixture. */
+_MM_RestoreHardwareLocale(State) {
+	global _I18nLocale, _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity, _I18nMissWarned
+	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	global _I18nFallbacksWarmed, _I18nFlagExistsCache
+	_I18nLocale := State[1]
+	_I18nCache := State[2], _I18nCacheLoaded := State[3], _I18nActiveCacheIdentity := State[4]
+	_I18nMissWarned := State[5]
+	_I18nCacheEn := State[6], _I18nCacheEnLoaded := State[7]
+	_I18nCacheFr := State[8], _I18nCacheFrLoaded := State[9]
+	_I18nFallbacksWarmed := State[10], _I18nFlagExistsCache := State[11]
+}
+
+/**
+ * Loads the real locale while detached caches protect the preceding test cohort.
+ * Kept with its one caller when the model selector page retired the hardware
+ * boundary tests that also used it.
+ */
+_MM_WithHardwareLocale(Code, Body) {
+	global _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity, _I18nMissWarned
+	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	global _I18nFallbacksWarmed, _I18nFlagExistsCache
+	Saved := _MM_HardwareLocaleState()
+	try {
+		_I18nCache := Map(), _I18nCacheLoaded := false, _I18nActiveCacheIdentity := false
+		_I18nMissWarned := Map()
+		_I18nCacheEn := Map(), _I18nCacheEnLoaded := false
+		_I18nCacheFr := Map(), _I18nCacheFrLoaded := false
+		_I18nFallbacksWarmed := false, _I18nFlagExistsCache := Map()
+		I18nInit(Map("script", Map("locale", Code)))
+		I18nPreload()
+		AssertEqual(Code, I18nGetLocale(), "the real locale owner acknowledges this fixture")
+		AssertTrue(_I18nCacheLoaded, "the actual locale file must load before menu construction")
+		return Body.Call()
+	} finally {
+		_MM_RestoreHardwareLocale(Saved)
+	}
+}
+
 _MM_CaptionLayoutRows() {
 	for Code in ["en", "fr"]
-		_LBMD_WithHardwareLocale(Code, _MM_WithCaptionLayout.Bind(_MM_CaptionLayoutRowsBody.Bind(Code)))
+		_MM_WithHardwareLocale(Code, _MM_WithCaptionLayout.Bind(_MM_CaptionLayoutRowsBody.Bind(Code)))
 }
 
 _MM_CaptionLayoutRowsBody(Code, Key, Corpus, Root) {
