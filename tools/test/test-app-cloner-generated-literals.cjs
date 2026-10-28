@@ -15,7 +15,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const RESOURCES = path.join(
@@ -44,14 +44,6 @@ function resolveProgram(candidates) {
 		if (!probe.error && probe.status === 0) return candidate;
 	}
 	return null;
-}
-
-function toBashPath(filePath) {
-	const normalized = path.resolve(filePath).replace(/\\/g, '/');
-	if (process.platform !== 'win32') return normalized;
-	const match = normalized.match(/^([A-Za-z]):(\/.*)$/);
-	if (!match) throw new Error(`cannot convert path for Bash: ${filePath}`);
-	return `/${match[1].toLowerCase()}${match[2]}`;
 }
 
 function writeExecutable(filePath, source) {
@@ -99,8 +91,8 @@ try {
 			'printf \'%s\\0\' "$VALUE_ONE" "$VALUE_TWO" "$VALUE_THREE"\n',
 		'utf8'
 	);
-	const shellSyntax = spawnSync(bash, ['-n', toBashPath(shellFile)], { encoding: 'utf8' });
-	const shellRoundtrip = spawnSync(bash, [toBashPath(shellFile)], { encoding: null });
+	const shellSyntax = spawnSync(bash, ['-n', bashPath(shellFile)], { encoding: 'utf8' });
+	const shellRoundtrip = spawnSync(bash, [bashPath(shellFile)], { encoding: null });
 	test(
 		'shell literals compile after quotes, substitutions, backslashes, and newlines',
 		shellEmission.status === 0 && shellSyntax.status === 0,
@@ -237,7 +229,7 @@ try {
 			(shellBody ? `${shellBody[1]}\n` : ''),
 		'utf8'
 	);
-	const cloneSyntax = spawnSync(bash, ['-n', toBashPath(cloneLauncher)], { encoding: 'utf8' });
+	const cloneSyntax = spawnSync(bash, ['-n', bashPath(cloneLauncher)], { encoding: 'utf8' });
 	test(
 		'the actual generated clone launcher body compiles with hostile assignments',
 		actualShellEmission.status === 0 && shellBody !== null && cloneSyntax.status === 0,
@@ -306,34 +298,34 @@ printf icns > "$out"
 	writeExecutable(path.join(fakeBin, 'osascript'), '#!/usr/bin/env bash\nexit 0\n');
 	writeExecutable(path.join(fakeBin, 'sleep'), '#!/usr/bin/env bash\nexit 0\n');
 
-	const markerBash = toBashPath(marker);
+	const markerBash = bashPath(marker);
 	const maliciousApp = `/Applications/A$(touch '${markerBash}')B"\\Name.app`;
 	const maliciousTarget = `target "$(touch '${markerBash}')"\\\nnext`;
 	const generator = spawnSync(
 		bash,
-		[toBashPath(SHORTCUT_SCRIPT), 'Shortcut', maliciousTarget, maliciousApp, '#123456', 'S'],
+		[bashPath(SHORTCUT_SCRIPT), 'Shortcut', maliciousTarget, maliciousApp, '#123456', 'S'],
 		{
 			cwd: fixtureRoot,
 			encoding: 'utf8',
 			env: {
 				...process.env,
-				HOME: toBashPath(home),
+				HOME: bashPath(home),
 				REAL_PYTHON: realPython.stdout.trim(),
-				PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
+				PATH: `${bashPath(fakeBin)}:${process.env.PATH || ''}`
 			}
 		}
 	);
 	const generated = path.join(home, 'Desktop', 'Shortcut.app', 'Contents', 'MacOS', 'open_target');
 	const generatedSyntax = fs.existsSync(generated)
-		? spawnSync(bash, ['-n', toBashPath(generated)], { encoding: 'utf8' })
+		? spawnSync(bash, ['-n', bashPath(generated)], { encoding: 'utf8' })
 		: { status: null };
 	const generatedRun = fs.existsSync(generated)
-		? spawnSync(bash, [toBashPath(generated)], {
+		? spawnSync(bash, [bashPath(generated)], {
 				encoding: 'utf8',
 				env: {
 					...process.env,
-					CAPTURE_PATH: toBashPath(capture),
-					PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
+					CAPTURE_PATH: bashPath(capture),
+					PATH: `${bashPath(fakeBin)}:${process.env.PATH || ''}`
 				}
 			})
 		: { status: null };
@@ -363,7 +355,7 @@ printf icns > "$out"
 	// profile. Execute both actual owners while leaving that OS boundary out.
 	const profileSetup = cloneSource.slice(profileStart, profileEnd);
 	const nativeFixturePath = (value) =>
-		path.join(fixtureRoot, path.posix.relative(toBashPath(fixtureRoot), value));
+		path.join(fixtureRoot, path.posix.relative(bashPath(fixtureRoot), value));
 	const cloneDestinations = [];
 	const cloneProfiles = [];
 	for (let index = 0; index < 3; index += 1) {
@@ -372,17 +364,17 @@ printf icns > "$out"
 			[
 				'-c',
 				`${cloneSetup}\n${profileSetup}\nCLONE_COMPLETE=1\nprintf '%s\\0' "$DEST" "$USER_DATA_DIR"\n`,
-				toBashPath(CLONE_SCRIPT),
-				toBashPath(fixtureRoot),
+				bashPath(CLONE_SCRIPT),
+				bashPath(fixtureRoot),
 				'Clone collision'
 			],
 			{
 				encoding: null,
 				env: {
 					...process.env,
-					HOME: toBashPath(home),
+					HOME: bashPath(home),
 					REAL_PYTHON: realPython.stdout.trim(),
-					PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
+					PATH: `${bashPath(fakeBin)}:${process.env.PATH || ''}`
 				}
 			}
 		);
@@ -447,23 +439,17 @@ printf icns > "$out"
 	const runCloneSetup = (tail, prefixBin = rollbackBin) =>
 		spawnSync(
 			bash,
-			[
-				'-c',
-				`${cloneSetup}\n${tail}`,
-				toBashPath(CLONE_SCRIPT),
-				toBashPath(fixtureRoot),
-				'Rollback'
-			],
+			['-c', `${cloneSetup}\n${tail}`, bashPath(CLONE_SCRIPT), bashPath(fixtureRoot), 'Rollback'],
 			{
 				encoding: 'utf8',
 				timeout: 10000,
 				env: {
 					...process.env,
-					HOME: toBashPath(rollbackHome),
+					HOME: bashPath(rollbackHome),
 					REAL_MKTEMP: realMktemp.stdout.trim(),
 					REAL_PYTHON: realPython.stdout.trim(),
-					OWNED_TMP_TEMPLATE: `${toBashPath(fixtureRoot)}/rollback-work.XXXXXX`,
-					PATH: `${toBashPath(prefixBin)}:${process.env.PATH || ''}`
+					OWNED_TMP_TEMPLATE: `${bashPath(fixtureRoot)}/rollback-work.XXXXXX`,
+					PATH: `${bashPath(prefixBin)}:${process.env.PATH || ''}`
 				}
 			}
 		);
@@ -685,21 +671,14 @@ printf icns > "$out"
 	for (const target of ['first-target', 'second-target', 'third-target']) {
 		const run = spawnSync(
 			bash,
-			[
-				toBashPath(SHORTCUT_SCRIPT),
-				'Collision',
-				target,
-				'/Applications/Editor.app',
-				'#123456',
-				'C'
-			],
+			[bashPath(SHORTCUT_SCRIPT), 'Collision', target, '/Applications/Editor.app', '#123456', 'C'],
 			{
 				encoding: 'utf8',
 				env: {
 					...process.env,
-					HOME: toBashPath(home),
+					HOME: bashPath(home),
 					REAL_PYTHON: realPython.stdout.trim(),
-					PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
+					PATH: `${bashPath(fakeBin)}:${process.env.PATH || ''}`
 				}
 			}
 		);
@@ -723,7 +702,7 @@ printf icns > "$out"
 			collisionRuns.map(({ destination, run }) => ({ destination, status: run.status }))
 		)
 	);
-	const reserveHelper = toBashPath(path.join(RESOURCES, 'reserve_bundle.sh'));
+	const reserveHelper = bashPath(path.join(RESOURCES, 'reserve_bundle.sh'));
 	const occupied = path.join(fixtureRoot, 'Occupied.app');
 	fs.writeFileSync(occupied, 'unrelated original file');
 	fs.symlinkSync(
@@ -738,14 +717,14 @@ printf icns > "$out"
 			'set -eu; source "$1"; reserve_bundle_directory "$2"',
 			'reservation',
 			reserveHelper,
-			toBashPath(occupied)
+			bashPath(occupied)
 		],
 		{ encoding: 'utf8' }
 	);
 	test(
 		'bundle reservation preserves occupied files and dangling symbolic links',
 		reservation.status === 0 &&
-			reservation.stdout.trim() === toBashPath(path.join(fixtureRoot, 'Occupied_2.app')) &&
+			reservation.stdout.trim() === bashPath(path.join(fixtureRoot, 'Occupied_2.app')) &&
 			fs.readFileSync(occupied, 'utf8') === 'unrelated original file' &&
 			fs.lstatSync(path.join(fixtureRoot, 'Occupied_1.app')).isSymbolicLink(),
 		reservation.stderr || reservation.stdout
@@ -757,7 +736,7 @@ printf icns > "$out"
 			'set -eu; source "$1"; reserve_bundle_directory "$2"; printf unexpected-success',
 			'reservation',
 			reserveHelper,
-			`${toBashPath(occupied)}/Forbidden.app`
+			`${bashPath(occupied)}/Forbidden.app`
 		],
 		{ encoding: 'utf8' }
 	);

@@ -417,12 +417,39 @@ function checkNativeBashPaths(convert) {
 			assert.equal(result.status, 0, `${JSON.stringify(prefix)}: ${result.stderr}`);
 			assert.equal(result.stdout, 'native path bytes');
 			if (process.platform !== 'win32') assert.equal(convert(file), file);
+			const environment = path.join(directory, 'environment.sh');
+			const script = path.join(directory, 'read-payload.sh');
+			fs.writeFileSync(environment, "export NATIVE_BASH_PATH_RECEIPT='native environment bytes'\n");
+			fs.writeFileSync(
+				script,
+				'test "$NATIVE_BASH_PATH_RECEIPT" = "native environment bytes" && cat -- "$1"\n'
+			);
+			const launched = spawnSync(bash, [convert(script), convert(file)], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, BASH_ENV: convert(environment) }
+			});
+			assert.ifError(launched.error);
+			assert.equal(launched.signal, null);
+			assert.equal(launched.status, 0, `${JSON.stringify(prefix)}: ${launched.stderr}`);
+			assert.equal(launched.stdout, 'native path bytes');
 		}
 	} finally {
 		fs.rmSync(scratch, { recursive: true, force: true });
 	}
 }
 checkNativeBashPaths(bashPath);
+if (process.platform !== 'win32') {
+	assert.throws(
+		() => checkNativeBashPaths((value) => value.replaceAll('\\', '/')),
+		(error) =>
+			error.code === 'ERR_ASSERTION' &&
+			error.actual === 1 &&
+			error.expected === 0 &&
+			error.message.includes(JSON.stringify('literal\\backslash')),
+		'the native filesystem control must reject the original POSIX separator rewrite'
+	);
+}
 
 // Execute the actual exported implementation under a Windows host model.
 // This is lexical coverage, not a claim that native Windows Bash ran here.
@@ -441,6 +468,94 @@ for (const [native, expected] of [
 ])
 	assert.equal(windowsPathModule.exports.bashPath(native), expected);
 assert.throws(() => bashPath(null), TypeError);
+
+/** Execute the actual fixture environment expressions with each native path grammar. */
+function nativeEnvironmentPaths(source, names, context) {
+	const values = [];
+	function visit(node) {
+		if (!node || typeof node !== 'object') return;
+		if (node.type === 'ObjectExpression') {
+			const properties = node.properties.filter((property) => property.type === 'Property');
+			if (names.every((name) => properties.some((property) => property.key.name === name))) {
+				values.push(
+					Object.fromEntries(
+						names.map((name) => {
+							const property = properties.find((entry) => entry.key.name === name);
+							return [
+								name,
+								vm.runInNewContext(source.slice(property.value.start, property.value.end), context)
+							];
+						})
+					)
+				);
+			}
+		}
+		for (const value of Object.values(node)) {
+			if (Array.isArray(value)) value.forEach(visit);
+			else if (value && typeof value === 'object') visit(value);
+		}
+	}
+	visit(parse(source, { ecmaVersion: 'latest' }));
+	return values;
+}
+
+// Native Node/CPython consumers require native environment path grammar;
+// retain it explicitly rather than relying on implicit MSYS env conversion.
+// Execute the actual assignments with path.win32, not the host's path.
+for (const [platform, pathGrammar, temporary, convert] of [
+	['win32', path.win32, 'C:\\native path\\fixture', windowsPathModule.exports.bashPath],
+	['linux', path.posix, '/tmp/literal\\backslash', (value) => value]
+]) {
+	const context = {
+		path: pathGrammar,
+		process: { platform },
+		bashPath: convert,
+		fixture: temporary,
+		runner: temporary,
+		archivePath: pathGrammar.join(temporary, 'ErgoptiPlus.app.zip'),
+		signaturePath: pathGrammar.join(temporary, 'signature.txt'),
+		outputPath: pathGrammar.join(temporary, 'appcast-dev.xml')
+	};
+	for (const [fixture, expectedCount, expected] of [
+		[
+			'test-swift-xctest-evidence.cjs',
+			2,
+			{
+				SWIFT_FIXTURE_PYTHON_BODY: pathGrammar.join(temporary, 'workflow-publisher.py'),
+				RUNNER_TEMP: temporary,
+				GITHUB_OUTPUT: null
+			}
+		],
+		[
+			'test-macos-sparkle-feed.cjs',
+			1,
+			{
+				SPARKLE_SIG_FILE: context.signaturePath,
+				ZIP_PATH: context.archivePath,
+				OUTPUT_PATH: context.outputPath
+			}
+		]
+	]) {
+		const maps = nativeEnvironmentPaths(
+			fs.readFileSync(path.join(__dirname, fixture), 'utf8'),
+			Object.keys(expected),
+			context
+		);
+		assert.equal(maps.length, expectedCount, `${fixture}: native environment owners must exist`);
+		for (const [index, values] of maps.entries()) {
+			for (const [name, value] of Object.entries(values)) {
+				const native =
+					expected[name] ?? pathGrammar.join(temporary, index === 0 ? 'step-outputs' : 'outputs');
+				assert.equal(
+					pathGrammar.normalize(value),
+					pathGrammar.normalize(native),
+					`${fixture}: ${name} must retain the native environment grammar on ${platform}`
+				);
+				if (platform !== 'win32') assert.equal(value, native);
+			}
+		}
+	}
+}
 
 /** Finds a direct private converter without rejecting Windows-only fixture bridges. */
 function fixturePathBinding(source) {
@@ -461,8 +576,8 @@ function fixturePathBinding(source) {
 			return conversion(node.alternate);
 		if (
 			node.type === 'CallExpression' &&
-			node.callee.property?.name === 'replaceAll' &&
-			node.arguments[0]?.value === '\\' &&
+			['replace', 'replaceAll'].includes(node.callee.property?.name) &&
+			(node.arguments[0]?.value === '\\' || node.arguments[0]?.regex?.pattern === '\\\\') &&
 			node.arguments[1]?.value === '/'
 		)
 			return true;
@@ -589,6 +704,12 @@ assert.equal(
 );
 assert.equal(
 	fixturePathBinding(
+		"const { bashPath } = require('../lib/git-bash.cjs'); const privatePath = value => value.replace(/\\\\/g, '/'); consume(privatePath(file));"
+	),
+	false
+);
+assert.equal(
+	fixturePathBinding(
 		"const { bashPath } = require('../lib/git-bash.cjs'); const privatePath = value => value.replaceAll('\\\\', '/'); consume(privatePath(file));"
 	),
 	false
@@ -621,7 +742,22 @@ for (const fixture of [
 	'test-linux-tray-icon-assets.cjs',
 	'test-linux-launcher-deps.cjs',
 	'test-linux-network-runtime.cjs',
-	'test-linux-portable-network-runtime.cjs'
+	'test-linux-portable-network-runtime.cjs',
+	'test-opensuse-ci-origin.cjs',
+	'test-opensuse-first-install-tooling.cjs',
+	'test-managed-python-release.cjs',
+	'test-macos-keyboard-layout-bundle.cjs',
+	'test-layouts-defaults-single-source.cjs',
+	'test-automation-query-ci-publisher.cjs',
+	'test-ollama-bootstrap-network-hardening.cjs',
+	'test-app-cloner-shortcut-maximize.cjs',
+	'test-app-cloner-generated-literals.cjs',
+	'test-macos-stable-signing-identity.cjs',
+	'test-macos-sparkle-feed.cjs',
+	'test-macos-sparkle-disarmed-bundles.cjs',
+	'test-macos-launcher-universal.cjs',
+	'test-macos-remap-launchagent.cjs',
+	'test-swift-xctest-evidence.cjs'
 ]) {
 	assert.ok(
 		fixturePathBinding(fs.readFileSync(path.join(__dirname, fixture), 'utf8')),
@@ -629,5 +765,5 @@ for (const fixture of [
 	);
 }
 console.log(
-	'[OK] Native Bash paths retain filesystem bytes; ten fixture callers share the tested owner.'
+	'[OK] Native Bash paths retain filesystem bytes; all declared fixture callers share the tested owner.'
 );

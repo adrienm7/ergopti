@@ -30,7 +30,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const build = fs.readFileSync(path.join(ROOT, 'tools/build/build_macos_app.sh'), 'utf8');
@@ -118,7 +118,7 @@ launcher_bin="$(build_launcher)"
 printf '%s\\n' "$launcher_bin"
 `,
 					'fixture',
-					tmp.replaceAll('\\', '/')
+					bashPath(tmp)
 				],
 				{
 					encoding: 'utf8',
@@ -210,8 +210,8 @@ ${assemblyFunction[0]}
 assemble_native_runtime "$1/ErgoptiPlus"
 `,
 					'fixture',
-					fixture.replaceAll('\\', '/'),
-					path.resolve(__dirname, '..', '..').replaceAll('\\', '/')
+					bashPath(fixture),
+					bashPath(ROOT)
 				],
 				{ encoding: 'utf8', timeout: 10000 }
 			);

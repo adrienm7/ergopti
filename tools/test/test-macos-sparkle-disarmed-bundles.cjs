@@ -29,7 +29,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const buildScript = fs.readFileSync(
@@ -128,7 +128,6 @@ const HAMMERSPOON_1_1_1_SPARKLE = [
 	'SUScheduledCheckInterval=21600'
 ];
 
-const toPosix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
 const bash = bashExecutable();
 
 /**
@@ -155,7 +154,7 @@ function runDisarm(entries, env = {}) {
 				''
 			].join('\n')
 		);
-		const run = spawnSync(bash, [toPosix(scriptPath), toPosix(plistPath)], {
+		const run = spawnSync(bash, [bashPath(scriptPath), bashPath(plistPath)], {
 			encoding: 'utf8',
 			env: { ...process.env, ...env }
 		});
