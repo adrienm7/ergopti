@@ -257,6 +257,72 @@ final class NativeAppClonerBundleOwnershipTests: XCTestCase {
 		}
 	}
 
+	func testActualNativeCliLogLimitsRetireOwnedResourcesAndPreserveRawPaths() throws {
+		try fixture { root in
+			let probe = Self.repositoryURL.appendingPathComponent("tools/test/lib/app-cloner-log-cleanup-probe.py")
+			fixtureCanRetire = false
+			let result = try run(["-c", #"exec /usr/bin/env python3 "$1" --resources "$2" --shell /bin/zsh --fixture "$3" --palette "$4""#,
+				"native-cli-log-cleanup", probe.path, Self.resourcesURL.path, root.appendingPathComponent("physical-cases").path, Self.repositoryURL.appendingPathComponent("static/ergopti_plus/_shared/data/native_theme.toml").path], root: root)
+			let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.output.utf8)) as? [String: Any])
+			fixtureCanRetire = report["ownership_closed"] as? Bool == true
+			XCTAssertTrue(fixtureCanRetire, "Retain the exact native CLI fixture if any child retirement is unknown")
+			XCTAssertEqual(result.status, 0, "The actual native CLI probe failed: \(result.output); \(result.stderr)")
+			XCTAssertEqual(report["state"] as? String, "PASSED")
+			XCTAssertEqual(report["source_kind"] as? String, "actual-cli-source-with-explicit-prefix-scopes")
+			XCTAssertEqual(report["shell"] as? String, "/bin/zsh")
+			let signalStatus = 128 + Int(SIGXFSZ)
+			let expected = ["clone:healthy": 0, "clone:finite": signalStatus, "clone:foreign": signalStatus,
+				"clone:refusal": signalStatus, "clone:deadpipe": signalStatus, "clone:deadpipe-foreign": signalStatus,
+				"clone:deadpipe-refusal": signalStatus, "clone:child-default": signalStatus,
+				"clone:backslash-c": 0, "clone:backslash-t": 0, "clone:result-backslash-c": 0, "clone:result-backslash-t": 0, "shortcut:healthy": 0,
+				"shortcut:finite": signalStatus, "shortcut:result-backslash-c": 0, "shortcut:result-backslash-t": 0, "owner:refusal-zero": 1, "owner:refusal-primary": 74]
+			let cases = try XCTUnwrap(report["cases"] as? [[String: Any]])
+			let keys = cases.compactMap { row -> String? in
+				guard let caller = row["caller"] as? String, let mode = row["mode"] as? String else { return nil }
+				return caller + ":" + mode
+			}
+			XCTAssertEqual(cases.count, expected.count)
+			XCTAssertEqual(keys.count, cases.count)
+			XCTAssertEqual(Set(keys), Set(expected.keys), "Every native case must execute exactly once")
+			XCTAssertEqual(Set(keys).count, cases.count)
+			for row in cases {
+				let caller = try XCTUnwrap(row["caller"] as? String)
+				let mode = try XCTUnwrap(row["mode"] as? String)
+				let raw = try XCTUnwrap(row["status"] as? Int)
+				let normalized = raw < 0 ? 128 - raw : raw
+				XCTAssertEqual(normalized, try XCTUnwrap(expected[caller + ":" + mode]))
+				XCTAssertEqual(row["normalized_status"] as? Int, normalized)
+				XCTAssertEqual(row["ownership_closed"] as? Bool, true)
+				XCTAssertEqual(row["workspace_created"] as? Bool, true)
+				XCTAssertEqual(row["workspace_exists"] as? Bool, caller == "owner")
+				let foreign = mode.hasSuffix("foreign")
+				let refusal = mode.hasSuffix("refusal") || caller == "owner" || mode.hasPrefix("result-backslash-")
+				XCTAssertEqual(row["destination_exists"] as? Bool, foreign || refusal)
+				if foreign { XCTAssertEqual(row["foreign_marker"] as? String, "foreign") }
+				XCTAssertEqual(row["child_survived"] as? Bool, false)
+				if mode.hasPrefix("result-backslash-") {
+					let destination = try XCTUnwrap(row["result_path"] as? String)
+					XCTAssertTrue(destination.contains(mode.hasSuffix("-c") ? "home\\c" : "home\\t"))
+					XCTAssertEqual(row["result_path_exact"] as? Bool, true)
+					XCTAssertEqual(row["output"] as? String, destination + "\n")
+					XCTAssertEqual(row["execution_scope"] as? String, caller == "clone" ? "actual-clone-prefix-and-success-tail" : "actual-full-shortcut-generator")
+				}
+				if caller == "clone" {
+					let app = try XCTUnwrap(row["source_app"] as? String)
+					let name = mode == "backslash-c" ? "Source\\c.app" : (mode == "backslash-t" ? "Source\\t.app" : "Source.app")
+					XCTAssertEqual(URL(fileURLWithPath: app).lastPathComponent, name)
+					let expectedHex = Data(("=== SOURCE=" + app).utf8).map { String(format: "%02x", $0) }.joined()
+					XCTAssertEqual(row["source_line_hex"] as? String, expectedHex)
+					if let limit = row["limit"] as? Int {
+						XCTAssertGreaterThan(limit, 0)
+						XCTAssertEqual(row["actual_log_bytes"] as? Int, limit)
+						XCTAssertEqual(limit, try XCTUnwrap(row["healthy_prefix_bytes"] as? Int) + 1)
+					}
+				}
+			}
+		}
+	}
+
 	func testActualShortcutRollsBackFailuresAndStillRunsWithoutPythonCommands() throws {
 		try fixture { root in
 			let paletteURL = Self.resourcesURL.appendingPathComponent("../../../../../_shared/data/native_theme.toml").standardizedFileURL

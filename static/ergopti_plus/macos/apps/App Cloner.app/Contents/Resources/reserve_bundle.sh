@@ -29,17 +29,19 @@ reserve_bundle_directory() {
 cleanup_bundle_creation() {
 	local cleanup_status=$? cleanup_failed=0 current_identity=""
 	trap - EXIT
+	# Retire every owned resource even when the diagnostic reader has closed.
+	trap '' PIPE
 	if [[ "$CLONE_COMPLETE" != "1" && -n "$DEST" ]]; then
 		if [[ ! -e "$DEST" && ! -L "$DEST" ]]; then
 			: # This reservation has already retired.
 		elif [[ ! -d "$DEST" || -L "$DEST" ]]; then
-			echo "Error: reserved bundle ownership changed; refusing cleanup: $DEST" >&2
+			echo "Error: reserved bundle ownership changed; refusing cleanup: $DEST" >&2 || cleanup_failed=1
 			cleanup_failed=1
 		elif ! current_identity="$(/usr/bin/stat -f '%d:%i' "$DEST")"; then
-			echo "Error: cannot inspect reserved bundle ownership; refusing cleanup: $DEST" >&2
+			echo "Error: cannot inspect reserved bundle ownership; refusing cleanup: $DEST" >&2 || cleanup_failed=1
 			cleanup_failed=1
 		elif [[ -z "$DEST_ID" || "$current_identity" != "$DEST_ID" ]]; then
-			echo "Error: reserved bundle ownership changed; refusing cleanup: $DEST" >&2
+			echo "Error: reserved bundle ownership changed; refusing cleanup: $DEST" >&2 || cleanup_failed=1
 			cleanup_failed=1
 		else
 			rm -rf -- "$DEST" || cleanup_failed=1
@@ -49,7 +51,7 @@ cleanup_bundle_creation() {
 		rm -rf -- "$TMPDIR_WORK" || cleanup_failed=1
 	fi
 	if [[ "$cleanup_status" == "0" && "$cleanup_failed" != "0" ]]; then
-		return 1
+		exit 1
 	fi
 	return "$cleanup_status"
 }
