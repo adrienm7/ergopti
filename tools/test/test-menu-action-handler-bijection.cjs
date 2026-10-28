@@ -831,6 +831,27 @@ function nativeFunctionReferenceKeys(source) {
 		],
 		[
 			'layout_bundle_variant_add',
+			'if ok then live = input_sources.is_live_enabled(var.name) end',
+			'if ok then live = true end'
+		],
+		['layout_bundle_variant_add', 'if ok and live == true then', 'if ok then'],
+		[
+			'layout_bundle_variant_add',
+			'elseif ok and live == false then',
+			'elseif ok and live == true then'
+		],
+		[
+			'layout_bundle_variant_add',
+			'i18n.get("menu.layout.add_pending_logout")',
+			'i18n.get("menu.layout.add_ok")'
+		],
+		[
+			'layout_bundle_variant_add',
+			'i18n.get("menu.layout.add_fail")',
+			'i18n.get("menu.layout.add_ok")'
+		],
+		[
+			'layout_bundle_variant_add',
 			'enable_keylayout_source_async(var.keylayout, label,',
 			'Foreign.enable_keylayout_source_async(var.keylayout, label,'
 		],
