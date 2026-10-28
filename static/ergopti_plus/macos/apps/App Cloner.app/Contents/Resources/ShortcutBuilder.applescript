@@ -1305,11 +1305,11 @@ on run argv
 	set resultPath to runDir & "/result"
 	set statusPath to runDir & "/status"
 	set donePath to runDir & "/done"
-	-- The worker ignores SIGXFSZ: under a file-size limit the status write
-	-- then fails with EFBIG instead of killing the worker before it creates
-	-- donePath, which left the progress loop below waiting forever. An empty
-	-- status still reaches the error dialog, because it is not "0".
-	set bgCmd to "(trap '' XFSZ; " & cmd ¬
+	-- Catch SIGXFSZ before running the helper: the worker must still publish
+	-- completion when its own diagnostic or status write exceeds a file limit.
+	-- An exec resets a caught handler, preserving the helper's default signal
+	-- disposition; ignoring the signal would also change every child process.
+	set bgCmd to "(trap ':' XFSZ; " & cmd ¬
 		& " > " & quoted form of resultPath & " 2>&1 ; " ¬
 		& "run_status=$?; echo \"$run_status\" > " & quoted form of statusPath & " ; " ¬
 		& "touch " & quoted form of donePath & ") >/dev/null 2>&1 &"
