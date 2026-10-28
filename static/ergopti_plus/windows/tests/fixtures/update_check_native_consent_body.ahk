@@ -223,8 +223,8 @@ _UCNC_Main() {
 try {
 	_UCNC_Main()
 	ExitApp(0)
-} catch Any as Failure {
-	FileAppend("FAIL update-check-native-consent " . Failure.Message . " file=" . Failure.File
-		. " line=" . Failure.Line . "`n", "*", "UTF-8")
+} catch Any as TopLevelFailure {
+	FileAppend("FAIL update-check-native-consent " . TopLevelFailure.Message . " file=" . TopLevelFailure.File
+		. " line=" . TopLevelFailure.Line . "`n", "*", "UTF-8")
 	ExitApp(1)
 }

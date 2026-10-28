@@ -245,8 +245,8 @@ _SPCC_Run() {
 try {
 	_SPCC_Run()
 	ExitApp(0)
-} catch Any as Failure {
-	FileAppend("FAIL spotlight-coordinate-owner " . Failure.Message . " [" . Failure.File . ":" . Failure.Line . "]`n"
-		. Failure.Stack . "`n", "*", "UTF-8")
+} catch Any as TopLevelFailure {
+	FileAppend("FAIL spotlight-coordinate-owner " . TopLevelFailure.Message . " [" . TopLevelFailure.File . ":" . TopLevelFailure.Line . "]`n"
+		. TopLevelFailure.Stack . "`n", "*", "UTF-8")
 	ExitApp(1)
 }

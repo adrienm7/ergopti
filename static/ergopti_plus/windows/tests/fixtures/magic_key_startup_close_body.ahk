@@ -225,7 +225,7 @@ try {
 	_MSUC_Require(!DllCall("User32\IsWindow", "Ptr", _MSUC.Hwnd, "Int"), "The genuine editor finally must destroy its exact Gui.")
 	FileAppend("PASS magic-key-editor-startup-close " . _MSUC.Editor . " " . _MSUC.Mode . "`n", "*")
 	ExitApp(0)
-} catch as Err {
-	FileAppend("FAIL " . Err.Message . "`n" . Err.Stack . "`n", "**")
+} catch as TopLevelFailure {
+	FileAppend("FAIL " . TopLevelFailure.Message . "`n" . TopLevelFailure.Stack . "`n", "**")
 	ExitApp(1)
 }

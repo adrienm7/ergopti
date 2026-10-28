@@ -192,7 +192,7 @@ Critical("On")
 try {
 	_OWCO_Run(A_Args[1], A_Args[2])
 	ExitApp(0)
-} catch as Failure {
-	FileAppend("FAIL ollama-close-owner " . A_Args[1] . ": " . Failure.Message . "`n" . Failure.Stack . "`n", "*", "UTF-8")
+} catch as TopLevelFailure {
+	FileAppend("FAIL ollama-close-owner " . A_Args[1] . ": " . TopLevelFailure.Message . "`n" . TopLevelFailure.Stack . "`n", "*", "UTF-8")
 	ExitApp(1)
 }

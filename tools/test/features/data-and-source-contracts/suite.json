@@ -577,6 +577,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-shell-messages.cjs"],
 			"repro": "npm run test:linux-shell-messages"
+		},
+		{
+			"id": "js-ahk-local-same-as-global",
+			"ordinal": 528,
+			"name": "AHK #Warn LocalSameAsGlobal replay (no local shadows a global in the library or any #Warn All child)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-ahk-local-same-as-global.cjs"],
+			"repro": "npm run test:ahk-local-same-as-global"
 		}
 	]
 }

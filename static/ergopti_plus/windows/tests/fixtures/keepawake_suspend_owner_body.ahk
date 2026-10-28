@@ -149,8 +149,8 @@ try {
 	_KASO_Main()
 	FileAppend("PASS keepawake-suspend " . A_Args[1] . "`n", "*")
 	ExitApp(0)
-} catch as Failure {
-	FileAppend("FAIL keepawake-suspend type=" . Type(Failure) . " line=" . Failure.Line
-		. " reason=" . Failure.Message . "`n", "*")
+} catch as TopLevelFailure {
+	FileAppend("FAIL keepawake-suspend type=" . Type(TopLevelFailure) . " line=" . TopLevelFailure.Line
+		. " reason=" . TopLevelFailure.Message . "`n", "*")
 	ExitApp(1)
 }

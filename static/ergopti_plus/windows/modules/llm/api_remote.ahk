@@ -1945,8 +1945,8 @@ _LLMRemote_CatalogDescriptorIsValid(providerId, desc) {
     label := desc["label"]
     baseUrl := desc["base_url"]
     defaultModel := desc["default_model"]
-    format := desc["format"]
-    if (Trim(label) = "" or !LLM_REMOTE_CATALOG_FORMATS.Has(format))
+    descFormat := desc["format"]
+    if (Trim(label) = "" or !LLM_REMOTE_CATALOG_FORMATS.Has(descFormat))
         return false
 
     ; The compatibility row is a user-supplied endpoint/model template. Every
@@ -2175,13 +2175,13 @@ _LLMRemote_LoadCatalog() {
 ; backend, not abort the whole driver boot. Mirror the graceful-degradation pattern
 ; used by _LLM_LoadPresets (models.ahk) and LLM_LoadProfilesJSON (profiles.ahk).
 try _LLMRemote_LoadCatalog()
-catch as _e {
+catch as _ApiProvidersLoadError {
 	LLM_API_PROVIDERS := Map()
 	LLM_API_PROVIDER_ORDER := []
 	LLM_REMOTE_MODEL_PRICES := Map()
 	LLM_REMOTE_TEST_REQUEST := Map()
 	LLM_REMOTE_DECISIONS_TEST := Map()
-	try LoggerError("LLM.remote", "api_providers.json load failed — remote API backend disabled: {1}.", _e.Message)
+	try LoggerError("LLM.remote", "api_providers.json load failed — remote API backend disabled: {1}.", _ApiProvidersLoadError.Message)
 }
 
 
