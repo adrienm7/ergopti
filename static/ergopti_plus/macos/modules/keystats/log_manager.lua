@@ -58,6 +58,7 @@ local Aggregator   = require("modules.keystats.aggregator")
 local Rotation     = require("modules.keystats.rotation")
 local IngestTrace  = require("modules.keystats.ingest_trace")
 local Export       = require("modules.keystats.export")
+local LedgerReplay = require("modules.keystats.ledger_replay")
 local Metrics      = require("keystats.metrics")
 
 
@@ -1075,30 +1076,112 @@ end
 -- Test seam for the restart/deduplication invariant above.
 M._local_ledger_replay_cursor = _local_ledger_replay_cursor
 
---- Apply the durable portion of this device's ledger to a newly-created cache.
+-- Forward-declared: the replay below and the paced deletes call it; it is
+-- defined with the recovery coroutine it yields.
+local _recovery_pace
+
+--- Meta key holding the resumable state of a pending local-ledger replay. It
+--- is written when a fresh cache is created and removed once the replayed
+--- cursor and id counter are published; while present, ingest waits and every
+--- start resumes the replay at the persisted batch boundary.
+local LEDGER_REPLAY_KEY = "local_ledger_replay"
+
+--- Bytes between two progress lines of a long replay.
+local LEDGER_REPLAY_PROGRESS_BYTES = 32 * 1024 * 1024
+
+--- Reads the pending replay state, or nil when no replay is pending.
 ---@param db userdata
----@return boolean, table
-local function _replay_local_data_sql(db)
+---@return table|nil state
+local function _read_ledger_replay_state(db)
+	for row in db:nrows("SELECT value FROM meta WHERE key=" .. _sq(LEDGER_REPLAY_KEY)) do
+		local ok, decoded = pcall(json.decode, row.value or "")
+		if ok and LedgerReplay.is_state(decoded) then return decoded end
+		-- An unreadable state restarts the replay: batches are idempotent.
+		Logger.warn(LOG, "Local ledger replay state is unreadable; the replay restarts at byte 0.")
+		return LedgerReplay.new_state()
+	end
+	return nil
+end
+
+--- Persists the replay state; the cache row is the resume point of the next start.
+---@param db userdata
+---@param state table
+---@return boolean
+local function _write_ledger_replay_state(db, state)
+	local ok, encoded = pcall(json.encode, state)
+	if not ok or type(encoded) ~= "string" then return false end
+	return db:exec("INSERT OR REPLACE INTO meta(key, value) VALUES(" .. _sq(LEDGER_REPLAY_KEY) .. ", "
+		.. _sq(encoded) .. ");") == sqlite3.OK
+end
+
+--- Replays the durable portion of this device's ledger into the cache in
+--- bounded steps. Inside the recovery coroutine each step stops at the slice
+--- budget and the coroutine yields, so the main thread never waits for more than
+--- one step; outside it (tests) the steps run back to back.
+---@param db userdata
+---@param state table Resumable replay state.
+---@return boolean ok
+---@return table cursor
+local function _replay_local_data_sql(db, state)
 	local empty_cursor = { offset = 0, date = nil }
 	local attrs = fs.attributes(_paths.data_sql_path)
-	if not attrs or (attrs.size or 0) == 0 then return true, empty_cursor end
-	local ledger = FileSystem.read(_paths.data_sql_path)
-	if type(ledger) ~= "string" then
-		Logger.error(LOG, "Cannot read local data.sql at %s for cache recovery.", _paths.data_sql_path)
-		return false, empty_cursor
+	local size = attrs and math.tointeger(attrs.size) or 0
+	if size == 0 then return true, empty_cursor end
+	local started_ns, resumed_at = timer.absoluteTime(), state.offset or 0
+	local next_progress = resumed_at + LEDGER_REPLAY_PROGRESS_BYTES
+	Logger.start(LOG, "Replaying the local ledger into a fresh cache from byte %d of %d…", resumed_at, size)
+	-- Every ledger batch is its own transaction: with synchronous=FULL each one
+	-- waits for a disk flush, which is what made the Mac replay 320 MB in 138 s.
+	-- The cache is disposable and the replay idempotent and resumable, so its
+	-- batches commit without a flush; the durable mode is restored before any
+	-- live write, and its first commit flushes the whole file.
+	if db:exec("PRAGMA synchronous = OFF;") ~= sqlite3.OK then
+		Logger.warn(LOG, "The replay keeps flushing every batch: %s.", tostring(db:errmsg()))
+	elseif _recovery then
+		-- An interrupted replay restores it too (_cancel_aggregate_recovery).
+		_recovery.durability_off = true
 	end
-	local complete_offset = _last_complete_ledger_offset(ledger)
-	local cursor = _local_ledger_replay_cursor(ledger, complete_offset)
-	if complete_offset == 0 then return true, cursor end
-
-	local rc = db:exec(ledger:sub(1, complete_offset))
-	if rc ~= sqlite3.OK then
+	local function restore_durability()
+		if _recovery then _recovery.durability_off = nil end
+		if db:exec(SqliteWriter.SYNCHRONOUS_PRAGMA) ~= sqlite3.OK then
+			Logger.error(LOG, "Cannot restore the cache's durable commit mode: %s.", tostring(db:errmsg()))
+		end
+	end
+	local exec = function(sql)
+		local rc = db:exec(sql)
+		if rc == sqlite3.OK then return true end
+		local detail = db:errmsg() or ("SQLite result " .. tostring(rc))
 		pcall(function() db:exec("ROLLBACK;") end)
-		Logger.error(LOG, "Local data.sql replay failed: %s.", db:errmsg() or "?")
-		return false, empty_cursor
+		return false, detail
 	end
-	Logger.done(LOG, "Replayed %d durable local-ledger byte(s).", complete_offset)
-	return true, cursor
+	while true do
+		local job = _recovery
+		local deadline = job and job.slice_start_ns and (job.slice_start_ns + RECOVERY_SLICE_NS)
+			or timer.absoluteTime()
+		local status, detail = LedgerReplay.step({
+			path = _paths.data_sql_path, size = size, state = state, exec = exec,
+			clock = timer.absoluteTime, deadline = deadline, cursor = _local_ledger_replay_cursor,
+		})
+		if status == "failed" then
+			restore_durability()
+			Logger.error(LOG, "Local data.sql replay failed at byte %d: %s.", state.offset, tostring(detail))
+			return false, empty_cursor
+		end
+		if status == "done" then
+			restore_durability()
+			Logger.success(LOG, "Replayed %d durable local-ledger byte(s) (%d this start) in %.0f ms.",
+				state.offset, state.offset - resumed_at, (timer.absoluteTime() - started_ns) / 1e6)
+			return true, detail
+		end
+		if not _write_ledger_replay_state(db, state) then
+			Logger.warn(LOG, "Local ledger replay progress could not be saved; a restart repeats its last steps.")
+		end
+		if state.offset >= next_progress then
+			next_progress = state.offset + LEDGER_REPLAY_PROGRESS_BYTES
+			Logger.info(LOG, "Local ledger replay: %d of %d MB.", state.offset // (1024 * 1024), size // (1024 * 1024))
+		end
+		_recovery_pace()
+	end
 end
 
 --- Flush the current recovery walker batch atomically.
@@ -1149,7 +1232,6 @@ local function _clear_derived_device_rows_at_once(db, device_id)
 	return true
 end
 
-local _recovery_pace
 
 --- Remove a single device partition before deterministic re-aggregation.
 --- Inside the cooperative recovery it deletes in committed batches with a pace
@@ -1610,7 +1692,24 @@ end
 --- Full aggregate recovery: foreign raw import, rollover facts, deterministic
 --- walk and the revision mark. Runs inside the recovery coroutine.
 --- @param db userdata SQLite handle.
-local function _recover_aggregate_cache(db)
+local function _recover_aggregate_cache(db, replay_state)
+	if replay_state ~= nil then
+		local replay_ok, cursor = _replay_local_data_sql(db, replay_state)
+		if not replay_ok then
+			Logger.error(LOG, "Skipped aggregate recovery because local ledger replay failed.")
+			return
+		end
+		-- The replayed raw ids and today.log cursor are owned by the ledger, not
+		-- by the derived rebuild. Publishing them only after a successful rebuild
+		-- left a failed one with next_event_id=1 and offset 0: every new event
+		-- then collided with a replayed id (INSERT OR IGNORE dropped it from the
+		-- cache) and data.sql gained the id restart that refuses later rebuilds.
+		_persist_recovery_state(db, cursor)
+		Rotation.set_offset(tonumber(cursor.offset) or 0, cursor.date)
+		if db:exec("DELETE FROM meta WHERE key=" .. _sq(LEDGER_REPLAY_KEY) .. ";") ~= sqlite3.OK then
+			Logger.error(LOG, "The finished ledger replay could not be marked; the next start repeats it.")
+		end
+	end
 	-- Foreign ledgers also carry raw rows only. Import them before the
 	-- deterministic aggregate walk so cross-device totals survive a normal
 	-- TMPDIR purge and older caches gain the missing foreign aggregates.
@@ -1666,10 +1765,10 @@ end
 --- Starts the aggregate recovery as a coroutine fed by timer slices. The first
 --- slice runs now, so a small cache recovers before init returns.
 --- @param db userdata SQLite handle.
-local function _start_aggregate_recovery(db)
+local function _start_aggregate_recovery(db, replay_state)
 	assert(_recovery == nil, "one aggregate recovery at a time")
 	local job = { db = db, slices = 0, started_ns = timer.absoluteTime(), handle = nil }
-	job.co = coroutine.create(function() _recover_aggregate_cache(db) end)
+	job.co = coroutine.create(function() _recover_aggregate_cache(db, replay_state) end)
 	_recovery = job
 	_run_recovery_slice(job)
 end
@@ -1688,6 +1787,10 @@ local function _cancel_aggregate_recovery()
 		if not settled then
 			pcall(Logger.error, LOG, "Aggregate recovery timer cleanup remains pending: %s.", tostring(cancelled))
 		end
+	end
+	if job.durability_off then
+		local called, rc = pcall(function() return job.db:exec(SqliteWriter.SYNCHRONOUS_PRAGMA) end)
+		if not called or rc ~= sqlite3.OK then pcall(Logger.error, LOG, "Cannot restore the cache's durable commit mode after an interrupted replay.") end
 	end
 	pcall(Logger.warn, LOG, "Aggregate cache recovery interrupted after %d slice(s); it restarts at the next start.",
 		job.slices)
@@ -2246,22 +2349,16 @@ local function _init(core_state)
 			_paths.today_log_path, _reset_rollover_cache) then
 			error("pending canonical ledger recovery was refused", 0)
 		end
-		local recovery_ready = true
-		if cache_was_fresh and db then
-			local replay_ok, cursor = _replay_local_data_sql(db)
-			-- The replayed raw ids and today.log cursor are owned by the ledger, not
-			-- by the derived rebuild. Publishing them only after a successful rebuild
-			-- left a failed one with next_event_id=1 and offset 0: every new event
-			-- then collided with a replayed id (INSERT OR IGNORE dropped it from the
-			-- cache) and data.sql gained the id restart that refuses later rebuilds.
-			if replay_ok then _persist_recovery_state(db, cursor)
-			else
-				recovery_ready = false
-				Logger.error(LOG, "Skipped aggregate recovery because local ledger replay failed.")
-			end
+		-- A fresh cache replays the whole ledger: 320 MB after a reboot emptied
+		-- TMPDIR held the main thread 138 s when it ran here (L64). The replay is
+		-- now the recovery coroutine's first stage, in bounded steps, and its
+		-- persisted state makes an interrupted one resume at its last batch.
+		if cache_was_fresh and db and not _write_ledger_replay_state(db, LedgerReplay.new_state()) then
+			error("the fresh cache cannot record its pending ledger replay", 0)
 		end
-		local recovery_due = db and recovery_ready
-			and (cache_was_fresh or _aggregate_cache_revision(db) ~= AGGREGATE_CACHE_REVISION)
+		local replay_state = db and _read_ledger_replay_state(db) or nil
+		local recovery_due = db and (replay_state ~= nil or cache_was_fresh
+			or _aggregate_cache_revision(db) ~= AGGREGATE_CACHE_REVISION)
 		-- Restore persisted counters and n-gram context from meta.
 		if db then
 			local offset_val = 0
@@ -2283,7 +2380,7 @@ local function _init(core_state)
 		end
 		-- Last: the live context above must not land in the middle of its walk.
 		-- It ran synchronously here and held the event taps for 22 s (issue #104).
-		if recovery_due then _start_aggregate_recovery(db) end
+		if recovery_due then _start_aggregate_recovery(db, replay_state) end
 	end
 
 	-- Rotation is normally initialised inside the SQLite branch above, which is
