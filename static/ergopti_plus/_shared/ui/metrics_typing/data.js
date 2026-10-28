@@ -39,6 +39,38 @@
 // ===================================
 // ===================================
 
+// Expected token count for each fixed-length n-gram tab.
+const NGRAM_EXPECTED_LEN = { bg: 2, tg: 3, qg: 4, pg: 5, hx: 6, hp: 7 };
+
+/**
+ * Lowercases grouping keys without inventing fixed native character tokens.
+ * Word and shortcut keys retain whole-text Unicode default lowercase.
+ * @param {string} key - The original native grouping key.
+ * @param {string} tab_name - The destination metric category.
+ * @returns {string} The category's case-insensitive grouping key.
+ */
+function lowercase_metric_key(key, tab_name) {
+	const lowered = key.toLowerCase();
+	if (tab_name !== 'c' && !Object.hasOwn(NGRAM_EXPECTED_LEN, tab_name)) return lowered;
+	if (lowered === key || /^[\x00-\x7F]*$/.test(key)) return lowered;
+	const source_chars = Array.from(key);
+	const lowered_chars = Array.from(lowered);
+	if (source_chars.length === lowered_chars.length) return lowered;
+
+	// Keep full-string context (Greek final sigma), but retain any scalar whose
+	// lowercase spelling would manufacture additional native character tokens.
+	let lowered_index = 0;
+	const projected = source_chars.map((character) => {
+		const width = Array.from(character.toLowerCase()).length;
+		const result = width === 1 ? lowered_chars[lowered_index] : character;
+		lowered_index += width;
+		return result;
+	});
+	if (lowered_index !== lowered_chars.length)
+		throw new Error('Metric lowercase mapping lost Unicode scalar alignment');
+	return projected.join('');
+}
+
 /**
  * Merges one source n-gram dictionary into a target accumulator, respecting
  * all active toggle filters (HS, LLM, manual, spaces, case-sensitivity).
@@ -71,19 +103,10 @@ function merge_dict(
 		tab_name === 'sc_pg';
 
 	Object.keys(source).forEach((k) => {
-		// Fix potential mojibake BEFORE toLowerCase: Hammerspoon's json.encode may pass
-		// raw UTF-8 bytes through evaluateJavaScript where each byte is treated as a
-		// Latin-1 code point.
-		// The UTF-8 encoding of NBSP (U+00A0) is [0xC2, 0xA0] → "Â\u00A0" (2 chars).
-		// The UTF-8 encoding of NNBSP (U+202F) is [0xE2, 0x80, 0xAF] → "â\u0080¯" (3 chars).
-		// CRITICAL: normalization must happen before toLowerCase() because toLowerCase()
-		// converts U+00C2 ("Â") to U+00E2 ("â"), breaking the NBSP replacement pattern.
-		// U+0080 (PAD control) never appears in legitimate typed text, making these safe.
-		let display_k = k
-			.replace(/\u00C2\u00A0/g, '\u00A0') // "Â" + NBSP → NBSP
-			.replace(/\u00E2\u0080\u00AF/g, '\u202F'); // "â" + PAD + "¯" → NNBSP
+		// Native JSON already carries Unicode; byte-repair guesses corrupt literal text.
+		let display_k = k;
 
-		if (!case_sensitive) display_k = display_k.toLowerCase();
+		if (!case_sensitive) display_k = lowercase_metric_key(display_k, tab_name);
 
 		// Normalize known control characters to their bracket-marker or space equivalents
 		// so they pass the ctrl-char filters and render with proper chip labels in all tabs.
@@ -106,7 +129,9 @@ function merge_dict(
 		if (!show_spaces && !is_word_ngram && display_k.includes(' ')) return;
 
 		const item = source[k];
-		const total_c = item.c || 0;
+		// Word storage separates clean and corrected completions; both are occurrences.
+		const error_c = item.e || 0;
+		const total_c = (item.c || 0) + (tab_name === 'w' || is_word_ngram ? error_c : 0);
 		const hs_c = item.hs || 0;
 		const llm_c = item.llm || 0;
 		const other_c = item.o || 0;
@@ -134,6 +159,7 @@ function merge_dict(
 					count: 0,
 					time: 0,
 					errors: 0,
+					accuracy_errors: 0,
 					synth_hs: 0,
 					synth_llm: 0,
 					synth_other: 0
@@ -146,7 +172,13 @@ function merge_dict(
 
 		target[display_k].count += real_count;
 		target[display_k].time += item.t || 0;
-		target[display_k].errors += item.e || 0;
+		target[display_k].errors += error_c;
+		// Evaluate physical-control policy before case folding can erase marker identity.
+		const accuracy_exempt =
+			tab_name !== 'w' &&
+			!is_word_ngram &&
+			(k.includes('[BS]') || k.includes('\x08') || k.toLowerCase() === 'backspace');
+		target[display_k].accuracy_errors += accuracy_exempt ? 0 : error_c;
 		target[display_k].synth_hs += filtered_hs;
 		target[display_k].synth_llm += filtered_llm;
 		target[display_k].synth_other += other_c;
@@ -234,37 +266,35 @@ function update_manifest_scope() {
 	const start_input = document.getElementById('date_start');
 	const end_input = document.getElementById('date_end');
 	app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
-	if (app_state.manifest_dates_sorted.length > 0) {
-		const app_set = new Set();
-		app_state.manifest_dates_sorted.forEach((date) => {
-			Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
-				if (app_name !== 'Unknown' && app_name !== '_sys' && app_name !== '_system') {
-					app_set.add(app_name);
-				}
-			});
+	const app_set = new Set();
+	app_state.manifest_dates_sorted.forEach((date) => {
+		Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
+			if (app_name !== 'Unknown' && app_name !== '_sys' && app_name !== '_system') {
+				app_set.add(app_name);
+			}
 		});
+	});
 
-		const previous_selection = new Set(app_state.selected_apps);
-		const previous_mode = app_state.app_selection_mode || APP_SELECTION_MODE.UNINITIALIZED;
+	const previous_selection = new Set(app_state.selected_apps);
+	const previous_mode = app_state.app_selection_mode || APP_SELECTION_MODE.UNINITIALIZED;
 
-		app_state.available_apps = Array.from(app_set).sort((a, b) => a.localeCompare(b));
+	app_state.available_apps = Array.from(app_set).sort((a, b) => a.localeCompare(b));
 
-		if (
-			previous_mode === APP_SELECTION_MODE.UNINITIALIZED ||
-			previous_mode === APP_SELECTION_MODE.ALL
-		) {
-			app_state.selected_apps = new Set(app_state.available_apps);
-			app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
-		} else if (previous_mode === APP_SELECTION_MODE.NONE) {
-			app_state.selected_apps = new Set();
-		} else {
-			const next_sel = new Set();
-			app_state.available_apps.forEach((app) => {
-				if (previous_selection.has(app)) next_sel.add(app);
-			});
-			app_state.selected_apps = next_sel;
-			if (next_sel.size === 0) app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
-		}
+	if (
+		previous_mode === APP_SELECTION_MODE.UNINITIALIZED ||
+		previous_mode === APP_SELECTION_MODE.ALL
+	) {
+		app_state.selected_apps = new Set(app_state.available_apps);
+		app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
+	} else if (previous_mode === APP_SELECTION_MODE.NONE) {
+		app_state.selected_apps = new Set();
+	} else {
+		const next_sel = new Set();
+		app_state.available_apps.forEach((app) => {
+			if (previous_selection.has(app)) next_sel.add(app);
+		});
+		app_state.selected_apps = next_sel;
+		if (next_sel.size === 0) app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
 	}
 
 	if (start_input && end_input && (!start_input.value || !end_input.value)) {
@@ -3055,13 +3085,18 @@ let _apps_sort_asc = false;
  * is the user's most-alternated workflow (typically editor ↔ browser).
  */
 function render_apps_kpi() {
-	const per_app = {}; // app → { chars, time_ms, switches_out: { other: count } }
+	const per_app = Object.create(null); // app → { chars, time_ms, switches_out: { other: count } }
 	const layouts_total = {}; // layout_id → cumulative count across filtered apps
 	const kc_hold_total = {}; // kc_str → { s, n, m } summed across filtered apps
 	_foreach_filtered_app((app, date_str, app_name) => {
 		const a =
 			per_app[app_name] ||
-			(per_app[app_name] = { chars: 0, time_ms: 0, app_time_ms: 0, switches_out: {} });
+			(per_app[app_name] = {
+				chars: 0,
+				time_ms: 0,
+				app_time_ms: 0,
+				switches_out: Object.create(null)
+			});
 		a.chars += app.chars || 0;
 		a.time_ms += app.time || 0;
 		a.app_time_ms += app.app_time_ms || 0;
@@ -3126,17 +3161,22 @@ function render_apps_kpi() {
 	);
 
 	// Build symmetric app-pair affinity: both directions of switching count.
-	const pair_count = {};
+	const pair_count = new Map();
 	_apps_data.forEach((d) => {
 		Object.entries(d.switches_out).forEach(([other, n]) => {
-			const key = [d.name, other].sort().join(' ↔ ');
-			pair_count[key] = (pair_count[key] || 0) + n;
+			const endpoints = [d.name, other].sort();
+			const key = JSON.stringify(endpoints);
+			const pair = pair_count.get(key);
+			if (pair) pair.count += n;
+			else pair_count.set(key, { endpoints, count: n });
 		});
 	});
-	const top_pair = Object.entries(pair_count).sort((a, b) => b[1] - a[1])[0];
+	const top_pair = Array.from(pair_count.values()).sort((a, b) => b.count - a.count)[0];
 	set(
 		'apps_top_pair',
-		top_pair ? `${escape_html(top_pair[0])} (${format_number(top_pair[1])}×)` : '—'
+		top_pair
+			? `${escape_html(top_pair.endpoints.join(' ↔ '))} (${format_number(top_pair.count)}×)`
+			: '—'
 	);
 
 	// Layouts seen — sorted by usage, top 3 to keep the value compact

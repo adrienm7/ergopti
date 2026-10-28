@@ -102,8 +102,14 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 
 	; Singleton — a second open replaces the previous picker (its callback is
 	; superseded), matching the native dialog which only ever shows one.
-	if (_ActPickWeb_Gui != 0)
+	if (_ActPickWeb_Gui != 0) {
+		RetiredEpoch := _ActPickWeb_SessionEpoch + !_ActPickWeb_ResetDone
 		_ActPickWeb_Close()
+		; Native retirement can admit a newer public request. This older
+		; replacement must not publish another picker over that successor.
+		if _ActPickWeb_SessionEpoch != RetiredEpoch || _ActPickWeb_Gui != 0
+			return true
+	}
 	_ActPickWeb_SessionEpoch += 1
 	SessionEpoch := _ActPickWeb_SessionEpoch
 	_ActPickWeb_ResetDone := false
@@ -114,6 +120,12 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 	_ActPickWeb_InitJs    := _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId)
 
 	g := Gui_Create("+Resize +MinSize360x360", Title)
+	; WM_CREATE runs inside the constructor, before its Gui can be published.
+	; A public successor admitted there owns the singleton from now on.
+	if !_ActPickWeb_SessionCurrent(SessionEpoch) {
+		g.Destroy()
+		return true
+	}
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0
@@ -123,7 +135,18 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 
 	; Native Show can dispatch Close before returning. Its existing handler
 	; must already own this exact window so cancellation can destroy it.
-	_ActPickWeb_Gui := g
+	Admitted := false
+	PreviousCritical := Critical("On")
+	try {
+		if _ActPickWeb_SessionCurrent(SessionEpoch) && !_ActPickWeb_ResetDone {
+			_ActPickWeb_Gui := g
+			Admitted := true
+		}
+	} finally Critical(PreviousCritical)
+	if !Admitted {
+		g.Destroy()
+		return true
+	}
 	; Show BEFORE creating the control — a hidden Gui has a zero client rect, so
 	; the control lays out blank and never recovers.
 	g.Show("w" . ACTPICK_WIDTH . " h" . ACTPICK_HEIGHT . " Center")
@@ -365,7 +388,11 @@ _ActPickWeb_Confirm(Id, HasParameter := false, Parameter := "", HasProvider := f
 		try cb(Mapped)
 		finally GestureClearPickedParameter()
 		return true
-	} catch Any {
+	} catch Any as Failure {
+		if Failure is Error
+			LoggerError("ActionPicker", "Action picker confirmation failed ({1}): {2}.", Type(Failure), Failure.Message)
+		else
+			LoggerError("ActionPicker", "Action picker confirmation failed with a thrown {1} value.", Type(Failure))
 		return false
 	} finally _ActPickWeb_Confirming := false
 }
@@ -622,37 +649,39 @@ _ActPickWeb_Reset() {
 	global _ActPickWeb_Controller, _ActPickWeb_WebView, _ActPickWeb_MsgSub, _ActPickWeb_NavSub
 	global _ActPickWeb_OnConfirm, _ActPickWeb_ResetDone, _ActPickWeb_SessionEpoch, _ActPickWeb_AfterClose
 
-	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
-	; Completed against this controller. Re-running the unset lines below would
-	; call __Delete's bound ComCall a SECOND time against a COM pointer WebView2
-	; has already torn down (Controller.Close() releases CoreWebView2's underlying
-	; interfaces) — a genuine SEH access violation that no try/catch can intercept.
-	if _ActPickWeb_ResetDone
-		return
-	_ActPickWeb_ResetDone := true
-	_ActPickWeb_SessionEpoch += 1
+	; Detach the exact retired session before native teardown can pump a public
+	; replacement. Local aliases keep every potentially final reference alive
+	; until the RAM-only transaction has released Critical.
+	Controller := unset, View := unset, MessageSubscription := unset, NavigationSubscription := unset
+	PreviousCritical := Critical("On")
+	try {
+		if _ActPickWeb_ResetDone
+			return
+		_ActPickWeb_ResetDone := true
+		_ActPickWeb_SessionEpoch += 1
+		if IsSet(_ActPickWeb_Controller)
+			Controller := _ActPickWeb_Controller
+		if IsSet(_ActPickWeb_WebView)
+			View := _ActPickWeb_WebView
+		if IsSet(_ActPickWeb_MsgSub)
+			MessageSubscription := _ActPickWeb_MsgSub
+		if IsSet(_ActPickWeb_NavSub)
+			NavigationSubscription := _ActPickWeb_NavSub
+		Confirm := _ActPickWeb_OnConfirm, AfterClose := _ActPickWeb_AfterClose
+		_ActPickWeb_Controller := unset, _ActPickWeb_WebView := unset
+		_ActPickWeb_MsgSub := unset, _ActPickWeb_NavSub := unset
+		_ActPickWeb_OnConfirm := 0, _ActPickWeb_AfterClose := 0
+	} finally Critical(PreviousCritical)
 	_ActPickWeb_ProgramRetire()
 
-	; The whole teardown runs under one try: a hard COM access violation can
-	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
-	; exceptions — it does NOT catch that class of failure, but wrapping the
-	; sequence still protects the *other* lines from a preceding non-fatal COM
-	; error so the globals below are always cleared even when the unsubscribe
-	; itself fails.
+	; Subscription destructors use their still-live controller. Teardown owns
+	; only these local aliases, so a successor's entire published state survives.
 	try {
-		; Release the subscriptions FIRST, while the controller is still alive. Their
-		; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
-		; Controller.Close() raises a COM error that — uncaught in the window's
-		; Close-event thread — terminates the entire AHK script.
-		_ActPickWeb_MsgSub := unset
-		_ActPickWeb_NavSub := unset
-		if IsSet(_ActPickWeb_Controller)
-			_ActPickWeb_Controller.Close()
+		MessageSubscription := unset
+		NavigationSubscription := unset
+		if IsSet(Controller)
+			Controller.Close()
 	}
-	_ActPickWeb_Controller := unset
-	_ActPickWeb_WebView    := unset
-	_ActPickWeb_OnConfirm  := 0
-	_ActPickWeb_AfterClose := 0
 }
 
 ; Discovery closes its resources independently from WebView COM teardown. An

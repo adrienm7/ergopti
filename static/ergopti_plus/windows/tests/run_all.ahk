@@ -122,6 +122,7 @@ _TestResultsBeginRun()
 ; AppState — must come before test_stubs.ahk because the stubs reference
 ; AppState fields directly, and before any infra/ file that reads AppState.
 #Include ../infra/app_state.ahk
+#Include support/native_cli_diagnostics.ahk
 
 ; Stubs second — they define ScriptInformation, Features, SendNewResult,
 ; WrapTextIfSelected, DeadKey, ToggleCapsLock, etc., which infra/ files
@@ -449,6 +450,7 @@ InstallSendNoOps()
 #Include unit/ui/healthcheck/test_healthcheck_core.ahk
 #Include unit/ui/healthcheck/test_healthcheck_configuration.ahk
 #Include unit/ui/healthcheck/test_diagnostics_collection.ahk
+#Include unit/ui/healthcheck/test_archive_failure_observation.ahk
 #Include unit/ui/healthcheck/test_diagnostics_window_control.ahk
 #Include unit/ui/healthcheck/test_healthcheck_owner_snapshots.ahk
 #Include unit/infra/input_probe/test_input_probe.ahk
@@ -779,6 +781,9 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/hotstrings/magic_key/test_magic_key_source_menu.ahk
 #Include unit/modules/hotstrings/magic_key/test_magic_key_source_hotkeys.ahk
 #Include unit/modules/keymap/test_layout_catalogue.ahk
+#Include unit/modules/keymap/test_layout_registry_download_custody.ahk
+#Include unit/modules/keymap/test_layout_registry_late_poll.ahk
+#Include unit/modules/keymap/test_layout_registry_inline_callback.ahk
 #Include unit/modules/keymap/test_layout_installed_record_corpora.ahk
 #Include unit/modules/keymap/test_layout_extension_runtime.ahk
 #Include unit/modules/keymap/test_layout_extension_menu.ahk
@@ -791,6 +796,7 @@ _LLM_Deps_State := "ready"
 #Include ../ui/menu/menu_layout.ahk
 #Include unit/modules/keymap/test_layout_manager_host.ahk
 #Include unit/modules/keymap/test_layout_composer_host.ahk
+#Include unit/modules/keymap/test_layout_composer_stage_ownership.ahk
 #Include unit/modules/keymap/test_layout_composer_check.ahk
 #Include unit/ui/field_check/test_network_check.ahk
 #Include unit/modules/keymap/test_ergopti_keylayout_tables.ahk
@@ -859,6 +865,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/modules/llm/api/test_llm_backend_lifecycle_dispatch.ahk
 #Include unit/modules/llm/prediction/test_llm_generate_prediction_feedback.ahk
 #Include unit/modules/llm/menu/test_llm_menu_persistence.ahk
+#Include unit/infra/lifecycle/test_llm_persistence_runner.ahk
 #Include unit/modules/llm/api/test_llm_temperature_boundary.ahk
 #Include unit/modules/llm/menu/test_llm_numeric_option_ranges.ahk
 #Include unit/modules/llm/api/test_llm_sync_target.ahk
@@ -1166,6 +1173,11 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/test_keystats_llm_accepted_metrics.ahk
 #Include unit/modules/keystats/metrics/test_metrics_sqlite_fixture_cleanup.ahk
 #Include unit/modules/keystats/test_keystats_shortcut_projection.ahk
+#Include unit/modules/keystats/test_keystats_word_projection_contract.ahk
+#Include unit/modules/keystats/test_keystats_accuracy_projection_contract.ahk
+#Include unit/modules/keystats/test_keystats_unicode_projection_contract.ahk
+#Include unit/modules/keystats/test_keystats_case_projection_contract.ahk
+#Include unit/modules/keystats/test_keystats_app_pair_projection_contract.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader_ngram_sources.ahk
 #Include unit/modules/keystats/ergonomics/test_roi_prune_bounded.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader_sql_fail_loud.ahk
@@ -1219,6 +1231,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/reader/test_klr_cache_sql_read_failure.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_timings.ahk
 #Include unit/modules/keystats/reader/test_klr_append_compensation.ahk
+#Include unit/modules/keystats/reader/test_klr_closed_comment_refresh.ahk
 #Include unit/modules/keystats/reader/test_klr_stream_writer_interleaving.ahk
 #Include unit/modules/keystats/metrics/test_metrics_full_retry_cadence.ahk
 #Include meta/modules/keystats/metrics/test_metrics_committed_ingest_signal.ahk
@@ -1300,6 +1313,11 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/test_keystats_json_64bit_decode.ahk
 #Include meta/adapters/crash_report/test_crash_build_offthread.ahk
 #Include meta/suite/test_assertions_are_case_sensitive.ahk
+#Include meta/suite/test_adapter_contract_exception_delivery.ahk
+#Include meta/suite/test_adapter_contract_boolean_types.ahk
+#Include meta/suite/test_no_throw_sentinel_delivery.ahk
+#Include meta/suite/test_retired_callback_exception_delivery.ahk
+#Include meta/suite/test_live_drive_failure_delivery.ahk
 #Include meta/modules/hotstrings/personal/test_personal_hotstring_node_shape.ahk
 #Include meta/modules/hotstrings/personal/test_personal_hotstring_seed.ahk
 #Include meta/modules/hotstrings/personal/test_personal_hotstring_new_section_seed.ahk
@@ -2051,6 +2069,7 @@ _LogBootProgress("keystats modules + tests included")
 ; The local reload control rides the Diagnostics endpoint owner above.
 #Include ../infra/driver_control.ahk
 #Include unit/infra/control/test_driver_control.ahk
+#Include unit/infra/control/test_driver_control_cli.ahk
 #Include ../ui/healthcheck/collection.ahk
 #Include unit/ui/webview/test_ui_warm_hosts.ahk
 #Include ../ui/healthcheck/helpers.ahk
@@ -2063,6 +2082,9 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/platform/remap/altgr/test_kana_altgr_ctrl_chords.ahk
 #Include ../ui/error_dialog/init.ahk
 #Include unit/ui/windows/test_error_dialog.ahk
+#Include unit/ui/webview/test_onboarding_open_generation.ahk
+#Include unit/ui/webview/test_changelog_open_generation.ahk
+#Include unit/ui/webview/test_changelog_restore_authority.ahk
 #Include unit/ui/windows/test_window_title_captions.ahk
 #Include ../ui/update_check/init.ahk
 #Include unit/modules/updater/test_updater_result_dialog_states.ahk

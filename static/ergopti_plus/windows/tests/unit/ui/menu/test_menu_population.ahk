@@ -373,3 +373,168 @@ _MP_BackgroundTimerPreservesPriority() {
 }
 Test("menu population: background timer never interrupts foreground controller initialization (menu-background-priority)",
 	_MP_BackgroundTimerPreservesPriority)
+
+_MPA_NativeSetTimer(State, Self, Params*) {
+	global MENU_POPULATION_TICK_MS, MENU_POPULATION_THREAD_PRIORITY
+	OwnedAdmission := Params.Length == 3
+		&& Params[2] == -MENU_POPULATION_TICK_MS && Params[3] == MENU_POPULATION_THREAD_PRIORITY
+		&& (State.InStart || (State.HasOwnProp("RejectRearm") && Params[1] == State.Callback))
+	if OwnedAdmission {
+		State.Callback := Params[1]
+		AssertTrue(HasMethod(State.Callback, "Call"), "the subject must supply its actual native timer capability")
+		if State.Reject || (State.HasOwnProp("RejectRearm") && State.RejectRearm && !State.InStart) {
+			State.Rejections += 1
+			throw State.Failure
+		}
+	}
+	Self.DeleteProp("Call")
+	try Result := Self.Call(Params*)
+	finally Self.DefineProp("Call", {Call: State.Observer})
+	if OwnedAdmission
+		State.NativeAdmissions += 1
+	return Result
+}
+
+_MPA_Start(Owner, State) {
+	State.InStart := true
+	try return Owner.Start()
+	finally State.InStart := false
+}
+
+_MPA_StartAdmission(Reject) {
+	AssertFalse(SetTimer.HasOwnProp("Call"), "the fixture cannot replace a foreign native timer observer")
+	SavedSuspend := A_IsSuspended
+	Owner := MenuPopulation()
+	Leaf := Owner.Create(_MP_TestRows(), "admission-transaction", 1)
+	State := {Reject: Reject, Rejections: 0, NativeAdmissions: 0, InStart: false,
+		Callback: 0, Observer: 0, Failure: Error("Injected native timer admission refusal")}
+	State.Observer := _MPA_NativeSetTimer.Bind(State)
+	SetTimer.DefineProp("Call", {Call: State.Observer})
+	try {
+		Suspend(false)
+		AssertEqual(1, Owner.Pending.Count)
+		AssertEqual(1, _MenuItemCount(Leaf), "the subject must retain a real seeded native menu")
+		if Reject {
+			Failure := 0
+			try _MPA_Start(Owner, State)
+			catch as Err
+				Failure := Err
+			AssertTrue(Failure == State.Failure, "the native admission refusal must preserve its original identity")
+			AssertEqual(1, State.Rejections)
+			AssertEqual(0, State.NativeAdmissions)
+			AssertFalse(Owner.Started, "a refused timer cannot latch startup success")
+			AssertFalse(HasMethod(Owner.Timer, "Call"), "a refused timer must release its unpublished callback")
+			AssertEqual(1, Owner.Pending.Count)
+			State.Reject := false
+		}
+		AssertTrue(_MPA_Start(Owner, State), "the same owner must admit a genuine native timer")
+		AssertEqual(1, State.NativeAdmissions)
+		Thread("Priority", -2)
+		Deadline := A_TickCount + 1500
+		while Owner.Pending.Count > 0 && A_TickCount < Deadline
+			Sleep(5)
+		AssertEqual(0, Owner.Pending.Count, "actual native callbacks must finish the prepared menu")
+		AssertEqual(1, Owner.Completed)
+		AssertFalse(Owner.Started)
+		AssertFalse(HasMethod(Owner.Timer, "Call"))
+		_MP_AssertComplete(Leaf)
+	} finally {
+		Thread("Priority", 0)
+		if SetTimer.HasOwnProp("Call") {
+			Descriptor := SetTimer.GetOwnPropDesc("Call")
+			AssertTrue(Descriptor.Call == State.Observer)
+			SetTimer.DeleteProp("Call")
+		}
+		try Owner.Stop()
+		finally {
+			Owner.Pending.Clear()
+			Leaf.Delete()
+			MenuDispatcher_PruneMenu(Leaf)
+			State.Observer := 0, State.Callback := 0
+			Suspend(SavedSuspend)
+		}
+	}
+}
+Test("menu population: genuine native admission drains and retires a private menu (menu-population-admission-transaction)",
+	_MPA_StartAdmission.Bind(false))
+Test("menu population: refused native admission remains retryable without a false latch (menu-population-admission-transaction)",
+	_MPA_StartAdmission.Bind(true))
+
+_MPA_ObserveCallbackError(State, Err, *) {
+	State.Errors.Push(Err)
+	return 1
+}
+
+_MPA_RearmAdmission() {
+	global _MenuDispatchTokens
+	AssertFalse(SetTimer.HasOwnProp("Call"))
+	SavedSuspend := A_IsSuspended
+	Owner := MenuPopulation()
+	Leaf := Owner.Create(_MP_LargeRows(), "rearm-admission-transaction", 1)
+	SeedId := _MenuItemIdAtPosition(Leaf, 0), SeedToken := _MenuDispatchTokens[SeedId]
+	State := {Reject: false, RejectRearm: true, Rejections: 0, NativeAdmissions: 0,
+		InStart: false, Callback: 0, Observer: 0, Errors: [],
+		Failure: Error("Injected native timer rearm refusal")}
+	State.Observer := _MPA_NativeSetTimer.Bind(State)
+	ErrorFn := _MPA_ObserveCallbackError.Bind(State)
+	SetTimer.DefineProp("Call", {Call: State.Observer})
+	try {
+		Suspend(false)
+		OnError(ErrorFn, -1)
+		AssertEqual(1, Owner.Pending.Count)
+		AssertEqual(1, _MenuItemCount(Leaf))
+		AssertTrue(_MPA_Start(Owner, State))
+		AssertEqual(1, State.NativeAdmissions)
+		Thread("Priority", -2)
+		Deadline := A_TickCount + 1500
+		while State.Errors.Length == 0 && A_TickCount < Deadline
+			Sleep(5)
+		Thread("Priority", 0)
+		AssertEqual(1, State.Errors.Length, "the actual native callback failure must be received exactly once")
+		AssertTrue(State.Errors[1] == State.Failure)
+		AssertEqual(1, State.Rejections)
+		AssertEqual(1, State.NativeAdmissions)
+		AssertEqual(1, Owner.Pending.Count)
+		AssertEqual(17, _MenuItemCount(Leaf), "the real first batch appends before the rejected native rearm")
+		AssertEqual(0, Owner.Completed)
+		AssertFalse(Owner.Failed, "valid prepared rows remain retryable after a timer admission error")
+		AssertFalse(Owner.Started, "a completed one-shot cannot leave a false running latch after its rearm is refused")
+		AssertFalse(HasMethod(Owner.Timer, "Call"))
+		State.RejectRearm := false
+		AssertTrue(_MPA_Start(Owner, State))
+		Thread("Priority", -2)
+		Deadline := A_TickCount + 1500
+		while Owner.Pending.Count > 0 && A_TickCount < Deadline
+			Sleep(5)
+		Thread("Priority", 0)
+		AssertEqual(0, Owner.Pending.Count)
+		AssertEqual(1, Owner.Completed)
+		AssertEqual(1, State.Errors.Length, "no unrelated callback error may be hidden by this fixture")
+		AssertTrue(State.Errors[1] == State.Failure)
+		AssertFalse(Owner.Started)
+		AssertFalse(HasMethod(Owner.Timer, "Call"))
+		AssertEqual(66, _MenuItemCount(Leaf), "the genuine retry completes the native menu without replaying its prefix")
+		AssertEqual(SeedId, _MenuItemIdAtPosition(Leaf, 0))
+		AssertEqual(SeedToken, _MenuDispatchTokens[SeedId])
+		AssertEqual("Choice 17", _MP_ReadLabel(Leaf, 16))
+		AssertEqual("Choice 18", _MP_ReadLabel(Leaf, 18))
+	} finally {
+		Thread("Priority", 0)
+		OnError(ErrorFn, 0)
+		if SetTimer.HasOwnProp("Call") {
+			Descriptor := SetTimer.GetOwnPropDesc("Call")
+			AssertTrue(Descriptor.Call == State.Observer)
+			SetTimer.DeleteProp("Call")
+		}
+		try Owner.Stop()
+		finally {
+			Owner.Pending.Clear()
+			Leaf.Delete()
+			MenuDispatcher_PruneMenu(Leaf)
+			State.Observer := 0, State.Callback := 0
+			Suspend(SavedSuspend)
+		}
+	}
+}
+Test("menu population: actual one-shot rearm refusal retains a retryable native menu cursor (menu-population-admission-transaction)",
+	_MPA_RearmAdmission)

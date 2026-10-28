@@ -570,3 +570,268 @@ for _TDC_ClaimedPidCase in [
 ]
 	Test("driver-control: claimed " . _TDC_ClaimedPidCase[1] . " keeps numeric process identity (driver-control-claimed-pid-kind)",
 		_TDC_ClaimedDriverPidKind.Bind(_TDC_ClaimedPidCase[1], _TDC_ClaimedPidCase[2]))
+
+_TDC_DeadlineKind(Phase, Token, ExpectedKind) {
+	Spec := _TDC_Spec(), Pid := ProcessExist()
+	AssertTrue(Pid is Integer && Pid > 1)
+	Text := '{"schema":1,"request_id":"deadline-kind","state":"'
+		. (Phase == "pending" ? "requested" : "claimed") . '","driver_pid":' . Pid
+		. ',"successor_pid":' . (Phase == "pending" ? "null" : String(Pid)) . ',"deadline":' . Token . "}"
+	Decoded := JsonParse(Text)
+	AssertEqual("deadline-kind", Decoded["request_id"])
+	AssertEqual(Pid, Decoded["driver_pid"])
+	Result := DriverControl_Resolve(Spec, Text, Pid, 1700000000, &Kind)
+	AssertEqual(ExpectedKind, Kind, "only an actual JSON number deadline may resolve a pending reload")
+	Prefix := '{"schema":1,"request_id":"deadline-kind","state":"'
+	if ExpectedKind == "claimed"
+		AssertEqual(Prefix . 'claimed","driver_pid":' . Pid . ',"successor_pid":' . Pid . ',"deadline":1700000120}`n', Result)
+	else if ExpectedKind == "completed"
+		AssertEqual(Prefix . 'completed","driver_pid":' . Pid . ',"successor_pid":' . Pid . '}`n', Result)
+	else if ExpectedKind == "timeout"
+		AssertEqual(Prefix . 'timeout","driver_pid":' . Pid . ',"reason":"deadline"}`n', Result)
+	else if ExpectedKind == ""
+		AssertEqual("", Result)
+	else
+		throw Error("Unknown control deadline fixture outcome")
+}
+for _TDC_DeadlinePhase in ["pending", "claimed"]
+	for _TDC_DeadlineCase in [
+		["future integer", "1700000120", "claimed", "completed"],
+		["expired integer", "1", "timeout", "timeout"],
+		["boolean true", "true", "", ""],
+		["boolean false", "false", "", ""],
+		["numeric string", '"1700000120"', "", ""],
+		["null", "null", "", ""]
+	]
+		Test("driver-control: " . _TDC_DeadlinePhase . " " . _TDC_DeadlineCase[1] . " preserves deadline kind (driver-control-deadline-kind)",
+			_TDC_DeadlineKind.Bind(_TDC_DeadlinePhase, _TDC_DeadlineCase[2],
+				_TDC_DeadlineCase[_TDC_DeadlinePhase == "pending" ? 3 : 4]))
+
+_TDC_RequestIdCharacters(Value, Expected, Length) {
+	if Value is String
+		AssertEqual(Length, StrLen(Value), "the real identifier fixture must preserve every supplied code unit")
+	else
+		AssertEqual(0, Length)
+	if Expected
+		AssertTrue(DriverControl_IsRequestId(Value))
+	else
+		AssertFalse(DriverControl_IsRequestId(Value), "a control identifier cannot contain a final newline or exceed its complete character limit")
+}
+_TDC_TokenCharacters(Value, Expected, Length) {
+	Spec := _TDC_Spec()
+	AssertTrue(Value is String)
+	AssertEqual(Length, StrLen(Value), "the token fixture must preserve the actual final newline and complete length")
+	if Expected
+		AssertTrue(DriverControl_IsToken(Spec, Value))
+	else
+		AssertFalse(DriverControl_IsToken(Spec, Value), "every token code unit must be a lowercase hexadecimal digit")
+}
+_TDC_MaxIdentifier := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+for _TDC_IdRow in [
+	["allowed alphabet", "aZ_09-", true, 6], ["empty", "", false, 0],
+	["maximum length", _TDC_MaxIdentifier, true, 64], ["oversize", _TDC_MaxIdentifier . "a", false, 65],
+	["LF suffix", "ok`n", false, 3], ["CRLF suffix", "ok`r`n", false, 4], ["CR suffix", "ok`r", false, 3],
+	["maximum LF suffix", _TDC_MaxIdentifier . "`n", false, 65],
+	["maximum CRLF suffix", _TDC_MaxIdentifier . "`r`n", false, 66],
+	["interior LF", "a`nb", false, 3], ["space suffix", "ok ", false, 3], ["number", 23, false, 0]
+]
+	Test("driver-control: request id " . _TDC_IdRow[1] . " validates every code unit (driver-control-character-boundaries)",
+		_TDC_RequestIdCharacters.Bind(_TDC_IdRow[2], _TDC_IdRow[3], _TDC_IdRow[4]))
+for _TDC_TokenRow in [
+	["valid hexadecimal", _TDC_MaxIdentifier, true, 64],
+	["LF suffix", SubStr(_TDC_MaxIdentifier, 1, 63) . "`n", false, 64],
+	["CRLF suffix", SubStr(_TDC_MaxIdentifier, 1, 62) . "`r`n", false, 64],
+	["uppercase", StrUpper(_TDC_MaxIdentifier), false, 64],
+	["short", SubStr(_TDC_MaxIdentifier, 1, 63), false, 63],
+	["long", _TDC_MaxIdentifier . "a", false, 65],
+	["CR suffix", SubStr(_TDC_MaxIdentifier, 1, 63) . "`r", false, 64],
+	["LF prefix", "`n" . SubStr(_TDC_MaxIdentifier, 1, 63), false, 64],
+	["interior LF", SubStr(_TDC_MaxIdentifier, 1, 31) . "`n" . SubStr(_TDC_MaxIdentifier, 33), false, 64]
+]
+	Test("driver-control: token " . _TDC_TokenRow[1] . " validates every code unit (driver-control-character-boundaries)",
+		_TDC_TokenCharacters.Bind(_TDC_TokenRow[2], _TDC_TokenRow[3], _TDC_TokenRow[4]))
+
+_TDC_RequestIdSessionBoundary(Id, Expected) {
+	_TDC_World(Body)
+	Body(World) {
+		World.Session.Start()
+		Text := '{"schema":1,"token":"' . World.Token . '","request_id":' . JsonStringLiteral(Id) . "}"
+		Decoded := JsonParse(Text)
+		AssertEqual(StrLen(Id), StrLen(Decoded["request_id"]))
+		AssertEqual(0, StrCompare(Id, Decoded["request_id"], true), "the real JSON file must preserve the complete identifier")
+		RequestPath := World.Session.Path("request")
+		AssertTrue(FSWriteDurable(RequestPath, Text))
+		Acknowledged := World.Endpoint.Call()
+		if Expected {
+			AssertEqual(1, World.Calls.Length)
+			AssertTrue(Acknowledged)
+			Result := JsonParse(_TDC_Read(World, "result"))
+			AssertEqual("requested", Result["state"])
+			AssertEqual(Id, Result["request_id"])
+		} else {
+			AssertEqual(0, World.Calls.Length, "an invalid complete identifier must never reach the actual reload boundary")
+			AssertFalse(Acknowledged)
+			Result := JsonParse(_TDC_Read(World, "result"))
+			AssertEqual("refused", Result["state"])
+			AssertEqual("malformed", Result["reason"])
+			AssertTrue(Result["request_id"] == JSON_NULL)
+		}
+		AssertFalse(FileExist(RequestPath), "the real private request file is consumed exactly once")
+	}
+}
+for _TDC_IdSessionRow in [["valid", "line-id", true], ["LF suffix", "line-id`n", false], ["CRLF suffix", "line-id`r`n", false]]
+	Test("driver-control: real request file " . _TDC_IdSessionRow[1] . " respects complete identifier validation (driver-control-character-boundaries)",
+		_TDC_RequestIdSessionBoundary.Bind(_TDC_IdSessionRow[2], _TDC_IdSessionRow[3]))
+
+_TDC_ResultStateEnum(Phase, Fields, Expected) {
+	Spec := _TDC_Spec(), Canonical := 0
+	for Declared in Spec["states"] {
+		if StrCompare(Declared, "requested", true) == 0
+			Canonical += 1
+		AssertTrue(StrCompare(Declared, "REQUESTED", true) != 0,
+			"the canonical declaration does not name an uppercase requested state")
+	}
+	AssertEqual(1, Canonical, "the canonical declaration names the exact lowercase requested state")
+	Text := '{"schema":1,"request_id":"state-enum","driver_pid":100,"successor_pid":200,' . Fields . "}"
+	Decoded := JsonParse(Text)
+	AssertTrue(Decoded is Map)
+	AssertEqual("state-enum", Decoded["request_id"])
+	AssertTrue(Decoded["successor_pid"] is Integer)
+	AssertEqual(200, Decoded["successor_pid"])
+	Kind := ""
+	if Phase == "completion"
+		Result := DriverControl_Completion(Spec, Text, 200)
+	else
+		Result := DriverControl_Resolve(Spec, Text, 200, 1700000000, &Kind)
+	if Expected {
+		AssertEqual('{"schema":1,"request_id":"state-enum","state":"completed","driver_pid":200,"successor_pid":200}`n', Result)
+		if Phase == "resolution"
+			AssertEqual("completed", Kind)
+	} else {
+		AssertEqual("", Result, "only the canonical declared requested enum can complete a named successor")
+		AssertEqual("", Kind)
+	}
+}
+for _TDC_StatePhase in ["completion", "resolution"]
+	for _TDC_StateRow in [
+		["canonical", '"state":"requested"', true],
+		["escaped canonical", '"state":"\u0072equested"', true],
+		["uppercase", '"state":"REQUESTED"', false],
+		["title case", '"state":"Requested"', false],
+		["mixed case", '"state":"rEqUeStEd"', false],
+		["other declared state", '"state":"claimed"', false],
+		["boolean", '"state":true', false],
+		["integer", '"state":1', false],
+		["array", '"state":[]', false],
+		["object", '"state":{}', false],
+		["null", '"state":null', false],
+		["last uppercase", '"state":"requested","state":"REQUESTED"', false],
+		["last canonical", '"state":"REQUESTED","state":"requested"', true]
+	]
+		Test("driver-control: " . _TDC_StatePhase . " " . _TDC_StateRow[1] . " follows the canonical state enum (driver-control-state-enum)",
+			_TDC_ResultStateEnum.Bind(_TDC_StatePhase, _TDC_StateRow[2], _TDC_StateRow[3]))
+
+_TDC_BootStateEnum(StateName, Expected) {
+	_TDC_World(Body)
+	Body(World) {
+		Pid := World.Session.Pid
+		Text := '{"schema":1,"request_id":"boot-state-enum","state":' . JsonStringLiteral(StateName)
+			. ',"driver_pid":500,"successor_pid":' . Pid . "}"
+		Decoded := JsonParse(Text)
+		AssertEqual(0, StrCompare(StateName, Decoded["state"], true))
+		AssertTrue(Decoded["successor_pid"] is Integer)
+		AssertEqual(Pid, Decoded["successor_pid"])
+		FSEnsureDirectoryStrict(World.Folder)
+		AssertTrue(FSWriteDurable(World.Session.Path("result"), Text))
+		World.Session.Start()
+		AssertTrue(World.Session.Active)
+		AssertEqual(1, World.Started, "the real session must reach its endpoint after reading the private result file")
+		Output := _TDC_Read(World, "result")
+		if Expected {
+			Result := JsonParse(Output)
+			AssertEqual("completed", Result["state"])
+			AssertEqual("boot-state-enum", Result["request_id"])
+			AssertEqual(Pid, Result["driver_pid"])
+			AssertEqual(Pid, Result["successor_pid"])
+		} else
+			AssertEqual(0, StrCompare(Text, Output, true),
+				"startup cannot complete or replace a private pending file whose state is not the declared enum")
+	}
+}
+for _TDC_BootStateRow in [["canonical", "requested", true], ["uppercase", "REQUESTED", false], ["title case", "Requested", false]]
+	Test("driver-control: boot private result " . _TDC_BootStateRow[1] . " preserves canonical state admission (driver-control-state-enum)",
+		_TDC_BootStateEnum.Bind(_TDC_BootStateRow[2], _TDC_BootStateRow[3]))
+
+_TDC_RequestKeyDomain(Extra, Expected) {
+	Spec := _TDC_Spec(), Corpus := _TDC_Corpus()
+	Text := '{"schema":1,"token":"' . Corpus["token"] . '","request_id":"key-domain"'
+		. (Extra == "" ? "" : "," . Extra) . "}"
+	Decoded := JsonParse(Text)
+	AssertEqual(1, Decoded["schema"])
+	AssertEqual(Corpus["token"], Decoded["token"])
+	AssertEqual("key-domain", Decoded["request_id"])
+	Id := DriverControl_ParseRequest(Spec, Text, Corpus["token"], &Reason, &Echoed)
+	if Expected {
+		AssertEqual("key-domain", Id)
+		AssertEqual("", Reason)
+		AssertEqual("", Echoed)
+	} else {
+		AssertEqual("", Id, "only the exact decoded request key domain is admitted")
+		AssertEqual("malformed", Reason)
+		AssertEqual("key-domain", Echoed)
+	}
+}
+for _TDC_KeyRow in [
+	["canonical", "", true],
+	["canonical duplicate", '"schema":1', true],
+	["escaped canonical duplicate", '"sc\u0068ema":1', true],
+	["known unknown", '"force":true', false],
+	["uppercase schema", '"SCHEMA":99', false],
+	["mixed schema", '"sChEmA":99', false],
+	["uppercase token", '"TOKEN":"ignored"', false],
+	["mixed token", '"ToKeN":"ignored"', false],
+	["uppercase request id", '"REQUEST_ID":"ignored"', false],
+	["mixed request id", '"Request_Id":"ignored"', false],
+	["escaped uppercase schema", '"\u0053CHEMA":99', false],
+	["escaped uppercase token", '"\u0054OKEN":"ignored"', false],
+	["escaped uppercase request id", '"\u0052EQUEST_ID":"ignored"', false]
+]
+	Test("driver-control: request " . _TDC_KeyRow[1] . " preserves the decoded key domain (driver-control-request-key-domain)",
+		_TDC_RequestKeyDomain.Bind(_TDC_KeyRow[2], _TDC_KeyRow[3]))
+
+_TDC_RequestKeySession(Extra, Expected) {
+	_TDC_World(Body)
+	Body(World) {
+		World.Session.Start()
+		Text := '{"schema":1,"token":"' . World.Token . '","request_id":"key-domain"'
+			. (Extra == "" ? "" : "," . Extra) . "}"
+		Decoded := JsonParse(Text)
+		AssertEqual(1, Decoded["schema"])
+		AssertEqual(World.Token, Decoded["token"])
+		AssertEqual("key-domain", Decoded["request_id"])
+		AssertTrue(FSWriteDurable(World.Session.Path("request"), Text))
+		Acknowledged := World.Endpoint.Call()
+		if Expected {
+			AssertEqual(1, World.Calls.Length)
+			AssertTrue(Acknowledged)
+			Result := JsonParse(_TDC_Read(World, "result"))
+			AssertEqual("requested", Result["state"])
+		} else {
+			AssertEqual(0, World.Calls.Length, "an undeclared decoded key cannot reach the real reload boundary")
+			AssertFalse(Acknowledged)
+			Result := JsonParse(_TDC_Read(World, "result"))
+			AssertEqual("refused", Result["state"])
+			AssertEqual("malformed", Result["reason"])
+		}
+		AssertEqual("key-domain", Result["request_id"])
+		AssertFalse(FileExist(World.Session.Path("request")))
+	}
+}
+for _TDC_KeySessionRow in [
+	["canonical", "", true], ["known unknown", '"force":true', false],
+	["uppercase schema", '"SCHEMA":99', false],
+	["uppercase token", '"TOKEN":"ignored"', false],
+	["uppercase request id", '"REQUEST_ID":"ignored"', false]
+]
+	Test("driver-control: private request " . _TDC_KeySessionRow[1] . " preserves the decoded key domain (driver-control-request-key-domain)",
+		_TDC_RequestKeySession.Bind(_TDC_KeySessionRow[2], _TDC_KeySessionRow[3]))

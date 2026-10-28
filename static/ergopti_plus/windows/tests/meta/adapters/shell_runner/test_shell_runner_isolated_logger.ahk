@@ -56,15 +56,16 @@ _SRIL_HelperReachesTheLogger() {
 	_SRIL_Captured := []
 
 	LoggerSetTestSink(_SRIL_Sink)
-	Threw := ""
+	Threw := "", ContractThrew := false
 	try {
 		_SR_LogError("probe marker {1}", "payload")
 	} catch as Err {
+		ContractThrew := true
 		Threw := Err.Message
 	}
 	LoggerClearTestSink()
 
-	Assert(Threw == "",
+	Assert(!ContractThrew,
 		"_SR_LogError must never raise into its caller — it runs from completion callbacks, where a throw aborts the shell task's cleanup. Got: " . Threw)
 	Assert(_SRIL_Captured.Length >= 1,
 		"_SR_LogError produced NO log line. Its dynamic resolution of LoggerError is throwing and the helper's own catch is hiding that in OutputDebug, which is invisible without a debugger — so every shell_runner diagnostic is lost. In AHK v2 `Func(...)` is the native class and raises ValueError: Invalid base; resolve by dynamic variable dereference instead")

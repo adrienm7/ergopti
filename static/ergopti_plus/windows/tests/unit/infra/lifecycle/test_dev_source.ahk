@@ -196,3 +196,70 @@ _DST_SharedPaths() {
 }
 Test("dev source: a developer run uses the installed paths.toml and the Reload path (windows-dev-mode)",
 	_DST_SharedPaths)
+
+
+; The common JS lane cannot qualify the unmodified Windows-only entry. Its
+; native success receipt requires all real PowerShell 5.1 entry controls.
+_DST_NativeInterpreterPolicy() {
+	global _DriverDir, _SR_TreeOwnedTasks, _SR_TreeCaptureDebts
+	Repo := FSResolveDirectoryPath(_DriverDir . "\..\..\..")
+	Script := Repo . "\tools\test\test-windows-dev-script.cjs"
+	AssertTrue(FileExist(Script), "the registered actual developer launcher CLI must exist")
+	Observed := {Calls: 0, Code: -1, Output: ""}
+	Construction := Map()
+	Handle := 0
+	Completed(Code, Output, Errors) {
+		Observed.Calls += 1
+		Observed.Code := Code
+		Observed.Output := Output . Errors
+	}
+	Capture(Owner, Native) {
+		Construction["owner"] := Owner
+	}
+	try {
+		Handle := ShellRunner_SpawnTreeOwned("node.exe", [Script], Completed, , Capture, 32768)
+		AssertTrue(Handle.start(), "the actual native policy process must start")
+		Started := A_TickCount
+		loop {
+			_SR_TreePoll()
+			if Observed.Calls == 1 && Construction.Has("owner") {
+				Claim := Construction["owner"].Get("TerminalClaim", 0)
+				if Claim is Map && Claim["TreeQuiesced"]
+					&& !FileExist(Claim["TmpFile"]) && !DirExist(Claim["CaptureDir"])
+					break
+			}
+			if TickExpired64(Started, 45000)
+				break
+			Sleep(10)
+		}
+		AssertEqual(1, Observed.Calls, "the exact native process must produce one bounded completion")
+		if Observed.Code != 0
+			NativeCliPrintFailureOutput("native developer interpreter policy", Observed.Output)
+		AssertEqual(0, Observed.Code, "native developer interpreter policy: " . NativeCliFailureHeadline(Observed.Output))
+		Markers := 0
+		for Line in StrSplit(StrReplace(Observed.Output, "`r`n", "`n"), "`n")
+			if InStr(Line, "[OK] Windows developer driver runner (") == 1
+				&& InStr(Line, "native_entry_cases=8; host_entry_body_cases=0).")
+				Markers += 1
+		AssertEqual(1, Markers, "host-only checks cannot certify the eight actual Windows entry cases")
+		AssertTrue(Construction.Has("owner"), "native construction must retain the exact retirement owner")
+		Owner := Construction["owner"], Claim := Owner["TerminalClaim"]
+		AssertTrue(Claim["TreeQuiesced"] && !Owner["FinalizationPending"], "the actual Node and PowerShell tree must physically retire")
+		AssertEqual(0, Claim["NativeErrors"].Length, "every native retirement receipt must be acknowledged")
+		AssertFalse(_SR_TreeOwnedTasks.Has(Owner["TaskId"]), "completed policy cannot retain a native task registry owner")
+		AssertFalse(_SR_TreeCaptureDebts.Has(ObjPtr(Claim)), "completed policy cannot retain a private capture debt")
+		for Key in ["ProcessHandle", "ThreadHandle", "JobHandle"] {
+			AssertEqual(0, Owner[Key], "construction must release its original " . Key)
+			AssertEqual(0, Claim[Key], "terminal completion must release its original " . Key)
+		}
+	} finally {
+		if IsObject(Handle) && !Handle.terminate() {
+			AssertTrue(Construction.Has("owner"), "a retained retirement must keep its exact owner")
+			Owner := Construction["owner"]
+			AssertTrue(Owner["TreeQuiesced"] && !Owner["FinalizationPending"],
+				"an already completed native policy must retain physical retirement proof")
+		}
+	}
+}
+Test("dev source: native Windows interpreter choices refuse fallback before process effects (windows-dev-interpreter-native)",
+	_DST_NativeInterpreterPolicy)

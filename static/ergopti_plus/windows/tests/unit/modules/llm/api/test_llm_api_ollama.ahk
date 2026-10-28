@@ -733,14 +733,16 @@ _OllamaTrimRegistry_DetachesBeforeReentrantCallback() {
 		88011, Map("cancelled", false,
 			"on_fail", _OllamaTrimRegistry_ReentrantSuccessor.Bind(State)),
 		88012, Map("cancelled", false, "on_fail", (*) => 0))
-	Err := ""
+	Err := "", ContractThrew := false
 	try _LLM_Ollama_TrimAsyncRegistry()
-	catch as Caught
+	catch as Caught {
+		ContractThrew := true
 		Err := Caught.Message
+	}
 	finally LLM_OLLAMA_MAX_INFLIGHT := OldMax
 	try {
-		AssertEqual("", Err,
-			"Ollama trim must not delete an owner already detached by reentrant work")
+		AssertFalse(ContractThrew,
+			"Ollama trim must not delete an owner already detached by reentrant work: " . Err)
 		AssertEqual(1, State["callbacks"],
 			"the displaced Ollama owner must emit exactly one terminal callback")
 		AssertFalse(_LLM_Ollama_Async.Has(88011),

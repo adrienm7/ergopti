@@ -1,0 +1,322 @@
+{
+	"description": "Exact native Windows scalar histories and SQLite reader snapshots, including valid Unicode text that resembles Latin-1-rendered UTF-8.",
+	"app": "encoding-probe.exe",
+	"timestamp": "2026-10-26 12:00:00.000",
+	"delay_ms": 100,
+	"cases": [
+		{
+			"id": "nbsp-only",
+			"events": [" "],
+			"manifest": {
+				"2026-10-26": {
+					"encoding-probe.exe": {
+						"chars": 1,
+						"time": 100
+					}
+				}
+			},
+			"range": {
+				"historical": {
+					"bg": {},
+					"c": {
+						" ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"hp": {},
+					"hx": {},
+					"kc": {},
+					"pg": {},
+					"qg": {},
+					"sc": {},
+					"sc_bg": {},
+					"sc_kb": {},
+					"tg": {},
+					"w": {},
+					"w_bg": {}
+				},
+				"today": {}
+			}
+		},
+		{
+			"id": "nnbsp-only",
+			"events": [" "],
+			"manifest": {
+				"2026-10-26": {
+					"encoding-probe.exe": {
+						"chars": 1,
+						"time": 100
+					}
+				}
+			},
+			"range": {
+				"historical": {
+					"bg": {},
+					"c": {
+						" ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"hp": {},
+					"hx": {},
+					"kc": {},
+					"pg": {},
+					"qg": {},
+					"sc": {},
+					"sc_bg": {},
+					"sc_kb": {},
+					"tg": {},
+					"w": {},
+					"w_bg": {}
+				},
+				"today": {}
+			}
+		},
+		{
+			"id": "ordinary-nbsp",
+			"events": ["a", " ", "b"],
+			"manifest": {
+				"2026-10-26": {
+					"encoding-probe.exe": {
+						"chars": 3,
+						"time": 300
+					}
+				}
+			},
+			"range": {
+				"historical": {
+					"bg": {
+						"a ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						" b": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"c": {
+						"a": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"b": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						" ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"hp": {},
+					"hx": {},
+					"kc": {},
+					"pg": {},
+					"qg": {},
+					"sc": {},
+					"sc_bg": {},
+					"sc_kb": {},
+					"tg": {
+						"a b": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"w": {
+						"a": {
+							"c": 1,
+							"t": 0,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"w_bg": {}
+				},
+				"today": {}
+			}
+		},
+		{
+			"id": "literal-capital-a-nbsp",
+			"events": ["Â", " "],
+			"manifest": {
+				"2026-10-26": {
+					"encoding-probe.exe": {
+						"chars": 2,
+						"time": 200
+					}
+				}
+			},
+			"range": {
+				"historical": {
+					"bg": {
+						"Â ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"c": {
+						" ": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"Â": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"hp": {},
+					"hx": {},
+					"kc": {},
+					"pg": {},
+					"qg": {},
+					"sc": {},
+					"sc_bg": {},
+					"sc_kb": {},
+					"tg": {},
+					"w": {
+						"Â": {
+							"c": 1,
+							"t": 0,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"w_bg": {}
+				},
+				"today": {}
+			}
+		},
+		{
+			"id": "literal-c1-sequence",
+			"events": ["â", "\u0080", "¯"],
+			"manifest": {
+				"2026-10-26": {
+					"encoding-probe.exe": {
+						"chars": 3,
+						"time": 300
+					}
+				}
+			},
+			"range": {
+				"historical": {
+					"bg": {
+						"\u0080¯": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"â\u0080": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"c": {
+						"\u0080": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"¯": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						},
+						"â": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"hp": {},
+					"hx": {},
+					"kc": {},
+					"pg": {},
+					"qg": {},
+					"sc": {},
+					"sc_bg": {},
+					"sc_kb": {},
+					"tg": {
+						"â\u0080¯": {
+							"c": 1,
+							"t": 100,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"w": {},
+					"w_bg": {}
+				},
+				"today": {}
+			}
+		}
+	]
+}

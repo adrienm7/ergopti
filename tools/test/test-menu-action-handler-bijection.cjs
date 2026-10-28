@@ -902,6 +902,18 @@ function nativeFunctionReferenceKeys(source) {
 		],
 		[
 			'layout_bundle_variant_add',
+			'input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)',
+			'Foreign.confirm_enabled_async(var.tis_id, {}, function(read, state)'
+		],
+		['layout_bundle_variant_add', 'if read and state.enabled == true then', 'if read then'],
+		['layout_bundle_variant_add', 'elseif read then', 'elseif true then'],
+		[
+			'layout_bundle_variant_add',
+			'i18n.get("menu.layout.add_pending_logout")',
+			'i18n.get("menu.layout.add_fail")'
+		],
+		[
+			'layout_bundle_variant_add',
 			'local enable_keylayout_source_async = input_sources.enable_keylayout_source_async',
 			'local enable_keylayout_source_async = false'
 		],

@@ -1083,6 +1083,19 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return _LifecycleRefuseShutdown("a synthetic modifier release is still pending")
 		}
+		; Registry retirement can refuse after native admission is fenced. Keep
+		; its gate inside both compensation scopes so refusal returns the exact
+		; configuration bundle and native admission to the live driver.
+		RegistryDownloadsReady := false
+		try RegistryDownloadsReady := LayoutRegistry_PrepareShutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Registry download shutdown preflight failed: {1}.", Err.Message)
+		if !RegistryDownloadsReady {
+			try LoggerError("Lifecycle", "Shutdown refused because a registry download still owns native cleanup.")
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return _LifecycleRefuseShutdown("a registry download still owns native cleanup")
+		}
 		; Retire user programs only after OS-held input is released. A refused
 		; exit keeps the real pause posture, and the enclosing finally blocks
 		; return the configuration bundle and native admission to the live driver.

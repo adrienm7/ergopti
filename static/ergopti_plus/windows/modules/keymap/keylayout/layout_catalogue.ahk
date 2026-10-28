@@ -241,11 +241,11 @@ LayoutCatalogue_IsErgopti(Entry) {
 ; ==============================
 ; ==============================
 
-; Replaces a file atomically: the text lands under a partial name first.
+; Acquire the stage exclusively: a pre-existing sidecar belongs to another owner.
 _LayoutCatalogueWriteText(Path, Text) {
 	global LAYOUT_REGISTRY_PARTIAL_SUFFIX
 	Partial := Path . LAYOUT_REGISTRY_PARTIAL_SUFFIX
-	if !FSWrite(Partial, Text)
+	if !FSWriteCreateDurable(Partial, Text)
 		throw Error("Cannot write " . Partial)
 	if !FSAtomicMoveReplace(Partial, Path)
 		throw Error("Cannot publish " . Path)
@@ -294,12 +294,15 @@ LayoutCatalogue_ReadInstalled(LocalDir) {
 	catch
 		throw Error("The installed-layouts record is not valid JSON: " . Path)
 	if !(Record is Map) || !Record.Has("schema_version")
-			|| (Record["schema_version"] != LAYOUT_CATALOGUE_INSTALLED_SCHEMA)
+		throw Error("The installed-layouts record has an unknown schema version: " . Path)
+	TopMembers := JsonObjectMemberSpans(Text)
+	if TopMembers["schema_version"]["kind"] != "number"
+			|| Record["schema_version"] != LAYOUT_CATALOGUE_INSTALLED_SCHEMA
 		throw Error("The installed-layouts record has an unknown schema version: " . Path)
 	if !Record.Has("layouts") || !(Record["layouts"] is Map)
 		throw Error("The installed-layouts record has no layouts table: " . Path)
 	Installed := Map()
-	Source := { path: Path, text: Text, top_members: JsonObjectMemberSpans(Text),
+	Source := { path: Path, text: Text, top_members: TopMembers,
 		layout_members: JsonObjectMemberSpans(Text, ["layouts"]), original: Map() }
 	for Id, Entry in Record["layouts"] {
 		Problem := _LayoutCatalogueInstalledEntryProblem(Id, Entry)
@@ -367,7 +370,8 @@ _LayoutCatalogueInstalledEntryProblem(Id, Entry) {
 		return "the entry is not an object"
 	if !Entry.Has("id") || Entry["id"] !== Id
 		return "its id field does not name this entry"
-	if !Entry.Has("sha256") || !Entry.Has("version") || !Entry.Has("size")
+	if !Entry.Has("sha256") || !(Entry["sha256"] is String)
+			|| !Entry.Has("version") || !(Entry["version"] is String) || !Entry.Has("size")
 		return "it has no verified checksum, version or size"
 	return ""
 }
@@ -618,24 +622,26 @@ _LayoutCatalogueOnInstallIndex(Id, LocalDir, Transport, Bundled, BundledDir, Fin
 	Url := LayoutRegistry_RawUrl(Entry["file"])
 	LayoutRegistry_Request(Url, Partial, Map("User-Agent", LAYOUT_REGISTRY_USER_AGENT),
 		LayoutRegistry_Settings()["download_timeout_sec"] * 1000, Transport,
-		_LayoutCatalogueOnLayout.Bind(Id, LocalDir, Entry, Url, Partial, Finish, Transport, BundledDir))
+		_LayoutCatalogueOnLayout.Bind(Id, LocalDir, Entry, Url, Finish, Transport, BundledDir))
 }
 
-_LayoutCatalogueOnLayout(Id, LocalDir, Entry, Url, Partial, Finish, Transport, BundledDir, Status, Etag, Err) {
+_LayoutCatalogueOnLayout(Id, LocalDir, Entry, Url, Finish, Transport, BundledDir, Status, Etag, Err, OutputOwner) {
 	global LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, LAYOUT_CATALOGUE_SOURCE_NETWORK
 	try {
-		if (Status != 200)
-			throw Error((Status == 0) ? Err : "HTTP " . Status . " for " . Url)
-		Text := _LayoutRegistryReadText(Partial)
+		if Status != 200
+			throw Error(Status == 0 ? Err : "HTTP " . Status . " for " . Url)
+		Text := OutputOwner.ReadText(LayoutRegistry_Settings()["max_file_bytes"])
+		if !(Text is String)
+			throw Error("Cannot read the owned registry layout response.")
 		LayoutRegistry_Verify(Entry, Text)
+		; Publication uses this same sibling name. Finish the exact download
+		; first, while a foreign acquisition failure owns no cleanup authority.
+		if !OutputOwner.Remove()
+			throw Error("Cannot retire the owned registry layout response.")
 	} catch as Failure {
-		if !FSDelete(Partial)
-			LoggerWarn("LayoutCatalogue", "Cannot remove the partial download {1}.", Partial)
 		Finish.Call(false, LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, Failure.Message)
 		return
 	}
-	if !FSDelete(Partial)
-		LoggerWarn("LayoutCatalogue", "Cannot remove the partial download {1}.", Partial)
 	_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_NETWORK, Finish, Transport, BundledDir)
 }
 

@@ -27,6 +27,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('node:os');
+const assert = require('node:assert/strict');
+const { scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
@@ -40,10 +43,9 @@ const RUN_ALL = path.join(TESTS_DIR, 'run_all.ahk');
  */
 function includeTargets(src) {
 	const out = [];
-	for (const line of src.split(/\r?\n/)) {
-		const t = line.trim();
-		if (!t.startsWith('#Include')) continue;
-		const rest = t.slice('#Include'.length).trim();
+	for (const token of scriptTokens(src, '.ahk')) {
+		if (token.kind !== 'include') continue;
+		const rest = token.value;
 		if (!rest || rest.startsWith('*i') || rest.startsWith('<')) continue;
 		out.push(rest);
 	}
@@ -59,7 +61,7 @@ function includeTargets(src) {
  * @returns {string} Absolute, normalised path (forward slashes).
  */
 function resolveInclude(target, fromFile) {
-	let t = target.replace(/`/g, '').trim();
+	let t = target.replace(/`/g, '').trim().replace(/\\/g, '/');
 	if (/%A_LineFile%/i.test(t)) {
 		t = t.replace(/%A_LineFile%/gi, fromFile);
 		return path.normalize(t).replace(/\\/g, '/');
@@ -128,10 +130,112 @@ function discoverTestFiles() {
 }
 
 /**
+ * Exercises valid Windows include spellings on the host running this gate.
+ * Physical canonical identities must survive macro expansion and traversal.
+ * @returns {void}
+ */
+function assertWindowsIncludePaths() {
+	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-includes-é-'));
+	try {
+		const nested = path.join(owned, 'nested');
+		fs.mkdirSync(nested);
+		const child = path.join(nested, 'case.ahk');
+		const tail = path.join(owned, 'tail.ahk');
+		fs.writeFileSync(child, '\uFEFF#Include ..\\tail.ahk\n');
+		fs.writeFileSync(tail, '\uFEFF; Owned transitive include leaf.\n');
+		const cases = [
+			{ name: 'line-file macro', target: '%A_LineFile%\\..\\nested\\case.ahk' },
+			{ name: 'Windows relative traversal', target: '.\\nested\\case.ahk' },
+			{ name: 'forward slash traversal', target: './nested/case.ahk' }
+		];
+		for (const vector of cases) {
+			const entry = path.join(owned, 'entry.ahk');
+			fs.writeFileSync(entry, '\uFEFF#Include ' + vector.target + '\n');
+			const expected = [entry, child, tail]
+				.map((file) => path.normalize(file).replace(/\\/g, '/'))
+				.sort();
+			assert.deepEqual(
+				[...includeClosure(entry)].sort(),
+				expected,
+				`${vector.name} must retain complete canonical Windows test reachability`
+			);
+		}
+	} finally {
+		fs.rmSync(owned, { recursive: true });
+	}
+}
+
+/**
+ * Reachability follows native preprocessing, never include-shaped comment/data.
+ * @returns {void}
+ */
+function assertWindowsIncludeCodeBoundaries() {
+	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-include-code-'));
+	try {
+		const entry = path.join(owned, 'entry.ahk');
+		const child = path.join(owned, 'case.ahk');
+		const alias = path.join(owned, "O'Brien.ahk");
+		fs.writeFileSync(child, '\uFEFF; Owned include leaf.\n');
+		fs.writeFileSync(alias, '\uFEFF; Owned literal path leaf.\n');
+		const cases = [
+			{ name: 'active', source: '#Include case.ahk', child: true, alias: false },
+			{ name: 'line comment', source: '; #Include case.ahk', child: false, alias: false },
+			{ name: 'block comment', source: '/*\n#Include case.ahk\n*/', child: false, alias: false },
+			{
+				name: 'continuation data',
+				source: 'Unused := "\n(\n#Include case.ahk\n)"',
+				child: false,
+				alias: false
+			},
+			{
+				name: 'apostrophe path then block',
+				source: "#Include O'Brien.ahk\n/*\n#Include case.ahk\n*/",
+				child: false,
+				alias: true
+			},
+			{
+				name: 'apostrophe path then active',
+				source: "#Include O'Brien.ahk\n#Include case.ahk",
+				child: true,
+				alias: true
+			},
+			{
+				name: 'active trailing comment',
+				source: '#Include case.ahk ; native include',
+				child: true,
+				alias: false
+			},
+			{ name: 'lowercase directive', source: '#include case.ahk', child: true, alias: false },
+			{
+				name: 'include again directive',
+				source: '#IncludeAgain case.ahk',
+				child: true,
+				alias: false
+			}
+		];
+		for (const vector of cases) {
+			fs.writeFileSync(entry, '\uFEFF' + vector.source + '\n');
+			const expected = [entry, ...(vector.child ? [child] : []), ...(vector.alias ? [alias] : [])]
+				.map((file) => path.normalize(file).replace(/\\/g, '/'))
+				.sort();
+			assert.deepEqual(
+				[...includeClosure(entry)].sort(),
+				expected,
+				`${vector.name} must agree with actual Windows include registration`
+			);
+		}
+	} finally {
+		fs.rmSync(owned, { recursive: true });
+	}
+}
+
+/**
  * Runs the full-tree gate while allowing scoped verification to reuse its graph.
  * @returns {number} Process exit status.
  */
 function main() {
+	assertWindowsIncludePaths();
+	assertWindowsIncludeCodeBoundaries();
 	const closure = includeClosure(RUN_ALL);
 	// Compare case-insensitively (Windows paths) to avoid drive-letter false orphans.
 	const closureLower = new Set([...closure].map((p) => p.toLowerCase()));

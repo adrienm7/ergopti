@@ -175,7 +175,10 @@ class FakePopen:
         self.index = FakePopen.created
         self.pid = 1000 + self.index
         self.returncode = None
-        EVENTS.append(["spawn", self.index, bool(start_new_session)])
+        EVENTS.append(["spawn", self.index, bool(start_new_session), list(args)])
+        if args[:2] == ["defaults", "import"]:
+            with builtins.open(args[3], "rb") as imported:
+                EVENTS.append(["import_payload", imported.read().decode("ascii")])
         if MODE == "race" and self.index == 1:
             deliver_or_queue_term()
 
@@ -247,6 +250,30 @@ function budgetContract(payload) {
 	return payload.exit === 0 && JSON.stringify(timeouts) === JSON.stringify([8, 5]);
 }
 
+function processGroupContract(payload) {
+	const children = eventsOf(payload, 'spawn');
+	return children.length === 2 && children.every((event) => event[2] === true);
+}
+
+function commandContract(payload) {
+	const children = eventsOf(payload, 'spawn');
+	if (payload.exit !== 0 || children.length !== 2) return false;
+	const read = children[0][3],
+		write = children[1][3];
+	return (
+		Array.isArray(read) &&
+		JSON.stringify(read) === JSON.stringify(['defaults', 'export', 'com.apple.HIToolbox', '-']) &&
+		Array.isArray(write) &&
+		write.length === 4 &&
+		JSON.stringify(write.slice(0, 3)) ===
+			JSON.stringify(['defaults', 'import', 'com.apple.HIToolbox']) &&
+		typeof write[3] === 'string' &&
+		write[3].endsWith('.plist') &&
+		JSON.stringify(eventsOf(payload, 'import_payload').map((event) => event[1])) ===
+			JSON.stringify(['plist'])
+	);
+}
+
 function timeoutKillContract(payload) {
 	return payload.exit === 1 && eventsOf(payload, 'killpg').some((event) => event[1] === 1001);
 }
@@ -311,6 +338,58 @@ try {
 		'utf8'
 	);
 
+	const confirm = source.match(/^local CONFIRM_SOURCE_SCRIPT = \[\[([\s\S]*?)\n\]\]$/m);
+	if (!confirm) throw new Error('input-source confirmation program not found');
+	const refreshDelayProbe = spawnSync(
+		python,
+		[
+			'-c',
+			`
+import ast, json, sys, types
+program = ast.parse(sys.stdin.read())
+sleeps = [node for node in ast.walk(program) if isinstance(node, ast.Call)
+    and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name)
+    and node.func.value.id == "time" and node.func.attr == "sleep"]
+assert len(sleeps) == 2, "Both actual selection legs must settle"
+observed = []
+namespace = {"time": types.SimpleNamespace(sleep=observed.append),
+    "sys": types.SimpleNamespace(argv=["confirm", "layout", "", "refresh", "0.417"]), "float": float}
+assignments = {}
+for node in program.body:
+    if isinstance(node, ast.Assign):
+        for target in node.targets:
+            if isinstance(target, ast.Name): assignments.setdefault(target.id, []).append(node)
+loading = set()
+def execute(node):
+    for child in ast.walk(node):
+        if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load) and child.id not in namespace:
+            assert child.id not in loading, "Cyclic delay dependency"
+            declarations = assignments.get(child.id, [])
+            assert len(declarations) == 1, "The delay must have one admitted definition"
+            loading.add(child.id)
+            execute(declarations[0])
+            loading.remove(child.id)
+    unit = ast.Module(body=[node], type_ignores=[])
+    exec(compile(ast.fix_missing_locations(unit), "actual-refresh-delay", "exec"), namespace)
+for call in sleeps: execute(ast.Expr(value=call))
+print(json.dumps(observed))
+`
+		],
+		{ input: confirm[1], encoding: 'utf8' }
+	);
+	test(
+		'both actual confirmation sleeps consume the admitted delay',
+		!refreshDelayProbe.error &&
+			refreshDelayProbe.status === 0 &&
+			JSON.stringify(JSON.parse(refreshDelayProbe.stdout || 'null')) ===
+				JSON.stringify([0.417, 0.417]),
+		JSON.stringify({
+			status: refreshDelayProbe.status,
+			stdout: refreshDelayProbe.stdout,
+			stderr: refreshDelayProbe.stderr
+		})
+	);
+
 	const budget = runMode(python, supervisor, fixtureDir, 'budget');
 	test(
 		'all nested children consume the one decreasing monotonic budget',
@@ -319,9 +398,67 @@ try {
 	);
 	test(
 		'every nested child starts in its own process group',
-		eventsOf(budget, 'spawn').length === 2 &&
-			eventsOf(budget, 'spawn').every((event) => event[2] === true),
+		processGroupContract(budget),
 		JSON.stringify(budget)
+	);
+
+	test(
+		'the editor exports and imports the intended preferences and its actual staged payload',
+		commandContract(budget),
+		JSON.stringify(budget)
+	);
+	const importCommand = '    run_child(["defaults", "import", DOMAIN, tmp])';
+	test(
+		'mutation guard rejects a missing preference import',
+		!commandContract(
+			runMode(
+				python,
+				replaceExactly(
+					supervisor,
+					importCommand,
+					'    pass  # mutation: drops the preference import'
+				),
+				fixtureDir,
+				'budget'
+			)
+		)
+	);
+	test(
+		'mutation guard rejects an extra preference child',
+		!commandContract(
+			runMode(
+				python,
+				replaceExactly(supervisor, importCommand, importCommand + '\n' + importCommand),
+				fixtureDir,
+				'budget'
+			)
+		)
+	);
+	test(
+		'mutation guard rejects a foreign preference export target',
+		!commandContract(
+			runMode(
+				python,
+				replaceExactly(
+					supervisor,
+					'run_child(["defaults", "export", DOMAIN, "-"], capture_stdout=True)',
+					'run_child(["defaults", "export", "foreign.domain", "-"], capture_stdout=True)'
+				),
+				fixtureDir,
+				'budget'
+			)
+		)
+	);
+	test(
+		'mutation guard rejects an undetached nested child',
+		!processGroupContract(
+			runMode(
+				python,
+				replaceExactly(supervisor, 'start_new_session=True)', 'start_new_session=False)'),
+				fixtureDir,
+				'budget'
+			)
+		)
 	);
 
 	const timeout = runMode(python, supervisor, fixtureDir, 'timeout');

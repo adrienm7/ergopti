@@ -522,12 +522,12 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 										schedule_menu_refresh(update_menu)
 									end)
 								end)
-							end)
-						end,
-					}, {
-						layout_variant_label = function() return label end,
-						layout_bundle_version = function() return latest_str end,
-					})`
+						end)
+					end,
+				}, {
+					layout_variant_label = function() return label end,
+					layout_bundle_version = function() return latest_str end,
+				})`
 					)
 				)
 					return false;

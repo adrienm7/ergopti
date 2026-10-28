@@ -291,3 +291,78 @@ _LCH_BootCase() {
 			"install", (*) => Log.Push("install")))))
 	AssertEqual("register", _KLT_Join(Log), "registered, never installed from the registry")
 }
+
+
+#Include ../../../support/layout_schema_kind_fixtures.ahk
+
+; Keep the shipped composition and real compiled keylayout as positive peers;
+; only the schema member token changes, including decoded duplicate identity.
+_LCH_SchemaSourceKind(Fixture) {
+	Declaration := _LCH_Declaration()
+	Keylayout := _LCH_Text()
+	Members := JsonObjectMemberSpans(Declaration)
+	AssertTrue(Members.Has("schema_version"), "the genuine composer fixture declares its schema")
+	Span := Members["schema_version"]
+	Candidate := SubStr(Declaration, 1, Span["member_start"] - 1) . Fixture.Members
+		. SubStr(Declaration, Span["member_start"] + Span["member_length"])
+	AssertTrue(JsonParse(Candidate) is Map, "the altered composition must remain valid actual JSON")
+	Rejected := false
+	try Checked := LayoutComposer_Check(Candidate, Keylayout)
+	catch as Err {
+		Rejected := true
+		AssertEqual(LAYOUT_COMPOSER_FAILURE_INVALID, Err.Extra)
+		AssertEqual("The composition has an unknown schema version.", Err.Message,
+			"composition refusal must belong to the actual schema gate")
+	}
+	AssertEqual(Fixture.Refused, Rejected,
+		"native composition admission must preserve schema source kind: " . Fixture.Label)
+	if !Fixture.Refused {
+		AssertTrue(Checked is Map)
+		AssertEqual("composed", Checked["entry"]["id"])
+		AssertEqual("Composer Corpus", Checked["entry"]["name"])
+		AssertEqual(CryptoSha256(Keylayout), Checked["entry"]["sha256"])
+	}
+}
+
+for Fixture in _LayoutSchemaKindFixtures(LAYOUT_COMPOSER_SCHEMA_VERSION)
+	Test("layout schema: composition " . Fixture.Label . " retains native kind (layout-schema-kind)",
+		_LCH_SchemaSourceKind.Bind(Fixture))
+
+
+; A prelaunch reload refusal is delivered by the real manager through both its
+; completion callback and its Boolean return. One public save owns one result.
+_LCH_RefreshRefusal(Selected, Use := false) {
+	Dir := _LCH_TempDir()
+	try {
+		Log := [], Reloads := []
+		Id := LayoutRegistry_Composer()["id"]
+		Deps := _LCH_Deps(Dir, Log, Selected ? Id : "")
+		RefuseReload(*) {
+			Reloads.Push(true)
+			return false
+		}
+		Options := Map("local_dir", Deps["local_dir"], "selected", Deps["selected"],
+			"packs", () => [], "reload", RefuseReload)
+		Deps["after"] := (LayoutId, Action, Completed) => _LayMgrWeb_After(LayoutId, Action, Completed, Options)
+		AssertTrue(LayoutComposer_Handle("composer_save",
+			Map("declaration", _LCH_Declaration(), "keylayout", _LCH_Text(), "use", Use), Deps))
+		AssertEqual(_LCH_Declaration(), LayoutComposer_ReadDeclaration(Dir))
+		AssertEqual(_LCH_Text(), LayoutRegistry_ReadLocal(Id, Deps["local_dir"])["Text"])
+		AssertEqual(Selected ? 1 : 0, Reloads.Length, "the actual manager reload boundary must be reached only for the selected layout")
+		Results := []
+		for Row in Log
+			if Row.Has("push") && Row["push"] == "composerResult"
+				Results.Push(Row["payload"])
+		AssertEqual(1, Results.Length, "one save must publish exactly one terminal composer result")
+		AssertEqual(Selected ? 0 : 1, Results[1]["ok"])
+		if Selected
+			AssertEqual(LAYOUT_COMPOSER_FAILURE_USE, Results[1]["code"])
+	} finally DirDelete(Dir, true)
+}
+Test("layout composer: a selected save publishes one result when the real manager refuses reload (composer-refresh-refusal)",
+	_LCH_RefreshRefusal.Bind(true))
+Test("layout composer: an unselected save does not reload and publishes one successful result (composer-refresh-refusal)",
+	_LCH_RefreshRefusal.Bind(false))
+
+Test("layout composer: an already selected save-use publishes one refused result (composer-refresh-refusal)",
+	_LCH_RefreshRefusal.Bind(true, true))

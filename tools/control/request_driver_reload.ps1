@@ -41,15 +41,109 @@ function Write-Outcome($outcome) {
 	$outcome | ConvertTo-Json -Compress
 }
 
+# Keep the original JSON root kind before PowerShell unwraps single-item arrays.
+function Read-DriverControlObject([string]$Path, [string]$Kind) {
+	$text = Get-Content -Raw -Encoding UTF8 -LiteralPath $Path
+	if ($null -eq $text -or -not $text.TrimStart().StartsWith('{', [StringComparison]::Ordinal)) {
+		throw "The driver $Kind is malformed."
+	}
+	try { $record = ConvertFrom-Json -InputObject $text }
+	catch { throw [IO.InvalidDataException]::new("The driver $Kind is malformed.", $_.Exception) }
+	if ($record -isnot [pscustomobject]) { throw "The driver $Kind is malformed." }
+	return $record
+}
+
+function Test-DriverControlMembers($Record, [string[]]$Required) {
+	$names = @($Record.PSObject.Properties | ForEach-Object { $_.Name })
+	foreach ($name in $Required) {
+		if ($names -cnotcontains $name) { return $false }
+	}
+	return $true
+}
+
+# Preserve integral JSON floating spellings without coercing strings or Booleans.
+function Test-DriverControlInteger($Value) {
+	if (-not ($Value -is [int] -or $Value -is [long] -or $Value -is [double] -or $Value -is [decimal])) {
+		return $false
+	}
+	try { $integer = [long]$Value } catch { return $false }
+	# The parsed value stays on the left: integer-first equality would round it.
+	return $Value -eq $integer
+}
+
+function Assert-DriverControlSession($Session, $Spec) {
+	if (-not (Test-DriverControlMembers $Session @('schema', 'driver', 'pid', 'token'))) {
+		throw 'The driver session is malformed.'
+	}
+	if (-not (Test-DriverControlInteger $Session.schema) -or $Session.schema -ne $Spec.schema -or
+		$Session.driver -isnot [string] -or $Session.driver -cne 'windows' -or
+		$Session.token -isnot [string] -or $Session.token -cnotmatch ('^[0-9a-f]{' + $Spec.token_hex_length + '}\z') -or
+		-not (Test-DriverControlInteger $Session.pid) -or $Session.pid -le 0 -or $Session.pid -gt [int]::MaxValue) {
+		throw 'The driver session is malformed.'
+	}
+}
+
+function Assert-DriverControlResult($Result, $Spec) {
+	$malformed = 'The driver result is malformed.'
+	if (-not (Test-DriverControlMembers $Result @('schema', 'request_id', 'state', 'driver_pid'))) {
+		throw $malformed
+	}
+	$allowed = @('schema', 'request_id', 'state', 'driver_pid', 'successor_pid', 'reason', 'deadline')
+	foreach ($property in $Result.PSObject.Properties) {
+		if ($allowed -cnotcontains $property.Name) { throw $malformed }
+	}
+	if (-not (Test-DriverControlInteger $Result.schema) -or $Result.schema -ne $Spec.schema -or
+		$Result.request_id -isnot [string] -or $Result.state -isnot [string] -or $Spec.states -cnotcontains $Result.state -or
+		-not (Test-DriverControlInteger $Result.driver_pid) -or $Result.driver_pid -le 0) {
+		throw $malformed
+	}
+	$idMatch = [regex]::Match($Result.request_id, $Spec.request_id_pattern)
+	if (-not $idMatch.Success -or $idMatch.Index -ne 0 -or $idMatch.Length -ne $Result.request_id.Length) {
+		throw $malformed
+	}
+	$hasSuccessor = Test-DriverControlMembers $Result @('successor_pid')
+	$hasDeadline = Test-DriverControlMembers $Result @('deadline')
+	$hasReason = Test-DriverControlMembers $Result @('reason')
+	if ($hasSuccessor -and $null -ne $Result.successor_pid -and
+		(-not (Test-DriverControlInteger $Result.successor_pid) -or $Result.successor_pid -le 0)) {
+		throw $malformed
+	}
+	if ($hasDeadline -and (-not (Test-DriverControlInteger $Result.deadline) -or $Result.deadline -le 0)) {
+		throw $malformed
+	}
+	if ($hasReason -and ($Result.reason -isnot [string] -or $Spec.reasons -cnotcontains $Result.reason)) {
+		throw $malformed
+	}
+	switch -CaseSensitive ($Result.state) {
+		'requested' {
+			if (-not $hasSuccessor -or $hasReason) { throw $malformed }
+			if ($null -eq $Result.successor_pid) {
+				if (-not $hasDeadline) { throw $malformed }
+			} elseif ($hasDeadline) { throw $malformed }
+		}
+		'claimed' {
+			if (-not $hasSuccessor -or $null -eq $Result.successor_pid -or -not $hasDeadline -or $hasReason) { throw $malformed }
+		}
+		'completed' {
+			if (-not $hasSuccessor -or $null -eq $Result.successor_pid -or $hasDeadline -or $hasReason) { throw $malformed }
+		}
+		'refused' {
+			if (-not $hasReason -or $Result.reason -ceq $Spec.timeout_reason -or $hasSuccessor -or $hasDeadline) { throw $malformed }
+		}
+		'timeout' {
+			if (-not $hasReason -or $Result.reason -cne $Spec.timeout_reason -or $hasSuccessor -or $hasDeadline) { throw $malformed }
+		}
+		default { throw $malformed }
+	}
+}
+
 $sessionPath = Join-Path $folder $spec.files.session
 if (-not (Test-Path -LiteralPath $sessionPath -PathType Leaf)) {
 	Write-Outcome ([ordered]@{ state = 'unreachable'; detail = 'no driver session is published' })
 	exit 3
 }
-$session = Get-Content -Raw -Encoding UTF8 -LiteralPath $sessionPath | ConvertFrom-Json
-if ($session.schema -ne $spec.schema -or $session.driver -ne 'windows' -or $session.token -notmatch '^[0-9a-f]{64}$') {
-	throw 'The driver session is malformed.'
-}
+$session = Read-DriverControlObject $sessionPath 'session'
+Assert-DriverControlSession $session $spec
 
 Add-Type -TypeDefinition @'
 using System;
@@ -128,16 +222,16 @@ $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMs)
 $last = $null
 while ([DateTime]::UtcNow -lt $deadline) {
 	if (Test-Path -LiteralPath $resultPath -PathType Leaf) {
-		$result = $null
-		try { $result = Get-Content -Raw -Encoding UTF8 -LiteralPath $resultPath | ConvertFrom-Json } catch { $result = $null }
-		if ($null -ne $result -and $result.request_id -eq $requestId) {
+		$result = Read-DriverControlObject $resultPath 'result'
+		Assert-DriverControlResult $result $spec
+		if ($result.request_id -ceq $requestId) {
 			$last = $result
-			if ($result.state -eq 'completed') { Write-Outcome $result; exit 0 }
-			if ($result.state -eq 'refused') { Write-Outcome $result; exit 1 }
-			if ($result.state -eq 'timeout') { Write-Outcome $result; exit 2 }
+			if ($result.state -ceq 'completed') { Write-Outcome $result; exit 0 }
+			if ($result.state -ceq 'refused') { Write-Outcome $result; exit 1 }
+			if ($result.state -ceq 'timeout') { Write-Outcome $result; exit 2 }
 			# A restart that cannot name its successor leaves a pending record with a
 			# deadline: past it, the answer is a timeout and never a completion.
-			if ($result.state -eq 'requested' -and $null -eq $result.successor_pid -and $null -ne $result.deadline -and
+			if ($result.state -ceq 'requested' -and $null -eq $result.successor_pid -and $null -ne $result.deadline -and
 				[DateTimeOffset]::UtcNow.ToUnixTimeSeconds() -gt [int64]$result.deadline) {
 				Write-Outcome ([ordered]@{ request_id = $requestId; state = 'timeout'; reason = $spec.timeout_reason; driver_pid = $driverPid })
 				exit 2

@@ -771,3 +771,211 @@ _R7BA_AllocationRace(Race) {
 }
 Test("Config backup allocation: genuine absence permits publication (backup-exclusive-allocation)", _R7BA_AllocationRace.Bind(false))
 Test("Config backup allocation: real racing directory retains exclusive ownership (backup-exclusive-allocation)", _R7BA_AllocationRace.Bind(true))
+
+
+; Literal file-copy authority must not expand destination filename patterns.
+_R7LC_RejectDestinationPattern() {
+	Root := A_Temp . "\ergopti_r7_literal_copy_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	try {
+		DirCreate(Root)
+		Source := Root . "\source.toml"
+		Bytes := "owned source bytes`n"
+		AssertTrue(FSWriteCreateDurable(Source, Bytes))
+		Literal := Root . "\literal.tmp"
+		AssertTrue(FSCopyCreateVerified(Source, Literal), "the same actual helper must first create and verify a literal destination")
+		AssertEqual(Bytes, FSReadUtf8Exact(Literal))
+		NativeControl := Root . "\control-*.tmp"
+		FileCopy(Source, NativeControl, false)
+		Controls := []
+		for Path in FSListDirectoryStrict(Root, false) {
+			SplitPath(Path, &Name)
+			if RegExMatch(Name, "^control-.*\.tmp$")
+				Controls.Push(Path)
+		}
+		AssertEqual(1, Controls.Length, "the native builtin must first demonstrate filename-pattern expansion on an unrelated owned path")
+		AssertEqual(Bytes, FSReadUtf8Exact(Controls[1]))
+		Foreign := Root . "\stage-foreign.tmp"
+		Sentinel := "foreign pending transaction`n"
+		AssertTrue(FSWriteCreateDurable(Foreign, Sentinel))
+		Copied := FSCopyCreateVerified(Source, Root . "\stage-*.tmp")
+		FileAppend("# literal-copy-pattern copied=" . Copied . " foreign_exists=" . !!FileExist(Foreign) . "`n", "*")
+		AssertTrue(FileExist(Foreign), "a destination pattern cannot delete an unrelated existing sibling")
+		AssertEqual(Sentinel, FSReadUtf8Exact(Foreign), "literal copy cannot acquire or replace a foreign sibling's bytes")
+		AssertFalse(Copied, "a literal destination cannot grant wildcard filename authority")
+		for Path in FSListDirectoryStrict(Root, false) {
+			SplitPath(Path, &Name)
+			AssertTrue(Name == "source.toml" || Name == "literal.tmp" || Name == "stage-foreign.tmp" || RegExMatch(Name, "^control-.*\.tmp$"),
+				"refusing an invalid literal destination must leave no copied sibling")
+		}
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("FileSystem literal copy: destination patterns cannot consume foreign sibling bytes (copy-literal-destination)", _R7LC_RejectDestinationPattern)
+
+
+
+; Imported manifest metadata remains literal all the way to native restore I/O.
+_R7LC_RestorePatternPreservesForeignBytes() {
+	Root := A_Temp . "\ergopti_r7_restore_pattern_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	CopyOwner := FSCopyCreateVerified
+	AssertFalse(CopyOwner.HasOwnProp("Call"), "a foreign copy observer cannot be detached")
+	PatternCalls := 0
+	Observe(Self, Source, Destination) {
+		CopyOwner.DeleteProp("Call")
+		try {
+			if InStr(Source, "*") || InStr(Destination, "*")
+				PatternCalls += 1
+			return CopyOwner.Call(Source, Destination)
+		} finally CopyOwner.DefineProp("Call", {Call: Observe})
+	}
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Later := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Backup := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		Manifest := Backup["path"] . "\" . Rules["manifest"]
+		Original := FSReadUtf8Exact(Manifest)
+		Changed := StrReplace(Original, '"path":"config.toml"', '"path":"config*.toml"', , &Count)
+		AssertEqual(1, Count, "the actual completed manifest must have one configuration-file member")
+		AssertTrue(FSWriteDurable(Manifest, Changed))
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Foreign := Cfg . "\config-foreign.toml.ergopti-restore.tmp"
+		Sentinel := "foreign unrelated staging bytes`n"
+		AssertTrue(FSWriteCreateDurable(Foreign, Sentinel))
+		CopyOwner.DefineProp("Call", {Call: Observe})
+		Result := ConfigBackup_Restore(Cfg, Backup["id"], Rules, Later)
+		CopyOwner.DeleteProp("Call")
+		FileAppend("# restore-copy-pattern actual_pattern_calls=" . PatternCalls . " ok=" . Result["ok"] . " foreign_exists=" . !!FileExist(Foreign) . "`n", "*")
+		AssertTrue(FileExist(Foreign), "an imported filename pattern cannot consume an unrelated native sidecar")
+		AssertEqual(Sentinel, FSReadUtf8Exact(Foreign), "the public restore must preserve exact foreign bytes")
+		AssertFalse(Result["ok"], "unsupported Windows filename syntax cannot acquire restoration authority")
+		AssertEqual("generation = 2`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+	} finally {
+		if CopyOwner.HasOwnProp("Call")
+			CopyOwner.DeleteProp("Call")
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config restore literal paths: imported patterns cannot consume foreign staging bytes (restore-literal-pattern)", _R7LC_RestorePatternPreservesForeignBytes)
+
+
+; A completed copy does not own a replacement that appears before verification.
+_R7LC_ReplacementSurvivesVerificationFailure() {
+	Root := A_Temp . "\ergopti_r7_copy_replaced_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Source := Root . "\source.toml", Destination := Root . "\stage.tmp", Moved := Root . "\owned-moved.tmp"
+	Compare := FSSameBytes
+	AssertFalse(Compare.HasOwnProp("Call"), "a foreign verification observer cannot be detached")
+	Completed := false
+	OriginalBytes := "original copied bytes`n", ForeignBytes := "replacement foreign bytes`n"
+	Observe(Self, ActualSource, ActualDestination) {
+		Compare.DeleteProp("Call")
+		AssertEqual(Source, ActualSource)
+		AssertEqual(Destination, ActualDestination)
+		BeforeFile := FileOpen(Destination, "r")
+		try Before := FSHandleSnapshot(BeforeFile.Handle)
+		finally BeforeFile.Close()
+		AssertTrue(Before["ok"], "the actual copied stage must have a native file identity")
+		FileMove(Destination, Moved, false)
+		AssertTrue(FSWriteCreateDurable(Destination, ForeignBytes))
+		AfterFile := FileOpen(Destination, "r")
+		try After := FSHandleSnapshot(AfterFile.Handle)
+		finally AfterFile.Close()
+		AssertTrue(After["ok"], "the replacement must have its own native file identity")
+		AssertTrue(Before["volume"] == After["volume"] && (Before["index_high"] != After["index_high"] || Before["index_low"] != After["index_low"]),
+			"the same pathname must now refer to a genuinely different native file")
+		Completed := true
+		return Compare.Call(ActualSource, ActualDestination)
+	}
+	try {
+		DirCreate(Root)
+		AssertTrue(FSWriteCreateDurable(Source, OriginalBytes))
+		Compare.DefineProp("Call", {Call: Observe})
+		Copied := FSCopyCreateVerified(Source, Destination)
+		if Compare.HasOwnProp("Call")
+			Compare.DeleteProp("Call")
+		AssertTrue(Completed, "the native copy and actual foreign replacement must complete before the real comparison")
+		AssertFalse(Copied, "the real comparison must refuse the foreign replacement bytes")
+		AssertEqual(OriginalBytes, FSReadUtf8Exact(Moved), "the real copy's original bytes remain independently observable")
+		AssertTrue(FileExist(Destination), "verification refusal cannot delete a different native file at the same pathname")
+		AssertEqual(ForeignBytes, FSReadUtf8Exact(Destination), "the actual foreign replacement must retain all its bytes")
+	} finally {
+		if Compare.HasOwnProp("Call")
+			Compare.DeleteProp("Call")
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("FileSystem copy ownership: verification refusal retains an actual foreign replacement (copy-replaced-stage)", _R7LC_ReplacementSurvivesVerificationFailure)
+
+
+; A refused native rename grants no authority over a replaced restore sidecar.
+_R7LC_RestoreMoveRefusalRetainsReplacement() {
+	static GENERIC_READ := 0x80000000, FILE_SHARE_READ := 0x00000001, OPEN_EXISTING := 3
+	static FILE_ATTRIBUTE_NORMAL := 0x00000080
+	Root := A_Temp . "\ergopti_r7_restore_replaced_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg", Stage := Cfg . "\config.toml.ergopti-restore.tmp", Moved := Root . "\owned-moved.tmp"
+	Mover := FSAtomicMoveReplace
+	AssertFalse(Mover.HasOwnProp("Call"), "a foreign rename observer cannot be detached")
+	Completed := false
+	ForeignBytes := "replacement restore sidecar bytes`n"
+	Observe(Self, ActualSource, ActualDestination) {
+		Mover.DeleteProp("Call")
+		AssertEqual(Stage, ActualSource)
+		AssertEqual(Cfg . "\config.toml", ActualDestination)
+		BeforeFile := FileOpen(Stage, "r")
+		try Before := FSHandleSnapshot(BeforeFile.Handle)
+		finally BeforeFile.Close()
+		AssertTrue(Before["ok"], "the verified restore copy must have a native identity")
+		FileMove(Stage, Moved, false)
+		AssertTrue(FSWriteCreateDurable(Stage, ForeignBytes))
+		AfterFile := FileOpen(Stage, "r")
+		try After := FSHandleSnapshot(AfterFile.Handle)
+		finally AfterFile.Close()
+		AssertTrue(After["ok"], "the replacement sidecar must have a native identity")
+		AssertTrue(Before["volume"] == After["volume"] && (Before["index_high"] != After["index_high"] || Before["index_low"] != After["index_low"]),
+			"the pathname must now refer to a genuinely different file")
+		Lock := DllCall("kernel32\CreateFileW", "Str", ActualDestination, "UInt", GENERIC_READ,
+			"UInt", FILE_SHARE_READ, "Ptr", 0, "UInt", OPEN_EXISTING, "UInt", FILE_ATTRIBUTE_NORMAL, "Ptr", 0, "Ptr")
+		AssertTrue(Lock != -1, "the actual destination must have an owned no-delete-share handle")
+		try {
+			Refused := Mover.Call(ActualSource, ActualDestination, &NativeError)
+			AssertFalse(Refused, "the actual native replacement must fail while the destination denies delete sharing")
+			AssertTrue(NativeError is Integer && NativeError != 0, "the actual native refusal must retain a concrete OS error")
+			FileAppend("# restore-native-rename-refusal error=" . NativeError . "`n", "*")
+			Completed := true
+			return Refused
+		} finally DllCall("kernel32\CloseHandle", "Ptr", Lock, "Int")
+	}
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Later := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Backup := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		Control := ConfigBackup_Restore(Cfg, Backup["id"], Rules, Later)
+		AssertTrue(Control["ok"], "the same real restore must first succeed without a denied native destination")
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Mover.DefineProp("Call", {Call: Observe})
+		Result := ConfigBackup_Restore(Cfg, Backup["id"], Rules, Later)
+		if Mover.HasOwnProp("Call")
+			Mover.DeleteProp("Call")
+		AssertTrue(Completed, "the actual foreign replacement and native sharing refusal must complete")
+		AssertFalse(Result["ok"])
+		AssertEqual("write", Result["reason"])
+		AssertEqual("generation = 2`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+		AssertEqual("generation = 1`n", FSReadUtf8Exact(Moved), "the moved original copy must remain independently observable")
+		AssertTrue(FileExist(Stage), "a native rename refusal cannot delete the foreign replacement sidecar")
+		AssertEqual(ForeignBytes, FSReadUtf8Exact(Stage))
+	} finally {
+		if Mover.HasOwnProp("Call")
+			Mover.DeleteProp("Call")
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config restore ownership: native rename refusal retains an actual foreign sidecar (restore-replaced-stage)", _R7LC_RestoreMoveRefusalRetainsReplacement)

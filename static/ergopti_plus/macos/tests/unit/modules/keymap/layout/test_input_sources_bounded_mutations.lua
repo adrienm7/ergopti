@@ -901,3 +901,41 @@ helpers.describe("input-source confirm: fresh reads until the write applies (com
 		reset_fixture_modules()
 	end)
 end)
+
+helpers.describe("input-source refresh: one admitted settling delay", function()
+	status_test("forwards the timing reader's value to the actual confirmation program (input-source-refresh-delay)", function()
+		BaseHelpers.provide_timings()
+		local real = require("infra.timings")
+		local previous_loader = package.preload["infra.timings"]
+		local previous_loaded = package.loaded["infra.timings"]
+		local admitted, reads = {}, 0
+		for key, value in pairs(real) do admitted[key] = value end
+		admitted.sec = function(section, key)
+			if section == "ui" and key == "input_source_reselect_settle_ms" then
+				reads = reads + 1
+				return 0.417
+			end
+			return real.sec(section, key)
+		end
+		local ok, failure = xpcall(function()
+			package.preload["infra.timings"] = function() return admitted end
+			package.loaded["infra.timings"] = nil
+			local f, calls = load_fixture(), 0
+			helpers.assert_eq(f.IS.confirm_source_async("Composer Check", { refresh = true }, function()
+				calls = calls + 1
+			end), true)
+			local args = f.tasks[1].args
+			helpers.assert_eq(args[1], "-c")
+			helpers.assert_eq(args[3], "Composer Check")
+			helpers.assert_eq(args[5], "refresh")
+			helpers.assert_eq(args[6], "0.417", "the private worker receives the admitted timing, not a copied default")
+			helpers.assert_true(reads > 0, "the genuine timing interface must be consulted")
+			f.tasks[1]:complete(0, '{"listed":true,"enabled":true,"select_capable":true,"selected":false}', "")
+			helpers.assert_eq(calls, 1)
+		end, debug.traceback)
+		package.preload["infra.timings"] = previous_loader
+		package.loaded["infra.timings"] = previous_loaded
+		reset_fixture_modules()
+		if not ok then error(failure, 0) end
+	end)
+end)

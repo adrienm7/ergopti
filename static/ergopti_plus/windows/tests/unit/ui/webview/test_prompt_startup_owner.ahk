@@ -140,3 +140,5 @@ _PRST_Case(Mode) {
 for _PRST_Mode in ["current", "close-create", "reopen-create"]
 	Test("Prompt editor startup: " . _PRST_Mode . " retains only its current owner (prompt-startup-owner)",
 		_PRST_Case.Bind(_PRST_Mode))
+
+#Include test_prompt_navigation_custody.ahk

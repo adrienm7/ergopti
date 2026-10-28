@@ -169,7 +169,7 @@ AssertThrows(Callback, Message := "expected exception") {
 	Threw := false
 	try {
 		Callback()
-	} catch {
+	} catch Any {
 		Threw := true
 	}
 	if !Threw {
@@ -220,6 +220,27 @@ _DescribeValue(V, Depth := 0) {
 	} catch {
 		return "?"
 	}
+}
+
+; A thrown object is opaque: inspecting it could execute arbitrary getters or
+; string conversion while reporting the original failure. Only primitive values
+; use the existing bounded renderer; escaping controls preserves one TAP line.
+_TestThrownValueDescription(Value) {
+	if Value is String || Value is Number {
+		Description := ""
+		for Character in StrSplit(_DescribeValue(Value)) {
+			if RegExMatch(Character, "[\x00-\x1F\x7F-\x9F\x{2028}\x{2029}]")
+				Description .= "\x" . Format("{:02X}", Ord(Character))
+			else
+				Description .= Character
+		}
+		return Type(Value) . ": " . Description
+	}
+	if Value is Map
+		return "Map"
+	if Value is Array
+		return "Array"
+	return "Object"
 }
 
 _JoinParts(parts) {
@@ -1080,21 +1101,24 @@ RunTests(PlanModuleOf := 0) {
 			}
 			if LeakedCritical
 				throw Error("Test LEAKED Critical: " . TestEntry.name)
-		} catch as e {
+		} catch Any as e {
 			if e is TestNotExecutedSignal {
 				Status := "not executed"
 				Detail := TEST_NOT_EXECUTED_MARKER . e.Message
 			} else {
 				Status := "not ok"
-				; Point [file:line] at the test's own call site, not the assert helper
-				; in test_framework.ahk where the throw physically happened.
-				Site := ""
-				try Site := _TestCallSite(e.Stack)
-				if (Site == "") {
-					SplitPath(e.File, &EFileName)
-					Site := EFileName . ":" . e.Line
-				}
-				Detail := " — " . e.Message . " [" . Site . "]"
+				if e is Error {
+					; Point [file:line] at the test's own call site, not the assert helper
+					; in test_framework.ahk where the throw physically happened.
+					Site := ""
+					try Site := _TestCallSite(e.Stack)
+					if (Site == "") {
+						SplitPath(e.File, &EFileName)
+						Site := EFileName . ":" . e.Line
+					}
+					Detail := " — " . e.Message . " [" . Site . "]"
+				} else
+					Detail := " — callback threw " . _TestThrownValueDescription(e)
 			}
 		}
 		if (Status == "ok") {
