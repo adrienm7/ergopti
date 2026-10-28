@@ -14,7 +14,7 @@ local Native = require("luv")
 --- Collects native files while refusing every incomplete enumeration.
 --- @param root string Absolute native directory.
 --- @param accept function Whether one basename belongs to the census.
---- @param skipped table Directory basenames excluded from this inventory.
+--- @param skipped table Directory/link basenames excluded before target reads.
 --- @return table|nil files Sorted complete native paths.
 --- @return string|nil detail Original native failure.
 function M.files(root, accept, skipped)
@@ -30,16 +30,27 @@ function M.files(root, accept, skipped)
 			end
 			assert(type(name) == "string" and name ~= "", "native discovery returned an invalid name")
 			local full = path .. "/" .. name
-			if kind == "link" or kind == "unknown" then
-				local attributes, attribute_error = Native.fs_stat(full)
-				assert(attributes, attribute_error or "native discovery stat refused")
+			local excluded = skipped[name]
+			if excluded and kind == "unknown" then
+				-- DT_UNKNOWN can name a regular file; classify without following a target.
+				local attributes, attribute_error = Native.fs_lstat(full)
+				assert(attributes, attribute_error or "native discovery lstat refused")
 				kind = attributes.type
+				assert(type(kind) == "string" and kind ~= "unknown", "native discovery lstat returned an invalid type")
 			end
-			assert(type(kind) == "string", "native discovery returned an invalid type")
-			if kind == "directory" then
-				if not skipped[name] then walk(full) end
-			elseif kind == "file" and accept(name) then
-				files[#files + 1] = full
+			-- Named directory/link exclusions must precede target metadata acquisition.
+			if not (excluded and (kind == "directory" or kind == "link")) then
+				if kind == "link" or kind == "unknown" then
+					local attributes, attribute_error = Native.fs_stat(full)
+					assert(attributes, attribute_error or "native discovery stat refused")
+					kind = attributes.type
+				end
+				assert(type(kind) == "string", "native discovery returned an invalid type")
+				if kind == "directory" then
+					if not skipped[name] then walk(full) end
+				elseif kind == "file" and accept(name) then
+					files[#files + 1] = full
+				end
 			end
 		end
 	end
