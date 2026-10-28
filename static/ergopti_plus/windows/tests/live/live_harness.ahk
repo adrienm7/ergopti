@@ -217,6 +217,7 @@ LiveDriveWindow(Match, Action, TimeoutMs := 0, Optional := false) {
 	global LIVE_DEFAULT_TIMEOUT_MS
 	State := {Done: false, Failed: false, Error: "", Hwnd: 0, Started: A_TickCount, Optional: Optional,
 		Limit: TimeoutMs ? TimeoutMs : LIVE_DEFAULT_TIMEOUT_MS}
+	; Every terminal path drops this reverse reference to the state-owning timer.
 	Tick := _LiveDriveTick.Bind(State, Match, Action)
 	State.Tick := Tick
 	SetTimer(Tick, 40)
@@ -224,18 +225,17 @@ LiveDriveWindow(Match, Action, TimeoutMs := 0, Optional := false) {
 }
 
 _LiveDriveTick(State, Match, Action, *) {
-	if State.Done {
-		SetTimer(State.Tick, 0)
+	if State.Done
 		return
-	}
 	if A_TickCount - State.Started > State.Limit {
 		if !State.Optional {
 			State.Failed := true
 			State.Error := "no window matched '" . (HasMethod(Match, "Call") ? "the watched window" : Match)
 				. "' within " . State.Limit . " ms"
 		}
-		State.Done := true
 		SetTimer(State.Tick, 0)
+		State.Tick := 0
+		State.Done := true
 		return
 	}
 	try {
@@ -250,6 +250,7 @@ _LiveDriveTick(State, Match, Action, *) {
 		State.Failed := true
 		State.Error := Err.Message
 	}
+	State.Tick := 0
 	State.Done := true
 }
 
