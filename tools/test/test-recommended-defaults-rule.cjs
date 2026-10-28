@@ -13,10 +13,13 @@
  * WHAT THIS PINS:
  *   1. Linux recommends "none" for every three- and four-finger swipe: the
  *      touchpad is read without being grabbed, so the desktop also acts.
- *   2. macOS recommends "none" for the three-finger tap (system Look up).
- *   3. The Gestures menu declares the shared note and both platform reasons,
- *      and the English locale carries their text. Each row Windows shows fits
- *      AutoHotkey's 260-unit menu item name in every locale.
+ *   2. The three-finger tap recommends left_click_toggle on every driver,
+ *      macOS included although the system uses it for Look up (maintainer's
+ *      choice, 2026-10-28).
+ *   3. The Gestures menu shows a short « Infos… » command instead of the
+ *      explanation rows; each driver opens its native info dialog with the
+ *      shared note and its platform's reason (Windows: its reason only), and
+ *      every row the menu declares stays a short caption in every locale.
  *   4. llm.trigger.debounce_ms is declared once: no per-platform override, the
  *      default and recommended equal _shared defaults.json, and every driver's
  *      generated config template carries that value.
@@ -62,62 +65,101 @@ for (const finger of [3, 4]) {
 	}
 }
 
-// 2. macOS: the three-finger tap is the system's Look up.
-assert.equal(recommended('gestures', 'tap_3', 'hs'), 'none', 'macOS tap_3 is Look up');
+// 2. macOS: the three-finger tap is the system's Look up, yet it stays
+// recommended like on Windows and Linux by the maintainer's choice (2026-10-28).
+for (const platform of ['ahk', 'hs', 'linux'])
+	assert.equal(
+		recommended('gestures', 'tap_3', platform),
+		'left_click_toggle',
+		`tap_3 recommends left_click_toggle on ${platform}`
+	);
 
-// 3. The menu says why and how to avoid the double action.
+// 3. The menu says why and how to avoid the double action, behind « Infos… ».
 const en = JSON.parse(read('_shared/data/locales/en.json'));
 const doc = parseToml(read('_shared/modules/features/manifest.toml'));
-const listRow = ((doc.menu && doc.menu.gestures_menu) || []).find(
-	(r) => r.id === 'gesture_recommended_notes'
+const gesturesMenu = (doc.menu && doc.menu.gestures_menu) || [];
+const infoRow = gesturesMenu.find((r) => r.id === 'gesture_recommended_info');
+assert.ok(infoRow && infoRow.type === 'command', 'the Gestures menu declares the Infos command');
+assert.equal(infoRow.i18n, 'menu.gestures.recommended_info');
+assert.equal(infoRow.platforms, undefined, 'the Infos row is on every driver');
+// The explanation used to be menu rows: a whole paragraph in the tray, and a
+// French Windows row AutoHotkey dropped (Menu.Add refuses more than 260 units).
+assert.ok(
+	!gesturesMenu.some((r) => r.type === 'label' || r.id === 'gesture_recommended_notes'),
+	'the Gestures menu shows no explanation row'
 );
-assert.ok(listRow && listRow.type === 'list', 'the Gestures menu lists gesture_recommended_notes');
-const templateRows = (doc.menu && doc.menu.gesture_recommended_notes) || [];
-for (const [id, key] of [
-	['gesture_recommended_note', 'menu.gestures.recommended_note'],
-	['gesture_recommended_reason_linux', 'menu.gestures.recommended_reason_linux'],
-	['gesture_recommended_reason_macos', 'menu.gestures.recommended_reason_macos'],
-	['gesture_recommended_reason_windows', 'menu.gestures.recommended_reason_windows']
-]) {
-	const row = templateRows.find((r) => r.id === id);
-	assert.ok(row, `the notes template declares ${id}`);
-	assert.equal(row.type, 'label');
-	assert.equal(row.i18n, key);
-	assert.ok(typeof en[key] === 'string' && en[key].length > 20, `${key} has English text`);
-}
-// Each driver publishes the template.
-for (const file of [
-	'linux/ui/menu/menu_builder.lua',
-	'macos/ui/menu/menu_gestures.lua',
-	'windows/ui/menu/menu_gestures.ahk'
+assert.equal(doc.menu.gesture_recommended_notes, undefined, 'the notes template is retired');
+for (const key of [
+	'menu.gestures.recommended_note',
+	'menu.gestures.recommended_reason_linux',
+	'menu.gestures.recommended_reason_macos',
+	'menu.gestures.recommended_reason_windows'
 ])
-	assert.match(read(file), /"gesture_recommended_notes"/, `${file} publishes the notes`);
+	assert.ok(typeof en[key] === 'string' && en[key].length > 20, `${key} has English text`);
 assert.match(en['menu.gestures.recommended_note'], /remove the system/i);
-// Windows replaces the system's own assignment, so the "remove it first" advice
-// is not shown there; its own note explains the greying instead.
-const platformsOf = (id) => templateRows.find((r) => r.id === id).platforms;
-assert.deepEqual(platformsOf('gesture_recommended_note'), ['hs', 'linux']);
-assert.deepEqual(platformsOf('gesture_recommended_reason_windows'), ['ahk']);
+assert.match(en['menu.gestures.recommended_reason_macos'], /Look up/);
 assert.match(en['menu.gestures.recommended_reason_windows'], /greyed out/i);
 assert.match(en['menu.gestures.recommended_reason_windows'], /no double action/i);
-// AutoHotkey's Menu.Add refuses a name longer than MAX_PATH (260 UTF-16 units)
-// with "Menu item name too long", and the row never appears. The French Windows
-// note was 263 units: the tray lost it and startup logged an error. Every row of
-// these notes that Windows shows must fit in every locale.
-const AHK_MENU_ITEM_MAX_UNITS = 260;
+// Every row the Gestures menu declares itself stays a short menu caption.
+const MENU_CAPTION_MAX_UNITS = 80;
 const localeDir = path.join(SP, '_shared', 'data', 'locales');
 const localeFiles = fs.readdirSync(localeDir).filter((name) => name.endsWith('.json'));
 assert.ok(localeFiles.length >= 21, 'every locale is checked');
-for (const row of templateRows) {
-	if (row.type !== 'label' || (row.platforms && !row.platforms.includes('ahk'))) continue;
-	for (const file of localeFiles) {
-		const text = JSON.parse(fs.readFileSync(path.join(localeDir, file), 'utf8'))[row.i18n];
+for (const file of localeFiles) {
+	const strings = JSON.parse(fs.readFileSync(path.join(localeDir, file), 'utf8'));
+	const info = strings['menu.gestures.recommended_info'];
+	assert.equal(typeof info, 'string', `${file} translates menu.gestures.recommended_info`);
+	assert.ok(info.endsWith('…') && info.length <= 16, `${file} Infos caption is short: ${info}`);
+	for (const row of gesturesMenu) {
+		if (typeof row.i18n !== 'string') continue;
+		const text = strings[row.i18n];
 		assert.equal(typeof text, 'string', `${file} translates ${row.i18n}`);
 		assert.ok(
-			text.length <= AHK_MENU_ITEM_MAX_UNITS,
-			`${file} ${row.i18n} is ${text.length} UTF-16 units; AutoHotkey menus refuse more than ${AHK_MENU_ITEM_MAX_UNITS}`
+			text.length <= MENU_CAPTION_MAX_UNITS,
+			`${file} ${row.i18n} is ${text.length} UTF-16 units; a Gestures menu row is a caption, not a paragraph`
 		);
 	}
+}
+// Each driver opens its existing native info dialog with the explanation. On
+// Windows the driver takes the system's assignment over itself, so the shared
+// "remove it first" note is not shown there.
+const DIALOG_OWNERS = [
+	{
+		file: 'windows/ui/menu/menu_gestures.ahk',
+		register: /"gesture_recommended_info", \(\*\) => GestureShowRecommendedInfo\(\)/,
+		body: /\nGestureShowRecommendedInfo\(\) \{\n([\s\S]*?)\n\}/,
+		helper: 'Ui_MsgBox(',
+		keys: ['menu.gestures.recommended_reason_windows'],
+		absent: ['menu.gestures.recommended_note']
+	},
+	{
+		file: 'macos/ui/menu/menu_gestures.lua',
+		register: /COMMAND\.GESTURE_RECOMMENDED_INFO\] = cmd_recommended_info\n/,
+		body: /local function cmd_recommended_info\(\)\n([\s\S]*?)\n\tend\n/,
+		helper: 'dialog.block_alert(',
+		keys: ['menu.gestures.recommended_note', 'menu.gestures.recommended_reason_macos'],
+		absent: []
+	},
+	{
+		file: 'linux/ui/menu/menu_builder.lua',
+		register: /COMMAND\.GESTURE_RECOMMENDED_INFO\] = function\(\)\n([\s\S]*?)\n\tend\n/,
+		body: /COMMAND\.GESTURE_RECOMMENDED_INFO\] = function\(\)\n([\s\S]*?)\n\tend\n/,
+		helper: 'show_info(',
+		keys: ['menu.gestures.recommended_note', 'menu.gestures.recommended_reason_linux'],
+		absent: []
+	}
+];
+for (const owner of DIALOG_OWNERS) {
+	const source = read(owner.file);
+	assert.match(source, owner.register, `${owner.file} registers the Infos command`);
+	assert.doesNotMatch(source, /gesture_recommended_notes/, `${owner.file} publishes no notes rows`);
+	const body = (source.match(owner.body) || [])[1];
+	assert.ok(body, `${owner.file} defines the Infos handler`);
+	assert.ok(body.includes(owner.helper), `${owner.file} Infos uses ${owner.helper.slice(0, -1)}`);
+	for (const key of owner.keys)
+		assert.ok(body.includes(`"${key}"`), `${owner.file} Infos shows ${key}`);
+	for (const key of owner.absent)
+		assert.ok(!body.includes(`"${key}"`), `${owner.file} Infos does not show ${key}`);
 }
 
 // 4. One debounce.
