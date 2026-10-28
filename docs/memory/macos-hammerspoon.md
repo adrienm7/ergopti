@@ -1726,15 +1726,16 @@ declaration too: `test_field_run.lua` and `test-macos-field-run-contract.cjs`
 refuse a check with no step. A step that needs a person is declared with
 `person`/`reason` and reported, never driven with synthetic input.
 
-## Keyboard input sources: the preference is not the live state
+## Keyboard input sources: read the state from a fresh process
 
-`AppleEnabledInputSources` (com.apple.HIToolbox) lists a layout as soon as it is
-written, but macOS 26 turns a layout written during the session on only at the
-next login: `TISEnableInputSource` answers 0 and the source stays disabled, and
-`TISSelectInputSource` answers -50. Decide "enabled" from the live list
-(`InputSources.is_live_enabled`, hs.keycodes), never from the preference; report
-the rest as pending (`modules/keymap/pending_layout_activation.lua`). SystemUIServer
-is `com.apple.SystemUIServer.agent` in `gui/<uid>`: a kickstart of
-`user/<uid>/com.apple.SystemUIServer` answers 113 and restarts nothing. The TIS
-probe (`tools/diagnostics/macos_tis_register_probe.swift`, P8 to P10) measures
-whether any re-read or an in-place content change avoids the logout.
+Writing `AppleEnabledInputSources` (com.apple.HIToolbox) turns a layout on at
+once on macOS 26, with no logout and no agent restart, but a process that
+already used TIS keeps its stale list: it reads enabled=false and its
+`TISSelectInputSource` answers -50, while a process started after the write
+sees the layout on and selects it (probe v5, P5). Hammerspoon is such a stale
+process, so `hs.keycodes` cannot confirm a fresh install: use
+`InputSources.confirm_source_async` (a child calling Carbon through ctypes). A
+rewritten enabled loose layout applies after `TISRegisterInputSource` on its
+file (P8 a). SystemUIServer is `com.apple.SystemUIServer.agent` in `gui/<uid>`;
+a kickstart of `user/<uid>/com.apple.SystemUIServer` answers 113. The same
+Ergopti bundle in ~/Library and /Library makes macOS renumber one copy's ids.
