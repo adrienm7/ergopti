@@ -4256,7 +4256,7 @@ const WINDOWS_GATES = [
 	},
 	{
 		name: 'Run isolated AHK LLM suites',
-		uses: ['run_llm_model_browser.ahk', 'run_llm_model_menu_disabled.ahk'],
+		uses: ['run_llm_model_browser.ahk'],
 		exits: [['if ($failed -gt 0) {', '1']]
 	},
 	{

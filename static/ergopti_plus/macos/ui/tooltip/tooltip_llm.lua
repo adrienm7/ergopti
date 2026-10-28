@@ -1604,7 +1604,7 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 			type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0,
 			tonumber(_state.reserved_count) or 0)
 	end
-	HotPath.log_if_slow("tooltip.show_predictions", _hot_t0, "LLM prediction render")
+	HotPath.log_if_slow("tooltip.show_predictions", _hot_t0)
 	return ok and rendered and still_owned()
 end
 

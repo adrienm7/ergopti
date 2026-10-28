@@ -6,6 +6,7 @@
 --- Executes Main's actual character-handler body with the real focus guard.
 --- An ordinary expansion must carry the owner captured before its match log.
 --- ==============================================================================
+local Errors = require("adapter_errors")
 local helpers = require("tests.helpers")
 local fixture = require("tests.support.text_owner_fixture")
 
@@ -42,7 +43,7 @@ helpers.describe("Main retains the ordinary expansion target", function()
 							local bc, value, _, _, publication = ...
 							count, text, owner = bc, value, publication
 							captured_current = type(owner) == "table" and owner.current()
-							return { ok = false, cleanup_ok = true, error = moved and "programmable publication is no longer current" or "controlled output refused" }
+							return { ok = false, cleanup_ok = true, error = moved and Errors.PROGRAMMABLE_PUBLICATION_STALE or "controlled output refused" }
 						end },
 				}, { __index = _G })
 				local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))

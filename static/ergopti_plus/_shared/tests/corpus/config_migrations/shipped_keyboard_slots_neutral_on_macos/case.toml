@@ -3,4 +3,4 @@ description = "Every retired macOS slot id and Ctrl-letter switch keeps its bind
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 14
-to_version = 15
+to_version = 16

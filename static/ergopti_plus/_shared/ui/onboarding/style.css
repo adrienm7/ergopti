@@ -26,7 +26,7 @@ body {
 
 body {
 	background: var(--theme-page-background);
-	color: #333;
+	color: var(--theme-grey-333);
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
 	font-size: 14px;
 	/* The outer page never scrolls: the step region does, so the footer
@@ -116,7 +116,7 @@ h1 {
 }
 
 .desc {
-	color: #555;
+	color: var(--theme-grey-555);
 	font-size: 12.5px;
 	line-height: 1.55;
 	margin: 0 0 14px;
@@ -124,7 +124,7 @@ h1 {
 }
 
 .hint {
-	color: #888;
+	color: var(--theme-grey-888);
 	font-size: 11px;
 	font-style: italic;
 	line-height: 1.5;
@@ -162,13 +162,13 @@ h1 {
 /* ====================================== */
 
 .lang-list {
-	border: 1px solid #e0e0e0;
+	border: 1px solid var(--theme-grey-e0e0e0);
 	border-radius: 8px;
 }
 
 .lang-item {
 	align-items: center;
-	background: #fff;
+	background: var(--theme-white);
 	border-bottom: 1px solid #f0f0f0;
 	cursor: pointer;
 	display: flex;
@@ -236,7 +236,7 @@ h1 {
 }
 
 #config-input {
-	background: #fff;
+	background: var(--theme-white);
 	border: 1.5px solid #d0d0d0;
 	border-radius: 7px 0 0 7px;
 	border-right: none;
@@ -299,8 +299,8 @@ h1 {
 
 .radio-card {
 	align-items: center;
-	background: #fff;
-	border: 1.5px solid #e0e0e0;
+	background: var(--theme-white);
+	border: 1.5px solid var(--theme-grey-e0e0e0);
 	border-radius: 8px;
 	cursor: pointer;
 	display: flex;
@@ -330,7 +330,7 @@ h1 {
 }
 
 .radio-label {
-	color: #333;
+	color: var(--theme-grey-333);
 	flex: 1 1 auto;
 	font-size: 13px;
 	line-height: 1.4;
@@ -350,7 +350,7 @@ h1 {
 }
 
 .magic-input {
-	background: #fff;
+	background: var(--theme-white);
 	border: 1.5px solid #d0d0d0;
 	border-radius: 7px;
 	color: var(--theme-label);
@@ -379,8 +379,8 @@ h1 {
 /* ====================================== */
 
 .checklist {
-	background: #fff;
-	border: 1px solid #e0e0e0;
+	background: var(--theme-white);
+	border: 1px solid var(--theme-grey-e0e0e0);
 	border-radius: 8px;
 	margin: 0 0 12px;
 	padding: 8px 12px;
@@ -423,11 +423,11 @@ h1 {
 }
 
 .check-row input[type='checkbox']:disabled + .check-label {
-	color: #999;
+	color: var(--theme-grey-999);
 }
 
 .check-label {
-	color: #333;
+	color: var(--theme-grey-333);
 	font-size: 12.5px;
 	line-height: 1.4;
 }
@@ -474,12 +474,12 @@ button:hover {
 
 .primary {
 	background: var(--theme-blue);
-	color: #fff;
+	color: var(--theme-white);
 }
 
 .secondary {
-	background: #e0e0e0;
-	color: #333;
+	background: var(--theme-grey-e0e0e0);
+	color: var(--theme-grey-333);
 }
 
 /* The Back button sits on the left, Next / Finish on the right. */

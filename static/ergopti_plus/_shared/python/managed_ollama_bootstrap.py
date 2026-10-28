@@ -93,6 +93,7 @@ class BootstrapPolicy:
                     )
                 )
             )
+            self.trust_names = tuple(trust)
             self.sha256 = hashlib.sha256(raw).hexdigest()
         except (OSError, ValueError, TypeError, KeyError, UnicodeError):
             raise BootstrapRefusal("policy") from None
@@ -147,12 +148,27 @@ class BootstrapPolicy:
         except (TypeError, ValueError, UnicodeError):
             raise BootstrapRefusal("session") from None
 
-    def capture(self, idle_timeout_ms):
-        """Capture original process settings; preserve case, empty values and raw store."""
+    def capture(self, idle_timeout_ms, *, inherited_trust):
+        """Capture original process settings; preserve case, empty values and raw store.
+
+        Args:
+            idle_timeout_ms: The daemon idle bound carried in the snapshot.
+            inherited_trust: Whether SSL_CERT_FILE and SSL_CERT_DIR reach the
+                daemon. Every caller states it: the macOS daemon owner passes
+                False (system and keychain trust only), a fixture that serves
+                its own anchor passes True.
+        """
         if type(idle_timeout_ms) is not int or not 1 <= idle_timeout_ms <= 2**31 - 1:
             raise BootstrapRefusal("policy")
+        if type(inherited_trust) is not bool:
+            raise BootstrapRefusal("policy")
+        names = (
+            self.names
+            if inherited_trust
+            else tuple(name for name in self.names if name not in self.trust_names)
+        )
         try:
-            environment = [[name, os.environ[name]] for name in self.names if name in os.environ]
+            environment = [[name, os.environ[name]] for name in names if name in os.environ]
             value = os.environ.get("OLLAMA_MODELS", "")
             if (
                 any(len(item.encode("utf-8")) > self.maximum_value_bytes for _, item in environment)

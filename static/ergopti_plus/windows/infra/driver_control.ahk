@@ -215,8 +215,8 @@ DriverControl_ResultText(Spec, Fields) {
 		throw Error("Invalid driver control result request id.")
 	if !HasId && State != "refused"
 		throw Error("Only a refusal may lack its request id.")
-	DriverPid := Fields.Get("driver_pid", 0)
-	if !(DriverPid is Integer) || DriverPid <= 0
+	ResultDriverPid := Fields.Get("driver_pid", 0)
+	if !(ResultDriverPid is Integer) || ResultDriverPid <= 0
 		throw Error("The result needs the writing driver's process id.")
 	HasDeadline := Fields.Has("deadline")
 	if HasDeadline && (!(Fields["deadline"] is Integer) || Fields["deadline"] <= 0)
@@ -249,7 +249,7 @@ DriverControl_ResultText(Spec, Fields) {
 					throw Error("A claim keeps the deadline.")
 			} else if HasDeadline
 				throw Error("A " . State . " result carries no deadline.")
-			if (State == "completed" || State == "claimed") && Successor != DriverPid
+			if (State == "completed" || State == "claimed") && Successor != ResultDriverPid
 				throw Error(State . " is written by the successor itself.")
 			Tail := Format(',"successor_pid":{1:d}', Successor)
 			if State == "claimed"
@@ -258,7 +258,7 @@ DriverControl_ResultText(Spec, Fields) {
 	}
 	Id := HasId ? '"' . Fields["request_id"] . '"' : "null"
 	return Format('{"schema":{1:d},"request_id":{2},"state":"{3}","driver_pid":{4:d}{5}}`n',
-		Spec["schema"], Id, State, DriverPid, Tail)
+		Spec["schema"], Id, State, ResultDriverPid, Tail)
 }
 
 /**

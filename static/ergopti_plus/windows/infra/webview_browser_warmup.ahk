@@ -52,10 +52,10 @@ class WebViewBrowserWarmup {
 				this.DestroyHost()
 				return false
 			}
-			Promise := this.EnvironmentFn.Call()
-			this.EnvironmentPromise := Promise
-			Promise.onSettled(ObjBindMethod(this, "EnvironmentReady", Promise),
-				ObjBindMethod(this, "Failed", "environment", Promise))
+			EnvironmentPromise := this.EnvironmentFn.Call()
+			this.EnvironmentPromise := EnvironmentPromise
+			EnvironmentPromise.onSettled(ObjBindMethod(this, "EnvironmentReady", EnvironmentPromise),
+				ObjBindMethod(this, "Failed", "environment", EnvironmentPromise))
 		} catch as Err {
 			this.Stop()
 			throw Err

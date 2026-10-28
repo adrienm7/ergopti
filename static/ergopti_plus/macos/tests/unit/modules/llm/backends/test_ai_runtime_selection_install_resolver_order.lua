@@ -7,8 +7,9 @@
 --- startup, when the AI is enabled with another backend, or after an update.
 --- These cases drive the real resolver, both dependency checkers and the menu's
 --- selection router against a fake filesystem and recorded native tasks:
---- 1. The resolver order (Ollama.app, ~/Applications, Homebrew, Ergopti's own
----    Application Support copy, PATH) and the retired ERGOPTI_OLLAMA_BIN.
+--- 1. The resolver names only Ergopti's own pinned runtime: a user's Ollama
+---    (Ollama.app, ~/Applications, Homebrew, PATH) never resolves, nor the former
+---    Application Support copy or the retired ERGOPTI_OLLAMA_BIN.
 --- 2. Boot checks and non-selection checks settle "missing" without a task.
 --- 3. The first selection installs exactly once; a re-selection reuses it.
 --- 4. The Ollama offer: accept downloads into the folder the resolver then
@@ -45,10 +46,12 @@ local with_environment = Fixture.with_environment
 -- =================================
 -- =================================
 
-helpers.describe("Ollama resolver order (ai-runtime-resolver)", function()
+-- Ergopti always uses its own pinned Ollama (maintainer decision, issue #104):
+-- no user location resolves, whatever is installed there; the list stays only
+-- to name a user's installation in a diagnostic.
+helpers.describe("Ollama resolver (ai-runtime-resolver, ollama-owned-runtime)", function()
 	for index, expected in ipairs(CANDIDATES) do
-		helpers.it("resolves " .. expected.source .. " before every later location ("
-			.. index .. ")", scoped(function()
+		helpers.it("never resolves a user's Ollama at " .. expected.source .. " (" .. index .. ")", scoped(function()
 			local state = new_state()
 			for later = index, #CANDIDATES do
 				state.executables[CANDIDATES[later].path] = true
@@ -56,19 +59,25 @@ helpers.describe("Ollama resolver order (ai-runtime-resolver)", function()
 			local Resolver = helpers.load_with_stubs("modules.llm.ollama_binary",
 				{ fs = fake_fs(state) })
 			local path, err, source = Resolver.resolve()
-			helpers.assert_eq(path, expected.path)
-			helpers.assert_nil(err)
-			helpers.assert_eq(source, expected.source)
+			helpers.assert_nil(path)
+			helpers.assert_nil(source)
+			helpers.assert_true(type(err) == "string" and err:find("Ergopti's own Ollama", 1, true) ~= nil)
+			local named = Resolver.find_user_installation()
+			if expected.source == "managed" then
+				helpers.assert_eq(named, CANDIDATES[index + 1].path, "the former copy is not a user's install")
+			else
+				helpers.assert_eq(named, expected.path)
+			end
 		end))
 	end
 
-	helpers.it("reports a clear error when no location holds Ollama", scoped(function()
+	helpers.it("reports a clear error when Ergopti's own Ollama is absent", scoped(function()
 		local Resolver = helpers.load_with_stubs("modules.llm.ollama_binary",
 			{ fs = fake_fs(new_state()) })
 		local path, err, source = Resolver.resolve()
 		helpers.assert_nil(path)
 		helpers.assert_nil(source)
-		helpers.assert_true(type(err) == "string" and err:find("no executable Ollama", 1, true) ~= nil)
+		helpers.assert_true(type(err) == "string" and err:find("Ergopti's own Ollama", 1, true) ~= nil)
 	end))
 
 	helpers.it("ignores a non-executable file and the retired bundled path", function()
@@ -127,66 +136,17 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 		helpers.assert_eq(#state.tasks, 0)
 	end))
 
-	helpers.it("reuses a found Ollama without a download folder", scoped(function()
+	helpers.it("never hands a user's Ollama to the bootstrap (ollama-owned-runtime)", scoped(function()
 		local state = new_state()
 		state.executables[CANDIDATES[1].path] = true
+		state.executables["/opt/homebrew/bin/ollama"] = true
 		local checker = load_ollama_checker(state)
-		helpers.assert_true(checker.install_for_selection())
-		helpers.assert_eq(#state.tasks, 1)
-		helpers.assert_eq(state.tasks[1].args[5], CANDIDATES[1].path)
-		helpers.assert_eq(state.tasks[1].args[6], "",
-			"a found executable must reach the script's zero-network fast path")
-		state.tasks[1].done(0, "", "")
-	end))
-
-	helpers.it("never lets a found Ollama's grant reach a later plain check", scoped(function()
-		local state = new_state()
-		local brew = "/opt/homebrew/bin/ollama"
-		state.executables[brew] = true
-		local checker = load_ollama_checker(state)
-		helpers.assert_true(checker.install_for_selection())
-		helpers.assert_eq(state.tasks[1].args[6], "")
-		state.tasks[1].done(0, "", "")
-
-		-- brew uninstall: a later non-selection check must not download.
-		state.executables[brew] = nil
 		local result
 		helpers.assert_true(checker.check_and_install_deps(function(ok) result = ok end))
-		helpers.assert_eq(#state.tasks, 1, "a plain check must never download without the offer")
+		helpers.assert_eq(#state.tasks, 0, "a user's Ollama is not a runtime to verify or start")
 		helpers.assert_eq(result, false)
 		helpers.assert_eq(checker.get_state(), "missing")
-	end))
-
-	helpers.it("installs once on the first selection and never on re-selection", scoped(function()
-		local state = new_state()
-		local daemon = { calls = 0 }
-		local checker = load_ollama_checker(state, daemon)
-		local results = {}
-		helpers.assert_true(checker.install_for_selection(function(ok) results[#results + 1] = ok end))
-		helpers.assert_eq(#state.tasks, 1)
-		helpers.assert_eq(state.tasks[1].args[5], "")
-		helpers.assert_eq(state.tasks[1].args[6], MANAGED_DIR,
-			"the download must land in the folder the resolver searches")
-
-		-- The verified install publishes the executable, then the task settles.
-		state.executables[MANAGED_BIN] = true
-		state.tasks[1].done(0, "", "")
-		helpers.assert_eq(results[1], true)
-		helpers.assert_eq(daemon.calls, 0, "stock client provisioning grants no daemon ownership")
-		helpers.assert_eq(checker.get_state(), "ready")
-		helpers.assert_eq(checker.get_daemon_state(), "pending")
-		helpers.assert_eq(checker.is_daemon_ready(), false)
-		helpers.assert_eq(#state.daemon_tasks, 0)
-		local Resolver = require("modules.llm.ollama_binary")
-		local path, _, source = Resolver.resolve()
-		helpers.assert_eq(path, MANAGED_BIN)
-		helpers.assert_eq(source, "managed")
-
-		helpers.assert_true(checker.install_for_selection())
-		helpers.assert_eq(state.tasks[2].args[5], MANAGED_BIN)
-		helpers.assert_eq(state.tasks[2].args[6], "",
-			"a re-selection must reuse the installed runtime, never download again")
-		state.tasks[2].done(0, "", "")
+		helpers.assert_eq(checker.runtime_available(), false)
 	end))
 
 	helpers.it("native provisioning waits for its exact authorized complete READY frame", scoped(function()

@@ -26,6 +26,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local PrivateLabel = require("diagnostics.private_label")
 local ConfigOutdated = require("config_outdated")
 local Loader = require("modules.hotstrings.loader")
 local Shell = require("adapters.shell_runner")
@@ -1241,7 +1242,7 @@ function M.route_bound_sources(paths, found, user_paths)
 		local user = user_paths[path] == true
 		if whole[category] and user then
 			Logger.info(LOG, "Extensions: the user's copy of '%s' overrides the file extension '%s' binds.",
-				category, owners[category].id)
+				PrivateLabel.mask(category), owners[category].id)
 			routed[#routed + 1] = { path = path, category = category, extension = owners[category] }
 		elseif whole[category] then
 			routed[#routed + 1] = { path = whole[category], category = category, extension = owners[category] }
@@ -1252,7 +1253,8 @@ function M.route_bound_sources(paths, found, user_paths)
 				kept[category] = carried_sections(path, skipped)
 				skipped = sections_without(skipped, kept[category])
 				if #skipped < #bound_sections[category] then
-					Logger.info(LOG, "Extensions: the user's copy of '%s' keeps its own bound section(s).", category)
+					Logger.info(LOG, "Extensions: the user's copy of '%s' keeps its own bound section(s).",
+						PrivateLabel.mask(category))
 				end
 			end
 			routed[#routed + 1] = {

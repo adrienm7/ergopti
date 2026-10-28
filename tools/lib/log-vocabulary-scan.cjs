@@ -70,6 +70,14 @@ const SLOTS = { reason: slotPatterns('reason'), phase: slotPatterns('phase') };
 const LOGGER_CALL =
 	/\bLogger(?:\.(debug|info|warn|error|start|success|trace|done|evidence)\b|(Debug|Info|Warn|Error|Start|Success|Trace|Done|Evidence)\s*\()/g;
 
+// An identifier that carries a reason, an error, a phase or a cause, compared with a literal
+// (`result.error == "..."`, `phase ~= "..."`, `delivery_error === '...'`), either way round.
+const MATCHED_NAME = String.raw`[A-Za-z0-9_.]*(?:error|reason|phase|cause)[A-Za-z0-9_]*`;
+const MATCHERS = [
+	new RegExp(String.raw`\b${MATCHED_NAME}\s*(?:===?|~=|!==?)\s*${LITERAL}`, 'g'),
+	new RegExp(String.raw`${LITERAL}\s*(?:===?|~=|!==?)\s*${MATCHED_NAME}\b`, 'g')
+];
+
 /**
  * The text of one call starting at `open` (the index of its `(`), with string
  * literals skipped so a `)` inside a message does not close it.
@@ -157,6 +165,27 @@ function scanText(text) {
 }
 
 /**
+ * Finds the places where code decides by comparing a reason, error, phase or cause with a
+ * free-form literal (a sentence, not a code-shaped id). Such a matcher breaks silently when
+ * the message is reworded, so none is allowed: compare an id of
+ * _shared/lua/adapter_errors.lua instead.
+ * @param {string} text File contents.
+ * @returns {Array<{line: number, value: string}>}
+ */
+function freeFormMatchers(text) {
+	const code = withoutCommentLines(text.replace(/^﻿/, ''));
+	const found = [];
+	for (const pattern of MATCHERS) {
+		for (const m of code.matchAll(pattern)) {
+			const value = m[1] ?? m[2];
+			if (value === '' || CODE_SHAPED.test(value)) continue;
+			found.push({ line: lineOf(code, m.index), value });
+		}
+	}
+	return found;
+}
+
+/**
  * The body of a named function, for the declared evidence-record formatters.
  * @returns {string|null}
  */
@@ -199,15 +228,20 @@ function sourceFiles(root, generated) {
  * Scans the whole tree.
  * @param {string} root Repository root.
  * @param {{generated?: Set<string>, formatters?: Array<{file: string, function: string}>}} [options]
- * @returns {{hits: Array<{kind: string, value: string, file: string, line: number, free: boolean}>, missingFormatters: string[]}}
+ * @returns {{hits: Array<{kind: string, value: string, file: string, line: number, free: boolean}>, missingFormatters: string[], matchers: Array<{file: string, line: number, value: string}>}}
  */
 function scanTree(root, options = {}) {
 	const generated = options.generated || new Set();
 	const hits = [];
+	const matchers = [];
 	for (const file of sourceFiles(root, generated)) {
 		const abs = path.join(root, file);
 		if (!fs.existsSync(abs)) continue;
-		for (const hit of scanText(fs.readFileSync(abs, 'utf8'))) hits.push({ ...hit, file });
+		const text = fs.readFileSync(abs, 'utf8');
+		for (const hit of scanText(text)) hits.push({ ...hit, file });
+		// The AutoHotkey sources compare with a single `=`; they stay on the baseline until the PC.
+		if (/\.(lua|js)$/.test(file))
+			for (const hit of freeFormMatchers(text)) matchers.push({ ...hit, file });
 	}
 	const missingFormatters = [];
 	for (const formatter of options.formatters || []) {
@@ -222,13 +256,14 @@ function scanTree(root, options = {}) {
 		for (const value of fields)
 			hits.push({ kind: 'evidence_field', value, file: formatter.file, line: 0, free: false });
 	}
-	return { hits, missingFormatters };
+	return { hits, missingFormatters, matchers };
 }
 
 module.exports = {
 	KINDS,
 	CODE_SHAPED,
 	scanText,
+	freeFormMatchers,
 	formatterFields,
 	scanTree
 };

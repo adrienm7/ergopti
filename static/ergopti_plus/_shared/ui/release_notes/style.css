@@ -21,7 +21,7 @@ body {
 }
 
 body {
-	background: #ffffff;
+	background: var(--theme-white);
 	color: #1a1a1a;
 	font-family:
 		'Segoe UI',
@@ -43,7 +43,7 @@ body {
 /* =============================== */
 
 #empty-notes {
-	color: #888888;
+	color: var(--theme-grey-888);
 	font-style: italic;
 	text-align: center;
 }
@@ -57,7 +57,7 @@ body {
 }
 
 #release-notes h2 {
-	border-bottom: 1px solid #dddddd;
+	border-bottom: 1px solid var(--theme-grey-ddd);
 	font-size: 1.2em;
 	padding-bottom: 0.2em;
 }
@@ -105,15 +105,15 @@ body {
 }
 
 #release-notes blockquote {
-	border-left: 3px solid #cccccc;
-	color: #555555;
+	border-left: 3px solid var(--theme-grey-ccc);
+	color: var(--theme-grey-555);
 	margin: 0.4em 0;
 	padding: 0.2em 0.8em;
 }
 
 #release-notes hr {
 	border: none;
-	border-top: 1px solid #dddddd;
+	border-top: 1px solid var(--theme-grey-ddd);
 	margin: 0.6em 0;
 }
 
@@ -138,7 +138,7 @@ body {
 
 #release-notes th,
 #release-notes td {
-	border: 1px solid #dddddd;
+	border: 1px solid var(--theme-grey-ddd);
 	padding: 0.25em 0.6em;
 	text-align: left;
 }

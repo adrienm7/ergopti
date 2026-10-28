@@ -33,7 +33,6 @@ local M = {}
 
 local hs = hs
 
-local SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 
 -- The longest any Accessibility call may hold the main thread. macOS disables
 -- an event tap that holds a key for about a second; an application that has
@@ -111,7 +110,7 @@ end
 --- Opens System Settings on the Accessibility list, without blocking.
 --- @return boolean started True when the pane opener was started.
 function M.open_settings()
-	return require("adapters.shell_runner").open(SETTINGS_URL) == true
+	return require("adapters.shell_runner").open(require("adapters.privacy_settings").url("accessibility")) == true
 end
 
 return M

@@ -206,11 +206,12 @@ helpers.describe("ApiOllama.get_base_url (configurable port)", function()
 	end)
 
 	-- With no user override set, the port comes from the single source
-	-- (_shared/modules/llm/defaults.json llm_ollama_port = 11434, via DEFAULT_STATE) — not
-	-- from a URL hardcoded at each call site. A regression that re-hardcodes a
-	-- different port, or drops the llm_ollama_port default, fails here.
-	helpers.it("defaults to the canonical loopback URL on port 11434", function()
-		helpers.assert_eq(ApiOllama.get_base_url(), "http://127.0.0.1:11434")
+	-- (_shared/modules/llm/defaults.json llm_ollama_owned_port = 11435, via DEFAULT_STATE),
+	-- the port of Ergopti's own Ollama, never the stock 11434 a user's own Ollama
+	-- keeps (issue #104). A regression that re-hardcodes a port, or reads the
+	-- stock-port key again, fails here.
+	helpers.it("defaults to the canonical loopback URL on Ergopti's own port 11435", function()
+		helpers.assert_eq(ApiOllama.get_base_url(), "http://127.0.0.1:11435")
 	end)
 
 	helpers.it("builds a well-formed loopback http URL", function()

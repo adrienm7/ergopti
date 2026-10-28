@@ -237,14 +237,14 @@ ComposerCheck_Run(OnDone, Deps := 0) {
 	}
 	_ComposerCheckBusy := true
 	LoggerStart(COMPOSER_CHECK_TAG, "Composer check started…")
-	Run := {Report: ComposerCheck_NewReport(), Deps: _ComposerCheck_Deps(Deps), OnDone: OnDone,
+	CheckRun := {Report: ComposerCheck_NewReport(), Deps: _ComposerCheck_Deps(Deps), OnDone: OnDone,
 		Fresh: false, Settled: false, Fixture: 0}
 	try {
-		_ComposerCheck_Begin(Run)
+		_ComposerCheck_Begin(CheckRun)
 	} catch as Err {
 		LoggerError(COMPOSER_CHECK_TAG, "The composer check raised: {1}", Err.Message)
-		_ComposerCheck_Record(Run, "internal_error", "fail", "raised")
-		_ComposerCheck_Finish(Run)
+		_ComposerCheck_Record(CheckRun, "internal_error", "fail", "raised")
+		_ComposerCheck_Finish(CheckRun)
 	}
 	return true
 }

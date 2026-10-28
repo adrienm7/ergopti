@@ -7,6 +7,17 @@
 --- An owned machine identity keeps the proof independent of the host's ID.
 --- ==============================================================================
 
+--- Returns a typing time on the driver's own clock (ergopti_hotstrings passes
+--- Monotonic.now_ms()). A fixed 1000 ms made the session tracker's verdict
+--- depend on the host's uptime; one origin keeps the scripted gaps exact.
+--- @param offset_ms number Scripted time of the keystroke.
+--- @return number typed_ms
+local typing_origin_ms
+local function typed_at(offset_ms)
+	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	return typing_origin_ms + offset_ms
+end
+
 local root = assert(arg[1])
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
 require("compat.utf8").install()
@@ -54,7 +65,7 @@ local ok, failure = xpcall(function()
 			assert(preferences.snapshot()[require("config_keys").KEY.METRICS_ENCRYPT] == true)
 			assert(completions == 0, "refusing historical work must never announce its success")
 			assert(not k.get_migration_progress().running and writer.get_meta(key) == nil and failures == 1)
-			k.on_keydown("b", 1000, "owned-app")
+			k.on_keydown("b", typed_at(1000), "owned-app")
 			Fixture.flush(k)
 			local rows = assert(writer.query_rows("SELECT text FROM events_typing ORDER BY id;"))
 			assert(#rows == 2)

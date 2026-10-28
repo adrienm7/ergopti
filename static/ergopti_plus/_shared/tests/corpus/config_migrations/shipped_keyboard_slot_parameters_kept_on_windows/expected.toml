@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_keyboard_slot_parameters_kept_on_windows/expected.toml
+
+[_meta]
+schema_version = 16
+
+[gestures.action_parameters]
+keyboard__cmd_a__open_url = "https://example.org/docs"
+keyboard__ctrl_g__open_url = "https://example.org/g"

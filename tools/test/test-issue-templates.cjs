@@ -15,7 +15,10 @@
  *    triage permission), each one a label the repository has, and blank
  *    issues are off;
  * 3. the repository comes from the updater defaults, and a worst-case prefill
- *    (long accented text and emoji in every field) stays within max_url_bytes.
+ *    (long accented text and emoji in every field) stays within max_url_bytes,
+ *    the report field is cut with the marker and the truncation note;
+ * 4. the bug form has the optional day log textarea (never prefilled) and no
+ *    consent checkbox.
  * ==============================================================================
  */
 
@@ -152,7 +155,7 @@ for (const id of templateIds) {
 			}
 		}
 	}
-	// The host fills report_field with the full report: the budget cuts the
+	// The host fills report_field with the compact report: the budget cuts the
 	// last field first, so any other place would drop the identity fields
 	if (template.report_field !== undefined) {
 		const fields = template.fields || [];
@@ -164,11 +167,47 @@ for (const id of templateIds) {
 	}
 }
 if (!registry.templates.bug || registry.templates.bug.report_field === undefined) {
-	failures.push('the bug template names no report_field for the full report');
+	failures.push('the bug template names no report_field for the compact report');
+}
+// The day log field: an optional textarea the user fills by hand, never prefilled
+{
+	const bug = registry.templates.bug || {};
+	const form = parseIssueFormYaml(fs.readFileSync(path.join(FORMS_DIR, bug.file || ''), 'utf8'));
+	const body = Array.isArray(form.body) ? form.body : [];
+	const dayLog = body.find((item) => item && item.id === bug.day_log_field);
+	if (typeof bug.day_log_field !== 'string' || !dayLog) {
+		failures.push('the bug template names no day_log_field that its form declares');
+	} else {
+		if (dayLog.type !== 'textarea')
+			failures.push(`${bug.file}: the day log field must be a textarea`);
+		if (dayLog.validations && dayLog.validations.required === true)
+			failures.push(`${bug.file}: the day log field must be optional`);
+		if ((bug.fields || []).includes(bug.day_log_field))
+			failures.push('the day log field must never be prefilled: it is not in fields');
+	}
+	// The consent box is gone: no checkboxes, nothing required beyond the facts
+	if (body.some((item) => item && item.type === 'checkboxes'))
+		failures.push(`${bug.file}: the consent checkbox must stay removed`);
 }
 if (fieldsChecked < 4) failures.push(`only ${fieldsChecked} prefilled field(s) checked`);
 if (labelsChecked < templateIds.length)
 	failures.push(`only ${labelsChecked} form label(s) checked`);
+
+// ── Plain YAML scalars ────────────────────────────────────────────────────
+// GitHub rejects the whole form when a plain scalar holds ": " or " #": the
+// project's own parser is lenient, so the raw lines are checked here.
+for (const file of fs.readdirSync(FORMS_DIR).filter((name) => name.endsWith('.yml'))) {
+	fs.readFileSync(path.join(FORMS_DIR, file), 'utf8')
+		.split('\n')
+		.forEach((line, index) => {
+			const match = /^\s*(?:- )?[A-Za-z_]+: (.+)$/.exec(line);
+			if (!match || /^["'|>\[{]/.test(match[1])) return;
+			if (/: |\s#/.test(match[1]))
+				failures.push(
+					`${file}:${index + 1}: a plain scalar holds ": " or " #", which GitHub refuses`
+				);
+		});
+}
 
 // ── config.yml ────────────────────────────────────────────────────────────
 try {
@@ -183,7 +222,7 @@ try {
 if (!repository || !repository.owner || !repository.repo) {
 	failures.push('the updater defaults declare no github.owner/github.repo');
 } else {
-	// What the app sends: short identity fields and the full report, far over
+	// What the app sends: short identity fields and the compact report, far over
 	// the budget, accented and with emoji (6 and 12 bytes encoded)
 	const long = 'Paramètres généraux — échec répété 😀 à l’ouverture de la fenêtre. '.repeat(120);
 	const values = {
@@ -193,7 +232,10 @@ if (!repository || !repository.owner || !repository.repo) {
 		driver: 'windows',
 		diagnostics: long
 	};
-	const url = IssueLink.buildIssueUrl(registry, repository, 'bug', values);
+	const note = 'The full report is on the clipboard and in the saved file.';
+	const url = IssueLink.buildIssueUrl(registry, repository, 'bug', values, {
+		[registry.templates.bug.report_field]: note
+	});
 	const expectedStart = `https://github.com/${repository.owner}/${repository.repo}/issues/new?template=bug_report.yml`;
 	if (!url.startsWith(expectedStart)) failures.push(`the URL does not start with ${expectedStart}`);
 	if (url.length > registry.max_url_bytes) {
@@ -202,6 +244,12 @@ if (!repository || !repository.owner || !repository.repo) {
 		);
 	}
 	if (!/[?&]version=/.test(url)) failures.push('the worst-case prefill lost the version field');
+	const reportValue = decodeURIComponent(
+		(new RegExp(`[?&]${registry.templates.bug.report_field}=([^&]*)`).exec(url) || [])[1] || ''
+	);
+	if (!reportValue.endsWith(registry.truncation_marker + '\n\n' + note))
+		failures.push('the cut report must end with the truncation marker and the note');
+	if (/[?&]day_log=/.test(url)) failures.push('the day log field must never be prefilled');
 }
 
 if (failures.length > 0) {

@@ -524,7 +524,8 @@ helpers.describe("tone actions: refusals and dropped answers", function()
 	helpers.it("drops a pending tone answer after choosing another API entry (ai-pass2-entry)", function()
 		scenario({ selection = "merci pour ton aide" }, function(world)
 			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), true)
-			local rows = require("ui.menu.llm_backend_rows").rows(world.engine, {}, nil, function() return {} end)
+			local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(require("ui.menu.llm_backend_rows"),
+				world.engine, {}, nil)
 			local selected = false
 			for _, row in ipairs(rows) do
 				if row.label and row.label:find("replacement-model", 1, true) then
@@ -728,8 +729,8 @@ helpers.describe("active API entry deletion", function()
 	helpers.it("ai-pass2-remove retires the active request before deleting its entry", function()
 		scenario({ selection = "merci pour ton aide" }, function(world)
 			helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
-			local rows = require("ui.menu.llm_backend_rows").rows(world.engine,
-				{ confirm = function() return true end }, nil, function() return {} end)
+			local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(require("ui.menu.llm_backend_rows"),
+				world.engine, { confirm = function() return true end }, nil)
 			local removed = false
 			for _, row in ipairs(rows) do
 				if row.label and row.label:find("🗑️", 1, true) then helpers.assert_true(row.action()); removed = true end

@@ -31,7 +31,7 @@ if not ok_luv then luv = nil end
 
 local DEFAULT_TIMEOUT_MS = Timings.ms("adapters", "default_timeout_ms")
 local DEFAULT_OWNER = "default"
-local MAX_OUTPUT_BYTES = 1024
+local MAX_OUTPUT_BYTES = Timings.count("limits", "file_digest_output_bytes")
 
 local _active = {}
 

@@ -133,7 +133,7 @@ helpers.describe("real script-action catalogue projection", function()
 			local actions = require("modules.gestures.actions")
 			local script = require("modules.shortcuts.script_control")
 			helpers.assert_eq(script.ACTIONS, actions.SG_NAMES)
-			helpers.assert_eq(#script.ACTIONS, 826)
+			helpers.assert_eq(#script.ACTIONS, 832)
 			for index, row in ipairs(expected) do
 				helpers.assert_eq(script.ACTIONS[index], row[1], "genuine catalogue order " .. index)
 				helpers.assert_true(row[1] ~= "-" and row[1] ~= "--", "original catalogue has no retired token")

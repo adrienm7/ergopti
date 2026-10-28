@@ -566,49 +566,6 @@ function nativeCaptionBinding(source, extension, root, getter) {
 		ahk.replace(' State :=', ' Foreign.State :=')
 	])
 		assert.equal(nativeCaptionBinding(changed, '.ahk', root, key), false);
-	const native = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_llm/menu_models.ahk'), 'utf8');
-	assert.equal(
-		nativeCaptionBinding(native, '.ahk', 'llm_model_identity_rows', 'model_backend_caption'),
-		true
-	);
-	for (const changed of [
-		native.replace(
-			'Frame := Map("model_backend_caption",',
-			'Frame := Map("withdrawn_model_backend_caption",'
-		),
-		native.replace(
-			'Frame := Map("model_backend_caption",',
-			'Foreign.Frame := Map("model_backend_caption",'
-		),
-		native.replace('_LLM_Menu_ModelFrameValue.Bind(Frame, Key)', '"not_callable"'),
-		native.replace('return Frame[Key]', 'return false'),
-		native.replace('return Getters', 'return Map()'),
-		native.replace('IdentityRows :=', 'Frame["model_backend_caption"] := false\n IdentityRows :='),
-		native.replace('IdentityRows :=', 'Frame[chosen] := false\n IdentityRows :=')
-	])
-		assert.equal(
-			nativeCaptionBinding(changed, '.ahk', 'llm_model_identity_rows', 'model_backend_caption'),
-			false
-		);
-	const mac = fs.readFileSync(path.join(SP, 'macos/ui/menu/menu_llm/models_selector.lua'), 'utf8');
-	assert.equal(
-		nativeCaptionBinding(mac, '.lua', 'llm_model_hardware_rows', 'model_hw_backend_caption'),
-		true
-	);
-	for (const changed of [
-		mac.replace('frame.model_hw_backend_caption =', 'other.model_hw_backend_caption ='),
-		mac.replace('pairs(values)', 'pairs(other)'),
-		mac.replace('getters[name] = function() return captured end', 'getters[name] = captured'),
-		mac.replace('return getters', 'return {}'),
-		mac.replace(
-			'frame.model_hw_backend_caption = display_backend',
-			'frame.model_hw_backend_caption = nil'
-		)
-	])
-		assert.equal(
-			nativeCaptionBinding(changed, '.lua', 'llm_model_hardware_rows', 'model_hw_backend_caption'),
-			false
-		);
 }
 
 /** Follows canonical includes only from executable native template roots.

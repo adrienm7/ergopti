@@ -194,6 +194,8 @@ if (!assemblyFunction) {
 					'-c',
 					`
 set -euo pipefail
+# The builder names the guardian plist through the shared identifiers.
+. "$2/static/ergopti_plus/_shared/data/identifiers.sh"
 REPO_ROOT="$1"
 LAUNCHER_DIR="$1/launcher"
 BUILD_DIR="$1/build"
@@ -208,7 +210,8 @@ ${assemblyFunction[0]}
 assemble_native_runtime "$1/ErgoptiPlus"
 `,
 					'fixture',
-					fixture.replaceAll('\\', '/')
+					fixture.replaceAll('\\', '/'),
+					path.resolve(__dirname, '..', '..').replaceAll('\\', '/')
 				],
 				{ encoding: 'utf8', timeout: 10000 }
 			);

@@ -24,7 +24,7 @@ helpers.describe("models manager: aborted downloads are reset before retry", fun
 	helpers.it("(models-manager-abort-leak) clears abort before invoking the approved download", function()
 		local modules = {
 			"hs", "adapters.shell_runner", "adapters.timer_scheduler", "infra.logger", "infra.i18n",
-			"infra.dialog_util", "infra.paths",
+			"infra.dialog_util", "infra.paths", "infra.timings",
 			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
 		}
@@ -72,6 +72,7 @@ helpers.describe("models manager: aborted downloads are reset before retry", fun
 				package.loaded["infra.dialog_util"] = {
 					block_alert = function() return "menu.llm.btn_download" end,
 				}
+				helpers.provide_timings()
 				package.loaded["infra.paths"] = {
 					shared_llm_path = function()
 						return helpers.shared("modules/llm/models.json")

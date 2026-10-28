@@ -553,6 +553,38 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-contract-vector-ledger.cjs"],
 			"repro": "npm run test:contract-vector-ledger"
+		},
+		{
+			"id": "js-menu-row-order-single-source",
+			"ordinal": 513,
+			"name": "Menu row order single source (no driver spells a display order of row_order.json)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-menu-row-order-single-source.cjs"],
+			"repro": "npm run test:menu-row-order-single-source"
+		},
+		{
+			"id": "js-file-system-port-wired",
+			"ordinal": 515,
+			"name": "FileSystem port spec wiring (both Lua owners check the lease and atomic write spec at load)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-file-system-port-wired.cjs"],
+			"repro": "npm run test:file-system-port-wired"
+		},
+		{
+			"id": "js-linux-shell-messages",
+			"ordinal": 519,
+			"name": "Linux shell messages (catalogue reader contract and every printed key in the generated catalogue)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-linux-shell-messages.cjs"],
+			"repro": "npm run test:linux-shell-messages"
+		},
+		{
+			"id": "js-ahk-local-same-as-global",
+			"ordinal": 528,
+			"name": "AHK #Warn LocalSameAsGlobal replay (no local shadows a global in the library or any #Warn All child)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-ahk-local-same-as-global.cjs"],
+			"repro": "npm run test:ahk-local-same-as-global"
 		}
 	]
 }

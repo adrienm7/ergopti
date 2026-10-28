@@ -14,6 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { installHostCapabilities } = require('./support/host-capabilities.cjs');
+const { installThemeTokens } = require('./support/theme-tokens.cjs');
 const root = path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui');
 const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
 let passed = 0;
@@ -36,6 +37,7 @@ function appsFixture() {
 		console
 	});
 	const index = read('metrics_apps/index.html');
+	installThemeTokens(context);
 	vm.runInContext(read('host_bridge.js'), context);
 	vm.runInContext(read('_generated/metrics_general_category_aliases.js'), context);
 	vm.runInContext(read('metrics_calendar.js'), context);
@@ -448,6 +450,7 @@ assert.equal(passed, 12, 'all original seven and five selection regressions must
 			document: { addEventListener() {}, getElementById: (id) => elements[id] || null },
 			console
 		});
+		installThemeTokens(context);
 		vm.runInContext(read('host_bridge.js'), context);
 		vm.runInContext(read('dom_utils.js'), context);
 		vm.runInContext(read('_generated/metrics_general_category_aliases.js'), context);

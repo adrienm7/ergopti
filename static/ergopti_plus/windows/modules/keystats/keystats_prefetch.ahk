@@ -1152,11 +1152,11 @@ KLPF_SerializeBlob(blob) {
 
 ; Read only the small provenance header; legacy snapshots have no trusted seed.
 KLPF_ReadHistorySeed(Path) {
-		File := FileOpen(Path, "r", "UTF-8")
-		if !IsObject(File)
+		SeedFile := FileOpen(Path, "r", "UTF-8")
+		if !IsObject(SeedFile)
 				throw Error("Metrics snapshot could not be opened for provenance.")
-		try Prefix := File.Read(KLPFWorker.MAX_SEED_HEADER_CHARS + 1)
-		finally File.Close()
+		try Prefix := SeedFile.Read(KLPFWorker.MAX_SEED_HEADER_CHARS + 1)
+		finally SeedFile.Close()
 		return KLPF_ParseHistorySeedPrefix(Prefix)
 }
 

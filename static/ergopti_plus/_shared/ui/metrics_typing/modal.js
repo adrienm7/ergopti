@@ -24,17 +24,17 @@
 
 // Color palette for app icon fallback badges
 const APP_BADGE_COLORS = [
-	'#007AFF',
-	'#34C759',
-	'#FF3B30',
-	'#FF9500',
+	ThemeTokens.color('blue'),
+	ThemeTokens.color('green'),
+	ThemeTokens.color('red'),
+	ThemeTokens.color('orange'),
 	'#AF52DE',
 	'#FF2D55',
-	'#5AC8FA',
-	'#FFCC00',
+	ThemeTokens.color('hue-5ac8fa'),
+	ThemeTokens.color('yellow'),
 	'#4CD964',
 	'#FF6B00',
-	'#30B0C7',
+	ThemeTokens.color('hue-30b0c7'),
 	'#FF6961',
 	'#77DD77',
 	'#AEC6CF',
@@ -76,7 +76,10 @@ function update_app_btn_text() {
 		btn.innerText = _t('ui_typing.apps_all');
 		btn.classList.add('active');
 	} else {
-		btn.innerText = sel === 0 ? _t('ui_typing.apps_none') : `Apps (${sel}/${tot})`;
+		btn.innerText =
+			sel === 0
+				? _t('ui_typing.apps_none')
+				: _t('ui_typing.apps_some').replace('{n}', sel).replace('{total}', tot);
 		btn.classList.remove('active');
 	}
 }

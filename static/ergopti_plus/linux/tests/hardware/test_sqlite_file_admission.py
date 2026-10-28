@@ -97,7 +97,11 @@ class SqliteFileAdmissionTests(unittest.TestCase):
         )
 
     def test_native_startup_admission_and_recovery(self):
-        for runtime_name in ("luajit", "lua5.4"):
+        # A suite row replays only the interpreter it runs on: the distribution
+        # and Ubuntu integration rows install no lua5.4. Run standalone, as the
+        # platform-metrics E2E shard does, the file covers both ABIs.
+        runtimes = (NATIVE_RUNTIME,) if NATIVE_RUNTIME is not None else ("luajit", "lua5.4")
+        for runtime_name in runtimes:
             runtime = shutil.which(runtime_name)
             self.assertIsNotNone(runtime, "Native file admission requires " + runtime_name)
             for mode in (

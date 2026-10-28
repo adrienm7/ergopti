@@ -144,7 +144,7 @@ local function with_fixture(outcome, callback)
 			local function raw_save() calls.saves = calls.saves + 1; return save() end
 			owner = Baseline.new({ state = state, keymap = keymap, admission = global.run_exclusive,
 				paused = function() return paused end, save_prefs = raw_save })
-			local raw, button, prompt_raises = "750", "OK", false
+			local raw, button, prompt_raises = "750", "button.ok", false
 			package.loaded["infra.dialog_util"] = { text_prompt = function(...)
 				observed.prompt = table.pack(...)
 				if prompt_raises then error("injected prompt refusal", 0) end
@@ -164,7 +164,7 @@ local function with_fixture(outcome, callback)
 				set_reentry = function(fn) after_native = fn end,
 				release_restore = function() inverse_blocked = false end,
 				restore_binding = function() keymap.set_base_delay = original_setter; keymap.get_base_delay = original_getter end,
-				set_prompt = function(value, selected, raises) raw = value; button = selected or "OK"; prompt_raises = raises end,
+				set_prompt = function(value, selected, raises) raw = value; button = selected or "button.ok"; prompt_raises = raises end,
 				observed = observed, path = path, read = function() return read_bytes(path) end, preferences = Preferences,
 			})
 		end)
@@ -367,7 +367,7 @@ helpers.describe("baseline delay mutation transaction", function()
 				helpers.assert_eq(f.observed.prompt[1], "menu.hotstrings.tooltip_default")
 				helpers.assert_eq(f.observed.prompt[2], "menu.hotstrings.delay_prompt")
 				helpers.assert_eq(f.observed.prompt[3], "100")
-				helpers.assert_eq(f.observed.prompt[4], "OK")
+				helpers.assert_eq(f.observed.prompt[4], "button.ok")
 				helpers.assert_eq(f.observed.prompt[5], "common.cancel")
 			end)
 		end)
@@ -388,7 +388,7 @@ helpers.describe("baseline delay mutation transaction", function()
 		with_fixture("ok", function(f)
 			f.set_prompt("750", "common.cancel")
 			f.action()
-			f.set_prompt("750", "OK", true)
+			f.set_prompt("750", "button.ok", true)
 			f.action()
 			helpers.assert_eq(f.calls.native, 0)
 			helpers.assert_eq(f.calls.writes, 0)

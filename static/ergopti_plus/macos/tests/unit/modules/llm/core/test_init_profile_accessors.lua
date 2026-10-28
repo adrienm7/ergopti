@@ -345,11 +345,11 @@ helpers.describe("Core profile accessors", function()
 		local target
 		if before == "ollama" then
 			target = "mlx"
-			hs_stub.http.__set_response("http://127.0.0.1:11434/api/version", 404, "")
+			hs_stub.http.__set_response("http://127.0.0.1:11435/api/version", 404, "")
 			hs_stub.http.__set_response(mlx_url, 200, '{"object":"list"}')
 		else
 			target = "ollama"
-			hs_stub.http.__set_response("http://127.0.0.1:11434/api/version", 200, '{"version":"fixture"}')
+			hs_stub.http.__set_response("http://127.0.0.1:11435/api/version", 200, '{"version":"fixture"}')
 			hs_stub.http.__set_response(mlx_url, 404, "")
 		end
 		fresh_core.auto_detect_backend()
@@ -373,10 +373,10 @@ helpers.describe("Core profile accessors", function()
 		local before = fresh_core.get_backend()
 		local mlx_url = require("modules.llm.api_mlx").get_base_url() .. "/v1/models"
 		if before == "mlx" then
-			hs_stub.http.__set_response("http://127.0.0.1:11434/api/version", 404, "")
+			hs_stub.http.__set_response("http://127.0.0.1:11435/api/version", 404, "")
 			hs_stub.http.__set_response(mlx_url, 200, '{"object":"list"}')
 		else
-			hs_stub.http.__set_response("http://127.0.0.1:11434/api/version", 200, '{"version":"fixture"}')
+			hs_stub.http.__set_response("http://127.0.0.1:11435/api/version", 200, '{"version":"fixture"}')
 			hs_stub.http.__set_response(mlx_url, 404, "")
 		end
 		fresh_core.auto_detect_backend()
@@ -405,10 +405,10 @@ helpers.describe("Core profile accessors", function()
 		local target = before == "ollama" and "mlx" or "ollama"
 		local mlx_url = require("modules.llm.api_mlx").get_base_url() .. "/v1/models"
 		if target == "mlx" then
-			hs_stub.http.__set_response("http://127.0.0.1:11434/api/version", 404, "")
+			hs_stub.http.__set_response("http://127.0.0.1:11435/api/version", 404, "")
 			hs_stub.http.__set_response(mlx_url, 200, '{"object":"list"}')
 		else
-			hs_stub.http.__set_response("http://127.0.0.1:11434/api/version", 200, '{"version":"fixture"}')
+			hs_stub.http.__set_response("http://127.0.0.1:11435/api/version", 200, '{"version":"fixture"}')
 			hs_stub.http.__set_response(mlx_url, 404, "")
 		end
 		package.loaded["modules.llm.api_ollama"].ensure_running = function()

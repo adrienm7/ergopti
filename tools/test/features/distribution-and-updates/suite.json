@@ -452,12 +452,12 @@
 			"repro": "npm run test:linux-portable-commands"
 		},
 		{
-			"id": "js-0479",
+			"id": "js-macos-dev-app-script",
 			"ordinal": 498,
-			"name": "macOS development installer emits executable Lua for literal paths and preserves original backups",
+			"name": "macOS developer app runner builds in source mode and opens only this clone's developer app",
 			"cmd": "$NODE_EXECUTABLE",
-			"args": ["tools/test/test-macos-dev-bootstrap.cjs"],
-			"repro": "node tools/test/test-macos-dev-bootstrap.cjs",
+			"args": ["tools/test/test-macos-dev-app-script.cjs"],
+			"repro": "npm run test:macos-dev-app-script",
 			"platforms": ["linux", "darwin"]
 		},
 		{
@@ -488,15 +488,82 @@
 		},
 		{
 			"id": "js-0504",
-			"ordinal": 513,
+			"ordinal": 514,
+			"name": "one .keylayout reader in the Lua drivers and tooling",
+			"cmd": "node",
+			"args": ["tools/test/test-keylayout-single-parser.cjs"],
+			"repro": "npm run test:keylayout-single-parser"
+		},
+		{
+			"id": "js-0505",
+			"ordinal": 516,
+			"name": "build scripts source identifiers.sh fail-fast and the AppImage containers mount the checkout",
+			"cmd": "node",
+			"args": ["tools/test/test-shell-identifiers-sourcing.cjs"],
+			"repro": "npm run test:shell-identifiers-sourcing"
+		},
+		{
+			"id": "js-macos-dev-source-build",
+			"ordinal": 517,
+			"name": "a developer source ErgoptiPlus.app is refused as a release and by every archive entry",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-dev-source-build.cjs"],
+			"repro": "npm run test:macos-dev-source-build"
+		},
+		{
+			"id": "js-macos-hammerspoon-cache",
+			"ordinal": 518,
+			"name": "the macOS build keeps the Hammerspoon zip outside the wiped build folder and admits only the pinned digest",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-hammerspoon-cache.cjs"],
+			"repro": "npm run test:macos-hammerspoon-cache"
+		},
+		{
+			"id": "js-macos-dev-native-receiver",
+			"ordinal": 520,
+			"name": "a developer app admits the bundled native network receiver only for the clone its sealed plist records",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-dev-native-receiver.cjs"],
+			"repro": "npm run test:macos-dev-native-receiver",
+			"platforms": ["linux", "darwin"]
+		},
+		{
+			"id": "js-macos-field-run-contract",
+			"ordinal": 521,
+			"name": "the macOS field report collector and the developer app's field run share one request and result contract",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-field-run-contract.cjs"],
+			"repro": "npm run test:macos-field-run-contract",
+			"platforms": ["linux", "darwin"]
+		},
+		{
+			"id": "js-linux-dev-script",
+			"ordinal": 524,
+			"name": "Linux developer runner starts the packages' entry point from this clone with its native backend",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-linux-dev-script.cjs"],
+			"repro": "npm run test:linux-dev-script",
+			"platforms": ["linux", "darwin"]
+		},
+		{
+			"id": "js-windows-dev-script",
+			"ordinal": 525,
+			"name": "Windows developer runner starts this clone's ErgoptiPlus.ahk with the shared developer variable",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-dev-script.cjs"],
+			"repro": "npm run test:windows-dev-script"
+		},
+		{
+			"id": "js-windows-control-cli-session",
+			"ordinal": 529,
 			"name": "Windows control CLI rejects malformed session identities through the actual PowerShell entrypoint",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-control-cli.cjs", "--phase=session"],
 			"repro": "node tools/test/test-windows-control-cli.cjs --phase=session"
 		},
 		{
-			"id": "js-0505",
-			"ordinal": 514,
+			"id": "js-windows-control-cli-result",
+			"ordinal": 530,
 			"name": "Windows control CLI accepts only typed matching result records and exact protocol states",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-control-cli.cjs", "--phase=result"],

@@ -181,17 +181,26 @@ check(
 	plistInteger('ThrottleInterval') === 10,
 	'the guardian restart throttle must remain exactly 10 seconds'
 );
+// The label has one source, _shared/data/identifiers.json, generated into Swift.
+const IDENTIFIERS = JSON.parse(
+	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.json'), 'utf8')
+);
+const GUARDIAN_LABEL =
+	IDENTIFIERS.service_labels && IDENTIFIERS.service_labels.macos_remap_guardian;
 check(
-	plistString('Label') && SWIFT.includes(`let kRemapGuardianLabel = "${plistString('Label')}"`),
-	'the Swift service label must equal the packaged plist label'
+	plistString('Label') === GUARDIAN_LABEL &&
+		SWIFT.includes('let kRemapGuardianLabel = Identifiers.ServiceLabels.macosRemapGuardian'),
+	'the Swift service label must be the shared identifier, equal to the packaged plist label'
 );
 check(
-	SWIFT.includes('let kRemapGuardianPlistName = "com.ergoptiplus.remap-guardian.plist"'),
+	SWIFT.includes('let kRemapGuardianPlistName = kRemapGuardianLabel + ".plist"') &&
+		fs.existsSync(path.join(ROOT, `static/ergopti_plus/macos/launcher/${GUARDIAN_LABEL}.plist`)),
 	'the Swift service registration must name the exact packaged plist'
 );
 const guardianCopy = BUILD_SCRIPT.indexOf('cp "$remap_guardian_plist"');
 const guardianDestination = BUILD_SCRIPT.indexOf(
-	'"$APP_PATH/Contents/Library/LaunchAgents/com.ergoptiplus.remap-guardian.plist"',
+	// The builder names the label through identifiers.sh, the shared single source.
+	'"$APP_PATH/Contents/Library/LaunchAgents/${ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN}.plist"',
 	guardianCopy
 );
 const guardianLint = BUILD_SCRIPT.indexOf('plutil -lint', guardianDestination);

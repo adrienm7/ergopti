@@ -1,6 +1,7 @@
 --- tests/unit/infra/config/test_empty_config_defaults.lua
 
 local helpers = require("tests.helpers")
+local MetricsState = require("infra.metrics_state_keys")
 
 helpers.describe("empty configuration boot projection", function()
 	helpers.it("keeps the AI menu neutral and takes privacy parameters from the shared owner", function()
@@ -80,7 +81,7 @@ helpers.describe("empty configuration boot projection", function()
 		end
 		local preferences = helpers.load_with_stubs("infra.preferences")
 		local state = preferences.build_initial_state({ "french_autocorrection.toml" }, {}, modules)
-		for _, key in ipairs({ "keymap", "shortcuts", "gestures", "keystats_enabled",
+		for _, key in ipairs({ "keymap", "shortcuts", "gestures", MetricsState.ENABLED,
 			"dynamichotstrings_enabled" }) do
 			helpers.assert_eq(state[key], false, "empty configuration must leave " .. key .. " off")
 		end

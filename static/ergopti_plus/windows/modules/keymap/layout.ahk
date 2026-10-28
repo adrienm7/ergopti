@@ -772,13 +772,15 @@ if Features["layout"]["ergopti_base"] {
 	; A row switched off types what the OS layout types there: its keys pass
 	; through, through variants created before every built-in layer below.
 	RegisterLayoutRowPassthrough()
-	for sc_int, entry in ErgoptiBaseMapping() {
-		sc_str := Format("SC{:03X}", sc_int)
-		if (entry is String) {
-			RemapKey(sc_str, entry)
-		} else if IsObject(entry) {
-			alt := entry.HasOwnProp("alt") ? entry.alt : ""
-			RemapKey(sc_str, entry.c, alt)
+	; Script-level loop variables are globals: distinctive names keep them from
+	; shadowing the locals of functions loaded beside this file under #Warn.
+	for _BaseRemapScInt, _BaseRemapEntry in ErgoptiBaseMapping() {
+		_BaseRemapSc := Format("SC{:03X}", _BaseRemapScInt)
+		if (_BaseRemapEntry is String) {
+			RemapKey(_BaseRemapSc, _BaseRemapEntry)
+		} else if IsObject(_BaseRemapEntry) {
+			_BaseRemapAlt := _BaseRemapEntry.HasOwnProp("alt") ? _BaseRemapEntry.alt : ""
+			RemapKey(_BaseRemapSc, _BaseRemapEntry.c, _BaseRemapAlt)
 		}
 	}
 	; Dead keys (¨ and ^ on Ergopti) — their behaviour goes through DeadKey()

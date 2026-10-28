@@ -37,9 +37,11 @@ class BootstrapPolicy:
     def __getattr__(self, name):
         return getattr(self.shared, name)
 
-    def capture(self, idle_timeout_ms):
+    def capture(self, idle_timeout_ms, *, inherited_trust):
         try:
-            return NetworkSnapshot(self.shared.capture(idle_timeout_ms))
+            return NetworkSnapshot(
+                self.shared.capture(idle_timeout_ms, inherited_trust=inherited_trust)
+            )
         except POLICY.BootstrapRefusal as error:
             raise ImageRefusal(str(error)) from error
 

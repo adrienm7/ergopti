@@ -357,7 +357,7 @@ try {
 		_PNCO_Subject()
 	}
 	ExitApp(0)
-} catch Any as Failure {
-	FileAppend("FAIL " . Failure.Message . " [" . Failure.File . ":" . Failure.Line . "]`n", "*", "UTF-8-RAW")
+} catch Any as TopLevelFailure {
+	FileAppend("FAIL " . TopLevelFailure.Message . " [" . TopLevelFailure.File . ":" . TopLevelFailure.Line . "]`n", "*", "UTF-8-RAW")
 	ExitApp(1)
 }

@@ -195,7 +195,7 @@ _NWCF_Main() {
 try {
 	_NWCF_Main()
 	ExitApp(0)
-} catch Any as Failure {
-	FileAppend("NWCF_PREREQUISITE " . Type(Failure) . " " . Failure.Message . " " . Failure.File . ":" . Failure.Line . Chr(10), "*", "UTF-8")
+} catch Any as TopLevelFailure {
+	FileAppend("NWCF_PREREQUISITE " . Type(TopLevelFailure) . " " . TopLevelFailure.Message . " " . TopLevelFailure.File . ":" . TopLevelFailure.Line . Chr(10), "*", "UTF-8")
 	ExitApp(95)
 }

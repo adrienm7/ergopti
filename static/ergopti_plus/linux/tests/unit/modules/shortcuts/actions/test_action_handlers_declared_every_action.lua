@@ -196,7 +196,7 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 		local previous_webview = package.loaded["ui.webview_manager"]
 		local opened = nil
 		package.loaded["ui.webview_manager"] = {
-			show = function(app_name)
+			toggle = function(app_name)
 				opened = app_name
 				return true
 			end,

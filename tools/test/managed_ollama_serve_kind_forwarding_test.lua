@@ -13,7 +13,11 @@ local body = assert(api:match("(local resolved_ok, ollama_bin, binary_err, sourc
 local Choice = assert(loadfile(root .. "/static/ergopti_plus/_shared/lua/core/llm/ollama_runtime_choice.lua"))()
 local binary, source_kind, authorized = "/canonical/ollama", "native_managed", true
 local built, failure, detail = {}, nil, nil
+-- The extracted body names its refusals by the API's module-level `Errors`
+-- upvalue (the closed adapter error ids); provide the same real module.
+local Errors = assert(loadfile(production .. "/static/ergopti_plus/_shared/lua/adapter_errors.lua"))()
 local environment = setmetatable({
+	Errors = Errors,
 	OllamaBinary = { resolve = function() return binary, "controlled-refusal", source_kind end },
 	RuntimeChoice = Choice,
 	hs = { host = { uuid = function() return "01234567-89ab-cdef-0123-456789abcdef" end } },
@@ -41,12 +45,12 @@ end)
 case(function()
 	source_kind = "path"; local before = #built
 	check(activate(), false); check(#built, before)
-	check(failure, "external runtime requires manual service management"); check(detail, false)
+	check(failure, Errors.OLLAMA_EXTERNAL_RUNTIME_MANUAL); check(detail, false)
 end)
 case(function()
 	source_kind = nil; local before = #built
 	check(activate(), false); check(#built, before)
-	check(failure, "external runtime requires manual service management"); check(detail, false)
+	check(failure, Errors.OLLAMA_EXTERNAL_RUNTIME_MANUAL); check(detail, false)
 end)
 case(function()
 	binary = nil; local before = #built

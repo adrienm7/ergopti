@@ -15,6 +15,7 @@ Contract.run_batching(helpers, helpers.shared("tests/corpus/llm/request_plan_bat
 Contract.run_token_budget(helpers, helpers.shared("tests/corpus/llm/request_plan_token_budget_vectors.json"))
 Contract.run_info_bar(helpers, helpers.shared("tests/corpus/llm/request_plan_info_bar_vectors.json"))
 Contract.run_live(helpers, helpers.shared("tests/corpus/llm/request_plan_live_vectors.json"))
+Contract.run_agent(helpers, helpers.shared("tests/corpus/llm/request_plan_agent_vectors.json"))
 Contract.run_ports(helpers, {
 	HttpClient = require("adapters.http_client"),
 	TimerScheduler = require("adapters.timer_scheduler"),

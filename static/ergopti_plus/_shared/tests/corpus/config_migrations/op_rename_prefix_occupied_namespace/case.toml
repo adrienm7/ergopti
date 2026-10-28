@@ -1,0 +1,6 @@
+# _shared/tests/corpus/config_migrations/op_rename_prefix_occupied_namespace/case.toml
+
+[case]
+description = "A rename_prefix target whose path is already a table refuses the migration like an occupied key."
+drivers = ["ahk", "hs", "linux"]
+outcome = "invalid"

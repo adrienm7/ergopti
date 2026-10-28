@@ -65,9 +65,9 @@ class BootstrapOwnerControls(unittest.TestCase):
             self.bootstrap.retire()
         self.session.retire()
 
-    def acquire(self, environment=None):
+    def acquire(self, environment=None, *, inherited_trust=True):
         with patch.dict(os.environ, environment or {}, clear=True):
-            snapshot = self.policy.capture(60000)
+            snapshot = self.policy.capture(60000, inherited_trust=inherited_trust)
         self.bootstrap = BOOT.EmptyNetworkBootstrap.acquire(
             self.session, snapshot, register=lambda value: None
         )
@@ -135,6 +135,30 @@ class BootstrapOwnerControls(unittest.TestCase):
             },
         )
         self.assertEqual(len(payload["environment"]), len(dict(payload["environment"])))
+
+    def test_closed_inherited_trust_keeps_every_route_and_drops_only_trust(self):
+        # Field run 2026-10-27 19:47: the macOS daemon owner captures with
+        # inherited_trust=False, so an inherited CA bundle never reaches Go or
+        # the native worker while every proxy and bypass setting still does.
+        values = {
+            "https_proxy": "http://private:token@relay:8080",
+            "NO_PROXY": ".internal",
+            "SSL_CERT_FILE": "/company/bundle.pem",
+            "SSL_CERT_DIR": "/company/hashed",
+        }
+        self.acquire(values, inherited_trust=False)
+        payload = json.loads(base64.b64decode(self.release()["payload"]))
+        self.assertEqual(
+            dict(payload["environment"]),
+            {"https_proxy": values["https_proxy"], "NO_PROXY": values["NO_PROXY"]},
+        )
+
+    def test_capture_requires_an_explicit_boolean_trust_decision(self):
+        with self.assertRaises(TypeError):
+            self.policy.capture(60000)
+        for decision in (None, 0, 1, "false"):
+            with self.subTest(decision=decision), self.assertRaises(BOOT.ImageRefusal):
+                self.policy.capture(60000, inherited_trust=decision)
 
     def test_capture_does_not_follow_later_environment_mutation(self):
         self.acquire({"https_proxy": "http://original:8080"})
@@ -267,7 +291,7 @@ class BootstrapOwnerControls(unittest.TestCase):
                 self.bootstrap.snapshot.authenticated_bytes(b"session", token)
         for budget in (0, -1, True, 1.5, 2**31):
             with self.assertRaises(BOOT.ImageRefusal):
-                self.policy.capture(budget)
+                self.policy.capture(budget, inherited_trust=True)
 
     def test_oversize_outer_envelope_refused_not_truncated(self):
         self.acquire(
@@ -290,7 +314,7 @@ class BootstrapOwnerControls(unittest.TestCase):
         ):
             with patch.dict(os.environ, values, clear=True):
                 with self.assertRaises(BOOT.ImageRefusal):
-                    self.policy.capture(60000)
+                    self.policy.capture(60000, inherited_trust=True)
         self.assertEqual(self.session.path.read_bytes(), b"")
 
     def test_duplicate_policy_fields_and_source_digest_mismatch_refuse(self):
@@ -395,7 +419,7 @@ class BootstrapProtocolControls(unittest.TestCase):
         fixture.empty_session()
         policy = BOOT.BootstrapPolicy(POLICY_PATH, PROXY.ProxyPolicy())
         with patch.dict(os.environ, {"HTTPS_PROXY": "http://private:token@relay:8080"}, clear=True):
-            snapshot = policy.capture(60000)
+            snapshot = policy.capture(60000, inherited_trust=True)
         self.bootstrap = BOOT.EmptyNetworkBootstrap.acquire(
             fixture.session, snapshot, register=lambda value: None
         )

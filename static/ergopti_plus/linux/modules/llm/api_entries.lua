@@ -439,6 +439,36 @@ function M.set_active(id)
 	return false
 end
 
+--- Gives an entry another model and selects it, in one private publication
+--- (the model selector page's listed or typed model).
+--- @param id string
+--- @param model string A model id the shared listing rule admits.
+--- @return boolean
+function M.set_model(id, model)
+	if not require("llm.api_model_listing").valid_id(model) then return false end
+	local current = state()
+	if current.publishing or current.write_refusal then return false end
+	for index, entry in ipairs(current.entries) do
+		if entry.id == id then
+			local copy = {}
+			for key, value in pairs(entry) do copy[key] = value end
+			copy.model = model
+			local changed = valid_entry(copy)
+			if not changed then return false end
+			local previous = current.active_id
+			current.entries[index], current.active_id = changed, id
+			if persist() then
+				current.dangling_active_id = nil
+				pcall(Logger.info, LOG, "API entry '%s' model set to '%s'.", id, model)
+				return true
+			end
+			current.entries[index], current.active_id = entry, previous
+			return false
+		end
+	end
+	return false
+end
+
 --- Deletes an entry and its key.
 --- @param id string
 --- @return boolean

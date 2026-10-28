@@ -1,0 +1,921 @@
+{
+	"_description": "Cross-driver corpus for erased and synthetic n-grams. A Backspace pops the newest erasable history entry and flags the n-grams that ended on it as errors (e); a Backspace never flags another Backspace. Synthetic events (meta s=1, st=hotstring|llm) carry their source into esrc and never count as the user's mistake. Each vector is replayed as one typing entry per flush, for one application, through the macOS (aggregator walk_typing) and Linux (aggregate_walker.walk with a carried context) walkers. 'expected' lists, per n-gram family, every token whose typed count c or erased count e is above zero, with c, e and the per-source counts esrc. The comparison is exact. The AHK replayer (KLW_WalkTypingEntry) is to be written on the PC; it is not part of this change.",
+	"date": "2024-06-01",
+	"app": "CorrectionApp",
+	"timestamps": ["2024-06-01 10:00:00.000", "2024-06-01 10:00:01.000"],
+	"vectors": [
+		{
+			"id": "erased_word_tail_is_flagged",
+			"description": "A Backspace after typed text flags the n-grams that ended on the erased character",
+			"flushes": [
+				[
+					{
+						"char": "a",
+						"delay": 100
+					},
+					{
+						"char": "b",
+						"delay": 100
+					},
+					{
+						"char": "c",
+						"delay": 100
+					},
+					{
+						"char": "[BS]",
+						"delay": 100
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"[BS]": {
+						"c": 1,
+						"e": 0
+					},
+					"a": {
+						"c": 1,
+						"e": 0
+					},
+					"b": {
+						"c": 1,
+						"e": 0
+					},
+					"c": {
+						"c": 1,
+						"e": 1
+					}
+				},
+				"ngram_bigrams": {
+					"ab": {
+						"c": 1,
+						"e": 0
+					},
+					"bc": {
+						"c": 1,
+						"e": 1
+					},
+					"c[BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_trigrams": {
+					"abc": {
+						"c": 1,
+						"e": 1
+					},
+					"bc[BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_quadgrams": {},
+				"ngram_pentagrams": {},
+				"ngram_hexagrams": {},
+				"ngram_heptagrams": {}
+			}
+		},
+		{
+			"id": "erased_backspace_flags_nothing",
+			"description": "A Backspace that pops another Backspace flags no n-gram",
+			"flushes": [
+				[
+					{
+						"char": "a",
+						"delay": 100
+					},
+					{
+						"char": "b",
+						"delay": 100
+					},
+					{
+						"char": "[BS]",
+						"delay": 100
+					},
+					{
+						"char": "[BS]",
+						"delay": 100
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"[BS]": {
+						"c": 2,
+						"e": 0
+					},
+					"a": {
+						"c": 1,
+						"e": 0
+					},
+					"b": {
+						"c": 1,
+						"e": 1
+					}
+				},
+				"ngram_bigrams": {
+					"[BS][BS]": {
+						"c": 1,
+						"e": 0
+					},
+					"ab": {
+						"c": 1,
+						"e": 1
+					},
+					"b[BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_trigrams": {
+					"ab[BS]": {
+						"c": 1,
+						"e": 0
+					},
+					"b[BS][BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_quadgrams": {},
+				"ngram_pentagrams": {},
+				"ngram_hexagrams": {},
+				"ngram_heptagrams": {}
+			}
+		},
+		{
+			"id": "erased_across_flushes",
+			"description": "The erased history survives a flush boundary",
+			"flushes": [
+				[
+					{
+						"char": "a",
+						"delay": 100
+					},
+					{
+						"char": "b",
+						"delay": 100
+					}
+				],
+				[
+					{
+						"char": "[BS]",
+						"delay": 100
+					},
+					{
+						"char": "c",
+						"delay": 100
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"[BS]": {
+						"c": 1,
+						"e": 0
+					},
+					"a": {
+						"c": 1,
+						"e": 0
+					},
+					"b": {
+						"c": 1,
+						"e": 1
+					},
+					"c": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_bigrams": {
+					"[BS]c": {
+						"c": 1,
+						"e": 0
+					},
+					"ab": {
+						"c": 1,
+						"e": 1
+					},
+					"b[BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_trigrams": {
+					"ab[BS]": {
+						"c": 1,
+						"e": 0
+					},
+					"b[BS]c": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_quadgrams": {
+					"ab[BS]c": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_pentagrams": {},
+				"ngram_hexagrams": {},
+				"ngram_heptagrams": {}
+			}
+		},
+		{
+			"id": "synthetic_hotstring_backspaces_are_sourced",
+			"description": "A hotstring erasing its trigger flags the erased n-grams with the hotstring source, not as the user's mistake",
+			"flushes": [
+				[
+					{
+						"char": "y",
+						"delay": 100
+					},
+					{
+						"char": "a",
+						"delay": 100
+					},
+					{
+						"char": "[BS]",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "hotstring"
+						}
+					},
+					{
+						"char": "[BS]",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "hotstring"
+						}
+					},
+					{
+						"char": "y",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "hotstring"
+						}
+					},
+					{
+						"char": "e",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "hotstring"
+						}
+					},
+					{
+						"char": "s",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "hotstring"
+						}
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"[BS]": {
+						"c": 2,
+						"e": 0,
+						"esrc": {
+							"hotstring": 2
+						}
+					},
+					"a": {
+						"c": 1,
+						"e": 1,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"e": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"s": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"y": {
+						"c": 2,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				},
+				"ngram_bigrams": {
+					"[BS][BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"[BS]y": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"a[BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"es": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"ya": {
+						"c": 1,
+						"e": 1,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"ye": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				},
+				"ngram_trigrams": {
+					"[BS][BS]y": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"[BS]ye": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"a[BS][BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"ya[BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"yes": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				},
+				"ngram_quadgrams": {
+					"[BS][BS]ye": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"[BS]yes": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"a[BS][BS]y": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				},
+				"ngram_pentagrams": {
+					"[BS][BS]yes": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"a[BS][BS]ye": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"ya[BS][BS]y": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				},
+				"ngram_hexagrams": {
+					"a[BS][BS]yes": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"ya[BS][BS]ye": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				},
+				"ngram_heptagrams": {
+					"ya[BS][BS]yes": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				}
+			}
+		},
+		{
+			"id": "synthetic_llm_backspaces_are_sourced",
+			"description": "An accepted suggestion erasing the typed prefix carries the llm source",
+			"flushes": [
+				[
+					{
+						"char": "h",
+						"delay": 100
+					},
+					{
+						"char": "e",
+						"delay": 100
+					},
+					{
+						"char": "[BS]",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "llm"
+						}
+					},
+					{
+						"char": "[BS]",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "llm"
+						}
+					},
+					{
+						"char": "h",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "llm"
+						}
+					},
+					{
+						"char": "i",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "llm"
+						}
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"[BS]": {
+						"c": 2,
+						"e": 0,
+						"esrc": {
+							"llm": 2
+						}
+					},
+					"e": {
+						"c": 1,
+						"e": 1,
+						"esrc": {
+							"llm": 1
+						}
+					},
+					"h": {
+						"c": 2,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					},
+					"i": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					}
+				},
+				"ngram_bigrams": {
+					"[BS][BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					},
+					"[BS]h": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					},
+					"e[BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					},
+					"he": {
+						"c": 1,
+						"e": 1,
+						"esrc": {
+							"llm": 1
+						}
+					},
+					"hi": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					}
+				},
+				"ngram_trigrams": {
+					"[BS][BS]h": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					},
+					"[BS]hi": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					},
+					"e[BS][BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					},
+					"he[BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					}
+				},
+				"ngram_quadgrams": {
+					"[BS][BS]hi": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					},
+					"e[BS][BS]h": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					}
+				},
+				"ngram_pentagrams": {
+					"e[BS][BS]hi": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					},
+					"he[BS][BS]h": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					}
+				},
+				"ngram_hexagrams": {
+					"he[BS][BS]hi": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"llm": 1
+						}
+					}
+				},
+				"ngram_heptagrams": {}
+			}
+		},
+		{
+			"id": "user_text_after_synthetic_output_starts_fresh",
+			"description": "Typed text after a synthetic burst does not chain onto the synthetic characters",
+			"flushes": [
+				[
+					{
+						"char": "y",
+						"delay": 100
+					},
+					{
+						"char": "a",
+						"delay": 100
+					},
+					{
+						"char": "[BS]",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "hotstring"
+						}
+					},
+					{
+						"char": "[BS]",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "hotstring"
+						}
+					},
+					{
+						"char": "o",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "hotstring"
+						}
+					},
+					{
+						"char": "k",
+						"delay": 50,
+						"meta": {
+							"s": 1,
+							"st": "hotstring"
+						}
+					},
+					{
+						"char": "x",
+						"delay": 100
+					},
+					{
+						"char": "z",
+						"delay": 100
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"[BS]": {
+						"c": 2,
+						"e": 0,
+						"esrc": {
+							"hotstring": 2
+						}
+					},
+					"a": {
+						"c": 1,
+						"e": 1,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"k": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"o": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"x": {
+						"c": 1,
+						"e": 0
+					},
+					"y": {
+						"c": 1,
+						"e": 0
+					},
+					"z": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_bigrams": {
+					"[BS][BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"[BS]o": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"a[BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"kx": {
+						"c": 1,
+						"e": 0
+					},
+					"ok": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"xz": {
+						"c": 1,
+						"e": 0
+					},
+					"ya": {
+						"c": 1,
+						"e": 1,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				},
+				"ngram_trigrams": {
+					"[BS][BS]o": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"[BS]ok": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"a[BS][BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"kxz": {
+						"c": 1,
+						"e": 0
+					},
+					"okx": {
+						"c": 1,
+						"e": 0
+					},
+					"ya[BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				},
+				"ngram_quadgrams": {
+					"[BS][BS]ok": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"[BS]okx": {
+						"c": 1,
+						"e": 0
+					},
+					"a[BS][BS]o": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"okxz": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_pentagrams": {
+					"[BS][BS]okx": {
+						"c": 1,
+						"e": 0
+					},
+					"[BS]okxz": {
+						"c": 1,
+						"e": 0
+					},
+					"a[BS][BS]ok": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					},
+					"ya[BS][BS]o": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				},
+				"ngram_hexagrams": {
+					"[BS][BS]okxz": {
+						"c": 1,
+						"e": 0
+					},
+					"a[BS][BS]okx": {
+						"c": 1,
+						"e": 0
+					},
+					"ya[BS][BS]ok": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				},
+				"ngram_heptagrams": {
+					"a[BS][BS]okxz": {
+						"c": 1,
+						"e": 0
+					},
+					"ya[BS][BS]okx": {
+						"c": 1,
+						"e": 0
+					}
+				}
+			}
+		}
+	]
+}

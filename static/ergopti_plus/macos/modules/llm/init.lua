@@ -50,7 +50,9 @@ local _SHARED_SCALAR_KEYS = {
 	"llm_max_words", "llm_pred_indent", "llm_show_info_bar",
 	"llm_streaming", "llm_streaming_multi", ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END,
 	ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING, ConfigKeys.COMMAND.LLM_RESET_ON_NAV, "llm_auto_raise_temp",
-	"llm_ollama_port",
+	-- llm_ollama_port names the stock Ollama port, which a user's own Ollama
+	-- keeps; Ergopti's own daemon listens on llm_ollama_owned_port.
+	"llm_ollama_port", "llm_ollama_owned_port",
 	-- Privacy gates for the prediction path. These were absent from this list AND
 	-- hardcoded to true in prediction_engine.lua, so the shared value was
 	-- unreachable and the two drivers shipped opposite defaults for the same
@@ -1663,8 +1665,9 @@ local function apply_backend_identity(backend, start_service)
 		CoreState.backend_transition_generation =
 			CoreState.backend_transition_generation + 1
 		local my_transition_generation = CoreState.backend_transition_generation
-		-- Any backend transition forces a fresh Ollama readiness verdict: leaving MLX
-		-- kills `ollama serve`, and returning relaunches it async (not yet listening).
+		-- Any backend transition forces a fresh Ollama readiness verdict: switching to
+		-- MLX retires the owned `ollama serve`, and returning relaunches it async (not
+		-- yet listening).
 		-- Without this, a stale-true _is_ready would make the warmup chain self-terminate
 		-- and predictions dispatch to a cold/dead server (F-M8). ensure_running launches
 		-- the daemon but must NEVER imply readiness.

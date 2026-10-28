@@ -24,6 +24,8 @@
 --- /proc/bus/input/devices, and that has no business on the keystroke path.
 --- ==============================================================================
 
+-- The cases replace these entries; the module end puts them back.
+local restore_loaded = require("tests.helpers").keep_loaded({ "modules.hotstrings.device_finder" })
 package.loaded["tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture"] = nil
 local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture")
 local helpers, tick_until_check, aggregate_consumer_session =
@@ -755,3 +757,4 @@ helpers.describe("managed source cohort provider and logger reentry", function()
 	end
 end)
 
+restore_loaded()

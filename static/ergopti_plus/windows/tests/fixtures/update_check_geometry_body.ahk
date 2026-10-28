@@ -87,7 +87,7 @@ _UCNG_Run() {
 try {
 	_UCNG_Run()
 	ExitApp(0)
-} catch Any as Failure {
-	FileAppend("FAIL update-check-geometry " . Failure.Message . " file=" . Failure.File . " line=" . Failure.Line . "`n", "*", "UTF-8")
+} catch Any as TopLevelFailure {
+	FileAppend("FAIL update-check-geometry " . TopLevelFailure.Message . " file=" . TopLevelFailure.File . " line=" . TopLevelFailure.Line . "`n", "*", "UTF-8")
 	ExitApp(1)
 }

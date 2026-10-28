@@ -202,6 +202,20 @@ function M.stage(stage_name)
 	pcall(BootJournal.append, "START", "Boot stage started: " .. name .. ".")
 end
 
+--- Opens a stage unless the boot is already inside that exact stage. A boot
+--- that pauses inside a stage and runs again when it resumes (the Accessibility
+--- wait) keeps one stage whose duration includes the pause; any other stage
+--- still open is reported as by M.stage().
+--- @param stage_name string Human-readable stage label, closed by M.mark().
+function M.stage_once(stage_name)
+	local name = tostring(stage_name)
+	if _open_stage == name then
+		pcall(Logger.debug, LOG, "Boot stage '%s' resumed.", name)
+		return
+	end
+	M.stage(name)
+end
+
 --- Names the stage a fatal abort interrupted.
 --- @return string stage Open stage, else the stage after the last completed one.
 function M.current_stage()

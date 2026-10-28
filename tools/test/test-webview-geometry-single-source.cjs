@@ -262,7 +262,6 @@ const MACOS_MODULES = {
 	onboarding: 'ui/onboarding/init.lua',
 	paths_editor: 'ui/menu/menu_paths.lua',
 	layout_manager: 'ui/layout_manager/init.lua',
-	token_prompt: 'ui/menu/menu_llm/models_selector.lua',
 	healthcheck: 'ui/healthcheck/core.lua',
 	error_dialog: 'ui/error_dialog/init.lua',
 	permission_dialog: 'ui/permission_dialog/init.lua',
@@ -273,6 +272,9 @@ const MACOS_MODULES = {
 // Apps deliberately not value-checked on macOS, each with the reason. A stale
 // entry (app gone from the manifest) fails, so this cannot quietly rot.
 const MACOS_EXCLUSIONS = {
+	token_prompt:
+		'no macOS reader since the custom-model dialog left with the model selector page ' +
+		'(2026-10-27); the Hugging Face login that shares its title sizes its own frame',
 	metrics_apps:
 		'sizes itself to the screen (sf.w - 100), by design — the manifest value is honoured only by Linux',
 	metrics_typing:

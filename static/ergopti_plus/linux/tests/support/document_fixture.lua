@@ -89,41 +89,61 @@ function M.new(app_name, handler, state)
 		end
 		c.views[#c.views+1]=v;return v
 	end
-	package.loaded.lgi={Gtk=Gtk,WebKit2=WebKit,GLib={MainContext={default=function()return {iteration=function()end}end}},
-		GObject={signal_handler_disconnect=function(ucm,id)
-			assert(ucm.connected[id]==true,"only the exact connected native signal retires")
-			ucm.connected[id]=false
-			ucm.on_script_message_received[ucm.signal_details[id]]=nil
-		end,signal_handler_is_connected=function(ucm,id)return ucm.connected[id]==true end}}
-	package.loaded["infra.monotonic"]={now_ms=function()return c.now end,has_hires=function()return true end}
-	package.loaded["infra.timings"]={ms=function(section,key)
-		assert(section=="ui" and key=="document_initialization_ack_timeout_ms");return 5000 end}
-	package.loaded["infra.managed_http_deadline"]={start=function(deadline,expired)
-		local t={started=true,settled=false,listeners={},deadline=deadline,expired=expired}
-		function t:cancel()if c.on_cancel then c.on_cancel()end;return true end
-		function t:is_settled()return self.settled end
-		function t:on_settled(cb)self.listeners[#self.listeners+1]=cb;return true end
-		function t:ack_close()self.settled=true;local callbacks=self.listeners;self.listeners={};for _,cb in ipairs(callbacks)do cb()end end
-		c.timers[#c.timers+1]=t;return t end}
-	package.loaded["adapters.event_loop"]={add_idle_handler=function(fn)c.idles[#c.idles+1]=fn end}
-	package.loaded["adapters.notifier"]={send_owned=function(message,opts,admit)
-		if c.on_notice_probe then c.on_notice_probe() end
-		if not admit() then return false end
-		c.notices[#c.notices+1]={message=message,title=opts.title};return true end}
-	package.loaded["adapters.application_notifier"]=package.loaded["adapters.notifier"]
-	package.loaded["ui.webkit_host"]=host
-	package.loaded["ui.webview_manager"]=nil
-	Manager=require("ui.webview_manager");c.manager=Manager
-	local native_shutdown = Manager.shutdown
-	local owned_state={}
-	for key,value in pairs(state or {})do owned_state[key]=value end
-	owned_state.is_paused=owned_state.is_paused or function()return c.paused==true end
-	c.state=owned_state;Manager.set_daemon_state(owned_state)
-	-- Preserve the actual module object used by manager._load_handler.
-	local module="ui."..app_name..".bridge"
-	c.saved_handler={value=package.loaded[module]};package.loaded[module]=handler
-	c.handler_module=module
-	assert(Manager.show(app_name)==true,"actual manager must create the controlled native window")
+	local native_shutdown
+	local function restore_loaded()
+		if c.handler_module then package.loaded[c.handler_module]=c.saved_handler.value end
+		for _,name in ipairs(names)do package.loaded[name]=saved[name].value end
+	end
+	-- Construction is one transaction. A failure after the first swap retires what
+	-- the manager built and restores every package.loaded entry before rethrowing:
+	-- a double left behind (the timings one refuses every other key) made one
+	-- fixture failure fail about 1200 later Linux tests.
+	local built, build_error = xpcall(function()
+		package.loaded.lgi={Gtk=Gtk,WebKit2=WebKit,GLib={MainContext={default=function()return {iteration=function()end}end}},
+			GObject={signal_handler_disconnect=function(ucm,id)
+				assert(ucm.connected[id]==true,"only the exact connected native signal retires")
+				ucm.connected[id]=false
+				ucm.on_script_message_received[ucm.signal_details[id]]=nil
+			end,signal_handler_is_connected=function(ucm,id)return ucm.connected[id]==true end}}
+		package.loaded["infra.monotonic"]={now_ms=function()return c.now end,has_hires=function()return true end}
+		package.loaded["infra.timings"]={ms=function(section,key)
+			assert(section=="ui" and key=="document_initialization_ack_timeout_ms");return 5000 end}
+		package.loaded["infra.managed_http_deadline"]={start=function(deadline,expired)
+			local t={started=true,settled=false,listeners={},deadline=deadline,expired=expired}
+			function t:cancel()if c.on_cancel then c.on_cancel()end;return true end
+			function t:is_settled()return self.settled end
+			function t:on_settled(cb)self.listeners[#self.listeners+1]=cb;return true end
+			function t:ack_close()self.settled=true;local callbacks=self.listeners;self.listeners={};for _,cb in ipairs(callbacks)do cb()end end
+			c.timers[#c.timers+1]=t;return t end}
+		package.loaded["adapters.event_loop"]={add_idle_handler=function(fn)c.idles[#c.idles+1]=fn end}
+		package.loaded["adapters.notifier"]={send_owned=function(message,opts,admit)
+			if c.on_notice_probe then c.on_notice_probe() end
+			if not admit() then return false end
+			c.notices[#c.notices+1]={message=message,title=opts.title};return true end}
+		package.loaded["adapters.application_notifier"]=package.loaded["adapters.notifier"]
+		package.loaded["ui.webkit_host"]=host
+		package.loaded["ui.webview_manager"]=nil
+		Manager=require("ui.webview_manager");c.manager=Manager
+		native_shutdown = Manager.shutdown
+		local owned_state={}
+		for key,value in pairs(state or {})do owned_state[key]=value end
+		owned_state.is_paused=owned_state.is_paused or function()return c.paused==true end
+		c.state=owned_state;Manager.set_daemon_state(owned_state)
+		-- Preserve the actual module object used by manager._load_handler.
+		local module="ui."..app_name..".bridge"
+		c.saved_handler={value=package.loaded[module]};c.handler_module=module
+		package.loaded[module]=handler
+		assert(Manager.show(app_name)==true,"actual manager must create the controlled native window")
+	end, debug.traceback)
+	if not built then
+		if native_shutdown then
+			pcall(native_shutdown)
+			for _,timer in ipairs(c.timers)do pcall(function() timer:ack_close() end) end
+			pcall(native_shutdown)
+		end
+		restore_loaded()
+		error(build_error, 0)
+	end
 	function c.view()return c.views[#c.views]end
 	function c.start_load()local v=c.view();v.loading=true;v.on_load_changed(v,"STARTED");return v end
 	function c.finish_load(v,page_nonce)
@@ -173,8 +193,7 @@ function M.new(app_name, handler, state)
 		end
 		called, retired = pcall(native_shutdown)
 		if not called and not has_primary then primary, has_primary = retired, true end
-		package.loaded[c.handler_module]=c.saved_handler.value
-		for _,name in ipairs(names)do package.loaded[name]=saved[name].value end
+		restore_loaded()
 		closing_fixture = false
 		if has_primary then error(primary, 0) end
 		return called and retired == true

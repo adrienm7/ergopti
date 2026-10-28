@@ -52,7 +52,7 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 	-- Load with a notify stub that records what was sent.
 	-- hs.notify.new() takes an options TABLE: { title=, informativeText=, subTitle= }
 	local notify_calls = {}
-	local notify_releases = 0
+	local notify_methods = {}
 	local notify_throws = false
 	local notify_refuses = false
 	local hs_overrides = {
@@ -65,13 +65,17 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 					informative_text = t.informativeText,
 					subtitle = t.subTitle,
 				})
-				local notification = {
-					release = function() notify_releases = notify_releases + 1 end,
-				}
-				notification.send = function()
+				-- Hammerspoon 1.1.1 notifications have no release(); the old stub
+				-- offered one, so a call that raised on every real Mac stayed green
+				-- (issue #104). An unknown method raises here exactly as it does there.
+				local notification = setmetatable({}, { __index = function(_, name)
+					notify_methods[#notify_methods + 1] = name
+					return nil
+				end })
+				rawset(notification, "send", function()
 					if notify_refuses then return false end
 					return notification
-				end
+				end)
 				return notification
 			end,
 			show = function(_n) end,
@@ -188,7 +192,7 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)
 		notify_calls = {}
-		notify_releases = 0
+		notify_methods = {}
 		notify_refuses = true
 		local accepted = adapter.send("Permission denied.", { level = "error" })
 		notify_refuses = false
@@ -198,8 +202,8 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 			"send() must expose the native refusal to callers")
 		helpers.assert_eq(#notify_calls, 1,
 			"the refusal must come from a real native dispatch attempt")
-		helpers.assert_eq(notify_releases, 1,
-			"a refused notification must still release its native object")
+		helpers.assert_eq(notify_methods, {},
+			"the adapter must call only methods a Hammerspoon notification provides")
 		helpers.assert_contains(table.concat(lines, "\n"),
 			"hs.notify refused delivery",
 			"revoked notification permission must produce an actionable ERROR log")

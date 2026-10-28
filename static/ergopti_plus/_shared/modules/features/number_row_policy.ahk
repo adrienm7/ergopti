@@ -75,8 +75,8 @@ NumberRowPolicyAvailability(Levels) {
 	}
 	if Classes.Count != 1
 		return Map("digits", "mixed", "symbols", "mixed")
-	for Class in Classes {
-		switch Class, true {
+	for RowClass in Classes {
+		switch RowClass, true {
 			case "sd": return Map("digits", "", "symbols", "already_symbols_first")
 			case "ds": return Map("digits", "already_digits_first", "symbols", "")
 			case "dd": return Map("digits", "digits_on_both", "symbols", "digits_on_both")
@@ -148,8 +148,8 @@ NumberRowPolicyReady(Snapshot, Value) {
 			|| NumberRowPolicyMode(Snapshot.Get("mode", "")) == "" || NumberRowPolicyMode(Value) == ""
 		return false
 	for Field in ["generation", "lifecycle"] {
-		Number := Snapshot.Get(Field, -1)
-		if !(Number is Integer) || (Number < 0 || Number > 9007199254740991)
+		FieldNumber := Snapshot.Get(Field, -1)
+		if !(FieldNumber is Integer) || (FieldNumber < 0 || FieldNumber > 9007199254740991)
 			return false
 	}
 	if !(Snapshot.Get("hkl", 0) is Integer) || Snapshot["hkl"] == 0

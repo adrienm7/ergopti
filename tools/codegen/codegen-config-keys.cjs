@@ -52,6 +52,7 @@ const MENU_MANIFEST = 'static/ergopti_plus/_shared/modules/menu/menu_manifest.js
 const EXTRAS = 'static/ergopti_plus/_shared/core/config_schema/config_key_extras.json';
 const LUA_OUTPUT = 'static/ergopti_plus/_shared/lua/config_keys.lua';
 const JS_OUTPUT = 'static/ergopti_plus/_shared/ui/_generated/config_keys.js';
+const CJS_OUTPUT = 'tools/lib/_generated/config_keys.cjs';
 const AHK_OUTPUT = 'static/ergopti_plus/windows/_generated/config_keys.ahk';
 
 // The menu row types a dispatcher routes by id. Groups, labels, separators and
@@ -292,6 +293,50 @@ function emitJs(tables) {
 }
 
 /**
+ * The Node tools' CommonJS module: the same strict tables, loadable with `require`.
+ * (The shared web UI script cannot serve them: the package is `type: module`, so
+ * Node reads a `.js` file as an ES module and its `module.exports` never runs.)
+ * @param {ReturnType<typeof collect>} tables
+ * @returns {string}
+ */
+function emitCjs(tables) {
+	const body = TABLE_NAMES.map(
+		(name) =>
+			`\t${name}: strict('${name}', {\n` +
+			tables[name].map(([k, v]) => `\t\t${k}: ${quoted(v)},`).join('\n') +
+			'\n\t})'
+	).join(',\n');
+	return (
+		'// tools/lib/_generated/config_keys.cjs\n' +
+		'\n' +
+		'// ==========================================\n' +
+		'// AUTO-GENERATED — do not edit manually\n' +
+		`// Sources: ${SCHEMA}\n` +
+		`//          ${MENU_MANIFEST}\n` +
+		'// Run: npm run codegen:config-keys\n' +
+		'// ==========================================\n' +
+		'\n' +
+		BANNER_WHY.map((line) => '// ' + line).join('\n') +
+		'\n' +
+		"'use strict';\n" +
+		'\n' +
+		'function strict(label, values) {\n' +
+		'\treturn new Proxy(Object.freeze(values), {\n' +
+		'\t\tget(target, name) {\n' +
+		"\t\t\tif (typeof name === 'symbol' || Object.prototype.hasOwnProperty.call(target, name))\n" +
+		'\t\t\t\treturn target[name];\n' +
+		"\t\t\tthrow new Error('config_keys.' + label + ' has no constant ' + String(name));\n" +
+		'\t\t}\n' +
+		'\t});\n' +
+		'}\n' +
+		'\n' +
+		'module.exports = Object.freeze({\n' +
+		body +
+		'\n});\n'
+	);
+}
+
+/**
  * The AutoHotkey classes; a missing static property throws a PropertyError.
  * @param {ReturnType<typeof collect>} tables
  * @returns {string}
@@ -330,7 +375,7 @@ function emitAhk(tables) {
 // ==========================================
 
 /**
- * Regenerates the three outputs under `root`.
+ * Regenerates the four outputs under `root`.
  * @param {string} [root] Repository root.
  * @returns {ReturnType<typeof collect>} The tables written.
  */
@@ -339,6 +384,7 @@ function main(root = REPO_ROOT) {
 	const targets = [
 		[LUA_OUTPUT, emitLua(tables)],
 		[JS_OUTPUT, emitJs(tables)],
+		[CJS_OUTPUT, emitCjs(tables)],
 		[AHK_OUTPUT, emitAhk(tables)]
 	];
 	for (const [rel, content] of targets) {
@@ -363,12 +409,14 @@ module.exports = {
 	EXTRAS,
 	LUA_OUTPUT,
 	JS_OUTPUT,
+	CJS_OUTPUT,
 	AHK_OUTPUT,
 	collect,
 	constantName,
 	table,
 	emitLua,
 	emitJs,
+	emitCjs,
 	emitAhk,
 	main
 };

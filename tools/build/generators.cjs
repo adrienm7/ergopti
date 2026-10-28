@@ -132,6 +132,7 @@ const GENERATORS = [
 		outputs: [
 			'static/ergopti_plus/_shared/lua/config_keys.lua',
 			'static/ergopti_plus/_shared/ui/_generated/config_keys.js',
+			'tools/lib/_generated/config_keys.cjs',
 			'static/ergopti_plus/windows/_generated/config_keys.ahk'
 		]
 	},
@@ -190,6 +191,14 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/lua/brightness_actions_data.lua']
 	},
 	{
+		script: 'codegen/codegen-adapter-errors.cjs',
+		outputs: ['static/ergopti_plus/_shared/lua/adapter_errors.lua']
+	},
+	{
+		script: 'codegen/codegen-menu-row-order.cjs',
+		outputs: ['static/ergopti_plus/_shared/lua/menu/row_order_data.lua']
+	},
+	{
 		script: 'codegen/codegen-layer-editor-data-js.cjs',
 		outputs: ['static/ergopti_plus/_shared/ui/layer_editor/_generated/layer_data.js']
 	},
@@ -218,7 +227,13 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-identifiers.cjs',
-		outputs: ['static/ergopti_plus/_shared/lua/identifiers.lua']
+		outputs: [
+			'static/ergopti_plus/_shared/lua/identifiers.lua',
+			'static/ergopti_plus/_shared/ui/_generated/identifiers.js',
+			'static/ergopti_plus/_shared/data/identifiers.sh',
+			'static/ergopti_plus/_shared/data/identifiers.py',
+			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/Identifiers.generated.swift'
+		]
 	},
 	{
 		script: 'codegen/codegen-app-dirs.cjs',
@@ -243,6 +258,32 @@ const GENERATORS = [
 			'static/ergopti_plus/macos/_generated/locale_table.lua',
 			'static/ergopti_plus/linux/_generated/locale_table.lua',
 			'static/ergopti_plus/windows/_generated/locale_table.ahk'
+		]
+	},
+	{
+		script: 'codegen/codegen-linux-shell-messages.cjs',
+		outputs: [
+			'static/ergopti_plus/linux/_generated/shell_messages/ar.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/cs.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/da.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/de.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/en.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/es.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/fr.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/he.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/hi.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/it.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/ja.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/ko.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/nl.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/no.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/pl.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/pt.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/ru.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/sv.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/tr.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/uk.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/zh.msg'
 		]
 	},
 	{
