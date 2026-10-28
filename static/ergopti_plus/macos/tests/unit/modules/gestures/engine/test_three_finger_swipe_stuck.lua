@@ -14,6 +14,12 @@
 ---    while the main thread is busy and delivers them in one burst, so 35 frames
 ---    held over 280 ms read as 2 ms and failed the 20 ms join confirmation, and a
 ---    late thumb could pass the landing window the same way.
+--- 2. The momentum macOS emits after a swipe's last two fingers lift continued a
+---    scroll the blocker had swallowed: the swipe's own tail re-armed the scroll
+---    guard, so every swipe started within its momentum was refused, which made
+---    the next one refused too.
+--- 3. An aborted swipe that had already fired armed the scroll guard, and
+---    its pair tail was let through to scroll the page it had just switched to.
 --- The two-finger scroll guarantees of three-finger-swipe-vs-scroll still hold.
 --- ==============================================================================
 
@@ -302,5 +308,90 @@ helpers.describe("gesture timing follows the touch frame's capture time (three-f
 		local fires = watched(h.fired)
 		h.finish()
 		helpers.assert_eq(#fires, 0, "fired: " .. table.concat(fires, ", "))
+	end)
+end)
+
+
+
+
+
+-- ==========================================================
+-- ==========================================================
+-- ======= 3/ A Swipe's Own Tail Never Arms the Guard =======
+-- ==========================================================
+-- ==========================================================
+
+helpers.describe("the scroll guard follows only a real scroll (three-finger-swipe-stuck)", function()
+	helpers.it("momentum after a swipe whose scroll was swallowed does not refuse the next swipe", function()
+		local h = new_harness()
+		-- First swipe: macOS reads the hand as a scroll, and the blocker swallows
+		-- its phases while three fingers are down.
+		local hand = { FINGER_A, FINGER_B, FINGER_C }
+		for i = 0, 20 do
+			h.frame(hand, nil, i * STEP)
+			if i > 2 then
+				helpers.assert_true(h.scroll_event(SCROLL_CHANGED, 0) == true,
+					"the blocker must swallow the swipe's scroll phases")
+			end
+		end
+		h.lift()
+		local first = #watched(h.fired)
+		helpers.assert_true(first > 0, "the first swipe must fire")
+		-- macOS then emits momentum for the swallowed scroll, up to the moment the
+		-- next swipe lands, 150 ms later.
+		h.scroll_event(0, MOMENTUM_BEGIN)
+		for _ = 1, 18 do
+			h.wait(FRAME_DT_SEC)
+			h.scroll_event(0, MOMENTUM_CONTINUE)
+		end
+		swipe_frames(h)
+		h.lift()
+		local reason = h.rejection("scroll guard")
+		local more = fires_since(h.fired, first)
+		h.finish()
+		helpers.assert_eq(reason, nil, "the swipe's own momentum armed the guard: " .. tostring(reason))
+		helpers.assert_true(more > 0, "a second swipe right after the first must fire")
+	end)
+
+	helpers.it("momentum after a real two-finger scroll still refuses a three-finger landing", function()
+		local h = new_harness()
+		local pair = { FINGER_A, FINGER_B }
+		for i = 0, 30 do
+			h.frame(pair, nil, i * STEP)
+			helpers.assert_true(h.scroll_event(SCROLL_CHANGED, 0) == false,
+				"a two-finger scroll is native and passes the blocker")
+		end
+		h.lift()
+		h.scroll_event(0, MOMENTUM_BEGIN)
+		h.wait(0.05)
+		h.scroll_event(0, MOMENTUM_CONTINUE)
+		swipe_frames(h)
+		h.lift()
+		local fires = watched(h.fired)
+		local reason = h.rejection("scroll guard")
+		h.finish()
+		helpers.assert_true(reason ~= nil, "landing on a native momentum scroll must name the scroll guard")
+		helpers.assert_eq(#fires, 0, "fired: " .. table.concat(fires, ", "))
+	end)
+
+	helpers.it("a swipe that fired and ends as a moving pair keeps its tail and arms no guard", function()
+		local h = new_harness()
+		swipe_frames(h, 20)
+		local first = #watched(h.fired)
+		helpers.assert_true(first > 0, "the first swipe must fire live")
+		-- The third finger lifts while the other two keep travelling.
+		for i = 21, 30 do h.frame({ FINGER_A, FINGER_B }, nil, i * STEP) end
+		local blocking_tail = h.Engine.is_blocking_scroll()
+		h.lift()
+		h.wait(0.1)
+		swipe_frames(h)
+		h.lift()
+		local reason = h.rejection("scroll guard")
+		local more = fires_since(h.fired, first)
+		h.finish()
+		helpers.assert_true(blocking_tail,
+			"the pair left by a swipe that already switched tabs must not scroll the new tab")
+		helpers.assert_eq(reason, nil, "a fired swipe's tail is not a scroll: " .. tostring(reason))
+		helpers.assert_true(more > 0, "the next swipe 100 ms later must fire")
 	end)
 end)

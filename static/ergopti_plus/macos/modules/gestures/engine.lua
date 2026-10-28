@@ -111,6 +111,11 @@ local MOMENTUM_PHASES_ACTIVE = { [1] = true, [2] = true }
 -- through, and of the last real scroll end (momentum, or a locked pair lifting).
 local lastNativeScrollAt = nil
 local lastScrollEndAt    = nil
+-- Whether the latest scroll phase macOS reported was swallowed by the blocker.
+-- macOS still emits momentum once the last two fingers of a swipe lift: that
+-- momentum continues the swipe, not a scroll, and must not arm the guard, or
+-- each swipe refuses the next one started within its momentum.
+local scrollPhaseSwallowed = false
 
 -- Touch frames are timed when the trackpad captured them: a stalled main thread
 -- delivers queued frames in one burst, and timing them at delivery measured a
@@ -312,7 +317,10 @@ end
 --- Records the end of a contact sequence that scrolled with two fingers.
 --- @param delivered number Delivery time of the lift, comparable with scroll events.
 local function noteGestureEnd(delivered)
-	if gs.aborted or (gs.active and gs.maxFingers == 2 and gs.lockedDir ~= nil) then
+	-- An aborted gesture that already fired was a swipe whose tail moved on as a
+	-- pair, not a scroll.
+	if (gs.aborted and not gs.hadLiveFire)
+		or (gs.active and gs.maxFingers == 2 and gs.lockedDir ~= nil) then
 		lastScrollEndAt = delivered
 	end
 end
@@ -356,8 +364,25 @@ local function noteNativeScroll(event, properties)
 	if type(properties) ~= "table" or not event.getProperty then return end
 	local scroll_phase   = event:getProperty(properties.scrollWheelEventScrollPhase)
 	local momentum_phase = event:getProperty(properties.scrollWheelEventMomentumPhase)
-	if SCROLL_PHASES_ACTIVE[scroll_phase] then lastNativeScrollAt = TimerScheduler.awake_time() end
-	if MOMENTUM_PHASES_ACTIVE[momentum_phase] then lastScrollEndAt = TimerScheduler.awake_time() end
+	if SCROLL_PHASES_ACTIVE[scroll_phase] then
+		lastNativeScrollAt = TimerScheduler.awake_time()
+		scrollPhaseSwallowed = false
+	end
+	if MOMENTUM_PHASES_ACTIVE[momentum_phase] and not scrollPhaseSwallowed then
+		lastScrollEndAt = TimerScheduler.awake_time()
+	end
+end
+
+--- Records a scroll phase the blocker swallowed: the momentum macOS emits after
+--- it belongs to the gesture that swallowed it.
+--- @param event table|nil The scrollWheel or gesture event.
+--- @param properties table|nil The event property names.
+local function noteSwallowedScroll(event, properties)
+	if type(event) ~= "table" and type(event) ~= "userdata" then return end
+	if type(properties) ~= "table" or not event.getProperty then return end
+	if SCROLL_PHASES_ACTIVE[event:getProperty(properties.scrollWheelEventScrollPhase)] then
+		scrollPhaseSwallowed = true
+	end
 end
 
 --- Computes continuous signed distance (absolute trackpad coordinates).
@@ -885,7 +910,9 @@ function M.process_frame(touches, frame_stamp)
 	-- A gesture of three or more fingers that dropped to two for good is a
 	-- scroll from then on: nothing fires, not even at the lift.
 	if gs.aborted then
-		stopScrollBlock()
+		-- The pair left by a swipe that already fired is its tail: scrolling the
+		-- page it just switched to would be a second, unwanted action.
+		if not gs.hadLiveFire or n < 2 then stopScrollBlock() end
 		if n == 0 then
 			noteGestureEnd(delivered)
 			resetGS()
@@ -1073,7 +1100,7 @@ function M.process_frame(touches, frame_stamp)
 						Logger.info(LOG, "Gesture aborted: %d -> 2 fingers (frames=%d, %.3fs, pair travel %.2f).",
 							gs.maxFingers, gs.tentativeLiftingFrames, elapsed, pair_travel)
 						gs.aborted = true
-						stopScrollBlock()
+						if not gs.hadLiveFire then stopScrollBlock() end
 						return
 					elseif drop_confirmed then
 						if not gs.lifting then
@@ -1311,6 +1338,8 @@ function M.init(core_state, actions_mod)
 				-- momentum: a multi-finger gesture landing on it must not fire.
 				if not blocking and scrollBlocker == candidate then
 					noteNativeScroll(event, evProperties)
+				elseif blocking then
+					noteSwallowedScroll(event, evProperties)
 				end
 				return blocking
 			end
@@ -1389,6 +1418,7 @@ function M.stop()
 	M.cancel_current_gesture()
 	lastNativeScrollAt = nil
 	lastScrollEndAt    = nil
+	scrollPhaseSwallowed = false
 	frameClock.reset()
 	if stop_scroll_blocker("Gesture scroll-blocker teardown") ~= true then return false end
 	_state   = nil
