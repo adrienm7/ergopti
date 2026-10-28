@@ -13,6 +13,9 @@
 --- 1. The step was one action every 5 units, far below a normal swipe's 15 to
 ---    45, and the first action needed a full step. The slot's default is now
 ---    50 per action, the first one after Geometry.INCREMENTAL_FIRST_STEP.
+--- 2. When the distance shrank below a step boundary (sd 39.78 after 8 steps,
+---    4.91 after 1) the engine rebased its origin and step count on the current
+---    point, so the next small move forward fired the same step again.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -176,3 +179,37 @@ helpers.describe("a three-finger swipe switches one tab (three-finger-tab-step)"
 	end)
 end)
 
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 3/ Drift Never Adds or Removes a Tab =======
+-- ====================================================
+-- ====================================================
+
+helpers.describe("drift around a step boundary holds the tabs fired (three-finger-tab-step)", function()
+	helpers.it("hovering just below the first step does not fire it twice", function()
+		-- 4.91 after one step in the field log: the hand dips under the first
+		-- step, comes back and goes on, then drifts back as it lifts.
+		assert_fires(swipe({ 4.5, 3.8, 4.6, 3.8, 8.5, 7.3 }), 1, "tab_next", "a dip below the step")
+	end)
+
+	helpers.it("hovering just below a later step does not fire it twice", function()
+		-- sd 39.78 after 8 steps at sensitivity 5: the step boundaries are at 4,
+		-- 9, 14 ... 39, 44.
+		local fired = swipe({ 39.5, 38.8, 39.4, 38.8, 43.0 }, 5)
+		assert_fires(fired, 8, "tab_next", "a dip below a later boundary")
+	end)
+
+	helpers.it("lift-off drift back does not reverse a short swipe", function()
+		assert_fires(swipe({ 5.0, 3.2 }), 1, "tab_next", "a short swipe drifting back as it lifts")
+	end)
+
+	helpers.it("a real reversal still switches back", function()
+		local fired = swipe({ 20, -6 })
+		helpers.assert_true(#fired == 2 and fired[1] == "tab_next" and fired[2] == "tab_prev",
+			"a swipe brought back past its start is a reversal; fired: " .. table.concat(fired, ", "))
+	end)
+end)

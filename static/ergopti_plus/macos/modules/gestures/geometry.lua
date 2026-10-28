@@ -132,6 +132,9 @@ function M.movedTogether(origin, current, axis)
 end
 
 --- Counts the incremental actions a swipe has earned over a distance.
+--- The count only ever grows within one swipe: the engine holds the actions
+--- already fired when the distance shrinks, so drift never takes one back or
+--- earns it twice.
 --- @param distance number Absolute travel along the swipe axis.
 --- @param step number Distance per action after the first (the sensitivity).
 --- @return integer steps
@@ -140,6 +143,16 @@ function M.incrementalSteps(distance, step)
 	local first = math.min(M.INCREMENTAL_FIRST_STEP, step)
 	if distance < first then return 0 end
 	return 1 + math.floor((distance - first) / step)
+end
+
+--- Distance a swipe must come back from its last action before it counts as a
+--- reversal: half the first step, so lift-off drift neither reverses a swipe
+--- nor, through the rebase, fires the opposite action.
+--- @param step number Distance per action after the first (the sensitivity).
+--- @param floor number Smallest reversal distance the engine accepts.
+--- @return number distance
+function M.incrementalReverseMin(step, floor)
+	return math.max(floor, math.min(M.INCREMENTAL_FIRST_STEP, step) / 2)
 end
 
 --- Infers the action configuration slot ID given fingers count and direction.
