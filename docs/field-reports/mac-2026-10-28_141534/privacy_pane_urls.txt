@@ -1,0 +1,10 @@
+  accessibility      legacy     exit=0 x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility
+  accessibility      extension  exit=0 x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility
+  automation         legacy     exit=0 x-apple.systempreferences:com.apple.preference.security?Privacy_Automation
+  automation         extension  exit=0 x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Automation
+  input_monitoring   legacy     exit=0 x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent
+  input_monitoring   extension  exit=0 x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ListenEvent
+  screen_recording   legacy     exit=0 x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture
+  screen_recording   extension  exit=0 x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture
+  System Settings left open (it was running before)
+check=privacy_pane_urls verdict=info codes=accessibility_legacy_exit_0,accessibility_extension_exit_0,automation_legacy_exit_0,automation_extension_exit_0,input_monitoring_legacy_exit_0,input_monitoring_extension_exit_0,screen_recording_legacy_exit_0,screen_recording_extension_exit_0 accepted=8 refused=0
