@@ -18,7 +18,9 @@
 ---    scroll the blocker had swallowed: the swipe's own tail re-armed the scroll
 ---    guard, so every swipe started within its momentum was refused, which made
 ---    the next one refused too.
---- 3. An aborted swipe that had already fired armed the scroll guard, and
+--- 3. A finger-count cascade (4 -> 3 -> 2) measured the pair's travel from the
+---    three-finger centroid, so the centroid jump alone aborted the gesture.
+--- 4. An aborted swipe that had already fired armed the scroll guard, and
 ---    its pair tail was let through to scroll the page it had just switched to.
 --- The two-finger scroll guarantees of three-finger-swipe-vs-scroll still hold.
 --- ==============================================================================
@@ -393,5 +395,45 @@ helpers.describe("the scroll guard follows only a real scroll (three-finger-swip
 			"the pair left by a swipe that already switched tabs must not scroll the new tab")
 		helpers.assert_eq(reason, nil, "a fired swipe's tail is not a scroll: " .. tostring(reason))
 		helpers.assert_true(more > 0, "the next swipe 100 ms later must fire")
+	end)
+end)
+
+
+
+
+
+-- =====================================================
+-- =====================================================
+-- ======= 4/ No Gesture State Outlives Its Hand =======
+-- =====================================================
+-- =====================================================
+
+helpers.describe("a refused gesture leaves nothing armed (three-finger-swipe-stuck)", function()
+	helpers.it("a staggered four-finger lift is not a moving pair", function()
+		local h = new_harness()
+		local hand = { FINGER_A, FINGER_B, FINGER_C, FINGER_D }
+		for _ = 1, 5 do h.frame(hand, nil, 0) end
+		-- Fingers leave one per frame: four, three, then two still fingers.
+		h.frame({ FINGER_A, FINGER_B, FINGER_C }, nil, 0)
+		h.frame({ FINGER_A, FINGER_B }, nil, 0)
+		h.lift()
+		local fires = watched(h.fired)
+		local aborted = h.line("Gesture aborted")
+		h.finish()
+		helpers.assert_eq(aborted, nil, "the centroid jump of a cascade is not pair travel: " .. tostring(aborted))
+		helpers.assert_true(#fires == 1 and fires[1] == "app_expose",
+			"the four-finger tap must commit; fired: " .. table.concat(h.fired, ", "))
+	end)
+
+	helpers.it("a thumb resting beside two scrolling fingers still never fires", function()
+		local h = new_harness()
+		h.frame({ FINGER_A, FINGER_B }, nil, 0)
+		for i = 1, 40 do
+			h.frame({ FINGER_A, FINGER_B, THUMB }, { true, true, false }, i * STEP)
+		end
+		h.lift()
+		local fires = watched(h.fired)
+		h.finish()
+		helpers.assert_eq(#fires, 0, "fired: " .. table.concat(fires, ", "))
 	end)
 end)
