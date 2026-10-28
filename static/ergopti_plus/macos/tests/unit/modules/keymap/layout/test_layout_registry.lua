@@ -74,7 +74,8 @@ local function manager(options)
 		digests[registry_file(entry.file)] = entry.sha256
 		for _, file in ipairs(entry.extension.files) do digests[registry_file(file.file)] = file.sha256 end
 	end
-	local state = { requests = {}, files = {}, enabled = {}, disabled = {}, selected = {}, deleted = {} }
+	local state = { requests = {}, files = {}, enabled = {}, disabled = {}, selected = {}, deleted = {},
+		live_reads = {}, pending = {} }
 	for path, text in pairs(options.files or {}) do state.files[path] = text end
 	local served = options.served or {}
 	if type(served) == "table" and served[INDEX_URL] then
@@ -122,6 +123,21 @@ local function manager(options)
 			return true
 		end,
 		active_sources = function() return options.active or {} end,
+		-- macOS turns a listed layout on at once unless the case says otherwise.
+		live_enabled = function(name)
+			state.live_reads[#state.live_reads + 1] = name
+			if options.live_unreadable then return nil, "live_state_unreadable" end
+			return options.pending_logout ~= true, nil
+		end,
+		pending = {
+			record = function(id, name) state.pending[id] = { keyboard_name = name, select = false }; return true end,
+			request_select = function(id)
+				if state.pending[id] == nil then return false end
+				state.pending[id].select = true
+				return true
+			end,
+			forget = function(id) state.pending[id] = nil; return true end,
+		},
 		bundle_names = function() return options.bundle_names or {} end,
 	}
 	return LayoutRegistry, deps, state
@@ -319,6 +335,37 @@ helpers.describe("layout manager (macOS): installing", function()
 		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
 		helpers.assert_true(result.ok, tostring(result.extra))
 		helpers.assert_true(result.detail.enabled == false)
+	end)
+
+	-- macOS 26 lists a layout written to the enabled-sources preference at once
+	-- but turns it on only at the next login (field probe, L25 and L52): the
+	-- install must say so, not claim it enabled, and remember it for the boot.
+	helpers.it("reports a listed layout macOS turns on at the next login as pending (composer-macos26)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files(), pending_logout = true })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok, tostring(result.extra))
+		helpers.assert_eq(result.detail.enabled, false, "a layout macOS has not turned on is not enabled")
+		helpers.assert_eq(result.detail.pending_activation, true)
+		helpers.assert_eq(state.live_reads[1], entry_of("ergol").keyboard_name, "the live list decides, by keyboard name")
+		helpers.assert_not_nil(state.pending.ergol, "the boot checks it again")
+		run(function(done) LayoutRegistry.uninstall("ergol", done, deps) end)
+		helpers.assert_nil(state.pending.ergol, "an uninstalled layout is no longer pending")
+	end)
+
+	helpers.it("neither enables nor records a layout whose live state cannot be read (composer-macos26)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files(), live_unreadable = true })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok, tostring(result.extra))
+		helpers.assert_eq(result.detail.enabled, false)
+		helpers.assert_eq(result.detail.pending_activation, false)
+		helpers.assert_nil(state.pending.ergol)
+	end)
+
+	helpers.it("does not read the live list when the preference could not be written (composer-macos26)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files(), enable_fails = true })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_eq(result.detail.pending_activation, false)
+		helpers.assert_eq(#state.live_reads, 0)
 	end)
 
 	helpers.it("refuses a second operation while one is running (layout-registry-install)", function()
@@ -544,4 +591,39 @@ require("test.composer_check_contract")(helpers, Json, {
 	-- The input source cannot be enabled: the install works, the host is not ready.
 	readiness_failure = function(fresh) return fresh({ enable_fails = true }) end,
 	readiness_failure_step = "composer_ready=fail:not_enabled",
+	-- macOS 26 lists the composition in the enabled sources and turns it on at
+	-- the next login; a stored one is listed there too, not live yet.
+	pending_activation = function(fresh)
+		return fresh({ pending_logout = true })
+	end,
+	pending_activation_step = "composer_ready=info:pending_logout",
 })
+
+helpers.describe("layout composer (macOS): a layout macOS turns on at the next login", function()
+	local fixture_dir = helpers.driver_root() .. "/../_shared/modules/layouts/composer_check/"
+	local function shipped(name)
+		local handle = assert(io.open(fixture_dir .. name, "rb"))
+		local text = handle:read("*a")
+		handle:close()
+		return text
+	end
+
+	-- Selecting a source macOS has not turned on answers paramErr (-50): the
+	-- save must not try, nor fail, and the boot selects it after the login.
+	helpers.it("defers « save and use » to the next login instead of failing the selection (composer-macos26)", function()
+		local LayoutRegistry, deps, state = manager({ files = shipped_files(), pending_logout = true })
+		deps.config_dir = "/cfg/"
+		local result = {}
+		LayoutRegistry.composer_save({ declaration = shipped("composition.json"), keylayout = shipped("composed.keylayout"),
+			use = true }, function(ok, code, detail, used, installed)
+			result = { ok = ok, code = code, detail = detail, used = used, installed = installed }
+		end, deps)
+		helpers.assert_true(result.ok, tostring(result.code) .. " " .. tostring(result.detail))
+		helpers.assert_eq(result.used, false, "nothing is in use before the login")
+		helpers.assert_eq(result.installed.pending_activation, true)
+		helpers.assert_eq(#state.selected, 0, "no selection is attempted")
+		local id = assert(LayoutRegistry.composer_settings()).id
+		helpers.assert_true(state.pending[id] ~= nil and state.pending[id].select == true,
+			"the boot after the login selects it")
+	end)
+end)
