@@ -1125,8 +1125,27 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 				true,
 				section + ': actual native callback/getter and final publication'
 			);
-			if (ownership === 'behavior') admittedBehavior++;
-			else admittedInert++;
+			if (ownership === 'behavior') {
+				admittedBehavior++;
+				for (const [callback, label] of [
+					['function() pcall(fn) end', 'menu_keyboard_layout.tis_call'],
+					['function() end', 'menu_keyboard_layout.tis_call'],
+					['function() return false end', 'menu_keyboard_layout.tis_call'],
+					['nil', 'menu_keyboard_layout.tis_call'],
+					['fn', 'foreign_owner']
+				]) {
+					const native = source.replace(
+						'\n\t\tfn,\n\t\t"menu_keyboard_layout.tis_call"',
+						'\n\t\t' + callback + ',\n\t\t"' + label + '"'
+					);
+					assert.notEqual(native, source, 'withdraw the actual deferred callback owner');
+					assert.equal(
+						owns(native),
+						false,
+						'swallowed, discarded or missing work cannot own a declared behavior'
+					);
+				}
+			} else admittedInert++;
 			assert.equal(
 				owns(source, definition, 'hs', '.lua', ownership === 'behavior' ? 'inert' : 'behavior'),
 				false

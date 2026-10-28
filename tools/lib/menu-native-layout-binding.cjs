@@ -328,7 +328,7 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 				!exact(
 					deferred,
 					`if type(fn) ~= "function" then return false end
-					return DeferredWork.after(TIS_CALL_DELAY, function() pcall(fn) end, "menu_keyboard_layout.tis_call")`
+					return DeferredWork.after(TIS_CALL_DELAY, fn, "menu_keyboard_layout.tis_call")`
 				)
 			)
 				return false;
