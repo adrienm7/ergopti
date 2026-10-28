@@ -1,39 +1,39 @@
 <script>
-	import Header from '$lib/components/Header.svelte';
-	import Footer from '$lib/components/Footer.svelte';
+	import Header from '#lib/components/Header.svelte';
+	import Footer from '#lib/components/Footer.svelte';
 
-	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
-	import KeyboardControls from '$lib/keyboard/controls/KeyboardControls.svelte';
+	import KeyboardBasis from '#lib/keyboard/KeyboardBasis.svelte';
+	import KeyboardControls from '#lib/keyboard/controls/KeyboardControls.svelte';
 
 	import 'modern-normalize';
 
 	import { afterUpdate, onMount } from 'svelte';
-	import { detectDev } from '$lib/js/isDev.js';
+	import { detectDev } from '#lib/js/isDev.js';
 	import { page } from '$app/state';
-	import { discordLink } from '$lib/stores_infos.js';
+	import { discordLink } from '#lib/stores_infos.js';
 	import { base } from '$app/paths';
 
 	import AOS from 'aos';
 	import 'aos/dist/aos.css';
 
-	import { wrapKbdWithPunctuation } from '$lib/js/wrapKbdWithPunctuation.js';
+	import { wrapKbdWithPunctuation } from '#lib/js/wrapKbdWithPunctuation.js';
 
-	import { makeIds } from '$lib/js/make-ids.js';
+	import { makeIds } from '#lib/js/make-ids.js';
 	import tocbot from 'tocbot';
-	import '$lib/css/tocbot.css';
+	import '#lib/css/tocbot.css';
 
-	import '$lib/css/global.css';
-	import '$lib/css/layout.css';
-	import '$lib/css/cards.css';
-	import '$lib/css/spacing.css';
-	import '$lib/css/titles.css';
-	import '$lib/css/typography.css';
-	import '$lib/css/ergopti_name.css';
-	import '$lib/css/images.css';
-	import '$lib/css/buttons.css';
-	import '$lib/css/banner.css';
+	import '#lib/css/global.css';
+	import '#lib/css/layout.css';
+	import '#lib/css/cards.css';
+	import '#lib/css/spacing.css';
+	import '#lib/css/titles.css';
+	import '#lib/css/typography.css';
+	import '#lib/css/ergopti_name.css';
+	import '#lib/css/images.css';
+	import '#lib/css/buttons.css';
+	import '#lib/css/banner.css';
 
-	import '$lib/icons/icomoon/style.css';
+	import '#lib/icons/icomoon/style.css';
 
 	onMount(() => {
 		tocbot.init({

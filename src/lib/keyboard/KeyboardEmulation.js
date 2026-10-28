@@ -1,8 +1,8 @@
-import * as stores_infos from '$lib/stores_infos.js';
+import * as stores_infos from '#lib/stores_infos.js';
 import { get } from 'svelte/store';
-import { Keyboard } from '$lib/keyboard/Keyboard.js';
+import { Keyboard } from '#lib/keyboard/Keyboard.js';
 import { base } from '$app/paths';
-import { getMagicKeyUrls } from '$lib/js/hotstringDataUrls.js';
+import { getMagicKeyUrls } from '#lib/js/hotstringDataUrls.js';
 
 function unescapeTomlString(s) {
 	if (!s && s !== '') return s;
