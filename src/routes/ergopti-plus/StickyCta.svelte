@@ -12,7 +12,7 @@ competes with the final call-to-action. OS-aware, like the hero button.
 
 <script>
 	import { onMount } from 'svelte';
-	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '$lib/js/getGitHubRelease.js';
+	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '#lib/js/getGitHubRelease.js';
 	import { ui } from './state.svelte.js';
 	import { t } from './i18n.svelte.js';
 

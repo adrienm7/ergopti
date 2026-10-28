@@ -264,7 +264,7 @@ legacy = "Legacy section title"
 		assert.ok(
 			program.body.some(
 				(node) =>
-					node.type === 'ImportDeclaration' && node.source.value === '$lib/js/hotstringDataUrls.js'
+					node.type === 'ImportDeclaration' && node.source.value === '#lib/js/hotstringDataUrls.js'
 			),
 			'the actual consumer imports the shared URL owner'
 		);

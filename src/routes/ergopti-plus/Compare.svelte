@@ -13,7 +13,7 @@ whole experience — free, local, unified across OSes — with no scripting."
 <script>
 	import { reveal } from './reveal.js';
 	import { t } from './i18n.svelte.js';
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
 
 	// $derived so labels re-translate the instant the language toggles.
 	let cols = $derived(['Ergopti+', 'Espanso', 'AutoHotkey', 'TextExpander', t('Autocorr. native')]);
