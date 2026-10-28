@@ -386,12 +386,12 @@ LLM_ValidModelIdentifier(Backend, Id) {
 	static MaxLength := 200
 	if !(Id is String) || Id == "" || StrLen(Id) > MaxLength
 		return false
-	Any := "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+	NamePattern := "^[A-Za-z0-9][A-Za-z0-9._-]*$"
 	if (Backend == "ollama") {
 		Fields := StrSplit(Id, ":")
 		if Fields.Length > 2
 			return false
-		if Fields.Length == 2 && !RegExMatch(Fields[2], "S)" . Any)
+		if Fields.Length == 2 && !RegExMatch(Fields[2], "S)" . NamePattern)
 			return false
 		; StrSplit of an empty name yields no segment, so the loop below would
 		; never refuse it (":4b").
@@ -401,13 +401,13 @@ LLM_ValidModelIdentifier(Backend, Id) {
 		if Segments.Length > 3
 			return false
 		for Index, Segment in Segments
-			if !RegExMatch(Segment, Index == 1 ? "S)^[a-z0-9][a-z0-9._-]*$" : "S)" . Any)
+			if !RegExMatch(Segment, Index == 1 ? "S)^[a-z0-9][a-z0-9._-]*$" : "S)" . NamePattern)
 				return false
 		return true
 	}
 	if (Backend == "mlx") {
 		Parts := StrSplit(Id, "/")
-		return (Parts.Length == 2 && RegExMatch(Parts[1], "S)" . Any) && RegExMatch(Parts[2], "S)" . Any)) ? true : false
+		return (Parts.Length == 2 && RegExMatch(Parts[1], "S)" . NamePattern) && RegExMatch(Parts[2], "S)" . NamePattern)) ? true : false
 	}
 	return false
 }
