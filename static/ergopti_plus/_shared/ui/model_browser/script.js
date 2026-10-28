@@ -17,7 +17,10 @@
  *    Linux, its pinned AHK twin on Windows); the page never reads files.
  * 2. Only what works now is selectable: a backend the driver reports
  *    unavailable greys its rows with the reason, and a model that is not
- *    installed offers its download, never its activation.
+ *    installed offers its download, never its activation. Each local backend
+ *    header carries "Install <backend>": usable only while its runtime is
+ *    missing, greyed with the reason once installed or on a machine that
+ *    cannot run it, and showing the install's progress while it runs.
  * 3. The page decides nothing: every action crosses the bridge to the code
  *    path the tray used (validation, persistence, warmup).
  * 4. Keyboard first: rows are focusable, arrows move, Enter uses the focused
@@ -26,7 +29,7 @@
  */
 
 var _models = []; // Rows of the current payload.
-var _backends = []; // [{ id, brand, emoji, kind, available, reason_key }] in display order.
+var _backends = []; // [{ id, brand, emoji, kind, available, reason_key, install? }] in display order.
 var _backend = ''; // Active backend id.
 var _active = ''; // Active model name (display name) on the active backend.
 var _selected = null; // Key of the highlighted row.
@@ -122,6 +125,24 @@ function injectProgress(update) {
 	var percent = typeof update.percent === 'number' ? update.percent : NaN;
 	row.pending = 'download';
 	row.progress = Number.isFinite(percent) ? Math.max(0, Math.min(100, Math.floor(percent))) : null;
+	render();
+}
+
+/**
+ * Called by the native backend while the runtime install of one local backend
+ * reports progress. Its group header shows the percentage until the next
+ * payload, which carries the outcome (installed and unlocked, or offered again).
+ * @param {object} update - { backend, percent }; percent in [0, 100], or null when unknown.
+ */
+function injectInstallProgress(update) {
+	if (!update || typeof update.backend !== 'string') return;
+	var b = backendById(update.backend);
+	if (!b || !b.install) return;
+	var percent = typeof update.percent === 'number' ? update.percent : NaN;
+	b.install = {
+		state: 'running',
+		percent: Number.isFinite(percent) ? Math.max(0, Math.min(100, Math.floor(percent))) : null
+	};
 	render();
 }
 
@@ -452,6 +473,51 @@ function render() {
 	updateCurrent();
 }
 
+// The install states a local backend's payload names (b.install.state).
+var INSTALL_STATES = { available: true, installed: true, unsupported: true, running: true };
+
+/**
+ * The "Install <backend>" button of a local backend's header. It acts only
+ * while the runtime is missing (or its last install failed); installed,
+ * unsupported on this machine and running installs grey it with the reason.
+ * The click runs the driver's own owned-runtime install (group action
+ * "install"), whose progress and outcome come back through the payload.
+ */
+function buildInstallButton(b, catalogueOwner) {
+	var install = b.install;
+	if (!INSTALL_STATES[install.state]) throw new Error('Unknown install state for backend ' + b.id);
+	var btn = document.createElement('button');
+	btn.type = 'button';
+	btn.className = 'act install';
+	var brand = b.brand || b.id;
+	if (install.state === 'running') {
+		btn.textContent =
+			typeof install.percent === 'number'
+				? _fmt('model_browser.install_running_percent', { name: brand, n: install.percent })
+				: _fmt('model_browser.install_running', { name: brand });
+	} else {
+		btn.textContent = _t('model_browser.install_runtime').replace('%s', brand);
+	}
+	btn.disabled = install.state !== 'available';
+	var reasonKey =
+		install.state === 'installed'
+			? 'model_browser.install_installed'
+			: install.state === 'unsupported'
+				? install.reason_key
+				: '';
+	if (reasonKey) {
+		btn.title = _fmt(reasonKey, { name: brand });
+		btn.setAttribute('aria-description', btn.title);
+	}
+	btn.onclick = function () {
+		if (_catalogueOwner !== catalogueOwner || btn.disabled) return;
+		b.install = { state: 'running', percent: null };
+		render();
+		postModelAction({ action: 'group_action', backend: b.id, id: 'install' });
+	};
+	return btn;
+}
+
 /**
  * One backend's header: its emoji and name, why it cannot run now, and its
  * tools — the driver's own actions (install, port, token…), the field that
@@ -472,6 +538,8 @@ function buildGroupHead(b) {
 		(reason ? ' <span class="reason">' + _escHtml(reason) + '</span>' : '');
 	var tools = document.createElement('div');
 	tools.className = 'group-tools';
+
+	if (b.install) tools.appendChild(buildInstallButton(b, catalogueOwner));
 
 	(Array.isArray(b.actions) ? b.actions : []).forEach(function (a) {
 		var btn = document.createElement('button');

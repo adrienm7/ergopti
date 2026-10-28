@@ -1488,7 +1488,8 @@ function M.shift_tone(direction, cycle)
 		local request_opts = {
 			runtime_response = runtime_response,
 			stream = false,
-			verify_local_model = verify_local_model == true,
+			-- A user-initiated rewrite names a missing local model before Ollama 404s.
+			verify_local_model = true,
 			temperature = Settings.get("temperature"),
 			max_tokens = Rewrite.max_tokens(plan.source),
 			line_mode = true,

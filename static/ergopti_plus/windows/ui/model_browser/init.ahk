@@ -652,10 +652,9 @@ _LLM_MBW_BuildPayload() {
 	Installed := Map()
 	for Tag in _LLM_ModelBrowser_GetInstalledTags()
 		Installed[StrLower(Tag)] := Tag
+	; The page's "Install Ollama" button posts the group action "install".
+	Tools["ollama`ninstall"] := (*) => _LLM_MBW_InstallOllama()
 	OllamaTools := []
-	if OllamaFailed
-		OllamaTools.Push(_LLM_MBW_Tool(Tools, "ollama", "install",
-			StrReplace(t("model_browser.install_runtime"), "%s", "Ollama"), (*) => _LLM_MBW_InstallOllama()))
 	PortDisplay := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
 	OllamaTools.Push(_LLM_MBW_Tool(Tools, "ollama", "ollama_port",
 		StrReplace(t("menu.llm.ollama_port_label"), "%s", "" . PortDisplay), (*) => LLM_Menu_PromptOllamaPort()))
@@ -692,10 +691,20 @@ _LLM_MBW_BuildPayload() {
 	_LLM_MBW_LocalServerRows(Rows, Tools, Models, ApiTools)
 
 	; A config.toml that refuses writes greys every backend with that cause.
+	; Until Ollama is installed (its owned runtime on disk, or a server that
+	; answered) its rows stay greyed and its group offers the install.
 	Blocked := _LLM_Menu_ConfigBlockReason()
-	OllamaReason := Blocked != "" ? Blocked : (OllamaFailed ? "model_browser.reason_ollama_missing" : "")
-	Backends := _LLM_MBW_BackendJson("ollama", OllamaReason == "", OllamaReason, OllamaTools, OllamaReason == "")
-		. "," . _LLM_MBW_BackendJson("mlx", false, "model_browser.reason_mlx_unsupported_os", [], false)
+	; Like LLM_Deps_HasFailed above, the bootstrap owner is optional in the
+	; page-only children that load this owner without ollama_deps_checker.ahk.
+	OllamaInstalled := !OllamaFailed && ((IsSet(LLM_Deps_IsReady) && LLM_Deps_IsReady())
+		|| Installed.Count > 0 || _LLM_MBW_OllamaRuntimePresent())
+	OllamaReason := Blocked != "" ? Blocked : (OllamaInstalled ? "" : "model_browser.reason_ollama_missing")
+	OllamaInstall := Blocked != "" ? "{state:" . JsonStringLiteral("unsupported") . ",reason_key:" . JsonStringLiteral(Blocked) . "}"
+		: "{state:" . JsonStringLiteral(_LLM_MBW_OllamaInstallState(OllamaInstalled)) . "}"
+	MlxInstall := "{state:" . JsonStringLiteral("unsupported") . ",reason_key:"
+		. JsonStringLiteral("model_browser.reason_mlx_unsupported_os") . "}"
+	Backends := _LLM_MBW_BackendJson("ollama", OllamaReason == "", OllamaReason, OllamaTools, OllamaReason == "", OllamaInstall)
+		. "," . _LLM_MBW_BackendJson("mlx", false, "model_browser.reason_mlx_unsupported_os", [], false, MlxInstall)
 		. "," . _LLM_MBW_BackendJson("api", Blocked == "", Blocked, ApiTools, false)
 	ModelsJson := ""
 	for Json in Models
@@ -744,8 +753,35 @@ _LLM_MBW_Tool(Tools, Backend, Id, Text, Action) {
 	return "{id:" . JsonStringLiteral(Id) . ",text:" . JsonStringLiteral(Text) . "}"
 }
 
+/**
+ * Whether Ergopti's own Ollama runtime is published on this computer: a
+ * directory lookup under the managed root (a version folder holding
+ * ollama.exe), never a process launch. The bootstrap still verifies it.
+ * @returns {Boolean}
+ */
+_LLM_MBW_OllamaRuntimePresent() {
+	Root := EnvGet("LOCALAPPDATA") . "\" . AppDirsWindowsManagedOllamaFolderName() . "\versions"
+	Loop Files Root . "\*", "D" {
+		if FileExist(A_LoopFileFullPath . "\ollama.exe")
+			return true
+	}
+	return false
+}
+
+/**
+ * The page's "Install Ollama" button state: running while the owned
+ * bootstrap runs, installed once Ollama can run, else available.
+ * @param {Boolean} Installed
+ * @returns {String}
+ */
+_LLM_MBW_OllamaInstallState(Installed) {
+	if IsSet(LLM_Deps_IsChecking) && LLM_Deps_IsChecking()
+		return "running"
+	return Installed ? "installed" : "available"
+}
+
 /** One backend entry of the payload, brand and emoji from backends.json. */
-_LLM_MBW_BackendJson(Id, Available, ReasonKey, Tools, AddModel) {
+_LLM_MBW_BackendJson(Id, Available, ReasonKey, Tools, AddModel, InstallJson := "") {
 	Brands := LLM_GetBackendBrands()
 	ToolsJson := ""
 	for Json in Tools
@@ -755,6 +791,7 @@ _LLM_MBW_BackendJson(Id, Available, ReasonKey, Tools, AddModel) {
 		. ",available:" . (Available ? "true" : "false")
 		. (ReasonKey != "" ? ",reason_key:" . JsonStringLiteral(ReasonKey) : "")
 		. (AddModel ? ",add_model:true" : "")
+		. (InstallJson != "" ? ",install:" . InstallJson : "")
 		. ",actions:[" . ToolsJson . "]}"
 }
 
@@ -826,12 +863,21 @@ _LLM_MBW_LocalServerRows(Rows, Tools, Models, ApiTools) {
 	}
 }
 
-/** The Ollama install the backend selection runs, from the page's Ollama group. */
+/**
+ * The Ollama install the backend selection runs, from the page's "Install
+ * Ollama" button. The page shows it running; its outcome re-sends the payload,
+ * which unlocks the Ollama rows once installed.
+ */
 _LLM_MBW_InstallOllama() {
 	global _LLM_Menu
+	LoggerInfo("LLM.browser", "Installing Ollama from the model selector page.")
 	if (_LLM_Menu.Get("backend", "") != "ollama")
-		return LLM_Menu_SetBackend("ollama")
-	return LLM_Deps_CheckAndInstall(_LLM_Menu.Get("model", ""))
+		Result := LLM_Menu_SetBackend("ollama")
+	else
+		Result := LLM_Deps_CheckAndInstall(_LLM_Menu.Get("model", ""),
+			(*) => LLM_ModelBrowser_Refresh(), (*) => LLM_ModelBrowser_Refresh())
+	LLM_ModelBrowser_Refresh()
+	return Result
 }
 
 /**
