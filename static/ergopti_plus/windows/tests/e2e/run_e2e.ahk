@@ -243,11 +243,11 @@ _E2E_ApplyRecordedEdit(&Document, &NextSend) {
         Entry := _Stub_RecordedSends[NextSend++]
         AssertTrue(Entry.args.Length > 0, "a captured native send must carry its payload")
         Payload := Entry.args[1]
-        AssertTrue(RegExMatch(Payload, "^\{BackSpace (\d+)\}\{Text\}([\s\S]*)$", &Edit),
+        AssertTrue(RegExMatch(Payload, "^\{BackSpace (\d+)\}\{Text\}([\s\S]*)$", &EditMatch),
             "the intercepted sender must emit a recognized atomic text edit: " . Payload)
-        Count := Integer(Edit[1])
+        Count := Integer(EditMatch[1])
         AssertTrue(Count <= _TextCodepointLength(Document), "an expansion must never delete before the virtual document starts")
-        Document := SubStr(Document, 1, StrLen(Document) - _TextTailCodeUnits(Document, Count)) . Edit[2]
+        Document := SubStr(Document, 1, StrLen(Document) - _TextTailCodeUnits(Document, Count)) . EditMatch[2]
         Deleted += Count
         Applied += 1
     }
@@ -286,11 +286,11 @@ _E2E_SendToNativeEdit(EditControl, FnName, Args*) {
     AssertEqual("SendFinalResult", FnName, "the native tier must receive the production final sender")
     AssertTrue(Args.Length == 2 and !Args[2], "the native sender must preserve its command payload")
     _HOOK_RecordSend(FnName, Args*)
-    AssertTrue(RegExMatch(Args[1], "^\{BackSpace (\d+)\}\{Text\}([\s\S]*)$", &Edit),
+    AssertTrue(RegExMatch(Args[1], "^\{BackSpace (\d+)\}\{Text\}([\s\S]*)$", &EditMatch),
         "the native tier must receive a recognized atomic edit")
-    loop Integer(Edit[1])
+    loop Integer(EditMatch[1])
         SendMessage(0x0102, 8, 1, EditControl)
-    _E2E_InsertNativeText(EditControl, Edit[2])
+    _E2E_InsertNativeText(EditControl, EditMatch[2])
     return true
 }
 
