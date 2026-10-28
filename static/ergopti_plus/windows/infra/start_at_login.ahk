@@ -80,16 +80,21 @@ _StartupShortcutTargetMatches(Actual, Expected) {
 	return _StartupExecutablePath(Actual) == StrLower(Expected)
 }
 
+; Both source ownership and compiled conflict observation use this one grammar.
+; Extract one argument; the caller still proves its existing absolute file identity.
+_StartupScriptArgumentPath(Arguments) {
+	if RegExMatch(Arguments, '^"([^"]+)"$', &Quoted)
+		return Quoted[1]
+	if RegExMatch(Arguments, '^[^\s"]+$')
+		return Arguments
+	return ""
+}
+
 ; Interpret exactly one script argument without accepting flags or another file.
 ; Windows path spelling is normalized only after the argument shape is proven.
 _StartupScriptArgumentMatches(Arguments, Script) {
-	if RegExMatch(Arguments, '^"([^"]+)"$', &Quoted)
-		Path := Quoted[1]
-	else if RegExMatch(Arguments, '^[^\s"]+$')
-		Path := Arguments
-	else
-		return false
-	return _StartupShortcutTargetMatches(Path, Script)
+	Path := _StartupScriptArgumentPath(Arguments)
+	return Path != "" && _StartupShortcutTargetMatches(Path, Script)
 }
 
 ; Manual source links may launch the script through its file association.
@@ -228,10 +233,11 @@ StartupOtherSourceConfigured(Folder, Command, ApprovalFn := _StartupReadApproval
 		FileGetShortcut(Link, &Target, , &Arguments)
 		if Arguments == ""
 			Script := Target
-		else if RegExMatch(Arguments, '^"([^"]+)"$', &Quoted)
-			Script := Quoted[1]
-		else
-			continue
+		else {
+			Script := _StartupScriptArgumentPath(Arguments)
+			if Script == ""
+				continue
+		}
 		if !_StartupOtherSourceIdentity(Script, ReadFn)
 			continue
 		Other := StartupLaunchCommand(true, Script, Target)
