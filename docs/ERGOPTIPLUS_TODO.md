@@ -108,7 +108,12 @@ a sealed Windows updater source, reseal with
   loader-lifetime fixture read its factory marker before the writer closed it). The eighth v1.0.7 release
   commit adds the maintainer's last asks (owned Ollama catalogue staged for the developer app, Install
   buttons in the model selector, the Lua undefined-globals gate, the three-finger swipe fixes of L46, the
-  macOS 26 composer pending-activation route of L25/L52) and a new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
+  macOS 26 composer pending-activation route of L25/L52). Run 40677989474 on ddd150b29b (validation of
+  dev) left three Common reds, tests still pinning the pre-composer input-source code (CI14: 9f4ec14cb2,
+  a7e59fb0d1, 2e398c5c93). The ninth v1.0.7 release commit adds L66 (one refused shortcut fails alone),
+  the three-finger step of 25 (L46), the bounded composer re-read (L52), the reboot-proof keystats cache
+  (L64), the fixes for issues #99 to #101 and #103, and the Dependabot and npm audit bumps (PRs 98 and
+  102); a new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
   `CFMessagePortSendRequest FAILED(-1)` (the runner's TSM UI server), rerun that job once.
 - **Decide after v1.0.7 [CI]:** since bc09e4584c no product path calls the stock
   `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
