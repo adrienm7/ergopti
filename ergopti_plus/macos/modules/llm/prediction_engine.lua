@@ -30,6 +30,10 @@ local WarmupController = require("modules.llm.warmup_controller")
 local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
+local InfoBar = require("llm.request_plan.info_bar")
+local PredictionTooltipPort = require("adapters.prediction_tooltip_port")
+local LivePlan = require("llm.request_plan.live")
+local AppProfileOverrides = require("llm.app_profile_overrides")
 local Rewrite          = require("llm.rewrite")
 local PromptAction     = require("llm.prompt_action")
 local Logger           = require("infra.logger")
@@ -42,7 +46,8 @@ local Paths            = require("infra.paths")
 local i18n             = require("infra.i18n")
 local Keycodes         = require("infra.keycodes")
 local tooltip          = require("ui.tooltip")
-local keylogger        = require("modules.keylogger")
+local keystats        = require("modules.keystats")
+local ConfigKeys = require("config_keys")
 
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
@@ -95,19 +100,6 @@ local SPINNER_FPS = 6  -- Frames per second for the streaming progress spinner
 -- prompt_builder's diversity/greedy branches meaningless.
 local MIN_NUM_PREDICTIONS = 1
 
--- ── Adaptive debounce ─────────────────────────────────────────────────────────
--- Adjust the inactivity delay based on live WPM so the timer fires sooner
--- when the user is thinking and later when they are actively typing.
-
-local FAST_TYPING_WPM    = 55   -- Above this WPM, extend debounce (user still mid-burst)
-local SLOW_TYPING_WPM    = 20   -- Below this WPM, shorten debounce (user paused to think)
-local DEBOUNCE_FAST_MULT = 1.5  -- Multiplier applied when WPM is above FAST_TYPING_WPM
-local DEBOUNCE_SLOW_MULT = 0.5  -- Multiplier applied when WPM is below SLOW_TYPING_WPM
--- Hard floor / ceiling so extreme WPM values don't produce unusable delays.
--- Sourced from the shared cross-driver registry so AHK and macOS stay in sync.
-local DEBOUNCE_MIN_SEC   = Timings.sec("llm", "prediction_debounce_min_ms")
-local DEBOUNCE_MAX_SEC   = Timings.sec("llm", "prediction_debounce_max_ms")
-
 -- ── Timing constants ──────────────────────────────────────────────────────────
 
 local CHAIN_FALLBACK_SEC  = Timings.sec("llm", "chain_fallback_ms")   -- Fire chain LLM if the F16 signal is somehow missed
@@ -126,13 +118,11 @@ local function load_live_config()
 	local path = Paths.shared("modules/llm/live.json")
 	local raw = path and FileSystem.read(path) or nil
 	local decoded = raw and JsonCodec.decode(raw) or nil
-	local debounce_ms = type(decoded) == "table" and tonumber(decoded.debounce_ms) or nil
-	local live_min_words = type(decoded) == "table" and tonumber(decoded.min_words) or nil
-	if not debounce_ms or debounce_ms < 0 or not live_min_words or live_min_words < 0 then
-		error("prediction_engine: " .. tostring(path)
-			.. " is unreadable or lacks a non-negative debounce_ms and min_words.")
+	local config, reason = LivePlan.config(decoded)
+	if not config then
+		error("prediction_engine: " .. tostring(path) .. " is unusable: " .. tostring(reason))
 	end
-	return { debounce_sec = debounce_ms / 1000, min_words = math.floor(live_min_words) }
+	return { debounce_sec = config.debounce_ms / 1000, min_words = config.min_words }
 end
 local LIVE_CONFIG = load_live_config()
 
@@ -203,10 +193,6 @@ end
 -- The last buffer+tail string sent to the LLM; prevents re-sending unchanged input
 local last_buffer_signature = nil
 
--- Length of the buffer at the time of the last LLM request; used by the adaptive
--- debounce to detect ongoing corrections (shrinking buffer = user still deleting)
-local _last_request_buffer_len = 0
-
 -- ── Timers ────────────────────────────────────────────────────────────────────
 
 -- Fires perform_check() after inactivity_debounce_sec of silence
@@ -234,11 +220,43 @@ local _deferred_telemetry_handles = {}
 -- True between an accepted prediction and the F16 chain trigger that follows it
 local chain_pending = false
 
--- Minimum gap between consecutive backend calls — protects paid APIs from per-keystroke
--- bursts and caps energy on local backends. Sourced from _shared/modules/llm/inference.json
--- so the AHK twin (modules/llm/api_common.ahk) reads the same floor.
-local ApiCommon = require("modules.llm.api_common")
-local _last_request_at_s = 0
+-- Minimum gap between two automatic backend calls: protects paid APIs from
+-- per-keystroke bursts and caps energy on local backends. The user sets it
+-- (llm.trigger.min_request_interval_ms, shared with Linux); an explicit request
+-- is never held. It is one value for every backend.
+local request_floor_sec = LLM_DEFAULTS.llm_min_request_interval
+-- The debounce and rate-floor decisions (_shared/lua/llm/request_plan): this
+-- engine feeds the plan events and the clock, and owns the native timers and
+-- the backend calls. The plan also holds when the last request went out.
+local _plan = require("llm.request_plan.debounce").new(function()
+	return request_floor_sec * 1000
+end)
+
+-- The explicit requests with no fetch counter of their own (the tone step).
+local _explicit = { tone_in_flight = false }
+
+--- Asks the plan what pressing an explicit shortcut does while its previous
+--- request may be in flight (a mashed shortcut): the new request is never
+--- delayed, and the one in flight is cancelled at the backend. The caller has
+--- already retired the old request's callbacks (fetch counter or generation),
+--- so a cancellation that answers synchronously reaches nothing current.
+--- @param key string The shortcut's identity, for the plan and the log.
+--- @param in_flight boolean Whether a request of that shortcut may still run.
+--- @return boolean superseded True when the request in flight was cancelled.
+local function explicit_supersedes(key, in_flight)
+	local ok, decisions = pcall(_plan.on_explicit, _plan, { key = key, in_flight = in_flight })
+	if not ok then
+		Logger.error(LOG, "Explicit request decision refused: %s", tostring(decisions))
+		return false
+	end
+	if decisions[1].action ~= "supersede" then return false end
+	Logger.info(LOG, "%s requested again: the request in flight is superseded.", key)
+	local cancel_ok, cancel_err = xpcall(core_llm.cancel_streaming, debug.traceback)
+	if not cancel_ok then
+		Logger.error(LOG, "The superseded request could not be cancelled: %s", tostring(cancel_err))
+	end
+	return true
+end
 
 -- ── LLM engine configuration ─────────────────────────────────────────────────
 -- Stub values that prevent crashes during the brief startup window before the
@@ -261,6 +279,11 @@ local show_info_bar           = LLM_DEFAULTS.llm_show_info_bar
 local sequential_mode         = LLM_DEFAULTS.llm_sequential_mode
 local inactivity_debounce_sec = LLM_DEFAULTS.llm_debounce
 local excluded_apps              = {}
+-- The application-to-profile map (llm.app_profile_overrides) and the stored text it came from
+local app_profile_overrides      = {}
+local app_profile_overrides_text = ""
+-- The mapped profiles already reported missing
+local missing_override_profiles = {}
 local is_ai_preview_enabled      = true
 -- Privacy gates, sourced from defaults.json like every other shared scalar. These
 -- were hardcoded to true here while the shared value said false and Windows read
@@ -685,10 +708,17 @@ function M.set_llm_enabled(enabled)
 
 	settle("runtime gate", core_llm.set_runtime_llm_enabled, is_llm_enabled)
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
+	-- The keys bound to an AI action follow the switch. Only a gate that is
+	-- loaded has layers to tell, so this never loads it (and its listeners).
+	local ai_actions = rawget(package.loaded, "modules.shortcuts.ai_actions")
+	if ai_actions ~= nil then ai_actions.notify() end
 	if not is_llm_enabled then
 		-- Turning the AI off ends live mode too: turning it back on must not
 		-- resume a translation the user no longer sees announced
 		M.stop_live_prompt("AI disabled", true)
+		-- The agent's automatic mode is disarmed too: its pause and requests go
+		local agent_runner = rawget(package.loaded, "modules.llm.agent_runner")
+		if agent_runner ~= nil then agent_runner.cancel_typing("AI off") end
 		settle("Ollama daemon recovery retirement", retire_ollama_daemon_recovery,
 			"prediction runtime disabled")
 		settle("prediction reset", M.reset)
@@ -881,6 +911,21 @@ function M.set_llm_instant_on_word_end(v)
 	Logger.debug(LOG, "Instant on word end: %s.", instant_on_word_end and "on" or "off")
 end
 
+--- Applies the stored per-application profile overrides.
+--- @param text any The v1 text of llm.app_profile_overrides ("" for none).
+--- @return boolean applied False when the text is unreadable, which leaves the map in force.
+function M.set_llm_app_profile_overrides(text)
+	local overrides, reason = AppProfileOverrides.decode(text)
+	if overrides == nil then
+		Logger.error(LOG, "Application profile overrides refused: %s.", tostring(reason))
+		return false
+	end
+	app_profile_overrides = overrides
+	app_profile_overrides_text = text or ""
+	Logger.debug(LOG, "Application profile overrides: %d configured.", #AppProfileOverrides.rows(overrides))
+	return true
+end
+
 function M.set_llm_disabled_apps(apps)
 	excluded_apps = apps
 	Logger.debug(LOG, "Excluded apps: %d configured.", type(apps) == "table" and #apps or 0)
@@ -932,6 +977,7 @@ function M.get_llm_runtime_setting(key)
 	if key == "llm_display_model_name" then return true, llm_display_name end
 	if key == "llm_backend_name" then return true, llm_backend_label end
 	if key == "llm_debounce" then return true, inactivity_debounce_sec end
+	if key == "llm_min_request_interval" then return true, request_floor_sec end
 	if key == "llm_max_words" then return true, max_words end
 	if key == "llm_min_words" then return true, min_words end
 	if key == "llm_temperature" then return true, temperature end
@@ -945,12 +991,13 @@ function M.get_llm_runtime_setting(key)
 	if key == "llm_pred_indent" then return true, prediction_indent end
 	if key == "llm_nav_modifiers" then return true, navigation_mods end
 	if key == "llm_val_modifiers" then return true, validation_mods end
-	if key == "llm_instant_on_word_end" then return true, instant_on_word_end end
+	if key == ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END then return true, instant_on_word_end end
 	if key == "llm_url_bar_filter_enabled" then return true, url_bar_filter_enabled end
 	if key == "llm_secure_field_filter_enabled" then
 		return true, secure_field_filter_enabled
 	end
 	if key == "llm_disabled_apps" then return true, excluded_apps end
+	if key == "llm_app_profile_overrides" then return true, app_profile_overrides_text end
 	return false, nil
 end
 
@@ -972,6 +1019,21 @@ function M.set_llm_debounce(seconds)
 		end
 	end
 	Logger.debug(LOG, "Inactivity timer delay updated: %.3fs.", inactivity_debounce_sec)
+	return true
+end
+
+--- Updates the minimum time between two automatic requests. It applies to the
+--- next dispatch; no timer is armed with it, so there is nothing to settle.
+--- @param seconds number|string A finite non-negative number of seconds (0 = no floor).
+--- @return boolean accepted False, with the previous value kept, for anything else.
+function M.set_llm_min_request_interval(seconds)
+	local value = tonumber(seconds)
+	if value == nil or value ~= value or value < 0 or value == math.huge then
+		Logger.error(LOG, "Request interval refused: %s is not a finite non-negative number of seconds.", tostring(seconds))
+		return false
+	end
+	request_floor_sec = value
+	Logger.debug(LOG, "Request interval updated: %.3fs.", request_floor_sec)
 	return true
 end
 
@@ -1027,22 +1089,6 @@ local function format_validation_shortcut(mods)
 	return table.concat(mods, "+")
 end
 
---- Strips the em-dash suffix from a profile label for compact info-bar display.
---- "Mon profil — texte long" → "Mon profil"
---- @param label string|nil The raw profile label.
---- @return string|nil The trimmed label, or nil if it was blank.
-local function trim_profile_label(label)
-	if type(label) ~= "string" then return nil end
-	local clean = label:match("^%s*(.-)%s*$")
-	if clean == "" then return nil end
-	local head = clean:match("^(.-)%s*—")
-	-- head:match("%S") guards against a bare "— foo" where head="" falling through to clean
-	local picked = (head and head:match("%S")) and head or clean
-	picked = picked:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s*—%s*$", "")
-	if picked == "" then return nil end
-	return picked
-end
-
 --- Assembles the info-bar text displayed beneath the prediction list.
 --- Returns nil when model_name is absent, which hides the info bar entirely.
 --- @param model_name string Display name of the active model.
@@ -1053,10 +1099,11 @@ end
 local function build_info_bar_text(model_name, elapsed_ms, backend, profile_name)
 	if not model_name or model_name == "" then return nil end
 
-	local pieces = { model_name }
-	if type(backend) == "string" and backend ~= "" then pieces[#pieces + 1] = backend end
-	local short_profile = trim_profile_label(profile_name)
-	if short_profile and short_profile ~= "" then pieces[#pieces + 1] = short_profile end
+	-- The pieces and the short prompt name are the shared plan's; the separator is macOS's.
+	local pieces = InfoBar.parts({
+		model = model_name, backend = backend, profile_label = profile_name, require_model = true,
+	})
+	if not pieces then return nil end
 	local text = table.concat(pieces, " — ")
 	-- elapsed_ms intentionally discarded — tooltip_llm owns the timing zone to avoid duplication
 	local _ = elapsed_ms
@@ -1087,45 +1134,51 @@ local function reset_llm_dismiss_timer()
 	return true
 end
 
---- Computes an adaptive debounce delay based on the user's current typing speed.
---- Fast typing → extend delay (prediction would be stale before it arrives).
---- Slow/paused → shorten delay (user is thinking, fire sooner).
---- If the buffer shrank since the last request, the user is still correcting —
---- keep the full configured delay to avoid sending a broken intermediate state.
---- @return number The debounce delay in seconds to use for this timer start.
-local function compute_adaptive_debounce()
-	-- Live mode redraws at every keystroke: its own short, fixed debounce only
-	-- coalesces a burst, whatever the typing speed
-	if _live then return LIVE_CONFIG.debounce_sec end
-	-- Correction guard: never reduce delay while the user is still deleting
-	local active_buffer = _state and _state.llm_buffer
-	if type(active_buffer) ~= "string" and _state then active_buffer = _state.buffer end
-	local cur_len = type(active_buffer) == "string" and #active_buffer or 0
-	if cur_len < _last_request_buffer_len then
-		return inactivity_debounce_sec
+--- Asks the plan what the keystroke does to the debounce timer. A negative menu
+--- debounce turns the automatic trigger off (a skip); live mode is an explicit
+--- request for it, so it keeps its own debounce. A skip leaves the pending
+--- timer alone, an arm has already withdrawn the plan's previous token. The
+--- delay is the configured one whatever the typing speed, as on Windows and
+--- Linux; it used to stretch to 1.5x above 55 WPM and shrink to 0.5x below 20,
+--- so the delay the menu showed was not the one macOS waited.
+--- @param delay_override number|nil Override in seconds; the configured debounce if nil.
+--- @param ends_word boolean|nil True when the buffer just ended a word.
+--- @return table|nil arm The arm decision, nil when nothing is to be armed.
+local function plan_arm(delay_override, ends_word)
+	local ok, decisions = pcall(function()
+		_plan:configure({
+			enabled = is_llm_enabled,
+			debounce_ms = inactivity_debounce_sec * 1000,
+			instant_on_word_end = instant_on_word_end,
+			live_debounce_ms = _live and LIVE_CONFIG.debounce_sec * 1000 or false,
+		})
+		if delay_override ~= nil then
+			return _plan:on_input({ cause = "override", delay_ms = delay_override * 1000 })
+		end
+		return _plan:on_input({ cause = "typing", ends_word = ends_word == true })
+	end)
+	if not ok then
+		Logger.error(LOG, "Debounce plan refused the keystroke: %s", tostring(decisions))
+		return nil
 	end
-
-	local ok, stats = pcall(keylogger.get_live_stats)
-	local wpm = (ok and type(stats) == "table") and (tonumber(stats.wpm_physical) or 0) or 0
-
-	if wpm > FAST_TYPING_WPM then
-		return math.min(inactivity_debounce_sec * DEBOUNCE_FAST_MULT, DEBOUNCE_MAX_SEC)
-	elseif wpm > 0 and wpm < SLOW_TYPING_WPM then
-		return math.max(inactivity_debounce_sec * DEBOUNCE_SLOW_MULT, DEBOUNCE_MIN_SEC)
+	for _, decision in ipairs(decisions) do
+		if decision.action == "arm" then return decision end
 	end
-	return inactivity_debounce_sec
+	return nil
 end
 
 --- Arms the inactivity debounce timer to fire perform_check() after silence.
---- @param delay_override number|nil Override in seconds; uses adaptive debounce if nil.
-local function start_inactivity_timer(delay_override)
+--- @param delay_override number|nil Override in seconds; the configured debounce if nil.
+--- @param ends_word boolean|nil True when the buffer just ended a word.
+local function start_inactivity_timer(delay_override, ends_word)
 	if not runtime_available() then return false end
-	-- A negative menu debounce turns the automatic trigger off; live mode is an
-	-- explicit request for it, so it keeps its own
-	if not is_llm_enabled or (inactivity_debounce_sec < 0 and not _live) then return false end
-	if stop_inactivity_timer() ~= true then return false end
-	local delay = delay_override
-	if delay == nil then delay = compute_adaptive_debounce() end
+	local arm = plan_arm(delay_override, ends_word)
+	if arm == nil then return false end
+	if stop_inactivity_timer(true) ~= true then
+		_plan:on_cancel()
+		return false
+	end
+	local delay = arm.delay_ms / 1000
 	local generation = _inactivity_generation + 1
 	_inactivity_generation = generation
 	local descriptor = {
@@ -1136,6 +1189,7 @@ local function start_inactivity_timer(delay_override)
 		generation = generation,
 		handle = nil,
 		settled = false,
+		token = arm.token,
 	}
 	_inactivity_timer = descriptor
 
@@ -1165,6 +1219,13 @@ local function start_inactivity_timer(delay_override)
 	local handle, committed = TimerScheduler.after(delay, function()
 		if descriptor.authorized ~= true or descriptor.delivered == true
 			or descriptor.generation ~= _inactivity_generation then
+			descriptor.authorized = false
+			release_descriptor()
+			return false
+		end
+		-- The plan agrees this is its current timer; one it withdrew sends nothing.
+		if _plan:on_timer(descriptor.token)[1].action ~= "fire" then
+			Logger.debug(LOG, "Inactivity timer superseded in the plan — nothing sent.")
 			descriptor.authorized = false
 			release_descriptor()
 			return false
@@ -1221,10 +1282,11 @@ local function start_inactivity_timer(delay_override)
 		return false
 	end
 	descriptor.authorized = true
-	if delay_override ~= nil then
+	local labels = require("llm.request_plan.debounce").REASON
+	if arm.why == labels.override or arm.why == labels.word_end then
 		Logger.trace(LOG, "Inactivity timer started (override: %.3fs).", delay)
 	else
-		Logger.trace(LOG, "Inactivity timer started (adaptive: %.3fs).", delay)
+		Logger.trace(LOG, "Inactivity timer started (debounce: %.3fs).", delay)
 	end
 	return true
 end
@@ -1251,9 +1313,15 @@ end
 --- Cancels the exact inactivity timer without firing the LLM check.
 --- A failed native stop remains retryable through the same descriptor.
 --- @return boolean stopped True only when no native capability remains.
-stop_inactivity_timer = function()
+stop_inactivity_timer = function(plan_superseded)
+	-- A start has already replaced the plan's pending token; every other stop
+	-- withdraws it once the native timer is gone.
+	local function withdrawn()
+		if plan_superseded ~= true then _plan:on_cancel() end
+		return true
+	end
 	local descriptor = _inactivity_timer
-	if not descriptor then return true end
+	if not descriptor then return withdrawn() end
 	descriptor.authorized = false
 	_inactivity_generation = _inactivity_generation + 1
 	if descriptor.callback_running == true then
@@ -1267,7 +1335,7 @@ stop_inactivity_timer = function()
 	local handle = descriptor.handle
 	if type(handle) ~= "table" or handle.timer == nil then
 		if _inactivity_timer == descriptor then _inactivity_timer = nil end
-		return true
+		return withdrawn()
 	end
 	local stop_ok, stop_result = xpcall(function()
 		return TimerScheduler.cancel(handle)
@@ -1283,7 +1351,7 @@ stop_inactivity_timer = function()
 	end
 	if _inactivity_timer == descriptor then _inactivity_timer = nil end
 	Logger.done(LOG, "Inactivity timer stopped.")
-	return true
+	return withdrawn()
 end
 
 
@@ -1651,14 +1719,39 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 			return
 		end
 		if not predispatch_is_current() then return end
-		if type(live_profile) ~= "table" then
+		local decision = LivePlan.decide(
+			{ debounce_ms = LIVE_CONFIG.debounce_sec * 1000, min_words = LIVE_CONFIG.min_words },
+			live, num_predictions, type(live_profile) == "table" and live_profile or nil)
+		if decision.action == "stop" then
+			-- The shared rule: live typing never falls back to the menu's prompt, so the
+			-- keystroke asks for nothing (it used to run once with the menu's prompt).
 			Logger.warn(LOG, "Live prompt '%s' no longer exists — live mode turned off.", live.profile_id)
-			M.stop_live_prompt("prompt deleted", true)
-			live = nil
-		else
-			request_profile   = live_profile
-			request_count     = live.num_predictions or num_predictions
-			request_min_words = LIVE_CONFIG.min_words
+			M.stop_live_prompt(decision.cause, true)
+			return
+		end
+		request_profile   = decision.profile
+		request_count     = decision.num_predictions
+		request_min_words = decision.min_words
+	end
+	-- The profile the user mapped to the focused application wins over the menu's; a live
+	-- prompt or a request that names its own keeps its own.
+	if request_profile == nil and next(app_profile_overrides) ~= nil then
+		local mapped = AppProfileOverrides.resolve(app_profile_overrides, AppFilter.focused_app_id(), nil)
+		if mapped ~= nil then
+			local mapped_ok, mapped_profile = xpcall(core_llm.find_profile, debug.traceback, mapped)
+			if not mapped_ok then
+				Logger.error(LOG, "Application profile lookup raised — request aborted: %s", tostring(mapped_profile))
+				return
+			end
+			if type(mapped_profile) == "table" then
+				request_profile = mapped_profile
+			else
+				if not missing_override_profiles[mapped] then
+					-- Once per profile and process: every request asks.
+					missing_override_profiles[mapped] = true
+					Logger.warn(LOG, "A profile mapped to an application no longer exists; the menu's profile applies there.")
+				end
+			end
 		end
 	end
 	local model_ok, model_to_use = xpcall(function()
@@ -1752,25 +1845,20 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 		end
 	end
 
-	-- Backend-aware request floor — re-arm the debounce timer for the
-	-- remaining gap instead of firing immediately. force_trigger (the
-	-- manual hotkey path) bypasses the floor because it is an explicit user
-	-- request, not a per-keystroke burst.
-	if not force_trigger then
-		local now_s        = hs.timer.secondsSinceEpoch()
-		local backend_id   = core_llm.get_backend and core_llm.get_backend() or "ollama"
-		local min_interval = ApiCommon.get_rate_limit_min_interval_s(backend_id)
-		local elapsed      = now_s - _last_request_at_s
-		if not predispatch_is_current() then return end
-		if _last_request_at_s > 0 and elapsed < min_interval then
-			local remaining = min_interval - elapsed
-			Logger.debug(LOG, "Backend '%s' floor (%dms) — deferring %dms.",
-				backend_id, math.floor(min_interval * 1000), math.floor(remaining * 1000))
-			-- Reuse the single canonical timer instead of creating an orphan;
-			-- store profile_name so the callback can forward it when it fires
-			defer_check(remaining, "Rate-limit deferral")
-			return
-		end
+	-- Request floor — re-arm the debounce timer for the remaining gap instead
+	-- of firing immediately. The plan lets force_trigger (the manual hotkey
+	-- path) through: it is an explicit user request, not a per-keystroke burst.
+	local floor_verdict = _plan:on_dispatch({ explicit = force_trigger },
+		hs.timer.secondsSinceEpoch() * 1000)[1]
+	if not predispatch_is_current() then return end
+	if floor_verdict.action == "defer" then
+		local remaining = floor_verdict.delay_ms / 1000
+		Logger.debug(LOG, "Request floor (%dms) — deferring %dms.",
+			math.floor(request_floor_sec * 1000), math.floor(remaining * 1000))
+		-- Reuse the single canonical timer instead of creating an orphan;
+		-- store profile_name so the callback can forward it when it fires
+		defer_check(remaining, "Rate-limit deferral")
+		return
 	end
 
 	-- Pre-build the info bar for streaming frames; on_success replaces it with the latency-aware version
@@ -1789,6 +1877,8 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	local my_fetch_id     = fetch_request_counter
 	_activity = { kind = (force_trigger or live) and "explicit" or "automatic", fetch = my_fetch_id }
 	local superseded_log_id = retire_request_log(_request_log_id)
+	-- A mashed hotkey: the previous press's request is cancelled, not left running.
+	if force_trigger then explicit_supersedes("Prediction", superseded_log_id ~= nil) end
 
 	-- The initiating timer owns this check only while its callback runs: its
 	-- guard reads false as soon as the callback returns, so an answer arriving
@@ -2029,8 +2119,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	-- Rate-limit and duplicate-suppression state describes real backend calls,
 	-- never a loading paint or failed watchdog construction.
 	last_buffer_signature    = signature
-	_last_request_buffer_len = #buffer
-	_last_request_at_s       = hs.timer.secondsSinceEpoch()
+	_plan:on_sent(hs.timer.secondsSinceEpoch() * 1000)
 end
 
 -- The reasons a manual request is refused, each with the locale key of the
@@ -2230,9 +2319,19 @@ function M.request_selection_rewrite(profile_id, source, on_raw, on_fail, contin
 			return false
 		end
 	end
+	-- A mashed tone shortcut: the previous step's request is cancelled first.
+	explicit_supersedes("Tone rewrite", _explicit.tone_in_flight ~= false)
+	local inflight = {}
+	_explicit.tone_in_flight = inflight
+	local function settle()
+		if _explicit.tone_in_flight == inflight then _explicit.tone_in_flight = false end
+	end
+	local function settled_raw(...) settle(); return on_raw(...) end
+	local function settled_fail(...) settle(); if on_fail ~= nil then return on_fail(...) end end
 	local dispatch_ok, dispatch_err = xpcall(core_llm.fetch_raw_completion, debug.traceback,
-		profile, source, source, model, temperature, max_tokens, on_raw, on_fail, continuation_check)
+		profile, source, source, model, temperature, max_tokens, settled_raw, settled_fail, continuation_check)
 	if not dispatch_ok then
+		settle()
 		Logger.error(LOG, "Tone rewrite dispatch raised: %s.", tostring(dispatch_err))
 		return false
 	end
@@ -2327,10 +2426,15 @@ function M.open_answer_surface(label)
 	predictions_visible = false
 	last_buffer_signature = nil
 	llm_request_counter = llm_request_counter + 1
+	local previous_activity = _activity
 	fetch_request_counter = fetch_request_counter + 1
 	local session = fetch_request_counter
 	_activity = { kind = "explicit", fetch = session }
-	log_request_cancellation(retire_request_log(_request_log_id), "supersede")
+	local retired_log_id = retire_request_log(_request_log_id)
+	log_request_cancellation(retired_log_id, "supersede")
+	-- A mashed answer shortcut: the previous answers' request is cancelled.
+	explicit_supersedes(label, retired_log_id ~= nil or (previous_activity ~= nil
+		and previous_activity.kind == "explicit" and previous_activity.fetch == session - 1))
 	local dismiss_delay = (_state.DELAYS and _state.DELAYS.llm_prediction) or 0
 	local shown_ok, shown = xpcall(function()
 		tooltip.set_llm_timeout(dismiss_delay)
@@ -2394,12 +2498,15 @@ function M.show_answers(session, answers, expected, on_accept, on_dismiss)
 	end
 	local waiting = #answers < expected
 	local shown_ok, shown = xpcall(function()
-		return tooltip.show_predictions(
-			predictions, 1, is_ai_preview_enabled, nil,
-			format_validation_shortcut(normalize_mods(validation_mods)), prediction_indent,
-			normalize_mods(navigation_mods), tooltip.tint("ai_prediction"),
-			waiting and i18n.get("llm.generating") or nil, waiting and expected or #predictions,
-			session, function() return runtime_available() and fetch_request_counter == session end)
+		return PredictionTooltipPort.wrap(tooltip).show({
+			predictions = predictions, current_index = 1, enabled = is_ai_preview_enabled,
+			shortcut_modifier = format_validation_shortcut(normalize_mods(validation_mods)),
+			indent = prediction_indent, navigation_modifiers = normalize_mods(navigation_mods),
+			background_color = tooltip.tint("ai_prediction"),
+			loading_text = waiting and i18n.get("llm.generating") or nil,
+			reserved_count = waiting and expected or #predictions, session_id = session,
+			commit_guard = function() return runtime_available() and fetch_request_counter == session end,
+		})
 	end, debug.traceback)
 	if not shown_ok or shown ~= true then
 		Logger.error(LOG, "Answers did not paint (result: %s).", tostring(shown))
@@ -2525,7 +2632,7 @@ function M.get_live_prompt()
 end
 
 --- Clears all active predictions and fully resets the prediction pipeline state.
---- Emits a keylogger dismissal event when predictions were visible before the reset,
+--- Emits a keystats dismissal event when predictions were visible before the reset,
 --- except at a global pause boundary where no deferred capability may survive.
 --- The keymap bridge wraps this to also handle hotstring dismissal telemetry.
 --- @param options table|nil Optional { suppress_telemetry = boolean }.
@@ -2545,6 +2652,7 @@ function M.reset(options)
 	fetch_request_counter = fetch_request_counter + 1
 	local reset_generation = fetch_request_counter
 	local cancelled_log_id = retire_request_log(_request_log_id)
+	_explicit.tone_in_flight = false
 	_deferred_profile_name = nil
 	chain_pending = false
 	_chain_generation = _chain_generation + 1
@@ -2635,12 +2743,12 @@ function M.reset(options)
 	cleanup_stage("backend stream cancel", core_llm.cancel_streaming, true)
 
 	if dismissed_predictions and not suppress_telemetry and reset_is_current() then
-		-- Persistence performs an open/write/flush in the keylogger. reset() is
+		-- Persistence performs an open/write/flush in the keystats. reset() is
 		-- reached from the keyDown eventtap, so telemetry must run only after that
 		-- callback returns. Capture the immutable pool before clearing module state.
 		local schedule_ok, handle_or_err, telemetry_committed = xpcall(function()
 			return schedule_deferred_telemetry(function()
-				pcall(keylogger.log_llm_dismissed, nil, dismissed_predictions)
+				pcall(keystats.log_llm_dismissed, nil, dismissed_predictions)
 				Logger.debug(LOG, "Predictions cleared (were visible).")
 			end)
 		end, debug.traceback)
@@ -2810,8 +2918,11 @@ end
 --- Initializes the engine by injecting the shared keymap core state.
 --- Must be called exactly once before any other engine function in this module.
 --- @param core_state table The shared state object from modules/keymap/init.lua.
+--- @param ports table|nil { TimerScheduler?, HttpClient? } replace the real owners; each is
+---   checked against its contract in llm.request_plan.ports. The tooltip is checked as the
+---   TooltipRenderer it is drawn through.
 --- @return boolean committed True only when every dependency is ready.
-function M.init(core_state)
+function M.init(core_state, ports)
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): invalid core_state (expected table, got %s).", type(core_state))
 		return false
@@ -2824,6 +2935,19 @@ function M.init(core_state)
 		Logger.error(LOG, "M.init(): a different state is already active — replacement refused.")
 		return false
 	end
+
+	-- The three ports of the request plan, checked once here so a missing method fails at
+	-- wiring and not inside a timer or a network callback.
+	ports = ports or {}
+	if type(ports) ~= "table" then
+		Logger.error(LOG, "M.init(): ports must be a table (got %s).", type(ports))
+		return false
+	end
+	local Ports = require("llm.request_plan.ports")
+	local timer_port = Ports.check("TimerScheduler", ports.TimerScheduler or TimerScheduler)
+	-- The backends build their own HTTP clients; only an injected one is checked here.
+	local http_port = ports.HttpClient ~= nil and Ports.check("HttpClient", ports.HttpClient) or nil
+	Ports.check("TooltipRenderer", PredictionTooltipPort.wrap(tooltip))
 
 	-- A parent may only publish this engine after every child reports an exact
 	-- commitment. Children treat a duplicate with the same retained binding as
@@ -2838,12 +2962,14 @@ function M.init(core_state)
 	if StreamingHandler.init({
 		core_llm  = core_llm,
 		tooltip   = tooltip,
-		keylogger = keylogger,
+		keystats = keystats,
 	}) ~= true then
 		Logger.error(LOG, "M.init(): streaming-handler dependency initialization refused.")
 		return false
 	end
 
+	TimerScheduler = timer_port
+	if http_port ~= nil then core_llm.set_inference_client(http_port) end
 	_state = core_state
 	Logger.debug(LOG, "Prediction engine state injected (%d mapping(s)).", #(core_state.mappings or {}))
 	return true
@@ -2864,11 +2990,7 @@ end
 --- so the prediction fires as soon as the word boundary is detected.
 function M.start_timer_word_end()
 	if not runtime_available() then return false end
-	if instant_on_word_end then
-		return start_inactivity_timer(0) == true
-	else
-		return start_inactivity_timer() == true
-	end
+	return start_inactivity_timer(nil, true) == true
 end
 
 --- Cancels the inactivity timer without firing the LLM check.

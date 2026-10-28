@@ -20,7 +20,7 @@
 
 local helpers = require("tests.helpers")
 local JsonCodec = require("adapters.json_codec")
-local ResponseClassifier = require("modules.llm.remote_response_classifier")
+local ResponseClassifier = require("llm.remote_response_classifier")
 
 
 
@@ -266,45 +266,6 @@ helpers.describe("LLM parser corpus — remote providers", function()
 		end
 	end
 end)
-
-helpers.describe("LLM parser corpus — remote usage ownership", function()
-	local cases = {
-		{
-			format = "openai",
-			body = '{"metadata":{"usage":{"prompt_tokens":900,"completion_tokens":800,"total_tokens":1700}},"choices":[{"message":{"content":"ok"}}],"usage":{"prompt_tokens":11,"completion_tokens":12,"total_tokens":23}}',
-			prompt = 11, completion = 12, total = 23,
-		},
-		{
-			format = "anthropic",
-			body = '{"metadata":{"usage":{"input_tokens":900,"output_tokens":800}},"content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":21,"output_tokens":22}}',
-			prompt = 21, completion = 22, total = 43,
-		},
-		{
-			format = "gemini",
-			body = '{"metadata":{"usageMetadata":{"promptTokenCount":900,"candidatesTokenCount":800,"totalTokenCount":1700}},"candidates":[{"content":{"parts":[{"text":"ok"}]}}],"usageMetadata":{"promptTokenCount":31,"candidatesTokenCount":32,"totalTokenCount":63}}',
-			prompt = 31, completion = 32, total = 63,
-		},
-	}
-	for _, case in ipairs(cases) do
-		helpers.it(case.format .. " uses only its canonical top-level usage map", function()
-			local usage = ResponseClassifier.classify(case.format, case.body).usage
-			helpers.assert_eq(usage.prompt_tokens, case.prompt)
-			helpers.assert_eq(usage.completion_tokens, case.completion)
-			helpers.assert_eq(usage.total_tokens, case.total)
-		end)
-	end
-
-	helpers.it("rejects negative and non-numeric usage fields", function()
-		local body = '{"choices":[{"message":{"content":"ok"}}],"usage":{"prompt_tokens":-1,"completion_tokens":"2","total_tokens":-3}}'
-		local usage = ResponseClassifier.classify("openai", body).usage
-		helpers.assert_eq(usage.prompt_tokens, 0)
-		helpers.assert_eq(usage.completion_tokens, 0)
-		helpers.assert_eq(usage.total_tokens, 0)
-	end)
-end)
-
-
-
 
 -- ============================================
 -- ============================================

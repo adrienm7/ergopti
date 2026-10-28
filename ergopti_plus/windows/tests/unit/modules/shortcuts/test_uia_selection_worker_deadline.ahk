@@ -525,3 +525,62 @@ _UIASW_SelectionConsumptionRejectsEveryPhysicalInvalidator() {
 Test("UIA selection: physical epoch invalidates cached caret provenance "
 	. "(audit-ahk-009)",
 	_UIASW_SelectionConsumptionRejectsEveryPhysicalInvalidator)
+
+
+; Replay a stop interrupting start before the native launch is admitted. The
+; wrapper calls the genuine ShellRunner start after the genuine UIA stop owner.
+_UIASW_StoppedReadyOwnerCannotLaunch() {
+	Fields := ["handle", "worker_hwnd", "worker_process_handle", "worker_generation",
+		"pending", "start_deadline_fn", "start_failure_tick", "start_diagnostic",
+		"spawn_fn", "cleanup_debt", "cleanup_draining", "process_cleanup_debt",
+		"process_cleanup_draining", "cleanup_retry_armed"]
+	Saved := Map()
+	for Name in Fields
+		Saved[Name] := UIASWState.%Name%
+	Receipt := {Handle: 0, OriginalStart: 0, Stopped: false, Started: false, Pid: 0}
+	Spawn(Executable, Args, Done, *) {
+		Handle := ShellRunner_Spawn(Executable, Args, Done)
+		Receipt.Handle := Handle
+		Receipt.OriginalStart := Handle.start
+		Handle.start := ResumeStart
+		return Handle
+	}
+	ResumeStart(*) {
+		Receipt.Stopped := UIASW_Stop("canceled")
+		Receipt.Started := Receipt.OriginalStart.Call()
+		Receipt.Pid := Receipt.Handle.processId()
+		return Receipt.Started
+	}
+	try {
+		UIASWState.handle := 0
+		UIASWState.worker_hwnd := 0
+		UIASWState.worker_process_handle := 0
+		UIASWState.pending := 0
+		UIASWState.start_deadline_fn := 0
+		UIASWState.start_failure_tick := 0
+		UIASWState.cleanup_debt := []
+		UIASWState.cleanup_draining := false
+		UIASWState.process_cleanup_debt := []
+		UIASWState.process_cleanup_draining := false
+		UIASWState.cleanup_retry_armed := false
+		UIASWState.spawn_fn := Spawn
+		AssertFalse(UIASW_Start(), "the stopped generation cannot report a live admitted worker")
+		AssertTrue(Receipt.Stopped, "the actual UIA owner acknowledges shutdown before native start resumes")
+		AssertFalse(Receipt.Started, "the genuine native start must remain fenced after its owner's accepted stop")
+		AssertEqual(0, Receipt.Pid, "retired startup cannot create an untracked native worker")
+		AssertFalse(IsObject(UIASWState.handle), "the stop leaves no live primary worker owner")
+		AssertFalse(IsObject(UIASWState.start_deadline_fn), "the stopped startup watchdog remains retired")
+		AssertEqual(0, UIASWState.cleanup_debt.Length, "the accepted cancellation leaves no retry debt")
+	} finally {
+		if IsObject(Receipt.Handle) {
+			; Break the test wrapper's receipt cycle before native cleanup.
+			Receipt.Handle.start := Receipt.OriginalStart
+			Receipt.Handle.terminate()
+		}
+		UIASW_Stop("canceled")
+		for Name, Value in Saved
+			UIASWState.%Name% := Value
+	}
+}
+Test("UIA worker process: stopped READY owner cannot launch afterward (shellrunner-async-prestart)",
+	_UIASW_StoppedReadyOwnerCannotLaunch)

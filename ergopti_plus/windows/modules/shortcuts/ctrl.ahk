@@ -37,7 +37,7 @@ if Features["shortcuts"]["paste_without_formatting"] {
 		; SetTimer so the synthetic ^v has already consumed the coerced text before the
 		; user's original (possibly non-text) clipboard is put back.
 		_PasteWithoutFormattingRestore(OldClip, OwnedSequence, OwnerToken) {
-				return CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
+				return CB_RestorePlainSnapshotEventually(OldClip, OwnedSequence,
 						OwnerToken, "paste_without_formatting")
 		}
 
@@ -60,26 +60,32 @@ if Features["shortcuts"]["paste_without_formatting"] {
 						}
 						; Admission precedes every read, including an empty temporary clear owned
 						; by another selection or paste. Only this owner may snapshot and coerce.
-						OldClip := CB_SaveAll()
-						if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__") {
-								try LoggerWarn("shortcuts", "PasteWithoutFormatting: clipboard snapshot failed; using native paste.")
+						Captured := 0
+						if !CB_SavePlainSnapshot(OwnerToken, &Captured) {
+								try LoggerWarn("shortcuts", "PasteWithoutFormatting: clipboard snapshot is unavailable or changed; using native paste.")
 								SendFinalResult("^v")
 								return
 						}
+						OldClip := Captured["saved"]
 						PlainText := CB_Read()
+						; Saving all formats can yield to a new non-text copy. Paste it intact.
+						if PlainText == "" {
+								SendFinalResult("^v")
+								return
+						}
 						OwnedSequence := 0
 						try {
-								if !CB_Write(PlainText)
+								if !CB_WritePlainSnapshot(Captured, PlainText, &OwnedSequence)
 										throw Error("clipboard write failed")
-								OwnedSequence := CB_GetSequenceNumber()
 								if !OwnedSequence
 										throw Error("clipboard sequence unavailable")
 								SendFinalResult("^v")
 								SetTimer(_PasteWithoutFormattingRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
 								RestoreTimerArmed := true
 						} catch as Err {
-								try CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
-										OwnerToken, "paste_without_formatting_rollback", true, !OwnedSequence)
+								if OwnedSequence
+									try CB_RestorePlainSnapshotEventually(OldClip, OwnedSequence,
+										OwnerToken, "paste_without_formatting_rollback")
 								try LoggerError("shortcuts", "PasteWithoutFormatting clipboard rollback retained: {1}.", Err.Message)
 						}
 				} finally {

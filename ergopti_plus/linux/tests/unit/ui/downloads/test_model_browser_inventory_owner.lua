@@ -95,6 +95,82 @@ helpers.describe("model browser inventory document", function()
 		end)
 	end)
 
+	helpers.it("(model-selector-progress) a pull's percentage reaches its row and survives a new payload", function()
+		with_browser(function(f, bridge)
+			f.handshake()
+			local before = #f.effects
+			helpers.assert_eq(bridge.on_download_progress("unknown:tag", 10), false, "no row, nothing sent")
+			helpers.assert_true(bridge.on_download_progress("qwen3.5:0.8b", 42))
+			helpers.assert_eq(#f.effects, before + 1)
+			helpers.assert_true(f.effects[#f.effects].code:find("injectProgress", 1, true) ~= nil)
+			local _, data = bridge.reproject_current()
+			local row
+			for _, candidate in ipairs(data.models) do
+				if candidate.runtime_name == "qwen3.5:0.8b" then row = candidate end
+			end
+			helpers.assert_eq(row.pending, "download")
+			helpers.assert_eq(row.progress, 42)
+			helpers.assert_eq(bridge.on_download_progress("qwen3.5:0.8b", nil), false, "the end clears it")
+			_, data = bridge.reproject_current()
+			for _, candidate in ipairs(data.models) do
+				if candidate.runtime_name == "qwen3.5:0.8b" then row = candidate end
+			end
+			helpers.assert_nil(row.progress)
+		end)
+	end)
+
+	-- model-selector-install-button: the Ollama group's install button follows
+	-- the runtime, MLX cannot run here, and the click runs the AI enable that
+	-- offers Ergopti's own Ollama download.
+	helpers.it("(model-selector-install-button) Install Ollama follows the runtime and runs the AI enable", function()
+		-- The API rows are another owner's (test_model_selector_api_listing);
+		-- the real one would load the HTTP stack this fixture does not provide.
+		local saved_rows = package.loaded["ui.menu.llm_backend_rows"]
+		package.loaded["ui.menu.llm_backend_rows"] = {
+			api_page = function() return { rows = {}, providers = {}, tools = {} } end,
+		}
+		local ok, failure = pcall(with_browser, function(f, bridge)
+			local phase, ollama_ok, installs = "idle", false, {}
+			bridge.bind({
+				dialogs = {}, delete_model = function() return true end, on_changed = function() end,
+				ollama_state = function()
+					if ollama_ok then return true end
+					return false, "model_browser.reason_ollama_missing"
+				end,
+				ollama_install_phase = function() return phase end,
+				install_ollama = function(_, on_changed) installs[#installs + 1] = on_changed; return true end,
+			})
+			local function backends()
+				local _, data = bridge.reproject_current()
+				local out = {}
+				for _, b in ipairs(data.backends) do out[b.id] = b end
+				return out
+			end
+			f.handshake()
+			local b = backends()
+			helpers.assert_eq(b.ollama.available, false, "a missing Ollama greys its rows")
+			helpers.assert_eq(b.ollama.install, { state = "available" })
+			helpers.assert_eq(b.mlx.install, { state = "unsupported", reason_key = "model_browser.reason_mlx_unsupported_os" })
+			helpers.assert_nil(b.api.install, "the API installs nothing")
+			f.send({ action = "group_action", backend = "ollama", id = "install" })
+			helpers.assert_eq(#installs, 1, "the click runs the AI enable")
+			phase = "running"
+			helpers.assert_eq(backends().ollama.install, { state = "running" })
+			f.send({ action = "group_action", backend = "ollama", id = "install" })
+			helpers.assert_eq(#installs, 1, "a running install is not started twice")
+			phase, ollama_ok = "ai_on", true
+			b = backends()
+			helpers.assert_eq(b.ollama.install, { state = "installed" })
+			helpers.assert_eq(b.ollama.available, true, "the installed runtime unlocks its rows")
+			ollama_ok = false
+			helpers.assert_eq(backends().ollama.install,
+				{ state = "unsupported", reason_key = "model_browser.reason_install_ai_on" })
+			bridge._reset()
+		end)
+		package.loaded["ui.menu.llm_backend_rows"] = saved_rows
+		assert(ok, failure)
+	end)
+
 	helpers.it("(linux-model-browser-owner) installed selection and available download retain their own page", function()
 		with_browser(function(f, _, seen)
 			local ready = f.handshake()
@@ -105,14 +181,19 @@ helpers.describe("model browser inventory document", function()
 			end
 			helpers.assert_not_nil(installed); helpers.assert_not_nil(available)
 			helpers.assert_true(installed.installed)
-			local selected = f.send({ action = "select_model", name = installed.name })
+			local selected = f.send({ action = "select_model", backend = "ollama", name = installed.name })
 			helpers.assert_eq(seen.selected, { installed.runtime_name })
 			helpers.assert_eq(f.manager.is_visible("model_browser"), false)
 			-- Native close consumes the old response's document authority.
 			helpers.assert_eq(selected, nil)
 			helpers.assert_true(f.manager.show("model_browser"))
 			f.handshake()
-			f.send({ action = "select_model", name = available.name })
+			-- model-selector-page: a model not downloaded offers its download,
+			-- never its activation.
+			f.send({ action = "select_model", backend = "ollama", name = available.name })
+			helpers.assert_eq(seen.selected, { installed.runtime_name }, "selecting a missing model selects nothing")
+			helpers.assert_eq(seen.downloads, {}, "selecting a missing model downloads nothing")
+			f.send({ action = "download_model", backend = "ollama", name = available.name })
 			helpers.assert_eq(seen.downloads, { { available.runtime_name, available.name } })
 		end)
 	end)

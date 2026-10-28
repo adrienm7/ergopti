@@ -31,6 +31,7 @@ local Logger = require("infra.logger")
 local Codec  = require("infra.toml.codec")
 local Mask   = require("personal_info.mask")
 local Paths  = require("infra.paths")
+local TableUtil = require("table_util")
 
 local LOG = "infra.personal_info_fields"
 
@@ -107,8 +108,7 @@ local function declaration()
 	end
 
 	_declaration = { policy = parsed.policy, fields = parsed.fields or {} }
-	local declared = 0
-	for _ in pairs(_declaration.fields) do declared = declared + 1 end
+	local declared = TableUtil.count(_declaration.fields)
 	Logger.debug(LOG, "Field classification loaded (%d field(s) declared).", declared)
 	return _declaration
 end

@@ -273,13 +273,15 @@ def session(root):
                         command("reset")
                         command("start-" + mode)
                         command("offer")
-                        assert command("start-" + mode)["requests"] == 1, (
-                            "second request must wait for pacing"
+                        # An explicit shortcut is never held by the rate floor
+                        # (bbc08ac19d); pressing it again supersedes and sends.
+                        assert command("start-" + mode)["requests"] == 2, (
+                            "an explicit request must not wait for the rate floor"
                         )
                         before = focus(1)
                         result = command("advance")
-                        assert result["requests"] == 1, (
-                            "pacing must recheck native text destination before sending"
+                        assert result["requests"] == 2, (
+                            "no held request may fire once the native destination moved"
                         )
                         unchanged(before)
                         cases += 1

@@ -169,8 +169,10 @@ BootProfile_StageEnd(Name, Detail := "") {
 		return
 	}
 	Started := Open.Delete(Name)
+	DurationMs := TickElapsed(Started.Tick, A_TickCount)
+	_BootStageDurations().Push({ Name: Name, Ms: DurationMs })
 	try LoggerSuccess("BootProfile", "Boot stage '{1}' done in {2} ms{3}.",
-		Name, TickElapsed(Started.Tick, A_TickCount), Detail != "" ? ": " . Detail : "")
+		Name, DurationMs, Detail != "" ? ": " . Detail : "")
 	_BootProfileStageResources(Name, Started)
 }
 
@@ -191,6 +193,28 @@ BootProfile_TotalBootMs() {
 	global _BOOT_PROFILE_START
 	Uptime := BootProfile_ProcessUptimeMs()
 	return (Uptime >= 0) ? Uptime : TickElapsed(_BOOT_PROFILE_START, A_TickCount)
+}
+
+; Durations of the closed stages in completion order, for the boot summary.
+; A function static for the same include-order reason as the registry above.
+; @returns {Array} Entries { Name, Ms }.
+_BootStageDurations() {
+	static Closed := []
+	return Closed
+}
+
+; Compact one-line table of the closed top-level stages, e.g. "i18n=47 tray_menu=2781".
+; Nested "menu row" stages overlap the tray menu stage and are left out so the
+; figures can be read against the total. Names are code literals, never content.
+; @returns {String}
+BootProfile_StageSummary() {
+	Text := ""
+	for Stage in _BootStageDurations() {
+		if SubStr(Stage.Name, 1, 9) == "menu row "
+			continue
+		Text .= (Text == "" ? "" : " ") . StrReplace(Stage.Name, " ", "_") . "=" . Stage.Ms
+	}
+	return Text
 }
 
 ; Names of the stages still open, for the boot-complete line.

@@ -53,9 +53,6 @@ TestGestures_SystemConfigurationContract() {
 			Values[Name] := Expected
 		}
 	}
-	AssertEqual("swipe_3", GestureSystemGroup("swipe_3_left"), "group shares dismissal")
-	AssertEqual("swipe_3", GestureSystemGroup("swipe_3_right"), "opposite direction shares dismissal")
-	AssertEqual("tap_3", GestureSystemGroup("tap_3"), "tap dismissal remains separate")
 }
 Test("Gestures: system configuration requires every native registry field", TestGestures_SystemConfigurationContract)
 
@@ -65,12 +62,12 @@ TestGestures_SystemSnapshotRefusal() {
 	PreviousSlots := State["slots"]
 	PreviousReady := State["ready"]
 	try {
-		AssertTrue(GestureSystemRefresh(false, (Name) => ""), "absent settings are a complete unconfigured snapshot")
+		AssertTrue(GestureSystemRefresh((Name) => ""), "absent settings are a complete unconfigured snapshot")
 		AssertTrue(State["ready"], "completed snapshot is available")
 		for Slot in GESTURE_SLOTS
 			AssertFalse(State["slots"][Slot], Slot . " absent is not configured")
 		Snapshot := State["slots"]
-		AssertFalse(GestureSystemRefresh(false, TestGestures_RefuseSystemRead), "read refusal propagates")
+		AssertFalse(GestureSystemRefresh(TestGestures_RefuseSystemRead), "read refusal propagates")
 		AssertFalse(State["ready"], "refusal exposes unknown status")
 		AssertTrue(State["slots"] == Snapshot, "partial replacement was not published")
 	} finally {
@@ -83,49 +80,6 @@ TestGestures_RefuseSystemRead(Name) {
 	throw Error("native registry read refused")
 }
 Test("Gestures: system snapshot refusal cannot publish partial success", TestGestures_SystemSnapshotRefusal)
-
-; Close callbacks cannot retire another notice or run a reload callback twice.
-TestGestures_SystemNoticeOwnership() {
-	State := GestureSystemState()
-	Windows := State["windows"]
-	Callbacks := State["callbacks"]
-	Observed := Map("destroyed", 0, "done", 0)
-	Notice := { Destroy: (*) => Observed["destroyed"] += 1 }
-	try {
-		State["windows"] := Map("swipe_3", Notice)
-		State["callbacks"] := Map("swipe_3", [(*) => Observed["done"] += 1])
-		AssertFalse(GestureSystemFinishNotice("swipe_3", {}, "close"), "stale owner refused")
-		AssertEqual(0, Observed["done"], "stale notice cannot reload")
-		AssertTrue(GestureSystemFinishNotice("swipe_3", Notice, "close"), "owned close accepted")
-		AssertEqual(1, Observed["destroyed"], "notice destroyed once")
-		AssertEqual(1, Observed["done"], "completion delivered once")
-		AssertFalse(GestureSystemFinishNotice("swipe_3", Notice, "close"), "duplicate close refused")
-		AssertEqual(1, Observed["done"], "duplicate close cannot reload twice")
-	} finally {
-		State["windows"] := Windows
-		State["callbacks"] := Callbacks
-	}
-}
-Test("Gestures: system notices retain exact group ownership", TestGestures_SystemNoticeOwnership)
-
-; A previous good value cannot suppress a warning after its refresh was refused.
-TestGestures_SystemAssignmentReadiness() {
-	State := GestureSystemState()
-	PreviousSlots := State["slots"]
-	PreviousReady := State["ready"]
-	try {
-		State["slots"] := Map("tap_3", true)
-		State["ready"] := false
-		AssertTrue(GestureSystemAssignmentNeedsWarning("tap_3"), "unverified old cache cannot suppress warning")
-		State["ready"] := true
-		AssertFalse(GestureSystemAssignmentNeedsWarning("tap_3"), "confirmed native mapping needs no warning")
-		AssertTrue(GestureSystemAssignmentNeedsWarning("tap_4"), "unconfigured sibling still needs warning")
-	} finally {
-		State["slots"] := PreviousSlots
-		State["ready"] := PreviousReady
-	}
-}
-Test("Gestures: system assignment warning requires a current snapshot", TestGestures_SystemAssignmentReadiness)
 
 TestGestures_AllSlotsHaveLabels() {
     for Slot in GESTURE_SLOTS {
@@ -300,6 +254,53 @@ TestGestures_ToggleUIRejectsLiveActivationRefusal() {
 }
 Test("Gestures: toggle surfaces a live activation refusal (gesture-toggle-activation-race)",
 	TestGestures_ToggleUIRejectsLiveActivationRefusal)
+
+; The toggle behind every UI window action (actions.toml, group "UI"): closed
+; opens, open in the background is raised and never closed, focused closes.
+TestGestures_ToggleUIThreeStates() {
+	Open := _GTUI_CallRecorder()
+	Close := _GTUI_CallRecorder()
+	Activate := _GTUI_CallRecorder(true)
+	_GestureGenericToggleUIWith((*) => 0, Open, Close, (*) => false, (*) => 0, Activate)
+	AssertEqual(1, Open.calls, "a closed window opens")
+	_GestureGenericToggleUIWith((*) => 123, Open, Close, (*) => true, (*) => 456, Activate)
+	AssertEqual(1, Activate.calls, "a background window is raised")
+	AssertEqual(0, Close.calls, "a background window is never closed")
+	_GestureGenericToggleUIWith((*) => 123, Open, Close, (*) => true, (*) => 123, Activate)
+	AssertEqual(1, Close.calls, "a focused window closes")
+	AssertEqual(1, Open.calls, "neither raise nor close opens a second window")
+}
+Test("Gestures: a UI window toggles open, raise, close (webview-toggle-actions)",
+	TestGestures_ToggleUIThreeStates)
+
+; Every catalogue window action names a page of the toggle table whose HWND
+; probe reads the page owner's own global (0 while closed) and whose opener is
+; the page's existing open function.
+TestGestures_EveryWindowActionHasATogglePage() {
+	Expected := Map(
+		"open_metrics_typing", "metrics_typing", "open_metrics_apps", "metrics_apps",
+		"open_hotstrings_editor", "hotstrings_editor", "open_paths_editor", "paths_editor",
+		"open_hotstrings_settings", "hotstrings_settings", "open_layout_manager", "layout_manager",
+		"open_layer_editor", "layer_editor", "open_model_browser", "model_browser",
+		"open_changelog", "changelog", "open_healthcheck", "healthcheck")
+	Listed := Map()
+	for ActionName in GestureActionPickerIds()
+		Listed[ActionName] := true
+	for ActionName, Page in Expected {
+		AssertTrue(Listed.Has(ActionName), ActionName . " is in the Windows catalogue")
+		AssertTrue(GESTURE_ACTIONS.Has(ActionName), ActionName . " has a handler")
+		Entry := _GestureToggleUIPage(Page)
+		AssertTrue(IsObject(Entry), Page . " is a toggle page")
+		AssertTrue(HasMethod(Entry.Hwnd, "Call") && HasMethod(Entry.Open, "Call"),
+			Page . " names its HWND probe and opener")
+		if (Page != "metrics_typing" && Page != "metrics_apps")
+			AssertEqual(0, Entry.Hwnd.Call(), Page . " reads as closed under the harness")
+	}
+	AssertEqual("", _GestureToggleUIPage("no_such_page"), "an unknown page has no entry")
+	AssertFalse(WMRequestClose(0), "no close request is posted without a window")
+}
+Test("Gestures: every UI window action has a toggle page (webview-toggle-actions)",
+	TestGestures_EveryWindowActionHasATogglePage)
 
 ; Catalogue <-> registry parity, both directions. A listed id with no handler
 ; is a binding that does nothing when it fires; a registered handler the
@@ -624,91 +625,10 @@ Test("Gestures: onboarding marker preserves TOML boolean type (AHK-102)",
     TestGestures_AutoConfigureMarkerPreservesBooleanType)
 
 
-; The actual cached provider must consume the shared fixed command declaration.
-; Its native registry refresh still runs only from the existing deferred timer.
-TestGestures_SharedSystemRefresh() {
-	global _SharedDir, GESTURE_SLOTS
-	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\gesture_system_refresh.json", "UTF-8"))
-	Root := _MR_GetManifestRoot()
-	Section := Corpus["section"]
-	Definition := Root[Section]
-	AssertEqual(1, Definition.Length, "one independently declared fixed control")
-	for Field, Expected in Corpus["rows"][1] {
-		if Expected is Array {
-			AssertEqual(Expected.Length, Definition[1][Field].Length, "exact platform count")
-			for Index, Platform in Expected
-				AssertEqual(Platform, Definition[1][Field][Index], "exact existing native platform")
-		} else
-			AssertEqual(Expected, Definition[1][Field], "independent field: " . Field)
-	}
-	ExpectedSlots := Corpus["cached_children"]["ahk"]
-	AssertEqual(GESTURE_SLOTS.Length + 1, ExpectedSlots.Length, "handwritten slot sequence includes only one trailing refresh")
-	for Index, Slot in GESTURE_SLOTS
-		AssertEqual(ExpectedSlots[Index], Slot, "cached native slot order")
-	State := GestureSystemState()
-	PreviousReady := State["ready"]
-	PreviousSlots := State["slots"]
-	Rendered := Menu()
-	try {
-		State["ready"] := false
-		Rows := GestureSystemRows()
-		AssertEqual(1, Rows.Length, "one cached system-status submenu")
-		Children := Rows[1]["items"]
-		AssertEqual(ExpectedSlots.Length, Children.Length, "all existing cached children precede the shared command")
-		AssertEqual(t("ui_apps.btn_refresh"), Children[Children.Length]["label"], "existing refresh translation")
-		AssertFalse(State["ready"], "building does not perform a registry read")
-		AssertEqual(Children.Length, _MR_RenderRows(Rendered, Children, "gesture_system_refresh_test", 1),
-			"actual native renderer consumes every cached child and command")
-		AssertEqual(Children.Length, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
-			"actual Win32 menu has the same number of children")
-		Flags := DllCall("GetMenuState", "ptr", Rendered.Handle, "uint", Children.Length - 1, "uint", 0x400, "uint")
-		Assert(Flags != 0xFFFFFFFF && !(Flags & 0x3), "existing Refresh remains a clickable native command")
-		Children[Children.Length]["action"].Call()
-		Started := A_TickCount
-		while !State["ready"] && A_TickCount - Started < 2000
-			Sleep(10)
-		AssertTrue(State["ready"], "actual command schedules the original native complete-snapshot refresh")
-		for Slot in GESTURE_SLOTS
-			AssertTrue(State["slots"].Has(Slot), "actual timer publishes the full native snapshot: " . Slot)
-	} finally {
-		SetTimer(GestureSystemRefresh, 0)
-		State["ready"] := PreviousReady
-		State["slots"] := PreviousSlots
-		Rendered.Delete()
-		MenuDispatcher_PruneMenu(Rendered)
-	}
-}
-Test("Gestures: shared system refresh consumes actual cached provider and native timer", TestGestures_SharedSystemRefresh)
+#Include test_gesture_keywatcher_owner.ahk
 
-; Mutations prove declaration ownership, while restoring the exact original root.
-TestGestures_SharedSystemRefreshDeclaration() {
-	Root := _MR_GetManifestRoot()
-	Section := "gesture_system_status_controls"
-	Original := Root[Section]
-	Rendered := Menu()
-	try {
-		Changed := Original[1].Clone()
-		Changed["i18n"] := "menu.gestures.open_settings"
-		Root[Section] := [Map("type", "---", "platforms", ["ahk"], "unavailable", "hide"), Changed]
-		Rows := GestureSystemRows()
-		Children := Rows[1]["items"]
-		AssertTrue(Children[Children.Length - 1]["separator"], "actual provider follows declared separator order")
-		AssertEqual(t("menu.gestures.open_settings"), Children[Children.Length]["label"], "actual provider follows declared caption")
-		AssertEqual(Children.Length - 1, _MR_RenderRows(Rendered, Children, "gesture_system_order_test", 1),
-			"actual native renderer counts all labelled rows")
-		AssertEqual(Children.Length, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
-			"actual native renderer retains the interior separator")
-		Changed["platforms"] := ["hs"]
-		Root[Section] := [Changed]
-		Hidden := GestureSystemRows()[1]["items"]
-		AssertEqual(Children.Length - 2, Hidden.Length, "platform hiding retains every existing cached Settings child")
-		Changed["platforms"] := ["ahk"]
-		Changed["id"] := "unknown_native_refresh_owner"
-		AssertEqual(0, GestureSystemRows().Length, "missing actual command refuses partial status publication")
-	} finally {
-		Root[Section] := Original
-		Rendered.Delete()
-		MenuDispatcher_PruneMenu(Rendered)
-	}
-}
-Test("Gestures: actual system refresh provider follows declaration order caption and platform", TestGestures_SharedSystemRefreshDeclaration)
+#Include test_gesture_plain_clipboard_owner.ahk
+
+#Include test_plain_paste_foreign_text_owner.ahk
+
+#Include test_take_note_native64_deadline.ahk

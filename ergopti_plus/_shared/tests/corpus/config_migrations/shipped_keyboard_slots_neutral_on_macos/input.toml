@@ -1,0 +1,26 @@
+[_meta]
+schema_version = 14
+
+[shortcuts.keyboard]
+cmd_a = "copy"
+cmd_shift_d = "paste_plain"
+hs_ctrl_a = "send_text"
+hs_ctrl_shift_c = "undo"
+hs_option_b = "redo"
+hs_ctrl_space = "llm_generate_prediction"
+magic_editor = "none"
+physical_none_KeyJ = "mute"
+
+[shortcuts.keys]
+ctrl_a = true
+ctrl_d = true
+ctrl_e = false
+ctrl_g = true
+ctrl_capslock = true
+ctrl_quote = false
+cmd_shift_v = true
+cmd_star = true
+wrap_text_if_selected = true
+
+[gestures.action_parameters]
+keep = "neighbor"

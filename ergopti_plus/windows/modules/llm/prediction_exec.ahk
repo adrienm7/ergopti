@@ -253,6 +253,13 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		return
 
 	Override := _LLM_Engine_NormalizePromptOverride(Override)
+	; The AI preview switch (hotstrings.preview_ai_enabled) governs the automatic
+	; typing-triggered bubble on every driver. A request the user asked for by
+	; name (a prompt action, live mode) carries an Override and is not a preview.
+	if !(Override is Map) && !HSE_PreviewSwitchCurrent("preview_ai_enabled") {
+		try LoggerDebug("LLM", "Automatic prediction skipped: the AI preview switch is off.")
+		return
+	}
 	IsLive := (Override is Map) && Override["live"]
 	; Hotstring tooltips win: a live prediction would replace the preview on the
 	; shared surface. The chain armed when it closes asks again.
@@ -268,7 +275,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; on every keystroke when the user has not opted in.
 	;
 	; MUST be the adapters/secure_field_detector.ahk port contract function
-	; (SFD_IsSecureField) — not the keylogger's own KL_IsFocusedFieldPassword —
+	; (SFD_IsSecureField) — not the keystats's own KL_IsFocusedFieldPassword —
 	; so this privacy gate has a single, directly-testable source of truth
 	; shared with every other consumer of the SecureFieldDetector port instead
 	; of duplicating Win32-class/style detection logic locally (MED-02: the
@@ -426,7 +433,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; Log the SIZE of the context, never its content. This used to emit
 	; SubStr(tail, -40), so the daily log accumulated a rolling 40-character
 	; sample of everything the user typed while the LLM was on — a plaintext
-	; keystroke sink outside the keylogger's privacy policy, which governs
+	; keystroke sink outside the keystats's privacy policy, which governs
 	; today.log and data.sql only. macOS already logs a length here.
 	try LoggerInfo("LLM", Format("Prediction request #{1} prepared — {2} chars of context.",
 		this_request_id, StrLen(tail)))
@@ -577,6 +584,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; "REWRITE: …" text, which carries no erasure and would be typed as is.
 	streaming_enabled := is_rewrite ? false : LLM_EffectiveStreaming(backend,
 		_LLM_Engine.Has("streaming") and _LLM_Engine["streaming"])
+	request_current := _LLM_Engine_RenderIdentityIsCurrent.Bind(this_request_id, request_semantic_signature)
 	if (backend == "api") {
 		entry := _LLM_Engine_GetActiveApiEntry()
 		if (entry == "") {
@@ -589,7 +597,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		log_model := model_tag
 		remote_transport := _LLM_Engine_ResolveRemoteTransport()
 		dispatch_fn := (temp, on_succ, on_fail) =>
-			remote_transport.Call(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, call_tokens)
+			remote_transport.Call(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, call_tokens, "", 0, request_current)
 	} else {
 		model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 		log_model := model_tag
@@ -602,7 +610,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 			? profile["stop_sequences"] : ""
 		is_batch := (profile is Map and profile.Has("batch") and profile["batch"] == true)
 		dispatch_fn := (temp, on_succ, on_fail) =>
-			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, call_tokens, is_batch, tail)
+			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, call_tokens, is_batch, tail, "", request_current)
 		dispatch_stream_fn := (temp, on_partial, on_succ, on_fail) =>
 			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail, stop_seqs, call_tokens, is_batch, tail)
 	}
@@ -668,7 +676,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		"dispatch_stream_fn",dispatch_stream_fn,
 		"streaming",         streaming_enabled,
 		"show_all_at_once",  _LLM_Engine.Has("show_all_at_once") and _LLM_Engine["show_all_at_once"],
-		; Wallclock at request start so the keylogger event can include the
+		; Wallclock at request start so the keystats event can include the
 		; round-trip latency (matches the HS log_llm shape's ``elapsed_ms``
 		; field). Read at finalize time as ``A_TickCount - request_start``.
 		"request_start",     A_TickCount
@@ -758,6 +766,8 @@ _LLM_Engine_ShowLoadingTooltip() {
 ; predictions separated by ``===`` (the convention HS's Parser.split_blocks
 ; also expects), and we split / dedup the response into slots.
 _LLM_Engine_DispatchBatch(state) {
+	if !_LLM_Engine_IsCurrent(state)
+		return
 	; Keep the compact violet loading tooltip until the batch response lands.
 	; macOS does not paint placeholder rows here — show_loading stays up.
 
@@ -778,7 +788,7 @@ _LLM_Engine_OnBatchSuccess(state, text, meta := "") {
 		return
 	; Capture per-request token usage when the backend provided it. Same
 	; structure as the sequential path so the finalize step can emit a
-	; unified keylogger event regardless of dispatch strategy.
+	; unified keystats event regardless of dispatch strategy.
 	if (meta is Map) {
 		state["prompt_tokens"]     := (state.Has("prompt_tokens")     ? state["prompt_tokens"]     : 0) + (meta.Has("prompt_tokens")     ? meta["prompt_tokens"]     : 0)
 		state["completion_tokens"] := (state.Has("completion_tokens") ? state["completion_tokens"] : 0) + (meta.Has("completion_tokens") ? meta["completion_tokens"] : 0)
@@ -924,7 +934,7 @@ _LLM_Engine_DispatchVariant(state) {
 	dispatch_fn := state["dispatch_fn"]
 	; Same signature as the streaming branch — forward ``meta`` so the
 	; finalize step can record token usage / cost. Without ``meta`` here
-	; the API path silently zeroed those metrics in the keylogger event.
+	; the API path silently zeroed those metrics in the keystats event.
 	dispatch_fn.Call(temp,
 		(text, meta := "") => _LLM_Engine_OnVariantSuccess(state_ref, text, meta),
 		(failure := "") => _LLM_Engine_OnVariantFail(state_ref, failure))
@@ -1070,11 +1080,18 @@ _LLM_Engine_FinalizeRequest(state) {
 	if !_LLM_Engine_IsCurrent(state)
 		return
 	if (state["slots"].Length == 0) {
+		; Capture the presentation before logging can admit another request.
+		Origin := LLM_Tooltip_GetPresentedToken()
+		if !_LLM_Engine_IsCurrent(state)
+			return
 		; Every variant failed — log a single ``llm_generation_failed`` so
 		; the audit trail captures the failure instead of silently
 		; dropping. The tooltip auto-dismisses via its own timer.
 		try LoggerWarn("LLM", "All variants failed for model {1} — no tooltip rendered.", state["model"])
-		try LLM_Tooltip_Hide()
+		; The request check rejects a logger reentry; the exact presentation
+		; fence also protects a replacement admitted inside the hide path.
+		if (_LLM_Engine_IsCurrent(state) and IsObject(Origin))
+			try LLM_Tooltip_HideExact(Origin)
 		try {
 			app_name := ""
 			try app_name := WIGetFocused()["appId"]
@@ -1102,7 +1119,7 @@ _LLM_Engine_FinalizeRequest(state) {
 	if state.Get("backend", "") == "ollama"
 		_LLM_Ollama_IsReady := true
 
-	; Keylogger event — same shape as HS (modules/keylogger/init.lua /
+	; Keystats event — same shape as HS (modules/keystats/init.lua /
 	; M.log_llm) so a tail of the unified log reads identically across
 	; drivers. The ``predictions`` field carries the full slot array now
 	; rather than a single string. Token usage / cost / latency are
@@ -1115,7 +1132,7 @@ _LLM_Engine_FinalizeRequest(state) {
 			"app",           app_name,
 			"context",       state["ctx"],
 			"predictions",   state["slots"],
-			; ``tag`` mirrors the HS log_llm shape (modules/keylogger/init.lua
+			; ``tag`` mirrors the HS log_llm shape (modules/keystats/init.lua
 			; M.log_llm) — a tail of the unified log can filter generations
 			; with a single regex regardless of which driver produced them.
 			"tag",           "<llm_generated></llm_generated>",
@@ -1144,7 +1161,7 @@ _LLM_Engine_FinalizeRequest(state) {
 
 	; Re-checked HERE — as the LAST statement before anything observable. The
 	; entry check alone was never enough, but neither was a check placed above the
-	; block: the summary log, the focused-window query and the keylogger write all
+	; block: the summary log, the focused-window query and the keystats write all
 	; yield, and a keystroke arriving in that window supersedes this request.
 	; Painting anyway shows a prediction for text the user has already left (the
 	; deferred tooltip hide that should correct it is skipped on the generation
@@ -1247,9 +1264,9 @@ _LLM_Engine_ParseSlots(raw, state) {
 	; later duplicate is dropped by the dedup and must not replace its edit.
 	if !state.Has("rewrite_edits")
 		state["rewrite_edits"] := Map()
-	for text, edit in edits {
+	for text, slot_edit in edits {
 		if !state["rewrite_edits"].Has(text)
-			state["rewrite_edits"][text] := edit
+			state["rewrite_edits"][text] := slot_edit
 	}
 	return result
 }
@@ -1364,13 +1381,13 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; and carries its erasure like a rewrite.
 	display_slots := []
 	for _, s in slots {
-		Edit := (HasRewrites and s != "" and rewrite_edits.Has(s)) ? rewrite_edits[s] : 0
-		if !(Edit is Map)
+		SlotEdit := (HasRewrites and s != "" and rewrite_edits.Has(s)) ? rewrite_edits[s] : 0
+		if !(SlotEdit is Map)
 			display_slots.Push(_LLM_Engine_DisplaySlot(s, ctx))
-		else if Edit.Get("rewrite", true)
-			display_slots.Push(_LLM_Engine_RewriteDisplaySlot(s, Edit))
+		else if SlotEdit.Get("rewrite", true)
+			display_slots.Push(_LLM_Engine_RewriteDisplaySlot(s, SlotEdit))
 		else
-			display_slots.Push(_LLM_Engine_CorrectionDisplaySlot(s, ctx, Edit))
+			display_slots.Push(_LLM_Engine_CorrectionDisplaySlot(s, ctx, SlotEdit))
 	}
 
 	_LLM_Engine_ApplyTooltipDisplayOpts(slots.Length)

@@ -217,4 +217,18 @@ helpers.describe("screen capture: the whole screen falls through the tools", fun
 	helpers.it("a timed-out capture is a failure", function()
 		helpers.assert_eq(ScreenCapture.classify("region", nil, nil, "timeout").status, "failed")
 	end)
+
+	helpers.it("a failure names a closed reason id and keeps the detail apart", function()
+		local Errors = require("adapter_errors")
+		helpers.assert_eq(ScreenCapture.classify("full", ScreenCapture.EXIT_NO_TOOL, nil, nil).reason,
+			Errors.SCREEN_CAPTURE_NO_TOOL)
+		helpers.assert_eq(ScreenCapture.classify("full", ScreenCapture.EXIT_NO_FILE, nil, nil).reason,
+			Errors.SCREEN_CAPTURE_NO_IMAGE)
+		local timed_out = ScreenCapture.classify("region", nil, nil, "timeout")
+		helpers.assert_eq(timed_out.reason, Errors.SCREEN_CAPTURE_DID_NOT_FINISH)
+		helpers.assert_eq(timed_out.detail, "timeout")
+		local failed = ScreenCapture.classify("full", 7, nil, nil)
+		helpers.assert_eq(failed.reason, Errors.SCREEN_CAPTURE_TOOL_FAILED)
+		helpers.assert_eq(failed.detail, 7)
+	end)
 end)

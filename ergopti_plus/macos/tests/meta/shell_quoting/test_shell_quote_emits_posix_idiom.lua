@@ -32,6 +32,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
+local CommandLines = require("tests.support.command_lines")
+local shell_quote = require("text_utils").shell_quote
 
 local BACKSLASH = string.char(92)
 local QUOTE = string.char(39)
@@ -145,12 +148,13 @@ helpers.describe("shell_quote: the broken spelling exists nowhere in the tree", 
 	helpers.it("no quote-escaping gsub uses a single backslash", function()
 		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
 		local driver_root = src_path:match("^(.+)[/\\]tests[/\\]") or "."
-		local shared_root = driver_root .. "/../_shared/lua"
+		local shared_root = helpers.shared("lua")
 
 		-- Directories that ship shell-invoking code for this driver.
 		local roots = {
 			driver_root .. "/adapters",
-			driver_root .. "/lib",
+			driver_root .. "/infra",
+			driver_root .. "/platform",
 			driver_root .. "/modules",
 			driver_root .. "/ui",
 			shared_root,
@@ -160,12 +164,7 @@ helpers.describe("shell_quote: the broken spelling exists nowhere in the tree", 
 		local scanned = 0
 
 		local function scan_file(path)
-			local fh = io.open(path, "r")
-			if not fh then
-				return
-			end
-			local src = fh:read("*a")
-			fh:close()
+			local src = SourceFile.read(path)
 			scanned = scanned + 1
 			local lineno = 0
 			for line in (src .. "\n"):gmatch("([^\n]*)\n") do
@@ -187,38 +186,14 @@ helpers.describe("shell_quote: the broken spelling exists nowhere in the tree", 
 		end
 
 		local function scan_dir(dir)
-			-- Portable directory walk: `lfs` when present, else shell out.
-			local ok, lfs = pcall(require, "lfs")
-			if ok and lfs and lfs.dir then
-				local ok2 = pcall(function()
-					for entry in lfs.dir(dir) do
-						if entry ~= "." and entry ~= ".." then
-							local full = dir .. "/" .. entry
-							local attr = lfs.attributes(full)
-							if attr and attr.mode == "directory" then
-								scan_dir(full)
-							elseif entry:sub(-4) == ".lua" then
-								scan_file(full)
-							end
-						end
-					end
-				end)
-				if ok2 then
-					return
-				end
+			local command = package.config:sub(1, 1) == "\\"
+				and ('cmd /c dir /b /s /a-d "' .. dir:gsub("/", "\\") .. '"')
+				or ("find " .. shell_quote(dir) .. " -type f -name '*.lua'")
+			local files = CommandLines.read(command)
+			assert(#files > 0, "source inventory must not be empty: " .. dir)
+			for _, path in ipairs(files) do
+				if path:match("%.lua$") then scan_file(path) end
 			end
-			local sep = package.config:sub(1, 1)
-			local cmd = (sep == "\\")
-					and ('dir /b /s "' .. dir:gsub("/", "\\") .. '\\*.lua" 2>nul')
-				or ('find "' .. dir .. '" -name "*.lua" -type f 2>/dev/null')
-			local pipe = io.popen(cmd)
-			if not pipe then
-				return
-			end
-			for line in pipe:lines() do
-				scan_file((line:gsub("\r$", "")))
-			end
-			pipe:close()
 		end
 
 		for _, dir in ipairs(roots) do

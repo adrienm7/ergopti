@@ -373,7 +373,8 @@ _SRLC_AsyncTerminationCallGraphIsBounded() {
 			"_SR_LegacyRequestTreeKill", 1),
 		"_SR_LegacyClaimAsyncTerminate", Map(
 			"_SR_LegacyRegistryOwnsLocked", 1,
-			"_SR_LegacyDetachCallbackLocked", 3),
+			; READY cancellation uses the same non-blocking token detach owner.
+			"_SR_LegacyDetachCallbackLocked", 4),
 		"_SR_LegacyDetachCallbackLocked", Map(),
 		"_SR_LegacyRequestTreeKill", Map(
 			"_SR_DeferLogError", 1),

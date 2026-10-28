@@ -106,25 +106,56 @@ function M.isElementSecure(element, observe)
 		if observe then observe(false) end
 		return false
 	end
-	local ok_role, role    = pcall(function() return element:attributeValue("AXRole") end)
-	local ok_sub,  subrole = pcall(function() return element:attributeValue("AXSubrole") end)
+	local ok_role, role, role_error = pcall(function() return element:attributeValue("AXRole") end)
+	local ok_sub, subrole, subrole_error = pcall(function() return element:attributeValue("AXSubrole") end)
+	-- Native AX failures return nil plus an error without raising a Lua exception.
+	-- Optional nil-only subroles remain valid; a transport refusal is unknown.
+	local role_read = ok_role and not (role == nil and role_error ~= nil)
+	local subrole_read = ok_sub and not (subrole == nil and subrole_error ~= nil)
 	if observe then
-		local confirmed_secure = (ok_role and role == SECURE_ROLE) or (ok_sub and subrole == SECURE_ROLE)
-		observe(confirmed_secure or (ok_role and ok_sub and type(role) == "string" and role ~= ""
+		local confirmed_secure = (role_read and role == SECURE_ROLE) or (subrole_read and subrole == SECURE_ROLE)
+		observe(confirmed_secure or (role_read and subrole_read and type(role) == "string" and role ~= ""
 			and (subrole == nil or type(subrole) == "string")))
 	end
-	if (ok_role and role == SECURE_ROLE) or (ok_sub and subrole == SECURE_ROLE) then
+	if (role_read and role == SECURE_ROLE) or (subrole_read and subrole == SECURE_ROLE) then
 		return true
 	end
-	if not ok_role or not ok_sub then
+	if not role_read or not subrole_read then
 		Logger.debug(LOG,
 			"AX secure-field classification incomplete (role_read=%s, subrole_read=%s); suppressing input.",
-			tostring(ok_role), tostring(ok_sub))
+			tostring(role_read), tostring(subrole_read))
 		return true
 	end
 	return false
 end
 
+
+--- Shares exact inspection reads while retaining confirmed native refusal for refresh.
+--- @param application_or_pid table|userdata|number Application object or PID.
+--- @param observe function|nil Optional callback receiving completeness and inspected PID.
+--- @return boolean|nil secure
+--- @return any error_detail
+--- @return boolean|nil focus_refused True only for AXFocusedUIElement nil plus error.
+local function inspect_focused_element(application_or_pid, observe)
+	local pid = resolve_pid(application_or_pid)
+	if pid == nil then return nil, "application PID is unavailable" end
+	if not (hs.axuielement and hs.axuielement.applicationElementForPID) then
+		return nil, "Accessibility element API is unavailable"
+	end
+
+	local ok, result, focus_refused = pcall(function()
+		local app_element = hs.axuielement.applicationElementForPID(pid)
+		if not app_element then return nil end
+		local focused, focused_error = app_element:attributeValue("AXFocusedUIElement")
+		if not focused then return nil, focused == nil and focused_error ~= nil end
+		return M.isElementSecure(focused, observe and function(complete) observe(complete, pid) end)
+	end)
+	if not ok then return nil, result end
+	if type(result) ~= "boolean" then
+		return nil, "focused Accessibility element is unavailable", focus_refused == true
+	end
+	return result, nil
+end
 
 --- Classifies the focused element for one exact application.
 --- Unlike refresh(), this does not consult frontmostApplication(), so a focused
@@ -133,23 +164,10 @@ end
 --- @param observe function|nil Optional callback receiving completeness and inspected PID.
 --- @return boolean|nil secure Nil means the focused element could not be read.
 --- @return any error_detail
+--- The private refusal bit never changes this public two-return contract.
 function M.inspectFocusedElement(application_or_pid, observe)
-	local pid = resolve_pid(application_or_pid)
-	if pid == nil then return nil, "application PID is unavailable" end
-	if not (hs.axuielement and hs.axuielement.applicationElementForPID) then
-		return nil, "Accessibility element API is unavailable"
-	end
-
-	local ok, result = pcall(function()
-		local app_element = hs.axuielement.applicationElementForPID(pid)
-		if not app_element then return nil end
-		local focused = app_element:attributeValue("AXFocusedUIElement")
-		if not focused then return nil end
-		return M.isElementSecure(focused, observe and function(complete) observe(complete, pid) end)
-	end)
-	if not ok then return nil, result end
-	if type(result) ~= "boolean" then return nil, "focused Accessibility element is unavailable" end
-	return result, nil
+	local secure, detail = inspect_focused_element(application_or_pid, observe)
+	return secure, detail
 end
 
 
@@ -228,10 +246,14 @@ function M.refresh(observe)
 	local ok, err = pcall(function()
 		local app = hs.application.frontmostApplication()
 		if not app then clear_cache(); return end
-		local secure = M.inspectFocusedElement(app, observe and function(known, pid)
+		local secure, _, focus_refused = inspect_focused_element(app, observe and function(known, pid)
 			complete, inspected_pid = known, pid
 		end)
-		if secure == nil then clear_cache(); return end
+		if secure == nil then
+			-- Native AX errors return nil plus an error; nil alone means no focus.
+			_cached_secure = focus_refused == true
+			return
+		end
 		_cached_secure = secure
 	end)
 
@@ -250,7 +272,7 @@ end
 --- secure marker lives: native AppKit sets AXRole = AXSecureTextField, whereas
 --- WebKit/Blink report AXRole = AXTextField and demote the marker to AXSubrole.
 --- Testing the role alone therefore fails OPEN on every Chrome/Edge/Brave/Arc
---- login form, letting the keylogger record the user's password characters.
+--- login form, letting the keystats record the user's password characters.
 --- @return boolean True when the cached element is secure or classification was incomplete.
 function M.isSecureField()
 	return _cached_secure

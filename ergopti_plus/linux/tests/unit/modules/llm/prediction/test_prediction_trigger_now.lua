@@ -56,7 +56,8 @@ local function fixture(state)
 	local engine = require("modules.llm.prediction_engine")
 	engine.init({ focus_id = function() return "owned-prediction-window" end,
 		scheduler = Fakes.timer_scheduler(),
-		engine = { current_buffer = function() return state.buffer or "" end, reset = function() end },
+		engine = { reset = function() end },
+		context = { text = function() return state.buffer or "" end, replaced = function() end },
 		is_paused = function() return state.paused == true end,
 		notify = function(text) seen.notices[#seen.notices + 1] = text return true end,
 	})
@@ -145,7 +146,7 @@ helpers.describe("Linux manual prediction trigger (llm-manual-prediction-feedbac
 			local handlers = engine.action_handlers()
 			helpers.assert_eq(type(handlers.llm_generate_prediction), "function",
 				"the engine provides the handler the daemon injects into the executor")
-			handlers.llm_generate_prediction("keyboard__super_space", nil)
+			handlers.llm_generate_prediction("keyboard__meta_space", nil)
 			helpers.assert_eq(#seen.fired, 1, "the action runs the manual trigger")
 		end)
 		restore()

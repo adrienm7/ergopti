@@ -113,6 +113,7 @@
 				"magic_key_source_char": { "type": "string", "minLength": 1, "maxLength": 1 },
 				"repeat_key_enabled": { "type": "boolean" },
 				"idle_reset_seconds": { "type": "number", "minimum": 0 },
+				"cascade_max_arrows": { "type": "integer", "minimum": 1, "maximum": 10 },
 				"click_resets_word": { "type": "boolean" },
 				"arrow_resets_word": { "type": "boolean" },
 				"shortcut_resets_word": { "type": "boolean" },
@@ -226,15 +227,19 @@
 						"active": { "type": "string", "minLength": 1 },
 						"num_predictions": { "type": "integer", "minimum": 1, "maximum": 32 },
 						"auto_profile_for_model": { "type": "boolean" },
-						"shortcuts": { "type": "object" },
-						"user_profiles": { "type": "array", "items": { "type": "object" } }
+						"shortcuts": { "type": "object" }
 					}
 				},
 				"trigger": {
 					"type": "object",
 					"additionalProperties": false,
 					"properties": {
-						"debounce_ms": { "type": "integer", "minimum": 0 },
+						"debounce_ms": {
+							"type": "integer",
+							"minimum": -1,
+							"description": "-1 is \"never\": the automatic trigger is off."
+						},
+						"min_request_interval_ms": { "type": "integer", "minimum": 0 },
 						"instant_on_word_end": { "type": "boolean" },
 						"after_hotstring": { "type": "boolean" },
 						"inline_autotype": { "type": "boolean" },
@@ -264,34 +269,19 @@
 
 		"metrics": {
 			"type": "object",
-			"additionalProperties": true,
-			"required": ["enabled"],
+			"additionalProperties": false,
 			"properties": {
 				"enabled": { "type": "boolean" },
 				"private_filter_enabled": { "type": "boolean" },
 				"secure_filter_enabled": { "type": "boolean" },
 				"system_auth_filter_enabled": { "type": "boolean" },
 				"encrypt": { "type": "boolean" },
-				"show_wpm_menubar": { "type": "boolean" },
-				"wpm_menubar_colors": { "type": "boolean" },
-
-				"menubar": { "type": "object" },
-				"float": { "type": "object" },
-				"shortcuts": {
-					"type": "object",
-					"additionalProperties": false,
-					"properties": {
-						"apps": { "type": ["boolean", "string"] },
-						"typing": { "type": ["boolean", "string"] }
-					}
-				},
-				"disabled_apps": {
-					"type": ["object", "array"],
-					"items": { "type": "string" },
-					"properties": {
-						"list": { "type": "array", "items": { "type": "string" } }
-					}
-				}
+				"disabled_apps": { "type": "array", "items": { "type": "string" } },
+				"wpm_widget_visible": { "type": "boolean" },
+				"wpm_widget_colors": { "type": "boolean" },
+				"wpm_widget_graph": { "type": "boolean" },
+				"wpm_menubar_visible": { "type": "boolean" },
+				"wpm_menubar_colors": { "type": "boolean" }
 			}
 		},
 
@@ -366,11 +356,12 @@
 			"additionalProperties": false,
 			"properties": {
 				"pause_switch_enabled": { "type": "boolean" },
-				"on_pause": { "type": ["boolean", "string"] },
-				"on_resume": { "type": ["boolean", "string"] },
+				"on_pause": { "type": "string" },
+				"on_resume": { "type": "string" },
 				"ergopti_base": { "type": "boolean" },
 				"direct_access_digits": { "type": "string", "enum": ["native", "digits", "symbols"] },
 				"number_row_reorder_edges": { "type": "boolean" },
+				"virtual_keyboard": { "type": "string", "enum": ["auto", "iso", "ansi"] },
 				"emulate_number_row": { "type": "boolean" },
 				"emulate_top_row": { "type": "boolean" },
 				"emulate_home_row": { "type": "boolean" },

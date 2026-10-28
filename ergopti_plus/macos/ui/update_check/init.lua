@@ -20,7 +20,10 @@
 ---    the owners of the menu session that asked. Only the exact window this
 ---    module created receives pushes, so a late callback of a closed window
 ---    never writes into its successor.
---- 4. Nothing here runs on the typing path; the check is asynchronous.
+--- 4. Release notes: Sparkle's own dialog shows none, so the offered release's
+---    changelog is shown in this window by the shared page; this module only
+---    names the repository and opens the links the session approved.
+--- 5. Nothing here runs on the typing path; the check is asynchronous.
 --- ==============================================================================
 
 local M = {}
@@ -34,6 +37,7 @@ local Json           = require("json")
 local CheckSession   = require("updater.check_session")
 local Updater        = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
+local WebviewResult  = require("adapters.webview_result")
 
 local LOG = "update_check"
 
@@ -70,11 +74,31 @@ local function push_to(view, message)
 		Logger.error(LOG, "An update-check message could not be encoded.")
 		return false
 	end
-	local submitted, err = pcall(function()
-		view:evaluateJavaScript("if(window.receiveUpdateCheck)window.receiveUpdateCheck(" .. encoded .. ")")
+	if view ~= _webview then return false end
+	local failed, completed, reported = false, false, false
+	local function report(category)
+		if view ~= _webview or reported then return end
+		reported = true
+		-- WebKit errors may include the evaluated payload; retain fixed metadata only
+		Logger.error(LOG, "Update-check JavaScript %s.", category)
+	end
+	local submitted, result = pcall(function()
+		return view:evaluateJavaScript("if(window.receiveUpdateCheck)window.receiveUpdateCheck(" .. encoded .. ")",
+			function(_, script_error)
+				if completed then return end
+				completed = true
+				if WebviewResult.is_error(script_error) then
+					failed = true
+					report("execution failed")
+				end
+			end)
 	end)
-	if not submitted then Logger.error(LOG, "The update-check window refused a message: %s.", tostring(err)) end
-	return submitted
+	if not submitted or result ~= view then
+		completed = true
+		report(submitted and "submission refused" or "submission raised")
+		return false
+	end
+	return view == _webview and not failed
 end
 
 --- Forgets the window's session: a late answer of its check shows nothing.
@@ -175,8 +199,7 @@ local function session_for(view, ctx)
 		-- Sparkle reads the same channel's feed and shows its own install dialog.
 		install = function(result) return UpdateLauncher.request_check(result.channel) end,
 		open_changelog = function(channel)
-			require("ui.changelog").open({ channel = channel, channel_owner = ctx.channel_owner })
-			return true
+			return require("ui.changelog").open({ channel = channel, channel_owner = ctx.channel_owner }) == true
 		end,
 		report = function(result, on_complete, is_current)
 			if not is_current() then return end
@@ -188,6 +211,9 @@ local function session_for(view, ctx)
 				time = os.date("%Y-%m-%d %H:%M:%S"),
 			}, on_complete, is_current)
 		end,
+		-- The notes pane's links: the session checked them against the repository
+		repository = function() return { owner = Updater.GH_OWNER, repo = Updater.GH_REPO } end,
+		open_url = function(url) return require("ui.ui_builder").open_http_url(url) == true end,
 		open_log = open_today_log,
 		close = function() if view == _webview then close_window() end end,
 		log_path = Logger.today_log_path,

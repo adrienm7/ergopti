@@ -15,6 +15,7 @@ function M.run(parent_pid, database)
 	local ffi = require("ffi")
 	ffi.cdef([[
 		int getppid(void);
+		unsigned int umask(unsigned int mask);
 		int prctl(int option, ...);
 		int execvp(const char *file, char *const argv[]);
 	]])
@@ -25,6 +26,13 @@ function M.run(parent_pid, database)
 	assert(ffi.C.prctl(PR_SET_PDEATHSIG, ffi.cast("unsigned long", SIGKILL), 0, 0, 0) == 0,
 		"SQLite parent lifetime binding failed")
 	assert(tonumber(ffi.C.getppid()) == parent, "SQLite parent already exited")
+	local source = debug.getinfo(1, "S").source:gsub("^@", "")
+	local root = assert(source:match("^(.*)/adapters/sqlite_process_worker%.lua$"), "SQLite worker source unavailable")
+	package.path = root .. "/?.lua;" .. package.path
+	local private = require("infra.private_sqlite_file")
+	assert(private.admit(database), "SQLite private file admission refused")
+	-- SQLite creates rollback journals and WAL/SHM after replacing this process.
+	ffi.C.umask(private.creation_mask)
 	local values = { "sqlite3", "-init", "/dev/null", "-bail", "-noheader", database }
 	local argv = ffi.new("char *[?]", #values + 1)
 	for index, value in ipairs(values) do argv[index - 1] = ffi.cast("char *", value) end

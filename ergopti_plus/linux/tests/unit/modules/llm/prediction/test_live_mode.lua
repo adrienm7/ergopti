@@ -109,9 +109,9 @@ local function scenario(opts, body)
 			scheduler = scheduler,
 			clock_ms = function() return scheduler.now * 1000 end,
 			engine = {
-				current_buffer = function() return world.buffer end,
 				reset = function() world.buffer = "" end,
 			},
+			context = { text = function() return world.buffer end, replaced = function() end },
 			is_paused = function() return world.paused end,
 			notify = function(text) world.notices[#world.notices + 1] = text; return true end,
 			on_live_change = function() world.live_changes = world.live_changes + 1 end,
@@ -313,6 +313,41 @@ helpers.describe("live mode: the sentence translated as it is typed", function()
 		end)
 	end)
 
+	helpers.it("sends at once when a word ends, without waiting for the live debounce (live-word-end-instant)", function()
+		scenario({ stored = { ["llm.trigger.instant_on_word_end"] = true } }, function(world)
+			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "translate_en|1"), true)
+			world.type("on se voit ")
+			world.scheduler.test.advance(0)
+			helpers.assert_eq(#world.posts, 1, "the word end asks before the live debounce has elapsed")
+		end)
+	end)
+
+	helpers.it("keeps the live debounce at a word end once the instant word end is switched off (live-word-end-instant)", function()
+		scenario({}, function(world)
+			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "translate_en|1"), true)
+			world.type("on se voit ")
+			world.scheduler.test.advance(0)
+			helpers.assert_eq(#world.posts, 0, "no instant request")
+			world.scheduler.test.advance(live_json().debounce_ms / 1000)
+			helpers.assert_eq(#world.posts, 1, "the live debounce still applies")
+		end)
+	end)
+
+	helpers.it("a live keystroke is automatic: it still waits for the backend's interval (explicit-never-held)", function()
+		scenario({}, function(world)
+			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "translate_en|1"), true)
+			world.type("on")
+			world.scheduler.test.advance(live_json().debounce_ms / 1000)
+			helpers.assert_eq(#world.posts, 1)
+			world.respond(1, "REWRITE: We")
+			world.type("x")
+			world.scheduler.test.advance(live_json().debounce_ms / 1000)
+			helpers.assert_eq(#world.posts, 1, "the second live request is inside the interval")
+			world.wait_for(2)
+			helpers.assert_eq(#world.posts, 2, "and goes once the interval has passed")
+		end)
+	end)
+
 	helpers.it("asks from the first word, below the menu's minimum word count", function()
 		scenario({}, function(world)
 			helpers.assert_true(require("modules.llm.settings").get("min_words") > 1,
@@ -428,7 +463,7 @@ helpers.describe("live mode: turning it on and off", function()
 
 	helpers.it("stops, never falls back, when its prompt is deleted while it runs", function()
 		scenario({ stored = {
-			["llm.user_profiles"] = require("modules.llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite as a pirate.\nREWRITE: <text>", batch = false },
 			}),
 		} }, function(world)
@@ -587,8 +622,11 @@ helpers.describe("live mode: hotstrings, Tab and explicit actions", function()
 			helpers.assert_eq(world.engine.get_live().profile_id, "translate_en", "live mode stays on")
 			world.respond(2, "REWRITE: On se voit demain.")
 			helpers.assert_eq(world.tab(), false, "its offer is not live mode's")
+			-- The explicit run is not held by the interval: its next variant is already out.
+			local before_typing = #world.posts
 			world.type(" ?")
-			world.wait_for(3)
+			world.wait_for(before_typing + 1)
+			helpers.assert_eq(#world.posts, before_typing + 1, "typing sends the live request")
 			helpers.assert_true(runs_prompt(world.posts[#world.posts], "translate_en"),
 				"the next keystroke is live again")
 		end)
@@ -618,7 +656,7 @@ helpers.describe("live mode: one normal profile chooser and retained prompt acti
 
 	helpers.it("has one profile chooser, keeps prompt actions and retires their override on explicit selection", function()
 		scenario({ stored = {
-			["llm.user_profiles"] = require("modules.llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite as a pirate.\nREWRITE: <text>", batch = false },
 				{ id = "user_plain", label = "Plain", system_single = "Continue.", batch = false },
 			}),
@@ -702,7 +740,7 @@ helpers.describe("manual profile selection retires retained Linux live actions",
 
 	helpers.it("requires exact stop ACK before profile persistence and never redraws a refused cancellation", function()
 		scenario({ stored = {
-			["llm.user_profiles"] = require("modules.llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite. REWRITE: <text>", batch = false },
 			}),
 		} }, function(world)

@@ -135,11 +135,14 @@ ScreenBrightnessCompleted(Id, ExitCode, Stdout, Stderr) {
 	if ExitCode == 0 && StrLen(Stdout) <= Job["data"]["max_receipt_bytes"] {
 		try Receipt := JsonParse(Stdout)
 	}
-	Acknowledged := !Job["canceled"] && !A_IsSuspended
-		&& BrightnessAcknowledged(Job["data"], Job["action"], Receipt)
+	; A receipt delivered after the worker deadline describes a request the user
+	; no longer waits on: it neither acknowledges nor reports a capability.
+	Current := !Job["canceled"] && !A_IsSuspended
+		&& !TickExpired64(Job["started"], Job["data"]["worker_timeout_ms"], A_TickCount)
+	Acknowledged := Current && BrightnessAcknowledged(Job["data"], Job["action"], Receipt)
 	if !Acknowledged {
 		LoggerWarn("ScreenBrightness", "Native request was not acknowledged ({1}).", Job["action"])
-		if !Job["canceled"] && !A_IsSuspended && (Receipt is Map)
+		if Current && (Receipt is Map)
 				&& (Receipt.Get("version", "") is Integer)
 				&& Receipt["version"] == Job["data"]["version"]
 				&& (Receipt.Get("action", 0) is String)

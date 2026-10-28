@@ -205,7 +205,7 @@ local function load_api(state, daemon)
 	package.loaded["modules.llm.progressive_reveal"] = {}
 	package.loaded["modules.llm.prediction_engine"] = { on_ollama_daemon_exit = function() return true end }
 	-- This selection fixture has no keyboard inference consumer.
-	package.loaded["modules.keylogger"] = {}
+	package.loaded["modules.keystats"] = {}
 	package.loaded["adapters.managed_ollama_daemon"] = nil
 	package.loaded["modules.llm.api_ollama"] = nil
 	local api = helpers.load_with_stubs("modules.llm.api_ollama", {
@@ -228,7 +228,7 @@ end
 
 --- Loads the real Ollama checker (and resolver) over the fake filesystem.
 local function load_ollama_checker(state, daemon)
-	package.loaded["ui.download_window"] = WINDOW_STUB
+	package.loaded["ui.download_window"] = state.window or WINDOW_STUB
 	load_api(state, daemon)
 	package.loaded["modules.llm.pty_process_group"] = {
 		create = function() return "/tmp/fixture-pty.py" end,
@@ -252,7 +252,7 @@ local function load_mlx_checker(state)
 	-- policy admission bound to the preceding fake native table.
 	package.loaded["modules.llm.network_env"] = nil
 	package.loaded["adapters.file_system"] = nil
-	package.loaded["ui.download_window"] = WINDOW_STUB
+	package.loaded["ui.download_window"] = state.window or WINDOW_STUB
 	package.loaded["modules.llm.pty_process_group"] = {
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,
@@ -278,7 +278,7 @@ local STUBBED_MODULES = {
 	"modules.llm.progressive_reveal", "modules.llm.prediction_engine",
 	"ui.menu.menu_llm.models_manager_ollama", "modules.llm.api_common",
 	"modules.llm.ollama_endpoint", "adapters.storage", "adapters.owned_program_runner",
-	"platform.remap.lease_helper", "modules.shortcuts.script_control", "modules.keylogger",
+	"platform.remap.lease_helper", "modules.shortcuts.script_control", "modules.keystats",
 	"core.llm.ollama_runtime_choice", "core.llm.managed_ollama_daemon_lifecycle",
 	"core.llm.managed_ollama_daemon_receipt", "llm.local_model_policy",
 }

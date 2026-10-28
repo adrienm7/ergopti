@@ -544,9 +544,52 @@ _LLV_MenuListsRewritePrompts() {
 	AssertTrue(Declared is Array && Declared.Length > 0, "the shared AI menu must be readable")
 	for Row in Declared
 		Assert(!(Row is Map) || _MR_Get(Row, "id", "") != Retired, "the shared AI menu declares no live selector")
-	Assert(_LMNM_GenerationRoute(_DriverFuncBody("_LLM_Menu_GroupBuilders"), _DriverFuncBody("LLM_Menu_BuildSubmenu")),
+	Assert(_LLV_GenerationRoute(_DriverFuncBody("_LLM_Menu_GroupBuilders"), _DriverFuncBody("LLM_Menu_BuildSubmenu")),
 		"the native generation group keeps the same typed renderer")
 }
+/**
+ * Finds a statement as executable code at an exact brace depth, never inside a
+ * comment, a string or a conditional branch. Kept with its one caller when the
+ * model selector page retired run_llm_model_menu_disabled.ahk.
+ * @param {String} Source Function body.
+ * @param {String} Pattern Regex whose first group is the statement's token.
+ * @param {Integer} Depth Required brace depth of that token.
+ * @returns {Integer} The token position, or 0.
+ */
+_LLV_ExecutableStatement(Source, Pattern, Depth) {
+	Masked := _DriverMaskNonCode(&Source)
+	if !RegExMatch(Source, Pattern, &Found)
+		return 0
+	Position := Found.Pos(1), Token := Found[1]
+	if SubStr(Masked, Position, StrLen(Token)) != Token
+		return 0
+	Prefix := SubStr(Masked, 1, Position - 1), CurrentDepth := 0
+	if RegExMatch(RTrim(Prefix, " `t`r`n"), 'i)(?:^|\n)[ \t]*(?:if|else|for|while|loop|catch|try|finally)\b[^\r\n{]*$')
+		return 0
+	Loop Parse Prefix {
+		if A_LoopField == "{"
+			CurrentDepth++
+		else if A_LoopField == "}"
+			CurrentDepth--
+	}
+	return CurrentDepth == Depth ? Position : 0
+}
+
+/**
+ * Tells whether the generation group keeps its typed renderer: the group
+ * builders bind llm_generation_settings and the AI menu draws through them.
+ * @param {String} Groups Body of _LLM_Menu_GroupBuilders.
+ * @param {String} Build Body of LLM_Menu_BuildSubmenu.
+ * @returns {Boolean}
+ */
+_LLV_GenerationRoute(Groups, Build) {
+	Bound := _LLV_ExecutableStatement(Groups,
+		'm)^[ \t]*(return) Map\([^)]*"llm_generation_settings", LLM_Menu_BuildGenerationMenu\)', 1)
+	Draw := _LLV_ExecutableStatement(Build,
+		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*"", Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
+	return Bound && Draw
+}
+
 Test("LLM live mode: retained prompt chooser and shortcut owners preserve state (retired-live-menu)",
 	_LLV_MenuListsRewritePrompts)
 
@@ -602,14 +645,14 @@ _LLV_ExpansionReissuesTheLiveRequest() {
 		global _LLM_Bridge_Buffer, _Stub_LlmTooltipVisible, _Stub_LlmPresentedRecord
 		; Outside live mode an expansion arms nothing: next-word prediction is unchanged
 		Plain := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
-			{ DeleteFromEnd: 0, InsertedText: "" }))
+			{ IsPrivate: false, DeleteFromEnd: 0, InsertedText: "" }))
 		AssertFalse(Plain.Active, "outside live mode an expansion arms nothing")
 
 		AssertTrue(_LLV_Toggle("translate_en|1"), "live mode on")
 		LLM_Tooltip_Show(["See you dm"], 1, true, Map("offer_id", 1))
 		AssertTrue(_Stub_LlmTooltipVisible, "precondition: a live tooltip is shown")
 		Captured := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
-			{ DeleteFromEnd: 2, InsertedText: "demain" }))
+			{ IsPrivate: false, DeleteFromEnd: 2, InsertedText: "demain" }))
 		AssertEqual("on se voit demain", _LLM_Bridge_Buffer, "the expansion reached the buffer")
 		AssertTrue(Captured.Active, "the live request is re-armed after the expansion")
 		Sleep(30)   ; the tooltip teardown is deferred off the hook thread
@@ -632,21 +675,21 @@ _LLV_ExpansionObserverRequiresCurrentFocus() {
 		_LLM_Bridge_ReadLiveFocus := () => Focus.Clone()
 		AssertTrue(_LLV_Toggle("translate_en|1"), "live mode on")
 		Missing := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
-			{ DeleteFromEnd: 2, InsertedText: "demain" }))
+			{ IsPrivate: false, DeleteFromEnd: 2, InsertedText: "demain" }))
 		AssertEqual("on se voit demain", _LLM_Bridge_Buffer,
 			"an unknown focus does not discard the committed canonical expansion")
 		AssertFalse(Missing.Active, "an unknown focused control refuses the deferred re-arm")
 		AssertEqual(0, Calls.Length, "an unverified typing target starts no transport")
 		Focus["control"] := 102
 		ChangeTarget() {
-			_HSE_MirrorCanonicalEffectToLlm({ DeleteFromEnd: 0, InsertedText: "" })
+			_HSE_MirrorCanonicalEffectToLlm({ IsPrivate: false, DeleteFromEnd: 0, InsertedText: "" })
 			Focus["control"] := 103
 		}
 		Changed := _LLV_CaptureRealTimer(ChangeTarget)
 		AssertFalse(Changed.Active, "a focused-control change retires the exact deferred owner")
 		AssertEqual(0, Calls.Length, "a stale typing target starts no transport")
 		Stable := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
-			{ DeleteFromEnd: 0, InsertedText: "" }))
+			{ IsPrivate: false, DeleteFromEnd: 0, InsertedText: "" }))
 		AssertTrue(Stable.Active, "a verified unchanged typing target re-arms the live request")
 		_LLV_Fire(Map("fn", Stable.Fn))
 		AssertEqual(1, Calls.Length, "the verified deferred re-arm starts exactly one transport")

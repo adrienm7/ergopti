@@ -10,7 +10,7 @@
 ---
 --- WHY THIS EXISTS (regression for project-healthcheck-stale-api):
 --- The diagnostic collectors probed functions that did not exist — log_manager
---- .get_paths(), aggregator.get_stats(), keylogger.privacy (whole module),
+--- .get_paths(), aggregator.get_stats(), keystats.privacy (whole module),
 --- llm.get_state(), layout.is_ergopti_base(), key_state.get_altgr/get_shift/
 --- get_caps(), terminators.count()/get_magic_key(). Each call was guarded, so
 --- nothing crashed — but the diagnostic window showed "unknown" for almost

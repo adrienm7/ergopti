@@ -20,10 +20,10 @@ local _modules = nil
 --- @return table modules Core modules for build_initial_state and snapshot.
 local function core_modules()
 	if not _modules then
-		package.loaded["modules.keylogger.kc_bridge"] = { init = function() return true end }
+		package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
 		_modules = {}
 		for key, name in pairs({ keymap = "keymap", dyn_hot_mod = "dynamic_hotstrings",
-			shortcuts_mod = "shortcuts", gestures = "gestures", keylogger = "keylogger" }) do
+			shortcuts_mod = "shortcuts", gestures = "gestures", keystats = "keystats" }) do
 			_modules[key] = helpers.load_with_stubs("modules." .. name)
 		end
 	end
@@ -163,7 +163,7 @@ helpers.describe("the Hotstrings switch saves over existing key spellings (toml-
 			.. 'shortcut = { mods = ["cmd"], key = "m", future = { keep = 9 } } # retained typing\n'
 			.. 'apps_shortcut = "unsupported historical value" # retained apps\n'
 		local ok, disk = save_after(legacy, function(state)
-			state.keylogger_enabled = false
+			state.keystats_enabled = false
 			state.metrics_shortcut, state.apps_time_shortcut = false, false
 		end)
 		helpers.assert_eq(ok, true)

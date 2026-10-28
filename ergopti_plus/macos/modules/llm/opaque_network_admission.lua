@@ -63,6 +63,56 @@ function M.new()
 	return phase
 end
 
+-- Printed by network-retry.sh, the Swift download spool and the Python receiver
+-- when an unusable automatic configuration (PAC, WPAD) sent a download direct.
+M.pac_fallback_marker = "__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:"
+local _fallback_stages
+
+--- The lookup stages after which a download goes direct, from the shared
+--- proxy_policy.json "pac_unavailable_fallback" (its one owner).
+--- @return table stages Set of closed stage codes.
+function M.pac_fallback_stages()
+	if not _fallback_stages then
+		local path = require("infra.paths").shared("modules/network/proxy_policy.json")
+		assert(type(path) == "string", "the shared proxy policy path is unavailable")
+		local bytes = assert(require("adapters.file_system").read(path), "the shared proxy policy is unreadable")
+		local policy = require("json").decode(bytes)
+		local listed = type(policy) == "table" and type(policy.pac_unavailable_fallback) == "table"
+			and policy.pac_unavailable_fallback.stages or nil
+		assert(type(listed) == "table" and #listed > 0, "the shared proxy policy names no PAC fallback stage")
+		local stages = {}
+		for _, stage in ipairs(listed) do
+			assert(type(stage) == "string" and stage:match("^native_[a-z_]+$"), "invalid PAC fallback stage")
+			stages[stage] = true
+		end
+		_fallback_stages = stages
+	end
+	return _fallback_stages
+end
+
+--- Whether a failed route lookup stage sends the download direct.
+--- @param stage any Closed stage code of the lookup step that gave up.
+--- @return boolean
+function M.is_pac_fallback_stage(stage)
+	return type(stage) == "string" and M.pac_fallback_stages()[stage] == true
+end
+
+--- The stage a child's output names in its PAC fallback marker, if any.
+--- Only a listed stage is returned: no other child text reaches a log through it.
+--- @param output any Child stderr (or combined output).
+--- @return string|nil stage
+function M.pac_fallback_stage(output)
+	if type(output) ~= "string" then return nil end
+	local start = 1
+	while true do
+		local first, last = output:find(M.pac_fallback_marker, start, true)
+		if not first then return nil end
+		local stage = output:match("^(native_[a-z_]+)", last + 1)
+		if M.is_pac_fallback_stage(stage) then return stage end
+		start = last + 1
+	end
+end
+
 --- Classifies a real admission receipt with the central existing policy.
 --- @param receipt table Existing managed-network fields.
 --- @param capabilities table Actual current caller capabilities.

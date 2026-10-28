@@ -113,6 +113,9 @@ func nativeWorkerEnvironment(private map[string]string) ([]string, error) {
 	}
 	// Only certificate data is sent to the signed native worker. Credentials
 	// from explicit proxy choices remain in Go's request-local transport.
+	// The sealed snapshot is the only trust source: on macOS the daemon owner
+	// captures it without SSL_CERT_FILE or SSL_CERT_DIR (system and keychain
+	// trust only), so a value here was placed by a caller that owns its anchor.
 	for _, name := range policy.TrustNames {
 		if value, exists := private[name]; exists {
 			result = append(result, name+"="+value)

@@ -4,7 +4,11 @@
 --- scalar preference lease and conditional TOML writer. Observations from native
 --- callbacks are asserted after the callback has returned.
 local helpers = require("tests.helpers")
-local SOURCE = '# retained header\n[hotstrings]\npreview_colored_tooltips = true\nfuture = "kept" # retained\n'
+-- The three presence switches start explicitly off, whatever their shipped
+-- default, so each case toggles one of them on from a known state.
+local SOURCE = '# retained header\n[hotstrings]\npreview_colored_tooltips = true\n'
+	.. 'preview_star_enabled = false\npreview_autocorrect_enabled = false\npreview_ai_enabled = false\n'
+	.. 'future = "kept" # retained\n'
 
 --- Runs a body with the actual scalar owner routed to private independent bytes.
 --- @param body function Receives owner, settings, private path and sandbox.
@@ -66,8 +70,8 @@ local function menu_controls(paused, relabel, magic_relabel, presence_options)
 			get_categories = function() return {} end,
 			language_packs = function() return {} end,
 			resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
-			get_global_delay = function() return 0.75 end,
-			has_global_delay_override = function() return false end,
+			get_base_delay = function() return 0.75 end,
+			has_base_delay_override = function() return false end,
 		},
 
 		on_menu_changed = function() observations.redraws = observations.redraws + 1 end,
@@ -144,6 +148,38 @@ helpers.describe("declared coloured preview native row", function()
 			assert(Preferences.refresh())
 			helpers.assert_eq(Settings.get("colored"), false)
 			helpers.assert_true(sandbox.read_bytes(path):find('future = "kept" # retained', 1, true) ~= nil)
+		end)
+	end)
+end)
+
+
+--- Runs a body with the desktop notifier replaced by a recorder.
+--- @param body function Receives the list of { text, level } sent.
+local function with_recording_notifier(body)
+	local original, sent = package.loaded["adapters.notifier"], {}
+	package.loaded["adapters.notifier"] = { send = function(text, opts)
+		sent[#sent + 1] = { text = text, level = opts and opts.level }
+		return true
+	end }
+	local ok, err = pcall(body, sent)
+	package.loaded["adapters.notifier"] = original
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("preview bubble toggles notify like the macOS menu", function()
+	helpers.it("announces the new state of the coloured bubble and nothing when the write is refused", function()
+		with_preferences(function(Preferences, _, _, _)
+			with_recording_notifier(function(sent)
+				local i18n = require("infra.i18n")
+				local lease = {}; assert(Preferences.acquire(lease))
+				local refused_rows = menu_controls(false)
+				helpers.assert_eq(refused_rows[5].fn(), false)
+				assert(Preferences.release(lease))
+				helpers.assert_eq(#sent, 0, "a refused toggle must not claim a new state")
+				local rows = menu_controls(false)
+				helpers.assert_eq(rows[5].fn(), true)
+				helpers.assert_eq(sent, { { text = i18n.get("menu.hotstrings.notify_bubble_colored"), level = "error" } })
+			end)
 		end)
 	end)
 end)

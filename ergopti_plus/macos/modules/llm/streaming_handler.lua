@@ -6,7 +6,7 @@
 --- Owns the HTTP async streaming pipeline for LLM predictions: fires the backend
 --- request via core_llm.fetch_llm_prediction, handles chunked streaming responses,
 --- parses streaming JSON tokens, manages the watchdog timer, and calls the tooltip
---- and keylogger APIs as predictions arrive. Extracted from prediction_engine so
+--- and keystats APIs as predictions arrive. Extracted from prediction_engine so
 --- the orchestrator can stay focused on state management and routing.
 ---
 --- FEATURES & RATIONALE:
@@ -30,6 +30,8 @@ local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
 local i18n    = require("infra.i18n")
 local TimerScheduler = require("adapters.timer_scheduler")
+local PredictionTooltipPort = require("adapters.prediction_tooltip_port")
+local TextUtils = require("text_utils")
 
 local LOG = "llm.streaming_handler"
 
@@ -60,7 +62,8 @@ local CONSECUTIVE_FAIL_WARN_THRESHOLD = 4
 -- Injected dependencies
 local _core_llm  = nil
 local _tooltip   = nil
-local _keylogger = nil
+local _renderer  = nil   -- the TooltipRenderer port over _tooltip, built on first draw
+local _keystats = nil
 
 local _consecutive_llm_failures = 0  -- Reset on success; triggers notification at threshold
 local _stream_watchdog_timer    = nil
@@ -72,11 +75,19 @@ local _stream_watchdog_timer    = nil
 -- =============================================
 -- =============================================
 
+--- The TooltipRenderer over the injected tooltip, built on the first draw so an
+--- init with a tooltip that cannot draw still reports its own refusal.
+--- @return table renderer
+local function renderer()
+	if _renderer == nil then _renderer = PredictionTooltipPort.wrap(_tooltip) end
+	return _renderer
+end
+
 --- Guards public functions that require initialized dependencies.
 --- @param func_name string Name of the calling function (for the error log).
 --- @return boolean True if dependencies are ready, false otherwise.
 local function require_state(func_name)
-	if not _core_llm or not _tooltip or not _keylogger then
+	if not _core_llm or not _tooltip or not _keystats then
 		Logger.error(LOG, "'%s' called before M.init() — dependencies not initialized.", func_name)
 		return false
 	end
@@ -117,7 +128,7 @@ local function build_dedup_key(pred)
 		table.insert(parts, next_words)
 	end
 
-	return (table.concat(parts):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", ""))
+	return TextUtils.trim((table.concat(parts):gsub("%s+", " ")))
 end
 
 --- Formats the validation modifier shortcut for tooltip display.
@@ -333,7 +344,7 @@ function M.build_callbacks(ctx)
 		-- and the last (still streaming) block may fail to parse — that's fine
 		local raw_blocks = {}
 		for b in (stripped .. "==="):gmatch("(.-)===") do
-			local clean = b:gsub("^%s+", ""):gsub("%s+$", "")
+			local clean = TextUtils.trim(b)
 			if clean ~= "" then table.insert(raw_blocks, clean) end
 		end
 		if #raw_blocks == 0 then table.insert(raw_blocks, stripped) end
@@ -384,12 +395,12 @@ function M.build_callbacks(ctx)
 		if not render_predictions("partial render", function()
 			local current     = _tooltip.get_current_index()
 			local display_idx = (current and math.min(math.max(1, current), #new_preds)) or 1
-			return _tooltip.show_predictions(
-				new_preds, display_idx, ctx.is_ai_preview_enabled, streaming_info_bar,
-				nil, prediction_indent, navigation_mods,
-				_tooltip.tint("ai_prediction"), "…", num_predictions, my_fetch_id,
-				request_is_current
-			)
+			return renderer().show({
+				predictions = new_preds, current_index = display_idx, enabled = ctx.is_ai_preview_enabled,
+				info_bar = streaming_info_bar, indent = prediction_indent, navigation_modifiers = navigation_mods,
+				background_color = _tooltip.tint("ai_prediction"), loading_text = "…",
+				reserved_count = num_predictions, session_id = my_fetch_id, commit_guard = request_is_current,
+			})
 		end) then return end
 
 		pending_ref.value = new_preds
@@ -427,7 +438,7 @@ function M.build_callbacks(ctx)
 		local front    = hs.application.frontmostApplication()
 		local app_name = front and front:title() or nil
 		if not request_is_current() then return end
-		_keylogger.log_llm(buffer, raw_predictions, app_name)
+		_keystats.log_llm(buffer, raw_predictions, app_name)
 
 		-- ── Filter: remove noise, invalid entries, and exact duplicates ──────
 		local valid_preds, seen_keys = {}, {}
@@ -520,11 +531,13 @@ function M.build_callbacks(ctx)
 				math.max(1, math.floor(_tooltip.get_current_index() or 1)),
 				#valid_preds
 			)
-			return _tooltip.show_predictions(
-				valid_preds, selected_idx, ctx.is_ai_preview_enabled, info_bar_text,
-				val_shortcut, prediction_indent, navigation_mods, _tooltip.tint("ai_prediction"),
-				loading_text, slot_count, my_fetch_id, request_is_current
-			)
+			return renderer().show({
+				predictions = valid_preds, current_index = selected_idx, enabled = ctx.is_ai_preview_enabled,
+				info_bar = info_bar_text, shortcut_modifier = val_shortcut, indent = prediction_indent,
+				navigation_modifiers = navigation_mods, background_color = _tooltip.tint("ai_prediction"),
+				loading_text = loading_text, reserved_count = slot_count, session_id = my_fetch_id,
+				commit_guard = request_is_current,
+			})
 		end) then return end
 
 		if is_final and not commit_final_ui() then return end
@@ -532,7 +545,7 @@ function M.build_callbacks(ctx)
 
 		pending_ref.value = valid_preds
 		visible_ref.value = true
-		_keylogger.log_llm_suggested(app_name, #valid_preds)
+		_keystats.log_llm_suggested(app_name, #valid_preds)
 		if not request_is_current() then return end
 
 		if is_final then
@@ -602,12 +615,13 @@ function M.build_callbacks(ctx)
 			local val_shortcut = format_validation_shortcut(validation_mods)
 			if not render_predictions("failure fallback render", function()
 				local selected_idx = math.max(1, _tooltip.get_current_index() or 1)
-				return _tooltip.show_predictions(
-					pending_ref.value, selected_idx, ctx.is_ai_preview_enabled, nil,
-					val_shortcut, prediction_indent, navigation_mods,
-					_tooltip.tint("ai_prediction"), nil, #pending_ref.value, my_fetch_id,
-					request_is_current
-				)
+				return renderer().show({
+					predictions = pending_ref.value, current_index = selected_idx,
+					enabled = ctx.is_ai_preview_enabled, shortcut_modifier = val_shortcut,
+					indent = prediction_indent, navigation_modifiers = navigation_mods,
+					background_color = _tooltip.tint("ai_prediction"), reserved_count = #pending_ref.value,
+					session_id = my_fetch_id, commit_guard = request_is_current,
+				})
 			end) then return end
 			if not commit_final_ui() then return end
 			if not request_is_current() then return end
@@ -709,12 +723,12 @@ function M.arm_watchdog(ctx)
 			local info = ctx.show_info_bar
 				and ctx.build_info_bar_text(ctx.llm_display_name, nil, ctx.resolve_backend_label(), "Timeout partiel")
 				or nil
-			local render_result = _tooltip.show_predictions(
-				pending_ref.value, 1, ctx.is_ai_preview_enabled, info,
-				val_shortcut, ctx.prediction_indent, ctx.navigation_mods,
-				_tooltip.tint("ai_prediction"), nil, #pending_ref.value, my_fetch_id,
-				request_is_current
-			)
+			local render_result = renderer().show({
+				predictions = pending_ref.value, current_index = 1, enabled = ctx.is_ai_preview_enabled,
+				info_bar = info, shortcut_modifier = val_shortcut, indent = ctx.prediction_indent,
+				navigation_modifiers = ctx.navigation_mods, background_color = _tooltip.tint("ai_prediction"),
+				reserved_count = #pending_ref.value, session_id = my_fetch_id, commit_guard = request_is_current,
+			})
 			if render_result ~= true then reject_watchdog_ui(render_result) end
 		end, debug.traceback)
 		if not callback_ok then reject_watchdog_ui(callback_err) end
@@ -815,7 +829,7 @@ end
 
 --- Initializes the streaming handler with its required dependencies.
 --- Must be called exactly once before any other function.
---- @param deps table Must contain: core_llm (table), tooltip (table), keylogger (table).
+--- @param deps table Must contain: core_llm (table), tooltip (table), keystats (table).
 --- @return boolean committed True only when every dependency is ready.
 function M.init(deps)
 	Logger.start(LOG, "Initializing…")
@@ -824,7 +838,7 @@ function M.init(deps)
 		return false
 	end
 	if _core_llm then
-		if _core_llm == deps.core_llm and _tooltip == deps.tooltip and _keylogger == deps.keylogger then
+		if _core_llm == deps.core_llm and _tooltip == deps.tooltip and _keystats == deps.keystats then
 			Logger.warn(LOG, "M.init() called more than once with the active dependencies — ignoring duplicate call.")
 			return true
 		end
@@ -839,13 +853,13 @@ function M.init(deps)
 		Logger.error(LOG, "M.init(): deps.tooltip must be a table — module non-functional.")
 		return false
 	end
-	if type(deps.keylogger) ~= "table" then
-		Logger.error(LOG, "M.init(): deps.keylogger must be a table — module non-functional.")
+	if type(deps.keystats) ~= "table" then
+		Logger.error(LOG, "M.init(): deps.keystats must be a table — module non-functional.")
 		return false
 	end
 	_core_llm  = deps.core_llm
 	_tooltip   = deps.tooltip
-	_keylogger = deps.keylogger
+	_keystats = deps.keystats
 	Logger.success(LOG, "Initialized.")
 	return true
 end

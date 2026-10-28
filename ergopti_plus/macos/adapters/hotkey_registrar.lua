@@ -31,6 +31,7 @@ local M = {}
 local hs     = hs
 local Chord  = require("chord")
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
 
 local LOG = "adapters.hotkey_registrar"
 
@@ -59,7 +60,7 @@ local MODIFIER_KEY_NAMES = {
 -- delete a hotkey and exactly one place a leak could come from.
 local _bindings = {}
 local _physical_claims = {}
--- Only conditionals actually suspended by a claim transaction may be restored.
+-- Only exact conditional generations actually suspended by a claim may resume.
 local _claim_suspensions = {}
 local _claim_transaction = false
 local set_enabled
@@ -90,6 +91,45 @@ end
 -- ==================================
 -- ==================================
 
+--- Captures an immutable restoration receipt before changing native state.
+--- @param entry table Exact conditional owner.
+--- @param owner string Diagnostic claimant, never the receipt identity.
+--- @return table receipt
+local function suspension_receipt(entry, owner)
+	return { entry = entry, generation = entry.claim_generation or 0, owner = owner }
+end
+
+--- Checks whether a receipt still belongs to the same requested activation.
+--- @param entry table|nil Current owner.
+--- @param receipt table Exact suspension receipt.
+--- @return boolean current
+local function suspension_current(entry, receipt)
+	return entry == receipt.entry and (entry.claim_generation or 0) == receipt.generation
+end
+
+--- Restores every eligible receipt without abandoning siblings after a refusal.
+--- @param identity string Target physical identity.
+--- @return boolean settled
+local function restore_suspensions(identity)
+	local inherited_transaction = _claim_transaction
+	_claim_transaction = true
+	local remaining, settled = M.physical_claims(), true
+	for handle, receipt in pairs(_claim_suspensions) do
+		local entry = _bindings[handle]
+		if not suspension_current(entry, receipt) then
+			_claim_suspensions[handle] = nil
+		elseif entry.identity == identity and remaining[identity] == nil then
+			if set_enabled(handle, true, true) == true and suspension_current(_bindings[handle], receipt) then
+				_claim_suspensions[handle] = nil
+			else
+				settled = false
+			end
+		end
+	end
+	_claim_transaction = inherited_transaction
+	return settled
+end
+
 --- Reports whether a chord key names a modifier key, which never fires a hotkey.
 --- @param key any Chord key in any spelling.
 --- @return boolean modifier
@@ -101,7 +141,7 @@ end
 --- @param chord string Canonical chord string, e.g. "Ctrl+Shift+S".
 --- @param callback function Invoked with no arguments on each press.
 --- @return string|nil handle An opaque handle, or nil when the chord was refused.
-local function bind_native(chord, callback, native_key, conditional)
+local function bind_native(chord, callback, native_key, conditional, admit_capslock)
 	if type(callback) ~= "function" then
 		Logger.error(LOG, "bind(): callback must be a function, got %s.", type(callback))
 		return nil
@@ -112,7 +152,8 @@ local function bind_native(chord, callback, native_key, conditional)
 		Logger.error(LOG, "bind(): refusing '%s' — %s.", tostring(chord), tostring(err))
 		return nil
 	end
-	if M.key_is_modifier(parsed.key) then
+	if M.key_is_modifier(parsed.key)
+			and not (admit_capslock == true and parsed.key:lower() == "capslock" and #parsed.mods > 0) then
 		Logger.error(LOG, "bind(): refusing '%s' — its key is a modifier key, which never fires a hotkey.",
 			tostring(chord))
 		return nil
@@ -126,12 +167,24 @@ local function bind_native(chord, callback, native_key, conditional)
 	if conditional and (identity == nil or M.physical_claims()[identity] ~= nil) then
 		return nil
 	end
-	local suspended = {}
-	if not conditional and identity then
+	if _claim_transaction then return nil end
+	local owns_transaction = not conditional and identity ~= nil
+	if owns_transaction then
+		_claim_transaction = true
+		-- A failed acquisition has no ordinary token; its exact conditional
+		-- receipts remain owned here and must settle before another acquisition.
+		if not restore_suspensions(identity) then _claim_transaction = false; return nil end
 		for handle, owned in pairs(_bindings) do
-			if owned.conditional and owned.identity == identity and owned.enabled then
-				if M.setEnabled(handle, false) ~= true then return nil end
-				suspended[#suspended + 1] = handle
+			if owned.conditional and owned.identity == identity
+				and (owned.enabled or owned.native_settled ~= true) then
+				if owned.enabled then _claim_suspensions[handle] = suspension_receipt(owned, "ordinary") end
+				local generation = owned.claim_generation or 0
+				if set_enabled(handle, false, true) ~= true or _bindings[handle] ~= owned
+					or (owned.claim_generation or 0) ~= generation then
+					restore_suspensions(identity)
+					_claim_transaction = false
+					return nil
+				end
 			end
 		end
 	end
@@ -171,7 +224,7 @@ local function bind_native(chord, callback, native_key, conditional)
 
 	local ok, hotkey = pcall(hs.hotkey.bind, parsed.mods, hs_key, deliver_if_enabled)
 	if not ok or not hotkey then
-		for _, handle in ipairs(suspended) do M.setEnabled(handle, true) end
+		if owns_transaction then restore_suspensions(identity); _claim_transaction = false end
 		Logger.warn(LOG, "bind(): the OS refused '%s' — %s.", tostring(chord), tostring(hotkey))
 		return nil
 	end
@@ -179,6 +232,7 @@ local function bind_native(chord, callback, native_key, conditional)
 	local handle = next_handle()
 	entry.hotkey = hotkey
 	_bindings[handle] = entry
+	if owns_transaction then _claim_transaction = false end
 	Logger.debug(LOG, "Bound %s → %s.", _bindings[handle].chord, handle)
 	return handle
 end
@@ -236,7 +290,7 @@ function M.replace_physical_claims(owner, rows)
 			if entry and (entry.claim_generation or 0) == before.generation then
 				if set_enabled(handle, before.enabled, true) ~= true and before.enabled then
 					-- Failed compensation stays fenced and retains an exact retry receipt.
-					suspended_before[handle] = owner
+					suspended_before[handle] = suspension_receipt(entry, owner)
 				end
 			end
 		end
@@ -246,7 +300,8 @@ function M.replace_physical_claims(owner, rows)
 		for handle, claimant in pairs(suspended_before) do
 			local entry = _bindings[handle]
 			local before = touched[handle]
-			if entry and (not before or (entry.claim_generation or 0) == before.generation) then
+			if suspension_current(entry, claimant)
+				and (not before or (entry.claim_generation or 0) == before.generation) then
 				_claim_suspensions[handle] = claimant
 			end
 		end
@@ -256,16 +311,16 @@ function M.replace_physical_claims(owner, rows)
 	for handle, entry in pairs(_bindings) do
 		if entry.conditional and claims[entry.identity]
 			and (entry.enabled or entry.native_settled ~= true) then
-			if entry.enabled then _claim_suspensions[handle] = owner end
+			if entry.enabled then _claim_suspensions[handle] = suspension_receipt(entry, owner) end
 			if not transition(handle, false) then return refuse() end
 		end
 	end
 	_physical_claims[owner] = claims
 	local remaining = M.physical_claims()
 	local restored = {}
-	for handle in pairs(_claim_suspensions) do
+	for handle, receipt in pairs(_claim_suspensions) do
 		local entry = _bindings[handle]
-		if not entry then restored[#restored + 1] = handle
+		if not suspension_current(entry, receipt) then restored[#restored + 1] = handle
 		elseif remaining[entry.identity] == nil then
 			if not transition(handle, true) then return refuse() end
 			restored[#restored + 1] = handle
@@ -286,7 +341,7 @@ function M.has_physical_conflict(mods, native_code, owner, binding_id)
 		if row and (claimant ~= owner or row.binding_id ~= binding_id) then return true end
 	end
 	for _, entry in pairs(_bindings) do
-		if entry.identity == identity and not entry.conditional then return true end
+		if entry.identity == identity and not entry.conditional and entry.native_deleted ~= true then return true end
 	end
 	return false
 end
@@ -299,19 +354,59 @@ function M.physical_claims()
 		for identity, row in pairs(rows) do claims[identity] = row end
 	end
 	for handle, entry in pairs(_bindings) do
-		if entry.identity and not entry.conditional then
+		if entry.identity and not entry.conditional and entry.native_deleted ~= true then
 			claims[entry.identity] = { action = "explicit", binding_id = handle }
 		end
 	end
 	return claims
 end
 
+--- Reports why one key name cannot be resolved in the active keyboard layout.
+--- A single character is layout-dependent: when the active keymap lacks it,
+--- Hammerspoon silently resolves it through its US-ANSI fallback table, which
+--- can land on a physical key that another live hotkey of the old layout still
+--- holds (the 2026-10-28 field run: 'g' fell back to keycode 5, where the
+--- Ergopti '.' of Ctrl+. was still registered). Named keys (space, f17…) do not
+--- depend on the layout. rawget skips the fallback metatable on purpose.
+--- @param key string Native key name.
+--- @return string|nil refusal Nil when the key resolves in the active layout.
+function M.layout_key_refusal(key)
+	if type(key) ~= "string" or utf8.len(key) ~= 1 then return nil end
+	local name = key:lower()
+	if rawget(hs.keycodes.map, name) ~= nil then return nil end
+	return string.format("key '%s' is not in the active keyboard layout", name)
+end
+
 --- Registers an ordinary named chord through the common native owner.
 --- @param chord string Canonical chord.
 --- @param callback function Delivery callback.
+--- @param ... table|nil Driver-only options beyond the two-parameter port
+---   contract: `{require_layout_key = true}` refuses a key the active layout
+---   cannot resolve instead of binding its US-ANSI fallback.
 --- @return string|nil handle
-function M.bind(chord, callback)
-	return bind_native(chord, callback)
+--- @return string|nil refusal Why no handle was returned, when known.
+function M.bind(chord, callback, ...)
+	local options = ...
+	if type(options) == "table" and options.require_layout_key == true then
+		local parsed = Chord.parse(chord)
+		local refusal = parsed and M.layout_key_refusal(parsed.key)
+		if refusal then return nil, refusal end
+	end
+	local handle = bind_native(chord, callback)
+	if handle == nil then return nil, "the registrar or macOS refused the registration" end
+	return handle
+end
+
+--- Registers a modified Caps Lock chord (e.g. "Ctrl+Capslock") through the
+--- common native owner, for the secondary_capslock slot only. It is the same
+--- Hammerspoon factory the retired Ctrl+CapsLock switch used, which was kept
+--- apart from the generic guard; bind() still refuses Caps Lock as a key, and
+--- this entry still refuses a bare Caps Lock and every other modifier key.
+--- @param chord string Canonical chord whose key is Caps Lock.
+--- @param callback function Delivery callback.
+--- @return string|nil handle
+function M.bind_capslock_chord(chord, callback)
+	return bind_native(chord, callback, nil, nil, true)
 end
 
 --- Acquires a proven numeric source without resolving its displayed glyph.
@@ -355,25 +450,43 @@ function M.unbind(handle)
 	_claim_suspensions[handle] = nil
 	entry.claim_generation = (entry.claim_generation or 0) + 1
 	entry.enabled = false
-	local ok, err = pcall(function() entry.hotkey:delete() end)
-	if not ok then
-		-- Keep the opaque handle retryable. Forgetting it here leaves a globally
-		-- captured chord with no remaining owner capable of deleting it. Disable is
-		-- a fail-safe best effort so personal bindings are not intercepted while a
-		-- later teardown retries the actual delete.
-		local disabled_ok, disable_err = pcall(function() entry.hotkey:disable() end)
-		entry.native_settled = disabled_ok
-		Logger.error(LOG, "unbind(): %s failed to release — %s; retained for retry (disabled=%s%s).",
-			entry.chord,
-			tostring(err),
-			tostring(disabled_ok),
-			disabled_ok and "" or ", disable error=" .. tostring(disable_err))
+	if entry.native_deleted ~= true then
+		local ok, err = pcall(function() entry.hotkey:delete() end)
+		if not ok then
+			-- Keep the opaque handle retryable. Forgetting it here leaves a globally
+			-- captured chord with no remaining owner capable of deleting it. Disable is
+			-- a fail-safe best effort so personal bindings are not intercepted while a
+			-- later teardown retries the actual delete.
+			local disabled_ok, disable_err = pcall(function() entry.hotkey:disable() end)
+			entry.native_settled = disabled_ok
+			Logger.error(LOG, "unbind(): %s failed to release — %s; retained for retry (disabled=%s%s).",
+				entry.chord,
+				tostring(err),
+				tostring(disabled_ok),
+				disabled_ok and "" or ", disable error=" .. tostring(disable_err))
+			return false
+		end
+		-- Native delete is void: only the nonthrowing terminal is an ACK.
+		entry.native_deleted = true
+		entry.native_settled = true
+	end
+	if not entry.conditional and entry.identity and not restore_suspensions(entry.identity) then
+		-- Keep the exact token as restoration debt, never as a physical claim.
 		return false
 	end
 
 	_bindings[handle] = nil
 	Logger.debug(LOG, "Released %s (%s).", entry.chord, tostring(handle))
 	return true
+end
+
+--- Reports an acknowledged native deletion whose conditional restoration is pending.
+--- The token and chord remain stable for exact cleanup retry, but hold no claim.
+--- @param handle string Opaque registrar token.
+--- @return boolean pending
+function M.release_pending(handle)
+	local entry = _bindings[handle]
+	return entry ~= nil and entry.native_deleted == true
 end
 
 --- Suspends or resumes a binding without releasing it.
@@ -388,9 +501,19 @@ set_enabled = function(handle, enabled, preserve_claim_suspension)
 	end
 
 	local want = enabled and true or false
+	-- A deleted native owner is already disabled and must never be enabled again.
+	if entry.native_deleted == true then return not want end
 	if not preserve_claim_suspension then
+		local receipt = _claim_suspensions[handle]
+		local current = receipt and suspension_current(entry, receipt)
 		entry.claim_generation = (entry.claim_generation or 0) + 1
-		if not want then _claim_suspensions[handle] = nil end
+		if not want then
+			_claim_suspensions[handle] = nil
+		elseif current then
+			-- A blocked enable preserves the already-requested activation, using
+			-- a new receipt so an in-flight transaction keeps its old snapshot.
+			_claim_suspensions[handle] = suspension_receipt(entry, receipt.owner)
+		end
 	end
 	if want and entry.conditional and M.physical_claims()[entry.identity] ~= nil then return false end
 	if entry.enabled == want and entry.native_settled == true then return true end
@@ -400,6 +523,7 @@ set_enabled = function(handle, enabled, preserve_claim_suspension)
 	-- keeps a later call retryable.
 	if not want then entry.enabled = false end
 
+	local generation = entry.claim_generation or 0
 	local ok, native_result = pcall(function()
 		if want then return entry.hotkey:enable() end
 		return entry.hotkey:disable()
@@ -413,6 +537,7 @@ set_enabled = function(handle, enabled, preserve_claim_suspension)
 		return false
 	end
 
+	if _bindings[handle] ~= entry or (entry.claim_generation or 0) ~= generation then return false end
 	entry.enabled = want
 	entry.native_settled = true
 	Logger.debug(LOG, "%s enabled=%s.", entry.chord, tostring(want))
@@ -448,9 +573,7 @@ end
 --- exposed for the suite to assert against after a stop/start cycle.
 --- @return number
 function M.live_count()
-	local n = 0
-	for _ in pairs(_bindings) do n = n + 1 end
-	return n
+	return TableUtil.count(_bindings)
 end
 
 return M

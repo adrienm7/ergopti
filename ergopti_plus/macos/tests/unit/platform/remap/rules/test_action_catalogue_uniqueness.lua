@@ -64,6 +64,8 @@ local function with_config_fixture(callback)
 			}
 			package.loaded["modules.keymap.layout"] = {
 				keyboard_form = function() return "ansi" end,
+				-- The first load names keys for the shipped virtual keyboard product.
+				default_virtual_keyboard_product = function() return "ansi" end,
 				key_code_for_char = function(char) return char end,
 			}
 			package.loaded["modules.gestures.actions"] = {

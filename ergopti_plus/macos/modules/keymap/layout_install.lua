@@ -149,7 +149,7 @@ local function list_bundles(dir)
 		-- Windows (used during Lua test runs)
 		cmd = string.format('cmd /c dir /b /a:d "%s"', dir:gsub("/", "\\"))
 	else
-		cmd = string.format("ls -1 '%s'", dir)
+		cmd = string.format("ls -1 %s", text_utils.shell_quote(dir))
 	end
 	local p = io.popen(cmd)
 	if not p then return out end
@@ -506,12 +506,51 @@ local function cleanup_other_scope(dir, scope_label)
 	return true
 end
 
+--- The Ergopti bundles installed in both the user and the system folders.
+--- macOS loads both copies: it logs "duplicate keyboard layout identifier" and
+--- renumbers the ids of the copy it reads second. On the maintainer's Mac (probe
+--- v5, P8 b) new content written to the user copy did not apply even after a
+--- re-register while a loose user layout's did (P8 a): the system copy is the
+--- one macOS types with. A second copy is therefore never written.
+--- @return table names Bundle names present in both folders.
+local function duplicate_bundles()
+	local system = {}
+	for _, entry in ipairs(find_installed_bundles(SYSTEM_LAYOUTS_DIR)) do system[entry.name] = true end
+	local both = {}
+	for _, entry in ipairs(find_installed_bundles(USER_LAYOUTS_DIR)) do
+		if system[entry.name] then both[#both + 1] = entry.name end
+	end
+	table.sort(both)
+	return both
+end
+
+--- Logs each Ergopti bundle installed in both folders, naming the copy macOS uses.
+--- @return table names Bundle names present in both folders.
+local function report_duplicate_bundles()
+	local both = duplicate_bundles()
+	for _, name in ipairs(both) do
+		Logger.warn(LOG, "%s is installed both in %s and in %s: macOS loads both and renumbers the second copy's layout ids; the system copy is the one it types with (probe v5, P8 b). Remove one copy (the user copy needs no password).",
+			name, USER_LAYOUTS_DIR, SYSTEM_LAYOUTS_DIR)
+	end
+	return both
+end
+
 --- Copies the latest bundle to the user's Keyboard Layouts directory.
 --- The user replacement commits before obsolete system copies are removed.
+--- The same bundle already in the system folder is not copied a second time.
 --- @param bundles_dir string Absolute path of the source bundles directory.
 --- @param bundle_name string Basename of the bundle to install.
 --- @return boolean true on success.
 local function install_user_unlocked(bundles_dir, bundle_name)
+	local in_system = false
+	for _, entry in ipairs(find_installed_bundles(SYSTEM_LAYOUTS_DIR)) do
+		if entry.name == bundle_name then in_system = true end
+	end
+	if in_system then
+		Logger.info(LOG, "%s is already installed in %s: no second copy is written to the user folder.",
+			bundle_name, SYSTEM_LAYOUTS_DIR)
+		return true
+	end
 	Logger.start(LOG, "Installing %s into the user Keyboard Layouts folder…", bundle_name)
 	local committed, detail = execute_install_transaction(
 		USER_LAYOUTS_DIR, bundles_dir, bundle_name)
@@ -617,6 +656,8 @@ return {
 	bundle_variants        = bundle_variants,
 	bundle_keylayout_names = bundle_keylayout_names,
 	install_user          = install_user,
+	duplicate_bundles     = duplicate_bundles,
+	report_duplicate_bundles = report_duplicate_bundles,
 	install_system         = install_system,
 	invalidate_bundle_caches = invalidate_bundle_caches,
 }

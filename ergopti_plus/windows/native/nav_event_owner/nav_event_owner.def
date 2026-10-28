@@ -49,4 +49,5 @@ EXPORTS
 	ErgoptiNav_CompleteReceipt
 	ErgoptiNav_PendingForToken
 	ErgoptiNav_GetLastOsError
+	ErgoptiNav_GetHookOrderStats
 	ErgoptiNav_TestDispatch

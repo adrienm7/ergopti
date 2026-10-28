@@ -35,3 +35,5 @@ Test("hs_count: gated-on scope shows its enabled count", () => (
 Test("hs_count: gated-on with no enabled sections shows 0", () => (
 	AssertEqual(0, _HS_GatedCount(true, 0), "all sections off shows 0")
 ))
+
+#Include test_hotstring_grand_total_publication.ahk

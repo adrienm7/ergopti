@@ -50,10 +50,28 @@ local function native_backend()
 	return NativeRuntime and NativeRuntime.load() or nil
 end
 
+--- The selection limits of the shared proxy policy (the parent applies the same
+--- ones to the receipt), read from the policy file beside this helper's shared root.
+--- @return table|nil limits { max_selections, max_proxy_bytes }
+local function policy_limits()
+	local file = io.open(shared_root .. "/modules/network/proxy_policy.json", "rb")
+	local bytes = file and file:read(32769)
+	if file then file:close() end
+	local decoded, policy = pcall(Json.decode, bytes or "")
+	if not decoded or type(policy) ~= "table" then return nil end
+	for _, key in ipairs({ "max_selections", "max_proxy_bytes" }) do
+		local value = policy[key]
+		if type(value) ~= "number" or value < 1 or value % 1 ~= 0 then return nil end
+	end
+	return { max_selections = policy.max_selections, max_proxy_bytes = policy.max_proxy_bytes }
+end
+
 --- Performs the actual system lookup and frees every native result allocation.
 --- @param url string
 --- @return table
 local function lookup(url, exclusions)
+	local limits = policy_limits()
+	if not limits then return { ok = false, error = "proxy-policy-unavailable" } end
 	local native = native_backend()
 	if not native then return { ok = false, error = "proxy-native-unavailable" } end
 	local ffi = native.ffi
@@ -83,7 +101,7 @@ local function lookup(url, exclusions)
 		local index = 0
 		while not NativeRuntime.is_null(native, proxies[index]) do
 			local value = ffi.string(proxies[index])
-			if #values >= 128 or #value > 65536 or value:find("[%z\r\n]") then
+			if #values >= limits.max_selections or #value > limits.max_proxy_bytes or value:find("[%z\r\n]") then
 				valid = false
 				break
 			end

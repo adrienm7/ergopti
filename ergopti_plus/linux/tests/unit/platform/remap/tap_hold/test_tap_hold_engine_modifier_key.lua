@@ -513,10 +513,10 @@ helpers.describe("tap-hold engine: RCtrl's Backspace under held keys", function(
 		local e = engine({ right_ctrl = { tap_action = "backspace", hold_modifier = "ctrl", time_activation_seconds = 0.2 } })
 		e:process(LSHIFT, DOWN, 0)
 		e:process(RCTRL, DOWN, 10)
-		helpers.assert_eq(trail((e:process(RCTRL, UP, 100))), "29↑ 42↑ 111↓ 111↑ 42↓")
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 100))), "97↑ 42↑ 111↓ 111↑ 42↓")
 		e:process(LSHIFT, UP, 200)
 		e:process(RCTRL, DOWN, 300)
-		helpers.assert_eq(trail((e:process(RCTRL, UP, 400))), "29↑ 14↓ 14↑", "alone, a Backspace")
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 400))), "97↑ 14↓ 14↑", "alone, a Backspace")
 	end)
 
 	helpers.it("types Right then Backspace under LAlt's one-shot Shift and spends it (rctrl-backspace-logic)", function()
@@ -624,3 +624,34 @@ helpers.describe("tap-hold engine: the navigation layer", function()
 
 end)
 
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= Hold side (PAR-15) ======================================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("tap-hold engine: the side a modifier hold takes", function()
+
+	helpers.it("holds the right Ctrl itself when the right Ctrl key holds ctrl", function()
+		local e = engine({ right_ctrl = { tap_action = "", hold_modifier = "ctrl", time_activation_seconds = 0.2 } })
+		helpers.assert_eq(trail(e:process(RCTRL, DOWN, 0)), "97↓",
+			"a plain ctrl on the right Ctrl key is the right Ctrl, as the Windows driver holds RCtrl")
+	end)
+
+	helpers.it("holds the left Ctrl when the file spelled the modifier with a left alias", function()
+		local e = engine({ right_ctrl = { tap_action = "", hold_modifier = "ctrl", hold_left_modifiers = "ctrl",
+			time_activation_seconds = 0.2 } })
+		helpers.assert_eq(trail(e:process(RCTRL, DOWN, 0)), "29↓",
+			"lctrl forces the left key on the right Ctrl key")
+	end)
+
+	helpers.it("holds the right Shift itself when the right Shift key holds shift", function()
+		local e = engine({ right_shift = { tap_action = "", hold_modifier = "shift", time_activation_seconds = 0.2 } })
+		helpers.assert_eq(trail(e:process(54, DOWN, 0)), "54↓")
+	end)
+
+end)

@@ -3,19 +3,20 @@
 --- ==============================================================================
 --- MODULE: Clipboard output telemetry and provenance
 --- DESCRIPTION:
---- Clipboard text must reach logical keylogger telemetry even though Quartz only
+--- Clipboard text must reach logical keystats telemetry even though Quartz only
 --- carries a tagged Cmd+V pair. This suite checks both channels independently:
 --- exact event tags for ownership, and the full logical payload for statistics.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SyntheticStack = require("tests.support.synthetic_input_stack")
 
 
-local function load_fixture(keylogger)
+local function load_fixture(keystats)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
-			or name == "modules.keylogger"
+			or name == "modules.keystats"
 			or name:match("^adapters%.")
 			or name == "infra.logger"
 			or name == "infra.timings"
@@ -26,18 +27,25 @@ local function load_fixture(keylogger)
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
+	local clock = SyntheticStack.install_timer_clock(hs_stub)
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.timings"] = {
+		-- The hot-path profiler, loaded through the expander, reads its slow threshold.
+		ms = function(_, key)
+			assert(key == "hotpath_slow_ms", "unexpected millisecond timing " .. tostring(key))
+			return 5
+		end,
 		sec = function(_, key)
 			return key == "clipboard_restore_ms" and 0.15 or 0.08
 		end,
 	}
-	if keylogger then package.loaded["modules.keylogger"] = keylogger end
+	if keystats then package.loaded["modules.keystats"] = keystats end
 
 	return {
 		hs = hs_stub,
+		clock = clock,
 		synthetic = require("adapters.synthetic_input"),
 		utils = require("modules.keymap.utils"),
 	}
@@ -59,6 +67,31 @@ end
 
 
 helpers.describe("clipboard output reaches synthetic telemetry", function()
+	helpers.it("shares native time across parallel restore timers and rearms (clipboard-native-fixture-clock)", function()
+		local fixture = load_fixture()
+		local interval = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+		local observed = {}
+		local function delivered() observed[#observed + 1] = fixture.clock.now() end
+		local first = fixture.hs.timer.new(interval, delivered)
+		local second = fixture.hs.timer.new(interval, delivered)
+		first:start(); second:start()
+		first:fire(); second:fire()
+		helpers.assert_eq(observed, { interval, interval },
+			"concurrently armed native timers spend one shared interval, not two")
+		helpers.assert_eq(fixture.clock.now(), interval)
+		first:start(); first:fire()
+		helpers.assert_eq(fixture.clock.now(), interval * 2, "a native rearm owns a fresh deadline")
+		local delivered_count = #observed
+		first:stop(); first:fire()
+		helpers.assert_eq(#observed, delivered_count, "stopped native timers deliver no callback")
+		helpers.assert_eq(fixture.clock.now(), interval * 2, "a stopped timer spends no native time")
+		local delayed = fixture.hs.timer.delayed.new(interval, delivered)
+		local entry = fixture.hs.timer.__timers[#fixture.hs.timer.__timers]
+		delayed:start(); delayed:start(interval * 2); entry:fire()
+		helpers.assert_eq(fixture.clock.now(), interval * 4, "delayed rearming replaces the pending deadline")
+		helpers.assert_true(not delayed:running())
+	end)
+
 	helpers.it("keeps paste echoes event-only while returning the full logical output", function()
 		local fixture = load_fixture()
 		local logical = ("p"):rep(60)
@@ -108,6 +141,8 @@ helpers.describe("clipboard output reaches synthetic telemetry", function()
 		helpers.assert_eq(handoff.status, "complete")
 		helpers.assert_eq(handoff.text, logical,
 			"restoration must wait until after Cmd+V has been handed off")
+		helpers.assert_eq(fixture.clock.now(), 0,
+			"zero-delay handoff turns must not spend the receiving host interval")
 		local restores = 0
 		for _, timer in ipairs(fixture.hs.timer.__timers) do
 			if timer.running and timer.delay == 0.15 then
@@ -116,6 +151,8 @@ helpers.describe("clipboard output reaches synthetic telemetry", function()
 			end
 		end
 		helpers.assert_eq(restores, 1, "one exact completion must own one clipboard restoration")
+		helpers.assert_true(fixture.clock.now() >= require("infra.timings").sec("debounce", "clipboard_paste_settle_ms"),
+			"delivering the restoration timer must spend the native host interval")
 		helpers.assert_eq(fixture.hs.pasteboard.readAllData(), original,
 			"the production restore must retain every original type and binary byte")
 	end)
@@ -196,7 +233,7 @@ helpers.describe("clipboard output reaches synthetic telemetry", function()
 		helpers.assert_eq(paste.ordinal, 4)
 		helpers.assert_eq(events[7].key, "v")
 
-		helpers.assert_not_nil(received, "keylogger must receive the logical paste")
+		helpers.assert_not_nil(received, "keystats must receive the logical paste")
 		helpers.assert_eq(received.text, pasted)
 		helpers.assert_eq(received.physical, "")
 		helpers.assert_eq(received.deletes, 3)

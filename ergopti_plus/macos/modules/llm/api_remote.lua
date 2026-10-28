@@ -42,6 +42,8 @@ local Paths          = require("infra.paths")
 local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
+local Ports = require("llm.request_plan.ports")
+local TokenBudget = require("llm.request_plan.token_budget")
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local TokenCrypto    = require("modules.llm.api_token_crypto")
 local _http_adapter  = require("adapters.http_client")
@@ -59,13 +61,15 @@ local _probe_client = _http_adapter.new(_http_options)
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
-local ResponseClassifier = require("modules.llm.remote_response_classifier")
+local ResponseClassifier = require("llm.remote_response_classifier")
 local Formats        = require("llm.remote_formats")
 local ProviderUses   = require("modules.llm.provider_uses")
 local LocalServers   = require("modules.llm.local_servers")
+local LocalServerPorts = require("modules.llm.local_server_ports")
 local AuthPolicy     = require("llm.local_server_auth")
 local ProviderConfig = require("llm.provider_config_policy")
 local Json           = require("json")
+local ApiModelListing = require("llm.api_model_listing")
 local LOG            = "llm.api_remote"
 -- One probe client per local server, created at its first sweep with the
 -- registry's local_server_probe_timeout_ms and pinned for the life of the
@@ -74,8 +78,8 @@ local LOG            = "llm.api_remote"
 local _local_probe_clients = {}
 local _retiring_local_probe_clients = setmetatable({}, { __mode = "k" })
 
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
+local ok_kl, keystats = pcall(require, "modules.keystats")
+if not ok_kl then keystats = nil end
 
 
 
@@ -88,7 +92,7 @@ if not ok_kl then keylogger = nil end
 
 --- Loaded from _shared/modules/llm/api_providers.json at require time (AHK twin loads the
 --- same file). Adding a provider = one entry in the JSON plus (optionally) a
---- new format branch in build_payload / parse_response below.
+--- new format branch in build_payload / post_and_parse_resolved below.
 --- Returns (providers_table, order_array, prices_table) on success, or three
 --- empty-catalogue equivalents on any failure so that a corrupted JSON file
 --- never aborts the full keymap-engine require chain.
@@ -109,11 +113,6 @@ local function catalog_descriptor_is_valid(provider_id, desc)
 	end
 	if desc.base_url ~= "" and not desc.base_url:match("^https?://%S+$") then return false end
 	return true
-end
-
-local function catalog_price_is_valid(value)
-	return type(value) == "number" and value == value and value >= 0
-		and value ~= math.huge and value ~= -math.huge
 end
 
 --- Normalizes the optional per-provider model_extras section (table model id
@@ -256,17 +255,9 @@ local function load_api_providers()
 				end
 			end
 		end
-		local out_prices = {}
-		for model, row in pairs(p_prices) do
-			if type(model) == "string" and model ~= ""
-				and type(row) == "table"
-				and catalog_price_is_valid(row["in"])
-				and catalog_price_is_valid(row["out"])
-			then
-				out_prices[model] = { ["in"] = row["in"], ["out"] = row["out"] }
-			else
-				Logger.warn("llm.api_remote", "api_providers.json: model_prices.%s skipped (missing in/out).", tostring(model))
-			end
+		local out_prices, skipped_prices = ResponseClassifier.parse_prices(p_prices)
+		for _, model in ipairs(skipped_prices) do
+			Logger.warn("llm.api_remote", "api_providers.json: model_prices.%s skipped (missing in/out).", model)
 		end
 		local out_test = parse_test_request(root.test_request)
 		local out_decisions_test = parse_decisions_test(root.decisions_test)
@@ -339,6 +330,12 @@ local function key_missing(entry)
 	local servers = M.is_local_server(entry.provider) and LocalServers.SERVERS or {}
 	return not AuthPolicy.entry_token_allowed(entry.provider, entry.token, entry.base_url, servers)
 end
+
+--- Whether an entry lacks the key its endpoint requires (the model selector
+--- page greys such an entry and asks for its key).
+--- @param entry table API entry.
+--- @return boolean missing
+function M.entry_key_missing(entry) return key_missing(entry) end
 
 --- Lists the providers that serve one use (modules/llm/provider_uses.lua), in
 --- the catalogue's order.
@@ -1131,7 +1128,11 @@ end
 --- @return string reason
 local function resolve_base_url(entry, provider)
 	local raw = entry.base_url
-	if raw == nil or raw == "" then raw = provider.base_url end
+	if raw == nil or raw == "" then
+		-- The default address of a local server is where the last scan found it
+		local scan = LocalServers.is_local(entry.provider) and LocalServers.port_scan(entry.provider) or nil
+		raw = scan and scan.running and scan.base_url or provider.base_url
+	end
 	return normalize_base_url(raw)
 end
 
@@ -1550,9 +1551,7 @@ local function dispatch_probe(client, base, format, token, callback)
 end
 
 local function estimate_cost(model, in_tokens, out_tokens)
-	if not model or model == "" or not MODEL_PRICES[model] then return 0.0 end
-	local p = MODEL_PRICES[model]
-	return (in_tokens * p["in"] + out_tokens * p["out"]) / 1000000.0
+	return ResponseClassifier.estimate_cost(MODEL_PRICES, model, in_tokens, out_tokens)
 end
 M.__estimate_cost_for_test = estimate_cost
 
@@ -1942,6 +1941,87 @@ function M.check_availability(_model_name, on_available, on_missing, on_cancelle
 end
 
 
+-- The listing state of each entry's provider, by entry id: the model selector
+-- page shows one row per listed model, or the provider's known models and a
+-- typed-id row while it is pending, refused or unavailable
+-- (_shared/lua/llm/api_model_listing.lua).
+local _listing_state = {}
+
+--- The ids the active entry's provider listed at its last successful listing.
+--- @param entry_id string Entry identifier.
+--- @return table|nil ids Nil before a listing succeeded for this entry.
+function M.listed_models(entry_id)
+	local state = _listing_state[entry_id]
+	return type(state) == "table" and state.state == "listed" and state.ids or nil
+end
+
+--- The listing state of one entry, as api_model_listing.plan reads it.
+--- @param entry_id string Entry identifier.
+--- @return table|nil state Nil when this entry was never listed.
+function M.listing_state(entry_id)
+	return _listing_state[entry_id]
+end
+
+--- Lists the models the active entry's provider serves, through the same
+--- authenticated models endpoint the availability check reads.
+--- @param on_done function Receives (ok, ids_or_reason).
+--- @return boolean dispatched
+function M.list_active_models(on_done)
+	if type(on_done) ~= "function" then error("api_remote.list_active_models requires on_done") end
+	local paused, _, pause_state_ok = read_script_pause_state()
+	if pause_state_ok ~= true or paused == true then return false end
+	local my_identity = _identity_generation
+	local lease = M.resolve_active_entry(function(resolved, entry)
+		if resolved ~= true or not entry then
+			Logger.callback(LOG, "Remote model listing", on_done, false, "no_active_entry")
+			return
+		end
+		local provider = M.PROVIDERS[entry.provider]
+		local base = provider and resolve_base_url(entry, provider) or nil
+		if not provider or not base or key_missing(entry) or not ApiModelListing.supported(provider.format) then
+			_listing_state[entry.id] = { state = "failed", reason = "unsupported" }
+			Logger.callback(LOG, "Remote model listing", on_done, false, "listing_unsupported")
+			return
+		end
+		local format = provider.format
+		_listing_state[entry.id] = { state = "pending" }
+		local dispatched = dispatch_probe(_check_client, base, format, entry.token, function(r)
+			if my_identity ~= _identity_generation then
+				-- The entry changed under the listing: it is no longer pending.
+				local held = _listing_state[entry.id]
+				if type(held) == "table" and held.state == "pending" then _listing_state[entry.id] = nil end
+				Logger.callback(LOG, "Remote model listing", on_done, false, "stale_identity")
+				return
+			end
+			local valid, reason = models_response_is_valid(format, r)
+			if not valid then
+				local status = type(r) == "table" and tonumber(r.status) or 0
+				_listing_state[entry.id] = { state = "failed", reason = (status or 0) > 0 and "refused" or "unavailable" }
+				Logger.info(LOG, "Remote model listing unavailable (provider=%s, status=%s, reason=%s).",
+					tostring(entry.provider), tostring(type(r) == "table" and r.status or nil), tostring(reason))
+				Logger.callback(LOG, "Remote model listing", on_done, false, "listing_refused")
+				return
+			end
+			local ok, ids = pcall(function() return ApiModelListing.model_ids(format, JsonCodec.decode(r.body)) end)
+			if not ok or type(ids) ~= "table" then
+				_listing_state[entry.id] = { state = "failed", reason = "unreadable" }
+				Logger.warn(LOG, "Remote model listing could not be read: %s.", tostring(ok and "no model list" or ids))
+				Logger.callback(LOG, "Remote model listing", on_done, false, "listing_unreadable")
+				return
+			end
+			_listing_state[entry.id] = { state = "listed", ids = ids }
+			Logger.info(LOG, "Remote model listing: %d model(s) for provider %s.", #ids, tostring(entry.provider))
+			Logger.callback(LOG, "Remote model listing", on_done, true, ids)
+		end)
+		if dispatched ~= true then
+			_listing_state[entry.id] = { state = "failed", reason = "unavailable" }
+			Logger.callback(LOG, "Remote model listing", on_done, false, "dispatch_refused")
+		end
+	end)
+	return type(lease) == "table"
+end
+
+
 
 
 -- =======================================
@@ -2039,11 +2119,11 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s body=%s",
 					model, req_id, tostring(status), (body or ""):sub(1, 200))
 				-- Log the failure so the audit trail shows it instead of
-				-- silently dropping. Same envelope as keylogger.log_llm
+				-- silently dropping. Same envelope as keystats.log_llm
 				-- but routed to log_llm_failed; the engine doesn't need
 				-- to know about the distinction.
-				if keylogger and type(keylogger.log_llm_failed) == "function" then
-					pcall(keylogger.log_llm_failed, full_text, nil, {
+				if keystats and type(keystats.log_llm_failed) == "function" then
+					pcall(keystats.log_llm_failed, full_text, nil, {
 						backend        = "api",
 						model          = tostring(model),
 						system_prompt  = system_prompt,
@@ -2074,8 +2154,8 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 			local raw_text = classified.text
 			if raw_text == "" then
 				Logger.warn(LOG, "[%s] #%d empty completion (could not parse).", model, req_id)
-				if keylogger and type(keylogger.log_llm_failed) == "function" then
-					pcall(keylogger.log_llm_failed, full_text, nil, {
+				if keystats and type(keystats.log_llm_failed) == "function" then
+					pcall(keystats.log_llm_failed, full_text, nil, {
 						backend        = "api",
 						model          = tostring(model),
 						system_prompt  = system_prompt,
@@ -2108,8 +2188,8 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 
 			if #results == 0 then
 				Logger.debug(LOG, "[%s] #%d PARSED -> 0 result (parser failure)", model, req_id)
-				if keylogger and type(keylogger.log_llm_failed) == "function" then
-					pcall(keylogger.log_llm_failed, full_text, nil, {
+				if keystats and type(keystats.log_llm_failed) == "function" then
+					pcall(keystats.log_llm_failed, full_text, nil, {
 						backend        = "api",
 						model          = tostring(model),
 						system_prompt  = system_prompt,
@@ -2129,8 +2209,8 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 			local usage = classified.usage
 
 			Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s) in %dms", model, req_id, #results, ms)
-			if keylogger and type(keylogger.log_llm) == "function" then
-				pcall(keylogger.log_llm, full_text, results, nil, {
+			if keystats and type(keystats.log_llm) == "function" then
+				pcall(keystats.log_llm, full_text, results, nil, {
 					backend           = "api",
 					model             = tostring(model),
 					system_prompt     = system_prompt,
@@ -2715,7 +2795,7 @@ function M.test_request(entry, spec, on_ok, on_fail)
 			end,
 			ApiCommon.new_dedup_stats(),
 			function(raw)
-				local text = type(raw) == "string" and raw:match("^%s*(.-)%s*$") or ""
+				local text = type(raw) == "string" and text_utils.trim(raw) or ""
 				if text == "" then
 					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "empty_reply") end
 					return
@@ -2747,7 +2827,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
                        on_success, on_fail, request_id_provider, _streaming, _on_partial)
 	local effective_temp     = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	local system_prompt      = Profiles.resolve_system_prompt(profile, num_predictions)
-	local tokens             = (tonumber(max_predict) or 32) * num_predictions + (num_predictions * 5)
+	local tokens             = TokenBudget.for_call(tonumber(max_predict) or 32, num_predictions)
 	local is_batch           = profile.batch
 	local dedup_stats        = ApiCommon.new_dedup_stats()
 	local t0                 = TimerScheduler.now()
@@ -2892,7 +2972,6 @@ end
 --- Exposed for regression tests only. These invariants cannot be asserted
 --- without running the exact helpers used by the production request path.
 M.__redact_url_for_test = redact_url
-M.__parse_response_for_test = parse_response
 
 
 
@@ -2960,9 +3039,12 @@ function M.local_server_descriptor(id)
 end
 
 --- Where a local server is probed and with which stored key: its API entry's
---- address and key, else those typed this session, else its default address.
+--- address and key, else those typed this session, else where the last port
+--- scan found it (llm.local_server_ports), else its catalogue address.
 --- @param provider_id string Server id of local_servers.json.
---- @return table target { id, base_url, token } (token "" or a stored reference).
+--- @return table target { id, entry_id, provider, base_url, token, port_source }
+---        (token "" or a stored reference; port_source "user" for a typed or
+---        stored address, else the scan's source, nil before any scan).
 function M.local_server_target(provider_id)
 	local provider = M.local_server_descriptor(provider_id)
 	if not provider then return nil end
@@ -2973,129 +3055,254 @@ function M.local_server_target(provider_id)
 	-- A pending "" used to win over it, and the server was never probed (#95).
 	local base_url = entry and entry.base_url or ""
 	if base_url == "" then base_url = pending.base_url or "" end
-	if base_url == "" then base_url = provider.base_url end
+	local port_source = "user"
+	if base_url == "" then
+		local scan = M.is_local_server(provider_id) and LocalServers.port_scan(provider_id) or nil
+		base_url = scan and scan.running and scan.base_url or provider.base_url
+		port_source = scan and scan.source or nil
+	end
 	local token = entry and entry.token or pending.token or ""
-	return { id = provider_id, entry_id = entry and entry.id, provider = entry and entry.provider, base_url = base_url, token = token }
+	return { id = provider_id, entry_id = entry and entry.id, provider = entry and entry.provider, base_url = base_url, token = token,
+		port_source = port_source }
 end
 
---- Sweeps every local server's models endpoint at once, with the rules of the
---- remote availability check (dispatch_probe), and publishes which answer
---- (modules/llm/local_servers.lua). Never blocks: each probe is asynchronous
---- and bounded by local_server_probe_timeout_ms.
---- @param on_done function|nil Receives (changed) when every server settled.
---- @return boolean started
-function M.detect_local_servers(on_done)
+-- Callbacks of the detections waiting for the running port scan; nil when idle
+local _port_scan_waiters = nil
+
+-- Test seam: the asynchronous port scan (modules/llm/local_server_ports.lua)
+M._scan_ports = function(entries, on_done) return LocalServerPorts.scan(entries, on_done) end
+
+--- Probes one local server target (the sweep's injected probe).
+--- @param target table From M.local_server_target.
+--- @param settle function Settles the probe with the HTTP response.
+--- @param ticket table The sweep's supersession fence.
+--- @return boolean dispatched
+local function probe_local_target(target, settle, ticket)
+	local base, reason = normalize_base_url(target.base_url)
+	if not base then
+		Logger.warn(LOG, "Local server '%s' has an invalid address: %s.", target.id, reason)
+		return false
+	end
+	local client = _local_probe_clients[target.id]
+	if not client then
+		-- A running server on loopback answers at once: the deadline is short
+		local created, value = xpcall(function()
+			return _http_adapter.new({ timeout_ms = Timings.ms("llm", "local_server_probe_timeout_ms"), follow_redirects = false })
+		end, debug.traceback)
+		if not created or type(value) ~= "table" then
+			Logger.error(LOG, "Local discovery native HTTP owner construction was refused.")
+			settle({ ok = false, status = 0, body = "", probe_error = true })
+			return true
+		end
+		client = value
+		_local_probe_clients[target.id] = client
+	end
+	-- The ticket fences logical supersession, not native task retirement.
+	-- Compare the live settings owner as well: these are its current in-memory
+	-- entry/pending fields, not a fresh private-file read or a disk lease.
+	local function target_is_current()
+		if ticket.is_current() ~= true or not M.is_local_server_view(target.id) then return false end
+		local current = M.local_server_target(target.id)
+		return current ~= nil and current.id == target.id and current.entry_id == target.entry_id and current.provider == target.provider
+			and current.base_url == target.base_url and current.token == target.token
+	end
+	local function native_failure()
+		Logger.error(LOG, "Local discovery native HTTP acquisition was refused for '%s'.", target.id)
+		settle({ ok = false, status = 0, body = "", probe_error = true })
+	end
+	local function probe(token)
+		if not target_is_current() then return false end
+		if type(client.get) ~= "function" or type(client.cancel) ~= "function"
+			or type(client.isSettled) ~= "function" or type(client.onSettled) ~= "function" then
+			native_failure(); return true
+		end
+		local function dispatch()
+			if not target_is_current() then settle(nil); return end
+			local returned, delivered, buffered = false, false, nil
+			local function deliver(response)
+				if not target_is_current() then
+					Logger.debug(LOG, "Local server '%s' probe answer dropped: its settings changed meanwhile.", target.id)
+					settle(nil)
+					return
+				end
+				-- The sweep publishes one line for every server; this one says why
+				-- a server is not listed (#99: "none answers" alone named no cause)
+				local status = type(response) == "table" and tonumber(response.status) or 0
+				Logger.debug(LOG, "Local server '%s' probe answered %s.", target.id,
+					status ~= 0 and ("HTTP " .. tostring(status))
+						or ("nothing (" .. tostring(type(response) == "table" and response.error or "no response") .. ")"))
+				if type(response) == "table" and response.ok == false and response.status == 0
+					and response.error_kind == "native_dispatch" then
+					settle({ ok = false, status = 0, body = "", probe_error = true })
+				else settle(response) end
+			end
+			local ok, started = xpcall(function()
+				return dispatch_probe(client, base, "openai", token, function(response)
+					if not returned then delivered, buffered = true, response else deliver(response) end
+				end)
+			end, debug.traceback)
+			returned = true
+			if not ok or started ~= true then native_failure()
+			elseif delivered then deliver(buffered) end
+		end
+		local ok, observation_accepted = xpcall(function()
+			if client.isSettled() == true then dispatch(); return true end
+			client.cancel()
+			if client.isSettled() == true then dispatch(); return true end
+			-- An accepted cancel never permits replacing an unsettled HTTP owner.
+			local returned, observed = false, false
+			local function resume()
+				local accepted = xpcall(function()
+					if client.isSettled() == true then dispatch() else native_failure() end
+				end, debug.traceback)
+				if not accepted then native_failure() end
+			end
+			local registered = client.onSettled(function()
+				if not returned then observed = true else resume() end
+			end)
+			returned = true
+			if registered == true and observed then resume() end
+			return registered
+		end, debug.traceback)
+		if not ok or observation_accepted ~= true then native_failure() end
+		return true
+	end
+	if target.token == "" then return probe("") end
+	TokenCrypto.decrypt_async(target.token, function(decrypted, token, token_reason)
+		-- Held credentials from an older generation must not acquire the
+		-- same HTTP client and cancel a newer request. Changed live settings
+		-- settle this current target as unavailable until its next search.
+		if not target_is_current() then settle(nil); return end
+		if decrypted ~= true or type(token) ~= "string" or token == "" then
+			Logger.warn(LOG, "Local server '%s' key is unreadable: %s.", target.id, tostring(token_reason))
+			-- Probed without its key, the server says whether it wants one
+			token = ""
+		end
+		if probe(token) ~= true then settle(nil) end
+	end)
+	return true
+end
+-- Test seam: the probe holds the native HTTP owners and the key decryption
+M._probe_local_target = probe_local_target
+
+--- Starts the sweep once the port scan settled: a catalogue server whose
+--- process does not run, at its default address, is not probed.
+--- @param waiters table The callbacks of every detection the scan served.
+local function sweep_after_scan(waiters)
 	M.refresh_local_server_views()
 	local targets = {}
 	for _, id in ipairs(LocalServers.view_order()) do
 		local target = M.local_server_target(id)
-		if target then targets[#targets + 1] = target end
+		local scan = target and M.is_local_server(id) and LocalServers.port_scan(id) or nil
+		if target and target.port_source ~= "user" and scan and scan.running == false then
+			Logger.debug(LOG, "Local server '%s' is not probed: %s.", id, tostring(scan.detail))
+		elseif target then
+			Logger.debug(LOG, "Local server '%s' probed at %s (%s).", id, redact_url(target.base_url),
+				target.port_source == "user" and "address set by the user" or ("port from " .. tostring(target.port_source)))
+			targets[#targets + 1] = target
+		end
 	end
-	return LocalServers.sweep(targets, function(target, settle, ticket)
-		local base, reason = normalize_base_url(target.base_url)
-		if not base then
-			Logger.warn(LOG, "Local server '%s' has an invalid address: %s.", target.id, reason)
-			return false
+	local function done(changed)
+		for _, waiter in ipairs(waiters) do
+			local ok, err = xpcall(waiter, debug.traceback, changed)
+			if not ok then Logger.error(LOG, "Local server detection callback raised: %s", tostring(err)) end
 		end
-		local client = _local_probe_clients[target.id]
-		if not client then
-			-- A running server on loopback answers at once: the deadline is short
-			local created, value = xpcall(function()
-				return _http_adapter.new({ timeout_ms = Timings.ms("llm", "local_server_probe_timeout_ms"), follow_redirects = false })
-			end, debug.traceback)
-			if not created or type(value) ~= "table" then
-				Logger.error(LOG, "Local discovery native HTTP owner construction was refused.")
-				settle({ ok = false, status = 0, body = "", probe_error = true })
-				return true
+	end
+	if LocalServers.sweep(targets, probe_local_target, done) ~= true then
+		Logger.error(LOG, "The local server sweep was refused after its port scan.")
+		done(false)
+	end
+end
+
+--- Lists every local server view with where it was looked for and what it
+--- answered, in menu order: the stable shape the AI menu and the model
+--- selector page read.
+--- @return table views Array of { id, display_name, port, port_source, base_url,
+---        models, status, reason }: port_source is "cli", "config", "listening",
+---        "default" or "user" (an address the user typed or stored), nil before
+---        any scan; models lists the model ids when status is "up", else nil;
+---        reason is nil when up, else "not_running", "needs_key", "no_answer",
+---        "unavailable" or "not_swept".
+function M.local_server_views()
+	local views = {}
+	for _, id in ipairs(LocalServers.view_order()) do
+		local target = M.local_server_target(id)
+		local descriptor = M.local_server_descriptor(id)
+		if target and descriptor then
+			local scan = M.is_local_server(id) and LocalServers.port_scan(id) or nil
+			local verdict = LocalServers.result(id)
+			local view = { id = id, display_name = descriptor.label, base_url = target.base_url,
+				port = tonumber(target.base_url:match("^%a[%w+.-]*://[^/]-:(%d+)")), port_source = target.port_source }
+			if target.port_source ~= "user" and scan and scan.running == false then
+				view.reason = "not_running"
+			elseif not verdict then
+				view.reason = "not_swept"
+			elseif verdict.status == LocalServers.STATUS_UP then
+				view.status, view.models = verdict.status, {}
+				for index, model in ipairs(verdict.models or {}) do view.models[index] = model end
+			else
+				view.status = verdict.status
+				view.reason = verdict.status == LocalServers.STATUS_NEEDS_KEY and "needs_key"
+					or verdict.status == LocalServers.STATUS_UNAVAILABLE and "unavailable" or "no_answer"
 			end
-			client = value
-			_local_probe_clients[target.id] = client
+			views[#views + 1] = view
 		end
-		-- The ticket fences logical supersession, not native task retirement.
-		-- Compare the live settings owner as well: these are its current in-memory
-		-- entry/pending fields, not a fresh private-file read or a disk lease.
-		local function target_is_current()
-			if ticket.is_current() ~= true or not M.is_local_server_view(target.id) then return false end
-			local current = M.local_server_target(target.id)
-			return current ~= nil and current.id == target.id and current.entry_id == target.entry_id and current.provider == target.provider
-				and current.base_url == target.base_url and current.token == target.token
-		end
-		local function native_failure()
-			Logger.error(LOG, "Local discovery native HTTP acquisition was refused for '%s'.", target.id)
-			settle({ ok = false, status = 0, body = "", probe_error = true })
-		end
-		local function probe(token)
-			if not target_is_current() then return false end
-			if type(client.get) ~= "function" or type(client.cancel) ~= "function"
-				or type(client.isSettled) ~= "function" or type(client.onSettled) ~= "function" then
-				native_failure(); return true
-			end
-			local function dispatch()
-				if not target_is_current() then settle(nil); return end
-				local returned, delivered, buffered = false, false, nil
-				local function deliver(response)
-					if not target_is_current() then
-						Logger.debug(LOG, "Local server '%s' probe answer dropped: its settings changed meanwhile.", target.id)
-						settle(nil)
-						return
-					end
-					-- The sweep publishes one line for every server; this one says why
-					-- a server is not listed (#99: "none answers" alone named no cause)
-					local status = type(response) == "table" and tonumber(response.status) or 0
-					Logger.debug(LOG, "Local server '%s' probe answered %s.", target.id,
-						status ~= 0 and ("HTTP " .. tostring(status))
-							or ("nothing (" .. tostring(type(response) == "table" and response.error or "no response") .. ")"))
-					if type(response) == "table" and response.ok == false and response.status == 0
-						and response.error_kind == "native_dispatch" then
-						settle({ ok = false, status = 0, body = "", probe_error = true })
-					else settle(response) end
-				end
-				local ok, started = xpcall(function()
-					return dispatch_probe(client, base, "openai", token, function(response)
-						if not returned then delivered, buffered = true, response else deliver(response) end
-					end)
-				end, debug.traceback)
-				returned = true
-				if not ok or started ~= true then native_failure()
-				elseif delivered then deliver(buffered) end
-			end
-			local ok, observation_accepted = xpcall(function()
-				if client.isSettled() == true then dispatch(); return true end
-				client.cancel()
-				if client.isSettled() == true then dispatch(); return true end
-				-- An accepted cancel never permits replacing an unsettled HTTP owner.
-				local returned, observed = false, false
-				local function resume()
-					local accepted = xpcall(function()
-						if client.isSettled() == true then dispatch() else native_failure() end
-					end, debug.traceback)
-					if not accepted then native_failure() end
-				end
-				local registered = client.onSettled(function()
-					if not returned then observed = true else resume() end
-				end)
-				returned = true
-				if registered == true and observed then resume() end
-				return registered
-			end, debug.traceback)
-			if not ok or observation_accepted ~= true then native_failure() end
-			return true
-		end
-		if target.token == "" then return probe("") end
-		TokenCrypto.decrypt_async(target.token, function(decrypted, token, token_reason)
-			-- Held credentials from an older generation must not acquire the
-			-- same HTTP client and cancel a newer request. Changed live settings
-			-- settle this current target as unavailable until its next search.
-			if not target_is_current() then settle(nil); return end
-			if decrypted ~= true or type(token) ~= "string" or token == "" then
-				Logger.warn(LOG, "Local server '%s' key is unreadable: %s.", target.id, tostring(token_reason))
-				-- Probed without its key, the server says whether it wants one
-				token = ""
-			end
-			if probe(token) ~= true then settle(nil) end
-		end)
+	end
+	return views
+end
+
+--- Sweeps every local server's models endpoint at once, with the rules of the
+--- remote availability check (dispatch_probe), and publishes which answer
+--- (modules/llm/local_servers.lua). First scans where each catalogue server
+--- runs and listens (modules/llm/local_server_ports.lua); a detection asked
+--- during a scan joins it. Never blocks: the scan's commands and each probe are
+--- asynchronous, bounded by local_server_port_scan_timeout_ms and
+--- local_server_probe_timeout_ms.
+--- @param on_done function|nil Receives (changed) when every server settled.
+--- @return boolean started
+function M.detect_local_servers(on_done)
+	if on_done ~= nil and type(on_done) ~= "function" then
+		error("api_remote.detect_local_servers: on_done must be a function")
+	end
+	if _port_scan_waiters then
+		if on_done then _port_scan_waiters[#_port_scan_waiters + 1] = on_done end
 		return true
-	end, on_done)
+	end
+	M.refresh_local_server_views()
+	local entries, undescribed = {}, {}
+	for _, id in ipairs(LocalServers.ORDER) do
+		local server = LocalServers.SERVERS[id]
+		if LocalServers.DISCOVERY[id] then
+			entries[#entries + 1] = { id = id, descriptor = LocalServers.DISCOVERY[id], base_url = server.base_url }
+		else
+			undescribed[id] = { id = id, running = false, pids = {}, base_url = server.base_url,
+				detail = "no discovery descriptor in local_servers.json" }
+		end
+	end
+	_port_scan_waiters = { on_done }
+	LocalServers.set_scanning(true)
+	local ok, err = xpcall(M._scan_ports, debug.traceback, entries, function(results)
+		for id, result in pairs(undescribed) do results[id] = result end
+		local waiters = _port_scan_waiters or {}
+		_port_scan_waiters = nil
+		LocalServers.set_port_scans(results)
+		LocalServers.set_scanning(false)
+		sweep_after_scan(waiters)
+	end)
+	if not ok then
+		_port_scan_waiters = nil
+		LocalServers.set_scanning(false)
+		Logger.error(LOG, "The local server port scan could not start: %s", tostring(err))
+		return false
+	end
+	return true
+end
+
+--- Hands in the HttpClient that sends inference requests (engine init, the
+--- HttpClient port of the shared request plan). The default stays this module's own client.
+--- @param client table Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	_infer_client = Ports.check("HttpClient", client)
 end
 
 return M

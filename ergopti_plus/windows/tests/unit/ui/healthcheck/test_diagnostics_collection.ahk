@@ -18,6 +18,7 @@
 /** Runs collection state regressions in an owned synthetic directory without launching a worker. */
 _TestHC_CollectionState(TestCase) {
 	D := DiagnosticCollectionWindows()
+	CleanupTimer := D.CollectionTimer
 	Root := A_Temp . "\ergopti-hc-collection-" . D.Id
 	D.Directory := Root . "\" . D.Id
 	D.Archive := D.Directory . ".zip"
@@ -127,7 +128,7 @@ _TestHC_CollectionState(TestCase) {
 			}
 		}
 	} finally {
-		SetTimer(D.CollectionTimer, 0)
+		SetTimer(CleanupTimer, 0)
 		DirDelete(Root, true)
 	}
 }
@@ -255,3 +256,5 @@ _TestHC_CollectionExclusiveProgress(Scenario := "retry") {
 Test("Diagnostics collection retries actual exclusive progress writes (groups247-collection)", _TestHC_CollectionExclusiveProgress)
 Test("Diagnostics collection preserves malformed progress refusal after sharing (groups247-collection)", _TestHC_CollectionExclusiveProgress.Bind("malformed"))
 Test("Diagnostics collection keeps its deadline behind exclusive progress (groups247-collection)", _TestHC_CollectionExclusiveProgress.Bind("deadline"))
+
+#Include test_healthcheck_collection_publish_owner.ahk

@@ -14,7 +14,7 @@
 ; was the only one of the three drivers with no is_private concept on this path:
 ; macOS (modules/keymap/expander.lua) skips both of its sinks for a private
 ; mapping "including the trigger, which is itself a fragment of the secret", and
-; Linux (modules/keylogger/keylogger.lua) substitutes a placeholder per
+; Linux (modules/keystats/keystats.lua) substitutes a placeholder per
 ; character. The marker now rides the Spec from CreateHotstring through the
 ; three fire paths into KL_LogHotstring.
 ;
@@ -37,22 +37,22 @@
 global _HFLP_IBAN    := "FR7630006000011234567890189"
 global _HFLP_TRIGGER := "@iban" . Chr(0x2605)
 
-; Runs Body with the keylogger "initialised" (KL_LogHotstring early-returns
+; Runs Body with the keystats "initialised" (KL_LogHotstring early-returns
 ; otherwise, and a test that silently exercised nothing would pass against the
 ; leaking code) and every recording stub emptied. Restores the flag afterwards
-; so no other test observes an initialised keylogger.
+; so no other test observes an initialised keystats.
 _HFLP_WithRecordingSink(Body) {
 	global _Stub_AppendLogRows, _Stub_RoiHotstringCalls, _Stub_WpmPushCalls, _Stub_FlushBufferCalls
-	PrevInit := Keylogger.initialized
+	PrevInit := Keystats.initialized
 	_Stub_AppendLogRows := []
 	_Stub_RoiHotstringCalls := []
 	_Stub_WpmPushCalls := []
 	_Stub_FlushBufferCalls := 0
-	Keylogger.initialized := true
+	Keystats.initialized := true
 	try {
 		Body()
 	} finally {
-		Keylogger.initialized := PrevInit
+		Keystats.initialized := PrevInit
 	}
 }
 
@@ -119,7 +119,7 @@ _HFLP_PrivateRowCarriesNoSecret() {
 	Assert(!InStr(Row["trigger"], "iban"),
 		"and the trigger field carries none of the trigger")
 }
-Test("keylogger: a private hotstring fire writes no secret to the metrics row (personal-info-fire-log-leak)",
+Test("keystats: a private hotstring fire writes no secret to the metrics row (personal-info-fire-log-leak)",
 	_HFLP_PrivateRowCarriesNoSecret)
 
 
@@ -138,7 +138,7 @@ _HFLP_OrdinaryRowIsUnchanged() {
 	AssertEqual(StrLen("par exemple") - StrLen("pex"), Row["net_saved_chars"],
 		"and the saved-character arithmetic is unchanged")
 }
-Test("keylogger: an ordinary hotstring fire is recorded verbatim (personal-info-fire-log-leak)",
+Test("keystats: an ordinary hotstring fire is recorded verbatim (personal-info-fire-log-leak)",
 	_HFLP_OrdinaryRowIsUnchanged)
 
 
@@ -173,7 +173,7 @@ _HFLP_PrivateFireStillCountsSavedKeystrokes() {
 	AssertEqual(1, _Stub_FlushBufferCalls,
 		"the typing buffer is still flushed first, so the fire stays ordered after the characters that produced it")
 }
-Test("keylogger: a private hotstring fire still counts the keystrokes it saved (personal-info-fire-log-leak)",
+Test("keystats: a private hotstring fire still counts the keystrokes it saved (personal-info-fire-log-leak)",
 	_HFLP_PrivateFireStillCountsSavedKeystrokes)
 
 

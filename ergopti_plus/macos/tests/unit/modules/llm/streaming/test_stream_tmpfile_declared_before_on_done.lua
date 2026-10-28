@@ -47,7 +47,7 @@ helpers.describe("api_ollama streaming: tmp_path declaration order", function()
 		for line in fh:lines() do
 			line_num = line_num + 1
 			-- Match declaration of tmp_path local (the hoisted one)
-			if not tmp_path_line and line:match("^%s*local tmp_path%s*=") then
+			if not tmp_path_line and line:match("^%s*local tmp_path[%s,=]") then
 				tmp_path_line = line_num
 			end
 			-- Match definition of the on_done closure

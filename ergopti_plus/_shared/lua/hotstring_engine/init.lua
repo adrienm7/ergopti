@@ -53,7 +53,10 @@ local Logger = require("logger.shim")
 -- gets them. Reimplementing any of it here would be a second Unicode case table
 -- — the accented and French-punctuation mappings are the whole difficulty.
 local text_utils = require("text_utils")
+local TableUtil = require("table_util")
 local PersonalFiles = require("hotstrings.personal_files")
+local Cascade = require("hotstring_engine.cascade")
+local InjectionPlan = require("hotstring_engine.injection_plan")
 
 local LOG = "shared.hotstring_engine"
 
@@ -256,7 +259,7 @@ end
 --- It lived inside `on_char`, capturing the engine instance's own codepoint
 --- buffer. That made the matcher inseparable from buffer OWNERSHIP, which is the
 --- single reason macOS could not adopt this core: its buffer belongs to the
---- keymap core state and is read by the keylogger, the LLM preview, the tooltip
+--- keymap core state and is read by the keystats, the LLM preview, the tooltip
 --- and script control.
 ---
 --- @param buf_cps table Array of UTF-8 codepoint strings (the rolling buffer).
@@ -355,9 +358,12 @@ function M.candidates_at(buf_cps, buckets, body_len, start_is_boundary, limit)
 	return out
 end
 
---- Whether a timed match stayed within its configured inter-key delay.
+--- Whether a timed match stayed within its configured expansion delay: the time
+--- between the LAST LETTER OF THE INPUT and the EXPANDER, to decide whether to
+--- give the output (the expander is the magic key when the trigger ends with it,
+--- otherwise the end character that completes the trigger).
 --- A zero delay disables expiry. A positive delay fails closed when the caller
---- did not provide monotonic timestamps for every consumed codepoint.
+--- did not provide monotonic timestamps for the letter and its expander.
 ---
 --- A gap is the difference of two clock readings, which overstates the real
 --- pause by up to the clock's resolution: on a whole-second clock two keys
@@ -365,19 +371,58 @@ end
 --- between them, and a 0.75 s delay then dropped the trigger. So only a pause
 --- that exceeds the delay by more than the resolution expires the match.
 --- @param result table Match returned by engine:on_char().
---- @param delay_sec number Maximum adjacent pause in seconds; zero disables it.
+--- @param delay_sec number Maximum last-letter-to-expander pause in seconds; zero disables it.
 --- @param resolution_ms number Resolution of the clock that stamped the keys; zero when exact.
 --- @return boolean
-function M.within_interkey_delay(result, delay_sec, resolution_ms)
+function M.within_expansion_delay(result, delay_sec, resolution_ms, multiplier)
 	if type(resolution_ms) ~= "number" or resolution_ms < 0 then
-		error("within_interkey_delay(): the clock resolution must be a non-negative number, got "
+		error("within_expansion_delay(): the clock resolution must be a non-negative number, got "
 			.. tostring(resolution_ms), 2)
 	end
 	local limit = tonumber(delay_sec)
 	if not limit or limit <= 0 then return true end
+	if multiplier ~= nil and (type(multiplier) ~= "number" or multiplier < 1) then
+		error("within_expansion_delay(): the complex-key multiplier must be a number of at least 1, got "
+			.. tostring(multiplier), 2)
+	end
 	if type(result) ~= "table" then return false end
-	local gap_ms = tonumber(result.max_interkey_gap_ms)
-	return gap_ms ~= nil and gap_ms - resolution_ms <= limit * 1000
+	local gap_ms = tonumber(result.expander_gap_ms)
+	-- Whole milliseconds, as Windows (Round(seconds * 1000)) and macOS: 1.005 s is
+	-- 1005 ms, not 1004.9999999999999, so the exact deadline instant fires. The
+	-- multiplier widens the allowed delay (never the measured gap).
+	return gap_ms ~= nil and gap_ms - resolution_ms <= math.floor(limit * (multiplier or 1) * 1000 + 0.5)
+end
+
+--- The factor that widens the expansion delay for a complex keystroke (PAR-7).
+---
+--- A Shift, Alt or AltGr/Option keystroke is slower than a bare letter, so the
+--- allowed delay is multiplied when the EXPANDER keystroke is complex, or when
+--- the REFERENCE keystroke (the last letter of the input) was complex and the
+--- gap to the expander is at most `carry_ms` (the lag between releasing Shift
+--- and pressing the next key). The factor and the carry are the shared timing
+--- registry's `[hotstrings] complex_key_delay_multiplier` / `complex_key_carry_ms`,
+--- passed in by each driver; this function owns the rule, never the values.
+--- Autocorrections are not widened: they fire on letter combinations.
+--- @param expander_complex boolean Shift/Alt/AltGr was held on the expander keystroke.
+--- @param reference_complex boolean Shift/Alt/AltGr was held on the reference keystroke.
+--- @param gap_ms number|nil Reference-to-expander gap in milliseconds; nil when unknown.
+--- @param multiplier number The registry's complex_key_delay_multiplier (at least 1).
+--- @param carry_ms number The registry's complex_key_carry_ms (not negative).
+--- @param widenable boolean|nil False for a category that is never widened (autocorrection).
+--- @return number factor `multiplier` or 1.
+function M.complex_delay_multiplier(expander_complex, reference_complex, gap_ms, multiplier, carry_ms, widenable)
+	if type(multiplier) ~= "number" or multiplier < 1 then
+		error("complex_delay_multiplier(): the multiplier must be a number of at least 1, got "
+			.. tostring(multiplier), 2)
+	end
+	if type(carry_ms) ~= "number" or carry_ms < 0 then
+		error("complex_delay_multiplier(): the carry must be a non-negative number of milliseconds, got "
+			.. tostring(carry_ms), 2)
+	end
+	if widenable == false then return 1 end
+	if expander_complex == true then return multiplier end
+	if reference_complex == true and type(gap_ms) == "number" and gap_ms <= carry_ms then return multiplier end
+	return 1
 end
 
 --- Whether a value is a valid `hotstrings.idle_reset_seconds`: a finite
@@ -386,6 +431,23 @@ end
 --- @return boolean
 function M.valid_idle_reset_seconds(value)
 	return type(value) == "number" and value == value and value >= 0 and value ~= math.huge
+end
+
+--- Fewest and most arrows `hotstrings.cascade_max_arrows` accepts. One arrow is
+--- a single expansion (no cascading). The manifest presets and the config schema
+--- state the same bounds; tools/test pins the three together.
+M.CASCADE_MIN_ARROWS = 1
+M.CASCADE_MAX_ARROWS = 10
+
+--- Whether a value is a valid `hotstrings.cascade_max_arrows`: a whole number
+--- from CASCADE_MIN_ARROWS to CASCADE_MAX_ARROWS, counting the ARROWS of a chain
+--- (1 = `a` -> `b` only, 2 = `a` -> `b` -> `c`). Every driver validates the
+--- setting with this rule (the Windows mirror is HSE_ValidCascadeMaxArrows).
+--- @param value any Candidate read from config.toml or a menu.
+--- @return boolean
+function M.valid_cascade_max_arrows(value)
+	return type(value) == "number" and value % 1 == 0
+		and value >= M.CASCADE_MIN_ARROWS and value <= M.CASCADE_MAX_ARROWS
 end
 
 --- Whether the pause before the current keystroke starts a new word.
@@ -397,7 +459,7 @@ end
 --- Windows engine applies the same rule in HSE_IdleResetsWord.
 --- @param last_ms number|nil Monotonic time of the previous keystroke, nil before any.
 --- @param now_ms number Monotonic time of the current keystroke.
---- As in within_interkey_delay, a gap read on a coarse clock overstates the
+--- As in within_expansion_delay, a gap read on a coarse clock overstates the
 --- real pause by up to its resolution, so only a gap that still reaches the
 --- delay once the resolution is taken off starts a new word: two keys typed
 --- together across a whole-second turnover must not split a word.
@@ -459,23 +521,25 @@ function M.new()
 
 	local engine = {}
 
-	--- Returns the largest adjacent timestamp gap in the last `count` codepoints.
+	--- The expansion delay's interval: the time between the LAST LETTER OF THE
+	--- INPUT and the EXPANDER, which decides whether to give the output. The
+	--- expander is the last consumed codepoint (the magic key when the trigger
+	--- ends with it, otherwise the end character that completes the trigger), and
+	--- the last input letter is the codepoint typed immediately before it.
+	--- @param offset number Distance from the expander back to the last input letter
+	---        (1, or 2 when a no-break space sat between the letter and the end character).
 	--- @param count number Number of codepoints consumed by the match.
 	--- @return number|nil Milliseconds, or nil when timing was not supplied.
-	local function max_tail_gap_ms(count)
-		if count <= 1 then return 0 end
-		local first = #_buf_times - count + 1
-		if first < 1 then return nil end
-		local largest = 0
-		for index = first + 1, #_buf_times do
-			local previous = _buf_times[index - 1]
-			local current = _buf_times[index]
-			if type(previous) ~= "number" or type(current) ~= "number" or current < previous then
-				return nil
-			end
-			largest = math.max(largest, current - previous)
+	local function expander_gap_ms(offset, count, times)
+		times = times or _buf_times
+		-- A match that is nothing but its expander has no letter to measure from.
+		if count <= offset then return 0 end
+		local current = times[#times]
+		local reference = times[#times - offset]
+		if type(reference) ~= "number" or type(current) ~= "number" or current < reference then
+			return nil
 		end
-		return largest
+		return current - reference
 	end
 
 	--- Loads a flat list of mapping tables into the engine, replacing any
@@ -663,8 +727,7 @@ function M.new()
 				return a.seq < b.seq
 			end)
 		end
-		local bucket_count = 0
-		for _ in pairs(candidate_buckets) do bucket_count = bucket_count + 1 end
+		local bucket_count = TableUtil.count(candidate_buckets)
 		Logger.success(LOG, "Mappings loaded (%d mapping(s) → %d entry(ies), %d bucket(s)).",
 			loaded, registered, bucket_count)
 		_buckets = candidate_buckets
@@ -686,6 +749,222 @@ function M.new()
 			entries = _mapping_state.entries,
 			buckets = _mapping_state.buckets,
 		}
+	end
+
+	--- Picks the mapping that fires for the last codepoint of `cps`, across the
+	--- two paths. Shared by the typed character and the cascade, which asks the
+	--- same question of the text an expansion just produced, so that a cascaded
+	--- step can never decide differently from a typed one.
+	---
+	--- Delegates to the module-level matcher rather than carrying its own copy.
+	--- This body used to be a closure over `_buf_cps`, which is precisely what
+	--- made the matcher inseparable from buffer ownership and blocked the macOS
+	--- adoption. Two copies of one search is also how a sibling gets forgotten,
+	--- which this repository has paid for more than once.
+	--- @param cps table Array of codepoints; the last one completes the trigger.
+	--- @param is_terminator boolean Whether that last codepoint is an end character.
+	--- @return table|nil mapping
+	--- @return number|nil tlen Trigger length in codepoints.
+	--- @return string|nil replacement Effective replacement.
+	--- @return boolean|nil via_end_char Whether the end-char path won.
+	--- @return boolean|nil nbsp_stripped Whether a no-break space preceded the terminator.
+	local function select_match(cps, is_terminator)
+		local buf_len = #cps
+		local function best_match(body_len, want_auto)
+			return M.best_match_at(cps, _buckets, body_len, want_auto, _start_is_boundary)
+		end
+
+		-- Path A — auto_expand: fires on the trigger's own last character.
+		local auto_map, auto_len, auto_repl = best_match(buf_len, true)
+
+		-- Path B — end-char: a non-auto trigger fires only when a terminator
+		-- follows it, so the body excludes the character just typed.
+		--
+		-- French typography complicates exactly two terminators. The layout emits
+		-- ":" and ";" as NNBSP+":" / NNBSP+";", so the no-break space lands in the
+		-- buffer BETWEEN the trigger and the terminator and the body must exclude
+		-- it too. Windows (hotstring_match.ahk) and macOS (expander.lua) both do
+		-- this; Linux did not, so a trigger followed by a typographic colon simply
+		-- never matched there.
+		--
+		-- The space is REQUIRED, not merely tolerated: a bare ":" with no nbsp
+		-- before it is mid-sequence text — the ":" of ":D" — and must not end a
+		-- hotstring. Only the end-char path is affected; a trigger whose own last
+		-- codepoint is ":" still fires on the auto path untouched.
+		local end_map, end_len, end_repl, nbsp_stripped = nil, nil, nil, false
+		if is_terminator then
+			local typed = cps[buf_len]
+			local body_len = buf_len - 1
+			local eligible = true
+			if typed == ":" or typed == ";" then
+				local preceding = body_len >= 1 and cps[body_len] or nil
+				if preceding == NNBSP_CHAR or preceding == NBSP_CHAR then
+					body_len = body_len - 1
+					nbsp_stripped = true
+				else
+					eligible = false
+				end
+			end
+			if eligible then
+				end_map, end_len, end_repl = best_match(body_len, false)
+			end
+			if not end_map then nbsp_stripped = false end
+		end
+
+		-- Resolve across the two paths by trigger LENGTH, which is what Windows
+		-- does (_HSE_EndCharBeats: a star match yields to a strictly longer
+		-- end-char trigger). macOS returns on the first auto hit instead, so the
+		-- two drivers disagree today; length is the rule the three converge on.
+		if auto_map and end_map then
+			if end_len > auto_len then
+				return end_map, end_len, end_repl, true, nbsp_stripped
+			end
+			return auto_map, auto_len, auto_repl, false, false
+		elseif auto_map then
+			return auto_map, auto_len, auto_repl, false, false
+		elseif end_map then
+			return end_map, end_len, end_repl, true, nbsp_stripped
+		end
+		return nil
+	end
+
+	--- The identity of a rule for the same-spec guard: two registrations of the
+	--- same trigger and the same completion kind are one spec, whichever source
+	--- or casing family they came from.
+	--- @param mapping table A loaded mapping.
+	--- @return string
+	local function spec_key(mapping)
+		return text_utils.trig_lower(mapping.trigger or "") .. "\0" .. (mapping.auto_expand and "auto" or "end")
+	end
+
+	--- Lets the text an expansion produced complete one more hotstring, until the
+	--- chain holds `max_arrows` expansions (arrows), and returns ONE net edit for
+	--- the whole chain.
+	---
+	--- The chain is resolved on a virtual copy of the buffer BEFORE anything is
+	--- injected, so the application receives a single burst (the atomicity the
+	--- drivers rely on: no intermediate text on screen, no keystroke that can land
+	--- between two bursts, and an Undo that restores what the user typed rather
+	--- than a half-way text). Each step asks `select_match` the very question a
+	--- typed character would, of the virtual buffer the previous step produced.
+	---
+	--- Stops at the first of: the arrow bound, a step that is `final_result`
+	--- (nothing may chain off it), no match, the same spec again (the guard that
+	--- makes `ab` -> `cab` terminate), or a refusal from `options.cascade_gate`
+	--- (the per-step expansion delay, which only the driver can resolve).
+	--- The end character that completed the first step is carried through the
+	--- whole chain, whatever its delimiter's "consumed" choice, so that a chain
+	--- gives the same text for a consumed and an unconsumed delimiter. A
+	--- following end step takes it as its own terminator; a step that would
+	--- swallow it (an auto step whose trigger reaches it) ends the chain instead,
+	--- so the end character the user typed always lands after the final text.
+	--- What is still there at the end is replayed by the caller, unless its
+	--- delimiter is consumed, in which case it is swallowed once, exactly as a
+	--- typed key's would be.
+	--- @param first table The first step's result, as built by on_char.
+	--- @param first_mapping table The mapping that produced `first`.
+	--- @param max_arrows number Most expansions the chain may hold, the first one included (>= 2).
+	--- @param options table on_char options (terminator_consumed, cascade_gate).
+	--- @return table result The first result when nothing cascaded, else the net edit.
+	local function cascade(first, first_mapping, max_arrows, options)
+		if not M.valid_cascade_max_arrows(max_arrows) then
+			Logger.error(LOG, "cascade(): max_arrows must be a whole number from %d to %d, got %s.",
+				M.CASCADE_MIN_ARROWS, M.CASCADE_MAX_ARROWS, tostring(max_arrows))
+			return first
+		end
+		if first.final_result or first.is_private then return first end
+
+		local gate = options.cascade_gate
+		local consumed = options.terminator_consumed == true
+		local original_len = #_buf_cps
+		-- Carried even when its delimiter is consumed: the consumption is applied
+		-- once, at the end (see the tail of this function).
+		local terminator = first.end_char and first.terminator or nil
+
+		-- The registry question of one step; the loop itself is the shared Cascade.
+		local function pick(vcps, vtimes, carried, _)
+			local mapping, tlen, replacement, via_end_char, nbsp_stripped =
+				select_match(vcps, carried ~= nil)
+			if not mapping then return nil end
+			if carried ~= nil and not via_end_char then
+				Logger.debug(LOG, "Cascade stopped: an auto step would swallow the end character.")
+				return nil
+			end
+			-- A private mapping (personal information) is never composed into another
+			-- hotstring's output: its text must stay under its own redaction.
+			if mapping.is_private then
+				Logger.debug(LOG, "Cascade stopped: a private mapping takes no part.")
+				return nil
+			end
+			-- A terminator the chain still carries is the end character of an end
+			-- step and the last codepoint of an auto step's trigger.
+			local step_bc = InjectionPlan.erase_count({
+				path = via_end_char and InjectionPlan.PATH_TERMINATOR or InjectionPlan.PATH_AUTO,
+				trigger_len = tlen, event_len = 1, event_on_screen = true,
+				nbsp_stripped = nbsp_stripped == true,
+			})
+			local step = {
+				key             = spec_key(mapping),
+				backspace_count = step_bc,
+				replacement     = replacement,
+				final_result    = mapping.final_result,
+				trigger_length  = tlen,
+			}
+			if gate ~= nil then
+				step.admit = function()
+					return gate({
+						trigger         = mapping.trigger,
+						replacement     = replacement,
+						group           = mapping.group,
+						section         = mapping.section,
+						is_private      = mapping.is_private,
+						end_char        = via_end_char,
+						expander_gap_ms = expander_gap_ms(via_end_char and (step_bc - tlen) or 1,
+							step_bc, vtimes),
+					})
+				end
+			end
+			return step
+		end
+
+		local net = Cascade.resolve({
+			buffer     = _buf_cps,
+			times      = _buf_times,
+			stamp      = _buf_times[original_len],
+			first      = {
+				key             = spec_key(first_mapping),
+				backspace_count = first.backspace_count,
+				replacement     = first.replacement,
+				terminator      = terminator,
+				final_result    = first.final_result,
+			},
+			max_arrows = max_arrows,
+			pick       = pick,
+		})
+		if not net then return first end
+
+		local stable = net.stable
+		local net_replacement = net.replacement
+		local net_bc = net.backspace_count
+		local net_trigger = first.trigger
+		if net_bc ~= first.backspace_count then
+			-- The chain reached further left than the first trigger: Undo must
+			-- restore the text that was really erased.
+			local typed_end = original_len - (first.end_char and 1 or 0)
+			net_trigger = table.concat(_buf_cps, "", stable + 1, typed_end)
+		end
+		first.trigger = net_trigger
+		first.replacement = net_replacement
+		first.backspace_count = net_bc
+		-- A consumed terminator stays what on_char reported; a replayed one is
+		-- whatever the chain left at its tail.
+		if not consumed then
+			first.terminator = terminator
+			first.end_char = terminator ~= nil
+		end
+		first.final_result = net.final_result
+		first.cascade_steps = net.steps
+		return first
 	end
 
 	--- Appends a character to the rolling buffer and checks for a trigger match.
@@ -721,72 +1000,9 @@ function M.new()
 		-- enough to follow the matcher.
 		Logger.debug(LOG, "on_char: buffer %d codepoint(s).", #_buf_cps)
 
-		local buf_len = #_buf_cps
-
-		-- Delegates to the module-level matcher rather than carrying its own copy.
-		-- This body used to be a closure over `_buf_cps`, which is precisely what
-		-- made the matcher inseparable from buffer ownership and blocked the macOS
-		-- adoption. Two copies of one search is also how a sibling gets forgotten,
-		-- which this repository has paid for more than once.
-		local function best_match(body_len, want_auto)
-			return M.best_match_at(_buf_cps, _buckets, body_len, want_auto, _start_is_boundary)
-		end
-
-		-- Path A — auto_expand: fires on the trigger's own last character.
-		local auto_map, auto_len, auto_repl = best_match(buf_len, true)
-
-		-- Path B — end-char: a non-auto trigger fires only when a terminator
-		-- follows it, so the body excludes the character just typed.
-		--
-		-- French typography complicates exactly two terminators. The layout emits
-		-- ":" and ";" as NNBSP+":" / NNBSP+";", so the no-break space lands in the
-		-- buffer BETWEEN the trigger and the terminator and the body must exclude
-		-- it too. Windows (hotstring_match.ahk) and macOS (expander.lua) both do
-		-- this; Linux did not, so a trigger followed by a typographic colon simply
-		-- never matched there.
-		--
-		-- The space is REQUIRED, not merely tolerated: a bare ":" with no nbsp
-		-- before it is mid-sequence text — the ":" of ":D" — and must not end a
-		-- hotstring. Only the end-char path is affected; a trigger whose own last
-		-- codepoint is ":" still fires on the auto path untouched.
-		local end_map, end_len, end_repl, nbsp_stripped = nil, nil, nil, false
-		if options.is_terminator == true then
-			local typed = _buf_cps[buf_len]
-			local body_len = buf_len - 1
-			local eligible = true
-			if typed == ":" or typed == ";" then
-				local preceding = body_len >= 1 and _buf_cps[body_len] or nil
-				if preceding == NNBSP_CHAR or preceding == NBSP_CHAR then
-					body_len = body_len - 1
-					nbsp_stripped = true
-				else
-					eligible = false
-				end
-			end
-			if eligible then
-				end_map, end_len, end_repl = best_match(body_len, false)
-			end
-			if not end_map then nbsp_stripped = false end
-		end
-
-		-- Resolve across the two paths by trigger LENGTH, which is what Windows
-		-- does (_HSE_EndCharBeats: a star match yields to a strictly longer
-		-- end-char trigger). macOS returns on the first auto hit instead, so the
-		-- two drivers disagree today; length is the rule the three converge on.
-		local mapping, tlen, replacement, via_end_char
-		if auto_map and end_map then
-			if end_len > auto_len then
-				mapping, tlen, replacement, via_end_char = end_map, end_len, end_repl, true
-			else
-				mapping, tlen, replacement, via_end_char = auto_map, auto_len, auto_repl, false
-			end
-		elseif auto_map then
-			mapping, tlen, replacement, via_end_char = auto_map, auto_len, auto_repl, false
-		elseif end_map then
-			mapping, tlen, replacement, via_end_char = end_map, end_len, end_repl, true
-		else
-			return nil
-		end
+		local mapping, tlen, replacement, via_end_char, nbsp_stripped =
+			select_match(_buf_cps, options.is_terminator == true)
+		if not mapping then return nil end
 
 		-- An end-char match always ERASES the terminator because it sits between
 		-- the trigger and the caret. Whether it stays erased is a separate policy:
@@ -800,13 +1016,16 @@ function M.new()
 		-- +1 for the terminator, +1 more for a stripped no-break space: both sit
 		-- between the trigger and the caret, so both are replaced. Mirrors
 		-- hotstring_dispatch.ahk (Spec.Length + endchar + HSE_TypoNbspStripped).
-		local bc = tlen + (erase_terminator and 1 or 0)
-			+ ((via_end_char and nbsp_stripped) and 1 or 0)
+		local bc = InjectionPlan.erase_count({
+			path = erase_terminator and InjectionPlan.PATH_TERMINATOR or InjectionPlan.PATH_AUTO,
+			trigger_len = tlen, event_len = 1, event_on_screen = true,
+			nbsp_stripped = nbsp_stripped == true,
+		})
 		-- Length, never the trigger: it is text the user typed, and the shared
 		-- logger's default level makes a debug line an always-on one.
 		Logger.debug(LOG, "Match: trigger of %d char(s), backspaces=%d end_char=%s.",
 			tlen, bc, tostring(via_end_char))
-		return {
+		local result = {
 			trigger            = mapping.trigger,
 			-- The EFFECTIVE replacement, which in conform mode carries the casing the
 			-- user typed rather than the casing stored at registration. Returning the
@@ -832,11 +1051,23 @@ function M.new()
 			-- the same thing — see expander.lua, which threads the flag through every
 			-- sink rather than re-deriving it.
 			is_private         = mapping.is_private,
-			-- The largest pause across the ENTIRE consumed suffix, not merely the
-			-- final pair. The Linux delay policy uses this to invalidate a trigger
-			-- after a pause at any position; other shared-engine users may omit time.
-			max_interkey_gap_ms = max_tail_gap_ms(bc),
+			-- The expansion delay's interval: last input letter to expander. An
+			-- earlier pause in the trigger does not count (the delay measures how
+			-- long the user waited before giving the expander); other shared-engine
+			-- users may omit time.
+			expander_gap_ms = expander_gap_ms(via_end_char and (bc - tlen) or 1, bc),
 		}
+		local max_arrows = options.cascade_max_arrows
+		-- One arrow is the first expansion alone: nothing to chain.
+		if max_arrows ~= nil and max_arrows ~= M.CASCADE_MIN_ARROWS then
+			result = cascade(result, mapping, max_arrows, options)
+		end
+		-- The terminator typed back after the replacement: the injection plan's
+		-- rule, applied to the final (possibly cascaded) result.
+		result.replay_terminator = InjectionPlan.tail(
+			result.end_char and InjectionPlan.PATH_TERMINATOR or InjectionPlan.PATH_AUTO,
+			result.consume_terminator, result.terminator)
+		return result
 	end
 
 	--- Clears the rolling typing buffer (e.g., on focus change or Escape key).
@@ -951,14 +1182,15 @@ function M.new()
 		return _start_is_boundary == true
 	end
 
-	--- Captures timing for an exact tail from this engine's physical input owner.
+	--- Captures timing for an exact tail from this engine's physical input owner;
+	--- the tail's last codepoint is its expander.
 	--- @param count number Positive integer of retained codepoints.
 	--- @return table|nil Detached timing summary, or nil for an invalid tail.
 	function engine:tail_timing_receipt(count)
 		if type(count) ~= "number" or count < 1 or count % 1 ~= 0 or count > #_buf_cps then
 			return nil
 		end
-		return { max_interkey_gap_ms = max_tail_gap_ms(count) }
+		return { expander_gap_ms = expander_gap_ms(1, count) }
 	end
 
 	--- The mappings the engine is currently considering, for the preview bubble.

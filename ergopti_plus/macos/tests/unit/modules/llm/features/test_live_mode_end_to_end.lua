@@ -110,7 +110,7 @@ local function build_world()
 	package.loaded["modules.shortcuts.script_control"] = {
 		is_paused = function() return world.paused end,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end,
 		log_llm_failed = function() end,
@@ -265,6 +265,10 @@ local function assert_menu_untouched(world)
 		helpers.assert_true(found, key)
 		helpers.assert_eq(value, expected, "the menu's " .. key .. " is unchanged")
 	end
+	-- The request interval is the shipped one: live mode never sets it.
+	local found, interval = world.engine.get_llm_runtime_setting("llm_min_request_interval")
+	helpers.assert_true(found, "llm_min_request_interval")
+	helpers.assert_eq(interval, world.core.DEFAULT_STATE.llm_min_request_interval, "the menu's request interval is unchanged")
 end
 
 --- Accepts a prediction through the real keymap bridge and expander.
@@ -512,6 +516,20 @@ helpers.describe("live mode end to end (llm-live-mode)", function()
 		helpers.assert_eq(#world.posts, 3, "the chain dispatches outside live mode")
 	end)
 
+	helpers.it("a prompt deleted while live mode runs stops it and asks for nothing (shared live plan)", function()
+		local world = build_world()
+		world.core_state.user_profiles = {
+			{ id = "custom_7", label = "My translator", system_single = "Translate TAIL. REWRITE: <text>" },
+		}
+		helpers.assert_true(toggle(world, "custom_7"))
+		helpers.assert_eq(world.engine.get_live_prompt().profile_id, "custom_7")
+		world.core_state.user_profiles = {}
+		keystroke(world, "on se voit")
+		fire_debounce(world, LIVE.debounce_sec, "the live debounce")
+		helpers.assert_nil(world.engine.get_live_prompt(), "live mode stopped")
+		helpers.assert_eq(#world.posts, 0, "no request, not even with the menu's prompt")
+	end)
+
 	helpers.it("runs every retained rewrite shortcut without a second profile chooser", function()
 		local world = build_world()
 		world.core_state.user_profiles = {
@@ -639,8 +657,8 @@ local function with_live_boundary_owner(scenario)
 		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
 			helpers.assert_eq(scheduler.cancelAll(), true); helpers.assert_eq(scheduler.activeCount(), 0)
 		end
-		local bridge = package.loaded["modules.keylogger.kc_bridge"]
-		if bridge and not rawequal(bridge, previous["modules.keylogger.kc_bridge"]) then bridge.stop() end
+		local bridge = package.loaded["modules.keystats.kc_bridge"]
+		if bridge and not rawequal(bridge, previous["modules.keystats.kc_bridge"]) then bridge.stop() end
 	end)
 	for name in pairs(package.loaded) do if previous[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(previous) do package.loaded[name] = value end

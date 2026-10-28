@@ -3,13 +3,14 @@
 ; The source is authored independently of the serializer under test. The same
 ; file reaches the real runtime loader, onboarding report and detached owners.
 _THS_Source(Shape, Recommended := false) {
-	Tap := Recommended ? "enter" : "escape", Seconds := Recommended ? "0.35" : "0.375"
-	Fields := 'tap_action = "' . Tap . '"`nhold_modifier = "ctrl"`ntime_activation_seconds = ' . Seconds . '`n'
+	; The recommendation ships no delay of its own: the key follows the global one.
+	Tap := Recommended ? "enter" : "escape", Seconds := Recommended ? "" : "0.375"
+	Fields := 'tap_action = "' . Tap . '"`nhold_modifier = "ctrl"`n' . (Recommended ? "" : 'time_activation_seconds = ' . Seconds . '`n')
 	switch Shape {
 		case "dotted": Source := "tap_hold.keys.caps_lock." . StrReplace(RTrim(Fields, "`n"), "`n", "`ntap_hold.keys.caps_lock.") . "`n"
 		case "quoted": Source := '["tap_hold"."keys"."caps_lock"]`n' . Fields
 		case "inline": Source := '[tap_hold]`nkeys = { caps_lock = { tap_action = "' . Tap
-			. '", hold_modifier = "ctrl", time_activation_seconds = ' . Seconds . ', future_note = "keep" } }`n'
+			. '", hold_modifier = "ctrl", ' . (Recommended ? "" : 'time_activation_seconds = ' . Seconds . ', ') . 'future_note = "keep" } }`n'
 		default: throw ValueError("Unknown tap-hold source shape")
 	}
 	return Source . '["tap_hold.keys.caps_lock"]`ntap_action = "literal-dot-owner" # foreign namespace`n'
@@ -53,7 +54,8 @@ _THS_ReportAndImport(Shape, Recommended) {
 		Loaded := LoadTapHoldToml(Fixture.tap, Defaults)
 		AssertEqual(Recommended ? "enter" : "escape", TapHoldTapAction(Loaded, "caps_lock"))
 		AssertEqual("ctrl", TapHoldHoldModifier(Loaded, "caps_lock"))
-		AssertEqual(Recommended ? 0.35 : 0.375, TapHoldDuration(Loaded, "caps_lock"))
+		AssertEqual(Recommended ? TAPHOLD_DEFAULT_ACTIVATION_SECONDS : 0.375, TapHoldDuration(Loaded, "caps_lock"),
+			"a key follows the global delay until the file gives it one of its own")
 		AssertTrue(TapHoldIsActive(Loaded, "caps_lock"), "the independent source is genuinely admitted at runtime")
 		Report := TapHoldKeyReport(Fixture.tap, Defaults)
 		AssertTrue(Report is Map)

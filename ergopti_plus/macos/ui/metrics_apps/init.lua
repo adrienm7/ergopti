@@ -4,7 +4,7 @@
 --- MODULE: Apps Time Dashboard UI
 --- DESCRIPTION:
 --- Hosts the WebView for the per-app time dashboard. Reads from the new
---- `db.sqlite` cache via `modules.keylogger.sqlite_reader` and projects the
+--- `db.sqlite` cache via `modules.keystats.sqlite_reader` and projects the
 --- result into the JSON shape consumed by the (unchanged) frontend JS.
 ---
 --- FEATURES & RATIONALE:
@@ -28,6 +28,7 @@ local OwnWindow = require("adapters.own_window")
 local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
+local Json       = require("json")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
@@ -36,6 +37,7 @@ local i18n       = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
 local ConfigPaths = require("infra.config_paths")
 local TimerScheduler = require("adapters.timer_scheduler")
+local CategoryStore = require("keystats.app_category_store")
 
 local LOG = "metrics_apps"
 
@@ -387,7 +389,7 @@ end
 local function ensure_ingest_listener()
 	if M._ingest_listener_registered then return true end
 	local ok, registered_or_err = xpcall(function()
-		_log_manager = _log_manager or require("modules.keylogger.log_manager")
+		_log_manager = _log_manager or require("modules.keystats.log_manager")
 		if type(_log_manager) ~= "table" or type(_log_manager.on_ingest_done) ~= "function" then
 			error("LogManager.on_ingest_done is unavailable")
 		end
@@ -438,7 +440,7 @@ local MAX_ICON_LOOKUPS_PER_OPEN = 30
 --- error, so the dashboard refused to render and showed nothing.
 --- @return string Absolute path of the category overrides file.
 local function categories_file()
-	return ConfigPaths.get_config_dir() .. "app_categories.json"
+	return ConfigPaths.get_config_dir() .. CategoryStore.FILE_NAME
 end
 --- Fallback category assigned to an uncategorised app on first edit.
 ---
@@ -505,19 +507,22 @@ local function load_categories()
 			tostring(read_ok and read_detail or content))
 		return nil, "failed"
 	end
-	if read_status == "absent" then return {}, "absent", { status = "absent" } end
+	if read_status == "absent" then return CategoryStore.empty(), "absent", { status = "absent" } end
 	if read_status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "App categories returned an invalid read status; edit refused — %s.",
 			tostring(read_status))
 		return nil, "failed"
 	end
 
-	local decode_ok, data = pcall(json.decode, content)
-	if not decode_ok or type(data) ~= "table" then
-		Logger.error(LOG, "App categories contain invalid JSON; edit refused.")
+	local model, reason = CategoryStore.decode(content, json.decode)
+	if not model then
+		Logger.error(LOG, "App categories are invalid (%s); edit refused.", tostring(reason))
 		return nil, "failed"
 	end
-	return data, "ok", { status = "ok", content = content }
+	-- A store in the previous flat layout is rewritten in the shared one by the
+	-- next save: the categories it holds are kept.
+	if model.legacy then Logger.info(LOG, "App categories read from the previous layout; the next save upgrades it.") end
+	return model, "ok", { status = "ok", content = content }
 end
 
 local function save_categories(data, source_snapshot)
@@ -525,7 +530,7 @@ local function save_categories(data, source_snapshot)
 		Logger.error(LOG, "App categories save refused without an exact source snapshot.")
 		return false
 	end
-	local encode_ok, encoded = pcall(json.encode, data)
+	local encode_ok, encoded = pcall(CategoryStore.encode, data, json.encode)
 	if not encode_ok or type(encoded) ~= "string" then
 		Logger.error(LOG, "App categories encode failed; changes were not saved.")
 		return false
@@ -549,16 +554,16 @@ local function push_categories_to_ui(generation, webview)
 	generation = generation or _generation
 	if not is_current_window(generation, webview) then return false end
 	local revision = next_publication_revision(_focus_owner, "categories_revision")
-	local categories = load_categories()
-	if not categories then return false end
+	local model = load_categories()
+	if not model then return false end
 	if not is_current_window(generation, webview) then return false end
-	local encoded_ok, encoded = pcall(json.encode, categories)
+	local encoded_ok, encoded = pcall(json.encode, CategoryStore.projection(model))
 	if not encoded_ok or type(encoded) ~= "string" then
 		Logger.error(LOG, "Apps dashboard category serialization failed.")
 		return false
 	end
 	return submit_javascript(generation, webview, string.format(
-		"window.publishMetricsAppsCategories(%s,%d);", encoded, revision), "categories", function(applied)
+		"window.publishMetricsAppsCategories(JSON.parse(%s),%d);", Json.quote(encoded), revision), "categories", function(applied)
 		Logger.debug(LOG, "Apps dashboard categories publication %s (generation=%d).",
 			applied and "applied" or "obsolete", generation)
 	end, true)
@@ -570,9 +575,9 @@ local function list_existing_categories()
 	local general = i18n.get("metrics_apps.general_category")
 	local seen = { [general] = true }
 	local result = { general }
-	for _, entry in pairs(cats) do
-		local t = type(entry) == "table" and entry.type or nil
-		if type(t) == "string" and t ~= "" and not seen[t] then
+	for _, entry in pairs(cats.apps) do
+		local t = entry.type
+		if not seen[t] then
 			seen[t] = true
 			table.insert(result, t)
 		end
@@ -590,13 +595,17 @@ local function prompt_score_then_save(app_name, chosen_cat, default_score, gener
 	if not owner_is_current(generation, webview) then return false end
 	if btn ~= i18n.get("button.ok") then return end
 	local score = tonumber(score_str)
-	if not score or score < -2 or score > 2 then
-		dialog.alert(i18n.get("common.warning"), i18n.get("metrics_apps.score_error"), i18n.get("button.ok"))
+	if not score or not CategoryStore.score_valid(score) then
+		dialog.block_alert(i18n.get("common.warning"), i18n.get("metrics_apps.score_error"), i18n.get("button.ok"))
 		return
 	end
 	local cats, _, source_snapshot = load_categories()
 	if not cats then return false end
-	cats[app_name] = { type = chosen_cat, score = score }
+	local stored, reason = CategoryStore.set(cats, app_name, chosen_cat, score)
+	if not stored then
+		Logger.error(LOG, "App category refused: %s.", tostring(reason))
+		return false
+	end
 	if not save_categories(cats, source_snapshot) then return false end
 	if generation ~= nil then
 		push_categories_to_ui(generation, webview)
@@ -647,10 +656,10 @@ function M.prompt_category(app_name, default_cat, default_score, generation, web
 				if btn == i18n.get("button.ok") and new_name and new_name ~= "" and new_name ~= c2.text then
 					local cats, _, source_snapshot = load_categories()
 					if not cats then return end
-					for _, entry in pairs(cats) do
-						if type(entry) == "table" and entry.type == c2.text then
-							entry.type = new_name
-						end
+					local renamed, reason = CategoryStore.rename_category(cats, c2.text, new_name)
+					if not renamed then
+						Logger.error(LOG, "Category rename refused: %s.", tostring(reason))
+						return
 					end
 					if save_categories(cats, source_snapshot) then
 						if generation ~= nil then
@@ -689,7 +698,7 @@ local function prompt_pick_app(generation, webview)
 			return
 		end
 		if type(choices) ~= "table" or #choices == 0 then
-			dialog.alert(i18n.get("common.warning"), i18n.get("metrics_apps.no_app_detected"), i18n.get("button.ok"))
+			dialog.block_alert(i18n.get("common.warning"), i18n.get("metrics_apps.no_app_detected"), i18n.get("button.ok"))
 			return
 		end
 		present_owned_chooser("Application metrics chooser", function(choice)
@@ -697,7 +706,7 @@ local function prompt_pick_app(generation, webview)
 			if not choice then return end
 			local cats    = load_categories()
 			if not cats then return end
-			local current = cats[choice.text] or { type = default_app_category(), score = 0 }
+			local current = cats.apps[choice.text] or { type = default_app_category(), score = 0 }
 			M.prompt_category(choice.text, current.type, current.score, generation, webview)
 		end, function(chooser)
 			chooser:placeholderText(i18n.get("metrics_apps.pick_app_placeholder"))
@@ -809,7 +818,7 @@ end
 --- @param manifest table SQLite projection keyed by date then application.
 --- @return table Projection safe to send to the dashboard.
 local function with_live_active_app_duration(manifest)
-	local ok_tracker, tracker = pcall(require, "modules.keylogger.context_tracker")
+	local ok_tracker, tracker = pcall(require, "modules.keystats.context_tracker")
 	if not ok_tracker or type(tracker.get_active_app_snapshot) ~= "function" then return manifest end
 	local ok_snapshot, snapshot = pcall(tracker.get_active_app_snapshot)
 	if not ok_snapshot or type(snapshot) ~= "table"
@@ -898,8 +907,10 @@ local function inject_payload(generation, webview, manifest, categories, icons, 
 		end
 	end
 	local function publish()
-		local code = string.format("window.publishMetricsAppsData(%s,%s,%s,{manifest_revision:%d,categories_revision:%d});",
-			manifest, categories, icons, manifest_revision, categories_revision)
+		-- Application names are data keys: JavaScript object literals treat
+		-- __proto__ specially, while JSON.parse preserves the exact own key.
+		local code = string.format("window.publishMetricsAppsData(JSON.parse(%s),JSON.parse(%s),JSON.parse(%s),{manifest_revision:%d,categories_revision:%d});",
+			Json.quote(manifest), Json.quote(categories), Json.quote(icons), manifest_revision, categories_revision)
 		return submit_javascript(generation, webview, code, label .. " publication", function(applied)
 			if applied then
 				Logger.success(LOG, "Apps dashboard %s injected.", label)
@@ -926,8 +937,8 @@ local function load_and_inject(generation, webview)
 	local manifest_revision = next_publication_revision(_focus_owner, "manifest_revision")
 	local categories_revision = next_publication_revision(_focus_owner, "categories_revision")
 
-	local log_manager   = require("modules.keylogger.log_manager")
-	local sqlite_reader = require("modules.keylogger.sqlite_reader")
+	local log_manager   = require("modules.keystats.log_manager")
+	local sqlite_reader = require("modules.keystats.sqlite_reader")
 	local sqlite_path   = log_manager.get_sqlite_path()
 	if not sqlite_path or not fs.attributes(sqlite_path) then
 		Logger.warn(LOG, "db.sqlite not available — dashboard will display empty.")
@@ -953,44 +964,63 @@ local function load_and_inject(generation, webview)
 	end
 	if not is_current_window(generation, webview) then return false end
 
-	local user_cats = load_categories()
-	if not user_cats then
+	local category_model = load_categories()
+	if not category_model then
 		Logger.warn(LOG, "Apps dashboard refresh refused because categories are unreadable.")
 		return false
 	end
+	local user_cats = CategoryStore.projection(category_model)
 	if not is_current_window(generation, webview) then return false end
 
-	-- App icon collection (capped to keep first paint fast).
-	local app_icons    = {}
-	local icon_lookups = 0
-	local seen_apps    = {}
-	for _, day_data in pairs(manifest) do
-		for app_name, _ in pairs(day_data) do
-			if not seen_apps[app_name] then
-				seen_apps[app_name] = true
-				local cached = M._app_icon_cache[app_name]
-				if cached ~= nil then
-					if cached then app_icons[app_name] = cached end
-				elseif icon_lookups < MAX_ICON_LOOKUPS_PER_OPEN then
-					local icon = get_app_icon(app_name)
-					M._app_icon_cache[app_name] = icon or false
-					if icon then app_icons[app_name] = icon end
-					icon_lookups = icon_lookups + 1
+	-- The rest is cut into bounded slices, one main-loop turn each: the icon
+	-- lookups, the JSON encodes plus the injection, and the disk-cache write used
+	-- to run in this single callback (issue #101: 1.1 s held on the main thread).
+	local function continue_load(label, step)
+		if schedule_continuation(BRIDGE_DEFER_DELAY_SEC, generation, webview, step, label) then
+			return true
+		end
+		close_window_generation(generation, webview, true, label .. " timer refusal")
+		return false
+	end
+
+	return continue_load("Apps dashboard icon collection", function()
+		-- App icon collection (capped to keep first paint fast).
+		local app_icons    = {}
+		local icon_lookups = 0
+		local seen_apps    = {}
+		for _, day_data in pairs(manifest) do
+			for app_name, _ in pairs(day_data) do
+				if not seen_apps[app_name] then
+					seen_apps[app_name] = true
+					local cached = M._app_icon_cache[app_name]
+					if cached ~= nil then
+						if cached then app_icons[app_name] = cached end
+					elseif icon_lookups < MAX_ICON_LOOKUPS_PER_OPEN then
+						local icon = get_app_icon(app_name)
+						M._app_icon_cache[app_name] = icon or false
+						if icon then app_icons[app_name] = icon end
+						icon_lookups = icon_lookups + 1
+					end
 				end
 			end
 		end
-	end
 
-	local cached_manifest_json = json.encode(manifest)
-	local manifest_json        = json.encode(with_live_active_app_duration(manifest))
-	local user_cats_json = json.encode(user_cats)
-	local app_icons_json = json.encode(app_icons)
+		continue_load("Apps dashboard payload publication", function()
+			local cached_manifest_json = json.encode(manifest)
+			local manifest_json        = json.encode(with_live_active_app_duration(manifest))
+			local user_cats_json = json.encode(user_cats)
+			local app_icons_json = json.encode(app_icons)
 
-	save_disk_cache({ manifest = cached_manifest_json, user_cats = user_cats_json, app_icons = app_icons_json })
-	if not is_current_window(generation, webview) then return false end
+			inject_payload(generation, webview, manifest_json, user_cats_json, app_icons_json,
+				MANIFEST_RETRY_LIMIT, MANIFEST_RETRY_DELAY_SEC, "manifest", manifest_revision,
+				categories_revision)
 
-	return inject_payload(generation, webview, manifest_json, user_cats_json, app_icons_json,
-		MANIFEST_RETRY_LIMIT, MANIFEST_RETRY_DELAY_SEC, "manifest", manifest_revision, categories_revision)
+			continue_load("Apps dashboard disk cache save", function()
+				save_disk_cache({ manifest = cached_manifest_json, user_cats = user_cats_json,
+					app_icons = app_icons_json })
+			end)
+		end)
+	end)
 end
 
 local function prefill_from_disk_cache(generation, webview)
@@ -1011,6 +1041,10 @@ end
 -- ======= 5/ Public API =======
 -- =============================
 -- =============================
+
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return M._wv end
 
 --- Closes the published apps dashboard generation.
 --- @return boolean committed

@@ -1,0 +1,19 @@
+[_meta]
+schema_version = 10
+
+[hotstrings.autocorrection]
+names = { enabled = false, time_activation_seconds = 0.4, future = "preserved inline owner" }
+
+[hotstrings.autocorrection.caps]
+enabled = true
+time_activation_seconds = 0.875
+
+[hotstrings.autocorrection.abbreviations.enabled]
+future = "preserved descendant"
+
+[hotstrings.modules.autocorrection]
+caps = true
+names = false
+
+[hotstrings.modules.autocorrection.abbreviations]
+future = false

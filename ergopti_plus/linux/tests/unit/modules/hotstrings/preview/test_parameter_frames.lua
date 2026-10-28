@@ -19,8 +19,8 @@ local function with_frames(body, paused, mutate)
 			get_groups = function() return {} end, get_categories = function() return {} end,
 			language_packs = function() return {} end,
 			resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
-			get_global_delay = function() return 0.75 end,
-			has_global_delay_override = function() return false end,
+			get_base_delay = function() return 0.75 end,
+			has_base_delay_override = function() return false end,
 		}, on_toggle_pause = function() end, on_quit = function() end }
 		context.is_paused = function() return context.paused end
 		local rows = helpers.load_module("ui.menu.menu_builder").build(context)

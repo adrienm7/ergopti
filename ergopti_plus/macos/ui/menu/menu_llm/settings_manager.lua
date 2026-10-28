@@ -17,18 +17,15 @@ local i18n    = require("infra.i18n")
 local dialog  = require("infra.dialog_util")
 local Notifications = require("infra.notifications")
 local ManifestMenu = require("infra.manifest_menu")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "menu_llm.settings"
 
 --- Creates a detached value snapshot for rollback.
 --- @param value any Value to clone.
 --- @return any clone
-local function clone_value(value)
-	if type(value) ~= "table" then return value end
-	local clone = {}
-	for key, child in pairs(value) do clone[clone_value(key)] = clone_value(child) end
-	return clone
-end
+local clone_value = TableUtil.deep_copy_with_keys
 
 --- Retains the exact source authority across forward, inverse and debt retry saves.
 --- Source adoption is never a publication receipt; only one next owned ACK may
@@ -496,6 +493,8 @@ function M.new(deps)
 		local display_val = current_val < 0 and i18n.get("menu.settings.never") or math.floor(current_val * 1000)
 		local display_def = math.floor(llm_mod.DEFAULT_STATE.llm_debounce * 1000)
 
+		-- Not menu.llm.debounce_prompt: this dialog accepts a blank (reset to the default) and
+		-- "Never"/-1 on top of milliseconds, the Windows one a plain integer of milliseconds.
 		local full_msg = string.format(i18n.get("menu.settings.delay_prompt"), display_def)
 
 		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.delay_title"), full_msg, tostring(display_val), i18n.get("button.ok"), i18n.get("common.cancel"))
@@ -529,6 +528,45 @@ function M.new(deps)
 			llm_mod.DEFAULT_STATE.llm_debounce, "set_llm_debounce")
 	end
 
+	--- Sets the minimum time between two automatic AI requests (all backends).
+	function obj.set_min_request_interval()
+		local state = deps.state
+
+		local current_val = tonumber(state.llm_min_request_interval)
+		if current_val == nil then current_val = llm_mod.DEFAULT_STATE.llm_min_request_interval end
+		local display_def = math.floor(llm_mod.DEFAULT_STATE.llm_min_request_interval * 1000)
+
+		local full_msg = string.format(i18n.get("menu.settings.min_interval_prompt"), display_def)
+
+		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.min_interval_title"), full_msg, tostring(math.floor(current_val * 1000)), i18n.get("button.ok"), i18n.get("common.cancel"))
+
+		if ok_p and btn == i18n.get("button.ok") then
+			local new_val
+			if raw:match("^%s*$") then
+				new_val = llm_mod.DEFAULT_STATE.llm_min_request_interval
+			else
+				new_val = tonumber(raw)
+				if new_val and new_val >= 0 then new_val = new_val / 1000 end
+			end
+
+			if new_val and is_finite_number(new_val) and new_val >= 0 then
+				return obj.apply_setting_transaction({
+					key = "llm_min_request_interval",
+					value = new_val,
+					runtime_fn = "set_llm_min_request_interval",
+					publish_setting = true,
+				})
+			end
+			return reject_numeric_input(i18n.get("menu.settings.min_interval_title"),
+				new_val and "numeric_prompt.out_of_range" or nil)
+		end
+	end
+
+	function obj.reset_min_request_interval()
+		return reset_to_default(obj.apply_setting_transaction, "llm_min_request_interval",
+			llm_mod.DEFAULT_STATE.llm_min_request_interval, "set_llm_min_request_interval")
+	end
+
 	--- Sets the maximum number of words kept per prediction.
 	function obj.set_max_words()
 		local state = deps.state
@@ -536,7 +574,7 @@ function M.new(deps)
 		local current_val = tonumber(state.llm_max_words)
 		local display_val = (current_val and current_val > 0) and tostring(current_val) or "0"
 
-		local full_msg = i18n.get("menu.settings.max_words_prompt")
+		local full_msg = i18n.get("menu.llm.max_words_prompt")
 
 		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.max_words_title"), full_msg, display_val, i18n.get("button.ok"), i18n.get("common.cancel"))
 
@@ -597,7 +635,7 @@ function M.new(deps)
 	function obj.set_temperature()
 		return generic_numeric_prompt(deps, obj.apply_setting_transaction,
 			i18n.get("menu.settings.temperature_title"),
-			i18n.get("menu.settings.temperature_prompt"),
+			i18n.get("menu.llm.temperature_prompt"),
 			"llm_temperature", nil, "set_llm_temperature", llm_mod.DEFAULT_STATE.llm_temperature, 0.0, 1.0
 		)
 	end
@@ -639,9 +677,9 @@ function M.new(deps)
 		local default_port = ApiMlx.get_default_port()
 		local lo, hi       = ApiMlx.get_port_bounds()
 
-		local full_msg = string.format(i18n.get("menu.llm.mlx_port_prompt"), tostring(default_port))
+		local full_msg = string.format(i18n.get("menu.llm.server_port_prompt"), "MLX", tostring(default_port))
 		local ok_p, btn, raw = pcall(dialog.text_prompt,
-			i18n.get("menu.llm.mlx_port_title"), full_msg, tostring(current),
+			string.format(i18n.get("menu.llm.server_port_title"), "MLX"), full_msg, tostring(current),
 			i18n.get("button.ok"), i18n.get("common.cancel"))
 		if not (ok_p and btn == i18n.get("button.ok")) then return end
 
@@ -654,7 +692,7 @@ function M.new(deps)
 		if not new_port or new_port < lo or new_port > hi then
 			Logger.warn(LOG, "set_mlx_port: invalid input '%s' (expected an integer %d-%d).",
 				tostring(raw), lo, hi)
-			return reject_numeric_input(i18n.get("menu.llm.mlx_port_title"),
+			return reject_numeric_input(string.format(i18n.get("menu.llm.server_port_title"), "MLX"),
 				new_port and "numeric_prompt.out_of_range" or nil)
 		end
 		local committed = false
@@ -735,8 +773,8 @@ function M.new(deps)
 			}
 		end
 		local rows = ManifestMenu.template_rows("llm_modifier_picker_frame", {
-			["llm_modifier_disabled"] = function() return apply_modifiers({"none"}) end,
-			["llm_modifier_none"] = function() return apply_modifiers({}) end,
+			[ConfigKeys.COMMAND.LLM_MODIFIER_DISABLED] = function() return apply_modifiers({"none"}) end,
+			[ConfigKeys.COMMAND.LLM_MODIFIER_NONE] = function() return apply_modifiers({}) end,
 		}, {
 			llm_modifier_disabled_checked = function() return current_str == "none" end,
 			llm_modifier_none_checked = function() return current_str == "" end,

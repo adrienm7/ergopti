@@ -6,13 +6,21 @@ local M = {}
 local unpack_values = table.unpack or unpack
 
 function M.attach(writer)
+	-- Logical flush ports own no native file descriptors. Do not let a broad
+	-- unknown-method metatable fabricate private cleanup debt, and preserve an
+	-- explicitly supplied debt port when a test models that refusal itself.
+	if rawget(writer, "has_private_file_debt") == nil then
+		writer.has_private_file_debt = function() return false end
+	end
 	writer.flush_transport_available = function() return true end
 	writer.start_flush = function(device, payload)
 		local ok = true
 		local raw_methods = { typing = "insert_typing_events", hotstrings = "insert_hotstring_events",
-			shortcuts = "insert_shortcut_events", switches = "insert_app_switch_events" }
+			shortcuts = "insert_shortcut_events", switches = "insert_app_switch_events",
+			llm = "insert_llm_events", windows = "insert_window_switch_events",
+			sessions = "insert_session_events", system = "insert_system_events" }
 		for family, method in pairs(raw_methods) do
-			if #payload.raw[family] > 0 and writer[method](device, payload.raw[family]) == false then ok = false end
+			if #(payload.raw[family] or {}) > 0 and writer[method](device, payload.raw[family]) == false then ok = false end
 		end
 		for _, entry in ipairs(payload.upserts) do
 			local args = { device }

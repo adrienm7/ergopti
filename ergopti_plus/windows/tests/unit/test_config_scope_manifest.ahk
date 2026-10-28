@@ -434,6 +434,14 @@ _ScopeObsoleteSource(Literal, Parent := false) {
 		: '[layout]`nergopti_base = ' . Literal . ' # retain until explicit cleanup`nergopti_alt_gr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n')
 }
 
+; The four preview switches are active by default, so a hotstrings clear writes
+; their off value (the manifest's cleared value) after the user's own rows
+; instead of deleting them. Keys follow the manifest order.
+_ScopePreviewOffRows() {
+	return "preview_ai_enabled = false`npreview_autocorrect_enabled = false`n"
+		. "preview_colored_tooltips = false`npreview_star_enabled = false`n"
+}
+
 _ScopeObsoleteLeafClear(Literal, Outcome := "complete") {
 	Fixture := _ScopeOwnerFixture(), Source := _ScopeObsoleteSource(Literal)
 	Assert(FSWriteDurable(Fixture.path, Source))
@@ -540,7 +548,8 @@ _ScopeObsoleteParentClear(Literal) {
 		Assert(Outdated.Has("hotstrings`nautocorrection"))
 		Receipt := ConfigScopeApply("hotstrings", "clear", Map(), Fixture.options)
 		AssertEqual("pending", Receipt["status"])
-		AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "neutral descendants cannot replace an obsolete table parent")
+		AssertEqual(StrReplace(Source, "[layout]`n", _ScopePreviewOffRows() . "[layout]`n"), FSReadUtf8Exact(Fixture.path),
+			"neutral descendants cannot replace an obsolete table parent")
 		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
 		Refusal.Call("native refusal")
 		AssertEqual("refused", Receipt["status"])
@@ -681,7 +690,7 @@ _ScopeObsoleteGlobal(Mode) {
 			AssertEqual("pending", Receipt["status"])
 			Assert(Backups >= 4, "the genuine global file cohort crosses its coordinated backup boundary")
 			AssertEqual(1, Launches)
-			Expected := StrReplace(Source, "ergopti_alt_gr = true`n", "")
+			Expected := StrReplace(StrReplace(Source, "ergopti_alt_gr = true`n", ""), "[layout]`n", _ScopePreviewOffRows() . "[layout]`n")
 				. '[shortcuts.keyboard]`nmagic_editor = "none"`n'
 				. '[shortcuts.script_control]`nscript_altgr_backspace = "none"`n'
 				. 'script_altgr_delete = "none"`nscript_altgr_enter = "none"`nscript_altgr_escape = "none"`n'

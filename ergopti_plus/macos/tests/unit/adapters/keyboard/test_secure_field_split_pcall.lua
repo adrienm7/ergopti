@@ -4,7 +4,7 @@
 --- MODULE: Regression — a throwing AXSubrole read must not discard a secure AXRole
 --- DESCRIPTION:
 --- Privacy leak that FAILS OPEN, which this module's own docstring names as the
---- disaster mode: "letting the keylogger record the user's password characters".
+--- disaster mode: "letting the keystats record the user's password characters".
 ---
 --- ROOT CAUSE ENCODED:
 --- refresh() read both AX attributes inside ONE pcall:
@@ -17,13 +17,13 @@
 --- password field.
 ---
 --- AX reads throw routinely: the element can die or be replaced between the two
---- calls. keylogger/context_tracker.lua already reads these same two attributes
+--- calls. keystats/context_tracker.lua already reads these same two attributes
 --- with SEPARATE pcalls for exactly this reason — this adapter was the sibling
 --- that did not.
 ---
 --- The test drives the real M.refresh() with an element whose AXRole reports a
 --- secure field and whose AXSubrole raises, then asserts the public predicate the
---- keylogger actually gates on.
+--- keystats actually gates on.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -102,7 +102,7 @@ helpers.describe("secure-field detection survives a throwing AX attribute read",
 		helpers.assert_true(Detector.isSecureField() == true,
 			"a successful AXRole = AXSecureTextField must survive a throw on the following "
 			.. "AXSubrole read — sharing one pcall discarded it and made the guard fail OPEN, "
-			.. "which is what lets the keylogger record password characters")
+			.. "which is what lets the keystats record password characters")
 	end)
 
 	helpers.it("fails closed when a plain AXRole survives but AXSubrole cannot be read", function()

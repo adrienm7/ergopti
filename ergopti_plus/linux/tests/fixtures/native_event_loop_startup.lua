@@ -11,7 +11,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_event_loop_startup%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. package.path
+	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
 local uv = require("luv")
 local failures = 0
 local cases = { "idle nil", "idle raised", "idle start raised", "timer nil", "timer raised", "timer start raised", "timer invalidated" }

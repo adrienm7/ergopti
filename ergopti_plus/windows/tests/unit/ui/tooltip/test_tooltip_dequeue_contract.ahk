@@ -28,7 +28,7 @@
 _DequeueContract_LoadCorpus() {
 	; A_ScriptDir is the runner's directory (windows/tests/), not this file's.
 	; ..\..\_shared resolves to ergopti_plus\_shared — same convention as all
-	; other corpus tests (test_corpus_keylogger_aggregation.ahk, etc.).
+	; other corpus tests (test_corpus_keystats_aggregation.ahk, etc.).
 	Path := A_ScriptDir . "\..\..\_shared\tests\corpus\tooltip\dequeue_vectors.json"
 	if !FileExist(Path)
 		return ""

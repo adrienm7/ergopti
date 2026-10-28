@@ -84,13 +84,17 @@ function M.assert_disabled_root(helpers, platform, source, top_level)
 	local result = with_boundary_owner(helpers, platform, source, top_level, function(renderer, current, factory)
 		if platform == "hs" then
 			local loader = between(source, "local function load_top_level()", "--- Invalidates locale-dependent caches")
-			local loop = between(source, "\tlocal items = {}\n\tfor _, entry in ipairs(load_top_level()) do", "\n\t-- Everything above collected row DATA")
+			local loop = between(source, "\tlocal items = {}\n\tlocal item_timings = {}\n\tfor _, entry in ipairs(load_top_level()) do",
+				"\n\t-- Everything above collected row DATA")
 			local wrapped = {}
 			for id, builder in pairs(builders) do wrapped[id] = function() return {builder()} end end
 			return assert(compile_source("local _top_level_cache; local _top_level_separator_receiver\n"
 				.. loader .. "\n" .. loop .. "\nreturn items", "@actual-macos-composition", {
 					separator_facade_current = current, separator_factory = factory, builders = wrapped,
 					ctx = {paused = false}, type = type, ipairs = ipairs, table = table, tostring = tostring,
+					-- Each built row is timed into the phase counters; inert here.
+					PhaseStats = {now = function() return 0 end, stop = function() return 0 end},
+					phase_name = function(id) return "menu_item." .. tostring(id) end, M = {},
 					i18n = {get = function(key) return key end}, Logger = {debug = function() end, error = function() end}}))()
 		end
 		-- The actor begins after the header. Its independent caption oracle stays

@@ -12,6 +12,9 @@ local RecordScanner = require("toml_codec.record_scanner")
 local KeyPath = require("toml_codec.key_path")
 local Bom = require("toml_codec.bom")
 local BasicString = require("toml_codec.basic_string")
+local SourceMemo = require("toml_codec.source_memo")
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 -- Integer subtype is an optional capability; LuaJIT leaves it absent.
 local math_type = math.type
 --- MODULE: TOML Codec (shared)
@@ -166,10 +169,8 @@ encode_value = function(v, shapes, owner, key)
 		end
 		-- Array members cannot become sections: keep their dictionaries inline,
 		-- including nested values, using the same escaping and ordering rules.
-		local keys, parts = {}, {}
-		for key in pairs(v) do keys[#keys + 1] = key end
-		table.sort(keys, function(left, right) return tostring(left) < tostring(right) end)
-		for _, key in ipairs(keys) do
+		local parts = {}
+		for _, key in ipairs(TableUtil.sorted_keys(v, TableUtil.by_text)) do
 			parts[#parts + 1] = encode_key(key) .. " = " .. encode_value(v[key], shapes, v, key)
 		end
 		return "{ " .. table.concat(parts, ", ") .. " }"
@@ -280,7 +281,8 @@ end
 -- =================================
 -- =================================
 
-local function trim(s) return (s:match("^%s*(.-)%s*$") or s) end
+-- Linear-time trim: the pattern form backtracks on a long value ending in spaces.
+local trim = TextUtils.trim
 
 --- Split a dotted section path into its segments, honouring quoted segments
 --- that may contain dots themselves. e.g.
@@ -330,10 +332,27 @@ local PARSE_ERROR = {}
 --- @param source string Complete value or physical line.
 --- @return string uncommented
 local function strip_comments(source)
+	-- Every state copies its characters verbatim and only `#` removes any, so a
+	-- source without one is returned as it is.
+	if not source:find("#", 1, true) then return source end
 	local out = {}
 	local quote = nil
 	local index = 1
 	while index <= #source do
+		-- A run of characters no state reacts to is copied in one slice; the
+		-- stop sets are exactly the characters each branch below acts on.
+		local stop = nil
+		if quote == nil then stop = source:find("[\"'#]", index)
+		elseif quote == '"' then stop = source:find('[\\"]', index)
+		elseif quote == "'" then stop = source:find("'", index, true) end
+		if quote == nil or quote == '"' or quote == "'" then
+			local run_end = (stop or (#source + 1)) - 1
+			if run_end >= index then
+				out[#out + 1] = source:sub(index, run_end)
+				index = run_end + 1
+				if index > #source then break end
+			end
+		end
 		local char = source:sub(index, index)
 		local triple = source:sub(index, index + 2)
 		if quote == '"""' or quote == "'''" then
@@ -407,7 +426,29 @@ local function split_top_level_commas(body, with_spans)
 	local quote = nil
 	local depth = 0
 	local index = 1
+	local plain_stop = with_spans and "[\"'%[%]{},#]" or "[\"'%[%]{},]"
+	-- No delimiter, quote or comment at all: the body is the single fragment.
+	if not body:find(plain_stop) then
+		if #body > 0 then
+			fragments[1] = body
+			if spans then spans[1] = { first = 1, last = #body } end
+		end
+		return fragments, spans
+	end
 	while index <= #body do
+		-- Plain runs are appended in one slice (see strip_comments).
+		local stop = nil
+		if quote == nil then stop = body:find(plain_stop, index)
+		elseif quote == '"' then stop = body:find('[\\"]', index)
+		elseif quote == "'" then stop = body:find("'", index, true) end
+		if quote == nil or quote == '"' or quote == "'" then
+			local run_end = (stop or (#body + 1)) - 1
+			if run_end >= index then
+				current[#current + 1] = body:sub(index, run_end)
+				index = run_end + 1
+				if index > #body then break end
+			end
+		end
 		local char = body:sub(index, index)
 		local triple = body:sub(index, index + 2)
 		if quote == '"""' or quote == "'''" then
@@ -1095,6 +1136,12 @@ function M.record_string_spans(raw)
 	return result
 end
 
+-- One preferences save decodes the same config.toml text 17 times across
+-- independent owners (preferences, record list, wrap pairs, inline parents,
+-- batch writer). Four texts cover the source and candidate of one save.
+local SHAPE_MEMO_ENTRIES = 4
+local _shape_memo = SourceMemo.new(SHAPE_MEMO_ENTRIES)
+
 --- Decodes a document with the established untagged Lua value model.
 --- @param content string TOML source.
 --- @return table|nil document
@@ -1110,11 +1157,23 @@ end
 --- @return table|nil document
 --- @return table|nil shapes Source-bound arrays and unchanged scalar tokens.
 function M.decode_with_shapes(content)
-	local shapes = { arrays = {}, numbers = {}, strings = {} }
-	local document = decode_document(content, shapes)
-	if not document then return nil, nil end
-	shapes.document = document
-	return document, shapes
+	local function build()
+		local shapes = { arrays = {}, numbers = {}, strings = {} }
+		local document = decode_document(content, shapes)
+		if not document then return nil end
+		shapes.document = document
+		return shapes
+	end
+	local shapes
+	if type(content) == "string" then
+		-- The memo clones the document and its table-keyed receipts together,
+		-- so the copy's receipts name the copy's own tables.
+		shapes = _shape_memo.fetch(content, false, build)
+	else
+		shapes = build()
+	end
+	if not shapes then return nil, nil end
+	return shapes.document, shapes
 end
 
 return M

@@ -152,6 +152,44 @@ KS_GetPhysicalInputGeneration() {
 }
 
 
+/**
+ * The existing context-reset class shared by prefix and prediction observers.
+ * The caller still owns Space handling and configurable boundary policies.
+ * @param {Integer} VK The native virtual-key code.
+ * @returns {Boolean} True when this key makes the caret context unknowable.
+ */
+KS_IsContextResetKey(VK) {
+	if !(VK is Integer)
+		throw TypeError("Context reset requires an integer virtual key.")
+	static ResetVKs := Map(
+		; VK_BACK is deliberately ABSENT: backspace decrements both buffers
+		; rather than wiping the preview — each observer owns that edit.
+		0x09, true,  ; VK_TAB
+		0x0D, true,  ; VK_RETURN
+		0x1B, true,  ; VK_ESCAPE
+		0x20, true,  ; VK_SPACE
+		; Hotstring word resets still depend on hotstrings.arrow_resets_word.
+		0x25, true,  ; VK_LEFT
+		0x26, true,  ; VK_UP
+		0x27, true,  ; VK_RIGHT
+		0x28, true,  ; VK_DOWN
+		; The rest of the navigation cluster. The engine's own contract lists
+		; these as buffer-invalidating, but only the arrows were ever enumerated
+		; here — so typing "bonjour ia", pressing Home and typing "." fired
+		; ia -> IA with {BackSpace 3} at line start and ate three characters of
+		; unrelated text. Delete and Insert belong with them: both rewrite the
+		; document by an amount this watcher cannot observe.
+		0x21, true,  ; VK_PRIOR  (PgUp)
+		0x22, true,  ; VK_NEXT   (PgDn)
+		0x23, true,  ; VK_END
+		0x24, true,  ; VK_HOME
+		0x2D, true,  ; VK_INSERT
+		0x2E, true,  ; VK_DELETE
+	)
+	return ResetVKs.Has(VK)
+}
+
+
 
 
 

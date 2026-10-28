@@ -473,6 +473,7 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 			local fixture = load_h01_system({ hs_overrides = { eventtap = eventtap } })
 			local now = 1000
 			fixture.hs.timer.secondsSinceEpoch = function() return now end
+			fixture.hs.timer.absoluteTime = function() return now * 1e9 end
 			local close_count = 0
 			fixture.hs.alert.show = function() return "awake" end
 			fixture.hs.alert.closeSpecific = function() close_count = close_count + 1 end

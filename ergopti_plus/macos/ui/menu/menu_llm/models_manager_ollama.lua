@@ -13,6 +13,7 @@
 local M = {}
 
 local hs            = hs
+local Errors = require("adapter_errors")
 local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
@@ -43,6 +44,22 @@ local OLLAMA_READINESS_MAX_RETRIES = 30              -- Allow thirty bounded pro
 -- Readiness failures after which nothing answers at the Ollama endpoint: no
 -- executable to start, a start that failed, or a start that never answered.
 -- The ownership refusals (pause, overlap, a stale caller) are not the user's to fix.
+--- Opens System Settings > Network, the click of a pull's network failure
+--- notice: the PAC and the direct route are the user's or IT's to fix there.
+--- @return boolean opened
+local function open_network_settings()
+	local Repair = require("ui.menu.menu_llm.mlx_repair_offer")
+	local ok, started = pcall(function()
+		local handle = ShellRunner.spawn(Repair.OPEN_BIN, { Repair.NETWORK_SETTINGS_URL }, nil)
+		return handle ~= nil and handle.start() == true
+	end)
+	if not ok or started ~= true then
+		Logger.error(LOG, "The network settings could not be opened: %s.", tostring(started))
+		return false
+	end
+	return true
+end
+
 local UNREACHABLE_READINESS = {
 	restart_command_unavailable = true,
 	restart_failed = true,
@@ -830,11 +847,11 @@ function M.new(deps, presets, ram_getter)
 				on_settled = function(published, reason)
 					if not owns_operation() then return end
 					if published ~= true then
-						notify_start_failure(reason == "external runtime requires manual service management"
+						notify_start_failure(reason == Errors.OLLAMA_EXTERNAL_RUNTIME_MANUAL
 							and "ollama.external_manual_start_body" or "ollama.daemon_fail")
 						-- Native pre-publication exit retains the established unreachable
 						-- readiness class; ownership/manual refusals keep their reason.
-						settle_operation(false, reason == "server task exited before publication"
+						settle_operation(false, reason == Errors.OLLAMA_SERVER_EXITED_BEFORE_PUBLICATION
 							and "restart_failed" or reason or "restart_failed")
 						return
 					end
@@ -1425,7 +1442,10 @@ function M.new(deps, presets, ram_getter)
 			if foreign_daemon then
 				network, network_err = NetworkEnv.prelude("OLLAMA-PULL")
 			else
-				network, network_err = NetworkEnv.opaque_prelude("OLLAMA-PULL")
+				-- The daemon Ergopti started reads only HTTPS_PROXY: a company PAC is
+				-- resolved for the registry by the launcher instead of refusing the pull.
+				network, network_err = NetworkEnv.opaque_prelude("OLLAMA-PULL",
+					{ pac_probe_client = "ollama" })
 			end
 			if not network then
 				Logger.error(LOG, "The Ollama model pull cannot start: %s.", tostring(network_err))
@@ -1441,6 +1461,13 @@ function M.new(deps, presets, ram_getter)
 		end
 		local network_admission = NetworkAdmission.new()
 		local pull_output = ""
+		-- The head of the raw stderr, where the admission prints its PAC fallback marker.
+		local pac_fallback_scan = ""
+		local function scan_pac_fallback(stderr)
+			if #pac_fallback_scan < 8192 then
+				pac_fallback_scan = (pac_fallback_scan .. (stderr or "")):sub(1, 8192)
+			end
+		end
 		local maybe_release_pull_owner
 		local launch_retry
 		local function settle_pull_task(callback_status)
@@ -1636,7 +1663,7 @@ function M.new(deps, presets, ram_getter)
 		local start_in_progress = true
 		local pending_completion = nil
 		local pending_chunks = {}
-		local function finish_pull(code, _stdout, stderr)
+		local function finish_pull(code, stdout, stderr)
 			if owner.completion_dispatching == true or owner.receipt_joining == true then return false end
 			if owner.completion_seen and (owner.task_settled == true
 				or owner.callback_status ~= code) then return false end
@@ -1647,6 +1674,8 @@ function M.new(deps, presets, ram_getter)
 			local authorized = owner.authorized == true
 				and owner.start_committed == true
 			if settle_pull_task(code) ~= true then
+				Logger.error(LOG, "The Ollama pull of %s ended (code %s) but its task could not be settled.",
+					tostring(target_model), tostring(code))
 				owner.authorized = false
 				owner.completion_dispatching = false
 				complete_progress_ui(owner, false, target_model)
@@ -1668,6 +1697,8 @@ function M.new(deps, presets, ram_getter)
 			if not authorized then return finish_result(true) end
 			if not current_or_cancel() then return finish_result(false) end
 			network_admission.push(stderr or "")
+			scan_pac_fallback(stderr)
+			local pac_fallback = NetworkAdmission.pac_fallback_stage(pac_fallback_scan)
 			local network_receipt = network_admission.finish(code)
 			local network_report
 			if network_receipt then
@@ -1677,6 +1708,10 @@ function M.new(deps, presets, ram_getter)
 			end
 			if not current_or_cancel() then return finish_result(false) end
 			if code == 0 then
+				if pac_fallback then
+					Logger.info(LOG, "The direct connection worked after the automatic network configuration failed (%s).",
+						pac_fallback)
+				end
 				complete_progress_ui(owner, true, target_model)
 				
 				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
@@ -1684,6 +1719,10 @@ function M.new(deps, presets, ram_getter)
 					pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 					settle_success()
 				end, function(reason)
+					if reason ~= "stale" then
+						Logger.error(LOG, "The Ollama model %s was pulled but does not load: %s.",
+							tostring(target_model), tostring(reason))
+					end
 					settle_cancel(reason == "stale" and "stale" or "model_load_failed")
 				end, opts)
 			elseif code == 15 then
@@ -1692,7 +1731,28 @@ function M.new(deps, presets, ram_getter)
 				settle_cancel("terminated")
 				return finish_result(false)
 			else
-				local requires_upgrade = needs_ollama_upgrade(pull_output)
+				-- The CLI prints its refusal (e.g. the 412 "newer version of Ollama") on
+				-- the final stderr, which the stream callback may never have seen (#101).
+				pull_output = pull_output .. sanitize_terminal_stream((stdout or "") .. (stderr or ""))
+				-- The cause is the last line the pull printed, often after a 100%
+				-- progress line (digest or manifest refusal); the notice alone left
+				-- no trace in the log.
+				local last_line = ""
+				for line in pull_output:gmatch("[^\r\n]+") do
+					if line:match("%S") then last_line = line end
+				end
+				-- An Ollama too old for the model is the user's to upgrade, and the
+				-- notice below says so: not an error window on top of it (#101). A
+				-- network report outranks it, as in the notice.
+				local requires_upgrade = network_report == nil and needs_ollama_upgrade(pull_output)
+				local pull_cause = last_line ~= "" and last_line:sub(1, 300) or "no output"
+				if requires_upgrade then
+					Logger.warn(LOG, "The Ollama pull of %s was refused: the installed Ollama is too old (code %s): %s.",
+						tostring(target_model), tostring(code), pull_cause)
+				else
+					Logger.error(LOG, "The Ollama pull of %s failed (code %s): %s.", tostring(target_model),
+						tostring(code), pull_cause)
+				end
 				local connection_error = pull_output:lower():find("could not connect") or pull_output:lower():find("connection refused")
 				
 				if network_report then
@@ -1705,12 +1765,20 @@ function M.new(deps, presets, ram_getter)
 				elseif connection_error then
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.service_disconnected"), "error")
 					complete_progress_ui(owner, false, target_model)
+				elseif pac_fallback then
+					-- Both causes: the PAC could not be used, then the direct try failed too.
+					Logger.error(LOG, "The automatic network configuration was unreachable (%s) and the direct connection failed (code %s).",
+						pac_fallback, tostring(code))
+					pcall(notifications.notify, i18n.get("ollama.fail_title"),
+						i18n.get("network.failure.pac_unreachable_direct_failed"), "error", open_network_settings)
+					complete_progress_ui(owner, false, target_model)
 				else
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), string.format(i18n.get("ollama.download_error"), target_model), "error")
 					complete_progress_ui(owner, false, target_model)
 				end
 				if owner.retry_requested ~= true then
-					settle_cancel("process_failed")
+					settle_cancel(requires_upgrade and RequirementRegistry.CANCEL_RUNTIME_UPGRADE_REQUIRED
+						or "process_failed")
 				end
 				return finish_result(owner.retry_requested == true)
 			end
@@ -1724,6 +1792,7 @@ function M.new(deps, presets, ram_getter)
 			end
 			if not current_or_cancel() then return false end
 			network_admission.push(stderr or "")
+			scan_pac_fallback(stderr)
 			local out = sanitize_terminal_stream((stdout or "") .. (stderr or ""))
 			pull_output = pull_output .. out
 			if out ~= "" then
@@ -2300,7 +2369,7 @@ function M.new(deps, presets, ram_getter)
 			if not bin then
 				pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
 					string.format(i18n.get("ollama.delete_error"), model_name,
-						"Ollama executable unavailable"), "error")
+						i18n.get("ollama.delete_reason_executable")), "error")
 				operation.finish(nil, "Ollama deletion executable refusal")
 				return false
 			end
@@ -2390,7 +2459,7 @@ function M.new(deps, presets, ram_getter)
 					operation.finish(nil, "Ollama model deletion start refusal")
 					pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
 						string.format(i18n.get("ollama.delete_error"), model_name,
-							"task start failed"), "error")
+							i18n.get("ollama.delete_reason_start")), "error")
 					return false
 				end
 				owner.start_committed = true
@@ -2413,7 +2482,7 @@ function M.new(deps, presets, ram_getter)
 			operation.finish(nil, "Ollama model deletion construction refusal")
 			pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
 				string.format(i18n.get("ollama.delete_error"), model_name,
-					"task creation failed"), "error")
+					i18n.get("ollama.delete_reason_creation")), "error")
 			return false
 		end, function(reason)
 			local authorized = operation.is_authorized() == true
@@ -2421,7 +2490,7 @@ function M.new(deps, presets, ram_getter)
 			if authorized then
 				pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
 					string.format(i18n.get("ollama.delete_error"), model_name,
-						tostring(reason or "readiness failed")), "error")
+						tostring(reason or i18n.get("ollama.delete_reason_readiness"))), "error")
 			end
 			return true
 		end, {

@@ -86,7 +86,7 @@ local function with_recorded_shell(body, native_webview)
 	os.execute = function() return true end
 	io.popen = function() return nil end
 	local saved_webview = package.loaded["ui.webview_manager"]
-	package.loaded["ui.webview_manager"] = native_webview or { show = function() return true end }
+	package.loaded["ui.webview_manager"] = native_webview or { show = function() return true end, toggle = function() return true end }
 	local ok, err = pcall(body)
 	os.execute, io.popen = real_execute, real_popen
 	package.loaded["ui.webview_manager"] = saved_webview
@@ -269,6 +269,35 @@ helpers.describe("action picker items (Linux)", function()
 		helpers.assert_eq(by_id.desktop_next_wrap.hint,
 			require("infra.i18n").get("dialog.action_picker.requires_workspaces"))
 		helpers.assert_eq(by_id.desktop_prev_wrap.disabled, true)
+	end)
+
+	helpers.it("greys the agent's manual actions with the AI notice while the AI is off (ai-off-picker)", function()
+		local engine = "modules.llm.prediction_engine"
+		local previous, switch = package.loaded[engine], { enabled = false }
+		package.loaded[engine] = { is_enabled = function() return switch.enabled end }
+		local ok, err = pcall(function()
+			local M = recording_manager()
+			local function rows()
+				local by_id = {}
+				for _, item in ipairs(M.get_picker_items()) do if item.type == "action" then by_id[item.id] = item end end
+				return by_id
+			end
+			local notice = require("infra.i18n").get("dialog.action_picker.requires_ai")
+			helpers.assert_true(notice ~= require("infra.i18n").get("llm.manual_prediction.disabled"),
+				"the greyed row has its own AI-off hint, not the suggestions notice")
+			local off = rows()
+			for _, id in ipairs({ "llm_agent_selection", "llm_agent_command" }) do
+				helpers.assert_eq(off[id].disabled, true, id .. ": greyed while the AI is off")
+				helpers.assert_eq(off[id].hint, notice, id .. ": with the reason")
+			end
+			switch.enabled = true
+			local on = rows()
+			for _, id in ipairs({ "llm_agent_selection", "llm_agent_command" }) do
+				helpers.assert_eq(on[id].disabled, nil, id .. ": offered again with the AI on, no reload")
+			end
+		end)
+		package.loaded[engine] = previous
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("names the missing tool when a desktop could wrap without it", function()

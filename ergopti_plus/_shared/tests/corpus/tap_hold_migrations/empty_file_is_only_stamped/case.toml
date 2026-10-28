@@ -1,0 +1,6 @@
+[case]
+description = "A file with no content is stamped, nothing else."
+drivers = ["linux"]
+outcome = "migrated"
+from_version = 0
+to_version = 1

@@ -736,7 +736,7 @@ _PTME_EveryMutationEntrypointUsesTheOutcomeGate() {
 		"numeric flush must requeue refused drafts before returning and refresh only after the stable success path")
 	NativeResetPattern := "s)_HCW_RunWriteBatch\(.*?"
 		. "_HCW_ReconcileNativeReset\.Bind\(\)\s*,\s*"
-		. "_HCW_CompleteNativeReset\.Bind\(\)\s*,\s*"
+		. "_HCW_CompleteNativeReset\.Bind\(_HCWGui\)\s*,\s*"
 		. "_HCW_ReportWriteFailure\.Bind\(\)\s*\)"
 	Assert(RegExMatch(_DriverFuncBody("_HCW_ResetAll"), NativeResetPattern),
 		"_HCW_ResetAll must close and announce success only from the success slot, with failure reporting in the failure slot")

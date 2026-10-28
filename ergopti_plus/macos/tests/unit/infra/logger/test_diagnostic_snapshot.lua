@@ -188,8 +188,15 @@ helpers.describe("Runtime diagnostics: previously invisible events now log", fun
 	end)
 
 	helpers.it("menu feature toggles and menu prime failures are logged", function()
-		local src = unit_with("Feature toggled from the menu")
-		helpers.assert_true(src:find("Feature toggled from the menu", 1, true) ~= nil)
+		-- The toggle line lives in the module both menus share (PAR-45); the
+		-- macOS menu must still route its toggles through it.
+		local shared_path = assert(package.searchpath("feature_notice", package.path), "feature_notice is not on the path")
+		local shared_file = assert(io.open(shared_path, "rb"))
+		local shared_src = shared_file:read("*a")
+		shared_file:close()
+		helpers.assert_true(shared_src:find("Feature toggled from the menu", 1, true) ~= nil)
+		local src = unit_with("Menu cache prime '%s' failed")
+		helpers.assert_true(src:find("FeatureNotice.feature(notice_ports", 1, true) ~= nil)
 		helpers.assert_true(src:find("Menu cache prime '%s' failed", 1, true) ~= nil)
 		helpers.assert_eq(nil, src:find("pcall(menu_mods.apps.prime, ctx)", 1, true),
 			"the bare pcall that discarded a prime failure is gone")
@@ -204,7 +211,12 @@ helpers.describe("Runtime diagnostics: previously invisible events now log", fun
 		local RuntimeLog = require("diagnostics.runtime_log")
 		helpers.assert_eq("osascript",
 			RuntimeLog.program_name("/usr/bin/osascript -e 'set the clipboard to \"secret\"'"))
-		local src = unit_with("_record_exit(RuntimeLog.program_name(executable)")
-		helpers.assert_true(src:find("_record_exit(RuntimeLog.program_name(executable)", 1, true) ~= nil)
+		-- The task completion names the program once, for the exit record and its
+		-- phase counter: the recorded exit must take that name, never the command.
+		local naming = "local program = RuntimeLog.program_name(executable)"
+		local src = unit_with(naming)
+		local named_at = src:find(naming, 1, true)
+		local recorded_at = src:find("_record_exit(program, exit_code", named_at, true)
+		helpers.assert_true(recorded_at ~= nil, "the exit is recorded under the program name")
 	end)
 end)

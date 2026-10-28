@@ -7,6 +7,17 @@
 --- claim evdev injection or hardware observation. No database/process stubs.
 --- ==============================================================================
 
+--- Returns a typing time on the driver's own clock (ergopti_hotstrings passes
+--- Monotonic.now_ms()). A fixed 1000 ms made the session tracker's verdict
+--- depend on the host's uptime; one origin keeps the scripted gaps exact.
+--- @param offset_ms number Scripted time of the keystroke.
+--- @return number typed_ms
+local typing_origin_ms
+local function typed_at(offset_ms)
+	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	return typing_origin_ms + offset_ms
+end
+
 local uv = require("luv")
 require("compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-sqlite-wpm-XXXXXX"))
@@ -18,9 +29,9 @@ assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
 
-local Keylogger = require("modules.keylogger.keylogger")
-local Writer = require("modules.keylogger.sqlite_writer")
-local Metrics = require("keylogger.metrics")
+local Keystats = require("modules.keystats.keystats")
+local Writer = require("modules.keystats.sqlite_writer")
+local Metrics = require("keystats.metrics")
 local Json = require("json")
 local path = root .. "/metrics.sqlite"
 local checks, failures = 0, 0
@@ -42,11 +53,11 @@ local function row_count()
 	return tonumber(assert(Writer.query_rows("SELECT COUNT(*) FROM events_typing;"))[1])
 end
 
-Keylogger.init({ sqlite_path = path, log_dir = root .. "/logs" })
-assert(Keylogger.is_enabled() and Writer.is_available())
-Keylogger.on_keydown("a", 1000, "owned-wpm")
-Keylogger.on_keydown("b", 2300, "owned-wpm")
-require("tests.support.sqlite_flush_native").flush(Keylogger)
+Keystats.init({ sqlite_path = path, log_dir = root .. "/logs" })
+assert(Keystats.is_enabled() and Writer.is_available())
+Keystats.on_keydown("a", typed_at(1000), "owned-wpm")
+Keystats.on_keydown("b", typed_at(2300), "owned-wpm")
+require("tests.support.sqlite_flush_native").flush(Keystats)
 local original = assert(Writer.query_rows("SELECT wpm,hex(text),hex(events_json) FROM events_typing;"))[1]
 
 check("public collector flush preserves fractional event-derived WPM and raw bytes", function()
@@ -61,7 +72,7 @@ check("public collector flush preserves fractional event-derived WPM and raw byt
 end)
 
 check("second collector flush cannot duplicate the accepted raw batch", function()
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
+	require("tests.support.sqlite_flush_native").flush(Keystats)
 	assert(row_count() == 1)
 	assert(Writer.query_rows("SELECT wpm,hex(text),hex(events_json) FROM events_typing;")[1] == original)
 end)

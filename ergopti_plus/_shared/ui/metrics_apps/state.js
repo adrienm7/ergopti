@@ -235,15 +235,15 @@ function buildAggregatedData() {
 	let targetTsStart = 0;
 	const anchorTs = currentSelectedDate ? parseDateKey(currentSelectedDate) : allDates[0].ts;
 
-	if (currentPeriod === 'day') targetTsStart = anchorTs;
-	else if (currentPeriod === 'week') targetTsStart = anchorTs - 7 * 86400000;
-	else if (currentPeriod === 'month') targetTsStart = anchorTs - 30 * 86400000;
-	else if (currentPeriod === 'year') targetTsStart = anchorTs - 365 * 86400000;
+	if (Object.hasOwn(METRICS_PERIOD_DAYS, currentPeriod)) {
+		// The selected recorded day is included, independent of local timezone changes.
+		targetTsStart = shiftMetricsDay(anchorTs, 1 - METRICS_PERIOD_DAYS[currentPeriod]);
+	}
 
 	const validDates = allDates.filter((d) => {
 		if (currentPeriod !== 'all' && (d.ts > anchorTs || d.ts < targetTsStart)) return false;
 		if (currentWeekdayFilter) {
-			const dow = (new Date(d.ts).getDay() + 6) % 7;
+			const dow = (new Date(d.ts).getUTCDay() + 6) % 7;
 			if (!currentWeekdayFilter.has(dow)) return false;
 		}
 		return true;
@@ -271,7 +271,7 @@ function buildAggregatedData() {
 			);
 		}
 
-		// New _system pseudo-app written by the keylogger caffeinate callbacks.
+		// New _system pseudo-app written by the keystats caffeinate callbacks.
 		// Tracks precise locked / sleeping durations so the active ratio can be
 		// computed without inflation from screen-locked time.
 		const sysEntry = dayData._system;
@@ -321,8 +321,8 @@ function buildAggregatedData() {
 			byDate.passive_ms += (sysEntry.locked_ms || 0) + (sysEntry.sleep_ms || 0);
 		}
 
-		// Weekday: parseDateKey returns a JS-compatible ts; convert to Mon=0..Sun=6
-		const dow = (new Date(d.ts).getDay() + 6) % 7;
+		// Read the recorded Gregorian weekday as Mon=0..Sun=6.
+		const dow = (new Date(d.ts).getUTCDay() + 6) % 7;
 		const byWk =
 			result.rich.by_weekday[dow] || (result.rich.by_weekday[dow] = { time_ms: 0, chars: 0 });
 
@@ -408,7 +408,7 @@ function buildAggregatedData() {
 			}
 			// #39 aggregate window titles
 			if (appData.win_titles) {
-				appOut.win_titles = appOut.win_titles || {};
+				appOut.win_titles = appOut.win_titles || Object.create(null);
 				Object.entries(appData.win_titles).forEach(([t, w]) => {
 					const slot = appOut.win_titles[t] || (appOut.win_titles[t] = { c: 0, ms: 0 });
 					slot.c += w.c || 0;
@@ -608,10 +608,9 @@ function buildAggregatedData() {
 					});
 				}
 			} else {
-				const dayLabel = formatDisplayDate(d.key).substring(0, 5);
-				if (!result.timeline[dayLabel]) result.timeline[dayLabel] = Object.create(null);
-				result.timeline[dayLabel][catName] =
-					(result.timeline[dayLabel][catName] || 0) + (Number(appData.app_time_ms) || 0);
+				if (!result.timeline[d.key]) result.timeline[d.key] = Object.create(null);
+				result.timeline[d.key][catName] =
+					(result.timeline[d.key][catName] || 0) + (Number(appData.app_time_ms) || 0);
 			}
 		}
 	});

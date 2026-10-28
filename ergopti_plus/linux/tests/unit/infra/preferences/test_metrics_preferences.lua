@@ -13,7 +13,7 @@ local Codec = require("toml_codec")
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
-		local names = { "infra.config_paths", "infra.metrics_preferences", "modules.keylogger.keylogger",
+		local names = { "infra.config_paths", "infra.metrics_preferences", "modules.keystats.keystats",
 			"adapters.storage", "ui.wpm.widget", "ui.wpm.tray_readout" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -72,8 +72,8 @@ helpers.describe("canonical metrics preferences", function()
 			package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
 				["metrics.enabled"] = false, ["metrics.private_filter_enabled"] = true,
 			} })
-			package.loaded["modules.keylogger.keylogger"] = nil
-			local collector = require("modules.keylogger.keylogger")
+			package.loaded["modules.keystats.keystats"] = nil
+			local collector = require("modules.keystats.keystats")
 			collector.init({ sqlite_path = path .. ".sqlite", log_dir = path .. ".logs" })
 			helpers.assert_eq(collector.is_enabled(), true)
 			helpers.assert_eq(collector.get_privacy_state().private_filter_enabled, false)
@@ -139,6 +139,50 @@ helpers.describe("canonical metrics preferences", function()
 			helpers.assert_eq(preferences.set("gestures.enabled", true), false)
 			helpers.assert_eq(preferences.set("metrics.enabled", "true"), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), '')
+		end)
+	end)
+
+	helpers.it("the excluded applications are a sparse list that survives a restart", function()
+		with_config('[metrics]\nunknown = "keep"\n', function(preferences, path)
+			helpers.assert_eq(preferences.get_list("metrics.disabled_apps"), {})
+			helpers.assert_true(preferences.set("metrics.disabled_apps", { "firefox", "org.gnome.Terminal" }))
+			local config = Codec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(config.metrics.disabled_apps, { "firefox", "org.gnome.Terminal" })
+			helpers.assert_eq(config.metrics.unknown, "keep")
+			package.loaded["infra.metrics_preferences"] = nil
+			local restarted = require("infra.metrics_preferences")
+			helpers.assert_eq(restarted.get_list("metrics.disabled_apps"), { "firefox", "org.gnome.Terminal" })
+			helpers.assert_true(restarted.set("metrics.disabled_apps", {}))
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).metrics.disabled_apps, nil)
+		end)
+	end)
+
+	helpers.it("a list of the wrong shape is neutral and refused as a write", function()
+		with_config('[metrics]\ndisabled_apps = "firefox"\n', function(preferences)
+			helpers.assert_eq(preferences.get_list("metrics.disabled_apps"), {})
+			helpers.assert_eq(preferences.set("metrics.disabled_apps", { 3 }), false)
+			helpers.assert_eq(preferences.set("metrics.enabled", { "x" }), false)
+		end)
+	end)
+
+	helpers.it("an excluded application is kept out of the metrics and nothing else", function()
+		with_config('[metrics]\nenabled = true\ndisabled_apps = ["Firefox"]\n', function(_, path)
+			package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {} })
+			package.loaded["modules.keystats.keystats"] = nil
+			local collector = require("modules.keystats.keystats")
+			collector.init({ sqlite_path = path .. ".sqlite", log_dir = path .. ".logs" })
+			helpers.assert_eq(collector.get_disabled_apps(), { "Firefox" })
+			helpers.assert_true(collector.is_app_excluded("firefox"), "matched without regard to case")
+			helpers.assert_true(collector.is_unrecorded_app("FIREFOX"))
+			helpers.assert_eq(collector.is_app_excluded("kate"), false)
+			helpers.assert_eq(collector.is_password_app("firefox"), false,
+				"the exclusion must not block hotstrings or predictions like a password application")
+			helpers.assert_true(collector.set_disabled_apps({ "kate" }))
+			helpers.assert_eq(collector.is_app_excluded("firefox"), false)
+			helpers.assert_true(collector.is_app_excluded("Kate"))
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).metrics.disabled_apps, { "kate" })
+			helpers.assert_eq(collector.set_disabled_apps({ 4 }), false)
+			helpers.assert_eq(collector.get_disabled_apps(), { "kate" })
 		end)
 	end)
 end)

@@ -6,20 +6,14 @@
 			"type": "check",
 			"i18n": "menu.hotstrings.tooltip_autocorrect",
 			"checked_when": ["hotstrings.preview_autocorrect_enabled"],
-			"disabled_when": ["preview_presence_ready"],
-			"platforms": ["hs", "linux"],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+			"disabled_when": ["preview_presence_ready"]
 		},
 		{
 			"id": "preview_ai_enabled",
 			"type": "check",
 			"i18n": "menu.hotstrings.tooltip_ai",
 			"checked_when": ["hotstrings.preview_ai_enabled"],
-			"disabled_when": ["preview_presence_ready"],
-			"platforms": ["hs", "linux"],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+			"disabled_when": ["preview_presence_ready"]
 		}
 	],
 	"positions": [2, 3],

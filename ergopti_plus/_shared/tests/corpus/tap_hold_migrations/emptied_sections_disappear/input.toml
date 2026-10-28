@@ -1,0 +1,5 @@
+[tap_hold]
+explicit_delays = false
+
+[tap_hold.keys.caps_lock]
+time_activation_seconds = 0.35

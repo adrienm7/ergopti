@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- script_control.pause_all() tears down keymap/LLM/tooltip/gestures/karabiner but
 --- never the WPM floating widget or menubar. Their hs.timer (0.2 s / 0.5 s) and the
---- widget's mouse eventtap kept firing under pause, polling keylogger.get_live_stats()
+--- widget's mouse eventtap kept firing under pause, polling keystats.get_live_stats()
 --- and re-rendering the canvas — a « pause = tout éteint » violation plus idle CPU.
 ---
 --- menu_metrics.build() re-syncs widget visibility on every build, and the
@@ -35,9 +35,9 @@ helpers.describe("menu_metrics: WPM widget/menubar are pause-gated in build (F-M
 
 	helpers.it("gates the menubar + widget START on `not paused`", function()
 		local src = read_src()
-		helpers.assert_true(src:find("state.keylogger_menubar_wpm and not paused", 1, true) ~= nil,
+		helpers.assert_true(src:find("state.keystats_menubar_wpm and not paused", 1, true) ~= nil,
 			"the menubar WPM start must be gated on `not paused`")
-		helpers.assert_true(src:find("state.keylogger_float_wpm and not paused", 1, true) ~= nil,
+		helpers.assert_true(src:find("state.keystats_float_wpm and not paused", 1, true) ~= nil,
 			"the floating WPM widget start must be gated on `not paused`")
 	end)
 end)

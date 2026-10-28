@@ -60,6 +60,9 @@
 			"timeout_ms": 8000,
 			"url": "https://api.github.com/rate_limit"
 		},
+		"proxy_pac": {
+			"timeout_ms": 8000
+		},
 		"ai_health": {
 			"timeout_ms": 4000,
 			"paths": {
@@ -321,7 +324,7 @@
 					"id": "running_apps",
 					"type": "list",
 					"opt_in": true,
-					"platforms": ["windows", "macos"]
+					"platforms": ["windows", "macos", "linux"]
 				}
 			]
 		},
@@ -362,6 +365,51 @@
 					"platforms": ["macos"]
 				},
 				{
+					"id": "key_downs",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_ups",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_ups_orphaned",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_ups_lost",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_stuck",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_long_holds",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_late",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_late_passed",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_lease_failures",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
 					"id": "kanata_running",
 					"type": "bool",
 					"platforms": ["linux"]
@@ -370,6 +418,36 @@
 					"id": "keymap_resolved",
 					"type": "bool",
 					"platforms": ["linux"]
+				},
+				{
+					"id": "hook_installed",
+					"type": "bool",
+					"platforms": ["windows"]
+				},
+				{
+					"id": "hook_events_seen",
+					"type": "count",
+					"platforms": ["windows"]
+				},
+				{
+					"id": "hook_foreign_injections",
+					"type": "count",
+					"platforms": ["windows"]
+				},
+				{
+					"id": "hook_front_reinstalls",
+					"type": "count",
+					"platforms": ["windows"]
+				},
+				{
+					"id": "hook_front_reinstall_failures",
+					"type": "count",
+					"platforms": ["windows"]
+				},
+				{
+					"id": "hook_last_error",
+					"type": "count",
+					"platforms": ["windows"]
 				}
 			]
 		},
@@ -431,6 +509,12 @@
 					"id": "github_api",
 					"type": "text",
 					"probe": "github_api",
+					"show_ms": true
+				},
+				{
+					"id": "proxy_pac",
+					"type": "text",
+					"probe": "proxy_pac",
 					"show_ms": true
 				},
 				{
@@ -521,6 +605,7 @@
 	"share_policy": {
 		"version": 1,
 		"notice_key": "healthcheck.export.privacy_notice",
+		"truncated_note_key": "healthcheck.export.url_truncated_note",
 		"projection": {
 			"kind": "object",
 			"fields": {
@@ -583,17 +668,71 @@
 									"kind": "boolean"
 								},
 								"os": {
-									"kind": "runtime",
-									"prefixes": [
-										"macOS ",
-										"Windows ",
-										"Ubuntu ",
-										"Fedora Linux ",
-										"Debian GNU/Linux ",
-										"Alpine Linux ",
-										"openSUSE Leap "
-									],
-									"suffixes": [""]
+									"kind": "platform_name",
+									"families": [
+										"macOS",
+										"Windows",
+										"Ubuntu",
+										"Fedora Linux",
+										"Debian GNU/Linux",
+										"Alpine Linux",
+										"openSUSE",
+										"Arch Linux",
+										"Linux Mint",
+										"Pop!_OS",
+										"Manjaro Linux",
+										"elementary OS",
+										"Zorin OS",
+										"Kali GNU/Linux",
+										"NixOS",
+										"Gentoo",
+										"Red Hat Enterprise Linux",
+										"Rocky Linux",
+										"AlmaLinux",
+										"CentOS",
+										"Void Linux",
+										"EndeavourOS",
+										"Garuda Linux",
+										"Nobara Linux",
+										"Bazzite",
+										"SteamOS",
+										"Raspbian GNU/Linux",
+										"Linux"
+									]
+								},
+								"desktop": {
+									"kind": "platform_name",
+									"families": [
+										"gnome",
+										"kde",
+										"plasma",
+										"xfce",
+										"cinnamon",
+										"x-cinnamon",
+										"mate",
+										"lxqt",
+										"lxde",
+										"budgie",
+										"pantheon",
+										"cosmic",
+										"hyprland",
+										"sway",
+										"i3",
+										"niri",
+										"wayfire",
+										"river",
+										"labwc",
+										"ubuntu",
+										"pop",
+										"unity",
+										"deepin",
+										"enlightenment",
+										"unknown"
+									]
+								},
+								"display_server": {
+									"kind": "enum",
+									"values": ["wayland", "x11", "unknown"]
 								}
 							}
 						},
@@ -641,6 +780,42 @@
 										"unknown"
 									],
 									"default": "unknown"
+								},
+								"key_downs": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_ups": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_ups_orphaned": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_ups_lost": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_stuck": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_long_holds": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_late": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_late_passed": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_lease_failures": {
+									"kind": "integer",
+									"minimum": 0
 								}
 							}
 						},
@@ -818,7 +993,16 @@
 											},
 											"state": {
 												"kind": "enum",
-												"values": ["granted", "denied", "unknown", "unsupported", "not_required"],
+												"values": [
+													"granted",
+													"denied",
+													"missing",
+													"unavailable",
+													"not_used",
+													"unknown",
+													"unsupported",
+													"not_required"
+												],
 												"default": "unknown"
 											}
 										}
@@ -832,6 +1016,81 @@
 					"kind": "object",
 					"fields": {
 						"github_api": {
+							"kind": "object",
+							"fields": {
+								"state": {
+									"kind": "enum",
+									"values": [
+										"pending",
+										"ok",
+										"error",
+										"timeout",
+										"disabled",
+										"unsupported",
+										"not_run",
+										"cancelled",
+										"unknown"
+									],
+									"default": "unknown"
+								},
+								"cleanup": {
+									"kind": "enum",
+									"values": ["pending", "settled", "unknown"],
+									"default": "unknown"
+								},
+								"ms": {
+									"kind": "number"
+								},
+								"native_status": {
+									"kind": "integer",
+									"minimum": -2147483648,
+									"maximum": 2147483647
+								},
+								"source_sha256": {
+									"kind": "hash"
+								},
+								"runtime_source_sha256": {
+									"kind": "hash"
+								},
+								"receiver_source_sha256": {
+									"kind": "hash"
+								},
+								"sender_source_sha256": {
+									"kind": "hash"
+								},
+								"sender_context": {
+									"kind": "enum",
+									"values": ["driver_spawned_osascript"]
+								},
+								"qualification_scope": {
+									"kind": "enum",
+									"values": ["local_runtime_nonce"]
+								},
+								"detail": {
+									"kind": "enum",
+									"values": [
+										"probe_busy",
+										"cleanup_debt",
+										"clock_refused",
+										"deadline_expired",
+										"unsupported",
+										"opt_in_required",
+										"not_embedded",
+										"isolated_environment_required",
+										"cancelled",
+										"native_refused",
+										"invalid_frame",
+										"transport_refused"
+									]
+								},
+								"runtime_pid": {
+									"kind": "integer",
+									"minimum": 1,
+									"maximum": 2147483647
+								}
+							}
+						},
+						"proxy_pac": {
 							"kind": "object",
 							"fields": {
 								"state": {
@@ -1367,6 +1626,81 @@
 								"kind": "object",
 								"fields": {
 									"github_api": {
+										"kind": "object",
+										"fields": {
+											"state": {
+												"kind": "enum",
+												"values": [
+													"pending",
+													"ok",
+													"error",
+													"timeout",
+													"disabled",
+													"unsupported",
+													"not_run",
+													"cancelled",
+													"unknown"
+												],
+												"default": "unknown"
+											},
+											"cleanup": {
+												"kind": "enum",
+												"values": ["pending", "settled", "unknown"],
+												"default": "unknown"
+											},
+											"ms": {
+												"kind": "number"
+											},
+											"native_status": {
+												"kind": "integer",
+												"minimum": -2147483648,
+												"maximum": 2147483647
+											},
+											"source_sha256": {
+												"kind": "hash"
+											},
+											"runtime_source_sha256": {
+												"kind": "hash"
+											},
+											"receiver_source_sha256": {
+												"kind": "hash"
+											},
+											"sender_source_sha256": {
+												"kind": "hash"
+											},
+											"sender_context": {
+												"kind": "enum",
+												"values": ["driver_spawned_osascript"]
+											},
+											"qualification_scope": {
+												"kind": "enum",
+												"values": ["local_runtime_nonce"]
+											},
+											"detail": {
+												"kind": "enum",
+												"values": [
+													"probe_busy",
+													"cleanup_debt",
+													"clock_refused",
+													"deadline_expired",
+													"unsupported",
+													"opt_in_required",
+													"not_embedded",
+													"isolated_environment_required",
+													"cancelled",
+													"native_refused",
+													"invalid_frame",
+													"transport_refused"
+												]
+											},
+											"runtime_pid": {
+												"kind": "integer",
+												"minimum": 1,
+												"maximum": 2147483647
+											}
+										}
+									},
+									"proxy_pac": {
 										"kind": "object",
 										"fields": {
 											"state": {
@@ -2008,6 +2342,24 @@
 									}
 								}
 							}
+						}
+					}
+				},
+				"day_log_attachment": {
+					"kind": "object",
+					"fields": {
+						"included": {
+							"kind": "boolean"
+						},
+						"bytes": {
+							"kind": "integer",
+							"minimum": 0,
+							"maximum": 4194304
+						},
+						"lines": {
+							"kind": "integer",
+							"minimum": 0,
+							"maximum": 4194304
 						}
 					}
 				}

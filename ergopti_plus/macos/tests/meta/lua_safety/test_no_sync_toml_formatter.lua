@@ -34,6 +34,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
+local CommandLines = require("tests.support.command_lines")
 
 -- Driver subtrees to scan. tests/ is excluded so this file's own documentation of
 -- the forbidden strings does not trip the guard.
@@ -100,13 +102,14 @@ local function collect_lua_files(dir, out)
 	else
 		cmd = string.format("find '%s' -type f -name '*.lua'", dir)
 	end
-	local pipe = io.popen(cmd)
-	if not pipe then return end
-	for line in pipe:lines() do
+	local source_count = #out
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, line in ipairs(inventory) do
 		local trimmed = line:gsub("%s+$", ""):gsub("\\", "/")
 		if trimmed:match("%.lua$") then out[#out + 1] = trimmed end
 	end
-	pipe:close()
+	assert(#out > source_count, "source inventory contains no matching files")
 end
 
 
@@ -135,15 +138,11 @@ helpers.describe("no driver source runs the Python TOML formatter synchronously"
 		for _, entry in ipairs(FORBIDDEN) do
 			local offenders = {}
 			for _, path in ipairs(files) do
-				local fh = io.open(path, "r")
-				if fh then
-					local src = fh:read("*a")
-					fh:close()
-					-- Normalise separators so the Windows form of the pattern is caught too.
-					local normalised = src:gsub("\\\\", "/"):gsub("%[/\\%]", "/")
-					if normalised:find(entry.needle, 1, true) then
-						offenders[#offenders + 1] = path:gsub("^.*[/\\]macos[/\\]", "")
-					end
+				local src = SourceFile.read(path)
+				-- Normalise separators so the Windows form of the pattern is caught too.
+				local normalised = src:gsub("\\\\", "/"):gsub("%[/\\%]", "/")
+				if normalised:find(entry.needle, 1, true) then
+					offenders[#offenders + 1] = path:gsub("^.*[/\\]macos[/\\]", "")
 				end
 			end
 			helpers.assert_true(#offenders == 0, string.format(

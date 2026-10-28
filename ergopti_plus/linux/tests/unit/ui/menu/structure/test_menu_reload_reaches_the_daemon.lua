@@ -100,6 +100,14 @@ helpers.describe("menu_builder: the Reload item reloads this daemon", function()
 		)
 	end)
 
+	helpers.it("marks the built Reload row so a stale click joins a finished reload", function()
+		local mb = helpers.load_module("ui.menu.menu_builder")
+		local items = mb.build({ config = make_config(), _version = "9.9.9", on_reload = function() end })
+		local reload = find_item(items, "recharg") or find_item(items, "reload")
+		helpers.assert_true(reload ~= nil, "the menu must contain a Reload item")
+		helpers.assert_eq(reload.joins_reload, true, "ui/menu/rebuild_owner reads this marker")
+	end)
+
 	helpers.it("never shells out — os.execute must not be reached at all", function()
 		-- This is the assertion the original could never have failed: os.execute
 		-- neither raises nor reports anything useful for a command that runs
@@ -230,6 +238,28 @@ helpers.describe("shared lifecycle commands (Linux)", function()
 			helpers.assert_true(items[#items] == quit, "the existing desktop Quit-last policy is retained")
 			reload.fn(); quit.fn()
 			helpers.assert_eq(table.concat(calls, ","), "reload,quit")
+		end)
+	end)
+
+	helpers.it("tells the user when the daemon refuses Quit because a shutdown already runs (quit-refused)", function()
+		with_lifecycle_declarations(function(builder)
+			local original, sent = package.loaded["adapters.notifier"], {}
+			package.loaded["adapters.notifier"] = { send = function(text, opts)
+				sent[#sent + 1] = { text = text, level = opts and opts.level }
+				return true
+			end }
+			local ok, err = pcall(function()
+				local answers, index = { false, true, nil }, 0
+				local items = builder.build({ config = make_config(),
+					on_quit = function() index = index + 1; return answers[index] end })
+				local quit = lifecycle_declared_row(items, "button.ok")
+				quit.fn()
+				helpers.assert_eq(sent, { { text = require("infra.i18n").get("notify.quit_refused"), level = "error" } })
+				quit.fn(); quit.fn()
+				helpers.assert_eq(#sent, 1, "an accepted or unanswered quit shows no refusal")
+			end)
+			package.loaded["adapters.notifier"] = original
+			if not ok then error(err, 0) end
 		end)
 	end)
 

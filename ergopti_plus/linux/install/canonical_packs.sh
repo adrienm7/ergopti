@@ -9,6 +9,18 @@
 CANONICAL_PACK_MIGRATION_MARKER=".ergopti-canonical-packs-v2"
 CANONICAL_PACK_BACKUP_DIR=".ergopti-migrations/canonical-seeds"
 
+# Reports whether two files hold the same bytes. sha256sum ships in coreutils,
+# which every supported image carries; cmp needs diffutils, which minimal Arch,
+# Fedora and openSUSE images lack.
+# @param $1 First file.
+# @param $2 Second file.
+same_bytes() {
+	local left right
+	left="$(sha256sum < "$1")" || return 2
+	right="$(sha256sum < "$2")" || return 2
+	[ "${left}" = "${right}" ]
+}
+
 # Removes legacy seeds from the active override namespace while retaining their
 # exact bytes outside the recursive *.toml loader. Modified files stay active.
 # A marker makes this a one-time legacy transition: later user overrides are
@@ -45,13 +57,20 @@ migrate_canonical_packs() {
 		installed_pack="${installed_dir}/${name}"
 		[ -f "${user_pack}" ] || continue
 		[ -f "${installed_pack}" ] || continue
-		cmp -s -- "${user_pack}" "${installed_pack}" || continue
+		# Status 1 means the bytes differ: a user override stays active. Any other
+		# status is an unreadable pack, which must abort the migration.
+		if same_bytes "${user_pack}" "${installed_pack}"; then
+			:
+		else
+			[ "$?" -eq 1 ] || return 1
+			continue
+		fi
 
 		# The suffix deliberately does not end in .toml: Loader.find_toml_files()
 		# scans recursively, so a normal TOML backup would remain an active pack.
 		backup="${backup_dir}/${name}.legacy-seed"
 		if [ -e "${backup}" ]; then
-			cmp -s -- "${user_pack}" "${backup}" || return 1
+			same_bytes "${user_pack}" "${backup}" || return 1
 			rm -f -- "${user_pack}"
 		else
 			mv -- "${user_pack}" "${backup}"

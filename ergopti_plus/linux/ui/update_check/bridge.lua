@@ -24,6 +24,9 @@
 --- 5. The updater refuses a check while busy: a click while the window's check
 ---    runs shows that window again, and a click while the updater is otherwise
 ---    busy starts nothing, rather than a check that could only fail.
+--- 6. Release notes: the offered release's changelog is shown in the window by
+---    the shared page, which has no other source of it; this module names the
+---    repository and opens the links the session approved with xdg-open.
 --- ==============================================================================
 
 local M = {}
@@ -85,6 +88,17 @@ end
 function M.download_offered(updater, release, ctx)
 	if type(release) ~= "table" or updater.get_cached_release() ~= release
 		or Installation.is_source_run() then return false end
+	-- A release read from the public Atom feed names no asset and no digest.
+	if release.check_only == true then
+		Logger.info(LOG, "Update refused: the release was found through the public feed, which names no installable asset.")
+		return false
+	end
+	-- A system package is updated by its package manager: downloading a release
+	-- the updater will then refuse to install only ends in an ERROR.
+	if type(updater.installation_kind) == "function" and updater.installation_kind() == "package" then
+		Logger.info(LOG, "Update refused: a system package is updated by its package manager.")
+		return false
+	end
 	local state = updater.get_state()
 	if state == "checking" or state == "downloading" or state == "installing" then return false end
 	ctx = type(ctx) == "table" and ctx or {}
@@ -277,6 +291,16 @@ local function new_session(updater)
 					tostring(result.detail)),
 				time = os.date("%Y-%m-%d %H:%M:%S"),
 			}, complete, current)
+		end,
+		-- The notes pane's links: the session checked them against the repository
+		repository = updater.repo_info,
+		open_url = function(url)
+			local Shell = require("adapters.shell_runner")
+			if not Shell.has_command("xdg-open") then
+				Logger.error(LOG, "xdg-open is unavailable: the release link cannot be opened.")
+				return false
+			end
+			return Shell.run("xdg-open " .. Shell.quote(url) .. " >/dev/null 2>&1 &") == true
 		end,
 		-- The menu's own "today's log" opener: the path comes from the sink that
 		-- writes it

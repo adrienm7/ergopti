@@ -16,7 +16,7 @@
 ;    navigation keys (arrows, F-keys) are ignored to keep context clean.
 ; 4. PrefixWatcher integration: keystrokes are fed from the prefix watcher's
 ;    pass-through InputHook (``hotstring_prefix_watcher.ahk``). On Windows,
-;    HookDispatcher + Keylogger + PrefixWatcher each create an InputHook;
+;    HookDispatcher + Keystats + PrefixWatcher each create an InputHook;
 ;    the LLM bridge no longer registers with HookDispatcher because keystrokes
 ;    were not reaching it on some machines while the prefix hook was reliable.
 ; 5. Agent-only feed: while the bridge is inactive (the AI menu switched off,
@@ -1080,8 +1080,7 @@ _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
 	if !IsObject(ih) || !IsObject(HookDispatcher._ih)
 		|| ObjPtr(ih) != ObjPtr(HookDispatcher._ih)
 		return
-	if (vk != 0x08 && ((vk >= 0x21 && vk <= 0x28) || vk == 0x2D || vk == 0x2E
-		|| vk == 0x09 || vk == 0x0D || vk == 0x1B))
+	if (KS_IsContextResetKey(vk) && vk != 0x20)
 		|| (!_PrefixIsModifierVK(vk) && _PrefixShortcutModifierHeld())
 		_PrefixRevokeIncompleteFragments()
 	LLM_Bridge_FeedKeyDownIfActive(vk)
@@ -1181,14 +1180,14 @@ LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unse
 		}
 		LLM_Bridge_MirrorAgentEdit(0, ch)
 	}
-	Buffer := Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
-	if Buffer != "" && _TextCompleteTailScalar(Buffer) == "" {
+	BridgeBuffer := Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
+	if BridgeBuffer != "" && _TextCompleteTailScalar(BridgeBuffer) == "" {
 		_LLM_Bridge_InvalidateIncompleteTyping(false)
 		return false
 	}
 	ObservedChar := ch
-	if StrLen(ch) == 1 && StrLen(_TextCompleteTailScalar(Buffer)) == 2
-		ObservedChar := _TextCompleteTailScalar(Buffer)
+	if StrLen(ch) == 1 && StrLen(_TextCompleteTailScalar(BridgeBuffer)) == 2
+		ObservedChar := _TextCompleteTailScalar(BridgeBuffer)
 	return _LLM_Bridge_SchedulePrefixObserver(ObservedChar,
 		ScheduleFn, IsSet(FocusFn) ? FocusFn : _LLM_Bridge_ReadLiveFocus)
 }
@@ -1250,8 +1249,8 @@ _LLM_Bridge_RunPrefixObserver(Owner) {
 		; Read the canonical buffer after any expansion, never the original trigger.
 		ContentGeneration := _LLM_Bridge_ContentGeneration
 		CurrentFn := _LLM_Bridge_PrefixObserverStillCurrent.Bind(Owner, ContentGeneration)
-		Buffer := Owner.Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
-		if Buffer != "" && _TextCompleteTailScalar(Buffer) == ""
+		BridgeBuffer := Owner.Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
+		if BridgeBuffer != "" && _TextCompleteTailScalar(BridgeBuffer) == ""
 			return false
 		if Owner.Active {
 			LLM_Engine_CancelInflight(CurrentFn)
@@ -1290,7 +1289,7 @@ LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
 		; Predictions are off: only the AI agent's typing observer listens
 		if (vk = 0x08)
 			_LLM_Bridge_ObserveAgentTyping(_TextTailCodeUnits(_LLM_Bridge_AgentBuffer, 1), "")
-		else if (vk = 0x09 or vk = 0x0D or vk = 0x1B)
+		else if (KS_IsContextResetKey(vk) && vk != 0x20)
 			LLM_Bridge_MirrorAgentEdit(0, "", true)
 		return
 	}
@@ -1304,8 +1303,13 @@ LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
 			return
 		}
 		LLM_Bridge_OnFlush()
-	} else if (vk = 0x0D or vk = 0x1B)
+	} else if (vk = 0x0D or vk = 0x1B) {
 		LLM_Bridge_OnFlush()
+	} else if (KS_IsContextResetKey(vk) && vk != 0x20) {
+		; The I1 hook forwards only keys not consumed by the prediction-cycle
+		; hotkeys. Cursor/editing input must retire both requests and offers.
+		LLM_Bridge_ResetPredictions()
+	}
 }
 
 
@@ -1397,6 +1401,9 @@ _LLM_Bridge_IsWordEndTrigger(ch) {
 LLM_Bridge_DeferTooltipHide(accepted := false, ExpectedRecord := 0) {
 	Record := IsObject(ExpectedRecord)
 		? ExpectedRecord : LLM_Tooltip_GetPresentedToken()
+	if !IsObject(Record)
+		return false
+	Record := LLM_Tooltip_WithdrawExact(Record, accepted)
 	if !IsObject(Record)
 		return false
 	SetTimer(_LLM_Bridge_DeferredTooltipHide.Bind(Record, accepted), -1)
@@ -1675,11 +1682,13 @@ LLM_Bridge_ResetPredictions() {
 	global _LLM_Bridge_Buffer, _LLM_Engine, _LLM_Bridge_Active
 	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
 		return
+	; Context retention applies even between requests, while work cancellation
+	; and visual disposal remain conditional on actual active work.
+	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("reset_on_nav") and _LLM_Engine["reset_on_nav"])
+		_LLM_Bridge_ClearBuffer()
 	if !LLM_Bridge_HasActivePredictionWork()
 		return
 	try LoggerDebug("LLM.tt", "ResetPredictions: cancelling generation + hiding any tooltip.")
-	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("reset_on_nav") and _LLM_Engine["reset_on_nav"])
-		_LLM_Bridge_ClearBuffer()
 	; Timings only: the surface is about to be hidden, so the full re-render the
 	; old call performed here was painted and thrown away in the same breath.
 	try LLM_Tooltip_MarkChainTimingOnly(A_TickCount)

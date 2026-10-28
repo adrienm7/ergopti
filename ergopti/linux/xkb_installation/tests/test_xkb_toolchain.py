@@ -321,14 +321,11 @@ class CleanPackageCompilationTests(unittest.TestCase):
             cache_dir=self.sandbox / "cache",
             sandboxed=True,
         )
-        with (
-            unittest.mock.patch.object(
-                clean,
-                "build_french_variant_symbols",
-                return_value=('default xkb_symbols "default" { include "%S/fr" };\n'),
-            ),
-            unittest.mock.patch("builtins.print"),
-        ):
+        with unittest.mock.patch.object(
+            clean,
+            "build_french_variant_symbols",
+            return_value=('default xkb_symbols "default" { include "%S/fr" };\n'),
+        ), unittest.mock.patch("builtins.print"):
             with self.assertRaises(SystemExit) as failure:
                 clean.install_clean(
                     symbols_path=LAYOUT_VERSION_DIR / "Ergopti_v2_2_1_plus.xkb",

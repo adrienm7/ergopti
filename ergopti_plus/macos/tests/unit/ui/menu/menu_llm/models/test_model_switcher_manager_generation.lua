@@ -544,8 +544,8 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-delayed-prompt-yield) drops a hardware prompt after its generation expires", function()
 		local modules = {
-			"hs", "adapters.timer_scheduler", "infra.logger", "infra.i18n",
-			"infra.dialog_util", "infra.paths",
+			"hs", "adapters.shell_runner", "adapters.timer_scheduler", "infra.logger", "infra.i18n",
+			"infra.dialog_util", "infra.paths", "infra.timings",
 			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
 		}
@@ -583,10 +583,12 @@ helpers.describe("model manager generation fences", function()
 		with_fixture(modules, hs_fixture, function()
 			install_common_stubs()
 			local prompts, downloads, cancellations = 0, 0, 0
+			require("tests.support.ui.menu.menu_llm.system_probe_stub").install(16, 100)
 			package.loaded["infra.dialog_util"] = {block_alert = function()
 				prompts = prompts + 1
 				return "menu.llm.btn_download"
 			end}
+			helpers.provide_timings()
 			package.loaded["infra.paths"] = {
 				shared_llm_path = function() return helpers.shared("modules/llm/models.json") end,
 			}
@@ -1025,6 +1027,8 @@ helpers.describe("model manager generation fences", function()
 		local hs_fixture = {
 			-- The pull's network prelude locates the bundled policy through test(1).
 			execute = helpers.existence_probe_execute(function() return "", true end),
+			-- The pull reads the shared route inventory through the real file adapter.
+			fs = require("tests.stubs.hs").fs,
 			http = {asyncPost = function() http_posts = http_posts + 1 end},
 			json = {encode = function() return "{}" end},
 			timer = {

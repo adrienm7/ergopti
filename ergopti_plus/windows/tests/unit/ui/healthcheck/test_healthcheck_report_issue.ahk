@@ -81,7 +81,8 @@ _THPA_Join(Calls) {
 
 _THPA_Snapshot(Long := false) {
 	Snapshot := Map("schema_version", 2, "driver", "windows", "generated_at", "2026-09-24T10:00:00Z",
-		"sections", Map("versions", Map("ergopti_version", "2.1.0"), "issues", Map("recent", "private fixture text")),
+		"sections", Map("versions", Map("ergopti_version", "2.1.0"), "system", Map("os", "Windows 11 Pro 26100.9457"),
+			"hardware", Map("arch", "x64"), "issues", Map("recent", "private fixture text")),
 		"probes", Map("github_api", Map("state", "error", "cleanup", "pending", "ms", 1)))
 	if Long {
 		Cohorts := []
@@ -154,9 +155,12 @@ _THPA_ReportPrefillsTheReport() {
 	AssertEqual("reveal:" . Outcome["path"], Calls[3])
 	AssertTrue(InStr(Calls[4], "open_url:https://github.com/") = 1, Calls[4])
 	AssertTrue(InStr(Calls[4], "template=bug_report.yml") > 0, Calls[4])
-	AssertEqual("", _THPA_QueryValue(Calls[4], "diagnostics"),
-		"No query default can reset an edit in the form")
-	AssertEqual("windows", _THPA_QueryValue(Calls[4], "os"))
+	AssertEqual("Windows%2011%20Pro%2026100.9457%20%28x64%29", _THPA_QueryValue(Calls[4], "os"),
+		"The Windows build and architecture, not the driver name")
+	Prefilled := _THPA_QueryValue(Calls[4], "diagnostics")
+	AssertEqual(IssueLink_PercentEncode(Document["fields"]["diagnostics"]), Prefilled,
+		"The form receives the compact report, which fits the budget")
+	AssertTrue(InStr(Document["fields"]["diagnostics"], Chr(96) . Chr(96) . Chr(96) . "json") = 0, "The JSON block stays out of the URL")
 	AssertTrue(InStr(Calls[4], "JDoe") = 0, "The form carries no private fields")
 }
 Test("Diagnostics page: report copies, then opens the bug form with the whole report (report-bug-flow)",
@@ -189,11 +193,15 @@ _THPA_ReportCutsALongReport() {
 	AssertEqual("copy:" . Document["text"], Calls[1], "The clipboard preserves the complete report")
 	AssertEqual("save:" . Outcome["path"] . ":" . Document["text"], Calls[2], "The local attachment is complete")
 	Url := SubStr(Calls[4], StrLen("open_url:") + 1)
-	AssertTrue(StrLen(Url) < 1200 && StrLen(Url) <= Config["templates"]["max_url_bytes"], "The form URL stays short")
+	AssertTrue(StrLen(Url) <= Config["templates"]["max_url_bytes"], "The form URL fits its budget")
 	AssertEqual("2.1.0", _THPA_QueryValue(Url, "version"), "Only validated host identity is prefilled")
-	AssertEqual("", _THPA_QueryValue(Url, "diagnostics"))
+	Ending := IssueLink_PercentEncode(Config["templates"]["truncation_marker"] . "`n`n"
+		. Config["schema"]["export_strings"][Config["schema"]["share_policy"]["truncated_note_key"]])
+	Prefilled := _THPA_QueryValue(Url, "diagnostics")
+	AssertTrue(InStr(Prefilled, IssueLink_PercentEncode("# ErgoptiPlus diagnostics")) = 1, "The compact report prefills the form")
+	AssertEqual(Ending, SubStr(Prefilled, -StrLen(Ending)), "A cut report ends with the marker and the note saying where the complete report is")
 }
-Test("Diagnostics page: report keeps a long attachment out of the editable URL (report-bug-flow)",
+Test("Diagnostics page: report cuts a long report in the URL and keeps it whole locally (report-bug-flow)",
 	_THPA_ReportCutsALongReport)
 
 _THPA_ReportStopsOnRefusedClipboard() {
@@ -288,9 +296,10 @@ _THPA_MenuReportBug() {
 		. "/issues/new?template=bug_report.yml&"
 	AssertEqual(Prefix, SubStr(Calls[4], 1, StrLen(Prefix)), "Not a bare URL: the bug template is selected")
 	AssertEqual("windows", _THPA_QueryValue(Calls[4], "driver"))
-	AssertEqual("windows", _THPA_QueryValue(Calls[4], "os"))
+	AssertTrue(InStr(_THPA_QueryValue(Calls[4], "os"), "Windows") = 1, "The system is named, not the driver: " . Calls[4])
 	AssertTrue(_THPA_QueryValue(Calls[4], "version") != "", "The version is prefilled: " . Calls[4])
-	AssertEqual("", _THPA_QueryValue(Calls[4], "diagnostics"), "The editable report field stays out of the URL")
+	AssertTrue(_THPA_QueryValue(Calls[4], "version") != "unknown", "A source run names its commit: " . Calls[4])
+	AssertTrue(_THPA_QueryValue(Calls[4], "diagnostics") != "", "The compact report prefills the form")
 }
 Test("Report a bug (menu): copies, saves and opens the prefilled bug form (menu-report-bug)",
 	_THPA_MenuReportBug)
@@ -376,9 +385,12 @@ _THPA_TemplateOnlyReport() {
 		_THPA_Paths(), Config, _THPA_Effects(Calls))
 	AssertEqual(true, Outcome["ok"])
 	Repo := Config["repository"]
-	AssertEqual("open_url:https://github.com/" . Repo["owner"] . "/" . Repo["repo"] . "/issues/new?template=bug_report.yml&version=2.1.0&os=windows&driver=windows", Calls[4])
-	for Id in ["title", "description", "reproduction", "diagnostics", "architecture"]
-		AssertEqual("", _THPA_QueryValue(Calls[4], Id), "Editable and undeclared fields stay out of the URL")
+	Prefix := "open_url:https://github.com/" . Repo["owner"] . "/" . Repo["repo"] . "/issues/new?template=bug_report.yml&version=2.1.0&os=Windows%2011%20Pro%2026100.9457%20%28x64%29&driver=windows&diagnostics="
+	AssertEqual(Prefix, SubStr(Calls[4], 1, StrLen(Prefix)), "The page cannot change the identity")
+	AssertTrue(_THPA_QueryValue(Calls[4], "diagnostics") != IssueLink_PercentEncode("private query text"), "The host report replaces the page's text")
+	AssertTrue(InStr(Calls[4], "PRIVATE") = 0, "No page-derived text reaches the URL")
+	for Id in ["title", "description", "reproduction", "architecture"]
+		AssertEqual("", _THPA_QueryValue(Calls[4], Id), "Undeclared fields stay out of the URL")
 	AssertEqual("copy:" . Document["text"], Calls[1])
 	AssertEqual("save:" . Outcome["path"] . ":" . Document["text"], Calls[2])
 }
@@ -453,3 +465,98 @@ _THPA_RecentErrorFacts() {
 	}
 }
 Test("Diagnostics export: closed recent error observations exclude private text", _THPA_RecentErrorFacts)
+
+_THPA_ConfigDirContext() {
+	Config := HealthCheck_Config()
+	Dir := "D:\Work\config\ergopti_plus"
+	Effects := _THPA_Effects([])
+	Effects["identity"] := () => Map("home", "C:\Users\JDoe", "user", "JDoe", "config_dir", Dir)
+	Context := HealthCheck_RedactionContext(Effects)
+	AssertEqual(Dir, Context["config_dir"], "the redaction context carries the configuration directory")
+	AssertEqual("read '<config>\hotstrings\<name>\<name>'",
+		Redact_Apply("read '" . Dir . "\hotstrings\my_pack\a.toml'", Config["redaction"], Context),
+		"a hotstring pack name under the configuration directory never reaches a report")
+}
+Test("Diagnostics export: the redaction context masks the configuration directory (config-dir-masking)", _THPA_ConfigDirContext)
+
+
+; The reader a day log test hands the collector instead of the real file.
+_THPA_DayLogReader(Text) {
+	return (Cap) => Map("found", true, "size", StrPut(Text, "UTF-8") - 1, "text", Text)
+}
+
+; A minimal host snapshot of the fixture.
+_THPA_DayLogSnapshot() {
+	return Map("schema_version", 2, "driver", "windows", "generated_at", "2026-09-24T10:00:00Z",
+		"sections", Map("versions", Map("ergopti_version", "2.4.0")), "probes", Map())
+}
+
+_THPA_DayLog() {
+	Config := HealthCheck_Config()
+	Raw := "2026-09-24 09:00:00:001 [INFO] [A] opened C:\Users\JDoe\x`n2026-09-24 09:00:01:002 [INFO] [B] token=abcdefghijkl`n"
+	Redacted := "2026-09-24 09:00:00:001 [INFO] [A] opened ~\x`n2026-09-24 09:00:01:002 [INFO] [B] token=<secret>`n"
+	Snapshot := _THPA_DayLogSnapshot()
+	Context := HealthCheck_RedactionContext(_THPA_Effects([]))
+
+	; Collecting redacts the log and records only the closed record
+	Reply := HealthCheck_DayLogPrepare(Snapshot, Config, Context, _THPA_DayLogReader(Raw))
+	AssertEqual("ready", Reply["state"])
+	AssertEqual(2, Reply["lines"])
+	AssertEqual(StrPut(Redacted, "UTF-8") - 1, Reply["bytes"])
+	AssertFalse(InStr(_HC_ValueToJson(Snapshot), "abcdefghijkl"), "the snapshot never holds the log")
+	With := HealthCheck_ShareDocument(Snapshot, Config["schema"], true)
+	AssertContains(With["text"], "day_log_attachment.included | true")
+	AssertFalse(InStr(HealthCheck_ShareDocument(Snapshot, Config["schema"])["text"], "day_log_attachment"),
+		"a report that does not save the log does not record it")
+
+	; Save writes the log first, then the report
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "save", "text", With["text"], "name", With["name"], "day_log", true),
+		_THPA_Paths(), Config, _THPA_Effects(Calls), Snapshot)
+	AssertTrue(Outcome["ok"])
+	Saves := []
+	for Call in Calls
+		if (SubStr(Call, 1, 5) == "save:")
+			Saves.Push(Call)
+	AssertEqual(2, Saves.Length)
+	AssertEqual("save:C:\Users\JDoe\AppData\Local\ergopti_plus\logs\diagnostics\ergopti-day-log-windows-2026-09-24T10_00_00Z.log:" . Redacted, Saves[1])
+	AssertContains(Saves[2], With["name"])
+
+	; Copy never carries the log
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "copy", "text", With["text"], "day_log", true),
+		_THPA_Paths(), Config, _THPA_Effects(Calls), Snapshot)
+	AssertFalse(Outcome["ok"])
+	AssertEqual(0, Calls.Length, "a refused copy touches nothing")
+
+	; Without the flag nothing about the log is saved or recorded
+	Plain := HealthCheck_ShareDocument(Snapshot, Config["schema"])
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "save", "text", Plain["text"], "name", Plain["name"]),
+		_THPA_Paths(), Config, _THPA_Effects(Calls), Snapshot)
+	AssertTrue(Outcome["ok"])
+	Saves := []
+	for Call in Calls
+		if (SubStr(Call, 1, 5) == "save:")
+			Saves.Push(Call)
+	AssertEqual(1, Saves.Length)
+
+	; An unprepared log is refused before any file is written
+	HealthCheck_DayLogDiscard(Snapshot)
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", With["text"], "name", With["name"],
+		"fields", Map(), "day_log", true), _THPA_Paths(), Config, _THPA_Effects(Calls), Snapshot)
+	AssertFalse(Outcome["ok"])
+	AssertEqual(0, Calls.Length, "nothing is copied or saved for an unprepared log")
+
+	; Over the cap, empty and missing are refused with their reason
+	Limits := Config["day_log"]
+	AssertEqual("too_large", HealthCheck_DayLogPrepare(Snapshot, Config, Context,
+		(Cap) => Map("found", true, "size", Limits["max_bytes"] + 1, "text", ""))["state"])
+	AssertFalse(Snapshot.Has("day_log_attachment"))
+	AssertEqual("empty", HealthCheck_DayLogPrepare(Snapshot, Config, Context, _THPA_DayLogReader(""))["state"])
+	AssertEqual("missing", HealthCheck_DayLogPrepare(Snapshot, Config, Context,
+		(Cap) => Map("found", false, "size", 0, "text", ""))["state"])
+	HealthCheck_DayLogDiscard(Snapshot)
+}
+Test("Diagnostics export: the opt-in day log is redacted, saved with the report and never copied (day-log-host)", _THPA_DayLog)

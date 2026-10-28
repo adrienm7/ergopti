@@ -135,7 +135,7 @@ helpers.describe("llm_prompt_prediction parameter: what the binding editors show
 				"the page fills the default count itself")
 		end, {
 			["llm.profiles.num_predictions"] = 3,
-			["llm.user_profiles"] = require("modules.llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
 				{ id = "user_mine", label = "Mine", system_single = "Continue.", batch = false },
 			}),
 		})

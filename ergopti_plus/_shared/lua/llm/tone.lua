@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 
 
@@ -113,12 +114,12 @@ function M.extract(block)
 	if not text then return nil end
 	text = text:match("^([^\r\n]*)") or ""
 	text = text:gsub("%*%*", "")
-	text = text:match("^%s*(.-)%s*$")
+	text = TextUtils.trim(text)
 	-- Only a pair that wraps the whole answer is the model quoting it
 	for _, pair in ipairs(QUOTE_PAIRS) do
 		local open, close = pair[1], pair[2]
 		if #text > #open + #close and text:sub(1, #open) == open and text:sub(-#close) == close then
-			text = text:sub(#open + 1, #text - #close):match("^%s*(.-)%s*$")
+			text = TextUtils.trim(text:sub(#open + 1, #text - #close))
 			break
 		end
 	end

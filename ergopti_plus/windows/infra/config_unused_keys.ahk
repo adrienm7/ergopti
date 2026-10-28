@@ -111,7 +111,9 @@ _ConfigUnusedKeysNeedsRetiredRoot(Document, Records, Physical, Sections := unset
 ; Scans FilePath against SchemaTree (the manifest-built Features tree by
 ; default, the same tree boot applies the file onto). Returns a Map with
 ; "status" ("ok", "unreadable", "malformed" or "unsupported") and "keys", an
-; Array of Maps carrying "section", "key", "kind" and rendered "value". An
+; Array of Maps carrying "section", "key", "kind" and rendered "value". A
+; successful scan also retains its exact private source (false for absence),
+; so a preview cannot bind these classifications to another image. An
 ; empty retired physical table has a private section_only Integer 1 marker:
 ; its preview owns that whole semantic section, never an empty-name leaf.
 ; A missing file is "ok" with no keys. Unaddressable retired root projections
@@ -125,7 +127,7 @@ ConfigUnusedKeysFind(FilePath, SchemaTree := unset) {
 		return Map("status", "unsupported", "keys", Keys)
 	Tree := IsSet(SchemaTree) ? SchemaTree : ManifestBuildFeaturesMap()
 	if !FileExist(FilePath)
-		return Map("status", "ok", "keys", Keys)
+		return Map("status", "ok", "keys", Keys, "source", false)
 	Source := FSReadUtf8Exact(FilePath)
 	if !(Source is String)
 		return Map("status", "unreadable", "keys", Keys)
@@ -208,7 +210,7 @@ ConfigUnusedKeysFind(FilePath, SchemaTree := unset) {
 		if Kind == "section" || Kind == "leaf"
 			Keys.Push(Map("section", Row.Section, "key", Row.Key, "kind", Kind, "value", Row.Raw))
 	}
-	return Map("status", "ok", "keys", Keys)
+	return Map("status", "ok", "keys", Keys, "source", Source)
 }
 
 ; Applies the loader's unknown-key and outdated-value rules to one semantic

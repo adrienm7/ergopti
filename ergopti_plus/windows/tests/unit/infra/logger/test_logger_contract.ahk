@@ -236,3 +236,272 @@ _RunLoggerContractTests() {
 }
 
 _RunLoggerContractTests()
+
+
+
+
+
+; ==============================================================================
+; EVIDENCE RECORDS (spec section 4.3) - regression guard for the lost Debug
+; evidence. The sections below follow the vector replay above.
+;
+; Regression guard for the lost one-click Debug evidence (spec section 4.3).
+;
+; ROOT CAUSE ENCODED: the "Send comparison" check wrote its eight scenario
+; records through LoggerInfo(INPUT_PROBE_TAG, "{1}", Record). The repeat
+; collapser (spec section 4.2) keys an INFO line by its UNFORMATTED template,
+; and the template "{1}" was the same for all eight records, so only the first
+; reached the log file: the other seven (and the hook-order record, same
+; template) were folded into a timed summary that was never written. The window
+; showed the evidence; the log the maintainer was asked to send back did not.
+;
+; The invariants: records written through LoggerEvidence all reach the sink and
+; the file, whatever their template, however identical to the previous one, and
+; whenever the same check runs again; and the ordinary INFO lines around them
+; keep collapsing. The producers of the two input checks use LoggerEvidence.
+;
+; SCOPE: behavioural. It drives the real logger with the repeat layer armed on a
+; driven clock, the real InputProbe_RowRecord for the record text, and the real
+; file flush, so a comment or a stub cannot satisfy it.
+; ==============================================================================
+
+
+; =============================================
+; =============================================
+; ======= 2/ Evidence: fixture and helpers ==============
+; =============================================
+; =============================================
+
+global _LEV_NOW := 0
+
+; Runs Body(Lines) with the repeat layer armed, a driven clock, the paths blanked
+; so nothing touches a real log, and every touched global restored afterwards.
+; Lines receives each line the sink saw, in delivery order.
+_LEV_WithArmedLogger(Body, Path := "") {
+	global LOGGER_MIN_LEVEL, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE, _LOGGER_SUB_PATHS
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_REPEAT_ENABLED
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
+	global _LEV_NOW
+
+	SavedLevel := LOGGER_MIN_LEVEL
+	SavedLog := LOGGER_LOG_PATH
+	SavedErrors := LOGGER_ERRORS_LOG_PATH
+	SavedDate := _LOGGER_PATH_DATE
+	SavedSubPaths := _LOGGER_SUB_PATHS
+	SavedArmed := _LOGGER_REPEAT_ENABLED
+	Lines := []
+	_LEV_NOW := 0
+	LOGGER_LOG_PATH := Path
+	LOGGER_ERRORS_LOG_PATH := ""
+	_LOGGER_PATH_DATE := ""
+	_LOGGER_SUB_PATHS := Map()
+	LOGGER_MIN_LEVEL := "DEBUG"
+	_LoggerRefreshFastFlags()
+	_LOGGER_DEDUP_KEY := ""
+	_LOGGER_DEDUP_LEVEL := ""
+	_LOGGER_DEDUP_COUNT := 0
+	_LastErrTime := 0
+	LOGGER_RING_BUFFER := []
+	LOGGER_RING_CURSOR := 0
+	_LOGGER_PENDING := []
+	_LOGGER_PENDING_ERRORS := []
+	_LOGGER_SUB_PENDING := Map()
+	_LOGGER_CLOCK_FN := () => _LEV_NOW * 1000
+	_LOGGER_STAMP_FN := () => FormatTime(DateAdd("20260115100000", _LEV_NOW, "Seconds"), "yyyy-MM-dd HH:mm:ss") . ":000"
+	LoggerSetTestSink((L) => Lines.Push(L))
+	if _LOGGER_REPEAT_ENABLED
+		_LoggerRepeatDisable()
+	_LoggerRepeatEnable()
+	try {
+		Body(Lines)
+	} finally {
+		LoggerClearTestSink()
+		_LoggerRepeatDisable()
+		if SavedArmed
+			_LoggerRepeatEnable()
+		_LOGGER_CLOCK_FN := 0
+		_LOGGER_STAMP_FN := 0
+		_LOGGER_DEDUP_KEY := ""
+		_LOGGER_DEDUP_LEVEL := ""
+		_LOGGER_DEDUP_COUNT := 0
+		_LastErrTime := 0
+		LOGGER_RING_BUFFER := []
+		LOGGER_RING_CURSOR := 0
+		_LOGGER_PENDING := []
+		_LOGGER_PENDING_ERRORS := []
+		_LOGGER_SUB_PENDING := Map()
+		LOGGER_LOG_PATH := SavedLog
+		LOGGER_ERRORS_LOG_PATH := SavedErrors
+		_LOGGER_PATH_DATE := SavedDate
+		_LOGGER_SUB_PATHS := SavedSubPaths
+		LOGGER_MIN_LEVEL := SavedLevel
+		_LoggerRefreshFastFlags()
+	}
+}
+
+; How many of Lines contain Needle.
+_LEV_Count(Lines, Needle) {
+	Count := 0
+	for _, Line in Lines {
+		if InStr(Line, Needle)
+			Count += 1
+	}
+	return Count
+}
+
+; Eight rows shaped like the send comparison's, through the real record function.
+_LEV_Rows() {
+	Rows := []
+	for Id in ["burst", "paste", "prediction", "rival", "short", "long", "unicode", "mixed"] {
+		Row := Map("scenario", Id, "mode", "SendInput", "n", 8, "exact", 8,
+			"lost", 0, "interleaved", 0, "garbled", 0, "timeout", 0,
+			"ret_med_us", 120, "settle_med_us", 900, "settle_p95_us", 1500, "settle_max_us", 2100)
+		Rows.Push(Row)
+	}
+	return Rows
+}
+
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 3/ Evidence: behaviour =====================
+; ==========================================
+; ==========================================
+
+_LEV_BurstSharingOneTemplateIsDelivered() {
+	_Body(Lines) {
+		for Row in _LEV_Rows()
+			LoggerEvidence("LEVTest", "{1}", InputProbe_RowRecord(Row))
+		Assert(_LEV_Count(Lines, "send_compare scenario=") == 8,
+			"all eight records written through one template must reach the sink, got "
+			. _LEV_Count(Lines, "send_compare scenario=") . " (the lost-evidence bug kept only the first)")
+		Assert(_LEV_Count(Lines, "repeated") == 0, "evidence records are never summarised")
+		Assert(_LEV_Count(Lines, "[INFO] [LEVTest]") == 8, "evidence is rendered as an INFO line")
+	}
+	_LEV_WithArmedLogger(_Body)
+}
+Test("logger: eight evidence records sharing one template all reach the sink (lost Debug evidence)",
+	_LEV_BurstSharingOneTemplateIsDelivered)
+
+_LEV_InfoBurstStillCollapses() {
+	_Body(Lines) {
+		; The control that lets the test above fail: the same burst through
+		; LoggerInfo keeps only the first record.
+		for Row in _LEV_Rows()
+			LoggerInfo("LEVTest", "{1}", InputProbe_RowRecord(Row))
+		Assert(_LEV_Count(Lines, "send_compare scenario=") == 1,
+			"an ordinary INFO burst sharing one template is still collapsed to its first line")
+	}
+	_LEV_WithArmedLogger(_Body)
+}
+Test("logger: the same burst through LoggerInfo is still collapsed (the collapsing is unchanged)",
+	_LEV_InfoBurstStillCollapses)
+
+_LEV_IdenticalRecordsAreNotDeduplicated() {
+	_Body(Lines) {
+		loop 3
+			LoggerEvidence("LEVTest", "check={1} verdict={2}", "network", "pass")
+		Assert(_LEV_Count(Lines, "check=network verdict=pass") == 3,
+			"a record identical to the previous one is not withheld by the consecutive dedup")
+		Assert(_LEV_Count(Lines, "identical") == 0, "no dedup summary is owed for evidence")
+	}
+	_LEV_WithArmedLogger(_Body)
+}
+Test("logger: identical consecutive evidence records are all written", _LEV_IdenticalRecordsAreNotDeduplicated)
+
+_LEV_RerunLaterIsDeliveredAgain() {
+	_Body(Lines) {
+		global _LEV_NOW
+		for RunAt in [0, 60, 300] {
+			_LEV_NOW := RunAt
+			for Row in _LEV_Rows()
+				LoggerEvidence("LEVTest", "{1}", InputProbe_RowRecord(Row))
+		}
+		Assert(_LEV_Count(Lines, "send_compare scenario=") == 24,
+			"a rerun of the check, inside the ten minute repeat window, writes all its records again")
+	}
+	_LEV_WithArmedLogger(_Body)
+}
+Test("logger: a rerun of a check later logs all its evidence records again", _LEV_RerunLaterIsDeliveredAgain)
+
+_LEV_NeighboursKeepCollapsing() {
+	_Body(Lines) {
+		global _LEV_NOW
+		LoggerInfo("LEVTest", "Probe {1}", 1)
+		_LEV_NOW := 1
+		LoggerEvidence("LEVTest", "Probe {1}", 2)
+		_LEV_NOW := 2
+		LoggerInfo("LEVTest", "Probe {1}", 3)
+		_LEV_NOW := 3
+		LoggerInfo("LEVTest", "Probe {1}", 4)
+		Assert(_LEV_Count(Lines, "Probe 1") == 1 && _LEV_Count(Lines, "Probe 2") == 1,
+			"the first info line and the evidence record are both delivered")
+		Assert(_LEV_Count(Lines, "Probe 3") == 0 && _LEV_Count(Lines, "Probe 4") == 0,
+			"info lines sharing the template are still withheld: the exemption belongs to evidence alone")
+		_LoggerFlushRepeats(true)
+		Assert(_LEV_Count(Lines, "repeated 2 more times") == 1,
+			"the withheld info lines are reported by one summary")
+	}
+	_LEV_WithArmedLogger(_Body)
+}
+Test("logger: info lines around an evidence record keep collapsing", _LEV_NeighboursKeepCollapsing)
+
+_LEV_FollowsTheLevelThreshold() {
+	_Body(Lines) {
+		global LOGGER_MIN_LEVEL
+		LOGGER_MIN_LEVEL := "WARNING"
+		_LoggerRefreshFastFlags()
+		LoggerEvidence("LEVTest", "dropped={1}", 1)
+		Assert(Lines.Length == 0, "evidence is an INFO line: a WARNING threshold filters it like LoggerInfo")
+	}
+	_LEV_WithArmedLogger(_Body)
+}
+Test("logger: an evidence record follows the level threshold like info", _LEV_FollowsTheLevelThreshold)
+
+_LEV_RecordsReachTheFile() {
+	Path := A_Temp . "\ergopti_evidence_test_" . A_TickCount . ".log"
+	try FileDelete(Path)
+	_Body(Lines) {
+		for Row in _LEV_Rows()
+			LoggerEvidence("LEVTest", "{1}", InputProbe_RowRecord(Row))
+		_LoggerFlush(true)
+	}
+	_LEV_WithArmedLogger(_Body, Path)
+	Text := FileExist(Path) ? FileRead(Path, "UTF-8") : ""
+	try FileDelete(Path)
+	Assert(Text != "", "the flush must have written the log file")
+	Found := 0
+	Pos := 1
+	while (Pos := InStr(Text, "send_compare scenario=", false, Pos)) {
+		Found += 1
+		Pos += 1
+	}
+	Assert(Found == 8, "all eight evidence records must be in the FILE, found " . Found)
+}
+Test("logger: evidence records reach the log file, not only the sink", _LEV_RecordsReachTheFile)
+
+
+
+
+
+; ===============================================
+; ===============================================
+; ======= 4/ Evidence: the producers use it ==============
+; ===============================================
+; ===============================================
+
+_LEV_InputProbeRecordsAreEvidence() {
+	for Name in ["InputProbe_RunSendComparison", "InputProbe_RunHookOrder"] {
+		Body := _DriverFuncBody(Name)
+		Assert(InStr(Body, 'LoggerEvidence(INPUT_PROBE_TAG, "{1}"') > 0,
+			Name . " must write its result records through LoggerEvidence")
+		Assert(!RegExMatch(Body, 'LoggerInfo\(INPUT_PROBE_TAG, "(?:\{1\}|send_compare)'),
+			Name . " must not write result records through the collapsible LoggerInfo")
+	}
+}
+Test("input probe: both checks write their result records as evidence", _LEV_InputProbeRecordsAreEvidence)

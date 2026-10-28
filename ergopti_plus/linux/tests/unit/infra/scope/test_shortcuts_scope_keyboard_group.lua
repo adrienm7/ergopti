@@ -17,16 +17,16 @@ local helpers, declared_parent, Sandbox, Codec, with_scope =
 	Fixture.helpers, Fixture.declared_parent, Fixture.Sandbox, Fixture.Codec, Fixture.with_scope
 
 local SOURCE = '[shortcuts]\nenabled = true\n'
-	.. '[shortcuts.keyboard]\nctrl_j = "open_url"\nctrl_k = "enter"\nsuper_j = "enter"\nalt_k = "enter"\nforeign_slot = "keep"\n'
+	.. '[shortcuts.keyboard]\nprimary_j = "open_url"\nprimary_k = "enter"\nmeta_j = "enter"\nalt_k = "enter"\nforeign_slot = "keep"\n'
 	.. '[shortcuts.tap_keys]\nnumber_row_left = "send_text"\n'
-	.. '[gesture_parameters]\nkeyboard__ctrl_j__open_url = "https://ctrl.example"\n'
+	.. '[gesture_parameters]\nkeyboard__primary_j__open_url = "https://ctrl.example"\n'
 	.. 'tap_3__open_url = "https://gesture.example"\n'
 	.. '[other]\nvalue = 42\n'
 
 --- A scope owner narrowed to the Ctrl group, on the fixture's file.
 local function ctrl_group(controls, path, backup)
 	return require("infra.shortcuts_scope").new({ path = path, backup_path = backup .. ".ctrl",
-		files = controls.files, is_paused = function() return controls.paused end, only = "keyboard_group:ctrl_" })
+		files = controls.files, is_paused = function() return controls.paused end, only = "keyboard_group:primary_" })
 end
 
 helpers.describe("Linux keyboard group scope", function()
@@ -35,17 +35,17 @@ helpers.describe("Linux keyboard group scope", function()
 			helpers.assert_true(ctrl_group(controls, path, backup).apply("clear"))
 			local config = Codec.decode(Sandbox.read_bytes(path))
 			local keyboard = config.shortcuts.keyboard or {}
-			helpers.assert_eq(keyboard.ctrl_j, nil, "a Ctrl slot is emptied")
-			helpers.assert_eq(keyboard.ctrl_k, nil, "a Ctrl slot is emptied")
-			helpers.assert_eq(config.gesture_parameters.keyboard__ctrl_j__open_url, nil, "its parameter goes with it")
-			helpers.assert_eq(keyboard.super_j, "enter", "the Super group is untouched")
+			helpers.assert_eq(keyboard.primary_j, nil, "a Ctrl slot is emptied")
+			helpers.assert_eq(keyboard.primary_k, nil, "a Ctrl slot is emptied")
+			helpers.assert_eq(config.gesture_parameters.keyboard__primary_j__open_url, nil, "its parameter goes with it")
+			helpers.assert_eq(keyboard.meta_j, "enter", "the Super group is untouched")
 			helpers.assert_eq(keyboard.alt_k, "enter", "the Alt group is untouched")
 			helpers.assert_eq(keyboard.foreign_slot, "keep", "an unknown key stays")
 			helpers.assert_eq(config.shortcuts.tap_keys.number_row_left, "send_text", "the tap keys are untouched")
 			helpers.assert_eq(config.gesture_parameters.tap_3__open_url, "https://gesture.example")
 			helpers.assert_eq(config.other.value, 42)
-			helpers.assert_eq(owners.keyboard.get_action("ctrl_j") or "none", "none")
-			helpers.assert_eq(owners.keyboard.get_action("super_j"), "enter")
+			helpers.assert_eq(owners.keyboard.get_action("primary_j") or "none", "none")
+			helpers.assert_eq(owners.keyboard.get_action("meta_j"), "enter")
 			os.remove(backup .. ".ctrl")
 		end, SOURCE)
 	end)
@@ -55,11 +55,11 @@ helpers.describe("Linux keyboard group scope", function()
 			helpers.assert_true(ctrl_group(controls, path, backup).apply("recommended"))
 			local config = Codec.decode(Sandbox.read_bytes(path))
 			local keyboard = config.shortcuts.keyboard or {}
-			helpers.assert_eq(keyboard.ctrl_j, nil, "a user Ctrl slot is removed")
-			helpers.assert_eq(keyboard.ctrl_g, "open_chatgpt", "the shipped Ctrl+G slot takes its recommended action")
-			helpers.assert_eq(keyboard.super_j, "enter", "the Super group is untouched")
-			helpers.assert_eq(keyboard.super_space, nil, "another group's preset is not applied")
-			helpers.assert_eq(owners.keyboard.get_action("ctrl_g"), "open_chatgpt")
+			helpers.assert_eq(keyboard.primary_j, nil, "a user Ctrl slot is removed")
+			helpers.assert_eq(keyboard.primary_g, "open_chatgpt", "the shipped Ctrl+G slot takes its recommended action")
+			helpers.assert_eq(keyboard.meta_j, "enter", "the Super group is untouched")
+			helpers.assert_eq(keyboard.meta_space, nil, "another group's preset is not applied")
+			helpers.assert_eq(owners.keyboard.get_action("primary_g"), "open_chatgpt")
 			os.remove(backup .. ".ctrl")
 		end, SOURCE)
 	end)
@@ -126,13 +126,13 @@ helpers.describe("Linux keyboard group scope", function()
 				drawn[i18n.get("menu.shortcuts.ctrl_group")].menu[2].fn()
 				helpers.assert_eq(questions, 0, "the group's clear asks nothing")
 				local keyboard = Codec.decode(Sandbox.read_bytes(path)).shortcuts.keyboard or {}
-				helpers.assert_eq(keyboard.ctrl_j, nil)
-				helpers.assert_eq(keyboard.super_j, "enter")
+				helpers.assert_eq(keyboard.primary_j, nil)
+				helpers.assert_eq(keyboard.meta_j, "enter")
 				groups()[i18n.get("menu.shortcuts.super_group")].menu[1].fn()
 				helpers.assert_eq(questions, 0, "the group's restore asks nothing")
 				keyboard = Codec.decode(Sandbox.read_bytes(path)).shortcuts.keyboard or {}
-				helpers.assert_eq(keyboard.super_j, nil, "a user Super slot is removed")
-				helpers.assert_eq(keyboard.super_space, "llm_generate_prediction")
+				helpers.assert_eq(keyboard.meta_j, nil, "a user Super slot is removed")
+				helpers.assert_eq(keyboard.meta_space, "llm_generate_prediction")
 				helpers.assert_eq(changed, 2)
 			end)
 			root.top_level, os.execute = top, execute

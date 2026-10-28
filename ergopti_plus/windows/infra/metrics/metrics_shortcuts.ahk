@@ -31,12 +31,10 @@
 ; ===============================
 
 class MetricsShortcuts {
-		; OFF by default. The keylogger captures every keystroke, so we never
+		; OFF by default. The keystats captures every keystroke, so we never
 		; auto-enable it: the user must tick it on once and confirm the
 		; warning dialog. The choice persists across reloads via INI.
 		static enabled           := false
-		; Real-time WPM display prefs.
-		static wpm_menubar_colors     := false  ; Color-code menubar WPM by keystroke origin
 }
 
 
@@ -58,19 +56,18 @@ MS_SaveBuiltToIni(Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
 
 _MS_PreferenceConfigKey(Prop) {
 		static Keys := Map(
-				"enabled", "metrics_enabled",
-				"wpm_menubar_colors", "metrics_wpm_menubar_colors"
+				"enabled", "enabled"
 		)
 		return Keys.Get(Prop, "")
 }
 
 _MS_BuildPreferencePlan(Prop, Target) {
-		ConfigKey := _MS_PreferenceConfigKey(Prop)
-		if (ConfigKey = "")
+		PreferenceConfigKey := _MS_PreferenceConfigKey(Prop)
+		if (PreferenceConfigKey = "")
 				throw ValueError("Unknown metrics preference '" . Prop . "'.")
 		Candidate := !!Target
 		return {
-				updates: [{ Section: "metrics", Key: ConfigKey, Value: Candidate }],
+				updates: [{ Section: "metrics", Key: PreferenceConfigKey, Value: Candidate }],
 				publish: _MS_PublishPreferenceCandidate.Bind(Prop, Candidate)
 		}
 }

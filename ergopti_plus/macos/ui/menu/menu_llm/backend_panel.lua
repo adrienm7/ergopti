@@ -233,8 +233,16 @@ end
 local _is_apple_silicon = nil
 local function is_apple_silicon()
 	if _is_apple_silicon == nil then
-		local ok, out = pcall(function() return hs.execute("uname -m") end)
-		_is_apple_silicon = ok and (out or ""):find("arm64") ~= nil
+		-- The process architecture is native and answers what `uname -m` prints
+		-- for this process (Rosetta included). The fork it replaces ran while the
+		-- menu module loaded at boot, at about 40 ms per fork on the Mac.
+		local info = type(hs.processInfo) == "table" and hs.processInfo.arch or nil
+		if type(info) == "string" and info ~= "" then
+			_is_apple_silicon = info == "arm64"
+		else
+			local ok, out = pcall(function() return hs.execute("uname -m") end)
+			_is_apple_silicon = ok and (out or ""):find("arm64") ~= nil
+		end
 	end
 	return _is_apple_silicon
 end
@@ -709,9 +717,17 @@ function M.build(ctx)
 	-- This entry only flips the backend so the prediction engine routes through
 	-- ApiRemote on the next request.
 	--- Selects the API backend; a local server's model row selects it too.
+	--- @param on_committed function|nil Run once the API backend is published
+	---   (the model selector page chains its entry work after the switch).
 	--- @return boolean|nil committed
-	local function activate_api()
+	local function activate_api(on_committed)
 		claim_runtime_selection()
+		if state.llm_backend == "api" then
+			if type(on_committed) == "function" then
+				return invoke_backend_boundary("API backend successor", on_committed)
+			end
+			return nil
+		end
 		if state.llm_backend ~= "api" then
 			Logger.info(LOG, "Activating remote API backend…")
 			local function finish_api_switch(debt)
@@ -733,6 +749,9 @@ function M.build(ctx)
 					if not invoke_backend_boundary("Owned Ollama retirement", ApiOllama.stop_owned_server) then
 						Logger.warn(LOG, "The prior owned Ollama daemon retains retirement debt.")
 					end
+				end
+				if type(on_committed) == "function" then
+					invoke_backend_boundary("API backend successor", on_committed)
 				end
 				return true
 			end
@@ -757,10 +776,19 @@ function M.build(ctx)
 	-- oMLX, LM Studio, llama.cpp, Jan… when they answer (local_server_panel.lua,
 	-- which the AI menu hands over): choosing one of their models stores the
 	-- server's API entry, then selects the API backend through activate_api.
+	local local_rows = {}
 	if ctx.local_server_rows ~= nil then
 		for _, row in ipairs(ctx.local_server_rows(activate_api)) do
 			table.insert(rows, row)
+			local_rows[#local_rows + 1] = row
 		end
+	end
+
+	-- The model selector page runs these exact selections, never copies of them:
+	-- the rows' own actions (nil while paused or unsupported) and the API switch.
+	if type(ctx.collect) == "table" then
+		ctx.collect.select = { mlx = rows[1].action, ollama = rows[2].action, api = not paused and activate_api or nil }
+		ctx.collect.local_rows = local_rows
 	end
 
 	-- The row names the selected option, cut before its em dash. A local

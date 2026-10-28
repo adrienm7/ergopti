@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 -- The two characters an AppleScript string literal escapes with a backslash,
 -- spelled by code so no quote character sits inside a quoted Lua string.
@@ -47,7 +48,7 @@ end
 --- @return string|nil reason Why the output was refused.
 function M.parse_applescript_paths(text)
 	if type(text) ~= "string" then return nil, "not_text" end
-	local body = text:gsub("^%s+", ""):gsub("%s+$", "")
+	local body = TextUtils.trim(text)
 	if body:sub(1, 1) ~= "{" or body:sub(-1) ~= "}" then return nil, "not_a_list" end
 	local paths, at, last = {}, 2, #body - 1
 	while true do

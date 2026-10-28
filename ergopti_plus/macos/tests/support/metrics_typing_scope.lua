@@ -16,10 +16,10 @@ local OWNERS = {
 	"adapters.running_application",
 	-- It also tells whether its own window is focused through this adapter.
 	"adapters.own_window",
-	"adapters.file_system", "adapters.timer_scheduler", "infra.logger", "infra.paths",
+	"adapters.file_system", "adapters.metadata_command_stats", "adapters.timer_scheduler", "infra.logger", "infra.paths",
 	"infra.i18n", "infra.fs_dir", "infra.text_utils", "text_utils",
 	"hs.fs", "hs.json", "json", "ui.ui_builder", "ui.metrics_typing",
-	"modules.keylogger.log_manager", "modules.keylogger.sqlite_reader",
+	"modules.keystats.log_manager", "modules.keystats.sqlite_reader",
 	"infra.paced_job", "infra.paced_json", "ui.metrics_typing.projection", "ui.metrics_typing.snapshot",
 }
 

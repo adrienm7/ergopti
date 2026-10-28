@@ -64,7 +64,7 @@ local function install_collaborators(effects)
 		handle_chain_signal = function() return false end,
 		is_visible = function() return false end,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		log_hotstring_suggested = function() end,
 		log_hotstring_dismissed = function() end,
 		log_llm_accepted = function() end,

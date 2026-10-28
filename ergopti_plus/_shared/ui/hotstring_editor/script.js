@@ -12,6 +12,13 @@
 // ====================================
 // ====================================
 
+// Delays of this page. A page script cannot read the timing registry, so each copy
+// is pinned to its [ui] key by tools/test/test-keystats-timings-single-source.cjs.
+const FOCUS_DELAY_MS = 80; // [ui] hotstring_editor_focus_delay_ms
+const EDIT_FOCUS_DELAY_MS = 50; // [ui] hotstring_editor_edit_focus_delay_ms
+const TOAST_MS = 1400; // [ui] hotstring_editor_toast_ms
+const ADD_ENTRY_DELAY_MS = 300; // [ui] hotstring_editor_add_entry_delay_ms
+
 function _t(key) {
 	return (window._i18n_strings && window._i18n_strings[key]) || null;
 }
@@ -207,7 +214,7 @@ function showConfirm(msg, fn, opts = {}) {
 		'</div>';
 
 	const okBtn = document.getElementById('confirm-ok');
-	okBtn.textContent = opts.okLabel || _t('common.delete') || 'Delete';
+	okBtn.textContent = opts.okLabel || _t('common.delete');
 	okBtn.style.background = opts.okColor || 'var(--danger)';
 
 	_confirmCb = fn;
@@ -315,8 +322,8 @@ function updateCompactBtn() {
 	const b = document.getElementById('compact-btn');
 	if (b)
 		b.textContent = compactView
-			? _t('editor.hotstrings.btn_view_expanded') || 'Expanded view'
-			: _t('editor.hotstrings.btn_view_compact') || 'Compact view';
+			? _t('editor.hotstrings.btn_view_expanded')
+			: _t('editor.hotstrings.btn_view_compact');
 }
 
 function toggleCompact() {
@@ -959,12 +966,16 @@ function render() {
 					ei +
 					'" onclick="event.stopPropagation(); updateBulk()" onmousedown="event.stopPropagation()"></div>';
 				html +=
-					'<div class="e-trig"><span class="trig-lbl" data-f="trig" title="Clic pour modifier">' +
+					'<div class="e-trig"><span class="trig-lbl" data-f="trig" title="' +
+					escapeHtml(_t('editor.hotstrings.click_to_edit')) +
+					'">' +
 					dispTrig(e.trigger) +
 					'</span></div>';
 				html += '<span class="e-arrow">→</span>';
 				html +=
-					'<div class="e-out-cell"><div class="e-out" data-f="out" title="Clic pour modifier">' +
+					'<div class="e-out-cell"><div class="e-out" data-f="out" title="' +
+					escapeHtml(_t('editor.hotstrings.click_to_edit')) +
+					'">' +
 					dispOutput(e.output) +
 					'</div></div>';
 				html += '<div class="e-tags">';
@@ -1026,29 +1037,31 @@ function render() {
 
 function showAddSec() {
 	edSec = null;
-	document.getElementById('sec-modal-title').textContent =
-		_t('editor.hotstrings.sec_modal_title_new') || 'New section';
+	document.getElementById('sec-modal-title').textContent = _t(
+		'editor.hotstrings.sec_modal_title_new'
+	);
 	const idEl = document.getElementById('sec-id');
 	idEl.value = '';
 	idEl.disabled = false;
 	document.getElementById('sec-desc').value = '';
 	clearSecErrors();
 	openModal('sec-modal');
-	setTimeout(() => idEl.focus(), 80);
+	setTimeout(() => idEl.focus(), FOCUS_DELAY_MS);
 }
 
 function showEditSec(si) {
 	edSec = si;
 	const s = D.sections[si];
-	document.getElementById('sec-modal-title').textContent =
-		_t('editor.hotstrings.sec_modal_title_rename') || 'Rename section';
+	document.getElementById('sec-modal-title').textContent = _t(
+		'editor.hotstrings.sec_modal_title_rename'
+	);
 	const idEl = document.getElementById('sec-id');
 	idEl.value = s.name;
 	idEl.disabled = true;
 	document.getElementById('sec-desc').value = s.description || '';
 	clearSecErrors();
 	openModal('sec-modal');
-	setTimeout(() => document.getElementById('sec-desc').focus(), 80);
+	setTimeout(() => document.getElementById('sec-desc').focus(), FOCUS_DELAY_MS);
 }
 
 function saveSec() {
@@ -1151,7 +1164,7 @@ function showAddEntry(si) {
 	).replace('%s', secName);
 	resetEntryForm();
 	openModal('entry-modal');
-	setTimeout(() => document.getElementById('e-trig').focus(), 80);
+	setTimeout(() => document.getElementById('e-trig').focus(), FOCUS_DELAY_MS);
 }
 
 function showEditEntry(si, ei, focusField) {
@@ -1268,7 +1281,7 @@ function saveEntry(andNew) {
 				_t('editor.hotstrings.add_entry_title') || 'Create a hotstring — Section « %s »'
 			).replace('%s', secName);
 			resetEntryForm();
-			setTimeout(() => document.getElementById('e-trig').focus(), 50);
+			setTimeout(() => document.getElementById('e-trig').focus(), EDIT_FOCUS_DELAY_MS);
 			return;
 		}
 
@@ -1331,8 +1344,8 @@ window.updateBulk = function () {
 			cnt +
 			' ' +
 			(cnt > 1
-				? _t('editor.hotstrings.bulk_selected_other') || 'selected'
-				: _t('editor.hotstrings.bulk_selected_one') || 'selected');
+				? _t('editor.hotstrings.bulk_selected_other')
+				: _t('editor.hotstrings.bulk_selected_one'));
 		const sel = document.getElementById('bulk-sec-sel');
 		sel.innerHTML =
 			'<option value="">' +
@@ -1426,7 +1439,7 @@ function persist() {
 
 	const t = document.getElementById('save-toast');
 	t.classList.add('show');
-	setTimeout(() => t.classList.remove('show'), 1400);
+	setTimeout(() => t.classList.remove('show'), TOAST_MS);
 }
 
 window.initData = function (d) {
@@ -1449,7 +1462,7 @@ window.initData = function (d) {
 
 	if (openMode === 'shortcut' && defaultSec) {
 		const si = D.sections.findIndex((s) => s.name === defaultSec);
-		if (si >= 0) setTimeout(() => showAddEntry(si), 300);
+		if (si >= 0) setTimeout(() => showAddEntry(si), ADD_ENTRY_DELAY_MS);
 	}
 };
 

@@ -9,6 +9,17 @@
 --- Software collector input is not a claim of evdev/uinput qualification.
 --- ==============================================================================
 
+--- Returns a typing time on the driver's own clock (ergopti_hotstrings passes
+--- Monotonic.now_ms()). A fixed 1000 ms made the session tracker's verdict
+--- depend on the host's uptime; one origin keeps the scripted gaps exact.
+--- @param offset_ms number Scripted time of the keystroke.
+--- @return number typed_ms
+local typing_origin_ms
+local function typed_at(offset_ms)
+	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	return typing_origin_ms + offset_ms
+end
+
 -- Standalone degraded-mode control: the required package is deliberately absent,
 -- while SQLite, configuration and the collector remain real. No native owner is
 -- replaced with a fake success and no durability claim is made for the RAM data.
@@ -16,24 +27,44 @@ if arg[1] == "--no-luv" then
 	package.loaded.luv = nil
 	package.preload.luv = function() error("deliberately absent native dependency") end
 	require("compat.utf8").install()
-	local K = require("modules.keylogger.keylogger")
-	local W = require("modules.keylogger.sqlite_writer")
+	local K = require("modules.keystats.keystats")
+	local W = require("modules.keystats.sqlite_writer")
 	assert(K.init({ sqlite_path = arg[2] .. "/minimal.sqlite", log_dir = arg[2] .. "/logs" }) ~= false)
+	if not rawget(_G, "jit") then
+		-- Stock Lua has neither luv nor an FFI descriptor API, so the private
+		-- file admission (run_sqlite_private_no_luv.lua) must refuse plaintext
+		-- storage. The collector still retains RAM and never claims a save.
+		assert(K.is_enabled() and not W.is_available() and not W.flush_transport_available(),
+			"stock Lua without a descriptor API must not admit the SQLite store")
+		K.on_keydown("a", typed_at(1000), "minimal")
+		assert(K.flush() == false and not K.has_flush_debt())
+		assert(K._pending_buffer_count_for_test() == 1)
+		assert(K.get_range_payload().today.minimal.c.a.c == 1)
+		assert(K.stop() == true and K._pending_buffer_count_for_test() == 1)
+		print("PASS native dependency absent on stock Lua: private storage refused, RAM retained, no saved ACK")
+		os.exit(0)
+	end
 	assert(K.is_enabled() and W.is_available() and not W.flush_transport_available())
 	local revision = W.get_revision()
-	K.on_keydown("a", 1000, "minimal")
+	K.on_keydown("a", typed_at(1000), "minimal")
 	assert(K.flush() == false and K.flush() == false)
 	assert(not K.has_flush_debt() and not K.is_flush_pending())
 	assert(K._pending_buffer_count_for_test() == 1)
 	assert(K.get_range_payload().today.minimal.c.a.c == 1)
 	assert(K.apply_configuration(assert(K.configuration_snapshot())) == true)
-	assert(K.set_app_category("minimal", "productive", 1) == true)
+	-- Categories live in the shared category file since dc40857660. Its atomic
+	-- publication may need luv (PUC Lua) or not (LuaJIT FFI): the result must be
+	-- true only when the file holds the edit, and SQLite is never the fallback.
+	local edited = K.set_app_category("minimal", "productive", 1)
 	assert(K.stop() == true and K.stop() == true)
 	assert(K._pending_buffer_count_for_test() == 1 and not K.get_flush_status().committed)
 	assert(K.get_flush_status().stopping and not K.has_flush_debt())
 	assert(#assert(W.query_rows("SELECT id FROM events_typing;")) == 0)
 	assert(W.get_revision() == revision, "unavailable flush must not advance the durable watermark")
-	assert(W.get_meta("app_score.minimal") == "1")
+	local stored = assert(require("modules.keystats.app_category_file").load())
+	assert(edited == (require("keystats.app_category_store").projection(stored).minimal ~= nil),
+		"the edit result must match what the category file holds")
+	assert(W.get_meta("app_score.minimal") == nil, "the category edit must not fall back to SQLite")
 	local warnings = 0
 	for _, line in ipairs(require("logger").ring_buffer_snapshot()) do
 		if line:find("SQLite flush transport unavailable", 1, true) then warnings = warnings + 1 end
@@ -46,7 +77,7 @@ end
 
 local uv = require("luv")
 if arg[1] == "--stale-clock" then
-	local timeout = require("infra.timings").ms("keylogger", "sqlite_operation_timeout_ms")
+	local timeout = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
 	local cached = uv.now()
 	uv.sleep(timeout + 50) -- Deliberately leave libuv's cached loop time stale.
 	assert(uv.now() == cached, "fixture must not refresh the loop before dispatch")
@@ -68,7 +99,7 @@ if arg[1] == "--parent-death" then
 	end
 	local request = assert(require("infra.sqlite_batch_process").start(arg[2] .. "/parent.sqlite",
 		"WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x<100000000) SELECT sum(x) FROM n;",
-		{ owner = "native-sqlite-parent-death", timeout_ms = require("infra.timings").ms("keylogger", "sqlite_operation_timeout_ms") }))
+		{ owner = "native-sqlite-parent-death", timeout_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") }))
 	assert(child_pid)
 	io.stdout:write(string.format("READY %d %d\n", uv.os_getpid(), child_pid)); io.stdout:flush()
 	uv.run()
@@ -85,8 +116,8 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled=true\n") and config:close())
-local K = require("modules.keylogger.keylogger")
-local W = require("modules.keylogger.sqlite_writer")
+local K = require("modules.keystats.keystats")
+local W = require("modules.keystats.sqlite_writer")
 local Process = require("infra.sqlite_batch_process")
 local Drain = require("tests.support.sqlite_flush_native")
 local Logger = require("logger")
@@ -128,10 +159,10 @@ Process.start = function(path, sql, options)
 		poll = function() if request:poll() then return { ok = false, output = "" } end end,
 	}
 end
-K.on_keydown("a", 1000, "ambiguous")
+K.on_keydown("a", typed_at(1000), "ambiguous")
 assert(K.flush() == false and K.is_flush_pending())
 assert(K.reset_session() == false and K.clear_cache() == false and K.migrate_stored_text() == false)
-K.on_keydown("b", 1100, "ambiguous")
+K.on_keydown("b", typed_at(1100), "ambiguous")
 assert(K._pending_buffer_count_for_test() == 2)
 local callbacks = 0
 assert(K.when_flush_settled(function() callbacks = callbacks + 1 end))
@@ -149,9 +180,9 @@ pass("new input stays in the next immutable snapshot, mutations refuse pending d
 
 assert(W.exec_sql("CREATE TRIGGER refusal BEFORE INSERT ON agg_app_day_chars_class WHEN NEW.app='rollback' "
 	.. "BEGIN SELECT RAISE(ABORT,'owned refusal'); END;"))
-K.on_keydown("x", 2000, "rollback")
+K.on_keydown("x", typed_at(2000), "rollback")
 assert(K.flush() == false)
-K.on_keydown("y", 2100, "rollback")
+K.on_keydown("y", typed_at(2100), "rollback")
 assert(not Drain.wait(K))
 assert(K.get_flush_status().read_safe and K.has_flush_debt())
 assert(total("rollback") == 2 and scalar("SELECT COUNT(*) FROM events_typing WHERE app='rollback';") == 0)
@@ -160,7 +191,13 @@ assert(K.reset_session() == false)
 assert(Drain.control(W, "DROP TRIGGER refusal;"))
 assert(Drain.flush(K))
 assert(total("rollback") == 2 and scalar("SELECT SUM(c) FROM ngram_chars WHERE app='rollback';") == 2)
-assert(tonumber(W.get_meta("linux_next_event_id")) == tonumber(cursor) + 1)
+-- The retry commits the typing row and the session start/end rows the same
+-- flush carries; each took one ID from the reserved range and none was skipped
+-- or reissued, so the cursor moved by exactly the rows committed past it.
+local committed = scalar("SELECT (SELECT COUNT(*) FROM events_typing WHERE id>=" .. cursor
+	.. ")+(SELECT COUNT(*) FROM events_session WHERE id>=" .. cursor .. ");")
+assert(committed >= 1 and tonumber(W.get_meta("linux_next_event_id")) == tonumber(cursor) + committed)
+assert(scalar("SELECT COUNT(DISTINCT id)=COUNT(*) FROM (SELECT id FROM events_typing UNION ALL SELECT id FROM events_session);") == 1)
 pass("conclusive ABORT exposes complete old+new RAM and retries its acknowledged IDs exactly once")
 
 -- A payload larger than Linux's per-argument ceiling must travel only on the
@@ -211,7 +248,7 @@ Process.start = function(path, sql, options)
 	current_commit = false
 	return request
 end
-K.on_keydown("p", 4000, "suspended")
+K.on_keydown("p", typed_at(4000), "suspended")
 assert(K.flush() == false)
 until_true(function()
 	if not selected then return false end
@@ -252,7 +289,7 @@ pass("stopped native SQLite leaves timers/input seam live, times out, retires ph
 -- The persisted reader and uncommitted collector must apply the same selection.
 -- Otherwise selecting an app changes counts merely when an unrelated flush lands.
 for _, app in ipairs({ "org.example.selected", "org.example.excluded" }) do
-	K.on_keydown("a", 4500, app)
+	K.on_keydown("a", typed_at(4500), app)
 	K.record_physical_key(app, 30, 4500)
 end
 local function selected_projection()
@@ -272,11 +309,11 @@ pass("selected-app character and physical-key totals are identical before and af
 
 -- Inclusive historical/future intervals must exclude both today's persisted
 -- data and the newer RAM delta; committing the latter cannot widen the range.
-local Reader = require("modules.keylogger.sqlite_reader")
+local Reader = require("modules.keystats.sqlite_reader")
 local selected_app = "org.example.selected"
 local today = os.date("%Y-%m-%d")
 assert(W.upsert_ngrams("owned-range-history", "2020-01-01", selected_app, { h = { c = 3 } }, "ngram_chars"))
-K.on_keydown("r", 4600, selected_app)
+K.on_keydown("r", typed_at(4600), selected_app)
 K.record_physical_key(selected_app, 31, 4600)
 for _, phase in ipairs({ "live", "committed" }) do
 	for _, bounds in ipairs({ { "2020-01-01", "2020-01-01" }, { "2100-01-01", "2100-01-01" } }) do
@@ -295,11 +332,11 @@ end
 assert(scalar("SELECT SUM(json_array_length(events_json)) FROM events_typing WHERE app='org.example.selected';") == 2)
 pass("inclusive date ranges keep persisted and live slices stable across an actual COMMIT")
 
-K.on_keydown("z", 5000, "stop")
+K.on_keydown("z", typed_at(5000), "stop")
 assert(K.flush() == false)
-K.on_keydown("q", 5100, "stop")
+K.on_keydown("q", typed_at(5100), "stop")
 assert(K.stop() == false and K.get_flush_status().stopping)
-K.on_keydown("n", 5200, "stop")
+K.on_keydown("n", typed_at(5200), "stop")
 until_true(function() return K.stop() end)
 assert(not K.has_flush_debt())
 assert(scalar("SELECT SUM(json_array_length(events_json)) FROM events_typing WHERE app='stop';") == 2)

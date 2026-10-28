@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; The asynchronous half of the diagnostics snapshot: the facts that need the
 ; network, and the processor load, which needs two samples. Each network probe
-; is a curl child owned by the process tree (CurlAsyncRequest), reached
+; is a native child owned by the process tree (CurlAsyncRequest, WinHTTP), reached
 ; through the Windows proxy the browser uses, harvested by a SetTimer poll and
 ; bounded by its timeout in _shared/modules/diagnostics/schema.json; every
 ; probe answers exactly once.
@@ -28,7 +28,7 @@
 ; The User-Agent GitHub requires on every API request
 global HC_PROBE_USER_AGENT := "ErgoptiPlus-Diagnostics"
 
-; How often a probe asks its curl child whether it answered
+; How often a probe asks its native child whether it answered
 global HC_PROBE_POLL_MS := 100
 
 ; The current run: { Epoch, Cancelled, Requests, Publish } (0 when none)
@@ -58,29 +58,30 @@ HealthCheck_StartProbes(Epoch, Schema, Publish, LocalOnly := false, Overrides :=
 	if HasOwner && !CurrentFn.Call()
 		return false
 	HealthCheck_CancelProbes(CurrentFn)
-	Run := { Epoch: Epoch, Cancelled: false, Requests: [], Publish: Publish }
+	ProbeRun := { Epoch: Epoch, Cancelled: false, Requests: [], Publish: Publish }
 	; Abort and terminal retirement can dispatch native messages. Publish only
 	; while the initiating window still owns the request, never over its successor.
 	PreviousCritical := Critical("On")
 	try {
 		if HasOwner && !CurrentFn.Call()
 			return false
-		_HC_ProbeRun := Run
+		_HC_ProbeRun := ProbeRun
 	} finally Critical(PreviousCritical)
 	Probes := Schema["probes"]
-	_HC_ProbeConfiguration(Run, Probes["configuration"], Overrides)
+	_HC_ProbeConfiguration(ProbeRun, Probes["configuration"], Overrides)
 	if LocalOnly
 		return true
 	Github := Probes["github_api"]
-	_HC_ProbeHttp(Run, "github_api", Github["url"],
+	_HC_ProbeHttp(ProbeRun, "github_api", Github["url"],
 		Map("User-Agent", HC_PROBE_USER_AGENT, "Accept", "application/vnd.github+json"),
 		Github["timeout_ms"], _HC_GithubAnswer)
-	_HC_ProbeAi(Run, Probes["ai_health"])
-	_HC_ProbeCpu(Run, Probes["cpu_load"])
+	_HC_ProbePac(ProbeRun, Probes["proxy_pac"])
+	_HC_ProbeAi(ProbeRun, Probes["ai_health"])
+	_HC_ProbeCpu(ProbeRun, Probes["cpu_load"])
 	return true
 }
 
-; Cancels the current run: its curl children are stopped, its answers dropped.
+; Cancels the current run: its native children are stopped, its answers dropped.
 ; @param CurrentFn {Func|Integer} Optional pure predicate for the requesting page.
 HealthCheck_CancelProbes(CurrentFn := 0) {
 	HasOwner := !(CurrentFn is Integer && CurrentFn == 0)
@@ -96,13 +97,13 @@ HealthCheck_CancelProbes(CurrentFn := 0) {
 			return false
 		if !IsObject(_HC_ProbeRun)
 			return true
-		Run := _HC_ProbeRun
+		ProbeRun := _HC_ProbeRun
 		_HC_ProbeRun := 0
-		Run.Cancelled := true
+		ProbeRun.Cancelled := true
 	} finally Critical(PreviousCritical)
-	for Request in Run.Requests {
+	for Request in ProbeRun.Requests {
 		if !Request.Abort()
-			LoggerError("Healthcheck", "A diagnostics probe's curl child refused to stop; its cleanup is retained.")
+			LoggerError("Healthcheck", "A diagnostics probe child refused to stop; its cleanup is retained.")
 	}
 	return true
 }
@@ -141,7 +142,7 @@ _HC_ProbeFinish(Run, Id, Started, Result, Sections := 0, NowTick := unset) {
 ; ==============================
 ; ==============================
 
-; Starts one HTTP GET probe: resolves the proxy, then hands the request to curl.
+; Starts one HTTP GET probe: the managed transport resolves the route, then sends it.
 ; @param Run {Object}
 ; @param Id {String}
 ; @param Url {String}
@@ -154,7 +155,7 @@ _HC_ProbeHttp(Run, Id, Url, Headers, TimeoutMs, Interpret) {
 	_HC_ProbeSend(Run, Id, Url, Headers, TimeoutMs, Interpret, Started)
 }
 
-; Sends the request of an HTTP probe through curl and arms its poll.
+; Sends the request of an HTTP probe through the managed transport and arms its poll.
 _HC_ProbeSend(Run, Id, Url, Headers, TimeoutMs, Interpret, Started, Port := 0) {
 	Request := 0
 	if Run.Cancelled {
@@ -165,6 +166,8 @@ _HC_ProbeSend(Run, Id, Url, Headers, TimeoutMs, Interpret, Started, Port := 0) {
 		CreateFn := Port is Map ? Port.Get("create_http", 0) : 0
 		Request := IsObject(CreateFn) ? CreateFn.Call() : CurlAsyncRequest()
 		Run.Requests.Push(Request)
+		if Id == "proxy_pac"
+			Interpret := _HC_PacBindRequest(Request, Interpret)
 		Request.SetManagedRouting(Port is Map ? Port.Get("managed_settings", 0) : 0, () => _HC_ManagedRunCurrent(Run))
 		Request.SetDeadline(Started, TimeoutMs)
 		Request.Open("GET", Url, true)
@@ -196,7 +199,7 @@ _HC_ManagedRunCurrent(Run) {
 	return IsObject(_HC_ProbeRun) && IsObject(Run) && ObjPtr(_HC_ProbeRun) == ObjPtr(Run) && !Run.Cancelled
 }
 
-; Asks an HTTP probe's curl child again after one poll interval.
+; Asks an HTTP probe's native child again after one poll interval.
 _HC_ProbeArmPoll(Run, Id, Request, Interpret, Started, TimeoutMs) {
 	SetTimer(_HC_ProbePoll.Bind(Run, Id, Request, Interpret, Started, TimeoutMs), -HC_PROBE_POLL_MS)
 }
@@ -220,7 +223,7 @@ _HC_ProbePoll(Run, Id, Request, Interpret, Started, TimeoutMs, NowTick := unset,
 		_HC_ProbeFinish(Run, Id, Started, Answer["result"], Answer.Get("sections", 0), NowTick?)
 		return
 	}
-	; curl's own max-time ends the child first; this bound only covers a child
+	; the worker's own original budget ends the child first; this bound only covers a child
 	; that never reports back
 	if (TickElapsed64(Started, NowTick?) > TimeoutMs + 1000) {
 		if !Request.Abort()
@@ -254,6 +257,155 @@ _HC_GithubAnswer(Status, Body) {
 		LoggerWarn("Healthcheck", "GitHub's rate limit answer could not be read: {1}.", Err.Message)
 	}
 	return Map("result", Map("state", "ok"), "sections", Map("network", Map("github_api", Value)))
+}
+
+; The system proxy auto-config (PAC): configured, downloadable and usable by the
+; managed downloader. The URL is read and fetched here but never reported.
+; @param Run {Object}
+; @param Config {Map} The schema's proxy_pac probe.
+_HC_ProbePac(Run, Config) {
+	Url := _HC_PacUrl()
+	if (Url == "") {
+		Started := A_TickCount
+		_HC_ProbeStarted("proxy_pac", "no PAC configured")
+		_HC_ProbeFinish(Run, "proxy_pac", Started, Map("state", "ok"), Map("network", Map("proxy_pac", "No PAC configured")))
+		return
+	}
+	_HC_ProbeHttp(Run, "proxy_pac", Url, Map("User-Agent", HC_PROBE_USER_AGENT), Config["timeout_ms"], _HC_PacAnswer)
+}
+
+; The PAC URL the user's Windows settings name, "" when none is set.
+; @returns {String}
+_HC_PacUrl() {
+	try return Trim(RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings", "AutoConfigURL"))
+	return ""
+}
+
+; Judges normalized PAC text after its request has admitted the actual bytes.
+; A String alone cannot prove encoding validity or the original byte count.
+; @param Status {Integer}
+; @param Body {String}
+; @returns {Map} { result, sections? }
+_HC_PacAnswer(Status, Body) {
+	if (Status != 200)
+		return Map("result", Map("state", "error", "detail", Status > 0 ? "PAC download: HTTP " . Status : "PAC download failed"))
+	if (Body == "")
+		return Map("result", Map("state", "error", "detail", "PAC is empty"))
+	if !InStr(Body, "FindProxyForURL")
+		return Map("result", Map("state", "error", "detail", "PAC does not define FindProxyForURL"))
+	Value := "HTTP 200, " . StrLen(Body) . " characters, FindProxyForURL found"
+	return Map("result", Map("state", "ok"), "sections", Map("network", Map("proxy_pac", Value)))
+}
+
+; Adapt only the real PAC request, including one created by an existing test
+; factory. Other HTTP probes retain their two-argument interpreter and transport.
+_HC_PacBindRequest(Request, Interpret) {
+	if !(Request is CurlAsyncRequest) || Request.HasOwnProp("_HC_PacSource")
+		|| Request.HasOwnProp("_OnManagedDone")
+		throw Error("The PAC request completion already has another owner.")
+	Request._HC_PacSource := 0
+	Request.DefineProp("_OnManagedDone", {Call: _HC_PacManagedDone})
+	return _HC_PacInterpret.Bind(Request, Interpret)
+}
+
+; The exact Job has settled before this callback. Capture its private RAW image
+; before the superclass deletes it, then always delegate real settlement once.
+; No transport prototype, decoding policy, response property or port is changed.
+_HC_PacManagedDone(Request, ExitCode, Stdout, Stderr) {
+	if ExitCode == 0 && Stderr == "" && !Request.Completed && !Request.Aborted
+		&& Request.ManagedTransport && Request.OutputPath == "" {
+		try Source := _HC_PacReadSource(Request.BodyPath)
+		catch
+			Source := Map("error", "PAC source bytes could not be read")
+		if !Request.Completed && !Request.Aborted
+			Request._HC_PacSource := Source
+	}
+	return CurlAsyncRequest.Prototype._OnManagedDone.Call(Request, ExitCode, Stdout, Stderr)
+}
+
+_HC_PacInterpret(Request, Interpret, Status, Body) {
+	if Status != 200
+		return Interpret.Call(Status, Body)
+	Source := Request._HC_PacSource
+	if !Request.Completed || Request.Aborted || !(Source is Map)
+		return Map("result", Map("state", "error", "detail", "PAC source bytes were not admitted"))
+	if Source.Has("error")
+		return Map("result", Map("state", "error", "detail", Source["error"]))
+	Answer := Interpret.Call(Status, Source["body"])
+	if Answer["result"].Get("state", "") == "ok" {
+		Value := "HTTP 200, " . Source["raw_bytes"] . " source bytes, " . Source["encoding"]
+			. ", " . Source["normalized_bytes"] . " UTF-8 bytes, FindProxyForURL found"
+		Answer["sections"]["network"]["proxy_pac"] := Value
+	}
+	return Answer
+}
+
+; The existing PAC limit counts source bytes including BOM, not UTF16 units.
+; The source worker also bounds the UTF8 normalization of a UTF16 script.
+_HC_PacReadSource(Path) {
+	Maximum := 1048576
+	Size := FileGetSize(Path)
+	if Size > Maximum
+		return Map("error", "PAC is over the 1048576 byte limit")
+	Raw := FSReadBytesStrict(Path)
+	if Raw.Size != Size
+		return Map("error", "PAC source changed during validation")
+	return _HC_PacDecodeSource(Raw, Maximum)
+}
+
+; Match Fetch's strict BOM handling on this same bounded RAW image. Generic
+; ResponseEncodingValid remains a UTF8-only fact, including for valid UTF16 PAC.
+_HC_PacDecodeSource(Raw, Maximum) {
+	Count := Raw.Size
+	if Count == 0
+		return Map("error", "PAC is empty")
+	if Count > Maximum
+		return Map("error", "PAC is over the 1048576 byte limit")
+	Offset := 0, Encoding := "UTF-8", BigEndian := false
+	if Count >= 3 && NumGet(Raw, 0, "UChar") == 0xEF
+		&& NumGet(Raw, 1, "UChar") == 0xBB && NumGet(Raw, 2, "UChar") == 0xBF
+		Offset := 3
+	else if Count >= 2 {
+		First := NumGet(Raw, 0, "UChar"), Second := NumGet(Raw, 1, "UChar")
+		if (First == 0xFF && Second == 0xFE) || (First == 0xFE && Second == 0xFF) {
+			Offset := 2, BigEndian := First == 0xFE
+			Encoding := BigEndian ? "UTF-16BE" : "UTF-16LE"
+		}
+	}
+	Bytes := Count - Offset
+	if Bytes == 0
+		return Map("error", "PAC is empty")
+	if Encoding == "UTF-8" {
+		if !HTTPIsValidUtf8(Raw.Ptr + Offset, Bytes)
+			return Map("error", "PAC encoding is invalid")
+		Body := StrGet(Raw.Ptr + Offset, -Bytes, "UTF-8")
+		NormalizedBytes := Bytes
+	} else {
+		if Mod(Bytes, 2)
+			return Map("error", "PAC UTF-16 has an incomplete code unit")
+		Units := Bytes // 2
+		WidePtr := Raw.Ptr + Offset
+		if BigEndian {
+			Wide := Buffer(Bytes, 0)
+			Loop Units {
+				At := (A_Index - 1) * 2
+				Unit := (NumGet(Raw, Offset + At, "UChar") << 8) | NumGet(Raw, Offset + At + 1, "UChar")
+				NumPut("UShort", Unit, Wide, At)
+			}
+			WidePtr := Wide.Ptr
+		}
+		; Reuse the native boundary before StrGet, which copies lone surrogates.
+		if !NativeTextIsWellFormedUtf16(WidePtr, Units)
+			return Map("error", "PAC encoding is invalid")
+		; The source bound also bounds this UTF16 text allocation to one MiB.
+		Body := StrGet(WidePtr, -Units, "UTF-16")
+		NormalizedBytes := StrPut(Body, "UTF-8") - 1
+		if NormalizedBytes > Maximum
+			return Map("error", "PAC is over the 1048576 byte limit")
+	}
+	if RegExMatch(Body, "\x00")
+		return Map("error", "PAC contains a null character")
+	return Map("body", Body, "raw_bytes", Count, "normalized_bytes", NormalizedBytes, "encoding", Encoding)
 }
 
 ; The local AI backend answers its version endpoint.

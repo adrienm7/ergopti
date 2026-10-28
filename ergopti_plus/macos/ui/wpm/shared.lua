@@ -80,7 +80,7 @@ end
 --- =======================================
 
 --- Resolves the active source in a rolling time window.
---- @param stats table Live stats payload from keylogger.
+--- @param stats table Live stats payload from keystats.
 --- @param source_color_duration number Active source duration in seconds.
 --- @param now_sec number|nil Current timestamp in seconds.
 --- @return string Active source name or "none".

@@ -111,7 +111,6 @@ _RemoteCancelPublication_Poll(State, ReqId) {
 _RemoteCancelPublication_CurlPort(State, RunFn) {
 	return Map(
 		"resolve_proxy", _Stub_CurlResolveProxyDirect.Bind(State),
-		"create_curl_capability", _CurlAuthIntegration_CreateImmediate,
 		"file_exists", (*) => true,
 		"temp_dir", (*) => A_Temp,
 		"write", (*) => true,
@@ -122,6 +121,7 @@ _RemoteCancelPublication_CurlPort(State, RunFn) {
 		"schedule_orphan_sweep", (*) => true,
 		"open_process", _RemoteCancelPublication_Open.Bind(State),
 		"terminate_process", _RemoteCancelPublication_Terminate.Bind(State),
+		"wait_process", (*) => 0,
 		"close_process", _RemoteCancelPublication_Close.Bind(State))
 }
 
@@ -485,3 +485,5 @@ _RemoteTrimRegistry_DetachesBeforeReentrantCallback() {
 }
 Test("api_remote: trim detaches owner before reentrant callback (async-trim-detach-before-callback)",
 	_RemoteTrimRegistry_DetachesBeforeReentrantCallback)
+
+#Include test_llm_backboard_exchange_after.ahk

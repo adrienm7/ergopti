@@ -60,7 +60,7 @@ _RSH_GroupRules() {
 	AssertEqual("hotstrings-shortcuts", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\shortcuts\test_capsword_auto_off.ahk"))
 	AssertEqual("keymap-gestures", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\platform\remap\tap_hold\test_tap_hold_loader.ahk"))
 	AssertEqual("keymap-gestures", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\gestures\test_gestures.ahk"))
-	AssertEqual("keylogger", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\keylogger\test_keylogger_event_id.ahk"))
+	AssertEqual("keystats", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\keystats\test_keystats_event_id.ahk"))
 	AssertEqual("ui", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\ui\menu\test_script_control_submenu.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\adapters\shell_runner\test_shell_runner_tree_owned.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\platform\network\test_managed_remote_transport.ahk"))
@@ -87,6 +87,83 @@ _RSH_List() {
 }
 Test("runner module: --list replays the named tests in registry order (runner-module)", _RSH_List)
 
+
+; Exact replay admission must account for every requested name, including a
+; missing name beside a valid control that would otherwise make the run green.
+_RSH_NewReplayDirectory() {
+	Directory := A_Temp . "\ergopti-runner-replay-" . A_ScriptHwnd . "-" . A_TickCount . "-" . Random(100000, 999999)
+	AssertTrue(DllCall("Kernel32\CreateDirectoryW", "Str", Directory, "Ptr", 0, "Int"),
+		"the replay fixture requires an exclusively acquired private root")
+	return Directory
+}
+
+_RSH_ListRefusesUnknown() {
+	Tests := [{name: "retained"}, {name: "other"}]
+	Directory := _RSH_NewReplayDirectory()
+	ListFile := Directory . "\requested.txt"
+	try {
+		for Missing in ["missing", "Retained"] {
+			if FileExist(ListFile)
+				FileDelete(ListFile)
+			FileAppend("retained`n" . Missing . "`n", ListFile, "UTF-8")
+			Refused := false
+			try _SelectListed(Tests, ListFile)
+			catch ValueError as Err {
+				AssertEqual("Unknown test listed for replay: " . Missing, Err.Message)
+				Refused := true
+			}
+			AssertTrue(Refused, "a retained passing case must not conceal an unknown requested name")
+		}
+		AssertEqual(2, Tests.Length, "admission never mutates the registry")
+	} finally DirDelete(Directory, true)
+}
+Test("runner list: unknown names refuse an otherwise valid replay (runner-list-contract)", _RSH_ListRefusesUnknown)
+
+
+_RSH_ListSelectionIntersections() {
+	Core := "C:\repo\static\ergopti_plus\windows\tests\unit\infra\test_text_utils.ahk"
+	Ui := "C:\repo\static\ergopti_plus\windows\tests\unit\ui\menu\test_menu.ahk"
+	Rows := [{name: "alpha", file: Core, interactive: false},
+		{name: "beta", file: Ui, interactive: false},
+		{name: "gamma", file: Core, interactive: true},
+		{name: "alpha", file: Core, interactive: false}]
+	Directory := _RSH_NewReplayDirectory()
+	ListFile := Directory . "\requested.txt"
+	try {
+		FileAppend("gamma`nbeta`nalpha`n", ListFile, "UTF-8")
+		Selected := _SelectRunTests(Rows, "", "core", ListFile, false, false, &Excluded, &UnmodularCount)
+		AssertEqual(2, Selected.Length, "duplicate registered names retain every original occurrence")
+		AssertTrue(Selected[1] == Rows[1])
+		AssertTrue(Selected[2] == Rows[4])
+		AssertEqual(3, UnmodularCount)
+		AssertEqual(1, Excluded.Length)
+		AssertTrue(Excluded[1] == Rows[3])
+		Selected := _SelectRunTests(Rows, "beta", "ui", ListFile, false, false, &Excluded, &UnmodularCount)
+		AssertEqual(1, Selected.Length, "known listed names outside an explicit filter remain legal")
+		AssertTrue(Selected[1] == Rows[2])
+		AssertEqual(0, Excluded.Length)
+		AssertEqual(1, UnmodularCount)
+		Selected := _SelectRunTests(Rows, "", "core", ListFile, true, true, &Excluded, &UnmodularCount)
+		AssertEqual(3, Selected.Length)
+		AssertTrue(Selected[1] == Rows[4], "reverse applies after the requested intersections")
+		AssertTrue(Selected[2] == Rows[3])
+		AssertTrue(Selected[3] == Rows[1])
+		AssertEqual(0, Excluded.Length)
+		AssertEqual(4, Rows.Length)
+		AssertEqual("alpha", Rows[1].name, "selection never reorders the source registry")
+		FileDelete(ListFile)
+		FileAppend("beta`nmissing`n", ListFile, "UTF-8")
+		Refused := false
+		try _SelectRunTests(Rows, "alpha", "core", ListFile, false, false, &Excluded, &UnmodularCount)
+		catch ValueError as Err {
+			AssertEqual("Unknown test listed for replay: missing", Err.Message)
+			Refused := true
+		}
+		AssertTrue(Refused, "explicit filters must not conceal a name missing from the full registry")
+	} finally DirDelete(Directory, true)
+}
+Test("runner list: admission precedes explicit selection intersections (runner-list-contract)", _RSH_ListSelectionIntersections)
+
 _RSH_Reverse() {
 	Tests := [{name: "a"}, {name: "b"}, {name: "c"}]
 	Reversed := _SelectReversed(Tests, true)
@@ -99,3 +176,86 @@ _RSH_Reverse() {
 	AssertEqual(0, _SelectReversed([], true).Length)
 }
 Test("runner module: --reverse runs the selection backwards (runner-module)", _RSH_Reverse)
+
+
+_RSH_DefaultPlanOwner() {
+	global TEST_MODULE_GROUPS
+	File := "C:\repo\static\ergopti_plus\windows\tests\unit\infra\test_text_utils.ahk"
+	Rows := [{file: File, name: "first"}, {file: File, name: "second"}]
+	Expected := "core`t" . File . "`tfirst`ncore`t" . File . "`tsecond`n"
+	AssertEqual(Expected, _TestBuildPlan(Rows), "the default plan preserves canonical unit classification and order")
+	AssertEqual(Expected, _TestBuildPlan(Rows, 0), "only the declared Integer zero chooses the same canonical owner")
+	AssertEqual(14, TEST_MODULE_GROUPS.Length, "the E2E owner must not create an empty unit shard")
+	for Unowned in ["unit\new_area\test_x.ahk", "e2e\run_e2e.ahk"] {
+		AssertThrows(_TestModuleOf.Bind("C:\repo\static\ergopti_plus\windows\tests\" . Unowned))
+		AssertThrows(_TestBuildPlan.Bind([{file: "C:\repo\static\ergopti_plus\windows\tests\" . Unowned, name: "unknown"}]))
+	}
+	AssertThrows(_SelectModule.Bind([], "e2e"), "E2E must remain outside the unit module vocabulary")
+}
+Test("runner plan: default ownership keeps all unit classification strict (runner-plan-owner)", _RSH_DefaultPlanOwner)
+
+_RSH_ExplicitPlanOwner() {
+	Files := []
+	Rows := [{file: "owned-entry.ahk", name: "first"}, {file: "owned-include.ahk", name: "second"}]
+	Plan := _TestBuildPlan(Rows, (File) => (Files.Push(File), "owned-suite"))
+	AssertEqual("owned-suite`towned-entry.ahk`tfirst`nowned-suite`towned-include.ahk`tsecond`n", Plan)
+	AssertEqual(2, Files.Length, "the owner must classify every actual registering file")
+	AssertEqual(Rows[1].file, Files[1])
+	AssertEqual(Rows[2].file, Files[2])
+}
+Test("runner plan: an explicit owner classifies exact ordered registrations (runner-plan-owner)", _RSH_ExplicitPlanOwner)
+
+_RSH_InvalidPlanOwners() {
+	for Invalid in ["0", 0.0, 1, "", "classifier", {}, [], Map()]
+		AssertThrows(_TestBuildPlan.Bind([], Invalid), "invalid ownership must refuse even an empty registry")
+}
+Test("runner plan: invalid classifier values never select the default (runner-plan-owner)", _RSH_InvalidPlanOwners)
+
+_RSH_InvalidPlanLabel(Label) {
+	Rows := [{file: "owned.ahk", name: "one"}]
+	Owner := (File) => Label
+	AssertThrows(_TestBuildPlan.Bind(Rows, Owner), "a classifier must not corrupt the plan's three fields")
+}
+for _RSH_BadPlanLabel in [
+	{Name: "empty", Value: ""}, {Name: "whitespace", Value: " "}, {Name: "integer", Value: 0},
+	{Name: "tab", Value: "bad`tfield"}, {Name: "newline", Value: "bad`nfield"},
+	{Name: "carriage return", Value: "bad`rfield"}, {Name: "object", Value: {}}
+]
+	Test("runner plan: " . _RSH_BadPlanLabel.Name . " classifier output is refused (runner-plan-owner)",
+		_RSH_InvalidPlanLabel.Bind(_RSH_BadPlanLabel.Value))
+
+
+_RSH_LateFailure() {
+	throw Error("A registration refused after planning must never execute.")
+}
+
+_RSH_RegistrationClosed() {
+	global TEST_REGISTRY
+	Before := TEST_REGISTRY.Length
+	Refused := false
+	try {
+		try Test("valid late registration control", _RSH_LateFailure)
+		catch Error as Err {
+			AssertEqual("Tests cannot be registered after execution starts.", Err.Message)
+			Refused := true
+		}
+		AssertTrue(Refused, "a real callback must not disappear after the execution plan is captured")
+		AssertEqual(Before, TEST_REGISTRY.Length, "a refused registration cannot mutate the registry")
+	} finally {
+		; Keep the original buggy behavior from contaminating following red tests.
+		while TEST_REGISTRY.Length > Before
+			TEST_REGISTRY.Pop()
+	}
+}
+Test("runner lifecycle: registration closes before callbacks start (runner-registration-contract)", _RSH_RegistrationClosed)
+
+_RSH_NestedRunRefused() {
+	Refused := false
+	try RunTests()
+	catch Error as Err {
+		AssertEqual("The test runner has already started.", Err.Message)
+		Refused := true
+	}
+	AssertTrue(Refused, "a nested run must not reset the active owner's TAP receipt")
+}
+Test("runner lifecycle: nested execution cannot replace an active receipt (runner-registration-contract)", _RSH_NestedRunRefused)

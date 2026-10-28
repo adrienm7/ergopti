@@ -24,6 +24,8 @@
 ---    absent returns nil.
 --- ==============================================================================
 
+local NativePath = require("native_path")
+
 local M = {}
 
 
@@ -49,8 +51,8 @@ local function get_llm_json_path(name)
 	-- Try to resolve relative to this source file's directory
 	local src = debug.getinfo(1, "S").source
 	if src and src:sub(1, 1) == "@" then
-		local dir = src:sub(2):match("^(.+)[/\\][^/\\]+$")
-		if dir then
+		local dir = NativePath.dirname(src:sub(2))
+		if dir and dir ~= "" then
 			-- Navigate up two levels: llm/ -> lua/ -> _shared/ -> modules/llm/<name>
 			local candidate = dir .. "/../../modules/llm/" .. name
 			local fh = io.open(candidate, "r")

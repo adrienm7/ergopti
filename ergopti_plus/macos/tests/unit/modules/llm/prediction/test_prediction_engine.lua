@@ -9,7 +9,7 @@
 --- a live macOS + MLX/Ollama environment and is deferred to integration testing.
 ---
 --- FEATURES & RATIONALE:
---- 1. Dependency Isolation: Heavy dependencies (modules.llm, modules.keylogger,
+--- 1. Dependency Isolation: Heavy dependencies (modules.llm, modules.keystats,
 ---    ui.tooltip, WarmupController, etc.) are stubbed via package.loaded before
 ---    the engine loads.
 --- 2. Pure-Function Coverage: normalize_mods, is_visible, is_chain_pending,
@@ -51,6 +51,7 @@ package.loaded["modules.llm"] = {
 		llm_show_info_bar      = true,
 		llm_sequential_mode    = false,
 		llm_debounce           = 0.3,
+		llm_min_request_interval = 0,
 		llm_auto_raise_temp    = false,
 		llm_streaming          = false,
 		llm_streaming_multi    = false,
@@ -154,16 +155,17 @@ package.loaded["modules.llm.streaming_handler"] = {
 }
 
 -- Stub AppFilter — the real export is is_blocked(state, apps, url_filter, secure_filter).
+local focused_app_for_test = nil
 package.loaded["modules.llm.app_filter"] = {
 	is_blocked = function(_state, _apps, _url, _secure) return false end,
+	focused_app_id = function() return focused_app_for_test end,
 }
 
--- Stub api_common (required inline at module level). get_rate_limit_min_interval_s
--- is the real export the floor check calls; 0 means "never defer" for tests.
+-- Stub api_common (required inline at module level). The request floor is the
+-- engine's own setting (0 in these fixtures: "never defer").
 package.loaded["modules.llm.api_common"] = {
 	MIN_CALL_INTERVAL_SEC = 0.5,
 	get_retry_policy      = function() return 2, 0.18, 5 end,
-	get_rate_limit_min_interval_s = function(_backend) return 0 end,
 }
 
 -- Stub lib.i18n — perform_check uses i18n.get() for the loading label.
@@ -196,9 +198,9 @@ package.loaded["ui.tooltip"] = {
 	tint                  = function(_) return nil end,
 }
 
--- Stub modules.keylogger — get_live_stats() returns wpm_physical (the field the
+-- Stub modules.keystats — get_live_stats() returns wpm_physical (the field the
 -- adaptive debounce reads); log_llm_dismissed() is called on reset.
-package.loaded["modules.keylogger"] = {
+package.loaded["modules.keystats"] = {
 	get_live_stats      = function() return { wpm_physical = 0 } end,
 	log_llm_dismissed   = function(_, _preds) end,
 }
@@ -223,7 +225,7 @@ local function load_real_setting_bridge()
 			F16_LLM_CHAIN_SIGNAL = 106,
 			to_name = function() return "f16" end,
 		},
-		["modules.keylogger"] = {},
+		["modules.keystats"] = {},
 		["ui.tooltip"] = {},
 		["modules.keymap.registry"] = {},
 		["modules.hotstrings.hotstrings_config"] = {},
@@ -916,6 +918,43 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 			"prompt construction must read only the independent LLM context")
 	end)
 
+	helpers.it("app-profile: the profile mapped to the focused application is the one the backend runs", function()
+		local core = package.loaded["modules.llm"]
+		local Overrides = require("llm.app_profile_overrides")
+		local previous_fetch, previous_find = core.fetch_llm_prediction, core.find_profile
+		local sent
+		core.find_profile = function(id) return id == "formal" and { id = "formal", label = "Formal" } or nil end
+		core.fetch_llm_prediction = function(...) sent = { profile = select(13, ...) } end
+		local ok, err = xpcall(function()
+			PE.set_llm_enabled(true)
+			helpers.assert_true(PE.set_llm_app_profile_overrides(Overrides.encode({ ["com.slack.app"] = "formal" })))
+			local found, text = PE.get_llm_runtime_setting("llm_app_profile_overrides")
+			helpers.assert_true(found and text == Overrides.encode({ ["com.slack.app"] = "formal" }),
+				"the transaction owner reads the stored text back")
+
+			focused_app_for_test = "com.Slack.app"
+			PE.init({ buffer = "hello wor", llm_buffer = "hello wor", mappings = {}, DELAYS = { llm_prediction = 0 } })
+			PE.perform_check(true)
+			helpers.assert_true(sent ~= nil and type(sent.profile) == "table" and sent.profile.id == "formal",
+				"a request typed in the mapped application runs its profile")
+
+			sent, focused_app_for_test = nil, "com.other.app"
+			PE.init({ buffer = "hello wor ", llm_buffer = "hello wor ", mappings = {}, DELAYS = { llm_prediction = 0 } })
+			PE.perform_check(true)
+			helpers.assert_true(sent ~= nil, "the other application still gets its request")
+			helpers.assert_nil(sent.profile, "and runs the menu's profile")
+
+			helpers.assert_eq(PE.set_llm_app_profile_overrides("v1:***"), false, "an unreadable text is refused")
+			local _, kept = PE.get_llm_runtime_setting("llm_app_profile_overrides")
+			helpers.assert_eq(kept, Overrides.encode({ ["com.slack.app"] = "formal" }), "and leaves the map in force")
+		end, debug.traceback)
+		core.fetch_llm_prediction, core.find_profile = previous_fetch, previous_find
+		PE.set_llm_app_profile_overrides("")
+		PE.set_llm_enabled(false)
+		focused_app_for_test = nil
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("(no-model-runtime) ready MLX cannot render, fetch, or warm without an active model", function()
 		local core = package.loaded["modules.llm"]
 		local tooltip = package.loaded["ui.tooltip"]
@@ -972,11 +1011,11 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 	helpers.it("clears visible state synchronously but defers dismissal persistence", function()
 		local core = package.loaded["modules.llm"]
 		local streaming = package.loaded["modules.llm.streaming_handler"]
-		local keylogger = package.loaded["modules.keylogger"]
+		local keystats = package.loaded["modules.keystats"]
 		local scheduler = require("adapters.timer_scheduler")
 		local previous_fetch = core.fetch_llm_prediction
 		local previous_build = streaming.build_callbacks
-		local previous_log = keylogger.log_llm_dismissed
+		local previous_log = keystats.log_llm_dismissed
 		local previous_after = scheduler.after
 		local previous_cancel = scheduler.cancel
 		local previous_on_settled = scheduler.onSettled
@@ -1007,7 +1046,7 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 			handle.observers[#handle.observers + 1] = observer
 			return true
 		end
-		keylogger.log_llm_dismissed = function()
+		keystats.log_llm_dismissed = function()
 			dismissal_calls = dismissal_calls + 1
 		end
 		streaming.build_callbacks = function(config)
@@ -1055,7 +1094,7 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 
 		core.fetch_llm_prediction = previous_fetch
 		streaming.build_callbacks = previous_build
-		keylogger.log_llm_dismissed = previous_log
+		keystats.log_llm_dismissed = previous_log
 		scheduler.after = previous_after
 		scheduler.cancel = previous_cancel
 		scheduler.onSettled = previous_on_settled

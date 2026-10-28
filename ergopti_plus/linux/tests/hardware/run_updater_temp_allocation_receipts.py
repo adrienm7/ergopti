@@ -37,6 +37,9 @@ local prepared_artifact = assert(Output.native_artifact("ergopti-plus-linux.tar.
  "Actual native archive runtime preparation unavailable")
 local prepared_output = Output.native()
 local prepared_digest = require("infra.fd_sha256").native()
+-- The detached-signature gate is built on the first download; build it now so
+-- its modules and policy are loaded before the descriptor limit applies.
+assert(type(Manager._select_signature_asset("{}")) == "string", "Actual signature gate preparation unavailable")
 local api = assert(os.getenv("ERGOPTI_NATIVE_UPDATER_API"))
 local denied = os.getenv("ERGOPTI_NATIVE_UPDATER_DENIED") == "true"
 local wants_callback = os.getenv("ERGOPTI_NATIVE_UPDATER_CALLBACK") == "true"

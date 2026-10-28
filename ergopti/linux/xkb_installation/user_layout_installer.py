@@ -11,8 +11,8 @@ pickers (libxkbregistry merges it with the system registry). Xorg's
 ``xkbcomp`` never reads this tree: an X11 session needs the system installer
 (``install.sh``).
 
-The ErgoptiPlus daemon runs this module to install what it converted with
-``keylayout_to_xkb.py`` from a registry ``.keylayout``:
+The ErgoptiPlus daemon runs this module to install what it converted, in Lua
+(``layouts/xkb_converter.lua``), from a registry ``.keylayout``:
 
     user_layout_installer.py install --layout-id ergol --display-name "Ergo-L" \
         --source-dir ~/.config/ergopti_plus/layouts/ergol
@@ -48,6 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from desktop_activation import (  # noqa: E402
     CleanupStatus,
     activate_layout,
+    apply_x11_user_tree,
     compile_rmlvo,
     deactivate_layouts,
     keymap_has_type,
@@ -64,6 +65,11 @@ from layout_package import (  # noqa: E402
 )
 
 EXIT_ARGUMENTS = 2
+
+# The session type logind publishes: "x11" for a pure Xorg session.
+ENV_SESSION_TYPE = "XDG_SESSION_TYPE"
+# The kind of refusal the daemon turns into a message about the session.
+KIND_XORG_SESSION = "xorg_session"
 
 # Overrides of the user tree and home, for sandboxed tests.
 ENV_USER_ROOT = "ERGOPTI_XKB_USER_ROOT"
@@ -116,6 +122,22 @@ def user_root(environ: Optional[Dict[str, str]] = None) -> Path:
     config_home = env.get("XDG_CONFIG_HOME")
     base = Path(config_home) if config_home else Path.home() / ".config"
     return base / "xkb"
+
+
+def is_xorg_session(environ: Optional[Dict[str, str]] = None) -> bool:
+    """True in a pure Xorg session, whose xkbcomp never reads the user tree."""
+    env = os.environ if environ is None else environ
+    return env.get(ENV_SESSION_TYPE, "").strip().lower() == "x11"
+
+
+def refuse_xorg_session(environ: Optional[Dict[str, str]] = None) -> None:
+    """Refuses before writing anything when the session could not use the tree."""
+    if is_xorg_session(environ):
+        raise InstallError(
+            EXIT_VALIDATION,
+            "this is an Xorg session, which does not read the user XKB tree; nothing was written",
+            KIND_XORG_SESSION,
+        )
 
 
 def user_home(environ: Optional[Dict[str, str]] = None) -> Path:
@@ -346,8 +368,16 @@ def install(
     languages: List[str],
     root: Path,
     home: Path,
+    environ: Optional[Dict[str, str]] = None,
+    allow_xorg: bool = False,
 ) -> dict:
-    """Installs one converted layout into the user tree."""
+    """Installs one converted layout into the user tree.
+
+    A pure Xorg session is refused unless the caller loads the layout itself
+    with ``apply_x11`` (``allow_xorg``): the desktop settings cannot select a
+    layout from the user tree there."""
+    if not allow_xorg:
+        refuse_xorg_session(environ)
     symbols = (source_dir / (layout_id + ".xkb")).read_text(encoding="utf-8")
     types = (source_dir / "xkb_types.txt").read_text(encoding="utf-8")
     compose_source = source_dir / (layout_id + ".XCompose")
@@ -437,8 +467,9 @@ def uninstall(layout_id: str, root: Path, home: Path, deactivate: bool = True) -
     }
 
 
-def activate(layout_id: str, root: Path) -> dict:
+def activate(layout_id: str, root: Path, environ: Optional[Dict[str, str]] = None) -> dict:
     """Makes one installed layout the first input source of the session."""
+    refuse_xorg_session(environ)
     if layout_id not in read_manifest(root):
         raise InstallError(EXIT_VALIDATION, "the layout %s is not installed" % layout_id)
     applied = activate_layout([LayoutSpec(layout_id)])
@@ -449,6 +480,21 @@ def activate(layout_id: str, root: Path) -> dict:
     }
 
 
+def apply_x11(layout_id: str, root: Path, environ: Optional[Dict[str, str]] = None) -> dict:
+    """Loads one installed layout into the running Xorg server, live."""
+    if layout_id not in read_manifest(root):
+        raise InstallError(EXIT_VALIDATION, "the layout %s is not installed" % layout_id)
+    applied, code = apply_x11_user_tree(LayoutSpec(layout_id), root, environ)
+    report = {
+        "ok": applied,
+        "verified": applied,
+        "detail": "loaded into the running X server" if applied else "not loaded: " + code,
+    }
+    if not applied:
+        report["code"] = code
+    return report
+
+
 def parse_arguments(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Install registry layouts in the user XKB tree.")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -457,7 +503,10 @@ def parse_arguments(argv: List[str]) -> argparse.Namespace:
     install_parser.add_argument("--display-name", required=True)
     install_parser.add_argument("--source-dir", required=True, type=Path)
     install_parser.add_argument("--language", action="append", default=[])
-    for name in ("uninstall", "activate"):
+    install_parser.add_argument(
+        "--allow-xorg", action="store_true", help="install in a pure Xorg session (see apply-x11)"
+    )
+    for name in ("uninstall", "activate", "apply-x11"):
         command = commands.add_parser(name)
         command.add_argument("--layout-id", required=True)
     return parser.parse_args(argv)
@@ -472,10 +521,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         if args.command == "install":
             report = install(
-                args.layout_id, args.display_name, args.source_dir, args.language, root, home
+                args.layout_id,
+                args.display_name,
+                args.source_dir,
+                args.language,
+                root,
+                home,
+                allow_xorg=args.allow_xorg,
             )
         elif args.command == "uninstall":
             report = uninstall(args.layout_id, root, home)
+        elif args.command == "apply-x11":
+            report = apply_x11(args.layout_id, root)
         else:
             report = activate(args.layout_id, root)
     except InstallError as error:

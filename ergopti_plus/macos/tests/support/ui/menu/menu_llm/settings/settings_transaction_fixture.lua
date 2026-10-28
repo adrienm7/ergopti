@@ -26,7 +26,8 @@ local MODULES = {
 	"ui.menu.menu_llm.warmup_controller",
 	"ui.menu.menu_llm.backend_panel",
 	"ui.menu.menu_llm.api_panel",
-	"ui.menu.menu_llm.models_selector",
+	"ui.menu.menu_llm.model_selector_page",
+	"ui.menu.menu_llm.custom_models",
 	"ui.menu.menu_llm.model_switcher",
 	"ui.menu.menu_llm.startup_controller",
 	"ui.menu.menu_llm.trigger_orchestrator",
@@ -51,6 +52,7 @@ local DEFAULT_STATE = {
 	llm_model_mlx = "",
 	llm_model_ollama = "",
 	llm_debounce = 0.35,
+	llm_min_request_interval = 0.5,
 	llm_max_words = 20,
 	llm_min_words = 4,
 	llm_temperature = 0.1,
@@ -140,6 +142,7 @@ local function with_fixture(options, callback)
 		llm_profile_shortcuts = {},
 		llm_user_profiles = {},
 		llm_debounce = 0.5,
+		llm_min_request_interval = 0.5,
 		llm_max_words = 7,
 		llm_min_words = 2,
 		llm_temperature = 0.2,
@@ -311,7 +314,7 @@ local function with_fixture(options, callback)
 	assert(locale_file:close())
 	local function fixture_caption(key)
 		if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
-		return options.translate and options.translate(key) or key
+		return options.translate and options.translate(key) or require("tests.helpers").I18N_PLACEHOLDER_FORMATS[key] or key
 	end
 	package.loaded["infra.i18n"] = {get = fixture_caption, section = fixture_caption}
 	local prompt_value = options.prompt_value or "0.75"
@@ -331,7 +334,6 @@ local function with_fixture(options, callback)
 			return {}
 		end,
 	}
-	local observed_selector_data
 	local display_renderer = assert(require("menu.renderer").new({
 		platform = "hs",
 		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
@@ -386,17 +388,6 @@ local function with_fixture(options, callback)
 		i18n = { get = fixture_caption, section = fixture_caption },
 		logger = Logger,
 	}))
-	if options.observe_native_model_children then
-		local genuine_render_rows = display_renderer.render_rows
-		display_renderer.render_rows = function(...)
-			local input = select(1, ...)
-			local results = table.pack(genuine_render_rows(...))
-			if observed_selector_data ~= nil and rawequal(input, observed_selector_data) then
-				options.observe_native_model_children(results[1], input)
-			end
-			return table.unpack(results, 1, results.n)
-		end
-	end
 	package.loaded["infra.manifest_menu"] = display_renderer
 
 	local keymap = {}
@@ -550,24 +541,8 @@ local function with_fixture(options, callback)
 		}
 		package.loaded["ui.menu.menu_llm.api_panel"] = {
 			build = function() return nil, nil end,
-			build_model_picker = function() return {} end,
+			active_entry_caption_text = function() return nil end,
 		}
-		if options.native_mlx_port then
-			package.loaded["ui.menu.menu_llm.models_selector"] = nil
-			local genuine_selector = require("ui.menu.menu_llm.models_selector")
-			package.loaded["ui.menu.menu_llm.models_selector"] = {
-				build = function(ctx)
-					local children = genuine_selector.build(ctx)
-					observed_selector_data = children
-					if options.observe_model_children then options.observe_model_children(children) end
-					return children
-				end,
-			}
-		else
-			package.loaded["ui.menu.menu_llm.models_selector"] = {
-				build = function() return {} end,
-			}
-		end
 		package.loaded["ui.menu.menu_llm.model_switcher"] = {
 			new = function()
 				return {

@@ -8,12 +8,10 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local function codes(set)
-	local result = {}
-	for code in pairs(set) do result[#result + 1] = code end
-	table.sort(result)
-	return result
+	return TableUtil.sorted_keys(set)
 end
 
 local function equal(left, right)

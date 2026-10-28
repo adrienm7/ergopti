@@ -371,11 +371,15 @@ end)
 --- settlement remains unsettled" because the decline arrives from inside the
 --- requirement task, whose retirement the armed observer then awaited.
 helpers.describe("startup_controller: a declined model download turns the AI off without an error (startup-declined-download-99)", function()
-	for _, reason in ipairs({ "download_declined", "disk_insufficient" }) do
+	-- runtime_upgrade_required: the pull's notice asked for a newer Ollama (#101)
+	for _, reason in ipairs({ "download_declined", "disk_insufficient", "runtime_upgrade_required" }) do
 		helpers.it("warns, defers the settlement and saves the off state after " .. reason, function()
 			local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
-			local declared = reason == "download_declined" and RequirementRegistry.CANCEL_DOWNLOAD_DECLINED
-				or RequirementRegistry.CANCEL_DISK_INSUFFICIENT
+			local declared = ({
+				download_declined = RequirementRegistry.CANCEL_DOWNLOAD_DECLINED,
+				disk_insufficient = RequirementRegistry.CANCEL_DISK_INSUFFICIENT,
+				runtime_upgrade_required = RequirementRegistry.CANCEL_RUNTIME_UPGRADE_REQUIRED,
+			})[reason]
 			helpers.assert_eq(declared, reason, "the reason the system check sends is the registry's")
 			local logged = { error = {}, warn = {} }
 			local logger = helpers.make_logger_stub()

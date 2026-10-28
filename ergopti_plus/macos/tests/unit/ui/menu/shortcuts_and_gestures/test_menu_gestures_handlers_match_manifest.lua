@@ -171,6 +171,7 @@ local function with_mode_fixture(options, callback)
 		package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true } }
 		for _, name in ipairs({ "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
 			"ui.menu.shortcut_utils", "infra.deferred_work" }) do package.loaded[name] = {} end
+		if options.dialog then package.loaded["infra.dialog_util"] = options.dialog end
 		local owner = require("ui.menu.menu_gestures")
 		function fixture.build()
 			return owner.build({
@@ -505,7 +506,7 @@ helpers.describe("Gestures: declared sensitivity head and real action-choice own
 					helpers.assert_nil(rows[index].checked)
 				end
 				helpers.assert_eq(rows[3].title, "-")
-				helpers.assert_eq(#rows, 21)
+				helpers.assert_eq(#rows, 3 + #f.controls.sensitivity_values)
 				for index, value in ipairs(f.controls.sensitivity_values) do
 					local expected = string.format("%.1f", value)
 					if value == 3.5 then expected = expected .. " " .. captions["menu.gestures.default_sensitivity"] end
@@ -527,7 +528,7 @@ helpers.describe("Gestures: declared sensitivity head and real action-choice own
 			helpers.assert_eq(rows[2].title, "— " .. f.strings["menu.gestures.sensitivity_hint"] .. " —")
 			head[2].platforms = { "linux" }
 			rows = assert(f.control_slot()).menu[4].menu
-			helpers.assert_eq(#rows, 20)
+			helpers.assert_eq(#rows, 2 + #f.controls.sensitivity_values)
 			f.root.gesture_change_action[1].i18n = "ui_apps.btn_refresh"
 			helpers.assert_eq(assert(f.control_slot()).menu[1].title, f.strings["ui_apps.btn_refresh"])
 		end)
@@ -629,7 +630,8 @@ helpers.describe("Gestures: shared swipe-child template and real native payloads
 					helpers.assert_eq(rows[4].title, f.swipe.captions[locale].sensitivity_3_5)
 					helpers.assert_eq(rows[4].disabled == true, mode ~= "incremental")
 					helpers.assert_eq(#rows[3].menu, 2)
-					helpers.assert_eq(#rows[4].menu, 21, "existing heading/hint/separator and eighteen native values")
+					helpers.assert_eq(#rows[4].menu, 3 + #f.controls.sensitivity_values,
+						"existing heading/hint/separator and the native values")
 					helpers.assert_eq(f.queue, {}, "building cannot queue native action selection")
 					helpers.assert_eq(f.saves, 0)
 				end)
@@ -741,4 +743,41 @@ helpers.describe("Gestures: shared swipe-child template and real native payloads
 			helpers.assert_eq(f.updates, 2)
 		end)
 	end)
+end)
+
+-- The recommended-defaults explanation was a group of menu rows: a whole
+-- paragraph in the tray. The menu now shows « Infos… », and the click opens the
+-- existing native alert with the shared note and the macOS reason.
+helpers.describe("Gestures: the Infos row opens the explanation in a dialog", function()
+	for _, locale in ipairs({ "en", "fr" }) do
+		helpers.it("shows no explanation row and opens the alert on click: " .. locale, function()
+			local alerts = {}
+			local dialog = {
+				block_alert = function(...)
+					alerts[#alerts + 1] = table.pack(...)
+					return "OK"
+				end,
+			}
+			with_mode_fixture({ locale = locale, dialog = dialog }, function(f)
+				local text = function(key) return assert(f.strings[key], key) end
+				local item = f.build()
+				local info = nil
+				for _, row in ipairs(item.submenu) do
+					for _, key in ipairs({ "menu.gestures.recommended_note", "menu.gestures.recommended_reason_macos" }) do
+						helpers.assert_true(row.title ~= text(key), "no menu row carries " .. key)
+					end
+					if row.title == text("menu.gestures.recommended_info") then info = row end
+				end
+				helpers.assert_true(info ~= nil, "the Infos row is rendered")
+				helpers.assert_type(info.fn, "function")
+				helpers.assert_eq(#alerts, 0, "building the menu opens no dialog")
+				info.fn()
+				helpers.assert_eq(#alerts, 1, "one click opens one alert")
+				helpers.assert_eq(alerts[1][1], text("menu.gestures.notify_title"))
+				helpers.assert_eq(alerts[1][2], text("menu.gestures.recommended_note") .. "\n\n"
+					.. text("menu.gestures.recommended_reason_macos"))
+				helpers.assert_eq(alerts[1][5], "informational")
+			end)
+		end)
+	end
 end)

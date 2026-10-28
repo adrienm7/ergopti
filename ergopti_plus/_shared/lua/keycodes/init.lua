@@ -138,7 +138,7 @@ M.ENTER = 76
 
 --- fn / globe (keycode 63, kVK_Function) — the key macOS reports in flagsChanged
 --- for fn. The physical-key stream resolves the Apple vendor fn/globe usage to
---- this keycode (modules/keylogger/physical_key_identity.lua), so both sources
+--- this keycode (modules/keystats/physical_key_identity.lua), so both sources
 --- give the key one identity, the one the heatmap draws at the fn position.
 M.FUNCTION = 63
 

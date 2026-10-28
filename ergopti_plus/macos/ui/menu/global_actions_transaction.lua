@@ -26,6 +26,7 @@ local M = {}
 
 local Logger = require("infra.logger")
 local ChordCatalogue = require("infra.script_chord_catalogue")
+local TableUtil = require("table_util")
 
 local LOG = "menu_global_actions"
 local DISABLED_ACTION = "none"
@@ -38,12 +39,7 @@ for _, slot in ipairs(ChordCatalogue.get().slots) do SCRIPT_SLOTS[#SCRIPT_SLOTS 
 --- Clones nested values without sharing keys or children.
 --- @param value any Source value.
 --- @return any clone
-local function clone_value(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[clone_value(key)] = clone_value(child) end
-	return copy
-end
+local clone_value = TableUtil.deep_copy_with_keys
 
 --- Compares nested values by exact type, key set, and leaf value.
 --- @param left any First value.
@@ -753,9 +749,16 @@ function M.create(deps)
 			deps.terminal_pending, debug.traceback)
 		if not pending_ok or type(terminal_pending) ~= "boolean" or terminal_pending then
 			if external_writer == token then external_writer = nil end
-			Logger.warn(LOG,
-				"Global external writer '%s' refused because terminal quiescence was not proved: %s.",
-				tostring(label), tostring(terminal_pending))
+			if pending_ok and terminal_pending == true then
+				-- Expected: a file burst that arrives while the reload or quit it
+				-- triggered is under way (field run 2026-10-27 19:47:04, ledger L45).
+				Logger.info(LOG, "Global external writer '%s' deferred: a reload or quit is in progress.",
+					tostring(label))
+			else
+				Logger.warn(LOG,
+					"Global external writer '%s' refused because terminal quiescence was not proved: %s.",
+					tostring(label), tostring(terminal_pending))
+			end
 			return false
 		end
 		local ok, result = xpcall(callback, debug.traceback)
@@ -780,6 +783,14 @@ function M.create(deps)
 	--- @return boolean accepted_or_committed
 	function owner.reset_defaults()
 		return request("reset")
+	end
+
+	--- Reports whether run_exclusive would refuse any caller that holds no retained
+	--- owner: a transaction, an external writer or its retained compensation owns
+	--- the admission. Quit reads it so the refusal is decided by quit_admission.
+	--- @return boolean blocked
+	function owner.is_exclusive_blocked()
+		return external_writer ~= nil or active_transaction ~= nil
 	end
 
 	--- Reports whether a candidate or retained compensation currently owns state.

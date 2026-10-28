@@ -125,7 +125,7 @@ _LLM_Menu_PrivacySnapshot(Key) {
 		return Snapshot
 	try {
 		Snapshot["source"] := _LLM_Menu_EnableReadSource()
-		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		Document := TOML_ParseDocumentShared(FSReadUtf8Exact(ConfigurationFile))
 		Snapshot["blocked"] := !IsSet(_LLM_Engine) || !(_LLM_Engine is Map)
 			|| !_LLM_Engine.Has("enabled") || !_LLM_Engine.Has("backend") || !_LLM_Engine.Has(Key)
 			|| !ManifestValuesEqual(_LLM_Engine["enabled"], Snapshot["enabled"])
@@ -416,7 +416,7 @@ _LLM_Menu_InfoBarSnapshot() {
 			|| _LLM_Engine["show_info_bar"] != _LLM_Menu["show_info_bar"])
 	try {
 		Snapshot["source"] := _LLM_Menu_EnableReadSource()
-		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		Document := TOML_ParseDocumentShared(FSReadUtf8Exact(ConfigurationFile))
 		for Field, Path in Map("enabled", "llm.enabled", "info_bar", "llm.display.show_info_bar",
 				"backend", "llm.models.selected") {
 			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
@@ -465,7 +465,7 @@ _LLM_Menu_IndentSnapshot() {
 			|| _LLM_Engine["show_all_at_once"] != _LLM_Menu["show_all_at_once"])
 	try {
 		Snapshot["source"] := _LLM_Menu_EnableReadSource()
-		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		Document := TOML_ParseDocumentShared(FSReadUtf8Exact(ConfigurationFile))
 		for Field, Path in Map("enabled", "llm.enabled", "count", "llm.profiles.num_predictions",
 				"indentation", "llm.display.pred_indent", "progressive", "llm.display.streaming_multi",
 				"backend", "llm.models.selected") {
@@ -789,7 +789,9 @@ LLM_Menu_PromptOllamaPort() {
 	}
 	global _LLM_Menu
 	current := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
-	ib := Ui_InputBox(t("menu.llm.ollama_port_prompt"), t("menu.llm.ollama_port_title"), "w400 h120", current)
+	ib := Ui_InputBox(
+		StrReplace(StrReplace(t("menu.llm.server_port_prompt"), "%s", "Ollama", , , 1), "%s", _LLM_DefaultFor("llm_ollama_port")),
+		StrReplace(t("menu.llm.server_port_title"), "%s", "Ollama"), "w400 h120", current)
 	if !_LLM_Menu_TryNormalizePortPrompt(ib.Result, ib.Value, &val)
 		return
 	return LLM_Menu_CommitMutation("the Ollama port setting",
@@ -1112,20 +1114,3 @@ _LLM_Menu_ShowNotice(Text) {
 		UI_HOTSTRING_TIMEOUT_SEC)
 }
 
-/**
- * Prompts the user to enter a custom Ollama model identifier.
- */
-LLM_Menu_PromptAddModel() {
-	InheritedCritical := A_IsCritical
-	if InheritedCritical {
-		Critical("Off")
-		try return LLM_Menu_PromptAddModel()
-		finally Critical(InheritedCritical)
-	}
-	global _LLM_Menu
-	ib := Ui_InputBox(t("menu.llm.ollama_model_hint"), t("menu.llm.add_custom_model"), "w450 h130")
-	if (ib.Result != "OK" || Trim(ib.Value) == "")
-		return
-	name := Trim(ib.Value)
-	LLM_Menu_SetModel(name)
-}

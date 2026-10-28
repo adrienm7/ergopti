@@ -25,6 +25,7 @@ local i18n      = require("infra.i18n")
 local Paths     = require("infra.paths")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
+local ShellRunner = require("adapters.shell_runner")
 local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
 
 local LOG = "menu_llm.models"
@@ -169,11 +170,7 @@ local function get_model_info_logic(model_name, presets)
 
 	local tag_list = {}
 	for em, _ in pairs(seen_emojis) do table.insert(tag_list, em) end
-	local EMOJI_ORDER = { ["🏆"]=1, ["⚡"]=2, ["🧠💭"]=3, ["🧠"]=4, ["💻"]=5, ["🌐"]=6, ["🖼️"]=7, ["⭐"]=8 }
-	table.sort(tag_list, function(a, b)
-		local oa = EMOJI_ORDER[a] or 99; local ob = EMOJI_ORDER[b] or 99
-		if oa == ob then return a < b end; return oa < ob
-	end)
+	table.sort(tag_list, require("menu.row_order").comparator("model_tag_emoji"))
 
 	local tag_str = #tag_list > 0 and (" " .. table.concat(tag_list, "")) or ""
 	return {
@@ -270,6 +267,27 @@ end
 -- =========================================
 -- =========================================
 
+--- Reads the free gigabytes of the root volume from `df -g /` output: the
+--- fourth column of the second line (the former awk 'NR==2 {print $4}').
+--- @param output string|nil Standard output of df.
+--- @return number Free gigabytes, 0 when the output has no readable figure.
+function M.parse_df_available_gb(output)
+	if type(output) ~= "string" then return 0 end
+	local second_line = nil
+	local line_number = 0
+	for line in output:gmatch("[^\r\n]+") do
+		line_number = line_number + 1
+		if line_number == 2 then second_line = line; break end
+	end
+	if not second_line then return 0 end
+	local column = 0
+	for field in second_line:gmatch("%S+") do
+		column = column + 1
+		if column == 4 then return tonumber(field) or 0 end
+	end
+	return 0
+end
+
 --- Factory function to create the Models Manager.
 --- @param deps table Module dependencies.
 function M.new(deps)
@@ -356,7 +374,12 @@ function M.new(deps)
 			owner.authorized = false
 			owner.committed = false
 			if owner.handle == nil then
-				if owner.installing == true then return false end
+				if owner.installing == true then
+					-- The probe tasks settle through their completion callbacks, which
+					-- then release this exact owner.
+					if type(owner.terminate_probes) == "function" then owner.terminate_probes() end
+					return false
+				end
 				owner.native_settled = true
 				if owner.requirement_registered ~= true then return true end
 				return release_owner() == true
@@ -411,211 +434,251 @@ function M.new(deps)
 		end
 
 		if not probe_owner_current() then return settle_before_timer() end
-		local _, mem_str = pcall(hs.execute, "sysctl -n hw.memsize")
-		if not probe_owner_current() then return settle_before_timer() end
-		local sys_ram_gb = math.ceil((tonumber(mem_str) or 0) / (1024^3))
-
-		local _, df_str = pcall(hs.execute, "df -g / | awk 'NR==2 {print $4}'")
-		if not probe_owner_current() then return settle_before_timer() end
-		local free_disk_gb = tonumber(df_str) or 0
-
-		local prepared_ok, prepared = xpcall(function()
-			local warnings, is_critical = {}, false
-			if sys_ram_gb > 0 and sys_ram_gb < ram_req then
-				table.insert(warnings, string.format(i18n.get("menu.llm.req_ram_low"), ram_req, sys_ram_gb))
-			else
-				table.insert(warnings, string.format(i18n.get("menu.llm.req_ram_ok"), ram_req, sys_ram_gb))
-			end
-
-			if free_disk_gb > 0 then
-				local rem = free_disk_gb - dl_req
-				if rem < 2 then
-					is_critical = true
-					table.insert(warnings, string.format(i18n.get("menu.llm.req_disk_insufficient"), dl_req, free_disk_gb))
-				elseif rem < 15 then
-					table.insert(warnings, string.format(i18n.get("menu.llm.req_disk_tight"), dl_req, free_disk_gb))
-				else
-					table.insert(warnings, string.format(i18n.get("menu.llm.req_disk_ok"), dl_req, free_disk_gb))
+		-- The two probes are asynchronous tasks: hs.execute blocks the main thread
+		-- for the whole child process, which delayed event taps and the Karabiner
+		-- lease heartbeat (issue #101). owner.installing stays true until the
+		-- continuation runs, so a PAUSE meanwhile is refused exactly as it was
+		-- while the blocking probe was on the stack, and the tasks are terminated.
+		local probe_tasks = {}
+		local probe_results = { ram_bytes = nil, df_output = nil }
+		local probes_pending = 2
+		owner.terminate_probes = function()
+			for _, task_handle in ipairs(probe_tasks) do
+				if type(task_handle) == "table" and type(task_handle.terminate) == "function" then
+					pcall(task_handle.terminate)
 				end
 			end
-
-			return {
-				is_critical = is_critical,
-				msg = string.format(i18n.get("menu.llm.model_label"), target_model)
-					.. "\n\n" .. table.concat(warnings, "\n"),
-			}
-		end, debug.traceback)
-		if prepared_ok ~= true then
-			Logger.error(LOG, "Model system-check preparation raised: %s.",
-				tostring(prepared))
-			cancel_once("System-check preparation failure")
-			return settle_before_timer()
 		end
-		local is_critical = prepared.is_critical
-		local msg = prepared.msg
-		if not probe_owner_current() then return settle_before_timer() end
 
-		local function deliver_system_check()
-			if owner.callback_pending ~= true or owner.callback_consumed == true
-				or owner.native_settled ~= true or owner.committed ~= true
-				or owner.requirement_registered ~= true then
-				return false
-			end
-			owner.callback_consumed = true
-			owner.callback_pending = false
-			owner.callback_running = true
-
-			local function run_system_check()
-				local function owner_current_or_cancel()
-					if owner.authorized ~= true or owner.committed ~= true
-						or owner.requirement_registered ~= true then
-						return false
-					end
-					if current_or_cancel() ~= true then return false end
-					return owner.authorized == true and owner.committed == true
-						and owner.requirement_registered == true
+		local function continue_after_probes()
+			owner.terminate_probes = nil
+			if not probe_owner_current() then return settle_before_timer() end
+			local sys_ram_gb = math.ceil((tonumber(probe_results.ram_bytes) or 0) / (1024^3))
+			local free_disk_gb = M.parse_df_available_gb(probe_results.df_output)
+			local prepared_ok, prepared = xpcall(function()
+				local warnings, is_critical = {}, false
+				if sys_ram_gb > 0 and sys_ram_gb < ram_req then
+					table.insert(warnings, string.format(i18n.get("menu.llm.req_ram_low"), ram_req, sys_ram_gb))
+				else
+					table.insert(warnings, string.format(i18n.get("menu.llm.req_ram_ok"), ram_req, sys_ram_gb))
 				end
-				if not owner_current_or_cancel() then return true end
-				-- By PID: a name lookup that misses falls back to reading every
-				-- window of every application (issue #99).
-				local app_ok, hs_app = xpcall(RunningApplication.current, debug.traceback)
-				if app_ok ~= true then
-					Logger.error(LOG, "Model system-check application lookup raised: %s.",
-						tostring(hs_app))
-					cancel_once("System-check application lookup failure")
+
+				if free_disk_gb > 0 then
+					local rem = free_disk_gb - dl_req
+					if rem < 2 then
+						is_critical = true
+						table.insert(warnings, string.format(i18n.get("menu.llm.req_disk_insufficient"), dl_req, free_disk_gb))
+					elseif rem < 15 then
+						table.insert(warnings, string.format(i18n.get("menu.llm.req_disk_tight"), dl_req, free_disk_gb))
+					else
+						table.insert(warnings, string.format(i18n.get("menu.llm.req_disk_ok"), dl_req, free_disk_gb))
+					end
+				end
+
+				return {
+					is_critical = is_critical,
+					msg = string.format(i18n.get("menu.llm.model_label"), target_model)
+						.. "\n\n" .. table.concat(warnings, "\n"),
+				}
+			end, debug.traceback)
+			if prepared_ok ~= true then
+				Logger.error(LOG, "Model system-check preparation raised: %s.",
+					tostring(prepared))
+				cancel_once("System-check preparation failure")
+				return settle_before_timer()
+			end
+			local is_critical = prepared.is_critical
+			local msg = prepared.msg
+			if not probe_owner_current() then return settle_before_timer() end
+
+			local function deliver_system_check()
+				if owner.callback_pending ~= true or owner.callback_consumed == true
+					or owner.native_settled ~= true or owner.committed ~= true
+					or owner.requirement_registered ~= true then
 					return false
 				end
-				if not owner_current_or_cancel() then return true end
-				if hs_app and type(hs_app.activate) == "function" then
-					pcall(function() hs_app:activate(true) end)
-				else
-					pcall(hs.focus)
-				end
-				-- Hammerspoon activation/focus can synchronously re-enter ScriptControl.
-				-- Revalidate the exact adopted owner before crossing the dialog boundary.
-				if not owner_current_or_cancel() then return true end
-				if is_critical then
-					pcall(dialog.block_alert, i18n.get("menu.llm.download_failed"), msg, i18n.get("common.close"), nil, "critical")
-					cancel_once("System-check cancellation", RequirementRegistry.CANCEL_DISK_INSUFFICIENT)
-					return true
-				end
-				
-				local sep  = string.rep("─", 25)
-				local body = sep .. "\n" .. msg .. "\n" .. sep .. "\n\n" .. i18n.get("menu.llm.not_installed_body")
-				if repo_info and repo_info ~= "" then
-					body = body .. "\n ➜ " .. repo_info
-				end
-				body = body .. "\n\n" .. i18n.get("menu.llm.launch_download_prompt")
+				owner.callback_consumed = true
+				owner.callback_pending = false
+				owner.callback_running = true
 
-				if not owner_current_or_cancel() then return true end
-				local ok_c, choice = pcall(dialog.block_alert,
-					string.format(i18n.get("menu.llm.hw_header"), engine_name),
-					body, i18n.get("menu.llm.btn_download"), i18n.get("common.cancel"), msg:find("⚠️") and "warning" or "informational")
-				if not owner_current_or_cancel() then return true end
-
-				if ok_c and choice == i18n.get("menu.llm.btn_download") then
-					-- Clear any stale abort flag from a previous cancelled download so
-					-- update_icon() calls in the new download are not silently no-oped.
-					if type(deps.clear_download_abort) == "function" then
-						local ok_clear, cleared = Logger.callback(LOG,
-							"Download-abort reset", deps.clear_download_abort)
-						if not ok_clear or cleared ~= true then
-							Logger.error(LOG, "Download refused because its prior abort state could not be reset.")
-							cancel_once("Download reset failure")
+				local function run_system_check()
+					local function owner_current_or_cancel()
+						if owner.authorized ~= true or owner.committed ~= true
+							or owner.requirement_registered ~= true then
 							return false
 						end
+						if current_or_cancel() ~= true then return false end
+						return owner.authorized == true and owner.committed == true
+							and owner.requirement_registered == true
 					end
 					if not owner_current_or_cancel() then return true end
-					local download_ok, accepted = Logger.callback(LOG,
-						"Approved model download", do_download)
-					if download_ok ~= true or accepted ~= true then
-						cancel_once("Model download dispatch failure")
+					-- By PID: a name lookup that misses falls back to reading every
+					-- window of every application (issue #99).
+					local app_ok, hs_app = xpcall(RunningApplication.current, debug.traceback)
+					if app_ok ~= true then
+						Logger.error(LOG, "Model system-check application lookup raised: %s.",
+							tostring(hs_app))
+						cancel_once("System-check application lookup failure")
 						return false
 					end
-				else
-					cancel_once("Download prompt cancellation", RequirementRegistry.CANCEL_DOWNLOAD_DECLINED)
+					if not owner_current_or_cancel() then return true end
+					if hs_app and type(hs_app.activate) == "function" then
+						pcall(function() hs_app:activate(true) end)
+					else
+						pcall(hs.focus)
+					end
+					-- Hammerspoon activation/focus can synchronously re-enter ScriptControl.
+					-- Revalidate the exact adopted owner before crossing the dialog boundary.
+					if not owner_current_or_cancel() then return true end
+					if is_critical then
+						pcall(dialog.block_alert, i18n.get("menu.llm.download_failed"), msg, i18n.get("common.close"), nil, "critical")
+						cancel_once("System-check cancellation", RequirementRegistry.CANCEL_DISK_INSUFFICIENT)
+						return true
+					end
+					
+					local sep  = string.rep("─", 25)
+					local body = sep .. "\n" .. msg .. "\n" .. sep .. "\n\n" .. i18n.get("menu.llm.not_installed_body")
+					if repo_info and repo_info ~= "" then
+						body = body .. "\n ➜ " .. repo_info
+					end
+					body = body .. "\n\n" .. i18n.get("menu.llm.launch_download_prompt")
+
+					if not owner_current_or_cancel() then return true end
+					local ok_c, choice = pcall(dialog.block_alert,
+						string.format(i18n.get("menu.llm.hw_header"), engine_name),
+						body, i18n.get("menu.llm.btn_download"), i18n.get("common.cancel"), msg:find("⚠️") and "warning" or "informational")
+					if not owner_current_or_cancel() then return true end
+
+					if ok_c and choice == i18n.get("menu.llm.btn_download") then
+						-- Clear any stale abort flag from a previous cancelled download so
+						-- update_icon() calls in the new download are not silently no-oped.
+						if type(deps.clear_download_abort) == "function" then
+							local ok_clear, cleared = Logger.callback(LOG,
+								"Download-abort reset", deps.clear_download_abort)
+							if not ok_clear or cleared ~= true then
+								Logger.error(LOG, "Download refused because its prior abort state could not be reset.")
+								cancel_once("Download reset failure")
+								return false
+							end
+						end
+						if not owner_current_or_cancel() then return true end
+						local download_ok, accepted = Logger.callback(LOG,
+							"Approved model download", do_download)
+						if download_ok ~= true or accepted ~= true then
+							cancel_once("Model download dispatch failure")
+							return false
+						end
+					else
+						cancel_once("Download prompt cancellation", RequirementRegistry.CANCEL_DOWNLOAD_DECLINED)
+					end
+					return true
 				end
+
+				local callback_ok, callback_result = xpcall(run_system_check,
+					debug.traceback)
+				owner.committed = false
+				if callback_ok ~= true then
+					Logger.error(LOG, "Model system-check continuation raised: %s.",
+						tostring(callback_result))
+					cancel_once("System-check continuation failure")
+				end
+				owner.callback_running = false
+				release_owner()
+				return callback_ok == true and callback_result ~= false
+			end
+
+			local function timer_callback()
+				if owner.callback_consumed == true or owner.callback_pending == true then
+					return false
+				end
+				owner.callback_pending = true
+				if owner.installing == true then return true end
+				deliver_system_check()
 				return true
 			end
 
-			local callback_ok, callback_result = xpcall(run_system_check,
-				debug.traceback)
-			owner.committed = false
-			if callback_ok ~= true then
-				Logger.error(LOG, "Model system-check continuation raised: %s.",
-					tostring(callback_result))
-				cancel_once("System-check continuation failure")
-			end
-			owner.callback_running = false
-			release_owner()
-			return callback_ok == true and callback_result ~= false
-		end
-
-		local function timer_callback()
-			if owner.callback_consumed == true or owner.callback_pending == true then
-				return false
-			end
-			owner.callback_pending = true
-			if owner.installing == true then return true end
-			deliver_system_check()
-			return true
-		end
-
-		local schedule_ok, handle_or_error, timer_committed = xpcall(function()
-			return TimerScheduler.after(0.1, timer_callback)
-		end, debug.traceback)
-		if schedule_ok == true and type(handle_or_error) == "table" then
-			owner.handle = handle_or_error
-			local observed_ok, observed = xpcall(function()
-				return TimerScheduler.onSettled(handle_or_error, function()
-					owner.native_settled = true
-					deliver_system_check()
-					release_owner()
-				end)
+			local schedule_ok, handle_or_error, timer_committed = xpcall(function()
+				return TimerScheduler.after(require("infra.timings").sec("ui", "model_manager_retry_ms"), timer_callback)
 			end, debug.traceback)
-			if observed_ok ~= true or observed ~= true then
+			if schedule_ok == true and type(handle_or_error) == "table" then
+				owner.handle = handle_or_error
+				local observed_ok, observed = xpcall(function()
+					return TimerScheduler.onSettled(handle_or_error, function()
+						owner.native_settled = true
+						deliver_system_check()
+						release_owner()
+					end)
+				end, debug.traceback)
+				if observed_ok ~= true or observed ~= true then
+					owner.authorized = false
+					owner.committed = false
+					local cancel_ok, settled = xpcall(function()
+						return TimerScheduler.cancel(handle_or_error)
+					end, debug.traceback)
+					if cancel_ok == true and settled == true then
+						owner.native_settled = true
+					end
+					Logger.error(LOG,
+						"Model system-check settlement observation failed: %s.",
+						tostring(observed))
+					cancel_once("System-check settlement-observer failure")
+					owner.installing = false
+					release_owner()
+					return false
+				end
+			end
+			if schedule_ok ~= true or type(handle_or_error) ~= "table"
+				or timer_committed ~= true then
 				owner.authorized = false
 				owner.committed = false
-				local cancel_ok, settled = xpcall(function()
-					return TimerScheduler.cancel(handle_or_error)
-				end, debug.traceback)
-				if cancel_ok == true and settled == true then
+				if owner.handle ~= nil then
+					pause_join()
+				else
 					owner.native_settled = true
 				end
-				Logger.error(LOG,
-					"Model system-check settlement observation failed: %s.",
-					tostring(observed))
-				cancel_once("System-check settlement-observer failure")
+				Logger.error(LOG, "Model system-check timer could not be armed: %s.",
+					tostring(schedule_ok and timer_committed or handle_or_error))
+				cancel_once("System-check timer refusal")
 				owner.installing = false
 				release_owner()
 				return false
 			end
-		end
-		if schedule_ok ~= true or type(handle_or_error) ~= "table"
-			or timer_committed ~= true then
-			owner.authorized = false
-			owner.committed = false
-			if owner.handle ~= nil then
+			if owner.authorized ~= true then
 				pause_join()
-			else
-				owner.native_settled = true
+				owner.installing = false
+				release_owner()
+				return false
 			end
-			Logger.error(LOG, "Model system-check timer could not be armed: %s.",
-				tostring(schedule_ok and timer_committed or handle_or_error))
-			cancel_once("System-check timer refusal")
+			owner.committed = true
 			owner.installing = false
-			release_owner()
-			return false
+			deliver_system_check()
+			return true
 		end
-		if owner.authorized ~= true then
-			pause_join()
-			owner.installing = false
-			release_owner()
-			return false
+
+		local function probe_done(slot)
+			return function(ok, output)
+				if ok ~= true then
+					Logger.warn(LOG, "Model system-check %s probe failed.", slot)
+				else
+					probe_results[slot] = output
+				end
+				probes_pending = probes_pending - 1
+				if probes_pending > 0 then return end
+				local continued, result = xpcall(continue_after_probes, debug.traceback)
+				if continued ~= true then
+					Logger.error(LOG, "Model system-check continuation after probes raised: %s.", tostring(result))
+					cancel_once("System-check probe continuation failure")
+					settle_before_timer()
+				end
+			end
 		end
-		owner.committed = true
-		owner.installing = false
-		deliver_system_check()
+		for _, probe in ipairs({
+			{ slot = "ram_bytes", executable = "/usr/sbin/sysctl", args = { "-n", "hw.memsize" } },
+			{ slot = "df_output", executable = "/bin/df", args = { "-g", "/" } },
+		}) do
+			local _, task_handle = ShellRunner.run(probe.executable, probe.args, probe_done(probe.slot))
+			probe_tasks[#probe_tasks + 1] = task_handle
+		end
 		return true
 	end
 
@@ -717,6 +780,11 @@ function M.new(deps)
 		return filtered
 	end
 	
+	--- The whole catalogue, whatever the active backend: the model selector
+	--- page lists every backend's rows side by side.
+	--- @return table presets
+	function obj.get_all_presets() return presets end
+
 	function obj.get_mlx_repo(name) return mlx.get_mlx_repo(name) end
 	function obj.get_model_info(name) return get_model_info_logic(name, presets) end
 	
@@ -754,6 +822,46 @@ function M.new(deps)
 		else
 			return ollama.get_installed_models() or {}
 		end
+	end
+
+	--- The installed models of one local backend, whatever backend is active:
+	--- the model selector page shows Ollama and MLX side by side.
+	--- @param backend string "ollama" or "mlx".
+	--- @return table installed Model name -> true.
+	function obj.backend_installed_models(backend)
+		if backend == "mlx" then return mlx.get_installed_models() or {} end
+		if backend == "ollama" then return ollama.get_installed_models() or {} end
+		error("models_manager.backend_installed_models: unknown local backend " .. tostring(backend))
+	end
+
+	--- Whether one backend holds a model, by display name or native name.
+	--- @param backend string "ollama" or "mlx".
+	--- @param display_name string Display name or backend-native identifier.
+	--- @return boolean installed
+	function obj.backend_model_installed(backend, display_name)
+		local installed = obj.backend_installed_models(backend)
+		if installed[display_name] then return true end
+		local actual_name = get_actual_model_name(display_name, presets, backend == "mlx")
+		return (installed[actual_name] or installed[actual_name .. ":latest"]) == true
+	end
+
+	--- The backend-native name of a catalogue model for one backend.
+	--- @param backend string "ollama" or "mlx".
+	--- @param display_name string Display name.
+	--- @return string
+	function obj.backend_actual_model_name(backend, display_name)
+		return get_actual_model_name(display_name, presets, backend == "mlx")
+	end
+
+	--- Downloads a Hugging Face repository the user added for MLX, through the
+	--- MLX download window catalogue models use.
+	--- @param repo string Validated owner/name repository id.
+	--- @param on_success function|nil
+	--- @param on_cancel function|nil
+	--- @param opts table|nil
+	--- @return boolean accepted
+	function obj.pull_mlx_repo(repo, on_success, on_cancel, opts)
+		return mlx.pull_model(repo, repo, on_success, on_cancel, opts) ~= false
 	end
 
 	function obj.check_requirements(target_model, on_success, on_cancel, opts)
@@ -882,6 +990,49 @@ function M.new(deps)
 		end
 		return ollama.pull_model(model, model, on_success, on_cancel, opts) == true
 	end
+
+	--- Removes a model from the local Ollama server, whatever backend the AI
+	--- menu uses for predictions (the developer field run's cleanup).
+	--- @param model string Ollama model name.
+	--- @return boolean accepted
+	function obj.delete_ollama_model(model)
+		return ollama.delete_model(model) == true
+	end
+
+	--- Downloads a catalogue model through the MLX download window, whatever
+	--- backend the AI menu uses. Its owner starts the model's server once the
+	--- download completes, as selecting the model does.
+	--- @param display_name string Display name from _shared/modules/llm/models.json.
+	--- @param on_success function|nil Called once the model is downloaded and served.
+	--- @param on_cancel function|nil Receives the reason of a failed or cancelled download.
+	--- @param opts table|nil Freshness and ownership options.
+	--- @return boolean accepted
+	function obj.pull_mlx_model(display_name, on_success, on_cancel, opts)
+		local repo = mlx.get_mlx_repo(display_name)
+		if not repo then
+			Logger.error(LOG, "MLX download refused: %s names no MLX repository.", tostring(display_name))
+			if type(on_cancel) == "function" then
+				Logger.callback(LOG, "MLX download repository refusal", on_cancel, "unavailable")
+			end
+			return false
+		end
+		return mlx.pull_model(display_name, repo, on_success, on_cancel, opts) ~= false
+	end
+
+	--- Reports whether the MLX cache holds a catalogue model.
+	--- @param display_name string Display name.
+	--- @return boolean installed
+	function obj.mlx_model_installed(display_name)
+		return (mlx.get_installed_models() or {})[display_name] == true
+	end
+
+	--- Removes a catalogue model from the MLX cache, whatever the active backend.
+	--- @param display_name string Display name.
+	--- @return boolean accepted
+	function obj.delete_mlx_model(display_name)
+		return mlx.delete_model(display_name) == true
+	end
+
 	function obj.delete_model(name) return get_active().delete_model(name) end
 	function obj.force_mlx_check(target_model, on_success, on_cancel, opts)
 		return mlx.check_requirements(target_model, on_success, on_cancel,

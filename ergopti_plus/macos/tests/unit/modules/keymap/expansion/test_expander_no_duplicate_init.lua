@@ -89,7 +89,7 @@ local function fresh_expander()
 		"infra.text_utils",
 		"modules.keymap.utils",
 		"infra.logger",
-		"modules.keylogger",
+		"modules.keystats",
 		"ui.tooltip",
 	}
 	for _, name in ipairs(to_wipe) do

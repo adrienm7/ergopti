@@ -260,11 +260,12 @@ helpers.describe("AI agent: what it refuses", function()
 		end)
 	end)
 
-	-- The agent never uses the AI menu's switch nor its prediction backend: it
-	-- was refused whenever the predictions were off.
-	helpers.it("works with the AI menu off and without a prediction backend", function()
-		Scenario.run({ command = "Écris à Paul", disabled = true, active_entry = false }, function(world)
-			helpers.assert_eq(world.engine.is_enabled(), false, "the AI menu is off")
+	-- The agent uses no prediction backend (it was refused whenever the
+	-- predictions had none), but with the AI off nothing of it runs: the manual
+	-- actions refuse with the AI menu's notice, as the other AI actions do.
+	helpers.it("works without a prediction backend when the AI is on", function()
+		Scenario.run({ command = "Écris à Paul", active_entry = false }, function(world)
+			helpers.assert_eq(world.engine.is_enabled(), true, "the AI menu is on")
 			helpers.assert_eq(world.engine.get_prediction_model(), nil, "no prediction backend is ready")
 			helpers.assert_eq(world.handlers.llm_agent_command("tap_3"), true)
 			world.wait_for(1)
@@ -273,6 +274,20 @@ helpers.describe("AI agent: what it refuses", function()
 			world.respond(1, ANSWER)
 			helpers.assert_eq(#world.offered(), 2, "and its actions offered")
 			helpers.assert_eq(#world.notices, 0, "no refusal")
+		end)
+	end)
+
+	helpers.it("refuses both manual actions with the AI notice while the AI is off (ai-off-agent)", function()
+		Scenario.run({ selection = SELECTION, command = "Écris à Paul", disabled = true }, function(world)
+			helpers.assert_eq(world.engine.is_enabled(), false, "the AI menu is off")
+			helpers.assert_eq(world.handlers.llm_agent_selection("tap_3"), false)
+			helpers.assert_eq(world.handlers.llm_agent_command("tap_3"), false)
+			world.wait_for(1)
+			helpers.assert_eq(#world.posts, 0, "System 2 is not asked")
+			helpers.assert_eq(world.reads, 0, "the selection is not read")
+			helpers.assert_eq(#world.dialogs, 0, "the command dialog is not opened")
+			helpers.assert_eq(world.notices[1], Scenario.text("llm.manual_prediction.disabled"))
+			helpers.assert_eq(world.notices[2], Scenario.text("llm.manual_prediction.disabled"))
 		end)
 	end)
 

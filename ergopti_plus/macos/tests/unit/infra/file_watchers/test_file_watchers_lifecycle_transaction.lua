@@ -19,6 +19,8 @@
 
 local helpers = require("tests.helpers")
 
+local SCHEDULER_OWNERS = { "adapters.timer_scheduler", "error_description", "number_policy" }
+
 
 
 
@@ -90,6 +92,8 @@ local function with_fixture(options, scenario)
 	local saved_file_watchers = package.loaded["infra.file_watchers"]
 	local saved_ui_restore = package.loaded["infra.ui_restore"]
 	local saved_logger = package.loaded["infra.logger"]
+	local saved_scheduler_modules = {}
+	for _, name in ipairs(SCHEDULER_OWNERS) do saved_scheduler_modules[name] = package.loaded[name] end
 	local saved_pathwatcher = hs.pathwatcher
 	local saved_timer = hs.timer
 	local saved_reload = hs.reload
@@ -201,12 +205,14 @@ local function with_fixture(options, scenario)
 			end }
 		end,
 		secondsSinceEpoch = function() return runtime.clock end,
+		absoluteTime = function() return runtime.clock * 1e9 end,
 	}
 	hs.reload = function() runtime.reloads = runtime.reloads + 1 end
 	_G.script_watchers = nil
 	package.loaded["infra.file_watchers"] = nil
 
 	local ok, err = xpcall(function()
+		for _, name in ipairs(SCHEDULER_OWNERS) do package.loaded[name] = nil end
 		local FileWatchers = require("infra.file_watchers")
 		scenario(FileWatchers, runtime)
 	end, debug.traceback)
@@ -214,6 +220,7 @@ local function with_fixture(options, scenario)
 	package.loaded["infra.file_watchers"] = saved_file_watchers
 	package.loaded["infra.ui_restore"] = saved_ui_restore
 	package.loaded["infra.logger"] = saved_logger
+	for _, name in ipairs(SCHEDULER_OWNERS) do package.loaded[name] = saved_scheduler_modules[name] end
 	hs.pathwatcher = saved_pathwatcher
 	hs.timer = saved_timer
 	hs.reload = saved_reload

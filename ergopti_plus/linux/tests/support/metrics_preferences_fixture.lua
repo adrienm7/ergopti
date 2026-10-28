@@ -23,9 +23,10 @@ function M.new(options)
 	function port.snapshot()
 		local snapshot = {}
 		for _, entry in ipairs(Manifest.features()) do
-			if entry.path:match("^metrics%.[^.]+$") and entry.type == "boolean" then
+			if entry.path:match("^metrics%.[^.]+$") and (entry.type == "boolean" or entry.type == "array") then
 				local value = values[entry.path]
-				assert(value == nil or type(value) == "boolean", "invalid metrics fixture value")
+				assert(value == nil or type(value) == (entry.type == "array" and "table" or "boolean"),
+					"invalid metrics fixture value")
 				if value == nil then value = Manifest.default_for(entry.path) end
 				snapshot[entry.path] = value
 			end
@@ -41,9 +42,11 @@ function M.new(options)
 	end
 	function port.set(key, value)
 		if options.writes_fail then return false end
-		assert(type(value) == "boolean", "metrics fixture requires a boolean")
+		assert(type(value) == "boolean" or type(value) == "table", "metrics fixture requires a boolean or a list")
 		assert(port.snapshot()[key] ~= nil, "unknown metrics fixture key")
-		if value == Manifest.default_for(key) then values[key] = nil else values[key] = value end
+		if type(value) == "table" then
+			values[key] = #value > 0 and value or nil
+		elseif value == Manifest.default_for(key) then values[key] = nil else values[key] = value end
 		return true
 	end
 	return port

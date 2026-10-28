@@ -715,6 +715,37 @@ function M.is_pending()
 	return _admission_abort ~= nil or (_transaction ~= nil and not _transaction.settled)
 end
 
+--- Reports, without logging and without requiring initialization, whether a
+--- reload or quit already owns the process. The two source watchers ask it when
+--- their reload request is refused: one file burst reaches both, the first one's
+--- reload is under way, and the second refusal is expected, not a failure.
+--- @return boolean in_progress False before init and when nothing is pending.
+function M.terminal_in_progress()
+	if _deps == nil then return false end
+	return _admission_abort ~= nil or (_transaction ~= nil and not _transaction.settled)
+end
+
+--- Names what kind of terminal transition owns the process, so the menu's Quit can
+--- tell a reload (which it abandons) from an exit (which it must not repeat).
+--- Never logs.
+--- @return string|nil kind "reload", "exit", "admission-abort" (a refused pre-fence
+---   release still owns the admission), or nil when nothing owns the process.
+function M.pending_kind()
+	if _admission_abort ~= nil then return "admission-abort" end
+	local transaction = _transaction
+	if transaction == nil or transaction.settled then return nil end
+	return transaction.kind
+end
+
+--- Names the stable reason the active terminal transition was requested with
+--- ("watcher", "menu", "hammerspoon_reload"...). Never logs.
+--- @return string|nil reason Nil when nothing owns the process.
+function M.pending_reason()
+	local transaction = _transaction
+	if transaction == nil or transaction.settled then return nil end
+	return transaction.reason
+end
+
 --- Names the stage the active terminal transaction is waiting on. It never logs,
 --- so the quit watchdog may call it after the logger sink was finalized.
 --- @return string stage

@@ -139,7 +139,11 @@ var LayerModel = (function () {
 		meta: 'MetaLeft'
 	};
 	const FN_NAMES = { windows: 'Fn', macos: 'fn', linux: 'Fn' };
-	const MACOS_MODIFIER_GLYPHS = { ctrl: '⌃', alt: '⌥', shift: '⇧', meta: '⌘', fn: 'fn' };
+	// The OSes that write every modifier as its own mark; the others spell the
+	// modifier's key.
+	const OS_MODIFIER_GLYPHS = {
+		macos: { ctrl: '⌃', alt: '⌥', shift: '⇧', meta: '⌘', fn: 'fn' }
+	};
 	const CHORD_JOINERS = { windows: '+', macos: '', linux: '+' };
 
 	// A caption token with fewer letters than this is part of a label's leading
@@ -618,7 +622,7 @@ var LayerModel = (function () {
 
 	/** A modifier's name as the OS writes it on its keycaps and menus. */
 	function modifierName(mod, view) {
-		if (view.os === 'macos') return MACOS_MODIFIER_GLYPHS[mod];
+		if (hasOwn(OS_MODIFIER_GLYPHS, view.os)) return OS_MODIFIER_GLYPHS[view.os][mod];
 		if (mod === 'fn') return FN_NAMES[view.os];
 		return keyLegend(MODIFIER_KEYS[mod], view);
 	}
@@ -631,9 +635,10 @@ var LayerModel = (function () {
 				const mods = new Set(
 					chord.mods.map((m) => (m === 'primary' ? data.primary_modifier[view.os] : m))
 				);
-				const ordered =
-					view.os === 'macos' ? ['ctrl', 'alt', 'shift', 'meta', 'fn'] : data.modifier_order;
-				const parts = ordered.filter((m) => mods.has(m)).map((m) => modifierName(m, view));
+				// Every OS writes its modifiers in the data's order (⌃⌥⇧⌘ on macOS).
+				const parts = data.modifier_order
+					.filter((m) => mods.has(m))
+					.map((m) => modifierName(m, view));
 				// A shortcut presses the physical key, so it reads as what that key
 				// types on the active layout: Ctrl+KeyZ is Ctrl+W on AZERTY.
 				parts.push(keyLegend(chord.key, view));

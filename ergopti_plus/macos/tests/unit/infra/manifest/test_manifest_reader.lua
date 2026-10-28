@@ -31,10 +31,10 @@ local STAR = "★" -- magic key trigger (UTF-8 literal, as used across the .lua 
 local KEYMAP_WIRED = {
 	["hotstrings.expansion_delay"]             = 0.75,
 	["hotstrings.trigger_char"]                   = STAR,
-	["hotstrings.preview_star_enabled"]        = false,
-	["hotstrings.preview_autocorrect_enabled"] = false,
-	["hotstrings.preview_ai_enabled"]          = false,
-	["hotstrings.preview_colored_tooltips"]    = false,
+	["hotstrings.preview_star_enabled"]        = true,
+	["hotstrings.preview_autocorrect_enabled"] = true,
+	["hotstrings.preview_ai_enabled"]          = true,
+	["hotstrings.preview_colored_tooltips"]    = true,
 }
 
 
@@ -73,7 +73,8 @@ helpers.describe("manifest_reader: default_for", function()
 	helpers.it("returns the declared default for a known path", function()
 		helpers.assert_eq(Manifest.default_for("hotstrings.trigger_char"), STAR, "trigger_char default")
 		helpers.assert_eq(Manifest.default_for("hotstrings.expansion_delay"), 0.75, "expansion_delay default")
-		helpers.assert_eq(Manifest.default_for("hotstrings.preview_star_enabled"), false, "preview default")
+		-- The previews ship on on every driver (PAR-24).
+		helpers.assert_eq(Manifest.default_for("hotstrings.preview_star_enabled"), true, "preview default")
 	end)
 
 	helpers.it("fails fast on an unknown path", function()
@@ -122,13 +123,13 @@ end)
 --- =======================================================
 --- =======================================================
 
--- The A2 follow-up wired more macOS modules to the manifest: keylogger (the
+-- The A2 follow-up wired more macOS modules to the manifest: keystats (the
 -- cross-driver metrics filter/encrypt flags), dynamic_hotstrings (per-category
 -- toggles, read via the feature toggle's `.enabled`).
 -- A drift in manifest.toml would silently change those runtime defaults — these
 -- pin the wired source values so it turns red first.
 helpers.describe("manifest_reader: extended module wiring parity", function()
-	helpers.it("keylogger metrics filter / encrypt defaults", function()
+	helpers.it("keystats metrics filter / encrypt defaults", function()
 		helpers.assert_eq(Manifest.default_for("metrics.private_filter_enabled"), true, "private filter")
 		helpers.assert_eq(Manifest.default_for("metrics.secure_filter_enabled"), true, "secure filter")
 		helpers.assert_eq(Manifest.default_for("metrics.system_auth_filter_enabled"), true, "system-auth filter")

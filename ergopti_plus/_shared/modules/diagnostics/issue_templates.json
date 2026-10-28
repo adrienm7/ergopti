@@ -1,5 +1,5 @@
 {
-	"_comment": "The GitHub issue forms ErgoptiPlus opens (Debug > Report a bug, Suggest a feature). `file` names a form of .github/ISSUE_TEMPLATE/ and every id in `fields` must be one of its fields (tools/test/test-issue-templates.cjs); `fields` also declares the URL builder's field order and truncation order. Diagnostic reporters prefill only host-derived version, os and driver values. `report_field` identifies the editable attachment field; the complete approved report is copied and saved locally, never inserted into the URL. The repository comes from _shared/modules/updater/defaults.json, never from here. max_url_bytes bounds the percent-encoded URL. Built by _shared/ui/issue_link.js and its Lua and AHK ports.",
+	"_comment": "The GitHub issue forms ErgoptiPlus opens (Debug > Report a bug, Suggest a feature). `file` names a form of .github/ISSUE_TEMPLATE/ and every id in `fields` must be one of its fields (tools/test/test-issue-templates.cjs); `fields` also declares the URL builder's field order and truncation order. Diagnostic reporters prefill the host-derived version, os and driver values and the compact approved report (markdown tables, no JSON block) in `report_field`, which is the last declared field so the budget cuts it first; a cut report ends with the truncation marker and one note saying the complete report is on the clipboard and in the saved file (share_policy.truncated_note_key of schema.json). The complete approved report is still copied and saved locally. `day_log_field` names the optional textarea where the user drops the redacted day log the app saved; it is never prefilled and so is not in `fields`. The repository comes from _shared/modules/updater/defaults.json, never from here. max_url_bytes bounds the percent-encoded URL. Built by _shared/ui/issue_link.js and its Lua and AHK ports.",
 	"issue_new_url": "https://github.com/{owner}/{repo}/issues/new",
 	"max_url_bytes": 7000,
 	"truncation_marker": " […]",
@@ -8,7 +8,8 @@
 			"file": "bug_report.yml",
 			"title_prefix": "[Bug] ",
 			"fields": ["version", "os", "driver", "diagnostics"],
-			"report_field": "diagnostics"
+			"report_field": "diagnostics",
+			"day_log_field": "day_log"
 		},
 		"feature": {
 			"file": "feature_request.yml",

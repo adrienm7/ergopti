@@ -8,7 +8,7 @@
 ;
 ; Root cause (commit "Fix clipboard ram leak"): meta/adapters/input/test_clipboard_ram_leak.ahk
 ; did `#Include ../../infra/testing.ahk` (a file that does not exist) and called
-; _KL_Clip_CharCountFromByteSize (defined only in keylogger_clipboard.ahk, which
+; _KL_Clip_CharCountFromByteSize (defined only in keystats_clipboard.ahk, which
 ; run_all.ahk did not include). In AHK v2 BOTH are load-time errors, and a
 ; load-time error pops a modal dialog the headless runner can never dismiss — the
 ; suite produced zero output and the CI step hung until its 15 min timeout.
@@ -18,7 +18,7 @@
 ;      point ErgoptiPlus.ahk (it registers every hotkey at load) nor the
 ;      nonexistent infra/testing.ahk — test files rely on test_framework.ahk, which
 ;      run_all.ahk includes once up front.
-;   2. run_all.ahk must include keylogger_clipboard.ahk so the clipboard test's
+;   2. run_all.ahk must include keystats_clipboard.ahk so the clipboard test's
 ;      direct call to _KL_Clip_CharCountFromByteSize resolves at load time.
 ; ==============================================================================
 
@@ -43,13 +43,13 @@ _RAI_TestSuiteIncludeIntegrity() {
 	RunAllSrc := FileRead(TestsDir . "\run_all.ahk", "UTF-8")
 	RunAllIncludes := _RAI_IncludeTargets(RunAllSrc)
 
-	; (2) keylogger_clipboard.ahk must be in the graph so the clipboard test loads.
+	; (2) keystats_clipboard.ahk must be in the graph so the clipboard test loads.
 	FoundClip := false
 	for Inc in RunAllIncludes {
-		if InStr(Inc, "keylogger_clipboard.ahk")
+		if InStr(Inc, "keystats_clipboard.ahk")
 			FoundClip := true
 	}
-	Assert(FoundClip, "run_all.ahk must #Include keylogger_clipboard.ahk so _KL_Clip_CharCountFromByteSize resolves (clipboard-ram-leak-test load-time hang)")
+	Assert(FoundClip, "run_all.ahk must #Include keystats_clipboard.ahk so _KL_Clip_CharCountFromByteSize resolves (clipboard-ram-leak-test load-time hang)")
 
 	; (1) No test file run_all pulls in may include the entry point or a phantom framework.
 	Checked := 0

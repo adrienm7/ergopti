@@ -8,8 +8,8 @@
 --- the macOS resolution cascade (modules.hotstrings.hotstrings_config's
 --- M.resolve) against it — proving delay/color/show_tooltip/priority precedence
 --- (user_section > user_category > toml_section > toml_category) matches the
---- AHK driver bit for bit. The AHK-only "_global" menu delay tier remains
---- outside this corpus's scope — see the corpus file's own description.
+--- AHK driver bit for bit. The base expansion delay the overrides are offsets of
+--- has its own corpus, base_delay_vectors.json, replayed at the end of this file.
 ---
 --- The AHK half lives in
 --- windows/tests/meta/test_corpus_hotstrings_config_resolve.ahk.
@@ -152,6 +152,68 @@ helpers.describe("hotstrings config resolve corpus (macOS): M.resolve matches ev
 			helpers.assert_eq(result.has_override, v.expected.has_override, "[" .. v.id .. "] has_override")
 
 			os.remove(toml_path)
+			os.remove(override_path)
+		end
+	end)
+end)
+
+
+
+
+
+-- ============================================
+-- ============================================
+-- ======= 4/ Delay offsets of the base =======
+-- ============================================
+-- ============================================
+
+helpers.describe("hotstrings base delay corpus (macOS): every vector stores and resolves as the other drivers do", function()
+	helpers.it("replays base_delay_vectors.json through the public setters", function()
+		local handle = assert(io.open(helpers.shared("tests/corpus/hotstrings/base_delay_vectors.json"), "r"))
+		local corpus = hs.json.decode(handle:read("*a"))
+		handle:close()
+		helpers.assert_true(#corpus.vectors > 0, "a corpus with no vectors proves nothing")
+		for _, vector in ipairs(corpus.vectors) do
+			local override_path = temp_path("base_" .. vector.id)
+			os.remove(override_path)
+			package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+			package.loaded["modules.hotstrings.hotstrings_config"] = nil
+			local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
+			local base = 0.75
+			helpers.assert_eq(mod.init({
+				override_path = override_path,
+				toml_resolver = function() return nil end,
+				base_delay = function() return base end,
+			}), true, vector.id)
+			for _, step in ipairs(vector.steps) do
+				if step.op == "set" then
+					helpers.assert_eq(mod.set_override(step.category, step.section, "delay", step.delay), true, vector.id)
+				elseif step.op == "clear" then
+					helpers.assert_eq(mod.clear_override(step.category, step.section, "delay"), true, vector.id)
+				else
+					helpers.assert_eq(step.op, "base", vector.id)
+					base = step.seconds
+					helpers.assert_eq(mod.refresh_delays(), true, vector.id)
+				end
+			end
+			for _, expected in ipairs(vector.expect) do
+				helpers.assert_eq(mod.resolve(expected.category, expected.section).delay, expected.delay,
+					vector.id .. ": effective delay of " .. expected.category .. "." .. tostring(expected.section))
+			end
+			local reread = io.open(override_path, "r")
+			local content = reread and reread:read("*a") or ""
+			if reread then reread:close() end
+			local decoded = require("infra.toml.codec").decode(content)
+			for key, leaves in pairs(vector.stored) do
+				local category, section = key:match("^([^.]+)%.?(.*)$")
+				local record = section ~= "" and decoded[category][section] or decoded[category]
+				for leaf, value in pairs(leaves) do
+					helpers.assert_eq(record[leaf], value, vector.id .. ": stored " .. key .. "." .. leaf)
+				end
+			end
+			if next(vector.stored) == nil then
+				helpers.assert_nil(next(decoded.rolls or {}), vector.id .. ": no value left in the file")
+			end
 			os.remove(override_path)
 		end
 	end)

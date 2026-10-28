@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. The driver's rule, from its readers. A key is used when a canonical
----    readers of this file takes it: config_overrides ([script] / [features]
+---    readers of this file takes it: config_overrides ([script]
 ---    scalars, applied to hs.settings at boot), Preferences.load (the menu
 ---    state), shortcut assignments and the setup wizard's import of an existing file. Each marks what
 ---    it reads through the walk it applies, so the cleanup cannot drift from
@@ -107,7 +107,10 @@ function M.run_from_menu(deps)
 		whole_unread_roots = true,
 		file_adapter = deps.file_adapter or require("adapters.file_system"),
 		on_removed = function(result)
-			return preferences.adopt_cleanup(path, result.previous, result.content)
+			if preferences.adopt_cleanup(path, result.previous, result.content) ~= true then
+				error("Preference baseline adoption refused after configuration cleanup", 0)
+			end
+			return true
 		end,
 	})
 end

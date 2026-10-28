@@ -59,7 +59,7 @@ if Features["shortcuts"]["gpt"]["enabled"] {
 						Run(Link)
 				} catch as Err {
 						LoggerError("shortcuts", "LaunchGptShortcut failed: {1}", Err.Message)
-						try TrayTip("Could not open the configured GPT link.", "ErgoptiPlus", "Iconx Mute")
+						try TrayTip(t("notify.open_gpt_failed"), "ErgoptiPlus", "Iconx Mute")
 				}
 		}
 }
@@ -80,7 +80,7 @@ if Features["shortcuts"]["get_hex_value"] {
 						TrayTip(HexColor, "ErgoptiPlus", "Iconi Mute")
 				} catch as Err {
 						LoggerError("shortcuts", "GetHexValue failed: {1}", Err.Message)
-						TrayTip("Color copy failed.", "ErgoptiPlus", "Iconx Mute")
+						TrayTip(t("notify.color_copy_failed"), "ErgoptiPlus", "Iconx Mute")
 				}
 		}
 }
@@ -183,6 +183,8 @@ if Features["shortcuts"]["move"] {
 				; notification even when it was never turned on.
 				WasActive := ActivitySimulation
 				ActivitySimulation := False
+				; Retire this session's queued cancellation before a successor starts.
+				SetTimer(StopActivitySimulation, 0)
 				SetTimer(SimulateActivity, 0)
 				SetTimer(AwakeCheckMouseMoved, 0)
 				SetTimer(AwakeReturnToOrigin, 0)
@@ -615,7 +617,8 @@ if Features["shortcuts"]["teleport_mouse"] {
 						return
 				}
 
-				MouseGetPos(&CurX, &CurY)
+				Point := MCGetPosStrict()
+				CurX := Point["x"], CurY := Point["y"]
 
 				; Find which monitor currently holds the cursor
 				CurrentIndex := 1
@@ -639,7 +642,7 @@ if Features["shortcuts"]["teleport_mouse"] {
 
 if Features["shortcuts"]["spotlight_mouse"] {
 		; Win + '
-		AddShortcut("#", "'", (*) => (MouseGetPos(&Mx, &My), SpotlightMouseAt(Mx, My, 5000)))
+		AddShortcut("#", "'", (*) => (SpotlightPoint := MCGetPosStrict(), SpotlightMouseAt(SpotlightPoint["x"], SpotlightPoint["y"], 5000)))
 }
 
 ; SpotlightMouseAt is defined in infra/spotlight.ahk and included globally before this module.
@@ -653,7 +656,7 @@ if Features["shortcuts"]["open_downloads"] {
 						return _OpenDownloadsWith(GetKnownFolderDownloads, Run)
 				} catch as Err {
 						LoggerError("Shortcuts", "OpenDownloads failed: {1}", Err.Message)
-						try TrayTip("Could not open Downloads.", "ErgoptiPlus", "Iconx Mute")
+						try TrayTip(t("notify.open_downloads_failed"), "ErgoptiPlus", "Iconx Mute")
 						return false
 				}
 		}

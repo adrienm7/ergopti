@@ -40,7 +40,7 @@ _TBUI_DetachedBuildMatchesWriter() {
 	Seed := '[existing]`nkeep = "yes"`n'
 	Updates := [
 		{ Section: "script", Key: "locale", Value: "fr" },
-		{ Section: "metrics", Key: "metrics_enabled", Value: true }
+		{ Section: "metrics", Key: "enabled", Value: true }
 	]
 	try {
 		AssertTrue(FSWrite(Path, Seed))

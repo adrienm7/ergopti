@@ -108,6 +108,21 @@ local function controller(state, context)
 			end)
 		end
 	end
+	-- The composer's operations take their callback last (open, save, remove).
+	for _, method in ipairs({ "composer_open", "composer_save", "composer_remove" }) do
+		local operation = registry[method]
+		if type(operation) == "function" then
+			owned_registry[method] = function(...)
+				if not current() then return false end
+				local args = { ... }
+				local done = args[#args]
+				args[#args] = function(...)
+					if current() then return done(...) end
+				end
+				return operation((table.unpack or unpack)(args))
+			end
+		end
+	end
 	local shell = dependency(state, "shell", "adapters.shell_runner")
 	local i18n = dependency(state, "i18n", "infra.i18n")
 	local function push(function_name, payload)

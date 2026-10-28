@@ -33,8 +33,8 @@ local function fake_config()
 			return { { id = "french", locale = "fr", categories = { "autocorrection" } } }
 		end,
 		resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
-		get_global_delay = function() return 0.75 end,
-		has_global_delay_override = function() return false end,
+		get_base_delay = function() return 0.75 end,
+		has_base_delay_override = function() return false end,
 	}
 end
 
@@ -134,7 +134,7 @@ local function configuration_parent_fixture(body)
 		webview = { show = function(name) callbacks[#callbacks + 1] = name; return false end },
 		config = { get_groups = function() return {} end, get_categories = function() return {} end,
 			language_packs = function() return {} end, resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
-			get_global_delay = function() return 0.75 end, has_global_delay_override = function() return false end } }
+			get_base_delay = function() return 0.75 end, has_base_delay_override = function() return false end } }
 	local function build(paused) context.paused = paused; return native.build(context) end
 	local ok, detail = xpcall(function() body(renderer, build, callbacks, locale) end, debug.traceback)
 	locale.set_locale(language)

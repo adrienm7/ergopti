@@ -18,6 +18,7 @@ local M = {}
 local text_utils = require("infra.text_utils")
 local AppDirs    = require("app_dirs")
 local NetworkEnv = require("modules.llm.network_env")
+local NativePath = require("native_path")
 
 -- The daemon appends to the same dated file the logger names, so the prefix
 -- and extension come from the one registry that names it.
@@ -26,6 +27,10 @@ local DAILY_LOG_SUFFIX = AppDirs.files.extension
 local STAMP_FORMAT = "+%Y-%m-%d %H:%M:%S"
 local OLLAMA_HOST = "127.0.0.1"
 local OLLAMA_PORT_MIN, OLLAMA_PORT_MAX = 1024, 65535
+
+-- The registry and its blob redirect hosts are the origins whose automatic route the
+-- launcher resolves (PAC, WPAD); the pull that asks the daemon uses the same.
+M.NETWORK_OPTIONS = { pac_probe_client = "ollama" }
 
 --- Resolves a POSIX parent directory from the Logger's current unified path.
 --- Only the directory is retained by the daemon; the dated filename is rebuilt
@@ -37,7 +42,7 @@ local function resolve_log_dir(unified_log_file)
 	if type(unified_log_file) ~= "string" or unified_log_file == "" then
 		return nil, "unified log path is absent"
 	end
-	local log_dir = unified_log_file:match("^(.*)/[^/]+$")
+	local log_dir = NativePath.dirname(unified_log_file)
 	if type(log_dir) ~= "string" or log_dir == "" then
 		return nil, "unified log path has no POSIX parent directory"
 	end
@@ -109,7 +114,10 @@ function M.build(ollama_bin, unified_log_file, port, source_kind, caller_nonce)
 		-- last successful write cannot turn a guarded refusal into exit zero.
 		return "exec " .. service, nil
 	end
-	local network, network_err = NetworkEnv.prelude("OLLAMA-SERVER")
+	-- The daemon reads only HTTPS_PROXY: under a company PAC the launcher names
+	-- the route for the registry it pulls from, and a lookup that fails leaves
+	-- the daemon to start anyway, for the models already on disk.
+	local network, network_err = NetworkEnv.prelude("OLLAMA-SERVER", M.NETWORK_OPTIONS)
 	if not network then return nil, network_err end
 
 	return table.concat({

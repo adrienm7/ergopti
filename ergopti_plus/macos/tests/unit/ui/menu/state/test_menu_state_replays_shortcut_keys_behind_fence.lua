@@ -21,7 +21,7 @@
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcut_bindings_fixture")
 
-local DISABLED_ID = "ctrl_d"
+local DISABLED_ID = "ctrl_g"
 -- A registered binding with a raw factory the fixture can make refuse.
 local REFUSED_ID = "cmd_star"
 -- Owners derived from other files (tap-key assignments, the layer's wheel in
@@ -45,7 +45,7 @@ local MENU_STATE_MODULES = {
 	"ui.menu.keymap_lifecycle",
 	"adapters.storage",
 	"infra.deferred_work",
-	"modules.keylogger.text_cipher",
+	"modules.keystats.text_cipher",
 }
 
 --- Runs the real sync_state_to_modules against the real Bindings registry.

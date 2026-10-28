@@ -155,7 +155,7 @@ helpers.describe("shortcut candidate forwarding", function()
 	helpers.it("passes the exact unpublished candidate through the real aggregate owner", function()
 		local controls = {}
 		local subject = load_subject(controls)
-		local candidate = { shortcuts = { keyboard = { cmd_a = "send_text" } } }
+		local candidate = { shortcuts = { keyboard = { primary_a = "send_text" } } }
 		helpers.assert_eq(subject.pause_bindings("feature_toggle"), true)
 		helpers.assert_eq(subject.resume_bindings("feature_toggle", candidate), true)
 		helpers.assert_true(controls.keyboard_candidate == candidate)
@@ -164,7 +164,7 @@ helpers.describe("shortcut candidate forwarding", function()
 	helpers.it("retains the claim after candidate refusal and permits exact recovery", function()
 		local controls = { keyboard_has_result = true, keyboard_result = false }
 		local subject, events = load_subject(controls)
-		local candidate = { shortcuts = { keyboard = { cmd_a = "send_text" } } }
+		local candidate = { shortcuts = { keyboard = { primary_a = "send_text" } } }
 		helpers.assert_eq(subject.pause_bindings("feature_toggle"), true)
 		helpers.assert_eq(subject.resume_bindings("feature_toggle", candidate), false)
 		helpers.assert_true(controls.keyboard_candidate == candidate)

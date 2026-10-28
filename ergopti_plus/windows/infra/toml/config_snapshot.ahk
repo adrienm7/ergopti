@@ -13,6 +13,38 @@
 
 global _ConfigTomlSnapshots := Map()
 
+/**
+ * Reads manifest intent only from the published native bootstrap cache. Detached
+ * runtime candidates have no source provenance and keep their strict readers.
+ * Outdated authored values use the manifest default without mutating the raw
+ * cache; the canonical loader retains ownership of diagnostics and cleanup.
+ * @returns {Boolean} Whether Cache has the actual bootstrap source owner.
+ */
+ConfigTomlTryReadBootValue(Cache, Section, Key, &Value) {
+	global ConfigurationFile, _ParseTomlCache
+	if !IsSet(ConfigurationFile) || ConfigurationFile == ""
+			|| !IsSet(_ParseTomlCache) || !_ParseTomlCache.Has(ConfigurationFile)
+			|| _ParseTomlCache[ConfigurationFile] != Cache
+		return false
+	Snapshot := ConfigTomlReadSnapshot(ConfigurationFile)
+	if Snapshot.Cache != Cache
+		throw Error("The early configuration reader lost its admitted cache")
+	Path := Section . "." . Key
+	Entry := ManifestFindEntryByPath(Path)
+	if !(Entry is Map) || !Entry.Has("default")
+		throw Error("Missing required feature manifest default: " . Path)
+	Value := Entry["default"]
+	for Row in Snapshot.Rows {
+		if Row.Section != Section || Row.Key != Key
+			continue
+		if TomlConfigValueMatchesManifest(Section, Key, Row.Value,
+				&ExpectedType, TOML_StripInlineComment(Row.Raw))
+			Value := Row.Value
+		return true
+	}
+	return true
+}
+
 /** Converts typed values at the native reader boundary, retaining nested shape. */
 _ConfigTomlNativeValue(Value, NativeBooleans := true) {
 	if Value is TOML_Bool
@@ -109,6 +141,39 @@ ConfigTomlDecodeSnapshot(Source) {
 		Rows: Rows, ArrayRows: ArrayRows, SkippedRecords: SkippedRecords }
 }
 
+/**
+ * Decodes an exact source once for READ-ONLY consumers of its Cache, Rows or
+ * Document. Keyed by the whole source text and by the identity of the loaded
+ * manifest feature list (the projection reads it), so a changed file or a
+ * reloaded manifest is decoded afresh. The result is shared and must not be
+ * mutated; ConfigTomlReadSnapshot keeps its own independent decodes because it
+ * compares a snapshot against a private shadow.
+ * @param {String} Source - Exact source text.
+ * @returns {Object} The shared snapshot described by ConfigTomlDecodeSnapshot.
+ */
+ConfigTomlDecodeSnapshotShared(Source) {
+	static Entries := []
+	static MAX_ENTRIES := 4
+	static MAX_SOURCE_CHARS := 262144
+	if !(Source is String)
+		throw TypeError("Configuration source must be a String")
+	Manifest := ObjPtr(ManifestFeatures())
+	for Entry in Entries {
+		if Entry.Manifest == Manifest && Entry.Source == Source {
+			PerfCount("config.snapshot_shared_hit")
+			return Entry.Snapshot
+		}
+	}
+	PerfCount("config.snapshot_shared_miss")
+	Snapshot := ConfigTomlDecodeSnapshot(Source)
+	if StrLen(Source) <= MAX_SOURCE_CHARS {
+		Entries.Push({ Source: Source, Manifest: Manifest, Snapshot: Snapshot })
+		while Entries.Length > MAX_ENTRIES
+			Entries.RemoveAt(1)
+	}
+	return Snapshot
+}
+
 ; Reuses the actual inline-table owner to preserve each child literal spelling.
 ; Typed rendering alone would manufacture legacy Boolean intent from signed zero.
 _ConfigTomlRawTree(Value, Raw) {
@@ -168,6 +233,7 @@ _ConfigTomlProjectRecord(Parts, Value, Raw, Namespaces, Cache, Rows) {
  */
 ConfigTomlReadSnapshot(Path) {
 	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
+	PerfCount("config.snapshot_read")
 	global _TomlReadFailures, _TomlUnreadableFiles
 	static Generations := Map()
 	static DecodeOwner := ConfigTomlDecodeSnapshot, JournalOwner := ConfigMigrateBoot
@@ -264,10 +330,16 @@ ParseConfigTomlFile(Path) {
 	}
 	; Admitted absence is a boot generation too. The existing writer retires
 	; this identity when first-use settings are actually published.
-	_ParseTomlCache[Path] := Snapshot.Cache
-	if IsSet(_TomlFileCache)
-		_TomlFileCache[Path] := Snapshot.Source
-	_ConfigTomlSnapshots[Path] := Snapshot
+	PreviousCritical := Critical("On")
+	try {
+		_TOML_InvalidateParseCache(Path)
+		_ParseTomlCache[Path] := Snapshot.Cache
+		if IsSet(_TomlFileCache) {
+			_TomlLoaderInvalidateCacheRead(Path)
+			_TomlFileCache[Path] := Snapshot.Source
+		}
+		_ConfigTomlSnapshots[Path] := Snapshot
+	} finally Critical(PreviousCritical)
 	return Snapshot.Cache
 }
 
@@ -283,7 +355,8 @@ TomlConfigStaticForeignOwnershipRegistry() {
 			"sfbs_reduction", "FeatureState"),
 		"hotstrings", Map(
 			"terminators", "TerminatorRecords",
-			"terminator_states", "TerminatorRecords"),
+			"terminator_states", "TerminatorRecords",
+			"terminator_consume", "TerminatorRecords"),
 		"gestures", Map(
 			"auto_configure_on_next_start", "Gestures"),
 		"personal_editor", Map(

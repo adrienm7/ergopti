@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 M.bridge_name = "hsPersonalInfo"
 
 local Json = require("json")
@@ -72,11 +73,8 @@ local function _build_initial_payload(state, captured)
 	local trigger = captured and captured.trigger or type(dynamic.get_trigger_char) == "function" and dynamic.get_trigger_char() or ""
 	local reverse = {}
 	for alias, field in pairs(letters) do reverse[field] = alias end
-	local keys = {}
-	for key in pairs(info) do keys[#keys + 1] = key end
-	table.sort(keys)
 	local fields = {}
-	for _, key in ipairs(keys) do
+	for _, key in ipairs(TableUtil.sorted_keys(info)) do
 		local alias = reverse[key]
 		fields[#fields + 1] = {
 			key = key,

@@ -12,6 +12,7 @@ local M = {}
 local Logger      = require("infra.logger")
 local i18n        = require("infra.i18n")
 local ShellRunner = require("adapters.shell_runner")
+local TextUtils = require("text_utils")
 local LOG         = "gestures.conflicts"
 
 
@@ -183,7 +184,7 @@ end
 --- @return number|nil Zero for disabled, a non-zero number for enabled, or nil.
 local function parse_preference_value(raw)
 	if type(raw) ~= "string" then return nil end
-	local value = raw:match("^%s*(.-)%s*$"):lower()
+	local value = TextUtils.trim(raw):lower()
 	if value == "true" or value == "yes" then return 1 end
 	if value == "false" or value == "no" then return 0 end
 	return tonumber(value)

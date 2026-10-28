@@ -28,6 +28,8 @@ local function load_remap(options)
 		logs = {},
 		refresh = 0,
 		resolve = 0,
+		resolve_products = {}, -- The virtual keyboard product each resolution was asked for
+		built_products = {}, -- The product each generation carried into the generator
 		build = 0,
 		deploy = 0,
 		lease_start = 0,
@@ -104,16 +106,18 @@ local function load_remap(options)
 			}
 		end,
 		save_user_config = function() return true end,
-		resolve_layout_actions = function()
+		resolve_layout_actions = function(_, product)
 			calls.resolve = calls.resolve + 1
+			calls.resolve_products[#calls.resolve_products + 1] = product
 			append("resolve")
 			if options.resolve_raises then error("synthetic layout failure") end
 			return 3, "ansi"
 		end,
 	}
 	package.loaded["platform.remap.generator"] = {
-		build_karabiner_json = function()
+		build_karabiner_json = function(state)
 			calls.build = calls.build + 1
+			calls.built_products[#calls.built_products + 1] = state.virtual_keyboard_product
 			append("build")
 			return {}
 		end,
@@ -179,7 +183,7 @@ local function load_remap(options)
 				calls.lease_phase = "recovering"
 				if calls.phase_listener then calls.phase_listener("recovering") end
 			end
-			return options.refresh_result ~= false
+			return options.refresh_result ~= false, options.refresh_reason
 		end,
 		start = function()
 			error("fresh ACTIVE start must be unreachable")
@@ -278,7 +282,7 @@ local function load_remap(options)
 		get = function() return "missing-config.toml" end,
 		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}
-	package.loaded["modules.keylogger.kc_bridge"] = {
+	package.loaded["modules.keystats.kc_bridge"] = {
 		clear_managed_set = function()
 			calls.managed_clear = calls.managed_clear + 1
 			append("managed-clear")

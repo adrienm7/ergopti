@@ -99,6 +99,8 @@ local function with_fixture(save_results, callback)
 			local hs_fixture = {
 				-- The pull's network prelude locates the bundled policy through test(1).
 				execute = helpers.existence_probe_execute(function() return "", true end),
+				-- The pull reads the shared route inventory through the real file adapter.
+				fs = require("tests.stubs.hs").fs,
 				http = {
 					asyncPost = function(_, _, _, done)
 						loadability_callbacks[#loadability_callbacks + 1] = done

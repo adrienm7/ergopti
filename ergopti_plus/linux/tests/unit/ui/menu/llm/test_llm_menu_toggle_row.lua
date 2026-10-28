@@ -171,7 +171,7 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 			local ok, err = pcall(function()
 				helpers.assert_true(ok_kbd, tostring(kbd))
 				kbd._reset()
-				helpers.assert_eq(#kbd.available_slots("ctrl_"), 0, "the blind catalogue offers no slot")
+				helpers.assert_eq(#kbd.available_slots("primary_"), 0, "the blind catalogue offers no slot")
 				local mb = helpers.load_module("ui.menu.menu_builder")
 				local items = mb.build({
 					_version = "0.0.0-dev.12",
@@ -273,7 +273,7 @@ local function with_slot_frame(locale, mutation, body)
 			state.assigned[#state.assigned + 1] = { option = option, picked = picked }
 			return state.accepts
 		end
-		function state.rows(bound) return build_rows("Actual caller slot", bound, "ctrl_a", state.assign) end
+		function state.rows(bound) return build_rows("Actual caller slot", bound, "primary_a", state.assign) end
 		body(state)
 	end)
 	for name in pairs(package.loaded) do
@@ -328,7 +328,7 @@ helpers.describe("Linux shared slot picker and conditional clear frame", functio
 				helpers.assert_eq(state.opened[1].current, "open_url")
 				helpers.assert_true(state.opened[1].items == state.items, "the native catalogue identity is forwarded")
 				helpers.assert_true(state.editor_items == state.items, "the native editor receives that same catalogue")
-				helpers.assert_eq(state.editor_binding, "ctrl_a")
+				helpers.assert_eq(state.editor_binding, "primary_a")
 				local picked = { shortcut = "Ctrl+Shift+Q" }
 				helpers.assert_eq(state.confirm("send_shortcut", {}, picked), accepts)
 				helpers.assert_eq(#state.assigned, 1)

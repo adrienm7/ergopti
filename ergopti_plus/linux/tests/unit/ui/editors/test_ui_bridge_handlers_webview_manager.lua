@@ -176,11 +176,11 @@ helpers.describe("ui.bridge_handlers", function()
 			local state = build_mock_state()
 			local reads = 0
 			local resets = 0
-			state.keylogger.export_metrics = function()
+			state.keystats.export_metrics = function()
 				reads = reads + 1
 				return { secret = true }
 			end
-			state.keylogger.reset_session = function() resets = resets + 1 end
+			state.keystats.reset_session = function() resets = resets + 1 end
 			wm.set_daemon_state(state)
 
 			local stolen = wm.route_message("action_picker", "metrics_typing_bridge",
@@ -641,7 +641,7 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(type(result) == "table")
       helpers.assert_eq(result.suppressed, false)
     end)
-    helpers.it("returns safe defaults when keylogger absent", function()
+    helpers.it("returns safe defaults when keystats absent", function()
       local result = handler.on_message("ready", {})
       helpers.assert_true(type(result.metrics_manifest) == "table")
       helpers.assert_true(type(result.app_icons) == "table")

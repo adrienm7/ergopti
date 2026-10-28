@@ -106,6 +106,8 @@ function M.run(opts, body)
 		local profiles = ProfilesFixture.without_inventory({
 			init = function() return true end,
 			is_enabled = function() return ai_on end,
+			enable = function() ai_on = true; return true end,
+			disable = function() ai_on = false; return true end,
 			get_current_model = function() return "ollama-model" end,
 			get_base_url = function() return world.base_url end,
 		})
@@ -138,7 +140,9 @@ function M.run(opts, body)
 				exec_checked = function(command)
 					world.model_offers[#world.model_offers + 1] = { command = command }
 					if type(opts.on_model_confirm) == "function" then opts.on_model_confirm(world) end
-					return opts.download_choice == true, "", opts.download_choice == true and nil or "command exited with status 1"
+					return opts.download_choice == true, "", opts.download_choice == true and nil or "command exited with status 1",
+						opts.download_choice == true and nil or require("adapter_errors").COMMAND_EXITED_NONZERO,
+						opts.download_choice == true and nil or 1
 				end,
 			}
 		end
@@ -179,9 +183,9 @@ function M.run(opts, body)
 			scheduler = scheduler,
 			clock_ms = function() return scheduler.now * 1000 end,
 			engine = {
-				current_buffer = function() return world.buffer end,
 				reset = function() world.buffer = "" end,
 			},
+			context = { text = function() return world.buffer end, replaced = function() end },
 			is_paused = function() return world.paused end,
 			notify = function(text) world.notices[#world.notices + 1] = text; return true end,
 			overlay = {

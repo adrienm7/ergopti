@@ -15,8 +15,10 @@ local M = {}
 
 local hs               = hs
 local notifications    = require("infra.notifications")
+local FeatureNotice    = require("feature_notice")
 local hotstring_editor = require("ui.hotstring_editor")
 local Logger           = require("infra.logger")
+local PhaseStats       = require("infra.phase_stats")
 local text_utils = require("infra.text_utils")
 local i18n             = require("infra.i18n")
 local ui_restore       = require("infra.ui_restore")
@@ -25,6 +27,7 @@ local Manifest         = require("infra.manifest_reader")
 local Preferences   = require("infra.preferences")
 local Builder       = require("ui.menu.builder")
 local ClickGate     = require("ui.menu.click_gate")
+local QuitAdmission = require("quit_admission")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
@@ -71,9 +74,9 @@ local MENU_REFRESH_COALESCE_SEC = 0.05
 
 -- config.toml [ui] menubar_icon: its variants and its default are the
 -- manifest's. v1 draws the simple glyph, v2 the detailed Ergopti logo.
-local MENUBAR_ICON_DEFAULT = Manifest.default_for("ui.menubar_icon")
+local MENUBAR_ICON_DEFAULT = Manifest.default_for(require("config_keys").KEY.UI_MENUBAR_ICON)
 local MENUBAR_ICON_VARIANTS = {}
-for _, variant in ipairs(Manifest.find_entry_by_path("ui.menubar_icon").enum_values) do
+for _, variant in ipairs(Manifest.find_entry_by_path(require("config_keys").KEY.UI_MENUBAR_ICON).enum_values) do
 	MENUBAR_ICON_VARIANTS[variant] = true
 end
 
@@ -100,7 +103,7 @@ local menu_mods = {
 	keyboard_layout = safe_require("ui.menu.menu_keyboard_layout", "keyboard layout menu"),
 	hotstrings      = safe_require("ui.menu.menu_hotstrings",      "hotstrings menu"),
 	llm             = safe_require("ui.menu.menu_llm",             "AI menu"),
-	keylogger       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
+	keystats       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
 	tap_holds       = safe_require("ui.menu.menu_tap_holds",    "tap-holds menu"),
 	apps            = safe_require("ui.menu.menu_apps",            "apps menu"),
 	about           = safe_require("ui.menu.menu_about",           "about/update menu"),
@@ -109,7 +112,7 @@ local menu_mods = {
 -- Load core modules
 local core_mods = {
 	llm           = safe_require("modules.llm", "AI engine"),
-	keylogger     = safe_require("modules.keylogger", "metrics engine"),
+	keystats     = safe_require("modules.keystats", "metrics engine"),
 	shortcuts_mod = safe_require("modules.shortcuts", "shortcuts engine"),
 	dyn_hot_mod   = safe_require("modules.dynamic_hotstrings", "dynamic hotstrings engine"),
 	capsword_auto_off = safe_require("infra.capsword_auto_off", "CapsWord auto-off settings"),
@@ -184,7 +187,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- and must be initialized here even when ConfigPaths is already ready.
 	if not MenuPaths.is_initialized() then
 		MenuPaths.init(base_dir, function()
-			return DeferredWork.after(0.25,
+			return DeferredWork.after(require("infra.timings").sec("ui", "config_editor_reload_delay_ms"),
 				function() pcall(hs.reload) end,
 				"menu.reload_after_paths")
 		end)
@@ -202,7 +205,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	Logger.info(LOG, "Menubar created successfully.")
 
 	local updateMenu
-	local _suppress_watcher_until = 0
+	local _suppress_watcher_until_awake = 0
 
 	-- Menu-cache state. Builder.generate() is expensive (counts every hotstring
 	-- group, builds the layout/apps/tap-holds submenus, renders the badge), and
@@ -404,16 +407,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end)
 	end
 
+	local notice_ports = {
+		send = function(text, level) return notifications.notify(text, nil, level) end,
+		info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+		warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
+	}
 	local function notify_feature(label, is_enabled)
-		-- Every menu feature toggle funnels through here; the toast was its only
-		-- trace, so a user log could never say what had been switched and when.
-		Logger.info(LOG, "Feature toggled from the menu: '%s' → %s.", tostring(label),
-			is_enabled and "enabled" or "disabled")
-		local notified, notify_err = pcall(notifications.notify, tostring(label), nil,
-			is_enabled and "success" or "error")
-		if not notified then
-			Logger.warn(LOG, "Feature toggle notification failed: %s.", tostring(notify_err))
-		end
+		FeatureNotice.feature(notice_ports, label, is_enabled)
 	end
 
 	-- Preference callbacks mutate shared tables and runtime engines before they
@@ -488,7 +488,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			hotstring_editor         = hotstring_editor,
 			core_mods                = rollback_modules or core_mods,
 			restoring                 = restoring == true,
-			-- A deferred engine refusal (keylogger start) lands after this sync
+			-- A deferred engine refusal (keystats start) lands after this sync
 			-- returned; it keeps the acknowledged value on disk like a boot one.
 			on_runtime_demotion      = session_demotions.record,
 		})
@@ -925,7 +925,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		pcall(core_mods.shortcuts_mod.set_extras, {
 			open_init = function()
 				return DeferredWork.after(0, function()
-					_suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8
+					_suppress_watcher_until_awake = TimerScheduler.awake_time() + 8
 					pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua"))
 				end, "menu.open_init")
 			end,
@@ -954,7 +954,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				local closed = close_loaded_dashboard(
 					"ui.metrics_typing", "Typing dashboard")
 				if closed ~= nil then return closed end
-				if core_mods.keylogger and type(core_mods.keylogger.show_metrics) == "function" then pcall(core_mods.keylogger.show_metrics) end
+				if core_mods.keystats and type(core_mods.keystats.show_metrics) == "function" then pcall(core_mods.keystats.show_metrics) end
 			end,
 			show_apps_time = function()
 				-- Toggle: close if open and focused, otherwise open or present it
@@ -965,7 +965,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end,
 			open_config = function()
 				return DeferredWork.after(0, function()
-					_suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8
+					_suppress_watcher_until_awake = TimerScheduler.awake_time() + 8
 					pcall(hs.execute, "open " .. text_utils.shell_quote(MenuPaths.get("ConfigTomlPath")))
 				end, "menu.open_config")
 			end,
@@ -1043,31 +1043,75 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return require("ui.menu.unused_keys_cleanup").run_from_menu()
 		end,
 		open_paths                = function()
-			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths")
+			return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths")
 		end,
 		reload                    = function()
 			return do_reload("menu")
 		end,
 		quit                      = function()
-			-- request_user_exit arms the bounded quit watchdog: once accepted, a stuck
-			-- fence, input drain, or teardown force-exits instead of hanging the app.
-			local accepted = run_global_exclusive("Quit", function()
-				local request_ok, request_accepted = xpcall(function()
-					return TerminationCoordinator.request_user_exit("menu_quit")
-				end, debug.traceback)
-				return request_ok and request_accepted == true
-			end)
-			if accepted ~= true then
-				-- A refusal used to reach only the log, so the user saw Quit do nothing
-				Logger.warn(LOG, "Menubar Quit was refused; the user is notified.")
-				pcall(notifications.notify, i18n.get("notify.quit_refused"), nil, "error")
+			-- What Quit does is decided by the one admission both drivers share
+			-- (_shared/lua/quit_admission.lua): it wins over a reload in flight (the
+			-- coordinator upgrades that reload to this exit), waits for a running
+			-- configuration write or publication up to the user-quit deadline, and is
+			-- refused only for a missing owner or an exit already under way.
+			local function start_exit(decision)
+				-- request_user_exit arms the bounded quit watchdog: once accepted, a stuck
+				-- fence, input drain, or teardown force-exits instead of hanging the app.
+				local function request()
+					local request_ok, request_accepted = xpcall(function()
+						return TerminationCoordinator.request_user_exit("menu_quit")
+					end, debug.traceback)
+					return request_ok and request_accepted == true
+				end
+				-- A reload in flight makes run_exclusive refuse on terminal quiescence;
+				-- the coordinator's own reload-to-exit upgrade is what Quit asks for.
+				local accepted
+				if decision.abandon_reload then
+					accepted = request()
+				else
+					accepted = run_global_exclusive("Quit", request)
+				end
+				if accepted ~= true then
+					FeatureNotice.quit_refused(notice_ports, i18n.get)
+				end
+				return accepted
 			end
-			return accepted
+			local pending_kind = TerminationCoordinator.pending_kind
+			local started = false
+			local state = QuitAdmission.await({
+				facts = function()
+					local kind = pending_kind()
+					return {
+						owner_available = global_actions_owner ~= nil
+							and type(global_actions_owner.run_exclusive) == "function"
+							and type(global_actions_owner.is_exclusive_blocked) == "function",
+						exit_pending = kind ~= nil and kind ~= "reload",
+						reload_pending = kind == "reload",
+						writer_active = global_actions_owner ~= nil
+							and global_actions_owner.is_exclusive_blocked() == true,
+						publication_pending = require("modules.hotstrings.hotstrings_config")
+							.publication_pending() == true,
+					}
+				end,
+				schedule = function(delay, callback)
+					local _, committed = TimerScheduler.after(delay, callback)
+					return committed == true
+				end,
+				now = function() return hs.timer.absoluteTime() / 1e9 end,
+				timeout = require("infra.timings").sec("ui", "user_quit_deadline_ms"),
+				poll = 0.25,
+				on_admitted = function(decision) started = start_exit(decision) == true end,
+				on_refused = function(decision)
+					QuitAdmission.refuse(notice_ports, i18n.get, decision)
+				end,
+				warn = notice_ports.warn,
+			})
+			return state == "waiting" or started
 		end,
 		open_logs                 = function() return LogOpeners.open_logs_folder(open_async) end,
 		open_console              = function() return require("ui.console_window").open() end,
 		open_paths_editor         = function()
-			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths_editor")
+			return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths_editor")
 		end,
 		open_hotstrings_editor    = function()
 			local ok, ed = pcall(require, "ui.hotstring_editor")
@@ -1102,7 +1146,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		set_log_level             = function(level)
 			local L = require("infra.logger")
-			local ok, committed = pcall(Storage.set, "log_level", level)
+			local ok, committed = pcall(Storage.set, require("config_keys").LEAF.LOG_LEVEL, level)
 			if not ok or committed ~= true then
 				L.warn("menu", "Log level %s was refused by settings; the live level was left unchanged.", level)
 				return false
@@ -1264,7 +1308,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				metrics_scope = require("ui.menu.metrics_scope").new({
 					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
-					demotions = session_demotions, core = core_mods.keylogger,
+					demotions = session_demotions, core = core_mods.keystats,
 					menubar = require("ui.wpm.wpm_menubar"), widget = require("ui.wpm.wpm_widget"),
 					script_control = core_mods.shortcuts_mod,
 					activation_pending = MenuState.metrics_start_pending,
@@ -1406,6 +1450,18 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return committed
 	end
 	local global_scope = nil
+	--- Shows why a global restore or clear was refused, with the typed failure
+	--- point the Windows reset names too. It used to refuse in silence: only
+	--- the log said that nothing had been restored.
+	--- @param report table Refused composition report.
+	local function show_reset_failure(report)
+		local title, message = require("config_reset_failure").message(report, i18n.get)
+		local shown, err = pcall(require("infra.dialog_util").block_alert, title, message,
+			i18n.get("button.ok"), nil, "critical")
+		if not shown then
+			Logger.error(LOG, "Reset failure dialog could not be shown (%s): %s.", tostring(err), message)
+		end
+	end
 	apply_global_scope = function(mode)
 		if read_only_reason ~= nil then return false end
 		if not global_scope then
@@ -1442,9 +1498,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
 					return core_mods.shortcuts_mod.is_paused()
 				end,
-				refresh = function()
+				refresh = function(committed, report)
 					Builder.invalidate_cache()
 					updateMenu()
+					if committed ~= true then show_reset_failure(report) end
 				end,
 			})
 		end
@@ -1517,6 +1574,20 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		update_checks            = update_checks,
 	}
 
+	-- The window toggles (ui/window_toggle) open these pages with the same
+	-- session context as their menu rows: the remap facade, the update channel
+	-- owner and the menu state exist only here.
+	local WindowToggle = require("ui.window_toggle")
+	WindowToggle.set_opener("layer_editor", function()
+		return require("ui.layer_editor").open({ karabiner = karabiner })
+	end)
+	WindowToggle.set_opener("changelog", function()
+		return require("ui.changelog").open({ channel_owner = channel_owner })
+	end)
+	WindowToggle.set_opener("healthcheck", function()
+		return require("ui.healthcheck").show_window({ state = state })
+	end)
+
 	-- updateMenu refreshes the menubar icon and re-wires script_control extras,
 	-- then marks the cached menu tree dirty so the NEXT open reflects the change.
 	-- It does NOT rebuild synchronously — the rebuild happens lazily, once, on the
@@ -1552,6 +1623,21 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return TrayMenu.setMenu(candidate) == true
 	end
 
+	--- Names the slowest top-level rows of the build just finished.
+	--- @param timings table|nil List of { id, ms } in build order.
+	--- @return string text ` Slowest: id=12.3 ms, …`, empty without timings.
+	local function slowest_items_text(timings)
+		if type(timings) ~= "table" or #timings == 0 then return "" end
+		local ranked = {}
+		for index, entry in ipairs(timings) do ranked[index] = entry end
+		table.sort(ranked, function(a, b) return a.ms > b.ms end)
+		local parts = {}
+		for index = 1, math.min(#ranked, 5) do
+			parts[index] = string.format("%s=%.1f ms", ranked[index].id, ranked[index].ms)
+		end
+		return " Slowest: " .. table.concat(parts, ", ") .. "."
+	end
+
 	local function rebuild_menu_cache()
 		require("ui.menu.start_at_login").request("status", function()
 			if type(updateMenu) == "function" then updateMenu() end
@@ -1574,7 +1660,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			_cached_menu_items = items
 			_cached_paused     = ctx.paused
 			_menu_dirty        = false
-			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).", elapsed_ms, #items)
+			PhaseStats.add("menu.rebuild", elapsed_ms * 1e6)
+			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s", elapsed_ms, #items,
+				Logger.is_enabled(Logger.LEVELS.INFO) and slowest_items_text(Builder.get_last_item_timings()) or "")
 			return true
 		else
 			Logger.error(LOG, "Menu tree rebuild failed (%.1f ms): %s.", elapsed_ms, tostring(items))
@@ -1600,9 +1688,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		rebuild_menu_cache()
 	end
 	schedule_menu_refresh = function()
+		PhaseStats.count("menu.refresh_requested")
 		if _menu_refresh_timer then return end
+		-- Each refresh is a full rebuild of 0.5 s or more on the Mac; naming the
+		-- code that asked for it says which state change cost a second one.
+		local caller = debug.getinfo(3, "Sl")
+		local requester = caller and (tostring(caller.short_src):match("[^/]+/[^/]+$") or tostring(caller.short_src))
+			.. ":" .. tostring(caller.currentline) or "?"
 		_menu_refresh_timer = hs.timer.doAfter(MENU_REFRESH_COALESCE_SEC, function()
 			_menu_refresh_timer = nil
+			Logger.debug(LOG, "Menu refresh requested by %s.", requester)
 			pcall(refresh_menu_now)
 		end)
 	end
@@ -1617,12 +1712,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			and type(core_mods.shortcuts_mod.is_paused) == "function"
 			and core_mods.shortcuts_mod.is_paused() or false
 		if _menu_dirty or not _cached_menu_items or paused_now ~= _cached_paused then
+			PhaseStats.count("menu.open_cold_rebuild")
 			Logger.debug(LOG, "Menu open → cold rebuild (dirty=%s, cache=%s, pause_flip=%s).",
 				tostring(_menu_dirty), tostring(_cached_menu_items ~= nil),
 				tostring(paused_now ~= _cached_paused))
 			ctx.paused = paused_now
 			rebuild_menu_cache()
 		else
+			PhaseStats.count("menu.open_from_cache")
 			Logger.debug(LOG, "Menu open → served from cache (cold path).")
 		end
 		return _cached_menu_items or {}
@@ -1639,6 +1736,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	updateMenu()
 
+	-- Ask the login item state now, before the prime build below: answered only
+	-- by that build, an enabled login item flipped the baked state and forced a
+	-- second full rebuild at every boot (two 0.5 to 0.6 s holds on the Mac, 23:34).
+	-- Before priming its answer only marks the menu dirty.
+	require("ui.menu.start_at_login").request("status", function()
+		if type(updateMenu) == "function" then updateMenu() end
+	end)
+
 	-- Warm the expensive menu-discovery caches off the boot path so the FIRST
 	-- click renders instantly. Without this, building the keyboard-layout and
 	-- apps submenus on first open would synchronously spawn python3 plus several
@@ -1648,7 +1753,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		function()
 			-- A failed prime only costs a slower first open, but it used to cost it
 			-- silently; the submenu then looked empty with nothing in the log.
-			for _prime_index, name in ipairs({ "keyboard_layout", "apps", "tap_holds" }) do
+			for _prime_index, name in ipairs({ "keyboard_layout", "apps", require("config_keys").KEY.TAP_HOLDS }) do
 				local mod = menu_mods[name]
 				if mod and type(mod.prime) == "function" then
 					local primed, prime_err = pcall(mod.prime, ctx)
@@ -1705,7 +1810,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- file changes that occurred during the previous (possibly cascading) boot
 	-- would immediately trigger another hs.reload(), causing an infinite loop.
 	local BOOT_SUPPRESS_SEC = 5
-	_suppress_watcher_until = hs.timer.secondsSinceEpoch() + BOOT_SUPPRESS_SEC
+	_suppress_watcher_until_awake = TimerScheduler.awake_time() + BOOT_SUPPRESS_SEC
 	Logger.debug(LOG, "Pathwatcher boot suppression active for %.0f s.", BOOT_SUPPRESS_SEC)
 
 	-- The same exclusion list infra/file_watchers already receives. Two recursive
@@ -1713,7 +1818,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local configWatcher = MenuWatchers.start_config_watcher(
 		base_dir,
 		function() return do_reload("watcher") end,
-		function() return _suppress_watcher_until end,
+		function() return _suppress_watcher_until_awake end,
 		ui_restore,
 		{ (hs.configdir or ".") .. "/cache" },
 		-- Resolved from MenuPaths, exactly as infra/file_watchers resolves the same

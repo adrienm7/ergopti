@@ -16,15 +16,15 @@ local Fixture = require("tests.support.shortcuts_scope_fixture")
 local Codec = require("toml_codec")
 
 local SOURCE = '[shortcuts]\nenabled = true\n'
-	.. 'keyboard = { cmd_a = "send_text", hs_ctrl_x = "send_text", hs_ctrl_space = "send_text" }\n'
-	.. '[gestures]\naction_parameters = { keyboard__cmd_a__send_text = "cmd", keyboard__hs_ctrl_x__send_text = "ctrl" }\n'
+	.. 'keyboard = { primary_a = "send_text", secondary_j = "send_text", secondary_space = "send_text" }\n'
+	.. '[gestures]\naction_parameters = { keyboard__primary_a__send_text = "cmd", keyboard__secondary_j__send_text = "ctrl" }\n'
 
 --- The select of the Ctrl group, built the way the menu builds it.
 --- @param keyboard table The fixture's keyboard registry.
 --- @return function select
 local function ctrl_group(keyboard)
 	local ids = {}
-	for _, slot in ipairs(keyboard.available_slots("hs_ctrl_")) do ids[#ids + 1] = slot.id end
+	for _, slot in ipairs(keyboard.available_slots("secondary_")) do ids[#ids + 1] = slot.id end
 	return require("ui.menu.shortcuts_scope").keyboard_group_rows(ids, keyboard.binding_id)
 end
 
@@ -34,13 +34,13 @@ helpers.describe("macOS keyboard group scope", function()
 			local committed, detail = f.owner.apply("clear", ctrl_group(f.keyboard))
 			helpers.assert_eq(committed, true, detail)
 			local decoded = Codec.decode(f.files.config)
-			helpers.assert_nil(decoded.shortcuts.keyboard.hs_ctrl_x, "a user Ctrl slot is removed")
-			helpers.assert_nil(decoded.shortcuts.keyboard.hs_ctrl_space, "a shipped Ctrl slot is emptied")
-			helpers.assert_nil(decoded.gestures.action_parameters.keyboard__hs_ctrl_x__send_text)
-			helpers.assert_eq(decoded.shortcuts.keyboard.cmd_a, "send_text", "the Cmd group is untouched")
-			helpers.assert_eq(decoded.gestures.action_parameters.keyboard__cmd_a__send_text, "cmd")
-			helpers.assert_eq(f.keyboard.get_action("hs_ctrl_space"), "none")
-			helpers.assert_eq(f.keyboard.get_action("cmd_a"), "send_text")
+			helpers.assert_nil(decoded.shortcuts.keyboard.secondary_j, "a user Ctrl slot is removed")
+			helpers.assert_nil(decoded.shortcuts.keyboard.secondary_space, "a shipped Ctrl slot is emptied")
+			helpers.assert_nil(decoded.gestures.action_parameters.keyboard__secondary_j__send_text)
+			helpers.assert_eq(decoded.shortcuts.keyboard.primary_a, "send_text", "the Cmd group is untouched")
+			helpers.assert_eq(decoded.gestures.action_parameters.keyboard__primary_a__send_text, "cmd")
+			helpers.assert_eq(f.keyboard.get_action("secondary_space"), "none")
+			helpers.assert_eq(f.keyboard.get_action("primary_a"), "send_text")
 		end, SOURCE)
 	end)
 
@@ -49,12 +49,12 @@ helpers.describe("macOS keyboard group scope", function()
 			local committed, detail = f.owner.apply("recommended", ctrl_group(f.keyboard))
 			helpers.assert_eq(committed, true, detail)
 			local decoded = Codec.decode(f.files.config)
-			helpers.assert_nil(decoded.shortcuts.keyboard.hs_ctrl_x, "a user Ctrl slot is removed")
-			helpers.assert_eq(decoded.shortcuts.keyboard.hs_ctrl_space, "llm_generate_prediction",
+			helpers.assert_nil(decoded.shortcuts.keyboard.secondary_j, "a user Ctrl slot is removed")
+			helpers.assert_eq(decoded.shortcuts.keyboard.secondary_space, "llm_generate_prediction",
 				"the shipped Ctrl+Space slot takes its recommended action")
-			helpers.assert_eq(decoded.shortcuts.keyboard.cmd_a, "send_text", "the Cmd group is untouched")
-			helpers.assert_eq(decoded.gestures.action_parameters.keyboard__cmd_a__send_text, "cmd")
-			helpers.assert_eq(f.keyboard.get_action("hs_ctrl_space"), "llm_generate_prediction")
+			helpers.assert_eq(decoded.shortcuts.keyboard.primary_a, "send_text", "the Cmd group is untouched")
+			helpers.assert_eq(decoded.gestures.action_parameters.keyboard__primary_a__send_text, "cmd")
+			helpers.assert_eq(f.keyboard.get_action("secondary_space"), "llm_generate_prediction")
 		end, SOURCE)
 	end)
 end)
@@ -91,11 +91,11 @@ helpers.describe("macOS keyboard group submenus open with their restore and clea
 		local rows = render_shortcuts_submenu(calls)
 		local seen = 0
 		for _, group in ipairs({
-			{ key = "menu.shortcuts.alt_group", prefix = "hs_option_" },
-			{ key = "menu.shortcuts.ctrl_group", prefix = "hs_ctrl_" },
-			{ key = "menu.shortcuts.ctrl_shift_group", prefix = "hs_ctrl_shift_" },
-			{ key = "menu.shortcuts.cmd_group", prefix = "cmd_" },
-			{ key = "menu.shortcuts.cmd_shift_group", prefix = "cmd_shift_" },
+			{ key = "menu.shortcuts.alt_group", prefix = "alt_" },
+			{ key = "menu.shortcuts.ctrl_group", prefix = "secondary_" },
+			{ key = "menu.shortcuts.ctrl_shift_group", prefix = "secondary_shift_" },
+			{ key = "menu.shortcuts.cmd_group", prefix = "primary_" },
+			{ key = "menu.shortcuts.cmd_shift_group", prefix = "primary_shift_" },
 		}) do
 			for _, entry in ipairs(rows) do
 				if entry.title == group.key then

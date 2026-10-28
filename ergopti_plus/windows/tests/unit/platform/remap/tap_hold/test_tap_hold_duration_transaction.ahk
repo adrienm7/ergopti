@@ -347,7 +347,7 @@ Test("tap-hold duration: held prompt rejects replaced source and rebased target 
 _THD_FutureSource() {
 	return Chr(0xFEFF)
 		. '# the unknown root is user data`nfuture.version = "001" # keep root spelling`n'
-		. '[tap_hold]`ninherit_defaults = false # explicit opt-out`n'
+		. '[tap_hold]`nexplicit_delays = true`ninherit_defaults = false # explicit opt-out`n'
 		. '[tap_hold.keys.caps_lock] # keep key header`n'
 		. 'enabled = false # keep the literal Boolean`n'
 		. 'tap_action = "escape"`nhold_modifier = "ctrl"`n'
@@ -434,9 +434,9 @@ _THD_AliasAndNoOpSources(TargetPath) {
 	global TapHold
 	_THD_Reset()
 	Sources := [
-		Chr(0xFEFF) . '# root dotted leaf`ntap_hold.keys.caps_lock.time_activation_seconds = 0.2`nfuture = "001"`n',
-		Chr(0xFEFF) . '["tap_hold"."keys"."caps_lock"] # quoted exact owner`ntime_activation_seconds = 0.2`nfuture_note = "001"`n',
-		Chr(0xFEFF) . '[tap_hold]`nkeys = { caps_lock = { time_activation_seconds = 0.2, enabled = false }, tab = { tap_action = "copy" } }`n'
+		Chr(0xFEFF) . '# root dotted leaf`ntap_hold.explicit_delays = true`ntap_hold.keys.caps_lock.time_activation_seconds = 0.2`nfuture = "001"`n',
+		Chr(0xFEFF) . '[tap_hold]`nexplicit_delays = true`n["tap_hold"."keys"."caps_lock"] # quoted exact owner`ntime_activation_seconds = 0.2`nfuture_note = "001"`n',
+		Chr(0xFEFF) . '[tap_hold]`nexplicit_delays = true`nkeys = { caps_lock = { time_activation_seconds = 0.2, enabled = false }, tab = { tap_action = "copy" } }`n'
 	]
 	for Source in Sources {
 		TapHold := _THGT_FreshState()
@@ -631,3 +631,105 @@ _THD_ReceiptRepeatsOwnerAfterPhysicalAdmission(TargetPath) {
 }
 Test("tap-hold duration: final physical admission repeats exact published owner checks (tap-hold-key-delay)",
 	() => _THHS_WithNativeFixture(_THD_ReceiptRepeatsOwnerAfterPhysicalAdmission))
+
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 2/ Global delay and reset (PAR-15) =======
+; ==================================================
+; ==================================================
+
+_THD_GlobalWrite(Seconds) {
+	return WriteTapHoldGlobalDuration(Seconds, _THD_Port.Bind("write"),
+		_THD_Port.Bind("replace"), _THGT_Delete, _THD_Port.Bind("authorize"))
+}
+
+_THD_ResetWrite(KeyId) {
+	return WriteTapHoldDurationReset(KeyId, _THD_Port.Bind("write"),
+		_THD_Port.Bind("replace"), _THGT_Delete, _THD_Port.Bind("authorize"))
+}
+
+; The three behaviours the maintainer asked for, through the real writers: a global
+; change moves a key without its own delay and never one with it, and a reset returns
+; the key to the global delay.
+_THD_GlobalChangeAndResetFollowTheModel(TargetPath) {
+	global TapHold, _THGT_Writes
+	_THD_Reset()
+	TapHold["keys"]["tab"] := Map("tap_action", "copy", "time_activation_seconds", 0.45)
+	AssertEqual(1, _THD_GlobalWrite(0.31), "the global delay is written through the actual owner")
+	AssertEqual(0.31, TapHoldGlobalDuration(TapHold))
+	AssertEqual(0.31, TapHoldDuration(TapHold, "caps_lock"), "a key without its own delay follows the global change")
+	AssertEqual(0.45, TapHoldDuration(TapHold, "tab"), "a key with its own delay is not moved by the global change")
+	Content := _THGT_Writes[1]["content"]
+	AssertContains(Content, "time_activation_seconds = 0.31", "the global delay is persisted at the root")
+	AssertContains(Content, "explicit_delays = true", "a written file flags every delay in it as the user's own")
+	AssertEqual(1, _THD_ResetWrite("tab"), "the reset goes through the actual owner")
+	AssertFalse(TapHoldHasOwnDuration(TapHold, "tab"))
+	AssertEqual(0.31, TapHoldDuration(TapHold, "tab"), "a reset key follows the global delay again")
+	AssertEqual(0.31, TapHoldGlobalDuration(TapHold), "the reset leaves the global delay alone")
+	Persisted := TOML_ParseDocument(_THGT_Writes[2]["content"])
+	AssertEqual("copy", Persisted["tap_hold"]["keys"]["tab"]["tap_action"],
+		"resetting a delay preserves the key's independent tap mapping")
+	AssertFalse(Persisted["tap_hold"]["keys"]["tab"].Has(ConfigLeaf.TIME_ACTIVATION_SECONDS),
+		"the persisted mapped key follows the global delay again")
+	_THD_WithPhysicalSource(TargetPath, _THGT_Writes[2]["content"], _THD_PersistedEmptyDurationReset)
+}
+Test("tap-hold delay: global change spares a key's own delay, a reset follows the global again (PAR-15)",
+	() => _THHS_WithNativeFixture(_THD_GlobalChangeAndResetFollowTheModel))
+
+; The absence check requires a real prior file row, not an entry added only to RAM.
+_THD_PersistedEmptyDurationReset(TargetPath) {
+	global TapHold
+	AssertEqual(1, WriteTapHoldDuration("left_ctrl", 0.42), "the actual writer persists a duration-only key")
+	Before := TOML_ParseDocument(FSReadUtf8Exact(TargetPath))
+	AssertEqual(1, Before["tap_hold"]["keys"]["left_ctrl"].Count, "the physical input has only its own duration")
+	AssertEqual(0.42, Before["tap_hold"]["keys"]["left_ctrl"][ConfigLeaf.TIME_ACTIVATION_SECONDS],
+		"the independent file read proves the key existed before reset")
+	AssertEqual(1, WriteTapHoldDurationReset("left_ctrl"), "the actual reset persists the empty-key removal")
+	AssertFalse(TapHold["keys"].Has("left_ctrl"), "a reset removes a truly empty modeled key")
+	After := TOML_ParseDocument(FSReadUtf8Exact(TargetPath))
+	AssertFalse(After["tap_hold"]["keys"].Has("left_ctrl"), "the formerly persisted empty key is removed")
+	AssertEqual("copy", After["tap_hold"]["keys"]["tab"]["tap_action"], "the mapped neighbor remains persisted")
+}
+
+_THD_GlobalAndResetRefuseInvalidInput(TargetPath) {
+	global TapHold, _THGT_Writes
+	_THD_Reset()
+	Before := TapHold
+	for Value in [0, -1, 10.001, "0.3", Map()]
+		AssertEqual(false, _THD_GlobalWrite(Value), "an unusable global delay is refused")
+	for KeyId in ["", "unknown_physical_key", "CAPS_LOCK"]
+		AssertEqual(false, _THD_ResetWrite(KeyId), "an unknown key cannot be reset")
+	AssertEqual(ObjPtr(Before), ObjPtr(TapHold))
+	AssertEqual(0, _THGT_Writes.Length)
+}
+Test("tap-hold delay: the global and reset writers refuse invalid input before staging (PAR-15)",
+	() => _THHS_WithNativeFixture(_THD_GlobalAndResetRefuseInvalidInput))
+
+; A per-key write on a file an earlier build wrote also finishes the migration: the
+; shipped delays copied in by that build go, the file is flagged, and the delay being
+; set is kept whatever its value.
+_THD_PerKeyWriteMigratesRetiredDelays(TargetPath) {
+	global TapHold, _THGT_Writes
+	_THD_Reset()
+	Source := '[tap_hold]`ninherit_defaults = false`n'
+		. '[tap_hold.keys.caps_lock]`ntap_action = "escape"`nhold_modifier = "ctrl"`ntime_activation_seconds = 0.35`n'
+		. '[tap_hold.keys.tab]`ntap_action = "copy"`ntime_activation_seconds = 0.2`n'
+		. '[tap_hold.keys.left_ctrl]`ntap_action = "paste"`ntime_activation_seconds = 0.45`n'
+	_THD_WithPhysicalSource(TargetPath, Source, _THD_PerKeyWriteMigratesBody)
+}
+
+_THD_PerKeyWriteMigratesBody(TargetPath) {
+	global _THGT_Writes
+	AssertEqual(1, _THD_Write("left_alt", 0.2), "the key being set keeps even a value that was once shipped")
+	Written := _THGT_Writes[1]["content"]
+	Assert(!InStr(Written, "time_activation_seconds = 0.35"), "the copied Caps Lock delay is removed")
+	AssertContains(Written, "time_activation_seconds = 0.45", "the user's own delay stays")
+	AssertContains(Written, "explicit_delays = true")
+	AssertContains(Written, "[tap_hold.keys.left_alt]")
+}
+Test("tap-hold delay: a per-key write removes the delays an earlier build copied into the file (PAR-15)",
+	() => _THHS_WithNativeFixture(_THD_PerKeyWriteMigratesRetiredDelays))

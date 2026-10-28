@@ -1672,6 +1672,7 @@
 					"sub_switch": {
 						"path": "category_enabled.key_combinations",
 						"default": true,
+						"independent": false,
 						"items": [
 							"shortcuts.key_combination_taps.alt_gr_then_left_alt",
 							"shortcuts.key_combination_taps.alt_gr_then_caps_lock",
@@ -2792,7 +2793,7 @@
 					"consent": true,
 					"groups": [],
 					"master": {
-						"path": "metrics.metrics_enabled",
+						"path": "metrics.enabled",
 						"default": false
 					}
 				}
@@ -2833,12 +2834,12 @@
 											"args": [
 												[
 													{
-														"key": "sg_actions.alt_tab_windows"
+														"key": "sg_actions.alt_tab_monitor"
 													}
 												],
 												[
 													{
-														"text": "Fn"
+														"text": "Option"
 													}
 												]
 											]
@@ -3112,7 +3113,7 @@
 						{
 							"items": [
 								{
-									"path": "shortcuts.keyboard.hs_ctrl_space",
+									"path": "shortcuts.keyboard.secondary_space",
 									"value": "llm_generate_prediction",
 									"default": "none",
 									"recommended": true,
@@ -3127,6 +3128,294 @@
 									"value_label": [
 										{
 											"key": "sg_actions.llm_generate_prediction"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_a",
+									"value": "select_line",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + A"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.select_line"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_d",
+									"value": "open_downloads",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + D"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.open_downloads"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_e",
+									"value": "open_file_manager",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + E"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.open_file_manager"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_h",
+									"value": "screenshot_region_clipboard",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + H"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.screenshot_region_clipboard"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_i",
+									"value": "open_system_settings",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + I"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.open_system_settings"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_m",
+									"value": "activity_simulation",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + M"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.activity_simulation"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_o",
+									"value": "surround_parens",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + O"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.surround_parens"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_p",
+									"value": "display_mirror_toggle",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + P"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.display_mirror_toggle"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_s",
+									"value": "copy_selected_path",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + S"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.copy_selected_path"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_t",
+									"value": "teleport_mouse",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + T"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.teleport_mouse"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_u",
+									"value": "uppercase_selection",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + U"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.uppercase_selection"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_w",
+									"value": "titlecase_selection",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + W"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.titlecase_selection"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_x",
+									"value": "pick_color",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + X"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.pick_color"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_capslock",
+									"value": "toggle_capslock",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + CapsLock"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.toggle_capslock"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_l",
+									"value": "lock_screen",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + L"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.lock_screen"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_period",
+									"value": "open_emoji_picker",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + ."
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.open_emoji_picker"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.secondary_quote",
+									"value": "spotlight_mouse",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Ctrl + '"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.spotlight_mouse"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.keyboard.primary_shift_v",
+									"value": "paste_plain",
+									"default": "none",
+									"recommended": true,
+									"label": [
+										{
+											"text": "Cmd + Shift + V"
+										}
+									],
+									"value_label": [
+										{
+											"key": "sg_actions.paste_plain"
 										}
 									]
 								},
@@ -3163,54 +3452,6 @@
 									]
 								},
 								{
-									"path": "shortcuts.keys.ctrl_a",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + A"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_a"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_d",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + D"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_d"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_e",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + E"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_e"
-										}
-									]
-								},
-								{
 									"path": "shortcuts.keys.ctrl_g",
 									"value": true,
 									"default": false,
@@ -3223,246 +3464,6 @@
 									"value_label": [
 										{
 											"key": "shortcuts.label_ctrl_g"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_h",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + H"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_h"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_i",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + I"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_i"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_m",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + M"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_m"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_o",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + O"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_o"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_p",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + P"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_p"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_s",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + S"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_s"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_t",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + T"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_t"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_u",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + U"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_u"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_w",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + W"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_w"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_x",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + X"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_x"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_capslock",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + CapsLock"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_capslock"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_l",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + L"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_l"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_period",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + ."
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_period"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.ctrl_quote",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Ctrl + '"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_ctrl_quote"
-										}
-									]
-								},
-								{
-									"path": "shortcuts.keys.cmd_shift_v",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"text": "Cmd + Shift + V"
-										}
-									],
-									"value_label": [
-										{
-											"key": "shortcuts.label_cmd_shift_v"
 										}
 									]
 								},
@@ -4439,49 +4440,6 @@
 									"text": "🇫🇷 Français"
 								}
 							]
-						},
-						{
-							"label": [
-								{
-									"key": "menu.hotstrings.preview_bubbles"
-								}
-							],
-							"select_all": true,
-							"items": [
-								{
-									"path": "hotstrings.preview_star_enabled",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"key": "menu.hotstrings.tooltip_magic"
-										}
-									]
-								},
-								{
-									"path": "hotstrings.preview_autocorrect_enabled",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"key": "menu.hotstrings.tooltip_autocorrect"
-										}
-									]
-								},
-								{
-									"path": "hotstrings.preview_colored_tooltips",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"key": "menu.hotstrings.tooltip_colored"
-										}
-									]
-								}
-							]
 						}
 					],
 					"master": {
@@ -4869,7 +4827,7 @@
 									]
 								},
 								{
-									"path": "shortcuts.keyboard.ctrl_g",
+									"path": "shortcuts.keyboard.primary_g",
 									"value": "open_chatgpt",
 									"default": "none",
 									"recommended": true,
@@ -4885,7 +4843,7 @@
 									]
 								},
 								{
-									"path": "shortcuts.keyboard.super_space",
+									"path": "shortcuts.keyboard.meta_space",
 									"value": "llm_generate_prediction",
 									"default": "none",
 									"recommended": true,
@@ -4929,6 +4887,7 @@
 					"sub_switch": {
 						"path": "category_enabled.key_combinations",
 						"default": true,
+						"independent": true,
 						"items": [
 							"shortcuts.key_combination_taps.alt_gr_then_left_alt",
 							"shortcuts.key_combination_taps.alt_gr_then_caps_lock",
@@ -4945,102 +4904,6 @@
 					"groups": [
 						{
 							"items": [
-								{
-									"path": "gestures.swipe_3_down",
-									"value": "tab_close",
-									"default": "none",
-									"recommended": true,
-									"label": [
-										{
-											"key": "menu.gestures.swipe_3_down"
-										}
-									],
-									"value_label": [
-										{
-											"key": "sg_actions.tab_close"
-										}
-									]
-								},
-								{
-									"path": "gestures.swipe_3_left",
-									"value": "tab_prev",
-									"default": "none",
-									"recommended": true,
-									"label": [
-										{
-											"key": "menu.gestures.swipe_3_left"
-										}
-									],
-									"value_label": [
-										{
-											"key": "sg_actions.tab_prev"
-										}
-									]
-								},
-								{
-									"path": "gestures.swipe_3_right",
-									"value": "tab_next",
-									"default": "none",
-									"recommended": true,
-									"label": [
-										{
-											"key": "menu.gestures.swipe_3_right"
-										}
-									],
-									"value_label": [
-										{
-											"key": "sg_actions.tab_next"
-										}
-									]
-								},
-								{
-									"path": "gestures.swipe_3_up",
-									"value": "tab_new",
-									"default": "none",
-									"recommended": true,
-									"label": [
-										{
-											"key": "menu.gestures.swipe_3_up"
-										}
-									],
-									"value_label": [
-										{
-											"key": "sg_actions.tab_new"
-										}
-									]
-								},
-								{
-									"path": "gestures.swipe_4_left",
-									"value": "desktop_prev",
-									"default": "none",
-									"recommended": true,
-									"label": [
-										{
-											"key": "menu.gestures.swipe_4_left"
-										}
-									],
-									"value_label": [
-										{
-											"key": "sg_actions.desktop_prev"
-										}
-									]
-								},
-								{
-									"path": "gestures.swipe_4_right",
-									"value": "desktop_next",
-									"default": "none",
-									"recommended": true,
-									"label": [
-										{
-											"key": "menu.gestures.swipe_4_right"
-										}
-									],
-									"value_label": [
-										{
-											"key": "sg_actions.desktop_next"
-										}
-									]
-								},
 								{
 									"path": "gestures.tap_3",
 									"value": "left_click_toggle",
@@ -5867,49 +5730,6 @@
 							"label": [
 								{
 									"text": "🇫🇷 Français"
-								}
-							]
-						},
-						{
-							"label": [
-								{
-									"key": "menu.hotstrings.preview_bubbles"
-								}
-							],
-							"select_all": true,
-							"items": [
-								{
-									"path": "hotstrings.preview_star_enabled",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"key": "menu.hotstrings.tooltip_magic"
-										}
-									]
-								},
-								{
-									"path": "hotstrings.preview_autocorrect_enabled",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"key": "menu.hotstrings.tooltip_autocorrect"
-										}
-									]
-								},
-								{
-									"path": "hotstrings.preview_colored_tooltips",
-									"value": true,
-									"default": false,
-									"recommended": true,
-									"label": [
-										{
-											"key": "menu.hotstrings.tooltip_colored"
-										}
-									]
 								}
 							]
 						}

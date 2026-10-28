@@ -14,8 +14,9 @@ local helpers = require("tests.helpers")
 local function with_window(scenario)
 	local names = {
 		"ui.download_window", "ui.download_window.javascript", "ui.ui_builder",
-		"infra.logger", "infra.deferred_work", "infra.paths", "infra.i18n",
+		"infra.logger", "infra.deferred_work", "infra.paths", "infra.timings", "infra.i18n",
 		"infra.text_utils",
+		"adapters.timer_scheduler", "error_description", "number_policy",
 	}
 	local saved, saved_hs = {}, _G.hs
 	local saved_shell_runner = package.loaded["adapters.shell_runner"]
@@ -32,6 +33,7 @@ local function with_window(scenario)
 		after = function(_, callback) fixture.timers[#fixture.timers + 1] = callback; return true end,
 	}
 	package.loaded["infra.paths"] = { shared = function() return "/assets" end }
+	helpers.provide_timings()
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.text_utils"] = {}
 	package.loaded["adapters.shell_runner"] = {}
@@ -58,7 +60,8 @@ local function with_window(scenario)
 			return { frame = function() return { x = 0, y = 0, w = 1920, h = 1080 } end }
 		end },
 		drawing = { windowLevels = { normal = 0, floating = 1 } },
-		timer = { secondsSinceEpoch = function() return 1 end },
+		timer = { secondsSinceEpoch = function() return 1 end,
+			absoluteTime = function() return 1000000000 end },
 	}
 	local ok, err = xpcall(function()
 		local window = require("ui.download_window")

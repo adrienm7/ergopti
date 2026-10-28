@@ -21,28 +21,36 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Json = require("json")
-local Agent = require("llm.agent")
+local LearningStore = require("llm.agent_learning_store")
+local NoReplaceMove = require("infra.no_replace_move")
+local RegularFileReader = require("infra.regular_file_reader")
+local RegularFileWriter = require("infra.regular_file_writer")
+local NativePath = require("native_path")
 
 local LOG = "modules.llm.agent_learning"
 
 -- The file under the XDG state folder
 local STATE_FILE = "ergopti_plus/agent_learning.json"
 -- How many applications are remembered
-M.MAX_APPS = 200
+M.MAX_APPS = LearningStore.MAX_APPS
 -- How long after a change the file is written
 local SAVE_DEBOUNCE_SEC = 2
 -- The file's format
 local VERSION = 1
+local ENOENT = 2 -- Linux reports genuine absence separately from read refusal.
 
--- { [app] = { used = integer, thresholds = { [intent] = number } } }
-local _apps = nil
--- The last `used` stamp handed out: larger is more recent
-local _sequence = 0
+-- The shared map logic; this driver persists the thresholds under `thresholds`.
+local Store = LearningStore.new("thresholds")
+-- { apps = { [app] = { used = integer, thresholds = { [intent] = number } } }, clock = the
+-- last `used` stamp handed out: larger is more recent }; nil until loaded.
+local _map = nil
 -- The pending save's timer
 local _save_timer = nil
 -- Boundaries, replaced by the tests: { path, scheduler }
 local _path = nil
 local _scheduler = nil
+-- A rejected source stays authoritative until its preservation is acknowledged.
+local _load_blocked = false
 
 
 
@@ -60,21 +68,49 @@ local function state_path()
 	return require("infra.config_paths").state_home() .. "/" .. STATE_FILE
 end
 
+--- Preserves the rejected source without replacing an older recovery file.
+--- @param path string
+--- @return boolean preserved
+local function preserve_corrupt(path)
+	local candidate, suffix = path .. ".corrupt", 0
+	while true do
+		local called, moved, failure = pcall(NoReplaceMove.move, path, candidate)
+		if called and moved == true then return true end
+		if not called or failure ~= "EEXIST" then return false end
+		suffix = suffix + 1
+		candidate = path .. ".corrupt." .. suffix
+	end
+end
+
 --- Reads the file into memory once.
 local function load()
-	if _apps then return end
-	_apps, _sequence = {}, 0
+	if _map and not _load_blocked then return end
+	_map = Store.new_map()
 	local path = state_path()
-	local fh = io.open(path, "r")
-	if not fh then return end
-	local text = fh:read("*a")
-	fh:close()
-	local root = Json.decode(text or "")
-	if type(root) ~= "table" or root.version ~= VERSION or type(root.apps) ~= "table" then
-		Logger.warn(LOG, "The agent's learning file is unreadable — it is kept aside and learning restarts.")
-		os.rename(path, path .. ".corrupt")
+	local fh, _, errno = RegularFileReader.open_source(path)
+	if not fh then
+		_load_blocked = errno ~= ENOENT
+		if _load_blocked then Logger.error(LOG, "The agent's learning source could not be read; mutations are blocked.") end
 		return
 	end
+	local read_ok, text = pcall(fh.read, fh, "*a")
+	local close_ok, closed = pcall(fh.close, fh)
+	if not read_ok or type(text) ~= "string" or not close_ok or closed ~= true then
+		_load_blocked = true
+		Logger.error(LOG, "The agent's learning read or close was refused; mutations are blocked.")
+		return
+	end
+	-- An overflowing persisted sequence becomes infinity in the legacy decoder,
+	-- leaving LRU eviction without any oldest entry. Admit exact JSON instead.
+	local root = Json.decode_lossless(text or "")
+	if type(root) ~= "table" or root.version ~= VERSION or type(root.apps) ~= "table" then
+		_load_blocked = not preserve_corrupt(path)
+		if _load_blocked then
+			Logger.error(LOG, "The agent's learning source could not be preserved; mutations are blocked.")
+		else Logger.warn(LOG, "The agent's learning file is unreadable — it is kept aside and learning restarts.") end
+		return
+	end
+	_load_blocked = false
 	for app, entry in pairs(root.apps) do
 		if type(app) == "string" and type(entry) == "table" and type(entry.used) == "number"
 			and type(entry.thresholds) == "table" then
@@ -84,8 +120,8 @@ local function load()
 					thresholds[intent] = value
 				end
 			end
-			_apps[app] = { used = entry.used, thresholds = thresholds }
-			if entry.used > _sequence then _sequence = entry.used end
+			_map.apps[app] = { used = entry.used, thresholds = thresholds }
+			if entry.used > _map.clock then _map.clock = entry.used end
 		end
 	end
 	Logger.debug(LOG, "Agent learning loaded.")
@@ -98,27 +134,36 @@ function M.flush()
 		(_scheduler or require("adapters.timer_scheduler")).cancel(_save_timer)
 		_save_timer = nil
 	end
-	if not _apps then return true end
+	if _load_blocked then return false end
+	if not _map then return true end
 	local path = state_path()
-	local dir = path:match("^(.*)/[^/]+$")
+	local dir = NativePath.dirname(path)
 	if dir and not require("adapters.shell_runner").run("mkdir -p "
 		.. require("adapters.shell_runner").quote(dir) .. " 2>/dev/null") then
 		Logger.error(LOG, "The agent's learning folder could not be created.")
 		return false
 	end
-	local text = Json.encode({ version = VERSION, apps = _apps })
+	local text = Json.encode({ version = VERSION, apps = _map.apps })
 	local temp = path .. ".tmp"
-	local fh = io.open(temp, "w")
-	if not fh or not text then
-		if fh then fh:close() end
+	local opened, fh, _, _, remove_owned = pcall(RegularFileWriter.open, temp, "wx")
+	if not opened or not fh or not text then
+		if opened and fh then pcall(fh.close, fh); remove_owned() end
 		Logger.error(LOG, "The agent's learning could not be written.")
 		return false
 	end
-	fh:write(text)
-	fh:close()
-	local renamed, err = os.rename(temp, path)
-	if not renamed then
-		Logger.error(LOG, "The agent's learning could not be saved: %s", tostring(err))
+	-- Buffered close can fail after write accepted every byte. Never replace the
+	-- committed map until both receipts succeed, and close even a throwing write.
+	local wrote, written = pcall(fh.write, fh, text)
+	local closed, flushed = pcall(fh.close, fh)
+	if not wrote or not written or not closed or flushed ~= true then
+		remove_owned()
+		Logger.error(LOG, "The agent's learning write or close was refused.")
+		return false
+	end
+	local called, renamed, err = pcall(os.rename, temp, path)
+	if not called or renamed ~= true then
+		remove_owned()
+		Logger.error(LOG, "The agent's learning could not be saved: %s", tostring(called and err or renamed))
 		return false
 	end
 	return true
@@ -154,9 +199,7 @@ end
 --- @return number
 function M.threshold(config, app, intent)
 	load()
-	local entry = type(app) == "string" and _apps[app] or nil
-	local value = entry and entry.thresholds[intent] or nil
-	return value or config.system1.threshold
+	return Store.threshold(_map, config, app, intent)
 end
 
 --- Records that the user accepted or dismissed an automatic suggestion.
@@ -167,28 +210,10 @@ end
 --- @return number threshold The new threshold.
 function M.record(config, app, intent, accepted)
 	load()
+	if _load_blocked then return config.system1.threshold end
 	if type(app) ~= "string" or app == "" then app = "?" end
-	local before = M.threshold(config, app, intent)
-	local after = Agent.learn(config, before, accepted == true)
-	local entry = _apps[app]
-	if not entry then
-		entry = { used = 0, thresholds = {} }
-		_apps[app] = entry
-	end
-	_sequence = _sequence + 1
-	entry.used = _sequence
-	entry.thresholds[intent] = after
-	-- Bounded: the least recently used applications go first.
-	local count = 0
-	for _ in pairs(_apps) do count = count + 1 end
-	while count > M.MAX_APPS do
-		local oldest, oldest_used = nil, math.huge
-		for name, candidate in pairs(_apps) do
-			if candidate.used < oldest_used then oldest, oldest_used = name, candidate.used end
-		end
-		_apps[oldest] = nil
-		count = count - 1
-	end
+	-- Bounded by the store: the least recently used applications go first.
+	local after, before = Store.record(_map, config, app, intent, accepted)
 	Logger.info(LOG, "Agent %s for '%s': threshold %.3f -> %.3f.", accepted and "accepted" or "dismissed",
 		intent, before, after)
 	schedule_save()
@@ -200,7 +225,7 @@ end
 function M._reset_for_test(opts)
 	opts = opts or {}
 	_path, _scheduler = opts.path, opts.scheduler
-	_apps, _sequence, _save_timer = nil, 0, nil
+	_map, _save_timer, _load_blocked = nil, nil, false
 end
 
 return M

@@ -44,6 +44,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Shell = require("adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
+local X11Focus = require("adapters.x11_focus")
 
 local LOG = "adapters.window_info"
 
@@ -92,13 +93,20 @@ local function decode_json(raw)
 	return value
 end
 
+--- Removes only the record delimiter appended by procfs to a kernel task name.
+--- @param record string Raw /proc/<pid>/comm bytes.
+--- @return string name Exact native task-name payload.
+local function process_name_record(record)
+	return (record:gsub("\n$", ""))
+end
+
 --- Reads the process name for a PID, or "" when it cannot be read.
 --- @param pid string|number|nil
 --- @return string
 local function comm_of(pid)
 	if not pid then return "" end
-	local comm = Shell.exec_line("cat " .. Shell.quote("/proc/" .. tostring(pid) .. "/comm"))
-	return comm or ""
+	local comm = Shell.exec("cat " .. Shell.quote("/proc/" .. tostring(pid) .. "/comm"))
+	return process_name_record(comm)
 end
 
 --- Reads a process name from /proc in this process: the window list names
@@ -110,7 +118,7 @@ local function read_proc_comm(pid)
 	if not handle then return "" end
 	local comm = handle:read("*a") or ""
 	handle:close()
-	return (comm:gsub("%s+$", ""))
+	return process_name_record(comm)
 end
 _read_proc_comm = read_proc_comm
 
@@ -145,10 +153,27 @@ end
 --- title changes within one browser window and switches between identical titles.
 --- @return table|nil WindowInfo, or nil when the query produced nothing.
 local function focused_x11()
-	local win_id = Shell.exec_line("xdotool getactivewindow 2>/dev/null")
-	if not win_id then return nil end
-	local title = Shell.exec_line("xdotool getwindowname " .. Shell.quote(win_id) .. " 2>/dev/null")
-	if not title then return nil end
+	local win_id, title, native_pid
+	local native_reason
+	if X11Focus.has_transport() then
+		win_id, title, native_pid, native_reason = X11Focus.query()
+		if native_reason == nil then
+			-- The server answered, in this process: no window, or an untitled
+			-- one, is no answer, exactly as an empty xdotool line was.
+			if not win_id or not title then return nil end
+		else
+			-- Transport trouble (server unreachable): ask the tools this once,
+			-- so a flaky connection degrades to the old route, not to silence.
+			Logger.debug(LOG, "Native X11 focus query unavailable (%s) — using xdotool.", native_reason)
+		end
+	end
+	if native_reason ~= nil or not X11Focus.has_transport() then
+		win_id = Shell.exec_line("xdotool getactivewindow 2>/dev/null")
+		if not win_id then return nil end
+		title = Shell.exec_line("xdotool getwindowname " .. Shell.quote(win_id) .. " 2>/dev/null")
+		if not title then return nil end
+		native_pid = nil
+	end
 
 	local info = empty_info()
 	info.windowTitle = title
@@ -162,7 +187,10 @@ local function focused_x11()
 	-- what this driver has always reported, what the keystroke metrics are
 	-- already attributed to, and what the other two drivers report; WM_CLASS
 	-- would be a nicer identity and a silent break of every stored attribution.
-	local pid = Shell.exec_line("xdotool getwindowpid " .. Shell.quote(win_id) .. " 2>/dev/null")
+	local pid = native_pid
+	if pid == nil and (native_reason ~= nil or not X11Focus.has_transport()) then
+		pid = Shell.exec_line("xdotool getwindowpid " .. Shell.quote(win_id) .. " 2>/dev/null")
+	end
 	info.appId = comm_of(pid)
 
 	_x11_cache.id = win_id
@@ -190,11 +218,35 @@ function M._parse_wmctrl_list(text)
 	return windows
 end
 
---- Lists every managed window in one wmctrl query, each named by the process
+--- WindowInfo tables for a list of { title, pid } windows, naming each owner by its
+--- process (one /proc read per process).
+--- @param windows table Array of { title, pid }.
+--- @return table
+local function infos_of_windows(windows)
+	local infos, names = {}, {}
+	for _, window in ipairs(windows) do
+		local entry = empty_info()
+		entry.windowTitle = window.title
+		if window.pid and window.pid > 0 then
+			if names[window.pid] == nil then names[window.pid] = _read_proc_comm(window.pid) end
+			entry.appId = names[window.pid]
+		end
+		infos[#infos + 1] = entry
+	end
+	return infos
+end
+
+--- Lists every managed window from the X server (libxcb in this process, else one wmctrl query), each named by the process
 --- name focused_x11() reports, read from /proc without a spawn per window:
 --- the excluded-applications picker builds this list on the menu path.
 --- @return table Array of WindowInfo.
 local function all_x11()
+	if X11Focus.has_transport() then
+		-- In this process, like the focus query: no wmctrl fork, no wmctrl dependency.
+		local clients, native_reason = X11Focus.clients()
+		if clients then return infos_of_windows(clients) end
+		Logger.debug(LOG, "Native X11 window list unavailable (%s) — using wmctrl.", tostring(native_reason))
+	end
 	if not Shell.has_command("wmctrl", true) then
 		if not _reported_no_window_list then
 			_reported_no_window_list = true
@@ -208,17 +260,7 @@ local function all_x11()
 		Logger.error(LOG, "getAll(): wmctrl -lp failed — %s.", tostring(err))
 		return {}
 	end
-	local infos, names = {}, {}
-	for _, window in ipairs(M._parse_wmctrl_list(out)) do
-		local entry = empty_info()
-		entry.windowTitle = window.title
-		if window.pid and window.pid > 0 then
-			if names[window.pid] == nil then names[window.pid] = _read_proc_comm(window.pid) end
-			entry.appId = names[window.pid]
-		end
-		infos[#infos + 1] = entry
-	end
-	return infos
+	return infos_of_windows(M._parse_wmctrl_list(out))
 end
 
 
@@ -245,10 +287,19 @@ local function sway_focused_node(node)
 	return nil
 end
 
+--- A client can emit valid JSON before failing; only acknowledged acquisition
+--- may publish focus metadata. Shell owns the checked process diagnostics.
+local function checked_json(command)
+	local ok, output = Shell.exec_checked(command)
+	if not ok then return nil end
+	return decode_json(output)
+end
+
 --- Queries sway (and any wlroots compositor speaking the sway IPC).
 --- @return table|nil
 local function focused_sway()
-	local tree = decode_json(Shell.exec("swaymsg -t get_tree 2>/dev/null"))
+	if not Shell.has_command("swaymsg") then return nil end
+	local tree = checked_json("swaymsg -t get_tree 2>/dev/null")
 	if not tree then return nil end
 	local node = sway_focused_node(tree)
 	if not node then return nil end
@@ -268,7 +319,8 @@ end
 --- Queries Hyprland.
 --- @return table|nil
 local function focused_hyprland()
-	local win = decode_json(Shell.exec("hyprctl activewindow -j 2>/dev/null"))
+	if not Shell.has_command("hyprctl") then return nil end
+	local win = checked_json("hyprctl activewindow -j 2>/dev/null")
 	if not win then return nil end
 	local info = empty_info()
 	info.windowTitle = tostring(win.title or "")
@@ -280,7 +332,8 @@ end
 --- Queries niri.
 --- @return table|nil
 local function focused_niri()
-	local win = decode_json(Shell.exec("niri msg --json focused-window 2>/dev/null"))
+	if not Shell.has_command("niri") then return nil end
+	local win = checked_json("niri msg --json focused-window 2>/dev/null")
 	if not win then return nil end
 	local info = empty_info()
 	info.windowTitle = tostring(win.title or "")
@@ -289,21 +342,19 @@ local function focused_niri()
 	return info, native_identity("niri", win.id, win.pid), tonumber(win.pid)
 end
 
+-- Each query probes its own client binary first and answers nil without it.
 local WAYLAND_QUERIES = {
-	sway     = { binary = "swaymsg", query = focused_sway },
-	hyprland = { binary = "hyprctl", query = focused_hyprland },
-	niri     = { binary = "niri",    query = focused_niri },
+	sway     = focused_sway,
+	hyprland = focused_hyprland,
+	niri     = focused_niri,
 }
 
 --- Tries every Wayland backend this session might speak.
 --- @return table|nil
 local function focused_wayland()
 	for _, name in ipairs(WAYLAND_BACKENDS) do
-		local backend = WAYLAND_QUERIES[name]
-		if Shell.has_command(backend.binary) then
-			local info, identity, pid = backend.query()
-			if info then return info, identity, pid end
-		end
+		local info, identity, pid = WAYLAND_QUERIES[name]()
+		if info then return info, identity, pid end
 	end
 
 	if not _reported_unsupported then
@@ -342,6 +393,20 @@ local function query_focused()
 	end
 	if DisplayServer.is_x11() then return focused_x11() end
 	return nil
+end
+
+--- Binds the in-process X11 focus query for this daemon (instead of forking
+--- xdotool four times a second). Called once at startup; a runtime without
+--- libxcb keeps the xdotool route and says so.
+--- @return boolean bound
+function M.use_native_x11()
+	local bound, reason = X11Focus.use_xcb()
+	if bound then
+		Logger.info(LOG, "Focus queries on X11 use libxcb in this process (no xdotool forks).")
+	else
+		Logger.warn(LOG, "libxcb focus queries unavailable (%s) — X11 focus keeps using xdotool.", tostring(reason))
+	end
+	return bound
 end
 
 --- Returns the identity of the currently focused window.

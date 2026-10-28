@@ -14,7 +14,10 @@
 ---    refreshed;
 --- 4. a failure's Report goes through the error window's report, naming the
 ---    updater and the cause;
---- 5. without an automatic-check owner the window shows a failure, not nothing.
+--- 5. without an automatic-check owner the window shows a failure, not nothing;
+--- 6. Sparkle's dialog shows no notes, so the offered release's changelog is
+---    seeded into this window, and its repository links open through the
+---    system handler only on this repository.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -25,7 +28,7 @@ local STUBS = { "adapters.update_launcher", "ui.changelog", "ui.error_dialog", "
 --- Loads the host with recording doubles of the launcher, the Versions window,
 --- the error window and the log opener. ctx: Host, requests, reports, changelogs.
 local function load_host()
-	local ctx = { requests = {}, reports = {}, changelogs = {}, saved = {} }
+	local ctx = { requests = {}, reports = {}, changelogs = {}, saved = {}, errors = {} }
 	for _, name in ipairs(STUBS) do ctx.saved[name] = package.loaded[name] end
 	package.loaded["adapters.update_launcher"] = {
 		request_check = function(channel) ctx.requests[#ctx.requests + 1] = channel; return true end,
@@ -37,12 +40,20 @@ local function load_host()
 		report = function(record, complete) ctx.reports[#ctx.reports + 1] = record; complete(true); return { cancel = function() end } end,
 	}
 	package.loaded["ui.log_openers"] = { open_today_log = function() return true end }
-	package.loaded["ui.ui_builder"] = { force_focus = function() ctx.focused = (ctx.focused or 0) + 1 end }
+	ctx.urls = {}
+	package.loaded["ui.ui_builder"] = {
+		force_focus = function() ctx.focused = (ctx.focused or 0) + 1 end,
+		open_http_url = function(url) ctx.urls[#ctx.urls + 1] = url; return true end,
+	}
 	ctx.Host = helpers.load_with_stubs("ui.update_check")
+	ctx.logger = require("infra.logger")
+	ctx.previous_error = ctx.logger.error
+	ctx.logger.error = function(_, message, ...) ctx.errors[#ctx.errors + 1] = string.format(message, ...) end
 	return ctx
 end
 
 local function restore(ctx)
+	ctx.logger.error = ctx.previous_error
 	for _, name in ipairs(STUBS) do package.loaded[name] = ctx.saved[name] end
 	package.loaded["ui.update_check"] = nil
 end
@@ -53,6 +64,7 @@ local function fake_view()
 	function view.evaluateJavaScript(_, js)
 		local payload = js:match("receiveUpdateCheck%((.*)%)$")
 		view.messages[#view.messages + 1] = payload and Json.decode(payload) or js
+		return view
 	end
 	function view.delete() view.deleted = true end
 	return view
@@ -182,6 +194,29 @@ helpers.describe("update-check window (macOS host)", function()
 			helpers.assert_eq(#view.messages, shown, "the replaced session's late answer is not shown")
 			helpers.assert_true(ctx.Host._session() ~= session, "the window has a new session")
 			ctx.Host._set_window(nil, nil)
+		end)
+	end)
+
+	helpers.it("seeds the offered release's notes and opens only repository links", function()
+		scenario(function(ctx)
+			local owners = fake_owners(function(channel)
+				local answer = available(channel)
+				answer.release = '{"tag_name":"v0.0.0-dev.150","body":"## Changelog\\n- **Fix: A thing**"}'
+				return answer
+			end)
+			local view = fake_view()
+			local session = ctx.Host._session_for(view, owners)
+			ctx.Host._set_window(view, session)
+			session.start()
+			local notes = view.messages[#view.messages].notes
+			helpers.assert_eq(notes.body, "## Changelog\n- **Fix: A thing**")
+			helpers.assert_eq(notes.owner, require("modules.updater").GH_OWNER)
+			helpers.assert_eq(notes.repo, require("modules.updater").GH_REPO)
+			local url = "https://github.com/" .. notes.owner .. "/" .. notes.repo .. "/releases/tag/v0.0.0-dev.150"
+			session.on_message({ action = "open_url", url = url })
+			helpers.assert_eq(ctx.urls, { url })
+			session.on_message({ action = "open_url", url = "https://example.com/" })
+			helpers.assert_eq(#ctx.urls, 1, "a link outside the repository never reaches the system handler")
 		end)
 	end)
 
@@ -351,4 +386,91 @@ helpers.describe("update host report cancellation reentry", function()
 			helpers.assert_true(ctx.Host._session() == replacement, "outer retirement cannot overwrite the reentrant session")
 		end)
 	end)
+end)
+
+
+helpers.describe("update-check JavaScript delivery (update-check-js-receipt)", function()
+	for _, mode in ipairs({ "nil", "false", "throw" }) do
+		helpers.it("rejects native submission " .. mode .. " (update-check-js-receipt)", function()
+			scenario(function(ctx)
+				local view = fake_view()
+				function view:evaluateJavaScript()
+					if mode == "throw" then error("native submission failed") end
+					if mode == "false" then return false end
+					return nil
+				end
+				ctx.Host._set_window(view, nil)
+				helpers.assert_eq(ctx.Host._push_to(view, { state = "checking" }), false)
+				helpers.assert_eq(#ctx.errors, 1, "the failed submission must be diagnosed")
+			end)
+		end)
+	end
+
+	helpers.it("observes native execution errors and accepts the native success sentinel (update-check-js-receipt)", function()
+		scenario(function(ctx)
+			local view = fake_view()
+			local complete
+			function view:evaluateJavaScript(_, callback) complete = callback; return self end
+			ctx.Host._set_window(view, nil)
+			helpers.assert_true(ctx.Host._push_to(view, { state = "checking" }))
+			helpers.assert_type(complete, "function", "execution must have an observed completion")
+			complete(nil, { code = 0 })
+			helpers.assert_eq(#ctx.errors, 0, "Hammerspoon's nil NSError sentinel is successful")
+			helpers.assert_true(ctx.Host._push_to(view, { state = "available" }))
+			complete(nil, { code = 4, domain = "WKErrorDomain", message = "private release payload" })
+			helpers.assert_eq(#ctx.errors, 1, "an asynchronous page exception must be diagnosed")
+			helpers.assert_nil(ctx.errors[1]:find("private release payload", 1, true),
+				"native diagnostics must not echo evaluated payloads")
+		end)
+	end)
+
+	helpers.it("rejects inline execution failure and ignores completion of a retired window (update-check-js-receipt)", function()
+		scenario(function(ctx)
+			local view = fake_view()
+			function view:evaluateJavaScript(_, callback)
+				callback(nil, { code = 4, domain = "WKErrorDomain" })
+				return self
+			end
+			ctx.Host._set_window(view, nil)
+			helpers.assert_eq(ctx.Host._push_to(view, { state = "checking" }), false)
+			helpers.assert_eq(#ctx.errors, 1)
+			local complete
+			function view:evaluateJavaScript(_, callback) complete = callback; return self end
+			helpers.assert_true(ctx.Host._push_to(view, { state = "checking" }))
+			ctx.Host._set_window(fake_view(), nil)
+			complete(nil, { code = 4, domain = "WKErrorDomain" })
+			helpers.assert_eq(#ctx.errors, 1, "a retired window cannot report into its successor")
+		end)
+	end)
+end)
+
+
+helpers.describe("update-check changelog admission", function()
+	for _, mode in ipairs({ "accepted", "refused", "missing" }) do
+		helpers.it("preserves the changelog opening receipt: " .. mode .. " (update-changelog-receipt)", function()
+			scenario(function(ctx)
+				local owners = fake_owners(available)
+				local view = fake_view()
+				local session = ctx.Host._session_for(view, owners)
+				ctx.Host._set_window(view, session)
+				session.start()
+				local calls = 0
+				package.loaded["ui.changelog"].open = function(options)
+					calls = calls + 1
+					helpers.assert_eq(options.channel, "dev")
+					helpers.assert_true(rawequal(options.channel_owner, owners.channel_owner))
+					if mode == "accepted" then return true end
+					if mode == "refused" then return false end
+					return nil
+				end
+				session.on_message({ action = "whats_new" })
+				local acknowledgement = view.messages[#view.messages]
+				helpers.assert_eq(calls, 1)
+				helpers.assert_eq(acknowledgement.type, "action")
+				helpers.assert_eq(acknowledgement.action, "whats_new")
+				helpers.assert_eq(acknowledgement.ok, mode == "accepted",
+					"the page must receive the actual changelog admission outcome")
+			end)
+		end)
+	end
 end)

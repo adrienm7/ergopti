@@ -51,7 +51,7 @@ function renderHourWeekdayHeatmap(aggData) {
 
 	// Heat: dark blue → orange → red, same palette as the keystroke heatmap.
 	const heat = (v) => {
-		if (v === 0) return '#1e1e2e';
+		if (v === 0) return ThemeTokens.color('hue-1e1e2e');
 		const t = Math.pow(v / max_v, 0.45);
 		if (t < 0.5) {
 			const tt = t * 2;
@@ -65,12 +65,12 @@ function renderHourWeekdayHeatmap(aggData) {
 	let labels_x = '';
 	for (let wd = 0; wd < W; wd++) {
 		const cx = LABEL_LEFT + wd * (CELL + GAP) + CELL / 2;
-		labels_x += `<text x="${cx}" y="14" text-anchor="middle" fill="#aaa" font-size="11" font-family="system-ui">${WEEKDAY_LABELS_FR[wd]}</text>`;
+		labels_x += `<text x="${cx}" y="14" text-anchor="middle" fill="${ThemeTokens.color('grey-aaa')}" font-size="11" font-family="system-ui">${WEEKDAY_LABELS_FR[wd]}</text>`;
 	}
 	let labels_y = '';
 	HOURS.forEach((hh, h_idx) => {
 		const cy = LABEL_TOP + h_idx * (CELL + GAP) + CELL / 2 + 4;
-		labels_y += `<text x="${LABEL_LEFT - 6}" y="${cy}" text-anchor="end" fill="#888" font-size="10" font-family="system-ui">${hh}h</text>`;
+		labels_y += `<text x="${LABEL_LEFT - 6}" y="${cy}" text-anchor="end" fill="${ThemeTokens.color('grey-888')}" font-size="10" font-family="system-ui">${hh}h</text>`;
 		for (let wd = 0; wd < W; wd++) {
 			const cx = LABEL_LEFT + wd * (CELL + GAP);
 			const cy2 = LABEL_TOP + h_idx * (CELL + GAP);
@@ -124,7 +124,7 @@ function renderRibbon(aggData) {
 	for (let h = 0; h < 24; h++) {
 		if (h % 3 === 0) {
 			const x = LABEL_LEFT + h * CELL_W + CELL_W / 2;
-			header += `<text x="${x}" y="12" text-anchor="middle" fill="#888" font-size="10" font-family="system-ui">${h}h</text>`;
+			header += `<text x="${x}" y="12" text-anchor="middle" fill="${ThemeTokens.color('grey-888')}" font-size="10" font-family="system-ui">${h}h</text>`;
 		}
 	}
 
@@ -134,11 +134,11 @@ function renderRibbon(aggData) {
 		const y = LABEL_TOP + rowIdx * (CELL_H + ROW_GAP);
 		// Day label (e.g. "Lun 04/05")
 		const ts = parseDateKey(dateStr);
-		const dow = (new Date(ts).getDay() + 6) % 7;
-		const dd = String(new Date(ts).getDate()).padStart(2, '0');
-		const mm = String(new Date(ts).getMonth() + 1).padStart(2, '0');
+		const dow = (new Date(ts).getUTCDay() + 6) % 7;
+		const dd = String(new Date(ts).getUTCDate()).padStart(2, '0');
+		const mm = String(new Date(ts).getUTCMonth() + 1).padStart(2, '0');
 		const label = `${WEEKDAY_LABELS_FR[dow]} ${dd}/${mm}`;
-		rows += `<text x="${LABEL_LEFT - 8}" y="${y + CELL_H / 2 + 4}" text-anchor="end" fill="#aaa" font-size="11" font-family="system-ui">${label}</text>`;
+		rows += `<text x="${LABEL_LEFT - 8}" y="${y + CELL_H / 2 + 4}" text-anchor="end" fill="${ThemeTokens.color('grey-aaa')}" font-size="11" font-family="system-ui">${label}</text>`;
 
 		HOURS.forEach((hh, hi) => {
 			const x = LABEL_LEFT + hi * CELL_W;
@@ -153,14 +153,14 @@ function renderRibbon(aggData) {
 					topCat = c;
 				}
 			});
-			const fill = topCat ? getCategoryColor(topCat, 0) : '#1e1e2e';
+			const fill = topCat ? getCategoryColor(topCat, 0) : ThemeTokens.color('hue-1e1e2e');
 			if (topCat) cats_seen.add(topCat);
 			// Opacity proportional to total minutes spent in that hour (capped at 1)
 			const opacity = Math.min(1, totalMs / (60 * 60 * 1000)) || 0.05;
 			const tip = topCat
 				? `${label} · ${hh}h — ${topCat} (${formatDuration(totalMs)})`
 				: `${label} · ${hh}h — inactif`;
-			rows += `<rect x="${x}" y="${y}" width="${CELL_W - 1}" height="${CELL_H}" rx="2" fill="${fill}" fill-opacity="${opacity}"><title>${tip}</title></rect>`;
+			rows += `<rect x="${x}" y="${y}" width="${CELL_W - 1}" height="${CELL_H}" rx="2" fill="${fill}" fill-opacity="${opacity}"><title>${escapeHtml(tip)}</title></rect>`;
 		});
 	});
 
@@ -252,7 +252,7 @@ function renderSankey(aggData) {
 		const y = leftY[n];
 		const col = getAppColor(n, 0);
 		svg += `<rect x="${LEFT_X}" y="${y - 10}" width="${NODE_W}" height="20" rx="3" fill="${col}"></rect>`;
-		svg += `<text x="${LEFT_X - 6}" y="${y + 4}" text-anchor="end" fill="#ddd" font-size="11" font-family="system-ui">${escapeHtml(n)}</text>`;
+		svg += `<text x="${LEFT_X - 6}" y="${y + 4}" text-anchor="end" fill="${ThemeTokens.color('grey-ddd')}" font-size="11" font-family="system-ui">${escapeHtml(n)}</text>`;
 	});
 
 	// Right nodes + labels
@@ -260,7 +260,7 @@ function renderSankey(aggData) {
 		const y = rightY[n];
 		const col = getAppColor(n, 0);
 		svg += `<rect x="${RIGHT_X - NODE_W}" y="${y - 10}" width="${NODE_W}" height="20" rx="3" fill="${col}"></rect>`;
-		svg += `<text x="${RIGHT_X + 6}" y="${y + 4}" text-anchor="start" fill="#ddd" font-size="11" font-family="system-ui">${escapeHtml(n)}</text>`;
+		svg += `<text x="${RIGHT_X + 6}" y="${y + 4}" text-anchor="start" fill="${ThemeTokens.color('grey-ddd')}" font-size="11" font-family="system-ui">${escapeHtml(n)}</text>`;
 	});
 
 	container.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
@@ -332,7 +332,7 @@ function renderDayTimeline() {
 			60 * 60 * 1000
 		);
 		const y = h * (ROW_H + GAP);
-		svg += `<text x="${LABEL_LEFT - 6}" y="${y + ROW_H / 2 + 4}" text-anchor="end" fill="#888" font-size="10" font-family="system-ui">${hh}h</text>`;
+		svg += `<text x="${LABEL_LEFT - 6}" y="${y + ROW_H / 2 + 4}" text-anchor="end" fill="${ThemeTokens.color('grey-888')}" font-size="10" font-family="system-ui">${hh}h</text>`;
 		// Background
 		svg += `<rect x="${LABEL_LEFT}" y="${y}" width="${HOUR_W}" height="${ROW_H}" rx="2" fill="rgba(255,255,255,0.04)"></rect>`;
 		// Stacked apps
@@ -398,19 +398,14 @@ function renderComparator(currentAgg) {
 
 	// Compute the equivalent prior period by shifting the anchor backwards
 	// by the period length. Restore state after.
-	const PERIOD_DAYS = { day: 1, week: 7, month: 30, year: 365 };
-	const days = PERIOD_DAYS[currentPeriod];
+	const days = METRICS_PERIOD_DAYS[currentPeriod];
 	if (!days || !currentSelectedDate) {
 		panel.innerHTML = `<div style="font-size:12px;color:var(--text-muted);">${_t('ui_apps.empty_comparator')}</div>`;
 		return;
 	}
 
 	const anchorTs = parseDateKey(currentSelectedDate);
-	const prevAnchor = new Date(anchorTs - days * 86400000);
-	const yyyy = prevAnchor.getFullYear();
-	const mm = String(prevAnchor.getMonth() + 1).padStart(2, '0');
-	const dd = String(prevAnchor.getDate()).padStart(2, '0');
-	const prevKey = `${yyyy}-${mm}-${dd}`;
+	const prevKey = formatMetricsDateKey(shiftMetricsDay(anchorTs, -days));
 
 	const savedDate = currentSelectedDate;
 	currentSelectedDate = prevKey;
@@ -433,8 +428,13 @@ function renderComparator(currentAgg) {
 		const d = curV - prevV;
 		const pct = prevV > 0 ? (d / prevV) * 100 : curV > 0 ? 100 : 0;
 		const sign = d >= 0 ? '+' : '−';
-		const colour = d > 0 ? '#30D158' : d < 0 ? '#FF453A' : '#888';
-		return `<div style="font-size:18px;color:#fff;font-weight:600;">${fmt(curV)}</div>
+		const colour =
+			d > 0
+				? ThemeTokens.color('green-dark')
+				: d < 0
+					? ThemeTokens.color('red-dark')
+					: ThemeTokens.color('grey-888');
+		return `<div style="font-size:18px;color:${ThemeTokens.color('white')};font-weight:600;">${fmt(curV)}</div>
 			<div style="font-size:11px;color:${colour};">${sign}${fmt(Math.abs(d))} (${sign}${Math.abs(pct).toFixed(0)}%)</div>
 			<div style="font-size:10px;color:var(--text-muted);">avant : ${fmt(prevV)}</div>`;
 	};
@@ -522,19 +522,19 @@ function renderSessionBoxplots(aggData) {
 	top.forEach((r, idx) => {
 		const y = idx * ROW_H + ROW_H / 2 + 8;
 		// Label
-		svg += `<text x="${LABEL_LEFT - 10}" y="${y + 4}" text-anchor="end" fill="#ddd" font-size="11" font-family="system-ui">${escapeHtml(r.name)}</text>`;
+		svg += `<text x="${LABEL_LEFT - 10}" y="${y + 4}" text-anchor="end" fill="${ThemeTokens.color('grey-ddd')}" font-size="11" font-family="system-ui">${escapeHtml(r.name)}</text>`;
 		// Whisker line
-		svg += `<line x1="${xFor(r.min)}" x2="${xFor(r.max)}" y1="${y}" y2="${y}" stroke="#666" stroke-width="1"/>`;
+		svg += `<line x1="${xFor(r.min)}" x2="${xFor(r.max)}" y1="${y}" y2="${y}" stroke="${ThemeTokens.color('grey-666')}" stroke-width="1"/>`;
 		// Min / max caps
-		svg += `<line x1="${xFor(r.min)}" x2="${xFor(r.min)}" y1="${y - 6}" y2="${y + 6}" stroke="#aaa"/>`;
-		svg += `<line x1="${xFor(r.max)}" x2="${xFor(r.max)}" y1="${y - 6}" y2="${y + 6}" stroke="#aaa"/>`;
+		svg += `<line x1="${xFor(r.min)}" x2="${xFor(r.min)}" y1="${y - 6}" y2="${y + 6}" stroke="${ThemeTokens.color('grey-aaa')}"/>`;
+		svg += `<line x1="${xFor(r.max)}" x2="${xFor(r.max)}" y1="${y - 6}" y2="${y + 6}" stroke="${ThemeTokens.color('grey-aaa')}"/>`;
 		// IQR box
 		const col = getAppColor(r.name, 0);
 		const x1 = xFor(r.q1),
 			x2 = xFor(r.q3);
 		svg += `<rect x="${x1}" y="${y - 10}" width="${Math.max(2, x2 - x1)}" height="20" rx="3" fill="${col}" fill-opacity="0.6"/>`;
 		// Median tick
-		svg += `<line x1="${xFor(r.med)}" x2="${xFor(r.med)}" y1="${y - 12}" y2="${y + 12}" stroke="#fff" stroke-width="2"/>`;
+		svg += `<line x1="${xFor(r.med)}" x2="${xFor(r.med)}" y1="${y - 12}" y2="${y + 12}" stroke="${ThemeTokens.color('white')}" stroke-width="2"/>`;
 		// Tooltip rect (transparent overlay)
 		const tip = `${r.name} — ${_t('ui_apps.boxplot_tip').replace('{n}', r.count).replace('{med}', formatDuration(r.med)).replace('{q1}', formatDuration(r.q1)).replace('{q3}', formatDuration(r.q3))}`;
 		svg += `<rect x="${LABEL_LEFT}" y="${y - 16}" width="${TRACK_W}" height="32" fill="transparent"><title>${escapeHtml(tip)}</title></rect>`;
@@ -700,7 +700,7 @@ function renderDailyTrajectories(aggData) {
 					{
 						label: _t('ui_apps.ds_focus_h'),
 						data: dates.map((d) => +(byDate[d].time_ms / 3600000).toFixed(2)),
-						borderColor: '#0A84FF',
+						borderColor: ThemeTokens.color('blue-dark'),
 						backgroundColor: 'rgba(10,132,255,0.15)',
 						tension: 0.25,
 						yAxisID: 'y1',
@@ -709,7 +709,7 @@ function renderDailyTrajectories(aggData) {
 					{
 						label: _t('ui_apps.ds_chars'),
 						data: dates.map((d) => byDate[d].chars || 0),
-						borderColor: '#FF9F0A',
+						borderColor: ThemeTokens.color('orange-dark'),
 						backgroundColor: 'rgba(255,159,10,0.10)',
 						tension: 0.25,
 						yAxisID: 'y2',
@@ -718,7 +718,7 @@ function renderDailyTrajectories(aggData) {
 					{
 						label: _t('ui_apps.ds_switches'),
 						data: dates.map((d) => byDate[d].switches || 0),
-						borderColor: '#BF5AF2',
+						borderColor: ThemeTokens.color('purple-dark'),
 						backgroundColor: 'rgba(191,90,242,0.10)',
 						tension: 0.25,
 						yAxisID: 'y2',
@@ -729,20 +729,20 @@ function renderDailyTrajectories(aggData) {
 			options: {
 				responsive: true,
 				maintainAspectRatio: false,
-				plugins: { legend: { labels: { color: '#ccc' } } },
+				plugins: { legend: { labels: { color: ThemeTokens.color('grey-ccc') } } },
 				scales: {
-					x: { grid: { display: false }, ticks: { color: '#888' } },
+					x: { grid: { display: false }, ticks: { color: ThemeTokens.color('grey-888') } },
 					y1: {
 						position: 'left',
 						beginAtZero: true,
 						grid: { color: 'rgba(255,255,255,0.08)' },
-						ticks: { color: '#0A84FF' }
+						ticks: { color: ThemeTokens.color('blue-dark') }
 					},
 					y2: {
 						position: 'right',
 						beginAtZero: true,
 						grid: { drawOnChartArea: false },
-						ticks: { color: '#FF9F0A' }
+						ticks: { color: ThemeTokens.color('orange-dark') }
 					}
 				}
 			}
@@ -756,7 +756,13 @@ function renderDailyTrajectories(aggData) {
 			const eff = Math.max(0, (byDate[d].time_ms || 0) - (byDate[d].passive_ms || 0));
 			return eff > 0 ? +(((byDate[d].active_ms || 0) / eff) * 100).toFixed(1) : 0;
 		});
-		const colors = ratios.map((r) => (r >= 60 ? '#30D158' : r >= 30 ? '#FFD60A' : '#FF453A'));
+		const colors = ratios.map((r) =>
+			r >= 60
+				? ThemeTokens.color('green-dark')
+				: r >= 30
+					? ThemeTokens.color('yellow-dark')
+					: ThemeTokens.color('red-dark')
+		);
 		if (dailyActiveRatioChart) dailyActiveRatioChart.destroy();
 		dailyActiveRatioChart = new Chart(c30.getContext('2d'), {
 			type: 'bar',
@@ -776,12 +782,12 @@ function renderDailyTrajectories(aggData) {
 				maintainAspectRatio: false,
 				plugins: { legend: { display: false } },
 				scales: {
-					x: { grid: { display: false }, ticks: { color: '#888' } },
+					x: { grid: { display: false }, ticks: { color: ThemeTokens.color('grey-888') } },
 					y: {
 						beginAtZero: true,
 						max: 100,
 						grid: { color: 'rgba(255,255,255,0.08)' },
-						ticks: { color: '#ccc', callback: (v) => `${v}%` }
+						ticks: { color: ThemeTokens.color('grey-ccc'), callback: (v) => `${v}%` }
 					}
 				}
 			}
@@ -810,14 +816,18 @@ function renderDailyTrajectories(aggData) {
 			options: {
 				responsive: true,
 				maintainAspectRatio: false,
-				plugins: { legend: { labels: { color: '#ccc' } } },
+				plugins: { legend: { labels: { color: ThemeTokens.color('grey-ccc') } } },
 				scales: {
-					x: { grid: { display: false }, ticks: { color: '#888' }, stacked: true },
+					x: {
+						grid: { display: false },
+						ticks: { color: ThemeTokens.color('grey-888') },
+						stacked: true
+					},
 					y: {
 						stacked: true,
 						beginAtZero: true,
 						grid: { color: 'rgba(255,255,255,0.08)' },
-						ticks: { color: '#ccc', callback: (v) => `${v}h` }
+						ticks: { color: ThemeTokens.color('grey-ccc'), callback: (v) => `${v}h` }
 					}
 				}
 			}
@@ -842,7 +852,7 @@ function renderDailyTrajectories(aggData) {
 					{
 						label: _t('ui_apps.ds_first_key'),
 						data: firstHrs,
-						borderColor: '#0A84FF',
+						borderColor: ThemeTokens.color('blue-dark'),
 						backgroundColor: 'rgba(10,132,255,0.10)',
 						tension: 0.25,
 						borderWidth: 2,
@@ -851,7 +861,7 @@ function renderDailyTrajectories(aggData) {
 					{
 						label: _t('ui_apps.ds_last_key'),
 						data: lastHrs,
-						borderColor: '#FF453A',
+						borderColor: ThemeTokens.color('red-dark'),
 						backgroundColor: 'rgba(255,69,58,0.10)',
 						tension: 0.25,
 						borderWidth: 2,
@@ -862,14 +872,14 @@ function renderDailyTrajectories(aggData) {
 			options: {
 				responsive: true,
 				maintainAspectRatio: false,
-				plugins: { legend: { labels: { color: '#ccc' } } },
+				plugins: { legend: { labels: { color: ThemeTokens.color('grey-ccc') } } },
 				scales: {
-					x: { grid: { display: false }, ticks: { color: '#888' } },
+					x: { grid: { display: false }, ticks: { color: ThemeTokens.color('grey-888') } },
 					y: {
 						min: 0,
 						max: 24,
 						grid: { color: 'rgba(255,255,255,0.08)' },
-						ticks: { color: '#ccc', stepSize: 4, callback: (v) => `${v}h` }
+						ticks: { color: ThemeTokens.color('grey-ccc'), stepSize: 4, callback: (v) => `${v}h` }
 					}
 				}
 			}
@@ -907,14 +917,14 @@ function renderRadialTop8(appsArray) {
 				{
 					label: _t('ui_apps.ds_focus_time'),
 					data: time_norm,
-					borderColor: '#0A84FF',
+					borderColor: ThemeTokens.color('blue-dark'),
 					backgroundColor: 'rgba(10,132,255,0.18)',
 					borderWidth: 2
 				},
 				{
 					label: _t('ui_apps.ds_chars'),
 					data: chars_norm,
-					borderColor: '#FF9F0A',
+					borderColor: ThemeTokens.color('orange-dark'),
 					backgroundColor: 'rgba(255,159,10,0.18)',
 					borderWidth: 2
 				}
@@ -923,15 +933,19 @@ function renderRadialTop8(appsArray) {
 		options: {
 			responsive: true,
 			maintainAspectRatio: false,
-			plugins: { legend: { labels: { color: '#ccc' } } },
+			plugins: { legend: { labels: { color: ThemeTokens.color('grey-ccc') } } },
 			scales: {
 				r: {
 					suggestedMin: 0,
 					suggestedMax: 100,
 					grid: { color: 'rgba(255,255,255,0.08)' },
 					angleLines: { color: 'rgba(255,255,255,0.08)' },
-					pointLabels: { color: '#ddd', font: { size: 11 } },
-					ticks: { color: '#888', backdropColor: 'transparent', stepSize: 25 }
+					pointLabels: { color: ThemeTokens.color('grey-ddd'), font: { size: 11 } },
+					ticks: {
+						color: ThemeTokens.color('grey-888'),
+						backdropColor: 'transparent',
+						stepSize: 25
+					}
 				}
 			}
 		}
@@ -968,7 +982,12 @@ function renderBurstHistogram(aggData) {
 		data: {
 			labels,
 			datasets: [
-				{ label: _t('ui_apps.ds_bursts'), data, backgroundColor: '#30D158', borderRadius: 4 }
+				{
+					label: _t('ui_apps.ds_bursts'),
+					data,
+					backgroundColor: ThemeTokens.color('green-dark'),
+					borderRadius: 4
+				}
 			]
 		},
 		options: {
@@ -979,9 +998,9 @@ function renderBurstHistogram(aggData) {
 				y: {
 					beginAtZero: true,
 					grid: { color: 'rgba(255,255,255,0.1)' },
-					ticks: { color: '#ccc' }
+					ticks: { color: ThemeTokens.color('grey-ccc') }
 				},
-				x: { grid: { display: false }, ticks: { color: '#ccc' } }
+				x: { grid: { display: false }, ticks: { color: ThemeTokens.color('grey-ccc') } }
 			}
 		}
 	});
@@ -1030,10 +1049,8 @@ function renderActivityCalendar() {
 	const container = document.getElementById('activity_calendar_container');
 	if (!container) return;
 
-	const today = new Date();
-	today.setHours(0, 0, 0, 0);
-	const start = new Date(today);
-	start.setDate(start.getDate() - 364);
+	const today = new Date(metricsLocalDayOrdinal(new Date()));
+	const start = new Date(shiftMetricsDay(today.getTime(), 1 - METRICS_PERIOD_DAYS.year));
 
 	// Build a date_str → { time_ms, chars } lookup from manifestData. We sum
 	// across all apps (excluding pseudo-apps) for each calendar day.
@@ -1053,27 +1070,24 @@ function renderActivityCalendar() {
 	const cells = [];
 	const cursor = new Date(start);
 	// Snap cursor back to the previous Monday so the first column is aligned.
-	cursor.setDate(cursor.getDate() - ((cursor.getDay() + 6) % 7));
+	cursor.setUTCDate(cursor.getUTCDate() - ((cursor.getUTCDay() + 6) % 7));
 	const end = new Date(today);
-	end.setDate(end.getDate() + 1);
+	end.setUTCDate(end.getUTCDate() + 1);
 
 	let max_v = 0;
 	while (cursor < end) {
-		const yyyy = cursor.getFullYear();
-		const mm = String(cursor.getMonth() + 1).padStart(2, '0');
-		const dd = String(cursor.getDate()).padStart(2, '0');
-		const key = `${yyyy}-${mm}-${dd}`;
+		const key = formatMetricsDateKey(cursor.getTime());
 		const day = per_day[key];
 		const v = !day ? 0 : _calendarMode === 'time' ? day.time_ms || 0 : day.chars || 0;
 		if (v > max_v) max_v = v;
 		cells.push({
 			key,
 			date: new Date(cursor),
-			weekday: (cursor.getDay() + 6) % 7, // 0=Mon … 6=Sun
+			weekday: (cursor.getUTCDay() + 6) % 7, // 0=Mon … 6=Sun
 			value: v,
 			in_window: cursor >= start && cursor <= today
 		});
-		cursor.setDate(cursor.getDate() + 1);
+		cursor.setUTCDate(cursor.getUTCDate() + 1);
 	}
 
 	const CELL = 11,
@@ -1085,7 +1099,7 @@ function renderActivityCalendar() {
 	const SVG_H = HEAD_H + 7 * (CELL + GAP) + 4;
 
 	const heat = (v) => {
-		if (v === 0) return '#1e1e2e';
+		if (v === 0) return ThemeTokens.color('hue-1e1e2e');
 		const t = Math.pow(v / Math.max(1, max_v), 0.45);
 		if (t < 0.4)
 			return `rgb(${Math.round(40 + t * 60)},${Math.round(70 + t * 110)},${Math.round(50 + t * 30)})`;
@@ -1103,10 +1117,10 @@ function renderActivityCalendar() {
 	cells.forEach((c, i) => {
 		if (c.weekday !== 0) return; // only consider Monday cells for column header
 		const col = Math.floor(i / 7);
-		if (c.date.getDate() <= 7 && c.date.getMonth() !== last_label_month) {
-			last_label_month = c.date.getMonth();
+		if (c.date.getUTCDate() <= 7 && c.date.getUTCMonth() !== last_label_month) {
+			last_label_month = c.date.getUTCMonth();
 			const cx = LABEL_W + col * (CELL + GAP);
-			month_labels += `<text x="${cx}" y="12" fill="#888" font-size="10" font-family="system-ui">${MONTHS_FR_SHORT[c.date.getMonth()]}</text>`;
+			month_labels += `<text x="${cx}" y="12" fill="${ThemeTokens.color('grey-888')}" font-size="10" font-family="system-ui">${MONTHS_FR_SHORT[c.date.getUTCMonth()]}</text>`;
 		}
 	});
 
@@ -1114,7 +1128,7 @@ function renderActivityCalendar() {
 	let wd_labels = '';
 	[1, 3, 5].forEach((wd_i) => {
 		const cy = HEAD_H + wd_i * (CELL + GAP) + 9;
-		wd_labels += `<text x="0" y="${cy}" fill="#666" font-size="9" font-family="system-ui">${wd_labels_short[wd_i]}</text>`;
+		wd_labels += `<text x="0" y="${cy}" fill="${ThemeTokens.color('grey-666')}" font-size="9" font-family="system-ui">${wd_labels_short[wd_i]}</text>`;
 	});
 
 	let rects = '';
@@ -1128,7 +1142,7 @@ function renderActivityCalendar() {
 			return;
 		}
 		const fill = heat(c.value);
-		const dt = `${c.date.getDate()}/${c.date.getMonth() + 1}/${c.date.getFullYear()}`;
+		const dt = `${c.date.getUTCDate()}/${c.date.getUTCMonth() + 1}/${c.date.getUTCFullYear()}`;
 		const v_txt =
 			_calendarMode === 'time'
 				? c.value > 0
@@ -1211,7 +1225,7 @@ function renderCpmByHourChart(aggData) {
 			maintainAspectRatio: false,
 			interaction: { mode: 'index', intersect: false },
 			plugins: {
-				legend: { labels: { color: '#ddd', font: { size: 11 } } },
+				legend: { labels: { color: ThemeTokens.color('grey-ddd'), font: { size: 11 } } },
 				tooltip: {
 					callbacks: {
 						title: (items) => (items[0] ? items[0].label : '')
@@ -1220,30 +1234,30 @@ function renderCpmByHourChart(aggData) {
 			},
 			scales: {
 				x: {
-					ticks: { color: '#888', font: { size: 10 } },
+					ticks: { color: ThemeTokens.color('grey-888'), font: { size: 10 } },
 					grid: { color: 'rgba(255,255,255,0.04)' }
 				},
 				y_chars: {
 					type: 'linear',
 					position: 'left',
-					ticks: { color: '#888', font: { size: 10 } },
+					ticks: { color: ThemeTokens.color('grey-888'), font: { size: 10 } },
 					grid: { color: 'rgba(255,255,255,0.04)' },
 					title: {
 						display: true,
 						text: _t('ui_apps.axis_chars'),
-						color: '#888',
+						color: ThemeTokens.color('grey-888'),
 						font: { size: 10 }
 					}
 				},
 				y_cpm: {
 					type: 'linear',
 					position: 'right',
-					ticks: { color: '#f59e0b', font: { size: 10 } },
+					ticks: { color: ThemeTokens.color('hue-f59e0b'), font: { size: 10 } },
 					grid: { drawOnChartArea: false },
 					title: {
 						display: true,
 						text: _t('ui_apps.axis_speed'),
-						color: '#f59e0b',
+						color: ThemeTokens.color('hue-f59e0b'),
 						font: { size: 10 }
 					}
 				}

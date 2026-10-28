@@ -102,6 +102,39 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 		helpers.assert_eq(dispatched, "script_quit", "a genuine right-AltGr sentinel must dispatch its action")
 	end)
 
+	-- A chord the tap saw after the main thread held it (stale-physical-event)
+	-- is not acted on late: pause, reload or quit 1.2 s after the press is a
+	-- surprise, and macOS may already have delivered the key without the tap.
+	helpers.it("a genuine sentinel that waited behind the main thread passes untouched (stale-physical-event)", function()
+		local EventClock = require("adapters.event_clock")
+		local Health = require("infra.key_event_health")
+		EventClock.reset()
+		Health.reset()
+		local host_ns = 3600 * 1e9
+		local saved = _G.hs.timer.absoluteTime
+		_G.hs.timer.absoluteTime = function() return host_ns end
+		local ok, err = pcall(function()
+			local function stamped(ms_ago)
+				local event = make_event(ESCAPE_SENTINEL)
+				local stamp = math.floor(host_ns - ms_ago * 1e6)
+				event.timestamp = function() return stamp end
+				return event
+			end
+			dispatched = nil
+			live_mods = { _raw = 0x40 }
+			helpers.assert_eq(handler(stamped(1)), true, "a fresh genuine sentinel is consumed")
+			_G.hs.timer.__fire_all()
+			helpers.assert_eq(dispatched, "script_quit")
+			dispatched = nil
+			helpers.assert_eq(handler(stamped(1200)), false, "a late sentinel is not consumed")
+			_G.hs.timer.__fire_all()
+			helpers.assert_eq(dispatched, nil, "and runs nothing")
+			helpers.assert_eq(Health.counts().stale_passed, 1)
+		end)
+		_G.hs.timer.absoluteTime = saved
+		if not ok then error(err, 0) end
+	end)
+
 	-- F-HIGH-22 regression: a prior fix required a genuinely right-hand AltGr hold,
 	-- but three follow-up commits progressively widened KeyState.is_right_altgr_held()
 	-- until it also accepted a bare LEFT Option hold (deviceLeftAlternate) and even a

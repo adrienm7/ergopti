@@ -46,8 +46,8 @@ _OBP_Read(World, Index, Path) {
 	Values := OnboardingReadCurrentValues(Index, Path)
 	if World.Route != "init-error" && World.Route != "error-popup" {
 		AssertTrue(Values is Map, "the controlled boundary still reads the actual booted configuration")
-		AssertTrue(Values["metrics.metrics_enabled"] is TOML_Bool)
-		AssertTrue(Values["metrics.metrics_enabled"].Value)
+		AssertTrue(Values["metrics.enabled"] is TOML_Bool)
+		AssertTrue(Values["metrics.enabled"].Value)
 	} else
 		AssertTrue(Values is String, "the actual malformed source must produce its ordinary read refusal")
 	if World.Route != "error-popup"
@@ -123,7 +123,7 @@ _OBP_Publication(Route, Mode) {
 		Errors: 0, Popups: 0, Messages: 0, Transitions: 0, ReplacementHwnd: 0 }
 	Fixture := 0
 	try {
-		Fixture := _ScopeOwnerFixture('[metrics]`nmetrics_enabled = true`n')
+		Fixture := _ScopeOwnerFixture('[metrics]`nenabled = true`n')
 		ConfigurationFile := Fixture.path
 		_AhkSubDir := ""
 		_ConfigDir := Fixture.directory . "\"
@@ -137,7 +137,7 @@ _OBP_Publication(Route, Mode) {
 		OriginalHwnd := _OBP_StartWindow(World)
 		Epoch := _OnbWeb_SessionEpoch
 		if Route == "init-error" || Route == "error-popup"
-			AssertTrue(FSWriteDurable(Fixture.path, Fixture.source . '[metrics]`nmetrics_enabled = false`n'),
+			AssertTrue(FSWriteDurable(Fixture.path, Fixture.source . '[metrics]`nenabled = false`n'),
 				"an external invalid edit exercises a genuine read refusal without a second Boot")
 		SourceBefore := FSReadUtf8Exact(Fixture.path)
 		switch Route {
@@ -175,7 +175,7 @@ _OBP_Publication(Route, Mode) {
 						? "window.setMetricsPath({request:1" : Route == "preview-locale" ? "window.applyStrings(" : "window.initData("
 					AssertTrue(InStr(Script, Expected) == 1, "the actual current route still publishes its complete response")
 					if Route == "load" || Route == "init-read" || Route == "init-locale"
-						AssertContains(Script, '"metrics.metrics_enabled":true')
+						AssertContains(Script, '"metrics.enabled":true')
 				}
 			}
 		} else {

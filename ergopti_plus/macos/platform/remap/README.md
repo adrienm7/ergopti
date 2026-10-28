@@ -26,11 +26,32 @@ implemented today.
   application. Ergopti runs its own background runtime: the unmodified pqrs
   VirtualHIDDevice plus a self-signed headless fork of Karabiner-Elements
   16.3.0 (Core-Service, Console-User-Server, `karabiner_cli`) that also streams
-  the physical keys to the keylogger. It runs only while Tap-Hold is on, reads a
+  the physical keys to the keystats. It runs only while Tap-Hold is on, reads a
   complete configuration owned by Ergopti instead of the user's
   `~/.config/karabiner`, and, through the menu option « close other Karabiner
   instances » (on by default), quits any other active Karabiner while it runs.
   The HS-274 delivery plan lists the work packages that build it.
+
+  Dormant Lua side (WP6 and WP7): `runtime_owner.lua` admits the runtime (pinned
+  artifact, install, VirtualHIDDevice version through `runtime_vhid.lua`,
+  launchd jobs, other running Karabiner) and names every refusal, then requests
+  the physical capture. The signed launcher's installed-source role owns the
+  Console (ADR 011, decision 8), so the owner spawns no process and is ready
+  only when the capture admits its first stream. It is reached only when `config_karabiner.toml`
+  holds the hidden `[karabiner] runtime = "owned"`; the absent default is
+  `shared` and changes nothing. `ke_paths.lua` selects the command line tool of
+  the runtime once, `Generator.deploy_owned_config` writes the complete file
+  under `~/Library/Application Support/ErgoptiPlus/karabiner/`, and
+  `onboarding.health_check("owned")` checks the owned install. The real ports
+  (`adapters/runtime_owner_ports.lua`) observe read-only, bind the consented
+  closer of another Karabiner (`adapters/karabiner_coexistence.lua`, Karabiner's
+  own quit steps, hidden `[karabiner] close_other_instances`, default `true`) and
+  the capture port (`adapters/runtime_capture_port.lua` over
+  `adapters/installed_physical_source.lua`). The artifact comes from
+  `vendor/remap-runtime/manifest.json`, which stays unpinned until the hosted
+  build, so an opted-in boot reports `artifact_unpinned` today. The Swift lease
+  worker and guardian accept the owned `ergoptiplus_remap_cli` next to the shared
+  tool, and the guardian record names the runtime.
 
 ## « Ergopti uses Karabiner »
 
@@ -48,6 +69,21 @@ document it cannot prove. Turning the switch off removes the rules only after
 the exact lease reported `STOPPED` and the off decision was persisted. The
 Configuration menu's « Remove Ergopti from Karabiner » runs the same path, or
 only the cleanup when the switch is already off.
+
+## Virtual keyboard type
+
+`[layout] virtual_keyboard` in `config.toml` (Automatic, ISO or ANSI; declared
+once in the shared features manifest as `layout.virtual_keyboard`, tray row in
+the Keyboard layout menu) sets Karabiner's
+`virtual_hid_keyboard.keyboard_type_v2`. Automatic resolves to ANSI
+(`Layout.AUTOMATIC_VIRTUAL_KEYBOARD_PRODUCT`), which passes an Apple ISO
+keyboard's ISO key pair through unswapped (issue #99); an explicit choice is
+deployed as written and is never replaced by the active layout's keycode
+convention, which only tells which keycode a key arrives as. Every regeneration
+reads the choice through the source the boot registers
+(`set_virtual_keyboard_source`) and names the generated outputs for that
+product (`Layout.product_key_name`); choosing a value in the menu persists it
+and requests a regeneration.
 
 ## Exact-lease lifecycle
 
@@ -121,7 +157,7 @@ its rule from the user's `layers.toml` on every regeneration (no file, no rule).
 release before that appended verbatim; it is never deployed, only compared, to
 prove and remove an older unleased ErgoptiPlus block.
 
-The module optionally supplies its live managed output keycodes to `modules.keylogger.kc_bridge`; that set remains empty unless an exact lease has acknowledged `READY`. It is diagnostic only: the keylogger never suppresses a credit because a keycode is a managed output, since the same keycode is also a real key (HS-274).
+The module optionally supplies its live managed output keycodes to `modules.keystats.kc_bridge`; that set remains empty unless an exact lease has acknowledged `READY`. It is diagnostic only: the keystats never suppresses a credit because a keycode is a managed output, since the same keycode is also a real key (HS-274).
 
 ## Lifecycle API
 

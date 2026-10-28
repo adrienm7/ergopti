@@ -54,6 +54,11 @@ AppDirsLogExtension() {
 	return ".log"
 }
 
+; Pre-configuration log, always in the default logs folder.
+AppDirsLogBootstrapName() {
+	return "bootstrap.log"
+}
+
 ; Environment variable holding the default logs root.
 AppDirsWindowsLogsBaseEnv() {
 	return "LOCALAPPDATA"

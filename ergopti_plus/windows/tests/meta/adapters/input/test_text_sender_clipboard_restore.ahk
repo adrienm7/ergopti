@@ -1,30 +1,13 @@
 ﻿; tests/meta/adapters/input/test_text_sender_clipboard_restore.ahk
 
 ; ==============================================================================
-; MODULE: Clipboard Restore On Every Post-Write Bail-Out
+; MODULE: Clipboard Restore Requires Publication Ownership
 ; DESCRIPTION:
-; _TextSendClipboard writes the payload into the user's real clipboard before it
-; can paste it. From that moment on, EVERY exit path owns a cleanup obligation:
-; whatever else goes wrong, the user's own clipboard content has to come back.
-;
-; The obligation was met on four of the five post-write bail-outs. The fifth —
-; the one taken when CB_GetSequenceNumber() cannot produce an ownership proof —
-; returned without restoring, because the shared restore helper deliberately
-; refuses to act without that very proof. The two guards composed into a hole:
-; the helper's refusal was correct in isolation, and so was calling it, but on
-; this path calling it was the same as doing nothing. The injected text then sat
-; in the clipboard until the user next copied something, so the next Ctrl+V in
-; any application pasted an expansion — or a password the driver had just typed.
-;
-; The guards below pin the repaired branch, its sibling that always did the right
-; thing, and the property that makes the new helper worth having — that it does
-; NOT ask for the proof it exists to replace.
-;
-; There is deliberately no sweep demanding a restore on every post-write exit:
-; the branch taken when the sequence CHANGED must not restore, because another
-; owner holds the clipboard by then. A blanket rule would fail on that correct
-; answer, and a guard that punishes the right behaviour gets deleted rather than
-; obeyed.
+; An authenticated publication may restore on a later failure while its sequence
+; still matches. An unavailable receipt cannot authorize restoration: a newer
+; external copy may already have replaced the setter's content before return.
+; Keep the previous generation-only helper contract for its direct legacy tests,
+; but prohibit using it in the live unknown-publication branch.
 ;
 ; SCOPE: source introspection via the move-resilient driver-source helpers.
 ; ==============================================================================
@@ -43,7 +26,7 @@
 
 ; The write after which the cleanup obligation exists. Everything before it can
 ; return freely — the user's clipboard is still untouched at that point.
-global _TSCR_WRITE_CALL := "CB_Write("
+global _TSCR_WRITE_CALL := "CB_WriteTextWithReceipt("
 
 ; Any of these discharges the obligation on a bail-out path.
 global _TSCR_RESTORE_CALLS := ["_TextSendRestoreClipboard(", "_TextSendForceRestoreClipboard(", "CB_RestoreAll("]
@@ -81,7 +64,7 @@ _TSCR_HasRestore(Segment) {
 ; =========================
 
 ; The specific branch the fix is about, named so a regression reads clearly.
-_TSCR_OwnershipBailOutRestores() {
+_TSCR_OwnershipBailOutPreservesForeignCopy() {
 	Body := _DriverFuncBody("_TextSendClipboard")
 	Assert(Body != "", "_TextSendClipboard() must exist in the driver source")
 
@@ -97,8 +80,10 @@ _TSCR_OwnershipBailOutRestores() {
 	Assert(ReturnAt > BailAt, "the ownership-unavailable bail-out must return")
 	Segment := SubStr(Body, BailAt, ReturnAt - BailAt)
 
-	Assert(_TSCR_HasRestore(Segment),
-		"the bail-out taken when clipboard ownership cannot be proven must restore the user's clipboard before returning. CB_Write has already succeeded at that point, so returning without a restore leaves the injected payload — an expansion, or a password the driver just typed — in the clipboard for the next Ctrl+V in any application")
+	Assert(!_TSCR_HasRestore(Segment),
+		"an unknown publication must not authorize any restore over a newer external copy")
+	Assert(InStr(Segment, '_TextSenderInvokeCallback(Callback, false, "clipboard ownership unavailable")') > 0,
+		"unknown publication must report failure through the existing FIFO terminal owner")
 }
 
 ; The force variant only earns its existence by NOT requiring the proof its
@@ -150,8 +135,8 @@ _TSCR_ClipWaitTimeoutRestores() {
 ; ===============================
 ; ===============================
 
-Test("meta text-sender-clipboard: the ownership-unavailable bail-out restores the clipboard",
-	_TSCR_OwnershipBailOutRestores)
+Test("meta text-sender-clipboard: an unavailable receipt cannot restore over a newer copy",
+	_TSCR_OwnershipBailOutPreservesForeignCopy)
 Test("meta text-sender-clipboard: the force restore does not require the proof it exists to replace",
 	_TSCR_ForceRestoreDoesNotRequireTheProof)
 Test("meta text-sender-clipboard: the ClipWait-timeout bail-out restores the clipboard",

@@ -85,15 +85,24 @@ Test("llm_bridge: TickCount delta uses wrap-safe (now - last + 0x100000000) & 0x
 ; ==========================================================================
 
 _TTCWS_LoggerWrapSafe() {
-	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("infra/logger.ahk"))
-	Assert(Src != "", "infra/logger.ahk must be readable")
-
-	; Both halves of the wrap-safe formula must be present in the ERROR dedup path
-	Assert(InStr(Src, "0x100000000") > 0,
-		"infra/logger.ahk must use the wrap-safe constant 0x100000000 in ERROR dedup TickCount delta (F38)")
-	Assert(InStr(Src, "0xFFFFFFFF") > 0,
-		"infra/logger.ahk must mask with 0xFFFFFFFF in ERROR dedup TickCount delta (F38)")
+	; Keep the historical F38 registration below for replay compatibility.
+	; Whole-file constants can come from the separate repeat helper and cannot
+	; prove the width of the actual consecutive-dedup comparison.
+	Src := _DriverFuncBody("_LoggerEmitBody")
+	Assert(Src != "", "The real _LoggerEmitBody() body must exist before checking its native clock domain")
+	Code := _DriverMaskNonCode(&Src)
+	Assert(RegExMatch(Code, "\bNow\s*:=\s*_LoggerNowMs\s*\(") > 0,
+		"F38: the actual emitter must acquire the production suppression clock")
+	Assert(RegExMatch(Code, "\bMsgLine\s*==\s*_LOGGER_DEDUP_KEY\b") > 0,
+		"F38: the guard must constrain the real identical-line dedup path")
+	Assert(RegExMatch(Code, "\(\s*Now\s*-\s*_LastErrTime\s*\)\s*<\s*LOGGER_DEDUP_WINDOW_MS\b") > 0,
+		"F38: the actual dedup window must compare the untruncated native64 age")
+	AssertEqual(0, RegExMatch(Code, "i)\b(?:0x0*(?:100000000|ffffffff)|429496729[56])\b|(?<!&)&(?!&)|\b_LoggerElapsedMs\s*\("),
+		"F38: the emitter must not fold the age to DWORD or borrow the modulo32 repeat helper")
+	Assert(RegExMatch(Code, "\b_LastErrTime\s*:=\s*Now\b") > 0,
+		"F38: accepted emissions must retain the actual full-width clock origin")
 }
+
 Test("logger: ERROR dedup TickCount delta uses wrap-safe (now - last + 0x100000000) & 0xFFFFFFFF formula (F38)", _TTCWS_LoggerWrapSafe)
 
 
@@ -110,13 +119,13 @@ _TTCWS_WpmWidgetWrapSafe() {
 	Src := _TTCWS_StripLineComments(_DriverDirConcat("ui/wpm"))
 	Assert(Src != "", "ui/wpm sources must be readable")
 
-	; The wrap-safe delta helper must be present — this constant cannot appear in
-	; color values (ARGB uses 0xFFFFFFFF, not 0x100000000), so its presence
-	; unambiguously confirms the wrap-safe formula was applied (F35 fix).
-	Assert(InStr(Src, "0x100000000") > 0,
-		"wpm_widget.ahk must use the wrap-safe constant 0x100000000 in TickCount delta computation (F35)")
+	; A_TickCount is the 64-bit GetTickCount64 on the supported runtime, so the
+	; event-age helper measures through the canonical TickElapsed64 rather than
+	; a 32-bit wrap formula that would truncate a native-width tick (F35).
+	Assert(RegExMatch(Src, "_WPMWidget_TickDelta\(now, last\) => TickElapsed64\(last, now\)") > 0,
+		"wpm_widget.ahk must measure event ages through TickElapsed64 (F35)")
 }
-Test("wpm_widget: TickCount delta uses wrap-safe (now - last + 0x100000000) & 0xFFFFFFFF formula (F35)", _TTCWS_WpmWidgetWrapSafe)
+Test("wpm_widget: event ages use the native-width TickElapsed64 delta (F35)", _TTCWS_WpmWidgetWrapSafe)
 
 
 

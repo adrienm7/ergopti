@@ -216,12 +216,9 @@ class InstallerWarningTests(unittest.TestCase):
     def test_warns_and_names_the_exact_fix_command(self):
         clean = self._installer()
         printed: list[str] = []
-        with (
-            mock.patch.object(clean, "run_capture", return_value=REPORTER_LOCALECTL),
-            mock.patch(
-                "builtins.print",
-                side_effect=lambda *a, **k: printed.append(" ".join(str(x) for x in a)),
-            ),
+        with mock.patch.object(clean, "run_capture", return_value=REPORTER_LOCALECTL), mock.patch(
+            "builtins.print",
+            side_effect=lambda *a, **k: printed.append(" ".join(str(x) for x in a)),
         ):
             clean.warn_stale_system_keymap("ergopti_plus")
         joined = "\n".join(printed)
@@ -231,12 +228,9 @@ class InstallerWarningTests(unittest.TestCase):
     def test_says_nothing_when_there_is_no_leftover(self):
         clean = self._installer()
         printed: list[str] = []
-        with (
-            mock.patch.object(clean, "run_capture", return_value="X11 Layout: us\n"),
-            mock.patch(
-                "builtins.print",
-                side_effect=lambda *a, **k: printed.append(" ".join(str(x) for x in a)),
-            ),
+        with mock.patch.object(clean, "run_capture", return_value="X11 Layout: us\n"), mock.patch(
+            "builtins.print",
+            side_effect=lambda *a, **k: printed.append(" ".join(str(x) for x in a)),
         ):
             clean.warn_stale_system_keymap("ergopti_plus")
         self.assertEqual(printed, [])
@@ -246,10 +240,9 @@ class InstallerWarningTests(unittest.TestCase):
         # display manager. Reporting it is this installer's job; repointing it
         # silently is not.
         clean = self._installer()
-        with (
-            mock.patch.object(clean, "run_capture", return_value=REPORTER_LOCALECTL) as capture,
-            mock.patch("builtins.print"),
-        ):
+        with mock.patch.object(
+            clean, "run_capture", return_value=REPORTER_LOCALECTL
+        ) as capture, mock.patch("builtins.print"):
             clean.warn_stale_system_keymap("ergopti_plus")
         for call in capture.call_args_list:
             command = call.args[0]
@@ -383,14 +376,11 @@ class CleanInstallRetiresTheLegacyTreeTests(unittest.TestCase):
     def test_cleanup_calls_the_retirement(self):
         import xkb_files_installer_clean as clean
 
-        with (
-            mock.patch.object(clean, "remove_generation_two_links", return_value=0),
-            mock.patch.object(clean, "strip_legacy_evdev_patch", return_value=0),
-            mock.patch.object(
-                clean, "retire_legacy_installation", return_value=["symbols/fr"]
-            ) as retire,
-            mock.patch("builtins.print") as printed,
-        ):
+        with mock.patch.object(
+            clean, "remove_generation_two_links", return_value=0
+        ), mock.patch.object(clean, "strip_legacy_evdev_patch", return_value=0), mock.patch.object(
+            clean, "retire_legacy_installation", return_value=["symbols/fr"]
+        ) as retire, mock.patch("builtins.print") as printed:
             roots = mock.Mock(system_root=Path("/usr/share/X11/xkb"))
             clean.cleanup_previous_installations(roots)
         retire.assert_called_once_with(Path("/usr/share/X11/xkb"))
@@ -414,9 +404,8 @@ class CompileFenceCoversTheVariantTests(unittest.TestCase):
             seen.append(spec)
             return True
 
-        with (
-            mock.patch.object(clean, "verify_keymap", side_effect=record),
-            mock.patch("builtins.print"),
+        with mock.patch.object(clean, "verify_keymap", side_effect=record), mock.patch(
+            "builtins.print"
         ):
             self.assertTrue(
                 clean.compile_validation(Path("/tmp/staging"), "ergopti", "ergopti_plus")
@@ -432,12 +421,9 @@ class CompileFenceCoversTheVariantTests(unittest.TestCase):
 
     def test_issue_84_french_variant_failure_aborts_the_install(self):
         clean = self._installer()
-        with (
-            mock.patch.object(
-                clean, "verify_keymap", side_effect=lambda spec, *a, **k: spec.layout != "fr"
-            ),
-            mock.patch("builtins.print"),
-        ):
+        with mock.patch.object(
+            clean, "verify_keymap", side_effect=lambda spec, *a, **k: spec.layout != "fr"
+        ), mock.patch("builtins.print"):
             self.assertFalse(clean.compile_validation(Path("/tmp/staging"), "ergopti", "ergopti"))
 
     def test_a_variant_that_fails_the_fence_aborts_the_install(self):
@@ -446,9 +432,8 @@ class CompileFenceCoversTheVariantTests(unittest.TestCase):
         def reject_the_variant(spec, *args, **kwargs):
             return spec.variant == ""
 
-        with (
-            mock.patch.object(clean, "verify_keymap", side_effect=reject_the_variant),
-            mock.patch("builtins.print"),
+        with mock.patch.object(clean, "verify_keymap", side_effect=reject_the_variant), mock.patch(
+            "builtins.print"
         ):
             self.assertFalse(
                 clean.compile_validation(Path("/tmp/staging"), "ergopti", "ergopti_plus")
@@ -456,9 +441,8 @@ class CompileFenceCoversTheVariantTests(unittest.TestCase):
 
     def test_a_host_with_no_compiler_still_installs(self):
         clean = self._installer()
-        with (
-            mock.patch.object(clean, "verify_keymap", return_value=None),
-            mock.patch("builtins.print"),
+        with mock.patch.object(clean, "verify_keymap", return_value=None), mock.patch(
+            "builtins.print"
         ):
             self.assertTrue(
                 clean.compile_validation(Path("/tmp/staging"), "ergopti", "ergopti_plus")
@@ -467,12 +451,9 @@ class CompileFenceCoversTheVariantTests(unittest.TestCase):
     def test_the_layout_alone_is_still_checked_without_a_variant(self):
         clean = self._installer()
         seen: list[LayoutSpec] = []
-        with (
-            mock.patch.object(
-                clean, "verify_keymap", side_effect=lambda spec, *a, **k: seen.append(spec) or True
-            ),
-            mock.patch("builtins.print"),
-        ):
+        with mock.patch.object(
+            clean, "verify_keymap", side_effect=lambda spec, *a, **k: seen.append(spec) or True
+        ), mock.patch("builtins.print"):
             self.assertTrue(clean.compile_validation(Path("/tmp/staging"), "ergopti"))
         self.assertEqual(seen, [LayoutSpec("ergopti", "")])
 

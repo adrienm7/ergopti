@@ -23,12 +23,23 @@ local RETIRED_KEYS = {
 	"karabiner.enable_failed",
 }
 
--- The texts about the F2 switch itself: they must name what they switch.
+-- The texts about a Karabiner decision the user makes: they must name what
+-- they decide. The F2 switch, and the Layout row choosing the type of
+-- Karabiner's virtual keyboard (which keycodes the two ISO-only keys reach).
 local SWITCH_KEYS = {
 	["menu.global.karabiner_integration"] = true,
 	["menu.global.remove_from_karabiner"] = true,
 	["menu.tapholds.karabiner_off_hint"] = true,
 	["notify.karabiner.removed"] = true,
+	["menu.layout.virtual_keyboard"] = true,
+}
+
+-- The Debug menu's field checks exist so the maintainer can test the remap
+-- engine on a Mac; their rows must say what they test, and they are shown
+-- only in the Debug submenu.
+local DEBUG_FIELD_CHECK_KEYS = {
+	["menu.debug.field_check_lease"] = true,
+	["menu.debug.field_check_owned_runtime"] = true,
 }
 
 --- Reads one file whole.
@@ -116,7 +127,8 @@ helpers.describe("no macOS tray text names Karabiner, in any locale", function()
 			helpers.assert_true(type(locale) == "table", code .. ".json must decode")
 			for _, key in ipairs(tray_keys()) do
 				local value = locale[key]
-				if type(value) == "string" and not SWITCH_KEYS[key] then
+				if type(value) == "string" and not SWITCH_KEYS[key]
+					and not DEBUG_FIELD_CHECK_KEYS[key] then
 					helpers.assert_nil(value:lower():find("karabiner", 1, true),
 						key .. " names the remap engine in " .. code .. ".json: " .. value)
 				end

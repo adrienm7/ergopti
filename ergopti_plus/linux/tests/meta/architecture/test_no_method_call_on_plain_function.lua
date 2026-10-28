@@ -33,7 +33,7 @@ local helpers = require("tests.helpers")
 
 -- Where a bridge's injected module lives. All of them follow the same shape, so
 -- a new one is covered the day it lands rather than the day someone adds it here.
-local RECEIVERS = { "state.llm", "state.keylogger", "state.gestures", "state.shortcuts" }
+local RECEIVERS = { "state.llm", "state.keystats", "state.gestures", "state.shortcuts" }
 
 --- Every .lua file under the driver, tests excluded.
 --- @return table Array of { path, source }.
@@ -111,7 +111,7 @@ helpers.describe("module calls: the table is never passed as self", function()
 					-- `llm:set_x(`, `state.llm:set_x(` and friends. Restricted to the
 					-- known receivers so a legitimate `self:method()` inside an object
 					-- module is not swept up with them.
-					for _, receiver in ipairs({ "llm", "keylogger", "gestures", "shortcuts", "updater" }) do
+					for _, receiver in ipairs({ "llm", "keystats", "gestures", "shortcuts", "updater" }) do
 						if line:find("%f[%w]" .. receiver .. ":[a-z_]+%(") then
 							offenders[#offenders + 1] = file.path .. ": " .. line:gsub("^%s+", "")
 						end

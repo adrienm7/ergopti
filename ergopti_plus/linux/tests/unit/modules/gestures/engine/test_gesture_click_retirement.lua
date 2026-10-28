@@ -1,6 +1,7 @@
 --- tests/unit/modules/gestures/engine/test_gesture_click_retirement.lua
 
 --- Real manager/lifecycle with explicit native process admission and settlement.
+local Errors = require("adapter_errors")
 local helpers = require("tests.helpers")
 local function with_manager(body)
 	local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
@@ -43,7 +44,7 @@ local function with_manager(body)
 			local called, ack = pcall(record, "xdotool " .. args[1] .. " " .. args[2])
 			if not state.hold then
 				op.result, op.settled = { ok = called and ack == true,
-					error = (not called or ack ~= true) and "process exited unsuccessfully" or nil,
+					error = (not called or ack ~= true) and Errors.PROCESS_EXITED_UNSUCCESSFULLY or nil,
 					exit_code = (called and ack == true) and 0 or 1,
 					stdout = "PRIVATE_PROCESS_OUTPUT", stderr = "PRIVATE_PROCESS_ERROR" }, true
 			end
@@ -288,7 +289,7 @@ helpers.describe("gesture click retirement", function()
 				manager.execute_action("left_click_toggle", "left")
 				if category == "deadline" then
 					local op = state.operations[1]
-					op.result, op.settled = { ok = false, error = "process deadline exceeded", stderr = "PRIVATE_PROCESS_ERROR" }, true
+					op.result, op.settled = { ok = false, error = Errors.PROCESS_DEADLINE_EXCEEDED, stderr = "PRIVATE_PROCESS_ERROR" }, true
 				end
 				state.harvest()
 				helpers.assert_eq(#state.diagnostics, 1, "native failure must not disappear silently")
@@ -352,7 +353,7 @@ helpers.describe("gesture click retirement", function()
 		with_manager(function(manager, state)
 			state.hold = true; manager.execute_action("left_click_toggle", "left")
 			local op = state.operations[1]
-			op.result, op.settled = { ok = false, exit_code = 5, error = "process exited unsuccessfully" }, true
+			op.result, op.settled = { ok = false, exit_code = 5, error = Errors.PROCESS_EXITED_UNSUCCESSFULLY }, true
 			state.paused, state.hold = true, false
 			state.harvest()
 			helpers.assert_eq(#state.diagnostics, 1)
@@ -366,7 +367,7 @@ helpers.describe("gesture click retirement", function()
 		with_manager(function(manager, state)
 			state.hold = true; manager.execute_action("left_click_toggle", "left")
 			local op = state.operations[1]
-			op.result = { ok = false, error = "process deadline exceeded" }
+			op.result = { ok = false, error = Errors.PROCESS_DEADLINE_EXCEEDED }
 			state.harvest()
 			helpers.assert_eq(#state.diagnostics, 1, "terminal failure must be visible even when group retirement is not")
 			helpers.assert_contains(state.diagnostics[1].line, "deadline")

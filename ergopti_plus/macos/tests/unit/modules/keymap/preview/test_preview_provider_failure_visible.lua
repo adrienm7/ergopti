@@ -24,7 +24,7 @@ local function run_scenario()
 		"modules.keymap.registry_groups",
 		"modules.keymap.registry_index",
 		"modules.keymap.utils",
-		"modules.keylogger",
+		"modules.keystats",
 		"modules.llm",
 		"modules.llm.prediction_engine",
 		"modules.diagnostics.hid_diagnostic_mailbox",
@@ -88,7 +88,7 @@ local function run_scenario()
 		tokens_from_repl = function(value) return value end,
 		plain_text = function(value) return value end,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		log_hotstring_suggested = function() end,
 		log_hotstring_dismissed = function() end,
 	}

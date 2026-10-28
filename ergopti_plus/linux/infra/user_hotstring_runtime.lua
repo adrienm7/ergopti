@@ -34,7 +34,7 @@ function M.new(options)
 		if buffer:sub(-(#rule.suffix + #magic)) ~= rule.suffix .. magic then return nil end
 		local count = Utf8.len(rule.suffix) + 1
 		local timing = engine:tail_timing_receipt(count)
-		if not Engine.within_interkey_delay(timing, seconds, Monotonic.resolution_ms()) then return nil end
+		if not Engine.within_expansion_delay(timing, seconds, Monotonic.resolution_ms()) then return nil end
 		return { destination = destination, input = input_epoch, buffer = buffer,
 			magic = magic, focus_epoch = options.detector.currentEpoch() }
 	end
@@ -49,8 +49,8 @@ function M.new(options)
 			or capture.magic ~= options.magic.get()
 			or capture.focus_epoch ~= options.detector.currentEpoch() then return false end
 		local foreground = options.window_info and options.window_info.getFocused()
-		if not foreground or foreground.appId == "" or options.keylogger.is_password_app(foreground.appId)
-			or options.keylogger.is_private_window(foreground.windowTitle) then return false end
+		if not foreground or foreground.appId == "" or options.keystats.is_password_app(foreground.appId)
+			or options.keystats.is_private_window(foreground.windowTitle) then return false end
 		return Destination.current(capture.destination) == true
 	end
 
@@ -70,8 +70,8 @@ function M.new(options)
 	function native.publication_current(capture)
 		if native.publication_cached(capture) ~= true then return false end
 		local foreground = options.window_info and options.window_info.getFocused()
-		if not foreground or foreground.appId == "" or options.keylogger.is_password_app(foreground.appId)
-			or options.keylogger.is_private_window(foreground.windowTitle) then return false end
+		if not foreground or foreground.appId == "" or options.keystats.is_password_app(foreground.appId)
+			or options.keystats.is_private_window(foreground.windowTitle) then return false end
 		return Destination.current(capture.destination) == true and native.publication_cached(capture) == true
 	end
 

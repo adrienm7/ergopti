@@ -16,8 +16,8 @@ local Shell = require("adapters.shell_runner")
 local Prompt = require("ui.text_prompt")
 local I18n = require("infra.i18n")
 local Logger = require("logger.shim")
-local ENABLED = "hotstrings.dynamic.user_code.enabled"
-local TIME = "hotstrings.dynamic.user_code.time_activation_seconds"
+local ENABLED = require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED
+local TIME = require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS
 local Publication = require("dynamic_hotstrings.menu_publication").new()
 
 --- Builds declared controls for the daemon's exact programmable runtime.

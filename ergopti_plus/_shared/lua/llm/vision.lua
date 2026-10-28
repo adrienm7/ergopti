@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 
 
@@ -176,7 +177,7 @@ function M.extract(block, tag)
 	local at = block:upper():find(tag:upper(), 1, true)
 	if not at then return nil end
 	local text = block:sub(at + #tag):gsub("%*%*", "")
-	text = text:match("^%s*(.-)%s*$")
+	text = TextUtils.trim(text)
 	if text == "" then return nil end
 	return text
 end

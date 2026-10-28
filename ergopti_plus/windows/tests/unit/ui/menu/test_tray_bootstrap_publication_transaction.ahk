@@ -636,3 +636,202 @@ _TBPT_NativeFailureRestoresCritical() {
 
 Test("startup native adapter: unique complete publication owner", _TBPT_NativeOwnerIsAdapter)
 Test("startup native adapter: original failure and caller critical state survive publication", _TBPT_NativeFailureRestoresCritical)
+
+
+_TBPR_Schedule(State, Callback, Delay) {
+	AssertEqual(-1, Delay, "startup delivery retains a one-shot native period")
+	State["attempts"] += 1
+	if State["retain_before_failure"] || !State["refuse"]
+		State["timers"].Push(Callback)
+	if State["refuse"]
+		throw State["failure"]
+}
+
+_TBPR_CommandRequestFailure(Id) {
+	State := Map("refuse", true, "retain_before_failure", false, "attempts", 0,
+		"timers", [], "calls", [], "failure", Error("Private startup scheduler refusal."))
+	Owner := TrayStartupCommands(() => Id == "quit", (Command) => State["calls"].Push(Command),
+		_TBPR_Schedule.Bind(State))
+	try {
+		Caught := 0
+		try Owner.Request(Id)
+		catch Any as Failure
+			Caught := Failure
+		AssertTrue(Caught == State["failure"], "the exact admission error must propagate")
+		AssertEqual(0, State["calls"].Length)
+		AssertEqual("", Owner.Pending,
+			"an unadmitted request cannot permanently reserve the startup command owner")
+		State["refuse"] := false
+		AssertTrue(Owner.Request(Id), "the caller must be able to retry after a native admission refusal")
+		AssertEqual(1, State["timers"].Length)
+		State["timers"][1].Call()
+		AssertEqual(1, State["calls"].Length)
+		AssertEqual(Id, State["calls"][1])
+	} finally Owner.Retire()
+}
+for _TBPR_Command in ["reload", "quit"]
+	Test("tray startup: failed " . _TBPR_Command . " scheduling leaves admission retryable (tray-startup-schedule-refusal)",
+		_TBPR_CommandRequestFailure.Bind(_TBPR_Command))
+
+_TBPR_AcceptedCommandKeepsIntent() {
+	State := Map("ready", false, "refuse", true, "retain_before_failure", false, "attempts", 0,
+		"timers", [], "calls", [], "failure", Error("Private startup scheduler refusal."))
+	Owner := TrayStartupCommands(() => State["ready"], (Command) => State["calls"].Push(Command),
+		_TBPR_Schedule.Bind(State))
+	try {
+		AssertTrue(Owner.Request("suspend"))
+		AssertEqual(0, State["attempts"], "accepted cold suspension waits for actual readiness")
+		State["ready"] := true
+		Caught := 0
+		try Owner.NotifyReady()
+		catch Any as Failure
+			Caught := Failure
+		AssertTrue(Caught == State["failure"])
+		AssertEqual("suspend", Owner.Pending,
+			"failure to deliver a previously accepted command must retain its original intent")
+		AssertFalse(Owner.Request("reload"), "a new command cannot replace that accepted intent")
+		State["refuse"] := false
+		AssertTrue(Owner.NotifyReady())
+		State["timers"][1].Call()
+		AssertEqual(1, State["calls"].Length)
+		AssertEqual("suspend", State["calls"][1])
+	} finally Owner.Retire()
+}
+Test("tray startup: failed delivery keeps an already accepted command (tray-startup-schedule-refusal)",
+	_TBPR_AcceptedCommandKeepsIntent)
+
+_TBPR_ClickScheduleFailure(RetainBeforeFailure) {
+	State := Map("ready", false, "refuse", true, "retain_before_failure", RetainBeforeFailure,
+		"attempts", 0, "timers", [], "shown", 0, "failure", Error("Private startup scheduler refusal."))
+	Owner := TrayStartupClick(() => State["ready"], () => State["shown"] += 1,
+		_TBPR_Schedule.Bind(State), (*) => 0)
+	try {
+		AssertEqual(0, Owner.OnTrayMessage(0, 0x205, 0x404, 0))
+		AssertTrue(Owner.Pending)
+		State["ready"] := true
+		Caught := 0
+		try Owner.NotifyReady()
+		catch Any as Failure
+			Caught := Failure
+		AssertTrue(Caught == State["failure"], "the actual scheduling failure remains visible")
+		AssertTrue(Owner.Pending, "failed readiness delivery cannot lose the retained native menu request")
+		AssertFalse(Owner.Scheduled, "failure cannot counterfeit a scheduled native callback")
+		if RetainBeforeFailure {
+			State["timers"][1].Call()
+			AssertEqual(0, State["shown"], "a callback retained by the failed admission has no display authority")
+		}
+		State["refuse"] := false
+		AssertTrue(Owner.NotifyReady(), "readiness can retry the same accepted menu request")
+		State["timers"][State["timers"].Length].Call()
+		AssertEqual(1, State["shown"], "the successful retry displays the actual request once")
+		AssertFalse(Owner.Pending)
+		AssertFalse(Owner.Scheduled)
+	} finally Owner.CancelPending()
+}
+for _TBPR_RetainBeforeFailure in [false, true]
+	Test("tray startup: failed native menu scheduling retries after partial=" . _TBPR_RetainBeforeFailure
+		. " admission (tray-startup-schedule-refusal)", _TBPR_ClickScheduleFailure.Bind(_TBPR_RetainBeforeFailure))
+
+
+_TBPR_ReentrantCommand(State, Id) {
+	State["calls"].Push(Id)
+	if State["calls"].Length == 1
+		AssertTrue(State["owner"].Request(Id), "the completed request may admit a distinct successor with the same command id")
+}
+
+_TBPR_ReentrantSchedule(State, Callback, Delay) {
+	State["attempts"] += 1
+	if State["attempts"] == 1 {
+		State["owner"].Dispatch()
+		throw State["failure"]
+	}
+	State["timers"].Push(Callback)
+}
+
+_TBPR_ReentrantRequestKeepsSuccessor() {
+	State := Map("owner", 0, "calls", [], "timers", [], "attempts", 0,
+		"failure", Error("Private first startup scheduler refusal."))
+	Owner := TrayStartupCommands(() => true, _TBPR_ReentrantCommand.Bind(State),
+		_TBPR_ReentrantSchedule.Bind(State))
+	State["owner"] := Owner
+	try {
+		Caught := 0
+		try Owner.Request("reload")
+		catch Any as Failure
+			Caught := Failure
+		AssertTrue(Caught == State["failure"])
+		AssertEqual(1, State["calls"].Length)
+		AssertEqual("reload", Owner.Pending,
+			"rollback of the older admission cannot erase a new request carrying the same command id")
+		AssertEqual(1, State["timers"].Length)
+		State["timers"][1].Call()
+		AssertEqual(2, State["calls"].Length)
+		AssertEqual("", Owner.Pending)
+	} finally {
+		Owner.Retire()
+		State["owner"] := 0
+		State["timers"] := []
+	}
+}
+Test("tray startup: failed admission preserves a reentrant same-id successor (tray-startup-recovery-edges)",
+	_TBPR_ReentrantRequestKeepsSuccessor)
+
+_TBPR_CancelingSchedule(State, Callback, Delay) {
+	State["callback"] := Callback
+	State["owner"].CancelPending()
+	throw State["failure"]
+}
+
+_TBPR_ClickCancellationWinsFailure() {
+	State := Map("ready", false, "shown", 0, "owner", 0, "callback", 0,
+		"failure", Error("Private cancelled scheduler refusal."))
+	Owner := TrayStartupClick(() => State["ready"], () => State["shown"] += 1,
+		_TBPR_CancelingSchedule.Bind(State), (*) => 0)
+	State["owner"] := Owner
+	try {
+		Owner.OnTrayMessage(0, 0x205, 0x404, 0)
+		State["ready"] := true
+		Caught := 0
+		try Owner.NotifyReady()
+		catch Any as Failure
+			Caught := Failure
+		AssertTrue(Caught == State["failure"])
+		AssertFalse(Owner.Pending, "explicit cancellation cannot be undone by an older failed admission")
+		AssertFalse(Owner.Scheduled)
+		AssertFalse(Owner.NotifyReady(), "a cancelled user request cannot be rescheduled")
+		State["callback"].Call()
+		AssertEqual(0, State["shown"], "the old queued callback remains inert after cancellation")
+	} finally {
+		Owner.CancelPending()
+		State["owner"] := 0, State["callback"] := 0
+	}
+}
+Test("tray startup: explicit cancellation wins over scheduler rollback (tray-startup-recovery-edges)",
+	_TBPR_ClickCancellationWinsFailure)
+
+_TBPR_ClickUnreadinessRetainsRequest() {
+	State := Map("ready", false, "shown", 0, "timers", [])
+	Owner := TrayStartupClick(() => State["ready"], () => State["shown"] += 1,
+		(Fn, Delay) => State["timers"].Push(Fn), (*) => 0)
+	try {
+		Owner.OnTrayMessage(0, 0x205, 0x404, 0)
+		State["ready"] := true
+		AssertTrue(Owner.NotifyReady())
+		State["ready"] := false
+		State["timers"][1].Call()
+		AssertEqual(0, State["shown"], "native navigation waits while root publication is unavailable")
+		AssertTrue(Owner.Pending, "temporary unreadiness must retain the actual accepted request")
+		AssertFalse(Owner.Scheduled, "the completed one-shot cannot remain a counterfeit native owner")
+		State["ready"] := true
+		AssertTrue(Owner.NotifyReady(), "the next actual root publication must release the retained request")
+		State["timers"][2].Call()
+		AssertEqual(1, State["shown"])
+		AssertFalse(Owner.Pending)
+		AssertFalse(Owner.Scheduled)
+	} finally {
+		Owner.CancelPending()
+		State["timers"] := []
+	}
+}
+Test("tray startup: temporary unreadiness retains deferred native navigation (tray-startup-recovery-edges)",
+	_TBPR_ClickUnreadinessRetainsRequest)

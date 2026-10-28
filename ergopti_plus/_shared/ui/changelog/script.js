@@ -142,7 +142,7 @@ var _restorePath = '';
  * @return {boolean}
  */
 function _detectNativeHost() {
-	if (window.__ergopti_host === 'linux') return true;
+	if (hostHasCapability('document_bridge')) return true;
 	if (
 		window.chrome &&
 		window.chrome.webview &&
@@ -200,7 +200,7 @@ function _hostBackup(value) {
 
 var postBridgeMessage = makeHostBridge('changelog_bridge');
 
-if (window.__ergopti_host === 'linux') {
+if (hostHasCapability('document_bridge')) {
 	window.__hostBridgeResponse = function (bridge, isBase64, payload) {
 		if (bridge !== 'changelog_bridge') return;
 		var response = decodeHostBridgeResponse(isBase64, payload);
@@ -440,10 +440,10 @@ function applyLabels() {
 	_renderSubscribeBanner();
 
 	var btnGh = document.getElementById('btn-github');
-	if (btnGh) btnGh.textContent = _t('changelog_window.open_github') || 'Voir sur GitHub ↗';
+	if (btnGh) btnGh.textContent = _t('changelog_window.open_github');
 
 	var btnRetry = document.getElementById('btn-retry');
-	if (btnRetry) btnRetry.textContent = _t('changelog_window.retry') || 'Réessayer';
+	if (btnRetry) btnRetry.textContent = _t('changelog_window.retry');
 
 	var btnPage = document.getElementById('btn-releases-page');
 	var pageLabel = _t('changelog_window.open_releases_page');
@@ -662,7 +662,14 @@ function _endLoad() {
  * @param {number} token - Load that owns this request.
  */
 function _clientFetch(channel, token) {
-	var url = 'https://api.github.com/repos/' + _ghOwner + '/' + _ghRepo + '/releases?per_page=20';
+	var url =
+		'https://' +
+		ERGOPTI_IDENTIFIERS.hosts.github_api +
+		'/repos/' +
+		_ghOwner +
+		'/' +
+		_ghRepo +
+		'/releases?per_page=20';
 	if (typeof fetch !== 'function') {
 		injectError(_t('changelog_window.error_network'));
 		return;
@@ -727,7 +734,7 @@ function renderReleaseList() {
 	if (_releases.length === 0) {
 		var empty = document.createElement('div');
 		empty.style.cssText = 'color:#555;font-size:12px;padding:16px 14px;';
-		empty.textContent = _t('changelog_window.no_releases') || 'Aucune version trouvée.';
+		empty.textContent = _t('changelog_window.no_releases');
 		list.appendChild(empty);
 		return;
 	}
@@ -753,12 +760,12 @@ function renderReleaseList() {
 		if (release.prerelease) {
 			var badge = document.createElement('div');
 			badge.className = 'release-item-badge badge-prerelease';
-			badge.textContent = _t('changelog_window.badge_prerelease') || 'pre-release';
+			badge.textContent = _t('changelog_window.badge_prerelease');
 			item.appendChild(badge);
 		} else if (idx === 0) {
 			var badge2 = document.createElement('div');
 			badge2.className = 'release-item-badge badge-latest';
-			badge2.textContent = _t('changelog_window.badge_latest') || 'latest';
+			badge2.textContent = _t('changelog_window.badge_latest');
 			item.appendChild(badge2);
 		}
 		if (_isInstalled(release)) {
@@ -932,7 +939,8 @@ function openOnGitHub() {
 	var url = _currentReleaseUrl;
 	if (!_isAllowedRepositoryUrl(url)) {
 		// Fall back to the releases index.
-		url = 'https://github.com/' + _ghOwner + '/' + _ghRepo + '/releases';
+		url =
+			'https://' + ERGOPTI_IDENTIFIERS.hosts.github + '/' + _ghOwner + '/' + _ghRepo + '/releases';
 	}
 	_postChangelogMessage({ action: 'open_url', url: url });
 }
@@ -941,7 +949,8 @@ function openOnGitHub() {
 function openReleasesPage() {
 	_postChangelogMessage({
 		action: 'open_url',
-		url: 'https://github.com/' + _ghOwner + '/' + _ghRepo + '/releases'
+		url:
+			'https://' + ERGOPTI_IDENTIFIERS.hosts.github + '/' + _ghOwner + '/' + _ghRepo + '/releases'
 	});
 }
 

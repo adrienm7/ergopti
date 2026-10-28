@@ -103,7 +103,7 @@ _LAG_AutoWithAiOff() {
 			_LAG_AssertNoPrediction(Fx, Before)
 			; An expansion the hotstring engine mirrors reaches the agent's context only
 			PreviousCritical := Critical("On")
-			try _HSE_MirrorCanonicalEffectToLlm({ DeleteFromEnd: 5, InsertedText: "contrat" })
+			try _HSE_MirrorCanonicalEffectToLlm({ IsPrivate: false, DeleteFromEnd: 5, InsertedText: "contrat" })
 			finally Critical(PreviousCritical)
 			AssertEqual("Bonjour. On se voit jeudi 14h avec Paul pour le contrat", _LLM_Bridge_AgentBuffer,
 				"the expansion reached the agent's context")
@@ -300,7 +300,7 @@ Test("LLM agent: agent-only context matches native Unicode Backspace (unicode-er
 	_LAG_UnicodePhysicalBackspace.Bind(false))
 
 
-/** Cache lifetime applies to actual enumerated tools across unsigned tick wrap. */
+/** Cache lifetime applies to actual enumerated tools across the native 64-bit clock domain. */
 _LAG_ToolsCacheLifetime(StartTick) {
 	_LAG_RunConnectors("", _Body)
 	_Body(Fx) {
@@ -316,11 +316,11 @@ _LAG_ToolsCacheLifetime(StartTick) {
 		AssertEqual(1, State.Reads, "initial force actually enumerates the folder")
 		AssertEqual("old", Initial["names"][1])
 		State.Files := ["C:\tools\new.cmd"]
-		Before := (StartTick + LLM_AGENT_TOOLS_TTL_MS - 1) & 0xFFFFFFFF
+		Before := StartTick + LLM_AGENT_TOOLS_TTL_MS - 1
 		Cached := LLM_AgentConnector_Tools(Config, false, Before)
 		AssertEqual(1, State.Reads, "strictly before expiry the cache is reused")
 		AssertEqual(ObjPtr(Initial), ObjPtr(Cached), "reuse retains the same cache owner")
-		Now := (StartTick + LLM_AGENT_TOOLS_TTL_MS) & 0xFFFFFFFF
+		Now := StartTick + LLM_AGENT_TOOLS_TTL_MS
 		Refreshed := LLM_AgentConnector_Tools(Config, false, Now)
 		AssertEqual(2, State.Reads, "at the exact TTL the folder must be enumerated again")
 		AssertEqual("new", Refreshed["names"][1], "removed tools disappear from the prompt list")
@@ -331,9 +331,43 @@ _LAG_ToolsCacheLifetime(StartTick) {
 		Forced := LLM_AgentConnector_Tools(Config, true, Now)
 		AssertEqual(3, State.Reads, "explicit force still bypasses a fresh cache")
 		AssertEqual("forced", Forced["names"][1])
+		Retained := LLM_AgentConnector_Tools(Config, false, Now - 1)
+		AssertEqual("forced", Retained["names"][1], "an older caller clock accepts the newer snapshot")
+		AssertEqual("C:\tools\forced.ahk", Retained["paths"]["forced"])
 	}
 }
 Test("LLM agent: tool cache expires at its exact ordinary TTL (tools-cache-wrap)",
 	_LAG_ToolsCacheLifetime.Bind(100))
 Test("LLM agent: tool cache expires across tick wrap (tools-cache-wrap)",
 	_LAG_ToolsCacheLifetime.Bind(0xFFFFFFF0))
+
+#Include test_llm_agent_tools_native64_ttl.ahk
+
+; A caret move changes the typing location even when only the agent observes.
+_LAG_CaretContext(Key, Reset) {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		_LAG_WithBridgeOff(_Typing)
+		_Typing() {
+			global _LLM_Bridge_AgentBuffer
+			Before := _LAG_PredictionSnapshot(Fx)
+			_LAG_TypeThroughBridge(Fx, "OLD_LOCATION_ASCII_SENTINEL ")
+			AssertEqual("OLD_LOCATION_ASCII_SENTINEL ", _LLM_Bridge_AgentBuffer,
+				"the real agent typing observer must hold the original location")
+			LLM_Bridge_FeedKeyDownIfActive(GetKeyVK(Key), true)
+			_LAG_TypeThroughBridge(Fx, "new location")
+			Expected := Reset ? "new location" : "OLD_LOCATION_ASCII_SENTINEL new location"
+			AssertEqual(Expected, _LLM_Bridge_AgentBuffer,
+				"typing after navigation must not append to the previous caret location")
+			_LAG_AssertNoPrediction(Fx, Before)
+			AssertEqual(0, Fx.Remote.Length, "observing typing must not dispatch a request")
+			AssertEqual(0, Sent.Length, "observing typing must not send keys")
+		}
+	}
+}
+
+for _LAG_CaretKey in ["Left", "Up", "Right", "Down", "Home", "End", "PgUp", "PgDn", "Insert", "Delete"]
+	Test("LLM agent off: " . _LAG_CaretKey . " retires the old typing location (agent-caret-context)",
+		_LAG_CaretContext.Bind(_LAG_CaretKey, true))
+Test("LLM agent off: modifier preserves the typing location (agent-caret-context)",
+	_LAG_CaretContext.Bind("LShift", false))

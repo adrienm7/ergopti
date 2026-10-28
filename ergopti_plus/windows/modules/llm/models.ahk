@@ -68,6 +68,8 @@ global _LLM_PresetsCache := unset
 ; Maps with the per-model metadata the prediction engine consumes.
 global _LLM_IndexCache := unset
 
+global _LLM_BackendBrandsCache := unset
+
 
 
 
@@ -155,7 +157,7 @@ LLM_GetModelInfo(display_name) {
 	return Map(
 		"ollama", "", "mlx", "",
 		"params_b", 0.0, "active_b", 0.0,
-		"ram_gb", 0.0, "speed_tok_s", 0,
+		"ram_gb", 0.0, "disk_gb", 0.0, "speed_tok_s", 0,
 		"type", "chat"
 	)
 }
@@ -306,6 +308,111 @@ _LLM_LoadPresets() {
 }
 
 /**
+ * The brand and emoji of every AI backend, read once from the shared
+ * _shared/modules/llm/backends.json that macOS, Linux and the model selector
+ * page read too. A missing or malformed file is a broken install: it throws.
+ * @returns {Map} Backend id → Map("brand", "emoji", "kind").
+ */
+LLM_GetBackendBrands() {
+	global _LLM_BackendBrandsCache
+	if IsSet(_LLM_BackendBrandsCache)
+		return _LLM_BackendBrandsCache
+	Path := LLM_GetSharedPath("backends.json")
+	if (Path == "")
+		throw Error("_shared/modules/llm/backends.json is missing.")
+	Raw := FSRead(Path)
+	if !(Raw is String)
+		throw Error("_shared/modules/llm/backends.json could not be read.")
+	Parsed := JsonParse(Raw)
+	if !(Parsed is Map) || !Parsed.Has("backends") || !(Parsed["backends"] is Map)
+		throw Error("_shared/modules/llm/backends.json has no backends table.")
+	for Id, Entry in Parsed["backends"] {
+		if !(Entry is Map) || !Entry.Has("brand") || !Entry.Has("emoji")
+				|| !(Entry["brand"] is String) || !(Entry["emoji"] is String)
+			throw Error("Backend '" . Id . "' has no brand or emoji in backends.json.")
+	}
+	_LLM_BackendBrandsCache := Parsed["backends"]
+	return _LLM_BackendBrandsCache
+}
+
+/**
+ * The emoji of one backend: "🦙", "🚀" or "🌐".
+ * @param {String} BackendId Backend identifier.
+ * @returns {String}
+ */
+LLM_BackendEmoji(BackendId) {
+	Brands := LLM_GetBackendBrands()
+	if !(BackendId is String) || !Brands.Has(BackendId)
+		throw ValueError("No backend '" . ((BackendId is String) ? BackendId : Type(BackendId)) . "' in backends.json.")
+	return Brands[BackendId]["emoji"]
+}
+
+/**
+ * The brand and emoji of one backend, as the Backend submenu names it: "Ollama 🦙".
+ * @param {String} BackendId Backend identifier.
+ * @returns {String}
+ */
+LLM_BackendBrandLabel(BackendId) {
+	Brands := LLM_GetBackendBrands()
+	if !(BackendId is String) || !Brands.Has(BackendId)
+		throw ValueError("No backend '" . ((BackendId is String) ? BackendId : Type(BackendId)) . "' in backends.json.")
+	return Brands[BackendId]["brand"] . " " . Brands[BackendId]["emoji"]
+}
+
+/**
+ * The tray's model button: the backend's emoji, then the model it runs, so the
+ * selected backend reads at a glance ("🦙 qwen3:4b", "🌐 OpenAI/gpt-4o-mini").
+ * @param {String} BackendId Backend identifier.
+ * @param {String} ModelText Model name, or the API entry's "<provider>/<model>".
+ * @returns {String}
+ */
+LLM_ModelSelectorCaption(BackendId, ModelText) {
+	if !(ModelText is String) || ModelText == ""
+		throw ValueError("The model button needs a non-empty model text.")
+	return LLM_BackendEmoji(BackendId) . " " . ModelText
+}
+
+/**
+ * Whether an identifier typed in the model selector page to add a model is
+ * well formed: an Ollama name ("qwen3:4b", "hf.co/owner/repo:Q4_K_M") or an
+ * MLX Hugging Face repository id. AHK twin of _shared/lua/llm/model_identifier.lua
+ * and of the page's validModelIdentifier(); all three pass
+ * _shared/tests/corpus/llm/model_identifiers.json.
+ * @param {String} Backend "ollama" or "mlx".
+ * @param {String} Id The identifier.
+ * @returns {Boolean}
+ */
+LLM_ValidModelIdentifier(Backend, Id) {
+	static MaxLength := 200
+	if !(Id is String) || Id == "" || StrLen(Id) > MaxLength
+		return false
+	NamePattern := "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+	if (Backend == "ollama") {
+		Fields := StrSplit(Id, ":")
+		if Fields.Length > 2
+			return false
+		if Fields.Length == 2 && !RegExMatch(Fields[2], "S)" . NamePattern)
+			return false
+		; StrSplit of an empty name yields no segment, so the loop below would
+		; never refuse it (":4b").
+		if (Fields[1] == "")
+			return false
+		Segments := StrSplit(Fields[1], "/")
+		if Segments.Length > 3
+			return false
+		for Index, Segment in Segments
+			if !RegExMatch(Segment, Index == 1 ? "S)^[a-z0-9][a-z0-9._-]*$" : "S)" . NamePattern)
+				return false
+		return true
+	}
+	if (Backend == "mlx") {
+		Parts := StrSplit(Id, "/")
+		return (Parts.Length == 2 && RegExMatch(Parts[1], "S)" . NamePattern) && RegExMatch(Parts[2], "S)" . NamePattern)) ? true : false
+	}
+	return false
+}
+
+/**
  * Walks the hierarchical preset list and returns the flat index used by the
  * legacy API. Each model contributes one entry keyed by its display name.
  *
@@ -373,6 +480,12 @@ _LLM_ExtractModelMetadata(model) {
 	else if (hw_mlx.Has("ram_gb") and _LLM_IsNumber(hw_mlx["ram_gb"]))
 		ram_gb := hw_mlx["ram_gb"]
 
+	; The Ollama weights' download is what the model occupies on disk; the
+	; Windows backend is Ollama, so it is the size the model selector page shows.
+	disk_gb := 0.0
+	if (hw_ollama.Has("download_gb") and _LLM_IsNumber(hw_ollama["download_gb"]))
+		disk_gb := hw_ollama["download_gb"]
+
 	params_b := _LLM_ParseBillions(params_total)
 	active_b := _LLM_ParseBillions(params_active)
 	if (active_b == 0)
@@ -386,6 +499,7 @@ _LLM_ExtractModelMetadata(model) {
 		"params_b",    params_b,
 		"active_b",    active_b,
 		"ram_gb",      ram_gb,
+		"disk_gb",     disk_gb,
 		"speed_tok_s", speed_tok,
 		"type",        model_type
 	)

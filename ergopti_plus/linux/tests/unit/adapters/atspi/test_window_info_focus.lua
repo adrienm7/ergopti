@@ -294,6 +294,18 @@ end)
 
 helpers.describe("window_info: Wayland", function()
 
+	for _, backend in ipairs({ "sway", "hyprland", "niri" }) do
+		helpers.it("(linux-focus-command-exit) rejects failed " .. backend .. " client output", function()
+			local executable = assert(arg and arg[-1], "the current interpreter must be identifiable")
+			local quote = require("text_utils").shell_quote
+			local fixture = helpers.driver_root() .. "/tests/hardware/run_wayland_query_exit.lua"
+			local status = os.execute(quote(executable) .. " " .. quote(fixture) .. " " .. quote(helpers.driver_root()) .. " " .. quote(backend))
+			helpers.assert_true(status == true or status == 0,
+				"actual compositor status must authorize metadata while preserving successful fallback")
+		end)
+	end
+
+
 	helpers.it("(linux-focus-native-query-error) refuses unexpected compositor errors before accessible fallback", function()
 		local name = "adapters.user_hotstring_destination"
 		local saved, captures = package.loaded[name], 0
@@ -430,6 +442,24 @@ helpers.describe("window_info: Wayland", function()
 		local info = wi.getFocused()
 		helpers.assert_eq(info.appId, "org.gnome.Nautilus", "niri reports app_id")
 		helpers.assert_eq(info.windowTitle, "Documents", "and title")
+		restore()
+	end)
+
+	helpers.it("runs no compositor query whose client binary is absent", function()
+		-- Each query probes its own client by name: swaymsg, hyprctl and niri are
+		-- absent from most desktops, and a spawn of a missing one is wasted work.
+		local wi, log = under("wayland", "sway", {})
+		wi.getFocused()
+		local probes = {}
+		for _, command in ipairs(log) do
+			for _, query in ipairs({ "swaymsg -t", "hyprctl activewindow", "niri msg" }) do
+				helpers.assert_true(not command:find(query, 1, true), "an absent client was queried: " .. command)
+			end
+			local binary = command:match("^command %-v '([%w]+)'")
+			if binary then probes[binary] = true end
+		end
+		helpers.assert_eq(probes, { swaymsg = true, hyprctl = true, niri = true },
+			"every Wayland client is probed before its query")
 		restore()
 	end)
 

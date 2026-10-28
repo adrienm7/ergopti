@@ -63,7 +63,7 @@ helpers.describe("llm settings: where the default comes from", function()
 		local settings = load_over_storage()
 		local Manifest = helpers.load_module("infra.manifest_reader")
 		local actual = {}
-		for _, name in ipairs({ "temperature", "context_length", "min_words", "max_words", "auto_raise_temp" }) do
+		for _, name in ipairs({ "temperature", "context_length", "min_words", "max_words", "auto_raise_temp", "reset_on_nav" }) do
 			actual[name] = settings.get(name)
 		end
 		drop_storage()
@@ -76,7 +76,7 @@ helpers.describe("llm settings: where the default comes from", function()
 
 	helpers.it("stores nothing while both are at their shipped values", function()
 		local settings, storage = load_over_storage()
-		for _, name in ipairs({ "temperature", "context_length", "min_words", "max_words", "auto_raise_temp" }) do
+		for _, name in ipairs({ "temperature", "context_length", "min_words", "max_words", "auto_raise_temp", "reset_on_nav" }) do
 			settings.get(name)
 		end
 		local written = 0
@@ -235,6 +235,7 @@ local function with_auto_menu(options, callback)
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local storage = PreferencesFixture.new({initial = {
 		["llm.generation.auto_raise_temp"] = options.selected,
+		["llm.generation.reset_on_nav"] = options.reset_on_nav,
 		["llm.profiles.num_predictions"] = options.count or 2,
 		["llm.future_field"] = 42,
 	}, writes_fail = options.refused})
@@ -289,7 +290,7 @@ local function with_auto_menu(options, callback)
 				if child then return child, siblings, position end
 			end
 		end
-		local title = require("infra.i18n").get(options.label or "menu.llm.auto_raise_temp")
+		local title = require("infra.i18n").get(options.find or options.label or "menu.llm.auto_raise_temp")
 		local row, siblings, position = find(items, title)
 		callback(assert(row, "the actual automatic temperature control must exist"), settings, profiles, storage, observed, context, admission, siblings, position)
 	end, debug.traceback)
@@ -305,6 +306,36 @@ local function auto_raise_corpus()
 	file:close()
 	return assert(require("json").decode(raw))
 end
+
+helpers.describe("LLM reset-on-navigation check", function()
+	helpers.it("(ai-context) is a Linux row, checked by default, that persists a change sparsely", function()
+		with_auto_menu({ find = "menu.llm.reset_on_nav" }, function(row, settings, _, storage, observed)
+			helpers.assert_eq(row.checked, true, "ships on, like Windows and macOS")
+			helpers.assert_eq(row.disabled or false, false)
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(settings.get("reset_on_nav"), false)
+			helpers.assert_eq(storage.get("llm.generation.reset_on_nav"), false)
+			helpers.assert_eq(storage.get("llm.future_field"), 42, "a neighbour survives")
+			helpers.assert_eq(observed.redraws, 1)
+		end)
+		with_auto_menu({ find = "menu.llm.reset_on_nav", reset_on_nav = false }, function(row, settings, _, storage)
+			helpers.assert_eq(row.checked or false, false)
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(settings.get("reset_on_nav"), true)
+			helpers.assert_eq(storage.has("llm.generation.reset_on_nav"), false, "the default stays an absent leaf")
+		end)
+	end)
+
+	helpers.it("(ai-context) is greyed and refuses a click while the AI is off", function()
+		with_auto_menu({ find = "menu.llm.reset_on_nav" }, function(row, settings, _, storage, observed, _, admission)
+			admission.enabled = false
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(settings.get("reset_on_nav"), true)
+			helpers.assert_eq(storage.has("llm.generation.reset_on_nav"), false)
+			helpers.assert_eq(observed.writes, 0)
+		end)
+	end)
+end)
 
 helpers.describe("LLM shared automatic temperature control", function()
 	helpers.it("replays the bool by prediction-count matrix through real owners (shared-auto-raise)", function()

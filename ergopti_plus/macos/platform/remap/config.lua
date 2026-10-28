@@ -38,6 +38,9 @@ local Defaults = require("platform.remap.defaults")
 local ActionCatalogue = require("platform.remap.action_catalogue")
 local Manifest = require("infra.manifest_reader")
 local Outdated = require("config_outdated")
+local KePaths = require("platform.remap.ke_paths")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "karabiner"
 
@@ -74,7 +77,7 @@ end
 --- @return boolean|nil value
 --- @return boolean outdated
 local function combinations_enabled(section, path)
-	return boolean_leaf(section, "enabled", nil, path, "mod_combos",
+	return boolean_leaf(section, "enabled", nil, path, ConfigKeys.KEY.MOD_COMBOS,
 		"a combination switch is boolean; its absent state is used")
 end
 
@@ -82,7 +85,7 @@ end
 --- @return boolean value
 --- @return boolean outdated
 local function tap_holds_switch(section, path)
-	return boolean_leaf(section, "enabled", Manifest.default_for("tap_holds.enabled"), path, "tap_holds",
+	return boolean_leaf(section, "enabled", Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED), path, ConfigKeys.KEY.TAP_HOLDS,
 		"a tap-hold switch is boolean; the neutral state is used")
 end
 
@@ -90,7 +93,7 @@ end
 --- @return boolean value
 --- @return boolean outdated
 local function combinations_symmetric(section, path)
-	return boolean_leaf(section, "symmetric", COMBO_SYMMETRIC_DEFAULT, path, "mod_combos",
+	return boolean_leaf(section, "symmetric", COMBO_SYMMETRIC_DEFAULT, path, ConfigKeys.KEY.MOD_COMBOS,
 		"a combination symmetry switch is boolean; the canonical default is used")
 end
 
@@ -101,6 +104,25 @@ end
 M.INTEGRATION_ENABLED_DEFAULT = true
 local INTEGRATION_SECTION = "karabiner"
 local INTEGRATION_KEY = "integration_enabled"
+--- Hidden `[karabiner] runtime`: which Karabiner runtime the generated rules
+--- target (ADR 011). `shared` (the absent default) is the official application
+--- and the user's karabiner.json; `owned` is the Ergopti background runtime and
+--- its own complete configuration. It is deliberately not a menu row and not in
+--- the shared manifest: the owned runtime is not shipped, so only a user who
+--- edits config_karabiner.toml by hand opts in. A value that is not one of the
+--- two names refuses the whole file, like a corrupt one, because a typo must not
+--- silently select the other runtime.
+M.RUNTIME_DEFAULT = KePaths.RUNTIME_SHARED
+local RUNTIME_KEY = "runtime"
+
+--- Hidden `[karabiner] close_other_instances`: whether the owned runtime may ask
+--- an official Karabiner-Elements that is running to quit (ADR 011, decision 3).
+--- It is the user's consent: `true` (the absent default, as the maintainer
+--- decided) lets the owned runtime close it, `false` makes the owned runtime
+--- report `other_karabiner_running` instead. Like `runtime` it is not a menu row
+--- until the owned runtime ships; a value that is not a boolean refuses the file.
+M.CLOSE_OTHER_INSTANCES_DEFAULT = true
+local CLOSE_OTHER_KEY = "close_other_instances"
 -- Builds before 2026-09-22 defaulted to off and wrote `[karabiner] enabled =
 -- false` on first launch; later builds ignored it. It is not the user's
 -- answer to the switch, so it is ignored and retained until explicit cleanup.
@@ -297,9 +319,11 @@ local _cached_actions = nil
 --- resolution can be re-run on its own, against the list already in memory.
 ---
 --- @param list table The action list to re-resolve IN PLACE.
+--- @param product string|nil Virtual keyboard product the names are written for; nil only for
+---   the first load, which every deploy re-resolves with the user's choice before it generates.
 --- @return number How many actions were resolved.
 --- @return string The captured layout keycode convention (the keycodes keys arrive as).
-function M.resolve_layout_actions(list)
+function M.resolve_layout_actions(list, product)
 	if type(list) ~= "table" then
 		Logger.error(LOG, "resolve_layout_actions(): expected a table — nothing resolved.")
 		return 0
@@ -308,10 +332,11 @@ function M.resolve_layout_actions(list)
 	-- the keycodes keys arrive as; the names are written for the deployed
 	-- virtual keyboard product, which passes the ISO pair through unswapped.
 	local form = Layout.keyboard_form()
+	product = product or Layout.default_virtual_keyboard_product()
 	local resolved = 0
 	for _, action in ipairs(list) do
 		if action.logical_char then
-			local key_code = Layout.key_code_for_char(action.logical_char, Layout.VIRTUAL_KEYBOARD_PRODUCT)
+			local key_code = Layout.key_code_for_char(action.logical_char, product)
 			local mods     = action.karabiner_modifiers
 			local entry    = { key_code = key_code }
 			if type(mods) == "table" and #mods > 0 then
@@ -414,8 +439,7 @@ function M.compute_non_canonical_combos(mod_combos)
 		::next::
 	end
 
-	local count = 0
-	for _ in pairs(non_canonical) do count = count + 1 end
+	local count = TableUtil.count(non_canonical)
 	Logger.debug(LOG, "Non-canonical combos computed: %d.", count)
 	return non_canonical
 end
@@ -463,8 +487,8 @@ local function build_state(tap_hold_keys, mod_combos, recommended)
 
 	return {
 		enabled                   = M.INTEGRATION_ENABLED_DEFAULT,
-		tap_holds_enabled         = recommended and Manifest.recommended_for("tap_holds.enabled")
-			or Manifest.default_for("tap_holds.enabled"),
+		tap_holds_enabled         = recommended and Manifest.recommended_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED)
+			or Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED),
 		-- Absent: the key combinations are on whatever the Tap-Holds switch says
 		-- (Generator.key_combinations_enabled), in the preset as on a fresh install.
 		mod_combos_enabled        = nil,
@@ -544,6 +568,27 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		end
 		integration_enabled = integration[INTEGRATION_KEY]
 	end
+	local runtime = M.RUNTIME_DEFAULT
+	if integration ~= nil and integration[RUNTIME_KEY] ~= nil then
+		local value = integration[RUNTIME_KEY]
+		if value ~= KePaths.RUNTIME_SHARED and value ~= KePaths.RUNTIME_OWNED then
+			Logger.error(LOG, "[%s] %s in '%s' must be \"%s\" or \"%s\", got %s — refusing the unsafe user config.",
+				INTEGRATION_SECTION, RUNTIME_KEY, user_config_path, KePaths.RUNTIME_SHARED,
+				KePaths.RUNTIME_OWNED, tostring(value))
+			return nil, "error"
+		end
+		runtime = value
+	end
+	local close_other_instances = M.CLOSE_OTHER_INSTANCES_DEFAULT
+	if integration ~= nil and integration[CLOSE_OTHER_KEY] ~= nil then
+		local value = integration[CLOSE_OTHER_KEY]
+		if type(value) ~= "boolean" then
+			Logger.error(LOG, "[%s] %s in '%s' must be true or false, got %s — refusing the unsafe user config.",
+				INTEGRATION_SECTION, CLOSE_OTHER_KEY, user_config_path, tostring(value))
+			return nil, "error"
+		end
+		close_other_instances = value
+	end
 	report_retired_integration(integration, user_config_path)
 
 	-- Saves are sparse against the neutral state: an absent table, key, slot or
@@ -556,9 +601,9 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		return true
 	end
 	local tap_holds = type(data.tap_holds) == "table"
-		and not source_array(data.tap_holds, { "tap_holds" }) and data.tap_holds or {}
+		and not source_array(data.tap_holds, { ConfigKeys.KEY.TAP_HOLDS }) and data.tap_holds or {}
 	local combos = type(data.mod_combos) == "table"
-		and not source_array(data.mod_combos, { "mod_combos" }) and data.mod_combos or {}
+		and not source_array(data.mod_combos, { ConfigKeys.KEY.MOD_COMBOS }) and data.mod_combos or {}
 
 	local function owned_table(parent, key, label, section)
 		if parent[key] == nil then return {} end
@@ -576,10 +621,10 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		end
 	end
 
-	local tap_hold_config = owned_table(tap_holds, "config", "[tap_holds.config]", "tap_holds")
+	local tap_hold_config = owned_table(tap_holds, "config", "[tap_holds.config]", ConfigKeys.KEY.TAP_HOLDS)
 	for _, key_def in ipairs(tap_hold_keys) do
 		if tap_hold_config[key_def.id] == nil then tap_hold_config[key_def.id] = {} end
-		if source_array(tap_hold_config[key_def.id], { "tap_holds", "config", key_def.id }) then
+		if source_array(tap_hold_config[key_def.id], { ConfigKeys.KEY.TAP_HOLDS, "config", key_def.id }) then
 			tap_hold_config[key_def.id] = {}
 		end
 		if type(tap_hold_config[key_def.id]) == "table" then
@@ -587,11 +632,11 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		end
 	end
 
-	local combos_config = owned_table(combos, "config", "[mod_combos.config]", "mod_combos")
+	local combos_config = owned_table(combos, "config", "[mod_combos.config]", ConfigKeys.KEY.MOD_COMBOS)
 	local known_combos = {}
 	for _, def in ipairs(mod_combos) do known_combos[def.id] = true end
 	for id, entry in pairs(combos_config) do
-		if known_combos[id] and source_array(entry, { "mod_combos", "config", tostring(id) }) then
+		if known_combos[id] and source_array(entry, { ConfigKeys.KEY.MOD_COMBOS, "config", tostring(id) }) then
 			combos_config[id] = {}
 		elseif type(entry) == "string" then
 			Logger.info(LOG, "Migrating combo '%s' from legacy string format.", id)
@@ -628,19 +673,19 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 			end
 		end
 	end
-	drop_outdated(tap_hold_config, tap_hold_keys, "tap_holds", { "tap", "hold" })
-	drop_outdated(combos_config, mod_combos, "mod_combos", { "tap", "hold", "combo" })
+	drop_outdated(tap_hold_config, tap_hold_keys, ConfigKeys.KEY.TAP_HOLDS, { "tap", "hold" })
+	drop_outdated(combos_config, mod_combos, ConfigKeys.KEY.MOD_COMBOS, { "tap", "hold", "combo" })
 
 	-- Reads one optional number; absence is the canonical default.
 	local function timing(section, key, default, label)
 		local section_name = assert(label:match("^([^.]+)%."), "a timing needs its owning section")
 		return timing_leaf(section, key, default, user_config_path, section_name)
 	end
-	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, "tap_holds.timeout_ms")
+	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS)
 	local sticky_ms = timing(tap_holds, "sticky_timeout_ms", STICKY_TIMEOUT_MS_DEFAULT,
-		"tap_holds.sticky_timeout_ms")
-	local simultaneous_ms = timing(combos, "simultaneous_threshold_ms", SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
-		"mod_combos.simultaneous_threshold_ms")
+		ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
+	local simultaneous_ms = timing(combos, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS, SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
+		ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 
 	local combo_symmetric = combinations_symmetric(combos, user_config_path)
 
@@ -654,6 +699,8 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	Logger.info(LOG, "User config loaded (Ergopti uses Karabiner: %s).", tostring(integration_enabled))
 	return {
 		enabled                   = integration_enabled,
+		runtime                   = runtime,
+		close_other_instances     = close_other_instances,
 		tap_holds_enabled         = tap_holds_enabled,
 		mod_combos_enabled        = mod_combos_enabled,
 		tap_hold_config           = tap_hold_config,
@@ -667,9 +714,9 @@ end
 
 -- The scalar leaves a menu setter can name as explicitly set by the user.
 local INTENT_LEAVES = {
-	["tap_holds.enabled"] = true, ["tap_holds.timeout_ms"] = true, ["tap_holds.sticky_timeout_ms"] = true,
-	["mod_combos.enabled"] = true, ["mod_combos.simultaneous_threshold_ms"] = true,
-	["mod_combos.symmetric"] = true,
+	[ConfigKeys.KEY.TAP_HOLDS_ENABLED] = true, [ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS] = true, [ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS] = true,
+	[ConfigKeys.KEY.MOD_COMBOS_ENABLED] = true, [ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS] = true,
+	[ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC] = true,
 }
 
 --- Validates a save's explicit leaf intent: only owned leaves, each set to true.
@@ -805,7 +852,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 				-- Combo strings keep their distinct explicit legacy migration path.
 				local preserve_scalar = not overwrite_corrupt and not repaired
 					and target[id] ~= nil and type(target[id]) ~= "table"
-					and (section == "tap_holds" or (section == "mod_combos" and type(target[id]) ~= "string"))
+					and (section == ConfigKeys.KEY.TAP_HOLDS or (section == ConfigKeys.KEY.MOD_COMBOS and type(target[id]) ~= "string"))
 				-- The user's own edit of this binding replaces its unusable value.
 				if repaired and (type(target[id]) ~= "table"
 					or (document_shapes and document_shapes.arrays[target[id]])) then
@@ -860,32 +907,32 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			assert(type(state.enabled) == "boolean", "the Karabiner integration switch must be a boolean")
 			table_at(document, INTEGRATION_SECTION)[INTEGRATION_KEY] = state.enabled
 		end
-		if not preserve_array(document.tap_holds, { "tap_holds" },
-			(state.tap_holds_enabled == nil or state.tap_holds_enabled == Manifest.default_for("tap_holds.enabled"))
+		if not preserve_array(document.tap_holds, { ConfigKeys.KEY.TAP_HOLDS },
+			(state.tap_holds_enabled == nil or state.tap_holds_enabled == Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED))
 			and (state.tap_hold_timeout_ms == nil or state.tap_hold_timeout_ms == TAP_HOLD_TIMEOUT_MS_DEFAULT)
 			and (state.sticky_timeout_ms == nil or state.sticky_timeout_ms == STICKY_TIMEOUT_MS_DEFAULT)
 			and bindings_neutral(state.tap_hold_config, { "tap", "hold", "timeout_ms" })) then
-			local tap_holds = table_at(document, "tap_holds")
-			assign_boolean(tap_holds, "tap_holds", "enabled", state.tap_holds_enabled,
-				Manifest.default_for("tap_holds.enabled"), tap_holds_switch)
-			assign_timing(tap_holds, "tap_holds", "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
-			assign_timing(tap_holds, "tap_holds", "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
-			if not preserve_array(tap_holds.config, { "tap_holds", "config" },
+			local tap_holds = table_at(document, ConfigKeys.KEY.TAP_HOLDS)
+			assign_boolean(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "enabled", state.tap_holds_enabled,
+				Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED), tap_holds_switch)
+			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
+			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
+			if not preserve_array(tap_holds.config, { ConfigKeys.KEY.TAP_HOLDS, "config" },
 				bindings_neutral(state.tap_hold_config, { "tap", "hold", "timeout_ms" })) then
-				merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" }, "tap_holds")
+				merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" }, ConfigKeys.KEY.TAP_HOLDS)
 				if next(tap_holds.config) == nil then tap_holds.config = nil end
 			end
 			if next(tap_holds) == nil then document.tap_holds = nil end
 		end
-		if not preserve_array(document.mod_combos, { "mod_combos" },
+		if not preserve_array(document.mod_combos, { ConfigKeys.KEY.MOD_COMBOS },
 			state.mod_combos_enabled == nil
 			and (state.simultaneous_threshold_ms == nil or state.simultaneous_threshold_ms == SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
 			and (state.combo_symmetric == nil or state.combo_symmetric == COMBO_SYMMETRIC_DEFAULT)
 			and bindings_neutral(state.mod_combos_config, { "tap", "hold", "combo" })) then
-			local mod_combos = table_at(document, "mod_combos")
+			local mod_combos = table_at(document, ConfigKeys.KEY.MOD_COMBOS)
 			-- Written only once set: an absent flag is on (Generator.key_combinations_enabled).
 			local _, outdated_enabled = combinations_enabled(mod_combos, user_config_path)
-			if not overwrite_corrupt and outdated_enabled and not explicit["mod_combos.enabled"] then
+			if not overwrite_corrupt and outdated_enabled and not explicit[ConfigKeys.KEY.MOD_COMBOS_ENABLED] then
 				if state.mod_combos_enabled ~= nil then
 					candidate_refusal = "candidate has no explicit repair owner for mod_combos.enabled"
 					error(candidate_refusal, 0)
@@ -893,12 +940,12 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			else
 				mod_combos.enabled = state.mod_combos_enabled
 			end
-			assign_timing(mod_combos, "mod_combos", "simultaneous_threshold_ms", state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
-			assign_boolean(mod_combos, "mod_combos", "symmetric", state.combo_symmetric,
+			assign_timing(mod_combos, ConfigKeys.KEY.MOD_COMBOS, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS, state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
+			assign_boolean(mod_combos, ConfigKeys.KEY.MOD_COMBOS, "symmetric", state.combo_symmetric,
 				COMBO_SYMMETRIC_DEFAULT, combinations_symmetric)
-			if not preserve_array(mod_combos.config, { "mod_combos", "config" },
+			if not preserve_array(mod_combos.config, { ConfigKeys.KEY.MOD_COMBOS, "config" },
 				bindings_neutral(state.mod_combos_config, { "tap", "hold", "combo" })) then
-				merge_bindings(table_at(mod_combos, "config"), state.mod_combos_config, { "tap", "hold", "combo" }, "mod_combos")
+				merge_bindings(table_at(mod_combos, "config"), state.mod_combos_config, { "tap", "hold", "combo" }, ConfigKeys.KEY.MOD_COMBOS)
 				if next(mod_combos.config) == nil then mod_combos.config = nil end
 			end
 			if next(mod_combos) == nil then document.mod_combos = nil end

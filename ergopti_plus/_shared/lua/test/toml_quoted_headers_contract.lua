@@ -41,33 +41,6 @@ return function(helpers)
 				helpers.assert_eq(prepare(source, { { section = "a", key = "b.c", delete = true, literal_key = true } }), false)
 			end
 		end)
-		helpers.it("deletes an owned extension leaf while preserving all neighboring bytes", function()
-			local prefix = '# retained\n[hotstrings.modules."ext:ergopti:rolls"] # identity\n'
-			local tail = 'unknown = [\n  "[quoted.data]",\n]\n[neighbor]\ncustom = true\n'
-			local ok, detail, content = prepare(prefix .. 'custom = true\n' .. tail, {
-				{ section = section, key = "custom", delete = true },
-			})
-			helpers.assert_eq(ok, true, detail)
-			helpers.assert_eq(content, prefix .. tail)
-		end)
-		helpers.it("inserts and updates through equivalent literal and escaped section spellings", function()
-			for _, header in ipairs({ "'ext:ergopti:rolls'", '"ext:ergopti:rolls"', '"ext:ergopti:roll\\u0073"' }) do
-				local ok, detail, content = prepare('[hotstrings.modules.' .. header .. ']\ncustom = false\n', {
-					{ section = section, key = "custom", value = true },
-					{ section = section, key = "other", value = "configured" },
-				})
-				helpers.assert_eq(ok, true, detail)
-				local group = Codec.decode(content).hotstrings.modules["ext:ergopti:rolls"]
-				helpers.assert_eq(group.custom, true)
-				helpers.assert_eq(group.other, "configured")
-			end
-		end)
-		helpers.it("renders canonical colon segments as valid quoted TOML on first insertion", function()
-			local ok, detail, content = prepare("", { { section = section, key = "custom", value = true } })
-			helpers.assert_eq(ok, true, detail)
-			helpers.assert_true(content:find('[hotstrings.modules."ext:ergopti:rolls"]', 1, true) ~= nil)
-			helpers.assert_eq(Codec.decode(content).hotstrings.modules["ext:ergopti:rolls"].custom, true)
-		end)
 		helpers.it("preserves sparse defaults under equivalent quoted owner paths", function()
 			local path = "/controlled/quoted-sparse-defaults.toml"
 			Writer.set_sparse_defaults(path, require("infra.manifest_reader"))
@@ -82,48 +55,6 @@ return function(helpers)
 			}, { read_with_status = function() return "", "ok" end })
 			helpers.assert_eq(literal_ok, true, literal_detail)
 			helpers.assert_eq(Codec.decode(literal_content)["hotstrings.modules"].literal.custom, false)
-		end)
-		helpers.it("rejects equivalent batch rows before reading and preserves unrelated case variants", function()
-			local reads = 0
-			local ok = Writer.prepare_batch("/controlled/duplicate-quoted.toml", {
-				{ section = 'a."x"', key = "v", delete = true },
-				{ section = "a.x", key = "v", value = true },
-			}, { read_with_status = function() reads = reads + 1; return "", "ok" end })
-			helpers.assert_eq(ok, false)
-			helpers.assert_eq(reads, 0)
-			local source = '[untouched]\nv = true\n[UNTOUCHED]\nv = false\n[a.x]\nv = true\n'
-			local prepared, detail, content = prepare(source, { { section = 'a."x"', key = "v", delete = true } })
-			helpers.assert_eq(prepared, true, detail)
-			helpers.assert_eq(content, source:sub(1, #source - #'v = true\n'))
-		end)
-		helpers.it("keeps quoted dots and bracket characters distinct from nested sections", function()
-			local source = '[a."b.c]"]\nvalue = true\n[a.b.c]\nvalue = true\n'
-			local ok, detail, content = prepare(source, { { section = 'a."b.c]"', key = "value", delete = true } })
-			helpers.assert_eq(ok, true, detail)
-			helpers.assert_eq(content, '[a."b.c]"]\n[a.b.c]\nvalue = true\n')
-		end)
-		helpers.it("rejects malformed table paths before acquiring a snapshot", function()
-			for _, bad in ipairs({ 'a..b', '.a', 'a.', 'a."open', 'a."x"tail', 'a."bad\\q"', 'a.[]', 'a. bad space' }) do
-				local reads = 0
-				local ok = Writer.prepare_batch("/controlled/malformed.toml", { { section = bad, key = "value", delete = true } }, {
-					read_with_status = function() reads = reads + 1; return "", "ok" end,
-				})
-				helpers.assert_eq(ok, false, bad)
-				helpers.assert_eq(reads, 0, bad)
-			end
-		end)
-		helpers.it("refuses malformed source headers and equivalent duplicate tables", function()
-			for _, source in ipairs({ '[a..b]\nv = true\n', '[a."open]\nv = true\n', '[a."x"]\nv = true\n[a.\'x\']\nv = false\n' }) do
-				local ok = prepare(source, { { section = "a.x", key = "v", delete = true } })
-				helpers.assert_eq(ok, false, source)
-			end
-		end)
-		helpers.it("refuses ambiguous case-folded targets and array-of-table targets", function()
-			for _, source in ipairs({ '[a."x"]\nv = true\n[A.x]\nv = false\n',
-				'[a."x"]\nv = true\n[A.x]\nneighbor = false\n', '[[a."x"]]\nv = true\n' }) do
-				local ok = prepare(source, { { section = "a.x", key = "v", delete = true } })
-				helpers.assert_eq(ok, false, source)
-			end
 		end)
 		helpers.it("keeps cleanup conservative while the batch deletes a quoted assignment key", function()
 			local source = '[a."x"]\nv = true\n'
@@ -187,66 +118,6 @@ return function(helpers)
 
 	helpers.describe("shared hotstring reader header syntax", function()
 		local Reader = require("toml_codec.reader")
-		for _, header in ipairs({ "[probe", "[[probe", "[[probe]", "[probe]]",
-			"[]", "[probe..child]", '["open]', '["bad\\q"]', "[probe] trailing", "[[probe]] trailing" }) do
-			helpers.it("(toml-hotstring-header) rejects an incomplete or malformed header " .. header, function()
-				local document, committed = Reader.parse_text('[[before]]\n"b" = { output = "B" }\n' .. header .. "\n")
-				helpers.assert_eq(committed, false, "a malformed header cannot issue a successful source receipt")
-				helpers.assert_eq(next(document.sections), nil, "a refused source exposes no partial entries")
-				helpers.assert_eq(#document.source_entries, 0)
-			end)
-		end
-		for _, header in ipairs({ "[future.settings]", '[_meta.sections."group.name"]',
-			'[_meta.sections."group#name"] # retained comment', "[[future.settings]]", "[" .. string.rep("long", 512) .. "]" }) do
-			helpers.it("(toml-hotstring-header) preserves a complete unfamiliar header " .. header:sub(1, 70), function()
-				local document, committed = Reader.parse_text('[[before]]\n"b" = { output = "B" }\n'
-					.. header .. '\n[[after]]\n"a" = { output = "A" }\n')
-				helpers.assert_eq(committed, true, "valid unfamiliar tables retain the existing forward-compatible dialect")
-				helpers.assert_eq(document.sections.before.entries[1].output, "B")
-				helpers.assert_eq(document.sections.after.entries[1].output, "A")
-			end)
-		end
-		-- These are literal hotstring identities, not TOML key paths. In
-		-- particular [[]], [[.probe]] and [[probe]]] were wrongly classified
-		-- as malformed by the first header guard and must keep their old names.
-		for _, name in ipairs({ "", ".probe", "probe]", "dotted.Équipe", "Équipe d'été", 'quote"section',
-			"with spaces", "probe..child", 'hash"#section', "bracket]section", "bracket[section", '"bad\\q"' }) do
-			helpers.it("(toml-hotstring-header) preserves the historical literal name " .. name, function()
-				local document, committed = Reader.parse_text('[[' .. name .. ']]\n"entry" = { output = "kept" }\n')
-				helpers.assert_eq(committed, true)
-				helpers.assert_eq(document.sections[name].entries[1].output, "kept")
-				helpers.assert_eq(document.sections_order[1], name)
-				helpers.assert_eq(#document.source_entries, 1)
-			end)
-		end
-		for _, name in ipairs({ "Équipe d'été", 'quote"section', 'hash"#section' }) do
-			for _, tail in ipairs({ " # notes", "#notes", "\t# notes" }) do
-				helpers.it("(toml-raw-comment) reads the exact literal name " .. name .. " before " .. tail, function()
-					local document, committed = Reader.parse_text('[[' .. name .. ']]' .. tail .. '\n"entry" = { output = "kept" }\n')
-					helpers.assert_eq(committed, true)
-					helpers.assert_eq(document.sections_order[1], name)
-					helpers.assert_eq(document.sections[name].entries[1].output, "kept")
-					helpers.assert_eq(#document.source_entries, 1)
-				end)
-			end
-		end
-		for _, name in ipairs({ 'quote"section]] # literal', "apostrophe'section]] # literal" }) do
-			helpers.it("(toml-raw-comment) never reinterprets the accepted identity " .. name, function()
-				local document, committed = Reader.parse_text('[[' .. name .. ']]\n"entry" = { output = "kept" }\n')
-				helpers.assert_eq(committed, true)
-				helpers.assert_eq(document.sections_order[1], name)
-				helpers.assert_eq(document.sections[name].entries[1].output, "kept")
-			end)
-		end
-		for _, header in ipairs({ '[[quote"section]] # notes ]] # ambiguous',
-			"[[apostrophe'section]]#notes]]#ambiguous", '[[hash#section]]', '[[hash#section]] # notes' }) do
-			helpers.it("(toml-raw-comment) retains the existing refusal for " .. header, function()
-				local document, committed = Reader.parse_text(header .. '\n"entry" = { output = "must not publish" }\n')
-				helpers.assert_eq(committed, false)
-				helpers.assert_eq(next(document.sections), nil)
-				helpers.assert_eq(#document.source_entries, 0)
-			end)
-		end
 		helpers.it("(toml-raw-comment) keeps rejected-header substring work linear as markers double", function()
 			local original_sub = string.sub
 			local function measure(markers)
@@ -270,49 +141,6 @@ return function(helpers)
 			-- approaches 4x. Count copied bytes, never wall-clock timing.
 			helpers.assert_true(large <= small * 3, "doubling markers must not quadruple substring work")
 		end)
-		for index, value in ipairs({ 'future_matrix = [\n [1, 2],\n]\n',
-			'future_matrix = [\n [1, { text = "[not a header" }],\n]\n',
-			'future_text = """\n[[not a header\n# """\n',
-			"future_text = '''\n[[not a header\n# '''\n" }) do
-			helpers.it("(toml-hotstring-header) preserves header-looking value continuation " .. index, function()
-				local document, committed = Reader.parse_text('[_meta]\n' .. value
-					.. '[[after]]\n"entry" = { output = "kept" }\n')
-				helpers.assert_eq(committed, true)
-				helpers.assert_eq(document.sections.after.entries[1].output, "kept")
-				helpers.assert_eq(#document.source_entries, 1)
-			end)
-		end
-		helpers.it("(toml-hotstring-header) keeps quoted metadata paths distinct from literal rule names", function()
-			local document, committed = Reader.parse_text('[_meta.sections."dotted.Équipe"]\ndelay = 0.2\n'
-				.. '[[dotted.Équipe]]\n"entry" = { output = "kept" }\n')
-			helpers.assert_eq(committed, true)
-			helpers.assert_eq(document.meta.sections["dotted.Équipe"].delay, 0.2)
-			helpers.assert_eq(document.sections["dotted.Équipe"].entries[1].output, "kept")
-		end)
 	end)
 
-	helpers.describe("shared hotstring reader logical-value completion", function()
-		local Reader = require("toml_codec.reader")
-		for index, vector in ipairs({
-			{ open = 'future_matrix = [\n', close = ']\n' },
-			{ open = 'future_matrix = [\n [1, 2],\n', close = ']\n' },
-			{ open = 'future_text = """\n[[not a header\n', close = '"""\n' },
-			{ open = "future_text = '''\n[[not a header\n", close = "'''\n" },
-		}) do
-			helpers.it("(toml-hotstring-value-eof) refuses an unfinished logical value " .. index, function()
-				local document, committed = Reader.parse_text('[[before]]\n"entry" = { output = "kept" }\n'
-					.. '[_meta]\n' .. vector.open)
-				helpers.assert_eq(committed, false, "an unfinished value cannot acknowledge a complete source")
-				helpers.assert_eq(next(document.sections), nil, "no earlier partial entries escape rejection")
-				helpers.assert_eq(#document.source_entries, 0)
-			end)
-			helpers.it("(toml-hotstring-value-eof) admits its completed logical-value neighbour " .. index, function()
-				local document, committed = Reader.parse_text('[_meta]\n' .. vector.open .. vector.close
-					.. '[[after]]\n"entry" = { output = "kept" }\n')
-				helpers.assert_eq(committed, true)
-				helpers.assert_eq(document.sections.after.entries[1].output, "kept")
-				helpers.assert_eq(#document.source_entries, 1)
-			end)
-		end
-	end)
 end

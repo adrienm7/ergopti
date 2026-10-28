@@ -26,7 +26,7 @@ local MODULES = {
 	"adapters.http_client",
 	"ui.download_window",
 	"ui.ui_builder",
-	"infra.paths",
+	"infra.paths", "infra.timings",
 	"infra.deferred_work",
 	"ui.download_window.javascript",
 	"ui.menu.menu_llm.requirement_operation_registry",
@@ -44,6 +44,7 @@ local function with_fixture(options, callback)
 	local progress = { shows = 0, completes = 0, aborts = 0, retry_starts = 0 }
 	local notifications = 0
 	local notification_records = {}
+	local error_records = {}
 	local http_callback
 	local terminate_mode = options.terminate_mode or "self"
 
@@ -56,7 +57,9 @@ local function with_fixture(options, callback)
 		done = noop,
 		info = noop,
 		warn = noop,
-		error = noop,
+		error = function(_, fmt, ...)
+			error_records[#error_records + 1] = select("#", ...) > 0 and string.format(fmt, ...) or tostring(fmt)
+		end,
 		callback = function(_, _, fn, ...)
 			if type(fn) ~= "function" then return false, nil end
 			return xpcall(fn, debug.traceback, ...)
@@ -83,6 +86,7 @@ local function with_fixture(options, callback)
 	}
 	package.loaded["adapters.shell_runner"] = { spawn = function() return nil end }
 	package.loaded["adapters.timer_scheduler"] = {
+		awake_time = function() return 0 end,
 		after = function(_, fn)
 			return { callback = fn, timer = {}, observers = {} }, true
 		end,
@@ -197,6 +201,7 @@ local function with_fixture(options, callback)
 	package.loaded["ui.menu.menu_llm.models_manager_ollama"] = nil
 	local real_window, native_window
 	if options.real_window then
+		helpers.provide_timings()
 		package.loaded["infra.paths"] = { shared = function()
 			return helpers.driver_root() .. "../_shared"
 		end }
@@ -259,6 +264,7 @@ local function with_fixture(options, callback)
 			native_window = function() return native_window end,
 			notifications = function() return notifications end,
 			notification_records = notification_records,
+			error_records = error_records,
 			http_callback = function() return http_callback end,
 			set_terminate_mode = function(mode) terminate_mode = mode end,
 		})

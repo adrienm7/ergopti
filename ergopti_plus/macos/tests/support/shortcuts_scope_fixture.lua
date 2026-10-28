@@ -9,7 +9,7 @@ local function run_fixture(body, source)
 	require("tests.support.module_isolation").purge(root, root:gsub("[/\\]macos$", "/_shared/lua"))
 	helpers.load_with_stubs("hs")
 	local controls = { writes = 0, native = {}, keyboard_handles = {} }
-	local files = { config = source or '[shortcuts]\nenabled = true\nchatgpt_url = "https://example.test"\nkeyboard = { cmd_a = "send_text", foreign = 17 }\ntap_keys = { number_row_left = "send_text", foreign = 21 }\nscript_control = { chords_enabled = true, script_altgr_enter = "open_url", script_altgr_backspace = "none", script_altgr_escape = "none", future = 42 }\nkeys = { ctrl_g = true, future = true }\n[gestures]\naction_parameters = { keyboard__cmd_a__send_text = "keyboard", tap_key__number_row_left__send_text = "tap", script__script_altgr_enter__open_url = "https://example.test", tap_4__open_url = "https://apple.com", future = { keep = 9 } }\n[future]\nkeep = 7\n' }
+	local files = { config = source or '[shortcuts]\nenabled = true\nchatgpt_url = "https://example.test"\nkeyboard = { primary_a = "send_text", foreign = 17 }\ntap_keys = { number_row_left = "send_text", foreign = 21 }\nscript_control = { chords_enabled = true, script_altgr_enter = "open_url", script_altgr_backspace = "none", script_altgr_escape = "none", future = 42 }\nkeys = { ctrl_g = true, future = true }\n[gestures]\naction_parameters = { keyboard__primary_a__send_text = "keyboard", tap_key__number_row_left__send_text = "tap", script__script_altgr_enter__open_url = "https://example.test", tap_4__open_url = "https://apple.com", future = { keep = 9 } }\n[future]\nkeep = 7\n' }
 	if source == false then files.config = nil end
 	local file_port = {
 		read = function(path)
@@ -91,6 +91,8 @@ local function run_fixture(body, source)
 		unbind = function(native) return native:delete() end,
 		setEnabled = function(native, enabled) native.enabled = enabled; return true end,
 		set_delivery_guard = function() return true end,
+		-- Every key resolves in this double's layout.
+		layout_key_refusal = function() return nil end,
 		replace_physical_claims = function(owner, rows)
 			controls.physical_claims = controls.physical_claims or {}
 			controls.physical_claims[owner] = rows
@@ -103,7 +105,13 @@ local function run_fixture(body, source)
 		local suffix = record[2] .. "_actions"
 		facade["pause_" .. suffix] = function() paused = true; return true end
 		facade["stop_" .. suffix] = function() paused = true; return true end
-		facade["resume_" .. suffix] = function() paused = false; return true end
+		-- One refused hotkey now fails alone (shortcut-refusal-isolation), so a
+		-- refused "binding" start is modelled where Bindings still refuses as a
+		-- whole: its child action owners refusing to reopen.
+		facade["resume_" .. suffix] = function()
+			if controls.refuse_start == "binding" then return false end
+			paused = false; return true
+		end
 		facade["is_" .. suffix .. "_paused"] = function() return paused end
 		facade["has_pending_" .. record[2] .. "_action"] = function() return false end
 	end

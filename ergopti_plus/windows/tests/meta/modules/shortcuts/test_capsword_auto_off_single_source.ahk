@@ -21,7 +21,11 @@
 _CWSS_Source() {
 	Rule := _DriverFuncBody("_TapHoldTapEndsCapsWord")
 	Assert(Rule != "", "_TapHoldTapEndsCapsWord must exist")
-	Src := _StripFullLineComments(_DriverDirConcat("modules/shortcuts") . "`n" . Rule)
+	Src := _DriverDirConcat("modules/shortcuts") . "`n" . Rule
+	for Name in ["CapsWordEndCallback", "CapsWordHandleAutoOff", "CapsWordActivationToggle", "CapsWordDeactivate",
+			"CapsWordSyncLed"]
+		Src .= "`n" . _DriverFuncBody(Name)
+	Src := _StripFullLineComments(Src)
 	Assert(InStr(Src, "CapsWordAutoOffArm(") > 0, "the CapsWord sources must be readable")
 	return Src
 }
@@ -62,7 +66,7 @@ _CWSS_PointerKindsOnlyInTheMapping() {
 	Src := _CWSS_Source()
 	; The adapter's own half of the list: native event -> kind, and the click
 	; kinds that release a gesture click-hold.
-	for Name in ["CapsWordAutoOffPointerEvents", "CapsWordAutoOffPolledKind", "_CapsWord_HandleAutoOff"] {
+	for Name in ["CapsWordAutoOffPointerEvents", "CapsWordAutoOffPolledKind", "CapsWordHandleAutoOff"] {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name . " must exist")
 		Src := StrReplace(Src, _StripFullLineComments(Body), "")

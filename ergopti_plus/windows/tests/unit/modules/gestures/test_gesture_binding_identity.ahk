@@ -368,3 +368,5 @@ TestGestures_ScriptLatePublicationRead() {
 }
 Test("gestures: late script publication neutralizes retained parameters (script-late-publication)",
 	TestGestures_ScriptLatePublicationRead)
+
+#Include test_gesture_pause_admission.ahk

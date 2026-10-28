@@ -237,7 +237,7 @@ helpers.describe("personal hotstring editor shortcut is transactional", function
 			local committed = MenuState.sync_state_to_modules({
 				hotstrings = {},
 				keymap = false,
-				keylogger_enabled = false,
+				keystats_enabled = false,
 				custom_editor_shortcut = { mods = { "cmd" }, key = "V" },
 			}, {}, false, {
 				keymap = { set_llm_model = function() return true end },

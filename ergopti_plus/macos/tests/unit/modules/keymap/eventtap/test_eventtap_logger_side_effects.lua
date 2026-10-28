@@ -21,7 +21,7 @@ local RESET_MODULES = {
 	"infra.logger", "adapters.log_transport", "adapters.event_provenance",
 	"adapters.synthetic_input",
 	"infra.paths", "infra.timings",
-	"modules.llm", "modules.llm.prediction_engine", "modules.keylogger",
+	"modules.llm", "modules.llm.prediction_engine", "modules.keystats",
 	"ui.tooltip", "modules.hotstrings.hotstrings_config", "adapters.tooltip_renderer",
 	"adapters.file_system",
 	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
@@ -133,7 +133,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 			handle_chain_signal = function() return false end,
 			is_visible = function() return false end,
 		}
-		package.loaded["modules.keylogger"] = setmetatable({
+		package.loaded["modules.keystats"] = setmetatable({
 			notify_synthetic = noop,
 			set_buffer = noop,
 		}, { __index = function() return noop end })

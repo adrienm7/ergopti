@@ -200,7 +200,7 @@ helpers.describe("dialog_util.alert: every call site agrees on the shape", funct
 		-- own file: the mismatch is between a definition here and callers elsewhere.
 		local offenders = {}
 		for _, rel in ipairs({
-			"infra/vscode_bridge.lua", "ui/metrics_apps/init.lua", "modules/keylogger/init.lua",
+			"infra/vscode_bridge.lua", "ui/metrics_apps/init.lua", "modules/keystats/init.lua",
 		}) do
 			local fh = io.open(helpers.driver_root() .. rel, "r")
 			if fh then

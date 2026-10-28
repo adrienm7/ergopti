@@ -26,6 +26,7 @@
 ---    failure and retains its diagnostic tail without an invented cause.
 --- ==============================================================================
 
+local TextUtils = require("text_utils")
 local M = {}
 
 -- Resolved per call: the locale owner is a stateful singleton that tests and
@@ -149,7 +150,7 @@ local function clean_line(line)
 	-- A pseudo-terminal lets uv color its output and redraw progress with CR.
 	line = line:gsub("\27%[[%d;?]*[ -/]*[@-~]", ""):gsub("\27%][^\7]*\7", "")
 	line = line:match("([^\r]*)\r*$") or line
-	line = line:gsub("^%s+", ""):gsub("%s+$", "")
+	line = TextUtils.trim(line)
 	if #line > MAX_LINE_CHARS then line = line:sub(1, MAX_LINE_CHARS) .. "…" end
 	return line
 end

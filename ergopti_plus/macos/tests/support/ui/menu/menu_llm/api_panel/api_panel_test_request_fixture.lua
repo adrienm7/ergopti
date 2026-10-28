@@ -34,6 +34,7 @@ local function install_doubles(args)
 		},
 		get_entries = function() return entries end,
 		set_entries = function(value) entries = value end,
+		entry_key_missing = function() return false end,
 		get_active_entry_id = function() return active_id end,
 		set_active_entry_id = function(value) active_id = value end,
 		get_active_entry = function()

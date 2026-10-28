@@ -379,9 +379,12 @@ function M._get_native_context_snapshot()
 		if not frame or type(pid) ~= "number" or pid <= 0 or pid % 1 ~= 0 then return nil end
 		local file = io.open("/proc/" .. string.format("%d", pid) .. "/comm", "r")
 		if not file then return nil end
-		local app = file:read("*l")
+		local app = file:read("*a")
 		local closed = file:close()
-		if closed ~= true or type(app) ~= "string" or app == "" then return nil end
+		if closed ~= true or type(app) ~= "string" then return nil end
+		-- procfs appends one LF; any earlier LF belongs to the kernel task name.
+		app = app:gsub("\n$", "")
+		if app == "" then return nil end
 		return { role = role, attributes = {}, active_scope = true,
 			native_bus_name = identity.native_bus_name, native_object_path = identity.native_object_path,
 			process_id = pid, app_id = app, window_title = frame.name,

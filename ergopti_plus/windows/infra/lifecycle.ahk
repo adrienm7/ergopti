@@ -74,7 +74,7 @@ global _LifecycleShutdownReason := ""
 ; Exact private AI attempt owned by this noninterruptible OnExit call.
 global _LifecycleAiShutdownAttempt := 0
 ;
-; A user exit refused only because a keylogger flush or journal handoff was
+; A user exit refused only because a keystats flush or journal handoff was
 ; running is retried once that settles, so one Quit is enough. The poll costs no
 ; shutdown veto: only the retried ExitApp passes through the gates again.
 global LIFECYCLE_FLUSH_EXIT_POLL_MS := 100
@@ -471,20 +471,36 @@ _SuspendPendingPoll() {
 		Suspend(1)
 		_SuspendStateWatchdog()
 }
+; Stop reports false both for absence and for retained cleanup. Accept its
+; explicit acknowledgment; normalize only genuine absence under the same short
+; state fence used by the worker owner, with no process or timer call inside it.
+_LifecycleStopUIAWorkerForSuspend() {
+	Result := UIASW_Stop("canceled")
+	if (Result is Integer) && Result == 1
+		return true
+	PreviousCritical := Critical("On")
+	try return !IsObject(UIASWState.handle) && UIASWState.worker_hwnd == 0
+		&& UIASWState.worker_process_handle == 0 && !IsObject(UIASWState.pending)
+		&& !IsObject(UIASWState.start_deadline_fn) && UIASWState.start_failure_tick == 0
+		&& UIASWState.cleanup_debt.Length == 0 && UIASWState.process_cleanup_debt.Length == 0
+		&& !UIASWState.cleanup_draining && !UIASWState.process_cleanup_draining
+	finally Critical(PreviousCritical)
+}
+
 Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
 	Transition := LifecycleTransitionBegin("suspend")
-	if IsSet(ProgramActions_Stop)
-		_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(true), true)
-	if IsSet(UserHotstringsInvalidate)
-		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"), true)
 	if !_LifecycleRunRequiredStep(Transition, "navigation-event",
 			() => _LifecycleSetNavEventOwnerSuspended(true), true) {
 		LifecycleTransitionFinish(Transition)
 		_LifecycleLogTransitionDebt(Transition)
 		return false
 	}
+	if IsSet(ProgramActions_Stop)
+		_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(true), true)
+	if IsSet(UserHotstringsInvalidate)
+		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"), true)
 	if IsSet(LLM_AuxInvalidate)
 		_LifecycleRunRequiredStep(Transition, "llm-aux-context",
 			LLM_AuxInvalidate.Bind("suspend"))
@@ -492,7 +508,7 @@ Ergopti_OnSuspendEnter() {
 		_LifecycleRunRequiredStep(Transition, "llm-local-servers",
 			LLM_Menu_LocalServersOnSuspend, true)
 	if IsSet(KL_Watchers_OnSuspend)
-		_LifecycleRunRequiredStep(Transition, "keylogger-system-intervals",
+		_LifecycleRunRequiredStep(Transition, "keystats-system-intervals",
 			KL_Watchers_OnSuspend)
 	; Release OS-level modifiers before even the lifecycle START log: LoggerStart
 	; flushes synchronously to disk and a slow/locked config drive must not delay
@@ -588,25 +604,25 @@ Ergopti_OnSuspendEnter() {
 		; A metrics projection can be a multi-second detached AHK process.  Native
 		; Suspend only disarms hotkeys, so explicitly kill its process tree rather
 		; than letting SQLite/JSON work continue throughout a paused driver.
-	_LifecycleRunRequiredStep(Transition, "keylogger-prefetch-typing",
-		() => KLPF_CancelBuild("typing"))
-	_LifecycleRunRequiredStep(Transition, "keylogger-prefetch-apps",
-		() => KLPF_CancelBuild("apps"))
-	_LifecycleRunRequiredStep(Transition, "keylogger-prefetch-range",
-		() => KLPF_CancelBuild("range:typing"))
+	_LifecycleRunRequiredStep(Transition, "keystats-prefetch-typing",
+		() => KLPF_CancelBuild("typing"), true)
+	_LifecycleRunRequiredStep(Transition, "keystats-prefetch-apps",
+		() => KLPF_CancelBuild("apps"), true)
+	_LifecycleRunRequiredStep(Transition, "keystats-prefetch-range",
+		() => KLPF_CancelBuild("range:typing"), true)
 		; The selection probe is a persistent detached AHK process. Native Suspend
 		; cannot stop it, so retire request ownership and its process tree before
 		; entering the paused state.
 	_LifecycleRunRequiredStep(Transition, "uia-selection-worker",
-		UIASW_Stop.Bind("canceled"))
+		_LifecycleStopUIAWorkerForSuspend, true)
 		; Preserve an hours-long at-rest proof scan at its exact stream cursor while
 		; disarming its one-shot slice/marker timers. Native Suspend does not stop
 		; timers, so the migration must be lifecycle-owned explicitly.
 	if IsSet(KL_Mig_OnSuspend)
-		_LifecycleRunRequiredStep(Transition, "keylogger-text-migration",
+		_LifecycleRunRequiredStep(Transition, "keystats-text-migration",
 			KL_Mig_OnSuspend)
 	_LifecycleRunRequiredStep(Transition, "keep-awake",
-		() => StopActivitySimulation())
+		() => StopActivitySimulation(), true)
 		; AHK-12: A gesture left/right click-hold (SendEvent "{LButton Down}") that
 		; was in progress when the user pauses the driver outlives the suspend because
 		; SetTimer callbacks bypass native Suspend — the button stays logically held
@@ -638,6 +654,11 @@ Ergopti_OnSuspendEnter() {
 	if IsSet(_LLM_Deps_PollTimer)
 		_LifecycleRunRequiredStep(Transition, "llm-dependency-poll",
 			() => SetTimer(_LLM_Deps_PollTimer, 0))
+		; Layout > « Layout on pause / resume »: the keyboard the user types on
+		; while the driver is paused (pause_layout_switch.ahk).
+	if IsSet(PauseLayoutSwitch_Apply)
+		_LifecycleRunRequiredStep(Transition, "keyboard-layout",
+			() => PauseLayoutSwitch_Apply("pause"), true)
 	if !LifecycleTransitionFinish(Transition) {
 		_LifecycleLogTransitionDebt(Transition)
 		return false
@@ -696,12 +717,17 @@ Ergopti_OnSuspendResume() {
 		; now, on the first resumed stack, instead of leaving every later filter
 		; click blocked behind loading_data until the watchdog expires.
 		if IsSet(KLWV_OnSuspendResume)
-				_LifecycleRunRequiredStep(Transition, "keylogger-webview",
+				_LifecycleRunRequiredStep(Transition, "keystats-webview",
 					KLWV_OnSuspendResume)
+		; Only an actual pre-pause ready signal can retain host initialization.
+		; No page message or safety timeout is turned into a new ready event.
+		if IsSet(WebViewHost_OnSuspendResume)
+				_LifecycleRunRequiredStep(Transition, "webview-readiness",
+					WebViewHost_OnSuspendResume)
 		; Re-arm exactly one migration continuation (active slice, durable marker,
 		; or deferred posture sync) after all pause guards have been lifted.
 		if IsSet(KL_Mig_OnResume)
-				_LifecycleRunRequiredStep(Transition, "keylogger-text-migration",
+				_LifecycleRunRequiredStep(Transition, "keystats-text-migration",
 					KL_Mig_OnResume)
 		; Deferred dependency callbacks are not allowed to rebuild the tray or
 		; start the bridge while native Suspend is active. Replay the pending work
@@ -726,6 +752,9 @@ Ergopti_OnSuspendResume() {
 			and Features["shortcuts"]["wrap_text_if_selected"]
 			_LifecycleRunRequiredStep(Transition, "uia-selection-worker",
 				() => SetTimer(UIASW_Start, -1))
+		if IsSet(PauseLayoutSwitch_Apply)
+			_LifecycleRunRequiredStep(Transition, "keyboard-layout",
+				() => PauseLayoutSwitch_Apply("resume"), true)
 		if !LifecycleTransitionFinish(Transition) {
 				_LifecycleLogTransitionDebt(Transition)
 				return false
@@ -737,6 +766,20 @@ Ergopti_OnSuspendResume() {
 		}
 		LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
 		return true
+}
+
+; Runs the quit transition: one owner, the switch to the pause layout. Its
+; debt is logged; nothing past the terminal gates may refuse the exit.
+_LifecycleApplyQuitLayout() {
+	Transition := LifecycleTransitionBegin("quit")
+	if IsSet(PauseLayoutSwitch_Apply)
+		_LifecycleRunRequiredStep(Transition, "keyboard-layout",
+			() => PauseLayoutSwitch_Apply("quit"), true)
+	if !LifecycleTransitionFinish(Transition) {
+		_LifecycleLogTransitionDebt(Transition)
+		return false
+	}
+	return true
 }
 
 _LifecycleLogTransitionDebt(Transaction) {
@@ -805,15 +848,15 @@ _SuspendStateWatchdog() {
 		}
 }
 ; Single global shutdown handler wired to OnExit (see the auto-execute section
-; after the keylogger is started). AHK v2 Reload() and ExitApp() tear the process
+; after the keystats is started). AHK v2 Reload() and ExitApp() tear the process
 ; down WITHOUT running per-module destructors — only callbacks registered via
-; OnExit run. The keylogger hot path is intentionally RAM-buffered (KL_AppendLog
+; OnExit run. The keystats hot path is intentionally RAM-buffered (KL_AppendLog
 ; queues into _pending_entries; KL_Hook_Tick flushes buffer_events every 200 ms
 ; and KL_IngestOnce drains _pending_entries to data.sql every 5 s), so WITHOUT this
 ; handler a Reload (the driver's standard "apply settings" mechanism, also fired by
 ; CheckKeyboardLayoutChange on a layout switch) silently loses the last few seconds
 ; of typing metrics on every restart. KL_Stop is idempotent (guards on
-; Keylogger.initialized) and already flushes + ingests + saves, so wiring it here
+; Keystats.initialized) and already flushes + ingests + saves, so wiring it here
 ; closes the data-loss window. EVERY step is try-wrapped: an OnExit callback that
 ; throws is swallowed by AHK and can hang exit, so the handler must never throw.
 ; Returning 0 lets the exit proceed.
@@ -914,7 +957,7 @@ _LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false) {
 	return 0
 }
 
-; Arms the retry of the same user exit after a transient keylogger refusal.
+; Arms the retry of the same user exit after a transient keystats refusal.
 ; Reloads and system exits keep their own owners; one retry is armed at most.
 ; @param Reason {String} The refused OnExit reason.
 ; @param Code {Integer} The refused exit code, reused by the retry.
@@ -938,7 +981,7 @@ _LifecycleArmFlushExitRetry(Reason, Code) {
 _LifecycleRetryExitNow(Code, *) {
 	global _LifecycleFlushExitRetryArmed
 	_LifecycleFlushExitRetryArmed := false
-	try LoggerInfo("Lifecycle", "Keylogger flush settled; retrying the deferred exit.")
+	try LoggerInfo("Lifecycle", "Keystats flush settled; retrying the deferred exit.")
 	ExitApp(Code)
 }
 
@@ -946,7 +989,7 @@ _LifecycleAbandonExitRetry(*) {
 	global _LifecycleFlushExitRetryArmed, LIFECYCLE_FLUSH_EXIT_BUDGET_MS
 	_LifecycleFlushExitRetryArmed := false
 	try LoggerError("Lifecycle",
-		"Deferred exit abandoned: the keylogger flush did not settle within {1} ms.",
+		"Deferred exit abandoned: the keystats flush did not settle within {1} ms.",
 		LIFECYCLE_FLUSH_EXIT_BUDGET_MS)
 }
 
@@ -1074,35 +1117,35 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return _LifecycleRefuseShutdown("the recovery executable remains the sole durable driver owner")
 		}
-		; Publish only the reversible keylogger bypass before draining. OnExit is
+		; Publish only the reversible keystats bypass before draining. OnExit is
 		; non-interruptible, so the InputHook can remain installed until every
 		; refusal-capable terminal operation has accepted. A refused Reload then
 		; returns to a complete driver instead of one with its producers stopped.
 		try KL_BeginShutdown()
 		catch as Err
-			try LoggerError("Lifecycle", "Keylogger shutdown lease failed: {1}.", Err.Message)
-		KeyloggerFlushReady := false
-		KeyloggerFlushReason := ""
-		try KeyloggerFlushReady := KL_FlushShutdownReady(, , &KeyloggerFlushReason)
+			try LoggerError("Lifecycle", "Keystats shutdown lease failed: {1}.", Err.Message)
+		KeystatsFlushReady := false
+		KeystatsFlushReason := ""
+		try KeystatsFlushReady := KL_FlushShutdownReady(, , &KeystatsFlushReason)
 		catch as Err
-			try LoggerError("Lifecycle", "Keylogger flush shutdown preflight failed: {1}.", Err.Message)
-		if !KeyloggerFlushReady {
+			try LoggerError("Lifecycle", "Keystats flush shutdown preflight failed: {1}.", Err.Message)
+		if !KeystatsFlushReady {
 			; A flush or journal handoff in progress settles on its own, so the
 			; same exit is retried once it ends instead of asking the user again.
 			; Braces: a one-line try would claim this else as its own clause.
-			if (KeyloggerFlushReason == "flush_in_progress" || KeyloggerFlushReason == "journal_busy") {
+			if (KeystatsFlushReason == "flush_in_progress" || KeystatsFlushReason == "journal_busy") {
 				try LoggerInfo("Lifecycle",
-					"Shutdown deferred while a keylogger flush settles ({1}).", KeyloggerFlushReason)
+					"Shutdown deferred while a keystats flush settles ({1}).", KeystatsFlushReason)
 				_LifecycleArmFlushExitRetry(reason, code)
 			} else {
 				try LoggerError("Lifecycle",
-					"Shutdown refused because keylogger persistence debt is not durable yet ({1}).",
-					KeyloggerFlushReason)
+					"Shutdown refused because keystats persistence debt is not durable yet ({1}).",
+					KeystatsFlushReason)
 			}
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return _LifecycleRefuseShutdown("keylogger persistence debt is not durable yet")
+			return _LifecycleRefuseShutdown("keystats persistence debt is not durable yet")
 		}
 		AppCategoriesReady := false
 		try AppCategoriesReady := KL_AppCat_PrepareShutdown()
@@ -1134,7 +1177,7 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Deferred hotstring shutdown drain failed: {1}.", Err.Message)
 		if !FireDrainComplete {
 			; The in-memory fire batch is still the sole owner. No producer has been
-			; stopped, so withdrawing the reversible keylogger lease is sufficient.
+			; stopped, so withdrawing the reversible keystats lease is sufficient.
 			try LoggerError("Lifecycle", "Shutdown refused because deferred hotstring records are still pending.")
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
@@ -1181,7 +1224,7 @@ Ergopti_OnShutdown(reason, code) {
 		PrefetchStopped := false
 		try PrefetchStopped := KLPF_CancelAll()
 		catch as Err
-			try LoggerError("Lifecycle", "Keylogger prefetch shutdown failed: {1}.", Err.Message)
+			try LoggerError("Lifecycle", "Keystats prefetch shutdown failed: {1}.", Err.Message)
 		if !PrefetchStopped {
 			try LoggerError("Lifecycle",
 				"Shutdown refused because a metrics projection worker is still alive.")
@@ -1220,7 +1263,7 @@ Ergopti_OnShutdown(reason, code) {
 		}
 		; FinalExit and ownership transfer remain refusal gates, but all live
 		; producers are still installed. A refusal rolls back the terminal handoff
-		; through _LifecycleRefuseShutdown and withdraws the keylogger lease below.
+		; through _LifecycleRefuseShutdown and withdraws the keystats lease below.
 		if FileReadActivityBusy() {
 			try KL_CancelShutdown()
 			return _LifecycleRefuseShutdown("an exact file read still owns native cleanup")
@@ -1270,6 +1313,10 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Removal authorization failed during terminal shutdown: {1}.", Err.Message)
 		; No code below this point may refuse shutdown. All fallible authority
 		; transfers have accepted while the live driver was still intact.
+		; A user quit leaves the keyboard on the pause layout, as on macOS and
+		; Linux; a reload, a logoff or another instance taking over is no quit.
+		if IsSet(PauseLayoutSwitch_IsUserQuit) && PauseLayoutSwitch_IsUserQuit(reason)
+			_LifecycleApplyQuitLayout()
 		; The reload is now certain: menu commands that waited for it go to the
 		; successor, read from the tray before any teardown retires its rows.
 		if (TerminalHandoff is Map) {
@@ -1283,13 +1330,13 @@ Ergopti_OnShutdown(reason, code) {
 		try GestureScreenshotCancelAll("shutdown")
 		try HotstringPrefixWatcherStop()
 		try HotstringPrefixWatcherOnShutdown()
-		KeyloggerStopped := false
-		try KeyloggerStopped := KL_Stop()
+		KeystatsStopped := false
+		try KeystatsStopped := KL_Stop()
 		catch as Err
-			try LoggerError("Lifecycle", "Terminal keylogger stop failed: {1}.", Err.Message)
-		if !KeyloggerStopped
+			try LoggerError("Lifecycle", "Terminal keystats stop failed: {1}.", Err.Message)
+		if !KeystatsStopped
 			try LoggerError("Lifecycle",
-				"Terminal keylogger stop retained persistence debt; exit will continue under the durable journal contract.")
+				"Terminal keystats stop retained persistence debt; exit will continue under the durable journal contract.")
 		try UIASW_Stop("canceled")
 		try {
 			if !SFD_Stop()

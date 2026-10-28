@@ -6,7 +6,7 @@
 ; DESCRIPTION:
 ; With Space configured as a tap-hold, typing an end-char trigger, pausing past
 ; the activation delay and tapping Space produced NOTHING: no expansion, and no
-; space either. The keylogger recorded a hotstring fire that never happened, and
+; space either. The keystats recorded a hotstring fire that never happened, and
 ; HSE_Buffer kept a space the screen did not have, so the next trigger was
 ; mis-framed.
 ;
@@ -124,18 +124,18 @@ _DVC_SpaceTapFallsThroughOnDecline() {
 	Body := _DriverFuncBody("_SpaceTap")
 	Assert(Body != "", "_SpaceTap() must exist in the driver source")
 
-	PressPos    := InStr(Body, 'TextPressKey("Space"')
+	PressPos    := InStr(Body, 'TextPressKeyFed("Space"')
 	FeedPos     := InStr(Body, 'HSE_FeedChar(" ", true)')
 	DispatchPos := InStr(Body, "HSE_DispatchMatch")
 	Assert(DispatchPos > 0, "_SpaceTap must still route the candidate through the dispatch")
 	Assert(PressPos > 0 and FeedPos > PressPos and DispatchPos > FeedPos,
 		"the suppressed tap must be emitted once before HSE/dispatch model it; a decline then falls through with that same literal Space already visible")
-	Assert(InStr(Body, 'TextPressKey("Space"', true, PressPos + 1) == 0,
+	Assert(InStr(Body, 'TextPressKeyFed("Space"', true, PressPos + 1) == 0,
 		"the decline path must not emit a second literal Space")
 	Assert(InStr(Body, "&CommittedScreenEffect", true, DispatchPos) > DispatchPos,
 		"the Space caller must consume the dispatcher's canonical screen effect")
 
-	; The keylogger fire record must live inside the fired branch. Logging it
+	; The keystats fire record must live inside the fired branch. Logging it
 	; before the verdict is what put phantom expansions in the metrics.
 	;
 	; Matched on either channel: the record is queued rather than written inline

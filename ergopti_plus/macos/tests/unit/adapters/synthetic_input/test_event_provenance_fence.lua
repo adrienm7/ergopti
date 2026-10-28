@@ -123,7 +123,7 @@ helpers.describe("event provenance: classify_with_fence ordering contract", func
 		local fixture = make_fixture()
 
 		local foreign, foreign_status, foreign_fence = fixture.provenance.classify_with_fence(
-			fixture.event(0), "keylogger")
+			fixture.event(0), "keystats")
 		helpers.assert_nil(foreign)
 		helpers.assert_eq(foreign_status, fixture.provenance.STATUS_FOREIGN)
 		helpers.assert_eq(foreign_fence.fence_index, 1)
@@ -131,7 +131,7 @@ helpers.describe("event provenance: classify_with_fence ordering contract", func
 			"one foreign event must claim one and only one physical fence")
 
 		local unreadable, unreadable_status, unreadable_fence = fixture.provenance.classify_with_fence(
-			fixture.event(nil, true), "keylogger")
+			fixture.event(nil, true), "keystats")
 		helpers.assert_nil(unreadable)
 		helpers.assert_eq(unreadable_status, fixture.provenance.STATUS_UNREADABLE)
 		helpers.assert_eq(unreadable_fence.fence_index, 2)

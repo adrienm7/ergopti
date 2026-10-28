@@ -67,9 +67,8 @@ local function with_scope(body)
 			local engine = require("modules.llm.prediction_engine")
 			engine.init({ overlay = overlay, scheduler = scheduler,
 				focus_id = function() return "x11:scope-fixture:1" end,
-				engine = {
-					current_buffer = function() return "Hello world" end,
-				},
+				engine = {},
+				context = { text = function() return "Hello world" end, replaced = function() end },
 			})
 			local files = {
 				read_with_status = function(target) return Writer.read_classified(target) end,

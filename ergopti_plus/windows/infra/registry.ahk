@@ -16,7 +16,7 @@
 ; 3. Typed writes: Reg_WriteDword, Reg_WriteString, and Reg_WriteBinary cover
 ;    the three value types used across the codebase.
 ; 4. Subtree enumeration: Reg_EnumValues returns all value names + data under a
-;    given key, used by keylogger_av_state to iterate CloudStore entries.
+;    given key, used by keystats_av_state to iterate CloudStore entries.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

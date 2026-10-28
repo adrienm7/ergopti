@@ -37,7 +37,7 @@ local LOG = "adapters.timer_scheduler"
 -- =========================================
 -- =========================================
 
--- The scheduler owns every armed token until firing or accepted cancellation.
+-- The scheduler owns armed tokens and refused native rollback cleanup.
 -- Weak values let GC erase a fire-and-forget repeater while its native timer
 -- remained live, making cancelAll() report success without stopping it.
 local _live_timers = {}
@@ -135,7 +135,13 @@ function M.after(delaySec, fn)
 		return t
 	end)
 	if not ok then
-		if allocated_timer then pcall(luv.close, allocated_timer) end
+		if allocated_timer then
+			local closed = pcall(luv.close, allocated_timer)
+			if not closed then
+				handle.timer = allocated_timer
+				_live_timers[handle.id] = handle
+			end
+		end
 		Logger.error(LOG, "after(): timer allocation/start failed — %s", tostring(timer_or_err))
 		handle.fired = true
 		return handle
@@ -183,7 +189,13 @@ function M.every(intervalSec, fn)
 		return t
 	end)
 	if not ok then
-		if allocated_timer then pcall(luv.close, allocated_timer) end
+		if allocated_timer then
+			local closed = pcall(luv.close, allocated_timer)
+			if not closed then
+				handle.timer = allocated_timer
+				_live_timers[handle.id] = handle
+			end
+		end
 		Logger.error(LOG, "every(): timer allocation/start failed — %s", tostring(timer_or_err))
 		handle.fired = true
 		return handle

@@ -81,7 +81,8 @@ _LLM_LocalModelOfferPublished(Receipt, Callback := 0, *) {
 _LLM_LocalModelOfferSchedule(Receipt, Callback, Delay) {
 	if !_LLM_LocalModelOfferCurrent(Receipt)
 		return false
-	TimerSetCallback(_LLM_LocalModelOfferPublished.Bind(Receipt, Callback), Delay)
+	; The delayed menu rebuild after a pull runs once, whatever sign the caller used.
+	TimerArmOneShotMs(_LLM_LocalModelOfferPublished.Bind(Receipt, Callback), Delay)
 	return true
 }
 

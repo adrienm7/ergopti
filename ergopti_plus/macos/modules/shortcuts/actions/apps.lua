@@ -20,6 +20,8 @@
 ---    with its own admission generation, so pausing one feature never fences or
 ---    settles the other's work. The clipboard stays process-global: one capture
 ---    at a time, whatever its parent.
+--- 4. Window placement: opening an application or folder preserves window
+---    frames. A delayed focus read cannot identify which application was opened.
 --- ==============================================================================
 
 local M = {}
@@ -73,9 +75,6 @@ local FINDER_PATH_SETTLE_SEC = 0.15
 
 -- Wait after Cmd+C for a text selection to reach the clipboard
 local COPY_SETTLE_SEC        = 0.2
-
--- Delay before centering newly opened windows (give them time to appear)
-local CENTER_DELAY_SEC       = 0.3
 
 -- Additional delay for navigating to a sub-folder after the app focuses
 local FOLDER_OPEN_DELAY_SEC  = 0.12
@@ -178,8 +177,16 @@ end
 local function apps_cleanup_debt(scope)
 	if scope.acquisitions ~= 0 then return true end
 	for _, entry in pairs(_apps_timers) do
+		local handle = entry.handle
+		-- A settled callback keeps its owner through the handoff, but that
+		-- ownership is not cleanup debt. A delivered native timer may still be.
+		local handing_off = entry.callback_active == true and entry.due == true
+			and type(handle) == "table" and handle.timer == nil
+			and apps_entry_authorized(entry)
 		if entry.scope == scope
-			and (entry.discard == true or entry.committed ~= true) then return true end
+			and (entry.discard == true
+				or (entry.committed ~= true and not handing_off)
+				or (entry.due == true and handle.timer ~= nil)) then return true end
 	end
 	for _, entry in pairs(_apps_shells) do
 		if entry.scope == scope
@@ -660,44 +667,6 @@ local function launch_first_available(apps)
 	return false
 end
 
---- Centers all visible standard windows of an application on their respective screens.
---- @param app userdata The hs.application object.
-local function center_windows_of_app(app)
-	if not app or type(app.allWindows) ~= "function" then return end
-	local ok, wins = pcall(function() return app:allWindows() end)
-	if not ok or not wins then return end
-
-	for _, w in ipairs(wins) do
-		if w:isStandard() and w:isVisible() then
-			local screen = w:screen()
-			if screen then
-				local sf = screen:frame()
-				local wf = w:frame()
-				pcall(function()
-					w:setFrame({
-						x = sf.x + math.floor((sf.w - wf.w) / 2),
-						y = sf.y + math.floor((sf.h - wf.h) / 2),
-						w = wf.w,
-						h = wf.h,
-					})
-				end)
-			end
-		end
-	end
-end
-
---- Centers the frontmost application's windows after a short delay.
---- @param scope table Parent scope that owns the timer.
---- @param delay number Seconds to wait before centering.
-local function center_frontmost_after(scope, delay)
-	local _, committed = schedule_apps_timer(scope, tonumber(delay) or 0.2,
-		"center frontmost application", function()
-		local ok, f = pcall(hs.application.frontmostApplication)
-		if ok and f then center_windows_of_app(f) end
-	end)
-	return committed == true
-end
-
 --- Logs a recognised target that stays closed and tells the user why.
 --- @param key string Locale key whose %s receives the target.
 --- @param target string The classified target.
@@ -825,7 +794,6 @@ function M.open_downloads(parent)
 	return focus_existing_finder_window(scope, downloads, function(focused)
 		if focused then
 			Logger.info(LOG, "Focused existing Finder window for Downloads.")
-			center_frontmost_after(scope, CENTER_DELAY_SEC)
 			return
 		end
 
@@ -837,7 +805,6 @@ function M.open_downloads(parent)
 					start_owned_open(scope, downloads, "open Downloads")
 				end)
 		end
-		center_frontmost_after(scope, CENTER_DELAY_SEC)
 	end)
 end
 
@@ -855,7 +822,6 @@ function M.open_finder(parent)
 				start_owned_open(scope, home, "open home folder")
 			end)
 	end
-	center_frontmost_after(scope, CENTER_DELAY_SEC)
 	return true
 end
 
@@ -880,7 +846,6 @@ function M.open_settings(parent)
 	if not AppLauncher.launch("System Settings") then
 		AppLauncher.launch("System Preferences")
 	end
-	center_frontmost_after(scope, CENTER_DELAY_SEC)
 	return true
 end
 

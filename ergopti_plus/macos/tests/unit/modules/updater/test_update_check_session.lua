@@ -24,7 +24,7 @@ local function build(opts)
 	opts = opts or {}
 	local ctx = {
 		pushed = {}, checks = {}, installs = {}, switches = {}, closes = 0, logs = {}, reports = {},
-		opened = 0, changelogs = {}, channel = opts.channel or "dev",
+		opened = 0, changelogs = {}, channel = opts.channel or "dev", urls = {},
 	}
 	ctx.session = load_session().new({
 		push = function(message) ctx.pushed[#ctx.pushed + 1] = message; return true end,
@@ -49,6 +49,11 @@ local function build(opts)
 			complete(true)
 		end,
 		open_log = function() ctx.opened = ctx.opened + 1; return false, true end,
+		repository = function()
+			if opts.repository_throws then error("no repository identity") end
+			return { owner = "adrienm7", repo = "ergopti" }
+		end,
+		open_url = function(url) ctx.urls[#ctx.urls + 1] = url; return opts.open_url_refused ~= true end,
 		close = function() ctx.closes = ctx.closes + 1 end,
 		log_path = function()
 			if opts.log_path_throws then error("no log sink") end
@@ -309,4 +314,85 @@ helpers.describe("update report explicit completion", function()
 		c.session.on_message({ action = "report" }); helpers.assert_eq(cancelled, 1)
 		local before = #c.pushed; old_done(true); helpers.assert_eq(#c.pushed, before)
 	end)
+		local RELEASE = '{"tag_name":"v0.0.0-dev.150","body":"## Changelog\\r\\n- **Fix: A thing**"}'
+		local function offered(extra)
+			local answer = {}
+			for key, value in pairs(AVAILABLE) do answer[key] = value end
+			for key, value in pairs(extra or {}) do answer[key] = value end
+			return answer
+		end
+
+		helpers.it("seeds the page with the release body and the repository", function()
+			local ctx = build()
+			ctx.session.start()
+			ctx.checks[1].answer(offered({ release = RELEASE }))
+			helpers.assert_eq(last(ctx).notes, {
+				body = "## Changelog\n- **Fix: A thing**", owner = "adrienm7", repo = "ergopti" })
+		end)
+
+		helpers.it("seeds no notes without a release body source or outside the offer", function()
+			local ctx = build()
+			ctx.session.start()
+			ctx.checks[1].answer(AVAILABLE)
+			helpers.assert_eq(last(ctx).notes, nil, "an answer without its release object carries no notes")
+			ctx.session.start()
+			ctx.checks[2].answer(offered({ state = "up_to_date", release = RELEASE }))
+			helpers.assert_eq(last(ctx).notes, nil, "only an offered release carries notes")
+		end)
+
+		helpers.it("shows the answer without notes and logs when the repository is unknown", function()
+			local ctx = build({ repository_throws = true })
+			ctx.session.start()
+			ctx.checks[1].answer(offered({ release = RELEASE }))
+			helpers.assert_eq(last(ctx).state, "available")
+			helpers.assert_eq(last(ctx).notes, nil)
+			local logged = false
+			for _, entry in ipairs(ctx.logs) do
+				if entry.level == "error" and entry.text:find("repository identity", 1, true) then logged = true end
+			end
+			helpers.assert_true(logged, "the missing repository is logged as an error")
+		end)
+
+		helpers.it("opens a repository link of the seeded notes and acknowledges it", function()
+			local ctx = build()
+			ctx.session.start()
+			ctx.checks[1].answer(offered({ release = RELEASE }))
+			local url = "https://github.com/adrienm7/ergopti/releases/tag/v0.0.0-dev.150"
+			ctx.session.on_message({ action = "open_url", url = url })
+			helpers.assert_eq(ctx.urls, { url })
+			helpers.assert_eq(last(ctx), { type = "action", action = "open_url", ok = true, missing = false })
+		end)
+
+		helpers.it("refuses a link outside the repository, before any host opens it", function()
+			local ctx = build()
+			ctx.session.start()
+			ctx.checks[1].answer(offered({ release = RELEASE }))
+			for _, url in ipairs({
+				"https://example.com/adrienm7/ergopti", "http://github.com/adrienm7/ergopti/releases",
+				"https://github.com/adrienm7/ergopti-fork", "https://github.com/adrienm7/ergopti@evil.test/x",
+				"javascript:alert(1)", "https://github.com/adrienm7/ergopti/a b",
+			}) do
+				ctx.session.on_message({ action = "open_url", url = url })
+				helpers.assert_eq(last(ctx).ok, false, url)
+			end
+			ctx.session.on_message({ action = "open_url" })
+			helpers.assert_eq(#ctx.urls, 0, "no refused link reached the host")
+		end)
+
+		helpers.it("refuses a link when the answer offered no notes or the phase is not an offer", function()
+			local ctx = build()
+			ctx.session.start()
+			ctx.session.on_message({ action = "open_url", url = "https://github.com/adrienm7/ergopti" })
+			ctx.checks[1].answer(AVAILABLE)
+			ctx.session.on_message({ action = "open_url", url = "https://github.com/adrienm7/ergopti" })
+			helpers.assert_eq(#ctx.urls, 0, "nothing opens while checking or without seeded notes")
+		end)
+
+		helpers.it("says so when the host cannot open an approved link", function()
+			local ctx = build({ open_url_refused = true })
+			ctx.session.start()
+			ctx.checks[1].answer(offered({ release = RELEASE }))
+			ctx.session.on_message({ action = "open_url", url = "https://github.com/adrienm7/ergopti" })
+			helpers.assert_eq(last(ctx).ok, false)
+		end)
 end)

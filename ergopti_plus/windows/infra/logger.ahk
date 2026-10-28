@@ -107,9 +107,14 @@ global LOGGER_ERRORS_LOG_PATH := ""
 ; compares this against today and re-resolves on a change.
 global _LOGGER_PATH_DATE := ""
 
-; Retention window for dated log files, in days. Single source of truth: both
-; LoggerInit and the midnight rollover in _LoggerFlush purge with this value.
-global LOGGER_RETENTION_DAYS := 14
+; Retention window for dated log files, in days. Both LoggerInit and the
+; midnight rollover in _LoggerFlush purge with this value, which LoggerLoadTimings
+; reassigns at boot from the shared registry ([logger] retention_days), the
+; number macOS and Linux read too. The sentinel 0 means "not loaded yet": a purge
+; is skipped rather than run with a guessed window, because _LoggerPurgeOldLogs
+; with 0 days treats every dated file as expired. Only the fatal-path LoggerInit
+; of infra/error_net.ahk can run that early.
+global LOGGER_RETENTION_DAYS := 0
 
 ; Fixed-name diagnostic files used by detached helpers cannot participate in
 ; the dated-log retention sweep. Keep one current file plus one rotated archive,
@@ -426,7 +431,7 @@ LoggerAppendBootstrapLine(Severity, Source, Message) {
 				? _DefaultLogsDir : LoggerDefaultLogsDir()
 		if !DirExist(Dir)
 				DirCreate(Dir)
-		BootstrapLog := Dir . "bootstrap.log"
+		BootstrapLog := Dir . AppDirsLogBootstrapName()
 		FileAppend(FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . " [" . Severity . "] ["
 				. Source . "] " . Message . "`r`n", BootstrapLog, "UTF-8")
 		return BootstrapLog
@@ -451,6 +456,19 @@ _LoggerResolveDatedPaths() {
 		return LogDir
 }
 
+; Reassign the retention window from the shared registry ([logger] retention_days).
+; AHK v2 runs global initializers before the auto-execute body, so the sentinel
+; above cannot call TimingsGet itself; infra/boot.ahk calls this right after
+; TimingsLoadShared(), before LoggerInit purges. Fail-fast: TimingsGet throws on
+; a missing key, and a window under one day would purge today's own files.
+LoggerLoadTimings() {
+		global LOGGER_RETENTION_DAYS
+		Days := TimingsGet("logger", "retention_days")
+		if (Days < 1)
+				throw ValueError(Format("[logger] retention_days must be at least 1 day, got {1}.", Days))
+		LOGGER_RETENTION_DAYS := Days
+}
+
 ; Initialise the logger. Reads the minimum level from the ini and resolves the
 ; log file path. Safe to call multiple times — later calls just refresh the
 ; minimum level (e.g. after the user changes it via the menu).
@@ -462,7 +480,10 @@ LoggerInit() {
 		if !(_LoggerPrivacyConfig() is Map)
 				throw Error("Logger privacy policy is not initialized.")
 		LogDir := _LoggerResolveDatedPaths()
-		_LoggerPurgeOldLogs(LogDir, LOGGER_RETENTION_DAYS)
+		if (LOGGER_RETENTION_DAYS > 0)
+				_LoggerPurgeOldLogs(LogDir, LOGGER_RETENTION_DAYS)
+		else
+				LoggerDebug("Logger", "Log retention is not loaded yet; the purge waits for the next rollover.")
 		; Sub-file routing comes from _generated/logger_sub_files.ahk, generated from
 		; _shared/modules/logger/sub_files.toml — adding a topical log is a TOML edit
 		; plus a codegen run, never a parser change in two drivers.
@@ -470,14 +491,30 @@ LoggerInit() {
 		LOGGER_SUB_FILES := LoggerSubFilesData()
 		_LoggerInitSubFiles(LogDir)
 		LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
-		if IsSet(ConfigurationFile) and FileExist(ConfigurationFile) {
-				try {
-						; The ordinary boot reader admits dotted/inline/quoted namespaces.
-						Content := FSReadStrict(ConfigurationFile)
-						Cache := ConfigTomlDecodeSnapshot(Content).Cache
-						Value := IniCacheGet(Cache, "script", "log_level", LOGGER_DEFAULT_LEVEL)
-						if LOGGER_SEVERITY.Has(Value) {
-								LOGGER_MIN_LEVEL := Value
+		Value := LOGGER_DEFAULT_LEVEL
+		if IsSet(ConfigurationFile) {
+				if ConfigMigrateBoot(ConfigurationFile, "known") {
+						; Normal boot and menu updates retain the canonical source
+						; generation, including its original native presence.
+						Cache := ConfigTomlReadSnapshot(ConfigurationFile).Cache
+						Value := IniCacheGet(Cache, ConfigKey.SCRIPT, ConfigLeaf.LOG_LEVEL, LOGGER_DEFAULT_LEVEL)
+				} else if FileExist(ConfigurationFile) {
+						; Fatal startup recovery can initialize logging before the
+						; configuration constructor admits a source; no cache exists yet.
+						try {
+								Content := FSReadStrict(ConfigurationFile)
+								Cache := ConfigTomlDecodeSnapshot(Content).Cache
+								Value := IniCacheGet(Cache, "script", "log_level", LOGGER_DEFAULT_LEVEL)
+						}
+				}
+		}
+		; Enum admission accepts case variants; native severity keys are exact.
+		; Resolve with the same comparison and publish the owning native name.
+		if Value is String {
+				for Level in LOGGER_SEVERITY {
+						if Level = Value {
+								LOGGER_MIN_LEVEL := Level
+								break
 						}
 				}
 		}
@@ -602,7 +639,7 @@ _LoggerRepairAppendDebt(Path, FlushFn, TruncateFn) {
 ; Injectable seams make short writes and failed stable flushes deterministic in
 ; regression tests without weakening the production filesystem boundary.
 _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
-		FlushFn := 0, TruncateFn := 0, WriteFn := 0, SourceRecords := 0) {
+		FlushFn := 0, TruncateFn := 0, WriteFn := 0, SourceRecords := 0, MaxBytes := 0) {
 	global _LOGGER_APPEND_OWNERS
 	if !(Path is String) or Path = "" or !(Blob is String)
 		return false
@@ -631,7 +668,10 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 		Stage := "redaction"
 		Blob := _LoggerPrivacyBlob(Blob, Config, SourceRecords)
 		Stage := "debt_repair"
-		if !_LoggerRepairAppendDebt(Path, ResolvedFlush, ResolvedTruncate)
+		if MaxBytes {
+			if !_LoggerPrepareBoundedAppend(Path, Blob, MaxBytes, ResolvedFlush, ResolvedTruncate)
+				return _LoggerRefuseAppend(Stage)
+		} else if !_LoggerRepairAppendDebt(Path, ResolvedFlush, ResolvedTruncate)
 			return _LoggerRefuseAppend(Stage)
 		; Another writer must not commit bytes that this owner's rollback can erase
 		Stage := "open"
@@ -650,7 +690,7 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 			throw Error("logger stable flush failed")
 		FileObject.Close()
 		FileObject := 0
-		return true
+		return !MaxBytes || FileGetSize(Path) <= MaxBytes
 	} catch {
 		_LoggerRefuseAppend(Stage)
 		if IsObject(FileObject)
@@ -856,7 +896,9 @@ _LoggerFlushOwned(ForceFlush := false) {
 	; file the operator reads as today's.
 	if (_LOGGER_PATH_DATE != "" and _LOGGER_PATH_DATE != FormatTime(, "yyyy-MM-dd")) {
 		RolledDir := _LoggerResolveDatedPaths()
-		_LoggerPurgeOldLogs(RolledDir, LOGGER_RETENTION_DAYS)
+		; Same sentinel guard as LoggerInit: a window not loaded yet purges nothing.
+		if (LOGGER_RETENTION_DAYS > 0)
+			_LoggerPurgeOldLogs(RolledDir, LOGGER_RETENTION_DAYS)
 		_LoggerInitSubFiles(RolledDir)
 	}
 
@@ -1162,40 +1204,40 @@ LoggerAppendBoundedDebug(Path, Line, MaxBytes := 0) {
 		MaxBytes := LOGGER_AUXILIARY_LOG_MAX_BYTES
 	if Type(MaxBytes) != "Integer" || MaxBytes < 4
 		return false
-	Payload := Line . "`r`n"
-	PayloadBytes := StrPut(Payload, "UTF-8") - 1
-	; AHK writes a three-byte UTF-8 BOM when creating a new text file.
-	if PayloadBytes + 3 > MaxBytes
+	; Admission and rotation consume the exact redacted bytes inside the append
+	; owner. Measuring the raw line can undercount expansions or reject a secret
+	; whose redacted replacement would fit; redacting here would run it twice.
+	return _LoggerAppendComplete(Path, Line . "`r`n", false,
+		0, 0, 0, 0, 0, MaxBytes)
+}
+
+; Called only after the sink has admitted its privacy policy and reserved Path.
+; Repair precedes every size decision so rotation never moves an unpaid native
+; rollback boundary to a different owner. The byte cap includes a new-file BOM.
+_LoggerPrepareBoundedAppend(Path, Blob, MaxBytes, FlushFn, TruncateFn) {
+	PayloadBytes := StrPut(Blob, "UTF-8") - 1
+	BomBytes := StrPut(Chr(0xFEFF), "UTF-8") - 1
+	if PayloadBytes + BomBytes > MaxBytes
 		return false
 	ArchivePath := Path . ".1"
-	try {
-		; A size decision must use repaired bytes, and rotation must never move
-		; an outstanding rollback boundary onto a different file owner
-		for RepairPath in [Path, ArchivePath] {
-			if !_LoggerRepairAppendDebt(RepairPath,
-					FSFlushFileBuffers, _LoggerTruncateAppend)
-				return false
-		}
-		if FileExist(ArchivePath) && FileGetSize(ArchivePath) > MaxBytes
-			FileDelete(ArchivePath)
-		CurrentBytes := FileExist(Path) ? FileGetSize(Path) : 0
-		NextBytes := CurrentBytes + PayloadBytes + (CurrentBytes == 0 ? 3 : 0)
-		if NextBytes > MaxBytes {
-			if FileExist(ArchivePath)
-				FileDelete(ArchivePath)
-			; A legacy file may already exceed the newly enforced cap. Rotating that
-			; debt would merely preserve an oversized owner, so discard it once.
-			if CurrentBytes > MaxBytes
-				FileDelete(Path)
-			else if FileExist(Path)
-				FileMove(Path, ArchivePath, true)
-		}
-		if !_LoggerAppendComplete(Path, Payload)
+	for RepairPath in [Path, ArchivePath] {
+		if !_LoggerRepairAppendDebt(RepairPath, FlushFn, TruncateFn)
 			return false
-		return FileGetSize(Path) <= MaxBytes
-	} catch {
-		return false
 	}
+	if FileExist(ArchivePath) && FileGetSize(ArchivePath) > MaxBytes
+		FileDelete(ArchivePath)
+	CurrentBytes := FileExist(Path) ? FileGetSize(Path) : 0
+	NextBytes := CurrentBytes + PayloadBytes + (CurrentBytes == 0 ? BomBytes : 0)
+	if NextBytes > MaxBytes {
+		if FileExist(ArchivePath)
+			FileDelete(ArchivePath)
+		; A legacy file above the cap cannot become a bounded archive.
+		if CurrentBytes > MaxBytes
+			FileDelete(Path)
+		else if FileExist(Path)
+			FileMove(Path, ArchivePath, true)
+	}
+	return true
 }
 
 ; Start of a routine internal operation (debug granularity). Pair with Done.
@@ -1223,6 +1265,20 @@ LoggerInfo(Tag, Msg, Args*) {
 				return
 		}
 		_LoggerEmit("INFO", Tag, Msg, Args*)
+}
+
+; Evidence record (spec section 4.3): an INFO line, rendered [INFO], that neither
+; the consecutive dedup nor the repeat collapser ever withholds. For the result
+; lines of a field check or a diagnostics probe that a person is asked to send
+; back, where records share one template and differ by arguments and the same
+; check may run again minutes later. Not a lifecycle half and not a substitute
+; for LoggerInfo: use it only for data meant to be read back.
+LoggerEvidence(Tag, Msg, Args*) {
+		global _LOGGER_INFO_ENABLED
+		if !_LOGGER_INFO_ENABLED {
+				return
+		}
+		_LoggerEmitBody("INFO", Tag, Msg, _LoggerFormatBody(Msg, Args), true)
 }
 
 ; Start of a significant action (init, HTTP request, user-triggered op).
@@ -1314,15 +1370,22 @@ LoggerRingBufferSnapshot() {
 ; Format and emit a log line if the current level allows it. Best-effort —
 ; never raises so a logging failure cannot break the driver. Hot-path-safe.
 _LoggerEmit(Level, Tag, Msg, Args*) {
-		global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
-		global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
-		global _LOGGER_REPEAT_ENABLED, _LOGGER_STAMP_FN
+		global LOGGER_SEVERITY
 		; Safety net for unknown levels — the public wrappers already short-circuit
 		; on the per-level fast-path flags, so a severity comparison here would be
 		; a redundant second filter. Only guard against a completely unrecognised Level.
 		if !LOGGER_SEVERITY.Has(Level) {
 				return
 		}
+		_LoggerEmitBody(Level, Tag, Msg, _LoggerFormatBody(Msg, Args), false)
+}
+
+; Substitutes Args into the {N} template Msg. A bad format string must not
+; break the driver, and the failure is recorded on the returned text itself.
+; @param Msg {String} Template.
+; @param Args {Array} Values; an empty array returns Msg unchanged.
+; @returns {String} The formatted body.
+_LoggerFormatBody(Msg, Args) {
 		Body := Msg
 		if Args.Length > 0 {
 				try {
@@ -1339,6 +1402,21 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 								. " — " . Args.Length . " arg(s) not substituted]"
 				}
 		}
+		return Body
+}
+
+; Writes one already formatted line through both suppression layers, the ring,
+; the sinks and the fan-out. Best-effort — never raises. Hot-path-safe.
+; @param Level {String} Key of LOGGER_SEVERITY.
+; @param Tag {String} Module tag.
+; @param Msg {String} The unformatted template (the INFO/DEBUG repeat key).
+; @param Body {String} The formatted body.
+; @param Exempt {Boolean} True for an evidence record (spec section 4.3): neither
+;   the consecutive dedup nor the repeat collapser may withhold it.
+_LoggerEmitBody(Level, Tag, Msg, Body, Exempt) {
+		global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
+		global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
+		global _LOGGER_REPEAT_ENABLED, _LOGGER_STAMP_FN
 		; The shared wall-clock helper caches the second-resolution text while
 		; sampling seconds and milliseconds from one non-interruptible SYSTEMTIME.
 		; The test clock face, when installed, replaces that one sample.
@@ -1360,14 +1438,17 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		; recurring line is de-bounced, not permanently silenced (logger-dedup-tick): a
 		; streak that outlives the window re-surfaces. When the streak ends a single
 		; "N identical lines suppressed" summary is emitted. Mirrors the macOS driver.
-		if (MsgLine == _LOGGER_DEDUP_KEY and ((Now - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < LOGGER_DEDUP_WINDOW_MS) {
+		; An evidence record is accepted like any line (it ends an open dedup streak
+		; below) but is never itself withheld: it is the data a person was asked to
+		; send back, so a shared template or an immediate rerun must not fold it.
+		if (!Exempt and MsgLine == _LOGGER_DEDUP_KEY and (Now - _LastErrTime) < LOGGER_DEDUP_WINDOW_MS) {
 				_LOGGER_DEDUP_COUNT += 1
 				return
 		}
 		; ── Repeat collapsing ──
 		; Only what the dedup let through reaches this layer, so a burst is reported
 		; once, promptly, by the dedup summary and never counted twice.
-		if (_LOGGER_REPEAT_ENABLED and _LoggerWithholdRepeat(Level, Tag, Msg, Body, Stamp, Now))
+		if (!Exempt and _LOGGER_REPEAT_ENABLED and _LoggerWithholdRepeat(Level, Tag, Msg, Body, Stamp, Now))
 				return
 		if (_LOGGER_DEDUP_COUNT > 0) {
 				_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)

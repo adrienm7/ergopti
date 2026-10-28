@@ -18,7 +18,7 @@
 ;     Abort (a cross-apartment COM call) starves the keyboard hook while the
 ;     message pump is suspended. Both plural siblings already deferred.
 ;   * The engine's staleness check ran only at callback ENTRY. Finalization logs,
-;     hides tooltips and writes to the keylogger before it renders, and any of
+;     hides tooltips and writes to the keystats before it renders, and any of
 ;     those can yield long enough for a keystroke to supersede the request — so
 ;     the render painted a prediction for text the user had already left, and
 ;     re-seeded the cache with that stale context for the NEXT request too.
@@ -180,7 +180,7 @@ _LIH_StalenessIsRecheckedBeforeRender() {
 
 	Before := SubStr(Src, Max(1, At - 700), 700)
 	Assert(InStr(Before, "_LLM_Engine_IsCurrent(state)") > 0,
-		"the request must be re-checked immediately before the render and cache seed. Everything between the entry check and this point — the summary log, the tooltip hide, the keylogger write — can yield, and a keystroke arriving in that window supersedes the request. Rendering anyway paints text the user has already left, and seeding last_ctx hands that stale context to the NEXT request as well")
+		"the request must be re-checked immediately before the render and cache seed. Everything between the entry check and this point — the summary log, the tooltip hide, the keystats write — can yield, and a keystroke arriving in that window supersedes the request. Rendering anyway paints text the user has already left, and seeding last_ctx hands that stale context to the NEXT request as well")
 }
 
 ; The entry checks must go through the same owner, or the duplication is back.

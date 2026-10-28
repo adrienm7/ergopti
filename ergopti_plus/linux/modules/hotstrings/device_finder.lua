@@ -42,6 +42,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local DeviceNames = require("infra.device_names")
+local NativePath = require("native_path")
 
 local LOG = "modules.hotstrings.device_finder"
 
@@ -199,7 +200,7 @@ function M.is_key_device(path, devices)
 	if type(path) ~= "string" or path == "" then
 		return false, "no device path"
 	end
-	local basename = path:match("([^/]+)$")
+	local basename = NativePath.basename(path)
 	if not basename or not basename:match("^event%d+$") then
 		return false, path .. " is not an /dev/input/eventN node"
 	end
@@ -242,7 +243,7 @@ function M.is_interceptable_key_device(path, devices)
 	local snapshot = type(devices) == "table" and devices or read_proc_devices()
 	local is_key, why = M.is_key_device(path, snapshot)
 	if not is_key then return false, why end
-	local basename = path:match("([^/]+)$")
+	local basename = NativePath.basename(path)
 	for _, dev in ipairs(snapshot) do
 		for _, handler in ipairs(dev.handlers) do
 			if handler == basename then

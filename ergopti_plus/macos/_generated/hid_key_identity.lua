@@ -9,7 +9,7 @@
 --- the keys no layer can bind), with the macOS virtual keycode the metrics
 --- store for it. `kc` is the same on every registry form;
 --- a key whose keycode depends on the keyboard type carries one keycode per
---- form instead. modules/keylogger/physical_key_identity.lua owns the policy
+--- form instead. modules/keystats/physical_key_identity.lua owns the policy
 --- that reads it.
 --- ==============================================================================
 

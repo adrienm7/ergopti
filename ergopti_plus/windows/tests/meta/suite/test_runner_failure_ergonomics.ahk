@@ -292,7 +292,7 @@ Test("runner receipt sharing: incomplete reset is refused and closed (receipt-sh
 _TRFE_ReceiptBootstrapPatterns() {
 	return Map(
 		"shared", "(?im)^#Include[ \t]+test_framework\.ahk\s*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./infra/app_state\.ahk(?=[ \t]*\r?$)",
-		"e2e", "(?im)^#Include[ \t]+\.\./test_framework\.ahk\s*\r?\n\s*global[ \t]+TEST_RESULTS_FILE[ \t]*:=[ \t]*_TestResultsPath\([ \t]*A_ScriptDir[^\r\n]*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./\.\./modules/keylogger/keylogger_hook\.ahk(?=[ \t]*\r?$)",
+		"e2e", "(?im)^#Include[ \t]+\.\./test_framework\.ahk\s*\r?\n\s*global[ \t]+TEST_RESULTS_FILE[ \t]*:=[ \t]*_TestResultsPath\([ \t]*A_ScriptDir[^\r\n]*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./\.\./modules/keystats/keystats_hook\.ahk(?=[ \t]*\r?$)",
 		"native", "(?im)^OnError\(_NativeDesktopStartupError\)\s*\r?\n\s*#Include[ \t]+test_framework\.ahk\s*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./infra/app_state\.ahk(?=[ \t]*\r?$)")
 }
 
@@ -347,7 +347,7 @@ _TRFE_ReceiptBootstrapRefusals(ReceiptBootstrapCode) {
 		AssertFalse(_TRFE_ReceiptBootstrapOwned(StrReplace(ReceiptBootstrapFixture, ReceiptBootstrapOwner, ReceiptBootstrapMoved, true, , 1)),
 			"an unchanged call count cannot move initialization after bootstrap dependencies")
 		ReceiptBootstrapForeign := RegExReplace(ReceiptBootstrapOwner,
-			"(?im)(app_state|keylogger_hook)\.ahk(?=[ \t]*\r?$)", "$1.ahk.foreign", &ReceiptBootstrapChanged)
+			"(?im)(app_state|keystats_hook)\.ahk(?=[ \t]*\r?$)", "$1.ahk.foreign", &ReceiptBootstrapChanged)
 		AssertEqual(1, ReceiptBootstrapChanged, "the actual dependency mutation is nonvacuous")
 		AssertFalse(_TRFE_ReceiptBootstrapOwned(StrReplace(ReceiptBootstrapFixture, ReceiptBootstrapOwner,
 			ReceiptBootstrapForeign, true, , 1)), "a same-count foreign bootstrap dependency is refused")
@@ -664,3 +664,255 @@ _TRFE_ProgressReceipt(Locked) {
 }
 Test("runner progress: selected receipt preserves legacy bytes (progress-receipt)", _TRFE_ProgressReceipt.Bind(false))
 Test("runner progress: refused selected receipt cannot report success (progress-receipt)", _TRFE_ProgressReceipt.Bind(true))
+
+; Canonical publication must expose native refusals instead of retaining an old run.
+_TRFE_CanonicalPublication(Mode, Receipt) {
+	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+	SavedFile := TEST_RESULTS_FILE
+	SavedCanonical := TEST_RESULTS_CANONICAL
+	Canonical := Receipt . ".canonical"
+	Handle := 0
+	Fresh := "1..1`r`nok 1 - fresh " . Chr(0xE9) . Chr(0x1F642) . "`r`n# 1 passed, 0 failed.`r`n"
+	Stale := "1..7`r`n# preceding canonical receipt`r`n"
+	try {
+		TEST_RESULTS_FILE := Receipt
+		TEST_RESULTS_CANONICAL := Mode == "same" ? Receipt : Canonical
+		FileAppend(Fresh, Receipt, "UTF-8")
+		if Mode == "same" {
+			_CopyTestResultsForCi()
+			AssertEqual(Fresh, FileRead(Receipt, "UTF-8"), "same-path publication preserves the current receipt")
+			return
+		}
+		; Prove genuine copying works on this owned filesystem before testing refusal.
+		FileCopy(Receipt, Canonical, true)
+		AssertEqual(Fresh, FileRead(Canonical, "UTF-8"), "native copy precondition")
+		FileDelete(Canonical)
+		if Mode == "success" {
+			_CopyTestResultsForCi()
+			AssertEqual(Fresh, FileRead(Canonical, "UTF-8"), "publication preserves the complete Unicode receipt")
+			return
+		}
+		FileAppend(Stale, Canonical, "UTF-8")
+		if Mode == "locked" {
+			Handle := DllCall("Kernel32\CreateFileW", "Str", Canonical, "UInt", 0x80000000,
+				"UInt", 1, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+			AssertTrue(Handle != 0 && Handle != -1, "own an actual read-only sharing capability")
+		} else {
+			AssertEqual("missing", Mode, "the fixture only admits its declared refusal modes")
+			FileDelete(Receipt)
+		}
+		NativeRefusal := 0
+		try FileCopy(Receipt, Canonical, true)
+		catch Error as Failure
+			NativeRefusal := Failure
+		AssertTrue(IsObject(NativeRefusal), "the genuine native denial control must refuse copying")
+		AssertEqual("Error", Type(NativeRefusal), "FileCopy uses its documented aggregate failure")
+		AssertEqual("1", NativeRefusal.Extra, "exactly one native file copy must fail")
+		Refusal := 0
+		try _CopyTestResultsForCi()
+		catch Error as Failure
+			Refusal := Failure
+		AssertTrue(IsObject(Refusal), "canonical publication must expose the actual copy refusal")
+		AssertEqual(Type(NativeRefusal), Type(Refusal), "the publication keeps the original native error type")
+		AssertEqual(NativeRefusal.Message, Refusal.Message, "the publication keeps the original failure reason")
+		AssertEqual(NativeRefusal.Extra, Refusal.Extra, "the publication keeps the original failed-file count")
+		AssertEqual(Stale, FileRead(Canonical, "UTF-8"), "refusal cannot fabricate a new canonical receipt")
+	} finally {
+		TEST_RESULTS_FILE := SavedFile
+		TEST_RESULTS_CANONICAL := SavedCanonical
+		if Handle != 0 && Handle != -1
+			AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int"), "retire the actual sharing capability")
+		if FileExist(Canonical)
+			FileDelete(Canonical)
+	}
+}
+for _TRFE_CopyMode in ["success", "same", "locked", "missing"]
+	Test("runner canonical publication: " . _TRFE_CopyMode . " (receipt-publication)",
+		_TRFE_WithSharedTap.Bind(_TRFE_CanonicalPublication.Bind(_TRFE_CopyMode)))
+
+; The runner owns final failure even when the diagnostic destination also refuses.
+_TRFE_PublicationExit(Mode, Receipt) {
+	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+	SavedFile := TEST_RESULTS_FILE
+	SavedCanonical := TEST_RESULTS_CANONICAL
+	Canonical := Receipt . ".canonical"
+	Port := _TRFE_InitializationExitPort()
+	try {
+		TEST_RESULTS_FILE := Receipt
+		TEST_RESULTS_CANONICAL := Canonical
+		FileAppend("complete owned receipt", Receipt, "UTF-8")
+		FileCopy(Receipt, Canonical, true)
+		AssertEqual("complete owned receipt", FileRead(Canonical, "UTF-8"), "native copy positive control")
+		if Mode != "success"
+			FileDelete(Receipt)
+		Port.ThrowOutput := Mode == "stderr-refusal"
+		if Port.ThrowOutput {
+			Thrown := false
+			try _TestResultsPublishOrExit(Port.ErrorOutput.Bind(Port), Port.Exit.Bind(Port))
+			catch Error as Failure {
+				Thrown := true
+				AssertEqual("Owned TAP stderr port refusal.", Failure.Message)
+			}
+			AssertTrue(Thrown, "secondary diagnostic refusal must remain visible")
+		} else {
+			AssertEqual(Mode == "success",
+				_TestResultsPublishOrExit(Port.ErrorOutput.Bind(Port), Port.Exit.Bind(Port)),
+				"publication reports only actual native success")
+		}
+		if Mode == "success" {
+			AssertEqual(0, Port.Messages.Length, "a successful native copy emits no failure")
+			AssertEqual(0, Port.ExitCodes.Length, "successful publication does not request failure")
+		} else {
+			AssertEqual(1, Port.Messages.Length, "one diagnostic reports the copy refusal")
+			AssertContains(Port.Messages[1], "FATAL TAP PUBLICATION ERROR: Error|1: Failed")
+			AssertEqual(1, Port.ExitCodes.Length, "publication cannot return without requesting process failure")
+			AssertEqual(1, Port.ExitCodes[1])
+		}
+		AssertEqual("complete owned receipt", FileRead(Canonical, "UTF-8"), "no refusal fabricates canonical bytes")
+	} finally {
+		TEST_RESULTS_FILE := SavedFile
+		TEST_RESULTS_CANONICAL := SavedCanonical
+		if FileExist(Canonical)
+			FileDelete(Canonical)
+	}
+}
+for _TRFE_PublicationMode in ["success", "missing", "stderr-refusal"]
+	Test("runner canonical exit: " . _TRFE_PublicationMode . " (receipt-publication)",
+		_TRFE_WithSharedTap.Bind(_TRFE_PublicationExit.Bind(_TRFE_PublicationMode)))
+
+; Isolated owners must replay their own entry and original supported selection.
+_TRFE_ReplayExecutingChild() {
+	global _StaticDir
+	Framework := _StaticDir . "\ergopti_plus\windows\tests\test_framework.ahk"
+	Directory := A_Temp . "\ergopti-replay-command-" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "-" . A_TickCount
+	if !DllCall("Kernel32\CreateDirectoryW", "Str", Directory, "Ptr", 0, "Int")
+		throw OSError(A_LastError, "Cannot acquire the owned replay command fixture")
+	Owned := _TRFE_AbsoluteTapPath(Directory)
+	Receipt := Directory . "\child.tap"
+	Child := Directory . "\replay's " . Chr(0xE9) . ".ahk"
+	FrameworkCopy := Directory . "\framework.ahk"
+	Argument := "two ' quotes " . Chr(34) . " $() " . Chr(96) . " " . Chr(0xE9)
+	Handle := 0
+	CanRetire := true
+	Observation := {Calls: 0, Code: -1, Output: "", Errors: ""}
+	Completed(Code, Output, Errors) {
+		Observation.Calls += 1
+		Observation.Code := Code
+		Observation.Output := Output
+		Observation.Errors := Errors
+	}
+	try {
+		FileCopy(Framework, FrameworkCopy)
+		QuotedReceipt := StrReplace(StrReplace(Receipt, Chr(96), Chr(96) . Chr(96)), Chr(34), Chr(96) . Chr(34))
+		Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
+			. 'EnvSet("ERGOPTI_AHK_RESULTS_FILE", "' . QuotedReceipt . '")' . "`n"
+			. "#Include framework.ahk`n"
+			. '_TestResultsBeginRun()' . "`n"
+			. '_TestPrint("# replay_entry " . A_ScriptFullPath)' . "`n"
+			. '_TestPrint("# replay_interpreter " . A_AhkPath)' . "`n"
+			. 'Test("owned intentional replay failure", () => AssertEqual("expected", "actual"))' . "`n"
+			. "RunTests()`n"
+		FileAppend(Source, Child, "UTF-8")
+		; Exercise a real short alias when the volume supplies one. The child owns
+		; its executable spelling: A_Temp and A_ScriptFullPath can differ on Windows.
+		ShortPath := Buffer(32768 * 2)
+		ShortLength := DllCall("Kernel32\GetShortPathNameW", "Str", Child,
+			"Ptr", ShortPath, "UInt", ShortPath.Size // 2, "UInt")
+		LaunchEntry := ShortLength > 0 && ShortLength < ShortPath.Size // 2
+			? StrGet(ShortPath, ShortLength, "UTF-16") : Child
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut", LaunchEntry, "--owned-selection", Argument], Completed)
+		AssertTrue(Handle.start(), "the real isolated replay child must start")
+		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
+		while !Observation.Calls && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Observation.Calls, "the actual runner completes once")
+		AssertEqual(1, Observation.Code, "only the intentional registered callback must fail: " . Observation.Output . Observation.Errors)
+		AssertEqual("", Observation.Errors, "the child cannot hide a startup or native transport failure")
+		AssertContains(Observation.Output, "# 0 passed, 1 failed.", "the real runner executes its intentional failure")
+		ReplayLines := []
+		EntryLines := []
+		InterpreterLines := []
+		; The disk owner writes UTF-8 regardless of the child stdout code page.
+		for Line in StrSplit(FileRead(Receipt, "UTF-8"), "`n", "`r") {
+			if SubStr(Line, 1, 12) == "#   replay: "
+				ReplayLines.Push(Line)
+			if SubStr(Line, 1, 15) == "# replay_entry "
+				EntryLines.Push(SubStr(Line, 16))
+			if SubStr(Line, 1, 21) == "# replay_interpreter "
+				InterpreterLines.Push(SubStr(Line, 22))
+		}
+		AssertEqual(1, ReplayLines.Length, "one failed callback emits one replay diagnostic")
+		AssertEqual(1, EntryLines.Length, "the real child reports one entry identity")
+		AssertEqual(1, InterpreterLines.Length, "the real child reports one interpreter identity")
+		AssertTrue(EntryLines[1] != "" && InterpreterLines[1] != "", "native executable identities cannot be empty")
+		_TestPrint("# replay_identity launch=" . LaunchEntry . " entry=" . EntryLines[1]
+			. " interpreter=" . InterpreterLines[1])
+		Replay := ReplayLines[1]
+		AssertContains(Replay, "'" . StrReplace(EntryLines[1], "'", "''") . "'",
+			"the replay must name the actual isolated entry with a PowerShell literal")
+		AssertContains(Replay, "& '" . StrReplace(InterpreterLines[1], "'", "''") . "' ",
+			"the command preserves the actual interpreter")
+		AssertContains(Replay, " '--owned-selection' 'two '' quotes " . Chr(34) . " $() " . Chr(96) . " " . Chr(0xE9) . "'",
+			"the original supported selection is quoted without interpolation")
+		AssertFalse(InStr(Replay, " --only "), "an isolated runner must not receive an unsupported filter")
+	} finally {
+		if IsObject(Handle) {
+			CanRetire := Handle.terminate()
+			AssertTrue(CanRetire, "retire the exact isolated child before its fixture")
+		}
+		if CanRetire {
+			Attributes := DllCall("Kernel32\GetFileAttributesW", "Str", Directory, "UInt")
+			if _TRFE_AbsoluteTapPath(Directory) != Owned || Attributes == 0xFFFFFFFF || (Attributes & 0x400)
+				throw Error("Owned replay fixture cleanup refused.")
+			for Leaf in [Receipt, Child, FrameworkCopy] {
+				if _TRFE_AbsoluteTapPath(Leaf) != Owned . "\" . SubStr(Leaf, StrLen(Directory) + 2)
+					throw Error("Owned replay fixture leaf cleanup refused.")
+				if FileExist(Leaf)
+					FileDelete(Leaf)
+			}
+			DirDelete(Directory)
+		}
+	}
+}
+Test("runner replay: actual isolated child preserves its executable selection (runner-replay-command)",
+	_TRFE_ReplayExecutingChild)
+
+_TRFE_ReplayCommandLiteral(Vector) {
+	AssertEqual(Vector.Expected, _TestReplayCommand(Vector.Interpreter, Vector.Entry, Vector.Arguments))
+	AssertEqual(Vector.Count, Vector.Arguments.Length, "formatting cannot mutate the original selection")
+}
+_TRFE_ReplayLiteralCases := [
+	{Name: "unfiltered entry", Interpreter: "AutoHotkey64.exe", Entry: "runner.ahk", Arguments: [], Count: 0,
+		Expected: "& 'AutoHotkey64.exe' 'runner.ahk'"},
+	{Name: "empty argument", Interpreter: "AutoHotkey64.exe", Entry: "runner.ahk", Arguments: [""], Count: 1,
+		Expected: "& 'AutoHotkey64.exe' 'runner.ahk' ''"},
+	{Name: "literal original selection", Interpreter: "C:\AHK dir\AutoHotkey64.exe", Entry: "C:\tests\runner's " . Chr(0xE9) . ".ahk",
+		Arguments: ["--owned-selection", "two ' quotes " . Chr(34) . " $() " . Chr(96) . " " . Chr(0xE9)], Count: 2,
+		Expected: "& 'C:\AHK dir\AutoHotkey64.exe' 'C:\tests\runner''s " . Chr(0xE9) . ".ahk' '--owned-selection' 'two '' quotes " . Chr(34) . " $() " . Chr(96) . " " . Chr(0xE9) . "'"}
+]
+for _TRFE_ReplayVector in _TRFE_ReplayLiteralCases
+	Test("runner replay: " . _TRFE_ReplayVector.Name . " (runner-replay-command)", _TRFE_ReplayCommandLiteral.Bind(_TRFE_ReplayVector))
+
+_TRFE_ReplayInvalidOperand(Vector) {
+	Thrown := false
+	try _TestReplayCommand(Vector.Interpreter, Vector.Entry, Vector.Arguments)
+	catch TypeError as Failure {
+		Thrown := true
+		AssertEqual(Vector.Message, Failure.Message, "the exact contract refusal must own the failure")
+	}
+	AssertTrue(Thrown, "invalid replay state cannot produce a misleading command")
+}
+_TRFE_ReplayInvalidCases := [
+	{Name: "invalid selection owner", Interpreter: "ahk.exe", Entry: "runner.ahk", Arguments: 0,
+		Message: "Runner replay arguments must be an Array."},
+	{Name: "missing entry", Interpreter: "ahk.exe", Entry: "", Arguments: [],
+		Message: "Runner replay requires an interpreter and entry path."},
+	{Name: "non-string argument", Interpreter: "ahk.exe", Entry: "runner.ahk", Arguments: [1],
+		Message: "Runner replay operands must be strings."}
+]
+for _TRFE_ReplayInvalidVector in _TRFE_ReplayInvalidCases
+	Test("runner replay: " . _TRFE_ReplayInvalidVector.Name . " (runner-replay-command)",
+		_TRFE_ReplayInvalidOperand.Bind(_TRFE_ReplayInvalidVector))

@@ -3,7 +3,7 @@
 
 Test_TextSenderDoesNotPasteAfterClipboardFailure() {
 	Body := _DriverFuncBody("_TextSendClipboard")
-	WriteCheck := InStr(Body, "if !CB_Write(Text)")
+	WriteCheck := InStr(Body, "if !CB_WriteTextWithReceipt(Text, &OwnedSequence)")
 	Paste := InStr(Body, '_TextSenderSendInput("^v", "clipboard paste")')
 	Assert(WriteCheck > 0 and Paste > WriteCheck,
 		"clipboard injection must check CB_Write before issuing Ctrl+V")

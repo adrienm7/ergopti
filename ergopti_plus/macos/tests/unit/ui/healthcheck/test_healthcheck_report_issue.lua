@@ -384,7 +384,8 @@ end
 
 local function host_snapshot(long)
 	local snapshot = { schema_version = 2, driver = "macos", generated_at = "2026-09-24T10:00:00Z",
-		sections = { versions = { ergopti_version = "2.4.0" }, issues = { recent = REPORT } },
+		sections = { versions = { ergopti_version = "2.4.0" }, system = { os = "macOS 15.1" },
+			hardware = { arch = "arm64" }, issues = { recent = REPORT } },
 		probes = { github_api = { state = "error", cleanup = "pending", ms = 1 } } }
 	if long then
 		snapshot.retired_probes = {}
@@ -429,12 +430,15 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_eq(result.path, calls.reveal[1], "the complete local attachment is returned")
 
 		local url = calls.open_url[1]
-		helpers.assert_eq(query_value(url, "diagnostics"), nil,
-			"the form receives no query default that could reset an edit")
-		helpers.assert_eq(query_value(url, "os"), "macos")
+		helpers.assert_eq(query_value(url, "os"), "macOS 15.1 (arm64)", "the real system name, version and architecture")
 		local repo = documents().repository
-		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macos&driver=macos"
-		helpers.assert_eq(url, prefix, "the canonical bug URL contains only stable host metadata")
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macOS%2015.1%20%28arm64%29&driver=macos&diagnostics="
+		helpers.assert_eq(url:sub(1, #prefix), prefix, "the canonical bug URL: identity, then the compact report")
+		local prefilled = query_value(url, "diagnostics")
+		helpers.assert_eq(prefilled, Share.document(host_snapshot(false), documents().schema, "").fields.diagnostics,
+			"the form receives the compact report, which fits the budget")
+		helpers.assert_true(prefilled:find("# ErgoptiPlus diagnostics", 1, true) == 1, "it is the report")
+		helpers.assert_true(not prefilled:find("```json", 1, true), "the JSON block stays out of the URL")
 		helpers.assert_eq(query_value(url, "driver"), "macos")
 		helpers.assert_true(not url:find("jdoe", 1, true), "the URL carries no account name: " .. url)
 		helpers.assert_true(not url:find("%2FUsers%2F", 1, true), "the URL carries no home folder: " .. url)
@@ -461,8 +465,11 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_true(#url <= templates.max_url_bytes, "the URL fits its budget")
 		helpers.assert_eq(query_value(url, "version"), "2.4.0", "only validated host identity is prefilled")
 		local prefilled = query_value(url, "diagnostics")
-		helpers.assert_eq(prefilled, nil, "long output never prefills or resets the issue form")
-		helpers.assert_true(#url < 1200, "the editable URL stays short independently of report length")
+		local note = documents().schema.export_strings[documents().schema.share_policy.truncated_note_key]
+		helpers.assert_true(prefilled ~= nil and prefilled:find("# ErgoptiPlus diagnostics", 1, true) == 1, "the compact report prefills the form")
+		helpers.assert_true(prefilled:sub(-#(documents().templates.truncation_marker .. "\n\n" .. note)) == documents().templates.truncation_marker .. "\n\n" .. note,
+			"a cut report ends with the marker and the note saying where the complete report is")
+		helpers.assert_true(not prefilled:find("```json", 1, true), "the JSON block stays out of the URL")
 		helpers.assert_eq(calls.save[1].text, calls.copy[1], "the saved attachment preserves the whole report")
 	end)
 
@@ -575,9 +582,9 @@ helpers.describe("healthcheck debug menu reports (report-bug-flow)", function()
 			.. "/issues/new?template=bug_report.yml&"
 		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix, "not a bare URL: the bug template is selected")
 		helpers.assert_eq(query_value(calls.open_url[1], "version"), "2.4.0")
-		helpers.assert_eq(query_value(calls.open_url[1], "os"), "macos")
+		helpers.assert_eq(query_value(calls.open_url[1], "os"), "macOS 15.1 (arm64)")
 		helpers.assert_eq(query_value(calls.open_url[1], "driver"), "macos")
-		helpers.assert_eq(query_value(calls.open_url[1], "diagnostics"), nil, "the editable field stays out of the URL")
+		helpers.assert_true(query_value(calls.open_url[1], "diagnostics") ~= nil, "the compact report prefills the form")
 		helpers.assert_true(not calls.open_url[1]:find("jdoe", 1, true), "the URL carries no account name")
 	end)
 
@@ -610,7 +617,7 @@ helpers.describe("healthcheck debug menu reports (report-bug-flow)", function()
 			.. "/issues/new?template=feature_request.yml&"
 		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix)
 		helpers.assert_contains(calls.open_url[1], "version=2.4.0")
-		helpers.assert_contains(calls.open_url[1], "os=macos")
+		helpers.assert_contains(calls.open_url[1], "os=macOS%2015.1")
 		helpers.assert_contains(calls.open_url[1], "driver=macos")
 		helpers.assert_eq(#calls.copy, 0, "a feature request copies nothing")
 	end)
@@ -716,8 +723,11 @@ helpers.describe("stable-metadata report URL", function()
 			fields = { diagnostics = "private query text", title = "PRIVATE_TITLE", description = "PRIVATE_DESCRIPTION", reproduction = "PRIVATE_REPRODUCTION", version = "9.9.9", os = "private host", driver = "foreign" } })
 		helpers.assert_eq(result.ok, true)
 		local repo = documents().repository
-		helpers.assert_eq(calls.open_url[1], "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macos&driver=macos")
-		for _, id in ipairs({ "title", "description", "reproduction", "diagnostics", "architecture" }) do helpers.assert_nil(query_value(calls.open_url[1], id)) end
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macOS%2015.1%20%28arm64%29&driver=macos&diagnostics="
+		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix, "the page cannot change the identity")
+		helpers.assert_true(query_value(calls.open_url[1], "diagnostics") ~= "private query text", "the host report replaces the page's text")
+		helpers.assert_true(not calls.open_url[1]:find("PRIVATE", 1, true), "no page-derived text reaches the URL")
+		for _, id in ipairs({ "title", "description", "reproduction", "architecture" }) do helpers.assert_nil(query_value(calls.open_url[1], id)) end
 		helpers.assert_eq(calls.save[1].text, calls.copy[1])
 		helpers.assert_eq(calls.copy[1], approved_text(false))
 		helpers.assert_eq(calls.order, { "copy", "save", "reveal", "open_url" })
@@ -778,5 +788,142 @@ helpers.describe("closed recent error facts", function()
 			end
 			helpers.assert_eq(Json.encode(vector.snapshot), original)
 		end
+	end)
+end)
+
+helpers.describe("redaction context carries the configuration directory (config-dir-masking)", function()
+	helpers.it("a hotstring pack name under the configuration directory never reaches a report (config-dir-masking)", function()
+		local Report, _, overrides = load_report()
+		local dir = HOME .. "/.config/ergopti_plus"
+		overrides.identity = function() return { home = HOME, user = "jdoe", config_dir = dir } end
+		local context = Report.redaction_context(overrides)
+		helpers.assert_eq(context.config_dir, dir)
+		helpers.assert_eq(
+			require("diagnostics.redact").apply("read '" .. dir .. "/hotstrings/my_pack/a.toml'", documents().redaction, context),
+			"read '<config>/hotstrings/<name>/<name>'")
+	end)
+end)
+
+--- Runs one action over the recorded effects to its explicit completion.
+local function completed_action_for(Report, action, config, context, overrides, snapshot)
+	return completed_action(Report, action, paths(), config, context, overrides, snapshot)
+end
+
+helpers.describe("opt-in day log in the report actions (day-log-host)", function()
+	local DayLogHost = require("healthcheck.day_log")
+	local LOG_TEXT = "2026-09-24 09:00:00:001 [INFO] [A] opened /Users/jdoe/x\n2026-09-24 09:00:01:002 [INFO] [B] token=abcdefghijkl\n"
+	local REDACTED = "2026-09-24 09:00:00:001 [INFO] [A] opened ~/x\n2026-09-24 09:00:01:002 [INFO] [B] token=<secret>\n"
+
+	--- A host fixture: the report module over recorded effects, a snapshot and its documents.
+	local function fixture()
+		local Report, calls, overrides = load_report()
+		local config = documents()
+		config.day_log = shared_json("modules/diagnostics/day_log.json")
+		local snapshot = host_snapshot(false)
+		local context = Report.redaction_context(overrides)
+		local function run(action)
+			return completed_action_for(Report, action, config, context, overrides, snapshot)
+		end
+		local function text(with_log)
+			return Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key),
+				with_log).text
+		end
+		return { calls = calls, config = config, snapshot = snapshot, context = context, run = run, text = text }
+	end
+
+	local function read_log(text)
+		return function() return { found = true, size = #text, text = text } end
+	end
+
+	helpers.it("collecting redacts the log, keeps its text away from the snapshot and records only the closed record (day-log-host)", function()
+		local f = fixture()
+		local reply = DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT))
+		helpers.assert_eq(reply.state, "ready")
+		helpers.assert_eq(reply.lines, 2)
+		helpers.assert_eq(reply.bytes, #REDACTED)
+		helpers.assert_eq(f.snapshot.day_log_attachment, { included = true, bytes = #REDACTED, lines = 2 })
+		helpers.assert_true(not Json.encode(f.snapshot):find("abcdefghijkl", 1, true), "the snapshot never holds the log")
+		DayLogHost.discard(f.snapshot)
+		helpers.assert_eq(f.snapshot.day_log_attachment, nil)
+	end)
+
+	helpers.it("a log over the cap, an empty one and a missing one are refused with their reason (day-log-host)", function()
+		local f = fixture()
+		f.config.day_log.max_bytes = 10
+		helpers.assert_eq(DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT)).state, "too_large")
+		helpers.assert_eq(f.snapshot.day_log_attachment, nil)
+		f.config.day_log.max_bytes = 4194304
+		helpers.assert_eq(DayLogHost.prepare(f.snapshot, f.config, f.context, read_log("")).state, "empty")
+		helpers.assert_eq(DayLogHost.prepare(f.snapshot, f.config, f.context,
+			function() return { found = false, size = 0, text = "" } end).state, "missing")
+	end)
+
+	helpers.it("save writes the log first, then the report, and the report records the log (day-log-host)", function()
+		local f = fixture()
+		DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT))
+		local text = f.text(true)
+		helpers.assert_true(text:find("day_log_attachment.included | true", 1, true) ~= nil, "the report records the attachment")
+		local document = Share.document(f.snapshot, f.config.schema,
+			require("infra.i18n").get(f.config.schema.share_policy.notice_key), true)
+		local result = f.run({ action = "save", text = text, name = document.name, day_log = true })
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(#f.calls.save, 2)
+		helpers.assert_eq(f.calls.save[1].name, "ergopti-day-log-macos-2026-09-24T10_00_00Z.log")
+		helpers.assert_eq(f.calls.save[1].text, REDACTED)
+		helpers.assert_eq(f.calls.save[2].name, document.name)
+		helpers.assert_eq(f.calls.save[2].text, text)
+	end)
+
+	helpers.it("without the flag nothing about the log is saved or recorded, even when it was prepared (day-log-host)", function()
+		local f = fixture()
+		DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT))
+		local text = f.text(false)
+		helpers.assert_true(not text:find("day_log_attachment", 1, true), "the report omits the record")
+		local result = f.run({ action = "save", text = text, name = "x" })
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(#f.calls.save, 1)
+	end)
+
+	helpers.it("copy never carries the log and an unprepared log is refused before any file is written (day-log-host)", function()
+		local f = fixture()
+		DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT))
+		helpers.assert_eq(f.run({ action = "copy", text = f.text(true), day_log = true }).ok, false)
+		helpers.assert_eq(#f.calls.copy, 0)
+		local g = fixture()
+		helpers.assert_eq(g.run({ action = "report", text = g.text(false), fields = {}, day_log = true }).ok, false)
+		helpers.assert_eq(#g.calls.save, 0)
+		helpers.assert_eq(#g.calls.copy, 0)
+	end)
+
+	helpers.it("a collection prepared for another snapshot is never saved (day-log-host)", function()
+		local f = fixture()
+		DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT))
+		local other = host_snapshot(false)
+		other.day_log_attachment = { included = true, bytes = #REDACTED, lines = 2 }
+		helpers.assert_true(not pcall(DayLogHost.file, other, f.config, { driver = "macos" }),
+			"the file of an unprepared snapshot is refused")
+	end)
+
+	helpers.it("reading the file distinguishes missing, unreadable, too large and read (day-log-host)", function()
+		local function fake(size, content)
+			return function()
+				local handle = {}
+				function handle:seek(whence, offset)
+					if whence == "end" then return size end
+					return offset or 0
+				end
+				function handle:read() return content end
+				function handle:close() return true end
+				return handle
+			end
+		end
+		helpers.assert_eq(DayLogHost.read_file("x", 100, function() return nil, "No such file", 2 end).found, false)
+		helpers.assert_true(not pcall(DayLogHost.read_file, "x", 100, function() return nil, "Permission denied", 13 end),
+			"an unreadable file is an error, not a missing one")
+		local big = DayLogHost.read_file("x", 5, fake(6, "abcdef"))
+		helpers.assert_eq({ big.found, big.size, big.text }, { true, 6, "" })
+		local ok = DayLogHost.read_file("x", 100, fake(3, "abc"))
+		helpers.assert_eq({ ok.found, ok.size, ok.text }, { true, 3, "abc" })
+		helpers.assert_true(not pcall(DayLogHost.read_file, "x", 100, fake(5, "abc")), "a short read is an error")
 	end)
 end)

@@ -413,7 +413,7 @@ _LMT_StreamingNativeRefusal() {
 		}
 		Assert(StreamingRow is Map, "the actual shared declaration must own the streaming row")
 		AssertEqual("grey", StreamingRow["unavailable"])
-		AssertEqual("platform_reason.token_streaming_transport_missing", StreamingRow["reason_key"])
+		AssertEqual("platform_reason.token_streaming_unvalidated_on_windows", StreamingRow["reason_key"])
 		for Backend in ["ollama", "api", "mlx"] {
 			_LLM_Menu["backend"] := Backend
 			_LLM_Menu["enabled"] := true

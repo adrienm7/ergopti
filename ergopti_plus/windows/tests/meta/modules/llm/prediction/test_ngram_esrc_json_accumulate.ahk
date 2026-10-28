@@ -15,7 +15,7 @@
 ; values. Source names must never be interpolated as JSON paths: punctuation
 ; would create nested members instead of updating the original counter.
 ;
-; SCOPE: source introspection of modules/keylogger/keylogger_walker.ahk.
+; SCOPE: source introspection of modules/keystats/keystats_walker.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -30,10 +30,10 @@
 ; ===================================================
 
 _NEA_CheckNoOverwrite() {
-	; Move-resilient: scan the modules/keylogger dir via the framework helper.
-	; All esrc_json anchors here are unique to keylogger_walker.ahk within that dir.
-	Src := _DriverDirConcat("modules/keylogger")
-	Assert(Src != "", "the keylogger sources must be available")
+	; Move-resilient: scan the modules/keystats dir via the framework helper.
+	; All esrc_json anchors here are unique to keystats_walker.ahk within that dir.
+	Src := _DriverDirConcat("modules/keystats")
+	Assert(Src != "", "the keystats sources must be available")
 
 	; The old bare-overwrite form must not appear in the UPSERT for ngram tables
 	Assert(!InStr(Src, "esrc_json=excluded.esrc_json"),

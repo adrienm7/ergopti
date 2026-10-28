@@ -47,7 +47,7 @@ local function scenario(body)
 		exec_checked = function(command)
 			observed.commands[#observed.commands + 1] = command
 			local accepted = observed.status == 0 or observed.status == true
-			return accepted, observed.answer or "", accepted and nil or "command exited with status 1"
+			return accepted, observed.answer or "", accepted and nil or "command exited with status 1", accepted and nil or require("adapter_errors").COMMAND_EXITED_NONZERO, accepted and nil or 1
 		end,
 	}
 	package.loaded["adapters.shell_runner"] = shell
@@ -142,7 +142,10 @@ h.describe("native menu dialog captions", function()
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local original_execute = os.execute
 		local commands, accepted, modals, dialogs = {}, nil, 0, nil
-		package.loaded["ui.menu.llm_backend_rows"] = { rows = function(_, ports) dialogs = ports; return {} end }
+		package.loaded["ui.menu.llm_backend_rows"] = {
+			bind_page = function(_, options) dialogs = options.dialogs end,
+			caption = function() return "model button" end,
+		}
 		package.loaded["infra.installation"] = { is_source_run = function() return false end }
 		package.loaded["ui.modal"] = { run = function(fn) modals = modals + 1; return fn() end }
 		package.loaded["ui.menu.uninstall"] = { run = function(opts)
@@ -173,7 +176,7 @@ h.describe("native menu dialog captions", function()
 				.. " --cancel-label=" .. Shell.quote(i18n.get("button.cancel")) .. " 2>/dev/null")
 			h.assert_eq(commands[2], "zenity --error --title=" .. title
 				.. " --text='Preserved &lt;failure&gt;' 2>/dev/null")
-			h.assert_type(dialogs, "table", "real model provider receives its native dialog ports")
+			h.assert_type(dialogs, "table", "the model selector page receives the native dialog ports")
 			dialogs.info("Native information", "Preserved information body")
 			h.assert_eq(commands[3], "zenity --info --title='ErgoptiPlus — Native information'"
 				.. " --text='Preserved information body' 2>/dev/null")
@@ -244,6 +247,30 @@ h.describe("programmable source problems open no dialog", function()
 end)
 
 
+h.describe("one-click check report caption (linux-native-titles)", function()
+	h.it("(linux-native-titles) the check report brands its caption and keeps the body plain text", function()
+		scenario(function(observed)
+			observed.status = 1
+			local runner = require("ui.field_check.window").new({
+				label = "Owned check", log = "owned_check", check_id = "owned", title_key = "Native 'check'",
+				steps = function(_, _, finish) finish() end, env = function() return {} end,
+				unusable_step = "owned_env",
+			})
+			h.assert_true(runner.run())
+			h.assert_eq(#observed.queued, 1, "the report opens from a fresh event-loop turn")
+			observed.queued[1]()
+			h.assert_eq(observed.modals, 1)
+			h.assert_eq(#observed.commands, 1)
+			local command = observed.commands[1]
+			local head = "zenity --question --no-markup --title='ErgoptiPlus — Native '\\''check'\\''' --text="
+			h.assert_eq(command:sub(1, #head), head)
+			local tail = " --ok-label='field_check.copy' --cancel-label='field_check.close'"
+			h.assert_eq(command:sub(-#tail), tail, "Close answers the dialog without a copy")
+		end)
+	end)
+end)
+
+
 h.describe("native caption consumer inventory", function()
 	h.it("(linux-native-titles) every production CLI caption remains in the independently bounded owner inventory", function()
 		local expected = {
@@ -256,6 +283,8 @@ h.describe("native caption consumer inventory", function()
 			["modules/llm/local_model_offer.lua"] = 2,
 			-- The enable refusal tests prove both policy-owned native captions and modal receipts.
 			["ui/llm_enable_refusal.lua"] = 2,
+			-- The one-click check runner owns the caption of every check report.
+			["ui/field_check/window.lua"] = 1,
 		}
 		local observed = {}
 		local root = h.driver_root()
@@ -279,7 +308,9 @@ h.describe("native caption consumer inventory", function()
 		local file = assert(io.open(root .. "/uninstall.sh", "rb"))
 		local source = assert(file:read("*a")); assert(file:close())
 		local _, count = source:gsub("%-%-title", "")
-		h.assert_eq(count, 1, "the independent removal worker has exactly one caption supplied by its tested GUI handoff")
+		-- One caption, GUI_TITLE from the tested GUI handoff, shown by zenity or by the
+		-- kdialog fallback (tools/test/test-linux-uninstall-sandbox.cjs proves both).
+		h.assert_eq(count, 2, "the independent removal worker shows its one handed-off caption through two dialog tools")
 	end)
 end)
 
@@ -287,8 +318,9 @@ end)
 --- @param backend string Native chooser name.
 --- @param status number Independent child exit code.
 --- @param output string Independent child stdout.
+--- @param application_root string|nil Real XDG data root for the application chooser.
 --- @return string receipt
-local function picker_exit_receipt(backend, status, output)
+local function picker_exit_receipt(backend, status, output, application_root)
 	local created, directory = Shell.exec_checked("mktemp -d")
 	assert(created)
 	directory = directory:gsub("[\r\n]+$", "")
@@ -307,10 +339,12 @@ local function picker_exit_receipt(backend, status, output)
 			.. "local modals = 0\n"
 			.. "package.loaded['ui.modal'] = { run = function(fn) modals = modals + 1; return fn() end }\n"
 			.. "local paths = { default_config_dir = function() return '/owned/default' end }\n"
-			.. "local value = require('ui.config_dir_picker').pick(shell, paths, nil, '/owned/current')\n"
+			.. (application_root and "local value = require('ui.app_chooser').pick(shell, 'Choose application')\n"
+				or "local value = require('ui.config_dir_picker').pick(shell, paths, nil, '/owned/current')\n")
 			.. "io.write(value == nil and 'refused' or 'accepted|' .. value)\n"
 			.. "io.write('|modal:' .. modals)\n")
 		local command = "env PATH=" .. Shell.quote(directory .. ":" .. (os.getenv("PATH") or ""))
+			.. (application_root and " XDG_DATA_HOME=" .. Shell.quote(application_root) or "")
 			.. " " .. Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(worker)
 		local executed, result, reason = Shell.exec_checked(command)
 		assert(executed, tostring(reason))
@@ -328,6 +362,27 @@ h.describe("native configuration picker exit receipts", function()
 		h.it("linux-config-picker-exit: " .. backend .. " accepts successful normalized selection", function()
 			h.assert_eq(picker_exit_receipt(backend, 0, "/owned/chosen/\n"), "accepted|/owned/chosen|modal:1")
 		end)
+		for _, case in ipairs({
+			{ "spaces", "/  configuration  " },
+			{ "carriage return", "/configuration\r" },
+			{ "trailing line feed", "/configuration\n" },
+			{ "embedded line feed", "/config\nuration" },
+		}) do
+			h.it("picker-native-path-bytes: " .. backend .. " preserves a real folder's " .. case[1], function()
+				local created, directory = Shell.exec_checked("mktemp -d")
+				assert(created)
+				directory = directory:gsub("[\r\n]+$", "")
+				local selected = directory .. case[2]
+				local ok, receipt = xpcall(function()
+					assert(Shell.run("mkdir -- " .. Shell.quote(selected)))
+					return picker_exit_receipt(backend, 0, selected .. "\n")
+				end, debug.traceback)
+				assert(Shell.run("rmdir -- " .. Shell.quote(selected) .. " " .. Shell.quote(directory)))
+				if not ok then error(receipt, 0) end
+				h.assert_eq(receipt, "accepted|" .. selected .. "|modal:1",
+					"only the CLI's final LF is framing; filename bytes must survive")
+			end)
+		end
 		for _, status in ipairs({ 1, 7 }) do
 			h.it("linux-config-picker-exit: " .. backend .. " refuses absolute stdout after exit " .. status, function()
 				h.assert_eq(picker_exit_receipt(backend, status, "/untrusted/selection\n"), "refused|modal:1")
@@ -335,6 +390,33 @@ h.describe("native configuration picker exit receipts", function()
 		end
 		h.it("linux-config-picker-exit: " .. backend .. " refuses successful empty stdout", function()
 			h.assert_eq(picker_exit_receipt(backend, 0, ""), "refused|modal:1")
+		end)
+	end
+end)
+
+h.describe("native application picker record admission", function()
+	for _, backend in ipairs({ "zenity", "kdialog" }) do
+		h.it("picker-native-record: " .. backend .. " never replaces a selected desktop file with its first line", function()
+			local created, directory = Shell.exec_checked("mktemp -d")
+			assert(created)
+			directory = directory:gsub("[\r\n]+$", "")
+			local applications = directory .. "/applications"
+			local prefix = applications .. "/owned.desktop"
+			local selected = prefix .. "\nother.desktop"
+			local ok, receipt = xpcall(function()
+				assert(Shell.run("mkdir -- " .. Shell.quote(applications)))
+				for _, filename in ipairs({ prefix, selected }) do
+					local file = assert(io.open(filename, "wb"))
+					assert(file:write("[Desktop Entry]\nType=Application\nName=Owned\nExec=true\n"))
+					assert(file:close())
+				end
+				return picker_exit_receipt(backend, 0, selected .. "\n", directory)
+			end, debug.traceback)
+			os.remove(prefix); os.remove(selected)
+			assert(Shell.run("rmdir -- " .. Shell.quote(applications) .. " " .. Shell.quote(directory)))
+			if not ok then error(receipt, 0) end
+			h.assert_eq(receipt, "refused|modal:1",
+				"an unsupported desktop-file id must be refused, never turned into another installed app")
 		end)
 	end
 end)

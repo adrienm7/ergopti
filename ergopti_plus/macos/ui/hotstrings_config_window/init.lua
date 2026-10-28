@@ -94,22 +94,18 @@ local _config = {
 -- (ui_builder.get_app_geometry → _shared/ui/apps.manifest.json, SSoT). No local
 -- width/height constant: hardcoding here is what caused the cross-driver drift.
 
--- The global delay fallback (seconds) that applies when no TOML default is set.
--- Fallback only. The live value is read from hotstrings_config, which loads it
--- from the shared canon the AutoHotkey driver also reads. A hand-mirrored copy
--- with a comment saying the two "must stay in sync" IS the second source — and
--- the one that silently stops matching when the canon moves.
-local GLOBAL_DEFAULT_DELAY_MS_FALLBACK = 750
-
---- Returns the shared global default expansion delay in milliseconds.
+--- Returns the shared global default expansion delay in milliseconds, read from
+--- the module that loads it from the shared canon. There is no local copy to
+--- fall back on: a missing value is a broken install and must be loud, not a
+--- second source that silently stops matching when the canon moves.
 --- @return number
 local function global_default_delay_ms()
-	local ok, cfg = pcall(require, "modules.hotstrings.hotstrings_config")
-	if ok and type(cfg) == "table" and type(cfg.get_global_default_delay_ms) == "function" then
-		local v = cfg.get_global_default_delay_ms()
-		if type(v) == "number" then return v end
+	local cfg = require("modules.hotstrings.hotstrings_config")
+	local v = cfg.get_global_default_delay_ms()
+	if type(v) ~= "number" then
+		error("hotstrings_config.get_global_default_delay_ms() returned " .. type(v) .. ", expected a number")
 	end
-	return GLOBAL_DEFAULT_DELAY_MS_FALLBACK
+	return v
 end
 
 -- The frontend (index.html / script.js / style.css) lives in the cross-driver
@@ -118,10 +114,7 @@ end
 local ASSETS_DIR = (Paths.shared("ui/hotstrings_config_window") or "") .. "/"
 
 -- Display order for the built-in categories — matches the menu and the AHK driver.
-local CATEGORY_ORDER = {
-	"magickey", "autocorrection", "rolls",
-	"sfbsreduction", "distancesreduction", "personal",
-}
+local CATEGORY_ORDER = require("menu.row_order").list("hotstring_config_categories")
 
 -- Friendly labels for each built-in category. Falls back to the TOML's [_meta]
 -- description when this table has no entry for a given key.
@@ -162,19 +155,15 @@ local function common_categories()
 	return order, labels
 end
 
--- Color palette offered in the "couleur" dropdown. The first six values
--- mirror the bootstrap defaults shipped in the category TOMLs so a user
--- who wandered too far can recover the original look in one click.
-local COLOR_PRESETS = {
-	{ label = i18n.get("hs_config.color_red"),    hex = "#e53935" },
-	{ label = i18n.get("hs_config.color_green"),  hex = "#43a047" },
-	{ label = i18n.get("hs_config.color_orange"), hex = "#fb8c00" },
-	{ label = i18n.get("hs_config.color_blue"),   hex = "#1e88e5" },
-	{ label = i18n.get("hs_config.color_purple"), hex = "#8e44ad" },
-	{ label = i18n.get("hs_config.color_cyan"),   hex = "#00838f" },
-	{ label = i18n.get("hs_config.color_yellow"), hex = "#fdd835" },
-	{ label = i18n.get("hs_config.color_gray"),   hex = "#6e6e73" },
-}
+-- Color palette offered in the "couleur" dropdown. The palette is generated from
+-- _shared/data/native_theme.toml, the one list the Linux window reads too.
+local NativeTheme = require("native_theme_data")
+local COLOR_PRESETS = {}
+local PRESET_HEX = {}
+for _, preset in ipairs(NativeTheme.hotstring_palette) do
+	COLOR_PRESETS[#COLOR_PRESETS + 1] = { label = i18n.get(preset.i18n), hex = preset.hex }
+	PRESET_HEX[preset.name] = preset.hex
+end
 
 
 
@@ -722,7 +711,7 @@ local function on_message(msg, owner)
 	if action == "set_all_grey" then
 		-- Set every common category's file-level colour to grey and wipe any
 		-- per-section colour override so the grey cascades down. Delays untouched.
-		local grey = "#6e6e73"
+		local grey = PRESET_HEX.gray
 		for _, c in ipairs((common_categories())) do
 			if owner and not owner_is_current(owner) then return false end
 			if hotstrings_config.set_override(c, nil, "color", grey) ~= true then return false end
@@ -952,6 +941,13 @@ function M.open()
 	_webview = webview
 	Logger.info(LOG, "Hotstrings config window opened.")
 	return owner_is_current(owner)
+end
+
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window()
+	if _webview ~= nil and owner_is_current(_owner) then return _webview end
+	return nil
 end
 
 --- Close and destroy the window.

@@ -27,7 +27,8 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	local calls = { ollama = {}, remote = {}, notices = {}, outputs = {}, cancelled = 0, applied = 0, resets = 0, focus = "x11:fixture:1" }
+	local calls = { ollama = {}, remote = {}, notices = {}, outputs = {}, generations = {}, cancelled = 0, applied = 0,
+		resets = 0, focus = "x11:fixture:1" }
 	package.loaded["adapters.secure_field_detector"] = {
 		isSecureField = function() return false end,
 		isSecureApp = function() return false end,
@@ -68,6 +69,7 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	package.loaded["modules.llm.profiles"] = profiles
 	package.loaded["modules.llm.profile_settings"] = {
 		get = function(key) if key == "num_predictions" then return 3 end end,
+		resolve_for_app = function() return nil end,
 		resolve = function()
 			if calls.on_profile then calls.on_profile() end
 			return { id = "raw", system_single = "{context}" }
@@ -98,7 +100,8 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 		end,
 		privacy_guard = privacy and privacy.guard,
 		privacy_context = privacy and privacy.context,
-		engine = { current_buffer = function() return calls.buffer or "Bonjour à tous" end, reset = function() calls.resets = calls.resets + 1 end },
+		engine = { reset = function() calls.resets = calls.resets + 1 end },
+		context = { text = function() return calls.buffer or "Bonjour à tous" end, replaced = function() end },
 		apply_prediction = function(candidate, context)
 			calls.applied = calls.applied + 1
 			if calls.on_apply then return calls.on_apply(candidate, context) end
@@ -109,6 +112,7 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 			if calls.on_output then calls.on_output(text, context) end
 		end,
 		notify = function(text) calls.notices[#calls.notices + 1] = text; return true end,
+		on_generation = function(_, info) calls.generations[#calls.generations + 1] = info end,
 	})
 	return engine, calls, scheduler, function()
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
@@ -191,20 +195,52 @@ helpers.describe("prediction backend: the selected backend answers", function()
 
 end)
 
-helpers.describe("prediction backend: variants are paced and diverse", function()
+helpers.describe("prediction backend: requests are paced, variants are diverse", function()
 
-	helpers.it("waits the shared API interval between two requests", function()
-		local engine, calls, scheduler, restore = load("api", ENTRY)
+	helpers.it("sends every variant of one request back to back, then holds the next request (variants-not-held)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 500 })
 		engine.predict("Bonjour à tous")
-		local first = #calls.remote
+		local variants = #calls.remote
+		engine.predict("Bonjour à tous, et vous")
+		local right_after = #calls.remote
 		scheduler.test.advance(0.49)
 		local before_interval = #calls.remote
 		scheduler.test.advance(0.02)
 		local after_interval = #calls.remote
 		restore()
-		helpers.assert_eq(first, 1, "the first request leaves at once")
-		helpers.assert_eq(before_interval, 1, "the second waits for the interval")
-		helpers.assert_eq(after_interval, 2)
+		helpers.assert_eq(variants, 3, "the variants of one automatic request are never held")
+		helpers.assert_eq(right_after, 3, "a distinct request is inside the interval")
+		helpers.assert_eq(before_interval, 3, "and waits for it")
+		helpers.assert_eq(after_interval, 6, "then all its variants follow without waiting")
+	end)
+
+	helpers.it("waits the interval the user set between two requests, not the backend's old fixed one (request-floor-setting)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 1200 })
+		engine.predict("Bonjour à tous")
+		engine.predict("Bonjour à tous, et vous")
+		scheduler.test.advance(1.19)
+		local before_interval = #calls.remote
+		scheduler.test.advance(0.02)
+		local after_interval = #calls.remote
+		restore()
+		helpers.assert_eq(before_interval, 3, "the next request waits the whole configured interval")
+		helpers.assert_eq(after_interval, 6)
+	end)
+
+	helpers.it("sends the variants back to back when the user set no interval (request-floor-setting)", function()
+		local engine, calls, _, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 0 })
+		engine.predict("Bonjour à tous")
+		local without_waiting = #calls.remote
+		restore()
+		helpers.assert_eq(without_waiting, 3)
+	end)
+
+	helpers.it("never holds an explicit request, nor the later variants of its run (explicit-never-held)", function()
+		local engine, calls, _, restore = load("api", ENTRY)
+		engine.predict("Bonjour à tous", { explicit = true })
+		local without_waiting = #calls.remote
+		restore()
+		helpers.assert_eq(without_waiting, 3, "every variant leaves without the floor holding any of them")
 	end)
 
 	helpers.it("warms each next variant", function()
@@ -216,12 +252,38 @@ helpers.describe("prediction backend: variants are paced and diverse", function(
 		helpers.assert_true(calls.remote[3].opts.temperature > calls.remote[2].opts.temperature)
 	end)
 
+	helpers.it("reports the remote tokens and cost summed over the variants", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, nil, false, true)
+		local ok, err = pcall(function()
+			engine.predict("Bonjour à tous")
+			calls.remote[1].done(" première suite", nil, { prompt_tokens = 100, completion_tokens = 10,
+				total_tokens = 110, est_cost_usd = 0.25 })
+			scheduler.settle()
+			calls.remote[2].done(" deuxième suite", nil, { prompt_tokens = 0, completion_tokens = 0,
+				total_tokens = 0, est_cost_usd = 0.0 })
+			scheduler.settle()
+			calls.remote[3].done(" troisième suite", nil, { prompt_tokens = 50, completion_tokens = 5,
+				total_tokens = 55, est_cost_usd = 0.5 })
+			helpers.assert_eq(#calls.generations, 1, "one generation row per prediction")
+			local info = calls.generations[1]
+			helpers.assert_eq(info.prompt_tokens, 150)
+			helpers.assert_eq(info.completion_tokens, 15)
+			helpers.assert_eq(info.total_tokens, 165)
+			helpers.assert_eq(info.est_cost_usd, 0.75)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("offers the first variant before the next one arrives", function()
-		local engine, _, _, restore = load("api", ENTRY)
+		local engine, calls, _, restore = load("api", ENTRY, nil, nil, true)
 		engine.predict("Bonjour à tous")
+		calls.remote[1].done(" que tout le monde aille bien", nil)
 		local offered = #engine.get_suggestions()
+		local sent = #calls.remote
 		restore()
 		helpers.assert_eq(offered, 1)
+		helpers.assert_eq(sent, 2, "the next variant is already on its way")
 	end)
 
 end)
@@ -328,7 +390,7 @@ helpers.describe("backend publication rechecks actual admission after dismissal"
 					local observations = {dismissals = 0, admissions = 0, changed = false}
 					local foreign = initial:gsub("value = 42", "value = 73")
 					engine.init({scheduler = scheduler, is_paused = function() return paused end,
-						overlay = {hide = function()
+						overlay = {show = function() return true end, hide = function()
 							if not armed then return end
 							observations.dismissals = observations.dismissals + 1
 							if condition == "pause" then paused = true end
@@ -375,15 +437,16 @@ end)
 
 helpers.describe("acceptance retires the originating prediction request", function()
 
-	helpers.it("does not send remaining variants after accepting the first paced candidate (acceptance-retires-request)", function()
-		local engine, calls, scheduler, restore = load("api", ENTRY)
+	helpers.it("does not send remaining variants after accepting the first candidate (acceptance-retires-request)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, nil, nil, true)
 		local ok, err = pcall(function()
 			engine.predict("Bonjour à tous")
-			helpers.assert_eq(#calls.remote, 1)
-			helpers.assert_eq(#engine.get_suggestions(), 1, "the first candidate is available during pacing")
+			calls.remote[1].done(" que tout le monde aille bien", nil)
+			helpers.assert_eq(#calls.remote, 2, "the second variant is in flight")
+			helpers.assert_eq(#engine.get_suggestions(), 1, "the first candidate is available meanwhile")
 			helpers.assert_eq(engine.accept(1), true)
 			scheduler.settle()
-			helpers.assert_eq(#calls.remote, 1, "acceptance retires the remaining paid requests")
+			helpers.assert_eq(#calls.remote, 2, "acceptance retires the remaining paid requests")
 			helpers.assert_eq(engine.is_predicting(), false)
 			helpers.assert_eq(#engine.get_suggestions(), 0)
 			helpers.assert_eq(calls.applied, 1)
@@ -1045,20 +1108,24 @@ helpers.describe("prediction resident global privacy admission", function()
 		end)
 		restore(); if not okay then error(problem, 0) end
 	end)
-	helpers.it("revokes a paced variant and admits a later ordinary request (llm-global-privacy)", function()
+	helpers.it("revokes a paced request and admits a later ordinary request (llm-global-privacy)", function()
 		local blocked = false
 		local engine, calls, scheduler, restore = load("api", ENTRY, settings, true, true, { guard = function() return blocked end })
 		local okay, problem = pcall(function()
-			request(engine, 2)
-			calls.remote[1].done(" que tout le monde aille bien", nil)
-			helpers.assert_eq(#calls.remote, 1, "the next variant must still be paced")
+			-- An automatic request (no prompt override): its variants go back to back.
+			engine.predict("Bonjour à tous")
+			for index = 1, 3 do calls.remote[index].done(" que tout le monde aille bien", nil) end
+			helpers.assert_eq(#calls.remote, 3, "the variants of one request are never held")
+			-- The next automatic request is inside the interval: it waits.
+			engine.predict("Bonjour à tous, et vous")
+			helpers.assert_eq(#calls.remote, 3, "the next request must still be paced")
 			blocked = true; scheduler.settle()
-			helpers.assert_eq(#calls.remote, 1, "revoked context must not send the next request")
+			helpers.assert_eq(#calls.remote, 3, "revoked context must not send the next request")
 			helpers.assert_eq(engine.has_suggestions(), false)
 			helpers.assert_true(engine.is_enabled())
 			blocked = false; request(engine); scheduler.settle()
-			helpers.assert_eq(#calls.remote, 2, "privacy recovery permits a new independent request")
-			calls.remote[2].done(" que tout le monde aille bien", nil)
+			helpers.assert_eq(#calls.remote, 4, "privacy recovery permits a new independent request")
+			calls.remote[4].done(" que tout le monde aille bien", nil)
 			helpers.assert_true(engine.accept(1))
 		end)
 		restore(); if not okay then error(problem, 0) end
@@ -1096,4 +1163,127 @@ helpers.describe("prediction resident global privacy admission", function()
 			restore(); if not okay then error(problem, 0) end
 		end)
 	end
+end)
+
+helpers.describe("prediction engine: model removal", function()
+	--- Replaces the removal owner with a scripted one for one scenario.
+	--- @return table starts, function restore_delete
+	local function scripted_delete()
+		local previous = package.loaded["modules.llm.model_delete"]
+		local starts = { cancels = 0 }
+		package.loaded["modules.llm.model_delete"] = {
+			start = function(base_url, tag, on_done, admission)
+				starts[#starts + 1] = { base_url = base_url, tag = tag, on_done = on_done, admission = admission }
+				return true
+			end,
+			cancel = function() starts.cancels = starts.cancels + 1; return true end,
+		}
+		return starts, function() package.loaded["modules.llm.model_delete"] = previous end
+	end
+
+	helpers.it("linux-model-delete: lists the installed models again after Ollama removed one", function()
+		local engine, _, _, restore = load("ollama", ENTRY, nil, false, true)
+		local starts, restore_delete = scripted_delete()
+		local okay, problem = pcall(function()
+			local refreshed, outcomes = 0, {}
+			package.loaded["modules.llm.profiles"].refresh_models_after_mutation = function() refreshed = refreshed + 1 end
+			helpers.assert_true(engine.delete_model("qwen:2b", function(...) outcomes[#outcomes + 1] = { ... } end))
+			helpers.assert_eq(#starts, 1)
+			helpers.assert_eq(starts[1].base_url, "http://127.0.0.1:11434")
+			helpers.assert_eq(starts[1].tag, "qwen:2b")
+			helpers.assert_true(starts[1].admission())
+			starts[1].on_done(true, "qwen:2b")
+			helpers.assert_eq(refreshed, 1, "the menu must not keep listing the removed model")
+			helpers.assert_eq(outcomes, { { true, "qwen:2b" } })
+		end)
+		restore_delete(); restore(); if not okay then error(problem, 0) end
+	end)
+
+	helpers.it("linux-model-delete: a removal answered after the AI was switched off is dropped and retired", function()
+		local engine, _, _, restore = load("ollama", ENTRY, nil, false, true)
+		local starts, restore_delete = scripted_delete()
+		local okay, problem = pcall(function()
+			local refreshed, outcomes = 0, 0
+			package.loaded["modules.llm.profiles"].refresh_models_after_mutation = function() refreshed = refreshed + 1 end
+			package.loaded["modules.llm.profiles"].disable = function() return true end
+			helpers.assert_true(engine.delete_model("qwen:2b", function() outcomes = outcomes + 1 end))
+			helpers.assert_true(engine.disable())
+			helpers.assert_eq(starts.cancels, 1, "switching the AI off retires the removal in flight")
+			helpers.assert_eq(starts[1].admission(), false)
+			starts[1].on_done(true, "qwen:2b")
+			helpers.assert_eq(refreshed, 0)
+			helpers.assert_eq(outcomes, 0)
+		end)
+		restore_delete(); restore(); if not okay then error(problem, 0) end
+	end)
+end)
+
+helpers.describe("prediction engine: model warmup lifecycle", function()
+	--- Binds the warmup to this engine on a virtual clock, as the daemon does.
+	--- @param engine table
+	--- @return table world, function restore_warmup
+	local function bound_warmup(engine)
+		package.loaded["modules.llm.warmup"] = nil
+		local Warmup = require("modules.llm.warmup")
+		local world = { scheduler = Fakes.timer_scheduler(), loads = {} }
+		package.loaded["modules.llm.api_ollama"].warmup = function(origin, model, receipt, on_done)
+			world.loads[#world.loads + 1] = { origin = origin, model = model, receipt = receipt, on_done = on_done }
+			return { started = true, is_settled = function() return true end, cancel = function() return true end }
+		end
+		helpers.assert_true(Warmup.init({ scheduler = world.scheduler, target = engine.warmup_target,
+			request = engine.warmup_request, busy = engine.is_predicting }))
+		world.warmup = Warmup
+		return world, function()
+			Warmup.shutdown()
+			package.loaded["modules.llm.warmup"] = nil
+		end
+	end
+	local INITIAL_SEC = require("infra.timings").ms("llm", "warmup_initial_delay_ms") / 1000
+
+	helpers.it("linux-model-warmup: the engine loads its Ollama model, and a pause stops the chain until resume", function()
+		local engine, _, _, restore = load("ollama", ENTRY, nil, false, true)
+		local world, restore_warmup = bound_warmup(engine)
+		local okay, problem = pcall(function()
+			local target = engine.warmup_target()
+			helpers.assert_eq(target.origin, "http://127.0.0.1:11434")
+			helpers.assert_eq(target.model, "ollama-model")
+			helpers.assert_true(world.warmup.schedule("startup"))
+			engine.on_pause_change(true)
+			helpers.assert_eq(world.warmup.pending(), false, "a pause stops the chain with the runtime")
+			world.scheduler.test.advance(INITIAL_SEC)
+			helpers.assert_eq(#world.loads, 0, "nothing is loaded while paused")
+			engine.on_pause_change(false)
+			helpers.assert_true(world.warmup.pending(), "resuming warms the model again")
+			world.scheduler.test.advance(INITIAL_SEC)
+			helpers.assert_eq(#world.loads, 1)
+			helpers.assert_eq(world.loads[1].model, "ollama-model")
+			world.loads[1].on_done(true)
+			helpers.assert_eq(world.warmup.pending(), false, "a loaded model ends the chain")
+			-- The scripted profiles answer the stored selection from here on.
+			local selected = "ollama-model"
+			package.loaded["modules.llm.profiles"].get_current_model = function() return selected end
+			local set_model = package.loaded["modules.llm.profiles"].set_model
+			package.loaded["modules.llm.profiles"].set_model = function(name, ...)
+				local saved = set_model(name, ...)
+				if saved == true then selected = name end
+				return saved
+			end
+			helpers.assert_true(engine.set_model("replacement-model"))
+			world.scheduler.test.advance(INITIAL_SEC)
+			helpers.assert_eq(#world.loads, 2)
+			helpers.assert_eq(world.loads[2].model, "replacement-model", "a new model is warmed in its turn")
+		end)
+		restore_warmup(); restore(); if not okay then error(problem, 0) end
+	end)
+
+	helpers.it("linux-model-warmup: an API backend or a switched-off AI loads nothing", function()
+		local engine, _, _, restore = load("api", ENTRY, nil, false, true)
+		local world, restore_warmup = bound_warmup(engine)
+		local okay, problem = pcall(function()
+			helpers.assert_nil(engine.warmup_target())
+			helpers.assert_eq(world.warmup.schedule("startup"), false)
+			helpers.assert_eq(world.warmup.pending(), false)
+		end)
+		restore_warmup(); restore(); if not okay then error(problem, 0) end
+	end)
 end)

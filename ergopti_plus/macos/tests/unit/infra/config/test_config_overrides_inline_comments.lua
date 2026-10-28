@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Regression test asserting that TOML inline comments (everything from the
 --- first unquoted `#` to end of line) are stripped from values before coercion.
---- Before the fix, `log_level = "DEBUG" # this is a comment` would coerce to
+--- Before the fix, `some_text = "DEBUG" # this is a comment` would coerce to
 --- the raw string `"DEBUG" # this is a comment` instead of `"DEBUG"`. This test
 --- encodes that exact failure mode so the bug can never silently return.
 ---
@@ -43,11 +43,11 @@ _G.hs.settings = test_settings
 
 
 
--- ================================================================
--- ================================================================
--- ======= 1/ Inline Comment Stripping ([features] section) =======
--- ================================================================
--- ================================================================
+-- ==============================================================
+-- ==============================================================
+-- ======= 1/ Inline Comment Stripping ([script] section) =======
+-- ==============================================================
+-- ==============================================================
 
 helpers.describe("config_overrides.apply — inline comment stripping", function()
 
@@ -61,30 +61,30 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 		os.remove(path)
 	end
 
-	helpers.it("strips an inline comment from a quoted string value in [features]", function()
+	helpers.it("strips an inline comment from a quoted string value in [script]", function()
 		stored = {}
 		_G.hs.settings.set = function(k, v) stored[k] = v end
 
-		-- The raw line is: log_level = "DEBUG" # this is a comment
+		-- The raw line is: some_text = "DEBUG" # this is a comment
 		-- After stripping the inline comment the value must coerce to "DEBUG",
 		-- not to the raw string `"DEBUG" # this is a comment`.
-		with_tmp('[features]\nlog_level = "DEBUG" # this is a comment\n', function(path)
+		with_tmp('[script]\nsome_text = "DEBUG" # this is a comment\n', function(path)
 			local applied = Overrides.apply(path)
 
 			helpers.assert_true(applied >= 1, "applied count")
-			helpers.assert_eq(stored["ergopti.log_level"], "DEBUG", "log_level after comment strip")
+			helpers.assert_eq(stored["ergopti.some_text"], "DEBUG", "some_text after comment strip")
 		end)
 	end)
 
 
-	helpers.it("strips an inline comment from a numeric value in [features]", function()
+	helpers.it("strips an inline comment from a numeric value in [script]", function()
 		stored = {}
 		_G.hs.settings.set = function(k, v) stored[k] = v end
 
 		-- The raw line is: some_value = 42 # numeric comment
 		-- After stripping, the value string is "42" which must coerce to the
 		-- number 42, not to the string "42 # numeric comment".
-		with_tmp('[features]\nsome_value = 42 # numeric comment\n', function(path)
+		with_tmp('[script]\nsome_value = 42 # numeric comment\n', function(path)
 			local applied = Overrides.apply(path)
 
 			helpers.assert_true(applied >= 1, "applied count")
@@ -93,17 +93,17 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 	end)
 
 
-	helpers.it("strips inline comments in [script] section as well", function()
+	helpers.it("strips inline comments from the log level as well", function()
 		stored = {}
 		_G.hs.settings.set = function(k, v) stored[k] = v end
 
-		with_tmp('[script]\nLogLevel = "INFO" # developer note\n', function(path)
+		with_tmp('[script]\nlog_level = "INFO" # developer note\n', function(path)
 			local applied = Overrides.apply(path)
 
 			helpers.assert_true(applied >= 1, "applied count")
-			-- LogLevel maps to the canonical ergopti.log_level key (F-M4); the comment
-			-- must still be stripped from the value.
-			helpers.assert_eq(stored["ergopti.log_level"], "INFO", "LogLevel after comment strip")
+			-- log_level lands under the canonical ergopti.log_level key (F-M4); the
+			-- comment must still be stripped from the value.
+			helpers.assert_eq(stored["ergopti.log_level"], "INFO", "log_level after comment strip")
 		end)
 	end)
 
@@ -113,11 +113,11 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 		_G.hs.settings.set = function(k, v) stored[k] = v end
 
 		-- Sanity-check: plain values (no comment) must still coerce correctly
-		with_tmp('[features]\nlog_level = "WARN"\n', function(path)
+		with_tmp('[script]\nsome_text = "WARN"\n', function(path)
 			local applied = Overrides.apply(path)
 
 			helpers.assert_true(applied >= 1, "applied count")
-			helpers.assert_eq(stored["ergopti.log_level"], "WARN", "log_level without comment")
+			helpers.assert_eq(stored["ergopti.some_text"], "WARN", "some_text without comment")
 		end)
 	end)
 
@@ -128,11 +128,11 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 
 		-- A line that is only a comment must be silently skipped; the count
 		-- must reflect only the real key=value entries.
-		with_tmp('[features]\n# full-line comment\nlog_level = "DEBUG"\n', function(path)
+		with_tmp('[script]\n# full-line comment\nsome_text = "DEBUG"\n', function(path)
 			local applied = Overrides.apply(path)
 
 			helpers.assert_eq(applied, 1, "only the real entry is counted")
-			helpers.assert_eq(stored["ergopti.log_level"], "DEBUG", "log_level set correctly")
+			helpers.assert_eq(stored["ergopti.some_text"], "DEBUG", "some_text set correctly")
 		end)
 	end)
 
@@ -145,11 +145,11 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 		-- the quoted value as well. The fix uses `#[^"]*$` which stops at a `"`.
 		-- `key = "has#hash" # trailing comment` must coerce to the string `has#hash`,
 		-- not to the truncated `has`.
-		with_tmp('[features]\nlog_level = "has#hash" # trailing comment\n', function(path)
+		with_tmp('[script]\nsome_text = "has#hash" # trailing comment\n', function(path)
 			local applied = Overrides.apply(path)
 
 			helpers.assert_true(applied >= 1, "applied count")
-			helpers.assert_eq(stored["ergopti.log_level"], "has#hash",
+			helpers.assert_eq(stored["ergopti.some_text"], "has#hash",
 				"# inside quoted value must be preserved; only the trailing comment is stripped")
 		end)
 	end)
@@ -166,7 +166,7 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 		-- the genuine trailing comment) and coerced to the mangled string `a \`.
 		-- The fix walks the string honouring `\"` escapes so the full value round-
 		-- trips and the trailing comment is still stripped correctly.
-		with_tmp('[features]\nkey = "a \\"quoted\\" word"  # comment\n', function(path)
+		with_tmp('[script]\nkey = "a \\"quoted\\" word"  # comment\n', function(path)
 			local applied = Overrides.apply(path)
 
 			helpers.assert_true(applied >= 1, "applied count")
@@ -181,14 +181,14 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 
 		with_tmp([==[[llm]
 app_profile_overrides = """
-[features]
-llm.enabled = false
+[script]
+some_text = "inert"
 """
 ]==], function(path)
 			local applied = Overrides.apply(path)
 			helpers.assert_eq(applied, 0,
-				"only the owned [script]/[features] tables may publish settings")
-			helpers.assert_nil(stored["ergopti.llm.enabled"],
+				"only the owned [script] table may publish settings")
+			helpers.assert_nil(stored["ergopti.some_text"],
 				"a header and assignment inside a string are inert user data")
 		end)
 	end)

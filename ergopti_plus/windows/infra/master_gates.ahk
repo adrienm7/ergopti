@@ -76,7 +76,10 @@ MasterGateDesiredTapHold(TapHoldSource) {
 _MG_DisableFeatureNode(Node, Prefix) {
 	if InStr(Prefix, ".") && Node.Has("enabled") {
 		Node["enabled"] := false
-		return
+		; A group switch (hotstrings.dynamic.enabled) sits beside its members and
+		; must not hide them from the walk; a feature's own parameters end it.
+		if !_MG_HasNestedFeature(Node)
+			return
 	}
 	for Key, Value in Node {
 		Path := Prefix . "." . Key
@@ -92,6 +95,15 @@ _MG_DisableFeatureNode(Node, Prefix) {
 		else if Prefix == "shortcuts.personal" && (Value is Integer) && (Value == 0 || Value == 1)
 			Node[Key] := false
 	}
+}
+
+; Whether a Features node holds other features beneath it, not only parameters.
+_MG_HasNestedFeature(Node) {
+	for _, Value in Node {
+		if Value is Map
+			return true
+	}
+	return false
 }
 
 ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn := 0) {
@@ -125,6 +137,19 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 		; Hotstrings master (includes Personal sub-category).
 		if !CategoryGateFn.Call("Hotstrings") and FeaturesTarget.Has("hotstrings") {
 				_MG_DisableFeatureNode(FeaturesTarget["hotstrings"], "hotstrings")
+		}
+
+		; Dynamic hotstrings master (hotstrings.dynamic.enabled, the one switch the
+		; three drivers share): off, no dynamic family or programmable hotstring
+		; runs, whatever its own switch says. The choices stay on disk.
+		if FeaturesTarget.Has("hotstrings") and FeaturesTarget["hotstrings"].Has("dynamic") {
+				DynamicNode := FeaturesTarget["hotstrings"]["dynamic"]
+				if DynamicNode.Has("enabled") and !DynamicNode["enabled"] {
+						for _DynamicId, DynamicValue in DynamicNode {
+								if (Type(DynamicValue) == "Map" and DynamicValue.Has("enabled"))
+										DynamicValue["enabled"] := false
+						}
+				}
 		}
 
 		; Per-TOML-file hotstring sub-category gates. Independent of the top
@@ -246,6 +271,27 @@ _MG_SupersedeForEmulatedLayout(FeaturesTarget, Entries := unset) {
 ; Reads and validates hotstring_category_keys from menu_manifest.json.
 ; The manifest is the sole behavioral definition: failure is explicit so a
 ; candidate state can never be partially gated by a stale fallback table.
+; Decodes the exact manifest text just read. The file is still read and
+; validated on EVERY call, so an invalid or changed manifest is judged afresh and
+; throws every time: only a decode of text equal to the last valid one is skipped.
+; The decoded root is read-only for the caller, which builds its own Map from it.
+; Boot and every tray rebuild decoded the unchanged 12.5 KB file several times
+; (about 40 ms each) through this loader.
+_MG_ParseManifestContent(Content) {
+		static LastContent := "", LastRoot := ""
+		if (LastRoot is Map && LastContent == Content) {
+				PerfCount("master_gates.manifest_decode_skipped")
+				return LastRoot
+		}
+		PerfCount("master_gates.manifest_decode")
+		Root := JsonParse(Content)
+		if (Root is Map) {
+				LastContent := Content
+				LastRoot := Root
+		}
+		return Root
+}
+
 _MG_LoadSubCategories(ManifestPath := "") {
 		global _SharedDir
 		; NOT memoized, deliberately. Caching the parsed manifest was tried and
@@ -268,7 +314,7 @@ _MG_LoadSubCategories(ManifestPath := "") {
 		if (Content == "") {
 				throw Error("Master gate manifest is empty: " . FilePath)
 		}
-		try Root := JsonParse(Content)
+		try Root := _MG_ParseManifestContent(Content)
 		catch as Err
 				throw Error("Master gate manifest is invalid JSON: " . Err.Message)
 		if !(Root is Map) or !Root.Has("hotstring_category_keys") {

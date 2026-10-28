@@ -44,8 +44,12 @@
 _GPCC_PastePlainSnapshotsFullClipboard() {
 	Seg := _DriverFuncBody("GesturePastePlain")
 	Assert(Seg != "", "GesturePastePlain() declaration must exist in gestures.ahk")
-	Assert(InStr(Seg, "CB_SaveAll()") > 0,
-		"GesturePastePlain must snapshot the full clipboard through CB_SaveAll() before coercing to plain text — the self-assign drops non-text formats the user may still want")
+	Assert(InStr(Seg, "CB_SavePlainSnapshot(OwnerToken, &Captured)") > 0,
+		"GesturePastePlain must snapshot the full clipboard through CB_SavePlainSnapshot() before coercing to plain text — the self-assign drops non-text formats the user may still want")
+	; The generation-bound snapshot owner is a full snapshot only while it saves
+	; every format through CB_SaveAll().
+	Assert(InStr(_DriverFuncBody("CB_SavePlainSnapshot"), "CB_SaveAll()") > 0,
+		"CB_SavePlainSnapshot must capture every clipboard format through CB_SaveAll()")
 }
 Test("gestures: GesturePastePlain snapshots full clipboard before coercion (gesturepickcolor-clipboard-clobber)", _GPCC_PastePlainSnapshotsFullClipboard)
 

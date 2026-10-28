@@ -64,13 +64,21 @@ _TBCC_FailurePathsInvalidateCache() {
 	DeleteCount := 0
 	Pos := 1
 	loop {
-		Found := InStr(Seg, "_ParseTomlCache.Delete(Path)", , Pos)
+		Found := InStr(Seg, "_TOML_InvalidateParseCache(Path)", , Pos)
 		if !Found
 			break
 		DeleteCount += 1
 		Pos := Found + 1
 	}
 	Assert(DeleteCount >= 4,
-		"TOML_BatchWrite must call _ParseTomlCache.Delete(Path) on all failure paths and on success (F37), found: " . DeleteCount)
+		"TOML_BatchWrite must retire the parsed generation on failure paths and success (F37), found: " . DeleteCount)
+	Invalidate := _DriverFuncBody("_TOML_InvalidateParseCache")
+	Assert(Invalidate != "", "the actual invalidation owner must exist")
+	Retire := InStr(Invalidate, "Owners.Delete(Key)")
+	Probe := InStr(Invalidate, "_ParseTomlCache.Has(Path)")
+	Assert(Retire > 0 && Probe > Retire,
+		"an absent cache entry must still revoke an interrupted parse generation")
+	Assert(InStr(Invalidate, "_ParseTomlCache.Delete(Path)") > Probe,
+		"the shared owner must still evict an existing cached model")
 }
 Test("toml_helpers: TOML_BatchWrite invalidates cache on all failure paths", _TBCC_FailurePathsInvalidateCache)

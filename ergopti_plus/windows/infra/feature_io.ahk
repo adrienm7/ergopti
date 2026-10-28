@@ -97,8 +97,12 @@ _FeatureLocateParts(Node, Parts, Prop) {
 		Node := Node[Seg]
 		; Alpha feature: a Map carrying "enabled". Its section is the path up to
 		; and including this segment; the leaf key is the explicit Prop, the next
-		; path segment (an alpha property like "letter"), or "enabled".
-		if (Type(Node) == "Map" and Node.Has("enabled")) {
+		; path segment (an alpha property like "letter"), or "enabled". A Map that
+		; also holds the next segment as a nested feature is a group whose own
+		; switch sits beside its members (hotstrings.dynamic.enabled beside
+		; hotstrings.dynamic.date): the walk goes on into the member.
+		if (Type(Node) == "Map" and Node.Has("enabled")
+			and !(Idx < Parts.Length and Node.Has(Parts[Idx + 1]) and Type(Node[Parts[Idx + 1]]) == "Map")) {
 			Section := _FeatureJoin(Parts, 1, Idx)
 			Key := (Prop != "") ? Prop
 				: (Idx < Parts.Length ? Parts[Idx + 1] : "enabled")

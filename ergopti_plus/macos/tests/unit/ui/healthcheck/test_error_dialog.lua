@@ -53,7 +53,8 @@ local function load_dialog(controls)
 	logger.warn = function(_, message, ...) context.warnings[#context.warnings + 1] = string.format(message, ...) end
 	package.loaded["infra.logger"] = logger
 	package.loaded["infra.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
-	package.loaded["infra.locale"] = { all = function() return { ["common.error_title"] = "Error" } end }
+	local function catalogue() return { ["common.error_title"] = "Error" } end
+	package.loaded["infra.locale"] = { all = catalogue, catalogue = catalogue }
 	package.loaded["adapters.timer_scheduler"] = {
 		after = function(delay, fn)
 			if delay == 0 then
@@ -88,7 +89,7 @@ local function load_dialog(controls)
 		DRIVER = "macos",
 		config = function()
 			return {
-				redaction = { home_placeholder = "~", account_placeholder = "<user>", secret_placeholder = "<secret>",
+				redaction = { home_placeholder = "~", account_placeholder = "<user>", secret_placeholder = "<secret>", email_placeholder = "<email>", foreign_home_markers = {}, shared_profile_names = {}, path_name_max_words = 3, config_placeholder = "<config>", config_name_placeholder = "<name>", config_known_names = {},
 					min_account_name_length = 3, token_prefixes = {}, bearer_min_length = 8, secret_keys = {},
 					secret_value_min_length = 6 },
 				templates = document("issue_templates"), repository = document("../updater/defaults").github, schema = sharing_schema,
@@ -102,7 +103,7 @@ local function load_dialog(controls)
 				sections = {
 					versions = { ergopti_version = context.version or "2.1.0", commit = "abc1234 (build)" },
 					system = { os = "macOS 15.1" },
-					issues = { warn_count = 1, err_count = 2, recent = { "2026-09-24 10:15:02:117 [ERROR] [keylogger] x" } },
+					issues = { warn_count = 1, err_count = 2, recent = { "2026-09-24 10:15:02:117 [ERROR] [keystats] x" } },
 					paths = { errors_today = ERRORS_FILE, diagnostics_dir = HOME .. "/Library/Logs/ergopti_plus/diagnostics" },
 				},
 			}
@@ -171,7 +172,7 @@ local function load_dialog(controls)
 			local fresh = {}; for key, value in pairs(webview) do if type(value) == "function" then fresh[key] = value end end
 			webview = setmetatable(fresh, {})
 		end
-		context.windows = (context.windows or 0) + 1; return webview end
+		context.windows = (context.windows or 0) + 1; context.webview = webview; return webview end
 	hs_stub.webview.usercontent.new = function(name)
 		context.handler_name = name
 		return {
@@ -268,7 +269,7 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 	helpers.it("a logged ERROR arms one timer and opens nothing synchronously (error-dialog-macos)", function()
 		local dialog, context = load_dialog()
 		helpers.assert_true(dialog.init(), "the shipped policy must load")
-		dialog.on_error("keylogger", "Flush failed: %s", "Flush failed: disk full")
+		dialog.on_error("keystats", "Flush failed: %s", "Flush failed: disk full")
 		helpers.assert_eq(#context.timers, 1, "one timer must be armed")
 		helpers.assert_eq(context.windows, nil, "no window may open inside the logging call")
 		helpers.assert_true(context.timers[1].delay > 0, "the window must open later, on the timer")
@@ -283,8 +284,8 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 	helpers.it("the same signature opens once; errors while pending or open are folded (error-dialog-macos)", function()
 		local dialog, context = load_dialog()
 		dialog.init()
-		dialog.on_error("keylogger", "Flush failed: %s", "Flush failed: disk full")
-		dialog.on_error("keylogger", "Other failure", "Other failure")
+		dialog.on_error("keystats", "Flush failed: %s", "Flush failed: disk full")
+		dialog.on_error("keystats", "Other failure", "Other failure")
 		helpers.assert_eq(#context.timers, 1, "an error logged while a window is pending must not arm another")
 		fire_timers(context)
 		context.page({ body = "ready" })
@@ -296,21 +297,62 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 		helpers.assert_eq(more and more.count, 2)
 		context.page({ body = { action = "close" } })
 		helpers.assert_eq(context.deleted, 1, "close must delete the window")
-		dialog.on_error("keylogger", "Flush failed: %s", "Flush failed: again")
+		dialog.on_error("keystats", "Flush failed: %s", "Flush failed: again")
 		helpers.assert_eq(#context.timers, 0, "a signature already shown this session must not open again")
 		dialog.on_error("menu", "New failure", "New failure")
 		helpers.assert_eq(#context.timers, 1, "after close, a new error opens a window again")
+	end)
+
+	-- A lease failure is followed by a bounded recovery with a fresh lease; the
+	-- window for one that recovered by itself alarmed the user about nothing.
+	local LEASE_FAILURE = "Karabiner lease %s failed; fencing before publishing failure: %s"
+
+	--- Installs a lease controller stub reporting a phase.
+	local function lease_phase(phase)
+		package.loaded["platform.remap.lease_controller"] = { status = function() return phase, { phase = phase } end }
+	end
+
+	helpers.it("holds a Karabiner lease failure and opens nothing once the lease runs again (hold-recoverable-error)", function()
+		local dialog, context = load_dialog()
+		dialog.init()
+		dialog.on_error("karabiner.lease", LEASE_FAILURE, "Karabiner lease abc failed; fencing before publishing failure: PONG")
+		helpers.assert_eq(#context.timers, 1, "only the hold timer is armed, not the window's")
+		helpers.assert_eq(context.timers[1].delay, dialog.RECOVERY_GRACE_SEC)
+		lease_phase("active")
+		fire_timers(context)
+		fire_timers(context)
+		package.loaded["platform.remap.lease_controller"] = nil
+		helpers.assert_eq(context.windows, nil, "a failure that recovered by itself never opens the window")
+	end)
+
+	helpers.it("still opens the window for a lease failure nothing recovered (hold-recoverable-error)", function()
+		local dialog, context = load_dialog()
+		dialog.init()
+		dialog.on_error("karabiner.lease", LEASE_FAILURE, "Karabiner lease abc failed; fencing before publishing failure: PONG")
+		helpers.assert_eq(context.windows, nil)
+		lease_phase("fenced")
+		fire_timers(context)
+		fire_timers(context)
+		package.loaded["platform.remap.lease_controller"] = nil
+		helpers.assert_eq(context.windows, 1, "after the grace period the failure is decided like any error")
+	end)
+
+	helpers.it("the held template is the one the lease controller logs (hold-recoverable-error)", function()
+		local source = helpers.read_driver_source('local LOG = "karabiner.lease"')
+		helpers.assert_not_nil(source, "the lease controller declares the module the window holds")
+		helpers.assert_true(source:find('Logger.error(LOG, "Karabiner lease %s failed; fencing before publishing failure: %s"', 1, true) ~= nil,
+			"the lease controller must log the failure the error window holds")
 	end)
 
 	helpers.it("nothing opens while the setting is unticked (error-dialog-macos)", function()
 		local dialog, context = load_dialog({ stored = false })
 		dialog.init()
 		helpers.assert_eq(dialog.is_enabled(), false)
-		dialog.on_error("keylogger", "Flush failed: %s", "Flush failed: disk full")
+		dialog.on_error("keystats", "Flush failed: %s", "Flush failed: disk full")
 		helpers.assert_eq(#context.timers, 0, "an unticked setting must keep every error quiet")
 		helpers.assert_true(dialog.set_enabled(true))
 		helpers.assert_eq(context.stored["script.show_error_dialog"], true, "the setting must persist")
-		dialog.on_error("keylogger", "Flush failed: %s", "Flush failed: disk full")
+		dialog.on_error("keystats", "Flush failed: %s", "Flush failed: disk full")
 		helpers.assert_eq(#context.timers, 1, "ticked again, the error opens a window")
 	end)
 
@@ -326,24 +368,24 @@ helpers.describe("error window (macOS): page and actions (error-dialog-macos)", 
 	helpers.it("ready sends the error and its report, redacted (error-dialog-macos)", function()
 		local dialog, context = load_dialog()
 		dialog.init()
-		dialog.on_error("keylogger", "Flush failed: %s", "Flush failed: " .. HOME .. "/notes.txt")
+		dialog.on_error("keystats", "Flush failed: %s", "Flush failed: " .. HOME .. "/notes.txt")
 		fire_timers(context)
 		context.page({ body = "ready" })
 		local init = page_messages(context)[1]
 		helpers.assert_eq(init.type, "init")
 		helpers.assert_eq(init.kind, "error")
-		helpers.assert_eq(init.module, "keylogger")
+		helpers.assert_eq(init.module, "keystats")
 		helpers.assert_eq(init.message, "Flush failed: ~/notes.txt", "the message must be redacted")
 		helpers.assert_eq(init.log_path, "~/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-09-24.log")
 		helpers.assert_true(init.text:find("# ErgoptiPlus diagnostics", 1, true) ~= nil, "the report must be sent")
 		helpers.assert_true(init.text:find(HOME, 1, true) == nil, "the report must be redacted")
-		helpers.assert_true(init.text:find("keylogger", 1, true) ~= nil, "the report must name the module")
+		helpers.assert_true(init.text:find("keystats", 1, true) ~= nil, "the report must name the module")
 	end)
 
 	helpers.it("copy, report and open act on the report the page showed (error-dialog-macos)", function()
 		local dialog, context = load_dialog()
 		dialog.init()
-		dialog.on_error("keylogger", "Flush failed: %s", "Flush failed: disk full")
+		dialog.on_error("keystats", "Flush failed: %s", "Flush failed: disk full")
 		fire_timers(context)
 		local focused_at_open = context.focused
 		context.page({ body = "ready" })
@@ -359,7 +401,10 @@ helpers.describe("error window (macOS): page and actions (error-dialog-macos)", 
 		helpers.assert_eq(report.fields.title, nil, "a shared title never contains free error text")
 		-- The report owner derives the attachment name from its retained snapshot.
 		helpers.assert_eq(report.name, nil, "a report names no file to save")
-		helpers.assert_eq(report.fields.diagnostics, nil, "the report field is filled from the text, not a summary")
+		helpers.assert_true(report.fields.diagnostics:find("# ErgoptiPlus diagnostics", 1, true) == 1,
+			"the report field is the compact report built from the same snapshot")
+		helpers.assert_true(report.fields.diagnostics:find("Flush failed: disk full", 1, true) == nil, "the compact report excludes free error text")
+		helpers.assert_true(report.fields.diagnostics:find("```json", 1, true) == nil, "the compact report has no JSON block")
 		helpers.assert_eq(report.fields.driver, "macos")
 		helpers.assert_eq(context.focused, focused_at_open, "reporting never brings the error window back to the front")
 		helpers.assert_eq(open.action, "open_path")
@@ -373,7 +418,7 @@ helpers.describe("error window (macOS): page and actions (error-dialog-macos)", 
 	helpers.it("an unknown action is refused and changes nothing (error-dialog-macos)", function()
 		local dialog, context = load_dialog()
 		dialog.init()
-		dialog.on_error("keylogger", "Flush failed: %s", "Flush failed: disk full")
+		dialog.on_error("keystats", "Flush failed: %s", "Flush failed: disk full")
 		fire_timers(context)
 		context.page({ body = { action = "open_path", id = "config_dir" } })
 		context.page({ body = { action = "copy", text = "forged" } })
@@ -459,4 +504,118 @@ helpers.describe("error dialog asynchronous action ownership", function()
 			helpers.assert_eq(owners[1].current(), false)
 		end)
 	end
+end)
+
+
+--- Installs the native fluent submission contract and independently delivered callbacks.
+--- @param context table Existing error-window fixture.
+--- @param mode string|nil Optional native submission refusal.
+--- @return table evaluations Native requests and their completion callbacks.
+local function install_evaluator(context, mode)
+	local evaluations = {}
+	context.webview.evaluateJavaScript = function(self, script, callback)
+		context.scripts[#context.scripts + 1] = script
+		evaluations[#evaluations + 1] = { callback = callback, view = self }
+		if mode == "throw" then error("PRIVATE_NATIVE_SCRIPT_FAILURE", 0) end
+		if mode == "nil" then return nil end
+		if mode == "false" then return false end
+		return self
+	end
+	return evaluations
+end
+
+--- Opens one healthy window before injecting the JavaScript native boundary.
+--- @return table dialog
+--- @return table context
+local function open_delivery_window()
+	local dialog, context = load_dialog()
+	helpers.assert_eq(dialog.init(), true)
+	dialog.on_error("synthetic", "Initial failure", "Initial failure")
+	fire_timers(context)
+	helpers.assert_type(context.webview, "table")
+	helpers.assert_eq(#context.errors, 0)
+	return dialog, context
+end
+
+helpers.describe("error dialog native JavaScript receipts", function()
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("(error-dialog-js-receipt) reports a native submission " .. mode, function()
+			local _, context = open_delivery_window()
+			local evaluations = install_evaluator(context, mode)
+			context.page({ body = "ready" })
+			helpers.assert_eq(#evaluations, 1)
+			helpers.assert_eq(#context.errors, 1)
+			helpers.assert_eq(table.concat(context.errors):find("PRIVATE_NATIVE_SCRIPT_FAILURE", 1, true), nil,
+				"A native exception may contain the complete private page payload")
+		end)
+	end
+	for _, sentinel in ipairs({ "nil", "code_zero" }) do
+		helpers.it("(error-dialog-js-receipt) preserves a native success " .. sentinel, function()
+			local _, context = open_delivery_window()
+			local evaluations = install_evaluator(context)
+			context.page({ body = "ready" })
+			helpers.assert_eq(#evaluations, 1)
+			if evaluations[1].callback then
+				evaluations[1].callback(nil, sentinel == "code_zero" and { code = 0 } or nil)
+			end
+			helpers.assert_eq(#context.errors, 0)
+			helpers.assert_eq(page_messages(context)[1].type, "init")
+		end)
+	end
+	helpers.it("(error-dialog-js-receipt) reports an asynchronous native script error without its payload", function()
+		local _, context = open_delivery_window()
+		local evaluations = install_evaluator(context)
+		context.page({ body = "ready" })
+		helpers.assert_type(evaluations[1].callback, "function", "Observe the actual WebKit completion")
+		helpers.assert_eq(#context.errors, 0)
+		evaluations[1].callback(nil, { code = 4, domain = "WKErrorDomain", localizedDescription = "PRIVATE_PAGE_PAYLOAD" })
+		helpers.assert_eq(#context.errors, 1)
+		helpers.assert_eq(table.concat(context.errors):find("PRIVATE_PAGE_PAYLOAD", 1, true), nil)
+	end)
+	for _, replacement in ipairs({ false, true }) do
+		helpers.it("(error-dialog-js-receipt) ignores a closed page callback with successor=" .. tostring(replacement), function()
+			local dialog, context = open_delivery_window()
+			local evaluations = install_evaluator(context)
+			context.page({ body = "ready" })
+			helpers.assert_type(evaluations[1].callback, "function")
+			context.page({ body = { action = "close" } })
+			if replacement then
+				dialog.on_error("synthetic", "Successor failure", "Successor failure")
+				fire_timers(context)
+				helpers.assert_eq(context.windows, 2)
+			end
+			local errors = #context.errors
+			evaluations[1].callback(nil, { code = 4, domain = "WKErrorDomain" })
+			helpers.assert_eq(#context.errors, errors)
+		end)
+	end
+	helpers.it("(error-dialog-js-receipt) observes localization script completion too", function()
+		local _, context = open_delivery_window()
+		local evaluations = install_evaluator(context)
+		context.navigation_callback("didFinishNavigation")
+		helpers.assert_eq(#evaluations, 1)
+		helpers.assert_type(evaluations[1].callback, "function")
+		evaluations[1].callback(nil, { code = 4, domain = "WKErrorDomain", localizedDescription = "PRIVATE_LOCALE_PAYLOAD" })
+		helpers.assert_eq(#context.errors, 1)
+		helpers.assert_eq(table.concat(context.errors):find("PRIVATE_LOCALE_PAYLOAD", 1, true), nil)
+	end)
+	helpers.it("(error-dialog-js-receipt) bounds diagnostic feedback from a failed folded update", function()
+		local dialog, context = open_delivery_window()
+		local evaluations = install_evaluator(context)
+		context.page({ body = "ready" })
+		helpers.assert_type(evaluations[1].callback, "function")
+		local logger = package.loaded["infra.logger"]
+		local record_error = logger.error
+		logger.error = function(module, message, ...)
+			record_error(module, message, ...)
+			dialog.on_error(module, message, string.format(message, ...))
+		end
+		evaluations[1].callback(nil, { code = 4, domain = "WKErrorDomain" })
+		helpers.assert_eq(#context.errors, 1)
+		helpers.assert_eq(#evaluations, 2, "The recorded failure is folded into the open window")
+		helpers.assert_type(evaluations[2].callback, "function")
+		evaluations[2].callback(nil, { code = 4, domain = "WKErrorDomain" })
+		helpers.assert_eq(#context.errors, 1, "The same delivery category is already visible for this session")
+		helpers.assert_eq(#evaluations, 2, "A failed folded update must not feed another failure update")
+	end)
 end)

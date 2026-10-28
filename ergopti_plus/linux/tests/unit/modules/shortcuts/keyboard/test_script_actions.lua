@@ -87,12 +87,12 @@ helpers.describe("script lifecycle actions", function()
 		local paths_before = package.loaded["infra.config_paths"]
 		local path = os.tmpname()
 		require("test.config_unused_keys_contract").sandbox.write_bytes(path,
-			'[shortcuts.keyboard]\nctrl_j = "select_line"\nctrl_k = "script_pause_toggle"\n')
+			'[shortcuts.keyboard]\nprimary_j = "select_line"\nprimary_k = "script_pause_toggle"\n')
 		package.loaded["infra.config_paths"] = { config = function() return path end }
 		local executed = {}
 		package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
-			["shortcuts.keyboard.ctrl_j"] = "select_line",
-			["shortcuts.keyboard.ctrl_k"] = "script_pause_toggle",
+			["shortcuts.keyboard.primary_j"] = "select_line",
+			["shortcuts.keyboard.primary_k"] = "script_pause_toggle",
 		} })
 		package.loaded["modules.gestures.manager"] = {
 			-- The loader keeps only the ids the catalogue offers; both stored ones are.
@@ -145,4 +145,24 @@ helpers.describe("script lifecycle actions", function()
 		end, "quit")
 	end)
 
+end)
+
+
+helpers.describe("pause transition acknowledgement", function()
+	for _, result in ipairs({ "nil", "true", "false", "throw" }) do
+		helpers.it("acknowledges a " .. result .. " listener result", function()
+			local calls = 0
+			local controller = require("modules.shortcuts.script_actions").new({ reset = function() end,
+				reload = function() end, quit = function() end,
+				on_pause_change = function()
+					calls = calls + 1
+					if result == "throw" then error("listener failed") end
+					if result == "false" then return false end
+					if result == "true" then return true end
+				end })
+			helpers.assert_eq(controller.toggle_pause(), result == "nil" or result == "true")
+			helpers.assert_true(controller.is_paused())
+			helpers.assert_eq(calls, 1, "acknowledgement does not apply a second transition")
+		end)
+	end
 end)

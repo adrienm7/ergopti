@@ -25,6 +25,8 @@
 ;    a logged ERROR opens the error window).
 ; 7. _shared/tests/corpus/diagnostics/error_report_vectors.json through
 ;    ErrorReport_Compose (the report the error window shows and sends).
+; 8. _shared/tests/corpus/healthcheck/form_identity_vectors.json through
+;    HealthCheck_ShareDocument (the version and system the bug form shows).
 ; Each corpus fails loudly when unreadable or empty: a replay over zero
 ; vectors would report success while checking nothing.
 ; ==============================================================================
@@ -116,7 +118,7 @@ _TCD_IssueLink() {
 	for Vector in Data["url_vectors"] {
 		Templates := Data["templates"].Clone()
 		Templates["max_url_bytes"] := Vector["max_url_bytes"]
-		Build := IssueLink_BuildUrl.Bind(Templates, Data["repository"], Vector["template"], Vector["values"])
+		Build := IssueLink_BuildUrl.Bind(Templates, Data["repository"], Vector["template"], Vector["values"], Vector.Get("notes", 0))
 		if Vector.Has("expect_error") {
 			AssertThrows(Build, Vector["id"] . ": an error was expected")
 			continue
@@ -214,6 +216,23 @@ _TCD_PageActions() {
 
 Test('corpus:diagnostics: page action vectors (page-actions-corpus)', _TCD_PageActions)
 
+_TCD_FormIdentity() {
+	Data := _TCD_Corpus("tests\corpus\healthcheck\form_identity_vectors.json")
+	Assert(Data["vectors"].Length >= 8, "the form-identity corpus must hold its vectors")
+	Schema := HealthCheck_Config()["schema"]
+	for Vector in Data["vectors"] {
+		Snapshot := Map("schema_version", 2, "driver", Vector["snapshot"]["driver"],
+			"generated_at", "2026-10-27T10:00:00Z", "sections", Vector["snapshot"]["sections"])
+		Document := HealthCheck_ShareDocument(Snapshot, Schema)
+		AssertEqual(Vector["version"], Document["fields"]["version"], Vector["id"] . ": version")
+		AssertEqual(Vector["os"], Document["fields"]["os"], Vector["id"] . ": os")
+		AssertTrue(InStr(Document["fields"]["diagnostics"], Chr(96) . Chr(96) . Chr(96) . "json") = 0,
+			Vector["id"] . ": the form report has no JSON block")
+	}
+}
+
+Test("corpus:diagnostics: issue form identity vectors (form-identity-corpus)", _TCD_FormIdentity)
+
 ; Page observations contain nested result maps whose identities differ after parsing.
 _TCD_NestedActionValues() {
 	Expected := Map('observations', Map('results', Map('redaction', Map('state', 'PASS', 'ms', 0))))
@@ -301,3 +320,36 @@ _TCD_ErrorReport() {
 }
 
 Test("corpus:diagnostics: error window report vectors (error-report-corpus)", _TCD_ErrorReport)
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 8/ Day Log Attachment =======
+; =====================================
+; =====================================
+
+_TCD_DayLog() {
+	Data := _TCD_Corpus("tests\corpus\diagnostics\day_log_vectors.json")
+	Rules := _TCD_Corpus("modules\diagnostics\redaction.json")
+	Assert(Data["vectors"].Length >= 8, "the day log corpus must hold its vectors")
+	for Vector in Data["vectors"] {
+		Got := DayLog_Collect(Vector.Has("raw") ? Vector["raw"] : "", Vector["file_size"], Rules, Data["context"],
+			Vector.Has("limits") ? Vector["limits"] : Data["limits"])
+		Expected := Vector["expected"]
+		AssertEqual(Expected.Count, Got.Count, Vector["id"] . ": the result carries extra or missing keys")
+		for Key, Value in Expected {
+			if (Value is Array) {
+				AssertEqual(Value.Length, Got[Key].Length, Vector["id"] . ": " . Key . " length")
+				for Index, Line in Value
+					AssertEqual(Line, Got[Key][Index], Vector["id"] . ": " . Key . " " . Index)
+			} else {
+				AssertEqual(Value, Got[Key], Vector["id"] . ": " . Key)
+			}
+		}
+	}
+}
+
+Test("corpus:diagnostics: day log vectors (day-log-corpus)", _TCD_DayLog)

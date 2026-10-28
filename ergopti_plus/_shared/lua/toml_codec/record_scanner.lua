@@ -12,6 +12,17 @@
 local M = {}
 local Bom = require("toml_codec.bom")
 local KeyPath = require("toml_codec.key_path")
+local SourceMemo = require("toml_codec.source_memo")
+
+-- One preferences save scans the same config.toml text 10 times (record list,
+-- preferences, inline parents, batch writer, personal metadata). A scan is a
+-- pure function of the text and the header grammar, so the newest texts are
+-- kept and every caller receives a private copy.
+local SCAN_MEMO_ENTRIES = 4
+local _scan_memo = SourceMemo.new(SCAN_MEMO_ENTRIES)
+-- Defined below scan_records, which is the only public entry point.
+local scan_source
+local TextUtils = require("text_utils")
 
 --- Finds the end of an already recognized triple-quote closing run.
 --- Value decoding owns validation of the maximum run length.
@@ -36,6 +47,15 @@ function M.advance(raw, depth, multiline_quote)
 	local length = #raw
 	local comment_offset
 	while index <= length do
+		-- Characters no state reacts to are skipped in one jump.
+		local stop
+		if multiline_quote then
+			stop = raw:find(multiline_quote == '"""' and '[\\"]' or "'", index)
+		else
+			stop = raw:find("[#\"'%[%]{}]", index)
+		end
+		if stop == nil then break end
+		index = stop
 		if multiline_quote then
 			if multiline_quote == '"""' and raw:sub(index, index) == "\\" then
 				index = index + 2
@@ -57,14 +77,13 @@ function M.advance(raw, depth, multiline_quote)
 			elseif char == '"' then
 				index = index + 1
 				while index <= length do
-					local quoted_char = raw:sub(index, index)
-					if quoted_char == "\\" then
-						index = index + 2
-					elseif quoted_char == '"' then
-						index = index + 1
-						break
+					local stop = raw:find('[\\"]', index)
+					if stop == nil then index = length + 1; break end
+					if raw:byte(stop) == 0x5C then
+						index = stop + 2
 					else
-						index = index + 1
+						index = stop + 1
+						break
 					end
 				end
 			elseif char == "'" then
@@ -110,9 +129,7 @@ local function split_lines(source)
 	return lines
 end
 
-local function trim(value)
-	return (value:match("^%s*(.-)%s*$")) or ""
-end
+local trim = TextUtils.trim
 
 --- Splits an assignment at the first equals sign outside quoted key segments.
 --- The strict codec still owns key and value validation; this shared lexical
@@ -122,13 +139,15 @@ end
 --- @return string|nil value Trimmed value spelling.
 --- @return string|nil original_rhs Untrimmed bytes after the separator.
 function M.split_assignment(line)
-	local in_dbl, in_sgl, escape = false, false, false
-	for i = 1, #line do
+	local in_dbl, in_sgl = false, false
+	local i, length = 1, #line
+	while i <= length do
+		-- Only a quote, a backslash or an equals sign changes the state.
+		i = line:find("[\\\"'=]", i)
+		if i == nil then break end
 		local c = line:sub(i, i)
-		if escape then
-			escape = false
-		elseif c == "\\" and in_dbl then
-			escape = true
+		if c == "\\" and in_dbl then
+			i = i + 1 -- the escaped character is skipped whole
 		elseif c == '"' and not in_sgl then
 			in_dbl = not in_dbl
 		elseif c == "'" and not in_dbl then
@@ -136,6 +155,7 @@ function M.split_assignment(line)
 		elseif not in_dbl and not in_sgl and c == "=" then
 			return trim(line:sub(1, i - 1)), trim(line:sub(i + 1)), line:sub(i + 1)
 		end
+		i = i + 1
 	end
 	return nil, nil
 end
@@ -195,6 +215,18 @@ end
 --- @return table|nil scan `{ lines, headers, records }`, nil when a value never closes.
 --- @return string|nil error_detail
 function M.scan_records(source, options)
+	local quoted = (options and options.quoted_headers) and true or false
+	if type(source) ~= "string" then return scan_source(source, quoted) end
+	return _scan_memo.fetch(source, quoted, function() return scan_source(source, quoted) end)
+end
+
+--- Scans one source without the memo; see scan_records.
+--- @param source string Complete file content.
+--- @param quoted boolean Whether headers use the quoted key-path grammar.
+--- @return table|nil scan
+--- @return string|nil error_detail
+scan_source = function(source, quoted)
+	local options = quoted and { quoted_headers = true } or nil
 	local lines = split_lines(source)
 	local headers, records = {}, {}
 	local current = nil

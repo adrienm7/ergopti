@@ -68,7 +68,7 @@ class WPMWidgetConst {
     ; [transparency]
     static ALPHA_ACTIVE       := 0
     static ALPHA_IDLE         := 0
-    ; Timings: [ui] and [keylogger].
+    ; Timings: [ui] and [keystats].
     static IDLE_HIDE_MS       := 0
     static COLOR_HOLD_MS      := 0
     static TICK_MS            := 0
@@ -89,10 +89,12 @@ class WPMWidgetConst {
     ; window-allocation cost is not absorbed by a tooltip render when the widget
     ; first appears (it showed up as a ~110 ms Tooltip.Present blip).
     static PREWARM_DELAY_MS := 900
+    ; Storage keys of the saved position, from the shared canon ([position]
+    ; storage_x / storage_y): the same two keys the other drivers use.
+    static STORE_X            := ""
+    static STORE_Y            := ""
     ; Config key names written to config.toml under [metrics].
     static CFG_VISIBLE        := "wpm_widget_visible"
-    static CFG_X              := "wpm_widget_x"
-    static CFG_Y              := "wpm_widget_y"
     static CFG_COLORS         := "wpm_widget_colors"
     static CFG_GRAPH          := "wpm_widget_graph"
     ; Ring buffer capacity for recent keystrokes.
@@ -102,9 +104,9 @@ class WPMWidgetConst {
 
 
 
-; Wrap-safe 32-bit TickCount delta: handles the ~49.7-day counter rollover
-; that makes a naive (now - last) subtraction return a huge negative number.
-_WPMWidget_TickDelta(now, last) => ((now - last + 0x100000000) & 0xFFFFFFFF)
+; A_TickCount is monotonic GetTickCount64 on the supported runtime. Keep the
+; complete age; callers reject absent/future observations before this helper.
+_WPMWidget_TickDelta(now, last) => TickElapsed64(last, now)
 
 
 
@@ -207,7 +209,7 @@ _WPMWidget_NeutralCategory(category) {
     return WPMWidgetConst.NEUTRAL.Has(category)
 }
 
-; Called by the keylogger hook after each accepted keystroke.
+; Called by the keystats hook after each accepted keystroke.
 ; category: TOML group name of the hotstring ("magickey", "rolls", …).
 ;   Pass "" for manual keystrokes or when the category is unknown.
 ;   "rolls" and "repeat_key" are treated as neutral and do not color the widget.
@@ -280,9 +282,11 @@ WPMWidget_Calc() {
     RingCritical := Critical("On")
     try {
         for _, ev in WPMWidget._ring {
-            t := ev["t"]
-            ; Wrap-safe age check: skip events older than the rolling window
-            if (_WPMWidget_TickDelta(now, t) > WPMWidgetConst.WINDOW_MS)
+            EventTick := ev["t"]
+            ; A producer may run after this frame sampled now. Such a future
+            ; row is not yet part of this calculation; malformed ticks refuse.
+            if (!(EventTick is Integer) || EventTick < 0 || EventTick > now
+                    || _WPMWidget_TickDelta(now, EventTick) > WPMWidgetConst.WINDOW_MS)
                 continue
             count++
             if ev["hs"]
@@ -291,10 +295,10 @@ WPMWidget_Calc() {
                 has_ai := true
             if ev["ac"]
                 has_ac := true
-            if (t < earliest)
-                earliest := t
-            if (t > latest)
-                latest := t
+            if (EventTick < earliest)
+                earliest := EventTick
+            if (EventTick > latest)
+                latest := EventTick
         }
     } finally {
         Critical(RingCritical)
@@ -679,14 +683,27 @@ WPMWidget_Tick() {
         return
     }
 
-    now    := A_TickCount
     result := WPMWidget_Calc()
     wpm    := result["wpm"]
-    ; Source color active for COLOR_HOLD_MS after the last event — long enough
-    ; for the 500 ms tick to always catch even very short burst expansions.
-    has_hs := _WPMWidget_TickDelta(now, WPMWidget._last_hs_tick) < WPMWidgetConst.COLOR_HOLD_MS
-    has_ai := _WPMWidget_TickDelta(now, WPMWidget._last_ai_tick) < WPMWidgetConst.COLOR_HOLD_MS
-    has_ac := _WPMWidget_TickDelta(now, WPMWidget._last_ac_tick) < WPMWidgetConst.COLOR_HOLD_MS
+    ; Sample native time with the source/input watermarks after calculation.
+    ; Keep this snapshot RAM-only and preserve an enclosing Critical caller.
+    StampCritical := Critical("On")
+    try {
+        now := A_TickCount
+        last_hs := WPMWidget._last_hs_tick
+        last_ai := WPMWidget._last_ai_tick
+        last_ac := WPMWidget._last_ac_tick
+        last_input := WPMWidget._last_input_ms
+    } finally {
+        Critical(StampCritical)
+    }
+    ; Zero means no source event, not an event in a later UInt32 era.
+    has_hs := last_hs is Integer && last_hs > 0 && last_hs <= now
+        && _WPMWidget_TickDelta(now, last_hs) < WPMWidgetConst.COLOR_HOLD_MS
+    has_ai := last_ai is Integer && last_ai > 0 && last_ai <= now
+        && _WPMWidget_TickDelta(now, last_ai) < WPMWidgetConst.COLOR_HOLD_MS
+    has_ac := last_ac is Integer && last_ac > 0 && last_ac <= now
+        && _WPMWidget_TickDelta(now, last_ac) < WPMWidgetConst.COLOR_HOLD_MS
 
     ; Update graph history.
     WPMWidget._graph_hist.Push(wpm)
@@ -694,8 +711,8 @@ WPMWidget_Tick() {
         WPMWidget._graph_hist.RemoveAt(1)
 
     ; Hide after IDLE_HIDE_MS of keyboard inactivity.
-    keyboard_idle := WPMWidget._last_input_ms > 0
-        && _WPMWidget_TickDelta(now, WPMWidget._last_input_ms) > WPMWidgetConst.IDLE_HIDE_MS
+    keyboard_idle := !(last_input is Integer) || last_input < 0 || last_input > now
+        || (last_input > 0 && _WPMWidget_TickDelta(now, last_input) > WPMWidgetConst.IDLE_HIDE_MS)
     ; Hide immediately if the mouse/touchpad was used more recently than the last keystroke —
     ; A_TimeIdleMouse is built into AHK and requires no hook install.
     mouse_active  := A_TimeIdleMouse < A_TimeIdleKeyboard

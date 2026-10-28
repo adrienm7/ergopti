@@ -2,6 +2,7 @@
 
 --- Runs the real planner, preference owner, runtime reconciler and transaction.
 local helpers = require("tests.helpers")
+local MetricsState = require("infra.metrics_state_keys")
 local Codec = require("toml_codec")
 local Manifest = require("infra.manifest_reader")
 local FS = require("adapters.file_system")
@@ -105,7 +106,8 @@ helpers.describe("macOS complete LLM scope", function()
 		local _, _, live_shortcuts = native()
 		helpers.assert_nil(live_shortcuts.llm_profile_shortcuts.foreign, "unknown stored neighbors cannot acquire hotkeys")
 		helpers.assert_eq(state.llm_enabled, false)
-		helpers.assert_eq(state.llm_debounce, 0.2)
+		-- Cleared to the manifest default, held in seconds by the native owner.
+		helpers.assert_eq(state.llm_debounce, Manifest.default_for("llm.trigger.debounce_ms") / 1000)
 		helpers.assert_eq(save(), true)
 		local value = Codec.decode(files.config)
 		helpers.assert_nil(value.llm.enabled)
@@ -169,7 +171,7 @@ helpers.describe("macOS complete LLM scope", function()
 
 	helpers.it("Clear consumes only the selected consent demotion", function()
 		local owner, _, files, _, save, demotions = fixture(true)
-		demotions.record({ feature = "metrics", key = "keylogger_enabled", persisted = true, demoted = false })
+		demotions.record({ feature = "metrics", key = MetricsState.ENABLED, persisted = true, demoted = false })
 		helpers.assert_eq(owner.apply("clear"), true)
 		helpers.assert_eq(#demotions.list(), 1)
 		helpers.assert_eq(demotions.list()[1].feature, "metrics")

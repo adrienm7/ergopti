@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local Json = require("json")
@@ -31,6 +32,7 @@ local AuthPolicy = require("llm.local_server_auth")
 local SourceWriter = require("toml_codec.writer")
 local ProviderConfig = require("llm.provider_config_policy")
 local EntryIdentity = require("llm.api_entry_identity")
+local NativePath = require("native_path")
 
 local LOG = "modules.llm.api_entries"
 local VERSION = 1
@@ -99,8 +101,8 @@ end
 --- @param publication table|nil Private native rename acknowledgement.
 --- @return boolean ok, string|nil err
 local function write_private(path, text, expected, admit, publication)
-	local dir = path:match("^(.*)/[^/]+$")
-	if dir then os.execute("mkdir -p '" .. (dir:gsub("'", "'\\''")) .. "'") end
+	local dir = NativePath.dirname(path)
+	if dir then os.execute("mkdir -p " .. TextUtils.shell_quote(dir)) end
 	local tmp = path .. ".tmp"
 	os.remove(tmp)
 	_create_private = _create_private or libc_create_private()
@@ -434,6 +436,36 @@ function M.set_active(id)
 		return true
 	end
 	state().active_id = previous
+	return false
+end
+
+--- Gives an entry another model and selects it, in one private publication
+--- (the model selector page's listed or typed model).
+--- @param id string
+--- @param model string A model id the shared listing rule admits.
+--- @return boolean
+function M.set_model(id, model)
+	if not require("llm.api_model_listing").valid_id(model) then return false end
+	local current = state()
+	if current.publishing or current.write_refusal then return false end
+	for index, entry in ipairs(current.entries) do
+		if entry.id == id then
+			local copy = {}
+			for key, value in pairs(entry) do copy[key] = value end
+			copy.model = model
+			local changed = valid_entry(copy)
+			if not changed then return false end
+			local previous = current.active_id
+			current.entries[index], current.active_id = changed, id
+			if persist() then
+				current.dangling_active_id = nil
+				pcall(Logger.info, LOG, "API entry '%s' model set to '%s'.", id, model)
+				return true
+			end
+			current.entries[index], current.active_id = entry, previous
+			return false
+		end
+	end
 	return false
 end
 

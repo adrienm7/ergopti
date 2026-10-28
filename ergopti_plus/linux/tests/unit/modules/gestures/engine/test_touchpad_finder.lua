@@ -154,8 +154,8 @@ helpers.describe("touchpad finder: which device", function()
 
 		local described = Finder.describe(mouse)
 		helpers.assert_true(not described.is_touchpad, "a mouse is not a touchpad")
-		helpers.assert_true(described.reason:find("ABS_MT_SLOT", 1, true) ~= nil,
-			"and the reason names the capability it lacks, not its name")
+		helpers.assert_eq(described.reason, require("adapter_errors").TOUCHPAD_NO_MULTITOUCH_SLOT,
+			"and the reason is the closed id of the capability it lacks, not a sentence")
 	end)
 
 	helpers.it("parses every device in the table", function()

@@ -4,11 +4,12 @@
 --- BRIDGE HANDLER: Error Window (Linux)
 --- DESCRIPTION:
 --- Opens the shared error window (_shared/ui/error_dialog/) when a logged ERROR
---- passes the shared policy (_shared/modules/diagnostics/error_policy.json), or
---- at start-up when the daemon crashed since the last notice, and serves the
---- page's actions: report on GitHub, copy the report, open the file the error
+--- passes the shared policy (_shared/modules/diagnostics/error_policy.json), and
+--- serves the page's actions: report on GitHub, copy the report, open the file the error
 --- is logged in, close.
 --- Bridge name: "error_dialog"
+--- The host-independent half (policy load, Debug switch, report, first
+--- message) is _shared/lua/error_dialog/core.lua, shared with the other host.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The shared logger core hands every emitted ERROR to M.on_error
@@ -19,9 +20,9 @@
 ---    session, at most max_dialogs per window_sec, errors logged while a window
 ---    is open are counted in it, nothing while the Debug menu's "Show a window
 ---    for every error" is unticked.
---- 3. A crash stops the daemon before any window can open, and systemd starts
----    it again: the next start shows the newest crash dump once, as a crash
----    notice, and remembers it in the crash folder.
+--- 3. A crash stops the daemon before any window can open; it is announced by the
+---    crash reporter's immediate desktop notification (as on macOS), and this
+---    window never opens for it at the next start.
 --- 4. The report is diagnostics.error_report's, built from the diagnostics
 ---    snapshot and redacted before the page sees it; copy, report and open go
 ---    through the diagnostics window's own actions (ui.healthcheck.report),
@@ -31,25 +32,21 @@
 --- ==============================================================================
 
 local M = {}
-local _scope_busy = false
-local _scope_owner, _scope_generation, _scope_receipts = nil, 0, setmetatable({}, { __mode = "k" })
+local _scope = require("scope_owner").new({ name = "ui.error_dialog.bridge", module = M })
 M.bridge_name = "error_dialog"
 
 local Logger      = require("logger.shim")
 local Policy      = require("diagnostics.error_policy")
-local ErrorReport = require("diagnostics.error_report")
+local DialogCore  = require("error_dialog.core")
 local Redact      = require("diagnostics.redact")
+local ConfigKeys = require("config_keys")
 
 local LOG = "bridge.error_dialog"
 
 -- The window's app id (the _shared/ui directory) and the Debug menu setting,
 -- as the features manifest declares it
 local APP = "error_dialog"
-local SETTING = "script.show_error_dialog"
-
--- The name of the file, in the crash folder, that remembers the newest crash
--- dump already announced
-local CRASH_ACK_FILE = ".last_crash_notice"
+local SETTING = ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG
 
 -- The page's actions
 local PAGE_ACTIONS = { report = true, copy = true, open_log = true, close = true }
@@ -103,65 +100,34 @@ M.defer = function(fn, delay_ms) return require("adapters.event_loop").defer(fn,
 -- =================================
 -- =================================
 
---- Reads and validates the shared policy.
---- @return table
-local function load_policy()
-	local path = require("infra.paths").shared("modules/diagnostics/error_policy.json")
-	local fh, err = io.open(path, "rb")
-	if not fh then error("the error policy cannot be read: " .. tostring(err)) end
-	local raw = fh:read("*a")
-	fh:close()
-	return Policy.validate(require("json").decode(raw))
-end
-
 --- Loads the policy and the Debug menu setting. Called once by the daemon,
 --- before the logger's error observer is installed.
 --- @return boolean initialised
 function M.init()
-	if _scope_owner ~= nil or _scope_busy then return false end
-	_scope_generation = _scope_generation + 1
-	if _policy ~= nil then
-		Logger.error(LOG, "The error window was initialised twice; the second call is refused.")
-		return false
-	end
-	Logger.start(LOG, "Initialising the error window…")
-	local ok, policy = pcall(load_policy)
-	if not ok then
-		Logger.error(LOG, "The error window cannot start: %s.", tostring(policy))
-		return false
-	end
-	_policy = policy
-	_decisions = Policy.new_state()
-	_enabled = M.is_enabled()
-	Logger.success(LOG, "Error window ready (%s).", _enabled and "enabled" or "disabled")
-	return true
+	if not _scope.admit_change() then return false end
+	return DialogCore.init(Logger, LOG, _policy ~= nil,
+		function() return require("infra.paths").shared("modules/diagnostics/error_policy.json") end,
+		function(policy, decisions)
+			_policy, _decisions = policy, decisions
+			_enabled = M.is_enabled()
+			return _enabled
+		end)
 end
 
 --- Whether the Debug menu's "Show a window for every error" is ticked.
 --- @return boolean
 function M.is_enabled()
 	if _enabled ~= nil then return _enabled end
-	local stored = require("adapters.storage").get(SETTING, nil)
-	if type(stored) == "boolean" then return stored end
-	local default = require("infra.manifest_reader").default_for(SETTING)
-	if type(default) ~= "boolean" then
-		error("the features manifest declares no boolean default for " .. SETTING)
-	end
-	return default
+	return DialogCore.stored_enabled(require("adapters.storage"),
+		function(path) return require("infra.manifest_reader").default_for(path) end, SETTING)
 end
 
 --- Ticks or unticks "Show a window for every error", durably.
 --- @param enabled boolean
 --- @return boolean saved
 function M.set_enabled(enabled)
-	if _scope_owner ~= nil or _scope_busy then return false end
-	_scope_generation = _scope_generation + 1
-	if type(enabled) ~= "boolean" then
-		Logger.error(LOG, "set_enabled() needs a boolean, got %s.", type(enabled))
-		return false
-	end
-	if require("adapters.storage").set(SETTING, enabled) ~= true then
-		Logger.error(LOG, "The error window setting could not be saved; it is unchanged.")
+	if not _scope.admit_change() then return false end
+	if not DialogCore.save_enabled(Logger, LOG, function() return require("adapters.storage") end, SETTING, enabled) then
 		return false
 	end
 	_enabled = enabled
@@ -191,44 +157,15 @@ local function build_report(record)
 	local HealthReport = require("ui.healthcheck.report")
 	local documents = Health.config()
 	local snapshot = Health.build_snapshot(require("ui.webview_manager").get_daemon_state(), false)
-	local sections = snapshot.sections
-	local versions, system, issues = sections.versions or {}, sections.system or {}, sections.issues or {}
-	local generated = tostring(snapshot.generated_at)
-	local identity = {
-		version       = tostring(versions.ergopti_version or "unknown"),
-		commit        = tostring(versions.commit or ""),
-		os            = tostring(system.os or "unknown"),
-		driver        = Health.DRIVER,
-		generated_utc = generated,
-		warn_count    = tonumber(issues.warn_count) or 0,
-		err_count     = tonumber(issues.err_count) or 0,
-	}
-	-- The recent warnings and errors of today's errors file, as many as the
-	-- diagnostics window shows (_shared/modules/diagnostics/recent_issues.json)
-	local recent = {}
-	for _, entry in ipairs(issues.recent or {}) do recent[#recent + 1] = tostring(entry) end
-	local report = ErrorReport.compose({
-		kind = record.kind, module = record.module, message = record.message, time = record.time,
-		recent = recent,
-	}, identity)
-	local paths = {}
-	for id, path in pairs(sections.paths or {}) do paths[id] = path end
-	local open_id = "errors_today"
-	if record.kind == "crash" then
-		open_id = "crash_report"
-		paths.crash_report = record.log_path
-	end
-	if type(paths[open_id]) ~= "string" or paths[open_id] == "" then
-		error("the file this error is logged in is unknown")
-	end
+	local composed = DialogCore.compose(record, snapshot, Health.DRIVER)
 	return {
-		report    = report,
+		report    = composed.report,
 		snapshot  = snapshot,
-		paths     = paths,
+		paths     = composed.paths,
 		documents = documents,
 		context   = HealthReport.redaction_context(),
-		log_path  = paths[open_id],
-		open_id   = open_id,
+		log_path  = composed.log_path,
+		open_id   = composed.open_id,
 	}
 end
 
@@ -239,9 +176,9 @@ end
 --- @return table|nil cancellable report; completion receives its actual outcome.
 function M.report(record, complete, current)
 	assert(type(complete) == "function" and type(current) == "function", "Error report needs its completion owner")
-	local generation = _scope_generation
+	local generation = _scope.generation()
 	local function owned()
-		return current() == true and generation == _scope_generation and _scope_owner == nil and not _scope_busy
+		return current() == true and generation == _scope.generation() and _scope.idle()
 			and package.loaded["ui.error_dialog.bridge"] == M
 	end
 	if not owned() then return nil end
@@ -268,15 +205,7 @@ end
 local function init_message(session)
 	local rules = session.documents.redaction
 	local function redact(text) return Redact.apply(text, rules, session.context) end
-	return {
-		type     = "init",
-		kind     = session.record.kind,
-		module   = redact(session.record.module),
-		message  = redact(session.record.message),
-		log_path = redact(session.log_path),
-		text     = redact(session.report.text),
-		more     = _folded,
-	}
+	return DialogCore.init_message(session.record, session.report, session.log_path, _folded, redact)
 end
 
 
@@ -390,12 +319,12 @@ local function perform(name, context)
 	end
 	local revision = cancel_action(session)
 	if _session ~= session or revision ~= _action_revision then return nil end
-	local token = { snapshot = session.snapshot, generation = _scope_generation }
+	local token = { snapshot = session.snapshot, generation = _scope.generation() }
 	session.action_token = token
 	local inline, answer, completed = true, nil, false
 	local function current()
 		return _session == session and session.action_token == token and session.snapshot == token.snapshot
-			and _scope_generation == token.generation and require("ui.webview_manager").current_epoch(APP) == session.epoch
+			and _scope.generation() == token.generation and require("ui.webview_manager").current_epoch(APP) == session.epoch
 	end
 	local request = require("ui.healthcheck.report").perform(action, session.paths, session.documents, session.context, nil, session.snapshot, {
 		current = current,
@@ -479,7 +408,7 @@ end
 --- @param template string The message before its arguments.
 --- @param message string The formatted message.
 function M.on_error(module_name, template, message)
-	if _scope_owner ~= nil or _scope_busy then return false end
+	if not _scope.idle() then return false end
 	if _policy == nil then return end
 	local verdict = Policy.decide(_decisions, _policy, {
 		module = module_name, template = template, at = M.clock(), enabled = M.is_enabled(), open = _busy,
@@ -490,8 +419,7 @@ function M.on_error(module_name, template, message)
 			M.defer(function() push({ type = "more", count = _folded }) end, 0)
 		end
 	elseif verdict == "show" then
-		schedule({ kind = "error", module = tostring(module_name), message = tostring(message),
-			time = os.date("%Y-%m-%d %H:%M:%S") })
+		schedule(DialogCore.error_record(module_name, message))
 	end
 end
 
@@ -501,74 +429,13 @@ end
 
 -- =================================
 -- =================================
--- ======= 5/ Crash Notice =========
+-- ======= 5/ Test Seam ============
 -- =================================
 -- =================================
-
---- Reads a whole small file.
---- @param path string
---- @return string|nil
-local function read_file(path)
-	local fh = io.open(path, "rb")
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
-	return content
-end
-
---- The module and the error of a crash dump, from its header lines.
---- @param text string
---- @return string module
---- @return string message The error, then the stack when the dump has one.
-function M.parse_crash_dump(text)
-	local module_name = text:match("\nModule:%s*([^\n]*)") or "daemon"
-	local message = text:match("\nError:%s*([^\n]*)") or ""
-	local stack = text:match("\nStack:\n(.*)$")
-	if stack and stack ~= "" then message = message .. "\n" .. stack:gsub("\n+$", "") end
-	return module_name, message
-end
-
---- Shows the newest crash dump once, when the daemon crashed since the last
---- notice. Called by the daemon once its loop runs.
---- @param crash_dir string The crash reporter's folder.
---- @return boolean shown
-function M.notify_last_crash(crash_dir)
-	if _scope_owner ~= nil or _scope_busy then return false end
-	if _policy == nil then return false end
-	-- Unticked, or a window already on its way: the dump stays unannounced and
-	-- is offered again at the next start
-	if not M.is_enabled() or _busy then return false end
-	local Shell = require("adapters.shell_runner")
-	local newest = Shell.exec_line("ls -1t " .. Shell.quote(crash_dir) .. " 2>/dev/null | grep -v '^%.' | head -n 1")
-	if type(newest) ~= "string" or newest == "" then return false end
-	local ack_path = crash_dir .. "/" .. CRASH_ACK_FILE
-	local acknowledged = read_file(ack_path)
-	if acknowledged and acknowledged:gsub("%s+$", "") == newest then return false end
-	-- Remembered before the window opens: a notice that crashes the daemon
-	-- again must not become a crash loop of notices
-	local fh = io.open(ack_path, "wb")
-	if not fh then
-		Logger.error(LOG, "The crash notice cannot be remembered in %s; it is not shown.", crash_dir)
-		return false
-	end
-	fh:write(newest, "\n")
-	fh:close()
-	local path = crash_dir .. "/" .. newest
-	local text = read_file(path)
-	if not text then
-		Logger.error(LOG, "The crash dump %s cannot be read.", path)
-		return false
-	end
-	local module_name, message = M.parse_crash_dump(text)
-	Logger.info(LOG, "The daemon crashed since the last start (%s); showing the notice.", newest)
-	schedule({ kind = "crash", module = module_name, message = message, time = newest, log_path = path })
-	return true
-end
 
 --- Test seam: forgets the policy, the decisions and the window.
 function M._reset()
-	if _scope_owner ~= nil or _scope_busy then return false end
-	_scope_generation = _scope_generation + 1
+	if not _scope.admit_change() then return false end
 	_policy, _decisions, _enabled = nil, nil, nil
 	settle()
 end
@@ -578,140 +445,20 @@ local function scope_ready()
 		and _scheduled == nil and _session == nil and _folded == 0 and _pending == nil
 end
 
---- Reads only the declared error state this module owns; no persistence occurs here.
-local function scope_state()
-	return { module = package.loaded["ui.error_dialog.bridge"], enabled = _enabled, busy = _busy, scheduled = _scheduled,
-		folded = _folded, session = _session, pending = _pending }
-end
-
-local function scope_equal(left, right)
-	return rawequal(left.module, right.module) and left.enabled == right.enabled and left.busy == right.busy and left.scheduled == right.scheduled and left.folded == right.folded and left.session == right.session and left.pending == right.pending
-end
-
---- Acquires the declared runtime field for one primary transaction token.
---- @param owner table Exact token; pending() describes primary compensation only.
---- @return boolean acquired
-local function scope_acquire_impl(owner)
-	if type(owner) ~= "table" or type(owner.pending) ~= "function" or _scope_owner ~= nil
-		or not rawequal(package.loaded["ui.error_dialog.bridge"], M) then return false end
-	if not scope_ready() or not rawequal(package.loaded["ui.error_dialog.bridge"], M) then return false end
-	_scope_owner = owner
-	return true
-end
-
-function M.scope_acquire(owner)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, acquired = pcall(scope_acquire_impl, owner)
-	_scope_busy = false
-	return called and acquired == true
-end
-
---- Releases the admission gate while retaining opaque inverse receipts.
---- @param owner table Exact token.
---- @return boolean released
-function M.scope_release(owner)
-	if _scope_busy or not rawequal(_scope_owner, owner) or owner.pending() ~= false then return false end
-	_scope_owner = nil
-	return true
-end
-
---- Captures an opaque, source-bound runtime inverse under the native claim.
---- @param owner table Exact token.
---- @return table|nil receipt
-local function scope_capture_impl(owner)
-	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["ui.error_dialog.bridge"], M) then return nil end
-	local generation = _scope_generation
-	local receipt, before = {}, scope_state()
-	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["ui.error_dialog.bridge"], M) or _scope_generation ~= generation then return nil end
-	_scope_receipts[receipt] = { owner = owner, before = before, expected = before, generation = _scope_generation }
-	return receipt
-end
-
-function M.scope_capture(owner)
-	if _scope_busy then return nil end
-	_scope_busy = true
-	local called, result = pcall(scope_capture_impl, owner)
-	_scope_busy = false
-	if not called then return nil end
-	return result
-end
-
---- Applies one canonical value after proving the captured runtime still owns it.
---- @param owner table Exact token.
---- @param receipt table Native opaque receipt.
---- @param value boolean Declared error-window preference.
---- @return boolean applied
-local function scope_apply_impl(owner, receipt, value)
-	local data = _scope_receipts[receipt]
-	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.attempted
-		or data.generation ~= _scope_generation or not scope_equal(scope_state(), data.expected)
-		or not rawequal(package.loaded["ui.error_dialog.bridge"], M) then return false end
-	if type(value) ~= "boolean" then return false end
-	local next_value = {}
-	for key, child in pairs(data.before) do next_value[key] = child end
-	next_value.enabled = value
-	_scope_generation = _scope_generation + 1
-	data.generation, data.expected, data.attempted = _scope_generation, next_value, true
-	local called = pcall(function()
-		_enabled = next_value.enabled
-	end)
-	local observed = scope_state()
-	return called and scope_equal(observed, next_value) and rawequal(_scope_owner, owner)
-		and rawequal(package.loaded["ui.error_dialog.bridge"], M) and data.generation == _scope_generation
-end
-
-function M.scope_apply(owner, receipt, value)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, result = pcall(scope_apply_impl, owner, receipt, value)
-	_scope_busy = false
-	if not called then return false end
-	return result
-end
-
---- Restores only this receipt's acknowledged or interrupted scalar publication.
---- @param owner table Exact token.
---- @param receipt table Native opaque receipt.
---- @return boolean restored
-local function scope_restore_impl(owner, receipt)
-	local data = _scope_receipts[receipt]
-	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.generation ~= _scope_generation then return false end
-	local current = scope_state()
-	if not rawequal(current.module, M) or not rawequal(package.loaded["ui.error_dialog.bridge"], M) or not (rawequal(current.module, data.before.module) and current.busy == data.before.busy and current.scheduled == data.before.scheduled and current.folded == data.before.folded and current.session == data.before.session and current.pending == data.before.pending
-		and (current.enabled == data.before.enabled or current.enabled == data.expected.enabled)) then return false end
-	if not data.attempted or data.restored then return scope_equal(current, data.before) end
-	local called = pcall(function()
-		_enabled = data.before.enabled
-	end)
-	local observed = scope_state()
-	if not called or not scope_equal(observed, data.before) or not rawequal(_scope_owner, owner)
-		or not rawequal(package.loaded["ui.error_dialog.bridge"], M) or data.generation ~= _scope_generation then return false end
-	_scope_generation = _scope_generation + 1
-	data.generation, data.expected, data.restored = _scope_generation, data.before, true
-	return true
-end
-
-function M.scope_restore(owner, receipt)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, result = pcall(scope_restore_impl, owner, receipt)
-	_scope_busy = false
-	if not called then return false end
-	return result
-end
-
---- Forgets only a finalized inverse, without changing live native state.
---- @param owner table Exact primary token.
---- @param receipt table Native opaque receipt.
---- @return boolean forgotten
-function M.scope_forget(owner, receipt)
-	local data = _scope_receipts[receipt]
-	if _scope_busy or rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or owner.pending() ~= false then return false end
-	if data.forgotten then return true end
-	data.before, data.expected, data.generation = nil, nil, nil
-	data.forgotten = true
-	return true
-end
+_scope.install({
+	-- Reads only the declared error state this module owns; no persistence occurs here.
+	state = function()
+		return { enabled = _enabled, busy = _busy, scheduled = _scheduled, folded = _folded, session = _session,
+			pending = _pending }
+	end,
+	stable = { "busy", "scheduled", "folded", "session", "pending" },
+	published = { "enabled" },
+	ready = scope_ready,
+	accept = function(value)
+		if type(value) ~= "boolean" then return nil end
+		return { enabled = value }
+	end,
+	publish = function(target) _enabled = target.enabled end,
+})
 
 return M

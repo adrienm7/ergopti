@@ -20,7 +20,7 @@
 ---    is the disjoint question — which physical key is this — and the two must
 ---    not be conflated: a modifier has no character, and asking the layout table
 ---    about one is how a phantom typed character gets invented.
---- 2. Names come back out. The domain callbacks and the keylogger want
+--- 2. Names come back out. The domain callbacks and the keystats want
 ---    "backspace", not 14, and the heatmap wants the code. Both directions live
 ---    here so neither is re-derived at a call site.
 --- 3. Values are from input-event-codes.h and are kernel ABI. They do not change

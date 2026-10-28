@@ -37,32 +37,26 @@ _MetaLoggerPairingExempt(Rel) {
 ; ======================================
 ; ======================================
 
-_MetaListAhkFilesLogger(Dir) {
-	Files := []
-	TempFile := A_Temp . "\meta_dir_logger.txt"
-	try FileDelete(TempFile)
-	RunWait('cmd /c dir /b /s /a-d "' . Dir . '" > "' . TempFile . '"', , "Hide")
-	try {
-		Raw := FileRead(TempFile)
-	} catch {
-		return Files
+_MetaLoggerReadSources(Root := unset) {
+	Census := _DriverProductionSourceCensus(Root?)
+	Prefix := RTrim(StrReplace(Census.Root, "\", "/"), "/") . "/"
+	Sources := Map()
+	for Path in Census.Paths {
+		Relative := SubStr(StrReplace(Path, "\", "/"), StrLen(Prefix) + 1)
+		if Relative == "" || Sources.Has(Relative)
+			throw Error("The logger census must retain distinct relative source identities.")
+		; A listed source is part of the subject: failed reads must fail the test.
+		Sources[Relative] := FileRead(Path, "UTF-8")
 	}
-	for Line in StrSplit(Raw, "`n", "`r") {
-		Line := Trim(Line)
-		if Line = "" {
-			continue
-		}
-		Line := StrReplace(Line, "\", "/")
-		if not Line ~= "i)\.ahk$" {
-			continue
-		}
-		if Line ~= "i)/tests/" {
-			continue
-		}
-		Files.Push(Line)
-	}
-	return Files
+	return Sources
 }
+
+_MetaLoggerCallCount(Body, Name) {
+	Code := _DriverMaskNonCode(&Body)
+	return _MetaCountPattern(Code, "i)\b" . Name . "\s*\(")
+		- _DriverTopLevelDefinitionCount(&Code, Name)
+}
+
 
 _MetaCountPattern(Body, Pattern) {
 	N := 0
@@ -91,55 +85,40 @@ _MetaLifecycleHasShortfall(OpenCount, CloseCount) {
 ; =====================================
 ; =====================================
 
-_MetaRunLoggerPairingTests() {
-	SplitPath(A_ScriptDir, , &_DriverRootRaw)
-	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
+_MetaLoggerCheckPairing(Root := unset) {
+	Sources := _MetaLoggerReadSources(Root?)
 	Imbalanced := 0
+	Producers := 0
 	Report := ""
-
-	for Sub in ["infra", "modules", "platform", "ui"] {
-		for AbsPath in _MetaListAhkFilesLogger(StrReplace(DriverRoot . Sub, "/", "\")) {
-			try {
-				Body := FileRead(StrReplace(AbsPath, "/", "\"))
-			} catch {
-				continue
-			}
-			NormRoot := StrReplace(DriverRoot, "\", "/")
-			Rel := SubStr(StrReplace(AbsPath, "\", "/"), StrLen(NormRoot) + 1)
-
-			NStart   := _MetaCountPattern(Body, "LoggerStart\(")
-			NSuccess := _MetaCountPattern(Body, "LoggerSuccess\(")
-			NTrace   := _MetaCountPattern(Body, "LoggerTrace\(")
-			NDone    := _MetaCountPattern(Body, "LoggerDone\(")
-
-			if _MetaLoggerPairingExempt(Rel)
-				continue
-
-			if NStart > 0 and NSuccess = 0 {
-				Imbalanced++
-				Report .= (Report == "" ? "" : "; ") . Rel . " has " . NStart . " LoggerStart but 0 LoggerSuccess"
-			}
-			if _MetaLifecycleHasShortfall(NTrace, NDone) {
-				Imbalanced++
-				Report .= (Report == "" ? "" : "; ") . Rel . " has " . NTrace . " LoggerTrace but " . NDone . " LoggerDone"
-			}
+	for Relative, Body in Sources {
+		if _MetaLoggerPairingExempt(Relative)
+			continue
+		NStart := _MetaLoggerCallCount(Body, "LoggerStart")
+		NSuccess := _MetaLoggerCallCount(Body, "LoggerSuccess")
+		NTrace := _MetaLoggerCallCount(Body, "LoggerTrace")
+		NDone := _MetaLoggerCallCount(Body, "LoggerDone")
+		Producers += NStart + NTrace
+		if NStart > 0 && NSuccess == 0 {
+			Imbalanced++
+			Report .= "`n" . Relative . " has " . NStart . " LoggerStart but no LoggerSuccess"
+		}
+		if _MetaLifecycleHasShortfall(NTrace, NDone) {
+			Imbalanced++
+			Report .= "`n" . Relative . " has " . NTrace . " LoggerTrace but " . NDone . " LoggerDone"
 		}
 	}
-
-	; The scan used to report through OutputDebug and register a Test whose body
-	; was EMPTY, so it could not fail — it occupied the name "logger pairing" in
-	; the suite while asserting nothing, which is worse than having no test at
-	; all: it deterred anyone from writing a real one. OutputDebug does not reach
-	; CI either, so the warnings went nowhere.
-	_MetaLoggerPairingAssert() {
-		Assert(Imbalanced == 0,
-			"unpaired lifecycle logs (a START with no reachable SUCCESS is this project's designated signal of a silent failure path): " . Report)
-	}
-	Test("meta logger pairing: no file opens a lifecycle pair it never closes",
-		_MetaLoggerPairingAssert)
+	Assert(Producers > 0, "the logger pairing census must inspect actual lifecycle producers")
+	Assert(Imbalanced == 0,
+		"unpaired lifecycle logs: " . Report)
+	return Map("files", Sources.Count, "producers", Producers)
 }
 
-_MetaRunLoggerPairingTests()
+_MetaLoggerPairingAssert() {
+	_MetaLoggerCheckPairing()
+}
+Test("meta logger pairing: no file opens a lifecycle pair it never closes",
+	_MetaLoggerPairingAssert)
+
 
 _MetaLoggerPairingRejectsPartialTracePair() {
 	Assert(_MetaLifecycleHasShortfall(2, 1),
@@ -169,19 +148,26 @@ Test("toml loader: generated fast path closes TRACE before return (toml-generate
 ; F-L08: a LoggerStart immediately before Reload() leaves a START with no reachable
 ; SUCCESS — the process restarts before the pair closes, so it reads as a silent failure
 ; to anyone auditing the prior process's rolled-over log. Guard the whole driver source.
-_MetaNoStartBeforeReload() {
-	SplitPath(A_ScriptDir, , &Root)
-	Root := StrReplace(Root, "\", "/")
-	offenders := ""
-	for Sub in ["infra", "modules", "platform", "ui"] {
-		Loop Files, Root . "/" . Sub . "/*.ahk", "FR" {
-			src := FileRead(A_LoopFileFullPath)
-			if RegExMatch(src, "LoggerStart\([^\r\n]*\)\s*\r?\n\s*Reload")
-				offenders .= "`n  " . A_LoopFileFullPath
-		}
+_MetaLoggerCheckReload(Root := unset) {
+	Sources := _MetaLoggerReadSources(Root?)
+	Offenders := ""
+	Starts := 0
+	Reloads := 0
+	for Relative, Body in Sources {
+		Starts += _MetaLoggerCallCount(Body, "LoggerStart")
+		Reloads += _MetaLoggerCallCount(Body, "Reload")
+		Code := _DriverMaskNonCode(&Body)
+		if RegExMatch(Code, "i)LoggerStart\([^\r\n]*\)\s*\r?\n\s*Reload")
+			Offenders .= "`n  " . Relative
 	}
-	Assert(offenders == "",
-		"A LoggerStart must not immediately precede Reload() — the paired SUCCESS never fires (dangling-start-before-reload). Use LoggerInfo/LoggerSuccess before Reload. Offenders:" . offenders)
+	Assert(Starts > 0 && Reloads > 0, "the reload census must inspect actual lifecycle and reload producers")
+	Assert(Offenders == "",
+		"A LoggerStart must not immediately precede Reload: " . Offenders)
+	return Map("files", Sources.Count, "starts", Starts, "reloads", Reloads)
+}
+
+_MetaNoStartBeforeReload() {
+	_MetaLoggerCheckReload()
 }
 Test("logger: no LoggerStart immediately precedes Reload (dangling-start-before-reload)", _MetaNoStartBeforeReload)
 
@@ -211,3 +197,158 @@ _MetaLifecycleLogsAreEnglish() {
 	}
 }
 Test("logger: lifecycle log messages are written in English (§4.4)", _MetaLifecycleLogsAreEnglish)
+
+
+; Native private source files qualify the scanner, including its refusal paths.
+_MLP_ExpectedRefusal(Check, Root, ErrorType, Fragment := "") {
+	Observed := false
+	try Check.Call(Root)
+	catch as Err {
+		Observed := true
+		AssertEqual(ErrorType, Type(Err), "the actual scanner must fail at the intended boundary")
+		if Fragment != ""
+			AssertTrue(InStr(Err.Message, Fragment) > 0, "the refusal must identify its actual failed invariant")
+	}
+	AssertTrue(Observed, "a failed source scan cannot certify a clean lifecycle census")
+}
+
+_MLP_Source(Kind) {
+	if Kind == "unbalanced" || Kind == "adapter" {
+		return 'Probe() {`n LoggerStart("Audit", "Started.")`n Text := "LoggerSuccess(noise)"`n}`n'
+	}
+	if Kind == "reload" {
+		return 'Probe() {`n LoggerStart("Audit", "Started.")`n Reload()`n}`n'
+	}
+	if Kind == "no-producer"
+		return '; LoggerStart(noise)`n; LoggerSuccess(noise)`nProbe() {`n Text := "LoggerTrace(noise)"`n}`n'
+	Source := 'Probe() {`n LoggerStart("Audit", "Started.")`n LoggerSuccess("Audit", "Finished.")`n'
+		. ' LoggerTrace("Audit", "Started.")`n LoggerDone("Audit", "Finished.")`n'
+	if Kind != "no-reload"
+		Source .= ' Reload()`n'
+	return Source . ' Text := "LoggerStart(noise)"`n}`n; LoggerTrace(noise)`n'
+}
+
+_MLP_CensusCase(Kind) {
+	; Resolve real helpers before entering any expected-error boundary.
+	Pairing := _MetaLoggerCheckPairing
+	ReloadCheck := _MetaLoggerCheckReload
+	Root := A_Temp . "\ergopti_logger_census_" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount
+	DirCreate(Root)
+	Handle := 0
+	try {
+		if Kind == "empty" {
+			_MLP_ExpectedRefusal(Pairing, Root, "ValueError", "no authored AHK files")
+			_MLP_ExpectedRefusal(ReloadCheck, Root, "ValueError", "no authored AHK files")
+			return
+		}
+		if Kind == "missing" {
+			_MLP_ExpectedRefusal(Pairing, Root . "\missing", "ValueError", "existing directory")
+			_MLP_ExpectedRefusal(ReloadCheck, Root . "\missing", "ValueError", "existing directory")
+			return
+		}
+		Directory := Root . (Kind == "adapter" || Kind == "balanced" ? "\adapters" : "\infra")
+		DirCreate(Directory)
+		Path := Directory . "\source.ahk"
+		FileAppend(_MLP_Source(Kind), Path, "UTF-8")
+		if Kind == "read-error" {
+			Handle := DllCall("Kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000, "UInt", 0,
+				"Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+			AssertTrue(Handle != -1, "the fixture must hold an actual share-denied source handle")
+			_MLP_ExpectedRefusal(Pairing, Root, "OSError")
+			_MLP_ExpectedRefusal(ReloadCheck, Root, "OSError")
+			AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Handle), "the private source lock must retire")
+			Handle := 0
+			AssertEqual(1, Pairing.Call(Root)["files"], "the same real source succeeds after its read lock is released")
+			return
+		}
+		if Kind == "unbalanced" || Kind == "adapter" {
+			_MLP_ExpectedRefusal(Pairing, Root, "Error", "unpaired lifecycle logs")
+			return
+		}
+		if Kind == "no-producer" {
+			_MLP_ExpectedRefusal(Pairing, Root, "Error", "actual lifecycle producers")
+			return
+		}
+		if Kind == "reload" {
+			_MLP_ExpectedRefusal(ReloadCheck, Root, "Error", "immediately precede Reload")
+			return
+		}
+		if Kind == "no-reload" {
+			_MLP_ExpectedRefusal(ReloadCheck, Root, "Error", "actual lifecycle and reload producers")
+			return
+		}
+		for Excluded in ["tests", "vendor", "build", "_generated"] {
+			DirCreate(Root . "\" . Excluded)
+			FileAppend(_MLP_Source("unbalanced"), Root . "\" . Excluded . "\ignored.ahk", "UTF-8")
+		}
+		Receipt := Pairing.Call(Root)
+		AssertEqual(1, Receipt["files"], "the canonical production predicate must exclude nonproduction trees")
+		AssertEqual(2, Receipt["producers"], "only real START and TRACE calls count, never comments or strings")
+		Receipt := ReloadCheck.Call(Root)
+		AssertEqual(1, Receipt["files"])
+		AssertEqual(1, Receipt["starts"])
+		AssertEqual(1, Receipt["reloads"])
+	} finally {
+		if Handle && Handle != -1
+			DllCall("Kernel32\CloseHandle", "Ptr", Handle)
+		DirDelete(Root, true)
+	}
+}
+for _MLP_Kind in ["empty", "missing", "read-error", "unbalanced", "adapter", "no-producer", "reload", "no-reload", "balanced"]
+	Test("logger census: actual " . _MLP_Kind . " source behavior (logger-census-failure)", _MLP_CensusCase.Bind(_MLP_Kind))
+
+
+_MLP_SourceRootAlias(Kind) {
+	Stem := "ergopti_logger_alias_" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount
+	Root := A_Temp . "\" . Stem
+	PreviousDirectory := A_WorkingDir
+	DirCreate(Root)
+	try {
+		FileAppend(_MLP_Source("reload"), Root . "\a_bad.ahk", "UTF-8")
+		FileAppend(_MLP_Source("balanced"), Root . "\z_good.ahk", "UTF-8")
+		if Kind == "dot"
+			Alias := Root . "\."
+		else if Kind == "parent"
+			Alias := Root . "\..\" . Stem
+		else {
+			SetWorkingDir(A_Temp)
+			Alias := Stem
+		}
+		Census := _DriverProductionSourceCensus(Alias)
+		AssertEqual(2, Census.Paths.Length, "the native census must retain both real files")
+		Sources := _MetaLoggerReadSources(Alias)
+		AssertEqual(2, Sources.Count, "an existing-directory alias cannot collapse distinct source identities")
+		AssertTrue(Sources.Has("a_bad.ahk"))
+		AssertTrue(Sources.Has("z_good.ahk"))
+		_MLP_ExpectedRefusal(_MetaLoggerCheckPairing, Alias, "Error", "unpaired lifecycle logs")
+		_MLP_ExpectedRefusal(_MetaLoggerCheckReload, Alias, "Error", "immediately precede Reload")
+	} finally {
+		SetWorkingDir(PreviousDirectory)
+		DirDelete(Root, true)
+	}
+}
+for _MLP_Alias in ["dot", "parent", "relative"]
+	Test("logger census: actual " . _MLP_Alias . " root retains both source identities (logger-source-root-alias)",
+		_MLP_SourceRootAlias.Bind(_MLP_Alias))
+
+
+_MLP_CallCase(Kind) {
+	Root := A_Temp . "\ergopti_logger_case_" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount
+	DirCreate(Root . "\adapters")
+	try {
+		; This real balanced file keeps both producer floors meaningful.
+		FileAppend(_MLP_Source("balanced"), Root . "\adapters\good.ahk", "UTF-8")
+		Text := Kind == "trace"
+			? 'Bad() {`n lOgGeRtRaCe("Audit", "Started.")`n}`n'
+			: 'Bad() {`n loggerstart("Audit", "Started.")`n rElOaD()`n}`n'
+		FileAppend(Text, Root . "\adapters\bad.ahk", "UTF-8")
+		AssertEqual(2, _MetaLoggerReadSources(Root).Count, "both real sources must reach the case guard")
+		if Kind == "trace"
+			_MLP_ExpectedRefusal(_MetaLoggerCheckPairing, Root, "Error", "unpaired lifecycle logs")
+		else
+			_MLP_ExpectedRefusal(_MetaLoggerCheckReload, Root, "Error", "immediately precede Reload")
+	} finally DirDelete(Root, true)
+}
+for _MLP_CallKind in ["trace", "reload"]
+	Test("logger census: actual " . _MLP_CallKind . " call casing retains violations (logger-call-case)",
+		_MLP_CallCase.Bind(_MLP_CallKind))

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Writer = require("modules.keylogger.sqlite_writer")
+local Writer = require("modules.keystats.sqlite_writer")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-sqlite-receipts-XXXXXX"))
 local checks, failures = 0, 0
 assert(Writer.open_db(root .. "/metrics.sqlite"), "actual canonical schema must bootstrap")

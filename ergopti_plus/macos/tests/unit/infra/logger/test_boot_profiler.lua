@@ -190,6 +190,36 @@ helpers.describe("infra.boot_profiler stages (boot-stage-trail)", function()
 		helpers.assert_contains(table.concat(journal_lines("/journal/fallback.log")), "Boot complete in 1234 ms.")
 	end)
 
+	-- issue #104: the Accessibility wait runs the boot again inside its own
+	-- stage once the grant arrives; reopening it warned and lost the wait time.
+	helpers.it("resumes a stage the boot is already inside (boot-stage-resume)", function()
+		reset_capture()
+		configure_journal()
+		boot.begin()
+		boot.stage_once("Waited stage")
+		CLOCK_NS = CLOCK_NS + 24000e6
+		boot.stage_once("Waited stage")
+		CLOCK_NS = CLOCK_NS + 9e6
+		boot.mark("Waited stage")
+		for _, call in ipairs(captured) do
+			helpers.assert_true(call.lvl ~= "warn", "a resumed stage is not a double open: " .. tostring(call.fmt))
+		end
+		local starts, completed = 0, nil
+		for _, call in ipairs(captured) do
+			if call.lvl == "start" then starts = starts + 1 end
+			if call.lvl == "success" and call.args[1] == "Waited stage" then completed = call.args[2] end
+		end
+		helpers.assert_eq(starts, 1, "one START line for one stage")
+		helpers.assert_true(completed ~= nil and math.abs(completed - 24009) < 0.01,
+			"the stage keeps the wait it was resumed after")
+		boot.stage_once("Other stage")
+		boot.stage_once("Third stage")
+		local warned = false
+		for _, call in ipairs(captured) do if call.lvl == "warn" then warned = true end end
+		helpers.assert_true(warned, "opening a different stage over an open one still warns")
+		boot.mark("Third stage")
+	end)
+
 	helpers.it("warns when a mark closes no matching open stage", function()
 		configure_journal()
 		reset_capture()
@@ -220,6 +250,111 @@ helpers.describe("infra.boot_profiler stages (boot-stage-trail)", function()
 		local m = first("success")
 		helpers.assert_true(m.args[3] >= 0 and m.args[3] < 0.5, "delta anchored to ~0")
 		helpers.assert_true(m.args[4] >= 0 and m.args[4] < 0.5, "total anchored to ~0")
+	end)
+end)
+
+helpers.describe("infra.boot_profiler CPU time beside wall time", function()
+	helpers.it("reports each stage's CPU milliseconds after its wall time", function()
+		configure_journal()
+		reset_capture()
+		local cpu = 500
+		boot.use_cpu_clock(function() return cpu end)
+		CLOCK_NS = 40e9
+		boot.begin()
+		boot.stage("Compute")
+		CLOCK_NS = CLOCK_NS + 100e6   -- 100 ms of wall time ...
+		cpu = cpu + 90                -- ... of which 90 ms were CPU: the stage computes.
+		boot.mark("Compute")
+		boot.stage("Wait")
+		CLOCK_NS = CLOCK_NS + 200e6   -- 200 ms of wall time ...
+		cpu = cpu + 5                 -- ... with 5 ms of CPU: the stage waits.
+		boot.mark("Wait")
+		local compute, wait
+		for _, record in ipairs(captured) do
+			if record.lvl == "success" and record.args[1] == "Compute" then compute = record end
+			if record.lvl == "success" and record.args[1] == "Wait" then wait = record end
+		end
+		helpers.assert_true(math.abs(compute.args[5] - 90) < 1e-6, "Compute CPU is 90 ms")
+		helpers.assert_true(math.abs(wait.args[5] - 5) < 1e-6, "Wait CPU is 5 ms")
+		helpers.assert_contains(table.concat(journal_lines("/journal/fallback.log")), "cpu 90.0 ms)")
+		helpers.assert_true(math.abs(boot.cpu_ms() - 95) < 1e-6, "boot CPU total spans begin() to now")
+		boot.use_cpu_clock(nil)
+	end)
+
+	helpers.it("writes the boot CPU total as one never-collapsed evidence line", function()
+		configure_journal()
+		local lines = {}
+		package.loaded["infra.logger"].evidence = function(_, fmt, ...)
+			lines[#lines + 1] = string.format(fmt, ...)
+			return true
+		end
+		local cpu = 10
+		boot.use_cpu_clock(function() return cpu end)
+		CLOCK_NS = 60e9
+		boot.begin()
+		CLOCK_NS = CLOCK_NS + 300e6
+		cpu = cpu + 120
+		boot.complete()
+		helpers.assert_eq(lines[#lines], "Boot CPU: 120 ms of process CPU over 300 ms of boot.")
+		boot.use_cpu_clock(nil)
+		package.loaded["infra.logger"].evidence = nil
+	end)
+end)
+
+helpers.describe("infra.boot_profiler sub-stages and require trace", function()
+	helpers.it("names the slowest first-time requires of a stage with their own time", function()
+		configure_journal()
+		local lines = {}
+		package.loaded["infra.logger"].evidence = function(_, fmt, ...)
+			lines[#lines + 1] = string.format(fmt, ...)
+			return true
+		end
+		package.preload["boot_trace_parent"] = function()
+			CLOCK_NS = CLOCK_NS + 10e6
+			require("boot_trace_child")
+			CLOCK_NS = CLOCK_NS + 5e6
+			return {}
+		end
+		package.preload["boot_trace_child"] = function()
+			CLOCK_NS = CLOCK_NS + 30e6
+			return {}
+		end
+		local native_require = require
+		boot.begin()
+		boot.trace_requires()
+		boot.stage("Traced stage")
+		require("boot_trace_parent")
+		boot.mark("Traced stage")
+		boot.complete()
+		helpers.assert_true(require == native_require, "complete() restores the native require")
+		local text = table.concat(lines, " | ")
+		helpers.assert_true(text:find("boot_trace_child=30.0 ms", 1, true) ~= nil, "child own time")
+		helpers.assert_true(text:find("boot_trace_parent=15.0 ms", 1, true) ~= nil,
+			"parent time excludes the nested load")
+		helpers.assert_true(text:find("loaded 2 module(s)", 1, true) ~= nil)
+		package.loaded["boot_trace_parent"], package.loaded["boot_trace_child"] = nil, nil
+		package.loaded["infra.logger"].evidence = nil
+	end)
+
+	helpers.it("sub() reports the time since the stage opened or the previous sub-stage", function()
+		configure_journal()
+		local lines = {}
+		package.loaded["infra.logger"].evidence = function(_, fmt, ...)
+			lines[#lines + 1] = string.format(fmt, ...)
+			return true
+		end
+		boot.begin()
+		helpers.assert_eq(boot.sub("orphan"), nil, "no open stage, no sub-stage")
+		boot.stage("Long stage")
+		CLOCK_NS = CLOCK_NS + 40e6
+		local first_ms = boot.sub("first part")
+		CLOCK_NS = CLOCK_NS + 5e6
+		local second_ms = boot.sub("second part")
+		helpers.assert_true(math.abs(first_ms - 40) < 0.01 and math.abs(second_ms - 5) < 0.01)
+		helpers.assert_eq(#lines, 1, "only the sub-stage over the INFO floor is evidence")
+		helpers.assert_true(lines[1]:find("Long stage / first part took 40.0 ms", 1, true) ~= nil)
+		boot.mark("Long stage")
+		package.loaded["infra.logger"].evidence = nil
 	end)
 end)
 

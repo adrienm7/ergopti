@@ -19,11 +19,11 @@ _PE32_ReadSource(RelPath) {
 }
 
 _PE32_SourceScanCheck() {
-	Src := _PE32_ReadSource("modules/keylogger/keylogger_av_state.ahk")
-	Assert(Src != "", "Source file keylogger_av_state.ahk must exist")
+	Src := _PE32_ReadSource("modules/keystats/keystats_av_state.ahk")
+	Assert(Src != "", "Source file keystats_av_state.ahk must exist")
 
 	Body := _DriverFuncBody("_KL_AV_FindCaptureExeSnapshot")
-	Assert(Body != "", "_KL_AV_FindCaptureExeSnapshot must exist in keylogger_av_state.ahk")
+	Assert(Body != "", "_KL_AV_FindCaptureExeSnapshot must exist in keystats_av_state.ahk")
 
 	; Regression guard: the old wrong size must no longer appear anywhere in the function body
 	Assert(!InStr(Body, "Buffer(560"), "Body must NOT contain Buffer(560 — old wrong PROCESSENTRY32W size (use PE32_SIZE constant instead)")
@@ -47,12 +47,12 @@ _PE32_SizeIsCorrectForX64() {
 	; AssertEqual(568, 568) compared a literal to itself. The value that matters is
 	; the CONSTANT the driver actually passes to Process32FirstW — if that drifts,
 	; the call fails with ERROR_BAD_LENGTH and process enumeration returns nothing,
-	; which the keylogger reports as "no AV running".
+	; which the keystats reports as "no AV running".
 	; PE32_SIZE is function-local, so its VALUE has to be read from the source.
 	Body := _DriverFuncBody("_KL_AV_FindCaptureExeSnapshot")
 	AssertTrue(RegExMatch(Body, "PE32_SIZE[ 	]*:=[ 	]*568"),
 		"PROCESSENTRY32W size on x64 must be 568 — a wrong dwSize makes Process32FirstW "
-		. "fail with ERROR_BAD_LENGTH, enumeration returns nothing, and the keylogger "
+		. "fail with ERROR_BAD_LENGTH, enumeration returns nothing, and the keystats "
 		. "reports that as no AV running")
 	; On x86 the correct size is 556, so the constant is only right for 64-bit.
 	; Assert the assumption rather than restate it: the whole suite runs 64-bit.
@@ -60,5 +60,5 @@ _PE32_SizeIsCorrectForX64() {
 		"this constant is the x64 layout — on a 32-bit host PE32_SIZE would have to be 556")
 }
 
-Test("keylogger_av_state: PROCESSENTRY32W dwSize must use PE32_SIZE=568 constant (not hardcoded 560)", _PE32_SourceScanCheck)
-Test("keylogger_av_state: PROCESSENTRY32W dwSize must be 568 on x64", _PE32_SizeIsCorrectForX64)
+Test("keystats_av_state: PROCESSENTRY32W dwSize must use PE32_SIZE=568 constant (not hardcoded 560)", _PE32_SourceScanCheck)
+Test("keystats_av_state: PROCESSENTRY32W dwSize must be 568 on x64", _PE32_SizeIsCorrectForX64)

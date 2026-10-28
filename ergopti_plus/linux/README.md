@@ -10,7 +10,7 @@ desktop environments.
 │  Ergopti Linux — architecture overview                           │
 │                                                                  │
 │  Key remapping + tap-hold  →  platform/remap/ (in the daemon)    │
-│  Hotstrings + keylogger    →  ergopti_hotstrings.lua (LuaJIT)    │
+│  Hotstrings + keystats    →  ergopti_hotstrings.lua (LuaJIT)    │
 │    ├─ input_reader.lua     →  /dev/input/eventN (raw evdev)      │
 │    ├─ engine.lua           →  trigger matching (pure Lua)        │
 │    ├─ injector.lua         →  ydotool / uinput injection         │
@@ -88,7 +88,7 @@ linux/
 > `app_launcher`, `crypto`. They are implemented and unit-tested but no Linux feature
 > calls them, so there is currently no tooltip surface, no notification, no clipboard
 > action and no window management on Linux. The `secure_field_detector` case is
-> **deliberate** — see the comment at `modules/keylogger/keylogger.lua:90-98`:
+> **deliberate** — see the comment at `modules/keystats/keystats.lua:90-98`:
 > delegating to it would _narrow_ password-app coverage and leak keystrokes.
 
 ## Running the daemon
@@ -105,6 +105,15 @@ luajit ergopti_hotstrings.lua --device /dev/input/event3 \
 # Dry-run (log matches without injecting)
 luajit ergopti_hotstrings.lua --dry-run --verbose
 ```
+
+## Developer mode
+
+`bash tools/dev/run-linux-dev.sh` (from the clone root, or `npm run dev:linux`)
+runs this tree through `install/launch.sh`, the packages' entry point, with the
+tray, the same config folder and the native archive backend built into `bin/`.
+It stops an installed `ergopti-hotstrings` user unit first. A saved `.lua` of
+the driver or of `_shared/lua` restarts the daemon, and so does the tray's
+Reload; the updater stays off. See `docs/design/developer-mode.md`.
 
 ## Running the tests
 
@@ -220,6 +229,25 @@ typing, including when the general privacy filters are disabled.
 ## Distribution support
 
 Target distributions: **Ubuntu 22.04+, Fedora 38+, Arch Linux, Debian 12+**.
+
+The AppImage brings its own LuaJIT, curl and tray library but uses the
+system's GNU C library (glibc) and GTK 3: it needs **glibc 2.35 or newer**
+(Ubuntu 22.04, Debian 12, Fedora 36, openSUSE Leap 16 or newer, Arch Linux).
+On an older glibc (Ubuntu 20.04, Debian 11) it refuses to start and says
+which version it found. Distributions built on **musl** instead of glibc
+(Alpine Linux, the musl editions of Void Linux) cannot run programs built for
+glibc at all, so neither the AppImage nor the `.deb`/`.rpm` packages run there;
+the AppImage refuses with a message saying so.
+
+The image is self-contained except for the C library, its loader, GLib, the
+C++ runtime and GTK 3, which a program that draws a tray icon and web views
+must share with the desktop it runs on: bundling a second glibc or GTK next to
+the host's graphics and NSS modules breaks them. Instead the image is built and
+launched on the oldest supported glibc (Ubuntu 22.04), a symbol-version check
+refuses anything newer, and a closure check refuses any other library an ELF
+file needs that the image does not carry. The list of what the recipient
+supplies, with the reason for each group, is
+`_shared/data/linux_appimage_recipient_libraries.json`.
 
 Requirements:
 

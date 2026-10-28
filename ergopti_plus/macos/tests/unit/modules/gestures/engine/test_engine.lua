@@ -9,7 +9,7 @@
 --- host.
 ---
 --- FEATURES & RATIONALE:
---- 1. Time-controlled simulation: overrides hs.timer.secondsSinceEpoch so tap
+--- 1. Time-controlled simulation: controls hs.timer.absoluteTime so tap
 ---    vs swipe timing thresholds can be reproduced deterministically.
 --- 2. Isolation: fresh module instance per test (fresh_engine()) to bypass the
 ---    double-init guard and give every test a clean _state.
@@ -22,11 +22,13 @@ local helpers = require("tests.helpers")
 package.loaded["infra.logger"] = nil
 local Logger = helpers.load_with_stubs("infra.logger")
 
+package.loaded["adapters.timer_scheduler"] = nil
 local Engine = helpers.load_with_stubs("modules.gestures.engine")
 
 -- Allow tests to override the time seen by process_frame.
 local _time = 0
 _G.hs.timer.secondsSinceEpoch = function() return _time end
+_G.hs.timer.absoluteTime = function() return _time * 1e9 end
 
 -- Mock script control for pause invariant tests in engine
 -- script_control is stubbed only so a TRANSITIVE require cannot pull the real
@@ -99,8 +101,10 @@ end
 local function fresh_engine(logger)
 	package.loaded["infra.logger"] = logger or Logger
 	package.loaded["modules.gestures.engine"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
 	local E = helpers.load_with_stubs("modules.gestures.engine")
 	_G.hs.timer.secondsSinceEpoch = function() return _time end
+	_G.hs.timer.absoluteTime = function() return _time * 1e9 end
 	return E
 end
 
@@ -817,13 +821,16 @@ helpers.describe("gestures.engine: finger count tracking", function()
 		_time = 0
 		E.process_frame({ make_touch(100, 100), make_touch(110, 100) })
 
-		-- Frame 2: 3rd finger joins
-		_time = 0.02
-		E.process_frame({
-			make_touch(100, 100),
-			make_touch(110, 100),
-			make_touch(105, 115),
-		})
+		-- Frames 2-5: the 3rd finger lands and holds through the confirmation (a
+		-- pair is the scroll count, so one frame of a third contact never counts)
+		for _, t in ipairs({ 0.02, 0.04, 0.06, 0.08 }) do
+			_time = t
+			E.process_frame({
+				make_touch(100, 100),
+				make_touch(110, 100),
+				make_touch(105, 115),
+			})
+		end
 
 		-- Lift quickly -- tap timing
 		_time = 0.1
@@ -840,9 +847,11 @@ helpers.describe("gestures.engine: finger count tracking", function()
 		helpers.assert_true(fired_3,     "tap_3 must fire when peak was 3 fingers")
 	end)
 
-	helpers.it("single finger join (2->3) is accepted immediately (fast path)", function()
-		-- This test confirms the fast-path: joining one finger above the current
-		-- count does not require candidate confirmation frames.
+	helpers.it("a 2->3 join during the landing confirms once the third contact holds", function()
+		-- A pair is the native scroll count, so a third contact joining it goes
+		-- through the candidate confirmation instead of the one-frame fast path
+		-- (three-finger-swipe-vs-scroll); a third finger landing a frame late and
+		-- staying down is still a three-finger gesture.
 		local fired = make_fired()
 		local E = fresh_engine()
 		E.init(make_state({ ga = { tap_3 = "app_expose" } }), fired.actions)
@@ -852,24 +861,25 @@ helpers.describe("gestures.engine: finger count tracking", function()
 		_time = 0
 		E.process_frame({ make_touch(100, 100), make_touch(110, 100) })
 
-		-- Frame 2: 3rd joins (single step up -- fast path)
-		_time = 0.01
-		E.process_frame({
-			make_touch(100, 100),
-			make_touch(110, 100),
-			make_touch(105, 115),
-		})
+		-- Frames 2-6: 3rd joins and holds
+		for _, t in ipairs({ 0.01, 0.025, 0.04, 0.055, 0.07 }) do
+			_time = t
+			E.process_frame({
+				make_touch(100, 100),
+				make_touch(110, 100),
+				make_touch(105, 115),
+			})
+		end
 
 		-- Lift
 		_time = 0.08
 		E.process_frame({})
 
-		-- tap_3 should fire because the join was accepted immediately
 		local found = false
 		for _, a in ipairs(fired.singles) do
 			if a == "app_expose" then found = true end
 		end
-		helpers.assert_true(found, "tap_3 must fire after immediate 2->3 join")
+		helpers.assert_true(found, "tap_3 must fire after a confirmed 2->3 landing join")
 	end)
 
 	--- Feeds a complete 3-finger right swipe: touch down, move, lift.

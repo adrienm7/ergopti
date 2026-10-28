@@ -33,7 +33,7 @@ local STUB_MODULES = {
 	"platform.remap.watchers",
 	"adapters.hotkey_registrar",
 	"adapters.timer_scheduler",
-	"modules.keylogger.kc_bridge",
+	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
 	"modules.shortcuts",
 	"hs.caffeinate.watcher",
@@ -136,11 +136,17 @@ local function with_remap(options, body)
 			get = function() return "tests/unit/platform/remap/activation-layout-barrier.toml" end,
 			get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 		}
+		-- The two timings platform/remap/init.lua reads; any other read is a new
+		-- dependency this fixture must learn about, so it fails loudly.
+		local timings_sec = {
+			["debounce.layout_tis_settle_ms"] = 0.5,
+			["ui.onboarding_startup_delay_ms"] = 2,
+		}
 		package.loaded["infra.timings"] = {
 			sec = function(category, key)
-				helpers.assert_eq(category, "debounce")
-				helpers.assert_eq(key, "layout_tis_settle_ms")
-				return 0.5
+				local value = timings_sec[category .. "." .. key]
+				helpers.assert_true(value ~= nil, "unexpected timing read: " .. category .. "." .. key)
+				return value
 			end,
 		}
 		package.loaded["platform.remap.defaults"] = {
@@ -367,7 +373,7 @@ local function with_remap(options, body)
 				return true
 			end,
 		}
-		package.loaded["modules.keylogger.kc_bridge"] = {
+		package.loaded["modules.keystats.kc_bridge"] = {
 			clear_managed_set = function() return true end,
 			refresh_managed_set = function()
 				calls.classifier_refreshes = calls.classifier_refreshes + 1

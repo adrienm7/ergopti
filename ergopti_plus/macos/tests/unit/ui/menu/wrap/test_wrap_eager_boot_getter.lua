@@ -13,8 +13,8 @@ local OWNED = {
 	"adapters.tray_menu", "adapters.hotkey_registrar", "infra.termination_coordinator", "ui.menu.menu_gestures",
 	"ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout", "ui.menu.menu_hotstrings", "ui.menu.menu_metrics",
 	"ui.menu.menu_tap_holds", "ui.menu.menu_apps", "ui.menu.menu_about", "ui.menu.menu_llm", "infra.personal_shortcuts",
-	"modules.dynamic_hotstrings", "modules.gestures", "modules.keylogger.text_cipher", "modules.llm",
-	"modules.keylogger", "modules.shortcuts", "modules.shortcuts.actions.text", "menu.wrap_mutation",
+	"modules.dynamic_hotstrings", "modules.gestures", "modules.keystats.text_cipher", "modules.llm",
+	"modules.keystats", "modules.shortcuts", "modules.shortcuts.actions.text", "menu.wrap_mutation",
 	"ui.menu.global_scope", "ui.menu.metrics_scope", "ui.menu.gesture_scope", "ui.menu.hotstrings_scope",
 	"ui.menu.scoped_preferences", "modules.hotstrings.hotstrings_config",
 }

@@ -48,8 +48,8 @@ local function fake_config(with_ergopti)
 		get_categories = function() return categories end,
 		language_packs = function() return {} end,
 		resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
-		get_global_delay = function() return 0.75 end,
-		has_global_delay_override = function() return false end,
+		get_base_delay = function() return 0.75 end,
+		has_base_delay_override = function() return false end,
 	}
 end
 
@@ -249,8 +249,8 @@ local function with_standard_empty(callback, locale)
 		any_enabled = function() return state.loaded end,
 		language_packs = function() return {} end,
 		resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
-		get_global_delay = function() return 0.75 end,
-		has_global_delay_override = function() return false end,
+		get_base_delay = function() return 0.75 end,
+		has_base_delay_override = function() return false end,
 		set_category_scope_enabled = function(ids, enabled)
 			state.writes[#state.writes + 1] = { ids = ids, enabled = enabled }
 			return true

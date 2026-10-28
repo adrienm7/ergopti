@@ -9,11 +9,19 @@ Central tooltip façade exposing a unified API for all overlay previews. Delegat
 
 ## Key files
 
-| File                    | Description                                              |
-| ----------------------- | -------------------------------------------------------- |
-| `init.lua`              | `M.show(kind, data)` / `M.hide()` unified façade         |
-| `tooltip_hotstring.lua` | Per-group tinted hotstring preview (hs.canvas)           |
-| `tooltip_llm.lua`       | LLM streaming prediction overlay (hs.canvas, multi-slot) |
+| File                    | Description                                                                |
+| ----------------------- | -------------------------------------------------------------------------- |
+| `init.lua`              | `M.show(kind, data)` / `M.hide()` unified façade                           |
+| `tooltip_hotstring.lua` | Per-group tinted hotstring preview (hs.canvas)                             |
+| `tooltip_llm.lua`       | LLM streaming prediction overlay (hs.canvas, multi-slot)                   |
+| `renderer.lua`          | Canvas creation and screen coordinate resolution                           |
+| `config.lua`            | Loader of the shared visual constants (fails fast on a missing key)        |
+| `dequeue.lua`           | Lua port of `_shared/modules/tooltip/dequeue.js`: stacked row expiry logic |
+
+The Linux driver renders the same tooltips in `linux/ui/tooltip/` (`config.lua`
+reads the same constants file, `preview.lua` decides what the preview shows,
+`llm.lua` presents LLM suggestions); there is no separate hotstring renderer
+module there.
 
 ## Shared constants
 

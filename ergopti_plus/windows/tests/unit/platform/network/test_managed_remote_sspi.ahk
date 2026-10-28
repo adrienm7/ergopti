@@ -19,9 +19,8 @@ class _ManagedRemoteSspiTlsOwner extends _ManagedRemoteFixtureOwner {
 }
 
 _ManagedRemote_ActualPostSspiAndOrderedRoutes(OrderedPac := false) {
-	; The proxy offers NTLM alone, so the transport needs a curl that lists
-	; NTLM. A curl that lists it, or an unknown one, runs the case.
-	TestRequireHostCurlNtlm()
+	; The proxy offers NTLM alone: WinHTTP answers it with the current user's
+	; session on every Windows image.
 	Fixture := _ManagedRemoteSspiTlsOwner()
 	Proxy := 0
 	try {

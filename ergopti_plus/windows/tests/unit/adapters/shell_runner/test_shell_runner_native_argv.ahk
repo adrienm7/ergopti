@@ -61,7 +61,7 @@ _SRAV_RoundTrip(SpawnFn, Values) {
 }
 
 _SRAV_MetricsVector() {
-	Values := ["--keylogger-prefetch-worker", "typing", "C:\synthetic metrics", "full",
+	Values := ["--keystats-prefetch-worker", "typing", "C:\synthetic metrics", "full",
 		"C:\stage.json", "C:\synthetic config\"]
 	for Timing in KLPF_WorkerTimingArgs()
 		Values.Push(Timing)

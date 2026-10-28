@@ -49,6 +49,8 @@ extern "C" {
 #define ERGOPTI_NAV_NO_ROUTE 0xFFu
 #define ERGOPTI_NAV_AHK_SEND_LEVEL_MAX 100u
 #define ERGOPTI_NAV_AHK_SEND_LEVEL_BASE 0xFFC3D44Du
+/* Highest dwExtraInfo AutoHotkey 2.0.26 stamps on its own Send output. */
+#define ERGOPTI_NAV_AHK_MARKER_MAX (ERGOPTI_NAV_AHK_SEND_LEVEL_BASE + 2u)
 #define ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY 8192u
 #define ERGOPTI_NAV_TERMINAL_ROUTE_BUSY (-11)
 
@@ -678,6 +680,43 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PendingForToken(
  */
 ERGOPTI_NAV_API uint32_t ERGOPTI_NAV_CALL ErgoptiNav_GetLastOsError(void);
 
+/** Exact size of ErgoptiNav_HookOrderStats; callers set struct_size to it. */
+#define ERGOPTI_NAV_HOOK_ORDER_STATS_SIZE 48u
+
+/** Counters of the front-position reassertion; see ErgoptiNav_GetHookOrderStats. */
+typedef struct ErgoptiNav_HookOrderStats {
+	uint32_t struct_size;
+	/* Nonzero when the debounce timer is the high-resolution kind (about 1 ms). */
+	uint32_t timer_high_resolution;
+	/* Keyboard events that reached this hook (any provenance). */
+	uint64_t keys_seen;
+	/* Foreign injected events which armed a reassertion (AutoHotkey SendInput). */
+	uint64_t injected_armed;
+	/* Hook handles installed in front of the previous one. */
+	uint64_t reinstalls;
+	/* Reinstalls the OS refused or whose old handle could not be released. */
+	uint64_t reinstall_failures;
+	/* Win32 error of the latest failed reinstall, or zero. */
+	uint32_t last_failure_error;
+	uint32_t reserved;
+} ErgoptiNav_HookOrderStats;
+
+_Static_assert(sizeof(ErgoptiNav_HookOrderStats) == ERGOPTI_NAV_HOOK_ORDER_STATS_SIZE,
+	"The hook-order stats wire size changed.");
+
+/**
+ * Copies the hook-order counters. AutoHotkey removes and reinstalls its own
+ * low-level hook around every SendInput, which puts that hook ahead of this
+ * one; the owner therefore reinstalls itself shortly after any foreign injected
+ * key burst so it keeps deciding before AutoHotkey's hotkeys. The counters let
+ * a probe prove the mechanism instead of assuming it.
+ *
+ * @param out_stats Receives the counters; its struct_size must be preset.
+ * @return An ErgoptiNav_Status value.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetHookOrderStats(
+	ErgoptiNav_HookOrderStats *out_stats);
+
 /**
  * Dispatches an event through the exact production state machine without a hook.
  *
@@ -754,6 +793,14 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookFlow(
 	uint8_t *out_mask_emitted,
 	uint8_t *out_pass_called,
 	uint8_t *out_mask_before_pass);
+
+/**
+ * Classifies one raw hook tuple with the production reassertion rule: true only
+ * for an injected event stamped by AutoHotkey's own Send. Hook-free test only.
+ */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookReassertWanted(
+	uint32_t flags,
+	uint64_t extra_info);
 
 /** Arms the same drain latch used by Stop without creating a hook thread. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestBeginDrain(void);

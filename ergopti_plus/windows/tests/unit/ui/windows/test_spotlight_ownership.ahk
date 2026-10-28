@@ -30,6 +30,7 @@ _SOW_CreateZero(Opts) {
 _SOW_DrawOk(Hwnd, PaintFn) {
 	global _SOW_Events
 	_SOW_Events.Push("draw:" . Hwnd)
+	return true
 }
 
 _SOW_DrawFails(Hwnd, PaintFn) {
@@ -451,3 +452,7 @@ _SOW_DismissDuringStartRetainsReservationUntilBuilderSettles() {
 }
 Test("spotlight session ownership: cancellation waits for local cleanup (spotlight-session-transaction)",
 	_SOW_DismissDuringStartRetainsReservationUntilBuilderSettles)
+
+#Include test_spotlight_upload_owner.ahk
+
+#Include test_spotlight_coordinate_owner.ahk

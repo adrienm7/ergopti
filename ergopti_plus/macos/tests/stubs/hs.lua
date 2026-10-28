@@ -781,6 +781,8 @@ M.eventtap = {
 			keyboardEventAutorepeat = 6,
 			keyboardEventKeyboardType = 8,
 			scrollWheelEventDeltaAxis2 = 7,
+			scrollWheelEventScrollPhase = 9,
+			scrollWheelEventMomentumPhase = 10,
 		},
 		-- Every type the driver actually names. It used to carry five, and the
 		-- gap was invisible in the worst way: keep-awake builds its watch list as
@@ -869,7 +871,16 @@ local INPUT_SOURCE_CALLBACK = nil
 --- from __reset() so that tests which assign `hs.keycodes.map = { ... }` to
 --- a stripped-down literal table cannot leak that state into later tests.
 M.keycodes.__rebuild_map = function()
-	M.keycodes.map = setmetatable({}, {
+	-- The printable ASCII keys are raw entries, as in the real active keymap,
+	-- so rawget-based layout probes see them; their values are the ones the
+	-- fallback below always served. A test models a layout lacking a key by
+	-- clearing that raw entry.
+	local raw = {}
+	for byte = 33, 126 do
+		local name = string.char(byte)
+		if name == name:lower() then raw[name] = tonumber(name) or 0 end
+	end
+	M.keycodes.map = setmetatable(raw, {
 		__index = function(_, k)
 			local hit = DEFAULT_KEYCODES_MAP[k]
 			if hit then return hit end
@@ -1094,8 +1105,8 @@ M.console = { printStyledtext = function(_) end }
 M.notify = {
 	new = function(arg1, arg2)
 		local opts = type(arg1) == "function" and arg2 or arg1
+		-- No release(): Hammerspoon 1.1.1 notifications do not have one (issue #104).
 		local notification = {
-			release = function() end,
 			opts = opts,
 		}
 		notification.send = function() return notification end

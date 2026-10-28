@@ -6,7 +6,7 @@
 --- Supplies the same manifest and n-gram prefetch envelope consumed by the
 --- shared typing dashboard on macOS and Windows. Linux previously registered no
 --- handler for this UI, so its WebKit page fell through to a missing file fetch
---- and could never receive live keylogger data.
+--- and could never receive live keystats data.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Instant first paint. The "ready" payload carries the n-grams of the whole
@@ -16,7 +16,7 @@
 ---    and refreshed on a later loop tick, after the page has drawn.
 --- 2. The refresh reaches the page through the same host response hook as the
 ---    answer, so the page applies it exactly as it applies a reply.
---- 3. The user's reset drops the kept payload with the keylogger's caches, so a
+--- 3. The user's reset drops the kept payload with the keystats's caches, so a
 ---    reset is a clean rebuild.
 --- 4. A payload built from an incomplete SQLite read is answered (the page says
 ---    the history is incomplete) but never kept, so the next opening retries.
@@ -39,7 +39,7 @@ local REFRESH_DELAY_MS = 250
 -- The last complete "ready" payload, and the generation of the latest refresh
 -- (a newer request supersedes an older pending one).
 local _cached_ready = nil
-local _cached_keylogger, _cached_generation = nil, nil
+local _cached_keystats, _cached_generation = nil, nil
 local _refresh_generation = 0
 -- True while the last answered payload came from an incomplete read.
 local _incomplete_reported = false
@@ -68,8 +68,8 @@ end
 --- @param include_prefetch boolean
 --- @return table|nil
 local function build_payload(state, include_prefetch)
-	if state.keylogger and type(state.keylogger.get_dashboard_payload) == "function" then
-		return state.keylogger.get_dashboard_payload({ include_prefetch = include_prefetch })
+	if state.keystats and type(state.keystats.get_dashboard_payload) == "function" then
+		return state.keystats.get_dashboard_payload({ include_prefetch = include_prefetch })
 	end
 	return AppsBridge.build_payload(state)
 end
@@ -106,9 +106,9 @@ end
 M._defer = default_defer
 M._push = default_push
 local Requests = Flush.new(APP_NAME, function(...) return M._push(...) end,
-	function(reply, cache, keylogger, generation)
+	function(reply, cache, keystats, generation)
 		if cache then
-			_cached_ready, _cached_keylogger, _cached_generation = reply, keylogger, generation
+			_cached_ready, _cached_keystats, _cached_generation = reply, keystats, generation
 		end
 	end)
 
@@ -138,7 +138,7 @@ end
 local function handle(payload, state, context, request)
 	local action = type(payload) == "table" and payload.action or payload
 	if action == "ready" then
-		if _cached_ready ~= nil and _cached_keylogger == state.keylogger
+		if _cached_ready ~= nil and _cached_keystats == state.keystats
 			and _cached_generation == request.generation then
 			Logger.debug(LOG, "Typing metrics UI ready — answering from the cached payload.")
 			schedule_refresh(state, context, request)
@@ -163,12 +163,12 @@ local function handle(payload, state, context, request)
 	if action == "clear_cache" then
 		_refresh_generation = _refresh_generation + 1
 		local cleared = false
-		if state.keylogger and type(state.keylogger.clear_cache) == "function" then
-			local ok, result = pcall(state.keylogger.clear_cache)
+		if state.keystats and type(state.keystats.clear_cache) == "function" then
+			local ok, result = pcall(state.keystats.clear_cache)
 			cleared = ok and result == true
 			if cleared then Logger.info(LOG, "Dashboard caches cleared by user reset.") end
 		else
-			Logger.error(LOG, "Reset requested but the keylogger exposes no clear_cache — nothing was cleared.")
+			Logger.error(LOG, "Reset requested but the keystats exposes no clear_cache — nothing was cleared.")
 		end
 		if not request.valid() then return nil end
 		local fresh, complete = build_ready(state)
@@ -178,8 +178,8 @@ local function handle(payload, state, context, request)
 	end
 
 	if action == "range" and type(payload) == "table" then
-		if state.keylogger and type(state.keylogger.get_range_payload) == "function" then
-			local range = state.keylogger.get_range_payload(payload.start_date, payload.end_date, payload.apps)
+		if state.keystats and type(state.keystats.get_range_payload) == "function" then
+			local range = state.keystats.get_range_payload(payload.start_date, payload.end_date, payload.apps)
 			if not range or not request.valid() then return nil end
 			local dashboard = build_payload(state, false)
 			if not dashboard then return nil end
@@ -227,7 +227,7 @@ function M.on_window_closed(epoch) Requests.close(epoch) end
 --- Test seam: forgets the cached payload and restores the default channels.
 function M._reset()
 	Requests.reset()
-	_cached_ready, _cached_keylogger, _cached_generation = nil, nil, nil
+	_cached_ready, _cached_keystats, _cached_generation = nil, nil, nil
 	_refresh_generation = 0
 	_incomplete_reported = false
 	M._defer = default_defer

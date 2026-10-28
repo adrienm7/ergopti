@@ -12,7 +12,7 @@
 ; A warm refresh must still retain the rebuilt tables and merge only the live
 ; walker delta, never replay the full history on each update.
 ;
-; SCOPE: source introspection of modules/keylogger/keylogger_reader.ahk.
+; SCOPE: source introspection of modules/keystats/keystats_reader.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -40,11 +40,11 @@ _NTNC_ReadSource(RelPath) {
 ; ===================================================
 
 _NTNC_CheckNgramClearedForColdReplay() {
-	Src := _NTNC_ReadSource("modules/keylogger/keylogger_reader.ahk")
-	Assert(Src != "", "modules/keylogger/keylogger_reader.ahk must be readable")
+	Src := _NTNC_ReadSource("modules/keystats/keystats_reader.ahk")
+	Assert(Src != "", "modules/keystats/keystats_reader.ahk must be readable")
 
 	Body := _DriverFuncBody("KLR_ClearAggregates")
-	Assert(Body != "", "KLR_ClearAggregates must be present in keylogger_reader.ahk")
+	Assert(Body != "", "KLR_ClearAggregates must be present in keystats_reader.ahk")
 
 	; Every ngram table must be cleared before the raw replay, otherwise stale
 	; rows loaded from an older aggregate-persisting writer would be doubled.
@@ -58,11 +58,11 @@ _NTNC_CheckNgramClearedForColdReplay() {
 }
 
 _NTNC_CheckAggStillCleared() {
-	Src := _NTNC_ReadSource("modules/keylogger/keylogger_reader.ahk")
-	Assert(Src != "", "modules/keylogger/keylogger_reader.ahk must be readable")
+	Src := _NTNC_ReadSource("modules/keystats/keystats_reader.ahk")
+	Assert(Src != "", "modules/keystats/keystats_reader.ahk must be readable")
 
 	Body := _DriverFuncBody("KLR_ClearAggregates")
-	Assert(Body != "", "KLR_ClearAggregates must be present in keylogger_reader.ahk")
+	Assert(Body != "", "KLR_ClearAggregates must be present in keystats_reader.ahk")
 
 	; The agg_* tables must still be cleared
 	Assert(InStr(Body, '"agg_app_day"'),

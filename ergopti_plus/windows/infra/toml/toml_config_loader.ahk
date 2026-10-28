@@ -352,7 +352,8 @@ TomlConfigSectionSkipKind(Header) {
 	; The record consumer owns its exact namespaces, including unknown row
 	; metadata. Neither the Features loader nor cleanup may acquire those rows.
 	if Parts is Array && Parts.Length >= 2 && Parts[1] == "hotstrings"
-			&& (Parts[2] == "terminators" || Parts[2] == "terminator_states")
+			&& (Parts[2] == "terminators" || Parts[2] == "terminator_states"
+				|| Parts[2] == "terminator_consume")
 		return "foreign"
 	if (Header == "ahk" or InStr(Header, "ahk.") == 1)
 		return "obsolete"
@@ -582,6 +583,23 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 	return ExpectedType
 }
 
+; The schema owns a string list at metrics.disabled_apps. One strict domain
+; validator serves canonical source admission and live metrics publication, so
+; cleanup cannot accept an item shape that later aborts startup.
+TomlConfigMetricsDisabledApps(Value) {
+	if !(Value is Array)
+		throw TypeError("metrics.disabled_apps must be a TOML array")
+	Result := Map()
+	for AppName in Value {
+		if !(AppName is String)
+			throw TypeError("metrics.disabled_apps items must be TOML strings")
+		Normalized := Trim(AppName)
+		if (Normalized != "")
+			Result[StrLower(Normalized)] := true
+	}
+	return Result
+}
+
 TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 		RawValue := unset) {
 	ExpectedType := TomlConfigExpectedType(CurrentSection, Key, &Entry)
@@ -617,8 +635,14 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 			return (!IsSet(RawValue) || LiteralKind == "string")
 				&& Value is String
 		case "array":
-			return (!IsSet(RawValue) || LiteralKind == "array")
-				&& Value is Array
+			if (IsSet(RawValue) && LiteralKind != "array") || !(Value is Array)
+				return false
+			if CurrentSection == ConfigKey.METRICS && Key == ConfigLeaf.DISABLED_APPS {
+				try TomlConfigMetricsDisabledApps(Value)
+				catch TypeError
+					return false
+			}
+			return true
 		case "feature":
 			return Value is Map
 		case "enum":
@@ -724,6 +748,7 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 	MigratedOverrides := 0
 	OutdatedEntries := Map()
 	Applied := 0
+	PerfCount("config.apply")
 
 	try LoggerStart("TomlConfigLoader", "Applying v2 config from '{1}'…", FilePath)
 

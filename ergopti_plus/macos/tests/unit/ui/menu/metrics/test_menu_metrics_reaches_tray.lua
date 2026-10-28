@@ -49,7 +49,7 @@ local function metrics_parent_fixture(body)
 	local native = require("ui.menu.menu_metrics")
 	local observed = { builds=0, parents=0, getters=0 }
 	local function build(paused, enabled)
-		local state = { keylogger_enabled=enabled }
+		local state = { keystats_enabled=enabled }
 		local item = native.build({ state=state, save_prefs=function()return true end,
 			updateMenu=function()end, script_control={is_paused=function()return paused==true end} })
 		if item == nil then return nil end

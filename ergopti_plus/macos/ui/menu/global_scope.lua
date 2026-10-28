@@ -25,6 +25,7 @@ local Manifest = require("infra.manifest_reader")
 local Composition = require("config_scope_composition")
 local Participant = require("config_scope_participant")
 local Logger = require("infra.logger")
+local ConfigKeys = require("config_keys")
 local LOG = "menu.global_scope"
 
 --- The remap engine's part of one scope, as an asynchronous participant: its
@@ -57,7 +58,7 @@ local function remap_participant(remap, scope, backup_path, defer)
 		if type(snapshot) ~= "table" then return done(false, "remap settings are owned by another transaction") end
 		remap.apply_scope({ scope = scope, mode = mode, backup_path = backup_path(scope) }, function(ok, reason, _, receipt)
 			committed = ok == true
-			if committed and scope == "tap_holds" and mode == "recommended" then
+			if committed and scope == ConfigKeys.KEY.TAP_HOLDS and mode == "recommended" then
 				if type(receipt) ~= "table" then
 					missing_receipt = true
 					return settle(done, false, "missing-navigation-layer-receipt")
@@ -97,7 +98,8 @@ end
 --- Creates the global owner from the menu's scope owners.
 --- @param options table owners (scope id -> function returning the scoped owner
 ---   or nil when unavailable), remap (facade or nil), backup_path(scope),
----   defer(fn), paused() and refresh(committed, report).
+---   defer(fn), paused() and refresh(committed, report), which also receives
+---   every refusal, with the typed failure point of its report.
 --- @return table owner apply(mode), pending(), retry_restore(done).
 function M.new(options)
 	assert(type(options) == "table" and type(options.owners) == "table", "the global scope needs its owners")
@@ -121,7 +123,7 @@ function M.new(options)
 		end
 		local remap = options.remap
 		if type(remap) == "table" and type(remap.get_enabled) == "function" and remap.get_enabled() == true then
-			registry.tap_holds = remap_participant(remap, "tap_holds", options.backup_path, options.defer)
+			registry.tap_holds = remap_participant(remap, ConfigKeys.KEY.TAP_HOLDS, options.backup_path, options.defer)
 			local chords = remap_participant(remap, "shortcuts", options.backup_path, options.defer)
 			registry.shortcuts = registry.shortcuts and { registry.shortcuts, chords } or { chords }
 		end
@@ -141,6 +143,10 @@ function M.new(options)
 			composition.retry_restore(function(ok) settled = ok == true end)
 			if not settled then
 				Logger.error(LOG, "Global scope %s refused: an earlier rollback is still pending.", tostring(mode))
+				-- Said like every other refusal: a click that changes nothing and
+				-- says nothing reads as a dead menu.
+				options.refresh(false, { scope = "global", mode = mode, point = "acquire",
+					kind = "rollback_pending", detail = "an earlier rollback is still pending" })
 				return false
 			end
 		end

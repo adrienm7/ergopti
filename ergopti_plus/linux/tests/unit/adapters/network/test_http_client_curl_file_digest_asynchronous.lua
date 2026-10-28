@@ -26,7 +26,7 @@ helpers.describe("file_digest: asynchronous sha256sum ownership", function()
 			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native digest allocation fixture must pass")
 		end)
-		helpers.it("linux-digest-replacement: rejected paths preserve an actual native incumbent", function()
+		helpers.it("linux-digest-replacement: rejected paths and deadlines preserve the native incumbent", function()
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 			local fixture = helpers.driver_root() .. "/tests/fixtures/native_file_digest_replacement.lua"
 			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))

@@ -1,0 +1,6 @@
+[case]
+description = "An old file carrying the explicit_delays flag: every delay in it is the user's own and stays, even one equal to a shipped value; the flag goes, the version replaces it."
+drivers = ["linux"]
+outcome = "migrated"
+from_version = 0
+to_version = 1

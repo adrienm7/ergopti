@@ -195,6 +195,36 @@ helpers.describe("hotstrings.idle_reset_seconds: a pause starts a new word", fun
 	end
 end)
 
+helpers.describe("hotstrings.cascade_max_arrows: how many expansions a chain may hold", function()
+	helpers.it("ships at three arrows, the manifest default", function()
+		helpers.assert_eq(Manifest.default_for("hotstrings.cascade_max_arrows"), 3)
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.get_cascade_max_arrows(), 3)
+			helpers.assert_eq(f.state.CASCADE_MAX_ARROWS, 3, "the expander reads the state field")
+		end)
+	end)
+
+	helpers.it("is applied live and read back", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.set_cascade_max_arrows(2), true)
+			helpers.assert_eq(f.keymap.get_cascade_max_arrows(), 2)
+			helpers.assert_eq(f.state.CASCADE_MAX_ARROWS, 2)
+			helpers.assert_eq(f.keymap.set_cascade_max_arrows(1), true)
+			helpers.assert_eq(f.state.CASCADE_MAX_ARROWS, 1)
+		end)
+	end)
+
+	for _, invalid in ipairs({ 0, 11, -1, 1.5, 0 / 0, math.huge, "2", true }) do
+		helpers.it("refuses the cascade arrow count " .. tostring(invalid), function()
+			with_keymap(function(f)
+				helpers.assert_eq(f.keymap.set_cascade_max_arrows(1), true)
+				helpers.assert_eq(f.keymap.set_cascade_max_arrows(invalid), false)
+				helpers.assert_eq(f.keymap.get_cascade_max_arrows(), 1, "a refused arrow count leaves the live one")
+			end)
+		end)
+	end
+end)
+
 helpers.describe("hotstrings.click_resets_word: a click starts a new word", function()
 	helpers.it("on, the run after a click starts a word", function()
 		with_keymap(function(f)

@@ -6,27 +6,28 @@
 
 local M = {}
 
--- Sentinel 0 (not the real 0.2 / 0.05): every caller passes the decrement/floor
--- from the shared-loaded tooltip config (ui/tooltip/config.lua M.timing). These
--- defaults only apply if `opts` is missing — and a 0 there makes that omission
--- show as no decrement/floor (an obvious symptom) instead of being masked by a
--- plausible hardcoded value. MIN_TIMER_SEC is a genuine local floor, not a
--- shared value, so it keeps its real value.
-local DEFAULT_TIMEOUT_DECREMENT_SEC = 0
-local DEFAULT_TIMEOUT_FLOOR_SEC = 0
+-- MIN_TIMER_SEC is a genuine local floor for the dequeue timer, not a shared
+-- value. The decrement and the floor of a row's duration are declared once, in
+-- _shared/modules/tooltip/constants.toml [timing]; every caller passes them from
+-- the loaded tooltip config (ui/tooltip/config.lua M.timing), so this module
+-- keeps no copy and raises when a caller forgets them.
 local MIN_TIMER_SEC = 0.05
 
 --- @param opts table|nil
 --- @return number, number decrement and floor (seconds)
 local function timing_opts(opts)
-	opts = opts or {}
-	return opts.timeout_decrement_sec or DEFAULT_TIMEOUT_DECREMENT_SEC,
-		opts.timeout_floor_sec or DEFAULT_TIMEOUT_FLOOR_SEC
+	local dec = type(opts) == "table" and opts.timeout_decrement_sec or nil
+	local floor = type(opts) == "table" and opts.timeout_floor_sec or nil
+	if type(dec) ~= "number" or type(floor) ~= "number" then
+		error("dequeue: opts.timeout_decrement_sec and opts.timeout_floor_sec are required"
+			.. " (tooltip/constants.toml [timing])", 3)
+	end
+	return dec, floor
 end
 
 --- Shortens a caller duration by the shared decrement, with a hard floor.
 --- @param caller_duration_sec number
---- @param opts table|nil
+--- @param opts table Carries timeout_decrement_sec and timeout_floor_sec.
 --- @return number
 function M.effective_duration_sec(caller_duration_sec, opts)
 	local dec, floor = timing_opts(opts)
@@ -99,10 +100,10 @@ end
 --- Stamps absolute expiry timestamps (seconds since epoch) on row copies.
 --- @param rows table
 --- @param now_sec number
---- @param opts table|nil
+--- @param opts table Field names, plus the timing values effective_duration_sec requires.
 --- @return table stamped_rows, number|nil next_expire_sec
 function M.stamp_expiry_times(rows, now_sec, opts)
-	opts = opts or {}
+	timing_opts(opts)
 	local duration_field = opts.duration_field or "duration"
 	local expire_field = opts.expire_field or "expire_at"
 	local is_rebuild = M.analyze_durations(rows, opts)

@@ -425,6 +425,53 @@ WriteTapHoldDuration(KeyId, Seconds, WriterFn := 0, ReplaceFn := 0,
 		_TH_BuildDurationContent.Bind(KeyId, Seconds, ExpectedSource, ConfigurationFile))
 }
 
+/**
+ * Persists the GLOBAL tap-hold delay: the delay of every key that has none of its own.
+ * A key with a delay of its own keeps it; this never writes a per-key value.
+ * @param {Number} Seconds Positive finite delay within the runtime limit.
+ * @returns {Integer|Boolean} Strict1 after publication, or false after refusal.
+ */
+WriteTapHoldGlobalDuration(Seconds, WriterFn := 0, ReplaceFn := 0,
+		DeleteFn := 0, AuthorizeFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return WriteTapHoldGlobalDuration(Seconds, WriterFn, ReplaceFn,
+			DeleteFn, AuthorizeFn)
+		finally Critical(InheritedCritical)
+	}
+	if !_TH_DurationValueValid(Seconds) {
+		try LoggerError("TapHoldWriter", "Refusing an invalid global tap-hold delay.")
+		return false
+	}
+	return _TH_CommitTapHoldMutation("global-duration",
+		_TH_BuildGlobalDurationCandidate.Bind(Seconds),
+		WriterFn, ReplaceFn, DeleteFn, AuthorizeFn)
+}
+
+/**
+ * Removes a key's own delay so it follows the global delay again.
+ * @param {String} KeyId Shared physical-key identifier.
+ * @returns {Integer|Boolean} Strict1 after publication, or false after refusal.
+ */
+WriteTapHoldDurationReset(KeyId, WriterFn := 0, ReplaceFn := 0,
+		DeleteFn := 0, AuthorizeFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return WriteTapHoldDurationReset(KeyId, WriterFn, ReplaceFn,
+			DeleteFn, AuthorizeFn)
+		finally Critical(InheritedCritical)
+	}
+	if !(KeyId is String) || !_TH_DurationKeyKnown(KeyId) {
+		try LoggerError("TapHoldWriter", "Refusing to reset the delay of an unknown physical key.")
+		return false
+	}
+	return _TH_CommitTapHoldMutation("duration-reset",
+		_TH_BuildDurationResetCandidate.Bind(KeyId),
+		WriterFn, ReplaceFn, DeleteFn, AuthorizeFn)
+}
+
 ; Apply a new hold option for a key directly to TapHold + tap_hold.toml.
 ; ``HoldOpt`` is one entry from ``_TH_HoldOptions``.
 WriteTapHoldHold(KeyId, HoldOpt, WriterFn := 0, ReplaceFn := 0,
@@ -681,6 +728,9 @@ _TH_DurationInitialImage(Data) {
 		throw ValueError("The inheritance flag needs strict Boolean intent")
 	Content := Chr(0xFEFF) . "[tap_hold]`n"
 	Content .= "inherit_defaults = " . TOML_RenderValue(TOML_Bool(InheritDefaults)) . "`n"
+	Content .= "explicit_delays = true`n"
+	if Data.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+		Content .= "time_activation_seconds = " . TOML_RenderValue(Data[ConfigLeaf.TIME_ACTIVATION_SECONDS]) . "`n"
 	for KeyId, Entry in Data["keys"] {
 		if !(KeyId is String) || !(Entry is Map)
 			throw ValueError("Duration persistence cannot serialize an invalid key model")
@@ -702,11 +752,47 @@ _TH_DurationInitialImage(Data) {
 
 _TH_DurationLeafImage(Source, KeyId, Seconds) {
 	Section := "tap_hold.keys." . TOML_RenderKey(KeyId)
-	Admitted := TOML_BuildConfigDocumentCandidate(Source,
-		[{ Section: Section, Key: "time_activation_seconds", Value: Seconds }], [])
+	Rows := [{ Section: Section, Key: ConfigLeaf.TIME_ACTIVATION_SECONDS, Value: Seconds }]
+	for Row in _TH_RetiredDelayRows(Source, KeyId)
+		Rows.Push(Row)
+	Admitted := TOML_BuildConfigDocumentCandidate(Source, Rows, [])
 	if !(Admitted is Map) || !Admitted.Has("content") || !(Admitted["content"] is String)
 		throw ValueError("The semantic TOML owner refused the duration image")
 	return Admitted["content"]
+}
+
+; The rows that finish the migration of a file written before no key shipped a
+; delay: each delay equal to a retired shipped one is removed (it was copied in
+; by a rewrite, not chosen), then the file is flagged so every delay it keeps is
+; the user's own from now on. A file already flagged needs no row; the key being
+; written keeps the value being set.
+; @param Source {String} The physical bytes the edit starts from.
+; @param KeepKeyId {String} The key whose delay is being set.
+; @returns {Array} Rows for TOML_BuildConfigDocumentCandidate.
+_TH_RetiredDelayRows(Source, KeepKeyId := "") {
+	global _SharedDir
+	Rows := []
+	Document := TOML_ParseDocument(Source)
+	Root := Document.Get("tap_hold", Map())
+	if !(Root is Map)
+		throw ValueError("The tap_hold source namespace must be a table.")
+	if Root.Has("explicit_delays") && _TH_TomlTrue(Root["explicit_delays"])
+		return Rows
+	Retired := TapHoldRetiredDelays(_SharedDir . "\tap_hold\defaults.toml")
+	Entries := Root.Get("keys", Map())
+	if (Entries is Map) {
+		for KeyId, Fields in Entries {
+			if !(KeyId is String) || KeyId == KeepKeyId || !(Fields is Map)
+					|| !Retired.Has(KeyId) || !Fields.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+				continue
+			Raw := _ConfigTomlNativeValue(Fields[ConfigLeaf.TIME_ACTIVATION_SECONDS])
+			if IsNumber(Raw) && Raw == Retired[KeyId]
+				Rows.Push({ Section: "tap_hold.keys." . TOML_RenderKey(KeyId),
+					Key: ConfigLeaf.TIME_ACTIVATION_SECONDS, Delete: true })
+		}
+	}
+	Rows.Push({ Section: "tap_hold", Key: "explicit_delays", Value: TOML_Bool(1) })
+	return Rows
 }
 
 _TH_DurationWasPublished(KeyId, Seconds) {
@@ -716,9 +802,9 @@ _TH_DurationWasPublished(KeyId, Seconds) {
 		return (TapHold is Map) && (Desired is Map) && Desired.Has("keys")
 			&& (Desired["keys"] is Map) && Desired["keys"].Has(KeyId)
 			&& (Desired["keys"][KeyId] is Map)
-			&& Desired["keys"][KeyId].Has("time_activation_seconds")
-			&& _TH_DurationValueValid(Desired["keys"][KeyId]["time_activation_seconds"])
-			&& Desired["keys"][KeyId]["time_activation_seconds"] == Seconds
+			&& Desired["keys"][KeyId].Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+			&& _TH_DurationValueValid(Desired["keys"][KeyId][ConfigLeaf.TIME_ACTIVATION_SECONDS])
+			&& Desired["keys"][KeyId][ConfigLeaf.TIME_ACTIVATION_SECONDS] == Seconds
 	} catch {
 		return false
 	}
@@ -756,7 +842,31 @@ _TH_DurationReceiptMatches(Source, Path, KeyId, Seconds, PhysicalMatchFn := 0) {
 _TH_BuildDurationCandidate(KeyId, Seconds, Candidate) {
 	if !_TH_CandidateEntry(Candidate, KeyId, &Entry)
 		return false
-	Entry["time_activation_seconds"] := Seconds
+	Entry[ConfigLeaf.TIME_ACTIVATION_SECONDS] := Seconds
+	return 1
+}
+
+_TH_BuildGlobalDurationCandidate(Seconds, Candidate) {
+	if !(Candidate is Map)
+		return false
+	Candidate[ConfigLeaf.TIME_ACTIVATION_SECONDS] := Seconds
+	return 1
+}
+
+; Drops the key's own delay; an entry that held nothing else goes with it, so the
+; file does not keep an empty table for a key that follows the global delay.
+_TH_BuildDurationResetCandidate(KeyId, Candidate) {
+	if !(Candidate is Map)
+		return false
+	if !Candidate.Has("keys") || !(Candidate["keys"] is Map) || !Candidate["keys"].Has(KeyId)
+		return 1
+	Entry := Candidate["keys"][KeyId]
+	if !(Entry is Map)
+		return false
+	if Entry.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+		Entry.Delete(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+	if Entry.Count == 0
+		Candidate["keys"].Delete(KeyId)
 	return 1
 }
 
@@ -999,13 +1109,18 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 		Lines.Push("# is set in layers.toml, not here.")
 		Lines.Push("")
 
-		; Root [tap_hold] section — emit inherit_defaults when it is false so
-		; the loader does not re-merge shipped defaults on the next reload.
-	        if Data.Has("inherit_defaults") and !Data["inherit_defaults"] {
-			Lines.Push("[tap_hold]")
+		; Root [tap_hold] section — inherit_defaults when it is false, so the loader
+		; does not re-merge shipped defaults on the next reload; the global delay
+		; when the user set one; and always explicit_delays, because every
+		; per-key delay written below is one the user set (the loader dropped the
+		; delays earlier builds copied into the file).
+		Lines.Push("[tap_hold]")
+		if Data.Has("inherit_defaults") and !Data["inherit_defaults"]
 			Lines.Push("inherit_defaults = false")
-			Lines.Push("")
-		}
+		Lines.Push("explicit_delays = true")
+		if Data.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+			Lines.Push(_TH_TomlFormatLine(ConfigLeaf.TIME_ACTIVATION_SECONDS, Data[ConfigLeaf.TIME_ACTIVATION_SECONDS]))
+		Lines.Push("")
 
 		; Keys section.
 	        if Data.Has("keys") {
@@ -1305,7 +1420,11 @@ class TapHoldScopeOwner {
 			throw Error("The tap-hold source cannot be read.")
 		Existing := TOML_ParseDocument(Source)
 		Kinds := TapHoldFieldKinds()
-		Rows := [{ Section: "tap_hold", Key: "inherit_defaults", Delete: true }]
+		; Every delay goes, the global one included: the recommendation sets none, and
+		; the per-key ones are deleted below with the rest of each key's fields, so no
+		; delay an earlier build copied into the file survives (no flag is needed).
+		Rows := [{ Section: "tap_hold", Key: "inherit_defaults", Delete: true },
+			{ Section: "tap_hold", Key: ConfigLeaf.TIME_ACTIVATION_SECONDS, Delete: true }]
 		for KeyId, Fields in _TH_OwnedDocumentKeys(Existing) {
 			for Field in Fields
 				Rows.Push({ Section: "tap_hold.keys." . KeyId, Key: Field, Delete: true })
@@ -1449,7 +1568,16 @@ _TH_KeyReportDocument(Document, Defaults) {
 		for KeyId, Fields in Preset
 			Keys[KeyId] := _TH_CloneData(Fields)
 	}
+	; A delay equal to a retired shipped one, in a file not yet flagged, was copied
+	; in by an earlier rewrite: it is not the user's setting.
+	Retired := (Root.Has("explicit_delays") && _TH_TomlTrue(Root["explicit_delays"]))
+		? Map() : TapHoldRetiredDelays(Defaults)
 	for KeyId, Fields in _TH_OwnedDocumentKeys(Document) {
+		if Fields.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS) && Retired.Has(KeyId) {
+			Raw := _ConfigTomlNativeValue(Fields[ConfigLeaf.TIME_ACTIVATION_SECONDS])
+			if IsNumber(Raw) && Raw == Retired[KeyId]
+				Fields.Delete(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+		}
 		if !Keys.Has(KeyId)
 			Keys[KeyId] := Map()
 		; A modifier hold and a layer hold exclude each other, as in the loader.

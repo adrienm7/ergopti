@@ -585,3 +585,5 @@ _LDRP_TypedSourceSwap() {
 }
 Test("digit row: typed source swaps preserve CapsLock and the real dead-key owner (digit-row-effective-source)",
 	_KLT_WithEmulation.Bind(_LDRP_TypedSourceSwap))
+
+#Include test_layout_poll_pause_owner.ahk

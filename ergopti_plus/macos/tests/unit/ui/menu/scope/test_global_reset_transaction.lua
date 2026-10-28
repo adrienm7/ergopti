@@ -212,13 +212,12 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 				"a manual reload cannot supersede the reset handoff")
 			helpers.assert_eq(observations.builder_ctx.do_reload("menu"), false,
 				"indirect menu callers must share the same reload capability")
-			helpers.assert_eq(observations.actions.quit(), false,
-				"a quit cannot upgrade the reset's exclusive reload owner")
+			helpers.assert_eq(observations.actions.quit(), true,
+				"a quit waits for the reset's write instead of upgrading its exclusive reload owner")
 			helpers.assert_eq(observations.calls.manual_reload or 0, 0)
 			helpers.assert_eq(observations.calls.exit or 0, 0)
-			-- The refused quit tells the user so; the reset itself notifies nothing.
-			helpers.assert_eq(#observations.notifications, 1)
-			helpers.assert_eq(observations.notifications[1].label, "notify.quit_refused")
+			-- Waiting tells nothing; only a wait that outlasts the quit deadline does.
+			helpers.assert_eq(#observations.notifications, 0)
 
 			local abort = observations.reload_abort
 			observations.reload_abort = nil

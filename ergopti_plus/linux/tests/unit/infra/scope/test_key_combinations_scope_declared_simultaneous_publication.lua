@@ -200,7 +200,7 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
    local function walk(list) for _,row in ipairs(list or {}) do
     total=total+1
     if tostring(row.title or ''):find('  :  ',1,true) then
-     count=count+1;helpers.assert_eq(#row.menu,4)
+     count=count+1;helpers.assert_eq(#row.menu,5,'clear, its separator, tap, hold and chord')
      helpers.assert_true(find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))~=nil)
     end
     if row.menu then walk(row.menu) end

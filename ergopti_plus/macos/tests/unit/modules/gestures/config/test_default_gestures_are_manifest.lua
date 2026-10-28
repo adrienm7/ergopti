@@ -52,6 +52,8 @@ helpers.describe("gestures: DEFAULT_GESTURES is the manifest's macOS values", fu
 				"gestures." .. slot .. " must preserve the explicit restoration action")
 		end
 		helpers.assert_eq(Gestures.DEFAULT_GESTURES.tap_3, "none")
+		-- The three-finger tap is the system's Look up, yet it stays recommended
+		-- as on Windows and Linux by the maintainer's choice (2026-10-28).
 		helpers.assert_eq(Gestures.RECOMMENDED_GESTURES.tap_3, "left_click_toggle")
 	end)
 end)

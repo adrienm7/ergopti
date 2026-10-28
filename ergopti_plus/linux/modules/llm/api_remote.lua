@@ -28,18 +28,25 @@
 
 local M = {}
 
+-- The HttpClient port of the request plan: the client that sends and cancels inference
+-- requests. The engine hands it in at init; every other request keeps the adapter.
+local InferenceClient = nil
+
 local Logger = require("logger.shim")
 local ErrorDescription = require("error_description")
 local Json = require("json")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local HttpClient = require("adapters.http_client")
+local Ports = require("llm.request_plan.ports")
 local PromptBuilder = require("llm.prompt_builder")
 local TextUtils = require("text_utils")
 local LlmBridge = require("infra.llm_bridge")
 local Monotonic = require("infra.monotonic")
 local Formats = require("llm.remote_formats")
+local Classifier = require("llm.remote_response_classifier")
 local AuthPolicy = require("llm.local_server_auth")
+local ApiModelListing = require("llm.api_model_listing")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local ProviderConfig = require("llm.provider_config_policy")
 
@@ -49,6 +56,9 @@ local LOG = "modules.llm.api_remote"
 -- A non-chat connection test also keeps the active prediction's owner intact.
 local OWNER = "llm_remote"
 local PROBE_OWNER = "llm_remote_probe"
+-- The model selector page's provider listings: their own owner, so a listing
+-- never cancels a prediction or a test.
+local LISTING_OWNER = "llm_remote_listing"
 local ANTHROPIC_VERSION = "2023-06-01"
 -- What each format serves: "chat" (predictions, tone, translation, the screen
 -- answers' text step, the agent's System 2 and chat triage), "vision" (an image
@@ -146,10 +156,10 @@ end
 
 --- Parses a catalogue document. Exposed for tests over the shared corpus.
 --- @param text string|nil
---- @return table { providers, order, test_request, decisions_test }
+--- @return table { providers, order, prices, test_request, decisions_test }
 --- @return boolean admitted Nonempty projected catalogue, before native read acknowledgement.
 function M.parse_catalogue(text)
-	local catalogue = { providers = {}, order = {}, test_request = nil, decisions_test = nil }
+	local catalogue = { providers = {}, order = {}, prices = {}, test_request = nil, decisions_test = nil }
 	local root = type(text) == "string" and Json.decode(text) or nil
 	if type(root) ~= "table" or type(root.providers) ~= "table" or type(root.provider_order) ~= "table" then
 		Logger.error(LOG, "api_providers.json is missing or malformed — no remote provider is available.")
@@ -172,6 +182,11 @@ function M.parse_catalogue(text)
 		else
 			Logger.warn(LOG, "api_providers.json: provider '%s' is invalid and was skipped.", tostring(id))
 		end
+	end
+	local skipped
+	catalogue.prices, skipped = Classifier.parse_prices(root.model_prices)
+	for _, model in ipairs(skipped) do
+		Logger.warn(LOG, "api_providers.json: model_prices.%s skipped (missing in/out).", model)
 	end
 	catalogue.test_request = parse_test_request(root.test_request)
 	catalogue.decisions_test = parse_decisions_test(root.decisions_test)
@@ -319,11 +334,7 @@ function M.normalize_base_url(raw)
 end
 
 --- Percent-encodes every byte outside the unreserved set.
---- @param value string
---- @return string
-local function percent_encode(value)
-	return (value:gsub("[^%w%-%._~]", function(ch) return string.format("%%%02X", ch:byte()) end))
-end
+local percent_encode = TextUtils.percent_encode
 
 --- Replaces credential-bearing query values before a URL is logged.
 --- @param url string
@@ -357,6 +368,14 @@ function M.endpoint(entry, model)
 	local provider = M.provider(entry.provider)
 	if not provider then return nil, "unknown provider " .. tostring(entry.provider) end
 	local base_raw = (type(entry.base_url) == "string" and entry.base_url ~= "") and entry.base_url or provider.base_url
+	-- A local server entry at its catalogue address goes where the last scan
+	-- found the server (modules/llm/local_servers.lua); discovery loads that
+	-- module, so an unloaded one has no scan to follow
+	local Servers = package.loaded["modules.llm.local_servers"]
+	if base_raw == provider.base_url and type(Servers) == "table" and type(Servers.port_scan) == "function" then
+		local scan = Servers.port_scan(entry.provider)
+		if scan and scan.running and type(scan.base_url) == "string" then base_raw = scan.base_url end
+	end
 	local base, reason = M.normalize_base_url(base_raw)
 	if not base then return nil, reason end
 	local token = entry.token
@@ -458,25 +477,19 @@ end
 --- @param body string
 --- @return string|nil
 function M.extract_text(format, body)
-	local root = type(body) == "string" and Json.decode_lossless(body) or nil
-	if type(root) ~= "table" or Formats.response_has_error(root) then return nil end
-	if format == "anthropic" then
-		for _, block in ipairs(type(root.content) == "table" and root.content or {}) do
-			if type(block) == "table" and block.type == "text" and type(block.text) == "string" then return block.text end
-		end
-		return nil
-	end
-	if format == "gemini" then
-		local candidate = type(root.candidates) == "table" and root.candidates[1]
-		local parts = type(candidate) == "table" and type(candidate.content) == "table" and candidate.content.parts
-		for _, part in ipairs(type(parts) == "table" and parts or {}) do
-			if type(part) == "table" and part.thought ~= true and type(part.text) == "string" then return part.text end
-		end
-		return nil
-	end
-	local choice = type(root.choices) == "table" and root.choices[1]
-	local message = type(choice) == "table" and choice.message
-	return type(message) == "table" and type(message.content) == "string" and message.content or nil
+	local text = Classifier.classify(format, body).text
+	return text ~= "" and text or nil
+end
+
+--- Prices the token usage a response reports with the catalogue's model_prices,
+--- so events_llm carries the same cost columns as on macOS.
+--- @param usage table remote_response_classifier usage, completed in place.
+--- @param model string The model the request named.
+--- @return table usage
+local function priced(usage, model)
+	usage.est_cost_usd = Classifier.estimate_cost(catalogue().prices, model,
+		usage.prompt_tokens, usage.completion_tokens)
+	return usage
 end
 
 --- The explanation a provider gives when it refuses a request.
@@ -515,7 +528,7 @@ local function cancel_exchange(scope, expected_epoch)
 	-- An earlier cancellation may have synchronously admitted another scope's
 	-- successor. Its new epoch does not belong to the original cancel-all call.
 	if scope.epoch ~= expected_epoch then return true, false end
-	if HttpClient.cancel(scope.owner) ~= true then return false, false end
+	if (InferenceClient or HttpClient).cancel(scope.owner) ~= true then return false, false end
 	if scope.epoch ~= expected_epoch then return true, false end
 	scope.epoch, scope.active = expected_epoch + 1, nil
 	return true, true
@@ -618,7 +631,7 @@ local function post_json(scope, epoch, url, headers, payload, fail, on_answer, a
 		fail("request could not be encoded")
 		return
 	end
-	local dispatched = HttpClient.post(url, headers, body, function(result)
+	local dispatched = (InferenceClient or HttpClient).post(url, headers, body, function(result)
 		if epoch ~= scope.epoch then return end
 		if authorized and not authorized() then return end
 		if type(result) ~= "table" or result.ok ~= true then
@@ -703,7 +716,9 @@ local function backboard_send(scope, epoch, prepared, spec, fail, on_answer, aut
 end
 
 --- Sends one completion. Same shape as api_ollama.chat, with the entry in
---- place of the base URL: on_done(full_text, err, failure_receipt?) is called exactly once.
+--- place of the base URL: on_done(full_text, nil, usage) on success, with the
+--- reported tokens priced from model_prices, or on_done("", err, failure_receipt?),
+--- exactly once.
 --- A Backboard entry sends one message (its assistant created first when
 --- needed); a decisions entry is refused, Jev being no chat model.
 --- @param entry table
@@ -730,7 +745,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		if receipt == nil then done("", detail) else done("", detail, receipt) end
 	end
 	local started = Monotonic.now_ms()
-	local function deliver(text)
+	local function deliver(text, usage)
 		if authorized and not authorized() then return end
 		if not text or text == "" then
 			Logger.warn(LOG, "Remote response held no completion text.")
@@ -740,7 +755,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		Logger.debug(LOG, "Remote completion received (%d chars in %d ms).", #text, Monotonic.now_ms() - started)
 		if authorized and not authorized() then return end
 		if type(on_chunk) == "function" then pcall(on_chunk, text) end
-		done(text, nil)
+		done(text, nil, usage)
 	end
 
 	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
@@ -750,7 +765,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		local system, user = split_messages(messages)
 		Logger.debug(LOG, "chat() → Backboard %s (model=%s)", M.redact_url(prepared.endpoint.url), prepared.model)
 		backboard_send(scope, epoch, prepared, { system = system, text = user }, fail, function(root)
-			deliver(Formats.backboard_text(root))
+			deliver(Formats.backboard_text(root), priced(Classifier.usage("backboard", root), prepared.model))
 		end, authorized)
 		return scope.active ~= nil and scope.active.epoch == epoch
 	end
@@ -758,14 +773,15 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	local request, reason = M.build_request(entry, messages, opts)
 	if not request then return refuse(reason) end
 	Logger.debug(LOG, "chat() → %s (model=%s)", M.redact_url(request.url), request.model)
-	local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
+	local dispatched = (InferenceClient or HttpClient).post(request.url, request.headers, request.body, function(result)
 		if epoch ~= scope.epoch then return end
 		if authorized and not authorized() then return end
 		if type(result) ~= "table" or result.ok ~= true then
 			fail(failure_detail(result), failure_receipt(result))
 			return
 		end
-		deliver(M.extract_text(request.format, result.body))
+		local classified = Classifier.classify(request.format, result.body)
+		deliver(classified.text ~= "" and classified.text or nil, priced(classified.usage, request.model))
 	end, { owner = scope.owner, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized })
 	if dispatched ~= true then
 		done("", "HTTP transport unavailable")
@@ -893,6 +909,73 @@ function M.models(entry, on_done)
 	return true
 end
 
+--- The model listing address of an entry: its provider's <base>/models, with
+--- the key in the headers (openai, anthropic) or the URL (gemini).
+--- @param entry table
+--- @return string|nil url, table|nil headers, string|nil format
+local function listing_endpoint(entry)
+	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
+	if not provider or not ApiModelListing.supported(provider.format) then return nil end
+	local endpoint = M.endpoint(entry, model_of(entry, provider))
+	if not endpoint then return nil end
+	local url
+	if endpoint.format == "anthropic" then
+		url = endpoint.url:gsub("/messages$", "/models")
+	elseif endpoint.format == "gemini" then
+		local base = endpoint.url:match("^(.-)/models/")
+		url = base and (base .. "/models?key=" .. percent_encode(entry.token)) or nil
+	else
+		url = endpoint.url:gsub("/chat/completions$", "/models")
+	end
+	return url, endpoint.headers, endpoint.format
+end
+
+--- Lists the models an entry's provider serves, for the model selector page,
+--- through the HTTP adapter with the request timeout. Never logs the address
+--- (a gemini key rides in it) nor the key.
+--- @param entry table Provider, base URL, token and model.
+--- @param on_done function Receives the api_model_listing state:
+---   { state = "listed", ids } or { state = "failed", reason }.
+--- @return boolean dispatched
+function M.list_models(entry, on_done)
+	if type(on_done) ~= "function" then error("api_remote.list_models requires on_done", 2) end
+	local url, headers, format = listing_endpoint(entry)
+	local provider_id = type(entry) == "table" and tostring(entry.provider) or "?"
+	local function finish(state)
+		local ok, err = pcall(on_done, state)
+		if not ok then Logger.error(LOG, "Remote model listing callback raised — %s", ErrorDescription.describe(err)) end
+	end
+	if not url then
+		finish({ state = "failed", reason = "unsupported" })
+		return false
+	end
+	Logger.info(LOG, "Remote model listing requested (provider=%s).", provider_id)
+	local dispatched = HttpClient.get(url, headers,
+		{ owner = LISTING_OWNER, timeout_ms = Timings.ms("llm", "request_timeout_ms"), follow_redirects = false },
+		function(result)
+			if type(result) ~= "table" or result.ok ~= true then
+				local status = type(result) == "table" and tonumber(result.status) or 0
+				Logger.info(LOG, "Remote model listing unavailable (provider=%s, status=%s).", provider_id, tostring(status))
+				finish({ state = "failed", reason = (status or 0) > 0 and "refused" or "unavailable" })
+				return
+			end
+			local decoded_ok, decoded = pcall(Json.decode, type(result.body) == "string" and result.body or "")
+			local ids = decoded_ok and ApiModelListing.model_ids(format, decoded) or nil
+			if type(ids) ~= "table" then
+				Logger.warn(LOG, "Remote model listing could not be read (provider=%s).", provider_id)
+				finish({ state = "failed", reason = "unreadable" })
+				return
+			end
+			Logger.info(LOG, "Remote model listing: %d model(s) for provider %s.", #ids, provider_id)
+			finish({ state = "listed", ids = ids })
+		end)
+	if dispatched ~= true then
+		finish({ state = "failed", reason = "unavailable" })
+		return false
+	end
+	return true
+end
+
 --- Sends the connectivity probe with one entry: the shared test_request as a
 --- chat (a Backboard entry as one message), or decisions_test to a decisions
 --- provider, which passes when the answer holds answers.
@@ -944,8 +1027,10 @@ function M.test(entry, on_done, admission)
 	return M.chat(entry, nil, {
 		{ role = "system", content = spec.system_prompt },
 		{ role = "user", content = spec.user_text },
-	}, { temperature = spec.temperature, max_tokens = spec.max_tokens, authorized = admission }, nil, function(text, err, receipt)
+	}, { temperature = spec.temperature, max_tokens = spec.max_tokens, authorized = admission }, nil, function(text, err, third)
 		local elapsed = Monotonic.now_ms() - started
+		-- The third value is the usage of a completion, a failure's receipt only beside err.
+		local receipt = err ~= nil and third or nil
 		if receipt == nil then on_done(err == nil, err or text, elapsed)
 		else on_done(err == nil, err or text, elapsed, receipt) end
 	end)
@@ -959,6 +1044,13 @@ function M._reset_for_test()
 		scope.epoch, scope.active, scope.used = scope.epoch + 1, nil, nil
 	end
 	_assistants = {}
+end
+
+--- Hands in the HttpClient that sends and cancels inference requests (engine init).
+--- nil restores the adapter.
+--- @param client table|nil Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	InferenceClient = client ~= nil and Ports.check("HttpClient", client) or nil
 end
 
 return M

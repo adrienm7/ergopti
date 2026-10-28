@@ -21,6 +21,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
+local CommandLines = require("tests.support.command_lines")
 
 -- Each tree is read except its test harness, which runs on a Windows checkout
 -- and parses its own Windows paths. Floors: a walk that reads nothing, or an
@@ -37,8 +39,9 @@ local OWNER = "_shared/lua/native_path.lua"
 -- Genuine Windows-path parsers, which must see both separators on every host:
 -- path = { count, reason }.
 local WINDOWS_PATH_PARSERS = {
-	["_shared/lua/program_parameter.lua"] = { 3, "validates a drive or UNC executable typed for the AHK driver" },
-	["_shared/lua/diagnostics/redact.lua"] = { 1, "redacts the home folder in both slash spellings a log can hold" },
+	["_shared/lua/program_parameter.lua"] = { 3, "validates a drive or UNC executable in the windows executable syntax" },
+	["_shared/lua/diagnostics/redact.lua"] = { 5,
+		"redacts the home folder and masks the configuration directory's names in both slash spellings a log can hold" },
 	["_shared/lua/open_target/init.lua"] = { 3, "classifies a drive, UNC or %VARIABLE% target as Windows-only" },
 	["_shared/lua/updater/config_backup.lua"] = { 1,
 		"refuses a shipped backup name that would not be one component on Windows" },
@@ -46,12 +49,7 @@ local WINDOWS_PATH_PARSERS = {
 
 -- Unconverted sites, each owned by a concurrent change and converted next:
 -- path = { count, reason }. The goal is an empty table.
-local BASELINE = {
-	["_shared/lua/config_migrate.lua"] = { 2, "config migration owner: split the backup path through NativePath" },
-	["_shared/lua/config_unused_keys.lua"] = { 2, "unused-key owner: split the backup path through NativePath" },
-	["_shared/lua/llm/profile_selector.lua"] = { 2, "LLM owner: resolve the profiles file through NativePath" },
-	["linux/modules/keylogger/sqlite_writer.lua"] = { 1, "keylogger owner: take the database folder through NativePath" },
-}
+local BASELINE = {}
 
 -- The separator class in each spelling, as raw Lua source text. The last two
 -- are the escaped form "[\\\\/]" that the first four do not contain.
@@ -92,13 +90,14 @@ local function collect(dir, out)
 	local cmd = windows
 		and ('cmd /c dir /b /s /a-d "' .. dir:gsub("/", "\\") .. '\\*.lua" 2>nul')
 		or ("find '" .. dir .. "' -type f -name '*.lua' 2>/dev/null")
-	local pipe = io.popen(cmd)
-	if not pipe then return end
-	for line in pipe:lines() do
+	local source_count = #out
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, line in ipairs(inventory) do
 		local t = line:gsub("%s+$", ""):gsub("\\", "/")
 		if t:match("%.lua$") then out[#out + 1] = t end
 	end
-	pipe:close()
+	assert(#out > source_count, "source inventory contains no matching files")
 end
 
 --- Counts plain occurrences of needle in text.
@@ -135,9 +134,7 @@ local function tree_sources(base, tree)
 		local rel = path:sub(#base + 1)
 		assert(path:sub(1, #base) == base, "the walk left the ergopti_plus folder: " .. path)
 		if rel:sub(1, #tree.excluded) ~= tree.excluded and rel ~= OWNER then
-			local handle = assert(io.open(path, "rb"), "unreadable driver source " .. path)
-			sources[#sources + 1] = { rel = rel, text = handle:read("*a") }
-			handle:close()
+			sources[#sources + 1] = { rel = rel, text = SourceFile.read(path) }
 		end
 	end
 	return sources

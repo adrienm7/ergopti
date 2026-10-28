@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Keeps, for the last physical key-downs the driver decided, only the decision
 --- and its time in a fixed ring: never the key, its code or its text, so the
---- ring holds less than the keylogger ledger already may. A typed key that the
+--- ring holds less than the keystats ledger already may. A typed key that the
 --- driver consumed and then never delivered is reported with one WARNING that
 --- carries the ring's recent decisions.
 ---

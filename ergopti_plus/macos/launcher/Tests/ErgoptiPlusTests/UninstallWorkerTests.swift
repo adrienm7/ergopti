@@ -129,4 +129,72 @@ final class UninstallWorkerTests: XCTestCase {
 			XCTAssertEqual(removals, 0)
 		}
 	}
+	// MARK: Owned runtime (ADR 011)
+
+	func testOwnedRuntimeIsRetiredBeforeTheGuardianAndTheBundle() throws {
+		var calls: [String] = []
+		try performConfirmedUninstall(
+			validate: { calls.append("validate") },
+			authorize: { true },
+			waitForCleanExit: { true },
+			retireOwnedRuntime: { calls.append("owned") },
+			unregister: { calls.append("unregister") },
+			trash: { calls.append("trash") }
+		)
+		XCTAssertEqual(calls, ["validate", "validate", "owned", "unregister", "validate", "trash"])
+	}
+
+	func testRefusedOwnedRuntimeRetirementNeverReachesTheBundle() {
+		var destructiveCalls = 0
+		XCTAssertThrowsError(try performConfirmedUninstall(
+			validate: {}, authorize: { true }, waitForCleanExit: { true },
+			retireOwnedRuntime: { throw UninstallFailure.ownedRuntime },
+			unregister: { destructiveCalls += 1 }, trash: { destructiveCalls += 1 }
+		))
+		XCTAssertEqual(destructiveCalls, 0)
+	}
+
+	func testNothingIsAskedWhenNoOwnedRuntimeIsInstalled() throws {
+		var prompts = 0
+		try OwnedRuntimeUninstall.retire(exists: { _ in false }, runAsAdministrator: { _ in prompts += 1; return true })
+		XCTAssertEqual(prompts, 0)
+	}
+
+	func testAnyOwnedFileIsEnoughToAskForRetirement() throws {
+		for present in [OwnedRuntimeUninstall.runtimeDirectory] + OwnedRuntimeUninstall.jobs.map({ $0.plist }) {
+			var scripts: [String] = []
+			try OwnedRuntimeUninstall.retire(exists: { $0 == present }, runAsAdministrator: { scripts.append($0); return true })
+			XCTAssertEqual(scripts, [OwnedRuntimeUninstall.appleScript()], present)
+		}
+	}
+
+	func testADeclinedAdministratorPromptIsANamedRefusal() {
+		XCTAssertThrowsError(try OwnedRuntimeUninstall.retire(exists: { _ in true }, runAsAdministrator: { _ in false })) { error in
+			XCTAssertEqual(error as? UninstallFailure, UninstallFailure.ownedRuntime)
+		}
+	}
+
+	func testTheAdministratorScriptNamesOnlyTheOwnedRuntime() {
+		let script = OwnedRuntimeUninstall.script()
+		XCTAssertTrue(script.hasPrefix("set -e; "), "the first failure must stop the script")
+		XCTAssertTrue(script.contains("launchctl bootout system/com.ergoptiplus.runtime.core"))
+		XCTAssertTrue(script.contains("launchctl bootout system/com.ergoptiplus.runtime.vhid"))
+		XCTAssertTrue(script.contains("/bin/rm -rf '/Library/Application Support/ErgoptiPlus/Runtime'"))
+		XCTAssertTrue(script.contains("/bin/rm -f /Library/LaunchDaemons/com.ergoptiplus.runtime.core.plist"))
+		XCTAssertFalse(script.contains("org.pqrs"), "the official Karabiner is never touched")
+		XCTAssertFalse(script.contains("||"), "no failure is swallowed")
+		XCTAssertFalse(script.contains("\""), "the AppleScript string holds no double quote")
+		XCTAssertEqual(
+			OwnedRuntimeUninstall.appleScript(),
+			"do shell script \"\(script)\" with administrator privileges"
+		)
+	}
+
+	func testEveryBootoutIsGuardedByALoadedCheck() {
+		for job in OwnedRuntimeUninstall.jobs {
+			let print = "if /bin/launchctl print system/\(job.label) >/dev/null 2>&1; then /bin/launchctl bootout system/\(job.label); fi"
+			XCTAssertTrue(OwnedRuntimeUninstall.script().contains(print), job.label)
+		}
+	}
+
 }

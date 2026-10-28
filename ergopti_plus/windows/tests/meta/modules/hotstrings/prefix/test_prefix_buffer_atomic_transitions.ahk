@@ -103,7 +103,7 @@ _PBAT_SpaceKeepsEngineLeftContext() {
 	Body := _DriverFuncBody("_OnPrefixKeyDown")
 	Space := InStr(Body, "else if (VK == 0x20)")
 	SpaceReset := InStr(Body, "_ResetPrefixBuffer()", true, Space)
-	NextBranch := InStr(Body, "else if ResetVKs.Has(VK)", true, SpaceReset)
+	NextBranch := InStr(Body, "else if KS_IsContextResetKey(VK)", true, SpaceReset)
 	Assert(Space > 0 and SpaceReset > Space and NextBranch > SpaceReset,
 		"Space must keep a dedicated preview-only branch before paired navigation resets")
 	Window := SubStr(Body, Space, NextBranch - Space)

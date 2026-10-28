@@ -316,6 +316,27 @@ ShellRunner_Exec(Cmd) {
 ; ===================================
 
 /**
+ * Windows PowerShell's executable: the one spelling a PowerShell stage shares,
+ * since the antivirus surface of the compiled script counts every copy.
+ * @returns {String} Absolute path under the Windows directory.
+ */
+ShellRunner_WinPsPath() {
+	return A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
+}
+
+/**
+ * The arguments a PowerShell stage starts with: no profile, no prompt, and
+ * the execution policy its scripts and modules need, followed by Args.
+ * @param {String} Args The stage's own arguments (-File or -Command first).
+ * @returns {Array}
+ */
+ShellRunner_WinPsArgs(Args*) {
+	Out := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass"]
+	Out.Push(Args*)
+	return Out
+}
+
+/**
  * Spawns an async subprocess and returns an opaque handle.
  * The handle exposes start(), terminate(), and the optional Windows-only
  * processId()/detach()/terminateAsync(); all are safe on a not-yet-started or
@@ -745,7 +766,12 @@ _SR_LegacyClaimAsyncTerminate(State) {
 		local outcome := Map("Accepted", false, "Pid", 0)
 		local phase := State["Phase"]
 		if phase = SR_LEGACY_PHASE_READY {
-			outcome["Accepted"] := true
+			; The controller may retire a published handle before start reaches
+			; BeginStart. Preserve cancellation after its watchdog is removed so
+			; the interrupted start cannot resume into an untracked process.
+			State["TerminationRequested"] := true
+			State["AsyncTerminationRequested"] := true
+			outcome["Accepted"] := _SR_LegacyDetachCallbackLocked(State)
 			return outcome
 		}
 		if phase = SR_LEGACY_PHASE_STARTING {
@@ -1202,7 +1228,7 @@ _SR_QuoteArgument(Arg) {
  * the exact refusal the spawn boundary applies. Every argument must already be
  * a String: a command line has no other type, and a caller that hands over an
  * Integer (a timing constant, a byte budget) is refused before any process is
- * created (keylogger-worker-timings-must-be-strings).
+ * created (keystats-worker-timings-must-be-strings).
  *
  * @param Executable {String} Absolute path to the child executable.
  * @param Args {Array} Argument vector; every element must be a String.
@@ -1360,17 +1386,47 @@ _SR_NewTreeOwnedTask(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
 	_SR_TreeOwnedDetach(*) {
 		return _SR_TreeHandleDetach(state)
 	}
+	_SR_TreeOwnedOutputTail(Self, MaxBytes) {
+		return _SR_TreeHandleOutputTail(state, MaxBytes)
+	}
 
 	handle.start := _SR_TreeOwnedStart
 	handle.terminate := _SR_TreeOwnedTerminate
 	handle.processId := _SR_TreeOwnedProcessId
 	handle.detach := _SR_TreeOwnedDetach
 	handle.requestTerminate := _SR_TreeOwnedRequestTerminate
+	handle.outputTail := _SR_TreeOwnedOutputTail
 	; A tree-owned termination cannot honestly be fire-and-forget: its defining
 	; contract is that no descendant exists on return. Keep the optional method
 	; for handle-shape compatibility, but route it through the same hard fence.
 	handle.terminateAsync := _SR_TreeOwnedTerminate
 	return handle
+}
+
+/**
+ * Reads the last bytes a running tree-owned child wrote to its capture, for a
+ * progress display (an Ollama pull's percentage). The capture is opened
+ * read-only and shared, as the child's own handle shares it; nothing is read
+ * once the task stopped capturing, and a refused read is no progress, not an
+ * error.
+ * @param {Map} State The task.
+ * @param {Integer} MaxBytes Most bytes read from the end.
+ * @returns {String} The tail, "" when unavailable.
+ */
+_SR_TreeHandleOutputTail(State, MaxBytes) {
+	if !(MaxBytes is Integer) || MaxBytes <= 0 || !State["CaptureOutput"] || !State["Started"]
+			|| State["TreeQuiesced"] || !(State["TmpFile"] is String) || State["TmpFile"] == ""
+		return ""
+	try {
+		Capture := FileOpen(State["TmpFile"], "r", "UTF-8-RAW")
+		Capture.Pos := Max(0, Capture.Length - MaxBytes)
+		Tail := Capture.Read()
+		Capture.Close()
+		return Tail
+	} catch as Err {
+		_SR_LogAt("Debug", "tree-owned capture tail unavailable for '{1}': {2}", State["Executable"], Err.Message)
+		return ""
+	}
 }
 
 _SR_TreeLogError(Owner, Message, Arguments*) {

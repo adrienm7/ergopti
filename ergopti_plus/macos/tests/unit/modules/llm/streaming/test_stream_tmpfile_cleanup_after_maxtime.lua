@@ -73,11 +73,8 @@ do
 		not has_max_time_literal,
 		"api_ollama.lua must not use bare literal \"60\" for --max-time (llm-api-net-03)"
 	)
-	local has_max_time_const = src:find("STREAM_MAX_TIME_SEC", 1, true) ~= nil
-	helpers.assert_true(
-		has_max_time_const,
-		"api_ollama.lua must reference STREAM_MAX_TIME_SEC in the curl --max-time argument (llm-api-net-03)"
-	)
+	-- The registered stream-cleanup-deadline case compares actual native curl
+	-- arguments with the scheduled timer; a declaration is not argument coverage.
 
 	-- Test 5: Safety-net timer must use STREAM_TMPFILE_CLEANUP_SEC, not the old 10s literal.
 	local has_old_delay = src:find("TimerScheduler.after(10,", 1, true) ~= nil
@@ -91,7 +88,7 @@ do
 		"api_ollama.lua safety-net timer must use STREAM_TMPFILE_CLEANUP_SEC (llm-api-net-03)"
 	)
 
-	-- Test 6: on_done must relinquish task ownership and then remove tmp_path
+	-- Test 6: on_done must relinquish task ownership and then settle its payload owner
 	-- before any parser or user callback can fail. Assert ordering instead of a
 	-- fixed source window so a transactional ownership preamble stays covered.
 	local on_done_pos = src:find("local function on_done(", 1, true)
@@ -99,12 +96,15 @@ do
 	local next_section = src:find("\n\t-- Build", on_done_pos, true) or #src
 	local on_done_body = src:sub(on_done_pos, next_section)
 	local ownership_pos = on_done_body:find("_active_stream_task = nil", 1, true)
-	local remove_pos = on_done_body:find("os.remove(tmp_path)", 1, true)
+	local remove_pos = on_done_body:find("retire_payload()", 1, true)
+	local capture_pos = src:find("local retire_payload = _payload_cleanup.capture(tmp_path,", 1, true)
+	helpers.assert_true(capture_pos ~= nil and capture_pos < on_done_pos,
+		"the exact payload cleanup owner must be captured before on_done")
 	local parser_pos = on_done_body:find("flush_lines()", 1, true)
 	helpers.assert_true(
 		ownership_pos ~= nil and remove_pos ~= nil and parser_pos ~= nil
 			and ownership_pos < remove_pos and remove_pos < parser_pos,
-		"api_ollama.lua on_done must release task ownership, remove tmp_path, then parse output (llm-api-net-03)"
+		"api_ollama.lua on_done must release task ownership, settle its captured payload cleanup, then parse output (llm-api-net-03)"
 	)
 end
 
@@ -149,7 +149,7 @@ do
 	-- exact same Lua lexical-scoping gotcha the Ollama twin's comment warns
 	-- about: a local declared AFTER a closure is defined resolves to the nil
 	-- global inside that closure, so os.remove(tmp_path) would throw.
-	local tmp_path_decl_pos = src:find("local tmp_path =", 1, true)
+	local tmp_path_decl_pos = src:find("local tmp_path[%s,=]")
 	local on_done_pos       = src:find("local function on_done(", 1, true)
 	helpers.assert_true(tmp_path_decl_pos ~= nil, "api_mlx_inference.lua must declare local tmp_path (F-MED-3)")
 	helpers.assert_true(on_done_pos ~= nil, "api_mlx_inference.lua must define on_done (F-MED-3)")
@@ -158,18 +158,21 @@ do
 		"api_mlx_inference.lua: tmp_path must be declared BEFORE on_done so the closure captures the real upvalue (F-MED-3)"
 	)
 
-	-- Test 4: release the completed task first, then remove tmp_path before any
+	-- Test 4: release the completed task first, then settle its payload owner before any
 	-- fallible parsing/logging/caller callback. This is the same transaction as
 	-- the Ollama twin and survives harmless changes to comment length.
 	local next_section = src:find("\n\t-- Build", on_done_pos, true) or #src
 	local on_done_body = src:sub(on_done_pos, next_section)
 	local ownership_pos = on_done_body:find("_ctx.stream.task = nil", 1, true)
-	local remove_pos = on_done_body:find("os.remove(tmp_path)", 1, true)
+	local remove_pos = on_done_body:find("retire_payload()", 1, true)
+	local capture_pos = src:find("local retire_payload = _payload_cleanup.capture(tmp_path,", 1, true)
+	helpers.assert_true(capture_pos ~= nil and capture_pos < on_done_pos,
+		"the exact payload cleanup owner must be captured before on_done")
 	local parser_pos = on_done_body:find("flush_lines()", 1, true)
 	helpers.assert_true(
 		ownership_pos ~= nil and remove_pos ~= nil and parser_pos ~= nil
 			and ownership_pos < remove_pos and remove_pos < parser_pos,
-		"api_mlx_inference.lua on_done must release task ownership, remove tmp_path, then parse output (F-MED-3)"
+		"api_mlx_inference.lua on_done must release task ownership, settle its captured payload cleanup, then parse output (F-MED-3)"
 	)
 end
 

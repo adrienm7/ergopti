@@ -63,7 +63,7 @@ end
 local function saved_config()
 	return {
 		gestures = true,
-		keylogger_enabled = true,
+		keystats_enabled = true,
 		llm_enabled = true,
 		shortcuts = true,
 		custom_editor_shortcut = { mods = { "ctrl" }, key = "k" },
@@ -72,7 +72,7 @@ end
 
 --- Boots ui.menu.start once over in-memory boundaries.
 --- @param opts table Failure plan: load_status (ok, corrupt, absent), saved, editor_bind, gestures_enable,
---- gestures_query, keylogger_start; generate(ctx, actions) returns the menu tree, and
+--- gestures_query, keystats_start; generate(ctx, actions) returns the menu tree, and
 --- before_start() runs on the reset stubs just before ui.menu.start.
 --- @return table fixture Live state, saves, log records and the menu ctx.
 function M.boot(opts)
@@ -102,7 +102,7 @@ function M.boot(opts)
 		gestures = false,
 		shortcuts = true,
 		llm_enabled = false,
-		keylogger_enabled = false,
+		keystats_enabled = false,
 		script_control_enabled = true,
 	}
 	local saves = {}
@@ -222,7 +222,7 @@ function M.boot(opts)
 	package.loaded["modules.gestures"] = {
 		SINGLE_SLOTS = { "swipe_left" }, DEFAULT_GESTURES = { swipe_left = "none" },
 	}
-	package.loaded["modules.keylogger.text_cipher"] = { set_enabled = function() return true end }
+	package.loaded["modules.keystats.text_cipher"] = { set_enabled = function() return true end }
 
 	local identity = function() return true end
 	package.loaded["modules.llm"] = {
@@ -232,11 +232,11 @@ function M.boot(opts)
 		set_llm_model_ollama = identity,
 		set_llm_model_mlx = identity,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		set_options = noop,
 		set_disabled_apps = noop,
 		start = function()
-			if opts.keylogger_start == false then return false end
+			if opts.keystats_start == false then return false end
 			return true
 		end,
 		stop = function() return true end,
@@ -358,7 +358,7 @@ function M.boot(opts)
 		return fixture.actions
 	end
 
-	--- Runs every deferred sync callback (hotkey warm-up, keylogger start).
+	--- Runs every deferred sync callback (hotkey warm-up, keystats start).
 	function fixture.flush_deferred()
 		local pending = {}
 		for index, callback in ipairs(deferred) do pending[index] = callback end

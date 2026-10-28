@@ -89,6 +89,12 @@ function M.with_fixture(body)
     end)
    end)
   end
+  function artifact.sealed_size(brand)
+   local state = exact(brand)
+   local handle = state.adopted and io.open(state.path, "rb")
+   if not handle then return nil end
+   local size = handle:seek("end"); handle:close(); return size
+  end
   function artifact.cancel_transfer(brand)
    local state = exact(brand)
    if not remove_owned(state) then return false end

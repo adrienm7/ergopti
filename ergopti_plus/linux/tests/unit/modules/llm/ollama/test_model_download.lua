@@ -109,6 +109,25 @@ helpers.describe("Ollama model download: streaming transaction", function()
 		restore()
 	end)
 
+	helpers.it("(model-selector-progress) tells the page each new whole percentage, then the end", function()
+		local Download, transport = load_fixture()
+		local told = {}
+		local ok, err = xpcall(function()
+			Download.set_progress_listener(function(tag, percent) told[#told + 1] = tag .. ":" .. tostring(percent) end)
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			transport.starts[1].on_chunk('{"status":"pulling","completed":25,"total":100}\n')
+			transport.starts[1].on_chunk('{"status":"pulling","completed":255,"total":1000}\n')
+			transport.starts[1].on_chunk('{"status":"pulling manifest"}\n')
+			transport.starts[1].on_chunk('{"status":"pulling","completed":426,"total":1000}\n{"status":"success"}\n')
+			transport.starts[1].on_done({ ok = true })
+			helpers.assert_eq(table.concat(told, ","), "qwen:2b:25,qwen:2b:42,qwen:2b:nil",
+				"a repeated whole percentage or a frame without one is not told; the end is")
+		end, debug.traceback)
+		Download.set_progress_listener(nil)
+		restore()
+		if not ok then error(err) end
+	end)
+
 	helpers.it("keeps a failed request retryable and cancels only its named owner", function()
 		local Download, transport, window, shown = load_fixture()
 		helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
@@ -431,13 +450,13 @@ helpers.describe("actual daemon keeps model host until physical retirement", fun
 		local registry = assert(text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]"))
 		local env = setmetatable({
 			privacy_owners = {},
-			keylogger = { stop = function() return true end },
+			keystats = { stop = function() return true end },
 			ShutdownCoordinator = require("infra.shutdown_coordinator"), prediction_engine = prediction,
 			webview_manager = webviews, dyn_hotstrings = false, updater = false, file_watchers = false,
 			process_lifecycle = false, secure_field_detector = false, metrics = false,
 			tooltip_preview = false, gestures = false, input_capture_gate = false,
 			package = { loaded = {} }, require = function() return { cleanup = function() end, flush = function() end } end,
-			TimerScheduler = { cancelAll = function() end }, Logger = { warn = function() end },
+			TimerScheduler = { cancelAll = function() return true end }, Logger = { warn = function() end },
 			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
 			event_loop = { stop = function() state.loops = state.loops + 1 end },
 		}, { __index = _G })
@@ -459,6 +478,7 @@ helpers.describe("actual daemon keeps model host until physical retirement", fun
 				state.hosts = state.hosts + 1
 				state.completed, state.retired = #window.completions, window.retired_session
 				window.host_closed = true
+				return true
 			end }
 			local coordinator = daemon_registry({ shutdown_runtime = Download.shutdown, cancel = function() end }, webviews, state)
 			helpers.assert_true(coordinator.request("terminal model shutdown"))
@@ -483,7 +503,7 @@ helpers.describe("actual daemon keeps model host until physical retirement", fun
 
 	helpers.it("actual daemon without an AI owner retains its ordinary host teardown", function()
 		local state = { loops = 0, hosts = 0 }
-		local coordinator = daemon_registry(false, { shutdown = function() state.hosts = state.hosts + 1 end }, state)
+		local coordinator = daemon_registry(false, { shutdown = function() state.hosts = state.hosts + 1; return true end }, state)
 		helpers.assert_true(coordinator.request("no optional AI module"))
 		helpers.assert_eq(state.hosts, 1)
 		helpers.assert_eq(state.loops, 1)

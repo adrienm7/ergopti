@@ -171,11 +171,15 @@ helpers.describe("common autocorrection native consumer recovery", function()
 
 	helpers.it("(common-autocorrection-recovery) early-boot admission cannot authorize initialization before its exact abort", function()
 		fixture(function(f)
+			helpers.assert_eq(f.Config.terminal_admission_blocked(), false)
 			local token = assert(f.Config.capture_terminal_admission())
+			helpers.assert_eq(f.Config.terminal_admission_blocked(), true,
+				"the menu's Quit reads a held terminal admission as a pending publication")
 			helpers.assert_true(token.current())
 			helpers.assert_eq(f.Config.init(f.options), false)
 			helpers.assert_eq(f.writes, 0)
 			helpers.assert_true(token.abort())
+			helpers.assert_eq(f.Config.terminal_admission_blocked(), false)
 			helpers.assert_eq(token.current(), false)
 			helpers.assert_eq(token.abort(), false)
 			f.acknowledge = true

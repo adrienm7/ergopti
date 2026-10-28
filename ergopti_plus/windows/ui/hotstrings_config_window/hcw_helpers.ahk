@@ -929,10 +929,10 @@ _HCW_GetSections(Entry, ReadFn := ReadTomlFile) {
 		Ordered := Map()
 		Pos := 1
 		while (RegExMatch(SectionsOrderRaw, '"([^"]*)"', &Tok, Pos)) {
-			T := StrLower(Tok[1])
-			if (T != "-" and Seen.Has(T)) {
-				Order.Push(T)
-				Ordered[T] := true
+			TokenLower := StrLower(Tok[1])
+			if (TokenLower != "-" and Seen.Has(TokenLower)) {
+				Order.Push(TokenLower)
+				Ordered[TokenLower] := true
 			}
 			Pos := Tok.Pos + Tok.Len
 		}
@@ -981,10 +981,10 @@ _HCW_StatusPath(Entry, Sec) {
 
 
 _HCW_FallbackDelayMs(Entry) {
-	global GLOBAL_DEFAULT_DELAY, UI_LLM_TIMEOUT_SEC
+	global UI_LLM_TIMEOUT_SEC
 	if (Entry.Key = "llm_prediction")
 		return Round(UI_LLM_TIMEOUT_SEC * 1000)
-	return Round(GLOBAL_DEFAULT_DELAY * 1000)
+	return Round(HotstringsBaseDelay() * 1000)
 }
 
 ; Source-default collision priority for the current entry's group — personal 50,

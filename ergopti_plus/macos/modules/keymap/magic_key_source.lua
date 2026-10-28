@@ -30,11 +30,12 @@ local FileSystem = require("adapters.file_system")
 local Json       = require("json")
 local Shared     = require("keymap.magic_key_source")
 local Geometry   = require("adapters.keyboard_geometry")
+local ConfigKeys = require("config_keys")
 
 local LOG = "keymap.magic_key_source"
 
 -- The canonical configuration path of the setting, and its automatic value.
-M.PATH = "hotstrings.magic_key_source"
+M.PATH = ConfigKeys.KEY.HOTSTRINGS_MAGIC_KEY_SOURCE
 local AUTOMATIC = Manifest.default_for(M.PATH)
 
 -- The registry record holding a key's keycode on a bare ISO board, where the

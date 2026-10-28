@@ -251,6 +251,13 @@ local function build_fixture_menu(context)
 		local defaults = assert(require("toml_codec").decode(file:read("*a"))); assert(file:close())
 		local Pair = helpers.load_module("modules.shortcuts.key_combinations")
 		context.is_paused = function() return false end
+		-- Layout on pause / resume: a desktop listing no layout, so only « No change ».
+		if context.pause_layout == nil then
+			context.pause_layout = { switcher = function()
+				return { backend = function() return "gnome" end, choices = function() return {} end,
+					refresh = function() end }
+			end }
+		end
 		context.gestures.is_assignable = function() return false end
 		context.gestures.capture_parameter_source_guard = function() return function() return true end end
 		local owner = Pair.new({keys = context.tap_holds.key_catalog(), hold_picker = defaults.tap_hold.hold_picker,
@@ -365,11 +372,11 @@ local function full_context()
 			get_slots      = function() return {} end,
 			get_sg_names   = function() return {} end,
 		},
-		-- `keylogger`, which is what _build_metrics reads. Named `metrics` in a
+		-- `keystats`, which is what _build_metrics reads. Named `metrics` in a
 		-- first draft, and the metrics submenu then collapsed to "(métriques non
 		-- disponibles)" — three manifest rows reported missing for a reason that
 		-- was in the stub, not the driver.
-		keylogger = {
+		keystats = {
 			is_enabled        = function() return true end,
 			toggle            = noop,
 			get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end,
@@ -556,6 +563,9 @@ helpers.describe("menu certification: published available component rows are ren
 			agent_system_backend_current_caption = i18n.get("menu.agent.off"),
 			agent_system_model_caption = "",
 			agent_disabled_apps_count = "0",
+			-- No configuration: both pause layouts are « No change ».
+			layout_pause_caption = i18n.get("menu.layout.layout_auto"),
+			layout_resume_caption = i18n.get("menu.layout.layout_auto"),
 		}
 		local checked, missing = 0, {}
 		for menu_key in pairs(root) do
@@ -670,6 +680,18 @@ helpers.describe("menu certification: no empty submenu", function()
 end)
 
 
+--- The model selector button, at any depth: its title starts with the API
+--- emoji of the shared brand table (the full context selects the API backend).
+local function selector_button(items)
+	local emoji = require("modules.llm.backend_brands").emoji("api")
+	for _, item in ipairs(items or {}) do
+		if type(item.title) == "string" and item.title:sub(1, #emoji) == emoji then return item end
+		local nested = selector_button(item.menu)
+		if nested then return nested end
+	end
+	return nil
+end
+
 helpers.describe("menu certification: actual API context reachability", function()
 
 	helpers.it("reaches the genuine provider children without running mutation callbacks", function()
@@ -682,19 +704,23 @@ helpers.describe("menu certification: actual API context reachability", function
 			local menu = mb.build(context)
 			local remote = require("modules.llm.api_remote")
 			local entries = require("modules.llm.api_entries")
-			local add = find_item(menu, i18n.get("menu.llm.api_add_entry"))
-			helpers.assert_not_nil(add, "the complete context must reach the real API provider group")
-			helpers.assert_type(add.menu, "table")
+			-- model-selector-page: the tray holds the one button; the providers
+			-- an entry is added for are the page's.
+			helpers.assert_nil(find_item(menu, i18n.get("menu.llm.api_add_entry")), "the tray lists no API provider")
+			helpers.assert_not_nil(selector_button(menu), "the complete context must reach the model selector button")
+			local page = require("ui.menu.llm_backend_rows").api_page(context.llm,
+				{ prompt = function() end, error = function() end, info = function() end, confirm = function() end },
+				function() end, { paused = false, is_paused = function() return false end })
 			local providers = remote.providers()
 			helpers.assert_true(#providers >= 16, "the actual shipped cloud catalogue must be reached")
-			helpers.assert_eq(#add.menu, #providers)
+			helpers.assert_eq(#page.providers, #providers)
 			for index, provider in ipairs(providers) do
-				helpers.assert_eq(add.menu[index].title, "➕ " .. provider.label)
-				helpers.assert_type(add.menu[index].fn, "function")
+				helpers.assert_eq(page.providers[index].label, provider.label)
+				helpers.assert_type(page.providers[index].run, "function")
 			end
-			helpers.assert_eq(add.menu[1].title, "➕ OpenAI")
-			helpers.assert_eq(add.menu[2].title, "➕ Anthropic")
-			helpers.assert_eq(add.menu[3].title, "➕ Google Gemini")
+			helpers.assert_eq(page.providers[1].label, "OpenAI")
+			helpers.assert_eq(page.providers[2].label, "Anthropic")
+			helpers.assert_eq(page.providers[3].label, "Google Gemini")
 			helpers.assert_true(rawequal(remote, package.loaded["modules.llm.api_remote"]))
 			helpers.assert_true(rawequal(entries, package.loaded["modules.llm.api_entries"]))
 			helpers.assert_eq(mutations, 0, "building the whole tray must not change the runtime backend")
@@ -730,14 +756,14 @@ helpers.describe("menu certification: private API source lifecycle", function()
 					rawset(package.loaded, name, expected[name])
 				end
 				local menu = build_full_menu(full_context())
-				helpers.assert_not_nil(find_item(menu, i18n.get("menu.llm.api_add_entry")))
+				helpers.assert_not_nil(selector_button(menu))
 				local private_path
 				local succeeded, raised = pcall(function()
 					with_api_source(function(builder, entries, path)
 						private_path = path
 						helpers.assert_eq(entries.path(), path)
 						helpers.assert_eq(#entries.list(), 0)
-						helpers.assert_not_nil(find_item(builder.build(full_context()), i18n.get("menu.llm.api_add_entry")))
+						helpers.assert_not_nil(selector_button(builder.build(full_context())))
 						error("private API scope sentinel")
 					end)
 				end)
@@ -1007,15 +1033,16 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 				end
 				local row = assert(build())
 				helpers.assert_eq(row.menu[1].title, expected.trigger_debounce_english)
-				helpers.assert_eq(row.menu[2].title, "-")
+				helpers.assert_eq(row.menu[2].title, expected.trigger_min_interval_english)
+				helpers.assert_eq(row.menu[3].title, "-")
 				helpers.assert_not_nil(find_item(row.menu, i18n.get("menu.llm.disable_url_bars")))
 				helpers.assert_not_nil(find_item(row.menu, i18n.get("menu.llm.disable_password_fields")))
 				local before = Sandbox.read_bytes(path)
 				local ok, detail = xpcall(function()
 					root[boundary.section] = { { type = "label", id = "hand_trigger_boundary", i18n = expected.marker_key,
 						platforms = { "ahk", "linux" }, unavailable = "hide" } }
-					row = assert(build()); helpers.assert_eq(row.menu[2].title, expected.marker_english)
-					helpers.assert_eq(row.menu[2].disabled, true); helpers.assert_nil(row.menu[2].fn)
+					row = assert(build()); helpers.assert_eq(row.menu[3].title, expected.marker_english)
+					helpers.assert_eq(row.menu[3].disabled, true); helpers.assert_nil(row.menu[3].fn)
 					helpers.assert_eq(changes, 0); helpers.assert_eq(Sandbox.read_bytes(path), before)
 					local preset = assert(find_item(row.menu[1].menu, "50 ms"))
 					helpers.assert_type(preset.fn, "function"); helpers.assert_nil(preset.fn())
@@ -1030,7 +1057,7 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 				end, debug.traceback)
 				root[boundary.section] = original
 				if not ok then error(detail, 0) end
-				row = assert(build()); helpers.assert_eq(row.menu[2].title, "-")
+				row = assert(build()); helpers.assert_eq(row.menu[3].title, "-")
 				helpers.assert_eq(changes, 1)
 			end)
 		end)
@@ -1419,6 +1446,7 @@ end)
 require("test.menu_layout_caption_values_contract").register(helpers, "linux")
 
 require("test.menu_numbered_caption_contract").register(helpers, "linux")
+require("test.menu_row_order_contract").register(helpers, 9)
 
 -- Component coverage above uses the recorded declaration only during its build.
 -- Current public policy is checked separately with the genuine prediction owner.
@@ -1626,8 +1654,8 @@ helpers.describe("actual Linux top-level boundary facade custody (declared-top-l
 					-- The real native header's existing tostring slot precedes admission.
 					ctx._version = setmetatable({}, {__tostring = function() withdraw(); return "9.9.9" end})
 				else
-					local native_read = ctx.keylogger.is_enabled
-					ctx.keylogger.is_enabled = function()
+					local native_read = ctx.keystats.is_enabled
+					ctx.keystats.is_enabled = function()
 						reads = reads + 1; local value = native_read()
 						if calls == 0 then withdraw() end
 						return value
@@ -1648,4 +1676,47 @@ helpers.describe("actual Linux top-level boundary facade custody (declared-top-l
 			end)
 		end
 	end
+end)
+
+-- The recommended-defaults explanation was a group of menu rows: a whole
+-- paragraph in the tray. The Gestures submenu now shows « Infos… », and the click
+-- opens the existing zenity info dialog with the shared note and the Linux reason.
+helpers.describe("Gestures Infos row opens the explanation in a dialog", function()
+	helpers.it("shows no explanation row and opens the zenity info dialog on click", function()
+		local note = i18n.get("menu.gestures.recommended_note")
+		local reason = i18n.get("menu.gestures.recommended_reason_linux")
+		local gestures = nil
+		local label = i18n.get("menu.gestures.title")
+		for _, item in ipairs(build_full_menu(full_context())) do
+			if type(item.title) == "string" and item.title:find(label, 1, true) then gestures = item end
+		end
+		helpers.assert_true(gestures ~= nil and type(gestures.menu) == "table", "the Gestures submenu is built")
+		for _, title in ipairs(all_titles(gestures.menu)) do
+			helpers.assert_true(title ~= note and title ~= reason, "no menu row carries the explanation")
+		end
+		local info = find_item(gestures.menu, i18n.get("menu.gestures.recommended_info"))
+		helpers.assert_true(info ~= nil, "the Infos row is rendered")
+		helpers.assert_type(info.fn, "function")
+
+		-- build_fixture_menu restores the global i18n_safe the builder defines once
+		-- the tray is built; a click runs later, as in production, so it needs one.
+		local commands = {}
+		local real_execute, real_i18n_safe = os.execute, rawget(_G, "i18n_safe")
+		os.execute = function(command)
+			commands[#commands + 1] = command
+			return true
+		end
+		rawset(_G, "i18n_safe", function(key) return i18n.get(key) end)
+		local ok, err = pcall(info.fn)
+		os.execute = real_execute
+		rawset(_G, "i18n_safe", real_i18n_safe)
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(#commands, 1, "one click opens one dialog")
+		helpers.assert_true(commands[1]:find("zenity --info", 1, true) == 1, "the existing info dialog: " .. commands[1])
+		-- shell_quote closes and reopens the quotes around an apostrophe.
+		local unquoted = commands[1]:gsub("'\\''", "'")
+		for _, expected in ipairs({ note, reason, i18n.get("menu.gestures.notify_title") }) do
+			helpers.assert_true(unquoted:find(expected, 1, true) ~= nil, "the dialog shows: " .. expected)
+		end
+	end)
 end)

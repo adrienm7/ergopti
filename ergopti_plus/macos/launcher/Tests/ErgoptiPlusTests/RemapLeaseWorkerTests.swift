@@ -287,17 +287,21 @@ private final class ScriptedModernGuardianService: RemapGuardianModernService {
 	var status: SMAppService.Status
 	private let statusAfterRegister: SMAppService.Status
 	private let registrationError: Error?
+	private let unregistrationError: Error?
 	private(set) var registerCalls = 0
+	private(set) var unregisterCalls = 0
 
 	/// Creates one scripted status transition or registration error.
 	init(
 		status: SMAppService.Status = .notRegistered,
 		statusAfterRegister: SMAppService.Status = .enabled,
-		registrationError: Error? = nil
+		registrationError: Error? = nil,
+		unregistrationError: Error? = nil
 	) {
 		self.status = status
 		self.statusAfterRegister = statusAfterRegister
 		self.registrationError = registrationError
+		self.unregistrationError = unregistrationError
 	}
 
 	/// Records registration and applies the configured result.
@@ -305,6 +309,13 @@ private final class ScriptedModernGuardianService: RemapGuardianModernService {
 		registerCalls += 1
 		if let registrationError { throw registrationError }
 		status = statusAfterRegister
+	}
+
+	/// Records removal of a stale record.
+	func unregister() throws {
+		unregisterCalls += 1
+		if let unregistrationError { throw unregistrationError }
+		status = .notRegistered
 	}
 }
 
@@ -329,7 +340,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 
 	/// Creates one unlocked durable record as if every private worker was killed.
 	private func makeAbandonedGuardianRecord(
-		token: String
+		token: String,
+		runtime: LeaseRuntime = .shared
 	) throws -> (home: URL, paths: LeaseGuardianPaths, record: LeaseGuardianRecord) {
 		let home = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
 			.appendingPathComponent("ergopti-guardian-\(UUID().uuidString)", isDirectory: true)
@@ -348,7 +360,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			token: token,
 			nonce: "ffeeddccbbaa99887766554433221100",
 			ownerPID: getpid(),
-			state: .live
+			state: .live,
+			runtime: runtime
 		)
 		try XCTUnwrap(record.encoded).write(
 			to: URL(fileURLWithPath: paths.recordPath(token: token))
@@ -828,6 +841,57 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 	/// A service reported `.notFound` (e.g. after an app update replaced the
 	/// bundle) gets the same single registration attempt as `.notRegistered`,
 	/// including the exact invalid-signature fallback, and nothing more.
+	/// An enabled record whose guardian is not healthy (launchd keeps it after
+	/// an ad hoc rebuild and refuses to spawn it, exit 78) is replaced once and
+	/// then takes the ordinary attempt, including the invalid-signature legacy
+	/// fallback; a healthy enabled record is never touched.
+	func testModernGuardianRegistrationReplacesAStaleEnabledRecordOnce() throws {
+		guard #available(macOS 13.0, *) else { return }
+		let healthy = ScriptedModernGuardianService(status: .enabled)
+		XCTAssertEqual(resolveModernRemapGuardianRegistration(
+			service: healthy,
+			guardianHealth: { true },
+			legacyInvalidSignatureFallback: { XCTFail("healthy record"); return false }
+		), .ready)
+		XCTAssertEqual(healthy.unregisterCalls, 0)
+		XCTAssertEqual(healthy.registerCalls, 0)
+
+		let stale = ScriptedModernGuardianService(
+			status: .enabled,
+			registrationError: NSError(
+				domain: kRemapGuardianServiceErrorDomain,
+				code: kSMErrorInvalidSignature
+			)
+		)
+		var lines: [String] = []
+		var legacyCalls = 0
+		XCTAssertEqual(resolveModernRemapGuardianRegistration(
+			service: stale,
+			guardianHealth: { false },
+			legacyInvalidSignatureFallback: {
+				legacyCalls += 1
+				return true
+			},
+			report: { lines.append($0) }
+		), .ready)
+		XCTAssertEqual(stale.unregisterCalls, 1)
+		XCTAssertEqual(stale.registerCalls, 1)
+		XCTAssertEqual(legacyCalls, 1)
+		XCTAssertTrue(lines.contains("remap guardian Background Items status: enabled"), "\(lines)")
+		XCTAssertTrue(lines.contains { $0.contains("stale remap guardian record removed") }, "\(lines)")
+
+		let stuck = ScriptedModernGuardianService(
+			status: .enabled,
+			unregistrationError: NSError(domain: kRemapGuardianServiceErrorDomain, code: 1)
+		)
+		XCTAssertEqual(resolveModernRemapGuardianRegistration(
+			service: stuck,
+			guardianHealth: { false },
+			legacyInvalidSignatureFallback: { XCTFail("no removal, no fallback"); return true }
+		), .unavailable)
+		XCTAssertEqual(stuck.registerCalls, 0)
+	}
+
 	func testModernGuardianRegistrationRetriesNotFoundOnce() throws {
 		guard #available(macOS 13.0, *) else { return }
 		let registered = ScriptedModernGuardianService(
@@ -894,6 +958,80 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			legacyInvalidSignatureFallback: { true }
 		), .unavailable)
 		XCTAssertEqual(stillMissing.registerCalls, 1, "registration is attempted once, never looped")
+	}
+
+	/// A developer build (issue #104) is ad hoc signed and shares the installed
+	/// app's bundle identifier, so Background Items can answer it with a stale
+	/// enabled record, an agent left unregistered or a non-signature error. Each
+	/// left its remaps inert with no named cause; it now takes its own legacy
+	/// agent, while denial and approval stay fail-closed and a release keeps
+	/// its exact invalid-signature-only policy.
+	func testDeveloperBuildTakesTheLegacyAgentForEveryNonUserOutcome() throws {
+		guard #available(macOS 13.0, *) else { return }
+		let authorizationFailure = NSError(
+			domain: kRemapGuardianServiceErrorDomain,
+			code: kSMErrorAuthorizationFailure
+		)
+		// Fresh scripted services per run: registration mutates their status.
+		let outcomes: [() -> ScriptedModernGuardianService] = [
+			{ ScriptedModernGuardianService(status: .enabled) },
+			{ ScriptedModernGuardianService(status: .notFound, statusAfterRegister: .notFound) },
+			{ ScriptedModernGuardianService(registrationError: authorizationFailure) },
+			// The stale-record replacement runs first; its refused removal is not a user decision.
+			{ ScriptedModernGuardianService(status: .enabled, unregistrationError: authorizationFailure) },
+		]
+		for makeService in outcomes {
+			for developerBuild in [true, false] {
+				var legacyCalls = 0
+				var logged: [String] = []
+				let result = resolveModernRemapGuardianRegistration(
+					service: makeService(),
+					guardianHealth: { false },
+					legacyInvalidSignatureFallback: {
+						legacyCalls += 1
+						return true
+					},
+					developerBuild: developerBuild,
+					report: { logged.append($0) }
+				)
+				let fallbacks = logged.filter { $0.hasPrefix("developer build: ") }
+				if developerBuild {
+					XCTAssertEqual(result, .ready)
+					XCTAssertEqual(legacyCalls, 1)
+					XCTAssertEqual(fallbacks.count, 1, "the developer fallback names its cause: \(logged)")
+				} else {
+					XCTAssertEqual(result, .unavailable)
+					XCTAssertEqual(legacyCalls, 0, "a release keeps its fail-closed policy")
+					XCTAssertTrue(fallbacks.isEmpty)
+				}
+			}
+		}
+
+		var deniedLegacyCalls = 0
+		XCTAssertEqual(resolveModernRemapGuardianRegistration(
+			service: ScriptedModernGuardianService(registrationError: NSError(
+				domain: kRemapGuardianServiceErrorDomain,
+				code: kSMErrorLaunchDeniedByUser
+			)),
+			guardianHealth: { true },
+			legacyInvalidSignatureFallback: {
+				deniedLegacyCalls += 1
+				return true
+			},
+			developerBuild: true
+		), .requiresApproval)
+		XCTAssertEqual(deniedLegacyCalls, 0, "a user denial never bootstraps around Background Items")
+		var approvalLegacyCalls = 0
+		XCTAssertEqual(resolveModernRemapGuardianRegistration(
+			service: ScriptedModernGuardianService(status: .requiresApproval),
+			guardianHealth: { true },
+			legacyInvalidSignatureFallback: {
+				approvalLegacyCalls += 1
+				return true
+			},
+			developerBuild: true
+		), .requiresApproval)
+		XCTAssertEqual(approvalLegacyCalls, 0)
 	}
 
 	/// Runtime observation is read-only and requires both eligibility and health.
@@ -2939,6 +3077,137 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 				role: .inner
 			))
 		}
+	}
+
+	/// Proves every lease role also admits the owned runtime's command line tool.
+	func testEveryRoleAdmitsTheOwnedRuntimeEndpointAndNamesItsRuntime() {
+		XCTAssertEqual(
+			kOwnedKarabinerCLIPath,
+			"/Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli",
+			"the Lua owner (ke_paths.lua) must name this exact tool"
+		)
+		let roles: [(LeaseInvocationRole, String, [String])] = [
+			(.worker, kKarabinerLeaseWorkerFlag, ["1", "5"]),
+			(.revoke, kKarabinerLeaseRevokeFlag, []),
+			(.inner, kKarabinerLeaseInnerFlag, ["5", "123", "456"]),
+		]
+		for (role, flag, suffix) in roles {
+			for runtime in LeaseRuntime.allCases {
+				let arguments = [
+					"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+					flag,
+					runtime.cliPath,
+					"ergopti_mode_\(token)",
+					"ergopti_revoked_\(token)",
+				] + suffix
+				let identity = LeaseIdentity.parse(arguments: arguments, role: role)
+				XCTAssertEqual(identity?.cliPath, runtime.cliPath)
+				XCTAssertEqual(
+					identity?.runtime,
+					runtime,
+					"\(flag) must bind the lease to the runtime its endpoint names"
+				)
+			}
+		}
+	}
+
+	/// Proves the owned runtime's other binaries and look-alike paths are refused.
+	func testIdentityRejectsEveryOwnedRuntimeExecutableExceptItsCLI() {
+		let runtimeDirectory = "/Library/Application Support/ErgoptiPlus/Runtime/"
+		let forbiddenPaths = [
+			runtimeDirectory + "ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core",
+			runtimeDirectory
+				+ "ErgoptiPlus-Remap-Console.app/Contents/MacOS/ErgoptiPlus-Remap-Console",
+			runtimeDirectory + "bin/ergoptiplus_remap_cli ",
+			runtimeDirectory + "bin/../bin/ergoptiplus_remap_cli",
+			runtimeDirectory + "bin/ergoptiplus_remap_cli\u{0}",
+			"/Library/Application Support/ErgoptiPlus/bin/ergoptiplus_remap_cli",
+			"~/Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli",
+			"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+		]
+		for forbiddenPath in forbiddenPaths {
+			let arguments = [
+				"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+				kKarabinerLeaseWorkerFlag,
+				forbiddenPath,
+				"ergopti_mode_\(token)",
+				"ergopti_revoked_\(token)",
+				"1",
+				"5",
+			]
+			XCTAssertNil(
+				LeaseIdentity.parse(arguments: arguments, role: .worker),
+				"\(forbiddenPath) must not become a lease CLI child"
+			)
+		}
+		XCTAssertNil(LeaseRuntime.named(by: "/usr/bin/true"))
+	}
+
+	/// Proves the guardian record names its runtime and nothing else.
+	func testGuardianRecordRoundTripsItsRuntimeAndRefusesAnyOtherText() throws {
+		let nonce = "ffeeddccbbaa99887766554433221100"
+		for runtime in LeaseRuntime.allCases {
+			let record = LeaseGuardianRecord(
+				token: token,
+				nonce: nonce,
+				ownerPID: 4242,
+				state: .live,
+				runtime: runtime
+			)
+			let encoded = try XCTUnwrap(record.encoded)
+			XCTAssertEqual(LeaseGuardianRecord.parse(encoded), record)
+			XCTAssertEqual(LeaseGuardianRecord.parse(encoded)?.runtime, runtime)
+		}
+		XCTAssertEqual(
+			LeaseGuardianRecord(token: token, nonce: nonce, ownerPID: 4242, state: .live).runtime,
+			.shared,
+			"a record created without a runtime keeps the shared one"
+		)
+		let valid = try XCTUnwrap(LeaseGuardianRecord(
+			token: token,
+			nonce: nonce,
+			ownerPID: 4242,
+			state: .live,
+			runtime: .owned
+		).encoded)
+		let text = try XCTUnwrap(String(data: valid, encoding: .utf8))
+		for replacement in ["/tmp/karabiner_cli", "", "Owned", "shared owned"] {
+			let forged = text.replacingOccurrences(of: "\nowned\n", with: "\n\(replacement)\n")
+			XCTAssertNil(
+				LeaseGuardianRecord.parse(Data(forged.utf8)),
+				"a record may name only a runtime, never \(replacement.isEmpty ? "nothing" : replacement)"
+			)
+		}
+		let legacy = text.replacingOccurrences(of: "\nowned\n", with: "\n")
+		XCTAssertNil(
+			LeaseGuardianRecord.parse(Data(legacy.utf8)),
+			"a record without its runtime line is not canonical"
+		)
+	}
+
+	/// Proves an abandoned owned-runtime lease is fenced through the owned tool,
+	/// never through the shared one, which may not even be installed.
+	func testGuardianFencesAnAbandonedOwnedRuntimeRecordThroughTheOwnedEndpoint() throws {
+		let fixture = try makeAbandonedGuardianRecord(token: token, runtime: .owned)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: executor,
+			cliPath: "/shared/stand-in/karabiner_cli",
+			ownedCLIPath: "/owned/stand-in/ergoptiplus_remap_cli",
+			terminateProcess: failUnexpectedGuardianTermination
+		)
+		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
+		XCTAssertTrue(executor.waitForRepeatedFence(timeout: 2))
+
+		let snapshot = executor.snapshot()
+		XCTAssertEqual(
+			snapshot.paths,
+			["/owned/stand-in/ergoptiplus_remap_cli", "/owned/stand-in/ergoptiplus_remap_cli"],
+			"an owned-runtime lease must never be revoked through the shared tool"
+		)
+		runtime = nil
 	}
 
 	/// Proves no shared stock Karabiner executable can cross the CLI boundary.

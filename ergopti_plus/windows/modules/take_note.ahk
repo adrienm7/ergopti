@@ -231,7 +231,7 @@ _TakeNoteExpire(JobId, Job) {
 _TakeNoteReschedule(JobId, Job) {
 	global TAKE_NOTE_POLL_INTERVAL_MS
 	Ops := Job["ops"]
-	if TickExpired(Job["started_tick"], Job["timeout_ms"], Ops.NowTick()) {
+	if TickExpired64(Job["started_tick"], Job["timeout_ms"], Ops.NowTick()) {
 		_TakeNoteExpire(JobId, Job)
 		return false
 	}
@@ -250,7 +250,7 @@ _TakeNoteAbortIfUnavailable(JobId, Job) {
 		_TakeNoteFinish(JobId)
 		return true
 	}
-	if TickExpired(Job["started_tick"], Job["timeout_ms"], Ops.NowTick()) {
+	if TickExpired64(Job["started_tick"], Job["timeout_ms"], Ops.NowTick()) {
 		_TakeNoteExpire(JobId, Job)
 		return true
 	}

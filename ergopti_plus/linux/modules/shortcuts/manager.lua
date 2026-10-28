@@ -32,6 +32,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local Paths  = require("infra.paths")
@@ -48,10 +49,11 @@ local EvdevCodes = require("infra.evdev_codes")
 local Monotonic = require("infra.monotonic")
 local CapsWordPolicy = require("caps_word.auto_off")
 local CapsWordAutoOff = require("modules.shortcuts.caps_word_auto_off")
+local ConfigKeys = require("config_keys")
 local LOG = "modules.shortcuts.manager"
 local _configuration_owner = nil
 local _capture_text_owner = nil
-local ENABLED_PATH = "shortcuts.enabled"
+local ENABLED_PATH = ConfigKeys.KEY.SHORTCUTS_ENABLED
 
 -- The send_text / send_key / send_shortcut vocabulary, read on first use.
 local SEND_KEYS_REL_PATH = "modules/actions/send_keys.json"
@@ -130,15 +132,15 @@ end
 --- reason a shortcut does not run.
 --- @param key string Stable action name; the dashboard groups by it.
 local function record(key)
-	local ok, keylogger = pcall(require, "modules.keylogger.keylogger")
-	if not ok or type(keylogger.record_shortcut) ~= "function" then return end
+	local ok, keystats = pcall(require, "modules.keystats.keystats")
+	if not ok or type(keystats.record_shortcut) ~= "function" then return end
 	local app = "unknown"
 	local ok_win, WindowInfo = pcall(require, "adapters.window_info")
 	if ok_win and type(WindowInfo.focused_app_id) == "function" then
 		local ok_id, id = pcall(WindowInfo.focused_app_id)
 		if ok_id and type(id) == "string" and id ~= "" then app = id end
 	end
-	pcall(keylogger.record_shortcut, app, key)
+	pcall(keystats.record_shortcut, app, key)
 end
 
 -- =========================================
@@ -227,9 +229,7 @@ local function load_wrap_pairs()
 		end
 	end
 
-	local count = 0
-	for _ in pairs(lookup) do count = count + 1 end
-	Logger.info(LOG, "Wrap-symbol catalogue loaded from shared SSoT (%d lookup key(s)).", count)
+	Logger.info(LOG, "Wrap-symbol catalogue loaded from shared SSoT (%d lookup key(s)).", TableUtil.count(lookup))
 
 	wrap_source = { path = path, content = original_content, pairs = copy_wrap_pairs(lookup) }
 	return lookup, ordered
@@ -314,8 +314,9 @@ end
 --- level and falls back to the clipboard.
 --- @param kind string "key" or "shortcut".
 --- @param parsed table A parse from parse_send_input.
+--- @param publication table|nil Retained destination for a printable key.
 --- @return boolean True when the input was sent.
-local function send_keystroke(kind, parsed)
+local function send_keystroke(kind, parsed, publication)
 	local vocabulary = M.send_vocabulary()
 	local mod_codes, held = {}, {}
 	local function hold(code)
@@ -332,7 +333,7 @@ local function send_keystroke(kind, parsed)
 			{ SendInput.entry(vocabulary, "keys", parsed.named).linux }, parsed.canonical)
 	end
 	if kind == "key" then
-		local result = Injector.inject(0, parsed.char, false)
+		local result = Injector.inject(0, parsed.char, false, nil, publication)
 		return type(result) == "table" and result.ok == true
 	end
 	local ok_layout, Layout = pcall(require, "adapters.keyboard_layout")
@@ -617,17 +618,21 @@ end
 --- of the word instead of the word.
 function M.select_word()
 	if _configuration_owner ~= nil then return false end
+	local publication = capture_text_destination()
+	if not publication then Logger.warn(LOG, "Word selection refused: no retained text destination."); return false end
 	record("select_word")
-	if not ComboEmitter.press("ctrl+Right") then return false end
-	return ComboEmitter.press("ctrl+shift+Left")
+	if not ComboEmitter.press("ctrl+Right", publication) then return false end
+	return ComboEmitter.press("ctrl+shift+Left", publication)
 end
 
 --- Selects the entire current line (Home, Shift+End).
 function M.select_line()
 	if _configuration_owner ~= nil then return false end
+	local publication = capture_text_destination()
+	if not publication then Logger.warn(LOG, "Line selection refused: no retained text destination."); return false end
 	record("select_line")
-	if not ComboEmitter.press("Home") then return false end
-	return ComboEmitter.press("shift+End")
+	if not ComboEmitter.press("Home", publication) then return false end
+	return ComboEmitter.press("shift+End", publication)
 end
 
 --- Wraps the current line in parentheses: Home, "(", End, ")", Home, the
@@ -635,26 +640,30 @@ end
 --- @return boolean True when every step was emitted.
 function M.surround_line_with_parens()
 	if _configuration_owner ~= nil then return false end
+	local publication = capture_text_destination()
+	if not publication then Logger.warn(LOG, "Line wrapping refused: no retained text destination."); return false end
 	record("surround_parens")
 	local function typed(text)
-		local result = Injector.inject(0, text, false)
+		local result = Injector.inject(0, text, false, nil, publication)
 		return type(result) == "table" and result.ok == true
 	end
-	return ComboEmitter.press("Home") and typed("(")
-		and ComboEmitter.press("End") and typed(")")
-		and ComboEmitter.press("Home")
+	return ComboEmitter.press("Home", publication) and typed("(")
+		and ComboEmitter.press("End", publication) and typed(")")
+		and ComboEmitter.press("Home", publication)
 end
 
 --- Pastes clipboard content as plain text (strips formatting).
 function M.paste_plain()
 	if _configuration_owner ~= nil then return false end
+	local publication = capture_text_destination()
+	if not publication then Logger.warn(LOG, "Plain-text paste refused: no retained text destination."); return false end
 	record("paste_plain")
 	local ok, text, reason = Clipboard.read_checked()
 	if not ok or text == "" then
 		Logger.warn(LOG, "Plain-text paste failed: %s.", tostring(reason or "clipboard is empty"))
 		return false
 	end
-	local result = Injector.inject(0, text, false)
+	local result = Injector.inject(0, text, false, nil, publication)
 	return type(result) == "table" and result.ok == true
 end
 
@@ -664,6 +673,9 @@ end
 --- of a second copy in the gesture layer.
 --- @return table { [action_id] = function(binding, parameter): boolean }
 function M.action_handlers()
+	-- Resolve the strict vocabulary at construction, before a live key asks
+	-- the pure parser whether this is text or an intentional named command.
+	local key_vocabulary = M.send_vocabulary()
 	return {
 		-- A key, a key combination, a tap-hold or a gesture bound to CapsWord
 		-- toggles the session the tray row shows, as Windows' ToggleCapsWord.
@@ -672,23 +684,30 @@ function M.action_handlers()
 		["select_word"] = function() return M.select_word() end,
 		["paste_plain"] = function() return M.paste_plain() end,
 		["surround_parens"] = function() return M.surround_line_with_parens() end,
-		["uppercase_selection"] = function() return M.transform_uppercase() end,
-		["titlecase_selection"] = function() return M.transform_titlecase() end,
+		[ConfigKeys.COMMAND.UPPERCASE_SELECTION] = function() return M.transform_uppercase() end,
+		[ConfigKeys.COMMAND.TITLECASE_SELECTION] = function() return M.transform_titlecase() end,
 		["selection_uppercase"] = function() return M.transform_to_uppercase() end,
-		["selection_lowercase"] = function() return M.transform_lowercase() end,
+		[ConfigKeys.COMMAND.SELECTION_LOWERCASE] = function() return M.transform_lowercase() end,
 		["selection_titlecase"] = function() return M.transform_to_titlecase() end,
 		-- The value is the binding's own parameter, validated by the executor.
 		["send_text"] = function(_, parameter)
+			local publication = capture_text_destination()
 			record("send_text")
+			if not publication then Logger.warn(LOG, "Text insertion refused: no retained text destination."); return false end
 			local parsed = M.parse_send_input("text", parameter)
 			if not parsed then return false end
-			local result = Injector.inject(0, parsed.text, false)
+			local result = Injector.inject(0, parsed.text, false, nil, publication)
 			return type(result) == "table" and result.ok == true
 		end,
 		["send_key"] = function(_, parameter)
+			local parsed = SendInput.parse_key(parameter, key_vocabulary)
+			local publication
+			if parsed and not parsed.named then publication = capture_text_destination() end
 			record("send_key")
-			local parsed = M.parse_send_input("key", parameter)
-			return parsed ~= nil and send_keystroke("key", parsed)
+			if parsed and not parsed.named and not publication then
+				Logger.warn(LOG, "Character insertion refused: no retained text destination."); return false
+			end
+			return parsed ~= nil and send_keystroke("key", parsed, publication)
 		end,
 		["send_shortcut"] = function(_, parameter)
 			record("send_shortcut")
@@ -775,7 +794,7 @@ function M.toggle()
 end
 
 -- The wrap-on-type switch (shortcuts.wrap_text_if_selected).
-local WRAP_ON_TYPE_KEY = "wrap_text_if_selected"
+local WRAP_ON_TYPE_KEY = ConfigKeys.LEAF.WRAP_TEXT_IF_SELECTED
 local DEFAULT_WRAP_ON_TYPE = Manifest.default_for(CONFIG_SECTION .. "." .. WRAP_ON_TYPE_KEY)
 if type(DEFAULT_WRAP_ON_TYPE) ~= "boolean" then
 	error("The manifest default for shortcuts." .. WRAP_ON_TYPE_KEY .. " must be a boolean.")

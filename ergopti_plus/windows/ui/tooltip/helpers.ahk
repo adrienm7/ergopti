@@ -243,7 +243,7 @@ _TooltipFilterUnexpiredDeadlineItems(Items, NowTick?) {
 		LiveItems := []
 		for , Item in Items {
 			if (_TooltipItemHasAbsoluteDeadline(Item)
-				and TickExpired(Item.ExpireOriginTick, Item.ExpireDurationMs, NowTick))
+				and TickExpired64(Item.ExpireOriginTick, Item.ExpireDurationMs, NowTick))
 				continue
 			LiveItems.Push(Item)
 		}
@@ -255,7 +255,7 @@ _TooltipAbsoluteDeadlinesStillLive(Items, NowTick?) {
 			NowTick := A_TickCount
 		for , Item in Items {
 			if (_TooltipItemHasAbsoluteDeadline(Item)
-				and TickExpired(Item.ExpireOriginTick, Item.ExpireDurationMs, NowTick))
+				and TickExpired64(Item.ExpireOriginTick, Item.ExpireDurationMs, NowTick))
 				return false
 		}
 		return true
@@ -353,7 +353,7 @@ _TooltipLifecycleDeadlineBounds(Plan, NowTick?) {
 		if !IsObject(Plan) or !Plan.HasOwnProp("DeadlineItems")
 			return Bounds
 		for , Item in Plan.DeadlineItems {
-			Remaining := TickRemaining(
+			Remaining := TickRemaining64(
 				Item.ExpireOriginTick, Item.ExpireDurationMs, NowTick)
 			if (Remaining <= 0) {
 				Bounds.Expired := true
@@ -1587,7 +1587,8 @@ _TooltipUiaProcessIsHostile(ProcName) {
 		if (ProcName == "" or !_TooltipUiaHostileCache.Has(ProcName))
 				return false
 		Entry := _TooltipUiaHostileCache[ProcName]
-		if !TickExpired(Entry.Tick, Entry.DurationMs)
+		; Hostile entries retain the full native A_TickCount clock.
+		if !TickExpired64(Entry.Tick, Entry.DurationMs)
 				return true
 		_TooltipUiaHostileCache.Delete(ProcName)
 		return false

@@ -7,6 +7,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+-- Stateless generated constants every owner now reads; loaded before any snapshot so they are
+-- not mistaken for residue of the fixture under test.
+require("config_keys")
 local Fixture = require("tests.support.gesture_actions_fixture")
 
 local function snapshot()
@@ -38,8 +41,8 @@ helpers.describe("Gesture actions fixture ownership", function()
 					if initial == "existing" then sentinel = {} end
 					for _, name in ipairs({ "modules.gestures.actions", "infra.notifications",
 						"adapters.timer_scheduler", "_generated.gesture_emit_actions",
-						"_generated.action_catalogue", "config_binding_identity", "tap_hold.key_combinations", "config_binding_publication", "config_keyboard_publication", "hs", "hs.timer",
-						"llm.translate", "toml_codec.record_scanner", "ui.menu.gesture_fixture_unrelated" }) do
+						"_generated.action_catalogue", "config_binding_identity", "tap_hold.key_combinations", "config_binding_publication", "config_keyboard_publication", "identifiers", "hs", "hs.timer",
+						"llm.translate", "manifest_reader", "timings", "toml_codec.record_scanner", "ui.menu.gesture_fixture_unrelated" }) do
 						package.loaded[name] = sentinel
 					end
 					_G.hs = sentinel
@@ -82,7 +85,7 @@ helpers.describe("Gesture actions fixture ownership", function()
 						local catalogue = { prefix = "", slots = { tap_3 = true } }
 						helpers.assert_eq(identity.gesture_binding_fits("tap_3", catalogue), true)
 						helpers.assert_eq(identity.gesture_binding_fits("removed_slot", catalogue), false)
-						helpers.assert_nil(identity.gesture_binding_fits("keyboard__cmd_1", catalogue))
+						helpers.assert_nil(identity.gesture_binding_fits("keyboard__primary_1", catalogue))
 						constructions = constructions + 1
 						if mode == "construction failure" then error(marker, 0) end
 						return result

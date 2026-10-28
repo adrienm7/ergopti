@@ -13,11 +13,11 @@ local helpers, Sandbox, Codec, Manifest, SOURCE, with_scope, with_collision_scop
 helpers.describe("shortcut retained native release debt", function()
 	local expected = {
 		shortcuts = { enabled = true, wrap_text_if_selected = true, chatgpt_url = "https://old.example", unknown = "keep",
-			keyboard = { ctrl_j = "open_url", ctrl_k = "enter", ctrl_p = "script_reload", foreign_slot = "keep" },
+			keyboard = { primary_j = "open_url", primary_k = "enter", primary_p = "script_reload", foreign_slot = "keep" },
 			tap_keys = { number_row_left = "send_text", unknown = "keep" } },
-		gesture_parameters = { keyboard__ctrl_j__open_url = "https://old.example", tap_key__number_row_left__send_text = "typed",
+		gesture_parameters = { keyboard__primary_j__open_url = "https://old.example", tap_key__number_row_left__send_text = "typed",
 			tap_3__open_url = "https://gesture.example", tap_hold__caps_lock__open_url = "https://hold.example", unknown = "keep" },
-		linux = { action_parameters = { keyboard__ctrl_k__open_url = "https://legacy.example", unknown = "keep" } },
+		linux = { action_parameters = { keyboard__primary_k__open_url = "https://legacy.example", unknown = "keep" } },
 		gestures = { enabled = false, tap_3 = "enter" }, metrics = { enabled = true }, llm = { enabled = true }, other = { value = 42 },
 	}
 	local receipts = {
@@ -80,9 +80,9 @@ helpers.describe("shortcut retained native release debt", function()
 					helpers.assert_eq(scope.pending(), false)
 					helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)), expected)
 					helpers.assert_eq(owners.manager.is_enabled(), true)
-					helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "open_url")
+					helpers.assert_eq(owners.keyboard.get_action("primary_j"), "open_url")
 					helpers.assert_eq(owners.taps.get_action("number_row_left"), "send_text")
-					helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__ctrl_j", "open_url"), "https://old.example")
+					helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__primary_j", "open_url"), "https://old.example")
 					helpers.assert_eq(next(live), nil)
 				end)
 			end)
@@ -138,7 +138,7 @@ helpers.describe("shortcut retained native release debt", function()
 			helpers.assert_eq(scope.apply("clear"), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
 			helpers.assert_eq(scope.pending(), true)
-			helpers.assert_eq(owners.keyboard.set_action("ctrl_j", "none"), false)
+			helpers.assert_eq(owners.keyboard.set_action("primary_j", "none"), false)
 			unblock()
 			helpers.assert_eq(scope.retry_restore(), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
@@ -167,7 +167,7 @@ helpers.describe("shortcut retained native release debt", function()
 			faults.reacquire = nil
 			helpers.assert_eq(scope.retry_restore(), true)
 			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)), expected)
-			helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "open_url")
+			helpers.assert_eq(owners.keyboard.get_action("primary_j"), "open_url")
 			helpers.assert_eq(next(live), nil)
 		end)
 	end)
@@ -254,14 +254,14 @@ helpers.describe("Linux ordinary obsolete shortcut parent policy", function()
 			local source = '[shortcuts]\nenabled = true\nkeyboard = "legacy"\ntap_keys = ["legacy"]\n[future]\nkeep = 7\n'
 			with_scope(function(_, owners, controls, path)
 				local accepted
-				if owner == "keyboard" then accepted = owners.keyboard.set_action("ctrl_j", "send_text")
+				if owner == "keyboard" then accepted = owners.keyboard.set_action("primary_j", "send_text")
 				else accepted = owners.taps.set_action("number_row_left", "send_text") end
 				helpers.assert_eq(accepted, false)
 				helpers.assert_eq(Sandbox.read_bytes(path), source)
 				helpers.assert_eq(#controls.backups, 0)
 				helpers.assert_eq(controls.runtime_calls, 0)
 				helpers.assert_eq(controls.device_calls, 0)
-				helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "none")
+				helpers.assert_eq(owners.keyboard.get_action("primary_j"), "none")
 				helpers.assert_eq(owners.taps.get_action("number_row_left"), "none")
 			end, source)
 		end)
@@ -365,14 +365,14 @@ end)
 helpers.describe("Linux shortcut scope canonical parameter admission", function()
 	helpers.it("refuses a live canonical parameter replacement without inventing a runtime reload", function()
 		with_scope(function(scope, owners, controls, path)
-			local foreign = SOURCE:gsub('keyboard__ctrl_j__open_url = "https://old.example"',
-				'keyboard__ctrl_j__open_url = "https://foreign.example"')
+			local foreign = SOURCE:gsub('keyboard__primary_j__open_url = "https://old.example"',
+				'keyboard__primary_j__open_url = "https://foreign.example"')
 			Sandbox.write_bytes(path, foreign)
 			helpers.assert_eq(scope.apply("clear"), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
 			helpers.assert_eq(#controls.backups, 0)
 			helpers.assert_eq(controls.runtime_calls, 0)
-			helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__ctrl_j", "open_url"), "https://old.example")
+			helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__primary_j", "open_url"), "https://old.example")
 		end)
 	end)
 end)
@@ -423,8 +423,8 @@ end)
 
 helpers.describe("Linux physical edit four-owner collision preflight", function()
 	for _, case in ipairs({
-		{ name = "ordinary logical binding", source = COLLISION_BASE .. 'ctrl_j = "copy"\n', key = "physical_ctrl_KeyJ", tap = NO_TAP_HOLDS },
-		{ name = "ordinary native None reservation", source = COLLISION_BASE .. 'ctrl_j = "none"\n', key = "physical_ctrl_KeyJ", tap = NO_TAP_HOLDS },
+		{ name = "ordinary logical binding", source = COLLISION_BASE .. 'primary_j = "copy"\n', key = "physical_ctrl_KeyJ", tap = NO_TAP_HOLDS },
+		{ name = "ordinary native None reservation", source = COLLISION_BASE .. 'primary_j = "none"\n', key = "physical_ctrl_KeyJ", tap = NO_TAP_HOLDS },
 		{ name = "plain tap key", source = COLLISION_BASE .. '[shortcuts.tap_keys]\nnumber_row_left = "copy"\n', key = "physical_none_Backquote", tap = NO_TAP_HOLDS },
 		{ name = "ordered combination", source = COLLISION_BASE .. '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "copy"\n', key = "physical_none_Tab", tap = NO_TAP_HOLDS },
 		{ name = "simultaneous combination", source = COLLISION_BASE .. '[mod_combos]\nenabled = true\nsimultaneous_threshold_ms = 50\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n', key = "physical_none_Tab", chord = "tab_then_caps_lock", tap = NO_TAP_HOLDS },
@@ -444,7 +444,7 @@ helpers.describe("Linux physical edit four-owner collision preflight", function(
 		end)
 	end
 	helpers.it("four-family preflight with no known collision does not grant native delivery", function()
-		with_collision_scope(COLLISION_BASE .. 'ctrl_j = "copy"\n', NO_TAP_HOLDS, function(scope, _, controls, path)
+		with_collision_scope(COLLISION_BASE .. 'primary_j = "copy"\n', NO_TAP_HOLDS, function(scope, _, controls, path)
 			local before = Sandbox.read_bytes(path)
 			-- The partial native model withdraws readiness at the source observation.
 			controls.on_source = function() controls.delivery_available = false end
@@ -456,7 +456,7 @@ helpers.describe("Linux physical edit four-owner collision preflight", function(
 	end)
 	for _, boundary in ipairs({ "source", "tap owner", "paused Manager", "held owner" }) do
 		helpers.it("refuses " .. boundary .. " revocation during the original map observation", function()
-			with_collision_scope(COLLISION_BASE .. 'ctrl_j = "copy"\n', NO_TAP_HOLDS, function(scope, owners, controls, path, Manager)
+			with_collision_scope(COLLISION_BASE .. 'primary_j = "copy"\n', NO_TAP_HOLDS, function(scope, owners, controls, path, Manager)
 				local once, token, original = false, {}, owners.taps.capture_collision_inventory
 				controls.on_source = function()
 					if once then return end; once = true

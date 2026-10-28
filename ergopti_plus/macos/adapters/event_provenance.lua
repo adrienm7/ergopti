@@ -13,7 +13,7 @@
 --- 1. Explicit Ownership: Untagged/unknown events remain foreign even when their
 ---    Quartz source PID is the current Hammerspoon process.
 --- 2. Independent Consumers: Each live tag is deduplicated separately for
----    keymap, keylogger, and any future loopback consumer.
+---    keymap, keystats, and any future loopback consumer.
 --- 3. Fail-safe Reads: A malformed user-data accessor is logged once and fails
 ---    closed; a missing PID only removes diagnostics from an otherwise known tag.
 --- ==============================================================================
@@ -189,7 +189,7 @@ function M.classify_with_fence(event, consumer_id)
 	if status == M.STATUS_OWNED then
 		-- A fenced physical replay carries an Ergopti tag solely to prevent a
 		-- second fence. Every consumer must otherwise process it exactly like the
-		-- original human event, including keylogger and shortcut taps.
+		-- original human event, including keystats and shortcut taps.
 		if metadata.physical_replay == true then
 			return nil, M.STATUS_FOREIGN, nil, true
 		end

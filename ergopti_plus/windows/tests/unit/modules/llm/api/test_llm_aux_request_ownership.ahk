@@ -210,6 +210,7 @@ _LAO_StaleCurlOwnerReleasesExactProcessHandle() {
 			State["terminate_calls"] += 1,
 			State["terminated_handle"] := Handle,
 			true),
+		"wait_process", (*) => 0,
 		"close_process", (Handle) => (
 			State["close_calls"] += 1,
 			State["closed_handle"] := Handle,

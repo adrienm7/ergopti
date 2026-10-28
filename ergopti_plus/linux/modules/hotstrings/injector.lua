@@ -34,7 +34,9 @@ local M = {}
 -- =========================================
 -- =========================================
 
+local Errors = require("adapter_errors")
 local Logger = require("logger.shim")
+local Perf = require("infra.perf_counters")
 local EvdevCodes = require("infra.evdev_codes")
 local KeyboardLayout = require("adapters.keyboard_layout")
 local layout_plan, layout_plan_current, layout_plan_view = KeyboardLayout.plan, KeyboardLayout.plan_current, KeyboardLayout.plan_view
@@ -271,7 +273,7 @@ local function send_text_native(tx, text, prepared)
 			for _, mod in ipairs(step.mods) do
 				press(MODIFIER_CODES[mod], "layout modifier down")
 			end
-			press(step.keycode, "replacement key down")
+			press(step.keycode, Errors.REPLACEMENT_KEY_DOWN)
 			must_emit(tx, step.keycode, EVDEV_VALUE_UP, "replacement key up")
 			-- Released in reverse, and always: a modifier left held after an
 			-- interrupted injection turns every subsequent keystroke into a shortcut.
@@ -281,7 +283,7 @@ local function send_text_native(tx, text, prepared)
 		end
 	end)
 	if caps then
-		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_DOWN, "capslock restore down")
+		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_DOWN, Errors.CAPSLOCK_RESTORE_DOWN)
 		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_UP, "capslock restore up")
 	end
 	if not ok_typed then error(typed_err, 0) end
@@ -409,7 +411,7 @@ require_publication = function(publication, cached)
 	if publication == nil then return end
 	local check = cached and publication.cached or publication.current
 	local ok, current = pcall(check)
-	if not ok or current ~= true then error("programmable publication is no longer current", 0) end
+	if not ok or current ~= true then error(Errors.PROGRAMMABLE_PUBLICATION_STALE, 0) end
 end
 
 --- Captures one original output and API set before any planning callback.
@@ -610,24 +612,30 @@ local function run_transaction(label, body, publication, prepared, data_attempt)
 		if not checked then return { ok = false, error = tostring(reason), failed_phase = "replacement preflight", cleanup_ok = true } end
 	end
 	local native_tx = OutputTransaction.new(prepared and prepared.channel or _uinput)
+	Perf.count("hotstring.expansions")
+	local transaction_started = Perf.clock()
 	local tx
 	-- Cleanup remains on the original transaction wire, so a refused late
 	-- publication never prevents owned key-ups or physical modifier restore.
 	tx = setmetatable({ publication = publication,
 		emit = function(code, value, phase, admission)
-			if value == EVDEV_VALUE_DOWN and phase ~= "capslock restore down" then
+			if value == EVDEV_VALUE_DOWN and phase ~= Errors.CAPSLOCK_RESTORE_DOWN then
 				require_publication(publication, true)
 				if prepared then prepared.cached() end
 			end
 			if value == EVDEV_VALUE_DOWN and admission then admission() end
 			if value == EVDEV_VALUE_DOWN and data_attempt then data_attempt(code, phase) end
-			return native_tx.emit(code, value, phase)
+			Perf.count("output.uinput_events")
+			local write_started = Perf.clock()
+			local accepted = native_tx.emit(code, value, phase)
+			Perf.span("output.uinput_write", write_started)
+			return accepted
 		end,
 	}, { __index = native_tx })
 	tx.channel = function()
 		local channel = native_tx.channel()
 		return { is_open = channel.is_open,
-			emit = function(code, value) return tx.emit(code, value, "clipboard paste chord") end }
+			emit = function(code, value) return tx.emit(code, value, Errors.CLIPBOARD_PASTE_CHORD) end }
 	end
 	local ok, err = pcall(function()
 		if prepared then prepared.cached() else require_publication(publication, false) end
@@ -656,8 +664,9 @@ local function run_transaction(label, body, publication, prepared, data_attempt)
 	end)
 	if not ok and not tx.is_failed() then tx.fail(err, "unexpected exception") end
 	local result = tx.finish()
+	Perf.span("hotstring.expand", transaction_started)
 	if not result.ok and not (publication ~= nil and result.cleanup_ok == true
-		and result.error == "programmable publication is no longer current") then stop_after_failure(result, label) end
+		and result.error == Errors.PROGRAMMABLE_PUBLICATION_STALE) then stop_after_failure(result, label) end
 	return result
 end
 
@@ -866,6 +875,7 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 		return { ok = false, error = "invalid arguments", cleanup_ok = true }
 	end
 
+	local owner = capture_replacement_owner()
 	if is_private then
 		Logger.trace(LOG, "inject(): bc=%d, private text (content withheld)…", backspace_count)
 	else
@@ -874,7 +884,7 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	if not retire_clipboard() then
 		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
 	end
-	local checked, prepared = pcall(prepare_replacement, replacement_text, publication)
+	local checked, prepared = pcall(prepare_replacement, replacement_text, publication, owner)
 	if not checked then
 		if is_private then Logger.error(LOG, "Cannot prepare a private replacement before erasure: %s.", tostring(prepared))
 		else Logger.error(LOG, "Cannot deliver '%s' before erasing its trigger: %s.", replacement_text, tostring(prepared)) end
@@ -1000,11 +1010,11 @@ function M.inject_fields(backspace_count, values, is_private)
 	if #values == 1 then
 		return M.inject(backspace_count, values[1], is_private)
 	end
+	local owner = capture_replacement_owner()
 	if not retire_clipboard() then
 		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
 	end
 
-	local owner = capture_replacement_owner()
 	if is_private then
 		Logger.trace(LOG, "inject_fields(): bc=%d, %d private field(s) (content withheld)…",
 			backspace_count, #values)

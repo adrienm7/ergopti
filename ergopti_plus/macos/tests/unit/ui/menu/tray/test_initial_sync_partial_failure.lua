@@ -31,7 +31,7 @@ helpers.describe("initial sync isolates one refused owner (R5)", function()
 		helpers.assert_not_nil(fixture.menu,
 			"one refused hotkey must not abort the whole menubar")
 		helpers.assert_eq(fixture.state.gestures, true, "Gestures must keep its saved ON")
-		helpers.assert_eq(fixture.state.keylogger_enabled, true, "Metrics must keep its saved ON")
+		helpers.assert_eq(fixture.state.keystats_enabled, true, "Metrics must keep its saved ON")
 		helpers.assert_eq(fixture.state.llm_enabled, true, "AI must keep its saved ON")
 		helpers.assert_true(fixture.has_error("hotstring_editor.set_shortcut"),
 			"the refused owner must be named by an ERROR")
@@ -39,7 +39,7 @@ helpers.describe("initial sync isolates one refused owner (R5)", function()
 		helpers.assert_eq(fixture.save_prefs(), true)
 		local written = fixture.saves[#fixture.saves]
 		helpers.assert_eq(written.gestures, true)
-		helpers.assert_eq(written.keylogger_enabled, true)
+		helpers.assert_eq(written.keystats_enabled, true)
 		helpers.assert_eq(written.llm_enabled, true)
 		helpers.assert_eq(written.custom_editor_shortcut, { mods = { "ctrl" }, key = "k" },
 			"the next save must not replace the saved chord with a default")
@@ -50,7 +50,7 @@ helpers.describe("initial sync isolates one refused owner (R5)", function()
 		helpers.assert_not_nil(fixture.menu)
 		helpers.assert_eq(fixture.state.gestures, false,
 			"the refused feature must show its real runtime posture")
-		helpers.assert_eq(fixture.state.keylogger_enabled, true)
+		helpers.assert_eq(fixture.state.keystats_enabled, true)
 		helpers.assert_eq(fixture.state.llm_enabled, true)
 		helpers.assert_eq(fixture.state.shortcuts, true)
 		helpers.assert_eq(fixture.boot_saves, 0, "boot must not write config.toml")
@@ -139,9 +139,9 @@ helpers.describe("initial sync isolates one refused owner (R5)", function()
 	end)
 
 	helpers.it("preserves the saved metrics value when a refused reset is reversed", function()
-		local fixture = boot({ keylogger_start = false })
+		local fixture = boot({ keystats_start = false })
 		fixture.flush_deferred()
-		helpers.assert_eq(fixture.state.keylogger_enabled, false)
+		helpers.assert_eq(fixture.state.keystats_enabled, false)
 		-- The following third call must be the reset owner's inverse.
 		fixture.refuse_gesture_assignment_after(2)
 		helpers.assert_eq(fixture.global_actions().factory_reset(), false,
@@ -150,19 +150,19 @@ helpers.describe("initial sync isolates one refused owner (R5)", function()
 		helpers.assert_eq(fixture.gesture_assignment_calls, 3, "the refused candidate must be followed by its inverse")
 		helpers.assert_eq(#fixture.saves, 0, "reset compensation must not write the demoted state")
 		helpers.assert_eq(fixture.save_prefs(), true)
-		helpers.assert_eq(fixture.saves[#fixture.saves].keylogger_enabled, true,
+		helpers.assert_eq(fixture.saves[#fixture.saves].keystats_enabled, true,
 			"the inverse must keep the saved Metrics ON, not write the demoted posture")
 	end)
 
-	helpers.it("keeps Metrics ON in config.toml when the deferred keylogger start is refused", function()
-		local fixture = boot({ keylogger_start = false })
+	helpers.it("keeps Metrics ON in config.toml when the deferred keystats start is refused", function()
+		local fixture = boot({ keystats_start = false })
 		fixture.flush_deferred()
-		helpers.assert_eq(fixture.state.keylogger_enabled, false,
+		helpers.assert_eq(fixture.state.keystats_enabled, false,
 			"the refused engine must not stay checked")
 		helpers.assert_eq(#fixture.saves, 0,
 			"a runtime refusal must not rewrite config.toml")
 		helpers.assert_eq(fixture.save_prefs(), true)
-		helpers.assert_eq(fixture.saves[#fixture.saves].keylogger_enabled, true,
+		helpers.assert_eq(fixture.saves[#fixture.saves].keystats_enabled, true,
 			"the next save must keep the saved Metrics ON")
 	end)
 end)

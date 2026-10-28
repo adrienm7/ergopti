@@ -98,8 +98,10 @@ function M.build_init_payload(opts)
 		items             = items,
 		-- The page's own editor for send_text / send_key / send_shortcut, from
 		-- the gestures manager's get_picker_parameter_fields; without them every
-		-- action confirms at once and the zenity prompt asks.
-		platform          = "linux",
+		-- action confirms at once and the zenity prompt asks. Ctrl is the
+		-- primary modifier and a program parameter names a POSIX executable.
+		executableSyntax  = "posix",
+		commandIsPrimary  = false,
 		sendVocabulary    = o.send_vocabulary,
 		parameterStrings  = o.parameter_strings,
 		-- The llm_prompt editor's choices and the "edit the current action"
@@ -142,9 +144,12 @@ local function close_session(session, context)
 			tostring(session.epoch))
 		return false
 	end
-	_active_session = nil
 	ProgramProviderPicker.close(session.providers)
-	M.pending_opts = nil
+	-- Window/provider retirement can synchronously open a different binding.
+	if _active_session == session then
+		_active_session = nil
+		M.pending_opts = nil
+	end
 	return true
 end
 
@@ -204,13 +209,17 @@ function M.open(opts, on_confirm, on_cancel)
 	end
 
 	if _active_session then
+		local previous_session = _active_session
 		local visible = type(Manager.is_visible) == "function"
 			and Manager.is_visible("action_picker") == true
+		if _active_session ~= previous_session then return false end
 		if visible and Manager.hide("action_picker") ~= true then
 			Logger.error(LOG, "Action picker replacement refused; prior session retained.")
 			return false
 		end
-		ProgramProviderPicker.close(_active_session.providers)
+		if _active_session ~= previous_session then return false end
+		ProgramProviderPicker.close(previous_session.providers)
+		if _active_session ~= previous_session then return false end
 		_active_session = nil
 		M.pending_opts = nil
 	end
@@ -244,10 +253,16 @@ function M.open(opts, on_confirm, on_cancel)
 	else
 		opened = Manager.show("action_picker")
 	end
+	if _active_session ~= session then
+		ProgramProviderPicker.close(session.providers)
+		return false
+	end
 	if opened ~= true then
 		ProgramProviderPicker.close(session.providers)
-		_active_session = nil
-		M.pending_opts = nil
+		if _active_session == session then
+			_active_session = nil
+			M.pending_opts = nil
+		end
 		Logger.error(LOG, "Action picker native window could not be opened.")
 		return false
 	end
@@ -383,7 +398,7 @@ end
 
 --- Handles an incoming JS message.
 --- @param payload any  String or table from host_bridge.js.
---- @param state  table Daemon state { engine, keylogger, config, llm, layout }.
+--- @param state  table Daemon state { engine, keystats, config, llm, layout }.
 --- @return any|nil  Response to send back to JS (if any).
 function M.on_message(payload, state, context)
 	if type(payload) == "string" then

@@ -276,9 +276,17 @@ LLM_AgentConnector_Tools(Config, Force := false, NowTick := unset) {
 	Now := IsSet(NowTick) ? NowTick : A_TickCount
 	global _LLM_AgentConnector_Tools, _LLM_AgentConnector_ListFn, _LLM_AgentConnector_EnsureDirFn
 	global LLM_AGENT_TOOL_EXTENSIONS, LLM_AGENT_TOOLS_TTL_MS
-	if !Force && (_LLM_AgentConnector_Tools is Map)
-			&& TickElapsed(_LLM_AgentConnector_Tools["tick"], Now) < LLM_AGENT_TOOLS_TTL_MS
-		return _LLM_AgentConnector_Tools
+	Snapshot := _LLM_AgentConnector_Tools
+	if !Force && (Snapshot is Map) {
+		CachedTick := Snapshot["tick"]
+		; Another refresh may publish after the caller retained its clock.
+		; Reuse that newer snapshot without passing a backwards age to the clock.
+		if (CachedTick is Integer) && CachedTick >= 0
+				&& (Now is Integer) && Now >= 0 && CachedTick > Now
+			return Snapshot
+		if TickElapsed64(CachedTick, Now) < LLM_AGENT_TOOLS_TTL_MS
+			return Snapshot
+	}
 	Dir := LLM_AgentConnector_ToolsDir()
 	Ensure := HasMethod(_LLM_AgentConnector_EnsureDirFn, "Call") ? _LLM_AgentConnector_EnsureDirFn
 		: FSEnsureDirectoryStrict

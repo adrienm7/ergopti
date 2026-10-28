@@ -1,0 +1,77 @@
+{
+	"description": "Golden vectors for the events_session rows: a typing session's start and end and the idle spans inside it. Replayed through the shared Lua state machine (_shared/lua/keystats/session_events.lua) the Linux driver runs.",
+	"rule": "A keystroke starts a session; a key or pointer input keeps it alive and ends an idle span, with duration_ms from the span's start (last input + micro_idle_ms) to the input. A tick after more than micro_idle_ms of silence starts an idle span once; after more than session_timeout_ms of silence the session ends, duration_ms from its first to its last input. Pointer input alone starts no session. stop closes an open session.",
+	"timings": { "micro_idle_ms": 30000, "session_timeout_ms": 300000 },
+	"cases": [
+		{
+			"id": "a_keystroke_starts_a_session",
+			"steps": [
+				{ "op": "input", "at": 1000, "keystroke": true, "expected": [{ "kind": "session_start" }] }
+			]
+		},
+		{
+			"id": "pointer_alone_starts_nothing",
+			"steps": [
+				{ "op": "input", "at": 1000, "keystroke": false, "expected": [] },
+				{ "op": "tick", "at": 400000, "expected": [] },
+				{ "op": "stop", "expected": [] }
+			]
+		},
+		{
+			"id": "an_idle_span_starts_once_and_ends_at_the_next_input",
+			"steps": [
+				{ "op": "input", "at": 1000, "keystroke": true, "expected": [{ "kind": "session_start" }] },
+				{ "op": "tick", "at": 31000, "expected": [] },
+				{ "op": "tick", "at": 31001, "expected": [{ "kind": "idle_start" }] },
+				{ "op": "tick", "at": 60000, "expected": [] },
+				{
+					"op": "input",
+					"at": 91000,
+					"keystroke": false,
+					"expected": [{ "kind": "idle_end", "duration_ms": 60000 }]
+				}
+			]
+		},
+		{
+			"id": "a_long_silence_ends_the_session",
+			"steps": [
+				{ "op": "input", "at": 1000, "keystroke": true, "expected": [{ "kind": "session_start" }] },
+				{ "op": "input", "at": 21000, "keystroke": true, "expected": [] },
+				{ "op": "tick", "at": 60000, "expected": [{ "kind": "idle_start" }] },
+				{
+					"op": "tick",
+					"at": 321001,
+					"expected": [{ "kind": "session_end", "duration_ms": 20000 }]
+				},
+				{ "op": "tick", "at": 400000, "expected": [] },
+				{
+					"op": "input",
+					"at": 500000,
+					"keystroke": true,
+					"expected": [{ "kind": "session_start" }]
+				}
+			]
+		},
+		{
+			"id": "an_input_after_a_missed_timeout_ends_the_old_session_first",
+			"steps": [
+				{ "op": "input", "at": 1000, "keystroke": true, "expected": [{ "kind": "session_start" }] },
+				{
+					"op": "input",
+					"at": 400000,
+					"keystroke": true,
+					"expected": [{ "kind": "session_end", "duration_ms": 0 }, { "kind": "session_start" }]
+				}
+			]
+		},
+		{
+			"id": "stop_closes_an_open_session",
+			"steps": [
+				{ "op": "input", "at": 1000, "keystroke": true, "expected": [{ "kind": "session_start" }] },
+				{ "op": "input", "at": 6000, "keystroke": false, "expected": [] },
+				{ "op": "stop", "expected": [{ "kind": "session_end", "duration_ms": 5000 }] },
+				{ "op": "stop", "expected": [] }
+			]
+		}
+	]
+}

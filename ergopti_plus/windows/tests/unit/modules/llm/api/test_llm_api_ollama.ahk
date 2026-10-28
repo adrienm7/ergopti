@@ -291,7 +291,7 @@ Test("LLM_UnescapeJSON: an escaped backslash adjacent to another escape sequence
 _OllamaCancel_FlagsProductionShapedEntry() {
 	global _LLM_Ollama_Async
 	fake_id := 99901
-	_LLM_Ollama_Async[fake_id] := Map(
+	_LLM_Ollama_Async[fake_id] := Map("requester_current", 0,
 		"pid", 0, "tmp_payload", "", "tmp_stdout", "",
 		"on_success", (*) => 0, "on_fail", (*) => 0,
 		"cancelled", false, "start_tick", A_TickCount,
@@ -337,13 +337,14 @@ _OllamaPidReceipt_CompleteGenerationPrecedesDeadline() {
 		"open_process", (*) => 9201,
 		"close_process", (*) => (State["close_calls"] += 1, true),
 		"terminate_process", (*) => (State["terminate_calls"] += 1, true),
+		"wait_process", (*) => 0,
 		"read_terminal", (*) => Map(
 			"complete", true, "exit", 0, "status", 200,
 			"body_read", true,
 			"body", '{"message":{"content":"owned generation"}}'))
 	ProcessOwner := _LLM_CurlAdoptProcess(4245, Port)
 	_LLM_Ollama_Pending := ""
-	_LLM_Ollama_Async[ReqId] := Map(
+	_LLM_Ollama_Async[ReqId] := Map("requester_current", 0,
 		"pid", 4245,
 		"process_owner", ProcessOwner,
 		"tmp_payload", "payload",
@@ -394,12 +395,13 @@ _OllamaPidReceipt_CancelUsesExactHandle() {
 			State["terminate_calls"] += 1,
 			State["terminated_handle"] := Handle,
 			true),
+		"wait_process", (*) => 0,
 		"read_terminal", (*) => Map(
 			"complete", false, "exit", -1, "status", 0,
 			"body_read", false, "body", ""))
 	ProcessOwner := _LLM_CurlAdoptProcess(4246, Port)
 	_LLM_Ollama_Pending := ""
-	_LLM_Ollama_Async[ReqId] := Map(
+	_LLM_Ollama_Async[ReqId] := Map("requester_current", 0,
 		"pid", 4246, "process_owner", ProcessOwner,
 		"tmp_payload", "payload", "tmp_stdout", "body",
 		"tmp_status", "status", "tmp_exit", "exit",
@@ -486,14 +488,14 @@ Test("Ollama process cleanup: close refusal retains exact ownership "
 _OllamaProcessCleanup_TerminationRefusalKeepsHandleOpen() {
 	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
 	State := Map("terminate_calls", 0, "wait_calls", 0, "close_calls", 0,
-		"accept_terminate", false)
+		"accept_terminate", false, "wait_result", 258)
 	TerminateProcess(Handle) {
 		State["terminate_calls"] += 1
 		return State["accept_terminate"]
 	}
 	WaitProcess(Handle) {
 		State["wait_calls"] += 1
-		return 258
+		return State["wait_result"]
 	}
 	CloseProcess(Handle) {
 		State["close_calls"] += 1
@@ -515,6 +517,8 @@ _OllamaProcessCleanup_TerminationRefusalKeepsHandleOpen() {
 	AssertEqual(1, _LLM_CurlCleanupDebt.Count)
 
 	State["accept_terminate"] := true
+	; The retry receives a separate exact exit observation after termination.
+	State["wait_result"] := 0
 	_LLM_CurlCleanupRetryTimer := 0
 	AssertTrue(LLM_CurlRetryCleanupDebt())
 	AssertTrue(Owner["released"])
@@ -643,8 +647,8 @@ Test("Ollama process cleanup: reentrant close keeps one exact owner "
 _OllamaCancelAllAsync_FlagsAll() {
 	global _LLM_Ollama_Async
 	; Inject two fake entries
-	_LLM_Ollama_Async[99902] := Map("http", "", "on_success", (*) => 0, "on_fail", (*) => 0, "cancelled", false)
-	_LLM_Ollama_Async[99903] := Map("http", "", "on_success", (*) => 0, "on_fail", (*) => 0, "cancelled", false)
+	_LLM_Ollama_Async[99902] := Map("requester_current", 0, "http", "", "on_success", (*) => 0, "on_fail", (*) => 0, "cancelled", false)
+	_LLM_Ollama_Async[99903] := Map("requester_current", 0, "http", "", "on_success", (*) => 0, "on_fail", (*) => 0, "cancelled", false)
 	LLM_OllamaCancelAllAsync()
 	AssertTrue(_LLM_Ollama_Async[99902]["cancelled"])
 	AssertTrue(_LLM_Ollama_Async[99903]["cancelled"])
@@ -672,7 +676,7 @@ Test("LLM_OllamaCancelAllAsync: no-op when registry is empty", _OllamaCancelAllA
 _OllamaCancelAllAsync_ClearsPendingAndFailsOnce() {
 	global _LLM_Ollama_Async, _LLM_Ollama_Pending
 	_LLM_Ollama_Async := Map()
-	_LLM_Ollama_Async[99910] := Map("http", "", "on_success", (*) => 0, "on_fail", (*) => 0, "cancelled", false)
+	_LLM_Ollama_Async[99910] := Map("requester_current", 0, "http", "", "on_success", (*) => 0, "on_fail", (*) => 0, "cancelled", false)
 	failed := 0
 	_LLM_Ollama_Pending := Map("on_success", (*) => 0, "on_fail", (*) => failed += 1)
 	LLM_OllamaCancelAllAsync()
@@ -699,7 +703,7 @@ _OllamaTrimRegistry_DropsOldestWhenAtCap() {
 	_LLM_Ollama_Async := Map()
 	base_id := 88000
 	loop LLM_OLLAMA_MAX_INFLIGHT
-		_LLM_Ollama_Async[base_id + A_Index] := Map("cancelled", false)
+		_LLM_Ollama_Async[base_id + A_Index] := Map("requester_current", 0, "cancelled", false)
 	AssertEqual(LLM_OLLAMA_MAX_INFLIGHT, _LLM_Ollama_Async.Count)
 	; _LLM_Ollama_TrimAsyncRegistry only trims when Count >= MAX_INFLIGHT
 	_LLM_Ollama_TrimAsyncRegistry()
@@ -717,7 +721,7 @@ _OllamaTrimRegistry_ReentrantSuccessor(State, *) {
 	if State["callbacks"] != 1
 		return
 	_LLM_Ollama_TrimAsyncRegistry()
-	_LLM_Ollama_Async[88013] := Map("cancelled", false, "on_fail", (*) => 0)
+	_LLM_Ollama_Async[88013] := Map("requester_current", 0, "cancelled", false, "on_fail", (*) => 0)
 }
 
 _OllamaTrimRegistry_DetachesBeforeReentrantCallback() {
@@ -758,7 +762,7 @@ Test("api_ollama: trim detaches owner before reentrant callback (async-trim-deta
 _OllamaTrimRegistry_NoOpBelowCap() {
 	global _LLM_Ollama_Async, LLM_OLLAMA_MAX_INFLIGHT
 	_LLM_Ollama_Async := Map()
-	_LLM_Ollama_Async[77001] := Map("cancelled", false)
+	_LLM_Ollama_Async[77001] := Map("requester_current", 0, "cancelled", false)
 	_LLM_Ollama_TrimAsyncRegistry()
 	; Count should remain 1 because we are below the cap
 	AssertEqual(1, _LLM_Ollama_Async.Count)
@@ -770,3 +774,7 @@ Test("_LLM_Ollama_TrimAsyncRegistry: no-op when registry is below cap", _OllamaT
 #Include %A_LineFile%/../test_llm_api_ollama_retirement.ahk
 
 #Include %A_LineFile%/../test_llm_api_ollama_chat_ownership.ahk
+
+#Include %A_LineFile%/../test_llm_ollama_response_utf8.ahk
+
+#Include %A_LineFile%/../test_llm_curl_process_exit_ack.ahk

@@ -1,0 +1,6 @@
+[case]
+description = "An old file without the flag: the delays an earlier build shipped for a key are copies, not choices, and go; a delay of another value stays."
+drivers = ["linux"]
+outcome = "migrated"
+from_version = 0
+to_version = 1

@@ -12,6 +12,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+-- The declared base expansion delay, read through the real reader before the
+-- fixture replaces it.
+local EXPANSION_DELAY = require("infra.manifest_reader").default_for("hotstrings.expansion_delay")
 
 local MODULE_NAMES = {
 	"hs",
@@ -243,7 +246,9 @@ local function run_isolated(options, assertions)
 			["platform.remap.lease_controller"] = LeaseController,
 			["infra.boot_profiler"] = {
 				begin = function() end,
+				trace_requires = function() end,
 				stage = function() end,
+				sub = function() end,
 				mark = function() end,
 				complete = function() end,
 				current_stage = function() return "fixture stage" end,
@@ -321,7 +326,15 @@ local function run_isolated(options, assertions)
 				stop = function() return true end,
 			},
 			["infra.manifest_reader"] = {
-				default_for = function() return "★" end,
+				-- The real cold hotstring controller reads the base expansion
+				-- delay from the manifest (31372616); every other read is the
+				-- trigger character the boot asks for.
+				default_for = function(path)
+					if path == "hotstrings.expansion_delay" then
+						return EXPANSION_DELAY
+					end
+					return "★"
+				end,
 				has_default = function() return false end,
 				sparse_operation = function() error("no configuration write in shutdown fixture") end,
 			},
@@ -441,9 +454,9 @@ helpers.describe("init: controlled reload owns the native shutdown handoff", fun
 			helpers.assert_eq(state.error_dialog_inits, 1, "init.lua must initialise the error window once")
 			helpers.assert_eq(type(state.notification_handler), "function",
 				"init.lua must register the logger's error handler")
-			helpers.assert_eq(state.notification_handler("keylogger", "Flush failed: disk full", "Flush failed: %s"), true,
+			helpers.assert_eq(state.notification_handler("keystats", "Flush failed: disk full", "Flush failed: %s"), true,
 				"the handler reports the error as handled")
-			helpers.assert_eq(state.error_dialog_calls, { { "keylogger", "Flush failed: %s", "Flush failed: disk full" } },
+			helpers.assert_eq(state.error_dialog_calls, { { "keystats", "Flush failed: %s", "Flush failed: disk full" } },
 				"the error window receives the module, the template and the message")
 		end)
 	end)

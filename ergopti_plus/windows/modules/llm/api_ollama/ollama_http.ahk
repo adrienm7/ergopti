@@ -387,14 +387,17 @@ _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 		if Terminate {
 			TerminateFn := _LLM_CurlArtifactPortFn(Port,
 				"terminate_process", _LLM_CurlTerminateProcessExact)
-			Terminated := false
-			try Terminated := TerminateFn.Call(Handle) == true
-			if !Terminated {
-				WaitFn := _LLM_CurlArtifactPortFn(Port,
-					"wait_process", _LLM_CurlWaitProcessExact)
-				try Terminated := WaitFn.Call(Handle) = 0
+			; Termination acceptance is only a request. Keep the exact capability
+			; and its process debt until a separate zero-time wait proves exit.
+			try TerminateFn.Call(Handle)
+			WaitFn := _LLM_CurlArtifactPortFn(Port,
+				"wait_process", _LLM_CurlWaitProcessExact)
+			Exited := false
+			try {
+				ExitReceipt := WaitFn.Call(Handle)
+				Exited := ExitReceipt is Integer && ExitReceipt == 0
 			}
-			if !Terminated
+			if !Exited
 				return false
 		}
 		CloseFn := _LLM_CurlArtifactPortFn(Port,
@@ -419,12 +422,14 @@ _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 _LLM_CurlReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 	if !(ProcessOwner is Map)
 		return true
-	; Keep failure-to-debt transfer atomic against another AHK thread. Native
-	; operations here are non-blocking: TerminateProcess, zero-time wait and close.
+	; The inner owner serializes native attempts. Job termination can yield,
+	; so only fresh release/debt publication belongs inside this Critical.
+	Released := _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate, Port)
 	NewDebt := false
 	PreviousCritical := Critical("On")
 	try {
-		if _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate, Port) {
+		; Another thread may finish the exact owner after our attempt returns.
+		if Released || ProcessOwner.Get("released", false) {
 			_LLM_CurlRetireProcessCleanupDebt(ProcessOwner)
 			return true
 		}
@@ -459,6 +464,31 @@ _LLM_CurlProcessExited(ProcessOwner, Port := 0) {
 		return false
 	; WAIT_OBJECT_0 is the sole proof that this exact retained process exited.
 	return Result = 0
+}
+
+
+; Read the terminal status while custody still retains the exact native object.
+; A signaled exit code 259 is a failed exit, not a process-liveness verdict.
+_LLM_CurlProcessExitCode(ProcessOwner) {
+	PreviousCritical := Critical("On")
+	try {
+		if !(ProcessOwner is Map) || ProcessOwner.Get("released", false)
+				|| ProcessOwner.Get("releasing", false)
+			throw Error("The curl process owner cannot provide a terminal exit receipt.")
+		if !_LLM_CurlProcessExited(ProcessOwner)
+			throw Error("The exact curl process has not acknowledged exit.")
+		if ProcessOwner.Has("tree") {
+			ExitCode := ProcessOwner["terminal"].Get("exit", "")
+			if !(ExitCode is Integer)
+				throw Error("The curl process tree returned an invalid exit receipt.")
+			return ExitCode
+		}
+		ExitCode := 0
+		Diagnostic := ""
+		if !_SR_TreeReadExitCode(ProcessOwner["handle"], &ExitCode, &Diagnostic)
+			throw Error(Diagnostic)
+		return ExitCode
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_CurlMaxFileSizeArg(CurlExe := "", VersionFn := 0) {
@@ -507,7 +537,26 @@ _LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath, MaxBodyBytes := 0,
 			Result["oversize"] := true
 			return Result
 		}
-		Result["body"] := ReadFn.Call(BodyPath, "UTF-8-RAW")
+		; All nonempty bodies consumed here are LLM JSON. Keep the same bounded
+		; byte image through validation and decoding; FileRead's text conversion
+		; repairs invalid UTF-8 before the JSON parser can reject it.
+		Raw := ReadFn.Call(BodyPath, "RAW m" . (MaxBodyBytes + 1))
+		if !(Raw is Buffer)
+			throw TypeError("The curl terminal body reader must return raw bytes.")
+		if Raw.Size > MaxBodyBytes {
+			Result["oversize"] := true
+			return Result
+		}
+		if Raw.Size > 0 && !HTTPIsValidUtf8(Raw, Raw.Size)
+			return Result
+		; FileRead previously removed a leading UTF-8 BOM. An empty successful
+		; DELETE is valid too; neither case may call the decoder with zero bytes.
+		Offset := Raw.Size >= 3 && NumGet(Raw, 0, "UChar") == 0xEF
+			&& NumGet(Raw, 1, "UChar") == 0xBB && NumGet(Raw, 2, "UChar") == 0xBF ? 3 : 0
+		Count := Raw.Size - Offset
+		; A positive StrGet length truncates at NUL. Exact length keeps every
+		; byte visible to JsonParse, including forbidden embedded/trailing NUL.
+		Result["body"] := Count > 0 ? StrGet(Raw.Ptr + Offset, -Count, "UTF-8") : ""
 		Result["body_read"] := true
 	}
 	return Result

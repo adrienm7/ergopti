@@ -14,6 +14,7 @@
 --- no io/network, no OS calls — so macOS and Linux share one decision table.
 --- ==============================================================================
 
+local Identifiers = require("identifiers")
 local M = {}
 
 M.SOURCE_API = "api"
@@ -171,7 +172,7 @@ end
 --- @return string|nil reason Why the feed gives no list.
 function M.feed_release_list(body, owner, repo)
 	if type(body) ~= "string" or not body:find("<feed[%s>]") then return nil, "not an Atom feed" end
-	local prefix = "https://github.com/" .. tostring(owner) .. "/" .. tostring(repo) .. "/releases/tag/"
+	local prefix = "https://" .. Identifiers.hosts.github .. "/" .. tostring(owner) .. "/" .. tostring(repo) .. "/releases/tag/"
 	local rows = {}
 	for entry in body:gmatch("<entry[%s>].-</entry%s*>") do
 		local href

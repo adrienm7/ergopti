@@ -32,6 +32,7 @@ local pasteboard    = hs.pasteboard
 local notifications = require("infra.notifications")
 local EventProvenance = require("adapters.event_provenance")
 local KeyState      = require("adapters.key_state")
+local KeyEventHealth = require("infra.key_event_health")
 local KeyboardGeometry = require("adapters.keyboard_geometry")
 local Logger        = require("infra.logger")
 local text_utils = require("infra.text_utils")
@@ -67,6 +68,7 @@ local text_acts = require("modules.shortcuts.actions.text")
 
 local Keycodes               = require("infra.keycodes")
 local ControlSentinels       = require("modules.keymap.control_sentinels")
+local ConfigKeys = require("config_keys")
 
 -- The control-sentinel listener slot the wheel bindings track the layer with.
 local LAYER_WHEEL_LISTENER = "shortcuts.layer_wheel"
@@ -108,6 +110,8 @@ local awake_origin_pos = nil
 -- to log the duration as an "awake" passive period on toggle OFF so the
 -- dashboard can subtract it from focus stats when the toggle is disabled.
 local awake_started_at = nil
+-- Only activation grace uses awake duration; passive-period accounting keeps its epoch receipt.
+local awake_grace_started_at = nil
 -- Name of the focused app at the moment keep-awake was enabled. The
 -- jiggler keeps this app at the foreground for the duration, so the
 -- dashboard can credit the awake_ms back to that app on toggle OFF.
@@ -435,6 +439,7 @@ local function auto_disable_awake(expected_started_at)
 
 	_awake_generation = _awake_generation + 1
 	awake_active = false
+	awake_grace_started_at = nil
 	stop_awake_input_watcher()
 	cancel_awake_return_timer()
 
@@ -446,7 +451,7 @@ local function auto_disable_awake(expected_started_at)
 	if awake_started_at then
 		local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
 		if dur_ms > 0 then
-			local ok_lm, log_manager = pcall(require, "modules.keylogger.log_manager")
+			local ok_lm, log_manager = pcall(require, "modules.keystats.log_manager")
 			if ok_lm and log_manager then
 				if type(log_manager.log_passive_period) == "function" then
 					pcall(log_manager.log_passive_period, "awake", dur_ms)
@@ -469,6 +474,7 @@ function M.toggle_awake()
 	if awake_active then
 		_awake_generation = _awake_generation + 1
 		awake_active = false
+		awake_grace_started_at = nil
 
 		local watcher_settled = stop_awake_input_watcher()
 		local return_timer_settled = cancel_awake_return_timer()
@@ -485,7 +491,7 @@ function M.toggle_awake()
 		if awake_started_at then
 			local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
 			if dur_ms > 0 then
-				local ok_lm, log_manager = pcall(require, "modules.keylogger.log_manager")
+				local ok_lm, log_manager = pcall(require, "modules.keystats.log_manager")
 				if ok_lm and log_manager then
 					if type(log_manager.log_passive_period) == "function" then
 						pcall(log_manager.log_passive_period, "awake", dur_ms)
@@ -540,7 +546,7 @@ function M.toggle_awake()
 			-- Ignore events within the activation grace window so the trigger
 			-- keystroke, the origin nudge, and a rapid second Ctrl+M (with the
 			-- touchpad brush it carries) never instantly deactivate keep-awake.
-			if awake_started_at and hs.timer.secondsSinceEpoch() - awake_started_at < AWAKE_ACTIVATION_GRACE_SEC then
+			if awake_grace_started_at and TimerScheduler.awake_time() - awake_grace_started_at < AWAKE_ACTIVATION_GRACE_SEC then
 				return finish_tap(false, fence_events)
 			end
 
@@ -575,7 +581,7 @@ function M.toggle_awake()
 				end
 			end
 
-			-- State teardown, keylogger I/O and logging all run after this callback has
+			-- State teardown, keystats I/O and logging all run after this callback has
 			-- handed Quartz every older fence event and the physical event itself.
 			SyntheticInput.defer_after_callback(
 				"keep-awake auto-deactivation", auto_disable_awake, awake_started_at)
@@ -598,6 +604,7 @@ function M.toggle_awake()
 		_awake_generation = next_generation
 		awake_active = true
 		awake_started_at = hs.timer.secondsSinceEpoch()
+		awake_grace_started_at = TimerScheduler.awake_time()
 		-- Capture the focused app at toggle-on so we can credit the keep-awake
 		-- duration back to it on toggle-off.
 		local _ok_app, _front = pcall(hs.application.frontmostApplication)
@@ -634,6 +641,7 @@ end
 function M.stop_awake()
 	_awake_generation = _awake_generation + 1
 	awake_active = false
+	awake_grace_started_at = nil
 
 	local watcher_settled = stop_awake_input_watcher()
 	local return_timer_settled = cancel_awake_return_timer()
@@ -872,7 +880,7 @@ function M.bind_tap_keys(admission_guard, decide)
 	local owner = acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
 		if not raw_binding_admitted(admission_guard) then return false end
 		local is_physical, fence_events = classify_physical_event(
-			e, "shortcuts.tap_keys")
+			e, ConfigKeys.KEY.SHORTCUTS_TAP_KEYS)
 		if not is_physical then return finish_tap(false, fence_events) end
 
 		local ok_key, keycode = pcall(e.getKeyCode, e)
@@ -884,6 +892,9 @@ function M.bind_tap_keys(admission_guard, decide)
 		end
 		local run = decide(keycode, KeyboardGeometry.event_type(e))
 		if type(run) ~= "function" then return finish_tap(false, fence_events) end
+		-- A press this late may already be in the application (the tap waited behind
+		-- the main thread): consuming it and running the action would do both.
+		if KeyEventHealth.passes_late_event(e) then return finish_tap(false, fence_events) end
 
 		local ok_repeat, repeat_flag = pcall(function()
 			return e:getProperty(eventtap.event.properties.keyboardEventAutorepeat)
@@ -1001,7 +1012,7 @@ local function post_wheel_strokes(strokes, notches)
 		for _, stroke in ipairs(strokes) do
 			if stroke.system then
 				-- NX system-defined media events are not keyDown/keyUp events, so they
-				-- do not enter keymap/keylogger keyboard callbacks and stay native here.
+				-- do not enter keymap/keystats keyboard callbacks and stay native here.
 				if post_system_key_phase(stroke.system, true) ~= true then all_posted = false end
 				if post_system_key_phase(stroke.system, false) ~= true then all_posted = false end
 			elseif SyntheticInput.emit_key_stroke(stroke.mods, stroke.keycode, KEYSTROKE_NO_DELAY_US) ~= true then

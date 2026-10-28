@@ -88,21 +88,21 @@ end
 
 helpers.describe("Linux keyboard slots under the grab (keyboard-slot-consume)", function()
 	helpers.it("swallows a bound chord and runs it on the next tick", function()
-		with_fixture({ ["shortcuts.keyboard.super_space"] = "select_line" }, function(shortcuts, seen)
+		with_fixture({ ["shortcuts.keyboard.meta_space"] = "select_line" }, function(shortcuts, seen)
 			local consumed, slot = shortcuts.consume({ key = " ", mods = { meta = true } }, seen.opts())
 			helpers.assert_eq(consumed, true, "a bound Super+Space must never reach the application")
-			helpers.assert_eq(slot, "super_space", "the hook reports the space bar as ' '")
+			helpers.assert_eq(slot, "meta_space", "the hook reports the space bar as ' '")
 			helpers.assert_eq(#seen.executed, 0, "the action waits for the next tick")
 			seen.tick()
-			helpers.assert_eq(seen.executed[1], "select_line@keyboard__super_space",
+			helpers.assert_eq(seen.executed[1], "select_line@keyboard__meta_space",
 				"the action runs under its keyboard binding")
 		end)
 	end)
 
 	helpers.it("matches a Shift-held letter reported in upper case", function()
-		with_fixture({ ["shortcuts.keyboard.ctrl_shift_p"] = "select_line" }, function(shortcuts, seen)
+		with_fixture({ ["shortcuts.keyboard.primary_shift_p"] = "select_line" }, function(shortcuts, seen)
 			local consumed = shortcuts.consume({ key = "P", mods = { ctrl = true, shift = true } }, seen.opts())
-			helpers.assert_eq(consumed, true, "Ctrl+Shift+P arrives as 'P' and must match ctrl_shift_p")
+			helpers.assert_eq(consumed, true, "Ctrl+Shift+P arrives as 'P' and must match primary_shift_p")
 		end)
 	end)
 
@@ -116,15 +116,15 @@ helpers.describe("Linux keyboard slots under the grab (keyboard-slot-consume)", 
 
 	helpers.it("forwards a bound chord a pause holds back, but not script control", function()
 		with_fixture({
-			["shortcuts.keyboard.ctrl_j"] = "select_line",
-			["shortcuts.keyboard.ctrl_r"] = "script_reload",
+			["shortcuts.keyboard.primary_j"] = "select_line",
+			["shortcuts.keyboard.primary_r"] = "script_reload",
 		}, function(shortcuts, seen)
 			helpers.assert_eq(shortcuts.consume({ key = "j", mods = { ctrl = true } }, seen.opts(true)), false,
 				"while paused an ordinary binding must not eat the key it no longer runs")
 			helpers.assert_eq(shortcuts.consume({ key = "r", mods = { ctrl = true } }, seen.opts(true)), true,
 				"script control still runs through a pause, so its chord is still claimed")
 			seen.tick()
-			helpers.assert_eq(seen.executed[1], "script_reload@keyboard__ctrl_r")
+			helpers.assert_eq(seen.executed[1], "script_reload@keyboard__primary_r")
 		end)
 	end)
 
@@ -137,17 +137,17 @@ helpers.describe("Linux keyboard slots under the grab (keyboard-slot-consume)", 
 	end)
 
 	helpers.it("queues an explicitly assigned ChatGPT action through the action executor", function()
-		with_fixture({ ["shortcuts.keyboard.ctrl_g"] = "open_chatgpt" }, function(shortcuts, seen)
+		with_fixture({ ["shortcuts.keyboard.primary_g"] = "open_chatgpt" }, function(shortcuts, seen)
 			helpers.assert_true(shortcuts.consume({ key = "g", mods = { ctrl = true } }, seen.opts()))
 			helpers.assert_eq(#seen.executed, 0)
 			seen.tick()
-			helpers.assert_eq(seen.executed[1], "open_chatgpt@keyboard__ctrl_g")
+			helpers.assert_eq(seen.executed[1], "open_chatgpt@keyboard__primary_g")
 			helpers.assert_eq(seen.chatgpt, 0, "the keyboard owner must not bypass the action executor")
 		end)
 	end)
 
 	helpers.it("forwards the key when the next tick cannot be queued", function()
-		with_fixture({ ["shortcuts.keyboard.ctrl_j"] = "select_line" }, function(shortcuts)
+		with_fixture({ ["shortcuts.keyboard.primary_j"] = "select_line" }, function(shortcuts)
 			local consumed = shortcuts.consume({ key = "j", mods = { ctrl = true } }, {
 				only_script = false,
 				defer = function() return false end,
@@ -157,11 +157,11 @@ helpers.describe("Linux keyboard slots under the grab (keyboard-slot-consume)", 
 	end)
 
 	helpers.it("matches the same identities in the observe-mode dispatch", function()
-		with_fixture({ ["shortcuts.keyboard.super_space"] = "select_line" }, function(shortcuts, seen)
+		with_fixture({ ["shortcuts.keyboard.meta_space"] = "select_line" }, function(shortcuts, seen)
 			local fired, slot = shortcuts.dispatch({ key = " ", mods = { meta = true } })
 			helpers.assert_eq(fired, true, "without the grab the chord still runs its binding")
-			helpers.assert_eq(slot, "super_space")
-			helpers.assert_eq(seen.executed[1], "select_line@keyboard__super_space")
+			helpers.assert_eq(slot, "meta_space")
+			helpers.assert_eq(seen.executed[1], "select_line@keyboard__meta_space")
 		end)
 	end)
 end)

@@ -15,9 +15,12 @@ local M = {}
 local PersonalFiles = require("hotstrings.personal_files")
 local hs         = hs
 local Logger     = require("infra.logger")
+local ParentSource = require("menu.frames.parent_source")
+local PhaseStats = require("infra.phase_stats")
 local Paths      = require("infra.paths")
 local LOG        = "builder"
 local i18n       = require("infra.i18n")
+local COMMAND    = require("config_keys").COMMAND
 -- The single reader of menu_manifest.json. See load_manifest below for why this
 -- module no longer has one of its own.
 local ManifestMenu = require("infra.manifest_menu")
@@ -41,134 +44,52 @@ local function separator_facade_current()
 		and type(separator_root) == "function" and rawget(ManifestMenu, "get_root") == separator_root
 end
 
---- Checks raw dense arrays without triggering source metamethods.
+--- Delegates the raw dense-array check to the shared section admission.
 --- @param value table Source array.
 --- @param records boolean Whether its values must be plain records.
 --- @return boolean
 local function debug_dense(value, records)
-	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
-	local count, maximum = 0, 0
-	for index, row in next, value do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
-		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
-		count, maximum = count + 1, math.max(maximum, index)
-	end
-	return count == maximum
+	return ParentSource.dense(value, records)
 end
 
---- Admits the actual Debug source structure without interpreting choice grammar.
+--- Delegates the actual Debug source admission to the shared section admission.
 --- @param renderer table|nil Actual manifest renderer.
 --- @param platform string Native platform token.
 --- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
 local function debug_source(renderer, platform)
-	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
-		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
-
-	local root = renderer.get_root()
-	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
-	local top, children = rawget(root, "top_level"), rawget(root, "debug_menu")
-	if not debug_dense(top, true) or not debug_dense(children, true) then return nil end
-	local parent
-	for _, row in next, top do
-		if rawget(row, "id") == "debug" then
-			if parent then return nil end
-			parent = row
-		end
-	end
-	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
-		or rawget(parent, "i18n") == "" or not debug_dense(rawget(parent, "rows"), true) then return nil end
-	local platforms = rawget(parent, "platforms")
-	if platforms ~= nil then
-		if not debug_dense(platforms, false) then return nil end
-		local visible = false
-		for _, token in next, platforms do
-			if type(token) ~= "string" then return nil end
-			if token == platform then visible = true end
-		end
-		if not visible then return nil end
-	end
-	local fields = {}
-	for key, value in next, parent do fields[key] = value end
-	return root, top, children, parent, fields
+	return ParentSource.read(renderer, platform, "debug")
 end
 
---- Rechecks the captured direct parent fields without source metamethods.
+--- Delegates the direct parent recheck to the shared section admission.
 --- @param parent table Actual direct source row.
 --- @param fields table Captured raw field references and scalar values.
 --- @return boolean
 local function debug_parent_unchanged(parent, fields)
-	for key, value in next, parent do
-		if not rawequal(value, rawget(fields, key)) then return false end
-	end
-	for key, value in next, fields do
-		if not rawequal(value, rawget(parent, key)) then return false end
-	end
-	return true
+	return ParentSource.unchanged(parent, fields)
 end
 
---- Checks raw dense arrays without triggering source metamethods.
+--- Delegates the raw dense-array check to the shared section admission.
 --- @param value table Source array.
 --- @param records boolean Whether its values must be plain records.
 --- @return boolean
 local function configuration_dense(value, records)
-	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
-	local count, maximum = 0, 0
-	for index, row in next, value do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
-		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
-		count, maximum = count + 1, math.max(maximum, index)
-	end
-	return count == maximum
+	return ParentSource.dense(value, records)
 end
 
---- Admits the actual Configuration source structure without interpreting command grammar.
+--- Delegates the actual Configuration source admission to the shared section admission.
 --- @param renderer table|nil Actual manifest renderer.
 --- @param platform string Native platform token.
 --- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
 local function configuration_source(renderer, platform)
-	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
-		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
-
-	local root = renderer.get_root()
-	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
-	local top, children = rawget(root, "top_level"), rawget(root, "configuration_menu")
-	if not configuration_dense(top, true) or not configuration_dense(children, true) then return nil end
-	local parent
-	for _, row in next, top do
-		if rawget(row, "id") == "configuration" then
-			if parent then return nil end
-			parent = row
-		end
-	end
-	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
-		or rawget(parent, "i18n") == "" or not configuration_dense(rawget(parent, "rows"), true) then return nil end
-	local platforms = rawget(parent, "platforms")
-	if platforms ~= nil then
-		if not configuration_dense(platforms, false) then return nil end
-		local visible = false
-		for _, token in next, platforms do
-			if type(token) ~= "string" then return nil end
-			if token == platform then visible = true end
-		end
-		if not visible then return nil end
-	end
-	local fields = {}
-	for key, value in next, parent do fields[key] = value end
-	return root, top, children, parent, fields
+	return ParentSource.read(renderer, platform, "configuration")
 end
 
---- Rechecks the captured direct parent fields without source metamethods.
+--- Delegates the direct parent recheck to the shared section admission.
 --- @param parent table Actual direct source row.
 --- @param fields table Captured raw field references and scalar values.
 --- @return boolean
 local function configuration_parent_unchanged(parent, fields)
-	for key, value in next, parent do
-		if not rawequal(value, rawget(fields, key)) then return false end
-	end
-	for key, value in next, fields do
-		if not rawequal(value, rawget(parent, key)) then return false end
-	end
-	return true
+	return ParentSource.unchanged(parent, fields)
 end
 
 
@@ -574,7 +495,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		-- parent row's `action`, which AppKit never sends for an item that
 		-- opens a submenu, so the Hotstrings master could not be switched from
 		-- the menu bar at all.
-		["hotstrings_toggle"]      = function()
+		[require("config_keys").COMMAND.HOTSTRINGS_TOGGLE]      = function()
 			if ctx.paused then
 				Logger.warn(LOG, "Hotstrings switch refused: the script is paused.")
 				return false
@@ -647,6 +568,32 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	local parent = receive(hotstrings_menu, { hotstrings_enabled = function() return master_on or nil end,
 		hotstrings_parent_total = function() return grand_total end, hotstrings_parent_count_present = function() return grand_has_count end })
 	return parent and { parent } or {}
+end
+
+-- Phase name of each top-level id, built once: the menu build never
+-- concatenates a name per item.
+local _item_phase_names = {}
+
+-- Per-row build times of the last generate() call, in build order. Kept local
+-- so the module table is never written outside its function declarations.
+local _last_item_timings = {}
+
+--- Returns the per-row build times of the last menu generation.
+--- @return table List of { id, ms } in build order.
+function M.get_last_item_timings()
+	return _last_item_timings
+end
+
+--- Returns the phase name `menu_item.<id>` of a top-level row.
+--- @param id string Top-level id declared by the manifest.
+--- @return string
+local function phase_name(id)
+	local name = _item_phase_names[id]
+	if name == nil then
+		name = "menu_item." .. tostring(id)
+		_item_phase_names[id] = name
+	end
+	return name
 end
 
 --- Generates the complete items list for the Hammerspoon menubar.
@@ -743,7 +690,7 @@ function M.generate(ctx, menu_mods, actions)
 			end
 			return agent_item and { agent_item } or {}
 		end,
-		["metrics"]         = function() return module_rows("keylogger") end,
+		["metrics"]         = function() return module_rows("keystats") end,
 		-- The shortcuts submodule surfaces the edit-shortcuts callback, so it gets
 		-- the actions on top of the context.
 		["shortcuts"]       = function()
@@ -766,11 +713,11 @@ function M.generate(ctx, menu_mods, actions)
 			local cfg_ctx = {}
 			for key, value in pairs(ctx or {}) do cfg_ctx[key] = value end
 			cfg_ctx.commands = {
-				["scope_restore"]       = restore,
-				["scope_clear"]         = clear,
-				["clean_unused_keys"]   = clean,
-				["config_folder"]       = actions.open_paths,
-				["setup_wizard"]        = actions.show_setup_wizard,
+				[require("config_keys").COMMAND.SCOPE_RESTORE]       = restore,
+				[require("config_keys").COMMAND.SCOPE_CLEAR]         = clear,
+				[require("config_keys").COMMAND.CLEAN_UNUSED_KEYS]   = clean,
+				[require("config_keys").COMMAND.CONFIG_FOLDER]       = actions.open_paths,
+				[require("config_keys").COMMAND.SETUP_WIZARD]        = actions.show_setup_wizard,
 			}
 			cfg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
@@ -844,11 +791,15 @@ function M.generate(ctx, menu_mods, actions)
 		["reload"]          = function()
 			local row = ManifestMenu.command_row("top_level", "reload", { reload = actions.reload })
 			if not row then return {} end
+			-- Read by ui.menu.click_gate: a click during a reload joins it.
+			row.joins_reload = true
 			return { row }
 		end,
 		["quit"]            = function()
 			local row = ManifestMenu.command_row("top_level", "quit", { quit = actions.quit })
 			if not row then return {} end
+			-- Read by ui.menu.click_gate: Quit wins over a reload in flight and runs at once.
+			row.bypasses_reload = true
 			return { row }
 		end,
 		["debug"]           = function()
@@ -865,18 +816,25 @@ function M.generate(ctx, menu_mods, actions)
 			for key, value in pairs(ctx or {}) do dbg_ctx[key] = value end
 			dbg_ctx.commands = {
 				["console"]        = actions.open_console,
-				["log_level"]      = actions.set_log_level,
-				["open_logs"]      = actions.open_logs,
-				["open_today_log"] = actions.open_today_log,
-				["open_error_log"] = actions.open_error_log,
+				[require("config_keys").LEAF.LOG_LEVEL]      = actions.set_log_level,
+				[require("config_keys").COMMAND.OPEN_LOGS]      = actions.open_logs,
+				[require("config_keys").COMMAND.OPEN_TODAY_LOG] = actions.open_today_log,
+				[require("config_keys").COMMAND.OPEN_ERROR_LOG] = actions.open_error_log,
 				["healthcheck"]    = function() healthcheck.show_window({ state = ctx.state }) end,
-				["report_bug"]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
-				["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,
-				["show_error_dialog"] = actions.toggle_error_dialog,
+				[COMMAND.FIELD_CHECK_LEASE] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LEASE) end,
+				[COMMAND.FIELD_CHECK_OWNED_RUNTIME] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_OWNED_RUNTIME) end,
+				[COMMAND.FIELD_CHECK_NETWORK] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_NETWORK) end,
+				[COMMAND.FIELD_CHECK_TOOLCHAIN] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_TOOLCHAIN) end,
+				[COMMAND.FIELD_CHECK_LOGIN_ITEMS] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LOGIN_ITEMS) end,
+				[COMMAND.FIELD_CHECK_KEY_ACCOUNTING] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_KEY_ACCOUNTING) end,
+				[COMMAND.COMPOSER_CHECK] = function() require("ui.field_check").run(COMMAND.COMPOSER_CHECK) end,
+				[require("config_keys").COMMAND.REPORT_BUG]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
+				[require("config_keys").COMMAND.SUGGEST_FEATURE] = function() require("ui.healthcheck.report").suggest_feature() end,
+				[require("config_keys").LEAF.SHOW_ERROR_DIALOG] = actions.toggle_error_dialog,
 			}
 			dbg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do dbg_ctx.state_getters[key] = value end
-			dbg_ctx.state_getters["script.log_level"] = function() return active_level_name end
+			dbg_ctx.state_getters[require("config_keys").KEY.SCRIPT_LOG_LEVEL] = function() return active_level_name end
 			dbg_ctx.state_getters["error_dialog_enabled"] = function()
 				return require("ui.error_dialog").is_enabled()
 			end
@@ -892,6 +850,7 @@ function M.generate(ctx, menu_mods, actions)
 	}
 
 	local items = {}
+	local item_timings = {}
 	for _, entry in ipairs(load_top_level()) do
 		if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 		local id = entry.id
@@ -907,7 +866,10 @@ function M.generate(ctx, menu_mods, actions)
 			-- promised and will not see.
 			Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
 		else
+			local item_started = PhaseStats.now()
 			local children = builders[id]() or {}
+			local item_ms = PhaseStats.stop(phase_name(id), item_started)
+			item_timings[#item_timings + 1] = { id = id, ms = item_ms }
 			if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 			for _, row in ipairs(children) do
 				-- « Pause = tout éteint »: every row the manifest marks as a feature
@@ -928,6 +890,7 @@ function M.generate(ctx, menu_mods, actions)
 		end
 	end
 
+	_last_item_timings = item_timings
 	-- Everything above collected row DATA; this is where the shared renderer turns
 	-- it into the table hs.menubar consumes, dropping any separator that would not
 	-- sit between two rows.

@@ -18,9 +18,12 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local Keylogger = require("modules.keylogger.keylogger")
-local Writer = require("modules.keylogger.sqlite_writer")
-local Reader = require("modules.keylogger.sqlite_reader")
+local Keystats = require("modules.keystats.keystats")
+local Writer = require("modules.keystats.sqlite_writer")
+local Reader = require("modules.keystats.sqlite_reader")
+local Calendar = require("modules.keystats.calendar")
+local Monotonic = require("infra.monotonic")
+local native_capture = Calendar.capture
 local fixtures = {
 	{ name = "25-hour DST end late evening", year = 2026, month = 10, day = 25, hour = 23, min = 30, previous = "2026-10-24" },
 	{ name = "midnight after 23-hour DST start", year = 2026, month = 3, day = 30, hour = 0, min = 30, previous = "2026-03-29" },
@@ -42,19 +45,25 @@ for i, fixture in ipairs(fixtures) do
 	local instant = native_time({ year = fixture.year, month = fixture.month, day = fixture.day, hour = fixture.hour, min = fixture.min, sec = 0 })
 	os.date = function(format, timestamp) return native_date(format, timestamp or instant) end
 	os.time = function(date) return date and native_time(date) or instant end
+	-- Capture reads the native wall clock (uv.gettimeofday), not os.time, so the
+	-- owned instant must reach the collector through its calendar observation.
+	Calendar.capture = function()
+		return { wall_ms = instant * 1000, mono_ms = math.floor(Monotonic.now_ms()),
+			date = native_date("%Y-%m-%d", instant), ts = native_date("!%Y-%m-%d %H:%M:%S", instant) }
+	end
 	local path = root .. "/owned-" .. i .. ".sqlite"
 	Writer.close_db()
 	local ok, err = xpcall(function()
-		Keylogger.init({ sqlite_path = path, log_dir = root .. "/logs" })
-		assert(Keylogger.is_enabled() and Writer.is_available())
-		Keylogger.record_synthetic_output("owned-calendar", "aa", "other", 1000)
-		require("tests.support.sqlite_flush_native").flush(Keylogger)
+		Keystats.init({ sqlite_path = path, log_dir = root .. "/logs" })
+		assert(Keystats.is_enabled() and Writer.is_available())
+		Keystats.record_synthetic_output("owned-calendar", "aa", "other", 1000)
+		require("tests.support.sqlite_flush_native").flush(Keystats)
 		local rows = assert(Writer.query_rows("SELECT date,app,c FROM ngram_chars WHERE token='a';"))
 		assert(#rows == 1 and rows[1]:match("|2$"))
 		assert(Writer.upsert_ngrams("owned-history", fixture.previous, "owned-calendar", { h = { c = 7 } }, "ngram_chars"))
 		local before = table.concat(assert(Writer.query_rows("SELECT date,app,token,c FROM ngram_chars ORDER BY date,token;")), "\n")
 		local revision = Writer.get_revision()
-		for _, payload in ipairs({ Reader.read_range_split_today(path), Keylogger.get_range_payload() }) do
+		for _, payload in ipairs({ Reader.read_range_split_today(path), Keystats.get_range_payload() }) do
 			assert(payload.historical.c.a == nil, "today's persisted row duplicated into historical")
 			assert(payload.historical.c.h and payload.historical.c.h.c == 7, "previous calendar day's persisted row omitted")
 			assert(count_today(payload, "a") == 2 and count_today(payload, "h") == 0)
@@ -62,7 +71,7 @@ for i, fixture in ipairs(fixtures) do
 		assert(Writer.get_revision() == revision)
 		assert(table.concat(assert(Writer.query_rows("SELECT date,app,token,c FROM ngram_chars ORDER BY date,token;")), "\n") == before)
 	end, debug.traceback)
-	os.date, os.time = native_date, native_time
+	os.date, os.time, Calendar.capture = native_date, native_time, native_capture
 	if ok then print("PASS " .. fixture.name) else
 		failures = failures + 1
 		io.stderr:write("FAIL " .. fixture.name .. ": " .. tostring(err) .. "\n")

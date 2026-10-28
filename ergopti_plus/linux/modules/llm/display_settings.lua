@@ -14,18 +14,19 @@ local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
 local DisplayPolicy = require("llm.display_policy")
+local ConfigKeys = require("config_keys")
 
 local LOG = "modules.llm.display_settings"
 local PREF_PREFIX = "llm.display."
 
 local DEFINITIONS = {
 	pred_indent = {
-		path = "llm.display.pred_indent",
+		path = ConfigKeys.KEY.LLM_DISPLAY_PRED_INDENT,
 		type = "number",
 	},
-	show_info_bar = { path = "llm.display.show_info_bar", type = "boolean" },
-	streaming = { path = "llm.display.streaming", type = "boolean" },
-	streaming_multi = { path = "llm.display.streaming_multi", type = "boolean" },
+	show_info_bar = { path = ConfigKeys.KEY.LLM_DISPLAY_SHOW_INFO_BAR, type = "boolean" },
+	streaming = { path = ConfigKeys.KEY.LLM_DISPLAY_STREAMING, type = "boolean" },
+	streaming_multi = { path = ConfigKeys.KEY.LLM_DISPLAY_STREAMING_MULTI, type = "boolean" },
 }
 
 local _defaults = {}

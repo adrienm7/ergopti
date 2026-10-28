@@ -30,12 +30,12 @@ _BEBFR_ErrorNetExitsBeforeReady() {
     Guard := InStr(Body, '_DriverBootPhase != "ready"')
     ExitPos := InStr(Body, "ExitApp(1)")
     StopHook := InStr(Body, "HookDispatcher.Stop()")
-    StopKeylogger := InStr(Body, "KL_Stop()")
+    StopKeystats := InStr(Body, "KL_Stop()")
     Benign := InStr(Body, "_IsBenignUiaOrphanedPatternError")
     Assert(Guard > 0 && ExitPos > Guard,
         "the global error net must ExitApp(1) for every uncaught failure before ready")
-    Assert(StopHook > Guard && StopKeylogger > Guard && StopHook < ExitPos && StopKeylogger < ExitPos,
-        "fatal boot handling must release any started hook/keylogger before ExitApp(1)")
+    Assert(StopHook > Guard && StopKeystats > Guard && StopHook < ExitPos && StopKeystats < ExitPos,
+        "fatal boot handling must release any started hook/keystats before ExitApp(1)")
     Assert(Benign > ExitPos,
         "the fatal-before-ready guard must run before recoverable UIA-error suppression")
 
@@ -53,7 +53,7 @@ _BEBFR_ErrorNetExitsBeforeReady() {
     Assert(SurfacePos > Guard && SurfacePos < ExitPos,
         "a fatal boot exit must surface a user-visible message (MsgBox) so the driver never silently 'does nothing'")
     Assert(InputCleanupPos > Guard && InputCleanupPos < SurfacePos
-        && InputCleanupPos < StopHook && InputCleanupPos < StopKeylogger,
+        && InputCleanupPos < StopHook && InputCleanupPos < StopKeystats,
         "fatal startup handling must release owned synthetic modifiers and resynchronise Caps state before any modal dialog or subsystem stop can strand the balancing key-up (fatal-startup-synthetic-modifier-latch)")
 
     CleanupBody := _DriverFuncBody("_ErgoptiFatalInputCleanup")

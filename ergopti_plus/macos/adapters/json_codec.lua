@@ -32,6 +32,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
 
 local LOG = "adapters.json_codec"
 
@@ -48,12 +49,7 @@ end
 --- table is reachable through two paths. JSON has no cycles to follow.
 --- @param value any Value hs.json.decode returned.
 --- @return any tree The same data with every table distinct.
-local function as_tree(value)
-	if type(value) ~= "table" then return value end
-	local tree = {}
-	for key, nested in pairs(value) do tree[key] = as_tree(nested) end
-	return tree
-end
+local as_tree = TableUtil.deep_copy
 
 
 --- Encodes a Lua table (or scalar) to a JSON string.

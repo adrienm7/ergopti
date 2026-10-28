@@ -28,6 +28,7 @@ local Composition = require("config_scope_composition")
 local Logger = require("logger.shim")
 local LOG = "infra.global_scope"
 local _composition, _registry = nil, {}
+require("infra.scope_registry").register("global_scope", function() return _composition ~= nil and _composition.pending() == true end)
 
 --- The composite owner, created once so its debt survives between requests.
 --- @return table composition
@@ -67,8 +68,12 @@ function M.participants(ctx)
 		registry.hotstrings = require("infra.hotstrings_scope").participant(is_paused,
 			{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
 	end
+	-- Config only on Linux: no runtime reader of the layout rows yet (see the owner).
+	if ctx.config then
+		registry.keyboard_layout = require("infra.keyboard_layout_scope").participant(is_paused)
+	end
 	if ctx.llm then registry.llm = require("infra.llm_scope").participant(is_paused) end
-	if ctx.keylogger then registry.metrics = require("infra.metrics_scope").participant(is_paused) end
+	if ctx.keystats then registry.metrics = require("infra.metrics_scope").participant(is_paused) end
 	return registry
 end
 
@@ -76,7 +81,8 @@ end
 --- @param mode string "recommended" or "clear".
 --- @param registry table Scope id -> participant, from participants().
 --- @return boolean committed
---- @return table report Composition report (applied, skipped, failed, detail).
+--- @return table report Composition report (applied, skipped, failed, detail, and the
+---   typed failure point and kind of a refusal).
 function M.apply(mode, registry)
 	assert(type(registry) == "table", "the global scope needs its participant registry")
 	local owner = composition()
@@ -85,7 +91,8 @@ function M.apply(mode, registry)
 		owner.retry_restore(function(ok) settled = ok == true end)
 		if not settled then
 			Logger.error(LOG, "Global scope %s refused: an earlier rollback is still pending.", tostring(mode))
-			return false, { scope = "global", mode = mode, detail = "an earlier rollback is still pending" }
+			return false, { scope = "global", mode = mode, point = "acquire", kind = "rollback_pending",
+				detail = "an earlier rollback is still pending" }
 		end
 	end
 	_registry = registry
@@ -94,6 +101,13 @@ function M.apply(mode, registry)
 	-- Every Linux owner settles synchronously; an unsettled request is a defect.
 	assert(report ~= nil, "a Linux scope participant settled asynchronously")
 	return committed, report
+end
+
+--- Whether a refused rollback of a global request is still retained. The tray's
+--- Quit reads it: the macOS menu refuses Quit while its global writer is owned.
+--- @return boolean pending
+function M.pending()
+	return _composition ~= nil and _composition.pending() == true
 end
 
 --- Test seam: forgets the composition and its debt.

@@ -257,7 +257,7 @@ end
 function M.split_blocks(raw)
 	local blocks = {}
 	for block in (raw .. "==="):gmatch("(.-)===") do
-		local clean = block:gsub("^%s+", ""):gsub("%s+$", "")
+		local clean = utils.trim(block)
 		if clean ~= "" then table.insert(blocks, clean) end
 	end
 	if #blocks == 0 then table.insert(blocks, raw) end
@@ -625,10 +625,8 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			nw = block:match("NEXT_WORDS%s*:%s*(.-)[\r\n]+") or block:match("NEXT_WORDS%s*:%s*(.-)$") or ""
 		end
 
-		local function trim(s) return s:match("^%s*(.-)%s*$") or "" end
-
-		tc = trim(tc:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", ""))
-		nw = trim(nw:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", ""))
+		tc = utils.trim((tc:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", "")))
+		nw = utils.trim((nw:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", "")))
 		
 		tc = apply_french_typography(tc)
 		nw = apply_french_typography(nw)
@@ -640,7 +638,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		end
 
 		if tc == "" and nw ~= "" then
-			tc = trim((tail_text or ""):gsub("^\"", ""):gsub("\"$", ""))
+			tc = utils.trim(((tail_text or ""):gsub("^\"", ""):gsub("\"$", "")))
 		end
 		if tc == "" and nw == "" then return nil end
 
@@ -1060,7 +1058,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		
 	else
 		-- Basic / Raw Mode Logic remains untouched
-		local nw = block:gsub("^%s+", ""):gsub("%s+$", "")
+		local nw = utils.trim(block)
 		nw = nw:match("([^\n\r]+)") or nw
 		nw = nw:gsub("^%[?[Nn][Ee][Xx][Tt]%]?%s*:?%s*", "")
 		nw = nw:gsub("^[Ss][Uu][Ii][Tt][Ee]%s*:%s*", "")

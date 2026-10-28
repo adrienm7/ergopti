@@ -317,7 +317,7 @@ helpers.describe("menu-state shortcut synchronization requires exact lifecycle s
 		package.loaded["ui.menu.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
-		package.loaded["modules.keylogger.text_cipher"] = { set_enabled = function() end }
+		package.loaded["modules.keystats.text_cipher"] = { set_enabled = function() end }
 		package.loaded["ui.menu.menu_state"] = nil
 		local MenuState = require("ui.menu.menu_state")
 
@@ -325,7 +325,7 @@ helpers.describe("menu-state shortcut synchronization requires exact lifecycle s
 			shortcuts = true,
 			hotstrings = {},
 			keymap = false,
-			keylogger_enabled = false,
+			keystats_enabled = false,
 		}
 		local result = MenuState.sync_state_to_modules(state, {}, false,
 			state_sync_deps({ resume_bindings = function() return false end }))
@@ -339,7 +339,7 @@ helpers.describe("menu-state shortcut synchronization requires exact lifecycle s
 		package.loaded["ui.menu.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
-		package.loaded["modules.keylogger.text_cipher"] = { set_enabled = function() end }
+		package.loaded["modules.keystats.text_cipher"] = { set_enabled = function() end }
 		package.loaded["ui.menu.menu_state"] = nil
 		local MenuState = require("ui.menu.menu_state")
 
@@ -347,7 +347,7 @@ helpers.describe("menu-state shortcut synchronization requires exact lifecycle s
 			shortcuts = false,
 			hotstrings = {},
 			keymap = false,
-			keylogger_enabled = false,
+			keystats_enabled = false,
 		}
 		local result = MenuState.sync_state_to_modules(state, {}, false,
 			state_sync_deps({ pause_bindings = function() return true end }))

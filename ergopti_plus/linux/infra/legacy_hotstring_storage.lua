@@ -34,6 +34,8 @@ local LeafRows = require("toml_codec.leaf_rows")
 local Codec = require("toml_codec")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
+local NativePath = require("native_path")
+local ConfigKeys = require("config_keys")
 
 local LOG = "infra.legacy_hotstring_storage"
 
@@ -43,7 +45,7 @@ local ENABLED_MARK = "+"
 
 -- The repeat leaf, whose legacy storage key had the same name, and the value
 -- that legacy reader answered for an absent key (its DEFAULT_ENABLED).
-local REPEAT_PATH = "hotstrings.repeat_key_enabled"
+local REPEAT_PATH = ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED
 local LEGACY_REPEAT_DEFAULT = true
 
 -- Legacy dynamic family switches were keyed by engine section.
@@ -275,7 +277,7 @@ function M.import(options)
 		end
 		if #operations == 0 then return true, 0 end
 		local rows = LeafRows.prepare(content or "", operations)
-		local directory = options.path:match("^(.*)/[^/]+$")
+		local directory = NativePath.dirname(options.path)
 		if status == "absent" and not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then
 			return false, "the configuration folder cannot be created"
 		end

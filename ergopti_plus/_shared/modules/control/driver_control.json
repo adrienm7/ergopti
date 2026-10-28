@@ -1,5 +1,5 @@
 {
-	"_comment": "Local driver control: a tool run by the same user asks the running driver to reload. The driver writes a session file holding a random token into a folder only that user can read; a request names the token, so only a process that can read the folder is obeyed. The driver hands an admitted request to its own reload owner and reports requested, refused and completed in the result file; it never starts a second driver or ends one by force. Completion is written by the reloaded driver itself, once ready, when the pending result names it as the successor. Read at run time by the Windows, macOS and Linux drivers and by tools/control.",
+	"_comment": "Local driver control: a tool run by the same user asks the running driver to reload. The driver writes a session file holding a random token into a folder only that user can read; a request names the token, so only a process that can read the folder is obeyed. The driver hands an admitted request to its own reload owner and reports requested, refused and completed in the result file; it never starts a second driver or ends one by force. Completion is written by the reloaded driver itself, once ready, when the pending result names it as the successor. When the successor cannot be named beforehand (a Linux restart), the pending result carries a null successor and a deadline: the first ready driver claims it, a record past its deadline is reported as timeout and never as completed. Read at run time by the Windows, macOS and Linux drivers and by tools/control.",
 	"schema": 1,
 	"max_request_bytes": 4096,
 	"token_hex_length": 64,
@@ -15,6 +15,8 @@
 		"linux": { "base": "XDG_RUNTIME_DIR", "segments": ["{app}", "control"] }
 	},
 	"windows_message": "Ergopti.Driver.Reload.v1",
-	"states": ["requested", "refused", "completed"],
-	"reasons": ["unauthenticated", "malformed", "busy", "refused", "failed"]
+	"states": ["requested", "claimed", "refused", "completed", "timeout"],
+	"pending_ttl_seconds": 120,
+	"timeout_reason": "deadline",
+	"reasons": ["unauthenticated", "malformed", "busy", "refused", "failed", "deadline"]
 }

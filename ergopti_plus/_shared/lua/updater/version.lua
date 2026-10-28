@@ -11,13 +11,14 @@
 --- It can be require()d by any driver (Hammerspoon Lua, LuaJIT, etc.).
 
 local M = {}
+local TextUtils = require("text_utils")
 
 --- Strip leading 'v'/'V' and surrounding whitespace.
 --- @param tag string|nil
 --- @return string
 function M.normalize_tag(tag)
 	if type(tag) ~= "string" then return "" end
-	local t = tag:match("^%s*(.-)%s*$") or tag
+	local t = TextUtils.trim(tag)
 	if t:sub(1, 1):lower() == "v" then t = t:sub(2) end
 	return t
 end

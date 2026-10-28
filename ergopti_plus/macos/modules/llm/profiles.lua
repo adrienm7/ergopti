@@ -26,6 +26,7 @@ local i18n     = require("infra.i18n")
 local Manifest = require("infra.manifest_reader")
 local Selector = require("llm.profile_selector")
 local Storage  = require("adapters.storage")
+local ConfigKeys = require("config_keys")
 local LOG      = "llm.profiles"
 
 
@@ -177,7 +178,7 @@ end
 --- The language a prompt's {language} placeholder names: the interface locale.
 --- @return string language
 function M.prompt_language()
-	return i18n.get_locale() or Manifest.default_for("script.locale")
+	return i18n.get_locale() or Manifest.default_for(ConfigKeys.KEY.SCRIPT_LOCALE)
 end
 
 --- Resolves the appropriate system prompt, injecting live session values.

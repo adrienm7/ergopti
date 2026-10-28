@@ -6,7 +6,7 @@
 --- The shared locale files use {1}, {2}, … The AutoHotkey driver's logger
 --- understands that natively; macOS had no equivalent, and the onboarding call
 --- sites reached for string.format, which looks for %s and leaves {1} alone.
---- So the privacy warning shown before enabling the keylogger displayed a
+--- So the privacy warning shown before enabling the keystats displayed a
 --- literal "{1}" where the metrics path belongs — on the one screen where the
 --- user most needs to see where their keystrokes will be stored.
 ---

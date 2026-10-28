@@ -13,35 +13,61 @@ local M = {}
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
+local AppIdentity = require("llm.app_identity")
+local NEVER_MS = require("llm.request_plan.debounce").NEVER_MS
+local ConfigKeys = require("config_keys")
+local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
+
+-- Exported so the menu offers the same choice the file stores.
+M.NEVER_MS = NEVER_MS
 
 local LOG = "modules.llm.trigger_settings"
 local PREF_PREFIX = "llm.trigger."
 
 local DEFINITIONS = {
 	debounce_ms = {
-		path = "llm.trigger.debounce_ms",
+		path = KEY.LLM_TRIGGER_DEBOUNCE_MS,
 		type = "number",
 		min = 50,
 		max = 10000,
 		presets = { 50, 100, 200, 300, 500, 750, 1000, 2000 },
+		-- The one value outside the range: no automatic trigger at all.
+		never = NEVER_MS,
+	},
+	-- The minimum time between two automatic AI requests (the rate floor).
+	min_request_interval_ms = {
+		path = KEY.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS,
+		type = "number",
+		min = 0,
+		max = 10000,
+		presets = { 0, 100, 200, 300, 500, 750, 1000, 2000, 5000 },
 	},
 	instant_on_word_end = {
-		path = "llm.trigger.instant_on_word_end",
+		path = KEY.LLM_TRIGGER_INSTANT_ON_WORD_END,
 		type = "boolean",
 	},
 	after_hotstring = {
-		path = "llm.trigger.after_hotstring",
+		path = KEY.LLM_TRIGGER_AFTER_HOTSTRING,
 		type = "boolean",
 	},
 	secure_filter_enabled = {
-		path = "llm.trigger.secure_filter_enabled",
+		path = KEY.LLM_TRIGGER_SECURE_FILTER_ENABLED,
 		type = "boolean",
 	},
 	url_bar_filter_enabled = {
-		path = "llm.trigger.url_bar_filter_enabled",
+		path = KEY.LLM_TRIGGER_URL_BAR_FILTER_ENABLED,
 		type = "boolean",
 	},
+	-- The applications no prediction runs in, as the identifiers the session reports.
+	disabled_apps = {
+		path = KEY.LLM_TRIGGER_DISABLED_APPS,
+		type = "table",
+		apps = true,
+	},
 }
+
+-- A hand-edited list cannot hold the menu hostage
+local MAX_APPS = 200
 
 local _defaults = {}
 local _values = {}
@@ -65,10 +91,26 @@ local function default_for(name)
 	return value
 end
 
+--- Whether a value is a dense list of distinct, normalised application identifiers.
+--- @param value any
+--- @return boolean
+local function valid_apps(value)
+	if type(value) ~= "table" or #value > MAX_APPS then return false end
+	local seen, count = {}, 0
+	for index, app in pairs(value) do
+		count = count + 1
+		if type(index) ~= "number" or type(app) ~= "string" or AppIdentity.normalize(app) ~= app or seen[app] then return false end
+		seen[app] = true
+	end
+	return count == #value
+end
+
 local function valid(name, value)
 	local def = definition(name)
 	if not def or type(value) ~= def.type then return false end
+	if def.apps then return valid_apps(value) end
 	if def.type == "number" then
+		if def.never ~= nil and value == def.never then return true end
 		return value == math.floor(value) and value >= def.min and value <= def.max
 	end
 	return true
@@ -95,6 +137,45 @@ function M.get(name)
 	end
 	_values[name] = shipped
 	return shipped
+end
+
+--- The applications the trigger never runs in, as a detached list.
+--- @return table apps Normalised identifiers.
+function M.disabled_apps()
+	local copy = {}
+	for index, app in ipairs(M.get(LEAF.DISABLED_APPS) or {}) do copy[index] = app end
+	return copy
+end
+
+--- Whether the trigger is switched off in an application.
+--- @param app any The identifier the session reports for the focused application.
+--- @return boolean disabled
+function M.is_app_disabled(app)
+	local key = AppIdentity.normalize(app)
+	if not key then return false end
+	for _, disabled in ipairs(M.get(LEAF.DISABLED_APPS) or {}) do
+		if disabled == key then return true end
+	end
+	return false
+end
+
+--- Replaces the list of applications the trigger never runs in.
+--- @param apps table Identifiers; each is normalised and duplicates are merged.
+--- @param expected_source table|nil Exact source retained by a deferred editor.
+--- @param admission function|nil Final originating configuration admission.
+--- @return boolean committed
+function M.set_disabled_apps(apps, expected_source, admission)
+	if type(apps) ~= "table" then return false end
+	local list, seen = {}, {}
+	for _, app in ipairs(apps) do
+		local key = AppIdentity.normalize(app)
+		if not key then
+			Logger.error(LOG, "Refused an unusable application identifier for the trigger exclusions.")
+			return false
+		end
+		if not seen[key] then seen[key] = true; list[#list + 1] = key end
+	end
+	return M.set(LEAF.DISABLED_APPS, list, expected_source, admission)
 end
 
 --- Persists before publishing the live value.
@@ -147,6 +228,15 @@ function M.presets(name)
 	local values = {}
 	for index, value in ipairs(def and def.presets or {}) do values[index] = value end
 	return values
+end
+
+--- Whether a value of a numeric setting means "never" (the setting is off).
+--- @param name string
+--- @param value any
+--- @return boolean never
+function M.is_never(name, value)
+	local def = definition(name)
+	return def ~= nil and def.never ~= nil and value == def.never
 end
 
 --- Returns the accepted numeric range.

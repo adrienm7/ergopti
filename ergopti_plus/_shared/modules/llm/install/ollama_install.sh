@@ -6,7 +6,7 @@
 # DESCRIPTION:
 # Provisions a working Ollama install on a freshly cloned macOS — installs the
 # `ollama` binary if missing, then makes sure the local server is reachable on
-# http://localhost:11434 so the rest of the stack can talk to it. No manual
+# the llm_ollama_port of ../defaults.json so the rest of the stack can talk to it. No manual
 # user setup required: the user's first Hammerspoon reload after switching to
 # (or installing on) the Ollama backend bootstraps everything.
 #
@@ -14,8 +14,8 @@
 # 1. Self-bootstrapping: prefers the official `curl … | sh` installer (works on
 #    a Mac vierge with no Homebrew), falls back to `brew install ollama` when
 #    Homebrew is already there. Either path lands a usable `ollama` binary.
-# 2. Server lifecycle: after the binary is installed, queries
-#    http://localhost:11434/api/tags. If the server is not running, launches
+# 2. Server lifecycle: after the binary is installed, queries /api/tags on
+#    that port. If the server is not running, launches
 #    `ollama serve` in the background (detached, redirected to /tmp/ergopti.log)
 #    and waits up to OLLAMA_READY_TIMEOUT_SEC seconds for it to come online.
 # 3. Streaming markers: emits identifiable lines on stdout (OLLAMA_INSTALLING,
@@ -42,10 +42,20 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
 # disks; capped low enough that a real install failure surfaces promptly.
 OLLAMA_READY_TIMEOUT_SEC=20
 
+# The default port is declared once, in _shared/modules/llm/defaults.json
+# (llm_ollama_port, pinned by tools/test/test-ollama-port-single-source.cjs).
+# The readiness probe and the server this script starts both use it.
+LLM_DEFAULTS_FILE="$(cd "$(dirname "$0")/.." && pwd)/defaults.json"
+OLLAMA_PORT="$(sed -n 's/^[[:space:]]*"llm_ollama_port":[[:space:]]*\([0-9][0-9]*\),\{0,1\}[[:space:]]*$/\1/p' "$LLM_DEFAULTS_FILE")"
+if [ -z "$OLLAMA_PORT" ]; then
+	printf "[OLLAMA-DEPS] llm_ollama_port is missing from %s.\n" "$LLM_DEFAULTS_FILE" >&2
+	exit 1
+fi
+
 # Server endpoint we probe to determine readiness. `/api/tags` returns 200
 # OK with an empty list on a freshly installed server, so it's a reliable
 # liveness signal that does not depend on any model already being present.
-OLLAMA_HEALTH_URL="http://localhost:11434/api/tags"
+OLLAMA_HEALTH_URL="http://localhost:${OLLAMA_PORT}/api/tags"
 
 # Path to the unified log file used by Hammerspoon. Spawning `ollama serve`
 # with stdout/stderr appended here means `tail -f /tmp/ergopti.log` shows
@@ -151,7 +161,7 @@ log_info "Démarrage du serveur Ollama en arrière-plan…"
 # Spawn the server fully detached so it survives this script's exit.
 # Output is appended to the unified log so `tail -f /tmp/ergopti.log` shows
 # the server's startup banner and any subsequent runtime errors.
-nohup ollama serve >>"$UNIFIED_LOG" 2>&1 &
+OLLAMA_HOST="127.0.0.1:${OLLAMA_PORT}" nohup ollama serve >>"$UNIFIED_LOG" 2>&1 &
 disown 2>/dev/null || true
 
 if ! wait_for_server; then
@@ -160,5 +170,5 @@ if ! wait_for_server; then
 fi
 
 emit_marker "OLLAMA_READY"
-log_info "✅ Serveur Ollama prêt sur http://localhost:11434."
+log_info "✅ Serveur Ollama prêt sur http://localhost:${OLLAMA_PORT}."
 exit 0

@@ -35,22 +35,22 @@ local function make_llm()
 	return bridge
 end
 
-local function load_subject(keylogger)
-	package.loaded["modules.keylogger"] = keylogger
+local function load_subject(keystats)
+	package.loaded["modules.keystats"] = keystats
 	local subject, synthetic = SyntheticStack.load("modules.keymap.expander")
 	return subject, synthetic
 end
 
 local function cleanup()
-	package.loaded["modules.keylogger"] = nil
+	package.loaded["modules.keystats"] = nil
 	package.loaded["modules.keymap.expander"] = nil
 end
 
 helpers.describe("repeat replacement transaction", function()
-	helpers.it("repeat replacement transaction publishes telemetry, keylogger buffer, and preview", function()
+	helpers.it("repeat replacement transaction publishes telemetry, keystats buffer, and preview", function()
 		local notifications = {}
 		local buffers = {}
-		local keylogger = {
+		local keystats = {
 			notify_synthetic = function(...)
 				notifications[#notifications + 1] = { ... }
 			end,
@@ -58,7 +58,7 @@ helpers.describe("repeat replacement transaction", function()
 				buffers[#buffers + 1] = buffer
 			end,
 		}
-		local Expander, SyntheticInput = load_subject(keylogger)
+		local Expander, SyntheticInput = load_subject(keystats)
 		local state = make_state("ab★")
 		local llm = make_llm()
 		Expander.init(state, make_registry(), llm)
@@ -91,11 +91,11 @@ helpers.describe("repeat replacement transaction", function()
 	helpers.it("repeat replacement transaction refuses output without ghost telemetry", function()
 		local notify_count = 0
 		local set_buffer_count = 0
-		local keylogger = {
+		local keystats = {
 			notify_synthetic = function() notify_count = notify_count + 1 end,
 			set_buffer = function() set_buffer_count = set_buffer_count + 1 end,
 		}
-		local Expander, SyntheticInput = load_subject(keylogger)
+		local Expander, SyntheticInput = load_subject(keystats)
 		local state = make_state("ab★")
 		local llm = make_llm()
 		Expander.init(state, make_registry(), llm)

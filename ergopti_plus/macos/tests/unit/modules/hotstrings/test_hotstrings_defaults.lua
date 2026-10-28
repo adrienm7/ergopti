@@ -65,8 +65,8 @@ helpers.describe("hotstrings_config: shared defaults are the single source", fun
 		local r = mod.resolve("rolls", nil)
 		helpers.assert_eq(r.color, sections.colors.global_default,
 			"global default color is loaded from [colors] global_default")
-		helpers.assert_eq(r.delay, tonumber(sections.delays.default_sec),
-			"global default delay is loaded from [delays] default_sec")
+		helpers.assert_eq(r.delay, require("infra.manifest_reader").default_for("hotstrings.expansion_delay"),
+			"global default delay is the manifest default of hotstrings.expansion_delay")
 
 		-- The "personal" category has its own baseline color from the same file.
 		local rp = mod.resolve("personal", nil)

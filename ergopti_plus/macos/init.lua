@@ -19,7 +19,9 @@ do
 	local _src = debug.getinfo(1, "S").source:gsub("^@", "")
 	-- Resolve absolute path when source is relative (Hammerspoon always provides abs)
 	local _abs = _src:sub(1, 1) == "/" and _src or (hs.fs and hs.fs.currentDir and hs.fs.currentDir() .. "/" .. _src or _src)
-	-- Strip "init.lua" to get the HS driver root
+	-- Strip "init.lua" to get the HS driver root. This runs before the shared Lua
+	-- root is on package.path, so native_path cannot be required yet; macOS has
+	-- no backslash separator, so splitting at slashes alone is the native rule.
 	local _hs_root = _abs:match("^(.*)/[^/]+$") or _abs
 	-- _shared/ lives one level up from the HS driver root (in ergopti_plus/)
 	local _ergopti_plus = _hs_root:match("^(.*)/[^/]+$") or _hs_root
@@ -52,6 +54,17 @@ do
 				end
 			end
 		end)
+	end
+
+	-- A developer app (infra/dev_source.lua) runs this clone, which holds no
+	-- LuaSocket: the build stages it into the app payload only. A root that does
+	-- not name this driver is left to the instance admission below, which
+	-- refuses the process.
+	local dev_ok, dev_root = pcall(function() return require("infra.dev_source").root() end)
+	if dev_ok and dev_root and searchers then
+		local DevSource = require("infra.dev_source")
+		local payload = DevSource.payload_driver_dir(hs.processInfo and hs.processInfo.bundlePath)
+		table.insert(searchers, 2, DevSource.payload_searcher(payload, loadfile, package.loadlib))
 	end
 end
 
@@ -182,7 +195,7 @@ Storage.set(HS_BOOT_READY_SETTING_KEY, false)
 
 -- Restore persisted log level from settings, or default to DEBUG
 do
-	local saved_level = Storage.get("log_level")
+	local saved_level = Storage.get(require("config_keys").LEAF.LOG_LEVEL)
 	local valid = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
 	if type(saved_level) == "string" and valid[saved_level] then
 		Logger.set_level(saved_level)
@@ -222,6 +235,7 @@ if scripting_observed ~= true or scripting_written ~= true then
 	BootJournal.append("INFO", "Native scripting server witness publication unacknowledged.")
 end
 Boot.begin()
+Boot.trace_requires()
 
 --- Records one boot fact in the log and in the synchronous boot journal, which
 --- reaches launcher.log until the configured log folder is committed. Callers
@@ -310,7 +324,7 @@ local function abort_pre_runtime_boot(stage, detail, alert_key, before_exit)
 	-- for as long as the dialog stays up.
 	local quiet_ok, quiet_err = pcall(function()
 		if TimerScheduler.cancelAll() ~= true then error("a native timer refused to stop") end
-		local kc_bridge = package.loaded["modules.keylogger.kc_bridge"]
+		local kc_bridge = package.loaded["modules.keystats.kc_bridge"]
 		if type(kc_bridge) == "table" and kc_bridge.stop() ~= true then
 			error("the KC ledger bridge did not stop")
 		end
@@ -339,7 +353,7 @@ Boot.stage("Path: config dir + paths.toml (config_paths.init)")
 -- ===================================
 -- ===================================
 
--- Initialize the paths module EARLY (before karabiner/keylogger modules load)
+-- Initialize the paths module EARLY (before karabiner/keystats modules load)
 -- so they can access the user-configured config_dir instead of using fallbacks
 local script_path = debug.getinfo(1, "S").source
 if script_path:sub(1, 1) == "@" then script_path = script_path:sub(2) end
@@ -366,7 +380,7 @@ local ManifestReader     = require("infra.manifest_reader")
 -- trap as project-lua-closure-before-local-nil-global.
 locale_mod.set_trigger_provider(function()
 	return keymap.get_trigger_char and keymap.get_trigger_char()
-		or ManifestReader.default_for("hotstrings.trigger_char")
+		or ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
 end)
 -- Expose keymap in the global table so the Hammerspoon console can call
 -- keymap.perf_report_all() / perf_enable() / perf_reset() without
@@ -651,7 +665,7 @@ local function settle_loaded_physical_owner(on_teardown_ready)
 	-- are still live. This port never loads or initializes the dormant module.
 	local physical = _local_teardown_state.physical
 	if physical == nil then
-		local owner = rawget(package.loaded, "modules.keylogger.physical_history_session")
+		local owner = rawget(package.loaded, "modules.keystats.physical_history_session")
 		if owner == nil then
 			physical = { settled = true }
 		else
@@ -670,7 +684,7 @@ local function settle_loaded_physical_owner(on_teardown_ready)
 		_local_teardown_state.physical = physical
 	end
 	local function current()
-		local owner = rawget(package.loaded, "modules.keylogger.physical_history_session")
+		local owner = rawget(package.loaded, "modules.keystats.physical_history_session")
 		if physical.owner == nil then return owner == nil end
 		return rawequal(owner, physical.owner)
 			and rawequal(rawget(physical.owner, "stop"), physical.stop)
@@ -890,12 +904,12 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 			end,
 		},
 		{
-			name = "keylogger",
+			name = "keystats",
 			run = function()
-				local module = package.loaded["modules.keylogger"]
+				local module = package.loaded["modules.keystats"]
 				if module == nil then return true end
 				if type(module) ~= "table" or type(module.shutdown) ~= "function" then
-					error("modules.keylogger.shutdown is unavailable")
+					error("modules.keystats.shutdown is unavailable")
 				end
 				return module.shutdown()
 			end,
@@ -951,6 +965,16 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 			local module = package.loaded["infra.driver_control"]
 			if module == nil then return true end
 			return module.stop()
+		end,
+	}
+	steps[#steps + 1] = {
+		name = "field-run",
+		run = function()
+			local module = package.loaded["infra.field_run"]
+			if module == nil then return true end
+			-- A run this teardown cuts short is closed with what cut it short
+			return module.stop({ kind = TerminationCoordinator.pending_kind(),
+				reason = TerminationCoordinator.pending_reason() })
 		end,
 	}
 	steps[#steps + 1] = {
@@ -1370,7 +1394,9 @@ end
 -- cleanup, LLM bootstrap, TOML loading and the keymap engine startup have all
 -- completed (F-MED-19).
 local function finish_boot_after_onboarding()
-Boot.stage("Accessibility permission")
+-- stage_once: when the wait below grants trust, this function runs again from
+-- inside this very stage, which must resume rather than open twice.
+Boot.stage_once("Accessibility permission")
 -- Every input owner below is an eventtap, and an untrusted process gets taps
 -- that never enable. The packaged runtime is its own app identity, so a user
 -- whose onboarding was skipped (config.toml already present) may never have
@@ -1468,15 +1494,13 @@ end
 -- boot_llm_enabled computation (including the saved-prefs / DEFAULT_STATE
 -- fallback) runs later in Section 3. Named distinctly so the two never shadow
 -- each other and the intent of each is unambiguous.
--- Overrides applied FIRST. config.toml's [features] layer can disable the LLM,
--- and it writes into hs.settings — but it used to run 50 lines below this read,
--- so a user who turned the LLM off in the file still paid the synchronous
--- lsof + curl cleanup on every boot. The two readers of this one setting sat on
--- opposite sides of the layer that populates it.
+-- Overrides applied FIRST. config.toml's [script] layer writes into hs.settings,
+-- and the native llm.enabled consent read below sits beside it: the two readers
+-- of one setting must not sit on opposite sides of the layer that populates it.
 local config_overrides = require("infra.config_overrides")
 config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
-local mlx_cleanup_enabled = config_overrides.read_native_value("llm.enabled") == true
+local mlx_cleanup_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED) == true
 local mlx_cleanup_settled = not mlx_cleanup_enabled
 local pending_llm_bootstrap = nil
 
@@ -1538,20 +1562,20 @@ Boot.stage("LLM backend bootstrap")
 -- =======================================
 
 -- Apply optional user overrides from hammerspoon/config.toml on top of
--- hs.settings. The [script] and [features] sections are an optional "expert"
--- layer the user can edit by hand to override anything the menu exposes
--- (LogLevel, individual feature flags). All overrides live in the
--- driver-specific config — no separate cross-driver config.toml.
+-- hs.settings. The [script] section is an optional "expert" layer the user can
+-- edit by hand (log_level). The [features] layer was retired: each declared
+-- feature has one canonical leaf, and a leftover [features] table is reported by
+-- the unused-key scan. All overrides live in the driver-specific config.
 -- (config_overrides.apply already ran in Section 2, before the MLX cleanup gate
 -- that reads a value it can write.)
 
 -- Re-apply the log level AFTER overrides. Logger.set_level already ran at boot
--- (above), BEFORE config_overrides — so a [script] log_level / LogLevel override
--- (which config_overrides maps onto the canonical "ergopti.log_level" key) would
+-- (above), BEFORE config_overrides — so a [script] log_level override
+-- (which config_overrides stores under the canonical "ergopti.log_level" key) would
 -- otherwise be written but never consumed. Re-derive and apply it here so the
 -- documented expert override actually takes effect on a reload.
 do
-	local lvl = Storage.get("log_level")
+	local lvl = Storage.get(require("config_keys").LEAF.LOG_LEVEL)
 	local valid_levels = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
 	if type(lvl) == "string" and valid_levels[lvl:upper()] then
 		Logger.set_level(lvl:upper())
@@ -1561,7 +1585,7 @@ end
 local Preferences = require("infra.preferences")
 local ok_core_llm, core_llm = pcall(require, "modules.llm")
 local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
-local boot_llm_enabled = config_overrides.read_native_value("llm.enabled")
+local boot_llm_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED)
 if boot_llm_enabled == nil then
 	if type(boot_saved_prefs.llm_enabled) == "boolean" then
 		boot_llm_enabled = boot_saved_prefs.llm_enabled
@@ -1726,6 +1750,9 @@ do
 			return require("native_path").without_trailing_separators(config_paths.get_config_dir()) .. "/hotstrings_config.toml"
 		end,
 		delay_transaction = keymap.with_hotstring_delays,
+		-- The base expansion delay the overrides are offsets of is the keymap's,
+		-- which the preferences set from hotstrings.expansion_delay.
+		base_delay = keymap.get_base_delay,
 		toml_resolver = function(category)
 			-- A namespaced extension pack names its own discovered file, and a
 			-- category an extension binds whole reads its metadata from it,
@@ -1771,6 +1798,9 @@ do
 	})
 
 	if hotstring_config_ready ~= true then error("hotstring override owner did not initialize") end
+	-- The delays it projects onto the registry are offsets of the base: project
+	-- them again whenever the base changes, and migrate the old file once it is known.
+	keymap.on_base_delay_change(hotstrings_config.refresh_delays)
 
 	-- Wire the config window so it can discover personal + extension files.
 	local ok_cw, cw = pcall(require, "ui.hotstrings_config_window")
@@ -1798,7 +1828,7 @@ end
 -- Magic key (the hotstring trigger character) defaults here; a user's custom
 -- value and per-section enabled states are restored from config.toml by
 -- menu_state during menu start (the v2 config is TOML, not the legacy config.json).
-local magic_key = ManifestReader.default_for("hotstrings.trigger_char")
+local magic_key = ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
 
 -- Pass the trigger char to keymap before loading files so magic-key hotstrings
 -- register against the right character.
@@ -1940,6 +1970,7 @@ for _, g in ipairs(personal_files) do
 	table.insert(hotfiles, g.name)
 	hotfile_paths[g.name] = g.path
 end
+Boot.sub("personal hotstrings")
 
 -- Extension packs next: the package tier sits between the personal groups and
 -- the bundled ones. Each pack registers under its namespaced ext: key and stays
@@ -1948,6 +1979,8 @@ for _, group in ipairs(ExtensionPacks.load(ExtensionPacks.catalogue(), keymap)) 
 	table.insert(hotfiles, group.name)
 	hotfile_paths[group.name] = group.path
 end
+
+Boot.sub("extension packs")
 
 -- Dynamic hotstrings (personal info, date triggers, etc.) — after personal,
 -- before common TOMLs, so dynamic rules beat same-length common hotstrings.
@@ -1975,6 +2008,7 @@ if dynamic_hotstrings.set_enabled(boot_personal_info) ~= true
 	error("canonical personal-info preference did not commit before eventtap startup")
 end
 table.insert(hotfiles, "dynamichotstrings")
+Boot.sub("dynamic hotstrings")
 
 -- Common TOML hotstring files — lowest priority among user-visible groups.
 -- A layout extension may bind a category, or some of its sections, to its own
@@ -1984,15 +2018,30 @@ local _toml_load_t0 = hs.timer.secondsSinceEpoch()
 local CommonHotstringsBoot = require("infra.common_hotstrings_boot")
 local common_file_count = 0
 local carried_categories = {}
+-- Whether every bundled source loaded, and which categories list the build's own
+-- sections (a user copy or an extension route lists another file's): the
+-- choice catalogue is published only from a complete load.
+local bundled_complete = true
+local build_sections = {}
+local slowest_common_ms, slowest_common_name = 0, "none"
 for _, fname in ipairs(toml_fnames) do
 	local name = fname:match("^(.-)%.toml$")
 	local own = hotstrings_dir .. fname
 	local path, section_sources = ExtensionPacks.route(name, own, is_user_hotstrings_copy(own))
 	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
+	local PhaseStats = require("infra.phase_stats")
+	local load_started = PhaseStats.now()
 	local receipt = CommonHotstringsBoot.load(keymap, name, path, section_sources, hotfiles, hotfile_paths)
-	if receipt.committed then common_file_count = common_file_count + 1 end
+	local load_ms = PhaseStats.stop("hotstring_load.common_file", load_started)
+	if load_ms > slowest_common_ms then slowest_common_ms, slowest_common_name = load_ms, name end
+	if receipt.committed then common_file_count = common_file_count + 1 else bundled_complete = false end
+	build_sections[name] = receipt.committed and path == own and section_sources == nil
+		and not is_user_hotstrings_copy(own)
 	carried_categories[name] = true
 end
+Boot.sub("common hotstring files")
+Logger.evidence(LOG, "Common hotstring load: %d file(s), slowest '%s' %.1f ms.",
+	common_file_count, slowest_common_name, slowest_common_ms)
 -- Language packs after the neutral files. A declared pack whose file is missing
 -- is a broken install: it is logged as an error rather than silently absent from
 -- the menu.
@@ -2006,12 +2055,16 @@ for _, pack in ipairs(language_packs) do
 			Logger.debug(LOG, string.format("Loading language TOML file: %s…", name))
 			local receipt = CommonHotstringsBoot.load(keymap, name, path, section_sources, hotfiles, hotfile_paths)
 			carried_categories[name] = true
-			if receipt.committed then language_file_count = language_file_count + 1 end
+			if receipt.committed then language_file_count = language_file_count + 1 else bundled_complete = false end
+			build_sections[name] = receipt.committed and path == own and section_sources == nil
+				and not is_user_hotstrings_copy(own)
 		else
+			bundled_complete = false
 			Logger.error(LOG, string.format("Language pack file %s/%s.toml is missing.", pack.id, stem))
 		end
 	end
 end
+Boot.sub("language hotstring files")
 -- A category an extension binds whole is its file even when no bundled file
 -- carries it. Sections bound into a category this driver does not carry have
 -- no metadata to join, so they are reported instead of guessed.
@@ -2022,6 +2075,28 @@ for _, route in ipairs(ExtensionPacks.unbundled_routes(carried_categories)) do
 		Logger.error(LOG, "An extension binds sections of '%s', a category this driver does not carry.",
 			route.category)
 	end
+end
+-- The cleanup judges an explicit category or section choice against what this
+-- build shipped, once every bundled source loaded. A personal file, an extension
+-- pack or a dynamic group is never judged: its absence may be temporary.
+if bundled_complete then
+	local PersonalHotstrings = require("infra.personal_hotstrings")
+	local Extensions = require("hotstrings.extensions")
+	local published = require("infra.hotstring_choice_catalogue").publish(function(id)
+		if PersonalHotstrings.is_personal_group(id) or Extensions.parse_category_key(id) ~= nil
+			or id == "dynamichotstrings" then
+			return { unjudged = true }
+		end
+		local sections = keymap.get_sections(id)
+		if sections == nil then return nil end
+		if not build_sections[id] then return { sections = nil } end
+		local names = {}
+		for _, section in ipairs(sections) do names[section.name] = true end
+		return { sections = names }
+	end)
+	if published ~= true then error("the hotstring choice catalogue did not publish at boot") end
+else
+	Logger.warn(LOG, "A bundled hotstring source did not load; explicit category choices stay unjudged this session.")
 end
 Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) and %d language file(s) in %.1fms.",
 	common_file_count, language_file_count, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
@@ -2036,6 +2111,7 @@ do
 			s.hits or 0, s.misses or 0, s.writes or 0, tostring(s.enabled)))
 	end
 end
+Boot.sub("choice catalogue and cache stats")
 Boot.mark("Hotstring groups registered (personal + dynamic + common)")
 Boot.stage("Final mapping sort + tail-index rebuild")
 
@@ -2080,6 +2156,25 @@ boot_note("Remap guardian status reported by the launcher: %s.",
 -- for a new one whenever a slot or the chords' switch changes.
 if type(karabiner) ~= "table" or karabiner.set_script_chords_source(shortcuts.karabiner_script_chords) ~= true then
 	error("karabiner.set_script_chords_source did not commit")
+end
+-- The virtual keyboard type the deployed karabiner.json carries is the user's
+-- choice (config.toml [layout] virtual_keyboard, Automatic by default). It is
+-- read from the file on every regeneration, so a choice persisted by the menu is
+-- the one the next deploy writes. An unreadable file refuses the deploy instead
+-- of guessing a product.
+do
+	local virtual_keyboard_default = require("infra.manifest_reader").default_for(require("config_keys").KEY.LAYOUT_VIRTUAL_KEYBOARD)
+	local registered = type(karabiner) == "table" and karabiner.set_virtual_keyboard_source(function()
+		-- Read-only: a retired key an older release left is warned and ignored, never a refusal.
+		local flat, _, reason, key_path = Preferences.current_view(config_paths.get("ConfigTomlPath"), true)
+		if flat == nil then
+			error("config.toml cannot be read (" .. tostring(reason) .. (key_path and (" at " .. key_path) or "")
+				.. "), so the virtual keyboard choice is unknown")
+		end
+		if flat.layout_virtual_keyboard == nil then return virtual_keyboard_default end
+		return flat.layout_virtual_keyboard
+	end)
+	if registered ~= true then error("karabiner.set_virtual_keyboard_source did not commit") end
 end
 if type(karabiner) ~= "table" or karabiner.init(file_system) ~= true then
 	error("karabiner.init did not commit")
@@ -2185,6 +2280,8 @@ local file_watchers_committed = require("infra.file_watchers").start({
 	ignored_dirs            = { TOML_CACHE_DIR },
 	-- The personal hotstrings tree is usually a SEPARATE git repository from the
 	-- driver, so a pull there must be gated by its own .git, not the driver's.
+	-- A developer app also reloads on shared Lua edits; a packaged tree never changes.
+	shared_source_dir       = require("infra.dev_source").is_active() and (logger_shared_root .. "/lua") or nil,
 	git_roots               = {
 		base_dir,
 		require("native_path").without_trailing_separators(config_paths.get("HotstringsDirPath") or ""),
@@ -2212,7 +2309,7 @@ Boot.stage("Boot complete (post-init deferrals scheduled)")
 -- Warm up macOS WebKit in the background so the first dashboard open is
 -- not penalised by the framework load (~1-2 s).  Deferred so it never
 -- blocks the boot critical path.
-hs.timer.doAfter(2, function()
+hs.timer.doAfter(require("infra.timings").sec("ui", "webkit_warmup_delay_ms"), function()
 	pcall(function() require("ui.ui_builder").warmup_webkit() end)
 end)
 
@@ -2220,7 +2317,7 @@ end)
 -- Windows loader does at startup: the warning behind what « Nettoyer
 -- config.toml » offers. Off the boot critical path; a failure is logged with
 -- its traceback, never lost in the timer's dispatch.
-hs.timer.doAfter(3, function()
+hs.timer.doAfter(require("infra.timings").sec("ui", "unused_keys_warning_delay_ms"), function()
 	local listed, list_err = xpcall(function()
 		require("ui.menu.unused_keys_cleanup").warn_unused(config_paths.get("ConfigTomlPath"))
 	end, debug.traceback)
@@ -2229,8 +2326,28 @@ hs.timer.doAfter(3, function()
 	end
 end)
 
+-- A layout installed while the session ran is turned on by macOS only at the
+-- next login (macOS 26): its record is owned from here, and once the boot
+-- settles each recorded layout is confirmed on (and selected when the user
+-- asked to use it) or logged as still off.
+local PendingLayoutActivation = require("modules.keymap.pending_layout_activation")
+PendingLayoutActivation.init(PendingLayoutActivation.production_deps())
+hs.timer.doAfter(require("infra.timings").sec("ui", "pending_layout_activation_delay_ms"), function()
+	local reported, report_err = xpcall(require("modules.keymap.layout_install").report_duplicate_bundles, debug.traceback)
+	if not reported then
+		Logger.error(LOG, "The duplicate keyboard-layout bundles could not be listed: %s", tostring(report_err))
+	end
+	local resumed, resume_err = xpcall(PendingLayoutActivation.resume, debug.traceback)
+	if not resumed then
+		Logger.error(LOG, "The pending keyboard layouts could not be checked: %s", tostring(resume_err))
+	end
+end)
+
 Boot.mark("Boot complete (post-init deferrals scheduled)")
 Boot.complete()
+-- Permanent phase counters (hot path, menu, boot sub-stages, config parses,
+-- child processes): one summary line per family every interval, never at boot.
+require("infra.phase_stats").start()
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
 Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
@@ -2244,6 +2361,14 @@ require("infra.driver_control").start({
 		return TerminationCoordinator.request_reload_owned(reason, on_aborted)
 	end,
 })
+-- The developer field run (tools/dev/collect-macos-field-report.sh): only a
+-- developer app runs it, so a packaged runtime never even loads the module.
+if require("infra.dev_source").is_active() then
+	require("infra.field_run").start({
+		root = require("infra.dev_source").root(),
+		pid = assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable"),
+	})
+end
 -- Trigger the first Karabiner deploy HERE, after init.lua fully completes.
 -- hs.timer callbacks scheduled during module init do not fire reliably;
 -- calling regenerate() from this top-level context guarantees the event loop

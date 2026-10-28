@@ -31,6 +31,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ../adapters/boot_clock.ahk
+
 ; QueryPerformanceFrequency is constant for the life of the process; cache it on
 ; first use so the per-keystroke path never re-queries it.
 global _HOTPATH_QPC_FREQ := 0
@@ -97,9 +99,7 @@ global _HOTPATH_BREAKDOWN_CAP := 24
 ; Read the current high-resolution performance counter.
 ; @returns {Integer} Raw QPC tick value; pass to HotPath_LogIfSlow as the start.
 HotPath_Now() {
-	local counter := 0
-	DllCall("QueryPerformanceCounter", "Int64*", &counter)
-	return counter
+	return PerfClockTicks()
 }
 
 ; Sum the wall clock of the segments in ``Closed`` that opened AND closed inside
@@ -164,8 +164,8 @@ HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
 	static Closed := []
 	local now := 0
 	if (_HOTPATH_QPC_FREQ == 0)
-		DllCall("QueryPerformanceFrequency", "Int64*", &_HOTPATH_QPC_FREQ)
-	DllCall("QueryPerformanceCounter", "Int64*", &now)
+		_HOTPATH_QPC_FREQ := PerfClockFrequency()
+	now := PerfClockTicks()
 	ElapsedMs := (now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0
 	; .Get, never a bracket read: an absent key THROWS in AHK v2, and this runs on
 	; the keystroke path where a throw would take the hook down.
@@ -225,8 +225,8 @@ _HotPathBreakdown(Marks, Op, Label := "", StartTicks := 0) {
 			return ""
 		local now := 0
 		if (_HOTPATH_QPC_FREQ == 0)
-			DllCall("QueryPerformanceFrequency", "Int64*", &_HOTPATH_QPC_FREQ)
-		DllCall("QueryPerformanceCounter", "Int64*", &now)
+			_HOTPATH_QPC_FREQ := PerfClockFrequency()
+		now := PerfClockTicks()
 		ElapsedMs := (_HOTPATH_QPC_FREQ > 0)
 			? ((now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0) : 0.0
 		Marks.Push({ L: Label, Ms: ElapsedMs })
@@ -345,6 +345,11 @@ HotPath_FlushStatistics(*) {
 	Owner := _HotPathStatisticsOwner()
 	if !Owner.Started
 		return
+	; Counted operations and process state share the minute: a stalled latency
+	; window must not hide a leaking handle or a parse storm.
+	try PerfCounters_Flush()
+	catch as PerfErr
+		try LoggerError("Perf", "Interval counters could not be published: {1}.", PerfErr.Message)
 	PreviousCritical := Critical("On")
 	try {
 		Snapshot := Owner.Stats
@@ -374,4 +379,130 @@ HotPath_StopStatistics() {
 	Owner.Started := false
 	try LoggerInfo("HotPath", "Latency statistics stopped.")
 	return true
+}
+
+
+
+
+
+; ======================================================
+; ======================================================
+; ======= 4/ Interval counters and process state =======
+; ======================================================
+; ======================================================
+
+; Counted operations (parses, rebuilds, hook events) complement timings: under a
+; loaded host a wall-clock figure moves with the machine, while "this interval
+; parsed 3 TOML files and rebuilt the menu twice" does not. Names are closed
+; code literals, never typed text, paths or user content. Increments are plain
+; Map arithmetic with no clock read, formatting or I/O; one evidence record per
+; flush interval publishes and resets them, so it is never collapsed.
+
+/** Owns the bounded counter registry; static so early include-order callers are safe. */
+_PerfCountersOwner() {
+	static Owner := { Counts: Map(), Refused: 0, Limit: 192, WindowStartMs: 0 }
+	return Owner
+}
+
+/** Adds to a named interval counter; a full registry refuses visibly through the flush. */
+PerfCount(Name, Amount := 1) {
+	Owner := _PerfCountersOwner()
+	Counts := Owner.Counts
+	if Counts.Has(Name) {
+		Counts[Name] += Amount
+		return true
+	}
+	if Counts.Count >= Owner.Limit {
+		Owner.Refused += 1
+		return false
+	}
+	Counts[Name] := Amount
+	return true
+}
+
+/** Opens a stage measurement; pair with PerfStage_End. Two QPC reads in total. */
+PerfStage_Begin() {
+	return PerfClockTicks()
+}
+
+/** Microseconds since PerfStage_Begin, without recording anything; for per-name counters. */
+PerfElapsedUs(StartTicks) {
+	global _HOTPATH_QPC_FREQ
+	if !IsSet(_HOTPATH_QPC_FREQ)
+		return 0
+	local now := 0
+	if (_HOTPATH_QPC_FREQ == 0)
+		_HOTPATH_QPC_FREQ := PerfClockFrequency()
+	now := PerfClockTicks()
+	return Round((now - StartTicks) / _HOTPATH_QPC_FREQ * 1000000)
+}
+
+/** Records a stage's duration into the latency summaries; the debug line is built only when enabled. */
+PerfStage_End(Label, StartTicks, Count := -1) {
+	global _HOTPATH_QPC_FREQ, _HOTPATH_SLOW_MS
+	if !IsSet(_HOTPATH_QPC_FREQ) || !IsSet(_HOTPATH_SLOW_MS)
+		return 0.0
+	local now := 0
+	if (_HOTPATH_QPC_FREQ == 0)
+		_HOTPATH_QPC_FREQ := PerfClockFrequency()
+	now := PerfClockTicks()
+	ElapsedMs := (now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0
+	HotPath_RecordLatency(Label, ElapsedMs, _HOTPATH_SLOW_MS)
+	; Total microseconds per stage ride the interval counter record, so a stage's cost
+	; is visible even where the repeat collapser folds its debug lines.
+	PerfCount("us." . Label, Round(ElapsedMs * 1000))
+	if LoggerIsDebugEnabled()
+		try LoggerDebug("Perf", "Stage '{1}' took {2} ms (count={3}).", Label, Round(ElapsedMs, 3), Count)
+	return ElapsedMs
+}
+
+/** Reads this process's memory and kernel-object counts; every field is -1 when its call fails. */
+PerfProcessState() {
+	State := { WorkingSetMb: -1, PeakWorkingSetMb: -1, PrivateMb: -1, Handles: -1, GdiObjects: -1, UserObjects: -1 }
+	ProcessResourceState(State)
+	return State
+}
+
+/** Renders the counters as "name=n" pairs in name order so consecutive records diff cleanly. */
+PerfCountersText(Counts) {
+	Names := []
+	for Name in Counts
+		Names.Push(Name)
+	Names := StrSplit(Sort(_PerfJoin(Names), "D|"), "|")
+	Text := ""
+	for Name in Names
+		if Name != ""
+			Text .= (Text == "" ? "" : " ") . Name . "=" . Counts[Name]
+	return Text
+}
+
+_PerfJoin(Names) {
+	Text := ""
+	for Name in Names
+		Text .= (Text == "" ? "" : "|") . Name
+	return Text
+}
+
+/** Publishes and resets the interval counters, then the process state; one evidence record each. */
+PerfCounters_Flush() {
+	Owner := _PerfCountersOwner()
+	PreviousCritical := Critical("On")
+	try {
+		Counts := Owner.Counts
+		Refused := Owner.Refused
+		Started := Owner.WindowStartMs
+		Owner.Counts := Map()
+		Owner.Refused := 0
+		Owner.WindowStartMs := A_TickCount
+	} finally Critical(PreviousCritical)
+	IntervalMs := Started ? ((A_TickCount - Started) & 0xFFFFFFFF) : 0
+	if Counts.Count > 0
+		try LoggerEvidence("Perf", "Interval counters ({1} ms): {2}.", IntervalMs, PerfCountersText(Counts))
+	if Refused > 0
+		try LoggerWarn("Perf", "Interval counters refused {1} increment(s) beyond the registry capacity.", Refused)
+	State := PerfProcessState()
+	try LoggerEvidence("Perf",
+		"Process state: working_set_mb={1} peak_working_set_mb={2} private_mb={3} handles={4} gdi_objects={5} user_objects={6}.",
+		State.WorkingSetMb, State.PeakWorkingSetMb, State.PrivateMb, State.Handles,
+		State.GdiObjects, State.UserObjects)
 }

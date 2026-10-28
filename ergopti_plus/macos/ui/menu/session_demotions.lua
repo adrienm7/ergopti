@@ -13,6 +13,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
 local LOG = "menu"
 
 
@@ -28,12 +29,7 @@ local LOG = "menu"
 --- Deep-copies plain Lua data so a recorded value cannot alias live state.
 --- @param value any Value to copy.
 --- @return any copy
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[clone(key)] = clone(child) end
-	return copy
-end
+local clone = TableUtil.deep_copy_with_keys
 
 --- Compares two plain Lua values structurally.
 --- @param left any First value.

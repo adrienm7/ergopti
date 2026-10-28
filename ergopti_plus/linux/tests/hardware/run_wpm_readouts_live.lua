@@ -4,7 +4,7 @@
 --- MODULE: The WPM Readouts, Live, On A Real Display
 --- DESCRIPTION:
 --- The floating widget through its real GTK surface and the tray readout
---- through the real libayatana-appindicator, fed the stats the keylogger
+--- through the real libayatana-appindicator, fed the stats the keystats
 --- hands the daemon's tick:
 ---   - the pill appears where the canon puts it, the size it says, painted in
 ---     the source's colour (read back from real cairo pixels);

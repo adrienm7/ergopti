@@ -70,7 +70,7 @@ _LACF_BridgeKLClearInFinally() {
 			and InStr(Accept . Body, "KL_ClearSynthetic") = 0,
 		"LLM output must not mark the whole clipboard wait synthetic; SendInput is invisible to InputHook and metrics are recorded from accepted events")
 }
-Test("llm_bridge: acceptance owns no queue-wide keylogger guard (llm-accept-cleanup-in-finally)", _LACF_BridgeKLClearInFinally)
+Test("llm_bridge: acceptance owns no queue-wide keystats guard (llm-accept-cleanup-in-finally)", _LACF_BridgeKLClearInFinally)
 
 ; PrefixWatcherSuppress(false) release timer must also be in the finally
 ; block -- a stuck suppression silences the hotstring engine permanently.

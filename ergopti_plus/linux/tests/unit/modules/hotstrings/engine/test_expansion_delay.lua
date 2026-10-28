@@ -60,7 +60,8 @@ helpers.describe("expansion delay: what the settings window writes is what resol
 		helpers.assert_true(type(shipped) == "number",
 			"every category must resolve to a number — the injector cannot compare against nil")
 
-		Config._set_overrides_for_test({ rolls = { delay = 1.5, sections = {} } })
+		-- The seam takes the stored form: seconds added to the base (0.75 s here).
+		Config._set_overrides_for_test({ rolls = { delay_offset = 0.75, sections = {} } })
 		helpers.assert_eq(delay_of("rolls"), 1.5,
 			"the value the user typed in the settings window must be the one that resolves")
 		Config._set_overrides_for_test({})
@@ -68,7 +69,7 @@ helpers.describe("expansion delay: what the settings window writes is what resol
 
 	helpers.it("a section override wins over its category", function()
 		Config._set_overrides_for_test({
-			rolls = { delay = 1.5, sections = { fast = { delay = 0.2 } } },
+			rolls = { delay_offset = 0.75, sections = { fast = { delay_offset = -0.55 } } },
 		})
 		helpers.assert_eq(delay_of("rolls", "fast"), 0.2,
 			"the narrower override must win, or a per-section setting is decoration")
@@ -78,7 +79,7 @@ helpers.describe("expansion delay: what the settings window writes is what resol
 	end)
 
 	helpers.it("clearing an override returns the shipped value, not zero", function()
-		Config._set_overrides_for_test({ rolls = { delay = 1.5, sections = {} } })
+		Config._set_overrides_for_test({ rolls = { delay_offset = 0.75, sections = {} } })
 		local overridden = delay_of("rolls")
 		Config._set_overrides_for_test({})
 		local restored = delay_of("rolls")
@@ -145,6 +146,177 @@ helpers.describe("expansion delay: the gap between keystrokes decides", function
 		helpers.assert_true(fires(0.75, nil, 1000),
 			"with no previous timestamp there is no gap, and refusing here would make the "
 				.. "first expansion after every start silently fail")
+	end)
+
+end)
+
+
+
+
+
+-- =========================================================
+-- =========================================================
+-- ======= 3/ The base delay and the offsets of it =========
+-- =========================================================
+-- =========================================================
+
+--- Runs a body against an isolated configuration folder holding these files.
+--- @param files table Map of file name to content, created before init.
+--- @param body function Called with (config, directory, read).
+local function with_config(files, body)
+	local shell = helpers.load_module("adapters.shell_runner")
+	shell._reset_runner()
+	package.loaded["adapters.shell_runner"] = shell
+	local directory = os.tmpname()
+	os.remove(directory)
+	assert(shell.run("mkdir -p " .. shell.quote(directory)))
+	for name, content in pairs(files) do
+		local handle = assert(io.open(directory .. "/" .. name, "wb"))
+		assert(handle:write(content))
+		assert(handle:close())
+	end
+	local function read(name)
+		local handle = io.open(directory .. "/" .. name, "rb")
+		if not handle then return nil end
+		local content = handle:read("*a")
+		handle:close()
+		return content
+	end
+	local preferences = require("infra.hotstring_preferences")
+	local fresh = helpers.load_module("modules.hotstrings.hotstrings_config")
+	local ok, failure = xpcall(function()
+		assert(preferences._set_file_for_test(directory .. "/config.toml"))
+		assert(fresh._set_override_config_dir_for_test(directory))
+		assert(fresh._set_config_file_for_test(directory .. "/config.toml"))
+		assert(fresh.init(nil, directory .. "/catalogue.toml"))
+		body(fresh, directory, read)
+	end, debug.traceback)
+	preferences._set_file_for_test(nil)
+	fresh._set_override_config_dir_for_test(nil)
+	fresh._set_config_file_for_test(nil)
+	shell.run("rm -rf " .. shell.quote(directory))
+	if not ok then error(failure, 0) end
+end
+
+helpers.describe("expansion delay: the base is a config.toml leaf and overrides are offsets of it", function()
+
+	helpers.it("reads the user's hotstrings.expansion_delay and falls back to the shared default", function()
+		with_config({ ["config.toml"] = "[hotstrings]\nexpansion_delay = 1.2\n" }, function(config)
+			helpers.assert_eq(config.get_base_delay(), 1.2)
+			helpers.assert_eq(config.has_base_delay_override(), true)
+			helpers.assert_eq(config.resolve("rolls", nil).delay, 1.2, "a category with no delay of its own waits the base")
+			helpers.assert_eq(config.get_global_default_delay_ms(), 1200, "the settings window shows the base")
+		end)
+		with_config({ ["config.toml"] = "[hotstrings]\nexpansion_delay = -3\n" }, function(config)
+			helpers.assert_eq(config.get_base_delay(), 0.75, "a value the owner refuses is read as absent")
+		end)
+		with_config({}, function(config)
+			helpers.assert_eq(config.get_base_delay(), 0.75)
+			helpers.assert_eq(config.has_base_delay_override(), false)
+		end)
+	end)
+
+	helpers.it("stores a delay override as an offset of the base and keeps it when the base moves", function()
+		with_config({}, function(config, _, read)
+			helpers.assert_eq(config.set_override("rolls", nil, "delay", 1.2), true)
+			helpers.assert_contains(read("hotstrings_overrides.toml"), "delay_offset = 0.45")
+			helpers.assert_nil(read("hotstrings_overrides.toml"):find("\ndelay = ", 1, true))
+			helpers.assert_eq(config.resolve("rolls", nil).delay, 1.2)
+			helpers.assert_eq(config.get_user_override("rolls").delay, 1.2, "the window reads the effective seconds")
+
+			helpers.assert_eq(config.set_base_delay(1.0), true)
+			helpers.assert_contains(read("config.toml"), "expansion_delay = 1")
+			helpers.assert_eq(config.resolve("rolls", nil).delay, 1.45, "the override follows the base")
+			helpers.assert_eq(config.get_user_override("rolls").delay, 1.45)
+			helpers.assert_contains(read("hotstrings_overrides.toml"), "delay_offset = 0.45",
+				"the file holds the offset, which a base change leaves alone")
+
+			helpers.assert_eq(config.set_base_delay(nil), true)
+			helpers.assert_eq(config.has_base_delay_override(), false, "restoring the default drops the leaf")
+			helpers.assert_eq(config.resolve("rolls", nil).delay, 1.2)
+			helpers.assert_eq(config.clear_override("rolls", nil, "delay"), true)
+			helpers.assert_nil(config.get_user_override("rolls").delay)
+			helpers.assert_eq(config.resolve("rolls", nil).delay, 0.75)
+		end)
+	end)
+
+	helpers.it("keeps an unlimited delay unlimited whatever the base", function()
+		with_config({}, function(config, _, read)
+			helpers.assert_eq(config.set_override("rolls", nil, "delay", 0), true)
+			helpers.assert_contains(read("hotstrings_overrides.toml"), "delay_unlimited = true")
+			helpers.assert_eq(config.resolve("rolls", nil).delay, 0)
+			helpers.assert_eq(config.set_base_delay(2.5), true)
+			helpers.assert_eq(config.resolve("rolls", nil).delay, 0, "0 is not an offset of the base")
+		end)
+	end)
+
+	helpers.it("never lets an offset that cancels the base become the unlimited delay", function()
+		with_config({ ["hotstrings_overrides.toml"] = "[rolls]\ndelay_offset = -0.75\n" }, function(config)
+			helpers.assert_eq(config.resolve("rolls", nil).delay, 0.001,
+				"0.75 s - 0.75 s is one millisecond, not 'never expires'")
+		end)
+	end)
+
+	helpers.it("replays the shared base delay corpus the other drivers replay", function()
+		local path = assert(helpers.load_module("infra.paths").shared("tests/corpus/hotstrings/base_delay_vectors.json"))
+		local handle = assert(io.open(path, "rb"))
+		local corpus = require("json").decode(handle:read("*a"))
+		handle:close()
+		helpers.assert_true(#corpus.vectors > 0, "a corpus with no vectors proves nothing")
+		for _, vector in ipairs(corpus.vectors) do
+			with_config({}, function(config, _, read)
+				for _, step in ipairs(vector.steps) do
+					if step.op == "set" then
+						helpers.assert_eq(config.set_override(step.category, step.section, "delay", step.delay), true, vector.id)
+					elseif step.op == "clear" then
+						helpers.assert_eq(config.clear_override(step.category, step.section, "delay"), true, vector.id)
+					else
+						helpers.assert_eq(step.op, "base", vector.id)
+						helpers.assert_eq(config.set_base_delay(step.seconds), true, vector.id)
+					end
+				end
+				for _, expected in ipairs(vector.expect) do
+					helpers.assert_eq(config.resolve(expected.category, expected.section).delay, expected.delay,
+						vector.id .. ": effective delay of " .. expected.category .. "." .. tostring(expected.section))
+				end
+				local decoded = require("toml_codec").decode(read("hotstrings_overrides.toml") or "")
+				for key, leaves in pairs(vector.stored) do
+					local category, section = key:match("^([^.]+)%.?(.*)$")
+					local record = section ~= "" and decoded[category][section] or decoded[category]
+					for leaf, value in pairs(leaves) do
+						helpers.assert_eq(record[leaf], value, vector.id .. ": stored " .. key .. "." .. leaf)
+					end
+				end
+				if next(vector.stored) == nil then
+					helpers.assert_nil(next(decoded.rolls or {}), vector.id .. ": no value left in the file")
+				end
+			end)
+		end
+	end)
+
+	helpers.it("migrates the absolute delays and the default delay of earlier builds without changing any", function()
+		local legacy = "# my notes\n[_global]\ndelay = 1.5\n[rolls]\ndelay = 2.0\ncolor = \"#112233\"\n"
+			.. "[rolls.ct]\ndelay = 0\n[magickey]\ndelay_offset = 0.25\n"
+		with_config({ ["hotstrings_overrides.toml"] = legacy }, function(config, _, read)
+			helpers.assert_eq(config.resolve("rolls", nil).delay, 2.0, "an absolute delay applies as it was before the migration")
+			helpers.assert_eq(config.resolve("rolls", "ct").delay, 0)
+			config.migrate_legacy_delays()
+			helpers.assert_eq(config.get_base_delay(), 1.5, "the old default delay is the base now")
+			helpers.assert_contains(read("config.toml"), "expansion_delay = 1.5")
+			helpers.assert_eq(config.resolve("rolls", nil).delay, 2.0)
+			helpers.assert_eq(config.resolve("rolls", "ct").delay, 0)
+			helpers.assert_eq(config.resolve("magickey", nil).delay, 1.75, "an offset already stored follows the migrated base")
+			local text = read("hotstrings_overrides.toml")
+			helpers.assert_contains(text, "delay_offset = 0.5")
+			helpers.assert_contains(text, "delay_unlimited = true")
+			helpers.assert_contains(text, "# my notes", "the user's comments survive")
+			helpers.assert_contains(text, '#112233')
+			helpers.assert_nil(text:find("\ndelay = ", 1, true), "no absolute delay remains")
+			helpers.assert_nil(text:find("_global", 1, true), "the old default delay record is gone")
+			local before = text
+			config.migrate_legacy_delays()
+			helpers.assert_eq(read("hotstrings_overrides.toml"), before, "a second pass changes nothing")
+		end)
 	end)
 
 end)

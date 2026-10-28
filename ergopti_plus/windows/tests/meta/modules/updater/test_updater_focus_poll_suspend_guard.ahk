@@ -13,7 +13,7 @@
 ;
 ;   1. PLC_Poll (adapters/process_lifecycle.ahk) fires every 250 ms, reading the
 ;      foreground window and fanning out to every focus callback (which downstream
-;      feed keylogger app-switch events). It must early-return on A_IsSuspended.
+;      feed keystats app-switch events). It must early-return on A_IsSuspended.
 ;
 ;   2. Updater_BackgroundTick (modules/updater.ahk) dispatches a network check and can
 ;      pop a TrayTip + rebuild the tray menu. It must re-arm its next tick (so the

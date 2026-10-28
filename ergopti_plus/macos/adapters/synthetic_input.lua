@@ -92,7 +92,7 @@ M.PUMP_DELIVERY_TIMEOUT_SEC = 0.25
 -- A physical event reaching a tap this much later than the freshest recent
 -- events waited behind the main thread: it is never consumed, replayed or
 -- answered with output, which macOS may already have overtaken.
-M.STALE_PHYSICAL_EVENT_MS = 500
+M.STALE_PHYSICAL_EVENT_MS = require("adapters.event_clock").STALE_PHYSICAL_EVENT_MS
 M.PUMP_MOUSE_BUTTON = 31
 M.PUMP_WATCHDOG_MAX_FAILURES = 5
 M.ACTION_LISTENER_RETRY_SEC = 0.05
@@ -1222,7 +1222,7 @@ local function confirm_dispatched_after_return(batch)
 			batch.confirm_timer = nil
 			-- If listener timer allocation failed at handoff, this independent
 			-- post-return timer is already outside every eventtap callback and is a
-			-- safe no-next-key retry path for tooltip/keylogger reconciliation.
+			-- safe no-next-key retry path for tooltip/keystats reconciliation.
 			if _action_listener_pending and start_action_dispatcher then
 				start_action_dispatcher(0)
 			end
@@ -1450,9 +1450,12 @@ end
 local function build_key_pair(batch, modifiers, key, unicode, loopback)
 	local tx = batch.tx
 	local ordinal = tx.next_ordinal + 1
-	local down = assert(new_key_event(modifiers, unicode and 0 or key, true),
+	-- Unicode text rides a carrier key the user is not holding: a key-down of a
+	-- key still down is lost, and with it the replacement's first character.
+	local code = unicode and require("adapters.unicode_carrier").keycode() or key
+	local down = assert(new_key_event(modifiers, code, true),
 		"adapters.synthetic_input: newKeyEvent returned nil for keyDown")
-	local up = assert(new_key_event(modifiers, unicode and 0 or key, false),
+	local up = assert(new_key_event(modifiers, code, false),
 		"adapters.synthetic_input: newKeyEvent returned nil for keyUp")
 	if unicode then
 		assert(type(down.setUnicodeString) == "function" and type(up.setUnicodeString) == "function",
@@ -2204,6 +2207,11 @@ function M.keyStrokes(batch, value)
 	local observable_start = batch.has_observable_action
 	local first_observable_start = batch.first_observable_ordinal
 	local ok, err = xpcall(function()
+		if select(2, require("adapters.unicode_carrier").keycode()) then
+			defer_diagnostic("debug",
+				"Synthetic text moved off a held key (%d byte(s)); its first character would have been lost.",
+				#value)
+		end
 		for _, codepoint in utf8.codes(value) do
 			append_pair(batch, {}, utf8.char(codepoint), true, batch.collector)
 		end
@@ -3209,7 +3217,7 @@ local function refuse_paced_publication(batch, owner)
 	end
 	discard_unposted_suffix(batch, owner.ordinal)
 	if owner.publication_cancelled then batch.tx.cancelled = true end
-	finish_serial_batch(batch, owner, "failed", "programmable publication is no longer current")
+	finish_serial_batch(batch, owner, "failed", require("adapter_errors").PROGRAMMABLE_PUBLICATION_STALE)
 end
 
 --- Evaluates a retained publication; full checks run only on the timer path.
@@ -4056,8 +4064,7 @@ function M.claim_physical_fence(event)
 	-- for a tap that holds an event too long (kCGEventTapDisabledByTimeout) and
 	-- delivers it without the tap, so the original may already be in the
 	-- application and a replayed copy would type it twice. It passes untouched.
-	local lateness = require("adapters.event_clock").lateness_ms(event)
-	if lateness ~= nil and lateness >= M.STALE_PHYSICAL_EVENT_MS then return nil end
+	if require("adapters.event_clock").is_stale(event) then return nil end
 	_lifecycle_defer_depth = _lifecycle_defer_depth + 1
 	local ok, adoption_or_err = xpcall(function()
 		local adoption

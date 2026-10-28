@@ -187,14 +187,14 @@ elseif ACTION == "python_helper" then
 	idle(5)
 elseif ACTION == "type_for_wpm" then
 	-- A user types after the configured application's real menu started Metrics
-	-- and the floating widget. No keylogger, model or widget method is stubbed.
+	-- and the floating widget. No keystats, model or widget method is stubbed.
 	for _, key in ipairs({ { 0, "a" }, { 11, "b" }, { 8, "c" } }) do
 		World.keyboard_event(hs, key[1], key[2], true)
 		World.keyboard_event(hs, key[1], key[2], false)
 		idle(0.1)
 	end
 	idle(0.3)
-	local stats = require("modules.keylogger").get_live_stats()
+	local stats = require("modules.keystats").get_live_stats()
 	World.record("FACT", "wpm_input_counted=" .. tostring(stats.wpm > 0))
 	local visible, recovered = 0, false
 	local config = require("toml_codec").decode(require("tests.support.source_file").read(

@@ -418,7 +418,7 @@ helpers.describe("macOS PowerShell provider metadata boundary", function()
 				helpers.assert_eq(#packet.choices, 1)
 				helpers.assert_eq(packet.choices[1].provider, "powershell")
 				local scalar = assert(owner.resolve(packet.choices[1].key, { "", "two words", "$(literal)`quote`", "日本" }))
-				local parsed = assert(require("program_parameter").parse(scalar, "hs"))
+				local parsed = assert(require("program_parameter").parse(scalar, "posix"))
 				helpers.assert_eq(parsed.executable, "/bin/pwsh")
 				helpers.assert_eq(parsed.arguments, {
 					"-NoProfile", "-NonInteractive", "-File", ROOT .. "/" .. name,

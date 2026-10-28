@@ -94,7 +94,7 @@ local function load_fixture()
 			end,
 			tint = function() return nil end,
 		},
-		keylogger = {},
+		keystats = {},
 	})
 	local pending = { value = { { to_type = " partial" } } }
 	local visible = { value = true }

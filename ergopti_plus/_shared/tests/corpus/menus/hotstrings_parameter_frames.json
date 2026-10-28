@@ -36,7 +36,12 @@
 		]
 	},
 	"preview": {
-		"ahk": [],
+		"ahk": [
+			"parameter_preview_magic",
+			"parameter_preview_presence",
+			"separator",
+			"parameter_preview_colored"
+		],
 		"hs": [
 			"parameter_preview_magic",
 			"parameter_preview_presence",

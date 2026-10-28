@@ -111,8 +111,8 @@ function M.resolve_ui_root(driver_root)
 		local fh = io.open(p .. "/host_bridge.js", "r")
 		if fh then
 			fh:close()
-			-- Normalize to forward slashes
-			return (p:gsub("\\", "/"))
+			-- Native Linux filenames retain backslashes as ordinary bytes.
+			return p
 		end
 	end
 	return ""
@@ -131,7 +131,7 @@ function M.resolve_locales_dir(driver_root)
 		local fh = io.open(p .. "/fr.json", "r")
 		if fh then
 			fh:close()
-			return (p:gsub("\\", "/"))
+			return p
 		end
 	end
 	return ""
@@ -226,7 +226,7 @@ function M.build_injected_html(assets_dir, html_name)
 		end
 		local href = attrs:match('href%s*=%s*"([^"]+)"')
 			or attrs:match("href%s*=%s*'([^']+)'")
-		if not href then return reject_asset("Stylesheet", attrs:match("^%s*(.-)%s*$")) end
+		if not href then return reject_asset("Stylesheet", require("text_utils").trim(attrs)) end
 		if is_remote(href) then return reject_asset("Stylesheet", href) end
 		local css = read_file(assets_dir .. "/" .. strip_asset_query(href))
 		if css == "" then return reject_asset("Stylesheet", href) end
@@ -332,17 +332,19 @@ function M.build_i18n_boot_script(locales_dir, active_locale, strings)
 		end
 	end
 
-	-- Build a file:// URL for the locales directory
-	local base = locales_dir:gsub("\\", "/")
+	-- Native path bytes are URI data, then JavaScript data. Neither boundary
+	-- may reinterpret a backslash, quote, fragment marker or script terminator.
+	local base = locales_dir
 	if base ~= "" then
 		if not base:match("^/") then base = "/" .. base end
 		if not base:match("/$") then base = base .. "/" end
-		base = "file://" .. base
+		base = "file://" .. require("text_utils").percent_encode(base):gsub("%%2F", "/")
 	end
 
+	local Json = require("json")
 	return string.format(
-		'<script>window.__i18n_base="%s";window._i18n_locale="%s";%s</script>',
-		base, active_locale, seed
+		'<script>window.__i18n_base=%s;window._i18n_locale=%s;%s</script>',
+		Json.encode(base):gsub("<", "\\u003c"), Json.encode(active_locale):gsub("<", "\\u003c"), seed
 	)
 end
 
@@ -389,7 +391,7 @@ function M.build_app_html(driver_root, app_name, active_locale, strings)
 	local i18n_script = M.build_i18n_boot_script(locales_dir, active_locale, strings)
 	html = M.inject_i18n_boot(html, i18n_script)
 	html = html:gsub("(<head[^>]*>)", function(tag)
-		return tag .. '<script>window.__ergopti_host="linux";</script>'
+		return tag .. '<script>window.__ergopti_host_capabilities={"document_bridge":true};</script>'
 	end, 1)
 	html = M.inject_no_remote_csp(html, app_name)
 

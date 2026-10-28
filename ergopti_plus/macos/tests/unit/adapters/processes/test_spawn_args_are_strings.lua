@@ -1,7 +1,7 @@
 --- tests/unit/adapters/processes/test_spawn_args_are_strings.lua
 
 --- ==============================================================================
---- MODULE: Spawn argument typing (keylogger-worker-timings-must-be-strings)
+--- MODULE: Spawn argument typing (keystats-worker-timings-must-be-strings)
 --- DESCRIPTION:
 --- An argument vector becomes an execve(2) argv: every element is a C string and
 --- nothing else. hs.task.new() does not convert a number and does not say which
@@ -236,6 +236,6 @@ helpers.describe("ShellRunner spawn argument typing", function()
 			.. "otherwise the assertion below is vacuous")
 		helpers.assert_true(validate_at < task_at,
 			"the argument check must run BEFORE hs.task.new, so a refusal costs no "
-			.. "native object (keylogger-worker-timings-must-be-strings)")
+			.. "native object (keystats-worker-timings-must-be-strings)")
 	end)
 end)

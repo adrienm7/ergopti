@@ -346,6 +346,25 @@ local ok, err = xpcall(function()
 	check(dead_results.passed == 8 and dead_results.failed == 0, "all eight independent actual native chord/dead symbol cases pass")
 	check(Capture.load(german_map, "C.UTF-8"), "the real server capture owner is restored after independent detached library cases")
 
+	-- Helpers return a shared cumulative table: snapshot numbers, not its alias.
+	local native_helpers = require("tests.helpers")
+	local native_before = native_helpers.get_results()
+	local semantic_passed, semantic_failed = native_before.passed, native_before.failed
+	local semantic_ok, semantic_err = pcall(dofile, "tests/hardware/run_xkb_semantic_controls.lua")
+	local native_after = native_helpers.get_results()
+	check(semantic_ok and native_after.passed - semantic_passed == 6 and native_after.failed - semantic_failed == 0,
+		"all six actual native selected-control cases pass independently of prior helper totals")
+	if not semantic_ok then io.stderr:write(tostring(semantic_err) .. "\n") end
+	-- Restore even if the fragment itself failed outside a helper case. Loading
+	-- locally parseable text alone is not proof of the actual server owner.
+	local restore_ok, semantic_restored = pcall(function()
+		if not Capture.load(german_map, "C.UTF-8") then return false end
+		local generation, rows = Capture.source_generation(), Capture.direct_sources({ 39 })
+		return generation ~= nil and plain(rows, 39) ~= nil and plain(rows, 39).text == "ö"
+	end)
+	check(restore_ok and semantic_restored == true, "the actual server source is restored after native selected-control cases")
+	assert(restore_ok and semantic_restored == true, "native selected-control restoration failed; retire the outer owner")
+
 	connection_lifetime_qualification(display, german_map)
 
 	DisplayServer._set_for_test(DisplayServer.WAYLAND)

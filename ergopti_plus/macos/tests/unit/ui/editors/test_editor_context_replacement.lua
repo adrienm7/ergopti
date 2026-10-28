@@ -191,7 +191,9 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 			local bridge = state.bridges[1]
 			bridge.callback(native_message(state.views[1], { action = "ready" }))
 			local payload = latest_init_payload(state, hs_stub)
-			helpers.assert_eq(payload.platform, "hs", "Command is the primary modifier of a captured shortcut")
+			helpers.assert_eq(payload.commandIsPrimary, true, "Command is the primary modifier of a captured shortcut")
+			helpers.assert_eq(payload.executableSyntax, "posix", "a program parameter names a POSIX executable")
+			helpers.assert_eq(payload.platform, nil, "the page receives capabilities, never a platform name")
 			helpers.assert_eq(payload.sendVocabulary.keys[1].id, "enter")
 			helpers.assert_eq(payload.parameterStrings.save, "Save")
 

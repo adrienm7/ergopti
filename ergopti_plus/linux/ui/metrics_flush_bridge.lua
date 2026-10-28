@@ -3,26 +3,27 @@
 --- Owns dashboard requests across SQLite settlement and native page replacement.
 local M = {}
 local Logger = require("logger.shim")
+local ErrorDescription = require("error_description")
 local LOG = "bridge.metrics_flush"
 local API = { "get_flush_status", "is_flush_pending", "has_flush_debt", "when_flush_settled" }
 
 --- Reads the mandatory RAM-only flush contract, refusing incomplete owners.
---- @param keylogger table|nil
+--- @param keystats table|nil
 --- @return table|nil status
-function M.status(keylogger)
-	if type(keylogger) ~= "table" then return nil end
+function M.status(keystats)
+	if type(keystats) ~= "table" then return nil end
 	for _, name in ipairs(API) do
-		if type(keylogger[name]) ~= "function" then return nil end
+		if type(keystats[name]) ~= "function" then return nil end
 	end
-	local ok, status = pcall(keylogger.get_flush_status)
+	local ok, status = pcall(keystats.get_flush_status)
 	if not ok or type(status) ~= "table" or type(status.phase) ~= "string"
 		or type(status.generation) ~= "number" or status.generation < 0
 		or status.generation % 1 ~= 0 then return nil end
 	for _, name in ipairs({ "pending", "has_debt", "read_safe", "committed", "stopping" }) do
 		if type(status[name]) ~= "boolean" then return nil end
 	end
-	local ok_pending, pending = pcall(keylogger.is_flush_pending)
-	local ok_debt, debt = pcall(keylogger.has_flush_debt)
+	local ok_pending, pending = pcall(keystats.is_flush_pending)
+	local ok_debt, debt = pcall(keystats.has_flush_debt)
 	if not ok_pending or not ok_debt or pending ~= status.pending or debt ~= status.has_debt
 		or (status.pending and status.read_safe) then return nil end
 	return status
@@ -81,66 +82,109 @@ function M.new(app, push, commit)
 		if context ~= nil then
 			context = { app_name = context.app_name, epoch = context.epoch }
 		end
-		local keylogger = state.keylogger
-		local status = keylogger and M.status(keylogger) or nil
+		local keystats = state.keystats
+		local status = keystats and M.status(keystats) or nil
 		if status and status.stopping then return nil end
-		if keylogger and (not status or (not status.pending and not status.read_safe)) then
-			Logger.error(LOG, "Dashboard request refused: the keylogger has no readable flush owner.")
+		if keystats and (not status or (not status.pending and not status.read_safe)) then
+			Logger.error(LOG, "Dashboard request refused: the keystats has no readable flush owner.")
 			return nil
 		end
 		read_generation = read_generation + 1
 		local request = { generation = status and status.generation, state = state, context = context }
 		local read_id, request_revision = read_generation, revision
 		local methods = {}
-		for _, name in ipairs(API) do methods[name] = keylogger and keylogger[name] end
+		for _, name in ipairs(API) do methods[name] = keystats and keystats[name] end
 
 		local function owned()
-			if request_revision ~= revision or state.keylogger ~= keylogger
+			if request_revision ~= revision or state.keystats ~= keystats
 				or (not mutation and read_id ~= read_generation) then return false end
 			if context and context.epoch and context.epoch <= closed_epoch then return false end
 			if not page_current(app, state, context) then return false end
 			for _, name in ipairs(API) do
-				if keylogger and keylogger[name] ~= methods[name] then return false end
+				if keystats and keystats[name] ~= methods[name] then return false end
 			end
 			return true
 		end
 
 		function request.valid()
 			if not owned() then return false end
-			if not keylogger then return true end
-			local current = M.status(keylogger)
+			if not keystats then return true end
+			local current = M.status(keystats)
 			return owned() and current ~= nil and current.generation == request.generation
 				and current.read_safe and not current.pending and not current.stopping
 		end
 
-		--- Only reset_session's positive ACK authorizes its own one-step generation change.
-		function request.accept_reset()
-			if not owned() or not keylogger then return false end
-			local current = M.status(keylogger)
-			if not current or current.generation ~= request.generation + 1 or not current.read_safe
-				or current.pending or current.has_debt or current.stopping or not owned() then return false end
-			request.generation = current.generation
-			return true
-		end
 
-		local function finish(delayed)
+		local function finish_with(executor, delayed)
 			if not request.valid() then return nil end
-			local ok, result, cache = pcall(execute, request)
+			local ok, result, cache = pcall(executor, request)
 			if not ok then
 				Logger.error(LOG, "Dashboard request failed: %s", tostring(result))
 				return nil
 			end
 			if type(result) ~= "table" or not request.valid() then return nil end
-			if commit then commit(result, cache, keylogger, request.generation) end
+			if commit then commit(result, cache, keystats, request.generation) end
 			if not request.valid() then return nil end
 			if delayed or force_push then push(result, state, context) end
 			return result
 		end
 
+		local function finish(delayed) return finish_with(execute, delayed) end
+
+		--- Completes only the reset that owns its opaque generation receipt.
+		function request.reset_session(build_reply)
+			if not request.valid() then return nil end
+			local start = keystats and keystats.request_session_reset
+			local verify = keystats and keystats.reset_receipt_generation
+			if type(start) ~= "function" or type(verify) ~= "function" then
+				Logger.error(LOG, "Dashboard reset refused: the collector has no owned completion protocol.")
+				return build_reply(false)
+			end
+			local armed, admitted, delivered, completion = false, false, false, nil
+			local function accept(success, receipt)
+				if not owned() or keystats.request_session_reset ~= start
+					or keystats.reset_receipt_generation ~= verify then return false end
+				local ok, generation, outcome = pcall(verify, receipt, request.generation)
+				local current = M.status(keystats)
+				if not ok or type(generation) ~= "number" or outcome ~= success
+					or type(success) ~= "boolean" or not current or current.generation ~= generation
+					or not current.read_safe or current.pending or current.has_debt or current.stopping
+					or not owned() or keystats.request_session_reset ~= start
+					or keystats.reset_receipt_generation ~= verify then return false end
+				request.generation = generation
+				return request.valid()
+			end
+			local function complete(success, receipt)
+				if delivered or completion then return end
+				completion = { success = success, receipt = receipt }
+				if armed and admitted then
+					delivered = true
+					if accept(success, receipt) then
+						finish_with(function() return build_reply(success) end, true)
+					end
+				end
+			end
+			local called, accepted = pcall(start, complete)
+			armed, admitted = true, called and accepted == true
+			if not admitted then
+				delivered = true
+				if not called then
+					Logger.error(LOG, "Dashboard reset request raised: %s.", ErrorDescription.describe(accepted))
+				end
+				if not request.valid() then return nil end
+				return build_reply(false)
+			end
+			if completion then
+				delivered = true
+				if accept(completion.success, completion.receipt) then return build_reply(completion.success) end
+			end
+			return nil
+		end
+
 		if not owned() then return nil end
 		if not status or status.read_safe then return finish(false) end
-		if not batch or batch.keylogger ~= keylogger or batch.generation ~= status.generation then
-			batch = { keylogger = keylogger, generation = status.generation, requests = {} }
+		if not batch or batch.keystats ~= keystats or batch.generation ~= status.generation then
+			batch = { keystats = keystats, generation = status.generation, requests = {} }
 		end
 		local pending = batch
 		-- Polls replace only older reads. Mutations retain their own page/generation.

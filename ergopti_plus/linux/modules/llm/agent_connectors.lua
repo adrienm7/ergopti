@@ -143,9 +143,10 @@ local DEFAULT_DEPS = {
 	write_file = function(path, content)
 		local fh = io.open(path, "wb")
 		if not fh then return false end
-		local ok = fh:write(content) ~= nil
-		fh:close()
-		return ok
+		-- A buffered write is not a complete calendar until close acknowledges it.
+		local wrote, written = pcall(fh.write, fh, content)
+		local closed, flushed = pcall(fh.close, fh)
+		return wrote and written ~= nil and written ~= false and closed and flushed == true
 	end,
 	remove = function(path) return os.remove(path) end,
 	utc_stamp = function() return os.date("!%Y%m%dT%H%M%SZ") end,

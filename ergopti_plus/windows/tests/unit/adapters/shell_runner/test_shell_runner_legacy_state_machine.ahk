@@ -93,6 +93,23 @@ _SRLSM_RequestTerminateBeforeStartRefusesStart() {
 Test("shell_runner legacy: requestTerminate before start refuses later start (shellrunner-legacy-request-prestart)",
 	_SRLSM_RequestTerminateBeforeStartRefusesStart)
 
+; A published UIA owner can be stopped before its interrupted start resumes.
+_SRLSM_PublicAsyncCancellationRefusesLaterStart() {
+	local observed := Map("done", 0)
+	local handle := ShellRunner_Spawn(A_ComSpec, ["/d", "/c", "exit /b 0"],
+		(*) => observed["done"] += 1)
+	try {
+		AssertTrue(handle.terminateAsync(), "the published READY owner accepts logical cancellation")
+		AssertFalse(handle.start(), "an interrupted start must not launch after asynchronous cancellation was acknowledged")
+		AssertEqual(0, handle.processId(), "cancellation before start cannot publish a native process identity")
+		AssertEqual(0, observed["done"], "a canceled pre-start callback remains detached")
+	} finally {
+		handle.terminate()
+	}
+}
+Test("shell_runner legacy: async cancellation fences later public start (shellrunner-async-prestart)",
+	_SRLSM_PublicAsyncCancellationRefusesLaterStart)
+
 _SRLSM_PublicHandleSurfaceIsComplete() {
 	local handle := ShellRunner_Spawn(A_ComSpec, ["/c", "exit /b 0"], (*) => 0)
 	for method_name in [

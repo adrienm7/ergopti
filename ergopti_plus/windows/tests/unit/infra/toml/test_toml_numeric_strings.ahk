@@ -54,17 +54,35 @@ _TNS_NumericControl() {
 Test("TOML: explicit numeric and Boolean intent remains typed (toml-numeric-string-control)",
 	_TNS_NumericControl)
 
+_TNS_StoredAnchor(Stored, Key, Value) {
+	Stored[Key] := Value
+	return true
+}
+
+; The widget anchor is stored through the Storage port, not written to
+; config.toml: the stored coordinates keep their numeric type, and no
+; configuration producer carries them.
 _TNS_WidgetProducers(Mode) {
 	global _LLM_Menu
 	OldX := WPMWidget.pos_x
 	OldY := WPMWidget.pos_y
+	OldStoreX := WPMWidgetConst.STORE_X
+	OldStoreY := WPMWidgetConst.STORE_Y
 	try {
+		WPMWidgetConst.STORE_X := "test.pos_x"
+		WPMWidgetConst.STORE_Y := "test.pos_y"
 		WPMWidget.pos_x := -125
 		WPMWidget.pos_y := 0
 		switch Mode {
-			case "position": Updates := _WPMWidget_BuildPositionCandidate(false, 0, false, 0).updates
-			case "display": Updates := _WPMWidget_BuildDisplayCandidate(false, 0, false, 0,
-				false, 0, false, 0).updates
+			case "position":
+				Stored := Map()
+				AssertTrue(WPMWidget_SavePosition(-125, 7, _TNS_StoredAnchor.Bind(Stored)))
+				AssertEqual(2, Stored.Count)
+				for Key, Value in Stored
+					AssertTrue(Value is Integer,
+						"the stored coordinate must keep its numeric intent")
+				return
+			case "display": Updates := _WPMWidget_BuildDisplayCandidate(false, 0, false, 0).updates
 			case "full":
 				Menu := _HSDeepCloneMap(_LLM_Menu)
 				Menu["onboarding_seen"] := false
@@ -73,27 +91,18 @@ _TNS_WidgetProducers(Mode) {
 				Updates := _ConfigCollectFullSaveUpdates(ManifestBuildFeaturesMap(), Menu)
 			default: throw ValueError("Unknown widget producer")
 		}
-		Coordinates := Map()
-		for Update in Updates {
-			if Update.Section == "metrics"
-					&& (Update.Key == WPMWidgetConst.CFG_X || Update.Key == WPMWidgetConst.CFG_Y) {
-				Value := Update.HasOwnProp("Delete") && Update.Delete == 1
-					? ManifestDefaultFor(Update.Section . "." . Update.Key) : Update.Value
-				AssertTrue(Value is Integer,
-					"the producer must retain numeric intent before any writer coercion")
-				Coordinates[Update.Key] := Value
-			}
-		}
-		AssertEqual(2, Coordinates.Count)
-		AssertEqual(-125, Coordinates[WPMWidgetConst.CFG_X])
-		AssertEqual(0, Coordinates[WPMWidgetConst.CFG_Y])
+		for Update in Updates
+			AssertFalse(Update.Section == "metrics" && (Update.Key == "wpm_widget_x" || Update.Key == "wpm_widget_y"),
+				"no configuration producer may carry the widget anchor")
 	} finally {
 		WPMWidget.pos_x := OldX
 		WPMWidget.pos_y := OldY
+		WPMWidgetConst.STORE_X := OldStoreX
+		WPMWidgetConst.STORE_Y := OldStoreY
 	}
 }
 for Mode in ["position", "display", "full"]
-	Test("TOML: widget " . Mode . " producer retains numbers (toml-numeric-string-widget)",
+	Test("TOML: widget " . Mode . " producer keeps the anchor out of config (toml-numeric-string-widget)",
 		_TNS_WidgetProducers.Bind(Mode))
 
 _TNS_ReadPreservesString(Value) {

@@ -10,6 +10,8 @@
 
 #Requires AutoHotkey v2.0
 
+global _LNTOC_PacketByteObserved := 0
+
 _LNTOC_WithState(Fn) {
 	global _LLM_TerminalOutputRecords, _LLM_TerminalOutputCreating, _LLM_TerminalOutputUnknown
 	global _LLM_NavEventOwnerTerminalRouteOwner
@@ -642,6 +644,15 @@ for _LNTOC_SharedUnknownMode in ["throw", "untyped"]
 		. " (todo49-natural-custody)",
 		_LNTOC_WithState.Bind(_LNTOC_SharedNaturalUnknownCase.Bind(_LNTOC_SharedUnknownMode)))
 
+; Observe actual fixture writes, not just captions or an intended case value.
+_LNTOC_ObservePacketByte(Direction, Offset) {
+	global _LNTOC_PacketByteObserved
+	if _LNTOC_PacketByteObserved is Map {
+		Key := Direction . "-byte-" . Offset
+		_LNTOC_PacketByteObserved[Key] := _LNTOC_PacketByteObserved.Get(Key, 0) + 1
+	}
+}
+
 /** An independent literal packet fixture never invokes a Windows send backend. */
 _LNTOC_PacketSerialize(State, Owner, Key, Attempt, Packets, Capacity, Count) {
 	_LNTOC_CheckKey(Owner, Key)
@@ -662,9 +673,11 @@ _LNTOC_PacketSerialize(State, Owner, Key, Attempt, Packets, Capacity, Count) {
 	}
 	NumPut("UInt", Remaining, Count)
 	State.PacketInput := Packets
-	if State.SerializeMutation >= 0
+	if State.SerializeMutation >= 0 {
 		NumPut("UChar", NumGet(Packets, State.SerializeMutation, "UChar") ^ 1,
 			Packets, State.SerializeMutation)
+		_LNTOC_ObservePacketByte("native", State.SerializeMutation)
+	}
 	if State.SerializeFailure == "packets-size"
 		Packets.Size := 40
 	else if State.SerializeFailure == "count-size"
@@ -781,6 +794,7 @@ _LNTOC_PacketConsumerVector(CaseName) {
 		if InStr(CaseName, "public-byte-") == 1 {
 			Offset := Integer(SubStr(CaseName, 13))
 			NumPut("UChar", NumGet(Receipt["packets"], Offset, "UChar") ^ 1, Receipt["packets"], Offset)
+			_LNTOC_ObservePacketByte("public", Offset)
 		}
 		if InStr(CaseName, "field-") == 1
 			Receipt[SubStr(CaseName, 7)] += 1
@@ -920,12 +934,50 @@ for _LNTOC_PacketCaseName in ["plain", "surrogate", "zero-up", "borrowed-storage
 	Test("terminal output packet receiver: " . _LNTOC_PacketCaseName . " (todo49-packet-receiving)",
 		_LNTOC_WithState.Bind(_LNTOC_PacketConsumerVector.Bind(_LNTOC_PacketCaseName)))
 Loop 40 {
+	_LNTOC_PacketByteOffset := A_Index - 1
 	for _LNTOC_PacketDirection in ["native-byte-", "public-byte-"] {
-		_LNTOC_PacketByteCase := _LNTOC_PacketDirection . (A_Index - 1)
+		_LNTOC_PacketByteCase := _LNTOC_PacketDirection . _LNTOC_PacketByteOffset
 		Test("terminal output packet receiver: " . _LNTOC_PacketByteCase . " (todo49-packet-receiving)",
 			_LNTOC_WithState.Bind(_LNTOC_PacketConsumerVector.Bind(_LNTOC_PacketByteCase)))
 	}
 }
+/** Census the real registry and run its actual bound byte cases before teardown. */
+_LNTOC_PacketByteCensus() {
+	global TEST_REGISTRY, _LNTOC_PacketByteObserved
+	Saved := _LNTOC_PacketByteObserved
+	Names := Map(), Count := 0
+	_LNTOC_PacketByteObserved := Map()
+	try {
+		for Entry in TEST_REGISTRY {
+			if !RegExMatch(Entry.name, "^terminal output packet receiver: ((native|public)-byte-([0-9]+)) \(todo49-packet-receiving\)$", &ByteMatch)
+				continue
+			AssertTrue(Integer(ByteMatch[3]) < 40, "the byte case must name an offset in its forty-byte packet")
+			Names[ByteMatch[1]] := Names.Get(ByteMatch[1], 0) + 1
+			Count += 1
+			Entry.callback.Call()
+		}
+		_TestPrint("# packet-byte-census registered=" . Count . " unique_names=" . Names.Count
+			. " actual_mutation_offsets=" . _LNTOC_PacketByteObserved.Count)
+		if Names.Count < 80 {
+			for Key, Occurrences in _LNTOC_PacketByteObserved
+				_TestPrint("# packet-byte-census actual=" . Key . " writes=" . Occurrences)
+		}
+		AssertEqual(80, Count, "both directions must register all forty packet bytes")
+		AssertEqual(80, Names.Count, "duplicate captions cannot stand in for missing byte cases")
+		AssertEqual(80, _LNTOC_PacketByteObserved.Count, "actual bound callbacks must mutate all eighty direction/offset pairs")
+		Loop 40 {
+			Offset := A_Index - 1
+			for Direction in ["native", "public"] {
+				Key := Direction . "-byte-" . Offset
+				AssertEqual(1, Names.Get(Key, 0), "each direction/offset must register exactly once: " . Key)
+				AssertEqual(1, _LNTOC_PacketByteObserved.Get(Key, 0), "each real mutation must occur exactly once: " . Key)
+			}
+		}
+	} finally _LNTOC_PacketByteObserved := Saved
+}
+Test("terminal output packet receiver: registered byte coverage reaches every actual offset (terminal-packet-byte-census)",
+	_LNTOC_PacketByteCensus)
+
 Test("terminal output packet receiver: exact attempt and stale receipt custody (todo49-packet-receiving)",
 	_LNTOC_WithState.Bind(_LNTOC_PacketReceiptIdentityCase))
 Test("terminal output packet receiver: direct ACK cannot bypass changed packet bytes (todo49-packet-receiving)",

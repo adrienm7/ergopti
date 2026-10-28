@@ -6,6 +6,14 @@
 ; Exercises the production WPM config reader with native TOML scalar values.
 ; ============================================================================
 
+_TWCT_Areas := [{ Left: 0, Top: 0, Right: 1920, Bottom: 1080 }]
+
+; The Storage port holds no position: the anchor stays at its default.
+_TWCT_NoStoredPosition(Key) => "_"
+
+; A Storage port double holding one saved anchor.
+_TWCT_StoredPosition(X, Y, Key) => Key == WPMWidgetConst.STORE_X ? X : Y
+
 TestWPMConfigRejectsStringEncodedBooleans() {
 	SavedVisible := WPMWidget.visible
 	SavedColors := WPMWidget.use_colors
@@ -18,7 +26,7 @@ TestWPMConfigRejectsStringEncodedBooleans() {
 		try WPMWidget_LoadConfig(Map("metrics", Map(
 			WPMWidgetConst.CFG_VISIBLE, "1",
 			WPMWidgetConst.CFG_COLORS, "1",
-			WPMWidgetConst.CFG_GRAPH, "1")))
+			WPMWidgetConst.CFG_GRAPH, "1")), _TWCT_Areas, _TWCT_NoStoredPosition)
 		catch
 			Thrown := true
 		AssertTrue(Thrown,
@@ -30,7 +38,7 @@ TestWPMConfigRejectsStringEncodedBooleans() {
 		WPMWidget_LoadConfig(Map("metrics", Map(
 			WPMWidgetConst.CFG_VISIBLE, true,
 			WPMWidgetConst.CFG_COLORS, true,
-			WPMWidgetConst.CFG_GRAPH, true)))
+			WPMWidgetConst.CFG_GRAPH, true)), _TWCT_Areas, _TWCT_NoStoredPosition)
 		AssertTrue(WPMWidget.visible)
 		AssertTrue(WPMWidget.use_colors)
 		AssertTrue(WPMWidget.show_graph)
@@ -59,15 +67,18 @@ TestWPMConfigValidatesSavedPositionAgainstEveryMonitor() {
 
 	SavedX := WPMWidget.pos_x
 	SavedY := WPMWidget.pos_y
+	SavedStoreX := WPMWidgetConst.STORE_X
+	SavedStoreY := WPMWidgetConst.STORE_Y
 	try {
+		WPMWidgetConst.STORE_X := "test.pos_x"
+		WPMWidgetConst.STORE_Y := "test.pos_y"
 		WPMWidget.pos_x := -1
 		WPMWidget.pos_y := -1
 		WPMWidget_LoadConfig(Map("metrics", Map(
 			WPMWidgetConst.CFG_VISIBLE, false,
 			WPMWidgetConst.CFG_COLORS, false,
-			WPMWidgetConst.CFG_GRAPH, false,
-			WPMWidgetConst.CFG_X, 5000,
-			WPMWidgetConst.CFG_Y, 100)), WorkAreas)
+			WPMWidgetConst.CFG_GRAPH, false)), WorkAreas,
+			_TWCT_StoredPosition.Bind(5000, 100))
 		AssertEqual(-1, WPMWidget.pos_x,
 			"the loader must discard a disconnected-monitor X coordinate")
 		AssertEqual(-1, WPMWidget.pos_y,
@@ -76,15 +87,16 @@ TestWPMConfigValidatesSavedPositionAgainstEveryMonitor() {
 		WPMWidget_LoadConfig(Map("metrics", Map(
 			WPMWidgetConst.CFG_VISIBLE, false,
 			WPMWidgetConst.CFG_COLORS, false,
-			WPMWidgetConst.CFG_GRAPH, false,
-			WPMWidgetConst.CFG_X, 100,
-			WPMWidgetConst.CFG_Y, 1400)), WorkAreas)
+			WPMWidgetConst.CFG_GRAPH, false)), WorkAreas,
+			_TWCT_StoredPosition.Bind(100, 1400))
 		AssertEqual(100, WPMWidget.pos_x)
 		AssertEqual(1400, WPMWidget.pos_y,
 			"the loader must preserve a valid lower-monitor coordinate")
 	} finally {
 		WPMWidget.pos_x := SavedX
 		WPMWidget.pos_y := SavedY
+		WPMWidgetConst.STORE_X := SavedStoreX
+		WPMWidgetConst.STORE_Y := SavedStoreY
 	}
 }
 Test("WPM config: saved surfaces remain reachable after monitor changes (AHK-104)",

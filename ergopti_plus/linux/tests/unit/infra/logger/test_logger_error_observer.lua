@@ -39,11 +39,11 @@ helpers.describe("logger core: error observer (error-dialog-linux)", function()
 			seen[#seen + 1] = { module_name, template, body }
 		end, function()
 			Core.warn("mod", "not an error %s", "x")
-			Core.error("keylogger", "Flush failed: %s (%d)", "disk full", 3)
+			Core.error("keystats", "Flush failed: %s (%d)", "disk full", 3)
 			Core.error("menu", "Plain failure")
 		end)
 		helpers.assert_eq(seen, {
-			{ "keylogger", "Flush failed: %s (%d)", "Flush failed: disk full (3)" },
+			{ "keystats", "Flush failed: %s (%d)", "Flush failed: disk full (3)" },
 			{ "menu", "Plain failure", "Plain failure" },
 		})
 	end)

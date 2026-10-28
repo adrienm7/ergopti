@@ -37,9 +37,17 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		for Name in ["entry", "capture_source", "source_current", "admit", "apply", "clock", "max_age"]
 			if !HasMethod(Options.Get(Name, 0), "Call")
 				throw TypeError("Local server native port is unavailable.", -1, Name)
-		for Name in ["timer", "on_publish", "on_error", "entry_bound", "views_bound"]
+		for Name in ["timer", "on_publish", "on_error", "entry_bound", "views_bound", "scan_ports"]
 			if Options.Has(Name) && !HasMethod(Options[Name], "Call")
 				throw TypeError("Local server optional port must be callable.", -1, Name)
+		; scan_ports(Entries, OnDone) finds where each catalogue server runs
+		; (LocalServerPortScan) before a sweep; discovery holds the validated
+		; descriptors it reads. Without the port every server is probed at its
+		; catalogue address, as the unit tests of the sweep itself do.
+		if Options.Has("scan_ports") && !(Options.Get("discovery", 0) is Map)
+			throw TypeError("Local server port scan requires the catalogue discovery descriptors.")
+		this.PortScans := Map()
+		this.ScanWaiters := 0
 		this.Options := Options.Clone()
 		this.Models := Options["models_owner"]
 		this.Order := Options["order"].Clone()
@@ -90,13 +98,29 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 					|| !(Entry.Get("BaseUrl", 0) is String) || !(Entry.Get("Token", 0) is String)
 					|| !(Entry.Get("Model", 0) is String)
 				throw TypeError("Local server entry must come from the validated native API owner.")
+			; An entry at the catalogue address follows the scan, as one stored
+			; without an address; any other address is the user's
+			Default := this._ScannedAddress(Id, Server)
+			AtDefault := Entry["BaseUrl"] == "" || Entry["BaseUrl"] == Server["base_url"]
 			return Map("id", Id, "entry_id", Entry["Id"], "provider", Entry["Provider"],
-				"base_url", Entry["BaseUrl"] == "" ? Server["base_url"] : Entry["BaseUrl"],
-				"token", Entry["Token"])
+				"base_url", AtDefault ? Default["base_url"] : Entry["BaseUrl"],
+				"token", Entry["Token"], "port_source", AtDefault ? Default["source"] : "user")
 		}
 		Fields := this.Pending.Get(Id, Map())
-		return Map("id", Id, "entry_id", "", "provider", Id, "base_url", Fields.Get("base_url", Server["base_url"]),
-			"token", Fields.Get("token", ""))
+		if Fields.Has("base_url")
+			return Map("id", Id, "entry_id", "", "provider", Id, "base_url", Fields["base_url"],
+				"token", Fields.Get("token", ""), "port_source", "user")
+		Default := this._ScannedAddress(Id, Server)
+		return Map("id", Id, "entry_id", "", "provider", Id, "base_url", Default["base_url"],
+			"token", Fields.Get("token", ""), "port_source", Default["source"])
+	}
+
+	/** @returns {Map} base_url and source of a server's default address: the last scan's, else the catalogue's. */
+	_ScannedAddress(Id, Server) {
+		Scan := this.PortScans.Get(Id, 0)
+		if (Scan is Map) && Scan["running"]
+			return Map("base_url", Scan["base_url"], "source", Scan["source"])
+		return Map("base_url", Server["base_url"], "source", (Scan is Map) ? "" : "unscanned")
 	}
 
 	_EntryMatches(Id, Server, Entry) {
@@ -168,11 +192,95 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		return this._Call("entry", Id)
 	}
 
-	/** Starts one shared logical sweep; exact same-provider native debt stays owned. */
+	/**
+	 * Starts one shared logical sweep; exact same-provider native debt stays
+	 * owned. With a scan port, first finds where each catalogue server runs;
+	 * a rescan asked during the scan joins it.
+	 */
 	Rescan(OnDone := 0) {
 		PreviousCritical := Critical("Off")
-		try return this._Rescan(OnDone)
-		finally Critical(PreviousCritical)
+		try {
+			if !this.Options.Has("scan_ports")
+				return this._Rescan(OnDone)
+			return this._ScanThenRescan(OnDone)
+		} finally Critical(PreviousCritical)
+	}
+
+	_ScanThenRescan(OnDone) {
+		if OnDone != 0 && !HasMethod(OnDone, "Call")
+			throw TypeError("Local server completion observer must be callable.")
+		if !this._Admitted() || this.Closed || A_IsSuspended
+			return false
+		if this.ScanWaiters is Array {
+			this.ScanWaiters.Push(OnDone)
+			return true
+		}
+		this.ScanWaiters := [OnDone]
+		Entries := []
+		Discovery := this.Options["discovery"]
+		for Id in this.BaseOrder
+			if Discovery.Has(Id)
+				Entries.Push(Map("id", Id, "descriptor", Discovery[Id], "base_url", this.Servers[Id]["base_url"]))
+		try this._Call("scan_ports", Entries, ObjBindMethod(this, "_Scanned"))
+		catch as Err {
+			this.ScanWaiters := 0
+			this._Report("scan", Err)
+			return false
+		}
+		return true
+	}
+
+	/** Records the scan, then runs every waiting rescan; the newest intent wins. */
+	_Scanned(Results) {
+		global LLM_LOCAL_SERVER_SCANS
+		Discovery := this.Options["discovery"]
+		for Id in this.BaseOrder
+			if !Discovery.Has(Id)
+				Results[Id] := Map("id", Id, "running", false, "pids", [], "base_url", this.Servers[Id]["base_url"],
+					"port", 0, "source", "", "detail", "no discovery descriptor in local_servers.json", "needs_listeners", false)
+		this.PortScans := Results
+		LLM_LOCAL_SERVER_SCANS := Results
+		Waiters := this.ScanWaiters is Array ? this.ScanWaiters : []
+		this.ScanWaiters := 0
+		for Waiter in Waiters
+			this._Rescan(Waiter)
+	}
+
+	/**
+	 * Lists every local server view with where it was looked for and what it
+	 * answered, in menu order: the stable shape the menu and the model selector
+	 * page read (the same as the Lua drivers' views).
+	 * @returns {Array} Maps of id, display_name, port, port_source, base_url,
+	 * models (Array when up, else 0), status, reason ("" when up, else
+	 * not_running, needs_key, no_answer, unavailable or not_swept).
+	 */
+	ServerViews() {
+		Views := []
+		for Id in this.Order {
+			Server := this.Servers.Get(Id, 0)
+			Target := this.Target(Id)
+			if !(Server is Map) || !(Target is Map)
+				continue
+			Scan := this.PortScans.Get(Id, 0)
+			View := Map("id", Id, "display_name", Server["label"], "base_url", Target["base_url"],
+				"port", RegExMatch(Target["base_url"], "^\w[\w+.-]*://[^/]*?:(\d+)", &Port) ? Integer(Port[1]) : 0,
+				"port_source", Target["port_source"], "models", 0, "status", "", "reason", "")
+			Verdict := this.Result(Id)
+			if Target["port_source"] != "user" && (Scan is Map) && !Scan["running"]
+				View["reason"] := "not_running"
+			else if !(Verdict is Map)
+				View["reason"] := "not_swept"
+			else if Verdict["status"] == "up" {
+				View["status"] := "up"
+				View["models"] := Verdict["models"].Clone()
+			} else {
+				View["status"] := Verdict["status"]
+				View["reason"] := Verdict["status"] == "needs_key" ? "needs_key"
+					: Verdict["status"] == "unavailable" ? "unavailable" : "no_answer"
+			}
+			Views.Push(View)
+		}
+		return Views
 	}
 
 	_Rescan(OnDone) {
@@ -245,7 +353,15 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 				? this._TargetFromEntry(Id, this.Servers[Id], Projection["entries"][Id]) : this._Target(Id, Source)
 			if !(Target is Map)
 				throw Error("Local discovery catalogue target is unavailable.")
+			; Every target keeps its cache identity; only a running server is probed
 			PrivateTargets[Id] := Target
+			Scan := this.PortScans.Get(Id, 0)
+			if Target["port_source"] != "user" && (Scan is Map) && !Scan["running"] {
+				try LoggerDebug("LLM.local_servers", "Local server '{1}' is not probed: {2}.", Id, Scan["detail"])
+				continue
+			}
+			try LoggerDebug("LLM.local_servers", "Local server '{1}' probed at {2} ({3}).", Id, Target["base_url"],
+				Target["port_source"] == "user" ? "address set by the user" : "port from " Target["port_source"])
 			Targets.Push(Map("id", Id, "base_url", Target["base_url"]))
 		}
 		if !this._Admitted() || !this._True("source_current", Source)
@@ -256,6 +372,15 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 			"configuration", Configuration, "intent", Intent, "generation", 0, "accepted", false)
 		OnDone := Request["observer"]
 		Done := HasMethod(OnDone, "Call") ? ObjBindMethod(this, "_Done", Sweep, OnDone) : 0
+		; No running server leaves no probe to register the sweep: the controller
+		; publishes it at once, under its next generation
+		if Targets.Length == 0 {
+			PreviousCritical := Critical("On")
+			try {
+				Sweep["generation"] := this.Controller.Generation + 1
+				this.Sweeps := Map(Sweep["generation"], Sweep)
+			} finally Critical(PreviousCritical)
+		}
 		; RescanBusy remains held through the shared creator and all synchronous
 		; native factories. A newer intent is replayed after this call unwinds.
 		return this.Controller.Sweep(Targets, ObjBindMethod(this, "_Probe", Sweep), Done)
@@ -496,12 +621,17 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 	}
 
 	_DropJob(Job) {
-		if !this._OwnsJob(Job) || Job["busy"]
+		PreviousCritical := Critical("On")
+		try {
+			if !this._OwnsJob(Job) || Job["busy"]
+				return false
+			Callback := Job["timer"]
+			NativeRecord := this.Models.Records.Get(Job["id"], 0)
+		} finally Critical(PreviousCritical)
+		; Queue retirement acknowledges the captured exact physical request first.
+		if !this._CancelExact(NativeRecord)
 			return false
-		; Queue retirement acknowledges the same exact physical request first.
-		if !this._CancelExact(this.Models.Records.Get(Job["id"], 0))
-			return false
-		if !this._Timer(Job["timer"], 0)
+		if !this._Timer(Callback, 0)
 			return false
 		Successor := 0
 		PreviousCritical := Critical("On")
@@ -509,6 +639,8 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 			if !this._OwnsJob(Job) || Job["busy"]
 				return false
 			this.Jobs.Delete(Job["id"])
+			; Keep the old callback alive outside Critical, not on its own job.
+			Job["timer"] := 0
 			Successor := Job["successor"]
 			Job["successor"] := 0
 			if Successor is Map && !this.Closed && !Successor["sweep"]["accepted"]
@@ -658,12 +790,9 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 						|| !(Entry.Get("BaseUrl", 0) is String) || !(Entry.Get("Token", 0) is String)
 						|| !(Entry.Get("Model", 0) is String)
 					throw TypeError("The native display entry is outside its provider.")
-				Targets[Id] := Map("id", Id, "entry_id", Entry["Id"], "provider", Entry["Provider"],
-					"base_url", Entry["BaseUrl"] == "" ? Server["base_url"] : Entry["BaseUrl"], "token", Entry["Token"])
+				Targets[Id] := this._TargetFromEntry(Id, Server, Entry)
 			} else if (Entry is Integer) && Entry == 0 {
-				Fields := this.Pending.Get(Id, Map())
-				Targets[Id] := Map("id", Id, "entry_id", "", "provider", Id, "base_url", Fields.Get("base_url", Server["base_url"]),
-					"token", Fields.Get("token", ""))
+				Targets[Id] := this._TargetFromEntry(Id, Server, 0)
 			} else throw TypeError("The native display entry lacks a typed absence verdict.")
 		}
 		return Targets

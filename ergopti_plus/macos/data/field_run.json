@@ -1,0 +1,77 @@
+{
+	"_comment": "Developer field run: tools/dev/collect-macos-field-report.sh asks a developer ErgoptiPlus.app (infra/dev_source.lua) to run every Debug field check, the diagnostics collection and the AI download flows, then copies the results it wrote. Read at run time by infra/field_run.lua, which starts only in developer source mode, and by the collector through plutil. The folder is relative to the clone root; a step's deadline is in seconds and never exceeds what is left of the request's own deadline. An AI step with progress_max_seconds is a download: its deadline is the longest it may stay without progress, each window with progress grants another, and progress_max_seconds bounds it; the default request deadline covers every step at its bound, and the collector waits that long plus its own grace. A step that needs a person is reported with that verdict and its reason, never run with a stand-in.",
+	"schema": 1,
+	"folder": "build/field-run",
+	"files": {
+		"ready": "ready.json",
+		"request": "request.json",
+		"refused": "refused.json",
+		"running": "running.json",
+		"results": "results",
+		"accepted": "accepted.json",
+		"done": "done.json"
+	},
+	"max_request_bytes": 4096,
+	"request_id_pattern": "^[A-Za-z0-9_-]{1,64}$",
+	"deadline_seconds": { "default": 4800, "min": 60, "max": 7200 },
+	"log_window_max_lines": 200,
+	"verdicts": ["pass", "fail", "skip", "timeout", "needs_person", "needs_typing"],
+	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
+	"steps": [
+		{ "id": "field_lease", "kind": "field_check", "check": "lease", "deadline_seconds": 45 },
+		{
+			"id": "field_owned_runtime",
+			"kind": "field_check",
+			"check": "owned_runtime",
+			"deadline_seconds": 60
+		},
+		{ "id": "field_network", "kind": "field_check", "check": "network", "deadline_seconds": 60 },
+		{
+			"id": "field_toolchain",
+			"kind": "field_check",
+			"check": "toolchain",
+			"deadline_seconds": 90
+		},
+		{
+			"id": "field_login_items",
+			"kind": "field_check",
+			"check": "login_items",
+			"deadline_seconds": 90
+		},
+		{ "id": "field_composer", "kind": "field_check", "check": "composer", "deadline_seconds": 90 },
+		{
+			"id": "key_accounting",
+			"kind": "field_check",
+			"check": "key_accounting",
+			"deadline_seconds": 45,
+			"person": "needs_typing",
+			"reason": "synthetic_input_unsafe"
+		},
+		{ "id": "diagnostics", "kind": "diagnostics", "deadline_seconds": 60 },
+		{
+			"id": "ollama_runtime",
+			"kind": "ai",
+			"deadline_seconds": 240,
+			"progress_max_seconds": 600
+		},
+		{
+			"id": "ollama_model",
+			"kind": "ai",
+			"deadline_seconds": 240,
+			"progress_max_seconds": 1200
+		},
+		{
+			"id": "mlx_runtime",
+			"kind": "ai",
+			"deadline_seconds": 300,
+			"progress_max_seconds": 1200
+		},
+		{
+			"id": "mlx_model",
+			"kind": "ai",
+			"deadline_seconds": 240,
+			"progress_max_seconds": 1200
+		}
+	],
+	"guard_step": "config_guard"
+}

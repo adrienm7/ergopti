@@ -43,8 +43,10 @@ local Perf       = require("infra.perf")
 local HotPath    = require("infra.hotpath_profiler")
 local KeystrokeIntegrity = require("infra.keystroke_integrity")
 local KeyEventHealth = require("infra.key_event_health")
+local UnicodeCarrier = require("adapters.unicode_carrier")
 local EventClock = require("adapters.event_clock")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
+local ConfigKeys = require("config_keys")
 
 local M   = {}
 local LOG = "keymap"
@@ -94,20 +96,21 @@ M.DELAY_KEY_TO_CATEGORY = {
 --- builds its whole `Features` map from the same manifest). `default_for` fails
 --- fast if a path is missing, so a renamed feature never silently becomes nil.
 M.DEFAULT_STATE = {
-	keymap                      = Manifest.default_for("hotstrings.enabled"),
-	repeat_key_enabled          = Manifest.default_for("hotstrings.repeat_key_enabled"),
-	expansion_delay             = Manifest.default_for("hotstrings.expansion_delay"),
-	idle_reset_seconds          = Manifest.default_for("hotstrings.idle_reset_seconds"),
-	click_resets_word           = Manifest.default_for("hotstrings.click_resets_word"),
-	arrow_resets_word           = Manifest.default_for("hotstrings.arrow_resets_word"),
-	shortcut_resets_word        = Manifest.default_for("hotstrings.shortcut_resets_word"),
+	keymap                      = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_ENABLED),
+	repeat_key_enabled          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED),
+	expansion_delay             = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_EXPANSION_DELAY),
+	idle_reset_seconds          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_IDLE_RESET_SECONDS),
+	cascade_max_arrows          = Manifest.default_for(require("config_keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS),
+	click_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_CLICK_RESETS_WORD),
+	arrow_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_ARROW_RESETS_WORD),
+	shortcut_resets_word        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_SHORTCUT_RESETS_WORD),
 	delays                      = {},     -- Per-group overrides; empty = use DELAYS_DEFAULT
-	trigger_char                = Manifest.default_for("hotstrings.trigger_char"),
-	preview_star_enabled        = Manifest.default_for("hotstrings.preview_star_enabled"),
-	preview_autocorrect_enabled = Manifest.default_for("hotstrings.preview_autocorrect_enabled"),
-	preview_ai_enabled          = Manifest.default_for("hotstrings.preview_ai_enabled"),
-	preview_colored_tooltips    = Manifest.default_for("hotstrings.preview_colored_tooltips"),
-	magic_key_source            = Manifest.default_for("hotstrings.magic_key_source"),
+	trigger_char                = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR),
+	preview_star_enabled        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED),
+	preview_autocorrect_enabled = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_AUTOCORRECT_ENABLED),
+	preview_ai_enabled          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_AI_ENABLED),
+	preview_colored_tooltips    = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS),
+	magic_key_source            = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_MAGIC_KEY_SOURCE),
 }
 
 
@@ -133,15 +136,17 @@ local BUFFER_MAX_CHARS = 500
 local BUFFER_TRIM_BYTE_GATE = BUFFER_MAX_CHARS * 4
 
 -- Complex-keystroke delay multiplier. Shift- or Alt-held keystrokes take
--- longer finger-path time than a bare letter, so we widen the expansion
--- window for them by this factor.
-local COMPLEX_DELAY_MULT = 2
+-- longer finger-path time than a bare letter, so the expansion window widens
+-- for them by this factor. Declared once for the three drivers in the shared
+-- timing registry ([hotstrings] complex_key_delay_multiplier, complex_key_carry_ms);
+-- the rule is the shared engine's complex_delay_multiplier.
+local COMPLEX_DELAY_MULT = require("infra.timings").ms("hotstrings", "complex_key_delay_multiplier")
 
 -- How long after a complex keystroke the bonus multiplier still applies to
 -- the next keystroke — this covers the small lag between releasing Shift
 -- and pressing the next letter. Beyond this window the bonus is dropped so
 -- it cannot inadvertently stretch an expansion on an unrelated later key.
-local COMPLEX_CARRY_SEC = 0.3
+local COMPLEX_CARRY_MS = require("infra.timings").ms("hotstrings", "complex_key_carry_ms")
 
 -- Central memory struct passed via reference to all sub-modules. The shape,
 -- invariants, and default seeding live in modules/keymap/state.lua; keeping
@@ -214,6 +219,7 @@ local function observe_context_epoch(epoch)
 	if epoch ~= _last_context_epoch then
 		CoreState.buffer = ""
 		CoreState.llm_buffer = ""
+		CoreState.llm_private_mark = ""
 		-- Deliberately not governed by hotstrings.arrow_resets_word or
 		-- shortcut_resets_word. An epoch is an opaque token for "an Ergopti
 		-- action handed output to Quartz": it does not say whether that output was
@@ -393,6 +399,7 @@ local function invalidate_observed_context()
 	if _one_shot_shift then _one_shot_shift.disarm() end
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
+	CoreState.llm_private_mark = ""
 	cancel_action_preview_recovery()
 	-- Not a word boundary: the cursor sits in territory we never observed, so
 	-- word-anchored triggers must stay silent until a real terminator is seen.
@@ -412,6 +419,7 @@ local function discard_paused_text_context()
 	if _one_shot_shift then _one_shot_shift.disarm() end
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
+	CoreState.llm_private_mark = ""
 	CoreState.start_is_word_boundary = false
 	CoreState.start_is_line_start = false
 	cancel_action_preview_recovery()
@@ -424,6 +432,7 @@ end
 local function invalidate_window_context()
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
+	CoreState.llm_private_mark = ""
 	cancel_action_preview_recovery()
 	CoreState.start_is_word_boundary = false
 	CoreState.start_is_line_start = false
@@ -449,6 +458,19 @@ function M.get_base_delay()
 	return CoreState.BASE_DELAY_SEC
 end
 
+--- Observers of the baseline delay. The override file stores each delay as an
+--- offset of it, so whoever projects delays (the hotstring config) must project
+--- them again when it changes.
+local _base_delay_observers = {}
+
+--- Registers a function called after every change of the baseline delay.
+--- A false answer refuses the change: the previous baseline is put back.
+--- @param observer function Called with no argument, returns true when it applied the change.
+function M.on_base_delay_change(observer)
+	assert(type(observer) == "function", "a base-delay observer is a function")
+	_base_delay_observers[#_base_delay_observers + 1] = observer
+end
+
 --- Sets the baseline inter-key delay threshold used for all unmapped groups.
 --- @param secs number The new threshold in seconds (clamped to ≥ 0).
 function M.set_base_delay(secs)
@@ -457,7 +479,16 @@ function M.set_base_delay(secs)
 		Logger.error(LOG, "Base-delay change refused because the active hotstring preview could not be revoked.")
 		return false
 	end
+	local previous = CoreState.BASE_DELAY_SEC
 	CoreState.BASE_DELAY_SEC = v
+	for _, observer in ipairs(_base_delay_observers) do
+		local called, applied = pcall(observer)
+		if not called or applied ~= true then
+			CoreState.BASE_DELAY_SEC = previous
+			Logger.error(LOG, "Base-delay change refused because a delay owner could not apply it.")
+			return false
+		end
+	end
 	Logger.debug(LOG, "Base delay: %.3fs.", v)
 	return true
 end
@@ -480,6 +511,25 @@ function M.set_idle_reset_seconds(secs)
 	CoreState.IDLE_RESET_SEC = secs
 	CoreState.WORD_TIMEOUT_SEC = secs
 	Logger.debug(LOG, "Idle reset: %gs.", secs)
+	return true
+end
+
+--- Returns how many expansions (arrows) a chain of hotstrings may hold.
+--- @return number Arrows; 1 means a single expansion, no cascade.
+function M.get_cascade_max_arrows()
+	return CoreState.CASCADE_MAX_ARROWS
+end
+
+--- Sets the longest chain of hotstrings.
+--- @param arrows number hotstrings.cascade_max_arrows; a whole number from 1 (a single expansion) to 10.
+--- @return boolean committed False for a value outside that range.
+function M.set_cascade_max_arrows(arrows)
+	if not HotstringCore.valid_cascade_max_arrows(arrows) then
+		Logger.error(LOG, "Cascade arrow count refused: '%s' is not a whole number from 1 to 10.", tostring(arrows))
+		return false
+	end
+	CoreState.CASCADE_MAX_ARROWS = arrows
+	Logger.debug(LOG, "Cascade arrows: %d.", arrows)
 	return true
 end
 
@@ -544,6 +594,7 @@ end
 -- it from the features manifest through its own setters, which refuse an
 -- invalid default with an ERROR and keep the neutral policy.
 M.set_idle_reset_seconds(M.DEFAULT_STATE.idle_reset_seconds)
+M.set_cascade_max_arrows(M.DEFAULT_STATE.cascade_max_arrows)
 M.set_click_resets_word(M.DEFAULT_STATE.click_resets_word)
 M.set_arrow_resets_word(M.DEFAULT_STATE.arrow_resets_word)
 M.set_shortcut_resets_word(M.DEFAULT_STATE.shortcut_resets_word)
@@ -823,6 +874,8 @@ M.set_repeat_feature_enabled = preview_fenced_registry_mutation(Registry.set_rep
 M.set_terminator_enabled   = preview_fenced_registry_mutation(Registry.set_terminator_enabled)
 M.set_terminators_enabled  = preview_fenced_registry_mutation(Registry.set_terminators_enabled)
 M.is_terminator_enabled    = Registry.is_terminator_enabled
+M.set_terminators_consume  = preview_fenced_registry_mutation(Registry.set_terminators_consume)
+M.is_terminator_consume    = Registry.is_terminator_consume
 M.get_terminator_defs      = Registry.get_terminator_defs
 M.validate_custom_terminator = Registry.validate_custom_terminator
 local add_custom_terminator_fenced = preview_fenced_registry_mutation(
@@ -854,9 +907,11 @@ M.set_llm_nav_modifiers      = LLMBridge.set_llm_nav_modifiers
 M.get_llm_enabled            = LLMBridge.get_llm_enabled
 M.get_llm_runtime_setting    = LLMBridge.get_llm_runtime_setting
 M.set_llm_disabled_apps      = LLMBridge.set_llm_disabled_apps
+M.set_llm_app_profile_overrides = LLMBridge.set_llm_app_profile_overrides
 M.set_llm_enabled            = LLMBridge.set_llm_enabled
 M.set_llm_after_hotstring    = LLMBridge.set_llm_after_hotstring
 M.set_llm_debounce           = LLMBridge.set_llm_debounce
+M.set_llm_min_request_interval = LLMBridge.set_llm_min_request_interval
 M.set_llm_auto_raise_temp    = LLMBridge.set_llm_auto_raise_temp
 M.set_llm_streaming              = LLMBridge.set_llm_streaming
 M.set_llm_streaming_multi        = LLMBridge.set_llm_streaming_multi
@@ -915,7 +970,7 @@ end
 --- to emit synthetic keystrokes and accurately sync the core buffer.
 ---
 --- `is_private` is NOT optional decoration: it is the only channel through which
---- a dynamic injector can tell the keylogger that what it just emitted is a
+--- a dynamic injector can tell the keystats that what it just emitted is a
 --- secret. perform_text_replacement forwards it to notify_synthetic, which keeps
 --- the discard markers intact and redacts only what it persists. Omitting it —
 --- which this function structurally forced, by stopping one argument short —
@@ -937,6 +992,7 @@ function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_
 			tostring(splice_error))
 		CoreState.buffer = ""
 		CoreState.llm_buffer = ""
+		CoreState.llm_private_mark = ""
 		CoreState.start_is_word_boundary = false
 		CoreState.start_is_line_start = false
 		local cleanup_ok, cleanup_result = xpcall(LLMBridge.reset_predictions, debug.traceback)
@@ -991,7 +1047,7 @@ function M.capture_user_hotstring(rule)
 	local destination = km_utils.capture_text_destination()
 	if not destination or CoreState.buffer:sub(-#rule.suffix) ~= rule.suffix
 		or M.has_registered_magic_action(CoreState.buffer) then return nil end
-	if CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = "user_code" },
+	if CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = require("config_keys").LEAF.USER_CODE },
 		_user_hotstring_elapsed, 1) ~= true then return nil end
 	return { lifecycle = _user_hotstring_lifecycle, input = _user_hotstring_input,
 		epoch = SyntheticInput.current_action_epoch(), buffer = CoreState.buffer,
@@ -1052,7 +1108,7 @@ local function publication_receipt(transaction, capture)
 		if notified or receipt.is_settled() ~= true then return end
 		notified = true
 		if transaction.completion_status ~= "complete" and capture.input == _user_hotstring_input then
-			CoreState.buffer, CoreState.llm_buffer = "", ""
+			CoreState.buffer, CoreState.llm_buffer, CoreState.llm_private_mark = "", "", ""
 			CoreState.start_is_word_boundary = false
 			CoreState.start_is_line_start = false
 		end
@@ -1121,7 +1177,7 @@ end
 --- is never used as transaction identity.
 ---
 --- Arming only: does NOT emit any keystroke. The caller is responsible for
---- also calling suppress_rescan() and keylogger.notify_synthetic() to complete
+--- also calling suppress_rescan() and keystats.notify_synthetic() to complete
 --- the synthetic-injection contract (see docs/PROJECT_MEMORY.md §synthetic).
 ---
 --- @param deletes number Retained for compatibility with legacy callers.
@@ -1207,13 +1263,6 @@ local _tc_char_len     = 1
 local _tc_dt           = 0
 local _tc_complex_mult = 1
 local _tc_is_ignored   = false
-
--- Hot-path sub-segment timings (milliseconds) for the slow-keystroke log line.
--- Populated only when Perf sampling is enabled (DEBUG builds) so steady-state
--- typing pays nothing; nil means "not measured this keystroke". They let a slow
--- keydown be attributed to trigger matching vs. LLM/tooltip preview rebuild.
-local _tc_dbg_checks_ms  = nil
-local _tc_dbg_preview_ms = nil
 
 --- Per-mapping delay + group-enable gate, module-level to avoid closure allocation.
 --- @param m table The mapping entry.
@@ -1516,7 +1565,16 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- A press already consumed before PAUSE still owns its repeats and release.
 	-- Ordinary paused keys retain the no-decode fast path below.
 	if provenance == nil and provenance_status == EventProvenance.STATUS_FOREIGN
-		and _one_shot_shift and _one_shot_shift.claim_repeat(e) then return true end
+		and _one_shot_shift then
+		if _key_down_context.stale and not FAST_EXIT_KEYCODES[_key_down_context.keycode]
+			and CoreState.processing_paused ~= true and SyntheticInput.admission_open() then
+			-- This press can already belong to the application, including a repeat
+			-- of an earlier consumed press. Its release must pass with it.
+			_one_shot_shift.forget_passed_key(_key_down_context.keycode)
+		elseif _one_shot_shift.claim_repeat(e) then
+			return true
+		end
+	end
 
 	-- The pause transaction closes new synthetic admission immediately after the
 	-- global drain reaches idle and keeps it closed through PAUSED/rollback. Raw
@@ -1569,6 +1627,16 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- no application ever receives one, and publish the signal in-process.
 	if ControlSentinels.is_sentinel(keyCode)
 		and ControlSentinels.claim_key(keyCode, true, e:getFlags()) then return true end
+	-- A key that waited behind the main thread may already be in the application
+	-- (SyntheticInput.STALE_PHYSICAL_EVENT_MS): an expansion or a repeat built on
+	-- it now would delete or retype text the user never saw that way. It passes
+	-- untouched and the buffer starts over.
+	if _key_down_context.stale and not FAST_EXIT_KEYCODES[keyCode] then
+		invalidate_observed_context()
+		pcall(KeyEventHealth.note_stale_pass)
+		return false
+	end
+
 	-- The physical magic key: a plain press of the chosen key types the magic key.
 	-- The event itself carries it from here, so the one-shot Shift, the buffer and
 	-- the application all see the magic key, in ignored and secure windows too,
@@ -1585,16 +1653,6 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- This replaces both the old SYNTHETIC_SIGNAL_KEYCODES check and the
 	-- 9-branch `or` chain further down, saving ~10 comparisons per keystroke.
 	if FAST_EXIT_KEYCODES[keyCode] then return false end
-
-	-- A key that waited behind the main thread may already be in the application
-	-- (SyntheticInput.STALE_PHYSICAL_EVENT_MS): an expansion or a repeat built on
-	-- it now would delete or retype text the user never saw that way. It passes
-	-- untouched and the buffer starts over.
-	if _key_down_context.stale then
-		invalidate_observed_context()
-		pcall(KeyEventHealth.note_stale_pass)
-		return false
-	end
 
 	-- Fast-exit when a Hammerspoon webview has focus. The is_ignored_window cache
 	-- makes this nearly free on repeated keystrokes; it already treats the HS app
@@ -1666,6 +1724,9 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 			CoreState.start_is_line_start = false
 		end
 		CoreState.llm_buffer = ""
+		-- The mark describes the hotstring buffer: it goes with it, and stays while a
+		-- bare Backspace keeps the word before the pause (and so a secret in it).
+		if CoreState.buffer == "" then CoreState.llm_private_mark = "" end
 		LLMBridge.reset_predictions()
 	end
 
@@ -1826,6 +1887,8 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	CoreState.buffer = CoreState.buffer .. chars
 	if #CoreState.buffer > BUFFER_TRIM_BYTE_GATE then
 		local ok, off = pcall(utf8.offset, CoreState.buffer, -BUFFER_MAX_CHARS)
+		-- The private mark loses the same head, so it keeps describing the buffer.
+		LLMBridge.private_context_trimmed(CoreState.buffer, (ok and off) and off - 1 or #CoreState.buffer)
 		-- Fall back to empty on a failed offset (malformed UTF-8) rather than
 		-- keeping the full overgrown buffer — losing ≤500 chars of history is
 		-- acceptable, unbounded growth is not.
@@ -1853,12 +1916,13 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- Complex keystrokes (involving Shift or Alt) allow a wider timing window
 	-- to accommodate the extra finger movement required by the modifier. The
 	-- bonus also carries over to the NEXT keystroke to cover Shift-release lag
-	-- — but only within a short window (COMPLEX_CARRY_SEC). A long pause
+	-- — but only within a short window (COMPLEX_CARRY_MS). A long pause
 	-- between a complex key and the following one means the two are unrelated,
 	-- and we must not stretch an expansion delay across that gap.
-	local is_complex       = flags.shift or flags.alt
-	local carry_from_prev  = CoreState.last_key_was_complex and dt <= COMPLEX_CARRY_SEC
-	local complex_mult     = (is_complex or carry_from_prev) and COMPLEX_DELAY_MULT or 1
+	local is_complex       = (flags.shift or flags.alt) and true or false
+	-- The shared rule (autocorrections are excluded later, by the mapping's group).
+	local complex_mult     = HotstringCore.complex_delay_multiplier(is_complex,
+		CoreState.last_key_was_complex == true, dt * 1000, COMPLEX_DELAY_MULT, COMPLEX_CARRY_MS, true)
 	CoreState.last_key_was_complex = is_complex
 
 	-- Populate module-level upvalues consumed by run_trigger_checks / mapping_fires.
@@ -1869,21 +1933,24 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	_tc_char_len     = (chars_bytes <= 2) and 1 or (text_utils.utf8_len(chars))
 	_tc_dt           = dt
 	_tc_complex_mult = complex_mult
+	-- The same two values for the cascade's further steps (expander.lua).
+	CoreState.cascade_elapsed      = dt
+	CoreState.cascade_complex_mult = complex_mult
 
-	-- DEBUG-only sub-segment timing (Perf gate): attribute a slow keystroke to
-	-- trigger matching vs. preview rebuild in the HotPath warning line.
-	local hot_dbg = Perf.is_enabled()
-	local ck0 = hot_dbg and HotPath.now() or nil
+	-- Sub-segment timing, always on: it feeds the phase counters summarised
+	-- every interval, and the nesting tracker reports a slow match or preview
+	-- rebuild with keydown as its parent instead of billing keydown for it.
+	local ck0 = HotPath.now()
 	local fired = run_trigger_checks()
-	if ck0 then _tc_dbg_checks_ms = HotPath.elapsed_ms(ck0) end
+	HotPath.log_if_slow("hotstring.match", ck0)
 	if fired then return true end
 
 	-- No trigger fired — the buffer is still the one we appended `chars` to,
 	-- so refresh the preview now (expander.update_preview is only reached
 	-- when an expansion happens, which we just ruled out).
-	local pv0 = hot_dbg and HotPath.now() or nil
+	local pv0 = HotPath.now()
 	update_preview_with_action_recovery(CoreState.buffer)
-	if pv0 then _tc_dbg_preview_ms = HotPath.elapsed_ms(pv0) end
+	HotPath.log_if_slow("preview.rebuild", pv0)
 
 	-- Enter / Tab with no predictions visible clears prediction state.
 	-- When predictions ARE visible, Tab is consumed upstream by handle_llm_keys
@@ -1923,8 +1990,9 @@ end
 local AUTOREPEAT_PROPERTY = eventtap.event.properties.keyboardEventAutorepeat
 
 --- Feeds one physical key event to the session's pairing counters
---- (infra/key_event_health.lua). Never changes what the key does: every read
---- is protected and the counters only write tables.
+--- (infra/key_event_health.lua) and to the held keys synthetic text avoids
+--- (adapters/unicode_carrier.lua). Never changes what the key does: every read
+--- is protected and both only write tables.
 --- @param e table Physical keyDown or keyUp event.
 --- @param phase string "down" or "up".
 --- @param lateness_ms number|nil Callback lateness from adapters/event_clock.lua.
@@ -1940,6 +2008,8 @@ local function observe_key_health(e, phase, lateness_ms, stamp)
 	end
 	local ok_char, character = pcall(Keycodes.character_for, keycode)
 	KeyEventHealth.note(phase, keycode, autorepeat, ok_char and character ~= nil, lateness_ms, stamp)
+	-- Synthetic text must not ride a key the user still holds (hsfix-held-carrier).
+	if type(keycode) == "number" then UnicodeCarrier.note_physical_key(phase, keycode) end
 	return keycode
 end
 
@@ -1952,21 +2022,20 @@ end
 local function onKeyDown(e)
 	-- Always-on latency tripwire (ported from the AHK hot-path profiler): two
 	-- monotonic clock reads per keystroke, logging a WARNING only when a keystroke
-	-- exceeds the slow threshold. Normal typing stays silent; a real hitch surfaces
-	-- with the offending char + buffer tail so "typing feels slow" is diagnosable
-	-- from the log alone. Opt-in Perf.sample below adds the p50/p99 distribution.
+	-- exceeds the slow threshold on its own time. Normal typing stays silent; a
+	-- real hitch surfaces with the segment that spent the time, never the typed
+	-- text. Opt-in Perf.sample below adds the p50/p99 distribution.
 	local t0_hot = HotPath.now()
 	local t0 = Perf.is_enabled() and Perf.now() or nil
-	-- Clear last keystroke's sub-segment timings so a slow line never reports
-	-- stale figures from an earlier keystroke that took a different branch.
+	-- Clear last keystroke's characters so trigger matching never reads stale
+	-- input from an earlier keystroke that took a different branch.
 	_tc_chars = ""
-	_tc_dbg_checks_ms, _tc_dbg_preview_ms = nil, nil
 
 	-- Classify once before any physical-input state mutation. Action-epoch
 	-- reconciliation deliberately runs from this immutable provenance result.
 	-- The first Ergopti tap reached by a
 	-- physical event claims every older deferred action, publishes its epoch and
-	-- returns its payload before the original. This makes keymap/keylogger ordering
+	-- returns its payload before the original. This makes keymap/keystats ordering
 	-- independent of Quartz tap insertion order.
 	local provenance = nil
 	local provenance_status = EventProvenance.STATUS_UNREADABLE
@@ -2004,7 +2073,7 @@ local function onKeyDown(e)
 		end
 	end
 	if fence_consumes_original then
-		HotPath.log_if_slow("keydown", t0_hot, _tc_chars)
+		HotPath.log_if_slow("keydown", t0_hot)
 		return true, fence_events
 	end
 	if provenance_status ~= EventProvenance.STATUS_OWNED then _user_hotstring_input = {} end
@@ -2016,7 +2085,7 @@ local function onKeyDown(e)
 	local entered, enter_err = pcall(SyntheticInput.enter_callback)
 	if not entered then
 		Logger.error(LOG, "Synthetic callback collector failed to start: %s.", tostring(enter_err))
-		HotPath.log_if_slow("keydown", t0_hot, _tc_chars)
+		HotPath.log_if_slow("keydown", t0_hot)
 		return (provenance and (provenance.loopback or provenance.stale_loopback)) == true,
 			fence_events
 	end
@@ -2055,13 +2124,7 @@ local function onKeyDown(e)
 		end
 	end
 	if t0 then Perf.sample("keymap_keydown", t0) end
-	-- Enrich the slow-keystroke detail with the per-stage breakdown when measured.
-	local hot_detail = _tc_chars
-	if _tc_dbg_checks_ms or _tc_dbg_preview_ms then
-		hot_detail = string.format("%s | match=%.2fms preview=%.2fms",
-			tostring(_tc_chars), _tc_dbg_checks_ms or 0, _tc_dbg_preview_ms or 0)
-	end
-	HotPath.log_if_slow("keydown", t0_hot, hot_detail)
+	HotPath.log_if_slow("keydown", t0_hot)
 	-- Owned echoes are the driver's own output; only physical presses (replays
 	-- included) enter the integrity ring.
 	if provenance_status ~= EventProvenance.STATUS_OWNED then
@@ -2236,7 +2299,7 @@ mouse_tap = eventtap.new(
 	function(e)
 		-- A click can move focus to another app before the deferred broker runs.
 		-- Claim older output here and return it ahead of the original mouseDown, even
-		-- when the optional keylogger tap is disabled. Otherwise an Ergopti shortcut
+		-- when the optional keystats tap is disabled. Otherwise an Ergopti shortcut
 		-- queued for app A can land in app B after the click changes focus.
 		local provenance, provenance_status, fence = EventProvenance.classify_with_fence(
 			e, "keymap.mouse")
@@ -2624,6 +2687,7 @@ function M.stop(teardown)
 	_window_context_reconcile_pending = false
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
+	CoreState.llm_private_mark = ""
 	CoreState.start_is_word_boundary = false
 	CoreState.start_is_line_start = false
 	cancel_action_preview_recovery()

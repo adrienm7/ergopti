@@ -33,7 +33,7 @@ _TSCSG_ClipboardHasSuspendGuardBeforeWrite() {
 	Assert(GuardPos > 0,
 		"_TextSendClipboard must check A_IsSuspended — it runs entirely on a SetTimer callback, which native Suspend() never disarms")
 
-	WritePos := InStr(Body, "CB_Write(")
+	WritePos := InStr(Body, "CB_WriteTextWithReceipt(")
 	Assert(WritePos > 0, "_TextSendClipboard must still call CB_Write")
 	Assert(GuardPos < WritePos,
 		"_TextSendClipboard: the A_IsSuspended guard must appear BEFORE CB_Write — a guard placed after the write still overwrites the clipboard while paused")

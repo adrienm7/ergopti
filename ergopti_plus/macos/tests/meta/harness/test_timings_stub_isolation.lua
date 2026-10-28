@@ -5,10 +5,10 @@
 --- DESCRIPTION:
 --- test_apply_prediction_paste_ops.lua installs a minimal
 --- `package.loaded["infra.timings"] = { sec = function() ... end }` stub (no
---- M.ms) and never restores it. Once modules.keylogger is not already cached,
---- the next test whose require chain reaches modules.keylogger (e.g. via
---- modules.keymap.llm_bridge, which requires modules.keylogger directly) hits
---- modules/keylogger/init.lua's module-level `Timings.ms("keylogger",
+--- M.ms) and never restores it. Once modules.keystats is not already cached,
+--- the next test whose require chain reaches modules.keystats (e.g. via
+--- modules.keymap.llm_bridge, which requires modules.keystats directly) hits
+--- modules/keystats/init.lua's module-level `Timings.ms("keystats",
 --- "micro_idle_timeout_ms")` call and crashes with "attempt to call a nil
 --- value (field 'ms')" — exactly the same order/GC-dependent contamination
 --- class as F-T1 (lib.i18n) and F-HIGH-23 (modules.keymap.registry*). Fix:
@@ -19,7 +19,7 @@
 
 local helpers = require("tests.helpers")
 
-helpers.describe("load_with_stubs isolates modules.keylogger from a leaked lib.timings stub", function()
+helpers.describe("load_with_stubs isolates modules.keystats from a leaked lib.timings stub", function()
 	helpers.it("clears a cached partial lib.timings stub so the real module reloads with M.ms", function()
 		-- Simulate the polluting predecessor: a lib.timings stub missing M.ms,
 		-- exactly what test_apply_prediction_paste_ops.lua installs.
@@ -33,17 +33,17 @@ helpers.describe("load_with_stubs isolates modules.keylogger from a leaked lib.t
 		-- and returns a real registry value (not nil, not an error).
 		local Timings = require("infra.timings")
 		helpers.assert_eq(type(Timings.ms), "function", "the real lib.timings must expose M.ms")
-		helpers.assert_eq(type(Timings.ms("keylogger", "micro_idle_timeout_ms")), "number",
-			"Timings.ms(\"keylogger\", \"micro_idle_timeout_ms\") must resolve to a real registry value")
+		helpers.assert_eq(type(Timings.ms("keystats", "micro_idle_timeout_ms")), "number",
+			"Timings.ms(\"keystats\", \"micro_idle_timeout_ms\") must resolve to a real registry value")
 	end)
 
-	helpers.it("modules.keylogger loads cleanly after a leaked partial lib.timings stub", function()
+	helpers.it("modules.keystats loads cleanly after a leaked partial lib.timings stub", function()
 		package.loaded["infra.timings"]       = { sec = function() return 0.1 end }
-		package.loaded["modules.keylogger"] = nil
+		package.loaded["modules.keystats"] = nil
 
 		helpers.load_with_stubs("infra.logger")
 
-		local ok, err = pcall(require, "modules.keylogger")
-		helpers.assert_true(ok, "modules.keylogger must load without error after a leaked partial lib.timings stub: " .. tostring(err))
+		local ok, err = pcall(require, "modules.keystats")
+		helpers.assert_true(ok, "modules.keystats must load without error after a leaked partial lib.timings stub: " .. tostring(err))
 	end)
 end)

@@ -66,7 +66,7 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	"modules/llm/api_remote.ahk", true,
 	"modules/llm/models.ahk", true,
 	"modules/llm/profiles.ahk", true,
-	"modules/keylogger/keylogger_hook.ahk", true,
+	"modules/keystats/keystats_hook.ahk", true,
 	"platform/remap/tap_hold_loader.ahk", true,
 	"modules/keymap/llm_bridge.ahk", true,
 	"ui/tray_menu.ahk", true,
@@ -80,7 +80,11 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; It exists precisely BECAUSE the previous design had no such variable and
 	; re-derived the hardware intent from GetKeyState — the bit the same function
 	; writes — which made the CapsLock LED self-latching.
-	"modules/shortcuts/capsword.ahk", true
+	"modules/shortcuts/capsword.ahk", true,
+	; _ComposerCheckBusy — a re-entrancy flag, not injected state. It starts false
+	; at its declaration, ComposerCheck_Run sets it for the one running check and
+	; that check's terminal step clears it; there is no init for a guard to wait on.
+	"ui/layout_manager/composer_check.ahk", true
 )
 
 ; Captured 2026-07-21 after excluding UPPER_SNAKE constants from the state

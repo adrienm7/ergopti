@@ -62,8 +62,10 @@ helpers.describe("karabiner.init — wizard session guard", function()
 		local src = read_source()
 		-- Bound the exact M.init branch so helper definitions earlier in the module
 		-- cannot satisfy the ordering assertion.
+		-- The owned Karabiner runtime needs no first-run wizard, so the branch
+		-- also requires that it is not selected.
 		local branch_pos = src:find(
-			"if _state.enabled and not _wizard_ran_this_session then", 1, true)
+			"if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session then", 1, true)
 		local branch_end = branch_pos and src:find("\n\tend", branch_pos, true)
 		helpers.assert_true(branch_pos ~= nil and branch_end ~= nil,
 			"the guarded first-run wizard branch must remain bounded")

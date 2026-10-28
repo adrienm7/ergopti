@@ -22,10 +22,13 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local Keylogger = require("modules.keylogger.keylogger")
-local Writer = require("modules.keylogger.sqlite_writer")
-local Reader = require("modules.keylogger.sqlite_reader")
+local Keystats = require("modules.keystats.keystats")
+local Writer = require("modules.keystats.sqlite_writer")
+local Reader = require("modules.keystats.sqlite_reader")
 local Json = require("json")
+local Calendar = require("modules.keystats.calendar")
+local Monotonic = require("infra.monotonic")
+local native_capture = Calendar.capture
 local checks, failures = 0, 0
 local function check(name, body)
 	checks = checks + 1
@@ -52,33 +55,57 @@ local fixtures = {
 	{ name = "UTC midnight east", tz = "OWN-2", utc = { year = 2026, month = 1, day = 2, hour = 0 } },
 	{ name = "UTC midnight between record and flush", tz = "OWN-2", utc = { year = 2026, month = 1, day = 1, hour = 23, min = 59, sec = 59 }, advance = 2 },
 }
+-- Each fixture jumps to an unrelated instant and timezone. The collector keeps
+-- its last calendar observation and refuses a day change without a midnight,
+-- so every fixture gets fresh owners after the previous ones retire.
+local OWNERS = { "modules.keystats.keystats", "modules.keystats.metrics_collector", "modules.keystats.sqlite_writer" }
+local function fresh_owners()
+	local deadline = uv.hrtime() + 10 * 1e9
+	local settled = Keystats.stop()
+	while not settled and uv.hrtime() < deadline do
+		uv.run("nowait"); uv.sleep(1); settled = Keystats.stop()
+	end
+	assert(settled, "the previous fixture's collector must retire")
+	for _, name in ipairs(OWNERS) do package.loaded[name] = nil end
+	Keystats = require("modules.keystats.keystats")
+	Writer = require("modules.keystats.sqlite_writer")
+end
 for index, fixture in ipairs(fixtures) do
+	if index > 1 then fresh_owners() end
 	assert(uv.os_setenv("TZ", "OWN0")); ffi.C.tzset()
 	local instant = native_time(fixture.utc)
 	assert(uv.os_setenv("TZ", fixture.tz)); ffi.C.tzset()
 	os.date = function(format, timestamp) return native_date(format, timestamp or instant) end
 	os.time = function(date) return date and native_time(date) or instant end
+	-- Capture reads the native wall clock (uv.gettimeofday), not os.time, so the
+	-- owned instant must reach the collector through its calendar observation.
+	Calendar.capture = function()
+		return { wall_ms = instant * 1000, mono_ms = math.floor(Monotonic.now_ms()),
+			date = native_date("%Y-%m-%d", instant), ts = native_date("!%Y-%m-%d %H:%M:%S", instant) }
+	end
 	Writer.close_db()
 	local path = root .. "/owned-" .. index .. ".sqlite"
-	Keylogger.init({ sqlite_path = path, log_dir = root .. "/logs" })
-	assert(Keylogger.is_enabled() and Writer.is_available())
+	Keystats.init({ sqlite_path = path, log_dir = root .. "/logs" })
+	assert(Keystats.is_enabled() and Writer.is_available())
 	local local_day, recorded_ts = os.date("%Y-%m-%d"), os.date("!%Y-%m-%d %H:%M:%S")
-	Keylogger.record_hotstring("owned-events", "q", "abc", 1000, "static", 0, false)
-	Keylogger.record_shortcut("owned-events", "owned-action", 1000)
+	Keystats.record_hotstring("owned-events", "q", "abc", 1000, "static", 0, false)
+	Keystats.record_shortcut("owned-events", "owned-action", 1000)
 	instant = instant + (fixture.advance or 0)
 	assert(os.date("%Y-%m-%d") == local_day, "fixture must not change the flush calendar day")
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
+	require("tests.support.sqlite_flush_native").flush(Keystats)
 	local hotstrings, shortcuts, typing = rows("events_hotstring"), rows("events_shortcut"), rows("events_typing")
 	local before, revision = packed(), assert(Writer.get_revision())
 	local manifest = Reader.read_manifest(path)
-	local dashboard = Keylogger.get_dashboard_payload({ include_prefetch = false }).metrics_manifest
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
+	local dashboard = Keystats.get_dashboard_payload({ include_prefetch = false }).metrics_manifest
+	require("tests.support.sqlite_flush_native").flush(Keystats)
 	print("native " .. fixture.name .. " local=" .. local_day .. "; typing=" .. typing[1] .. "; hotstring=" .. hotstrings[1] .. "; shortcut=" .. shortcuts[1])
 	check(fixture.name .. ": public raw days agree with local aggregates and retain UTC instants/IDs", function()
 		assert(#hotstrings == 1 and #shortcuts == 1 and #typing == 1)
 		assert(hotstrings[1] == "2|" .. local_day .. "|" .. recorded_ts)
 		assert(shortcuts[1] == "3|" .. local_day .. "|" .. recorded_ts)
-		assert(typing[1] == "1|" .. local_day .. "|" .. os.date("!%Y-%m-%d %H:%M:%S"))
+		-- Since 2368c17013 the typing row keeps its capture instant, like the
+		-- other raw rows, rather than the later flush instant.
+		assert(typing[1] == "1|" .. local_day .. "|" .. recorded_ts)
 		assert(manifest[local_day]["owned-events"].hs_chars == 3 and dashboard[local_day]["owned-events"].hs_chars == 3)
 		assert(assert(Writer.query_rows("SELECT trigger||'|'||replacement||'|'||h_type||'|'||net_saved_chars FROM events_hotstring;"))[1] == "q|abc|static|2")
 		assert(assert(Writer.query_rows("SELECT key FROM events_shortcut;"))[1] == "owned-action")
@@ -119,18 +146,18 @@ for index, fixture in ipairs(fixtures) do
 				.. "UNION ALL SELECT id FROM events_hotstring UNION ALL SELECT id FROM events_shortcut UNION ALL SELECT id FROM events_app_switch);"))
 			assert(all[1] == "11|11|1|11" and Writer.get_meta("linux_next_event_id") == "12")
 		end)
-		Keylogger.record_hotstring("owned-events", "private-owned", "xyz", 1000, "static", 0, true)
-		require("tests.support.sqlite_flush_native").flush(Keylogger)
+		Keystats.record_hotstring("owned-events", "private-owned", "xyz", 1000, "static", 0, true)
+		require("tests.support.sqlite_flush_native").flush(Keystats)
 		check("private public logging retains aggregate counts and withholds raw hotstring content", function()
 			assert(#rows("events_hotstring") == 3, "private output must not append a raw hotstring row")
 			assert(Reader.read_manifest(path)[local_day]["owned-events"].hs_chars == 6)
 		end)
 		local accepted = packed()
-		Keylogger.suppress()
-		Keylogger.record_hotstring("owned-events", "suppressed", "unused", 1000, "static", 0, false)
-		Keylogger.record_shortcut("owned-events", "suppressed-action", 1000)
-		Keylogger.unsuppress()
-		require("tests.support.sqlite_flush_native").flush(Keylogger)
+		Keystats.suppress()
+		Keystats.record_hotstring("owned-events", "suppressed", "unused", 1000, "static", 0, false)
+		Keystats.record_shortcut("owned-events", "suppressed-action", 1000)
+		Keystats.unsuppress()
+		require("tests.support.sqlite_flush_native").flush(Keystats)
 		check("suppressed public producers cannot append raw rows", function() assert(packed() == accepted) end)
 	end
 	os.date, os.time = native_date, native_time

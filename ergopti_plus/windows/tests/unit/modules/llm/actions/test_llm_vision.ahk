@@ -354,13 +354,13 @@ _LVS_Complete(Capture, Ok, Reason := "saved") {
 	Capture.OnDone.Call(Ok, Reason)
 }
 
-_LVS_RecordRemote(Fx, Resolved, Url, Body, OnSuccess, OnFail) {
-	Fx.Vision.Push(Map("resolved", Resolved, "url", Url, "body", Body,
+_LVS_RecordRemote(Fx, Resolved, Url, Body, OnSuccess, OnFail, CurrentFn) {
+	Fx.Vision.Push(Map("resolved", Resolved, "url", Url, "body", Body, "requester_current", CurrentFn,
 		"on_success", OnSuccess, "on_fail", OnFail))
 }
 
-_LVS_RecordOllama(Fx, Body, OnSuccess, OnFail) {
-	Fx.Ollama.Push(Map("body", Body, "on_success", OnSuccess, "on_fail", OnFail))
+_LVS_RecordOllama(Fx, Body, OnSuccess, OnFail, CurrentFn) {
+	Fx.Ollama.Push(Map("body", Body, "on_success", OnSuccess, "on_fail", OnFail, "requester_current", CurrentFn))
 }
 
 ; Runs Body(Calls, Lines, Sent, Fx) with the prompt-prediction fixture, a fake
@@ -915,3 +915,388 @@ _LVS_RequesterSurfaceReentry() {
 	}
 }
 Test("LLM vision: native source getter cannot revive withdrawn requester (todo46-manual-requester)", _LVS_RequesterSurfaceReentry)
+
+
+_LVS_GenericRemoteRequesterAdmission(Boundary, Withdraw) {
+	global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_AuxGeneration, _LLM_AuxOwners
+	SavedRemote := [_LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_AuxGeneration, _LLM_AuxOwners]
+	try {
+		_LLM_Remote_Async := Map()
+		_LLM_AuxOwners := Map()
+		_LVS_Run(_LPP_Menu(), Body)
+	} finally {
+		_LLM_Remote_Async := SavedRemote[1]
+		_LLM_Remote_AsyncCounter := SavedRemote[2]
+		_LLM_AuxGeneration := SavedRemote[3]
+		_LLM_AuxOwners := SavedRemote[4]
+	}
+	Body(Calls, Lines, Sent, Fx) {
+		global _LLM_Engine_RemoteTransport, _LLM_Menu
+		Gate := Boundary == "target" ? _LLM_Engine_GetActiveApiEntry
+			: Boundary == "resolved" ? _LLMRemoteResolveEntry
+			: Boundary == "context" ? _LLMRemote_BuildRequestContext : _LLMRemoteBuildPayload
+		Dispatch := _LLMRemote_DispatchManagedCurl
+		AssertFalse(Dispatch.HasOwnProp("Call"))
+		AssertFalse(Gate.HasOwnProp("Call"))
+		Epoch := LLM_AuxGeneration()
+		State := _ManagedCurlControlState()
+		Callbacks := []
+		Seen := false
+		try {
+			_LLM_Engine_RemoteTransport := 0
+			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
+			if Boundary != "before_launch"
+				Gate.DefineProp("Call", {Call: ObserveGate})
+			AssertTrue(_LLM_Vision_RequestScopeCurrent(Epoch), "the actual requester starts admitted")
+			LLM_Vision_SendText("Return an answer.", "Private original screen context.", 64,
+				(*) => Callbacks.Push("success"), (*) => Callbacks.Push("failure"), _LLM_Vision_RequestScopeCurrent.Bind(Epoch))
+			AssertTrue(Seen, "the genuine selected request boundary must execute")
+			AssertEqual(Withdraw ? 0 : 1, State["spawns"],
+				"a withdrawn original screen requester cannot acquire a managed HTTP worker")
+			AssertEqual(Withdraw ? 0 : 1, State["starts"])
+			AssertEqual(0, Callbacks.Length, "withdrawal and a still-pending native request publish no terminal verdict")
+			AssertEqual(0, Calls.Length, "the outer fixture recorder must not replace generic generation")
+		} finally {
+			if Gate.HasOwnProp("Call")
+				Gate.DeleteProp("Call")
+			if Dispatch.HasOwnProp("Call")
+				Dispatch.DeleteProp("Call")
+			if State.Has("id") {
+				LLM_RemoteCancelAsync(State["id"])
+				_LLMRemote_PollRequest(State["id"])
+			}
+			if State.Has("request")
+				_ManagedCurlControlRelease(State)
+		}
+		ObserveGate(Self, Args*) {
+			Gate.DeleteProp("Call")
+			Result := Gate.Call(Args*)
+			Seen := true
+			if Withdraw
+				WithdrawBackend()
+			return Result
+		}
+		ObserveDispatch(Self, Id, Reservation, Resolved, Url, Payload, Port := 0) {
+			Dispatch.DeleteProp("Call")
+			State["id"] := Id
+			return Dispatch.Call(Id, Reservation, Resolved, Url, Payload,
+				Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+					"create_http", Create))
+		}
+		Create() {
+			Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(State), "before_launch", BeforeLaunch))
+			State["request"] := Request
+			return Request
+		}
+		BeforeLaunch(Request) {
+			if Boundary == "before_launch" {
+				Seen := true
+				if Withdraw
+					WithdrawBackend()
+			}
+		}
+		WithdrawBackend() {
+			_LLM_Menu["enabled"] := false
+			LLM_AuxInvalidate("vision generic requester test disable")
+			_LLM_Menu["enabled"] := true
+			AssertFalse(_LLM_Vision_RequestScopeCurrent(Epoch), "the original backend lifecycle is genuinely withdrawn")
+		}
+	}
+}
+for _LVS_AdmissionBoundary in ["target", "resolved", "context", "payload", "before_launch"] {
+	for _LVS_AdmissionWithdraw in [true, false]
+		Test("LLM vision: generic remote admission " . _LVS_AdmissionBoundary . " withdrawal=" . _LVS_AdmissionWithdraw . " (vision-generic-requester-admission)",
+			_LVS_GenericRemoteRequesterAdmission.Bind(_LVS_AdmissionBoundary, _LVS_AdmissionWithdraw))
+}
+
+
+_LVS_ImageRemoteRequesterAdmission(Withdraw) {
+	global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_AuxGeneration, _LLM_AuxOwners
+	Saved := [_LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_AuxGeneration, _LLM_AuxOwners]
+	try {
+		_LLM_Remote_Async := Map()
+		_LLM_AuxOwners := Map()
+		_LVS_Run(_LPP_Menu(), Body)
+	} finally {
+		_LLM_Remote_Async := Saved[1]
+		_LLM_Remote_AsyncCounter := Saved[2]
+		_LLM_AuxGeneration := Saved[3]
+		_LLM_AuxOwners := Saved[4]
+	}
+	Body(Calls, Lines, Sent, Fx) {
+		global _LLM_Vision_RemoteTransport, _LLM_Menu
+		Dispatch := _LLMRemote_DispatchManagedCurl
+		AssertFalse(Dispatch.HasOwnProp("Call"))
+		Epoch := LLM_AuxGeneration()
+		State := _ManagedCurlControlState()
+		Seen := false
+		try {
+			_LLM_Vision_RemoteTransport := 0
+			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
+			AssertTrue(_LVS_Invoke("llm_screen_region", "openai|gpt-4.1-mini"))
+			AssertEqual(1, Fx.Captures.Length, "the real screen action owns a retained image capture")
+			_LVS_Complete(Fx.Captures[1], true)
+			AssertTrue(Seen, "the real screen action must reach actual native launch admission")
+			AssertEqual(Withdraw ? 0 : 1, State["spawns"],
+				"a withdrawn image requester cannot acquire a managed HTTP worker")
+			AssertEqual(Withdraw ? 0 : 1, State["starts"])
+			AssertEqual(0, Fx.Vision.Length, "the fixture image recorder cannot replace real PostBody generation")
+		} finally {
+			if Dispatch.HasOwnProp("Call")
+				Dispatch.DeleteProp("Call")
+			if State.Has("id") {
+				LLM_RemoteCancelAsync(State["id"])
+				_LLMRemote_PollRequest(State["id"])
+			}
+			if State.Has("request")
+				_ManagedCurlControlRelease(State)
+		}
+		ObserveDispatch(Self, Id, Reservation, Resolved, Url, Payload, Port := 0) {
+			Dispatch.DeleteProp("Call")
+			State["id"] := Id
+			return Dispatch.Call(Id, Reservation, Resolved, Url, Payload,
+				Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+					"create_http", Create))
+		}
+		Create() {
+			Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(State), "before_launch", BeforeLaunch))
+			State["request"] := Request
+			return Request
+		}
+		BeforeLaunch(Request) {
+			Seen := true
+			if Withdraw {
+				_LLM_Menu["enabled"] := false
+				LLM_AuxInvalidate("vision image requester test disable")
+				_LLM_Menu["enabled"] := true
+				AssertFalse(_LLM_Vision_RequestScopeCurrent(Epoch))
+			}
+		}
+	}
+}
+for _LVS_ImageWithdraw in [true, false]
+	Test("LLM vision: original image requester native launch withdrawal=" . _LVS_ImageWithdraw . " (vision-image-requester-admission)",
+		_LVS_ImageRemoteRequesterAdmission.Bind(_LVS_ImageWithdraw))
+
+
+_LVS_PublicAuxRemoteAdmission(Action, Boundary, Mode) {
+	global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_AuxGeneration, _LLM_AuxOwners
+	Saved := [_LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_AuxGeneration, _LLM_AuxOwners]
+	try {
+		_LLM_Remote_Async := Map()
+		_LLM_AuxOwners := Map()
+		Screen := _LTN_Screen("merci pour votre aide")
+		if Action == "tone"
+			_LTN_Run(_LPP_Menu(), Screen, Body)
+		else
+			_LTR_Run(_LPP_Menu(), Screen, "fr", Body)
+	} finally {
+		_LLM_Remote_Async := Saved[1]
+		_LLM_Remote_AsyncCounter := Saved[2]
+		_LLM_AuxGeneration := Saved[3]
+		_LLM_AuxOwners := Saved[4]
+	}
+	Body(Calls, Lines, Sent) {
+		global _LLM_Engine_RemoteTransport, _LLM_Menu, _LLM_Tone_ReadSelection
+		global _LLM_Tone_Generation, _LLM_Translate_Generation
+		Gate := Boundary == "target" ? _LLM_Engine_GetActiveApiEntry : _LLMRemote_BuildRequestContext
+		Dispatch := _LLMRemote_DispatchManagedCurl
+		AssertFalse(Dispatch.HasOwnProp("Call"))
+		AssertFalse(Gate.HasOwnProp("Call"))
+		Epoch := LLM_AuxGeneration()
+		State := _ManagedCurlControlState()
+		Seen := false
+		try {
+			_LLM_Engine_RemoteTransport := 0
+			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
+			if Boundary != "before_launch"
+				Gate.DefineProp("Call", {Call: ObserveGate})
+			Invoke()
+			AssertTrue(Seen, "the public auxiliary action must execute its genuine selected request boundary")
+			AssertEqual(Mode == "unchanged" ? 1 : 0, State["spawns"],
+				"the original auxiliary action cannot acquire HTTP after its backend or action is withdrawn")
+			AssertEqual(Mode == "unchanged" ? 1 : 0, State["starts"])
+			AssertEqual(0, Calls.Length, "the fixture recorder cannot replace generic generation")
+			AssertEqual(0, Sent.Length, "the controlled HTTP boundary supplies no completion to type")
+		} finally {
+			if Gate.HasOwnProp("Call")
+				Gate.DeleteProp("Call")
+			if Dispatch.HasOwnProp("Call")
+				Dispatch.DeleteProp("Call")
+			if State.Has("id") {
+				LLM_RemoteCancelAsync(State["id"])
+				_LLMRemote_PollRequest(State["id"])
+			}
+			if State.Has("request")
+				_ManagedCurlControlRelease(State)
+		}
+		Invoke() {
+			return Action == "tone" ? GestureInvokeAction("llm_tone_more_formal") : _LTR_Invoke("en")
+		}
+		ObserveGate(Self, Args*) {
+			Gate.DeleteProp("Call")
+			Result := Gate.Call(Args*)
+			Seen := true
+			WithdrawSource()
+			return Result
+		}
+		ObserveDispatch(Self, Id, Reservation, Resolved, Url, Payload, Port := 0) {
+			Dispatch.DeleteProp("Call")
+			State["id"] := Id
+			return Dispatch.Call(Id, Reservation, Resolved, Url, Payload,
+				Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+					"create_http", Create))
+		}
+		Create() {
+			Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(State), "before_launch", BeforeLaunch))
+			State["request"] := Request
+			return Request
+		}
+		BeforeLaunch(Request) {
+			if Boundary == "before_launch" {
+				Seen := true
+				WithdrawSource()
+			}
+		}
+		WithdrawSource() {
+			if Mode == "unchanged"
+				return
+			if Mode == "newer" {
+				OldGeneration := Action == "tone" ? _LLM_Tone_Generation : _LLM_Translate_Generation
+				Reader := _LLM_Tone_ReadSelection
+				Refusals := 0
+				try {
+					; A real newer action supersedes the original even when its
+					; actual outer selection port is busy and refuses capture.
+					_LLM_Tone_ReadSelection := (*) => (Refusals += 1, false)
+					AssertFalse(Invoke())
+				} finally _LLM_Tone_ReadSelection := Reader
+				AssertEqual(1, Refusals, "the real newer action must reach its selection port")
+				NewGeneration := Action == "tone" ? _LLM_Tone_Generation : _LLM_Translate_Generation
+				AssertEqual(OldGeneration + 1, NewGeneration, "the public newer action must actually revoke the original generation")
+			} else {
+				_LLM_Menu["enabled"] := false
+				LLM_AuxInvalidate("public auxiliary requester test disable")
+				if Mode == "aba"
+					_LLM_Menu["enabled"] := true
+				AssertFalse(_LLM_Vision_RequestScopeCurrent(Epoch))
+			}
+		}
+	}
+}
+for _LVS_PublicAction in ["tone", "translation"] {
+	for _LVS_PublicBoundary in ["target", "context", "before_launch"] {
+		for _LVS_PublicMode in ["off", "aba", "newer", "unchanged"]
+			Test("LLM public " . _LVS_PublicAction . ": remote " . _LVS_PublicBoundary . " " . _LVS_PublicMode . " (public-aux-requester-admission)",
+				_LVS_PublicAuxRemoteAdmission.Bind(_LVS_PublicAction, _LVS_PublicBoundary, _LVS_PublicMode))
+	}
+}
+
+_LVS_PublicLocalRequester(Action, Withdraw) {
+	global _LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_Ollama_PreflightPort, _LLM_Vision_OllamaTransport
+	global _LLM_AuxGeneration, _LLM_AuxOwners, _LLM_AuxCleanupDebt
+	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_Epoch
+	Saved := [_LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_Ollama_PreflightPort,
+		_LLM_Vision_OllamaTransport, _LLM_AuxGeneration, _LLM_AuxOwners, _LLM_AuxCleanupDebt,
+		_LLM_Deps_State, _LLM_Deps_Checking]
+	Origin := LLM_OllamaCaptureOriginCustody, Spawn := _LLM_Ollama_DoSpawn
+	AssertFalse(Origin.HasOwnProp("Call")), AssertFalse(Spawn.HasOwnProp("Call"))
+	State := Map("timer", 0, "runs", 0, "seen", false, "paths", [])
+	Port := Map("write", Write, "run", Run, "poll", (*) => 0,
+		"terminate_process", (*) => true, "wait_process", (*) => 0, "close_process", (*) => true)
+	try {
+		_LLM_Ollama_Async := Map(), _LLM_Ollama_Pending := ""
+		_LLM_AuxOwners := Map(), _LLM_AuxCleanupDebt := Map(), _LLM_Vision_OllamaTransport := 0
+		_LLM_Ollama_PreflightPort := Map("schedule", (Callback, Period) => State["timer"] := Callback, "list_models", List)
+		Menu := _LPP_Menu(), Menu["backend"] := "ollama", Menu["model"] := _LLM_LOCAL_DEFAULTS["llm_model"]
+		Screen := _LTN_Screen("merci pour votre aide")
+		if Action == "tone"
+			_LTN_Run(Menu, Screen, Body)
+		else
+			_LTR_Run(Menu, Screen, "fr", Body)
+	} finally {
+		if Origin.HasOwnProp("Call")
+			Origin.DeleteProp("Call")
+		if Spawn.HasOwnProp("Call")
+			Spawn.DeleteProp("Call")
+		try {
+			for _, Entry in _LLM_Ollama_Async.Clone() {
+				_LLM_CurlReleaseEntryProcess(Entry, true, Port)
+				_LLM_Ollama_CleanupCurlFiles(Entry)
+			}
+			for _, Owner in _LLM_AuxOwners.Clone()
+				_LLM_AuxRetireOwner(Owner, true)
+			for Path in State["paths"]
+				AssertFalse(FileExist(Path), "each original private local payload must retire")
+		} finally {
+			_LLM_Ollama_Async := Saved[1], _LLM_Ollama_Pending := Saved[2], _LLM_Ollama_PreflightPort := Saved[3]
+			_LLM_Vision_OllamaTransport := Saved[4], _LLM_AuxGeneration := Saved[5]
+			_LLM_AuxOwners := Saved[6], _LLM_AuxCleanupDebt := Saved[7]
+			_LLM_Deps_State := Saved[8], _LLM_Deps_Checking := Saved[9]
+		}
+	}
+	Body(Calls, Lines, Sent) {
+		global _LLM_Engine
+		PriorCritical := Critical("Off")
+		try {
+			_LLM_Engine["backend"] := "ollama", _LLM_Engine["model"] := Menu["model"]
+			; Controlled server reachability enters the real dependency owner; source
+			; admission, origin custody and all request state remain production code.
+			_LLM_Deps_DoCheck_Result(true, A_TickCount, _LLM_Deps_Epoch, _LLM_Engine["model"])
+			AssertTrue(LLM_Deps_IsReady(), "the genuine dependency owner records the supplied server reachability")
+			Origin.DefineProp("Call", {Call: ObserveOrigin})
+			Spawn.DefineProp("Call", {Call: ObserveSpawn})
+			AssertTrue(Action == "tone" ? GestureInvokeAction("llm_tone_more_formal") : _LTR_Invoke("en"),
+				"the actual public action starts from an admitted local requester")
+			if HasMethod(State["timer"], "Call")
+				State["timer"].Call()
+			Started := A_TickCount
+			while State["runs"] == 0 && _LLM_Ollama_Async.Count > 0 && TickElapsed64(Started) < 1000
+				Sleep(10)
+			AssertTrue(State["seen"], "the genuine original local origin capture must execute")
+			AssertEqual(Withdraw ? 0 : 1, State["runs"], "the original public action cannot adopt a fresh source after withdrawal")
+			AssertEqual(0, Calls.Length, "a local action cannot be replaced by the fixture's remote recorder")
+			AssertEqual(0, Sent.Length)
+		} finally Critical(PriorCritical)
+	}
+	ObserveOrigin(Self, Args*) {
+		global _LLM_Tone_ReadSelection, _LLM_Tone_Generation, _LLM_Translate_Generation
+		Origin.DeleteProp("Call")
+		Result := Origin.Call(Args*)
+		State["seen"] := true
+		if Withdraw {
+			Before := Action == "tone" ? _LLM_Tone_Generation : _LLM_Translate_Generation
+			Epoch := LLM_AuxGeneration()
+			_LLM_Tone_ReadSelection := (*) => false
+			AssertFalse(Action == "tone" ? GestureInvokeAction("llm_tone_more_formal") : _LTR_Invoke("en"),
+				"the actual newer action reaches the busy selection boundary")
+			After := Action == "tone" ? _LLM_Tone_Generation : _LLM_Translate_Generation
+			AssertTrue(After > Before, "the actual newer action retires its predecessor")
+			AssertEqual(Epoch, LLM_AuxGeneration(), "this retirement does not alter origin custody")
+			AssertTrue(LLM_OllamaOriginCustodyCurrent(Result, Result.Call("origin")), "the genuine origin remains admitted")
+		}
+		return Result
+	}
+	ObserveSpawn(Self, Id, Payload, PayloadPath, OutputPath, Job, OriginalPort := 0) {
+		Spawn.DeleteProp("Call")
+		return Spawn.Call(Id, Payload, PayloadPath, OutputPath, Job, Port)
+	}
+	List(Callback, Owner, Strict) {
+		LLM_AuxBindResources(Owner, Map("finalizer", Owner["on_retired"]))
+		Callback.Call(LLM_LocalModelListReceipt(Map("ok", true, "status", 200,
+			"body", '{"models":[{"name":' . JsonStringLiteral(Owner["identity"]) . '}]}')))
+	}
+	Write(Path, Payload) {
+		State["paths"].Push(Path)
+		return FSWrite(Path, Payload)
+	}
+	Run(Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+		State["runs"] += 1
+		Pid := 990002
+		ProcessOwner := Map("pid", Pid, "handle", 990002, "released", false)
+	}
+}
+for Action in ["tone", "translation"]
+	for Withdraw in [true, false]
+		Test("LLM public " . Action . ": local newer-action admission withdrawal=" . Withdraw . " (public-local-requester)",
+			_LVS_PublicLocalRequester.Bind(Action, Withdraw))

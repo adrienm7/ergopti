@@ -3,6 +3,18 @@
 --- Software input calls use the actual module's default layout label; they do
 --- not claim physical input or active desktop layout selection. No provider,
 --- clock, SQL or process doubles. Historical metadata fixtures are explicit.
+
+--- Returns a typing time on the driver's own clock (ergopti_hotstrings passes
+--- Monotonic.now_ms()). A fixed 1000 ms made the session tracker's verdict
+--- depend on the host's uptime; one origin keeps the scripted gaps exact.
+--- @param offset_ms number Scripted time of the keystroke.
+--- @return number typed_ms
+local typing_origin_ms
+local function typed_at(offset_ms)
+	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	return typing_origin_ms + offset_ms
+end
+
 local uv = require("luv")
 require("compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-layouts-seen-XXXXXX"))
@@ -13,9 +25,9 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local K = require("modules.keylogger.keylogger")
-local W = require("modules.keylogger.sqlite_writer")
-local R = require("modules.keylogger.sqlite_reader")
+local K = require("modules.keystats.keystats")
+local W = require("modules.keystats.sqlite_writer")
+local R = require("modules.keystats.sqlite_reader")
 local Hook = require("adapters.keyboard_hook")
 local Json = require("json")
 local path, day = root .. "/metrics.sqlite", os.date("%Y-%m-%d")
@@ -44,15 +56,17 @@ check("healthy empty native manifest retains its existing shape and completion",
 	assert(next(manifest) == nil and complete == true)
 end)
 local active_metadata = assert(Hook.get_layout())
-K.on_keydown("a", 1000, "owned-layout-app")
-K.on_keydown("b", 2000, "owned-layout-app")
+K.on_keydown("a", typed_at(1000), "owned-layout-app")
+K.on_keydown("b", typed_at(2000), "owned-layout-app")
 require("tests.support.sqlite_flush_native").flush(K)
 local before, raw = layout_bytes(), raw_bytes()
 print("native module metadata=" .. active_metadata .. "; layout rows:\n" .. before)
+-- The shared walker counts a layout once per flushed stream, not per keystroke:
+-- the two keys below form one stream, so the layout is seen once.
 check("actual public collector flush projects persisted metadata into the canonical dashboard field", function()
 	local manifest, complete = R.read_manifest(path)
-	assert(complete == true and count(manifest, day, "owned-layout-app", active_metadata) == 2)
-	assert(count(payload(), day, "owned-layout-app", active_metadata) == 2)
+	assert(complete == true and count(manifest, day, "owned-layout-app", active_metadata) == 1)
+	assert(count(payload(), day, "owned-layout-app", active_metadata) == 1)
 	assert(cell(manifest, day, "owned-layout-app").layouts == nil)
 	assert(cell(manifest, day, "owned-layout-app").chars == 2)
 end)
@@ -80,7 +94,7 @@ local accepted_bytes = layout_bytes()
 K.clear_cache()
 check("native device contributions and distinct quoted UTF8 layout labels retain their totals", function()
 	local manifest = R.read_manifest(path)
-	assert(count(manifest, day, "owned-layout-app", active_metadata) == 5)
+	assert(count(manifest, day, "owned-layout-app", active_metadata) == 4)
 	assert(count(manifest, day, "owned-layout-app", secondary) == 4)
 	assert(count(payload(), day, "owned-layout-app", secondary) == 4)
 end)
@@ -120,7 +134,7 @@ check("genuine native metadata read refusal preserves partial controls without a
 end)
 local recovered = payload()
 check("same revision recovery rebuilds the canonical metadata map in the public dashboard", function()
-	assert(count(recovered, day, "owned-layout-app", active_metadata) == 5)
+	assert(count(recovered, day, "owned-layout-app", active_metadata) == 4)
 	assert(count(recovered, "1999-12-31", "owned-history", secondary) == 7)
 	assert(W.get_revision() == revision)
 end)
@@ -128,7 +142,7 @@ assert(W.exec_sql("ALTER TABLE agg_app_day_layouts RENAME TO owned_hidden_layout
 local cached = payload()
 assert(W.exec_sql("ALTER TABLE owned_hidden_layouts RENAME TO agg_app_day_layouts;"))
 check("healthy completed revision cache retains existing reuse and all read passes preserve native bytes", function()
-	assert(count(cached, day, "owned-layout-app", active_metadata) == 5)
+	assert(count(cached, day, "owned-layout-app", active_metadata) == 4)
 	assert(layout_bytes() == accepted_bytes and raw_bytes() == raw)
 end)
 W.close_db()

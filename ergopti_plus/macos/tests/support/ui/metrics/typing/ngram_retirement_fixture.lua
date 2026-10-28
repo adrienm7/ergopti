@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Publication = require("tests.support.ui.metrics.typing.publication")
 local Json = require("json")
 local FakeSqlite = require("tests.support.fake_ngram_sqlite")
 local with_delivery = require("tests.support.typing_delivery_fixture")
@@ -108,11 +109,11 @@ function M.run(callback)
 					if path == "/fixture/db.sqlite" then return { mode = "file" } end
 					return old_attributes(path, ...)
 				end
-				package.loaded["modules.keylogger.log_manager"].get_sqlite_path = function()
+				package.loaded["modules.keystats.log_manager"].get_sqlite_path = function()
 					return "/fixture/db.sqlite"
 				end
-				package.loaded["modules.keylogger.sqlite_reader"] = nil
-				local reader = require("modules.keylogger.sqlite_reader")
+				package.loaded["modules.keystats.sqlite_reader"] = nil
+				local reader = require("modules.keystats.sqlite_reader")
 				local projection = require("ui.metrics_typing.projection")
 				local encoder = require("infra.paced_json").encode
 				state.reader, state.projection = reader, projection
@@ -143,8 +144,8 @@ function M.run(callback)
 							local info = debug.getinfo(depth, "fS")
 							if not info then break end
 							if state.armed == "before-merge" and state.merges == 0
-								and info.source:gsub("\\", "/"):sub(-#"modules/keylogger/sqlite_reader.lua")
-									== "modules/keylogger/sqlite_reader.lua" then boundary = true end
+								and info.source:gsub("\\", "/"):sub(-#"modules/keystats/sqlite_reader.lua")
+									== "modules/keystats/sqlite_reader.lua" then boundary = true end
 							if info.func == encoder then
 								local name, value = debug.getlocal(depth, 1)
 								assert(name == "value", "The real encoder value parameter must be observable")
@@ -166,10 +167,10 @@ function M.run(callback)
 						local call = evaluations[index]
 						if not call.received then
 							call.received = true
-							local full = call.code:match("^window%.publishTypingMetricsData%((.*)%)%;$")
+							local full = Publication.decode(call.code)
 							local range = call.code:match("^window%.receive_range_data%((.*)%)$")
 							if full then
-								state.last_delivery = Json.decode("[" .. full .. "]")[1].initial_data
+								state.last_delivery = full.initial_data
 							elseif range then
 								state.last_delivery = Json.decode("[" .. range .. "]")[1]
 							end

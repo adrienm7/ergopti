@@ -224,7 +224,7 @@ helpers.describe("the macOS dispatcher confirms before destructive actions", fun
 			for _, id in ipairs({ "empty_trash", "remove_quarantine_selection", "force_quit_frontmost" }) do
 				questions = {}
 				local before = #calls
-				helpers.assert_eq(Actions.execute_single(id, "keyboard__cmd_1"), true)
+				helpers.assert_eq(Actions.execute_single(id, "keyboard__primary_1"), true)
 				helpers.assert_eq(#questions, 1, id .. " must ask")
 				helpers.assert_eq(questions[1].label, Actions.get_label(id))
 				helpers.assert_eq(#calls, before, id .. " must not run before the answer")

@@ -70,7 +70,7 @@ helpers.describe("synthetic input: explicit per-event provenance", function()
 		local duplicate = provenance.classify(events[3], "keymap")
 		helpers.assert_true(duplicate.duplicate)
 
-		local other_consumer = provenance.classify(events[3], "keylogger")
+		local other_consumer = provenance.classify(events[3], "keystats")
 		helpers.assert_true(not other_consumer.duplicate)
 		helpers.assert_true(synthetic.current_action_epoch() == synthetic.current_action_epoch(),
 			"epoch reads must return the same allocation until another handoff")
@@ -210,13 +210,13 @@ helpers.describe("synthetic input: explicit per-event provenance", function()
 			"the first consumer of a stale action tag must invalidate current context")
 		helpers.assert_eq(synthetic.stats().action_handoffs, 1)
 
-		local sibling = provenance.classify(first_down, "keylogger")
+		local sibling = provenance.classify(first_down, "keystats")
 		helpers.assert_true(sibling.stale and sibling.effect == "action")
 		helpers.assert_true(synthetic.current_action_epoch() == first_epoch,
 			"a sibling consumer must not publish the same stale tag twice")
 		helpers.assert_eq(synthetic.stats().action_handoffs, 1)
 
-		provenance.classify(first_up, "keylogger")
+		provenance.classify(first_up, "keystats")
 		helpers.assert_eq(synthetic.stats().action_handoffs, 2,
 			"a distinct stale phase tag must publish its own conservative boundary")
 		provenance.classify(second_down, "keymap")

@@ -19,7 +19,7 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 		package.loaded["ui.menu.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
-		package.loaded["modules.keylogger.text_cipher"] = { set_enabled = noop }
+		package.loaded["modules.keystats.text_cipher"] = { set_enabled = noop }
 		package.loaded["ui.menu.preferences_transaction"] = nil
 		package.loaded["ui.menu.menu_state"] = nil
 		local Transaction = require("ui.menu.preferences_transaction")
@@ -33,8 +33,8 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 			llm_model = "committed-display-model",
 			chatgpt_url = "https://committed.example.test/",
 			custom_editor_shortcut = false,
-			keylogger_enabled = false,
-			keylogger_encrypt = false,
+			keystats_enabled = false,
+			keystats_encrypt = false,
 		}
 		local observed = {
 			core_backends = {},

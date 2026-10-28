@@ -25,6 +25,20 @@ LoggerSubFilesData() {
 	return [
 		; Gesture recognition, probe loop, swipe events.
 		Map("name", "ErgoptiPlus_gestures.log", "tags", ["[gestures", "gesture"]),
+		; Ollama backend server, API calls, dependency installer.
+		Map("name", "ErgoptiPlus_ollama.log", "tags", ["[ollama", "[llm.api_ollama]", "[ollama_deps]", "[LLM.ollama", "[modules.llm.api_ollama]", "[modules.llm.managed_ollama_proxy]"]),
+		; LLM menu, model switching, warmup, toggle events.
+		Map("name", "ErgoptiPlus_llm.log", "tags", ["[llm.", "[menu_llm", "[keymap.llm", "WARMUP", "[TOGGLE]", "[LLM", "[modules.llm.", "[infra.llm_", "[ui.llm_", "[ui.menu.llm_", "[ui.tooltip.llm]"]),
+		; Keymap processing, dynamic hotstrings, personal info, TOML reader.
+		Map("name", "ErgoptiPlus_hotstrings.log", "tags", ["[keymap.", "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring", "[Hotstring", "[HSE", "[UserHotstrings", "[PersonalToml", "[PersonalInfo", "[modules.dynamic_hotstrings.", "[infra.personal_info_fields]"]),
+		; Keystroke logging, SQLite writes, rotation, export.
+		Map("name", "ErgoptiPlus_keystats.log", "tags", ["[keystats", "[Keystats", "[KL", "[modules.keystats.", "[infra.metrics_"]),
+		; Menu builder, UI components, app picker, download window.
+		Map("name", "ErgoptiPlus_menu.log", "tags", ["[menu]", "[menu_", "[builder]", "[ui_builder]", "[app_picker]", "[download_window]", "[Menu", "[TrayMenu]", "[ui.menu.", "[manifest_menu]", "[adapters.tray_menu]"]),
+		; Notification toasts and the notifications module.
+		Map("name", "ErgoptiPlus_notify.log", "tags", ["[notify", "[notifications", "[Notifier]", "[adapters.notifier]", "[adapters.application_notifier]"]),
+		; Driver initialisation, path resolution, config loading.
+		Map("name", "ErgoptiPlus_boot.log", "tags", ["[init]", "[menu_paths]", "[paths]", "[config", "[Boot]", "[BootProfile]", "[Startup]", "[FirstBoot]", "[ConfigPaths]", "[timings]", "[infra.runtime_guard]", "[ergopti_hotstrings]"]),
 		; Ergopti keyboard layout shifts, caps, alt-gr processing.
 		Map("name", "ErgoptiPlus_layout.log", "tags", ["[LayoutShift]", "[LayoutCaps]", "[LayoutAltGr]"]),
 		; AHK tray-menu dispatch, script shortcuts, TOML loader events.

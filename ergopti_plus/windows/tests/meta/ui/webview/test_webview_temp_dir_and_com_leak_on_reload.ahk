@@ -18,7 +18,7 @@
 ; KLWV_Close releases the controller, destroys the Gui AND deletes the udir,
 ; and KLWV_CloseAll iterates a Clone() so deleting entries mid-loop is safe.
 ;
-; This is a meta-static test (scans source text) because keylogger_webview.ahk
+; This is a meta-static test (scans source text) because keystats_webview.ahk
 ; and ErgoptiPlus.ahk register top-level hooks/Guis and cannot be #Included by
 ; the headless runner. If the OnExit wiring of KLWV_CloseAll is removed, or
 ; KLWV_Close stops releasing the controller / deleting the udir, this fails.
@@ -64,7 +64,7 @@ _WVRL_CloseAllWiredToOnExit() {
 	Assert(InStr(Src, "OnExit(Ergopti_OnShutdown, -1)") > 0,
 		"ErgoptiPlus.ahk must prepend Ergopti_OnShutdown to OnExit: a refusal must stop later logger teardown, while accepted shutdown still closes every WebView")
 }
-Test("keylogger: KLWV_CloseAll runs on shutdown via OnExit (webview-temp-dir-and-com-leak-on-reload)", _WVRL_CloseAllWiredToOnExit)
+Test("keystats: KLWV_CloseAll runs on shutdown via OnExit (webview-temp-dir-and-com-leak-on-reload)", _WVRL_CloseAllWiredToOnExit)
 
 
 
@@ -76,9 +76,9 @@ Test("keylogger: KLWV_CloseAll runs on shutdown via OnExit (webview-temp-dir-and
 ; ==================================================
 
 _WVRL_CloseReleasesEverything() {
-	Src := _WVRL_ReadSource("modules/keylogger/keylogger_webview.ahk")
+	Src := _WVRL_ReadSource("modules/keystats/keystats_webview.ahk")
 	Seg := _DriverFuncBody("KLWV_Close")
-	Assert(Seg != "", "KLWV_Close(which) must exist in keylogger_webview.ahk")
+	Assert(Seg != "", "KLWV_Close(which) must exist in keystats_webview.ahk")
 	; Releasing the COM controller is what stops the msedgewebview2.exe host and
 	; releases the lock on the per-launch profile dir.
 	SubReleasePos := InStr(Seg, 'entry.Delete("msg_sub")')
@@ -101,15 +101,15 @@ _WVRL_CloseReleasesEverything() {
 	Assert(InStr(Deferred, 'Owner["attempts"] < 4') > 0 && InStr(Deferred, "LoggerWarn") > 0,
 		"confirmed profile cleanup must use bounded retries and log terminal failure")
 }
-Test("keylogger: KLWV_Close releases controller, gui and udir (webview-temp-dir-and-com-leak-on-reload)", _WVRL_CloseReleasesEverything)
+Test("keystats: KLWV_Close releases controller, gui and udir (webview-temp-dir-and-com-leak-on-reload)", _WVRL_CloseReleasesEverything)
 
 _WVRL_CloseAllIteratesClone() {
-	Src := _WVRL_ReadSource("modules/keylogger/keylogger_webview.ahk")
+	Src := _WVRL_ReadSource("modules/keystats/keystats_webview.ahk")
 	Seg := _DriverFuncBody("KLWV_CloseAll")
-	Assert(Seg != "", "KLWV_CloseAll() must exist in keylogger_webview.ahk")
+	Assert(Seg != "", "KLWV_CloseAll() must exist in keystats_webview.ahk")
 	; KLWV_Close mutates KLWV.windows (Delete) mid-iteration; iterating a Clone()
 	; avoids skipping entries / corrupting the enumerator.
 	Assert(InStr(Seg, "KLWV.windows.Clone()") > 0,
 		"KLWV_CloseAll must iterate KLWV.windows.Clone() - KLWV_Close deletes from KLWV.windows during the loop")
 }
-Test("keylogger: KLWV_CloseAll iterates a Clone (webview-temp-dir-and-com-leak-on-reload)", _WVRL_CloseAllIteratesClone)
+Test("keystats: KLWV_CloseAll iterates a Clone (webview-temp-dir-and-com-leak-on-reload)", _WVRL_CloseAllIteratesClone)

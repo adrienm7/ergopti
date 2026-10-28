@@ -178,6 +178,8 @@ function M.evdev_reader(opts)
 		return opts.active_leds or {}
 	end
 	function fake.wait_readable() return fake.cursor < #fake.queued end
+	--- The multi-source wait: queued events make it ready at once, none is a quiet wait.
+	function fake.wait_any_readable() return fake.cursor < #fake.queued end
 	function fake.read_event()
 		if fake.cursor >= #fake.queued then return nil end
 		fake.cursor = fake.cursor + 1
@@ -233,7 +235,7 @@ function M.shell_runner(opts)
 	-- Delegated, never re-implemented. This one is a pure predicate with no shell
 	-- contact, and a fake that answered differently from the real validator would
 	-- let a test pass on an argv that production refuses -- the exact failure the
-	-- double is supposed to rule out (keylogger-worker-timings-must-be-strings).
+	-- double is supposed to rule out (keystats-worker-timings-must-be-strings).
 	fake.validate_spawn_args = require("adapters.shell_runner").validate_spawn_args
 	function fake.run(command) fake.commands[#fake.commands + 1] = command ; return true end
 	function fake.exec(command)
@@ -648,7 +650,7 @@ end
 -- =============================================
 -- =============================================
 
---- An in-memory stand-in for the keylogger's SQLite writer.
+--- An in-memory stand-in for the keystats's SQLite writer.
 ---
 --- Every export answers plausibly and records what it was handed, so a caller
 --- can assert on what would have been persisted without a database — and, more
@@ -671,18 +673,19 @@ function M.sqlite_writer(opts)
 	local available = opts.available ~= false
 	local system_day_paths = {}
 	local fake = {
-		typing = {}, hotstrings = {}, shortcuts = {}, app_switches = {},
+		typing = {}, hotstrings = {}, shortcuts = {}, llm = {}, app_switches = {}, window_switches = {},
+		session_events = {}, system_events = {},
 		app_days = {}, ngrams = {}, scancodes = {},
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
 		app_buckets = {}, bursts = {}, sessions = {}, switches_to = {}, ergo = {},
 		titles = {}, layouts = {}, kc_hold = {}, system_days = {},
-		categories = {},
 		media_events = {}, media_rebuilds = {}, media_projections = {},
 		devices = {}, meta = {}, revision = 0, executed = {}, path = nil,
 	}
 
 	function fake.is_available() return available end
 	function fake.flush_transport_available() return available end
+	function fake.has_private_file_debt() return false end
 	function fake.open_db(path) fake.path = path ; return available end
 	function fake.close_db() fake.path = nil ; return true end
 	function fake.get_db_path() return fake.path end
@@ -724,6 +727,10 @@ function M.sqlite_writer(opts)
 	end
 	fake.insert_hotstring_events = collect(fake.hotstrings)
 	fake.insert_shortcut_events = collect(fake.shortcuts)
+	fake.insert_llm_events = collect(fake.llm)
+	fake.insert_window_switch_events = collect(fake.window_switches)
+	fake.insert_session_events = collect(fake.session_events)
+	fake.insert_system_events = collect(fake.system_events)
 	fake.insert_app_switch_events = collect(fake.app_switches)
 
 	function fake.upsert_app_day(device_id, date, app, fields)
@@ -793,10 +800,7 @@ function M.sqlite_writer(opts)
 		return nil, true
 	end
 
-	function fake.set_app_category(device_id, app_name, category, score)
-		fake.categories[#fake.categories + 1] = {
-			device_id = device_id, app = app_name, category = category, score = score,
-		}
+	function fake.drop_legacy_category_scores()
 		return true
 	end
 
@@ -806,7 +810,7 @@ function M.sqlite_writer(opts)
 		if not available or type(fake.path) ~= "string" or fake.path == "" or opts.media_commit == false then return false end
 		if media_policy then return true end
 		local ok, store, policy = pcall(function()
-			local shared = require("keylogger.media_store")
+			local shared = require("keystats.media_store")
 			local json = require("json")
 			local path = require("tests.helpers").driver_root() .. "/../_shared/data/keycodes/metrics_media_keys.json"
 			local file = assert(io.open(path, "rb"))

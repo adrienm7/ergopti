@@ -572,7 +572,11 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 			frame[3], frame[10] = frame[10], frame[3]
 			local rows = assert(f.rows())
 			helpers.assert_eq(rows[1].title, oracle.labels.create)
-			helpers.assert_eq(rows[#rows].title, oracle.labels.auto_detect)
+			-- The separately declared per-application section (a separator and its
+			-- group, llm_profile_lua_app_overrides) follows the frame's own last row.
+			helpers.assert_eq(rows[#rows].title, "menu.profiles.per_app_overrides")
+			helpers.assert_eq(rows[#rows - 1].title, "-")
+			helpers.assert_eq(rows[#rows - 2].title, oracle.labels.auto_detect)
 		end)
 	end)
 	local faults = {

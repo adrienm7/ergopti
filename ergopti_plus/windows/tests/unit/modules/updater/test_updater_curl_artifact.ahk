@@ -1,35 +1,6 @@
 ﻿; tests/unit/modules/updater/test_updater_curl_artifact.ahk
 ; Actual packaged artifact staging over Schannel and an owned SSPI NTLM relay.
-; Literal factory controls remain distinct from genuine authenticated wire tests.
-
-_ArtifactCurlFactoryControls() {
-	global _DriverDir, _VendorDir
-	Observed := []
-	Handle := 0
-	try {
-		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
-			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\curl_attempt_controls.ps1", "-EnginePath",
-				_VendorDir . "\ergopti_curl_attempt.ps1"],
-			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)))
-		AssertTrue(Handle.start(), "actual factory helper model process starts")
-		Started := A_TickCount
-		while Observed.Length == 0 && !TickExpired64(Started, 15000) {
-			_SR_TreePoll()
-			Sleep(10)
-		}
-		AssertEqual(1, Observed.Length)
-		; The fixture names its failing control on stdout/stderr; carry it into
-		; the job log instead of a bare exit status.
-		AssertEqual(0, Observed[1]["exit"], "fixture output: " . Observed[1]["stdout"] . " | " . Observed[1]["stderr"])
-		AssertEqual("CURL_ATTEMPT_MODEL_CONTROLS:29", Trim(Observed[1]["stdout"], "`r`n "))
-		AssertEqual("", Observed[1]["stderr"])
-	} finally {
-		if IsObject(Handle)
-			AssertTrue(Handle.terminate(), "model helper's actual process Job retires")
-	}
-}
-Test("artifact curl: independent factory namespace and causal fallback model controls", _ArtifactCurlFactoryControls)
+; The engine itself is covered by winhttp_transport_controls.ps1.
 
 class _ArtifactNtlmProxyOwner {
 	__New(Tls, Mode, ServeRemotePac := false) {
@@ -170,10 +141,10 @@ class _ArtifactCurlDownloadRun extends _UpdaterNativeDownloadRun {
 	__New(Tls, Proxy, Path, Digest := "", Size := 524288) {
 		super.__New(Tls, Path, 30000, false)
 		this.Proxy := Proxy
+		this.WrongExecutableIdentity := false
 		this.Size := Size
 		if Digest != ""
 			this.Digest := Digest
-		this.ForeignBytes := ""
 	}
 	Start() {
 		global _VendorDir, _SharedDir, UPDATER_MIN_EXE_SIZE_BYTES
@@ -188,8 +159,8 @@ class _ArtifactCurlDownloadRun extends _UpdaterNativeDownloadRun {
 		this.StagingSetupDiagnosticPath := this.StagingDiagnosticPath . ".setup"
 		this.RouteShapeDiagnosticPath := this.Directory . "route-shape.json"
 		FileAppend(this.OldBytes, this.CurrentExe, "UTF-8-RAW")
-		if this.ForeignBytes != ""
-			FileAppend(this.ForeignBytes, this.NewExe, "UTF-8-RAW")
+		this.StagingOwner := _UpdaterStagedArtifactRetirement({NewExe: this.NewExe, SwapScript: this.SwapPath})
+		AssertTrue(this.StagingOwner.AcquireExclusive(), "the real parent reserves exclusive native outputs before launch")
 		Url := "https://managed-fixture.invalid:" . this.Owner.State["tls_port"] . this.Path
 		this.StartedTick := A_TickCount
 		this.Transport := _Updater_BuildStagingTransport(
@@ -199,6 +170,13 @@ class _ArtifactCurlDownloadRun extends _UpdaterNativeDownloadRun {
 			this.DeadlineMs, this.StartedTick, _SharedDir . "\modules\network\proxy_policy.json",
 			_SharedDir . "\modules\updater\defaults.json", this.Size)
 		try {
+			_Updater_BindStagedArtifactTransport(this.Transport, this.StagingOwner)
+			if this.WrongExecutableIdentity {
+				IdentityName := this.Transport.Prefix . "_STAGED_EXECUTABLE_ID"
+				OriginalIdentity := EnvGet(IdentityName)
+				WrongIdentity := (SubStr(OriginalIdentity, 1, 1) == "0" ? "1" : "0") . SubStr(OriginalIdentity, 2)
+				EnvSet(IdentityName, WrongIdentity)
+			}
 			Prefix := this.Transport.Prefix
 			DiagnosticPair := {Name: Prefix . "_TEST_STAGING_DIAGNOSTIC", Value: this.StagingDiagnosticPath}
 			RouteShapePair := {Name: Prefix . "_TEST_ROUTE_SHAPE", Value: this.RouteShapeDiagnosticPath}
@@ -219,12 +197,24 @@ class _ArtifactCurlDownloadRun extends _UpdaterNativeDownloadRun {
 			AssertTrue(this.Handle.start(), "real authenticated artifact stage private Job starts")
 		} finally _Updater_ClearStagingTransport(this.Transport)
 	}
+	Wait(BudgetMs := 35000) {
+		Result := super.Wait(BudgetMs)
+		if Result["exit"] != 0
+			AssertTrue(this.StagingOwner.Retire(), "only the parent retires its exact staged identities after Job quiescence")
+		return Result
+	}
+	Retire() {
+		if IsObject(this.Handle) && !this.Handle.terminate()
+			return false
+		if this.HasOwnProp("StagingOwner") && !this.StagingOwner.Retire()
+			return false
+		return super.Retire()
+	}
 }
 
 _ArtifactCurlActualSspiAndStaging() {
-	; Its first proxy offers NTLM alone, so staging needs a curl that lists
-	; NTLM. A curl that lists it, or an unknown one, runs the case.
-	TestRequireHostCurlNtlm()
+	; WinHTTP authenticates an NTLM-only proxy on every Windows image, so this
+	; case never depends on the optional features of the host's curl.exe.
 	Tls := _UpdaterNativeTransportOwner()
 	Proxy := 0
 	try {
@@ -239,17 +229,16 @@ _ArtifactCurlActualSspiAndStaging() {
 				Run.Start()
 				if Mode == "NtlmOnly" {
 					Run.Accepted()
-					Foreign := _ArtifactCurlDownloadRun(Tls, Proxy, "/updater/good?marker=staging-fixture")
-					Foreign.ForeignBytes := "Independent preexisting destination bytes must survive."
-					Tls.DownloadRuns.Push(Foreign)
-					Foreign.Start()
-					Refused := Foreign.Wait()
-					AssertTrue(Refused["exit"] != 0 && Refused["stdout"] != "READY", "CreateNew refuses a preexisting destination")
+					Second := _ArtifactCurlDownloadRun(Tls, Proxy, "/updater/good?marker=staging-fixture")
+					Second.WrongExecutableIdentity := true
+					Tls.DownloadRuns.Push(Second)
+					Second.Start()
+					Refused := Second.Wait()
+					AssertTrue(Refused["exit"] != 0 && Refused["stdout"] != "READY", "the genuine worker refuses a valid-format foreign identity")
 					Failure := _Updater_ParseStagingFailure(Refused["stdout"])
-					AssertTrue(Failure["valid"], "exclusive-create failure returns actual typed filesystem receipt")
+					AssertTrue(Failure["valid"], "actual child output custody refusal retains its bounded receipt")
 					AssertEqual("file_create", Failure["receipt"].Get("stage", ""))
-					AssertEqual(Foreign.ForeignBytes, FileRead(Foreign.NewExe, "UTF-8"), "native create refusal and staging cleanup preserve all preexisting bytes")
-					AssertTrue(!FileExist(Foreign.SwapPath), "exclusive-create refusal writes no swap worker")
+					AssertTrue(!FileExist(Second.NewExe) && !FileExist(Second.SwapPath), "the parent retires only its exact staged outputs after worker refusal")
 				} else {
 					Result := Run.Wait()
 					AssertTrue(Result["exit"] != 0 && Result["stdout"] != "READY", "advertised Negotiate forbids automatic NTLM downgrade")
@@ -258,7 +247,7 @@ _ArtifactCurlActualSspiAndStaging() {
 					AssertTrue(!FileExist(Run.NewExe) && !FileExist(Run.SwapPath), "auth refusal publishes no executable or swap")
 				}
 			} finally Proxy.Close()
-			AssertTrue(Proxy.State.Get("bare", 0) >= 1, "actual first Negotiate-only curl received a bare CONNECT challenge")
+			AssertTrue(Proxy.State.Get("bare", 0) >= 1, "the actual WinHTTP client received a bare CONNECT challenge first")
 			if Mode == "NtlmOnly" {
 				AssertEqual(2, Proxy.State.Get("type_one", -1), "each operation has one causal NTLM successor with one native Type1")
 				AssertEqual(2, Proxy.State.Get("type_three", -1), "each native Type2 causes one actual SSPI Type3")
@@ -273,7 +262,7 @@ _ArtifactCurlActualSspiAndStaging() {
 			Proxy := 0
 		}
 		Tls.Observe()
-		AssertEqual(2, Tls.State["DownloadGood"], "both native authenticated tunnels reach actual artifact bytes; only exclusive-create acceptance publishes")
+		AssertEqual(2, Tls.State["DownloadGood"], "both native authenticated tunnels reach exact artifact bytes before output custody admission")
 		AssertEqual(0, Tls.State["DownloadCredentials"], "default credentials stay on the proxy, never at origin")
 	} finally {
 		try {
@@ -311,14 +300,14 @@ _ArtifactCurlProductionDispatchJoin() {
 	Assert(IsObject(Asset), "the actual parser accepts independently supplied release metadata")
 	AssertEqual(524288, Asset.Size, "the parser retains the independent byte bound")
 	Script := FileRead(_Updater_StagingWorkerPath(), "UTF-8")
-	AssertContains(Script, 'if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterCurlDownload',
+	AssertContains(Script, 'if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterArtifactDownload',
 		"the real produced worker selects curl for authenticated release assets")
-	AssertContains(Script, '$DeadlineMs $StartedTick $AuthenticatedSize $ProxyPolicyPath $UpdaterDefaultsPath $ReadEnvironment}',
+	AssertContains(Script, '$DeadlineMs $StartedTick $AuthenticatedSize $ProxyPolicyPath $UpdaterDefaultsPath $ReadEnvironment $OpenParentDestination}',
 		"curl receives the original clock, independent size and canonical policy paths")
-	AssertContains(Script, 'if ($AuthenticatedSize -le 0 -or $State.StagedExecutableOwned)',
-		"authenticated staging cleanup cannot delete an unowned executable")
-	AssertContains(Script, 'if ($AuthenticatedSize -le 0 -or $State.SwapWorkerOwned)',
-		"authenticated staging cleanup cannot delete an unowned swap worker")
+	AssertContains(Script, 'if ($AuthenticatedSize -le 0) {CleanWorker $NewExe',
+		"authenticated staging never path-deletes a parent-owned executable")
+	AssertContains(Script, 'if ($AuthenticatedSize -le 0) {CleanWorker $SwapScriptPath',
+		"authenticated staging never path-deletes a parent-owned swap worker")
 	DigestCheck := InStr(Script, '$ActualDigest -cne $ExpectedSha256')
 	Ready := InStr(Script, 'Write-Output "READY"')
 	Assert(DigestCheck > 0 && Ready > DigestCheck,

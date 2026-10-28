@@ -14,7 +14,7 @@ local Paths = require("infra.paths")
 local Logger = require("logger.shim")
 
 local CLOUD = [[{"provider_order":["cerebras"],"providers":{"cerebras":{"label":"Cerebras","base_url":"https://example.invalid/v1","default_model":"fixture","format":"openai"}}}]]
-local LOCAL = [[{"server_order":["lmstudio"],"servers":{"lmstudio":{"label":"LM Studio","base_url":"http://127.0.0.1:1234/v1","auth":"optional"}}}]]
+local LOCAL = [[{"server_order":["lmstudio"],"servers":{"lmstudio":{"label":"LM Studio","base_url":"http://127.0.0.1:1234/v1","auth":"optional","discovery":{"process_names":["lm-studio"]}}}}]]
 local SOURCE = [[{"version":1,"active_id":"retired-1","entries":[{"id":"retired-1","provider":"removed_vendor_for_probe","label":"Old provider","token":"invented-fixture-token","future":{"empty":[],"nothing":null}},{"id":"usable-1","provider":"cerebras","label":"Usable provider","token":"invented-fixture-token"},{"id":"local-1","provider":"lmstudio","label":"Local provider","token":"","model":"first-model","base_url":"http://127.0.0.1:1234/v1"}],"future_root":{"flag":false}}]]
 local SELECTED = [[{"version":1,"active_id":"usable-1","entries":[{"id":"retired-1","provider":"removed_vendor_for_probe","label":"Old provider","token":"invented-fixture-token","future":{"empty":[],"nothing":null}},{"id":"usable-1","provider":"cerebras","label":"Usable provider","token":"invented-fixture-token","model":"","base_url":""},{"id":"local-1","provider":"lmstudio","label":"Local provider","token":"","model":"first-model","base_url":"http://127.0.0.1:1234/v1"}],"future_root":{"flag":false}}]]
 local LOCAL_UPDATED = [[{"version":1,"active_id":"retired-1","entries":[{"id":"retired-1","provider":"removed_vendor_for_probe","label":"Old provider","token":"invented-fixture-token","future":{"empty":[],"nothing":null}},{"id":"usable-1","provider":"cerebras","label":"Usable provider","token":"invented-fixture-token","model":"","base_url":""},{"id":"local-1","provider":"lmstudio","label":"Local provider","token":"","model":"second-model","base_url":"http://127.0.0.1:1234/v1"}],"future_root":{"flag":false}}]]
@@ -67,6 +67,8 @@ local function with_case(options, body)
 	if options.cloud ~= false then write(cloud, options.cloud or CLOUD) end
 	if options.local_source ~= false then write(local_path, options.local_source or LOCAL) end
 	local original_shared, original_open = Paths.shared, io.open
+	local Reader = require("infra.regular_file_reader")
+	local original_source_open = Reader.open_source
 	local original_warn, original_error = Logger.warn, Logger.error
 	local warnings, errors = {}, {}
 	Paths.shared = function(name)
@@ -79,10 +81,7 @@ local function with_case(options, body)
 	require("config_outdated").reset_for_tests()
 	local fault = options.fault
 	if fault then
-		io.open = function(file_path, mode)
-			local file, detail = original_open(file_path, mode)
-			local selected = fault.lane == "cloud" and cloud or local_path
-			if not file or file_path ~= selected or not mode:match("r") then return file, detail end
+		local function fault_stream(file)
 			return {
 				read = function(_, ...)
 					local bytes = file:read(...)
@@ -97,6 +96,18 @@ local function with_case(options, body)
 					return fault.value
 				end,
 			}
+		end
+		-- Cloud still owns its stdio port; local sources now acquire pinned native
+		-- streams. Inject each refusal at its actual public acquisition boundary.
+		io.open = function(file_path, mode)
+			local file, detail = original_open(file_path, mode)
+			if not file or fault.lane ~= "cloud" or file_path ~= cloud or not mode:match("r") then return file, detail end
+			return fault_stream(file)
+		end
+		Reader.open_source = function(file_path)
+			local file, detail, errno = original_source_open(file_path)
+			if not file or fault.lane ~= "local" or file_path ~= local_path then return file, detail, errno end
+			return fault_stream(file)
 		end
 	end
 	local ok, detail = pcall(function()
@@ -114,6 +125,7 @@ local function with_case(options, body)
 			write = function(bytes) write(path, bytes) end, create_private = create_private })
 	end)
 	io.open, Paths.shared = original_open, original_shared
+	Reader.open_source = original_source_open
 	Logger.warn, Logger.error = original_warn, original_error
 	for _, owned in ipairs({ path, cloud, local_path, path .. ".tmp", path .. ".corrupt" }) do os.remove(owned) end
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end

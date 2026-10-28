@@ -53,6 +53,7 @@ local function with_screenshot(options, scenario)
 			prompts = 0,
 			temp_paths = {},
 			removed = {},
+			refused_removals = {},
 			files = {},
 			pasteboard = { count = 3, image = nil, writes = {} },
 		}
@@ -63,13 +64,20 @@ local function with_screenshot(options, scenario)
 				return path
 			end,
 			create_secure_temp_file = function()
-				local path = "/private/tmp/ergopti-gesture-shot-" .. (#f.temp_paths + 1)
+				local path = opts.temp_path or ("/private/tmp/ergopti-gesture-shot-" .. (#f.temp_paths + 1))
 				f.temp_paths[#f.temp_paths + 1] = path
 				f.files[path] = 0
 				return path
 			end,
 			remove_exact = function(path)
 				f.removed[#f.removed + 1] = path
+				if opts.native_remove then
+					local removed, detail = opts.native_remove(path)
+					if removed == true then f.files[path] = nil end
+					return removed, detail
+				end
+				if f.files[path] == nil then return false, "No such file or directory" end
+				if f.refused_removals[path] then return false, "Permission denied" end
 				f.files[path] = nil
 				return true
 			end,
@@ -113,6 +121,7 @@ local function with_screenshot(options, scenario)
 			warn = function() end,
 			error = function(_, message, ...)
 				f.errors[#f.errors + 1] = string.format(tostring(message), ...)
+				if f.on_error then f.on_error() end
 			end,
 		}
 		package.loaded["infra.notifications"] = {
@@ -424,5 +433,152 @@ helpers.describe("gesture clipboard screenshots use the verified owner", functio
 		package.loaded["modules.shortcuts.actions.screenshot_save"] = saved_screenshot
 		_G.hs = saved_hs
 		if not ok then error(err, 0) end
+	end)
+end)
+
+
+
+
+
+-- ======================================
+-- ======================================
+-- ======= 6/ Temporary Cleanup ========
+-- ======================================
+-- ======================================
+
+helpers.describe("shared screenshot owner retains temporary cleanup debt", function()
+	helpers.it("retains a physical permission-denied capture until recovery (screenshot-physical-unlink-debt)", function()
+		local quote = require("infra.text_utils").shell_quote
+		local command = "/usr/bin/mktemp -d " .. quote(helpers.temp_dir() .. "/ergopti-capture-cleanup.XXXXXX")
+		local process = assert(io.popen(command, "r"))
+		local output = process:read("a")
+		local closed, reason, status = process:close()
+		helpers.assert_true(closed == true and reason == "exit" and status == 0)
+		helpers.assert_eq(output:sub(-1), "\n")
+		local directory = output:sub(1, -2)
+		local path = directory .. "/owned-capture"
+		local image = assert(io.open(path, "wb"))
+		assert(image:close())
+		local function mode(value)
+			local ok, kind, code = os.execute("/bin/chmod " .. value .. " " .. quote(directory))
+			assert(ok == true and kind == "exit" and code == 0, "fixture permission change must commit")
+		end
+		local ok, problem = xpcall(function()
+			mode("500")
+			with_screenshot({ temp_path = path, native_remove = function(candidate)
+				local removed, detail = os.remove(candidate)
+				return removed == true, detail
+			end }, function(subject, f)
+				helpers.assert_true(subject.capture({ "-i" }))
+				f.tasks[1].finish(1, "", "")
+				local retained = assert(io.open(path, "rb"), "physical EACCES must leave the file present")
+				assert(retained:close())
+				helpers.assert_true(subject.has_pending_screenshot_action(),
+					"the owner must retain a real POSIX unlink refusal")
+				helpers.assert_eq(subject.pause_screenshot_actions("shortcut_bindings"), false)
+				mode("700")
+				helpers.assert_true(subject.resume_screenshot_actions("shortcut_bindings"))
+				helpers.assert_nil(io.open(path, "rb"), "the exact retained file must be removed after permission recovery")
+				helpers.assert_eq(subject.has_pending_screenshot_action(), false)
+				helpers.assert_eq(#f.temp_paths, 1)
+			end)
+		end, debug.traceback)
+		mode("700")
+		local remaining = io.open(path, "rb")
+		if remaining then remaining:close(); assert(os.remove(path)) end
+		assert(os.remove(directory))
+		if not ok then error(problem, 0) end
+	end)
+
+	helpers.it("keeps a refused temporary unlink pending until the exact retry (screenshot-unlink-debt)", function()
+		with_screenshot(nil, function(subject, f)
+			helpers.assert_true(subject.capture({ "-i" }))
+			local task, path = f.tasks[1], f.temp_paths[1]
+			f.write_capture(task)
+			f.refused_removals[path] = true
+			task.finish(0, "", "")
+			helpers.assert_true(f.files[path] ~= nil, "a refused unlink still owns the captured image")
+			helpers.assert_true(subject.has_pending_screenshot_action(),
+				"native process completion does not settle a retained screenshot file")
+			helpers.assert_eq(subject.capture({ "-i" }), false, "cleanup debt must block another same-parent capture")
+			helpers.assert_eq(#f.tasks, 1)
+			helpers.assert_eq(subject.pause_screenshot_actions("shortcut_bindings"), false)
+			f.refused_removals[path] = nil
+			helpers.assert_true(subject.resume_screenshot_actions("shortcut_bindings"))
+			helpers.assert_nil(f.files[path])
+			helpers.assert_eq(subject.has_pending_screenshot_action(), false)
+			for _, removed in ipairs(f.removed) do helpers.assert_eq(removed, path) end
+			helpers.assert_eq(#f.temp_paths, 1, "cleanup retries must retain the original pathname")
+			helpers.assert_eq(#f.notifications, 1, "cleanup retries must never repeat the completed capture")
+		end)
+	end)
+
+	helpers.it("retains refused cleanup after a paused capture finally exits (screenshot-paused-unlink-debt)", function()
+		with_screenshot(nil, function(subject, f)
+			helpers.assert_true(subject.capture({ "-i" }))
+			local task, path = f.tasks[1], f.temp_paths[1]
+			f.refused_removals[path] = true
+			helpers.assert_eq(subject.pause_screenshot_actions("shortcut_bindings"), false)
+			task.finish(1, "", "")
+			helpers.assert_true(subject.has_pending_screenshot_action())
+			helpers.assert_eq(subject.resume_screenshot_actions("shortcut_bindings"), false)
+			helpers.assert_eq(#f.notifications, 0, "retired capture callbacks cannot publish a verdict")
+			f.refused_removals[path] = nil
+			helpers.assert_true(subject.resume_screenshot_actions("shortcut_bindings"))
+			helpers.assert_nil(f.files[path])
+			helpers.assert_eq(subject.has_pending_screenshot_action(), false)
+		end)
+	end)
+
+	helpers.it("keeps cleanup diagnostics fenced against reentrant admission (screenshot-unlink-reentry)", function()
+		with_screenshot(nil, function(subject, f)
+			helpers.assert_true(subject.capture({ "-i" }))
+			local task, path = f.tasks[1], f.temp_paths[1]
+			f.write_capture(task)
+			f.refused_removals[path] = true
+			local nested_capture, nested_pause
+			f.on_error = function()
+				f.on_error = nil
+				nested_capture = subject.capture({ "-i" })
+				nested_pause = subject.pause_screenshot_actions("shortcut_bindings")
+			end
+			task.finish(0, "", "")
+			helpers.assert_eq(nested_capture, false, "a cleanup diagnostic must not admit a successor")
+			helpers.assert_eq(nested_pause, false, "the exact cleanup frame is still active during its diagnostic")
+			helpers.assert_eq(#f.tasks, 1)
+			f.refused_removals[path] = nil
+			helpers.assert_true(subject.resume_screenshot_actions("shortcut_bindings"))
+			helpers.assert_nil(f.files[path])
+		end)
+	end)
+
+	helpers.it("releases cleanup after independent native absence proof (screenshot-unlink-absent)", function()
+		with_screenshot(nil, function(subject, f)
+			helpers.assert_true(subject.capture({ "-i" }))
+			local task, path = f.tasks[1], f.temp_paths[1]
+			f.files[path] = nil
+			task.finish(1, "", "")
+			helpers.assert_eq(subject.has_pending_screenshot_action(), false)
+			helpers.assert_true(subject.pause_screenshot_actions("shortcut_bindings"))
+			helpers.assert_eq(#f.errors, 0, "proved absence settles the owned pathname despite ENOENT")
+		end)
+	end)
+
+	helpers.it("isolates retained screenshot cleanup from another parent (screenshot-unlink-parent)", function()
+		with_screenshot(nil, function(subject, f)
+			helpers.assert_true(subject.capture({ "-i" }, "shortcut_bindings"))
+			local first, path = f.tasks[1], f.temp_paths[1]
+			f.write_capture(first)
+			f.refused_removals[path] = true
+			first.finish(0, "", "")
+			helpers.assert_true(subject.capture({ "-i" }, "independent_parent"))
+			f.write_capture(f.tasks[2])
+			f.tasks[2].finish(0, "", "")
+			helpers.assert_true(subject.has_pending_screenshot_action("shortcut_bindings"))
+			helpers.assert_eq(subject.has_pending_screenshot_action("independent_parent"), false)
+			f.refused_removals[path] = nil
+			helpers.assert_true(subject.pause_screenshot_actions("shortcut_bindings"))
+			helpers.assert_nil(f.files[path])
+		end)
 	end)
 end)

@@ -244,6 +244,8 @@ M.terminator_is_consumed   = Terminators.terminator_is_consumed
 M.set_terminator_enabled   = Terminators.set_terminator_enabled
 M.set_terminators_enabled  = Terminators.set_terminators_enabled
 M.is_terminator_enabled    = Terminators.is_terminator_enabled
+M.set_terminators_consume  = Terminators.set_terminators_consume
+M.is_terminator_consume    = Terminators.is_terminator_consume
 M.get_terminator_defs      = Terminators.get_terminator_defs
 M.validate_custom_terminator = Terminators.validate_custom_terminator
 M.add_custom_terminator    = Terminators.add_custom_terminator
@@ -642,7 +644,7 @@ function M.add(trigger, replacement, opts)
 	local is_final          = opts.final_result       == true
 	-- Marks a mapping whose trigger AND replacement are user secrets (the
 	-- personal_info.toml phone / SSN / IBAN prefixes). The expander reads this
-	-- to suppress the keylogger call and the plaintext DEBUG line that would
+	-- to suppress the keystats call and the plaintext DEBUG line that would
 	-- otherwise copy both into the 14-day log and the exported metrics store
 	local is_private        = opts.is_private         == true
 	-- The personal_info.toml field this replacement was built from, when it has

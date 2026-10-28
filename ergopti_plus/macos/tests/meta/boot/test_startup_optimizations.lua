@@ -7,11 +7,11 @@
 --- fails CI instead of only showing up as a sluggish driver on the user's machine.
 ---
 --- WHY THIS EXISTS:
----  1. keylogger-no-window-filter — hs.window.filter's FIRST instantiation makes
+---  1. keystats-no-window-filter — hs.window.filter's FIRST instantiation makes
 ---     Hammerspoon enumerate every window of every app on the main thread. Built
 ---     eagerly at start it delayed the engine; built lazily on the first browser
 ---     activation it still froze Hammerspoon for 4.8 s and 3.3 s and cost the
----     Karabiner lease (issue #95). The keylogger now binds Accessibility
+---     Karabiner lease (issue #95). The keystats now binds Accessibility
 ---     watchers to the active browser and its focused window only.
 ---  2. gestures-prewarm-no-reinit — gestures.start()'s dependency pre-warm
 ---     re-called Actions.init()/Engine.init(), which are already run at module
@@ -48,14 +48,14 @@ end
 
 -- ======================================================
 -- ======================================================
--- ======= 1/ Keylogger creates no window filters =======
+-- ======= 1/ Keystats creates no window filters ========
 -- ======================================================
 -- ======================================================
 
-helpers.describe("startup: keylogger watches browsers without hs.window.filter (keylogger-no-window-filter)", function()
-	local src = read_code("local function ensure_browser_window_watchers") -- modules/keylogger/init.lua
+helpers.describe("startup: keystats watches browsers without hs.window.filter (keystats-no-window-filter)", function()
+	local src = read_code("local function ensure_browser_window_watchers") -- modules/keystats/init.lua
 
-	helpers.it("(keylogger-no-window-filter) the keylogger never instantiates hs.window.filter", function()
+	helpers.it("(keystats-no-window-filter) the keystats never instantiates hs.window.filter", function()
 		helpers.assert_true(src:find("hs.window.filter", 1, true) == nil,
 			"hs.window.filter enumerates every window of every app on the main thread")
 	end)

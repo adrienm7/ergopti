@@ -15,6 +15,8 @@ local Storage = require("adapters.storage")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 local ManifestMenu = require("infra.manifest_menu")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 local LOG = "gesture_conflicts"
 local boot_notified = false
 
@@ -25,9 +27,7 @@ function M.groups(gestures)
 	local groups = {}
 	if not gestures.is_enabled() then return groups end
 	local seen = {}
-	local slots = {}
-	for slot in pairs(gestures.DEFAULT_GESTURES) do slots[#slots + 1] = slot end
-	table.sort(slots)
+	local slots = TableUtil.sorted_keys(gestures.DEFAULT_GESTURES)
 	for _, slot in ipairs(slots) do
 		local action = gestures.get_action(slot)
 		local group = slot:match("^(%a+_%d+)")
@@ -115,7 +115,7 @@ function M.rows(gestures)
 	local open_settings = M.open_settings
 	for _, group in ipairs(M.groups(gestures)) do
 		local rows = ManifestMenu.template_rows("gesture_system_slot_linux_frame", {
-			["gesture_system_open_unknown_slot"] = function(...) return open_settings(...) end,
+			[ConfigKeys.COMMAND.GESTURE_SYSTEM_OPEN_UNKNOWN_SLOT] = function(...) return open_settings(...) end,
 		}, {
 			["gesture_system_slot_caption"] = function() return I18n.get("gesture.slots." .. group.slot) end,
 		}, {})

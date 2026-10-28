@@ -20,6 +20,7 @@ local M = {}
 
 local hs = hs
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
 
 local LOG = "adapters.input_source_broker"
 
@@ -30,9 +31,7 @@ local _native_state_uncertain = false
 --- Counts active subscribers without exposing the mutable registry.
 --- @return number count Active subscriber count.
 local function subscriber_count()
-	local count = 0
-	for _ in pairs(_subscribers) do count = count + 1 end
-	return count
+	return TableUtil.count(_subscribers)
 end
 
 --- Fans one native notification out to a stable subscriber snapshot.

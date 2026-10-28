@@ -26,7 +26,7 @@
 local helpers = require("tests.helpers")
 local with_activation = require("tests.support.llm_activation_fixture")
 
-local OLLAMA_URL = "http://127.0.0.1:11434"
+local OLLAMA_URL = "http://127.0.0.1:11435"
 
 
 
@@ -266,7 +266,7 @@ local function with_startup(options, callback)
 		package.loaded["infra.logger"] = logger
 		package.loaded["modules.llm"] = {
 			BUILTIN_PROFILES = {},
-			DEFAULT_STATE = { llm_ollama_port = 11434 },
+			DEFAULT_STATE = { llm_ollama_port = 11434, llm_ollama_owned_port = 11435 },
 			get_current_model = function() return "stub-model" end,
 		}
 		local timers = {}

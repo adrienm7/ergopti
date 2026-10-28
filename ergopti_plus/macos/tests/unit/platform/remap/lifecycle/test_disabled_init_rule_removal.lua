@@ -23,7 +23,7 @@ local OWNED_MODULES = {
 	"adapters.hotkey_registrar",
 	"infra.timings",
 	"infra.config_paths",
-	"modules.keylogger.kc_bridge",
+	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
 	"platform.remap",
 }
@@ -132,7 +132,7 @@ local function run_disabled_init(removal_succeeds)
 		package.loaded["adapters.hotkey_registrar"] = { unbind = function() end }
 		package.loaded["infra.timings"] = { sec = function() return 0.01 end }
 		package.loaded["infra.config_paths"] = { get = function() return "existing-config.toml" end }
-		package.loaded["modules.keylogger.kc_bridge"] = {
+		package.loaded["modules.keystats.kc_bridge"] = {
 			refresh_managed_set = function() return true end,
 		}
 		package.loaded["modules.gestures.engine"] = {}

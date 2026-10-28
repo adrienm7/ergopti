@@ -106,13 +106,13 @@ _OEC_MetricsWarningUsesTheChosenDir() {
 	}
 }
 
-; One resolver, through the keylogger's own rule, so the consent text cannot
+; One resolver, through the keystats's own rule, so the consent text cannot
 ; drift from the folder KL_Init writes to.
 _OEC_ResolverIsSharedAndHonoursTheChoice() {
 	Body := _DriverFuncBody("_Onboarding_MetricsPathFor")
 	Assert(Body != "", "_Onboarding_MetricsPathFor() must exist as the single resolver")
 	Assert(InStr(Body, "KL_MetricsDirFor(") > 0,
-		"the consent path must come from the keylogger's rule, not a local concatenation")
+		"the consent path must come from the keystats's rule, not a local concatenation")
 	Assert(InStr(Body, "_Onboarding_ConfigDirFor(") > 0,
 		"the consent path must resolve the field value the way the commit does")
 	Boot := _DriverFuncBody("_Onboarding_ConfigDirFor")

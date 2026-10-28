@@ -11,7 +11,7 @@
 ; tooltip module and wired into ONE of the driver's UIA.GetFocusedElement call
 ; sites. The others are all main-thread callbacks too — a 500 ms repeating
 ; selection poll and a per-focus-change one-shot in the secure-field adapter.
-; The keylogger password classifier now shares the selection poll's disposable
+; The keystats password classifier now shares the selection poll's disposable
 ; process, whose deadline can terminate a provider call already in progress.
 ;
 ; The clamp writes process-wide singleton properties, so in a session where any

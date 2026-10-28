@@ -14,7 +14,7 @@
 ; their starter BoundFunc in a field). The fix stores the warm-up in KLAVState.warmup_fn,
 ; routes it through the GUARDED tick KL_AV_FastTick, and cancels it in KL_AV_Stop.
 ;
-; Meta-static because modules/keylogger is not in the headless runner's include graph.
+; Meta-static because modules/keystats is not in the headless runner's include graph.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -36,4 +36,4 @@ _AVWC_AssertCancellable() {
 	Assert(InStr(Stop, "warmup_fn") > 0,
 		"KL_AV_Stop must cancel KLAVState.warmup_fn so the orphaned warm-up cannot fire after stop (av-warmup-cancellable)")
 }
-Test("keylogger: AV-state warm-up is cancellable + guarded (av-warmup-cancellable)", _AVWC_AssertCancellable)
+Test("keystats: AV-state warm-up is cancellable + guarded (av-warmup-cancellable)", _AVWC_AssertCancellable)

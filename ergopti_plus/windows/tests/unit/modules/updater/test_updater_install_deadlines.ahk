@@ -128,14 +128,19 @@ _UpdaterTest_AbsoluteDownloadDeadlineOwnsCleanup() {
 	DirCreate(TempDir)
 	NewExe := TempDir . "\ErgoptiPlus_new.exe"
 	SwapScript := TempDir . "\swap_update.ps1"
-	FileAppend("partial", NewExe, "UTF-8-RAW")
-	FileAppend("partial", SwapScript, "UTF-8-RAW")
+	Artifacts := { NewExe: NewExe, SwapScript: SwapScript }
+	Staged := _UpdaterStagedArtifactRetirement(Artifacts)
+	Artifacts.StagingRetirement := Staged
 	State := { Terminations: 0, Notices: 0, Message: "" }
 	try {
+		AssertTrue(Staged.AcquireExclusive(), "the parent must exclusively own both staged native identities")
+		FileAppend("partial", NewExe, "UTF-8-RAW")
+		FileAppend("partial", SwapScript, "UTF-8-RAW")
+		AssertTrue(Staged.Validate(), "partial bytes must retain their original parent-owned identities")
 		_UpdaterDownloadInProgress := true
 		_UpdaterDownloadWorker := _UpdaterTestDeadlineWorker(State)
 		_UpdaterDownloadRequest := 0
-		_UpdaterDownloadArtifacts := { NewExe: NewExe, SwapScript: SwapScript }
+		_UpdaterDownloadArtifacts := Artifacts
 		_UpdaterDownloadStartedTick := 100
 		_UpdaterSelfUpdateEpoch := 51
 		_UpdaterSwapOwner := 0
@@ -165,6 +170,7 @@ _UpdaterTest_AbsoluteDownloadDeadlineOwnsCleanup() {
 		_UpdaterSwapOwner := Saved.SwapOwner
 		_UpdaterExitIntent := Saved.ExitIntent
 		_UpdaterExitInvocation := Saved.ExitInvocation
+		AssertTrue(Staged.Retire(), "fixture cleanup must close every retained staged reference")
 		try FileDelete(NewExe)
 		try FileDelete(SwapScript)
 		try DirDelete(TempDir)
@@ -172,6 +178,27 @@ _UpdaterTest_AbsoluteDownloadDeadlineOwnsCleanup() {
 }
 Test("Updater AHK-049: absolute download deadline terminates and cleans staging (updater-absolute-download-deadline-2026-08-28)",
 	_UpdaterTest_AbsoluteDownloadDeadlineOwnsCleanup)
+
+_UpdaterTest_UnownedStagingPathsPreserved() {
+	Directory := _SR_AcquireCaptureDirectory()
+	ForeignExecutable := Directory . "foreign-executable.data"
+	ForeignSwap := Directory . "foreign-swap.data"
+	try {
+		FileAppend("Independent executable sentinel", ForeignExecutable, "UTF-8-RAW")
+		FileAppend("Independent swap sentinel", ForeignSwap, "UTF-8-RAW")
+		AssertTrue(_Updater_RetireCurlCaptureArtifacts({NewExe: ForeignExecutable, SwapScript: ForeignSwap}, true))
+		AssertEqual("Independent executable sentinel", FileRead(ForeignExecutable, "UTF-8"),
+			"paths without an exclusive native owner never authorize executable deletion")
+		AssertEqual("Independent swap sentinel", FileRead(ForeignSwap, "UTF-8"),
+			"paths without an exclusive native owner never authorize swap deletion")
+	} finally {
+		try FileDelete(ForeignExecutable)
+		try FileDelete(ForeignSwap)
+		try DirDelete(Directory)
+	}
+}
+Test("Updater: retirement preserves unowned staging paths (updater-staging-foreign-paths)",
+	_UpdaterTest_UnownedStagingPathsPreserved)
 
 _UpdaterTest_MarkdownPayloadCannotCloseScript() {
 	Canary := "</script><script>window.auditCanary=1</script>"

@@ -1,5 +1,5 @@
 {
-	"_comment": "Swipe direction to configuration slot, replayed by the macOS geometry (modules/gestures/geometry.lua) and the Linux evdev decoder (modules/gestures/mt_decoder.lua). Angles use the screen convention both drivers classify in: 0 is right and 90 is down, so y grows downward. Units differ per driver, so each consumer scales the unit vector to a multiple of its own swipe threshold: travel 'swipe' is four times the threshold, travel 'short' a quarter of it, which is no swipe at all (slot null). Both drivers put the axis/diagonal boundary near 25 degrees (macOS at 25 and 65, Linux at a 2:1 axis ratio, about 26.6), so the boundary vectors sit at 15, 35, 55 and 75 degrees, inside the same region on both. A slot is swipe_<fingers>_<direction>, horizontal part first for a diagonal, and must be declared in _shared/modules/actions/actions.toml.",
+	"_comment": "Swipe direction to configuration slot, replayed by the macOS geometry (modules/gestures/geometry.lua) and the Linux evdev decoder (modules/gestures/mt_decoder.lua), which both classify through _shared/lua/gestures/direction.lua. Angles use the screen convention both drivers classify in: 0 is right and 90 is down, so y grows downward. Units differ per driver, so each consumer scales the unit vector to a multiple of its own swipe threshold: travel 'swipe' is four times the threshold, travel 'short' a quarter of it, which is no swipe at all (slot null). A slot is swipe_<fingers>_<direction>, horizontal part first for a diagonal, and must be declared in _shared/modules/actions/actions.toml. boundary_vectors pin the classifier itself in normalised units, a swipe minimum of 1 and the boundary_rule diagonal minimum: travel is Manhattan (|dx| + |dy|), a swipe within 25 degrees of an axis is straight (both boundaries inclusive), a diagonal needs the diagonal minimum and otherwise takes its dominant axis, horizontal on a tie. Each consumer multiplies dx and dy by its own swipe minimum.",
 	"fingers": [3, 4, 5],
 	"vectors": [
 		{ "angle": 0, "travel": "swipe", "direction": "right" },
@@ -19,5 +19,30 @@
 		{ "angle": 305, "travel": "swipe", "direction": "right_up" },
 		{ "angle": 90, "travel": "short", "direction": null },
 		{ "angle": 225, "travel": "short", "direction": null }
+	],
+	"boundary_rule": { "minimum": 1, "diagonal_minimum": 1.5 },
+	"boundary_vectors": [
+		{ "id": "below_minimum", "dx": 0.999, "dy": 0, "direction": null },
+		{ "id": "at_minimum", "dx": 1, "dy": 0, "direction": "right" },
+		{ "id": "up_at_minimum", "dx": 0, "dy": -1, "direction": "up" },
+		{ "id": "manhattan_below_minimum", "dx": 0.5, "dy": 0.499, "direction": null },
+		{
+			"id": "manhattan_at_minimum_tie_goes_horizontal",
+			"dx": 0.5,
+			"dy": 0.5,
+			"direction": "right"
+		},
+		{ "id": "tie_goes_horizontal_leftward", "dx": -0.5, "dy": 0.5, "direction": "left" },
+		{ "id": "short_diagonal_takes_dominant_axis", "dx": 0.4, "dy": 0.6, "direction": "down" },
+		{ "id": "diagonal_at_manhattan_minimum", "dx": 0.75, "dy": 0.75, "direction": "right_down" },
+		{ "id": "diagonal_just_below_its_minimum", "dx": 0.749, "dy": 0.75, "direction": "down" },
+		{ "id": "diagonal_left_up", "dx": -0.75, "dy": -0.75, "direction": "left_up" },
+		{ "id": "inside_horizontal_sector", "dx": 2, "dy": 0.932, "direction": "right" },
+		{ "id": "past_horizontal_sector", "dx": 2, "dy": -0.934, "direction": "right_up" },
+		{ "id": "inside_horizontal_sector_leftward", "dx": -2, "dy": -0.932, "direction": "left" },
+		{ "id": "past_horizontal_sector_leftward", "dx": -2, "dy": 0.934, "direction": "left_down" },
+		{ "id": "before_vertical_sector", "dx": -0.9, "dy": 1.929, "direction": "left_down" },
+		{ "id": "inside_vertical_sector", "dx": -0.9, "dy": 1.931, "direction": "down" },
+		{ "id": "before_vertical_sector_upward", "dx": 0.9, "dy": -1.929, "direction": "right_up" }
 	]
 }

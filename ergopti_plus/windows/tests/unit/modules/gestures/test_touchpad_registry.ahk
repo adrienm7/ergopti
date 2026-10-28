@@ -295,3 +295,5 @@ _TPR_BothWritersGoThroughTheOwner() {
 }
 Test("touchpad registry: both writers go through the one owner (touchpad-one-owner)",
 	_TPR_BothWritersGoThroughTheOwner)
+
+#Include test_gesture_powershell_path_encoding.ahk

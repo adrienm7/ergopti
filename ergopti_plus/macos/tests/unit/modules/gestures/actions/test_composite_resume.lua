@@ -136,7 +136,7 @@ helpers.describe("gesture Actions composite resume", function()
 		helpers.assert_eq(actions.force_cleanup("shortcut_bindings"), true)
 		helpers.assert_eq(actions.resume_after_cleanup("shortcut_bindings"), true)
 		helpers.assert_eq(actions.execute_single(
-			"open_config", "keyboard__cmd_1"), true)
+			"open_config", "keyboard__primary_1"), true)
 
 		helpers.assert_true(#calls.click_force_parents > 0)
 		helpers.assert_true(#calls.click_release_parents > 0)

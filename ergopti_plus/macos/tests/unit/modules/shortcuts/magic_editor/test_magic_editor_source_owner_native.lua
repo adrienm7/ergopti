@@ -114,7 +114,7 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 	helpers.it("preserves an explicit physical none claim from another ordinary slot", function()
 		with_fixture(function(subject, registrar, _, _, spec, respond)
 			registrar.replace_physical_claims("ordinary", {
-				{ chord = "Ctrl+C", action = "none", binding_id = "keyboard__hs_ctrl_c" },
+				{ chord = "Ctrl+C", action = "none", binding_id = "keyboard__secondary_c" },
 			})
 			helpers.assert_eq(subject.start(spec), true)
 			respond()

@@ -65,7 +65,7 @@ _DSSS_NoResurrectedDeadState() {
 ; Both arm sites of the deferred app-category save must follow the constant.
 ; Migrating one of two is how a "single source of truth" silently becomes two.
 _DSSS_DeferredSaveRetryIsSingleSourced() {
-	Src := _DriverDirConcat("modules/keylogger")
+	Src := _DriverDirConcat("modules/keystats")
 	Assert(InStr(Src, "DEFERRED_SAVE_RETRY_MS := 5000") > 0,
 		"prerequisite: the deferred-save retry constant must still be declared")
 

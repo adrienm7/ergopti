@@ -307,7 +307,7 @@ def session(root):
                                 "adapters/atspi_focus_watch.lua",
                                 "adapters/atspi_focus_watch_worker.lua",
                                 "adapters/secure_field_detector.lua",
-                                "modules/keylogger/focus_guard.lua",
+                                "modules/keystats/focus_guard.lua",
                             )
                         },
                     },

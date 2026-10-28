@@ -74,12 +74,44 @@ WPMWidget_BuildCompact() {
 		; Rounded corners of the canon's radius, as on macOS and Linux: the pill
 		; used to be the only square one.
 		Diameter := 2 * WPMWidgetConst.CORNER_R
-		WinSetRegion("0-0 w" . w . " h" . h . " r" . Diameter . "-" . Diameter, "ahk_id " . g.Hwnd)
+		_WPMWidget_ApplyRoundedRegion(g.Hwnd, w, h, Diameter)
 
 		WPMWidget._gui       := g
 		WPMWidget._lbl_wpm   := lbl_wpm
 		WPMWidget._lbl_unit  := lbl_unit
 		WPMWidget._lbl_strip := lbl_strip
+}
+
+
+; Clips a WPM surface this driver owns to its rounded pill. The HWND reaches
+; WinSetRegion as a pure integer on purpose: the "ahk_id N" string is a WinTitle
+; search, which skips hidden windows while DetectHiddenWindows is off, and the
+; compact Gui is built hidden (the tick reveals it once the user types), so the
+; string form raised an uncaught TargetError on every start-up and on every
+; later show (issue #103). A window that is already gone, or whose handle now
+; belongs to another process, is a defined close/rebuild race: it returns false
+; after one DEBUG line. Every other failure, including a TargetError on a window
+; that still exists, propagates. RegionFn is an injectable test seam.
+_WPMWidget_ApplyRoundedRegion(Hwnd, W, H, Diameter, RegionFn := 0) {
+		if !(Hwnd is Integer) || Hwnd <= 0
+				throw TypeError("The WPM region target must be a positive HWND, got " . Type(Hwnd) . ".")
+		if !WMHandleOwnedByThisProcess(Hwnd) {
+				LoggerDebug("WPMWidget", "Rounded region skipped: window {1} no longer exists.", Hwnd)
+				return false
+		}
+		Options := "0-0 w" . W . " h" . H . " r" . Diameter . "-" . Diameter
+		try {
+				if HasMethod(RegionFn, "Call")
+						RegionFn.Call(Options, Hwnd)
+				else
+						WinSetRegion(Options, Hwnd)
+		} catch TargetError as Err {
+				if WMHandleOwnedByThisProcess(Hwnd)
+						throw Err
+				LoggerDebug("WPMWidget", "Rounded region skipped: window {1} closed while the region was applied.", Hwnd)
+				return false
+		}
+		return true
 }
 
 
@@ -439,12 +471,12 @@ WPMWidget_DragStart(ctrl, info, PostFn := 0, *) {
 }
 
 WPMWidget_DragEnd(WParam := 0, LParam := 0, Message := 0, Hwnd := 0,
-		MoveFn := 0, WriterFn := 0, NotifyFn := 0, *) {
+		MoveFn := 0, StoreFn := 0, NotifyFn := 0, *) {
 		InheritedCritical := A_IsCritical
 		if InheritedCritical {
 				Critical("Off")
 				try return WPMWidget_DragEnd(WParam, LParam, Message, Hwnd,
-						MoveFn, WriterFn, NotifyFn)
+						MoveFn, StoreFn, NotifyFn)
 				finally Critical(InheritedCritical)
 		}
 		if !WPMWidget._dragging
@@ -462,7 +494,7 @@ WPMWidget_DragEnd(WParam := 0, LParam := 0, Message := 0, Hwnd := 0,
 				NewX := fx
 				NewY := fy
 		}
-		if !WPMWidget_SavePosition(NewX, NewY, WriterFn, NotifyFn) {
+		if !WPMWidget_SavePosition(NewX, NewY, StoreFn, NotifyFn) {
 				; Native dragging has already moved the window. A refused durable
 				; candidate must restore the retained anchor as well as retain RAM.
 				try {

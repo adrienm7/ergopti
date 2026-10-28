@@ -15,10 +15,10 @@ _SICSO_SendInstantRestoreOwnsSequence() {
     Restore := _DriverFuncBody("_SendInstant_RestoreClipboard")
 
     Assert(SendBody != "" && Restore != "", "SendInstant and its restore worker must exist")
-    Assert(InStr(SendBody, "CB_SaveAll()") > 0 && InStr(SendBody, "CB_Write(Text)") > 0,
+    Assert(InStr(SendBody, "CB_SaveAll()") > 0 && InStr(SendBody, "CB_WriteTextWithReceipt(Text, &OwnedSequence)") > 0,
         "SendInstant must use the clipboard adapter for its all-format transaction")
-    Assert(InStr(SendBody, "OwnedSequence := CB_GetSequenceNumber()") > 0,
-        "SendInstant must capture the sequence immediately after publishing its payload")
+    Assert(InStr(SendBody, "CB_WriteTextWithReceipt(Text, &OwnedSequence)") > 0,
+        "SendInstant must receive the authenticated sequence from its publication")
     Assert(InStr(SendBody, "_SendInstant_RestoreClipboard.Bind(OldClipboard, OwnedSequence, OwnerToken)") > 0,
         "SendInstant must bind its owned sequence and shared transaction token to the deferred restore")
     Assert(InStr(Restore, "CB_RestoreOwnedAllEventually(OldClip, OwnedSequence, OwnerToken") > 0,

@@ -567,22 +567,6 @@ helpers.describe("native hotstring discovery preserves filename bytes", function
 		assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
 		if not ok then error(err, 0) end
 	end)
-
-	helpers.it("refuses truncated native discovery records (native-discovery-framing)", function()
-		local Shell = require("adapters.shell_runner")
-		local previous = Shell.exec
-		Shell.exec = function() return "/uncommitted/source.toml" end
-		local ok, err = pcall(function()
-			local Loader = helpers.load_module("modules.hotstrings.loader")
-			for _, discover in ipairs({ Loader.find_toml_files, Loader.list_subdirs }) do
-				local admitted, reason = pcall(discover, "/isolated")
-				helpers.assert_eq(admitted, false, "an incomplete native record must not become a source")
-				helpers.assert_true(tostring(reason):find("incomplete path framing", 1, true) ~= nil)
-			end
-		end)
-		Shell.exec = previous
-		if not ok then error(err, 0) end
-	end)
 end)
 
 

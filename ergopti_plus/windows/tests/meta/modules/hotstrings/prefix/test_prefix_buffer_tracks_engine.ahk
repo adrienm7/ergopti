@@ -117,8 +117,10 @@ _PBT_BackspaceRecoversTheWordTheEngineStillHolds() {
 _PBT_ResetListExcludesBackspace() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "the driver source must be readable")
-	Assert(RegExMatch(Src, "ResetVKs\s*:=\s*Map\(\s*0x08") == 0,
-		"VK_BACK must not be the first entry of ResetVKs — a reset wipes the preview buffer, and the engine only decrements")
+	Owner := _DriverFuncBody("KS_IsContextResetKey")
+	Assert(Owner != "", "the canonical context-reset owner must exist")
+	AssertFalse(KS_IsContextResetKey(0x08),
+		"VK_BACK must not belong to ResetVKs — a reset wipes the preview buffer, and the engine only decrements")
 }
 
 
@@ -178,7 +180,7 @@ _PBT_AppendGrowsAndBoundaryResets() {
 
 		; A single character before the boundary, deliberately: the reset path
 		; runs deferred near-miss analytics for buffers of 2+ chars, and that
-		; touches the Keylogger singleton, which this harness stubs as a bare
+		; touches the Keystats singleton, which this harness stubs as a bare
 		; class. One char short-circuits that branch and still proves the reset.
 		_PrefixBuffer := "a"
 		_PrefixAppendTypedChar(" ")

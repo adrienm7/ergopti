@@ -34,6 +34,7 @@ local Cleanup = require("healthcheck.cleanup")
 local Actions  = require("healthcheck.actions")
 local TimerScheduler = require("adapters.timer_scheduler")
 local DeferredWork = require("infra.deferred_work")
+local TableUtil = require("table_util")
 local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
 
 local LOG = "healthcheck"
@@ -269,6 +270,42 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.field_check_ports",
+		contract = { "new" },
+		-- The Debug menu's field checks build their ports on click.
+		wired    = true,
+	},
+	{
+		id       = "adapters.field_run_ports",
+		contract = { "new" },
+		-- Built by infra/field_run.lua, which starts only in developer source mode.
+		wired    = true,
+	},
+	{
+		id       = "adapters.runtime_owner_ports",
+		contract = { "new", "unpinned_count" },
+		-- Required only by the remap bridge after the hidden `runtime = "owned"` opt-in.
+		wired    = true,
+	},
+	{
+		id       = "adapters.runtime_capture_port",
+		contract = { "new" },
+		-- Built by the owned runtime ports; dormant at default boot.
+		wired    = true,
+	},
+	{
+		id       = "adapters.installed_physical_source",
+		contract = { "new", "module_path" },
+		-- Built by the owned runtime's capture port and the owned runtime field check.
+		wired    = true,
+	},
+	{
+		id       = "adapters.karabiner_coexistence",
+		contract = { "new" },
+		-- Built by the owned runtime ports and the field check; acts only when consented.
+		wired    = true,
+	},
+	{
 		id       = "adapters.system_switcher_sampler",
 		contract = { "new" },
 		wired    = true,
@@ -339,6 +376,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.prediction_tooltip_port",
+		contract = { "wrap" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.program_providers",
 		contract = { "create" },
 		wired    = true,
@@ -372,6 +414,11 @@ local ADAPTER_SPECS = {
 		id       = "adapters.screen_capture",
 		contract = { "permission_state", "request_permission", "open_permission_settings",
 			"clipboard_change_count", "clipboard_has_image", "copy_image_file_to_clipboard" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.privacy_settings",
+		contract = { "url", "url_for", "os_major" },
 		wired    = true,
 	},
 	{
@@ -438,8 +485,20 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.foreign_ledger_snapshot",
+		contract = { "open", "advance", "start", "poll", "close" },
+		-- Metrics foreign sync verifies source receipts before admitting SQL batches.
+		wired    = true,
+	},
+	{
 		id       = "adapters.ledger_append",
 		contract = { "cleanup", "recover", "flush" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.metadata_command_stats",
+		contract = { "clock", "record", "snapshot" },
+		-- Slow ingest and slow preferences save reports count the metadata forks.
 		wired    = true,
 	},
 	{
@@ -607,6 +666,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.unicode_carrier",
+		contract = { "note_physical_key", "keycode" },
+		-- The keymap taps report held keys; every synthetic text event asks it.
+		wired    = true,
+	},
+	{
 		id       = "adapters.update_launcher",
 		contract = { "request_check" },
 		wired    = true,
@@ -731,9 +796,7 @@ function M.run(opts)
 	-- session, before the clock starts
 	local schema = M.config().schema
 	local started = hs.timer.absoluteTime()
-	local permission_ids = {}
-	for id in pairs(schema.permissions[M.DRIVER] or {}) do permission_ids[#permission_ids + 1] = id end
-	table.sort(permission_ids)
+	local permission_ids = TableUtil.sorted_keys(schema.permissions[M.DRIVER] or {})
 
 	-- Each collector is isolated: a report exists to be read when things are
 	-- broken, so one collector raising costs its own section, never the window
@@ -868,6 +931,8 @@ local function init_message(session)
 			schema    = documents.schema,
 			redaction = documents.redaction,
 			context   = require("ui.healthcheck.report").redaction_context(),
+			-- The guided diagnostic collection is a Windows host action only.
+			capabilities = { diagnostic_collection = false },
 		},
 		snapshot = session.snapshot,
 	}
@@ -890,7 +955,25 @@ local function perform_action(session, action, documents)
 		send(session, { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
 			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
-				require("infra.i18n").get(documents.schema.share_policy.notice_key)).text })
+				require("infra.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text })
+	elseif action.action == "day_log" then
+		-- Opt-in: ticking collects and redacts today's log; unticking drops it
+		local DayLogHost = require("healthcheck.day_log")
+		if not action.enabled then
+			DayLogHost.discard(session.snapshot)
+			send(session, { type = "action", action = "day_log", ok = true, state = "off" })
+			return
+		end
+		Logger.start(LOG, "Collecting today's log for the report…")
+		Logger.flush_repeats(true)
+		local reply = DayLogHost.prepare(session.snapshot, documents, require("ui.healthcheck.report").redaction_context(),
+			function(cap) return DayLogHost.read_file(Logger.today_log_path(), cap) end)
+		if reply.state == "ready" then
+			Logger.success(LOG, "Today's log is ready: %d lines, %d bytes.", reply.lines, reply.bytes)
+		else
+			Logger.warn(LOG, "Today's log is not attachable: %s.", tostring(reply.state))
+		end
+		send(session, reply)
 	elseif action.action == "close" then
 		close_owned_window(session.webview, "page close")
 	elseif action.action == "cancel" then
@@ -979,6 +1062,17 @@ local function inject_strings(webview)
 		webview:evaluateJavaScript("if(window.i18n_apply){window.i18n_apply(" .. json .. ");}")
 	end)
 	if not ok then Logger.error(LOG, "The diagnostics page's strings were refused: %s.", tostring(err)) end
+end
+
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _window end
+
+--- Closes the open diagnostics window, for ui/window_toggle.
+--- @return boolean committed
+function M.close_window()
+	if _window == nil then return true end
+	return close_owned_window(_window, "toggle close")
 end
 
 --- Opens the diagnostics window. Replaces any existing window (singleton).

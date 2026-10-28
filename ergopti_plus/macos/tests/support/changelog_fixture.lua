@@ -15,7 +15,16 @@ local SHARED_DEFAULTS = FIXTURE_DIR .. "/../../../_shared/modules/updater/defaul
 local SHARED_CHANNELS = FIXTURE_DIR .. "/../../../_shared/modules/updater/channels.json"
 local SHARED_NETWORK_POLICY = FIXTURE_DIR .. "/../../../_shared/modules/network/managed_network.json"
 
+--- The repository identity of the shared defaults, the updater's own source.
+local function read_shared_github()
+	local handle = assert(io.open(SHARED_DEFAULTS, "r"))
+	local raw = handle:read("*a")
+	handle:close()
+	return assert(require("json").decode(raw)).github
+end
+
 local function with_changelog(callback)
+	local shared_github = read_shared_github()
 	local previous_hs = rawget(_G, "hs")
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
@@ -23,6 +32,8 @@ local function with_changelog(callback)
 			"ui.ui_builder",
 			"adapters.file_system",
 			"adapters.json_codec",
+			"adapters.http_client",
+			"adapters.timer_scheduler",
 			"infra.deferred_work",
 			"infra.i18n",
 			"infra.logger",
@@ -63,11 +74,19 @@ local function with_changelog(callback)
 				end,
 			}
 			package.loaded["modules.shortcuts.script_control"] = state.script_control
+			helpers.provide_timings()
 			local hs_stub = require("tests.stubs.hs")
 			hs_stub.__reset()
-			hs_stub.http.asyncGet = function(url, headers, on_response)
+			-- The real HttpClient owns redirects, so the window never reaches the
+			-- opaque auto-follow entry: asyncGet fails the case that uses it.
+			hs_stub.http.asyncGet = function()
+				error("the changelog must request through adapters.http_client, not hs.http.asyncGet")
+			end
+			hs_stub.http.doAsyncRequest = function(url, method, _, headers, on_response, _, explicit_redirect)
 				state.callbacks[#state.callbacks + 1] = on_response
-				state.urls_requested[#state.urls_requested + 1] = { url = url, headers = headers }
+				state.urls_requested[#state.urls_requested + 1] = {
+					url = url, headers = headers, method = method, auto_follow = explicit_redirect,
+				}
 			end
 			hs_stub.json.decode = function(body)
 				if body == state.dev_body then
@@ -175,6 +194,8 @@ local function with_changelog(callback)
 			-- build with no backup, which installs nothing unless a case says so.
 			changelog._deps = {
 				updater = {
+					GH_OWNER = shared_github.owner,
+					GH_REPO = shared_github.repo,
 					is_local_source = function() return false end,
 					current_version = function() return "0.0.0-dev.140" end,
 				},

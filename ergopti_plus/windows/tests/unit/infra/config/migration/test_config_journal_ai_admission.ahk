@@ -104,6 +104,50 @@ _CMJ_NewerSchemaPersistenceRows(Path, Source, Getters) {
 	AssertEqual(1, Messages.Length)
 	AssertEqual(t("config.read_only.newer_schema"), Messages[1], "the refused restore names the newer configuration")
 	AssertTrue(FSUtf8ExactMatches(Path, Source), "the refused restore writes nothing")
+	_CMJ_NewerSchemaParents(Path, Source)
+}
+
+; The dynamic AI parent (profiles) is a native row: it
+; name the same cause, and a click kept from before a reload rechecks it
+; (ai-submenus-newer-config-2026-10-23).
+_CMJ_NewerSchemaParents(Path, Source) {
+	AssertEqual("menu.read_only.newer_schema", _LLM_Menu_ConfigBlockReason(), "the native parents name the newer configuration")
+	Child := Menu()
+	Target := Menu()
+	try {
+		Child.Add("probe", (*) => 0)
+		Rows := _LLM_Menu_GreyConfigParents("llm_profile", _LLM_Menu_ProfileParentRows(Child, "Basic", false), false)
+		Assert(Rows is Array, "the profile parent frame is drawn")
+		AssertTrue(Rows[1].Get("disabled", false), "the profile parent is greyed")
+		AssertEqual("menu.read_only.newer_schema", Rows[1].Get("disabled_reason_key", ""), "the profile parent names the cause")
+		MenuRenderer_AppendRows(Target, "llm_menu", "llm_profile_parent_frame_ahk", Rows)
+		Flags := DllCall("GetMenuState", "ptr", Target.Handle, "uint", 0, "uint", 0x400, "uint")
+		AssertTrue((Flags & 0x3) != 0, "the native profile parent is greyed")
+		Label := Buffer(2048, 0)
+		DllCall("GetMenuStringW", "ptr", Target.Handle, "uint", 0, "ptr", Label, "int", 1024, "uint", 0x400)
+		Head := _MR_ReasonHead(t("menu.read_only.newer_schema"))
+		Assert(InStr(StrGet(Label, "UTF-16"), Head) > 0, "the native caption names the cause: " . StrGet(Label, "UTF-16"))
+		Other := _LLM_Menu_GreyConfigParents("llm_profile", _LLM_Menu_ProfileParentRows(Child, "Basic", true), true)
+		AssertFalse(Other[1].Has("disabled_reason_key"), "a parent greyed for another reason keeps its plain greying")
+	} finally {
+		Target.Delete()
+		MenuDispatcher_PruneMenu(Target)
+		Child.Delete()
+		MenuDispatcher_PruneMenu(Child)
+	}
+	; Only the profile parent takes the cause: the model selector button opens
+	; the page, which greys every backend with that cause itself.
+	Model := _LLM_Menu_GreyConfigParents("llm_model", [Map("label", "Servers", "submenu", Menu())], false)
+	AssertFalse(Model[1].Has("disabled_reason_key"), "the model selector row is left to the page")
+	Unrelated := _LLM_Menu_GreyConfigParents("llm_trigger", [Map("label", "Other", "submenu", Menu())], false)
+	AssertFalse(Unrelated[1].Has("disabled_reason_key"), "a row outside the writing submenu is left alone")
+	Ran := 0
+	Guarded := _LLM_Menu_GuardConfigRows([Map("label", "leaf", "action", (*) => ++Ran,
+		"items", [Map("label", "inner", "action", (*) => ++Ran)])])
+	AssertFalse(Guarded[1]["action"].Call("leaf", 1, ""), "a retained click rechecks the configuration")
+	AssertFalse(Guarded[1]["items"][1]["action"].Call("inner", 1, ""), "a nested retained click rechecks it too")
+	AssertEqual(0, Ran, "a refused click never reaches its action")
+	AssertTrue(FSUtf8ExactMatches(Path, Source), "the refused clicks write nothing")
 }
 Test("config journal: newer schema disables AI activation and explains update without changing settings (newer-schema-ai)",
 	_CMJ_WithAiPersistenceState.Bind(_CMJ_NewerSchemaAiAdmission))
@@ -119,6 +163,11 @@ _CMJ_CurrentSchemaAiAdmission(Path) {
 	AssertTrue(Getters["llm_toggle_ready"].Call(), "an admitted ordinary current configuration remains available")
 	AssertTrue(Getters["llm_scope_ready"].Call(), "the restore stays available on a current configuration")
 	AssertFalse(Getters["config_newer_schema"].Call(), "a current configuration names no newer cause")
+	AssertEqual("", _LLM_Menu_ConfigBlockReason(), "a writable configuration names no cause on the native parents")
+	Ran := 0
+	Guarded := _LLM_Menu_GuardConfigRows([Map("label", "leaf", "action", (*) => ++Ran)])
+	Guarded[1]["action"].Call("leaf", 1, "")
+	AssertEqual(1, Ran, "a writable configuration runs the retained click")
 	AssertFalse(MenuRenderer_ResolveDisabledWhen("llm_menu", "llm_toggle", Getters))
 	Suspend(true)
 	AssertFalse(Getters["llm_toggle_ready"].Call(), "configuration readiness does not override suspension")

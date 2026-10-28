@@ -146,9 +146,17 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 	end)
 
 	helpers.it("arms the replacement detached, with the previous app kept aside", function()
-		local ran = {}
-		Installer._run = function(executable, args) ran[#ran + 1] = { executable = executable, args = args }; return true end
-		helpers.assert_true(Installer.arm_swap("/private/tmp/user/x/app/ErgoptiPlus.app"))
+		local ran, observed = {}, {}
+		Installer._run = function(executable, args, completed)
+			ran[#ran + 1] = { executable = executable, args = args, completed = completed }
+			return true
+		end
+		helpers.assert_true(Installer.arm_swap("/private/tmp/user/x/app/ErgoptiPlus.app", function(armed)
+			observed[#observed + 1] = armed
+		end))
+		helpers.assert_eq(observed, {}, "dispatch alone must not acknowledge the detached installer")
+		ran[1].completed(true, "ARMED", "")
+		helpers.assert_eq(observed, { true })
 		local args = ran[1].args
 		helpers.assert_eq(ran[1].executable, "/bin/sh")
 		helpers.assert_true(args[2]:find("nohup", 1, true) ~= nil, "the replacement outlives this process")
@@ -158,14 +166,14 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 		helpers.assert_eq(args[7], "/private/tmp/user/x/app/ErgoptiPlus.app")
 		helpers.assert_eq(args[8], "/Applications/ErgoptiPlus.app.previous")
 		helpers.assert_eq(args[9], "/private/tmp/user/x/swap.log")
-		helpers.assert_eq(select(1, Installer.arm_swap("/etc/passwd")), false, "only a staged app is accepted")
+		helpers.assert_eq(select(1, Installer.arm_swap("/etc/passwd", function() end)), false, "only a staged app is accepted")
 	end)
 
 	helpers.it("refuses outside a packaged launch", function()
 		env.ERGOPTI_LAUNCHER_EXECUTABLE = nil
 		helpers.assert_nil(Installer.app_bundle())
 		helpers.assert_eq(Installer.stage({ tag = TAG }, function() end), false)
-		helpers.assert_eq(select(1, Installer.arm_swap("/private/tmp/user/x/app/ErgoptiPlus.app")), false)
+		helpers.assert_eq(select(1, Installer.arm_swap("/private/tmp/user/x/app/ErgoptiPlus.app", function() end)), false)
 	end)
 end)
 
@@ -286,8 +294,10 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		local open = fake(dir, "open", 'echo "$2" >> ' .. quote(opened))
 		local script = Installer.SWAP_SCRIPT:gsub("/usr/bin/open", open)
 		local pid = opts.pid or "999999999"
+		local acknowledgement = dir .. "/arming-receipt"
 		local status, output = sh("sh -c " .. quote(script) .. " swap " .. pid .. " " .. quote(app) .. " "
-			.. quote(staged) .. " " .. quote(previous))
+			.. quote(staged) .. " " .. quote(previous) .. " 3>" .. quote(acknowledgement))
+		helpers.assert_eq(read(acknowledgement), "ARMED\n", "the actual worker acknowledges before the same swap checks")
 		local result = {
 			status = status, output = output,
 			app = read(app .. "/marker"), previous = read(previous .. "/marker"), opened = read(opened) or "",

@@ -569,7 +569,7 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 	; (PrefixWatcherSuppress/KL_MarkSynthetic) that are released exactly once,
 	; by the callback, on any path where TextSend itself did not throw --  a
 	; bail-out here that never invokes Callback leaked those guards forever,
-	; permanently suppressing normal hotstring/keylogger observation.
+	; permanently suppressing normal hotstring/keystats observation.
 	if A_IsSuspended {
 		_TextSenderInvokeCallback(Callback, false, "driver suspended before clipboard injection")
 		return
@@ -581,22 +581,15 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 	Generation := _TEXT_CLIPBOARD_GENERATION
 	EraseCount := (Opts is Map) ? Opts.Get("erase_before", 0) : 0
 
-	; A failed write leaves the previous clipboard content intact. Never continue
-	; to ClipWait/^v in that state or the user receives unrelated stale text.
-	if !CB_Write(Text) {
+	; A failed setter does not authorize a paste or a restore of unknown content.
+	if !CB_WriteTextWithReceipt(Text, &OwnedSequence) {
 		LoggerError("TextSender", "TextSend: clipboard write failed - skipping paste to avoid injecting stale content.")
 		_TextSenderInvokeCallback(Callback, false, "clipboard write failed")
 		return
 	}
-	OwnedSequence := CB_GetSequenceNumber()
 	if !OwnedSequence {
 		LoggerError("TextSender", "TextSend: clipboard sequence is unavailable - skipping paste because ownership cannot be proven.")
-		; Delegate rollback to the central clipboard owner. The process generation
-		; excludes newer driver injections, but cannot exclude an external copy.
-		; With no recorded ownership sequence, any positive observable sequence
-		; wins even on the first attempt. An observed zero retains the existing
-		; unfenced rollback policy; it does not prove that this payload is still ours.
-		_TextSendForceRestoreClipboard(Saved, Generation)
+		; Unknown publication ownership must not restore over a newer user copy.
 		_TextSenderInvokeCallback(Callback, false, "clipboard ownership unavailable")
 		return
 	}
@@ -819,6 +812,13 @@ _TextSenderReportOutput(Text) {
 		CapsWordAutoOffObserveOutput(Text)
 }
 
+; Windows string output boundaries terminate at NUL even though an AHK String
+; can retain a suffix after it. Refuse the whole request instead of committing
+; the full source text after the receiver obtained only its prefix.
+_TextSenderContainsNul(Text) {
+	return Text is String && RegExMatch(Text, "\x00") > 0
+}
+
 ; Inserts text at the current insertion point.
 ; Uses the Clipboard port (CB_SaveAll / CB_Write / CB_RestoreAll) for the clipboard
 ; path so the interaction is mockable and the driver has one canonical clipboard
@@ -830,6 +830,13 @@ _TextSenderReportOutput(Text) {
 ; @param Callback {Func|0}   Called with the completion Boolean and error message.
 TextSend(Text, Opts, Callback) {
 	global TEXT_CLIPBOARD_THRESHOLD, _TEXT_CLIPBOARD_QUEUE
+	if _TextSenderContainsNul(Text)
+			|| ((Opts is Map) && Opts.Has("deleted_text") && _TextSenderContainsNul(Opts["deleted_text"])) {
+		try LoggerWarn("TextSender", "Text output refused: NUL code units cannot cross a Windows string boundary.")
+		finally _TextSenderInvokeCallback(Callback, false,
+			"text output and deletion evidence cannot contain NUL code units")
+		return
+	}
 	Mode := "auto"
 	if (Opts is Map) and Opts.Has("mode") and Opts["mode"] != ""
 		Mode := Opts["mode"]
@@ -853,8 +860,8 @@ TextSend(Text, Opts, Callback) {
 			: (StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD ? "clipboard" : "direct")
 
 	if Mode = "native" {
-		_TextSenderQueueNative(Text, Opts, Callback)
-		_TextSenderReportOutput(Text)
+		if _TextSenderQueueNative(Text, Opts, Callback)
+			_TextSenderReportOutput(Text)
 		return
 	}
 
@@ -1056,6 +1063,18 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 	}
 	Stroke := _TextSenderKeystroke(Words, Key, Blind)
 	return (Stroke == "") ? false : _TextSenderSendInput(Stroke, "key press")
+}
+
+; Emits one plain key press that the CALLER feeds to the hotstring engine itself,
+; so the send must not also be declared to the buffers: TextPressKey declares an
+; unmodified key as a caret edit, which empties both buffers, and a trigger fed
+; afterwards (the Space tap-hold completing an end-character trigger) could never
+; complete. The caller owns the buffer feed that follows a true result.
+; @param Key {String} Key name (e.g. "Space").
+; @return {Boolean} True when the keystroke was sent.
+TextPressKeyFed(Key) {
+	Stroke := _TextSenderKeystroke([], Key)
+	return (Stroke == "") ? false : _TextSenderSendInput(Stroke, "fed key press")
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test

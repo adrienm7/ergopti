@@ -13,15 +13,15 @@
 /* =================================== */
 
 :root {
-	--bg-color: #f5f5f7;
-	--panel-bg: #ffffff;
-	--text-color: #1d1d1f;
-	--text-muted: #86868b;
-	--accent: #007aff;
-	--border: #d2d2d7;
-	--th-bg: #e5e5ea;
-	--th-hover: #d1d1d6;
-	--td-hover: #f0f0f5;
+	--bg-color: var(--theme-metrics-bg);
+	--panel-bg: var(--theme-metrics-panel);
+	--text-color: var(--theme-metrics-text);
+	--text-muted: var(--theme-metrics-text-muted);
+	--accent: var(--theme-accent);
+	--border: var(--theme-metrics-border);
+	--th-bg: var(--theme-metrics-th-bg);
+	--th-hover: var(--theme-metrics-th-hover);
+	--td-hover: var(--theme-metrics-td-hover);
 
 	--filter-bg: var(--bg-color);
 	--filter-text: var(--text-muted);
@@ -43,11 +43,11 @@
 	--llm-border: rgba(var(--kpi-llm-rgb), 0.5);
 	--global-border: rgba(var(--kpi-wpm-rgb), 0.5);
 
-	--strong-color: #1d1d1f;
+	--strong-color: var(--theme-metrics-strong);
 
 	/* Score badge colors */
-	--score-pos-color: #34c759;
-	--score-neg-color: #ff3b30;
+	--score-pos-color: var(--theme-green);
+	--score-neg-color: var(--theme-red);
 	--score-neutral-color: #86868b;
 	--score-pos-bg: rgba(52, 199, 89, 0.08);
 	--score-neg-bg: rgba(255, 59, 48, 0.08);
@@ -56,16 +56,6 @@
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--bg-color: #1e1e1e;
-		--panel-bg: #2d2d2d;
-		--text-color: #f0f0f0;
-		--text-muted: #aaaaaa;
-		--accent: #0a84ff;
-		--border: #444444;
-		--th-bg: #333333;
-		--th-hover: #444444;
-		--td-hover: #3d3d3d;
-
 		--kpi-hs-rgb: 255, 69, 58;
 		--kpi-llm-rgb: 191, 90, 242;
 		--kpi-wpm-rgb: 255, 214, 10;
@@ -78,10 +68,8 @@
 		--llm-bg: rgba(var(--kpi-llm-rgb), 0.1);
 		--global-bg: rgba(var(--kpi-wpm-rgb), 0.1);
 
-		--strong-color: #ffffff;
-
-		--score-pos-color: #32d74b;
-		--score-neg-color: #ff453a;
+		--score-pos-color: var(--theme-hue-32d74b);
+		--score-neg-color: var(--theme-red-dark);
 		--score-neutral-color: #bdbdbd;
 		--score-pos-bg: rgba(50, 215, 75, 0.08);
 		--score-neg-bg: rgba(255, 69, 58, 0.08);
@@ -179,7 +167,7 @@ h1 {
 .filter-btn.active {
 	background: var(--accent);
 	border-color: var(--accent);
-	color: #fff;
+	color: var(--theme-white);
 	font-weight: bold;
 }
 
@@ -213,7 +201,7 @@ h1 {
 	text-transform: uppercase;
 }
 .stats-grid-secondary .stat-value {
-	color: #fff;
+	color: var(--theme-white);
 	font-size: 1.4em;
 	font-weight: 600;
 }
@@ -239,7 +227,7 @@ h1 {
 	background: #1a1a1a;
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	border-radius: 12px;
-	color: #ddd;
+	color: var(--theme-grey-ddd);
 	max-width: 920px;
 	padding: 20px 24px;
 	width: 100%;
@@ -253,21 +241,21 @@ h1 {
 	padding-bottom: 10px;
 }
 .app-modal-header h2 {
-	color: #fff;
+	color: var(--theme-white);
 	font-size: 18px;
 	margin: 0;
 }
 .app-modal-close {
 	background: transparent;
 	border: 0;
-	color: #888;
+	color: var(--theme-grey-888);
 	cursor: pointer;
 	font-size: 24px;
 	line-height: 1;
 	padding: 0 8px;
 }
 .app-modal-close:hover {
-	color: #fff;
+	color: var(--theme-white);
 }
 .app-modal-tiles {
 	display: grid;
@@ -282,19 +270,19 @@ h1 {
 	padding: 10px 12px;
 }
 .app-modal-tile-label {
-	color: #888;
+	color: var(--theme-grey-888);
 	font-size: 10px;
 	letter-spacing: 0.5px;
 	text-transform: uppercase;
 }
 .app-modal-tile-value {
-	color: #fff;
+	color: var(--theme-white);
 	font-size: 16px;
 	font-weight: 600;
 	margin-top: 2px;
 }
 .app-modal-tile-detail {
-	color: #888;
+	color: var(--theme-grey-888);
 	font-size: 10px;
 	margin-top: 2px;
 }
@@ -302,7 +290,7 @@ h1 {
 	margin-top: 14px;
 }
 .app-modal-section h3 {
-	color: #888;
+	color: var(--theme-grey-888);
 	font-size: 12px;
 	letter-spacing: 0.5px;
 	margin: 0 0 8px 0;

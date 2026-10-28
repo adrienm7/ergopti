@@ -323,7 +323,7 @@ _KLEmitSuggestionDismissed(Rec) {
 	if (Rec.HasOwnProp("IsPrivate") and Rec.IsPrivate) {
 		return
 	}
-	; A token-aware post-present callback may be invalidated while the keylogger
+	; A token-aware post-present callback may be invalidated while the keystats
 	; performs privacy checks. In that case no suggested row reached the queue, so
 	; emitting its dismissed half would corrupt the lifecycle pair.
 	if (Rec.HasOwnProp("SuggestedPublished") and !Rec.SuggestedPublished)
@@ -409,7 +409,7 @@ _PrefixSuggestionMarkPublished(Record) {
 }
 
 ; A same-text surface may reuse a metric record only after its suggested row
-; actually reached the keylogger queue. An unpublished record is still owned by
+; actually reached the keystats queue. An unpublished record is still owned by
 ; the yielded publisher that created it; lending it to another surface creates
 ; an ABA cleanup race when the first publisher resumes.
 _PrefixSuggestionRecordIsPublished(Record) {
@@ -451,8 +451,8 @@ _PrefixLogSuggestionPublishFailure(Err) {
 }
 
 ; Atomically bind the metric state to the surface that actually won the pixel
-; commit, while leaving privacy checks and keylogger work outside Critical. The
-; keylogger's final queue mutation rechecks the same token and marks the record
+; commit, while leaving privacy checks and keystats work outside Critical. The
+; keystats's final queue mutation rechecks the same token and marks the record
 ; published in that transaction, preserving suggested/dismissed pairing even if
 ; OnChar invalidates the surface during privacy filtering.
 _NotifySuggestionShownForSurface(Trigger, Output, Category, IsPrivate,
@@ -495,7 +495,7 @@ _NotifySuggestionShownForSurface(Trigger, Output, Category, IsPrivate,
 		catch as Err
 			_PrefixLogSuggestionPublishFailure(Err)
 	} else if TooltipSurfaceTokenIsCurrent(SurfaceToken) {
-		; Headless unit harnesses do not include the production keylogger. Preserve
+		; Headless unit harnesses do not include the production keystats. Preserve
 		; their recording stub while production always uses the guarded queue path.
 		try {
 			KL_LogHotstringSuggested(Trigger, Output, Category)
@@ -666,7 +666,7 @@ _PrefixInvalidateDeferredEffects() {
 
 ; Lifecycle hooks called by infra/lifecycle.ahk. Suspend retains the fire batch;
 ; resume re-arms it exactly once; shutdown drains it before KL_Stop closes the
-; durable keylogger sinks and then invalidates every remaining timer owner.
+; durable keystats sinks and then invalidates every remaining timer owner.
 HotstringPrefixWatcherOnSuspend() {
 	_PrefixRevokeIncompleteFragments()
 	_PrefixInvalidateDeferredEffects()
@@ -713,7 +713,7 @@ HotstringPrefixWatcherOnShutdown() {
 	_HSE_FireLogScheduled := true
 	_HSE_FireLogScheduledGeneration := _PrefixDeferredGeneration
 	; The process is already terminating, so there is no future idle tick. The
-	; keylogger shutdown lease permits durable pre-pause rows, while its realtime
+	; keystats shutdown lease permits durable pre-pause rows, while its realtime
 	; ROI/WPM sinks remain pause-gated.
 	return _HSE_DrainFireLog(_PrefixDeferredGeneration, false)
 }
@@ -1423,7 +1423,7 @@ _PrefixCommitPostFireEffect(Effect) {
 _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 	global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed, HSE_Buffer
 	global _PrefixPrivateResidue
-	global _HSE_TerminalOwner
+	global _HSE_TerminalOwner, _UIA_SelectionCache
 	; Serialize from admission, before any observer can yield and reorder ★.
 	; LLM mirroring is RAM-only; its ancillary work owns a deferred callback.
 	PreviousCritical := Critical("On")
@@ -1754,31 +1754,8 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; Synthetic key events are rejected by InputHook I1.  Only an explicit
 	; engine-level suppression (used by standalone/manual callers) blocks a
 	; physical keydown from updating the buffer.
-	static ResetVKs := Map(
-		; VK_BACK is deliberately ABSENT: backspace decrements both buffers
-		; rather than wiping the preview — see the VK == 0x08 branch below.
-		0x09, true,  ; VK_TAB
-		0x0D, true,  ; VK_RETURN
-		0x1B, true,  ; VK_ESCAPE
-		0x20, true,  ; VK_SPACE
-		; The arrows reset only under hotstrings.arrow_resets_word (below).
-		0x25, true,  ; VK_LEFT
-		0x26, true,  ; VK_UP
-		0x27, true,  ; VK_RIGHT
-		0x28, true,  ; VK_DOWN
-		; The rest of the navigation cluster. The engine's own contract lists
-		; these as buffer-invalidating, but only the arrows were ever enumerated
-		; here — so typing "bonjour ia", pressing Home and typing "." fired
-		; ia -> IA with {BackSpace 3} at line start and ate three characters of
-		; unrelated text. Delete and Insert belong with them: both rewrite the
-		; document by an amount this watcher cannot observe.
-		0x21, true,  ; VK_PRIOR  (PgUp)
-		0x22, true,  ; VK_NEXT   (PgDn)
-		0x23, true,  ; VK_END
-		0x24, true,  ; VK_HOME
-		0x2D, true,  ; VK_INSERT
-		0x2E, true,  ; VK_DELETE
-	)
+	; One key-state class owns the shared context-reset membership. The
+	; watcher retains its existing Space and configurable arrow policies.
 	; Same try guard as _OnPrefixChar — an unhandled error here permanently
 	; silences the OnKeyDown callback for all subsequent keystrokes.
 	try {
@@ -1794,7 +1771,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		AltGrHeld := _PrefixAltGrMasksCtrl(KS_IsDown("RAlt"), KS_IsDown("SC138"))
 		if _PrefixHandleCtrlContextChord(VK, CtrlHeld, AltGrHeld)
 			return
-		if ResetVKs.Has(VK) || (!_PrefixIsModifierVK(VK) && _PrefixShortcutModifierHeld())
+		if KS_IsContextResetKey(VK) || (!_PrefixIsModifierVK(VK) && _PrefixShortcutModifierHeld())
 			_PrefixRevokeIncompleteFragments()
 		; An arrow key is an arrow under any modifier: it belongs to
 		; hotstrings.arrow_resets_word, in the ResetVKs branch below.
@@ -1847,7 +1824,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				LLM_Bridge_FeedKeyDownIfActive(VK, true)
 		} else if (VK == 0x20) {
 			_ResetPrefixBuffer()
-		} else if ResetVKs.Has(VK) {
+		} else if KS_IsContextResetKey(VK) {
 			; Insert/Delete rewrite text without promising a boundary. Tab/Enter
 			; and Escape may move or destroy the focused control, so publish an
 			; unknown focus token; cursor movers and Space retain the current owner.
@@ -2082,13 +2059,13 @@ _ResetPrefixBuffer(ConsumedByFire := false, AlreadyClearedBuffer := unset) {
 	} else {
 		TooltipHide("ResetBuf", true)
 		_NotifySuggestionDismissed()
-		; Near-miss / manual-trigger detection is pure keylogger analytics with no
-		; ordering requirement, so (a) skip it entirely when the keylogger is inactive
+		; Near-miss / manual-trigger detection is pure keystats analytics with no
+		; ordering requirement, so (a) skip it entirely when the keystats is inactive
 		; — the default case pays zero — and (b) defer the O(n) trigger-set scan off the
 		; synchronous, Critical keystroke thread to the next idle tick, so a logging
 		; session never pays it on the typing path (near-miss-on-hotpath-scan). Buf is a
 		; value copy, so the deferred scan sees the buffer as it was at reset time.
-		if (StrLen(Buf) >= 2 and Keylogger.initialized)
+		if (StrLen(Buf) >= 2 and Keystats.initialized)
 			SetTimer(_CheckNearMiss.Bind(Buf, _PrefixDeferredGeneration), -1)
 	}
 }
@@ -2271,7 +2248,7 @@ HotstringPrefixWatcherOnSurfacePresented(Items, SurfaceToken) {
 		HotPath_RecordLatency("Prefix.InputToVisible",
 			BootClockWallMs() - PrimaryItem.PreviewStartedWallMs, 50)
 	; This callback is deliberately outside the renderer Critical span. The metric
-	; helper binds its state + final keylogger queue push to SurfaceToken without
+	; helper binds its state + final keystats queue push to SurfaceToken without
 	; running privacy work under Critical.
 	if !_NotifySuggestionShownForSurface(PrimaryItem.Trigger, PrimaryItem.Text,
 		PrimaryItem.Category, PrimaryItem.IsPrivate, SurfaceToken)
@@ -2376,10 +2353,10 @@ _CheckNearMiss(Buf, Generation := unset, PausedOverride := unset) {
 	if !CanPublish
 		return
 	; Defense in depth: the sole consumer (KL_LogHotstringNearMiss) is inert when the
-	; keylogger is off, so the whole O(n) scan is dead work then. _ResetPrefixBuffer
-	; already gates + defers this, but guard here too in case the keylogger stopped
+	; keystats is off, so the whole O(n) scan is dead work then. _ResetPrefixBuffer
+	; already gates + defers this, but guard here too in case the keystats stopped
 	; between the deferred schedule and this firing (near-miss-on-hotpath-scan).
-	if !Keylogger.initialized
+	if !Keystats.initialized
 		return
 	; Compare the last WORD, not the whole buffer. Since the star-fire path
 	; re-seeds the preview from HSE_Buffer, this buffer can hold several words
@@ -2466,11 +2443,11 @@ _EditDistance1(a, b) {
 }
 
 KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
-	if !Keylogger.initialized
+	if !Keystats.initialized
 		return
 	KL_AppendLog(Map(
 		"type",        kind,
-		"app",         Keylogger.session_app,
+		"app",         Keystats.session_app,
 		"trigger",     trigger,
 		"replacement", replacement,
 		"h_type",      h_type
@@ -2765,8 +2742,15 @@ _LookupAndRender(CollectFn := unset, ResolveFn := unset) {
 			: HotstringsResolve(Entry.Category, Entry.Section)
 		if !Cfg.ShowTooltip
 			continue
-		Color := (Cfg.Color != "") ? Cfg.Color : ""
 		Decision := Entry.FireDecision
+		; The preview switches decide which family may paint at all: the star
+		; family (magic-key completion) and the autocorrect family (end character)
+		; each have their own, as on macOS and Linux. Dispatch is unaffected.
+		if !HSE_PreviewSwitchCurrent(HSE_PreviewFamilySwitch(Decision))
+			continue
+		; The tint is the colour switch's: off, every bubble is neutral.
+		Color := (Cfg.Color != "" && HSE_PreviewSwitchCurrent("preview_colored_tooltips"))
+			? Cfg.Color : ""
 		GateDurationMs := Decision.HasOwnProp("GateDurationMs")
 			? Decision.GateDurationMs : 0
 		RemainingMs := Decision.HasOwnProp("RemainingMs")
@@ -2791,7 +2775,7 @@ _LookupAndRender(CollectFn := unset, ResolveFn := unset) {
 	HotPath_LogIfSlow("Prefix.PreviewMetadata", MetadataStarted)
 	if (Items.Length == 0) {
 		if LoggerIsDebugEnabled()
-			LoggerDebug("PrefixWatcher", "DBG all candidates have ShowTooltip=false, hiding.")
+			LoggerDebug("PrefixWatcher", "DBG no candidate may be shown (ShowTooltip=false or its preview switch off), hiding.")
 		_PrefixRetireEmptyLookup(EmptyOwner, "LookupNoItems")
 		return
 	}

@@ -228,56 +228,40 @@ end)
 
 describe("Build commit: the crash dump names the build and the config dir", function()
 	it("writes the resolved commit and the configuration directory", function()
-		require("tests.support.modules.diagnostics.crash_admission").with_admission(function(redact)
+		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
 			local ConfigPaths = require("infra.config_paths")
 			local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
-			local real_open, real_exec, real_popen = io.open, os.execute, io.popen
-			local parts = {}
 			with_module("infra.diagnostic_snapshot", {
 				resolve_commit = function() return SHORT, Snapshot.COMMIT_SOURCE_BUILD end,
 			}, function()
-				io.open = function()
-					return {
-						write = function(_, s) parts[#parts + 1] = s; return true end,
-						close = function() return true end,
-					}
-				end
-				os.execute = function() return true end
-				io.popen = function() return nil end
 				local ok, err = pcall(Reporter.dump, "engine", "boom")
-				io.open, os.execute, io.popen = real_open, real_exec, real_popen
 				if not ok then error(err, 0) end
+				assert_true(err == true, "metadata dump must acknowledge its retained redacted output")
 			end)
 			local body = table.concat(parts)
-			assert_true(body:find("Commit:    " .. SHORT .. " (build)", 1, true) ~= nil, body)
-			assert_true(body:find("Config:    " .. redact(ConfigPaths.get_config_dir()), 1, true) ~= nil, body)
+			local report = require("json").decode(body)
+			assert_true(report ~= nil, "the dump is the shared JSON report: " .. body)
+			assert_true(report.git_hash == SHORT and report.commit_source == "build", body)
+			assert_true(report.config_dir == redact(ConfigPaths.get_config_dir()), body)
 		end)
 	end)
 
 	it("a resolver failure is written as its reason and the dump survives", function()
-		require("tests.support.modules.diagnostics.crash_admission").with_admission(function(redact)
+		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
 			local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
-			local real_open, real_exec, real_popen = io.open, os.execute, io.popen
-			local parts = {}
 			with_module("infra.diagnostic_snapshot", {
 				resolve_commit = function() error("stamp read exploded") end,
 			}, function()
-				io.open = function()
-					return {
-						write = function(_, s) parts[#parts + 1] = s; return true end,
-						close = function() return true end,
-					}
-				end
-				os.execute = function() return true end
-				io.popen = function() return nil end
 				local ok, err = pcall(Reporter.dump, "engine", "boom")
-				io.open, os.execute, io.popen = real_open, real_exec, real_popen
 				if not ok then error(err, 0) end
+				assert_true(err == true, "metadata dump must acknowledge its retained redacted output")
 			end)
 			local body = table.concat(parts)
-			assert_true(body:find("Commit:    unknown (resolution failed:", 1, true) ~= nil, body)
-			assert_true(body:find("stamp read exploded", 1, true) ~= nil, body)
-			assert_true(body:find("Error:     boom", 1, true) ~= nil, "the dump itself is still written")
+			local report = require("json").decode(body)
+			assert_true(report ~= nil, "the dump is the shared JSON report: " .. body)
+			assert_true(report.git_hash:find("unknown (resolution failed:", 1, true) == 1, body)
+			assert_true(report.git_hash:find("stamp read exploded", 1, true) ~= nil, body)
+			assert_true(report.error_msg == "boom", "the dump itself is still written")
 		end)
 	end)
 end)

@@ -13,6 +13,8 @@
 --- 2. Visible failures: construction, start and stop failures are logged and
 ---    reported as false, and a throwing callback is logged with its traceback
 ---    instead of vanishing inside the native watcher.
+--- 3. Exact callback authority: stop revokes delivery before native teardown,
+---    and a retired watcher cannot deliver into a later activation.
 --- ==============================================================================
 
 local M = {}
@@ -29,15 +31,17 @@ function M.new(on_wake)
 	if type(on_wake) ~= "function" then error("a wake watcher needs a callback", 2) end
 	local watcher = {}
 	local native = nil
+	local active = false
 
 	--- Starts watching; a second start is a no-op.
 	--- @return boolean started
 	function watcher.start()
-		if native then return true end
+		if native then return active end
+		local candidate
 		local ok, candidate_or_err = xpcall(function()
 			local wake_event = hs.caffeinate.watcher.systemDidWake
 			return hs.caffeinate.watcher.new(function(event)
-				if event ~= wake_event then return end
+				if event ~= wake_event or not active or native ~= candidate then return end
 				local called, err = xpcall(on_wake, debug.traceback)
 				if not called then Logger.error(LOG, "Wake callback raised: %s.", tostring(err)) end
 			end)
@@ -46,18 +50,22 @@ function M.new(on_wake)
 			Logger.error(LOG, "The wake watcher could not be created: %s.", tostring(candidate_or_err))
 			return false
 		end
+		candidate = candidate_or_err
 		local started, result_or_err = xpcall(function() return candidate_or_err:start() end, debug.traceback)
 		if not started or result_or_err ~= candidate_or_err then
 			Logger.error(LOG, "The wake watcher could not start: %s.", tostring(result_or_err))
 			return false
 		end
 		native = candidate_or_err
+		active = true
 		return true
 	end
 
 	--- Stops watching; the exact native watcher is kept when stop fails.
 	--- @return boolean stopped
 	function watcher.stop()
+		-- Revoke callbacks before a native failure can leave the watcher running.
+		active = false
 		if native == nil then return true end
 		local ok, err = xpcall(function() native:stop() end, debug.traceback)
 		if not ok then

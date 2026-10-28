@@ -36,6 +36,12 @@
 ; =========================================
 ; =========================================
 
+; Whether the editor closes after an add. An absent key means off, the one
+; default the native menu, both editors and the macOS and Linux drivers share.
+_EditorCloseOnAddEnabled() {
+	return _EditorPrefGet("close_on_add", "0") == "1"
+}
+
 ; Keys under [personal_editor] in the v2 config TOML.
 _EditorPrefGet(Key, Default) {
 	global ConfigurationFile
@@ -43,7 +49,7 @@ _EditorPrefGet(Key, Default) {
 		return Default
 	}
 	; Preference keys can be owned by dotted assignments or an inline namespace.
-	Cache := ConfigTomlDecodeSnapshot(FSReadStrict(ConfigurationFile)).Cache
+	Cache := ConfigTomlDecodeSnapshotShared(FSReadStrict(ConfigurationFile)).Cache
 	Val := IniCacheGet(Cache, "personal_editor", Key, "_MISSING_")
 	return (Val == "_MISSING_") ? Default : Val
 }
@@ -224,7 +230,7 @@ OpenPersonalEditor(DefaultSection := "") {
 	PrioEdit.GetPos(, &PrioY, , &PrioH)
 	BtnAdd := W.Add("Button", "xm y" . (PrioY + PrioH + 12) . " w110 h26", t("editor.hotstrings.btn_add"))
 	CloseOnAddChk := W.Add("CheckBox", "x+10 yp+5 w120", t("editor.hotstrings.chk_close_after"))
-	CloseOnAddChk.Value := (_EditorPrefGet("close_on_add", "0") == "1") ? 1 : 0
+	CloseOnAddChk.Value := _EditorCloseOnAddEnabled() ? 1 : 0
 
 	; Token help — to the right of the Add button, vertically centered
 	BtnAdd.GetPos(, &BtnAddY, , &BtnAddH)
@@ -269,7 +275,7 @@ OpenPersonalEditor(DefaultSection := "") {
 	CloseOnAddChk.OnEvent("Click", (*) => _EditorPrefSet("close_on_add",
 		CloseOnAddChk.Value ? "1" : "0"))
 
-	W.OnEvent("Close", (*) => _OnEditorClose(W, SessionEpoch))
+	W.OnEvent("Close", _PersonalEditorWindowClose.Bind(W, SessionEpoch))
 	W.OnEvent("Size", (*) => _ResizeEditor(W, LV, OutputEdit, StatusText))
 
 	if SessionEpoch != _PersonalEditorSessionEpoch {
@@ -805,6 +811,14 @@ _SwitchEditorSection(SectionName) {
 	OpenPersonalEditor(SectionName)
 }
 
+; The logical retirement helper also serves writer/session callers which retain
+; their controls until cleanup. Only the genuine native Close owns destruction.
+_PersonalEditorWindowClose(Window, SessionEpoch, *) {
+	if _OnEditorClose(Window, SessionEpoch)
+		Window.Destroy()
+	return true
+}
+
 _OnEditorClose(Window := 0, SessionEpoch := 0) {
 	global _PersonalEditorGui, _PersonalEditorPrioCtrl
 	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
@@ -819,6 +833,7 @@ _OnEditorClose(Window := 0, SessionEpoch := 0) {
 	_PersonalEditorGui := ""
 	; Drop the reference to the now-destroyed control so no form helper touches it
 	_PersonalEditorPrioCtrl := ""
+	return true
 }
 
 _ResizeEditor(W, LV, OutputEdit, StatusText) {

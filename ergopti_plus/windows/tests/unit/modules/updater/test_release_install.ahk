@@ -326,6 +326,162 @@ _RIT_BackupAndRestoreRealFiles() {
 Test("Config backup: backs up and restores the configuration's exact bytes (config-backup-real-files)",
 	_RIT_BackupAndRestoreRealFiles)
 
+
+; A damaged manifest must not make the complete backup picker throw or replace
+; a usable backup with metadata that its page/restore consumers cannot read.
+_RIT_BackupRejectsMalformedMetadata(Field, Token) {
+	Root := A_Temp . "\ergopti_rit_metadata_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "[script]`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Valid := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		Later := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Damaged := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Later)
+		ManifestPath := Damaged["path"] . "\" . Rules["manifest"]
+		Raw := FileRead(ManifestPath, "UTF-8")
+		Member := JsonStringLiteral(Field) . ":" . JsonStringLiteral(Damaged[Field])
+		Changed := StrReplace(Raw, Member, JsonStringLiteral(Field) . ":" . Token, , &Count)
+		AssertEqual(1, Count, "the fixture must mutate the genuine manifest's selected metadata")
+		AssertTrue(FSWriteDurable(ManifestPath, Changed), "the malformed on-disk manifest must be published")
+		Latest := ConfigBackup_Latest(Cfg, "pre_install", Rules)
+		AssertEqual(Valid["id"], Latest["id"], "damaged metadata must leave the valid backup available")
+		AssertEqual(0, _ConfigBackup_Load(Cfg, Damaged["id"], Rules), "the malformed record has no restore authority")
+		Refused := ConfigBackup_Restore(Cfg, Damaged["id"], Rules, Later)
+		AssertFalse(Refused["ok"], "a malformed manifest is never restored")
+		AssertEqual("missing", Refused["reason"])
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+for _RIT_MetadataField in ["created_at", "tag", "from_version"] {
+	for _RIT_MetadataToken in ["[]", "{}", "null", "7"]
+		Test("Config backup: malformed " . _RIT_MetadataField . "=" . _RIT_MetadataToken
+			. " cannot hide valid backups (config-backup-manifest-metadata)",
+			_RIT_BackupRejectsMalformedMetadata.Bind(_RIT_MetadataField, _RIT_MetadataToken))
+}
+
+
+_RIT_LatestBackupUsesCollisionOrder(Kind, Tag) {
+	Root := A_Temp . "\ergopti_rit_order_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "[script]`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		loop 11 {
+			AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = " . A_Index . "`n"),
+				"each collision must back up a distinct generation")
+			Created := ConfigBackup_Create(Cfg, Kind, Tag, "", Rules, Clock)
+			Latest := ConfigBackup_Latest(Cfg, Kind, Rules)
+			AssertEqual(Created["id"], Latest["id"],
+				"every collision must select the newest complete backup, including collision " . A_Index)
+		}
+		AssertEqual(Created["id"], ConfigBackup_Latest(Cfg, Kind, Rules)["id"])
+		FileDelete(Created["path"] . "\" . Rules["manifest"])
+		AssertEqual(SubStr(Created["id"], 1, -2) . "10", ConfigBackup_Latest(Cfg, Kind, Rules)["id"],
+			"an interrupted newest backup must expose the previous complete collision")
+		LaterClock := () => Map("stamp", "20260930-101501", "iso", "2026-09-30T10:15:01Z")
+		Later := ConfigBackup_Create(Cfg, Kind, Tag, "", Rules, LaterClock)
+		AssertEqual(Later["id"], ConfigBackup_Latest(Cfg, Kind, Rules)["id"],
+			"a later timestamp must outrank every earlier collision counter")
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "changed = true`n"))
+		Selected := ConfigBackup_Latest(Cfg, Kind, Rules)
+		Restored := ConfigBackup_Restore(Cfg, Selected["id"], Rules, LaterClock)
+		AssertTrue(Restored["ok"], "the selected newest backup must remain restorable")
+		AssertEqual("generation = 11`n", FSReadStrict(Cfg . "\config.toml"),
+			"restoring the latest record must recover its exact configuration generation")
+		AssertEqual("changed = true`n", FSReadStrict(Restored["pre"]["path"] . "\config\config.toml"),
+			"the integrated restore must retain the replaced configuration first")
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+for _RIT_OrderKind in ["pre_install", "pre_restore"] {
+	for _RIT_OrderTag in ["", "v1.2.3", "2026-9"]
+		Test("Config backup: latest follows numeric collision order for " . _RIT_OrderKind . " tag=" . _RIT_OrderTag
+			. " (config-backup-collision-order)", _RIT_LatestBackupUsesCollisionOrder.Bind(_RIT_OrderKind, _RIT_OrderTag))
+}
+
+
+_RIT_BackupOrderKeepsDistinctTagIdentity() {
+	Root := A_Temp . "\ergopti_rit_tags_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "[script]`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		First := ConfigBackup_Create(Cfg, "pre_install", "v1-9", "", Rules, Clock)
+		Second := ConfigBackup_Create(Cfg, "pre_install", "v1-10", "", Rules, Clock)
+		AssertEqual(First["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"],
+			"different numeric release tags retain the existing deterministic tie order")
+		LaterClock := () => Map("stamp", "20260930-101501", "iso", "2026-09-30T10:15:01Z")
+		Later := ConfigBackup_Create(Cfg, "pre_install", "v1-1", "", Rules, LaterClock)
+		AssertEqual(Later["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"],
+			"the exact creation timestamp remains primary across different release tags")
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+Test("Config backup: collision ordering preserves release tag identity (config-backup-collision-order)",
+	_RIT_BackupOrderKeepsDistinctTagIdentity)
+
+
+_RIT_BackupCounterNeverReusesRemovedNames(RemovedIndex, Tag) {
+	Root := A_Temp . "\ergopti_rit_gap_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "[script]`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Created := []
+		loop 3
+			Created.Push(ConfigBackup_Create(Cfg, "pre_install", Tag, "", Rules, Clock))
+		DirDelete(Created[RemovedIndex]["path"], true)
+		Newest := ConfigBackup_Create(Cfg, "pre_install", Tag, "", Rules, Clock)
+		AssertEqual(Newest["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"],
+			"removing an older backup must not make a new generation sort before retained backups")
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+for _RIT_RemovedIndex in [1, 2] {
+	for _RIT_GapTag in ["", "v1.2.3", "2026-9"]
+		Test("Config backup: removing collision " . _RIT_RemovedIndex . " preserves newest selection for tag=" . _RIT_GapTag
+			. " (config-backup-collision-gap)", _RIT_BackupCounterNeverReusesRemovedNames.Bind(_RIT_RemovedIndex, _RIT_GapTag))
+}
+
+
+_RIT_BackupCounterOverflowRefusesBeforePublication(Counter) {
+	Root := A_Temp . "\ergopti_rit_counter_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "[script]`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Folder := Cfg . "\" . Rules["folder"]
+		DirCreate(Folder . "\" . Rules["kinds"]["pre_install"] . "-20260930-101500-" . Counter)
+		Failure := ""
+		try ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		catch as Err
+			Failure := Err.Message
+		AssertTrue(InStr(Failure, "collision counter") > 0,
+			"an exhausted or unrepresentable counter must refuse instead of wrapping or reusing a name")
+		AssertEqual("[script]`n", FSReadStrict(Cfg . "\config.toml"))
+		Manifests := 0
+		loop files Folder . "\" . Rules["manifest"], "FR"
+			Manifests += 1
+		AssertEqual(0, Manifests, "a refused allocation cannot publish a complete backup")
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+for _RIT_Counter in ["9223372036854775807", "9223372036854775808"]
+	Test("Config backup: counter " . _RIT_Counter . " refuses before publication (config-backup-counter-overflow)",
+		_RIT_BackupCounterOverflowRefusesBeforePublication.Bind(_RIT_Counter))
+
+
 _RIT_ManifestPathsStayInside() {
 	AssertTrue(ConfigBackup_IsContained("hotstrings/personal_hotstrings.toml"))
 	for _, Bad in ["", "/etc/passwd", "..\x", "a/../b", "a//b", "C:/x", "a\b", "./a"]
@@ -399,3 +555,219 @@ _RIT_PublicFailureJsonNeverSerializesNativeReceipt() {
 	AssertEqual("C:\cfg\backup", Decoded["backup_path"], "the original user-visible backup is preserved")
 }
 Test("Release install: page JSON contains only canonical safe failure fields", _RIT_PublicFailureJsonNeverSerializesNativeReceipt)
+
+
+_RIT_BackupAllocationPreservesOrdinaryFile(Mode) {
+	Root := A_Temp . "\ergopti_rit_occupied_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Folder := Cfg . "\" . Rules["folder"]
+		Base := Rules["kinds"]["pre_install"] . "-20260930-101500"
+		if Mode != "base" {
+			First := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+			AssertEqual(Base, First["id"])
+		}
+		Suffix := Mode == "base" ? "" : Mode == "next" ? "-2" : "-12"
+		Expected := Base . (Mode == "base" ? "-2" : Mode == "next" ? "-3" : "-13")
+		Occupied := Folder . "\" . Base . Suffix
+		DirCreate(Folder)
+		Sentinel := "foreign ordinary file " . Mode . "`n"
+		AssertTrue(FSWriteCreateDurable(Occupied, Sentinel), "the collision must be an actual ordinary file")
+		AssertFalse(DirExist(Occupied), "the collision must not be a backup directory")
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Created := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		AssertEqual(Expected, Created["id"], "allocation must advance above every retained matching file or directory")
+		AssertEqual(Sentinel, FSReadUtf8Exact(Occupied), "allocation cannot replace or delete the foreign file")
+		AssertEqual(Created["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"],
+			"the new complete backup must retain numeric chronology")
+		AssertEqual("generation = 2`n", FSReadUtf8Exact(Created["path"] . "\config\config.toml"))
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+for _RIT_OccupiedMode in ["base", "next", "gap"]
+	Test("Config backup: ordinary file at " . _RIT_OccupiedMode . " preserves bytes and allocation order (config-backup-ordinary-collision)",
+		_RIT_BackupAllocationPreservesOrdinaryFile.Bind(_RIT_OccupiedMode))
+
+
+_RIT_BackupAllocationPreservesCaseVariant(Kind, Position) {
+	Root := A_Temp . "\ergopti_rit_case_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Folder := Cfg . "\" . Rules["folder"]
+		Base := Rules["kinds"]["pre_install"] . "-20260930-101500"
+		if Position == "next"
+			ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		DirCreate(Folder)
+		Foreign := Folder . "\" . StrUpper(Base . (Position == "next" ? "-2" : ""))
+		SentinelPath := Kind == "directory" ? Foreign . "\foreign.txt" : Foreign
+		if Kind == "directory"
+			DirCreate(Foreign)
+		Sentinel := "foreign case variant " . Kind . " " . Position . "`n"
+		AssertTrue(FSWriteCreateDurable(SentinelPath, Sentinel))
+		AssertTrue(FileExist(Folder . "\" . Base . (Position == "next" ? "-2" : "")),
+			"the native filesystem must resolve the existing case variant as the same occupied path")
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Created := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		AssertEqual(Base . (Position == "next" ? "-3" : "-2"), Created["id"],
+			"allocation must honor Windows case-insensitive pathname collisions")
+		AssertEqual(Sentinel, FSReadUtf8Exact(SentinelPath), "the existing case variant must preserve its exact bytes")
+		AssertFalse(FileExist(Foreign . "\" . Rules["manifest"]),
+			"an existing directory cannot acquire this transaction's backup manifest")
+		AssertEqual(Created["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"])
+		AssertEqual("generation = 2`n", FSReadUtf8Exact(Created["path"] . "\config\config.toml"))
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+for _RIT_CaseKind in ["file", "directory"] {
+	for _RIT_CasePosition in ["base", "next"]
+		Test("Config backup: case-variant " . _RIT_CaseKind . " at " . _RIT_CasePosition . " preserves foreign ownership (config-backup-case-collision)",
+			_RIT_BackupAllocationPreservesCaseVariant.Bind(_RIT_CaseKind, _RIT_CasePosition))
+}
+
+
+; The manifest schema version is numeric; AHK's Boolean/string coercion cannot
+; grant a malformed backup the current schema's restore authority.
+
+_R7BS_ManifestSchema(Token, Accepted) {
+	global CONFIG_BACKUP_SCHEMA_VERSION
+	static Sequence := 0
+	Sequence += 1
+	Root := A_Temp . "\ergopti_r7_backup_schema_" . PLC_CurrentProcessId() . "_" . A_TickCount . "_" . Sequence
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		FirstClock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		LaterClock := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Valid := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, FirstClock)
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Candidate := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, LaterClock)
+		ManifestPath := Candidate["path"] . "\" . Rules["manifest"]
+		Original := FSReadUtf8Exact(ManifestPath)
+		Member := '"schema_version":' . CONFIG_BACKUP_SCHEMA_VERSION
+		Changed := StrReplace(Original, Member, '"schema_version":' . Token, , &ChangedCount)
+		AssertEqual(1, ChangedCount, "the actual completed manifest must own exactly one schema-version token")
+		AssertTrue(FSWriteDurable(ManifestPath, Changed))
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 3`n"))
+		Loaded := _ConfigBackup_Load(Cfg, Candidate["id"], Rules)
+		Latest := ConfigBackup_Latest(Cfg, "pre_install", Rules)
+		if Accepted {
+			AssertTrue(Loaded is Map, "supported numeric schema versions retain their genuine restore authority")
+			AssertEqual(Candidate["id"], Latest["id"])
+			Result := ConfigBackup_Restore(Cfg, Candidate["id"], Rules, LaterClock)
+			AssertTrue(Result["ok"])
+			AssertEqual("generation = 2`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+		} else {
+			AssertEqual(0, Loaded, "a Boolean or string cannot impersonate the numeric backup schema")
+			AssertEqual(Valid["id"], Latest["id"], "a malformed schema cannot hide an earlier supported backup")
+			Result := ConfigBackup_Restore(Cfg, Candidate["id"], Rules, LaterClock)
+			AssertFalse(Result["ok"])
+			AssertEqual("missing", Result["reason"])
+			AssertEqual("generation = 3`n", FSReadUtf8Exact(Cfg . "\config.toml"), "rejected metadata cannot replace live configuration")
+		}
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+for _R7BS_Case in [["1", true], ["1.0", true], ["1e0", true], ["true", false], ['"1"', false], ["false", false], ["0", false]]
+	Test("Config backup schema kind: " . _R7BS_Case[1] . " retains only numeric version authority (backup-schema-json-kind)",
+		_R7BS_ManifestSchema.Bind(_R7BS_Case[1], _R7BS_Case[2]))
+
+
+; A fixed stage basename is not authority over an existing private sidecar.
+_R7RS_RestorePreservesForeignStage() {
+	Root := A_Temp . "\ergopti_r7_restore_stage_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Later := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Original := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Control := ConfigBackup_Restore(Cfg, Original["id"], Rules, Later)
+		AssertTrue(Control["ok"], "the actual restore must first succeed on the same native paths")
+		AssertEqual("generation = 1`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 3`n"))
+		Foreign := Cfg . "\config.toml.ergopti-restore.tmp"
+		Sentinel := "foreign pending editor bytes`n"
+		AssertTrue(FSWriteCreateDurable(Foreign, Sentinel), "the colliding sidecar has its own exact preexisting bytes")
+		Result := ConfigBackup_Restore(Cfg, Original["id"], Rules, Later)
+		AssertTrue(FileExist(Foreign), "restore must never consume a stage pathname it did not create")
+		AssertEqual(Sentinel, FSReadUtf8Exact(Foreign), "unrelated sidecar bytes must survive unchanged")
+		if Result["ok"] {
+			AssertEqual("generation = 1`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+		} else {
+			AssertEqual("write", Result["reason"], "an occupied stage may explicitly refuse publication")
+			AssertEqual("generation = 3`n", FSReadUtf8Exact(Cfg . "\config.toml"), "refusal keeps the live destination intact")
+		}
+		if Result["pre"] is Map
+			AssertEqual("generation = 3`n", FSReadUtf8Exact(Result["pre"]["path"] . "\config\config.toml"))
+		else
+			AssertFalse(Result["ok"], "only an explicit pre-write refusal may omit the recovery snapshot")
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config restore: preexisting sidecar bytes retain their own stage identity (restore-foreign-stage)",
+	_R7RS_RestorePreservesForeignStage)
+
+
+; A backup pathname becomes owned only through exclusive native creation.
+_R7BA_AllocationRace(Race) {
+	static Sequence := 0
+	Sequence += 1
+	Root := A_Temp . "\ergopti_r7_backup_race_" . PLC_CurrentProcessId() . "_" . A_TickCount . "_" . Sequence
+	Cfg := Root . "\cfg", Foreign := "", ObserverCompleted := false, Caught := 0, Result := 0
+	Allocator := _ConfigBackup_NextId
+	AssertFalse(Allocator.HasOwnProp("Call"), "a foreign allocator observer cannot be detached")
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Observe(Self, Folder, Base) {
+			Allocator.DeleteProp("Call")
+			Id := Allocator.Call(Folder, Base)
+			Foreign := Folder . "\" . Id
+			AssertFalse(FileExist(Foreign), "the real allocator must initially return an absent identity")
+			DirCreate(Foreign)
+			AssertTrue(FSWriteCreateDurable(Foreign . "\foreign.txt", "foreign directory owner`n"))
+			ObserverCompleted := true
+			return Id
+		}
+		if Race
+			Allocator.DefineProp("Call", {Call: Observe})
+		try Result := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		catch as Err
+			Caught := Err
+		if Race {
+			AssertTrue(ObserverCompleted, "the transparent observer must complete the actual allocation and foreign native creation")
+			AssertEqual("foreign directory owner`n", FSReadUtf8Exact(Foreign . "\foreign.txt"))
+			AssertFalse(FileExist(Foreign . "\" . Rules["manifest"]), "a racing directory cannot acquire this backup transaction's manifest")
+			AssertFalse(FileExist(Foreign . "\config\config.toml"), "the backup cannot write payloads inside a foreign directory")
+			AssertTrue(Caught is OSError, "the actual native collision must refuse backup publication with its native error")
+		} else {
+			AssertEqual(0, Caught, "the same genuine backup path must succeed without a foreign producer")
+			AssertTrue(Result is Map)
+			AssertTrue(FileExist(Result["path"] . "\" . Rules["manifest"]))
+			AssertEqual("generation = 1`n", FSReadUtf8Exact(Result["path"] . "\config\config.toml"))
+		}
+	} finally {
+		if Allocator.HasOwnProp("Call")
+			Allocator.DeleteProp("Call")
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config backup allocation: genuine absence permits publication (backup-exclusive-allocation)", _R7BA_AllocationRace.Bind(false))
+Test("Config backup allocation: real racing directory retains exclusive ownership (backup-exclusive-allocation)", _R7BA_AllocationRace.Bind(true))

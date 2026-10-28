@@ -34,6 +34,9 @@ local function with_window(test)
 			set_override = function() state.writes = state.writes + 1 return true end,
 			resolve = function() return {} end, get_toml_defaults = function() return {} end,
 			get_user_override = function() return {} end, get_sections = function() return {} end,
+			-- The window refuses to open without the canon's delay; these cases
+			-- only need a number to forward, not the shared value itself.
+			get_global_default_delay_ms = function() return 1 end,
 		}
 		_G.hs = { json = { encode = function()
 			if state.on_encode then state.on_encode() end

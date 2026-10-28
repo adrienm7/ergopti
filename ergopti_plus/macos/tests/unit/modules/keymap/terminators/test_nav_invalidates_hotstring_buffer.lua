@@ -71,7 +71,7 @@ local function load_fixture()
 	}, {
 		__index = function() return function() end end,
 	})
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		log_hotstring_suggested = function() end,
 		log_hotstring_dismissed = function() end,
 		log_llm_accepted = function() end,

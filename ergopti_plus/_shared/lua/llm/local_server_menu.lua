@@ -96,4 +96,49 @@ function M.rows(options)
 	return rows
 end
 
+--- Projects the same verdicts as rows of the model selector page: one row per
+--- model a server serves, a server that wants its key as one greyed row, and
+--- the sweep and the other addresses as tools of the API group. Each `run` is
+--- the driver's own action; the driver keeps it and sends the page the rest.
+--- @param options table As for M.rows.
+--- @return table rows Page rows { name, runtime_name, provider, installed,
+---   available, hint_key, run, actions = { { id, text, run } } }.
+--- @return table tools { { id, text, run } } for the API group.
+function M.page_rows(options)
+	local rows, tools = {}, {}
+	local live = not options.paused
+	for _, id in ipairs(options.detected) do
+		local verdict = options.result(id)
+		local label = options.servers[id].label
+		local actions = {}
+		if live then
+			actions[#actions + 1] = { id = "set_key", text = options.tr("menu.llm.local_servers.api_key"),
+				run = function() return options.actions.key(id) end }
+			actions[#actions + 1] = { id = "address",
+				text = options.format("menu.llm.local_servers.address", M.host_of(verdict.base_url)),
+				run = function() return options.actions.address(id) end }
+		end
+		if verdict.status == Discovery.STATUS_NEEDS_KEY then
+			rows[#rows + 1] = { name = label, provider = label, installed = true, available = false,
+				hint_key = "model_browser.hint_api_no_key", actions = actions }
+		else
+			for _, model in ipairs(verdict.models) do
+				rows[#rows + 1] = { name = label .. "/" .. model, runtime_name = model, provider = label,
+					installed = true, actions = actions,
+					run = live and function() return options.actions.select(id, model) end or nil }
+			end
+		end
+	end
+	if live then
+		tools[#tools + 1] = { id = "rescan", text = options.tr("menu.llm.local_servers.rescan"),
+			run = options.actions.rescan }
+		for index, id in ipairs(options.order) do
+			tools[#tools + 1] = { id = "address_" .. index,
+				text = options.tr("menu.llm.local_servers.other_address") .. " — " .. options.servers[id].label,
+				run = function() return options.actions.address(id) end }
+		end
+	end
+	return rows, tools
+end
+
 return M

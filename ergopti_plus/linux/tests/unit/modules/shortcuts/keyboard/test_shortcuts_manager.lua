@@ -149,10 +149,9 @@ helpers.describe("modules/shortcuts/manager.lua", function()
     helpers.assert_eq(hook.releases, releases + 1)
   end)
 
-  helpers.it("restores the hook after the CapsWord block", function()
-    package.loaded["adapters.keyboard_hook"] = prior_hook
-    helpers.assert_eq(package.loaded["adapters.keyboard_hook"], prior_hook)
-  end)
+  -- Not an `it`: a --only filter skips cases, and the fake would then stay in
+  -- package.loaded for every later module (the diagnostics bridge reads the hook).
+  package.loaded["adapters.keyboard_hook"] = prior_hook
 
   -- ==========================================================================
   -- 4. Enable / disable / toggle

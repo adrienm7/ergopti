@@ -5,14 +5,18 @@ This engine has no Python HTTP or TLS dependency. Foundation owns the network;
 the caller owns redirects, output descriptors, integrity and publication.
 """
 
+import importlib.util
 import json
 import math
 import os
 from pathlib import Path
+import plistlib
+import re
 import selectors
 import stat
 import struct
 import subprocess
+import tempfile
 import time
 
 
@@ -32,6 +36,12 @@ FAILURE_STAGES = {
     "native_policy_load": frozenset(["unavailable"]),
     "native_selection_bound": frozenset(["unavailable"]),
     "native_proxy_lookup": frozenset(["unavailable"]),
+    "native_proxy_budget": frozenset(["unavailable"]),
+    "native_proxy_candidates": frozenset(["unavailable"]),
+    "native_pac_download": frozenset(["unavailable"]),
+    "native_pac_evaluation": frozenset(["unavailable"]),
+    "native_proxy_routes": frozenset(["unavailable"]),
+    "native_wpad_discovery": frozenset(["unavailable"]),
     "native_proxy_dictionary": frozenset(["proxy"]),
     "native_route_empty": frozenset(["unavailable"]),
     "native_certificate_load": frozenset(["certificate"]),
@@ -53,6 +63,10 @@ FAILURE_STAGES = {
 }
 # END GENERATED NATIVE HTTP FAILURE STAGES
 
+
+_FALLBACK_MARKER = re.compile(
+    r"^# native_http_proxy_fallback route=direct reason=(native_[a-z_]{1,63})$", re.MULTILINE
+)
 
 REASONS = frozenset(
     (
@@ -87,12 +101,55 @@ def _positive_timeout(value):
     )
 
 
+def _dev_source_names(root):
+    """The developer source-mode names declared once in _shared/data/identifiers.json."""
+    path = root.parent / "_shared/data/identifiers.py"
+    spec = importlib.util.spec_from_file_location("_ergopti_identifiers", path)
+    if spec is None or spec.loader is None:
+        raise NativeHTTPError("unavailable")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except OSError:
+        raise NativeHTTPError("unavailable") from None
+    return module.DEV_SOURCE
+
+
+def _developer_launcher(root):
+    """Return the launcher of a developer app that runs this clone.
+
+    A developer build (ERGOPTI_DEV_SOURCE=1) runs the Lua of a clone, so its
+    launcher cannot be derived from this file's path. The launcher's sealed
+    Info.plist records the clone root instead: the exported launcher is admitted
+    only when its own bundle names exactly the clone this file runs from. The
+    device and inode proof in _resolve_worker still applies. Anything else is
+    refused as unavailable, as a driver outside a bundle always was.
+    """
+    names = _dev_source_names(root)
+    clone = os.environ.get(names["environment"])
+    if not clone or str(root) != clone + "/static/ergopti_plus/macos":
+        raise NativeHTTPError("unavailable")
+    launcher = os.environ.get("ERGOPTI_LAUNCHER_EXECUTABLE") or ""
+    suffix = "/Contents/MacOS/ErgoptiPlus"
+    if not launcher.endswith(suffix) or not launcher[: -len(suffix)].endswith(".app"):
+        raise NativeHTTPError("unavailable")
+    try:
+        with open(launcher[: -len(suffix)] + "/Contents/Info.plist", "rb") as handle:
+            info = plistlib.load(handle)
+    except (OSError, plistlib.InvalidFileException, ValueError):
+        raise NativeHTTPError("unavailable") from None
+    if not isinstance(info, dict) or info.get(names["plist_key"]) != clone:
+        raise NativeHTTPError("unavailable")
+    return launcher
+
+
 def _resolve_worker():
     root = Path(__file__).absolute().parents[2]
     suffix = "/Contents/Resources/static/ergopti_plus/macos"
-    if not str(root).endswith(suffix):
-        raise NativeHTTPError("unavailable")
-    expected = str(root)[: -len(suffix)] + "/Contents/MacOS/ErgoptiPlus"
+    if str(root).endswith(suffix):
+        expected = str(root)[: -len(suffix)] + "/Contents/MacOS/ErgoptiPlus"
+    else:
+        expected = _developer_launcher(root)
     if os.environ.get("ERGOPTI_LAUNCHER_EXECUTABLE") != expected:
         raise NativeHTTPError("unavailable")
     try:
@@ -204,6 +261,8 @@ class NativeHTTPResponse:
         self._role_progress = None
         self._role_process_constructor = False
         self._role_process_complete = False
+        self._stderr_file = None
+        self._route_fallback = None
         try:
             if absolute_deadline is not None:
                 if not _positive_timeout(absolute_deadline):
@@ -295,6 +354,9 @@ class NativeHTTPResponse:
                 ):
                     raise NativeHTTPError("protocol")
             self._diagnostic_stage = "native_spawn"
+            # The worker writes one closed fallback marker to stderr. A file keeps
+            # it readable without a pipe that could block the worker.
+            self._stderr_file = tempfile.TemporaryFile()
             if register is not None:
                 # A real Popen constructor can raise after child creation. Keep
                 # its exact object reachable before entering that constructor.
@@ -304,7 +366,7 @@ class NativeHTTPResponse:
                     [executable, *arguments],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL,
+                    stderr=self._stderr_file,
                     bufsize=0,
                     close_fds=True,
                 )
@@ -314,7 +376,7 @@ class NativeHTTPResponse:
                     [executable, *arguments],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL,
+                    stderr=self._stderr_file,
                     bufsize=0,
                     close_fds=True,
                 )
@@ -543,6 +605,10 @@ class NativeHTTPResponse:
         except BaseException as refused:
             self._observe_failure(refused, "native_cleanup")
             raise
+        # A refusal after a direct fallback still names the lookup step that gave up.
+        fallback = getattr(self, "_route_fallback", None)
+        if fallback is not None:
+            failure.native_route_fallback = fallback
         self._observe_failure(failure, getattr(self, "_diagnostic_stage", "native_request"), source)
 
     def _observe_failure(self, failure, stage, source=None):
@@ -591,6 +657,23 @@ class NativeHTTPResponse:
             "cleanup": "confirmed" if retired else "unconfirmed",
         }
 
+    @property
+    def route_fallback(self):
+        """Stage code of the lookup step that made the worker go direct, or None.
+
+        Only a marker naming an allowlisted stage is accepted, so a URL or any
+        other worker text can never reach a log through this value.
+        """
+        if self._route_fallback is None and self._stderr_file is not None:
+            try:
+                text = os.pread(self._stderr_file.fileno(), 4096, 0).decode("ascii", "replace")
+            except (OSError, ValueError):
+                return None
+            match = _FALLBACK_MARKER.search(text)
+            if match is not None and match.group(1) in FAILURE_STAGES:
+                self._route_fallback = match.group(1)
+        return self._route_fallback
+
     def close(self):
         if self._closed:
             return
@@ -612,6 +695,11 @@ class NativeHTTPResponse:
                     stream.close()
             # No successor/publication may race the physical native process.
             self._process.wait()
+        # Read the marker once the child has retired, then release the file.
+        _ = self.route_fallback
+        if self._stderr_file is not None:
+            self._stderr_file.close()
+            self._stderr_file = None
         self._closed = True
 
     def __enter__(self):

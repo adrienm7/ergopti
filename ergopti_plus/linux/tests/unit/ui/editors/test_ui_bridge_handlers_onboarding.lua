@@ -113,6 +113,8 @@ helpers.describe("ui.bridge_handlers", function()
 			local result = handler.on_message({ action = "ready" }, state)
 			helpers.assert_true(result.pushed)
 			helpers.assert_eq(result.data.platform, "linux")
+			helpers.assert_eq(result.data.capabilities, { gesture_registration = false },
+				"the page learns from the host that Linux registers no gesture with the system")
 			helpers.assert_eq(result.data.locale, "en")
 			helpers.assert_eq(result.data.system_layout, "qwerty")
 			helpers.assert_eq(result.data.config_dir, "", "the default folder is not a custom choice")
@@ -245,7 +247,7 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(#captured.titles, 0)
 		end)
 
-		helpers.it("(onboarding-metrics-path) initData carries the keylogger's metrics store", function()
+		helpers.it("(onboarding-metrics-path) initData carries the keystats's metrics store", function()
 			local state = onboarding_state()
 			local result = handler.on_message({ action = "ready" }, state)
 			helpers.assert_eq(result.data.metrics_path, "/tmp/data/metrics.sqlite")
@@ -272,7 +274,7 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(#captured.pushes, 0)
 		end)
 
-		helpers.it("(onboarding-metrics-path) the real resolver names the keylogger store", function()
+		helpers.it("(onboarding-metrics-path) the real resolver names the keystats store", function()
 			local previous = package.loaded["infra.config_paths"]
 			with_real_config_paths(function(ConfigPaths)
 				helpers.assert_eq(ConfigPaths.metrics_path(), ConfigPaths.data("metrics.sqlite"))
@@ -687,30 +689,35 @@ helpers.describe("ui.bridge_handlers", function()
 			local raw = '[_meta]\nschema_version = 7\n[hotstrings]\ntrigger_char = false\n[future]\nkeep = "independent"\n'
 			local concurrent = raw .. '# concurrent edit during candidate staging\n'
 			local original_open, staged = io.open, 0
+			local NativeWriter = require("infra.regular_file_writer")
+			local original_stage = NativeWriter.open
 			local ok, err = pcall(function()
 				helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
 				write_file(path, raw)
 				state.writer = require("toml_codec.writer")
-				io.open = function(open_path, mode)
-					local fh, why, code = original_open(open_path, mode)
-					if fh and open_path == path .. ".tmp" and mode == "w" then
+				NativeWriter.open = function(open_path, mode)
+					if open_path ~= path .. ".tmp" or mode ~= "wx" then return original_stage(open_path, mode) end
+					local function opened(fh, ...)
+						if not fh then return fh, ... end
 						return {
 							write = function(_, content) return fh:write(content) end,
 							close = function()
-								local closed = fh:close()
-								staged = staged + 1
-								local source = assert(original_open(path, "w"))
-								assert(source:write(concurrent)); assert(source:close())
-								return closed
+								local function closed(...)
+									staged = staged + 1
+									local source = assert(original_open(path, "w"))
+									assert(source:write(concurrent)); assert(source:close())
+									return ...
+								end
+								return closed(fh:close())
 							end,
-						}
+						}, ...
 					end
-					return fh, why, code
+					return opened(original_stage(open_path, mode))
 				end
 				local refused = finish(state, { locale = "fr", config_dir = target, operations = {
 					{ path = "hotstrings.trigger_char", value = "§" },
 				} })
-				io.open = original_open
+				NativeWriter.open = original_stage
 				helpers.assert_eq(staged, 1, "the actual writer reaches the concurrent staging boundary")
 				helpers.assert_eq(refused, { done = false })
 				helpers.assert_eq(values, { locale = "en", config_dir = previous_dir }, "the failed commit restores preferences")
@@ -730,7 +737,7 @@ helpers.describe("ui.bridge_handlers", function()
 				helpers.assert_true(bytes:find('# concurrent edit during candidate staging', 1, true) ~= nil)
 				helpers.assert_eq(require("toml_codec").decode(bytes).hotstrings.trigger_char, "§")
 			end)
-			io.open = original_open
+			NativeWriter.open = original_stage
 			os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
 			if not ok then error(err, 0) end
 		end)

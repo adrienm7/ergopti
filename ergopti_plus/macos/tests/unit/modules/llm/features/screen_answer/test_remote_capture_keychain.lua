@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local PortFakes = require("tests.support.port_fakes")
 local Json = require("json")
 
 -- Keep the process-wide shared logger identity outside native fixture scopes.
@@ -19,13 +20,13 @@ local MODULES = {
 	"modules.llm.warmup_controller", "modules.llm.streaming_handler",
 	"modules.llm.prompt_builder", "modules.llm.app_filter", "modules.llm.api_common",
 	"modules.llm.api_remote", "modules.llm.api_mlx", "modules.llm.api_ollama",
-	"modules.llm.profiles", "modules.keylogger", "modules.shortcuts.script_control",
+	"modules.llm.profiles", "modules.keystats", "modules.shortcuts.script_control",
 	"modules.shortcuts.actions.screenshot_save", "adapters.file_system",
 	"adapters.json_codec", "adapters.storage", "adapters.timer_scheduler",
 	"adapters.mouse_control", "infra.logger", "infra.timings", "infra.keycodes",
 	"ui.tooltip", "llm.vision", "llm.rewrite", "llm.prompt_action", "llm.translate",
 	"text_utils", "compat.utf8", "modules.llm.api_token_crypto", "adapters.http_client",
-	"modules.llm.remote_response_classifier", "modules.llm.local_servers",
+	"llm.remote_response_classifier", "modules.llm.local_servers",
 	"modules.llm.provider_uses", "modules.llm.progressive_reveal", "modules.llm.parser",
 	"infra.manifest_reader", "llm.provider_config_policy", "llm.remote_formats",
 	"llm.profile_selector", "llm.parser", "llm.prompt_builder", "llm.local_server_auth",
@@ -64,12 +65,11 @@ local function with_capture(callback)
 		package.loaded["adapters.mouse_control"] = {
 			screen_frame_under_cursor = function() return { x = 0, y = 0, w = 640, h = 480 } end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
-			cancel = function() return true end,
+		package.loaded["adapters.timer_scheduler"] = PortFakes.timer_scheduler({
 			now = function() return 0 end,
-		}
+		})
 		package.loaded["modules.llm"] = {
-			DEFAULT_STATE = { llm_enabled = true, llm_min_words = 1, llm_max_words = 0, llm_debounce = 0 },
+			DEFAULT_STATE = { llm_enabled = true, llm_min_words = 1, llm_max_words = 0, llm_debounce = 0, llm_min_request_interval = 0 },
 			get_current_model = function() return "text-model" end,
 			is_backend_ready = function()
 				if f.on_readiness then f.on_readiness() end
@@ -90,7 +90,7 @@ local function with_capture(callback)
 		package.loaded["modules.llm.api_ollama"] = { stop_warmup = function() return true end }
 		package.loaded["modules.llm.prompt_builder"] = {}
 		package.loaded["modules.llm.app_filter"] = {}
-		package.loaded["modules.keylogger"] = {}
+		package.loaded["modules.keystats"] = {}
 		package.loaded["modules.llm.profiles"] = { prompt_language = function() return "en" end }
 		package.loaded["modules.shortcuts.script_control"] = {
 			is_paused = function() return f.paused end,
@@ -121,7 +121,7 @@ local function with_capture(callback)
 				return true
 			end,
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["ui.tooltip"] = PortFakes.complete_tooltip({
 			set_navigate_callback = function() end,
 			set_enter_validates = function() end,
 			set_llm_timeout = function() end,
@@ -134,7 +134,7 @@ local function with_capture(callback)
 				return true
 			end,
 			show = function(text) f.notices[#f.notices + 1] = text; return true end,
-		}
+		})
 		local flow = helpers.load_with_stubs("modules.llm.screen_answer")
 		package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 		local remote = require("modules.llm.api_remote")

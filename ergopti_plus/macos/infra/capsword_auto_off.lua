@@ -25,10 +25,12 @@ local M = {}
 local Logger   = require("infra.logger")
 local Manifest = require("infra.manifest_reader")
 local Policy   = require("caps_word.auto_off")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "capsword"
 local PLATFORM = "hs"
-local SECTION = "shortcuts.caps_word"
+local SECTION = ConfigKeys.KEY.SHORTCUTS_CAPS_WORD
 local POINTER_SECTION = "shortcuts.caps_word.pointer"
 
 --- Menu-state key of the inactivity delay.
@@ -66,9 +68,7 @@ end
 --- Detached copy of one setting value.
 local function copy_value(value)
 	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, item in pairs(value) do copy[key] = item end
-	return copy
+	return TableUtil.shallow_copy(value)
 end
 
 --- Detached copy of the owned keys of a menu state.

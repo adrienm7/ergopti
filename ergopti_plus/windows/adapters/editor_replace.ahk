@@ -84,7 +84,7 @@ _TextSenderNativeSchedule(Callback) {
 	SetTimer(Callback, -TEXT_NATIVE_POLL_MS)
 }
 
-/** Queues one immutable request, returning before any receiver messages execute. */
+/** Returns true only after one immutable request is admitted and scheduled. */
 _TextSenderQueueNative(Text, Opts, Callback) {
 	global _TEXT_NATIVE_OWNER, _TEXT_NATIVE_SERIAL
 	Options := Opts is Map ? Opts.Clone() : Map()
@@ -93,6 +93,8 @@ _TextSenderQueueNative(Text, Opts, Callback) {
 		Count := Options.Get("erase_before", 0)
 		if !(Text is String) || !(Deleted is String)
 			throw TypeError("native editor output requires literal Unicode text")
+		if _TextSenderContainsNul(Text) || _TextSenderContainsNul(Deleted)
+			throw ValueError("native editor text cannot contain NUL code units")
 		if Count > 0 && (!Options.Has("deleted_text")
 				|| _TextCodepointLength(Deleted) != Count)
 			throw ValueError("native editor erasure requires the exact deleted text")
@@ -113,10 +115,12 @@ _TextSenderQueueNative(Text, Opts, Callback) {
 			_TEXT_NATIVE_OWNER := Owner
 		} finally Critical(PreviousCritical)
 		Port["schedule"].Call(Owner.PollFn)
+		return true
 	} catch as Err {
 		if IsSet(Owner) && _TEXT_NATIVE_OWNER == Owner
 			_TEXT_NATIVE_OWNER := 0
 		_TextSenderInvokeCallback(Callback, false, Err.Message)
+		return false
 	}
 }
 

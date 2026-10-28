@@ -23,6 +23,8 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 M.bridge_name = "healthcheck"
 
 local Logger = require("logger.shim")
@@ -46,7 +48,7 @@ local _started_at = os.time()
 -- RuntimeGuard.optional_require, but the user can switch them off: switched
 -- off is a neutral "disabled"; absent means the module failed to load (logged
 -- by the guard), which is a failure.
-local REQUIRED_PARTS = { "engine", "keylogger", "config" }
+local REQUIRED_PARTS = { "engine", "keystats", "config" }
 local OPTIONAL_PARTS = { "llm" }
 
 -- The evdev bus numbers of /proc/bus/input/devices, as schema buses
@@ -173,7 +175,7 @@ end
 local function machine_model()
 	local vendor = read_file("/sys/class/dmi/id/sys_vendor")
 	local product = read_file("/sys/class/dmi/id/product_name")
-	local text = ((vendor or "") .. " " .. (product or "")):gsub("%s+", " "):match("^%s*(.-)%s*$")
+	local text = TextUtils.trim((((vendor or "") .. " " .. (product or "")):gsub("%s+", " ")))
 	return text ~= "" and text or nil
 end
 
@@ -231,11 +233,34 @@ local function process_memory(status)
 	return kib and tonumber(kib) * 1024 or nil
 end
 
+--- The applications with a window on screen, as the other two drivers list them
+--- (opt-in, process names only). Wayland has no cross-client window enumeration
+--- (no compositor exposes one), so the field is left out there rather than shown
+--- as an empty list, which would read as "nothing is open".
+--- @return table|nil Sorted process names, nil when the session cannot list windows.
+local function running_apps()
+	if not require("infra.display_server").is_x11() then
+		Logger.info(LOG, "Open applications are not listed: this session is not X11 and Wayland exposes no window list.")
+		return nil
+	end
+	local list, seen = {}, {}
+	for _, info in ipairs(require("adapters.window_info").getAll()) do
+		local app = type(info) == "table" and info.appId or nil
+		if type(app) == "string" and app ~= "" and info.windowTitle ~= "" and not seen[app] then
+			seen[app] = true
+			list[#list + 1] = app
+		end
+	end
+	table.sort(list)
+	return list
+end
+
 --- The system section and its load.
 --- @param facts table system_facts()
 --- @param state table Daemon state.
+--- @param detailed boolean Whether the user ticked "Include details".
 --- @return table
-local function collect_system(facts, state)
+local function collect_system(facts, state, detailed)
 	local layout = state.layout
 	local status = read_file("/proc/self/status")
 	return {
@@ -249,6 +274,7 @@ local function collect_system(facts, state)
 		process_memory  = process_memory(status),
 		uptime          = os.time() - _started_at,
 		elevated        = elevated(status),
+		running_apps    = detailed == true and running_apps() or nil,
 	}
 end
 
@@ -310,7 +336,7 @@ local function collect_features(state)
 	local ok_manager, Manager = pcall(require, "platform.remap.manager")
 	if ok_manager then add("tapholds", Manager.tap_holds_enabled()) end
 	add("llm", module_enabled(state.llm))
-	add("metrics", module_enabled(state.keylogger))
+	add("metrics", module_enabled(state.keystats))
 	return { items = items }
 end
 
@@ -344,6 +370,22 @@ local function device_access(path, mode)
 	return "unknown"
 end
 
+--- Whether the daemon may write a device node, asked through access(2).
+--- Opening for writing from Lua means O_CREAT: with the uinput module absent, a
+--- root daemon created a regular file at /dev/uinput that the writer then took
+--- for the device. access(2) answers the same question and creates nothing.
+--- @param path string
+--- @return string "granted", "missing" or "unknown"
+local function device_writable(path)
+	local allowed, err = require("luv").fs_access(path, "W")
+	if allowed == true then return "granted" end
+	-- false: absent, or present and not writable by this user
+	if allowed == false then return "missing" end
+	Logger.warn(LOG, "Diagnostics could not check %s: %s.", path, tostring(err))
+	return "unknown"
+end
+M._device_writable_for_test = device_writable
+
 --- The devices /proc/bus/input/devices lists, one table per block.
 --- @return table
 local function input_devices()
@@ -376,7 +418,7 @@ local function collect_permissions(ids)
 	end
 	local readers = {
 		input_devices = function() return event and device_access(event, "rb") or "unknown" end,
-		uinput        = function() return device_access("/dev/uinput", "ab") end,
+		uinput        = function() return device_writable(require("adapters.uinput_writer").UINPUT_PATH) end,
 	}
 	local items = {}
 	for _, id in ipairs(ids) do
@@ -520,14 +562,12 @@ function M.build_snapshot(state, detailed, extensive, complete_local)
 	local schema = M.config().schema
 	local started = now_ms()
 	local facts = collect("system facts", function() return require("infra.diagnostic_snapshot").system_facts() end)
-	local permission_ids = {}
-	for id in pairs(schema.permissions[M.DRIVER] or {}) do permission_ids[#permission_ids + 1] = id end
-	table.sort(permission_ids)
+	local permission_ids = TableUtil.sorted_keys(schema.permissions[M.DRIVER] or {})
 	local sections = {
 		paths       = collect("paths", function() return collect_paths(schema) end),
 		versions    = collect("versions", function() return collect_versions(facts) end),
 		hardware    = collect("hardware", function() return collect_hardware(facts) end),
-		system      = collect("system", function() return collect_system(facts, state) end),
+		system      = collect("system", function() return collect_system(facts, state, detailed == true) end),
 		input       = collect("input", function() return collect_input(state) end),
 		features    = collect("features", function() return collect_features(state) end),
 		-- Filled by the configuration probe: reading and decoding the files is far
@@ -655,6 +695,8 @@ local function init_message(session)
 			schema    = documents.schema,
 			redaction = documents.redaction,
 			context   = require("ui.healthcheck.report").redaction_context(),
+			-- The guided diagnostic collection is a Windows host action only.
+			capabilities = { diagnostic_collection = false },
 		},
 		snapshot = session.snapshot,
 	}
@@ -697,7 +739,25 @@ local function perform(session, action, state, context)
 		return { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
 			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
-				require("infra.i18n").get(documents.schema.share_policy.notice_key)).text }
+				require("infra.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text }
+	end
+	if action.action == "day_log" then
+		-- Opt-in: ticking collects and redacts today's log; unticking drops it
+		local DayLogHost = require("healthcheck.day_log")
+		if not action.enabled then
+			DayLogHost.discard(session.snapshot)
+			return { type = "action", action = "day_log", ok = true, state = "off" }
+		end
+		Logger.start(LOG, "Collecting today's log for the report…")
+		local reply = DayLogHost.prepare(session.snapshot, documents, Report.redaction_context(), function(cap)
+			return DayLogHost.read_file(LoggerSink.main_log_path(), cap)
+		end)
+		if reply.state == "ready" then
+			Logger.success(LOG, "Today's log is ready: %d lines, %d bytes.", reply.lines, reply.bytes)
+		else
+			Logger.warn(LOG, "Today's log is not attachable: %s.", tostring(reply.state))
+		end
+		return reply
 	end
 	if action.action == "cancel" then
 		local revision = cancel_action(session)
@@ -758,7 +818,7 @@ end
 
 --- Handles an incoming page message.
 --- @param payload any String or table from host_bridge.js.
---- @param state table Daemon state { engine, keylogger, config, llm, gestures, shortcuts, layout, … }.
+--- @param state table Daemon state { engine, keystats, config, llm, gestures, shortcuts, layout, … }.
 --- @param context table|nil { app_name, epoch, close_owned_window } from the webview manager.
 --- @return table|nil The answer the page receives.
 function M.on_message(payload, state, context)

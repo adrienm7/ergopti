@@ -17,6 +17,9 @@ local DEPENDENCIES = {
 	"infra.timings",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
+	"adapters.timer_scheduler",
+	"error_description",
+	"number_policy",
 	"modules.gestures.actions_click",
 }
 
@@ -40,6 +43,7 @@ local function with_fixture(config, body)
 		deferred = {},
 		defer_calls = 0,
 		now = 100,
+		awake_ns = 0,
 	}
 	config.construct = config.construct or {}
 	config.start = config.start or {}
@@ -88,6 +92,7 @@ local function with_fixture(config, body)
 		},
 		timer = {
 			secondsSinceEpoch = function() return fixture.now end,
+			absoluteTime = function() return fixture.awake_ns end,
 		},
 		eventtap = {
 			new = function(watched_types, callback)
@@ -202,7 +207,9 @@ local function with_fixture(config, body)
 		warn = function() end,
 		error = function() end,
 	}
-	package.loaded["infra.timings"] = { sec = function() return 0.25 end }
+	package.loaded["infra.timings"] = { sec = function()
+		return config.click_cooldown_sec or 0.25
+	end }
 	package.loaded["adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function()
@@ -275,6 +282,9 @@ local function with_fixture(config, body)
 			return true
 		end,
 	}
+	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["error_description"] = nil
+	package.loaded["number_policy"] = nil
 	package.loaded["modules.gestures.actions_click"] = nil
 	_G.hs = hs_stub
 
@@ -509,6 +519,7 @@ helpers.describe("click-hold acquisition transaction", function()
 			local key_watcher = fixture.taps[1]
 			local drag_tap = fixture.taps[2]
 			fixture.now = fixture.now + 1
+			fixture.awake_ns = fixture.awake_ns + 1000000000
 			local swallowed = drag_tap.callback({
 				getType = function() return types.leftMouseUp end,
 				location = function() return { x = 130, y = 90 } end,
@@ -537,6 +548,7 @@ helpers.describe("click-hold acquisition transaction", function()
 			helpers.assert_eq(ClickActions.toggle_right_click(), true)
 			local drag_tap = fixture.taps[2]
 			fixture.now = fixture.now + 1
+			fixture.awake_ns = fixture.awake_ns + 1000000000
 			local callback_ok, swallowed = pcall(drag_tap.callback, {
 				getType = function() return types.rightMouseUp end,
 				location = function() return { x = 130, y = 90 } end,
@@ -637,4 +649,65 @@ helpers.describe("click-hold acquisition transaction", function()
 			helpers.assert_eq(ClickActions.is_right_click_held(), false)
 		end)
 	end)
+end)
+
+
+-- Civil-time corrections are independent of the150ms finger-lift grace.
+-- Compose the real click owner and real TimerScheduler over healthy native
+-- taps/events, with independent gettimeofday and mach_absolute_time samples.
+local CLOCK_CASES = {
+	{ name = "ignores a healthy release before150ms", wall_delta = 0.05, awake_ns = 50000000, consume = true },
+	{ name = "passes a healthy release at150ms", wall_delta = 0.15, awake_ns = 150000000, consume = false },
+	{ name = "passes release after a backwards civil-clock correction", wall_delta = -3600, awake_ns = 1000000000, consume = false },
+	{ name = "ignores an early release despite a forwards civil-clock correction", wall_delta = 3600, awake_ns = 50000000, consume = true },
+}
+
+helpers.describe("click-hold monotonic finger-lift grace", function()
+	for _, side in ipairs({ "left", "right" }) do
+		for _, case in ipairs(CLOCK_CASES) do
+			helpers.it("(click-hold-monotonic-grace) " .. side .. " " .. case.name, function()
+				with_fixture({ click_cooldown_sec = 0.15 }, function(ClickActions, fixture, types)
+					local toggle = ClickActions["toggle_" .. side .. "_click"]
+					local is_held = ClickActions["is_" .. side .. "_click_held"]
+					local down_type = types[side .. "MouseDown"]
+					local up_type = types[side .. "MouseUp"]
+					helpers.assert_true(toggle("gestures"))
+					helpers.assert_eq(fixture.posted, { down_type })
+					helpers.assert_true(is_held())
+					local key_tap, side_tap = fixture.taps[1], fixture.taps[2]
+					local up = { getType = function() return up_type end }
+					fixture.now = fixture.now + case.wall_delta
+					fixture.awake_ns = case.awake_ns
+					local consumed = side_tap.callback(up)
+					helpers.assert_eq(consumed, case.consume,
+						"only awake elapsed time may suppress the exact physical release")
+					if case.consume then
+						helpers.assert_true(is_held(), "an early finger lift preserves the hold")
+						helpers.assert_true(side_tap.enabled and key_tap.enabled)
+						helpers.assert_eq(side_tap.stop_attempts, 0)
+						helpers.assert_eq(key_tap.stop_attempts, 0)
+						helpers.assert_eq(#fixture.deferred, 0)
+						fixture.awake_ns = fixture.awake_ns + 1000000000
+						fixture.now = fixture.now + 1
+						helpers.assert_eq(side_tap.callback(up), false,
+							"a later matching release must reach Quartz")
+					end
+					helpers.assert_eq(is_held(), false, "physical release fences held state before return")
+					helpers.assert_eq(side_tap.enabled, false)
+					helpers.assert_eq(key_tap.enabled, false)
+					helpers.assert_eq(side_tap.stop_attempts, 1)
+					helpers.assert_eq(key_tap.stop_attempts, 1)
+					helpers.assert_eq(fixture.posted, { down_type },
+						"the original physical up is the release; no synthetic duplicate is posted")
+					helpers.assert_eq(#fixture.deferred, 1)
+					fixture.deferred[1].callback()
+					helpers.assert_eq(side_tap.callback(up), false,
+						"a retired exact tap cannot consume a later release")
+					helpers.assert_eq(fixture.posted, { down_type })
+					helpers.assert_eq(side_tap.stop_attempts, 1)
+					helpers.assert_true(ClickActions.force_cleanup("gestures"))
+				end)
+			end)
+		end
+	end
 end)

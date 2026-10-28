@@ -131,7 +131,7 @@ helpers.describe("the last swallow sites are migrated", function()
 	end)
 
 	helpers.it("the Ollama response handler reports its own throws", function()
-		local src = helpers.read_driver_source("OLLAMA_KILL_SETTLE_SEC")
+		local src = helpers.read_driver_source("function M.stop_owned_server")
 		local code = src:gsub("%-%-[^\n]*", "")
 
 		local at = code:find("local status, body = r.status, r.body", 1, true)

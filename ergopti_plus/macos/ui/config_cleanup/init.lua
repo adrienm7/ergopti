@@ -5,6 +5,7 @@ local M = {}
 local Logger = require("infra.logger")
 local ui_builder = require("ui.ui_builder")
 local Session = require("config_cleanup_session")
+local WebviewResult = require("adapters.webview_result")
 local LOG = "config_cleanup"
 local BRIDGE = "config_cleanup_bridge"
 local active, retiring
@@ -45,18 +46,53 @@ local function close(owner, native_closed)
 	return true
 end
 
---- Delivers a controller result only to its current native page.
+--- Reports one fixed failure category for an exact current page, without its data.
+--- @param owner table Window owner.
+--- @param view any Exact native WebView.
+--- @param category string Fixed failure category.
+local function report_delivery_failure(owner, view, category)
+	if active ~= owner or owner.view ~= view then return end
+	owner.delivery_failures = owner.delivery_failures or {}
+	if owner.delivery_failures[category] then return end
+	owner.delivery_failures[category] = true
+	Logger.error(LOG, "Configuration cleanup response %s; repeats suppressed for this window.", category)
+end
+
+--- Delivers a controller result only to its current native page and observes both receipts.
 --- @param owner table Window owner.
 --- @param state table Host-owned cleanup state.
+--- @return boolean submitted
 local function send(owner, state)
-	if active ~= owner or not owner.view then return end
-	local encoded = hs.json.encode(state)
-	if type(encoded) ~= "string" then error("cleanup state could not be encoded") end
+	if active ~= owner or not owner.view then return false end
+	local view = owner.view
+	local encoded_ok, encoded = pcall(hs.json.encode, state)
+	if not encoded_ok or type(encoded) ~= "string" then
+		report_delivery_failure(owner, view, "encoding failed")
+		return false
+	end
 	if type(state.keys) == "table" and next(state.keys) == nil then
 		encoded = encoded:gsub('"keys"%s*:%s*%{%}', '"keys":[]', 1)
 	end
+	if active ~= owner or owner.view ~= view then return false end
 	owner.token = state.session
-	owner.view:evaluateJavaScript("if(window.receiveConfigCleanup)window.receiveConfigCleanup(" .. encoded .. ")")
+	local completed = false
+	local accepted, receipt = pcall(function()
+		return view:evaluateJavaScript(
+			"if(window.receiveConfigCleanup)window.receiveConfigCleanup(" .. encoded .. ")",
+			function(_, script_error)
+				if completed then return end
+				completed = true
+				if WebviewResult.is_error(script_error) then
+					report_delivery_failure(owner, view, "execution failed")
+				end
+			end)
+	end)
+	if not accepted or receipt ~= view then
+		completed = true
+		report_delivery_failure(owner, view, accepted and "submission refused" or "submission raised")
+		return false
+	end
+	return active == owner and owner.view == view
 end
 
 --- Opens or focuses the cleanup page without performing a scan or deletion.

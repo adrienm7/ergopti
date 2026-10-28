@@ -31,8 +31,9 @@ local SyntheticInput   = require("adapters.synthetic_input")
 local text_utils       = require("infra.text_utils")
 local core_llm         = require("modules.llm")
 local Logger           = require("infra.logger")
+local PhaseStats       = require("infra.phase_stats")
 local Keycodes         = require("infra.keycodes")
-local keylogger        = require("modules.keylogger")
+local keystats        = require("modules.keystats")
 local tooltip          = require("ui.tooltip")
 local engine           = require("modules.llm.prediction_engine")
 local ToneRewrite      = require("modules.llm.tone_rewrite")
@@ -45,6 +46,9 @@ local expander         = require("modules.keymap.expander")
 local TimerScheduler   = require("adapters.timer_scheduler")
 local ManifestReader = require("infra.manifest_reader")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
+local Timings          = require("infra.timings")
+local ConfigKeys = require("config_keys")
+local ContextBuffer    = require("llm.context_buffer")  -- shared navigation rule of the AI context
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -94,7 +98,7 @@ local ARROW_NAVIGATION_DELTA = {
 -- Fallback sentinel used when no row contributes a timeout. A committed
 -- infinite row itself carries duration 0, which TooltipConfig treats as the
 -- canonical "never auto-dismiss" value.
-local INFINITE_TOOLTIP_SEC       = 86400  -- 24h stand-in for "never auto-dismiss"
+local INFINITE_TOOLTIP_SEC       = Timings.sec("tooltip", "infinite_ttl_ms")  -- 24h stand-in for "never auto-dismiss"
 -- Tiny offset added on top of the tooltip timeout when chaining LLM after a hotstring,
 -- so the LLM fires just after the tooltip would normally close.
 local HOTSTRING_CHAIN_OFFSET_SEC = 0.05
@@ -594,6 +598,7 @@ function M.set_llm_show_info_bar(v)         return engine.set_llm_show_info_bar(
 function M.set_llm_sequential_mode(v)       return engine.set_llm_sequential_mode(v)       end
 function M.set_llm_auto_raise_temp(v)       return engine.set_llm_auto_raise_temp(v)       end
 function M.set_llm_disabled_apps(apps)           return engine.set_llm_disabled_apps(apps)           end
+function M.set_llm_app_profile_overrides(text)   return engine.set_llm_app_profile_overrides(text)   end
 function M.set_llm_url_bar_filter_enabled(v)      return engine.set_llm_url_bar_filter_enabled(v)      end
 function M.set_llm_secure_field_filter_enabled(v) return engine.set_llm_secure_field_filter_enabled(v) end
 function M.set_llm_instant_on_word_end(v)         return engine.set_llm_instant_on_word_end(v)         end
@@ -602,6 +607,7 @@ function M.set_llm_nav_modifiers(mods)      return engine.set_llm_nav_modifiers(
 function M.set_llm_min_words(w)             return engine.set_llm_min_words(w)             end
 function M.set_llm_max_words(w)             return engine.set_llm_max_words(w)             end
 function M.set_llm_debounce(seconds)        return engine.set_llm_debounce(seconds)        end
+function M.set_llm_min_request_interval(seconds) return engine.set_llm_min_request_interval(seconds) end
 function M.set_llm_streaming(v)             return engine.set_llm_streaming(v)             end
 function M.set_llm_streaming_multi(v)       return engine.set_llm_streaming_multi(v)       end
 function M.set_llm_agent_system1(v)         return AgentRunner.set_system1(v)              end
@@ -630,8 +636,8 @@ end
 --- @return boolean found True when the runtime owner recognizes the key.
 --- @return any value Current runtime value.
 function M.get_llm_runtime_setting(key)
-	if key == "llm_after_hotstring" then return true, fire_llm_after_hotstring end
-	if key == "llm_reset_on_nav" then return true, reset_buffer_on_navigation end
+	if key == ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING then return true, fire_llm_after_hotstring end
+	if key == ConfigKeys.COMMAND.LLM_RESET_ON_NAV then return true, reset_buffer_on_navigation end
 	local found, value = engine.get_llm_runtime_setting(key)
 	if found then return found, value end
 	return AgentRunner.get_runtime_setting(key)
@@ -696,6 +702,44 @@ local function arm_llm_timer(label, fn, delay)
 	return true
 end
 
+--- The part of a hotstring-buffer text the AI may see, and the mark it keeps.
+---
+--- The AI context mirrors the hotstring buffer, which holds the replacement of
+--- a private (personal-information) expansion like any other text. That text
+--- must never reach a prompt, local or remote, so everything up to the last
+--- private expansion is withheld (the shared rule, see
+--- ContextBuffer.after_private; Linux clears its context object instead).
+--- @param text string The hotstring buffer.
+--- @return string visible
+local function ai_context_of(text)
+	local visible, mark = ContextBuffer.after_private(text, _state.llm_private_mark or "")
+	_state.llm_private_mark = mark
+	return visible
+end
+
+--- Declares that a private expansion just landed: the AI forgets the buffer.
+---
+--- Called by the expander once the replacement is committed, with the buffer
+--- the engine now holds, so the secret (and the trigger, a fragment of it)
+--- stays out of every later prompt.
+--- @param buffer string The hotstring buffer after the private replacement.
+function M.mark_private_context(buffer)
+	if not require_state("mark_private_context") then error("keymap LLM bridge is not initialised", 2) end
+	if type(buffer) ~= "string" then error("private context buffer must be a string", 2) end
+	_state.llm_private_mark = buffer
+	_state.llm_buffer = ""
+	Logger.debug(LOG, "Private expansion — AI typing context forgotten.")
+end
+
+--- Keeps the private mark aligned with a hotstring buffer whose head was cut.
+--- @param buffer string The buffer before the cut.
+--- @param removed integer Bytes removed from its head.
+function M.private_context_trimmed(buffer, removed)
+	if not _state or (_state.llm_private_mark or "") == "" then return end
+	local _, mark = ContextBuffer.after_private(buffer, _state.llm_private_mark)
+	_state.llm_private_mark = removed >= #mark and "" or mark:sub(removed + 1)
+end
+
 --- Refreshes the preview tooltip from the current buffer content.
 ---
 --- Decision tree:
@@ -705,16 +749,18 @@ end
 ---   4. Otherwise → reset predictions and arm the inactivity timer.
 ---
 --- @param buf string The current typed buffer.
-function M.update_preview(buf)
+local function update_preview_body(buf)
 	if not require_state("update_preview") then return end
 	-- This is the sole observation seam for physical text. Hotstring matching owns
 	-- `_state.buffer`; LLM prompting owns this separate context so navigation can
 	-- revoke cursor-relative actions without defeating the user's keep-context
 	-- preference.
-	_state.llm_buffer = buf
+	local ai_context = buf
+	if type(buf) == "string" then ai_context = ai_context_of(buf) end
+	_state.llm_buffer = ai_context
 	-- The agent's automatic mode waits for a pause in the typing: every
 	-- keystroke drops what it had in flight and re-arms its own timer
-	local agent_ok, agent_error = xpcall(AgentRunner.observe_typing, debug.traceback, buf)
+	local agent_ok, agent_error = xpcall(AgentRunner.observe_typing, debug.traceback, ai_context)
 	if not agent_ok then Logger.error(LOG, "Agent typing observer raised: %s.", tostring(agent_error)) end
 
 	-- Skip timer ops entirely when LLM is off: stop_timer()/start_timer() involve
@@ -779,6 +825,7 @@ function M.update_preview(buf)
 	-- consumes its records without scanning registry buckets or re-arbitrating.
 	local matches = {}
 	local winner_match = nil
+	local providers_started = PhaseStats.now()
 	for provider_index, provider in ipairs(_state.preview_providers) do
 		-- The optional second result is an opaque action identity. It lets a
 		-- side-effectful provider bind the successfully rendered row to the exact
@@ -827,11 +874,18 @@ function M.update_preview(buf)
 		-- eventtap's maximum accepted window here; while the row is visibly
 		-- committed its exact lease is the action-path authority. Without this,
 		-- Shift+magic could still expand after the row had disappeared.
-		return _state.mapping_delay_remaining(
+		local allowed, remaining = _state.mapping_delay_remaining(
 			mapping, elapsed, tonumber(_state.COMPLEX_DELAY_MULT) or 1)
+		-- The exact deadline instant still fires, but a row with no time left is
+		-- never advertised (Windows refuses RemainingMs == 0 the same way).
+		if allowed and remaining == 0 then return false, 0 end
+		return allowed, remaining
 	end
+	PhaseStats.stop("preview.providers", providers_started)
+	local resolve_started = PhaseStats.now()
 	local resolution = #matches == 0 and not engine_blocked
 		and expander.resolve_magic_action(buf, literal_preview_allowed) or nil
+	PhaseStats.stop("preview.resolve", resolve_started)
 	if resolution and resolution.winner then
 		for _, action in ipairs(resolution.candidates) do
 			local mapping = action.mapping
@@ -870,7 +924,7 @@ function M.update_preview(buf)
 		-- character their layout no longer produces. The literal remains only as
 		-- the fallback for a state that has not resolved one yet.
 		local magic_key = (_state and _state.magic_key ~= nil and _state.magic_key ~= "")
-			and _state.magic_key or ManifestReader.default_for("hotstrings.trigger_char")
+			and _state.magic_key or ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR)
 		local rows          = {}
 		local any_enabled   = false
 		local min_timeout   = nil
@@ -1114,7 +1168,7 @@ function M.update_preview(buf)
 				local t_key, t_repl, t_type = trigger_key, primary_match.repl, type_str
 				local schedule_ok, telemetry_handle, telemetry_committed = xpcall(function()
 					return schedule_prediction_deferred("hotstring suggestion telemetry", function()
-						pcall(keylogger.log_hotstring_suggested, nil, t_key, t_repl, t_type)
+						pcall(keystats.log_hotstring_suggested, nil, t_key, t_repl, t_type)
 					end)
 				end, debug.traceback)
 				if not schedule_ok or telemetry_committed ~= true then
@@ -1221,6 +1275,16 @@ function M.update_preview(buf)
 			end
 		end
 	end
+end
+
+--- Refreshes the hotstring preview for the buffer, timing the whole refresh as
+--- the `preview.total` phase so a slow keystroke can be split into providers,
+--- the magic-action resolution and the remaining row and tooltip work.
+--- @param buf string The current typed buffer.
+function M.update_preview(buf)
+	local started = PhaseStats.now()
+	update_preview_body(buf)
+	PhaseStats.stop("preview.total", started)
 end
 
 
@@ -1454,7 +1518,7 @@ local function reset_predictions_impl(keep_hotstring_log, force_full, suppress_t
 		if may_persist_preview(dismissed) and suppress_telemetry ~= true then
 			local schedule_ok, handle_or_err, telemetry_committed = xpcall(function()
 				return schedule_prediction_deferred("hotstring dismissal telemetry", function()
-					pcall(keylogger.log_hotstring_dismissed, nil, d_trigger, d_repl, d_type)
+					pcall(keystats.log_hotstring_dismissed, nil, d_trigger, d_repl, d_type)
 				end)
 			end, debug.traceback)
 			if not schedule_ok or telemetry_committed ~= true then
@@ -1704,7 +1768,7 @@ function M.apply_prediction(idx)
 			-- transaction events already carry their provenance independently of
 			-- whether the text path used direct key pairs or Cmd+V.
 			_state.buffer = next_buffer
-			_state.llm_buffer = _state.buffer
+			_state.llm_buffer = ai_context_of(_state.buffer)
 		end,
 		true,   -- is_final
 		true,   -- is_ignored
@@ -1715,7 +1779,7 @@ function M.apply_prediction(idx)
 		return false
 	end
 	local telemetry_ok, telemetry_err = xpcall(function()
-		keylogger.log_llm_accepted(text_to_type, nil, all_preds, idx, delete_count, deleted_text)
+		keystats.log_llm_accepted(text_to_type, nil, all_preds, idx, delete_count, deleted_text)
 	end, debug.traceback)
 	if not telemetry_ok then
 		Logger.error(LOG, "Prediction acceptance telemetry raised after text commit: %s", tostring(telemetry_err))
@@ -1850,10 +1914,8 @@ end
 function M.check_escape_reset()
 	if not require_state("check_escape_reset") then return false end
 	if not M.is_runtime_available() then
-		if reset_buffer_on_navigation then
-			_state.buffer = ""
-			_state.llm_buffer = ""
-		end
+		if reset_buffer_on_navigation then _state.buffer = "" end
+		_state.llm_buffer = ContextBuffer.retained_after_navigation(_state.llm_buffer, reset_buffer_on_navigation == true)
 		if type(tooltip.is_hotstring_visible) == "function"
 			and tooltip.is_hotstring_visible() then
 			invalidate_cursor_context(reset_buffer_on_navigation)
@@ -1877,8 +1939,8 @@ function M.check_escape_reset()
 	if reset_buffer_on_navigation then
 		Logger.debug(LOG, "Escape — buffer cleared.")
 		_state.buffer = ""
-		_state.llm_buffer = ""
 	end
+	_state.llm_buffer = ContextBuffer.retained_after_navigation(_state.llm_buffer, reset_buffer_on_navigation == true)
 	M.reset_predictions()
 	return false
 end
@@ -1889,9 +1951,10 @@ end
 function M.check_nav_reset()
 	if not require_state("check_nav_reset") then return end
 
-	if reset_buffer_on_navigation and _state.llm_buffer ~= "" then
+	local retained = ContextBuffer.retained_after_navigation(_state.llm_buffer, reset_buffer_on_navigation == true)
+	if retained ~= _state.llm_buffer then
 		Logger.debug(LOG, "LLM context cleared on navigation.")
-		_state.llm_buffer = ""
+		_state.llm_buffer = retained
 	end
 	M.reset_predictions()
 end

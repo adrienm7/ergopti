@@ -7,7 +7,7 @@
 ---
 --- That commit established the contract in modules/keymap/expander.lua: for a
 --- mapping tagged is_private, BOTH the replacement and the trigger are secrets, so
---- the keylogger call and the DEBUG line are skipped and a content-free line is
+--- the keystats call and the DEBUG line are skipped and a content-free line is
 --- logged instead — "DEBUG is the driver's default level", so an unguarded line
 --- lands in a log retained 14 days. It applied that contract to the two EXPANSION
 --- sinks (try_auto_expand and the terminator path) and stopped there.

@@ -14,6 +14,20 @@
 
 local helpers = require("tests.helpers")
 
+-- Each scenario owns its freshly bound scheduler and the parent that captures it.
+local SCHEDULER_OWNERS = {
+	"infra.file_watchers", "adapters.timer_scheduler", "error_description", "number_policy",
+}
+
+--- Restores exact predecessor modules even when a scenario assertion raises.
+--- @param body function Original scenario callback.
+--- @return function callback
+local function with_scheduler_scope(body)
+	return function()
+		return helpers.with_fresh_modules(SCHEDULER_OWNERS, body)
+	end
+end
+
 -- ui_restore is UI glue not meant to load headless; mock it so the test isolates
 -- file_watchers' own logic. notifications/i18n load fine under the stub harness.
 package.loaded["infra.ui_restore"] = {
@@ -23,13 +37,13 @@ package.loaded["infra.ui_restore"] = {
 }
 
 helpers.describe("infra/file_watchers — arming contract", function()
-	helpers.it("loads and exposes start()", function()
+	helpers.it("loads and exposes start()", with_scheduler_scope(function()
 		package.loaded["infra.file_watchers"] = nil
 		local FW = require("infra.file_watchers")
 		helpers.assert_true(type(FW.start) == "function", "must expose start()")
-	end)
+	end))
 
-	helpers.it("arms watchers under one pinned lifecycle owner", function()
+	helpers.it("arms watchers under one pinned lifecycle owner", with_scheduler_scope(function()
 		local FW = require("infra.file_watchers")
 
 		-- Stub the OS-touching hs surface M.start uses.
@@ -63,9 +77,9 @@ helpers.describe("infra/file_watchers — arming contract", function()
 		helpers.assert_eq(true, _G.script_watchers[1]:stop(), "the owner must settle native cleanup")
 		helpers.assert_eq(armed, stopped, "the owner must transitively stop every armed watcher")
 		_G.script_watchers = nil
-	end)
+	end))
 
-	helpers.it("covers personal_info.toml exactly once in the bundle-fallback topology", function()
+	helpers.it("covers personal_info.toml exactly once in the bundle-fallback topology", with_scheduler_scope(function()
 		local saved_file_watchers = package.loaded["infra.file_watchers"]
 		local saved_pathwatcher = hs.pathwatcher
 		local saved_timer = hs.timer
@@ -89,6 +103,7 @@ helpers.describe("infra/file_watchers — arming contract", function()
 				return { stop = function() end }
 			end,
 			secondsSinceEpoch = function() return clock end,
+			absoluteTime = function() return clock * 1e9 end,
 		}
 
 		local ok, err = xpcall(function()
@@ -131,9 +146,9 @@ helpers.describe("infra/file_watchers — arming contract", function()
 		hs.timer = saved_timer
 		_G.script_watchers = saved_roots
 		if not ok then error(err, 0) end
-	end)
+	end))
 
-	helpers.it("revokes a pending reload before teardown and retains failed timer cleanup for retry", function()
+	helpers.it("revokes a pending reload before teardown and retains failed timer cleanup for retry", with_scheduler_scope(function()
 		for _, failure in ipairs({ "false", "throw" }) do
 			package.loaded["infra.file_watchers"] = nil
 			local FW = require("infra.file_watchers")
@@ -167,6 +182,7 @@ helpers.describe("infra/file_watchers — arming contract", function()
 					return timer
 				end,
 				secondsSinceEpoch = function() return clock end,
+				absoluteTime = function() return clock * 1e9 end,
 			}
 			hs.fs.attributes = function(_path) return nil end
 			hs.reload = function() reloads = reloads + 1 end
@@ -198,9 +214,9 @@ helpers.describe("infra/file_watchers — arming contract", function()
 				prev_pw, prev_timer, prev_attr, prev_reload
 			_G.script_watchers = nil
 		end
-	end)
+	end))
 
-	helpers.it("watch_personal_hotstrings_dir terminates on a self-referential directory cycle (F-LOW-4)", function()
+	helpers.it("watch_personal_hotstrings_dir terminates on a self-referential directory cycle (F-LOW-4)", with_scheduler_scope(function()
 		-- Simulate a self-referential symlink under the personal-hotstrings tree:
 		-- every directory contains one further "loop" entry that resolves back to
 		-- a directory again — a growing-path cycle indistinguishable, from this
@@ -238,5 +254,5 @@ helpers.describe("infra/file_watchers — arming contract", function()
 		_G.script_watchers = nil
 
 		helpers.assert_true(ok, "start() must terminate and not throw/hang on a directory cycle: " .. tostring(err))
-	end)
+	end))
 end)

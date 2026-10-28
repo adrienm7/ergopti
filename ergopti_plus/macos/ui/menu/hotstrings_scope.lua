@@ -41,6 +41,7 @@ local ScopeFile = require("config_scope_file")
 local Extensions = require("hotstrings.extensions")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
 
 local LOG = "menu.hotstrings_scope"
 
@@ -48,20 +49,24 @@ local LOG = "menu.hotstrings_scope"
 --- is absent where the menu state is the only reader on this driver, and a
 --- getter is present where the native owner can read its value back.
 local OWNERS = {
-	{ key = "repeat_key_enabled", setter = "set_repeat_feature_enabled", getter = "is_repeat_feature_enabled" },
-	{ key = "expansion_delay", setter = "set_base_delay", getter = "get_base_delay" },
-	{ key = "idle_reset_seconds", setter = "set_idle_reset_seconds", getter = "get_idle_reset_seconds" },
-	{ key = "click_resets_word", setter = "set_click_resets_word", getter = "is_click_resets_word_enabled" },
-	{ key = "arrow_resets_word", setter = "set_arrow_resets_word", getter = "is_arrow_resets_word_enabled" },
-	{ key = "shortcut_resets_word", setter = "set_shortcut_resets_word",
+	{ key = require("config_keys").LEAF.REPEAT_KEY_ENABLED, setter = "set_repeat_feature_enabled", getter = "is_repeat_feature_enabled" },
+	{ key = require("config_keys").LEAF.EXPANSION_DELAY, setter = "set_base_delay", getter = "get_base_delay" },
+	{ key = require("config_keys").LEAF.IDLE_RESET_SECONDS, setter = "set_idle_reset_seconds", getter = "get_idle_reset_seconds" },
+	{ key = require("config_keys").LEAF.CASCADE_MAX_ARROWS, setter = "set_cascade_max_arrows", getter = "get_cascade_max_arrows" },
+	{ key = require("config_keys").LEAF.CLICK_RESETS_WORD, setter = "set_click_resets_word", getter = "is_click_resets_word_enabled" },
+	{ key = require("config_keys").LEAF.ARROW_RESETS_WORD, setter = "set_arrow_resets_word", getter = "is_arrow_resets_word_enabled" },
+	{ key = require("config_keys").LEAF.SHORTCUT_RESETS_WORD, setter = "set_shortcut_resets_word",
 		getter = "is_shortcut_resets_word_enabled" },
-	{ key = "trigger_char", setter = "set_trigger_char", getter = "get_trigger_char" },
-	{ key = "magic_key_source", setter = "set_magic_key_source", getter = "get_magic_key_source" },
-	{ key = "preview_star_enabled", setter = "set_preview_star_enabled" },
-	{ key = "preview_autocorrect_enabled", setter = "set_preview_autocorrect_enabled" },
-	{ key = "preview_colored_tooltips", setter = "set_preview_colored_tooltips" },
-	{ key = "preview_ai_enabled", setter = "set_preview_ai_enabled" },
+	{ key = require("config_keys").LEAF.TRIGGER_CHAR, setter = "set_trigger_char", getter = "get_trigger_char" },
+	{ key = require("config_keys").LEAF.MAGIC_KEY_SOURCE, setter = "set_magic_key_source", getter = "get_magic_key_source" },
+	{ key = require("config_keys").LEAF.PREVIEW_STAR_ENABLED, setter = "set_preview_star_enabled" },
+	{ key = require("config_keys").LEAF.PREVIEW_AUTOCORRECT_ENABLED, setter = "set_preview_autocorrect_enabled" },
+	{ key = require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS, setter = "set_preview_colored_tooltips" },
+	{ key = require("config_keys").LEAF.PREVIEW_AI_ENABLED, setter = "set_preview_ai_enabled" },
 	{ key = "dynamichotstrings_enabled" },
+	-- The date feature row's enabled leaf (hotstrings.dynamic.date.enabled since
+	-- the L20 fix); dynamic hotstrings read it from the menu state.
+	{ key = "dynamichotstrings_date" },
 	{ key = "dynamichotstrings_user_code_time_activation_seconds", native = "dynamic",
 		setter = "set_user_code_time_activation", getter = "user_code_time_activation" },
 	{ key = "dynamichotstrings_user_code_enabled", native = "dynamic",
@@ -73,12 +78,7 @@ for _, owner in ipairs(OWNERS) do OWNER[owner.key] = owner end
 --- Menu-state key of the typing-engine switch (hotstrings.enabled).
 local ENGINE_KEY = "keymap"
 
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[key] = clone(child) end
-	return copy
-end
+local clone = TableUtil.deep_copy
 
 --- Whether a group or section identity can be named by a canonical path.
 --- @param id string
@@ -200,6 +200,7 @@ function M.new(options)
 	--- @return table|nil file The prepared override participant.
 	--- @return table|nil parsed The candidate as the engine's reader parses it.
 	local function prepare_overrides(mode)
+		local base_after
 		local committed = Config.scope_snapshot()
 		if type(committed) ~= "table" then return false, "the override file was not read cleanly" end
 		local registered, groups = keymap.hotstring_delay_inventory(), {}
@@ -216,27 +217,35 @@ function M.new(options)
 			end
 		end
 		table.sort(groups, function(left, right) return left.id < right.id end)
-		local inherit = Config.delay_projection({})
+		-- The base expansion delay is one of the scope's own scalars: after it the base
+		-- is the recommended value (restore) or the default (clear), and the delays below
+		-- are offsets of THAT base, whatever the user's is today.
+		base_after = mode == "recommended" and Manifest.recommended_for(require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY)
+			or Manifest.default_for(require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY)
+		local inherit = Config.delay_projection({}, base_after)
 		local changes = Planner.plan({ mode = mode, features = Manifest.features(), groups = groups,
 			inherited = function(name, section) return inherit(name, section, registered[name].metadata) end,
 			extra = { { override = { "dynamichotstrings" }, fields = Planner.FIELDS } } })
 		local path = Config.get_override_path()
 		local file = ScopeFile.new({ path = path, backup_path = options.override_backup_path(), files = options.files,
 			remove = options.remove })
-		local prepared, detail = file.prepare(Planner.writer_rows(changes))
+		local prepared, detail = file.prepare(Planner.writer_rows(changes, base_after))
 		if prepared ~= true then return false, detail end
 		local source = file.source()
 		if source.status ~= committed.source.status
 			or (source.status == "ok" and source.content ~= committed.source.content) then
 			return false, "the override file changed since it was loaded"
 		end
-		local parsed = Config.parse_override_content(file.candidate() or "")
+		local readable, parsed = pcall(Config.parse_override_content, file.candidate() or "")
+		if not readable then return false, "the prepared override file is not valid TOML: " .. tostring(parsed) end
 		for _, change in ipairs(changes) do
 			local key = change.override[1] == "ext" and ("ext." .. change.override[2]) or change.override[1]
 			local entry = parsed[key]
 			local target = entry
 			if entry and change.section then target = (entry.sections or {})[change.section:lower()] end
 			local value = target and target[change.field]
+			-- A delay is stored as an offset of the base the scope leaves behind.
+			if change.field == "delay" then value = Config.effective_delay(target, base_after) end
 			if value ~= change.value then
 				return false, "the override file keeps a spelling the scope cannot address: " .. key
 			end
@@ -280,7 +289,7 @@ function M.new(options)
 			local value = values[owner.key]
 			if value ~= nil and owner.native ~= "dynamic" and owner.setter and current(owner.key) ~= value then
 				if keymap[owner.setter](value) ~= true then return false end
-				if owner.key == "trigger_char" and options.editor then options.editor.set_trigger_char(value) end
+				if owner.key == require("config_keys").LEAF.TRIGGER_CHAR and options.editor then options.editor.set_trigger_char(value) end
 			end
 		end
 		if programmable then
@@ -402,14 +411,17 @@ function M.new(options)
 			end
 			local values = { [ENGINE_KEY] = state[ENGINE_KEY] }
 			for _, owner in ipairs(OWNERS) do values[owner.key] = clone(current(owner.key)) end
-			local terminators = {}
+			local terminators, consumption = {}, {}
 			for _, def in ipairs(keymap.get_terminator_defs()) do
-				if def.key then terminators[def.key] = keymap.is_terminator_enabled(def.key) end
+				if def.key then
+					terminators[def.key] = keymap.is_terminator_enabled(def.key)
+					if def.custom ~= true then consumption[def.key] = keymap.is_terminator_consume(def.key) end
+				end
 			end
 			local snapshot = { config = config, programmable = programmable, groups = groups, sections = sections, values = values,
 				hotstrings = clone(state.hotstrings), delays = clone(state.delays), reloaded = {},
-				candidate = active.overrides, terminators = terminators,
-				terminator_states = clone(state.terminator_states) }
+				candidate = active.overrides, terminators = terminators, consumption = consumption,
+				terminator_states = clone(state.terminator_states), terminator_consume = clone(state.terminator_consume) }
 			active = snapshot
 			return snapshot
 		end,
@@ -450,6 +462,10 @@ function M.new(options)
 			local retained = clone(state.terminator_states or {})
 			for key in pairs(defaults) do retained[key] = nil end
 			state.terminator_states = retained
+			if keymap.set_terminators_consume(TerminatorScope.consume_defaults()) ~= true then return false end
+			local kept_consume = clone(state.terminator_consume or {})
+			for key in pairs(TerminatorScope.consume_defaults()) do kept_consume[key] = nil end
+			state.terminator_consume = kept_consume
 			return apply_values(values, active.programmable)
 		end,
 		restore = function(snapshot)
@@ -464,6 +480,8 @@ function M.new(options)
 			if not reload_groups(snapshot.reloaded) then return false end
 			if keymap.set_terminators_enabled(snapshot.terminators) ~= true then return false end
 			state.terminator_states = clone(snapshot.terminator_states)
+			if keymap.set_terminators_consume(snapshot.consumption) ~= true then return false end
+			state.terminator_consume = clone(snapshot.terminator_consume)
 			if apply_values(snapshot.values) ~= true then return false end
 			state.hotstrings = clone(snapshot.hotstrings)
 			return true

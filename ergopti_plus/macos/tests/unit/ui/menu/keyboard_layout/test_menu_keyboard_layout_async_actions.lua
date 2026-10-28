@@ -105,7 +105,7 @@ end)
 --- dispatch and retained business callback.
 --- @param operation string `upgrade` or `enable`.
 --- @param business_ok boolean Terminal result delivered by the async owner.
-local function exercise_bundle_action(operation, business_ok)
+local function exercise_bundle_action(operation, business_ok, live)
 	helpers.with_fresh_modules({
 		"infra.deferred_work",
 		"modules.keymap.input_sources",
@@ -143,6 +143,11 @@ local function exercise_bundle_action(operation, business_ok)
 		input_sources.upgrade_active_list_async = function(_legacy, on_done)
 			dispatches = dispatches + 1
 			business_done = on_done
+			return true
+		end
+		-- Whether macOS turned the added variant on now (macOS 26: at the next login).
+		input_sources.confirm_enabled_async = function(_name, _options, on_done)
+			on_done(true, { listed = true, enabled = live ~= false })
 			return true
 		end
 		input_sources.enable_keylayout_source_async = function(keylayout, label, on_done)
@@ -206,7 +211,9 @@ local function exercise_bundle_action(operation, business_ok)
 
 		business_done(business_ok)
 		helpers.assert_eq(#notices, 1)
-		helpers.assert_eq(notices[1], business_ok and "success" or "error")
+		local expected = business_ok and "success" or "error"
+		if business_ok and live == false then expected = "info" end
+		helpers.assert_eq(notices[1], expected)
 		helpers.assert_eq(#scheduled, 2)
 		helpers.assert_eq(refreshes, 0)
 		scheduled[2].callback()
@@ -223,6 +230,10 @@ helpers.describe("menu_keyboard_layout: async bundle mutations", function()
 			end)
 		end
 	end
+	-- The preference lists the variant but macOS 26 turns it on at the next login.
+	helpers.it("enable reports a variant macOS turns on at the next login as info (composer-macos26)", function()
+		exercise_bundle_action("enable", true, false)
+	end)
 end)
 
 

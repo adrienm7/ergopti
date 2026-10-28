@@ -15,6 +15,7 @@
 --- ==============================================================================
 
 local M = {}
+local NativePath = require("native_path")
 
 local Answers    = require("onboarding_answers")
 local TomlCodec  = require("toml_codec")
@@ -49,7 +50,7 @@ end
 --- @return string
 local function new_config_path()
 	local base = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
-	base = base:gsub("\\", "/"):gsub("/+$", "")
+	base = NativePath.without_trailing_separators(base)
 	_sequence = _sequence + 1
 	return string.format("%s/ergopti_onboarding_%d_%d_%d.toml", base, os.time(),
 		math.random(100000, 999999), _sequence)

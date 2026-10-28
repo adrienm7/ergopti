@@ -32,7 +32,7 @@ local M = {}
 function M.with_sentinel(callback)
 	local names = {
 		"infra.logger", "infra.notifications", "infra.keycodes", "infra.i18n",
-		"modules.gestures.engine", "modules.gestures.actions", "modules.keylogger",
+		"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
 		"adapters.event_provenance", "adapters.synthetic_input",
 		"adapters.timer_scheduler", "adapters.key_state",
 		"modules.shortcuts.script_control",
@@ -61,7 +61,7 @@ function M.with_sentinel(callback)
 			get_label = function(name) return name end,
 			execute_single = function() return false end,
 		}
-		package.loaded["modules.keylogger"] = {log_shortcut = function() end}
+		package.loaded["modules.keystats"] = {log_shortcut = function() end}
 		package.loaded["adapters.event_provenance"] = {
 			STATUS_UNREADABLE = "unreadable",
 			classify_with_fence = function() return nil, "hardware", nil end,
@@ -138,7 +138,7 @@ function M.with_configurable(callback)
 		package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
 		package.loaded["adapters.file_system"] = {
 			read = function() return Json.encode(catalogue) end,
-			read_with_status = function() return '[shortcuts.keyboard]\ncmd_a = "throwing_action"\n', "ok" end,
+			read_with_status = function() return '[shortcuts.keyboard]\nprimary_a = "throwing_action"\n', "ok" end,
 			write = function() error("callback dispatch must not publish preferences") end,
 		}
 		package.loaded["adapters.hotkey_registrar"] = {

@@ -25,7 +25,7 @@ class _CurlCaptureDirectoryMoveGraphCapture extends _UpdaterCurlCaptureLedger {
 		this.GraphDirectories := Map(10, true)
 		this.GraphPaths := Map(this.Path, 10)
 		Id := 20
-		for Name in ["artifact.bin", "headers.bin", "capability.json", "transport.conf"] {
+		for Name in ["artifact.bin", "headers.bin"] {
 			this.GraphHandles[Id] := Id
 			this.GraphDirectories[Id] := false
 			this.GraphPaths[this.Path . "\" . Name] := Id
@@ -159,14 +159,14 @@ _CurlCaptureDirectoryMoveGraphCase(Point := 0) {
 			Owner.RenameCalls := 0
 			AssertTrue(Owner.Execute())
 			_CurlCaptureDirectoryMoveGraphCheck(Capture, Owner.Target)
-			AssertEqual(9, Owner.RenameCalls, "four staging moves, one empty root move, and four placement moves actually commit")
+			AssertEqual(5, Owner.RenameCalls, "two staging moves, one empty root move, and two placement moves actually commit")
 			AssertFalse(Owner.Exists(Owner.Source))
 		}
 		AssertTrue(Owner.Closed)
 		AssertFalse(Capture.Running)
 		AssertEqual(0, Capture.FixtureDirectoryMove)
 		AssertFalse(Owner.Exists(Owner.HoldingPath), "the exact empty holding namespace retires only after all children leave")
-		AssertEqual(5, Capture.GraphHandles.Count, "only the five original metadata authorities remain")
+		AssertEqual(3, Capture.GraphHandles.Count, "only the three original metadata authorities remain")
 	} finally {
 		if _CurlCaptureDirectoryMoveFixtureDebt.Has(ObjPtr(Capture)) && _CurlCaptureDirectoryMoveFixtureDebt[ObjPtr(Capture)] == Owner
 			_CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(Capture))
@@ -174,14 +174,14 @@ _CurlCaptureDirectoryMoveGraphCase(Point := 0) {
 }
 Test("updater curl capture: actual fixture owner stages retained children before the empty graph root move",
 	_CurlCaptureDirectoryMoveGraphCase)
-loop 9
+loop 5
 	Test("updater curl capture: exact graph transition " . A_Index . " refusal restores every held identity",
 		_CurlCaptureDirectoryMoveGraphCase.Bind(A_Index))
 
 _CurlCaptureDirectoryMoveGraphForeignRollback() {
 	global _CurlCaptureDirectoryMoveFixtureDebt
 	Capture := _CurlCaptureDirectoryMoveGraphCapture()
-	Owner := _CurlCaptureDirectoryMoveGraph(Capture, 6)
+	Owner := _CurlCaptureDirectoryMoveGraph(Capture, 4)
 	try {
 		AssertThrows(ObjBindMethod(Owner, "Execute"))
 		Capture.GraphPaths[Owner.Source] := 999

@@ -157,6 +157,7 @@ end
 local function sticky_physical_event()
 	local observed = { set_calls = 0, flags = {} }
 	local event = {
+		getKeyCode = function() return 0 end,
 		getFlags = function() return {} end,
 		setFlags = function(_, flags)
 			observed.set_calls = observed.set_calls + 1

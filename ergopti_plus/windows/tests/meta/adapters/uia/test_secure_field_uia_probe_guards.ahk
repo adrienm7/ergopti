@@ -20,7 +20,7 @@
 ; the typing path. The probe-site set is DERIVED FROM THE SOURCE rather than
 ; listed, so a new call site joins the guarantee automatically instead of
 ; quietly reintroducing the stall. Deriving it immediately turned up a FOURTH
-; site the shipped enumeration never named — the keylogger's password probe.
+; site the shipped enumeration never named — the keystats's password probe.
 ; That probe now shares the killable worker with selection capture, so its COM
 ; fault and latency are isolated instead of exempted in the resident process.
 ;

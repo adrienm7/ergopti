@@ -17,6 +17,42 @@
 --- ==============================================================================
 
 local M = {}
+
+--- English formats of the keys a caption with several getters (caption_getters) reads.
+--- Such a caption refuses a format without its placeholders, so a stub that echoes
+--- the key (the usual one) would drop the whole row; a stub that replaces the
+--- baseline starts from these.
+M.I18N_PLACEHOLDER_FORMATS = { ["menu.llm.server_port_label"] = "%s server port: %s" }
+
+--- The shared timing registry, built from the real file on first use. A fixture that virtualises
+--- the file system or the shared paths calls M.provide_timings() before it does, so a call-time
+--- read of the registry (`require("infra.timings").sec(...)`) answers with the real values
+--- instead of failing on a missing virtual constants.toml.
+local REAL_TIMINGS = nil
+
+--- Builds the real timing registry reader once, while the file system is real. The runner calls it
+--- before any test; M.provide_timings() builds it on demand when a suite runs without the runner.
+local function real_timings()
+	if REAL_TIMINGS == nil then
+		local silent = setmetatable({}, { __index = function() return function() end end })
+		REAL_TIMINGS = require("timings").new({
+			logger = silent, log = "timings", loaded_level = "done",
+			shared_path = function(rel) return M.shared(rel) end,
+			parse = require("infra.toml.reader").parse,
+		})
+	end
+	return REAL_TIMINGS
+end
+
+--- Reads the registry now, before a fixture replaces the file system.
+function M.warm_timings()
+	real_timings()
+end
+
+--- Installs the real timing registry reader as the module the code under test requires.
+function M.provide_timings()
+	package.loaded["infra.timings"] = real_timings()
+end
 local CommandLines = require("tests.support.command_lines")
 local SourceFile = require("tests.support.source_file")
 
@@ -279,11 +315,17 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- was first required, and no later call here can reach it. A test that needs
 	-- such a submodule re-read must clear it itself.
 	loaded[module_name] = nil
-	-- The keylogger and its process-lifetime physical-source settlement port
+	-- Foreign ledger readers retain the native hash API across ingest turns.
+	loaded["adapters.foreign_ledger_snapshot"] = nil
+	if module_name == "modules.keystats.export" or module_name == "adapters.foreign_ledger_snapshot" then
+		loaded["infra.paced_job"] = nil
+		loaded["adapters.timer_scheduler"] = nil
+	end
+	-- The keystats and its process-lifetime physical-source settlement port
 	-- form one ownership unit. A fresh fixture parent cannot inherit a child
 	-- bound to the preceding CoreState; the scoped proxy restores both caches.
-	if module_name == "modules.keylogger" or module_name == "modules.keylogger.init" then
-		loaded["modules.keylogger.physical_accounting_mode"] = nil
+	if module_name == "modules.keystats" or module_name == "modules.keystats.init" then
+		loaded["modules.keystats.physical_accounting_mode"] = nil
 	end
 	-- Expander and TerminatorReplay form one ownership unit: Expander.init now
 	-- consumes the replay module's exact commitment, and replay correctly refuses
@@ -378,9 +420,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- { sec = function() ... end }, no M.ms). lib.timings has no hs dependency
 	-- and is cheap to re-parse from constants.toml, so always reloading the real
 	-- module is safe. Without this, any later test whose require chain reaches
-	-- modules.keylogger (which calls Timings.ms(...) at module load time, e.g.
+	-- modules.keystats (which calls Timings.ms(...) at module load time, e.g.
 	-- via modules.keymap.llm_bridge) crashes with "attempt to call a nil value
-	-- (field 'ms')" the moment modules.keylogger is not already cached.
+	-- (field 'ms')" the moment modules.keystats is not already cached.
 	loaded["infra.timings"] = nil
 
 	-- Drop the keyboard-layout install / input-source modules (split out of
@@ -433,8 +475,11 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
 	-- canonical "— … —" decoration, so the stub must expose them or any builder
 	-- that renders a section header crashes with a nil-field call.
+	-- A caption that takes several getters (caption_getters) refuses a format without its
+	-- placeholders, so the keys the AI menu builds that way carry their English format.
+	local PLACEHOLDER_FORMATS = M.I18N_PLACEHOLDER_FORMATS
 	loaded["infra.i18n"] = {
-		get             = function(key) return key end,
+		get             = function(key) return PLACEHOLDER_FORMATS[key] or key end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
 		decorate_section = function(text) return "— " .. text .. " —" end,
@@ -551,6 +596,27 @@ local _production_sources = nil
 
 --- Loads (once) every production Lua file under the driver root.
 --- @return table Array of file bodies, tests/ excluded.
+--- Source text in which each generated config-key reference reads as the quoted string it
+--- stands for, for tests that scan driver source for the literal a call passes. A name the
+--- generated tables do not hold is left as written, so the scan still refuses it.
+--- @param text string Lua source text.
+--- @return string expanded
+function M.expand_config_keys(text)
+	local keys = require("config_keys")
+	local function resolve(whole, root_table, name)
+		local found, tbl = pcall(function() return keys[root_table] end)
+		if not found then return whole end
+		local ok, value = pcall(function() return tbl[name] end)
+		return ok and type(value) == "string" and string.format("%q", value) or whole
+	end
+	text = text:gsub('require%("config_keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
+		return resolve('require("config_keys").' .. root_table .. "." .. name, root_table, name)
+	end)
+	return (text:gsub("ConfigKeys%.(%u+)%.([%u%d_]+)", function(root_table, name)
+		return resolve("ConfigKeys." .. root_table .. "." .. name, root_table, name)
+	end))
+end
+
 local function production_sources()
 	if _production_sources then return _production_sources end
 
@@ -579,7 +645,7 @@ local function production_sources()
 
 	local bodies = {}
 	for _, path in ipairs(paths) do
-		bodies[#bodies + 1] = SourceFile.read(path)
+		bodies[#bodies + 1] = M.expand_config_keys(SourceFile.read(path))
 	end
 
 	-- A completed but empty inventory is not reusable source evidence. Leaving
@@ -793,14 +859,19 @@ function M.make_logger_stub()
 	local noop = function() end
 	return {
 		debug   = noop, trace   = noop, done    = noop,
-		info    = noop, start   = noop, success = noop,
+		info    = noop, start   = noop, success = noop, evidence = noop,
 		warn    = noop, error   = noop,
 		set_level = noop, set_sink = noop, is_enabled = function() return false end,
+		-- The level table is the real shared one: production reads Logger.LEVELS
+		-- to gate work that only an enabled level prints.
+		LEVELS = require("logger").LEVELS,
 		ring_buffer_snapshot = function() return {} end,
 		session_issues = function() return { warn_count = 0, err_count = 0, last_error = nil } end,
 		pcall   = function(_, fn, ...) return pcall(fn, ...) end,
 		callback = function(_, _, fn, ...) return xpcall(fn, debug.traceback, ...) end,
 		build   = function() return noop end,
+		-- Every dialog_util modal runs through this wrapper; it has no clock here.
+		run_modal = function(fn, ...) return fn(...) end,
 		redact_message = function(text) return text end,
 		install_runtime_error_capture = noop,
 		init_log_path = noop,

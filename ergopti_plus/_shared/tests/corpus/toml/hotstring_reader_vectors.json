@@ -1,0 +1,769 @@
+{
+	"_comment": "Hotstring reader header and logical-value vectors, replayed by _shared/lua/test/toml_hotstring_reader_vectors_contract.lua on macOS and Linux. entry point: the hotstring TOML reader's parse_text(text) -> document, committed. text is the whole file. expect.committed is whether the source receipt is issued; a refused source exposes no section and no source entry (source_entries is then 0). On a committed text, sections lists, for each named section (a literal hotstring group name, not a key path), the output of its first entry; first_section is the first section in file order; source_entries is the number of source entries; meta_delays lists [_meta.sections.<name>] delays. A section header such as [[name]] names the literal group; [x.y] tables under [_meta] are metadata paths. Converted from toml_quoted_headers_contract.lua.",
+	"entry_point": "hotstring TOML reader parse_text(text) -> document (sections, sections_order, source_entries, meta), committed",
+	"drivers": {
+		"macos": "Replays every vector.",
+		"linux": "Replays every vector.",
+		"windows": "Not ported: one AHK consumer must call the Windows hotstring TOML reader on each text and compare the committed verdict, the sections, their first output and order, the source entry count and the metadata delays."
+	},
+	"vectors": [
+		{
+			"id": "malformed-header-1-refused",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[probe\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "malformed-header-2-refused",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[[probe\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "malformed-header-3-refused",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[[probe]\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "malformed-header-4-refused",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[probe]]\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "malformed-header-5-refused",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[]\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "malformed-header-6-refused",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[probe..child]\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "malformed-header-7-refused",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[\"open]\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "malformed-header-8-refused",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[\"bad\\q\"]\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "malformed-header-9-refused",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[probe] trailing\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "malformed-header-10-refused",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[[probe]] trailing\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "complete-unfamiliar-header-1-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[future.settings]\n[[after]]\n\"a\" = { output = \"A\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "before",
+						"output": "B"
+					},
+					{
+						"name": "after",
+						"output": "A"
+					}
+				]
+			}
+		},
+		{
+			"id": "complete-unfamiliar-header-2-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[_meta.sections.\"group.name\"]\n[[after]]\n\"a\" = { output = \"A\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "before",
+						"output": "B"
+					},
+					{
+						"name": "after",
+						"output": "A"
+					}
+				]
+			}
+		},
+		{
+			"id": "complete-unfamiliar-header-3-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[_meta.sections.\"group#name\"] # retained comment\n[[after]]\n\"a\" = { output = \"A\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "before",
+						"output": "B"
+					},
+					{
+						"name": "after",
+						"output": "A"
+					}
+				]
+			}
+		},
+		{
+			"id": "complete-unfamiliar-header-4-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[[future.settings]]\n[[after]]\n\"a\" = { output = \"A\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "before",
+						"output": "B"
+					},
+					{
+						"name": "after",
+						"output": "A"
+					}
+				]
+			}
+		},
+		{
+			"id": "complete-unfamiliar-header-5-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[before]]\n\"b\" = { output = \"B\" }\n[longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong]\n[[after]]\n\"a\" = { output = \"A\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "before",
+						"output": "B"
+					},
+					{
+						"name": "after",
+						"output": "A"
+					}
+				]
+			}
+		},
+		{
+			"id": "historical-literal-name-1-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "",
+						"output": "kept"
+					}
+				],
+				"first_section": "",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "historical-literal-name-2-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[.probe]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": ".probe",
+						"output": "kept"
+					}
+				],
+				"first_section": ".probe",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "historical-literal-name-3-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[probe]]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "probe]",
+						"output": "kept"
+					}
+				],
+				"first_section": "probe]",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "historical-literal-name-4-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[dotted.Équipe]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "dotted.Équipe",
+						"output": "kept"
+					}
+				],
+				"first_section": "dotted.Équipe",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "historical-literal-name-5-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[Équipe d'été]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "Équipe d'été",
+						"output": "kept"
+					}
+				],
+				"first_section": "Équipe d'été",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "historical-literal-name-6-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[quote\"section]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "quote\"section",
+						"output": "kept"
+					}
+				],
+				"first_section": "quote\"section",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "historical-literal-name-7-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[with spaces]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "with spaces",
+						"output": "kept"
+					}
+				],
+				"first_section": "with spaces",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "historical-literal-name-8-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[probe..child]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "probe..child",
+						"output": "kept"
+					}
+				],
+				"first_section": "probe..child",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "historical-literal-name-9-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[hash\"#section]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "hash\"#section",
+						"output": "kept"
+					}
+				],
+				"first_section": "hash\"#section",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "historical-literal-name-10-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[bracket]section]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "bracket]section",
+						"output": "kept"
+					}
+				],
+				"first_section": "bracket]section",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "historical-literal-name-11-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[bracket[section]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "bracket[section",
+						"output": "kept"
+					}
+				],
+				"first_section": "bracket[section",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "historical-literal-name-12-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[[\"bad\\q\"]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "\"bad\\q\"",
+						"output": "kept"
+					}
+				],
+				"first_section": "\"bad\\q\"",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "exact-literal-name-1-before-a-comment",
+			"group": "toml-raw-comment",
+			"text": "[[Équipe d'été]] # notes\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "Équipe d'été",
+						"output": "kept"
+					}
+				],
+				"first_section": "Équipe d'été",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "exact-literal-name-2-before-a-comment",
+			"group": "toml-raw-comment",
+			"text": "[[Équipe d'été]]#notes\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "Équipe d'été",
+						"output": "kept"
+					}
+				],
+				"first_section": "Équipe d'été",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "exact-literal-name-3-before-a-comment",
+			"group": "toml-raw-comment",
+			"text": "[[Équipe d'été]]\t# notes\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "Équipe d'été",
+						"output": "kept"
+					}
+				],
+				"first_section": "Équipe d'été",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "exact-literal-name-4-before-a-comment",
+			"group": "toml-raw-comment",
+			"text": "[[quote\"section]] # notes\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "quote\"section",
+						"output": "kept"
+					}
+				],
+				"first_section": "quote\"section",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "exact-literal-name-5-before-a-comment",
+			"group": "toml-raw-comment",
+			"text": "[[quote\"section]]#notes\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "quote\"section",
+						"output": "kept"
+					}
+				],
+				"first_section": "quote\"section",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "exact-literal-name-6-before-a-comment",
+			"group": "toml-raw-comment",
+			"text": "[[quote\"section]]\t# notes\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "quote\"section",
+						"output": "kept"
+					}
+				],
+				"first_section": "quote\"section",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "exact-literal-name-7-before-a-comment",
+			"group": "toml-raw-comment",
+			"text": "[[hash\"#section]] # notes\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "hash\"#section",
+						"output": "kept"
+					}
+				],
+				"first_section": "hash\"#section",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "exact-literal-name-8-before-a-comment",
+			"group": "toml-raw-comment",
+			"text": "[[hash\"#section]]#notes\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "hash\"#section",
+						"output": "kept"
+					}
+				],
+				"first_section": "hash\"#section",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "exact-literal-name-9-before-a-comment",
+			"group": "toml-raw-comment",
+			"text": "[[hash\"#section]]\t# notes\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "hash\"#section",
+						"output": "kept"
+					}
+				],
+				"first_section": "hash\"#section",
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "accepted-identity-1-never-reinterpreted",
+			"group": "toml-raw-comment",
+			"text": "[[quote\"section]] # literal]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "quote\"section]] # literal",
+						"output": "kept"
+					}
+				],
+				"first_section": "quote\"section]] # literal"
+			}
+		},
+		{
+			"id": "accepted-identity-2-never-reinterpreted",
+			"group": "toml-raw-comment",
+			"text": "[[apostrophe'section]] # literal]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "apostrophe'section]] # literal",
+						"output": "kept"
+					}
+				],
+				"first_section": "apostrophe'section]] # literal"
+			}
+		},
+		{
+			"id": "existing-refusal-1-retained",
+			"group": "toml-raw-comment",
+			"text": "[[quote\"section]] # notes ]] # ambiguous\n\"entry\" = { output = \"must not publish\" }\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "existing-refusal-2-retained",
+			"group": "toml-raw-comment",
+			"text": "[[apostrophe'section]]#notes]]#ambiguous\n\"entry\" = { output = \"must not publish\" }\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "existing-refusal-3-retained",
+			"group": "toml-raw-comment",
+			"text": "[[hash#section]]\n\"entry\" = { output = \"must not publish\" }\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "existing-refusal-4-retained",
+			"group": "toml-raw-comment",
+			"text": "[[hash#section]] # notes\n\"entry\" = { output = \"must not publish\" }\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "header-looking-value-continuation-1-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[_meta]\nfuture_matrix = [\n [1, 2],\n]\n[[after]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "after",
+						"output": "kept"
+					}
+				],
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "header-looking-value-continuation-2-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[_meta]\nfuture_matrix = [\n [1, { text = \"[not a header\" }],\n]\n[[after]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "after",
+						"output": "kept"
+					}
+				],
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "header-looking-value-continuation-3-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[_meta]\nfuture_text = \"\"\"\n[[not a header\n# \"\"\"\n[[after]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "after",
+						"output": "kept"
+					}
+				],
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "header-looking-value-continuation-4-preserved",
+			"group": "toml-hotstring-header",
+			"text": "[_meta]\nfuture_text = '''\n[[not a header\n# '''\n[[after]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "after",
+						"output": "kept"
+					}
+				],
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "quoted-metadata-path-distinct-from-the-literal-rule-name",
+			"group": "toml-hotstring-header",
+			"text": "[_meta.sections.\"dotted.Équipe\"]\ndelay = 0.2\n[[dotted.Équipe]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "dotted.Équipe",
+						"output": "kept"
+					}
+				],
+				"meta_delays": [
+					{
+						"name": "dotted.Équipe",
+						"delay": 0.2
+					}
+				]
+			}
+		},
+		{
+			"id": "unfinished-logical-value-1-refused",
+			"group": "toml-hotstring-value-eof",
+			"text": "[[before]]\n\"entry\" = { output = \"kept\" }\n[_meta]\nfuture_matrix = [\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "completed-logical-value-1-admitted",
+			"group": "toml-hotstring-value-eof",
+			"text": "[_meta]\nfuture_matrix = [\n]\n[[after]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "after",
+						"output": "kept"
+					}
+				],
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "unfinished-logical-value-2-refused",
+			"group": "toml-hotstring-value-eof",
+			"text": "[[before]]\n\"entry\" = { output = \"kept\" }\n[_meta]\nfuture_matrix = [\n [1, 2],\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "completed-logical-value-2-admitted",
+			"group": "toml-hotstring-value-eof",
+			"text": "[_meta]\nfuture_matrix = [\n [1, 2],\n]\n[[after]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "after",
+						"output": "kept"
+					}
+				],
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "unfinished-logical-value-3-refused",
+			"group": "toml-hotstring-value-eof",
+			"text": "[[before]]\n\"entry\" = { output = \"kept\" }\n[_meta]\nfuture_text = \"\"\"\n[[not a header\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "completed-logical-value-3-admitted",
+			"group": "toml-hotstring-value-eof",
+			"text": "[_meta]\nfuture_text = \"\"\"\n[[not a header\n\"\"\"\n[[after]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "after",
+						"output": "kept"
+					}
+				],
+				"source_entries": 1
+			}
+		},
+		{
+			"id": "unfinished-logical-value-4-refused",
+			"group": "toml-hotstring-value-eof",
+			"text": "[[before]]\n\"entry\" = { output = \"kept\" }\n[_meta]\nfuture_text = '''\n[[not a header\n",
+			"expect": {
+				"committed": false,
+				"source_entries": 0
+			}
+		},
+		{
+			"id": "completed-logical-value-4-admitted",
+			"group": "toml-hotstring-value-eof",
+			"text": "[_meta]\nfuture_text = '''\n[[not a header\n'''\n[[after]]\n\"entry\" = { output = \"kept\" }\n",
+			"expect": {
+				"committed": true,
+				"sections": [
+					{
+						"name": "after",
+						"output": "kept"
+					}
+				],
+				"source_entries": 1
+			}
+		}
+	]
+}

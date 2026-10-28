@@ -2,16 +2,44 @@
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://ergopti.com/schema/tap_hold.schema.json",
 	"title": "Ergopti+ tap-hold configuration (shared)",
-	"description": "JSON Schema for _shared/tap_hold/defaults.toml AND for the AHK driver's complete tap-hold configuration under config/ergopti_plus/ahk/tap_hold.toml. The per-driver file is seeded once from the driver-local defaults at first boot and then owned by the user — there is no runtime merge.",
+	"description": "JSON Schema for _shared/tap_hold/defaults.toml AND for the Windows and Linux per-driver tap_hold.toml. The shared defaults are read at runtime on every boot; the user file is laid over them key by key on Windows, and on Linux when it sets [tap_hold] inherit_defaults = true.",
 	"type": "object",
 	"additionalProperties": false,
-	"required": ["tap_hold"],
 
 	"properties": {
+		"_meta": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"schema_version": {
+					"type": "integer",
+					"minimum": 0,
+					"description": "The version of the user file, written by the Linux driver and migrated at boot by _shared/tap_hold/migrations.toml. Absent: an unstamped file from before versioning."
+				}
+			}
+		},
 		"tap_hold": {
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
+				"enabled": {
+					"type": "boolean",
+					"description": "Switches the feature on or off (Linux file switch)."
+				},
+				"inherit_defaults": {
+					"type": "boolean",
+					"description": "Lays the file over the shipped recommendation key by key."
+				},
+				"time_activation_seconds": {
+					"type": "number",
+					"exclusiveMinimum": 0,
+					"maximum": 10,
+					"description": "The GLOBAL delay in seconds: what every key without a delay of its own waits before its hold fires. Absent: the timing registry's tap_hold.default_activation_ms."
+				},
+				"explicit_delays": {
+					"type": "boolean",
+					"description": "Retired. Windows still writes it: true means every per-key time_activation_seconds in the file is the user's own. Linux no longer reads or writes it; its v0_to_v1 migration (_shared/tap_hold/migrations.toml) uses it once, to leave the delays of a flagged file alone, and removes it."
+				},
 				"keys": { "$ref": "#/$defs/keys_map" }
 			}
 		}
@@ -27,7 +55,6 @@
 		"key_definition": {
 			"type": "object",
 			"additionalProperties": false,
-			"required": ["time_activation_seconds"],
 			"properties": {
 				"enabled": {
 					"type": "boolean",
@@ -36,8 +63,8 @@
 				"time_activation_seconds": {
 					"type": "number",
 					"minimum": 0,
-					"maximum": 5,
-					"description": "Hold threshold in seconds. Below = tap_action; above = hold_*."
+					"maximum": 10,
+					"description": "This key's OWN hold delay in seconds, set by the user. Absent: the key follows the global delay. Below = tap_action; above = hold_*."
 				},
 				"tap_action": {
 					"type": "string",

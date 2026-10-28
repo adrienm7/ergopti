@@ -24,10 +24,11 @@ Values are grouped into thematic sections:
 | `[debounce]`   | Keyboard/clipboard settle delays, Karabiner probing, hotstring expansion                        |
 | `[gestures]`   | Touchdevice probe loop, tap geometry, click cooldown                                            |
 | `[keep_awake]` | Mouse-jitter activity simulation tick bounds                                                    |
-| `[keylogger]`  | Ingest tick, session gaps, WPM windows, network/sensor polls, hook flush                        |
+| `[keystats]`   | Ingest tick, session gaps, WPM windows, network/sensor polls, hook flush                        |
 | `[tap_hold]`   | Tap-min, key-repeat initial delay and interval, one-shot shift                                  |
 | `[ergonomics]` | Block-break, flow window, hesitation detection                                                  |
 | `[ui]`         | Menu refresh delays, Karabiner lifecycle, WPM widgets, HS reload debounce                       |
+| `[adapters]`   | Default deadline of the HTTP, digest and child-process adapters (Linux and macOS)               |
 
 All values are in **milliseconds** unless the key name explicitly says `_sec`.
 

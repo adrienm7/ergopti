@@ -19,7 +19,7 @@ local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 local MENU_MODULES = {
 	keyboard_layout = "ui.menu.menu_keyboard_layout",
 	hotstrings      = "ui.menu.menu_hotstrings",
-	keylogger       = "ui.menu.menu_metrics",
+	keystats       = "ui.menu.menu_metrics",
 	shortcuts       = "ui.menu.menu_shortcuts",
 	tap_holds       = "ui.menu.menu_tap_holds",
 	gestures        = "ui.menu.menu_gestures",
@@ -102,7 +102,7 @@ local function build_tray(paused)
 		paused     = paused,
 		config     = { log_level = 2 },
 		base_dir   = helpers.driver_root(),
-		state      = { shortcuts = true, gestures = true, keylogger_enabled = true, hotstrings = {} },
+		state      = { shortcuts = true, gestures = true, keystats_enabled = true, hotstrings = {} },
 		hotfiles   = {},
 		save_prefs = function() return true end,
 		updateMenu = function() end,

@@ -35,7 +35,10 @@ The build script (`tools/build/build-features-manifest.js`, exposed as
 `static/ergopti_plus/_shared/tap_hold/defaults.toml`) and emits:
 
 - `static/ergopti_plus/windows/_generated/features_manifest.ahk` — AHK `Map`
-- `static/ergopti_plus/macos/_generated/features_manifest.lua` — Lua table
+- `static/ergopti_plus/_shared/lua/features/manifest_data.lua` — the Lua table
+  macOS and Linux share, written once; each driver's
+  `_generated/features_manifest.lua` projects it through
+  `features.manifest` when it loads
 - Per-driver `_generated/config_template.toml` — ready-to-copy user config
 - Per-driver `_generated/tap_hold_template.toml`
 
@@ -80,4 +83,5 @@ repository so drivers can boot without running the build step.
 - Build script: `tools/build/build-features-manifest.js`
 - npm script: `package.json` → `"build:manifest"`
 - Generated AHK output: `static/ergopti_plus/windows/_generated/features_manifest.ahk`
-- Generated Lua output: `static/ergopti_plus/macos/_generated/features_manifest.lua`
+- Generated Lua output: `static/ergopti_plus/_shared/lua/features/manifest_data.lua`
+  (projected by `_shared/lua/features/manifest.lua`)

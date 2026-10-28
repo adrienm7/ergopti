@@ -317,7 +317,7 @@ function M.warmup_webkit()
 		pcall(function() wv:html("<html><body></body></html>") end)
 		pcall(function() wv:hide() end)
 		-- Hold the warmup webview for 5 s so WebKit fully initialises, then release.
-		if DeferredWork.after(5,
+		if DeferredWork.after(require("infra.timings").sec("ui", "webkit_warmup_hold_ms"),
 			function()
 				if _webkit_warmup_session ~= session then return false end
 				session.pending = false

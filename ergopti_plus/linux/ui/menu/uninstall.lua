@@ -32,7 +32,9 @@ local function read_file(path)
 end
 
 --- Requests removal after the menu's own localized confirmation.
---- @param opts table { confirm, fail, quit, title, confirmation, failure }; tests
+--- @param opts table { confirm, fail, quit, title, confirmation, failure,
+---   missing_program }; missing_program is the localized message whose {1} the
+---   script replaces by the program an exit 69 reports missing; tests
 ---   also pass root, version_source, run, read and getenv.
 --- @return boolean launched
 function M.run(opts)
@@ -70,6 +72,7 @@ function M.run(opts)
 	end
 	command = command .. " --yes --wait-owner " .. quote(pid .. ":" .. started)
 		.. " --gui " .. quote(WindowTitles.compose(opts.title)) .. " " .. quote(opts.failure)
+		.. " " .. quote(opts.missing_program)
 	if run("systemctl --user show-environment >/dev/null 2>&1") then
 		local launcher = "systemd-run --user --collect --quiet --service-type=exec --unit="
 			.. quote("ergopti-uninstall-" .. pid .. "-" .. started)

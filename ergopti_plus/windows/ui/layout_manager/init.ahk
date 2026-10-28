@@ -52,7 +52,8 @@ global LAYMGR_HOST_ACCESS_ALLOW := 1
 ; The only actions the page may send (the page and the Lua hosts declare the
 ; same list; tools/test/test-layout-manager-page.cjs pins the three).
 global LAYMGR_ACTIONS := Map("ready", true, "refresh", true, "install", true, "update", true,
-	"uninstall", true, "select", true, "open_homepage", true, "close", true)
+	"uninstall", true, "select", true, "open_homepage", true, "close", true,
+	"composer_open", true, "composer_save", true, "composer_remove", true)
 
 
 
@@ -144,8 +145,12 @@ LayoutManager_PageState(LocalDir := unset) {
 	}
 	global _LayMgrWeb_RuntimeRefresh
 	Busy := (_LayMgrWeb_RuntimeRefresh is Map) ? _LayMgrWeb_RuntimeRefresh : LayoutCatalogue_Busy()
+	; shortcut_menu_path: the extension file this driver loads as a layout's
+	; shortcut menu (ui/menu/menu_shortcuts.ahk); the page counts it and never
+	; derives it from the platform.
 	return Map(
 		"platform", LAYOUT_CATALOGUE_PLATFORM,
+		"shortcut_menu_path", "shortcuts/menu.ahk",
 		"index", (Index is Map) ? Index : JSON_NULL,
 		"source", Source,
 		"error", (Last["error"] is Map) ? Last["error"] : JSON_NULL,
@@ -188,26 +193,39 @@ _LayMgrWeb_Strings() {
  * @param {Map} Payload - Decoded message.
  * @param {Map} Deps - "local_dir", "push" (FunctionName, Payload), "install",
  *   "uninstall", "select", "refresh", "open_url", "close"; the production ones by default.
+ * @param {Integer} SessionEpoch - The scheduling session; the current one for direct callers.
  * @returns {boolean} Whether the message was accepted.
  */
-LayoutManager_HandleMessage(Payload, Deps := 0) {
-	global LAYMGR_ACTIONS, _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh
-	if !(Deps is Map)
-		Deps := _LayMgrWeb_DefaultDeps()
+LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
+	global LAYMGR_ACTIONS, _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh, _LayMgrWeb_SessionEpoch
+	if !IsSet(SessionEpoch)
+		SessionEpoch := _LayMgrWeb_SessionEpoch
 	if !(Payload is Map) || !Payload.Has("action") || !(Payload["action"] is String)
 			|| !LAYMGR_ACTIONS.Has(Payload["action"]) {
 		LoggerWarn("LayoutManager", "Refused a layout manager message outside the allowlist.")
 		return false
 	}
 	Action := Payload["action"]
+	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+		return false
+	if !(Deps is Map)
+		Deps := _LayMgrWeb_DefaultDeps()
+	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+		return false
 	if (_LayMgrWeb_RuntimeRefresh is Map) && (Action == "install" || Action == "update"
-			|| Action == "uninstall" || Action == "select") {
+			|| Action == "uninstall" || Action == "select" || Action == "composer_save"
+			|| Action == "composer_remove") {
 		LoggerWarn("LayoutManager", "Refused a layout mutation while runtime refresh is pending.")
 		return false
 	}
 	if (Action == "ready") {
 		_LayMgrWeb_Result := 0
-		Deps["push"].Call("initData", Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"])))
+		Initial := Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"]))
+		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			return false
+		Deps["push"].Call("initData", Initial)
+		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			return false
 		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
 		return true
 	}
@@ -219,12 +237,16 @@ LayoutManager_HandleMessage(Payload, Deps := 0) {
 		Deps["close"].Call()
 		return true
 	}
+	if (Action == "composer_open" || Action == "composer_save" || Action == "composer_remove")
+		return LayoutComposer_Handle(Action, Payload, Deps)
 	Id := Payload.Has("id") ? Payload["id"] : ""
 	if !LayoutRegistry_IsValidId(Id) {
 		LoggerWarn("LayoutManager", "Refused a layout manager '{1}' without a valid layout id.", Action)
 		return false
 	}
 	State := LayoutManager_PageState(Deps["local_dir"])
+	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+		return false
 	Entry := LayoutCatalogue_Entry(State["index"], Id)
 	if (Action == "open_homepage") {
 		Source := (Entry is Map) ? Entry : State["installed"].Get(Id, 0)
@@ -233,6 +255,8 @@ LayoutManager_HandleMessage(Payload, Deps := 0) {
 			LoggerWarn("LayoutManager", "Refused to open the homepage of '{1}': none is published over https.", Id)
 			return false
 		}
+		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			return false
 		Deps["open_url"].Call(Homepage)
 		return true
 	}
@@ -241,11 +265,16 @@ LayoutManager_HandleMessage(Payload, Deps := 0) {
 			LoggerWarn("LayoutManager", "Refused to {1} '{2}': the catalogue does not list it.", Action, Id)
 			return false
 		}
+		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			return false
 		Deps["install"].Call(Id, _LayMgrWeb_OnDone.Bind(Deps, Id, Action))
-		_LayMgrWeb_PushState(Deps)
+		if _LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			_LayMgrWeb_PushState(Deps)
 		return true
 	}
 	if (Action == "select" && State["builtin"].Has(Id)) {
+		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			return false
 		Deps["select"].Call(Id)
 		return true
 	}
@@ -254,12 +283,22 @@ LayoutManager_HandleMessage(Payload, Deps := 0) {
 		return false
 	}
 	if (Action == "uninstall") {
+		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			return false
 		Outcome := Deps["uninstall"].Call(Id)
 		_LayMgrWeb_OnDone(Deps, Id, Action, Outcome["ok"], Outcome.Get("code", ""), Outcome.Get("detail", ""))
 		return true
 	}
+	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+		return false
 	Deps["select"].Call(Id)
 	return true
+}
+
+; Readiness initializes the admitted page under pause; user commands do not.
+_LayMgrWeb_CommandCurrent(SessionEpoch, Action) {
+	global _LayMgrWeb_SessionEpoch
+	return SessionEpoch == _LayMgrWeb_SessionEpoch && (Action == "ready" || !A_IsSuspended)
 }
 
 _LayMgrWeb_OnDone(Deps, Id, Action, Ok, CodeOrDetail := "", Detail := "") {
@@ -536,6 +575,12 @@ _LayMgrWeb_SessionCall(SessionEpoch, Callback, Params*) {
 			return false
 		; Claim before dispatch: both native navigation and the page emit ready.
 		_LayMgrWeb_ReadyEpoch := SessionEpoch
+	}
+	; Preserve the scheduling epoch across dependency reads and page snapshots.
+	if Callback == LayoutManager_HandleMessage && Params.Length > 0 {
+		if Params.Length == 1
+			Params.Push(0)
+		Params.Push(SessionEpoch)
 	}
 	try Callback(Params*)
 	catch as Err {

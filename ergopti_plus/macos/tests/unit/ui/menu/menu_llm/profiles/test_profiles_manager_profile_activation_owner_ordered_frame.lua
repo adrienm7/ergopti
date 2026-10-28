@@ -140,7 +140,11 @@ helpers.describe("complete ordered profile frame: actual macOS owner", function(
 			frame[1], frame[10] = frame[10], frame[1]
 			local rows = f.rows()
 			helpers.assert_eq(rows[1].title, f.i18n.get(oracle.labels.create))
-			helpers.assert_eq(rows[#rows].title, f.i18n.get(oracle.labels.auto_detect))
+			-- The per-application overrides end the submenu after the frame, behind
+			-- their separator, as on Windows: the frame's last row precedes them.
+			helpers.assert_eq(rows[#rows].title, f.i18n.get("menu.profiles.per_app_overrides"))
+			helpers.assert_eq(rows[#rows - 1].title, "-")
+			helpers.assert_eq(rows[#rows - 2].title, f.i18n.get(oracle.labels.auto_detect))
 			helpers.assert_eq(#f.fixture.recommendations, 0)
 		end)
 	end)

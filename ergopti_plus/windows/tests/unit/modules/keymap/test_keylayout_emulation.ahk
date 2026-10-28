@@ -378,25 +378,19 @@ Test("layout registry: URL, ids and verification against the index (layout-regis
 		"a truncated file must fail the size check")
 ))
 
-Test("curl: a request can write its body to a file, byte for byte (layout-registry-emulation)",
-	_KLT_CurlOutputFileCase)
+Test("transport: a request can write its body to a file, byte for byte (layout-registry-emulation)",
+	_KLT_OutputFileCase)
 
-_KLT_CurlOutputFileCase() {
-	Configs := []
-	; Reads the curl config at the spawn boundary, then refuses to start a child.
-	Capture := (Exe, Args, *) => (Configs.Push(FileRead(Args[3], "UTF-8")), 0)
+; The bytes themselves are proven against real WinHTTP by
+; tests/fixtures/winhttp_transport_controls.ps1; this guards the request surface.
+_KLT_OutputFileCase() {
 	Target := A_Temp . "\ergopti_keylayout_output_" . A_TickCount . ".test"
-	for OutputPath in [Target, ""] {
-		Req := CurlAsyncRequest(Map("spawn", Capture))
-		Req.Open("GET", "https://example.invalid/index.json", true)
-		if (OutputPath != "")
-			Req.SetOutputFile(OutputPath)
-		AssertThrows(() => Req.Send(), "a child that did not start must be reported")
-	}
-	AssertEqual(2, Configs.Length, "both requests must reach the spawn boundary")
-	AssertContains(Configs[1], "output = " . _HTTP_CurlConfigQuote(Target), "the body goes to the requested file")
-	AssertContains(Configs[2], 'output = "-"', "without an output file the body stays on stdout")
+	Req := CurlAsyncRequest()
+	AssertEqual("", Req.OutputPath, "without an output file the body is read back from the private response file")
+	Req.SetOutputFile(Target)
+	AssertEqual(Target, Req.OutputPath, "the body goes to the requested file")
 	AssertThrows(() => CurlAsyncRequest().SetOutputFile(""), "an empty output path is refused")
+	AssertThrows(() => CurlAsyncRequest().SetOutputFile("C:\bad`nname"), "a path with a control character is refused")
 }
 
 Test("layout registry: a local copy is read only when it matches its record (layout-registry-emulation)",

@@ -21,7 +21,7 @@
 ;    instead of emulating something else.
 ; 3. A download lands under a temporary name; the catalogue publishes it only
 ;    once the layout matches its index entry.
-; 4. The transfer runs in a curl child (CurlAsyncRequest) polled from a timer,
+; 4. The transfer runs in a native WinHTTP child (CurlAsyncRequest) polled from a timer,
 ;    so the keyboard thread never waits on the network. Every collaborator is
 ;    injectable so tests replay a download without a network.
 ; 5. The physical magic key follows one order: the user's configured key, the
@@ -55,11 +55,11 @@ global LAYOUT_REGISTRY_PARTIAL_SUFFIX := ".download"
 global LAYOUT_REGISTRY_USER_AGENT := "ErgoptiPlus-Layouts/1.0"
 
 ; How often a running download is polled. Short enough that a layout is ready a
-; tenth of a second after curl exits, long enough to cost nothing while it runs.
+; tenth of a second after the child exits, long enough to cost nothing while it runs.
 global LAYOUT_REGISTRY_POLL_MS := 100
 
-; Extra polls allowed past the transfer budget before a download that curl
-; never reported finished is abandoned (curl enforces the budget itself).
+; Extra polls allowed past the transfer budget before a download that the child
+; never reported finished is abandoned (the worker enforces the budget itself).
 global LAYOUT_REGISTRY_POLL_GRACE := 20
 
 
@@ -74,6 +74,7 @@ global LAYOUT_REGISTRY_POLL_GRACE := 20
 
 ; Parsed shared files, loaded on first use (they never change while running).
 global _LayoutRegistryDefaults := 0
+global _LayoutRegistryComposer := 0
 global _LayoutRegistryKeycodes := 0
 global _LayoutRegistryGithub := 0
 
@@ -104,6 +105,19 @@ LayoutRegistry_Settings() {
 	if !IsObject(_LayoutRegistryDefaults)
 		_LayoutRegistryDefaults := _LayoutRegistryReadJson("modules\layouts\defaults.json")["registry"]
 	return _LayoutRegistryDefaults
+}
+
+/**
+ * The [composer] table of _shared/modules/layouts/defaults.json: the reserved
+ * id the per-layer composer's layout is installed under, the folder that keeps
+ * the user's composition and its bounds (docs/layout-composer.md).
+ * @returns {Map}
+ */
+LayoutRegistry_Composer() {
+	global _LayoutRegistryComposer
+	if !IsObject(_LayoutRegistryComposer)
+		_LayoutRegistryComposer := _LayoutRegistryReadJson("modules\layouts\defaults.json")["composer"]
+	return _LayoutRegistryComposer
 }
 
 /** Reads a fresh canonical keycode table without adopting the public cache. */
@@ -164,6 +178,15 @@ LayoutRegistry_RawUrl(RelativePath) {
  */
 LayoutRegistry_LocalDir(ConfigDir) {
 	return ConfigDir . LayoutRegistry_Settings()["local_folder"] . "\"
+}
+
+/**
+ * Folder keeping the user's composition (declaration and compiled layout).
+ * @param {string} ConfigDir - Configuration folder, with its trailing backslash.
+ * @returns {string} Folder path with a trailing backslash.
+ */
+LayoutRegistry_ComposerDir(ConfigDir) {
+	return ConfigDir . LayoutRegistry_Composer()["folder"] . "\"
 }
 
 /**
@@ -292,7 +315,7 @@ _LayoutRegistryDefaultTransport() {
 }
 
 /**
- * Downloads one URL of the registry into ``Partial`` in a curl child polled
+ * Downloads one URL of the registry into ``Partial`` in a native WinHTTP child polled
  * from a timer, never on the keyboard thread, and calls
  * OnSettled(Status, Etag, Error) exactly once: Status 0 when no HTTP response
  * arrived, Error then saying why; Etag is the response's, "" when none.
@@ -302,7 +325,7 @@ _LayoutRegistryDefaultTransport() {
  * @param {Integer} TimeoutMs - Budget of the whole transfer, connection included.
  * @param {Map} Transport - "request" (a CurlAsyncRequest-like object),
  *   "resolve_proxy" (SystemProxy_ResolveAsync) and "schedule" (Fn, DelayMs);
- *   the curl transport when 0.
+ *   the managed transport when 0.
  * @param {Func} OnSettled
  */
 LayoutRegistry_Request(Url, Partial, Headers, TimeoutMs, Transport, OnSettled) {
@@ -310,7 +333,8 @@ LayoutRegistry_Request(Url, Partial, Headers, TimeoutMs, Transport, OnSettled) {
 	if !(Transport is Map)
 		Transport := _LayoutRegistryDefaultTransport()
 	Job := { Url: Url, Partial: Partial, Headers: Headers, TimeoutMs: TimeoutMs, Transport: Transport,
-		OnSettled: OnSettled, Settled: false, Started: Started, Request: 0 }
+		OnSettled: OnSettled, Settled: false, Started: Started, Request: 0,
+		Retiring: false, RetirementError: "" }
 	LoggerDebug("LayoutRegistry", "Fetching {1}", Url)
 	if Transport.Get("managed", false)
 		_LayoutRegistrySend(Job)
@@ -350,12 +374,41 @@ _LayoutRegistrySend(Job, Proxy := unset) {
 		if !Req.Send()
 			throw Error("The managed registry request refused dispatch.")
 	} catch as Err {
+		Failure := "cannot download " . Job.Url . ": " . Err.Message
 		if IsObject(Job.Request)
-			Job.Request.Abort()
-		_LayoutRegistrySettle(Job, 0, "", "cannot download " . Job.Url . ": " . Err.Message)
+			_LayoutRegistryRetire(Job, Job.Request, Failure)
+		else
+			_LayoutRegistrySettle(Job, 0, "", Failure)
 		return
 	}
 	_LayoutRegistryPoll(Job, Req, 0)
+}
+
+; Consumers own the response file. They may remove or replace it only after
+; the exact request confirms retirement, including a previously refused Abort.
+_LayoutRegistryRetire(Job, Req, Failure) {
+	global LAYOUT_REGISTRY_POLL_MS
+	PreviousCritical := Critical("On")
+	try {
+		if Job.Settled
+			return
+		if !Job.Retiring {
+			Job.RetirementError := Failure
+			Job.Retiring := true
+		}
+	} finally Critical(PreviousCritical)
+	Retired := false
+	try Retired := Req.Abort()
+	if Job.Settled
+		return
+	if Retired is Integer && Retired == 1 {
+		_LayoutRegistrySettle(Job, 0, "", Job.RetirementError)
+		return
+	}
+	; Keep the request, partial and single terminal callback owned while native
+	; completion or the facade's abort debt still has not proved quiescence.
+	; Scheduling failure remains visible to the caller; it never proves an ACK.
+	Job.Transport["schedule"].Call(_LayoutRegistryPoll.Bind(Job, Req, 0), LAYOUT_REGISTRY_POLL_MS)
 }
 
 _LayoutRegistryPoll(Job, Req, Polls) {
@@ -364,17 +417,19 @@ _LayoutRegistryPoll(Job, Req, Polls) {
 		return
 	}
 	global LAYOUT_REGISTRY_POLL_MS, LAYOUT_REGISTRY_POLL_GRACE
+	if Job.Retiring {
+		_LayoutRegistryRetire(Job, Req, Job.RetirementError)
+		return
+	}
 	try {
 		Ready := Req.WaitForResponse(0)
 	} catch as Err {
-		try Req.Abort()
-		_LayoutRegistrySettle(Job, 0, "", "download of " . Job.Url . " failed: " . Err.Message)
+		_LayoutRegistryRetire(Job, Req, "download of " . Job.Url . " failed: " . Err.Message)
 		return
 	}
 	if !Ready {
 		if (Polls > Ceil(Job.TimeoutMs / LAYOUT_REGISTRY_POLL_MS) + LAYOUT_REGISTRY_POLL_GRACE) {
-			try Req.Abort()
-			_LayoutRegistrySettle(Job, 0, "", "download of " . Job.Url . " did not finish in time")
+			_LayoutRegistryRetire(Job, Req, "download of " . Job.Url . " did not finish in time")
 			return
 		}
 		Job.Transport["schedule"].Call(_LayoutRegistryPoll.Bind(Job, Req, Polls + 1), LAYOUT_REGISTRY_POLL_MS)

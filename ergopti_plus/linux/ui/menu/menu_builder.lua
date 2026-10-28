@@ -39,6 +39,9 @@ local Languages = require("hotstrings.languages")
 local LocaleTable = require("_generated.locale_table")
 local MagicKey = require("modules.hotstrings.magic_key")
 local MagicKeySourceRows = require("keymap.magic_key_source")
+local MagicFrame = require("menu.frames.magic_frame")
+local ParentSource = require("menu.frames.parent_source")
+local PersonalInfoSource = require("menu.frames.personal_info_source")
 local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
 local Modal = require("ui.modal")
@@ -48,6 +51,7 @@ local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
 local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
 local LOG = "ui.menu.menu_builder"
+local COMMAND = require("config_keys").COMMAND
 
 --- Keeps private executable/argv data out of persistent menu presentation.
 local function binding_label(label, registry, binding, action)
@@ -151,7 +155,7 @@ local function _fill(template, placeholder, value)
 end
 
 local function shell_quote(value)
-	return "'" .. tostring(value or ""):gsub("'", "'\\''") .. "'"
+	return require("text_utils").shell_quote(value or "")
 end
 
 --- Normalises a child-process exit status across interpreters.
@@ -285,6 +289,8 @@ local function open_action_picker(title, current, binding, on_confirm, selected_
 		Logger.error(LOG, "Action picker is unavailable for '%s'.", tostring(title))
 		return false
 	end
+	local Paths = require("infra.config_paths")
+	local path = Paths.config("config.toml")
 	local items = type(selected_items) == "table" and selected_items or Gestures.get_picker_items()
 	local editor = Gestures.get_picker_parameter_fields(items, binding)
 	return Picker.open({
@@ -298,7 +304,13 @@ local function open_action_picker(title, current, binding, on_confirm, selected_
 		language_choices = editor.language_choices,
 		default_count = editor.default_count,
 		edit_current_label = editor.edit_current_label,
-	}, function(option, _state, picked) return on_confirm(option, picked) end)
+	}, function(option, _state, picked)
+		if Paths.config("config.toml") ~= path then
+			Logger.warn(LOG, "Action picker confirmation refused after its configuration folder changed.")
+			return false
+		end
+		return on_confirm(option, picked)
+	end)
 end
 
 --- The rows under one bindable slot: the searchable picker and, when the slot
@@ -318,8 +330,8 @@ local function slot_binding_rows(slot_label, bound, binding, assign)
 	local function pick() open_action_picker(slot_label, bound, binding, assign) end
 	local function clear() assign("none") end
 	local rows = ManifestMenu.template_rows("slot_binding_frame", {
-		["slot_binding_pick"] = pick,
-		["slot_binding_clear"] = clear,
+		[require("config_keys").COMMAND.SLOT_BINDING_PICK] = pick,
+		[require("config_keys").COMMAND.SLOT_BINDING_CLEAR] = clear,
 	}, {
 		["slot_binding_has_action"] = function() return bound ~= "none" end,
 	}, {})
@@ -421,7 +433,7 @@ local function _build_header(ctx)
 			fields[name] = value
 		end
 		local expected_kind = key == "linux_tray_active_header" and "label" or "command"
-		local expected_id = key == "linux_tray_active_header" and "linux_tray_active_header" or "linux_tray_resume"
+		local expected_id = key == "linux_tray_active_header" and "linux_tray_active_header" or require("config_keys").COMMAND.LINUX_TRAY_RESUME
 		if rawget(record, "type") ~= expected_kind or rawget(record, "id") ~= expected_id
 			or type(rawget(record, "i18n")) ~= "string" or rawget(record, "i18n") == ""
 			or rawget(record, "caption_getter") ~= "linux_tray_version"
@@ -461,7 +473,7 @@ local function _build_header(ctx)
 	if not current() then return nil end
 	local ok, rows = pcall(function()
 		if is_paused then
-			return ManifestMenu.template_rows("linux_tray_paused_header", { ["linux_tray_resume"] = function()
+			return ManifestMenu.template_rows("linux_tray_paused_header", { [require("config_keys").COMMAND.LINUX_TRAY_RESUME] = function()
 				if type(ctx.on_toggle_pause) ~= "function" then
 					Logger.error(LOG, "Paused title row: ctx.on_toggle_pause is absent — the script stays paused.")
 					return
@@ -537,12 +549,12 @@ local function _build_layouts(ctx)
 	-- The "Manage layouts…" row opens the shared layout manager window.
 	render_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do render_ctx.commands[key] = value end
-	render_ctx.commands["layout_manager"] = function()
+	render_ctx.commands[require("config_keys").COMMAND.LAYOUT_MANAGER] = function()
 		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 			Logger.error(LOG, "No webview manager in the menu context — the layout manager cannot open.")
 			return false
 		end
-		return ctx.webview.show("layout_manager")
+		return ctx.webview.show(require("config_keys").COMMAND.LAYOUT_MANAGER)
 	end
 
 
@@ -597,9 +609,7 @@ local function _build_layouts(ctx)
 			end
 
 			-- Ordered: `pairs` would reshuffle the list on every menu build.
-			local names = {}
-			for name in pairs(known) do names[#names + 1] = name end
-			table.sort(names)
+			local names = require("table_util").sorted_keys(known)
 
 			local rows = {}
 			for _, name in ipairs(names) do
@@ -626,7 +636,7 @@ local function _build_layouts(ctx)
 	-- The physical magic key: the key typing the magic key, chosen by pressing it
 	-- or from the candidates (modules/hotstrings/magic_key_source.lua); the rows
 	-- are the shared ones macOS draws too.
-	providers["magic_key_source"] = function()
+	providers[require("config_keys").LEAF.MAGIC_KEY_SOURCE] = function()
 		local Source = ctx.magic_key_source
 		if type(Source) ~= "table" then
 			Logger.error(LOG, "No physical magic-key owner in the menu context — its row cannot be built.")
@@ -672,71 +682,59 @@ local function _build_layouts(ctx)
 	end
 
 	-- Native-only status never acquires a preference or forced-input writer.
-	render_ctx.commands["number_row_mode"] = function() return false end
-	render_ctx.commands["number_row_edges"] = function() return false end
-	providers["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
+	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_MODE] = function() return false end
+	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end
+	providers["number_row_policy"] = function()
+		local NumberRowLive = require("modules.keymap.number_row_live")
+		local available, reason = NumberRowLive.available()
+		local stored = NumberRowLive.stored()
+		-- The choice is stored first; a refusal after that is told, except the two the
+		-- greyed row already explains.
+		local function applied(ok, code)
+			if not ok and code ~= "session_unsupported" and code ~= "no_source_layout" then
+				show_error(i18n_safe("layouts.linux_rows_not_applied"))
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands, {
+			available = available,
+			reason_key = reason == "no_source_layout" and "platform_reason.number_row_live_no_layout"
+				or "platform_reason.number_row_live_session",
+			get_order = function() return stored.order end,
+			get_edges = function() return stored.edges end,
+			set_order = function(value) return NumberRowLive.set("order", value, applied) end,
+			set_edges = function(value) return NumberRowLive.set("edges", value, applied) end,
+		})
+	end
+	-- Layout on pause / resume: the shared frames macOS draws, listing the
+	-- desktop's own layouts (ui/menu/pause_layout_rows.lua).
+	providers["layout_switching"] = function()
+		if type(ctx.pause_layout) ~= "table" then
+			Logger.error(LOG, "No pause layout switch in the menu context — its rows cannot be built.")
+			return {}
+		end
+		return require("ui.menu.pause_layout_rows").rows({
+			paused = ctx.paused == true,
+			t = i18n_safe,
+			show_error = show_error,
+			on_changed = function()
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+			preferences = require("infra.pause_layout_preferences"),
+			switch = ctx.pause_layout,
+		})
+	end
 	local rows = ManifestMenu
 		and ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, providers)
 		or {}
 	return receive(rows, { layout_enabled = function() return nil end })
 end
 
---- Retains the actual single editor declaration through provider projection.
---- Native callbacks refuse a withdrawn source before scheduling or opening UI.
+--- Delegates the personal-information editor source admission to the shared module.
 --- @return function|nil current
 --- @return function|nil template
 local function personal_info_editor_source()
-	local modules = rawget(package, "loaded")
-	local renderer = ManifestMenu
-	if type(modules) ~= "table" or rawget(modules, "infra.manifest_menu") ~= renderer
-		or type(renderer) ~= "table" or getmetatable(renderer) ~= nil then return nil end
-	local template, root_owner, array_owner = rawget(renderer, "template_rows"),
-		rawget(renderer, "get_root"), rawget(renderer, "get_array")
-	if type(template) ~= "function" or type(root_owner) ~= "function" or type(array_owner) ~= "function" then return nil end
-	local function facade_current()
-		return rawget(package, "loaded") == modules and rawget(modules, "infra.manifest_menu") == renderer
-			and getmetatable(renderer) == nil and rawget(renderer, "template_rows") == template
-			and rawget(renderer, "get_root") == root_owner and rawget(renderer, "get_array") == array_owner
-	end
-	local root, source = root_owner(), array_owner("personal_info_editor_frame")
-	if not facade_current() or type(root) ~= "table" or getmetatable(root) ~= nil
-		or type(source) ~= "table" or getmetatable(source) ~= nil
-		or rawget(root, "personal_info_editor_frame") ~= source or rawget(source, 1) == nil then return nil end
-	for index in next, source do if index ~= 1 then return nil end end
-	local declaration = rawget(source, 1)
-	if type(declaration) ~= "table" or getmetatable(declaration) ~= nil
-		or rawget(declaration, "type") ~= "command" or rawget(declaration, "id") ~= "personal_info_editor_open"
-		or type(rawget(declaration, "i18n")) ~= "string" or rawget(declaration, "i18n") == ""
-		or rawget(declaration, "unavailable") ~= "hide" then return nil end
-	local allowed = { type = true, id = true, i18n = true, platforms = true, unavailable = true }
-	local fields, count = {}, 0
-	for key, value in next, declaration do
-		if not allowed[key] then return nil end
-		fields[key], count = value, count + 1
-	end
-	if count ~= 5 then return nil end
-	local platforms = rawget(declaration, "platforms")
-	if type(platforms) ~= "table" or getmetatable(platforms) ~= nil
-		or rawget(platforms, 1) ~= "hs" or rawget(platforms, 2) ~= "linux" then return nil end
-	for index in next, platforms do if index ~= 1 and index ~= 2 then return nil end end
-	local function current()
-		if not facade_current() then return false end
-		if root_owner() ~= root or array_owner("personal_info_editor_frame") ~= source or not facade_current()
-			or getmetatable(root) ~= nil or rawget(root, "personal_info_editor_frame") ~= source
-			or getmetatable(source) ~= nil or rawget(source, 1) ~= declaration
-			or getmetatable(declaration) ~= nil or getmetatable(platforms) ~= nil then return false end
-		for index in next, source do if index ~= 1 then return false end end
-		local actual_count = 0
-		for key, value in next, declaration do
-			if fields[key] ~= value then return false end
-			actual_count = actual_count + 1
-		end
-		if actual_count ~= count then return false end
-		for index in next, platforms do if index ~= 1 and index ~= 2 then return false end end
-		return rawget(platforms, 1) == "hs" and rawget(platforms, 2) == "linux"
-	end
-	if not current() then return nil end
-	return current, template
+	return PersonalInfoSource.read(ManifestMenu)
 end
 
 --- Whether any hotstring can expand: a category gate open, or the dynamic
@@ -803,72 +801,15 @@ local function parameter_delay_captions(root)
 end
 
 
--- Captures the actual declared frame before native value readers can reenter it.
+
+
+-- The frame snapshot and its currency check are one body shared by both drivers.
 local function magic_frame_snapshot(renderer, key, expected)
-	key, expected = key or "hotstrings_magic_trigger_frame", expected or 3
-	local root = renderer.get_root()
-	local frame = type(root) == "table" and rawget(root, key)
-	if type(frame) ~= "table" or getmetatable(frame) ~= nil or #frame ~= expected then return nil end
-	local slots = 0
-	for index in next, frame do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > expected then return nil end
-		slots = slots + 1
-	end
-	if slots ~= expected then return nil end
-	local snapshot = {}
-	for index, row in ipairs(frame) do
-		if type(row) ~= "table" or getmetatable(row) ~= nil then return nil end
-		local fields = {}
-		for key, value in next, row do
-			if type(value) == "table" then
-				if getmetatable(value) ~= nil then return nil end
-				local entries = {}
-				for field, item in next, value do
-					if type(item) == "table" or type(item) == "function" then return nil end
-					entries[field] = item
-				end
-				fields[key] = { identity = value, entries = entries }
-			elseif type(value) == "function" then return nil
-			else fields[key] = value end
-		end
-		snapshot[index] = { identity = row, fields = fields }
-	end
-	return { root = root, frame = frame, rows = snapshot, key = key }
+	return MagicFrame.snapshot(renderer, key, expected)
 end
 
--- Publication is withheld when any captured declaration identity or field changed.
 local function magic_frame_current(renderer, snapshot)
-	if not snapshot or not rawequal(renderer.get_root(), snapshot.root)
-		or not rawequal(rawget(snapshot.root, snapshot.key), snapshot.frame)
-		or getmetatable(snapshot.frame) ~= nil or #snapshot.frame ~= #snapshot.rows then return false end
-	local slots = 0
-	for index in next, snapshot.frame do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #snapshot.rows then return false end
-		slots = slots + 1
-	end
-	if slots ~= #snapshot.rows then return false end
-	for index, saved in ipairs(snapshot.rows) do
-		local row = rawget(snapshot.frame, index)
-		if not rawequal(row, saved.identity) or getmetatable(row) ~= nil then return false end
-		local count, expected = 0, 0
-		for key, value in next, row do
-			count = count + 1
-			local prior = saved.fields[key]
-			if type(prior) == "table" then
-				if not rawequal(value, prior.identity) or getmetatable(value) ~= nil then return false end
-				local entries, wanted = 0, 0
-				for field, item in next, value do
-					entries = entries + 1
-					if not rawequal(item, prior.entries[field]) then return false end
-				end
-				for _ in next, prior.entries do wanted = wanted + 1 end
-				if entries ~= wanted then return false end
-			elseif not rawequal(value, prior) then return false end
-		end
-		for _ in next, saved.fields do expected = expected + 1 end
-		if count ~= expected then return false end
-	end
-	return true
+	return MagicFrame.current(renderer, snapshot)
 end
 
 local function _manifest_hotstring_rows(ctx, config)
@@ -1008,7 +949,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
 			return false
 		end
-		return ManifestMenu.check_row("hotstring_scope_checkbox", "hotstring_scope_all_sections",
+		return ManifestMenu.check_row("hotstring_scope_checkbox", require("config_keys").COMMAND.HOTSTRING_SCOPE_ALL_SECTIONS,
 			{ hotstring_scope_all_sections = action },
 			{ hotstring_scope_all_on = function() return all_on end })
 	end
@@ -1067,7 +1008,11 @@ local function _manifest_hotstring_rows(ctx, config)
 							if type(config.toggle_section) ~= "function" then return false end
 							return config.toggle_section(id, name)
 						end)
-						if called and committed == true then return true end
+						if called and committed == true then
+							require("ui.menu.feature_notice").feature(name, config.is_section_checked and config.is_section_checked(id, name)
+								or (config.is_section_enabled and config.is_section_enabled(id, name)) or false)
+							return true
+						end
 						Logger.error(LOG, "Hotstring section toggle refused for '%s.%s' (%s).", id, name,
 							called and "owner-not-committed" or "owner-error")
 						show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
@@ -1083,17 +1028,20 @@ local function _manifest_hotstring_rows(ctx, config)
 				if not current_source() then return false end
 				return config.set_category_scope_enabled({ id }, enabled)
 			end)
-			if called and committed == true then return true end
+			if called and committed == true then
+				require("ui.menu.feature_notice").feature(category_label(id, category), enabled)
+				return true
+			end
 			Logger.error(LOG, "Hotstring category scope refused for '%s' (%s).", id,
 				called and "owner-not-committed" or "owner-error")
 			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
 			return false
 		end
 		local render_ctx = { commands = {
-			["hotstring_category_enable_all"] = function()
+			[require("config_keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = function()
 				return commit_scope(true)
 			end,
-			["hotstring_category_disable_all"] = function()
+			[require("config_keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = function()
 				return commit_scope(false)
 			end,
 		} }
@@ -1102,7 +1050,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				["hotstring_category_file"] = function()
 					if not category or not category.path then return {} end
 					local source = category.path
-					local row = ManifestMenu.command_row("hotstring_file_commands", "hotstring_file_open",
+					local row = ManifestMenu.command_row("hotstring_file_commands", require("config_keys").COMMAND.HOTSTRING_FILE_OPEN,
 						{ hotstring_file_open = function() return ctx.on_open_file(source) end },
 						{ hotstring_file_ready = function() return type(ctx.on_open_file) == "function" end })
 					return row and { row } or {}
@@ -1115,12 +1063,14 @@ local function _manifest_hotstring_rows(ctx, config)
 				enabled = function() return type(config.is_group_enabled) == "function" and config.is_group_enabled(id) == true end,
 				available = function(field) return controls ~= nil and controls.file[field] ~= true end,
 				enable = function(enabled)
-					return (enabled and config.enable_group or config.disable_group)(id) == true
+					local committed = (enabled and config.enable_group or config.disable_group)(id) == true
+					if committed then require("ui.menu.feature_notice").feature(category_label(id, category), enabled) end
+					return committed
 				end,
 				tooltip_enabled = function() return type(config.resolve) == "function" and config.resolve(id, nil).show_tooltip == true end,
 				tooltip = function(value) return config.set_personal_metadata(id, nil, "show_tooltip", value) == true end,
 				edit = function() return ctx.webview ~= nil and type(ctx.webview.show) == "function"
-					and ctx.webview.show("hotstrings_config_window") == true end,
+					and ctx.webview.show(require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW) == true end,
 				metadata_reason = function() return i18n_safe("menu.hotstrings.personal_metadata_unavailable") end,
 				changed = function() if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end end,
 			})
@@ -1266,20 +1216,21 @@ local function _manifest_hotstring_rows(ctx, config)
 		return true
 	end
 
-	--- The row for the global default delay — the one every category inherits
-	--- when neither it nor its sections declare one.
+	--- The row for the base expansion delay (`hotstrings.expansion_delay`) — the
+	--- one every category inherits when neither it nor its sections declare one,
+	--- and that the delay overrides are offsets of.
 	--- @return table
 	local function global_delay_row()
-		local current = config.get_global_delay and config.get_global_delay() or nil
+		local current = config.get_base_delay and config.get_base_delay() or nil
 		if type(current) ~= "number" then
-			Logger.error(LOG, "hotstrings_config exposes no global delay — the row cannot show a value.")
+			Logger.error(LOG, "hotstrings_config exposes no base delay — the row cannot show a value.")
 			return {
 				label    = i18n_safe(captions.default) .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
 				disabled = true,
 			}
 		end
 
-		local overridden = config.has_global_delay_override and config.has_global_delay_override() or false
+		local overridden = config.has_base_delay_override and config.has_base_delay_override() or false
 		local title = i18n_safe(captions.default)
 		return {
 			-- menu.settings.default_indicator carries its own leading space.
@@ -1288,7 +1239,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			action = function()
 				local chosen = prompt_delay(title, current)
 				if chosen == nil then return end
-				return commit_delay(config.set_global_delay, chosen)
+				return commit_delay(config.set_base_delay, chosen)
 			end,
 		}
 	end
@@ -1467,12 +1418,15 @@ local function _manifest_hotstring_rows(ctx, config)
 						action      = function()
 							local saved = snapshot()
 							if Terminators.set_terminator_enabled(key,
-								not Terminators.is_terminator_enabled(key)) then commit(saved) end
+								not Terminators.is_terminator_enabled(key)) and commit(saved) then
+								require("ui.menu.feature_notice").feature(string.format(i18n_safe("notify.word_expander_prefix"), label),
+									Terminators.is_terminator_enabled(key))
+							end
 						end,
 					}
 					if def.custom then
-						local delete_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_delete", {
-							["word_expander_delete"] = function()
+						local delete_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_DELETE, {
+							[require("config_keys").COMMAND.WORD_EXPANDER_DELETE] = function()
 								local saved = snapshot()
 								if Terminators.remove_custom_terminator(key) ~= true then return false end
 								return commit(saved) == true
@@ -1485,8 +1439,8 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			local catalogue_rows = sub
 			sub = {}
-			local add_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_add", {
-				["word_expander_add"] = function()
+			local add_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_ADD, {
+				[require("config_keys").COMMAND.WORD_EXPANDER_ADD] = function()
 					local char = prompt_text(
 						i18n_safe("dialog.hotstrings.new_delimiter_title"),
 						i18n_safe("dialog.hotstrings.new_delimiter_prompt"),
@@ -1523,9 +1477,9 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			local exp_ctx = {
 				commands = {
-					["word_expanders_enable_all"] = set_all(true),
-					["word_expanders_disable_all"] = set_all(false),
-					["word_expanders_restore"] = reset_terminators,
+					[require("config_keys").COMMAND.WORD_EXPANDERS_ENABLE_ALL] = set_all(true),
+					[require("config_keys").COMMAND.WORD_EXPANDERS_DISABLE_ALL] = set_all(false),
+					[require("config_keys").COMMAND.WORD_EXPANDERS_RESTORE] = reset_terminators,
 				},
 				state_getters = { ["word_expanders_ready"] = word_expanders_ready },
 			}
@@ -1590,7 +1544,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- The values were all there; only the prompts were missing.
 			if not captions then return {} end
 
-			local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", "hotstrings_config_window", {
+			local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW, {
 				hotstrings_config_window = function()
 					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstrings settings.")
@@ -1600,7 +1554,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					-- bridge but no page, so this row opened a window reading
 					-- "Error: app 'hotstrings_config' not found" — the settings window
 					-- this whole submenu points at had never once opened on Linux.
-					ctx.webview.show("hotstrings_config_window")
+					ctx.webview.show(require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW)
 				end,
 			}, { hotstrings_config_ready = function() return true end })
 			local sub = ManifestMenu.template_rows("hotstrings_delays_frame", {}, {}, {
@@ -1804,7 +1758,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				local ok, current = pcall(ctx.is_paused)
 				return ok and current == false
 			end
-			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", "personal_hotstring_open_editor",
+			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", require("config_keys").COMMAND.PERSONAL_HOTSTRING_OPEN_EDITOR,
 				{ personal_hotstring_open_editor = function() return ctx.webview.show("hotstring_editor") end },
 				{ personal_hotstring_editor_ready = editor_ready })
 
@@ -1824,8 +1778,8 @@ local function _manifest_hotstring_rows(ctx, config)
 
 				for _, name in ipairs(personal and personal.sections_order or {}) do
 					local selected = (current == name)
-					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {
-						["personal_default_section"] = function()
+					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", require("config_keys").COMMAND.PERSONAL_DEFAULT_SECTION, {
+						[require("config_keys").COMMAND.PERSONAL_DEFAULT_SECTION] = function()
 							Editor.set_pref("default_section", name)
 							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 						end,
@@ -1840,7 +1794,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					choices[#choices + 1] = choice
 				end
 				local sub = ManifestMenu.template_rows("hotstring_personal_default_frame", {
-					["personal_default_none"] = none_action,
+					[require("config_keys").COMMAND.PERSONAL_DEFAULT_NONE] = none_action,
 				}, {
 					["personal_default_unset"] = function() return current == nil or current == "" end,
 					["personal_default_boundary"] = function() return false end,
@@ -1902,14 +1856,14 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 			end
 			local controls = ManifestMenu.template_rows("hotstring_personal_controls_frame", {
-				["personal_close_on_add"] = close_action,
+				[require("config_keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = close_action,
 			}, {
 				["personal_open_present"] = function() return false end,
 				["personal_controls_head_boundary"] = function() return false end,
 				["personal_controls_tail_boundary"] = function() return true end,
 				["personal_preferences_present"] = function() return preferences_present end,
 				["personal_controls_ready"] = function() return true end,
-				["personal_close_on_add"] = function() return close_on_add end,
+				[require("config_keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = function() return close_on_add end,
 			}, {
 				["personal_editor"] = function() return editor_row and { editor_row } or {} end,
 				["personal_default_parent"] = function() return default_parent end,
@@ -2026,8 +1980,8 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- Offered first because it is the action the extension as a unit
 				-- affords; the per-pack rows below are for the user who wants half.
 				local bulk = ManifestMenu.template_rows("hotstring_extension_bulk_controls", {
-					["extension_enable_all"] = function() return commit_gates(true) end,
-					["extension_disable_all"] = function() return commit_gates(false) end,
+					[require("config_keys").COMMAND.EXTENSION_ENABLE_ALL] = function() return commit_gates(true) end,
+					[require("config_keys").COMMAND.EXTENSION_DISABLE_ALL] = function() return commit_gates(false) end,
 				}, {}, {})
 
 				for _, name in ipairs(packs) do
@@ -2056,7 +2010,11 @@ local function _manifest_hotstring_rows(ctx, config)
 								if type(config.toggle_section) ~= "function" then return false end
 								return config.toggle_section(bound.category, bound.section)
 							end)
-							if called and committed == true then return true end
+							if called and committed == true then
+								require("ui.menu.feature_notice").feature(description, config.is_section_checked
+									and config.is_section_checked(bound.category, bound.section) or false)
+								return true
+							end
 							Logger.error(LOG, "Extension hotstring section toggle refused for '%s.%s' (%s).", bound.category, bound.section,
 								called and "owner-not-committed" or "owner-error")
 							show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
@@ -2102,14 +2060,15 @@ local function _manifest_hotstring_rows(ctx, config)
 		-- renderer materialises, rather than a menu tree this driver assembled.
 		["preview_bubbles"] = function()
 			local choices = {}
-			local row = ManifestMenu.check_row("preview_magic_control", "preview_star_enabled", {
-				["preview_star_enabled"] = function()
+			local row = ManifestMenu.check_row("preview_magic_control", require("config_keys").LEAF.PREVIEW_STAR_ENABLED, {
+				[require("config_keys").LEAF.PREVIEW_STAR_ENABLED] = function()
 					if PreviewSettings.toggle("star") ~= true then return false end
+					require("ui.menu.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_star"), PreviewSettings.get("star") == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 			}, {
-				["hotstrings.preview_star_enabled"] = function() return PreviewSettings.get("star") == true end,
+				[require("config_keys").KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED] = function() return PreviewSettings.get("star") == true end,
 				-- Preserve configuration access while the Linux engine is paused.
 				["preview_magic_ready"] = function() return true end,
 			})
@@ -2117,9 +2076,14 @@ local function _manifest_hotstring_rows(ctx, config)
 			local magic_rows = choices
 			choices = {}
 			local presence_commands, presence_getters = {}, { preview_presence_ready = function() return true end }
-			for key, name in pairs({ preview_autocorrect_enabled = "autocorrect", preview_ai_enabled = "ai" }) do
+			local bubble_notice_keys = {
+				autocorrect = "menu.hotstrings.notify_bubble_autocorrect",
+				ai = "menu.hotstrings.notify_bubble_ai",
+			}
+			for key, name in pairs({ [COMMAND.PREVIEW_AUTOCORRECT_ENABLED] = "autocorrect", [COMMAND.PREVIEW_AI_ENABLED] = "ai" }) do
 				presence_commands[key] = function()
 					if PreviewSettings.toggle(name) ~= true then return false end
+					require("ui.menu.feature_notice").feature(i18n_safe(bubble_notice_keys[name]), PreviewSettings.get(name) == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end
@@ -2131,14 +2095,15 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 			local presence_rows = choices
 			choices = {}
-			local row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
-				["preview_colored_tooltips"] = function()
+			local row = ManifestMenu.check_row("preview_colored_control", require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS, {
+				[require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS] = function()
 					if PreviewSettings.toggle("colored") ~= true then return false end
+					require("ui.menu.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_colored"), PreviewSettings.get("colored") == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 			}, {
-				["hotstrings.preview_colored_tooltips"] = function() return PreviewSettings.get("colored") == true end,
+				[require("config_keys").KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS] = function() return PreviewSettings.get("colored") == true end,
 				-- Configuring a preview remains allowed while the Linux engine is paused.
 				["preview_colored_ready"] = function() return true end,
 			})
@@ -2168,7 +2133,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			for key, value in pairs(c) do params_ctx[key] = value end
 			params_ctx.commands = {}
 			for key, value in pairs(c.commands or {}) do params_ctx.commands[key] = value end
-			params_ctx.commands["repeat_key"] = function()
+			params_ctx.commands[require("config_keys").COMMAND.REPEAT_KEY] = function()
 				RepeatKey.toggle()
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			end
@@ -2188,7 +2153,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return committed
 			end
-			params_ctx.commands["idle_reset"] = function(seconds)
+			params_ctx.commands[require("config_keys").COMMAND.IDLE_RESET] = function(seconds)
 				return word_reset_changed(WordReset.set_idle_seconds(seconds))
 			end
 			params_ctx.commands["idle_reset_custom"] = function()
@@ -2205,20 +2170,26 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 				return word_reset_changed(WordReset.set_idle_seconds(seconds))
 			end
-			params_ctx.commands["click_resets_word"] = function()
+			params_ctx.commands[COMMAND.CASCADE_MAX_ARROWS] = function(arrows)
+				return word_reset_changed(WordReset.set_cascade_max_arrows(arrows))
+			end
+			params_ctx.commands[require("config_keys").COMMAND.CLICK_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_click_resets_word())
 			end
-			params_ctx.commands["arrow_resets_word"] = function()
+			params_ctx.commands[require("config_keys").COMMAND.ARROW_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_arrow_resets_word())
 			end
-			params_ctx.commands["shortcut_resets_word"] = function()
+			params_ctx.commands[require("config_keys").COMMAND.SHORTCUT_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_shortcut_resets_word())
 			end
-			params_ctx.commands["tap_hold_resets_word"] = function()
+			params_ctx.commands[require("config_keys").COMMAND.TAP_HOLD_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_tap_hold_resets_word())
 			end
-			params_ctx.state_getters["hotstrings.idle_reset_seconds"] = function()
+			params_ctx.state_getters[require("config_keys").KEY.HOTSTRINGS_IDLE_RESET_SECONDS] = function()
 				return WordReset.idle_seconds()
+			end
+			params_ctx.state_getters[require("config_keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS] = function()
+				return WordReset.cascade_max_arrows()
 			end
 			params_ctx.state_getters["hotstrings_click_resets_word"] = function()
 				return WordReset.click_resets_word()
@@ -2251,15 +2222,16 @@ local function _manifest_hotstring_rows(ctx, config)
 	end
 
 	hs_ctx.commands = {
-		["scope_restore"] = function() return apply_hotstrings_scope("recommended") end,
-		["scope_clear"] = function() return apply_hotstrings_scope("clear") end,
+		[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_hotstrings_scope("recommended") end,
+		[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_hotstrings_scope("clear") end,
 		-- The category switch, the submenu's first row. Every driver registers it:
 		-- no tray can switch a category from the row that opens its submenu.
-		["hotstrings_toggle"]      = function()
+		[require("config_keys").COMMAND.HOTSTRINGS_TOGGLE]      = function()
 			-- The batched writers, not a loop of toggle_group: each toggle_group
 			-- ends in a full load_all(), which re-parses every pack — magickey.toml
 			-- alone is 305 KB — once per category, inside a menu callback.
 			local changed
+			local enabling = not hotstrings_on()
 			if hotstrings_on() then
 				-- Off stops every expansion: each gate closes, keeping its section
 				-- choices, and the dynamic hotstrings stop with them.
@@ -2272,12 +2244,13 @@ local function _manifest_hotstring_rows(ctx, config)
 			else
 				changed = config.enable_all()
 			end
+			if changed ~= false then require("ui.menu.feature_notice").feature(i18n_safe("notify.hotstrings"), enabling) end
 			if changed ~= false and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
 		-- Reloading the catalogue from disk: this driver's own affordance, because
 		-- it is the only one whose hotstrings can change under it without a
 		-- restart. Declared with that reason rather than appended unannounced.
-		["hotstrings_reload"]      = function()
+		[require("config_keys").COMMAND.HOTSTRINGS_RELOAD]      = function()
 			if config.reload then config.reload() end
 		end,
 	}
@@ -2441,53 +2414,72 @@ local function _build_llm(ctx)
 			return
 		end
 		local rows = {}
-		local current_delay = TriggerSettings.get("debounce_ms")
-		local delay_choices = {}
-		for _, value in ipairs(TriggerSettings.presets("debounce_ms")) do
-			delay_choices[#delay_choices + 1] = {
-				label = tostring(value) .. " ms",
-				checked = current_delay == value,
-				action = function()
-					TriggerSettings.set("debounce_ms", value)
+		--- Builds one delay row: the numeric setting's presets, an optional "Never"
+		--- (the shared sentinel, as on macOS) and the free numeric entry.
+		--- @param name string Trigger setting name.
+		--- @param label_key string i18n key of the row label (one %s: the current value).
+		--- @param offers_never boolean Whether "Never" is a choice of this setting.
+		--- @return table row
+		local function delay_row(name, label_key, offers_never)
+			local current = TriggerSettings.get(name)
+			local delay_choices = {}
+			local function choose(value)
+				return function()
+					TriggerSettings.set(name, value)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end
+			end
+			for _, value in ipairs(TriggerSettings.presets(name)) do
+				delay_choices[#delay_choices + 1] = { label = tostring(value) .. " ms", checked = current == value, action = choose(value) }
+			end
+			local never = offers_never and TriggerSettings.is_never(name, current)
+			if offers_never then
+				for _, row in ipairs(ManifestMenu.template_rows("llm_debounce_never_row", {
+					[require("config_keys").COMMAND.LLM_DEBOUNCE_NEVER] = choose(TriggerSettings.NEVER_MS),
+				}, {
+					["llm_debounce_is_never"] = function() return never end,
+				}) or {}) do delay_choices[#delay_choices + 1] = row end
+			end
+			local bounds = TriggerSettings.bounds(name)
+			local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
+				[require("config_keys").COMMAND.LLM_NUMERIC_CUSTOM_VALUE] = function()
+					local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
+					if not ok_prompt then
+						Logger.error(LOG, "No numeric prompt; %s can only take a preset.", name)
+						return
+					end
+					-- The prompt is headed by the declared caption of the group that opens it.
+					local title_key
+					for _, entry in ipairs(ManifestMenu.get_array("llm_menu")) do
+						if entry.id == "llm_trigger" then title_key = entry.i18n end
+					end
+					if type(title_key) ~= "string" or title_key == "" then
+						Logger.error(LOG, "The AI trigger group declares no caption; %s prompt refused.", name)
+						return
+					end
+					local value, save = numeric_setting_request(ctx.on_menu_changed, TriggerSettings,
+						"modules.llm.trigger_settings", name, "llm.trigger." .. name)
+					if not save then return false end
+					Prompt.ask({
+						title = i18n_safe(title_key),
+						hint = string.format("%d – %d ms", bounds.min, bounds.max),
+						value = value,
+						min = bounds.min,
+						max = bounds.max,
+						on_save = function(number) return save(math.floor(number)) end,
+					}, ctx.webview)
 				end,
+			})
+			for _, row in ipairs(custom_rows or {}) do delay_choices[#delay_choices + 1] = row end
+			return {
+				label = string.format(i18n_safe(label_key),
+					never and i18n_safe("menu.settings.never") or (tostring(current) .. " ms")),
+				items = delay_choices,
 			}
 		end
-		local bounds = TriggerSettings.bounds("debounce_ms")
-		local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
-			["llm_numeric_custom_value"] = function()
-				local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
-				if not ok_prompt then
-					Logger.error(LOG, "No numeric prompt; debounce can only take a preset.")
-					return
-				end
-				-- The prompt is headed by the declared caption of the group that opens it.
-				local title_key
-				for _, entry in ipairs(ManifestMenu.get_array("llm_menu")) do
-					if entry.id == "llm_trigger" then title_key = entry.i18n end
-				end
-				if type(title_key) ~= "string" or title_key == "" then
-					Logger.error(LOG, "The AI trigger group declares no caption; debounce prompt refused.")
-					return
-				end
-				local value, save = numeric_setting_request(ctx.on_menu_changed, TriggerSettings,
-					"modules.llm.trigger_settings", "debounce_ms", "llm.trigger.debounce_ms")
-				if not save then return false end
-				Prompt.ask({
-					title = i18n_safe(title_key),
-					hint = string.format("%d – %d ms", bounds.min, bounds.max),
-					value = value,
-					min = bounds.min,
-					max = bounds.max,
-					on_save = function(number) return save(math.floor(number)) end,
-				}, ctx.webview)
-			end,
-		})
-		for _, row in ipairs(custom_rows or {}) do delay_choices[#delay_choices + 1] = row end
-		rows[#rows + 1] = {
-			label = string.format(i18n_safe("menu.llm.debounce_label"), tostring(current_delay) .. " ms"),
-			items = delay_choices,
-		}
+		rows[#rows + 1] = delay_row(require("config_keys").LEAF.DEBOUNCE_MS, "menu.llm.debounce_label", true)
+		-- The one minimum time between two automatic requests (shortcuts are never held).
+		rows[#rows + 1] = delay_row(require("config_keys").LEAF.MIN_REQUEST_INTERVAL_MS, "menu.llm.min_interval_label", false)
 		local boundary_rows = ManifestMenu.template_rows("llm_trigger_provider_boundary", {}, {}, {})
 		if not boundary_rows then return end
 		for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end
@@ -2500,7 +2492,7 @@ local function _build_llm(ctx)
 				paused = true, blocked = true}
 			local ok, detail = xpcall(function()
 				local path = "llm.trigger." .. name
-				local values, source = Preferences.get_many({"llm.enabled", "llm.models.selected", path})
+				local values, source = Preferences.get_many({require("config_keys").KEY.LLM_ENABLED, require("config_keys").KEY.LLM_MODELS_SELECTED, path})
 				snapshot.source = source
 				snapshot.preferences_generation = Preferences.generation()
 				if type(llm.streaming_revision) ~= "function" then error("Native admission revision is unavailable") end
@@ -2511,8 +2503,8 @@ local function _build_llm(ctx)
 				snapshot.backend = llm.get_backend()
 				snapshot.paused = ctx.paused == true or ctx.is_paused()
 				snapshot.blocked = Preferences.admit() ~= true
-					or values["llm.enabled"] ~= snapshot.enabled
-					or values["llm.models.selected"] ~= snapshot.backend or values[path] ~= snapshot.value
+					or values[require("config_keys").KEY.LLM_ENABLED] ~= snapshot.enabled
+					or values[require("config_keys").KEY.LLM_MODELS_SELECTED] ~= snapshot.backend or values[path] ~= snapshot.value
 			end, debug.traceback)
 			if not ok then
 				Logger.warn(LOG, "Privacy row source is unavailable: %s.", tostring(detail))
@@ -2520,8 +2512,8 @@ local function _build_llm(ctx)
 			end
 			return snapshot
 		end
-		local url_source = privacy_snapshot("url_bar_filter_enabled")
-		local secure_source = privacy_snapshot("secure_filter_enabled")
+		local url_source = privacy_snapshot(require("config_keys").LEAF.URL_BAR_FILTER_ENABLED)
+		local secure_source = privacy_snapshot(require("config_keys").LEAF.SECURE_FILTER_ENABLED)
 		local function privacy_command(expected, name)
 			local current = privacy_snapshot(name)
 			local decision = PrivacyPolicy.intent(expected, current)
@@ -2545,20 +2537,40 @@ local function _build_llm(ctx)
 		end
 		local trigger_ctx = {
 			commands = {
-				["llm_url_bar_filter"] = function() return privacy_command(url_source, "url_bar_filter_enabled") end,
-				["llm_secure_field_filter"] = function() return privacy_command(secure_source, "secure_filter_enabled") end,
-				["llm_instant_on_word_end"] = function() return toggle("instant_on_word_end") end,
-				["llm_after_hotstring"] = function() return toggle("after_hotstring") end,
+				[require("config_keys").COMMAND.LLM_URL_BAR_FILTER] = function() return privacy_command(url_source, require("config_keys").LEAF.URL_BAR_FILTER_ENABLED) end,
+				[require("config_keys").COMMAND.LLM_SECURE_FIELD_FILTER] = function() return privacy_command(secure_source, require("config_keys").LEAF.SECURE_FILTER_ENABLED) end,
+				[require("config_keys").COMMAND.LLM_INSTANT_ON_WORD_END] = function() return toggle(require("config_keys").LEAF.INSTANT_ON_WORD_END) end,
+				[require("config_keys").COMMAND.LLM_AFTER_HOTSTRING] = function() return toggle(require("config_keys").LEAF.AFTER_HOTSTRING) end,
 			},
 			state_getters = {
-				["llm_url_bar_filter_enabled"] = function() return TriggerSettings.get("url_bar_filter_enabled") end,
-				["llm_secure_field_filter_enabled"] = function() return TriggerSettings.get("secure_filter_enabled") end,
+				["llm_url_bar_filter_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.URL_BAR_FILTER_ENABLED) end,
+				["llm_secure_field_filter_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.SECURE_FILTER_ENABLED) end,
 				["llm_url_bar_filter_ready"] = function() return PrivacyPolicy.ready(url_source) end,
 				["llm_secure_field_filter_ready"] = function() return PrivacyPolicy.ready(secure_source) end,
-				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get("instant_on_word_end") end,
-				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get("after_hotstring") end,
+				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.INSTANT_ON_WORD_END) end,
+				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.AFTER_HOTSTRING) end,
 				["llm_trigger_ready"] = ready,
 			},
+		}
+		-- The applications the trigger never runs in: the submenu the other two drivers draw.
+		local AppRows = require("ui.menu.app_exclusion_rows")
+		local exclusion_title = i18n_safe("menu.llm.exclude_from_ai")
+		rows[#rows + 1] = {
+			label = AppRows.caption(#TriggerSettings.disabled_apps(),
+				{ none = "menu.llm.exclude_from_ai", counted = "menu.llm.disabled_in_label" }),
+			disabled = not ready() or nil,
+			items = AppRows.rows({
+				get = TriggerSettings.disabled_apps,
+				set = function(list) return ready() and TriggerSettings.set_disabled_apps(list) end,
+				current = type(llm.get_agent_last_app) == "function" and llm.get_agent_last_app or function() return nil end,
+				prompt = function(title, text, initial, hidden, choices)
+					return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
+				end,
+				title = exclusion_title,
+				changed = function()
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}),
 		}
 		rows = ManifestMenu.build("llm_trigger_menu", "LLM", nil, nil, trigger_ctx, {
 			["llm_trigger_leading"] = function() return leading_rows end,
@@ -2576,7 +2588,7 @@ local function _build_llm(ctx)
 		-- The model predictions actually use: an API entry's when the API answers.
 		local current_model = llm.get_prediction_model and llm.get_prediction_model() or nil
 		local effective = ProfileSettings.effective_profile(current_model)
-		local count = ProfileSettings.get("num_predictions") or 1
+		local count = ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS) or 1
 		local function refresh()
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end
@@ -2646,9 +2658,9 @@ local function _build_llm(ctx)
 		local active_builtin, user_profiles, seed
 		local function auto_profile()
 			if not create_ready() then return false end
-			local current = ProfileSettings.get("auto_profile_for_model")
+			local current = ProfileSettings.get(require("config_keys").LEAF.AUTO_PROFILE_FOR_MODEL)
 			if type(current) ~= "boolean" or not create_ready() then return false end
-			local saved = ProfileSettings.set("auto_profile_for_model", not current, current_model)
+			local saved = ProfileSettings.set(require("config_keys").LEAF.AUTO_PROFILE_FOR_MODEL, not current, current_model)
 			if saved ~= true then return false end
 			refresh()
 			return true
@@ -2698,9 +2710,9 @@ local function _build_llm(ctx)
 				rows[#rows + 1] = {
 					label = label,
 					items = ManifestMenu.template_rows("llm_custom_profile_controls", {
-						["llm_profile_use"] = function() return select_profile(profile_id) end,
-						["llm_profile_edit"] = function() return open_editor(owned_profile, false) end,
-						["llm_profile_delete"] = function()
+						[require("config_keys").COMMAND.LLM_PROFILE_USE] = function() return select_profile(profile_id) end,
+						[require("config_keys").COMMAND.LLM_PROFILE_EDIT] = function() return open_editor(owned_profile, false) end,
+						[require("config_keys").COMMAND.LLM_PROFILE_DELETE] = function()
 								if type(edit_current) ~= "function" or edit_current() ~= true then
 									Logger.error(LOG, "Profile deletion refused: its originating configuration is no longer current.")
 									return false
@@ -2743,14 +2755,47 @@ local function _build_llm(ctx)
 			}
 			return true
 		end
+		--- The per-application overrides: map the application last typed in to the profile
+		--- in force, and one row per mapping that clears it. The same rows as Windows.
+		local function app_override_rows()
+			local AppOverrides = require("llm.app_profile_overrides")
+			local mapped = AppOverrides.rows(ProfileSettings.app_overrides())
+			local last = type(llm.get_agent_last_app) == "function" and llm.get_agent_last_app() or nil
+			local clear_rows = {}
+			for _, entry in ipairs(mapped) do
+				local app, profile_id = entry.app, entry.profile
+				local profile = ProfileSettings.resolve_id(profile_id)
+				clear_rows[#clear_rows + 1] = {
+					label = app .. "  →  " .. (profile and ProfileSettings.menu_label(profile, count) or profile_id),
+					action = function()
+						if not create_ready() then return false end
+						if ProfileSettings.clear_app_override(app) ~= true then return false end
+						refresh()
+						return true
+					end,
+				}
+			end
+			return ManifestMenu.template_rows("llm_profile_app_override_frame", {
+				[COMMAND.LLM_PROFILE_OVERRIDE_ACTIVE_APP] = function()
+					if not create_ready() or AppOverrides.normalize_app(last) == nil then return false end
+					if ProfileSettings.set_app_override(last, effective) ~= true then return false end
+					refresh()
+					return true
+				end,
+			}, {
+				["llm_profile_overrides_present"] = function() return #clear_rows > 0 end,
+			}, {
+				["llm_profile_override_rows"] = function() return clear_rows end,
+			}) or {}
+		end
 		local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {
-			["llm_profile_auto_detect"] = auto_profile,
-			["llm_profile_clone"] = function() return open_editor(seed, true, { as_new = true }, true) end,
-			["llm_profile_create"] = function() return open_editor(nil, true, nil, true) end,
+			[require("config_keys").COMMAND.LLM_PROFILE_AUTO_DETECT] = auto_profile,
+			[require("config_keys").COMMAND.LLM_PROFILE_CLONE] = function() return open_editor(seed, true, { as_new = true }, true) end,
+			[require("config_keys").COMMAND.LLM_PROFILE_CREATE] = function() return open_editor(nil, true, nil, true) end,
 		}, {
 			["llm_profile_recommendation_present"] = function() return false end,
 			["llm_profile_recommendation_paused"] = function() return false end,
-			["llm_profile_auto_detect_checked"] = function() return ProfileSettings.get("auto_profile_for_model") == true end,
+			["llm_profile_auto_detect_checked"] = function() return ProfileSettings.get(require("config_keys").LEAF.AUTO_PROFILE_FOR_MODEL) == true end,
 			["llm_profile_custom_present"] = custom_present,
 			["llm_profile_clone_present"] = clone_present,
 			["llm_profile_create_ready"] = create_ready,
@@ -2760,10 +2805,22 @@ local function _build_llm(ctx)
 			["llm_profile_custom_rows"] = custom_rows,
 		})
 		if not rows then return end
+		-- The per-application overrides end the submenu, as on Windows.
+		local override_rows = ManifestMenu.template_rows("llm_profile_lua_app_overrides", {}, {}, {
+			["llm_profile_app_overrides"] = app_override_rows,
+		})
+		if not override_rows then return end
+		for _, row in ipairs(override_rows) do rows[#rows + 1] = row end
+		-- The profile parent writes config.toml: it names the same cause as the
+		-- switch, and its retained rows recheck it at click time.
+		local ConfigGuard = require("ui.menu.llm_config_guard")
+		local blocked = ConfigGuard.reason()
+		ConfigGuard.protect(rows)
 		append_rendered_row(target, {
 			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective_label),
 			items = rows,
-			disabled = not enabled or nil,
+			disabled = not enabled or blocked ~= nil or nil,
+			disabled_reason_key = enabled and blocked or nil,
 		}, "llm_profile")
 	end
 
@@ -2773,7 +2830,7 @@ local function _build_llm(ctx)
 		local DisplayPolicy = require("llm.display_policy")
 		local ProfileSettings = require("modules.llm.profile_settings")
 		local function show_all_ready()
-			return DisplayPolicy.ready(ProfileSettings.get("num_predictions"),
+			return DisplayPolicy.ready(ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS),
 				ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
 				or type(llm.is_enabled) ~= "function" or llm.is_enabled() ~= true)
 		end
@@ -2781,18 +2838,18 @@ local function _build_llm(ctx)
 		local function streaming_snapshot()
 			local paused
 			if type(ctx.is_paused) == "function" then paused = ctx.is_paused() end
-			local values, source = Preferences.get_many({ "llm.enabled", "llm.display.streaming", "llm.display.streaming_multi" })
+			local values, source = Preferences.get_many({ require("config_keys").KEY.LLM_ENABLED, require("config_keys").KEY.LLM_DISPLAY_STREAMING, require("config_keys").KEY.LLM_DISPLAY_STREAMING_MULTI })
 			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
 			local enabled = type(llm.is_enabled) == "function" and llm.is_enabled() or nil
-			local streaming, progressive = DisplaySettings.get("streaming"), DisplaySettings.get("streaming_multi")
+			local streaming, progressive = DisplaySettings.get("streaming"), DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI)
 			return {
 				owner = Preferences, source = source,
 				generation = type(revision) == "number" and Preferences.generation() + revision or nil,
 				platform = "linux",
 				backend = type(llm.get_backend) == "function" and llm.get_backend() or nil,
 				enabled = enabled, paused = paused,
-				blocked = Preferences.admit() ~= true or enabled ~= values["llm.enabled"]
-					or streaming ~= values["llm.display.streaming"] or progressive ~= values["llm.display.streaming_multi"],
+				blocked = Preferences.admit() ~= true or enabled ~= values[require("config_keys").KEY.LLM_ENABLED]
+					or streaming ~= values[require("config_keys").KEY.LLM_DISPLAY_STREAMING] or progressive ~= values[require("config_keys").KEY.LLM_DISPLAY_STREAMING_MULTI],
 				progressive = progressive, streaming = streaming,
 			}
 		end
@@ -2800,11 +2857,11 @@ local function _build_llm(ctx)
 		local rows = {}
 		local function indentation_snapshot()
 			local snapshot = streaming_snapshot()
-			local values, source = Preferences.get_many({ "llm.profiles.num_predictions", "llm.display.pred_indent" })
-			snapshot.count = ProfileSettings.get("num_predictions")
-			snapshot.indentation = DisplaySettings.get("pred_indent")
-			snapshot.blocked = snapshot.blocked or snapshot.count ~= values["llm.profiles.num_predictions"]
-				or snapshot.indentation ~= values["llm.display.pred_indent"]
+			local values, source = Preferences.get_many({ require("config_keys").KEY.LLM_PROFILES_NUM_PREDICTIONS, require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT })
+			snapshot.count = ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS)
+			snapshot.indentation = DisplaySettings.get(require("config_keys").LEAF.PRED_INDENT)
+			snapshot.blocked = snapshot.blocked or snapshot.count ~= values[require("config_keys").KEY.LLM_PROFILES_NUM_PREDICTIONS]
+				or snapshot.indentation ~= values[require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT]
 			-- Re-reading the canonical owner advances its revision for every source
 			-- change, including unrelated fields and away/back transitions.
 			snapshot.source = source
@@ -2816,10 +2873,10 @@ local function _build_llm(ctx)
 		end
 		local indentation_source = indentation_snapshot()
 		local function info_bar_snapshot()
-			local values, source = Preferences.get_many({ "llm.enabled", "llm.display.show_info_bar" })
+			local values, source = Preferences.get_many({ require("config_keys").KEY.LLM_ENABLED, require("config_keys").KEY.LLM_DISPLAY_SHOW_INFO_BAR })
 			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
 			local enabled = type(llm.is_enabled) == "function" and llm.is_enabled() or nil
-			local selected = DisplaySettings.get("show_info_bar")
+			local selected = DisplaySettings.get(require("config_keys").LEAF.SHOW_INFO_BAR)
 			local paused
 			if type(ctx.is_paused) == "function" then paused = ctx.is_paused() end
 			return {
@@ -2827,28 +2884,28 @@ local function _build_llm(ctx)
 				generation = type(revision) == "number" and Preferences.generation() + revision or nil,
 				backend = type(llm.get_backend) == "function" and llm.get_backend() or nil,
 				info_bar = selected, enabled = enabled, paused = paused,
-				blocked = Preferences.admit() ~= true or enabled ~= values["llm.enabled"]
-					or selected ~= values["llm.display.show_info_bar"],
+				blocked = Preferences.admit() ~= true or enabled ~= values[require("config_keys").KEY.LLM_ENABLED]
+					or selected ~= values[require("config_keys").KEY.LLM_DISPLAY_SHOW_INFO_BAR],
 			}
 		end
 		local info_bar_source = info_bar_snapshot()
 		local display_ctx = {
 			commands = {
-				["llm_indentation"] = function(value)
+				[require("config_keys").COMMAND.LLM_INDENTATION] = function(value)
 					local current = indentation_snapshot()
 					local decision = DisplayPolicy.indentation_intent(indentation_source, current, value, DisplaySettings.indent_values())
 					if decision.admitted ~= true then return false end
-					if DisplaySettings.set("pred_indent", decision.value, current.source) ~= true then return false end
+					if DisplaySettings.set(require("config_keys").LEAF.PRED_INDENT, decision.value, current.source) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
-				["llm_show_all"] = function()
+				[require("config_keys").COMMAND.LLM_SHOW_ALL] = function()
 					if not show_all_ready() then return false end
-					if DisplaySettings.set("streaming_multi", not DisplaySettings.get("streaming_multi")) ~= true then return false end
+					if DisplaySettings.set(require("config_keys").LEAF.STREAMING_MULTI, not DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI)) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
-				["llm_token_streaming"] = function()
+				[require("config_keys").COMMAND.LLM_TOKEN_STREAMING] = function()
 					local current = streaming_snapshot()
 					local decision = DisplayPolicy.streaming_intent(streaming_source, current)
 					if decision.admitted ~= true then return false end
@@ -2856,19 +2913,19 @@ local function _build_llm(ctx)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
-				["llm_info_bar"] = function()
+				[require("config_keys").COMMAND.LLM_INFO_BAR] = function()
 					local current = info_bar_snapshot()
 					local decision = DisplayPolicy.info_bar_intent(info_bar_source, current)
 					if decision.admitted ~= true then return false end
-					if DisplaySettings.set("show_info_bar", decision.value, current.source) ~= true then return false end
+					if DisplaySettings.set(require("config_keys").LEAF.SHOW_INFO_BAR, decision.value, current.source) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 			},
 			state_getters = {
-				["llm.display.pred_indent"] = function() return indentation_source.indentation end,
+				[require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT] = function() return indentation_source.indentation end,
 				["llm_indentation_ready"] = function() return DisplayPolicy.indentation_ready(indentation_source) end,
-				["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(DisplaySettings.get("streaming_multi")) end,
+				["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI)) end,
 				["llm_show_all_ready"] = show_all_ready,
 				["llm_token_streaming_enabled"] = function()
 					return DisplayPolicy.streaming_capable(streaming_source.platform, streaming_source.backend)
@@ -2955,59 +3012,74 @@ local function _build_llm(ctx)
 		return { items = child_rows, disabled = not enabled or nil }
 	end
 
-	-- The models this machine actually has. A `list`, because the rows are
-	-- whatever Ollama reports and no static entry can enumerate them.
-	local function ollama_model_rows()
-		if type(llm.get_models) ~= "function" then return {} end
-		-- With the AI off no tray build may ask Ollama for its models: the
-		-- inventory GET (/api/tags) is a probe, and the AI is inert until the
-		-- switch-on, as on Windows and macOS (ai-off-inert-linux-2026-10-22)
-		local ai_on = type(llm.is_enabled) == "function" and llm.is_enabled() == true
-		local models = ai_on and llm.get_models() or {}
-		if type(models) ~= "table" then return {} end
-		local current = llm.get_current_model and llm.get_current_model() or nil
-		local rows = {}
-		for _, model in ipairs(models) do
-			rows[#rows + 1] = {
-				label = model,
-				-- `checked`, not a "✓" glued to the label: the tray draws its own
-				-- mark, and the glued form puts one platform's convention inside a
-				-- string twenty other languages also read.
-				checked = model == current,
-				action = function()
-					if llm.set_model then llm.set_model(model) end
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
-			}
+	-- The dialogs the model selector page's transactions open: the menu owns
+	-- them, so they never fight the keyboard grab (ui/modal.lua).
+	local page_dialogs = {
+		prompt = prompt_text,
+		error = show_error,
+		info = show_info,
+		confirm = function(title, text)
+			return ask_yes_no(title, zenity_plain(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
+		end,
+	}
+	--- Tells the user how a model removal ended: it runs after the page acted.
+	--- @param succeeded boolean
+	--- @param tag string
+	--- @param reason string|nil
+	local function deletion_notice(succeeded, tag, reason)
+		local Notifier = require("adapters.application_notifier")
+		-- A notification caption, not a menu row: it never reaches the renderer.
+		local delivered
+		if succeeded then
+			local caption = i18n_safe("ollama.deleted_title")
+			delivered = Notifier.send(string.format(i18n_safe("ollama.model_deleted"), tag),
+				{ title = caption, level = "success" })
+		else
+			local caption = i18n_safe("ollama.delete_fail_title")
+			delivered = Notifier.send(string.format(i18n_safe("ollama.delete_error"), tag, tostring(reason)),
+				{ title = caption, level = "error" })
 		end
-		if #rows > 0 then
-			for _, row in ipairs(ManifestMenu.status_rows("llm_menu", "llm_models", "model_picker_tail") or {}) do
-				rows[#rows + 1] = row
-			end
+		if delivered ~= true then Logger.warn(LOG, "The model-deletion notice for '%s' was not delivered.", tag) end
+	end
+	--- Removes one installed model after the same confirmation Windows and macOS ask.
+	--- @param model string Ollama-native tag.
+	--- @return boolean dispatched
+	local function delete_model(model)
+		if ctx.paused == true then return false end
+		if type(llm.delete_model) ~= "function" then
+			Logger.error(LOG, "The AI engine cannot delete models — '%s' was kept.", model)
+			return false
 		end
-		local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
-			["llm_browse_models"] = function()
-				return ctx.webview.show("model_browser") == true
-			end,
+		local confirmed = ask_yes_no(i18n_safe("menu.llm.delete_model_title"),
+			zenity_plain(string.format(i18n_safe("menu.llm.delete_model_body"), model)),
+			i18n_safe("button.delete"), i18n_safe("button.cancel"))
+		if confirmed ~= true then return false end
+		return llm.delete_model(model, function(succeeded, tag, reason)
+			deletion_notice(succeeded, tag, reason)
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end) == true
+	end
+	-- One button opens the model selector page, where the backend and the model
+	-- are chosen together (maintainer, 2026-10-27): the backend's emoji, then
+	-- the model. The menu lists no model and no API entry. Drawing the button
+	-- binds the page to this build's engine, dialogs and refresh.
+	dynamic_handlers["llm_model"] = function(target)
+		LlmBackendRows.bind_page(llm, {
+			dialogs = page_dialogs, on_changed = ctx.on_menu_changed, delete_model = delete_model,
+			context = { paused = ctx.paused, is_paused = ctx.is_paused },
+		})
+		local row = ManifestMenu.command_row("llm_model_selector_commands", COMMAND.LLM_MODEL_SELECTOR, {
+			[COMMAND.LLM_MODEL_SELECTOR] = function() return ctx.webview.show("model_browser") == true end,
 		}, {
-			["llm_model_browser_ready"] = function()
+			["llm_model_selector_caption"] = function() return LlmBackendRows.caption(llm) end,
+			["llm_model_selector_ready"] = function()
 				return type(ctx.webview) == "table" and type(ctx.webview.show) == "function"
 			end,
 		})
-		if browser_row then rows[#rows + 1] = browser_row end
-		return rows
-	end
-
-	-- Who answers: Ollama's models above, or the API entries (Cerebras, …).
-	providers["llm_models"] = function()
-		return LlmBackendRows.rows(llm, {
-			prompt = prompt_text,
-			error = show_error,
-			info = show_info,
-			confirm = function(title, text)
-				return ask_yes_no(title, zenity_plain(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
-			end,
-		}, ctx.on_menu_changed, ollama_model_rows, { paused = ctx.paused, is_paused = ctx.is_paused })
+		if not row then return end
+		-- The button stays enabled when config.toml refuses writes: the page it
+		-- opens greys every backend with that cause, as on Windows and macOS.
+		append_rendered_row(target, row, "llm_model")
 	end
 
 	--- The suggestion count row: a generation parameter, the first one on every
@@ -3020,7 +3092,7 @@ local function _build_llm(ctx)
 				tostring(ProfileSettings))
 			return nil
 		end
-		local current = ProfileSettings.get("num_predictions")
+		local current = ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS)
 		local choices = {}
 		for value = 1, 10 do
 			-- One key per plural form, the rows macOS and Windows draw.
@@ -3030,7 +3102,7 @@ local function _build_llm(ctx)
 				label = string.format(i18n_safe(count_key), value),
 				checked = current == value,
 				action = function()
-					ProfileSettings.set("num_predictions", value)
+					ProfileSettings.set(require("config_keys").LEAF.NUM_PREDICTIONS, value)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end,
 			}
@@ -3085,7 +3157,7 @@ local function _build_llm(ctx)
 			local bounds = Settings.bounds(setting.name)
 			if bounds then
 				local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
-					["llm_numeric_custom_value"] = function()
+					[require("config_keys").COMMAND.LLM_NUMERIC_CUSTOM_VALUE] = function()
 						local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
 						if not ok_prompt then
 							Logger.error(LOG, "No numeric prompt — '%s' can only take a preset.", setting.name)
@@ -3116,21 +3188,21 @@ local function _build_llm(ctx)
 		--- Reads current group, pause and prediction-count facts before delivery.
 		--- @return boolean ready
 		local function ready()
-			local count = ProfileSettings.get("num_predictions")
+			local count = ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS)
 			return ctx.paused ~= true and type(llm.is_enabled) == "function" and llm.is_enabled() == true
 				and type(count) == "number" and count >= 2
 		end
 		local generation_ctx = {
 			commands = {
-				["llm_auto_raise_temperature"] = function()
+				[require("config_keys").COMMAND.LLM_AUTO_RAISE_TEMPERATURE] = function()
 					if not ready() then return false end
-					if Settings.set("auto_raise_temp", not Settings.get("auto_raise_temp")) ~= true then return false end
+					if Settings.set(require("config_keys").LEAF.AUTO_RAISE_TEMP, not Settings.get(require("config_keys").LEAF.AUTO_RAISE_TEMP)) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 			},
 			state_getters = {
-				["llm_auto_raise_enabled"] = function() return Settings.get("auto_raise_temp") end,
+				["llm_auto_raise_enabled"] = function() return Settings.get(require("config_keys").LEAF.AUTO_RAISE_TEMP) end,
 				["llm_auto_raise_ready"] = ready,
 			},
 		}
@@ -3138,6 +3210,27 @@ local function _build_llm(ctx)
 			["llm_generation_values"] = function() return rows end,
 		})
 		for _, row in ipairs(generation_rows) do target[#target + 1] = row end
+		-- Whether a navigation or Escape clears the AI's typing context, the row
+		-- Windows and macOS show in the same submenu.
+		local function generation_ready()
+			return ctx.paused ~= true and type(llm.is_enabled) == "function" and llm.is_enabled() == true
+		end
+		local RESET_ON_NAV = require("config_keys").LEAF.RESET_ON_NAV
+		local reset_rows = ManifestMenu.build("llm_generation_reset_navigation", "LLM", nil, nil, {
+			commands = {
+				[COMMAND.LLM_RESET_ON_NAV] = function()
+					if not generation_ready() then return false end
+					if Settings.set(RESET_ON_NAV, not Settings.get(RESET_ON_NAV)) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			},
+			state_getters = {
+				["llm_reset_on_nav_checked"] = function() return Settings.get(RESET_ON_NAV) end,
+				["llm_generation_ready"] = generation_ready,
+			},
+		}, {})
+		for _, row in ipairs(reset_rows) do target[#target + 1] = row end
 	end
 
 	-- The category switch, the submenu's first row: appindicator binds item.fn
@@ -3160,7 +3253,7 @@ local function _build_llm(ctx)
 		return require("config_migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "newer"
 	end
 	-- The restore alone: the AI menu's clear row was retired.
-	llm_ctx.commands["scope_restore"] = function()
+	llm_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
 		-- A retained row rechecks what greyed it when it was built.
 		if not scope_ready() then
 			Logger.warn(LOG, "AI settings restore refused: %s.", ctx.paused == true and "the script is paused"
@@ -3171,7 +3264,7 @@ local function _build_llm(ctx)
 		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
-	llm_ctx.commands["llm_toggle"] = function()
+	llm_ctx.commands[require("config_keys").COMMAND.LLM_TOGGLE] = function()
 		if not toggle_ready() then return false end
 		if llm.toggle then llm.toggle(ctx.on_menu_changed) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -3210,7 +3303,7 @@ local function _build_agent(ctx)
 	})
 end
 
---- Builds the metrics/keylogger submenu.
+--- Builds the metrics/keystats submenu.
 --- Reports the at-rest migration and offers to stop it.
 --- Converting a year of stored rows takes minutes, and without this entry the
 --- user ticks menu.metrics.encrypt_at_rest and sees nothing happen at all.
@@ -3218,7 +3311,7 @@ end
 --- PROVIDER data — the `metrics_migration` list declares the slot and the shared
 --- renderer draws the row. A `list` and not a `command`, because the label IS the
 --- progress: "n / total", which no static declaration can spell.
---- @param k table The keylogger module.
+--- @param k table The keystats module.
 --- @return table One provider row.
 local function _migration_row(k)
 	if type(k.get_migration_progress) ~= "function" then
@@ -3245,7 +3338,7 @@ end
 --- above its definition would bind the nil global
 --- (project-lua-closure-before-local-nil-global).
 --- @param ctx table Menu context; ctx.webview opens the two metrics windows.
---- @param k table The keylogger module.
+--- @param k table The keystats module.
 --- @return table Menu rows, empty when the renderer could not be bound.
 local function _manifest_metrics_rows(ctx, k)
 	if not ManifestMenu then
@@ -3253,7 +3346,7 @@ local function _manifest_metrics_rows(ctx, k)
 		return {}
 	end
 
-	--- Reads one flag out of the keylogger's privacy state.
+	--- Reads one flag out of the keystats's privacy state.
 	--- @param key string
 	--- @return function
 	local function privacy(key)
@@ -3278,17 +3371,17 @@ local function _manifest_metrics_rows(ctx, k)
 	-- not a silent always-enabled row — which is the whole point of resolving them
 	-- declaratively instead of re-deriving the condition at each call site.
 	local getters = {
-		keylogger_enabled      = function() return type(k.is_enabled) == "function" and k.is_enabled() end,
-		metrics_filter_private = privacy("private_filter_enabled"),
-		metrics_filter_secure  = privacy("secure_filter_enabled"),
-		metrics_filter_sysauth = privacy("system_auth_filter_enabled"),
+		keystats_enabled      = function() return type(k.is_enabled) == "function" and k.is_enabled() end,
+		metrics_filter_private = privacy(require("config_keys").LEAF.PRIVATE_FILTER_ENABLED),
+		metrics_filter_secure  = privacy(require("config_keys").LEAF.SECURE_FILTER_ENABLED),
+		metrics_filter_sysauth = privacy(require("config_keys").LEAF.SYSTEM_AUTH_FILTER_ENABLED),
 		-- The manifest gates the colour row on the widget being visible: choosing
 		-- how to colour something that is not on screen is a control with no
 		-- subject. Without this getter the resolver logs an error and falls back to
 		-- the safe answer, so the row would be permanently greyed — right by
 		-- accident, and wrong the moment the widget is shown.
-		metrics_suppressed     = function()
-			return type(k.is_suppressed) == "function" and k.is_suppressed() or false
+		metrics_suspended      = function()
+			return type(k.is_collection_suspended) == "function" and k.is_collection_suspended() or false
 		end,
 		wpm_widget_visible     = function()
 			local widget = wpm_widget()
@@ -3410,15 +3503,15 @@ local function _manifest_metrics_rows(ctx, k)
 	-- handle the row" by looking for the quoted id, and a bare key is invisible
 	-- to it — which would report three declared rows as unhandled while they work.
 	render_ctx.commands = {
-		["wpm_widget"] = cmd_wpm_widget,
-		["widget_colors"] = cmd_widget_colors,
-		["include_realtime"] = cmd_include_realtime,
+		[require("config_keys").COMMAND.WPM_WIDGET] = cmd_wpm_widget,
+		[require("config_keys").COMMAND.WIDGET_COLORS] = cmd_widget_colors,
+		[require("config_keys").COMMAND.INCLUDE_REALTIME] = cmd_include_realtime,
 		-- The category switch, the submenu's first row: appindicator binds
 		-- item.fn only on a row with no submenu, so the parent cannot carry it.
-		["scope_restore"] = restore_metrics_scope,
-		["metrics_toggle"] = function()
+		[require("config_keys").COMMAND.SCOPE_RESTORE] = restore_metrics_scope,
+		[require("config_keys").COMMAND.METRICS_TOGGLE] = function()
 			if type(k.set_enabled) ~= "function" then
-				Logger.error(LOG, "The keylogger exposes no set_enabled — the gate does nothing.")
+				Logger.error(LOG, "The keystats exposes no set_enabled — the gate does nothing.")
 				return
 			end
 			k.set_enabled(not (type(k.is_enabled) == "function" and k.is_enabled()))
@@ -3430,26 +3523,26 @@ local function _manifest_metrics_rows(ctx, k)
 		-- this supplies only the toggle. The row used to carry a DIFFERENT label
 		-- here than on the other two drivers — one switch, two names.
 		["encryption"]     = toggle("encrypt", k.set_encrypt_enabled),
-		["show_typing"]    = open_window("metrics_typing"),
-		["show_apps"]      = open_window("metrics_apps"),
+		[require("config_keys").COMMAND.SHOW_TYPING]    = open_window("metrics_typing"),
+		[require("config_keys").COMMAND.SHOW_APPS]      = open_window("metrics_apps"),
 
-		["filter_private"] = toggle("private_filter_enabled", k.set_private_filter_enabled),
-		["filter_secure"]  = toggle("secure_filter_enabled", k.set_secure_filter_enabled),
-		["filter_sysauth"] = toggle("system_auth_filter_enabled", k.set_system_auth_filter_enabled),
+		[require("config_keys").COMMAND.FILTER_PRIVATE] = toggle(require("config_keys").LEAF.PRIVATE_FILTER_ENABLED, k.set_private_filter_enabled),
+		[require("config_keys").COMMAND.FILTER_SECURE]  = toggle(require("config_keys").LEAF.SECURE_FILTER_ENABLED, k.set_secure_filter_enabled),
+		[require("config_keys").COMMAND.FILTER_SYSAUTH] = toggle(require("config_keys").LEAF.SYSTEM_AUTH_FILTER_ENABLED, k.set_system_auth_filter_enabled),
 
 		-- This driver answers these five in its log rather than in a window; the
 		-- other two open a metrics WINDOW for the same figures. Declared rows
 		-- since 2026-08-06, so the manifest can describe a driver-specific row
 		-- rather than the driver keeping it to itself.
-		["metrics_suspend"] = function()
-			if type(k.is_suppressed) ~= "function" then
-				Logger.error(LOG, "Keylogger exposes no is_suppressed — the row cannot toggle anything.")
+		[require("config_keys").COMMAND.METRICS_SUSPEND] = function()
+			if type(k.is_collection_suspended) ~= "function" then
+				Logger.error(LOG, "Keystats exposes no is_collection_suspended — the row cannot toggle anything.")
 				return
 			end
-			if k.is_suppressed() then k.unsuppress() else k.suppress() end
+			if k.is_collection_suspended() then k.resume_collection() else k.suspend_collection() end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
-		["reset_wpm_position"] = function()
+		[require("config_keys").COMMAND.RESET_WPM_POSITION] = function()
 			local widget = wpm_widget()
 			if not widget then
 				Logger.error(LOG, "No WPM widget module — its place cannot be reset.")
@@ -3457,7 +3550,7 @@ local function _manifest_metrics_rows(ctx, k)
 			end
 			widget.reset_position()
 		end,
-		["wpm_menubar"] = function()
+		[require("config_keys").COMMAND.WPM_MENUBAR] = function()
 			local ok, readout = pcall(require, "ui.wpm.tray_readout")
 			if not ok then
 				Logger.error(LOG, "No WPM tray readout module — the row cannot toggle anything.")
@@ -3466,19 +3559,31 @@ local function _manifest_metrics_rows(ctx, k)
 			local changed = readout.is_running() and readout.stop() or readout.start()
 			if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
-		["menubar_colors"] = function()
+		[require("config_keys").COMMAND.MENUBAR_COLORS] = function()
 			local ok, readout = pcall(require, "ui.wpm.tray_readout")
 			if not ok then return end
 			local changed = readout.set_use_source_colors(not readout.uses_source_colors())
 			if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
-		["metrics_reset_session"] = function()
-			if type(k.reset_session) ~= "function" then
-				Logger.error(LOG, "Keylogger exposes no reset_session — the row does nothing.")
-				return
+		[require("config_keys").COMMAND.METRICS_RESET_SESSION] = function()
+			if type(k.request_session_reset) ~= "function" then
+				Logger.error(LOG, "Keystats exposes no request_session_reset — the row does nothing.")
+				return false
 			end
-			k.reset_session()
-			Logger.info(LOG, "Metrics session reset.")
+			local completed = nil
+			local accepted = k.request_session_reset(function(success)
+				completed = success
+				if success == true then
+					Logger.info(LOG, "Metrics session reset.")
+				else
+					Logger.error(LOG, "Metrics session reset was refused; the session is unchanged.")
+				end
+			end)
+			if accepted ~= true then
+				Logger.error(LOG, "Metrics session reset was refused; the session is unchanged.")
+				return false
+			end
+			return completed ~= false
 		end,
 	}
 
@@ -3486,6 +3591,31 @@ local function _manifest_metrics_rows(ctx, k)
 	-- is the progress itself.
 	local providers = {
 		["metrics_migration"] = function() return { _migration_row(k) } end,
+		-- The applications whose typing is never recorded: the same submenu the
+		-- other two drivers draw, over this driver's own keystats list.
+		["exclude_apps"] = function()
+			local AppRows = require("ui.menu.app_exclusion_rows")
+			local count = #k.get_disabled_apps()
+			local on = type(k.is_enabled) == "function" and k.is_enabled() == true
+			-- The add-application prompt's caption, not a row label.
+			local prompt_title = i18n_safe("menu.metrics.exclude_apps")
+			return { {
+				label = AppRows.caption(count),
+				disabled = on,
+				items = AppRows.rows({
+					get = k.get_disabled_apps,
+					set = k.set_disabled_apps,
+					current = k.last_app,
+					prompt = function(title, text, initial, hidden, choices)
+						return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
+					end,
+					title = prompt_title,
+					changed = function()
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}),
+			} }
+		end,
 	}
 
 	return ManifestMenu.build("metrics_menu", "Metrics", handlers, nil, render_ctx, providers)
@@ -3505,7 +3635,7 @@ end
 --- because they configure features the FEATURE manifest already declares
 --- elsewhere: the WPM widget (it has since come back, see ui/wpm),
 --- the two metrics-window shortcuts, and the app-exclusion list, for which this
---- driver's keylogger exposes no setter. A row that cannot be rendered is a
+--- driver's keystats exposes no setter. A row that cannot be rendered is a
 --- promise the manifest makes on this driver's behalf and the driver breaks.
 ---
 --- What stays hand-built below is what the manifest does not describe on any
@@ -3513,77 +3643,35 @@ end
 --- encryption-migration status, and suspend/reset.
 --- @param ctx table Menu context.
 --- @return table One menu entry with its submenu.
---- Checks raw dense arrays without triggering source metamethods.
+--- Delegates the raw dense-array check to the shared section admission.
 --- @param value table Source array.
 --- @param records boolean Whether its values must be plain records.
 --- @return boolean
 local function metrics_dense(value, records)
-	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
-	local count, maximum = 0, 0
-	for index, row in next, value do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
-		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
-		count, maximum = count + 1, math.max(maximum, index)
-	end
-	return count == maximum
+	return ParentSource.dense(value, records)
 end
 
---- Admits the actual Metrics source structure without interpreting command grammar.
+--- Delegates the actual Metrics source admission to the shared section admission.
 --- @param renderer table|nil Actual manifest renderer.
 --- @param platform string Native platform token.
 --- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
 local function metrics_source(renderer, platform)
-	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
-		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
-
-	local ok, root = pcall(renderer.get_root)
-	if not ok then return nil end
-	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
-	local top, children = rawget(root, "top_level"), rawget(root, "metrics_menu")
-	if not metrics_dense(top, true) or not metrics_dense(children, true) then return nil end
-	local parent
-	for _, row in next, top do
-		if rawget(row, "id") == "metrics" then
-			if parent then return nil end
-			parent = row
-		end
-	end
-	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
-		or rawget(parent, "i18n") == "" or not metrics_dense(rawget(parent, "rows"), true) then return nil end
-	local platforms = rawget(parent, "platforms")
-	if platforms ~= nil then
-		if not metrics_dense(platforms, false) then return nil end
-		local visible = false
-		for _, token in next, platforms do
-			if type(token) ~= "string" then return nil end
-			if token == platform then visible = true end
-		end
-		if not visible then return nil end
-	end
-	local fields = {}
-	for key, value in next, parent do fields[key] = value end
-	return root, top, children, parent, fields
+	return ParentSource.read(renderer, platform, "metrics")
 end
 
---- Rechecks the captured direct parent fields without source metamethods.
+--- Delegates the direct parent recheck to the shared section admission.
 --- @param parent table Actual direct source row.
 --- @param fields table Captured raw field references and scalar values.
 --- @return boolean
 local function metrics_parent_unchanged(parent, fields)
-	for key, value in next, parent do
-		if not rawequal(value, rawget(fields, key)) then return false end
-	end
-	for key, value in next, fields do
-		if not rawequal(value, rawget(parent, key)) then return false end
-	end
-	return true
+	return ParentSource.unchanged(parent, fields)
 end
 
 
 local function _build_metrics(ctx)
 	local root, top, section, parent, fields = metrics_source(ManifestMenu, "linux")
 	if root == nil then return nil end
-	local k = ctx.keylogger
+	local k = ctx.keystats
 	if type(k) ~= "table" then
 		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_metrics_absent_rows", {}, {}, {})
 		if not status_rows then return nil end
@@ -3593,7 +3681,7 @@ local function _build_metrics(ctx)
 		if not rawequal(root, current_root) or not rawequal(top, current_top)
 			or not rawequal(section, current_section) or not rawequal(parent, current_parent)
 			or not metrics_parent_unchanged(parent, fields) then return nil end
-		local projected = ManifestMenu.group_row("top_level", "metrics", items, { keylogger_enabled = function() return nil end })
+		local projected = ManifestMenu.group_row("top_level", "metrics", items, { keystats_enabled = function() return nil end })
 		current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")
 		if not rawequal(root, current_root) or not rawequal(top, current_top)
 			or not rawequal(section, current_section) or not rawequal(parent, current_parent)
@@ -3613,7 +3701,7 @@ local function _build_metrics(ctx)
 	if not rawequal(root, current_root) or not rawequal(top, current_top)
 		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
 		or not metrics_parent_unchanged(parent, fields) then return nil end
-	local projected = ManifestMenu.group_row("top_level", "metrics", items, { keylogger_enabled = function() return on end })
+	local projected = ManifestMenu.group_row("top_level", "metrics", items, { keystats_enabled = function() return on end })
 	current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")
 	if not rawequal(root, current_root) or not rawequal(top, current_top)
 		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
@@ -3749,10 +3837,11 @@ local function _build_shortcuts(ctx)
 			and type(sc.is_caps_word_active()) == "boolean"
 	end
 	local selection_rows = {}
-	local caps_row = ManifestMenu.check_row("selection_caps_word_control", "selection_caps_word", {
-		["selection_caps_word"] = function()
+	local caps_row = ManifestMenu.check_row("selection_caps_word_control", require("config_keys").COMMAND.SELECTION_CAPS_WORD, {
+		[require("config_keys").COMMAND.SELECTION_CAPS_WORD] = function()
 			if not caps_word_ready() or sc.toggle_caps_word() ~= true then return false end
 			Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
+			require("ui.menu.feature_notice").feature(i18n_safe("sg_actions.caps_word"), sc.is_caps_word_active() == true)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end,
@@ -3795,9 +3884,9 @@ local function _build_shortcuts(ctx)
 	if not helper_boundary then return {} end
 	for _, row in ipairs(helper_boundary) do selection_rows[#selection_rows + 1] = row end
 	local helper_methods = {
-		["selection_select_word"] = "select_word",
-		["selection_select_line"] = "select_line",
-		["selection_paste_plain"] = "paste_plain",
+		[require("config_keys").COMMAND.SELECTION_SELECT_WORD] = "select_word",
+		[require("config_keys").COMMAND.SELECTION_SELECT_LINE] = "select_line",
+		[require("config_keys").COMMAND.SELECTION_PASTE_PLAIN] = "paste_plain",
 	}
 	local helper_getters = {
 		selection_select_word_ready = function() return case_ready(helper_methods.selection_select_word) end,
@@ -3883,8 +3972,8 @@ local function _build_shortcuts(ctx)
 				return committed
 			end
 			local rows = ManifestMenu.template_rows("keyboard_group_scope_controls", {
-				["scope_restore"] = function() return apply_group_scope("recommended") end,
-				["scope_clear"] = function() return apply_group_scope("clear") end,
+				[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_group_scope("recommended") end,
+				[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_group_scope("clear") end,
 			}, {
 				["keyboard_group_ready"] = function()
 					return ctx.paused ~= true and type(ctx.is_paused) == "function" and ctx.is_paused() == false
@@ -4024,7 +4113,7 @@ local function _build_shortcuts(ctx)
 			end,
 		})
 	end
-	group_builders["script_control"] = function()
+	group_builders[require("config_keys").LEAF.SCRIPT_CONTROL] = function()
 		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")
 		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
 		if not ok_chords or not ok_gestures then
@@ -4062,7 +4151,7 @@ local function _build_shortcuts(ctx)
 		for key, value in pairs(ctx) do chords_ctx[key] = value end
 		chords_ctx.commands = {}
 		for key, value in pairs(ctx.commands or {}) do chords_ctx.commands[key] = value end
-		chords_ctx.commands["script_control_toggle"] = function()
+		chords_ctx.commands[require("config_keys").COMMAND.SCRIPT_CONTROL_TOGGLE] = function()
 			local read, current = false, nil
 			if type(Chords.chords_enabled) == "function" then read, current = pcall(Chords.chords_enabled) end
 			local called, committed = false, false
@@ -4074,11 +4163,12 @@ local function _build_shortcuts(ctx)
 				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
 				return false
 			end
+			require("ui.menu.feature_notice").feature(i18n_safe("notify.script_control"), not current)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end
-		chords_ctx.commands["scope_restore"] = function() return apply_chords_scope("recommended") end
-		chords_ctx.commands["scope_clear"] = function() return apply_chords_scope("clear") end
+		chords_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_chords_scope("recommended") end
+		chords_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_chords_scope("clear") end
 		chords_ctx.state_getters = {}
 		for key, value in pairs(ctx.state_getters or {}) do chords_ctx.state_getters[key] = value end
 		chords_ctx.state_getters["script_control_enabled"] = function() return chords_on end
@@ -4135,10 +4225,10 @@ local function _build_shortcuts(ctx)
 		for key, value in pairs(ctx.commands or {}) do cw_ctx.commands[key] = value end
 		cw_ctx.state_getters = {}
 		for key, value in pairs(ctx.state_getters or {}) do cw_ctx.state_getters[key] = value end
-		cw_ctx.commands["caps_word_idle_timeout"] = function(seconds)
+		cw_ctx.commands[require("config_keys").COMMAND.CAPS_WORD_IDLE_TIMEOUT] = function(seconds)
 			return changed(AutoOff.set_idle_timeout_seconds(seconds))
 		end
-		cw_ctx.state_getters["shortcuts.caps_word.idle_timeout_seconds"] = function()
+		cw_ctx.state_getters[require("config_keys").KEY.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS] = function()
 			return settings.idle_timeout_seconds
 		end
 		-- One checkbox per kind the manifest declares, in its order; a kind
@@ -4198,9 +4288,9 @@ local function _build_shortcuts(ctx)
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
-	sc_ctx.commands["scope_restore"] = function() return apply_shortcuts_scope("recommended") end
-	sc_ctx.commands["scope_clear"] = function() return apply_shortcuts_scope("clear") end
-	sc_ctx.commands["shortcuts_toggle"] = function()
+	sc_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_shortcuts_scope("recommended") end
+	sc_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_shortcuts_scope("clear") end
+	sc_ctx.commands[require("config_keys").COMMAND.SHORTCUTS_TOGGLE] = function()
 		local read, current = false, nil
 		if type(sc.is_enabled) == "function" then read, current = pcall(sc.is_enabled) end
 		local called, committed = false, false
@@ -4212,10 +4302,11 @@ local function _build_shortcuts(ctx)
 			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
 			return false
 		end
+		require("ui.menu.feature_notice").feature(i18n_safe("menu.shortcuts.title"), not current)
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return true
 	end
-	sc_ctx.commands["edit_chatgpt_url"] = function()
+	sc_ctx.commands[require("config_keys").COMMAND.EDIT_CHATGPT_URL] = function()
 		local ok_chatgpt, ChatGPT = pcall(require, "modules.shortcuts.chatgpt")
 		if not ok_chatgpt or type(ChatGPT.get_url) ~= "function"
 			or type(ChatGPT.set_url) ~= "function" then
@@ -4246,7 +4337,7 @@ local function _build_shortcuts(ctx)
 		host = function() return require("ui.physical_shortcuts.bridge") end,
 		refused = function() show_error(i18n_safe("physical_shortcuts.window_unavailable")) end,
 	})
-	sc_ctx.commands["physical_shortcuts_editor"] = physical_editor.open
+	sc_ctx.commands[require("config_keys").COMMAND.PHYSICAL_SHORTCUTS_EDITOR] = physical_editor.open
 	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return enabled end
 	sc_ctx.state_getters["key_combinations_enabled"] = function()
@@ -4268,14 +4359,15 @@ local function _build_shortcuts(ctx)
 			and type(sc.is_wrap_on_type_enabled) == "function" and type(sc.set_wrap_on_type_enabled) == "function"
 	end
 	if type(sc.is_wrap_on_type_enabled) == "function" then
-		sc_ctx.feature_rows["shortcuts.wrap_text_if_selected"] = function()
+		sc_ctx.feature_rows[require("config_keys").KEY.SHORTCUTS_WRAP_TEXT_IF_SELECTED] = function()
 			local on = sc.is_wrap_on_type_enabled()
 			local rows = ManifestMenu.template_rows("shortcut_wrap_live_control", {
-				["shortcut_wrap_on_type"] = function()
+				[require("config_keys").COMMAND.SHORTCUT_WRAP_ON_TYPE] = function()
 					if not wrap_on_type_ready() then return false end
 					local current = sc.is_wrap_on_type_enabled()
 					if type(current) ~= "boolean" or not wrap_on_type_ready() then return false end
 					if sc.set_wrap_on_type_enabled(not current) ~= true then return false end
+					require("ui.menu.feature_notice").feature(i18n_safe("shortcuts.label_wrap_text"), not current)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
@@ -4468,7 +4560,7 @@ local function _build_tap_holds(ctx)
 		local guard, setter = edit_guard("set_threshold")
 		if not guard then changed(false); return false end
 		local value = prompt_text(i18n_safe("menu.tapholds.key_tap_delay_dialog_title"),
-			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt"), current_ms),
+			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt_current"), current_ms),
 			tostring(current_ms))
 		if value == nil then return false end
 		local ms = tonumber(value)
@@ -4479,6 +4571,45 @@ local function _build_tap_holds(ctx)
 		end
 		if guard() ~= true then changed(false); return false end
 		local call_ok, persisted = pcall(setter, key_id, math.floor(ms + 0.5) / 1000, guard)
+		if not call_ok or persisted ~= true then
+			changed(false)
+			return false
+		end
+		changed(true)
+		return true
+	end
+
+	--- Asks for the GLOBAL delay, in milliseconds: the delay of every key that has
+	--- none of its own. A key with a delay of its own keeps it.
+	local function ask_global_delay(current_ms)
+		local guard, setter = edit_guard("set_global_threshold")
+		if not guard then changed(false); return false end
+		local default_ms = math.floor(require("platform.remap.tap_hold_loader").GLOBAL_DEFAULT_SECONDS * 1000 + 0.5)
+		local value = prompt_text(i18n_safe("menu.tapholds.tap_hold_dialog_title"),
+			string.format(i18n_safe("menu.tapholds.tap_hold_dialog_prompt"), default_ms),
+			tostring(current_ms))
+		if value == nil then return false end
+		local ms = tonumber(value)
+		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
+			Logger.warn(LOG, "Invalid global tap-hold delay '%s' — ignored.", tostring(value))
+			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
+			return false
+		end
+		if guard() ~= true then changed(false); return false end
+		local call_ok, persisted = pcall(setter, math.floor(ms + 0.5) / 1000, guard)
+		if not call_ok or persisted ~= true then
+			changed(false)
+			return false
+		end
+		changed(true)
+		return true
+	end
+
+	--- Removes a key's own delay, so it follows the global delay again.
+	local function reset_delay(key_id)
+		local guard, setter = edit_guard("set_threshold")
+		if not guard then changed(false); return false end
+		local call_ok, persisted = pcall(setter, key_id, nil, guard)
 		if not call_ok or persisted ~= true then
 			changed(false)
 			return false
@@ -4503,18 +4634,29 @@ local function _build_tap_holds(ctx)
 			local tap_label = _tap_hold_action_label(tap, ctx.gestures)
 			local hold_label = hold and HoldOptions.label(hold, i18n_safe) or i18n_safe("tap_hold.hold.none")
 			local configured = tap ~= "" or (hold ~= nil and hold.kind ~= "none")
-			local ms = math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5)
+			-- A key follows the global delay until the user gives it one of its own;
+			-- `entry` carries the effective value either way.
+			local own_delay = th.has_own_delay(key_id)
+			local global_ms = math.floor(th.global_seconds() * 1000 + 0.5)
+			local ms = own_delay and math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5) or global_ms
 
 			local key_rows = ManifestMenu.template_rows("tap_hold_key_rows", {
-				["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
-				["tap_hold_key_tap"] = function() pick_tap(catalog_entry, tap) end,
-				["tap_hold_key_hold_action"] = function() return pick_hold(catalog_entry, hold) end,
-				["tap_hold_key_delay"] = function() return ask_delay(key_id, ms) end,
+				[require("config_keys").COMMAND.TAP_HOLD_KEY_NATIVE] = function() changed(Writer.set_native(key_id)) end,
+				[require("config_keys").COMMAND.TAP_HOLD_KEY_TAP] = function() pick_tap(catalog_entry, tap) end,
+				[require("config_keys").COMMAND.TAP_HOLD_KEY_HOLD_ACTION] = function() return pick_hold(catalog_entry, hold) end,
+				[require("config_keys").COMMAND.TAP_HOLD_KEY_DELAY] = function() return ask_delay(key_id, ms) end,
+				[require("config_keys").COMMAND.TAP_HOLD_KEY_DELAY_USE_GLOBAL] = function() return reset_delay(key_id) end,
 			}, {
 				["tap_hold_key_configured"] = function() return configured end,
 				["tap_hold_key_tap_caption"] = function() return tap_label end,
 				["tap_hold_key_hold_caption"] = function() return hold_label end,
-				["tap_hold_key_delay_caption"] = function() return ms .. " ms" end,
+				["tap_hold_key_delay_caption"] = function()
+					if own_delay then return ms .. " ms" end
+					return string.format(i18n_safe("menu.tapholds.key_tap_delay_inherited"), global_ms .. " ms")
+				end,
+				["tap_hold_key_global_delay_caption"] = function() return global_ms .. " ms" end,
+				["tap_hold_key_delay_is_global"] = function() return not own_delay end,
+				["tap_hold_key_delay_has_override"] = function() return own_delay end,
 			}, {})
 			if key_rows then
 
@@ -4530,6 +4672,13 @@ local function _build_tap_holds(ctx)
 	end
 
 	local providers = {
+		["tap_hold_global_delay"] = function()
+			local global_ms = math.floor(th.global_seconds() * 1000 + 0.5)
+			return { {
+				label = string.format(i18n_safe("menu.tapholds.tap_hold_title"), global_ms .. " ms"),
+				action = function() return ask_global_delay(global_ms) end,
+			} }
+		end,
 		["tap_hold_keys_left"] = function() return hand_rows("left") end,
 		["tap_hold_keys_right"] = function() return hand_rows("right") end,
 	}
@@ -4541,7 +4690,7 @@ local function _build_tap_holds(ctx)
 	-- The feature switch is persisted in the file ([tap_hold] enabled), as the
 	-- Windows toggle is in its config; turning it on also lifts a runtime
 	-- « Disable all ».
-	render_ctx.commands["tapholds_toggle"] = function()
+	render_ctx.commands[require("config_keys").COMMAND.TAPHOLDS_TOGGLE] = function()
 		local want = not feature_on
 		local ok = Writer.set_enabled(want)
 		if ok and want then ok = th.set_enabled(true) end
@@ -4556,15 +4705,15 @@ local function _build_tap_holds(ctx)
 		changed(committed)
 		return committed
 	end
-	render_ctx.commands["scope_restore"] = function() return apply_scope("recommended") end
-	render_ctx.commands["scope_clear"] = function() return apply_scope("clear") end
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_scope("recommended") end
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_scope("clear") end
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
 	render_ctx.state_getters["tapholds_enabled"] = function() return feature_on end
 
 	-- The navigation layer editor: the shared page, saved and applied by
 	-- ui/layer_editor/bridge.lua.
-	render_ctx.commands["edit_nav_layer"] = function()
+	render_ctx.commands[require("config_keys").COMMAND.EDIT_NAV_LAYER] = function()
 		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 			Logger.error(LOG, "No webview manager in the menu context — the layer editor cannot open.")
 			return
@@ -4608,8 +4757,8 @@ local function _build_gestures(ctx)
 	-- renderer builds each row and its label from the declaration, right after
 	-- the switch, and this driver registers only what the click does.
 	local gesture_commands = {
-		["scope_restore"] = function() return apply_scope("recommended") end,
-		["scope_clear"] = function() return apply_scope("clear") end,
+		[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_scope("recommended") end,
+		[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_scope("clear") end,
 	}
 
 	-- The master toggle's BEHAVIOUR. Its label, its position and the two i18n keys
@@ -4618,7 +4767,9 @@ local function _build_gestures(ctx)
 	-- label, a mark that belonged to the tray rather than to the string.
 	local gestures_on = enabled
 	local function master_toggle_action()
-		ge.toggle()
+		local before = ge.is_enabled()
+		local after = ge.toggle()
+		if after ~= before then require("ui.menu.feature_notice").feature(i18n_safe("menu.gestures.notify_title"), after == true) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 
@@ -4644,14 +4795,19 @@ local function _build_gestures(ctx)
 	-- count, so grouping would mean parsing the names apart only to regroup them.
 	local providers = {}
 	providers["system_gesture_status"] = function() return require("ui.gesture_conflicts").rows(ge) end
-	gesture_commands["system_gesture_settings"] = function() return require("ui.gesture_conflicts").open_settings() end
+	-- The recommended-defaults rule and why Linux recommends no swipe, behind
+	-- the menu's « Infos… » row: several sentences do not fit a menu row.
+	gesture_commands[require("config_keys").COMMAND.GESTURE_RECOMMENDED_INFO] = function()
+		show_info(i18n_safe("menu.gestures.notify_title"), zenity_plain(i18n_safe("menu.gestures.recommended_note")
+			.. "\n\n" .. i18n_safe("menu.gestures.recommended_reason_linux")))
+		return true
+	end
+	gesture_commands[require("config_keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = function() return require("ui.gesture_conflicts").open_settings() end
 	providers["gesture_slots_linux"] = function()
 		local out = {}
 		-- Every known slot is configurable here. A partial quick list made
 		-- parameterized actions unreachable for the omitted gesture bindings.
-		local slots = {}
-		for slot in pairs(ge.DEFAULT_GESTURES or {}) do slots[#slots + 1] = slot end
-		table.sort(slots)
+		local slots = require("table_util").sorted_keys(ge.DEFAULT_GESTURES or {})
 
 		-- What this machine's touchpad can physically express. The kernel only
 		-- advertises BTN_TOOL_QUADTAP at four slots and QUINTTAP at five, so a pad
@@ -4727,7 +4883,7 @@ local function _build_gestures(ctx)
 	for key, value in pairs(ctx) do gesture_ctx[key] = value end
 	gesture_ctx.commands = {}
 	for key, value in pairs(gesture_commands or {}) do gesture_ctx.commands[key] = value end
-	gesture_ctx.commands["gestures_toggle"] = master_toggle_action
+	gesture_ctx.commands[require("config_keys").COMMAND.GESTURES_TOGGLE] = master_toggle_action
 	gesture_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do gesture_ctx.state_getters[key] = value end
 	gesture_ctx.state_getters["gestures_enabled"] = function() return gestures_on end
@@ -4739,69 +4895,28 @@ local function _build_gestures(ctx)
 	return receive(menu, { gestures_enabled = function() return gestures_on end })
 end
 
---- Checks raw dense arrays without triggering source metamethods.
+--- Delegates the raw dense-array check to the shared section admission.
 --- @param value table Source array.
 --- @param records boolean Whether its values must be plain records.
 --- @return boolean
 local function configuration_dense(value, records)
-	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
-	local count, maximum = 0, 0
-	for index, row in next, value do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
-		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
-		count, maximum = count + 1, math.max(maximum, index)
-	end
-	return count == maximum
+	return ParentSource.dense(value, records)
 end
 
---- Admits the actual Configuration source structure without interpreting command grammar.
+--- Delegates the actual Configuration source admission to the shared section admission.
 --- @param renderer table|nil Actual manifest renderer.
 --- @param platform string Native platform token.
 --- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
 local function configuration_source(renderer, platform)
-	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
-		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
-
-	local root = renderer.get_root()
-	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
-	local top, children = rawget(root, "top_level"), rawget(root, "configuration_menu")
-	if not configuration_dense(top, true) or not configuration_dense(children, true) then return nil end
-	local parent
-	for _, row in next, top do
-		if rawget(row, "id") == "configuration" then
-			if parent then return nil end
-			parent = row
-		end
-	end
-	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
-		or rawget(parent, "i18n") == "" or not configuration_dense(rawget(parent, "rows"), true) then return nil end
-	local platforms = rawget(parent, "platforms")
-	if platforms ~= nil then
-		if not configuration_dense(platforms, false) then return nil end
-		local visible = false
-		for _, token in next, platforms do
-			if type(token) ~= "string" then return nil end
-			if token == platform then visible = true end
-		end
-		if not visible then return nil end
-	end
-	local fields = {}
-	for key, value in next, parent do fields[key] = value end
-	return root, top, children, parent, fields
+	return ParentSource.read(renderer, platform, "configuration")
 end
 
---- Rechecks the captured direct parent fields without source metamethods.
+--- Delegates the direct parent recheck to the shared section admission.
 --- @param parent table Actual direct source row.
 --- @param fields table Captured raw field references and scalar values.
 --- @return boolean
 local function configuration_parent_unchanged(parent, fields)
-	for key, value in next, parent do
-		if not rawequal(value, rawget(fields, key)) then return false end
-	end
-	for key, value in next, fields do
-		if not rawequal(value, rawget(parent, key)) then return false end
-	end
-	return true
+	return ParentSource.unchanged(parent, fields)
 end
 
 --- Builds the Configuration submenu.
@@ -4835,10 +4950,12 @@ local function _build_configuration(ctx)
 		if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
 		local GlobalScope = require("infra.global_scope")
 		local committed, report = GlobalScope.apply(mode, GlobalScope.participants(ctx))
-		-- « Reverted » is only said when it is true; a pending rollback is an
-		-- ERROR the composition logs, which the error window already reports.
-		if not committed and report.reverted ~= false then
-			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+		-- The refusal names its typed failure point, as the Windows reset does:
+		-- the generic « could not be saved, it has been reverted » claimed a
+		-- revert for a pending rollback or finalization, where none took place.
+		if not committed then
+			local title, message = require("config_reset_failure").message(report, i18n_safe)
+			show_error(message, title)
 		end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
@@ -4853,11 +4970,11 @@ local function _build_configuration(ctx)
 		-- Every category through its own scope owner, hotstrings included: the
 		-- recommended hotstrings, never the neutral state where every catalogue is
 		-- off, and that neutral state for the clear.
-		["scope_restore"] = function() return apply_global_scope("recommended") end,
-		["scope_clear"] = function() return apply_global_scope("clear") end,
+		[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_global_scope("recommended") end,
+		[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_global_scope("clear") end,
 		-- The cleanup needs no daemon state: it reads config.toml itself and
 		-- opens the shared review page through the driver's WebView owner.
-		["clean_unused_keys"] = function()
+		[require("config_keys").COMMAND.CLEAN_UNUSED_KEYS] = function()
 			local ok_cleanup, Cleanup = pcall(require, "ui.menu.unused_keys_cleanup")
 			if not ok_cleanup or type(Cleanup) ~= "table" then
 				Logger.error(LOG, "Unused-settings cleanup is unavailable: %s.", tostring(Cleanup))
@@ -4871,14 +4988,14 @@ local function _build_configuration(ctx)
 		-- The folders editor, as on the other two drivers. This row used to open
 		-- the hotstrings folder in the file manager, a second meaning for one
 		-- label.
-		["config_folder"] = function()
+		[require("config_keys").COMMAND.CONFIG_FOLDER] = function()
 			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 				Logger.error(LOG, "No webview manager — the folders editor cannot open.")
 				return
 			end
 			ctx.webview.show("paths_editor")
 		end,
-		["setup_wizard"] = call_ctx("on_show_setup_wizard"),
+		[require("config_keys").COMMAND.SETUP_WIZARD] = call_ctx("on_show_setup_wizard"),
 	}
 
 	render_ctx.state_getters = {}
@@ -4956,7 +5073,7 @@ end
 --- @param up table The updater module.
 --- @return table row A provider row with its items.
 local function _channel_picker(ctx, up)
-	return ManifestMenu.choice_row("about_update_channel_menu", "update_channel", {
+	return ManifestMenu.choice_row("about_update_channel_menu", require("config_keys").COMMAND.UPDATE_CHANNEL, {
 		update_channel = function(id)
 			local ok, committed = pcall(up.set_channel, id)
 			if not ok or committed ~= true then return false end
@@ -4970,7 +5087,7 @@ local function _channel_picker(ctx, up)
 			end
 			return true
 		end,
-	}, { ["updater.channel"] = function() return up.get_channel() end })
+	}, { [require("config_keys").KEY.UPDATER_CHANNEL] = function() return up.get_channel() end })
 end
 
 --- Supplies the registered cadence choice to the existing updater owner.
@@ -4978,7 +5095,7 @@ end
 --- @param up table Native updater owner.
 --- @return table row Shared choice provider data.
 local function _frequency_picker(ctx, up)
-	return ManifestMenu.choice_row("about_update_frequency_menu", "update_check_interval", {
+	return ManifestMenu.choice_row("about_update_frequency_menu", require("config_keys").COMMAND.UPDATE_CHECK_INTERVAL, {
 		update_check_interval = function(seconds)
 			if up.set_check_interval(seconds) ~= true then return false end
 			up.stop_background_checks()
@@ -4987,7 +5104,7 @@ local function _frequency_picker(ctx, up)
 			return true
 		end,
 	}, {
-		["updater.check_interval_seconds"] = function()
+		[require("config_keys").KEY.UPDATER_CHECK_INTERVAL_SECONDS] = function()
 			return Schedule.snap_interval(up.get_check_interval(), up.TIMING)
 		end,
 	})
@@ -5027,12 +5144,18 @@ local function _about_update_rows(ctx)
 	-- frequency row are still drawn, greyed with the reason: left out, nobody
 	-- could tell whether the automatic update exists.
 	local source_run = Installation.is_source_run()
+	-- A system package never self-updates either, so it gets the same greyed rows
+	-- with its own reason (the key the Versions window already shows).
+	local update_blocked_reason = source_run and "menu.about.source_run_reason" or nil
+	if not source_run and type(up.installation_kind) == "function" and up.installation_kind() == "package" then
+		update_blocked_reason = "changelog_window.install_blocked_package"
+	end
 	local frequency_row = _frequency_picker(ctx, up)
 
 	-- A check discovers releases; installation needs the separately named row.
 	if source_run then
-		local source_row = ManifestMenu.command_row("about_source_menu", "about_source_check", {
-			["about_source_check"] = function() return false end,
+		local source_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
+			[require("config_keys").COMMAND.ABOUT_SOURCE_CHECK] = function() return false end,
 		}, { ["about_source_release_ready"] = function() return not source_run end })
 		if source_row then out[#out + 1] = source_row end
 	else
@@ -5074,15 +5197,23 @@ local function _about_update_rows(ctx)
 	-- "download" row that does nothing is indistinguishable from a broken one.
 	if up.get_state() == "available" then
 		local rel = up.get_cached_release()
-		if rel and source_run then
-			-- A source run offers the latest release to look at, but has no
-			-- installation to replace: the row stays, greyed, and the renderer
-			-- names why as on every greyed row with a reason, with no action a
-			-- click could start.
+		if rel and rel.check_only == true then
+			-- Read from the public feed because the API was unreachable: announced, not installable.
 			out[#out + 1] = {
 				label = _fill(i18n_safe("menu.about.update_now"), "{tag}", rel.tag),
 				disabled = true,
-				disabled_reason_key = "menu.about.source_run_reason",
+				disabled_reason_key = "update_check.check_only",
+			}
+		elseif rel and update_blocked_reason then
+			-- A source run offers the latest release to look at, but has no
+			-- installation to replace; a system package is updated by its
+			-- package manager: the row stays, greyed, and the renderer names why
+			-- as on every greyed row with a reason, with no action a click could
+			-- start.
+			out[#out + 1] = {
+				label = _fill(i18n_safe("menu.about.update_now"), "{tag}", rel.tag),
+				disabled = true,
+				disabled_reason_key = update_blocked_reason,
 			}
 		elseif rel then
 			out[#out + 1] = {
@@ -5097,10 +5228,10 @@ local function _about_update_rows(ctx)
 	end
 
 
-	if source_run then
+	if update_blocked_reason then
 		frequency_row.items = nil
 		frequency_row.disabled = true
-		frequency_row.disabled_reason_key = "menu.about.source_run_reason"
+		frequency_row.disabled_reason_key = update_blocked_reason
 		out[#out + 1] = frequency_row
 		return out
 	end
@@ -5128,10 +5259,13 @@ local function _uninstall_command(ctx)
 		if not uninstall_caption_facade_current() or not current() then return false end
 		local failure = i18n_safe("dialog.uninstall.failed")
 		if not uninstall_caption_facade_current() or not current() then return false end
+		local missing_program = i18n_safe("dialog.uninstall.missing_program")
+		if not uninstall_caption_facade_current() or not current() then return false end
 		local options = {
 			title = title,
 			confirmation = confirmation,
 			failure = failure,
+			missing_program = missing_program,
 			confirm = function(title, text)
 				return ask_yes_no(title, zenity_plain(text),
 					i18n_safe("button.remove"), i18n_safe("button.cancel"))
@@ -5150,70 +5284,28 @@ local function _uninstall_command(ctx)
 	end
 end
 
---- Checks raw dense arrays without triggering source metamethods.
+--- Delegates the raw dense-array check to the shared section admission.
 --- @param value table Source array.
 --- @param records boolean Whether its values must be plain records.
 --- @return boolean
 local function about_dense(value, records)
-	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
-	local count, maximum = 0, 0
-	for index, row in next, value do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
-		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
-		count, maximum = count + 1, math.max(maximum, index)
-	end
-	return count == maximum
+	return ParentSource.dense(value, records)
 end
 
---- Admits the actual About source structure without interpreting choice grammar.
+--- Delegates the actual About source admission to the shared section admission.
 --- @param renderer table|nil Actual manifest renderer.
 --- @param platform string Native platform token.
 --- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
 local function about_source(renderer, platform)
-	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
-		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
-
-	local root = renderer.get_root()
-	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
-	local top, children = rawget(root, "top_level"), rawget(root, "about_menu")
-	if not about_dense(top, true) or not about_dense(children, true) or #children == 0 then return nil end
-	local parent
-	for _, row in next, top do
-		if rawget(row, "id") == "about" then
-			if parent then return nil end
-			parent = row
-		end
-	end
-	if parent == nil or rawget(parent, "type") ~= "group" or rawget(parent, "label_prefix") ~= nil
-		or type(rawget(parent, "i18n")) ~= "string" or rawget(parent, "i18n") == ""
-		or not about_dense(rawget(parent, "rows"), true) then return nil end
-	local platforms = rawget(parent, "platforms")
-	if platforms ~= nil then
-		if not about_dense(platforms, false) then return nil end
-		local visible = false
-		for _, token in next, platforms do
-			if type(token) ~= "string" then return nil end
-			if token == platform then visible = true end
-		end
-		if not visible then return nil end
-	end
-	local fields = {}
-	for key, value in next, parent do fields[key] = value end
-	return root, top, children, parent, fields
+	return ParentSource.read(renderer, platform, "about")
 end
 
---- Rechecks the captured direct parent fields without source metamethods.
+--- Delegates the direct parent recheck to the shared section admission.
 --- @param parent table Actual direct source row.
 --- @param fields table Captured raw field references and scalar values.
 --- @return boolean
 local function about_parent_unchanged(parent, fields)
-	for key, value in next, parent do
-		if not rawequal(value, rawget(fields, key)) then return false end
-	end
-	for key, value in next, fields do
-		if not rawequal(value, rawget(parent, key)) then return false end
-	end
-	return true
+	return ParentSource.unchanged(parent, fields)
 end
 
 --- Builds the about item: the updater block, Versions and its GitHub page, then
@@ -5225,7 +5317,7 @@ local function _build_about(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		["start_at_login"] = function()
+		[require("config_keys").COMMAND.START_AT_LOGIN] = function()
 			if not require("ui.menu.start_at_login").toggle() then
 				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
 			end
@@ -5236,14 +5328,14 @@ local function _build_about(ctx)
 		-- never sees and call that an About box — while ui/changelog/ was written,
 		-- registered in webview_manager's bridge table and given a window title,
 		-- with no caller anywhere. The page existed and nothing could reach it.
-		["about_changelog"] = function()
+		[require("config_keys").COMMAND.ABOUT_CHANGELOG] = function()
 			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 				Logger.error(LOG, "No webview manager — the release notes cannot open.")
 				return
 			end
 			ctx.webview.show("changelog")
 		end,
-		["about_releases_page"] = function()
+		[require("config_keys").COMMAND.ABOUT_RELEASES_PAGE] = function()
 			if type(ctx.updater) ~= "table" then
 				Logger.error(LOG, "No updater module — the releases page URL is unknown.")
 				return
@@ -5294,7 +5386,7 @@ end
 --- The daemon owns the reload; the menu asks it to, exactly as the quit item
 --- asks via on_quit. No signal, no subprocess, no PID to get wrong.
 local function _build_reload(ctx)
-	return ManifestMenu.command_row("top_level", "reload", {
+	local row = ManifestMenu.command_row("top_level", "reload", {
 		reload = function()
 			if type(ctx.on_reload) ~= "function" then
 				-- Loudly, not silently: a Reload item that cannot reload is the
@@ -5309,6 +5401,10 @@ local function _build_reload(ctx)
 			end
 		end,
 	})
+	-- Read by ui/menu/rebuild_owner: a click on a stale Reload row joins the
+	-- reload that already ran instead of replaying a second one.
+	if type(row) == "table" then row.joins_reload = true end
+	return row
 end
 
 --- Builds the quit item.
@@ -5316,74 +5412,39 @@ local function _build_quit(ctx)
 	return ManifestMenu.command_row("top_level", "quit", {
 		quit = function()
 			Logger.info(LOG, "Quit requested via tray menu.")
-			if ctx.on_quit then ctx.on_quit() end
+			if not ctx.on_quit then return end
+			-- Only an explicit false is a refusal: the owner answers false for the
+			-- causes of the shared quit admission (infra/quit_request.lua), as the
+			-- macOS menu does, and the user is told with the one notice.
+			if ctx.on_quit() == false then
+				require("ui.menu.feature_notice").quit_refused(i18n_safe)
+			end
 		end,
 	})
 end
 
---- Checks raw dense arrays without triggering source metamethods.
+--- Delegates the raw dense-array check to the shared section admission.
 --- @param value table Source array.
 --- @param records boolean Whether its values must be plain records.
 --- @return boolean
 local function debug_dense(value, records)
-	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
-	local count, maximum = 0, 0
-	for index, row in next, value do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
-		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
-		count, maximum = count + 1, math.max(maximum, index)
-	end
-	return count == maximum
+	return ParentSource.dense(value, records)
 end
 
---- Admits the actual Debug source structure without interpreting choice grammar.
+--- Delegates the actual Debug source admission to the shared section admission.
 --- @param renderer table|nil Actual manifest renderer.
 --- @param platform string Native platform token.
 --- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
 local function debug_source(renderer, platform)
-	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
-		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
-
-	local root = renderer.get_root()
-	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
-	local top, children = rawget(root, "top_level"), rawget(root, "debug_menu")
-	if not debug_dense(top, true) or not debug_dense(children, true) then return nil end
-	local parent
-	for _, row in next, top do
-		if rawget(row, "id") == "debug" then
-			if parent then return nil end
-			parent = row
-		end
-	end
-	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
-		or rawget(parent, "i18n") == "" or not debug_dense(rawget(parent, "rows"), true) then return nil end
-	local platforms = rawget(parent, "platforms")
-	if platforms ~= nil then
-		if not debug_dense(platforms, false) then return nil end
-		local visible = false
-		for _, token in next, platforms do
-			if type(token) ~= "string" then return nil end
-			if token == platform then visible = true end
-		end
-		if not visible then return nil end
-	end
-	local fields = {}
-	for key, value in next, parent do fields[key] = value end
-	return root, top, children, parent, fields
+	return ParentSource.read(renderer, platform, "debug")
 end
 
---- Rechecks the captured direct parent fields without source metamethods.
+--- Delegates the direct parent recheck to the shared section admission.
 --- @param parent table Actual direct source row.
 --- @param fields table Captured raw field references and scalar values.
 --- @return boolean
 local function debug_parent_unchanged(parent, fields)
-	for key, value in next, parent do
-		if not rawequal(value, rawget(fields, key)) then return false end
-	end
-	for key, value in next, fields do
-		if not rawequal(value, rawget(parent, key)) then return false end
-	end
-	return true
+	return ParentSource.unchanged(parent, fields)
 end
 
 --- Builds the debug submenu from the shared manifest.
@@ -5419,20 +5480,23 @@ local function _build_debug(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		["log_level"]      = ctx.on_set_log_level,
-		["open_logs"]      = call_ctx("on_open_logs"),
-		["open_today_log"] = call_ctx("on_open_today_log"),
-		["open_error_log"] = call_ctx("on_open_error_log"),
+		[require("config_keys").LEAF.LOG_LEVEL]      = ctx.on_set_log_level,
+		[require("config_keys").COMMAND.OPEN_LOGS]      = call_ctx("on_open_logs"),
+		[require("config_keys").COMMAND.OPEN_TODAY_LOG] = call_ctx("on_open_today_log"),
+		[require("config_keys").COMMAND.OPEN_ERROR_LOG] = call_ctx("on_open_error_log"),
 		["healthcheck"]    = call_ctx("on_healthcheck"),
+		[COMMAND.COMPOSER_CHECK] = call_ctx("on_composer_check"),
+		-- Self-contained like the report rows: the check reads its own settings and ports
+		[COMMAND.FIELD_CHECK_NETWORK] = function() require("ui.field_check.network_check").run() end,
 		-- Self-contained: the report reads the daemon state the webview manager
 		-- already holds, so the daemon supplies no callback for them
-		["report_bug"]      = function() require("ui.healthcheck.report").report_bug() end,
-		["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,
-		["show_error_dialog"] = call_ctx("on_toggle_error_dialog"),
+		[require("config_keys").COMMAND.REPORT_BUG]      = function() require("ui.healthcheck.report").report_bug() end,
+		[require("config_keys").COMMAND.SUGGEST_FEATURE] = function() require("ui.healthcheck.report").suggest_feature() end,
+		[require("config_keys").LEAF.SHOW_ERROR_DIALOG] = call_ctx("on_toggle_error_dialog"),
 	}
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
-	render_ctx.state_getters["script.log_level"] = function() return ctx.log_level end
+	render_ctx.state_getters[require("config_keys").KEY.SCRIPT_LOG_LEVEL] = function() return ctx.log_level end
 	render_ctx.state_getters["error_dialog_enabled"] = function()
 		return require("ui.error_dialog.bridge").is_enabled()
 	end
@@ -5490,7 +5554,7 @@ end
 ---   config         table    Hotstrings_config module.
 ---   layout         string   Current keyboard layout.
 ---   on_layout_change function Called with new layout name.
----   keylogger      table    Keylogger module.
+---   keystats      table    Keystats module.
 ---   llm            table|nil LLM prediction engine state.
 ---   dry_run        boolean  Dry-run mode flag.
 ---   verbose        boolean  Verbose flag.
@@ -5499,6 +5563,7 @@ end
 ---   on_set_log_level function (optional) Log level change.
 ---   on_open_logs   function (optional) Open logs dir.
 ---   on_healthcheck function (optional) Launch healthcheck.
+---   on_composer_check function (optional) Run the composed layout check.
 ---   on_show_setup_wizard function (optional) Launch setup wizard.
 --- }
 --- @return table Array of { title, menu?, fn?, checked?, disabled? } items.

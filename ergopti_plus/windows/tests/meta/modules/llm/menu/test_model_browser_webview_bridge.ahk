@@ -20,23 +20,28 @@
 ; =====================================================
 ; =====================================================
 
+_MBWB_SubscriptionRetained(Body) {
+	Code := _DriverMaskNonCode(&Body)
+	if !RegExMatch(Code, "m)^[ \t]+([A-Za-z0-9_]+)\s*:=\s*[A-Za-z0-9_]+\.WebMessageReceived\(", &Capture)
+		return false
+	ReturnName := Capture[1]
+	return RegExMatch(Code, "m)^[ \t]+_LLM_MBW_MsgSub\s*:=\s*" . ReturnName . "\s*$") > 0
+}
+
 _MBWB_CheckSubscriptionPersisted() {
 	Body := _DriverFuncBody("_LLM_ModelBrowser_ShowWeb")
-	Assert(Body != "", "_LLM_ModelBrowser_ShowWeb must exist in ui/model_browser/init.ahk")
-
-	CallPos := InStr(Body, "_LLM_MBW_WebView.WebMessageReceived(")
-	Assert(CallPos > 0, "_LLM_ModelBrowser_ShowWeb must call _LLM_MBW_WebView.WebMessageReceived(...) as a method")
-
-	LineStart := CallPos
-	loop {
-		if (LineStart <= 1 or SubStr(Body, LineStart, 1) = "`n")
-			break
-		LineStart--
-	}
-	Line := Trim(SubStr(Body, LineStart, CallPos - LineStart + 40))
-	Assert(InStr(Line, "_LLM_MBW_MsgSub :=") > 0,
-		"_LLM_ModelBrowser_ShowWeb must capture the return value of WebMessageReceived(...) into _LLM_MBW_MsgSub -- a bare, uncaptured call lets AHK free the subscription almost immediately")
+	Assert(Body != "", "The actual model browser constructor must exist")
+	; Startup owns the returned subscription locally until it can atomically
+	; lend it to the still-current host; the native child also checks its lifetime.
+	AssertTrue(_MBWB_SubscriptionRetained(Body), "The exact SDK return must reach the retained subscription owner")
+	AssertFalse(_MBWB_SubscriptionRetained(StrReplace(Body, "MsgSub := View.WebMessageReceived(", "View.WebMessageReceived(")),
+		"A discarded subscription return cannot qualify")
+	AssertFalse(_MBWB_SubscriptionRetained(StrReplace(Body, "_LLM_MBW_MsgSub := MsgSub", "_LLM_MBW_MsgSub := Foreign")),
+		"An unrelated retained value cannot qualify")
+	AssertFalse(_MBWB_SubscriptionRetained(StrReplace(Body, "_LLM_MBW_MsgSub := MsgSub", "; _LLM_MBW_MsgSub := MsgSub")),
+		"A commented transfer cannot qualify")
 }
+
 Test("model_browser: WebMessageReceived subscription handle is captured into _LLM_MBW_MsgSub, not discarded (webview-bridge-discarded-subscription)",
 	_MBWB_CheckSubscriptionPersisted)
 

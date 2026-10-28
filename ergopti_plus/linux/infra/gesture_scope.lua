@@ -13,6 +13,7 @@ local Manifest = require("infra.manifest_reader")
 local Transaction = require("config_scope_transaction")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
+local ConfigKeys = require("config_keys")
 
 --- Builds one recoverable gesture transaction with a unique backup destination.
 --- @param options table Path, backup_path, files and gestures owner.
@@ -72,7 +73,7 @@ function M.new(options)
 				if parameter_domain("gesture_parameters." .. key) then state.parameters[key] = nil end
 			end
 			state.enabled = settings.enabled
-			if state.enabled == nil then state.enabled = Manifest.default_for("gestures.enabled") end
+			if state.enabled == nil then state.enabled = Manifest.default_for(ConfigKeys.KEY.GESTURES_ENABLED) end
 			state.reading = state.enabled
 			return gestures.apply_scope_state(state)
 		end,

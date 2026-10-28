@@ -15,8 +15,10 @@
 ---    evaluateJavaScript("injectModels(…)"), so the page never reads files itself.
 --- 2. Singleton window: a second M.open() while visible brings the window to front
 ---    and refreshes the catalogue instead of stacking duplicates.
---- 3. Thin bridge: only two messages cross the boundary — "select_model" (activate)
----    and "open_url" (open the model's source page) — mirroring the changelog window.
+--- 3. Thin bridge: "select_model" and "open_url" keep their historic callers; the
+---    selector page owner (ui/menu/menu_llm/model_selector_page.lua) also answers
+---    download, delete, custom-model and disable actions through on_action, and
+---    each one runs the tray's own code path.
 --- ==============================================================================
 
 local M = {}
@@ -72,6 +74,12 @@ end
 -- preserved because ui_builder concatenates asset filenames directly onto this
 -- directory.
 local ASSETS_DIR = (Paths.shared("ui/model_browser") or "") .. "/"
+
+-- Actions the selector page owner answers through its on_action callback.
+local PAGE_ACTIONS = {
+	select_model = true, download_model = true, delete_model = true, remove_custom_model = true,
+	disable_model = true, add_model = true, add_provider = true, group_action = true, row_action = true,
+}
 
 
 
@@ -136,6 +144,8 @@ end
 --- @param ctx table { presets, active_backend, active_model, models_mgr }.
 --- @return table { backend, active, models = { … } }.
 local function build_catalogue(ctx)
+	-- The selector page owner builds the whole multi-backend payload itself.
+	if type(ctx.build_payload) == "function" then return ctx.build_payload() end
 	local backend = ctx.active_backend or "mlx"
 	return ModelCatalogue.build(ctx.presets, backend, ctx.active_model,
 		function(display_name)
@@ -231,6 +241,18 @@ local function create_ucc()
 				return
 			end
 
+			if PAGE_ACTIONS[body.action] and type(_ctx.on_action) == "function" then
+				local context, session = _ctx, _session
+				Logger.info(LOG, "Model selector action: %s.", body.action)
+				local ok, accepted = Logger.callback(LOG, "Model selector action", context.on_action, body)
+				if _ctx ~= context or _session ~= session or _wv_committed ~= true then return end
+				if ok and accepted == true and (body.action == "select_model" or body.action == "disable_model") then
+					M.close()
+				elseif ok and accepted == true then
+					inject_catalogue(context)
+				end
+				return
+			end
 			if body.action == "select_model" and type(body.name) == "string" and body.name ~= "" then
 				if _selection_owner ~= nil then return end
 				local selection = { context = _ctx, callback = _on_select, session = _session }
@@ -348,7 +370,7 @@ function M.open(ctx)
 			html_string       = final_html,
 			on_navigation     = function(action)
 				if action == "didFinishNavigation" then
-					DeferredWork.after(0.15, function()
+					DeferredWork.after(require("infra.timings").sec("ui", "webview_navigation_flush_delay_ms"), function()
 						if not candidate_is_active() then return end
 						local navigation_session = _session
 						if not _ready then flush_queue() end
@@ -392,7 +414,7 @@ function M.open(ctx)
 	_wv_committed = true
 
 	-- Safety: flush after 1.5 s if the ready handshake never arrives.
-	DeferredWork.after(1.5, function()
+	DeferredWork.after(require("infra.timings").sec("ui", "webview_ready_safety_flush_ms"), function()
 		if not candidate_is_active() or _ready then return end
 		local fallback_session = _session
 		flush_queue()
@@ -402,6 +424,10 @@ function M.open(ctx)
 	Logger.success(LOG, "Model browser created.")
 	return true
 end
+
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _wv end
 
 --- Closes the model browser window if open.
 function M.close()
@@ -435,6 +461,48 @@ function M.close()
 	local controller_settled = release_controller(owned_ucc)
 	Logger.info(LOG, "Model browser closed.")
 	return controller_settled
+end
+
+--- Re-sends the payload to the open page, after a runtime or model change.
+--- @return boolean refreshed False when no page is open.
+function M.refresh()
+	if not _wv or _wv_committed ~= true or not _ctx then return false end
+	inject_catalogue(_ctx)
+	return true
+end
+
+--- Shows one row's download percentage on the open page.
+--- @param update table { backend, name, percent }.
+--- @return boolean sent False when no page is open.
+function M.inject_progress(update)
+	if not _wv or _wv_committed ~= true or type(update) ~= "table" then return false end
+	local ok, json = pcall(hs.json.encode, { backend = update.backend, name = update.name, percent = update.percent })
+	if not ok or not json then
+		Logger.warn(LOG, "Failed to encode a download percentage as JSON.")
+		return false
+	end
+	eval("injectProgress(" .. json .. ")")
+	return true
+end
+
+--- Shows a local backend's runtime install percentage in its group header.
+--- @param update table { backend, percent }.
+--- @return boolean sent False when no page is open.
+function M.inject_install_progress(update)
+	if not _wv or _wv_committed ~= true or type(update) ~= "table" then return false end
+	local ok, json = pcall(hs.json.encode, { backend = update.backend, percent = update.percent })
+	if not ok or not json then
+		Logger.warn(LOG, "Failed to encode a runtime install percentage as JSON.")
+		return false
+	end
+	eval("injectInstallProgress(" .. json .. ")")
+	return true
+end
+
+--- Whether the page is open.
+--- @return boolean
+function M.is_open()
+	return _wv ~= nil and _wv_committed == true
 end
 
 -- Exposed for unit tests only — pure catalogue-normalisation helpers with no

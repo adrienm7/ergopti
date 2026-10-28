@@ -29,7 +29,15 @@ local function load_menu_quit_action()
 	helpers.load_with_stubs("infra.logger")
 	local exit_calls = {}
 	local exit_mode = { value = "true" }
-	local stock_calls = { execute = 0, launch = 0, notifications = {} }
+	local stock_calls = { execute = 0, launch = 0, notifications = {}, timers = {}, clock = 0 }
+	local real_scheduler = require("adapters.timer_scheduler")
+	package.loaded["adapters.timer_scheduler"] = setmetatable({
+		after = function(_, callback)
+			stock_calls.timers[#stock_calls.timers + 1] = callback
+			return {}, true
+		end,
+	}, { __index = real_scheduler })
+	_G.hs.timer.absoluteTime = function() return stock_calls.clock * 1e9 end
 	_G.hs.execute = function()
 		stock_calls.execute = stock_calls.execute + 1
 		return "", true
@@ -50,6 +58,7 @@ local function load_menu_quit_action()
 	package.loaded["ui.menu.global_actions_transaction"] = {
 		create = function(deps)
 			return {
+				is_exclusive_blocked = function() return stock_calls.writer_blocked == true end,
 				run_exclusive = function(_, callback)
 					if deps.terminal_pending() then return false end
 					local ok, result = xpcall(callback, debug.traceback)
@@ -119,8 +128,13 @@ local function load_menu_quit_action()
 		adopt = function() end,
 		setMenu = function() return true end,
 	}
+	package.loaded["modules.hotstrings.hotstrings_config"] = {
+		publication_pending = function() return stock_calls.publication_blocked == true end,
+		terminal_admission_blocked = function() return stock_calls.publication_blocked == true end,
+	}
 	package.loaded["infra.termination_coordinator"] = {
-		is_pending = function() return false end,
+		is_pending = function() return exit_mode.kind ~= nil end,
+		pending_kind = function() return exit_mode.kind end,
 		request_user_exit = function(reason)
 			exit_calls[#exit_calls + 1] = { reason = reason }
 			if exit_mode.value == "throw" then error("coordinated exit fault") end
@@ -134,7 +148,7 @@ local function load_menu_quit_action()
 		"ui.menu.menu_gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
 		"ui.menu.menu_hotstrings", "ui.menu.menu_llm", "ui.menu.menu_metrics",
 		"ui.menu.menu_tap_holds", "ui.menu.menu_apps", "ui.menu.menu_about",
-		"modules.llm", "modules.keylogger", "modules.dynamic_hotstrings", "modules.gestures",
+		"modules.llm", "modules.keystats", "modules.dynamic_hotstrings", "modules.gestures",
 	}) do
 		package.loaded[module_name] = {}
 	end
@@ -201,6 +215,53 @@ helpers.describe("menu Quit uses exact lease revocation", function()
 			helpers.assert_true(body:find(retired, 1, true) == nil,
 				"menu Quit must not regain stock-process authority: " .. retired)
 		end
+	end)
+
+	helpers.it("refuses a second Quit while an exit already owns the process, with the one notice", function()
+		local quit_action, exit_calls, stock_calls, exit_mode = load_menu_quit_action()
+		exit_mode.kind = "exit"
+		helpers.assert_eq(quit_action(), false)
+		helpers.assert_eq(#exit_calls, 0, "no second exit request reaches the coordinator")
+		helpers.assert_eq(stock_calls.notifications, { "notify.quit_refused" })
+	end)
+
+	helpers.it("lets Quit win over a reload in flight: it asks the coordinator at once (quit-wins-over-reload)", function()
+		local quit_action, exit_calls, stock_calls, exit_mode = load_menu_quit_action()
+		exit_mode.kind = "reload"
+		helpers.assert_eq(quit_action(), true, "the reload is abandoned, not refused")
+		helpers.assert_eq(#exit_calls, 1)
+		helpers.assert_eq(exit_calls[1].reason, "menu_quit")
+		helpers.assert_eq(stock_calls.notifications, {}, "no refusal notice")
+	end)
+
+	helpers.it("waits for a running write or publication, then exits once (quit-waits-for-writer)", function()
+		for _, field in ipairs({ "writer_blocked", "publication_blocked" }) do
+			local quit_action, exit_calls, stock_calls = load_menu_quit_action()
+			stock_calls[field] = true
+			stock_calls.timers = {} -- menu start armed its own timers; only Quit's poll counts
+			helpers.assert_eq(quit_action(), true, field .. ": Quit is accepted as waiting")
+			helpers.assert_eq(#exit_calls, 0, field .. ": the write is not cut")
+			helpers.assert_eq(#stock_calls.timers, 1, field .. ": one poll is armed")
+			stock_calls.clock = 1
+			table.remove(stock_calls.timers, 1)()
+			helpers.assert_eq(#exit_calls, 0, field .. ": still running")
+			stock_calls[field] = false
+			stock_calls.clock = 2
+			table.remove(stock_calls.timers, 1)()
+			helpers.assert_eq(#exit_calls, 1, field .. ": exits once the write settled")
+			helpers.assert_eq(stock_calls.notifications, {})
+		end
+	end)
+
+	helpers.it("gives up with the refusal notice when the write outlasts the quit deadline", function()
+		local quit_action, exit_calls, stock_calls = load_menu_quit_action()
+		stock_calls.writer_blocked = true
+		stock_calls.timers = {}
+		quit_action()
+		stock_calls.clock = 1000
+		table.remove(stock_calls.timers, 1)()
+		helpers.assert_eq(#exit_calls, 0)
+		helpers.assert_eq(stock_calls.notifications, { "notify.quit_refused" })
 	end)
 
 	helpers.it("fails closed when coordinated exit throws, returns nil, or explicitly refuses", function()

@@ -54,12 +54,18 @@ M.EV_SYN = 0x00
 M.EV_KEY = 0x01
 M.EV_REL = 0x02
 
+-- The EV_REL axes of a pointer movement and of a classic wheel notch.
+M.REL_X      = 0x00
+M.REL_Y      = 0x01
+M.REL_HWHEEL = 0x06
+M.REL_WHEEL  = 0x08
+
 -- The EV_REL axes that are a wheel turn, vertical and horizontal, in both the
 -- classic and the high-resolution reports. Every other axis (REL_X, REL_Y,
 -- REL_DIAL...) is pointer motion or a knob, not a scroll.
 M.REL_WHEEL_AXES = {
-	[0x06] = true, -- REL_HWHEEL
-	[0x08] = true, -- REL_WHEEL
+	[M.REL_HWHEEL] = true,
+	[M.REL_WHEEL]  = true,
 	[0x0b] = true, -- REL_WHEEL_HI_RES
 	[0x0c] = true, -- REL_HWHEEL_HI_RES
 }

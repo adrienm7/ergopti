@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Regression guard ensuring the case-transform injector in
 ; modules/gestures/actions.ahk marks its output as synthetic before calling
-; SendInstant, so the keylogger does not record injected characters as real
+; SendInstant, so the keystats does not record injected characters as real
 ; keystrokes that would corrupt ngram statistics, and that the Win+U / Win+W
 ; shortcuts go through that injector instead of a copy of it.
 ;

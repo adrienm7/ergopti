@@ -6,7 +6,7 @@
 ; Behavioral guard for the config-shortcuts-array-parse-escape-bug finding.
 ;
 ; CS_CoerceValue() in infra/config_shortcuts.ahk hand-rolls a TOML array
-; tokenizer for the metrics_disabled_apps privacy filter. The original
+; tokenizer for the disabled_apps privacy filter. The original
 ; tokenizer probed the ACCUMULATED string (SubStr(cur, -1)) to decide whether
 ; a quote was escaped. That lookbehind is unreliable: an escaped backslash
 ; (\\) just before a closing quote fools the probe into treating the quote as

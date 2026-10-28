@@ -390,3 +390,5 @@ Test("prompt-editor: save payload rejects malformed scalar fields",
 	_PEC_SavePayloadRejectsMalformedScalars)
 
 #Include test_llm_profile_opening_image.ahk
+
+#Include test_prompt_startup_repoint.ahk

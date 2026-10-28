@@ -1,0 +1,7 @@
+[tap_hold]
+inherit_defaults = false
+explicit_delays = true
+
+[tap_hold.keys.caps_lock]
+tap_action = "enter"
+time_activation_seconds = 0.35

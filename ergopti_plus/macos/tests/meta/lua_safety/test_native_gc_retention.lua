@@ -9,6 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
+local CommandLines = require("tests.support.command_lines")
 local DRIVER_ROOT = helpers.driver_root()
 
 --- Removes Lua line and long-bracket comments before executable assertions.
@@ -75,13 +77,14 @@ local function ui_sources()
 		local command = separator == "\\"
 			and ('cmd /c dir /b /s /a-d "' .. ui_root:gsub("/", "\\") .. '*.lua"')
 			or ("find '" .. ui_root .. "' -type f -name '*.lua'")
-		local pipe = io.popen(command)
-		helpers.assert_not_nil(pipe, "the UI source fallback walk must start")
-		for line in pipe:lines() do
+		local source_count = #paths
+		local inventory = CommandLines.read(command)
+		assert(#inventory > 0, "source inventory must not be empty")
+		for _, line in ipairs(inventory) do
 			local normalized = line:gsub("\\", "/"):gsub("%s+$", "")
 			paths[#paths + 1] = normalized:gsub("^.*/macos/", "")
 		end
-		pipe:close()
+		assert(#paths > source_count, "source inventory contains no matching files")
 	end
 	table.sort(paths)
 	return paths
@@ -193,9 +196,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 			"the UI source walk must cover the class instead of an empty allowlist")
 		local raw_sites = 0
 		for _, relative in ipairs(files) do
-			local handle = assert(io.open(DRIVER_ROOT .. relative, "rb"))
-			local code = strip_lua_comments(handle:read("*a") or "")
-			handle:close()
+			local code = strip_lua_comments(SourceFile.read(DRIVER_ROOT .. relative))
 			local count = count_pattern(code, "hs%.timer%.doAfter")
 			local contract = expected[relative]
 			if contract then
@@ -221,10 +222,6 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 				"_active_chooser%s*=%s*chooser",
 				"_active_chooser%s*==%s*chooser%s+then%s+_active_chooser%s*=%s*nil",
 			},
-			[module_source("ui.menu.menu_llm.models_selector")] = {
-				"_model_browser_chooser%s*=%s*chooser",
-				"_model_browser_chooser%s*==%s*chooser%s+then%s+_model_browser_chooser%s*=%s*nil",
-			},
 			[module_source("ui.metrics_apps.init")] = {
 				"_chooser_owners%s*%[%s*owner_id%s*%]%s*=%s*chooser_or_err",
 				"_chooser_owners%s*%[%s*owner_id%s*%]%s*=%s*nil",
@@ -234,9 +231,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 		paths[#paths + 1] = module_source("infra.app_picker")
 		local constructions = 0
 		for _, relative in ipairs(paths) do
-			local handle = assert(io.open(DRIVER_ROOT .. relative, "rb"))
-			local code = strip_lua_comments(handle:read("*a") or "")
-			handle:close()
+			local code = strip_lua_comments(SourceFile.read(DRIVER_ROOT .. relative))
 			local count = count_pattern(code, "hs%.chooser%.new%s*%(")
 			if count > 0 then
 				local contract = chooser_contracts[relative]
@@ -251,7 +246,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 			end
 			constructions = constructions + count
 		end
-		helpers.assert_eq(constructions, 3,
+		helpers.assert_eq(constructions, 2,
 			"the chooser construction floor must change deliberately with the owner inventory")
 	end)
 
