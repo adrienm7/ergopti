@@ -3,12 +3,12 @@
 --- ==============================================================================
 --- MODULE: Pending Layout Activation (macOS)
 --- DESCRIPTION:
---- Remembers the installed layouts macOS has not turned on yet. The enabled
---- input-source preference lists a layout at once, but macOS 26 turns it on
---- only at the next login (field probe, docs/ERGOPTIPLUS_TODO.md L25): the
---- install then reports « pending », and at the next boot of the driver this
---- module checks whether macOS turned the layout on and, when the user asked to
---- use it, selects it.
+--- Remembers the installed layouts macOS has not turned on yet: the fallback
+--- of the install. Writing the enabled input-source preference normally turns
+--- a layout on at once, as a fresh process sees it (probe v5, P5); when that
+--- fresh read still finds it off, the install reports « pending », and at the
+--- next boot of the driver (after a login, P10) this module checks whether
+--- macOS turned the layout on and, when the user asked to use it, selects it.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Honest states: a pending layout is never called enabled. At boot each one
