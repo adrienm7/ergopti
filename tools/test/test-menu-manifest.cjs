@@ -3322,7 +3322,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	assert.deepEqual(
 		corpus.sensitivity_values,
-		[1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30]
+		[1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60]
 	);
 	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
 	assert.equal(locales.length, 21);

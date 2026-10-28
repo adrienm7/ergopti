@@ -87,7 +87,7 @@ local function strip(list, store, prefix)
 end
 
 local function backend_entry(id, fields)
-	local entry = { id = id, brand = BackendBrands.label(id):match("^(%S+)"), emoji = BackendBrands.emoji(id),
+	local entry = { id = id, brand = BackendBrands.brand(id), emoji = BackendBrands.emoji(id),
 		kind = BackendBrands.kind(id) }
 	for k, v in pairs(fields) do entry[k] = v end
 	return entry

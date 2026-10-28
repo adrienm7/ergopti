@@ -656,6 +656,7 @@
 			"startup_model_disk_insufficient",
 			"startup_model_download_declined",
 			"startup_ollama_unreachable",
+			"startup_ollama_upgrade_required",
 			"startup_runtime_not_installed",
 			"state_failed",
 			"string",

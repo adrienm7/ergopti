@@ -549,7 +549,8 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 				local_delta = ((ddx + ddy > 0) and 1 or -1) * mag
 			end
 			local local_sign = (local_delta > 0) and 1 or (local_delta < 0 and -1 or 0)
-			if local_sign ~= 0 and local_sign ~= gs.liveAxisSign and math.abs(local_delta) >= LIVE_AXIS_MIN then
+			local reverse_min = Geometry.incrementalReverseMin(sensitivity, LIVE_AXIS_MIN)
+			if local_sign ~= 0 and local_sign ~= gs.liveAxisSign and math.abs(local_delta) >= reverse_min then
 				Logger.info(LOG, string.format("INCREMENTAL REVERSAL DETECTED slot=%s axis=%s local_delta=%.2f prevSign=%d newSign=%d — rebasing startPos to (%.1f,%.1f)",
 					slot, axis, local_delta, gs.liveAxisSign, local_sign, pos.x, pos.y))
 				-- Clone pos: startPos and endPos must not alias the same table; the
@@ -566,7 +567,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 		end
 
 		local sd = signedDistAxis(pos, axis)
-		local targetSteps = math.floor(math.abs(sd) / sensitivity)
+		local targetSteps = Geometry.incrementalSteps(math.abs(sd), sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
 
 		if diff > 0 then
@@ -582,17 +583,12 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 				gs.lastFirePos    = pos
 				gs.lastLiveFire   = now
 			end
-		elseif diff < 0 then
-			-- Fallback rebase: still kept as a safety net if reversal slipped past
-			-- the early detector above (e.g., sudden centroid jump from finger count change).
-			Logger.info(LOG, string.format("INCREMENTAL FALLBACK REBASE slot=%s axis=%s sd=%.2f targetSteps=%d prevSteps=%d diff=%d",
-				slot, axis, sd, targetSteps, gs.stepsCommitted, diff))
-			gs.startPos       = {x = pos.x, y = pos.y}
-			gs.endPos         = {x = pos.x, y = pos.y}
-			gs.stepsCommitted = 0
-			gs.liveAxisSign   = nil
-			gs.lastFirePos    = nil
 		end
+		-- A shrinking distance holds the actions already fired. The former rebase
+		-- here restarted the count from the current point, so hovering just below
+		-- a step boundary (sd 39.78 after 8 steps, 4.91 after 1) fired the same
+		-- step again on the next small move forward. A real reversal is caught
+		-- above, from the last fire position.
 		return
 	end
 
@@ -765,7 +761,7 @@ local function commitGesture(now)
 
 	if mode == "incremental" then
 		local sd = signedDistAxis(gs.endPos, dir)
-		local targetSteps = math.floor(math.abs(sd) / sensitivity)
+		local targetSteps = Geometry.incrementalSteps(math.abs(sd), sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
 		Logger.info(LOG, "commitGesture INCREMENTAL: sd=%.2f targetSteps=%d prevSteps=%d diff=%d",
 			sd, targetSteps, gs.stepsCommitted, diff)

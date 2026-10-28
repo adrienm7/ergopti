@@ -52,17 +52,27 @@ body {
 
 /* ── Toolbar ─────────────────────────────────────────────────────────────── */
 
+/* The toolbar never scrolls with the report, so whatever it holds (deep-test
+   output, the day log preview and its notices) is capped here: the report
+   tables keep most of the window (issue #101). Past the cap the toolbar
+   scrolls on its own and its buttons stay pinned at its top. */
 .toolbar {
 	background: var(--panel);
 	border-bottom: 1px solid var(--border);
 	flex: none;
+	max-height: 40vh;
+	overflow-y: auto;
 	padding: 10px 16px 6px;
 }
 
 .toolbar .buttons {
+	background: var(--panel);
 	display: grid;
 	gap: 6px;
 	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+	position: sticky;
+	top: 0;
+	z-index: 1;
 }
 
 .toolbar-left,
@@ -104,6 +114,12 @@ body {
 
 #deep-results:empty {
 	display: none;
+}
+
+/* The day log preview (head, a gap line and tail) also lives in the toolbar. */
+#day-log-preview-text {
+	max-height: 10em;
+	overflow-y: auto;
 }
 
 @media (max-width: 800px) {

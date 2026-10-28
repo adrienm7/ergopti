@@ -207,7 +207,7 @@ require("tests.support.file_system_transaction_fixture").with_fixture(function(n
 	local first_timer
 	first_timer = loop.api.new(0, function() sentinel = true; first_timer:stop() end)
 	first_timer:start()
-	initialized = Manager.init({ LOG_DIR = temporary })
+	initialized = Manager.init({ LOG_DIR = temporary, CACHE_DIR = temporary })
 	assert(initialized, table.concat(errors, " | "))
 	local db = assert(Writer.get_db())
 	local rows_after_return = 0

@@ -163,6 +163,8 @@ local function run_fixture(body, source)
 		unbind = function(native) return native:delete() end,
 		setEnabled = function(native, enabled) native.enabled = enabled; return true end,
 		set_delivery_guard = function() return true end,
+		-- Every key resolves in this double's layout.
+		layout_key_refusal = function() return nil end,
 		replace_physical_claims = function(owner, rows)
 			controls.physical_claims = controls.physical_claims or {}
 			controls.physical_claims[owner] = rows

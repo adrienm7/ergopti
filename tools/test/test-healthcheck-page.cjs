@@ -1156,6 +1156,26 @@ if (
 )
 	fail('#deep-results must have a max-height and scroll inside the toolbar');
 
+// The toolbar is not part of the scrolling report, so everything it gained since
+// (the day log section and its preview, issue #101 again) must stay bounded:
+// the toolbar itself is capped, and every preformatted box it holds scrolls in
+// its own bounded box.
+const cssRule = (selector) =>
+	new RegExp(`(?:^|\\n)${selector.replace(/[.#]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(pageCss);
+const isBounded = (rule) =>
+	Boolean(rule) && /max-height:/.test(rule[1]) && /overflow-y:\s*auto/.test(rule[1]);
+if (!isBounded(cssRule('.toolbar')))
+	fail('.toolbar must have a max-height and scroll on its own: it never scrolls with the report');
+const pageHtml = fs.readFileSync(path.join(PAGE, 'index.html'), 'utf8');
+const toolbarHtml = /<header class="toolbar">([\s\S]*?)<\/header>/.exec(pageHtml);
+if (!toolbarHtml) fail('index.html must keep its <header class="toolbar">');
+const toolbarPres = toolbarHtml ? [...toolbarHtml[1].matchAll(/<pre\b[^>]*\bid="([^"]+)"/g)] : [];
+if (toolbarPres.length < 2) fail('the toolbar scan found fewer <pre> boxes than the page holds');
+for (const [, id] of toolbarPres) {
+	if (!isBounded(cssRule(`#${id}`)))
+		fail(`#${id} sits in the fixed toolbar and must have a max-height and scroll on its own`);
+}
+
 if (failures.length > 0) {
 	console.error(`[FAIL] diagnostics page behaviour: ${failures.length} failure(s)`);
 	for (const failure of failures) console.error(`  - ${failure}`);

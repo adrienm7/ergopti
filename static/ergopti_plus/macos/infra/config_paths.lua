@@ -800,6 +800,20 @@ function M.metrics_dir(dir)
 	return NativePath.with_trailing_separator(dir) .. "metrics"
 end
 
+--- Persistent cache folder of the keystats SQLite mirror. The mirror lived in
+--- TMPDIR, which macOS empties at every reboot, so each reboot rebuilt it from
+--- the whole durable ledger (field ledger L64); the user's Caches folder
+--- survives a reboot and, like TMPDIR, is never synced nor shown in the
+--- metrics folder. HOME is read at each call so an owned test home applies.
+--- @return string ~/Library/Caches/<app folder>/metrics, without trailing slash.
+function M.metrics_cache_dir()
+	local home = os.getenv("HOME")
+	if type(home) ~= "string" or home:sub(1, 1) ~= "/" then
+		error("config_paths.metrics_cache_dir: an absolute HOME is required", 2)
+	end
+	return NativePath.with_trailing_separator(home) .. "Library/Caches/" .. AppDirs.folder_name .. "/metrics"
+end
+
 --- Ensures a directory exists. Exposed because the path editor creates the
 --- directory the user typed before it is stored.
 --- @param path string Absolute path with trailing slash.
