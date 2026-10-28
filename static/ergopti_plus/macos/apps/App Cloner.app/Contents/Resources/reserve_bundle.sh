@@ -1,16 +1,134 @@
 # apps/App Cloner.app/Contents/Resources/reserve_bundle.sh
 
+# A wall-clock second can be shared by independently reserved bundles. Keep
+# their native identity independent of their name and creation time.
+new_bundle_identifier() (
+	if [[ "$#" != "1" ]]; then
+		printf 'Error: one bundle identifier kind is required\n' >&2
+		return 1
+	fi
+	case "$1" in
+		clone|shortcut) ;;
+		*) printf 'Error: invalid bundle identifier kind\n' >&2; return 1 ;;
+	esac
+	local bundle_prefix='fr.b519hs'
+	# Validate bytes before command substitution can discard trailing newlines
+	# or NULs. A valid receipt cannot conceal a failed native generator.
+	set -o pipefail
+	{
+		if /usr/bin/uuidgen; then generator_status=0; else generator_status=$?; fi
+		printf '\0%s' "$generator_status"
+	} | /usr/bin/perl -e '
+		use strict;
+		use warnings;
+		my ($prefix, $kind) = @ARGV;
+		local $/;
+		my $framed = <STDIN>;
+		if (!defined($framed) || $framed !~ /\A(.*)\0([0-9]+)\z/s) {
+			print STDERR "Error: native bundle identifier status is unavailable\n";
+			exit 1;
+		}
+		my ($receipt, $status) = ($1, $2);
+		if ($status != 0) {
+			print STDERR "Error: native bundle identifier generation failed (exit=$status)\n";
+			exit $status;
+		}
+		if ($receipt !~ /\A([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\n\z/) {
+			print STDERR "Error: invalid native bundle identifier receipt\n";
+			exit 1;
+		}
+		print "$prefix.$kind.$1\n";
+	' "$bundle_prefix" "$1"
+)
+
 # Reserve a new bundle before any writer can touch its contents. A prior
 # existence check alone lets repeated or concurrent runs merge their bundles.
 reserve_bundle_directory() {
-	local requested="$1" candidate="$1" suffix=0
-	while ! mkdir "$candidate" 2>/dev/null; do
-		if [[ ! -e "$candidate" && ! -L "$candidate" ]]; then
-			printf 'Error: cannot reserve bundle directory: %s\n' "$candidate" >&2
-			return 1
+	/usr/bin/perl -MErrno=EEXIST -e '
+		use strict;
+		use warnings;
+		my ($requested) = @ARGV;
+		my $stem = $requested;
+		$stem =~ s/\.app\z//;
+		my $candidate = $requested;
+		my $suffix = 0;
+		while (!mkdir($candidate)) {
+			my $error = 0 + $!;
+			if ($error != EEXIST) {
+				print STDERR "Error: cannot reserve bundle directory: $candidate (errno=$error)\n";
+				exit 1;
+			}
+			$suffix++;
+			$candidate = "${stem}_${suffix}.app";
+		}
+		print "$candidate\n";
+	' "$1"
+}
+
+# EXIT must be installed by the caller: zsh runs a function-local EXIT trap
+# when that function ends, before its caller has finished creating the bundle.
+cleanup_bundle_creation() {
+	local cleanup_status=$? cleanup_failed=0 current_identity=""
+	trap - EXIT
+	# Retire every owned resource even when the diagnostic reader has closed.
+	trap '' PIPE
+	if [[ "$CLONE_COMPLETE" != "1" && -n "$DEST" ]]; then
+		if [[ ! -e "$DEST" && ! -L "$DEST" ]]; then
+			: # This reservation has already retired.
+		elif [[ ! -d "$DEST" || -L "$DEST" ]]; then
+			echo "Error: reserved bundle ownership changed; refusing cleanup: $DEST" >&2 || cleanup_failed=1
+			cleanup_failed=1
+		elif ! current_identity="$(/usr/bin/stat -f '%d:%i' "$DEST")"; then
+			echo "Error: cannot inspect reserved bundle ownership; refusing cleanup: $DEST" >&2 || cleanup_failed=1
+			cleanup_failed=1
+		elif [[ -z "$DEST_ID" || "$current_identity" != "$DEST_ID" ]]; then
+			echo "Error: reserved bundle ownership changed; refusing cleanup: $DEST" >&2 || cleanup_failed=1
+			cleanup_failed=1
+		else
+			rm -rf -- "$DEST" || cleanup_failed=1
 		fi
-		suffix=$((suffix + 1))
-		candidate="${requested%.app}_${suffix}.app"
-	done
-	printf '%s\n' "$candidate"
+	fi
+	if [[ -n "$TMPDIR_WORK" ]]; then
+		rm -rf -- "$TMPDIR_WORK" || cleanup_failed=1
+	fi
+	if [[ "$cleanup_status" == "0" && "$cleanup_failed" != "0" ]]; then
+		exit 1
+	fi
+	return "$cleanup_status"
+}
+
+initialize_bundle_creation() {
+	DEST=""
+	DEST_ID=""
+	TMPDIR_WORK=""
+	CLONE_COMPLETE=0
+	trap 'exit 129' HUP
+	trap 'exit 130' INT
+	trap 'exit 143' TERM
+}
+
+reserve_owned_bundle_directory() {
+	DEST="$(reserve_bundle_directory "$1")"
+	if [[ ! -d "$DEST" || -L "$DEST" ]]; then
+		echo "Error: reserved bundle is not a directory: $DEST" >&2
+		exit 1
+	fi
+	DEST_ID="$(/usr/bin/stat -f '%d:%i' "$DEST")" || {
+		identity_status=$?
+		echo "Error: cannot capture reserved bundle ownership: $DEST" >&2
+		exit "$identity_status"
+	}
+}
+
+# Publish exact path bytes and one protocol newline through a checked writer.
+# BSD printf can lose buffered stdout without returning a failure status.
+# Callers propagate failure outside the function so zsh runs their EXIT cleanup.
+write_bundle_receipt() {
+	if [[ "$#" != 1 ]]; then
+		printf 'Error: one bundle receipt path is required\n' >&2
+		return 1
+	fi
+	/bin/cat <<ERGOPTI_BUNDLE_RECEIPT
+$1
+ERGOPTI_BUNDLE_RECEIPT
 }

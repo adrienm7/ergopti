@@ -929,12 +929,16 @@ end
 -- Carbon is called through ctypes: the AppleScript ObjC bridge crashes on these
 -- calls (see ENABLED_LIST_SCRIPT), the C API does not.
 local CONFIRM_SOURCE_SCRIPT = [[
-import ctypes, json, sys, time
+import ctypes, json, math, sys, time
 
 TARGET = sys.argv[1]
 REGISTER_PATH = sys.argv[2]
 FLAGS = sys.argv[3].split(",")
+if len(sys.argv) != 5:
+    raise ValueError("input-source confirmation requires an explicit settle delay")
 SETTLE_SEC = float(sys.argv[4])
+if not math.isfinite(SETTLE_SEC) or SETTLE_SEC <= 0:
+    raise ValueError("input-source settle delay must be finite and positive")
 REFRESH = "refresh" in FLAGS
 ENABLE = "enable" in FLAGS
 UTF8 = 0x08000100

@@ -16,6 +16,12 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const { pythonExecutable } = require('../lib/python.cjs');
+const {
+	resolvePython,
+	resolvePythonForBash,
+	createNativeStatResources
+} = require('./lib/app-cloner-native-stat-port.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const RESOURCES = path.join(
@@ -31,24 +37,17 @@ const RESOURCES = path.join(
 const EMITTER = path.join(RESOURCES, 'quote_launcher_values.py');
 const CLONE_SCRIPT = path.join(RESOURCES, 'clone_app.sh');
 const SHORTCUT_SCRIPT = path.join(RESOURCES, 'make_shortcut.sh');
-const PY_CANDIDATES = ['python3', 'python'];
+const PHYSICAL_CLI_PROBE_TIMEOUT_MS = 15000;
 const results = [];
 
 function test(name, ok, detail = '') {
 	results.push({ name, ok, detail });
 }
 
-function resolveProgram(candidates) {
-	for (const candidate of candidates) {
-		const probe = spawnSync(candidate, ['--version'], { encoding: 'utf8' });
-		if (!probe.error && probe.status === 0) return candidate;
-	}
-	return null;
-}
-
 function toBashPath(filePath) {
-	const normalized = path.resolve(filePath).replace(/\\/g, '/');
-	if (process.platform !== 'win32') return normalized;
+	const absolute = path.resolve(filePath);
+	if (process.platform !== 'win32') return absolute;
+	const normalized = absolute.replace(/\\/g, '/');
 	const match = normalized.match(/^([A-Za-z]):(\/.*)$/);
 	if (!match) throw new Error(`cannot convert path for Bash: ${filePath}`);
 	return `/${match[1].toLowerCase()}${match[2]}`;
@@ -65,28 +64,393 @@ function decodeNulFields(buffer) {
 	return fields;
 }
 
-const python = resolveProgram(PY_CANDIDATES);
+const python = resolvePython();
 const bash = bashExecutable();
-if (!python) {
-	console.error(`Required interpreter unavailable: python=${python}`);
-	process.exit(1);
-}
-
-const realPython = spawnSync(bash, ['-c', 'command -v "$1"', 'python-runtime', python], {
-	encoding: 'utf8'
-});
-if (realPython.status !== 0 || !realPython.stdout.trim()) {
-	throw new Error(`Required Python unavailable in Bash: ${realPython.stderr}`);
-}
+const realPython = resolvePythonForBash(bash, python);
 
 const hostile = [
 	'He said "hi" and $(touch should-not-run)',
 	"apostrophe ' plus backslash \\\ and $HOME `uname`",
 	'first line\nsecond line\\'
 ];
+let fixtureCanRetire = true;
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launcher-literals-'));
 
 try {
+	const nativePathDirectory = path.join(
+		fixtureRoot,
+		process.platform === 'win32' ? "native ' path" : 'native\\path'
+	);
+	fs.mkdirSync(nativePathDirectory);
+	const nativePathFile = path.join(nativePathDirectory, 'known-bytes.bin');
+	const knownPathBytes = Buffer.from([0, 1, 10, 37, 92, 255]);
+	fs.writeFileSync(nativePathFile, knownPathBytes);
+	const nativePathRead = spawnSync(
+		bash,
+		['-c', 'test -f "$1" && cat "$1"', 'native-path-roundtrip', toBashPath(nativePathFile)],
+		{ encoding: null }
+	);
+	test(
+		'the actual Bash path port reads native filename data without changing POSIX backslashes',
+		nativePathRead.status === 0 &&
+			Buffer.isBuffer(nativePathRead.stdout) &&
+			nativePathRead.stdout.equals(knownPathBytes),
+		JSON.stringify({
+			status: nativePathRead.status,
+			stdout: nativePathRead.stdout?.toString('hex'),
+			stderr: nativePathRead.stderr?.toString('utf8')
+		})
+	);
+	const { statQuery, portedCloneScript, portedShortcutScript } = createNativeStatResources({
+		resources: RESOURCES,
+		fixtureRoot,
+		toBashPath
+	});
+	const receiptHelper = toBashPath(path.join(path.dirname(portedCloneScript), 'reserve_bundle.sh'));
+	const receiptValues = [
+		'/fixture/plain.app',
+		'/fixture/backslash\\c\\t.app',
+		'/fixture/first\nsecond.app',
+		'/fixture/trailing\n',
+		'/fixture/\nERGOPTI_BUNDLE_RECEIPT\nlast.app',
+		'/fixture/\'"$HOME`literal`.app',
+		'/fixture/$(not-a-command).app'
+	];
+	const receiptRuns = receiptValues.map((value) => {
+		const result = spawnSync(
+			bash,
+			[
+				'-c',
+				'set -euo pipefail; source "$1"; write_bundle_receipt "$2"',
+				'receipt-bytes',
+				receiptHelper,
+				value
+			],
+			{ encoding: null }
+		);
+		return { value, status: result.status, output: result.stdout, diagnostic: result.stderr };
+	});
+	test(
+		'the shared receipt writer preserves exact path bytes and one protocol newline',
+		receiptRuns.every(
+			(row) =>
+				row.status === 0 &&
+				row.diagnostic.length === 0 &&
+				row.output.equals(Buffer.from(row.value + '\n', 'utf8'))
+		),
+		JSON.stringify(receiptRuns)
+	);
+	const invalidReceipts = [[], ['one', 'two']].map((values) =>
+		spawnSync(
+			bash,
+			[
+				'-c',
+				'set -euo pipefail; source "$1"; shift; write_bundle_receipt "$@"',
+				'receipt-arity',
+				receiptHelper,
+				...values
+			],
+			{ encoding: 'utf8' }
+		)
+	);
+	test(
+		'the shared receipt writer rejects invalid argument counts before publishing bytes',
+		invalidReceipts.every(
+			(row) =>
+				row.status === 1 &&
+				row.stdout === '' &&
+				row.stderr.includes('one bundle receipt path is required')
+		),
+		JSON.stringify(invalidReceipts)
+	);
+	if (process.platform !== 'win32') {
+		const physicalPython = pythonExecutable();
+		fixtureCanRetire = false;
+		const physicalRun = spawnSync(
+			physicalPython,
+			[
+				path.join(ROOT, 'tools/test/lib/app-cloner-log-cleanup-probe.py'),
+				'--palette',
+				path.join(ROOT, 'static/ergopti_plus/_shared/data/native_theme.toml'),
+				'--resources',
+				path.dirname(portedCloneScript),
+				'--shell',
+				bash,
+				'--fixture',
+				path.join(fixtureRoot, 'physical-log-cleanup')
+			],
+			{
+				encoding: 'utf8',
+				timeout: PHYSICAL_CLI_PROBE_TIMEOUT_MS,
+				env: {
+					...process.env,
+					REAL_PYTHON: physicalPython,
+					OWNED_STAT_QUERY: statQuery,
+					OWNED_STAT_FAULT: ''
+				}
+			}
+		);
+		if (physicalRun.error)
+			throw new Error(
+				`Physical CLI probe failed: ${physicalRun.error.message}; ${physicalRun.stderr}; retain ${fixtureRoot}`
+			);
+		const physical = JSON.parse(physicalRun.stdout);
+		fixtureCanRetire = physical.ownership_closed === true;
+		if (!fixtureCanRetire)
+			throw new Error(
+				`Physical CLI ownership is unknown; retain ${fixtureRoot}: ${physicalRun.stdout}`
+			);
+		const signalExit = 128 + os.constants.signals.SIGXFSZ;
+		const expectedPhysical = {
+			'clone:healthy': 0,
+			'clone:finite': signalExit,
+			'clone:foreign': signalExit,
+			'clone:refusal': signalExit,
+			'clone:deadpipe': signalExit,
+			'clone:deadpipe-foreign': signalExit,
+			'clone:deadpipe-refusal': signalExit,
+			'clone:child-default': signalExit,
+			'clone:backslash-c': 0,
+			'clone:backslash-t': 0,
+			'clone:result-backslash-c': 0,
+			'clone:result-backslash-t': 0,
+			'shortcut:healthy': 0,
+			'shortcut:finite': signalExit,
+			'shortcut:result-backslash-c': 0,
+			'shortcut:result-backslash-t': 0,
+			'clone:result-closed-fd': 1,
+			'clone:result-closed-pipe': 128 + os.constants.signals.SIGPIPE,
+			'shortcut:result-closed-fd': 1,
+			'shortcut:result-closed-pipe': 128 + os.constants.signals.SIGPIPE,
+			'owner:refusal-zero': 1,
+			'owner:refusal-primary': 74
+		};
+		const limitedCloneModes = new Set([
+			'finite',
+			'foreign',
+			'refusal',
+			'deadpipe',
+			'deadpipe-foreign',
+			'deadpipe-refusal'
+		]);
+		const physicalCases = Array.isArray(physical.cases) ? physical.cases : [];
+		const keys = physicalCases.map((row) => `${row.caller}:${row.mode}`);
+		const completePhysical =
+			physicalCases.length === Object.keys(expectedPhysical).length &&
+			new Set(keys).size === keys.length &&
+			keys.every((key) => Object.hasOwn(expectedPhysical, key));
+		test(
+			'the actual CLI physical probe executes its exact twenty-two owned POSIX cases',
+			physicalRun.status === 0 &&
+				physical.state === 'PASSED' &&
+				completePhysical &&
+				physical.source_kind === 'actual-cli-source-with-explicit-prefix-scopes' &&
+				physicalCases.every(
+					(row) => row.ownership_closed === true && row.workspace_created === true
+				),
+			physicalRun.stdout
+		);
+		test(
+			'finite log writes preserve primary failures, foreign bundles and independent workspace retirement',
+			completePhysical &&
+				physicalCases.every((row) => {
+					const foreign = row.mode.endsWith('foreign');
+					const refusal =
+						row.mode.endsWith('refusal') ||
+						row.caller === 'owner' ||
+						row.mode.startsWith('result-');
+					return (
+						row.normalized_status === expectedPhysical[`${row.caller}:${row.mode}`] &&
+						row.workspace_exists === (row.caller === 'owner') &&
+						row.destination_exists === (foreign || refusal) &&
+						(!foreign || row.foreign_marker === 'foreign') &&
+						(row.caller !== 'clone' ||
+							(!limitedCloneModes.has(row.mode) && row.limit === null) ||
+							(limitedCloneModes.has(row.mode) &&
+								row.limit === 0 &&
+								row.log_fault_armed === true &&
+								row.log_prefix_bytes === row.healthy_prefix_bytes &&
+								row.log_exact_after_fault === true &&
+								row.source_record_refused === true &&
+								(() => {
+									const caseRoot = path.join(
+										fixtureRoot,
+										'physical-log-cleanup',
+										`${row.caller}-${row.mode}`
+									);
+									const admitted = fs.readFileSync(path.join(caseRoot, 'log-prefix.bin'));
+									const actual = fs.readFileSync(path.join(caseRoot, 'owned.log'));
+									return (
+										admitted.length === row.healthy_prefix_bytes &&
+										actual.length === row.actual_log_bytes &&
+										actual.equals(Buffer.concat([admitted, Buffer.from(row.output, 'utf8')])) &&
+										!actual.includes(
+											Buffer.from(`SRC_EXE=${row.source_app}/Contents/MacOS/Source\n`, 'utf8')
+										)
+									);
+								})()))
+					);
+				}),
+			physicalRun.stdout
+		);
+		test(
+			'the actual final receipt writers report closed descriptors and pipes while retiring owned workspaces',
+			completePhysical &&
+				['clone', 'shortcut'].every((caller) =>
+					['result-closed-fd', 'result-closed-pipe'].every((mode) => {
+						const row = physicalCases.find((item) => item.caller === caller && item.mode === mode);
+						return (
+							row &&
+							row.normalized_status === expectedPhysical[`${caller}:${mode}`] &&
+							row.termination_kind === 'exit' &&
+							row.workspace_exists === false &&
+							row.destination_exists === true &&
+							row.result_path_exact === false &&
+							row.ownership_closed === true
+						);
+					})
+				),
+			physicalRun.stdout
+		);
+		test(
+			'actual logging preserves literal backslash-c and backslash-t source paths byte for byte',
+			completePhysical &&
+				['backslash-c', 'backslash-t'].every((mode) => {
+					const row = physicalCases.find((item) => item.caller === 'clone' && item.mode === mode);
+					const name = mode === 'backslash-c' ? 'Source\\c.app' : 'Source\\t.app';
+					return (
+						path.basename(row.source_app) === name &&
+						row.source_line_hex ===
+							Buffer.from(`=== SOURCE=${row.source_app}`, 'utf8').toString('hex')
+					);
+				}),
+			physicalRun.stdout
+		);
+		test(
+			'both actual CLI success formatters return literal backslash HOME paths exactly',
+			completePhysical &&
+				physicalCases
+					.filter((row) => row.mode.startsWith('result-backslash-'))
+					.every(
+						(row) =>
+							row.result_path_exact === true &&
+							row.output === row.result_path + '\n' &&
+							row.result_path.includes(row.mode.endsWith('-c') ? 'home\\c' : 'home\\t') &&
+							row.execution_scope ===
+								(row.caller === 'clone'
+									? 'actual-clone-prefix-and-success-tail'
+									: 'actual-full-shortcut-generator')
+					),
+			physicalRun.stdout
+		);
+		test(
+			'a real external child keeps the default file-size signal after actual healthy logging',
+			completePhysical &&
+				physicalCases.some(
+					(row) =>
+						row.caller === 'clone' &&
+						row.mode === 'child-default' &&
+						row.normalized_status === signalExit &&
+						row.child_survived === false
+				),
+			physicalRun.stdout
+		);
+		fixtureCanRetire = false;
+		const identityRun = spawnSync(
+			physicalPython,
+			[
+				path.join(ROOT, 'tools/test/lib/app-cloner-identity-probe.py'),
+				'--resources',
+				RESOURCES,
+				'--shell',
+				bash,
+				'--fixture',
+				path.join(fixtureRoot, 'identity'),
+				'--palette',
+				path.join(ROOT, 'static/ergopti_plus/_shared/data/native_theme.toml')
+			],
+			{ encoding: 'utf8', timeout: PHYSICAL_CLI_PROBE_TIMEOUT_MS }
+		);
+		if (identityRun.error)
+			throw new Error(
+				`Identity probe did not complete; retain ${fixtureRoot}: ${identityRun.error.message}`
+			);
+		const identity = JSON.parse(identityRun.stdout);
+		fixtureCanRetire = identity.ownership_closed === true;
+		if (!fixtureCanRetire)
+			throw new Error(
+				`Identity process custody is unknown; retain ${fixtureRoot}: ${identityRun.stdout}`
+			);
+		const identifierPattern =
+			/^fr\.b519hs\.(clone|shortcut)\.[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
+		test(
+			'actual same-second shortcut creations reserve distinct native identities',
+			identityRun.status === 0 &&
+				identity.state === 'PASSED' &&
+				identity.failures.length === 0 &&
+				identity.positive.length === 1 &&
+				identity.positive[0].caller === 'shortcut' &&
+				identity.positive[0].execution_scope === 'actual-full-shortcut-generator' &&
+				identity.positive[0].distinct_destinations === true &&
+				identity.positive[0].distinct_identifiers === true &&
+				identity.positive[0].creations.length === 2 &&
+				identity.positive[0].creations.every(
+					(row) =>
+						identifierPattern.test(row.identifier) &&
+						row.identifier.startsWith('fr.b519hs.shortcut.') &&
+						row.uuid_calls === 1 &&
+						row.workspace_retired === true
+				),
+			identityRun.stdout
+		);
+		const helperKinds = Object.keys(identity.helper_generations).sort();
+		test(
+			'both identity namespaces call the native generator once and reject unknown arguments before it',
+			helperKinds.join(',') === 'clone,shortcut' &&
+				helperKinds.every(
+					(kind) =>
+						identity.helper_generations[kind].length === 2 &&
+						new Set(identity.helper_generations[kind]).size === 2 &&
+						identity.helper_generations[kind].every(
+							(value) => identifierPattern.test(value) && value.startsWith(`fr.b519hs.${kind}.`)
+						)
+				) &&
+				identity.admission.length === 3 &&
+				JSON.stringify(identity.admission.map((row) => row.arguments)) ===
+					JSON.stringify([[], ['unknown'], ['clone', 'extra']]) &&
+				identity.admission.every((row) => row.status === 1 && row.uuid_calls === 0),
+			identityRun.stdout
+		);
+		const uuidFaults = [
+			'nonzero',
+			'valid-nonzero',
+			'empty',
+			'malformed',
+			'missing-newline',
+			'extra-newline',
+			'multiple-records',
+			'nul'
+		];
+		const expectedFaults = new Set(
+			['clone', 'shortcut'].flatMap((caller) => uuidFaults.map((mode) => `${caller}:${mode}`))
+		);
+		const actualFaults = identity.faults.map((row) => `${row.caller}:${row.mode}`);
+		test(
+			'both callers reject failed or malformed native UUID receipts before any bundle or workspace allocation',
+			actualFaults.length === expectedFaults.size &&
+				new Set(actualFaults).size === expectedFaults.size &&
+				actualFaults.every((key) => expectedFaults.has(key)) &&
+				identity.faults.every(
+					(row) =>
+						row.status === (['nonzero', 'valid-nonzero'].includes(row.mode) ? 73 : 1) &&
+						row.uuid_calls === 1 &&
+						row.bundle_parent_created === false &&
+						row.workspace_created === false &&
+						row.owned_group_retired === true
+				),
+			identityRun.stdout
+		);
+	}
 	const shellEmission = spawnSync(
 		python,
 		[EMITTER, 'shell', 'VALUE_ONE', hostile[0], 'VALUE_TWO', hostile[1], 'VALUE_THREE', hostile[2]],
@@ -99,12 +463,19 @@ try {
 			'printf \'%s\\0\' "$VALUE_ONE" "$VALUE_TWO" "$VALUE_THREE"\n',
 		'utf8'
 	);
-	const shellSyntax = spawnSync(bash, ['-n', toBashPath(shellFile)], { encoding: 'utf8' });
-	const shellRoundtrip = spawnSync(bash, [toBashPath(shellFile)], { encoding: null });
+	const shellSyntax = spawnSync(bash, ['-n', toBashPath(shellFile)], {
+		encoding: 'utf8'
+	});
+	const shellRoundtrip = spawnSync(bash, [toBashPath(shellFile)], {
+		encoding: null
+	});
 	test(
 		'shell literals compile after quotes, substitutions, backslashes, and newlines',
 		shellEmission.status === 0 && shellSyntax.status === 0,
-		JSON.stringify({ emission: shellEmission.stderr, syntax: shellSyntax.stderr })
+		JSON.stringify({
+			emission: shellEmission.stderr,
+			syntax: shellSyntax.stderr
+		})
 	);
 	test(
 		'shell literals round-trip byte-exact without executing their contents',
@@ -134,7 +505,9 @@ try {
 			'print(json.dumps([VALUE_ONE, VALUE_TWO, VALUE_THREE], ensure_ascii=False))\n',
 		'utf8'
 	);
-	const pythonCompile = spawnSync(python, ['-m', 'py_compile', pythonFile], { encoding: 'utf8' });
+	const pythonCompile = spawnSync(python, ['-m', 'py_compile', pythonFile], {
+		encoding: 'utf8'
+	});
 	const pythonRoundtrip = spawnSync(python, [pythonFile], { encoding: 'utf8' });
 	let pythonValues = [];
 	try {
@@ -145,7 +518,10 @@ try {
 	test(
 		'Python literals compile after quotes, substitutions, backslashes, and newlines',
 		pythonEmission.status === 0 && pythonCompile.status === 0,
-		JSON.stringify({ emission: pythonEmission.stderr, compile: pythonCompile.stderr })
+		JSON.stringify({
+			emission: pythonEmission.stderr,
+			compile: pythonCompile.stderr
+		})
 	);
 	test(
 		'Python literals round-trip byte-exact',
@@ -164,7 +540,9 @@ try {
 	);
 
 	const plistName = 'A&B <Clone> "quoted" \'single\'';
-	const xmlEmission = spawnSync(python, [EMITTER, 'xml', plistName], { encoding: 'utf8' });
+	const xmlEmission = spawnSync(python, [EMITTER, 'xml', plistName], {
+		encoding: 'utf8'
+	});
 	test(
 		'XML literals escape every plist metacharacter through the production emitter',
 		xmlEmission.status === 0 &&
@@ -237,7 +615,9 @@ try {
 			(shellBody ? `${shellBody[1]}\n` : ''),
 		'utf8'
 	);
-	const cloneSyntax = spawnSync(bash, ['-n', toBashPath(cloneLauncher)], { encoding: 'utf8' });
+	const cloneSyntax = spawnSync(bash, ['-n', toBashPath(cloneLauncher)], {
+		encoding: 'utf8'
+	});
 	test(
 		'the actual generated clone launcher body compiles with hostile assignments',
 		actualShellEmission.status === 0 && shellBody !== null && cloneSyntax.status === 0,
@@ -258,7 +638,9 @@ try {
 		`${actualPythonEmission.stdout || ''}` + (pythonBody ? `${pythonBody[1]}\n` : ''),
 		'utf8'
 	);
-	const pwaCompile = spawnSync(python, ['-m', 'py_compile', pwaLauncher], { encoding: 'utf8' });
+	const pwaCompile = spawnSync(python, ['-m', 'py_compile', pwaLauncher], {
+		encoding: 'utf8'
+	});
 	test(
 		'the actual generated PWA launcher body compiles with hostile assignments',
 		actualPythonEmission.status === 0 && pythonBody !== null && pwaCompile.status === 0,
@@ -311,14 +693,16 @@ printf icns > "$out"
 	const maliciousTarget = `target "$(touch '${markerBash}')"\\\nnext`;
 	const generator = spawnSync(
 		bash,
-		[toBashPath(SHORTCUT_SCRIPT), 'Shortcut', maliciousTarget, maliciousApp, '#123456', 'S'],
+		[toBashPath(portedShortcutScript), 'Shortcut', maliciousTarget, maliciousApp, '#123456', 'S'],
 		{
 			cwd: fixtureRoot,
 			encoding: 'utf8',
 			env: {
 				...process.env,
 				HOME: toBashPath(home),
+				OWNED_STAT_FAULT: '',
 				REAL_PYTHON: realPython.stdout.trim(),
+				OWNED_STAT_QUERY: toBashPath(statQuery),
 				PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
 			}
 		}
@@ -341,14 +725,21 @@ printf icns > "$out"
 	test(
 		'the production shortcut generator emits a syntactically valid hostile launcher',
 		generator.status === 0 && generatedSyntax.status === 0,
-		JSON.stringify({ generator: generator.stderr, syntax: generatedSyntax.stderr })
+		JSON.stringify({
+			generator: generator.stderr,
+			syntax: generatedSyntax.stderr
+		})
 	);
 	test(
 		'the generated shortcut preserves arguments without command substitution',
 		generatedRun.status === 0 &&
 			!fs.existsSync(marker) &&
 			JSON.stringify(captured) === JSON.stringify(['-n', maliciousTarget]),
-		JSON.stringify({ status: generatedRun.status, captured, stderr: generatedRun.stderr })
+		JSON.stringify({
+			status: generatedRun.status,
+			captured,
+			stderr: generatedRun.stderr
+		})
 	);
 	writeExecutable(path.join(fakeBin, 'date'), "#!/usr/bin/env bash\nprintf '%s\\n' 1700000000\n");
 	const setupEnd = cloneSource.indexOf('# Resolve source app');
@@ -372,7 +763,7 @@ printf icns > "$out"
 			[
 				'-c',
 				`${cloneSetup}\n${profileSetup}\nCLONE_COMPLETE=1\nprintf '%s\\0' "$DEST" "$USER_DATA_DIR"\n`,
-				toBashPath(CLONE_SCRIPT),
+				toBashPath(portedCloneScript),
 				toBashPath(fixtureRoot),
 				'Clone collision'
 			],
@@ -381,7 +772,9 @@ printf icns > "$out"
 				env: {
 					...process.env,
 					HOME: toBashPath(home),
+					OWNED_STAT_FAULT: '',
 					REAL_PYTHON: realPython.stdout.trim(),
+					OWNED_STAT_QUERY: toBashPath(statQuery),
 					PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
 				}
 			}
@@ -411,7 +804,10 @@ printf icns > "$out"
 					path.basename(profile) === path.basename(cloneDestinations[index], '.app') &&
 					fs.readFileSync(path.join(profile, 'profile-marker'), 'utf8') === String(index)
 			),
-		JSON.stringify({ destinations: cloneDestinations, profiles: cloneProfiles })
+		JSON.stringify({
+			destinations: cloneDestinations,
+			profiles: cloneProfiles
+		})
 	);
 	test(
 		'the first clone keeps its original unsuffixed data profile',
@@ -429,7 +825,9 @@ printf icns > "$out"
 	fs.symlinkSync(preserved, preservedLink, 'junction');
 	const rollbackBin = path.join(fixtureRoot, 'rollback-bin');
 	fs.mkdirSync(rollbackBin);
-	const realMktemp = spawnSync(bash, ['-c', 'command -v mktemp'], { encoding: 'utf8' });
+	const realMktemp = spawnSync(bash, ['-c', 'command -v mktemp'], {
+		encoding: 'utf8'
+	});
 
 	writeExecutable(
 		path.join(rollbackBin, 'python3'),
@@ -444,13 +842,13 @@ printf icns > "$out"
 		path.join(rollbackBin, 'mktemp'),
 		'#!/usr/bin/env bash\nset -eu\nexec "$REAL_MKTEMP" -d "$OWNED_TMP_TEMPLATE"\n'
 	);
-	const runCloneSetup = (tail, prefixBin = rollbackBin) =>
+	const runCloneSetup = (tail, prefixBin = rollbackBin, statFault = '') =>
 		spawnSync(
 			bash,
 			[
 				'-c',
 				`${cloneSetup}\n${tail}`,
-				toBashPath(CLONE_SCRIPT),
+				toBashPath(portedCloneScript),
 				toBashPath(fixtureRoot),
 				'Rollback'
 			],
@@ -460,8 +858,10 @@ printf icns > "$out"
 				env: {
 					...process.env,
 					HOME: toBashPath(rollbackHome),
+					OWNED_STAT_FAULT: statFault,
 					REAL_MKTEMP: realMktemp.stdout.trim(),
 					REAL_PYTHON: realPython.stdout.trim(),
+					OWNED_STAT_QUERY: toBashPath(statQuery),
 					OWNED_TMP_TEMPLATE: `${toBashPath(fixtureRoot)}/rollback-work.XXXXXX`,
 					PATH: `${toBashPath(prefixBin)}:${process.env.PATH || ''}`
 				}
@@ -560,7 +960,11 @@ printf icns > "$out"
 			) === 'foreign' &&
 			fs.statSync(`${nativeFixturePath(replacedDestination)}.held`).isDirectory() &&
 			!fs.existsSync(nativeFixturePath(replacedTemporary)),
-		JSON.stringify({ status: replaced.status, stdout: replaced.stdout, stderr: replaced.stderr })
+		JSON.stringify({
+			status: replaced.status,
+			stdout: replaced.stdout,
+			stderr: replaced.stderr
+		})
 	);
 	const symlinkReplacement = runCloneSetup(
 		'mv "$DEST" "$DEST.held"; ln -s "$DEST.held" "$DEST"; printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; exit 76'
@@ -592,7 +996,17 @@ printf icns > "$out"
 	);
 	writeExecutable(
 		path.join(cleanupFailureBin, 'python3'),
-		'#!/usr/bin/env bash\nif [[ "$#" == 3 ]]; then echo owned-bundle-cleanup-failure >&2; exit 77; fi\nexec "$REAL_PYTHON" "$@"\n'
+		'#!/usr/bin/env bash\nexec "$REAL_PYTHON" "$@"\n'
+	);
+
+	const realRm = spawnSync(bash, ['-c', 'command -v rm'], { encoding: 'utf8' });
+	if (realRm.status !== 0 || !realRm.stdout.trim()) throw new Error('Required rm unavailable');
+	writeExecutable(
+		path.join(cleanupFailureBin, 'rm'),
+		`#!/usr/bin/env bash
+if [[ "$3" == *.app ]]; then echo owned-bundle-cleanup-failure >&2; exit 77; fi
+exec '${realRm.stdout.trim().replaceAll("'", "'\\''")}' "$@"
+`
 	);
 	const cleanupFailure = runCloneSetup(
 		'printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; exit 74',
@@ -619,18 +1033,20 @@ printf icns > "$out"
 	fs.mkdirSync(identityFailureBin);
 	writeExecutable(
 		path.join(identityFailureBin, 'python3'),
-		'#!/usr/bin/env bash\nif [[ "$1" == "-" && "$#" == 2 ]]; then echo owned-identity-capture-failure >&2; exit 78; fi\nexec "$REAL_PYTHON" "$@"\n'
+		'#!/usr/bin/env bash\nexec "$REAL_PYTHON" "$@"\n'
 	);
 	const beforeIdentityFailure = fs.readdirSync(path.dirname(preserved));
-	const identityFailure = runCloneSetup('printf unexpected-success', identityFailureBin);
+	const identityFailure = runCloneSetup('printf unexpected-success', identityFailureBin, 'capture');
 	const uncertainBundles = fs
 		.readdirSync(path.dirname(preserved))
 		.filter((name) => !beforeIdentityFailure.includes(name));
 	test(
 		'an identity capture failure reports the error and preserves an unadmitted destination',
-		identityFailure.status === 78 &&
+		identityFailure.status !== 0 &&
 			identityFailure.stdout.includes('cannot capture reserved bundle ownership') &&
-			identityFailure.stdout.includes('reserved bundle ownership changed; refusing cleanup') &&
+			identityFailure.stdout.includes(
+				'cannot inspect reserved bundle ownership; refusing cleanup'
+			) &&
 			uncertainBundles.length === 1 &&
 			fs.statSync(path.join(path.dirname(preserved), uncertainBundles[0])).isDirectory() &&
 			!identityFailure.stdout.includes('unexpected-success'),
@@ -651,10 +1067,14 @@ printf icns > "$out"
 			completedTemporary &&
 			fs.statSync(nativeFixturePath(completedDestination)).isDirectory() &&
 			!fs.existsSync(nativeFixturePath(completedTemporary)),
-		JSON.stringify({ status: completed.status, stdout: completed.stdout, stderr: completed.stderr })
+		JSON.stringify({
+			status: completed.status,
+			stdout: completed.stdout,
+			stderr: completed.stderr
+		})
 	);
 	const receiptFailure = runCloneSetup(
-		'printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; CLONE_COMPLETE=1; exec 1>&-; printf unavailable-output'
+		'printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; CLONE_COMPLETE=1; exec 1>&-; write_bundle_receipt unavailable-output || exit "$?"'
 	);
 	const [publishedDestination, retiredTemporary] = decodeNulFields(
 		Buffer.from(receiptFailure.stdout)
@@ -681,12 +1101,107 @@ printf icns > "$out"
 		JSON.stringify(fs.readdirSync(path.dirname(preserved)))
 	);
 
+	const runShortcut = (prefixBin) =>
+		spawnSync(
+			bash,
+			[
+				toBashPath(portedShortcutScript),
+				'Shortcut rollback',
+				'target',
+				'/Applications/Editor.app',
+				'#123456',
+				'S'
+			],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: {
+					...process.env,
+					HOME: toBashPath(rollbackHome),
+					OWNED_STAT_FAULT: '',
+					REAL_PYTHON: realPython.stdout.trim(),
+					OWNED_STAT_QUERY: toBashPath(statQuery),
+					REAL_MKTEMP: realMktemp.stdout.trim(),
+					OWNED_TMP_TEMPLATE: `${toBashPath(fixtureRoot)}/shortcut-work.XXXXXX`,
+					PATH: `${toBashPath(prefixBin)}:${toBashPath(fakeBin)}:${process.env.PATH || ''}`
+				}
+			}
+		);
+	fs.mkdirSync(path.join(rollbackHome, 'Desktop'));
+	const existingShortcut = path.join(rollbackHome, 'Desktop', 'Shortcut Rollback.app');
+	fs.mkdirSync(existingShortcut);
+	fs.writeFileSync(path.join(existingShortcut, 'owned-marker'), 'existing shortcut');
+	const shortcutAllocationFailure = runShortcut(failureBin);
+	test(
+		'the full shortcut helper rolls back its reservation when temporary allocation fails',
+		shortcutAllocationFailure.status === 73 &&
+			shortcutAllocationFailure.stderr.includes('owned-allocation-failure') &&
+			fs.readdirSync(path.dirname(existingShortcut)).length === 1,
+		JSON.stringify({
+			status: shortcutAllocationFailure.status,
+			stdout: shortcutAllocationFailure.stdout,
+			stderr: shortcutAllocationFailure.stderr
+		})
+	);
+	const shortcutFailureBin = path.join(fixtureRoot, 'shortcut-write-failure-bin');
+	fs.mkdirSync(shortcutFailureBin);
+	writeExecutable(
+		path.join(shortcutFailureBin, 'mktemp'),
+		'#!/usr/bin/env bash\nexec "$REAL_MKTEMP" -d "$OWNED_TMP_TEMPLATE"\n'
+	);
+	writeExecutable(
+		path.join(shortcutFailureBin, 'cat'),
+		'#!/usr/bin/env bash\necho owned-shortcut-write-failure >&2\nexit 79\n'
+	);
+	const shortcutWriteFailure = runShortcut(shortcutFailureBin);
+	test(
+		'the full shortcut helper rolls back a later write error and retires its temporary workspace',
+		shortcutWriteFailure.status === 79 &&
+			shortcutWriteFailure.stderr.includes('owned-shortcut-write-failure') &&
+			fs.readdirSync(path.dirname(existingShortcut)).length === 1 &&
+			!fs.readdirSync(fixtureRoot).some((name) => name.startsWith('shortcut-work.')),
+		JSON.stringify({
+			status: shortcutWriteFailure.status,
+			stdout: shortcutWriteFailure.stdout,
+			stderr: shortcutWriteFailure.stderr
+		})
+	);
+	const shortcutSuccess = runShortcut(rollbackBin);
+	const shortcutDestination = nativeFixturePath(shortcutSuccess.stdout.trim());
+	test(
+		'the full shortcut helper keeps its successful bundle and preserves the existing shortcut',
+		shortcutSuccess.status === 0 &&
+			fs.statSync(path.join(shortcutDestination, 'Contents', 'Info.plist')).isFile() &&
+			fs.readFileSync(path.join(existingShortcut, 'owned-marker'), 'utf8') ===
+				'existing shortcut' &&
+			!fs.readdirSync(fixtureRoot).some((name) => name.startsWith('shortcut-work.')),
+		JSON.stringify({
+			status: shortcutSuccess.status,
+			stdout: shortcutSuccess.stdout,
+			stderr: shortcutSuccess.stderr
+		})
+	);
+
+	writeExecutable(path.join(unavailablePythonBin, 'python'), '#!/usr/bin/env bash\nexit 127\n');
+	const shortcutUnavailablePython = runShortcut(unavailablePythonBin);
+	const shortcutWithoutPython = nativeFixturePath(shortcutUnavailablePython.stdout.trim());
+	test(
+		'the full shortcut helper preserves its healthy standalone path without Python commands',
+		shortcutUnavailablePython.status === 0 &&
+			fs.statSync(path.join(shortcutWithoutPython, 'Contents', 'Info.plist')).isFile() &&
+			fs.readFileSync(path.join(existingShortcut, 'owned-marker'), 'utf8') === 'existing shortcut',
+		JSON.stringify({
+			status: shortcutUnavailablePython.status,
+			stdout: shortcutUnavailablePython.stdout,
+			stderr: shortcutUnavailablePython.stderr
+		})
+	);
 	const collisionRuns = [];
 	for (const target of ['first-target', 'second-target', 'third-target']) {
 		const run = spawnSync(
 			bash,
 			[
-				toBashPath(SHORTCUT_SCRIPT),
+				toBashPath(portedShortcutScript),
 				'Collision',
 				target,
 				'/Applications/Editor.app',
@@ -698,7 +1213,9 @@ printf icns > "$out"
 				env: {
 					...process.env,
 					HOME: toBashPath(home),
+					OWNED_STAT_FAULT: '',
 					REAL_PYTHON: realPython.stdout.trim(),
+					OWNED_STAT_QUERY: toBashPath(statQuery),
 					PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
 				}
 			}
@@ -720,7 +1237,10 @@ printf icns > "$out"
 					launcher
 			),
 		JSON.stringify(
-			collisionRuns.map(({ destination, run }) => ({ destination, status: run.status }))
+			collisionRuns.map(({ destination, run }) => ({
+				destination,
+				status: run.status
+			}))
 		)
 	);
 	const reserveHelper = toBashPath(path.join(RESOURCES, 'reserve_bundle.sh'));
@@ -767,10 +1287,200 @@ printf icns > "$out"
 			refused.stdout === '' &&
 			refused.stderr.includes('cannot reserve bundle directory') &&
 			fs.readFileSync(occupied, 'utf8') === 'unrelated original file',
-		JSON.stringify({ status: refused.status, stdout: refused.stdout, stderr: refused.stderr })
+		JSON.stringify({
+			status: refused.status,
+			stdout: refused.stdout,
+			stderr: refused.stderr
+		})
+	);
+	const reservationRaceRoot = path.join(fixtureRoot, 'reservation-retirement-race');
+	fs.mkdirSync(reservationRaceRoot);
+	const retirementRace = spawnSync(
+		bash,
+		[
+			toBashPath(path.join(ROOT, 'tools', 'test', 'lib', 'app-cloner-reservation-race.sh')),
+			reserveHelper,
+			toBashPath(reservationRaceRoot)
+		],
+		{ encoding: 'utf8', timeout: 20000 }
+	);
+	test(
+		'a genuine EEXIST still chooses a suffix after the previous owner retires its path',
+		retirementRace.status === 0 &&
+			!retirementRace.error &&
+			retirementRace.stdout ===
+				`${toBashPath(path.join(reservationRaceRoot, 'Contended_1.app'))}\0` &&
+			fs.statSync(path.join(reservationRaceRoot, 'Contended_1.app')).isDirectory() &&
+			!fs.existsSync(path.join(reservationRaceRoot, 'Contended.app')),
+		JSON.stringify({
+			status: retirementRace.status,
+			error: retirementRace.error?.message,
+			stdout: retirementRace.stdout,
+			stderr: retirementRace.stderr
+		})
+	);
+	const literalReservation = path.join(fixtureRoot, "Équipe ' $HOME `not-executed`.app");
+	const literalReserved = spawnSync(
+		bash,
+		[
+			'-c',
+			'set -eu; source "$1"; reserve_bundle_directory "$2"',
+			'reservation',
+			reserveHelper,
+			toBashPath(literalReservation)
+		],
+		{ encoding: 'utf8' }
+	);
+	test(
+		'errno-aware reservation preserves literal shell metacharacters as path data',
+		literalReserved.status === 0 &&
+			literalReserved.stdout === `${toBashPath(literalReservation)}\n` &&
+			fs.statSync(literalReservation).isDirectory(),
+		JSON.stringify({
+			status: literalReserved.status,
+			stdout: literalReserved.stdout,
+			stderr: literalReserved.stderr
+		})
+	);
+	const missingParent = path.join(fixtureRoot, 'missing-parent', 'Refused.app');
+	const missingParentRefusal = spawnSync(
+		bash,
+		[
+			'-c',
+			'set -eu; source "$1"; reserve_bundle_directory "$2"',
+			'reservation',
+			reserveHelper,
+			toBashPath(missingParent)
+		],
+		{ encoding: 'utf8', timeout: 10000 }
+	);
+	test(
+		'a genuine missing-parent errno remains fatal without guessing a suffix',
+		missingParentRefusal.status === 1 &&
+			!missingParentRefusal.error &&
+			missingParentRefusal.stdout === '' &&
+			missingParentRefusal.stderr.includes('cannot reserve bundle directory') &&
+			!fs.existsSync(path.dirname(missingParent)),
+		JSON.stringify({
+			status: missingParentRefusal.status,
+			stdout: missingParentRefusal.stdout,
+			stderr: missingParentRefusal.stderr
+		})
+	);
+	const routingRoot = path.join(fixtureRoot, 'url-routing');
+	fs.mkdirSync(routingRoot);
+	const routingRun = spawnSync(
+		python,
+		[
+			path.join(ROOT, 'tools', 'test', 'lib', 'app-cloner-url-routing-probe.py'),
+			CLONE_SCRIPT,
+			routingRoot,
+			bash,
+			toBashPath(routingRoot)
+		],
+		{ encoding: 'utf8', timeout: 20000 }
+	);
+	if (routingRun.error || routingRun.status !== 0) {
+		throw new Error(
+			`Actual launcher routing probe did not execute: ${routingRun.error?.message || routingRun.stderr}`
+		);
+	}
+	const routing = JSON.parse(routingRun.stdout);
+	const expectedRoutingInputs = {
+		empty: '',
+		folder: '/fixture/project',
+		'colon-file': '/fixture/report:2026.txt',
+		'tilde-file': '~/Documents',
+		https: 'https://example.invalid/path?q=1',
+		http: 'http://example.invalid/',
+		'teams-double': 'msteams://l/chat/0',
+		'teams-chat': 'msteams:/l/chat/0',
+		'teams-calendar': 'msteams:/calendar',
+		opaque: 'mailto:fixture@example.invalid',
+		custom: 'A+B.C-1:opaque',
+		'non-scheme': '1invalid:filename'
+	};
+	const routingFamilies = {
+		native: () => [],
+		electron: (root) => ['--user-data-dir', `${root}/profile`],
+		vscode: (root) => [
+			'--user-data-dir',
+			`${root}/profile`,
+			'--extensions-dir',
+			`${root}/extensions`,
+			'--new-window'
+		]
+	};
+	const expectedRoutingCount =
+		Object.keys(expectedRoutingInputs).length * Object.keys(routingFamilies).length;
+	const completeRouting =
+		routing.cases.length === expectedRoutingCount &&
+		new Set(routing.cases.map((row) => `${row.family}:${row.name}`)).size ===
+			expectedRoutingCount &&
+		routing.cases.every(
+			(row) =>
+				Object.hasOwn(routingFamilies, row.family) &&
+				Object.hasOwn(expectedRoutingInputs, row.name) &&
+				row.input === expectedRoutingInputs[row.name]
+		);
+	const actualRoutingRow = (row) =>
+		row.status === 0 &&
+		row.stdout === '' &&
+		row.stderr === '' &&
+		row.executions.length === 1 &&
+		['-arm64', '-x86_64'].includes(row.executions[0][0]) &&
+		row.executions[0][1] === 'fixture-executable';
+	test(
+		'the complete production launcher executes every URI and file routing case in every app family',
+		completeRouting && routing.cases.every(actualRoutingRow),
+		JSON.stringify(routing)
+	);
+	const uriCases = new Set([
+		'https',
+		'http',
+		'teams-double',
+		'teams-chat',
+		'teams-calendar',
+		'opaque',
+		'custom'
+	]);
+	test(
+		'accepted single-slash Teams and RFC scheme URIs dispatch through actual open-a once without positional URL arguments',
+		completeRouting &&
+			routing.cases
+				.filter((row) => uriCases.has(row.name))
+				.every(
+					(row) =>
+						actualRoutingRow(row) &&
+						JSON.stringify(row.executions[0].slice(2)) ===
+							JSON.stringify(routingFamilies[row.family](row.owned_shell)) &&
+						JSON.stringify(row.opens) ===
+							JSON.stringify([['-a', 'fixture-application', row.input]]) &&
+						JSON.stringify(row.sleeps) === JSON.stringify([['1']])
+				),
+		JSON.stringify(routing.cases.filter((row) => uriCases.has(row.name)))
+	);
+	test(
+		'empty and file arguments preserve their actual positional data and never dispatch a URL',
+		completeRouting &&
+			routing.cases
+				.filter((row) => !uriCases.has(row.name))
+				.every(
+					(row) =>
+						actualRoutingRow(row) &&
+						JSON.stringify(row.executions[0].slice(2)) ===
+							JSON.stringify([
+								...routingFamilies[row.family](row.owned_shell),
+								...(row.input ? [row.input] : [])
+							]) &&
+						row.opens.length === 0 &&
+						row.sleeps.length === 0
+				),
+		JSON.stringify(routing.cases.filter((row) => !uriCases.has(row.name)))
 	);
 } finally {
-	fs.rmSync(fixtureRoot, { recursive: true, force: true });
+	if (fixtureCanRetire) fs.rmSync(fixtureRoot, { recursive: true, force: true });
+	else console.error(`Retaining the exact CLI fixture with unresolved ownership: ${fixtureRoot}`);
 }
 
 console.log('TAP version 14');

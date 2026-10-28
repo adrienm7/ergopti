@@ -1125,8 +1125,27 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 				true,
 				section + ': actual native callback/getter and final publication'
 			);
-			if (ownership === 'behavior') admittedBehavior++;
-			else admittedInert++;
+			if (ownership === 'behavior') {
+				admittedBehavior++;
+				for (const [callback, label] of [
+					['function() pcall(fn) end', 'menu_keyboard_layout.tis_call'],
+					['function() end', 'menu_keyboard_layout.tis_call'],
+					['function() return false end', 'menu_keyboard_layout.tis_call'],
+					['nil', 'menu_keyboard_layout.tis_call'],
+					['fn', 'foreign_owner']
+				]) {
+					const native = source.replace(
+						'\n\t\tfn,\n\t\t"menu_keyboard_layout.tis_call"',
+						'\n\t\t' + callback + ',\n\t\t"' + label + '"'
+					);
+					assert.notEqual(native, source, 'withdraw the actual deferred callback owner');
+					assert.equal(
+						owns(native),
+						false,
+						'swallowed, discarded or missing work cannot own a declared behavior'
+					);
+				}
+			} else admittedInert++;
 			assert.equal(
 				owns(source, definition, 'hs', '.lua', ownership === 'behavior' ? 'inert' : 'behavior'),
 				false
@@ -1264,6 +1283,53 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 			'layout_bundle_upgrade_to',
 			'local upgrade_active_list_async     = input_sources.upgrade_active_list_async',
 			'local upgrade_active_list_async = false'
+		],
+		[
+			'layout_bundle_variant_add',
+			'input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)',
+			'Foreign.confirm_enabled_async(var.tis_id, {}, function(read, state)'
+		],
+		[
+			'layout_bundle_variant_add',
+			'input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)',
+			'input_sources.confirm_source_async(var.tis_id, {}, function(read, state)'
+		],
+		[
+			'layout_bundle_variant_add',
+			'input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)',
+			'input_sources.confirm_enabled_async(var.name, {}, function(read, state)'
+		],
+		[
+			'layout_bundle_variant_add',
+			'if read and state.enabled == true then',
+			'if state.enabled == true then'
+		],
+		['layout_bundle_variant_add', 'if read and state.enabled == true then', 'if read then'],
+		['layout_bundle_variant_add', 'elseif read then', 'elseif true then'],
+		[
+			'layout_bundle_variant_add',
+			'i18n.get("menu.layout.add_consent")',
+			'i18n.get("menu.layout.add_ok")'
+		],
+		[
+			'layout_bundle_variant_add',
+			'schedule_menu_refresh(update_menu)\n\t\t\t\t\t\t\t\t\tend)\n\t\t\t\t\t\t\t\tend)',
+			'do end\n\t\t\t\t\t\t\t\t\tend)\n\t\t\t\t\t\t\t\tend)'
+		],
+		[
+			'layout_bundle_variant_add',
+			'schedule_menu_refresh(update_menu)\n\t\t\t\t\t\t\t\t\t\treturn',
+			'schedule_menu_refresh(update_menu)'
+		],
+		[
+			'layout_bundle_variant_add',
+			'i18n.get("menu.layout.add_pending_logout")',
+			'i18n.get("menu.layout.add_ok")'
+		],
+		[
+			'layout_bundle_variant_add',
+			'i18n.get("menu.layout.add_fail")',
+			'i18n.get("menu.layout.add_ok")'
 		],
 		[
 			'layout_bundle_variant_add',

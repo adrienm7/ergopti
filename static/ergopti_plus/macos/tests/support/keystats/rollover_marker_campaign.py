@@ -109,7 +109,16 @@ def main():
             if sql.strip() == "BEGIN TRANSACTION;":
                 self.reset_seen = False
             if sql.strip() == "UPDATE meta SET value='0' WHERE key='today_log_offset';":
-                self.reset_seen = True
+                # Fresh replay publication also writes offset zero. Only the
+                # actual pending rollover journal authorizes this reset fault.
+                receipt_path = owned / "metrics/by_device/device/data.sql.append-journal.json"
+                receipt = json.loads(receipt_path.read_text()) if receipt_path.is_file() else None
+                self.reset_seen = (
+                    isinstance(receipt, dict)
+                    and receipt.get("version") == 2
+                    and receipt.get("kind") == "rollover"
+                    and receipt.get("phase") == "pending"
+                )
             if (
                 options.case == "reset_commit_refused"
                 and active_phase == "prepare"
@@ -131,6 +140,9 @@ def main():
                     record["visible_old_offset"] = holder.execute(
                         "SELECT value FROM meta WHERE key='today_log_offset'"
                     ).fetchone()[0]
+                    assert int(record["visible_old_offset"]) > 0, (
+                        "The native busy control must target a consumed rollover, not cold replay publication"
+                    )
                     record["real_reader_acquired"] = holder.in_transaction
                     self.connection.execute("PRAGMA busy_timeout=0;")
                     busy_used = True

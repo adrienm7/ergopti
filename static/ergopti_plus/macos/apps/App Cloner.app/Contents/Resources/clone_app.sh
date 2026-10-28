@@ -25,7 +25,13 @@ if [[ "$DIAG" != /dev/null ]]; then
 fi
 
 log() {
-	echo "$@" >> "$DIAG"
+	(
+		trap - EXIT
+		trap '' PIPE
+		trap 'exit "$LOG_XFSZ_STATUS"' XFSZ
+		IFS=' '
+		printf '%s\n' "$*" >> "$DIAG"
+	) || { local log_status=$?; exit "$log_status"; }
 }
 
 # Mirror clone_app.sh stdout/stderr only into this run's owned log.
@@ -43,6 +49,19 @@ PWA_MODE="${7:-0}"        # 1 = clone is a WKWebView PWA pointing at OPEN_ARG (U
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 QUOTE_HELPER="$SCRIPT_DIR/quote_launcher_values.py"
 source "$SCRIPT_DIR/reserve_bundle.sh"
+
+LOG_XFSZ_SIGNAL="$(kill -l XFSZ)" || {
+	log_signal_status=$?
+	printf 'Error: cannot determine the log file-size signal number\n' >&2
+	exit "$log_signal_status"
+}
+case "$LOG_XFSZ_SIGNAL" in
+	''|0|0*|*[!0-9]*)
+		printf 'Error: invalid log file-size signal number: %s\n' "$LOG_XFSZ_SIGNAL" >&2
+		exit 1
+		;;
+esac
+LOG_XFSZ_STATUS=$((128 + LOG_XFSZ_SIGNAL))
 
 [[ -f "$QUOTE_HELPER" ]] || { echo "Error: launcher literal helper missing"; exit 1; }
 
@@ -68,60 +87,20 @@ log "============================================================"
 safe_name="$(printf '%s' "$CLONE_NAME" | tr ':/' '-' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 [[ -z "$safe_name" ]] && safe_name="Clone"
 
-# Cleanup requires the same Python runtime as launcher generation. Check it
-# before reserving any destination that would need that cleanup.
-python3 -c 'import os, shutil, stat, sys'
+# Launcher generation needs Python; fail before reserving its destination.
+python3 -c 'import sys'
+
+UNIQUE_ID="$(new_bundle_identifier clone)" || {
+	identity_status=$?
+	printf 'Error: clone bundle identity generation failed\n' >&2
+	exit "$identity_status"
+}
 
 APPS_DIR="$HOME/Applications"
 mkdir -p "$APPS_DIR"
-# Retire only this run's reserved bundle when creation fails. A completed
-# bundle survives the EXIT cleanup, including a failed final stdout write.
-DEST=""
-DEST_ID=""
-TMPDIR_WORK=""
-CLONE_COMPLETE=0
-cleanup_clone() {
-	local cleanup_status=$? cleanup_failed=0
-	trap - EXIT
-	if [[ "$CLONE_COMPLETE" != "1" && -n "$DEST" ]]; then
-		python3 - "$DEST" "$DEST_ID" <<'CLEANUP_BUNDLE' || cleanup_failed=1
-import os, shutil, stat, sys
-path, expected_identity = sys.argv[1:]
-try:
-    entry = os.lstat(path)
-except FileNotFoundError:
-    sys.exit(0)
-identity = f"{entry.st_dev}:{entry.st_ino}"
-if not stat.S_ISDIR(entry.st_mode) or identity != expected_identity:
-    sys.exit(f"Error: reserved bundle ownership changed; refusing cleanup: {path}")
-shutil.rmtree(path)
-CLEANUP_BUNDLE
-	fi
-	if [[ -n "$TMPDIR_WORK" ]]; then
-		rm -rf -- "$TMPDIR_WORK" || cleanup_failed=1
-	fi
-	if [[ "$cleanup_status" == "0" && "$cleanup_failed" != "0" ]]; then
-		return 1
-	fi
-	return "$cleanup_status"
-}
-trap cleanup_clone EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
-DEST="$(reserve_bundle_directory "$APPS_DIR/${safe_name}.app")"
-DEST_ID="$(python3 - "$DEST" <<'BUNDLE_IDENTITY'
-import os, stat, sys
-entry = os.lstat(sys.argv[1])
-if not stat.S_ISDIR(entry.st_mode):
-    sys.exit(f"Error: reserved bundle is not a directory: {sys.argv[1]}")
-print(f"{entry.st_dev}:{entry.st_ino}")
-BUNDLE_IDENTITY
-)" || {
-	identity_status=$?
-	echo "Error: cannot capture reserved bundle ownership: $DEST" >&2
-	exit "$identity_status"
-}
+initialize_bundle_creation
+trap cleanup_bundle_creation EXIT
+reserve_owned_bundle_directory "$APPS_DIR/${safe_name}.app"
 
 CONTENTS="$DEST/Contents"
 MACOS="$CONTENTS/MacOS"
@@ -129,8 +108,6 @@ RES="$CONTENTS/Resources"
 mkdir -p "$MACOS" "$RES"
 
 TMPDIR_WORK=$(mktemp -d "/tmp/appcloner.XXXXXX")
-
-UNIQUE_ID="fr.b519hs.clone.$(date +%s)"
 
 # Resolve source app's main executable name once, up front — needed by both
 # the family-detection and the launcher generation.
@@ -1067,7 +1044,7 @@ esac
 #                            a URL as positional argv to Electron silently
 #                            no-ops because the app isn't yet a registered
 #                            URL handler in this process tree.
-URL_SCHEME_RE='^[a-zA-Z][a-zA-Z0-9+.-]*://'
+URL_SCHEME_RE='^[a-zA-Z][a-zA-Z0-9+.-]*:'
 if [[ -n "$OPEN_ARG" && ! "$OPEN_ARG" =~ $URL_SCHEME_RE ]]; then
 	ARGS+=("$OPEN_ARG")
 fi
@@ -1397,4 +1374,4 @@ DOCKEOF
 # return value, so we end with just the bundle path. The diagnostic file
 # location is in the log itself if needed.
 CLONE_COMPLETE=1
-echo "$DEST"
+write_bundle_receipt "$DEST" || exit "$?"

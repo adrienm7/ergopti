@@ -56,8 +56,9 @@ helpers.describe("helpers.temp_dir", function()
 	end)
 
 	helpers.it("still honours TEMP and TMP where those are the ones set", function()
-		helpers.assert_eq(with_env({ TEMP = "C:/Users/x/AppData/Local/Temp" },
-			helpers.temp_dir), "C:/Users/x/AppData/Local/Temp")
+		local temp = package.config:sub(1, 1) == "\\"
+			and "C:/Users/x/AppData/Local/Temp" or "/tmp/fixture-temp"
+		helpers.assert_eq(with_env({ TEMP = temp }, helpers.temp_dir), temp)
 		helpers.assert_eq(with_env({ TMP = "/tmp/fixture" }, helpers.temp_dir),
 			"/tmp/fixture")
 	end)
@@ -68,8 +69,10 @@ helpers.describe("helpers.temp_dir", function()
 	end)
 
 	helpers.it("normalises separators and drops a trailing slash", function()
-		helpers.assert_eq(with_env({ TMPDIR = "C:\\Temp\\" }, helpers.temp_dir),
-			"C:/Temp",
+		local windows = package.config:sub(1, 1) == "\\"
+		local candidate = windows and "C:\\Temp\\" or "/tmp/fixture/"
+		local expected = windows and "C:/Temp" or "/tmp/fixture"
+		helpers.assert_eq(with_env({ TMPDIR = candidate }, helpers.temp_dir), expected,
 			"callers append '/name', so a trailing slash would produce a double one")
 	end)
 

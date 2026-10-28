@@ -18,6 +18,11 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const {
+	resolvePython,
+	resolvePythonForBash,
+	createNativeStatResources
+} = require('./lib/app-cloner-native-stat-port.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SOURCE_SCRIPT = path.join(
@@ -63,6 +68,7 @@ function writeExecutable(filePath, source) {
 }
 
 const bash = bashExecutable();
+const realPython = resolvePythonForBash(bash, resolvePython());
 
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-app-cloner-'));
 const fakeBin = path.join(fixtureRoot, 'bin');
@@ -70,6 +76,11 @@ const desktop = path.join(fixtureRoot, 'Desktop');
 const launcher = path.join(desktop, 'Shortcut.app', 'Contents', 'MacOS', 'open_target');
 
 try {
+	const { statQuery, portedShortcutScript } = createNativeStatResources({
+		resources: path.dirname(SOURCE_SCRIPT),
+		fixtureRoot,
+		toBashPath
+	});
 	fs.mkdirSync(fakeBin, { recursive: true });
 	writeExecutable(
 		path.join(fakeBin, 'qlmanage'),
@@ -113,7 +124,7 @@ printf 'icns' > "$out"
 	const run = spawnSync(
 		bash,
 		[
-			toBashPath(SOURCE_SCRIPT),
+			toBashPath(portedShortcutScript),
 			'Shortcut',
 			'/tmp/project',
 			'/Applications/Visual Studio Code.app',
@@ -127,6 +138,9 @@ printf 'icns' > "$out"
 			env: {
 				...process.env,
 				HOME: toBashPath(fixtureRoot),
+				REAL_PYTHON: realPython.stdout.trim(),
+				OWNED_STAT_QUERY: toBashPath(statQuery),
+				OWNED_STAT_FAULT: '',
 				PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
 			}
 		}
