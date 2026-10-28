@@ -39,6 +39,7 @@ local STUBBED_MODULES = {
 local function make_state()
 	return {
 		LOG_DIR               = "/virtual/metrics",
+		CACHE_DIR             = "/virtual/metrics/cache",
 		buffer_events         = {},
 		buffer_text           = "",
 		rich_chunks           = {},

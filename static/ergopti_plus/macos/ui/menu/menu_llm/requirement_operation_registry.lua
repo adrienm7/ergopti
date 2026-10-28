@@ -14,10 +14,15 @@ local Logger = require("infra.logger")
 local LOG = "menu_llm.requirements"
 
 -- Why a requirement ended without a failure: the user declined the model
--- download, or the disk cannot hold it. A caller turns the AI off with a
--- warning for these, since the dialog already told the user (#99).
+-- download, the disk cannot hold it, or the runtime must be upgraded first. A
+-- caller turns the AI off with a warning for these, since a dialog or notice
+-- already told the user (#99, #101).
 M.CANCEL_DOWNLOAD_DECLINED = "download_declined"
 M.CANCEL_DISK_INSUFFICIENT = "disk_insufficient"
+-- The installed runtime refused the model as too new for it (Ollama's 412
+-- "requires a newer version of Ollama"); its notice already asked for the
+-- upgrade (#101).
+M.CANCEL_RUNTIME_UPGRADE_REQUIRED = "runtime_upgrade_required"
 -- Observation only: each entry is the same original operation, released only
 -- by its existing terminal-plus-physical-child join. No registry GC can erase
 -- a live requirement's migration fence.

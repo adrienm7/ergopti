@@ -156,6 +156,7 @@ local function load_fixture(options)
 	package.loaded["adapters.file_system"] = saved_file_system
 	local state = {
 		LOG_DIR = "/tmp/ergopti_action_epoch_order",
+		CACHE_DIR = "/tmp/ergopti_action_epoch_order/cache",
 		buffer_events = { { "old", 20, {} } },
 		buffer_text = "old",
 		rich_chunks = { { type = "text", text = "old" } },
