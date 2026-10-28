@@ -29,19 +29,20 @@ local reporter = {
 		return pcall(callback)
 	end,
 }
-local filesystem = {
-	dir = function(path)
-		print("CLI_DISCOVERY " .. path)
-		local name = path:match("/tests/meta$") and "test_cli_alpha.lua" or "test_cli_beta.lua"
-		local delivered = false
-		return function()
-			if delivered then return nil end
-			delivered = true
-			return name
-		end
+-- Bound discovery at its current public interface; native bootstrap stays real.
+local discovery = {
+	collect = function(driver_root, directory)
+		assert(driver_root == root, "unexpected fixture driver root")
+		local modules = {
+			["tests/meta"] = { "tests.meta.test_cli_alpha" },
+			["tests/unit"] = { "tests.unit.test_cli_beta" },
+		}
+		local selected = assert(modules[directory], "unexpected fixture discovery directory: " .. tostring(directory))
+		print("CLI_DISCOVERY " .. driver_root .. "/" .. directory)
+		return selected
 	end,
-	attributes = function() return { mode = "file" } end,
 }
+
 local ports = {
 	["tests.helpers"] = reporter,
 	["text_utils"] = { shell_quote = function(value) return value end },
@@ -51,7 +52,8 @@ local ports = {
 	["tests.support.command_lines"] = {},
 	["tests.stubs.hs"] = {},
 	["test.runner_home"] = { isolate = function() end },
-	["lfs"] = filesystem,
+	["luv"] = actual_require("luv"),
+	["test.runner_discovery"] = discovery,
 }
 local cases = {
 	["tests.meta.test_cli_alpha"] = "alpha sentinel",

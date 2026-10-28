@@ -280,57 +280,100 @@ console.log(
 		`or ${npmScripts.length} npm script(s).\x1b[0m`
 );
 
-// A native cwd is data: POSIX backslashes and newlines cannot become separators
-// or shell record boundaries before the actual Linux test loader starts.
+// Native cwd bytes must survive both real unit runners and complete discovery.
+// The ambient and actual same-runtime-without-lfs controls use the same native
+// luv file; an optional installed module cannot hide a broken discovery branch.
 if (process.platform === 'linux') {
+	const { REQUIRED_LUA_SERIES } = require('./lib/host-toolchain.cjs');
+	const linuxRuntime = require('./run-linux-lua.cjs').findRuntime();
+	const macRuntime = 'lua';
+	assert.ok(linuxRuntime, 'The existing native Linux Lua runner is required');
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runner-path-'));
+	// Two drivers, two provider modes, and three physical prefixes must all run.
+	const EXPECTED_NATIVE_PATH_CASES = 12;
+	const observedCases = new Set();
+	const providerMarker = 'Native discovery: same runtime and real luv; lfs unavailable';
+	const withoutLfsSource = [
+		'local native = require("luv")',
+		'assert(native.exepath() == os.getenv("ERGOPTI_TEST_NATIVE_LUA"), "the native Lua executable changed")',
+		'local library = assert(package.searchpath("luv", package.cpath))',
+		'assert(native.fs_realpath(library) == os.getenv("ERGOPTI_TEST_NATIVE_LUV"), "the native luv library changed")',
+		'assert(not pcall(require, "lfs"), "the without-lfs control unexpectedly resolved lfs")',
+		'io.write(' + JSON.stringify(providerMarker + '\n') + ')'
+	].join('\n');
+
+	/** Observe the actual interpreter and library selected by the ordinary host. */
+	function nativeFacts(program) {
+		const source = [
+			'local native = require("luv")',
+			'assert(debug.getinfo(native.fs_stat,"S").what=="C", "the native provider must be real")',
+			'local library = assert(package.searchpath("luv", package.cpath))',
+			'local values = {assert(native.exepath()), assert(native.fs_realpath(library)), _VERSION, package.path, os.getenv("LD_LIBRARY_PATH") or ""}',
+			'io.write(table.concat(values, string.char(0)), string.char(0))'
+		].join('\n');
+		const observed = spawnSync(program, ['-e', source], {
+			cwd: ROOT,
+			encoding: 'utf8',
+			timeout: 30000
+		});
+		assert.ifError(observed.error);
+		assert.equal(observed.status, 0, observed.stderr);
+		const fields = observed.stdout.split(String.fromCharCode(0));
+		assert.equal(fields.pop(), '');
+		assert.equal(fields.length, 5);
+		const [executable, library, version, luaPath, loaderPath] = fields;
+		assert.ok(path.isAbsolute(executable) && path.isAbsolute(library));
+		assert.ok(fs.statSync(executable).isFile() && fs.statSync(library).isFile());
+		return { executable, library, version, luaPath, loaderPath };
+	}
+
+	/** Isolate a real native provider, bypassing environment-setting shell aliases. */
+	function withoutLfs(name, program, facts) {
+		const directory = path.join(temporary, 'native-providers', name);
+		const binaries = path.join(directory, 'bin');
+		fs.mkdirSync(binaries, { recursive: true, mode: 0o700 });
+		fs.symlinkSync(facts.library, path.join(directory, 'luv.so'));
+		fs.symlinkSync(facts.executable, path.join(binaries, program));
+		const cpath = path.join(directory, '?.so');
+		const abi = facts.version.match(/^Lua (\d+)\.(\d+)$/);
+		assert.ok(abi, 'The actual interpreter must acknowledge its Lua ABI');
+		const env = {
+			...process.env,
+			PATH: binaries + path.delimiter + (process.env.PATH || ''),
+			LUA_CPATH: cpath,
+			LUA_PATH: facts.luaPath,
+			LD_LIBRARY_PATH: facts.loaderPath,
+			ERGOPTI_TEST_NATIVE_LUA: facts.executable,
+			ERGOPTI_TEST_NATIVE_LUV: facts.library
+		};
+		env['LUA_CPATH_' + abi[1] + '_' + abi[2]] = cpath;
+		env['LUA_PATH_' + abi[1] + '_' + abi[2]] = facts.luaPath;
+		return env;
+	}
+
 	try {
-		const runtime = require('./run-linux-lua.cjs').findRuntime();
-		assert.ok(runtime, 'the native Linux runner needs its declared Lua runtime');
-		const probe = spawnSync(
-			runtime,
-			[
-				'-e',
-				[
-					'local uv=require("luv"); assert(debug.getinfo(uv.fs_stat,"S").what=="C")',
-					'local library=assert(package.searchpath("luv",package.cpath))',
-					'io.write(library,"\\0",tostring(pcall(require,"lfs")),"\\0")'
-				].join(';')
-			],
-			{ cwd: ROOT, encoding: 'utf8' }
+		const linuxFacts = nativeFacts(linuxRuntime);
+		const macFacts = nativeFacts(macRuntime);
+		assert.equal(
+			macFacts.version,
+			'Lua ' + REQUIRED_LUA_SERIES,
+			'The macOS runner uses the canonical pinned Lua series, never the Linux LuaJIT preference'
 		);
-		assert.ifError(probe.error);
-		assert.equal(probe.status, 0, probe.stderr);
-		const [library, ambientLfs] = probe.stdout.split('\0');
-		assert.ok(library);
-		const nativeModules = path.join(temporary, 'native-modules');
-		fs.mkdirSync(nativeModules);
-		fs.symlinkSync(path.resolve(ROOT, library), path.join(nativeModules, 'luv.so'));
-		const withoutLfs = { ...process.env, LUA_CPATH: `${nativeModules}/?.so`, LUA_PATH: ';;' };
-		const absence = spawnSync(
-			runtime,
-			[
-				'-e',
-				'local uv=require("luv"); assert(debug.getinfo(uv.fs_stat,"S").what=="C"); assert(not pcall(require,"lfs"))'
-			],
-			{ cwd: ROOT, env: withoutLfs, encoding: 'utf8' }
-		);
-		assert.ifError(absence.error);
-		assert.equal(absence.status, 0, absence.stderr);
-		console.log(
-			`[OK] Genuine native luv; ambient lfs=${ambientLfs}; isolated C module search refuses lfs.`
-		);
+		const withoutLinux = withoutLfs('linux', linuxRuntime, linuxFacts);
+		const withoutMac = withoutLfs('macos', macRuntime, macFacts);
 		for (const prefix of ['ordinary', 'literal\\backslash', 'literal\nnewline']) {
 			const checkout = path.join(temporary, prefix);
-			const driver = path.join(checkout, 'static/ergopti_plus/linux');
-			fs.mkdirSync(driver, { recursive: true });
-			for (const entry of fs.readdirSync(path.join(ROOT, 'static/ergopti_plus/linux'), {
-				withFileTypes: true
-			})) {
-				const source = path.join(ROOT, 'static/ergopti_plus/linux', entry.name);
-				const target = path.join(driver, entry.name);
-				if (entry.name === 'tests') fs.cpSync(source, target, { recursive: true });
-				else fs.symlinkSync(source, target);
+			for (const name of ['linux', 'macos']) {
+				const driver = path.join(checkout, 'static/ergopti_plus', name);
+				fs.mkdirSync(driver, { recursive: true });
+				for (const entry of fs.readdirSync(path.join(ROOT, 'static/ergopti_plus', name), {
+					withFileTypes: true
+				})) {
+					const source = path.join(ROOT, 'static/ergopti_plus', name, entry.name);
+					const target = path.join(driver, entry.name);
+					if (entry.name === 'tests') fs.cpSync(source, target, { recursive: true });
+					else fs.symlinkSync(source, target);
+				}
 			}
 			fs.symlinkSync(
 				path.join(ROOT, 'static/ergopti_plus/_shared'),
@@ -345,39 +388,161 @@ if (process.platform === 'linux') {
 			fs.symlinkSync(path.join(TOOLS, 'control'), path.join(tools, 'control'));
 			const home = path.join(checkout, 'home');
 			fs.mkdirSync(home);
-			for (const [mode, environment] of [
-				['ambient', process.env],
-				['without-lfs', withoutLfs]
-			]) {
-				const launched = spawnSync(
-					process.execPath,
-					[
-						path.join(tools, 'test/run-linux-lua.cjs'),
-						'tests/run.lua',
-						'--module=infra',
-						'--only=keeps the POSIX request tool'
-					],
+			for (const mode of ['ambient', 'without-lfs']) {
+				const isolated = mode === 'without-lfs';
+				const prefixArguments = isolated ? ['-e', withoutLfsSource] : [];
+				const commands = [
 					{
+						name: 'Linux',
+						program: process.execPath,
+						args: [
+							path.join(tools, 'test/run-linux-lua.cjs'),
+							...prefixArguments,
+							'tests/run.lua',
+							'--module=infra',
+							'--only=keeps the POSIX request tool'
+						],
 						cwd: checkout,
+						count: 1,
+						marker: /ok   keeps the POSIX request tool/,
+						env: isolated ? withoutLinux : process.env
+					},
+					{
+						name: 'macOS',
+						program: isolated ? macFacts.executable : macRuntime,
+						args: [
+							...prefixArguments,
+							'tests/run.lua',
+							'--only=tests.unit.infra.text_and_paths.paths.test_native_path'
+						],
+						cwd: path.join(checkout, 'static/ergopti_plus/macos'),
+						count: 5,
+						marker: /ok   posix-backslash-separator-owner/,
+						env: isolated ? withoutMac : process.env
+					}
+				];
+				for (const command of commands) {
+					const launched = spawnSync(command.program, command.args, {
+						cwd: command.cwd,
 						encoding: 'utf8',
 						timeout: 30000,
 						maxBuffer: 8 * 1024 * 1024,
-						env: { ...environment, HOME: home }
+						env: { ...command.env, HOME: home }
+					});
+					assert.ifError(launched.error);
+					assert.equal(
+						launched.status,
+						0,
+						command.name +
+							' ' +
+							mode +
+							' ' +
+							JSON.stringify(prefix) +
+							': ' +
+							launched.stdout +
+							'\n' +
+							launched.stderr
+					);
+					assert.match(launched.stdout, command.marker);
+					if (isolated) assert.equal(launched.stdout.split(providerMarker).length - 1, 1);
+					if (command.name === 'Linux') {
+						const group = launched.stdout.match(/Module group "infra": (\d+) of (\d+) module\(s\)/);
+						assert.ok(group, 'The complete declared infrastructure group must be loaded');
+						assert.ok(Number(group[1]) > 0 && Number(group[2]) >= Number(group[1]));
+						assert.match(launched.stdout, new RegExp('Total modules:\\s+' + group[1] + '\\n'));
+					} else {
+						assert.match(launched.stdout, /Total modules:\s+1\n/);
 					}
-				);
-				assert.ifError(launched.error);
-				assert.equal(
-					launched.status,
-					0,
-					`${JSON.stringify(prefix)}/${mode}: ${launched.stdout}\n${launched.stderr}`
-				);
-				assert.match(launched.stdout, /ok   keeps the POSIX request tool/);
-				assert.match(launched.stdout, /Passed tests:\s+1\nFailed tests:\s+0/);
-				console.log(
-					`[OK] Linux native prefix ${JSON.stringify(prefix)}/${mode} executes one existing case without loader errors.`
-				);
+					assert.match(
+						launched.stdout,
+						new RegExp('Passed tests:\\s+' + command.count + '\\nFailed tests:\\s+0')
+					);
+					const identity = JSON.stringify([command.name, mode, prefix]);
+					assert.ok(!observedCases.has(identity), 'Duplicate native path matrix case: ' + identity);
+					observedCases.add(identity);
+					console.log(
+						'[OK] ' +
+							command.name +
+							' ' +
+							mode +
+							' native prefix ' +
+							JSON.stringify(prefix) +
+							' executes ' +
+							command.count +
+							' existing case(s) without loader errors.'
+					);
+				}
 			}
 		}
+		assert.equal(
+			observedCases.size,
+			EXPECTED_NATIVE_PATH_CASES,
+			'The complete native path matrix must run'
+		);
+		// The source contract must see a newline inside a basename too. A regular
+		// declared file is the healthy control; hiding the undeclared emission
+		// would turn the second actual contract run into a false green.
+		const censusRoot = path.join(temporary, 'source-census\nfixture');
+		fs.mkdirSync(censusRoot);
+		const censusSource = String.raw`
+local function read(path)
+ local handle = assert(io.open(path, "rb"))
+ local value = assert(handle:read("*a")); assert(handle:close()); return value
+end
+local function write(path, text)
+ local handle = assert(io.open(path, "wb")); assert(handle:write(text)); assert(handle:close())
+end
+package.path = arg[4] .. "/?.lua;" .. arg[4] .. "/?/init.lua;" .. package.path
+local inventory = require("hotpath_segments")
+local registry = assert(require("toml_codec").decode(read(arg[3])))
+local contract = assert(loadfile(arg[1]))()
+local declarations = {}
+for name in pairs(inventory.for_driver("macos")) do
+ declarations[#declarations + 1] = string.format('HotPath.log_if_slow(%q)\n', name)
+end
+write(arg[2] .. "/declared.lua", table.concat(declarations))
+local cases = 0
+local helpers = {
+ describe = function(_, body) body() end,
+ it = function(_, body) body(); cases = cases + 1 end,
+ assert_true = function(value, detail) assert(value, detail) end,
+ assert_eq = function(value, expected, detail) assert(value == expected, detail) end,
+}
+local options = { driver = "macos", root = arg[2],
+ call_pattern = 'HotPath%.log_if_slow%(%s*"([^"]+)"',
+ default_slow_ms = assert(registry.logger.hotpath_slow_ms),
+}
+contract.register(helpers, options)
+assert(cases > 0); io.write("CENSUS_CONTROL_PASSED=", cases, "\n")
+write(arg[2] .. "/hidden\nemission.lua", 'HotPath.log_if_slow("source-census-newline-undeclared")\n')
+contract.register(helpers, options)
+io.write("CENSUS_HIDDEN_ACCEPTED\n")
+`;
+		const census = spawnSync(
+			macFacts.executable,
+			[
+				'-e',
+				withoutLfsSource,
+				'-',
+				path.join(ROOT, 'static/ergopti_plus/_shared/lua/test/hotpath_segments_contract.lua'),
+				censusRoot,
+				path.join(ROOT, 'static/ergopti_plus/_shared/modules/timings/constants.toml'),
+				path.join(ROOT, 'static/ergopti_plus/_shared/lua')
+			],
+			{ input: censusSource, env: withoutMac, cwd: ROOT, encoding: 'utf8', timeout: 30000 }
+		);
+		assert.ifError(census.error);
+		assert.match(census.stdout, /CENSUS_CONTROL_PASSED=[1-9][0-9]*\n/);
+		assert.notEqual(
+			census.status,
+			0,
+			'The complete source census must reject the hidden undeclared emission'
+		);
+		assert.match(census.stderr, /source-census-newline-undeclared/);
+		assert.ok(!census.stdout.includes('CENSUS_HIDDEN_ACCEPTED'));
+		console.log(
+			'[OK] The source census rejects an undeclared emission in a newline-bearing filename.'
+		);
 	} finally {
 		fs.rmSync(temporary, { recursive: true, force: true });
 	}

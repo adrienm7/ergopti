@@ -21,14 +21,14 @@
 
 local M = {}
 local Inventory = require("hotpath_segments")
+local Discovery = require("test.runner_discovery")
 
 -- The parse must find at least this many call sites, or a pattern that stopped
 -- matching would report nothing and pass over nothing.
 local MIN_PARSED_SITES = 4
 local SKIPPED_DIRECTORIES = { tests = true, vendor = true, _generated = true, native = true }
 
---- Lists every production .lua file under a driver root, through lfs when it is
---- installed and the platform's directory listing otherwise.
+--- Lists production Lua files through the supplied port or the native census.
 --- @param root string Absolute driver root.
 --- @param directory table|nil Native directory port supplied by the driver.
 --- @return table paths Sorted, native path bytes preserved.
@@ -50,48 +50,11 @@ local function production_files(root, directory)
 		table.sort(found)
 		return found
 	end
-	local ok_lfs, lfs = pcall(require, "lfs")
-	if ok_lfs then
-		local function walk(dir)
-			for entry in lfs.dir(dir) do
-				if entry ~= "." and entry ~= ".." then
-					local full = dir .. "/" .. entry
-					local mode = lfs.attributes(full, "mode")
-					if mode == "directory" then
-						if not SKIPPED_DIRECTORIES[entry] then walk(full) end
-					elseif entry:match("%.lua$") then
-						found[#found + 1] = full
-					end
-				end
-			end
-		end
-		walk(root)
-	else
-		local windows = package.config:sub(1, 1) == "\\"
-		-- On POSIX find runs inside the root, so the listed paths never contain
-		-- it: a POSIX root may hold a backslash or a newline.
-		local command = windows and string.format('cmd /c dir /b /s /a-d "%s"', root:gsub("/", "\\"))
-			or "cd '" .. root:gsub("'", "'\\''") .. "' && find . -type f -name '*.lua'"
-		local pipe = assert(io.popen(command))
-		for line in pipe:lines() do
-			local inside
-			if windows then
-				line = line:gsub("\\", "/")
-				inside = line:sub(#root + 1)
-			else
-				inside = line:match("^%.(/.+)$")
-				line = inside and (root .. inside)
-			end
-			local skipped = inside == nil
-			for directory in pairs(SKIPPED_DIRECTORIES) do
-				if inside and inside:find("/" .. directory .. "/", 1, true) then skipped = true end
-			end
-			if not skipped and line:match("%.lua$") then found[#found + 1] = line end
-		end
-		pipe:close()
-	end
-	table.sort(found)
-	return found
+	local files, detail = Discovery.files(root, function(name)
+		return name:match("%.lua$") ~= nil
+	end, SKIPPED_DIRECTORIES)
+	assert(files, detail)
+	return files
 end
 
 --- Collects the segment names a driver emits, with the file of the first emission.
