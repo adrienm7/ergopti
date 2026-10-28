@@ -17,6 +17,7 @@ local hs       = hs
 local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
 local Geometry = require("modules.gestures.geometry")
+local FrameClock = require("modules.gestures.frame_clock")
 local AccessibilityPermission = require("adapters.accessibility_permission")
 local MouseControl = require("adapters.mouse_control")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -111,6 +112,12 @@ local MOMENTUM_PHASES_ACTIVE = { [1] = true, [2] = true }
 local lastNativeScrollAt = nil
 local lastScrollEndAt    = nil
 
+-- Touch frames are timed when the trackpad captured them: a stalled main thread
+-- delivers queued frames in one burst, and timing them at delivery measured a
+-- held third finger as a few milliseconds. Scroll events keep delivery time, so
+-- every comparison with them uses the frame's delivery time (gs.startDelivery).
+local frameClock = FrameClock.new()
+
 local scrollBlocker  = nil
 local scrollBlockerCommitted = false
 local isBlockingScroll = false
@@ -203,6 +210,7 @@ local function resetGS()
 		active         = false,
 		pointerDrag    = false, -- Sticky until the last lift: a button went down, the contacts are a click-drag
 		startTime      = nil,
+		startDelivery  = nil, -- Delivery time of the first frame, comparable with scroll events
 		startPos       = nil,
 		endPos         = nil,
 		maxFingers     = 0,
@@ -302,10 +310,10 @@ local function multiFingerAllowed(mf, axis, slot)
 end
 
 --- Records the end of a contact sequence that scrolled with two fingers.
---- @param now number Timestamp of the lift.
-local function noteGestureEnd(now)
+--- @param delivered number Delivery time of the lift, comparable with scroll events.
+local function noteGestureEnd(delivered)
 	if gs.aborted or (gs.active and gs.maxFingers == 2 and gs.lockedDir ~= nil) then
-		lastScrollEndAt = now
+		lastScrollEndAt = delivered
 	end
 end
 
@@ -329,7 +337,7 @@ local function twoFingerScrollOwns(now)
 	if travel >= PAIR_SCROLL_TRAVEL then
 		return true, "pair scroll", string.format("travel %.2f >= %.2f", travel, PAIR_SCROLL_TRAVEL)
 	end
-	if lastNativeScrollAt and gs.startTime and lastNativeScrollAt >= gs.startTime then
+	if lastNativeScrollAt and gs.startDelivery and lastNativeScrollAt >= gs.startDelivery then
 		return true, "pair scroll", "macOS reported a scroll phase for the pair"
 	end
 	local since_landing = now - (gs.startTime or now)
@@ -780,12 +788,15 @@ end
 --- Starts one independent multi-finger gesture from the current frame.
 --- @param n number Current finger count.
 --- @param pos table Current centroid.
---- @param now number Timestamp of the frame.
-local function beginGesture(n, pos, now, touches)
+--- @param now number Capture time of the frame.
+--- @param touches table The raw touch data objects.
+--- @param delivered number Delivery time of the frame, comparable with scroll events.
+local function beginGesture(n, pos, now, touches, delivered)
 	gs.active         = true
 	gs.aborted        = false
 	gs.multiFingerBlocked = nil
 	gs.startTime      = now
+	gs.startDelivery  = delivered
 	gs.startPos       = {x = pos.x, y = pos.y}
 	gs.endPos         = {x = pos.x, y = pos.y}
 	gs.maxFingers     = n
@@ -811,9 +822,9 @@ local function beginGesture(n, pos, now, touches)
 	gs.tentativeLiftingFrames = 0
 	snapshotContacts(touches)
 	gs.rejections = {}
-	if lastScrollEndAt and now - lastScrollEndAt < SCROLL_MOMENTUM_GUARD_SEC then
+	if lastScrollEndAt and delivered - lastScrollEndAt < SCROLL_MOMENTUM_GUARD_SEC then
 		gs.multiFingerBlocked = string.format("%.0f ms since the last scroll < %.0f ms",
-			(now - lastScrollEndAt) * 1000, SCROLL_MOMENTUM_GUARD_SEC * 1000)
+			(delivered - lastScrollEndAt) * 1000, SCROLL_MOMENTUM_GUARD_SEC * 1000)
 	end
 end
 
@@ -829,7 +840,10 @@ end
 
 --- Evaluates a raw frame array of touches from the trackpad API.
 --- @param touches table The raw touch data objects.
-function M.process_frame(touches)
+--- @param frame_stamp number|nil The touch device's capture timestamp of the
+---   frame, in seconds; nil when the caller has none (a replay), which times the
+---   frame at its delivery.
+function M.process_frame(touches, frame_stamp)
 	if type(touches) ~= "table" then return end
 
 	-- Signal that we are receiving data
@@ -842,8 +856,10 @@ function M.process_frame(touches)
 	end
 
 	local n   = #touches
-	-- Gesture windows measure awake duration, independent of civil-clock corrections.
-	local now = TimerScheduler.awake_time()
+	-- Gesture windows measure awake duration, independent of civil-clock
+	-- corrections, between the moments the frames were captured.
+	local delivered = TimerScheduler.awake_time()
+	local now = frameClock.capture(frame_stamp, delivered)
 
 	-- A click-drag is never a gesture. Pressing the trackpad with one finger and
 	-- sliding another, or dragging after a tap to click, reports two or more
@@ -871,7 +887,7 @@ function M.process_frame(touches)
 	if gs.aborted then
 		stopScrollBlock()
 		if n == 0 then
-			noteGestureEnd(now)
+			noteGestureEnd(delivered)
 			resetGS()
 		end
 		return
@@ -882,7 +898,7 @@ function M.process_frame(touches)
 		if gs.active and gs.startPos and gs.endPos then
 			Logger.info(LOG, "process_frame: n=0 → fingers lifted, calling commitGesture (was active)")
 			commitGestureSafely(now)
-			noteGestureEnd(now)
+			noteGestureEnd(delivered)
 		elseif gs.active then
 			Logger.debug(LOG, "process_frame: n=0 but startPos/endPos missing (startPos=%s, endPos=%s)",
 				tostring(gs.startPos), tostring(gs.endPos))
@@ -951,7 +967,7 @@ function M.process_frame(touches)
 		local pos = Geometry.avgPos(touches)
 		if not gs.active then
 			Logger.info(LOG, "GESTURE START: fingers=%d pos=(%.1f,%.1f) ts=%.3f", n, pos.x, pos.y, now)
-			beginGesture(n, pos, now, touches)
+			beginGesture(n, pos, now, touches, delivered)
 		else
 			if gs.lifting then
 				-- A confirmed sub-two-finger bridge ended the previous gesture.
@@ -959,8 +975,8 @@ function M.process_frame(touches)
 				-- restart from the current count even when it differs from the old one.
 				Logger.debug(LOG, "Rapid re-tap detected (%d finger(s)) — committing and restarting.", n)
 				if gs.startPos then commitGestureSafely(now) end
-				noteGestureEnd(now)
-				beginGesture(n, pos, now, touches)
+				noteGestureEnd(delivered)
+				beginGesture(n, pos, now, touches, delivered)
 				return
 			end
 
@@ -1373,6 +1389,7 @@ function M.stop()
 	M.cancel_current_gesture()
 	lastNativeScrollAt = nil
 	lastScrollEndAt    = nil
+	frameClock.reset()
 	if stop_scroll_blocker("Gesture scroll-blocker teardown") ~= true then return false end
 	_state   = nil
 	_actions = nil
