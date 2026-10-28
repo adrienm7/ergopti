@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local M = {}
+local Discovery = require("test.runner_discovery")
 
 --- Runs a source collector against controlled file failures and a repair.
 --- @param root string Driver root with its trailing separator.
@@ -17,7 +18,11 @@ local M = {}
 function M.with_fault(root, mode, callback)
 	local state = { paths = { root .. "a_source.lua", root .. "z_source.lua" },
 		opens = {}, closes = 0, enumerations = 0, repaired = false }
-	local open, popen = io.open, io.popen
+	local open, popen, discover = io.open, io.popen, Discovery.files
+	Discovery.files = function()
+		state.enumerations = state.enumerations + 1
+		return state.paths
+	end
 	io.popen = function()
 		state.enumerations = state.enumerations + 1
 		local index = 0
@@ -52,7 +57,7 @@ function M.with_fault(root, mode, callback)
 		}
 	end
 	local outcome = table.pack(pcall(callback, state))
-	io.open, io.popen = open, popen
+	io.open, io.popen, Discovery.files = open, popen, discover
 	if not outcome[1] then error(outcome[2], 0) end
 	return table.unpack(outcome, 2, outcome.n)
 end

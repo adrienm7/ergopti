@@ -53,7 +53,6 @@ end
 function M.provide_timings()
 	package.loaded["infra.timings"] = real_timings()
 end
-local CommandLines = require("tests.support.command_lines")
 local SourceFile = require("tests.support.source_file")
 local NativePath = require("native_path")
 
@@ -621,28 +620,14 @@ end
 local function production_sources()
 	if _production_sources then return _production_sources end
 
-	local root = M.driver_root()
-	local is_windows = package.config:sub(1, 1) == "\\"
-	local command
-	if is_windows then
-		command = 'dir /b /s /a-d "' .. root:gsub("/", "\\") .. '*.lua"'
-	else
-		command = 'find "' .. root:gsub('"', '\\"') .. '" -type f -name "*.lua"'
-	end
+	local Discovery = require("test.runner_discovery")
 
-	-- Collect the PATHS first and sort them, because neither `find` nor `dir /b /s`
-	-- promises an order: it follows the filesystem, so a fresh CI runner returns a
-	-- different one from the last. Every source invariant built on this list was
-	-- therefore non-deterministic, and one of them — the boot-ordering guard — went
-	-- red or green depending on which file the scan happened to reach first.
-	local paths = {}
-	for _, path in ipairs(CommandLines.read(command)) do
-		local normalized = path:gsub("\\", "/")
-		if not normalized:find("/tests/", 1, true) then
-			paths[#paths + 1] = path
-		end
-	end
-	table.sort(paths)
+	-- The relative directory census excludes the harness, never a checkout's parents.
+	-- Native pathnames remain data, including newlines and shell syntax.
+	local paths, detail = Discovery.files(M.driver_root(), function(name)
+		return name:match("%.lua$") ~= nil
+	end, { tests = true })
+	assert(paths, detail)
 
 	local bodies = {}
 	for _, path in ipairs(paths) do
