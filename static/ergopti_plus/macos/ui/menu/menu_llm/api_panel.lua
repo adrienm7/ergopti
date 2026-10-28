@@ -183,6 +183,22 @@ function M.active_entry_display_name()
 	return entry_names(remote, remote.get_entries() or {})[active_id]
 end
 
+--- The active entry as the tray's model button names it: the provider's
+--- display name from api_providers.json, then the model its requests use
+--- ("OpenAI/gpt-4o-mini"). The page lists entries by their automatic name.
+--- @return string|nil text Nil when no entry is active.
+function M.active_entry_caption_text()
+	local remote = llm_mod and llm_mod.api_remote
+	if type(remote) ~= "table" or type(remote.get_active_entry) ~= "function" then return nil end
+	local entry = remote.get_active_entry()
+	if type(entry) ~= "table" then return nil end
+	local provider = type(remote.PROVIDERS) == "table" and remote.PROVIDERS[entry.provider] or nil
+	if type(provider) ~= "table" or type(provider.label) ~= "string" or provider.label == "" then return nil end
+	local model = (type(entry.model) == "string" and entry.model ~= "") and entry.model or provider.default_model
+	if type(model) ~= "string" or model == "" then return provider.label end
+	return provider.label .. "/" .. model
+end
+
 -- Shared probe-verdict rendering for the Test action and the post-add
 -- probe: success carries excerpt + latency, failure appends the provider's
 -- own "[status] message" line (no locale key needed for it). Module-level:
@@ -280,7 +296,7 @@ local function add_system1_entry(add)
 					if ok ~= true then
 						Logger.error(LOG, "System 1 API entry committed with cleanup debt: %s", tostring(reason))
 					end
-					if add.previous_active_id ~= "" then add.WarmupCtrl.warmup(require("config_keys").COMMAND.API_ADD_ENTRY) end
+					if add.previous_active_id ~= "" then add.WarmupCtrl.warmup("api_add_entry") end
 					pcall_log("update_menu(add system1 committed)", add.update_menu)
 					notify_probe_verdict(true, label, reply, ms, nil)
 					return
@@ -388,8 +404,14 @@ function M.build(ctx)
 	local WarmupCtrl  = ctx.WarmupCtrl
 	local keymap      = ctx.keymap
 
-	if state.llm_backend ~= "api" then
+	-- The model selector page collects the same actions on any backend: it
+	-- switches to the API backend before it runs one of them.
+	local collect = type(ctx.collect) == "table" and ctx.collect or nil
+	if state.llm_backend ~= "api" and not collect then
 		return nil, nil
+	end
+	if collect then
+		collect.entries, collect.select, collect.add = {}, {}, {}
 	end
 
 	local api_remote = llm_mod.api_remote
@@ -420,11 +442,7 @@ function M.build(ctx)
 	-- the new entry immediately.
 	for _, e in ipairs(entries) do
 		if not is_system1_only(api_remote, e) then
-			table.insert(rows, {
-				label    = names[e.id],
-				checked  = (e.id == active_id),
-				disabled = (paused or mutation_busy) or nil,
-				action       = (not paused and not mutation_busy) and function()
+			local select_entry = (not paused and not mutation_busy) and function()
 					if _mutation_owner ~= nil then return false end
 					if reset_prediction_identity(keymap, "select remote API entry") ~= true then return false end
 					local previous_active_id = api_remote.get_active_entry_id()
@@ -452,7 +470,19 @@ function M.build(ctx)
 					end)
 					return true
 				end or nil
+			table.insert(rows, {
+				label    = names[e.id],
+				checked  = (e.id == active_id),
+				disabled = (paused or mutation_busy) or nil,
+				action   = select_entry,
 			})
+			if collect then
+				collect.select[e.id] = select_entry
+				collect.entries[#collect.entries + 1] = {
+					id = e.id, name = names[e.id], provider = e.provider, model = tostring(e.model or ""),
+					active = e.id == active_id, key_missing = api_remote.entry_key_missing(e),
+				}
+			end
 		end
 	end
 
@@ -583,7 +613,7 @@ function M.build(ctx)
 								if not mutation_is_current(my_add_gen) then return end
 								finish_mutation(my_add_gen)
 								if ok == true or durable == true then
-									WarmupCtrl.warmup(require("config_keys").COMMAND.API_ADD_ENTRY)
+									WarmupCtrl.warmup("api_add_entry")
 									pcall_log("update_menu(add committed)", update_menu)
 									if ok == true then
 										pcall_log("notify(api_validated)", notifications.notify,
@@ -637,6 +667,15 @@ function M.build(ctx)
 					end
 			end or nil,
 			})
+			if collect then collect.add[pid] = add_rows[#add_rows].action end
+		end
+	end
+
+	if collect then
+		collect.providers = {}
+		for _, pid in ipairs(api_remote.PROVIDER_ORDER) do
+			local p = api_remote.PROVIDERS[pid]
+			if p then collect.providers[#collect.providers + 1] = { id = pid, label = p.label } end
 		end
 	end
 
@@ -793,6 +832,10 @@ function M.build(ctx)
 	if remove_row then
 		remove_row.label = "🗑️ " .. remove_row.label .. (active_entry and (" (" .. active_label .. ")") or "")
 	end
+	if collect then
+		collect.test_active = test_row and not test_row.disabled and test_row.action or nil
+		collect.remove_active = remove_row and not remove_row.disabled and remove_row.action or nil
+	end
 	local active_rows = { api_test_active = test_row, api_remove_active = remove_row }
 	for _, declaration in ipairs(ManifestMenu.get_array("llm_api_active_commands")) do
 		local row = active_rows[declaration.id]
@@ -837,106 +880,107 @@ function M.build(ctx)
 	return api_title, ManifestMenu.render_rows(rows, "llm_backend")
 end
 
---- Builds the "active model" submenu when the remote API backend is selected.
---- Mirrors Windows ``_LLM_Menu_BuildApiEntriesMenu()`` — local catalogue rows
---- are hidden because they have no ``urls.api`` entry in models.json.
---- @param ctx table Context with fields: state, paused, is_paused, keymap, update_menu, WarmupCtrl.
---- @return table menu Populated API entry picker.
-function M.build_model_picker(ctx)
-	local state       = ctx.state
-	local paused      = ctx.paused
-	local update_menu = ctx.update_menu
-	local WarmupCtrl  = ctx.WarmupCtrl
-	local keymap      = ctx.keymap
-
+--- Clears the active API entry: the API backend's "no model". The model
+--- selector page's "no model" runs it on the API backend; the transaction is
+--- the tray picker's former one (identity reset, lease, persist, rollback).
+--- @param ctx table { state, keymap, update_menu, is_paused }.
+--- @return boolean started
+function M.clear_active_entry(ctx)
+	local state, keymap, update_menu = ctx.state, ctx.keymap, ctx.update_menu
+	if type(ctx.is_paused) ~= "function" then return false end
+	local ok_pause, paused = pcall(ctx.is_paused)
+	if not ok_pause or paused ~= false or _mutation_owner ~= nil then return false end
 	local api_remote = llm_mod.api_remote
-	local entries    = (api_remote and api_remote.get_entries()) or {}
-	local active_id  = (api_remote and api_remote.get_active_entry_id()) or ""
-	local rows       = {}
-	local mutation_busy = _mutation_owner ~= nil
-	local names      = entry_names(api_remote, entries)
-
-	local selection_rows = ManifestMenu.template_rows("llm_api_selection_frame", {
-		[require("config_keys").COMMAND.LLM_API_NO_MODEL] = function()
-			if _mutation_owner ~= nil then return false end
-			if api_remote and api_remote.set_active_entry_id then
-				if reset_prediction_identity(keymap, "select No Model") ~= true then return false end
-				local previous_active_id = api_remote.get_active_entry_id()
-				local previous_model = state.llm_model
-				local my_generation = begin_mutation()
-				if not my_generation then return false end
-				api_remote.set_active_entry_id("")
-				state.llm_model = ""
-				persist_entries("persist_api_entries(clear_active)", function(ok, reason, durable)
-					if not mutation_is_current(my_generation) then return end
-					finish_mutation(my_generation)
-					if ok == true or durable == true then
-						if ok ~= true then
-							Logger.error(LOG, "No Model selection committed with cleanup debt: %s",
-								tostring(reason))
-						end
-						pcall_log("update_menu(clear_active)", update_menu)
-						return
-					end
-					api_remote.set_active_entry_id(previous_active_id)
-					state.llm_model = previous_model
-					notify_persistence_failure("No Model selection")
-					pcall_log("update_menu(clear_active rollback)", update_menu)
-				end)
-				return true
+	if not api_remote or type(api_remote.set_active_entry_id) ~= "function" then return false end
+	if reset_prediction_identity(keymap, "select No Model") ~= true then return false end
+	local previous_active_id = api_remote.get_active_entry_id()
+	local previous_model = state.llm_model
+	local my_generation = begin_mutation()
+	if not my_generation then return false end
+	api_remote.set_active_entry_id("")
+	state.llm_model = ""
+	persist_entries("persist_api_entries(clear_active)", function(persisted, reason, durable)
+		if not mutation_is_current(my_generation) then return end
+		finish_mutation(my_generation)
+		if persisted == true or durable == true then
+			if persisted ~= true then
+				Logger.error(LOG, "No Model selection committed with cleanup debt: %s", tostring(reason))
 			end
-			return false
-		end,
-	}, {
-		llm_api_no_model_checked = function() return active_id == "" or active_id == nil end,
-		llm_api_selection_ready = function() return not paused and not mutation_busy end,
-		llm_api_entries_present = function() return #entries > 0 end,
-	}, {})
-	if not selection_rows then return {} end
-	for _, row in ipairs(selection_rows) do
-		if paused or mutation_busy then row.action = nil end
-		rows[#rows + 1] = row
-	end
+			pcall_log("update_menu(clear_active)", update_menu)
+			return
+		end
+		api_remote.set_active_entry_id(previous_active_id)
+		state.llm_model = previous_model
+		notify_persistence_failure("No Model selection")
+		pcall_log("update_menu(clear_active rollback)", update_menu)
+	end)
+	return true
+end
 
-	for _, e in ipairs(entries) do
-		if not is_system1_only(api_remote, e) then
-			table.insert(rows, {
-				label    = names[e.id],
-				checked  = (e.id == active_id),
-				disabled = (paused or mutation_busy) or nil,
-				action       = (not paused and not mutation_busy) and function()
-					if _mutation_owner ~= nil then return false end
-					if reset_prediction_identity(keymap, "select remote API entry") ~= true then return false end
-					local previous_active_id = api_remote.get_active_entry_id()
-					local previous_model = state.llm_model
-					local my_generation = begin_mutation()
-					if not my_generation then return false end
-					api_remote.set_active_entry_id(e.id)
-					state.llm_model = tostring(e.model or "")
-					persist_entries("persist_api_entries(set_active)", function(ok, reason, durable)
-						if not mutation_is_current(my_generation) then return end
-						finish_mutation(my_generation)
-						if ok == true or durable == true then
-							if ok ~= true then
-								Logger.error(LOG, "Remote API selection committed with cleanup debt: %s",
-									tostring(reason))
-							end
-							WarmupCtrl.warmup("api_set_active")
-							pcall_log("update_menu(set_active)", update_menu)
-							return
-						end
-						api_remote.set_active_entry_id(previous_active_id)
-						state.llm_model = previous_model
-						notify_persistence_failure("Remote API entry selection")
-						pcall_log("update_menu(set_active rollback)", update_menu)
-					end)
-					return true
-				end or nil,
-			})
+--- Makes one model of an entry's provider the active one: the entry keeps its
+--- provider, address and key and takes the model, then becomes the active
+--- entry. The model selector page offers each model the provider lists, or one
+--- the user types; the transaction is the entry selection's (lease, persist,
+--- rollback, warmup).
+--- @param ctx table { state, keymap, update_menu, WarmupCtrl, is_paused }.
+--- @param entry_id string Entry identifier.
+--- @param model string Model id the provider serves.
+--- @return boolean started
+function M.set_entry_model(ctx, entry_id, model)
+	local state, keymap, update_menu, WarmupCtrl = ctx.state, ctx.keymap, ctx.update_menu, ctx.WarmupCtrl
+	model = TextUtils.trim(tostring(model or ""))
+	if model == "" then
+		Logger.warn(LOG, "API entry model change refused: the model id is empty.")
+		return false
+	end
+	if type(ctx.is_paused) ~= "function" then return false end
+	local ok_pause, paused = pcall(ctx.is_paused)
+	if not ok_pause or paused ~= false or _mutation_owner ~= nil then return false end
+	local api_remote = llm_mod.api_remote
+	local previous_entries = api_remote.get_entries() or {}
+	local changed, found = {}, false
+	for _, e in ipairs(previous_entries) do
+		if e.id == entry_id then
+			local copy = {}
+			for k, v in pairs(e) do copy[k] = v end
+			copy.model = model
+			changed[#changed + 1] = copy
+			found = true
+		else
+			changed[#changed + 1] = e
 		end
 	end
-
-	return ManifestMenu.render_rows(rows, "llm_model")
+	if not found then
+		Logger.warn(LOG, "API entry model change refused: entry '%s' is gone.", tostring(entry_id))
+		return false
+	end
+	if reset_prediction_identity(keymap, "change remote API entry model") ~= true then return false end
+	local my_generation = begin_mutation()
+	if not my_generation then return false end
+	local previous_active_id = api_remote.get_active_entry_id()
+	local previous_model = state.llm_model
+	api_remote.set_entries(changed)
+	api_remote.set_active_entry_id(entry_id)
+	state.llm_model = model
+	Logger.info(LOG, "API entry model change staged (entry=%s, model=%s).", tostring(entry_id), model)
+	persist_entries("persist_api_entries(set_model)", function(persisted, reason, durable)
+		if not mutation_is_current(my_generation) then return end
+		finish_mutation(my_generation)
+		if persisted == true or durable == true then
+			if persisted ~= true then
+				Logger.error(LOG, "Remote API model change committed with cleanup debt: %s", tostring(reason))
+			end
+			WarmupCtrl.warmup("api_set_model")
+			pcall_log("update_menu(set_model)", update_menu)
+			return
+		end
+		api_remote.set_entries(previous_entries)
+		api_remote.set_active_entry_id(previous_active_id)
+		state.llm_model = previous_model
+		notify_persistence_failure("Remote API model change")
+		pcall_log("update_menu(set_model rollback)", update_menu)
+	end)
+	return true
 end
 
 --- Stores what the user chose for a local server (local_servers.json): its

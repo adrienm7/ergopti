@@ -17,7 +17,6 @@ return {
 		"personal",
 	},
 	["llm_menu_rows"] = {
-		"llm_backend",
 		"llm_model",
 		"llm_profile",
 		"llm_trigger",

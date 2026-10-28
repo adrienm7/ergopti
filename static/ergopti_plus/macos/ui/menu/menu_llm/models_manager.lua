@@ -780,6 +780,11 @@ function M.new(deps)
 		return filtered
 	end
 	
+	--- The whole catalogue, whatever the active backend: the model selector
+	--- page lists every backend's rows side by side.
+	--- @return table presets
+	function obj.get_all_presets() return presets end
+
 	function obj.get_mlx_repo(name) return mlx.get_mlx_repo(name) end
 	function obj.get_model_info(name) return get_model_info_logic(name, presets) end
 	
@@ -817,6 +822,46 @@ function M.new(deps)
 		else
 			return ollama.get_installed_models() or {}
 		end
+	end
+
+	--- The installed models of one local backend, whatever backend is active:
+	--- the model selector page shows Ollama and MLX side by side.
+	--- @param backend string "ollama" or "mlx".
+	--- @return table installed Model name -> true.
+	function obj.backend_installed_models(backend)
+		if backend == "mlx" then return mlx.get_installed_models() or {} end
+		if backend == "ollama" then return ollama.get_installed_models() or {} end
+		error("models_manager.backend_installed_models: unknown local backend " .. tostring(backend))
+	end
+
+	--- Whether one backend holds a model, by display name or native name.
+	--- @param backend string "ollama" or "mlx".
+	--- @param display_name string Display name or backend-native identifier.
+	--- @return boolean installed
+	function obj.backend_model_installed(backend, display_name)
+		local installed = obj.backend_installed_models(backend)
+		if installed[display_name] then return true end
+		local actual_name = get_actual_model_name(display_name, presets, backend == "mlx")
+		return (installed[actual_name] or installed[actual_name .. ":latest"]) == true
+	end
+
+	--- The backend-native name of a catalogue model for one backend.
+	--- @param backend string "ollama" or "mlx".
+	--- @param display_name string Display name.
+	--- @return string
+	function obj.backend_actual_model_name(backend, display_name)
+		return get_actual_model_name(display_name, presets, backend == "mlx")
+	end
+
+	--- Downloads a Hugging Face repository the user added for MLX, through the
+	--- MLX download window catalogue models use.
+	--- @param repo string Validated owner/name repository id.
+	--- @param on_success function|nil
+	--- @param on_cancel function|nil
+	--- @param opts table|nil
+	--- @return boolean accepted
+	function obj.pull_mlx_repo(repo, on_success, on_cancel, opts)
+		return mlx.pull_model(repo, repo, on_success, on_cancel, opts) ~= false
 	end
 
 	function obj.check_requirements(target_model, on_success, on_cancel, opts)

@@ -290,6 +290,9 @@ helpers.describe("Actual AI menu local discovery context (local-configured-nativ
 				return "backend", {}
 			end
 			menu.build_item()
+			-- The local server rows are the model selector page's since 2026-10-27:
+			-- the page collects the Backend panel against the bound context.
+			require("ui.menu.menu_llm.model_selector_page").collected()
 			helpers.assert_eq(captured and captured.is_paused, native_pause)
 			helpers.assert_eq(captured.is_paused(), false)
 			paused = true

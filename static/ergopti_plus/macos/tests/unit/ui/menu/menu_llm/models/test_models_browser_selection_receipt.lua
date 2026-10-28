@@ -3,57 +3,38 @@
 --- ==============================================================================
 --- MODULE: Model Browser Selection Receipt Composition
 --- DESCRIPTION:
---- Drives the real model-menu provider, browser bridge and WebView factory over
---- the existing native reference fixture. Selection receipts are injected at the
---- provider's model-switch boundary; no backend or real native window is started.
+--- Drives the real model selector browser bridge and WebView factory over the
+--- existing native reference fixture. Selection receipts are injected at the
+--- selector page owner's action boundary (on_action), which runs the tray's
+--- model switch; no backend or real native window is started.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.ui.owned_window_close_fixture")
 
---- Opens the actual browser through its native-bound model-menu command.
---- @param mode string First model-switch receipt: false, true or throw.
---- @param scenario function Receives browser, native observations and switch calls.
+--- Opens the actual browser as the selector page owner does.
+--- @param mode string First selection receipt: false, true or throw.
+--- @param scenario function Receives browser, native observations and selection calls.
 local function with_selection(mode, scenario)
 	helpers.with_stub_scope({
-		"ui.menu.menu_llm.models_selector", "ui.menu.menu_llm.backend_labels",
+		"ui.menu.menu_llm.backend_labels",
 		"infra.manifest_menu", "menu.renderer", "logger.shim", "infra.paths",
 		"adapters.own_window", "adapters.running_application", "error_description",
 		"native_path", "number_policy",
 	}, function()
 		Fixture("ui.model_browser", function(browser, native)
-			local controls = { attempts = {}, receipt = mode, paused = false }
-			local selector = require("ui.menu.menu_llm.models_selector")
-			local ctx = {
-				state = { llm_backend = "ollama", llm_model = "", llm_user_models = {}, llm_enabled = false },
-				models_mgr = {
-					get_installed_models = function() return {} end,
-					get_presets = function() return {} end,
-					get_model_info = function() return nil end,
-				},
-				is_paused = function() return controls.paused end,
-				paused = false,
-				switch_model = function(name)
-					controls.attempts[#controls.attempts + 1] = name
-					if controls.receipt == "throw" then error("MODEL_SELECTION_REFUSED") end
-					return controls.receipt == "true"
-				end,
-				disable_model = function() error("unexpected model disable") end,
-				save_prefs = function() error("unexpected preference write") end,
-				update_menu = function() error("unexpected menu publication") end,
-				DEFAULT_STATE = { llm_model_mlx = "", llm_model_ollama = "" },
-			}
+			local controls = { attempts = {}, receipt = mode }
 			local result = table.pack(xpcall(function()
-				local row
-				for _, entry in ipairs(selector.build(ctx)) do
-					if entry.label == "menu.llm.browse_models_entry" then row = entry end
-				end
-				helpers.assert_type(row, "table")
-				helpers.assert_type(row.action, "function")
-				row.action()
-				helpers.assert_eq(#native.windows, 0, "menu command defers native presentation")
+				helpers.assert_true(browser.open({
+					build_payload = function() return { backend = "ollama", active = "", models = {} } end,
+					on_action = function(body)
+						controls.attempts[#controls.attempts + 1] = body.name
+						if controls.receipt == "throw" then error("MODEL_SELECTION_REFUSED") end
+						return controls.receipt == "true"
+					end,
+				}))
 				native.drain()
-				helpers.assert_eq(#native.windows, 1, "the real provider must open its shared browser")
+				helpers.assert_eq(#native.windows, 1, "the selector page opens one shared browser")
 				scenario(browser, native, controls)
 			end, debug.traceback))
 			local closed = browser.close()
@@ -75,9 +56,9 @@ local function selection_callback(native)
 	return callback
 end
 
-helpers.describe("model-menu browser selection receipt", function()
+helpers.describe("model selector browser selection receipt", function()
 	for _, receipt in ipairs({ "false", "throw" }) do
-		helpers.it("keeps a " .. receipt .. " model-menu selection open for a successful retry", function()
+		helpers.it("keeps a " .. receipt .. " page selection open for a successful retry", function()
 			with_selection(receipt, function(_, native, controls)
 				local view, callback = native.windows[1], selection_callback(native)
 				callback({ body = { action = "select_model", name = "retry-model", session = 1 } })
@@ -98,7 +79,7 @@ helpers.describe("model-menu browser selection receipt", function()
 		end)
 	end
 
-	helpers.it("closes one native browser after the model-menu selection commits", function()
+	helpers.it("closes one native browser after the page selection commits", function()
 		with_selection("true", function(_, native, controls)
 			local view, callback = native.windows[1], selection_callback(native)
 			callback({ body = { action = "select_model", name = "ready-model", session = 1 } })

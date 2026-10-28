@@ -9,7 +9,8 @@
 ; "cerebras/qwen-3.8-27b", with no name to type:
 ; - the shared corpus (api_entry_names_vectors.json), which macOS and Linux
 ;   replay through _shared/lua/llm/api_entry_names.lua, pins the port;
-; - the rows show the automatic name, never a name an earlier build stored;
+; - the selector page rows show the automatic name, never a name an earlier
+;   build stored;
 ; - two entries of one provider and model read apart;
 ; - the dialog asks the provider, URL, key and model, and no name.
 ; ==============================================================================
@@ -69,13 +70,14 @@ _LAEN_Entry(Id, Name, Model, BaseUrl := "https://api.cerebras.ai/v1") {
 		"Token", "sekret", "Model", Model)
 }
 
-; The labels of the entry rows, the rows before the Add row.
+; The names of the entry rows of the model selector page, in entry order.
 _LAEN_EntryLabels() {
+	Rows := Map(), Models := []
+	_LLM_Menu_ApiEntryPageRows(Rows, Models)
 	Labels := []
-	for Row in _LLM_Menu_ApiEntriesRows() {
-		if (Row.Get("label", "") == t("menu.llm.api_add_entry"))
-			break
-		Labels.Push(Row["label"])
+	for Json in Models {
+		Assert(RegExMatch(Json, 'name:"((?:[^"\\]|\\.)*)"', &Match), "each API row carries its name")
+		Labels.Push(Match[1])
 	}
 	return Labels
 }

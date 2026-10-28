@@ -1,11 +1,13 @@
 --- tests/unit/ui/downloads/test_models_browser_shared_command.lua
 
 --- ==============================================================================
---- MODULE: Shared Models Browser Command Tests
+--- MODULE: The Model Selector Button
 --- DESCRIPTION:
---- Drives the actual tray model provider and native-bound shared command row.
---- Browser availability and the native acknowledgement cannot become a model
---- selection, settings write or AI bootstrap request.
+--- Regression model-selector-page (maintainer, 2026-10-27). The tray builds one
+--- button, "<emoji> <model>", that opens the model selector page; it lists no
+--- model, so a tray build reads no inventory. The page's model removal runs the
+--- tray's own confirmed transaction, which these cases drive through the
+--- binding the build hands the page.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -18,7 +20,7 @@ local function with_browser(callback)
 		"_generated.locale_table", "keymap.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal",
 		"ui.text_prompt", "llm.trigger_policy", "infra.version", "infra.installation",
-		"updater.version_label", "updater.schedule" }
+		"updater.version_label", "updater.schedule", "ui.model_browser.bridge" }
 	local saved = {}
 	for _, name in ipairs(names) do
 		saved[name] = package.loaded[name]
@@ -27,6 +29,7 @@ local function with_browser(callback)
 	end
 	local ok, err = xpcall(function()
 		local controls = { shows = 0, result = true }
+		package.loaded["ui.model_browser.bridge"] = { bind = function(options) controls.bound = options end }
 		local source = debug.getinfo(1, "S").source:gsub("^@", "")
 		local driver = assert(source:match("^(.*)/tests/unit/ui/"))
 		package.loaded["infra.paths"] = { shared = function(relative)
@@ -42,6 +45,8 @@ local function with_browser(callback)
 		package.loaded["infra.i18n"] = {
 			get = function(key)
 				if key == "menu.builder.active_brand" then return header_brand end
+				-- The button's caption is its getter alone ("%s" in every locale).
+				if key == "menu.llm.model_selector_caption" then return "%s" end
 				return key
 			end,
 			section = function(key) return key end,
@@ -54,8 +59,10 @@ local function with_browser(callback)
 		end
 		root.top_level = selected
 		local facade = {}; for key, value in pairs(native) do facade[key] = value end
-		facade.build = function(_, _, _, _, _, providers)
-			return native.render_rows(providers.llm_models(), "llm_models")
+		facade.build = function(_, _, dynamic_handlers)
+			local rows = {}
+			dynamic_handlers.llm_model(rows)
+			return rows
 		end
 		package.loaded["infra.manifest_menu"] = facade
 		package.loaded["ui.menu.menu_builder"] = nil
@@ -64,6 +71,8 @@ local function with_browser(callback)
 			llm = {
 				is_enabled = function() return false end,
 				get_models = function() return {} end,
+				get_backend = function() return "ollama" end,
+				get_current_model = function() return "qwen3:4b" end,
 			},
 			webview = { show = function(kind)
 				controls.kind = kind
@@ -78,28 +87,28 @@ local function with_browser(callback)
 	if not ok then error(err, 0) end
 end
 
---- Finds the actual browser command in native-rendered row data.
+--- The model selector button among native-rendered rows, at any depth: the
+--- one whose title starts with the Ollama emoji of the shared brand table.
 --- @param rows table Native rows.
---- @param label string Expected translated label.
---- @return table|nil row
-local function find_row(rows, label)
+--- @return table|nil row, table|nil siblings The rows that hold it.
+local function selector_row(rows)
+	local emoji = require("modules.llm.backend_brands").emoji("ollama")
 	for _, row in ipairs(rows or {}) do
-		if row.title == label then return row end
-		local nested = find_row(row.menu, label)
-		if nested then return nested end
+		if type(row.title) == "string" and row.title:sub(1, #emoji) == emoji then return row, rows end
+		local nested, siblings = selector_row(row.menu)
+		if nested then return nested, siblings end
 	end
 	return nil
 end
 
-helpers.describe("shared models browser command", function()
-	helpers.it("uses the canonical label with AI off and requires exact browser acknowledgement", function()
+helpers.describe("the model selector button (model-selector-page)", function()
+	helpers.it("names the model after the backend emoji and opens the page with its exact acknowledgement", function()
 		with_browser(function(fixture)
-			local declaration = fixture.renderer.get_array("llm_model_commands")
-			helpers.assert_eq(declaration[1].id, "llm_browse_models")
-			declaration[1].i18n = "common.restore_recommended"
-			local row = find_row(fixture.builder.build(fixture.ctx), "common.restore_recommended")
+			local row, siblings = selector_row(fixture.builder.build(fixture.ctx))
 			helpers.assert_type(row, "table")
-			helpers.assert_type(row.fn, "function")
+			helpers.assert_eq(#siblings, 1, "the AI menu draws one button, no model list")
+			helpers.assert_eq(row.title, require("modules.llm.backend_brands").emoji("ollama") .. " qwen3:4b")
+			helpers.assert_eq(row.menu, nil, "the button opens the page, never a submenu")
 			helpers.assert_true(row.disabled ~= true)
 			helpers.assert_eq(row.fn(), true)
 			helpers.assert_eq(fixture.controls.kind, "model_browser")
@@ -107,105 +116,25 @@ helpers.describe("shared models browser command", function()
 				fixture.controls.result = result
 				helpers.assert_eq(row.fn(), false)
 			end
-			fixture.controls.result = nil
-			helpers.assert_eq(row.fn(), false)
-			helpers.assert_eq(fixture.controls.shows, 5)
+			helpers.assert_eq(fixture.controls.shows, 4)
 		end)
 	end)
 
-	helpers.it("disables a missing browser port and refuses a held callback after capability loss", function()
+	helpers.it("disables the button without a page host and refuses a held callback after its loss", function()
 		with_browser(function(fixture)
-			local row = find_row(fixture.builder.build(fixture.ctx), "menu.llm.browse_models_entry")
+			local row = selector_row(fixture.builder.build(fixture.ctx))
 			helpers.assert_type(row.fn, "function")
 			fixture.ctx.webview = nil
 			helpers.assert_eq(row.fn(), false)
 			helpers.assert_eq(fixture.controls.shows, 0)
-			row = find_row(fixture.builder.build(fixture.ctx), "menu.llm.browse_models_entry")
+			row = selector_row(fixture.builder.build(fixture.ctx))
 			helpers.assert_eq(row.disabled, true)
 		end)
 	end)
 end)
 
-
-local function picker_boundary_owner(renderer)
-	for _, row in ipairs(renderer.get_array("llm_menu")) do
-		if row.id == "llm_models" then return row end
-	end
-	error("actual Linux model provider is absent")
-end
-
-helpers.describe("declared model picker tail boundary", function()
-	helpers.it("retains the native empty-list condition and installed-model/browser order", function()
-		for _, models in ipairs({{}, {"installed-one", "installed-two"}}) do
-			with_browser(function(f)
-				f.ctx.llm.is_enabled = function() return true end
-				f.ctx.llm.get_models = function() return models end
-				helpers.assert_eq(picker_boundary_owner(f.renderer).status_rows.model_picker_tail, {{type="---"}})
-				local browser = find_row(f.builder.build(f.ctx), "menu.llm.browse_models_entry")
-				helpers.assert_type(browser.fn, "function")
-				-- Capture the actual canonical rows before their real native lowering.
-				local original = f.renderer.render_rows
-				local actual
-				f.renderer.render_rows = function(rows, id) if id == "llm_models" then actual=rows end;return original(rows,id) end
-				f.builder.build(f.ctx)
-				helpers.assert_eq(#actual, #models > 0 and #models+2 or 1)
-				for i, name in ipairs(models) do helpers.assert_eq(actual[i].label,name) end
-				if #models > 0 then helpers.assert_eq(actual[#models+1].separator,true) end
-				helpers.assert_eq(actual[#actual].label,"menu.llm.browse_models_entry")
-				helpers.assert_eq(f.controls.shows,0)
-			end)
-		end
-	end)
-
-	helpers.it("consumes the shared inert presentation and keeps exact native browser acknowledgement", function()
-		with_browser(function(f)
-			f.ctx.llm.is_enabled=function()return true end
-			f.ctx.llm.get_models=function()return{"native-model"}end
-			picker_boundary_owner(f.renderer).status_rows.model_picker_tail={{type="label",i18n="common.restore_recommended"}}
-			local rows=f.builder.build(f.ctx)
-			local presentation=find_row(rows,"common.restore_recommended")
-			helpers.assert_type(presentation,"table")
-			helpers.assert_eq(presentation.disabled,true)
-			helpers.assert_eq(presentation.fn,nil)
-			local browser=find_row(rows,"menu.llm.browse_models_entry")
-			helpers.assert_eq(browser.fn(),true)
-			helpers.assert_eq(f.controls.kind,"model_browser")
-			helpers.assert_eq(f.controls.shows,1)
-		end)
-	end)
-
-	for _, mode in ipairs({"missing", "wrong_owner", "clicked", "extra_callback"}) do
-		helpers.it("refuses " .. mode .. " boundary while retaining native model and browser data",function()
-			with_browser(function(f)
-				f.ctx.llm.is_enabled=function()return true end
-				f.ctx.llm.get_models=function()return{"native-model"}end
-				local owner=picker_boundary_owner(f.renderer)
-				local effects=0
-				if mode=="missing"then owner.status_rows.model_picker_tail=nil
-				elseif mode=="wrong_owner"then owner.id="foreign_models"
-				elseif mode=="clicked"then owner.status_rows.model_picker_tail={{type="command",id="foreign",action=function()effects=effects+1 end}}
-				else owner.status_rows.model_picker_tail={{type="---",action=function()effects=effects+1 end}}end
-				local actual
-				local original=f.renderer.render_rows
-				f.renderer.render_rows=function(rows,id)if id=="llm_models"then actual=rows end;return original(rows,id)end
-				local rows=f.builder.build(f.ctx)
-				helpers.assert_eq(#actual,2)
-				helpers.assert_eq(actual[1].label,"native-model")
-				helpers.assert_eq(actual[2].label,"menu.llm.browse_models_entry")
-				-- The model opens its submenu; its Select row carries the click.
-				local model_row=find_row(rows,"native-model")
-				helpers.assert_type(model_row.menu,"table")
-				helpers.assert_type(find_row(model_row.menu,"menu.llm.select_model").fn,"function")
-				helpers.assert_type(find_row(rows,"menu.llm.browse_models_entry").fn,"function")
-				helpers.assert_eq(effects,0)
-				helpers.assert_eq(f.controls.shows,0)
-			end)
-		end)
-	end
-end)
-
 helpers.describe("AI off: the tray asks Ollama for no model (ai-off-inert-linux-2026-10-22)", function()
-	helpers.it("builds the model rows without an inventory read while off, and with one once on", function()
+	helpers.it("builds the button without an inventory read, AI off or on", function()
 		with_browser(function(f)
 			local enabled = false
 			local reads = 0
@@ -214,18 +143,11 @@ helpers.describe("AI off: the tray asks Ollama for no model (ai-off-inert-linux-
 				reads = reads + 1
 				return { "installed-one" }
 			end
-			helpers.assert_type(find_row(f.builder.build(f.ctx), "menu.llm.browse_models_entry"), "table",
-				"the model browser stays reachable with the AI off")
-			helpers.assert_eq(reads, 0, "a tray build with the AI off must not probe the Ollama inventory")
-
+			helpers.assert_type(selector_row(f.builder.build(f.ctx)), "table",
+				"the model selector stays reachable with the AI off")
 			enabled = true
-			local rows = f.builder.build(f.ctx)
-			helpers.assert_eq(reads, 1, "the switch-on lets the tray list the installed models")
-			helpers.assert_type(find_row(rows, "installed-one"), "table")
-
-			enabled = false
-			f.builder.build(f.ctx)
-			helpers.assert_eq(reads, 1, "the switch-off stops the inventory reads again")
+			helpers.assert_type(selector_row(f.builder.build(f.ctx)), "table")
+			helpers.assert_eq(reads, 0, "the tray lists no model, so no build probes the Ollama inventory")
 		end)
 	end)
 end)
@@ -257,7 +179,7 @@ local function scripted_question(answer)
 	return commands, function() os.execute = previous end
 end
 
-helpers.describe("installed model submenu: select and delete as on Windows and macOS", function()
+helpers.describe("the page removes an installed model as on Windows and macOS", function()
 	--- Prepares an AI-on context listing two installed models.
 	--- @param f table with_browser fixture.
 	--- @return table deletes
@@ -269,7 +191,6 @@ helpers.describe("installed model submenu: select and delete as on Windows and m
 		f.ctx.llm.is_enabled = function() return true end
 		f.ctx.llm.get_models = function() return { "qwen:2b", "gemma:1b" } end
 		f.ctx.llm.get_current_model = function() return "gemma:1b" end
-		f.ctx.llm.set_model = function(model) deletes.selected = model; return true end
 		f.ctx.llm.delete_model = function(model, on_done)
 			deletes[#deletes + 1] = { model = model, on_done = on_done }
 			return true
@@ -278,32 +199,14 @@ helpers.describe("installed model submenu: select and delete as on Windows and m
 		return deletes
 	end
 
-	helpers.it("linux-model-delete: each installed model opens Select and Delete, the parent keeps the tick", function()
-		with_browser(function(f)
-			local deletes = installed(f)
-			local rows = f.builder.build(f.ctx)
-			local selected, other = find_row(rows, "gemma:1b"), find_row(rows, "qwen:2b")
-			helpers.assert_eq(selected.checked, true)
-			helpers.assert_eq(other.checked, false)
-			helpers.assert_type(other.menu, "table")
-			local select = find_row(other.menu, "menu.llm.select_model")
-			helpers.assert_eq(select.checked, false)
-			helpers.assert_eq(find_row(selected.menu, "menu.llm.select_model").checked, true)
-			helpers.assert_type(find_row(other.menu, "menu.llm.delete_model_cache").fn, "function")
-			select.fn()
-			helpers.assert_eq(deletes.selected, "qwen:2b")
-			helpers.assert_eq(#deletes, 0, "selecting removes nothing")
-		end)
-	end)
-
 	helpers.it("linux-model-delete: Delete asks first, removes the model, then says so and redraws", function()
 		with_browser(function(f)
 			local deletes = installed(f)
 			local notices, restore_notices = scripted_notices()
 			local commands, restore_question = scripted_question(true)
 			local ok, err = pcall(function()
-				local rows = f.builder.build(f.ctx)
-				helpers.assert_eq(find_row(find_row(rows, "qwen:2b").menu, "menu.llm.delete_model_cache").fn(), true)
+				f.builder.build(f.ctx)
+				helpers.assert_eq(f.controls.bound.delete_model("qwen:2b"), true)
 				helpers.assert_true(commands[#commands]:find("menu.llm.delete_model_title", 1, true) ~= nil,
 					"the removal is confirmed with the dialog the other drivers show")
 				helpers.assert_eq(#deletes, 1)
@@ -326,14 +229,14 @@ helpers.describe("installed model submenu: select and delete as on Windows and m
 			local deletes = installed(f)
 			local commands, restore_question = scripted_question(false)
 			local ok, err = pcall(function()
-				local rows = f.builder.build(f.ctx)
-				local row = find_row(find_row(rows, "qwen:2b").menu, "menu.llm.delete_model_cache")
-				helpers.assert_eq(row.fn(), false)
+				f.builder.build(f.ctx)
+				local delete_model = f.controls.bound.delete_model
+				helpers.assert_eq(delete_model("qwen:2b"), false)
 				helpers.assert_eq(#deletes, 0)
-				-- A row still on screen when the script is paused asks nothing.
+				-- A page still open when the script is paused asks nothing.
 				local asked = #commands
 				f.ctx.paused = true
-				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(delete_model("qwen:2b"), false)
 				helpers.assert_eq(#commands, asked)
 				helpers.assert_eq(#deletes, 0)
 			end)

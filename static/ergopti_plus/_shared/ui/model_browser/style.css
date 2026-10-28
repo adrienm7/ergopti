@@ -4,10 +4,10 @@
  * ==============================================================================
  * MODULE: Model Browser Window Styles
  * DESCRIPTION:
- * Dark-theme styling for the shared model-browser table rendered by both the
- * macOS Hammerspoon driver (hs.webview) and the Windows AHK driver (WebView2).
- * A sortable, filterable table replaces the macOS hs.chooser and the AHK
- * ListView so both platforms share one curated catalogue view.
+ * Dark-theme styling for the shared model selector page rendered by the macOS
+ * (hs.webview), Windows (WebView2) and Linux (WebKitGTK) drivers: one table
+ * grouped by backend, greyed where a backend cannot run, with a visible focus
+ * ring on every row and button for keyboard use.
  * ==============================================================================
  */
 
@@ -124,22 +124,20 @@ thead th.sorted-desc::after {
 	content: ' ▼';
 }
 
+.col-current {
+	text-align: center;
+	width: 64px;
+}
 .col-status {
 	text-align: center;
-	width: 70px;
+	width: 140px;
+}
+.col-actions {
+	width: 230px;
 }
 .col-num {
 	text-align: right;
 	width: 88px;
-}
-.col-family {
-	width: 150px;
-}
-.col-type {
-	width: 110px;
-}
-.col-src {
-	width: 40px;
 }
 
 tbody td {
@@ -262,4 +260,134 @@ tbody tr.active .name-cell::after {
 	background: #3a3a3d;
 	color: var(--text-dim);
 	cursor: default;
+}
+
+/* ===== Selector additions ===== */
+#backend-filter {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	color: var(--text);
+	font-size: 13px;
+	padding: 6px 8px;
+}
+
+#backend-filter-label {
+	color: var(--text-dim);
+	font-size: 12px;
+}
+
+#current {
+	background: var(--bg-alt);
+	border-bottom: 1px solid var(--border);
+	color: var(--text);
+	flex: 0 0 auto;
+	font-weight: 600;
+	padding: 8px 14px;
+}
+
+tbody tr.group th {
+	background: var(--bg-head);
+	color: var(--text);
+	cursor: default;
+	font-size: 12px;
+	padding: 8px 10px;
+	text-align: left;
+}
+
+tbody tr.group.unavailable th,
+tbody tr.unavailable {
+	color: var(--text-dim);
+}
+
+tbody tr.group .reason {
+	color: var(--text-dim);
+	font-weight: 400;
+	margin-left: 8px;
+}
+
+tbody tr.unavailable,
+tbody tr.missing {
+	cursor: default;
+}
+
+tbody tr.unavailable td {
+	opacity: 0.55;
+}
+
+/* The way out of an unavailable row (its key, its runtime) stays legible. */
+tbody tr.unavailable td.col-actions {
+	opacity: 1;
+}
+
+tbody tr:focus,
+button:focus-visible,
+thead th:focus-visible,
+#backend-filter:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+
+.sub {
+	color: var(--text-dim);
+	display: block;
+	font-size: 11px;
+}
+
+.mark.on {
+	color: var(--accent);
+	font-weight: 700;
+}
+
+.chip.default {
+	background: var(--theme-green-dark);
+	color: var(--text);
+}
+
+.status.remote {
+	color: var(--accent);
+}
+
+.act {
+	background: var(--bg-head);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	color: var(--text);
+	cursor: pointer;
+	font-size: 12px;
+	margin-right: 4px;
+	padding: 3px 9px;
+}
+
+.act:hover {
+	border-color: var(--accent);
+}
+
+.act.danger:hover {
+	border-color: var(--theme-danger);
+	color: var(--theme-hue-f87171);
+}
+
+.act.link {
+	padding: 3px 7px;
+}
+
+#footer-actions {
+	display: flex;
+	gap: 8px;
+}
+
+#btn-disable,
+#btn-add-custom {
+	background: var(--bg-head);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	color: var(--text);
+	cursor: pointer;
+	font-size: 13px;
+	padding: 8px 14px;
+}
+
+[hidden] {
+	display: none !important;
 }

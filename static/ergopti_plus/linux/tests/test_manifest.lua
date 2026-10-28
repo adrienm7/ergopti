@@ -648,6 +648,7 @@ return {
 	"tests.unit.modules.llm.ollama.test_model_delete",
 	"tests.unit.modules.llm.ollama.test_model_warmup",
 	"tests.unit.modules.llm.settings.test_display_settings",
+	"tests.unit.modules.llm.brands.test_backend_brands",
 	"tests.unit.modules.llm.settings.test_navigation_settings",
 	"tests.unit.modules.llm.prediction.test_prediction_digit_accept",
 	"tests.unit.modules.llm.prediction.test_llm_tooltip_chords_consumed",

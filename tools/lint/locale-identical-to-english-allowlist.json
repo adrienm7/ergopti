@@ -1123,6 +1123,10 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["cs", "da", "de", "es", "it", "nl", "no", "pl", "pt"]
 		},
+		"menu.llm.model_selector_caption": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
 		"menu.llm.model_specs_ram": {
 			"reason": "unit-or-abbreviation",
 			"locales": ["cs", "da", "de", "es", "hi", "it", "nl", "no", "pl", "pt", "sv", "tr"]
@@ -1213,6 +1217,14 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["de", "nl"]
 		},
+		"model_browser.col_actions": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"model_browser.col_disk": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "no", "sv", "tr"]
+		},
 		"model_browser.col_name": {
 			"reason": "loanword-or-cognate",
 			"locales": ["cs", "da", "nl", "pl", "tr"]
@@ -1221,13 +1233,38 @@
 			"reason": "unit-or-abbreviation",
 			"locales": "*"
 		},
-		"model_browser.col_type": {
+		"model_browser.filter_backend": {
 			"reason": "loanword-or-cognate",
-			"locales": ["da", "fr", "nl", "no"]
+			"locales": ["de", "nl"]
 		},
-		"model_browser.type_chat": {
-			"reason": "brand-or-feature-name",
-			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pt", "sv"]
+		"model_browser.unit_gb": {
+			"reason": "unit-or-abbreviation",
+			"locales": [
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"sv",
+				"tr",
+				"zh"
+			]
+		},
+		"model_browser.unit_params": {
+			"reason": "unit-or-abbreviation",
+			"locales": "*"
+		},
+		"model_browser.unit_params_moe": {
+			"reason": "unit-or-abbreviation",
+			"locales": "*"
 		},
 		"notify.hotstrings": {
 			"reason": "brand-or-feature-name",

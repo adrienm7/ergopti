@@ -1692,7 +1692,8 @@ function closedCapturedNativeOwners(unit, role, parseTree = luaProducerTree) {
 				if (
 					node.name === 'llm' &&
 					argument === 0 &&
-					((role === 'llm' && owner === 'LlmBackendRows.rows') ||
+					((role === 'llm' &&
+						['LlmBackendRows.caption', 'LlmBackendRows.bind_page'].includes(owner)) ||
 						(role === 'agent' && owner === 'disabled_app_rows'))
 				)
 					return true;

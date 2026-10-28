@@ -66,7 +66,7 @@ LLM_Menu_LocalServersInit(RequestBuild := true) {
 LLM_Menu_LocalServersRows() {
 	global _LLM_LocalServerPanel
 	if !IsSet(_LLM_LocalServerPanel) || !(_LLM_LocalServerPanel is LLM_LocalServerPanel)
-		return MenuRenderer_StatusRows("llm_menu", "llm_backend", "unavailable")
+		return MenuRenderer_StatusRows("llm_menu", "llm_model", "unavailable")
 	return _LLM_LocalServerPanel.Rows()
 }
 
@@ -367,7 +367,7 @@ class LLM_LocalServerPanel {
 	}
 
 	_UnavailableRows() {
-		return MenuRenderer_StatusRows("llm_menu", "llm_backend", "unavailable")
+		return MenuRenderer_StatusRows("llm_menu", "llm_model", "unavailable")
 	}
 
 	/** Does not mint a receipt or produce HTTP work while resolving the row title. */

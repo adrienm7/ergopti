@@ -877,9 +877,11 @@ function M.new(ctx)
 		end
 
 		if keymap and type(keymap.set_llm_backend_name) == "function" then
+			-- The shared brand table names local backends; the API's label is its own.
 			local backend_label = ""
-			if state.llm_backend == "mlx"    then backend_label = "MLX 🚀"    end
-			if state.llm_backend == "ollama" then backend_label = "Ollama 🦙" end
+			if state.llm_backend == "mlx" or state.llm_backend == "ollama" then
+				backend_label = require("ui.menu.menu_llm.backend_labels").brand(state.llm_backend)
+			end
 			pcall(keymap.set_llm_backend_name, backend_label)
 		end
 

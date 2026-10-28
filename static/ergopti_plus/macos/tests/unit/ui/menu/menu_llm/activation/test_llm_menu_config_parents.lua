@@ -8,6 +8,9 @@
 --- parents only knew about the pause: they stayed live over a file every click
 --- of theirs was going to be refused on, and a menu kept open across a reload
 --- onto a newer file ran the click anyway (ai-submenus-newer-config-2026-10-23).
+--- The backend and API parents moved to the model selector page on 2026-10-27,
+--- whose owner greys and refuses under the same cause
+--- (tests/unit/ui/menu/menu_llm/models/test_model_selector_page.lua).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -63,16 +66,9 @@ helpers.describe("AI submenu configuration guard (ai-submenus-newer-config-2026-
 				read_only_status = function() return protected and "newer" or nil end,
 			}
 			local handlers
-			-- The fixture declares no dynamic row and stubs both panels with empty
-			-- submenus: declare the two parents and give each submenu a live leaf.
+			-- The fixture declares no dynamic row: declare the profile parent.
 			package.loaded["ui.menu.menu_llm.menu_layout"].row_ids = function()
-				return { "llm_backend", "llm_profile" }
-			end
-			package.loaded["ui.menu.menu_llm.backend_panel"].build = function()
-				return "backend", { { title = "Ollama", fn = function() return true end } }
-			end
-			package.loaded["ui.menu.menu_llm.api_panel"].build = function()
-				return "API", { { title = "Entry", fn = function() return true end } }
+				return { "llm_profile" }
 			end
 			package.loaded["infra.manifest_menu"].build = function(_key, _category, built_handlers)
 				handlers = built_handlers
@@ -89,23 +85,19 @@ helpers.describe("AI submenu configuration guard (ai-submenus-newer-config-2026-
 		end)
 	end
 
-	helpers.it("greys the servers, API and profile parents with the newer-version cause", function()
+	helpers.it("greys the profile parent with the newer-version cause", function()
 		with_rows(true, function(built)
-			local backend = built.rows.llm_backend
-			helpers.assert_eq(#backend, 2, "the servers and the API parents are both placed")
-			for index, label in ipairs({ "backend", "API", "profile" }) do
-				local row = index < 3 and backend[index] or built.rows.llm_profile[1]
-				helpers.assert_true(row.title:find(" — menu.read_only.newer_schema", 1, true) ~= nil,
-					label .. " parent names the newer configuration: " .. tostring(row.title))
-				helpers.assert_eq(row.disabled, true, label .. " parent is greyed")
-				helpers.assert_nil(row.fn, label .. " parent has nothing to run")
-			end
+			local row = built.rows.llm_profile[1]
+			helpers.assert_true(row.title:find(" — menu.read_only.newer_schema", 1, true) ~= nil,
+				"profile parent names the newer configuration: " .. tostring(row.title))
+			helpers.assert_eq(row.disabled, true, "profile parent is greyed")
+			helpers.assert_nil(row.fn, "profile parent has nothing to run")
 		end)
 	end)
 
 	helpers.it("leaves the parents live and unsuffixed on a writable configuration", function()
 		with_rows(false, function(built)
-			for _, row in ipairs({ built.rows.llm_backend[1], built.rows.llm_backend[2], built.rows.llm_profile[1] }) do
+			for _, row in ipairs({ built.rows.llm_profile[1] }) do
 				helpers.assert_nil(row.title:find("menu.read_only", 1, true), tostring(row.title))
 				helpers.assert_true(row.disabled ~= true, tostring(row.title) .. " stays live")
 			end
@@ -121,10 +113,8 @@ helpers.describe("AI submenu configuration guard (ai-submenus-newer-config-2026-
 					walk(item.menu)
 				end
 			end
-			walk(built.rows.llm_backend[1].menu)
-			walk(built.rows.llm_backend[2].menu)
 			walk(built.rows.llm_profile[1].menu)
-			helpers.assert_true(#leaves >= 3, "each of the three submenus must offer a live row")
+			helpers.assert_true(#leaves >= 1, "the profile submenu must offer a live row")
 			built.protect(true)
 			for _, leaf in ipairs(leaves) do
 				helpers.assert_eq(leaf.fn(), false, tostring(leaf.title) .. " rechecks the configuration")
