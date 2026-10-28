@@ -120,11 +120,13 @@ helpers.describe("window toggle (macOS)", function()
 	end)
 
 	helpers.it("every page module exposes its window and close hooks", function()
-		local root = helpers.driver_root()
 		for page, spec in pairs(WindowToggle.PAGES) do
-			local rel = spec.module:gsub("%.", "/")
-			local handle = io.open(root .. rel .. ".lua") or io.open(root .. rel .. "/init.lua")
-			if spec.module == "ui.healthcheck" then handle = io.open(root .. "ui/healthcheck/core.lua") end
+			-- Resolved by module name, as require would, so a move keeps the check;
+			-- the health check defines its window hooks in its core submodule.
+			local name = spec.module == "ui.healthcheck" and "ui.healthcheck.core" or spec.module
+			local path = package.searchpath(name, package.path)
+			helpers.assert_true(path ~= nil, page .. ": page module " .. name .. " resolves")
+			local handle = io.open(path)
 			helpers.assert_true(handle ~= nil, page .. ": page module source is readable")
 			local src = handle:read("*a")
 			handle:close()
