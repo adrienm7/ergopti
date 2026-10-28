@@ -1173,9 +1173,16 @@ momentum phase or a locked pair lifting. A first stricter tuning (4 frames plus
 50 ms, a 150 ms landing, half the lock distance, share 0.5, a guard after any
 scroll phase) missed deliberate swipes on the maintainer's Mac. Every refusal
 logs `Three-finger candidate rejected by <gate>: <value>` once per touch. The
-Linux `mt_decoder.lua` applies the same rules. Action: never give a pair a fast
-path, read a missed swipe from its `rejected by` line before retuning, and move endPos
-with startPos on every centroid compensation.
+Linux `mt_decoder.lua` applies the same rules. Gesture time is the frame's
+capture time (`modules/gestures/frame_clock.lua`, from the touchdevice callback's
+stamp; Linux uses the SYN_REPORT kernel stamp): a stalled main thread delivers
+queued frames in one burst, which timed at delivery read 35 held frames as 2 ms.
+Comparisons with scroll events stay on delivery time. Momentum arms the guard
+only after a scroll phase the blocker let through: macOS emits momentum after a
+swipe's last two fingers lift, and counting it made each swipe refuse the next.
+Action: never give a pair a fast path, read a missed swipe from its
+`rejected by` line before retuning, never time a frame by when Lua reads it, and
+move endPos and dropPos with startPos on every centroid compensation.
 
 ### project-hs-click-drag-is-not-a-gesture
 
