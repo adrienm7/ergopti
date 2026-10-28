@@ -2099,7 +2099,7 @@ _LLMRemote_LoadCatalog() {
         if Verdict["descriptor"] is Map
             LocalDiscovery[Id] := Verdict["descriptor"]
         else
-            try LoggerError("LLM.remote", "local_servers.json: {1}; that server is never probed.", Verdict["reason"])
+            try LoggerError("LLM.remote", "local_servers.json: {1}; that server is never probed.", Verdict["problem"])
     }
     for Id in LocalCatalogue["order"] {
         Desc := LocalCatalogue["servers"][Id]
