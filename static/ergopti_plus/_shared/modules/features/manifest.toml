@@ -2802,9 +2802,11 @@ description_key = "menu.caps_word.pointer.other_buttons"
 #   are recommended "none" (menu.gestures.recommended_reason_linux). The taps
 #   have no desktop default and keep their binding.
 # - macOS: the three-finger tap is the system's « Look up & data detectors »
-#   (on by default), so it is recommended "none"
-#   (menu.gestures.recommended_reason_macos). The three-finger swipes are off in
-#   a default macOS install, and the four-finger swipes already recommend "none".
+#   (on by default), yet tap_3 stays recommended "left_click_toggle", as on
+#   Windows and Linux, by the maintainer's choice (2026-10-28); the menu's info
+#   dialog says to turn Look up off first (menu.gestures.recommended_reason_macos).
+#   The three-finger swipes are off in a default macOS install, and the
+#   four-finger swipes already recommend "none".
 # - Windows: every slot is a system gesture, but the driver writes the touchpad
 #   registry itself (modules/gestures/touchpad_registry.ahk, backed up first),
 #   so Windows runs only Ergopti's action: no double action, the recommendation
@@ -2894,7 +2896,7 @@ description_key = "menu.gestures.swipe_4_up"
 id = "tap_3"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "left_click_toggle", hs = "none", linux = "left_click_toggle" }
+recommended_per_platform = { ahk = "left_click_toggle", hs = "left_click_toggle", linux = "left_click_toggle" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.tap_3"
@@ -6704,12 +6706,17 @@ type = "---"
 # The recommended-defaults rule of 2026-10-24 (see section 3.6): the preset
 # avoids what the system already does, every slot stays reassignable, and the
 # user removes the system's own assignment first to avoid a double action.
-# A `list` whose provider publishes the `gesture_recommended_notes` template
-# below on every driver (labels are inert: the coverage gate credits them only
-# through a published template).
+# Several sentences do not fit a menu row (AutoHotkey also refuses an item name
+# over 260 UTF-16 units), so the menu shows « Infos… » and each driver opens its
+# native info dialog with the text: menu.gestures.recommended_note then the
+# platform's reason on macOS and Linux; on Windows only
+# menu.gestures.recommended_reason_windows, because the driver takes the
+# system's own assignment over itself and the "remove it first" advice does not
+# apply there.
 [[menu.gestures_menu]]
-type = "list"
-id = "gesture_recommended_notes"
+type = "command"
+id = "gesture_recommended_info"
+i18n = "menu.gestures.recommended_info"
 
 # The Windows driver has no status submenu since 2026-10-25: a slot whose
 # Precision Touchpad registry values do not send Ergopti's shortcut is greyed
@@ -8941,37 +8948,6 @@ platforms = ["hs"]
 unavailable = "hide"
 
 # Cached system status presentation; native inventories and settings/probes stay native.
-[[menu.gesture_recommended_notes]]
-type = "label"
-id = "gesture_recommended_note"
-i18n = "menu.gestures.recommended_note"
-platforms = ["hs", "linux"]
-unavailable = "hide"
-
-# Windows: the driver takes the system assignment over itself, so the "remove
-# the system's assignment first" advice above does not apply; the slot is
-# usable only while the touchpad settings send Ergopti's shortcut.
-[[menu.gesture_recommended_notes]]
-type = "label"
-id = "gesture_recommended_reason_windows"
-i18n = "menu.gestures.recommended_reason_windows"
-platforms = ["ahk"]
-unavailable = "hide"
-
-[[menu.gesture_recommended_notes]]
-type = "label"
-id = "gesture_recommended_reason_linux"
-i18n = "menu.gestures.recommended_reason_linux"
-platforms = ["linux"]
-unavailable = "hide"
-
-[[menu.gesture_recommended_notes]]
-type = "label"
-id = "gesture_recommended_reason_macos"
-i18n = "menu.gestures.recommended_reason_macos"
-platforms = ["hs"]
-unavailable = "hide"
-
 # macOS has cached native conflict/pinch data; its existing parent has only clear/count states.
 [[menu.gesture_system_status_macos_frame]]
 type = "include"

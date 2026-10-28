@@ -44,17 +44,28 @@ BuildGesturesMenu(Options := unset) {
 		"scope_clear",      (*) => _GES_ApplyScope("clear", ScopeOptions),
 		"auto_configure",   (*) => GestureAutoConfigureAction(),
 		"manual_tutorial",  (*) => GestureShowManualTutorialDialog(),
+		"gesture_recommended_info", (*) => GestureShowRecommendedInfo(),
 	)
 	Getters := Map("gestures_enabled", _GES_IsEnabled)
-	; The recommended-defaults note: a gesture is offered only while the system
-	; sends Ergopti's shortcut for it. There is no status provider: the slot rows
-	; below carry the availability themselves.
-	ListProviders := Map("gesture_slots_ahk", (*) => _GES_SlotRows(),
-		"gesture_recommended_notes", (*) => MenuRenderer_TemplateRows("gesture_recommended_notes", Map(), Map(), Map()))
+	; There is no status provider: the slot rows below carry the availability
+	; themselves, and « Infos… » explains it in a dialog.
+	ListProviders := Map("gesture_slots_ahk", (*) => _GES_SlotRows())
 	Built := MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", ListProviders, Commands, Getters)
 	if Built is Menu
 		GestureSystemWatchMenu(Built)
 	return Built
+}
+
+/**
+ * Shows why a gesture is offered or greyed out, behind the menu's « Infos… » row.
+ * The text is several sentences long, and AutoHotkey refuses a menu item name
+ * over 260 UTF-16 units. On Windows the driver takes the system's own
+ * assignment over itself, so the shared "remove the system assignment first"
+ * note does not apply and only the Windows reason is shown.
+ * @returns {String} The native button the user pressed.
+ */
+GestureShowRecommendedInfo() {
+	return Ui_MsgBox(t("menu.gestures.recommended_reason_windows"), t("menu.gestures.notify_title"), "Iconi")
 }
 
 ; True when the gestures feature is switched on in the loaded configuration.
