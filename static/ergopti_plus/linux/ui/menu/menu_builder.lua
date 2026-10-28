@@ -4795,8 +4795,13 @@ local function _build_gestures(ctx)
 	-- count, so grouping would mean parsing the names apart only to regroup them.
 	local providers = {}
 	providers["system_gesture_status"] = function() return require("ui.gesture_conflicts").rows(ge) end
-	-- The recommended-defaults note and why Linux recommends no swipe.
-	providers["gesture_recommended_notes"] = function() return ManifestMenu.template_rows("gesture_recommended_notes", {}) end
+	-- The recommended-defaults rule and why Linux recommends no swipe, behind
+	-- the menu's « Infos… » row: several sentences do not fit a menu row.
+	gesture_commands[require("config_keys").COMMAND.GESTURE_RECOMMENDED_INFO] = function()
+		show_info(i18n_safe("menu.gestures.notify_title"), zenity_plain(i18n_safe("menu.gestures.recommended_note")
+			.. "\n\n" .. i18n_safe("menu.gestures.recommended_reason_linux")))
+		return true
+	end
 	gesture_commands[require("config_keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = function() return require("ui.gesture_conflicts").open_settings() end
 	providers["gesture_slots_linux"] = function()
 		local out = {}

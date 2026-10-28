@@ -377,6 +377,7 @@ class MenuCommand {
 	static GESTURES_TOGGLE := "gestures_toggle"
 	static GESTURE_MODE_INCREMENTAL := "gesture_mode_incremental"
 	static GESTURE_MODE_SINGLE := "gesture_mode_single"
+	static GESTURE_RECOMMENDED_INFO := "gesture_recommended_info"
 	static GESTURE_SLOT_CHANGE_ACTION := "gesture_slot_change_action"
 	static GESTURE_SYSTEM_OPEN_DISABLED_PINCH := "gesture_system_open_disabled_pinch"
 	static GESTURE_SYSTEM_OPEN_ENABLED_PINCH := "gesture_system_open_enabled_pinch"

@@ -1452,6 +1452,7 @@
 	"menu.gestures.default_sensitivity": "（通用默认值）",
 	"menu.gestures.enabled": "️ 手势",
 	"menu.gestures.recommended_note": "推荐的手势会避开系统已有的操作。任何手势都可以重新分配:请先移除系统自身的分配,否则两个操作都会执行。",
+	"menu.gestures.recommended_info": "信息…",
 	"menu.gestures.recommended_reason_linux": "在 Linux 上不推荐三指和四指滑动:触控板只是被读取而没有被独占,所以桌面(GNOME、KDE、Hyprland、COSMIC)也会响应这些手势。",
 	"menu.gestures.recommended_reason_macos": "在 macOS 上,系统也将三指轻点用于“查询”:使用前请在触控板设置中关闭“查询”,否则两个操作都会执行。",
 	"menu.gestures.recommended_reason_windows": "在 Windows 中,只有触摸板设置把手势发送给 Ergopti 时,该手势才可用。Ergopti 会自行完成此设置(自动配置);未分配的手势会显示为灰色。Ergopti 会取代系统自带的操作,因此不会出现双重操作。",

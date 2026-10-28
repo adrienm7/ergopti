@@ -1447,6 +1447,7 @@
 	"menu.gestures.default_sensitivity": "(Défaut général)",
 	"menu.gestures.enabled": "️ Gestes",
 	"menu.gestures.recommended_note": "Les gestes conseillés évitent ce que votre système fait déjà. Tout geste peut être réassigné : retirez d'abord l'assignation du système, sinon les deux actions s'exécutent.",
+	"menu.gestures.recommended_info": "Infos…",
 	"menu.gestures.recommended_reason_linux": "Sous Linux, les balayages à trois et quatre doigts ne sont pas conseillés : le pavé tactile est lu, pas capturé, donc votre bureau (GNOME, KDE, Hyprland, COSMIC) agit aussi dessus.",
 	"menu.gestures.recommended_reason_macos": "Sous macOS, le toucher à trois doigts sert aussi au système pour la recherche d'un mot : désactivez-la dans les réglages du trackpad avant de l'utiliser, sinon les deux actions s'exécutent.",
 	"menu.gestures.recommended_reason_windows": "Sous Windows, un geste n'est utilisable que si les réglages du pavé tactile l'envoient à Ergopti. Ergopti s'en charge lui-même (« Configurer automatiquement ») ; un geste non assigné est grisé. Ergopti remplace l'action du système : pas de double action.",

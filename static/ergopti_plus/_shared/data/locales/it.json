@@ -1452,6 +1452,7 @@
 	"menu.gestures.default_sensitivity": "(Predefinito generale)",
 	"menu.gestures.enabled": "️ Gesti",
 	"menu.gestures.recommended_note": "I gesti consigliati evitano ciò che il sistema fa già. Ogni gesto può essere riassegnato: rimuovi prima l'assegnazione del sistema, altrimenti vengono eseguite entrambe le azioni.",
+	"menu.gestures.recommended_info": "Info…",
 	"menu.gestures.recommended_reason_linux": "Su Linux gli scorrimenti con tre e quattro dita non sono consigliati: il touchpad viene letto, non catturato, quindi anche il desktop (GNOME, KDE, Hyprland, COSMIC) reagisce.",
 	"menu.gestures.recommended_reason_macos": "Su macOS il sistema usa il tocco con tre dita anche per Cerca: disattiva Cerca nelle impostazioni del trackpad prima di usarlo, altrimenti vengono eseguite entrambe le azioni.",
 	"menu.gestures.recommended_reason_windows": "In Windows un gesto è utilizzabile solo se le impostazioni del touchpad lo inviano a Ergopti. Ergopti lo configura da sé (Configura automaticamente); un gesto non assegnato appare disattivato. Ergopti sostituisce l'azione del sistema: niente doppia azione.",

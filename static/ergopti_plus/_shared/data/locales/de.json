@@ -1452,6 +1452,7 @@
 	"menu.gestures.default_sensitivity": "(Allgemeiner Standard)",
 	"menu.gestures.enabled": "️ Gesten",
 	"menu.gestures.recommended_note": "Empfohlene Gesten vermeiden, was Ihr System bereits tut. Jede Geste kann neu zugewiesen werden: Entfernen Sie zuerst die Zuweisung des Systems, sonst laufen beide Aktionen.",
+	"menu.gestures.recommended_info": "Infos…",
 	"menu.gestures.recommended_reason_linux": "Unter Linux werden Wischgesten mit drei und vier Fingern nicht empfohlen: Das Touchpad wird gelesen, nicht blockiert, daher reagiert auch Ihr Desktop (GNOME, KDE, Hyprland, COSMIC) darauf.",
 	"menu.gestures.recommended_reason_macos": "Unter macOS nutzt das System das Tippen mit drei Fingern auch für „Nachschlagen“: Schalte „Nachschlagen“ in den Trackpad-Einstellungen aus, bevor du es verwendest, sonst werden beide Aktionen ausgeführt.",
 	"menu.gestures.recommended_reason_windows": "Unter Windows ist eine Geste nur nutzbar, wenn die Touchpad-Einstellungen sie an Ergopti senden. Ergopti richtet das selbst ein (Automatisch konfigurieren); eine unbelegte Geste ist ausgegraut. Ergopti ersetzt die Systemaktion: keine doppelte Aktion.",
