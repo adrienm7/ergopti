@@ -43,6 +43,11 @@
 ; _LLMRemoteParseResponse.
 global LLM_API_PROVIDERS := Map()
 global LLM_LOCAL_API_SERVERS := Map()
+; Server id -> validated discovery descriptor of local_servers.json; a server
+; without one is never probed (local_server_ports.ahk)
+global LLM_LOCAL_SERVER_DISCOVERY := Map()
+; Server id -> where the last port scan found it (LocalServersOwner publishes it)
+global LLM_LOCAL_SERVER_SCANS := Map()
 global LLM_API_PROVIDER_ORDER := []
 
 ; The formats a catalogue provider may declare, each with what it serves:
@@ -1320,6 +1325,16 @@ _LLMRemote_TrimAsyncRegistry() {
         return
 }
 
+; The address of an entry stored without one: where the last port scan found
+; a local server, else the provider's catalogue address.
+_LLMRemote_DefaultBaseUrl(ProviderId, Provider) {
+    global LLM_LOCAL_SERVER_SCANS
+    Scan := LLM_LOCAL_SERVER_SCANS.Get(ProviderId, 0)
+    if (Scan is Map) && Scan["running"]
+        return Scan["base_url"]
+    return Provider["BaseUrl"]
+}
+
 ; Resolves an entry record to a normalised Map(Provider, Format, BaseUrl,
 ; Token, Model). Returns "" when the entry is unusable (missing token /
 ; model / unknown provider) so the caller can fail cleanly on a single
@@ -1333,7 +1348,7 @@ _LLMRemoteResolveEntry(Entry) {
     ProvFmt  := Provider["Format"]
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
     if (BaseUrl == "")
-        BaseUrl := Provider["BaseUrl"]
+        BaseUrl := _LLMRemote_DefaultBaseUrl(ProviderId, Provider)
     if !(BaseUrl is String) || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
         return ""
     Token := _LLMRemoteEntryGet(Entry, "Token", "")
@@ -1415,7 +1430,7 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
     Provider := LLM_API_PROVIDERS[ProviderId]
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
     if (BaseUrl == "")
-        BaseUrl := Provider["BaseUrl"]
+        BaseUrl := _LLMRemote_DefaultBaseUrl(ProviderId, Provider)
     Token    := _LLMRemoteEntryGet(Entry, "Token", "")
     if !_LLMRemote_ConfigScalarIsSafe(BaseUrl) || BaseUrl == ""
             || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
@@ -2019,7 +2034,7 @@ _LLMRemote_CatalogDecisionsTestIsValid(Section) {
 
 _LLMRemote_LoadCatalog() {
     global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
-    global LLM_LOCAL_API_SERVERS
+    global LLM_LOCAL_API_SERVERS, LLM_LOCAL_SERVER_DISCOVERY
     global LLM_REMOTE_DECISIONS_TEST
     path := _SharedDir . "\modules\llm\api_providers.json"
     if !FileExist(path)
@@ -2072,9 +2087,20 @@ _LLMRemote_LoadCatalog() {
     }
 
     LocalCatalogue := Map("order", [], "servers", Map())
-    try LocalCatalogue := LocalServerAuthCatalogue(JsonParse(FSReadUtf8Exact(_SharedDir . "\modules\llm\local_servers.json")), candidateProviders)
-    catch as Err
+    LocalRoot := 0
+    try {
+        LocalRoot := JsonParse(FSReadUtf8Exact(_SharedDir . "\modules\llm\local_servers.json"))
+        LocalCatalogue := LocalServerAuthCatalogue(LocalRoot, candidateProviders)
+    } catch as Err
         try LoggerError("LLM.remote", "The local API catalogue is unavailable; optional authentication is refused.")
+    LocalDiscovery := Map()
+    for Id in LocalCatalogue["order"] {
+        Verdict := LocalServerPortsDescriptor(Id, LocalRoot["servers"][Id].Get("discovery", 0))
+        if Verdict["descriptor"] is Map
+            LocalDiscovery[Id] := Verdict["descriptor"]
+        else
+            try LoggerError("LLM.remote", "local_servers.json: {1}; that server is never probed.", Verdict["reason"])
+    }
     for Id in LocalCatalogue["order"] {
         Desc := LocalCatalogue["servers"][Id]
         candidateProviders[Id] := Map("Label", Desc["label"], "BaseUrl", Desc["base_url"],
@@ -2082,6 +2108,7 @@ _LLMRemote_LoadCatalog() {
         candidateOrder.Push(Id)
     }
     LLM_LOCAL_API_SERVERS := LocalCatalogue["servers"]
+    LLM_LOCAL_SERVER_DISCOVERY := LocalDiscovery
 
     candidatePrices := Map()
     for model, row in prices {

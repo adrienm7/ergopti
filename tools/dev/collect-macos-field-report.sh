@@ -214,9 +214,14 @@ step karabiner sh -c '"/Library/Application Support/org.pqrs/Karabiner-Elements/
 # reasons so a failed signature check names its cause.
 step karabiner_signature sh -c 'codesign --verify --deep --strict --verbose=4 /Applications/Karabiner-Elements.app; echo "codesign exit=$?"; spctl -a -vv /Applications/Karabiner-Elements.app; echo "spctl exit=$?"'
 step memory sh -c 'memory_pressure | tail -1; vm_stat | head -5'
-step processes sh -c 'pgrep -lf "ErgoptiPlus|Hammerspoon|karabiner|ollama|omlx" || true'
+# The process names of _shared/modules/llm/local_servers.json (discovery) too,
+# so a report shows which local API server runs
+step processes sh -c 'pgrep -ilf "ErgoptiPlus|Hammerspoon|karabiner|ollama|omlx|llama-server|local-ai|LM Studio|llmster|Jan" || true'
 step launchd sh -c 'launchctl list | grep -iE "ergopti|pqrs" || true'
-step listeners sh -c 'lsof -nP -iTCP -sTCP:LISTEN | grep -iE "ollama|omlx|hammerspoon" || true'
+# Unfiltered: a server renamed by setproctitle (oMLX's Python shows as
+# "Python" to lsof) or listening on a port set by the user must still appear.
+# It holds only process names, pids and loopback ports.
+step listeners sh -c 'lsof -nP -iTCP -sTCP:LISTEN || true'
 step input_sources sh -c 'defaults read com.apple.HIToolbox AppleEnabledInputSources; defaults read com.apple.HIToolbox AppleSelectedInputSources'
 step user_layouts sh -c 'ls -la "${HOME}/Library/Keyboard Layouts" 2>&1'
 
