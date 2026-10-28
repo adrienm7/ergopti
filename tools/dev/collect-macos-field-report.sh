@@ -46,9 +46,10 @@ set -e
 . "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
 # shellcheck source=macos-field-shell-checks.sh
 . "$REPO_ROOT/tools/dev/macos-field-shell-checks.sh"
+# shellcheck source=field-report-git.sh
+. "$REPO_ROOT/tools/dev/field-report-git.sh"
 set +e
 LOG_DIR="${HOME}/Library/Logs/ergopti_plus"
-FIELD_BRANCH_PREFIX="field/"
 FIELD_RUN_SPEC="static/ergopti_plus/macos/data/field_run.json"
 # How long the collector keeps waiting for done after the request's own
 # deadline (the declared default, which covers every step at its bound): the
@@ -77,62 +78,17 @@ esac
 cd "${REPO_ROOT}" || fail "Cannot enter the repository root."
 git rev-parse --git-dir >/dev/null 2>&1 || fail "Not inside the Ergopti clone."
 
-[ -z "$(git status --porcelain --untracked-files=no)" ] || fail "Commit or discard the tracked changes first: the collector commits only its own folder."
-branch="$(git branch --show-current)"
-# The base is the branch the field branch derives from and is updated from on
-# every run; git config remembers it so later runs on the field branch keep it.
-case "${branch}" in
-	"${FIELD_BRANCH_PREFIX}"*)
-		base="$(git config --get "branch.${branch}.ergoptiFieldBase" || printf 'dev')"
-		;;
-	# From dev, main or any other branch (or a detached commit) the report goes
-	# to a new field branch derived from it, so a maintainer only has to run
-	# this script. Today's branch for the same base is reused when it exists.
-	*)
-		base="${branch:-$(git rev-parse --short HEAD)}"
-		branch="${FIELD_BRANCH_PREFIX}mac-$(date +%Y-%m-%d)-${base//\//-}"
-		if git rev-parse -q --verify "refs/heads/${branch}" >/dev/null; then
-			git switch -q "${branch}" || fail "Cannot switch to ${branch}."
-		else
-			git switch -q -c "${branch}" || fail "Cannot create ${branch}."
-		fi
-		git config "branch.${branch}.ergoptiFieldBase" "${base}" || fail "Cannot record the base of ${branch}."
-		log "Collecting on ${branch}, derived from ${base}."
-		;;
-esac
+# From dev, main or any other branch (or a detached commit) the report goes to
+# a field branch derived from it (tools/dev/field-report-git.sh), so a
+# maintainer only has to run this script.
+field_report_enter_branch mac
 
 # ===========================================
 # ======= 1/ Update from the base ===========
 # ===========================================
 
-# A shallow clone (--depth 1) holds no common ancestor of the base and the
-# field branch, so a plain merge refuses "unrelated histories". Deepen both
-# until the merge base is known; full history is never downloaded. A base that
-# is not a branch on origin (a local branch or a commit) is not updated.
-if git ls-remote --exit-code --heads origin "${base}" >/dev/null 2>&1; then
-	log "Fetching ${base} and bringing it into ${branch}..."
-	depth=50
-	while :; do
-		git fetch -q --depth "${depth}" origin "${base}" || fail "git fetch of ${base} failed."
-		base_head="$(git rev-parse FETCH_HEAD)" || fail "Cannot read the fetched ${base} head."
-		git merge-base HEAD "${base_head}" >/dev/null 2>&1 && break
-		[ "${depth}" -lt 3200 ] || fail "No common history with ${base} within ${depth} commits; re-clone with --depth 1."
-		depth=$((depth * 4))
-	done
-	git merge --ff-only "${base_head}" >/dev/null 2>&1 \
-		|| git merge --no-edit "${base_head}" \
-		|| fail "Could not bring ${base} into ${branch}; resolve the merge and run again."
-else
-	log "${base} is not a branch on origin: ${branch} is not updated."
-fi
-
-stamp="$(date +%Y-%m-%d_%H%M%S)"
-out="docs/field-reports/mac-${stamp}"
-mkdir -p "${out}" || fail "Cannot create ${out}."
-steps="${out}/steps.txt"
-: > "${steps}"
-# The coordinator reads which code the report ran on before anything else.
-printf 'field_branch: %s\nbase: %s\ncommit: %s\n' "${branch}" "${base}" "$(git rev-parse --short HEAD)" > "${out}/base.txt"
+field_report_update_from_base
+field_report_open_folder mac
 # Set by the INT/TERM trap; the remaining evidence is still collected.
 interrupted=false
 finalized=false
@@ -205,18 +161,9 @@ finalize() {
 		printf '%-28s missing\n' "logs" >> "${steps}"
 	fi
 
-	log "Collected into ${out}:"
-	ls -1 "${out}" | sed 's/^/  /'
-	git add -f -- "${out}" || fail "git add of ${out} failed."
 	subject="docs(field): macOS field report ${stamp} on ${base}"
 	"${interrupted}" && subject="${subject} (interrupted)"
-	git commit -q -m "${subject}" -- "${out}" || fail "git commit failed."
-	if [ "${push}" = true ]; then
-		git push -u origin HEAD || fail "git push failed; run 'git push -u origin HEAD' by hand."
-		log "Pushed ${branch}. Tell the coordinator: report ${out}."
-	else
-		log "Committed on ${branch} without pushing."
-	fi
+	field_report_commit "${subject}"
 }
 
 # Ctrl-C or TERM: the field run's partial results and today's logs are still

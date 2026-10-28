@@ -39,6 +39,7 @@ const CHECKS_PATH = 'static/ergopti_plus/macos/infra/field_check_checks.lua';
 const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.sh';
 const SHELL_CHECKS = 'tools/dev/macos-field-shell-checks.sh';
 const PRIVACY_PANES = 'static/ergopti_plus/macos/data/privacy_panes.json';
+const FIELD_GIT = 'tools/dev/field-report-git.sh';
 
 if (process.platform === 'win32') {
 	console.log('[SKIP] The macOS field report collector is a macOS shell tool; not run on Windows.');
@@ -96,7 +97,7 @@ function fixture(name, { onDev = false } = {}) {
 	const origin = path.join(base, 'origin.git');
 	const bin = path.join(base, 'bin');
 	const home = path.join(base, 'home');
-	for (const relative of [SCRIPT, SPEC_PATH, IDENTIFIERS, SHELL_CHECKS, PRIVACY_PANES]) {
+	for (const relative of [SCRIPT, SPEC_PATH, IDENTIFIERS, SHELL_CHECKS, PRIVACY_PANES, FIELD_GIT]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
 	}
