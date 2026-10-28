@@ -913,11 +913,15 @@ local function rollback_input_source_subscription(reason)
 	return not _input_source_callback_owned
 end
 
+--- Detail of a retirement whose SIGTERM was accepted while the exit is still
+--- to be delivered: the read is ending, not refusing to end.
+local LAYOUT_READ_EXIT_PENDING = "native exit pending"
+
 --- Requests retirement without confusing a signal acknowledgement with exit.
 --- SIGTERM acceptance leaves the native task and its GC pin owned until exit.
 --- @param handle table Exact ShellRunner read handle.
 --- @return boolean settled
---- @return any detail
+--- @return any detail LAYOUT_READ_EXIT_PENDING, or why the termination was refused.
 local function retire_layout_read(handle)
 	local function released()
 		if _layout_poll_handle ~= handle then return end
@@ -938,7 +942,7 @@ local function retire_layout_read(handle)
 		_layout_poll_pending = true
 		_layout_poll_termination_pending = true
 	end
-	return false, stopped and stop_result == true and "native exit pending" or stop_result
+	return false, stopped and stop_result == true and LAYOUT_READ_EXIT_PENDING or stop_result
 end
 
 --- Retries the exact layout-read termination retained by a prior refusal.
@@ -1090,6 +1094,13 @@ function M.start_input_source_watcher(on_change)
 						local settled, stop_result = retire_layout_read(stale)
 						if settled then
 							Logger.warn(LOG, "Layout poll read timed out — terminated the read and released the guard so the next tick can retry.")
+						elseif stop_result == LAYOUT_READ_EXIT_PENDING then
+							-- A main-thread stall longer than the watchdog lets the read
+							-- finish while its exit is still queued behind this timer (#99,
+							-- after a 13 s hold): the termination is under way, not refused.
+							-- The exit releases the guard; the next tick still reports an
+							-- exit that never came.
+							Logger.warn(LOG, "Layout poll read timed out — termination requested; its exit releases the guard before the next read.")
 						else
 							Logger.error(LOG,
 								"Timed-out layout read termination failed; retaining the exact handle: %s.",
