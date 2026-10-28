@@ -213,9 +213,11 @@ final class ManagedPTYWorkerTests: XCTestCase {
 	// identity and digest are proved through the retained descriptor.
 	func testLinkedSnapshotIsPrivateVerifiedAndIndependentOfTheSource() throws {
 		let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
+		// An empty home, as the cold native CI homes are: no Library folder yet
+		// (preflight 40615470853 refused every installer with 64 there).
 		let home = root.appendingPathComponent("home")
-		try FileManager.default.createDirectory(at: home.appendingPathComponent("Library/Application Support"),
-			withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+		try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true,
+			attributes: [.posixPermissions: 0o700])
 		defer { try? FileManager.default.removeItem(at: root) }
 		let source = root.appendingPathComponent("source.sh")
 		try Data("abc".utf8).write(to: source)
@@ -241,6 +243,11 @@ final class ManagedPTYWorkerTests: XCTestCase {
 		XCTAssertEqual(held.st_mode & 0o7777, 0o400)
 		XCTAssertEqual(folder.st_mode & 0o7777, 0o700)
 		XCTAssertEqual(rootInfo.st_mode & 0o7777, 0o700)
+		for created in ["Library", "Library/Application Support"] {
+			var ancestor = stat()
+			XCTAssertEqual(lstat(home.appendingPathComponent(created).path, &ancestor), 0)
+			XCTAssertEqual(ancestor.st_mode & 0o7777, 0o700, "a created \(created) is owner-only")
+		}
 		XCTAssertEqual(fcntl(snapshot.descriptor, F_GETFD) & FD_CLOEXEC, FD_CLOEXEC)
 		XCTAssertEqual(fcntl(snapshot.descriptor, F_GETFL) & O_ACCMODE, O_RDONLY)
 		XCTAssertTrue(snapshot.verified(sha256: digest))
