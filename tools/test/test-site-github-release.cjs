@@ -18,7 +18,7 @@ const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '../..');
 const source = fs.readFileSync(path.join(ROOT, 'src/lib/js/getGitHubRelease.js'), 'utf8');
-const importLine = "import { branchForInstall } from '$lib/js/isDev.js';";
+const importLine = "import { branchForInstall } from '#lib/js/isDev.js';";
 assert.equal(source.split(importLine).length - 1, 1, 'the canonical branch port must be explicit');
 assert.equal((source.match(/^import /gm) || []).length, 1, 'unknown dependencies must refuse');
 assert.equal(

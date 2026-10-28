@@ -1,7 +1,7 @@
 <script>
-	import Ergopti from '$lib/components/Ergopti.svelte';
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
-	import SFB from '$lib/components/SFB.svelte';
+	import Ergopti from '#lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
+	import SFB from '#lib/components/SFB.svelte';
 </script>
 
 <section>
@@ -12,12 +12,12 @@
 		gestion de chacune des fonctionnalités implémentées :
 	</p>
 	<enhanced:img
-		src="$lib/images/ergopti_plus_windows.jpg"
+		src="../../lib/images/ergopti_plus_windows.jpg"
 		alt="Screenshot du menu du script Ergopti+"
 	/>
 	<tiny-space></tiny-space>
 	<enhanced:img
-		src="$lib/images/ergopti_plus_macos.jpg"
+		src="../../lib/images/ergopti_plus_macos.jpg"
 		alt="Screenshot du menu du script Ergopti+ sur macOS"
 	/>
 

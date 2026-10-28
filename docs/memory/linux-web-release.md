@@ -391,6 +391,19 @@ Duktape.
 The website's gettext source keys are French user-facing strings. Do not replace
 them with English developer identifiers without a deliberate catalog migration.
 
+### project-site-kit3-paths-and-images
+
+SvelteKit 3 refuses `$lib` and drops `base` from `$app/paths`. Library imports
+go through the `#lib/*` subpath import in package.json; static files go
+through `asset('file')` and pages through `resolve('/route')`, both without
+a base prefix. Helpers that are executed by tests in a `vm` realm take the
+`asset` resolver as a parameter, so a test injects one per base path.
+`enhanced:img` sources stay relative to the page and the benchmark image glob
+stays rooted at `/src/lib/`. The vite-imagetools cache under
+`node_modules/.cache/imagetools` changes the emitted image set between a warm
+and a cold build. Action: delete that cache before comparing two builds'
+outputs.
+
 ### project-svelte-script-comment-closing-tag
 
 The HTML parser can terminate a Svelte `<script>` block on a closing-tag token

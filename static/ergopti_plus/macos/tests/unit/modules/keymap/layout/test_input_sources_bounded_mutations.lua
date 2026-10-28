@@ -785,7 +785,7 @@ helpers.describe("input-source confirm: a fresh process reads the state (compose
 		local deadline = original_sec("ui", "input_source_operation_timeout_ms")
 		local timing_port = setmetatable({}, { __index = previous_timings })
 		timing_port.sec = function(section, key)
-			if section == "ui" and key == "input_source_refresh_settle_ms" then
+			if section == "ui" and key == "input_source_reselect_settle_ms" then
 				reads = reads + 1
 				return injected
 			end
@@ -796,7 +796,6 @@ helpers.describe("input-source confirm: a fresh process reads the state (compose
 			package.preload["infra.timings"] = function() return timing_port end
 			local f = load_fixture()
 			package.preload["infra.timings"] = previous_loader
-			timing_port.sec = original_sec
 			local answers = 0
 			for _, refresh in ipairs({ true, false }) do
 				helpers.assert_eq(f.IS.confirm_source_async("Composer Check", { refresh = refresh }, function(confirmed)
@@ -808,8 +807,9 @@ helpers.describe("input-source confirm: a fresh process reads the state (compose
 					"the real child argv must carry the injected timing, not a Python default")
 				helpers.assert_eq(#task.args, 6)
 				task:complete(0, '{"listed":true,"enabled":true}', "")
+				injected = 0.291
 			end
-			helpers.assert_eq(reads, 1, "read the shared duration once when its Lua owner loads")
+			helpers.assert_eq(reads, 2, "read the current shared duration once for each child")
 			helpers.assert_eq(answers, 2)
 			helpers.assert_eq(f.timers[1].delay, deadline, "the overall operation deadline is independent")
 		end, debug.traceback)
@@ -834,6 +834,8 @@ helpers.describe("input-source confirm: a fresh process reads the state (compose
 		helpers.assert_eq(args[3], "Composer Check")
 		helpers.assert_eq(args[4], "/u/composed.keylayout")
 		helpers.assert_eq(args[5], "refresh")
+		helpers.assert_eq(args[6], tostring(require("infra.timings").sec("ui", "input_source_reselect_settle_ms")),
+			"the refresh pause comes from the timing registry")
 		f.tasks[1]:complete(0, '{"listed": true, "enabled": true, "selected": false, "register": 0, "refreshed": null}\n', "")
 		helpers.assert_eq(#answers, 1)
 		helpers.assert_eq(answers[1].ok, true)

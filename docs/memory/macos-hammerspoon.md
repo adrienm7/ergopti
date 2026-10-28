@@ -213,14 +213,22 @@ generates it from the native producer and seals it in the bundle, and each
 release attaches it as an asset. The developer app runs the clone's Python and
 shared data, so without it the owned Ollama install refused at
 `runtime_install` with `OLLAMA_MANAGED_CATALOGUE_MISSING`.
-`tools/dev/run-macos-dev-app.sh` therefore runs
-`tools/dev/stage-macos-dev-ollama-catalogue.py`, which copies (Git-ignored) the
-catalogue of the newest immutable release whose `runtime_contract_sha256`
-binds the clone's contract, after checking GitHub's asset digest, the runtime
-policy for both hosts, the publication tag and each pinned native asset. A
-contract edited since the last release has no binding catalogue: the stager
-removes the stale one and warns, and the owned install stays refused until a
-release publishes it. Windows and Linux pin the official Ollama in the
+`tools/dev/run-macos-dev-app.sh` (and the field-report collector when it
+reuses a running developer app) therefore runs
+`tools/dev/stage-macos-dev-ollama-catalogue.py`, which runs the release
+producer and catalogue generator on the Mac from the clone's own pins: the
+official archive admitted by its `ollama_release.json` SHA-256 and size, the
+upstream source at the contract's `source_commit`, and the contract's
+`go_version` (a downloaded toolchain only through the Go checksum database).
+The catalogue is `unpublished-ci` with no URL; the installer then admits the
+archive kept in `build/macos-dev-ollama/` against its pinned digest. Copying a
+published catalogue instead failed for every unreleased version (field run
+2026-10-28, v1.0.7): never make the developer app depend on a publication. A
+build is reused while the contract and every fingerprinted source still match.
+An owned runtime installed from one build is refused, never replaced, after
+those sources change and rebuild: remove
+`~/Library/Application Support/Ergopti/ollama-native-http` to reinstall.
+Windows and Linux pin the official Ollama in the
 committed `ollama_release.json`, so their source modes never lack a catalogue.
 
 ### project-macos-installers-run-from-a-linked-private-snapshot
@@ -568,6 +576,19 @@ deadline; without them the worker's inner fenced itself after 17.5 s of an
 open menu (`lease-output-keepalive`, pinned against the Swift budgets in
 `test_native_lease_budget_parity.lua`). An answer read after a failure is
 logged as late, not missing.
+
+### project-hs-task-without-streaming-reads-output-at-exit
+
+A non-streaming `hs.task` (`ShellRunner.run`, or `spawn` without `on_chunk`)
+reads stdout with `readDataToEndOfFile` in its termination handler only
+(`libtask.m` 1.1.1). A child that prints more than the pipe buffer (at most
+64 KiB) blocks on its write and never exits: the local server sweep's
+`ps -axww -o pid=,args=` (every argument of every process of a managed Mac)
+was killed at its 6 s deadline (field report 2026-10-28, exit 15 = SIGTERM),
+while the collector's filtered `pgrep -ilf` on the same Mac returned. Give
+such a child a filtered command (`pgrep -l -f <pattern>`, `ps -p <pids>`, a
+pipe into awk inside `/bin/sh -c`), never a whole-machine listing. The Linux
+process runner refuses output past 64 KiB (`process_limits.max_output_bytes`).
 
 ### project-hs-webview-becomes-key-only-with-text-entry
 

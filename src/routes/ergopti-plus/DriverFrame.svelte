@@ -20,8 +20,8 @@ FEATURES & RATIONALE:
 -->
 
 <script>
-	import { base } from '$app/paths';
-	import { driverWindowSrc, hostDriverWindow } from '$lib/js/driverWindowHost.js';
+	import { asset } from '$app/paths';
+	import { driverWindowSrc, hostDriverWindow } from '#lib/js/driverWindowHost.js';
 	import WindowChrome from './WindowChrome.svelte';
 	import { reveal } from './reveal.js';
 	import { ui } from './state.svelte.js';
@@ -45,7 +45,7 @@ FEATURES & RATIONALE:
 	// Flips true on the iframe's load event so the skeleton shimmer can hide.
 	let loaded = $state(false);
 
-	let frameSrc = $derived(driverWindowSrc(id, base));
+	let frameSrc = $derived(driverWindowSrc(id, asset));
 
 	/**
 	 * Play the native host: once the iframe loads, inject the data through
@@ -56,7 +56,7 @@ FEATURES & RATIONALE:
 		const win = ev.currentTarget?.contentWindow;
 		loaded = true;
 		if (!win) return;
-		hostDriverWindow(win, id, { base, locale: 'fr', onInfoChange: oninfochange }).catch((e) =>
+		hostDriverWindow(win, id, { asset, locale: 'fr', onInfoChange: oninfochange }).catch((e) =>
 			console.error('Injection dans la fenêtre du driver impossible :', e)
 		);
 	}

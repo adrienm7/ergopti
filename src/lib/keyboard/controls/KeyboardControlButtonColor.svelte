@@ -1,5 +1,5 @@
 <script>
-	import * as stores_infos from '$lib/stores_infos.js';
+	import * as stores_infos from '#lib/stores_infos.js';
 
 	export let id;
 

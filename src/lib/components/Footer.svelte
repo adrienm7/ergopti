@@ -1,6 +1,6 @@
 <script>
-	import Ergopti from '$lib/components/Ergopti.svelte';
-	import { discordLink } from '$lib/stores_infos.js';
+	import Ergopti from '#lib/components/Ergopti.svelte';
+	import { discordLink } from '#lib/stores_infos.js';
 	const date = new Date().getFullYear();
 </script>
 
