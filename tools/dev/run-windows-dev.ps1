@@ -50,9 +50,13 @@ $ProcessName = $Identifiers.app.name
 
 # AutoHotkey v2, x64 as the built exe: the per-machine then the per-user install.
 $Candidates = @()
-if ($AutoHotkey) { $Candidates += $AutoHotkey }
-$Candidates += (Join-Path $env:ProgramFiles 'AutoHotkey\v2\AutoHotkey64.exe')
-if ($env:LOCALAPPDATA) { $Candidates += (Join-Path $env:LOCALAPPDATA 'Programs\AutoHotkey\v2\AutoHotkey64.exe') }
+if ($AutoHotkey) {
+	$Candidates += $AutoHotkey
+} else {
+	# An explicit interpreter is authoritative; only an absent request permits discovery.
+	$Candidates += (Join-Path $env:ProgramFiles 'AutoHotkey\v2\AutoHotkey64.exe')
+	if ($env:LOCALAPPDATA) { $Candidates += (Join-Path $env:LOCALAPPDATA 'Programs\AutoHotkey\v2\AutoHotkey64.exe') }
+}
 $Interpreter = $Candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
 if (-not $Interpreter) {
 	Fail ("AutoHotkey v2 (AutoHotkey64.exe) not found in: " + ($Candidates -join ', ') +
