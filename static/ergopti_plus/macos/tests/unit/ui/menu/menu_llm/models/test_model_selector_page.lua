@@ -436,6 +436,21 @@ helpers.describe("model selector page owner", function()
 		end)
 	end)
 
+	-- model-selector-single-emoji: the page writes the emoji before the brand,
+	-- so a brand carrying it too drew « 🦙 Ollama 🦙 » on every group header.
+	helpers.it("sends each backend's bare brand beside its emoji", function()
+		with_page({}, function(Page, ctx, _, collected, p)
+			local Labels = require("ui.menu.menu_llm.backend_labels")
+			local payload = Page.build_payload(ctx, p, collected)
+			for _, id in ipairs({ "ollama", "mlx", "api" }) do
+				local b = backend_of(payload, id)
+				helpers.assert_eq(b.emoji, Labels.emoji(id))
+				helpers.assert_eq(b.brand, Labels.name(id))
+				helpers.assert_nil(b.brand:find(b.emoji, 1, true), id .. " brand carries no emoji")
+			end
+		end)
+	end)
+
 	helpers.it("labels the tray button emoji first for each backend form", function()
 		with_page({}, function(Page)
 			local Labels = require("ui.menu.menu_llm.backend_labels")
