@@ -292,6 +292,37 @@ if (process.platform === 'linux') {
 	// Two drivers, two provider modes, and three physical prefixes must all run.
 	const EXPECTED_NATIVE_PATH_CASES = 12;
 	const observedCases = new Set();
+	const EXPECTED_E2E_BOOTSTRAP_CASES = 6;
+	const observedE2EBootstraps = new Set();
+	// Execute only the real entrypoint bootstrap and corpus loader. The full
+	// scenario suite remains the responsibility of the existing E2E command.
+	const e2eBootstrapSource = String.raw`
+local entry = assert(arg[1])
+local expected_root = assert(arg[2])
+local handle = assert(io.open(entry, "rb"))
+local source = assert(handle:read("*a")); assert(handle:close())
+local anchor = "\nlocal function make_vkb("
+local boundary = assert(source:find(anchor, 1, true), "the E2E bootstrap boundary must exist")
+assert(not source:find(anchor, boundary + #anchor, true), "the E2E bootstrap boundary must be unique")
+assert(package.loaded["tests.helpers"] == nil and package.loaded["tests.support.synthetic_input_stack"] == nil)
+local checks = [=[
+local native = require("luv")
+local expected_root = ...
+assert(native.fs_realpath(driver_root) == expected_root, "the E2E bootstrap must preserve its native driver root")
+assert(helpers == package.loaded["tests.helpers"] and type(helpers.temp_dir) == "function")
+assert(SyntheticStack == package.loaded["tests.support.synthetic_input_stack"] and type(SyntheticStack.load) == "function")
+for _, name in ipairs({"tests.helpers", "tests.support.synthetic_input_stack"}) do
+ local resolved = assert(package.searchpath(name, package.path))
+ assert(native.fs_realpath(resolved):sub(1, #expected_root + 1) == expected_root .. "/", "the real driver module must come from this checkout")
+end
+local vectors = load_corpus()
+assert(type(package.loaded.json.decode) == "function" and #vectors > 0)
+local json_path = assert(package.searchpath("json", package.path))
+assert(native.fs_realpath(json_path) == native.fs_realpath(shared_lua .. "/json.lua"), "the real shared decoder must load")
+io.write("E2E_BOOTSTRAP_ONLY=", #vectors, "\n")
+]=]
+assert(load(source:sub(1, boundary - 1) .. "\n" .. checks, "@" .. entry, "t"))(expected_root)
+`;
 	const providerMarker = 'Native discovery: same runtime and real luv; lfs unavailable';
 	const withoutLfsSource = [
 		'local native = require("luv")',
@@ -472,12 +503,60 @@ if (process.platform === 'linux') {
 							' existing case(s) without loader errors.'
 					);
 				}
+				const e2eDriver = path.join(checkout, 'static/ergopti_plus/macos');
+				const bootstrap = spawnSync(
+					isolated ? macFacts.executable : macRuntime,
+					[...prefixArguments, '-', 'tests/e2e/run_e2e.lua', fs.realpathSync(e2eDriver)],
+					{
+						input: e2eBootstrapSource,
+						cwd: e2eDriver,
+						encoding: 'utf8',
+						timeout: 30000,
+						env: { ...(isolated ? withoutMac : process.env), HOME: home }
+					}
+				);
+				assert.ifError(bootstrap.error);
+				assert.equal(
+					bootstrap.status,
+					0,
+					'E2E bootstrap only ' +
+						mode +
+						' ' +
+						JSON.stringify(prefix) +
+						': ' +
+						bootstrap.stdout +
+						'\n' +
+						bootstrap.stderr
+				);
+				assert.equal(
+					(bootstrap.stdout.match(/^E2E_BOOTSTRAP_ONLY=[1-9][0-9]*$/gm) || []).length,
+					1
+				);
+				if (isolated) assert.equal(bootstrap.stdout.split(providerMarker).length - 1, 1);
+				const bootstrapIdentity = JSON.stringify([mode, prefix]);
+				assert.ok(
+					!observedE2EBootstraps.has(bootstrapIdentity),
+					'Duplicate E2E bootstrap case: ' + bootstrapIdentity
+				);
+				observedE2EBootstraps.add(bootstrapIdentity);
+				console.log(
+					'[OK] E2E bootstrap only ' +
+						mode +
+						' ' +
+						JSON.stringify(prefix) +
+						' loads real helpers, synthetic stack, and nonempty shared corpus.'
+				);
 			}
 		}
 		assert.equal(
 			observedCases.size,
 			EXPECTED_NATIVE_PATH_CASES,
 			'The complete native path matrix must run'
+		);
+		assert.equal(
+			observedE2EBootstraps.size,
+			EXPECTED_E2E_BOOTSTRAP_CASES,
+			'The complete E2E bootstrap matrix must run'
 		);
 		// The source contract must see a newline inside a basename too. A regular
 		// declared file is the healthy control; hiding the undeclared emission

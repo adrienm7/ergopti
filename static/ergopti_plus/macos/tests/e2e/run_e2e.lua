@@ -32,20 +32,13 @@
 -- ---------------------------------------------------------------------------
 -- Bootstrap: resolve driver root from this file's own path, mirror run.lua.
 -- ---------------------------------------------------------------------------
-local self_path   = debug.getinfo(1, "S").source:gsub("^@", "")
-local driver_root = self_path:match("^(.*)[/\\]tests[/\\]e2e[/\\]run_e2e%.lua$") or "."
-driver_root = driver_root:gsub("\\", "/")
-
-if driver_root == "." then
-	local sep      = package.config:sub(1, 1)
-	local cwd_cmd  = (sep == "\\") and "cd" or "pwd"
-	local h        = io.popen(cwd_cmd)
-	if h then
-		local cwd = h:read("*l") or "."
-		h:close()
-		driver_root = cwd:gsub("\\", "/"):gsub("/$", "")
-	end
-end
+local self_path = debug.getinfo(1, "S").source
+assert(self_path:sub(1, 1) == "@", "the E2E runner needs its native source file")
+local native_path, root_error = require("luv").fs_realpath(self_path:sub(2))
+assert(type(native_path) == "string" and native_path ~= "", root_error or "the E2E source path is unavailable")
+if package.config:sub(1, 1) == "\\" then native_path = native_path:gsub("\\", "/") end
+local driver_root = assert(native_path:match("^(.*)/tests/e2e/run_e2e%.lua$"),
+	"the E2E source path must belong to its driver root")
 
 local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
 -- Single shared-tree root for this bootstrap harness; everything below derives
