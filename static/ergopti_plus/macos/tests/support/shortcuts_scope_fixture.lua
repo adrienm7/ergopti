@@ -91,6 +91,8 @@ local function run_fixture(body, source)
 		unbind = function(native) return native:delete() end,
 		setEnabled = function(native, enabled) native.enabled = enabled; return true end,
 		set_delivery_guard = function() return true end,
+		-- Every key resolves in this double's layout.
+		layout_key_refusal = function() return nil end,
 		replace_physical_claims = function(owner, rows)
 			controls.physical_claims = controls.physical_claims or {}
 			controls.physical_claims[owner] = rows
@@ -103,7 +105,13 @@ local function run_fixture(body, source)
 		local suffix = record[2] .. "_actions"
 		facade["pause_" .. suffix] = function() paused = true; return true end
 		facade["stop_" .. suffix] = function() paused = true; return true end
-		facade["resume_" .. suffix] = function() paused = false; return true end
+		-- One refused hotkey now fails alone (shortcut-refusal-isolation), so a
+		-- refused "binding" start is modelled where Bindings still refuses as a
+		-- whole: its child action owners refusing to reopen.
+		facade["resume_" .. suffix] = function()
+			if controls.refuse_start == "binding" then return false end
+			paused = false; return true
+		end
 		facade["is_" .. suffix .. "_paused"] = function() return paused end
 		facade["has_pending_" .. record[2] .. "_action"] = function() return false end
 	end
