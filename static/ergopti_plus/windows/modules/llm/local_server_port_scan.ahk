@@ -112,12 +112,15 @@ class LocalServerPortScan {
 		if State["timer"]
 			try SetTimer(State["timer"], 0)
 		Results := Map()
+		Home := StrReplace(this.Options.Get("home", EnvGet("USERPROFILE")), "\", "/")
+		Context := Map("os", "windows", "home", Home, "read_file", ObjBindMethod(this, "_ReadFile"), "decode_json", JsonParse)
 		if !(Output is String) {
-			try LoggerError("LLM.local_server_ports", "The process list is unreadable: local servers are probed at their catalogue port.")
+			; A warning, not an error: a settings-file port is still read. The
+			; listening sockets come from the same child, so none is known.
+			try LoggerWarn("LLM.local_server_ports", "The process list is unreadable (the process scan gave no answer): "
+				. "local servers are probed at the port of their settings file, else of the catalogue.")
 			for Entry in Entries
-				Results[Entry["id"]] := Map("id", Entry["id"], "running", true, "pids", [], "base_url", Entry["base_url"],
-					"port", LocalServerPortsDefaultPort(Entry["base_url"]), "source", "default",
-					"detail", "process list unreadable", "needs_listeners", false)
+				Results[Entry["id"]] := LocalServerPortsResolveUnlisted(Entry["id"], Entry["descriptor"], Entry["base_url"], Context)
 			return this._Report(Entries, Results, OnDone)
 		}
 		ProcessRows := "", ListenerRows := ""
@@ -129,8 +132,6 @@ class LocalServerPortScan {
 		}
 		Processes := LocalServerPortsParseProcesses(ProcessRows)
 		Listeners := LocalServerPortsParseListeners(ListenerRows)
-		Home := StrReplace(this.Options.Get("home", EnvGet("USERPROFILE")), "\", "/")
-		Context := Map("os", "windows", "home", Home, "read_file", ObjBindMethod(this, "_ReadFile"), "decode_json", JsonParse)
 		for Entry in Entries {
 			Result := LocalServerPortsResolve(Entry["id"], Entry["descriptor"], Entry["base_url"], Processes, Context)
 			Results[Entry["id"]] := LocalServerPortsApplyListeners(Result, Listeners)
