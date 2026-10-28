@@ -505,9 +505,22 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 						layout_enable_variant = function()
 							defer_tis_call(function()
 								enable_keylayout_source_async(var.keylayout, label, function(ok)
-									if ok then pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), label), nil, "success") end
-									if not ok then pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error") end
-									schedule_menu_refresh(update_menu)
+									if not ok then
+										pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error")
+										schedule_menu_refresh(update_menu)
+										return
+									end
+									input_sources.confirm_source_async(var.tis_id, {}, function(read, state)
+										if read and state.enabled == true then
+											pcall(notifications.notify, string.format(i18n.get("menu.layout.add_consent"), label), nil, "success")
+										elseif read then
+											Logger.warn(LOG, "Layout '%s' is listed but not turned on (reason=not_enabled:macos_requires_logout).", label)
+											pcall(notifications.notify, string.format(i18n.get("menu.layout.add_pending_logout"), label), nil, "info")
+										else
+											pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error")
+										end
+										schedule_menu_refresh(update_menu)
+									end)
 								end)
 							end)
 						end,
