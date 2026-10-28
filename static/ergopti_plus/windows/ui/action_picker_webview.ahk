@@ -622,37 +622,39 @@ _ActPickWeb_Reset() {
 	global _ActPickWeb_Controller, _ActPickWeb_WebView, _ActPickWeb_MsgSub, _ActPickWeb_NavSub
 	global _ActPickWeb_OnConfirm, _ActPickWeb_ResetDone, _ActPickWeb_SessionEpoch, _ActPickWeb_AfterClose
 
-	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
-	; Completed against this controller. Re-running the unset lines below would
-	; call __Delete's bound ComCall a SECOND time against a COM pointer WebView2
-	; has already torn down (Controller.Close() releases CoreWebView2's underlying
-	; interfaces) — a genuine SEH access violation that no try/catch can intercept.
-	if _ActPickWeb_ResetDone
-		return
-	_ActPickWeb_ResetDone := true
-	_ActPickWeb_SessionEpoch += 1
+	; Detach the exact retired session before native teardown can pump a public
+	; replacement. Local aliases keep every potentially final reference alive
+	; until the RAM-only transaction has released Critical.
+	Controller := unset, View := unset, MessageSubscription := unset, NavigationSubscription := unset
+	PreviousCritical := Critical("On")
+	try {
+		if _ActPickWeb_ResetDone
+			return
+		_ActPickWeb_ResetDone := true
+		_ActPickWeb_SessionEpoch += 1
+		if IsSet(_ActPickWeb_Controller)
+			Controller := _ActPickWeb_Controller
+		if IsSet(_ActPickWeb_WebView)
+			View := _ActPickWeb_WebView
+		if IsSet(_ActPickWeb_MsgSub)
+			MessageSubscription := _ActPickWeb_MsgSub
+		if IsSet(_ActPickWeb_NavSub)
+			NavigationSubscription := _ActPickWeb_NavSub
+		Confirm := _ActPickWeb_OnConfirm, AfterClose := _ActPickWeb_AfterClose
+		_ActPickWeb_Controller := unset, _ActPickWeb_WebView := unset
+		_ActPickWeb_MsgSub := unset, _ActPickWeb_NavSub := unset
+		_ActPickWeb_OnConfirm := 0, _ActPickWeb_AfterClose := 0
+	} finally Critical(PreviousCritical)
 	_ActPickWeb_ProgramRetire()
 
-	; The whole teardown runs under one try: a hard COM access violation can
-	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
-	; exceptions — it does NOT catch that class of failure, but wrapping the
-	; sequence still protects the *other* lines from a preceding non-fatal COM
-	; error so the globals below are always cleared even when the unsubscribe
-	; itself fails.
+	; Subscription destructors use their still-live controller. Teardown owns
+	; only these local aliases, so a successor's entire published state survives.
 	try {
-		; Release the subscriptions FIRST, while the controller is still alive. Their
-		; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
-		; Controller.Close() raises a COM error that — uncaught in the window's
-		; Close-event thread — terminates the entire AHK script.
-		_ActPickWeb_MsgSub := unset
-		_ActPickWeb_NavSub := unset
-		if IsSet(_ActPickWeb_Controller)
-			_ActPickWeb_Controller.Close()
+		MessageSubscription := unset
+		NavigationSubscription := unset
+		if IsSet(Controller)
+			Controller.Close()
 	}
-	_ActPickWeb_Controller := unset
-	_ActPickWeb_WebView    := unset
-	_ActPickWeb_OnConfirm  := 0
-	_ActPickWeb_AfterClose := 0
 }
 
 ; Discovery closes its resources independently from WebView COM teardown. An
