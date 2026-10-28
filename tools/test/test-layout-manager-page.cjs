@@ -583,6 +583,19 @@ check('the result line reports success, a translated failure and its detail', ()
 		byId.get('result').textContent,
 		strings['layout_manager.result_installed_not_enabled'].replace('%s', 'Ergo-L')
 	);
+	// macOS 26 turns a listed layout on only at the next login: no step is left to the user
+	window.updateState({
+		platform: 'macos',
+		shortcut_menu_path: SHORTCUT_MENU.macos,
+		index,
+		installed: {},
+		result: { id: 'ergol', action: 'install', ok: true, warning: 'pending_logout' }
+	});
+	assert.equal(
+		byId.get('result').textContent,
+		strings['layout_manager.result_installed_pending_logout'].replace('%s', 'Ergo-L')
+	);
+	assert.equal(byId.get('result').classList.contains('is-error'), false);
 	window.updateState({
 		platform: 'macos',
 		shortcut_menu_path: SHORTCUT_MENU.macos,
