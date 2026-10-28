@@ -9,7 +9,7 @@
 
 	import { afterUpdate, onMount } from 'svelte';
 	import { detectDev } from '$lib/js/isDev.js';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { discordLink } from '$lib/stores_infos.js';
 	import { base } from '$app/paths';
 
@@ -78,9 +78,16 @@
 
 	const isDev = detectDev();
 
-	let devHref = '/';
-	$: devHref =
-		($page.url && $page.url.pathname ? $page.url.pathname.replace(/^\/dev/, '') : '/') || '/';
+	/**
+	 * Map the current development path to the same page on the stable site.
+	 * The template calls it so that the $app/state read stays tracked on
+	 * client navigation in this legacy-mode component.
+	 * @param {string} pathname - The current URL path.
+	 * @returns {string} The stable-site path.
+	 */
+	function stableHref(pathname) {
+		return pathname.replace(/^\/dev/, '') || '/';
+	}
 </script>
 
 <svelte:head>
@@ -126,7 +133,7 @@
 
 <div class="banner">
 	{#if isDev}
-		<a href={devHref}>
+		<a href={stableHref(page.url.pathname)}>
 			<div class="dev-banner-content">
 				<p>🚧 VERSION DE DEV 🚧</p>
 				<p class="subtitle">
