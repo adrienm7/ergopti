@@ -206,3 +206,44 @@ assert.match(failureStages.stderr, /\bOK\b/);
 assert.doesNotMatch(failureStages.stderr, /skipped=/);
 process.stdout.write(failureStages.stdout);
 process.stdout.write(failureStages.stderr);
+
+// MLX has separate owners from the reserved Ollama bootstrap. Execute both
+// unchanged production function bodies with real filesystem/process signals.
+const mlxWorkspaces = spawnSync(
+	pythonExecutable(),
+	['tools/test/macos_mlx_bootstrap_workspace_test.py'],
+	{ cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', timeout: 30000 }
+);
+assert.equal(mlxWorkspaces.error, undefined, 'the MLX workspace receiver must start');
+assert.equal(mlxWorkspaces.signal, null, 'the MLX workspace receiver must retire');
+assert.equal(mlxWorkspaces.status, 0, mlxWorkspaces.stderr || mlxWorkspaces.stdout);
+assert.match(mlxWorkspaces.stderr, /Ran 5 tests in/);
+assert.match(mlxWorkspaces.stderr, /\bOK\b/);
+assert.doesNotMatch(mlxWorkspaces.stderr, /skipped=/);
+const expectedWorkspaceCases = [
+	'uv block 15',
+	'uv group_block 15',
+	'python group_block 15',
+	'uv block 2',
+	'uv block 1',
+	'python block 15',
+	'python block 2',
+	'python block 1',
+	'uv success 0',
+	'uv failure 0',
+	'python success 0',
+	'python failure 0',
+	'python install_failure 0',
+	'uv foreign 0',
+	'python foreign 0'
+].sort();
+const actualWorkspaceCases = [
+	...mlxWorkspaces.stdout.matchAll(
+		/^PASS MLX workspace owner=(uv|python) mode=(\w+) signal=(\d+)$/gm
+	)
+]
+	.map((match) => `${match[1]} ${match[2]} ${match[3]}`)
+	.sort();
+assert.deepEqual(actualWorkspaceCases, expectedWorkspaceCases);
+process.stdout.write(mlxWorkspaces.stdout);
+process.stdout.write(mlxWorkspaces.stderr);
