@@ -262,7 +262,9 @@ end
 ---   sources_env() -> the M.sources env, active_id() -> id of the current
 ---   layout or "", install(entry, text, on_done(ok, code, detail)),
 ---   uninstall(id, on_done(ok, code, detail)), select(id, on_done(ok, code, detail)),
----   installed() -> table of installed entries, log(level, message, ...).
+---   installed() -> table of installed entries, log(level, message, ...); and,
+---   for a driver whose install can report pending_activation (macOS),
+---   select_after_login(id) -> recorded.
 --- @param env table
 --- @return table { open, save, remove }
 function M.new(env)
@@ -326,6 +328,17 @@ function M.new(env)
 					return
 				end
 				if payload.use ~= true and env.active_id() ~= settings.id then
+					on_done(true, nil, nil, false, install_code)
+					return
+				end
+				-- macOS lists the layout but turns it on only at the next login:
+				-- selecting it now is refused, so the driver selects it then.
+				if type(install_code) == "table" and install_code.pending_activation == true then
+					if type(env.select_after_login) ~= "function" or not env.select_after_login(settings.id) then
+						env.log("error", "The composed layout cannot be selected after the next login.")
+						on_done(false, M.FAILURE_USE, "the selection after the next login cannot be recorded", false)
+						return
+					end
 					on_done(true, nil, nil, false, install_code)
 					return
 				end

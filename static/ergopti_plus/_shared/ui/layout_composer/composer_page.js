@@ -20,7 +20,7 @@
  *                 {action: "composer_remove"}    delete the composition
  *   host -> page  composerData({platform, sources, declaration, active,
  *                               shortcuts})
- *                 composerResult({action, ok, code, detail})
+ *                 composerResult({action, ok, code, detail, used, pending})
  *   sources = [{id, name, convention, text}]: every registry layout the host
  *   can read; declaration = the stored composition.json text or null;
  *   shortcuts = "full" when the OS types a layer of its own under Ctrl, Alt
@@ -507,9 +507,11 @@ function composerRenderStatus() {
 			result.textContent = _t(
 				state.action === 'composer_remove'
 					? 'layout_composer.result_removed'
-					: state.used
-						? 'layout_composer.result_saved_used'
-						: 'layout_composer.result_saved'
+					: state.pending
+						? 'layout_composer.result_saved_pending_logout'
+						: state.used
+							? 'layout_composer.result_saved_used'
+							: 'layout_composer.result_saved'
 			);
 		} else {
 			var failure = 'layout_composer.failure_' + state.code;
@@ -580,7 +582,8 @@ window.composerResult = function (result) {
 		ok: composerTrue(result.ok),
 		code: result.code,
 		detail: result.detail,
-		used: composerTrue(result.used)
+		used: composerTrue(result.used),
+		pending: composerTrue(result.pending)
 	};
 	if (composerTrue(result.ok)) {
 		composerState.dirty = false;
