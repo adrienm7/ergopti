@@ -312,6 +312,9 @@ local function multiFingerAllowed(mf, axis, slot)
 		gs.cohesive = true
 		return true
 	end
+	-- No travel since the promotion (the direction locked on that very frame)
+	-- is not decided yet; logging it spent the gate's one line on a false 0.00.
+	if share == nil then return false end
 	rejectCandidate("cohesion", "least contact share %.2f < %.2f since promotion (%d-finger %s)",
 		share, Geometry.COHESION_MIN_SHARE, mf, tostring(slot))
 	return false

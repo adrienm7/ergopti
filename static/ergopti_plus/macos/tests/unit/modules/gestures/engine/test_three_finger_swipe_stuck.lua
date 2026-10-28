@@ -24,6 +24,8 @@
 ---    its pair tail was let through to scroll the page it had just switched to.
 --- 5. An aborted gesture stayed aborted while one finger rested, silently
 ---    refusing every swipe until the whole hand lifted.
+--- 6. A direction locking on the frame the third finger was confirmed logged
+---    "cohesion: least contact share 0.00" before any contact could move.
 --- The two-finger scroll guarantees of three-finger-swipe-vs-scroll still hold.
 --- ==============================================================================
 
@@ -442,6 +444,24 @@ helpers.describe("a refused gesture leaves nothing armed (three-finger-swipe-stu
 		h.finish()
 		helpers.assert_true(#fires > 0 and fires[1] == "tab_next",
 			"a resting finger must not keep the aborted state; fired: " .. table.concat(h.fired, ", "))
+	end)
+
+	helpers.it("a swipe that locks on its promotion frame is not refused by cohesion", function()
+		local h = new_harness()
+		-- The pair drifts 2 units (below its own lock distance) while the third
+		-- finger lands, so the direction locks on the very frame the third finger
+		-- is confirmed, before any contact moved since that promotion.
+		for i = 0, 4 do h.frame({ FINGER_A, FINGER_B }, nil, i * 0.5) end
+		local hand = { FINGER_A, FINGER_B, FINGER_C }
+		for _ = 1, 4 do h.frame(hand, { true, true, true }, 2.0) end
+		for i = 1, 20 do h.frame(hand, nil, 2.0 + i * STEP) end
+		h.lift()
+		local fires = watched(h.fired)
+		local reason = h.rejection("cohesion")
+		h.finish()
+		helpers.assert_eq(reason, nil, "no travel since the promotion is not a refusal yet: " .. tostring(reason))
+		helpers.assert_true(#fires > 0 and fires[1] == "tab_next",
+			"the swipe must fire; fired: " .. table.concat(h.fired, ", "))
 	end)
 
 	helpers.it("a thumb resting beside two scrolling fingers still never fires", function()
