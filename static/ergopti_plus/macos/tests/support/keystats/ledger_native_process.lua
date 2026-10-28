@@ -55,7 +55,7 @@ return function()
 		local db, opened, timers, offset = nil, false, {}, nil
 		local path = temporary .. "/metrics/by_device/device/data.sql"
 		local db_path = temporary .. "/ergopti_metrics/device/db.sqlite"
-		local writer = { init = function() end }
+		local writer = { init = function() end, SYNCHRONOUS_PRAGMA = "PRAGMA synchronous = FULL;" }
 		function writer.open_db()
 			local missing = not require("lfs").attributes(db_path)
 			db = open(db_path); opened = true
@@ -77,7 +77,10 @@ return function()
 		writer.set_next_event_id = function() end
 		writer.persist_next_event_id = function() return true end
 		package.loaded["modules.keystats.sqlite_writer"] = writer
+		-- The fresh-cache replay publishes its cursor when it ends (L64), after
+		-- Rotation.init received the fresh cache's 0.
 		local rotation = { init = function(options) offset = options.today_log_offset end,
+			set_offset = function(value) offset = value end,
 			is_initialized = function() return true end, read_new_entries = function() return {}, 0, "eof" end }
 		package.loaded["modules.keystats.rotation"] = rotation
 		local phase = assert(os.getenv("ERGOPTI_LEDGER_IO_PHASE"))
