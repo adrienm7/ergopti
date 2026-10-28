@@ -301,7 +301,7 @@ _RPA_EnvelopeDone(State, Code, Output, Errors) {
 	State["calls"] += 1
 }
 
-_RPA_ExactNativeShutdownEnvelope() {
+_RPA_ExactNativeShutdownEnvelope(Scenario := "program") {
 	Root := A_Temp . "\program_shutdown106_" . A_ScriptHwnd . "_" . A_TickCount
 	AssertFalse(DirExist(Root), "the shutdown child fixture has a private owner")
 	DirCreate(Root)
@@ -346,7 +346,7 @@ _RPA_ExactNativeShutdownEnvelope() {
 		Harness := Root . "\shutdown.ahk"
 		FileAppend(Source, Harness, "UTF-8")
 		State := Map("calls", 0)
-		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Harness], _RPA_EnvelopeDone.Bind(State))
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Harness, Scenario], _RPA_EnvelopeDone.Bind(State))
 		try {
 			AssertEqual(1, Handle.start(), "the exact production shutdown child starts")
 			Started := A_TickCount
@@ -667,3 +667,7 @@ _RPA_MalformedCompletion(Context) {
 }
 Test("user program: malformed completion never formats untrusted private status",
 	_RPA_WithFixture.Bind(_RPA_WithCapturedProgramLogs.Bind(_RPA_MalformedCompletion)))
+
+for _RPA_RegistryMode in ["ready", "refuse", "throw", "empty-error"]
+	Test("lifecycle registry shutdown: " . _RPA_RegistryMode . " returns native admission and its bundle (registry-shutdown-compensation)",
+		_RPA_ExactNativeShutdownEnvelope.Bind("registry-" . _RPA_RegistryMode))

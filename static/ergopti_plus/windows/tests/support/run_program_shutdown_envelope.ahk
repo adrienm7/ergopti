@@ -63,13 +63,23 @@ LLM_NavEventOwner_PrepareShutdown(*) {
 	global _RPA_EnvelopeState
 	_RPA_EnvelopeRequire(_RPA_EnvelopeState.Get("left", 0) > 0
 		&& _RPA_EnvelopeState.Get("right", 0) > 0, "held buttons release before native preflight")
+	_RPA_EnvelopeState["nav-prepared"] := true
 	return _RPA_EnvelopeCount("nav")
 }
 LLM_NavEventOwner_CancelShutdown(*) {
+	global _RPA_EnvelopeState
+	_RPA_EnvelopeState["nav-prepared"] := false
 	return _RPA_EnvelopeCount("nav-cancel")
 }
 LayoutRegistry_PrepareShutdown(*) {
-	return _RPA_EnvelopeCount("registry")
+	global _RPA_EnvelopeState
+	_RPA_EnvelopeCount("registry")
+	Mode := _RPA_EnvelopeState["registry-mode"]
+	if Mode == "throw"
+		throw Error("exact registry shutdown fixture exception")
+	if Mode == "empty-error"
+		throw Error("")
+	return Mode != "refuse"
 }
 ReloadTerminalHandoffClaim(*) {
 	_RPA_EnvelopeCount("claim")
@@ -82,9 +92,16 @@ ConfigTransitionRetainedBarrier(*) {
 	return false
 }
 ConfigWriteAcquireLifecycleBundle(*) {
-	return Map("fixture", true)
+	global _RPA_EnvelopeState
+	_RPA_EnvelopeCount("bundle-acquire")
+	Bundle := Map("fixture", true)
+	_RPA_EnvelopeState["bundle"] := Bundle
+	return Bundle
 }
-_ConfigWriteTerminalRelease(*) {
+_ConfigWriteTerminalRelease(Bundle) {
+	global _RPA_EnvelopeState
+	_RPA_EnvelopeRequire(Bundle == _RPA_EnvelopeState["bundle"],
+		"only the exact acquired configuration bundle may be returned")
 	return _RPA_EnvelopeCount("bundle-release")
 }
 TapHoldShutdownReleaseGate(*) {
@@ -127,7 +144,7 @@ _RPA_EnvelopeRun() {
 				_UserProgramGeneration := 0
 				_UserProgramPaused := Paused
 				if Mode != "later" {
-					_RPA_EnvelopeState := Map()
+					_RPA_EnvelopeState := Map("registry-mode", "ready")
 					ReloadResult := _ReloadPreservingSuspendNonCritical(0, 0, 0, 0)
 					_RPA_EnvelopeRequire((ReloadResult is Integer) && ReloadResult == 0,
 						"actual reload refuses unretired program debt")
@@ -138,7 +155,7 @@ _RPA_EnvelopeRun() {
 				}
 				_LifecycleShutdownVetoAttempts := 0
 				loop LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS {
-					_RPA_EnvelopeState := Map()
+					_RPA_EnvelopeState := Map("registry-mode", "ready")
 					_LifecycleShutdownReason := "stale fixture reason"
 					BeforeGeneration := _UserProgramGeneration
 					Result := Ergopti_OnShutdown("Reload", 0)
@@ -187,8 +204,60 @@ _RPA_EnvelopeRun() {
 	Suspend(false)
 }
 
+_RPA_RegistryEnvelopeRun(Mode) {
+	global _RPA_EnvelopeState, _UserProgramEntries, _UserProgramAcquiring
+	global _UserProgramPaused, _UserProgramGeneration, _LifecycleShutdownReason
+	global _LifecycleShutdownVetoAttempts
+	_RPA_EnvelopeRequire(Mode == "ready" || Mode == "refuse" || Mode == "throw" || Mode == "empty-error",
+		"the registry envelope requires an explicit known native owner result")
+	for Paused in [false, true] {
+		Suspend(Paused)
+		try {
+			_RPA_EnvelopeState := Map("registry-mode", Mode, "nav-prepared", false)
+			_UserProgramEntries := Map(), _UserProgramAcquiring := 0
+			_UserProgramPaused := Paused, _UserProgramGeneration := 0
+			_LifecycleShutdownVetoAttempts := 0
+			Result := Ergopti_OnShutdown("Reload", 0)
+			_RPA_EnvelopeRequire((Result is Integer) && Result == 1,
+				"an admitted shutdown refusal must keep the genuine handler alive")
+			_RPA_EnvelopeRequire(_RPA_EnvelopeState.Get("nav", 0) == 1
+				&& _RPA_EnvelopeState.Get("registry", 0) == 1,
+				"the real handler must reach both native admission owners exactly once")
+			Prepared := _RPA_EnvelopeState["nav-prepared"]
+			CancelCalls := _RPA_EnvelopeState.Get("nav-cancel", 0)
+			_RPA_EnvelopeRequire(!Prepared && CancelCalls == 1,
+				"registry refusal must return native admission: prepared=" . Prepared . ", cancel=" . CancelCalls)
+			_RPA_EnvelopeRequire(_RPA_EnvelopeState.Get("bundle-acquire", 0) == 1
+				&& _RPA_EnvelopeState.Get("bundle-release", 0) == 1,
+				"the registry gate must compensate its exact owned configuration bundle once")
+			_RPA_EnvelopeRequire(_RPA_EnvelopeState.Get("modifier", 0) == 1,
+				"held native modifiers must be released before registry retirement")
+			_RPA_EnvelopeRequire(_UserProgramGeneration == (Mode == "ready" ? 1 : 0),
+				"registry refusal must precede actual user-program retirement")
+			_RPA_EnvelopeRequire(_RPA_EnvelopeState.Get("full-save", 0) == (Mode == "ready" ? 1 : 0),
+				"only the healthy registry control may reach full-save settlement")
+			_RPA_EnvelopeRequire(_LifecycleShutdownVetoAttempts == 1
+				&& _RPA_EnvelopeState.Get("reload-refuse", 0) == 1,
+				"each registry refusal must consume one honored veto and refuse the pending reload once")
+			_RPA_EnvelopeRequire(_RPA_EnvelopeState["gate"] == (Mode == "ready"
+				? "an accepted full configuration save remains non-durable"
+				: "a registry download still owns native cleanup"),
+				"the genuine refusal must name the exact unsettled owner")
+			_RPA_EnvelopeRequire(_UserProgramPaused == Paused && A_IsSuspended == Paused,
+				"registry refusal must preserve program and native pause posture")
+		} finally Suspend(false)
+	}
+}
+
 try {
-	_RPA_EnvelopeRun()
+	_RPA_EnvelopeRequire(A_Args.Length == 1, "the native envelope requires its exact scenario")
+	Scenario := A_Args[1]
+	if Scenario == "program"
+		_RPA_EnvelopeRun()
+	else if SubStr(Scenario, 1, 9) == "registry-"
+		_RPA_RegistryEnvelopeRun(SubStr(Scenario, 10))
+	else
+		throw Error("Unknown shutdown envelope scenario: " . Scenario)
 	FileAppend("program-shutdown-envelope-ok", "*", "UTF-8-RAW")
 	ExitApp(0)
 } catch as Err {
