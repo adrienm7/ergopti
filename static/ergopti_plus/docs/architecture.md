@@ -159,6 +159,7 @@ graph TD
         MACOS_toml_cache["TomlCache.lua"]
         MACOS_tooltip_renderer["TooltipRenderer.lua"]
         MACOS_tray_menu["TrayMenu.lua"]
+        MACOS_unicode_carrier["UnicodeCarrier.lua"]
         MACOS_update_launcher["UpdateLauncher.lua"]
         MACOS_wake_watcher["WakeWatcher.lua"]
         MACOS_webview_result["WebviewResult.lua"]
