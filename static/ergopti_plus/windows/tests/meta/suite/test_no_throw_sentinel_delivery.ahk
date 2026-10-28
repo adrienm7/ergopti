@@ -44,11 +44,28 @@ _AMSG_Receive(Callback, Target, Fault) {
 	}
 }
 
+_AMSG_MetaCallback(Callback) {
+	global _LOGGER_TEST_SINK
+	Snapshot := _TLOG_CaptureLoggerState()
+	SavedSink := _LOGGER_TEST_SINK
+	try {
+		; A preceding control must not make the fault pass through log deduplication.
+		_ResetLogger()
+		Callback.Call()
+	} finally {
+		_LOGGER_TEST_SINK := SavedSink
+		_TLOG_RestoreLoggerState(Snapshot)
+	}
+}
+
 _AMSG_Vectors := [
 	["text sender containment", _TSSIF_AdapterMethodsContainSendInputFailure, TextEraseChars],
 	["logger fanout", TestLogger_FanOutQueueSurvivesFlushSwap, _LoggerFanOut],
 	["remote trim", _RemoteTrimRegistry_DetachesBeforeReentrantCallback, _LLMRemote_TrimAsyncRegistry],
-	["Ollama trim", _OllamaTrimRegistry_DetachesBeforeReentrantCallback, _LLM_Ollama_TrimAsyncRegistry]
+	["Ollama trim", _OllamaTrimRegistry_DetachesBeforeReentrantCallback, _LLM_Ollama_TrimAsyncRegistry],
+	["LLM containment", _AMSG_MetaCallback.Bind(_LCS_ThrowingCallbackIsLoggedNotSwallowed), _LLM_InvokeCallback],
+	["LLM optional callback", _AMSG_MetaCallback.Bind(_LCS_MissingCallbackIsANoOp), _LLM_InvokeCallback],
+	["shell runner logger", _AMSG_MetaCallback.Bind(_SRIL_HelperReachesTheLogger), _SR_LogError]
 ]
 for _AMSG_Vector in _AMSG_Vectors {
 	Test("no-throw sentinel: " . _AMSG_Vector[1] . " healthy control (empty-message-owner)",
