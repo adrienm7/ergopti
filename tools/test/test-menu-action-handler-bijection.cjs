@@ -831,14 +831,35 @@ function nativeFunctionReferenceKeys(source) {
 		],
 		[
 			'layout_bundle_variant_add',
-			'if ok then live = input_sources.is_live_enabled(var.name) end',
-			'if ok then live = true end'
+			'input_sources.confirm_source_async(var.tis_id, {}, function(read, state)',
+			'Foreign.confirm_source_async(var.tis_id, {}, function(read, state)'
 		],
-		['layout_bundle_variant_add', 'if ok and live == true then', 'if ok then'],
 		[
 			'layout_bundle_variant_add',
-			'elseif ok and live == false then',
-			'elseif ok and live == true then'
+			'input_sources.confirm_source_async(var.tis_id, {}, function(read, state)',
+			'input_sources.confirm_source_async(var.name, {}, function(read, state)'
+		],
+		[
+			'layout_bundle_variant_add',
+			'if read and state.enabled == true then',
+			'if state.enabled == true then'
+		],
+		['layout_bundle_variant_add', 'if read and state.enabled == true then', 'if read then'],
+		['layout_bundle_variant_add', 'elseif read then', 'elseif true then'],
+		[
+			'layout_bundle_variant_add',
+			'i18n.get("menu.layout.add_consent")',
+			'i18n.get("menu.layout.add_ok")'
+		],
+		[
+			'layout_bundle_variant_add',
+			'schedule_menu_refresh(update_menu)\n\t\t\t\t\t\t\t\t\tend)\n\t\t\t\t\t\t\t\tend)',
+			'do end\n\t\t\t\t\t\t\t\t\tend)\n\t\t\t\t\t\t\t\tend)'
+		],
+		[
+			'layout_bundle_variant_add',
+			'schedule_menu_refresh(update_menu)\n\t\t\t\t\t\t\t\t\t\treturn',
+			'schedule_menu_refresh(update_menu)'
 		],
 		[
 			'layout_bundle_variant_add',
