@@ -361,6 +361,11 @@ From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their bu
   owned repair failed (`modules/llm/ollama_install_state.lua`). A download shows its
   percentage: macOS from the download window (Ollama and MLX), Linux from the /api/pull
   NDJSON, Windows from the managed pull's own output (the unmanaged cmd-window pull shows none).
+  Follow-ups (maintainer, 2026-10-28): macOS lists only the active entry's provider, so an
+  inactive entry shows its known models with the "unavailable" hint, accepted for this release;
+  listing every macOS entry needs their Keychain keys resolved. The known models are the
+  configured, default and model_extras ones; a per-provider known-model list in
+  `api_providers.json` (read by all three drivers) would offer more without a listing.
   Mac confirms: the AI menu shows one button with the emoji and the model; the page
   opens from it and from the toggle shortcut before the AI menu was ever opened; choosing an
   MLX model while Ollama is active switches the backend; a model not downloaded offers only

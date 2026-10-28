@@ -2237,7 +2237,7 @@
 	"model_browser.status_downloading": "جارٍ التنزيل…",
 	"model_browser.install_runtime": "تثبيت %s",
 	"model_browser.hint_api_no_key": "مفتاح API مفقود: أضِفه لاستخدام هذا النموذج.",
-	"model_browser.hint_api_listing_unavailable": "لا يعرض هذا المزوّد قائمة نماذجه هنا: النموذج المُعدّ فقط، أو اكتب معرّفًا آخر.",
+	"model_browser.hint_api_listing_unavailable": "قائمة نماذج هذا المزوّد غير متاحة هنا: تُعرض نماذجه المعروفة؛ اكتب معرّفًا آخر عبر «نموذج آخر…».",
 	"model_browser.hint_api_listing_refused": "رفض المزوّد عرض نماذجه (تحقق من المفتاح): نماذجه المعروفة، أو اكتب معرّفًا آخر.",
 	"model_browser.hint_api_listing_pending": "جارٍ تحميل نماذج هذا المزوّد…",
 	"model_browser.status_downloading_percent": "جارٍ التنزيل… {n} %",

@@ -2237,7 +2237,7 @@
 	"model_browser.status_downloading": "ダウンロード中…",
 	"model_browser.install_runtime": "%s をインストール",
 	"model_browser.hint_api_no_key": "API キーがありません。このモデルを使うには追加してください。",
-	"model_browser.hint_api_listing_unavailable": "このプロバイダーのモデル一覧はここでは取得できません。設定済みのモデルのみか、別の ID を入力してください。",
+	"model_browser.hint_api_listing_unavailable": "このプロバイダーのモデル一覧はここでは取得できません。既知のモデルを表示しています。別の ID は「別のモデル…」から入力してください。",
 	"model_browser.hint_api_listing_refused": "プロバイダーがモデル一覧を拒否しました(キーを確認してください)。既知のモデルを使うか、別の ID を入力してください。",
 	"model_browser.hint_api_listing_pending": "このプロバイダーのモデルを読み込み中…",
 	"model_browser.status_downloading_percent": "ダウンロード中… {n} %",

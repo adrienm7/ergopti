@@ -1887,7 +1887,7 @@
 	"model_browser.status_downloading": "Downloading…",
 	"model_browser.install_runtime": "Install %s",
 	"model_browser.hint_api_no_key": "API key missing: add it to use this model.",
-	"model_browser.hint_api_listing_unavailable": "This provider's model list is not available here: only the configured model, or type another id.",
+	"model_browser.hint_api_listing_unavailable": "This provider's model list is not available here: its known models are listed; type another id with Other model…",
 	"model_browser.hint_api_listing_refused": "The provider refused to list its models (check the key): its known models, or type another id.",
 	"model_browser.hint_api_listing_pending": "Loading this provider's models…",
 	"model_browser.status_downloading_percent": "Downloading… {n} %",

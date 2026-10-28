@@ -2237,7 +2237,7 @@
 	"model_browser.status_downloading": "Baixando…",
 	"model_browser.install_runtime": "Instalar %s",
 	"model_browser.hint_api_no_key": "Falta a chave de API: adicione-a para usar este modelo.",
-	"model_browser.hint_api_listing_unavailable": "A lista de modelos deste provedor não está disponível aqui: apenas o modelo configurado, ou digite outro id.",
+	"model_browser.hint_api_listing_unavailable": "A lista de modelos deste fornecedor não está disponível aqui: são apresentados os modelos conhecidos; escreva outro identificador com Outro modelo…",
 	"model_browser.hint_api_listing_refused": "O fornecedor recusou listar os seus modelos (verifique a chave): os modelos conhecidos, ou escreva outro identificador.",
 	"model_browser.hint_api_listing_pending": "A carregar os modelos deste fornecedor…",
 	"model_browser.status_downloading_percent": "A transferir… {n} %",

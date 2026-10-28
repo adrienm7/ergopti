@@ -2237,7 +2237,7 @@
 	"model_browser.status_downloading": "Laster ned…",
 	"model_browser.install_runtime": "Installer %s",
 	"model_browser.hint_api_no_key": "API-nøkkel mangler: legg den til for å bruke denne modellen.",
-	"model_browser.hint_api_listing_unavailable": "Denne leverandørens modelliste er ikke tilgjengelig her: bare den konfigurerte modellen, eller skriv en annen id.",
+	"model_browser.hint_api_listing_unavailable": "Modellisten til denne leverandøren er ikke tilgjengelig her: de kjente modellene vises; skriv inn en annen id med Annen modell…",
 	"model_browser.hint_api_listing_refused": "Leverandøren nektet å liste modellene sine (sjekk nøkkelen): de kjente modellene, eller skriv inn en annen id.",
 	"model_browser.hint_api_listing_pending": "Laster inn modellene til denne leverandøren…",
 	"model_browser.status_downloading_percent": "Laster ned… {n} %",
