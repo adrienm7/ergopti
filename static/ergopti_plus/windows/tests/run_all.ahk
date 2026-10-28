@@ -450,6 +450,7 @@ InstallSendNoOps()
 #Include unit/ui/healthcheck/test_healthcheck_core.ahk
 #Include unit/ui/healthcheck/test_healthcheck_configuration.ahk
 #Include unit/ui/healthcheck/test_diagnostics_collection.ahk
+#Include unit/ui/healthcheck/test_archive_failure_observation.ahk
 #Include unit/ui/healthcheck/test_diagnostics_window_control.ahk
 #Include unit/ui/healthcheck/test_healthcheck_owner_snapshots.ahk
 #Include unit/infra/input_probe/test_input_probe.ahk
