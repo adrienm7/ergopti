@@ -85,7 +85,7 @@ class ColdReceiptTests(unittest.TestCase):
             },
         }
 
-    def test_actual_lua_cold_client_receipt_validates_without_daemon_launch(self):
+    def run_actual_lua(self, installed_permissions):
         """Execute the real fixture over controlled ports; no native/macOS credit."""
         directory = Path(self.root.name)
         config = dict(
@@ -104,6 +104,7 @@ class ColdReceiptTests(unittest.TestCase):
             "receipt_path": self.result["receipt_path"],
             "physical_receipt": copy.deepcopy(self.result["physical_receipt"]),
             "observations": str(directory / "controlled-observations.json"),
+            "installed_permissions": installed_permissions,
         }
         inputs_path = directory / "inputs.json"
         inputs_path.write_text(json.dumps(inputs))
@@ -130,6 +131,10 @@ hs = {
   processInfo = { arch = "x86_64" },
   fs = { attributes = function(path) assert(path == config.install_dir); return nil end,
     symlinkAttributes = function(path)
+      -- The installer publishes the official binary at the managed path.
+      if path == config.install_dir .. "/ollama" then
+        return installed and { mode = "file", permissions = input.installed_permissions } or nil
+      end
       local file = io.open(path, "rb"); if file then file:close(); return {} end
       return nil
     end },
@@ -140,10 +145,9 @@ package.preload["adapters.python_interpreter"] = function()
     native_candidates = function() return {} end }
 end
 package.preload["modules.llm.ollama_binary"] = function()
-  return { SOURCE_MANAGED = "controlled-official-client", resolve = function()
-    if installed then return config.install_dir .. "/ollama", nil, "controlled-official-client" end
-    return nil
-  end }
+  -- The resolver selects only the native runtime, so it stays cold here.
+  return { resolve = function() return nil end,
+    managed_executable_path = function() return config.install_dir .. "/ollama" end }
 end
 local handle = {
   executable = config.helper, arguments = { "--managed-pty-worker", "1800000" },
@@ -221,7 +225,20 @@ write(counts, input.observations)
         actual = json.loads(Path(config["result"]).read_text())
         self.assertNotIn("error", actual)
         self.assertNotIn("ui_failure", actual)
+        return actual, config
+
+    def test_actual_lua_cold_client_receipt_validates_without_daemon_launch(self):
+        actual, config = self.run_actual_lua("rwxr-xr-x")
+        self.assertIs(actual["runtime_installed"], True)
         validate(actual, config)
+
+    def test_actual_lua_refuses_an_official_binary_that_is_not_executable(self):
+        actual, config = self.run_actual_lua("rw-r--r--")
+        self.assertIs(actual["runtime_installed"], False)
+        with self.assertRaisesRegex(
+            RuntimeError, "did not prove a successful retired installation"
+        ):
+            validate(actual, config)
 
     def test_real_source_inventory_contains_the_loadable_shared_receipt(self):
         self.assertIn("_shared/lua/core/llm/native_pty_receipt.lua", SOURCE_PATHS)
