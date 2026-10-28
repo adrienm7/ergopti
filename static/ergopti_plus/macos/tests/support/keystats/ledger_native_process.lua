@@ -113,7 +113,7 @@ return function()
 				assert(file:write("# Fixture-owned user exclusion\n"))
 				assert(file:close())
 			end
-			assert(manager.init({ LOG_DIR = temporary .. "/metrics" }), "actual fresh-cache manager init must succeed: " .. table.concat(errors, " | "))
+			assert(manager.init({ LOG_DIR = temporary .. "/metrics", CACHE_DIR = temporary .. "/ergopti_metrics" }), "actual fresh-cache manager init must succeed: " .. table.concat(errors, " | "))
 			assert(offset == 123, "actual startup must replay the repaired batch before restoring its cursor: " .. tostring(offset) .. " | " .. table.concat(errors, " | "))
 		else
 			assert(writer.open_db())
