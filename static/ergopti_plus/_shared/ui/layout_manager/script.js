@@ -232,6 +232,13 @@ function resultMessage(result, rows) {
 		const key = FAILURE_KEYS[result.code] || 'layout_manager.failure_other';
 		return { text: _fmt('layout_manager.result_failed', name, _t(key)), isError: true, detail };
 	}
+	if (result.warning === 'pending_logout') {
+		return {
+			text: _fmt('layout_manager.result_installed_pending_logout', name),
+			isError: false,
+			detail
+		};
+	}
 	if (result.warning === 'not_enabled') {
 		return {
 			text: _fmt('layout_manager.result_installed_not_enabled', name),

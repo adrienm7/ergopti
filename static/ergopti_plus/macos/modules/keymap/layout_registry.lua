@@ -57,6 +57,10 @@ M.FAILURE_RECORD = "record_failed"
 M.FAILURE_SELECT = "select_failed"
 M.FAILURE_INVALID = Composer.FAILURE_INVALID
 
+-- The closed reason of a layout the enabled-sources preference lists but macOS
+-- turns on only at the next login (logged as not_enabled:<reason>).
+M.REASON_REQUIRES_LOGOUT = "macos_requires_logout"
+
 -- The platform name registry entries list when macOS can install them.
 local PLATFORM = "macos"
 
@@ -172,6 +176,8 @@ local function default_deps(settings)
 		disable_source = InputSources.disable_keylayout_source_async,
 		select_source = InputSources.set_input_source_async,
 		active_sources = InputSources.list_active_keyboard_layouts,
+		live_enabled = InputSources.is_live_enabled,
+		pending = require("modules.keymap.pending_layout_activation"),
 		bundle_names = Install.bundle_keylayout_names,
 	}
 end
@@ -382,6 +388,39 @@ local function acquire_slot(id, action, on_done)
 	return true
 end
 
+--- What an installed layout's enable came to. The enabled-sources preference
+--- can list a layout macOS turns on only at the next login, so the live list
+--- decides: on now (enabled), listed but off (pending_activation, recorded for
+--- the next boot), or the enable failed.
+--- @param deps table
+--- @param id string Layout id.
+--- @param entry table Record entry (keyboard_name).
+--- @param listed boolean Whether the enable wrote the preference.
+--- @param reason string|nil The enable's failure reason.
+--- @return table state { enabled, pending_activation, reason }
+local function settle_enable(deps, id, entry, listed, reason)
+	if not listed then
+		-- The layout is installed; only the enabled list could not be updated.
+		-- System Settings can still add it by hand.
+		Logger.warn(LOG, "The '%s' layout is installed but not enabled: %s.", id, tostring(reason))
+		return { enabled = false, pending_activation = false, reason = reason }
+	end
+	local live, live_err = deps.live_enabled(entry.keyboard_name)
+	if live == true then
+		deps.pending.forget(id)
+		return { enabled = true, pending_activation = false }
+	end
+	if live == nil then
+		Logger.error(LOG, "The '%s' layout is listed in the enabled sources, but whether macOS turned it on cannot be read: %s.",
+			id, tostring(live_err))
+		return { enabled = false, pending_activation = false, reason = live_err }
+	end
+	Logger.warn(LOG, "The '%s' layout is installed and listed in the enabled sources, but macOS turns it on only at the next login (reason=not_enabled:%s).",
+		id, M.REASON_REQUIRES_LOGOUT)
+	deps.pending.record(id, entry.keyboard_name)
+	return { enabled = false, pending_activation = true, reason = M.REASON_REQUIRES_LOGOUT }
+end
+
 --- Publishes a verified layout: the local copy, the installed file, the record.
 --- @param deps table
 --- @param entry table
@@ -406,7 +445,7 @@ local function publish(deps, entry, text)
 end
 
 --- Installs (or updates) one registry layout and adds it to the input sources.
---- on_done(true, { entry, path, source, enabled }) or
+--- on_done(true, { entry, path, source, enabled, pending_activation }) or
 --- on_done(false, failure_code, detail) is called exactly once.
 --- @param id string Registry id.
 --- @param on_done function
@@ -494,13 +533,10 @@ function M.install(id, on_done, deps)
 				finish(false, code, publish_err)
 				return
 			end
-			deps.enable_source(path, entry.name, function(enabled, _output, reason)
-				if not enabled then
-					-- The layout is installed; only the enabled list could not be
-					-- updated. System Settings can still add it by hand.
-					Logger.warn(LOG, "The '%s' layout is installed but not enabled: %s.", id, tostring(reason))
-				end
-				finish(true, { entry = entry, path = path, source = detail.source, enabled = enabled == true })
+			deps.enable_source(path, entry.name, function(listed, _output, reason)
+				local state = settle_enable(deps, id, entry, listed == true, reason)
+				finish(true, { entry = entry, path = path, source = detail.source, enabled = state.enabled,
+					pending_activation = state.pending_activation })
 			end)
 		end)
 	end, deps)
@@ -549,6 +585,7 @@ function M.uninstall(id, on_done, deps)
 				return
 			end
 		end
+		deps.pending.forget(id)
 		local current, current_err = read_installed(deps)
 		local ok, err = false, current_err
 		if current then ok, err = write_installed(deps, Catalogue.without_installed(current, id)) end
@@ -608,7 +645,7 @@ end
 --- Installs the layout the user composed (docs/layout-composer.md): no catalogue
 --- and no download, the caller built the entry from the compiled file. The copy
 --- is published and enabled exactly like a registry layout's.
---- on_done(true, { entry, path, source, enabled }) or
+--- on_done(true, { entry, path, source, enabled, pending_activation }) or
 --- on_done(false, failure_code, detail) is called exactly once.
 --- @param entry table Record entry of the composition.
 --- @param text string The compiled .keylayout.
@@ -664,11 +701,10 @@ function M.install_local(entry, text, on_done, deps)
 			finish(false, code, publish_err)
 			return
 		end
-		deps.enable_source(path, entry.name, function(enabled, _output, enable_reason)
-			if not enabled then
-				Logger.warn(LOG, "The composed '%s' layout is installed but not enabled: %s.", id, tostring(enable_reason))
-			end
-			finish(true, { entry = entry, path = path, source = "composer", enabled = enabled == true })
+		deps.enable_source(path, entry.name, function(listed, _output, enable_reason)
+			local state = settle_enable(deps, id, entry, listed == true, enable_reason)
+			finish(true, { entry = entry, path = path, source = "composer", enabled = state.enabled,
+				pending_activation = state.pending_activation })
 		end)
 	end)
 	return true
@@ -717,6 +753,7 @@ local function composer_operations(deps)
 		install = function(entry, text, on_done) return M.install_local(entry, text, on_done, deps) end,
 		uninstall = function(id, on_done) return M.uninstall(id, on_done, deps) end,
 		select = function(id, on_done) return M.select(id, on_done, deps) end,
+		select_after_login = function(id) return deps.pending.request_select(id) end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
 	})
 end
