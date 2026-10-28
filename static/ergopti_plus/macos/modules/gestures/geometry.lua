@@ -104,7 +104,8 @@ end
 --- @param axis string "horiz" or "vert".
 --- @return boolean together True when each contact covered at least
 ---   COHESION_MIN_SHARE of the centroid's travel, in its direction.
---- @return number share The least share any contact covered (0 when unknown).
+--- @return number|nil share The least share any contact covered (0 when the
+---   contacts cannot be paired, nil while the centroid has not travelled).
 function M.movedTogether(origin, current, axis)
 	if type(origin) ~= "table" or type(current) ~= "table"
 		or #origin == 0 or #origin ~= #current then
@@ -114,7 +115,7 @@ function M.movedTogether(origin, current, axis)
 	local total = 0
 	for i = 1, #origin do total = total + (current[i][along] - origin[i][along]) end
 	total = total / #origin
-	if total == 0 then return false, 0 end
+	if total == 0 then return false, nil end
 	local sign = total > 0 and 1 or -1
 	local share = math.huge
 	for i = 1, #origin do
