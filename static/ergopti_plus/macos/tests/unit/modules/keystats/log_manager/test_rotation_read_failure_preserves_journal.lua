@@ -85,6 +85,7 @@ end
 local function make_state()
 	return {
 		LOG_DIR               = "/virtual/keystats/metrics",
+		CACHE_DIR             = "/virtual/keystats/metrics/cache",
 		buffer_events         = {},
 		buffer_text           = "",
 		rich_chunks           = {},

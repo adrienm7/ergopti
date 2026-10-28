@@ -146,7 +146,7 @@ local function exercise_bundle_action(operation, business_ok, live)
 			return true
 		end
 		-- Whether macOS turned the added variant on now (macOS 26: at the next login).
-		input_sources.confirm_source_async = function(_name, _options, on_done)
+		input_sources.confirm_enabled_async = function(_name, _options, on_done)
 			on_done(true, { listed = true, enabled = live ~= false })
 			return true
 		end

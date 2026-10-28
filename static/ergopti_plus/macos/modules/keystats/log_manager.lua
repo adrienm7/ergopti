@@ -9,7 +9,7 @@
 ---     <config_dir>/metrics/by_device/<device_id>/device.json
 ---     <config_dir>/metrics/by_device/<device_id>/data.sql       (append-only SQL)
 ---     <config_dir>/metrics/by_device/<device_id>/today.log      (JSONL hot path)
----     <tmpdir>/ergopti_metrics/<device_id>/db.sqlite             (cache mirror)
+---     ~/Library/Caches/<app>/metrics/<device_id>/db.sqlite      (cache mirror)
 ---
 --- SUBMODULES (each owns a distinct concern):
 --- - sqlite_writer  — SQLite lifecycle, schema bootstrap, INSERT builders.
@@ -20,8 +20,8 @@
 --- FEATURES & RATIONALE:
 --- 1. Source of truth on disk is plain SQL text — Git-friendly, no helper
 ---    needed (KEYSTATS_SPEC §1.6).
---- 2. SQLite cache lives in tmpdir; user-visible folder only has data.sql +
----    device.json (KEYSTATS_SPEC §1.7).
+--- 2. SQLite cache lives in the user's Caches folder, which survives a reboot;
+---    the user-visible folder only has data.sql + device.json (KEYSTATS_SPEC §1.7).
 --- 3. Hot path never blocks on SQLite: keystroke handler appends a JSONL line;
 ---    aggregation runs in the ingest tick.
 --- 4. Ingest is crash-safe — INSERT OR IGNORE in a transaction is idempotent
@@ -261,25 +261,27 @@ end
 -- ==================================
 -- ==================================
 
---- Resolve <tmpdir>/ — macOS sets TMPDIR per-user; fall back to /tmp/.
-local function _resolve_tmpdir()
+--- The cache folder of earlier versions, <TMPDIR>/ergopti_metrics/, or nil
+--- without a TMPDIR. Read only to adopt a cache that is still there.
+--- @return string|nil root With a trailing separator.
+local function _legacy_cache_root()
 	local t = os.getenv("TMPDIR")
-	if type(t) == "string" and t ~= "" then
-		return NativePath.with_trailing_separator(t)
-	end
-	return "/tmp/"
+	if type(t) ~= "string" or t:sub(1, 1) ~= "/" then return nil end
+	return NativePath.with_trailing_separator(t) .. "ergopti_metrics/"
 end
 
 --- Compute every path the log manager touches once `device_id` is known.
 --- @param metrics_dir string The metrics root (CoreState.LOG_DIR).
+--- @param cache_dir   string The SQLite cache root (CoreState.CACHE_DIR).
 --- @param device_id   string The current device's UUID.
 --- @return table Resolved path bundle. The caller publishes it only after the
 --- device identity transaction commits.
-local function _resolve_paths(metrics_dir, device_id)
+local function _resolve_paths(metrics_dir, cache_dir, device_id)
 	local md = NativePath.with_trailing_separator(metrics_dir)
 
 	local by_dev  = md .. "by_device/" .. device_id .. "/"
-	local tmp_dir = _resolve_tmpdir() .. "ergopti_metrics/" .. device_id .. "/"
+	local cache   = NativePath.with_trailing_separator(cache_dir) .. device_id .. "/"
+	local legacy  = _legacy_cache_root()
 
 	return {
 		metrics_dir      = md,
@@ -287,9 +289,31 @@ local function _resolve_paths(metrics_dir, device_id)
 		device_json_path = by_dev .. "device.json",
 		data_sql_path    = by_dev .. "data.sql",
 		today_log_path   = by_dev .. "today.log",
-		tmpdir_dir       = tmp_dir,
-		sqlite_path      = tmp_dir .. "db.sqlite",
+		cache_dir        = cache,
+		sqlite_path      = cache .. "db.sqlite",
+		legacy_sqlite_path = legacy and (legacy .. device_id .. "/db.sqlite") or nil,
 	}
+end
+
+--- Moves a cache left in TMPDIR by an earlier version into the persistent cache
+--- folder, once, before any connection exists. A rollback journal moves first:
+--- a database without its hot journal would lose an interrupted transaction.
+--- When the move is refused (another volume), the bounded replay rebuilds it.
+--- @param paths table Resolved path bundle.
+local function _adopt_legacy_cache(paths)
+	local legacy = paths.legacy_sqlite_path
+	if not legacy or legacy == paths.sqlite_path then return end
+	if fs.attributes(paths.sqlite_path) ~= nil or fs.attributes(legacy) == nil then return end
+	local journal_ok = true
+	if fs.attributes(legacy .. "-journal") ~= nil then
+		journal_ok = os.rename(legacy .. "-journal", paths.sqlite_path .. "-journal") == true
+	end
+	local moved = journal_ok and os.rename(legacy, paths.sqlite_path) == true
+	if moved then
+		Logger.info(LOG, "Moved the metrics cache out of TMPDIR into the persistent cache folder.")
+	else
+		Logger.warn(LOG, "The TMPDIR metrics cache could not be moved; the ledger replay rebuilds it.")
+	end
 end
 
 
@@ -2286,7 +2310,8 @@ local function _init(core_state)
 		Logger.warn(LOG, "M.init() called twice — ignoring duplicate.")
 		return true
 	end
-	if type(core_state) ~= "table" or type(core_state.LOG_DIR) ~= "string" then
+	if type(core_state) ~= "table" or type(core_state.LOG_DIR) ~= "string"
+		or type(core_state.CACHE_DIR) ~= "string" then
 		Logger.error(LOG, "M.init(): invalid core_state — log manager non-functional.")
 		return false
 	end
@@ -2299,11 +2324,11 @@ local function _init(core_state)
 		return false
 	end
 	local device_id = device_obj.device_id
-	local paths = _resolve_paths(core_state.LOG_DIR, device_id)
+	local paths = _resolve_paths(core_state.LOG_DIR, core_state.CACHE_DIR, device_id)
 
 	_mkdir_p(paths.metrics_dir)
 	_mkdir_p(paths.by_device_dir)
-	_mkdir_p(paths.tmpdir_dir)
+	_mkdir_p(paths.cache_dir)
 
 	if not _ensure_metrics_gitignore(paths) then return false end
 
@@ -2315,7 +2340,7 @@ local function _init(core_state)
 		if not identity_committed then return false end
 		device_obj = published_device
 		device_id = device_obj.device_id
-		paths = _resolve_paths(core_state.LOG_DIR, device_id)
+		paths = _resolve_paths(core_state.LOG_DIR, core_state.CACHE_DIR, device_id)
 	end
 
 	-- A torn header would permanently block durable outbox publication. Admit
@@ -2329,6 +2354,7 @@ local function _init(core_state)
 	_device_obj = device_obj
 	_device_id = device_id
 	_paths = paths
+	_adopt_legacy_cache(_paths)
 	local cache_was_fresh = fs.attributes(_paths.sqlite_path) == nil
 
 	-- Initialise submodules.
