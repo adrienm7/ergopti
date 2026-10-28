@@ -197,6 +197,8 @@ _OllamaWarmupPendingRetryCase(Mode) {
 		OriginalGeneration := _LLM_Ollama_WarmupGeneration
 		OriginalStart := OriginalRequest.DeadlineStart
 		OriginalWaits := OriginalRequest.WaitCalls
+		AssertFalse(_LLM_Ollama_WarmupPendingFn.Call(StrUpper(_LLM_Ollama_WarmupRetryModel)),
+			"a case-distinct model cannot borrow the pending request")
 		if Mode == "complete" {
 			OriginalRequest.Completed := true
 			OriginalRequest.AbortAccepted := true
