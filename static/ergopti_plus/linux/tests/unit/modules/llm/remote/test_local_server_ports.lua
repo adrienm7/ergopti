@@ -29,11 +29,12 @@ helpers.describe("Local server port discovery (local-server-ports)", function()
 end)
 
 helpers.describe("Linux local server port scan commands (local-server-ports)", function()
-	--- Runs a scan of the actual catalogue over fake ps and ss answers.
-	--- @param answers table Program -> { exit_code, stdout }.
+	--- Runs a scan of the actual catalogue over fake pgrep, ss and ps answers.
+	--- @param answers table Program -> { exit_code, stdout, error? }.
+	--- @param files table|nil Absolute path -> content.
 	--- @return table results
 	--- @return table runs The programs run, in order.
-	local function scan_with(answers)
+	local function scan_with(answers, files)
 		local Policy = require("llm.local_server_ports")
 		local previous = package.loaded["modules.llm.local_server_ports"]
 		package.loaded["modules.llm.local_server_ports"] = nil
@@ -41,7 +42,7 @@ helpers.describe("Linux local server port scan commands (local-server-ports)", f
 		package.loaded["modules.llm.local_server_ports"] = previous
 		local runs, results = {}, nil
 		Scanner._home = function() return "/home/u" end
-		Scanner._read_file = function() return nil end
+		Scanner._read_file = function(path) return (files or {})[path] end
 		Scanner._run = function(program, args, options, callback)
 			runs[#runs + 1] = { program = program, args = args, timeout_ms = options.timeout_ms }
 			callback(answers[program] or { exit_code = 1, stdout = "" })
@@ -57,18 +58,31 @@ helpers.describe("Linux local server port scan commands (local-server-ports)", f
 		return results, runs
 	end
 
-	helpers.it("a command-line port needs ps only", function()
-		local results, runs = scan_with({ ps = { exit_code = 0, stdout = "700 /usr/bin/llama-server --port 8181\n" } })
+	-- What the process runner answers for a command past its deadline
+	local TIMED_OUT = { exit_code = -1, stdout = "", error = "pgrep did not finish within 2000 ms" }
+
+	helpers.it("a command-line port needs pgrep only", function()
+		local results, runs = scan_with({ pgrep = { exit_code = 0, stdout = "700 /usr/bin/llama-server --port 8181\n" } })
 		helpers.assert_eq(#runs, 1)
-		helpers.assert_eq(runs[1].program, "ps")
-		helpers.assert_true(runs[1].timeout_ms > 0, "ps is bounded")
+		helpers.assert_eq(runs[1].program, "pgrep")
 		helpers.assert_eq(results.llamacpp.base_url, "http://127.0.0.1:8181/v1")
 		helpers.assert_eq(results.omlx.running, false)
 	end)
 
+	helpers.it("the process lookup names the catalogue's processes within its budget (omlx-fast-process-lookup)", function()
+		local Timings = require("infra.timings")
+		local results, runs = scan_with({ pgrep = { exit_code = 1, stdout = "" } })
+		helpers.assert_eq(runs[1].program, "pgrep", "no full ps listing of every argument of every process")
+		helpers.assert_true(runs[1].args[#runs[1].args]:find("omlx%-server") ~= nil, "the pattern names oMLX's process")
+		helpers.assert_eq(runs[1].timeout_ms, Timings.ms("llm", "local_server_process_lookup_timeout_ms"))
+		helpers.assert_true(runs[1].timeout_ms <= 2000, "the lookup has its own short deadline")
+		helpers.assert_eq(#runs, 1, "no catalogue process (pgrep exit 1) is an answer, not a failure")
+		helpers.assert_eq(results.jan.running, false)
+	end)
+
 	helpers.it("ss gives the listening port of a running server without a port", function()
 		local results, runs = scan_with({
-			ps = { exit_code = 0, stdout = "900 /opt/Jan/jan\n" },
+			pgrep = { exit_code = 0, stdout = "900 /opt/Jan/jan\n" },
 			ss = { exit_code = 0, stdout = 'LISTEN 0 128 127.0.0.1:1338 0.0.0.0:* users:(("jan",pid=900,fd=30))\n' },
 		})
 		helpers.assert_eq(runs[2].program, "ss")
@@ -76,8 +90,23 @@ helpers.describe("Linux local server port scan commands (local-server-ports)", f
 		helpers.assert_eq(results.jan.source, "listening")
 	end)
 
-	helpers.it("a failed ps probes every server at its catalogue port", function()
-		local results = scan_with({})
+	helpers.it("a timed-out process list reads the listening ports of a process of the server's name (omlx-ps-timeout-listening)",
+		function()
+			local results, runs = scan_with({
+				pgrep = TIMED_OUT,
+				ss = { exit_code = 0, stdout = 'LISTEN 0 128 127.0.0.1:8181 0.0.0.0:* users:(("omlx-server",pid=4242,fd=7))\n' },
+				ps = { exit_code = 0, stdout = "4242 omlx-server\n" },
+			})
+			helpers.assert_eq(runs[2].program, "ss")
+			helpers.assert_eq(runs[3].program, "ps")
+			helpers.assert_eq(runs[3].args[#runs[3].args], "4242", "only the listening pids are described")
+			helpers.assert_eq(results.omlx.source, "listening")
+			helpers.assert_eq(results.omlx.base_url, "http://127.0.0.1:8181/v1")
+			helpers.assert_eq(results.llamacpp.source, "default")
+		end)
+
+	helpers.it("with no reading at all a server falls back to its catalogue port", function()
+		local results = scan_with({ pgrep = TIMED_OUT, ss = TIMED_OUT })
 		helpers.assert_eq(results.omlx.running, true)
 		helpers.assert_eq(results.omlx.source, "default")
 	end)
