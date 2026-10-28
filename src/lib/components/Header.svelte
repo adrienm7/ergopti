@@ -2,7 +2,7 @@
 	import Ergopti from '../components/Ergopti.svelte';
 	import ErgoptiPlus from '../components/ErgoptiPlus.svelte';
 
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { base } from '$app/paths';
 
 	import { getKeyboardData } from '$lib/keyboard/data/getKeyboardData.js';
@@ -48,7 +48,7 @@
 	});
 
 	function isCurrent(path) {
-		return $page.url && ($page.url.pathname === path || $page.url.pathname === base + path);
+		return page.url.pathname === path || page.url.pathname === base + path;
 	}
 
 	$effect(() => {
