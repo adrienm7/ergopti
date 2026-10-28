@@ -672,8 +672,10 @@ _LMT_SelectorPageActiveCommands() {
 		_LLM_Menu["api_entries"] := [_LMT_ApiEntry("active")]
 		_LLM_Menu["api_entry_id"] := "active"
 		Rows := Map(), Models := []
-		_LLM_Menu_ApiEntryPageRows(Rows, Models)
-		AssertEqual(1, Models.Length, "the active entry is one page row")
+		Listed := Map("active", Map("state", "listed",
+			"ids", [_LLM_Menu_ResolveApiEntry(_LLM_Menu["api_entries"][1])["model"]]))
+		_LLM_Menu_ApiEntryPageRows(Rows, Models, Listed)
+		AssertEqual(1, Models.Length, "the active entry, listed alone, is one page row")
 		for Key, Row in Rows
 			Entry := Row
 		for Id in ["test", "edit", "remove"]

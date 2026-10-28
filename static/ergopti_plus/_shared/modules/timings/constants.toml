@@ -86,6 +86,10 @@ managed_proxy_lookup_timeout_ms = 30000
 # AHK: api_remote.ahk LLM_REMOTE_POLL_MS / api_ollama.ahk LLM_OLLAMA_POLL_MS.
 poll_interval_ms = 50
 
+# How often a managed Ollama model pull's percentage is read for the model
+# selector page. AHK: ollama_managed_bootstrap.ahk (the pull's capture tail).
+pull_progress_poll_ms = 1000
+
 # MLX stream: fail fast if the server never sends the first TCP byte.
 stream_connect_timeout_ms = 5000
 

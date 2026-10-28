@@ -70,10 +70,14 @@ _LAEN_Entry(Id, Name, Model, BaseUrl := "https://api.cerebras.ai/v1") {
 		"Token", "sekret", "Model", Model)
 }
 
-; The names of the entry rows of the model selector page, in entry order.
+; The names of the entry rows of the model selector page, in entry order. Each
+; provider listed only the entry's own model, so the page shows one row per entry.
 _LAEN_EntryLabels() {
-	Rows := Map(), Models := []
-	_LLM_Menu_ApiEntryPageRows(Rows, Models)
+	global _LLM_Menu
+	Rows := Map(), Models := [], Listings := Map()
+	for Entry in _LLM_Menu["api_entries"]
+		Listings[Entry["Id"]] := Map("state", "listed", "ids", [_LLM_Menu_ResolveApiEntry(Entry)["model"]])
+	_LLM_Menu_ApiEntryPageRows(Rows, Models, Listings)
 	Labels := []
 	for Json in Models {
 		Assert(RegExMatch(Json, 'name:"((?:[^"\\]|\\.)*)"', &Match), "each API row carries its name")
