@@ -12,12 +12,35 @@
 
 _LRDC_Wire() => '{"layouts":[],"witness":"réel"}' . "`r`n"
 
+; Read activity is keyed lexically by the owner's resolved long path, while the
+; fixture directory may be a short alias such as RUNNER~1 under A_Temp. Busy
+; queries therefore use the authoritative Owner.Path, never the requested name.
+_LRDC_OwnerPath(Owner, Directory) {
+	if IsObject(Owner)
+		return Owner.Path
+	return FSResolveDirectoryPath(RTrim(Directory, "\")) . "\response.download"
+}
+
+; Proves that the requested stage name and the resolved owner path open the
+; same native file, so querying Owner.Path keeps the same physical coordinate.
+_LRDC_AssertSameNativeFile(Owner, Stage) {
+	Probe := DllCall("kernel32\CreateFileW", "Str", Stage, "UInt", 0x80000000,
+		"UInt", 3, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+	AssertTrue(Probe != -1, "the requested stage name must open the owned native file")
+	try {
+		Expected := FSHandleSnapshot(Owner.Pin.Handle), Actual := FSHandleSnapshot(Probe)
+		AssertTrue(Expected.Get("ok", false) && Actual.Get("ok", false))
+		for Key in ["volume", "index_high", "index_low"]
+			AssertEqual(Expected[Key], Actual[Key], "the requested and resolved stage names must denote one native file")
+	} finally AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Probe, "Int") != 0)
+}
+
 _LRDC_Finish(Owner, Directory) {
 	if IsObject(Owner) {
 		Owner.Retired := true
 		AssertTrue(Owner.Remove(), "the exact fixture download must retire before directory cleanup")
 	}
-	AssertFalse(FileReadActivityBusy(Directory . "response.download"))
+	AssertFalse(FileReadActivityBusy(_LRDC_OwnerPath(Owner, Directory)))
 	DirDelete(Directory, true)
 }
 
@@ -26,7 +49,8 @@ _LRDC_PublishExact(Bom) {
 	Wire := (Bom ? Chr(0xFEFF) : "") . _LRDC_Wire()
 	try {
 		Owner := _LayoutRegistryDownload(Stage)
-		AssertTrue(FileReadActivityBusy(Stage), "creation owns real cleanup before transport dispatch")
+		_LRDC_AssertSameNativeFile(Owner, Stage)
+		AssertTrue(FileReadActivityBusy(Owner.Path), "creation owns real cleanup before transport dispatch")
 		AssertThrows(() => Owner.ReadText(4096), "an active transfer cannot be consumed")
 		AssertFalse(LayoutRegistry_PrepareShutdown(), "an active transfer must refuse terminal admission")
 		_LCT_WriteRaw(Stage, Wire)
@@ -108,12 +132,12 @@ _LRDC_Debt(Mode) {
 			AssertTrue(ForeignHandle != -1)
 		}
 		AssertTrue(_LayoutRegistryDownloadOwners().Has(Owner), "refused cleanup keeps its exact domain capability")
-		AssertTrue(FileReadActivityBusy(Stage), "unacknowledged cleanup still blocks terminal admission")
+		AssertTrue(FileReadActivityBusy(Owner.Path), "unacknowledged cleanup still blocks terminal admission")
 		Boundary.DeleteProp("Call")
 		AssertTrue(LayoutRegistry_RetireDownloads(), "a later admission retries the retained native owner")
 		AssertTrue(Owner.Removed)
 		AssertFalse(_LayoutRegistryDownloadOwners().Has(Owner))
-		AssertFalse(FileReadActivityBusy(Stage))
+		AssertFalse(FileReadActivityBusy(Owner.Path))
 		AssertFalse(FileExist(Stage))
 		AssertEqual(PublishMode && ThrowAfter ? _LRDC_Wire() : "previous-cache", FSReadUtf8Exact(Destination))
 		if ForeignHandle != -1
@@ -404,7 +428,7 @@ _LRDC_SnapshotRetry() {
 		Boundary.DeleteProp("Call")
 		AssertEqual(_LRDC_Wire(), Owner.ReadText(4096), "a transient snapshot failure must be retried before caching its receipt")
 		AssertTrue(Owner.Remove())
-		AssertFalse(FileReadActivityBusy(Stage))
+		AssertFalse(FileReadActivityBusy(Owner.Path))
 	} finally {
 		if Boundary.HasOwnProp("Call")
 			Boundary.DeleteProp("Call")
