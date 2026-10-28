@@ -699,6 +699,19 @@ application already has. Action: a new fence, emission path or physical-key tap
 must keep both rules
 (`key-up-fence-pairing`, `stale-physical-event`).
 
+### project-hs-text-carrier-never-a-held-key
+
+A synthetic Unicode text event still names a key code, and a key-down of a key
+the user holds is lost downstream. Every text event used key code 0, the A key
+on Ergopti and QWERTY: with a rollover (Space pressed before the last A is
+released) « axa » expanded to « XA » (2026-10-28). The keymap taps report each
+physical edge to `adapters/unicode_carrier.lua`, and text rides the first plain
+character key not held; Return, Tab, Space, Delete, Escape and the keypad are
+never carriers because applications act on those codes. Linux releases held
+forwarded keys before typing; Windows `{Text}` (VK_PACKET) names no key. Action:
+a new emitter of Unicode key events takes its key code from that module, never
+a literal (`hsfix-held-carrier`).
+
 ### project-hs-key-taps-never-ask-accessibility
 
 Every Accessibility call runs on the main thread with the event taps, and
