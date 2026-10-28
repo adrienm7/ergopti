@@ -690,6 +690,10 @@ input_source_confirm_retry_base_ms = 500
 # HS: keymap/input_sources.lua CONFIRM_WINDOW_SEC.
 input_source_confirm_window_ms = 8000
 
+# Settling delay after each leg of a fresh-process keyboard-layout reselect.
+# macOS: keymap/input_sources.lua INPUT_SOURCE_REFRESH_SETTLE_SEC.
+input_source_refresh_settle_ms = 300
+
 # Hard deadline for a native keyboard input-source mutation subprocess.
 # HS: keymap/input_sources.lua INPUT_SOURCE_OPERATION_TIMEOUT_SEC.
 # Linux: adapters/input_source_switch.lua (each gsettings or setxkbmap child).
