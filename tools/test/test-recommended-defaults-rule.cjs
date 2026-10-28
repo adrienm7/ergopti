@@ -34,6 +34,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { parse: parseToml } = require('smol-toml');
+const { scriptTokens, stripComments } = require('../lib/script-source.cjs');
 
 const SP = path.resolve(__dirname, '..', '..', 'static', 'ergopti_plus');
 const read = (rel) => fs.readFileSync(path.join(SP, rel), 'utf8');
@@ -126,7 +127,8 @@ for (const file of localeFiles) {
 const DIALOG_OWNERS = [
 	{
 		file: 'windows/ui/menu/menu_gestures.ahk',
-		register: /"gesture_recommended_info", \(\*\) => GestureShowRecommendedInfo\(\)/,
+		register:
+			/^\s*MenuCommand\.GESTURE_RECOMMENDED_INFO, \(\*\) => GestureShowRecommendedInfo\(\),\s*$/m,
 		body: /\nGestureShowRecommendedInfo\(\) \{\n([\s\S]*?)\n\}/,
 		helper: 'Ui_MsgBox(',
 		keys: ['menu.gestures.recommended_reason_windows'],
@@ -149,17 +151,221 @@ const DIALOG_OWNERS = [
 		absent: []
 	}
 ];
-for (const owner of DIALOG_OWNERS) {
-	const source = read(owner.file);
-	assert.match(source, owner.register, `${owner.file} registers the Infos command`);
+/** Selects the native call's arguments through the shared lexical boundary. */
+function nativeDialogArguments(body, owner) {
+	const extension = path.extname(owner.file);
+	const tokens = scriptTokens(body, extension);
+	const prefix = scriptTokens(owner.helper, extension);
+	for (let start = 0; start + prefix.length <= tokens.length; start += 1) {
+		if (['.', ':', 'function'].includes(tokens[start - 1]?.value)) continue;
+		if (
+			!prefix.every(
+				(token, offset) =>
+					tokens[start + offset].kind === token.kind && tokens[start + offset].value === token.value
+			)
+		)
+			continue;
+		let depth = 1;
+		for (let end = start + prefix.length; end < tokens.length; end += 1) {
+			if (tokens[end].kind !== 'symbol') continue;
+			if (tokens[end].value === '(') depth += 1;
+			if (tokens[end].value === ')') depth -= 1;
+			if (depth === 0) return tokens.slice(start + prefix.length, end);
+		}
+	}
+	return null;
+}
+
+/** Checks executable owners while retaining their translated argument strings. */
+function assertInfoDialogOwner(source, owner) {
+	const extension = path.extname(owner.file);
+	const code = stripComments(source, extension);
+	let executable = '';
+	let previous = 0;
+	for (const token of scriptTokens(source, extension)) {
+		if (token.kind !== 'string') continue;
+		executable +=
+			code.slice(previous, token.start) + code.slice(token.start, token.end).replace(/[^\n]/g, ' ');
+		previous = token.end;
+	}
+	executable += code.slice(previous);
+	assert.match(executable, owner.register, `${owner.file} registers the Infos command`);
 	assert.doesNotMatch(source, /gesture_recommended_notes/, `${owner.file} publishes no notes rows`);
-	const body = (source.match(owner.body) || [])[1];
-	assert.ok(body, `${owner.file} defines the Infos handler`);
+	const definition = new RegExp(owner.body.source, `${owner.body.flags}d`).exec(executable);
+	assert.ok(definition && definition[1], `${owner.file} defines the Infos handler`);
+	const [start, end] = definition.indices[1];
+	const body = code.slice(start, end);
 	assert.ok(body.includes(owner.helper), `${owner.file} Infos uses ${owner.helper.slice(0, -1)}`);
-	for (const key of owner.keys)
+	const nativeArguments = nativeDialogArguments(body, owner);
+	assert.ok(nativeArguments, `${owner.file} Infos uses ${owner.helper.slice(0, -1)}`);
+	for (const key of owner.keys) {
 		assert.ok(body.includes(`"${key}"`), `${owner.file} Infos shows ${key}`);
+		assert.ok(
+			nativeArguments.some((token) => token.kind === 'string' && token.value === key),
+			`${owner.file} Infos shows ${key}`
+		);
+	}
 	for (const key of owner.absent)
 		assert.ok(!body.includes(`"${key}"`), `${owner.file} Infos does not show ${key}`);
+}
+
+for (const owner of DIALOG_OWNERS) assertInfoDialogOwner(read(owner.file), owner);
+
+// Keep the canonical binding strict: the generated command must still reach
+// its real native dialog. A spelling migration must not let a foreign command,
+// discarded handler, or comment stand in for the executable owner.
+const windowsInfo = DIALOG_OWNERS[0];
+const windowsSource = read(windowsInfo.file);
+const windowsBinding = windowsSource.match(windowsInfo.register);
+assert.ok(windowsBinding, 'the real Windows Infos binding exists before mutation');
+const binding = windowsBinding[0];
+const windowsMutations = [
+	{
+		name: 'foreign command',
+		from: binding,
+		to: binding.replace(
+			'MenuCommand.GESTURE_RECOMMENDED_INFO',
+			'MenuCommand.SYSTEM_GESTURE_SETTINGS'
+		),
+		failure: 'registers the Infos command'
+	},
+	{
+		name: 'raw command literal',
+		from: binding,
+		to: binding.replace('MenuCommand.GESTURE_RECOMMENDED_INFO', '"gesture_recommended_info"'),
+		failure: 'registers the Infos command'
+	},
+	{
+		name: 'foreign handler',
+		from: binding,
+		to: binding.replace('GestureShowRecommendedInfo()', 'GestureShowManualTutorialDialog()'),
+		failure: 'registers the Infos command'
+	},
+	{ name: 'missing binding', from: binding, to: '', failure: 'registers the Infos command' },
+	{
+		name: 'line-comment binding',
+		from: binding,
+		to: `; ${binding.trim()}`,
+		failure: 'registers the Infos command'
+	},
+	{
+		name: 'block-comment binding',
+		from: binding,
+		to: `/*\n${binding}\n*/`,
+		failure: 'registers the Infos command'
+	},
+	{
+		name: 'missing native dialog',
+		from: windowsInfo.helper,
+		to: 'DiscardedInfoDialog(',
+		failure: 'Infos uses Ui_MsgBox'
+	},
+	{
+		name: 'missing platform reason',
+		from: '"menu.gestures.recommended_reason_windows"',
+		to: '"menu.gestures.notify_title"',
+		failure: 'Infos shows menu.gestures.recommended_reason_windows'
+	},
+	{
+		name: 'forbidden shared note',
+		from: '"menu.gestures.recommended_reason_windows"',
+		to: '"menu.gestures.recommended_reason_windows") . t("menu.gestures.recommended_note"',
+		failure: 'Infos does not show menu.gestures.recommended_note'
+	}
+];
+for (const mutation of windowsMutations) {
+	const mutated = windowsSource.replace(mutation.from, mutation.to);
+	assert.notEqual(mutated, windowsSource, `${mutation.name} changes the real Windows owner`);
+	assert.throws(
+		() => assertInfoDialogOwner(mutated, windowsInfo),
+		(error) =>
+			error instanceof assert.AssertionError &&
+			error.message.startsWith(`${windowsInfo.file} ${mutation.failure}`),
+		`${mutation.name} must fail the unchanged dialog contract`
+	);
+}
+for (const owner of DIALOG_OWNERS.slice(1)) {
+	const source = read(owner.file);
+	const registered = source.match(owner.register);
+	assert.ok(registered, `${owner.file} has a real Infos binding before mutation`);
+	const commented = source.replace(registered[0], `--[[\n${registered[0]}\n]]`);
+	assert.throws(
+		() => assertInfoDialogOwner(commented, owner),
+		(error) =>
+			error instanceof assert.AssertionError &&
+			error.message.startsWith(`${owner.file} registers the Infos command`),
+		`${owner.file} cannot register its Infos dialog through a comment`
+	);
+}
+
+// These concrete decoys used to certify an owner present only in unused text.
+// Check every driver's lexical boundary without changing its native source.
+for (const owner of DIALOG_OWNERS) {
+	const source = read(owner.file);
+	const registered = source.match(owner.register);
+	const definition = source.match(owner.body);
+	assert.ok(
+		registered && definition && definition[1],
+		`${owner.file} has a real owner before decoys`
+	);
+	const windows = path.extname(owner.file) === '.ahk';
+	const body = definition[1];
+	const reason = owner.keys.at(-1);
+	const helperText = windows
+		? `\tIgnoredNativeHelper := ${JSON.stringify(owner.helper)}\n`
+		: `\tlocal ignored_native_helper = ${JSON.stringify(owner.helper)}\n`;
+	const reasonText = windows
+		? `\tIgnoredReason := ${JSON.stringify(reason)}\n`
+		: `\tlocal ignored_reason = ${JSON.stringify(reason)}\n`;
+	const stringBinding = windows
+		? source.replace(registered[0], '') +
+			`\nIgnoredInfosText := "\n(\n${registered[0].trim()}\n)"\n`
+		: `local ignored_infos = [=[\n${registered[0]}\n]=]\n` + source.replace(registered[0], '');
+	const decoys = [
+		{
+			name: 'string-only registration',
+			source: stringBinding,
+			failure: 'registers the Infos command'
+		},
+		{
+			name: 'string-only native helper',
+			source: source.replace(
+				body,
+				helperText + body.replace(owner.helper, windows ? 'Format(' : 'tostring(')
+			),
+			failure: `Infos uses ${owner.helper.slice(0, -1)}`
+		},
+		{
+			name: 'unused reason literal',
+			source: source.replace(
+				body,
+				reasonText +
+					body.replace(JSON.stringify(reason), JSON.stringify('menu.gestures.notify_title'))
+			),
+			failure: `Infos shows ${reason}`
+		}
+	];
+	if (owner !== DIALOG_OWNERS.at(-1)) {
+		const unusedDefinition = windows
+			? source.replace(definition[0], '') +
+				`\nIgnoredInfosHandler := '\n(\n${definition[0].trim()}\n)'\n`
+			: `local ignored_handler = [=[\n${definition[0]}\n]=]\n` + source.replace(definition[0], '');
+		decoys.push({
+			name: 'string-only handler definition',
+			source: unusedDefinition,
+			failure: 'defines the Infos handler'
+		});
+	}
+	for (const decoy of decoys) {
+		assert.notEqual(decoy.source, source, `${owner.file} ${decoy.name} changes the real owner`);
+		assert.throws(
+			() => assertInfoDialogOwner(decoy.source, owner),
+			(error) =>
+				error instanceof assert.AssertionError &&
+				error.message.startsWith(`${owner.file} ${decoy.failure}`),
+			`${owner.file} ${decoy.name} must fail the executable dialog contract`
+		);
+	}
 }
 
 // 4. One debounce.
