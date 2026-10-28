@@ -123,7 +123,10 @@ class FakePopen:
         self.index = FakePopen.created
         self.pid = 1000 + self.index
         self.returncode = None
-        EVENTS.append(["spawn", self.index, bool(start_new_session)])
+        EVENTS.append(["spawn", self.index, bool(start_new_session), list(args)])
+        if args[:2] == ["defaults", "import"]:
+            with builtins.open(args[3], "rb") as imported:
+                EVENTS.append(["import_payload", imported.read().decode("ascii")])
         if MODE == "race" and self.index == 1:
             deliver_or_queue_term()
 
@@ -187,7 +190,31 @@ function replaceExactly(source, before, after) {
 
 function budgetContract(payload) {
 	const timeouts = eventsOf(payload, 'communicate').map((event) => event[2]);
-	return payload.exit === 0 && JSON.stringify(timeouts) === JSON.stringify([8, 5, 1]);
+	return payload.exit === 0 && JSON.stringify(timeouts) === JSON.stringify([8, 5]);
+}
+
+function processGroupContract(payload) {
+	const children = eventsOf(payload, 'spawn');
+	return children.length === 2 && children.every((event) => event[2] === true);
+}
+
+function commandContract(payload) {
+	const children = eventsOf(payload, 'spawn');
+	if (payload.exit !== 0 || children.length !== 2) return false;
+	const read = children[0][3],
+		write = children[1][3];
+	return (
+		Array.isArray(read) &&
+		JSON.stringify(read) === JSON.stringify(['defaults', 'export', 'com.apple.HIToolbox', '-']) &&
+		Array.isArray(write) &&
+		write.length === 4 &&
+		JSON.stringify(write.slice(0, 3)) ===
+			JSON.stringify(['defaults', 'import', 'com.apple.HIToolbox']) &&
+		typeof write[3] === 'string' &&
+		write[3].endsWith('.plist') &&
+		JSON.stringify(eventsOf(payload, 'import_payload').map((event) => event[1])) ===
+			JSON.stringify(['plist'])
+	);
 }
 
 function timeoutKillContract(payload) {
@@ -242,9 +269,67 @@ try {
 	);
 	test(
 		'every nested child starts in its own process group',
-		eventsOf(budget, 'spawn').length === 3 &&
-			eventsOf(budget, 'spawn').every((event) => event[2] === true),
+		processGroupContract(budget),
 		JSON.stringify(budget)
+	);
+
+	test(
+		'the editor exports and imports the intended preferences and its actual staged payload',
+		commandContract(budget),
+		JSON.stringify(budget)
+	);
+	const importCommand = '    run_child(["defaults", "import", DOMAIN, tmp])';
+	test(
+		'mutation guard rejects a missing preference import',
+		!commandContract(
+			runMode(
+				python,
+				replaceExactly(
+					supervisor,
+					importCommand,
+					'    pass  # mutation: drops the preference import'
+				),
+				fixtureDir,
+				'budget'
+			)
+		)
+	);
+	test(
+		'mutation guard rejects an extra preference child',
+		!commandContract(
+			runMode(
+				python,
+				replaceExactly(supervisor, importCommand, importCommand + '\n' + importCommand),
+				fixtureDir,
+				'budget'
+			)
+		)
+	);
+	test(
+		'mutation guard rejects a foreign preference export target',
+		!commandContract(
+			runMode(
+				python,
+				replaceExactly(
+					supervisor,
+					'run_child(["defaults", "export", DOMAIN, "-"], capture_stdout=True)',
+					'run_child(["defaults", "export", "foreign.domain", "-"], capture_stdout=True)'
+				),
+				fixtureDir,
+				'budget'
+			)
+		)
+	);
+	test(
+		'mutation guard rejects an undetached nested child',
+		!processGroupContract(
+			runMode(
+				python,
+				replaceExactly(supervisor, 'start_new_session=True)', 'start_new_session=False)'),
+				fixtureDir,
+				'budget'
+			)
+		)
 	);
 
 	const timeout = runMode(python, supervisor, fixtureDir, 'timeout');
