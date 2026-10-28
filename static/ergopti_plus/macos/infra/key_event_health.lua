@@ -218,6 +218,12 @@ local function note_lateness(phase, lateness_ms)
 		M.LATE_CALLBACK_MS))
 end
 
+--- Returns the awake clock in milliseconds, the clock STUCK_MS is measured on.
+--- @return number Milliseconds from an arbitrary monotonic origin.
+function M.now_ms()
+	return Timer.now_ns() / NS_PER_MS
+end
+
 --- Records one physical key event seen by a keymap event tap. Safe inside the
 --- tap: table writes only, every line is written on a later turn.
 --- @param phase string "down" or "up".
