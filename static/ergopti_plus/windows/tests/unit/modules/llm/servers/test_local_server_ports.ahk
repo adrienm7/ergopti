@@ -35,7 +35,7 @@ _LSP_Catalogue() {
 _LSP_Replay(Vector, Catalogue) {
 	Server := Catalogue["servers"][Vector["server"]]
 	Verdict := LocalServerPortsDescriptor(Vector["server"], Server["discovery"])
-	AssertTrue(Verdict["descriptor"] is Map, Verdict["reason"])
+	AssertTrue(Verdict["descriptor"] is Map, Verdict["problem"])
 	Files := Vector["files"]
 	Context := Map("os", Vector["os"], "home", "/Users/u", "decode_json", JsonParse,
 		"read_file", (Path) => Files.Has(Path) ? Files[Path] : 0)

@@ -584,6 +584,8 @@
 			"no_source_layout",
 			"not-initialized",
 			"not_initialized",
+			"not_running",
+			"not_swept",
 			"observer_failed",
 			"off",
 			"ok",
