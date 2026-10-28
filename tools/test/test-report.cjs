@@ -1150,6 +1150,186 @@ function testTimingDiagnostics(spawnReporter = spawnSync) {
 }
 testTimingDiagnostics();
 
+/** Refuses malformed machine-row bytes without tightening human or stderr output. */
+function testTimingUtf8() {
+	const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-reporter-utf8-'));
+	const reporter = path.resolve(__dirname, 'report.cjs');
+	const transcript = path.join(folder, 'stdout.bin');
+	const stderrFile = path.join(folder, 'stderr.bin');
+	const runner = path.join(folder, 'runner.cjs');
+	const receipt = path.join(folder, 'receipt.json');
+	let retired = true;
+	let complete = false;
+	fs.writeFileSync(
+		runner,
+		"const fs=require('node:fs'); const bytes=fs.readFileSync(process.argv[2]); " +
+			'const cuts=JSON.parse(process.argv[5]); cuts.push(bytes.length); let at=0; ' +
+			'function emit() { const end=cuts.shift(); process.stdout.write(bytes.subarray(at,end)); at=end; ' +
+			'if(cuts.length) setTimeout(emit,15); else { process.stderr.write(fs.readFileSync(process.argv[3])); ' +
+			'process.exitCode=Number(process.argv[4]); } } emit();\n'
+	);
+	function launch(raw, mode, code = 0, stderr = Buffer.alloc(0), cuts = []) {
+		fs.writeFileSync(transcript, raw);
+		fs.writeFileSync(stderrFile, stderr);
+		retired = false;
+		const result = spawnSync(
+			process.execPath,
+			[
+				reporter,
+				'--name',
+				'machine-row-utf8',
+				'--json',
+				receipt,
+				'--',
+				...(mode === 'file'
+					? ['PARSE_FILE', transcript]
+					: [process.execPath, runner, transcript, stderrFile, String(code), JSON.stringify(cuts)])
+			],
+			{
+				timeout: 10000,
+				env: { ...process.env, GITHUB_ACTIONS: '', GITHUB_STEP_SUMMARY: '' }
+			}
+		);
+		retired =
+			!result.error &&
+			result.signal === null &&
+			Number.isInteger(result.status) &&
+			result.status >= 0;
+		assert.ifError(result.error);
+		check('UTF-8 probe child settles without a signal', retired);
+		if (mode !== 'file') {
+			check(
+				'UTF-8 validation forwards every original stdout byte',
+				result.stdout.subarray(0, raw.length).equals(raw)
+			);
+			check(
+				'UTF-8 validation forwards every original stderr byte',
+				result.stderr.subarray(0, stderr.length).equals(stderr)
+			);
+		}
+		return { result, json: JSON.parse(fs.readFileSync(receipt, 'utf8')) };
+	}
+	try {
+		for (const driver of ['linux', 'macos']) {
+			const row = {
+				schema: 1,
+				driver,
+				id: 1,
+				kind: 'case',
+				module: 'tests.unit.owner',
+				name: 'NAME_TOKEN',
+				status: 'pass',
+				elapsed_ms: 0,
+				timing_error: ''
+			};
+			const record = (name) =>
+				Buffer.concat([
+					Buffer.from('# lua_timing ' + JSON.stringify(row).split('NAME_TOKEN')[0]),
+					name,
+					Buffer.from(JSON.stringify(row).split('NAME_TOKEN')[1])
+				]);
+			const footer = Buffer.from('\nPassed tests: 1\nFailed tests: 0\n');
+			for (const bytes of [[0xff], [0x80], [0xc3], [0xc0, 0xaf], [0xed, 0xa0, 0x80]]) {
+				const raw = Buffer.concat([record(Buffer.from(bytes)), footer]);
+				for (const mode of ['child', 'file']) {
+					const { result, json } = launch(raw, mode);
+					check(
+						`${driver} ${mode}: malformed UTF-8 machine bytes fail the gate`,
+						result.status === 1
+					);
+					assert.deepStrictEqual(json.timing_errors, ['Timing input line 1: invalid UTF-8']);
+					assert.deepStrictEqual(json.timings, []);
+					check(
+						'invalid timing bytes do not rewrite assertion counts',
+						json.passed === 1 && json.failed === 0
+					);
+				}
+			}
+			const name = 'français é 💻 �';
+			const valid = Buffer.concat([record(Buffer.from(name)), footer]);
+			for (const mode of ['child', 'file']) {
+				const { result, json } = launch(valid, mode);
+				check(
+					`${driver} ${mode}: Unicode and literal replacement characters are valid`,
+					result.status === 0
+				);
+				assert.deepStrictEqual(json.timings, [{ ...row, name }]);
+				assert.deepStrictEqual(json.timing_errors, []);
+			}
+			const split = launch(valid, 'child', 0, Buffer.from('interleaved stderr\n'), [
+				3,
+				valid.indexOf(Buffer.from('é')) + 1,
+				valid.indexOf(Buffer.from('💻')) + 2
+			]);
+			check(
+				'valid UTF-8 survives prefix and multibyte child chunk boundaries',
+				split.result.status === 0 && split.json.timings[0].name === name
+			);
+			const bad = Buffer.concat([record(Buffer.from([0xff])), footer]);
+			const native = launch(bad, 'child', 7);
+			check(
+				'UTF-8 timing refusal preserves an existing native failure',
+				native.result.status === 7 && native.json.exit_code === 7
+			);
+			assert.deepStrictEqual(native.json.timing_errors, ['Timing input line 1: invalid UTF-8']);
+			const human = launch(Buffer.concat([Buffer.from([0xff, 0x0a]), valid]), 'child', 0, bad);
+			check(
+				'ordinary binary stdout and timing-shaped stderr are not machine rows',
+				human.result.status === 0
+			);
+			assert.deepStrictEqual(human.json.timings, [{ ...row, name }]);
+			assert.deepStrictEqual(human.json.timing_errors, []);
+			for (const ending of ['\n', '\r\n', '']) {
+				const prefix = Buffer.from('Passed tests: 1\r\nFailed tests: 0\r\n');
+				for (const [bytes, invalid] of [
+					[Buffer.from(name), false],
+					[Buffer.from([0xc3]), true]
+				]) {
+					const raw = Buffer.concat([prefix, record(bytes), Buffer.from(ending)]);
+					const parsed = parseResults(raw.toString('utf8'), raw);
+					check(
+						'raw timing rows preserve counts at LF, CRLF and final EOF',
+						parsed.passed === 1 && parsed.failed === 0
+					);
+					assert.deepStrictEqual(
+						parsed.timing_errors,
+						invalid ? ['Timing input line 3: invalid UTF-8'] : []
+					);
+					assert.deepStrictEqual(parsed.timings, invalid ? [] : [{ ...row, name }]);
+				}
+			}
+			const unfinished = Buffer.from('Passed tests: 1\nFailed tests: 0\n# lua_timing {"name":"');
+			for (const mode of ['child', 'file']) {
+				const { result, json } = launch(Buffer.concat([unfinished, Buffer.from([0xc3])]), mode);
+				check(
+					'a truncated final machine row cannot become a successful timing receipt',
+					result.status === 1
+				);
+				assert.deepStrictEqual(json.timing_errors, ['Timing input line 3: invalid UTF-8']);
+			}
+		}
+		// Windows publishes TAP duration lines, not a synthetic Lua driver tag.
+		const tap = Buffer.concat([
+			Buffer.from([0xff, 0x0a]),
+			Buffer.from('ok 1 - français é 💻 �\n# duration_ms 1 0.125\n# 1 passed, 0 failed\n')
+		]);
+		for (const mode of ['child', 'file']) {
+			const { result, json } = launch(tap, mode, 0, Buffer.from([0xff]));
+			check(
+				'native Windows TAP format is unaffected by Lua row decoding',
+				result.status === 0 && json.format === 'tap' && json.passed === 1 && json.failed === 0
+			);
+		}
+		const failedTap = launch(tap, 'child', 7);
+		check('TAP native failure status is retained', failedTap.result.status === 7);
+		complete = true;
+	} finally {
+		if (retired && complete) fs.rmSync(folder, { recursive: true, force: true });
+		else process.stderr.write(`Reporter UTF-8 fixture retained for diagnosis: ${folder}\n`);
+	}
+}
+testTimingUtf8();
+
 /** Exercises actual fixture cleanup using recording launches that create no child process. */
 function testTimingFixtureRetirement() {
 	for (const [label, outcome, retained] of [
