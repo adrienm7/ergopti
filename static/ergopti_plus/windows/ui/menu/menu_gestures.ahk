@@ -44,7 +44,7 @@ BuildGesturesMenu(Options := unset) {
 		"scope_clear",      (*) => _GES_ApplyScope("clear", ScopeOptions),
 		"auto_configure",   (*) => GestureAutoConfigureAction(),
 		"manual_tutorial",  (*) => GestureShowManualTutorialDialog(),
-		"gesture_recommended_info", (*) => GestureShowRecommendedInfo(),
+		MenuCommand.GESTURE_RECOMMENDED_INFO, (*) => GestureShowRecommendedInfo(),
 	)
 	Getters := Map("gestures_enabled", _GES_IsEnabled)
 	; There is no status provider: the slot rows below carry the availability

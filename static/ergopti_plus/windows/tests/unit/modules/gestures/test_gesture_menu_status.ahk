@@ -330,7 +330,7 @@ _GSS_InfoOpensTheWindowsReason() {
 		if _MR_IsForAhk(Item)
 			AssertTrue(Item.Get("type", "") != "label", "the Gestures menu shows no explanation row")
 	AssertContains(_DriverFuncBody("BuildGesturesMenu"),
-		'"gesture_recommended_info", (*) => GestureShowRecommendedInfo()',
+		'MenuCommand.GESTURE_RECOMMENDED_INFO, (*) => GestureShowRecommendedInfo()',
 		"the Infos row opens the explanation dialog")
 	InfoShown := []
 	try {

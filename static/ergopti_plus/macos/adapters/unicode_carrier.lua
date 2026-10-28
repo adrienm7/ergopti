@@ -24,9 +24,6 @@
 local M = {}
 
 local KeyEventHealth = require("infra.key_event_health")
-local Timer          = require("adapters.timer_scheduler")
-
-local NS_PER_MS = 1e6
 
 --- Plain character keys of the ANSI block, key code 0 (A) first as Quartz and
 --- hs.eventtap.keyStrokes use it. Return (36), Tab (48), Space (49), Delete
@@ -58,7 +55,7 @@ function M.note_physical_key(phase, keycode)
 		_held_since_ms[keycode] = nil
 		return
 	end
-	_held_since_ms[keycode] = Timer.now_ns() / NS_PER_MS
+	_held_since_ms[keycode] = KeyEventHealth.now_ms()
 end
 
 --- Whether the user holds this key right now, by the taps' own edges.
@@ -80,7 +77,7 @@ end
 --- @return boolean moved True when the default carrier is held.
 function M.keycode()
 	if next(_held_since_ms) == nil then return M.CARRIER_KEYCODES[1], false end
-	local now_ms = Timer.now_ns() / NS_PER_MS
+	local now_ms = KeyEventHealth.now_ms()
 	for index, keycode in ipairs(M.CARRIER_KEYCODES) do
 		if not is_held(keycode, now_ms) then return keycode, index > 1 end
 	end
