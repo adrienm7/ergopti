@@ -43,8 +43,9 @@ function test(name, ok, detail = '') {
 }
 
 function toBashPath(filePath) {
-	const normalized = path.resolve(filePath).replace(/\\/g, '/');
-	if (process.platform !== 'win32') return normalized;
+	const absolute = path.resolve(filePath);
+	if (process.platform !== 'win32') return absolute;
+	const normalized = absolute.replace(/\\/g, '/');
 	const match = normalized.match(/^([A-Za-z]):(\/.*)$/);
 	if (!match) throw new Error(`cannot convert path for Bash: ${filePath}`);
 	return `/${match[1].toLowerCase()}${match[2]}`;
@@ -73,6 +74,30 @@ const hostile = [
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launcher-literals-'));
 
 try {
+	const nativePathDirectory = path.join(
+		fixtureRoot,
+		process.platform === 'win32' ? "native ' path" : 'native\\path'
+	);
+	fs.mkdirSync(nativePathDirectory);
+	const nativePathFile = path.join(nativePathDirectory, 'known-bytes.bin');
+	const knownPathBytes = Buffer.from([0, 1, 10, 37, 92, 255]);
+	fs.writeFileSync(nativePathFile, knownPathBytes);
+	const nativePathRead = spawnSync(
+		bash,
+		['-c', 'test -f "$1" && cat "$1"', 'native-path-roundtrip', toBashPath(nativePathFile)],
+		{ encoding: null }
+	);
+	test(
+		'the actual Bash path port reads native filename data without changing POSIX backslashes',
+		nativePathRead.status === 0 &&
+			Buffer.isBuffer(nativePathRead.stdout) &&
+			nativePathRead.stdout.equals(knownPathBytes),
+		JSON.stringify({
+			status: nativePathRead.status,
+			stdout: nativePathRead.stdout?.toString('hex'),
+			stderr: nativePathRead.stderr?.toString('utf8')
+		})
+	);
 	const { statQuery, portedCloneScript, portedShortcutScript } = createNativeStatResources({
 		resources: RESOURCES,
 		fixtureRoot,
