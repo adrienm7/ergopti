@@ -32,10 +32,14 @@ _LSP_Catalogue() {
 	return JsonParse(FileRead(_SharedDir . "\modules\llm\local_servers.json", "UTF-8"))
 }
 
+_LSP_DescriptorIsValid(Id, Catalogue) {
+	AssertTrue(LocalServerPortsDescriptor(Id, Catalogue["servers"][Id]["discovery"])["descriptor"] is Map)
+}
+
 _LSP_Replay(Vector, Catalogue) {
 	Server := Catalogue["servers"][Vector["server"]]
 	Verdict := LocalServerPortsDescriptor(Vector["server"], Server["discovery"])
-	AssertTrue(Verdict["descriptor"] is Map, Verdict["reason"])
+	AssertTrue(Verdict["descriptor"] is Map, Verdict["problem"])
 	Files := Vector["files"]
 	Context := Map("os", Vector["os"], "home", "/Users/u", "decode_json", JsonParse,
 		"read_file", (Path) => Files.Has(Path) ? Files[Path] : 0)
@@ -74,8 +78,7 @@ _LSP_RegisterCorpus() {
 		throw Error("The independent port discovery corpus requires explicit review.")
 	Catalogue := _LSP_Catalogue()
 	for Id in Catalogue["server_order"]
-		Test("local server ports: catalogue descriptor is valid: " . Id,
-			((Id) => AssertTrue(LocalServerPortsDescriptor(Id, Catalogue["servers"][Id]["discovery"])["descriptor"] is Map)).Bind(Id))
+		Test("local server ports: catalogue descriptor is valid: " . Id, _LSP_DescriptorIsValid.Bind(Id, Catalogue))
 	for Vector in Corpus["cases"]
 		Test("local server ports corpus: " . Vector["name"], _LSP_Replay.Bind(Vector, Catalogue))
 }
