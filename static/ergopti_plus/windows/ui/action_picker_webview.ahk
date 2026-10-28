@@ -365,7 +365,11 @@ _ActPickWeb_Confirm(Id, HasParameter := false, Parameter := "", HasProvider := f
 		try cb(Mapped)
 		finally GestureClearPickedParameter()
 		return true
-	} catch Any {
+	} catch Any as Failure {
+		if Failure is Error
+			LoggerError("ActionPicker", "Action picker confirmation failed ({1}): {2}.", Type(Failure), Failure.Message)
+		else
+			LoggerError("ActionPicker", "Action picker confirmation failed with a thrown {1} value.", Type(Failure))
 		return false
 	} finally _ActPickWeb_Confirming := false
 }
