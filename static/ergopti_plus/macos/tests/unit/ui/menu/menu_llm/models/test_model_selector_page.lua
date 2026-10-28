@@ -20,7 +20,7 @@ local OWNED = {
 	"ui.menu.menu_llm.model_selector_page", "ui.menu.menu_llm.custom_models",
 	"ui.menu.menu_llm.backend_labels", "infra.dialog_util", "infra.deferred_work",
 	"modules.llm", "modules.llm.api_mlx",
-	"ui.menu.menu_llm.mlx_repair_offer", "ui.menu.menu_llm.api_panel",
+	"ui.menu.menu_llm.mlx_repair_offer", "ui.menu.menu_llm.api_panel", "ui.download_window", "ui.model_browser",
 }
 
 --- One runtime checker double.
@@ -57,12 +57,25 @@ local CATALOGUE = { { label = "Alibaba", families = { { label = "Qwen", models =
 local function with_page(opts, body)
 	helpers.with_fresh_modules(OWNED, function()
 		local calls = { switch = {}, select = {}, pulls = {}, saves = 0, api = {} }
-		package.loaded["infra.dialog_util"] = { block_alert = function() return "OK" end }
+		package.loaded["infra.dialog_util"] = { block_alert = function() return "OK" end,
+			text_prompt = function() return "OK", opts.typed_model or "" end }
 		package.loaded["infra.deferred_work"] = { after = function(_, fn) fn(); return true end }
 		package.loaded["ui.menu.menu_llm.mlx_repair_offer"] = { set_alternative = function() end }
+		package.loaded["ui.download_window"] = { set_percent_listener = function(fn) calls.percent_listener = fn end }
+		package.loaded["ui.model_browser"] = { inject_progress = function(update)
+			calls.progress = calls.progress or {}
+			calls.progress[#calls.progress + 1] = update
+			return true
+		end }
 		package.loaded["modules.llm.api_mlx"] = { get_port = function() return 3460 end, get_default_port = function() return 3460 end }
 		package.loaded["modules.llm"] = { api_remote = {
-			listed_models = function(id) return (opts.listed or {})[id] end,
+			listing_state = function(id)
+				local ids = (opts.listed or {})[id]
+				if ids then return { state = "listed", ids = ids } end
+				return (opts.listing or {})[id]
+			end,
+			PROVIDERS = { openai = { default_model = "gpt-4o-mini", model_extras = { ["o-extra"] = {} } },
+				groq = { default_model = "llama", model_extras = {} } },
 			local_server_views = function() return opts.local_views or {} end,
 			get_active_entry = function() return nil end,
 		} }
@@ -214,6 +227,22 @@ helpers.describe("model selector page owner", function()
 		end)
 	end)
 
+	helpers.it("shows the download window's percentage on the downloading row", function()
+		with_page({}, function(Page, ctx, calls, collected, p)
+			helpers.assert_eq(calls.percent_listener, Page.on_download_percent, "the page observes the window")
+			helpers.assert_eq(Page.on_download_percent("ollama_model", 10), false, "no page download, no row")
+			helpers.assert_true(Page.handle_action(ctx, { action = "download_model", backend = "ollama", name = "Qwen-B" }, p, collected))
+			helpers.assert_eq(Page.on_download_percent("mlx_model", 10), false, "another backend's download")
+			helpers.assert_true(Page.on_download_percent("ollama_model", 42))
+			helpers.assert_eq(calls.progress[1].name, "Qwen-B")
+			helpers.assert_eq(calls.progress[1].percent, 42)
+			helpers.assert_eq(row_of(Page.build_payload(ctx, p, collected), "ollama", "Qwen-B").progress, 42,
+				"a refreshed payload keeps the percentage")
+			calls.done()
+			helpers.assert_nil(row_of(Page.build_payload(ctx, p, collected), "ollama", "Qwen-B").progress)
+		end)
+	end)
+
 	helpers.it("validates, persists and downloads a model added by identifier", function()
 		with_page({}, function(Page, ctx, calls, collected, p)
 			helpers.assert_eq(Page.handle_action(ctx, { action = "add_model", backend = "ollama", name = "Bad Name" }, p, collected), false)
@@ -244,6 +273,46 @@ helpers.describe("model selector page owner", function()
 			local keyless = row_of(payload, "api", "Groq/llama")
 			helpers.assert_eq(keyless.available, false)
 			helpers.assert_eq(keyless.hint_key, "model_browser.hint_api_no_key")
+		end)
+	end)
+
+	helpers.it("falls back to the provider's known models and a typed-id row with the listing's reason", function()
+		local entries = {
+			{ id = "e1", name = "OpenAI/gpt-4o", provider = "openai", model = "gpt-4o", active = true, key_missing = false },
+		}
+		local cases = {
+			{ listing = { e1 = { state = "failed", reason = "refused" } }, hint = "model_browser.hint_api_listing_refused" },
+			{ listing = { e1 = { state = "failed", reason = "unavailable" } }, hint = "model_browser.hint_api_listing_unavailable" },
+			{ listing = { e1 = { state = "pending" } }, hint = "model_browser.hint_api_listing_pending" },
+			{ listing = {}, hint = "model_browser.hint_api_listing_unavailable" },
+		}
+		for _, case in ipairs(cases) do
+			with_page({ entries = entries, listing = case.listing, typed_model = "gpt-5" }, function(Page, ctx, calls, collected, p)
+				local payload = Page.build_payload(ctx, p, collected)
+				helpers.assert_not_nil(row_of(payload, "api", "OpenAI/gpt-4o"), "the configured model")
+				helpers.assert_not_nil(row_of(payload, "api", "OpenAI/gpt-4o-mini"), "the provider's default model")
+				helpers.assert_not_nil(row_of(payload, "api", "OpenAI/o-extra"), "the catalogue's model extras")
+				local typed = row_of(payload, "api", "OpenAI")
+				helpers.assert_not_nil(typed, "the typed-id row")
+				helpers.assert_eq(typed.hint_key, case.hint)
+				helpers.assert_eq(typed.available, false, "the typed-id row is no model to activate")
+				helpers.assert_eq(Page.handle_action(ctx, { action = "select_model", backend = "api", name = "OpenAI" }, p, collected), false)
+				helpers.assert_true(Page.handle_action(ctx, { action = "row_action", backend = "api", name = "OpenAI", id = "other_model" }, p, collected))
+				helpers.assert_eq(calls.api[1], "model:e1:gpt-5", "the typed id becomes the entry's model")
+			end)
+		end
+		with_page({ entries = entries, listed = { e1 = { "gpt-4.1" } } }, function(Page, ctx, _, collected, p)
+			local payload = Page.build_payload(ctx, p, collected)
+			helpers.assert_nil(row_of(payload, "api", "OpenAI"), "a listed provider needs no typed-id row")
+			helpers.assert_nil(row_of(payload, "api", "OpenAI/o-extra"), "a listing replaces the known models")
+			helpers.assert_not_nil(row_of(payload, "api", "OpenAI/gpt-4o"), "the configured model stays visible")
+		end)
+		-- A second entry whose own model is the first entry's known default keeps that row.
+		local two = { entries[1], { id = "e2", name = "OpenAI/gpt-4o-mini", provider = "openai", model = "gpt-4o-mini",
+			active = false, key_missing = false } }
+		with_page({ entries = two, listing = {} }, function(Page, ctx, _, collected, p)
+			local row = row_of(Page.build_payload(ctx, p, collected), "api", "OpenAI/gpt-4o-mini")
+			helpers.assert_eq(row.entry_id, "e2", "an entry's own model wins over another entry's known one")
 		end)
 	end)
 
