@@ -243,7 +243,7 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 			MsgSub := View.WebMessageReceived(_PromptEdWeb_OnWebMessage)
 			if !_PromptEdWeb_StartupCurrent(g)
 				return true
-			NavSub := View.NavigationCompleted(_PromptEdWeb_OnNavigationCompleted)
+			NavSub := View.NavigationCompleted(_PromptEdWeb_OnNavigationCompleted.Bind(g))
 			if !_PromptEdWeb_StartupCurrent(g)
 				return true
 			try View.SetVirtualHostNameToFolderMapping(PROMPTED_VHOST, _SharedDir, PROMPTED_HOST_ACCESS_ALLOW)
@@ -376,11 +376,18 @@ _PromptEdWeb_HandlePayload(Payload, Action := "") {
 	_PromptEdWeb_Defer(_PromptEdWeb_Save.Bind(EditId, Epoch, Name, Batch, Prompt))
 }
 
-; Push the init payload once the page has finished loading.
-_PromptEdWeb_OnNavigationCompleted(Handler, Args) {
+; A navigation owns its native window, independently of profile repoints on
+; that same host. An in-flight old callback cannot borrow a successor's context.
+_PromptEdWeb_OnNavigationCompleted(Window, Handler, Args) {
 	global _PromptEdWeb_EditId, _PromptEdWeb_ContextEpoch
-	_PromptEdWeb_Defer(_PromptEdWeb_PushInit.Bind(
-		_PromptEdWeb_EditId, _PromptEdWeb_ContextEpoch))
+	PreviousCritical := Critical("On")
+	try {
+		if !(Window is Gui) || !_PromptEdWeb_StartupCurrent(Window)
+			return false
+		Initialize := _PromptEdWeb_PushInit.Bind(_PromptEdWeb_EditId, _PromptEdWeb_ContextEpoch)
+	} finally Critical(PreviousCritical)
+	_PromptEdWeb_Defer(Initialize)
+	return true
 }
 
 ; Build and push the init({...}) payload consumed by the frontend.
