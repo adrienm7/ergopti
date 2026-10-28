@@ -156,6 +156,9 @@ local _pending_rollover = false
 --- Aggregator state while it runs, so ingest waits for it (today.log buffers).
 local _recovery = nil
 
+--- Runtime fence mirroring the durable pending replay row until publication commits.
+local _local_ledger_replay_pending = false
+
 --- Registered post-ingest listeners — called after every successful ingest cycle.
 --- Each entry is a function(); failures are logged and contained so one broken
 --- listener cannot prevent the others from firing. Register via M.on_ingest_done().
@@ -1114,6 +1117,21 @@ local function _write_ledger_replay_state(db, state)
 		.. _sq(encoded) .. ");") == sqlite3.OK
 end
 
+--- Restore the exact replay owner's durable mode before publication or release.
+--- A refusal retains its flag so teardown can retry without closing the database.
+---@param db userdata
+---@param job table|nil Exact recovery owner, when running cooperatively.
+---@return boolean restored
+local function _restore_replay_durability(db, job)
+	local called, rc = pcall(db.exec, db, SqliteWriter.SYNCHRONOUS_PRAGMA)
+	if not called or rc ~= sqlite3.OK then
+		Logger.error(LOG, "Cannot restore the cache's durable commit mode; replay publication remains blocked.")
+		return false
+	end
+	if job then job.durability_off = nil end
+	return true
+end
+
 --- Replays the durable portion of this device's ledger into the cache in
 --- bounded steps. Inside the recovery coroutine each step stops at the slice
 --- budget and the coroutine yields, so the main thread never waits for more than
@@ -1128,6 +1146,7 @@ local function _replay_local_data_sql(db, state)
 	local size = attrs and math.tointeger(attrs.size) or 0
 	if size == 0 then return true, empty_cursor end
 	local started_ns, resumed_at = timer.absoluteTime(), state.offset or 0
+	local replay_job = _recovery
 	local next_progress = resumed_at + LEDGER_REPLAY_PROGRESS_BYTES
 	Logger.start(LOG, "Replaying the local ledger into a fresh cache from byte %d of %d…", resumed_at, size)
 	-- Every ledger batch is its own transaction: with synchronous=FULL each one
@@ -1137,15 +1156,12 @@ local function _replay_local_data_sql(db, state)
 	-- live write, and its first commit flushes the whole file.
 	if db:exec("PRAGMA synchronous = OFF;") ~= sqlite3.OK then
 		Logger.warn(LOG, "The replay keeps flushing every batch: %s.", tostring(db:errmsg()))
-	elseif _recovery then
-		-- An interrupted replay restores it too (_cancel_aggregate_recovery).
-		_recovery.durability_off = true
+	elseif replay_job then
+		-- An interrupted replay retains this exact restoration owner.
+		replay_job.durability_off = true
 	end
 	local function restore_durability()
-		if _recovery then _recovery.durability_off = nil end
-		if db:exec(SqliteWriter.SYNCHRONOUS_PRAGMA) ~= sqlite3.OK then
-			Logger.error(LOG, "Cannot restore the cache's durable commit mode: %s.", tostring(db:errmsg()))
-		end
+		return _restore_replay_durability(db, replay_job)
 	end
 	local exec = function(sql)
 		local rc = db:exec(sql)
@@ -1168,7 +1184,7 @@ local function _replay_local_data_sql(db, state)
 			return false, empty_cursor
 		end
 		if status == "done" then
-			restore_durability()
+			if not restore_durability() then return false, empty_cursor end
 			Logger.success(LOG, "Replayed %d durable local-ledger byte(s) (%d this start) in %.0f ms.",
 				state.offset, state.offset - resumed_at, (timer.absoluteTime() - started_ns) / 1e6)
 			return true, detail
@@ -1523,12 +1539,34 @@ local function _persist_recovery_state(db, cursor)
 		.. ")") do
 		max_id = tonumber(row.max_id) or 0
 	end
-	SqliteWriter.set_next_event_id(max_id + 1)
-	SqliteWriter.persist_next_event_id()
-	db:exec(string.format("UPDATE meta SET value='%d' WHERE key='today_log_offset';", tonumber(cursor.offset) or 0))
-	db:exec("UPDATE meta SET value=" .. _sq(cursor.date or "") .. " WHERE key='today_log_date';")
-	local ok, context_json = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
-	if ok then db:exec("UPDATE meta SET value=" .. _sq(context_json) .. " WHERE key='ngram_ctx_json';") end
+	local context_ok, context_json = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
+	if not context_ok or type(context_json) ~= "string" then
+		Logger.error(LOG, "Cannot encode the replayed typing context; replay publication remains pending.")
+		return false
+	end
+	local old_id = SqliteWriter.get_next_event_id()
+	local published, failure = pcall(function()
+		assert(db:exec("BEGIN TRANSACTION;") == sqlite3.OK, "cannot begin replay publication")
+		SqliteWriter.set_next_event_id(max_id + 1)
+		assert(SqliteWriter.persist_next_event_id() == true, "cannot publish the replayed event id")
+		assert(db:exec(string.format("UPDATE meta SET value='%d' WHERE key='today_log_offset';", tonumber(cursor.offset) or 0)) == sqlite3.OK,
+			"cannot publish the replayed cursor")
+		assert(db:exec("UPDATE meta SET value=" .. _sq(cursor.date or "") .. " WHERE key='today_log_date';") == sqlite3.OK,
+			"cannot publish the replayed date")
+		assert(db:exec("UPDATE meta SET value=" .. _sq(context_json) .. " WHERE key='ngram_ctx_json';") == sqlite3.OK,
+			"cannot publish the replayed context")
+		assert(db:exec("COMMIT;") == sqlite3.OK, "cannot commit replay publication")
+	end)
+	if not published then
+		local rolled_back, rollback_rc = pcall(db.exec, db, "ROLLBACK;")
+		if not rolled_back or rollback_rc ~= sqlite3.OK then
+			Logger.error(LOG, "Replay publication rollback remains pending.")
+		end
+		SqliteWriter.set_next_event_id(old_id)
+		Logger.error(LOG, "Replay metadata publication refused: %s.", tostring(failure))
+		return false
+	end
+	return true
 end
 
 --- Return the aggregate-cache compatibility marker from meta.
@@ -1704,11 +1742,13 @@ local function _recover_aggregate_cache(db, replay_state)
 		-- left a failed one with next_event_id=1 and offset 0: every new event
 		-- then collided with a replayed id (INSERT OR IGNORE dropped it from the
 		-- cache) and data.sql gained the id restart that refuses later rebuilds.
-		_persist_recovery_state(db, cursor)
+		if _persist_recovery_state(db, cursor) ~= true then return end
 		Rotation.set_offset(tonumber(cursor.offset) or 0, cursor.date)
 		if db:exec("DELETE FROM meta WHERE key=" .. _sq(LEDGER_REPLAY_KEY) .. ";") ~= sqlite3.OK then
 			Logger.error(LOG, "The finished ledger replay could not be marked; the next start repeats it.")
+			return
 		end
+		_local_ledger_replay_pending = false
 	end
 	-- Foreign ledgers also carry raw rows only. Import them before the
 	-- deterministic aggregate walk so cross-device totals survive a normal
@@ -1723,10 +1763,12 @@ local function _recover_aggregate_cache(db, replay_state)
 	end
 end
 
+local _cancel_aggregate_recovery
+
 --- Runs one budgeted slice of the recovery and schedules the next one.
 --- @param job table The exact recovery owned by `_recovery`.
 local function _run_recovery_slice(job)
-	if _recovery ~= job then return end
+	if _recovery ~= job or job.cancelled then return end
 	job.slice_start_ns = timer.absoluteTime()
 	job.slices = job.slices + 1
 	local resumed, resume_err = coroutine.resume(job.co)
@@ -1734,8 +1776,9 @@ local function _run_recovery_slice(job)
 		Logger.error(LOG, "Aggregate cache recovery raised: %s.", tostring(resume_err))
 	end
 	if coroutine.status(job.co) == "dead" then
+		if job.durability_off and not _restore_replay_durability(job.db, job) then return end
 		_recovery = nil
-		_restore_live_aggregator(job.db)
+		if not _local_ledger_replay_pending then _restore_live_aggregator(job.db) end
 		if job.slices > 1 then
 			Logger.done(LOG, "Aggregate cache recovery ended after %d slice(s) over %.0f ms.",
 				job.slices, (timer.absoluteTime() - job.started_ns) / 1e6)
@@ -1757,8 +1800,7 @@ local function _run_recovery_slice(job)
 	if committed ~= true then
 		-- Nothing is marked rebuilt, so the next start retries the whole recovery.
 		Logger.error(LOG, "Aggregate cache recovery could not schedule its next slice; it retries at the next start.")
-		_recovery = nil
-		_restore_live_aggregator(job.db)
+		_cancel_aggregate_recovery()
 	end
 end
 
@@ -1776,25 +1818,24 @@ end
 --- Abandons a running recovery before teardown. Its derived rows stay unmarked,
 --- so the next start repeats it; no SQLite transaction is open between slices.
 --- @return boolean settled False while its timer cleanup remains pending.
-local function _cancel_aggregate_recovery()
+_cancel_aggregate_recovery = function()
 	local job = _recovery
 	if job == nil then return true end
-	_recovery = nil
+	job.cancelled = true
 	local settled = true
 	if job.handle ~= nil then
 		local ok, cancelled = xpcall(function() return TimerScheduler.cancel(job.handle) end, debug.traceback)
 		settled = ok and cancelled == true
-		if not settled then
+		if settled then job.handle = nil
+		else
 			pcall(Logger.error, LOG, "Aggregate recovery timer cleanup remains pending: %s.", tostring(cancelled))
 		end
 	end
-	if job.durability_off then
-		local called, rc = pcall(function() return job.db:exec(SqliteWriter.SYNCHRONOUS_PRAGMA) end)
-		if not called or rc ~= sqlite3.OK then pcall(Logger.error, LOG, "Cannot restore the cache's durable commit mode after an interrupted replay.") end
-	end
+	if job.durability_off and not _restore_replay_durability(job.db, job) then settled = false end
+	if settled then _recovery = nil end
 	pcall(Logger.warn, LOG, "Aggregate cache recovery interrupted after %d slice(s); it restarts at the next start.",
 		job.slices)
-	pcall(_restore_live_aggregator, job.db)
+	if not _local_ledger_replay_pending then pcall(_restore_live_aggregator, job.db) end
 	return settled
 end
 
@@ -1809,7 +1850,7 @@ end
 function M.ingest_once()
 	-- The recovery owns the shared Aggregator until it ends; today.log keeps
 	-- every event meanwhile and the next tick ingests it.
-	if _recovery ~= nil then return false end
+	if _recovery ~= nil or _local_ledger_replay_pending then return false end
 	if not _resume_pending_rollover() then return false end
 
 	local trace = IngestTrace.begin(function() return timer.absoluteTime() end, function(line)
@@ -2175,7 +2216,8 @@ end
 --- be retried without constructing a sibling owner.
 --- @return boolean complete True only when no initialization cleanup debt remains.
 local function _release_failed_init_resources()
-	local complete = _cancel_aggregate_recovery()
+	local recovery_settled = _cancel_aggregate_recovery()
+	local complete = recovery_settled
 	local readers_ok, readers_closed = pcall(Export.cleanup)
 	if not readers_ok or readers_closed ~= true then
 		complete = false
@@ -2208,6 +2250,10 @@ local function _release_failed_init_resources()
 	if LedgerAppend.cleanup() ~= true then
 		complete = false
 		pcall(Logger.error, LOG, "Canonical ledger native cleanup remains pending.")
+	end
+	if not recovery_settled then
+		Logger.error(LOG, "Failed-init database close waits for recovery cleanup.")
+		return false
 	end
 	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
 		debug.traceback)
@@ -2357,6 +2403,7 @@ local function _init(core_state)
 			error("the fresh cache cannot record its pending ledger replay", 0)
 		end
 		local replay_state = db and _read_ledger_replay_state(db) or nil
+		_local_ledger_replay_pending = replay_state ~= nil
 		local recovery_due = db and (replay_state ~= nil or cache_was_fresh
 			or _aggregate_cache_revision(db) ~= AGGREGATE_CACHE_REVISION)
 		-- Restore persisted counters and n-gram context from meta.
@@ -2470,6 +2517,18 @@ function M.ensure_ingest_running()
 		end
 	end
 
+	if _recovery and _recovery.cancelled then return false end
+	if _local_ledger_replay_pending and _recovery == nil then
+		local db = SqliteWriter.get_db()
+		if not db then return false end
+		local replay_state = _read_ledger_replay_state(db)
+		if replay_state == nil then
+			Logger.error(LOG, "Pending local replay has no durable resume state; ingest remains blocked.")
+			return false
+		end
+		_start_aggregate_recovery(db, replay_state)
+	end
+
 	if _ingest_timer then
 		if _physical_sink_generation == physical_generation then _physical_sink_active = true end
 		return true
@@ -2495,7 +2554,8 @@ function M.stop(opts)
 	_physical_sink_active = false
 	_physical_sink_generation = _physical_sink_generation + 1
 	local process_exit = type(opts) == "table" and opts.process_exit == true
-	local complete = _cancel_aggregate_recovery()
+	local recovery_settled = _cancel_aggregate_recovery()
+	local complete = recovery_settled
 	local ingest_timer = _ingest_timer
 	if ingest_timer then
 		if not _stop_ingest_timer(ingest_timer, "Ingest timer") then
@@ -2526,26 +2586,31 @@ function M.stop(opts)
 				"Deferred log cleanup remains pending: %s.", tostring(drained_or_err))
 		end
 	end
+	local cache_writes_allowed = recovery_settled and not _local_ledger_replay_pending
 	if process_exit then
-		-- Only publish an already-committed data.sql outbox batch: one bounded append.
-		-- A refusal keeps it in the cache, where the next boot's ingest retries it.
-		local db = SqliteWriter.get_db()
-		if db then
-			local flush_ok, flushed_or_err = xpcall(function()
-				return _flush_local_data_sql_outbox(db)
-			end, debug.traceback)
-			if not flush_ok or flushed_or_err ~= true then
-				pcall(Logger.warn, LOG,
-					"Pending data.sql outbox kept in the cache for the next boot: %s.",
-					tostring(flushed_or_err))
+		if cache_writes_allowed then
+			-- Only publish an already-committed data.sql outbox batch: one bounded append.
+			-- A refusal keeps it in the cache, where the next boot's ingest retries it.
+			local db = SqliteWriter.get_db()
+			if db then
+				local flush_ok, flushed_or_err = xpcall(function()
+					return _flush_local_data_sql_outbox(db)
+				end, debug.traceback)
+				if not flush_ok or flushed_or_err ~= true then
+					pcall(Logger.warn, LOG,
+						"Pending data.sql outbox kept in the cache for the next boot: %s.",
+						tostring(flushed_or_err))
+				end
 			end
 		end
 	else
-		local ingest_ok, ingest_err = xpcall(M.ingest_once, debug.traceback)
-		if not ingest_ok then
-			complete = false
-			pcall(Logger.error, LOG,
-				"Final ingest cleanup remains pending: %s.", tostring(ingest_err))
+		if cache_writes_allowed then
+			local ingest_ok, ingest_err = xpcall(M.ingest_once, debug.traceback)
+			if not ingest_ok then
+				complete = false
+				pcall(Logger.error, LOG,
+					"Final ingest cleanup remains pending: %s.", tostring(ingest_err))
+			end
 		end
 	end
 	local readers_ok, readers_closed = pcall(Export.cleanup)
@@ -2556,6 +2621,10 @@ function M.stop(opts)
 	if LedgerAppend.cleanup() ~= true then
 		complete = false
 		pcall(Logger.error, LOG, "Canonical ledger native cleanup remains pending.")
+	end
+	if not recovery_settled then
+		Logger.error(LOG, "Database close waits for exact recovery cleanup.")
+		return false
 	end
 	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
 		debug.traceback)
