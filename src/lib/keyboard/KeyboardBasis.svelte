@@ -1,6 +1,6 @@
 <script>
-	import '$lib/keyboard/Keyboard.css';
-	import { Keyboard } from '$lib/keyboard/Keyboard.js';
+	import '#lib/keyboard/Keyboard.css';
+	import { Keyboard } from '#lib/keyboard/Keyboard.js';
 	import { onMount } from 'svelte';
 
 	export let id;

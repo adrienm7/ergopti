@@ -43,6 +43,10 @@ ASSET_FIELDS = {
     "provenance_sha256",
 }
 RECEIPT_BASENAME = ".ergopti-managed-runtime.json"
+# Clone-relative folder where tools/dev/stage-macos-dev-ollama-catalogue.py keeps
+# the asset a developer clone built from its pinned sources. Its unpublished
+# catalogue has no download URL; a sealed bundle never holds this folder.
+DEVELOPER_ASSET_DIRECTORY = "build/macos-dev-ollama"
 
 
 class RuntimeRefusal(Exception):

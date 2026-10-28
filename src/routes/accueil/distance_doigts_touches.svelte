@@ -1,10 +1,10 @@
 <script>
-	import Ergopti from '$lib/components/Ergopti.svelte';
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
-	import SFB from '$lib/components/SFB.svelte';
+	import Ergopti from '#lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
+	import SFB from '#lib/components/SFB.svelte';
 
-	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
-	import { base } from '$app/paths';
+	import KeyboardBasis from '#lib/keyboard/KeyboardBasis.svelte';
+	import { resolve } from '$app/paths';
 </script>
 
 <section>
@@ -167,8 +167,9 @@
 	</p>
 	<p>
 		Attention toutefois, car ces fréquences vont varier selon le texte analysé et la langue de
-		celui-ci. Vous trouverez plus de détails sur la page <a href={base + '/benchmarks'} class="link"
-			>Benchmarks</a
+		celui-ci. Vous trouverez plus de détails sur la page <a
+			href={resolve('/benchmarks')}
+			class="link">Benchmarks</a
 		>.
 	</p>
 </section>

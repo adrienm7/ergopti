@@ -2309,6 +2309,7 @@
 	"ollama.error_checksum": "Det nedlastede Ollama-arkivet besto ikke SHA-256-kontrollen og ble forkastet. Ingenting ble installert.",
 	"ollama.error_installer_refused": "Ergoptis Ollama-installasjonsprogram avviste sin egen forespørsel, så ingenting ble installert. Start Ergopti på nytt og velg Ollama-motoren igjen; hvis det fortsetter, send diagnoserapporten.",
 	"ollama.error_runtime_refused": "Ergopti kunne ikke bekrefte sin fastlåste Ollama-versjon (utgivelseskatalog eller integritetskontroll), så ingenting ble installert. Send diagnoserapporten.",
+	"ollama.error_dev_catalogue_missing": "Denne utviklerappen har ennå ikke bygget sin fastlåste Ollama fra klonens kildekode, så ingenting ble installert. Kjør tools/dev/run-macos-dev-app.sh på nytt og les årsaken som vises (Go og Xcode-verktøyene kreves).",
 	"ollama.error_killed": "Systemet stoppet installasjonen av Ollama ({1}) før den var ferdig, så ingenting ble installert. Prøv igjen; hvis det skjer igjen, send diagnoserapporten.",
 	"ollama.external_manual_start_body": "Denne Ollama-installasjonen administreres utenfor Ergopti. Start eller stopp tjenesten selv, eller installer Ergoptis administrerte miljø via tilbudet om å sette opp Ollama.",
 	"ollama.native_offer_body": "Installer Ergoptis egen Ollama %s, versjonen Ergopti låser og bekrefter. Den kjører på sin egen port ved siden av en Ollama du har installert selv, som Ergopti aldri bruker, stopper eller endrer. Modellene dine blir der de er.",

@@ -326,7 +326,7 @@ function M.build_payload(ctx, probes, collected)
 		end
 		backends[#backends + 1] = {
 			id = backend, kind = "local", emoji = BackendLabels.emoji(backend),
-			brand = BackendLabels.head(BackendLabels.brand(backend)),
+			brand = BackendLabels.name(backend),
 			available = available, reason_key = reason,
 			is_installed = function(display_name)
 				return models_mgr.backend_model_installed(backend, display_name) == true
@@ -339,7 +339,7 @@ function M.build_payload(ctx, probes, collected)
 	end
 	backends[#backends + 1] = {
 		id = "api", kind = "remote", emoji = BackendLabels.emoji("api"),
-		brand = BackendLabels.head(BackendLabels.brand("api")), available = true,
+		brand = BackendLabels.name("api"), available = true,
 		extra_rows = api_rows(ctx, collected),
 		providers = collected.providers,
 		actions = { { id = "rescan", text = i18n.get("menu.llm.local_servers.rescan") } },

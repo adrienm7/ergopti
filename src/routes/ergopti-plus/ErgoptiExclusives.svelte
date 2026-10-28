@@ -16,9 +16,9 @@ FEATURES & RATIONALE:
 -->
 
 <script>
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
-	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
-	import KeyboardControls from '$lib/keyboard/controls/KeyboardControls.svelte';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
+	import KeyboardBasis from '#lib/keyboard/KeyboardBasis.svelte';
+	import KeyboardControls from '#lib/keyboard/controls/KeyboardControls.svelte';
 	import { reveal } from './reveal.js';
 
 	const bigramCards = [
