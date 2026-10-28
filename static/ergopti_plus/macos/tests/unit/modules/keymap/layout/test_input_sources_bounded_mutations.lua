@@ -750,9 +750,8 @@ helpers.describe("input-source enable: the preference is not the live state (com
 	-- successful write, the script exited 1 and every enable read "process_failed"
 	-- (field runs 2026-10-27, L52). The script must end on its own write.
 	helpers.it("ends the enabled-list editor on its own write, with no agent restart", function()
-		local handle = assert(io.open(helpers.driver_root() .. "/modules/keymap/input_sources.lua", "rb"))
-		local source = handle:read("*a")
-		handle:close()
+		local source = helpers.read_driver_source("local ENABLED_LIST_SCRIPT = [[")
+		helpers.assert_not_nil(source, "the editor script's owner is found")
 		local script = source:match("local ENABLED_LIST_SCRIPT = %[%[(.-)%]%]")
 		helpers.assert_not_nil(script, "the editor script is found")
 		helpers.assert_true(script:find("launchctl", 1, true) == nil, "the editor restarts no agent")
