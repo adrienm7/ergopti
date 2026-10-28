@@ -2309,6 +2309,7 @@
 	"ollama.error_checksum": "Het gedownloade Ollama-archief faalde voor de SHA-256-controle en is verwijderd. Er is niets geïnstalleerd.",
 	"ollama.error_installer_refused": "Het Ollama-installatieprogramma van Ergopti weigerde zijn eigen verzoek; er is niets geïnstalleerd. Start Ergopti opnieuw en kies opnieuw de Ollama-backend; als het blijft gebeuren, stuur dan het diagnoserapport.",
 	"ollama.error_runtime_refused": "Ergopti kon zijn vastgezette Ollama-runtime niet verifiëren (releasecatalogus of integriteitscontrole); er is niets geïnstalleerd. Stuur het diagnoserapport.",
+	"ollama.error_dev_catalogue_missing": "Deze ontwikkelaarsapp heeft zijn vastgezette Ollama nog niet uit de bronnen van de kloon gebouwd, dus er is niets geïnstalleerd. Voer tools/dev/run-macos-dev-app.sh opnieuw uit en lees de reden die het toont (Go en de Xcode-tools zijn nodig).",
 	"ollama.error_killed": "Het systeem heeft de installatie van Ollama ({1}) gestopt voordat die klaar was, dus er is niets geïnstalleerd. Probeer het opnieuw; als het weer gebeurt, stuur dan het diagnoserapport.",
 	"ollama.external_manual_start_body": "Deze Ollama-installatie wordt buiten Ergopti beheerd. Start of stop de service zelf, of installeer de door Ergopti beheerde runtime via het aanbod om Ollama in te stellen.",
 	"ollama.native_offer_body": "Ergopti’s eigen Ollama %s installeren, de versie die Ergopti vastzet en controleert. Het draait op een eigen poort naast elke Ollama die u zelf hebt geïnstalleerd, die Ergopti nooit gebruikt, stopt of wijzigt. Uw modellen blijven waar ze zijn.",
