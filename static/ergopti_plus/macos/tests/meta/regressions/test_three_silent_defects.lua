@@ -41,8 +41,13 @@ helpers.describe("input-source upgrade: the native helper returns a parseable co
 		local code = src:gsub("%-%-[^\n]*", "")
 		helpers.assert_true(code:find("InputSourceSelector.upgrade(replacements)", 1, true) ~= nil,
 			"the typed helper owns native mutation and canonical count serialization")
-		helpers.assert_nil(code:find("TISCreateInputSourceList", 1, true),
+		-- The fresh-process read calls the C API through ctypes in its own child
+		-- (CONFIRM_SOURCE_SCRIPT, probe v5); the crashing bridge was AppleScriptObjC.
+		local without_ctypes_child = code:gsub("local CONFIRM_SOURCE_SCRIPT = %[%[.-%]%]", "")
+		helpers.assert_true(code:find("cf = ctypes.CDLL", 1, true) ~= nil, "the ctypes child is found")
+		helpers.assert_nil(without_ctypes_child:find("TISCreateInputSourceList", 1, true),
 			"the former Carbon dictionary bridge must not be reconstructed in Lua")
+		helpers.assert_nil(code:find("osascript", 1, true), "no AppleScript bridge reaches Carbon")
 	end)
 
 	helpers.it("the actual count grammar accepts native counts and rejects the former list form", function()
