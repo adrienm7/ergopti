@@ -1172,6 +1172,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/test_keystats_accuracy_projection_contract.ahk
 #Include unit/modules/keystats/test_keystats_unicode_projection_contract.ahk
 #Include unit/modules/keystats/test_keystats_case_projection_contract.ahk
+#Include unit/modules/keystats/test_keystats_app_pair_projection_contract.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader_ngram_sources.ahk
 #Include unit/modules/keystats/ergonomics/test_roi_prune_bounded.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader_sql_fail_loud.ahk
