@@ -16,6 +16,7 @@ const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
+const shellQuote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
 const recipe = path.join(ROOT, 'tools/build/PKGBUILD');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-arch-package-'));
 const failures = [];
@@ -31,7 +32,8 @@ function check(name, callback) {
 try {
 	assert.equal(process.platform, 'linux', 'Arch native package staging requires Linux');
 	const srcdir = path.join(scratch, 'src');
-	const pkgdir = path.join(scratch, 'pkg');
+	// Arch accepts literal POSIX backslashes; every staged helper must keep them.
+	const pkgdir = path.join(scratch, 'pkg\\native');
 	const stubs = path.join(scratch, 'stubs');
 	const calls = path.join(scratch, 'calls');
 	for (const directory of [srcdir, pkgdir, stubs]) fs.mkdirSync(directory);
@@ -119,6 +121,11 @@ try {
 	assert.equal(interpreter.status, 0, interpreter.stderr);
 	const realLua = interpreter.stdout.trim();
 	assert.ok(path.isAbsolute(realLua), 'a real LuaJIT interpreter must be available');
+	const flock = spawnSync(bashExecutable(), ['-c', 'command -v flock'], { encoding: 'utf8' });
+	assert.equal(flock.status, 0, flock.stderr);
+	const realFlock = flock.stdout.trim();
+	assert.ok(path.isAbsolute(realFlock), 'the actual session-lock owner must be available');
+	stub('flock', 'exec "$ARCH_REAL_FLOCK" "$@"');
 	stub(
 		'luajit',
 		'if [ -n "${ARCH_PACKAGE_PROBE:-}" ]; then exec "$ARCH_REAL_LUA" -e "$ARCH_PACKAGE_PROBE"; fi\nexec "$ARCH_REAL_LUA" "$@"'
@@ -134,16 +141,23 @@ try {
 		...process.env,
 		PATH: `${stubs}:${process.env.PATH}`,
 		ARCH_CALLS: calls,
-		ARCH_REAL_LUA: realLua
+		ARCH_REAL_LUA: realLua,
+		ARCH_REAL_FLOCK: realFlock,
+		ARCH_PACKAGE_PROBE: ''
 	};
-	const launch = (...args) => {
+	const launchWithEnvironment = (extra, ...args) => {
 		fs.writeFileSync(calls, '');
 		return spawnSync(bashExecutable(), [wrapper, ...args], {
-			env,
+			env: { ...env, ...extra },
 			encoding: 'utf8',
 			timeout: 15000
 		});
 	};
+	const launch = (...args) => launchWithEnvironment({}, ...args);
+	// These cases stop at the already controlled interpreter boundary, not help:
+	// the real launcher must acquire the resources that an actual daemon needs.
+	const launchDaemon = (...args) =>
+		launchWithEnvironment({ ARCH_PACKAGE_PROBE: 'print("ARCH_DAEMON_ENTRY")' }, ...args);
 	check('arch-desktop-entry-reaches-the-session-owner', () => {
 		const desktop = fs.readFileSync(
 			path.join(pkgdir, 'usr/share/applications/ergopti.desktop'),
@@ -151,7 +165,7 @@ try {
 		);
 		const command = desktop.match(/^Exec=(.+)$/m);
 		assert.ok(command, 'staged desktop must name its executable');
-		const result = launch(...command[1].trim().split(/\s+/).slice(1), '--help');
+		const result = launchDaemon(...command[1].trim().split(/\s+/).slice(1));
 		assert.equal(result.status, 0, result.stderr);
 		const invoked = fs.readFileSync(calls, 'utf8');
 		assert.match(invoked, /systemctl --user start ergopti-hotstrings.service/);
@@ -165,7 +179,7 @@ try {
 		);
 		const command = unit.match(/^ExecStart=(.+)$/m);
 		assert.ok(command, 'staged unit must have an executable command');
-		const result = launch(...command[1].trim().split(/\s+/).slice(1), '--help');
+		const result = launchDaemon(...command[1].trim().split(/\s+/).slice(1));
 		assert.equal(result.status, 78, result.stderr);
 		const invoked = fs.readFileSync(calls, 'utf8');
 		assert.match(invoked, /pkexec .*setup_permissions.sh --user 1000/);
@@ -181,7 +195,7 @@ try {
 			'sg',
 			'export ARCH_ACQUIRED_GROUPS="${ARCH_ACQUIRED_GROUPS:-} $1"\nexec /bin/bash -c "$3"'
 		);
-		const result = launch('--service', '--tray', '--help');
+		const result = launchDaemon('--service', '--tray');
 		assert.equal(result.status, 0, result.stderr);
 		const invoked = fs.readFileSync(calls, 'utf8');
 		assert.equal(
@@ -189,8 +203,46 @@ try {
 			2,
 			'both stale group credentials must be acquired'
 		);
-		assert.match(invoked, /^luajit .*ergopti_hotstrings\.lua --tray --help$/m);
+		assert.match(invoked, /^luajit .*ergopti_hotstrings\.lua --tray$/m);
+		assert.match(
+			result.stdout,
+			/^ARCH_DAEMON_ENTRY$/m,
+			'the controlled daemon boundary must execute'
+		);
 		assert.doesNotMatch(invoked, /pkexec|systemctl/);
+	});
+	check('arch-packaged-mixed-help-does-not-acquire-session-resources', () => {
+		stub('id', 'if [ "$1" = -u ]; then echo 1000; else echo users; fi');
+		const desktop = fs.readFileSync(
+			path.join(pkgdir, 'usr/share/applications/ergopti.desktop'),
+			'utf8'
+		);
+		const unit = fs.readFileSync(
+			path.join(pkgdir, 'usr/lib/systemd/user/ergopti-hotstrings.service'),
+			'utf8'
+		);
+		const desktopCommand = desktop.match(/^Exec=(.+)$/m);
+		const unitCommand = unit.match(/^ExecStart=(.+)$/m);
+		assert.ok(desktopCommand && unitCommand, 'both actual package entry points must be present');
+		const desktopArgs = desktopCommand[1].trim().split(/\s+/).slice(1);
+		const unitArgs = unitCommand[1].trim().split(/\s+/).slice(1);
+		for (const help of ['--help', '-h']) {
+			for (const args of [desktopArgs, unitArgs, ['--groups-refreshed', ...unitArgs]]) {
+				for (const combined of [
+					[...args, help],
+					[help, ...args]
+				]) {
+					// No probe: this must be the genuine packaged driver's usage path.
+					const result = launch(...combined);
+					assert.equal(result.status, 0, `${combined.join(' ')}: ${result.stderr}`);
+					assert.match(result.stdout, /^Usage: luajit ergopti_hotstrings\.lua \[OPTIONS\]/m);
+					assert.doesNotMatch(result.stdout, /ARCH_DAEMON_ENTRY/);
+					const invoked = fs.readFileSync(calls, 'utf8');
+					assert.match(invoked, /^luajit /m, 'help must reach the packaged interpreter');
+					assert.doesNotMatch(invoked, /^(?:systemctl|pkexec|sg|flock|id) /m);
+				}
+			}
+		}
 	});
 	check('arch-staged-bootstrap-and-data-readers-use-the-packaged-shared-tree', () => {
 		const booted = launch('--help');
@@ -277,11 +329,25 @@ try {
 		assert.notEqual(hookName, '', 'the recipe must declare a pacman lifecycle hook');
 		const hook = fs.readFileSync(path.join(path.dirname(recipe), hookName), 'utf8');
 		const relocatedHook = path.join(scratch, 'package.install');
-		fs.writeFileSync(relocatedHook, hook.replaceAll('/usr/lib/ergopti', library));
+		const packageRootAssignment = '_ergopti_package_root=/usr/lib/ergopti';
+		assert.equal(
+			hook.split(packageRootAssignment).length,
+			2,
+			'the hook root assignment must be unique'
+		);
+		fs.writeFileSync(
+			relocatedHook,
+			hook.replace(packageRootAssignment, () => `_ergopti_package_root=${shellQuote(library)}`)
+		);
 		// Only the privileged filesystem boundary is relocated. The shipped
 		// setup function, session selection and account validation execute intact.
 		const setup = path.join(library, 'install/setup_permissions.sh');
-		fs.writeFileSync(setup, fs.readFileSync(setup, 'utf8').replaceAll('/etc/', `${pkgdir}/etc/`));
+		const setupSource = fs.readFileSync(setup, 'utf8');
+		assert.match(setupSource, /^install -d \/etc\/udev\/rules\.d \/etc\/modules-load\.d$/m);
+		fs.writeFileSync(
+			setup,
+			setupSource.replaceAll(' /etc/', () => ` ${shellQuote(path.join(pkgdir, 'etc'))}/`)
+		);
 		stub('id', 'echo 0');
 		stub(
 			'getent',
@@ -300,12 +366,18 @@ try {
 				{ env, encoding: 'utf8', timeout: 15000 }
 			);
 		};
+		const ownedScratchEntries = fs.readdirSync(scratch).sort();
 		for (const action of ['post_install', 'post_upgrade']) {
 			const result = runHook(action);
 			assert.equal(result.status, 0, `${action}: ${result.stderr}`);
 			const invoked = fs.readFileSync(calls, 'utf8');
 			assert.match(invoked, /usermod -aG input,uinput desktop/);
 			assert.match(invoked, /modprobe uinput/);
+			assert.deepEqual(
+				fs.readdirSync(scratch).sort(),
+				ownedScratchEntries,
+				'permission setup must not create an unowned sibling of the staged package'
+			);
 		}
 		stub('usermod', 'exit 73');
 		const refused = runHook('post_upgrade');
@@ -316,7 +388,7 @@ try {
 			'a refused hook must stop before later privileged work'
 		);
 
-		const runtimeRoot = path.join(scratch, 'run/user');
+		const runtimeRoot = path.join(scratch, 'run\\native/user');
 		for (const uid of ['1000', '1001']) {
 			fs.mkdirSync(path.join(runtimeRoot, uid), { recursive: true });
 			fs.writeFileSync(path.join(runtimeRoot, uid, 'bus'), 'private bus-presence fixture');
@@ -324,11 +396,17 @@ try {
 		const stop = path.join(library, 'install/stop_sessions.sh');
 		// A regular fixture records socket presence; no real session bus or
 		// account switch is permitted in this unprivileged package test.
+		const stopSource = fs.readFileSync(stop, 'utf8');
+		const runtimeLoop = 'for runtime in /run/user/[0-9]*; do';
+		assert.equal(
+			stopSource.split(runtimeLoop).length,
+			2,
+			'the session enumeration must have one owner'
+		);
 		fs.writeFileSync(
 			stop,
-			fs
-				.readFileSync(stop, 'utf8')
-				.replaceAll('/run/user/', `${runtimeRoot}/`)
+			stopSource
+				.replace(runtimeLoop, () => `for runtime in ${shellQuote(runtimeRoot)}/[0-9]*; do`)
 				.replaceAll('[ -S ', '[ -f ')
 		);
 		stub('getent', 'echo "desktop$2:x:$2:$2::/home/desktop$2:/bin/bash"');
