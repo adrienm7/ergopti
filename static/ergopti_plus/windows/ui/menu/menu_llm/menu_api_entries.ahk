@@ -509,11 +509,21 @@ _LLM_Menu_OnApiValidationDone(reachable, Name, EntryId, Owner, NotifyFn := 0) {
 			TrayTip(StrReplace(t("menu.llm.api_validated_body"), "%s", CurrentName),
 				t("menu.llm.api_validated_title"), "Iconi")
 		} else {
-			TrayTip(StrReplace(t("menu.llm.api_unreachable_body"), "%s", CurrentName),
-				t("menu.llm.api_unreachable_title"), "Icon!")
+			Prefix := _LLM_Menu_ApiValidationFailurePrefix(Owner)
+			TrayTip(StrReplace(t(Prefix . "body"), "%s", CurrentName),
+				t(Prefix . "title"), "Icon!")
 		}
 		return true
 	} finally Critical(PreviousCritical)
+}
+
+; Names a refused key instead of a silent endpoint: a 401/403 is an answer, and
+; "did not respond" sent the user chasing the URL instead of the key.
+; @param Owner Map|any Readiness owner carrying the probe's HTTP status.
+; @returns {String} Locale key prefix of the failure notice.
+_LLM_Menu_ApiValidationFailurePrefix(Owner) {
+	Status := Owner is Map ? Owner.Get("http_status", 0) : 0
+	return (Status == 401 || Status == 403) ? "menu.llm.api_key_refused_" : "menu.llm.api_unreachable_"
 }
 
 _LLM_Menu_RemoveActiveApiEntry(Port := 0) {

@@ -74,6 +74,17 @@ helpers.describe("AI menu: adding and testing a Cerebras key", function()
 		state.finish_test(false, "HTTP 401: Wrong API Key", 90)
 		restore()
 		helpers.assert_true(state.errors[1]:find("Wrong API Key", 1, true) ~= nil)
+		helpers.assert_eq(state.error_titles[1], require("infra.i18n").get("menu.llm.api_key_refused_title"),
+			"a 401 proves the server answered, so the title names the refused key")
+	end)
+
+	helpers.it("titles a transport failure as unreachable", function()
+		local build, state, restore = setup("api")
+		state.answers = { "bad", "qwen" }
+		find(build(), "➕ Cerebras").action()
+		state.finish_test(false, "connection refused", 90)
+		restore()
+		helpers.assert_eq(state.error_titles[1], require("infra.i18n").get("menu.llm.api_unreachable_title"))
 	end)
 
 	helpers.it("adds nothing when the key prompt is cancelled", function()

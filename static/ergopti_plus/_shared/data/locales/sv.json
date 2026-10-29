@@ -1759,6 +1759,8 @@
 	"menu.llm.api_test_entry": "Testa det valda API:et",
 	"menu.llm.api_test_ok_body": "«{1}» svarade på {2} ms: {3}",
 	"menu.llm.api_test_ok_title": "API-testet lyckades",
+	"menu.llm.api_key_refused_body": "\"%s\" svarade men nekade nyckeln — kontrollera token som angetts på servern.",
+	"menu.llm.api_key_refused_title": "API-nyckel nekad",
 	"menu.llm.api_unreachable_body": "\"%s\" svarade inte — kontrollera token, URL och modell.",
 	"menu.llm.api_unreachable_title": "API-post inte nåbar",
 	"menu.llm.api_validated_body": "\"%s\" svarade framgångsrikt.",

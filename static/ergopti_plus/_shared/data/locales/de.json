@@ -1759,6 +1759,8 @@
 	"menu.llm.api_test_entry": "Ausgewählte API testen",
 	"menu.llm.api_test_ok_body": "„{1}“ hat in {2} ms geantwortet: {3}",
 	"menu.llm.api_test_ok_title": "API-Test erfolgreich",
+	"menu.llm.api_key_refused_body": "\"%s\" hat geantwortet, aber den Schlüssel abgelehnt — prüfen Sie das im Server festgelegte Token.",
+	"menu.llm.api_key_refused_title": "API-Schlüssel abgelehnt",
 	"menu.llm.api_unreachable_body": "\"%s\" hat nicht geantwortet — Token, URL und Modell prüfen.",
 	"menu.llm.api_unreachable_title": "API-Eintrag nicht erreichbar",
 	"menu.llm.api_validated_body": "\"%s\" hat erfolgreich geantwortet.",

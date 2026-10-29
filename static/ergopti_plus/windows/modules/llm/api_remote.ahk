@@ -1592,6 +1592,9 @@ _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms, Owner := 0) {
     }
     status := 0
     try status := Http.Status
+    ; A validation caller tells a refused key (401/403) from a silent endpoint.
+    if Owner is Map
+        Owner["http_status"] := status
     if (Owner is Map) && Owner.Get("listing", false) {
         ; A model listing reads the body the probe already holds; malformed
         ; source bytes are no listing.

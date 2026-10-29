@@ -1759,6 +1759,8 @@
 	"menu.llm.api_test_entry": "Przetestuj wybrane API",
 	"menu.llm.api_test_ok_body": "«{1}» odpowiedział w {2} ms: {3}",
 	"menu.llm.api_test_ok_title": "Test API zakończony powodzeniem",
+	"menu.llm.api_key_refused_body": "\"%s\" odpowiedział, ale odrzucił klucz — sprawdź token ustawiony na serwerze.",
+	"menu.llm.api_key_refused_title": "Klucz API odrzucony",
 	"menu.llm.api_unreachable_body": "\"%s\" nie odpowiedział — sprawdź token, URL i model.",
 	"menu.llm.api_unreachable_title": "Wpis API nieosiągalny",
 	"menu.llm.api_validated_body": "\"%s\" odpowiedział pomyślnie.",

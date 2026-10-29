@@ -1759,6 +1759,8 @@
 	"menu.llm.api_test_entry": "Перевірити вибраний API",
 	"menu.llm.api_test_ok_body": "«{1}» відповів за {2} мс: {3}",
 	"menu.llm.api_test_ok_title": "Перевірка API пройшла успішно",
+	"menu.llm.api_key_refused_body": "«%s» відповів, але відхилив ключ — перевірте токен, заданий на сервері.",
+	"menu.llm.api_key_refused_title": "Ключ API відхилено",
 	"menu.llm.api_unreachable_body": "«%s» не відповів — перевірте токен, URL і модель.",
 	"menu.llm.api_unreachable_title": "Запис API недоступний",
 	"menu.llm.api_validated_body": "«%s» успішно відповів.",

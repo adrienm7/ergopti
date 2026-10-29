@@ -1759,6 +1759,8 @@
 	"menu.llm.api_test_entry": "चयनित API का परीक्षण करें",
 	"menu.llm.api_test_ok_body": "«{1}» ने {2} ms में उत्तर दिया: {3}",
 	"menu.llm.api_test_ok_title": "API परीक्षण सफल रहा",
+	"menu.llm.api_key_refused_body": "\"%s\" ने उत्तर दिया लेकिन कुंजी अस्वीकार कर दी — सर्वर में सेट टोकन जाँचें।",
+	"menu.llm.api_key_refused_title": "API कुंजी अस्वीकृत",
 	"menu.llm.api_unreachable_body": "\"%s\" ने प्रतिक्रिया नहीं दी — टोकन, URL और मॉडल जांचें।",
 	"menu.llm.api_unreachable_title": "API प्रविष्टि अप्राप्य",
 	"menu.llm.api_validated_body": "\"%s\" ने सफलतापूर्वक प्रतिक्रिया दी।",

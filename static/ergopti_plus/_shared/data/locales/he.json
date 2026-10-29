@@ -1759,6 +1759,8 @@
 	"menu.llm.api_test_entry": "בדוק את ה-API שנבחר",
 	"menu.llm.api_test_ok_body": "«{1}» הגיב תוך {2} מ״ש: {3}",
 	"menu.llm.api_test_ok_title": "בדיקת ה-API הצליחה",
+	"menu.llm.api_key_refused_body": "\"%s\" ענה אך דחה את המפתח — בדקו את האסימון שהוגדר בשרת.",
+	"menu.llm.api_key_refused_title": "מפתח ה-API נדחה",
 	"menu.llm.api_unreachable_body": "\"%s\" לא הגיב — בדוק את האסימון, ה־URL והדגם.",
 	"menu.llm.api_unreachable_title": "רשומת ה־API לא נגישה",
 	"menu.llm.api_validated_body": "\"%s\" השיב בהצלחה.",
