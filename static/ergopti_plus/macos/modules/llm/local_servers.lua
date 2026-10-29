@@ -282,14 +282,34 @@ end
 
 --- Returns where the last scan found a catalogue server.
 --- @param id string Server id.
---- @return table|nil { running, pids, base_url, port, source, detail }; nil before any scan.
+--- @return table|nil { running, pids, base_url, port, source, detail, api_key };
+---        nil before any scan. api_key is the server's settings-file key.
 function M.port_scan(id)
 	local result = _port_scans[id]
 	if not result then return nil end
 	local pids = {}
 	for index, pid in ipairs(result.pids or {}) do pids[index] = pid end
 	return { running = result.running, pids = pids, base_url = result.base_url, port = result.port,
-		source = result.source, detail = result.detail }
+		source = result.source, detail = result.detail, api_key = result.api_key }
+end
+
+--- Returns every server's last scan, for matching a keyless request to the
+--- key its loopback server holds (llm.local_server_auth.discovered_key).
+--- @return table Server id -> M.port_scan(id).
+function M.port_scans()
+	local scans = {}
+	for id in pairs(_port_scans) do scans[id] = M.port_scan(id) end
+	return scans
+end
+
+--- The key a running loopback server's own settings file holds, for a
+--- request the user gave no key (oMLX started with auth.api_key answers 401
+--- otherwise, and was neither listed nor addable by hand). Never logged.
+--- @param provider_id string Provider id of the entry or probe.
+--- @param base_url string|nil Its configured address; "" for the scanned one.
+--- @return string key "" when no scanned server holds one.
+function M.discovered_key(provider_id, base_url)
+	return AuthPolicy.discovered_key(provider_id, base_url, M.port_scans(), M.SERVERS)
 end
 
 --- Marks the process scan that precedes a sweep as running or finished.

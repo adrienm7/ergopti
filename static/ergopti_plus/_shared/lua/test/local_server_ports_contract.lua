@@ -17,7 +17,7 @@ local Ports = require("llm.local_server_ports")
 --- @param decode_json function The driver's JSON decoder.
 --- @param helpers table Driver assertion and registration owner.
 function M.run(corpus, catalogue, decode_json, helpers)
-	assert(corpus.version == 1 and #corpus.cases == 15, "independent port discovery inventory")
+	assert(corpus.version == 1 and #corpus.cases == 17, "independent port discovery inventory")
 	for _, id in ipairs(catalogue.server_order) do
 		helpers.it("catalogue discovery descriptor is valid: " .. id, function()
 			local descriptor, reason = Ports.descriptor(id, catalogue.servers[id].discovery)
@@ -49,6 +49,12 @@ function M.run(corpus, catalogue, decode_json, helpers)
 				helpers.assert_eq(result.port, expected.port)
 				helpers.assert_eq(result.base_url, expected.base_url)
 				helpers.assert_eq(result.needs_listeners, nil)
+				-- A settings-file key is used, never logged
+				helpers.assert_eq(result.api_key, expected.api_key)
+				if result.api_key then
+					helpers.assert_true(not Ports.describe(result):find(result.api_key, 1, true),
+						"the scan description must not carry the key")
+				end
 			end
 		end)
 	end

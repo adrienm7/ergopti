@@ -905,9 +905,10 @@ function M.resolve_active_entry(callback)
 		return copy
 	end
 
-	-- A local server the user gave no key to is sent none
+	-- A local server the user gave no key to is sent the one its own settings
+	-- file holds, else none
 	if type(stored) ~= "string" or stored == "" then
-		invoke_token_callback(callback, true, resolved_copy(""), nil)
+		invoke_token_callback(callback, true, resolved_copy(LocalServers.discovered_key(entry.provider, entry.base_url)), nil)
 		return settled_token_lease()
 	end
 	if not TokenCrypto.is_encrypted(stored) then
@@ -2440,8 +2441,9 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 		on_ready(provider, entry, token, base)
 	end
 	if type(stored_token) ~= "string" or stored_token == "" then
-		-- key_missing() let it through: a local server given no key
-		with_token("")
+		-- key_missing() let it through: a local server given no key, sent the
+		-- one its own settings file holds, else none
+		with_token(LocalServers.discovered_key(provider_id, entry.base_url))
 		return true
 	end
 	TokenCrypto.decrypt_async(stored_token, function(decrypted, token, token_reason)
@@ -3176,7 +3178,7 @@ local function probe_local_target(target, settle, ticket)
 		if not ok or observation_accepted ~= true then native_failure() end
 		return true
 	end
-	if target.token == "" then return probe("") end
+	if target.token == "" then return probe(LocalServers.discovered_key(target.id, target.base_url)) end
 	TokenCrypto.decrypt_async(target.token, function(decrypted, token, token_reason)
 		-- Held credentials from an older generation must not acquire the
 		-- same HTTP client and cancel a newer request. Changed live settings
