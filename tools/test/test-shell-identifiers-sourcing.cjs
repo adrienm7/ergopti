@@ -35,7 +35,14 @@ const scripts = execFileSync('git', ['ls-files', '-z', '--', 'tools', 'static'],
 })
 	.split('\0')
 	.filter((file) => file.endsWith('.sh') && !file.endsWith('identifiers.sh'))
-	.filter((file) => fs.readFileSync(path.join(ROOT, file), 'utf8').includes('data/identifiers.sh'));
+	// A comment may name the file it relies on (field-report-git.sh documents that
+	// its caller sources it); only an executable line is a sourcing to check.
+	.filter((file) =>
+		fs
+			.readFileSync(path.join(ROOT, file), 'utf8')
+			.split('\n')
+			.some((line) => !/^\s*#/.test(line) && line.includes('data/identifiers.sh'))
+	);
 
 assert.ok(scripts.length >= 4, `only ${scripts.length} script(s) source identifiers.sh`);
 
