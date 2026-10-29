@@ -6,13 +6,18 @@
 --- A remote entry is staged only while its availability probe owns a terminal
 --- callback. An immediate probe refusal restores the prior runtime identity,
 --- releases the panel mutation lease, and reports the failed operation.
+--- The add action answers the backend switch with a literal receipt: true once
+--- the probe owns the entry, false on refusal (a nil receipt made the switch
+--- log "API backend successor refused: nil" and abandon a dispatched probe).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
 
-helpers.describe("API panel validation acquisition", function()
-	helpers.it("rolls back and releases the lease when availability refuses", function()
+--- Builds the panel around a scripted availability probe and runs the add action.
+--- @param check_result any What the stubbed check_availability returns.
+--- @param assertions function Receives the action receipt and the fixture state.
+local function run_add_action(check_result, assertions)
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"infra.i18n",
@@ -59,7 +64,7 @@ helpers.describe("API panel validation acquisition", function()
 				end,
 				check_availability = function()
 					validation_calls = validation_calls + 1
-					return false
+					return check_result
 				end,
 			}
 			package.loaded["modules.llm"] = {
@@ -127,7 +132,24 @@ helpers.describe("API panel validation acquisition", function()
 			end
 			helpers.assert_type(add_action, "function")
 
-			add_action()
+			local receipt = add_action()
+			assertions(receipt, {
+				validation_calls = validation_calls, persistence_calls = persistence_calls,
+				entries = entries, active_id = active_id, state = state,
+				previous_entry = previous_entry, warmups = warmups, updates = updates,
+				notifications = notifications, panel = panel, context = context,
+			})
+		end)
+end
+
+helpers.describe("API panel validation acquisition", function()
+	helpers.it("rolls back and releases the lease when availability refuses", function()
+		run_add_action(false, function(receipt, f)
+			local validation_calls, persistence_calls = f.validation_calls, f.persistence_calls
+			local entries, active_id, state = f.entries, f.active_id, f.state
+			local previous_entry, warmups, updates = f.previous_entry, f.warmups, f.updates
+			local notifications, panel, context = f.notifications, f.panel, f.context
+			helpers.assert_true(receipt == false, "a refused probe must answer a literal false receipt")
 			helpers.assert_eq(validation_calls, 1)
 			helpers.assert_eq(persistence_calls, 0)
 			helpers.assert_eq(#entries, 1)
@@ -151,6 +173,17 @@ helpers.describe("API panel validation acquisition", function()
 			helpers.assert_eq(released_add.disabled, nil)
 			helpers.assert_type(released_add.action, "function",
 				"the refused probe must not strand the process-wide mutation lease")
+		end)
+	end)
+
+	helpers.it("answers a literal true receipt once the probe owns the staged entry", function()
+		run_add_action(true, function(receipt, f)
+			helpers.assert_true(receipt == true,
+				"the backend switch requires a literal true receipt from the add action")
+			helpers.assert_eq(f.validation_calls, 1)
+			helpers.assert_eq(#f.entries, 2, "the entry stays staged while its probe runs")
+			helpers.assert_true(f.active_id ~= f.previous_entry.id)
+			helpers.assert_eq(#f.notifications, 0)
 		end)
 	end)
 end)
