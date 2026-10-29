@@ -324,7 +324,12 @@
 		},
 		{
 			"id": "llm",
-			"greyed_when_paused": true
+			"greyed_when_paused": true,
+			"health_dot": {
+				"ready": "🟢",
+				"warming": "🟡",
+				"unreachable": "🔴"
+			}
 		},
 		{
 			"id": "agent",
@@ -485,7 +490,6 @@
 			},
 			"i18n": "menu.llm.model_label",
 			"disabled_when_off": false,
-			"health_dot": true,
 			"platforms": [
 				"ahk",
 				"hs",
@@ -497,7 +501,6 @@
 			"id": "llm_profile",
 			"i18n": "menu.profiles.profile_label_prefix",
 			"disabled_when_off": true,
-			"health_dot": false,
 			"platforms": [
 				"ahk",
 				"hs",
@@ -517,7 +520,6 @@
 			"id": "llm_trigger",
 			"i18n": "menu.llm.trigger_menu_title",
 			"disabled_when_off": true,
-			"health_dot": false,
 			"platforms": [
 				"ahk",
 				"hs",
@@ -529,7 +531,6 @@
 			"id": "llm_generation_settings",
 			"i18n": "menu.llm.generation_menu_title",
 			"disabled_when_off": true,
-			"health_dot": false,
 			"platforms": [
 				"ahk",
 				"hs"
@@ -549,7 +550,6 @@
 			"id": "llm_display",
 			"i18n": "menu.llm.display_menu_title",
 			"disabled_when_off": true,
-			"health_dot": false,
 			"platforms": [
 				"ahk",
 				"hs",
@@ -561,7 +561,6 @@
 			"id": "llm_navigation",
 			"i18n": "menu.llm.nav_menu_title",
 			"disabled_when_off": true,
-			"health_dot": false,
 			"platforms": [
 				"ahk",
 				"hs",

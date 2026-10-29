@@ -413,7 +413,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		package.loaded["ui.menu.menu_llm.menu_layout"] = {
 			row_ids = function() return {} end,
 			row_disabled = function() return false end,
-			has_health_dot = function() return false end,
+			title_health_dot = function() return nil end,
 		}
 		local profile_renderer = assert(require("menu.renderer").new({
 			platform = "hs",

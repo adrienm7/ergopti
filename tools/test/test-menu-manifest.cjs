@@ -5314,7 +5314,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		assert.equal(declared[0].type, row.type);
 		assert.equal(declared[0].i18n, row.i18n);
 		assert.equal(declared[0].disabled_when_off, true);
-		assert.equal(declared[0].health_dot, false);
+		assert.equal(Object.hasOwn(declared[0], 'health_dot'), false);
 		assert.deepEqual(declared[0].platforms, ['ahk', 'hs', 'linux']);
 	}
 	for (const row of menu.llm_menu.filter((row) => ['llm_model', 'llm_profile'].includes(row.id)))
@@ -7984,15 +7984,15 @@ console.log(
 	}
 	// The independent predecessor signatures locate source bodies, rather than
 	// declaring a public ABI. The admitted warning receipt adds one optional port.
-	const frozenWarningLocator =
-		'_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {';
+	// The health dot moved to the AI title, so no row receives operational state.
+	const frozenWarningLocator = '_LLM_Menu_EmitRow(id, disabled) {';
 	const reviewedWarningLocator = frozenWarningLocator
 		.replace('(', '(TargetMenu, ')
 		.replace(') {', ', CapturedWarningRows := unset) {');
 	assert.equal(
 		expected.producer_edges.filter((edge) => edge.signatures.ahk === frozenWarningLocator).length,
 		2,
-		'both independent warning-owner locators retain their original four parameters'
+		'both independent warning-owner locators retain their original two parameters'
 	);
 	const warningOwnerSource = readFileSync(
 		resolve(SHARED, '../windows/ui/menu/menu_llm/menu_main.ahk'),
@@ -8007,7 +8007,7 @@ console.log(
 			'wrong original parameter',
 			warningOwnerSource.replace(
 				reviewedWarningLocator,
-				reviewedWarningLocator.replace('llm_is_operational', 'foreign_operational')
+				reviewedWarningLocator.replace('disabled', 'foreign_disabled')
 			)
 		],
 		[
@@ -8019,7 +8019,7 @@ console.log(
 		],
 		['duplicate owner', warningOwnerSource + '\n' + reviewedWarningLocator + '\n}\n'],
 		[
-			'unrelated fifth parameter',
+			'unrelated fourth parameter',
 			warningOwnerSource.replace(
 				reviewedWarningLocator,
 				reviewedWarningLocator.replace(
@@ -8029,14 +8029,14 @@ console.log(
 			)
 		],
 		[
-			'required fifth parameter',
+			'required fourth parameter',
 			warningOwnerSource.replace(
 				reviewedWarningLocator,
 				reviewedWarningLocator.replace('CapturedWarningRows := unset', 'CapturedWarningRows')
 			)
 		],
 		[
-			'missing fifth parameter',
+			'missing fourth parameter',
 			warningOwnerSource.replace(reviewedWarningLocator, frozenWarningLocator)
 		]
 	]) {

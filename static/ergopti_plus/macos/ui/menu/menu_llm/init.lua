@@ -1096,13 +1096,10 @@ local function create_menu(deps)
 				--      never shown as an eternal "still loading" spinner.
 				-- is_backend_ready() is synchronous and reflects the warmup state accurately
 				-- even on the first menu open after a model swap.
-				local health_dot
-				-- Which row carries the dot is the manifest's call, not this file's:
-				-- the same declaration drives the Windows renderer, so the two cannot
-				-- end up dotting different rows.
-				if not MenuLayout.has_health_dot("llm_model") or not state.llm_enabled or paused then
-						health_dot = ""
-				else
+				-- The dot sits on the AI title, from the glyphs the manifest's top-level
+				-- ``llm`` entry declares for every driver (maintainer, 2026-10-29).
+				local health_status = nil
+				if state.llm_enabled and not paused then
 						local backend_ready = false
 						if type(llm_mod.is_backend_ready) == "function" then
 								local ok, ready = pcall(llm_mod.is_backend_ready)
@@ -1117,13 +1114,13 @@ local function create_menu(deps)
 								load_failed = ok and failed == true
 						end
 						if backend_ready then
-								health_dot = "🟢 "
+								health_status = "ready"
 						elseif load_failed then
-								health_dot = "🔴 "
+								health_status = "unreachable"
 						elseif _llm_health_status == true then
-								health_dot = "🟡 "
+								health_status = "warming"
 						else
-								health_dot = "🔴 "
+								health_status = "unreachable"
 						end
 				end
 
@@ -1134,7 +1131,7 @@ local function create_menu(deps)
 				if state.llm_backend == "api" then
 						api_entry_name = ApiPanel.active_entry_caption_text()
 				end
-				local rich_model_title = health_dot .. ModelSelectorPage.caption(state, active_display_model, api_entry_name)
+				local rich_model_title = ModelSelectorPage.caption(state, active_display_model, api_entry_name)
 
 				ModelSelectorPage.bind({
 						state                   = state,
@@ -1944,9 +1941,14 @@ local function create_menu(deps)
 
 				-- The tick mirrors the switch; the parent has no action, since a row
 				-- that opens a submenu is never clicked.
-				return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {
+				local parent_row = ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {
 					llm_parent_enabled = function() return state.llm_enabled or nil end,
 				})
+				local title_dot = health_status and MenuLayout.title_health_dot(health_status) or nil
+				if type(parent_row) == "table" and type(parent_row.label) == "string" and title_dot then
+						parent_row.label = parent_row.label .. " " .. title_dot
+				end
+				return parent_row
 		end
 
 		check_startup, startup_scope_idle, startup_runtime = StartupCtrl.new({

@@ -1756,18 +1756,18 @@ const {
 			'foreign parent import'
 		],
 		[
-			'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
-			'return Foreign.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
+			'local parent_row = ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
+			'local parent_row = Foreign.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
 			'foreign caption owner'
 		],
 		[
-			'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
-			'return ManifestMenu.group_row("llm_native_parent", "foreign_parent", main_menu, {',
+			'local parent_row = ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
+			'local parent_row = ManifestMenu.group_row("llm_native_parent", "foreign_parent", main_menu, {',
 			'foreign row identity'
 		],
 		[
-			'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
-			'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", {}, {',
+			'local parent_row = ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
+			'local parent_row = ManifestMenu.group_row("llm_native_parent", "llm_parent_content", {}, {',
 			'discarded native child'
 		],
 		[
@@ -1794,11 +1794,16 @@ const {
 			'local ok, result = xpcall(create_menu, debug.traceback, deps)',
 			'local ok, result = true, {}',
 			'unused real handler factory'
+		],
+		[
+			'\t\t\t\treturn parent_row\n',
+			'\t\t\t\treturn { label = "foreign" }\n',
+			'discarded completed parent'
 		]
 	];
 	assert.equal(
 		controls.length,
-		9,
+		10,
 		'all independently authored actual native-owner withdrawal controls remain registered'
 	);
 	for (const [before, after, reason] of controls) {

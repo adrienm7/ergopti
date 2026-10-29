@@ -45,12 +45,12 @@
 ; before enabling), true = greyed while off. Mirrors macOS is_disabled vs paused.
 _LMLS_Canonical() {
 	return [
-		Map("id", "llm_model",               "off", false, "dot", true),
-		Map("id", "llm_profile",             "off", true,  "dot", false),
-		Map("id", "llm_trigger",             "off", true,  "dot", false),
-		Map("id", "llm_generation_settings", "off", true,  "dot", false),
-		Map("id", "llm_display",             "off", true,  "dot", false),
-		Map("id", "llm_navigation",          "off", true,  "dot", false)
+		Map("id", "llm_model",               "off", false),
+		Map("id", "llm_profile",             "off", true),
+		Map("id", "llm_trigger",             "off", true),
+		Map("id", "llm_generation_settings", "off", true),
+		Map("id", "llm_display",             "off", true),
+		Map("id", "llm_navigation",          "off", true)
 	]
 }
 
@@ -111,9 +111,8 @@ _LMLS_ManifestMatchesCanonical() {
 		Assert((rows[i]["disabled_when_off"] = true) == (c["off"] = true),
 			"llm_menu row '" . c["id"] . "' disabled_when_off must be " . (c["off"] ? "true" : "false")
 			. " (backend/model stay usable while off; the rest grey out — macOS parity)")
-		Assert((rows[i]["health_dot"] = true) == (c["dot"] = true),
-			"llm_menu row '" . c["id"] . "' health_dot must be " . (c["dot"] ? "true" : "false")
-			. " — exactly one row carries the backend-reachability dot, and the manifest is what says which")
+		Assert(!rows[i].Has("health_dot"),
+			"llm_menu row '" . c["id"] . "' must not carry a health dot — the AI title does")
 	}
 }
 Test("llm-menu-layout-shared: the manifest matches the canonical row order + greying policy", _LMLS_ManifestMatchesCanonical)
@@ -127,13 +126,10 @@ _LMLS_FallbackMirrorsManifest() {
 		; Tolerate variable inner spacing: assert the id and its bool co-occur in the body.
 		idTok  := '"id", "' . c["id"] . '"'
 		boolTok := '"disabled_when_off", ' . (c["off"] ? "true" : "false")
-		dotTok  := '"health_dot", ' . (c["dot"] ? "true" : "false")
 		Assert(InStr(Seg, idTok) > 0,
 			"_LLM_MenuLayout_Fallback must contain row id '" . c["id"] . "'")
 		Assert(InStr(Seg, idTok) > 0 and InStr(Seg, boolTok) > 0,
 			"_LLM_MenuLayout_Fallback row '" . c["id"] . "' must carry disabled_when_off=" . (c["off"] ? "true" : "false") . " (mirror the manifest)")
-		Assert(InStr(Seg, idTok) > 0 and InStr(Seg, dotTok) > 0,
-			"_LLM_MenuLayout_Fallback row '" . c["id"] . "' must carry health_dot=" . (c["dot"] ? "true" : "false") . " (mirror the manifest)")
 	}
 }
 Test("llm-menu-layout-shared: Windows fallback mirrors the manifest", _LMLS_FallbackMirrorsManifest)
@@ -184,18 +180,29 @@ _LMLS_DispatchAnswersEveryRow() {
 }
 Test("llm-menu-layout-shared: the dispatch answers every declared row", _LMLS_DispatchAnswersEveryRow)
 
-; The declared health_dot must REACH the row. A field the manifest declares and
-; no driver reads is worse than no field: editing it moves nothing and there is
-; nothing to read that says so.
-_LMLS_HealthDotIsRead() {
-	Build := _DriverFuncBody("LLM_Menu_BuildSubmenu")
-	Assert(InStr(Build, '_MR_Get(_row, "health_dot"') > 0,
-		"LLM_Menu_BuildSubmenu must pass each row's declared health_dot into _LLM_Menu_EmitRow")
+; The health dot sits on the AI title (maintainer, 2026-10-29), from the glyphs
+; the manifest's top-level ``llm`` entry declares for every driver: no settings
+; row draws one, and the tray title reads the declaration instead of a literal.
+_LMLS_HealthDotOnTitle() {
 	Emit := _DriverFuncBody("_LLM_Menu_EmitRow")
-	Assert(InStr(Emit, "has_health_dot && llm_is_operational") > 0,
-		"_LLM_Menu_EmitRow must gate the dot on the declared flag, not on the row id alone")
+	for _, Glyph in ["🟢", "🟡", "🔴"]
+		Assert(InStr(Emit, Glyph) == 0, "_LLM_Menu_EmitRow must not draw the health dot " . Glyph)
+	Title := _DriverFuncBody("LLM_Menu_TrayTitle")
+	Assert(Title != "", "LLM_Menu_TrayTitle() must exist")
+	Assert(InStr(Title, "MenuManifest_LoadTopLevel()") > 0 && InStr(Title, '"health_dot"') > 0,
+		"LLM_Menu_TrayTitle must read the dot from the manifest's top-level llm entry")
+	for _, Glyph in ["🟢", "🟡", "🔴"]
+		Assert(InStr(Title, Glyph) == 0, "LLM_Menu_TrayTitle must not hardcode " . Glyph)
+	Dots := 0
+	for _, Entry in MenuManifest_LoadTopLevel()
+		if (Entry is Map) && Entry.Get("id", "") == "llm"
+			Dots := Entry.Get("health_dot", 0)
+	Assert(Dots is Map, "the top-level llm entry must declare its health_dot glyphs")
+	AssertEqual("🟢", Dots["ready"], "ready glyph")
+	AssertEqual("🟡", Dots["warming"], "warming glyph")
+	AssertEqual("🔴", Dots["unreachable"], "unreachable glyph")
 }
-Test("llm-menu-layout-shared: the declared health_dot reaches the row", _LMLS_HealthDotIsRead)
+Test("llm-menu-layout-shared: the health dot sits on the AI title", _LMLS_HealthDotOnTitle)
 
 ; The retired spec file must stay retired. Two shared descriptions of one menu is
 ; the state this migration ended; a reintroduced menu_layout.json would drift from
@@ -283,7 +290,7 @@ _LMLS_CurrentInventoryPolicy(Rows) {
 		AssertEqual(Expected["id"], Rows[Index]["id"], "current LLM inventory IDs and order")
 		AssertEqual(Types[Index], Rows[Index]["type"], "current LLM inventory exact route type")
 		AssertEqual(Expected["off"], Rows[Index]["disabled_when_off"], "current LLM inventory exact off policy")
-		AssertEqual(Expected["dot"], Rows[Index]["health_dot"], "current LLM inventory exact health-dot policy")
+		AssertFalse(Rows[Index].Has("health_dot"), "current LLM inventory carries no row health dot")
 	}
 }
 
@@ -315,7 +322,7 @@ _LMLS_InventorySourceControl(Kind) {
 		case "revived":
 			; Independently retained row removed by published dd8bd7554.
 			Retired := '{"type":"group","id":"llm_live_mode","i18n":"menu.llm.live_mode_title",'
-				. '"disabled_when_off":true,"health_dot":false,"platforms":["ahk","hs","linux"]}'
+				. '"disabled_when_off":true,"platforms":["ahk","hs","linux"]}'
 			Values.InsertAt(Trigger + 1, Retired)
 			ExpectedMessage := "current LLM inventory row count - expected: <6>, actual: <7>"
 		case "missing":
