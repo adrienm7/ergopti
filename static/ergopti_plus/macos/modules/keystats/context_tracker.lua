@@ -634,7 +634,7 @@ end
 --- watchable. Both are ordinary focus traffic, not driver faults (issue #104).
 local AX_DEAD_ELEMENT = "AXUIElementRef is invalid"
 local AX_UNWATCHABLE_ELEMENT = { ["Illegal argument"] = true, ["Notification unsupported"] = true,
-	[AX_DEAD_ELEMENT] = true }
+	[AX_DEAD_ELEMENT] = true, ["Messaging failed"] = true }
 
 --- Returns the AX message of a watcher error, without its location or traceback.
 --- @param detail any xpcall error value.
