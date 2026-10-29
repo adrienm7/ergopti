@@ -207,6 +207,38 @@
 				"port": 8080,
 				"base_url": "http://127.0.0.1:8080/v1"
 			}
+		},
+		{
+			"name": "oMLX started with authentication: its settings file holds the key a keyless probe lacks (field report 2026-10-29)",
+			"server": "omlx",
+			"os": "macos",
+			"ps": "77996 omlx-server",
+			"files": {
+				"/Users/u/.omlx/settings.json": "{\"server\":{\"port\":8181},\"auth\":{\"api_key\":\"s3cret\",\"skip_api_key_verification\":false}}"
+			},
+			"expected": {
+				"running": true,
+				"source": "config",
+				"port": 8181,
+				"base_url": "http://127.0.0.1:8181/v1",
+				"api_key": "s3cret"
+			}
+		},
+		{
+			"name": "oMLX started from the command line still reads the key of its settings file",
+			"server": "omlx",
+			"os": "macos",
+			"ps": "77996 /usr/bin/python3 -m omlx.cli serve --port 8282",
+			"files": {
+				"/Users/u/.omlx/settings.json": "{\"auth\":{\"api_key\":\"cli-key\"}}"
+			},
+			"expected": {
+				"running": true,
+				"source": "cli",
+				"port": 8282,
+				"base_url": "http://127.0.0.1:8282/v1",
+				"api_key": "cli-key"
+			}
 		}
 	]
 }

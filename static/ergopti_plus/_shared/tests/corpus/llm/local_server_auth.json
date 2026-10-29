@@ -1,4 +1,55 @@
 {
+	"discovered_key_cases": [
+		{
+			"name": "omlx-row-scanned-key",
+			"provider": "omlx",
+			"base_url": "",
+			"scans": { "omlx": { "running": true, "base_url": "http://127.0.0.1:8181/v1", "api_key": "k" } },
+			"key": "k"
+		},
+		{
+			"name": "manual-openai-compat-same-loopback-port",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:8181/v1/",
+			"scans": { "omlx": { "running": true, "base_url": "http://127.0.0.1:8181/v1", "api_key": "k" } },
+			"key": "k"
+		},
+		{
+			"name": "manual-openai-compat-other-port",
+			"provider": "openai_compat",
+			"base_url": "http://127.0.0.1:9999/v1",
+			"scans": { "omlx": { "running": true, "base_url": "http://127.0.0.1:8181/v1", "api_key": "k" } },
+			"key": ""
+		},
+		{
+			"name": "remote-url-never-gets-local-key",
+			"provider": "openai_compat",
+			"base_url": "http://192.168.1.5:8181/v1",
+			"scans": { "omlx": { "running": true, "base_url": "http://127.0.0.1:8181/v1", "api_key": "k" } },
+			"key": ""
+		},
+		{
+			"name": "stopped-server",
+			"provider": "omlx",
+			"base_url": "",
+			"scans": { "omlx": { "running": false, "base_url": "http://127.0.0.1:8181/v1", "api_key": "k" } },
+			"key": ""
+		},
+		{
+			"name": "server-without-key",
+			"provider": "omlx",
+			"base_url": "",
+			"scans": { "omlx": { "running": true, "base_url": "http://127.0.0.1:8181/v1" } },
+			"key": ""
+		},
+		{
+			"name": "cloud-provider-never-gets-local-key",
+			"provider": "openai",
+			"base_url": "",
+			"scans": { "omlx": { "running": true, "base_url": "http://127.0.0.1:8181/v1", "api_key": "k" } },
+			"key": ""
+		}
+	],
 	"auth_cases": [
 		{
 			"name": "omlx-empty",

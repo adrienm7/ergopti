@@ -112,6 +112,39 @@ function M.entry_matches(provider, base_url, server_id, servers)
 	return configured ~= nil and canonical ~= nil and configured == canonical
 end
 
+--- Finds the key a running local server's own settings file holds for a
+--- request the user gave no key: the scanned server of that catalogue
+--- provider, else, for a generic provider, the scanned server listening at
+--- the same canonical loopback endpoint. A key never leaves loopback.
+--- @param provider any Provider id of the entry or probe.
+--- @param base_url any Its configured address; "" for the scanned address.
+--- @param scans table Server id -> { running, base_url, api_key }.
+--- @param servers table Validated catalogue.
+--- @return string key "" when no scanned server holds one.
+function M.discovered_key(provider, base_url, scans, servers)
+	if type(provider) ~= "string" or type(scans) ~= "table" or type(servers) ~= "table" then return "" end
+	local typed = type(base_url) == "string" and base_url ~= ""
+	local configured = typed and loopback_endpoint(base_url) or nil
+	if typed and not configured then return "" end
+	local function key_of(id)
+		local scan = scans[id]
+		if type(scan) ~= "table" or scan.running ~= true or type(scan.api_key) ~= "string" or scan.api_key == "" then return nil end
+		local scanned = loopback_endpoint(scan.base_url)
+		if not scanned or (configured and configured ~= scanned) then return nil end
+		return scan.api_key
+	end
+	if servers[provider] ~= nil then return key_of(provider) or "" end
+	if (provider ~= "openai" and provider ~= "openai_compat") or not configured then return "" end
+	local ids = {}
+	for id in pairs(servers) do ids[#ids + 1] = id end
+	table.sort(ids)
+	for _, id in ipairs(ids) do
+		local key = key_of(id)
+		if key then return key end
+	end
+	return ""
+end
+
 --- Projects configured generic loopback endpoints as views, never new providers.
 --- Canonical endpoints already belong to their declared catalogue row. Unknown
 --- metadata and credentials remain private to the driver's originating entry.

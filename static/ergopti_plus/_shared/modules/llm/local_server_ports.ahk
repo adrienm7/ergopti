@@ -61,6 +61,7 @@ LocalServerPortsDescriptor(Id, Raw) {
 			&& (Config.Get("file", 0) is String) && Config["file"] != ""
 			&& (Config.Get("port_key", 0) is String) && RegExMatch(Config["port_key"], "^\w[\w.]*$")
 			&& (!Config.Has("dir_file") || ((Config["dir_file"] is String) && Config["dir_file"] != ""))
+			&& (!Config.Has("key_key") || ((Config["key_key"] is String) && RegExMatch(Config["key_key"], "^\w[\w.]*$")))
 		if Valid
 			for OsName in Config["os"]
 				if !(OsName == "macos" || OsName == "linux" || OsName == "windows")
