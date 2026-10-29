@@ -39,8 +39,8 @@ helpers.describe("Accessibility calls are bounded (ax-messaging-timeout)", funct
 			helpers.assert_eq(adapter.bound_messaging_timeout(), true)
 			helpers.assert_eq(#calls, 1)
 			helpers.assert_eq(calls[1], adapter.MESSAGING_TIMEOUT_SEC)
-			helpers.assert_true(adapter.MESSAGING_TIMEOUT_SEC > 0 and adapter.MESSAGING_TIMEOUT_SEC <= 1.0,
-				"a hung application must release the event taps within a second")
+			helpers.assert_true(adapter.MESSAGING_TIMEOUT_SEC > 0 and adapter.MESSAGING_TIMEOUT_SEC < 1.0,
+				"a hung application must release the event taps before macOS disables them (~1 s)")
 		end)
 	end)
 
