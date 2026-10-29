@@ -664,7 +664,10 @@ function M.build(ctx)
 					if not validation_call_ok or validation_result ~= true then
 						rollback_validation(validation_call_ok and "refused" or "raised",
 							validation_result)
+						return false
 					end
+					-- The backend switch commits only on a literal true receipt.
+					return true
 			end or nil,
 			})
 			if collect then collect.add[pid] = add_rows[#add_rows].action end
