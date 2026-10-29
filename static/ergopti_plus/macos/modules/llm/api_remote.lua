@@ -1834,7 +1834,16 @@ end
 
 --- Cancels the active request/response inference, if any.
 function M.cancel_streaming()
-	local ok, result = xpcall(function() return _infer_client.cancel() end, debug.traceback)
+	local detail
+	local ok, result = xpcall(function()
+		local settled, cancel_detail = _infer_client.cancel()
+		detail = cancel_detail
+		return settled
+	end, debug.traceback)
+	-- hs.http.asyncPost returns no task: the POST in flight is revoked logically
+	-- and its late answer is fenced by the client generation, so the stop has
+	-- happened (as for Ollama). Only a refused native task or timer is a failure.
+	if ok == true and result == false and detail == "pending" then return true end
 	if not ok or result ~= true then
 		Logger.error(LOG, "Remote inference cancellation failed: %s", tostring(result))
 		return false
