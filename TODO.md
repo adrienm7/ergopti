@@ -7,8 +7,8 @@ Updated: 2026-10-28 evening. Latest stable: [v1.0.7](https://github.com/adrienm7
 Windows PC and the Mac one on the Mac.** Open work only: a finished item is removed, its lessons go to
 [docs/memory](docs/memory/README.md), and the history stays in Git
 (`git log --follow -p -- TODO.md`). Item numbers are stable and never reused. Open
-questions are in [questions-for-maintainer.md](docs/questions-for-maintainer.md); per-work handoff files
-are in [`docs/todo-agents/`](docs/todo-agents/).
+questions are in [questions-for-maintainer.md](docs/questions-for-maintainer.md). There are no separate
+handoff files: an agent writes what is left into the item itself.
 
 Tags: **[CODE]** software to write or adopt; **[CI]** only a hosted or native CI run qualifies it;
 **[PHYS-W]**, **[PHYS-M]**, **[PHYS-L]** needs a real Windows PC, Mac or Linux machine.
@@ -28,7 +28,7 @@ running the hooks, never with `--no-verify`; never weaken a test; quality over s
 ruff 0.15.8 and Prettier before every commit. After touching
 a sealed Windows updater source, reseal with
 `node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`. Procedures:
-[COORDINATOR-MEMORY](docs/todo-agents/COORDINATOR-MEMORY.md).
+[workflow and verification memory](docs/memory/workflow-and-verification.md).
 
 ## PC Windows todo (run by the agent on the Windows PC)
 
@@ -1300,17 +1300,17 @@ here); macOS and Linux behaviour that needs hardware goes through the Debug fiel
       `ci-windows.yml`, off until configured (61fb29d64d); README code signing policy and privacy
       (c6db589c76). Left (maintainer): apply, then set the variables and secrets; eligibility table,
       form answers and switch-on steps in the
-      [handoff](docs/todo-agents/signpath-foundation-application.md).
+      [handoff](docs/tooling/signpath-foundation-application.md).
 - [ ] **`ErgoptiPlus.exe` flagged by a corporate proxy (Netskope, Airbus tester).** [CODE] [PHYS-W]
       Done: no hidden PowerShell clipboard stage, own version resource, English metadata, tar.exe
       extraction, the keylogger naming gone (keystats rename; the gate forbids `keylog` in the script
       and the bundle), string-surface ceilings and a per-build record with the exe SHA-256 in CI
       (e2c9dfb79d), the submission pack
-      [windows-exe-false-positive-submission-pack.md](docs/todo-agents/windows-exe-false-positive-submission-pack.md).
+      [windows-exe-false-positive-submission-pack.md](docs/tooling/windows-exe-false-positive-submission-pack.md).
       Left (maintainer): signing (132), VirusTotal lookup, Microsoft and vendor submissions, the
       tester's block page and retry (T1-T4); decide whether the `WH_KEYBOARD_LL` probe in
       `input_probe.ahk` stays in the release exe. Playbook:
-      [handoff](docs/todo-agents/windows-exe-flagged-by-proxy.md).
+      [handoff](docs/tooling/windows-exe-flagged-by-proxy.md).
 
 ## Big item 2: macOS Karabiner input reliability (items 31, 117, 140)
 
@@ -1323,8 +1323,10 @@ here); macOS and Linux behaviour that needs hardware goes through the Debug fiel
       default run loop mode; an on-time deadline now waits for a `/bin/cat` echo before judging the
       worker (25411ee080, after v1.0.5). Reproduce on the Mac with these log lines; the only
       workaround is Configuration > Ergopti uses Karabiner > Off. Recovery deploys (28 of 33 on
-      2026-10-19) cannot be reduced without fewer lease failures. Leftovers:
-      [issue99-karabiner-input.md](docs/todo-agents/issue99-karabiner-input.md).
+      2026-10-19) cannot be reduced without fewer lease failures. Leftovers: the starvation
+      hypothesis for silent PONG/READY timeouts (`memory_pressure | tail -1` during lease errors);
+      only the keymap tap skips an event that waited behind the main thread (`adapters/event_clock.lua`),
+      the tap-keys and script-control taps do not yet.
 - [ ] **Dropped letters on macOS.** [PHYS-M] Unproven. Every consumed and never delivered key is
       reported ("typed key(s) swallowed", decisions only, never the key). Mac action: Debug > Report
       a bug right when a letter disappears, then compare with lease failures or Karabiner deploys.
@@ -1360,7 +1362,7 @@ here); macOS and Linux behaviour that needs hardware goes through the Debug fiel
       (item 50: hotstring output already uses SendInput at level 0, so it is exposed to this rehook). Consumers that rely on their own hook staying ahead of AutoHotkey's (the
       native nav owner DLL, item 91) lose that position at the first SendInput of the other paths.
       Consumer audit:
-      [windows-input-hooks-items-49-50.md](docs/todo-agents/windows-input-hooks-items-49-50.md). Left:
+      [windows-input-hooks.md](docs/design/windows-input-hooks.md). Left:
       decide per remaining SendInput consumer (text sender, HSE dispatch) whether it can avoid
       SendInput or make the consumer order-independent (single-hook/RawInput source, needs an MSVC
       DLL and manifest); the terminal-capture hardware list; the `SetWindowsHookExW` string in the
@@ -1396,16 +1398,15 @@ here); macOS and Linux behaviour that needs hardware goes through the Debug fiel
 
 ## Wave 2: mid-size work
 
-In progress (agent), October 22:
-
-- [ ] **Windows config policy (items 33, 42) and the TOML parse cost.** [CODE] Per sub-item in
-      [config-policy-33-42.md](docs/todo-agents/config-policy-33-42.md); 33: Windows keyboard binding
-      publication from its real input owner, macOS Hotstrings category authority, Linux retired
-      API-provider reader, macOS Karabiner obsolete-leaf intent, Windows retired cleanup
-      projections; 42: explicit `--config FILE.toml` watcher admission, Windows full-save comment
-      preservation. Parse cost: every document-mode write parses source, expected model and final
-      candidate, and every start pays two builds after ready; reuse one parse per transaction
-      before adding any cache. **In progress (agent).**
+- [ ] **Windows config policy (items 33, 42) and the TOML parse cost.** [CODE] Done: the Windows
+      keyboard binding publication (ef238c2758), the macOS Karabiner obsolete-leaf intent
+      (54a537b724), the Windows retired cleanup projections (300790cb37), the Linux `--config FILE.toml`
+      watcher (3dd420292d), per-row admission of outdated API providers on Windows. Left: native macOS
+      qualification of the Hotstrings category boot publication and of the obsolete-leaf setters; the
+      Windows cleanup still cannot offer bare root keys or unknown `[[x]]` generations; the Linux
+      symlink watcher case under a real luaposix `posix.stat`. Parse cost: every document-mode write
+      parses source, expected model and final candidate, and every start pays two builds after
+      ready; reuse one parse per transaction before adding any cache.
 
 Not started:
 
@@ -1715,8 +1716,8 @@ Added October 22 (from the agents' reports; details in their commits):
 
 - [ ] **macOS swallowed-keys check on v1.0.6.** [PHYS-M] The fixes (03a2c2fa4b, d026f3e024,
       a414e83fb7, 19fa9fa872, 89cbcae90b, 9b500a9e8c, c21e920d7e, bb6fcc2cc2) shipped in v1.0.6;
-      they need a Mac day of typing with the `key_event_health` counters; handoff in
-      [issue99-karabiner-input.md](docs/todo-agents/issue99-karabiner-input.md).
+      they need a Mac day of typing with the `key_event_health` counters (`infra/key_event_health.lua`,
+      written to the driver log).
 - [ ] **Keystats rename leftovers.** [CODE] The rename is done (180a53e4de, 1 283 files, 579 paths). Left:
       the comment in `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` (a compiled
       script: recompile on a Mac); declare each persisted name once and make tests read it instead
@@ -1846,7 +1847,7 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       instead of "apply now"). Keep, or rewrite dev once with a lease: maintainer's call.
 - [ ] **Signing and antivirus: maintainer actions.** Apply to SignPath at signpath.org/apply (the
       HubSpot form does not load in an automated browser; answers in
-      [signpath-foundation-application.md](docs/todo-agents/signpath-foundation-application.md)), submit
+      [signpath-foundation-application.md](docs/tooling/signpath-foundation-application.md)), submit
       the Defender false positive, and ask the tester for the exact block page.
 
 - [ ] **36. Windows updater production coupling.** [CODE] The "original23" collector stays inactive
@@ -2012,8 +2013,10 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
 - [ ] Clear and Restore per category and global, then restart: unknown keys kept, personal hotstrings kept
       by Restore, exact backups; recommended-settings restore asks no confirmation where it should not.
 - [ ] Shortcuts group restore and clear; tap delay row opens the dialog and « Use global delay (…) » is
-      right below it; tap and hold pickers (steps in
-      [macos-tap-hold-action-picker.md](docs/todo-agents/macos-tap-hold-action-picker.md)).
+      right below it; tap and hold pickers: Tap-Holds > a key > « Tap → … » opens the shared action
+      picker window (no submenu), picking Escape applies it and « ∅ » gives the key back; « Hold → … »
+      lists only holdable actions; Shortcuts > « Combinaisons de touches » > a pair opens the same
+      window for each of its three slots.
 - [ ] Menu row order looks as before in every submenu (orders now come from one data file, PAR-76 R18).
 - [ ] « Retirer les anciennes règles » on an upgrade (item 43); Login Items show one Ergopti (item 24,
       Debug > Show what starts Ergopti at login).
@@ -2035,7 +2038,7 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
 - [ ] Issue #99: `memory_pressure | tail -1` during lease errors; oMLX listed (DEBUG line `Local server 'omlx'
 probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/v1/models`);
       `Ollama bootstrap failed (exit=137)` with an external Ollama; declining the download opens no error
-      window ([issue99-ai-startup-updater.md](docs/todo-agents/issue99-ai-startup-updater.md)).
+      window.
 
 #### 5. Network, updates and field checks
 
@@ -2074,7 +2077,7 @@ probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.
       it): `gh pr comment 10422 -R AppImage/appimage.github.io --body '/retest'`; read the bot's
       screenshot (status window and tray menu, 98d41e630b) and warnings.
 - [ ] Airbus tester (Netskope): retry the `ErgoptiPlus.exe` download and report T1-T4
-      ([matrix](docs/todo-agents/windows-exe-flagged-by-proxy.md)).
+      ([matrix](docs/tooling/windows-exe-flagged-by-proxy.md)).
 - [ ] Give the v1.0.5 SHA-256 to VirusTotal; submit it to Microsoft Defender as a false positive if
       flagged.
 - [ ] Number-row testers (October 13 and Discord): retest with their exact setup (native layout,
@@ -2170,10 +2173,8 @@ Standing checks:
       `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/v1/models` and
       `lsof -nP -iTCP -sTCP:LISTEN | grep -i omlx`); `Ollama bootstrap failed (exit=137)` with an
       external Ollama; which login item starts the second Hammerspoon; declining the download
-      opens no error window. Details:
-      [issue99-ai-startup-updater.md](docs/todo-agents/issue99-ai-startup-updater.md).
-- [ ] **Fixes of October 21-22**: tap and hold pickers (steps in
-      [macos-tap-hold-action-picker.md](docs/todo-agents/macos-tap-hold-action-picker.md)); tap delay
+      opens no error window.
+- [ ] **Fixes of October 21-22**: tap and hold pickers (steps in the Mac list above); tap delay
       row opens the AppleScript dialog, « Use global delay (…) » right below; Shortcuts group
       restore/clear; Ctrl+S open target (as on Windows, registry keys answer « Windows only »);
       Backspace word start (Terminal Return, `ab`, three Backspaces, `c★`; TextEdit

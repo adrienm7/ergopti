@@ -10,7 +10,7 @@
  *      hotkey at each InputLevel, a physical-state read and the physical idle
  *      timer make of a replayed edge, against AutoHotkey Send controls, and
  *   2. checks that every native test case named by the lifecycle table of
- *      docs/todo-agents/windows-input-hooks-items-49-50.md still exists, so the
+ *      docs/design/windows-input-hooks.md still exists, so the
  *      audit's claims about down, repeat, up, owner change, pause and reload
  *      cannot be orphaned by a rename.
  * Step 1 sends F13 to F16 and a Shift tap through the real input stream: it
@@ -34,7 +34,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 const NATIVE = path.join(WINDOWS, 'native', 'nav_event_owner');
 const PROBE = path.join(WINDOWS, 'tests', 'hardware', 'replay_marker_consumers.ahk');
-const DOC = path.join(ROOT, 'docs', 'todo-agents', 'windows-input-hooks-items-49-50.md');
+const DOC = path.join(ROOT, 'docs', 'design', 'windows-input-hooks.md');
 const AHK = process.env.ERGOPTI_AHK_EXE || 'C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey64.exe';
 const LIFECYCLE = ['down and up', 'repeat', 'owner change while held', 'pause', 'reload and stop'];
 
