@@ -339,9 +339,10 @@ _MI_StagePrebuiltLlm(Submenu) {
 	global _LLM_Menu_Handle, _LLM_Menu
 	if !(Submenu is Menu) || _LLM_Menu_Handle != Submenu || !(_LLM_Menu is Map)
 		throw Error("The caller-owned AI submenu was withdrawn before root staging.")
-	TrayMenuStage_AddFeature(t("menu.llm.title"), Submenu)
+	Title := LLM_Menu_TrayTitle()
+	TrayMenuStage_AddFeature(Title, Submenu)
 	if _LLM_Menu["enabled"]
-		TrayMenuStage_Check(t("menu.llm.title"))
+		TrayMenuStage_Check(Title)
 	BootProfile_Mark("MENU/initMenu: caller-owned LLM tray projection")
 }
 

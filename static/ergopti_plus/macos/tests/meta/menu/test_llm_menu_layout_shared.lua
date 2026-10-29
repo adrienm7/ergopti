@@ -38,12 +38,12 @@ local DRIVER_ROOT = helpers.driver_root()  -- trailing slash
 -- The Backend chooser moved to the model selector page on 2026-10-27; the
 -- model row is the page's button.
 local CANON = {
-	{ id = "llm_model",               greys_off = false, dot = true  },
-	{ id = "llm_profile",             greys_off = true,  dot = false },
-	{ id = "llm_trigger",             greys_off = true,  dot = false },
-	{ id = "llm_generation_settings", greys_off = true,  dot = false },
-	{ id = "llm_display",             greys_off = true,  dot = false },
-	{ id = "llm_navigation",          greys_off = true,  dot = false },
+	{ id = "llm_model",               greys_off = false },
+	{ id = "llm_profile",             greys_off = true },
+	{ id = "llm_trigger",             greys_off = true },
+	{ id = "llm_generation_settings", greys_off = true },
+	{ id = "llm_display",             greys_off = true },
+	{ id = "llm_navigation",          greys_off = true },
 }
 
 -- Takes a selector unique to one production file rather than that file's
@@ -52,6 +52,16 @@ local CANON = {
 local function read_source(selector)
 	local src = helpers.read_driver_source(selector)
 	return src
+end
+
+--- Reads and decodes the whole shared menu manifest.
+--- @return table The decoded manifest.
+local function manifest()
+	local fh = io.open(DRIVER_ROOT .. "../_shared/modules/menu/menu_manifest.json", "r")
+	helpers.assert_true(fh ~= nil, "_shared/modules/menu/menu_manifest.json must be readable")
+	local raw = fh:read("*a")
+	fh:close()
+	return hs.json.decode(raw)
 end
 
 --- Reads the manifest's llm_menu rows that this driver renders: the declared
@@ -100,9 +110,8 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 				"llm_menu row " .. i .. " must be '" .. c.id .. "' (order is the menu order)")
 			helpers.assert_true((row.disabled_when_off == true) == c.greys_off,
 				"llm_menu row '" .. c.id .. "' disabled_when_off must be " .. tostring(c.greys_off))
-			helpers.assert_true((row.health_dot == true) == c.dot,
-				"llm_menu row '" .. c.id .. "' health_dot must be " .. tostring(c.dot) ..
-				" — exactly one row carries the backend-reachability dot, and the manifest says which")
+			helpers.assert_eq(row.health_dot, nil,
+				"llm_menu row '" .. c.id .. "' must not carry a health dot — the AI title does")
 		end
 	end)
 
@@ -120,34 +129,42 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 			"llm_model must be disabled when paused")
 		helpers.assert_true(MenuLayout.row_disabled("llm_profile", true, false) == true,
 			"llm_profile (greys off) must be disabled when the feature is off")
-		for _, c in ipairs(CANON) do
-			helpers.assert_true(MenuLayout.has_health_dot(c.id) == c.dot,
-				"MenuLayout.has_health_dot('" .. c.id .. "') must be " .. tostring(c.dot))
-		end
+		helpers.assert_eq(MenuLayout.has_health_dot, nil,
+			"no submenu row carries the health dot any more — the AI title does")
 	end)
 
-	helpers.it("init.lua asks the manifest which row carries the health dot", function()
+	helpers.it("the AI title health dot comes from the top-level llm declaration", function()
+		local data = manifest()
+		local llm_top
+		for _, entry in ipairs(data.top_level) do
+			if entry.id == "llm" then llm_top = entry end
+		end
+		helpers.assert_true(type(llm_top) == "table", "top_level must declare the llm entry")
+		helpers.assert_eq(llm_top.health_dot.ready, "🟢")
+		helpers.assert_eq(llm_top.health_dot.warming, "🟡")
+		helpers.assert_eq(llm_top.health_dot.unreachable, "🔴")
+		local MenuLayout = helpers.load_with_stubs("ui.menu.menu_llm.menu_layout")
+		for status, glyph in pairs(llm_top.health_dot) do
+			helpers.assert_eq(MenuLayout.title_health_dot(status), glyph,
+				"title_health_dot('" .. status .. "') must read the manifest glyph")
+		end
+		helpers.assert_eq(MenuLayout.title_health_dot("unknown"), nil)
 		local src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
-		helpers.assert_true(src:find('MenuLayout%.has_health_dot%("llm_model"') ~= nil,
-			"init.lua must gate the health dot on the declared flag — a field the manifest " ..
-			"declares and no driver reads is decoration, and editing it would move nothing")
+		helpers.assert_true(src:find("MenuLayout%.title_health_dot%(health_status%)") ~= nil,
+			"init.lua must take the title glyph from the manifest, not a literal")
+		helpers.assert_true(src:find('"🟢 "', 1, true) == nil and src:find('"🔴 "', 1, true) == nil,
+			"init.lua must not hardcode a health glyph")
 	end)
 
 	helpers.it("the menu_layout.lua fallback mirrors the canonical policy", function()
 		local src = read_source("local function load_policy") -- ui/menu/menu_llm/menu_layout.lua
 		local block = src:match("FALLBACK_GREYS_WHEN_OFF%s*=%s*{(.-)}")
 		helpers.assert_true(block ~= nil, "menu_layout.lua must define FALLBACK_GREYS_WHEN_OFF")
-		local dot_block = src:match("FALLBACK_HEALTH_DOT%s*=%s*{(.-)}")
-		helpers.assert_true(dot_block ~= nil, "menu_layout.lua must define FALLBACK_HEALTH_DOT")
 		for _, c in ipairs(CANON) do
 			local val = block:match(c.id .. "%s*=%s*(%a+)")
 			helpers.assert_true(val ~= nil, "fallback must list row '" .. c.id .. "'")
 			helpers.assert_true((val == "true") == c.greys_off,
 				"fallback row '" .. c.id .. "' must be " .. tostring(c.greys_off) .. " (mirror the manifest)")
-			local dot_val = dot_block:match(c.id .. "%s*=%s*(%a+)")
-			helpers.assert_true(dot_val ~= nil, "health-dot fallback must list row '" .. c.id .. "'")
-			helpers.assert_true((dot_val == "true") == c.dot,
-				"health-dot fallback row '" .. c.id .. "' must be " .. tostring(c.dot) .. " (mirror the manifest)")
 		end
 	end)
 
@@ -192,12 +209,12 @@ helpers.describe("shared fixed LLM group declarations", function()
 			if groups[row.id] then
 				helpers.assert_eq(row.type, "group")
 				helpers.assert_eq(row.disabled_when_off, true)
-				helpers.assert_eq(row.health_dot, false)
+				helpers.assert_eq(row.health_dot, nil)
 				count = count + 1
 			elseif row.id == "llm_generation_settings" then
 				helpers.assert_eq(row.type, "group")
 				helpers.assert_eq(row.disabled_when_off, true)
-				helpers.assert_eq(row.health_dot, false)
+				helpers.assert_eq(row.health_dot, nil)
 				additional_groups = additional_groups + 1
 			else
 				helpers.assert_eq(row.type, "dynamic", "all other native parent contracts retain their existing shape")

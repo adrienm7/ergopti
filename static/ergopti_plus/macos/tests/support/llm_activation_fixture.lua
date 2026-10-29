@@ -429,7 +429,7 @@ local function build_fixture(backend, save_results, options)
 	package.loaded["ui.menu.menu_llm.menu_layout"] = {
 		row_ids = function() return {} end,
 		row_disabled = function() return false end,
-		has_health_dot = function() return false end,
+		title_health_dot = function() return nil end,
 	}
 	local presentation_renderer = assert(require("menu.renderer").new({
 		platform = "hs",

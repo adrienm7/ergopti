@@ -57,25 +57,11 @@ local FALLBACK_GREYS_WHEN_OFF = {
 	llm_navigation          = true,
 }
 
---- Built-in fallback — mirrors which row carries the backend-health dot. Same
---- role as FALLBACK_GREYS_WHEN_OFF above, and pinned the same way.
-local FALLBACK_HEALTH_DOT = {
-	llm_model               = true,
-	llm_profile             = false,
-	llm_trigger             = false,
-	llm_generation_settings = false,
-	llm_display             = false,
-	llm_navigation          = false,
-}
-
 --- Built-in fallback row ORDER — the order the two tables above cannot express.
 local FALLBACK_ROW_ORDER = require("menu.row_order").list("llm_menu_rows")
 
 -- Map of row id -> disabled_when_off (bool). nil until first load.
 local _policy = nil
-
--- Map of row id -> health_dot (bool). nil until first load.
-local _dots = nil
 
 -- Ordered list of the row ids this driver renders. nil until first load.
 local _ids = nil
@@ -101,19 +87,18 @@ end
 local function load_policy()
 	if _policy then return _policy end
 
-	local policy, dots, ids = nil, nil, nil
+	local policy, ids = nil, nil
 	local ok_menu, ManifestMenu = pcall(require, "infra.manifest_menu")
 	if ok_menu and ManifestMenu and type(ManifestMenu.get_array) == "function" then
 		local rows = ManifestMenu.get_array(LLM_MENU_KEY)
 		if type(rows) == "table" then
-			policy, dots, ids = {}, {}, {}
+			policy, ids = {}, {}
 			for _, row in ipairs(rows) do
 				-- Only the rows this driver renders carry a greying policy: the
 				-- separator and Linux's two inline lists have no submenu to grey.
 				if type(row) == "table" and type(row.id) == "string"
 					and (row.type == "dynamic" or row.type == "group") and is_for_this_driver(row) then
 					policy[row.id] = (row.disabled_when_off == true)
-					dots[row.id] = (row.health_dot == true)
 					ids[#ids + 1] = row.id
 				end
 			end
@@ -122,15 +107,14 @@ local function load_policy()
 
 	if not policy or next(policy) == nil then
 		Logger.warn(LOG, "menu_manifest.json 'llm_menu' unreadable/empty — using built-in fallback greying policy.")
-		policy, dots, ids = {}, {}, {}
+		policy, ids = {}, {}
 		for id, v in pairs(FALLBACK_GREYS_WHEN_OFF) do policy[id] = v end
-		for id, v in pairs(FALLBACK_HEALTH_DOT) do dots[id] = v end
 		-- Deliberately ordered, unlike the two tables above: this list decides
 		-- what the caller registers a handler for, and pairs() order is not.
 		ids = FALLBACK_ROW_ORDER
 	end
 
-	_policy, _dots, _ids = policy, dots, ids
+	_policy, _ids = policy, ids
 	return _policy
 end
 
@@ -160,15 +144,29 @@ function M.row_ids()
 	return _ids
 end
 
---- Whether the given row carries the backend-reachability dot (its ``health_dot``
---- flag in the manifest). Exactly one row does; asking the manifest rather than
---- hardcoding which means moving the dot is a manifest edit on both drivers at
---- once, not a source edit on each.
---- @param id string Row id from the manifest's llm_menu.
---- @return boolean.
-function M.has_health_dot(id)
-	load_policy()
-	return _dots[id] == true
+--- The backend health dot the AI title carries for a status, read from the
+--- ``health_dot`` table of the manifest's top-level ``llm`` entry: the same
+--- declaration drives the Windows and Linux titles, so no driver owns a glyph.
+--- @param status string "ready", "warming" or "unreachable".
+--- @return string|nil The glyph, or nil when the manifest declares none.
+function M.title_health_dot(status)
+	local ok_menu, ManifestMenu = pcall(require, "infra.manifest_menu")
+	if not ok_menu or type(ManifestMenu) ~= "table" or type(ManifestMenu.get_root) ~= "function" then
+		Logger.error(LOG, "Manifest renderer unavailable — the AI title has no health dot.")
+		return nil
+	end
+	local root = ManifestMenu.get_root()
+	local top = type(root) == "table" and root.top_level or nil
+	if type(top) ~= "table" then return nil end
+	for _, entry in ipairs(top) do
+		if type(entry) == "table" and entry.id == "llm" then
+			local dots = entry.health_dot
+			local glyph = type(dots) == "table" and dots[status] or nil
+			if type(glyph) == "string" and glyph ~= "" then return glyph end
+			return nil
+		end
+	end
+	return nil
 end
 
 --- Resolves a menu row's `disabled` value from the shared policy, mirroring the

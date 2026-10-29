@@ -58,7 +58,13 @@ function nativeLlmParentPublication(source, builderSource, definition, topLevel,
 	const child =
 		'main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}';
 	const parent =
-		'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, { llm_parent_enabled = function() return state.llm_enabled or nil end, })';
+		'local parent_row = ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, { llm_parent_enabled = function() return state.llm_enabled or nil end, })';
+	// The health dot the manifest's top-level entry declares joins the caption
+	// before the completed parent is returned.
+	const titleDot =
+		'local title_dot = health_status and MenuLayout.title_health_dot(health_status) or nil ' +
+		'if type(parent_row) == "table" and type(parent_row.label) == "string" and title_dot then ' +
+		'parent_row.label = parent_row.label .. " " .. title_dot end return parent_row';
 	const childAt = positions(build, child),
 		parentAt = rootPositions(build, parent);
 	if (
@@ -75,7 +81,14 @@ function nativeLlmParentPublication(source, builderSource, definition, topLevel,
 		return false;
 	// Completed parent publication is the actual build_item terminal expression.
 	const parentTokens = scriptTokens(parent, '.lua');
-	if (parentAt[0] + parentTokens.length !== build.tokens.length) return false;
+	const titleDotTokens = scriptTokens(titleDot, '.lua');
+	const titleDotAt = rootPositions(build, titleDot);
+	if (
+		titleDotAt.length !== 1 ||
+		parentAt[0] + parentTokens.length !== titleDotAt[0] ||
+		titleDotAt[0] + titleDotTokens.length !== build.tokens.length
+	)
+		return false;
 	const loadManifest = body(builder, 'local function load_manifest()');
 	const loadTop = body(builder, 'local function load_top_level()');
 	const rootRead = lex('return ManifestMenu.get_root()');

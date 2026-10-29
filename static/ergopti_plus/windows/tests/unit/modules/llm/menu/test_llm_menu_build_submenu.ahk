@@ -415,7 +415,7 @@ _LBMS_ActualWarningAnchor() {
 			"action", _LLM_Menu_OnWarningInstallClick)]
 		; The captured emitter returns its rows; MenuRenderer_Build draws them.
 		MenuRenderer_AppendRows(Destination, "llm_menu", "llm_model", _LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle,
-			"llm_model", false, false, false, WarningRows, Destination, "LLM"))
+			"llm_model", false, WarningRows, Destination, "LLM"))
 		Labels := _LBMS_Labels(Destination)
 		AssertEqual(t("menu.llm.warning_install_ollama"), Labels[1],
 			"the retained native warning precedes the model selector button it concerns")
@@ -500,7 +500,7 @@ _LBMS_CapturedTargetRefusal() {
 		Cases := [{Owner: Map(), Target: Owner}, {Owner: Owner, Target: Foreign},
 			{Owner: Owner, Target: Map()}]
 		for Subject in Cases {
-			Callback := _LLM_Menu_EmitCapturedRow.Bind(Subject.Owner, "llm_model", false, false, false, [])
+			Callback := _LLM_Menu_EmitCapturedRow.Bind(Subject.Owner, "llm_model", false, [])
 			Failure := ""
 			try Callback.Call(Subject.Target, "LLM")
 			catch as Err

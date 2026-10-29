@@ -8,7 +8,7 @@
 				"hs": "macos/ui/menu/menu_llm/init.lua"
 			},
 			"signatures": {
-				"ahk": "_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {",
+				"ahk": "_LLM_Menu_EmitRow(id, disabled) {",
 				"hs": "local function build_item()"
 			}
 		},
@@ -40,7 +40,7 @@
 				"hs": "macos/ui/menu/menu_llm/init.lua"
 			},
 			"signatures": {
-				"ahk": "_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {",
+				"ahk": "_LLM_Menu_EmitRow(id, disabled) {",
 				"hs": "local function build_item()"
 			}
 		},

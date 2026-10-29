@@ -12,8 +12,8 @@
 ; FEATURES & RATIONALE:
 ; 1. Persistent menu object: the AHK v2 ``Menu`` instance is reused across
 ;    rebuilds so the canonical tray position is preserved.
-; 2. Health-dot prefix: backend reachability is reflected via the 🟢/🔴 prefix
-;    on the model entry, painted from the most recent async probe result.
+; 2. Health dot: backend reachability is reflected by the dot the manifest
+;    declares, appended to the AI tray title from the latest async probe result.
 ; 3. Warning row: surfaces a missing Ollama install with a re-install click
 ;    target — without this, a missing daemon was completely silent.
 ; ==============================================================================
@@ -81,6 +81,37 @@ _LLM_Menu_PublishRoot(Submenu, PublishAuthorizeFn) {
 }
 
 /**
+ * The AI tray title with its backend health dot, from the glyphs the manifest's
+ * top-level ``llm`` entry declares for every driver (maintainer, 2026-10-29).
+ * No dot while the AI is off or suspended, or before a first probe answers.
+ * @returns {String} The localized title, followed by the dot when one applies.
+ */
+LLM_Menu_TrayTitle() {
+	global _LLM_Menu
+	Title := t("menu.llm.title")
+	if !(_LLM_Menu is Map) || !_LLM_Menu.Get("enabled", false) || A_IsSuspended
+		return Title
+	Status := _LLM_Menu.Get("last_health_status", "")
+	if Status == ""
+		return Title
+	BackendReady := false
+	try BackendReady := _LLM_Menu_BackendIsReadyForUse()
+	; A reachable server whose backend cannot serve yet (missing runtime, API
+	; not configured) fires no prediction, so it never reads as ready.
+	State := (Status == "ok") ? (BackendReady ? "ready" : "warming") : "unreachable"
+	Glyph := ""
+	for _, Entry in MenuManifest_LoadTopLevel() {
+		if (Entry is Map) && Entry.Get("id", "") == "llm" {
+			Dots := Entry.Get("health_dot", 0)
+			if (Dots is Map)
+				Glyph := Dots.Get(State, "")
+			break
+		}
+	}
+	return Glyph == "" ? Title : Title . " " . Glyph
+}
+
+/**
  * Swaps the IA row's child in the published root, leaving every sibling row as is.
  * @param {Menu} Submenu The staged IA child this build owns.
  * @param {Func} PublishAuthorizeFn The root generation fence of this projection.
@@ -90,7 +121,9 @@ _LLM_Menu_PublishRoot(Submenu, PublishAuthorizeFn) {
 _LLM_Menu_ReplacePublishedRow(Submenu, PublishAuthorizeFn) {
 	if _TrayRootFirstPublicationPending()
 		return -1
-	Label := t("menu.llm.title")
+	; A changed health dot changes the caption: no row matches, and the caller
+	; re-stages the root under the new title.
+	Label := LLM_Menu_TrayTitle()
 	PreviousCritical := Critical("On")
 	try {
 		Position := -1
@@ -142,22 +175,16 @@ LLM_Menu_BuildSubmenu() {
 	_tStaged := A_TickCount
 
 	; Enable / Disable toggle. The checked state MUST reflect
-	; ``_LLM_Menu["enabled"]`` alone — that's the user's intent. We keep a
-	; separate ``_llm_is_operational`` flag (enabled AND active-backend ready)
-	; for the health dot below, because we still want a visual cue when the user
-	; has flipped the toggle ON but the selected backend is not usable yet.
-	; Previously the checkbox itself used _llm_is_operational, so clicking
-	; ON while Ollama was missing left the toggle visually OFF — the user
-	; thought the click did nothing.
+	; ``_LLM_Menu["enabled"]`` alone — that's the user's intent. Backend
+	; readiness only colours the health dot of the AI title (LLM_Menu_TrayTitle):
+	; when the checkbox itself followed readiness, clicking ON while Ollama was
+	; missing left the toggle visually OFF — the user thought the click did nothing.
 	; Probe deps ONCE, guarded: when the feature is off at boot the deps
 	; subsystem may not be ready to answer, and an unguarded throw here used to
 	; abort the whole build BEFORE the toggle was added — leaving the IA submenu
 	; empty, with no visible control to switch the feature back on.
 	_deps_ready := false
 	try _deps_ready := LLM_Deps_IsReady()
-	_backend_ready := false
-	try _backend_ready := _LLM_Menu_BackendIsReadyForUse()
-	_llm_is_operational := (_LLM_Menu["enabled"] && _backend_ready)
 
 	; Mirror the macOS menu (ui/menu/menu_llm/init.lua is_disabled): when the
 	; feature is OFF, render the FULL menu unchanged but grey out every settings
@@ -201,7 +228,7 @@ LLM_Menu_BuildSubmenu() {
 			GroupDisabled[_row["id"]] := RowDisabled
 		} else {
 			DynamicHandlers[_row["id"]] := _LLM_Menu_EmitCapturedRow.Bind(
-				StagedHandle, _row["id"], RowDisabled, _llm_is_operational, _MR_Get(_row, "health_dot", false), WarningRows)
+				StagedHandle, _row["id"], RowDisabled, WarningRows)
 		}
 	}
 	MenuRenderer_Build("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders(),
@@ -313,10 +340,10 @@ _LLM_Menu_GuardedAction(Action, Params*) {
 
 ; Binding captures each row before the native renderer invokes it, avoiding loop closures.
 ; The rows go back to the renderer, which draws them at the declared entry.
-_LLM_Menu_EmitCapturedRow(Owner, Id, Disabled, Operational, HealthDot, WarningRows, TargetMenu, CategoryName) {
+_LLM_Menu_EmitCapturedRow(Owner, Id, Disabled, WarningRows, TargetMenu, CategoryName) {
 	if !(Owner is Menu) || !(TargetMenu is Menu) || TargetMenu != Owner
 		throw Error("An LLM row cannot leave its detached native menu owner.")
-	return _LLM_Menu_GreyConfigParents(Id, _LLM_Menu_EmitRow(TargetMenu, Id, Disabled, Operational, HealthDot, WarningRows),
+	return _LLM_Menu_GreyConfigParents(Id, _LLM_Menu_EmitRow(TargetMenu, Id, Disabled, WarningRows),
 		Disabled)
 }
 
@@ -365,10 +392,11 @@ LLM_Menu_Build() {
 	; while Ollama was missing although the feature was on.
 	; Both branches are guarded with try: the item may not exist yet if the updater
 	; build request fires before initMenu has had a chance to register it.
+	TrayTitle := LLM_Menu_TrayTitle()
 	if (_LLM_Menu["enabled"]) {
-		try A_TrayMenu.Check(t("menu.llm.title"))
+		try A_TrayMenu.Check(TrayTitle)
 	} else {
-		try A_TrayMenu.Uncheck(t("menu.llm.title"))
+		try A_TrayMenu.Uncheck(TrayTitle)
 	}
 	try LoggerInfo("LLM", "LLM_Menu_Build: IA submenu built with {1} item(s) in {2}ms.", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"), TickElapsed(_t0))
 	} catch as e {
@@ -451,12 +479,12 @@ _LLM_MenuLayout_Rows() {
  */
 _LLM_MenuLayout_Fallback() {
 	return [
-		Map("id", "llm_model",               "disabled_when_off", false, "health_dot", true),
-		Map("id", "llm_profile",             "disabled_when_off", true,  "health_dot", false),
-		Map("id", "llm_trigger",             "disabled_when_off", true,  "health_dot", false),
-		Map("id", "llm_generation_settings", "disabled_when_off", true,  "health_dot", false),
-		Map("id", "llm_display",             "disabled_when_off", true,  "health_dot", false),
-		Map("id", "llm_navigation",          "disabled_when_off", true,  "health_dot", false)
+		Map("id", "llm_model",               "disabled_when_off", false),
+		Map("id", "llm_profile",             "disabled_when_off", true),
+		Map("id", "llm_trigger",             "disabled_when_off", true),
+		Map("id", "llm_generation_settings", "disabled_when_off", true),
+		Map("id", "llm_display",             "disabled_when_off", true),
+		Map("id", "llm_navigation",          "disabled_when_off", true)
 	]
 }
 
@@ -471,40 +499,32 @@ _LLM_MenuLayout_Fallback() {
  * are returned here with their anchor row to preserve menu order.
  * @param {String}  id                  Row id from the manifest's llm_menu.
  * @param {Boolean} disabled            Greying flag already resolved from the spec policy.
- * @param {Boolean} llm_is_operational  Enabled AND deps ready — gates the health dot.
- * @param {Boolean} has_health_dot      The row's declared health_dot flag. Which row
- *                                      carries the dot is the manifest's call, not this
- *                                      file's, so macOS cannot end up dotting another row.
  * @returns {Array} Row data for MenuRenderer_Build; empty for an unknown id.
  */
-_LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset) {
+_LLM_Menu_EmitRow(TargetMenu, id, disabled, CapturedWarningRows := unset) {
 	global _LLM_Menu
 	if !(TargetMenu is Menu)
 		throw TypeError("An LLM settings row requires its native target.")
 	switch id {
 	case "llm_model":
 		; One button opens the model selector page (maintainer, 2026-10-27): the
-		; cached health dot, the backend's emoji and the model. The Backend
+		; backend's emoji and the model; the health dot sits on the AI title. The Backend
 		; chooser, the model list and the API entries left the menu; the menu
 		; builds none of them. BOTH probes are non-blocking and paint on the next
 		; pass, so opening the tray can never freeze the thread.
 		; Force past the idle gate: this row is only painted while the tray menu is
 		; actually being built, i.e. for a user looking at it right now, so the dot
-		; must refresh even when A_TimeIdlePhysical claims the machine has been
+		; (on the AI title) must refresh even when A_TimeIdlePhysical claims the machine has been
 		; unattended. The 3 s throttle inside the helper is NOT bypassed, so a
 		; rebuild storm still costs a single ping.
 		_LLM_Menu_FireHealthProbe(true)
 		_LLM_Menu_FireInstalledTagsProbe()
-		last_status := _LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""
-		health_dot := (has_health_dot && llm_is_operational)
-			? ((last_status == "ok") ? "🟢 " : (last_status == "ko") ? "🔴 " : "")
-			: ""
 		; The shown model follows the active backend (an API entry's name with
 		; backend api, never the preserved Ollama slot) — the thinking-model row
 		; below must agree with the same text.
 		model_shown := _LLM_Menu_ModelDisplayText()
 		caption_text := _LLM_Menu_ModelCaptionText()
-		Caption := health_dot . LLM_ModelSelectorCaption(_LLM_Menu.Get("backend", "ollama"),
+		Caption := LLM_ModelSelectorCaption(_LLM_Menu.Get("backend", "ollama"),
 			caption_text != "" ? caption_text : t("menu.llm.no_model_none"))
 		; The definitions-only test graph loads no WebView page: the button is
 		; then drawn greyed instead of calling a missing owner.
