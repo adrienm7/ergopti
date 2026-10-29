@@ -1,4 +1,4 @@
-<!-- docs/todo-agents/windows-exe-false-positive-submission-pack.md -->
+<!-- docs/tooling/windows-exe-false-positive-submission-pack.md -->
 
 # ErgoptiPlus.exe false-positive submission pack and string-surface hygiene
 

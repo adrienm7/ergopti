@@ -1,5 +1,5 @@
 {
-	"$comment": "Antivirus-facing surface of ErgoptiPlus.exe, checked by tools/ci/windows-exe-av-surface.cjs on every Windows build. forbidden patterns must not occur; a ceiling may not be exceeded and is lowered when a count drops, so it is the string surface of the last measured build (node tools/ci/windows-exe-av-surface.cjs --breakdown --sources static/ergopti_plus/windows <exe> prints the per-file origin of every count). Patterns are case-insensitive JavaScript regular expressions. PowerShell stages are bundled scripts run with -File, never encoded commands or code compiled from transported text. See docs/todo-agents/windows-exe-flagged-by-proxy.md.",
+	"$comment": "Antivirus-facing surface of ErgoptiPlus.exe, checked by tools/ci/windows-exe-av-surface.cjs on every Windows build. forbidden patterns must not occur; a ceiling may not be exceeded and is lowered when a count drops, so it is the string surface of the last measured build (node tools/ci/windows-exe-av-surface.cjs --breakdown --sources static/ergopti_plus/windows <exe> prints the per-file origin of every count). Patterns are case-insensitive JavaScript regular expressions. PowerShell stages are bundled scripts run with -File, never encoded commands or code compiled from transported text. See docs/tooling/windows-exe-flagged-by-proxy.md.",
 	"schema": 1,
 	"script": {
 		"forbidden": {

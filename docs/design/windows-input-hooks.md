@@ -1,4 +1,4 @@
-<!-- docs/todo-agents/windows-input-hooks-items-49-50.md -->
+<!-- docs/design/windows-input-hooks.md -->
 
 # Windows input hooks: items 49 (hook order) and 50 (SendEvent against SendInput)
 

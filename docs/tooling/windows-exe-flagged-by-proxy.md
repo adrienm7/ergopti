@@ -1,4 +1,4 @@
-<!-- docs/todo-agents/windows-exe-flagged-by-proxy.md -->
+<!-- docs/tooling/windows-exe-flagged-by-proxy.md -->
 
 # ErgoptiPlus.exe v1.0.4 flagged by a corporate proxy (Netskope)
 
