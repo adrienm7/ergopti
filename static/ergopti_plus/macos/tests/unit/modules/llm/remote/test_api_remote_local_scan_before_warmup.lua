@@ -24,11 +24,10 @@ local function get_upvalue(fn, target)
 	return nil
 end
 
-local PROVIDER = "fixture_local"
-ApiRemote.PROVIDERS[PROVIDER] = {
-	label = "Fixture local", base_url = "http://127.0.0.1:8000/v1",
-	default_model = "fixture-model", format = "openai",
-}
+-- Any catalogue local server takes this path; LM Studio proves it is not oMLX's alone
+local PROVIDER = "lmstudio"
+local DEFAULT_PORT = ApiRemote.PROVIDERS[PROVIDER].base_url:match(":(%d+)")
+helpers.assert_true(ApiRemote.is_local_server(PROVIDER), "the fixture needs a catalogue local server")
 
 --- Runs one warmup with a stubbed scan state, scan entry point and HTTP owner.
 --- @param entry table Remote entry to warm.
@@ -40,17 +39,24 @@ local function with_fixture(entry, scan, body)
 	helpers.assert_true(LocalServers ~= nil and warmup_client ~= nil, "fixture upvalues must resolve")
 	local real = {
 		is_local = LocalServers.is_local, port_scan = LocalServers.port_scan,
-		detect = ApiRemote.detect_local_servers, get = warmup_client.get,
+		discovered_key = LocalServers.discovered_key, detect = ApiRemote.detect_local_servers, get = warmup_client.get,
 	}
 	local state = { scan = scan, urls = {}, scans = 0 }
 	LocalServers.is_local = function(id) return id == PROVIDER end
 	LocalServers.port_scan = function(id) return id == PROVIDER and state.scan or nil end
+	LocalServers.discovered_key = function(id)
+		return id == PROVIDER and type(state.scan) == "table" and state.scan.api_key or ""
+	end
 	ApiRemote.detect_local_servers = function(on_done)
 		state.scans = state.scans + 1
 		state.on_scanned = on_done
 		return true
 	end
-	warmup_client.get = function(url) state.urls[#state.urls + 1] = url end
+	state.headers = {}
+	warmup_client.get = function(url, headers)
+		state.urls[#state.urls + 1] = url
+		state.headers[#state.headers + 1] = headers or {}
+	end
 	local ok, err = pcall(function()
 		ApiRemote.set_entries({ entry })
 		ApiRemote.set_active_entry_id(entry.id)
@@ -58,6 +64,7 @@ local function with_fixture(entry, scan, body)
 		body(state)
 	end)
 	LocalServers.is_local, LocalServers.port_scan = real.is_local, real.port_scan
+	LocalServers.discovered_key = real.discovered_key
 	ApiRemote.detect_local_servers, warmup_client.get = real.detect, real.get
 	ApiRemote.set_active_entry_id("")
 	if not ok then error(err) end
@@ -75,11 +82,21 @@ helpers.describe("api_remote locates a local server before its warmup ping", fun
 		end)
 	end)
 
+	helpers.it("(local-scan-before-warmup) sends the key the scan read from the server's settings", function()
+		with_fixture({ id = "local-k", provider = PROVIDER, base_url = "", model = "m", token = "" }, nil, function(state)
+			state.scan = { running = true, base_url = "http://127.0.0.1:8181/v1", api_key = "server-key" }
+			state.on_scanned(true)
+			helpers.assert_eq(#state.urls, 1)
+			helpers.assert_eq(state.headers[1].Authorization, "Bearer server-key",
+				"a keyless entry borrows the key the scan found, else its server answers 401")
+		end)
+	end)
+
 	helpers.it("(local-scan-before-warmup) still pings the default when the scan finds nothing", function()
 		with_fixture({ id = "local-b", provider = PROVIDER, base_url = "", model = "m", token = "t" }, nil, function(state)
 			state.on_scanned(false)
 			helpers.assert_eq(#state.urls, 1, "a scan that finds nothing must not stall the warmup")
-			helpers.assert_true(state.urls[1]:find("127.0.0.1:8000", 1, true) ~= nil, state.urls[1])
+			helpers.assert_true(state.urls[1]:find("127.0.0.1:" .. DEFAULT_PORT, 1, true) ~= nil, state.urls[1])
 		end)
 	end)
 
