@@ -392,6 +392,40 @@ Test("_LLMRemoteBuildPayload: openai payload merges model extras (api-test-entry
 	_RemotePayload_OpenAI_MergesModelExtras)
 
 
+; A hybrid reasoning model served by a local server wrote its reasoning as
+; plain text until max_tokens ran out, so a prediction got no answer. Every
+; local server carries the shared local_servers.json request_fields, sent as
+; their exact JSON source so enable_thinking stays the literal false.
+_RemotePayload_LocalServer_TurnsThinkingOff() {
+	global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS
+	Assert(LLM_LOCAL_API_SERVERS.Count > 0, "the shared catalogue lists local servers")
+	for Id in LLM_LOCAL_API_SERVERS {
+		Fields := LLM_API_PROVIDERS[Id]["RequestFields"]
+		Assert(Fields.Has("chat_template_kwargs"), Id . " must carry chat_template_kwargs")
+		p := _LLMRemoteBuildPayload("openai", "qwen3.5-4b", "s", "u", 0.3, 40, Map(), Fields)
+		AssertContains(RegExReplace(p, "\s"), '"chat_template_kwargs":{"enable_thinking":false}')
+		AssertContains(p, '"max_tokens":40')
+	}
+	for Id in ["openai", "cerebras"]
+		Assert(!LLM_API_PROVIDERS[Id].Has("RequestFields"), Id . " must not carry local request fields")
+}
+Test("_LLMRemoteBuildPayload: a local server turns thinking off (local-request-fields)",
+	_RemotePayload_LocalServer_TurnsThinkingOff)
+
+
+_RemotePayload_LocalRequestFields_FailClosed() {
+	Fields := _LLMRemote_LocalRequestFields('{"request_fields":{"_comment":"d","list":[1],"empty":{},"none":null,"flag":true,"max_tokens":9}}')
+	Assert(!Fields.Has("_comment") && !Fields.Has("list") && !Fields.Has("empty") && !Fields.Has("none"),
+		"documentation keys, arrays, empty objects and null are dropped")
+	Assert(Fields.Has("flag") && Fields["flag"] == "true", "a boolean keeps its JSON source")
+	p := _LLMRemoteBuildPayload("openai", "m", "s", "u", 0.1, 16, Map(), Fields)
+	AssertContains(p, '"flag":true')
+	Assert(!InStr(p, '"max_tokens":9'), "a request field never replaces a field the payload sets")
+}
+Test("_LLMRemote_LocalRequestFields: fields are projected fail-closed (local-request-fields)",
+	_RemotePayload_LocalRequestFields_FailClosed)
+
+
 _RemotePayload_OpenAI_NoExtrasUnchanged() {
 	p := _LLMRemoteBuildPayload("openai", "gpt-4o-mini", "s", "u", 0.1)
 	Assert(InStr(p, "reasoning_effort") == 0,

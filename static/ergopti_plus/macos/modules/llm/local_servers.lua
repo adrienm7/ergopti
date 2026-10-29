@@ -82,6 +82,7 @@ M.FAILURE_MODEL_MISSING = "model_missing"
 --- @return table servers Server id -> { id, label, base_url }.
 --- @return boolean published Complete same-source local inventory.
 --- @return table discovery Server id -> validated discovery descriptor.
+--- @return table request_fields Body fields of every request to a local server.
 local function load_catalogue()
 	local path = Paths.shared_llm_path("local_servers.json")
 	local raw, status = nil, "error"
@@ -89,12 +90,12 @@ local function load_catalogue()
 	if status ~= "ok" or type(raw) ~= "string" then
 		Logger.error(LOG, "local_servers.json is unreadable at %s (%s): no local server is detected.",
 			tostring(path), tostring(status))
-		return {}, {}, false
+		return {}, {}, false, {}, {}
 	end
 	local ok, root = pcall(JsonCodec.decode, raw)
 	if not ok or type(root) ~= "table" or type(root.server_order) ~= "table" or type(root.servers) ~= "table" then
 		Logger.error(LOG, "local_servers.json is malformed: no local server is detected.")
-		return {}, {}, false
+		return {}, {}, false, {}, {}
 	end
 	local source = Json.decode_lossless(raw)
 	local shaped = type(source) == "table" and not Json.is_array(source) and not Json.is_null(source)
@@ -112,11 +113,11 @@ local function load_catalogue()
 		if descriptor then discovery[id] = descriptor
 		else Logger.error(LOG, "local_servers.json: %s; that server is never probed.", reason) end
 	end
-	return order, servers, shaped and #order == #source.server_order, discovery
+	return order, servers, shaped and #order == #source.server_order, discovery, AuthPolicy.request_fields(root)
 end
 
 local config_published
-M.ORDER, M.SERVERS, config_published, M.DISCOVERY = load_catalogue()
+M.ORDER, M.SERVERS, config_published, M.DISCOVERY, M.REQUEST_FIELDS = load_catalogue()
 
 --- Reports admission of the original local catalogue, including a valid empty list.
 --- Runtime mutations and server reachability cannot grant inventory authority.
