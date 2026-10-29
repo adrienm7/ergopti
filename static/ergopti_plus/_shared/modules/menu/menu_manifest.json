@@ -493,21 +493,6 @@
 			]
 		},
 		{
-			"type": "list",
-			"id": "llm_after_model_boundary",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
-		},
-		{
-			"type": "---",
-			"platforms": [
-				"linux"
-			],
-			"unavailable": "hide"
-		},
-		{
 			"type": "dynamic",
 			"id": "llm_profile",
 			"i18n": "menu.profiles.profile_label_prefix",
@@ -4974,15 +4959,6 @@
 			"type": "command",
 			"id": "llm_download_shortcut",
 			"i18n": "menu.llm.show_download_window",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
-		}
-	],
-	"llm_after_model_boundary": [
-		{
-			"type": "---",
 			"platforms": [
 				"hs"
 			],

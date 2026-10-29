@@ -8057,30 +8057,16 @@ console.log(
 			'the whole native parent context owns its genuine macOS boundary'
 		);
 	}
-	const linuxBoundary = outerBoundary.linux_presentation_boundary;
-	const linuxIndex = declaredFrames[outerBoundary.section].findIndex(
-		(row) => row.id === linuxBoundary.preceding_id
-	);
-	assert(linuxIndex >= 0, 'the actual Linux model button retains its adjacent boundary');
-	function assertOnlyLinuxPresentationBoundary(row) {
-		assert.deepEqual(
-			row,
-			linuxBoundary.declaration,
-			'HIDE classifies only the actual inert Linux separator'
-		);
-	}
-	assertOnlyLinuxPresentationBoundary(declaredFrames[outerBoundary.section][linuxIndex + 1]);
-	assert.throws(
-		() =>
-			assertOnlyLinuxPresentationBoundary({
-				type: 'command',
-				id: 'new_functional_row',
-				i18n: 'button.cancel',
-				platforms: ['linux'],
-				unavailable: 'hide'
-			}),
-		assert.AssertionError,
-		'a newly functional row cannot borrow this presentation-only classification'
+	// The model and the profile rows form one block on every driver: no row,
+	// separator or boundary list may sit between them, whatever the platform.
+	const [joinedFirst, joinedSecond] = outerBoundary.adjacent_without_boundary;
+	const outerRows = declaredFrames[outerBoundary.section];
+	const joinedIndex = outerRows.findIndex((row) => row.id === joinedFirst);
+	assert(joinedIndex >= 0, 'the actual model button remains declared');
+	assert.equal(
+		outerRows[joinedIndex + 1]?.id,
+		joinedSecond,
+		'the profile row directly follows the model row on every platform'
 	);
 	const outerSource = readFileSync(resolve(SHARED, '..', outerBoundary.owner), 'utf8');
 	assert(
