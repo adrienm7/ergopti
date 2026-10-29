@@ -87,6 +87,10 @@ local function with_screenshot(options, scenario)
 			end,
 		}
 		package.loaded["adapters.shell_runner"] = {
+			open = function(target)
+				f.opened[#f.opened + 1] = target
+				return true
+			end,
 			spawn = function(executable, args, on_done)
 				local record = { executable = executable, args = args, on_done = on_done }
 				f.tasks[#f.tasks + 1] = record
@@ -141,10 +145,8 @@ local function with_screenshot(options, scenario)
 				if opts.permission == nil then return true end
 				return opts.permission
 			end,
-			urlevent = { openURL = function(url)
-				f.opened[#f.opened + 1] = url
-				return true
-			end },
+			-- Mirrors Hammerspoon: openURL refuses a URL lacking "://".
+			urlevent = { openURL = function(url) return url:find("://", 1, true) ~= nil end },
 			image = { imageFromPath = function(path)
 				if (f.files[path] or 0) > 0 then return { path = path } end
 				return nil
