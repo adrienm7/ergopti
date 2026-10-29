@@ -18,6 +18,11 @@
 
 local M = {}
 
+-- A test file run on its own, without tests/run.lua, still loads these helpers
+-- first: isolating here keeps its logs and config away from the account's own
+-- ~/Library/Logs/ergopti_plus. Idempotent, the runner already isolated.
+require("test.runner_home").isolate()
+
 --- English formats of the keys a caption with several getters (caption_getters) reads.
 --- Such a caption refuses a format without its placeholders, so a stub that echoes
 --- the key (the usual one) would drop the whole row; a stub that replaces the
