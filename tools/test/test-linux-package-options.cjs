@@ -33,6 +33,15 @@ function run(script, args = []) {
 	});
 }
 const built = run('build-linux-driver.sh');
+// The .rpm publishes a LuaJIT luv binding; staging only needs an ELF to carry,
+// so the native build recipe stays out of this argument-order regression.
+const LUV_MODULE = path.join(scratch, 'luv.so');
+fs.writeFileSync(
+	LUV_MODULE,
+	Buffer.concat([Buffer.from([0x7f, 0x45, 0x4c, 0x46]), Buffer.from('fixture')])
+);
+const stagingArgs = (format) =>
+	format === 'rpm' ? ['--skip-rpm', '--luv-module', LUV_MODULE] : ['--skip-deb'];
 assert.equal(built.status, 0, built.stderr || built.stdout || built.error?.message);
 let refusals = 0;
 for (const format of ['deb', 'rpm']) {
@@ -70,7 +79,7 @@ for (const format of ['deb', 'rpm']) {
 		);
 		refusals++;
 	}
-	const valid = run(script, [skip]);
+	const valid = run(script, stagingArgs(format));
 	assert.equal(valid.status, 0, valid.stderr || valid.stdout || valid.error?.message);
 	assert.ok(valid.stdout.includes(`Structure complete (${skip})`));
 	assert.equal(
@@ -86,7 +95,7 @@ try {
 	for (const format of ['deb', 'rpm']) {
 		const staged = spawnSync(
 			bashExecutable(),
-			[path.join(alias, `tools/build/build-linux-${format}.sh`), `--skip-${format}`],
+			[path.join(alias, `tools/build/build-linux-${format}.sh`), ...stagingArgs(format)],
 			{
 				cwd: ROOT,
 				env,

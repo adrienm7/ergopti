@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ROOT = path.resolve(__dirname, '../..');
 const SOURCE = 'static/ergopti_plus/_shared/data/linux_native_runtime.json';
+const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.json';
 const LUA_OUTPUT = 'static/ergopti_plus/linux/_generated/native_runtime.lua';
 const MANAGERS = ['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk'];
 const KEYS = ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb'];
@@ -344,6 +345,29 @@ function render(data, read) {
 		`_native_output_build_packages() {\n\tcase "$1" in\n${buildRows.join('\n')}\n\t\t*) return 1 ;;\n\tesac\n}`
 	);
 	const luvSource = data.network_runtime.portable.flatpak_sources.luv;
+	// The .rpm publishes its own LuaJIT luv binding built from the same pinned
+	// recipe at package build time: Fedora's generic lua-luv targets another ABI.
+	const luvPin = [
+		'NATIVE_LUV_SOURCE_REVISION=' + JSON.stringify(luvSource.commit),
+		'NATIVE_LUV_CMAKE_OPTIONS=(' +
+			LUV_CMAKE_OPTIONS.map((option) => JSON.stringify(option)).join(' ') +
+			')'
+	];
+	const luvRecipe = ['NATIVE_LUV_SOURCE_URL=' + JSON.stringify(luvSource.url), ...luvPin].join(
+		'\n'
+	);
+	// A new build script spells no host: it derives it from identifiers.sh.
+	const githubPrefix = `https://${JSON.parse(read(IDENTIFIERS)).hosts.github}/`;
+	const luvRepository = luvSource.url.slice(githubPrefix.length);
+	if (
+		!luvSource.url.startsWith(githubPrefix) ||
+		!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.git$/.test(luvRepository)
+	)
+		throw new Error(`The luv source ${luvSource.url} is not a repository on ${githubPrefix}.`);
+	const packagedLuvRecipe = [
+		`NATIVE_LUV_SOURCE_URL="https://$ERGOPTI_HOST_GITHUB/${luvRepository}"`,
+		...luvPin
+	].join('\n');
 	const luvBuildRows = MANAGERS.map((manager) => {
 		const packages = data.network_runtime.source_luv_build_packages[manager];
 		return packages === null
@@ -355,11 +379,7 @@ function render(data, read) {
 		'LINUX SOURCE NETWORK BUILD',
 		[
 			`_network_source_build_packages() {\n\tcase "$1" in\n${luvBuildRows.join('\n')}\n\t\t*) return 1 ;;\n\tesac\n}`,
-			'NATIVE_LUV_SOURCE_URL=' + JSON.stringify(luvSource.url),
-			'NATIVE_LUV_SOURCE_REVISION=' + JSON.stringify(luvSource.commit),
-			'NATIVE_LUV_CMAKE_OPTIONS=(' +
-				LUV_CMAKE_OPTIONS.map((option) => JSON.stringify(option)).join(' ') +
-				')'
+			luvRecipe
 		].join('\n')
 	);
 	result[installer] = projectRegion(
@@ -399,6 +419,12 @@ function render(data, read) {
 			result[file] = projectRegion(read(file), 'LINUX NATIVE REQUIREMENTS', body);
 		}
 	}
+	const packagedLuv = 'tools/build/build-linux-packaged-luv.sh';
+	result[packagedLuv] = projectRegion(
+		read(packagedLuv),
+		'LINUX PACKAGED LUV SOURCE',
+		packagedLuvRecipe
+	);
 	return result;
 }
 
