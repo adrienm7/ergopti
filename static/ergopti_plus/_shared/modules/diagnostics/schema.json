@@ -772,11 +772,14 @@
 										"idle",
 										"prepared",
 										"starting",
-										"running",
+										"active",
 										"paused",
-										"stopping",
+										"recovering",
+										"fencing",
 										"failed",
-										"fenced",
+										"stopping",
+										"unregistering",
+										"uninitialized",
 										"unknown"
 									],
 									"default": "unknown"
@@ -827,7 +830,7 @@
 								},
 								"ai_backend": {
 									"kind": "enum",
-									"values": ["ollama", "mlx", "disabled", "unknown"],
+									"values": ["ollama", "mlx", "api", "disabled", "unknown"],
 									"default": "unknown"
 								}
 							}
