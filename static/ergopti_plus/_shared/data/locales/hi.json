@@ -1043,6 +1043,8 @@
 	"linux_shell.launcher.no_package_manager": "त्रुटि: कोई पैकेज मैनेजर नहीं मिला (apt, dnf या pacman आवश्यक है)।",
 	"linux_shell.build_luv.module_generated": "LuaJIT नेटवर्किंग मॉड्यूल स्रोत से बनाया गया।",
 	"linux_shell.build_luv.recipe_required": "नेटिव luv बिल्ड को उसकी स्रोत रेसिपी चाहिए।",
+	"linux_shell.native_modules.call_refused": "नेटिव मॉड्यूल परिवेश को एक निरपेक्ष ड्राइवर रूट और required या optional मोड चाहिए।",
+	"linux_shell.native_modules.module_unpublished": "Ergopti शुरू नहीं हो सकता: {1} एक प्रकाशित नेटिव मॉड्यूल नहीं है।",
 	"linux_shell.install.already_installed": "{1} — पहले से इंस्टॉल है",
 	"linux_shell.install.archive_digest_unavailable": "बनाए रखे गए डिस्क्रिप्टर वाले अपडेट के लिए वास्तविक OpenSSL3 रनटाइम आवश्यक है; क्षमता अनुपलब्ध रहती है।",
 	"linux_shell.install.capability_verified": "{1} — क्षमता सत्यापित",

@@ -1038,6 +1038,8 @@
 	"linux_shell.launcher.no_package_manager": "Error: no package manager found (apt, dnf or pacman is required).",
 	"linux_shell.build_luv.module_generated": "LuaJIT networking module built from source.",
 	"linux_shell.build_luv.recipe_required": "The native luv build needs its source recipe.",
+	"linux_shell.native_modules.call_refused": "The native module environment needs an absolute driver root and the required or optional mode.",
+	"linux_shell.native_modules.module_unpublished": "Ergopti cannot start: {1} is not a published native module.",
 	"linux_shell.install.already_installed": "{1} — already installed",
 	"linux_shell.install.archive_digest_unavailable": "retained-FD updates require an actual OpenSSL3 runtime; capability remains unavailable.",
 	"linux_shell.install.capability_verified": "{1} — capability verified",

@@ -1043,6 +1043,8 @@
 	"linux_shell.launcher.no_package_manager": "שגיאה: לא נמצא מנהל חבילות (נדרש apt, dnf או pacman).",
 	"linux_shell.build_luv.module_generated": "מודול הרשת של LuaJIT נבנה מקוד המקור.",
 	"linux_shell.build_luv.recipe_required": "הבנייה המקורית של luv דורשת את מתכון המקור שלה.",
+	"linux_shell.native_modules.call_refused": "סביבת המודולים המקוריים דורשת שורש מנהל התקן מוחלט ואת המצב required או optional.",
+	"linux_shell.native_modules.module_unpublished": "לא ניתן להפעיל את Ergopti: ‏{1} אינו מודול מקורי שפורסם.",
 	"linux_shell.install.already_installed": "{1} — כבר מותקן",
 	"linux_shell.install.archive_digest_unavailable": "עדכונים עם מתאר שמור דורשים סביבת OpenSSL3 אמיתית; היכולת נשארת לא זמינה.",
 	"linux_shell.install.capability_verified": "{1} — היכולת אומתה",

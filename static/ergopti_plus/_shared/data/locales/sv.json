@@ -1043,6 +1043,8 @@
 	"linux_shell.launcher.no_package_manager": "Fel: ingen pakethanterare hittades (apt, dnf eller pacman krävs).",
 	"linux_shell.build_luv.module_generated": "LuaJIT-nätverksmodul byggd från källkoden.",
 	"linux_shell.build_luv.recipe_required": "Det inbyggda luv-bygget behöver sitt källrecept.",
+	"linux_shell.native_modules.call_refused": "Miljön för inbyggda moduler kräver en absolut drivrutinsrot och läget required eller optional.",
+	"linux_shell.native_modules.module_unpublished": "Ergopti kan inte starta: {1} är inte en publicerad inbyggd modul.",
 	"linux_shell.install.already_installed": "{1} — redan installerat",
 	"linux_shell.install.archive_digest_unavailable": "uppdateringar med kvarhållen deskriptor kräver en verklig OpenSSL3-körtid; funktionen förblir otillgänglig.",
 	"linux_shell.install.capability_verified": "{1} — funktion verifierad",
