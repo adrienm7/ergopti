@@ -1186,10 +1186,6 @@ local function create_menu(deps)
 						for _, row in ipairs(ManifestMenu.render_rows(info_rows, "llm_model")) do row_for("llm_model", row) end
 				end
 
-				local model_boundary_rows = ManifestMenu.template_rows("llm_after_model_boundary", {}, {}, {})
-				if not model_boundary_rows then return {} end
-				list_providers.llm_after_model_boundary = function() return model_boundary_rows end
-
 
 				local profiles_item = profiles_mgr.get_menu_item()
 				profiles_item.disabled = MenuLayout.row_disabled("llm_profile", is_disabled, paused)

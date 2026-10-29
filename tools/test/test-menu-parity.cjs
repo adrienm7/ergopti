@@ -1020,12 +1020,6 @@ OPENS_SUBMENU.llm_model.push({
 	}
 });
 OPENS_SUBMENU.llm_model.push({
-	menu: 'llm_after_model_boundary',
-	platforms: ['hs'],
-	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' }
-});
-OPENS_SUBMENU.llm_model.push({
 	menu: 'llm_install_warning_frame',
 	platforms: ['ahk'],
 	kind: 'compose',

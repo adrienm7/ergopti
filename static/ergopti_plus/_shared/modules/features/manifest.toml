@@ -4630,18 +4630,8 @@ disabled_when_off = false
 health_dot = true
 platforms = ["ahk", "hs", "linux"]
 
-# The macOS native model bucket ends here; the whole renderer owns this boundary.
-[[menu.llm_menu]]
-type = "list"
-id = "llm_after_model_boundary"
-platforms = ["hs"]
-unavailable = "hide"
-
-[[menu.llm_menu]]
-type = "---"
-platforms = ["linux"]
-unavailable = "hide"
-
+# The model and the prompt rows form one block on every driver: no separator
+# between them (maintainer, 2026-10-29).
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_profile"
@@ -8596,10 +8586,6 @@ i18n = "menu.llm.show_download_window"
 platforms = ["hs"]
 unavailable = "hide"
 
-[[menu.llm_after_model_boundary]]
-type = "---"
-platforms = ["hs"]
-unavailable = "hide"
 # Personal hotstring frames retain native source inventory and callback owners.
 [[menu.hotstring_personal_none]]
 type = "check"
