@@ -377,7 +377,8 @@ le lecteur macOS ignore chaque `[tap_hold.*]`, et rien ne les recoupe.
 > « partagé » décrit dans la colonne macOS (application officielle 16.0.0, règles fusionnées
 > dans le `karabiner.json` de l'utilisateur) reste le chemin de production jusqu'à la
 > livraison de ce runtime, planifiée dans
-> [`docs/handovers/2026-09-29-overnight/hs274-delivery-plan.md`](handovers/2026-09-29-overnight/hs274-delivery-plan.md).
+> [l'ADR 011](../static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md) et l'item 31 de
+> [TODO.md](../TODO.md).
 
 ### 6.4 Gestes
 

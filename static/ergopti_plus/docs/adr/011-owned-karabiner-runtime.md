@@ -29,9 +29,10 @@ heuristic (timing, order, PID, user data, sender identity) was measured and
 rejected. The only exact source is a raw HID stream read inside the Karabiner
 core, before remapping, with device and element identity: a producer Ergopti
 must own. The complete analysis, the rejected paths and the work packages are in
-the [HS-274 delivery plan](../../../../docs/handovers/2026-09-29-overnight/hs274-delivery-plan.md);
-its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
-[decision log](../../../../docs/handovers/2026-09-29-overnight/DECISIONS.md).
+the HS-274 delivery plan; its section 6 asked the maintainer five questions,
+answered on 2026-09-29 in the decision log. Both left the tree with the old
+handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
+`docs/handovers/2026-09-29-overnight/` (`hs274-delivery-plan.md`, `DECISIONS.md`).
 
 ## Decision
 
@@ -149,9 +150,9 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
 
 ## Evidence in the codebase
 
-- The plan and its work packages:
-  `docs/handovers/2026-09-29-overnight/hs274-delivery-plan.md` (section 6
-  records these answers).
+- The plan and its work packages: the HS-274 delivery plan quoted above, in
+  Git at `49c62d77a1` (section 6 records these answers); the open work
+  packages are item 31 of `TODO.md`.
 - The realigned invariants: `docs/memory/macos-hammerspoon.md`
   (`project-hs-owned-remap-runtime`, `project-hs-karabiner-exact-lease-isolation`,
   `project-hs-fork-admission-in-both-launch-modes`).
