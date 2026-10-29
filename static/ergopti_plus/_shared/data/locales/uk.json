@@ -1043,6 +1043,8 @@
 	"linux_shell.launcher.no_package_manager": "Помилка: менеджер пакетів не знайдено (потрібен apt, dnf або pacman).",
 	"linux_shell.build_luv.module_generated": "Мережевий модуль LuaJIT зібрано з вихідного коду.",
 	"linux_shell.build_luv.recipe_required": "Для нативної збірки luv потрібен її вихідний рецепт.",
+	"linux_shell.native_modules.call_refused": "Середовищу нативних модулів потрібні абсолютний корінь драйвера та режим required або optional.",
+	"linux_shell.native_modules.module_unpublished": "Ergopti не може запуститися: {1} не є опублікованим нативним модулем.",
 	"linux_shell.install.already_installed": "{1} — уже встановлено",
 	"linux_shell.install.archive_digest_unavailable": "оновлення зі збереженим дескриптором потребують справжнього середовища OpenSSL3; можливість лишається недоступною.",
 	"linux_shell.install.capability_verified": "{1} — можливість перевірено",

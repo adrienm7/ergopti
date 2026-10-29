@@ -1043,6 +1043,8 @@
 	"linux_shell.launcher.no_package_manager": "Fehler: kein Paketmanager gefunden (apt, dnf oder pacman erforderlich).",
 	"linux_shell.build_luv.module_generated": "LuaJIT-Netzwerkmodul aus dem Quellcode gebaut.",
 	"linux_shell.build_luv.recipe_required": "Der native luv-Build benötigt sein Quellrezept.",
+	"linux_shell.native_modules.call_refused": "Die Umgebung der nativen Module benötigt einen absoluten Treiberpfad und den Modus required oder optional.",
+	"linux_shell.native_modules.module_unpublished": "Ergopti kann nicht starten: {1} ist kein veröffentlichtes natives Modul.",
 	"linux_shell.install.already_installed": "{1} — bereits installiert",
 	"linux_shell.install.archive_digest_unavailable": "Aktualisierungen mit gehaltenem Dateideskriptor erfordern eine echte OpenSSL3-Laufzeit; die Funktion bleibt nicht verfügbar.",
 	"linux_shell.install.capability_verified": "{1} — Funktion bestätigt",
