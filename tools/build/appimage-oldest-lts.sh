@@ -11,7 +11,8 @@
 # file need at most its glibc; check-elf-glibc-ceiling.cjs proves it on the
 # packaged tree. The container also rebuilds the driver's native archive backend
 # in build/linux, so the .deb, .rpm and tarball made from the bundle afterwards
-# load on it too.
+# load on it too, and builds the .rpm's LuaJIT luv binding in
+# build/linux/packaged-luv.
 #
 # Usage:
 #   bash tools/build/appimage-oldest-lts.sh build
@@ -53,7 +54,9 @@ apt_install() {
 # Inside the container: the build
 # ----------------------------------------------------------------------
 container_build() {
+	# cmake, make, git and the LuaJIT headers build the .rpm's luv binding below.
 	apt_install bash ca-certificates curl binutils file gcc libc6-dev pkg-config python3 \
+		cmake make git libluajit-5.1-dev \
 		luajit lua-luv libssl-dev libglib2.0-dev libglib2.0-bin glib-networking \
 		dconf-gsettings-backend gsettings-desktop-schemas libayatana-appindicator3-1
 	# The runner's Node, mounted read-only: the release's own is too old for the
@@ -66,6 +69,15 @@ container_build() {
 	local backend="libergopti_archive_publication.so"
 	rm -f "$BUILD_ROOT/linux/bin/$backend"
 	bash tools/build/build-linux-native-output.sh
+
+	# The .rpm publishes its own LuaJIT luv binding; built here, it needs at most
+	# this release's glibc as well. build-linux-rpm.sh takes it with --luv-module.
+	local luv_stage
+	luv_stage="$(mktemp -d)"
+	bash tools/build/build-linux-packaged-luv.sh "$luv_stage"
+	rm -rf "$BUILD_ROOT/packaged-luv"
+	install -D -m 755 "$luv_stage/luv.so" "$BUILD_ROOT/packaged-luv/luv.so"
+	node tools/build/check-elf-glibc-ceiling.cjs "$BUILD_ROOT/packaged-luv/luv.so"
 
 	# appimagetool ships as an AppImage and a container has no FUSE: unpack it.
 	local tools

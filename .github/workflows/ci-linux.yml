@@ -4328,8 +4328,9 @@ jobs:
           node tools/build/update-asset-signature.cjs release-sign "build/linux/$LINUX_BUNDLE_ASSET"
 
       - name: Install the packaging toolchains
-        # rpmbuild is not on the runner image. appimagetool runs in the AppImage
-        # build container above.
+        # rpmbuild is not on the runner image. appimagetool, and the toolchain
+        # of the .rpm's LuaJIT luv binding, run in the oldest-LTS build
+        # container above.
         shell: bash
         run: |
           set -euo pipefail
@@ -4349,7 +4350,9 @@ jobs:
           logs="$RUNNER_TEMP/linux-packagers"
           mkdir -p "$logs"
           bash tools/build/build-linux-deb.sh > "$logs/deb.log" 2>&1 & deb=$!
-          bash tools/build/build-linux-rpm.sh > "$logs/rpm.log" 2>&1 & rpm=$!
+          # The .rpm publishes the luv binding the oldest-LTS container built.
+          bash tools/build/build-linux-rpm.sh --luv-module "$GITHUB_WORKSPACE/build/linux/packaged-luv/luv.so" \
+              > "$logs/rpm.log" 2>&1 & rpm=$!
           failed=0
           for name in deb rpm; do
             status=0
