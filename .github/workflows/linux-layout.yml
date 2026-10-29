@@ -53,16 +53,12 @@ jobs:
       #
       # Exclusions: historical corpus texts are data, not code; .gitkeep
       # placeholders inside committed bundle fixtures must stay byte-stable.
-      # *.ahk.source and *.ahk.txt are byte-exact archived copies of AHK
-      # sources under docs/handovers, pinned by each bundle's SHA256SUMS or
-      # manifest.json: their BOM is the AHK one, and stripping it would break
-      # the hash those bundles are verified against.
       - name: Reject UTF-8 BOM in tracked non-AHK text files
         run: |
           bad=""
           while IFS= read -r -d '' f; do
             case "$f" in
-              *.ahk | *.ahk.source | *.ahk.txt) continue ;;
+              *.ahk) continue ;;
               static/corpus/original/*) continue ;;
               *.gitkeep) continue ;;
             esac
