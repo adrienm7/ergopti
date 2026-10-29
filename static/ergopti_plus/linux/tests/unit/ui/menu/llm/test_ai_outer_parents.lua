@@ -138,6 +138,46 @@ helpers.describe("Linux AI persistence rows under a configuration saved by a new
 	end)
 end)
 
+-- The health dot sits on the AI title on every driver, from the glyphs the
+-- manifest's top-level llm entry declares (maintainer, 2026-10-29).
+helpers.describe("Linux AI title health dot", function()
+	for status, glyph in pairs({ ready = "🟢", warming = "🟡", unreachable = "🔴" }) do
+		helpers.it("appends the manifest " .. status .. " glyph to the enabled AI title", function()
+			with_world(function(ctx)
+				local old_enabled, old_health = ctx.llm.is_enabled, ctx.llm.health_status
+				local ok, err = xpcall(function()
+					ctx.llm.is_enabled = function() return true end
+					ctx.llm.health_status = function() return status end
+					local row = parent(ctx, "llm")
+					helpers.assert_type(row, "table", "the AI parent is built")
+					helpers.assert_eq(row.title:sub(-#glyph), glyph, "the dot ends the AI title")
+					ctx.llm.is_enabled = function() return false end
+					local off = parent(ctx, "llm")
+					helpers.assert_nil(off.title:find(glyph, 1, true), "a disabled AI shows no dot")
+				end, debug.traceback)
+				ctx.llm.is_enabled, ctx.llm.health_status = old_enabled, old_health
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end
+
+	helpers.it("shows no dot when the engine reports no health", function()
+		with_world(function(ctx)
+			local old_enabled, old_health = ctx.llm.is_enabled, ctx.llm.health_status
+			local ok, err = xpcall(function()
+				ctx.llm.is_enabled = function() return true end
+				ctx.llm.health_status = function() return nil end
+				local row = parent(ctx, "llm")
+				for _, glyph in ipairs({ "🟢", "🟡", "🔴" }) do
+					helpers.assert_nil(row.title:find(glyph, 1, true), "no health, no dot")
+				end
+			end, debug.traceback)
+			ctx.llm.is_enabled, ctx.llm.health_status = old_enabled, old_health
+			if not ok then error(err, 0) end
+		end)
+	end)
+end)
+
 helpers.describe("Linux shared AI outer parents with published available component source", function()
 	for _, kind in ipairs({ "llm", "agent" }) do
 		helpers.it("retains the genuine completed " .. kind .. " child and its callbacks", function()

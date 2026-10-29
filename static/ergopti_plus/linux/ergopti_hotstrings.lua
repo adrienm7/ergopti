@@ -1757,6 +1757,9 @@ local function main()
 			target = prediction_engine.warmup_target,
 			request = prediction_engine.warmup_request,
 			busy = prediction_engine.is_predicting,
+			changed = function()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
 		}) then
 			require("modules.llm.warmup").schedule("startup")
 		end
