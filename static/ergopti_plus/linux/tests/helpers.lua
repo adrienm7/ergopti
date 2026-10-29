@@ -22,6 +22,11 @@
 
 local M = {}
 
+-- A test file run on its own, without tests/run.lua, still loads these helpers
+-- first: isolating here keeps its logs and config away from the account's own
+-- home. Idempotent, the runner already isolated.
+require("test.runner_home").isolate()
+
 -- Value formatting and stack-trace helpers shared with macOS (single source of truth).
 local fmt = require("test.format")
 local _timing = nil
