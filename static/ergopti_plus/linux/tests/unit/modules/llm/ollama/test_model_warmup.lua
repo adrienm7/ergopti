@@ -28,6 +28,7 @@ local function run(scenario)
 	local ok, err = xpcall(function()
 		helpers.assert_true(Warmup.init({
 			scheduler = world.scheduler,
+			changed = function() world.changed = (world.changed or 0) + 1 end,
 			target = function() return world.target end,
 			busy = function() return world.busy end,
 			request = function(target, on_done)
@@ -294,5 +295,51 @@ helpers.describe("Ollama model warmup request", function()
 		end, debug.traceback)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(err, 0) end
+	end)
+
+	helpers.describe("Ollama warmup health for the AI title dot", function()
+		helpers.it("is warming until the load, ready after it, and redraws the tray once", function()
+			run(function(Warmup, world)
+				helpers.assert_true(Warmup.schedule("enable"))
+				helpers.assert_eq(Warmup.status(), "warming")
+				world.scheduler.test.advance(INITIAL_SEC)
+				helpers.assert_eq(Warmup.status(), "warming", "a request in flight is still warming")
+				answer(world, true)
+				helpers.assert_eq(Warmup.status(), "ready")
+				helpers.assert_eq(world.changed, 1, "the loaded model redraws the AI title")
+			end)
+		end)
+
+		helpers.it("turns unreachable on the first failure without redrawing every retry", function()
+			run(function(Warmup, world)
+				helpers.assert_true(Warmup.schedule("enable"))
+				world.scheduler.test.advance(INITIAL_SEC)
+				answer(world, false, "connection refused")
+				helpers.assert_eq(Warmup.status(), "unreachable")
+				world.scheduler.test.advance(BASE_SEC)
+				answer(world, false, "connection refused")
+				helpers.assert_eq(world.changed, 1, "only the first failure changes the dot")
+				world.scheduler.test.advance(BASE_SEC * 2)
+				answer(world, true)
+				helpers.assert_eq(Warmup.status(), "ready")
+				helpers.assert_eq(world.changed, 2)
+			end)
+		end)
+
+		helpers.it("reports no health when no Ollama model may be loaded", function()
+			run(function(Warmup, world)
+				world.target = nil
+				helpers.assert_nil(Warmup.status())
+			end)
+		end)
+
+		helpers.it("refuses a changed port that is not a function", function()
+			package.loaded["modules.llm.warmup"] = nil
+			local Warmup = require("modules.llm.warmup")
+			local scheduler = Fakes.timer_scheduler()
+			helpers.assert_eq(Warmup.init({ scheduler = scheduler, target = function() end,
+				request = function() end, busy = function() return false end, changed = true }), false)
+			package.loaded["modules.llm.warmup"] = nil
+		end)
 	end)
 end)

@@ -19,6 +19,9 @@
 ---    prediction, it waits one interval instead.
 --- 4. A model Ollama does not have ends the chain: retrying cannot load it, and
 ---    the prediction path already offers its download.
+--- 5. Health: M.status() feeds the AI title dot every driver draws from the
+---    manifest, and the optional `changed` port redraws the tray when a chain
+---    loads its model or first fails.
 --- ==============================================================================
 
 local M = {}
@@ -43,6 +46,8 @@ local _request = nil
 local _ready_key = nil
 -- The origin and model the running chain is loading.
 local _chain_key = nil
+-- Whether the running chain has failed at least once since it started.
+local _failed = false
 
 
 
@@ -84,6 +89,13 @@ end
 
 local fire
 
+--- Tells the tray that the health its AI title shows has changed.
+local function notify_changed()
+	if not _ports or _ports.changed == nil then return end
+	local ok, err = pcall(_ports.changed)
+	if not ok then Logger.error(LOG, "The warmup health change could not be published: %s.", tostring(err)) end
+end
+
 --- Arms the next attempt of one chain.
 --- @param generation integer
 --- @param delay_ms number
@@ -114,15 +126,20 @@ end
 local function on_result(generation, key, next_interval, loaded, failure)
 	if generation ~= _generation then return end
 	if loaded then
-		_ready_key, _chain_key = key, nil
+		_ready_key, _chain_key, _failed = key, nil, false
 		Logger.info(LOG, "Ollama model loaded — ready for predictions.")
+		notify_changed()
 		return
 	end
+	local first_failure = not _failed
+	_failed = true
 	if LocalModelPolicy.is_missing(failure) then
 		_chain_key = nil
 		Logger.info(LOG, "Warmup ended: Ollama does not have the selected model.")
+		notify_changed()
 		return
 	end
+	if first_failure then notify_changed() end
 	if _timer then
 		Logger.info(LOG, "Warmup attempt failed (%s) — the pending retry timer is retained.",
 			type(failure) == "string" and failure or "unclassified failure")
@@ -181,7 +198,8 @@ end
 
 --- Binds the ports once for this process.
 --- @param ports table { scheduler = { after, cancel }, target = function → { origin, model, receipt }|nil,
----   request = function(target, on_done(loaded, failure)) → owned operation, busy = function → boolean }
+---   request = function(target, on_done(loaded, failure)) → owned operation, busy = function → boolean,
+---   changed = optional function called when status() changes after a load answer }
 --- @return boolean bound
 function M.init(ports)
 	Logger.start(LOG, "Initializing…")
@@ -191,7 +209,8 @@ function M.init(ports)
 	end
 	if type(ports) ~= "table" or type(ports.scheduler) ~= "table" or type(ports.scheduler.after) ~= "function"
 		or type(ports.scheduler.cancel) ~= "function" or type(ports.target) ~= "function"
-		or type(ports.request) ~= "function" or type(ports.busy) ~= "function" then
+		or type(ports.request) ~= "function" or type(ports.busy) ~= "function"
+		or (ports.changed ~= nil and type(ports.changed) ~= "function") then
 		Logger.error(LOG, "Warmup initialization refused: incomplete ports.")
 		return false
 	end
@@ -216,7 +235,7 @@ function M.schedule(reason)
 		Logger.warn(LOG, "Warmup for '%s' deferred: the previous chain still owns its timer.", tostring(reason))
 		return false
 	end
-	_chain_key = key
+	_chain_key, _failed = key, false
 	Logger.debug(LOG, "Warmup scheduled (%s).", tostring(reason))
 	return arm(_generation, INITIAL_DELAY_MS, RETRY_BASE_MS)
 end
@@ -225,7 +244,7 @@ end
 --- @return boolean settled True once no warmup timer and no request remain.
 function M.stop()
 	_generation = _generation + 1
-	_ready_key, _chain_key = nil, nil
+	_ready_key, _chain_key, _failed = nil, nil, false
 	if not _ports then return true end
 	if _timer then
 		if _ports.scheduler.cancel(_timer) ~= true then
@@ -245,6 +264,19 @@ end
 --- @return boolean
 function M.pending()
 	return _timer ~= nil or not request_settled()
+end
+
+--- The health of the current warmup target, for the AI title dot.
+--- @return string|nil status "ready", "warming" or "unreachable"; nil when no
+---   Ollama model may be loaded now (AI off, paused, or a non-Ollama backend).
+function M.status()
+	if not _ports then return nil end
+	local target = read_target()
+	if not target then return nil end
+	local key = key_of(target)
+	if key == _ready_key then return "ready" end
+	if not _failed and key == _chain_key and M.pending() then return "warming" end
+	return "unreachable"
 end
 
 --- Stops the chain and releases the ports, for the daemon's teardown.
