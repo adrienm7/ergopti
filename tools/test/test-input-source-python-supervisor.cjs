@@ -542,7 +542,7 @@ print(json.dumps(observed))
 	const confirmPath = path.join(fixtureDir, 'confirm-source.py');
 	fs.writeFileSync(confirmPath, confirmMatch[1], 'utf8');
 	const confirmModel = path.join(__dirname, 'fixtures', 'input-source-confirm-refresh.py');
-	const confirm = (duration) => {
+	const runConfirmModel = (duration) => {
 		const run = spawnSync(python, [confirmModel, confirmPath, ...duration], {
 			cwd: ROOT,
 			encoding: 'utf8',
@@ -553,7 +553,7 @@ print(json.dumps(observed))
 		return JSON.parse(run.stdout);
 	};
 	for (const duration of ['0.3', '0.125', '0.875']) {
-		const result = confirm([duration]);
+		const result = runConfirmModel([duration]);
 		const effect = result.events.filter((event) => ['select', 'sleep'].includes(event[0]));
 		test(
 			`confirmation refresh receives both settle delays from its required argument: ${duration}`,
@@ -569,7 +569,7 @@ print(json.dumps(observed))
 		);
 	}
 	for (const duration of [[], ['invalid'], ['0'], ['-0.1'], ['nan'], ['inf']]) {
-		const result = confirm(duration);
+		const result = runConfirmModel(duration);
 		test(
 			`confirmation refresh refuses an absent or invalid required duration: ${JSON.stringify(duration)}`,
 			result.error !== null && result.events.length === 0,
