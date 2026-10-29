@@ -100,24 +100,37 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 		end)
 	end)
 
-	helpers.it("opens the exact Screen Recording privacy pane", function()
-		local opened = {}
-		with_native({ urlevent = { openURL = function(url)
-			opened[#opened + 1] = url
-			return true
-		end } }, function(adapter)
+	--- Runs body with shell_runner.open replaced by a recorder.
+	--- @param started boolean What the stubbed open reports.
+	--- @param body function Receives the adapter and the recorded targets.
+	local function with_open(started, body)
+		local saved = package.loaded["adapters.shell_runner"]
+		local targets = {}
+		package.loaded["adapters.shell_runner"] = { open = function(target)
+			targets[#targets + 1] = target
+			return started
+		end }
+		-- Mirrors Hammerspoon: openURL refuses a URL lacking "://".
+		local native = { urlevent = { openURL = function(url) return url:find("://", 1, true) ~= nil end } }
+		local ok, err = pcall(with_native, native, function(adapter) body(adapter, targets) end)
+		package.loaded["adapters.shell_runner"] = saved
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("opens the exact Screen Recording privacy pane through Launch Services", function()
+		with_open(true, function(adapter, targets)
 			helpers.assert_eq(adapter.open_permission_settings(), true)
-			helpers.assert_eq(opened, {
-				"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
-			})
+			helpers.assert_eq(targets, { adapter.settings_url() })
+			helpers.assert_true(targets[1]:find("://", 1, true) == nil,
+				"the pane URI has no '://', which hs.urlevent.openURL refuses")
 		end)
 	end)
 
-	helpers.it("reports a refused settings URL instead of claiming it opened", function()
-		with_native({ urlevent = { openURL = function() return false end } }, function(adapter)
+	helpers.it("reports an open that could not start instead of claiming it opened", function()
+		with_open(false, function(adapter)
 			local opened, detail = adapter.open_permission_settings()
 			helpers.assert_eq(opened, false)
-			helpers.assert_contains(detail, "false")
+			helpers.assert_contains(detail, "open")
 		end)
 	end)
 

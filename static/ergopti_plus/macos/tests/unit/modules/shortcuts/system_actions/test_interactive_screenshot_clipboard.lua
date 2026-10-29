@@ -21,6 +21,7 @@ local SUBJECT_MODULES = {
 	"adapters.task_lifecycle",
 	"adapters.file_system",
 	"adapters.screen_capture",
+	"adapters.shell_runner",
 	"infra.notifications",
 	"infra.logger",
 	"modules.shortcuts.actions.system_pixel",
@@ -55,6 +56,12 @@ local function with_pixel(options, scenario)
 			pasteboard = { count = 10, image = nil, writes = {} },
 		}
 
+		package.loaded["adapters.shell_runner"] = {
+			open = function(target)
+				f.opened[#f.opened + 1] = target
+				return true
+			end,
+		}
 		package.loaded["adapters.task_lifecycle"] = {
 			native = function(label, path, callback, args)
 				local task = { label = label, path = path, args = args, callback = callback }
@@ -107,10 +114,8 @@ local function with_pixel(options, scenario)
 				if opts.permission == nil then return true end
 				return opts.permission
 			end,
-			urlevent = { openURL = function(url)
-				f.opened[#f.opened + 1] = url
-				return true
-			end },
+			-- Mirrors Hammerspoon: openURL refuses a URL lacking "://".
+			urlevent = { openURL = function(url) return url:find("://", 1, true) ~= nil end },
 			mouse = { absolutePosition = function() return { x = 10, y = 20 } end },
 			image = { imageFromPath = function(path)
 				if (f.files[path] or 0) > 0 then return { path = path } end
