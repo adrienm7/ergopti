@@ -112,7 +112,7 @@ LayoutRegistry_Settings() {
 /**
  * The [composer] table of _shared/modules/layouts/defaults.json: the reserved
  * id the per-layer composer's layout is installed under, the folder that keeps
- * the user's composition and its bounds (docs/layout-composer.md).
+ * the user's composition and its bounds (docs/design/layout-composer.md).
  * @returns {Map}
  */
 LayoutRegistry_Composer() {

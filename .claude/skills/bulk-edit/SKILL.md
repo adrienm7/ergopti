@@ -41,8 +41,8 @@ if (mojibake > 0) {
 }
 ```
 
-This exact guard exists because a rewrite of `docs/PROJECT_MEMORY.md` shipped 212
-mojibake sequences into the canonical memory. The corruption entered upstream —
+This exact guard exists because a rewrite of the project memory, then a single
+file, shipped 212 mojibake sequences into the canonical memory. The corruption entered upstream —
 the replacement blocks had been extracted with `Get-Content` without
 `-Encoding UTF8`, which decodes as ANSI on PowerShell 5.1 — and the write step
 copied it faithfully. **A rewrite is only as clean as the data you feed it: check

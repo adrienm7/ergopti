@@ -1,4 +1,4 @@
-<!-- docs/layout-composer.md -->
+<!-- docs/design/layout-composer.md -->
 
 # Per-layer layout composer
 

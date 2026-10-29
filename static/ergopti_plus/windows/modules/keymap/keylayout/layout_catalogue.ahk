@@ -683,7 +683,7 @@ _LayoutCataloguePublishVerified(Id, LocalDir, Entry, Text, Source, Finish) {
 }
 
 /**
- * Installs the layout the user composed (docs/layout-composer.md): no catalogue
+ * Installs the layout the user composed (docs/design/layout-composer.md): no catalogue
  * and no download, the caller built the entry from the compiled file. The copy
  * must still match the entry it is recorded with, so it is read back like any
  * other installed layout.

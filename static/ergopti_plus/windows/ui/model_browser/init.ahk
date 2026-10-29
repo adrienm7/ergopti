@@ -359,7 +359,7 @@ global _LLM_MBW_ResetDone  := false
 ; Virtual host mapped to _SharedDir so the document and its relative assets
 ; and the locale fetch resolve over https:// -- file:// is an opaque origin
 ; and the chrome.webview JS->AHK channel does not reliably deliver from it
-; (see PROJECT_MEMORY project-webview2-bridge-gotchas).
+; (see docs/memory project-webview2-bridge-gotchas).
 global LLM_MBW_VHOST := "ergopti.modelbrowser"   ; -> _SharedDir
 ; COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW.
 global LLM_MBW_HOST_ACCESS_ALLOW := 1

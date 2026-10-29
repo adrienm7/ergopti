@@ -139,7 +139,7 @@ end
 --- Creates the controller of one page.
 --- deps.registry: { refresh(on_done), snapshot(), install(id, on_done),
 ---   uninstall(id, on_done), select(id, on_done) }; on_done(ok, detail_or_code, detail).
---- deps.registry also offers the composer (docs/layout-composer.md) as
+--- deps.registry also offers the composer (docs/design/layout-composer.md) as
 ---   composer_open(on_done), composer_save(payload, on_done) and
 ---   composer_remove(on_done) (_shared/lua/layouts/composer.lua); a registry
 ---   without them refuses the three composer messages.
