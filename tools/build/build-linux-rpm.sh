@@ -2,19 +2,36 @@
 # tools/build/build-linux-rpm.sh
 #
 # Assembles a .rpm package from the build/linux/ driver bundle.
-# Requires rpm-build (Linux only). The script validates structure on any platform
-# but actual .rpm creation requires rpmbuild.
+# Requires Linux; actual .rpm creation also requires rpmbuild.
+#
+# The package publishes its own LuaJIT luv binding in native_modules/: Fedora's
+# lua-luv is built for the generic Lua ABI, not LuaJIT's 5.1 one, and the driver
+# enumerates directories through luv. It is compiled at package build time by
+# build-linux-packaged-luv.sh, here unless --luv-module hands over one already
+# built (the release builds it on the oldest supported LTS, for its glibc).
+# Nothing is downloaded or compiled at installation.
 #
 # Usage:
 #   bash tools/build/build-linux-rpm.sh              # full build + .rpm
-#   bash tools/build/build-linux-rpm.sh --skip-rpm   # structure only (cross-platform)
+#   bash tools/build/build-linux-rpm.sh --skip-rpm   # structure only
+#   ... --luv-module /abs/luv.so                     # publish this already
+#                                                    # built binding instead
 
 set -euo pipefail
 
 SKIP_RPM=false
+LUV_MODULE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-rpm) SKIP_RPM=true; shift ;;
+    --luv-module)
+      if [[ $# -lt 2 || "$2" != /* ]]; then
+        echo "[ERR] --luv-module needs an absolute module path." >&2
+        exit 1
+      fi
+      LUV_MODULE="$2"
+      shift 2
+      ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -99,6 +116,30 @@ echo "Package: $PACKAGE_NAME $VERSION-$RELEASE ($ARCH)"
 install -D -m 644 "$BUILD_DIR/linux/install/99-ergopti-uinput.rules" "$INSTALL_ROOT/etc/udev/rules.d/99-ergopti-uinput.rules"
 install -D -m 644 "$BUILD_DIR/linux/install/ergopti-uinput.conf" "$INSTALL_ROOT/etc/modules-load.d/ergopti-uinput.conf"
 
+
+# ----------------------------------------------------------------------
+# 3b. LuaJIT luv binding
+# ----------------------------------------------------------------------
+# build_native_luv.sh loads its result through the build host's LuaJIT and
+# refuses a module without the C entry points the driver calls.
+NATIVE_LUV_STAGE="$RPM_ROOT/native-luv"
+mkdir "$NATIVE_LUV_STAGE"
+if [ -n "$LUV_MODULE" ]; then
+  if [ -L "$LUV_MODULE" ] || [ ! -f "$LUV_MODULE" ]; then
+    echo "[ERR] --luv-module $LUV_MODULE is not a regular file." >&2
+    exit 1
+  fi
+  install -m 755 "$LUV_MODULE" "$NATIVE_LUV_STAGE/luv.so"
+else
+  bash "$SCRIPT_DIR/build-linux-packaged-luv.sh" "$NATIVE_LUV_STAGE"
+fi
+if [ "$(head -c 4 "$NATIVE_LUV_STAGE/luv.so" | od -An -tx1 | tr -d ' \n')" != 7f454c46 ]; then
+  echo "[ERR] The luv binding is not an ELF shared object." >&2
+  exit 1
+fi
+install -D -m 755 "$NATIVE_LUV_STAGE/luv.so" "$INSTALL_ROOT/usr/lib/ergopti/native_modules/luv.so"
+echo "  LuaJIT luv binding: usr/lib/ergopti/native_modules/luv.so"
+
 chmod -R 755 "$INSTALL_ROOT/usr/lib/ergopti"
 echo "  $(find "$INSTALL_ROOT/usr/lib/ergopti" -type f | wc -l) files"
 
@@ -110,6 +151,8 @@ cat > "$INSTALL_ROOT/usr/bin/ergopti" << 'WRAPPER_EOF'
 DRIVER_ROOT="/usr/lib/ergopti"
 SHARED_LUA="$DRIVER_ROOT/_shared/lua"
 export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;"
+source "$DRIVER_ROOT/install/native_modules_env.sh"
+ergopti_admit_native_modules "$DRIVER_ROOT" required || exit 1
 exec bash "$DRIVER_ROOT/install/launch.sh" "$@"
 WRAPPER_EOF
 chmod 755 "$INSTALL_ROOT/usr/bin/ergopti"
@@ -208,7 +251,6 @@ Requires:       libxkbcommon-x11
 Requires:       libX11
 Requires:       libX11-xcb
 # END GENERATED LINUX NATIVE REQUIREMENTS
-Recommends:     lua-luv
 Recommends:     lua-filesystem
 Recommends:     openssl
 Recommends:     yad
