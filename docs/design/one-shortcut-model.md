@@ -3,8 +3,7 @@
 # One shortcut data model (plan for PAR-41, in progress)
 
 Status: steps 1, 2 and the shared part of step 7 are done (see "Progress").
-Audit rows C12 and C13 of `docs/audits/2026-10-24-cross-os-parity.md` are the
-evidence.
+Rows C12 and C13 of the 2026-10-24 cross-OS parity audit are the evidence.
 
 ## What exists today
 

@@ -1363,7 +1363,7 @@ output ownership or complete physical coverage during normal remapping before
 deduplicating. EventViewer raw capture disables remapping, a first
 `from.any`/`to.from_event` rule blocks later rules, and datagram delivery alone
 provides neither coverage nor provenance. Consult the
-[HS-274 evidence and rejected paths](../audits/hammerspoon/2026_09_09/discoveries.md)
+HS-274 evidence and rejected paths (`docs/audits/hammerspoon/2026_09_09/discoveries.md` at 49c62d77a1)
 before repeating acquisition experiments or using historical TODOs.
 `modules/keystats/physical_accounting_mode.lua` is the one owner of the
 answer: the event tap (keyDown `kc`, flagsChanged modifier events) and the
@@ -1450,7 +1450,7 @@ executable inventories in `tools/diagnostics/hs274-remap.py`; do not remove IPC
 authentication or infer cleanup from sudo leader PIDs alone. Native macOS reports
 launchd state as `disabled`, while sudo may report a non-executable file as
 `command not found`; retain raw replies and use the verified exec-refusal probe.
-The [producer contract](../audits/hammerspoon/2026_09_09/producer-contract.md)
+The producer contract (`docs/audits/hammerspoon/2026_09_09/producer-contract.md` at 49c62d77a1)
 records the isolated runtime evidence and the pre-normalization capture boundary.
 
 The upstream agent also launches the installed Core-Service bundle directly with
@@ -1465,7 +1465,7 @@ allow an unexpected PID merely because a later arguments snapshot looks harmless
 
 For reusable Hammerspoon admission fixtures, retained screenshots, artifact
 identity and the distinction between Windows doubles and native virtual-HID
-proof, consult the [native continuation record](../audits/hammerspoon/2026_09_09/native-hammerspoon.md).
+proof, consult the native continuation record (`docs/audits/hammerspoon/2026_09_09/native-hammerspoon.md` at 49c62d77a1).
 
 When a correctly selected, validly signed Hammerspoon copy remains absent from
 Accessibility, inspect TCC bundle resolution before repeating UI automation.
@@ -1482,7 +1482,7 @@ field/window checks and all four privacy transitions through the same consumer
 modules. Reuse `tools/diagnostics/hs274-context-target.swift` and its owned
 controller; target command acknowledgements are not substitutes for independent
 AX observations. Native acceptance and its remaining coverage limits are in the
-[external target receipt](../audits/hammerspoon/2026_09_09/native-hammerspoon.md#external-target-acceptance-on-native-macos).
+external target receipt (`docs/audits/hammerspoon/2026_09_09/native-hammerspoon.md, section "external-target-acceptance-on-native-macos"` at 49c62d77a1).
 
 A hosted macOS runner can execute real Quartz taps without proving physical
 keyboard or Karabiner provenance. Native original/copy marker preservation
@@ -1494,7 +1494,7 @@ can wait indefinitely for approval or exit zero pending reboot. Check actual
 system-extension state. Normal authentication with an owned temporary CI
 administrator reached `[activated enabled]`, which persisted after account
 removal. Keep capability failures distinct from production regressions and consult the
-[native receipts](../audits/hammerspoon/2026_09_09/discoveries.md#real-macos-github-actions-evidence)
+native receipts (`docs/audits/hammerspoon/2026_09_09/discoveries.md, section "real-macos-github-actions-evidence"` at 49c62d77a1)
 before repeating an installation or acquisition attempt.
 
 ### project-hs-native-approval-ui-observations
@@ -1506,7 +1506,7 @@ unrelated sidebar nodes can fail coercion during whole-window enumeration.
 Scope the read to the verified provider group. A successful AXPress on the
 provider checkbox still left native state waiting for approval in the recorded
 experiment; independently verify state after UI actions. Consult the
-[approval UI evidence](../audits/hammerspoon/2026_09_09/discoveries.md#normal-approval-interface-observation)
+approval UI evidence (`docs/audits/hammerspoon/2026_09_09/discoveries.md, section "normal-approval-interface-observation"` at 49c62d77a1)
 before treating a scripting error as a permission denial or a click as approval.
 
 ### project-hs-sampled-element-state-boundary
@@ -1619,7 +1619,7 @@ bits and array leaves with distinct cookies; both observations must remain
 available. A usage-range bound also truncated this descriptor. Keep diagnostic
 capacity explicit and distinguish per-element readability from atomic held state
 or physical-press ownership. Exact samples are retained in the
-[inventory refusal](../audits/hammerspoon/2026_09_09/hs274-inventory-refusal.json).
+inventory refusal (`docs/audits/hammerspoon/2026_09_09/hs274-inventory-refusal.json` at 49c62d77a1).
 
 For native inventory regressions, reuse the four snapshots in
 `tools/diagnostics/fixtures/hs274-native-inventories.json` through
@@ -1628,7 +1628,7 @@ released fixture and a fixture with Space initially held, preserving all scalar
 and array leaves. Run the replays or query individual cookies instead of loading
 the complete corpus into context. Enumeration/readability is distinct from
 synchronizing queued events at lease opening; the
-[native acceptance](../audits/hammerspoon/2026_09_09/native-hammerspoon.md#complete-fixture-inventory-acceptance)
+native acceptance (`docs/audits/hammerspoon/2026_09_09/native-hammerspoon.md, section "complete-fixture-inventory-acceptance"` at 49c62d77a1)
 records that boundary.
 
 For initial held-key acquisition, replay
@@ -1653,7 +1653,7 @@ Real remapping of fixture Escape to Space and passthrough Space produced the
 same observed Quartz source fields; only Escape appeared in the physical
 ledger. Virtual-output sender identity therefore cannot resolve that collision.
 The reusable native fixture and exact receipts are routed through the
-[investigation report](../audits/hammerspoon/2026_09_09/discoveries.md).
+investigation report (`docs/audits/hammerspoon/2026_09_09/discoveries.md` at 49c62d77a1).
 This validates a virtual fixture, not physical keyboard hardware.
 
 ### project-karabiner-saved-timer-authority

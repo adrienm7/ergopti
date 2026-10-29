@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: HS-274 — a remapped tap and its physical key
 --- DESCRIPTION:
---- Ported from docs/audits/hammerspoon/2026_09_08/proofs/duplicate-count.lua,
+--- Ported from the 2026-09-08 audit proof duplicate-count.lua,
 --- driving the real keystats keyDown and flagsChanged branches and the real
 --- aggregator instead of a stubbed classifier.
 ---

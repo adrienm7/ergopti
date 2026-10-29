@@ -1465,8 +1465,10 @@ Not started:
 Maintainer rule: the same behaviour on Windows, macOS and Linux wherever possible, unless there is a
 good reason stated in the menu reason text; everything that can be common lives in `_shared`
 (hexagonal architecture: rules and ports in `_shared`, OS code only in adapters); every constant,
-delay, colour and label has one declaration. Source: [audit](docs/audits/2026-10-24-cross-os-parity.md)
-(row ids `H1`, `R3`, ... refer to it); entries are `PAR-1` to `PAR-85`, stable ids. Rows tagged I in the
+delay, colour and label has one declaration. Source: the cross-OS parity audit of 2026-10-24, in Git
+at 49c62d77a1 (`docs/audits/2026-10-24-cross-os-parity.md`; row ids `H1`, `R3`, `L6`, ... refer to
+it, and "audit test item N" to `docs/audits/2026-10-18-test-parity-audit.md` there); entries are
+`PAR-1` to `PAR-85`, stable ids. Rows tagged I in the
 audit come from grep counts: confirm them before starting. Done and verified: about 35 entries (see git log); the list below is what remains. Decisions taken: PAR-7 shared multiplier, PAR-17 identical defaults with stated exceptions, PAR-19 implement on Windows and Linux.
 
 ### A. Behaviour that differs without a good reason (fix first)
@@ -1691,6 +1693,23 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       unrelated (keystroke ring, phase attribution ring).
 
 ## Backlog (one line each)
+
+Still true in the code on 2026-10-29, carried from the retired 2026-10-04 Linux handoff audit:
+
+- [ ] **Linux fractional AI context length.** [CODE] `linux/modules/llm/settings.lua` `BOUNDS.context_length`
+      lacks `integer = true`, so `M.set("context_length", 80.5)` is accepted and the shared prompt builder
+      then extracts an empty context. Add the flag and a `test_llm_settings.lua` case.
+- [ ] **Stateless GitHub installation tokens are not redacted.** [CODE] The `ghs_` rule of
+      `_shared/modules/diagnostics/redaction.json` allows only an alphanumeric body, so a
+      `ghs_<app-id>_<jwt>` token stays visible in diagnostics on every OS. Widen the charset and add a
+      `redaction_vectors.json` case (Lua, JS and AHK consumers replay it).
+- [ ] **Linux confirmed force quit reads the PID after the question.** [CODE] `window_signal` in
+      `linux/modules/gestures/system_actions.lua` resolves the PID from the saved XID only after the
+      confirmation, so another process can be killed if the window closed meanwhile. Capture the PID
+      with the XID in `M.TARGETS`.
+- [ ] **Linux clipboard restore overwrites an external copy.** [CODE] `new_paste_stage` in
+      `linux/adapters/clipboard.lua` restores the saved value without checking that the clipboard still
+      holds the pasted text, so a copy made by another application during the paste is lost.
 
 Added October 22 (from the agents' reports; details in their commits):
 

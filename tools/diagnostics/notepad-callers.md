@@ -52,5 +52,5 @@ uses no clipboard or keyboard transport. Focus and external process changes can
 still invalidate a trial. Package profile restoration is not proven isolated;
 the experiment owns the selected synthetic document, not Notepad's shared profile.
 
-Historical finite evidence is retained in
-[`docs/audits/ahk/2026_10_05/notepad_native_receiving.md`](../../docs/audits/ahk/2026_10_05/notepad_native_receiving.md).
+Historical finite evidence stays in Git at commit 49c62d77a1, in
+`docs/audits/ahk/2026_10_05/notepad_native_receiving.md`.
