@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: HS-274 — a managed output that is also a real key
 --- DESCRIPTION:
---- Ported from docs/audits/hammerspoon/2026_09_08/proofs/physical-collision.lua,
+--- Ported from the 2026-09-08 audit proof physical-collision.lua,
 --- driving the real keystats keyDown branch, the real Karabiner bridge
 --- classifier and the real aggregator.
 ---
@@ -12,7 +12,7 @@
 --- key. With Escape's tap sent to Space, the bridge classifies 49 as a managed
 --- output, yet the physical Space key (a none/none passthrough) produces the
 --- very same Quartz keyDown and writes no ledger line. The rejected one-line fix
---- (docs/audits/hammerspoon/2026_09_08/proofs/rejected-keycode.patch) suppressed
+--- (rejected-keycode.patch of the same audit) suppressed
 --- every managed output keycode and silently lost that real Space; the shipped
 --- defaults make Return and Backspace collide the same way. The physical Space
 --- must keep exactly one credit.

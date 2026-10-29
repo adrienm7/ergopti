@@ -12,7 +12,7 @@ ownership test group by analogy. A baseline/candidate/candidate/baseline trial
 preserved all 49 cases but showed small, variable CPU differences and increased
 sampled root-process peak working set from 8.7-8.9 MiB to 14.6-14.9 MiB.
 Reconsider with a changed workload or evidence of a worthwhile tradeoff. See the
-[MLX test compilation experiment](../audits/performance/hammerspoon/2026_09_09/mlx_test_compilation/report.md).
+MLX test compilation experiment (`docs/audits/performance/hammerspoon/2026_09_09/mlx_test_compilation/report.md` at 49c62d77a1).
 
 ## Grouping metrics SQL rows into JSON only to decode them again
 
@@ -21,7 +21,7 @@ arrays decoded back into AHK Maps. On the real derived image, three paired
 samples increased the two-helper cost from 924–938 ms to 1821–1855 ms despite
 equivalent output. Reducing SQLite calls did not repay the extra AHK decoder.
 Reconsider only with a pipeline that retains encoded output, or changed evidence.
-See the [candidate measurements](../audits/performance/ahk/2026_09_09/candidate_clone/report.md).
+See the candidate measurements (`docs/audits/performance/ahk/2026_09_09/candidate_clone/report.md` at 49c62d77a1).
 
 ## Serializing a readonly SQLite source instead of checking page reads
 
@@ -31,7 +31,7 @@ pages after native read failures. An exclusive lock on a fixture's last page
 made `SQLite_BackupInto` fail while direct serialization returned a nonzero handle.
 Normal-output equality and lower copy latency did not detect this data-loss
 path. The checked contiguous-buffer variant was separately rejected for growth
-regressions below. See the [clone experiment](../audits/performance/ahk/2026_09_09/serialized_clone/report.md).
+regressions below. See the clone experiment (`docs/audits/performance/ahk/2026_09_09/serialized_clone/report.md` at 49c62d77a1).
 
 ## File-backed reader clones as a direct latency shortcut
 
@@ -41,7 +41,7 @@ processes on the 702390272-byte derived image gave six-sample clone medians of
 1710 ms and 3503 ms respectively. Process memory fell sharply, but complete
 opening and system-wide memory were not measured. Reconsider only with a changed
 memory-pressure workload or publication design and fresh end-to-end evidence.
-See the [private-file clone experiment](../audits/performance/ahk/2026_09_09/private_file_clone/report.md).
+See the private-file clone experiment (`docs/audits/performance/ahk/2026_09_09/private_file_clone/report.md` at 49c62d77a1).
 
 ## Mapped reader sources as an already-validated clone optimization
 
@@ -52,7 +52,7 @@ refused ordinary backup while mapped backup succeeded with correct payload.
 That is a changed refusal mechanism, not observed corruption and not established
 fault equivalence. Reconsider only with mapped-I/O fault, parent publication and
 concurrent source-replacement evidence; keep ordinary-read regression assertions.
-See the [mapped-source investigation](../audits/performance/ahk/2026_09_13/mapped_clone/report.md).
+See the mapped-source investigation (`docs/audits/performance/ahk/2026_09_13/mapped_clone/report.md` at 49c62d77a1).
 
 ## Generated manifests at runtime
 
@@ -60,7 +60,7 @@ Do not replace checked-in `_generated/` feature manifests with a runtime TOML
 read. The 2026-08-03 audit found consumers for every generated artifact; parsing
 roughly 130 KB on every driver boot would trade 134 KB of committed output for
 startup cost and undo ADR-002. See
-[the simplification audit](../audits/2026-08-03-mise-en-commun-et-simplification.md#21-supprimer--_generated).
+the simplification audit (`docs/audits/2026-08-03-mise-en-commun-et-simplification.md, section "21-supprimer--_generated"` at 49c62d77a1).
 
 ## Native single-field dialogs as webviews
 
@@ -78,7 +78,7 @@ restriction. Its doubling growth strategy also retained 18995008 native bytes
 versus 10181416 for the ordinary pager after a 1 MiB insert into the synthetic
 8 MiB fixture. Initial copy savings do not establish safe incremental behavior.
 The native growth guard reproduced the regression before restoring the original
-runtime. See the [clone investigation](../audits/performance/ahk/2026_09_09/serialized_clone/report.md).
+runtime. See the clone investigation (`docs/audits/performance/ahk/2026_09_09/serialized_clone/report.md` at 49c62d77a1).
 
 ## File-size-driven module splitting
 
@@ -142,7 +142,7 @@ were slower than both controls. One candidate run failed both unchanged p95
 budgets. Desktop variation prevents assigning every stall to the query, but the
 evidence does not justify shipping it. Reconsider only with a changed mechanism
 and matched moving-position controls. See the
-[native border experiment](../audits/performance/ahk/2026_09_08/border_position/report.md).
+native border experiment (`docs/audits/performance/ahk/2026_09_08/border_position/report.md` at 49c62d77a1).
 
 ## Moving the Karabiner lease token out of the rule text
 
