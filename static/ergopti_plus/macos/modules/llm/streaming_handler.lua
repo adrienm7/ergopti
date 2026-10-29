@@ -682,6 +682,16 @@ function M.arm_watchdog(ctx)
 		end
 	end
 
+	--- Hands a request that showed nothing in time back to its current owner,
+	--- once the watchdog no longer holds the callback.
+	local function report_watchdog_timeout()
+		if not request_is_current() or type(ctx.on_stream_timeout) ~= "function" then return end
+		local ok, err = pcall(ctx.on_stream_timeout)
+		if not ok then
+			Logger.error(LOG, "Stream timeout handler raised: %s", tostring(err))
+		end
+	end
+
 	local owner = {
 		handle = nil,
 		authorized = true,
@@ -710,12 +720,13 @@ function M.arm_watchdog(ctx)
 		owner.callback_consumed = true
 		owner.callback_pending = false
 		owner.callback_running = true
+		local timed_out = false
 		local callback_ok, callback_err = xpcall(function()
 			if not request_is_current() then return end
 			if not visible_ref.value or #pending_ref.value == 0 then
 				Logger.warn(LOG, "Watchdog triggered: stream produced no visible result for %gs.",
 					STREAM_WATCHDOG_SEC)
-				reject_watchdog_ui("no committed partial prediction")
+				timed_out = true
 				return
 			end
 			Logger.warn(LOG, "Watchdog triggered: stream stalled for %gs — surfacing partial results.", STREAM_WATCHDOG_SEC)
@@ -734,6 +745,10 @@ function M.arm_watchdog(ctx)
 		if not callback_ok then reject_watchdog_ui(callback_err) end
 		owner.callback_running = false
 		if _stream_watchdog_timer == owner then _stream_watchdog_timer = nil end
+		-- A slow model that has shown nothing yet is a timeout, not a failed
+		-- paint: reporting it as one opened the error window, and its reset ran
+		-- inside this callback, where the watchdog cannot be stopped yet.
+		if timed_out then report_watchdog_timeout() end
 		return true
 	end
 
