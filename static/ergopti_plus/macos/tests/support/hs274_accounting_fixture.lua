@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Drives the real keystats event callback and the real metrics aggregator
 --- for the HS-274 regressions ported from
---- docs/audits/hammerspoon/2026_09_08/proofs/. Only persistence and OS
+--- the 2026-09-08 audit proofs. Only persistence and OS
 --- lifecycle boundaries are doubles (tests.support.keystats_provenance_fixture):
 --- the keyDown and flagsChanged branches, their meta.kc decision and the
 --- aggregator's kc_ngram credits are production code.
