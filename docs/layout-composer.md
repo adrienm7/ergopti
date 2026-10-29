@@ -2,7 +2,7 @@
 
 # Per-layer layout composer
 
-Design of the October 13 request (big item 4 of `ERGOPTIPLUS_TODO.md`): a
+Design of the October 13 request (big item 4 of `TODO.md`): a
 keyboard layout built from layers. Each of the four layers (base, Shift,
 AltGr, Shift+AltGr) is taken from any layout of the registry, a shortcuts layer
 says what a key gives while Ctrl, Alt or Win is held, and every key of every

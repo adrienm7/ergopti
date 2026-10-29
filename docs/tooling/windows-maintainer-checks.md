@@ -1,6 +1,6 @@
 # Windows maintainer checks
 
-The "Maintainer checks > Windows PC" lists of `docs/ERGOPTIPLUS_TODO.md` ask for
+The "Maintainer checks > Windows PC" lists of `TODO.md` ask for
 things only a real driver shows: a tray row clicked, a dialog opened, a window
 titled, a reload followed. `tools/maintainer/windows-live-checks.cjs` runs the
 ones that can be automated against a real `ErgoptiPlus.ahk` booted from the

@@ -1,4 +1,4 @@
-<!-- todo_linux.md -->
+<!-- docs/design/linux-driver-plan.md -->
 
 # Plan & TODO — Driver Linux (moteur de hotstrings X11 + Wayland)
 

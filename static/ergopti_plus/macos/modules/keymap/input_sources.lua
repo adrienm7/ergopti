@@ -729,7 +729,7 @@ end
 -- com.apple.HIToolbox) through `defaults export` / `defaults import`. macOS
 -- reads that list at login: a layout written while the session runs is listed
 -- by the preference at once but turned on only at the next login (macOS 26
--- field probe, docs/ERGOPTIPLUS_TODO.md L25). Whether it is on now is read
+-- field probe, TODO.md L25). Whether it is on now is read
 -- separately, from the live list (is_live_enabled).
 --
 -- The script used to end with `launchctl kickstart -k user/<uid>/

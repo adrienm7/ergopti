@@ -1930,7 +1930,7 @@ end
 ---
 --- Reads the device's evdev node directly, WITHOUT a grab, and decodes the
 --- multitouch protocol in process. The docstring here used to describe scraping
---- `libinput debug-events`; that route is rejected in todo_linux.md §12.3 for
+--- `libinput debug-events`; that route is rejected in docs/design/linux-driver-plan.md §12.3 for
 --- two independent reasons — this driver removed exactly that pattern from the
 --- keyboard path for four documented defects, and libinput gates its whole
 --- gesture state machine on `finger_count <= 4`, so five-finger swipes and

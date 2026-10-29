@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Windows Live Checks
  * DESCRIPTION:
- * Runs the "Maintainer checks > Windows PC" lines of docs/ERGOPTIPLUS_TODO.md
+ * Runs the "Maintainer checks > Windows PC" lines of TODO.md
  * that need a real driver, against a real ErgoptiPlus.ahk booted from the
  * working tree in an isolated profile (the startup smoke's: LOCALAPPDATA and
  * ERGOPTI_STARTUP_SMOKE_DIR name a scratch folder). The driver serves the

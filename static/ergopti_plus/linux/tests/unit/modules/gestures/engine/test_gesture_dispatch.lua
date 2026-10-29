@@ -19,7 +19,7 @@
 ---
 --- WHAT IS NOT TESTED HERE: whether the action does anything. That is the emit
 --- path, which is still xdotool and therefore silent under Wayland — recorded in
---- todo_linux.md §12.5 rather than asserted as working.
+--- docs/design/linux-driver-plan.md §12.5 rather than asserted as working.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
