@@ -88,7 +88,12 @@ assert.ok(Number.parseInt(versionText, 10) >= 5, 'the fixture needs a supported 
 if (process.platform === 'win32')
 	assert.match(versionText, /^5\.1\./, 'native entry controls qualify Windows PowerShell 5.1');
 console.log(`[runtime] PowerShell ${versionText}`);
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-windows-dev-runner-'));
+// The launcher derives the clone from its own resolved location, which expands
+// a Windows 8.3 temporary directory (RUNNER~1) and follows macOS /var. Start
+// from that same canonical coordinate so every expected path is comparable.
+const scratch = fs.realpathSync.native(
+	fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-windows-dev-runner-'))
+);
 let nativeEntryCases = 0;
 let hostEntryBodyCases = 0;
 
