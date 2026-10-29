@@ -3,10 +3,9 @@
 # Metrics pause and session reset (PAR-50)
 
 Two rows of the Metrics menu, `metrics_suspend` and `metrics_reset_session`,
-exist on all three drivers with one meaning. Audit rows S5 and M10 of
-`docs/audits/2026-10-24-cross-os-parity.md` are the evidence: before this
-change they were Linux-only, and the Linux pause borrowed the password-field
-flag.
+exist on all three drivers with one meaning. Before this change they were
+Linux-only, and the Linux pause borrowed the password-field flag (rows S5 and
+M10 of the 2026-10-24 cross-OS parity audit).
 
 ## Pause
 
