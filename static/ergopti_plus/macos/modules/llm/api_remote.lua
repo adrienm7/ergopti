@@ -1140,6 +1140,17 @@ local function resolve_base_url(entry, provider)
 	return normalize_base_url(raw)
 end
 
+--- Whether a local server entry follows its scanned address while no scan
+--- has found that server running, so its URL would fall back to the default.
+--- @param entry table Remote entry.
+--- @return boolean
+local function local_address_unscanned(entry)
+	if entry.base_url ~= nil and entry.base_url ~= "" then return false end
+	if not LocalServers.is_local(entry.provider) then return false end
+	local scan = LocalServers.port_scan(entry.provider)
+	return not (type(scan) == "table" and scan.running == true)
+end
+
 --- Reports an endpoint refusal without persisting the rejected URL itself.
 --- @param operation string Semantic operation.
 --- @param entry table Active remote entry.
@@ -1638,92 +1649,110 @@ function M.warmup(_model_name, _profile, on_acquired)
 			report_acquisition(false)
 			return
 		end
-		local base, base_error = resolve_base_url(entry, provider)
-		if not base then
-			_warmup_active = false
-			accepted = false
-			log_endpoint_refusal("warmup", entry, base_error)
-			report_acquisition(false)
-			return
-		end
-		local token = entry.token or ""
-		if key_missing(entry) then
-			_warmup_active = false
-			accepted = false
-			Logger.debug(LOG, "warmup: no token configured for entry '%s'.", tostring(entry.id))
-			report_acquisition(false)
-			return
-		end
-
-		local identity_entry = find_active_entry()
-		local format = provider.format
-		if not ProviderUses.format_serves(format, ProviderUses.PREDICTION) then
-			_warmup_active = false
-			accepted = false
-			Logger.warn(LOG, "warmup: provider '%s' serves the agent's System 1 only, not predictions.",
-				tostring(entry.provider))
-			report_acquisition(false)
-			return
-		end
-
-		local dispatch_committed = false
-		local pending_response = nil
-		local function apply_response(r)
-			if my_warmup ~= _warmup_generation
-				or my_identity ~= _identity_generation
-				or find_active_entry() ~= identity_entry then
+		local function dispatch_ping()
+			local base, base_error = resolve_base_url(entry, provider)
+			if not base then
+				_warmup_active = false
+				accepted = false
+				log_endpoint_refusal("warmup", entry, base_error)
+				report_acquisition(false)
 				return
 			end
-			_warmup_active = false
-			local was_ready = _is_ready
-			local response_valid, refusal_reason = models_response_is_valid(format, r)
-			_is_ready = response_valid
-			if _is_ready and not was_ready then
-				Logger.info(LOG, "Remote API ready (provider=%s, model=%s).",
-					tostring(entry.provider), tostring(entry.model))
-			elseif type(r) == "table" and r.ok == true then
-				log_models_response_refusal("warmup", entry, r, refusal_reason)
-			elseif not _is_ready then
-				Logger.warn(LOG, "Remote API ping failed (status=%s) for provider=%s.",
-					tostring(type(r) == "table" and r.status or nil),
+			local token = entry.token or ""
+			if key_missing(entry) then
+				_warmup_active = false
+				accepted = false
+				Logger.debug(LOG, "warmup: no token configured for entry '%s'.", tostring(entry.id))
+				report_acquisition(false)
+				return
+			end
+
+			local identity_entry = find_active_entry()
+			local format = provider.format
+			if not ProviderUses.format_serves(format, ProviderUses.PREDICTION) then
+				_warmup_active = false
+				accepted = false
+				Logger.warn(LOG, "warmup: provider '%s' serves the agent's System 1 only, not predictions.",
 					tostring(entry.provider))
+				report_acquisition(false)
+				return
 			end
-			if M.is_local_server(entry.provider) then
-				local status = type(r) == "table" and tonumber(r.status) or 0
-				if _is_ready then
-					LocalServers.report_success(entry.provider)
-				elseif status == 0 or status == 401 or status == 403 then
-					-- A models probe answering 404 means a wrong address, not a
-					-- missing model: only an absent server or a wanted key is reported
-					LocalServers.report_failure(entry.provider, status, nil, entry.model)
-				end
-			end
-		end
-		local dispatch_ok, dispatched_or_err = xpcall(function()
-			return dispatch_probe(_warmup_client, base, format, token, function(r)
-				if dispatch_committed ~= true then
-					pending_response = r
+
+			local dispatch_committed = false
+			local pending_response = nil
+			local function apply_response(r)
+				if my_warmup ~= _warmup_generation
+					or my_identity ~= _identity_generation
+					or find_active_entry() ~= identity_entry then
 					return
 				end
-				apply_response(r)
-			end)
-		end, debug.traceback)
-		if not dispatch_ok or dispatched_or_err ~= true then
-			pending_response = nil
-			_warmup_active = false
-			accepted = false
-			Logger.error(LOG, "Remote warmup GET acquisition failed: %s.",
-				tostring(dispatched_or_err))
-			report_acquisition(false)
-		else
-			dispatch_committed = true
-			if pending_response ~= nil then
-				local response = pending_response
-				pending_response = nil
-				apply_response(response)
+				_warmup_active = false
+				local was_ready = _is_ready
+				local response_valid, refusal_reason = models_response_is_valid(format, r)
+				_is_ready = response_valid
+				if _is_ready and not was_ready then
+					Logger.info(LOG, "Remote API ready (provider=%s, model=%s).",
+						tostring(entry.provider), tostring(entry.model))
+				elseif type(r) == "table" and r.ok == true then
+					log_models_response_refusal("warmup", entry, r, refusal_reason)
+				elseif not _is_ready then
+					Logger.warn(LOG, "Remote API ping failed (status=%s) for provider=%s.",
+						tostring(type(r) == "table" and r.status or nil),
+						tostring(entry.provider))
+				end
+				if M.is_local_server(entry.provider) then
+					local status = type(r) == "table" and tonumber(r.status) or 0
+					if _is_ready then
+						LocalServers.report_success(entry.provider)
+					elseif status == 0 or status == 401 or status == 403 then
+						-- A models probe answering 404 means a wrong address, not a
+						-- missing model: only an absent server or a wanted key is reported
+						LocalServers.report_failure(entry.provider, status, nil, entry.model)
+					end
+				end
 			end
-			report_acquisition(true)
+			local dispatch_ok, dispatched_or_err = xpcall(function()
+				return dispatch_probe(_warmup_client, base, format, token, function(r)
+					if dispatch_committed ~= true then
+						pending_response = r
+						return
+					end
+					apply_response(r)
+				end)
+			end, debug.traceback)
+			if not dispatch_ok or dispatched_or_err ~= true then
+				pending_response = nil
+				_warmup_active = false
+				accepted = false
+				Logger.error(LOG, "Remote warmup GET acquisition failed: %s.",
+					tostring(dispatched_or_err))
+				report_acquisition(false)
+			else
+				dispatch_committed = true
+				if pending_response ~= nil then
+					local response = pending_response
+					pending_response = nil
+					apply_response(response)
+				end
+				report_acquisition(true)
+			end
 		end
+		-- A local server entry that follows its scanned address pinged the
+		-- catalogue default after every reload: no scan runs at startup, so a
+		-- server on another port (oMLX's settings.json, LM Studio's own choice)
+		-- stayed "not running" and predictions never started. Locate it first.
+		if local_address_unscanned(entry) then
+			local deferred = M.detect_local_servers(function()
+				if my_warmup ~= _warmup_generation or my_identity ~= _identity_generation then return end
+				dispatch_ping()
+			end)
+			if deferred then
+				Logger.debug(LOG, "warmup: locating local server '%s' before its ping.", tostring(entry.provider))
+				report_acquisition(true)
+				return
+			end
+		end
+		dispatch_ping()
 		end)
 	end, debug.traceback)
 	if not launch_ok then
