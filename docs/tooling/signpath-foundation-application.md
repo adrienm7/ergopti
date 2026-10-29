@@ -1,4 +1,4 @@
-<!-- docs/todo-agents/signpath-foundation-application.md -->
+<!-- docs/tooling/signpath-foundation-application.md -->
 
 # SignPath Foundation application (checklist item 132)
 
