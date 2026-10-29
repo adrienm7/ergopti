@@ -24,8 +24,9 @@ keeps private request configuration out of the command line.
 Linux needs a GIO runtime and compiled proxy schemas; Windows uses its own
 native APIs and does not load GIO. Shared policy belongs in
 `_shared/lua/network/` and `_shared/modules/network/`. Saved Windows candidate
-patches are inactive preparation, with the actual native/E2E/package/install
-checks listed in the [Windows handover](../../../../../docs/handovers/2026-10-04-group6-windows/README.md).
+patches are inactive preparation; they and their twelve native, E2E, package
+and install checks left the tree with the old handovers and stay in Git at
+`49c62d77a1` (`docs/handovers/2026-10-04-group6-windows/`).
 Real WinHTTP behavior is proven against owned loopback services by
 `tests/fixtures/winhttp_transport_controls.ps1`; this directory does not claim
 that enterprise certificate and authentication acceptance passed.

@@ -1352,8 +1352,8 @@ here); macOS and Linux behaviour that needs hardware goes through the Debug fiel
       combination and script-shortcut consumers (down, repeat, up, owner change while held, pause,
       reload); finish event-specific capture and replay and modifier ownership (source pin,
       authenticated event stream, non-hook handler conversion, chained/repeat semantics). Regenerate
-      the DLL and manifest only through the official MSVC generator; check the patches in
-      `docs/handovers/2026-10-12-dev-consolidation/` against the tree first.
+      the DLL and manifest only through the official MSVC generator (the four pending patches of the
+      12 October consolidation were found already in the tree on 2026-10-23).
       Measured on the maintainer's PC (Debug > Record keyboard hook order, 2026-10-24): before a
       SendInput the test hook is first; after it the AutoHotkey hook is first, so SendInput does
       reinstall the AutoHotkey hook in front of any hook installed earlier. SendEvent does not
@@ -1831,7 +1831,9 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       the Defender false positive, and ask the tester for the exact block page.
 
 - [ ] **36. Windows updater production coupling.** [CODE] The "original23" collector stays inactive
-      (`docs/handovers/2026-10-12-group6-ci/INACTIVE-ORIGINAL23-SOURCE.md`) until enrolled.
+      until enrolled; its source preparation stays in Git
+      (`49c62d77a1:docs/handovers/2026-10-12-group6-ci/`). Missing: the first trusted PowerShell host
+      acquisition (a pre-host native binding with an approved image contract).
 - [ ] **62 (macOS and Linux).** [CODE] Packaged paths resolve every request and redirect natively;
       the environment fallback now resolves each origin of the client inventory and refuses two
       different relays (1fd254d92e, 749e00c4c8). Left: confirm the Ollama blob host on the Mac,
@@ -2096,16 +2098,21 @@ Standing checks:
    cette version » keeps a backup.
 6. **Items 19, 49, 50**: tooltips near screen edges on Windows 10 and 11 at several DPI scales; hook
    order around a SendInput rehook; the send-mode measurement.
-7. **Hotstrings** (items 34, 37, 102, 104, 105, 129): follow
-   [GROUP2-WINDOWS-TODO](docs/handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md); with no
-   Ergopti layout installed the shipped pack, suffix rules and magic-key repeat appear once;
-   `update` never proposes `date`.
+7. **Hotstrings** (items 34, 37, 102, 104, 105, 129), in the installed driver: delays 0.5 s
+   recommended and cleared back to 1.0 s; handwritten delimiters and `[[hotstrings.terminators]]`
+   through Add, Delete, toggle, save and restart; with no Ergopti layout installed the shipped pack,
+   the 24 suffix rules and magic-key repeat appear once; personal files (duplicates, unreadable,
+   junctions, depth 16) and their delay, priority, colour and tooltip edits; each common
+   autocorrection family alone (34/95/11 rules); `run_all.ahk --only "programmable hotstrings"`
+   and the compiled probe `tools/test/run-compiled-user-hotstrings.ps1`; `update` never proposes
+   `date`. Full list: `49c62d77a1:docs/handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md`.
 8. **Layout switching** (item 38): AZERTY with emulation to native Ergopti and back keeps AltGr
    usable without a reload, also on an AZERTY-style AltGr (LCtrl+RAlt) and a Kana layout.
 9. **Touchpad registry** (item 13): values restored after OFF and removal; kept after a refusal.
-10. **Managed network** (item 62): the twelve steps of the
-    [Group 6 Windows handover](docs/handovers/2026-10-04-group6-windows/README.md) behind a company
-    proxy.
+10. **Managed network** (item 62), behind a company proxy: WinINet settings, PAC order and
+    failover, WPAD absence, the eight remote CA cases, Negotiate and NTLM proxy challenges, then the
+    installed updater (download, swap, rollback). The twelve detailed steps stay in Git
+    (`49c62d77a1:docs/handovers/2026-10-04-group6-windows/README.md`).
 11. **CapsWord auto-off**: delays, the eight default delimiters, each pointer kind, the LAlt then
     CapsLock trigger.
 12. **AI off (#97)**: no local server sweep, no AI hotkeys, a refused AI hotkey leaves the driver
@@ -2211,8 +2218,9 @@ not open software work.
 ## Decided, do not re-raise
 
 - **Delta updates (item 22)**: withdrawn by the maintainer; full signed downloads stay below 20 MB.
-  Reconsider only if release size or measured repeated-download cost grows
-  ([rationale](docs/handovers/2026-10-04-parallel-containers/PARALLEL-WORK.md#delta-updates-decision)).
+  Full signed, checksummed downloads keep one install and rollback path, without delta-base
+  selection, patch rebuild or extra fallbacks. Reconsider only if release size or measured
+  repeated-download cost grows.
 - **Report a bug has no review screen**: the report is reviewable on GitHub (October 21).
 - **Not defects after native review**: L48, L83 and the release-notes CR handling on Windows; L30,
   L85, L88 and L18 on macOS.

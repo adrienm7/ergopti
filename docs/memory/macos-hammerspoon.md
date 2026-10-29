@@ -920,8 +920,8 @@ In shared mode, the production path until the owned runtime ships, Ergopti owns
 only token-scoped Karabiner rules and variables and never owns, quits, unloads
 or restarts Karabiner-Elements' UI, daemon, grabber, console user server or
 VirtualHID processes. `tests/meta/architecture/test_karabiner_stock_process_isolation.lua`
-enforces this; keep it strict until WP6 of the
-[HS-274 plan](../handovers/2026-09-29-overnight/hs274-delivery-plan.md) lands
+enforces this; keep it strict until WP6 of the HS-274 plan (item 31 of
+`TODO.md`, [ADR 011](../../static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md)) lands
 the owned runtime together with the exact code it must allow. ADR 011 then
 permits two things only: controlling the Ergopti-labelled runtime peers, and
 quitting stock Karabiner through the default-on « close other Karabiner
