@@ -211,6 +211,26 @@ helpers.describe("stream watchdog exact TimerScheduler ownership", function()
 		helpers.assert_true(fixture.handler.stop_watchdog())
 	end)
 
+	helpers.it("hands a stream that showed nothing back as a timeout once released", function()
+		local fixture = load_fixture()
+		fixture.context.pending_predictions_ref.value = {}
+		fixture.context.predictions_visible_ref.value = false
+		local timeouts, stop_result = 0, nil
+		fixture.context.on_stream_timeout = function()
+			timeouts = timeouts + 1
+			stop_result = fixture.handler.stop_watchdog()
+		end
+		helpers.assert_true(fixture.handler.arm_watchdog(fixture.context))
+		fixture.timers[1]:deliver()
+
+		helpers.assert_eq(timeouts, 1)
+		helpers.assert_eq(fixture.ui_failures, nil,
+			"a slow model is no failed paint: it must not open the error window")
+		helpers.assert_eq(stop_result, true,
+			"the timeout reset runs after the callback, so it can settle the watchdog")
+		helpers.assert_eq(fixture.renders, 0)
+	end)
+
 	helpers.it("preserves a successor installed during native stop proof", function()
 		local fixture = load_fixture()
 		helpers.assert_true(fixture.handler.arm_watchdog(fixture.context))
