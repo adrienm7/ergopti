@@ -57,6 +57,8 @@ local ManifestMenu     = require("infra.manifest_menu")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local runtime_install_offer = require("ui.menu.menu_llm.runtime_install_offer")
 local ShellRunner         = require("adapters.shell_runner")
+local TimerScheduler      = require("adapters.timer_scheduler")
+local Timings             = require("infra.timings")
 
 local LOG = "menu_llm"
 
@@ -195,11 +197,68 @@ local _llm_health_status = nil
 local _llm_health_origin = nil
 local _llm_health_generation = 0
 
+-- The menubar keeps a static prebuilt menu, so the AI title's dot only changes
+-- when something rebuilds it. A backend turns ready (or fails) after the build
+-- that painted the dot, so this watch re-reads the readiness of the active
+-- backend, whichever it is, and repaints only when the dot would differ.
+local HEALTH_WATCH_SEC = Timings.sec("llm", "ai_health_watch_ms")
+local _health_watch = { handle = nil, painted = nil, read = nil, repaint = nil }
+
+--- Stops the health watch; the next AI menu build re-arms it when needed.
+local function stop_health_watch()
+	local handle = _health_watch.handle
+	_health_watch.handle = nil
+	_health_watch.read = nil
+	_health_watch.repaint = nil
+	if handle then TimerScheduler.cancel(handle) end
+end
+
+--- One watch tick: repaints the AI title once when its dot is out of date.
+local function check_health_watch()
+	local read, repaint = _health_watch.read, _health_watch.repaint
+	if type(read) ~= "function" or type(repaint) ~= "function" then return end
+	local ok, now = pcall(read)
+	if not ok then
+		Logger.error(LOG, "The AI health watch could not read the backend: %s.", tostring(now))
+		return
+	end
+	if now == _health_watch.painted then return end
+	Logger.debug(LOG, "AI health changed from %s to %s: repainting the AI title.",
+		tostring(_health_watch.painted), tostring(now))
+	-- Recorded before the repaint, so a coalesced rebuild never repaints twice
+	_health_watch.painted = now
+	if now == nil then stop_health_watch() end
+	local repainted, err = pcall(repaint)
+	if not repainted then Logger.error(LOG, "The AI title repaint failed: %s.", tostring(err)) end
+end
+
+--- Keeps the dot of the AI title in step with the backend after this build.
+--- @param painted string|nil The status this build painted; nil stops the watch.
+--- @param read function Returns the status the dot should show now.
+--- @param repaint function Rebuilds the menu.
+local function watch_health(painted, read, repaint)
+	_health_watch.painted = painted
+	if painted == nil then stop_health_watch(); return end
+	_health_watch.read = read
+	_health_watch.repaint = repaint
+	if _health_watch.handle then return end
+	local handle, committed = TimerScheduler.every(HEALTH_WATCH_SEC, check_health_watch)
+	if committed ~= true then
+		Logger.error(LOG, "The AI health watch could not start: the AI title dot follows menu rebuilds only.")
+		return
+	end
+	_health_watch.handle = handle
+end
+M.__check_health_watch_for_test = check_health_watch
+M.__watch_health_for_test = watch_health
+M.__stop_health_watch_for_test = stop_health_watch
+
 --- Revokes every pending health writer and clears the shared display value.
 local function invalidate_llm_health()
 	_llm_health_generation = _llm_health_generation + 1
 	_llm_health_status = nil
 	_llm_health_origin = nil
+	stop_health_watch()
 end
 
 --- Revokes pending health callbacks and resets the display to not-yet-checked.
@@ -1098,8 +1157,12 @@ local function create_menu(deps)
 				-- even on the first menu open after a model swap.
 				-- The dot sits on the AI title, from the glyphs the manifest's top-level
 				-- ``llm`` entry declares for every driver (maintainer, 2026-10-29).
-				local health_status = nil
-				if state.llm_enabled and not paused then
+				local function read_health_status()
+						local live_paused = paused
+						if deps.script_control and type(deps.script_control.is_paused) == "function" then
+								live_paused = deps.script_control.is_paused() == true
+						end
+						if not state.llm_enabled or live_paused then return nil end
 						local backend_ready = false
 						if type(llm_mod.is_backend_ready) == "function" then
 								local ok, ready = pcall(llm_mod.is_backend_ready)
@@ -1113,15 +1176,14 @@ local function create_menu(deps)
 								local ok, failed = pcall(llm_mod.is_backend_load_failed)
 								load_failed = ok and failed == true
 						end
-						if backend_ready then
-								health_status = "ready"
-						elseif load_failed then
-								health_status = "unreachable"
-						elseif _llm_health_status == true then
-								health_status = "warming"
-						else
-								health_status = "unreachable"
-						end
+						if backend_ready then return "ready" end
+						if load_failed then return "unreachable" end
+						if _llm_health_status == true then return "warming" end
+						return "unreachable"
+				end
+				local health_status = read_health_status()
+				if type(update_menu) == "function" then
+						watch_health(health_status, read_health_status, update_menu)
 				end
 
 				-- One button replaces the model list (maintainer, 2026-10-27): the
