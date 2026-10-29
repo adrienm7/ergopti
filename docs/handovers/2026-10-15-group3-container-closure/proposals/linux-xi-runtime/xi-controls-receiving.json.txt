@@ -1,6 +1,0 @@
-{
-  "exit": 0,
-  "passed": 25,
-  "skipped": 0,
-  "scope": "controlled command replies and real owned filesystem; no ELF/native/installed claim"
-}

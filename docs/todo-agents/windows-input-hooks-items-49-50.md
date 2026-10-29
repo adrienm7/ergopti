@@ -214,7 +214,7 @@ both hooks live only inside one non-pumping stretch of the hook thread.
 
 ## Handover patches (checked against the tree, 2026-10-23)
 
-The four pending patches of `docs/handovers/2026-10-12-dev-consolidation/` no
+The four pending patches of the retired `docs/handovers/2026-10-12-dev-consolidation/` no
 longer apply because their effect is already in the tree: the half-range clock
 test (`>= 0x80000000u`), the owned Win32 payload serializer
 (`OutputWin32UnitValid`, `ErgoptiNav_SerializeTerminalOutputAttempt`), the
