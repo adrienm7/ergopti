@@ -1043,6 +1043,8 @@
 	"linux_shell.launcher.no_package_manager": "Errore: nessun gestore di pacchetti trovato (serve apt, dnf o pacman).",
 	"linux_shell.build_luv.module_generated": "Modulo di rete LuaJIT compilato dai sorgenti.",
 	"linux_shell.build_luv.recipe_required": "La compilazione nativa di luv richiede la sua ricetta sorgente.",
+	"linux_shell.native_modules.call_refused": "L’ambiente dei moduli nativi richiede una radice assoluta del driver e la modalità required o optional.",
+	"linux_shell.native_modules.module_unpublished": "Ergopti non può avviarsi: {1} non è un modulo nativo pubblicato.",
 	"linux_shell.install.already_installed": "{1} — già installato",
 	"linux_shell.install.archive_digest_unavailable": "gli aggiornamenti con descrittore trattenuto richiedono un vero runtime OpenSSL3; la funzionalità resta non disponibile.",
 	"linux_shell.install.capability_verified": "{1} — funzionalità verificata",

@@ -205,7 +205,11 @@ function portable() {
 			assert.match(installer, /linux\/native_modules\/luv\.so/);
 			assert.match(
 				read(`${DRIVER}/install/standalone_launcher.sh`),
-				/export LUA_CPATH="\$DRIVER_ROOT\/native_modules\/\?\.so;\$\{LUA_CPATH:-;;\}"/
+				/^ergopti_admit_native_modules "\$DRIVER_ROOT" optional$/m
+			);
+			assert.match(
+				read(`${DRIVER}/install/native_modules_env.sh`),
+				/export LUA_CPATH="\$modules\/\?\.so;\$\{LUA_CPATH:-;;\}"/
 			);
 			assert.match(read(`${DRIVER}/tests/distro/e2e_install.sh`), /runtime_probe\.lua/);
 		}

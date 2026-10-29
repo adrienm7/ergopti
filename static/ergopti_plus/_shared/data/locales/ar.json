@@ -1043,6 +1043,8 @@
 	"linux_shell.launcher.no_package_manager": "خطأ: لم يُعثر على مدير حزم (يلزم apt أو dnf أو pacman).",
 	"linux_shell.build_luv.module_generated": "تم بناء وحدة الشبكة لـ LuaJIT من المصدر.",
 	"linux_shell.build_luv.recipe_required": "يتطلب البناء الأصلي لـ luv وصفة المصدر الخاصة به.",
+	"linux_shell.native_modules.call_refused": "تحتاج بيئة الوحدات الأصلية إلى جذر مطلق للمشغّل وإلى الوضع required أو optional.",
+	"linux_shell.native_modules.module_unpublished": "لا يمكن تشغيل Ergopti: ‏{1} ليست وحدة أصلية منشورة.",
 	"linux_shell.install.already_installed": "{1} — مثبّت بالفعل",
 	"linux_shell.install.archive_digest_unavailable": "تتطلب التحديثات ذات الواصف المحتفَظ به بيئة OpenSSL3 فعلية؛ تبقى القدرة غير متاحة.",
 	"linux_shell.install.capability_verified": "{1} — تم التحقق من القدرة",

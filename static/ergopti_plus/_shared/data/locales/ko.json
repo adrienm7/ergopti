@@ -1043,6 +1043,8 @@
 	"linux_shell.launcher.no_package_manager": "오류: 패키지 관리자를 찾을 수 없습니다(apt, dnf 또는 pacman 필요).",
 	"linux_shell.build_luv.module_generated": "LuaJIT 네트워킹 모듈을 소스에서 빌드했습니다.",
 	"linux_shell.build_luv.recipe_required": "luv 네이티브 빌드에는 소스 레시피가 필요합니다.",
+	"linux_shell.native_modules.call_refused": "네이티브 모듈 환경에는 드라이버의 절대 루트와 required 또는 optional 모드가 필요합니다.",
+	"linux_shell.native_modules.module_unpublished": "Ergopti를 시작할 수 없습니다: {1}은(는) 게시된 네이티브 모듈이 아닙니다.",
 	"linux_shell.install.already_installed": "{1} — 이미 설치됨",
 	"linux_shell.install.archive_digest_unavailable": "유지된 디스크립터 업데이트에는 실제 OpenSSL3 런타임이 필요합니다. 이 기능은 계속 사용할 수 없습니다.",
 	"linux_shell.install.capability_verified": "{1} — 기능 확인됨",

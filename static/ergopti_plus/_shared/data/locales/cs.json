@@ -1043,6 +1043,8 @@
 	"linux_shell.launcher.no_package_manager": "Chyba: nebyl nalezen správce balíčků (je vyžadován apt, dnf nebo pacman).",
 	"linux_shell.build_luv.module_generated": "Síťový modul LuaJIT sestaven ze zdrojových kódů.",
 	"linux_shell.build_luv.recipe_required": "Nativní sestavení luv vyžaduje svůj zdrojový recept.",
+	"linux_shell.native_modules.call_refused": "Prostředí nativních modulů vyžaduje absolutní kořen ovladače a režim required nebo optional.",
+	"linux_shell.native_modules.module_unpublished": "Ergopti nelze spustit: {1} není publikovaný nativní modul.",
 	"linux_shell.install.already_installed": "{1} — již nainstalováno",
 	"linux_shell.install.archive_digest_unavailable": "aktualizace s ponechaným deskriptorem vyžadují skutečné běhové prostředí OpenSSL3; funkce zůstává nedostupná.",
 	"linux_shell.install.capability_verified": "{1} — funkce ověřena",
