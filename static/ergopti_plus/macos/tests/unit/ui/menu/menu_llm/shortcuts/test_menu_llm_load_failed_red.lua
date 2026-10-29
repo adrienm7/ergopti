@@ -47,11 +47,11 @@ helpers.describe("menu_llm — load-failure status dot", function()
 		)
 	end)
 
-	helpers.it("has an `elseif load_failed` branch ahead of the orange branch", function()
+	helpers.it("has a `load_failed` branch ahead of the orange branch", function()
 		local src = read_menu_llm_source()
-		local failed_pos = src:find("elseif load_failed then", 1, true)
+		local failed_pos = src:find("if load_failed then return \"unreachable\" end", 1, true)
 		local orange_pos = src:find("_llm_health_status == true", 1, true)
-		helpers.assert_true(failed_pos ~= nil, "expected an `elseif load_failed then` branch")
+		helpers.assert_true(failed_pos ~= nil, "expected a `load_failed` → unreachable branch")
 		helpers.assert_true(orange_pos ~= nil, "expected the orange `_llm_health_status == true` branch")
 		helpers.assert_true(failed_pos < orange_pos,
 			"the load_failed (red) branch must be evaluated BEFORE the orange branch, " ..

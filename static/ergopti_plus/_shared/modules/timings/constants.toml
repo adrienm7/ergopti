@@ -47,6 +47,12 @@ backend_busy_recheck_ms = 300
 # HS:  api_remote.lua REQUEST_TIMEOUT_MS.
 request_timeout_ms = 30000
 
+# Period of the AI health watch that repaints the AI menu title's dot when
+# the active backend turns ready or fails after the menu was built (any
+# backend: local API, MLX, Ollama). It only reads in-memory state.
+# HS: ui/menu/menu_llm/init.lua HEALTH_WATCH_SEC.
+ai_health_watch_ms = 1000
+
 # Deadline of one models probe of a local OpenAI-compatible server
 # (_shared/modules/llm/local_servers.json). A running server on loopback
 # answers in milliseconds; an absent one refuses the connection at once, so
