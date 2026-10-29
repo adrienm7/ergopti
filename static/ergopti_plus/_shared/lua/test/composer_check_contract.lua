@@ -1,6 +1,6 @@
 --- _shared/lua/test/composer_check_contract.lua
 
---- Exercises the Debug check « Test the composed layout » (docs/layout-composer.md)
+--- Exercises the Debug check « Test the composed layout » (docs/design/layout-composer.md)
 --- over a driver's real layout registry with the shared check composition:
 --- a fresh run installs, verifies and removes it; a user's own composition is
 --- only read; every way the host can fail is a failed step, never a silent pass.

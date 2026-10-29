@@ -480,7 +480,7 @@ function findDeadTests(file, src, ext) {
  * expansion, a guard that silently no-ops — passes. This is the shape that let
  * the macOS `on_done` bug ship: the callback aborted on its first line, the
  * surrounding pcall swallowed it, and the test stayed green
- * (PROJECT_MEMORY, project-lua-closure-before-local-nil-global).
+ * (docs/memory, project-lua-closure-before-local-nil-global).
  */
 /**
  * True when `assert_eq(pcall(f), false)` compares the inline status with false:

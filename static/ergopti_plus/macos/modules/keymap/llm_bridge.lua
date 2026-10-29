@@ -1163,7 +1163,7 @@ local function update_preview_body(buf)
 			-- keeping the other still leaks. The DEBUG line sixty lines above names
 			-- the persisted sink that must withhold the row whole; these two ARE
 			-- that sink, and they were writing the value verbatim.
-			-- docs/PROJECT_MEMORY.md records the same class shipping once before.
+			-- docs/memory records the same class shipping once before.
 			if may_persist_preview(primary_match) then
 				local t_key, t_repl, t_type = trigger_key, primary_match.repl, type_str
 				local schedule_ok, telemetry_handle, telemetry_committed = xpcall(function()

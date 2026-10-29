@@ -287,7 +287,7 @@ la bonne réponse est 3 sur Windows et Linux (la frappe est déjà à l'écran) 
 (elle est consommée, plus l'optimisation de préfixe commun). Les trois produisent
 `by the way`. Le corpus a tort, pas macOS.
 
-**La machine à états n'est écrite nulle part.** `docs/STATE_TRANSITION_MATRIX.md` décrit le
+**La machine à états n'est écrite nulle part.** `docs/design/windows-state-transitions.md` décrit le
 cycle de vie du _driver_, pas le tampon. Les variables d'état réelles ne sont **nommées**
 que sur Windows (`HSE_Buffer`, `HSE_StartIsWordBoundary`, `HSE_Suppressed`,
 `HSE_RebuildInProgress`, `HSE_LastEndChar`), et les commentaires de leur fichier sont la

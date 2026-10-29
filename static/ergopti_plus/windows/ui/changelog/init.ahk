@@ -71,7 +71,7 @@ global _CLW_ResetDone  := false
 ; Virtual host mapped to _SharedDir so the document and its relative assets
 ; and the locale fetch resolve over https:// -- file:// is an opaque origin
 ; and the chrome.webview JS->AHK channel does not reliably deliver from it
-; (see PROJECT_MEMORY project-webview2-bridge-gotchas).
+; (see docs/memory project-webview2-bridge-gotchas).
 global CHANGELOG_VHOST := "ergopti.changelog"   ; -> _SharedDir
 ; COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW.
 global CHANGELOG_HOST_ACCESS_ALLOW := 1

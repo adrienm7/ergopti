@@ -6,9 +6,9 @@ Updated: 2026-10-28 evening. Latest stable: [v1.0.7](https://github.com/adrienm7
 (released 2026-10-28 from main 18d69a24c0). **Next step: the two machine lists below, the PC one on the
 Windows PC and the Mac one on the Mac.** Open work only: a finished item is removed, its lessons go to
 [docs/memory](docs/memory/README.md), and the history stays in Git
-(`git log --follow -p -- TODO.md`). Item numbers are stable and never reused. Open
-questions are in [questions-for-maintainer.md](docs/questions-for-maintainer.md). There are no separate
-handoff files: an agent writes what is left into the item itself.
+(`git log --follow -p -- TODO.md`). Item numbers are stable and never reused. This file is the only
+checklist: open questions are in "Questions for the maintainer" at the end, and there are no separate
+handoff files (an agent writes what is left into the item itself).
 
 Tags: **[CODE]** software to write or adopt; **[CI]** only a hosted or native CI run qualifies it;
 **[PHYS-W]**, **[PHYS-M]**, **[PHYS-L]** needs a real Windows PC, Mac or Linux machine.
@@ -118,11 +118,12 @@ git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin \
 
 The resulting tags are `archive/fix-macos`, `archive/fix-linux` and `archive/fix-windows`.
 
-## Linux open items from the July plan (docs/design/linux-driver-plan.md)
+## Linux open items from the July plan
 
-The former root `todo_linux.md` (written 2026-07-30 for the X11/Wayland hotstring engine) moved to
-[docs/design/linux-driver-plan.md](docs/design/linux-driver-plan.md), which keeps its reasoning. Its 11 unticked
-boxes are listed here; several may be done since, so check the code before starting one:
+The July Linux driver plan (X11/Wayland hotstring engine, 2026-07-30) is retired; its rejected
+gesture routes are in `docs/memory/rejected_proposals.md`. Its notifier, LLM manifest section and LLM
+HTTP transport items are done (`linux/adapters/notifier.lua`, `[sections.llm]` lists `linux`,
+`linux/modules/llm/api_remote.lua`). Still open on 2026-10-29:
 
 - M3.3: remove `linux/ui/menu/menu_builder.lua` in favour of the shared renderer.
 - 20 of the 36 gesture slots are physically out of reach on some machines.
@@ -131,10 +132,8 @@ boxes are listed here; several may be done since, so check the code before start
 - No external process can move, focus or close a window under Wayland.
 - The decoder's event trace is a reconstruction, not a capture.
 - The navigation layer leaves the wheel transparent (`volu`/`vold`).
-- No notification surface: the `Notifier` port has no adapter.
-- Enable `[sections.llm]` for `linux` in the shared manifest.
-- Interactive LLM behaviour is blocked on an HTTP transport.
-- Remote API backends are also blocked on a secret store.
+- Remote API backends work (`api_remote.lua`), but their tokens have no secret store
+  (`linux/modules/llm/api_entries.lua` neither encrypts nor uses a keyring).
 
 ## Next fix/<os> agent pass (read when the maintainer asks for a new fix/linux, fix/macos or fix/windows)
 
@@ -1062,7 +1061,7 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       `UC_PAGE_ACTIONS`, then drop `open_url:available` from `luaHostsOnly` in
       `tools/test/test-update-check-dialog.cjs`.
 
-## Decisions of 2026-10-26 to implement (docs/questions-for-maintainer.md)
+## Decisions of 2026-10-26 to implement (the maintainer's answers of that day)
 
 - [x] **Slow-segment threshold 5 ms on macOS and Linux.** [CODE] Done (`[logger] hotpath_slow_ms`); Windows reader left.
 - [ ] **Versioned `tap_hold.toml` migrator.** [CODE] Linux done (`_shared/tap_hold/migrations.toml`,
@@ -1195,8 +1194,8 @@ Space tap-hold press tick; HS-274 owned Karabiner runtime (dormant, hidden `[kar
 Debug field checks on all OS; evidence log API that is never collapsed (`LoggerEvidence`, `Logger.evidence`); redaction
 rules and the opt-in redacted day log; AV-surface gate and the false-positive submission pack; CI tooling (rerun verdict,
 Flatpak cache and retry, remap-runtime workflow, slowest-test summary); performance work (below); cross-OS parity audit
-(PAR entries). Hosted validation on throwaway `tmp/ci-validate-*` branches is logged in
-[ci-validation-2026-10-24.md](docs/ci-validation-2026-10-24.md).
+(PAR entries). Hosted validation ran on throwaway `tmp/ci-validate-*` branches (Swift run
+40021100985, Go 40021624397 and Karabiner vendor headers 40023031301 green).
 
 **Performance state per OS (measure before optimising; every driver now has permanent counters).**
 
@@ -1221,7 +1220,7 @@ review). libXi dependency declined (Xi packet retired). Items 46/47/48 retired e
 check, no removal. No token-reuse rearm (ADR 012). Expansion delay with end char: from the last typed letter to the
 expander (`★` or the end character).
 
-**Decisions still pending for the maintainer.** `docs/questions-for-maintainer.md` (check it for anything new). The 2026-10-24 QCM answers are implemented (October 25): PAR-6, PAR-8, PAR-15, PAR-21, PAR-24, hotstring cascading, Space tap completion, the recommended-defaults rule and AI off on Linux. Still open: the content-Gui pool of the Windows prediction tooltip, PAR-12 on the PC.
+**Decisions still pending for the maintainer.** See "Questions for the maintainer" at the end of this file. The 2026-10-24 QCM answers are implemented (October 25): PAR-6, PAR-8, PAR-15, PAR-21, PAR-24, hotstring cascading, Space tap completion, the recommended-defaults rule and AI off on Linux. Still open: the content-Gui pool of the Windows prediction tooltip, PAR-12 on the PC.
 
 **Remaining work, in the order to take it.**
 
@@ -1392,7 +1391,7 @@ here); macOS and Linux behaviour that needs hardware goes through the Debug fiel
       already via `TextPressKeyFed`, Linux pinned by 504ee63, macOS emits a native space).
       `test_hotstring_output_is_final.ahk` is already in `run_all.ahk`. Left: on each OS type `fb` + Space,
       Enter and ★ with the abbreviation and brand packs, at 1, 2 and 3 arrows, consumed and not.
-- [ ] **Per-layer layout composer.** [CODE] Done on the three OS (docs/layout-composer.md): shared
+- [ ] **Per-layer layout composer.** [CODE] Done on the three OS (docs/design/layout-composer.md): shared
       model, page, 21 locales, Windows host, macOS and Linux install paths, tests, one-click Debug
       "Test the composed layout". Left: typing the composed layout on a real keyboard on each OS.
 
@@ -1414,9 +1413,8 @@ Not started:
       unresolved download host is left to the proxy or the native worker; private, loopback,
       link-local and CGNAT addresses and names resolving to them stay refused; the build recipe
       patches upstream `ValidateRedirectTarget`. The hosted Go cell (`go vet`, `go test` through
-      `build-macos-managed-ollama.py`) passed on a throwaway branch (run 40021624397, see
-      [ci-validation-2026-10-24.md](docs/ci-validation-2026-10-24.md)). Left: the same cell on the final
-      source before a release.
+      `build-macos-managed-ollama.py`) passed on a throwaway branch (run 40021624397). Left: the same
+      cell on the final source before a release.
 - [x] **54/81. Last three native Windows menu rows.** Done in 02b63912f1 (local): census Windows
       0, macOS 0, Linux 0. The default-section, file and folder submenus are renderer template
       children (`MenuRenderer_TemplateChild` reserves, `MenuRenderer_FillTemplateChild` fills,
@@ -1810,7 +1808,7 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       per-key edits in a page; that produces one custom `.keylayout`, the single source the three OS already
       share: Windows emulates it (AHK reads a `.keylayout`), macOS installs it as the input source, Linux
       converts it to XKB (`_shared/lua/layouts/xkb_converter.lua`). The per-layer layout composer
-      (docs/layout-composer.md) already compiles a composition into `composed.keylayout` and installs it on
+      (docs/design/layout-composer.md) already compiles a composition into `composed.keylayout` and installs it on
       the three OS; build on it, do not add a second format. Left: (1) the menu options (Ergopti or Bépo base,
       `layout.direct_access_digits`, `layout.number_row_reorder_edges`, the row switches) feed the compiled
       `.keylayout` on macOS and Linux instead of narrowing a Windows-only emulation, with Ctrl/Cmd maps, dead
@@ -2269,3 +2267,13 @@ not open software work.
   category fails a gate; a minute more of wall time buys a CI whose red job says what broke.
 - **Maintainer workflow**: partial work is delivered into dev after the feasible container or CI
   work, with native or device gaps documented here rather than holding a branch.
+
+## Questions for the maintainer
+
+Each names the default kept meanwhile. Answer here; the agent then moves the decision into the item
+or under "Decided, do not re-raise".
+
+- **"Sticky" in French and Latin-script locales.** The sticky-modifier labels keep the English
+  "Sticky", like the `menu.tapholds.sticky_*` strings. Use a French term such as « rémanent »?
+- **Dutch "Rolls".** `category.rolls` and `hs_config.cat_rolls` keep "Rolls" (Dutch "Rollen" means
+  "roles"). Another Dutch word?

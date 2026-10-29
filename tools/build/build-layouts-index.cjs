@@ -48,7 +48,7 @@ const REGISTRY_DIR = path.join(REPO_ROOT, ...LAYOUT_DEFAULTS.registry.folder.spl
 const INDEX_PATH = path.join(REGISTRY_DIR, LAYOUT_DEFAULTS.registry.index_file);
 
 // Ids a registry layout may not take: the composer's own id and the reference
-// layouts a composition can start from (docs/layout-composer.md), which share
+// layouts a composition can start from (docs/design/layout-composer.md), which share
 // the registry's namespace.
 const RESERVED_IDS = new Set([LAYOUT_DEFAULTS.composer.id]);
 {

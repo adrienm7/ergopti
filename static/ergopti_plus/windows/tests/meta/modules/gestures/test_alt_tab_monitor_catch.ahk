@@ -4,7 +4,7 @@
 ; MODULE: AltTabMonitor Bare-Try Meta Test (Pattern 3 sibling)
 ; DESCRIPTION:
 ; Regression guard for the documented "bare try with no catch" anti-pattern
-; (docs/PROJECT_MEMORY.md's project-ahk-invariant-incomplete-application).
+; (docs/memory's project-ahk-invariant-incomplete-application).
 ; AltTabMonitor (infra/window_utils.ahk) enumerates every top-level window and
 ; calls several WinGet* functions per window with NO try/catch at all — a
 ; window closing mid-enumeration (a routine race, not a bug) threw

@@ -8,7 +8,7 @@
  * layout from four layers and a shortcuts layer, and writes it as one complete
  * .keylayout that the three drivers consume through the readers they already
  * have. This gate holds the model to the shared layout vectors and to the
- * composition contract of docs/layout-composer.md.
+ * composition contract of docs/design/layout-composer.md.
  *
  * WHAT IS CHECKED:
  * 1. Reader: the model types what _shared/tests/corpus/layouts/keylayout_vectors.json

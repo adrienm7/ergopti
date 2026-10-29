@@ -7,7 +7,6 @@ description: Consult or maintain routed project memory without loading unrelated
 
 `docs/memory/README.md` is the routing index for hard-won knowledge. The actual
 entries live beside it in focused files under `docs/memory/`.
-`docs/PROJECT_MEMORY.md` is only a compatibility pointer for older clients.
 This catalog is shared by every developer, agent and reviewer and replaces
 agent-private memory stores.
 
