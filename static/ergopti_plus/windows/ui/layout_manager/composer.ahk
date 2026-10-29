@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Layout Composer Host (Windows)
 ; DESCRIPTION:
-; The Windows half of the per-layer layout composer (docs/layout-composer.md),
+; The Windows half of the per-layer layout composer (docs/design/layout-composer.md),
 ; hosted in the layout manager window: it sends the shared composer page the
 ; layouts it can compose from and the user's stored composition, and turns what
 ; the page saves into an installed layout of the reserved id `composed`, which

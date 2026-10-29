@@ -439,7 +439,7 @@ KeylayoutEmulation_Check(Id, Text, Convention, KeycodeTable) {
 
 ; The shortcut levels of a loaded layout. A registry layout types every Ctrl, Alt
 ; and Win chord from its Command level; the layout the composer built
-; (docs/layout-composer.md) selects a keyMap of its own for each of the three, so
+; (docs/design/layout-composer.md) selects a keyMap of its own for each of the three, so
 ; its chords follow the modifier held. A modifier the layout selects no keyMap
 ; for falls back to the Command level.
 _KLE_ShortcutLevels(Model, Id, LevelIndex) {

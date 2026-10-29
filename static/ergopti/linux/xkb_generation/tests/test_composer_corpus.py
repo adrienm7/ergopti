@@ -19,7 +19,7 @@ CORPUS_DIR = STATIC_DIR / "ergopti_plus" / "_shared" / "tests" / "corpus" / "lay
 
 # keyMap index per XKB level (base, caps, shift, caps+shift, command, option,
 # shift+option), read off the composer's modifierMap by hand
-# (docs/layout-composer.md).
+# (docs/design/layout-composer.md).
 COMPOSER_LEVEL_INDICES = [0, 2, 1, 1, 5, 3, 4]
 KEY_Q = 12  # macOS code of the key right of Tab under the iso convention
 KEY_BRACKET_LEFT = 33

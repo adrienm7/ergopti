@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Layout Composer Host Tests (Windows)
 ; DESCRIPTION:
-; The composed layout (docs/layout-composer.md) is installed under the reserved
+; The composed layout (docs/design/layout-composer.md) is installed under the reserved
 ; id `composed` and emulated like any registry layout. These tests replay the
 ; shared composer corpus (_shared/tests/corpus/layouts/composer) through the
 ; real emulation, pin that registry layouts still type every chord from their

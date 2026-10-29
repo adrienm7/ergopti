@@ -20,7 +20,7 @@
 --- Fix: a throw inside a timer callback is RECOVERABLE by definition — the
 --- callback is abandoned and the run loop carries on — so it goes to the
 --- errors-only sink and stops there. The crash reporter stays reserved for
---- genuine uncaught fatals (PROJECT_MEMORY: errors-only-log-sink).
+--- genuine uncaught fatals (docs/memory: errors-only-log-sink).
 ---
 --- ROOT CAUSE ENCODED: the previous version of section 1 asserted only "not
 --- called synchronously", which doAfter(0) satisfies while the freeze remains

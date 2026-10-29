@@ -106,8 +106,7 @@ abstraction would conceal real per-OS behavior rather than remove duplication.
 
 Do not move native Hammerspoon helpers from `adapters/` into `lib/` merely for
 folder symmetry. The `hs.*` purity boundary deliberately keeps native calls in
-adapters, and the raw-line ratchet enforces it. See
-[the refactor guide](../REFACTOR_GUIDE.md#3-ce-que-ce-guide-refuse-de-proposer).
+adapters, and the raw-line ratchet enforces it.
 
 ## Porting Windows to the shared Lua matcher
 
@@ -165,3 +164,13 @@ transfer benefit. This is a maintainer scope decision, not a measured bandwidth
 benchmark or a claim that deltas were implemented. Reconsider only when release
 size or observed repeated-download costs materially increase. Archive compression
 and enterprise proxy/trust support remain independent requirements.
+
+## Linux touchpad gestures through libinput
+
+Do not read Linux touchpad gestures through libinput, by FFI or by scraping
+`libinput debug-events`. libinput gates its gesture state machine on
+`finger_count <= 4` (`tp_gesture_post_events`, libinput 1.31.3) and emits no
+gesture taps, so at most 16 of the 36 declared slots and none of the taps
+would work; the driver also removed output scraping from the keyboard path
+for four defects. `modules/gestures/manager.lua` reads the touchpad evdev node
+without a grab and decodes multitouch itself.

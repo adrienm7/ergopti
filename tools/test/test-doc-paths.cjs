@@ -17,7 +17,7 @@
  * This guard scans only *.md (so the deliberate dead-path *guards* in .ahk/.lua
  * test sources — which assert the old path never returns — are not flagged) and
  * fails with file:line if any dead driver path reappears in a doc. It is scoped
- * to static/ergopti_plus/ so the historical record in docs/PROJECT_MEMORY.md and
+ * to static/ergopti_plus/ so the historical record in docs/memory and
  * the archived audits are untouched.
  * ==============================================================================
  */

@@ -9,7 +9,7 @@ menu options and later per-key edits, and that produces **one custom
 `.keylayout`**, the single source on every OS. Windows emulates it (the
 emulation already reads a `.keylayout`), macOS installs it as the input source,
 Linux converts it to XKB. No second format, no pre-generated variants: the
-per-layer composer of `docs/layout-composer.md` is the base.
+per-layer composer of `docs/design/layout-composer.md` is the base.
 
 Legend used below: **Verified here** means run on this Linux host (libxkbcommon
 1.6.0, xkbcomp 1.4.6, setxkbmap 1.3.4, Xvfb) while writing this note.
