@@ -26,6 +26,14 @@ const projector = path.join(ROOT, 'tools/build/linux-package-version.cjs');
 const sourcePackage = path.join(ROOT, 'package.json');
 const env = { ...process.env, DPKG_DEB_COMPRESSOR_TYPE: 'none', ERGOPTI_LINUX_BUILD_DIR: BUILD };
 delete env.ERGOPTI_BUILD_VERSION;
+// The rpm packager builds luv itself without --luv-module; this test checks
+// version metadata only, so it hands over an ELF-headed fixture as the
+// packaging-options test does instead of compiling luv on every host.
+const LUV_MODULE = path.join(scratch, 'luv.so');
+fs.writeFileSync(
+	LUV_MODULE,
+	Buffer.concat([Buffer.from([0x7f, 0x45, 0x4c, 0x46]), Buffer.from('fixture')])
+);
 let refused = 0;
 let archives = 0;
 let rpmInstallReplays = 0;
@@ -104,7 +112,7 @@ try {
 		}
 		for (const [format, args] of [
 			['deb', []],
-			['rpm', ['--skip-rpm']],
+			['rpm', ['--skip-rpm', '--luv-module', LUV_MODULE]],
 			['flatpak', ['--skip-flatpak']]
 		]) {
 			const result = bash(
