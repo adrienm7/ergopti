@@ -183,7 +183,8 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     }
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
     Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens,
-        resolved.Has("Extras") ? resolved["Extras"] : Map())
+        resolved.Has("Extras") ? resolved["Extras"] : Map(),
+        resolved.Has("RequestFields") ? resolved["RequestFields"] : Map())
 
     ; The managed worker (WinHTTP in its own process) is the only production
     ; transport: the WinHTTP COM object would put DNS/connect/Send back on the
@@ -1363,7 +1364,9 @@ _LLMRemoteResolveEntry(Entry) {
     }
     ModelExtras := Provider.Has("ModelExtras") ? Provider["ModelExtras"] : Map()
     Extras := (ModelExtras is Map && ModelExtras.Has(Model)) ? ModelExtras[Model] : Map()
-    return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model, "Extras", Extras)
+    RequestFields := Provider.Has("RequestFields") ? Provider["RequestFields"] : Map()
+    return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model,
+        "Extras", Extras, "RequestFields", RequestFields)
 }
 
 ; Per-phase timeout (ms) for the readiness ping. Same value the sync path
@@ -1735,7 +1738,10 @@ _LLMRemoteSetAuthHeaders(Http, Format, Token) {
 ;   (model_extras), merged into OpenAI-shape payloads only. Anthropic and
 ;   Gemini branches never receive them: an unknown field can fail those
 ;   endpoints, and each extra is documented for one provider model.
-_LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_tokens := "", Extras := Map()) {
+; @param {Map} RequestFields - Body fields of a local server (local_servers.json
+;   request_fields, name -> validated JSON source text), merged into
+;   OpenAI-shape payloads after the extras and never over a field already set.
+_LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_tokens := "", Extras := Map(), RequestFields := Map()) {
     SysEsc  := _LLMRemoteJsonEscape(SystemPrompt)
     UserEsc := _LLMRemoteJsonEscape(UserText)
     ModelEsc := _LLMRemoteJsonEscape(Model)
@@ -1771,6 +1777,15 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
                 ExtraFrag .= Format(',"{1}":"{2}"', Field, _LLMRemoteJsonEscape(Val))
             else if (Val is Number)
                 ExtraFrag .= Format(',"{1}":{2}', Field, Val)
+        }
+    }
+    if (RequestFields is Map) {
+        for Field, Source in RequestFields {
+            Taken := (Extras is Map && Extras.Has(Field))
+            for Fixed in ["model", "messages", "temperature", "max_tokens", "stream"]
+                Taken := Taken || (Field == Fixed)
+            if !Taken
+                ExtraFrag .= "," . JsonStringLiteral(Field) . ":" . Source
         }
     }
     return Format('{"model":"{1}","messages":[{"role":"system","content":"{2}"},{"role":"user","content":"{3}"}],"temperature":{4},"max_tokens":{5},"stream":false{6}}',
@@ -1969,6 +1984,40 @@ _LLMRemote_CatalogPriceIsValid(value) {
     return value is Number and value >= 0 and value <= 1.7976931348623157e308
 }
 
+; Projects local_servers.json request_fields into name -> exact JSON source.
+; The source text travels verbatim because JsonParse decodes JSON booleans as
+; 0/1, and a chat template's enable_thinking must stay the literal false.
+; Documentation keys start with _; a field that is not plain JSON (arrays,
+; null, empty objects) is dropped alone, as the shared Lua policy does.
+_LLMRemote_LocalRequestFields(Text) {
+    Fields := Map()
+    try Members := JsonObjectMemberSpans(Text, ["request_fields"])
+    catch
+        return Fields
+    for Name, Span in Members {
+        if !RegExMatch(Name, "^[A-Za-z][A-Za-z0-9_]*$")
+            continue
+        if _LLMRemote_RequestValueIsPlain(JsonParse(Span["text"]))
+            Fields[Name] := Span["text"]
+    }
+    return Fields
+}
+
+; True for a JSON scalar or a non-empty object of identifier keys holding them.
+_LLMRemote_RequestValueIsPlain(Value) {
+    if (Value is String || Value is Number)
+        return true
+    if !(Value is Map) || Value.Count == 0
+        return false
+    for Key, Nested in Value {
+        if (Type(Key) != "String" || !RegExMatch(Key, "^[A-Za-z_][A-Za-z0-9_]*$"))
+            return false
+        if !_LLMRemote_RequestValueIsPlain(Nested)
+            return false
+    }
+    return true
+}
+
 ; Normalizes the optional per-provider model_extras section (Map model id ->
 ; Map field -> value) into publishable tables. Fail-closed per piece: doc
 ; keys, non-map models, non-scalar values and field names that would break
@@ -2103,9 +2152,12 @@ _LLMRemote_LoadCatalog() {
 
     LocalCatalogue := Map("order", [], "servers", Map())
     LocalRoot := 0
+    LocalRequestFields := Map()
     try {
-        LocalRoot := JsonParse(FSReadUtf8Exact(_SharedDir . "\modules\llm\local_servers.json"))
+        LocalText := FSReadUtf8Exact(_SharedDir . "\modules\llm\local_servers.json")
+        LocalRoot := JsonParse(LocalText)
         LocalCatalogue := LocalServerAuthCatalogue(LocalRoot, candidateProviders)
+        LocalRequestFields := _LLMRemote_LocalRequestFields(LocalText)
     } catch as Err
         try LoggerError("LLM.remote", "The local API catalogue is unavailable; optional authentication is refused.")
     LocalDiscovery := Map()
@@ -2119,7 +2171,8 @@ _LLMRemote_LoadCatalog() {
     for Id in LocalCatalogue["order"] {
         Desc := LocalCatalogue["servers"][Id]
         candidateProviders[Id] := Map("Label", Desc["label"], "BaseUrl", Desc["base_url"],
-            "DefaultModel", "", "Format", "openai", "ModelExtras", Map())
+            "DefaultModel", "", "Format", "openai", "ModelExtras", Map(),
+            "RequestFields", LocalRequestFields)
         candidateOrder.Push(Id)
     }
     LLM_LOCAL_API_SERVERS := LocalCatalogue["servers"]

@@ -296,6 +296,7 @@ local function register_local_servers()
 				format        = "openai",
 				model_extras  = {},
 				local_server  = true,
+				request_fields = LocalServers.REQUEST_FIELDS,
 			}
 		end
 	end
@@ -1332,7 +1333,10 @@ end
 --- (model_extras), merged into OpenAI-shape payloads only. Anthropic and
 --- Gemini branches never receive them. No per-model literal may ever be
 --- restated here (single-sourced in api_providers.json).
-local function build_payload(format, model, system_prompt, user_prompt, temperature, max_tokens, extras)
+--- @param request_fields table|nil Body fields of a local server
+--- (local_servers.json request_fields), merged into OpenAI-shape payloads
+--- after the model extras and never over a field already set.
+local function build_payload(format, model, system_prompt, user_prompt, temperature, max_tokens, extras, request_fields)
 	temperature = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	-- No literal: an unset cap resolves to the one shared default
 	-- (DEFAULT_MAX_TOKENS), the same constant the engine threads from the budget.
@@ -1376,7 +1380,7 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 			end
 		end
 	end
-	return payload
+	return AuthPolicy.apply_request_fields(payload, request_fields)
 end
 M.__build_payload_for_test = build_payload
 
@@ -2301,7 +2305,7 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 
 	local provider_extras = type(provider.model_extras) == "table" and provider.model_extras[model] or nil
 	local payload = build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens,
-		provider_extras)
+		provider_extras, provider.request_fields)
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
 		Logger.error(LOG, "[%s] #%d Payload encode failed — %s", model, req_id, tostring(enc_err))
@@ -2523,7 +2527,8 @@ end
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back.
 --- @param with_extras boolean|nil Merge the model's model_extras of
----        api_providers.json into an OpenAI-shape body, as a prediction does.
+---        api_providers.json, and a local server's request_fields of
+---        local_servers.json, into an OpenAI-shape body, as a prediction does.
 --- @param current function|nil Must still return true immediately before HTTP.
 --- @return boolean sent True when the key resolution started.
 local function request_prebuilt(client, label, use, provider_id, model, body, on_text, on_fail, with_extras, current)
@@ -2558,6 +2563,9 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 			for field, value in pairs(extras) do
 				if body[field] == nil then body[field] = value end
 			end
+		end
+		if with_extras and provider.format == "openai" then
+			AuthPolicy.apply_request_fields(body, provider.request_fields)
 		end
 		local url, url_error = build_url(base, provider.format, model, token)
 		if not url then

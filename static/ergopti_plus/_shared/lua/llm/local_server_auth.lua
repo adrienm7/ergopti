@@ -42,6 +42,54 @@ function M.catalogue(root, occupied)
 	return order, servers
 end
 
+--- Copies one request field value made only of JSON scalars and objects.
+--- @param value any Decoded JSON value.
+--- @return any|nil copy nil when a part cannot travel as plain JSON.
+local function copy_request_value(value)
+	local kind = type(value)
+	if kind == "boolean" or kind == "string" or (kind == "number" and value == value) then return value end
+	if kind ~= "table" or Json.is_array(value) or next(value) == nil then return nil end
+	local copy = {}
+	for key, nested in pairs(value) do
+		if type(key) ~= "string" or not key:match("^[A-Za-z_][A-Za-z0-9_]*$") then return nil end
+		local kept = copy_request_value(nested)
+		if kept == nil then return nil end
+		copy[key] = kept
+	end
+	return copy
+end
+
+--- Projects the body fields every request to a local server carries.
+--- Documentation keys start with _; a field that cannot travel as plain JSON
+--- is dropped alone, so one bad field never disables the others.
+--- @param root any Decoded local_servers.json.
+--- @return table fields Field name -> value (possibly empty).
+function M.request_fields(root)
+	local fields = {}
+	local raw = type(root) == "table" and root.request_fields or nil
+	if type(raw) ~= "table" or Json.is_array(raw) then return fields end
+	for name, value in pairs(raw) do
+		if type(name) == "string" and name:match("^[A-Za-z][A-Za-z0-9_]*$") then
+			fields[name] = copy_request_value(value)
+		end
+	end
+	return fields
+end
+
+--- Merges the local request fields into an OpenAI-shape body.
+--- A field the body already sets wins, so no catalogue entry can replace the
+--- model, the messages or the token budget of a request.
+--- @param body table Request body, modified in place.
+--- @param fields table|nil Output of request_fields.
+--- @return table body
+function M.apply_request_fields(body, fields)
+	if type(body) ~= "table" or type(fields) ~= "table" then return body end
+	for name, value in pairs(fields) do
+		if body[name] == nil then body[name] = value end
+	end
+	return body
+end
+
 --- Checks authentication material, independently of configured endpoint ownership.
 --- Callers first resolve a registered provider; no stored row can grant capability.
 --- @param provider_id any Actual registered provider identity.
