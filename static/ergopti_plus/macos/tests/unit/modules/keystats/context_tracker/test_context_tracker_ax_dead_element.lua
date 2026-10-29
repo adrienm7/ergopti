@@ -95,6 +95,13 @@ helpers.describe("context tracker: dead or unwatchable focused elements (ax-dead
 		helpers.assert_eq(result.removed, { "first" }, "a refused watcher is not retained")
 	end)
 
+	helpers.it("releases a previous element whose application stopped answering (ax-messaging-failed-removal)", function()
+		local result = focus_through("context_tracker.lua:649: Messaging failed\nstack traceback:\n\t[C]: in method 'removeWatcher'")
+		helpers.assert_true(result.rendered:find("[ERROR]", 1, true) == nil, result.rendered)
+		helpers.assert_eq(result.removed, { "first", "second" },
+			"the unanswered element is not retried on every later focus change")
+	end)
+
 	helpers.it("keeps any other watcher failure an ERROR", function()
 		local result = focus_through(nil, "context_tracker.lua:631: observer refused the watcher")
 		helpers.assert_contains(result.rendered, "[ERROR]")
