@@ -35,9 +35,10 @@ local hs = hs
 
 
 -- The longest any Accessibility call may hold the main thread. macOS disables
--- an event tap that holds a key for about a second; an application that has
--- not answered by then is hung, and its read fails instead of freezing input.
-M.MESSAGING_TIMEOUT_SEC = 1.0
+-- an event tap whose events wait about a second: a 1.0 s bound landed exactly
+-- on that edge (a 1001 ms focused-window probe was followed by "Keystats event
+-- tap found disabled"), so a hung application's read fails well before it.
+M.MESSAGING_TIMEOUT_SEC = 0.5
 
 --- Sets the process-wide Accessibility messaging timeout. macOS applies the
 --- system-wide element's timeout to every element without its own, which is
