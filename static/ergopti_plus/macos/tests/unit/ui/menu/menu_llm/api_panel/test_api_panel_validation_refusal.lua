@@ -15,7 +15,8 @@ local helpers = require("tests.helpers")
 
 
 --- Builds the panel around a scripted availability probe and runs the add action.
---- @param check_result any What the stubbed check_availability returns.
+--- @param check_result any What the stubbed check_availability returns, or a
+---        function standing in for it (receives the probe callbacks).
 --- @param assertions function Receives the action receipt and the fixture state.
 local function run_add_action(check_result, assertions)
 		helpers.with_fresh_modules({
@@ -62,8 +63,9 @@ local function run_add_action(check_result, assertions)
 					end
 					return nil
 				end,
-				check_availability = function()
+				check_availability = function(...)
 					validation_calls = validation_calls + 1
+					if type(check_result) == "function" then return check_result(...) end
 					return check_result
 				end,
 			}
@@ -184,6 +186,29 @@ helpers.describe("API panel validation acquisition", function()
 			helpers.assert_eq(#f.entries, 2, "the entry stays staged while its probe runs")
 			helpers.assert_true(f.active_id ~= f.previous_entry.id)
 			helpers.assert_eq(#f.notifications, 0)
+		end)
+	end)
+
+	helpers.it("names a refused key instead of a silent endpoint on HTTP 401", function()
+		run_add_action(function(_, _, on_missing)
+			on_missing(false, 401)
+			return true
+		end, function(receipt, f)
+			helpers.assert_true(receipt == true)
+			helpers.assert_eq(#f.entries, 1, "a refused key rolls the staged entry back")
+			helpers.assert_eq(#f.notifications, 1)
+			helpers.assert_eq(f.notifications[1].title, "menu.llm.api_key_refused_title",
+				"an endpoint that answered 401 must not be reported as unreachable")
+		end)
+	end)
+
+	helpers.it("keeps the unreachable notice for an endpoint that never answered", function()
+		run_add_action(function(_, _, on_missing)
+			on_missing(true, 0)
+			return true
+		end, function(_, f)
+			helpers.assert_eq(#f.notifications, 1)
+			helpers.assert_eq(f.notifications[1].title, "menu.llm.api_unreachable_title")
 		end)
 	end)
 end)

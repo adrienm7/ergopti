@@ -591,10 +591,14 @@ function M.build(ctx)
 						api_remote.set_entries(previous_entries)
 						api_remote.set_active_entry_id(previous_active_id)
 						state.llm_model = previous_model
-						if kind == "unreachable" then
-							pcall_log("notify(api_unreachable)", notifications.notify,
-								i18n.get("menu.llm.api_unreachable_title"),
-								string.format(i18n.get("menu.llm.api_unreachable_body"), new_name),
+						if kind == "unreachable" or kind == "key_refused" then
+							-- A 401/403 is an answer: saying "did not respond" sent
+							-- the user chasing the URL instead of the key.
+							local prefix = kind == "key_refused" and "menu.llm.api_key_refused_"
+								or "menu.llm.api_unreachable_"
+							pcall_log("notify(api_" .. kind .. ")", notifications.notify,
+								i18n.get(prefix .. "title"),
+								string.format(i18n.get(prefix .. "body"), new_name),
 								"warning")
 						else
 							Logger.error(LOG, "Remote API validation did not commit (%s): %s",
@@ -654,8 +658,12 @@ function M.build(ctx)
 								pcall_log("update_menu(add persistence rollback)", update_menu)
 							end)
 						end,
-						function(_unreachable)
-							rollback_validation("unreachable", "probe rejected credentials")
+						function(_unreachable, status)
+							if status == 401 or status == 403 then
+								rollback_validation("key_refused", "HTTP " .. tostring(status))
+							else
+								rollback_validation("unreachable", "HTTP " .. tostring(status))
+							end
 						end,
 						function(reason)
 							rollback_validation("cancelled", reason)

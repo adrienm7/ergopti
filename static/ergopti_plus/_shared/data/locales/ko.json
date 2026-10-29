@@ -1759,6 +1759,8 @@
 	"menu.llm.api_test_entry": "선택한 API 테스트",
 	"menu.llm.api_test_ok_body": "«{1}»이(가) {2} ms 만에 응답: {3}",
 	"menu.llm.api_test_ok_title": "API 테스트 성공",
+	"menu.llm.api_key_refused_body": "\"%s\"이(가) 응답했지만 키를 거부했습니다 — 서버에 설정된 토큰을 확인하세요.",
+	"menu.llm.api_key_refused_title": "API 키가 거부됨",
 	"menu.llm.api_unreachable_body": "\"%s\"이(가) 응답하지 않았습니다 — 토큰, URL, 모델을 확인하세요.",
 	"menu.llm.api_unreachable_title": "API 항목에 연결할 수 없음",
 	"menu.llm.api_validated_body": "\"%s\"이(가) 성공적으로 응답했습니다.",

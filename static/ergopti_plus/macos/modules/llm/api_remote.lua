@@ -423,15 +423,18 @@ end
 --- @param owner table|nil Availability owner.
 --- @param outcome string `available`, `missing`, or `cancelled`.
 --- @param detail any Missing reachability flag or cancellation reason.
+--- @param status number|nil HTTP status of a missing verdict, so a caller can
+---        tell a refused key (401/403) from a silent endpoint.
 --- @return boolean delivered Whether this call owned the terminal.
-local function finish_availability_owner(owner, outcome, detail)
+local function finish_availability_owner(owner, outcome, detail, status)
 	if type(owner) ~= "table" or owner.done == true then return false end
 	owner.done = true
 	if _availability_owner == owner then _availability_owner = nil end
 	if outcome == "available" and type(owner.on_available) == "function" then
 		ApiCommon.protected_call(owner.on_available, "on_available")
 	elseif outcome == "missing" and type(owner.on_missing) == "function" then
-		ApiCommon.protected_call(owner.on_missing, "on_missing", detail == true)
+		ApiCommon.protected_call(owner.on_missing, "on_missing", detail == true,
+			type(status) == "number" and status or nil)
 	elseif outcome == "cancelled" and type(owner.on_cancelled) == "function" then
 		ApiCommon.protected_call(owner.on_cancelled, "on_cancelled", detail)
 	end
@@ -1868,6 +1871,7 @@ function M.check_availability(_model_name, on_available, on_missing, on_cancelle
 		end
 		if resolved ~= true or not entry then
 			accepted = false
+			Logger.warn(LOG, "Availability check refused: the active API entry could not be resolved.")
 			finish_availability_owner(owner, "missing", true)
 			return
 		end
@@ -1887,6 +1891,8 @@ function M.check_availability(_model_name, on_available, on_missing, on_cancelle
 		end
 		if key_missing(entry) then
 			accepted = false
+			Logger.warn(LOG, "Availability check refused: provider '%s' needs a key for this endpoint.",
+				tostring(entry.provider))
 			finish_availability_owner(owner, "missing", true)
 			return
 		end
@@ -1917,11 +1923,14 @@ function M.check_availability(_model_name, on_available, on_missing, on_cancelle
 				if response_valid then
 					finish_availability_owner(owner, "available")
 				else
+					local status = type(r) == "table" and r.status or nil
 					if type(r) == "table" and r.ok == true then
 						log_models_response_refusal("availability check", entry, r, refusal_reason)
+					else
+						Logger.warn(LOG, "Availability check failed: provider '%s' answered HTTP %s.",
+							tostring(entry.provider), tostring(status))
 					end
-					finish_availability_owner(owner, "missing",
-						type(r) == "table" and r.status == 0)
+					finish_availability_owner(owner, "missing", status == 0, status)
 				end
 			end)
 		end, debug.traceback)

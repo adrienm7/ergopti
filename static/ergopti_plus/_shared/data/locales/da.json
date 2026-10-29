@@ -1759,6 +1759,8 @@
 	"menu.llm.api_test_entry": "Test den valgte API",
 	"menu.llm.api_test_ok_body": "«{1}» svarede på {2} ms: {3}",
 	"menu.llm.api_test_ok_title": "API-test gennemført",
+	"menu.llm.api_key_refused_body": "\"%s\" svarede, men afviste nøglen — kontrollér tokenet, der er angivet på serveren.",
+	"menu.llm.api_key_refused_title": "API-nøgle afvist",
 	"menu.llm.api_unreachable_body": "\"%s\" svarede ikke — tjek token, URL og model.",
 	"menu.llm.api_unreachable_title": "API-post kan ikke nås",
 	"menu.llm.api_validated_body": "\"%s\" svarede vellykket.",

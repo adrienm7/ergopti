@@ -1759,6 +1759,8 @@
 	"menu.llm.api_test_entry": "De geselecteerde API testen",
 	"menu.llm.api_test_ok_body": "«{1}» antwoordde in {2} ms: {3}",
 	"menu.llm.api_test_ok_title": "API-test geslaagd",
+	"menu.llm.api_key_refused_body": "\"%s\" antwoordde maar weigerde de sleutel — controleer het token dat in de server is ingesteld.",
+	"menu.llm.api_key_refused_title": "API-sleutel geweigerd",
 	"menu.llm.api_unreachable_body": "\"%s\" antwoordde niet — controleer token, URL en model.",
 	"menu.llm.api_unreachable_title": "API-vermelding niet bereikbaar",
 	"menu.llm.api_validated_body": "\"%s\" antwoordde met succes.",

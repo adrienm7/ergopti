@@ -1759,6 +1759,8 @@
 	"menu.llm.api_test_entry": "選択した API をテスト",
 	"menu.llm.api_test_ok_body": "「{1}」が {2} ms で応答しました：{3}",
 	"menu.llm.api_test_ok_title": "API テストに成功しました",
+	"menu.llm.api_key_refused_body": "「%s」は応答しましたがキーを拒否しました — サーバーに設定したトークンを確認してください。",
+	"menu.llm.api_key_refused_title": "API キーが拒否されました",
 	"menu.llm.api_unreachable_body": "「%s」は応答しませんでした — トークン、URL、モデルを確認してください。",
 	"menu.llm.api_unreachable_title": "API エントリに到達できません",
 	"menu.llm.api_validated_body": "「%s」が正常に応答しました。",

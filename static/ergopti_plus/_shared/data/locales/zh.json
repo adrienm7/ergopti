@@ -1759,6 +1759,8 @@
 	"menu.llm.api_test_entry": "测试所选 API",
 	"menu.llm.api_test_ok_body": "«{1}» 在 {2} 毫秒内响应：{3}",
 	"menu.llm.api_test_ok_title": "API 测试成功",
+	"menu.llm.api_key_refused_body": "「%s」已响应但拒绝了密钥 — 请检查服务器中设置的令牌。",
+	"menu.llm.api_key_refused_title": "API 密钥被拒绝",
 	"menu.llm.api_unreachable_body": "「%s」未响应 — 请检查令牌、URL 和模型。",
 	"menu.llm.api_unreachable_title": "API 条目无法访问",
 	"menu.llm.api_validated_body": "「%s」响应成功。",
