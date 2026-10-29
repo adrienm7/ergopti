@@ -87,6 +87,7 @@ const GENERATORS = [
 			'static/ergopti_plus/linux/install.sh',
 			'tools/build/build-linux-deb.sh',
 			'tools/build/build-linux-rpm.sh',
+			'tools/build/build-linux-packaged-luv.sh',
 			'tools/build/PKGBUILD',
 			'tools/build/nix/flake.nix',
 			'tools/build/templates/linux-portable-runtime-env.sh'
