@@ -217,7 +217,7 @@ static/ergopti_plus/      The Ergopti+ driver suite
 static/ergopti/           Ergopti layout artefacts (keylayout, XKB, XCompose)
 static/drivers/           Driver support assets (alfred, espanso, kalamine)
 tools/                    Build, codegen, lint and test tooling
-docs/                     Engineering docs — start with docs/memory/README.md
+docs/                     Engineering docs — start with docs/README.md
 video/                    Remotion promo film and README GIFs, rendered from the
                           driver's own windows and data (see video/README.md)
 ```
