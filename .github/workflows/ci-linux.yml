@@ -4910,9 +4910,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          eval "$(grep -E '^(DRIVER_ROOT|SHARED_LUA)=|^export LUA_PATH=' /usr/bin/ergopti)"
-          if [ -z "${LUA_PATH:-}" ]; then
-              echo "::error::/usr/bin/ergopti no longer exports LUA_PATH — this check read nothing."
+          # Replay the wrapper's whole environment, its native luv admission
+          # included, and stop before its final exec of the launcher.
+          if [ "$(tail -n 1 /usr/bin/ergopti)" != 'exec bash "$DRIVER_ROOT/install/launch.sh" "$@"' ]; then
+              echo "::error::/usr/bin/ergopti no longer ends with its launcher exec — this replay would run it."
+              exit 1
+          fi
+          eval "$(sed '$d' /usr/bin/ergopti)"
+          if [ -z "${LUA_PATH:-}" ] || [[ "${LUA_CPATH:-}" != /usr/lib/ergopti/native_modules/* ]]; then
+              echo "::error::/usr/bin/ergopti no longer exports LUA_PATH and its native LUA_CPATH — this check read nothing."
               exit 1
           fi
           luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
