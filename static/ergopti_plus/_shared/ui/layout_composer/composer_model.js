@@ -15,7 +15,7 @@
  * FEATURES & RATIONALE:
  * 1. One output format. Every driver already reads, installs or converts a
  *    registry .keylayout, so the composer's only product is such a file
- *    (docs/layout-composer.md); no driver re-implements the composition.
+ *    (docs/design/layout-composer.md); no driver re-implements the composition.
  * 2. The reader follows the rules of the Windows reader
  *    (windows/modules/keymap/keylayout/keylayout_parser.ahk) and the Linux
  *    converter: comments stripped, character references decoded, control

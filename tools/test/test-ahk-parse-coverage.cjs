@@ -12,7 +12,7 @@
  *
  * WHY IT MUST NOT RUN THE SCRIPT:
  * Every "parse-only" trick that goes through AutoHotkey.exe RUNS the driver when
- * the parse succeeds. `/validate` is silently ignored (measured, PROJECT_MEMORY
+ * the parse succeeds. `/validate` is silently ignored (measured, docs/memory
  * `feedback_ahk_ui_syntax_validation`), and an `ExitApp` probe still fires the
  * driver's OnExit handlers. With `#SingleInstance Force` in the entry point,
  * that is not a theoretical concern: it can take down the maintainer's running

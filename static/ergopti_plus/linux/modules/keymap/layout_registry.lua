@@ -994,7 +994,7 @@ end
 -- ====================================
 -- ====================================
 
---- Installs the layout the user composed (docs/layout-composer.md) in the user
+--- Installs the layout the user composed (docs/design/layout-composer.md) in the user
 --- XKB tree: no catalogue and no download, the caller built the entry from the
 --- compiled file. The converter reads the entry's hints from a one-layout
 --- index written next to the copy.

@@ -1178,7 +1178,7 @@ end
 ---
 --- Arming only: does NOT emit any keystroke. The caller is responsible for
 --- also calling suppress_rescan() and keystats.notify_synthetic() to complete
---- the synthetic-injection contract (see docs/PROJECT_MEMORY.md §synthetic).
+--- the synthetic-injection contract (see docs/memory §synthetic).
 ---
 --- @param deletes number Retained for compatibility with legacy callers.
 --- @param text string Retained for compatibility with legacy callers.

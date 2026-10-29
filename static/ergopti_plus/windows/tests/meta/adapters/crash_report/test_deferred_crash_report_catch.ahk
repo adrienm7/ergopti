@@ -4,7 +4,7 @@
 ; MODULE: Deferred Crash Report Bare-Try Meta Test (Pattern 3)
 ; DESCRIPTION:
 ; Regression guard for the documented "bare try with no catch" anti-pattern
-; (docs/PROJECT_MEMORY.md's project-ahk-invariant-incomplete-application), as
+; (docs/memory's project-ahk-invariant-incomplete-application), as
 ; it applies to the crash-reporting pipeline's own safety net.
 ; _ErgoptiDeferredCrashReport wrapped CrashReport_Build/CrashReport_PromptUser
 ; in a bare try with no catch, so a failure inside the safety net itself was

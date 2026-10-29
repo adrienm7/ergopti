@@ -299,6 +299,10 @@ aggregate notice; the hosted console log loses Unicode in test case names, so
 count results from the execution manifest, not the console. Manual `ci.yml`
 dispatches choose `os_lanes` (all, one OS or a pair), run under a per-run
 concurrency group, and never run Release / Publish, which stays push-only.
+GitHub dispatches only a workflow file that exists on the default branch: to
+run a job that only a branch has (2026-10-24, the macOS Swift, Go and Karabiner
+header cells), push a throwaway `push`-triggered workflow to a
+`tmp/ci-validate-*` ref and delete the ref afterwards; never add it to dev.
 
 ### project-macos-lane-runner-budget
 

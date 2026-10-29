@@ -658,7 +658,7 @@ end
 -- ====================================
 -- ====================================
 
---- Installs the layout the user composed (docs/layout-composer.md): no catalogue
+--- Installs the layout the user composed (docs/design/layout-composer.md): no catalogue
 --- and no download, the caller built the entry from the compiled file. The copy
 --- is published and enabled exactly like a registry layout's.
 --- on_done(true, { entry, path, source, enabled, pending_activation, consent }) or

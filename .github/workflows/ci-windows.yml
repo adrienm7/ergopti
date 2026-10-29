@@ -402,7 +402,7 @@ jobs:
               $env:ERGOPTI_AHK_RESULTS_FILE = Join-Path $env:RUNNER_TEMP "windows-ahk-isolated-$name.txt"
               # Start-Process, not the call operator: AutoHotkey is a GUI-subsystem
               # binary, so a direct invocation returns neither the exit code nor
-              # stderr (PROJECT_MEMORY, feedback_ahk_ui_syntax_validation).
+              # stderr (docs/memory, feedback_ahk_ui_syntax_validation).
               $proc = Start-Process -FilePath $ahk -ArgumentList @("/ErrorStdOut", $runner) `
                   -Wait -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError $err
               Write-Host "--- $name (exit $($proc.ExitCode)) ---"

@@ -23,7 +23,7 @@
 --- backend and a large model, turning AI OFF in the tray menu therefore left the
 --- 2s POST loop running indefinitely, and when the model finally loaded api_mlx
 --- fired a user-facing "server ready" notification WHILE AI WAS DISABLED —
---- violating PROJECT_MEMORY project-macos-llm-runtime-enable-gate.
+--- violating docs/memory project-macos-llm-runtime-enable-gate.
 ---
 --- Fix: set_llm_enabled(false) now mirrors pause_all() — WarmupController.stop()
 --- plus a pcall'd lazy api_mlx.stop_warmup(); the enable path mirrors
