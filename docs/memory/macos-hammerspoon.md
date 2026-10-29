@@ -1292,6 +1292,15 @@ failed fence force-exits with status 70 and logs the pending stage.
 `tests/meta/shutdown/test_quit_teardown_never_blocks.lua` scans every teardown step's
 callee. Map each new step receiver there.
 
+### project-swift-test-needs-full-xcode
+
+`swift test` on `static/ergopti_plus/macos/launcher/` fails with "no such
+module 'XCTest'" on a Mac that only has the Xcode Command Line Tools
+(`xcode-select -p` pointing at `/Library/Developer/CommandLineTools`): the
+XCTest framework ships only with Xcode.app. Install Xcode.app and point
+`xcode-select` at it (or run `xcodebuild test`) before attempting the launcher
+XCTest suite on a real Mac; do not retry `swift test` under CLT-only setups.
+
 ### project-swift-sdk-posix-imports
 
 Swift SDK imports can shadow libc functions with same-named structures and can

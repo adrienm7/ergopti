@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-28 evening. Latest stable: [v1.0.7](https://github.com/adrienm7/ergopti/releases/tag/v1.0.7)
+Updated: 2026-10-29. Latest stable: [v1.0.7](https://github.com/adrienm7/ergopti/releases/tag/v1.0.7)
 (released 2026-10-28 from main 18d69a24c0). **Next step: the two machine lists below, the PC one on the
 Windows PC and the Mac one on the Mac.** Open work only: a finished item is removed, its lessons go to
 [docs/memory](docs/memory/README.md), and the history stays in Git
@@ -81,13 +81,17 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    - **Three-finger swipe (L46):** each step of 25 units (4, 29, 54, 79…) gives one more action, and two-finger
      scrolls never switch tabs.
 2. **Open [PHYS-M] items of "Mac field session 2026-10-27: problem ledger > Open TODO"** below: L16, L17,
-   L24, L26, L27, L28, L42, L43, then the [CODE]-only L18, L23 and L34 once a day log measures them.
+   L24, L26, L27, L28, L42, L43, then the [CODE]-only L18 and L23 once a day log measures them
+   (L34 closed: the later runs stayed within budget, see the ledger).
 3. **"Maintainer checks > Mac hardware session"** and **"Maintainer checks > Mac"** below, section by
    section; report each line as pass, fail or not run.
 4. **Native macOS ownership contracts (from the former root TODO.md).** On a real Mac, run the launcher XCTest
    suite (`static/ergopti_plus/macos/launcher/`), the FSEvents/pathwatcher startup refusal
    (`macos/infra/file_watchers.lua`), the POSIX filesystem capability tests and the ServiceManagement process
    boundaries: hosted gates cannot execute Darwin poll/FD behaviour or the hidden `FSEventStreamStart` result.
+   `swift test` there needs full Xcode.app, not just the Command Line Tools (`no such module 'XCTest'`
+   otherwise); confirmed on a CLT-only checkout 2026-10-29, see
+   [macos-hammerspoon memory](docs/memory/macos-hammerspoon.md).
 5. **Production Hammerspoon profile (from the former root TODO.md).** Collect the `hotpath_profiler`,
    `boot_profiler` and `perf` artifacts on the Mac and measure MLX adoption, WPM `mouseMoved` traffic, Terminal
    identity lookup, keystats app attribution, canvas/AX work and the remaining synchronous shell helpers before
@@ -872,8 +876,6 @@ nil`, has no behavior effect: `executeAndReturnError` returns a non-optional des
 main.swift:1290 "will never be executed", OwnedSuspendedImageGuardian.swift:58-59 trailing
 closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swiftc to compile
   them.
-- **L34** [CODE] HotPath over budget: preview.rebuild 5.3 to 13.3 ms, hotstring.match 6.4 ms,
-  keydown 5.8 ms (new.txt 14:26 to 16:18). Low priority; profile with perf-profiling. Not reproduced on the later runs: the 21:16 hot-path summary reads keydown max 4.6 ms, preview.rebuild max 2.6 ms, hotstring.match max 0.2 ms, all within budget; no change.
 - **L41** Fixed bc33bfbc73 [PHYS-M]. Every native download stopped at stage
   `native_certificate_load` (19:47 run: the MLX `uv sync` staging failed 6 of 6 attempts with
   native receipt reason `certificate`, 19:48:49 to 19:51:26; 03_field_network tls and transfer `certificate`). This is
