@@ -10,10 +10,8 @@ INSTALL_ROOT="$(cd -- "$WRAPPER_DIR/.." && pwd -P)"
 DRIVER_ROOT="$INSTALL_ROOT/linux"
 SHARED_LUA="$INSTALL_ROOT/_shared/lua"
 export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;"
-if [ -d "$DRIVER_ROOT/native_modules" ]; then
-	[ ! -L "$DRIVER_ROOT/native_modules" ] && [ -f "$DRIVER_ROOT/native_modules/luv.so" ] \
-		&& [ ! -L "$DRIVER_ROOT/native_modules/luv.so" ] || exit 1
-	export LUA_CPATH="$DRIVER_ROOT/native_modules/?.so;${LUA_CPATH:-;;}"
-fi
+# The installer publishes native_modules only for a system without a LuaJIT luv.
+source "$DRIVER_ROOT/install/native_modules_env.sh"
+ergopti_admit_native_modules "$DRIVER_ROOT" optional
 # The standalone installer already selected its startup owner.
 exec bash "$DRIVER_ROOT/install/launch.sh" --service "$@"

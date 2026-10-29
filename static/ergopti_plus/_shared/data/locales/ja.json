@@ -1043,6 +1043,8 @@
 	"linux_shell.launcher.no_package_manager": "エラー: パッケージマネージャーが見つかりません (apt、dnf、pacman のいずれかが必要です)。",
 	"linux_shell.build_luv.module_generated": "LuaJIT ネットワークモジュールをソースからビルドしました。",
 	"linux_shell.build_luv.recipe_required": "luv のネイティブビルドにはソースレシピが必要です。",
+	"linux_shell.native_modules.call_refused": "ネイティブモジュール環境には、ドライバーの絶対ルートと required または optional のモードが必要です。",
+	"linux_shell.native_modules.module_unpublished": "Ergopti を起動できません: {1} は公開されたネイティブモジュールではありません。",
 	"linux_shell.install.already_installed": "{1} — インストール済み",
 	"linux_shell.install.archive_digest_unavailable": "保持したディスクリプターによる更新には実際の OpenSSL3 ランタイムが必要です。この機能は利用できないままです。",
 	"linux_shell.install.capability_verified": "{1} — 機能を確認済み",

@@ -1043,6 +1043,8 @@
 	"linux_shell.launcher.no_package_manager": "Fejl: ingen pakkehåndtering fundet (apt, dnf eller pacman kræves).",
 	"linux_shell.build_luv.module_generated": "LuaJIT-netværksmodul bygget fra kildekoden.",
 	"linux_shell.build_luv.recipe_required": "Den native luv-build kræver sin kildeopskrift.",
+	"linux_shell.native_modules.call_refused": "Miljøet for native moduler kræver en absolut driverrod og tilstanden required eller optional.",
+	"linux_shell.native_modules.module_unpublished": "Ergopti kan ikke starte: {1} er ikke et publiceret native modul.",
 	"linux_shell.install.already_installed": "{1} — allerede installeret",
 	"linux_shell.install.archive_digest_unavailable": "opdateringer med fastholdt deskriptor kræver en egentlig OpenSSL3-runtime; funktionen forbliver utilgængelig.",
 	"linux_shell.install.capability_verified": "{1} — funktion bekræftet",
