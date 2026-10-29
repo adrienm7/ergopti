@@ -3,7 +3,7 @@
 # Coordinator memory (written October 21, 2026, 18:00 Paris)
 
 Everything the coordinating session knew, so a fresh session or agent can continue without it. Read
-[the checklist](../ERGOPTIPLUS_TODO.md) first, then this file, then the per-agent files in this folder.
+[the checklist](../../TODO.md) first, then this file, then the per-agent files in this folder.
 
 ## Where things stand
 

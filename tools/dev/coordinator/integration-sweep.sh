@@ -14,7 +14,7 @@
 #   bash tools/dev/coordinator/integration-sweep.sh <output-dir> [jobs]
 #
 # Pinned Ruff 0.15.8 and Node 22 must be first on PATH (the commit hook needs
-# them too). As root, the known host-only reds of docs/ERGOPTIPLUS_TODO.md
+# them too). As root, the known host-only reds of TODO.md
 # ("Host-only reds") are expected; compare against them, never weaken a test.
 # ==============================================================================
 

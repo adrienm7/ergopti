@@ -16,7 +16,7 @@
  * launcher bundle id 49 times and the Hugging Face host 388 times. A rename or
  * a mirror switch had no single place to start from. The generated file is
  * committed so no driver parses JSON for a constant; the Windows driver is not
- * generated here yet (see the PAR-83 note in docs/ERGOPTIPLUS_TODO.md).
+ * generated here yet (see the PAR-83 note in TODO.md).
  *
  * USAGE:  node tools/codegen/codegen-identifiers.cjs
  * ==============================================================================

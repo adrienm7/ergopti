@@ -154,7 +154,7 @@ for (const file of [
 
 const failures = [];
 for (const file of [
-	'docs/ERGOPTIPLUS_TODO.md',
+	'TODO.md',
 	'tools/test/test-layouts-registry.cjs',
 	'static/ergopti/linux/xkb_generation/tests/test_keystroke_vectors.py'
 ]) {

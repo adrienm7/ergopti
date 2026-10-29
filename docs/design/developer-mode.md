@@ -133,5 +133,5 @@ every native helper path, read in `origin/dev` at `bde408f3a6`.
   stopped, the tray appears, typing expands, a saved `.lua` restarts the daemon
   (log line `Debounced source reload firing`), and the tray's Reload restarts
   it. The relay's successor writes no terminal output; read the log file.
-- Windows [PHYS-W]: see `docs/ERGOPTIPLUS_TODO.md`, item "Developer mode on the
+- Windows [PHYS-W]: see `TODO.md`, item "Developer mode on the
   three OS".
