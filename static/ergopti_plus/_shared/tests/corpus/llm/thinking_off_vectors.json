@@ -981,7 +981,7 @@
 				"temperature": 0.7
 			},
 			"added": [],
-			"family": 25
+			"family": 26
 		},
 		{
 			"id": "deepseek_deepseek-chat",
@@ -1003,7 +1003,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 30,
+			"family": 32,
 			"kind": "toggle"
 		},
 		{
@@ -1026,7 +1026,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 28,
+			"family": 30,
 			"kind": "toggle"
 		},
 		{
@@ -1049,7 +1049,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 30,
+			"family": 32,
 			"kind": "toggle"
 		},
 		{
@@ -1088,7 +1088,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 27,
+			"family": 29,
 			"kind": "effort"
 		},
 		{
@@ -1151,7 +1151,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 24,
+			"family": 25,
 			"kind": "effort"
 		},
 		{
@@ -1215,7 +1215,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 27,
+			"family": 29,
 			"kind": "toggle"
 		},
 		{
@@ -1273,7 +1273,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 27,
+			"family": 29,
 			"kind": "effort"
 		},
 		{
@@ -1336,7 +1336,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 24,
+			"family": 25,
 			"kind": "toggle"
 		},
 		{
@@ -1359,7 +1359,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 23,
+			"family": 24,
 			"kind": "toggle"
 		},
 		{
@@ -1403,7 +1403,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 27,
+			"family": 29,
 			"kind": "toggle"
 		},
 		{
@@ -1442,7 +1442,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 27,
+			"family": 29,
 			"kind": "effort"
 		},
 		{
@@ -1484,7 +1484,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 28,
+			"family": 30,
 			"kind": "effort"
 		},
 		{
@@ -1504,7 +1504,7 @@
 				"temperature": 0.7
 			},
 			"added": [],
-			"family": 27
+			"family": 29
 		},
 		{
 			"id": "openai_compat_gpt-5.1",
@@ -1542,6 +1542,185 @@
 				"temperature": 0.7
 			},
 			"added": []
+		},
+		{
+			"id": "perplexity_sonar",
+			"provider": "perplexity",
+			"model": "sonar",
+			"body": { "model": "sonar", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "sonar", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "perplexity_sonar-pro",
+			"provider": "perplexity",
+			"model": "sonar-pro",
+			"body": { "model": "sonar-pro", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "sonar-pro", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "moonshot_kimi-k3",
+			"provider": "moonshot",
+			"model": "kimi-k3",
+			"body": { "model": "kimi-k3", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "kimi-k3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 25,
+			"kind": "effort"
+		},
+		{
+			"id": "moonshot_kimi-k3.1-pro",
+			"provider": "moonshot",
+			"model": "kimi-k3.1-pro",
+			"body": { "model": "kimi-k3.1-pro", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "kimi-k3.1-pro",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 25,
+			"kind": "effort"
+		},
+		{
+			"id": "dashscope_qwen3.8-flash",
+			"provider": "dashscope",
+			"model": "qwen3.8-flash",
+			"body": { "model": "qwen3.8-flash", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "qwen3.8-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 29,
+			"kind": "toggle"
+		},
+		{
+			"id": "dashscope_qwen3.8-max",
+			"provider": "dashscope",
+			"model": "qwen3.8-max",
+			"body": { "model": "qwen3.8-max", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "qwen3.8-max",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 29,
+			"kind": "toggle"
+		},
+		{
+			"id": "zai_glm-4.7",
+			"provider": "zai",
+			"model": "glm-4.7",
+			"body": { "model": "glm-4.7", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "glm-4.7",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["thinking"]],
+			"family": 24,
+			"kind": "toggle"
+		},
+		{
+			"id": "zai_glm-5.3-flash",
+			"provider": "zai",
+			"model": "glm-5.3-flash",
+			"body": { "model": "glm-5.3-flash", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "glm-5.3-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 23,
+			"kind": "effort"
+		},
+		{
+			"id": "zai_glm-5.2",
+			"provider": "zai",
+			"model": "glm-5.2",
+			"body": { "model": "glm-5.2", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "glm-5.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["thinking"]],
+			"family": 24,
+			"kind": "toggle"
+		},
+		{
+			"id": "minimax_MiniMax-M3",
+			"provider": "minimax",
+			"model": "MiniMax-M3",
+			"body": { "model": "MiniMax-M3", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "MiniMax-M3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["thinking"]],
+			"family": 28,
+			"kind": "toggle"
+		},
+		{
+			"id": "minimax_MiniMax-M3.1-Flash",
+			"provider": "minimax",
+			"model": "MiniMax-M3.1-Flash",
+			"body": {
+				"model": "MiniMax-M3.1-Flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "MiniMax-M3.1-Flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 27,
+			"kind": "effort"
+		},
+		{
+			"id": "minimax_MiniMax-M2.7",
+			"provider": "minimax",
+			"model": "MiniMax-M2.7",
+			"body": { "model": "MiniMax-M2.7", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "MiniMax-M2.7",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 26
 		}
 	],
 	"refusal_vectors": [
