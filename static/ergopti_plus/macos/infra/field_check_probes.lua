@@ -56,8 +56,10 @@ local M = {}
 
 local STATE = { pass = "pass", fail = "fail", info = "info", skip = "skip" }
 
--- Seconds an external command may run before its step is a timeout.
-local COMMAND_TIMEOUT = 10
+-- Seconds an external command of these probes may run before its step is a
+-- timeout: twice the field checks' own bound, since a strict codesign check
+-- reads every file of a bundle and the Ollama one alone is gigabytes.
+local PROBE_COMMAND_TIMEOUT = 10
 
 local CODESIGN = "/usr/bin/codesign"
 
@@ -145,7 +147,7 @@ function M.permissions(ports, report, finish)
 		report.step("signing_identity", STATE.skip, "no_bundle")
 		return finish()
 	end
-	ports.exec(CODESIGN, { "--verify", "--strict", "--verbose=2", bundle }, COMMAND_TIMEOUT,
+	ports.exec(CODESIGN, { "--verify", "--strict", "--verbose=2", bundle }, PROBE_COMMAND_TIMEOUT,
 		function(code, output, errors)
 			if code == 0 then
 				report.step("app_signature", STATE.pass, "valid")
@@ -154,7 +156,7 @@ function M.permissions(ports, report, finish)
 				report.step("app_signature", STATE.fail, code == nil and "timeout"
 					or failure_token(code) .. ":" .. (signature_cause(text) or "unclassified"))
 			end
-			ports.exec(CODESIGN, { "-dv", "--verbose=2", bundle }, COMMAND_TIMEOUT,
+			ports.exec(CODESIGN, { "-dv", "--verbose=2", bundle }, PROBE_COMMAND_TIMEOUT,
 				function(describe_code, describe_output, describe_errors)
 					local text = tostring(describe_output or "") .. "\n" .. tostring(describe_errors or "")
 					local identity = M.parse_signing_identity(text)
@@ -275,7 +277,7 @@ local function count_refusals(ports, executable, prefix, files, callback)
 		local args = {}
 		for _, argument in ipairs(prefix) do args[#args + 1] = argument end
 		args[#args + 1] = files[index]
-		ports.exec(executable, args, COMMAND_TIMEOUT, function(code)
+		ports.exec(executable, args, PROBE_COMMAND_TIMEOUT, function(code)
 			if code == nil then timed_out = timed_out + 1 elseif code ~= 0 then bad = bad + 1 end
 			check(index + 1)
 		end)
@@ -346,7 +348,7 @@ local function check_keylayouts(ports, files, callback)
 			bad, cause = bad + 1, cause or "unreadable"
 			return check(index + 1)
 		end
-		ports.exec_input(XMLLINT, { "--noout", "--nonet", "-" }, M.keylayout_as_xml10(text), COMMAND_TIMEOUT,
+		ports.exec_input(XMLLINT, { "--noout", "--nonet", "-" }, M.keylayout_as_xml10(text), PROBE_COMMAND_TIMEOUT,
 			function(code, _, errors)
 				if code == nil then
 					timed_out = timed_out + 1
@@ -586,7 +588,7 @@ function M.launcher_roles(ports, report, finish)
 		return finish()
 	end
 	report.step("launcher_present", STATE.pass, "yes")
-	ports.exec(launcher, { M.HTTP_WORKER_FLAG }, COMMAND_TIMEOUT, function(usage_code)
+	ports.exec(launcher, { M.HTTP_WORKER_FLAG }, PROBE_COMMAND_TIMEOUT, function(usage_code)
 		report.step("http_worker_usage", usage_code == M.USAGE_EXIT and STATE.pass or STATE.fail,
 			usage_code == M.USAGE_EXIT and "usage_refused" or failure_token(usage_code))
 		ports.loopback_server(M.LOOPBACK_PATH, function(server)
@@ -600,7 +602,7 @@ function M.launcher_roles(ports, report, finish)
 			-- What the worker received, for an EX_USAGE that names no guard
 			report.step("http_worker_request", STATE.info, "args_" .. (#args + 1) .. ":bytes_" .. #request)
 			ports.exec_input(launcher, args, request,
-				COMMAND_TIMEOUT, function(code, stdout)
+				PROBE_COMMAND_TIMEOUT, function(code, stdout)
 					local hits = server.hits()
 					server.stop()
 					local status, stage = M.parse_worker_head(stdout)
@@ -751,7 +753,7 @@ function M.app_health(ports, report, finish)
 		report.step("app_crash_" .. index, STATE.info, owned[index].process .. ":" .. owned[index].kind)
 	end
 	report.step("other_crash_reports_24h", STATE.info, crashes.other or 0)
-	ports.exec(PS, { "-o", "rss=,%cpu=", "-p", tostring(ports.pid()) }, COMMAND_TIMEOUT, function(code, output)
+	ports.exec(PS, { "-o", "rss=,%cpu=", "-p", tostring(ports.pid()) }, PROBE_COMMAND_TIMEOUT, function(code, output)
 		local rss, cpu = M.parse_usage(code == 0 and output or "")
 		if not rss then
 			report.step("app_rss_mb", STATE.fail, failure_token(code))
@@ -814,7 +816,7 @@ function M.ai_local(ports, report, finish)
 		report.step("ollama_binary", STATE.skip, "not_installed")
 		return listing_stage()
 	end
-	ports.exec(CODESIGN, { "--verify", "--strict", "--verbose=2", facts.ollama_path }, COMMAND_TIMEOUT,
+	ports.exec(CODESIGN, { "--verify", "--strict", "--verbose=2", facts.ollama_path }, PROBE_COMMAND_TIMEOUT,
 		function(code, output, errors)
 			if code == 0 then
 				report.step("ollama_binary", STATE.pass, "signature_valid")
