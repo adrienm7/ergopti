@@ -1,5 +1,5 @@
 {
-	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of backboard and decisions live in _shared/lua/llm/remote_formats.lua. `thinking_dialect` (optional) says how the provider carries each reasoning control kind of _shared/modules/llm/thinking_off.json: kind -> body fields deep-merged into the request (a field the body already sets wins), the string $level replaced by the model family's level. A kind the provider does not list is never sent (openai_compat lists none: it may point at a strict endpoint). Sources: platform.claude.com build-with-claude/thinking and effort, developers.openai.com guides/reasoning, ai.google.dev thinking, docs.x.ai reasoning, docs.mistral.ai reasoning, api-docs.deepseek.com thinking_mode, docs.cohere.com compatibility-api, inference-docs.cerebras.ai reasoning, openrouter.ai reasoning-tokens, console.groq.com reasoning, docs.together.ai reasoning-models-guide, docs.fireworks.ai post-chatcompletions (checked 2026-10-30).",
+	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of backboard and decisions live in _shared/lua/llm/remote_formats.lua. `thinking_dialect` (optional) says how the provider carries each reasoning control kind of _shared/modules/llm/thinking_off.json: kind -> body fields deep-merged into the request (a field the body already sets wins), the string $level replaced by the model family's level. A kind the provider does not list is never sent (openai_compat lists none: it may point at a strict endpoint). Sources: platform.claude.com build-with-claude/thinking and effort, developers.openai.com guides/reasoning, ai.google.dev thinking, docs.x.ai reasoning, docs.mistral.ai reasoning, api-docs.deepseek.com thinking_mode, docs.cohere.com compatibility-api, inference-docs.cerebras.ai reasoning, openrouter.ai reasoning-tokens, console.groq.com reasoning, docs.together.ai reasoning-models-guide, docs.fireworks.ai post-chatcompletions (checked 2026-10-30). Every provider after fireworks names the official pages its address, key, listing, default model and dialect were read from in its _source (checked 2026-10-30).",
 	"provider_order": [
 		"openai",
 		"anthropic",
@@ -13,6 +13,11 @@
 		"groq",
 		"together",
 		"fireworks",
+		"perplexity",
+		"moonshot",
+		"dashscope",
+		"zai",
+		"minimax",
 		"backboard",
 		"typesafe",
 		"openrouter_jev",
@@ -116,6 +121,54 @@
 			"default_model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
 			"format": "openai",
 			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
+		},
+		"perplexity": {
+			"label": "Perplexity",
+			"base_url": "https://api.perplexity.ai",
+			"default_model": "sonar",
+			"format": "openai",
+			"_source": "https://docs.perplexity.ai/docs/legacy/sonar/openai-compatibility, https://docs.perplexity.ai/docs/legacy/sonar/models (sonar does not reason; no thinking control documented)"
+		},
+		"moonshot": {
+			"label": "Moonshot AI (Kimi)",
+			"base_url": "https://api.moonshot.ai/v1",
+			"default_model": "kimi-k3",
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } },
+			"_source": "https://platform.kimi.ai/docs/api/chat, https://platform.kimi.ai/docs/models (the K3 series always thinks, reasoning_effort low/high/max; thinking.type disabled only on the retiring kimi-k2.6, so no toggle)"
+		},
+		"dashscope": {
+			"label": "Alibaba Qwen (DashScope)",
+			"base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+			"default_model": "qwen3.8-flash",
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "enable_thinking": false },
+				"effort": { "reasoning_effort": "$level" }
+			},
+			"_source": "https://www.alibabacloud.com/help/en/model-studio/deep-thinking, https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope (Singapore shared domain)"
+		},
+		"zai": {
+			"label": "Z.ai (GLM)",
+			"base_url": "https://api.z.ai/api/paas/v4",
+			"default_model": "glm-4.7",
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "thinking": { "type": "disabled" } },
+				"effort": { "reasoning_effort": "$level" }
+			},
+			"_source": "https://docs.z.ai/api-reference/llm/chat-completion, https://docs.z.ai/guides/capabilities/thinking-mode"
+		},
+		"minimax": {
+			"label": "MiniMax",
+			"base_url": "https://api.minimax.io/v1",
+			"default_model": "MiniMax-M3",
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "thinking": { "type": "disabled" } },
+				"effort": { "reasoning_effort": "$level" }
+			},
+			"_source": "https://platform.minimax.io/docs/api-reference/text-openai-api, https://platform.minimax.io/docs/api-reference/models/openai/list-models"
 		},
 		"backboard": {
 			"label": "Backboard",
