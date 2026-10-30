@@ -457,6 +457,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-test-prediction-single-source.cjs"],
 			"repro": "npm run test:test-prediction-single-source"
+		},
+		{
+			"id": "js-windows-route-plan",
+			"ordinal": 540,
+			"name": "Windows route plan replays the shared route-plan vectors in PowerShell",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-route-plan.cjs"],
+			"repro": "node tools/test/test-windows-route-plan.cjs"
 		}
 	]
 }
