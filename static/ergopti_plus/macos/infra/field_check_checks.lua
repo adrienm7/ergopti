@@ -6,7 +6,8 @@
 --- The four one-click Mac checks of the Debug menu, as step lists over the
 --- ports of infra/field_check.lua:
 --- 1. lease: is the Karabiner lease healthy right now (command line tool,
----    integration switch, lease phase, guardian, losses this session)?
+---    integration switch, lease phase, guardian, losses and swallowed keys this
+---    session, lease failures per kind, free memory)?
 --- 2. owned_runtime: is the Ergopti-owned Karabiner runtime (ADR 011, HS-274)
 ---    still dormant, and what of it is installed on this Mac?
 --- 3. key_accounting: for a few seconds, how many key presses does the Quartz
@@ -33,6 +34,7 @@
 local Identifiers = require("identifiers")
 local Logger = require("infra.logger")
 local KePaths = require("platform.remap.ke_paths")
+local LeaseMemorySnapshot = require("platform.remap.lease_memory_snapshot")
 local RuntimeVhid = require("platform.remap.runtime_vhid")
 local TextUtils = require("text_utils")
 
@@ -55,6 +57,21 @@ M.KEY_ACCOUNTING_SECONDS = 30
 local COMMAND_TIMEOUT = 5
 
 local function yes_no(flag) return flag and "yes" or "no" end
+
+--- Names lease failure counts per kind in the step grammar ("pong:2+ready:1").
+--- @param kinds table|nil Kind → count.
+--- @return string names "none" when no lease failed.
+function M.format_lease_kinds(kinds)
+	local names = {}
+	for kind, count in pairs(kinds or {}) do
+		if count > 0 then names[#names + 1] = kind end
+	end
+	if #names == 0 then return "none" end
+	table.sort(names)
+	local parts = {}
+	for _, kind in ipairs(names) do parts[#parts + 1] = kind .. ":" .. tostring(kinds[kind]) end
+	return table.concat(parts, "+")
+end
 
 --- Counts the non-empty lines of a command output.
 --- @param text any Command output.
@@ -162,15 +179,30 @@ function M.lease_with_facts(ports, report, finish, remap, waited)
 	report.step("lease_failures", lease_total == 0 and STATE.pass or STATE.fail, lease_total)
 	local losses = (counts.ups_without_down or 0) + (counts.downs_without_up or 0) + (counts.stuck or 0)
 	report.step("key_losses", losses == 0 and STATE.pass or STATE.fail, losses)
+	-- A key the driver consumed and never delivered: the dropped-letter owner
+	-- this driver can see (infra/keystroke_integrity.lua).
+	local swallowed = ports.swallowed_keys()
+	report.step("swallowed_keys", swallowed == 0 and STATE.pass or STATE.fail, swallowed)
+	-- PONG and READY timeouts are the Apple silicon lease failures (117/140).
+	report.step("lease_failure_kinds", STATE.info, M.format_lease_kinds(counts.lease))
+	-- Starvation is their open explanation: the free memory names it.
+	local function memory_then_finish()
+		ports.exec(LeaseMemorySnapshot.TOOL, {}, COMMAND_TIMEOUT, function(code, output)
+			local percent = code == 0 and LeaseMemorySnapshot.parse_free_percent(output) or nil
+			report.step("memory_free_percent", STATE.info,
+				percent or (code == nil and "timeout" or (code == 0 and "unparsed" or "exit_" .. tostring(code))))
+			finish()
+		end)
+	end
 	if not cli then
 		report.step("cli_version", STATE.skip, "no_cli")
-		finish()
+		memory_then_finish()
 		return
 	end
 	ports.exec(KePaths.CLI, { "--version" }, COMMAND_TIMEOUT, function(code, output)
 		local version = code == 0 and M.parse_version(output) or nil
 		report.step("cli_version", version and STATE.pass or STATE.fail, version or (code == nil and "timeout" or "exit_" .. tostring(code)))
-		finish()
+		memory_then_finish()
 	end)
 end
 
