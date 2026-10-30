@@ -132,6 +132,20 @@ const linux = {
 	baseFallback: requireSegments(data.linux, 'base_fallback', 'logs.linux').join('/'),
 	relative: relative('linux', '/')
 };
+const configSection = parsed.config || fail('[config] is missing.');
+const configMacos = configSection.macos || fail('[config.macos] is missing.');
+const configSegments = requireSegments(configMacos, 'segments', 'config.macos');
+if (configSegments.filter((s) => s === APP_PLACEHOLDER).length !== 1) {
+	fail(`config.macos.segments must name "${APP_PLACEHOLDER}" exactly once.`);
+}
+const config = {
+	overrideKey: requireString(configSection, 'override_key', 'config'),
+	hotstringsDir: requireString(configSection, 'hotstrings_dir', 'config'),
+	personalHotstringsFile: requireString(configSection, 'personal_hotstrings_file', 'config'),
+	macosBase: requireString(configMacos, 'base', 'config.macos'),
+	macosRelative: configSegments.map((s) => (s === APP_PLACEHOLDER ? folderName : s)).join('/'),
+	macosPathsFile: requireSegments(configMacos, 'paths_file', 'config.macos').join('/')
+};
 if (!macos.relative.endsWith(folderName)) {
 	fail(
 		'logs.macos.segments must end with the application folder: the launcher restricts only that folder.'
@@ -192,6 +206,14 @@ function emitLua() {
 		`\t\tbase_env = ${luaStr(linux.base)},\n` +
 		`\t\tbase_fallback = ${luaStr(linux.baseFallback)},\n` +
 		`\t\trelative = ${luaStr(linux.relative)},\n` +
+		'\t},\n' +
+		'\tconfig = {\n' +
+		`\t\toverride_key = ${luaStr(config.overrideKey)},\n` +
+		`\t\thotstrings_dir = ${luaStr(config.hotstringsDir)},\n` +
+		`\t\tpersonal_hotstrings_file = ${luaStr(config.personalHotstringsFile)},\n` +
+		`\t\tmacos_base_env = ${luaStr(config.macosBase)},\n` +
+		`\t\tmacos_relative = ${luaStr(config.macosRelative)},\n` +
+		`\t\tmacos_paths_file = ${luaStr(config.macosPathsFile)},\n` +
 		'\t},\n' +
 		'}\n'
 	);
@@ -338,6 +360,12 @@ function emitSwift() {
 			'kFatalReportFileName',
 			macos.fatalReport,
 			'Per-launch fatal report, beside launcher.log.'
+		) +
+		'\n' +
+		constant(
+			'kMacOSPathsFileHomeRelativePath',
+			config.macosPathsFile,
+			'The paths.toml that may move the configuration folder, relative to the home folder.'
 		)
 	);
 }

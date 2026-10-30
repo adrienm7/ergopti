@@ -351,6 +351,66 @@ class PinnedGoTests(unittest.TestCase):
             with self.assertRaises(self.stager.StageRefusal):
                 self.stager.HostPorts(self.go("go1.25.0", settings)).pinned_go("go1.26.8")
 
+    def test_the_go_pins_follow_the_contract_version(self):
+        pins = json.loads((ROOT / "tools/dev/macos-dev-go.json").read_text())
+        contract = json.loads((ROOT / CONTRACT).read_text())
+        self.assertEqual(pins["version"], contract["go_version"])
+        self.assertEqual(set(pins["archives"]), set(self.stager.HOSTS))
+
+    def go_archive(self, version):
+        """Writes the pins of one fake official archive whose go reports version."""
+        buffer = io.BytesIO()
+        script = (
+            '#!/bin/sh\nif [ "$1 $2" = "env GOVERSION" ]; then echo %s; exit 0; fi\nexit 9\n'
+            % version
+        ).encode()
+        with tarfile.open(fileobj=buffer, mode="w:gz") as bundle:
+            entry = tarfile.TarInfo("go/bin/go")
+            entry.size = len(script)
+            entry.mode = 0o755
+            bundle.addfile(entry, io.BytesIO(script))
+        data = buffer.getvalue()
+        (self.root / "tools/dev").mkdir(parents=True, exist_ok=True)
+        filename = "%s.darwin-arm64.tar.gz" % version
+        pins = {
+            "version": version,
+            "url": "https://example.invalid/{filename}",
+            "archives": {
+                "arm64": {
+                    "filename": filename,
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                    "size": len(data),
+                }
+            },
+        }
+        (self.root / "tools/dev/macos-dev-go.json").write_text(json.dumps(pins))
+        return data
+
+    def host_without_go(self, served):
+        ports = self.stager.HostPorts(None, self.root)
+        ports.machine = lambda: "arm64"
+        ports.download = lambda url, destination: Path(destination).write_bytes(served)
+        return ports
+
+    def test_a_mac_without_go_gets_the_pinned_archive(self):
+        data = self.go_archive("go1.26.8")
+        with mock.patch.object(self.stager.shutil, "which", return_value=None):
+            go = self.host_without_go(data).pinned_go("go1.26.8")
+        self.assertEqual(go, (self.root / "build/macos-dev-go/go1.26.8/go/bin/go").resolve())
+
+    def test_refuses_a_go_archive_that_differs_from_its_pin(self):
+        data = self.go_archive("go1.26.8")
+        with mock.patch.object(self.stager.shutil, "which", return_value=None):
+            with self.assertRaises(self.stager.StageRefusal):
+                self.host_without_go(data + b"x").pinned_go("go1.26.8")
+        self.assertFalse((self.root / "build/macos-dev-go/go1.26.8").exists())
+
+    def test_refuses_go_pins_of_another_version(self):
+        data = self.go_archive("go1.26.7")
+        with mock.patch.object(self.stager.shutil, "which", return_value=None):
+            with self.assertRaises(self.stager.StageRefusal):
+                self.host_without_go(data).pinned_go("go1.26.8")
+
 
 if __name__ == "__main__":
     unittest.main()

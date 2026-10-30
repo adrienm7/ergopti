@@ -327,7 +327,16 @@ function read(folder, name) {
 				const other = path.join(paths.base, 'other');
 				git(paths.base, 'clone', '-q', '--branch', 'feature/x', `file://${paths.origin}`, other);
 				fs.writeFileSync(path.join(other, 'later.txt'), 'later\n');
-				git(other, 'add', 'later.txt');
+				// The new commit also changes the collector: the run must use it.
+				const script = path.join(other, SCRIPT);
+				const source = fs.readFileSync(script, 'utf8');
+				const anchor = '\nfield_report_open_folder linux\n';
+				assert(source.includes(anchor), 'the collector opens its folder after the update');
+				fs.writeFileSync(
+					script,
+					source.replace(anchor, `${anchor}log "fixture: updated collector"\n`)
+				);
+				git(other, 'add', 'later.txt', SCRIPT);
 				git(other, 'commit', '-q', '-m', 'later');
 				git(other, 'push', '-q', 'origin', 'feature/x');
 				// A report folder is named to the second: a run in the same one is refused.
@@ -343,6 +352,8 @@ function read(folder, name) {
 					fs.existsSync(path.join(paths.clone, 'later.txt')),
 					"the base's new commit is merged"
 				);
+				assert.match(second.stdout, /updated: running the updated collector/);
+				assert.match(second.stdout, /fixture: updated collector/, 'the updated collector ran');
 				const folders = reportFolders(paths);
 				assert.equal(folders.length, 2);
 				assert.match(
