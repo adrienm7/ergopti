@@ -69,7 +69,7 @@ SlotRolesData() {
 			Map("id", "period", "chord_key", ".", "label", "."),
 			Map("id", "comma", "chord_key", ",", "label", ","),
 			Map("id", "quote", "chord_key", "'", "label", "'"),
-			Map("id", "capslock", "chord_key", "capslock", "label", "Caps Lock"),
+			Map("id", "capslock", "chord_key", "sc03a", "label", "Caps Lock"),
 			Map("id", "sc029", "chord_key", "sc029", "label", "²")
 		]
 	)

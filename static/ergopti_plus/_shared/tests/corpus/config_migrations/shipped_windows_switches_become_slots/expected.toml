@@ -1,0 +1,24 @@
+# _shared/tests/corpus/config_migrations/shipped_windows_switches_become_slots/expected.toml
+
+[_meta]
+schema_version = 19
+
+[shortcuts]
+chatgpt_url = "https://example.org/gpt"
+wrap_text_if_selected = true
+
+[shortcuts.keyboard]
+meta_a = "copy"
+meta_capslock = "toggle_capslock"
+meta_g = "open_chatgpt"
+meta_m = "activity_simulation"
+meta_n = "take_note"
+meta_s = "copy_selected_path"
+meta_x = "pick_color"
+primary_b = "none"
+
+[shortcuts.search]
+search_engine = "https://example.org"
+
+[shortcuts.take_note]
+dated_notes = true

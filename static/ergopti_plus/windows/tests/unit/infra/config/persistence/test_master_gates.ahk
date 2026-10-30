@@ -120,7 +120,7 @@ Test("master gates: explicit category-gate callback contract fails fast", TestMa
 ; ask the KeyCombinations gate alone (infra/key_combinations.ahk).
 _MGKC_Candidate() {
 	return Map("shortcuts", Map(
-		"gpt", Map("enabled", true, "link", "https://example.test"),
+		"a_grave", Map("enabled", true, "letter", "q"),
 		"key_combination_taps", Map("alt_gr_then_left_alt", "ctrl_backspace")))
 }
 
@@ -137,8 +137,8 @@ TestMasterGates_KeyCombinationsSubGate() {
 		ApplyMasterGatesToFeatures(Candidate, Map(), _MGKC_Gates(Gates[1], Gates[2]))
 		AssertEqual("ctrl_backspace", Candidate["shortcuts"]["key_combination_taps"]["alt_gr_then_left_alt"],
 			"a master gate never rewrites a pair's action")
-		AssertEqual(Gates[1], Candidate["shortcuts"]["gpt"]["enabled"], "the Shortcuts master still gates the other shortcuts")
-		AssertEqual("https://example.test", Candidate["shortcuts"]["gpt"]["link"], "and keeps their parameters")
+		AssertEqual(Gates[1], Candidate["shortcuts"]["a_grave"]["enabled"], "the Shortcuts master still gates the other shortcuts")
+		AssertEqual("q", Candidate["shortcuts"]["a_grave"]["letter"], "and keeps their parameters")
 	}
 	Saved := CategoryEnabled.Clone()
 	try {
@@ -279,7 +279,7 @@ _A1_WithDesiredFixture(Body) {
 	try {
 		Owner["initialized"] := false
 		Features := Map("layout", Map("ergopti_base", true, "ergopti_alt_gr", false),
-			"shortcuts", Map("gpt", Map("enabled", true, "link", "https://example.test")),
+			"shortcuts", Map("a_grave", Map("enabled", true, "letter", "q"), "chatgpt_url", "https://old.test"),
 			"hotstrings", Map("repeat_key_enabled", true, "trigger_char", "*",
 				"rolls", Map("hc", Map("enabled", true))))
 		TapHold := Map("keys", Map("caps_lock", Map("tap_action", "enter", "hold_modifier", "ctrl")))
@@ -334,13 +334,13 @@ Test("master intent: child edits preserve disabled runtime and sibling intent (a
 
 _A1_GatesKeepParameters() {
 	Candidate := Map("layout", Map("ergopti_base", true, "parameter", "retained"),
-		"shortcuts", Map("gpt", Map("enabled", true, "letter", "q"), "delay_ms", 42))
+		"shortcuts", Map("a_grave", Map("enabled", true, "letter", "q"), "delay_ms", 42))
 	ApplyMasterGatesToFeatures(Candidate, Map(), (*) => false)
 	AssertEqual("retained", Candidate["layout"]["parameter"], "gates preserve string parameters")
 	AssertEqual(42, Candidate["shortcuts"]["delay_ms"], "gates preserve numeric parameters")
-	AssertEqual("q", Candidate["shortcuts"]["gpt"]["letter"], "disabled alpha features retain their parameter")
+	AssertEqual("q", Candidate["shortcuts"]["a_grave"]["letter"], "disabled alpha features retain their parameter")
 	AssertFalse(Candidate["layout"]["ergopti_base"])
-	AssertFalse(Candidate["shortcuts"]["gpt"]["enabled"])
+	AssertFalse(Candidate["shortcuts"]["a_grave"]["enabled"])
 }
 Test("master intent: runtime projection preserves pure parameters (a1-desired)", _A1_GatesKeepParameters)
 
@@ -397,8 +397,8 @@ _A1_ReenableDesiredOnly() {
 	AssertTrue(Features["layout"]["ergopti_base"], "reenabling restores the desired true child")
 	AssertFalse(Features["layout"]["ergopti_alt_gr"], "reenabling does not enable the undesired sibling")
 	AssertTrue(ToggleCategoryAllFeatures("Shortcuts", true, (*) => true, (*) => 0, (*) => true))
-	AssertTrue(Features["shortcuts"]["gpt"]["enabled"])
-	AssertEqual("https://example.test", Features["shortcuts"]["gpt"]["link"], "parameters survive OFF and ON")
+	AssertTrue(Features["shortcuts"]["a_grave"]["enabled"])
+	AssertEqual("q", Features["shortcuts"]["a_grave"]["letter"], "parameters survive OFF and ON")
 }
 Test("master intent: reenable restores only desired children (a1-desired)",
 	_A1_WithDesiredFixture.Bind(_A1_ReenableDesiredOnly))
@@ -453,8 +453,8 @@ _A1_EditorsUseDesiredIntent() {
 		AssertEqual("#", MasterGateDesiredFeatures(Features)["hotstrings"]["trigger_char"],
 			"the magic-key parameter publishes into retained intent")
 		AssertTrue(ModifyLink(0, "https://changed.test", (*) => true, (*) => 0, (*) => true))
-		AssertEqual("https://changed.test", ReadFeatureStateV2("shortcuts.gpt")["link"])
-		AssertFalse(Features["shortcuts"]["gpt"]["enabled"], "parameter edits do not activate shortcuts")
+		AssertEqual("https://changed.test", MasterGateDesiredFeatures(Features)["shortcuts"]["chatgpt_url"],
+			"the link parameter publishes into retained intent")
 	} finally {
 		HSE_RepeatEnabled := SavedRepeat
 		ScriptInformation["MagicKey"] := SavedMagic

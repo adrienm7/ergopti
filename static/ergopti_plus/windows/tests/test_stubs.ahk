@@ -113,33 +113,13 @@ global Features := Map(
     "shortcuts", Map(
         ; Plain bools (default = true|false in the manifest).
         "wrap_text_if_selected",    true,
-        "get_hex_value",            true,
-        "microsoft_bold",           true,
-        "title_case",               true,
-        "uppercase",                true,
-        "paste_without_formatting", false,
-        "save",                     false,
-        "select_line",              true,
-        "spotlight_mouse",          true,
-        "surround_with_parentheses", true,
-        "teleport_mouse",           true,
-        "ctrl_j",                   false,
-        "open_downloads",           false,
-        "move",                     false,
-        "screen",                   false,
-        "win_caps_lock",            false,
-        ; Modélisation α — Map per feature with { enabled, <extra props> }.
-        "gpt", Map(
-            "enabled", true,
-            "link",    "https://chatgpt.com/",
-        ),
+        "chatgpt_url",              "https://chatgpt.com/",
+        ; The settings of the search and note actions.
         "search", Map(
-            "enabled",                 true,
             "search_engine",           "https://www.google.com",
             "search_engine_url_query", "https://www.google.com/search?q=",
         ),
         "take_note", Map(
-            "enabled",            true,
             "dated_notes",        false,
             "destination_folder", "D:\\Bureau",
         ),

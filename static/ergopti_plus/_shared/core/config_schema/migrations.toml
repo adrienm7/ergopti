@@ -78,7 +78,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 18
+current_version = 19
 unstamped_version = 2
 
 
@@ -963,4 +963,54 @@ ops = [
 	{ op = "rename", section = "shortcuts.keyboard", key = "win_sc029", to_key = "meta_sc029" },
 	{ op = "rename_prefix", section = "shortcuts.keyboard", prefix = "win_sc", to_prefix = "meta_sc" },
 	{ op = "rename_prefix", section = "shortcuts.keyboard", prefix = "win_SC", to_prefix = "meta_SC" },
+]
+
+[steps.v18_to_v19]
+from = 18
+to = 19
+drivers = ["ahk"]
+reason = "The Windows feature switches become the keyboard slots of the same chords, as on macOS since v15: a switch left on becomes its catalogue action, a switch turned off becomes none, and an action the user chose for the slot wins."
+# A saved slot is already under its neutral id (v18), so it keeps its value over
+# the switch of the same chord. Win+G and Win+S recommended open_url and
+# search_web, which read a per-binding parameter the switch never wrote, while
+# the switch ran the ChatGPT link and the selection opener. A file restored to
+# the recommendations holds both, so those two values become what the chord
+# actually ran. A URL on the slot and then the switch's link go to the setting
+# open_chatgpt reads, the first one present winning. The search and note fields
+# other than the switch stay where they are: they are now settings.
+ops = [
+	{ op = "rename", section = "action_parameters", key = "keyboard__meta_g__open_url", to_section = "shortcuts", to_key = "chatgpt_url" },
+	{ op = "rename", section = "shortcuts.gpt", key = "link", to_section = "shortcuts", to_key = "chatgpt_url" },
+	{ op = "rename", section = "shortcuts.gpt", key = "enabled", to_section = "shortcuts.keyboard", to_key = "meta_g" },
+	{ op = "rename", section = "shortcuts.search", key = "enabled", to_section = "shortcuts.keyboard", to_key = "meta_s" },
+	{ op = "rename", section = "shortcuts.take_note", key = "enabled", to_section = "shortcuts.keyboard", to_key = "meta_n" },
+	{ op = "rename", section = "shortcuts", key = "get_hex_value", to_section = "shortcuts.keyboard", to_key = "meta_x" },
+	{ op = "rename", section = "shortcuts", key = "microsoft_bold", to_section = "shortcuts.keyboard", to_key = "primary_b" },
+	{ op = "rename", section = "shortcuts", key = "title_case", to_section = "shortcuts.keyboard", to_key = "meta_w" },
+	{ op = "rename", section = "shortcuts", key = "uppercase", to_section = "shortcuts.keyboard", to_key = "meta_u" },
+	{ op = "rename", section = "shortcuts", key = "paste_without_formatting", to_section = "shortcuts.keyboard", to_key = "primary_shift_v" },
+	{ op = "rename", section = "shortcuts", key = "select_line", to_section = "shortcuts.keyboard", to_key = "meta_a" },
+	{ op = "rename", section = "shortcuts", key = "spotlight_mouse", to_section = "shortcuts.keyboard", to_key = "meta_quote" },
+	{ op = "rename", section = "shortcuts", key = "surround_with_parentheses", to_section = "shortcuts.keyboard", to_key = "meta_o" },
+	{ op = "rename", section = "shortcuts", key = "teleport_mouse", to_section = "shortcuts.keyboard", to_key = "meta_t" },
+	{ op = "rename", section = "shortcuts", key = "open_downloads", to_section = "shortcuts.keyboard", to_key = "meta_d" },
+	{ op = "rename", section = "shortcuts", key = "move", to_section = "shortcuts.keyboard", to_key = "meta_m" },
+	{ op = "rename", section = "shortcuts", key = "screen", to_section = "shortcuts.keyboard", to_key = "meta_h" },
+	{ op = "rename", section = "shortcuts", key = "win_caps_lock", to_section = "shortcuts.keyboard", to_key = "meta_capslock" },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_g", map = [{ from = "open_url", to = "open_chatgpt" }, { from = true, to = "open_chatgpt" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_s", map = [{ from = "search_web", to = "copy_selected_path" }, { from = true, to = "copy_selected_path" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_n", map = [{ from = true, to = "take_note" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_x", map = [{ from = true, to = "pick_color" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "primary_b", map = [{ from = true, to = "microsoft_bold" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_w", map = [{ from = true, to = "titlecase_selection" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_u", map = [{ from = true, to = "uppercase_selection" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "primary_shift_v", map = [{ from = true, to = "paste_plain" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_a", map = [{ from = true, to = "select_line" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_quote", map = [{ from = true, to = "spotlight_mouse" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_o", map = [{ from = true, to = "surround_parens" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_t", map = [{ from = true, to = "teleport_mouse" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_d", map = [{ from = true, to = "open_downloads" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_m", map = [{ from = true, to = "activity_simulation" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_h", map = [{ from = true, to = "screen_capture" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_capslock", map = [{ from = true, to = "toggle_capslock" }, { from = false, to = "none" }] },
 ]

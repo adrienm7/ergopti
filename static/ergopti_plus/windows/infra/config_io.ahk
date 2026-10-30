@@ -2442,6 +2442,88 @@ ReadKeyboardShortcutsConfig() {
 		}
 }
 
+/**
+ * The physical key a slot's letter lives on when the layout owner decides it: a
+ * letter the Ergopti emulation remapped (the slot follows the letter, not the key
+ * the host layout prints on it), and the apostrophe, which a host layout may type
+ * with Shift while the chord means the key alone.
+ * @param {String} SlotId Neutral slot id.
+ * @returns {String} Canonical "SCnnn", or "" when the host layout answers.
+ */
+KeyboardSlotLayoutScan(SlotId) {
+		global RemappedList
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("key")
+				return ""
+		Char := SlotRoleChordKey(Native["key"])
+		if StrLen(Char) != 1 || !(RemappedList.Has(Char) || Char == "'")
+				return ""
+		return MagicEditorNormalizeScan(RetrieveScancode(Char))
+}
+
+/**
+ * The canonical chord a slot binds: its key is the physical one where the layout
+ * owner decides it (KeyboardSlotLayoutScan).
+ * @param {String} SlotId Neutral slot id.
+ * @param {String} Scan The slot's layout scan, "" for none.
+ * @returns {String} The chord, or "" when the slot names no modifier.
+ */
+_KeyboardSlotBoundChord(SlotId, Scan) {
+		Chord := _KeyboardSlotChord(SlotId)
+		if Scan == "" || Chord == ""
+				return Chord
+		Parsed := ChordParse(Chord)
+		Formatted := ChordFormat(Parsed["mods"], StrLower(Scan))
+		return Formatted["ok"] ? Formatted["label"] : ""
+}
+
+/**
+ * Registers every configured slot. A Win slot on a key the layout owner decides
+ * joins the physical broker, which already holds that Win variant for the remap
+ * of the same key; the others take their own hotkey through the registrar, which
+ * reports refusal by returning "".
+ * @returns {Integer} The slots bound.
+ */
+KeyboardShortcutsBindAll() {
+		global KeyboardShortcutAssignments
+		LoggerStart("KeyboardShortcuts", "Registering configurable keyboard hotkeys…")
+		Bound := 0
+		for Slot, Action in KeyboardShortcutAssignments {
+				if Slot == MagicEditorSlot()["id"]
+						continue
+				if MagicEditorRecordOrdinaryPhysical(Slot, Action)
+						continue
+				if Action == "none"
+						continue
+				Scan := KeyboardSlotLayoutScan(Slot)
+				if Scan != "" && SubStr(Slot, 1, 5) == "meta_" {
+						MagicEditorRecordOrdinaryScan(Scan, Slot, Action)
+						Bound++
+						continue
+				}
+				; The broker asks at each press; a native hotkey would swallow the chord
+				; with the Shortcuts category off, and turning it on reloads the driver.
+				if !IsCategoryGated("Shortcuts")
+						continue
+				Chord := _KeyboardSlotBoundChord(Slot, Scan)
+				if Chord == "" {
+						LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — chord not resolvable.", Slot)
+						continue
+				}
+				Handle := HotkeyRegistrarBind(Chord, ((_s) => (*) => RunKeyboardShortcutAction(_s))(Slot))
+				if Handle == "" {
+						LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}' ({2}).", Slot, Chord)
+						continue
+				}
+				LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", Slot, Action)
+				MagicEditorRecordOrdinaryHandle(Slot, Handle)
+				KeyboardShortcutRecordHandle(Slot, Action, Handle)
+				Bound++
+		}
+		LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", Bound)
+		return Bound
+}
+
 RunKeyboardShortcutAction(SlotId) {
 		global KeyboardShortcutAssignments, GESTURE_ACTIONS
 		Action := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"

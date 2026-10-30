@@ -1,0 +1,29 @@
+# _shared/tests/corpus/config_migrations/shipped_windows_switches_become_slots/input.toml
+
+[_meta]
+schema_version = 18
+
+[shortcuts]
+get_hex_value = true
+microsoft_bold = false
+move = true
+select_line = true
+win_caps_lock = true
+wrap_text_if_selected = true
+
+[shortcuts.gpt]
+enabled = true
+link = "https://example.org/gpt"
+
+[shortcuts.keyboard]
+meta_a = "copy"
+meta_g = "open_url"
+meta_s = "search_web"
+
+[shortcuts.search]
+enabled = false
+search_engine = "https://example.org"
+
+[shortcuts.take_note]
+dated_notes = true
+enabled = true

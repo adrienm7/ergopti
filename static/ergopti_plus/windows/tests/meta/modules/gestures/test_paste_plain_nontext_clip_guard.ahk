@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for finding paste-plain-destroys-nontext-clip.
 ;
-; Both PasteWithoutFormatting (modules/shortcuts/ctrl.ahk) and GesturePastePlain
+; Both GesturePastePlain (modules/gestures/actions.ahk) and GesturePastePlain
 ; (modules/gestures.ahk) strip rich formatting by writing the text view through
 ; CB_WritePlainSnapshot(Captured, PlainText, &OwnedSequence). AHK's text view is text-only in AHK v2, so that
 ; round-trip DESTROYS a non-text clipboard payload (image / file list). The fix
@@ -43,18 +43,6 @@ _PPNC_ReadSource(FileName) {
 ; ======= 2/ Guard assertions ======================
 ; ==================================================
 ; ==================================================
-
-_PPNC_PasteWithoutFormattingHasTextGuard() {
-	Src := _PPNC_ReadSource("ctrl.ahk")
-	Seg := _DriverFuncBody("PasteWithoutFormatting")
-	Assert(Seg != "", "PasteWithoutFormatting(*) declaration must exist in modules/shortcuts/ctrl.ahk")
-	StripIdx := InStr(Seg, "CB_WritePlainSnapshot(Captured, PlainText, &OwnedSequence)")
-	Assert(StripIdx > 0, "PasteWithoutFormatting must still strip rich formatting through CB_WritePlainSnapshot(Captured, PlainText, &OwnedSequence)")
-	Before := SubStr(Seg, 1, StripIdx - 1)
-	Assert(InStr(Before, "CB_Read()") > 0,
-		"PasteWithoutFormatting must guard CB_WritePlainSnapshot(Captured, PlainText, &OwnedSequence) with a CB_Read() text-availability check -- otherwise it destroys a non-text clipboard payload")
-}
-Test("ctrl: PasteWithoutFormatting guards strip on non-text clipboard (paste-plain-destroys-nontext-clip)", _PPNC_PasteWithoutFormattingHasTextGuard)
 
 _PPNC_GesturePastePlainHasTextGuard() {
 	Src := _DriverDirConcat("modules/gestures")

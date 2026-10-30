@@ -5,4 +5,4 @@ description = "The v18 slot renames are a Windows step: a macOS or Linux file on
 drivers = ["hs", "linux"]
 outcome = "migrated"
 from_version = 17
-to_version = 18
+to_version = 19

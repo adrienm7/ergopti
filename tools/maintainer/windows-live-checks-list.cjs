@@ -423,7 +423,7 @@ const CHECKS = [
 			const { session } = await bootEnglish(
 				context,
 				'wins',
-				'[category_enabled]\nshortcuts = true\n[shortcuts.search]\nenabled = true\n[shortcuts.keyboard]\nwin_s = "search_web"\n'
+				'[category_enabled]\nshortcuts = true\n[shortcuts.keyboard]\nmeta_s = "search_web"\n'
 			);
 			await session.run('pump', ['2500']);
 			await session.run('edit_open');

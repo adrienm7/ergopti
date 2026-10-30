@@ -91,7 +91,7 @@ function validate(input) {
 		'editor: the contextual slot must belong to every driver'
 	);
 	check(
-		slots.find((entry) => entry.id === 'meta_d')?.recommended === 'none',
+		slots.find((entry) => entry.id === 'meta_d')?.recommended === 'open_downloads',
 		'editor: Win+D has no fixed editor recommendation'
 	);
 	for (const [platform, slot] of Object.entries(PREDICTION_SLOTS)) {

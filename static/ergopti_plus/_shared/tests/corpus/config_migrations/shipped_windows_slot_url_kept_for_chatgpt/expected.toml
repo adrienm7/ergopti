@@ -1,0 +1,10 @@
+# _shared/tests/corpus/config_migrations/shipped_windows_slot_url_kept_for_chatgpt/expected.toml
+
+[_meta]
+schema_version = 19
+
+[shortcuts]
+chatgpt_url = "https://example.org/mine"
+
+[shortcuts.keyboard]
+meta_g = "open_chatgpt"

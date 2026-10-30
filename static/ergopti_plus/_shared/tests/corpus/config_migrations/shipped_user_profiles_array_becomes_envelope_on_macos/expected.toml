@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_user_profiles_array_becomes_envelope_on_macos/expected.toml
 
 [_meta]
-schema_version = 18
+schema_version = 19
 
 [llm]
 enabled = true

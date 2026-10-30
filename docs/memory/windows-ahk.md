@@ -1353,3 +1353,12 @@ Windows prefix that contains `git.exe` (mingw64 or ucrt64), with no cross-prefix
 fallback. Hosted Git 2.56 moved the SDK from mingw64 to ucrt64, which is why the
 seven managed-network `native_tls` cases started failing; check the prefix first
 when they fail.
+
+## Keyboard slots bind after the layout
+
+`KeyboardShortcutsBindAll` runs after `modules/keymap/layout.ahk` because a slot's
+letter means the key that types it under the Ergopti emulation
+(`KeyboardSlotLayoutScan` reads `RemappedList`), and before `MagicEditorStart`
+because a Win slot on such a key joins the physical broker, which acquires its
+keys once. Moving the binding earlier silently returns every emulated letter to the
+host layout's key; keep the order pinned by `test_keyboard_slot_neutral_roles.ahk`.

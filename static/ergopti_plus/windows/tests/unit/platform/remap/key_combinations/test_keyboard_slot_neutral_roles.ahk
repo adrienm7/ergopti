@@ -153,3 +153,60 @@ _KSNR_ChordsHoldOnBothAltGrFamilies() {
 	}
 }
 Test("neutral slots: each chord keeps its exact spec on AZERTY AltGr and Kana", _KSNR_ChordsHoldOnBothAltGrFamilies)
+
+; The Win and Ctrl switches registered on the key that TYPES the letter under the
+; Ergopti emulation, and a slot used to bind the host layout's key. Each switch
+; became a slot in schema v19, so a slot must keep the switch's key.
+_KSNR_EmulatedLetterKeepsItsKey() {
+	global RemappedList
+	Saved := RemappedList
+	RemappedList := Map("a", "SC01E", "b", "sc30")
+	try {
+		AssertEqual("SC01E", KeyboardSlotLayoutScan("meta_a"), "a remapped letter is the key that types it")
+		AssertEqual("SC030", KeyboardSlotLayoutScan("primary_b"), "whatever the scan's spelling")
+		AssertEqual("", KeyboardSlotLayoutScan("meta_c"), "the host layout answers a letter the emulation leaves")
+		AssertEqual("", KeyboardSlotLayoutScan("meta_space"), "a named key is no letter")
+		AssertEqual("", KeyboardSlotLayoutScan("magic_editor"), "the contextual slot names no chord")
+		Parsed := ChordParse(_KeyboardSlotBoundChord("primary_b", "SC030"))
+		AssertEqual("^SC030", HotkeyRegistrarNativeSpec(Parsed["mods"], Parsed["key"]), "the Ctrl slot binds that key")
+		Parsed := ChordParse(_KeyboardSlotBoundChord("primary_c", ""))
+		AssertEqual("^c", HotkeyRegistrarNativeSpec(Parsed["mods"], Parsed["key"]), "without a scan the letter stays")
+	} finally
+		RemappedList := Saved
+	AssertTrue(RegExMatch(KeyboardSlotLayoutScan("meta_quote"), "^SC[0-9A-F]{3}$") > 0, "the apostrophe is a key of its own")
+}
+Test("neutral slots: a slot keeps the key the emulation types its letter on", _KSNR_EmulatedLetterKeepsItsKey)
+
+_KSNR_CapsLockIsThePhysicalKey() {
+	Parsed := ChordParse(_KeyboardSlotChord("meta_capslock"))
+	AssertEqual("#SC03A", HotkeyRegistrarNativeSpec(Parsed["mods"], Parsed["key"]),
+		"a scan-code hotkey on the key hides a key-name one, so the chord names the scan")
+}
+Test("neutral slots: Win + Caps Lock keeps its scan-code hotkey", _KSNR_CapsLockIsThePhysicalKey)
+
+; Boot order: the slots read RemappedList, and the Win broker acquires its keys once.
+_KSNR_SlotsBindBetweenLayoutAndBroker() {
+	Src := _DriverSourceNoComments()
+	Layout := InStr(Src, "#Include modules/keymap/layout.ahk")
+	Bind := InStr(Src, "KeyboardShortcutsBindAll()" . "`n")
+	Broker := InStr(Src, "MagicEditorStart()" . "`n")
+	AssertTrue(Layout > 0 && Bind > Layout, "the slots bind once the layout tables exist")
+	AssertTrue(Broker > Bind, "the slots join the broker before it acquires its keys")
+}
+Test("neutral slots: the slots bind after the layout and before the Win broker", _KSNR_SlotsBindBetweenLayoutAndBroker)
+
+; The switches owned these until v19: an action must work with no switch at all.
+_KSNR_ActionsNeedNoSwitch() {
+	Win := _DriverDirConcat("modules/shortcuts")
+	AssertTrue(RegExMatch(Win, "m)^global AWAKE_TICK_MIN_MS") > 0, "keep-awake's constants exist whatever is bound")
+	AssertFalse(RegExMatch(Win, 'if Features\["shortcuts"\]\["(move|search|open_downloads|get_hex_value|screen)"\]'),
+		"no retired switch gates an action's owner")
+	Body := _DriverFuncBody("GestureTakeNote")
+	AssertTrue(InStr(Body, '"keyboard__"') > 0, "a keyboard binding starts its note on a fresh line, as Win+N did")
+	AssertTrue(GESTURE_ACTIONS.Has("open_chatgpt"), "Win+G's recommended action exists on Windows")
+	; A switch was off with the Shortcuts category off, whatever it stored.
+	Bind := _DriverFuncBody("KeyboardShortcutsBindAll")
+	AssertTrue(InStr(Bind, 'IsCategoryGated("Shortcuts")') > 0 && InStr(Bind, 'IsCategoryGated("Shortcuts")') < InStr(Bind, "HotkeyRegistrarBind("),
+		"a native slot hotkey is not taken while the Shortcuts category is off")
+}
+Test("neutral slots: the actions of the retired switches stand alone", _KSNR_ActionsNeedNoSwitch)

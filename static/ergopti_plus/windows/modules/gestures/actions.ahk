@@ -202,11 +202,14 @@ global GESTURE_ACTIONS := Map(
 		"open_url", {
 				Fn: (BindingId := "") => GestureOpenConfiguredURL(BindingId),
 		},
+		"open_chatgpt", {
+				Fn: (*) => GestureOpenChatGpt(),
+		},
 		"pick_color", {
 				Fn: (*) => GesturePickColor(),
 		},
 		"take_note", {
-				Fn: (*) => GestureTakeNote(),
+				Fn: (BindingId := "") => GestureTakeNote(BindingId),
 		},
 		"activity_simulation", {
 				Fn: (*) => (
@@ -321,10 +324,14 @@ global GESTURE_ACTIONS := Map(
 ; _generated/gesture_emit_actions.ahk. Registered HERE, at static-init: a
 ; handler built by anything deferred off the boot path would open a window in
 ; which a gesture fires and finds nothing registered.
+; A synthetic Home or End is invisible to the prefix watcher's InputHook, so the
+; hotstring buffers must be told the caret moved: otherwise the next expansion
+; backspaces over the selected line instead of its own trigger.
+global GESTURE_CARET_MOVING_EMITS := Map("select_line", true, "surround_parens", true)
 for _EmitId, _Emit in GestureEmitActionsData() {
 		if _Emit.HasOwnProp("Seq") {
 				; Raw send sequence — no portable key/modifier form exists for it.
-				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeSeqEmitter(_Emit.Seq) }
+				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeSeqEmitter(_Emit.Seq, GESTURE_CARET_MOVING_EMITS.Has(_EmitId)) }
 		} else {
 				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeKeyEmitter(_Emit.Key, _Emit.Mods, _EmitId == "paste"),
 						Key: _Emit.Key, Mods: _Emit.Mods }
@@ -393,8 +400,8 @@ _GestureWithPasteAdmission(EmitFn) {
 		finally CB_EndOwnedTransaction(OwnerToken)
 }
 
-_GestureMakeSeqEmitter(Seq) {
-		return (*) => SendFinalResult(Seq)
+_GestureMakeSeqEmitter(Seq, MovesCaret := false) {
+		return MovesCaret ? (*) => SendFinalResult(Seq, false, true) : (*) => SendFinalResult(Seq)
 }
 
 ; Same reason: the profile id arrives as a parameter, so each preset keeps its own.
@@ -540,6 +547,23 @@ GestureOpenConfiguredURL(BindingId := "") {
 		}
 }
 
+; Opens the configured ChatGPT link (shortcuts.chatgpt_url), which the manifest
+; declares for every driver. A configured URL is external input and Run() can
+; throw: this is a hook callback, so the failure stays here with visible,
+; nonblocking feedback.
+GestureOpenChatGpt() {
+		global Features
+		try {
+				Link := Features["shortcuts"]["chatgpt_url"]
+				if (Type(Link) != "String" or Trim(Link) = "")
+						throw Error("the configured ChatGPT link is empty or invalid")
+				Run(Link)
+		} catch as Err {
+				LoggerError("gestures", "open_chatgpt failed: {1}", Err.Message)
+				try TrayTip(t("notify.open_gpt_failed"), "ErgoptiPlus", "Iconx Mute")
+		}
+}
+
 ; Opens a shell target (an executable or a URI such as ms-settings:). A refusal
 ; stays inside the gesture callback and is logged, never escalated to the
 ; driver's global error handler.
@@ -566,10 +590,12 @@ GesturePickColor() {
 		}
 }
 
-GestureTakeNote() {
-		; Preserve the gesture's historical no-newline behaviour while delegating
-		; every blocking/OS step to the same job used by the Win+N shortcut.
-		return _TakeNoteQueueFromFeatures(false)
+; A keyboard binding starts the note on a fresh line, as the Win+N shortcut always
+; did; a gesture keeps its historical no-newline behaviour. Every blocking or OS
+; step belongs to the same job.
+; @param {String} BindingId The binding that fired.
+GestureTakeNote(BindingId := "") {
+		return _TakeNoteQueueFromFeatures(SubStr(BindingId, 1, 10) == "keyboard__")
 }
 
 

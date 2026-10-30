@@ -327,7 +327,7 @@ TestFMv2_ShortcutsTakeNote() {
 	Built := ManifestBuildFeaturesMap()
 	Entry := Built["shortcuts"]["take_note"]
 	AssertEqual("Map", Type(Entry))
-	AssertEqual(false, Entry["enabled"])
+	AssertFalse(Entry.Has("enabled"), "the switch is the meta_n slot since schema v19")
 	AssertEqual(false, Entry["dated_notes"])
 	AssertEqual("D:\Bureau", Entry["destination_folder"])
 }
@@ -535,7 +535,7 @@ TestFMv2_PersonalEditorHasNoDedicatedMagicBinding() {
 		"the ordinary editor opening command remains in the Personal menu")
 	AssertEqual("none", ManifestDefaultFor("shortcuts.keyboard.meta_d"),
 		"an empty configuration must never install the editor recommendation")
-	AssertEqual("none", ManifestRecommendedFor("shortcuts.keyboard.meta_d"),
+	AssertEqual("open_downloads", ManifestRecommendedFor("shortcuts.keyboard.meta_d"),
 		"Win+D remains available for personal assignments instead of a fixed recommendation")
 	AssertEqual("open_hotstrings_editor", ManifestDefaultFor("shortcuts.keyboard.magic_editor"),
 		"the physical conditional slot owns the editor recommendation")

@@ -54,7 +54,6 @@ _ShortcutDrainSends() {
 ; DisableCapsWord which are already stubbed in test_stubs.ahk and AHK v2
 ; raises a parse error on duplicate function definitions.
 #Include ../../../../modules/shortcuts/utils.ahk
-#Include ../../../../modules/shortcuts/ctrl.ahk
 #Include ../../../../modules/shortcuts/win.ahk
 
 
@@ -744,4 +743,3 @@ for _GPC_Scenario in ["entry-pause", "prompt-pause", "prompt-cancel", "prompt-pa
 	Test("Shortcuts/win: path copy continuation " . _GPC_Scenario . " (getpath-continuation-revocation)",
 		_GPC_ContinuationRevocation.Bind(_GPC_Scenario))
 
-#Include test_shortcut_plain_clipboard_owner.ahk

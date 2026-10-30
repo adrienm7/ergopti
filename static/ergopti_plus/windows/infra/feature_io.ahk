@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; v2-native feature locator + write/batch for the tray menu, replacing the
 ; v1->v2 path translator (infra/path_translator.ahk). Given a canonical v2 manifest
-; path (e.g. "layout.ergopti_base", "shortcuts.gpt", "shortcuts.gpt.letter",
+; path (e.g. "layout.ergopti_base", "shortcuts.a_grave", "shortcuts.a_grave.letter",
 ; "hotstrings.autocorrection.accents") it resolves the config.toml {section, key}
 ; and the in-memory Features node by INTROSPECTING the Features Map — no
 ; hand-maintained PascalCase rename tables.
@@ -132,7 +132,7 @@ _FeatureLocateParts(Node, Parts, Prop) {
 ; @param FeaturesMap  The Features Map to mutate. Always passed explicitly by
 ;                      the caller (feedback_loader_target_explicit) — this
 ;                      function never reaches for a global itself.
-; @param V2Path  Canonical v2 path (toggle target, e.g. "shortcuts.gpt").
+; @param V2Path  Canonical v2 path (toggle target, e.g. "shortcuts.a_grave").
 ; @param Value   New value (bool, or string for alpha props like a letter/link).
 ; @param Prop    Optional alpha property leaf (e.g. "letter"); omit for the
 ;                enabled/plain toggle.
