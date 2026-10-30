@@ -2,8 +2,8 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-30. Latest stable: [v1.0.7](https://github.com/adrienm7/ergopti/releases/tag/v1.0.7)
-(released 2026-10-28 from main 18d69a24c0). **Next step: the two machine lists below, the PC one on the
+Updated: 2026-10-30. Latest stable: [v1.0.8](https://github.com/adrienm7/ergopti/releases/tag/v1.0.8)
+(released 2026-10-30 from main; v1.0.7 was main 18d69a24c0). **Next step: the two machine lists below, the PC one on the
 Windows PC and the Mac one on the Mac.** Open work only: a finished item is removed, its lessons go to
 [docs/memory](docs/memory/README.md), and the history stays in Git
 (`git log --follow -p -- TODO.md`). On 2026-10-30 the finished items, the fixed entries of the Mac
