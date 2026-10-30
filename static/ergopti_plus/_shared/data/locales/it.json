@@ -3740,6 +3740,7 @@
 	"platform_reason.number_row_live_session": "Non disponibile: Solo una sessione X11, o GNOME o KDE su Wayland, lo applica subito. Questo desktop mantiene la disposizione attuale; la tua scelta è salvata.",
 	"platform_reason.number_row_live_no_layout": "Non disponibile: Installa prima una disposizione ErgoptiPlus: questa scelta modifica la disposizione che usi.",
 	"layouts.linux_rows_not_applied": "La scelta della riga dei numeri è salvata, ma non è stato possibile aggiornare la disposizione di tastiera in uso.",
+	"layouts.rows_not_applied": "La scelta della riga dei numeri è salvata, ma non è stato possibile aggiornare la disposizione di tastiera in uso.",
 	"platform_reason.number_row_source_unavailable": "Non disponibile: Simboli prima richiede un layout emulato attivo con livelli validi di numeri e simboli in ogni posizione della riga.",
 	"menu.layout.number_row_not_applied": " (non applicato)",
 	"platform_reason.number_row_already_digits_first": "Nessun effetto: questo layout digita già le cifre senza Maiusc.",

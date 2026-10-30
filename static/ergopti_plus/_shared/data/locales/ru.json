@@ -3740,6 +3740,7 @@
 	"platform_reason.number_row_live_session": "Недоступно: Сразу применяют это только сеанс X11 или GNOME и KDE в Wayland. Это окружение сохраняет текущую раскладку; ваш выбор сохранён.",
 	"platform_reason.number_row_live_no_layout": "Недоступно: Сначала установите раскладку ErgoptiPlus: этот выбор изменяет используемую вами раскладку.",
 	"layouts.linux_rows_not_applied": "Выбор для ряда цифр сохранён, но текущую раскладку клавиатуры обновить не удалось.",
+	"layouts.rows_not_applied": "Выбор для ряда цифр сохранён, но текущую раскладку клавиатуры обновить не удалось.",
 	"platform_reason.number_row_source_unavailable": "Недоступно: Режим «Сначала символы» требует активной эмулируемой раскладки с допустимыми уровнями цифр и символов на каждой позиции ряда.",
 	"menu.layout.number_row_not_applied": " (не применяется)",
 	"platform_reason.number_row_already_digits_first": "Без эффекта: эта раскладка уже печатает цифры без Shift.",

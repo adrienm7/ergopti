@@ -1411,13 +1411,31 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		return layout_scope
 	end
+	--- The number-row rows the menu state holds (the layout scope's live part).
+	--- @return table { order, edges }
+	local function layout_scope_rows()
+		return { order = state.layout_number_row_mode, edges = state.layout_number_row_reorder_edges == true }
+	end
 	apply_preference_scope = function(scope, mode)
 		local owner = preference_scope_owner(scope)
 		if not owner then return false end
+		local before = scope == "keyboard_layout" and layout_scope_rows() or nil
 		local committed = owner.apply(mode)
 		if committed == true then
 			Builder.invalidate_cache()
 			updateMenu()
+			-- The layout's own restore rebuilds the typing layout for the new rows.
+			local after = before and layout_scope_rows() or nil
+			if after and (after.order ~= before.order or after.edges ~= before.edges) then
+				require("modules.keymap.number_row_live").apply(after, function(applied, code)
+					if not applied then
+						Logger.warn(LOG, "The keyboard layout scope stored rows the typing layout does not have yet: %s.",
+							tostring(code))
+					end
+					Builder.invalidate_cache()
+					updateMenu()
+				end)
+			end
 		end
 		return committed
 	end
@@ -1497,6 +1515,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			global_scope = require("ui.menu.global_scope").new({
 				owners = owners,
 				remap = karabiner,
+				-- The layout rows settle once the layout typing them is selected.
+				layout = { rows = layout_scope_rows, live = require("modules.keymap.number_row_live") },
 				backup_path = function(scope)
 					scope_generation = scope_generation + 1
 					return MenuPaths.get("KarabinerConfigPath") .. ".global-" .. scope .. "-"

@@ -3740,6 +3740,7 @@
 	"platform_reason.number_row_live_session": "Ikke tilgængelig: Kun en X11-session eller GNOME eller KDE på Wayland anvender dette med det samme. Dette skrivebord beholder sit nuværende layout; dit valg er gemt.",
 	"platform_reason.number_row_live_no_layout": "Ikke tilgængelig: Installer først et ErgoptiPlus-layout; dette valg ændrer det layout, du bruger.",
 	"layouts.linux_rows_not_applied": "Valget for talrækken er gemt, men det aktive tastaturlayout kunne ikke opdateres.",
+	"layouts.rows_not_applied": "Valget for talrækken er gemt, men det aktive tastaturlayout kunne ikke opdateres.",
 	"platform_reason.number_row_source_unavailable": "Ikke tilgængelig: Symboler først kræver et aktivt emuleret layout med gyldige tal- og symbolniveauer på alle positioner i talrækken.",
 	"menu.layout.number_row_not_applied": " (ikke anvendt)",
 	"platform_reason.number_row_already_digits_first": "Ingen effekt: dette layout skriver allerede tallene uden Skift.",
