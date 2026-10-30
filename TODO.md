@@ -1390,8 +1390,14 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       acquisition (a pre-host native binding with an approved image contract).
 - [ ] **62 (macOS and Linux).** [CODE] Packaged paths resolve every request and redirect natively;
       the environment fallback now resolves each origin of the client inventory and refuses two
-      different relays (1fd254d92e, 749e00c4c8). Left: confirm the Ollama blob host on the Mac,
-      the Go twin `_shared/go/route_plan` in a CI cell, a Linux wrapper test.
+      different relays (1fd254d92e, 749e00c4c8). The Go twin runs in the `network-ai` cell ("Qualify
+      the Go route plan twin"). Linux wrapper test done 30 October:
+      `linux/tests/hardware/run_managed_ollama_route_plan.py` installs the driver as the packages lay
+      it out, takes LUA_PATH from the wrapper's own export line, runs from a foreign directory and
+      answers both origins with a real PAC through glib-pacrunner on a private bus (8 cases, passing
+      in a Linux container; a registry-only stage turns 4 red); CI step "Qualify the installed managed
+      Ollama route plan". Left: confirm the Ollama blob host on the Mac, the first hosted run of the
+      new step.
 - [ ] **CI duration** ([target](docs/memory/workflow-and-verification.md)). Flatpak runtime cache and a
       bounded retry are in (07a601c97e plus the retry commit); confirm on a hosted run (target under
       5 min). Windows Integration still adds 4-5 min on the critical path; the macOS lane (about 58
@@ -1419,15 +1425,28 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       the reload restarts the daemon (pending record, see "Config policy remainders").
       Windows: done (`test_menu_reload_replay.ahk` reload-click-joins).
 - [ ] **13/35.** [CODE] Enrol the complete guardian acceptance collector in main CI.
-- [ ] **93. Linux ordered pairs.** [CODE] XI2 property cookies proven on Xvfb in WSL; the saved Xi
-      packet is retired (libXi as a package dependency declined by the maintainer). Physical input
-      and the XKB/XI2 server-state join need a real kernel and desktop.
-- [ ] **97/98.** [CODE] Native physical-position capture and all-owner collision admission; Linux
-      identity needs the MediaStore device contract. The star setting migration is dropped (no
-      users, no legacy migration).
+- [ ] **93. Linux ordered pairs.** [PHYS-L] XI2 property cookies proven on Xvfb in WSL and again on
+      30 October in an Ubuntu 24.04 container (Xvfb 21.1.12, `run_xi2_property_cookies.py`: created,
+      modified, deleted); the saved Xi packet is retired (libXi as a package dependency declined by
+      the maintainer). Nothing else is provable on Xvfb: it reads no kernel device, so the join of a
+      uinput Writer edge with the server's XKB/XI2 modifier state needs Xorg or a compositor reading
+      real evdev nodes, and physical input needs a real kernel and desktop.
+- [ ] **97/98.** [CODE] Native physical-position capture and all-owner collision admission. The
+      MediaStore device contract now exists (`_shared/lua/keystats/media_identity.lua`: `device` is a
+      decimal u64 string, as macOS fills it), so the Linux identity is no longer blocked on policy;
+      the candidate is the owned descriptor's `st_rdev` from `fstat`, never a path or event-node
+      number. Not added on 30 October because nothing on Linux would read it yet: no Linux producer
+      calls `sqlite_writer.insert_media_events`, and `keyboard_hook.capture_position` hands the editor
+      `native_code` and `mods` only. Decide the consumer first (Linux media-key metrics, or a
+      per-device physical binding), then add the identity with it. The star setting migration is
+      dropped (no users, no legacy migration).
 - [ ] **106.** [PHYS-M] Genuine Apple Shortcuts invocation with bounded cancellation; only the
       refusal-in-time probe exists (in 116).
-- [ ] **107.** [CODE] macOS forced output, Linux input+XI2+writer join.
+- [ ] **107.** [CODE] macOS forced output. Linux is settled by design: the number-row ordering and
+      edge keys are applied by rebuilding the layout (`docs/design/linux-number-row-runtime.md`), so
+      the hook's input+XI2+writer join is deliberately unreachable (nothing passes `numberRowMode`)
+      and is not owed; left for Linux only [PHYS-L] mutter and KWin reloading a `~/.config/xkb`
+      layout (W1 to W4 of that note).
 - [ ] **108.** [CODE] Item 97's collision/source/modifier/output joins.
 - [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible
       Variables/KeyHistory snapshot.
