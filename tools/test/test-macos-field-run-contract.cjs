@@ -362,8 +362,24 @@ function reportFolder(paths) {
 			const declared = new Set(
 				spec.steps.filter((step) => step.kind === 'field_check').map((step) => step.check)
 			);
+			// A Debug menu check that waits for a person runs as its automatic sibling
+			const substitutes = Object.fromEntries(
+				[
+					...(source.match(/M\.FIELD_RUN_SUBSTITUTES = \{([^}]*)\}/)?.[1] ?? '').matchAll(
+						/(\w+)\s*=\s*"(\w+)"/g
+					)
+				].map((match) => [match[1], match[2]])
+			);
+			assert.equal(substitutes.key_accounting, 'typing_selftest');
 			for (const name of names)
-				assert(declared.has(name), `no field run step runs the check ${name}`);
+				assert(
+					declared.has(name) || declared.has(substitutes[name]),
+					`no field run step runs the check ${name}`
+				);
+			assert(
+				spec.steps.every((step) => !step.person),
+				'the field run is automatic: no step may wait for a person'
+			);
 			for (const verdict of ['pass', 'fail', 'skip', 'timeout', 'needs_person', 'needs_typing'])
 				assert(spec.verdicts.includes(verdict), `verdict ${verdict} is not declared`);
 			for (const step of spec.steps.filter((item) => item.person))

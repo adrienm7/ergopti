@@ -806,6 +806,12 @@ M.checks = {
 	network_hosts = Probes.network_hosts,
 	app_health = Probes.app_health,
 	ai_local = Probes.ai_local,
+	typing_selftest = Probes.typing_selftest,
 }
+
+--- The Debug menu checks the field run does not ask for, each with the
+--- automatic check it runs instead: the menu's key accounting waits for a
+--- person to type, the field run's types into its own scratch field.
+M.FIELD_RUN_SUBSTITUTES = { key_accounting = "typing_selftest" }
 
 return M

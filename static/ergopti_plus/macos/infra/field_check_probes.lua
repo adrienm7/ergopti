@@ -24,6 +24,9 @@
 ---    driver or macOS wrote for it during the last day.
 --- 8. ai_local: the owned Ollama's signature, its server's listing, one token
 ---    predicted with a model already installed, and the MLX models on disk.
+--- 9. typing_selftest: the automatic key accounting. The app types a fixed
+---    sequence into a scratch field of its own, and only there; the tap must
+---    see each key once and the field must hold exactly the sequence.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only, like the Debug checks: nothing is granted, prompted, written
@@ -618,6 +621,71 @@ function M.ai_local(ports, report, finish)
 			end
 			listing_stage()
 		end)
+end
+
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 9/ Typing self-test =======
+-- ===================================
+-- ===================================
+
+-- The sequence typed into the scratch field: plain letters with no terminator,
+-- so no hotstring fires, short so keystats only gains these few keystrokes.
+M.SELFTEST_KEYS = { "w", "k", "j", "x" }
+
+-- Seconds the passive counter watches; the scratch typing ends well before.
+M.SELFTEST_COUNT_SECONDS = 6
+
+--- The automatic key accounting. The app opens a scratch text field of its
+--- own, brings it to the front and types the fixed sequence there, checking
+--- before each key that the field still has the focus: a key never reaches the
+--- user's application, and a lost focus stops the sequence with its code. The
+--- passive counter must see each posted key once and the field must hold the
+--- sequence exactly; the previous application gets the focus back. Synthetic
+--- keys are posted after Karabiner, so the virtual keyboard path and the
+--- ledger's double count are only provable with physical keys, as their codes
+--- say. Keystats counts this field's typing like any of the app's windows.
+function M.typing_selftest(ports, report, finish)
+	local expected = table.concat(M.SELFTEST_KEYS)
+	local before = ports.keystats_facts()
+	local typed = nil
+	ports.count_keys(M.SELFTEST_COUNT_SECONDS, function(observed)
+		local after = ports.keystats_facts()
+		if type(typed) ~= "table" then
+			report.step("scratch_focus", STATE.fail, "typing_unsettled")
+			return finish()
+		end
+		report.step("scratch_focus", typed.focused and STATE.pass or STATE.fail, typed.focused and "focused"
+			or (typed.aborted or "not_focused"))
+		local posted = typed.posted or 0
+		report.step("keys_posted", posted == #M.SELFTEST_KEYS and STATE.pass or STATE.fail,
+			posted == #M.SELFTEST_KEYS and posted or ("posted_" .. posted .. "_of_" .. #M.SELFTEST_KEYS
+				.. (typed.aborted and (":" .. typed.aborted) or "")))
+		report.step("tap_running", observed.tap_running and STATE.pass or STATE.fail, observed.tap_running and "yes" or "no")
+		local presses = observed.presses or 0
+		report.step("presses_seen", posted > 0 and presses == posted and STATE.pass or STATE.fail,
+			"seen_" .. presses .. "_of_" .. posted)
+		if typed.text == nil then
+			report.step("field_text", posted > 0 and STATE.fail or STATE.skip, "unreadable")
+		else
+			report.step("field_text", typed.text == expected and STATE.pass or STATE.fail,
+				typed.text == expected and "exact" or ("mismatch_" .. #typed.text .. "_chars"))
+		end
+		if typed.latency_ms then report.step("type_latency_ms", STATE.info, math.floor(typed.latency_ms)) end
+		report.step("ledger_credits", STATE.info,
+			math.max(0, (after.ledger_drained or 0) - (before.ledger_drained or 0)))
+		report.step("source", STATE.info, after.credit_source)
+		report.step("karabiner_path", STATE.skip, "physical_keys_only")
+		report.step("double_count", STATE.skip, "physical_keys_only")
+		report.step("front_restored", typed.restored and STATE.pass or STATE.fail, typed.restored and "yes" or "no")
+		report.step("keystats_effect", STATE.info, posted .. "_keys_credited_to_ergoptiplus")
+		finish()
+	end)
+	ports.scratch_typing(M.SELFTEST_KEYS, function(outcome) typed = outcome end)
 end
 
 return M
