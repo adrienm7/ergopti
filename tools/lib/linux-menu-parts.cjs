@@ -418,9 +418,24 @@ function linuxMenuRootSource(pluginRoot) {
 	return composed.source;
 }
 
+/**
+ * Reads one driver source file; the Linux tray root comes back composed with its parts.
+ * Gates that read files by path use it so a moved builder is still read where they look.
+ * @param {string} file absolute or relative path of any file
+ * @returns {string}
+ */
+function readSourceFile(file) {
+	const resolved = path.resolve(file);
+	const suffix = path.sep + path.join(...LINUX_MENU_ROOT.split('/'));
+	return resolved.endsWith(suffix)
+		? linuxMenuRootSource(resolved.slice(0, -suffix.length))
+		: fs.readFileSync(resolved, 'utf8');
+}
+
 module.exports = {
 	LINUX_MENU_ROOT,
 	composeLinuxMenuRoot,
 	readLinuxMenuSources,
-	linuxMenuRootSource
+	linuxMenuRootSource,
+	readSourceFile
 };

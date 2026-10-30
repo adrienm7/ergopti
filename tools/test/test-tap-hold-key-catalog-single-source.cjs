@@ -33,6 +33,8 @@ require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a
 
 const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 const TOML = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -59,7 +61,7 @@ const errors = [];
  */
 function read(file) {
 	try {
-		return fs.readFileSync(file, 'utf8');
+		return readSourceFile(file);
 	} catch (e) {
 		errors.push(`cannot read ${path.relative(ROOT, file)}: ${e.message}`);
 		return '';

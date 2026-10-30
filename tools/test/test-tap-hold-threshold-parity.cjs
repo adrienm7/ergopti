@@ -34,12 +34,14 @@ require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a
 
 const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const APP = path.join(ROOT, 'static', 'ergopti_plus');
 const DEFAULTS = path.join(APP, '_shared', 'tap_hold', 'defaults.toml');
 const REGISTRY = path.join(APP, '_shared', 'modules', 'timings', 'constants.toml');
-const read = (...parts) => fs.readFileSync(path.join(APP, ...parts), 'utf8');
+const read = (...parts) => readSourceFile(path.join(APP, ...parts));
 
 const errors = [];
 

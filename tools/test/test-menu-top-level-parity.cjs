@@ -60,6 +60,8 @@
 
 const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -157,7 +159,7 @@ for (const [driver, ids] of Object.entries(projections)) {
 // ==================================================
 // ==================================================
 
-const linuxSrc = fs.readFileSync(LINUX_BUILDER, 'utf8');
+const linuxSrc = readSourceFile(LINUX_BUILDER);
 
 // M.build() appends one entry per top-level row. Reading the calls in order is
 // what makes this a comparison of the real menu rather than of a second list
@@ -342,7 +344,7 @@ function builtIds(spec, src) {
 }
 
 for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
-	const built = builtIds(spec, fs.readFileSync(spec.file, 'utf8'));
+	const built = builtIds(spec, readSourceFile(spec.file));
 	if (!built) continue;
 
 	if (built.length < MIN_ROOT_IDS) {
