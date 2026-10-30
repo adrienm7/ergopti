@@ -252,7 +252,7 @@
 		},
 		{
 			"id": "platform-reason-wording",
-			"ordinal": 465,
+			"ordinal": 441,
 			"name": "platform reasons describe the platform and never schedule work",
 			"cmd": "node",
 			"args": ["tools/test/test-platform-reason-wording.cjs"],
@@ -260,7 +260,7 @@
 		},
 		{
 			"id": "llm-prompt-keys-single-source",
-			"ordinal": 481,
+			"ordinal": 456,
 			"name": "AI numeric prompts and local-server port dialogs use one key set on every driver",
 			"cmd": "node",
 			"args": ["tools/test/test-llm-prompt-keys-single-source.cjs"],
