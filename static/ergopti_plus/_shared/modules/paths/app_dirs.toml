@@ -90,6 +90,11 @@ segments = ["Library", "Logs", "{app}"]
 # always stay in this default folder, whatever LogsDirPath says.
 launcher_log = "launcher.log"
 fatal_report = "hammerspoon-fatal.txt"
+# The controlled reload's synchronous stage trail (adapters/reload_breadcrumb.lua),
+# beside launcher.log for the same reason: a reload that loses the app leaves
+# it for the next boot and the field report collector before any configuration
+# is read.
+reload_breadcrumb = "reload_breadcrumb.txt"
 
 [logs.windows]
 # Local, not Roaming: logs are machine state and must not follow the profile.
