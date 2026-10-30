@@ -22,9 +22,11 @@
 ---    paths it added, so a provider refusing one of them (HTTP 400 naming it)
 ---    can be asked once more without it (refused_field, strip).
 --- 4. A malformed table is refused whole, never half-applied.
---- 5. Refused fields persist (refusals_parse, refusals_export): a model a
----    provider refused once is never sent that field again, even after a
----    restart. The store is bounded; each driver owns where it lives.
+--- 5. Refused fields persist (refusals_parse, record_refusal): a model a
+---    provider refused once is not sent that field again, even after a
+---    restart, until the refusal expires (refusal_expiry_days), so a later
+---    provider fix is picked up. The store is bounded and plain data; each
+---    driver owns where it lives.
 --- 6. A family may say its models accept only the default sampling
 ---    (default_sampling_only): the drivers then send no temperature.
 ---
@@ -134,6 +136,10 @@ function M.parse_families(raw)
 	if not is_object(raw) or not is_list(raw.families) or raw.families[1] == nil then
 		return nil, "thinking_off.json holds no families array"
 	end
+	local days = raw.refusal_expiry_days
+	if type(days) ~= "number" or days <= 0 or days % 1 ~= 0 then
+		return nil, "thinking_off.json refusal_expiry_days must be a positive integer"
+	end
 	local families = {}
 	for index, family in ipairs(raw.families) do
 		local where = "family " .. index
@@ -167,6 +173,7 @@ function M.parse_families(raw)
 		families[#families + 1] = { models = family.models, controls = controls,
 			default_sampling_only = family.default_sampling_only == true }
 	end
+	families.expiry_sec = days * 86400
 	return families, nil
 end
 
@@ -384,19 +391,25 @@ function M.strip(body, added, field)
 	return body
 end
 
---- Reads a persisted refusal store: "<provider>|<model>" -> array of field
---- names. Malformed entries are dropped, and counted for the driver's log.
+--- Reads a persisted refusal store: "<provider>|<model>" -> { field = the
+--- epoch second it was refused }. A refusal older than the expiry is
+--- forgotten, so a later provider fix is picked up; malformed entries are
+--- dropped and counted for the driver's log.
 --- @param raw any The decoded store.
---- @return table refused key -> set of field names.
+--- @param now number Epoch seconds.
+--- @param expiry_sec number Lifetime of a refusal (parse_families' expiry_sec).
+--- @return table refused key -> field -> epoch second.
 --- @return integer dropped Entries that were not kept.
-function M.refusals_parse(raw)
+function M.refusals_parse(raw, now, expiry_sec)
 	local refused, dropped, count = {}, 0, 0
 	if type(raw) ~= "table" then return refused, raw == nil and 0 or 1 end
 	for key, fields in pairs(raw) do
 		local set = {}
-		if type(key) == "string" and key:find("|", 1, true) and is_list(fields) and count < M.MAX_REFUSALS then
-			for _, field in ipairs(fields) do
-				if type(field) == "string" and field:match(FIELD_PATTERN) then set[field] = true end
+		if type(key) == "string" and key:find("|", 1, true) and is_object(fields) and count < M.MAX_REFUSALS then
+			for field, at in pairs(fields) do
+				if field:match(FIELD_PATTERN) and type(at) == "number" and now - at < expiry_sec and at <= now then
+					set[field] = at
+				end
 			end
 		end
 		if next(set) then
@@ -409,14 +422,16 @@ function M.refusals_parse(raw)
 	return refused, dropped
 end
 
---- Records a refused field. The store keeps at most MAX_REFUSALS pairs: a
---- pair beyond them is refused (the caller still skips the field this session).
---- @param refused table key -> set of field names, changed in place.
+--- Records a refused field at a time. The store keeps at most MAX_REFUSALS
+--- pairs: a pair beyond them is refused (the caller still skips the field
+--- this session).
+--- @param refused table key -> field -> epoch second, changed in place.
 --- @param provider string
 --- @param model string
 --- @param field string
+--- @param now number Epoch seconds.
 --- @return boolean stored False when the store is full.
-function M.record_refusal(refused, provider, model, field)
+function M.record_refusal(refused, provider, model, field, now)
 	local key = provider .. "|" .. model
 	if not refused[key] then
 		local count = 0
@@ -424,22 +439,8 @@ function M.record_refusal(refused, provider, model, field)
 		if count >= M.MAX_REFUSALS then return false end
 		refused[key] = {}
 	end
-	refused[key][field] = true
+	refused[key][field] = now
 	return true
-end
-
---- The refusal store as plain data: key -> sorted array of field names.
---- @param refused table key -> set of field names.
---- @return table
-function M.refusals_export(refused)
-	local out = {}
-	for key, set in pairs(refused) do
-		local fields = {}
-		for field in pairs(set) do fields[#fields + 1] = field end
-		table.sort(fields)
-		out[key] = fields
-	end
-	return out
 end
 
 return M

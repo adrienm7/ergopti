@@ -1454,7 +1454,7 @@ local function thinking_refused()
 		stored = nil
 	end
 	local dropped
-	_thinking_refused, dropped = ThinkingOff.refusals_parse(stored)
+	_thinking_refused, dropped = ThinkingOff.refusals_parse(stored, os.time(), THINKING_FAMILIES.expiry_sec or 0) -- no families table: nothing is remembered
 	if dropped > 0 then Logger.warn(LOG, "%d malformed refused thinking field entr(ies) dropped.", dropped) end
 	return _thinking_refused
 end
@@ -1496,11 +1496,11 @@ end
 local function thinking_refusal(provider_id, model, status, response_body, added, body)
 	local field = ThinkingOff.refused_field(status, extract_server_message(response_body), added)
 	if not field then return false end
-	if not ThinkingOff.record_refusal(thinking_refused(), tostring(provider_id), tostring(model), field) then
+	if not ThinkingOff.record_refusal(thinking_refused(), tostring(provider_id), tostring(model), field, os.time()) then
 		-- Skipped for this session all the same; only the restart forgets it
-		_thinking_refused[tostring(provider_id) .. "|" .. tostring(model)] = { [field] = true }
+		_thinking_refused[tostring(provider_id) .. "|" .. tostring(model)] = { [field] = os.time() }
 		Logger.warn(LOG, "The refused thinking fields are full: '%s' for model %s is not remembered.", field, tostring(model))
-	elseif Storage.set(M.THINKING_REFUSED_KEY, ThinkingOff.refusals_export(_thinking_refused)) ~= true then
+	elseif Storage.set(M.THINKING_REFUSED_KEY, _thinking_refused) ~= true then
 		Logger.error(LOG, "The refused thinking fields could not be saved; they hold until the next restart.")
 	end
 	ThinkingOff.strip(body, added, field)

@@ -211,12 +211,22 @@ helpers.describe("api_remote: a refused thinking field is dropped once and remem
 		local fh = assert(io.open(REFUSED_FILE, "r"), "the refusal is written to the state file")
 		local stored = Json.decode(fh:read("*a"))
 		fh:close()
-		helpers.assert_eq(stored["deepseek|deepseek-flash"][1], "thinking")
+		helpers.assert_eq(type(stored["deepseek|deepseek-flash"].thinking), "number", "with the time it was refused")
 		-- A restart: the store is read again from the file
 		remote._reset_for_test(REFUSED_FILE)
 		local request = assert(remote.build_request({ provider = "deepseek", model = "deepseek-flash", token = "k" }, MESSAGES, {}))
 		unload()
 		helpers.assert_eq(Json.decode(request.body).thinking, nil, "the stored refusal is read back")
+	end)
+
+	helpers.it("an expired refusal is forgotten, so a later provider fix is picked up", function()
+		local fh = assert(io.open(REFUSED_FILE, "w"))
+		fh:write(Json.encode({ ["deepseek|deepseek-flash"] = { thinking = os.time() - 400 * 86400 } }))
+		fh:close()
+		local remote = load_remote()
+		local request = assert(remote.build_request({ provider = "deepseek", model = "deepseek-flash", token = "k" }, MESSAGES, {}))
+		unload()
+		helpers.assert_eq(Json.decode(request.body).thinking.type, "disabled", "the field is sent again")
 	end)
 
 	helpers.it("an unrelated HTTP 400 is not a refusal", function()

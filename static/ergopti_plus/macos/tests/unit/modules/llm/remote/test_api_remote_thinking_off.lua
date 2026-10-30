@@ -213,7 +213,7 @@ helpers.describe("api_remote: a refused thinking field is dropped once and remem
 			posts[1].done(refusal("thinking is not supported"))
 			local ok, stored = require("adapters.storage").read_exact(remote.THINKING_REFUSED_KEY)
 			helpers.assert_true(ok and type(stored) == "table", "the refusal is stored")
-			helpers.assert_eq(stored["deepseek|deepseek-flash"][1], "thinking")
+			helpers.assert_eq(type(stored["deepseek|deepseek-flash"].thinking), "number", "with the time it was refused")
 			-- A restart: a fresh module over the same storage
 			package.loaded["modules.llm.api_remote"] = nil
 			local fresh = require("modules.llm.api_remote")

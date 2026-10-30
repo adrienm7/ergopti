@@ -21,9 +21,11 @@
 ;    reports the paths it added, so a provider refusing one of them (HTTP 400
 ;    naming it) can be asked once more without it.
 ; 4. A malformed table is refused whole, never half-applied.
-; 5. Refused fields persist (LLM_ThinkingOffRefusalsParse / Export): a model a
-;    provider refused once is never sent that field again, even after a
-;    restart. The store is bounded; the driver owns where it lives.
+; 5. Refused fields persist (LLM_ThinkingOffRefusalsParse / RecordRefusal): a
+;    model a provider refused once is not sent that field again, even after
+;    a restart, until the refusal expires (refusal_expiry_days), so a later
+;    provider fix is picked up. The store is bounded; the driver owns where
+;    it lives.
 ; 6. A family may say its models accept only the default sampling
 ;    (default_sampling_only): the driver then sends no temperature.
 ;
@@ -81,7 +83,11 @@ LLM_ThinkingOffParseFamilies(Text) {
 	Root := JsonParse(Text)
 	if !(Root is Map) || !(Root.Get("families", 0) is Array) || Root["families"].Length == 0
 		throw ValueError("thinking_off.json holds no families array.")
+	Days := Root.Get("refusal_expiry_days", 0)
+	if !(Days is Integer) || Days <= 0
+		throw ValueError("thinking_off.json refusal_expiry_days must be a positive integer.")
 	Families := []
+	Families.ExpirySec := Days * 86400
 	for Index, Family in Root["families"] {
 		Where := "family " . Index
 		if !(Family is Map)
@@ -273,13 +279,17 @@ LLM_ThinkingOffDefaultSamplingOnly(Families, Model) {
 }
 
 /**
- * Reads a persisted refusal store: "<provider>|<model>" -> Array of field
- * names. Malformed entries are dropped and counted.
+ * Reads a persisted refusal store: "<provider>|<model>" -> Map field -> the
+ * epoch second it was refused. A refusal older than the expiry is forgotten,
+ * so a later provider fix is picked up; malformed entries are dropped and
+ * counted.
  * @param {Any} Raw The stored value.
+ * @param {Number} Now Epoch seconds.
+ * @param {Number} ExpirySec Lifetime of a refusal (the families' ExpirySec).
  * @param {VarRef} Dropped Receives how many entries were not kept.
- * @returns {Map} Key -> Map of field names.
+ * @returns {Map} Key -> Map field -> epoch second.
  */
-LLM_ThinkingOffRefusalsParse(Raw, &Dropped := 0) {
+LLM_ThinkingOffRefusalsParse(Raw, Now, ExpirySec, &Dropped := 0) {
 	global LLM_THINKING_OFF_FIELD_PATTERN, LLM_THINKING_OFF_MAX_REFUSALS
 	Refused := Map(), Dropped := 0
 	if !(Raw is Map) {
@@ -288,10 +298,11 @@ LLM_ThinkingOffRefusalsParse(Raw, &Dropped := 0) {
 	}
 	for Key, Fields in Raw {
 		Set := Map()
-		if (Key is String) && InStr(Key, "|") && (Fields is Array) && Refused.Count < LLM_THINKING_OFF_MAX_REFUSALS {
-			for Field in Fields {
-				if (Field is String) && RegExMatch(Field, LLM_THINKING_OFF_FIELD_PATTERN)
-					Set[Field] := true
+		if (Key is String) && InStr(Key, "|") && (Fields is Map) && Refused.Count < LLM_THINKING_OFF_MAX_REFUSALS {
+			for Field, At in Fields {
+				if (Field is String) && RegExMatch(Field, LLM_THINKING_OFF_FIELD_PATTERN) && (At is Number)
+						&& Now - At < ExpirySec && At <= Now
+					Set[Field] := At
 			}
 		}
 		if (Set.Count > 0)
@@ -303,11 +314,12 @@ LLM_ThinkingOffRefusalsParse(Raw, &Dropped := 0) {
 }
 
 /**
- * Records a refused field; a full store refuses a new pair.
- * @param {Map} Refused Key -> Map of field names, changed in place.
+ * Records a refused field at a time; a full store refuses a new pair.
+ * @param {Map} Refused Key -> Map field -> epoch second, changed in place.
+ * @param {Number} Now Epoch seconds.
  * @returns {Boolean} False when the store is full.
  */
-LLM_ThinkingOffRecordRefusal(Refused, Provider, Model, Field) {
+LLM_ThinkingOffRecordRefusal(Refused, Provider, Model, Field, Now) {
 	global LLM_THINKING_OFF_MAX_REFUSALS
 	Key := Provider . "|" . Model
 	if !Refused.Has(Key) {
@@ -315,25 +327,8 @@ LLM_ThinkingOffRecordRefusal(Refused, Provider, Model, Field) {
 			return false
 		Refused[Key] := Map()
 	}
-	Refused[Key][Field] := true
+	Refused[Key][Field] := Now
 	return true
-}
-
-/**
- * The refusal store as plain data: key -> Array of field names (sorted, as
- * a Map enumerates).
- * @param {Map} Refused
- * @returns {Map}
- */
-LLM_ThinkingOffRefusalsExport(Refused) {
-	Out := Map()
-	for Key, Set in Refused {
-		Fields := []
-		for Field in Set
-			Fields.Push(Field)
-		Out[Key] := Fields
-	}
-	return Out
 }
 
 

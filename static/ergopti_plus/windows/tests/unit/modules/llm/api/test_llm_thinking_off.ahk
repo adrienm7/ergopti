@@ -182,17 +182,17 @@ _LTO_SamplingAndStoreVectors() {
 	}
 	for Vector in _LTO_Vectors("refusal_store_vectors") {
 		V := Vector["value"]
-		Refused := LLM_ThinkingOffRefusalsParse(V["stored"], &Dropped)
+		Refused := LLM_ThinkingOffRefusalsParse(V["stored"], V["now"], LLM_THINKING_FAMILIES.ExpirySec, &Dropped)
 		AssertEqual(V["dropped"], Dropped, V["id"] . ": dropped")
-		AssertEqual("", _LVS_DeepEqual(LLM_ThinkingOffRefusalsExport(Refused), V["refused"]), V["id"])
+		AssertEqual("", _LVS_DeepEqual(Refused, V["refused"]), V["id"])
 		Checked += 1
 	}
 	AssertTrue(Checked >= 12, "expected at least 12 sampling and store vectors, found " . Checked)
 	Full := Map()
 	loop LLM_THINKING_OFF_MAX_REFUSALS
-		AssertTrue(LLM_ThinkingOffRecordRefusal(Full, "p", "m" . A_Index, "thinking"))
-	AssertFalse(LLM_ThinkingOffRecordRefusal(Full, "p", "one-more", "thinking"), "a full store refuses a new pair")
-	AssertTrue(LLM_ThinkingOffRecordRefusal(Full, "p", "m1", "reasoning"), "a known pair still records")
+		AssertTrue(LLM_ThinkingOffRecordRefusal(Full, "p", "m" . A_Index, "thinking", 1))
+	AssertFalse(LLM_ThinkingOffRecordRefusal(Full, "p", "one-more", "thinking", 1), "a full store refuses a new pair")
+	AssertTrue(LLM_ThinkingOffRecordRefusal(Full, "p", "m1", "reasoning", 1), "a known pair still records")
 }
 Test("LLM thinking off: default sampling and the refusal store replay the shared corpus (thinking-off-everywhere)",
 	_LTO_SamplingAndStoreVectors)
