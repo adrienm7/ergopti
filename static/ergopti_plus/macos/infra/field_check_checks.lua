@@ -804,6 +804,7 @@ M.checks = {
 	storage = Probes.storage,
 	launcher_roles = Probes.launcher_roles,
 	network_hosts = Probes.network_hosts,
+	app_health = Probes.app_health,
 }
 
 return M

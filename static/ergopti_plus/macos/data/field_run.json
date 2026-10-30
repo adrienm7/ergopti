@@ -144,6 +144,13 @@
 			"deadline_seconds": 240,
 			"progress_max_seconds": 2400,
 			"proves": "The MLX model download and serve path works with the smallest installed catalogue model, and the active-model file is put back."
+		},
+		{
+			"id": "field_app_health",
+			"kind": "field_check",
+			"check": "app_health",
+			"deadline_seconds": 30,
+			"proves": "No crash report from the driver or from macOS for the app in the last day; the app's memory and CPU share after the AI steps are named."
 		}
 	],
 	"guard_step": "config_guard"
