@@ -464,6 +464,7 @@
 			LLM_TOGGLE: "llm_toggle",
 			LLM_TOKEN_STREAMING: "llm_token_streaming",
 			LLM_TRIGGER_DEBOUNCE: "llm_trigger_debounce",
+			LLM_TRIGGER_MIN_INTERVAL: "llm_trigger_min_interval",
 			LLM_URL_BAR_FILTER: "llm_url_bar_filter",
 			LOG_LEVEL: "log_level",
 			MAGIC_KEY_CONFIG_LINUX: "magic_key_config_linux",
