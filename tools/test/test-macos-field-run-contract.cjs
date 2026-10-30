@@ -906,6 +906,11 @@ function reportFolder(paths) {
 					`${day} 10:00:00:000 [ERROR] [menu] Fixture menu failure 3.\n` +
 					`${day} 10:00:01:000 [WARNING] [preferences] Slow preferences save 900 ms (prepare=1 write=1 ms; operations=1; ).\n`
 			);
+			// The trail a lost reload left (adapters/reload_breadcrumb.lua), then the next boot
+			fs.writeFileSync(
+				path.join(logs, 'reload_breadcrumb.txt'),
+				'accepted 5000.000\nlease_fence_requested 5001.250\nboot 9000.000\n'
+			);
 			// A configuration folder moved by the launcher's paths.toml, as
 			// config_paths.lua reads it: the collisions must follow it.
 			const moved = path.join(paths.home, 'moved-config');
@@ -971,6 +976,12 @@ function reportFolder(paths) {
 				const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD');
 				assert.match(committed, /field_run\/01_field_lease\.json/);
 				assert.match(committed, /ErgoptiPlus_\d{4}-\d{2}-\d{2}\.log/);
+				assert.equal(
+					fs.readFileSync(path.join(folder, 'reload_breadcrumb.txt'), 'utf8'),
+					'accepted 5000.000\nlease_fence_requested 5001.250\nboot 9000.000\n',
+					'the reload trail travels as written'
+				);
+				assert.match(committed, /reload_breadcrumb\.txt/);
 				assert.equal(git(paths.clone, 'status', '--porcelain', '--untracked-files=no'), '');
 			} finally {
 				driver.child.kill();
