@@ -15,7 +15,15 @@ param(
 	[Parameter(Mandatory = $true)][int64]$StartedTick,
 	[Parameter(Mandatory = $true)][ValidateRange(1, 2147483647)][int]$DeadlineMs,
 	[Parameter(Mandatory = $true)][string]$ServeEnvironmentPath,
-	[Parameter(Mandatory = $true)][string]$ServeEnvironmentSha256
+	[Parameter(Mandatory = $true)][string]$ServeEnvironmentSha256,
+	[Parameter(Mandatory = $true)][string]$VendorDirectory,
+	[Parameter(Mandatory = $true)][string]$VendorSha256,
+	[Parameter(Mandatory = $true)][string]$ProxyPolicyPath,
+	[Parameter(Mandatory = $true)][string]$ProxyPolicySha256,
+	[Parameter(Mandatory = $true)][string]$UpdaterDefaultsPath,
+	[Parameter(Mandatory = $true)][string]$UpdaterDefaultsSha256,
+	[Parameter(Mandatory = $true)][string]$RouteOriginsPath,
+	[Parameter(Mandatory = $true)][string]$RouteOriginsSha256
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -69,6 +77,98 @@ function Read-OllamaServeEnvironment([string]$Path, [string]$ExpectedHash) {
 	}
 	if ($environment.Count -eq 0) { throw 'The serve environment declaration is empty.' }
 	return $environment
+}
+
+# The proxy dependencies the launcher reads, in inventory order: the AHK owner
+# hashes the same names (OllamaManagedBootstrap RuntimeVendorInventory).
+function Get-OllamaRuntimeVendorNames {
+	return @('ergopti_route_plan.ps1', 'ergopti_network_routes.ps1', 'ergopti_windows_proxy_config.ps1',
+		'ergopti_native_proxy_ex.ps1', 'ergopti_network_pac.ps1')
+}
+
+# Opens every proxy dependency under one inventory digest. The streams stay
+# open, so a dependency the route module dot-sources by path cannot change.
+function Open-OllamaRuntimeVendor([string]$Directory, [string]$ExpectedHash) {
+	if ($Directory -cnotmatch '^[A-Za-z]:\\' -or $ExpectedHash -cnotmatch '^[0-9a-f]{64}\z') {
+		throw 'The runtime proxy dependencies require their captured directory and digest.'
+	}
+	$sources = [ordered]@{}
+	try {
+		$inventory = ''
+		foreach ($name in (Get-OllamaRuntimeVendorNames)) {
+			$path = [IO.Path]::Combine($Directory, $name)
+			$stream = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+			$sources.Add($name, @{ stream = $stream; block = $null })
+			$hash = [Security.Cryptography.SHA256]::Create()
+			try { $actual = ([BitConverter]::ToString($hash.ComputeHash($stream))).Replace('-', '').ToLowerInvariant() }
+			finally { $hash.Dispose(); $stream.Position = 0 }
+			$reader = [IO.StreamReader]::new($stream, [Text.UTF8Encoding]::new($false, $true), $false, 1024, $true)
+			try { $code = $reader.ReadToEnd() } finally { $reader.Dispose(); $stream.Position = 0 }
+			$tokens = $null; $errors = $null
+			# The real path keeps PSScriptRoot, which the route module dot-sources by
+			$ast = [Management.Automation.Language.Parser]::ParseInput($code, $path, [ref]$tokens, [ref]$errors)
+			if ($errors.Count -ne 0) { throw 'A runtime proxy dependency cannot be parsed.' }
+			$sources[$name].block = $ast.GetScriptBlock()
+			$inventory += $name + "`n" + $actual + "`n"
+		}
+		$hash = [Security.Cryptography.SHA256]::Create()
+		try { $actual = ([BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes($inventory)))).Replace('-', '').ToLowerInvariant() }
+		finally { $hash.Dispose() }
+		if ($actual -cne $ExpectedHash) { throw 'The runtime proxy dependency inventory changed.' }
+		return $sources
+	} catch {
+		foreach ($source in $sources.Values) { $source.stream.Dispose() }
+		throw
+	}
+}
+
+# Reads one captured JSON declaration after checking its digest.
+function Read-OllamaRuntimeJson([string]$Path, [string]$ExpectedHash) {
+	if ($Path -cnotmatch '^[A-Za-z]:\\' -or $ExpectedHash -cnotmatch '^[0-9a-f]{64}\z') {
+		throw 'A runtime declaration requires its captured absolute source and digest.'
+	}
+	$bytes = [IO.File]::ReadAllBytes($Path)
+	$hash = [Security.Cryptography.SHA256]::Create()
+	try { $actual = ([BitConverter]::ToString($hash.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant() }
+	finally { $hash.Dispose() }
+	if ($actual -cne $ExpectedHash) { throw 'A captured runtime declaration changed.' }
+	return [Text.UTF8Encoding]::new($false, $true).GetString($bytes) | ConvertFrom-Json
+}
+
+# The daemon cannot evaluate a PAC or read the Windows proxy settings: each
+# origin of route_origins.json "ollama" is looked up natively, the shared route
+# plan turns the answers into HTTPS_PROXY and NO_PROXY, and an exported relay
+# of the user is inherited untouched. The relay is then asked for a tunnel the
+# way the daemon will: one that demands a Windows login (NTLM, Negotiate) is
+# never exported, and the receipt says so, so the pull refuses with a named
+# reason while local models keep working offline.
+# Returns @{ Mode; Tunnel; Environment }; a refused lookup or plan throws.
+function Get-OllamaRuntimeProxy($Vendor, $Request) {
+	. $Vendor['ergopti_route_plan.ps1'].block
+	. $Vendor['ergopti_network_routes.ps1'].block
+	$origins = Read-OllamaRuntimeJson $Request.route_origins $Request.route_origins_sha256
+	$budgetMs = [int]$origins.route_lookup_budget_seconds * 1000
+	if ($budgetMs -le 0) { throw 'The route lookup budget is invalid.' }
+	$clock = [Diagnostics.Stopwatch]::StartNew()
+	$resolve = {
+		param($Origin)
+		$remaining = [Math]::Min($budgetMs - $clock.ElapsedMilliseconds, (Get-OllamaRuntimeRemaining $Request))
+		return Resolve-ErgoptiNativeNetworkRoutes $Origin ([int]$remaining) $null $null $Request.policy $Request.defaults
+	}
+	$read = { param($Name) [Environment]::GetEnvironmentVariable($Name, 'Process') }
+	$proxy = Get-ErgoptiOwnedProxyEnvironment -Origins @($origins.clients.ollama) -Resolve $resolve -ReadEnvironment $read
+	if (-not $proxy.Ok) { throw ('The owned runtime proxy was refused: ' + $proxy.Reason) }
+	$tunnel = 'none'
+	if ($proxy.Mode -ceq 'relay') {
+		$tunnel = 'unprobed'
+		if ($proxy.Proxy -cmatch '^http://') {
+			$registry = ([Uri](@($origins.clients.ollama)[0])).Host + ':443'
+			$tunnel = Test-ErgoptiRelayTunnel -Relay $proxy.Proxy -Target $registry `
+				-TimeoutMs ([Math]::Max(1, [Math]::Min(5000, (Get-OllamaRuntimeRemaining $Request))))
+		}
+		if ($tunnel -ceq 'windows_login') { $proxy.Environment = [ordered]@{} }
+	}
+	return @{ Mode = $proxy.Mode; Tunnel = $tunnel; Environment = $proxy.Environment }
 }
 
 function New-OllamaRuntimeStart([string]$Executable, [int]$Port, [string]$ModelsPath, $ServeEnvironment) {
@@ -169,13 +269,19 @@ function Wait-OllamaRuntimeDescendants {
 
 function Invoke-OllamaRuntimeEntry {
 	$source = $null; $root = $null; $stage = $null; $borrowed = [IntPtr]::Zero
-	$models = [IntPtr]::Zero; $child = $null; $ready = $null
+	$models = [IntPtr]::Zero; $child = $null; $ready = $null; $vendor = $null
 	# Dot-sourcing the helper binds its CLI defaults: preserve our admitted values.
 	$request = @{ root = $ManagedRoot; root_identity = $RootIdentity; path = $PublishedPath;
 		identity = $StageIdentity; ticket = $TicketId; manifest = $ManifestSha256;
-		runtime_ticket = $RuntimeTicket; port = $Port; started_tick = $StartedTick; deadline_ms = $DeadlineMs }
+		runtime_ticket = $RuntimeTicket; port = $Port; started_tick = $StartedTick; deadline_ms = $DeadlineMs;
+		policy = $ProxyPolicyPath; defaults = $UpdaterDefaultsPath;
+		route_origins = $RouteOriginsPath; route_origins_sha256 = $RouteOriginsSha256 }
 	$serveEnvironment = Read-OllamaServeEnvironment $ServeEnvironmentPath $ServeEnvironmentSha256
 	try {
+		# The route module reads the policy and defaults by path: pin them first
+		$null = Read-OllamaRuntimeJson $ProxyPolicyPath $ProxyPolicySha256
+		$null = Read-OllamaRuntimeJson $UpdaterDefaultsPath $UpdaterDefaultsSha256
+		$vendor = Open-OllamaRuntimeVendor $VendorDirectory $VendorSha256
 		if ($request.runtime_ticket -cnotmatch '^[0-9a-f]{32}\z' -or $request.started_tick -le 0) {
 			throw 'Runtime start requires its fresh admitted ticket and original clock.'
 		}
@@ -202,6 +308,8 @@ function Invoke-OllamaRuntimeEntry {
 		$readyPath = [IO.Path]::Combine($root.path, '.runtime-' + $request.runtime_ticket + '.json')
 		if (-not [Ergopti.Ollama.ManagedNative]::PathIsAbsent($readyPath)) { throw 'The fresh runtime receipt already exists.' }
 		$start = New-OllamaRuntimeStart ([IO.Path]::Combine($stage.path, 'ollama.exe')) $request.port $modelsPath $serveEnvironment
+		$proxy = Get-OllamaRuntimeProxy $vendor $request
+		foreach ($name in $proxy.Environment.Keys) { $start.EnvironmentVariables[$name] = $proxy.Environment[$name] }
 		$null = Get-OllamaRuntimeRemaining $request
 		if (@(Get-OllamaRuntimeListeners $request.port).Count -ne 0) {
 			throw 'Managed runtime refuses a pre-existing listener; its owner is unchanged.'
@@ -224,7 +332,8 @@ function Invoke-OllamaRuntimeEntry {
 					root_identity = $root.identity; version_identity = $request.identity; manifest_sha256 = $request.manifest;
 					origin = 'http://127.0.0.1:' + $request.port; launcher_pid = $PID; child_pid = $child.Id;
 					child_created_filetime = [Ergopti.Ollama.RuntimeObservation]::CreationTime($child.Handle);
-					ready_file_identity = $readyIdentity; leases_held = 1 }
+					ready_file_identity = $readyIdentity; leases_held = 1;
+					proxy_mode = $proxy.Mode; proxy_tunnel = $proxy.Tunnel }
 				$bytes = [Text.UTF8Encoding]::new($false, $true).GetBytes(($receipt | ConvertTo-Json -Compress) + "`n")
 				$ready.Write($bytes, 0, $bytes.Length); $ready.Flush($true)
 				$imageHash = Get-OllamaStreamHash $ready
@@ -264,6 +373,7 @@ function Invoke-OllamaRuntimeEntry {
 		if ($borrowed -ne [IntPtr]::Zero -and -not [Ergopti.Ollama.ManagedNative]::CloseHandle($borrowed)) { throw 'The published runtime retains native close debt.' }
 		if ($null -ne $root) { Close-OllamaManagedRoot $root }
 		if ($null -ne $source) { $source.stream.Dispose() }
+		if ($null -ne $vendor) { foreach ($entry in $vendor.Values) { $entry.stream.Dispose() } }
 	}
 }
 

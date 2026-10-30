@@ -2191,6 +2191,7 @@
 	"mlx.cause_venv_not_native": "Prostředí MLX bylo sestaveno s Pythonem pro jiný procesor ({1}): macOS by ho spouštěl přes Rosettu, proto se nespouští.",
 	"network.failure.certificate": "Ověření certifikátu zabezpečeného připojení selhalo. Zkontrolujte systémové certifikáty, hodiny a adresu serveru; ve spravované síti požádejte o pomoc oddělení IT.",
 	"network.failure.proxy": "Nelze použít systémové nastavení proxy, nebo proxy odmítla připojení či vyžaduje ověření. Zkontrolujte systémové nastavení proxy.",
+	"network.failure.proxy_windows_login": "Proxy vyžaduje vaše přihlášení k Windows (NTLM nebo Negotiate), které Ollama v Ergopti nemůže poskytnout, takže přes ni nelze stáhnout žádný model. Stáhněte model v jiné síti nebo požádejte IT o proxy bez tohoto přihlášení.",
 	"network.failure.host_blocked": "Síť blokuje přístup k tomuto serveru (firemní filtrování nebo firewall).",
 	"network.failure.offline": "Síť nebo síťová trasa není dostupná. Zkontrolujte připojení a systémové nastavení sítě.",
 	"network.failure.pac_unreachable_direct_failed": "Automatická konfigurace proxy (PAC) není dostupná nebo ji nelze přečíst a přímé připojení zkoušené místo ní také selhalo. Zkontrolujte síťové připojení a nastavení proxy v systému, nebo se obraťte na oddělení IT.",

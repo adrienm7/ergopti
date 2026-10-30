@@ -2191,6 +2191,7 @@
 	"mlx.cause_venv_not_native": "MLX 환경이 다른 프로세서({1})용 Python으로 만들어졌습니다. macOS가 Rosetta로 실행하게 되므로 시작하지 않습니다.",
 	"network.failure.certificate": "보안 연결의 인증서 검증에 실패했습니다. 시스템 인증서, 시간 및 서버 주소를 확인하세요. 관리형 네트워크에서는 IT 부서에 도움을 요청하세요.",
 	"network.failure.proxy": "시스템 프록시 설정을 사용할 수 없거나 프록시가 연결을 거부하거나 인증을 요청했습니다. 시스템 프록시 설정을 확인하세요.",
+	"network.failure.proxy_windows_login": "프록시가 Windows 로그인(NTLM 또는 Negotiate)을 요구하지만 Ergopti의 Ollama는 이를 제공할 수 없어 이 프록시를 통해 모델을 다운로드할 수 없습니다. 다른 네트워크에서 모델을 다운로드하거나 IT 팀에 이 로그인이 필요 없는 프록시를 요청하세요.",
 	"network.failure.host_blocked": "네트워크가 이 서버에 대한 접근을 차단하고 있습니다(회사 필터링 또는 방화벽).",
 	"network.failure.offline": "네트워크 또는 네트워크 경로를 사용할 수 없습니다. 연결과 시스템 네트워크 설정을 확인하세요.",
 	"network.failure.pac_unreachable_direct_failed": "자동 프록시 구성(PAC)에 연결하거나 읽을 수 없었고, 대신 시도한 직접 연결도 실패했습니다. 네트워크 연결과 시스템 프록시 설정을 확인하거나 IT 부서에 문의하세요.",

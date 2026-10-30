@@ -2191,6 +2191,7 @@
 	"mlx.cause_venv_not_native": "L’ambiente MLX è stato creato con un Python per un altro processore ({1}): macOS lo eseguirebbe con Rosetta, quindi non viene avviato.",
 	"network.failure.certificate": "La verifica del certificato della connessione sicura non è riuscita. Controlla i certificati di sistema, l’orologio e l’indirizzo del server; su una rete gestita, chiedi aiuto al reparto IT.",
 	"network.failure.proxy": "Non è stato possibile usare la configurazione proxy del sistema, oppure il proxy ha rifiutato la connessione o richiesto l’autenticazione. Controlla le impostazioni proxy del sistema.",
+	"network.failure.proxy_windows_login": "Il proxy richiede l’accesso di Windows (NTLM o Negotiate), che l’Ollama di Ergopti non può fornire, quindi nessun modello può essere scaricato tramite esso. Scarica il modello su un’altra rete o chiedi al reparto IT un proxy senza questo accesso.",
 	"network.failure.host_blocked": "La rete blocca l'accesso a questo server (filtro aziendale o firewall).",
 	"network.failure.offline": "La rete o il percorso di rete non è disponibile. Controlla la connessione e le impostazioni di rete del sistema.",
 	"network.failure.pac_unreachable_direct_failed": "La configurazione automatica del proxy (PAC) non è raggiungibile o leggibile, e anche la connessione diretta tentata al suo posto non è riuscita. Controlla la connessione di rete e le impostazioni proxy di sistema, oppure rivolgiti al reparto IT.",
