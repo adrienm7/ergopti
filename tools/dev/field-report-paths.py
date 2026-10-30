@@ -103,7 +103,11 @@ def main():
         "LOG_UNIFIED_PREFIX": files["unified_prefix"],
         "LOG_ERRORS_PREFIX": files["errors_prefix"],
         "LOG_EXTENSION": files["extension"],
+        # The launcher writes these before any configuration is read, so they
+        # stay in the default folder whatever LogsDirPath says.
+        "LOG_DEFAULT_DIR": default_log_dir,
         "LOG_LAUNCHER": logs["macos"]["launcher_log"],
+        "LOG_FATAL_REPORT": logs["macos"]["fatal_report"],
         "LOG_TOPICAL": " ".join(topical),
         # Always in the default folder, whatever LogsDirPath says, like launcher.log.
         "RELOAD_BREADCRUMB": os.path.join(default_log_dir, logs["macos"]["reload_breadcrumb"]),
