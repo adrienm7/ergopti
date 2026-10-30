@@ -49,9 +49,6 @@ global NETWORK_CHECK_ID := "network"
 ; tools/test/test-network-field-check-parity.cjs.
 global NETWORK_CHECK_STEPS := ["proxy_settings", "pac_download", "pac_script", "route_lookup", "tls", "transfer", "digest"]
 
-; Largest PAC accepted, mirroring native_pac.max_script_bytes of proxy_policy.json.
-global NETWORK_CHECK_PAC_MAX_BYTES := 1048576
-
 ; Budgets in milliseconds.
 global NETWORK_CHECK_PAC_TIMEOUT_MS := 15000
 global NETWORK_CHECK_REQUEST_TIMEOUT_MS := 20000
@@ -125,14 +122,27 @@ _NetworkCheck_IsStrictUtf8(Bytes, Size) {
 }
 
 /**
+ * The largest PAC accepted: native_pac.max_script_bytes of the shared proxy
+ * policy, the limit the managed download applies. Read once, and a missing or
+ * malformed policy raises: the check runs inside its own per-step guard.
+ * @returns {Integer} Bytes.
+ */
+NetworkCheck_PacMaxBytes() {
+	global _SharedDir
+	static Maximum := 0
+	if !Maximum
+		Maximum := JsonParse(FileRead(_SharedDir . "\modules\network\proxy_policy.json", "UTF-8"))["native_pac"]["max_script_bytes"]
+	return Maximum
+}
+
+/**
  * Judges one PAC answer the way the managed download does.
  * @param {Integer} Status - HTTP status; 0 when the request failed.
  * @param {Buffer|String} Bytes - The response body, "" when absent.
  * @returns {string} "ok" or "error".
  */
 NetworkCheck_JudgePac(Status, Bytes) {
-	global NETWORK_CHECK_PAC_MAX_BYTES
-	if Status != 200 || !(Bytes is Buffer) || Bytes.Size == 0 || Bytes.Size > NETWORK_CHECK_PAC_MAX_BYTES
+	if Status != 200 || !(Bytes is Buffer) || Bytes.Size == 0 || Bytes.Size > NetworkCheck_PacMaxBytes()
 		return "error"
 	First := NumGet(Bytes, 0, "UChar")
 	Second := Bytes.Size > 1 ? NumGet(Bytes, 1, "UChar") : 0
@@ -337,7 +347,7 @@ _NetworkCheck_ReadSettings() {
 ; Downloads the PAC directly, as the managed download does. Calls
 ; Callback(Status, Bytes) once; Status is 0 and Bytes "" when the request fails.
 _NetworkCheck_FetchPac(Url, Callback) {
-	global NETWORK_CHECK_PAC_TIMEOUT_MS, NETWORK_CHECK_POLL_MS, NETWORK_CHECK_PAC_MAX_BYTES
+	global NETWORK_CHECK_PAC_TIMEOUT_MS, NETWORK_CHECK_POLL_MS
 	Whr := ""
 	try {
 		Whr := HTTPCreateWinHttpRequest()
@@ -354,7 +364,7 @@ _NetworkCheck_FetchPac(Url, Callback) {
 }
 
 _NetworkCheck_PollPac(Whr, Deadline, Callback, State) {
-	global NETWORK_CHECK_POLL_MS, NETWORK_CHECK_PAC_MAX_BYTES
+	global NETWORK_CHECK_POLL_MS
 	Done := false
 	try Done := Whr.WaitForResponse(0)
 	if !Done && A_TickCount < Deadline {
@@ -371,8 +381,8 @@ _NetworkCheck_PollPac(Whr, Deadline, Callback, State) {
 		Status := Whr.Status
 		Body := Whr.ResponseBody
 		Size := Body.MaxIndex() + 1
-		if Size > NETWORK_CHECK_PAC_MAX_BYTES + 1
-			Size := NETWORK_CHECK_PAC_MAX_BYTES + 1
+		if Size > NetworkCheck_PacMaxBytes() + 1
+			Size := NetworkCheck_PacMaxBytes() + 1
 		Bytes := Buffer(Size)
 		Loop Size
 			NumPut("UChar", Body[A_Index - 1], Bytes, A_Index - 1)
