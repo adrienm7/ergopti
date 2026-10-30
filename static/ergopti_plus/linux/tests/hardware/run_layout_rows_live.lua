@@ -12,7 +12,9 @@
 --- running server. Every claim is read back from the server with
 --- `xkbcomp -xkb $DISPLAY -`: base and Shift exchanged on the moved keys, Ctrl and
 --- AltGr levels and the layout's dead keys untouched, three builds in a row with no
---- restart.
+--- restart. Last, the global scope composes the real layout participant over the
+--- real number-row preferences, layout manager and server: it settles only once
+--- the server holds the layout without the ordering it cleared.
 ---
 --- The layouts are installed with no session type, as the layout manager does from
 --- a Wayland session: an Xorg session never installs into the user tree, it only
@@ -298,6 +300,44 @@ for _, order in ipairs({ "digits", "native", "digits" }) do
 	local wanted = order == "digits" and composed_digits or composed_native
 	check(same(levels(keymap, "AE05"), levels(wanted, "AE05")), "consecutive build " .. order .. " is the one held")
 end
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 5/ The global scope, composed with real producers =======
+-- =================================================================
+-- =================================================================
+
+-- The menu stores an ordering and the layout manager loads it; the global clear
+-- then composes the real layout participant, which writes config.toml and settles
+-- only once the server holds the layout without the ordering.
+local Live = require("modules.keymap.number_row_live")
+local stored = await("the menu stores « digits »", function(done) Live.set("order", "digits", done) end)
+check(stored[1] == true, "the menu's choice is stored and loaded: " .. tostring(stored[2]))
+check(levels(server_keymap(), "AE01")[BASE] == "1", "the server types 1 on the bare 1 key")
+
+local GlobalScope = require("infra.global_scope")
+local LayoutScope = require("infra.keyboard_layout_scope")
+local settled_at_once = nil
+local cleared = await("the global clear", function(done)
+	local answered = false
+	GlobalScope.apply("clear", { keyboard_layout = LayoutScope.participant(function() return false end) },
+		function(...)
+			answered = true
+			return done(...)
+		end)
+	settled_at_once = answered
+end)
+check(settled_at_once == false, "the global request returned before the session answered")
+check(cleared[1] == true, "the global clear is committed: " .. tostring(cleared[2] and cleared[2].detail))
+check(type(cleared[2]) == "table" and cleared[2].applied[1] == "keyboard_layout", "the layout category took part")
+check(Live.stored().order == "native", "config.toml holds the default ordering again")
+check(same(levels(server_keymap(), "AE01"), levels(composed_native, "AE01")),
+	"the server holds the layout without the ordering: " .. show(levels(server_keymap(), "AE01")))
+check(GlobalScope.pending() == false, "no global writer is left pending")
 
 Registry.shutdown()
 cleanup()
