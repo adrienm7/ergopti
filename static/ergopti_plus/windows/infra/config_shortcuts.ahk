@@ -220,8 +220,8 @@ _CS_RequireString(Value, Key) {
 _CS_ValidateMetricsSection(Section) {
 		Validated := Map()
 		for Key in ["enabled",
-				"private_filter_enabled", ConfigLeaf.SECURE_FILTER_ENABLED,
-				ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED, "encrypt"] {
+				"private_filter_enabled", "secure_filter_enabled",
+				"system_auth_filter_enabled", "encrypt"] {
 				if Section.Has(Key)
 						Validated[Key] := _CS_RequireBoolean(Section[Key], Key)
 		}
@@ -259,10 +259,10 @@ CS_Load() {
 		; through Manifest.default_for("metrics.<id>").
 		if Validated.Has("private_filter_enabled")
 				MetricsFilters.private_browsing := Validated["private_filter_enabled"]
-		if Validated.Has(ConfigLeaf.SECURE_FILTER_ENABLED)
-				MetricsFilters.secure_field := Validated[ConfigLeaf.SECURE_FILTER_ENABLED]
-		if Validated.Has(ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED)
-				MetricsFilters.system_auth := Validated[ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED]
+		if Validated.Has("secure_filter_enabled")
+				MetricsFilters.secure_field := Validated["secure_filter_enabled"]
+		if Validated.Has("system_auth_filter_enabled")
+				MetricsFilters.system_auth := Validated["system_auth_filter_enabled"]
 		if Validated.Has("encrypt")
 				MetricsFilters.encrypt := Validated["encrypt"]
 
