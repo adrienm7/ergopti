@@ -57,6 +57,12 @@ local LIVE_STATE_FILES = { ConfigTomlPath = true, PersonalTomlPath = true, Perso
 local LISTING_RETRY_SECONDS = 2
 local LISTING_ATTEMPTS = 20
 
+-- Seconds between two looks at the owned runtime while its metadata hint is
+-- pending, and how many: an install changes the files the hint keys on, so
+-- resolve() answers nil until the new hint settles.
+local RESOLVE_RETRY_SECONDS = 1
+local RESOLVE_ATTEMPTS = 30
+
 
 
 
@@ -229,6 +235,26 @@ local function mlx_supported()
 	return ok and supported ~= false
 end
 
+--- Calls back with the owned Ollama runtime once its metadata hint settles.
+--- The step after an install read the pending hint as an absent runtime and
+--- skipped (field run of 2026-10-30 19:17: runtime_installed, then
+--- runtime_absent); a hint still pending after the bound reads as absent.
+--- @param callback function fn(path|nil, source|nil, pending).
+local function settled_ollama_binary(callback)
+	local Binary = require("modules.llm.ollama_binary")
+	local attempts = 0
+	local function look()
+		attempts = attempts + 1
+		local _, _, state = Binary.native_candidate()
+		if state == "pending" and attempts < RESOLVE_ATTEMPTS then
+			return Timer.after(RESOLVE_RETRY_SECONDS, look)
+		end
+		local path, _, source = Binary.resolve()
+		callback(path, source, state == "pending")
+	end
+	look()
+end
+
 --- Installs or reuses the Ollama runtime through the selection router, as the
 --- install button of the AI menu does. An Ollama of another origin (the app,
 --- Homebrew) is reused: the router would offer to replace it with the native
@@ -240,8 +266,13 @@ local function ollama_runtime(finish)
 	local before = Deps.runtime_available()
 	local function settle(ok)
 		if ok ~= true then return finish("fail", { "install_failed", "state_" .. tostring(Deps.get_state()) }) end
-		local _, _, now_source = Binary.resolve()
-		finish("pass", { before and "runtime_reused" or "runtime_installed" }, { source = tostring(now_source) })
+		settled_ollama_binary(function(now_path, now_source, pending)
+			if not now_path then
+				return finish("fail", { before and "runtime_reused" or "runtime_installed",
+					pending and "metadata_pending" or "runtime_unresolved" })
+			end
+			finish("pass", { before and "runtime_reused" or "runtime_installed" }, { source = tostring(now_source) })
+		end)
 	end
 	local accepted
 	if path and require("core.llm.ollama_runtime_choice").classify(source) == "foreign" then
@@ -281,29 +312,29 @@ end
 local function ollama_model(finish)
 	local manager = models_manager()
 	if not manager then return finish("skip", { "ai_menu_absent" }) end
-	if not require("modules.llm.ollama_deps_checker").runtime_available() then
-		return finish("skip", { "runtime_absent" })
-	end
-	local model = smallest_model("ollama")
-	if not model then return finish("fail", { "no_catalogue_model" }) end
-	local report = { model = model.runtime_name, download_gb = model.download_gb }
-	ollama_listing(model.runtime_name, function(before, started_server)
-		if before == nil then return finish("fail", { "server_unreachable" }, report) end
-		report.started_server = started_server
-		local codes = { before and "model_preexisting" or "model_absent" }
-		manager.pull_ollama_model(model.runtime_name, function()
-			ollama_listing(model.runtime_name, function(listed)
-				if listed ~= true then
-					codes[#codes + 1] = "not_listed_after_pull"
-					return finish("fail", codes, report)
-				end
-				codes[#codes + 1] = "pulled"
-				codes[#codes + 1] = "model_kept"
-				finish("pass", codes, report)
+	settled_ollama_binary(function(path, _, pending)
+		if not path then return finish("skip", { pending and "metadata_pending" or "runtime_absent" }) end
+		local model = smallest_model("ollama")
+		if not model then return finish("fail", { "no_catalogue_model" }) end
+		local report = { model = model.runtime_name, download_gb = model.download_gb }
+		ollama_listing(model.runtime_name, function(before, started_server)
+			if before == nil then return finish("fail", { "server_unreachable" }, report) end
+			report.started_server = started_server
+			local codes = { before and "model_preexisting" or "model_absent" }
+			manager.pull_ollama_model(model.runtime_name, function()
+				ollama_listing(model.runtime_name, function(listed)
+					if listed ~= true then
+						codes[#codes + 1] = "not_listed_after_pull"
+						return finish("fail", codes, report)
+					end
+					codes[#codes + 1] = "pulled"
+					codes[#codes + 1] = "model_kept"
+					finish("pass", codes, report)
+				end)
+			end, function(reason)
+				codes[#codes + 1] = "pull_" .. tostring(reason)
+				finish("fail", codes, report)
 			end)
-		end, function(reason)
-			codes[#codes + 1] = "pull_" .. tostring(reason)
-			finish("fail", codes, report)
 		end)
 	end)
 end
