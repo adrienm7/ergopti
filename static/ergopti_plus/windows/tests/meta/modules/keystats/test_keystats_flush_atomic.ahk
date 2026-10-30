@@ -33,9 +33,8 @@
 ; ==================================================
 ; ==================================================
 
-_KLFA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
+_KLFA_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _KLFA_StripComments(Src) {
@@ -48,7 +47,7 @@ _KLFA_StripComments(Src) {
 }
 
 _KLFA_FlushBufferCritical() {
-	Raw := _KLFA_ReadSource("modules/keystats/keystats.ahk")
+	Raw := _KLFA_ReadSource("keystats.ahk")
 	Src := _KLFA_StripComments(Raw)
 	Body := _DriverFuncBody("KL_FlushBuffer")
 	Assert(Body != "", "KL_FlushBuffer() must exist in modules/keystats/keystats.ahk")
@@ -84,7 +83,7 @@ Test("keystats: KL_FlushBuffer takes an atomic snapshot under Critical(On) befor
 ; =======================================================
 
 _KLFA_MouseFlushScrollCritical() {
-	Raw := _KLFA_ReadSource("modules/keystats/keystats_mouse.ahk")
+	Raw := _KLFA_ReadSource("keystats_mouse.ahk")
 	Src := _KLFA_StripComments(Raw)
 	Body := _DriverFuncBody("KL_Mouse_FlushScroll")
 	Assert(Body != "", "KL_Mouse_FlushScroll() must exist in modules/keystats/keystats_mouse.ahk")

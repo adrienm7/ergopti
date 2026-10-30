@@ -29,13 +29,12 @@
 ; ===============================================================
 ; ===============================================================
 
-_TSO_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
+_TSO_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TSO_OneShotReschedules() {
-	Src := _TSO_ReadSource("adapters/timer_scheduler.ahk")
+	Src := _TSO_ReadSource("timer_scheduler.ahk")
 	; Use the definition pattern (with trailing " {") to avoid matching the call site at TimerAfter.
 	Body := _DriverFuncBody("_TimerAdapterMakeOneShot")
 

@@ -19,10 +19,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TLPPH_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TLPPH_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TLPPH_StripLineComments(Src) {
@@ -42,7 +40,7 @@ _TLPPH_StripLineComments(Src) {
 ; ========================================================================
 
 _TLPPH_ZeroHklPreservesPending() {
-	Src := _TLPPH_StripLineComments(_TLPPH_ReadSource("modules/keymap/layout_poll_helper.ahk"))
+	Src := _TLPPH_StripLineComments(_TLPPH_ReadSource("layout_poll_helper.ahk"))
 	Assert(Src != "", "modules/keymap/layout_poll_helper.ahk must be readable")
 
 	Body := _DriverFuncBody("_ShouldReloadForHkl")

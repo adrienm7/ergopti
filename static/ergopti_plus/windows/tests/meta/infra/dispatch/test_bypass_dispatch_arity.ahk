@@ -31,10 +31,8 @@
 ; =====================================================
 ; =====================================================
 
-_BDA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_BDA_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -47,7 +45,7 @@ _BDA_ReadSource(RelPath) {
 ; =====================================================
 
 _BDA_OldOneArgCallAbsent() {
-	Src := _BDA_ReadSource("infra/menu_dispatcher.ahk")
+	Src := _BDA_ReadSource("menu_dispatcher.ahk")
 	Seg := _DriverFuncBody("_DispatchIfMissed")
 	Assert(Seg != "", "_DispatchIfMissed must exist in menu_dispatcher.ahk")
 	; The old broken form passed a single string — any match here means the
@@ -58,7 +56,7 @@ _BDA_OldOneArgCallAbsent() {
 Test("menu_dispatcher: _DispatchIfMissed does not use old single-arg Callback.Call", _BDA_OldOneArgCallAbsent)
 
 _BDA_ThreeArgCallPresent() {
-	Src := _BDA_ReadSource("infra/menu_dispatcher.ahk")
+	Src := _BDA_ReadSource("menu_dispatcher.ahk")
 	Seg := _DriverFuncBody("_DispatchIfMissed")
 	Assert(Seg != "", "_DispatchIfMissed must exist in menu_dispatcher.ahk")
 	; The correct form satisfies the (ItemName, ItemPos, MenuObj) arity that

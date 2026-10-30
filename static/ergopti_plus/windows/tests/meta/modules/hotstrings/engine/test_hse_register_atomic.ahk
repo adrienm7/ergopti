@@ -25,10 +25,8 @@
 ; ===================================================
 ; ===================================================
 
-_HRA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_HRA_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -39,7 +37,7 @@ _HRA_ReadSource(RelPath) {
 ; ===================================================
 
 _HRA_RegisterIsAtomic() {
-	Src := _HRA_ReadSource("infra/hotstrings/hotstring_engine_main.ahk")
+	Src := _HRA_ReadSource("hotstring_engine_main.ahk")
 	Body := _DriverFuncBody("HSE_Register")
 	Assert(Body != "", "HSE_Register must exist in hotstring_engine_main.ahk")
 	

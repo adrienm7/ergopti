@@ -25,10 +25,8 @@
 ; ===================================================
 ; ===================================================
 
-_HRG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_HRG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _HRG_CountText(Haystack, Needle) {
@@ -50,7 +48,7 @@ _HRG_CountText(Haystack, Needle) {
 
 _HRG_RebuildIsGuarded() {
 	; 1. Verify flag exists in engine.
-	EngineSrc := _HRG_ReadSource("infra/hotstrings/hotstring_engine_main.ahk")
+	EngineSrc := _HRG_ReadSource("hotstring_engine_main.ahk")
 	Assert(InStr(EngineSrc, "global HSE_RebuildInProgress := false") > 0,
 		"HSE_RebuildInProgress global flag must be defined in hotstring_engine_main.ahk")
 	
@@ -68,7 +66,7 @@ _HRG_RebuildIsGuarded() {
 		"HSE_FindMatchAtEnd must return no match for either rebuild fence before reading any registry index (hse-registry-torn-read-vs-onmessage)")
 	
 	; 3. Verify the serialized coordinator owns the fence across every pass.
-	MenuSrc := _HRG_ReadSource("ui/menu/menu_rebuild.ahk")
+	MenuSrc := _HRG_ReadSource("menu_rebuild.ahk")
 	Coordinator := _DriverFuncBody("RebuildHotstringsLive")
 	AcquireBody := _DriverFuncBody("_HSLR_RequestAndTryAcquire")
 	ReleaseBody := _DriverFuncBody("_HSLR_TryReleaseIfDrained")

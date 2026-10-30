@@ -34,10 +34,8 @@
 ; =================================================
 ; =================================================
 
-_LPBN_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
+_LPBN_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -48,7 +46,7 @@ _LPBN_ReadSource(RelPath) {
 ; ===================================================
 
 _LPBN_CheckGuardRejectsObjects() {
-	Src := _LPBN_ReadSource("modules/llm/models.ahk")
+	Src := _LPBN_ReadSource("models.ahk")
 	Assert(Src != "", "modules/llm/models.ahk must be readable")
 
 	Body := _DriverFuncBody("_LLM_ParseBillions")
@@ -64,7 +62,7 @@ _LPBN_CheckGuardRejectsObjects() {
 }
 
 _LPBN_CheckGuardComesBeforeRegExMatch() {
-	Src := _LPBN_ReadSource("modules/llm/models.ahk")
+	Src := _LPBN_ReadSource("models.ahk")
 	Assert(Src != "", "modules/llm/models.ahk must be readable")
 
 	Body := _DriverFuncBody("_LLM_ParseBillions")

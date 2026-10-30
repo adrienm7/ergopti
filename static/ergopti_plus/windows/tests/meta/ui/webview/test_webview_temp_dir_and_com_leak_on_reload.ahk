@@ -37,10 +37,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_WVRL_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_WVRL_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -76,7 +74,7 @@ Test("keystats: KLWV_CloseAll runs on shutdown via OnExit (webview-temp-dir-and-
 ; ==================================================
 
 _WVRL_CloseReleasesEverything() {
-	Src := _WVRL_ReadSource("modules/keystats/keystats_webview.ahk")
+	Src := _WVRL_ReadSource("keystats_webview.ahk")
 	Seg := _DriverFuncBody("KLWV_Close")
 	Assert(Seg != "", "KLWV_Close(which) must exist in keystats_webview.ahk")
 	; Releasing the COM controller is what stops the msedgewebview2.exe host and
@@ -104,7 +102,7 @@ _WVRL_CloseReleasesEverything() {
 Test("keystats: KLWV_Close releases controller, gui and udir (webview-temp-dir-and-com-leak-on-reload)", _WVRL_CloseReleasesEverything)
 
 _WVRL_CloseAllIteratesClone() {
-	Src := _WVRL_ReadSource("modules/keystats/keystats_webview.ahk")
+	Src := _WVRL_ReadSource("keystats_webview.ahk")
 	Seg := _DriverFuncBody("KLWV_CloseAll")
 	Assert(Seg != "", "KLWV_CloseAll() must exist in keystats_webview.ahk")
 	; KLWV_Close mutates KLWV.windows (Delete) mid-iteration; iterating a Clone()

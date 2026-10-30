@@ -21,10 +21,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TEPMS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TEPMS_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TEPMS_StripLineComments(Src) {
@@ -44,7 +42,7 @@ _TEPMS_StripLineComments(Src) {
 ; =====================================================================
 
 _TEPMS_ModifierVkEarlyReturn() {
-	Src := _TEPMS_StripLineComments(_TEPMS_ReadSource("modules/keystats/keystats_ergonomics.ahk"))
+	Src := _TEPMS_StripLineComments(_TEPMS_ReadSource("keystats_ergonomics.ahk"))
 	Assert(Src != "", "modules/keystats/keystats_ergonomics.ahk must be readable")
 
 	Body := _DriverFuncBody("KL_Ergo_UpdatePinky")

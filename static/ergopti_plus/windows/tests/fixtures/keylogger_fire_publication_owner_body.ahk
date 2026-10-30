@@ -15,6 +15,10 @@ _KFPO_Require(Condition, Message) {
 		throw Error(Message)
 }
 
+HotstringCategoryLogName(Category) {
+	return Category
+}
+
 LoggerDebug(Source, Message, Values*) {
 	global _KFPO
 	Text := Message

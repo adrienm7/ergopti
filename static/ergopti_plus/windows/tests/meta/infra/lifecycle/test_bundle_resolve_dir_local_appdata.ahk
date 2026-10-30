@@ -32,10 +32,8 @@
 ; ===================================================
 ; ===================================================
 
-_BRDL_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
+_BRDL_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -78,7 +76,7 @@ _BRDL_CheckResolveLocalAppDataDirMatchesEnv() {
 }
 
 _BRDL_CheckNoDoubleDot() {
-	Src := _BRDL_ReadSource("infra/bundle.ahk")
+	Src := _BRDL_ReadSource("bundle.ahk")
 	Assert(Src != "", "infra/bundle.ahk must be readable")
 
 	Body := _DriverFuncBody("_Bundle_ResolveDir")
@@ -92,7 +90,7 @@ _BRDL_CheckNoDoubleDot() {
 ; must delegate to the shared, EnvGet-based resolver rather than referencing
 ; the nonexistent A_LocalAppData built-in directly.
 _BRDL_CheckUsesSharedResolver() {
-	Src := _BRDL_ReadSource("infra/bundle.ahk")
+	Src := _BRDL_ReadSource("bundle.ahk")
 	Assert(Src != "", "infra/bundle.ahk must be readable")
 
 	Body := _DriverFuncBody("_Bundle_ResolveDir")

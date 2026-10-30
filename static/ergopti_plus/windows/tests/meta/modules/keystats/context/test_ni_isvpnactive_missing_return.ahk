@@ -33,10 +33,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_VpnRet_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_VpnRet_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -49,7 +47,7 @@ _VpnRet_ReadSource(RelPath) {
 ; ==================================================
 
 _VpnRet_NoMatchPathReturnsFalse() {
-	Src := _VpnRet_ReadSource("adapters/network_info.ahk")
+	Src := _VpnRet_ReadSource("network_info.ahk")
 	Seg := _DriverFuncBody("NI_GetVpnStatus")
 	Assert(Seg != "", "NI_GetVpnStatus() declaration must exist in network_info.ahk")
 	; The function must contain the no-match typed return that follows the

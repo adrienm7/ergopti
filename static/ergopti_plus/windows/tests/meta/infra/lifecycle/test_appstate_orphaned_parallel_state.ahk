@@ -36,10 +36,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_AOPS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_AOPS_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -53,7 +51,7 @@ _AOPS_ReadSource(RelPath) {
 
 ; The dead Map must not exist: it is the parallel copy of the live globals.
 _AOPS_NoParallelMap() {
-	Src := _AOPS_ReadSource("infra/app_state.ahk")
+	Src := _AOPS_ReadSource("app_state.ahk")
 	Assert(InStr(Src, "AppState := Map(") == 0,
 		"infra/app_state.ahk must not declare an AppState Map - it is a parallel unused copy of the live globals and a single-source-of-truth trap (appstate-orphaned-parallel-state)")
 }
@@ -61,7 +59,7 @@ Test("app_state: no parallel AppState Map declaration (appstate-orphaned-paralle
 
 ; The typed accessors fronting the dead Map must not exist either.
 _AOPS_NoDeadAccessors() {
-	Src := _AOPS_ReadSource("infra/app_state.ahk")
+	Src := _AOPS_ReadSource("app_state.ahk")
 	Assert(InStr(Src, "AppState_GetNumberOfRepetitions(") == 0,
 		"AppState_GetNumberOfRepetitions must be removed - the live counter lives in NumberOfRepetitions via nav_layer_helpers.ahk (appstate-orphaned-parallel-state)")
 	Assert(InStr(Src, "AppState_TouchLastSentKey(") == 0,
@@ -74,7 +72,7 @@ Test("app_state: dead AppState_* accessors are removed (appstate-orphaned-parall
 ; The pruning thresholds must have a single declaration in the live entry
 ; script, not a duplicate copy in app_state.ahk.
 _AOPS_ThresholdsSingleSource() {
-	StateSrc := _AOPS_ReadSource("infra/app_state.ahk")
+	StateSrc := _AOPS_ReadSource("app_state.ahk")
 	Assert(InStr(StateSrc, "global LAST_SENT_KEY_TIME_PRUNE_AT :=") == 0,
 		"LAST_SENT_KEY_TIME_PRUNE_AT must be declared once in ErgoptiPlus.ahk, not duplicated in app_state.ahk (appstate-orphaned-parallel-state)")
 	Assert(InStr(StateSrc, "global LAST_SENT_KEY_TIME_MAX_AGE_MS :=") == 0,
@@ -90,8 +88,8 @@ Test("app_state: prune thresholds have a single source in ErgoptiPlus.ahk (appst
 ; layout.ahk and shortcuts/utils.ahk previously referenced the removed AppState Map via
 ; AppState["remapped_list"], which caused an UnsetError crash on boot (AppState is unset).
 _AOPS_NoRemappedListViaAppState() {
-	LayoutSrc   := _AOPS_ReadSource("modules/keymap/layout.ahk")
-	ShortcutSrc := _AOPS_ReadSource("modules/shortcuts/utils.ahk")
+	LayoutSrc   := _AOPS_ReadSource("layout.ahk")
+	ShortcutSrc := _AOPS_ReadSource("utils.ahk")
 	; Search for the string key used in the removed AppState Map
 	Assert(InStr(LayoutSrc, "remapped_list") == 0,
 		"modules/keymap/layout.ahk must not access AppState[remapped_list] - use RemappedList directly (appstate-orphaned-parallel-state)")

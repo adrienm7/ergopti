@@ -38,10 +38,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_AHSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_AHSG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -57,7 +55,7 @@ _AHSG_EngineBufferIsSuperGlobal() {
 	; that is valid only because this explicit top-level declaration makes the
 	; engine buffer super-global across the included module.
 	EngineMain := _StripFullLineComments(
-		_AHSG_ReadSource("infra/hotstrings/hotstring_engine_main.ahk"))
+		_AHSG_ReadSource("hotstring_engine_main.ahk"))
 	Assert(RegExMatch(EngineMain, "m)^global[ \t]+[^\r\n]*\bHSE_Buffer\b") > 0,
 		"hotstring_engine_main must declare HSE_Buffer global at top level, or ActivateHotstrings' IsSet guard reads an unset local and silently misses the empty-buffer fast path")
 }
@@ -65,7 +63,7 @@ Test("hotstring_engine: HSE_Buffer stays a module super-global for ActivateHotst
 	_AHSG_EngineBufferIsSuperGlobal)
 
 _AHSG_GateBeforePoke() {
-	Src := _AHSG_ReadSource("infra/hotstrings/hotstring_engine.ahk")
+	Src := _AHSG_ReadSource("hotstring_engine.ahk")
 	Seg := _DriverFuncBody("ActivateHotstrings")
 	Assert(Seg != "", "ActivateHotstrings() declaration must exist in hotstring_engine.ahk")
 
@@ -84,7 +82,7 @@ _AHSG_GateBeforePoke() {
 Test("hotstring_engine: ActivateHotstrings gates the Sleep poke on a pending HSE_Buffer (activate-hotstrings-sleep-on-keyboard-thread)", _AHSG_GateBeforePoke)
 
 _AHSG_GuardReturnsEarly() {
-	Src := _AHSG_ReadSource("infra/hotstrings/hotstring_engine.ahk")
+	Src := _AHSG_ReadSource("hotstring_engine.ahk")
 	Seg := _DriverFuncBody("ActivateHotstrings")
 	; Slice from the function head to the first space poke: the early-return that
 	; skips the dance on an empty buffer must live in that prologue.

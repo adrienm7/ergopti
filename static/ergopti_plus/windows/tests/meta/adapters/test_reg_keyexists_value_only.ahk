@@ -38,10 +38,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_RKVO_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_RKVO_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -55,7 +53,7 @@ _RKVO_ReadSource(RelPath) {
 ; ====================================================
 
 _RKVO_KeyExistsEnumeratesValues() {
-	Src := _RKVO_ReadSource("infra/registry.ahk")
+	Src := _RKVO_ReadSource("registry.ahk")
 	Seg := _DriverFuncBody("Reg_KeyExists")
 	Assert(Seg != "", "Reg_KeyExists(keyPath) declaration must exist in infra/registry.ahk")
 	; Opening the key itself is stronger than enumerating its values: it also

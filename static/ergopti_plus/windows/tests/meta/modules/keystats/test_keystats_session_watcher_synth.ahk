@@ -33,10 +33,8 @@
 ; ==================================================
 ; ==================================================
 
-_KSW_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_KSW_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -49,7 +47,7 @@ _KSW_ReadSource(RelPath) {
 ; ==================================================
 
 _KSW_WatcherGatedBySynth() {
-	Src := _KSW_ReadSource("modules/keystats/keystats_hook.ahk")
+	Src := _KSW_ReadSource("keystats_hook.ahk")
 	Body := _DriverFuncBody("KL_Hook_NoteActivity")
 	Assert(Body != "", "KL_Hook_NoteActivity() must exist in keystats_hook.ahk")
 	Assert(InStr(Body, "KL_Watchers_OnKeystroke") > 0,
