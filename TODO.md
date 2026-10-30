@@ -115,6 +115,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      number of issue lines only); `config.toml`, `config_karabiner.toml`, the personal hotstrings and personal
      info files each parse with the driver's TOML reader, read-only; today's log exists; the logs folder takes a
      probe file (removed at once); the auto-reload file watcher owner is published (FSEvents accepted it).
+   - `field_launcher_roles`: the launcher resolves; `--managed-http-worker` with malformed arguments exits 64
+     at once (any other exit or a timeout: the role did not dispatch); the same worker carries one direct GET,
+     with the request `native_http.py` sends, to a loopback server the check opens and closes. An exit 64 there
+     (the 2026-10-30 `native_child_status=64`), a refusal stage or `not_reached` names where it broke.
 
 ## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
 

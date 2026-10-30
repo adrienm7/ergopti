@@ -89,6 +89,13 @@
 			"proves": "The keystats database passes SQLite's read-only quick check, every configuration file parses, the logs folder takes a write and the file watchers are owned."
 		},
 		{
+			"id": "field_launcher_roles",
+			"kind": "field_check",
+			"check": "launcher_roles",
+			"deadline_seconds": 45,
+			"proves": "The launcher resolves, its headless HTTP worker role refuses malformed arguments with EX_USAGE, and it carries one direct GET to a loopback server the check owns."
+		},
+		{
 			"id": "key_accounting",
 			"kind": "field_check",
 			"check": "key_accounting",

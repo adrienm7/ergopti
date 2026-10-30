@@ -15,6 +15,9 @@
 --- 4. storage: the keystats database passes SQLite's quick check (read-only),
 ---    every configuration file parses, the logs folder takes a write and the
 ---    auto-reload file watchers are owned.
+--- 5. launcher_roles: the launcher this runtime resolves answers its headless
+---    roles before any application startup, and its native HTTP worker carries
+---    one request to a loopback server this check owns.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only, like the Debug checks: nothing is granted, prompted, written
@@ -28,6 +31,7 @@
 --- ==============================================================================
 
 local Identifiers = require("identifiers")
+local Json = require("json")
 
 local M = {}
 
@@ -362,6 +366,101 @@ function M.storage(ports, report, finish)
 			end
 			finish()
 		end)
+end
+
+
+
+
+
+-- =================================
+-- =================================
+-- ======= 5/ Launcher roles =======
+-- =================================
+-- =================================
+
+M.HTTP_WORKER_FLAG = "--managed-http-worker"
+
+-- The usage refusal every headless role answers to malformed arguments
+-- (EX_USAGE), before it reads anything or starts the application.
+M.USAGE_EXIT = 64
+
+-- Seconds of the loopback request: its budget and its idle bound, which the
+-- worker requires to match its two arguments.
+M.LOOPBACK_SECONDS = 5
+
+-- The path the loopback server answers; anything else is not this check's.
+M.LOOPBACK_PATH = "/ergopti-field-probe"
+
+--- The request the native HTTP worker reads on stdin, as native_http.py sends it.
+--- @param port integer Loopback port.
+--- @return string json
+function M.loopback_request(port)
+	return Json.encode({
+		version = 1,
+		url = "http://127.0.0.1:" .. tostring(port) .. M.LOOPBACK_PATH,
+		method = "GET",
+		headers = Json.array({}),
+		timeout = M.LOOPBACK_SECONDS,
+		idle_timeout = M.LOOPBACK_SECONDS,
+		direct = true,
+	})
+end
+
+--- Reads the worker's first frame: the HTTP head or the refusal it published.
+--- The frames are length-prefixed binary; only their JSON bodies are searched,
+--- so a stdout the task layer could not decode reads as nothing.
+--- @param stdout any Worker stdout.
+--- @return integer|nil status, string|nil refusal_stage
+function M.parse_worker_head(stdout)
+	local text = tostring(stdout or "")
+	local stage = text:match('"native_refusal_stage"%s*:%s*"(native_[a-z_]+)"')
+	local status = tonumber(text:match('"status"%s*:%s*(%d+)'))
+	return status, stage
+end
+
+--- The launcher's headless roles. A role must refuse malformed arguments with
+--- EX_USAGE at once: anything else means the role did not dispatch (a launcher
+--- built before it, a kill by an endpoint agent, the GUI starting). Then the
+--- native HTTP worker, which every managed download goes through, carries one
+--- direct GET to a loopback server this check opens and closes: an exit code,
+--- a refusal stage or a request that never arrived names where it broke. No
+--- byte leaves the Mac.
+function M.launcher_roles(ports, report, finish)
+	local launcher, environment = ports.launcher()
+	if type(launcher) ~= "string" then
+		report.step("launcher_present", STATE.fail, "unresolved")
+		report.step("http_worker_usage", STATE.skip, "no_launcher")
+		report.step("http_worker_loopback", STATE.skip, "no_launcher")
+		return finish()
+	end
+	report.step("launcher_present", STATE.pass, "yes")
+	ports.exec(launcher, { M.HTTP_WORKER_FLAG }, COMMAND_TIMEOUT, function(usage_code)
+		report.step("http_worker_usage", usage_code == M.USAGE_EXIT and STATE.pass or STATE.fail,
+			usage_code == M.USAGE_EXIT and "usage_refused" or failure_token(usage_code))
+		ports.loopback_server(M.LOOPBACK_PATH, function(server)
+			if not server then
+				report.step("http_worker_loopback", STATE.fail, "server_refused")
+				return finish()
+			end
+			local seconds = tostring(M.LOOPBACK_SECONDS)
+			ports.exec_input(launcher, { M.HTTP_WORKER_FLAG, seconds, seconds }, M.loopback_request(server.port),
+				COMMAND_TIMEOUT, function(code, stdout)
+					local hits = server.hits()
+					server.stop()
+					local status, stage = M.parse_worker_head(stdout)
+					if code == 0 and hits == 1 then
+						report.step("http_worker_loopback", STATE.pass, "http_" .. tostring(status or "unread"))
+					elseif stage then
+						report.step("http_worker_loopback", STATE.fail, failure_token(code) .. ":" .. stage)
+					elseif hits == 0 then
+						report.step("http_worker_loopback", STATE.fail, failure_token(code) .. ":not_reached")
+					else
+						report.step("http_worker_loopback", STATE.fail, failure_token(code) .. ":hits_" .. hits)
+					end
+					finish()
+				end, environment)
+		end)
+	end, environment)
 end
 
 return M

@@ -802,6 +802,7 @@ M.checks = {
 	event_taps = Probes.event_taps,
 	input_sources = Probes.input_sources,
 	storage = Probes.storage,
+	launcher_roles = Probes.launcher_roles,
 }
 
 return M

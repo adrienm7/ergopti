@@ -223,9 +223,96 @@ end
 
 
 
+-- =================================
+-- =================================
+-- ======= 5/ Launcher roles =======
+-- =================================
+-- =================================
+
+-- Ports the loopback server tries, from the dynamic range, before giving up.
+local LOOPBACK_PORT_ATTEMPTS = 5
+local LOOPBACK_PORT_MIN, LOOPBACK_PORT_MAX = 49152, 65535
+
+--- The launcher this runtime resolves, with the environment it is run with.
+--- @return string|nil launcher, table|nil environment
+local function launcher()
+	local path, _, environment = require("platform.remap.lease_helper").resolve()
+	return path, environment
+end
+
+--- Runs one executable with exact stdin bytes and settles once.
+--- @param executable string Absolute path.
+--- @param args table Argument array.
+--- @param input string Bytes written to stdin, then closed.
+--- @param timeout_s number Seconds before the child is terminated.
+--- @param callback function fn(exit_code|nil, stdout, stderr).
+--- @param environment table|nil Explicit child environment.
+local function exec_input(executable, args, input, timeout_s, callback, environment)
+	local ShellRunner = require("adapters.shell_runner")
+	local Timer = require("adapters.timer_scheduler")
+	local settled, timer = false, nil
+	local function settle(code, stdout, stderr)
+		if settled then return end
+		settled = true
+		if timer then Timer.cancel(timer) end
+		callback(code, stdout or "", stderr or "")
+	end
+	local handle = ShellRunner.spawn(executable, args, function(code, stdout, stderr)
+		settle(code, stdout, stderr)
+	end, nil, environment)
+	if handle.isSettled() or not handle.start() then return settle(nil, "") end
+	timer = Timer.after(timeout_s, function()
+		timer = nil
+		pcall(handle.terminate)
+		settle(nil, "")
+	end)
+	if not handle.set_input(input) or not handle.close_input() then
+		pcall(handle.terminate)
+		settle(nil, "")
+	end
+end
+
+--- Opens a loopback HTTP server that answers one path with 204 and counts the
+--- requests it received; the caller stops it.
+--- @param path string The path it answers.
+--- @param callback function fn({ port, hits(), stop() } | nil).
+local function loopback_server(path, callback)
+	local hits = 0
+	for _ = 1, LOOPBACK_PORT_ATTEMPTS do
+		local port = math.random(LOOPBACK_PORT_MIN, LOOPBACK_PORT_MAX)
+		local ok, server = pcall(function()
+			local candidate = hs.httpserver.new(false, false)
+			candidate:setInterface("loopback")
+			candidate:setPort(port)
+			candidate:setCallback(function(_, requested)
+				if requested == path then hits = hits + 1 end
+				return "", requested == path and 204 or 404, {}
+			end)
+			if candidate:start() ~= candidate or candidate:getPort() ~= port then
+				pcall(function() candidate:stop() end)
+				return nil
+			end
+			return candidate
+		end)
+		if ok and server then
+			return callback({
+				port = port,
+				hits = function() return hits end,
+				stop = function() pcall(function() server:stop() end) end,
+			})
+		end
+	end
+	require("infra.logger").warn("adapters.field_probe_ports", "No loopback port could be bound for the HTTP worker check.")
+	callback(nil)
+end
+
+
+
+
+
 -- ==========================
 -- ==========================
--- ======= 5/ Factory =======
+-- ======= 6/ Factory =======
 -- ==========================
 -- ==========================
 
@@ -245,6 +332,9 @@ function M.new()
 		log_facts = log_facts,
 		watcher_owners = watcher_owners,
 		keystats_database = keystats_database,
+		launcher = launcher,
+		exec_input = exec_input,
+		loopback_server = loopback_server,
 	}
 end
 
