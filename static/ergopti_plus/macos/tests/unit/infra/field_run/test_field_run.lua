@@ -975,3 +975,59 @@ helpers.describe("field run ports: the MLX model step", function()
 			"the step names the file it could not put back")
 	end)
 end)
+
+helpers.describe("field run ports: Ollama model step", function()
+	helpers.it("waits for the runtime metadata an install just changed instead of skipping", function()
+		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.shell_runner",
+			"adapters.timer_scheduler", "infra.paths", "infra.field_run", "modules.llm.ollama_binary",
+			"modules.llm.api_ollama", "modules.llm.ollama_deps_checker", "ui.menu.menu_llm" }
+		helpers.with_stub_scope(stubbed, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["adapters.file_system"] = { read = function() return "{}" end }
+			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
+			local timers = 0
+			package.loaded["adapters.timer_scheduler"] = {
+				after = function(_, callback) timers = timers + 1; callback() end,
+				cancel = function() end,
+			}
+			package.loaded["infra.paths"] = { shared_llm_path = function() return "/shared/models.json" end }
+			package.loaded["infra.field_run"] = {
+				smallest_model = function() return { name = "Granite", runtime_name = "granite4:350m-h", download_gb = 0.36 } end,
+			}
+			-- The 19:17 Mac run: the install had just rewritten the runtime files,
+			-- so the hint was pending twice before it named the executable.
+			local looks = 0
+			package.loaded["modules.llm.ollama_binary"] = {
+				native_candidate = function()
+					looks = looks + 1
+					if looks <= 2 then return nil, nil, "pending" end
+					return "/owned/ollama", {}
+				end,
+				resolve = function()
+					if looks <= 2 then return nil, "managed runtime metadata is pending", nil end
+					return "/owned/ollama", nil, "native_managed"
+				end,
+			}
+			-- What the step read before: the pending hint answers "absent".
+			package.loaded["modules.llm.ollama_deps_checker"] = {
+				runtime_available = function() return package.loaded["modules.llm.ollama_binary"].resolve() ~= nil end,
+			}
+			package.loaded["modules.llm.api_ollama"] = {
+				forget_local_models = function() end,
+				verify_local_model = function(_, callback) callback(true) end,
+				ensure_running = function() end,
+			}
+			local pulled = false
+			local manager = { pull_ollama_model = function(_, on_success) pulled = true; on_success(); return true end }
+			package.loaded["ui.menu.menu_llm"] = { active_models_manager = function() return manager end }
+			package.loaded["adapters.field_run_ports"] = nil
+			local ports = require("adapters.field_run_ports").new("/repo")
+			local verdict, codes
+			ports.run_step({ id = "ollama_model", kind = "ai" }, function(v, c) verdict, codes = v, table.concat(c, ",") end)
+			helpers.assert_eq(verdict, "pass", "the step must not read a pending hint as an absent runtime")
+			helpers.assert_true(pulled, "the model step ran its pull")
+			helpers.assert_eq(timers, 2, "it looked again once per pending answer")
+			helpers.assert_eq(codes, "model_preexisting,pulled,model_kept")
+		end)
+	end)
+end)
