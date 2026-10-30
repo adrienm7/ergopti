@@ -729,11 +729,54 @@ end
 
 
 
--- ==========================
--- ==========================
--- ======= 9/ Factory =======
--- ==========================
--- ==========================
+-- =====================================
+-- =====================================
+-- ======= 9/ Layout rows builds =======
+-- =====================================
+-- =====================================
+
+-- The shipped layout the check builds from, and its own name and files: Ergo-L
+-- moves cells with the symbols first (Ergopti types digits on both levels).
+local ROWS_SOURCE_ID = "ergol"
+local ROWS_KEYBOARD_NAME = "Ergopti Field Rows"
+local ROWS_FILE_PREFIX = "ErgoptiFieldRows-"
+
+--- The layout rows check's environment (infra/field_check_layout_rows.lua).
+--- @return table|nil env
+--- @return string|nil error
+local function layout_rows_env()
+	local Build = require("modules.keymap.layout_rows_build")
+	local InputSources = require("modules.keymap.input_sources")
+	local shipped, shipped_err = require("modules.keymap.layout_registry").shipped_layout(ROWS_SOURCE_ID)
+	if not shipped then return nil, shipped_err end
+	local deps = Build.default_deps({
+		file_prefix = ROWS_FILE_PREFIX,
+		record_path = require("infra.config_paths").get_config_dir() .. "layouts/field_rows_builds.json",
+	})
+	if type(deps.keycodes_table) ~= "table" then return nil, "the keycode table is unreadable" end
+	return {
+		source = { id = ROWS_SOURCE_ID, keyboard_name = ROWS_KEYBOARD_NAME, text = shipped.text,
+			convention = shipped.entry.keycode_convention },
+		replace = function(source, rows, on_done) return Build.replace(source, rows, on_done, deps) end,
+		retire_all = function(on_done) return Build.retire_all(on_done, deps) end,
+		exists = deps.exists,
+		sources_state = InputSources.read_sources_state_async,
+		-- A source id is no menu name: the native selector looks it up by id.
+		select_id = function(id, on_done)
+			return InputSources.set_input_source_async(nil, id, function(ok, _, reason) on_done(ok, reason) end)
+		end,
+	}, nil
+end
+
+
+
+
+
+-- ===========================
+-- ===========================
+-- ======= 10/ Factory =======
+-- ===========================
+-- ===========================
 
 -- Test seam: the shell runner exec_input spawns through; nil in production.
 M._shell_runner = nil
@@ -783,6 +826,7 @@ function M.new()
 		end,
 		hotstring_candidates = hotstring_candidates,
 		prediction_readiness = prediction_readiness,
+		layout_rows_env = layout_rows_env,
 	}
 end
 
