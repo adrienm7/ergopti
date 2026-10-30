@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "शॉर्टकट के माध्यम से hotstring जोड़ने के बाद UI बंद करें",
 	"menu.hotstrings.config_item": "⚙️ विलंब और रंग कॉन्फ़िगर करें…",
 	"menu.hotstrings.consumed": "उपभोग किया गया",
+	"menu.hotstrings.consumed_delimiters": "विस्तार द्वारा उपभोग किए गए",
 	"menu.hotstrings.consumed_suffix": "(उपभोग किया गया)",
 	"menu.hotstrings.custom_label": "कस्टम",
 	"menu.hotstrings.default_category_prefix": "डिफ़ॉल्ट श्रेणी: ",

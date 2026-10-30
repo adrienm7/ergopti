@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "Stäng användargränssnitt efter att ha lagt till en hotstring via genväg",
 	"menu.hotstrings.config_item": "⚙️ Konfigurera fördröjningar och färger…",
 	"menu.hotstrings.consumed": "konsumerad",
+	"menu.hotstrings.consumed_delimiters": "Förbrukas av expansionen",
 	"menu.hotstrings.consumed_suffix": "(konsumerad)",
 	"menu.hotstrings.custom_label": "Anpassad",
 	"menu.hotstrings.default_category_prefix": "Standardkategori: ",

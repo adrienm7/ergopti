@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "Закрыть интерфейс после добавления хотстринга через сочетание",
 	"menu.hotstrings.config_item": "⚙️ Настроить задержки и цвета…",
 	"menu.hotstrings.consumed": "поглощён",
+	"menu.hotstrings.consumed_delimiters": "Поглощаются при раскрытии",
 	"menu.hotstrings.consumed_suffix": "(поглощён)",
 	"menu.hotstrings.custom_label": "Пользовательский",
 	"menu.hotstrings.default_category_prefix": "Категория по умолчанию: ",

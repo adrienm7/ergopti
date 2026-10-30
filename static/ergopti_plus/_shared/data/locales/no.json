@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "Lukk grensesnittet etter at en hotstring er lagt til via snarvei",
 	"menu.hotstrings.config_item": "⚙️ Konfigurer forsinkelser og farger…",
 	"menu.hotstrings.consumed": "forbrukt",
+	"menu.hotstrings.consumed_delimiters": "Forbrukes av utvidelsen",
 	"menu.hotstrings.consumed_suffix": "(forbrukt)",
 	"menu.hotstrings.custom_label": "Egendefinert",
 	"menu.hotstrings.default_category_prefix": "Standardkategori: ",

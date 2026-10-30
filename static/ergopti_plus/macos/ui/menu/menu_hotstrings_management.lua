@@ -262,6 +262,42 @@ function M.build_management(ctx)
 		end
 	end
 
+	-- Whether an expansion swallows each built-in delimiter: a click on its catalogue
+	-- row above switches it on or off, so this half of its state has its own rows.
+	local consume_rows = {}
+	for _, def in ipairs(defs) do
+		if type(def) == "table" and not def.custom and def.type ~= "separator" and def.key then
+			local consumed = ctx.keymap and type(ctx.keymap.is_terminator_consume) == "function"
+				and ctx.keymap.is_terminator_consume(def.key) or false
+			local label = ctx.applyTriggerChar(i18n.get(def.label_key))
+			consume_rows[#consume_rows + 1] = {
+				label    = label,
+				checked  = consumed or nil,
+				disabled = paused or nil,
+				action   = not paused and function()
+					local next_consume = not consumed
+					local committed = KeymapLifecycle.commit_mutation(ctx, "toggle delimiter consumption", function()
+						if not ctx.keymap or type(ctx.keymap.set_terminators_consume) ~= "function" then return false end
+						return ctx.keymap.set_terminators_consume({ [def.key] = next_consume })
+					end)
+					if not committed then return false end
+					if type(state.terminator_consume) ~= "table" then state.terminator_consume = {} end
+					-- Back on the catalogue choice, the stored consume table holds no key.
+					if next_consume == (def.consume == true) then
+						state.terminator_consume[def.key] = nil
+					else
+						state.terminator_consume[def.key] = next_consume
+					end
+					if ctx.save_prefs() ~= true then return false end
+					ctx.notify_feature(string.format(i18n.get("notify.word_expander_prefix"),
+						label .. " " .. i18n.get("menu.hotstrings.consumed_suffix")), next_consume)
+					ctx.updateMenu()
+					return true
+				end or nil,
+			}
+		end
+	end
+
 	-- Custom terminators + add button, grouped together at the bottom
 	local catalogue_rows = exp_sub
 	exp_sub = {}
@@ -395,6 +431,7 @@ function M.build_management(ctx)
 	}
 	local entry_rows = ManifestMenu.template_rows("hotstrings_word_expander_frame", {}, {}, {
 		["parameter_catalogue_entries"] = function() return catalogue_rows end,
+		["parameter_consume_children"] = consume_rows,
 		["parameter_custom_entries"] = function() return exp_sub end,
 	})
 	if not entry_rows then return nil end
