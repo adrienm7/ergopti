@@ -663,11 +663,13 @@ function M.add(trigger, replacement, opts)
 	-- word-boundary / group-order / seq tiebreakers (behaviour unchanged).
 	local priority          = type(opts.priority) == "number" and opts.priority or PRIORITY_COMMON
 
-	-- Replacements containing newlines or key directives are always "final" so
-	-- the engine does not attempt to chain another expansion on top of them.
-	if replacement:match("\n") or replacement:match("{Tab}") or replacement:match("{Enter}") or replacement:match("{Return}") then
-		is_final = true
-	end
+	-- The output grammar (send_input.parse_output). {U+XXXX} and the brace escapes
+	-- are text, resolved once here so the matcher, the case forms and the preview
+	-- see the characters. A key token is always "final": the caret is no longer
+	-- behind this text, so nothing can chain off it.
+	local replacement_has_keys
+	replacement, replacement_has_keys = km_utils.resolve_output(replacement)
+	if replacement_has_keys then is_final = true end
 
 	--- Appends or updates a single mapping entry in the database.
 	--- @param t string The trigger.
