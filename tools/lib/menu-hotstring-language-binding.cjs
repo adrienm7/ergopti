@@ -1543,7 +1543,7 @@ function hotstringLanguagePublication(sources, manifest, platform, target) {
 					['Gates.Push(Cat["v1"])', 1],
 					['Paths.Push(V2Path)', 1],
 					[
-						'return _HS_AllSectionsRow(_HS_ScopeAllOn(Gates, Paths), ((p) => (Bool) => ToggleLanguageAllSections(p, Bool))(Pack))'
+						'return _HS_AllSectionsRow(_HS_ScopeAllOn(Gates, Paths), ((p) => (Bool) => _HS_SelectionNotice(HotstringsLanguageName(p["locale"]), Bool, ToggleLanguageAllSections(p, Bool)))(Pack))'
 					]
 				]) &&
 				route(language, '.ahk', [
