@@ -96,7 +96,7 @@ function M.new(ports)
 
 	local function on_text(id, answer)
 		if not current(id) then return end
-		answer = type(answer) == "string" and answer:gsub("^%s+", ""):gsub("%s+$", "") or ""
+		answer = type(answer) == "string" and require("text_utils").trim(answer) or ""
 		if answer == "" then return on_fail(id, M.EMPTY_ANSWER_REASON) end
 		ports.info("Test prediction #%d answered (%d byte(s)).", id, #answer)
 		local kept, cut = excerpt(answer, M.EXCERPT_CHARS)
