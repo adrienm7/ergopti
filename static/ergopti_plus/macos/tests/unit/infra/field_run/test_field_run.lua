@@ -385,7 +385,12 @@ helpers.describe("field run: a run", function()
 				helpers.assert_type(result.log_window.lines, "table")
 				helpers.assert_true(spec.verdict_set[result.verdict], "undeclared verdict " .. tostring(result.verdict))
 			end
-			local typing = state.json(result_path("r11", 7, "key_accounting"))
+			-- Found by its id: the field run's own probes are declared before it
+			local typing_index
+			for index, step in ipairs(spec.steps) do
+				if step.id == "key_accounting" then typing_index = index end
+			end
+			local typing = state.json(result_path("r11", typing_index, "key_accounting"))
 			helpers.assert_eq(typing.verdict, "needs_typing")
 			helpers.assert_eq(typing.codes[1], "synthetic_input_unsafe")
 			for _, id in ipairs(state.calls) do

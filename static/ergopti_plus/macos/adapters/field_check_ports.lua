@@ -244,7 +244,7 @@ M.exec = exec
 --- The ports of the real Mac.
 --- @return table ports
 function M.new()
-	return {
+	local ports = {
 		path_exists = FileSystem.exists,
 		exec = exec,
 		home = function() return os.getenv("HOME") end,
@@ -265,6 +265,12 @@ function M.new()
 		login_startup_status = login_startup_status,
 		composer_env = function() return (require("modules.keymap.composer_check").env()) end,
 	}
+	-- The field run's own checks (infra/field_check_probes.lua) read more facts
+	for name, port in pairs(require("adapters.field_probe_ports").new()) do
+		if ports[name] ~= nil then error("field check ports: duplicate port " .. name, 2) end
+		ports[name] = port
+	end
+	return ports
 end
 
 return M
