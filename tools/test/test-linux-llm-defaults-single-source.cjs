@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * The Linux driver's Ollama defaults must equal the cross-driver canonicals so it
  * predicts with the same settings as macOS/Windows. They live once:
- *   - port / temperature / context-length / keep-alive → _shared/modules/llm/defaults.json
+ *   - owned and stock ports / temperature / context-length / keep-alive → _shared/modules/llm/defaults.json
  *   - max_tokens                                        → _shared/lua/llm/prompt_builder.lua
  *
  * ROOT CAUSE ENCODED:
@@ -53,7 +53,8 @@ const errors = [];
 // ── 1. linux_bridge mirrors must equal the canonical values ───────────────
 const bridge = stripLua(read('linux/infra/llm_bridge.lua'));
 const bridgeChecks = [
-	['OLLAMA_DEFAULT_PORT', DEFAULTS.llm_ollama_port, 'defaults.json llm_ollama_port'],
+	['OLLAMA_OWNED_PORT', DEFAULTS.llm_ollama_owned_port, 'defaults.json llm_ollama_owned_port'],
+	['OLLAMA_STOCK_PORT', DEFAULTS.llm_ollama_port, 'defaults.json llm_ollama_port'],
 	['DEFAULT_TEMPERATURE', DEFAULTS.llm_temperature, 'defaults.json llm_temperature'],
 	[
 		'DEFAULT_KEEP_ALIVE',
@@ -98,7 +99,8 @@ const predForbidden = [
 	[/max_tokens\s*=\s*200\b/, 'max_tokens 200 (use PromptBuilder.DEFAULT_MAX_TOKENS)'],
 	[/_max_context_chars\s*=\s*2000\b/, 'context 2000 (use HttpBridge.DEFAULT_CONTEXT_LENGTH)'],
 	[/localhost:11434/, 'localhost:11434 (use HttpBridge.resolve_base_url)'],
-	[/port\s*=\s*11434\b/, 'port 11434 (use HttpBridge.OLLAMA_DEFAULT_PORT)']
+	[/port\s*=\s*1143[45]\b/, 'an Ollama port literal (use HttpBridge.OLLAMA_OWNED_PORT)'],
+	[/OLLAMA_DEFAULT_PORT/, 'the retired OLLAMA_DEFAULT_PORT (use HttpBridge.OLLAMA_OWNED_PORT)']
 ];
 for (const [re, desc] of predForbidden) {
 	if (re.test(pred)) errors.push(`prediction_engine.lua: forbidden divergent literal — ${desc}`);
@@ -118,7 +120,7 @@ if (/localhost:11434/.test(modelBrowser)) {
 
 // ── 4. profiles must resolve port/host from the shared bridge ─────────────
 const profiles = stripLua(read('linux/modules/llm/profiles.lua'));
-for (const ref of ['HttpBridge.OLLAMA_DEFAULT_PORT', 'HttpBridge.OLLAMA_DEFAULT_HOST']) {
+for (const ref of ['HttpBridge.OLLAMA_OWNED_PORT', 'HttpBridge.OLLAMA_DEFAULT_HOST']) {
 	if (!profiles.includes(ref)) errors.push(`profiles.lua: must resolve endpoint via ${ref}`);
 }
 
@@ -159,7 +161,7 @@ if (errors.length > 0) {
 }
 
 console.log(
-	`\x1b[32m[OK] Linux LLM defaults single-sourced — linux_bridge mirrors defaults.json (port ${DEFAULTS.llm_ollama_port}, ` +
+	`\x1b[32m[OK] Linux LLM defaults single-sourced — linux_bridge mirrors defaults.json (owned port ${DEFAULTS.llm_ollama_owned_port}, ` +
 		`temp ${DEFAULTS.llm_temperature}, ctx ${DEFAULTS.llm_context_length}, keep_alive ${DEFAULTS.llm_ollama_keep_alive}); ` +
 		`no divergent literals in prediction_engine/profiles; macOS keep_alive routed.\x1b[0m`
 );

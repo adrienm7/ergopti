@@ -12,7 +12,7 @@ helpers.describe("infra.llm_bridge", function()
   helpers.describe("resolve_base_url()", function()
     helpers.it("returns default URL with no overrides", function()
       local url = LB.resolve_base_url()
-      helpers.assert_eq(url, "http://127.0.0.1:11434")
+      helpers.assert_eq(url, "http://127.0.0.1:11435")
     end)
 
     helpers.it("uses custom port", function()
@@ -22,7 +22,7 @@ helpers.describe("infra.llm_bridge", function()
 
     helpers.it("uses custom host", function()
       local url = LB.resolve_base_url(nil, "10.0.0.5")
-      helpers.assert_eq(url, "http://10.0.0.5:11434")
+      helpers.assert_eq(url, "http://10.0.0.5:11435")
     end)
 
     helpers.it("uses both custom host and port", function()
@@ -39,8 +39,15 @@ helpers.describe("infra.llm_bridge", function()
     end)
 
     helpers.it("floors non-integer ports", function()
-      local url = LB.resolve_base_url(11434.9)
-      helpers.assert_eq(url, "http://127.0.0.1:11434")
+      local url = LB.resolve_base_url(11435.9)
+      helpers.assert_eq(url, "http://127.0.0.1:11435")
+    end)
+
+    -- A daemon on the stock port is the user's own Ollama: never Ergopti's origin.
+    helpers.it("(linux-owned-ollama) refuses the stock Ollama port, even floored", function()
+      helpers.assert_eq(LB.resolve_base_url(11434), "")
+      helpers.assert_eq(LB.resolve_base_url(11434.9), "")
+      helpers.assert_eq(LB.resolve_base_url(11434, "127.0.0.1"), "")
     end)
   end)
 
@@ -48,16 +55,16 @@ helpers.describe("infra.llm_bridge", function()
     helpers.it("builds the exact known operation paths", function()
       local origin = LB.resolve_base_url()
       helpers.assert_eq(LB.ollama_endpoint(origin, "tags"),
-        "http://127.0.0.1:11434/api/tags")
+        "http://127.0.0.1:11435/api/tags")
       helpers.assert_eq(LB.ollama_endpoint(origin, "chat"),
-        "http://127.0.0.1:11434/api/chat")
+        "http://127.0.0.1:11435/api/chat")
     end)
 
     helpers.it("normalises one trailing slash without accepting an operation path", function()
-      helpers.assert_eq(LB.ollama_endpoint("http://127.0.0.1:11434/", "chat"),
-        "http://127.0.0.1:11434/api/chat")
-      helpers.assert_eq(LB.ollama_endpoint("http://127.0.0.1:11434/api/chat", "chat"), nil)
-      helpers.assert_eq(LB.ollama_endpoint("http://127.0.0.1:11434", "unknown"), nil)
+      helpers.assert_eq(LB.ollama_endpoint("http://127.0.0.1:11435/", "chat"),
+        "http://127.0.0.1:11435/api/chat")
+      helpers.assert_eq(LB.ollama_endpoint("http://127.0.0.1:11435/api/chat", "chat"), nil)
+      helpers.assert_eq(LB.ollama_endpoint("http://127.0.0.1:11435", "unknown"), nil)
     end)
   end)
 
@@ -333,7 +340,8 @@ helpers.describe("infra.llm_bridge", function()
       helpers.assert_eq(LB.OLLAMA_DEFAULT_HOST, "127.0.0.1")
       -- These mirror _shared/modules/llm/defaults.json; the JS gate
       -- test-linux-llm-defaults-single-source pins them equal so they cannot drift.
-      helpers.assert_eq(LB.OLLAMA_DEFAULT_PORT, 11434)      -- llm_ollama_port
+      helpers.assert_eq(LB.OLLAMA_OWNED_PORT, 11435)        -- llm_ollama_owned_port
+      helpers.assert_eq(LB.OLLAMA_STOCK_PORT, 11434)        -- llm_ollama_port (the user's own)
       helpers.assert_eq(LB.DEFAULT_TEMPERATURE, 0.1)        -- llm_temperature (was a divergent 0.7)
       helpers.assert_eq(LB.DEFAULT_KEEP_ALIVE, "30m")       -- llm_ollama_keep_alive
       helpers.assert_eq(LB.DEFAULT_CONTEXT_LENGTH, 500)     -- llm_context_length (Linux was 2000)
