@@ -318,7 +318,7 @@ _ODL_Main() {
 		_OllamaWV_Gui := World.Gui, _OllamaWV_WebView := World.View, _OllamaWV_Controller := World.Controller
 		_OllamaWV_Epoch += 1, World.Epoch := _OllamaWV_Epoch
 		_OCSD_Note("before-endpoint")
-		_ODL_Require(LLM_Ollama_SetPort(11434), "the actual endpoint must be initialized through its real validator")
+		_ODL_Require(LLM_Ollama_SetPort(11435), "the actual endpoint must be initialized through its real validator")
 		_OCSD_Note("after-endpoint")
 		_LLM_Menu["enabled"] := true
 		Ports := Map("deps_ready", _ODL_DependencyReady.Bind(World), "deps_check", _ODL_DependencyCheck.Bind(World))
