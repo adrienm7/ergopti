@@ -178,11 +178,7 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 		local mb = helpers.load_module("ui.menu.menu_builder")
 		helpers.assert_true(mb ~= nil)
 
-		local source = nil
-		for _, path in ipairs({ "ui/menu/menu_builder.lua" }) do
-			local fh = io.open("./" .. path, "r")
-			if fh then source = fh:read("*a") ; fh:close() end
-		end
+		local source = helpers.read_menu_source()
 		helpers.assert_not_nil(source, "the builder's source must be readable")
 		helpers.assert_contains(source, 'ManifestMenu.build("shortcuts_menu"',
 			"the submenu must go through the shared renderer — a hand-rolled one "
