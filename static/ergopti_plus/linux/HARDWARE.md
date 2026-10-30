@@ -299,7 +299,7 @@ scroll produces no gesture and gets no line):
 # ergopti-expect: fingers=4 direction=right tap=false
 ```
 
-Put the file in `tests/fixtures/touchpad_records/` and run
+Save it as `tests/fixtures/touchpad_record_<pad>.yml` and run
 `luajit tests/run.lua --only="touchpad-record"`. **Expect** every declared
 gesture back, in order. A failure here is the decoder misreading a real pad,
 which is exactly what this section exists to catch; keep the file and report it.

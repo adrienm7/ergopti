@@ -6,7 +6,7 @@
 --- The decoder's fixtures are a reconstruction of the kernel protocol. A trace
 --- recorded with `libinput record` on a real touchpad is a capture; this suite
 --- proves the reader of that format and replays every trace kept under
---- tests/fixtures/touchpad_records against the real decoder.
+--- tests/fixtures/touchpad_record_*.yml against the real decoder.
 ---
 --- WHAT IS STILL MISSING:
 --- No trace from a physical touchpad is in the tree yet: that needs a Linux
@@ -198,22 +198,21 @@ helpers.describe("touchpad record: replaying into the decoder", function()
 	end)
 
 	helpers.it("(touchpad-record) every kept trace decodes into the gestures it declares", function()
-		local directory = helpers.driver_root() .. "/tests/fixtures/touchpad_records"
+		-- Traces sit beside the other fixtures as touchpad_record_<name>.yml.
+		local directory = helpers.driver_root() .. "/tests/fixtures"
 		local Directory = require("infra.native_directory")
-		helpers.assert_eq(Directory.kind(directory), "directory", "the trace directory is kept, with its README")
-		local readme = false
-		for _, entry in ipairs(assert(Directory.entries(directory))) do
+		local entries = assert(Directory.entries(directory))
+		helpers.assert_true(#entries > 0, "the fixture directory is listed")
+		for _, entry in ipairs(entries) do
 			local name = entry.name
-			if name == "README.md" then readme = true; goto continue end
-			helpers.assert_true(name:match("%.yml$") ~= nil, "only libinput record files are kept here: " .. name)
-			local file = assert(io.open(directory .. "/" .. name, "rb"))
-			local trace, reason = Record.decode(file:read("*a"))
-			file:close()
-			helpers.assert_true(trace ~= nil, name .. ": " .. tostring(reason))
-			helpers.assert_true(#trace.expected > 0, name .. " must declare its gestures with # ergopti-expect:")
-			assert_gestures(name, Record.replay(stamped_decoder(), trace), trace.expected)
-			::continue::
+			if name:match("^touchpad_record_.+%.yml$") then
+				local file = assert(io.open(directory .. "/" .. name, "rb"))
+				local trace, reason = Record.decode(file:read("*a"))
+				file:close()
+				helpers.assert_true(trace ~= nil, name .. ": " .. tostring(reason))
+				helpers.assert_true(#trace.expected > 0, name .. " must declare its gestures with # ergopti-expect:")
+				assert_gestures(name, Record.replay(stamped_decoder(), trace), trace.expected)
+			end
 		end
-		helpers.assert_true(readme, "the README saying how to add a trace is listed")
 	end)
 end)
