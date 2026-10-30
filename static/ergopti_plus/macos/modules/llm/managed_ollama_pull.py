@@ -395,8 +395,14 @@ def main():
                 files.close()
     except Cancelled:
         return 130
-    except Exception:
-        print("Managed Ollama pull admission refused.", file=sys.stderr)
+    except Exception as error:
+        # Field run of 2026-10-30 20:47: the pull exited 78 after 30 s with no
+        # trace of which check refused it.
+        print(
+            "Managed Ollama pull admission refused: %s."
+            % RUNTIME.describe_refusal(error, __file__),
+            file=sys.stderr,
+        )
         return 78
 
 

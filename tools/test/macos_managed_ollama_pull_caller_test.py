@@ -20,6 +20,40 @@ sys.modules[specification.name] = CALLER
 specification.loader.exec_module(CALLER)
 
 
+class RefusalLineTests(unittest.TestCase):
+    def test_refusal_names_its_check_and_never_a_path(self):
+        # Field run of 2026-10-30 20:47: the pull exited 78 with a bare
+        # "admission refused" line and no trace of which check refused it.
+        argv = [
+            "managed_ollama_pull.py",
+            "--admission-timeout",
+            "5",
+            "--idle-timeout",
+            "5",
+            "--retirement-timeout",
+            "5",
+            "--maximum-bytes",
+            "1024",
+        ]
+        diagnostic = __import__("io").StringIO()
+
+        def refuse(deadline):
+            raise ValueError("/private/secret/path")
+
+        with (
+            patch.object(CALLER, "request", side_effect=refuse),
+            patch.object(sys, "stderr", diagnostic),
+            patch.object(sys, "argv", argv),
+        ):
+            self.assertEqual(CALLER.main(), 78)
+        self.assertRegex(
+            diagnostic.getvalue(),
+            r"\AManaged Ollama pull admission refused: ValueError at "
+            r"macos_managed_ollama_pull_caller_test\.py:\d+ refuse\.\n\Z",
+        )
+        self.assertNotIn("secret", diagnostic.getvalue())
+
+
 class ReservedFileTests(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.TemporaryDirectory()
