@@ -27,7 +27,7 @@ function Invoke-OllamaManagedArchiveDownload {
 		-not $Source.stream.CanRead -or $ConnectTimeoutMs -le 0 -or
 		$DeadlineMs -le 0 -or $StartedTick -le 0) { throw 'Managed archive acquisition requires its original source and clock.' }
 	$state = @{ Stage = 'file_create'; Reason = 'download'; Receipt = @{};
-		CleanupDebt = @(); NativeCleanupDebt = $false }
+		CleanupDebt = @(); NativeCleanupDebt = $false; PacFallbackStage = '' }
 	$null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $state
 	$stagePath = [IO.Path]::Combine($Root.path, '.stage-' + $Ticket)
 	$drive = [IO.DriveInfo]::new([IO.Path]::GetPathRoot($stagePath))
@@ -81,7 +81,7 @@ function Invoke-OllamaManagedArchiveDownload {
 		return [ordered]@{ ok = $true; phase = 'downloaded'; ticket = $Ticket;
 			root_identity = $Root.identity; stage_identity = $stageIdentity;
 			archive_identity = $capture.output_owner.identity; archive = $destination;
-			bytes = $bytes; sha256 = $Source.pin.sha256;
+			bytes = $bytes; sha256 = $Source.pin.sha256; pac_fallback_stage = $state.PacFallbackStage;
 			creation_wal_identity = $receipt.creation_wal_identity;
 			creation_wal_sha256 = $receipt.creation_wal_sha256 }
 	} catch {
