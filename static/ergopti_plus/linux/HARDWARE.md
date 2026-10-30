@@ -275,3 +275,33 @@ On an immutable distribution, `/usr` is read-only: everything lands in
 
 For NixOS, use the flake in `tools/build/nix/` instead — `install.sh` does not
 apply and running it produces a machine that half-works until the next rebuild.
+
+---
+
+## 13. Record a touchpad trace
+
+The gesture decoder's fixtures are written from the kernel's documentation,
+and the CI round trip replays what a virtual touchpad sent. Neither is a real
+touchpad. One recording from a real one turns the decoder's test into a check
+against a capture.
+
+```bash
+sudo libinput record --output-file swipe.yml /dev/input/eventN   # the touchpad's node
+# perform, slowly and once each: a three-finger swipe up, a four-finger swipe
+# right, a two-finger scroll down, then press Ctrl+C
+```
+
+Add one `# ergopti-expect:` line per gesture after `ndevices: 1`, in order (a
+scroll produces no gesture and gets no line):
+
+```text
+# ergopti-expect: fingers=3 direction=up tap=false
+# ergopti-expect: fingers=4 direction=right tap=false
+```
+
+Put the file in `tests/fixtures/touchpad_records/` and run
+`luajit tests/run.lua --only="touchpad-record"`. **Expect** every declared
+gesture back, in order. A failure here is the decoder misreading a real pad,
+which is exactly what this section exists to catch; keep the file and report it.
+Before committing a trace, check its header carries nothing private (`dmi:` names
+the machine model and is fine; remove anything else you would not publish).
