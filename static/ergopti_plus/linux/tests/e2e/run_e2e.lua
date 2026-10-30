@@ -550,6 +550,19 @@ local TAP_WRAP_SCENARIOS = {
 		receipt = "attempts=1 queued=0 executed=0 reads=2 action=none binding=none" },
 }
 
+-- Built-in dynamic hotstrings fire only at a word start (item 129): with the
+-- date rules on, "td★" after a space expands, which proves they are live, and
+-- the same suffix ending a longer word stays as typed. The date is read
+-- before and after the child, so a run across midnight still has its answer.
+local DYNAMIC_SCENARIOS = {
+	{ name = "a built-in date rule expands at a word start", dynamic = "dates", keys = " td★",
+		screen = function() return " " .. os.date("%Y_%m_%d") end },
+	{ name = "a built-in date rule does not fire at the end of a longer word", dynamic = "dates", keys = " uptd★",
+		screen = " uptd★" },
+	{ name = "\"update\" never proposes \"date\" (dynamic-word-start)", dynamic = "dates", keys = " update★",
+		screen = " update★" },
+}
+
 -- A real consumed down owns repeats only while its native epochs and owners
 -- remain valid. A refused repeat stays swallowed until release, even if the
 -- pause, group or inhibition is restored before the next repeat.
@@ -699,8 +712,11 @@ do
 			env[#env + 1] = { "ERGOPTI_E2E_CLOCK", scenario.clock or "system" }
 			env[#env + 1] = { "ERGOPTI_E2E_TAP_WRAP", scenario.tap_wrap or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_MAGIC_REPEAT", scenario.magic_repeat or "none" }
+			env[#env + 1] = { "ERGOPTI_E2E_DYNAMIC", scenario.dynamic or "none" }
 			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
+			local expected_before = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local output, status = ChildCapture.run(command)
+			local expected_after = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local completed = ChildCapture.accepted(output, status, scenario.magic_repeat == "injection")
 			if scenario.tap_collision_receipt then
 				local receipt = output:match("TAP_COLLISION ([^\r\n]+)")
@@ -728,10 +744,10 @@ do
 			end
 			local quoted = output:match("SCREEN (%b\"\")")
 			local screen = quoted and (loadstring or load)("return " .. quoted)() or nil
-			if screen == scenario.screen and completed then
+			if (screen == expected_before or screen == expected_after) and completed then
 				pass(prefix .. scenario.name)
 			else
-				fail(prefix .. scenario.name, string.format("%q", scenario.screen),
+				fail(prefix .. scenario.name, string.format("%q", expected_after),
 					screen and string.format("%q (exit %s, receipt %s)", screen, tostring(status), tostring(completed)) or ("no SCREEN line: " .. output:sub(-300)))
 			end
 		end
@@ -739,6 +755,7 @@ do
 	run_key_scenarios(home_env, "")
 	run_key_scenarios(home_env, "", TAP_WRAP_SCENARIOS)
 	run_key_scenarios(home_env, "", MAGIC_REPEAT_SCENARIOS)
+	run_key_scenarios(home_env, "", DYNAMIC_SCENARIOS)
 
 	-- hardening-e-presets: the same keys over the recommended preset, committed
 	-- by a start-up child through the menu's own composition in a folder tree
