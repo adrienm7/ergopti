@@ -826,6 +826,7 @@ end
 -- The checks only the developer field run asks for (data/field_run.json)
 local Probes = require("infra.field_check_probes")
 local LayoutRows = require("infra.field_check_layout_rows")
+local LocalServerProbe = require("infra.field_check_local_servers")
 
 --- Check identity → definition(ports, report, finish), as run by infra.field_check.
 M.checks = {
@@ -852,6 +853,7 @@ M.checks = {
 	hotstring_roundtrip = Probes.hotstring_roundtrip,
 	prediction_tooltip = Probes.prediction_tooltip,
 	layout_rows = LayoutRows.layout_rows,
+	local_servers = LocalServerProbe.local_servers,
 }
 
 --- The Debug menu checks the field run does not ask for, each with the

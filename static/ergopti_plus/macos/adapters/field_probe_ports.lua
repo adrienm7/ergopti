@@ -741,6 +741,30 @@ local ROWS_SOURCE_ID = "ergol"
 local ROWS_KEYBOARD_NAME = "Ergopti Field Rows"
 local ROWS_FILE_PREFIX = "ErgoptiFieldRows-"
 
+--- The local server catalogue the driver loaded (infra/field_check_local_servers.lua).
+--- @return table { order, discovery, published }
+local function local_server_catalogue()
+	local LocalServers = require("modules.llm.local_servers")
+	return { order = LocalServers.ORDER, discovery = LocalServers.DISCOVERY,
+		published = LocalServers.config_catalogue_published() }
+end
+
+--- One detection sweep of every local server, as the AI menu runs it; read-only.
+--- @param on_done function fn(views|nil), once.
+local function local_servers_detect(on_done)
+	local Api = require("modules.llm.api_remote")
+	local answered = false
+	local started = Api.detect_local_servers(function()
+		if answered then return end
+		answered = true
+		on_done(Api.local_server_views())
+	end)
+	if started ~= true and not answered then
+		answered = true
+		on_done(nil)
+	end
+end
+
 --- The layout rows check's environment (infra/field_check_layout_rows.lua).
 --- @return table|nil env
 --- @return string|nil error
@@ -827,6 +851,8 @@ function M.new()
 		hotstring_candidates = hotstring_candidates,
 		prediction_readiness = prediction_readiness,
 		layout_rows_env = layout_rows_env,
+		local_server_catalogue = local_server_catalogue,
+		local_servers_detect = local_servers_detect,
 	}
 end
 
