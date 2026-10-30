@@ -23,7 +23,9 @@ local function load_subject()
 		bind = function(chord, _, options)
 			counters.bind = counters.bind + 1
 			controls.options[chord] = options
-			if controls.refuse_on_call == counters.bind then return nil, "OS_REFUSED" end
+			if controls.refuse_on_call == counters.bind or controls.refuse_always then
+				return nil, controls.refusal or "OS_REFUSED"
+			end
 			local token = "handle#" .. tostring(counters.bind)
 			live[token] = true
 			return token
@@ -38,6 +40,13 @@ local function load_subject()
 			live[token] = nil
 			return true
 		end,
+		OS_REFUSAL = "OS_REFUSED",
+	}
+	package.loaded["adapters.timer_scheduler"] = { awake_time = function() return controls.now or 0 end }
+	controls.rebinds = 0
+	package.loaded["infra.timings"] = { sec = function() return 60 end }
+	package.loaded["modules.shortcuts"] = {
+		rebind_for_layout = function() controls.rebinds = controls.rebinds + 1; return true end,
 	}
 	package.loaded["adapters.file_system"] = {
 		read = function()
@@ -91,6 +100,32 @@ helpers.describe("configurable shortcuts: startup transaction (shortcut-refusal-
 			"the retry binds the refused slot alone")
 		helpers.assert_eq(counters.bind, 3)
 		helpers.assert_eq(next(subject.pending_slots()), nil)
+	end)
+
+	helpers.it("rebinds every shortcut once a minute while macOS refuses a held key", function()
+		-- Field log 2026-10-30: after a layout switch Ctrl+G still held keycode 5,
+		-- the Ergopti '.', and retrying Ctrl+. alone failed for 11 minutes.
+		local subject, controls = load_subject()
+		controls.refuse_always = true
+		helpers.assert_eq(subject.start(), true)
+		controls.now = 100
+		helpers.assert_eq(subject.bind_pending(false), false)
+		helpers.assert_eq(controls.rebinds, 1, "an OS refusal asks for one full rebind")
+		controls.now = 130
+		subject.bind_pending(false)
+		helpers.assert_eq(controls.rebinds, 1, "not again within the minute")
+		controls.now = 161
+		subject.bind_pending(false)
+		helpers.assert_eq(controls.rebinds, 2, "again once the minute has passed")
+	end)
+
+	helpers.it("does not rebind everything for a key the layout lacks", function()
+		local subject, controls = load_subject()
+		controls.refuse_always = true
+		controls.refusal = "key '.' is not in the active keyboard layout"
+		helpers.assert_eq(subject.start(), true)
+		subject.bind_pending(false)
+		helpers.assert_eq(controls.rebinds, 0)
 	end)
 
 	helpers.it("asks the registrar to refuse a key the layout lacks, except on the final retry", function()
