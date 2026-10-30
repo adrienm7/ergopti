@@ -1630,6 +1630,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/corpus/test_corpus_tooltip_layout.ahk
 ; TOML coercion corpus
 #Include meta/corpus/test_corpus_toml_batch_write.ahk
+#Include meta/corpus/test_corpus_toml_leaf_rows.ahk
 #Include meta/corpus/test_corpus_toml_inline_scalar.ahk
 #Include meta/corpus/test_corpus_toml_coercion.ahk
 
