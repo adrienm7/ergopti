@@ -960,7 +960,7 @@ GPTLinkEditor(*) {
 _EditorBuildLinkPlan(NewValue) {
 	global Features
 	if _FeatureUsesDesiredState(Features)
-		return _FeatureBuildSinglePlan(Features, "shortcuts.chatgpt_url", NewValue, "")
+		return _FeatureBuildSinglePlan(Features, ConfigKey.SHORTCUTS_CHATGPT_URL, NewValue, "")
 	return {
 		updates: [{ Section: "shortcuts", Key: "chatgpt_url", Value: NewValue }],
 		publish: _EditorPublishLink.Bind(NewValue),
