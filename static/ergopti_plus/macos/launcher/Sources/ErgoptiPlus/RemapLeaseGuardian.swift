@@ -26,6 +26,7 @@
 import Darwin
 import Dispatch
 import Foundation
+import Security
 import ServiceManagement
 
 
@@ -2064,6 +2065,32 @@ enum RemapGuardianRegistrationStatus: String, Equatable {
 	case notRequested = "not_requested"
 }
 
+/// Names what an ad hoc build did to its registrations before registering.
+/// The status cannot carry it: the driver logs it from the role's second line
+/// and the field run's login-items check reports it.
+enum RemapGuardianRegistrationNote: String, Equatable {
+	/// The exact legacy agent and the Background Items record were removed and
+	/// the previous guardian exited before the registration.
+	case adhocReregistered = "developer_adhoc_reregistered"
+	/// Live lease records or a pending approval kept the current registration.
+	case adhocResetDeferred = "developer_adhoc_reset_deferred"
+	/// A removal or the previous guardian's exit could not be proven; the
+	/// registration ran over the existing state, as before the reset existed.
+	case adhocResetRefused = "developer_adhoc_reset_refused"
+}
+
+/// The registration role's complete answer: one status line, then the note
+/// line when the ad hoc reset ran.
+struct RemapGuardianRegistrationOutcome: Equatable {
+	let status: RemapGuardianRegistrationStatus
+	let note: RemapGuardianRegistrationNote?
+
+	/// The exact bytes the registration role prints.
+	var output: String {
+		return status.rawValue + "\n" + (note.map { $0.rawValue + "\n" } ?? "")
+	}
+}
+
 enum RemapGuardianSettingsResult: String, Equatable {
 	case opened
 	case notRequired = "not_required"
@@ -2163,22 +2190,27 @@ func unregisterRemapGuardian(executablePath: String) -> RemapGuardianUnregistrat
 			}
 			return true
 		},
-		guardianHasExited: {
-			let target = "gui/\(getuid())/" + kRemapGuardianLabel
-			guard PosixGuardianLaunchctlRunner().exitStatus(arguments: ["print", target])
-				== kGuardianLaunchctlUnknownServiceStatus else { return false }
-			return waitForRemapGuardianUnregistrationObservation(observe: {
-			let descriptor = Darwin.open(paths.singletonLock, O_RDWR | O_CLOEXEC | O_NOFOLLOW)
-			guard descriptor >= 0 else { return errno == ENOENT }
-			defer { Darwin.close(descriptor) }
-			guard guardianFileIdentity(descriptor: descriptor) != nil,
-				ergoptiFlock(descriptor, LOCK_SH | LOCK_NB) == 0
-			else { return false }
-			_ = ergoptiFlock(descriptor, LOCK_UN)
-			return true
-			})
-		}
+		guardianHasExited: { remapGuardianJobHasExited(paths) }
 	)
+}
+
+/// Proves this label's job is gone: launchctl names it unknown (113) and no
+/// guardian still holds the singleton lock. Shared by removal and the ad hoc
+/// reset, which both must not overlap a draining guardian with a new one.
+func remapGuardianJobHasExited(_ paths: LeaseGuardianPaths) -> Bool {
+	let target = "gui/\(getuid())/" + kRemapGuardianLabel
+	guard PosixGuardianLaunchctlRunner().exitStatus(arguments: ["print", target])
+		== kGuardianLaunchctlUnknownServiceStatus else { return false }
+	return waitForRemapGuardianUnregistrationObservation(observe: {
+		let descriptor = Darwin.open(paths.singletonLock, O_RDWR | O_CLOEXEC | O_NOFOLLOW)
+		guard descriptor >= 0 else { return errno == ENOENT }
+		defer { Darwin.close(descriptor) }
+		guard guardianFileIdentity(descriptor: descriptor) != nil,
+			ergoptiFlock(descriptor, LOCK_SH | LOCK_NB) == 0
+		else { return false }
+		_ = ergoptiFlock(descriptor, LOCK_UN)
+		return true
+	})
 }
 
 @available(macOS 13.0, *)
@@ -2351,6 +2383,78 @@ func resolveModernRemapGuardianRegistration(
 	}
 }
 
+/// Replaces both registrations of an ad hoc build (no TeamIdentifier) before
+/// its registration. Every rebuild is a new cdhash, and launchd spawned the job
+/// under the definition recorded for the previous one: macOS killed that spawn
+/// about 3 s later (CODESIGNING 4, Launch Constraint Violation) and only the
+/// relaunch after the 10 s ThrottleInterval survived (field run 2026-10-30,
+/// where this copy's legacy agent and its Background Items record coexisted).
+/// Live lease records keep the current guardian, since removing it would fence
+/// them, and a pending approval stays the user's decision.
+@available(macOS 13.0, *)
+func resetAdhocRemapGuardianRegistration(
+	service: RemapGuardianModernService,
+	leasesAreEmpty: () -> Bool,
+	removeLegacy: () -> Bool,
+	guardianHasExited: () -> Bool,
+	report: (String) -> Void
+) -> RemapGuardianRegistrationNote {
+	guard leasesAreEmpty() else {
+		report("ad hoc build: lease records are live; the current guardian registration is kept")
+		return .adhocResetDeferred
+	}
+	guard service.status != .requiresApproval else {
+		report("ad hoc build: Login Items approval is pending; the registration is not reset")
+		return .adhocResetDeferred
+	}
+	guard removeLegacy() else {
+		report("ad hoc build: this copy's legacy agent could not be removed; registering over it")
+		return .adhocResetRefused
+	}
+	if service.status == .enabled {
+		do {
+			try service.unregister()
+		} catch {
+			let failure = error as NSError
+			report("ad hoc build: the Background Items record could not be removed: "
+				+ "\(failure.domain) \(failure.code)")
+			return .adhocResetRefused
+		}
+	}
+	guard service.status == .notRegistered || service.status == .notFound else {
+		report("ad hoc build: Background Items still holds the agent; registering over it")
+		return .adhocResetRefused
+	}
+	guard guardianHasExited() else {
+		report("ad hoc build: the previous guardian did not exit; registering over it")
+		return .adhocResetRefused
+	}
+	report("ad hoc build: legacy agent and Background Items record removed; registering afresh")
+	return .adhocReregistered
+}
+
+/// An ad hoc signature names its identifier and no team; Developer ID names both.
+func signingInformationIsAdhoc(_ fields: [String: Any]) -> Bool {
+	return fields[kSecCodeInfoIdentifier as String] is String
+		&& fields[kSecCodeInfoTeamIdentifier as String] == nil
+}
+
+/// Reads this process's own signing information, or nil when it is unreadable.
+func currentProcessSigningInformation() -> [String: Any]? {
+	var code: SecCode?
+	guard SecCodeCopySelf(SecCSFlags(), &code) == errSecSuccess, let code else { return nil }
+	var staticCode: SecStaticCode?
+	guard SecCodeCopyStaticCode(code, SecCSFlags(), &staticCode) == errSecSuccess,
+		let staticCode else { return nil }
+	var information: CFDictionary?
+	guard SecCodeCopySigningInformation(
+		staticCode,
+		SecCSFlags(rawValue: kSecCSSigningInformation),
+		&information
+	) == errSecSuccess else { return nil }
+	return information as? [String: Any]
+}
+
 /// Observes modern authorization without registering, bootstrapping, or
 /// otherwise changing ServiceManagement state. Only exact live health is ready.
 @available(macOS 13.0, *)
@@ -2443,13 +2547,32 @@ func openRemapGuardianSettingsIfRequired() -> RemapGuardianSettingsResult {
 /// Registers only ErgoptiPlus's own user LaunchAgent before Hammerspoon starts.
 /// A denied/disabled background item leaves the remap lease unable to ARM; the
 /// application itself may still launch so the user can recover from its menu.
-func remapGuardianRegistrationStatus(
+/// An ad hoc build first replaces its stale registrations; a Developer ID build
+/// never does.
+func remapGuardianRegistrationOutcome(
 	executablePath: String
-) -> RemapGuardianRegistrationStatus {
-	guard !executablePath.isEmpty else { return .unavailable }
+) -> RemapGuardianRegistrationOutcome {
+	guard !executablePath.isEmpty else {
+		return RemapGuardianRegistrationOutcome(status: .unavailable, note: nil)
+	}
 	if #available(macOS 13.0, *) {
 		let service = SMAppService.agent(plistName: kRemapGuardianPlistName)
-		return resolveModernRemapGuardianRegistration(
+		var note: RemapGuardianRegistrationNote?
+		if let signing = currentProcessSigningInformation() {
+			if signingInformationIsAdhoc(signing) {
+				let paths = LeaseGuardianPaths()
+				note = resetAdhocRemapGuardianRegistration(
+					service: service,
+					leasesAreEmpty: { remapGuardianLeaseRecordsAreEmpty(paths) },
+					removeLegacy: { removeLegacyRemapGuardian(executablePath: executablePath) },
+					guardianHasExited: { remapGuardianJobHasExited(paths) },
+					report: { LauncherLog.write($0) }
+				)
+			}
+		} else {
+			LauncherLog.write("remap guardian: own signature unreadable; no ad hoc reset")
+		}
+		let status = resolveModernRemapGuardianRegistration(
 			service: service,
 			guardianHealth: {
 				waitForLegacyGuardianHealth(LeaseGuardianPaths())
@@ -2462,13 +2585,17 @@ func remapGuardianRegistrationStatus(
 			) != nil,
 			report: { LauncherLog.write($0) }
 		)
+		return RemapGuardianRegistrationOutcome(status: status, note: note)
 	}
-	return ensureLegacyRemapGuardianRegistered(executablePath: executablePath)
-		? .ready
-		: .unavailable
+	return RemapGuardianRegistrationOutcome(
+		status: ensureLegacyRemapGuardianRegistered(executablePath: executablePath)
+			? .ready
+			: .unavailable,
+		note: nil
+	)
 }
 
 /// Returns whether the independent guardian is registered and currently healthy.
 func ensureRemapGuardianRegistered(executablePath: String) -> Bool {
-	return remapGuardianRegistrationStatus(executablePath: executablePath) == .ready
+	return remapGuardianRegistrationOutcome(executablePath: executablePath).status == .ready
 }

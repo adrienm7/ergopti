@@ -413,6 +413,7 @@ check(appDelegateSource.length > 1000, 'the GUI launcher delegate must remain lo
 for (const registration of [
 	'guardianRegistrar',
 	'remapGuardianRegistrationStatus',
+	'remapGuardianRegistrationOutcome',
 	'ensureLegacyRemapGuardianRegistered(',
 	'ensureRemapGuardianRegistered(',
 	'.register()'
