@@ -18,6 +18,11 @@
 		"dashscope",
 		"zai",
 		"minimax",
+		"siliconflow",
+		"deepinfra",
+		"sambanova",
+		"huggingface",
+		"nvidia",
 		"backboard",
 		"typesafe",
 		"openrouter_jev",
@@ -169,6 +174,55 @@
 				"effort": { "reasoning_effort": "$level" }
 			},
 			"_source": "https://platform.minimax.io/docs/api-reference/text-openai-api, https://platform.minimax.io/docs/api-reference/models/openai/list-models"
+		},
+		"siliconflow": {
+			"label": "SiliconFlow",
+			"base_url": "https://api.siliconflow.com/v1",
+			"default_model": "Qwen/Qwen3-8B",
+			"format": "openai",
+			"thinking_dialect": { "toggle": { "enable_thinking": false } },
+			"_source": "https://docs.siliconflow.com/en/api-reference/chat-completions/chat-completions, https://docs.siliconflow.com/en/userguide/capabilities/reasoning (enable_thinking; no reasoning_effort documented)"
+		},
+		"deepinfra": {
+			"label": "DeepInfra",
+			"base_url": "https://api.deepinfra.com/v1/openai",
+			"default_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "reasoning": { "enabled": false } },
+				"effort": { "reasoning_effort": "$level" }
+			},
+			"_source": "https://docs.deepinfra.com/chat/overview, https://docs.deepinfra.com/chat/reasoning"
+		},
+		"sambanova": {
+			"label": "SambaNova",
+			"base_url": "https://api.sambanova.ai/v1",
+			"default_model": "Meta-Llama-3.3-70B-Instruct",
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "chat_template_kwargs": { "enable_thinking": false } },
+				"effort": { "reasoning_effort": "$level" }
+			},
+			"_source": "https://docs.sambanova.ai/docs/api-reference/chat-completions/create-chat-based-completion, https://docs.sambanova.ai/docs/en/features/text-generation (reasoning_effort low/medium/high for gpt-oss)"
+		},
+		"huggingface": {
+			"label": "Hugging Face",
+			"base_url": "https://router.huggingface.co/v1",
+			"default_model": "meta-llama/Llama-3.1-8B-Instruct",
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } },
+			"_source": "https://huggingface.co/docs/inference-providers/tasks/chat-completion (reasoning_effort none to xhigh, per provider and model; no toggle documented), https://huggingface.co/docs/inference-providers/hub-api"
+		},
+		"nvidia": {
+			"label": "NVIDIA NIM",
+			"base_url": "https://integrate.api.nvidia.com/v1",
+			"default_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "chat_template_kwargs": { "enable_thinking": false } },
+				"effort": { "reasoning_effort": "$level" }
+			},
+			"_source": "https://docs.api.nvidia.com/nim/reference/llm-apis, https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b (chat_template_kwargs; reasoning_effort on gpt-oss)"
 		},
 		"backboard": {
 			"label": "Backboard",
