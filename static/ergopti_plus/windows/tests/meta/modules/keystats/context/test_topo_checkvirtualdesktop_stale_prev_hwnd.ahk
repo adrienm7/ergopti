@@ -36,10 +36,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_TCSP_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_TCSP_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -53,7 +51,7 @@ _TCSP_ReadSource(RelPath) {
 ; the incoming last-seen tick, and the current time — proving the reference
 ; windows are passed in rather than re-read from mutated module state.
 _TCSP_PureDecisionExists() {
-	Src := _TCSP_ReadSource("modules/keystats/keystats_window_topology.ahk")
+	Src := _TCSP_ReadSource("keystats_window_topology.ahk")
 	Assert(InStr(Src, "KL_Topo_IsLikelyDesktopSwitch(prev_alive, incoming_last_seen, now)") > 0,
 		"KL_Topo_IsLikelyDesktopSwitch(prev_alive, incoming_last_seen, now) pure decision helper must exist so the heuristic no longer mixes stale prev_hwnd with the incoming hwnd")
 }
@@ -62,7 +60,7 @@ Test("topo: KL_Topo_IsLikelyDesktopSwitch pure helper exists (topo-checkvirtuald
 ; The caller must capture incoming_last_seen BEFORE overwriting seen_hwnds, and
 ; pass both the outgoing prev_hwnd and that captured value into the check.
 _TCSP_PreCaptureBeforeWrite() {
-	Src := _TCSP_ReadSource("modules/keystats/keystats_window_topology.ahk")
+	Src := _TCSP_ReadSource("keystats_window_topology.ahk")
 	Seg := _DriverFuncBody("KL_Topo_Tick")
 	Assert(Seg != "", "KL_Topo_Tick() declaration must exist")
 	CapIdx := InStr(Seg, "incoming_last_seen := KLTopo.seen_hwnds.Has(hwnd)")
@@ -78,7 +76,7 @@ Test("topo: tick captures incoming_last_seen before mutating seen_hwnds (topo-ch
 
 ; The named gap constant must replace the magic 3000 ms literal.
 _TCSP_GapConstantNamed() {
-	Src := _TCSP_ReadSource("modules/keystats/keystats_window_topology.ahk")
+	Src := _TCSP_ReadSource("keystats_window_topology.ahk")
 	Assert(InStr(Src, "DESKTOP_SWITCH_MIN_GAP_MS") > 0,
 		"The desktop-switch gap threshold must be a named constant (DESKTOP_SWITCH_MIN_GAP_MS), not a magic 3000 literal")
 	Seg := _DriverFuncBody("KL_Topo_IsLikelyDesktopSwitch")

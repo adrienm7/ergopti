@@ -30,9 +30,8 @@
 ; =========================================================
 ; =========================================================
 
-_PSC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
+_PSC_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _PSC_StripComments(Src) {
@@ -45,7 +44,7 @@ _PSC_StripComments(Src) {
 }
 
 _PSC_SplitBlocksHasMaxCount() {
-	Src := _PSC_ReadSource("modules/llm/parser.ahk")
+	Src := _PSC_ReadSource("parser.ahk")
 
 	Assert(InStr(Src, "LLM_Parser_SplitBlocks(raw, max_count") > 0,
 		"LLM_Parser_SplitBlocks must accept a max_count parameter (llm-split-batch-no-cap)")
@@ -67,7 +66,7 @@ Test("parser: LLM_Parser_SplitBlocks accepts and enforces max_count (llm-split-b
 ; =================================================================
 
 _PSC_ParseResponsePassesCap() {
-	Src := _PSC_StripComments(_PSC_ReadSource("modules/llm/parser.ahk"))
+	Src := _PSC_StripComments(_PSC_ReadSource("parser.ahk"))
 	Body := _DriverFuncBody("LLM_Parser_ParseResponse")
 
 	Assert(Body != "", "LLM_Parser_ParseResponse must exist in parser.ahk")

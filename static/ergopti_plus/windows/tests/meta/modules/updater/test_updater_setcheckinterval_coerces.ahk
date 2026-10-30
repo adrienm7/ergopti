@@ -35,10 +35,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_USCI_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_USCI_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -51,7 +49,7 @@ _USCI_ReadSource(RelPath) {
 ; ==================================================
 
 _USCI_CoercesInsteadOfExactTypeReject() {
-	Src := _USCI_ReadSource("modules/updater.ahk")
+	Src := _USCI_ReadSource("updater.ahk")
 	Seg := _DriverFuncBody("Updater_SetCheckInterval")
 	Assert(Seg != "", "Updater_SetCheckInterval(Seconds) declaration must exist in modules/updater.ahk")
 
@@ -67,7 +65,7 @@ _USCI_CoercesInsteadOfExactTypeReject() {
 Test("updater: Updater_SetCheckInterval coerces instead of exact-type reject (updater-setcheckinterval-type-guard-rejects-non-integer)", _USCI_CoercesInsteadOfExactTypeReject)
 
 _USCI_LogsOnRejection() {
-	Src := _USCI_ReadSource("modules/updater.ahk")
+	Src := _USCI_ReadSource("updater.ahk")
 	Seg := _DriverFuncBody("Updater_SetCheckInterval")
 	; A rejected value must be visible in the log rather than silently dropped.
 	Assert(InStr(Seg, "LoggerWarn") > 0,

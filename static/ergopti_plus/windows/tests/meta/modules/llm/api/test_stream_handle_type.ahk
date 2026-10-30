@@ -29,10 +29,8 @@
 ; ======================================
 ; ======================================
 
-_SHT_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_SHT_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -46,7 +44,7 @@ _SHT_ReadSource(RelPath) {
 ; ==================================================
 
 _SHT_AssertHandleTypeCheck() {
-	Src := _SHT_ReadSource("modules/llm/api_ollama.ahk")
+	Src := _SHT_ReadSource("api_ollama.ahk")
 	Body := _DriverFuncBody("_LLM_Ollama_RemoveStreamHandle")
 	Assert(Body != "", "_LLM_Ollama_RemoveStreamHandle declaration must exist in api_ollama.ahk")
 
@@ -76,7 +74,7 @@ Test("api_ollama: _LLM_Ollama_RemoveStreamHandle uses IsObject/HasOwnProp, not '
 ; ==============================================================
 
 _SHT_AssertObjectReferenceComparison() {
-	Src := _SHT_ReadSource("modules/llm/api_ollama.ahk")
+	Src := _SHT_ReadSource("api_ollama.ahk")
 	Body := _DriverFuncBody("_LLM_Ollama_RemoveStreamHandle")
 	Assert(Body != "", "_LLM_Ollama_RemoveStreamHandle declaration must exist in api_ollama.ahk")
 

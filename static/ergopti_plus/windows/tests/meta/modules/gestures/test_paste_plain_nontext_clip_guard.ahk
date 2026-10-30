@@ -31,10 +31,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_PPNC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_PPNC_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -47,7 +45,7 @@ _PPNC_ReadSource(RelPath) {
 ; ==================================================
 
 _PPNC_PasteWithoutFormattingHasTextGuard() {
-	Src := _PPNC_ReadSource("modules/shortcuts/ctrl.ahk")
+	Src := _PPNC_ReadSource("ctrl.ahk")
 	Seg := _DriverFuncBody("PasteWithoutFormatting")
 	Assert(Seg != "", "PasteWithoutFormatting(*) declaration must exist in modules/shortcuts/ctrl.ahk")
 	StripIdx := InStr(Seg, "CB_WritePlainSnapshot(Captured, PlainText, &OwnedSequence)")

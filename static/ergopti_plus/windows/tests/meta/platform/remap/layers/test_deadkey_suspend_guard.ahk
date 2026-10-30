@@ -29,10 +29,8 @@
 ; ==================================================
 ; ==================================================
 
-_DKSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_DKSG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -43,7 +41,7 @@ _DKSG_ReadSource(RelPath) {
 ; ==================================================
 
 _DKSG_AssertDeadKeyHasSuspendGuard() {
-	Src := _DKSG_ReadSource("modules/keymap/layout.ahk")
+	Src := _DKSG_ReadSource("layout.ahk")
 	Body := _DriverFuncBody("DeadKey")
 	Assert(Body != "", "DeadKey(Mapping) declaration must exist in layout.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,

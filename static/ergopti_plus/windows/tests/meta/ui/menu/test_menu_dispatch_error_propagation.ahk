@@ -27,10 +27,8 @@
 ; ==================================================
 ; ==================================================
 
-_MDEP_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_MDEP_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -43,7 +41,7 @@ _MDEP_ReadSource(RelPath) {
 ; ==================================================
 
 _MDEP_CheckErrorPropagation() {
-	Src := _MDEP_ReadSource("infra/menu_dispatcher.ahk")
+	Src := _MDEP_ReadSource("menu_dispatcher.ahk")
 	Body := _DriverFuncBody("_DispatchIfMissed")
 	Assert(Body != "", "_DispatchIfMissed must exist in menu_dispatcher.ahk")
 
