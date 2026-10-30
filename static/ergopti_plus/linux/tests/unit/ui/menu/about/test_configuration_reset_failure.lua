@@ -68,7 +68,7 @@ local function click(row_key, committed, report)
 	local ok, err = pcall(function()
 		package.loaded["infra.global_scope"] = {
 			participants = function() return {} end,
-			apply = function() return committed, report end,
+			apply = function(_, _, done) done(committed, report); return true end,
 		}
 		local ctx = { _version = "test", on_quit = function() end, is_paused = function() return false end }
 		local row = configuration_row(ctx, row_key)
