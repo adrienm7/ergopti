@@ -739,6 +739,24 @@ usable either: the LCtrl tap-hold turns them into a tap (Paste). Action: add
 any new external trigger as a caller of that primitive, never by relaxing the
 Tab policy (`test_llm_tab_accept_policy.ahk`).
 
+### project-ahk-ai-off-disarms-ai-keys
+
+A key bound to an `llm_*` action is unarmed while the AI is off, so it stays the
+application's and the switch-on needs no reload: `AiActionBlocked`
+(`infra/ai_action_gate.ahk`) is asked at each press by `TapHoldTapAction`, whose
+blocked answer is the native tap, by `TapKeyShouldFire`,
+`ScriptShortcutSlotRunsAction`, `KeyCombinationOwns`/`KeyCombinationFire`,
+`GestureDispatch` and `_MagicEditorBrokerWinner`. Native keyboard slots cannot ask,
+so `KeyboardShortcutsFollowAiSwitch` releases and re-arms their handles at boot and
+at the commit of the switch. Readers of what is stored (menu, writer) use
+`TapHoldConfiguredTapAction`. Action: a new key-claiming layer asks
+`AiActionBlocked`; extend `test_ai_action_gate.ahk`.
+The agent's manual actions refuse with the AI off (`_LLM_Agent_ManualRefusal`, notice`n`llm.manual_prediction.disabled`) and the picker greys them from the `ai:on` token of`nthe generated catalogue, with `dialog.action_picker.requires_ai`, read at each open.
+The automatic mode is disarmed too: `LLM_Agent_WatchesTyping` and `LLM_Agent_OnTyping`
+arm no pause and the triage refuses while the AI is off, and`n`LLM_Agent_OnAiSwitchedOff` retires the pause, the feed and the flow in flight at the`nswitch-off; the first keystroke after the switch-on re-arms it. The agent-only typing`nfeed therefore only runs with the AI on and the prediction bridge stopped.
+The menu's `LLM_Menu_TestPrediction` bypasses the engine on purpose: an engine answer is
+a tooltip the user could accept into the focused document.
+
 ### project-llm-validation-digit-is-the-digit-row-key
 
 The validation chord's native route was resolved by `VkKeyScanExW` of the digit

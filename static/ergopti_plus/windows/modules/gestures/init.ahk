@@ -227,6 +227,12 @@ GestureDispatch(slot) {
 				return
 		}
 
+		; An AI action is unarmed while the AI is off, as for the keys.
+		if AiActionBlocked(ActionName) {
+				LoggerDebug("gestures", "Gesture {1} -> {2} held back: the AI is off.", slot, ActionName)
+				return
+		}
+
 		; Release all modifiers held down by the touchpad shortcut (Ctrl+Win+Shift)
 		; before firing the action — otherwise SendEvent/Send calls inherit the
 		; still-down state and produce wrong combos on every swipe after the first.

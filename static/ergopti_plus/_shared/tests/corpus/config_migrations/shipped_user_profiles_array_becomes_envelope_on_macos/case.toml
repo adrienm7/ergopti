@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_user_profiles_array_becomes_envelope_on_macos/case.toml
+
+[case]
+description = "The prompt profiles macOS kept as an array at [llm.profiles] user_profiles move to the llm.user_profiles envelope every OS reads; the active profile stays."
+drivers = ["hs"]
+outcome = "migrated"
+from_version = 16
+to_version = 17

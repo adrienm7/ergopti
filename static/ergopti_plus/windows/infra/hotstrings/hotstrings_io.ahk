@@ -109,7 +109,13 @@ HotstringsConfigInit(OverridePath) {
 				return false
 		}
 		_HotstringsOverridesPath    := OverridePath
-		_HotstringsOverrides        := _ParseOverrides(OverridePath)
+		try {
+				_HotstringsOverrides := _ParseOverrides(OverridePath)
+		} catch ValueError as Err {
+				try LoggerError("HotstringsConfig", "The override file '{1}' is not valid TOML: {2} ({3}). No user override applies until it is repaired.",
+						OverridePath, Err.Message, Err.Extra)
+				return false
+		}
 		; The word and consumed delimiter strings of earlier builds: read once so
 		; HotstringsDelimitersBoot can move them to config.toml, never used as a state.
 		_HotstringsLegacyDelimiters := { Word: _ParseGlobalKey(OverridePath, "word_delimiters"),
@@ -248,6 +254,10 @@ _HotstringsNewOverrideSection() {
 }
 
 ; Parse the override TOML file. Returns an empty Map when the file is missing.
+; A file that is not valid TOML (a duplicate key or table, an unclosed header, a
+; key with no value) raises, as the shared reader does on the other drivers
+; (_shared/tests/corpus/hotstrings/override_parse_vectors.json): the caller
+; decides how a whole unreadable file is reported.
 ; Recognises the following header forms:
 ;   [category]                       — standard category (e.g. [magickey])
 ;   [category.section]               — section override (e.g. [magickey.repeat])
@@ -266,10 +276,32 @@ _ParseOverrides(Path) {
 		CurrentSec := ""
 		; Tracks every section key already seen to detect duplicates
 		SeenSections := Map()
+		; The keys of the current table, and whether a multi-line array is open.
+		SeenKeys := Map()
+		InArray := false
 
 		loop parse, Content, "`n", "`r" {
 				Line := Trim(TOML_StripInlineComment(A_LoopField), " `t")
 				if (Line == "" or SubStr(Line, 1, 1) == "#") {
+						continue
+				}
+
+				if InArray {
+						InArray := SubStr(Line, 1, 1) != "]"
+						continue
+				}
+				if (SubStr(Line, 1, 1) == "[") {
+						SeenKeys := Map()
+						if !InStr(Line, "]")
+								throw ValueError("Unclosed table header in the override file: it is not valid TOML.", -1, Line)
+				}
+
+				; The reserved table of earlier builds holds the delimiter strings, read
+				; once by _ParseGlobalKey. It is no override category: keeping it in the
+				; catalogue would make every later write refuse the reserved identifier.
+				if RegExMatch(Line, "^\[__global__(?:\.[^\]]*)?\]$") {
+						CurrentCat := ""
+						CurrentSec := ""
 						continue
 				}
 
@@ -279,7 +311,7 @@ _ParseOverrides(Path) {
 						CurrentSec := StrLower(ExtSecMatch[2])
 						SectionName := CurrentCat . "." . CurrentSec
 						if SeenSections.Has(SectionName)
-								try LoggerWarn("HotstringsConfig", "Duplicate section '[{1}]' in overrides file — later values will override earlier.", SectionName)
+								throw ValueError("Duplicate table '[" . SectionName . "]' in the override file: it is not valid TOML.", -1, Path)
 						SeenSections[SectionName] := true
 						if !Result.Has(CurrentCat)
 								Result[CurrentCat] := _HotstringsNewOverrideEntry()
@@ -294,7 +326,7 @@ _ParseOverrides(Path) {
 						CurrentSec := ""
 						SectionName := CurrentCat
 						if SeenSections.Has(SectionName)
-								try LoggerWarn("HotstringsConfig", "Duplicate section '[{1}]' in overrides file — later values will override earlier.", SectionName)
+								throw ValueError("Duplicate table '[" . SectionName . "]' in the override file: it is not valid TOML.", -1, Path)
 						SeenSections[SectionName] := true
 						if !Result.Has(CurrentCat)
 								Result[CurrentCat] := _HotstringsNewOverrideEntry()
@@ -307,21 +339,12 @@ _ParseOverrides(Path) {
 						CurrentSec := StrLower(SecMatch[2])
 						SectionName := CurrentCat . "." . CurrentSec
 						if SeenSections.Has(SectionName)
-								try LoggerWarn("HotstringsConfig", "Duplicate section '[{1}]' in overrides file — later values will override earlier.", SectionName)
+								throw ValueError("Duplicate table '[" . SectionName . "]' in the override file: it is not valid TOML.", -1, Path)
 						SeenSections[SectionName] := true
 						if !Result.Has(CurrentCat)
 								Result[CurrentCat] := _HotstringsNewOverrideEntry()
 						if !Result[CurrentCat].Sections.Has(CurrentSec)
 								Result[CurrentCat].Sections[CurrentSec] := _HotstringsNewOverrideSection()
-						continue
-				}
-
-				; The reserved table of earlier builds holds the delimiter strings, read
-				; once by _ParseGlobalKey. It is no override category: keeping it in the
-				; catalogue would make every later write refuse the reserved identifier.
-				if (Line == "[__global__]") {
-						CurrentCat := ""
-						CurrentSec := ""
 						continue
 				}
 
@@ -331,12 +354,26 @@ _ParseOverrides(Path) {
 						CurrentSec := ""
 						SectionName := CurrentCat
 						if SeenSections.Has(SectionName)
-								try LoggerWarn("HotstringsConfig", "Duplicate section '[{1}]' in overrides file — later values will override earlier.", SectionName)
+								throw ValueError("Duplicate table '[" . SectionName . "]' in the override file: it is not valid TOML.", -1, Path)
 						SeenSections[SectionName] := true
 						if !Result.Has(CurrentCat)
 								Result[CurrentCat] := _HotstringsNewOverrideEntry()
 						continue
 				}
+
+				; A table this driver does not read (a quoted key, an array of tables).
+				if (SubStr(Line, 1, 1) == "[") {
+						CurrentCat := ""
+						CurrentSec := ""
+						continue
+				}
+
+				if !RegExMatch(Line, '^("[^"]*"|[A-Za-z0-9_\-\.]+)\s*=\s*(\S.*)$', &KeyMatch)
+						throw ValueError("A line of the override file is neither a table nor a key with a value: it is not valid TOML.", -1, Line)
+				if SeenKeys.Has(KeyMatch[1])
+						throw ValueError("Duplicate key '" . KeyMatch[1] . "' in the override file: it is not valid TOML.", -1, Path)
+				SeenKeys[KeyMatch[1]] := true
+				InArray := SubStr(KeyMatch[2], 1, 1) == "[" and !InStr(KeyMatch[2], "]")
 
 				if (CurrentCat == "") {
 						continue

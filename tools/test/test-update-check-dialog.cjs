@@ -585,18 +585,9 @@ const OTHERS = [{ channel: 'main', tag: 'v1.2.0' }];
 		luaActions.length === 7,
 		`check_session ACTIONS lists ${luaActions.length} actions, expected 7`
 	);
-	// The release-notes link is served by the macOS and Linux hosts; the Windows
-	// host does not seed notes yet, so its page never posts it. Remove the entry
-	// when UC_PAGE_ACTIONS gains open_url (the equality below then covers it).
-	const luaHostsOnly = ['open_url:available'];
-	const sharedActions = luaActions.filter((action) => !luaHostsOnly.includes(action));
 	expect(
-		luaHostsOnly.every((action) => luaActions.includes(action)),
-		'a Lua-hosts-only action is no longer in check_session ACTIONS'
-	);
-	expect(
-		sorted(ahkActions) === sorted(sharedActions),
-		`UC_PAGE_ACTIONS ${sorted(ahkActions)} and check_session ACTIONS ${sorted(sharedActions)} differ`
+		sorted(ahkActions) === sorted(luaActions),
+		`UC_PAGE_ACTIONS ${sorted(ahkActions)} and check_session ACTIONS ${sorted(luaActions)} differ`
 	);
 }
 

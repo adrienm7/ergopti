@@ -328,7 +328,7 @@ _LPI_AgentCase(Private, OnlyText) {
 	Run(State) {
 		_AHK04_RunIsolated(Dispatch)
 		Dispatch() {
-			_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), Body)
+			_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), Body)
 		}
 		Body(Fx, Lines, Sent) {
 			global _LLM_Bridge_Active, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding, _LPI_Marker

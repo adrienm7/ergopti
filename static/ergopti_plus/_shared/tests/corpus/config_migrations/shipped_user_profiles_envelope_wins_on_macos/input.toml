@@ -1,0 +1,10 @@
+# _shared/tests/corpus/config_migrations/shipped_user_profiles_envelope_wins_on_macos/input.toml
+
+[_meta]
+schema_version = 16
+
+[llm]
+user_profiles = "v1:W3siaWQiOiJ1c2VyX2ZpcnN0IiwibGFiZWwiOiJGaXJzdCBQcm9maWxlIiwic3lzdGVtX3NpbmdsZSI6ImZpcnN0In1d"
+
+[llm.profiles]
+user_profiles = [{ id = "user_old", label = "Old" }]

@@ -39,6 +39,21 @@
 global ASSET_SIGNATURE_SPKI_PREFIX := "3059301306072a8648ce3d020106082a8648ce3d030107034200"
 global ASSET_SIGNATURE_SPKI_BYTES := 91
 global ASSET_SIGNATURE_COMPONENT_BYTES := 32
+; A bound on the published signature (base64 of 64 bytes is 88 characters).
+global ASSET_SIGNATURE_BODY_LIMIT := 4096
+; What each closed reason means, for the log. The wording of the Linux gate
+; (linux/modules/updater/signature_gate.lua), with its verifier named.
+global ASSET_SIGNATURE_REASON_TEXT := Map(
+	"policy_off", "the signing policy is off",
+	"no_signature", "the release publishes no signature for the executable",
+	"malformed_signature", "the published signature is malformed",
+	"bad_key", "the verification key of the signing policy is unusable",
+	"no_native", "the Windows CNG provider cannot verify the signature",
+	"mismatch", "the signature does not match the executable's size and digest",
+	"bad_policy", "the signing policy file is invalid",
+	"required_without_key", "the signing policy requires a signature but holds no key",
+	"bad_asset", "the executable's name, size or digest cannot be signed",
+	"fetch_failed", "the signature could not be downloaded")
 
 
 
@@ -156,4 +171,102 @@ AssetSignature_Evaluate(Policy, Asset, SignatureBase64) {
 	if Check["ok"]
 		return Map("verdict", "verified", "reason", "")
 	return Map("verdict", Required ? "refused" : "not_enforced", "reason", Check["reason"])
+}
+
+
+
+
+
+; ==================================
+; ==================================
+; ======= 4/ The update gate =======
+; ==================================
+; ==================================
+
+; The shared policy, as every verifier reads it.
+; @returns {Map} The decoded asset_signing.json.
+_AssetSignature_ReadPolicy() {
+	global _SharedDir
+	return JsonParse(FSReadStrict(_SharedDir . "\modules\updater\asset_signing.json"))
+}
+
+; Downloads a published signature, bounded, on the manual request's lifetime.
+; @param Url {String} The authenticated repository URL of the signature asset.
+; @param Request {Object} The install's request context.
+; @returns {String} The signature text.
+; @throws {Error} When the request gives no complete answer.
+_AssetSignature_Fetch(Url, Request) {
+	global ASSET_SIGNATURE_BODY_LIMIT, UPDATER_REQUEST_POLICY_ALLOW
+	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
+	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
+	Started := A_TickCount
+	Req := CurlAsyncRequest()
+	Req.SetManagedRouting(0, () => _Updater_RequestPolicy(Request) == UPDATER_REQUEST_POLICY_ALLOW)
+	Req.SetDeadline(Started, UPDATER_HTTP_RESOLVE_TIMEOUT_MS + UPDATER_HTTP_CONNECT_TIMEOUT_MS
+		+ UPDATER_HTTP_SEND_TIMEOUT_MS + UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
+	Req.Open("GET", Url, true)
+	Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
+	Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
+		UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
+	if !Req.Send() || !_HTTP_ManagedWait(Req)
+		throw Error("the request did not complete")
+	if (Req.Status != 200)
+		throw Error("HTTP " . Req.Status)
+	Text := Req.ResponseText
+	if !Req.ResponseEncodingValid || StrLen(Text) > ASSET_SIGNATURE_BODY_LIMIT
+		throw Error("the response is not a signature")
+	return Text
+}
+
+/**
+ * Decides whether an update may start, before anything is downloaded: the signed
+ * record binds the name, the size and the digest the staging worker then enforces
+ * on the downloaded bytes. A policy that cannot be read or admitted refuses
+ * instead of skipping the check. With no key provisioned nothing is fetched.
+ * @param {string} AssetName - The executable's asset name.
+ * @param {Object} Asset - The authenticated asset: Size and Digest.
+ * @param {Object} Release - The offered release: RawJson and Tag.
+ * @param {Object} Request - The install's request context.
+ * @param {Func|Integer} ReadPolicyFn - Replaces the policy read (tests only).
+ * @param {Func|Integer} FetchFn - Replaces the download (tests only), called as (Url, Request).
+ * @returns {Boolean} Whether the update may proceed.
+ */
+AssetSignature_AllowsInstall(AssetName, Asset, Release, Request, ReadPolicyFn := 0, FetchFn := 0) {
+	global ASSET_SIGNATURE_REASON_TEXT
+	Why := "bad_policy"
+	try {
+		Policy := IsObject(ReadPolicyFn) ? ReadPolicyFn.Call() : _AssetSignature_ReadPolicy()
+		Why := AssetSignature_AdmitPolicy(Policy)
+	} catch as Err
+		try LoggerError("Updater", "The update signing policy could not be read: {1}.", Err.Message)
+	if (Why != "") {
+		try LoggerError("Updater", "Update refused: {1}.", ASSET_SIGNATURE_REASON_TEXT[Why])
+		return false
+	}
+	Signature := "", FetchFailed := false
+	if (Policy["public_key_spki_base64"] != "") {
+		SignatureAsset := _Updater_FindAsset(Release.RawJson, AssetName . Policy["signature_suffix"], Release.Tag)
+		if IsObject(SignatureAsset) {
+			try Signature := Trim((IsObject(FetchFn) ? FetchFn : _AssetSignature_Fetch).Call(SignatureAsset.Url, Request),
+				" `t`r`n")
+			catch as Err {
+				FetchFailed := true
+				try LoggerWarn("Updater", "The update signature could not be downloaded: {1}.", Err.Message)
+			}
+		}
+	}
+	Result := AssetSignature_Evaluate(Policy, Map("name", AssetName, "size", Asset.Size, "sha256", Asset.Digest), Signature)
+	Reason := Result["reason"]
+	if (FetchFailed && Reason == "no_signature")
+		Reason := "fetch_failed"
+	switch Result["verdict"] {
+		case "verified":
+			try LoggerInfo("Updater", "Update signature verified.")
+			return true
+		case "not_enforced":
+			try LoggerWarn("Updater", "Update signature not enforced: {1}.", ASSET_SIGNATURE_REASON_TEXT[Reason])
+			return true
+	}
+	try LoggerError("Updater", "Update refused: {1}.", ASSET_SIGNATURE_REASON_TEXT[Reason])
+	return false
 }

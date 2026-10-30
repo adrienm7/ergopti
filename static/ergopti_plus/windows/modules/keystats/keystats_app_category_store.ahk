@@ -60,7 +60,7 @@ _KL_AppCat_DecodeStore(Content, Path := "") {
 		if Value is String {
 			if Value == ""
 				throw ValueError("A legacy app category cannot be empty.")
-		} else if Versioned && Value is Map {
+		} else if Value is Map {
 			Fields := JsonObjectMemberSpans(AppMembers[Key]["text"])
 			if !Value.Has("type") || !_KL_AppCat_LabelValid(Value["type"])
 				|| !Value.Has("score") || !_KL_AppCat_ScoreValid(Value["score"])

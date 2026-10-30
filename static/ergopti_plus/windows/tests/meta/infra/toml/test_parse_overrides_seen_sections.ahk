@@ -56,8 +56,8 @@ _TPOSS_SeenSectionsTracker() {
 	Assert(InStr(Body, "SeenSections.Has(") > 0,
 		"_ParseOverrides must check SeenSections.Has(SectionName) before processing each section header")
 
-	; Must warn on duplicate via LoggerWarn
-	Assert(InStr(Body, "LoggerWarn") > 0,
-		"_ParseOverrides must call LoggerWarn when a duplicate section header is detected")
+	; A duplicate header is invalid TOML, as on the other drivers: it raises.
+	Assert(InStr(Body, 'throw ValueError("Duplicate table') > 0,
+		"_ParseOverrides must raise when a duplicate section header is detected")
 }
-Test("hotstrings_config: _ParseOverrides tracks SeenSections and warns on duplicates", _TPOSS_SeenSectionsTracker)
+Test("hotstrings_config: _ParseOverrides tracks SeenSections and raises on duplicates", _TPOSS_SeenSectionsTracker)

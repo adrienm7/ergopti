@@ -585,6 +585,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-field-report-contract.cjs"],
 			"repro": "npm run test:windows-field-report-contract"
+		},
+		{
+			"id": "js-field-log-scrub",
+			"ordinal": 535,
+			"name": "a field report pushes no typed text: every driver's log spelling is scrubbed and the collectors copy no raw log",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-field-log-scrub.cjs"],
+			"repro": "npm run test:field-log-scrub"
 		}
 	]
 }

@@ -325,8 +325,10 @@ was counted since the previous call, totals untouched), `volume_text(counters)`
 The figures travel in the evidence record each driver already writes once per
 interval: macOS appends `Log volume over N s: ...` to the `Memory snapshot`
 record of `phase_stats`, Linux appends `| log: ...` to the `PerfCounters`
-interval record. Windows still has to count in `_LoggerEmit` and add the same
-seven figures, in the same order, to its phase-summary evidence record.
+interval record, Windows appends `Log volume over N s: ...` to the `Process
+state` record of `Perf`; the AHK logger counts in `_LoggerEmitBody`, its summary
+emitters and the level wrappers' fast path (`LoggerVolume`, `LoggerVolumeInterval`,
+`LoggerVolumeText`, `LoggerResetVolume`).
 Contract: `_shared/lua/test/logger_volume_contract.lua`.
 
 ### 5.2 Error window hook

@@ -58,11 +58,11 @@
 #             hint, instead of offering a binding that would do nothing. Linux
 #             understands "tool:<binary>" (on PATH), "session:x11" and
 #             "session:workspaces" (a session whose workspaces another process
-#             can read and pick: X11, KDE Plasma, sway or Hyprland). The Lua
-#             drivers understand "ai:on" (the AI menu's switch is on: the
+#             can read and pick: X11, KDE Plasma, sway or Hyprland). Every
+#             driver understands "ai:on" (the AI menu's switch is on: the
 #             picker greys the row with the AI-off notice while it is off, and
 #             the action refuses itself then). The other
-#             tokens have no macOS probe, and Windows has none yet, so the
+#             tokens have no macOS or Windows probe, so the
 #             generator refuses them for those drivers rather than emitting one
 #             nothing checks.
 #   scalable  (axis only) whether the axis repeats with the swipe distance.
@@ -1267,6 +1267,7 @@ parameter = "llm_language"
 platform = "all"
 requires_linux = ["ai:on"]
 requires_hs = ["ai:on"]
+requires_ahk = ["ai:on"]
 
 [sg_actions.llm_agent_command]
 # llm_agent_selection on a command the user types in a dialog ("meeting
@@ -1275,6 +1276,7 @@ requires_hs = ["ai:on"]
 platform = "all"
 requires_linux = ["ai:on"]
 requires_hs = ["ai:on"]
+requires_ahk = ["ai:on"]
 
 [sg_actions.llm_agent_auto_toggle]
 # Switches the agent between its automatic mode and "on action"
