@@ -606,6 +606,7 @@ function M.new()
 		keystats_database = keystats_database,
 		launcher = launcher,
 		exec_input = exec_input,
+		read_text = function(path) return require("adapters.file_system").read(path) end,
 		loopback_server = loopback_server,
 		crash_counts = crash_counts,
 		pid = function() return hs.processInfo.processID end,
