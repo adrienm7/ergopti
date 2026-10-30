@@ -919,7 +919,10 @@ Not started:
       tests). macOS in code (launcher role `--managed-proxy-route`, 06addb2e3f; per-origin route
       plan 1fd254d92e and 749e00c4c8); Swift compiled and tested on the hosted macOS cell. Windows
       is covered by the WinHTTP transport (62). Left: a real-PAC pull on the maintainer's Mac (Debug >
-      Test network), the Ollama blob host inventory check, a `route_plan` step in the network check.
+      Test network). The network check already has its `route_plan` step (shared
+      `field_check_network.lua`); the blob host inventory check is the field-run step
+      `field_ollama_blob_host` since 30 October (`blob_host` fails `unplanned_host` when the registry
+      redirects a blob to a host `route_origins.json` does not plan).
       The daemon start now looks up every inventory origin (it read only the single-origin variable,
       so `pac_probe_client = "ollama"` never resolved at start; fixed with the fallback below).
 - [ ] **PAC unusable: direct fallback (maintainer decision).** [CODE] [PHYS-M] macOS done on branch
@@ -1283,6 +1286,9 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       entry again (ea02cf7000: the generic registrar refuses Caps Lock and the whole shortcut start rolled
       back). The registrar tests say macOS never fires a Caps Lock hotkey: check on a real Mac that Ctrl+Caps
       Lock toggles Caps Lock; if not, report it and drop the slot's recommendation on macOS with a reason.
+      Since 30 October the field run proves it: press Ctrl+Caps Lock once before the run, then the step
+      `field_capslock_chord` passes `delivered:N` or fails `never_delivered` (the keymap modifier tap
+      counts the physical chord, the slot's native callback counts each delivery).
 - [ ] **Layout emulation on macOS and Linux through one generated `.keylayout`, live (maintainer request, 27
       October).** [CODE] Decided by the maintainer: no pre-generated variants. The user picks a layout
       (Ergopti, Bépo, ...), the menu options (number row in direct access or symbols, row switches) and later
@@ -1393,7 +1399,9 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       Variables/KeyHistory snapshot.
 - [ ] **120 (formerly 46/47/48).** [CODE] Broad Ollama process termination on macOS stays debt (the
       other clauses of 46/47/48 were stale or by design; their context was lost and the maintainer
-      retired them).
+      retired them). Checked 30 October: the macOS driver no longer kills any Ollama broadly; quit and
+      reload retire only the owned daemon (`api_ollama.stop_owned_server`), and the only `pkill -f`
+      sweeps left name the expander, the HTTP helper and `mlx_lm` server. Proposal: close it.
 - [ ] **L115.** [CODE] Provider error envelope guard: not reproducible under WSL LuaJIT (6 of 6
       runs pass); leave it or close it.
 - Optional, not planned: XKB angle-name gaps and raw-input grammar (L118-L120); concurrent JSON
