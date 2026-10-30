@@ -154,6 +154,13 @@ const CASES = [
 	],
 	[
 		LINUX,
+		'modules/hotstrings/injector.lua',
+		"inject(): bc=%d text='%s'…",
+		['3', `${CANARY}'…\n${CANARY} second line`],
+		'inject(): bc=3 '
+	],
+	[
+		LINUX,
 		'modules/shortcuts/wrap_on_type.lua',
 		"PRIMARY unchanged since the selection window opened — typing '%s'.",
 		[CANARY],
@@ -161,10 +168,10 @@ const CASES = [
 	]
 ];
 
-/** Fills a template's {n} or %s placeholders with values. */
+/** Fills a template's {n}, %s or %d placeholders with values. */
 function render(template, values) {
 	let next = 0;
-	return template.replace(/\{(\d+)\}|%s/g, (_, index) =>
+	return template.replace(/\{(\d+)\}|%[sd]/g, (_, index) =>
 		index ? values[Number(index) - 1] : values[next++]
 	);
 }
