@@ -132,6 +132,10 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 		path.join(logs, `${LOG_FILES.main}${day}${LOG_FILES.extension}`),
 		'2026-10-28 10:00:00 [INFO] [BootProfile] Boot complete in 812 ms (cpu 300 ms).\n' +
 			'2026-10-28 10:01:00 [INFO] [network_check] check=network verdict=pass steps=1 pac=pass\n' +
+			'2026-10-28 10:01:10 [INFO] [composer_check] check=composer verdict=fail steps=2 build=fail\n' +
+			'2026-10-28 10:01:20 [INFO] [field_check] check=layout_probe verdict=skip steps=0\n' +
+			'2026-10-28 10:01:30 [INFO] [field_check] check=typing_probe verdict=needs_typing steps=1\n' +
+			'2026-10-28 10:01:40 [INFO] [field_check] check=odd_probe verdict=partial steps=1\n' +
 			'2026-10-28 10:02:00 [WARNING] [Fixture] a warning\n' +
 			"2026-10-28 10:03:00 [ERROR] [injector] Cannot deliver 'TYPEDCANARY' before erasing its trigger: boom.\n" +
 			"2026-10-28 10:04:00 [TRACE] [injector] inject(): bc=3 text='TYPEDCANARY'…\n"
@@ -304,6 +308,28 @@ function read(folder, name) {
 					!fs.existsSync(path.join(folder, `${LOG_FILES.main}2000-01-01${LOG_FILES.extension}`))
 				);
 				assert.match(read(folder, 'digest_field_checks.txt'), /check=network verdict=pass/);
+				// The macOS marks, the verdict word kept after each, and one summary.
+				const marked = read(folder, 'field_checks.txt');
+				for (const line of [
+					'✅ field check network: pass',
+					'❌ field check composer: fail',
+					'⏭️ field check layout_probe: skip',
+					'⌨️ field check typing_probe: needs_typing',
+					'⚠️ field check odd_probe: partial'
+				]) {
+					assert.ok(marked.includes(`  ${line}\n`), `field_checks.txt names ${line}`);
+					assert.ok(
+						result.stdout.includes(`[field-report]   ${line}`),
+						`the terminal shows ${line}`
+					);
+				}
+				const summary =
+					'Field check summary: ✅ 1 pass, ❌ 1 fail, ⏭️ 1 skip, ⌨️ 1 needs_typing, ⚠️ 1 other.';
+				assert.ok(marked.endsWith(`${summary}\n`), 'field_checks.txt ends with the summary');
+				assert.ok(
+					result.stdout.includes(`[field-report] ${summary}`),
+					'the terminal shows the summary'
+				);
 				assert.match(read(folder, 'digest_boot.txt'), /Boot complete in 812 ms/);
 				assert.match(read(folder, 'digest_errors.txt'), /\[WARNING\] \[Fixture\]/);
 				const layout = read(folder, 'keyboard_layout.txt');
