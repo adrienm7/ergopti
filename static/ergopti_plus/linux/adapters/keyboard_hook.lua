@@ -121,6 +121,13 @@ local _number_row = { retired = {}, suppressed = {}, mode = "native" }
 local _devices = {}
 local _pointer_devices = {}
 local _device = nil
+-- The mice the navigation layer owns while it binds a wheel direction: grabbed
+-- for the hold, every report forwarded but a bound notch (LayerPointer.sync).
+-- slots maps each taken reader slot to its path; buttons holds the forwarded
+-- buttons still down: the grab ends after them. emit_relative writes one
+-- relative report on the virtual device (onEmitRelative). One table: the
+-- module's main chunk is at LuaJIT's 200-local ceiling.
+local LayerPointer = { slots = {}, buttons = {}, emit_relative = nil }
 
 -- One unread event per source for the timestamp merge. Heads survive a bounded
 -- pump so an older backlog entry can never be overtaken on the next iteration.
@@ -2419,7 +2426,92 @@ end
 -- =========================================
 -- =========================================
 
-local function _dispatch_pointer(ev)
+-- Event-type bits of EVIOCGBIT(0): a mouse reports EV_REL, a touchpad or a tablet EV_ABS.
+LayerPointer.EV_REL_BIT, LayerPointer.EV_ABS_BIT = 0x02, 0x03
+
+--- Whether bit `bit` of an event-type mask is set (no bit operators under LuaJIT).
+function LayerPointer.has_type(mask, bit)
+	return math.floor(mask / 2 ^ bit) % 2 == 1
+end
+
+--- Whether the held navigation layer binds a wheel direction now.
+function LayerPointer.wanted()
+	return _running and _intercept and LayerPointer.emit_relative ~= nil and _remapper ~= nil
+		and type(_remapper.wheel_bound) == "function" and _remapper:wheel_bound() == true
+end
+
+--- Takes the mice while the layer binds the wheel, gives them back once it does
+--- not and no forwarded button is still down. A touchpad is never taken: it
+--- scrolls with its fingers, and its absolute reports cannot be forwarded.
+function LayerPointer.sync()
+	local wanted, held = LayerPointer.wanted(), next(LayerPointer.slots) ~= nil
+	if wanted and not held then
+		for _, path in ipairs(_pointer_devices) do
+			local slot = pointer_slot(path)
+			local mask = EvdevReader.is_open(slot) and EvdevReader.event_capabilities(slot) or nil
+			if mask and LayerPointer.has_type(mask, LayerPointer.EV_REL_BIT)
+				and not LayerPointer.has_type(mask, LayerPointer.EV_ABS_BIT) then
+				if EvdevReader.grab(slot) then
+					LayerPointer.slots[slot] = path
+				else
+					Logger.warn(LOG, "The navigation layer cannot take %s: its wheel keeps scrolling.", path)
+				end
+			end
+		end
+		if next(LayerPointer.slots) ~= nil then Logger.debug(LOG, "The navigation layer took the mouse wheel.") end
+	elseif held and not wanted and next(LayerPointer.buttons) == nil then
+		for slot, path in pairs(LayerPointer.slots) do
+			if EvdevReader.is_open(slot) and EvdevReader.ungrab(slot) ~= true then
+				Logger.error(LOG, "The navigation layer could not give %s back to the desktop.", path)
+			end
+		end
+		LayerPointer.slots = {}
+		Logger.debug(LOG, "The navigation layer gave the mouse back.")
+	end
+end
+
+--- Dispatches the key events a bound wheel notch became, as a due hold is.
+function LayerPointer.dispatch_rows(rows)
+	local exact, generation, output = _remapper, _remapper_generation, _broker
+	for _, row in ipairs(rows) do
+		if not _remapper_batch_current(exact, generation, output) then return false end
+		_dispatch_event({ type = EVDEV_TYPE_KEY, code = row.code, value = row.value, remapped = true,
+			holder = row.holder or (exact.output_holder and exact:output_holder(row)), handoff = row.handoff }, _device)
+		if not _remapper_batch_current(exact, generation, output) or not _running then return false end
+	end
+	return true
+end
+
+--- One report of a mouse the navigation layer holds: a notch it binds runs the
+--- binding (and its high-resolution twin is dropped), everything else goes on to
+--- the desktop through the virtual device.
+--- @param ev table
+--- @param slot string The pointer's reader slot.
+function LayerPointer.forward(ev, slot)
+	if ev.type == InputEvent.EV_REL then
+		local report = InputEvent.WHEEL_REPORTS[ev.code]
+		if report and ev.value ~= 0 and _remapper and _remapper.wheel_binding then
+			local direction = ev.value > 0 and 1 or -1
+			if _remapper:wheel_binding(report.axis, direction) then
+				if not report.classic then return end
+				for _ = 1, math.abs(ev.value) do
+					local rows = _remapper:wheel(report.axis, direction)
+					if rows and not LayerPointer.dispatch_rows(rows) then return end
+				end
+				return
+			end
+		end
+		if LayerPointer.emit_relative(ev.code, ev.value) ~= true then
+			Logger.warn(LOG, "A mouse report under the navigation layer was not forwarded (axis %d).", ev.code)
+		end
+	elseif ev.type == EVDEV_TYPE_KEY and InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT then
+		if ev.value == InputEvent.VALUE_DOWN then LayerPointer.buttons[ev.code] = true
+		else LayerPointer.buttons[ev.code] = nil end
+		_forward_raw({ type = EVDEV_TYPE_KEY, code = ev.code, value = ev.value }, slot)
+	end
+end
+
+local function _dispatch_pointer(ev, slot)
 	if ev.type == EVDEV_TYPE_KEY and ev.code >= InputEvent.POINTER_BUTTON_FIRST then
 		-- A click while a tap-hold key is down makes it a chord (Shift+click),
 		-- and so does the release of one, as on Windows (hook_dispatcher's
@@ -2442,6 +2534,10 @@ local function _dispatch_pointer(ev)
 		-- that merely moved the mouse while tapping CapsLock typed no Enter.
 		_remapper:activity()
 		local at_ms=_event_clock_now_ms(); if at_ms then _tick_remapper(at_ms) end
+	end
+	if slot ~= nil and LayerPointer.slots[slot] then
+		LayerPointer.forward(ev, slot)
+		LayerPointer.sync()
 	end
 	if _on_pointer_event then
 		-- The value and the frame's SYN_REPORT let the metrics measure a movement.
@@ -2582,12 +2678,14 @@ function M.pump()
 			Perf.count("input.key_events")
 			_dispatch_event(selected_event, selected.path)
 			Perf.span("input.dispatch", dispatch_started)
+			LayerPointer.sync()
 		else
 			Perf.count("input.pointer_events")
-			-- The pointer is not grabbed: its events reached the desktop when
-			-- they happened, and only keep the events' clock fresh here.
+			-- The pointer is not grabbed, except while the navigation layer binds
+			-- its wheel: its events reached the desktop when they happened, and
+			-- only keep the events' clock fresh here.
 			if _remapper and _intercept then _event_time_ms(selected_event) end
-			_dispatch_pointer(selected_event)
+			_dispatch_pointer(selected_event, selected.slot)
 		end
 		_pending_events[selected.slot] = _read_source(selected)
 	end
@@ -3305,6 +3403,7 @@ local function _acquire_pointers(paths, tx)
 	end
 	for path in pairs(retained) do _close_paths({ path }, pointer_slot, tx) end
 	_pointer_devices = {}
+	LayerPointer.slots, LayerPointer.buttons = {}, {}
 	for index, path in ipairs(paths) do _pointer_devices[index] = path end
 	return true
 end
@@ -3784,6 +3883,7 @@ function M.start(opts)
 	-- an emitter left over from an earlier session would satisfy the guard below
 	-- while pointing at a channel this session never asked for.
 	_emit_raw  = type(options.onEmitRaw) == "function" and options.onEmitRaw or nil
+	LayerPointer.emit_relative = type(options.onEmitRelative) == "function" and options.onEmitRelative or nil
 
 	local ok_capture, refusal = M.can_capture(_intercept, _emit_raw)
 	if not ok_capture then
@@ -3977,6 +4077,7 @@ function M.stop()
 	_close_paths(_devices, keyboard_slot)
 	_buffered_reader_cleanup=nil
 	_pointer_devices = {}
+	LayerPointer.slots, LayerPointer.buttons = {}, {}
 	_devices = {}
 	_device  = nil
 	_pinned_device = nil
@@ -4033,6 +4134,7 @@ function M.emergency_stop(reason)
 	_close_paths(_devices, keyboard_slot)
 	_buffered_reader_cleanup=nil
 	_pointer_devices = {}
+	LayerPointer.slots, LayerPointer.buttons = {}, {}
 	_devices = {}
 	_device = nil
 	_pinned_device = nil
@@ -4297,6 +4399,7 @@ function M._test_drive(events, callbacks, intercept)
 	_on_consume  = cb.onConsume
 	_on_desync   = cb.onDesync
 	_emit_raw    = cb.onEmitRaw
+	LayerPointer.emit_relative = cb.onEmitRelative
 	_intercept   = intercept and true or false
 	-- liveXkb drives the production path through adapters/xkb_capture, whose
 	-- backend and keymap the test has installed; otherwise a capture double.
