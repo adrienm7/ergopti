@@ -1805,3 +1805,19 @@ rewritten enabled loose layout applies after `TISRegisterInputSource` on its
 file (P8 a). SystemUIServer is `com.apple.SystemUIServer.agent` in `gui/<uid>`;
 a kickstart of `user/<uid>/com.apple.SystemUIServer` answers 113. The same
 Ergopti bundle in ~/Library and /Library makes macOS renumber one copy's ids.
+
+### project-keylayout-rows-keep-shortcut-keymaps
+
+A `.keylayout` without a Command or Control `keyMapSelect` (Ergo-L) sends Cmd+1
+and Ctrl+1 to `defaultIndex`, usually the plain keyMap 0. Rewriting that keyMap
+for the number-row options would therefore change the shortcuts too, while the
+XKB converter reads each level before its swap and keeps them.
+`layouts/keylayout_rows.lua` first routes every press with Cmd, Ctrl or Option
+that selected a rewritten keyMap to a verbatim copy of it (exact
+`keyMapSelect` entries inserted first, since the first match wins).
+`test-keylayout-row-options.cjs` proves the edited file against the converter
+on the registry layouts. Action: any other `.keylayout` rewrite (per-key edits)
+goes through the same copy, and tag positions come from `layouts.keylayout`
+(`positions`, `key_positions`): the single-reader gate refuses a second
+scanner. A macOS build of a changed layout always gets a new name and id
+(probe M3); `field_layout_rows` proves the live replace on the Mac.
