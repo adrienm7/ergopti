@@ -217,19 +217,37 @@ into its item below or into the matching existing item.
       model except Cerebras `qwen-3.8-27b`. Also check whether Anthropic requests send `temperature`
       (Opus 5.5, Sonnet 5.5 and Fable reject non-default sampling with a 400).
       Windows (work/windows-port, 30 Oct): already on dev, audited: `thinking_off.ahk` replays every section of `thinking_off_vectors.json`; predictions, Test-API, tone/translate, vision, agent, local servers and the Ollama warmup turn thinking off; 400 retry with `ST_Set` refusal and `_LLM_Remote_RetryOf`; no temperature for default-sampling models; the warmup now pinned by a test. [PHYS-W] one Opus 5.5 and one gpt-oss request.
-- [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS.** [CODE] Each one with its
-      key handling, model listing, the thinking-off dialect of the item above, localized labels and tests.
-      Verify every endpoint against the provider's official documentation.
-  - OpenAI-compatible with one key: Perplexity, Moonshot (Kimi), Alibaba Qwen (DashScope international),
-    Z.ai (Zhipu GLM), MiniMax, SiliconFlow, DeepInfra, SambaNova, Hugging Face Inference Providers, NVIDIA NIM,
-    Nebius AI Studio, Novita AI, Hyperbolic, Scaleway Generative APIs, OVHcloud AI Endpoints, Upstage (Solar),
-    AI21 (Jamba), Venice.ai, Vercel AI Gateway, GitHub Models, Poe, Featherless, Lambda, Inception Labs
-    (Mercury), Chutes, Requesty, Baseten, Writer (Palmyra), Aleph Alpha, Reka, Liquid AI, StepFun, 01.AI.
-  - Own authentication or per-account address: Azure OpenAI / Microsoft Foundry (deployment URL, `api-key`
-    header, Entra ID), Amazon Bedrock (SigV4 and Bedrock API keys), Google Vertex AI (OAuth service account),
-    Cloudflare Workers AI and AI Gateway (account id), IBM watsonx, Databricks Model Serving, Snowflake Cortex.
-  - Mainly used in China: ByteDance Doubao (Volcengine Ark), Baidu Qianfan (ERNIE), Tencent Hunyuan, iFlytek
-    Spark, Baichuan.
+- [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS (worker `feat/llm-providers`).**
+      [CODE] Done (official documentation read 2026-10-30, each descriptor's `_source`): Perplexity, Moonshot,
+      DashScope, Z.ai, MiniMax, SiliconFlow, DeepInfra, SambaNova, Hugging Face, NVIDIA NIM, Nebius, Novita,
+      Hyperbolic, Scaleway, OVHcloud, Upstage, AI21, Venice, Vercel AI Gateway, Poe, Featherless, Inception,
+      Chutes, Requesty, Baseten, Reka, StepFun, Volcengine Ark, Baidu Qianfan, iFlytek Spark, Baichuan. The three
+      drivers read the catalogue generically (key, requests, `<base>/models` listing), so no driver code changed;
+      labels are brand names read from the catalogue, like the providers before them, so no locale key.
+      `test_api_provider_catalogue.lua` (macOS, Linux) requires a default-model thinking vector and a recorded
+      listing or its reason for every provider; the shared corpora are replayed by the three drivers. Not added:
+      GitHub Models (retired 2026-07-30), Lambda Inference (shut down), 01.AI (API stopped 2026-09-03), Aleph Alpha
+      and Liquid AI (no public hosted API), Writer (its reference documents `POST /v1/chat`, not
+      `/chat/completions`, and lists `{"models": [...]}`), Tencent Hunyuan (moving to TokenHub `hy3`, whose
+      international address is only in third-party sources), BytePlus ModelArk (documentation unreadable).
+      Inferred, not read: Chutes and Featherless honour `chat_template_kwargs.enable_thinking` on Qwen; SambaNova
+      `enable_thinking: false` (only `true` is shown); whether Qianfan `ernie-5.1` is hybrid. Watch: Perplexity
+      ended Sonar chat-completions support on 2026-09-27 (requests still answer, converted to its Agent API);
+      `dashscope-intl` is a legacy shared domain; Moonshot K2 retires by December. Left:
+  - Per-account address (design): an `openai_compat` entry with the account URL and a Bearer key already reaches
+    Azure OpenAI / Foundry v1 (`https://<resource>.openai.azure.com/openai/v1`, the key accepted as Bearer, the
+    model is the deployment name), Amazon Bedrock with a long-term API key (the bedrock-runtime address
+    `/openai/v1` has no `/models`; `bedrock-mantle.<region>.api.aws/v1` lists), Cloudflare Workers AI
+    (`api.cloudflare.com/client/v4/accounts/<id>/ai/v1`, its listing is Cloudflare-shaped at `/ai/models/search`;
+    AI Gateway `/compat` is deprecated in favour of that address), Databricks (`https://<workspace>/serving-endpoints`,
+    PAT) and Snowflake Cortex (`https://<account>.snowflakecomputing.com/api/v2/cortex/v1`, PAT, 15-day default
+    expiry). Shipping them as catalogue rows needs a `base_url` template whose placeholders (resource, region,
+    account, workspace) the add-entry form asks for on the three OS, and no catalogue default model (the
+    validators require one today). Google Vertex AI (OAuth access token, 1 h) and IBM watsonx (API key exchanged
+    for an IAM token; the OpenAI-shaped model gateway is a preview) need a token-refresh auth model first.
+  - The listing reader takes `data` (and `models` for Gemini) only: DashScope's native listing
+    (`output.models[].model`) and Writer's `models[]` would need a per-provider listing shape on the three OS.
+  - With about forty providers, the Linux zenity prompt of the screen actions lists every one on a line.
 - [ ] **Every known local AI server in `local_servers.json`, on the three OS.** [CODE] Detection by process,
       settings file and port like the existing four, with the thinking-off dialect: vLLM (8000), SGLang
       (30000), KoboldCpp (5001), text-generation-webui (5000), TabbyAPI (5000), GPT4All (4891), AMD Lemonade
