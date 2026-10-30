@@ -160,6 +160,14 @@ helpers.describe("menu_about: the check frequency (macOS)", function()
 			helpers.assert_true(found[1] ~= nil, "a local version draws the check row")
 			helpers.assert_true(found[2] ~= nil, "a local version draws the frequency row, naming the preset " .. case.code)
 			helpers.assert_eq(found[2], found[1] + 1, "the frequency row follows the check row")
+			-- The channel picker, right before the check row, changes nothing for a
+			-- local version either.
+			local channel_row = rows[found[1] - 1]
+			helpers.assert_true(type(channel_row) == "table" and type(channel_row.title) == "string",
+				"a local version draws the channel row")
+			helpers.assert_eq(channel_row.disabled, true, "the channel row is greyed")
+			helpers.assert_true(channel_row.title:find(" — " .. head, 1, true) ~= nil, "the channel row says why")
+			helpers.assert_nil(channel_row.menu, "the channel row opens nothing")
 			for at, label in ipairs(expected) do
 				local row = rows[found[at]]
 				helpers.assert_eq(row.title, label .. " — " .. head, "the row says why it is greyed")

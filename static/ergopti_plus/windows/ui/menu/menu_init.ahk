@@ -582,7 +582,14 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 	for Row in SeparatorRows
 		Rows.Push(Row)
 
-	Rows.Push(_MI_ChannelPickerRow(SetChannelFn))
+	ChannelRow := _MI_ChannelPickerRow(SetChannelFn)
+	if IsLocal {
+		; A local version installs nothing, so its channel changes nothing.
+		ChannelRow.Delete("items")
+		ChannelRow["disabled"] := true
+		ChannelRow["disabled_reason_key"] := "menu.about.source_run_reason"
+	}
+	Rows.Push(ChannelRow)
 
 	; The preset in force, which both the live picker and its greyed stand-in name
 	; (a live value outside the presets reads as its nearest preset, the one a
