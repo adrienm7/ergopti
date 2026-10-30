@@ -1079,6 +1079,35 @@ remaps revoked indefinitely. An unowned reload whose fence is refused reloads
 natively the same way, since the revocation cannot be undone in that VM; an
 owned reload (`request_reload_owned`) and an exit keep their exact abort.
 
+### project-hs-adhoc-guardian-reregisters-before-registering
+
+An ad hoc build (no TeamIdentifier: every developer build, and the ad hoc ZIP
+release) changes cdhash on each rebuild, and launchd spawned the guardian under
+the definition recorded for the previous one: macOS killed it about 3 s after
+registration (CODESIGNING 4, Launch Constraint Violation, parent launchd) and
+only the relaunch after the 10 s ThrottleInterval survived (field run
+2026-10-30, with this copy's legacy plist and its Background Items record both
+present). `resetAdhocRemapGuardianRegistration` therefore removes the exact own
+legacy plist and `unregister()`s an enabled record, then proves the job gone
+(launchctl 113, singleton lock free) before `register()`. Live lease records
+and a pending approval keep the registration. The register role prints the
+note (`developer_adhoc_*`) on a second line; the driver logs it and
+`field_login_items` reports it as `guardian_registration`. A Developer ID build
+never takes the reset. Its launchctl steps and waits are counted by
+`test-hardening-d-native-timeout-contract.cjs`.
+
+### project-macos-reload-breadcrumb
+
+A controlled reload writes `reload_breadcrumb.txt` in the default logs folder
+synchronously, one `<stage> <ms since the Mac's boot>` line per coordinator
+stage and teardown step (`adapters/reload_breadcrumb.lua`), because a reload
+that loses the app discards its queued log lines (2026-10-30 21:06: the day log
+stopped at the lease revocation, no boot and no crash report followed). The
+next boot appends `boot`; the macOS field-report collector copies the file.
+The error window stays closed while `TerminationCoordinator.terminal_in_progress()`
+holds: one opened mid-reload in that run. Keep `driver_reload` disabled until a
+trail names the stage the app is lost in.
+
 ### project-hs-kc-ledger-process-lifecycle
 
 The Karabiner physical-key ledger keeps draining when metrics are disabled.
