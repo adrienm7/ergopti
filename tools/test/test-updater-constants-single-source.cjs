@@ -217,6 +217,18 @@ for (const [label, source] of [
 // answers 404 while a channel has no release). AHK cannot read JSON at include
 // time, so its template literal is pinned here.
 const checkUrl = defaults.update_check && defaults.update_check.releases_url;
+const ahkFeedUrlM = ahkSrc.match(/UPDATER_RELEASES_FEED_URL_TEMPLATE\s*:=\s*"([^"]+)"/);
+if (!ahkFeedUrlM) {
+	fail('core.ahk: could not find UPDATER_RELEASES_FEED_URL_TEMPLATE');
+} else if (ahkFeedUrlM[1] !== defaults.release_sources.atom_feed_url) {
+	fail(
+		`core.ahk UPDATER_RELEASES_FEED_URL_TEMPLATE="${ahkFeedUrlM[1]}" does not match defaults.json release_sources.atom_feed_url`
+	);
+} else {
+	pass(
+		'core.ahk UPDATER_RELEASES_FEED_URL_TEMPLATE matches defaults.json release_sources.atom_feed_url'
+	);
+}
 const ahkCheckUrlM = ahkSrc.match(/UPDATER_RELEASES_API_URL_TEMPLATE\s*:=\s*"([^"]+)"/);
 if (
 	typeof checkUrl !== 'string' ||

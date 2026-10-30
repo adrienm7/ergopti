@@ -125,8 +125,11 @@ UpdateCheck_ShowResult(Request, Answer) {
 		State["log_path"] := LoggerTodayLogPath()
 	}
 	_UC_Release := (Phase == "available") ? Answer["release"] : 0
-	if (Phase == "available")
+	if (Phase == "available") {
 		State["notes"] := _UpdateCheck_ReleaseNotes(_UC_Release)
+		if Answer.Get("check_only", false)
+			State["check_only"] := true
+	}
 	LoggerInfo("UpdateCheck", "Update check window: {1} (channel {2}).", Phase, Request.Channel)
 	Accepted := _UpdateCheck_Present(State)
 	if Accepted && Phase == "error" && ManagedNetworkFailureWindows_CanonicalReport(Answer.Get("network_report", 0))
@@ -191,6 +194,8 @@ _UpdateCheck_StateJson(State) {
 		. ',"current":' . JsonStringLiteral(State.Get("current", ""))
 		. ',"latest":' . JsonStringLiteral(State.Get("latest", ""))
 		. ',"others":[' . Others . ']'
+	if State.Get("check_only", false)
+		Json .= ',"check_only":true'
 	if State.Has("notes") {
 		Notes := State["notes"]
 		Json .= ',"notes":{"body":' . JsonStringLiteral(Notes["body"], true)
@@ -301,6 +306,10 @@ UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false, A
 			Effect("close", _UpdateCheck_CloseWindow).Call()
 			Outcome["ok"] := true, Outcome["closed"] := true
 		case "update":
+			if State.Get("check_only", false) {
+				LoggerWarn("UpdateCheck", "Refused an update of a release only the public feed announced.")
+				return Outcome
+			}
 			Install := Effect("install", (Release) => _UpdateCheck_Install(Release, Owner))
 			if !_UpdateCheck_ActionCurrent(Owner)
 				return Outcome
@@ -556,7 +565,8 @@ _UpdateCheck_BuildNative() {
 		SwitchButton.OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "switch_channel", Other.channel))
 		_UpdateCheck_CenterRow([SwitchButton], Geo.w)
 	}
-	G.Add("Text", "xm y+10 w" . Width . " Center vStatus", "")
+	CheckOnly := _UC_State.Get("check_only", false)
+	G.Add("Text", "xm y+10 w" . Width . " Center vStatus", CheckOnly ? t("update_check.check_only") : "")
 	Row := []
 	if (Phase == "available") {
 		WhatsNew := G.Add("Button", "xm y+8", t("update_check.whats_new"))
@@ -571,7 +581,7 @@ _UpdateCheck_BuildNative() {
 	}
 	Row.Push(G.Add("Button", (Row.Length ? "x+8 yp" : "xm y+12"), t("common.close")))
 	Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "close", ""))
-	if (Phase == "available") {
+	if (Phase == "available" && !CheckOnly) {
 		Row.Push(G.Add("Button", "x+8 yp Default", t("update_check.update")))
 		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "update", ""))
 	}
