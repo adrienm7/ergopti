@@ -132,6 +132,7 @@ local OWNED = {
 	"modules.gestures.conflicts",
 	"modules.gestures.engine",
 	"modules.gestures.frame_clock",
+	"infra.gesture_frame_evidence",
 	"modules.gestures.geometry",
 	"modules.gestures.sticky_modifiers",
 	"modules.keystats",
