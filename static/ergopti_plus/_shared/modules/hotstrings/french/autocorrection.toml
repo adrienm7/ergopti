@@ -458,8 +458,8 @@ typographic_apostrophe ={ fr = "Lâ€™apostrophe devient typographique lors de lâ€
 "oiu" = { output = "oui", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "OUi" = { output = "Oui", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "oyu" = { output = "you", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
-"poru" = { output = "pour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"sru" = { output = "sur", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"poru" = { output = "pour", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"sru" = { output = "sur", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "uei" = { output = "uie", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "uio" = { output = "uoi", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "~_" = { output = "~ ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
