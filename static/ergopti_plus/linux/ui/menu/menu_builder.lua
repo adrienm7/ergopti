@@ -3098,21 +3098,7 @@ local function _build_llm(ctx)
 	return NativeParent.finish(parent, items)
 end
 
---- Builds the AI agent submenu (ui/menu/agent_rows.lua).
---- @param ctx table Menu context.
---- @return table Row data { label, submenu }.
-local function _build_agent(ctx)
-	if not ManifestMenu then
-		Logger.error(LOG, "Manifest renderer unavailable — the AI agent submenu cannot be built.")
-		return nil
-	end
-	return require("ui.menu.agent_rows").build(ctx, {
-		prompt = function(title, text, initial, hidden, choices)
-			return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
-		end,
-		error = function(text) show_error(zenity_plain(text)) end,
-	})
-end
+local _build_agent = require("ui.menu.menu_agent").build
 
 --- Builds the metrics/keystats submenu.
 --- Reports the at-rest migration and offers to stop it.
