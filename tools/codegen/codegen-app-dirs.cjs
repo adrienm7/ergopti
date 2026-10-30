@@ -121,7 +121,8 @@ const macos = {
 	base: requireString(data.macos, 'base', 'logs.macos'),
 	relative: relative('macos', '/'),
 	launcherLog: requireString(data.macos, 'launcher_log', 'logs.macos'),
-	fatalReport: requireString(data.macos, 'fatal_report', 'logs.macos')
+	fatalReport: requireString(data.macos, 'fatal_report', 'logs.macos'),
+	reloadBreadcrumb: requireString(data.macos, 'reload_breadcrumb', 'logs.macos')
 };
 const windows = {
 	base: requireString(data.windows, 'base', 'logs.windows'),
@@ -201,6 +202,7 @@ function emitLua() {
 		`\t\trelative = ${luaStr(macos.relative)},\n` +
 		`\t\tlauncher_log = ${luaStr(macos.launcherLog)},\n` +
 		`\t\tfatal_report = ${luaStr(macos.fatalReport)},\n` +
+		`\t\treload_breadcrumb = ${luaStr(macos.reloadBreadcrumb)},\n` +
 		'\t},\n' +
 		'\tlinux = {\n' +
 		`\t\tbase_env = ${luaStr(linux.base)},\n` +
