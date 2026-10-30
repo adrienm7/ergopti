@@ -892,6 +892,13 @@ X11_NO_DISPLAY = "no_display"
 X11_TOOL_MISSING = "tool_missing"
 X11_COMPILE_FAILED = "compile_failed"
 X11_NOT_LOADED = "not_loaded"
+X11_STALE_KEYMAP = "stale_keymap"
+
+# The keys whose cells the number-row options move. A loaded keymap is the
+# installed layout only when these keys hold what the installed files declare:
+# a desktop that puts back an older layout of the same name (a system copy, a
+# settings daemon) keeps the name and changes the cells.
+ROW_PROBE_KEYS = ("<TLDE>",) + tuple("<AE%02d>" % number for number in range(1, 13))
 
 _TYPES_SECTION = re.compile(r'(xkb_types\s*\{\s*include\s+)"[^"]*"')
 _SYMBOLS_NAME = re.compile(r'xkb_symbols\s+"([^"]*)"')
@@ -914,11 +921,68 @@ def x11_keymap_text(spec: LayoutSpec, tree_root: Path, display: str) -> str | No
     return printed
 
 
-def x11_loaded_symbols(display: str) -> str | None:
-    """The name of the symbols section the running server holds, or ``None``."""
-    dumped = run_capture(["xkbcomp", "-xkb", display, "-"], timeout=X11_TOOL_TIMEOUT_SECONDS)
-    match = _SYMBOLS_NAME.search(dumped or "")
-    return match.group(1) if match else None
+def x11_loaded_keymap(display: str) -> str | None:
+    """The keymap the running server holds, as ``xkbcomp`` prints it, or ``None``."""
+    return run_capture(["xkbcomp", "-xkb", display, "-"], timeout=X11_TOOL_TIMEOUT_SECONDS)
+
+
+def compile_keymap_text(keymap: str, tree_root: Path) -> str | None:
+    """Compiles a keymap description offline, printed the way the server prints it."""
+    try:
+        result = subprocess.run(
+            ["xkbcomp", "-I" + str(tree_root), "-xkb", "-", "-"],
+            input=keymap,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=X11_TOOL_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.stdout if result.returncode == 0 and result.stdout else None
+
+
+def keymap_layout_group(keymap: str, layout: str) -> int | None:
+    """The 1-based group that holds ``layout`` in a compiled keymap, or ``None``.
+
+    The symbols section is named from the layouts it was built from
+    (``pc+us+ergopti:2+inet(evdev)``); a layout without an index is group 1."""
+    match = _SYMBOLS_NAME.search(keymap or "")
+    if not match:
+        return None
+    for part in match.group(1).split("+"):
+        name, _, index = part.partition(":")
+        if name.split("(", 1)[0] == layout:
+            return int(index) if index.isdigit() else 1
+    return None
+
+
+def keymap_group_symbols(keymap: str, key: str, group: int) -> list[str]:
+    """The keysym names of ``key`` in ``group``; a single-group key may be printed bare."""
+    held = keymap_key_symbols(keymap, key, group)
+    if held or group != 1:
+        return held
+    block = keymap_key_block(keymap, key) or ""
+    bare = re.findall(r"\[([^\]]*)\]", block)
+    return [part.strip() for part in bare[-1].split(",") if part.strip()] if bare else []
+
+
+def keymap_carries_layout(held: str, expected: str, layout: str) -> bool:
+    """Whether the keymap ``held`` by a server types ``layout`` as compiled in ``expected``.
+
+    Both are printed by ``xkbcomp``, so keysym names are spelled the same way;
+    the layout may sit in another group of ``held`` (a desktop with several
+    input sources)."""
+    held_group = keymap_layout_group(held, layout)
+    expected_group = keymap_layout_group(expected, layout)
+    if held_group is None or expected_group is None:
+        return False
+    for key in ROW_PROBE_KEYS:
+        wanted = keymap_group_symbols(expected, key, expected_group)
+        if keymap_group_symbols(held, key, held_group) != wanted:
+            return False
+    return True
 
 
 def apply_x11_user_tree(
@@ -927,9 +991,12 @@ def apply_x11_user_tree(
     """Replaces the running X11 keymap with a layout of the user XKB tree.
 
     Returns ``(applied, code)`` with a closed code: ``applied``, ``not_x11``,
-    ``no_display``, ``tool_missing``, ``compile_failed`` or ``not_loaded`` (the
+    ``no_display``, ``tool_missing``, ``compile_failed``, ``not_loaded`` (the
     server compiled the upload but still holds another layout, which is what a
-    desktop that re-applies its own settings looks like)."""
+    desktop that re-applies its own settings looks like) or ``stale_keymap``
+    (the server holds a layout of that name whose number row is not the
+    installed one). Only a server keymap read back after the upload proves the
+    layout is in use."""
     env = os.environ if environ is None else environ
     if session_type(environ) != "x11":
         return False, X11_NOT_X11
@@ -939,7 +1006,8 @@ def apply_x11_user_tree(
     if not (shutil.which("setxkbmap") and shutil.which("xkbcomp")):
         return False, X11_TOOL_MISSING
     keymap = x11_keymap_text(spec, tree_root, display)
-    if keymap is None:
+    expected = compile_keymap_text(keymap, tree_root) if keymap is not None else None
+    if expected is None:
         return False, X11_COMPILE_FAILED
     try:
         result = subprocess.run(
@@ -955,9 +1023,11 @@ def apply_x11_user_tree(
         return False, X11_COMPILE_FAILED
     if result.returncode != 0:
         return False, X11_COMPILE_FAILED
-    held = x11_loaded_symbols(display)
-    if held is None or ("+" + spec.layout) not in held:
+    held = x11_loaded_keymap(display)
+    if keymap_layout_group(held or "", spec.layout) is None:
         return False, X11_NOT_LOADED
+    if not keymap_carries_layout(held or "", expected, spec.layout):
+        return False, X11_STALE_KEYMAP
     return True, X11_APPLIED
 
 
