@@ -384,7 +384,7 @@ HTTP transport items are done (`linux/adapters/notifier.lua`, `[sections.llm]` l
 - No external process can move, focus or close a window under Wayland.
 - The decoder's event trace is a reconstruction, not a capture. [PHYS-L] Code done 30 October:
   `tests/support/touchpad_record.lua` reads `libinput record` files, `test_touchpad_record.lua` replays
-  every trace in `linux/tests/fixtures/touchpad_records/` into the decoder, and the uinput round trip
+  every `linux/tests/fixtures/touchpad_record_*.yml` trace into the decoder, and the uinput round trip
   replays its own kernel capture through that reader. Left: one recording from a real touchpad
   (`linux/HARDWARE.md` section 13).
 - Done: the navigation layer's wheel bindings run on Linux (the recommended layer makes it the
