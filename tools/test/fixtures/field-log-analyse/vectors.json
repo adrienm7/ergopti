@@ -198,8 +198,8 @@
 		{
 			"driver": "macos",
 			"source": "static/ergopti_plus/macos/ui/healthcheck/core.lua",
-			"template": "The synchronous diagnostics took %.1f ms, over the %d ms budget.",
-			"line": "2026-10-30 10:00:00:123 [INFO] [healthcheck] The synchronous diagnostics took 164.7 ms, over the 5 ms budget.",
+			"template": "The synchronous diagnostics took %.1f ms, over the %d ms budget%s.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [healthcheck] The synchronous diagnostics took 164.7 ms, over the 5 ms budget; slowest: keymap=98.2 ms, ai=31.0 ms.",
 			"expect": {
 				"measures": [
 					{
@@ -531,9 +531,9 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+			"source": "static/ergopti_plus/linux/ui/menu/menu_reload.lua",
 			"template": "Reload requested from the tray menu…",
-			"line": "2026-10-30 10:00:00:123 [INFO] [menu] Reload requested from the tray menu…",
+			"line": "2026-10-30 10:00:00:123 [INFO] [ui.menu.menu_reload] Reload requested from the tray menu…",
 			"expect": {
 				"lifecycle": ["reload"]
 			}
@@ -550,8 +550,8 @@
 		{
 			"driver": "linux",
 			"source": "static/ergopti_plus/linux/ui/healthcheck/bridge.lua",
-			"template": "The synchronous diagnostics took %.1f ms, over the %d ms budget.",
-			"line": "2026-10-30 10:00:00:123 [INFO] [healthcheck] The synchronous diagnostics took 12.0 ms, over the 5 ms budget.",
+			"template": "The synchronous diagnostics took %.1f ms, over the %d ms budget%s.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [healthcheck] The synchronous diagnostics took 12.0 ms, over the 5 ms budget; slowest: layout=7.5 ms.",
 			"expect": {
 				"measures": [
 					{
@@ -784,8 +784,8 @@
 		{
 			"driver": "windows",
 			"source": "static/ergopti_plus/windows/ui/healthcheck/core.ahk",
-			"template": "The synchronous diagnostics took {1} ms, over the {2} ms budget.",
-			"line": "2026-10-30 10:00:00:123 [INFO] [Healthcheck] The synchronous diagnostics took 41 ms, over the 5 ms budget.",
+			"template": "The synchronous diagnostics took {1} ms, over the {2} ms budget{3}.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [Healthcheck] The synchronous diagnostics took 41 ms, over the 5 ms budget; slowest: Keymap=30 ms.",
 			"expect": {
 				"measures": [
 					{
