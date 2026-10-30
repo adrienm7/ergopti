@@ -36,6 +36,8 @@
 ; no counterpart in _shared/core/ports/ — it wraps Windows-only process spawning.
 ; ==============================================================================
 
+#Include ../infra/phase_stats.ahk
+
 #Include ../infra/tick_count.ahk
 
 
@@ -183,6 +185,17 @@ _SR_ProgramName(Cmd) {
 	return (Name != "" && RegExMatch(Name, "^[\w.+-]+$")) ? Name : "unknown"
 }
 
+; Names the program of a spawned executable, never its arguments: unlike a composed
+; command, the executable is a whole path, spaces included.
+; @param Executable {String}
+; @returns {String}
+_SR_ExecutableName(Executable) {
+	if !(Executable is String)
+		return "unknown"
+	SplitPath(Executable, &Name)
+	return (Name != "" && RegExMatch(Name, "^[\w.+-]+$")) ? Name : "unknown"
+}
+
 ; Reports a process exit with its status and duration. The first exit of each
 ; program is logged, then at most one line per program per window (carrying the
 ; number of runs it summarises), unless a run is slow — a slow child is exactly
@@ -198,6 +211,7 @@ _SR_RecordExit(Program, Status, DurationMs) {
 	static LastLogged := Map()
 	static Suppressed := Map()
 	Now := A_TickCount
+	PhaseStats_AddMs("process." . Program, DurationMs)
 	if (LastLogged.Has(Program) && (Now - LastLogged[Program]) < WINDOW_MS && DurationMs < SLOW_MS) {
 		Suppressed[Program] := Suppressed.Get(Program, 0) + 1
 		return false
@@ -379,6 +393,8 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 
 	local state := _SR_LegacyNewState(task_id, "",
 		IsSet(OnDone) && IsObject(OnDone) ? OnDone : 0)
+	state["PhaseProgram"] := _SR_ExecutableName(Executable)
+	state["PhaseStartedTick"] := A_TickCount
 	local handle := {}
 
 	; AHK v2 fat-arrow bodies must be a single expression — a multi-statement
@@ -583,7 +599,9 @@ _SR_LegacyBuildClaimLocked(State, Pid, FireDone, Owner) {
 		"UseDirectFallback", false,
 		"TreeKillFn", 0,
 		"DirectKillFn", 0,
-		"CleanupDiagnostics", Map())
+		"CleanupDiagnostics", Map(),
+		"PhaseProgram", State.Get("PhaseProgram", ""),
+		"PhaseStartedTick", State.Get("PhaseStartedTick", 0))
 	_SR_CompletionInitClaim(claim, callback_token)
 	State["Native"] := 0
 	State["TerminalClaim"] := claim
@@ -851,6 +869,9 @@ _SR_CompletionBegin(Claim) {
 			return false
 		Claim["Finished"] := true
 		Claim["CompletionBusy"] := true
+		; One claim per process, one-shot: the phase is counted exactly once.
+		if (Claim.Get("PhaseProgram", "") != "")
+			PhaseStats_AddMs("process." . Claim["PhaseProgram"], A_TickCount - Claim["PhaseStartedTick"])
 		return true
 	} finally {
 		Critical(previous_critical)
@@ -1339,6 +1360,8 @@ _SR_NewTreeOwnedTask(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
 	local state := Map(
 		"TaskId", task_id,
 		"Executable", Executable,
+		"PhaseProgram", _SR_ExecutableName(Executable),
+		"PhaseStartedTick", A_TickCount,
 		"Command", cmd,
 		"NativeLaunch", NativeLaunch,
 		"TmpFile", "",
@@ -2274,6 +2297,8 @@ _SR_TreeNewTerminalClaim(State, Callback, AccountingConfirmedZero) {
 		"NativeExitObserved", State["RootReaped"],
 		"TaskId", task_id,
 		"Executable", State["Executable"],
+		"PhaseProgram", State.Get("PhaseProgram", ""),
+		"PhaseStartedTick", State.Get("PhaseStartedTick", 0),
 		"TmpFile", State["TmpFile"],
 		"CaptureDir", State.Get("CaptureDir", ""),
 		"MaxOutputBytes", State.Get("MaxOutputBytes", 0),

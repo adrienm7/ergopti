@@ -29,6 +29,8 @@
 ;    changed unrepresentable namespaces refuse before any staging write.
 ; ==============================================================================
 
+#Include ../phase_stats.ahk
+
 #Requires Autohotkey v2.0+
 
 #Include ../number.ahk
@@ -168,7 +170,9 @@ global _ConfigBootOutdatedEntries := Map()
 ; ``FileExist``.
 ; Multi-line arrays ( key = [\n  "a",\n  "b"\n] ) are fully supported.
 ParseTomlFile(Path) {
-		return _ParseTomlFileImpl(Path, true, true)
+		Started := PhaseStats_Now()
+		try return _ParseTomlFileImpl(Path, true, true)
+		finally PhaseStats_Stop("toml.parse", Started)
 }
 
 ; Transactional candidate rendering must observe bytes only after its terminal
@@ -176,7 +180,9 @@ ParseTomlFile(Path) {
 ; does not replace that cache object; a refused Reload continues on the exact
 ; pre-transition in-memory state.
 TOML_ParseFreshFile(Path) {
-		return _ParseTomlFileImpl(Path, false, false)
+		Started := PhaseStats_Now()
+		try return _ParseTomlFileImpl(Path, false, false)
+		finally PhaseStats_Stop("toml.parse", Started)
 }
 
 ; Fresh, uncached parse that keeps ``true``/``false`` literals as TOML_Bool so

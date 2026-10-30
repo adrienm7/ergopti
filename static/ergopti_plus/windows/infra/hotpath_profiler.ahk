@@ -32,6 +32,7 @@
 #Requires AutoHotkey v2.0
 
 #Include ../adapters/boot_clock.ahk
+#Include phase_stats.ahk
 
 ; QueryPerformanceFrequency is constant for the life of the process; cache it on
 ; first use so the per-keystroke path never re-queries it.
@@ -368,6 +369,9 @@ HotPath_FlushStatistics(*) {
 	try PerfCounters_Flush()
 	catch as PerfErr
 		try LoggerError("Perf", "Interval counters could not be published: {1}.", PerfErr.Message)
+	try PhaseStats_MaybeFlush()
+	catch as PhaseErr
+		try LoggerError("Perf", "Phase summary could not be published: {1}.", PhaseErr.Message)
 	PreviousCritical := Critical("On")
 	try {
 		Snapshot := Owner.Stats
