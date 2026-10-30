@@ -13,6 +13,9 @@ if native_cpath and native_cpath ~= "" then package.cpath = native_cpath end
 local available, uv = pcall(require, "luv")
 if not available then io.stderr:write("ENVIRONMENT: native lua-luv is required\n"); os.exit(2) end
 require("compat.utf8").install()
+-- API keys live in the desktop secret service: give this process the in-memory
+-- one the unit runner uses, never the developer's keyring or a missing tool.
+require("tests.support.secret_service_fake").isolate()
 local Http = require("adapters.http_client")
 local EventLoop = require("adapters.event_loop")
 local Remote = require("modules.llm.api_remote")
