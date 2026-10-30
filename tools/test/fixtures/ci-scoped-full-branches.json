@@ -983,6 +983,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Restart the daemon through the local reload control",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Install prerequisites for The tray binding names libraries and symbols that exist",
 			"protocol": 10
 		},
@@ -1086,6 +1092,12 @@
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
 			"step": "Qualify native retained FD SHA-256",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "Install prerequisites for Prepare authenticated managed HTTP validation tools",
 			"protocol": 9
 		},
 		{
