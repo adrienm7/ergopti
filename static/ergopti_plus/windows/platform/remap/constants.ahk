@@ -541,8 +541,11 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 		CancelReason := ""
 		if (Released and ReleaseProved and !Suspended and !A_IsSuspended)
 			CancelReason := CancelTapFn.Call(KeyId, GuardMs)
+		; A release sooner than the shared tap minimum is a key bounce: CapsLock held
+		; as Ctrl typed its tap on a 20 ms brush (tap_hold/decision_vectors.json).
+		; Owned here so no hold-modifier hotkey can miss it, as Linux does in its engine.
 		TapAllowed := Released and ReleaseProved and !Suspended and !A_IsSuspended and !Retracted
-			and ElapsedMs <= TapThresholdSec * 1000 and CancelReason == ""
+			and ElapsedMs >= TapMinDurationMs() and ElapsedMs <= TapThresholdSec * 1000 and CancelReason == ""
 		if LoggerIsDebugEnabled() {
 			LoggerDebug("TapHoldModifier", "Ownership complete for key='{1}', modifier='{2}', source={3}, released={4}, elapsed_ms={5}, tap={6}.",
 				KeyId, _TH_SyntheticKeyLabel(ModKey), PhysicalModifierPassthrough ? "physical_passthrough" : "synthetic",
