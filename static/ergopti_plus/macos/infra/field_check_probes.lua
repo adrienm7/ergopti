@@ -18,6 +18,8 @@
 --- 5. launcher_roles: the launcher this runtime resolves answers its headless
 ---    roles before any application startup, and its native HTTP worker carries
 ---    one request to a loopback server this check owns.
+--- 6. network_hosts: every external host the drivers declare answers one HEAD
+---    through the managed transport (route lookup, proxy, TLS), by its key.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only, like the Debug checks: nothing is granted, prompted, written
@@ -461,6 +463,51 @@ function M.launcher_roles(ports, report, finish)
 				end, environment)
 		end)
 	end, environment)
+end
+
+
+
+
+
+-- ================================
+-- ================================
+-- ======= 6/ Network hosts =======
+-- ================================
+-- ================================
+
+--- Reads the helper's `step host_<key> <state> <value>` lines.
+--- @param output any Helper stdout.
+--- @return table steps key → { state, value }
+function M.parse_host_lines(output)
+	local steps = {}
+	for key, state, value in tostring(output or ""):gmatch("step host_([%w_]+) (%a+) (%S+)") do
+		if (state == STATE.pass or state == STATE.fail) and not steps[key] then
+			steps[key] = { state = state, value = value }
+		end
+	end
+	return steps
+end
+
+--- The external hosts the drivers declare, each reached with one HEAD to its
+--- root through the managed transport a download uses (route lookup, PAC or
+--- proxy, TLS trust), by the native helper. Any HTTP answer below 500 proves
+--- the route; a host the helper did not answer for fails by its key.
+function M.network_hosts(ports, report, finish)
+	local keys = {}
+	for key in pairs(Identifiers.hosts) do keys[#keys + 1] = key end
+	table.sort(keys)
+	ports.host_heads(function(code, output)
+		local steps = code == 0 and M.parse_host_lines(output) or {}
+		for _, key in ipairs(keys) do
+			local step = steps[key]
+			if step then
+				report.step("host_" .. key, step.state, step.value)
+			else
+				report.step("host_" .. key, STATE.fail, code == nil and "helper_unavailable" or "no_answer")
+			end
+		end
+		finish()
+	end)
 end
 
 return M
