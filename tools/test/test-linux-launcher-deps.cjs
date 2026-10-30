@@ -161,7 +161,14 @@ const packageRows = [
 ];
 const packageTable = new Map(packageRows.map((match) => [`${match[1]}:${match[2]}`, match[3]]));
 const packageManagers = ['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk'];
-const requiredCapabilities = ['luajit', 'notify-send', 'sha256sum', 'xkbcli', 'libatspi.so.0'];
+const requiredCapabilities = [
+	'luajit',
+	'notify-send',
+	'sha256sum',
+	'xkbcli',
+	'libatspi.so.0',
+	'secret-tool'
+];
 const nativePackages = {
 	apt: ['libxkbcommon0', 'libxkbcommon-x11-0', 'libx11-6', 'libx11-xcb1'],
 	dnf: ['libxkbcommon', 'libxkbcommon-x11', 'libX11', 'libX11-xcb'],
@@ -228,8 +235,21 @@ const expectedPackages = new Map([
 	['apk:notify-send', 'libnotify'],
 	['apk:sha256sum', 'coreutils'],
 	['apk:xkbcli', 'xkbcli'],
-	['apk:libatspi.so.0', 'at-spi2-core']
+	['apk:libatspi.so.0', 'at-spi2-core'],
+	// The package that ships /usr/bin/secret-tool on each distribution (checked
+	// against the distribution indexes: Debian and openSUSE split the command).
+	['apt:secret-tool', 'libsecret-tools'],
+	['dnf:secret-tool', 'libsecret'],
+	['zypper:secret-tool', 'secret-tool'],
+	['pacman:secret-tool', 'libsecret'],
+	['xbps:secret-tool', 'libsecret'],
+	['apk:secret-tool', 'libsecret']
 ]);
+// Remote API keys are refused without the secret service command, so the
+// installer admits it like every other required command.
+if (!/^_check_or_install secret-tool$/m.test(installerCode)) {
+	errors.push('the installer never admits secret-tool (remote API keys)');
+}
 for (const [dependency, expectedPackage] of expectedPackages) {
 	const actualPackage = packageTable.get(dependency);
 	if (actualPackage !== expectedPackage) {
