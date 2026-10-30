@@ -799,6 +799,7 @@ M.checks = {
 	login_items = M.login_items,
 	composer = M.composer,
 	permissions = Probes.permissions,
+	event_taps = Probes.event_taps,
 }
 
 return M
