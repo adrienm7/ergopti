@@ -1695,6 +1695,18 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 
 ## Backlog (one line each)
 
+Maintainer requests of 2026-10-30 (Windows, macOS and Linux each):
+
+- [ ] **AI menu: a button to test a prediction.** [CODE] It runs one prediction on a sample context with the
+      active backend and shows the result or the refusal reason.
+- [ ] **Update channel picker greyed in an unbuilt local copy.** [CODE] The dev versus main selector has no
+      meaning in a source checkout that was not built; grey it with its reason.
+- [ ] **Tap-hold menu: spaces around the slash.** [CODE] The two greyed left/right hand titles read
+      "tap/hold"; write "tap / hold" in every locale (i18n skill).
+- [ ] **"Create a GitHub issue" button is broken.** [CODE] It opens a GitHub page saying "Whoops, something
+      went wrong". Check the generated `issues/new` URL (length limit, query encoding, template or label
+      names) and fix it on the three OS.
+
 Still true in the code on 2026-10-29, carried from the retired 2026-10-04 Linux handoff audit:
 
 - [ ] **Linux fractional AI context length.** [CODE] `linux/modules/llm/settings.lua` `BOUNDS.context_length`
