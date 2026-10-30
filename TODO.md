@@ -216,6 +216,7 @@ into its item below or into the matching existing item.
       `_shared/lua/llm/vision.lua` (no format turns thinking off), the Windows Ollama warmup, every cloud
       model except Cerebras `qwen-3.8-27b`. Also check whether Anthropic requests send `temperature`
       (Opus 5.5, Sonnet 5.5 and Fable reject non-default sampling with a 400).
+      Windows (work/windows-port, 30 Oct): already on dev, audited: `thinking_off.ahk` replays every section of `thinking_off_vectors.json`; predictions, Test-API, tone/translate, vision, agent, local servers and the Ollama warmup turn thinking off; 400 retry with `ST_Set` refusal and `_LLM_Remote_RetryOf`; no temperature for default-sampling models; the warmup now pinned by a test. [PHYS-W] one Opus 5.5 and one gpt-oss request.
 - [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS.** [CODE] Each one with its
       key handling, model listing, the thinking-off dialect of the item above, localized labels and tests.
       Verify every endpoint against the provider's official documentation.
@@ -235,6 +236,7 @@ into its item below or into the matching existing item.
       (8000), Docker Model Runner (12434), Microsoft Foundry Local (dynamic port), llamafile (8080, shared with
       llama.cpp and LocalAI), a hand-started `mlx_lm.server` (8080), exo (52415), Msty, AnythingLLM. Ports
       shared by several servers are probed once and named together, as llama.cpp and LocalAI are.
+      Windows (30 Oct): detection is data-driven (`LocalServerPortsDescriptor`, `.exe` names, command-line and config ports, the shared port corpus), so a server added to the JSON needs no AHK code; the new servers themselves are not in the JSON yet on any OS.
 - [ ] **Mac field report 2026-10-30 21:01, functional errors left open (worker `fix/macos-field-errors`).**
       Fixed there: shortcut full rebind on each bounded retry (35cc4a5d), pre-dispatch Ollama pull receipt
       (6f6b752f), one model-list error per outage (6051b50c), MLX server stopped before a repair (fcdb6f27),
@@ -737,7 +739,7 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       metrics dir and accepts legacy flat string values the Lua codec refuses, and it preserves unknown
       members the codec drops. Align the location (decision pending), the record shape and the score range,
       and replay `_shared/tests/corpus/metrics/app_category_store_vectors.json` in AHK.
-- [ ] **AI off disarms the agent's automatic mode.** [CODE] Done on Linux and macOS (e284077ba9). Windows:
+- [x] **AI off disarms the agent's automatic mode.** [CODE] Done on Linux and macOS (e284077ba9). Windows:
       the AHK agent runner arms no typing pause and refuses a triage or request in flight while the AI is
       off, cancels the pause at the switch-off and re-arms on the next keystroke; rewrite
       `test_llm_agent_ai_off.ahk` (it feeds the agent with the AI off on purpose) to assert that.
@@ -932,6 +934,7 @@ Not started:
       `PROXY a; DIRECT` keeps only its first entry; [PHYS-L] a pull on a PAC-only network whose PAC is
       unreachable. Deferred: Windows (`ergopti_network_routes.ps1` still refuses with `pac_failed` or
       `wpad_failed`) must follow the same policy.
+      Windows (30 Oct): no longer deferred, `ergopti_network_routes.ps1` `New-ErgoptiPacDirectFallback` goes direct at the policy's stages; [PHYS-W] confirm on a network whose PAC is unreachable.
 - [ ] **AppImage self-contained.** [CODE] `.zsync` and update information are done (10c016e51f,
       6fb83014e3). Built on ubuntu:22.04 (glibc 2.35 floor, no bundled libc or loader, musl refused in words,
       tray closure kept); the build refuses a foreign loader or a staged C library (dce846a0bd). Left: hosted
@@ -1003,6 +1006,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       pieces done (28bdd5a5d9, vectors `check_only_vectors.json` and `list_cache_vectors.json`). Windows
       needs the Atom fallback in `core.ahk` plus an AHK feed parser, then a reseal of the sealed updater
       sources (only when `run_all.ahk` has no foreign hunk).
+      Windows (30 Oct): the Atom fallback and its parser are on dev (`core.ahk`, `test_updater_check_only_fallback.ahk`); [PHYS-W] a check with api.github.com blocked.
 - [ ] **PAR-15. Tap-hold thresholds.** [CODE] Done: exact per-key thresholds pinned, one one-shot timeout
       (macOS read 3000 against 2000 ms), Linux holds the key's own side. macOS reads the shared per-key
       thresholds too (8cb8f04); one fallback `default_activation_ms = 200` (macOS was 250). Left: Windows
@@ -1040,7 +1044,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [ ] **PAR-53. Bring HotPath-style slow-segment logging to macOS and Linux.** [CODE] Done (shared
       `hotpath_segments.lua`, always-on Linux spans, one warning per segment per 10 s). Left: nesting
       attribution (Windows has it), the threshold question.
-- [ ] **PAR-54. PhaseStats and child-process timing.** [CODE] Done on macOS and Linux (`process.<program>`,
+- [x] **PAR-54. PhaseStats and child-process timing.** [CODE] Done on macOS and Linux (`process.<program>`,
       `toml.parse`, `menu.rebuild`, `boot.stage`, `boot.stage_cpu`). Windows: port `phase_stats_core.lua` with
       the same phases (`boot_profiler.ahk` already measures stages).
 - [ ] **PAR-55. Crash reports: one content, one cap, one notice.** [CODE] Done on macOS and Linux (shared
@@ -1064,6 +1068,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       redirects, document lease; the download-document contract is Linux-only by design). Left: Windows
       consumers of `http/get_redirect_vectors.json`, `native_presentations/original_captions.json`,
       `route_plan_vectors.json`.
+      Windows (30 Oct): `get_redirect_vectors` (`test_corpus_updater_redirect.ahk`) and `original_captions` (`test_window_title_captions.ahk`) were already replayed; `route_plan_vectors.json` is now replayed by the PowerShell twin `vendor/ergopti_route_plan.ps1` (`test-windows-route-plan.cjs`).
 - [ ] **PAR-60. Hotstring `family_samples.json` plus chaining, synthetic-output and erase vectors.** [CODE]
       Done on macOS and Linux (`family_samples.json`, `sequence_vectors.json`, `cascade_vectors.json` in both
       E2E harnesses). Left: a Windows `family_samples` consumer.
@@ -1093,6 +1098,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       macOS and Linux (generated shell and Lua precedence, Linux lookup limits from the policy, drift guard).
       Left, Windows: generated or read AHK copy in `http_client.ahk` (reseal), the route-plan consumer
       replaying `route_plan_vectors.json`, the native lookup limits from the policy.
+      Windows (30 Oct): `http_client.ahk` reads the curl relay names from `proxy_policy.json` (its ratchet entry removed); route plan ported (`vendor/ergopti_route_plan.ps1`). Left: wire it into the owned Ollama daemon start and pull (`ollama-runtime-launch.ps1`, `ollama-model-pull.ps1`; decide what an SSPI-only relay exports), the native lookup limits from the policy; [PHYS-W] a pull behind a PAC.
 - [ ] **PAR-72. Shared registries and catalogues.** [CODE] Done: layout registry store, shortcuts
       catalogue, healthcheck report runner, agent learning store (daee88e48d..e105336d39); gesture
       direction and temperature were already shared with vectors. Left: the registry install/select flows and
@@ -1266,6 +1272,7 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       daemon on 11434 left untouched, with regression tests that an installed system Ollama is never
       resolved or started. [PHYS-W] [PHYS-L] confirm with a system Ollama running on 11434: Ergopti's
       listens on 11435 (Linux: enable the AI from the menu on a machine running `ollama serve`).
+      Windows (30 Oct): done in code on dev: owned port from `llm_ollama_owned_port`, 11434 refused (`LLM_Option_TryNormalizeOllamaPort`), a saved 11434 dropped once and logged (`persist.ahk`), only the owned runtime is launched (`test_ollama_owned_only.ahk`). [PHYS-W] still open.
 - [ ] **Ctrl+Caps Lock slot on macOS.** [PHYS-M] The `secondary_capslock` slot binds through its own native
       entry again (ea02cf7000: the generic registrar refuses Caps Lock and the whole shortcut start rolled
       back). The registrar tests say macOS never fires a Caps Lock hotkey: check on a real Mac that Ctrl+Caps
@@ -1365,6 +1372,7 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
 - [ ] **142 gaps.** [CODE] Windows: a Reload click during a pending reload now follows the join rule
       (standing-checks agent); no hash-check requirement identified for the Windows client. Linux:
       the reload restarts the daemon (pending record, see "Config policy remainders").
+      Windows: done (`test_menu_reload_replay.ahk` reload-click-joins).
 - [ ] **13/35.** [CODE] Enrol the complete guardian acceptance collector in main CI.
 - [ ] **93. Linux ordered pairs.** [CODE] XI2 property cookies proven on Xvfb in WSL; the saved Xi
       packet is retired (libXi as a package dependency declined by the maintainer). Physical input
