@@ -49,6 +49,7 @@ local CatalogueFiles = require("hotstrings.catalogue_files")
 local PersonalFiles = require("hotstrings.personal_files")
 local TableUtil = require("table_util")
 local NativePath = require("native_path")
+local OutputTokens = require("modules.hotstrings.output_tokens")
 
 local LOG = "modules.hotstrings.loader"
 
@@ -289,9 +290,13 @@ function M.load_catalogue(paths, options, prepared_sources)
 					for index, entry in ipairs(section.entries) do
 						if type(entry.trigger) == "string" and type(entry.output) == "string" then
 							entry_count = entry_count + 1
+							local replacement, has_key_tokens = OutputTokens.resolve(entry.output)
 							registrations[sec_name][index] = {
 								trigger           = configured_magic_trigger(entry.trigger, options),
-								replacement       = entry.output,
+								replacement       = replacement,
+								-- {Left} and friends: the daemon presses them, and the buffer
+								-- cannot follow the caret afterwards.
+								has_key_tokens    = has_key_tokens,
 								is_word           = entry.is_word           or false,
 								is_case_sensitive = entry.is_case_sensitive or false,
 								-- The three flags the loader used to drop on the floor. Without

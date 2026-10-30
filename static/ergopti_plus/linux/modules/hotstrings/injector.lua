@@ -578,9 +578,9 @@ end
 --- @param owner table Common original output captured before diagnostic callbacks.
 --- @return table batch Common output guard and active-field admission.
 --- @return table fields Exact retained route for each original value.
-local function prepare_fields(values, owner)
+local function prepare_fields(values, owner, publication)
 	local fields = {}
-	for index, value in ipairs(values) do fields[index] = prepare_replacement(value, nil, owner) end
+	for index, value in ipairs(values) do fields[index] = prepare_replacement(value, publication, owner) end
 	local active = 1
 	local batch = { channel = owner.channel }
 	function batch.current()
@@ -589,7 +589,8 @@ local function prepare_fields(values, owner)
 		-- every receipt before output is reserved, rather than accepting each alone.
 		for _, field in ipairs(fields) do field.cached() end
 	end
-	function batch.cached() fields[active].cached() end
+	-- An output of keys alone has no text field to check.
+	function batch.cached() if fields[active] then fields[active].cached() end end
 	function batch.activate(index)
 		-- The genuine transaction now owns the busy output epoch. Source checking
 		-- must not query the broker's idle-only output_current observer here.
@@ -1066,6 +1067,74 @@ function M.inject_fields(backspace_count, values, is_private)
 	if result.ok then
 		Logger.done(LOG, "inject_fields(): done (bc=%d, %d field(s)).", backspace_count, #values)
 		notify_output(table.concat(values, "\t"))
+	end
+	return result
+end
+
+--- Performs a hotstring injection whose output presses keys ({Left}, {Enter}...):
+--- erases the trigger, then plays the parsed tokens in order as one transaction.
+--- inject() stays text-only, because a prediction or a selection holding the
+--- characters "{Left}" must type them.
+--- @param backspace_count integer Characters to erase before the output.
+--- @param tokens table Ordered tokens of send_input.parse_output.
+--- @param is_private boolean|nil True when the text is PII and must not be logged.
+--- @param replay_terminator string|nil Exact non-consumed carrier to type last.
+--- @param publication table|nil Retained full-phase and cached-key admission guards.
+--- @return table result { ok, error, cleanup_ok }.
+function M.inject_tokens(backspace_count, tokens, is_private, replay_terminator, publication)
+	if type(backspace_count) ~= "number" or type(tokens) ~= "table" then
+		Logger.error(LOG, "inject_tokens(): invalid arguments — bc is %s, tokens is %s.",
+			type(backspace_count), type(tokens))
+		return { ok = false, error = "invalid arguments", cleanup_ok = true }
+	end
+	local values = {}
+	for _, token in ipairs(tokens) do
+		if token.kind == "text" then values[#values + 1] = token.value end
+	end
+	local owner = capture_replacement_owner()
+	if not retire_clipboard() then
+		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
+	end
+	-- A count only: this log is kept for 14 days and the text may be a secret.
+	Logger.trace(LOG, "inject_tokens(): bc=%d, %d token(s)…", backspace_count, #tokens)
+	local checked, prepared, fields = pcall(prepare_fields, values, owner, publication)
+	if not checked then
+		Logger.error(LOG, "Cannot prepare a replacement with keys before erasure (content withheld).")
+		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
+	end
+
+	local result = run_transaction("inject_tokens()", function(tx)
+		if backspace_count > 0 then
+			send_backspaces(tx, backspace_count)
+			sleep_ms(INTER_PHASE_DELAY_MS)
+		end
+		require_publication(publication, false)
+		local field = 0
+		for _, token in ipairs(tokens) do
+			if token.kind == "text" then
+				field = field + 1
+				prepared.activate(field)
+				if not send_text(tx, token.value, is_private, fields[field]) then error(tx.error(), 0) end
+				fields[field].delivered = true
+			else
+				for _ = 1, token.count do
+					must_emit(tx, token.entry.linux, EVDEV_VALUE_DOWN, "output key down")
+					must_emit(tx, token.entry.linux, EVDEV_VALUE_UP, "output key up")
+				end
+				-- What the key does is asynchronous in most toolkits (the same reason
+				-- as a field Tab): text sent at once could land before the caret moved.
+				sleep_ms(INTER_PHASE_DELAY_MS)
+			end
+		end
+		if replay_terminator and replay_terminator ~= "" then
+			require_publication(publication, false)
+			send_terminator(tx, replay_terminator)
+		end
+	end, publication, prepared)
+
+	if result.ok then
+		Logger.done(LOG, "inject_tokens(): done (bc=%d).", backspace_count)
+		notify_output(table.concat(values) .. (replay_terminator or ""))
 	end
 	return result
 end

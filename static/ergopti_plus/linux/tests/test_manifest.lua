@@ -477,6 +477,7 @@ return {
 	"tests.unit.infra.i18n.test_shared_hotstring_languages",
 	"tests.unit.modules.hotstrings.engine.test_shared_hotstring_engine",
 	"tests.unit.modules.hotstrings.engine.test_hotstring_cascade",
+	"tests.unit.modules.hotstrings.engine.test_output_token_vectors",
 	"tests.unit.modules.hotstrings.engine.test_hotstring_cascade_net_edit",
 	"tests.unit.modules.hotstrings.engine.test_hotstring_injection_plan",
 	"tests.meta.architecture.test_shell_quoting_call_sites",
