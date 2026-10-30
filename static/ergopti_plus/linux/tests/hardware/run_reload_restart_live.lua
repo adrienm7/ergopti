@@ -210,7 +210,7 @@ local function cleanup()
 end
 
 print("=== reload as a daemon restart, across real processes ===")
-os.execute("setsid " .. quote(launcher) .. " </dev/null >/dev/null 2>&1 &")
+os.execute(quote(launcher) .. " </dev/null >/dev/null 2>&1 &")
 local first = wait_generation(1)
 if not check(first ~= nil, "the first daemon publishes its control session") then
 	print(read(scratch .. "/daemon.log") or "")
