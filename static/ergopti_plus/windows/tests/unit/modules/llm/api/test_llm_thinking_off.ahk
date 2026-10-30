@@ -197,6 +197,20 @@ _LTO_SamplingAndStoreVectors() {
 Test("LLM thinking off: default sampling and the refusal store replay the shared corpus (thinking-off-everywhere)",
 	_LTO_SamplingAndStoreVectors)
 
+_LTO_OllamaThinkVectors() {
+	global LLM_THINKING_FAMILIES
+	Checked := 0
+	for Vector in _LTO_Vectors("ollama_think_vectors") {
+		V := Vector["value"]
+		AssertEqual(_LTO_Member(Vector, "think"), LLM_ThinkingOffOllamaThink(LLM_THINKING_FAMILIES, V["model"]), V["model"])
+		Checked += 1
+	}
+	AssertTrue(Checked >= 10, "expected at least 10 Ollama think vectors, found " . Checked)
+	AssertEqual("false", LLM_ThinkingOffOllamaThink([], "gpt-oss:20b"), "an unreadable table sends false")
+}
+Test("LLM thinking off: the Ollama think value replays the shared corpus (thinking-off-everywhere)",
+	_LTO_OllamaThinkVectors)
+
 _LTO_ParseVectors() {
 	Checked := 0
 	for Vector in _LTO_Vectors("family_parse_vectors") {

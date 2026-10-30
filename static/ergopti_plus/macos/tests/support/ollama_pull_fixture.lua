@@ -186,6 +186,8 @@ local function with_fixture(options, callback)
 		start = function(task) return task:start() == true end,
 	}
 
+	-- Its loader reads the shared tree through hs.fs, which this fixture omits
+	package.loaded["modules.llm.thinking_families"] = { ollama_think = function() return false end }
 	_G.hs = {
 		execute = function() return "", true end,
 		http = {

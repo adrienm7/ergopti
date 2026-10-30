@@ -1168,7 +1168,8 @@ _LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine := true, Curre
 			"model", Backend["model"],
 			"system", Payload["system"],
 			"text", Payload["user"],
-			"max_tokens", Payload["max_tokens"]))
+			"max_tokens", Payload["max_tokens"],
+			"think", LLM_OllamaThink(Backend["model"])))
 	}
 	Result := _LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine, CurrentFn)
 	return !(Result is Integer && Result == false)
