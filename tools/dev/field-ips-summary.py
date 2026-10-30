@@ -5,7 +5,9 @@ The macOS collector (tools/dev/collect-macos-field-report.sh) runs this over
 ~/Library/Logs/DiagnosticReports. For each report of an owned process
 (ErgoptiPlus and its launcher roles, Hammerspoon, Ollama, Python, Karabiner)
 modified since the run started, it prints what names the cause and nothing
-else: the process name, the report kind, the exception type, signal and
+else: the process name and role, its parent and responsible process, its
+code signing identifier, team, flags and validation category, the report
+kind, the exception type, signal and
 subtype, the termination namespace, code and indicator, and the top frames
 of the faulting thread that belong to the app's own images. Paths, user
 names, environment, register values and other images' frames are never
@@ -30,6 +32,8 @@ MAX_FRAMES = 12
 def safe(value):
     """A value printed only when it carries no path or user text."""
     text = str(value)
+    if text == "":
+        return "none"
     if "/" in text or "@" in text or not SAFE_VALUE.match(text):
         return "redacted"
     return text
@@ -93,6 +97,21 @@ def summary(name, text):
     header, body = parsed
     lines.append(f"  process: {safe(body.get('procName') or header.get('app_name') or 'unknown')}")
     lines.append(f"  bug_type: {safe(header.get('bug_type', 'unknown'))}")
+    # Who started the process and under which signing identity: a launch
+    # constraint names the parent (launchd for a ServiceManagement agent), the
+    # role and the code signature it judged.
+    for key in (
+        "procRole",
+        "parentProc",
+        "responsibleProc",
+        "codeSigningID",
+        "codeSigningTeamID",
+        "codeSigningFlags",
+        "codeSigningValidationCategory",
+        "codeSigningTrustLevel",
+    ):
+        if key in body:
+            lines.append(f"  {key}: {safe(body[key])}")
     exception = body.get("exception") or {}
     for key in ("type", "signal", "subtype", "codes"):
         if key in exception:
