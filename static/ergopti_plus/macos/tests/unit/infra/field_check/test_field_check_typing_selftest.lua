@@ -9,7 +9,7 @@
 ---    missed or doubled a key and a field holding other text each fail their
 ---    own step, and the previous app must get the focus back;
 --- 2. the Karabiner path and the ledger's double count are named as needing
----    physical keys, and the keystrokes keystats gains are named;
+---    physical keys, and the keys are named as tagged synthetic input;
 --- 3. a typing that has not settled when the counter stops fails, never passes;
 --- 4. the menu rebuild must be accepted, and its duration and slowest rows are
 ---    named; a menu that does not exist fails.
@@ -82,7 +82,7 @@ helpers.describe("typing self-test probe", function()
 		helpers.assert_eq(steps.ledger_credits.value, "0")
 		helpers.assert_eq(steps.karabiner_path.value, "physical_keys_only")
 		helpers.assert_eq(steps.double_count.state, "skip")
-		helpers.assert_eq(steps.keystats_effect.value, "4_keys_credited_to_ergoptiplus")
+		helpers.assert_eq(steps.keystats_effect.value, "tagged_synthetic_input")
 	end)
 
 	helpers.it("fails a field that never had the focus, without typing", function()

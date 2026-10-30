@@ -670,7 +670,7 @@ end
 -- ====================================
 
 -- The sequence typed into the scratch field: plain letters with no terminator,
--- so no hotstring fires, short so keystats only gains these few keystrokes.
+-- so nothing reacts to it even if the tag were lost.
 M.SELFTEST_KEYS = { "w", "k", "j", "x" }
 
 -- Seconds the passive counter watches; the scratch typing ends well before.
@@ -681,10 +681,11 @@ M.SELFTEST_COUNT_SECONDS = 6
 --- before each key that the field still has the focus: a key never reaches the
 --- user's application, and a lost focus stops the sequence with its code. The
 --- passive counter must see each posted key once and the field must hold the
---- sequence exactly; the previous application gets the focus back. Synthetic
---- keys are posted after Karabiner, so the virtual keyboard path and the
---- ledger's double count are only provable with physical keys, as their codes
---- say. Keystats counts this field's typing like any of the app's windows.
+--- sequence exactly; the previous application gets the focus back. The keys
+--- go through the tagged injection owner, so the keymap and keystats treat
+--- them as the driver's own output; they are posted after Karabiner, so the
+--- virtual keyboard path and the ledger's double count are only provable with
+--- physical keys, as their codes say.
 function M.typing_selftest(ports, report, finish)
 	local expected = table.concat(M.SELFTEST_KEYS)
 	local before = ports.keystats_facts()
@@ -718,7 +719,7 @@ function M.typing_selftest(ports, report, finish)
 		report.step("karabiner_path", STATE.skip, "physical_keys_only")
 		report.step("double_count", STATE.skip, "physical_keys_only")
 		report.step("front_restored", typed.restored and STATE.pass or STATE.fail, typed.restored and "yes" or "no")
-		report.step("keystats_effect", STATE.info, posted .. "_keys_credited_to_ergoptiplus")
+		report.step("keystats_effect", STATE.info, "tagged_synthetic_input")
 		finish()
 	end)
 	ports.scratch_typing(M.SELFTEST_KEYS, function(outcome) typed = outcome end)
