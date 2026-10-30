@@ -520,23 +520,31 @@ class HostReachability(unittest.TestCase):
             (ROOT / "static/ergopti_plus/_shared/data/identifiers.json").read_text()
         )["hosts"]
         lines, requests = self.run_hosts({})
+        paths = {"ollama_registry": "v2/"}
         self.assertEqual(
             [line.split()[1] for line in lines], ["host_" + key for key in sorted(hosts)]
         )
         self.assertEqual(
             [url for url, _, _ in requests],
-            ["https://" + hosts[key] + "/" for key in sorted(hosts)],
+            ["https://" + hosts[key] + "/" + paths.get(key, "") for key in sorted(hosts)],
         )
         self.assertTrue(all(method == "HEAD" for _, method, _ in requests))
         self.assertTrue(all(line.endswith(" pass http_200") for line in lines))
 
     def test_a_server_error_and_a_transport_failure_fail_their_host_only(self):
         lines, _ = self.run_hosts(
-            {"https://huggingface.co/": 503, "https://registry.ollama.ai/": "proxy"}
+            {"https://huggingface.co/": 503, "https://registry.ollama.ai/v2/": "proxy"}
         )
         self.assertIn("step host_huggingface fail http_503", lines)
         self.assertIn("step host_ollama_registry fail proxy", lines)
         self.assertIn("step host_github pass http_200", lines)
+
+    def test_the_registry_is_probed_at_its_api_base_where_401_proves_it(self):
+        # Field run 2026-10-30 20:51: the registry root answered 503 while reachable.
+        lines, _ = self.run_hosts(
+            {"https://registry.ollama.ai/": 503, "https://registry.ollama.ai/v2/": 401}
+        )
+        self.assertIn("step host_ollama_registry pass http_401", lines)
 
     def test_no_line_carries_a_host_name(self):
         lines, _ = self.run_hosts({"https://github.com/": 404})
