@@ -64,7 +64,7 @@ _MAE_Input(World, Prompt, Title, Options, Default) {
 		else if World.Mode == "navigate-during-input"
 			World.View.Url := World.Url . "&foreign=1"
 		else if World.Mode == "store-changed-during-input" {
-			World.ExpectedDisk := '{"audit.exe":"foreign edit","legacy.exe":"neutral"}' . "`n"
+			World.ExpectedDisk := '{"audit.exe":{"type":"foreign edit","score":0},"explorer.exe":{"type":"neutral","score":0}}' . "`n"
 			AssertTrue(FSWriteDurable(World.Path, World.ExpectedDisk))
 		}
 	}
@@ -120,7 +120,7 @@ _MAE_Worker(World, *) {
 		AssertEqual("full", Job["mode"])
 		Db := SQLite_Open(":memory:")
 		AssertTrue(Db != 0 && KLR_LoadSchema(Db), "the refresh must use real SQLite and the canonical schema")
-		for App in ["AUDIT.EXE", "legacy.exe"]
+		for App in ["AUDIT.EXE", "explorer.exe"]
 			AssertTrue(SQLite_Exec(Db, "INSERT INTO agg_app_day(device_id,date,app,chars,category) VALUES ('owned','2026-10-20',"
 				. SQLite_Q(App) . ",4,'native category');"))
 		; The existing Func is retained, not copied or replaced. Its new trusted-
@@ -235,20 +235,19 @@ _MAE_CheckResult(World) {
 	Document := JsonParse(FSReadStrict(World.Path))
 	AssertEqual("ergopti.app_categories", Document["schema"])
 	AssertEqual(1, Document["version"])
-	AssertTrue(Document["apps"]["legacy.exe"] is String,
-		"untouched legacy categories must not silently become historical overrides")
-	AssertEqual("neutral", Document["apps"]["legacy.exe"])
+	AssertEqual("neutral", Document["apps"]["explorer.exe"]["type"])
+	AssertEqual(0, Document["apps"]["explorer.exe"]["score"])
 	ExpectedScore := Mode == "edit-lower" ? -2 : (Mode == "edit-upper" ? 2 : 1.25)
 	ProjectedName := App == "audit.exe" ? "AUDIT.EXE" : App
 	AssertTrue(World.Projection["user_categories"].Has(ProjectedName), "the real manifest casing must receive its explicit override")
 	AssertEqual("Révision 😀", World.Projection["user_categories"][ProjectedName]["type"])
 	AssertEqual(ExpectedScore, World.Projection["user_categories"][ProjectedName]["score"])
-	AssertFalse(World.Projection["user_categories"].Has("legacy.exe"), "legacy strings remain future typing categories only")
+	AssertFalse(World.Projection["user_categories"].Has("explorer.exe"), "an unedited shipped record remains a future typing category only")
 	AssertTrue(World.View.Messages.Length > 0, "the real full-build callback must post the freshly published projection")
 	Delivered := World.View.Messages[World.View.Messages.Length]["blob"]["user_categories"]
 	AssertEqual(ExpectedScore, Delivered[ProjectedName]["score"])
 	AssertEqual("productive", World.Inputs[1], "native defaults come from the trusted store, never payload.cat")
-	AssertEqual("0", World.Inputs[2], "an untouched legacy string supplies only a zero score prefill")
+	AssertEqual("0", World.Inputs[2], "an untouched record supplies only a zero score prefill")
 	if Mode == "pick-many-cancel" {
 		AssertEqual(3, World.Inputs.Length, "canceling the next app must stop the batch without undoing the first durable edit")
 		AssertFalse(Document["apps"].Has("second.exe"))
@@ -285,7 +284,7 @@ _MAE_CaseOwned(Mode, PreviousCritical) {
 		Inputs: [], Pickers: 0, Warnings: 0, Options: 0, Receipt: 0, Spawns: 0, Started: 0,
 		WorkerError: 0, Lock: 0, ExpectedDisk: "", Projection: 0, PrefetchReceipt: 0,
 		Prefetch: KLPF_PrefetchPath("apps", Root) }
-	World.Original := '{"audit.exe":"productive","legacy.exe":"neutral"}' . "`n"
+	World.Original := '{"audit.exe":{"type":"productive","score":0},"explorer.exe":{"type":"neutral","score":0}}' . "`n"
 	World.ExpectedDisk := World.Original
 	World.View := _MAE_View(World.Url)
 	World.Entry := Map("epoch", 71, "webview", World.View, "navigation_url", World.Url,
@@ -305,7 +304,7 @@ _MAE_CaseOwned(Mode, PreviousCritical) {
 		KLAppCat.save_fn := Timer
 		if KLAppCat.HasOwnProp("write_owner")
 			KLAppCat.write_owner := 0
-		AssertTrue(KL_AppCat_Init(Root), "the existing public loader must admit the private legacy image")
+		AssertTrue(KL_AppCat_Init(Root), "the existing public loader must admit the private record image")
 		KLWV.windows := Map("apps", World.Entry), KLWV.metrics_dir := Root
 		KLPFWorker.jobs := Map(), KLPFWorker.spawn_fn := _MAE_Spawn.Bind(World), KLPFWorker.publish_fn := 0
 		KLWV.first_paint_push_fn := 0
