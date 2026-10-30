@@ -1242,7 +1242,7 @@ _LVS_PublicLocalRequester(Action, Withdraw) {
 			_LLM_Engine["backend"] := "ollama", _LLM_Engine["model"] := Menu["model"]
 			; Controlled server reachability enters the real dependency owner; source
 			; admission, origin custody and all request state remain production code.
-			_LLM_Deps_DoCheck_Result(true, A_TickCount, _LLM_Deps_Epoch, _LLM_Engine["model"])
+			_LLM_Deps_DoCheck_Result(true, A_TickCount, _LLM_Deps_Epoch, _LLM_Engine["model"], , , , , (*) => true)
 			AssertTrue(LLM_Deps_IsReady(), "the genuine dependency owner records the supplied server reachability")
 			Origin.DefineProp("Call", {Call: ObserveOrigin})
 			Spawn.DefineProp("Call", {Call: ObserveSpawn})

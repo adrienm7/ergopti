@@ -26,7 +26,7 @@
 	"llm_ollama_port": 11434,
 	"_comment_owned_port": "Port of the Ollama daemon Ergopti installs and pins itself, never 11434: a user's own Ollama keeps that port and is never contacted, stopped or modified.",
 	"llm_ollama_owned_port": 11435,
-	"_todo_owned_port": "TODO: Linux and Windows still run their Ollama on llm_ollama_port; move them to llm_ollama_owned_port as macOS did.",
+	"_todo_owned_port": "TODO: Linux still runs its Ollama on llm_ollama_port; move it to llm_ollama_owned_port as macOS and Windows did.",
 	"llm_ollama_keep_alive": "30m",
 
 	"_comment_platform": "Per-platform model/backend defaults are intentionally NOT in this shared file: the available models and default backend differ by platform, so each driver owns them (windows/lib/llm_defaults.ahk, macos/modules/llm/init.lua)."

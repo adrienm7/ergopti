@@ -839,7 +839,7 @@ global _LLM_Menu := Map(
 	"streaming", true, "show_all_at_once", true, "pred_indent", 0,
 	"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
 	"inline_autotype", false,
-	"ollama_port", 11434
+	"ollama_port", 11435
 )
 global _LLM_Menu_Loaded := false
 ; Definitions-only chord translation and hotkey identities; registers no hotkey.
@@ -2271,6 +2271,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/llm/servers/test_ollama_runtime_owner.ahk
 #Include unit/modules/llm/servers/test_ollama_managed_bootstrap.ahk
 #Include unit/modules/llm/servers/test_ollama_managed_origin.ahk
+#Include unit/modules/llm/servers/test_ollama_owned_only.ahk
 #Include unit/modules/llm/servers/test_ollama_managed_model_offer.ahk
 #Include unit/modules/shortcuts/test_run_program_actions.ahk
 #Include unit/modules/shortcuts/test_run_program_actions_custody.ahk

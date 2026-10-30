@@ -1099,7 +1099,7 @@ _LPP_LocalQueuedCustody(Boundary, Mode, CompletedRetry := false, WithdrawComplet
 		try {
 			Options := _LLM_Engine.Clone(), Options["backend"] := "ollama", Options["model"] := Menu["model"]
 			LLM_Engine_Init(Options)
-			_LLM_Deps_DoCheck_Result(true, A_TickCount, _LLM_Deps_Epoch, Menu["model"])
+			_LLM_Deps_DoCheck_Result(true, A_TickCount, _LLM_Deps_Epoch, Menu["model"], , , , , (*) => true)
 			AssertTrue(LLM_Deps_IsReady(), "controlled reachability must enter the actual dependency owner")
 			Constructor.DefineProp("Call", {Call: WarmupConstructor})
 			if CompletedRetry {

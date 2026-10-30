@@ -38,7 +38,7 @@ _OllamaAsync_PreparationAdmission(Mode) {
 		_LLM_AuxOwners := Map(), _LLM_AuxCleanupDebt := Map(), _LLM_ManagedBootstrap := 0
 		LLM_Defaults_Load()
 		AssertTrue(LLM_Ollama_LoadDefaults(), "the real canonical boot owner supplies an admitted server origin")
-		AssertEqual(LLM_Defaults["llm_ollama_port"], LLM_OLLAMA_PORT, "the test never invents a server-port default")
+		AssertEqual(LLM_Defaults["llm_ollama_owned_port"], LLM_OLLAMA_PORT, "the test never invents a server-port default")
 		_LLM_Ollama_PreflightPort := Map("schedule", Schedule, "list_models", ListModels, "spawn", Spawn)
 		DirectoryFn.DefineProp("Call", {Call: ObserveDirectory})
 		Caught := false

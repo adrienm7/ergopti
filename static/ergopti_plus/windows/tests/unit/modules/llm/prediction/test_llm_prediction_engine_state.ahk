@@ -603,11 +603,17 @@ Test("LLM_Engine_FirePrediction: re-arms timer when Ollama not ready",
 	_FirePrediction_RearmsWhenOllamaNotReady)
 
 _OllamaAllowInference_GraceAfterWarmupStart() {
-	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupStartedTick
-	_LLM_Ollama_IsReady := false
-	_LLM_Ollama_WarmupStartedTick := A_TickCount - 10000
-	AssertTrue(LLM_OllamaAllowInference(), "grace must allow inference 8s after warmup start")
-	_LLM_Ollama_WarmupStartedTick := 0
+	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupStartedTick, _LLM_Deps_State
+	SavedState := _LLM_Deps_State
+	try {
+		_LLM_Deps_State := "ready"
+		_LLM_Ollama_IsReady := false
+		_LLM_Ollama_WarmupStartedTick := A_TickCount - 10000
+		AssertTrue(LLM_OllamaAllowInference(), "grace must allow inference 8s after warmup start")
+	} finally {
+		_LLM_Ollama_WarmupStartedTick := 0
+		_LLM_Deps_State := SavedState
+	}
 }
 Test("LLM_OllamaAllowInference: grace period after warmup start",
 	_OllamaAllowInference_GraceAfterWarmupStart)

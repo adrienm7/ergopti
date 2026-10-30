@@ -19,10 +19,11 @@
 ; =====================================
 ; =====================================
 
-; Ollama server port. The default lives in exactly ONE place —
-; _shared/modules/llm/defaults.json (llm_ollama_port). The user can override it
-; from the tray menu (persisted under [llm] ollama_port in config.toml) when they
-; run the daemon on a non-standard port. Sentinel 0 — sourced at boot from
+; Port of the Ollama Ergopti runs itself. The default lives in exactly ONE place —
+; _shared/modules/llm/defaults.json (llm_ollama_owned_port); a user's own Ollama
+; keeps the stock port and is never contacted. The user can move Ergopti's daemon
+; from the tray menu (persisted under [llm] ollama_port in config.toml), never onto
+; the stock port. Sentinel 0 — sourced at boot from
 ; LLM_Defaults by LLM_Ollama_LoadDefaults() (well before any request fires).
 ; LLM_OLLAMA_BASE_URL is DERIVED from it; change both via LLM_Ollama_SetPort.
 global LLM_OLLAMA_PORT     := 0
@@ -501,18 +502,18 @@ LLMApiLoadTimings() {
 }
 
 ; Source the Ollama port default from the shared registry (LLM_Defaults, loaded
-; from _shared/modules/llm/defaults.json) at boot — keeps 11434 in exactly one
+; from _shared/modules/llm/defaults.json) at boot — keeps the port in exactly one
 ; place. Mirrors LLMApiLoadTimings; called right after it in infra/boot.ahk, after
 ; LLM_Defaults_Load(). The per-user override is applied later by LLM_Menu_Init.
 LLM_Ollama_LoadDefaults(SetPortFn := 0) {
 	global LLM_Defaults, LLM_OLLAMA_KEEP_ALIVE
 	if !IsSet(LLM_Defaults) || !(LLM_Defaults is Map)
 		return false
-	if !LLM_Defaults.Has("llm_ollama_port")
+	if !LLM_Defaults.Has("llm_ollama_owned_port")
 			|| !LLM_Defaults.Has("llm_ollama_keep_alive")
 		return false
 	if !LLM_Option_TryNormalizeOllamaPort(
-			LLM_Defaults["llm_ollama_port"], &NormalizedPort)
+			LLM_Defaults["llm_ollama_owned_port"], &NormalizedPort)
 		return false
 	if !(LLM_Defaults["llm_ollama_keep_alive"] is String)
 		return false
