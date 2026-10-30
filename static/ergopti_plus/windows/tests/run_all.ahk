@@ -401,6 +401,7 @@ InstallSendNoOps()
 
 ; ── Per-module test files (each registers Test() cases) ──
 #Include unit/adapters/test_adapter_compliance.ahk
+#Include unit/adapters/test_file_system_ports.ahk
 #Include unit/infra/config/persistence/test_feature_io_locator.ahk
 #Include meta/infra/config/persistence/test_feature_io_impl_no_global.ahk
 #Include meta/suite/test_isset_no_property_arg.ahk
