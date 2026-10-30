@@ -42,7 +42,8 @@ _LRDT_ChildSource() {
 		"Ergopti_OnSuspendResume", "_TrayRootErrorIsSilent", "LLM_DisplayIndentValues", "LLM_Menu_ApplySharedDefaults",
 		"Keylayout_Parse", "LayoutRegistry_Keycodes", "MagicEditorRecordLayoutFallback",
 		"KeylayoutEmulation_LayerIsActive", "NumberRowEffectiveMode", "GetForegroundKeyboardLayout",
-		"LayoutRowsPolicyEmulates", "MasterGateDesiredTapHold", "TapHoldHoldLayer", "NavLayer_BuildTable", "WMPresentWindow"] {
+		"LayoutRowsPolicyEmulates", "MasterGateDesiredTapHold", "TapHoldHoldLayer", "NavLayer_BuildTable", "WMPresentWindow",
+		"TimingsGet"] {
 		OwnerRoot := (Symbol == "LLM_DisplayIndentValues" || Symbol == "LayoutRowsPolicyEmulates")
 			? _DriverDir . "\..\_shared" : _DriverDir
 		Owner := _DriverProductionFileForSymbol(Symbol, OwnerRoot)
@@ -52,7 +53,7 @@ _LRDT_ChildSource() {
 			Code .= "#Include " . Owner . "`n"
 		}
 	}
-	AssertEqual(18, Seen.Count, "The whole host, resume/menu and real data-policy owners must be nonempty and distinct")
+	AssertEqual(19, Seen.Count, "The whole host, resume/menu and real data-policy owners must be nonempty and distinct")
 	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
 	Fixture := _DriverDir . "\tests\fixtures\layer_editor_ready_delivery_body.ahk"
 	AssertTrue(FileExist(PromiseOwner) && FileExist(Fixture))
