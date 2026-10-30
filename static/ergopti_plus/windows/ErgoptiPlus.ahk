@@ -1212,6 +1212,7 @@ for _KbSlot, _KbAction in KeyboardShortcutAssignments {
 		}
 		LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", _KbSlot, _KbAction)
 		MagicEditorRecordOrdinaryHandle(_KbSlot, _KbHandle)
+		KeyboardShortcutRecordHandle(_KbSlot, _KbAction, _KbHandle)
 		_KbBoundCount++
 }
 LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)

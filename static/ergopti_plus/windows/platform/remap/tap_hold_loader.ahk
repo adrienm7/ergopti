@@ -448,10 +448,19 @@ TapHoldIsActive(TapHold, KeyId) {
 		&& TapHoldIsConfigured(TapHold, KeyId)
 }
 
-; Return the configured tap action for ``KeyId`` (a string) or "" if
-; absent. Callers compare to known action ids ("enter", "tab", "backspace"…)
-; to decide which Send() to emit.
+; Return the tap action ``KeyId`` runs now (a string) or "" for the key's native
+; tap. Callers compare to known action ids ("enter", "tab", "backspace"…) to
+; decide which Send() to emit. An AI action is unarmed while the AI is off: every
+; hotkey criterion asks here at each press, so the key is left to the application
+; and the switch-on needs no reload.
 TapHoldTapAction(TapHold, KeyId) {
+	Action := TapHoldConfiguredTapAction(TapHold, KeyId)
+	return AiActionBlocked(Action) ? "" : Action
+}
+
+; Return the tap action stored for ``KeyId`` (a string) or "" if absent, whatever
+; the AI switch says: what the menu shows and what a write must preserve.
+TapHoldConfiguredTapAction(TapHold, KeyId) {
 	if !TapHoldIsEnabled(TapHold, KeyId) {
 		return ""
 	}

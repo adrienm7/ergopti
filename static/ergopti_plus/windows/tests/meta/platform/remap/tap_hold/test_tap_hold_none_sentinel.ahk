@@ -105,8 +105,8 @@ _THNS_TapHoldTapActionReturnsSentinel() {
 	Src := _THNS_ReadSource()
 	Assert(Src != "", "platform/remap/ source must be readable")
 
-	Body := _DriverFuncBody("TapHoldTapAction")
-	Assert(Body != "", "TapHoldTapAction must be defined in platform/remap/tap_hold_loader.ahk or tap_hold_writer.ahk")
+	Body := _DriverFuncBody("TapHoldConfiguredTapAction")
+	Assert(Body != "", "TapHoldConfiguredTapAction must be defined in platform/remap/tap_hold_loader.ahk or tap_hold_writer.ahk")
 
 	; The function must check Has() before indexing to avoid a missing-key throw
 	Assert(InStr(Body, ".Has(") > 0,
