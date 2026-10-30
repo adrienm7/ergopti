@@ -258,6 +258,10 @@ end
 --- @return string
 local function masked_for_preview(candidate)
 	local value = candidate.replacement
+	-- The row shows what the output types, as on macOS: a {Left} is not text.
+	if candidate.has_key_tokens and type(value) == "string" then
+		value = require("modules.hotstrings.output_tokens").parse(value).text
+	end
 	-- A multi-field row (an @-combo) carries parallel `parts` and `fields` arrays
 	-- instead of one value and one field name. Each part must be masked against
 	-- ITS OWN classification — an IBAN hidden, the phone number beside it shown —

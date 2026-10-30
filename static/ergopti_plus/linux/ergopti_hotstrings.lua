@@ -1393,10 +1393,14 @@ local function main()
 			if not opts.dry_run then
 				injector._begin_injection()
 				local replay_terminator = result.replay_terminator
+				-- An output that presses keys goes through its parsed tokens, and only
+				-- its typed text reaches the telemetry below.
+				local parsed_output = result.has_key_tokens
+					and require("modules.hotstrings.output_tokens").parse(result.replacement) or nil
 				local ok_delivery, delivery = pcall(
-					injector.inject,
+					parsed_output and injector.inject_tokens or injector.inject,
 					result.backspace_count,
-					result.replacement,
+					parsed_output and parsed_output.tokens or result.replacement,
 					result.is_private,
 					replay_terminator,
 					destination
@@ -1411,9 +1415,12 @@ local function main()
 					-- Logical telemetry and undo are commit records: publishing either
 					-- before the last checked SYN_REPORT invents an expansion the target
 					-- application may never have received.
-					keystats.record_hotstring(app_id, result.trigger, result.replacement,
+					keystats.record_hotstring(app_id, result.trigger,
+							parsed_output and parsed_output.text or result.replacement,
 							now_ms, result.group, result.backspace_count, result.is_private, replay_terminator)
-					_undoable = {
+					-- Undo erases what it typed, counted back from the caret: a pressed
+					-- key has moved the caret, so that count would delete the wrong text.
+					_undoable = not parsed_output and {
 						trigger     = result.trigger,
 						replacement = result.replacement,
 						is_private  = result.is_private,
@@ -1421,7 +1428,7 @@ local function main()
 						-- The terminator typed back AFTER the replacement: it is the
 						-- character an immediate Backspace actually removes.
 						replayed    = replay_terminator,
-					}
+					} or nil
 					-- Replay queued input only after output committed. On failure the
 					-- hook emergency-ungrabs and the logical text position is unknown.
 					for _, queued in ipairs(queued_input) do
@@ -1450,7 +1457,11 @@ local function main()
 			-- resetting unconditionally is why Linux could never chain, and made
 			-- final_result unobservable here.
 			if expansion_committed then
-				if result.final_result then
+				if result.has_key_tokens then
+					-- The caret is somewhere the engine never saw: neither the word
+					-- buffer nor the AI context can describe the text behind it.
+					engine:reset(false)
+				elseif result.final_result then
 					-- The field holds the replacement whether or not the matcher may chain
 					-- off it: the AI context mirrors it, then only the word buffer is dropped.
 					engine:apply_expansion(result)
