@@ -27,7 +27,7 @@ local Manifest = require("infra.manifest_reader")
 local Composition = require("config_scope_composition")
 local Logger = require("logger.shim")
 local LOG = "infra.global_scope"
-local _composition, _registry = nil, {}
+local _composition, _registry, _in_flight = nil, {}, false
 require("infra.scope_registry").register("global_scope", function() return _composition ~= nil and _composition.pending() == true end)
 
 --- The composite owner, created once so its debt survives between requests.
@@ -68,7 +68,7 @@ function M.participants(ctx)
 		registry.hotstrings = require("infra.hotstrings_scope").participant(is_paused,
 			{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
 	end
-	-- Config only on Linux: no runtime reader of the layout rows yet (see the owner).
+	-- The layout rows, acknowledged once the session holds the layout that carries them.
 	if ctx.config then
 		registry.keyboard_layout = require("infra.keyboard_layout_scope").participant(is_paused)
 	end
@@ -77,30 +77,43 @@ function M.participants(ctx)
 	return registry
 end
 
---- Applies one mode to every registered category, all or nothing.
+--- Applies one mode to every registered category, all or nothing. The layout
+--- category settles once the session holds the layout it changed, after a child
+--- process answers, so the outcome arrives through on_done.
 --- @param mode string "recommended" or "clear".
 --- @param registry table Scope id -> participant, from participants().
---- @return boolean committed
---- @return table report Composition report (applied, skipped, failed, detail, and the
----   typed failure point and kind of a refusal).
-function M.apply(mode, registry)
+--- @param on_done function on_done(committed, report) exactly once: the composition
+---   report (applied, skipped, failed, detail, and the typed failure point and kind
+---   of a refusal).
+--- @return boolean accepted False when refused at once (on_done has then been called).
+function M.apply(mode, registry, on_done)
 	assert(type(registry) == "table", "the global scope needs its participant registry")
+	assert(type(on_done) == "function", "the global scope needs its continuation")
 	local owner = composition()
-	if owner.pending() then
-		local settled = false
-		owner.retry_restore(function(ok) settled = ok == true end)
-		if not settled then
-			Logger.error(LOG, "Global scope %s refused: an earlier rollback is still pending.", tostring(mode))
-			return false, { scope = "global", mode = mode, point = "acquire", kind = "rollback_pending",
-				detail = "an earlier rollback is still pending" }
-		end
+	local function refuse(kind, detail)
+		Logger.error(LOG, "Global scope %s refused: %s.", tostring(mode), detail)
+		on_done(false, { scope = "global", mode = mode, point = "acquire", kind = kind, detail = detail })
+		return false
 	end
-	_registry = registry
-	local committed, report = false, nil
-	owner.apply(mode, function(ok, result) committed, report = ok == true, result end)
-	-- Every Linux owner settles synchronously; an unsettled request is a defect.
-	assert(report ~= nil, "a Linux scope participant settled asynchronously")
-	return committed, report
+	if _in_flight then return refuse("pending", "a global request is still settling") end
+	_in_flight = true
+	local function run()
+		_registry = registry
+		owner.apply(mode, function(ok, report)
+			_in_flight = false
+			on_done(ok == true, report)
+		end)
+	end
+	if not owner.pending() then
+		run()
+		return true
+	end
+	owner.retry_restore(function(settled)
+		if settled == true then return run() end
+		_in_flight = false
+		refuse("rollback_pending", "an earlier rollback is still pending")
+	end)
+	return true
 end
 
 --- Whether a refused rollback of a global request is still retained. The tray's
@@ -112,7 +125,7 @@ end
 
 --- Test seam: forgets the composition and its debt.
 function M._reset_for_test()
-	_composition, _registry = nil, {}
+	_composition, _registry, _in_flight = nil, {}, false
 end
 
 return M
