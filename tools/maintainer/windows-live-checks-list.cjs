@@ -1378,8 +1378,8 @@ const CHECKS = [
 				problems.push(`the backup ${backups[0]} is not the exact old file`);
 			const want = {
 				'_meta.schema_version': String(version),
-				'shortcuts.keyboard.ctrl_g': '"open_hotstrings_editor"',
-				'shortcuts.keyboard.win_e': '"search_web"',
+				'shortcuts.keyboard.primary_g': '"open_hotstrings_editor"',
+				'shortcuts.keyboard.meta_e': '"search_web"',
 				'hotstrings.dynamic.enabled': 'false',
 				'hotstrings.cascade_max_arrows': '3',
 				'layout.direct_access_digits': '"digits"',
