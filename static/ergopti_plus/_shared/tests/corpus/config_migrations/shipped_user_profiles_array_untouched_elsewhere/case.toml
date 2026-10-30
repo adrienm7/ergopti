@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_user_profiles_array_untouched_elsewhere/case.toml
+
+[case]
+description = "Only macOS ever wrote the array: on Windows and Linux the step only stamps the file."
+drivers = ["ahk", "linux"]
+outcome = "migrated"
+from_version = 16
+to_version = 17
