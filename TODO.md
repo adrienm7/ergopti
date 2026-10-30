@@ -130,6 +130,12 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
 --strict`; a running server lists its models (not running: skip, never started here); one token is
      predicted from the check's own text with the smallest catalogue model already installed (none: skip, never
      a download); the MLX runtime and the catalogue models in its cache are counted.
+   - `key_accounting` (automatic, no person): the app opens its own scratch text field, brings it to the
+     front and types `wkjx` there only, checking before each key that the field still has the focus (a lost
+     focus stops the sequence with its code; no key reaches another app); the passive tap must see each key
+     once, the field must hold exactly `wkjx`, the previous app must get the focus back. Synthetic keys are
+     posted after Karabiner: the virtual keyboard path and the ledger's double count are `physical_keys_only`.
+     Keystats gains these four keystrokes under ErgoptiPlus (`keystats_effect`).
 
 ## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
 

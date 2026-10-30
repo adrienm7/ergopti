@@ -466,9 +466,103 @@ end
 
 
 
+-- =======================================
+-- =======================================
+-- ======= 8/ Scratch typing field =======
+-- =======================================
+-- =======================================
+
+-- Seconds the scratch window takes to come to the front, between two typed
+-- keys, before the field is read, and at most in all.
+local SCRATCH_SETTLE_SECONDS = 0.6
+local SCRATCH_KEY_GAP_SECONDS = 0.08
+local SCRATCH_READ_SECONDS = 0.4
+local SCRATCH_BOUND_SECONDS = 5
+
+-- The scratch page: one text field that takes the focus itself.
+local SCRATCH_HTML = [[<!doctype html><html><body style="margin:12px;font:14px -apple-system">
+<textarea id="field" rows="2" cols="30" autofocus></textarea>
+<script>document.getElementById("field").focus();</script></body></html>]]
+
+--- Types keys into a scratch text field this process opens, and only there:
+--- the focus is checked before each key, and the window is closed and the
+--- previous application brought back whatever happens.
+--- @param keys table Single characters.
+--- @param callback function fn({ focused, posted, aborted, text, latency_ms, restored }).
+local function scratch_typing(keys, callback)
+	local Timer = require("adapters.timer_scheduler")
+	local OwnWindow = require("adapters.own_window")
+	local outcome = { focused = false, posted = 0 }
+	local previous = hs.application.frontmostApplication()
+	local view, settled, bound, started = nil, false, nil, nil
+	local function settle(aborted)
+		if settled then return end
+		settled = true
+		if bound then Timer.cancel(bound) end
+		outcome.aborted = outcome.aborted or aborted
+		if view then pcall(function() view:delete() end) end
+		if previous then pcall(function() previous:activate() end) end
+		Timer.after(SCRATCH_READ_SECONDS, function()
+			local front = hs.application.frontmostApplication()
+			outcome.restored = previous == nil or (front ~= nil and front:pid() == previous:pid())
+			callback(outcome)
+		end)
+	end
+	--- True while the scratch field's window is the focused one of this process.
+	local function scratch_has_focus()
+		local front = hs.application.frontmostApplication()
+		if not front or front:pid() ~= hs.processInfo.processID then return false, "not_frontmost" end
+		local focused, own = hs.window.focusedWindow(), OwnWindow.for_webview(view)
+		if not focused or not own or focused:id() ~= own:id() then return false, "window_unfocused" end
+		return true
+	end
+	local ok, err = pcall(function()
+		local screen = hs.screen.mainScreen():frame()
+		view = hs.webview.new({ x = screen.x + screen.w / 2 - 180, y = screen.y + 80, w = 360, h = 90 },
+			{ developerExtrasEnabled = false })
+		view:windowStyle({ "titled" }):windowTitle("Ergopti field run"):allowTextEntry(true)
+		view:level(hs.drawing.windowLevels.floating):html(SCRATCH_HTML):show()
+		require("ui.ui_builder").force_focus(view, true)
+	end)
+	if not ok then
+		require("infra.logger").error("adapters.field_probe_ports", "The scratch field could not open: %s.", tostring(err))
+		return settle("scratch_refused")
+	end
+	bound = Timer.after(SCRATCH_BOUND_SECONDS, function()
+		bound = nil
+		settle("scratch_bound")
+	end)
+	local function type_key(index)
+		if settled then return end
+		if index > #keys then
+			return Timer.after(SCRATCH_READ_SECONDS, function()
+				if settled then return end
+				view:evaluateJavaScript('document.getElementById("field").value', function(text)
+					outcome.text = type(text) == "string" and text or nil
+					outcome.latency_ms = (hs.timer.absoluteTime() - started) / 1e6
+					settle(nil)
+				end)
+			end)
+		end
+		local focused, reason = scratch_has_focus()
+		if not focused then return settle(index == 1 and reason or ("focus_lost_" .. reason)) end
+		outcome.focused = true
+		started = started or hs.timer.absoluteTime()
+		hs.eventtap.event.newKeyEvent({}, keys[index], true):post()
+		hs.eventtap.event.newKeyEvent({}, keys[index], false):post()
+		outcome.posted = index
+		Timer.after(SCRATCH_KEY_GAP_SECONDS, function() type_key(index + 1) end)
+	end
+	Timer.after(SCRATCH_SETTLE_SECONDS, function() type_key(1) end)
+end
+
+
+
+
+
 -- ==========================
 -- ==========================
--- ======= 8/ Factory =======
+-- ======= 9/ Factory =======
 -- ==========================
 -- ==========================
 
@@ -497,6 +591,7 @@ function M.new()
 		ollama_refresh = ollama_refresh,
 		ollama_installed_model = ollama_installed_model,
 		ollama_predict = ollama_predict,
+		scratch_typing = scratch_typing,
 	}
 end
 
