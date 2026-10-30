@@ -52,7 +52,8 @@ undeclared segment or drops a declared one; the Windows list stays in
 are always timed (two `luv.hrtime` reads, no string unless slow); a span that is
 not an inventory segment (idle wait, tray, keystats flush) is timed but never
 warns. `PhaseStats` bookkeeping is `_shared/lua/phase_stats_core.lua` on both
-Lua drivers. A new typing-path span joins the inventory, never a private list.
+Lua drivers and its port `windows/infra/phase_stats.ahk`, with the same phases
+and evidence line. A new typing-path span joins the inventory, never a private list.
 
 ### project-fixed-field-lists-drop-flags
 
@@ -389,8 +390,10 @@ stop job or drops a marker the relay checks). The contract test
 `_shared/lua/test/quit_admission_contract.lua` is replayed by both drivers; a new
 cause is a new fact there, never a driver-local `if`. Linux reads "a writer is
 active" from `infra/scope_registry.lua`, where every scope module registers a
-probe over the owner it keeps. Windows has no refusal notice yet (its OnExit
-gates veto silently, bounded to five attempts).
+probe over the owner it keeps. Windows ports the decision in
+`infra/quit_admission.ahk` and adds one refusal: an OnExit gate can still veto the
+admitted exit, which returns from `ExitApp`, so a veto with no retry owner gets the
+same notice.
 
 ### project-a-row-a-platform-lacks-is-hidden-or-greyed
 
@@ -750,9 +753,11 @@ macOS and Linux write the same crash report through `_shared/lua/crash_report.lu
 `crash_report_vectors.json`. The logger core counts lines per level plus
 dropped, suppressed and collapsed lines (`volume()`, `volume_interval()`; SPEC
 5.3) and each driver appends them to its interval evidence record. A driver that
-filters before the core must call `note_dropped()`. Windows has neither yet
-(PAR-55, PAR-56): add the fields and counters to the shared vectors, never a
-third layout.
+filters before the core must call `note_dropped()`. Windows has no Lua core and
+replays the same vectors in `crash_reporter.ahk` and its two PowerShell workers,
+with its own detail after the shared fields, and counts the same seven figures in
+`logger.ahk`. A new field or counter joins the shared vectors, never a third
+layout.
 
 ### project-logs-folder-single-resolver
 

@@ -106,7 +106,10 @@ Updater_OneClickUpdate(*) {
 			Json, Current, CompletedRequest, Terminal))
 }
 
-_Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
+; @param CheckOnly {Boolean} The answer comes from the public Atom feed: a release
+;   it names is announced, never installable.
+; @param FeedFn {Func|Integer} Replaces _Updater_FetchFeedJsonAsync (tests only).
+_Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0, CheckOnly := false, FeedFn := 0) {
 	global _UpdaterCheckInProgress
 	_UpdaterCheckInProgress := false
 	; Physical menu state must be reconciled even when the result is discarded
@@ -125,6 +128,17 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		return
 	}
 
+	if !CheckOnly && _Updater_JsonPayloadIsFailure(Json) {
+		; api.github.com gave no list (blocked, throttled, rate-limited): the public
+		; feed on github.com still tells whether a newer release exists.
+		try LoggerInfo("Updater", "One-click check: the GitHub API gave no list; reading the public Atom feed.")
+		_UpdaterCheckInProgress := true
+		_Updater_ScheduleMenuRebuildForRequest(Request)
+		OnFeed := (FeedJson, CompletedRequest, FeedTerminal := 0) => _Updater_OneClickUpdateCallback(
+			FeedJson, Current, CompletedRequest, FeedTerminal, true)
+		(IsObject(FeedFn) ? FeedFn : _Updater_FetchFeedJsonAsync).Call(Request.Channel, Request, OnFeed)
+		return
+	}
 	Others := _Updater_RequestOtherChannels(Request)
 	if _Updater_JsonPayloadIsFailure(Json) {
 		try LoggerWarn("Updater", "One-click check: network unreachable.")
@@ -174,6 +188,16 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		HtmlUrl:     _Updater_ParseHtmlUrl(Json),
 		PublishedAt: _Updater_ParsePublishedAt(Json),
 		Prerelease:  _Updater_ParsePrerelease(Json)
+	}
+	if CheckOnly {
+		; Not published to the tray row: installing needs the API's asset list.
+		try LoggerInfo("Updater", "One-click check: {1} found through the public feed, check only.", Latest)
+		_Updater_ScheduleMenuRebuildForRequest(Request)
+		if !_Updater_RequestMayPublish(Request)
+			return UpdateCheck_Abandon(Request)
+		UpdateCheck_ShowResult(Request, Map("state", "available", "current", Current, "latest", Latest,
+			"others", Others, "release", Release, "check_only", true))
+		return
 	}
 	if !_Updater_PublishOneClickRelease(Release, Request)
 		try LoggerDone("Updater", "One-click update check completed without offering the release.")

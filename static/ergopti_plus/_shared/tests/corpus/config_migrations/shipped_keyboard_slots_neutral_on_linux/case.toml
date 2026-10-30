@@ -3,4 +3,4 @@ description = "Every retired Linux slot id keeps its binding under the role-name
 drivers = ["linux"]
 outcome = "migrated"
 from_version = 14
-to_version = 16
+to_version = 17

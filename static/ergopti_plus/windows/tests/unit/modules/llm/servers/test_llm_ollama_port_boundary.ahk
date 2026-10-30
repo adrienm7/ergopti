@@ -150,7 +150,7 @@ _AHK022_SharedDefaultsUseTheSameBoundary() {
 	try {
 		Calls := []
 		LLM_Defaults := Map(
-			"llm_ollama_port", "14000",
+			"llm_ollama_owned_port", "14000",
 			"llm_ollama_keep_alive", "7m")
 		AssertTrue(LLM_Ollama_LoadDefaults(
 			(Port) => (Calls.Push(Port), 1)))
@@ -158,7 +158,7 @@ _AHK022_SharedDefaultsUseTheSameBoundary() {
 		AssertEqual(14000, Calls[1])
 		AssertEqual("7m", LLM_OLLAMA_KEEP_ALIVE)
 
-		LLM_Defaults["llm_ollama_port"] := 80
+		LLM_Defaults["llm_ollama_owned_port"] := 80
 		AssertFalse(LLM_Ollama_LoadDefaults(
 			(Port) => (Calls.Push(Port), 1)))
 		AssertEqual(1, Calls.Length,
@@ -166,7 +166,7 @@ _AHK022_SharedDefaultsUseTheSameBoundary() {
 		AssertEqual("7m", LLM_OLLAMA_KEEP_ALIVE,
 			"invalid defaults must preserve the last complete publication")
 
-		LLM_Defaults["llm_ollama_port"] := 15000
+		LLM_Defaults["llm_ollama_owned_port"] := 15000
 		LLM_Defaults["llm_ollama_keep_alive"] := "8m"
 		AssertFalse(LLM_Ollama_LoadDefaults((*) => "1"),
 			"a string-shaped setter result must not certify publication")

@@ -156,7 +156,7 @@ function M.register(h, opts)
 		end)
 
 		h.it("(slot-migration) a file at the new version is untouched and a newer one is refused", function()
-			local current = Engine.plan("[_meta]\nschema_version = 16\n[shortcuts.keyboard]\ncmd_a = \"copy\"\n", registry, driver, context)
+			local current = Engine.plan("[_meta]\nschema_version = 17\n[shortcuts.keyboard]\ncmd_a = \"copy\"\n", registry, driver, context)
 			h.assert_eq(current.outcome, "current")
 			h.assert_nil(current.candidate)
 			local newer = Engine.plan("[_meta]\nschema_version = 17\n[shortcuts.keyboard]\ncmd_a = \"copy\"\n", registry, driver, context)

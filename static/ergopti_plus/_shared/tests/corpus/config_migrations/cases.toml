@@ -82,6 +82,8 @@ cases = [
 	"op_rename_prefix_collision",
 	"op_rename_prefix_occupied_namespace",
 	"op_set_if_absent",
+	"op_encode_value",
+	"op_encode_value_replay",
 	"op_wrap_value",
 	"op_wrap_value_replay",
 	"shipped_dynamic_switch_scalar_becomes_row",
@@ -146,5 +148,8 @@ cases = [
 	"shipped_cascade_depth_off_becomes_one_arrow",
 	"shipped_cascade_depth_levels_gain_one_arrow",
 	"shipped_cascade_depth_replay_is_idempotent",
-	"shipped_cascade_depth_eleven_kept_as_outdated"
+	"shipped_cascade_depth_eleven_kept_as_outdated",
+	"shipped_user_profiles_array_becomes_envelope_on_macos",
+	"shipped_user_profiles_envelope_wins_on_macos",
+	"shipped_user_profiles_array_untouched_elsewhere"
 ]

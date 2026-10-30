@@ -1170,6 +1170,20 @@ _LLM_Menu_ReportApiEntriesLoadFailure(Reason, ReportFn := 0) {
 }
 
 
+; One WARNING per outdated row, naming it as Linux does, so the user can fix the
+; entry by hand: api_entries.json has no cleanup offer.
+; @param Path {String} The api_entries.json the rows came from.
+; @param Retired {Array} The rows _LLM_Menu_ParseAndValidateApiEntries kept aside.
+; @param WarnFn {Func|Integer} Test seam for the log sink.
+_LLM_Menu_ReportRetiredApiEntries(Path, Retired, WarnFn := 0) {
+	Sink := HasMethod(WarnFn, "Call") ? WarnFn : (Message, Args*) => LoggerWarn("LLM", Message, Args*)
+	for Row in Retired
+		ConfigOutdatedReportInFile(Path, "entries[id=" . Row["Id"] . "]",
+			"this build no longer lists its provider '" . Row["Provider"]
+			. "'; the entry is not usable and is written back unchanged", Sink)
+}
+
+
 ; Read api_entries.json on startup and publish only one completely validated
 ; authority. A missing file is normal first-run state; unreadable or corrupt
 ; files are reported and retained byte-for-byte for recovery.
@@ -1192,10 +1206,7 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 	if !Parsed["ok"]
 		return _LLM_Menu_ReportApiEntriesLoadFailure(Parsed["reason"], ReportFn)
 	entries := Parsed["entries"]
-	if Parsed["retired"].Length
-		try LoggerWarn("LLM",
-			"Kept {1} API entries whose provider this build no longer lists; they are not usable and are written back unchanged.",
-			Parsed["retired"].Length)
+	_LLM_Menu_ReportRetiredApiEntries(path, Parsed["retired"])
 	; Re-anchor the active id only if it still exists; otherwise pick the
 	; first entry so a corrupted ``api_entry_id`` does not leave the user
 	; with "no active entry" while entries exist on disk.

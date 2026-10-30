@@ -147,7 +147,7 @@ class _G4B_Fixture {
 		this.Files := _G4B_Files(this)
 		this.Runtime := _G4B_Runtime(this)
 	}
-	Start() {
+	Start(Silent := false) {
 		Plan := Map("ManagedRoot", "C:\managed", "CataloguePath", "C:\catalogue.json",
 			"CatalogueSha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"AssetId", "windows-amd64", "port", 23456, "version", "0.24.0", "deadline_ms", 9000,
@@ -157,7 +157,7 @@ class _G4B_Fixture {
 			"consent", ObjBindMethod(this, "Consent"), "models", ObjBindMethod(this, "Models"),
 			"version", ObjBindMethod(this, "VersionReceipt"), "pull", ObjBindMethod(this, "Pull"))
 		this.Flow := OllamaManagedBootstrap(this.Model, 9101,
-			(*) => this.ReadyCalls += 1, (*) => this.FailedCalls += 1, Port)
+			(*) => this.ReadyCalls += 1, (*) => this.FailedCalls += 1, Port, Silent)
 		this.Flow.Begin()
 	}
 	Consent(Kind, Model) {

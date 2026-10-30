@@ -13,7 +13,8 @@
 ; FEATURES & RATIONALE:
 ; 1. Data-only steps, read at runtime with the driver's own TOML reader. A
 ;    step is a list of ops from a closed set (rename, rename_prefix,
-;    move_section, merge_into, map_value, wrap_value, delete, set_if_absent)
+;    move_section, merge_into, map_value, wrap_value, encode_value, delete,
+;    set_if_absent)
 ;    and this file holds their only Windows semantics. The corpus under _shared/tests/corpus/config_migrations is
 ;    replayed here, by the Lua engine and by the JS reference, so the three
 ;    cannot drift; _shared/tests/corpus/config_migration_registries pins which
@@ -67,6 +68,7 @@ _ConfigMigrateOpFields() {
 		"merge_into", [["section", "to_section"], []],
 		"map_value", [["section", "key", "map"], []],
 		"wrap_value", [["section", "key", "to_key"], []],
+		"encode_value", [["section", "key", "to_section", "to_key", "encoding"], []],
 		"delete", [["section"], ["key"]],
 		"set_if_absent", [["section", "key", "value"], []]
 	)
@@ -129,6 +131,8 @@ _ConfigMigrateValidateOp(Op, Where) {
 		if Op.Has(Field) && !_ConfigMigrateIsBareKey(Op[Field])
 			throw Error(Where . ": '" . Field . "' must be one bare segment")
 	}
+	if (Op["op"] == "encode_value" && !(Op["encoding"] == "user_profile_registry"))
+		throw Error(Where . ": encode_value names no known encoding")
 	if ((Op["op"] == "rename" || Op["op"] == "copy_if_absent") && !Op.Has("to_section") && !Op.Has("to_key"))
 		throw Error(Where . ": " . Op["op"] . " needs to_section or to_key")
 	if Op["op"] == "rename_prefix" {
@@ -536,6 +540,49 @@ _ConfigMigrateMoveChordAction(Model, Op, Context) {
 	}
 }
 
+; A non-empty array of tables becomes the encoded string of its new key. An
+; occupied target wins (the source stays for the cleanup), and anything the
+; encoding cannot carry stays where it is: not encoded means not deleted.
+_ConfigMigrateEncodeValue(Model, Op) {
+	Section := Op["section"]
+	if !Model.Has(Section) || !Model[Section].Has(Op["key"])
+		return
+	Value := Model[Section][Op["key"]]
+	if !(Value is Array) || Value.Length == 0
+		return
+	if Model.Has(Op["to_section"]) && Model[Op["to_section"]].Has(Op["to_key"])
+		return
+	for Item in Value {
+		if !(Item is Map)
+			return
+	}
+	if !Model.Has(Op["to_section"])
+		Model[Op["to_section"]] := Map()
+	Model[Op["to_section"]][Op["to_key"]] := "v1:" . CryptoBase64EncodeUtf8(_ConfigMigrateCanonicalJson(Value))
+	Model[Section].Delete(Op["key"])
+	_ConfigMigrateDropIfEmpty(Model, Section)
+}
+
+; JSON with sorted keys and no spaces: the bytes the Lua and JS interpreters
+; encode for the same value. A Map enumerates its keys in order.
+_ConfigMigrateCanonicalJson(Value) {
+	if Value is Map {
+		Parts := ""
+		for Key, Item in Value
+			Parts .= (Parts == "" ? "" : ",") . JsonStringLiteral(Key) . ":" . _ConfigMigrateCanonicalJson(Item)
+		return "{" . Parts . "}"
+	}
+	if Value is Array {
+		Parts := ""
+		for Item in Value
+			Parts .= (A_Index == 1 ? "" : ",") . _ConfigMigrateCanonicalJson(Item)
+		return "[" . Parts . "]"
+	}
+	if Value is TOML_Bool
+		return Value.Value ? "true" : "false"
+	return (Value is String) ? JsonStringLiteral(Value) : String(Value)
+}
+
 ; Applies one validated op to the model.
 _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 	Section := Op["section"]
@@ -595,6 +642,8 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 				return
 			_ConfigMigrateMove(Model, Section, Op["key"], Section . "." . Op["key"], Op["to_key"])
 			_ConfigMigrateDropIfEmpty(Model, Section)
+		case "encode_value":
+			_ConfigMigrateEncodeValue(Model, Op)
 		case "delete":
 			if !Op.Has("key") {
 				for Name in _ConfigMigrateSectionsAtOrBelow(Model, Section)

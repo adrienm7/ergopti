@@ -35,6 +35,9 @@ const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/collect-windows-field-report.ps1';
 const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.json';
 const APP_DIRS = 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml';
+const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
+const COLLISIONS = 'tools/dev/hotstring-collisions.py';
+const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml';
 const GUARD =
 	"if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { Fail 'This collector runs on Windows only.' }\n";
 
@@ -232,7 +235,7 @@ function fixture(name, start = 'dev') {
 	const clone = path.join(base, 'clone');
 	const origin = path.join(base, 'origin.git');
 	const local = path.join(base, 'localappdata');
-	for (const relative of [IDENTIFIERS, APP_DIRS]) {
+	for (const relative of [IDENTIFIERS, APP_DIRS, LOG_SCRUB, COLLISIONS, BUNDLED_SAMPLE]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
 	}
@@ -247,7 +250,8 @@ function fixture(name, start = 'dev') {
 		path.join(logs, `${LOG.main}${today()}${LOG.extension}`),
 		'2026-10-28 10:00:00 [INFO] [BootProfile] Boot complete in 900 ms (since process start).\n' +
 			'2026-10-28 10:01:00 [INFO] [ComposerCheck] check=composer verdict=fail steps=2 load=pass type=fail\n' +
-			'2026-10-28 10:02:00 [ERROR] [Fixture] an error\n'
+			'2026-10-28 10:02:00 [ERROR] [Fixture] an error\n' +
+			"2026-10-28 10:03:00 [DEBUG] [LLM.tt] DISMISS: keystroke 'TYPEDCANARY' typed while a prediction was shown.\n"
 	);
 	fs.writeFileSync(path.join(logs, LOG.bootstrap), 'yield second_instance\n');
 	git(clone, 'init', '-q', '-b', 'dev');
@@ -321,7 +325,20 @@ try {
 			for (const name of ['versions', 'toolchain', 'processes', 'proxy'])
 				assert.match(steps, new RegExp(`^${name}\\s+exit=\\d+$`, 'm'));
 			const dayLog = `${LOG.main}${today()}${LOG.extension}`;
-			assert.match(steps, new RegExp(`^${dayLog.replace(/\./g, '\\.')}\\s+copied$`, 'm'));
+			assert.match(
+				steps,
+				new RegExp(`^${dayLog.replace(/\./g, '\\.')}\\s+copied \\(scrubbed\\)$`, 'm')
+			);
+			assert.match(steps, /^hotstring_collisions\s+exit=0$/m);
+			const dayLogCopy = fs.readFileSync(path.join(folders[0], dayLog), 'utf8');
+			assert.doesNotMatch(dayLogCopy, /TYPEDCANARY/, 'the pushed day log keeps no typed text');
+			assert.match(dayLogCopy, /keystroke <text withheld> typed while/);
+			for (const file of fs.readdirSync(folders[0]))
+				assert.doesNotMatch(
+					fs.readFileSync(path.join(folders[0], file), 'utf8'),
+					/TYPEDCANARY/,
+					`${file} holds no typed text`
+				);
 			assert.match(
 				fs.readFileSync(path.join(folders[0], 'digest_field_checks.txt'), 'utf8'),
 				/check=composer verdict=fail/

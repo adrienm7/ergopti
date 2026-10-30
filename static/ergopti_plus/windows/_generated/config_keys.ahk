@@ -450,6 +450,7 @@ class MenuCommand {
 	static LLM_RESET_ON_NAV := "llm_reset_on_nav"
 	static LLM_SECURE_FIELD_FILTER := "llm_secure_field_filter"
 	static LLM_SHOW_ALL := "llm_show_all"
+	static LLM_TEST_PREDICTION := "llm_test_prediction"
 	static LLM_TOGGLE := "llm_toggle"
 	static LLM_TOKEN_STREAMING := "llm_token_streaming"
 	static LLM_TRIGGER_DEBOUNCE := "llm_trigger_debounce"

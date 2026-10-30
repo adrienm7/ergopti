@@ -36,6 +36,18 @@ signature is already reported without blocking, and a new value would not be
 admitted by the Windows verifier, which reads the same policy file. A policy that
 cannot be read or admitted refuses the update instead of skipping the check.
 
+## How the Windows updater applies it
+
+`Updater_DownloadAndInstall` is the one path of the tray's update, the update
+prompt and the release installer. It asks `AssetSignature_AllowsInstall`
+(`windows/modules/updater/asset_signature.ahk`) before its transaction starts,
+with the size and digest GitHub's release API authenticated; the staging worker
+then enforces that same digest on the downloaded bytes. The table above applies,
+with one difference: no key means nothing is fetched. Step 4 below is also the
+first real download of the `.sig` asset through the managed transport, so an
+`"off"` log saying the signature could not be downloaded must be resolved before
+step 5.
+
 macOS needs nothing more: Sparkle verifies the EdDSA signature of the appcast
 download, and the in-app release installer checks the GitHub API digest and the
 code-signature requirement of the staged app.
@@ -49,7 +61,7 @@ code-signature requirement of the staged app.
 | Shared vectors                | `_shared/tests/corpus/updater/asset_signature_vectors.json`          |
 | Linux verifier                | `linux/infra/asset_signature.lua` (OpenSSL)                          |
 | Linux updater gate            | `linux/modules/updater/signature_gate.lua`                           |
-| Windows verifier              | `windows/modules/updater/asset_signature.ahk` (CNG)                  |
+| Windows verifier and gate     | `windows/modules/updater/asset_signature.ahk` (CNG)                  |
 | CI signing                    | `Sign the update asset` steps in `ci-windows.yml` and `ci-linux.yml` |
 | CI presence gate              | `ci-release.yml`, "Refuse to publish an incomplete..."               |
 

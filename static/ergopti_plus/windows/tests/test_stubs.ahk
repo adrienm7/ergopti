@@ -281,6 +281,7 @@ global Features := Map(
         ),
         "trigger", Map(
             "debounce_ms",          500,
+            "min_request_interval_ms", 300,
             "instant_on_word_end",  true,
             "after_hotstring",      true,
             "inline_autotype",      false,

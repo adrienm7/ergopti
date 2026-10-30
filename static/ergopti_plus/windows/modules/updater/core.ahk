@@ -41,6 +41,10 @@ global UPDATER_UNKNOWN_COMMIT_KEY := "menu.about.commit_unknown"
 ; update_check.releases_url in _shared/modules/updater/defaults.json (pinned
 ; by tools/test/test-updater-constants-single-source.cjs).
 global UPDATER_RELEASES_API_URL_TEMPLATE := "https://api.github.com/repos/{owner}/{repo}/releases?per_page=100"
+; The public releases Atom feed, read when api.github.com gives no list: a
+; check-only answer, because the feed names no asset and no digest.
+global UPDATER_GITHUB_WEB_ROOT := "https://github.com/"
+global UPDATER_RELEASES_FEED_URL_TEMPLATE := "https://github.com/{owner}/{repo}/releases.atom"
 
 ; Returned instead of a release when the list holds none of the requested
 ; channel: distinct from "" (network or HTTP failure), which callers report
@@ -2161,10 +2165,10 @@ _Updater_ParseListCache(Text, Url) {
 	if !(Text is String)
 		return 0
 	Parts := StrSplit(Text, "`n", , 4)
-	if (Parts.Length != 4 || Parts[1] != UPDATER_LIST_CACHE_MAGIC || Parts[2] != Url || Parts[3] == "")
+	if (Parts.Length != 4 || Parts[1] != UPDATER_LIST_CACHE_MAGIC || Parts[2] == "" || Parts[2] != Url || Parts[3] == "")
 		return 0
 	Body := Parts[4]
-	if (SubStr(LTrim(Body), 1, 1) != "[" || SubStr(RTrim(Body), -1) != "]")
+	if (SubStr(LTrim(Body, " `t`r`n"), 1, 1) != "[" || SubStr(RTrim(Body, " `t`r`n"), -1) != "]")
 		return 0
 	return { Etag: Parts[3], Json: Body }
 }
@@ -2431,10 +2435,17 @@ Updater_ReleaseApiUrl() {
 		"{owner}", UPDATER_GH_OWNER), "{repo}", UPDATER_GH_REPO)
 }
 
+; Returns the public releases Atom feed URL.
+Updater_ReleaseFeedUrl() {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO, UPDATER_RELEASES_FEED_URL_TEMPLATE
+	return StrReplace(StrReplace(UPDATER_RELEASES_FEED_URL_TEMPLATE,
+		"{owner}", UPDATER_GH_OWNER), "{repo}", UPDATER_GH_REPO)
+}
+
 ; Returns the GitHub Releases HTML page URL (for "Open in browser" actions).
 Updater_ReleasesPageUrl() {
 	global UPDATER_GH_OWNER, UPDATER_GH_REPO
-	return "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases"
+	return UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases"
 }
 
 ; Returns the GitHub release URL to surface as the "current version" deep link
@@ -2449,7 +2460,7 @@ Updater_CurrentReleaseUrl() {
 		and BUNDLE_RELEASE_URL != ""
 		and BUNDLE_RELEASE_URL != "__BUNDLE_RELEASE_URL__"
 		return BUNDLE_RELEASE_URL
-	return "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases/latest"
+	return UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases/latest"
 }
 
 ; Shared manual URL boundary for both About-menu links and changelog actions.
@@ -2461,7 +2472,7 @@ _Updater_IsAllowedManualUrl(Url) {
 		return false
 	if RegExMatch(Url, "[\x00-\x20\x7f]")
 		return false
-	AllowedRoot := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+	AllowedRoot := UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
 	if SubStr(Url, 1, StrLen(AllowedRoot)) !== AllowedRoot
 		return false
 	Suffix := SubStr(Url, StrLen(AllowedRoot) + 1)
@@ -2740,6 +2751,122 @@ _Updater_JsonIsNoChannelRelease(Json) {
 ; The user-facing sentence for a channel without any release yet.
 _Updater_NoChannelReleaseMessage(Channel) {
 	return StrReplace(t("updater.no_release_on_channel"), "{channel}", _Updater_ChannelLabel(Channel))
+}
+
+; Lists the releases of a GitHub releases Atom feed as the JSON array the update
+; check reads: tag_name and published_at, newest first as the feed orders them.
+; Port of feed_release_list in _shared/lua/updater/release_sources.lua, replaying
+; _shared/tests/corpus/updater/check_only_vectors.json: only an entry whose
+; alternate link is a release tag of this repository counts, and a tag outside
+; [A-Za-z0-9._+-] is dropped.
+; @param Body {String} The feed document.
+; @param Owner {String} Expected repository owner.
+; @param Repo {String} Expected repository name.
+; @param Reason {VarRef} Why the feed gives no list.
+; @returns {String} The JSON array text; "" when the feed gives no list.
+_Updater_ParseReleaseFeed(Body, Owner, Repo, &Reason := "") {
+	Reason := ""
+	if !(Body is String) || !RegExMatch(Body, "<feed[\s>]") {
+		Reason := "not an Atom feed"
+		return ""
+	}
+	Prefix := UPDATER_GITHUB_WEB_ROOT . Owner . "/" . Repo . "/releases/tag/"
+	Rows := ""
+	Position := 1
+	while (Position := RegExMatch(Body, "s)<entry[\s>].*?</entry\s*>", &Entry, Position)) {
+		Position += Entry.Len[0]
+		Tag := _Updater_FeedEntryTag(Entry[0], Prefix)
+		if (Tag == "")
+			continue
+		Updated := RegExMatch(Entry[0], "<updated[^>]*>\s*([^<]*?)\s*</updated>", &Stamp) ? Stamp[1] : ""
+		; Only an ISO timestamp travels: no feed text reaches the JSON unescaped
+		if !RegExMatch(Updated, "^[0-9T:.Z+-]+\z")
+			Updated := ""
+		Rows .= (Rows == "" ? "" : ",") . '{"tag_name":"' . Tag . '","published_at":"' . Updated . '"}'
+	}
+	if (Rows == "") {
+		Reason := "an Atom feed without a release of " . Owner . "/" . Repo
+		return ""
+	}
+	return "[" . Rows . "]"
+}
+
+; The release tag a feed entry's alternate link names under the repository's tag
+; prefix, or "" when it names none.
+; @param Entry {String} One <entry> element.
+; @param Prefix {String} The repository's release tag URL prefix.
+; @returns {String}
+_Updater_FeedEntryTag(Entry, Prefix) {
+	Position := 1
+	while (Position := RegExMatch(Entry, "<link[\s/][^>]*>", &Link, Position)) {
+		Position += Link.Len[0]
+		Rel := _Updater_FeedAttribute(Link[0], "rel")
+		if (Rel != "" && Rel != "alternate")
+			continue
+		Href := _Updater_FeedAttribute(Link[0], "href")
+		if (Href == "")
+			continue
+		if (SubStr(Href, 1, StrLen(Prefix)) !== Prefix)
+			return ""
+		Tag := _Updater_FeedPercentDecode(SubStr(Href, StrLen(Prefix) + 1))
+		return RegExMatch(Tag, "^[A-Za-z0-9._+-]+\z") ? Tag : ""
+	}
+	return ""
+}
+
+; One attribute of a raw start tag, quoted either way; "" when absent.
+_Updater_FeedAttribute(StartTag, Name) {
+	return RegExMatch(StartTag, "\s" . Name . "\s*=\s*([\x22'])(.*?)\1", &Match) ? Match[2] : ""
+}
+
+; Decodes the ASCII percent escapes of a URL path segment. Any other escape stays
+; as text, which the tag rule then refuses.
+_Updater_FeedPercentDecode(Segment) {
+	Out := "", Position := 1
+	while (Found := RegExMatch(Segment, "%([0-7][0-9A-Fa-f])", &Escape, Position)) {
+		Code := Integer("0x" . Escape[1])
+		Out .= SubStr(Segment, Position, Found - Position) . (Code > 0 ? Chr(Code) : Escape[0])
+		Position := Found + Escape.Len[0]
+	}
+	return Out . SubStr(Segment, Position)
+}
+
+; Interprets the feed's response like _Updater_InterpretResponse does the API's:
+; the channel's latest release as a single object, with the other channels kept
+; on the request. Nothing is cached: the list is no copy of the API's.
+; @returns {String} The release object; UPDATER_NO_CHANNEL_RELEASE; "" on a failure.
+_Updater_InterpretFeedResponse(Status, Body, Channel, Request) {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	if (Status != 200) {
+		try LoggerWarn("Updater", "The public release feed answered HTTP {1}.", Status)
+		return ""
+	}
+	List := _Updater_ParseReleaseFeed(Body, UPDATER_GH_OWNER, UPDATER_GH_REPO, &Reason)
+	if (List == "") {
+		try LoggerWarn("Updater", "The public release feed gives no list: {1}.", Reason)
+		return ""
+	}
+	Index := _Updater_ReleaseListIndex(List)
+	_Updater_RecordOtherChannels(Request, List, Channel, Index)
+	return _Updater_SelectChannelRelease(List, Channel, Index)
+}
+
+; Reads the public feed as the same completion path as an API check; OnJson gets
+; what _Updater_InterpretFeedResponse returns.
+; @param Channel {String}
+; @param Request {Object}
+; @param OnJson {Func} Called as (Json, Request, Terminal).
+; @returns {Object|Integer} The request owner, or 0.
+_Updater_FetchFeedJsonAsync(Channel, Request, OnJson) {
+	Owner := _Updater_RegisterAsyncRequestOwner(0, Channel, OnJson, Updater_ReleaseFeedUrl(), Request)
+	if !IsObject(Owner) {
+		_Updater_InvokeAsyncOnJson(OnJson, "", Request, 0, "invalid feed check ownership")
+		return 0
+	}
+	Owner.Record["feed"] := true
+	_Updater_SendOwnedAsyncRequest(Owner, _Updater_PollAsync,
+		"Async feed check dispatch", _Updater_PrepareFeedAsyncTransport)
+	return Owner
 }
 
 ; Async, non-blocking sibling of Updater_FetchLatestJson. Dispatches the GitHub
@@ -3122,7 +3249,13 @@ _Updater_PrepareLatestAsyncTransport(Owner, FactoryFn := 0) {
 	return _Updater_AsyncRequestOwned(Owner) ? Req : 0
 }
 
-_Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn := 0) {
+; The feed's transport: the list's, asking for Atom. No validator: the feed has
+; no copy to answer a 304 from.
+_Updater_PrepareFeedAsyncTransport(Owner, FactoryFn := 0) {
+	return _Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn, "application/atom+xml")
+}
+
+_Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn := 0, Accept := "application/vnd.github+json") {
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
 	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
 	Record := Owner.Record
@@ -3139,7 +3272,7 @@ _Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn := 0) {
 	Req.Open("GET", Record["url"], true)
 	if !_Updater_AsyncRequestOwned(Owner)
 		return 0
-	Req.SetRequestHeader("Accept", "application/vnd.github+json")
+	Req.SetRequestHeader("Accept", Accept)
 	if !_Updater_AsyncRequestOwned(Owner)
 		return 0
 	Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
@@ -3326,8 +3459,9 @@ _Updater_PollAsync(id) {
 	Json := ""
 	if (!failed and ready) {
 		try {
-			Json := _Updater_InterpretResponse(
-				Status, Body, Etag, Channel, Url, Request, RateLimit)
+			Json := rec.Get("feed", false)
+				? _Updater_InterpretFeedResponse(Status, Body, Channel, Request)
+				: _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request, RateLimit)
 		} catch as Err {
 			try LoggerDebug("Updater", "Async response read failed: {1}.", Err.Message)
 			Json := ""

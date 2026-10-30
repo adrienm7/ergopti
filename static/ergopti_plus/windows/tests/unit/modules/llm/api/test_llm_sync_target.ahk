@@ -30,7 +30,7 @@ _LLMST_Features(Enabled, Model, Backend) {
 			"streaming_multi", false,
 			"pred_indent", 0),
 		"trigger", Map(
-			"debounce_ms", 100,
+			"debounce_ms", 100, "min_request_interval_ms", 300,
 			"instant_on_word_end", false,
 			"after_hotstring", false,
 			"inline_autotype", false,
@@ -57,7 +57,7 @@ _LLMST_Menu() {
 		"streaming", true,
 		"show_all_at_once", true,
 		"pred_indent", 2,
-		"debounce_ms", 250,
+		"debounce_ms", 250, "min_request_interval_ms", 300,
 		"instant_on_word_end", true,
 		"after_hotstring", true,
 		"inline_autotype", true,

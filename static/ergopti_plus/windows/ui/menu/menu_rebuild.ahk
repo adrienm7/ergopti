@@ -11,6 +11,8 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include ../../infra/phase_stats.ahk
+
 
 
 
@@ -816,7 +818,9 @@ RebuildTrayMenu(PublishAuthorizeFn := 0, WorkerFn := 0,
 		ForceFullWorkerWhenQueued, CallerLlm)
 	if !Acquired
 		return QueuedOutcome
-	return _TrayRootDrain()
+	Started := PhaseStats_Now()
+	try return _TrayRootDrain()
+	finally PhaseStats_Stop("menu.rebuild", Started)
 }
 
 ; Sets the active log level without a restart. Disk and the cached hot-path

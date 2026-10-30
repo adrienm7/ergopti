@@ -110,7 +110,7 @@ global _LLM_Menu := Map(
 	"backend",                    "ollama",
 	; Local Ollama daemon port — placeholder, replaced at startup by
 	; LLM_Menu_ApplySharedDefaults() from the shared default (defaults.json
-	; llm_ollama_port). User-overridable from the backend submenu (persisted
+	; llm_ollama_owned_port). User-overridable from the backend submenu (persisted
 	; under [llm] ollama_port) for non-standard setups.
 	"ollama_port",                0,
 	"model",                      "",
@@ -120,6 +120,7 @@ global _LLM_Menu := Map(
 	"min_words",                  3,
 	"max_words",                  15,
 	"debounce_ms",                500,
+	"min_request_interval_ms",    300,
 	"ctx_chars",                  500,
 	"temperature",                "0.10",
 	"instant_on_word_end",        true,
@@ -203,6 +204,7 @@ LLM_Menu_ApplySharedDefaults() {
 		"llm_min_words",               "min_words",
 		"llm_max_words",               "max_words",
 		"llm_debounce_ms",             "debounce_ms",
+		"llm_min_request_interval_ms", "min_request_interval_ms",
 		"llm_context_length",          "ctx_chars",
 		"llm_pred_indent",             "pred_indent",
 		"llm_temperature",             "temperature",
@@ -217,7 +219,7 @@ LLM_Menu_ApplySharedDefaults() {
 		"llm_disable_password_fields", "disable_password_fields",
 		"llm_nav_modifiers",           "nav_modifiers",
 		"llm_val_modifiers",           "val_modifiers",
-		"llm_ollama_port",             "ollama_port"
+		"llm_ollama_owned_port",       "ollama_port"
 	)
 
 	for shared_key, tray_key in _key_map {
@@ -226,7 +228,7 @@ LLM_Menu_ApplySharedDefaults() {
 		if tray_key == "ollama_port" {
 			if !LLM_Option_TryNormalizeOllamaPort(
 					LLM_Defaults[shared_key], &NormalizedPort)
-				throw Error("Shared LLM default 'llm_ollama_port' is invalid.")
+				throw Error("Shared LLM default 'llm_ollama_owned_port' is invalid.")
 			_LLM_Menu[tray_key] := NormalizedPort
 			continue
 		}

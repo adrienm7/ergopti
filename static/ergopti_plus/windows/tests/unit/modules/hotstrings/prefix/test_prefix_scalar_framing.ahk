@@ -347,7 +347,7 @@ _PCSF_Case(Mode) {
 	try {
 		if Mode == "agent-pair" || Mode == "direct-bridge" {
 			Body(Fx, Lines, Sent) => _PCA_WithObserverFixture(_PCSF_Check.Bind(Mode))
-			_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), Body)
+			_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), Body)
 		} else {
 			_PCA_WithObserverFixture(_PCSF_Check.Bind(Mode))
 		}

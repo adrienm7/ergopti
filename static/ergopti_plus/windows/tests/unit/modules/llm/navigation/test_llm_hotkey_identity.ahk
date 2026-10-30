@@ -40,7 +40,7 @@ _LHI_StaleSavedOptsCannotRollbackLive() {
 	try {
 		_LLM_Menu_Loaded := false
 		_LLM_Menu["model"] := "live-model"
-		_LLM_Menu["ollama_port"] := 11434
+		_LLM_Menu["ollama_port"] := 11435
 		BootSnapshot := Map("model", "boot-model", "ollama_port", 12000)
 		AssertTrue(_LLM_Menu_RestoreSavedOptsOnce(BootSnapshot))
 		AssertEqual("boot-model", _LLM_Menu["model"])
