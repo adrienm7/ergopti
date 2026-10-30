@@ -582,6 +582,7 @@ InstallSendNoOps()
 #Include unit/modules/hotstrings/catalogue/test_hotstring_handler.ahk
 #Include unit/modules/hotstrings/catalogue/test_hotstrings_end_to_end.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_loader.ahk
+#Include unit/platform/remap/tap_hold/test_tap_hold_migration.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_overlay_and_modifiers.ahk
 #Include unit/infra/i18n/test_i18n.ahk
 #Include unit/infra/i18n/test_locale_probe_is_silent.ahk
