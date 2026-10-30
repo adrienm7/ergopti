@@ -82,6 +82,13 @@
 			"proves": "The selected and enabled input sources are readable, and every installed Ergopti .keylayout and bundle Info.plist parses."
 		},
 		{
+			"id": "field_storage",
+			"kind": "field_check",
+			"check": "storage",
+			"deadline_seconds": 90,
+			"proves": "The keystats database passes SQLite's read-only quick check, every configuration file parses, the logs folder takes a write and the file watchers are owned."
+		},
+		{
 			"id": "key_accounting",
 			"kind": "field_check",
 			"check": "key_accounting",
