@@ -470,7 +470,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/test/managed_ollama_go_evidence_test.py', 47]);
 	cases.push(['tools/test/managed_ollama_signal_pid_publication_test.py', 2]);
 	// The developer app's managed Ollama build; injected ports, no network.
-	cases.push(['tools/test/macos_dev_ollama_catalogue_test.py', 9]);
+	cases.push(['tools/test/macos_dev_ollama_catalogue_test.py', 13]);
 } else {
 	process.stdout.write(
 		'SKIP actual POSIX process peers on Windows; Apple SDK receiving is separate.\n'
