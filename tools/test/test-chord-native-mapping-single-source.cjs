@@ -49,7 +49,8 @@ const CATALOGUE = path.join(
 	'static/ergopti_plus/_shared/modules/actions/modifier_chords.json'
 );
 const AHK_ADAPTER = path.join(ROOT, 'static/ergopti_plus/windows/adapters/hotkey_registrar.ahk');
-const AHK_SLOTS = path.join(ROOT, 'static/ergopti_plus/windows/infra/config_io.ahk');
+const AHK_SLOTS = path.join(ROOT, 'static/ergopti_plus/windows/_generated/slot_roles.ahk');
+const SLOT_ROLES = path.join(ROOT, 'static/ergopti_plus/_shared/modules/actions/slot_roles.json');
 const LUA_CHORD = path.join(ROOT, 'static/ergopti_plus/_shared/lua/chord/init.lua');
 const HS_SLOTS = path.join(
 	ROOT,
@@ -119,20 +120,12 @@ function parseAhkMap(src, name) {
  * @param {string} name
  * @returns {Object<string,string>}
  */
-function parseAhkStaticMap(src, name) {
-	const re = new RegExp(`static\\s+${name}\\s*:=\\s*Map\\(([^)]*)\\)`, 'm');
-	const m = src.match(re);
-	if (!m) {
-		fail(`could not find "static ${name} := Map(…)" — the parser drifted`);
-		return {};
-	}
-	const tokens = [...m[1].matchAll(/"((?:[^"`]|`.)*)"/g)].map((t) => t[1]);
-	if (tokens.length === 0 || tokens.length % 2 !== 0) {
-		fail(`${name}: parsed ${tokens.length} quoted token(s) — expected a non-zero even count`);
-		return {};
-	}
+function parseAhkSlotKeys(src) {
 	const out = {};
-	for (let i = 0; i < tokens.length; i += 2) out[tokens[i]] = tokens[i + 1];
+	for (const m of src.matchAll(/Map\("id", "((?:[^"`]|`.)*)", "chord_key", "((?:[^"`]|`.)*)"/g))
+		out[m[1]] = m[2];
+	if (Object.keys(out).length === 0)
+		fail('could not find the generated Windows slot keys — the parser drifted');
 	return out;
 }
 
@@ -209,7 +202,7 @@ const hsSlotsSrc = fs.readFileSync(HS_SLOTS, 'utf8');
 
 const ahkPrefixes = parseAhkMap(ahkAdapterSrc, 'HOTKEY_MOD_PREFIXES');
 const ahkNativeKeys = parseAhkMap(ahkAdapterSrc, 'HOTKEY_KEY_NATIVE');
-const ahkSlotKeys = parseAhkStaticMap(ahkSlotsSrc, '_SlotKeyNames');
+const ahkSlotKeys = parseAhkSlotKeys(ahkSlotsSrc);
 const hsSlotKeys = parseLuaCatalogueKeys(hsSlotsSrc, catalogue);
 const modOrder = parseModOrder(luaChordSrc);
 const aliases = parseAliases(luaChordSrc);
@@ -342,13 +335,23 @@ for (const entry of catalogue.keys || []) {
 // The drivers may not invent a slot key the catalogue never declared: a suffix
 // that means something on one driver and nothing on the other is exactly the
 // divergence the shared catalogue was created to end.
+// slot_roles.json declares the few keys that exist only on a driver's slots.
 const declaredChordKeys = new Set((catalogue.keys || []).map((e) => e.id));
+const slotExtras = JSON.parse(fs.readFileSync(SLOT_ROLES, 'utf8')).extra_keys;
+const windowsExtras = new Map(slotExtras.windows.map((extra) => [extra.id, extra.chord_key]));
+for (const [id, chordKey] of windowsExtras) {
+	if (ahkSlotKeys[id] !== chordKey) {
+		fail(
+			`Windows slot vocabulary: extra key "${id}" resolves to "${ahkSlotKeys[id]}", slot_roles.json says "${chordKey}"`
+		);
+	}
+}
 for (const [driver, table] of [
 	['Windows', ahkSlotKeys],
 	['macOS', hsSlotKeys]
 ]) {
 	for (const id of Object.keys(table)) {
-		if (!declaredChordKeys.has(id)) {
+		if (!declaredChordKeys.has(id) && !(driver === 'Windows' && windowsExtras.has(id))) {
 			fail(
 				`${driver} slot vocabulary declares "${id}", which modifier_chords.json does not — add it to the catalogue`
 			);
