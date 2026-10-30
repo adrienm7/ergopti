@@ -374,7 +374,7 @@ end
 --- decisions base_url is the full endpoint.
 --- @param entry table { provider, base_url?, token }
 --- @param model string The model the request names.
---- @return table|nil endpoint { url, headers, format }, string|nil reason
+--- @return table|nil endpoint { url, headers, format, provider, model }, string|nil reason
 function M.endpoint(entry, model)
 	if type(entry) ~= "table" then return nil, "no API entry" end
 	local provider = M.provider(entry.provider)
@@ -413,7 +413,9 @@ function M.endpoint(entry, model)
 		url = base .. "/chat/completions"
 		if token ~= "" then headers["Authorization"] = "Bearer " .. token end
 	end
-	return { url = url, headers = headers, format = provider.format }
+	-- The provider and model name the request at every boundary after this one:
+	-- complete_body (thinking off, request fields) reads them from the target.
+	return { url = url, headers = headers, format = provider.format, provider = entry.provider, model = model }
 end
 
 --- The system and user turns of a PromptBuilder message list.
