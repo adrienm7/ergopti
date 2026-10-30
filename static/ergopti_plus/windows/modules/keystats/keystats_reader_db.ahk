@@ -1684,7 +1684,7 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 						KLW_ResetBatch()
 						KLRReplay := Map(
 								"db", db,
-								"device_lit", SQLite_Q(device_id),
+								"device_id", device_id,
 								"entries_since_flush", 0,
 								"activity", Map(),
 								"replayed", 0,
@@ -1923,7 +1923,7 @@ KLR_ReplayFlush() {
 		global KLRReplay
 		if !KLRReplay.Count
 				return false
-		sql := KLW_BuildBatchSql(KLRReplay["device_lit"], false)
+		sql := KLW_BuildBatchSql(KLRReplay["device_id"], false)
 		KLRReplay["entries_since_flush"] := 0
 		if (sql = "")
 				return true

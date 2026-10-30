@@ -10,6 +10,7 @@
 _KLRRF_FailedRefresh() {
 	SavedBatch := KLW.batch
 	SavedDevice := Keystats._device_id_lit
+	SavedDeviceId := Keystats.device_id
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	try {
@@ -19,6 +20,7 @@ _KLRRF_FailedRefresh() {
 		KLRCache.disposable := false
 		KLW_ResetBatch()
 		Keystats._device_id_lit := "'dev-one'"
+		Keystats.device_id := "dev-one"
 		KLW.batch["app_day"]["pending"] := Map("date", "2026-01-01", "app", "code.exe", "time_ms", 5)
 		Pending := KLW.batch
 		AssertTrue(SQLite_Exec(Db, "UPDATE agg_app_day SET chars=7;"
@@ -42,6 +44,7 @@ _KLRRF_FailedRefresh() {
 	} finally {
 		KLW.batch := SavedBatch
 		Keystats._device_id_lit := SavedDevice
+		Keystats.device_id := SavedDeviceId
 		_KLRDC_Cleanup()
 	}
 }

@@ -9,8 +9,9 @@
 ; independently from the inner-loop walking code.
 ;
 ; FEATURES & RATIONALE:
-; 1. KLW_SqlEscape / KLW_JsonEscape / KLW_EsrcMergeExpr / KLW_SplitKey:
-;    SQL-formatting helpers used exclusively by KLW_BuildBatchSql.
+; 1. KLW_SqlEscape / KLW_SplitKey: helpers of KLW_BuildBatchSql. A statement the
+;    three drivers share is rendered from the catalogue
+;    (_shared/data/db/queries.sql) by name; the Windows-only tables stay spelled here.
 ; 2. KLW_BuildBatchSql: drains KLW.batch into one SQL string (all tables in one
 ;    pass) and returns it to the caller so it can be appended to data.sql in
 ;    the same write as the raw event INSERTs — a single fsync.
@@ -34,39 +35,24 @@ KLW_SqlEscape(s) {
 		return SQLite_Q(s)
 }
 
-KLW_JsonEscape(m) {
-		return KLW_SqlEscape(KL_JsonEncode(m))
+; Renders one catalogue statement of the batch, one per line of data.sql.
+_KLW_Statement(Name, Row, Fields, DeviceId, Extra := unset) {
+		Slots := IsSet(Extra) ? Extra : Map()
+		Slots["device_id"] := DeviceId
+		Slots["date"] := String(Row["date"])
+		Slots["app"] := String(Row["app"])
+		for Slot, Field in Fields
+				Slots[Slot] := Row[Field]
+		return KeystatsQuery(Name, Slots) . "`n"
 }
 
-; Build a SQLite expression that merges the incoming esrc_json INTO the stored
-; esrc_json by summing each key present in the batch item.  A plain column
-; assignment would clobber all prior counts accumulated across flush cycles;
-; this instead keeps a running sum per source type.
-KLW_EsrcMergeExpr(EsrcMap) {
-		if (!IsObject(EsrcMap) || EsrcMap.Count == 0)
-				return "COALESCE(esrc_json,'{}') "
-		; Source labels are literal object keys, not JSON paths. Share the
-		; histogram merge so punctuation cannot create nested counters.
-		return KLW_BucketMergeExpr("esrc_json")
-}
-
-; Merge numeric distributions without interpolating bucket labels as JSON paths.
-; Both live flushes and cold replay drain the batch, so replacement loses history.
-; The object is spelled with json_quote rather than json_group_object, which
-; cuts a key at an embedded NUL: "a\u0000b" came back as "a", merged into a
-; second "a" key and the stored map stopped describing what was counted.
-KLW_BucketMergeExpr(Column) {
-		return "(SELECT COALESCE('{' || group_concat(json_quote(key) || ':' || total, ',') || '}', '{}') FROM (SELECT key,SUM(value) AS total FROM ("
-				. "SELECT key,value FROM json_each(COALESCE(" . Column . ",'{}')) UNION ALL "
-				. "SELECT key,value FROM json_each(excluded." . Column . ")) GROUP BY key))"
-}
-
-; Match FinalizeSession's earliest-sample cap across the whole day, not per flush.
-KLW_DurationsMergeExpr() {
-		return "(SELECT json_group_array(value) FROM (SELECT value FROM ("
-				. "SELECT 0 AS batch,key,value FROM json_each(COALESCE(durations_json,'[]')) UNION ALL "
-				. "SELECT 1 AS batch,key,value FROM json_each(excluded.durations_json)) "
-				. "ORDER BY batch,key LIMIT " . KLWConst.SESSION_DURATIONS_CAP . "))"
+; A batch row holds the columns the walker owns. The catalogue statement names
+; the others too; 0 adds nothing to what KLR_RebuildAggregates owns.
+_KLW_Zeros(Names) {
+		Slots := Map()
+		for Name in Names
+				Slots[Name] := 0
+		return Slots
 }
 
 ; Split a Chr(1)-delimited composite key into N parts.
@@ -100,14 +86,15 @@ KLW_SplitKey(k, n) {
 ; Returns the SQL text accumulated this tick (or "" when nothing to emit).
 ; Caller appends it to data.sql in the same write that contains the raw
 ; INSERT statements.
-; `device_id_lit` is optional for the live writer, which always uses the
+; `DeviceId` is optional for the live writer, which always uses the
 ; current Keystats device.  The cold-cache reader supplies the source device
 ; explicitly while replaying shared raw events, so cross-device aggregates can
 ; never be attributed to the Windows host that happened to open the dashboard.
-KLW_BuildBatchSql(device_id_lit := "", TrimTitles := true) {
+KLW_BuildBatchSql(DeviceId := "", TrimTitles := true) {
 		if !KLW.batch.Has("app_day")
 				return ""
-		d := (device_id_lit != "") ? device_id_lit : Keystats._device_id_lit
+		Device := (DeviceId != "") ? DeviceId : Keystats.device_id
+		d := KLW_SqlEscape(Device)
 		out := ""
 
 		; agg_app_day — walker-owned columns ONLY. `time_ms` stays here because
@@ -121,14 +108,15 @@ KLW_BuildBatchSql(device_id_lit := "", TrimTitles := true) {
 		; KLR_RebuildAggregates, which computes it once all-time from events_*;
 		; writing it here too would double-count it.
 		for _, row in KLW.batch["app_day"] {
-				category_lit := (row.Has("category") && row["category"] != "")
-						? KLW_SqlEscape(row["category"]) : "NULL"
-				out .= Format(
-						"INSERT INTO agg_app_day (device_id, date, app, category, time_ms, llm_chars, llm_triggers, llm_input_chars) VALUES ({1},{2},{3},{4},{5},{6},{7},{8}) ON CONFLICT(device_id, date, app) DO UPDATE SET category=COALESCE(excluded.category,category),time_ms=time_ms+excluded.time_ms,llm_chars=llm_chars+excluded.llm_chars,llm_triggers=llm_triggers+excluded.llm_triggers,llm_input_chars=llm_input_chars+excluded.llm_input_chars;`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						category_lit, KLW_GetMap(row, "time_ms", 0),
-						KLW_GetMap(row, "llm_chars", 0), KLW_GetMap(row, "llm_triggers", 0),
-						KLW_GetMap(row, "llm_input_chars", 0))
+				Slots := _KLW_Zeros(["chars", "pauses", "think_time_ms", "hs_chars", "hs_triggers", "hs_suggested",
+						"llm_suggested", "hs_input_chars", "app_time_ms"])
+				if (row.Has("category") && row["category"] != "")
+						Slots["category"] := String(row["category"])
+				Slots["time_ms"] := KLW_GetMap(row, "time_ms", 0)
+				Slots["llm_chars"] := KLW_GetMap(row, "llm_chars", 0)
+				Slots["llm_triggers"] := KLW_GetMap(row, "llm_triggers", 0)
+				Slots["llm_input_chars"] := KLW_GetMap(row, "llm_input_chars", 0)
+				out .= _KLW_Statement("agg.app_day", row, Map(), Device, Slots)
 		}
 
 		; agg_app_day_ms (app_time_ms) is intentionally NOT written by the walker
@@ -137,24 +125,19 @@ KLW_BuildBatchSql(device_id_lit := "", TrimTitles := true) {
 
 		; agg_app_day_buckets.
 		for _, row in KLW.batch["app_buckets"] {
-				out .= Format(
-						"INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited, hs_input_time_sum, hs_input_credited, llm_input_time_sum, llm_input_credited) VALUES ({1},{2},{3},{4},{5},{6},{7},{8},{9},{10}) ON CONFLICT(device_id, date, app, bucket_ms) DO UPDATE SET time_sum=time_sum+excluded.time_sum,credited=credited+excluded.credited,hs_input_time_sum=hs_input_time_sum+excluded.hs_input_time_sum,hs_input_credited=hs_input_credited+excluded.hs_input_credited,llm_input_time_sum=llm_input_time_sum+excluded.llm_input_time_sum,llm_input_credited=llm_input_credited+excluded.llm_input_credited;`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						row["bucket_ms"], row["time_sum"], row["credited"],
-						row["hs_in_t"], row["hs_in_c"], row["llm_in_t"], row["llm_in_c"])
+				out .= _KLW_Statement("agg.buckets", row, Map("bucket_ms", "bucket_ms", "time_sum", "time_sum",
+						"credited", "credited", "hs_input_time_sum", "hs_in_t", "hs_input_credited", "hs_in_c",
+						"llm_input_time_sum", "llm_in_t", "llm_input_credited", "llm_in_c"), Device)
 		}
 
 		; n-gram tables.
 		for tbl_name, tbl in KLW.batch["ngram"] {
 				for key, item in tbl {
 						parts := KLW_SplitKey(key, 3)
-						out .= Format(
-								"INSERT INTO {1} (device_id, date, app, token, c, td, cd, e, esrc_json) VALUES ({2},{3},{4},{5},{6},{7},{8},{9},{10}) ON CONFLICT(device_id, date, app, token) DO UPDATE SET c=c+excluded.c,td=td+excluded.td,cd=cd+excluded.cd,e=e+excluded.e,esrc_json={11};`n",
-								tbl_name, d,
-								KLW_SqlEscape(parts[1]), KLW_SqlEscape(parts[2]), KLW_SqlEscape(parts[3]),
-								item["c"], item["td"], item["cd"], item["e"],
-								KLW_JsonEscape(item["esrc"]),
-								KLW_EsrcMergeExpr(item["esrc"]))
+						out .= KeystatsQuery("agg.ngram", Map("table", tbl_name, "device_id", Device,
+								"date", parts[1], "app", parts[2], "token", parts[3],
+								"c", item["c"], "td", item["td"], "cd", item["cd"], "e", item["e"],
+								"esrc_json", KL_JsonEncode(item["esrc"]))) . "`n"
 				}
 		}
 
@@ -186,11 +169,8 @@ KLW_BuildBatchSql(device_id_lit := "", TrimTitles := true) {
 
 		; agg_app_day_kc_hold.
 		for _, row in KLW.batch["kc_hold"] {
-				out .= Format(
-						"INSERT INTO agg_app_day_kc_hold (device_id, date, app, keycode, sum_ms, count, max_ms, tap_count, hold_count) VALUES ({1},{2},{3},{4},{5},{6},{7},{8},{9}) ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET sum_ms=sum_ms+excluded.sum_ms,count=count+excluded.count,max_ms=MAX(max_ms, excluded.max_ms),tap_count=tap_count+excluded.tap_count,hold_count=hold_count+excluded.hold_count;`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						row["keycode"], row["sum_ms"], row["count"],
-						row["max_ms"], row["tap_count"], row["hold_count"])
+				out .= _KLW_Statement("agg.kc_hold", row, Map("keycode", "keycode", "sum_ms", "sum_ms", "count", "count",
+						"max_ms", "max_ms", "tap_count", "tap_count", "hold_count", "hold_count"), Device)
 		}
 
 		; agg_app_day_titles — walker owns `ms` (focus time per title); the
@@ -208,10 +188,8 @@ KLW_BuildBatchSql(device_id_lit := "", TrimTitles := true) {
 		; it meaning, leaving the table unbounded by construction.
 		title_app_days := Map()
 		for _, row in KLW.batch["titles"] {
-				out .= Format(
-						"INSERT INTO agg_app_day_titles (device_id, date, app, title, ms) VALUES ({1},{2},{3},{4},{5}) ON CONFLICT(device_id, date, app, title) DO UPDATE SET ms=ms+excluded.ms;`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						KLW_SqlEscape(row["title"]), row["ms"])
+				out .= _KLW_Statement("agg.title", row, Map("ms", "ms"), Device,
+						Map("c", 0, "title", String(row["title"])))
 				; Private replay ranks complete totals after every batch has landed.
 				if TrimTitles
 						title_app_days[row["date"] . Chr(1) . row["app"]] := row
@@ -219,88 +197,70 @@ KLW_BuildBatchSql(device_id_lit := "", TrimTitles := true) {
 		; Ranked by (c + ms) like the macOS twin: a title matters either because it
 		; was seen often or because it held focus for a long time.
 		for _, ad in title_app_days {
-				out .= Format(
-						"DELETE FROM agg_app_day_titles WHERE device_id={1} AND date={2} AND app={3} AND title NOT IN (SELECT title FROM agg_app_day_titles WHERE device_id={1} AND date={2} AND app={3} ORDER BY (c + ms) DESC LIMIT {4});`n",
-						d, KLW_SqlEscape(ad["date"]), KLW_SqlEscape(ad["app"]),
-						KLWConst.TITLE_CAP_PER_APP_DAY)
+				out .= _KLW_Statement("agg.title_prune", ad, Map(), Device,
+						Map("cap", KLWConst.TITLE_CAP_PER_APP_DAY))
 		}
 
 		; agg_app_day_hourly — walker owns the per-hour error columns
 		; (e/em/es/e_buckets_json); the keystroke count `c` is owned by
 		; KLR_RebuildAggregates so it is not written here (avoids double-count).
 		for _, row in KLW.batch["hourly"] {
-				out .= Format(
-						"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, e, em, es, e_buckets_json) VALUES ({1},{2},{3},{4},{5},{6},{7},{8}) ON CONFLICT(device_id, date, app, hour) DO UPDATE SET e=e+excluded.e,em=em+excluded.em,es=es+excluded.es,e_buckets_json=" . KLW_BucketMergeExpr("e_buckets_json") . ";`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						KLW_SqlEscape(row["hour"]), row["e"], row["em"], row["es"],
-						KLW_JsonEscape(row["e_buckets"]))
+				out .= _KLW_Statement("agg.hourly", row, Map("e", "e", "em", "em", "es", "es"), Device,
+						Map("c", 0, "hour", String(row["hour"]), "e_buckets_json", KL_JsonEncode(row["e_buckets"])))
 		}
 
 		; agg_app_day_hourly_min5 — walker owns e/es/e_buckets_json; the keystroke
 		; count `c` is owned by KLR_RebuildAggregates so it is not written here.
 		for _, row in KLW.batch["hourly_min5"] {
-				out .= Format(
-						"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, e, es, e_buckets_json) VALUES ({1},{2},{3},{4},{5},{6},{7}) ON CONFLICT(device_id, date, app, slot) DO UPDATE SET e=e+excluded.e,es=es+excluded.es,e_buckets_json=" . KLW_BucketMergeExpr("e_buckets_json") . ";`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						KLW_SqlEscape(row["slot"]), row["e"], row["es"],
-						KLW_JsonEscape(row["e_buckets"]))
+				out .= _KLW_Statement("agg.hourly_min5", row, Map("e", "e", "es", "es"), Device,
+						Map("c", 0, "slot", String(row["slot"]), "e_buckets_json", KL_JsonEncode(row["e_buckets"])))
 		}
 
 		; agg_app_day_layouts.
 		for _, row in KLW.batch["layouts"] {
-				out .= Format(
-						"INSERT INTO agg_app_day_layouts (device_id, date, app, layout, count) VALUES ({1},{2},{3},{4},{5}) ON CONFLICT(device_id, date, app, layout) DO UPDATE SET count=count+excluded.count;`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						KLW_SqlEscape(row["layout"]), row["count"])
+				out .= _KLW_Statement("agg.layouts", row, Map("count", "count"), Device,
+						Map("layout", String(row["layout"])))
 		}
 
 		; agg_app_day_chars_class.
 		for _, row in KLW.batch["chars_class"] {
-				first_lit := row.Has("first_typed_min") ? KLW_SqlEscape(row["first_typed_min"]) : "NULL"
-				last_lit  := row.Has("last_typed_min")  ? KLW_SqlEscape(row["last_typed_min"])  : "NULL"
-				out .= Format(
-						"INSERT INTO agg_app_day_chars_class (device_id, date, app, letter, digit, punct, space, other, first_typed_min, last_typed_min) VALUES ({1},{2},{3},{4},{5},{6},{7},{8},{9},{10}) ON CONFLICT(device_id, date, app) DO UPDATE SET letter=letter+excluded.letter,digit=digit+excluded.digit,punct=punct+excluded.punct,space=space+excluded.space,other=other+excluded.other,first_typed_min=COALESCE(agg_app_day_chars_class.first_typed_min, excluded.first_typed_min),last_typed_min=COALESCE(excluded.last_typed_min, agg_app_day_chars_class.last_typed_min);`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						row["letter"], row["digit"], row["punct"], row["space"], row["other"],
-						first_lit, last_lit)
+				Slots := Map()
+				if row.Has("first_typed_min")
+						Slots["first_typed_min"] := String(row["first_typed_min"])
+				if row.Has("last_typed_min")
+						Slots["last_typed_min"] := String(row["last_typed_min"])
+				out .= _KLW_Statement("agg.chars_class", row, Map("letter", "letter", "digit", "digit",
+						"punct", "punct", "space", "space", "other", "other"), Device, Slots)
 		}
 
 		; agg_app_day_errors.
 		for _, row in KLW.batch["errors"] {
-				out .= Format(
-						"INSERT INTO agg_app_day_errors (device_id, date, app, bs_total, cascade_count, cascade_max_len, recovery_sum_ms, recovery_count) VALUES ({1},{2},{3},{4},{5},{6},{7},{8}) ON CONFLICT(device_id, date, app) DO UPDATE SET bs_total=bs_total+excluded.bs_total,cascade_count=cascade_count+excluded.cascade_count,cascade_max_len=MAX(cascade_max_len, excluded.cascade_max_len),recovery_sum_ms=recovery_sum_ms+excluded.recovery_sum_ms,recovery_count=recovery_count+excluded.recovery_count;`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						row["bs_total"], row["cascade_count"], row["cascade_max_len"],
-						row["recovery_sum_ms"], row["recovery_count"])
+				out .= _KLW_Statement("agg.errors", row, Map("bs_total", "bs_total", "cascade_count", "cascade_count",
+						"cascade_max_len", "cascade_max_len", "recovery_sum_ms", "recovery_sum_ms",
+						"recovery_count", "recovery_count"), Device)
 		}
 
-		; agg_app_day_ergo.
+		; agg_app_day_ergo. The focus latency is not measured on Windows.
 		for _, row in KLW.batch["ergo"] {
-				out .= Format(
-						"INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, same_hand_streak_max, auto_repeat_count) VALUES ({1},{2},{3},{4},{5},{6}) ON CONFLICT(device_id, date, app) DO UPDATE SET same_finger_streak_max=MAX(same_finger_streak_max, excluded.same_finger_streak_max),same_hand_streak_max=MAX(same_hand_streak_max, excluded.same_hand_streak_max),auto_repeat_count=auto_repeat_count+excluded.auto_repeat_count;`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						row["same_finger_streak_max"], row["same_hand_streak_max"],
-						row["auto_repeat_count"])
+				out .= _KLW_Statement("agg.ergo", row, Map("same_finger_streak_max", "same_finger_streak_max",
+						"same_hand_streak_max", "same_hand_streak_max", "auto_repeat_count", "auto_repeat_count"), Device,
+						_KLW_Zeros(["focus_to_first_key_sum_ms", "focus_to_first_key_count"]))
 		}
 
 		; agg_app_day_burst.
 		for _, row in KLW.batch["bursts"] {
-				out .= Format(
-						"INSERT INTO agg_app_day_burst (device_id, date, app, count_total, max_cpm, max_chars, length_buckets_json, inter_delay_count, inter_delay_sum, inter_delay_sumsq) VALUES ({1},{2},{3},{4},{5},{6},{7},{8},{9},{10}) ON CONFLICT(device_id, date, app) DO UPDATE SET count_total=count_total+excluded.count_total,max_cpm=MAX(max_cpm, excluded.max_cpm),max_chars=MAX(max_chars, excluded.max_chars),length_buckets_json=" . KLW_BucketMergeExpr("length_buckets_json") . ",inter_delay_count=inter_delay_count+excluded.inter_delay_count,inter_delay_sum=inter_delay_sum+excluded.inter_delay_sum,inter_delay_sumsq=inter_delay_sumsq+excluded.inter_delay_sumsq;`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						row["count_total"], row["max_cpm"], row["max_chars"],
-						KLW_JsonEscape(row["length_buckets"]),
-						row["inter_count"], row["inter_sum"], row["inter_sumsq"])
+				out .= _KLW_Statement("agg.burst", row, Map("count_total", "count_total", "max_cpm", "max_cpm",
+						"max_chars", "max_chars", "inter_delay_count", "inter_count", "inter_delay_sum", "inter_sum",
+						"inter_delay_sumsq", "inter_sumsq"), Device,
+						Map("length_buckets_json", KL_JsonEncode(row["length_buckets"])))
 		}
 
-		; agg_app_day_session.
+		; agg_app_day_session. The cap matches FinalizeSession's earliest samples
+		; across the whole day, not per flush.
 		for _, row in KLW.batch["sessions"] {
-				out .= Format(
-						"INSERT INTO agg_app_day_session (device_id, date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json) VALUES ({1},{2},{3},{4},{5},{6},{7},{8}) ON CONFLICT(device_id, date, app) DO UPDATE SET count_total=count_total+excluded.count_total,longest_ms=MAX(longest_ms, excluded.longest_ms),longest_chars=MAX(longest_chars, excluded.longest_chars),total_active_ms=total_active_ms+excluded.total_active_ms,durations_json=" . KLW_DurationsMergeExpr() . ";`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						row["count_total"], row["longest_ms"], row["longest_chars"],
-						row["total_active_ms"],
-						KLW_JsonEscape(row["durations"]))
+				out .= _KLW_Statement("agg.session", row, Map("count_total", "count_total", "longest_ms", "longest_ms",
+						"longest_chars", "longest_chars", "total_active_ms", "total_active_ms"), Device,
+						Map("duration_cap", KLWConst.SESSION_DURATIONS_CAP, "durations_json", KL_JsonEncode(row["durations"])))
 		}
 
 		; agg_app_day_switches_to is intentionally NOT written by the walker —

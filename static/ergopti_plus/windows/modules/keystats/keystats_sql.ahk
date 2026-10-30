@@ -4,6 +4,8 @@
 ; MODULE: Keystats - SQL Builders
 ; DESCRIPTION:
 ; Type-specific INSERT statement builders for every keystats event kind. Mirrors the macOS sqlite_writer module.
+; A statement the three drivers share is rendered from the catalogue
+; (_shared/data/db/queries.sql) by name; the others are Windows spellings.
 ;
 ; Extracted from keystats.ahk (audit F1) and #Include'd in place by it. Pure
 ; definitions only - AHK resolves these symbols across the whole compilation
@@ -11,6 +13,7 @@
 ; ==============================================================================
 
 #Include keystats_hotstring_units.ahk
+#Include ../../_generated/keystats_queries.ahk
 
 ; Only INSERT statements are emitted from AHK. They go straight into
 ; data.sql; no SQLite is opened on the AHK side. The launcher rebuilds
@@ -111,71 +114,77 @@ KL_BuildInsertTyping(e, id) {
     )
 }
 
+; The four columns every event shares, for a catalogue statement's typed slots.
+; @param e {Map} Journal entry.
+; @param id {Integer} Stable event id.
+; @returns {Map} Slot values, extended by the caller.
+KL_EventSlots(e, id) {
+    ts := String(e["timestamp"])
+    return Map("device_id", Keystats.device_id, "id", id, "ts", ts, "date", SubStr(ts, 1, 10))
+}
+
+; An empty text is an absent value: a nullable slot renders it as NULL.
+KL_SlotNullableText(Slots, Name, Value) {
+    if (Value != "")
+        Slots[Name] := String(Value)
+}
+
+; A journal number that is empty or not a number is an absent value.
+KL_SlotNullableNumber(Slots, Name, Value) {
+    if (Value != "" && IsNumber(Value))
+        Slots[Name] := Value
+}
+
+; A slot the catalogue declares NOT NULL takes 0 for a duration the journal lost.
+KL_NumberOrZero(Value) {
+    return (Value != "" && IsNumber(Value)) ? Value : 0
+}
+
 KL_BuildInsertAppSwitch(e, id) {
-    ts := e["timestamp"]
-    return Format(
-        "INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlNullable(KL_GetMap(e, "prev_app", "")),
-        KL_SqlNullable(KL_GetMap(e, "next_app", "")),
-        KL_SqlNum(KL_GetMap(e, "duration_ms", 0))
-    )
+    Slots := KL_EventSlots(e, id)
+    KL_SlotNullableText(Slots, "prev_app", KL_GetMap(e, "prev_app", ""))
+    KL_SlotNullableText(Slots, "next_app", KL_GetMap(e, "next_app", ""))
+    Slots["duration_ms"] := KL_NumberOrZero(KL_GetMap(e, "duration_ms", 0))
+    return KeystatsQuery("events.app_switch", Slots)
 }
 
 KL_BuildInsertWindowSwitch(e, id) {
-    ts := e["timestamp"]
-    return Format(
-        "INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
-        KL_SqlNullable(KL_GetMap(e, "prev_title", "")),
-        KL_SqlNullable(KL_GetMap(e, "next_title", "")),
-        KL_SqlNum(KL_GetMap(e, "duration_ms", 0))
-    )
+    Slots := KL_EventSlots(e, id)
+    Slots["app"] := String(KL_GetMap(e, "app", "Unknown"))
+    KL_SlotNullableText(Slots, "prev_title", KL_GetMap(e, "prev_title", ""))
+    KL_SlotNullableText(Slots, "next_title", KL_GetMap(e, "next_title", ""))
+    Slots["duration_ms"] := KL_NumberOrZero(KL_GetMap(e, "duration_ms", 0))
+    return KeystatsQuery("events.window_switch", Slots)
 }
 
 KL_BuildInsertShortcut(e, id) {
-    ts := e["timestamp"]
-    return Format(
-        "INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES ({1}, {2}, {3}, {4}, {5}, {6});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
-        KL_SqlStr(KL_GetMap(e, "key", ""))
-    )
+    Slots := KL_EventSlots(e, id)
+    Slots["app"] := String(KL_GetMap(e, "app", "Unknown"))
+    Slots["key"] := String(KL_GetMap(e, "key", ""))
+    return KeystatsQuery("events.shortcut", Slots)
 }
 
 KL_BuildInsertSystem(e, id) {
-    ts   := e["timestamp"]
     meta := Map()
     for k, v in e {
         if (k != "type" && k != "timestamp" && k != "action")
             meta[k] := v
     }
-    return Format(
-        "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(KL_GetMap(e, "action", "")),
-        KL_SqlJson(meta)
-    )
+    Slots := KL_EventSlots(e, id)
+    Slots["action"] := String(KL_GetMap(e, "action", ""))
+    Slots["metadata_json"] := KL_JsonEncode(meta)
+    return KeystatsQuery("events.system", Slots)
 }
 
 KL_BuildInsertHotstring(e, id, kind) {
-    ts := e["timestamp"]
-    Sql := Format(
-        "INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
-        KL_SqlStr(kind),
-        KL_SqlStr(KL_GetMap(e, "trigger", "")),
-        KL_SqlStr(KL_GetMap(e, "replacement", "")),
-        KL_SqlNullable(KL_GetMap(e, "h_type", "")),
-        KL_SqlNum(KL_GetMap(e, "net_saved_chars", ""))
-    )
+    Slots := KL_EventSlots(e, id)
+    Slots["app"] := String(KL_GetMap(e, "app", "Unknown"))
+    Slots["kind"] := String(kind)
+    Slots["trigger"] := String(KL_GetMap(e, "trigger", ""))
+    Slots["replacement"] := String(KL_GetMap(e, "replacement", ""))
+    KL_SlotNullableText(Slots, "h_type", KL_GetMap(e, "h_type", ""))
+    KL_SlotNullableNumber(Slots, "net_saved_chars", KL_GetMap(e, "net_saved_chars", ""))
+    Sql := KeystatsQuery("events.hotstring", Slots)
     return Sql . (kind = "fired" ? KLHotstringUnits.DeclarationSql(Keystats._device_id_lit) : "")
 }
 
@@ -212,14 +221,10 @@ KL_BuildInsertLlm(e, id, kind) {
 }
 
 KL_BuildInsertSession(e, id, kind) {
-    ts := e["timestamp"]
-    return Format(
-        "INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES ({1}, {2}, {3}, {4}, {5}, {6});",
-        Keystats._device_id_lit, id,
-        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(kind),
-        KL_SqlNum(KL_GetMap(e, "duration_ms", ""))
-    )
+    Slots := KL_EventSlots(e, id)
+    Slots["kind"] := String(kind)
+    KL_SlotNullableNumber(Slots, "duration_ms", KL_GetMap(e, "duration_ms", ""))
+    return KeystatsQuery("events.session", Slots)
 }
 
 KL_GetMap(m, key, default := "") {
