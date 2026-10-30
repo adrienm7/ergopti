@@ -706,6 +706,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-xkb-row-options.cjs"],
 			"repro": "npm run test:xkb-row-options"
+		},
+		{
+			"id": "keylayout-row-options",
+			"ordinal": 542,
+			"name": "the number-row options: the .keylayout macOS installs types what the Linux converter makes of the same options, Ctrl and Cmd keeping the layout's cells",
+			"cmd": "node",
+			"args": ["tools/test/test-keylayout-row-options.cjs"],
+			"repro": "npm run test:keylayout-row-options"
 		}
 	]
 }
