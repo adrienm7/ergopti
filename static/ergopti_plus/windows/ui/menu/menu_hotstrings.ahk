@@ -552,11 +552,13 @@ _HS_DelimReset(WriterFn := 0, NotifyFn := 0) {
 ; strict durable success. A refused writer leaves the engine strings untouched
 ; and produces no misleading notification.
 ; @param NoticeFn {Func|Integer} Replaces the generic "saved" notice.
-_HS_DelimCommit(CommitFn, NotifyFn := 0, NoticeFn := 0) {
+; @param RebuildFn {Func|Integer} Redraws the tray; the real one unless the caller
+;   injected its notifier, which means it runs with no tray to redraw.
+_HS_DelimCommit(CommitFn, NotifyFn := 0, NoticeFn := 0, RebuildFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _HS_DelimCommit(CommitFn, NotifyFn, NoticeFn)
+		try return _HS_DelimCommit(CommitFn, NotifyFn, NoticeFn, RebuildFn)
 		finally Critical(InheritedCritical)
 	}
 	try Committed := CommitFn.Call()
@@ -571,19 +573,30 @@ _HS_DelimCommit(CommitFn, NotifyFn := 0, NoticeFn := 0) {
 	try {
 		if IsObject(NoticeFn) {
 			NoticeFn.Call()
-			return true
+		} else {
+			Message := t("hs_config.notify_delimiters_saved")
+			if HasMethod(NotifyFn, "Call")
+				NotifyFn.Call(Message, "", "Iconi Mute")
+			else
+				TrayTip(Message, "", "Iconi Mute")
 		}
-		Message := t("hs_config.notify_delimiters_saved")
-		if HasMethod(NotifyFn, "Call")
-			NotifyFn.Call(Message, "", "Iconi Mute")
-		else
-			TrayTip(Message, "", "Iconi Mute")
 	} catch as Err {
 		; The durable mutation already succeeded; confine a notifier failure so a
 		; tray callback cannot escape through AHK's menu dispatcher.
 		try LoggerError("HotstringsMenu",
 			"Delimiter settings were saved but the success notification failed: {1}.",
 			Err.Message)
+	}
+	; No reload follows this write: the rows keep the ticks and the "consumed"
+	; suffix they were drawn with until the tray is built again.
+	try {
+		if HasMethod(RebuildFn, "Call")
+			RebuildFn.Call()
+		else if !HasMethod(NotifyFn, "Call")
+			RebuildTrayMenu()
+	} catch as Err {
+		try LoggerError("HotstringsMenu",
+			"Delimiter settings were saved but the tray could not be redrawn: {1}.", Err.Message)
 	}
 	return true
 }
@@ -620,10 +633,13 @@ _HS_DelimAddCustom() {
 	G.OnEvent("Close", (*) => G.Destroy())
 	G.OnEvent("Escape", (*) => G.Destroy())
 
+	; Read before Show: Show pumps messages, so the dialog can be answered before
+	; this thread resumes, and a destroyed Gui has no Hwnd left to wait on.
+	DialogHwnd := G.Hwnd
 	G.Show("Center AutoSize")
 	_HS_DelimAddGui := G
 	; Block until the GUI is closed (OK or Cancel)
-	try WinWaitClose("ahk_id " . G.Hwnd)
+	try WinWaitClose("ahk_id " . DialogHwnd)
 	finally _HS_DelimAddGui := ""
 
 	; A held native dialog cannot borrow its pre-pause menu admission.

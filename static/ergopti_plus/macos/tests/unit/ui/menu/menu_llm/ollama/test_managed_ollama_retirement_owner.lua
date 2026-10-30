@@ -117,6 +117,26 @@ helpers.describe("Managed Ollama exact daemon retirement owner", function()
 		end)
 	end)
 
+	helpers.it("names the helper's refusal when an exit leaves no receipt (ollama-pull-unsettled-cause)", function()
+		-- Field run of 2026-10-30 20:47: three pulls ended with code 78 and an
+		-- empty receipt; the log said only that the task "could not be settled".
+		with_managed({}, function(f)
+			helpers.assert_true(start(f))
+			local task = f.pulls[1]
+			task.running = false
+			task.on_done(78, "", "Managed Ollama pull admission refused: TimeoutError at pull.py:9 request.\n")
+			helpers.assert_eq(f.active_tasks.ollama_pull, task)
+			local named = false
+			for _, record in ipairs(f.error_records) do
+				if record:find("could not be settled; last output: Managed Ollama pull admission refused: TimeoutError", 1, true) then
+					named = true
+				end
+			end
+			helpers.assert_true(named, "the unsettled error must quote the helper's refusal: "
+				.. table.concat(f.error_records, " | "))
+		end)
+	end)
+
 	helpers.it("refuses callback zero without a same-session retirement receipt", function()
 		with_managed({}, function(f)
 			local accepted, terminals = start(f)

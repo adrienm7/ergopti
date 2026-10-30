@@ -168,7 +168,9 @@ end
 --- Classifies one input event and atomically claims every older deferred payload
 --- before a non-owned event can mutate user-visible state. Unreadable events also
 --- take the ordering fence, but remain distinct so consumers can pass them through
---- without treating an unknown synthetic echo as human input.
+--- without treating an unknown synthetic echo as human input. Owned metadata
+--- carries `selftest` for a live field-run selftest key; it stays owned here,
+--- and only the keymap's selftest gate may decode it as typing.
 --- @param event userdata|table hs.eventtap event.
 --- @param consumer_id string Stable consumer name.
 --- @return table|nil metadata Owned-event metadata.

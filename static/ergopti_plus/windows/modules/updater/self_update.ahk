@@ -711,7 +711,7 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0, CheckOnly
 	}
 	try {
 		_Updater_ClaimBalloon()
-		TrayTip(Format(t("updater.tray_new_version_body"), Latest), t("updater.tray_new_version_title"))
+		_Updater_ShowReleaseBalloon(Format(t("updater.tray_new_version_body"), Latest))
 		if _Updater_CommitReleaseNotification(Reservation, Request)
 			_Updater_RecordNotifiedTag(Latest)
 	} catch as Err {
@@ -741,13 +741,18 @@ _Updater_AnnounceCheckOnlyRelease(Latest, Current, Request, ShowFn := 0) {
 		if IsObject(ShowFn)
 			ShowFn.Call(Text)
 		else
-			TrayTip(Text, t("updater.tray_new_version_title"))
+			_Updater_ShowReleaseBalloon(Text)
 		if _Updater_CommitReleaseNotification(Reservation, Request)
 			_Updater_RecordNotifiedTag(Latest)
 	} catch as Err {
 		_Updater_ReleaseNotificationReservation(Reservation)
 		try LoggerError("Updater", "Could not surface the check-only update notification: {1}.", Err.Message)
 	}
+}
+
+; The one balloon both release announcements show, under the same title.
+_Updater_ShowReleaseBalloon(Text) {
+	TrayTip(Text, t("updater.tray_new_version_title"))
 }
 
 ; Balloon ownership. Every balloon of the driver is a TrayTip on the one tray

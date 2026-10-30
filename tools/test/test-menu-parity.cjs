@@ -63,6 +63,7 @@ require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a
 const fs = require('fs');
 const path = require('path');
 const { scriptTokens } = require('../lib/script-source.cjs');
+const { readLinuxMenuSources, linuxMenuRootSource } = require('../lib/linux-menu-parts.cjs');
 const { checkParentSource } = require('../lib/menu-parent-source-gate.cjs');
 const {
 	delegatedMenuSources,
@@ -1350,7 +1351,8 @@ const PERSONAL_DEFAULT_GROUP_PROOF = OPENS_SUBMENU.hotstring_personal[0].selecte
 // The actual language provider composes the checkbox, completed frame and native parent.
 const {
 	hotstringLanguagePublication,
-	files: languageOwnerFiles
+	files: languageOwnerFiles,
+	readOwnerSources: readLanguageOwnerSources
 } = require('../lib/menu-hotstring-language-binding.cjs');
 OPENS_SUBMENU.hotstring_languages = [
 	{ menu: 'hotstring_scope_checkbox', platforms: ['ahk', 'hs', 'linux'] },
@@ -3455,15 +3457,23 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 }
 
 // Actual Linux parents require their reviewed algorithm AND native producer/caller.
-const linuxAiSources = Object.fromEntries(
-	[
-		'linux/ui/menu/ai_parent.lua',
-		'linux/ui/menu/agent_rows.lua',
-		'linux/ui/menu/menu_builder.lua'
-	].map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
-);
+// The tray root is read with its split section modules folded back in.
+const linuxMenuSources = readLinuxMenuSources(SP);
+const linuxAiSources = {
+	...Object.fromEntries(
+		['linux/ui/menu/ai_parent.lua', 'linux/ui/menu/agent_rows.lua'].map((file) => [
+			file,
+			fs.readFileSync(path.join(SP, file), 'utf8')
+		])
+	),
+	'linux/ui/menu/menu_builder.lua': linuxMenuRootSource(SP)
+};
 const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-parent-binding.cjs');
-require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(linuxAiSources, manifest);
+require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
+	linuxAiSources,
+	manifest,
+	linuxMenuSources
+);
 {
 	const assert = require('node:assert/strict');
 	for (const kind of ['llm', 'agent']) {
@@ -5285,12 +5295,7 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 								? nativeLinuxAiParentPublication(linuxAiSources, manifest, row.id, platform)
 								: opened.hotstring_language_owner
 									? hotstringLanguagePublication(
-											Object.fromEntries(
-												languageOwnerFiles[platform].map((file) => [
-													file,
-													fs.readFileSync(path.join(SP, file), 'utf8')
-												])
-											),
+											readLanguageOwnerSources(SP, platform),
 											manifest,
 											platform,
 											target

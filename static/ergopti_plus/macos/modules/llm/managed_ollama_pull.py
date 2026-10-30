@@ -348,51 +348,68 @@ def main():
     try:
         value = request(deadline)
         with RECEIPT.ReservedReceipt(value["receipt_path"]) as private_receipt:
-
-            def emit(progress):
-                # Native error/status strings may include request URLs. UI
-                # receives only independent bounded byte progress or a scalar.
-                if "completed" in progress and "total" in progress:
-                    print(
-                        "OLLAMA_PULL_BYTES "
-                        + str(progress["completed"])
-                        + " "
-                        + str(progress["total"]),
-                        flush=True,
-                    )
-                elif progress.get("status") == "success":
-                    print("OLLAMA_PULL_COMPLETE", flush=True)
-
-            files = AUTH.OperationFiles(value["anchor"], value["nonce"])
+            # Set once execute() may submit work: from then on only its own
+            # receipt can prove the daemon side retired.
+            dispatched = False
             try:
-                policy = {
-                    "retirement_ms": math.ceil(options.retirement_timeout * 1000),
-                    "idle_ms": math.ceil(options.idle_timeout * 1000),
-                    "maximum_bytes": options.maximum_bytes,
-                }
-                if max(policy["retirement_ms"], policy["idle_ms"]) > (1 << 31) - 1:
-                    raise AUTH.AuthorityRefusal()
-                result = execute(
-                    value,
-                    owner_factory=select_owner,
-                    idle_timeout=options.idle_timeout,
-                    maximum_bytes=options.maximum_bytes,
-                    deadline=deadline,
-                    retirement_timeout=options.retirement_timeout,
-                    cancellation=cancellation,
-                    emit=emit,
-                    private_receipt=private_receipt,
-                    before_submit=lambda owner: files.bind(
-                        owner, policy, POLICY.private_session, PORTS.listener
-                    ),
-                    on_retirement_clock=lambda stop: files.seal_window(stop, CLEANUP.boot_session),
-                    on_completion=lambda proof: (
-                        files.remove() if proof["state"] == "retired" and not files.sealed else None
-                    ),
-                )
-                return result
-            finally:
-                files.close()
+
+                def emit(progress):
+                    # Native error/status strings may include request URLs. UI
+                    # receives only independent bounded byte progress or a scalar.
+                    if "completed" in progress and "total" in progress:
+                        print(
+                            "OLLAMA_PULL_BYTES "
+                            + str(progress["completed"])
+                            + " "
+                            + str(progress["total"]),
+                            flush=True,
+                        )
+                    elif progress.get("status") == "success":
+                        print("OLLAMA_PULL_COMPLETE", flush=True)
+
+                files = AUTH.OperationFiles(value["anchor"], value["nonce"])
+                try:
+                    policy = {
+                        "retirement_ms": math.ceil(options.retirement_timeout * 1000),
+                        "idle_ms": math.ceil(options.idle_timeout * 1000),
+                        "maximum_bytes": options.maximum_bytes,
+                    }
+                    if max(policy["retirement_ms"], policy["idle_ms"]) > (1 << 31) - 1:
+                        raise AUTH.AuthorityRefusal()
+                    dispatched = True
+                    result = execute(
+                        value,
+                        owner_factory=select_owner,
+                        idle_timeout=options.idle_timeout,
+                        maximum_bytes=options.maximum_bytes,
+                        deadline=deadline,
+                        retirement_timeout=options.retirement_timeout,
+                        cancellation=cancellation,
+                        emit=emit,
+                        private_receipt=private_receipt,
+                        before_submit=lambda owner: files.bind(
+                            owner, policy, POLICY.private_session, PORTS.listener
+                        ),
+                        on_retirement_clock=lambda stop: files.seal_window(
+                            stop, CLEANUP.boot_session
+                        ),
+                        on_completion=lambda proof: (
+                            files.remove()
+                            if proof["state"] == "retired" and not files.sealed
+                            else None
+                        ),
+                    )
+                    return result
+                finally:
+                    files.close()
+            except Cancelled:
+                if not dispatched:
+                    publish_pre_dispatch_refusal(private_receipt, value["nonce"], 130)
+                raise
+            except Exception:
+                if not dispatched:
+                    publish_pre_dispatch_refusal(private_receipt, value["nonce"], 78)
+                raise
     except Cancelled:
         return 130
     except Exception as error:
@@ -404,6 +421,40 @@ def main():
             file=sys.stderr,
         )
         return 78
+
+
+def publish_pre_dispatch_refusal(private_receipt, nonce, status):
+    """Close a refusal that happened before any daemon work could be submitted.
+
+    Field run of 2026-10-30 20:47, 20:56 and 21:05: each refused pull left its
+    reserved receipt empty, so the menu kept the exact task slot and logged
+    that the pull "could not be settled".
+    """
+    if private_receipt.published:
+        return
+    try:
+        private_receipt.publish(
+            {
+                "version": 1,
+                "nonce": nonce,
+                "state": "retired",
+                "worker_status": status,
+                "source_admitted": False,
+                "listener_bound": False,
+                "request_reaped": True,
+                "daemon_operation_retired": True,
+                "operation": "",
+                "source_commit": "",
+                "binary_sha256": "",
+                "asset_sha256": "",
+            }
+        )
+    except Exception as error:
+        print(
+            "Managed Ollama pull refusal receipt was not published: %s."
+            % RUNTIME.describe_refusal(error, __file__),
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

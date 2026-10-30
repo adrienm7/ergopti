@@ -40,6 +40,16 @@ and its keystats ledger recorded the test keys. Judge such a check from the
 private driver's own state (`HSE_Buffer`, its log), and leave CapsWord, which
 writes the real CapsLock state, to a desktop with no other driver.
 
+### project-live-checks-send-restores-capslock
+
+A `Send` that is not `{Blind}` lifts CapsLock around its keys and restores it
+when it ends, even a Send from another process. CapsWord ends between those two
+moments on the driver side, so `{Space}` put the toggle back on 15 ms after
+CapsWord had turned it off and the next word came out in capitals: a false
+failure, the driver had done its work (a probe saw `CapsWordEnabled` 0, `SC039`
+as the hotkey, U+0009 in OnChar). Named keys of a CapsLock check are therefore
+`{Blind}{SC039}`, the form a physical key takes. `{Text}` is a packet and is safe.
+
 ### project-live-checks-quiet-logs-do-not-prove-an-idle-driver
 
 A scope restore or clear spends seconds inside native menu code without logging
@@ -47,6 +57,13 @@ A scope restore or clear spends seconds inside native menu code without logging
 while it parses. "Quiet" therefore needs a command the driver answers (its only
 thread is free) and a single live process of the session; counting the log is
 not enough.
+
+### project-live-checks-a-held-write-delays-every-menu-click
+
+`MenuDispatcher` holds a click behind a configuration write for 10 s before it
+runs it, so a Quit clicked under a held lease reports its refusal after 10 s plus
+its own 12 s deadline. A check that waits for only the deadline sees nothing and
+blames the driver. Read the log with `waitForLog` for both.
 
 ### project-live-checks-versions-window-needs-memory
 

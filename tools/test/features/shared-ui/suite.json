@@ -180,7 +180,7 @@
 		},
 		{
 			"id": "js-0353",
-			"ordinal": 368,
+			"ordinal": 365,
 			"name": "app and window switching actions carry one explicit label each and migrate the ids macOS merged",
 			"cmd": "node",
 			"args": ["tools/test/test-app-switch-labels.cjs"],
@@ -188,7 +188,7 @@
 		},
 		{
 			"id": "js-0358",
-			"ordinal": 374,
+			"ordinal": 367,
 			"name": "window title audit mutations",
 			"cmd": "node",
 			"args": ["tools/test/test-gui-title-audit.cjs"],
@@ -196,7 +196,7 @@
 		},
 		{
 			"id": "js-0359",
-			"ordinal": 375,
+			"ordinal": 368,
 			"name": "window titles (Gui/windowTitle carry the \"ErgoptiPlus\" prefix)",
 			"cmd": "node",
 			"args": ["tools/lint/audit-gui-titles.cjs"],
@@ -204,7 +204,7 @@
 		},
 		{
 			"id": "js-0363",
-			"ordinal": 379,
+			"ordinal": 372,
 			"name": "shared UI JavaScript syntax (every browser script parses before WebView injection)",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-ui-js-syntax.cjs"],
@@ -212,7 +212,7 @@
 		},
 		{
 			"id": "js-0373",
-			"ordinal": 389,
+			"ordinal": 381,
 			"name": "Linux document bridge challenges retain intrinsic page nonce and exact lease",
 			"cmd": "node",
 			"args": [
@@ -223,7 +223,7 @@
 		},
 		{
 			"id": "js-0377",
-			"ordinal": 393,
+			"ordinal": 385,
 			"name": "download actions retain their operation session across native reuse",
 			"cmd": "node",
 			"args": ["tools/test/test-download-window-session.cjs"],
@@ -231,7 +231,7 @@
 		},
 		{
 			"id": "js-0381",
-			"ordinal": 397,
+			"ordinal": 389,
 			"name": "onboarding wizard asks one No-first page per scope and emits manifest paths only",
 			"cmd": "node",
 			"args": ["tools/test/test-onboarding-wizard-page.cjs"],
@@ -239,7 +239,7 @@
 		},
 		{
 			"id": "js-0396",
-			"ordinal": 412,
+			"ordinal": 395,
 			"name": "tooltip corpus parity (JSON corpus matches JS layoutTestVectors + dequeueTestVectors)",
 			"cmd": "node",
 			"args": ["tools/test/test-tooltip-corpus-parity.cjs"],
@@ -247,7 +247,7 @@
 		},
 		{
 			"id": "js-0455",
-			"ordinal": 455,
+			"ordinal": 433,
 			"name": "layout composer model composes four layers and a shortcuts layer from registry layouts into one .keylayout the shared vectors read back",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-composer-model.cjs"],
@@ -255,7 +255,7 @@
 		},
 		{
 			"id": "shared-ui-no-platform-branches",
-			"ordinal": 468,
+			"ordinal": 444,
 			"name": "shared pages read host capabilities and never compare a platform or driver name",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-ui-no-platform-branches.cjs"],
@@ -263,7 +263,7 @@
 		},
 		{
 			"id": "js-0473",
-			"ordinal": 470,
+			"ordinal": 445,
 			"name": "tooltip duration decrement and floor have one declaration that every engine and vector uses",
 			"cmd": "node",
 			"args": ["tools/test/test-tooltip-timing-single-source.cjs"],
@@ -271,7 +271,7 @@
 		},
 		{
 			"id": "js-0474",
-			"ordinal": 471,
+			"ordinal": 446,
 			"name": "hex colour census counts literals, not comments, issue numbers or entities",
 			"cmd": "node",
 			"args": ["tools/test/test-hex-colours.cjs"],
@@ -279,7 +279,7 @@
 		},
 		{
 			"id": "shared-ui-theme",
-			"ordinal": 482,
+			"ordinal": 457,
 			"name": "shared pages take their recurring colours from theme.css and link it",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-ui-theme.cjs"],
@@ -287,7 +287,7 @@
 		},
 		{
 			"id": "encryptor-startup-receipt",
-			"ordinal": 510,
+			"ordinal": 480,
 			"name": "Encryptor startup preserves icon helper and process replacement without a fixed temporary log",
 			"cmd": "node",
 			"args": ["tools/test/test-encryptor-launch.cjs"],

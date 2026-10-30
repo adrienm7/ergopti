@@ -9,6 +9,15 @@
 
 #Requires AutoHotkey v2.0
 
+; A native window child binds the one UI delay its host reads, with the value the
+; suite loaded from the shared registry; any other key is refused.
+_WebViewChildTimingBinding(Key) {
+	return "TimingsGet(Section, Key) {`n"
+		. "if Section != " . Chr(34) . "ui" . Chr(34) . " || Key != " . Chr(34) . Key . Chr(34) . "`n"
+		. "throw Error(" . Chr(34) . "This child binds only " . Key . "." . Chr(34) . ")`n"
+		. "return " . TimingsGet("ui", Key) . "`n}`n"
+}
+
 _OWOC_Source(Root) {
 	global _DriverDir
 	Source := _EDOT_Source(Root)
@@ -22,7 +31,8 @@ _OWOC_Source(Root) {
 		AssertTrue(Owner != "", "The wizard child requires its genuine whole owner: " . Symbol)
 		Source .= "#Include " . Owner . "`n"
 	}
-	return Source . "#Include " . _DriverDir . "\ui\onboarding\core.ahk`n"
+	return Source . _WebViewChildTimingBinding("webview_host_safety_flush_ms")
+		. "#Include " . _DriverDir . "\ui\onboarding\core.ahk`n"
 		. "#Include " . _DriverDir . "\ui\onboarding\translate.ahk`n"
 		. "#Include " . _DriverDir . "\ui\onboarding\webview.ahk`n"
 		. "#Include " . _DriverDir . "\tests\fixtures\onboarding_open_generation_body.ahk`n"

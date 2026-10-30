@@ -474,6 +474,8 @@ class LiveSession {
 		await this.stop();
 		for (const name of fs.readdirSync(this.live))
 			fs.rmSync(path.join(this.live, name), { force: true });
+		// The readiness receipt is created exclusively, once per started process tree.
+		fs.rmSync(path.join(this.root, 'ready.json'), { force: true });
 		this.nextId = 1;
 		this.child = null;
 		if (options.startupClicks) this.stageStartupClicks(options.startupClicks);

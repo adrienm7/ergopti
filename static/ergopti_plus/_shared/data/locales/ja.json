@@ -1802,6 +1802,7 @@
 	"menu.llm.debounce_label": "提案前のアイドル時間: %s",
 	"menu.llm.debounce_prompt": "生成前の待機時間（ms単位、例: 600）:",
 	"menu.llm.min_interval_label": "自動AIリクエスト間の最小間隔: %s",
+	"menu.llm.trigger.min_request_interval_ms": "リクエスト間隔",
 	"menu.llm.delete_model_body": "モデル\"%s\"をローカルキャッシュから削除してもよいですか？",
 	"menu.llm.delete_model_cache": "🗑️ このモデルをキャッシュから削除",
 	"menu.llm.delete_model_title": "モデルを削除しますか？",

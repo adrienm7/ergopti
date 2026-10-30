@@ -25,8 +25,13 @@ const { spawnSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = ['windows', 'macos', 'linux'];
 const RETIRED = 'macos/ui/menu/menu_llm/live_mode_panel.lua';
-// The tray model list retired with the model selector page (2026-10-27).
-const RETIRED_SOURCES = new Set([RETIRED, 'macos/ui/menu/menu_llm/models_selector.lua']);
+// The tray model list retired with the model selector page (2026-10-27), the
+// Windows chord switches with schema v19.
+const RETIRED_SOURCES = new Set([
+	RETIRED,
+	'macos/ui/menu/menu_llm/models_selector.lua',
+	'windows/modules/shortcuts/ctrl.ahk'
+]);
 const TOOL = 'tools/test/test-native-menu-rows.cjs';
 const CORPUS = 'tools/test/fixtures/native-menu-census-legacy.json';
 const BASELINE = 'tools/test/native-menu-rows-baseline.json';
