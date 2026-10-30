@@ -11,8 +11,8 @@
 #Requires AutoHotkey v2.0
 
 _PPCCSO_PlainPasteRestoreOwnsSequence() {
-    Shortcut := _DriverFuncBody("PasteWithoutFormatting")
-    ShortcutRestore := _DriverFuncBody("_PasteWithoutFormattingRestore")
+    Shortcut := _DriverFuncBody("GesturePastePlain")
+    ShortcutRestore := _DriverFuncBody("_GesturePastePlainRestore")
     Gesture := _DriverFuncBody("GesturePastePlain")
     GestureRestore := _DriverFuncBody("_GesturePastePlainRestore")
 

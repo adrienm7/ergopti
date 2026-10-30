@@ -4,7 +4,7 @@
 //
 // Checks enforced:
 //   1. File header   — first non-empty line must be a comment containing a relative path
-//   2. No Co-Authored-By — recent commits must not contain Co-Authored-By trailers
+//   2. No Co-Authored-By — recent commits must not contain Co-Authored-By or Claude-Session trailers
 //   3. No PascalCase TOML keys — keys in config/**/*.toml must start with lowercase
 //   4. Section spacing — major sections need 5 blank lines before, minor 3
 //   5. Banner alignment — = counts must match title line length exactly
@@ -142,9 +142,9 @@ function checkNoCoAuthor() {
 
 	const lines = log.split('\n');
 	lines.forEach((line, i) => {
-		if (/co-authored-by/i.test(line)) {
+		if (/^\s*(?:co-authored-by|claude-session):/i.test(line)) {
 			console.warn(
-				`  WARN  git-log:${i + 1}  Co-Authored-By trailer found in recent commit: ${line.trim()}`
+				`  WARN  git-log:${i + 1}  Tool attribution trailer found in recent commit: ${line.trim()}`
 			);
 			totalViolations++;
 		}

@@ -41,7 +41,7 @@ _FMS_RootAndSectionRows(Path) {
 	Cache := ParseConfigTomlFile(Path)
 	AssertEqual("@", IniCacheGet(Cache, "hotstrings", "trigger_char"))
 	AssertEqual(true, IniCacheGet(Cache, "category_enabled", "hotstrings"))
-	AssertEqual("none", IniCacheGet(Cache, "shortcuts.keyboard", "win_space"))
+	AssertEqual("none", IniCacheGet(Cache, "shortcuts.keyboard", "meta_space"))
 	Target := ManifestBuildFeaturesMap()
 	Target["hotstrings"]["autocorrection"]["names"]["enabled"] := false
 	Assert(ApplyConfigToml(Target, Path) >= 1, "at least the actual known dotted feature must apply")
@@ -49,9 +49,9 @@ _FMS_RootAndSectionRows(Path) {
 	AssertEqual(false, TOML_UnreadableFile(Path))
 }
 _FMS_RootSettingsAndDottedFeatureApply() {
-	Source := 'hotstrings.trigger_char = "@"`ncategory_enabled.hotstrings = true`nshortcuts.keyboard.win_space = "none"`nhotstrings.autocorrection.names.enabled = true`n'
+	Source := 'hotstrings.trigger_char = "@"`ncategory_enabled.hotstrings = true`nshortcuts.keyboard.meta_space = "none"`nhotstrings.autocorrection.names.enabled = true`n'
 	_FMS_WithSource("root", Source, _FMS_RootAndSectionRows)
-	Source := '[hotstrings]`ntrigger_char = "@"`nautocorrection.names.enabled = true`n[category_enabled]`nhotstrings = true`n[shortcuts]`nkeyboard.win_space = "none"`n'
+	Source := '[hotstrings]`ntrigger_char = "@"`nautocorrection.names.enabled = true`n[category_enabled]`nhotstrings = true`n[shortcuts]`nkeyboard.meta_space = "none"`n'
 	_FMS_WithSource("section", Source, _FMS_RootAndSectionRows)
 }
 Test("configuration snapshot: root and dotted settings reach cache and features (config-semantic-snapshot)",
@@ -109,11 +109,11 @@ _FMS_LegacyBooleans(Path) {
 	AssertEqual(0, Rejected)
 	AssertEqual(2, Migrated, "bare zero/one preserve the installed legacy Boolean contract")
 	AssertEqual(2, Outdated.Count, "quoted and out-of-range values remain obsolete")
-	AssertTrue(Target["shortcuts"]["screen"])
+	AssertTrue(Target["layout"]["number_row_reorder_edges"])
 	AssertFalse(Target["layout"]["ergopti_base"])
 }
 _FMS_LegacyBooleanCompatibility() {
-	_FMS_WithSource("legacy", 'shortcuts.screen = 1`nlayout.ergopti_base = 0`nshortcuts.microsoft_bold = "true"`nshortcuts.title_case = 2`n',
+	_FMS_WithSource("legacy", 'layout.number_row_reorder_edges = 1`nlayout.ergopti_base = 0`nlayout.ctrl_magic_save = "true"`nlayout.ergopti_alt_gr = 2`n',
 		_FMS_LegacyBooleans)
 }
 Test("configuration snapshot: legacy Boolean intent and outdated values stay governed (config-semantic-snapshot)",
@@ -213,17 +213,17 @@ Test("configuration snapshot: unknown scalars survive and writer admission stays
 _FMS_RepeatedFeatureValuesAreDetached(Path) {
 	ParseConfigTomlFile(Path)
 	Target := ManifestBuildFeaturesMap()
-	AssertEqual(1, ApplyConfigToml(Target, Path))
-	Target["shortcuts"]["take_note"]["enabled"] := false
-	Target["shortcuts"]["take_note"]["destination_folder"] := "changed by the first consumer"
+	AssertEqual(2, ApplyConfigToml(Target, Path))
+	Target["shortcuts"]["a_grave"]["enabled"] := false
+	Target["shortcuts"]["a_grave"]["letter"] := "changed by the first consumer"
 	Second := ManifestBuildFeaturesMap()
-	AssertEqual(1, ApplyConfigToml(Second, Path))
-	AssertTrue(Second["shortcuts"]["take_note"]["enabled"])
-	AssertEqual("owned", Second["shortcuts"]["take_note"]["destination_folder"],
+	AssertEqual(2, ApplyConfigToml(Second, Path))
+	AssertTrue(Second["shortcuts"]["a_grave"]["enabled"])
+	AssertEqual("owned", Second["shortcuts"]["a_grave"]["letter"],
 		"a feature consumer cannot rewrite the retained admitted source row")
 }
 _FMS_RepeatedFeatureReadUsesOriginalSource() {
-	_FMS_WithSource("detached", '[shortcuts]`ntake_note = { enabled = true, dated_notes = false, destination_folder = "owned" }`n',
+	_FMS_WithSource("detached", '[shortcuts]`na_grave = { enabled = true, letter = "owned" }`n',
 		_FMS_RepeatedFeatureValuesAreDetached)
 }
 Test("configuration snapshot: repeated feature reads detach their retained source values (config-semantic-snapshot)",
@@ -353,13 +353,13 @@ _FMS_FullSavePreservesOutdatedAndUnknown(Path) {
 		Cache := ParseConfigTomlFile(Path)
 		ApplyBootConfigToml(Target, Path)
 		AssertEqual("@", IniCacheGet(Cache, "hotstrings", "trigger_char"))
-		AssertTrue(_ConfigBootOutdatedEntries.Has("shortcuts`nscreen"))
+		AssertTrue(_ConfigBootOutdatedEntries.Has("layout`nnumber_row_reorder_edges"))
 		AssertEqual(0, _ConfigBootRejectedOverrides)
 		Collect() {
 			Observed.collector_entered := 1
 			Updates := [
 				{ Section: "hotstrings", Key: "trigger_char", Value: IniCacheGet(Cache, "hotstrings", "trigger_char") },
-				{ Section: "shortcuts", Key: "screen", Value: Target["shortcuts"]["screen"] }]
+				{ Section: "layout", Key: "number_row_reorder_edges", Value: Target["layout"]["number_row_reorder_edges"] }]
 			Observed.collector_completed := 1
 			return Updates
 		}
@@ -400,7 +400,7 @@ _FMS_FullSavePreservesOutdatedAndUnknown(Path) {
 	}
 }
 _FMS_FullSaveUsesSemanticReadWithoutCleanup() {
-	_FMS_WithSource("fullsave", '_meta.schema_version = 17`nhotstrings.trigger_char = "@"`n[shortcuts]`nscreen = 2 # outdated, retained`n[future]`nold = "retain" # user data`n',
+	_FMS_WithSource("fullsave", '_meta.schema_version = 19`nhotstrings.trigger_char = "@"`n[layout]`nnumber_row_reorder_edges = 2 # outdated, retained`n[future]`nold = "retain" # user data`n',
 		_FMS_FullSavePreservesOutdatedAndUnknown)
 }
 Test("configuration snapshot: actual full save retains outdated and unknown scalar records (config-semantic-snapshot)",

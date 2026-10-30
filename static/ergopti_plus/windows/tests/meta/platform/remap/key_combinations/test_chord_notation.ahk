@@ -209,14 +209,14 @@ _ChordNative_RunAll() {
 
 	_ChordNative_SlotChords() {
 		; The slot ids are our own vocabulary; this is where they meet the notation
-		AssertEqual(_KeyboardSlotChord("ctrl_shift_v"), "Ctrl+Shift+V", "ctrl_shift_v")
-		AssertEqual(_KeyboardSlotChord("ctrl_b"), "Ctrl+B", "ctrl_b")
-		AssertEqual(_KeyboardSlotChord("win_e"), "Cmd+E", "win_e maps onto the canonical cmd modifier")
+		AssertEqual(_KeyboardSlotChord("primary_shift_v"), "Ctrl+Shift+V", "primary_shift_v")
+		AssertEqual(_KeyboardSlotChord("primary_b"), "Ctrl+B", "primary_b")
+		AssertEqual(_KeyboardSlotChord("meta_e"), "Cmd+E", "meta_e maps onto the canonical cmd modifier")
 		AssertEqual(_KeyboardSlotChord("alt_space"), "Alt+Space", "alt_space")
-		AssertEqual(_KeyboardSlotChord("win_period"), "Cmd+.", "win_period names a character, not a word")
-		AssertEqual(_KeyboardSlotChord("win_comma"), "Cmd+,", "win_comma names a character, not a word")
-		AssertEqual(_KeyboardSlotChord("win_enter"), "Cmd+Return", "win_enter names the Return key")
-		AssertEqual(_KeyboardSlotChord("win_sc029"), "Cmd+Sc029", "win_sc029 keeps the scan code as the key")
+		AssertEqual(_KeyboardSlotChord("meta_period"), "Cmd+.", "meta_period names a character, not a word")
+		AssertEqual(_KeyboardSlotChord("meta_comma"), "Cmd+,", "meta_comma names a character, not a word")
+		AssertEqual(_KeyboardSlotChord("meta_enter"), "Cmd+Return", "meta_enter names the Return key")
+		AssertEqual(_KeyboardSlotChord("meta_sc029"), "Cmd+Sc029", "meta_sc029 keeps the scan code as the key")
 		AssertEqual(_KeyboardSlotChord("nomodifier_x"), "",
 			"a slot with no recognised modifier must be refused — binding its bare "
 			. "suffix would steal a plain letter from every application")
@@ -227,7 +227,7 @@ _ChordNative_RunAll() {
 		; The end-to-end path the boot loop actually walks: slot id → chord → spec.
 		; Pinned against the specs the driver emitted before the notation existed,
 		; so adopting it cannot silently rebind a user's shortcut
-		Cases := Map("ctrl_shift_v", "^+v", "ctrl_b", "^b", "win_x", "#x", "alt_1", "!1", "win_sc029", "#SC029")
+		Cases := Map("primary_shift_v", "^+v", "primary_b", "^b", "meta_x", "#x", "alt_1", "!1", "meta_sc029", "#SC029")
 		for Slot, ExpectedSpec in Cases {
 			Chord := _KeyboardSlotChord(Slot)
 			Parsed := ChordParse(Chord)

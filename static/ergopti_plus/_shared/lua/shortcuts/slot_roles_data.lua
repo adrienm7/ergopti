@@ -33,6 +33,9 @@ return {
 		{ driver = "linux", prefix = "alt_shift_", roles = { "alt", "shift" } },
 	},
 	extra_keys = {
+		{ driver = "windows", id = "quote", label = "'", chord_key = "'" },
+		{ driver = "windows", id = "capslock", label = "Caps Lock", chord_key = "sc03a" },
+		{ driver = "windows", id = "sc029", label = "²", chord_key = "sc029" },
 		{ driver = "macos", id = "quote", label = "'", chord_key = "'" },
 		{ driver = "macos", id = "capslock", label = "Caps Lock", chord_key = "capslock" },
 	},

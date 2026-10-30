@@ -8,6 +8,8 @@
 ; Only the user-settings reader is substituted; no transport method is replaced.
 ; ==============================================================================
 
+#Include ../../../fixtures/host_capability_gate.ahk
+
 global _ManagedRemoteFixtureCleanupDebt := Map()
 global _ManagedRemoteFixtureCleanupExitRegistered := false
 
@@ -78,6 +80,17 @@ _ManagedRemoteFixtureSelectRootScope(Scope, Actions, Runner) {
 	if StrCompare(Actions, "true", true) != 0 || StrCompare(Runner, "github-hosted", true) != 0
 		throw Error("Machine root-store scope requires the explicit hosted ephemeral CI context.")
 	return "LocalMachine"
+}
+
+; Windows answers every add to CurrentUser\Root with a security warning, and
+; X509Store.Add blocks behind it until someone clicks. Nobody can on an unattended
+; run: the wait would only expire as a trust budget, whatever the machine's load.
+; The hosted lanes run in the elevated LocalMachine scope, which asks nothing.
+_ManagedRemoteFixtureRootAdmissionProbe(Scope, Interactive) {
+	return Map("state", StrCompare(Scope, "CurrentUser", true) == 0 && !Interactive ? "absent" : "present",
+		"name", "unattended root admission",
+		"why", "Windows shows a security warning that needs a click before it adds a CurrentUser root; "
+			. "rerun with --interactive to click it, the hosted CI lanes execute this case in LocalMachine scope")
 }
 
 _ManagedRemoteFixtureTokenOpen() {
@@ -384,6 +397,9 @@ class _ManagedRemoteFixtureOwner {
 	}
 
 	ChangeTrust(Installed) {
+		global _AHK_INTERACTIVE
+		if Installed
+			TestRequireHostCapability(_ManagedRemoteFixtureRootAdmissionProbe.Bind(this.RootStoreScope, _AHK_INTERACTIVE))
 		Sequence := this.State["sequence"]
 		this.Signal(Installed ? "InstallRoot" : "RemoveRoot")
 		this.WaitState("ready", Installed ? "trusted" : "removed", 10000, Sequence,
@@ -727,7 +743,8 @@ _ManagedRemoteFixtureFinalize(Fixture, BodyFailed, PrimaryFailure, CleanupFn, Pr
 			; Retain reporting refusal locally; retrying the same sink would mask priority.
 			Fixture.CleanupFailureCheckpointStatus := "unavailable"
 		}
-		if BodyFailed
+		; A case that did not run has no finding to protect: its refused cleanup stays red.
+		if BodyFailed && !(PrimaryFailure is TestNotExecutedSignal)
 			throw PrimaryFailure
 		throw CleanupFailure
 	}

@@ -1,0 +1,25 @@
+# _shared/tests/corpus/config_migrations/shipped_keyboard_slots_neutral_on_windows/expected.toml
+
+[_meta]
+schema_version = 19
+
+[action_parameters]
+keyboard__alt_x__open_url = "https://example.org/alt"
+keyboard__primary_b__open_url = "https://example.org/b"
+keyboard__primary_shift_v__send_text = "plain"
+keyboard__meta_a__open_url = "https://example.org/a"
+tap_key__a__open_url = "https://example.org/tap"
+
+[shortcuts.keyboard]
+alt_x = "open_url"
+ctrl_f1 = "copy"
+magic_editor = "none"
+meta_SC03A = "toggle_capslock"
+meta_a = "open_url"
+meta_capslock = "toggle_capslock"
+meta_quote = "spotlight_mouse"
+meta_sc029 = "pick_color"
+meta_sc030 = "take_note"
+meta_space = "copy"
+primary_b = "open_url"
+primary_shift_v = "send_text"

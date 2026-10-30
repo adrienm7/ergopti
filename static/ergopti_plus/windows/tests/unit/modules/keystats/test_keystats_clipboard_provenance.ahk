@@ -183,7 +183,7 @@ _KCP_EveryDeferredPastePairsOwnership() {
 	Pairs := [
 		["_TextSenderStartClipboard", "_TextSenderFinishClipboard"],
 		["SendInstant", "_SendInstant_RestoreClipboard"],
-		["PasteWithoutFormatting", "_PasteWithoutFormattingRestore"],
+		["GesturePastePlain", "_GesturePastePlainRestore"],
 		["GesturePastePlain", "_GesturePastePlainRestore"],
 		["GetSelectionAsync", "_SelectionCaptureFinish"],
 		["GestureScreenshotRegion", "GestureRegionCaptureFinish"]

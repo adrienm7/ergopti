@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "Закрити інтерфейс після додавання хотстрингу через скорочення",
 	"menu.hotstrings.config_item": "⚙️ Налаштувати затримки та кольори…",
 	"menu.hotstrings.consumed": "поглинутий",
+	"menu.hotstrings.consumed_delimiters": "Поглинаються під час розгортання",
 	"menu.hotstrings.consumed_suffix": "(поглинутий)",
 	"menu.hotstrings.custom_label": "Власний",
 	"menu.hotstrings.default_category_prefix": "Категорія за замовчуванням: ",

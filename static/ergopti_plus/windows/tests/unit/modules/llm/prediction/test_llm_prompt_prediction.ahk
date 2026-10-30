@@ -235,7 +235,7 @@ _LPP_RewriteEndToEnd() {
 	_LPP_Run(_LPP_Menu(), LPP_BUFFER, _Body)
 	_Body(Calls, Lines) {
 		global GestureActionParameters, _LLM_Menu, _LLM_Engine, _LLM_Bridge_Buffer, LPP_SENTENCE
-		Binding := "keyboard__ctrl_shift_r"
+		Binding := "keyboard__primary_shift_r"
 		GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := "rewrite|2"
 		AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding),
 			"the bound action must request a prediction")
@@ -670,7 +670,7 @@ _LPP_PublicPredictionAdmission(ProfileId, Boundary, Cancel) {
 			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
 			if Boundary != "before_launch"
 				Gate.DefineProp("Call", {Call: ObserveGate})
-			Binding := "keyboard__ctrl_shift_r"
+			Binding := "keyboard__primary_shift_r"
 			GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := ProfileId . "|2"
 			AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding))
 			AssertTrue(Seen, "the actual public prediction must reach its selected request boundary")
@@ -756,7 +756,7 @@ _LPP_VariantStopAdmission(ProfileId, Boundary, Cancel) {
 			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
 			if Boundary != "before_launch"
 				Gate.DefineProp("Call", {Call: ObserveGate})
-			Binding := "keyboard__ctrl_shift_r"
+			Binding := "keyboard__primary_shift_r"
 			GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := ProfileId . "|2"
 			AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding))
 			AssertTrue(Seen, "the first actual variant must reach its selected admission boundary")
@@ -963,7 +963,7 @@ _LPP_DefaultPredictionCustody(Boundary, Mode) {
 			}
 		}
 		Invoke(Profile) {
-			Binding := "keyboard__ctrl_shift_r"
+			Binding := "keyboard__primary_shift_r"
 			GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := Profile . "|1"
 			AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding), "the actual public gesture must admit the request")
 		}
@@ -1240,7 +1240,7 @@ _LPP_LocalQueuedCustody(Boundary, Mode, CompletedRetry := false, WithdrawComplet
 	}
 	Invoke(Profile) {
 		global GestureActionParameters
-		Binding := "keyboard__ctrl_shift_r"
+		Binding := "keyboard__primary_shift_r"
 		GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := Profile . "|1"
 		AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding), "the genuine public local action must be admitted")
 	}

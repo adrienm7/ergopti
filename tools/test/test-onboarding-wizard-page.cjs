@@ -600,7 +600,7 @@ function cataloguePaths(driver) {
 		'Yes pre-checks every recommendation'
 	);
 	// A slot row names the chord and the action it imports.
-	const slot = items.find((item) => item.path === 'shortcuts.keyboard.win_a');
+	const slot = items.find((item) => item.path === 'shortcuts.keyboard.meta_a');
 	assert.ok(slot, 'Win + A is a recommended keyboard slot');
 	const slotRow = rows[items.indexOf(slot)];
 	assert.equal(slotRow.trigger, 'Win + A');

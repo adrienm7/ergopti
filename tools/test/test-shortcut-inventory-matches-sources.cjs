@@ -7,14 +7,13 @@
  * `docs/audits/2026-10-27-shortcut-inventory.json` lists every shortcut config
  * entry of the three drivers (PAR-41 step 1). Later steps of the one-shortcut
  * model consume it, so it must not rot: this gate re-derives each fact from the
- * code that owns it (the features manifest, the AutoHotkey `AddShortcut` calls,
- * the macOS hotkey registry, the slot prefix tables) and fails on any drift.
+ * code that owns it (the features manifest, the macOS hotkey registry, the slot prefix tables) and fails on any drift.
  *
  * FEATURES & RATIONALE:
  * 1. Entry sets: the inventory names exactly the manifest's legacy booleans,
  *    keyboard slots and personal toggles of each driver.
- * 2. Chords: every boolean's chord is the one its handler registers, read from
- *    the AutoHotkey and Lua sources (read-only).
+ * 2. Chords: every macOS boolean's chord is the one its handler registers, read
+ *    from the Lua sources (read-only). Windows has no chord switch left.
  * 3. Actions: every action id exists in actions.toml.
  * 4. Slot families: the prefixes match each driver's slot prefix table.
  * ==============================================================================
@@ -129,30 +128,7 @@ assert.deepStrictEqual(
 // ====================================
 // ====================================
 
-const AHK_MODIFIERS = { '#': 'win', '^': 'ctrl', '+': 'shift', '!': 'alt' };
-const AHK_KEYS = { "'": 'quote' };
-const winSource = read(DRIVERS, 'windows', 'modules', 'shortcuts', 'win.ahk');
-const ctrlSource = read(DRIVERS, 'windows', 'modules', 'shortcuts', 'ctrl.ahk');
 const bindings = read(DRIVERS, 'macos', 'modules', 'shortcuts', 'bindings.lua');
-
-/** The chord a Windows boolean registers: the first AddShortcut after its gate. */
-function windowsChord(id) {
-	for (const source of [winSource, ctrlSource]) {
-		const gate = source.indexOf(`if Features["shortcuts"]["${id}"]`);
-		if (gate === -1) continue;
-		const call = source.slice(gate).match(/AddShortcut\(\s*"([#^+!]+)",\s*"(.)"/);
-		assert(call, `no AddShortcut after the ${id} gate`);
-		return {
-			modifiers: [...call[1]].map((c) => AHK_MODIFIERS[c]).sort(),
-			key: AHK_KEYS[call[2]] || call[2]
-		};
-	}
-	if (id === 'win_caps_lock') {
-		assert(/#SC03A::/.test(winSource), 'Win+CapsLock hotkey is gone');
-		return { modifiers: ['win'], key: 'capslock' };
-	}
-	return null;
-}
 
 /** The chord a macOS boolean binds, from its hotkey_defs factory. */
 function macosChord(id) {
@@ -178,7 +154,7 @@ for (const row of inventory.rows) {
 	}
 	if (row.kind === 'legacy_boolean') {
 		const id = row.config_key.split('.').pop();
-		const actual = row.driver === 'windows' ? windowsChord(id) : macosChord(id);
+		const actual = macosChord(id);
 		assert.deepStrictEqual(
 			actual,
 			{ modifiers: [...row.chord.modifiers].sort(), key: row.chord.key },
@@ -210,6 +186,8 @@ const families = (driver) =>
 		.map((f) => f.prefix)
 		.sort();
 
+const roleFamilies = JSON.parse(read(SHARED, 'modules', 'actions', 'slot_roles.json')).families;
+const prefixesOf = (driver) => roleFamilies[driver].map((roles) => roles.join('_') + '_').sort();
 const windowsGroups = [
 	...read(DRIVERS, 'windows', 'infra', 'config_io.ahk')
 		.match(/global KEYBOARD_SLOT_GROUPS := \[([\s\S]*?)\n\]/)[1]
@@ -219,9 +197,12 @@ const windowsGroups = [
 	.filter((p) => p !== 'magic_')
 	.sort();
 assert.deepStrictEqual(families('windows'), windowsGroups, 'Windows slot prefixes differ');
+assert.deepStrictEqual(
+	families('windows'),
+	prefixesOf('windows'),
+	'Windows groups differ from slot_roles.json'
+);
 
-const roleFamilies = JSON.parse(read(SHARED, 'modules', 'actions', 'slot_roles.json')).families;
-const prefixesOf = (driver) => roleFamilies[driver].map((roles) => roles.join('_') + '_').sort();
 assert.deepStrictEqual(families('macos'), prefixesOf('macos'), 'macOS slot prefixes differ');
 assert.deepStrictEqual(families('linux'), prefixesOf('linux'), 'Linux slot prefixes differ');
 

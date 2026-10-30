@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "סגור ממשק לאחר הוספת hotstring דרך קיצור",
 	"menu.hotstrings.config_item": "⚙️ הגדר השהיות וצבעים…",
 	"menu.hotstrings.consumed": "נצרך",
+	"menu.hotstrings.consumed_delimiters": "נצרכים על ידי ההרחבה",
 	"menu.hotstrings.consumed_suffix": "(נצרך)",
 	"menu.hotstrings.custom_label": "מותאם",
 	"menu.hotstrings.default_category_prefix": "קטגוריית ברירת מחדל: ",

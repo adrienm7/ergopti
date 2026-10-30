@@ -119,7 +119,7 @@ MagicEditorRecordOrdinaryHandle(Slot, Handle) {
 	State := MagicEditorState()
 	if State["initialized"]
 		throw Error("Ordinary keyboard registration cannot mutate an initialized Win broker.")
-	if SubStr(Slot, 1, 4) == "win_" && Handle != ""
+	if SubStr(Slot, 1, 5) == "meta_" && Handle != ""
 		State["ordinary_handles"][Slot] := Handle
 }
 
@@ -167,13 +167,13 @@ MagicEditorNormalizeScan(Scan, Keycodes := unset) {
 
 /**
  * Joins a previously supported explicit SC slot without a competing native owner.
- * @param {String} Slot Existing ordinary win_scNNN identity.
+ * @param {String} Slot Existing ordinary meta_scNNN identity.
  * @param {String} Action Validated ordinary action, without inventing assignments.
  * @param {Map} Keycodes Actual physical catalogue, optional fixture root seam.
  * @returns {Boolean} Whether this exact existing slot is physical.
  */
 MagicEditorRecordOrdinaryPhysical(Slot, Action, Keycodes := unset) {
-	if !RegExMatch(Slot, "i)^win_(SC[0-9a-f]{3})$", &Match)
+	if !RegExMatch(Slot, "i)^meta_(SC[0-9a-f]{3})$", &Match)
 		return false
 	State := MagicEditorState(), Scan := MagicEditorNormalizeScan(Match[1]), Known := false
 	Catalogue := IsSet(Keycodes) ? Keycodes : MagicEditorPhysicalCatalogue()
@@ -187,6 +187,22 @@ MagicEditorRecordOrdinaryPhysical(Slot, Action, Keycodes := unset) {
 		throw ValueError("An existing physical Win assignment must name an actual unacquired key.")
 	State["ordinary_physical"][Scan] := Map("slot", Slot, "action", Action)
 	return true
+}
+
+/**
+ * Joins an ordinary Win slot whose letter lives on a key the layout owner decides,
+ * so the slot shares that key's one Win variant with its remap.
+ * @param {String} Scan Canonical physical scan.
+ * @param {String} Slot The ordinary slot.
+ * @param {String} Action Its validated action.
+ * @param {Map} Keycodes Actual physical catalogue, optional fixture root seam.
+ */
+MagicEditorRecordOrdinaryScan(Scan, Slot, Action, Keycodes := unset) {
+	State := MagicEditorState()
+	if State["initialized"]
+		throw Error("An ordinary Win slot requires an unstarted broker.")
+	Canonical := MagicEditorNormalizeScan(Scan, IsSet(Keycodes) ? Keycodes : MagicEditorPhysicalCatalogue())
+	State["ordinary_physical"][Canonical] := Map("slot", Slot, "action", Action)
 }
 
 /** Retains an effective legacy feature's Win callback without a parallel variant. */
@@ -292,7 +308,7 @@ _MagicEditorExplicitClaim(Source, Hkl) {
 	SourceVk := KS_ScancodeToVk(Source["native_code"], Hkl)
 	Selected := 0, Slots := []
 	for Slot in _IniCache["shortcuts.keyboard"] {
-		if SubStr(Slot, 1, 4) != "win_" || !KeyboardShortcutAssignments.Has(Slot)
+		if SubStr(Slot, 1, 5) != "meta_" || !KeyboardShortcutAssignments.Has(Slot)
 			continue
 		Chord := ChordParse(_KeyboardSlotChord(Slot))
 		if !Chord["ok"]

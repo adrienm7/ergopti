@@ -156,11 +156,11 @@ _RPA_WithFixture(Body) {
 		. ',"arguments":[' . JsonStringLiteral(Script) . ',' . JsonStringLiteral(Output)
 		. ',"","two words","日本語","line\nnext"]}'
 	GestureAssignments := Map("tap_3", "run_program")
-	KeyboardShortcutAssignments := Map("ctrl_p", "run_program")
-	GestureActionParameters := Map("gesture__tap_3__run_program", Scalar, "keyboard__ctrl_p__run_program", Scalar)
-	FileAppend('[gestures]`ntap_3 = "run_program"`n[shortcuts.keyboard]`nctrl_p = "run_program"`n'
+	KeyboardShortcutAssignments := Map("primary_p", "run_program")
+	GestureActionParameters := Map("gesture__tap_3__run_program", Scalar, "keyboard__primary_p__run_program", Scalar)
+	FileAppend('[gestures]`ntap_3 = "run_program"`n[shortcuts.keyboard]`nprimary_p = "run_program"`n'
 		. '[action_parameters]`n"gesture__tap_3__run_program" = ' . JsonStringLiteral(Scalar)
-		. '`n"keyboard__ctrl_p__run_program" = ' . JsonStringLiteral(Scalar) . '`n', ConfigurationFile, "UTF-8")
+		. '`n"keyboard__primary_p__run_program" = ' . JsonStringLiteral(Scalar) . '`n', ConfigurationFile, "UTF-8")
 	_UserProgramPaused := false
 	Context := Map("directory", Directory, "script", Script, "output", Output, "scalar", Scalar)
 	try Body.Call(Context)
@@ -194,7 +194,7 @@ _RPA_NativeGestureAndKeyboard(Context) {
 	AssertEqual("0:9:two words3:日本語9:line`nnext", FSReadUtf8Exact(Context["output"]),
 		"real gesture invocation preserves literal empty/Unicode/newline arguments")
 	FileDelete(Context["output"])
-	GestureInvokeAction("run_program", "keyboard__ctrl_p")
+	GestureInvokeAction("run_program", "keyboard__primary_p")
 	_RPA_WaitSettled()
 	AssertEqual("0:9:two words3:日本語9:line`nnext", FSReadUtf8Exact(Context["output"]),
 		"real keyboard invocation shares the executable/argv owner")
@@ -239,7 +239,7 @@ _RPA_NativeCancellation(Context) {
 	AssertEqual(1, _UserProgramEntries.Count, "exact native program owner is retained")
 	Receipt := ProgramActions_Stop(true)
 	if Receipt != true
-		AssertFalse(ProgramActions_Run("keyboard__ctrl_p"), "unsettled cancelled tree prevents replacement")
+		AssertFalse(ProgramActions_Run("keyboard__primary_p"), "unsettled cancelled tree prevents replacement")
 	_RPA_WaitSettled()
 	AssertEqual(true, ProgramActions_Stop(true), "physical retirement eventually acknowledges")
 	AssertFalse(ProgramActions_Run("gesture__tap_3"), "paused native owner cannot acquire another program")
@@ -485,11 +485,11 @@ _RPA_IndependentLiteralScript(Context) {
 		EncodedArguments .= "]"
 		Scalar := '{"version":1,"executable":' . JsonStringLiteral(Executable)
 			. ',"arguments":' . EncodedArguments . '}'
-		GestureActionParameters := Map("gesture__tap_3__run_program", Scalar, "keyboard__ctrl_p__run_program", Scalar)
+		GestureActionParameters := Map("gesture__tap_3__run_program", Scalar, "keyboard__primary_p__run_program", Scalar)
 		FileDelete(ConfigurationFile)
-		FileAppend('[gestures]`ntap_3 = "run_program"`n[shortcuts.keyboard]`nctrl_p = "run_program"`n'
+		FileAppend('[gestures]`ntap_3 = "run_program"`n[shortcuts.keyboard]`nprimary_p = "run_program"`n'
 			. '[action_parameters]`n"gesture__tap_3__run_program" = ' . JsonStringLiteral(Scalar)
-			. '`n"keyboard__ctrl_p__run_program" = ' . JsonStringLiteral(Scalar) . '`n', ConfigurationFile, "UTF-8")
+			. '`n"keyboard__primary_p__run_program" = ' . JsonStringLiteral(Scalar) . '`n', ConfigurationFile, "UTF-8")
 		EnvSet(EnvName, "must-not-expand-private106")
 		AssertEqual(true, ProgramActions_Run(Binding), "the actual Unicode/spaced runtime and script start")
 		Assert(_UserProgramEntries.Has(Binding), "the exact private action owner remains live behind its gate")

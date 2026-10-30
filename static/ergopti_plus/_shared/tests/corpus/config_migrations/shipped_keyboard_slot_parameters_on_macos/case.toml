@@ -5,4 +5,4 @@ description = "Every action parameter of a retired macOS slot follows its slot t
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 14
-to_version = 17
+to_version = 19

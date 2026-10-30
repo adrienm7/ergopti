@@ -13,6 +13,7 @@
 
 #Include config_write_lease.ahk
 #Include config_unused_keys.ahk
+#Include %A_LineFile%\..\slot_roles.ahk
 
 ; Reports one user-visible error for a configuration mutation that did not
 ; reach disk. The TOML writer already logs its low-level failure; this adds the
@@ -2272,35 +2273,22 @@ ScriptShortcutRows() {
 /**
  * Resolves a keyboard-shortcut slot id to a canonical chord string.
  *
- * The slot id is our own vocabulary ("ctrl_shift_v", "win_sc029"); the chord is
- * the cross-driver one. Everything AutoHotkey-specific — that Ctrl is "^", that
- * Space is "{Space}" — now lives in the HotkeyRegistrar adapter, which is the
- * only layer allowed to know it. This function previously emitted a native
- * AutoHotkey spec directly, which is why the macOS driver had to reimplement the
- * same slot grammar from scratch.
- * @param {String} SlotId e.g. "ctrl_shift_v", "win_e", "alt_space".
+ * The slot id is the neutral vocabulary of every driver ("primary_shift_v",
+ * "meta_sc029"); the chord is the cross-driver one. Everything
+ * AutoHotkey-specific — that Ctrl is "^", that Space is "{Space}" — lives in the
+ * HotkeyRegistrar adapter, the only layer allowed to know it.
+ * @param {String} SlotId e.g. "primary_shift_v", "meta_e", "alt_space".
  * @returns {String} The canonical chord, or "" when the slot names no modifier.
  */
 _KeyboardSlotChord(SlotId) {
-		if SubStr(SlotId, 1, 10) = "ctrl_shift"
-				Mods := ["ctrl", "shift"]
-		else if SubStr(SlotId, 1, 4) = "ctrl"
-				Mods := ["ctrl"]
-		else if SubStr(SlotId, 1, 3) = "win"
-				Mods := ["cmd"]
-		else if SubStr(SlotId, 1, 3) = "alt"
-				Mods := ["alt"]
-		else
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("modifiers")
 				return ""
-		if SubStr(SlotId, 1, 10) = "ctrl_shift"
-				Suffix := SubStr(SlotId, 12)
-		else
-				Suffix := SubStr(SlotId, InStr(SlotId, "_") + 1)
-		; Slot-id spellings for keys whose canonical name is a character. The
-		; brace-wrapped AutoHotkey forms that used to live here moved to the adapter
-		static _SlotKeyNames := Map("period", ".", "comma", ",", "enter", "return")
-		Key := _SlotKeyNames.Has(Suffix) ? _SlotKeyNames[Suffix] : Suffix
-		Formatted := ChordFormat(Mods, Key)
+		Mods := []
+		; The chord vocabulary calls the Windows key "cmd" on every driver.
+		for Modifier in Native["modifiers"]
+				Mods.Push(Modifier == "win" ? "cmd" : Modifier)
+		Formatted := ChordFormat(Mods, SlotRoleChordKey(Native["key"]))
 		return Formatted["ok"] ? Formatted["label"] : ""
 }
 
@@ -2318,21 +2306,19 @@ KeyboardSlotDeclaration() {
 
 _KeyboardSlotBuildDeclaration() {
 		Keys := []
-		loop Parse "abcdefghijklmnopqrstuvwxyz0123456789"
-				Keys.Push(A_LoopField)
-		for Special in ["space", "enter", "period", "comma", "sc029"]
-				Keys.Push(Special)
-		return Map("groups", ["alt_", "ctrl_", "ctrl_shift_", "win_"], "keys", Keys)
+		for Entry in SlotRolesData()["keys"]
+				Keys.Push(Entry["id"])
+		return Map("groups", SlotRoleFamilyPrefixes(), "keys", Keys)
 }
 
 /**
- * Resolves a physical Win slot (win_SC03A, any letter case) to its canonical
+ * Resolves a physical Win slot (meta_SC03A, any letter case) to its canonical
  * scan when the shipped physical key registry has that key.
  * @param {String} Slot Persisted slot id.
  * @returns {String} Canonical "SCnnn", or "" when Slot is no physical slot.
  */
 KeyboardSlotPhysicalScan(Slot) {
-		if !(Slot is String) || !RegExMatch(Slot, "i)^win_(SC[0-9a-f]{3})$", &Match)
+		if !(Slot is String) || !RegExMatch(Slot, "i)^meta_(SC[0-9a-f]{3})$", &Match)
 				return ""
 		Scan := StrUpper(Match[1])
 		for Key in MagicEditorPhysicalCatalogue()["keys"] {
@@ -2388,8 +2374,8 @@ KeyboardSlotCatalogueIds() {
 				return 0
 		for Key in MagicEditorPhysicalCatalogue()["keys"] {
 				Scan := StrUpper(Key["ahk"])
-				Slots["win_" . Scan] := true
-				Slots["win_" . StrLower(Scan)] := true
+				Slots["meta_" . Scan] := true
+				Slots["meta_" . StrLower(Scan)] := true
 		}
 		Ids := []
 		for Slot in Slots
@@ -2420,7 +2406,7 @@ ReadKeyboardShortcutsConfig() {
 		;
 		; The slot picker offers every modifier chord in GESTURE_ACTIONS — roughly
 		; 600 of them — while KEYBOARD_SHORTCUT_DEFAULTS holds 15. Iterating only
-		; the defaults meant a slot the user added (say win_b) was written to
+		; the defaults meant a slot the user added (say meta_b) was written to
 		; config.toml by SetKeyboardShortcutAction, and then never read back on the
 		; Reload that same function triggers: absent from KeyboardShortcutAssignments,
 		; so no hotkey is registered and the entry vanishes from the menu too. The
@@ -2435,7 +2421,7 @@ ReadKeyboardShortcutsConfig() {
 		}
 
 		for Slot, _ in SlotsToRead {
-				; A slot this build's owner does not bind (a hand-written ctrl_f1, a
+				; A slot this build's owner does not bind (a hand-written primary_f1, a
 				; case variant, an unknown physical key) is the unused key the boot
 				; loader already warned about: it stays on disk for the cleanup and
 				; must never become a live hotkey.
@@ -2454,6 +2440,88 @@ ReadKeyboardShortcutsConfig() {
 						try LoggerWarn("Shortcuts", "Keyboard slot '{1}' has unknown action '{2}' — falling back to '{3}'.", Slot, Value,
 								KeyboardShortcutAssignments.Has(Slot) ? KeyboardShortcutAssignments[Slot] : "(none)")
 		}
+}
+
+/**
+ * The physical key a slot's letter lives on when the layout owner decides it: a
+ * letter the Ergopti emulation remapped (the slot follows the letter, not the key
+ * the host layout prints on it), and the apostrophe, which a host layout may type
+ * with Shift while the chord means the key alone.
+ * @param {String} SlotId Neutral slot id.
+ * @returns {String} Canonical "SCnnn", or "" when the host layout answers.
+ */
+KeyboardSlotLayoutScan(SlotId) {
+		global RemappedList
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("key")
+				return ""
+		Char := SlotRoleChordKey(Native["key"])
+		if StrLen(Char) != 1 || !(RemappedList.Has(Char) || Char == "'")
+				return ""
+		return MagicEditorNormalizeScan(RetrieveScancode(Char))
+}
+
+/**
+ * The canonical chord a slot binds: its key is the physical one where the layout
+ * owner decides it (KeyboardSlotLayoutScan).
+ * @param {String} SlotId Neutral slot id.
+ * @param {String} Scan The slot's layout scan, "" for none.
+ * @returns {String} The chord, or "" when the slot names no modifier.
+ */
+_KeyboardSlotBoundChord(SlotId, Scan) {
+		Chord := _KeyboardSlotChord(SlotId)
+		if Scan == "" || Chord == ""
+				return Chord
+		Parsed := ChordParse(Chord)
+		Formatted := ChordFormat(Parsed["mods"], StrLower(Scan))
+		return Formatted["ok"] ? Formatted["label"] : ""
+}
+
+/**
+ * Registers every configured slot. A Win slot on a key the layout owner decides
+ * joins the physical broker, which already holds that Win variant for the remap
+ * of the same key; the others take their own hotkey through the registrar, which
+ * reports refusal by returning "".
+ * @returns {Integer} The slots bound.
+ */
+KeyboardShortcutsBindAll() {
+		global KeyboardShortcutAssignments
+		LoggerStart("KeyboardShortcuts", "Registering configurable keyboard hotkeys…")
+		Bound := 0
+		for Slot, Action in KeyboardShortcutAssignments {
+				if Slot == MagicEditorSlot()["id"]
+						continue
+				if MagicEditorRecordOrdinaryPhysical(Slot, Action)
+						continue
+				if Action == "none"
+						continue
+				Scan := KeyboardSlotLayoutScan(Slot)
+				if Scan != "" && SubStr(Slot, 1, 5) == "meta_" {
+						MagicEditorRecordOrdinaryScan(Scan, Slot, Action)
+						Bound++
+						continue
+				}
+				; The broker asks at each press; a native hotkey would swallow the chord
+				; with the Shortcuts category off, and turning it on reloads the driver.
+				if !IsCategoryGated("Shortcuts")
+						continue
+				Chord := _KeyboardSlotBoundChord(Slot, Scan)
+				if Chord == "" {
+						LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — chord not resolvable.", Slot)
+						continue
+				}
+				Handle := HotkeyRegistrarBind(Chord, ((_s) => (*) => RunKeyboardShortcutAction(_s))(Slot))
+				if Handle == "" {
+						LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}' ({2}).", Slot, Chord)
+						continue
+				}
+				LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", Slot, Action)
+				MagicEditorRecordOrdinaryHandle(Slot, Handle)
+				KeyboardShortcutRecordHandle(Slot, Action, Handle)
+				Bound++
+		}
+		LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", Bound)
+		return Bound
 }
 
 RunKeyboardShortcutAction(SlotId) {
@@ -2529,26 +2597,26 @@ _MakeKeyboardShortcutHandler(SlotId, ActionName) {
 _FormatSlotLabel(SlotId) {
 		if SlotId == MagicEditorSlot()["id"]
 				return MagicEditorSlotLabel()
-		static _ModLabels := Map("ctrl_shift_", "Ctrl + Shift + ", "ctrl_", "Ctrl + ", "win_", "Win + ", "alt_", "Alt + ")
-		; Only the two NAMED keys are translatable — ".", "," and "²" are the glyphs
-		; themselves. The map holds i18n KEYS, never labels: a static initialised with
-		; t() would freeze the language at first call, and the menu is rebuilt on a
-		; language switch expecting the new one.
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("modifiers")
+				return SlotId
+		; Only the two NAMED keys are translatable; the others print the catalogue's
+		; own language-neutral label. The map holds i18n KEYS, never labels: a static
+		; initialised with t() would freeze the language at first call, and the menu
+		; is rebuilt on a language switch expecting the new one.
 		static _KeyNameKeys := Map("space", "common.key_space", "enter", "common.key_enter")
-		static _KeyGlyphs := Map("period", ".", "comma", ",", "sc029", "²")
-		for Prefix, ModLabel in _ModLabels {
-				if (SubStr(SlotId, 1, StrLen(Prefix)) = Prefix) {
-						Suffix := SubStr(SlotId, StrLen(Prefix) + 1)
-						if _KeyNameKeys.Has(Suffix)
-								Key := t(_KeyNameKeys[Suffix])
-						else if _KeyGlyphs.Has(Suffix)
-								Key := _KeyGlyphs[Suffix]
-						else
-								Key := StrUpper(Suffix)
-						return ModLabel . Key
-				}
+		Suffix := Native["key"]
+		Key := StrUpper(Suffix)
+		for Entry in SlotRolesData()["keys"] {
+				if Entry["id"] == Suffix
+						Key := Entry["label"]
 		}
-		return SlotId
+		if _KeyNameKeys.Has(Suffix)
+				Key := t(_KeyNameKeys[Suffix])
+		Label := ""
+		for Modifier in Native["modifiers"]
+				Label .= SlotRolesData()["native_labels"][Modifier] . " + "
+		return Label . Key
 }
 
 ; The keyboard-shortcut groups, in display order. The i18n KEYS are stored, never
@@ -2557,9 +2625,9 @@ _FormatSlotLabel(SlotId) {
 global KEYBOARD_SLOT_GROUPS := [
 		Map("prefix", "magic_", "group_key", "menu.shortcuts.group_contextual", "add_key", "menu.shortcuts.add_contextual"),
 		Map("prefix", "alt_", "group_key", "menu.shortcuts.alt_group", "add_key", "menu.shortcuts.alt_add"),
-		Map("prefix", "ctrl_", "group_key", "menu.shortcuts.ctrl_group", "add_key", "menu.shortcuts.ctrl_add"),
-		Map("prefix", "ctrl_shift_", "group_key", "menu.shortcuts.ctrl_shift_group", "add_key", "menu.shortcuts.ctrl_shift_add"),
-		Map("prefix", "win_", "group_key", "menu.shortcuts.win_group", "add_key", "menu.shortcuts.win_add"),
+		Map("prefix", "primary_", "group_key", "menu.shortcuts.ctrl_group", "add_key", "menu.shortcuts.ctrl_add"),
+		Map("prefix", "primary_shift_", "group_key", "menu.shortcuts.ctrl_shift_group", "add_key", "menu.shortcuts.ctrl_shift_add"),
+		Map("prefix", "meta_", "group_key", "menu.shortcuts.win_group", "add_key", "menu.shortcuts.win_add"),
 ]
 
 /**
@@ -2610,7 +2678,7 @@ KeyboardSlotRows() {
 
 /**
  * The keyboard-slot group a slot is listed in: the LONGEST group prefix that
- * matches it, or "ctrl_shift_v" would also belong to the Ctrl group. The tray
+ * matches it, or "primary_shift_v" would also belong to the Ctrl group. The tray
  * and the group's restore and clear ask this one rule.
  * @param {String} Slot Persisted slot id.
  * @returns {String} The group prefix, or "" when no group lists the slot.

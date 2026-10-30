@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "Sluit de interface na het toevoegen van een hotstring via sneltoets",
 	"menu.hotstrings.config_item": "⚙️ Vertragingen en kleuren configureren…",
 	"menu.hotstrings.consumed": "verbruikt",
+	"menu.hotstrings.consumed_delimiters": "Verbruikt door de uitbreiding",
 	"menu.hotstrings.consumed_suffix": "(verbruikt)",
 	"menu.hotstrings.custom_label": "Aangepast",
 	"menu.hotstrings.default_category_prefix": "Standaardcategorie: ",

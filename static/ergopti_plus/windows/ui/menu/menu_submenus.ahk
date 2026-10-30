@@ -244,7 +244,8 @@ _BuildDynamicHotstringsSubmenu(Options := unset) {
 		}
 	}
 	return _HS_CategoryMenu("DynamicHotstrings", "", Rows,
-		(_Targets, Enabled) => ToggleDynamicAllSections(Enabled, Options))
+		(_Targets, Enabled) => _HS_SelectionNotice(GetCategoryTitle("DynamicHotstrings"), Enabled,
+			ToggleDynamicAllSections(Enabled, Options)))
 }
 
 /**

@@ -585,7 +585,7 @@ _PPH_Script(Entry, Mode) {
 	}
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`nOnError(_PPH_Error)`n" . Registry
 	Code .= '_PPH_Error(Err, *) {`nFileAppend(Err.Message, "**")`nExitApp(1)`n}`n'
-	for Name in ["GesturePastePlain", "_GesturePastePlainRestore", "PasteWithoutFormatting", "_PasteWithoutFormattingRestore"]
+	for Name in ["GesturePastePlain", "_GesturePastePlainRestore", "GesturePastePlain", "_GesturePastePlainRestore"]
 		Code .= _DriverFuncBody(Name) . "`n"
 	Code .= 'global SEND_INSTANT_PASTE_DELAY_MS := ' . SEND_INSTANT_PASTE_DELAY_MS . "`n"
 	Code .= 'global S := Map("text", "genuine copy", "rich", true, "seq", 42, "reads", 0, "saves", 0, "writes", 0, "restores", 0, "warnings", 0, "errors", 0, "sent", [], "sent_text", [], "active_at_send", 0, "excel", false, "fail_save", false)`n'
@@ -662,7 +662,7 @@ _PPH_ActualPlainPaste(Entry, Mode) {
 	AssertTrue(Retired, "retain the source until its exact native tree retires")
 }
 
-for Entry in ["GesturePastePlain", "PasteWithoutFormatting"] {
+for Entry in ["GesturePastePlain", "GesturePastePlain"] {
 	for Mode in ["busy-text", "busy-clear", "busy-external", "busy-excel", "text", "non-text", "excel", "snapshot-failure"] {
 		Test("clipboard: actual " . Entry . " respects " . Mode . " (plain-paste-owner-refusal)",
 			_PPH_ActualPlainPaste.Bind(Entry, Mode))

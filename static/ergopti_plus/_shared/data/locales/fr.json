@@ -1527,6 +1527,7 @@
 	"menu.hotstrings.close_on_add": "Fermer l'UI après ajout d'un hotstring par le raccourci",
 	"menu.hotstrings.config_item": "⚙️ Configurer délais et couleurs…",
 	"menu.hotstrings.consumed": "consommé",
+	"menu.hotstrings.consumed_delimiters": "Consommés par l’expansion",
 	"menu.hotstrings.consumed_suffix": "(consommé)",
 	"menu.hotstrings.custom_label": "Personnalisé",
 	"menu.hotstrings.default_category_prefix": "Catégorie par défaut : ",

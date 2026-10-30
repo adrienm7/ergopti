@@ -1527,6 +1527,7 @@
 	"menu.hotstrings.close_on_add": "Close UI after adding a hotstring via shortcut",
 	"menu.hotstrings.config_item": "⚙️ Configure delays and colours…",
 	"menu.hotstrings.consumed": "consumed",
+	"menu.hotstrings.consumed_delimiters": "Consumed by the expansion",
 	"menu.hotstrings.consumed_suffix": "(consumed)",
 	"menu.hotstrings.custom_label": "Custom",
 	"menu.hotstrings.default_category_prefix": "Default category: ",

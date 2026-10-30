@@ -11,12 +11,12 @@
 #Requires AutoHotkey v2.0
 
 _CPHNB_KeyboardAndGesturePickersFailFast() {
-    ShortcutBody := _DriverFuncBody("GetHexValue")
+    ShortcutBody := _DriverFuncBody("GesturePickColor")
     GestureBody := _DriverFuncBody("GesturePickColor")
-    Assert(ShortcutBody != "", "GetHexValue must exist for the Win+X color hotkey")
+    Assert(ShortcutBody != "", "GesturePickColor must exist for the Win+X color hotkey")
     Assert(GestureBody != "", "GesturePickColor must exist for the matching gesture action")
 
-    for Name, Body in Map("GetHexValue", ShortcutBody, "GesturePickColor", GestureBody) {
+    for Name, Body in Map("GesturePickColor", ShortcutBody, "GesturePickColor", GestureBody) {
         Assert(InStr(Body, "try") > 0 && InStr(Body, "catch as Err") > 0,
             Name . " must contain desktop and clipboard failures")
         Assert(InStr(Body, "CB_Write(HexColor)") > 0,

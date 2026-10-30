@@ -454,6 +454,7 @@ class MenuCommand {
 	static LLM_TOGGLE := "llm_toggle"
 	static LLM_TOKEN_STREAMING := "llm_token_streaming"
 	static LLM_TRIGGER_DEBOUNCE := "llm_trigger_debounce"
+	static LLM_TRIGGER_MIN_INTERVAL := "llm_trigger_min_interval"
 	static LLM_URL_BAR_FILTER := "llm_url_bar_filter"
 	static LOG_LEVEL := "log_level"
 	static MAGIC_KEY_CONFIG_LINUX := "magic_key_config_linux"

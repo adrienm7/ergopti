@@ -46,7 +46,7 @@ _FIGB_Writer(Path, Updates) {
 	_FIGB_WrittenUpdates := Updates
 	_FIGB_ObservedDuringWrite := [
 		_FIGB_Target["layout"]["ergopti_base"],
-		_FIGB_Target["shortcuts"]["microsoft_bold"]
+		_FIGB_Target["shortcuts"]["wrap_text_if_selected"]
 	]
 	return 1
 }
@@ -77,7 +77,7 @@ class _FIGB_ObservedEntries {
 _FIGB_Fixture() {
 	return Map(
 		"layout", Map("ergopti_base", false),
-		"shortcuts", Map("microsoft_bold", false)
+		"shortcuts", Map("wrap_text_if_selected", false)
 	)
 }
 
@@ -185,7 +185,7 @@ _FIGB_DurableSuccessPublishesExplicitTargetAfterWrite() {
 		_FIGB_Reset(Target)
 		Entries := [
 			Map("path", "layout.ergopti_base", "value", true),
-			Map("path", "shortcuts.microsoft_bold", "value", true)
+			Map("path", "shortcuts.wrap_text_if_selected", "value", true)
 		]
 		AssertEqual(2, WriteFeatureBatchV2(Target, Entries,
 			_FIGB_Writer, _FIGB_Notify))
@@ -194,7 +194,7 @@ _FIGB_DurableSuccessPublishesExplicitTargetAfterWrite() {
 			"the batch candidate must remain detached during durable I/O")
 		AssertFalse(_FIGB_ObservedDuringWrite[2])
 		AssertTrue(Target["layout"]["ergopti_base"])
-		AssertTrue(Target["shortcuts"]["microsoft_bold"])
+		AssertTrue(Target["shortcuts"]["wrap_text_if_selected"])
 		AssertEqual(0, _FIGB_NotifyCalls)
 	} finally {
 		try ConfigurationFile := OriginalPath
@@ -214,14 +214,14 @@ _FIGB_DurableFailurePublishesNothing() {
 	ConfigurationFile := Fixture.path
 	Entries := [
 		Map("path", "layout.ergopti_base", "value", true),
-		Map("path", "shortcuts.microsoft_bold", "value", true)
+		Map("path", "shortcuts.wrap_text_if_selected", "value", true)
 	]
 	try {
 		AssertEqual(0, WriteFeatureBatchV2(Target, Entries,
 			_FIGB_RefusingWriter, _FIGB_Notify))
 		AssertEqual(1, _FIGB_WriteCalls)
 		AssertFalse(Target["layout"]["ergopti_base"])
-		AssertFalse(Target["shortcuts"]["microsoft_bold"],
+		AssertFalse(Target["shortcuts"]["wrap_text_if_selected"],
 			"a refused durable batch must publish no live leaf")
 	} finally {
 		try ConfigurationFile := OriginalPath

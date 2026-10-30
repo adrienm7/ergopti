@@ -21,8 +21,8 @@ _CMJ_CapturedTransitionRejectsCallerNulSuffix(Side) {
 	HadPath := IsSet(ConfigurationFile)
 	PreviousPath := HadPath ? ConfigurationFile : ""
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
-	Source := '[_meta]`nschema_version = 17`n[layout]`nergopti_base = true`n# genuine original image`n'
-	Candidate := '[_meta]`nschema_version = 17`n[layout]`nergopti_base = false`n# genuine candidate image`n'
+	Source := '[_meta]`nschema_version = 19`n[layout]`nergopti_base = true`n# genuine original image`n'
+	Candidate := '[_meta]`nschema_version = 19`n[layout]`nergopti_base = false`n# genuine candidate image`n'
 	Bundle := false
 	PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
 	try {
@@ -134,8 +134,8 @@ _CMJ_CapturedImageRejectsCallerNulSuffix(Request, Side, WithBom := false) {
 	HadPath := IsSet(ConfigurationFile)
 	PreviousPath := HadPath ? ConfigurationFile : ""
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
-	Source := '[_meta]`nschema_version = 17`n[layout]`nergopti_base = true`n# genuine captured image`n'
-	Candidate := '[_meta]`nschema_version = 17`n[layout]`nergopti_base = false`n# genuine captured candidate`n'
+	Source := '[_meta]`nschema_version = 19`n[layout]`nergopti_base = true`n# genuine captured image`n'
+	Candidate := '[_meta]`nschema_version = 19`n[layout]`nergopti_base = false`n# genuine captured candidate`n'
 	PhysicalSource := WithBom ? Chr(0xFEFF) . Source : Source
 	Bundle := false, PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
 	try {
@@ -306,7 +306,7 @@ Test("config journal: captured ordinary write rejects caller-only FinalCandidate
 ; Physical source bytes remain ASCII; no transition or native publication occurs.
 _CMJ_UpstreamExactCallerNul(Kind) {
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
-	Source := '[_meta]`nschema_version = 17`n[layout]`nergopti_base = true`n'
+	Source := '[_meta]`nschema_version = 19`n[layout]`nergopti_base = true`n'
 	PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
 	try {
 		AssertEqual(17, ConfigMigrateCurrentVersion(), "the independent current image requires the actual v17 registry")

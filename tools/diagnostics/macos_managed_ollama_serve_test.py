@@ -356,9 +356,47 @@ class ProductionServeControls(unittest.TestCase):
         self.assertEqual(self.native_calls, [])
         self.assertFalse((self.target.parent / "ollama-native-sessions").exists())
 
-    def test_user_facing_native_activation_remains_unavailable(self):
-        with self.assertRaisesRegex(self.subject.ServeRefusal, "unavailable"):
-            self.subject.serve(11434, 5, 60, 5)
+    def test_cli_names_the_refusal_the_driver_logs(self):
+        argv = [
+            "managed_ollama_serve.py",
+            "--port",
+            "11435",
+            "--timeout",
+            "5",
+            "--idle-timeout",
+            "60",
+            "--retirement-timeout",
+            "5",
+        ]
+        for raised, expected in (
+            (
+                self.subject.ServeRefusal("unavailable"),
+                r"\AManaged Ollama daemon admission refused: unavailable\.\n\Z",
+            ),
+            (
+                ValueError("/private/secret/path"),
+                r"\AManaged Ollama daemon admission refused: ValueError at "
+                r"macos_managed_ollama_serve_test\.py:\d+ \w+\.\n\Z",
+            ),
+        ):
+            diagnostic = io.StringIO()
+
+            def refuse(*arguments, **options):
+                raise raised
+
+            with (
+                patch.object(self.subject, "serve", side_effect=refuse),
+                patch.object(sys, "stderr", diagnostic),
+                patch.object(sys, "argv", argv),
+            ):
+                self.assertEqual(self.subject.main(), 78)
+            self.assertRegex(diagnostic.getvalue(), expected)
+            self.assertNotIn("secret", diagnostic.getvalue())
+
+    def test_closed_native_activation_refuses_before_acquisition(self):
+        with patch.object(self.subject, "NATIVE_PRODUCTION_QUALIFIED", False):
+            with self.assertRaisesRegex(self.subject.ServeRefusal, "unavailable"):
+                self.subject.serve(11434, 5, 60, 5)
         self.assertEqual(self.native_calls, [])
         self.assertEqual(self.binary.stat().st_nlink, 1)
 
@@ -390,7 +428,10 @@ class ProductionServeControls(unittest.TestCase):
 
     def test_unqualified_lifecycle_acknowledges_only_no_acquisition_refusal(self):
         stream = io.StringIO()
-        with patch.object(sys, "stdout", stream):
+        with (
+            patch.object(self.subject, "NATIVE_PRODUCTION_QUALIFIED", False),
+            patch.object(sys, "stdout", stream),
+        ):
             with self.assertRaisesRegex(self.subject.ServeRefusal, "unavailable"):
                 self.subject.serve(11434, 5, 60, 5, caller_nonce="ab" * 16)
         self.assertEqual(
@@ -766,7 +807,8 @@ if len(sys.argv) > 1 and sys.argv[1] in ('--managed-ollama-listener-probe', '--m
             with self.assertRaises(self.subject.ServeRefusal):
                 self.subject.serve(11434, 5, 60, 5, acquire_readiness=True)
             owner.assert_not_called()
-        self.assertFalse(self.subject.NATIVE_PRODUCTION_QUALIFIED)
+        # The macOS driver starts no other Ollama, so the native owner is open.
+        self.assertTrue(self.subject.NATIVE_PRODUCTION_QUALIFIED)
 
     def test_optional_cli_publishes_ready_only_after_original_socket_session_join(self):
         self.readiness_peer(prepare=False)
@@ -825,7 +867,7 @@ if len(sys.argv) > 1 and sys.argv[1] in ('--managed-ollama-listener-probe', '--m
             patch.object(sys, "argv", argv),
         ):
             self.assertEqual(self.subject.main(), 78)
-        self.assertEqual(error.getvalue(), "Managed Ollama daemon admission refused.\n")
+        self.assertEqual(error.getvalue(), "Managed Ollama daemon admission refused: cancelled.\n")
         self.assertEqual(
             stream.getvalue(),
             "ERGOPTI_MANAGED_DAEMON_V1 " + "ef" * 16 + " ACTIVE\n"
@@ -1087,7 +1129,10 @@ class CallerInputControls(unittest.TestCase):
             ),
         ):
             result = self.subject.main()
-        self.assertEqual(diagnostic.getvalue(), "Managed Ollama daemon admission refused.\n")
+        # The reason is one fixed word the driver logs, never a path or a value.
+        self.assertRegex(
+            diagnostic.getvalue(), r"\AManaged Ollama daemon admission refused: [a-z_]+\.\n\Z"
+        )
         return result
 
     def terminal_ack(self, stream, *, active):

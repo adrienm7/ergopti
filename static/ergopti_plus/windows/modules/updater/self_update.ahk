@@ -628,7 +628,11 @@ Updater_BackgroundTick(Owner := 0, ArmEpoch := 0, *) {
 ; LAST_NOTIFIED_TAG, and on a genuinely new release caches it, rebuilds the tray
 ; menu, and surfaces a TrayTip. Any failure is logged and the loop just waits
 ; for the next interval — a network blip must not silently kill the updater.
-_Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
+; @param CheckOnly {Boolean} The answer comes from the public Atom feed: a release
+;   it names is announced, never cached for the tray's install row.
+; @param FeedFn {Func|Integer} Replaces _Updater_FetchFeedJsonAsync (tests only).
+; @param ShowFn {Func|Integer} Replaces the check-only balloon (tests only).
+_Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0, CheckOnly := false, FeedFn := 0, ShowFn := 0) {
 	; Background work may publish only in the exact pause generation where it
 	; was born. This also closes the register-vs-suspend race in the shared owner.
 	if !_Updater_RequestMayPublish(Request)
@@ -640,6 +644,15 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 	}
 	; Every outcome is INFO: a check runs a few times a day, and "did it check,
 	; and what did it find" is the first question when an update never arrives.
+	if !CheckOnly && _Updater_JsonPayloadIsFailure(Json) {
+		; api.github.com gave no list (blocked, throttled, rate-limited), as on
+		; Linux: a user behind such a proxy would otherwise never hear of a release.
+		try LoggerInfo("Updater", "Background check: the GitHub API gave no list; reading the public Atom feed.")
+		OnFeed := (FeedJson, CompletedRequest, FeedTerminal := 0) => _Updater_HandleBackgroundResult(
+			FeedJson, Current, CompletedRequest, FeedTerminal, true, 0, ShowFn)
+		(IsObject(FeedFn) ? FeedFn : _Updater_FetchFeedJsonAsync).Call(Request.Channel, Request, OnFeed)
+		return
+	}
 	if _Updater_JsonPayloadIsFailure(Json) {
 		try LoggerInfo("Updater", "Background check result: network unreachable.")
 		_Updater_RecordBackgroundCheck(false, Request)
@@ -663,6 +676,10 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 		Latest, Current, Request.Channel, _Updater_InstalledChannel()) {
 		try LoggerInfo("Updater", "Background check result: up to date (current {1}, latest {2}, channel {3}).",
 			Current, Latest, Request.Channel)
+		return
+	}
+	if CheckOnly {
+		_Updater_AnnounceCheckOnlyRelease(Latest, Current, Request, ShowFn)
 		return
 	}
 	Release := {
@@ -700,6 +717,36 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 	} catch as Err {
 		_Updater_ReleaseNotificationReservation(Reservation)
 		try LoggerError("Updater", "Could not surface background update notification: {1}.", Err.Message)
+	}
+}
+
+; Tells once that the public feed names a newer release. The tray's row installs
+; from the cached release, which needs the API's asset list and digests, so
+; nothing is cached and the balloon stays unclaimed: its click offers nothing the
+; blocked API could not honour. Its text says why it cannot be installed yet.
+_Updater_AnnounceCheckOnlyRelease(Latest, Current, Request, ShowFn := 0) {
+	Reservation := _Updater_TryReserveReleaseNotification(Request, Latest)
+	if !IsObject(Reservation) {
+		try LoggerInfo("Updater", "Background check result: {1} available, already notified.", Latest)
+		return
+	}
+	try LoggerInfo("Updater", "New release available (public feed, check only): {1} (current: {2}).", Latest, Current)
+	if !_Updater_RequestMayPublish(Request) {
+		_Updater_ReleaseNotificationReservation(Reservation)
+		return
+	}
+	try {
+		_Updater_ReleaseBalloon()
+		Text := Format(t("updater.tray_new_version_body"), Latest) . " " . t("update_check.check_only")
+		if IsObject(ShowFn)
+			ShowFn.Call(Text)
+		else
+			TrayTip(Text, t("updater.tray_new_version_title"))
+		if _Updater_CommitReleaseNotification(Reservation, Request)
+			_Updater_RecordNotifiedTag(Latest)
+	} catch as Err {
+		_Updater_ReleaseNotificationReservation(Reservation)
+		try LoggerError("Updater", "Could not surface the check-only update notification: {1}.", Err.Message)
 	}
 }
 

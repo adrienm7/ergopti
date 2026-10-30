@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "UI nach Hinzufügen eines Hotstrings per Tastenkürzel schließen",
 	"menu.hotstrings.config_item": "⚙️ Verzögerungen und Farben konfigurieren…",
 	"menu.hotstrings.consumed": "verbraucht",
+	"menu.hotstrings.consumed_delimiters": "Von der Erweiterung verbraucht",
 	"menu.hotstrings.consumed_suffix": "(verbraucht)",
 	"menu.hotstrings.custom_label": "Benutzerdefiniert",
 	"menu.hotstrings.default_category_prefix": "Standardkategorie: ",

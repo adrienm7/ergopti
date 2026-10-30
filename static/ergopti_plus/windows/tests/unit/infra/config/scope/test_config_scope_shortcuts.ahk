@@ -10,7 +10,7 @@ _ScopeShortcutsCase(Mode, FromManifest := false) {
 	OldFeatures := IsSet(Features) ? Features : unset, OldKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset, OldCache := IsSet(_IniCache) ? _IniCache : unset
 	OldDefaults := IsSet(KEYBOARD_SHORTCUT_DEFAULTS) ? KEYBOARD_SHORTCUT_DEFAULTS : unset
 	OldParameters := IsSet(GestureActionParameters) ? GestureActionParameters : unset
-	Source := '[shortcuts.personal]`n"custom tool" = true`nunknown_user = true`n[shortcuts.keyboard]`nwin_b = "open_url"`nwin_cc = "open_url"`n[category_enabled]`nshortcuts = true`n[llm]`nenabled = true`n[action_parameters]`nkeyboard__win_b__open_url = "https://keyboard.test"`nscript__pause__open_url = "https://script.test"`ntap_key__grave__open_url = "https://tap.test"`ngesture__tap_4__open_url = "https://gesture.test"`ntap_hold__space__open_url = "https://hold.test"`nunknown_user = "keep"`n'
+	Source := '[shortcuts.personal]`n"custom tool" = true`nunknown_user = true`n[shortcuts.keyboard]`nmeta_b = "open_url"`nmeta_cc = "open_url"`n[category_enabled]`nshortcuts = true`n[llm]`nenabled = true`n[action_parameters]`nkeyboard__meta_b__open_url = "https://keyboard.test"`nscript__pause__open_url = "https://script.test"`ntap_key__grave__open_url = "https://tap.test"`ngesture__tap_4__open_url = "https://gesture.test"`ntap_hold__space__open_url = "https://hold.test"`nunknown_user = "keep"`n'
 	Fixture := _ScopeOwnerFixture(Source)
 	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
@@ -27,10 +27,10 @@ _ScopeShortcutsCase(Mode, FromManifest := false) {
 		RegisterPersonalFeature("custom tool", false, "scope fixture")
 		_IniCache := TOML_ParseFreshFile(Fixture.path)
 		KeyboardShortcutAssignments := Map()
-		KEYBOARD_SHORTCUT_DEFAULTS := Map("win_space", ManifestDefaultFor("shortcuts.keyboard.win_space"))
+		KEYBOARD_SHORTCUT_DEFAULTS := Map("meta_space", ManifestDefaultFor("shortcuts.keyboard.meta_space"))
 		ReadKeyboardShortcutsConfig()
 		GestureActionParameters := _IniCache["action_parameters"].Clone()
-		AssertEqual(KeyboardShortcutAssignments["win_b"], "open_url")
+		AssertEqual(KeyboardShortcutAssignments["meta_b"], "open_url")
 		Factory := "_SC_ScopeCommands"
 		Commands := %Factory%(Fixture.options)
 		Id := Mode == "clear" ? "scope_clear" : "scope_restore"
@@ -47,9 +47,9 @@ _ScopeShortcutsCase(Mode, FromManifest := false) {
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		Assert(!Parsed["shortcuts.personal"].Has("custom tool"))
 		AssertEqual(Parsed["shortcuts.personal"]["unknown_user"], true)
-		Assert(!Parsed["shortcuts.keyboard"].Has("win_b"), "the ConfigIO-owned custom slot must be cleared")
-		AssertEqual(Parsed["shortcuts.keyboard"]["win_cc"], "open_url", "an unknown slot is preserved")
-		for Key in ["keyboard__win_b__open_url", "script__pause__open_url", "tap_key__grave__open_url"]
+		Assert(!Parsed["shortcuts.keyboard"].Has("meta_b"), "the ConfigIO-owned custom slot must be cleared")
+		AssertEqual(Parsed["shortcuts.keyboard"]["meta_cc"], "open_url", "an unknown slot is preserved")
+		for Key in ["keyboard__meta_b__open_url", "script__pause__open_url", "tap_key__grave__open_url"]
 			Assert(!Parsed["action_parameters"].Has(Key), "selected parameters are removed: " . Key)
 		AssertEqual(Parsed["action_parameters"]["gesture__tap_4__open_url"], "https://gesture.test")
 		AssertEqual(Parsed["action_parameters"]["tap_hold__space__open_url"], "https://hold.test")
@@ -60,7 +60,7 @@ _ScopeShortcutsCase(Mode, FromManifest := false) {
 		else
 			AssertEqual(Parsed["category_enabled"]["shortcuts"], ManifestRecommendedFor("category_enabled.shortcuts"))
 		AssertEqual(Features["shortcuts"]["personal"]["custom tool"], true, "desired state stays untouched before acknowledgement")
-		AssertEqual(KeyboardShortcutAssignments["win_b"], "open_url")
+		AssertEqual(KeyboardShortcutAssignments["meta_b"], "open_url")
 		Refusal.Call("native close refused")
 		AssertEqual(Receipt["status"], "refused")
 		AssertEqual(FSReadUtf8Exact(Fixture.path), Source)

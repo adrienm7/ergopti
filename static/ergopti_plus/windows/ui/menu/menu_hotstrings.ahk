@@ -406,6 +406,7 @@ _HS_WordExpanderRows(Commands := unset) {
 	Owner := _HotstringsTerminatorRecords
 
 	Rows := []
+	ConsumeRows := []
 
 	; ── Built-in catalogue entries, in catalogue order ───────────────────────
 	for _, D in Defs {
@@ -431,8 +432,12 @@ _HS_WordExpanderRows(Commands := unset) {
 			Lbl .= " " . t("menu.hotstrings.consumed_suffix")
 		Rows.Push(Map(
 			"label",   Lbl,
-			"action",  ((EntryKey) => (*) => _HS_DelimToggleEntry(EntryKey))(Key),
+			"action",  ((EntryKey, EntryLabel) => (*) => _HS_DelimToggleEntry(EntryKey, 0, 0, EntryLabel))(Key, Lbl),
 			"checked", State.Enabled ? true : false))
+		ConsumeRows.Push(Map(
+			"label",   t(D["label_key"]),
+			"action",  ((EntryKey, EntryLabel) => (*) => _HS_DelimToggleConsume(EntryKey, EntryLabel))(Key, t(D["label_key"])),
+			"checked", State.Consume ? true : false))
 	}
 	CatalogueRows := Rows
 	Rows := []
@@ -445,7 +450,8 @@ _HS_WordExpanderRows(Commands := unset) {
 				. (Record.Consume ? " " . t("menu.hotstrings.consumed_suffix") : ""),
 				"checked", Record.Enabled,
 				"items", [Map("label", Record.Label, "checked", Record.Enabled,
-					"action", ((Captured, Enabled) => (*) => _HS_DelimRecordState(Captured, !Enabled))(Admission, Record.Enabled)),
+					"action", ((Captured, Enabled, Label) => (*) => _HS_DelimRecordRowClick(Captured, !Enabled, Label))(
+						Admission, Record.Enabled, Record.Label)),
 					MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_delete",
 					Map("word_expander_delete", ((Captured) => (*) => _HS_DelimRemoveRecord(Captured))(Admission)),
 					Map("word_expanders_ready", (*) => !A_IsSuspended))]))
@@ -457,7 +463,8 @@ _HS_WordExpanderRows(Commands := unset) {
 		Map("word_expanders_ready", (*) => !A_IsSuspended)))
 
 	Entries := MenuRenderer_TemplateRows("hotstrings_word_expander_frame", Map(), Map(),
-		Map("parameter_catalogue_entries", (*) => CatalogueRows, "parameter_custom_entries", (*) => Rows))
+		Map("parameter_catalogue_entries", (*) => CatalogueRows, "parameter_consume_children", ConsumeRows,
+			"parameter_custom_entries", (*) => Rows))
 	if !(Entries is Array)
 		return []
 
@@ -497,8 +504,34 @@ _HS_WordExpanderCommand(Command, Ready, *) {
 
 ; Toggle a whole catalogue entry (all of its chars) on/off and persist. The state
 ; is a config.toml leaf written through the live writer: no reload.
-_HS_DelimToggleEntry(Key, WriterFn := 0, NotifyFn := 0) {
-	return _HS_DelimCommit(() => HotstringsTerminatorToggle(Key, WriterFn), NotifyFn)
+; @param Label {String} The row's label: names the entry in the feature notice.
+_HS_DelimToggleEntry(Key, WriterFn := 0, NotifyFn := 0, Label := "") {
+	Notice := (Label != "") ? _HS_DelimEntryNotice.Bind(Key, Label, NotifyFn) : 0
+	return _HS_DelimCommit(() => HotstringsTerminatorToggle(Key, WriterFn), NotifyFn, Notice)
+}
+
+; Switches whether the expansion swallows one built-in delimiter, the other half
+; of its state: a click on its catalogue row switches it on or off.
+; @param Label {String} The row's label: names the entry in the feature notice.
+_HS_DelimToggleConsume(Key, Label, WriterFn := 0, NotifyFn := 0) {
+	global _HotstringsTerminatorRecords
+	Owner := _HotstringsTerminatorRecords
+	if !(Owner is Object) || !Owner.Builtin.Has(Key)
+		return false
+	Next := Owner.Builtin[Key].Consume ? 0 : 1
+	return _HS_DelimCommit(() => HotstringsTerminatorBuiltinCommit(Map(Key, Map("consume", Next)), WriterFn), NotifyFn,
+		() => NotifyFeature(_HS_DelimNoticeLabel(Label . " " . t("menu.hotstrings.consumed_suffix")), Next, NotifyFn))
+}
+
+; Announces the state one built-in delimiter row reached.
+_HS_DelimEntryNotice(Key, Label, NotifyFn) {
+	global _HotstringsTerminatorRecords
+	NotifyFeature(_HS_DelimNoticeLabel(Label), _HotstringsTerminatorRecords.Builtin[Key].Enabled ? true : false, NotifyFn)
+}
+
+; The feature name of one delimiter row in a notice.
+_HS_DelimNoticeLabel(Label) {
+	return StrReplace(t("notify.word_expander_prefix"), "%s", Label)
 }
 
 ; Set every built-in catalogue entry on (true) or off (false), preserving the
@@ -516,11 +549,12 @@ _HS_DelimReset(WriterFn := 0, NotifyFn := 0) {
 ; Execute one delimiter transaction and show the success notice only after
 ; strict durable success. A refused writer leaves the engine strings untouched
 ; and produces no misleading notification.
-_HS_DelimCommit(CommitFn, NotifyFn := 0) {
+; @param NoticeFn {Func|Integer} Replaces the generic "saved" notice.
+_HS_DelimCommit(CommitFn, NotifyFn := 0, NoticeFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _HS_DelimCommit(CommitFn, NotifyFn)
+		try return _HS_DelimCommit(CommitFn, NotifyFn, NoticeFn)
 		finally Critical(InheritedCritical)
 	}
 	try Committed := CommitFn.Call()
@@ -533,6 +567,10 @@ _HS_DelimCommit(CommitFn, NotifyFn := 0) {
 		return false
 
 	try {
+		if IsObject(NoticeFn) {
+			NoticeFn.Call()
+			return true
+		}
 		Message := t("hs_config.notify_delimiters_saved")
 		if HasMethod(NotifyFn, "Call")
 			NotifyFn.Call(Message, "", "Iconi Mute")
@@ -1025,7 +1063,8 @@ _HS_PersonalRows(Options := unset) {
 		if !(PersonalRows is Array)
 			return []
 		_HS_CategoryMenu("Personal", "", PersonalRows,
-			(_Targets, Enabled) => HS_TogglePersonalAllSections(Enabled, Options), PersonalMenu)
+			(_Targets, Enabled) => _HS_SelectionNotice(t("menu.hotstrings.personal_header"), Enabled,
+				HS_TogglePersonalAllSections(Enabled, Options)), PersonalMenu)
 		PersonalActiveCount := 0
 		PersonalAllEnabled  := true
 		PersonalSectionCount := 0
@@ -1582,6 +1621,16 @@ _HS_DelimRemoveRecord(Admission, Options := unset) {
 		return false
 	return HotstringsTerminatorRecordsEdit(
 		Map("mode", "remove", "key", Admission.Key, "admission", Admission), Options?)
+}
+
+; One click on a user delimiter's row: its state, then the notice once the edit is
+; admitted. The edit reloads, so a later notice could not reach the tray icon.
+; @param NotifyFn {Func|Integer} Replaces NotifierSend (tests only).
+_HS_DelimRecordRowClick(Admission, Enabled, Label, Options := unset, NotifyFn := 0) {
+	Receipt := _HS_DelimRecordState(Admission, Enabled, Options?)
+	if (Receipt is Map) && (Receipt["status"] == "pending" || Receipt["status"] == "committed")
+		NotifyFeature(_HS_DelimNoticeLabel(Label), Enabled ? true : false, NotifyFn)
+	return Receipt
 }
 
 _HS_DelimRecordState(Admission, Enabled, Options := unset) {

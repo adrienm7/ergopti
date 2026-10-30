@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_windows_slot_url_kept_for_chatgpt/case.toml
+
+[case]
+description = "A URL the user set on the Win+G slot is the link it keeps opening, ahead of the link of the retired switch."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 18
+to_version = 19

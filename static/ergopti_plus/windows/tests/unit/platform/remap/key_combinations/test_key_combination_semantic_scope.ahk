@@ -10,7 +10,7 @@ _KCT_SemanticScopeSource(Shape) {
 		. 'combination__future_pair__open_url = "foreign-pair"`n'
 		. 'Combination__space_then_enter__open_url = "foreign-case"`n'
 		. 'combination__space_then_enter__OPEN_URL = "foreign-action"`n'
-		. 'keyboard__win_b__open_url = "foreign-domain"`n'
+		. 'keyboard__meta_b__open_url = "foreign-domain"`n'
 	switch Shape {
 		case "dotted":
 			Source := StrReplace(RTrim(Taps, "`n"), "`n", "`nshortcuts.key_combination_taps.")
@@ -28,7 +28,7 @@ _KCT_SemanticScopeSource(Shape) {
 		Source .= "shortcuts.key_combination_holds." . StrReplace(RTrim(Holds, "`n"), "`n", "`nshortcuts.key_combination_holds.") . "`n"
 		Source .= "action_parameters." . StrReplace(RTrim(Parameters, "`n"), "`n", "`naction_parameters.") . "`n"
 	}
-	return Source . '[shortcuts.keyboard]`nwin_b = "copy"`n[category_enabled]`nkey_combinations = false`nshortcuts = false`n'
+	return Source . '[shortcuts.keyboard]`nmeta_b = "copy"`n[category_enabled]`nkey_combinations = false`nshortcuts = false`n'
 		. '["shortcuts.key_combination_taps"]`nspace_then_enter = "literal-dot-owner" # preserve exact foreign namespace`n'
 		. '[private]`ntext = "001" # preserve exact foreign bytes`n'
 }
@@ -85,11 +85,11 @@ _KCT_SemanticScope(Shape, Mode) {
 			AssertFalse(Params.Has("combination__space_then_enter__open_url"))
 			for Key, Value in Map("combination__future_pair__open_url", "foreign-pair",
 				"Combination__space_then_enter__open_url", "foreign-case",
-				"combination__space_then_enter__OPEN_URL", "foreign-action", "keyboard__win_b__open_url", "foreign-domain")
+				"combination__space_then_enter__OPEN_URL", "foreign-action", "keyboard__meta_b__open_url", "foreign-domain")
 				AssertEqual(Value, Params[Key], "unowned parameter remains exact: " . Key)
 			AssertEqual("keep", Taps["future_pair"])
 			AssertEqual("keep", Holds["future_pair"])
-			AssertEqual("copy", Document["shortcuts"]["keyboard"]["win_b"])
+			AssertEqual("copy", Document["shortcuts"]["keyboard"]["meta_b"])
 			AssertEqual(false, Snapshot.Cache["category_enabled"]["shortcuts"])
 			AssertEqual(Mode == "recommended", Snapshot.Cache["category_enabled"].Get("key_combinations",
 				ManifestDefaultFor("category_enabled.key_combinations")), "clear preserves the disabled group switch")

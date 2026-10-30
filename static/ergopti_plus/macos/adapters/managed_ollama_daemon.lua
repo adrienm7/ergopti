@@ -8,8 +8,24 @@
 --- ==============================================================================
 
 local M = {}
+local Logger = require("infra.logger")
+local LOG = "managed_ollama_daemon"
 local Receipt = require("core.llm.managed_ollama_daemon_receipt")
 local MAX_PROTOCOL_BYTES = require("adapters.owned_program_runner").MAX_PROTOCOL_BYTES
+-- The serve owner writes one fixed refusal line on stderr; anything else there
+-- (a traceback names paths) is never logged.
+local REFUSAL_PATTERN = "Managed Ollama daemon admission refused: [%w_.: ]+%."
+local DIAGNOSTIC_LIMIT = 4096
+
+--- Logs the serve owner's fixed refusal line once, when its stderr carries one.
+--- @param status integer|nil Exit status of the serve owner.
+--- @param stderr string Captured standard error, bounded.
+local function log_refusal(status, stderr)
+	local refusal = stderr:match(REFUSAL_PATTERN)
+	if refusal then
+		Logger.warn(LOG, "Managed Ollama daemon exited (status=%s): %s", tostring(status), refusal)
+	end
+end
 
 --- Prepares observations without launching or acquiring native resources.
 --- @param task table Original ShellRunner handle, retained by its caller.
@@ -47,11 +63,22 @@ function M.prepare(command, nonce, callbacks)
 	local task, handle
 	local acquiring = true
 	local early_delivery = false
-	local function done(status, stdout)
+	local diagnostic = ""
+	local function capture(stderr)
+		if type(stderr) == "string" and stderr ~= "" and #diagnostic < DIAGNOSTIC_LIMIT then
+			diagnostic = (diagnostic .. stderr):sub(1, DIAGNOSTIC_LIMIT)
+		end
+	end
+	local function done(status, stdout, stderr)
+		capture(stderr)
+		-- Field run 2026-10-30 17:37: the daemon exited before READY and the log
+		-- named no reason, so the refusal line is logged before the join.
+		if status ~= 0 then log_refusal(status, diagnostic) end
 		if acquiring or not handle then early_delivery = true; return end
 		handle.complete(status, stdout)
 	end
-	local function chunk(_, stdout)
+	local function chunk(_, stdout, stderr)
+		capture(stderr)
 		if acquiring or not handle then early_delivery = true; return true end
 		if type(stdout) == "string" and stdout ~= "" then handle.feed(stdout) end
 		return true

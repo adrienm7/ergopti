@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "通过快捷键添加热字符串后关闭界面",
 	"menu.hotstrings.config_item": "⚙️ 配置延迟和颜色…",
 	"menu.hotstrings.consumed": "已消耗",
+	"menu.hotstrings.consumed_delimiters": "由展开消耗的分隔符",
 	"menu.hotstrings.consumed_suffix": "（已消耗）",
 	"menu.hotstrings.custom_label": "自定义",
 	"menu.hotstrings.default_category_prefix": "默认类别：",
