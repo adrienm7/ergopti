@@ -67,7 +67,16 @@ local LOG = "adapters.uinput_writer"
 -- linux/input-event-codes.h
 local EV_SYN     = 0x00
 local EV_KEY     = 0x01
+local EV_REL     = 0x02
 local SYN_REPORT = 0x00
+
+-- The relative axes the device can send: pointer motion and both wheels, in
+-- their classic and high-resolution reports. The keyboard hook forwards a mouse
+-- through them while the navigation layer owns its wheel (adapters/keyboard_hook).
+local RELATIVE_AXES = { 0x00, 0x01, 0x06, 0x08, 0x0b, 0x0c }
+local RELATIVE_AXIS = {}
+for _, axis in ipairs(RELATIVE_AXES) do RELATIVE_AXIS[axis] = true end
+local RELATIVE_VALUE_LIMIT = 0x7FFFFFFF
 
 -- linux/uinput.h ioctl requests, asm-generic _IOC encoding.
 --   UI_SET_EVBIT   = _IOW('U', 100, int)                → 0x40045564
@@ -77,6 +86,8 @@ local SYN_REPORT = 0x00
 --   UI_DEV_DESTROY = _IO ('U',   2)                     → 0x5502
 local UI_SET_EVBIT   = 0x40045564
 local UI_SET_KEYBIT  = 0x40045565
+--   UI_SET_RELBIT  = _IOW('U', 102, int)                → 0x40045566
+local UI_SET_RELBIT  = 0x40045566
 local UI_DEV_SETUP   = 0x405C5503
 local UI_DEV_CREATE  = 0x5501
 local UI_DEV_DESTROY = 0x5502
@@ -282,6 +293,36 @@ local function emit_owned(capability, code, value, transaction)
 		elseif value == 0 then output.down[code] = nil
 		elseif output.down[code] ~= true then output.roster_known = false end
 		if transaction ~= nil then transaction.write_epoch = output.write_epoch end
+	end
+	_busy = false
+	return called and acknowledged == true
+end
+
+--- Writes a complete REL/SYN attempt through one captured native owner, outside
+--- any key transaction: a pointer movement or wheel notch never interleaves with
+--- an injected text.
+--- @param capability table Opaque capability.
+--- @param axis integer One of RELATIVE_AXES.
+--- @param value integer A signed 32-bit delta.
+--- @return boolean acknowledged
+local function emit_relative_owned(capability, axis, value)
+	local output = _output
+	if _busy or _debt or _transaction ~= nil or not output_identity(output)
+		or not rawequal(capability, output.capability) then return false end
+	if not RELATIVE_AXIS[axis] or type(value) ~= "number" or value ~= math.floor(value)
+		or value < -RELATIVE_VALUE_LIMIT or value > RELATIVE_VALUE_LIMIT then return false end
+	_busy = true
+	output.write_epoch = output.write_epoch + 1
+	local called, acknowledged = pcall(function()
+		if output.write(output.fd, encode_event(EV_REL, axis, value)) ~= true then return false end
+		if not output_identity(output) then return false end
+		if output.write(output.fd, encode_event(EV_SYN, SYN_REPORT, 0)) ~= true then return false end
+		return output_identity(output)
+	end)
+	if not called or acknowledged ~= true then
+		_debt = true
+		output.write_debt = true
+		pcall(Logger.error, LOG, "An owned native REL/SYN attempt was not acknowledged.")
 	end
 	_busy = false
 	return called and acknowledged == true
@@ -712,6 +753,10 @@ function M.open()
 		for code = 1, KEY_CODE_MAX do
 			if not admit(UI_SET_KEYBIT, code) then return false end
 		end
+		if not admit(UI_SET_EVBIT, EV_REL) then return false end
+		for _, axis in ipairs(RELATIVE_AXES) do
+			if not admit(UI_SET_RELBIT, axis) then return false end
+		end
 		if not admit(UI_SET_EVBIT, EV_SYN) then return false end
 		if not admit(UI_DEV_SETUP, encode_setup()) then return false end
 		if not admit(UI_DEV_CREATE, 0) then return false end
@@ -819,6 +864,35 @@ function M.emit(code, value)
 	end
 	if not _backend.write(_fd, M.encode_event(EV_SYN, SYN_REPORT, 0)) then
 		Logger.warn(LOG, "emit(%d:%d): SYN_REPORT write failed — the key stays buffered.", code, value)
+		return false
+	end
+	return true
+end
+
+--- Writes one relative report (a pointer movement or a wheel notch) and its SYN.
+--- Refused while a key transaction or a dispatch owns the channel.
+--- @param axis integer REL_X, REL_Y, REL_HWHEEL, REL_WHEEL or a high-resolution wheel.
+--- @param value integer Signed delta.
+--- @return boolean written
+function M.emit_relative(axis, value)
+	if _dispatch or _busy or _debt or _transaction ~= nil then return false end
+	if _output ~= nil then return emit_relative_owned(_output.capability, axis, value) end
+	if not RELATIVE_AXIS[axis] or type(value) ~= "number" or value ~= math.floor(value)
+		or value < -RELATIVE_VALUE_LIMIT or value > RELATIVE_VALUE_LIMIT then
+		Logger.error(LOG, "emit_relative(): invalid arguments — axis=%s value=%s.", tostring(axis), tostring(value))
+		return false
+	end
+	if not _fd then
+		Logger.error(LOG, "emit_relative(): device is not open.")
+		return false
+	end
+	_legacy_wire = true
+	if not _backend.write(_fd, M.encode_event(EV_REL, axis, value)) then
+		Logger.warn(LOG, "emit_relative(%d:%d): write failed.", axis, value)
+		return false
+	end
+	if not _backend.write(_fd, M.encode_event(EV_SYN, SYN_REPORT, 0)) then
+		Logger.warn(LOG, "emit_relative(%d:%d): SYN_REPORT write failed.", axis, value)
 		return false
 	end
 	return true
@@ -1088,6 +1162,9 @@ M.INPUT_EVENT_SIZE = INPUT_EVENT_SIZE
 M.KEY_CODE_MAX = KEY_CODE_MAX
 M.UI_SET_EVBIT   = UI_SET_EVBIT
 M.UI_SET_KEYBIT  = UI_SET_KEYBIT
+M.UI_SET_RELBIT  = UI_SET_RELBIT
+M.EV_REL     = EV_REL
+M.RELATIVE_AXES = RELATIVE_AXES
 M.UI_DEV_SETUP   = UI_DEV_SETUP
 M.UI_DEV_CREATE  = UI_DEV_CREATE
 M.UI_DEV_DESTROY = UI_DEV_DESTROY

@@ -3051,6 +3051,8 @@ local function main()
 		onHold = on_hold,
 		onHoldAdmission = hold_admission,
 		onEmitRaw  = injector.emit_key,
+		-- A mouse the navigation layer holds for its wheel bindings moves on through it.
+		onEmitRelative = injector.emit_relative,
 		outputBroker = injector.output_broker(),
 		requireOutputBroker = opts.grab == true,
 	})

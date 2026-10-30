@@ -756,6 +756,20 @@ function M.emit_key(code, value)
 	return _uinput.emit(code, value)
 end
 
+--- Writes one relative report (pointer motion or a wheel notch) on the virtual
+--- device, for a mouse the navigation layer holds while it binds the wheel.
+--- @param axis integer evdev REL_* code.
+--- @param value integer Signed delta.
+--- @return boolean True when the report and its SYN were written.
+function M.emit_relative(axis, value)
+	if not _uinput or not _uinput.is_open() or type(_uinput.emit_relative) ~= "function" then
+		Logger.error(LOG, "emit_relative(%s:%s): no uinput channel — the report cannot be put back.",
+			tostring(axis), tostring(value))
+		return false
+	end
+	return _uinput.emit_relative(axis, value)
+end
+
 --- Opens the non-forking uinput channel, if this system can provide one.
 ---
 --- Called by the daemon before taking a grab. Returns false rather than raising
