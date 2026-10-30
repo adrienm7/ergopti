@@ -170,6 +170,7 @@
 		"test:field-log-scrub": "node ./tools/test/test-field-log-scrub.cjs",
 		"test:field-log-analyse": "node ./tools/test/test-field-log-analyse.cjs",
 		"test:windows-field-report-contract": "node ./tools/test/test-windows-field-report-contract.cjs",
+		"test:windows-route-plan": "node ./tools/test/test-windows-route-plan.cjs",
 		"test:macos-bundle-payload": "node ./tools/test/test-macos-bundle-payload.cjs",
 		"test:macos-keyboard-layout-bundle": "node ./tools/test/test-macos-keyboard-layout-bundle.cjs",
 		"test:macos-launcher-universal": "node ./tools/test/test-macos-launcher-universal.cjs",
