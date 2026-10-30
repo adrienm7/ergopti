@@ -324,7 +324,7 @@
 		},
 		{
 			"id": "js-0360",
-			"ordinal": 376,
+			"ordinal": 369,
 			"name": "updater constants single source (owner/repo/timing literals match defaults.json)",
 			"cmd": "node",
 			"args": ["tools/test/test-updater-constants-single-source.cjs"],
@@ -332,7 +332,7 @@
 		},
 		{
 			"id": "js-0364",
-			"ordinal": 380,
+			"ordinal": 373,
 			"name": "changelog remote content and native bridge stay inside their authenticated boundary",
 			"cmd": "node",
 			"args": ["tools/test/test-changelog-security.cjs"],
@@ -340,7 +340,7 @@
 		},
 		{
 			"id": "js-0365",
-			"ordinal": 381,
+			"ordinal": 374,
 			"name": "changelog release notes render as sanitized Markdown (DOM-only, repository links only)",
 			"cmd": "node",
 			"args": ["tools/test/test-changelog-markdown.cjs"],
@@ -348,7 +348,7 @@
 		},
 		{
 			"id": "js-0367",
-			"ordinal": 383,
+			"ordinal": 376,
 			"name": "release bodies split into changelog, downloads, intro and footer (CI markers, legacy and feed bodies)",
 			"cmd": "node",
 			"args": ["tools/test/test-release-body-sections.cjs"],
@@ -356,7 +356,7 @@
 		},
 		{
 			"id": "js-0368",
-			"ordinal": 384,
+			"ordinal": 377,
 			"name": "update channel registry: shared vectors, locales, generated data and release tag families agree",
 			"cmd": "node",
 			"args": ["tools/test/test-update-channels-contract.cjs"],
@@ -364,7 +364,7 @@
 		},
 		{
 			"id": "js-0369",
-			"ordinal": 385,
+			"ordinal": 378,
 			"name": "update-check schedule: shared vectors, presets, locales and generated Windows data agree",
 			"cmd": "node",
 			"args": ["tools/test/test-update-schedule-contract.cjs"],
@@ -372,7 +372,7 @@
 		},
 		{
 			"id": "js-0371",
-			"ordinal": 387,
+			"ordinal": 379,
 			"name": "Versions page: tabs change the view, the banner subscribes through the host",
 			"cmd": "node",
 			"args": ["tools/test/test-changelog-channel-sync.cjs"],
@@ -380,7 +380,7 @@
 		},
 		{
 			"id": "js-0374",
-			"ordinal": 390,
+			"ordinal": 382,
 			"name": "Versions page: one click installs a chosen release through the host, restore banner",
 			"cmd": "node",
 			"args": ["tools/test/test-changelog-release-install.cjs"],
@@ -388,7 +388,7 @@
 		},
 		{
 			"id": "js-0375",
-			"ordinal": 391,
+			"ordinal": 383,
 			"name": "release install: only clicks install on every driver, one set of install reasons",
 			"cmd": "node",
 			"args": ["tools/test/test-release-install-contract.cjs"],
@@ -396,7 +396,7 @@
 		},
 		{
 			"id": "js-0376",
-			"ordinal": 392,
+			"ordinal": 384,
 			"name": "one installed-build-or-source-run owner per driver; Uninstall greyed on a source run",
 			"cmd": "node",
 			"args": ["tools/test/test-source-run-single-owner.cjs"],
@@ -404,7 +404,7 @@
 		},
 		{
 			"id": "js-0388",
-			"ordinal": 404,
+			"ordinal": 394,
 			"name": "HS-274 native run refuses a Hammerspoon consumer on Linux while the producer and consumer baseline versions differ",
 			"cmd": "node",
 			"args": ["tools/test/test-hs274-baseline-contract.cjs"],
@@ -412,7 +412,7 @@
 		},
 		{
 			"id": "js-0443",
-			"ordinal": 443,
+			"ordinal": 423,
 			"name": "Linux AppImage loads on the oldest supported LTS glibc and its asset name carries no linux",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-appimage-portability.cjs"],
@@ -420,7 +420,7 @@
 		},
 		{
 			"id": "js-0451",
-			"ordinal": 451,
+			"ordinal": 430,
 			"name": "ErgoptiPlus.exe carries its own version resource derived from the stamped release version",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-exe-version-info.cjs"],
@@ -428,7 +428,7 @@
 		},
 		{
 			"id": "js-0453",
-			"ordinal": 453,
+			"ordinal": 431,
 			"name": "HS-274 producer and native-fixture tooling: Python suites and portable C++ tests",
 			"cmd": "node",
 			"args": ["tools/test/run-hs274-diagnostics-tests.cjs"],
@@ -437,7 +437,7 @@
 		},
 		{
 			"id": "js-0454",
-			"ordinal": 454,
+			"ordinal": 432,
 			"name": "ErgoptiPlus.exe antivirus surface: no inline P/Invoke or PowerShell unzip stage, launch patterns held at their ceilings",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-exe-av-surface.cjs"],
@@ -445,7 +445,7 @@
 		},
 		{
 			"id": "js-0478",
-			"ordinal": 486,
+			"ordinal": 461,
 			"name": "Linux code launches only programs the minimal Arch, Fedora and openSUSE images ship, CI installs or a package declares",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-portable-commands.cjs"],
@@ -453,7 +453,7 @@
 		},
 		{
 			"id": "js-macos-dev-app-script",
-			"ordinal": 498,
+			"ordinal": 470,
 			"name": "macOS developer app runner builds in source mode and opens only this clone's developer app",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-dev-app-script.cjs"],
@@ -462,7 +462,7 @@
 		},
 		{
 			"id": "js-0480",
-			"ordinal": 499,
+			"ordinal": 471,
 			"name": "HS-274 aggregate failure receipts preserve failed child diagnostics after later healthy suites",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-hs274-diagnostic-receipts.cjs"],
@@ -471,7 +471,7 @@
 		},
 		{
 			"id": "js-0481",
-			"ordinal": 506,
+			"ordinal": 478,
 			"name": "macOS journal retries and initial ledger publication recover from actual Common Linux write and close failures",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-journal-native-receipt.cjs"],
@@ -480,7 +480,7 @@
 		},
 		{
 			"id": "js-0483",
-			"ordinal": 512,
+			"ordinal": 482,
 			"name": "AppImage needed-library closure (every ELF library is in the image or on the documented recipient list)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-elf-needed-closure.cjs"],
@@ -488,7 +488,7 @@
 		},
 		{
 			"id": "js-0504",
-			"ordinal": 514,
+			"ordinal": 484,
 			"name": "one .keylayout reader in the Lua drivers and tooling",
 			"cmd": "node",
 			"args": ["tools/test/test-keylayout-single-parser.cjs"],
@@ -496,7 +496,7 @@
 		},
 		{
 			"id": "js-0505",
-			"ordinal": 516,
+			"ordinal": 486,
 			"name": "build scripts source identifiers.sh fail-fast and the AppImage containers mount the checkout",
 			"cmd": "node",
 			"args": ["tools/test/test-shell-identifiers-sourcing.cjs"],
@@ -504,7 +504,7 @@
 		},
 		{
 			"id": "js-macos-dev-source-build",
-			"ordinal": 517,
+			"ordinal": 487,
 			"name": "a developer source ErgoptiPlus.app is refused as a release and by every archive entry",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-dev-source-build.cjs"],
@@ -512,7 +512,7 @@
 		},
 		{
 			"id": "js-macos-hammerspoon-cache",
-			"ordinal": 518,
+			"ordinal": 488,
 			"name": "the macOS build keeps the Hammerspoon zip outside the wiped build folder and admits only the pinned digest",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-hammerspoon-cache.cjs"],
@@ -520,7 +520,7 @@
 		},
 		{
 			"id": "js-macos-dev-native-receiver",
-			"ordinal": 520,
+			"ordinal": 490,
 			"name": "a developer app admits the bundled native network receiver only for the clone its sealed plist records",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-dev-native-receiver.cjs"],
@@ -529,7 +529,7 @@
 		},
 		{
 			"id": "js-macos-field-run-contract",
-			"ordinal": 521,
+			"ordinal": 491,
 			"name": "the macOS field report collector and the developer app's field run share one request and result contract",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-field-run-contract.cjs"],
@@ -538,7 +538,7 @@
 		},
 		{
 			"id": "js-linux-dev-script",
-			"ordinal": 524,
+			"ordinal": 493,
 			"name": "Linux developer runner starts the packages' entry point from this clone with its native backend",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-dev-script.cjs"],
@@ -547,7 +547,7 @@
 		},
 		{
 			"id": "js-windows-dev-script",
-			"ordinal": 525,
+			"ordinal": 494,
 			"name": "Windows developer runner starts this clone's ErgoptiPlus.ahk with the shared developer variable",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-dev-script.cjs"],
@@ -555,7 +555,7 @@
 		},
 		{
 			"id": "js-windows-control-cli-session",
-			"ordinal": 530,
+			"ordinal": 499,
 			"name": "Windows control CLI runs both session and result admissions through its standalone entrypoint",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-control-cli.cjs"],
@@ -563,7 +563,7 @@
 		},
 		{
 			"id": "js-windows-control-cli-result",
-			"ordinal": 531,
+			"ordinal": 500,
 			"name": "Windows control CLI accepts only typed matching result records and exact protocol states",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-control-cli.cjs", "--phase=result"],
@@ -571,7 +571,7 @@
 		},
 		{
 			"id": "js-linux-field-report-contract",
-			"ordinal": 532,
+			"ordinal": 501,
 			"name": "the Linux field report collector derives its field branch, names its base and commits its logs like the macOS one",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-field-report-contract.cjs"],
@@ -580,7 +580,7 @@
 		},
 		{
 			"id": "js-windows-field-report-contract",
-			"ordinal": 533,
+			"ordinal": 502,
 			"name": "the Windows field report collector derives its field branch, names its base and commits its logs like the macOS one",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-field-report-contract.cjs"],
@@ -588,7 +588,7 @@
 		},
 		{
 			"id": "js-field-log-scrub",
-			"ordinal": 535,
+			"ordinal": 504,
 			"name": "a field report pushes no typed text: every driver's log spelling is scrubbed and the collectors copy no raw log",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-log-scrub.cjs"],
@@ -596,7 +596,7 @@
 		},
 		{
 			"id": "js-field-log-analyse",
-			"ordinal": 538,
+			"ordinal": 507,
 			"name": "one log analyser reads every driver's spelling, judges each measure against the budget its code declares and ranks what to fix first",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-log-analyse.cjs"],

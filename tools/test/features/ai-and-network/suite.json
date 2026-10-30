@@ -324,7 +324,7 @@
 		},
 		{
 			"id": "js-0350",
-			"ordinal": 365,
+			"ordinal": 364,
 			"name": "a manual prediction is refused for the same four reasons, with the same notices, on every driver",
 			"cmd": "node",
 			"args": ["tools/test/test-manual-prediction-refusals-single-source.cjs"],
@@ -332,7 +332,7 @@
 		},
 		{
 			"id": "js-0366",
-			"ordinal": 382,
+			"ordinal": 375,
 			"name": "changelog loads are bounded and fall back to the releases Atom feed",
 			"cmd": "node",
 			"args": ["tools/test/test-changelog-network-resilience.cjs"],
@@ -340,7 +340,7 @@
 		},
 		{
 			"id": "js-0372",
-			"ordinal": 388,
+			"ordinal": 380,
 			"name": "Versions managed failures retain safe report and exact action ownership",
 			"cmd": "node",
 			"args": ["tools/test/test-changelog-managed-failure.cjs"],
@@ -348,7 +348,7 @@
 		},
 		{
 			"id": "js-0378",
-			"ordinal": 394,
+			"ordinal": 386,
 			"name": "managed download failures render safe translated actions with captured owners",
 			"cmd": "node",
 			"args": ["tools/test/test-managed-network-failure-ui.cjs"],
@@ -356,7 +356,7 @@
 		},
 		{
 			"id": "js-0379",
-			"ordinal": 395,
+			"ordinal": 387,
 			"name": "managed fixture late accepted clients retain exact retirement ownership",
 			"cmd": "node",
 			"args": ["tools/test/test-managed-remote-retirement.cjs"],
@@ -364,7 +364,7 @@
 		},
 		{
 			"id": "js-0380",
-			"ordinal": 396,
+			"ordinal": 388,
 			"name": "model browser actions retain their operation session across native reuse",
 			"cmd": "node",
 			"args": ["tools/test/test-model-browser-session.cjs"],
@@ -372,7 +372,7 @@
 		},
 		{
 			"id": "js-0448",
-			"ordinal": 448,
+			"ordinal": 427,
 			"name": "Ollama release pin parity (one 0.40.4 pin, no retired 0.24.0 pin or upstream seam)",
 			"cmd": "node",
 			"args": ["tools/test/test-ollama-release-pin-parity.cjs"],
@@ -380,7 +380,7 @@
 		},
 		{
 			"id": "js-0449",
-			"ordinal": 449,
+			"ordinal": 428,
 			"name": "managed Ollama no-cloud parity (every owned server gets the shared OLLAMA_NO_CLOUD)",
 			"cmd": "node",
 			"args": ["tools/test/test-managed-ollama-no-cloud.cjs"],
@@ -388,7 +388,7 @@
 		},
 		{
 			"id": "js-0456",
-			"ordinal": 456,
+			"ordinal": 434,
 			"name": "managed Ollama PAC route (launcher role, shell admission and daemon environment)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-managed-proxy-route-contract.cjs"],
@@ -396,7 +396,7 @@
 		},
 		{
 			"id": "js-0467",
-			"ordinal": 466,
+			"ordinal": 442,
 			"name": "Go route plan gate cannot pass vacuously (missing toolchain, no test files, skipped test)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-go-route-plan-gate.cjs"],
@@ -404,7 +404,7 @@
 		},
 		{
 			"id": "js-0468",
-			"ordinal": 467,
+			"ordinal": 443,
 			"name": "proxy policy single source (every hand-typed precedence pinned to proxy_policy.json, no new copy)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-proxy-policy-single-source.cjs"],
@@ -412,7 +412,7 @@
 		},
 		{
 			"id": "js-0476",
-			"ordinal": 484,
+			"ordinal": 459,
 			"name": "network field check parity (one step list, every label localised, no URL in the evidence)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-network-field-check-parity.cjs"],
@@ -420,7 +420,7 @@
 		},
 		{
 			"id": "js-0493",
-			"ordinal": 497,
+			"ordinal": 469,
 			"name": "proxy precedence shell projection (the shell expansions are generated from proxy_policy.json)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-codegen-proxy-precedence.cjs"],
@@ -428,7 +428,7 @@
 		},
 		{
 			"id": "js-ollama-termination-owned",
-			"ordinal": 523,
+			"ordinal": 492,
 			"name": "Ollama termination ownership (no driver stops Ollama by process name or by its port)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ollama-termination-owned.cjs"],
@@ -436,7 +436,7 @@
 		},
 		{
 			"id": "js-model-selector-page",
-			"ordinal": 526,
+			"ordinal": 495,
 			"name": "model selector page greys unavailable backends, downloads missing models and keeps keyboard access",
 			"cmd": "node",
 			"args": ["tools/test/test-model-selector-page.cjs"],
@@ -444,7 +444,7 @@
 		},
 		{
 			"id": "js-llm-backend-brands-single-source",
-			"ordinal": 527,
+			"ordinal": 496,
 			"name": "AI backend brand and emoji single source (backends.json, emoji-first model button)",
 			"cmd": "node",
 			"args": ["tools/test/test-llm-backend-brands-single-source.cjs"],
@@ -452,7 +452,7 @@
 		},
 		{
 			"id": "js-test-prediction-single-source",
-			"ordinal": 536,
+			"ordinal": 505,
 			"name": "the AI menu's test prediction: one excerpt length and blank-answer reason, on the three drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-test-prediction-single-source.cjs"],

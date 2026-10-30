@@ -284,7 +284,7 @@
 		},
 		{
 			"id": "js-0382",
-			"ordinal": 398,
+			"ordinal": 390,
 			"name": "metrics manifest payload contract (reader vocabulary reaches real consumers)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-manifest-contract.cjs"],
@@ -292,7 +292,7 @@
 		},
 		{
 			"id": "js-0383",
-			"ordinal": 399,
+			"ordinal": 391,
 			"name": "typing-speed source toggles (net expansion gain and filter semantics)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-speed-source-filters.cjs"],
@@ -300,7 +300,7 @@
 		},
 		{
 			"id": "js-0384",
-			"ordinal": 400,
+			"ordinal": 392,
 			"name": "Linux metrics SQLite bridge (persistent manifest + selected-range refresh)",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-metrics-sqlite-bridge.cjs"],
@@ -308,7 +308,7 @@
 		},
 		{
 			"id": "js-0385",
-			"ordinal": 401,
+			"ordinal": 393,
 			"name": "Windows metrics range bridge (native selected date/app refresh)",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-metrics-range-bridge.cjs"],
@@ -316,7 +316,7 @@
 		},
 		{
 			"id": "js-0403",
-			"ordinal": 419,
+			"ordinal": 400,
 			"name": "pinned AHK timing copies match the shared timing registry",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-timings-single-source.cjs"],
@@ -324,7 +324,7 @@
 		},
 		{
 			"id": "js-0404",
-			"ordinal": 420,
+			"ordinal": 401,
 			"name": "SQLite event cursor numeric policy single source",
 			"cmd": "node",
 			"args": ["tools/test/test-sqlite-event-id-single-source.cjs"],
@@ -332,7 +332,7 @@
 		},
 		{
 			"id": "js-0406",
-			"ordinal": 422,
+			"ordinal": 403,
 			"name": "WPM readout constants single source (every canon key read by a driver, none restated)",
 			"cmd": "node",
 			"args": ["tools/test/test-wpm-constants-single-source.cjs"],
@@ -340,7 +340,7 @@
 		},
 		{
 			"id": "js-0407",
-			"ordinal": 423,
+			"ordinal": 404,
 			"name": "WPM strip darkening cross-driver drift (Lua model and AHK round-half-up on the canon factor; golden vectors)",
 			"cmd": "node",
 			"args": ["tools/test/test-wpm-color-normalisation-single-source.cjs"],
@@ -348,7 +348,7 @@
 		},
 		{
 			"id": "js-0413",
-			"ordinal": 429,
+			"ordinal": 409,
 			"name": "every dialog or notice that reports a fixable state offers its fix as an action (hardening-g)",
 			"cmd": "node",
 			"args": ["tools/test/test-hardening-g-fixable-errors-offer-an-action.cjs"],
@@ -356,7 +356,7 @@
 		},
 		{
 			"id": "compact-data-sql",
-			"ordinal": 444,
+			"ordinal": 424,
 			"name": "SQL compaction retains captured markers and refuses partial projections",
 			"cmd": "node",
 			"args": ["tools/test/test-compact-data-sql.cjs"],
@@ -364,7 +364,7 @@
 		},
 		{
 			"id": "compact-data-sql-protocol",
-			"ordinal": 445,
+			"ordinal": 425,
 			"name": "SQL compaction wrapper receives native duration and exact failed-child diagnostics",
 			"cmd": "node",
 			"args": ["tools/test/test-compact-data-sql-protocol.cjs"],
@@ -372,7 +372,7 @@
 		},
 		{
 			"id": "metrics-collection-controls",
-			"ordinal": 464,
+			"ordinal": 440,
 			"name": "metrics pause and session reset: one declaration, one meaning and one set of sequences on all three drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-collection-controls.cjs"],
@@ -380,7 +380,7 @@
 		},
 		{
 			"id": "keystats-sql-census",
-			"ordinal": 479,
+			"ordinal": 454,
 			"name": "keystats SQL census extractor counts concatenated statements once and groups CLI and in-process spellings by shape",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-sql-census.cjs"],
@@ -388,7 +388,7 @@
 		},
 		{
 			"id": "keystats-query-catalogue",
-			"ordinal": 480,
+			"ordinal": 455,
 			"name": "keystats named-query catalogue returns the legacy rows on a realistic fixture in both dialects and its compiled outputs are current",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-query-catalogue.cjs"],
@@ -396,7 +396,7 @@
 		},
 		{
 			"id": "keystats-sql-shared-spelling",
-			"ordinal": 502,
+			"ordinal": 474,
 			"name": "no keystats statement is spelled by hand in both Lua drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-sql-shared-spelling.cjs"],
@@ -404,7 +404,7 @@
 		},
 		{
 			"id": "keystats-write-catalogue",
-			"ordinal": 504,
+			"ordinal": 476,
 			"name": "keystats write statements of the catalogue leave the rows the legacy driver SQL left and render to the shared vectors",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-write-catalogue.cjs"],
