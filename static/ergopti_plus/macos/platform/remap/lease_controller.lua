@@ -104,6 +104,15 @@ local GUARDIAN_UNREGISTER_FLAG = "--unregister-remap-guardian"
 local GUARDIAN_SETTINGS_FLAG = "--open-remap-guardian-settings"
 local GUARDIAN_STATUS_OUTPUT_MAX_BYTES = 32
 local GUARDIAN_SETTINGS_OUTPUT_MAX_BYTES = 32
+-- A registration may add one note line after its status
+-- (RemapGuardianRegistrationNote): what an ad hoc build did to its stale
+-- legacy agent and Background Items record before registering.
+local GUARDIAN_REGISTRATION_OUTPUT_MAX_BYTES = 64
+local GUARDIAN_REGISTRATION_NOTES = {
+	developer_adhoc_reregistered = true,
+	developer_adhoc_reset_deferred = true,
+	developer_adhoc_reset_refused = true,
+}
 local GUARDIAN_STATUSES = {
 	ready = true,
 	requires_approval = true,
@@ -1663,15 +1672,20 @@ local function start_guardian_observation(flag, label, on_done, on_canonical)
 			-- A settings recheck or newer status probe supersedes both the cache
 			-- write and the consumer callback from this older observation.
 			if not guardian_observation_is_current(observation_serial) then return end
-			local status = nil
-			if exit_code == 0 and type(stdout) == "string"
-				and #stdout <= GUARDIAN_STATUS_OUTPUT_MAX_BYTES then
+			local status, note = nil, nil
+			local max_bytes = registration and GUARDIAN_REGISTRATION_OUTPUT_MAX_BYTES
+				or GUARDIAN_STATUS_OUTPUT_MAX_BYTES
+			if exit_code == 0 and type(stdout) == "string" and #stdout <= max_bytes then
 				status = stdout:match("^([a-z_]+)\n$")
-				if GUARDIAN_STATUSES[status] ~= true then status = nil end
+				if not status and registration then
+					status, note = stdout:match("^([a-z_]+)\n([a-z_]+)\n$")
+					if GUARDIAN_REGISTRATION_NOTES[note] ~= true then status, note = nil, nil end
+				end
+				if GUARDIAN_STATUSES[status] ~= true then status, note = nil, nil end
 			end
 			if status then
 				_state.guardian_status = status
-				if on_canonical then on_canonical(status) end
+				if on_canonical then on_canonical(status, note) end
 				invoke_callback(label, on_done, status, nil)
 				return
 			end
@@ -1747,10 +1761,27 @@ function M.register_guardian(on_done)
 	if not require_state("register_guardian") then return nil, "uninitialized" end
 	Logger.info(LOG, "Registering the remap guardian for this Ergopti lifecycle.")
 	return start_guardian_observation(GUARDIAN_REGISTER_FLAG, "guardian registration", on_done,
-		function(status)
+		function(status, note)
 			_state.guardian_registration_settled = true
-			Logger.info(LOG, "Remap guardian registration answered '%s'.", status)
+			_state.guardian_registration_note = note
+			_state.guardian_registration_status = status
+			if note then
+				Logger.info(LOG, "Remap guardian registration answered '%s' (%s).", status, note)
+			else
+				Logger.info(LOG, "Remap guardian registration answered '%s'.", status)
+			end
 		end)
+end
+
+--- The note and status of this lifecycle's settled registration, read from
+--- memory. The status stays the registration's own answer when later probes
+--- replace the cached guardian status.
+--- @return string|nil note `developer_adhoc_*` after an ad hoc build's reset,
+---   nil for a Developer ID build or before the registration settled.
+--- @return string|nil status The registration's answer, nil before it settled.
+function M.guardian_registration_note()
+	if not _state then return nil, nil end
+	return _state.guardian_registration_note, _state.guardian_registration_status
 end
 
 --- Reports whether the next guardian observation must register the guardian.
@@ -1778,6 +1809,8 @@ function M.unregister_guardian(on_done)
 	local request = { callbacks = type(on_done) == "function" and { on_done } or {} }
 	_state.guardian_unregistration_request = request
 	_state.guardian_registration_settled = false
+	_state.guardian_registration_note = nil
+	_state.guardian_registration_status = nil
 	_state.guardian_status = nil
 	next_guardian_observation()
 	local function finish_if_settled()
