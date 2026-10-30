@@ -1,0 +1,12 @@
+owned reports since the run started: 1
+== ErgoptiPlus-2026-10-30-215403.ips
+  process: ErgoptiPlus
+  bug_type: 309
+  exception.type: EXC_CRASH
+  exception.signal: SIGKILL (Code Signature Invalid)
+  exception.codes: 0x0000000000000000, 0x0000000000000000
+  termination.namespace: CODESIGNING
+  termination.code: 4
+  termination.indicator: Launch Constraint Violation
+  termination.flags: 66
+  owned_frames: 0
