@@ -912,6 +912,7 @@ Not started:
       Test network), the Ollama blob host inventory check, a `route_plan` step in the network check.
       The daemon start now looks up every inventory origin (it read only the single-origin variable,
       so `pac_probe_client = "ollama"` never resolved at start; fixed with the fallback below).
+      Windows (30 Oct): the launcher looks up both `route_origins.json` "ollama" origins natively and starts the daemon with HTTPS_PROXY/NO_PROXY from the shared route plan (57276199); a relay demanding a Windows login is never exported and the pull refuses with a named reason, the start stays (local models offline). Left: [PHYS-W] a pull behind a PAC; maintainer decision: an option for NTLM relays (a local authenticating forwarder, or none).
 - [ ] **PAC unusable: direct fallback (maintainer decision).** [CODE] [PHYS-M] macOS done on branch
       `tmp/wip-pac-fallback`: when the PAC or WPAD route lookup fails at a stage listed in
       `proxy_policy.json` `pac_unavailable_fallback` (PAC download, evaluation, WPAD discovery, lookup
@@ -1099,6 +1100,7 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       Left, Windows: generated or read AHK copy in `http_client.ahk` (reseal), the route-plan consumer
       replaying `route_plan_vectors.json`, the native lookup limits from the policy.
       Windows (30 Oct): `http_client.ahk` reads the curl relay names from `proxy_policy.json` (its ratchet entry removed); route plan ported (`vendor/ergopti_route_plan.ps1`). Left: wire it into the owned Ollama daemon start and pull (`ollama-runtime-launch.ps1`, `ollama-model-pull.ps1`; decide what an SSPI-only relay exports), the native lookup limits from the policy; [PHYS-W] a pull behind a PAC.
+      Windows (30 Oct, later): the route plan is wired into the owned daemon start (57276199); the healthcheck PAC limit reads the policy (1255b8b6). Left: [PHYS-W] a pull behind a PAC, and the maintainer's decision on an NTLM/Negotiate relay option (today such a relay is never exported and the pull refuses with `network.failure.proxy_windows_login`).
 - [ ] **PAR-72. Shared registries and catalogues.** [CODE] Done: layout registry store, shortcuts
       catalogue, healthcheck report runner, agent learning store (daee88e48d..e105336d39); gesture
       direction and temperature were already shared with vectors. Left: the registry install/select flows and
