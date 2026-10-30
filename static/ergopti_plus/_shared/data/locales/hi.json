@@ -1767,6 +1767,7 @@
 	"menu.llm.api_test_ok_title": "API परीक्षण सफल रहा",
 	"menu.llm.api_key_refused_body": "\"%s\" ने उत्तर दिया लेकिन कुंजी अस्वीकार कर दी — सर्वर में सेट टोकन जाँचें।",
 	"menu.llm.api_key_refused_title": "API कुंजी अस्वीकृत",
+	"menu.llm.api_key_no_secret_store": "API कुंजी सहेजी नहीं गई: किसी भी डेस्कटॉप सीक्रेट सेवा ने इसे स्वीकार नहीं किया ({1})। Ergopti+ कभी भी कुंजी को सादे पाठ में नहीं लिखता। अपना कीरिंग (GNOME Keyring, KWallet या KeePassXC) शुरू करें, फिर दोबारा कोशिश करें।",
 	"menu.llm.api_unreachable_body": "\"%s\" ने प्रतिक्रिया नहीं दी — टोकन, URL और मॉडल जांचें।",
 	"menu.llm.api_unreachable_title": "API प्रविष्टि अप्राप्य",
 	"menu.llm.api_validated_body": "\"%s\" ने सफलतापूर्वक प्रतिक्रिया दी।",

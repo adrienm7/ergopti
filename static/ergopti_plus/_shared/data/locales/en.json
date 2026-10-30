@@ -1762,6 +1762,7 @@
 	"menu.llm.api_test_ok_title": "API test succeeded",
 	"menu.llm.api_key_refused_body": "\"%s\" answered but refused the key — check the token set in the server.",
 	"menu.llm.api_key_refused_title": "API key refused",
+	"menu.llm.api_key_no_secret_store": "The API key was not saved: no desktop secret service accepted it ({1}). Ergopti+ never writes a key in plaintext. Start your keyring (GNOME Keyring, KWallet or KeePassXC), then try again.",
 	"menu.llm.api_unreachable_body": "\"%s\" did not respond — check the token, URL and model.",
 	"menu.llm.api_unreachable_title": "API entry unreachable",
 	"menu.llm.api_validated_body": "\"%s\" responded successfully.",

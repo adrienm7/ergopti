@@ -1767,6 +1767,7 @@
 	"menu.llm.api_test_ok_title": "API-Test erfolgreich",
 	"menu.llm.api_key_refused_body": "\"%s\" hat geantwortet, aber den Schlüssel abgelehnt — prüfen Sie das im Server festgelegte Token.",
 	"menu.llm.api_key_refused_title": "API-Schlüssel abgelehnt",
+	"menu.llm.api_key_no_secret_store": "Der API-Schlüssel wurde nicht gespeichert: Kein Geheimnisdienst des Desktops hat ihn angenommen ({1}). Ergopti+ schreibt einen Schlüssel nie im Klartext. Starten Sie Ihren Schlüsselbund (GNOME Keyring, KWallet oder KeePassXC) und versuchen Sie es erneut.",
 	"menu.llm.api_unreachable_body": "\"%s\" hat nicht geantwortet — Token, URL und Modell prüfen.",
 	"menu.llm.api_unreachable_title": "API-Eintrag nicht erreichbar",
 	"menu.llm.api_validated_body": "\"%s\" hat erfolgreich geantwortet.",

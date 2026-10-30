@@ -1767,6 +1767,7 @@
 	"menu.llm.api_test_ok_title": "API テストに成功しました",
 	"menu.llm.api_key_refused_body": "「%s」は応答しましたがキーを拒否しました — サーバーに設定したトークンを確認してください。",
 	"menu.llm.api_key_refused_title": "API キーが拒否されました",
+	"menu.llm.api_key_no_secret_store": "API キーは保存されませんでした。デスクトップのシークレットサービスが受け付けませんでした（{1}）。Ergopti+ はキーを平文で書き込みません。キーリング（GNOME Keyring、KWallet、KeePassXC）を起動してから、もう一度お試しください。",
 	"menu.llm.api_unreachable_body": "「%s」は応答しませんでした — トークン、URL、モデルを確認してください。",
 	"menu.llm.api_unreachable_title": "API エントリに到達できません",
 	"menu.llm.api_validated_body": "「%s」が正常に応答しました。",

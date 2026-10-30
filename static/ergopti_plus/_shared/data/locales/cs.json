@@ -1767,6 +1767,7 @@
 	"menu.llm.api_test_ok_title": "Test API byl úspěšný",
 	"menu.llm.api_key_refused_body": "„%s“ odpověděl, ale odmítl klíč — zkontrolujte token nastavený na serveru.",
 	"menu.llm.api_key_refused_title": "Klíč API odmítnut",
+	"menu.llm.api_key_no_secret_store": "Klíč API nebyl uložen: žádná služba tajemství pracovní plochy jej nepřijala ({1}). Ergopti+ nikdy nezapisuje klíč jako prostý text. Spusťte svou klíčenku (GNOME Keyring, KWallet nebo KeePassXC) a zkuste to znovu.",
 	"menu.llm.api_unreachable_body": "„%s\" neodpověděl — zkontrolujte token, URL a model.",
 	"menu.llm.api_unreachable_title": "Záznam API nedosažitelný",
 	"menu.llm.api_validated_body": "„%s\" úspěšně odpověděl.",
