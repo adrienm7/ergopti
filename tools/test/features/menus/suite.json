@@ -265,6 +265,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-llm-prompt-keys-single-source.cjs"],
 			"repro": "npm run test:llm-prompt-keys-single-source"
+		},
+		{
+			"id": "linux-menu-parts",
+			"ordinal": 538,
+			"name": "the Linux tray root is read with its split section modules, and every other wiring is refused",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-menu-parts.cjs"],
+			"repro": "npm run test:linux-menu-parts"
 		}
 	]
 }
