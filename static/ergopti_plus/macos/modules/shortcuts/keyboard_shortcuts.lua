@@ -51,11 +51,9 @@ local ConfigKeys = require("config_keys")
 local RefusalRetry = require("modules.shortcuts.refusal_retry")
 
 local LOG = "shortcuts.keyboard_shortcuts"
-local TimerScheduler = require("adapters.timer_scheduler")
--- Read when first needed: the timing registry is not consulted at module load.
-local FULL_REBIND_MIN_INTERVAL_SEC = nil
--- Awake time of the last full rebind a refused retry asked for.
-local _last_full_rebind_at = nil
+-- Retry index whose full rebind is restarting this owner: start() then
+-- continues that retry series instead of opening a fresh one.
+local _full_rebind_retry_index = nil
 
 -- Ownership inspection needs only key identities; action initialization belongs
 -- to assignment validation and delivery, not the cleanup reader.
@@ -1219,7 +1217,13 @@ function M.start(candidate, raw_claims)
 	local count = TableUtil.count(_hotkeys)
 	Logger.success(LOG, "Keyboard shortcuts started (%d active binding(s), %d waiting for a retry).",
 		count, TableUtil.count(_pending_slots))
-	if next(_pending_slots) ~= nil then _refusal_retry.schedule() end
+	if next(_pending_slots) ~= nil then
+		if _full_rebind_retry_index ~= nil then
+			_refusal_retry.resume(_full_rebind_retry_index)
+		else
+			_refusal_retry.schedule()
+		end
+	end
 	return true
 end
 
@@ -1257,8 +1261,9 @@ end
 --- each on its own.
 --- @param final boolean|nil True on the last bounded retry: a key the layout
 ---   still cannot resolve is then bound at its US-ANSI position.
+--- @param index integer|nil Position of this retry in its bounded series.
 --- @return boolean settled True when no refused slot remains.
-function M.bind_pending(final)
+function M.bind_pending(final, index)
 	if not _started or _lifecycle_paused == true or _start_attempt ~= nil then
 		return next(_pending_slots) == nil
 	end
@@ -1280,17 +1285,19 @@ function M.bind_pending(final)
 	-- static chord resolved while the keycode map still described the previous
 	-- layout. Retrying this slot alone never moves it; one full rebind with the
 	-- current map does (field log 2026-10-30, Ctrl+. refused for 11 minutes).
+	-- Every retry of the bounded series may rebind: a probe layout switched
+	-- back and forth several times in a few seconds (field log 2026-10-30
+	-- 18:30) left the one rebind a minute allowed spent on a stale map, and
+	-- Ctrl+. stayed refused after the last retry.
 	for _, refusal in pairs(_pending_slots) do
 		if refusal == Registrar.OS_REFUSAL then
-			local now = TimerScheduler.awake_time()
-			FULL_REBIND_MIN_INTERVAL_SEC = FULL_REBIND_MIN_INTERVAL_SEC
-				or require("infra.timings").sec("adapters", "shortcut_full_rebind_min_interval_ms")
-			if _last_full_rebind_at == nil or now - _last_full_rebind_at >= FULL_REBIND_MIN_INTERVAL_SEC then
-				_last_full_rebind_at = now
-				Logger.info(LOG, "A refused shortcut may be held by a chord of the previous layout; rebinding every shortcut.")
-				local ok_rebind, rebound = pcall(function() return require("modules.shortcuts").rebind_for_layout() end)
-				if not ok_rebind then Logger.error(LOG, "Full shortcut rebind raised: %s.", tostring(rebound)) end
-			end
+			Logger.info(LOG,
+				"A refused shortcut may be held by a chord of the previous layout; rebinding every shortcut (retry %s).",
+				tostring(index))
+			_full_rebind_retry_index = math.type(index) == "integer" and index or nil
+			local ok_rebind, rebound = pcall(function() return require("modules.shortcuts").rebind_for_layout() end)
+			_full_rebind_retry_index = nil
+			if not ok_rebind then Logger.error(LOG, "Full shortcut rebind raised: %s.", tostring(rebound)) end
 			break
 		end
 	end
