@@ -1802,6 +1802,7 @@
 	"menu.llm.debounce_label": "وقت الخمول قبل الاقتراح: %s",
 	"menu.llm.debounce_prompt": "تأخير الخمول قبل التوليد (بالميلي ثانية، مثال: 600):",
 	"menu.llm.min_interval_label": "الحد الأدنى بين طلبين تلقائيين للذكاء الاصطناعي: %s",
+	"menu.llm.trigger.min_request_interval_ms": "الفاصل بين الطلبات",
 	"menu.llm.delete_model_body": "هل تريد فعلًا حذف النموذج \"%s\" من الذاكرة المؤقتة المحلية؟",
 	"menu.llm.delete_model_cache": "🗑️ حذف هذا النموذج من الذاكرة المؤقتة",
 	"menu.llm.delete_model_title": "حذف النموذج؟",

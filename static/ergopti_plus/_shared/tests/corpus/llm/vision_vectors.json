@@ -1,6 +1,6 @@
 {
 	"description": "Golden vectors for screen reading (llm_screen_region / llm_screen_full): the binding parameter, the vision model it resolves to with _shared/modules/llm/vision.json, the request body each API dialect receives, and how a tagged answer is read. Generated from _shared/lua/llm/vision.lua, replayed by it and by windows/modules/llm/vision.ahk.",
-	"rule": "parse: \"<backend>\" or \"<backend>|<model>\"; backend matches ^[a-z][a-z0-9_]*$; model is 1-200 characters, no control character or |, no leading or trailing spacing. A parse vector with valid false is refused; one without model has none. model_vectors: the binding's model, else vision.json default_models[backend], else none (a vector without model). request_vectors compare the decoded JSON body. extract: the text after the first case-insensitive tag, ** removed, trimmed, over every following line; none when absent or empty (a vector without text).",
+	"rule": "parse: \"<backend>\" or \"<backend>|<model>\"; backend matches ^[a-z][a-z0-9_]*$; model is 1-200 characters, no control character or |, no leading or trailing spacing. A parse vector with valid false is refused; one without model has none. model_vectors: the binding's model, else vision.json default_models[backend], else none (a vector without model). request_vectors compare the decoded JSON body. extract: the text after the first case-insensitive tag, ** removed, trimmed, over every following line; none when absent or empty (a vector without text). An ollama spec carries think, the resolved think value (false or a level, thinking_off ollama_think), sent as the body's think; an ollama spec without it is refused.",
 	"extract_vectors": [
 		{
 			"block": "SCREEN: Hi Marc,\nsee you at 3.\n",
@@ -360,7 +360,8 @@
 				"mime": "image/png",
 				"model": "m",
 				"system": "SYS",
-				"text": "Transcribe this screenshot."
+				"text": "Transcribe this screenshot.",
+				"think": false
 			}
 		},
 		{
@@ -388,7 +389,37 @@
 				"max_tokens": 600,
 				"model": "m",
 				"system": "SYS",
-				"text": "SCREEN:\nhello"
+				"text": "SCREEN:\nhello",
+				"think": false
+			}
+		},
+		{
+			"body": {
+				"messages": [
+					{
+						"content": "SYS",
+						"role": "system"
+					},
+					{
+						"content": "SCREEN:\nhello",
+						"role": "user"
+					}
+				],
+				"model": "gpt-oss:20b",
+				"options": {
+					"num_predict": 600
+				},
+				"stream": false,
+				"think": "low"
+			},
+			"format": "ollama",
+			"id": "ollama_think_level",
+			"spec": {
+				"max_tokens": 600,
+				"model": "gpt-oss:20b",
+				"system": "SYS",
+				"text": "SCREEN:\nhello",
+				"think": "low"
 			}
 		}
 	]

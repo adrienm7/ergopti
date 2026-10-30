@@ -23,7 +23,9 @@ cannot do is the short manual list at the end of this page.
   open). Nothing replaces a driver function with a stub.
 - Real keys come from `windows/tests/live/typist.ahk`, a separate hook-free
   process. Its `SendInput` at level 0 is ignored by the driver's InputHook, as a
-  tap-hold's tap is, so it types with `SendEvent` at `SendLevel` 100.
+  tap-hold's tap is, so it types with `SendEvent` at `SendLevel` 100. A check
+  that depends on CapsLock sends named keys as `{Blind}{SC039}`: a `Send` that is
+  not blind restores CapsLock when it ends, which no physical key can do.
 - Every driver and typist it starts is stopped before it returns, the successors
   of a reload included. The report names the other AutoHotkey scripts that were
   running, because AutoHotkey's `SendInput` falls back to `SendEvent` while
@@ -75,6 +77,16 @@ real CapsLock state, which that driver's CapsLock tap-hold would see.
 | `win-s-open-target`                     | Win+S open target                                          | `test_open_target_vectors.ahk`, `test_shortcuts.ahk` |
 | `backspace-word-start`                  | Backspace word start                                       | `test_hotstring_backspace_word_start.ahk`            |
 | `capsword-auto-off`                     | CapsWord auto-off                                          | `test_capsword_state.ahk`, the shared corpus         |
+| `clear-restore-categories`              | Clear and Restore: per category and global, then restart   | `test_keyboard_slot_group_scope.ahk`                 |
+| `number-row-layouts`                    | Number row on each installed layout, each ordering         | `test_number_row_symbols.ahk`                        |
+| `hotstring-delays-recommended-cleared`  | Hotstrings: delays 0.5 s recommended, cleared back to 1.0  | `test_hotstring_delimiter_scope_preservation.ahk`    |
+| `handwritten-delimiters`                | Handwritten delimiters: Add, toggle, Delete, restart       | `test_terminator_admission.ahk`                      |
+| `consume-submenu`                       | The delimiters an expansion consumes                       | `test_hotstring_delimiter_global_transaction.ahk`    |
+| `ai-off-inert`                          | AI off (#97)                                               | `test_llm_hotkeys_deferred_by_pause.ahk`             |
+| `test-prediction-ai-off`                | Test a prediction refuses with the AI off                  | `test_llm_menu_test_prediction.ahk`                  |
+| `tap-hold-v1-migration`                 | tap_hold.toml backup and v1 stamp on an old file           | the `tap_hold_migrations` corpus                     |
+| `old-config-migration`                  | An old config.toml through the whole registry              | the `config_migrations` corpus                       |
+| `quit-refused-during-write`             | Quit during a configuration write                          | `test_quit_admission.ahk`                            |
 
 ## What stays manual
 
@@ -113,9 +125,9 @@ the typed-keys ledger).
    Ctrl+V; AltGr+Entrée/Suppr/Retour arrière/Échap run their script actions; the
    AI menu; « Revenir à cette version » keeps a backup. Bring back the log of the
    session. This needs a prediction producer the live harness does not have.
-6. **Number row outputs.** Type each row on the real AZERTY, US QWERTY and Ergopti
-   layouts for every ordering and the edge-keys choice, with each row emulation
-   switch, and compare with the menu; the ² key included.
+6. **Number row outputs.** `number-row-layouts` types the ten digit keys for every
+   ordering on each layout installed on the PC. By hand: a layout not installed
+   there, the edge-keys choice, each row emulation switch, the ² key.
 7. **CapsWord, when `capsword-auto-off` was not executed.** With no other driver
    running, run it. By hand: the trigger LAlt then CapsLock; the eight default
    delimiters, each pointer kind and the delay end it; the next word is lower

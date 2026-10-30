@@ -3,8 +3,15 @@
 /** Proves the declared Hotstrings language controls through their physical native owners. */
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
 const { scriptTokens } = require('./script-source.cjs');
+const {
+	LINUX_MENU_ROOT,
+	composeLinuxMenuRoot,
+	readLinuxMenuSources
+} = require('./linux-menu-parts.cjs');
 const { COMMAND } = require('./_generated/config_keys.cjs');
 
 // Independent presentation contract: the former native checkbox and language heads.
@@ -1455,6 +1462,12 @@ function ahkDeclaredHotstringsTransport(stage, consumer) {
 function hotstringLanguagePublication(sources, manifest, platform, target) {
 	try {
 		if (!files[platform] || !Object.hasOwn(declarations, target)) return false;
+		if (platform === 'linux') {
+			// The tray root is read with its split section modules folded back in.
+			const composed = composeLinuxMenuRoot(sources);
+			if (!composed.ok) return false;
+			sources = { ...sources, [LINUX_MENU_ROOT]: composed.source };
+		}
 		if (target === 'hotstring_language_parent_windows' && platform !== 'ahk') return false;
 		if (target === 'hotstring_language_parent_lua' && platform === 'ahk') return false;
 		for (const key of [
@@ -2815,4 +2828,14 @@ function personalFolderCaptionPublication(source) {
 		return false;
 	}
 }
+
+/** One platform's owner sources under `base`; Linux adds the tray root's split modules. */
+function readOwnerSources(base, platform) {
+	const sources = Object.fromEntries(
+		files[platform].map((file) => [file, fs.readFileSync(path.join(base, file), 'utf8')])
+	);
+	return platform === 'linux' ? { ...sources, ...readLinuxMenuSources(base) } : sources;
+}
+
 module.exports.personalFolderCaptionPublication = personalFolderCaptionPublication;
+module.exports.readOwnerSources = readOwnerSources;

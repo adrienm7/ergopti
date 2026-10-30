@@ -1275,10 +1275,10 @@ function M.new(deps, presets, ram_getter)
 			model = target_model,
 			messages = {{ role = "user", content = "ok" }},
 			stream = false,
-			think = false,
+			-- Its one token must not open a reasoning block
+			think = require("modules.llm.thinking_families").ollama_think(target_model),
 			options = {
 				num_predict = 1,
-				think = false,
 				thinking_budget = 0,
 			},
 		}
@@ -1674,8 +1674,16 @@ function M.new(deps, presets, ram_getter)
 			local authorized = owner.authorized == true
 				and owner.start_committed == true
 			if settle_pull_task(code) ~= true then
-				Logger.error(LOG, "The Ollama pull of %s ended (code %s) but its task could not be settled.",
-					tostring(target_model), tostring(code))
+				-- The helper's own refusal line is the only trace of why it left no
+				-- retirement receipt (field run of 2026-10-30 20:47: nothing named it).
+				local helper_said = ""
+				local tail = pull_output .. sanitize_terminal_stream((stdout or "") .. (stderr or ""))
+				for line in tail:gmatch("[^\r\n]+") do
+					if line:match("%S") then helper_said = line end
+				end
+				Logger.error(LOG, "The Ollama pull of %s ended (code %s) but its task could not be settled; last output: %s.",
+					tostring(target_model), tostring(code),
+					helper_said ~= "" and helper_said:sub(1, 300) or "none")
 				owner.authorized = false
 				owner.completion_dispatching = false
 				complete_progress_ui(owner, false, target_model)

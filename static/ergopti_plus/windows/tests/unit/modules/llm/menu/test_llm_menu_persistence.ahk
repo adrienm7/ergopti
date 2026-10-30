@@ -211,8 +211,13 @@ Test_LLM_Persist_AllTrayKeysAreSynced() {
 		trayKey := ahk["tray_key"]
 		needle1 := '"' . trayKey . '"'
 		needle2 := "['" . trayKey . "']"
-		inSync := (InStr(syncBlock, needle1) > 0 or InStr(syncBlock, needle2) > 0)
-		inAppend := (InStr(appendBlock, needle1) > 0 or InStr(appendBlock, needle2) > 0)
+		; The persistence owner may name the key through its generated constant, but
+		; only a constant whose value is this exact key counts as the key.
+		leafName := StrUpper(trayKey)
+		needle3 := ConfigLeaf.HasOwnProp(leafName) && ConfigLeaf.%leafName% == trayKey
+			? "ConfigLeaf." . leafName : needle1
+		inSync := (InStr(syncBlock, needle1) > 0 or InStr(syncBlock, needle2) > 0 or InStr(syncBlock, needle3) > 0)
+		inAppend := (InStr(appendBlock, needle1) > 0 or InStr(appendBlock, needle2) > 0 or InStr(appendBlock, needle3) > 0)
 		Assert(inSync or inAppend,
 			"tray key '" . trayKey . "' (" . entry["id"] . ") must appear in "
 			. "_LLM_Menu_SyncToFeatures or _LLM_Menu_AppendPersistedUpdates")

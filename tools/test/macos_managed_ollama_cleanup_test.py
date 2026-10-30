@@ -6,6 +6,7 @@ import hmac
 import importlib.util
 import json
 import os
+import stat
 from pathlib import Path
 import sys
 import tempfile
@@ -138,6 +139,43 @@ class Ports:
             mac = "0" * 64
         self.response = Response(self, payload, [("X-Ergopti-Native-Proof", mac)])
         return self.response
+
+
+class ApfsDirectoryLinkCount(unittest.TestCase):
+    def test_operation_files_bind_when_the_directory_link_count_follows_its_entries(self):
+        # APFS counts a directory's entries in st_nlink; the macOS field run of
+        # 2026-10-30 21:57 refused every model pull at the directory fence.
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        anchor = root / "anchor"
+        anchor.touch(mode=0o600)
+        anchor.chmod(0o600)
+        real_fstat, real_lstat = os.fstat, Path.lstat
+
+        def apfs(value, entries):
+            if not stat.S_ISDIR(value.st_mode):
+                return value
+            fields = list(value)
+            fields[stat.ST_NLINK] = 2 + entries
+            return os.stat_result(fields)
+
+        def fstat(fd):
+            value = real_fstat(fd)
+            if stat.S_ISDIR(value.st_mode):
+                return apfs(value, len(os.listdir(fd)))
+            return value
+
+        def lstat(path):
+            value = real_lstat(path)
+            if stat.S_ISDIR(value.st_mode):
+                return apfs(value, len(os.listdir(path)))
+            return value
+
+        with patch.object(os, "fstat", fstat), patch.object(Path, "lstat", lstat):
+            files = AUTH.OperationFiles(ref(anchor), ORIGINAL)
+            self.addCleanup(files.close)
+            files.directory_fence()
 
 
 class CleanupReceiving(unittest.TestCase):

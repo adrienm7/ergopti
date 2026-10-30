@@ -78,6 +78,9 @@ _LMCT_ChildSource() {
 	Source := FSReadStrict(Owner)
 	for Symbol in ["LayoutManager_Open", "_LayMgrWeb_OnWebMessage", "_LayMgrWeb_SessionCall", "LayoutManager_HandleMessage"]
 		AssertTrue(IsObject(_DriverFindFunctionDefinition(&Source, Symbol)), "The complete real SDK-to-consumer route must exist: " . Symbol)
+	; The owner's text moves into the private child, so its own relative includes
+	; must keep resolving from where the owner really lives.
+	Source := StrReplace(Source, "%A_LineFile%", Owner)
 	return Code . _LMCT_OverlayTimerOwner(Source) . "`n#Include " . _DriverDir . "\tests\fixtures\layout_manager_command_body.ahk`n"
 }
 

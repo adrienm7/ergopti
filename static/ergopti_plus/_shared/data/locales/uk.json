@@ -1802,6 +1802,7 @@
 	"menu.llm.debounce_label": "Час простою до пропозиції: %s",
 	"menu.llm.debounce_prompt": "Затримка простою перед генерацією (у мс, напр. 600):",
 	"menu.llm.min_interval_label": "Мінімальний інтервал між двома автоматичними запитами до ШІ: %s",
+	"menu.llm.trigger.min_request_interval_ms": "Інтервал запитів",
 	"menu.llm.delete_model_body": "Справді видалити модель \"%s\" із локального кешу?",
 	"menu.llm.delete_model_cache": "🗑️ Видалити цю модель із кешу",
 	"menu.llm.delete_model_title": "Видалити модель?",

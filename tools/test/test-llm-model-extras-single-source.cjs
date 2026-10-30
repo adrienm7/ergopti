@@ -238,10 +238,14 @@ for (const [index, family] of families.entries()) {
 	}
 }
 
-// Every Ollama chat body the drivers write carries keep_alive; each must also
-// turn thinking off, or a thinking model spends its whole budget reasoning (a
-// warmup's single token, a screenshot's transcription). Lua bodies are table
-// literals, AHK bodies are JSON text built in one function.
+// Every Ollama chat body the drivers write sends think, resolved from the
+// model family (thinking_off.json ollama_think): false turns a hybrid model's
+// reasoning off, but gpt-oss ignores it and needs its lowest level, so a
+// literal false would leave it reasoning through a warmup's single token or a
+// screenshot's transcription. A body is found by keep_alive or num_predict:
+// in Lua, a table literal holding messages (an options table counts for its
+// parent); in AHK, JSON text built in one function. The think it sends must
+// be an expression, never a literal, and its file must reach the resolver.
 const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/modules',
 	'static/ergopti_plus/macos/ui',
@@ -282,26 +286,56 @@ function enclosingTable(code, at) {
 	return code.slice(start, end + 1);
 }
 
+// A Lua table literal starting at a position whose key is options.
+function isOptionsTable(code, start) {
+	return /(^|[^A-Za-z0-9_.])options\s*=\s*$/.test(code.slice(Math.max(0, start - 40), start));
+}
+
+// A Lua body table around an anchor: an options table stands for its parent.
+function luaBody(code, at) {
+	let table = enclosingTable(code, at);
+	const start = code.lastIndexOf(table, at);
+	if (isOptionsTable(code, start)) table = enclosingTable(code, start);
+	return table;
+}
+
+const RESOLVER = /ollama_think|OllamaThink|spec\.think|Spec\.Get\("think"/;
+const LUA_LITERAL_THINK = /(^|[^A-Za-z0-9_])think\s*=\s*(false|true)\b/;
+const AHK_LITERAL_THINK = /"think":\s*(false|true)/;
+const LUA_RESOLVED_THINK = /(^|[^A-Za-z0-9_.])think\s*=\s*(?!(false|true)\b)[A-Za-z_]/;
+const AHK_RESOLVED_THINK = /"think":'\s*(\.\s*)?[A-Za-z_]/;
+
 let ollamaBodies = 0;
 for (const rel of OLLAMA_ROOTS.flatMap(sourceFiles)) {
 	const isAhk = rel.endsWith('.ahk');
 	const code = stripLineComments(fs.readFileSync(path.join(ROOT, rel), 'utf8'), isAhk);
-	const anchor = isAhk ? /"keep_alive":/g : /(^|[^A-Za-z0-9_.])keep_alive\s*=[^=]/g;
+	const lineOf = (index) => code.slice(0, index).split('\n').length;
+	const literal = (isAhk ? AHK_LITERAL_THINK : LUA_LITERAL_THINK).exec(code);
+	if (literal) {
+		fail(
+			`${rel}:${lineOf(literal.index)} sends a literal think: resolve it (thinking_off ollama_think).`
+		);
+	}
+	const anchor = isAhk
+		? /"(keep_alive|num_predict)":['"]/g
+		: /(^|[^A-Za-z0-9_.])(keep_alive|num_predict)\s*=[^=]/g;
+	const seen = new Set();
 	for (const match of code.matchAll(anchor)) {
 		const body = isAhk
 			? code.slice(code.lastIndexOf('\n}', match.index) + 1, code.indexOf('\n}', match.index))
-			: enclosingTable(code, match.index);
+			: luaBody(code, match.index);
+		if (!isAhk && !/(^|[^A-Za-z0-9_.])messages\s*=/.test(body)) continue;
+		if (seen.has(body)) continue;
+		seen.add(body);
 		ollamaBodies += 1;
-		const off = isAhk
-			? /"think":false/.test(body)
-			: /(^|[^A-Za-z0-9_.])think\s*=\s*false/.test(body);
-		if (!off) {
-			const line = code.slice(0, match.index).split('\n').length;
-			fail(`${rel}:${line} writes an Ollama chat body without think = false.`);
+		if (!(isAhk ? AHK_RESOLVED_THINK : LUA_RESOLVED_THINK).test(body)) {
+			fail(`${rel}:${lineOf(match.index)} writes an Ollama chat body without its resolved think.`);
+		} else if (!RESOLVER.test(code)) {
+			fail(`${rel} sends an Ollama think that does not come from thinking_off ollama_think.`);
 		}
 	}
 }
-if (ollamaBodies < 4)
+if (ollamaBodies < 9)
 	fail(`found only ${ollamaBodies} Ollama chat bodies: the scan lost its anchor.`);
 
 if (failed) process.exit(1);

@@ -453,7 +453,7 @@
 		},
 		{
 			"id": "hotstring-output-tokens",
-			"ordinal": 539,
+			"ordinal": 508,
 			"name": "the {name} tokens of a hotstring output are one shared corpus every driver suite replays",
 			"cmd": "node",
 			"args": ["tools/test/test-hotstring-output-tokens.cjs"],
@@ -461,7 +461,7 @@
 		},
 		{
 			"id": "js-0349",
-			"ordinal": 364,
+			"ordinal": 509,
 			"name": "the number-row tap keys are one list, pinned to the manifest defaults and the Windows hotkeys",
 			"cmd": "node",
 			"args": ["tools/test/test-tap-keys-single-source.cjs"],
@@ -469,7 +469,7 @@
 		},
 		{
 			"id": "js-0351",
-			"ordinal": 366,
+			"ordinal": 510,
 			"name": "keyboard slots keep neutral defaults and independent manifest recommendations across drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-keyboard-slot-recommended-bindings.cjs"],
@@ -477,7 +477,7 @@
 		},
 		{
 			"id": "js-0352",
-			"ordinal": 367,
+			"ordinal": 511,
 			"name": "the number-row key left of 1 recommends an instant capture of every screen on every driver",
 			"cmd": "node",
 			"args": ["tools/test/test-number-row-full-capture.cjs"],
@@ -485,7 +485,7 @@
 		},
 		{
 			"id": "js-0354",
-			"ordinal": 369,
+			"ordinal": 512,
 			"name": "action picker greys a host-disabled row with its reason and never confirms it",
 			"cmd": "node",
 			"args": ["tools/test/test-action-picker-disabled-rows.cjs"],
@@ -493,7 +493,7 @@
 		},
 		{
 			"id": "js-0355",
-			"ordinal": 370,
+			"ordinal": 513,
 			"name": "action picker edits a text, a key or a shortcut and validates it as the drivers do",
 			"cmd": "node",
 			"args": ["tools/test/test-action-picker-parameter-editor.cjs"],
@@ -501,7 +501,7 @@
 		},
 		{
 			"id": "js-0356",
-			"ordinal": 371,
+			"ordinal": 514,
 			"name": "Apple Shortcuts cold CLI diagnostic preserves ownership and never admits a provider",
 			"cmd": "node",
 			"args": ["tools/test/test-apple-shortcuts-cold-cli-probe.cjs"],
@@ -509,7 +509,7 @@
 		},
 		{
 			"id": "js-0432",
-			"ordinal": 372,
+			"ordinal": 515,
 			"name": "installed Shortcuts target keeps 34 filesystem controls separate from native admission",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-apple-shortcuts-installed-target.cjs"],
@@ -517,7 +517,7 @@
 		},
 		{
 			"id": "js-0370",
-			"ordinal": 386,
+			"ordinal": 516,
 			"name": "Windows touchpad registry: one data file, both writers through one backing-up owner, restore row",
 			"cmd": "node",
 			"args": ["tools/test/test-touchpad-registry-single-source.cjs"],
@@ -525,7 +525,7 @@
 		},
 		{
 			"id": "js-0386",
-			"ordinal": 402,
+			"ordinal": 517,
 			"name": "keycode data single source (generated JS matches azerty.json, DC-1)",
 			"cmd": "node",
 			"args": ["tools/test/test-keycode-data-js-parity.cjs"],
@@ -533,7 +533,7 @@
 		},
 		{
 			"id": "js-0387",
-			"ordinal": 403,
+			"ordinal": 518,
 			"name": "physical-key registry is complete, unique per driver and agrees with every hand copy (evdev, kVK, SC, Karabiner, kanata)",
 			"cmd": "node",
 			"args": ["tools/test/test-physical-keys-registry.cjs"],
@@ -541,7 +541,7 @@
 		},
 		{
 			"id": "js-0389",
-			"ordinal": 405,
+			"ordinal": 519,
 			"name": "layer-action vocabulary resolves on every OS or says why, and sends what the action catalogue sends",
 			"cmd": "node",
 			"args": ["tools/test/test-layer-actions-vocabulary.cjs"],
@@ -549,7 +549,7 @@
 		},
 		{
 			"id": "js-0390",
-			"ordinal": 406,
+			"ordinal": 520,
 			"name": "layer editor data is generated from the registry, the vocabulary and the preset, with every label translated",
 			"cmd": "node",
 			"args": ["tools/test/test-layer-editor-data.cjs"],
@@ -557,7 +557,7 @@
 		},
 		{
 			"id": "js-0391",
-			"ordinal": 407,
+			"ordinal": 521,
 			"name": "layer editor model reads and writes what the loaders read, and an edit on one OS changes no other OS",
 			"cmd": "node",
 			"args": ["tools/test/test-layer-editor-model.cjs"],
@@ -565,7 +565,7 @@
 		},
 		{
 			"id": "js-0392",
-			"ordinal": 408,
+			"ordinal": 522,
 			"name": "layer editor page renders, picks and saves a layers.toml every OS loads, through the host protocol",
 			"cmd": "node",
 			"args": ["tools/test/test-layer-editor-page.cjs"],
@@ -573,7 +573,7 @@
 		},
 		{
 			"id": "js-0393",
-			"ordinal": 409,
+			"ordinal": 523,
 			"name": "layer editor legends: the hosts send the current layout and the layer key by one contract",
 			"cmd": "node",
 			"args": ["tools/test/test-layer-editor-legends.cjs"],
@@ -581,7 +581,7 @@
 		},
 		{
 			"id": "js-0394",
-			"ordinal": 410,
+			"ordinal": 524,
 			"name": "recommended navigation layer reproduces the Windows nav_layer.ahk key for key (golden) and resolves on every OS",
 			"cmd": "node",
 			"args": ["tools/test/test-nav-layer-recommended-golden.cjs"],
@@ -589,7 +589,7 @@
 		},
 		{
 			"id": "js-0395",
-			"ordinal": 411,
+			"ordinal": 525,
 			"name": "layer-file schema corpus replays through the JS loader (every error code, OS and binding form)",
 			"cmd": "node",
 			"args": ["tools/test/test-keymap-layers-corpus.cjs"],
@@ -597,7 +597,7 @@
 		},
 		{
 			"id": "js-0401",
-			"ordinal": 417,
+			"ordinal": 526,
 			"name": "gesture slot-space single source (Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space pinned to it)",
 			"cmd": "node",
 			"args": ["tools/test/test-gesture-slots-single-source.cjs"],
@@ -605,7 +605,7 @@
 		},
 		{
 			"id": "js-0402",
-			"ordinal": 418,
+			"ordinal": 527,
 			"name": "gesture recommended actions single source (macOS DEFAULT_GESTURES and Windows GESTURE_FACTORY_DEFAULTS built from the manifest)",
 			"cmd": "node",
 			"args": ["tools/test/test-gesture-defaults-single-source.cjs"],
@@ -613,7 +613,7 @@
 		},
 		{
 			"id": "js-0410",
-			"ordinal": 426,
+			"ordinal": 528,
 			"name": "no AHK name or VK hotkey targets a key another hotkey declares by scan code (hardening-c)",
 			"cmd": "node",
 			"args": ["tools/test/test-hardening-c-ahk-scan-code-precedence.cjs"],
@@ -621,7 +621,7 @@
 		},
 		{
 			"id": "js-0447",
-			"ordinal": 447,
+			"ordinal": 529,
 			"name": "CapsWord auto-off settings are one declaration: delay presets, delimiter catalogue and pointer kinds",
 			"cmd": "node",
 			"args": ["tools/test/test-caps-word-auto-off-single-source.cjs"],
@@ -629,7 +629,7 @@
 		},
 		{
 			"id": "js-0452",
-			"ordinal": 452,
+			"ordinal": 530,
 			"name": "the copy_selected_path open-target rule is one shared corpus every driver suite replays",
 			"cmd": "node",
 			"args": ["tools/test/test-open-target-vectors-shared.cjs"],
@@ -637,7 +637,7 @@
 		},
 		{
 			"id": "js-0457",
-			"ordinal": 457,
+			"ordinal": 531,
 			"name": "a fresh installation enables no layout emulation, system layout change or number-row inversion on any driver",
 			"cmd": "node",
 			"args": ["tools/test/test-neutral-installation.cjs"],
@@ -645,7 +645,7 @@
 		},
 		{
 			"id": "js-0458",
-			"ordinal": 458,
+			"ordinal": 532,
 			"name": "the owned Karabiner runtime pin is all-or-nothing and its driver pin equals the build tooling's",
 			"cmd": "node",
 			"args": ["tools/test/test-remap-runtime-manifest.cjs"],
@@ -653,7 +653,7 @@
 		},
 		{
 			"id": "action-catalogue-shared-projection",
-			"ordinal": 469,
+			"ordinal": 533,
 			"name": "the shared Lua action catalogue loads exactly each Lua driver's own catalogue",
 			"cmd": "node",
 			"args": ["tools/test/test-action-catalogue-shared-projection.cjs"],
@@ -661,7 +661,7 @@
 		},
 		{
 			"id": "recommended-defaults-rule",
-			"ordinal": 487,
+			"ordinal": 534,
 			"name": "recommended defaults avoid system conflicts (Linux swipes, macOS tap), one trigger debounce, MLX reason shown",
 			"cmd": "node",
 			"args": ["tools/test/test-recommended-defaults-rule.cjs"],
@@ -669,7 +669,7 @@
 		},
 		{
 			"id": "cascade-arrow-bounds",
-			"ordinal": 488,
+			"ordinal": 535,
 			"name": "the cascade arrow count has one range across the manifest, schema, both engines and the v14 migration",
 			"cmd": "node",
 			"args": ["tools/test/test-cascade-arrow-bounds.cjs"],
@@ -677,7 +677,7 @@
 		},
 		{
 			"id": "lua-features-manifest-projection",
-			"ordinal": 489,
+			"ordinal": 536,
 			"name": "the shared Lua features manifest loads exactly each Lua driver's own manifest",
 			"cmd": "node",
 			"args": ["tools/test/test-lua-features-manifest-projection.cjs"],
@@ -685,7 +685,7 @@
 		},
 		{
 			"id": "tap-hold-migrations",
-			"ordinal": 507,
+			"ordinal": 537,
 			"name": "the versioned tap_hold.toml registry, its corpus and the retired explicit_delays marker",
 			"cmd": "node",
 			"args": ["tools/test/test-tap-hold-migrations.cjs"],
@@ -693,7 +693,7 @@
 		},
 		{
 			"id": "keylayout-canonical-parity",
-			"ordinal": 509,
+			"ordinal": 538,
 			"name": "keylayout canonical form: the shared Lua parser and the converter's Python parser read every shipped layout the same, and the converter writes the same XKB from it",
 			"cmd": "node",
 			"args": ["tools/test/test-keylayout-canonical-parity.cjs"],
@@ -701,7 +701,7 @@
 		},
 		{
 			"id": "xkb-row-options",
-			"ordinal": 522,
+			"ordinal": 539,
 			"name": "the number-row options: the Linux converter and the web composer type the same layout, and both match the hand-written Windows outcomes",
 			"cmd": "node",
 			"args": ["tools/test/test-xkb-row-options.cjs"],

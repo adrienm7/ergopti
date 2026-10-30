@@ -1802,6 +1802,7 @@
 	"menu.llm.debounce_label": "Vilotidens innan förslag: %s",
 	"menu.llm.debounce_prompt": "Inaktivitetsfördröjning innan generering (i ms, t.ex. 600):",
 	"menu.llm.min_interval_label": "Minsta tid mellan två automatiska AI-förfrågningar: %s",
+	"menu.llm.trigger.min_request_interval_ms": "Förfrågningsintervall",
 	"menu.llm.delete_model_body": "Vill du verkligen ta bort modellen \"%s\" från den lokala cachen?",
 	"menu.llm.delete_model_cache": "🗑️ Ta bort den här modellen från cacheminnet",
 	"menu.llm.delete_model_title": "Ta bort modellen?",

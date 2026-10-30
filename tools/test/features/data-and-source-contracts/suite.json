@@ -356,7 +356,7 @@
 		},
 		{
 			"id": "js-0361",
-			"ordinal": 377,
+			"ordinal": 370,
 			"name": "name parity (text_utils + action_picker + manifest_menu symmetric across drivers)",
 			"cmd": "node",
 			"args": ["tools/test/test-name-parity.cjs"],
@@ -364,7 +364,7 @@
 		},
 		{
 			"id": "js-0397",
-			"ordinal": 413,
+			"ordinal": 396,
 			"name": "TOML coercion parity (corpus cross-driver gate)",
 			"cmd": "node",
 			"args": ["tools/test/test-toml-coercion-parity.cjs"],
@@ -372,7 +372,7 @@
 		},
 		{
 			"id": "js-0398",
-			"ordinal": 414,
+			"ordinal": 397,
 			"name": "shared test.format single source (inspect/deep_equal/fail_msg_for consumed from _shared, no local copies)",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-test-format.cjs"],
@@ -380,7 +380,7 @@
 		},
 		{
 			"id": "js-0399",
-			"ordinal": 415,
+			"ordinal": 398,
 			"name": "file watchers constants single source (SCAN_MAX_DEPTH=16 + debounce=0.5s match across Linux + macOS infra/file_watchers.lua)",
 			"cmd": "node",
 			"args": ["tools/test/test-file-watchers-constants-single-source.cjs"],
@@ -388,7 +388,7 @@
 		},
 		{
 			"id": "js-0400",
-			"ordinal": 416,
+			"ordinal": 399,
 			"name": "format_toml CLI behavioral test (bare invocation exits 1 = usage; --preview sorts sections/keys + styles headers, file untouched)",
 			"cmd": "node",
 			"args": ["tools/test/test-format-toml-importable.cjs"],
@@ -396,7 +396,7 @@
 		},
 		{
 			"id": "js-0405",
-			"ordinal": 421,
+			"ordinal": 402,
 			"name": "no plan-item references in tracked source (refactor/delivery tokens purged; algorithmic Phase-N allowlisted)",
 			"cmd": "node",
 			"args": ["tools/test/test-no-plan-refs-in-source.cjs"],
@@ -404,7 +404,7 @@
 		},
 		{
 			"id": "js-0409",
-			"ordinal": 425,
+			"ordinal": 406,
 			"name": "every Hammerspoon deadline keeps 2 s over the native worker budget it waits for (hardening-d)",
 			"cmd": "node",
 			"args": ["tools/test/test-hardening-d-native-timeout-contract.cjs"],
@@ -412,7 +412,7 @@
 		},
 		{
 			"id": "js-0411",
-			"ordinal": 427,
+			"ordinal": 407,
 			"name": "no macOS or Linux module builds a user-data path inside the installed driver folder (hardening-b)",
 			"cmd": "node",
 			"args": ["tools/test/test-hardening-b-no-user-data-under-driver-dir.cjs"],
@@ -420,7 +420,7 @@
 		},
 		{
 			"id": "js-0437",
-			"ordinal": 437,
+			"ordinal": 417,
 			"name": "word-expander catalogue rows resolve a translated label key on every driver (no French literal)",
 			"cmd": "node",
 			"args": ["tools/test/test-terminator-labels-localized.cjs"],
@@ -428,7 +428,7 @@
 		},
 		{
 			"id": "js-0446",
-			"ordinal": 446,
+			"ordinal": 426,
 			"name": "generated config templates carry the 5/3 blank-line header spacing the writers render",
 			"cmd": "node",
 			"args": ["tools/test/test-config-template-spacing.cjs"],
@@ -436,7 +436,7 @@
 		},
 		{
 			"id": "js-0462",
-			"ordinal": 462,
+			"ordinal": 438,
 			"name": "translation audit scope (every driver, shared tree, unused-key baseline)",
 			"cmd": "node",
 			"args": ["tools/test/test-audit-translations-scope.cjs"],
@@ -444,7 +444,7 @@
 		},
 		{
 			"id": "js-0463",
-			"ordinal": 463,
+			"ordinal": 439,
 			"name": "visible text is localized (Windows notices, macOS field labels, Linux key names)",
 			"cmd": "node",
 			"args": ["tools/test/test-visible-text-is-localized.cjs"],
@@ -452,7 +452,7 @@
 		},
 		{
 			"id": "js-0464",
-			"ordinal": 472,
+			"ordinal": 447,
 			"name": "key-combination defaults are the same on the three drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-key-combination-defaults-parity.cjs"],
@@ -460,7 +460,7 @@
 		},
 		{
 			"id": "js-0465",
-			"ordinal": 473,
+			"ordinal": 448,
 			"name": "config-key and menu-command constants are generated from the schema and the menu manifest",
 			"cmd": "node",
 			"args": ["tools/test/test-config-keys-codegen.cjs"],
@@ -468,7 +468,7 @@
 		},
 		{
 			"id": "js-0466",
-			"ordinal": 474,
+			"ordinal": 449,
 			"name": "raw config-key and command-id literals only go down (ratchet against the generated constants)",
 			"cmd": "node",
 			"args": ["tools/test/test-config-key-literals.cjs"],
@@ -476,7 +476,7 @@
 		},
 		{
 			"id": "js-0471",
-			"ordinal": 475,
+			"ordinal": 450,
 			"name": "log vocabulary scanner matches every reason, phase, tag and evidence-field shape",
 			"cmd": "node",
 			"args": ["tools/test/test-log-vocabulary-scan.cjs"],
@@ -484,7 +484,7 @@
 		},
 		{
 			"id": "js-0472",
-			"ordinal": 476,
+			"ordinal": 451,
 			"name": "no hard-coded UI strings at display calls on any surface (baseline only shrinks)",
 			"cmd": "node",
 			"args": ["tools/test/test-no-hardcoded-ui-strings.cjs"],
@@ -492,7 +492,7 @@
 		},
 		{
 			"id": "js-0469",
-			"ordinal": 477,
+			"ordinal": 452,
 			"name": "Lua drivers copy, count, trim, shell-quote and percent-encode through the shared owners only",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-lua-helpers-single-use.cjs"],
@@ -500,7 +500,7 @@
 		},
 		{
 			"id": "js-0470",
-			"ordinal": 478,
+			"ordinal": 453,
 			"name": "every shared timing registry key is read at runtime or pinned to a driver copy",
 			"cmd": "node",
 			"args": ["tools/test/test-timings-registry-liveness.cjs"],
@@ -508,7 +508,7 @@
 		},
 		{
 			"id": "js-0475",
-			"ordinal": 483,
+			"ordinal": 458,
 			"name": "timing and size constant names declared in more than one file only go down (ratchet)",
 			"cmd": "node",
 			"args": ["tools/test/test-duplicate-constant-names.cjs"],
@@ -516,7 +516,7 @@
 		},
 		{
 			"id": "js-0500",
-			"ordinal": 500,
+			"ordinal": 472,
 			"name": "source-shape gates read a generated config-key constant as the literal it stands for",
 			"cmd": "node",
 			"args": ["tools/test/test-config-key-tokens.cjs"],
@@ -524,7 +524,7 @@
 		},
 		{
 			"id": "js-0501",
-			"ordinal": 501,
+			"ordinal": 473,
 			"name": "drift guard isolation skips directory links and keeps file links",
 			"cmd": "node",
 			"args": ["tools/test/test-drift-guard-isolation-skips-directory-links.cjs"],
@@ -532,7 +532,7 @@
 		},
 		{
 			"id": "js-0502",
-			"ordinal": 503,
+			"ordinal": 475,
 			"name": "shortcut inventory matches the manifest, handler chords and slot prefix tables",
 			"cmd": "node",
 			"args": ["tools/test/test-shortcut-inventory-matches-sources.cjs"],
@@ -540,7 +540,7 @@
 		},
 		{
 			"id": "js-0503",
-			"ordinal": 505,
+			"ordinal": 477,
 			"name": "slot roles resolve on every driver and the crosswalk equals the inventory",
 			"cmd": "node",
 			"args": ["tools/test/test-slot-roles-single-source.cjs"],
@@ -548,7 +548,7 @@
 		},
 		{
 			"id": "js-contract-vector-ledger",
-			"ordinal": 508,
+			"ordinal": 479,
 			"name": "Contract vector ledger (every case moved into a JSON vector corpus is accounted for once)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-contract-vector-ledger.cjs"],
@@ -556,7 +556,7 @@
 		},
 		{
 			"id": "js-menu-row-order-single-source",
-			"ordinal": 513,
+			"ordinal": 483,
 			"name": "Menu row order single source (no driver spells a display order of row_order.json)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-menu-row-order-single-source.cjs"],
@@ -564,7 +564,7 @@
 		},
 		{
 			"id": "js-file-system-port-wired",
-			"ordinal": 515,
+			"ordinal": 485,
 			"name": "FileSystem port spec wiring (both Lua owners check the lease and atomic write spec at load)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-file-system-port-wired.cjs"],
@@ -572,7 +572,7 @@
 		},
 		{
 			"id": "js-linux-shell-messages",
-			"ordinal": 519,
+			"ordinal": 489,
 			"name": "Linux shell messages (catalogue reader contract and every printed key in the generated catalogue)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-shell-messages.cjs"],
@@ -580,7 +580,7 @@
 		},
 		{
 			"id": "js-ahk-local-same-as-global",
-			"ordinal": 528,
+			"ordinal": 497,
 			"name": "AHK #Warn LocalSameAsGlobal replay (no local shadows a global in the library or any #Warn All child)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ahk-local-same-as-global.cjs"],
@@ -588,7 +588,7 @@
 		},
 		{
 			"id": "js-lua-undefined-globals",
-			"ordinal": 529,
+			"ordinal": 498,
 			"name": "Lua undefined global reads (no production Lua of macOS, Linux or _shared reads a global nothing defines)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-lua-undefined-globals.cjs"],

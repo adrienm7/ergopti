@@ -5,9 +5,19 @@ const {
 	declaredLinuxTopLevelPublication,
 	nativeLinuxAiParentPublication
 } = require('../../lib/menu-native-llm-parent-binding.cjs');
-module.exports = function (sources, manifest) {
+const { composeLinuxMenuRoot } = require('../../lib/linux-menu-parts.cjs');
+const { verifyQuitSplit } = require('../lib/linux-menu-split.cjs');
+/**
+ * @param sources the AI sources, the tray root composed with its split modules
+ * @param manifest the menu manifest
+ * @param menuSources the tray root and its split modules as they are on disk
+ */
+module.exports = function (sources, manifest, menuSources) {
 	const file = 'linux/ui/menu/menu_builder.lua',
 		source = sources[file];
+	const composed = composeLinuxMenuRoot(menuSources);
+	assert.equal(composed.ok, true, 'the tray root composes: ' + composed.reason);
+	assert.equal(composed.source, source, 'the AI sources carry the composed tray root');
 	const ports = [
 		['complete native root', (body) => declaredLinuxTopLevelPublication(body)],
 		...['llm', 'agent'].map((kind) => [
@@ -254,5 +264,30 @@ module.exports = function (sources, manifest) {
 			controls++;
 		}
 	}
+	// The same cohort is still enforced once a section builder lives in its own
+	// module: breaking it there, or wiring the module any other way, is refused.
+	for (const [name, credits] of ports)
+		controls += verifyQuitSplit(
+			menuSources,
+			credits,
+			[
+				[
+					'local function _build_quit(ctx)',
+					'local function _build_quit(ctx)\n\tManifestMenu = nil',
+					'split module reassigns the facade'
+				],
+				[
+					'local function _build_quit(ctx)',
+					'local function _build_quit(ctx)\n\tPrepareNativePresentation = Foreign.prepare',
+					'split module reassigns the native factory'
+				],
+				[
+					'local function _build_quit(ctx)',
+					'local function _build_quit(ctx)\n\tseparator_render = nil',
+					'split module reassigns the root renderer'
+				]
+			],
+			name
+		);
 	return controls;
 };

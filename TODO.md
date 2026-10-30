@@ -190,6 +190,21 @@ into its item below or into the matching existing item.
       tooltip display, so those say "no budget declared" until the code declares one; the Windows driver
       logs no per-request LLM latency (only timeouts); `tools/test/features/test-infrastructure/suite.json`
       on dev lists ordinal 537 before 485 (0ba0e905), which stops `npm run test:js` before any check.
+- [ ] **macOS field holds of 2026-10-30 (worker `perf/macos-field-holds`).** [CODE] [PHYS-M] From the field
+      report `mac-2026-10-30_210120` (141 holds over 250 ms). Done: the unjournaled-ledger admission scans data.sql
+      with native finds (17 s hold, append prepare=17225 ms; about 15x faster); the personal-row alias check of a
+      preferences save is indexed once (hotstrings=970 ms of the 2 s saves, which are also the 2 s
+      `startup_controller` holds; 3.3 s to 0.16 s with 12 personal groups); the dynamic-rule preview provider tests
+      a suffix before its settings-reading section guard (preview.providers 1.7 ms per key); the synchronous
+      diagnostics line names its slowest collectors on the three OS; the keyboard-layout row times its sources,
+      bundles, variants and rows stages. Left, from the next field report: (1) menu rebuilds are 90 of the holds
+      (28 s, about 300 ms each, every ~67 s in the evening with keyboard_layout up to 420 ms): read the new
+      `menu_keyboard_layout.*` phases and find what asks for the periodic refresh (its requester is a DEBUG
+      line); (2) preferences save `sparse` (about 280 ms) and `write` (600 to 800 ms, 4 metadata forks) were not
+      reproduced off the Mac; (3) keystats append `write` 150 to 350 ms and the ledger read itself remain on the
+      main thread; (4) name the collector behind the healthcheck 100 to 230 ms from its new line, and the
+      ignored-window AX probe (500 ms timeout); (5) the one-off holds of `field_run`, `error_dialog`, `keymap/utils`
+      timers and `menu_state` (shell.ioreg 146 ms).
 - [ ] **Thinking off for every model on every backend and OS (worker `fix/llm-thinking-off`).** [CODE] The
       rule depends on the MODEL, not on the provider: model families (normalized model id) declare an intent
       (off, or the lowest level a model allows) and a control kind; each provider and local server declares
@@ -220,6 +235,31 @@ into its item below or into the matching existing item.
       (8000), Docker Model Runner (12434), Microsoft Foundry Local (dynamic port), llamafile (8080, shared with
       llama.cpp and LocalAI), a hand-started `mlx_lm.server` (8080), exo (52415), Msty, AnythingLLM. Ports
       shared by several servers are probed once and named together, as llama.cpp and LocalAI are.
+- [ ] **Mac field report 2026-10-30 21:01, functional errors left open (worker `fix/macos-field-errors`).**
+      Fixed there: shortcut full rebind on each bounded retry (35cc4a5d), pre-dispatch Ollama pull receipt
+      (6f6b752f), one model-list error per outage (6051b50c), MLX server stopped before a repair (fcdb6f27),
+      both schema versions named (9cfe90de), plus the diagnostics below. Left, one line per family:
+  - [PHYS-M] **Ctrl+. after a layout flip.** Confirm on the next field run that no "Some shortcuts are still
+    unregistered" line follows a "rebinding every shortcut (retry N)" line. If one does, the static chord was
+    rebound while `hs.keycodes.map` still described the previous layout (18:30:09 rebound "for Ergopti" with
+    a map lacking '.'): rebinding then needs the map's own change notification, not the TIS event.
+  - [CODE] **Ollama pull refused while reading its request.** Such an exit leaves an empty receipt, which
+    cannot be told from a crash after submission, so its task slot stays owned. Passing the receipt path on
+    the command line would let the owner publish a pre-dispatch refusal for that stage too.
+  - [PHYS-M] **Eventtaps refused at 10:07.** The errors now name `accessibility_trusted`; if it reads false,
+    macOS withdrew the grant at run time and nothing asked the user again until the next boot.
+  - [PHYS-M] **Personal hotstring reload rolled back (11:37, twice).** The editor and the registry now name
+    the refusing step; read that line on the next save that fails.
+  - [PHYS-M] **Key events lost upstream** (key-ups without key-down until 15:32, repeated key-downs until
+    11:44): no line names a cause; they coincide with main-thread holds and Karabiner lease failures.
+  - [PHYS-M] **MLX discovery after the 01:19 repair.** The rebuilt server answered `/v1/models` but 404 on
+    every POST route for 340 s before discovery gave up; not reproducible without the Mac.
+  - [PHYS-M] **Screenshot without an image (10:15).** The error now names `interactive=` and the stderr: an
+    interactive capture with empty stderr would be an Escape reported as success, to be settled as a cancel.
+  - [CODE] **Field check `app_health`** logs an ERROR from `fs_dir` when the driver's `crash_reports` folder
+    does not exist yet (20:56, 21:06); an absent folder is zero reports (field-run owner).
+  - [PHYS-M] **Keystats ingest "database is locked"** once at 20:52, during the field run's read-only checks;
+    confirm whether the `quick_check` of `field_storage` overlapped the ingest transaction.
 - [ ] **Container note.** `tools/test/test-managed-ollama-protocol.cjs` stops in a cloud container on Git's
       "dubious ownership" when run as a non-root user over a root-owned checkout; give the test its own
       `safe.directory` for its child Git calls instead of relying on the host configuration.

@@ -167,6 +167,12 @@ local function build_tray(observe_layout)
 		karabiner  = remap_double(),
 		gestures   = gestures_double(),
 		shortcuts  = shortcuts_double(),
+		-- The delimiter catalogue always ships, and the consumption submenu lists it.
+		keymap     = {
+			get_terminator_defs = function() return { { key = "space", label_key = "menu.hotstrings.consumed" } } end,
+			is_terminator_enabled = function() return true end,
+			is_terminator_consume = function() return false end,
+		},
 		llm_handler = { build_item = function() return llm_item end },
 	}
 	local actions = setmetatable({}, { __index = function() return function() end end })

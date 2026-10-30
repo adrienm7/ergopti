@@ -331,7 +331,8 @@ _LLM_Vision_OnCaptured(Flow, Ok, Reason := "") {
 		"text", LLM_VISION_READ_USER_TEXT,
 		"image", Image,
 		"mime", Config["image_mime"],
-		"max_tokens", Config["read_max_tokens"]))
+		"max_tokens", Config["read_max_tokens"],
+		"think", LLM_OllamaThink(Flow["model"])))
 	LoggerInfo("LLM", "Screen reading #{1}: {2} KB of image sent to '{3}'.",
 		Flow["generation"], Round(StrLen(Image) * 3 / 4 / 1024), Flow["backend"])
 	if _LLM_Vision_IsCurrent(Flow)
@@ -446,10 +447,10 @@ _LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine := true, CurrentF
 		Transport := HasMethod(_LLM_Vision_RemoteTransport, "Call")
 			? _LLM_Vision_RemoteTransport : _LLM_Vision_RemoteRequest
 		; A provider refusing a thinking field gets the request once more without it
-		Send := (Sent, Fail) => Transport.Call(Target["resolved"], Target["url"], Sent, OnSuccess, Fail, CurrentFn)
+		Resend := (Sent, Fail) => Transport.Call(Target["resolved"], Target["url"], Sent, OnSuccess, Fail, CurrentFn)
 		Transport.Call(Target["resolved"], Target["url"], Body, OnSuccess,
 			_LLMRemoteThinkingRetryFail.Bind(Map("retried", false, "resolved", Target["resolved"], "added", Added,
-				"body", Body, "send", Send), OnFail), CurrentFn)
+				"body", Body, "send", Resend), OnFail), CurrentFn)
 		return
 	}
 	Transport := HasMethod(_LLM_Vision_OllamaTransport, "Call")
@@ -547,11 +548,13 @@ LLM_Vision_SendText(System, User, MaxTokens, OnSuccess, OnFail, CurrentFn := 0) 
 	}
 	; The local server's chat body, written whole: the prediction payload stops
 	; at the first line break, and an answer may take several lines
+	Model := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 	_LLM_Vision_Send(Map("format", "ollama"), LLM_Vision_BuildRequest("ollama", Map(
-		"model", LLM_ResolveOllamaTag(_LLM_Engine["model"]),
+		"model", Model,
 		"system", System,
 		"text", User,
-		"max_tokens", MaxTokens)), OnSuccess, OnFail, true, CurrentFn)
+		"max_tokens", MaxTokens,
+		"think", LLM_OllamaThink(Model))), OnSuccess, OnFail, true, CurrentFn)
 	return true
 }
 

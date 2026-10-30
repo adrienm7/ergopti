@@ -367,6 +367,30 @@ helpers.describe("network field check window (Linux)", function()
 		end)
 	end)
 
+	helpers.it("(linux-field-run) runs headless: the same evidence line and result, and no window", function()
+		with_window(Ports.new((deps())), function(Window, world)
+			local result
+			helpers.assert_true(Window.run_headless(function(settled) result = settled end, world.services))
+			world.flush()
+			helpers.assert_eq(#world.dialogs, 0, "no dialog and nothing for a person to close")
+			helpers.assert_eq(#world.evidence, 1)
+			helpers.assert_eq(result and result.check, "network")
+			helpers.assert_eq(result.passed, true)
+			helpers.assert_eq(result.steps[1].id, "proxy_settings")
+			helpers.assert_true(not Window.is_running())
+		end)
+	end)
+
+	helpers.it("(linux-field-run) refuses a headless run while a clicked one is pending", function()
+		local pending
+		local collaborators = deps({ http_get = function(_, _, _, callback) pending = callback; return true end })
+		with_window(Ports.new(collaborators), function(Window, world)
+			helpers.assert_true(Window.run(world.services))
+			helpers.assert_eq(Window.run_headless(function() error("a refused run never settles") end, world.services), false)
+			pending({ ok = true, status = 200, body = "" })
+		end)
+	end)
+
 	helpers.it("(linux-network-check) copies exactly what the window shows", function()
 		with_window(Ports.new((deps())), function(Window, world)
 			world.click = "copy"

@@ -177,7 +177,7 @@ function M.build_payload(buffer, config)
 		messages   = messages,
 		stream     = stream,
 		-- A thinking model would spend the whole budget reasoning
-		think      = false,
+		think      = require("modules.llm.api_remote").ollama_think(model_name),
 		keep_alive = config.keep_alive or M.DEFAULT_KEEP_ALIVE,
 		options    = {
 			temperature = temperature,

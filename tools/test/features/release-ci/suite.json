@@ -269,7 +269,7 @@
 		},
 		{
 			"id": "js-0438",
-			"ordinal": 438,
+			"ordinal": 418,
 			"name": "Linux E2E matrix rows keep every former harness once and every row required by the verdict",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-e2e-shards.cjs"],
@@ -277,7 +277,7 @@
 		},
 		{
 			"id": "js-0440",
-			"ordinal": 440,
+			"ordinal": 420,
 			"name": "Managed Ollama receiving admits only this commit and run clean build from its parallel build cell",
 			"cmd": "node",
 			"args": ["tools/test/test-managed-ollama-handoff.cjs"],

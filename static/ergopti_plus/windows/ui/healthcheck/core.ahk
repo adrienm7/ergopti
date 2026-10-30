@@ -343,17 +343,41 @@ HealthCheck_Config() {
 ; @param Name {String} Collector name, used in the log lines.
 ; @param Collector {Func} Zero-argument collector to invoke.
 ; @param Fallback {Any} Value substituted when the collector fails.
+; @param Timings {Array|Integer} Receives Map("name", Name, "ms", duration) when an Array.
 ; @return {Any} The collected value, or Fallback.
-_HealthCheck_Collect(Name, Collector, Fallback) {
+_HealthCheck_Collect(Name, Collector, Fallback, Timings := 0) {
 	try LoggerTrace("Healthcheck", "Collecting '{1}'…", Name)
+	CollectStarted := _HealthCheck_NowMs()
 	Value := Fallback
 	try {
 		Value := Collector()
 	} catch as e {
 		try LoggerWarn("Healthcheck", "Collector '{1}' failed, field degraded: {2}.", Name, e.Message)
 	}
+	if (Timings is Array)
+		Timings.Push(Map("name", Name, "ms", _HealthCheck_NowMs() - CollectStarted))
 	try LoggerDone("Healthcheck", "Collected '{1}'.", Name)
 	return Value
+}
+
+; Names the slowest collectors of one synchronous collection, so an
+; over-budget line says which section held the thread (the 2026-10-30 macOS
+; field report had 29 collections of 100 to 230 ms and no owner).
+; @param Timings {Array} Maps { name, ms } in run order.
+; @param Count {Integer} How many to name: the schema's phase_a_slowest_named.
+; @returns {String} "; slowest: system=120.3 ms, ...", empty without timings.
+_HealthCheck_SlowestCollectors(Timings, Count) {
+	Remaining := Timings.Clone()
+	Parts := []
+	while (Parts.Length < Count && Remaining.Length > 0) {
+		Slowest := 1
+		for Index, Entry in Remaining
+			if (Entry["ms"] > Remaining[Slowest]["ms"])
+				Slowest := Index
+		Entry := Remaining.RemoveAt(Slowest)
+		Parts.Push(Entry["name"] . "=" . Format("{:.1f}", Entry["ms"]) . " ms")
+	}
+	return Parts.Length > 0 ? "; slowest: " . _HC_Join(Parts, ", ") : ""
 }
 
 ; The warnings and errors: the session counters, the last error and the
@@ -434,16 +458,17 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 	; _HealthCheck_Collect: inside the constructor a bare call could not be
 	; guarded, and the first one to throw took the whole snapshot — and the
 	; crash report it was run for — down with it.
-	Paths       := _HealthCheck_Collect("paths", () => _HealthCheck_Paths(ReportSubdir), Map())
-	Versions    := _HealthCheck_Collect("versions", _HealthCheck_Versions, Map())
-	Hardware    := _HealthCheck_Collect("hardware", _HealthCheck_Hardware, Map())
-	System      := _HealthCheck_Collect("system", () => _HealthCheck_System(Detailed, UptimeSec), Map())
-	Input       := _HealthCheck_Collect("input", _HealthCheck_Input, Map())
-	FeatureMap  := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []))
-	Ai          := _HealthCheck_Collect("ai", _HealthCheck_Ai, Map())
-	Peripherals := _HealthCheck_Collect("peripherals", () => _HealthCheck_Peripherals(Detailed), Map("items", []))
-	Issues      := _HealthCheck_Collect("issues", _HealthCheck_Issues, Map())
-	Developer   := _HealthCheck_Collect("developer", _HealthCheck_Developer, Map())
+	Timings := []
+	Paths       := _HealthCheck_Collect("paths", () => _HealthCheck_Paths(ReportSubdir), Map(), Timings)
+	Versions    := _HealthCheck_Collect("versions", _HealthCheck_Versions, Map(), Timings)
+	Hardware    := _HealthCheck_Collect("hardware", _HealthCheck_Hardware, Map(), Timings)
+	System      := _HealthCheck_Collect("system", () => _HealthCheck_System(Detailed, UptimeSec), Map(), Timings)
+	Input       := _HealthCheck_Collect("input", _HealthCheck_Input, Map(), Timings)
+	FeatureMap  := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []), Timings)
+	Ai          := _HealthCheck_Collect("ai", _HealthCheck_Ai, Map(), Timings)
+	Peripherals := _HealthCheck_Collect("peripherals", () => _HealthCheck_Peripherals(Detailed), Map("items", []), Timings)
+	Issues      := _HealthCheck_Collect("issues", _HealthCheck_Issues, Map(), Timings)
+	Developer   := _HealthCheck_Collect("developer", _HealthCheck_Developer, Map(), Timings)
 	Probes      := _HealthCheck_PendingProbes(Schema, Extensive)
 
 	Sections := Map(
@@ -477,8 +502,8 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 	; Not a warning: the next snapshot would count it among the session's
 	; problems. The report's developer section carries the duration.
 	if (Elapsed > Schema["phase_a_budget_ms"])
-		try LoggerInfo("Healthcheck", "The synchronous diagnostics took {1} ms, over the {2} ms budget.",
-			Elapsed, Schema["phase_a_budget_ms"])
+		try LoggerInfo("Healthcheck", "The synchronous diagnostics took {1} ms, over the {2} ms budget{3}.",
+			Elapsed, Schema["phase_a_budget_ms"], _HealthCheck_SlowestCollectors(Timings, Schema["phase_a_slowest_named"]))
 	Undeclared := HealthCheck_CheckFields(Snapshot, Schema)["undeclared"]
 	if (Undeclared.Length > 0)
 		try LoggerError("Healthcheck", "The diagnostics snapshot carries fields the schema does not declare: {1}.",

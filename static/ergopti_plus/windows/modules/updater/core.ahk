@@ -2764,10 +2764,10 @@ _Updater_NoChannelReleaseMessage(Channel) {
 ; @param Repo {String} Expected repository name.
 ; @param Reason {VarRef} Why the feed gives no list.
 ; @returns {String} The JSON array text; "" when the feed gives no list.
-_Updater_ParseReleaseFeed(Body, Owner, Repo, &Reason := "") {
-	Reason := ""
+_Updater_ParseReleaseFeed(Body, Owner, Repo, &Detail := "") {
+	Detail := ""
 	if !(Body is String) || !RegExMatch(Body, "<feed[\s>]") {
-		Reason := "not an Atom feed"
+		Detail := "not an Atom feed"
 		return ""
 	}
 	Prefix := UPDATER_GITHUB_WEB_ROOT . Owner . "/" . Repo . "/releases/tag/"
@@ -2785,7 +2785,7 @@ _Updater_ParseReleaseFeed(Body, Owner, Repo, &Reason := "") {
 		Rows .= (Rows == "" ? "" : ",") . '{"tag_name":"' . Tag . '","published_at":"' . Updated . '"}'
 	}
 	if (Rows == "") {
-		Reason := "an Atom feed without a release of " . Owner . "/" . Repo
+		Detail := "an Atom feed without a release of " . Owner . "/" . Repo
 		return ""
 	}
 	return "[" . Rows . "]"
@@ -2841,9 +2841,9 @@ _Updater_InterpretFeedResponse(Status, Body, Channel, Request) {
 		try LoggerWarn("Updater", "The public release feed answered HTTP {1}.", Status)
 		return ""
 	}
-	List := _Updater_ParseReleaseFeed(Body, UPDATER_GH_OWNER, UPDATER_GH_REPO, &Reason)
+	List := _Updater_ParseReleaseFeed(Body, UPDATER_GH_OWNER, UPDATER_GH_REPO, &Detail)
 	if (List == "") {
-		try LoggerWarn("Updater", "The public release feed gives no list: {1}.", Reason)
+		try LoggerWarn("Updater", "The public release feed gives no list: {1}.", Detail)
 		return ""
 	}
 	Index := _Updater_ReleaseListIndex(List)

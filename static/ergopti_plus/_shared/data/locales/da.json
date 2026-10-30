@@ -1802,6 +1802,7 @@
 	"menu.llm.debounce_label": "Inaktivitetstid før forslag: %s",
 	"menu.llm.debounce_prompt": "Forsinkelse ved inaktivitet før generering (i ms, f.eks. 600):",
 	"menu.llm.min_interval_label": "Mindste tid mellem to automatiske AI-forespørgsler: %s",
+	"menu.llm.trigger.min_request_interval_ms": "Forespørgselsinterval",
 	"menu.llm.delete_model_body": "Vil du virkelig slette modellen \"%s\" fra den lokale cache?",
 	"menu.llm.delete_model_cache": "🗑️ Slet dette model fra cache",
 	"menu.llm.delete_model_title": "Slet modellen?",

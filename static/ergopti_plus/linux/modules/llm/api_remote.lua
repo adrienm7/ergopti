@@ -520,6 +520,16 @@ function thinking_families()
 	return families
 end
 
+--- The think value of an Ollama chat body for a model (thinking_off.json):
+--- false, or the effort level of a family that ignores false (gpt-oss).
+--- @param model string The model id.
+--- @return boolean|string think
+function M.ollama_think(model)
+	local think = ThinkingOff.ollama_think(thinking_families(), tostring(model))
+	if think ~= false then Logger.debug(LOG, "Ollama think for model %s: %s.", tostring(model), think) end
+	return think
+end
+
 --- Completes a request body for a provider: a local server's request_fields
 --- of local_servers.json (OpenAI shape), then the model family's reasoning
 --- control (thinking_off.json) through the provider's thinking_dialect. A

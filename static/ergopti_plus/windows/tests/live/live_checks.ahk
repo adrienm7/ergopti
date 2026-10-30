@@ -502,6 +502,182 @@ LiveCmdRowInfo(Args) {
 		. " token=" . _MenuDispatchTokens.Has(Row.Id) . " flags=" . Row.Flags
 }
 
+
+
+
+
+
+; ==============================
+; ==============================
+; ======= 6/ The AI, off =======
+; ==============================
+; ==============================
+
+/**
+ * What the AI's background paths hold: the switch, whether its hotkeys wait for
+ * the switch-on, the runtime and navigation slots, whether a discovery scan has
+ * ever reported, and the notice the tooltip was last asked to show.
+ */
+LiveCmdAiState(Args) {
+	global _LLM_Menu_HotkeysAwaitEnable, _LLM_Menu_NavActiveSlot, LLM_LOCAL_SERVER_SCANS
+	Scans := IsSet(LLM_LOCAL_SERVER_SCANS) && LLM_LOCAL_SERVER_SCANS is Map ? LLM_LOCAL_SERVER_SCANS.Count : 0
+	return "enabled=" . (LLM_Menu_AiEnabled() ? 1 : 0)
+		. " await=" . (_LLM_Menu_HotkeysAwaitEnable ? 1 : 0)
+		. " navslot=" . _LLM_Menu_NavActiveSlot
+		. " scans=" . Scans
+		. " notice=" . _LiveTooltipNotice()
+}
+
+; The text of the tooltip request TooltipShow published, or "" when none.
+_LiveTooltipNotice() {
+	global _TooltipPendingRequest
+	if !IsSet(_TooltipPendingRequest) || !IsObject(_TooltipPendingRequest)
+		return ""
+	Items := _TooltipPendingRequest.Items
+	if Items is Array
+		Items := Items.Length ? Items[1] : ""
+	return IsObject(Items) && Items.HasOwnProp("Text") ? LiveOneLine(Items.Text) : ""
+}
+
+/** The translation of a locale key, for an orchestrator that compares a shown text. */
+LiveCmdTranslate(Args) {
+	return "text=" . LiveOneLine(t(Args[1]))
+}
+
+/**
+ * Runs the AI's real first activation with a navigation binder that answers as
+ * the system does when it refuses a hotkey. Only that answer is simulated: no
+ * real refusal can be provoked, and switching the AI on would start its backend.
+ */
+LiveCmdAiHotkeyRefused(Args) {
+	global LLM_NAV_REFUSAL_EXTERNAL, _LLM_Menu_HotkeysAwaitEnable, _LLM_PROFILE_HOTKEY_STATUS_READY
+	Notified := {Title: ""}
+	Refuse(*) {
+		_LLM_Menu_LogNavBindingFailure("live check: the system refused the navigation hotkeys.", (*) => 0,
+			LLM_NAV_REFUSAL_EXTERNAL)
+		return false
+	}
+	Settled := _LLM_Menu_RequireFirstRestoreHotkeys(true, (*) => _LLM_PROFILE_HOTKEY_STATUS_READY, Refuse, false,
+		(Title, Body) => Notified.Title := Title)
+	return "settled=" . (Settled ? 1 : 0) . " await=" . (_LLM_Menu_HotkeysAwaitEnable ? 1 : 0)
+		. " notified=" . (Notified.Title != "" ? 1 : 0)
+}
+
+
+
+
+
+; ============================================
+; ============================================
+; ======= 7/ Delimiters and the layout =======
+; ============================================
+; ============================================
+
+/**
+ * Clicks the row that opens the add-delimiter window and answers it as a user
+ * does. Arguments: the character, 1 to tick "consumed", then the row's path.
+ */
+LiveCmdAddDelimiter(Args) {
+	Char := Args[1]
+	Consume := Args[2] == "1"
+	Path := Args.Clone()
+	Path.RemoveAt(1, 2)
+	Row := LiveRowByPath(Path)
+	Before := LiveVisibleWindows()
+	State := LiveDriveWindow(() => LiveNewWindow(Before), _LiveAnswerDelimiter.Bind(Char, Consume))
+	LiveClickRow(Row)
+	LiveAwaitDrive(State, "the add-delimiter window")
+	return "answered"
+}
+
+_LiveAnswerDelimiter(Char, Consume, Hwnd) {
+	ControlSetText(Char, "Edit1", "ahk_id " . Hwnd)
+	ControlSetChecked(Consume ? 1 : 0, "Button1", "ahk_id " . Hwnd)
+	ControlClick("Button2", "ahk_id " . Hwnd)
+}
+
+/** The keyboard layouts installed for this user, as handles in hexadecimal. */
+LiveCmdKeyboardLayouts(Args) {
+	Count := DllCall("GetKeyboardLayoutList", "Int", 0, "Ptr", 0, "Int")
+	List := Buffer(Count * A_PtrSize, 0)
+	DllCall("GetKeyboardLayoutList", "Int", Count, "Ptr", List, "Int")
+	Text := ""
+	loop Count
+		Text .= (Text == "" ? "" : " ") . Format("{:X}", NumGet(List, (A_Index - 1) * A_PtrSize, "UPtr"))
+	return "layouts=" . Text
+}
+
+/** Makes a layout the typing target's: its window and this thread are the same. */
+LiveCmdEditLayout(Args) {
+	Hkl := Integer("0x" . Args[1])
+	if !DllCall("ActivateKeyboardLayout", "Ptr", Hkl, "UInt", 0, "Ptr")
+		throw OSError(A_LastError, A_ThisFunc, "The layout could not be activated.")
+	LivePump(200)
+	return "active=" . Format("{:X}", GetForegroundKeyboardLayout())
+}
+
+; What one key types on a layout at one Shift level, "" when nothing, and whether
+; it is a dead key. The system's own table: the driver's reading is what is judged.
+_LiveLayoutChar(Sc, Shifted, Hkl, &Dead) {
+	Vk := DllCall("MapVirtualKeyExW", "UInt", Sc, "UInt", 1, "Ptr", Hkl, "UInt")
+	Keys := Buffer(256, 0)
+	if Shifted
+		NumPut("UChar", 0x80, Keys, 0x10)
+	Out := Buffer(16, 0)
+	Count := DllCall("ToUnicodeEx", "UInt", Vk, "UInt", Sc, "Ptr", Keys, "Ptr", Out, "Int", 8, "UInt", 4, "Ptr", Hkl, "Int")
+	Dead := Count < 0
+	return Count == 0 ? "" : StrGet(Out, Dead ? 1 : Count, "UTF-16")
+}
+
+/**
+ * The number row of a layout as the system's table has it and the ordering the
+ * driver applies there. Argument: the handle. Keys are separated by a space,
+ * each "base/shift"; a dead level is reported as "dead".
+ */
+LiveCmdLayoutRow(Args) {
+	Hkl := Integer("0x" . Args[1])
+	Text := "mode=" . NumberRowEffectiveMode(Hkl, false) . " row="
+	loop 10 {
+		Sc := A_Index + 1
+		Base := _LiveLayoutChar(Sc, false, Hkl, &BaseDead)
+		Shift := _LiveLayoutChar(Sc, true, Hkl, &ShiftDead)
+		Text .= (A_Index > 1 ? " " : "") . (BaseDead ? "dead" : Base) . "/" . (ShiftDead ? "dead" : Shift)
+	}
+	return Text
+}
+
+/** The delay a hotstring family resolves to. Arguments: the category, the section ("" for none). */
+LiveCmdHotstringDelay(Args) {
+	Resolved := HotstringsResolve(Args[1], Args.Length >= 2 ? Args[2] : "")
+	return "delay=" . Resolved.Delay . " override=" . (Resolved.HasOverride ? 1 : 0)
+}
+
+/**
+ * Clicks a row and catches the notice it publishes, which the tooltip consumes
+ * within a moment. Arguments: the row's path.
+ */
+LiveCmdClickReadNotice(Args) {
+	Row := LiveRowByPath(Args)
+	LiveClickRow(Row)
+	Started := A_TickCount
+	while A_TickCount - Started < 3000 {
+		Notice := _LiveTooltipNotice()
+		if Notice != ""
+			return "notice=" . Notice
+		Sleep(2)
+	}
+	return "notice="
+}
+
+LiveRegister("hotstring_delay", LiveCmdHotstringDelay)
+LiveRegister("click_read_notice", LiveCmdClickReadNotice)
+LiveRegister("ai_state", LiveCmdAiState)
+LiveRegister("translate", LiveCmdTranslate)
+LiveRegister("ai_hotkey_refused", LiveCmdAiHotkeyRefused)
+LiveRegister("add_delimiter", LiveCmdAddDelimiter)
+LiveRegister("keyboard_layouts", LiveCmdKeyboardLayouts)
+LiveRegister("edit_layout", LiveCmdEditLayout)
+LiveRegister("layout_row", LiveCmdLayoutRow)
 LiveRegister("info", LiveCmdInfo)
 LiveRegister("tree", LiveCmdTree)
 LiveRegister("rows", LiveCmdRows)

@@ -987,6 +987,8 @@ LLM_Menu_TriggerPrediction(FireFn := 0) {
 
 ; The most characters of an answer the test prediction's notice shows.
 global LLM_TEST_PREDICTION_EXCERPT_CHARS := 200
+; Shown to the user, so prose rather than a closed log reason id.
+global LLM_TEST_PREDICTION_EMPTY_ANSWER := "the backend returned an empty answer"
 
 ; Generation of the newest test prediction: an older answer is dropped.
 global _LLM_Menu_TestPredictionGeneration := 0
@@ -1051,12 +1053,12 @@ _LLM_Menu_TestPredictionIsCurrent(Generation) {
 
 ; The backend answered: show the answer, a blank one being a failure.
 _LLM_Menu_OnTestPredictionAnswer(Generation, Text, *) {
-	global LLM_TEST_PREDICTION_EXCERPT_CHARS
+	global LLM_TEST_PREDICTION_EXCERPT_CHARS, LLM_TEST_PREDICTION_EMPTY_ANSWER
 	if !_LLM_Menu_TestPredictionIsCurrent(Generation)
 		return
 	Answer := (Text is String) ? Trim(Text, " `t`r`n") : ""
 	if (Answer == "") {
-		_LLM_Menu_OnTestPredictionFailure(Generation, Map("reason", "the backend returned an empty answer"))
+		_LLM_Menu_OnTestPredictionFailure(Generation, Map("reason", LLM_TEST_PREDICTION_EMPTY_ANSWER))
 		return
 	}
 	; Sizes only: the answer stays out of the log, like every prediction.

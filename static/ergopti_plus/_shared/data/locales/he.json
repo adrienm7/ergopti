@@ -1802,6 +1802,7 @@
 	"menu.llm.debounce_label": "זמן חוסר פעילות לפני הצעה: %s",
 	"menu.llm.debounce_prompt": "השהיית חוסר פעילות לפני יצירה (במילישניות, לדוגמה 600):",
 	"menu.llm.min_interval_label": "הזמן המינימלי בין שתי בקשות AI אוטומטיות: %s",
+	"menu.llm.trigger.min_request_interval_ms": "מרווח בין בקשות",
 	"menu.llm.delete_model_body": "האם באמת ברצונך למחוק את המודל \"%s\" מהמטמון המקומי?",
 	"menu.llm.delete_model_cache": "🗑️ מחק מודל זה מהמטמון",
 	"menu.llm.delete_model_title": "למחוק את המודל?",
