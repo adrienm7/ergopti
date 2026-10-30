@@ -9,6 +9,7 @@
 
 local M = {}
 local Json = require("json")
+local TableUtil = require("table_util")
 
 
 
@@ -183,10 +184,7 @@ function M.discovered_key(provider, base_url, scans, servers)
 	end
 	if servers[provider] ~= nil then return key_of(provider) or "" end
 	if (provider ~= "openai" and provider ~= "openai_compat") or not configured then return "" end
-	local ids = {}
-	for id in pairs(servers) do ids[#ids + 1] = id end
-	table.sort(ids)
-	for _, id in ipairs(ids) do
+	for _, id in ipairs(TableUtil.sorted_keys(servers)) do
 		local key = key_of(id)
 		if key then return key end
 	end

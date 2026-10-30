@@ -75,7 +75,7 @@ helpers.describe("healthcheck: shared report enums", function()
 		local descriptor = find_enum(schema, "remap_phase")
 		helpers.assert_not_nil(descriptor, "the schema declares remap_phase as an enum")
 		local accepted = value_set(descriptor)
-		local source = read_file(helpers.driver_root() .. "platform/remap/lease_controller.lua")
+		local source = helpers.read_driver_source('local LOG = "karabiner.lease"')
 		local phases = lease_phases(source)
 		for _, known in ipairs({ "active", "paused", "fencing", "recovering", "uninitialized" }) do
 			helpers.assert_true(phases[known] == true, "the source scan finds the phase " .. known)
@@ -90,7 +90,7 @@ helpers.describe("healthcheck: shared report enums", function()
 		local descriptor = find_enum(schema, "ai_backend")
 		helpers.assert_not_nil(descriptor, "the schema declares ai_backend as an enum")
 		local accepted = value_set(descriptor)
-		local source = read_file(helpers.driver_root() .. "modules/llm/backend_detector.lua")
+		local source = helpers.read_driver_source('local LOG = "backend_detector"')
 		local count = 0
 		for backend in source:gmatch('M%.BACKEND_[%w_]+%s*=%s*"([%w_]+)"') do
 			count = count + 1
