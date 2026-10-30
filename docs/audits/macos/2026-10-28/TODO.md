@@ -6,7 +6,7 @@ The user stopped new research and requested durable records before container del
 
 ## Confirmed bug left in a protected installer
 
-- [ ] Give `native_bootstrap_python` operation-local ownership of its uv-wheel and Python-archive temporary workspaces in `static/ergopti_plus/macos/modules/llm/native_python_bootstrap.sh`, with cleanup on interruption and preservation of the primary refusal status. The owned Ollama installation path was explicitly excluded from edits.
+- [x] (30 October, `fix/macos-overnight-c`) Give `native_bootstrap_python` operation-local ownership of its uv-wheel and Python-archive temporary workspaces in `static/ergopti_plus/macos/modules/llm/native_python_bootstrap.sh`, with cleanup on interruption and preservation of the primary refusal status. The owned Ollama installation path was explicitly excluded from edits.
 
 **Proof:** the unchanged helper and the caller's real EXIT reporting trap are exercised by the archived `oct28-protected-bootstrap-report/probe-uv-python.py`. The normal download-refusal control returns `1` and removes its workspace. A real process-group SIGTERM during either the uv or Python download returns `-15` and leaves the allocated directory and controlled partial bytes. No live group member remains. The caller EXIT trap reports a stage; the native PTY guardian owns its separate source snapshots, not these download folders.
 
@@ -24,8 +24,8 @@ The corrected one-file oracle preserves all original assertions and rejects 22 n
 
 ## Unconfirmed native hypotheses: reproduce before considering fixes
 
-- [ ] `OwnedProgramWorker.runBridge`: reproduce a terminal receipt output-write refusal with the real native test session. The source-flow hypothesis is that a recorded terminal state might coexist with process exit zero after forwarding fails. The Lua consumer still requires a terminal receipt and exit zero and therefore fails closed. No actual Swift/Darwin failure was proved.
-- [ ] `InstalledPhysicalSourceBridge`: reproduce cancellation/setup refusal before nonblocking descriptor setup with a quiet real child and owned native transport. Check bounded refusal and actual owned-group retirement. The source-only hypothesis is that a short-circuited setup can leave blocking pipes before cancellation is consumed. Existing guardian closure might already resolve it; no native failure was proved.
+- [x] (30 October: confirmed in the source and fixed; `OwnedProgramForwardingTests` requires exit 70) `OwnedProgramWorker.runBridge`: reproduce a terminal receipt output-write refusal with the real native test session. The source-flow hypothesis is that a recorded terminal state might coexist with process exit zero after forwarding fails. The Lua consumer still requires a terminal receipt and exit zero and therefore fails closed. No actual Swift/Darwin failure was proved.
+- [x] (30 October: the `||` short-circuit is confirmed in the source and fixed, guarded by `test_native_bridge_transport_setup.lua`; a native reproduction still needs a real installed peer) `InstalledPhysicalSourceBridge`: reproduce cancellation/setup refusal before nonblocking descriptor setup with a quiet real child and owned native transport. Check bounded refusal and actual owned-group retirement. The source-only hypothesis is that a short-circuited setup can leave blocking pipes before cancellation is consumed. Existing guardian closure might already resolve it; no native failure was proved.
 
 The archived `recorded/oct28-native-receipts/ready.json` names the exact source pins, candidate lines, proposed native probes and limits. Do not count these two hypotheses as delivered fixes or confirmed bugs.
 

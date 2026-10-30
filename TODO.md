@@ -452,19 +452,26 @@ runs the branch cleanup below. Each pass left a full handover; read it first:
   2. Done 30 October: on CPython 3.8.20 (uv) both XKB suites pass (42 and 265 tests, 14 skips for
      xkbcli >= 1.13 and the xkbcommon binding, absent here), `generate_xkb_files.py --check` reproduces the
      shipped files and every installer CLI starts; nothing needed a fix.
-- macOS (from its TODO, plus Mac bugs the Linux pass proved):
-  1. `native_python_bootstrap` in `macos/modules/llm/native_python_bootstrap.sh` leaves its uv-wheel and
-     Python-archive temp workspaces behind on SIGTERM. Give it operation-local cleanup; the proof is in the
-     archive.
-  2. `macos/modules/llm/network_env.lua` turns POSIX backslashes into slashes while locating the driver root.
-  3. `ensure-mlx-deps.sh` takes the first awk field of `shasum`, which gives a wrong digest for names that
-     contain a backslash.
-  4. Two native leads are unconfirmed: the `OwnedProgramWorker.runBridge` receipt write refusal and the
-     `InstalledPhysicalSourceBridge` early cancellation. Reproduce both before fixing.
-  5. The macOS optional-callback regression accepts a genuine `error(nil)`, because it checks the payload and
-     not the `pcall` status. This is a test defect, found by the Windows pass.
-  6. The `test_ledger_replay_bounded` CPU budget (20 ms) failed at 71 ms in one full portable run. The cause is
-     unknown, so the test was neither weakened nor blamed.
+- macOS (from its TODO, plus Mac bugs the Linux pass proved): items 1 to 6 done 30 October on
+  `fix/macos-overnight-c`.
+  1. Done: `native_bootstrap_python` owns its workspace; INT/TERM/HUP release it, restore the caller's handlers
+     and re-raise, so the status stays 143 and the caller's EXIT report names the stage
+     (`test_native_python_bootstrap_interrupt.lua`, real bash and a real group SIGTERM in both download stages).
+  2. Done: `network_env.lua`, the MLX download and the webview locale base split on the host separators
+     (`native_path`) and the URL base is percent-encoded (`test_posix_backslash_source_paths.lua`, tree scan).
+  3. Done: the installers share `sha256_file_digest` (`network-retry.sh`), the release stage and the Karabiner
+     checksum parser strip shasum's escape marker (`test_sha256_digest_escaped_names.lua`). Left: the build-time
+     `tools/build/build_macos_app.sh` digests (lines 261, 811) take the first field too; a shared JS test pins the
+     second spelling, so the coordinator owns that change.
+  4. Both leads confirmed in the source and fixed. `OwnedProgramWorker.runBridge` verified a terminal before
+     forwarding it, so an unforwarded receipt exited 0 (`OwnedProgramForwardingTests`, requires exit 70; not run
+     here, the macOS launcher lane runs it). `InstalledPhysicalSourceBridge` short-circuited its nonblocking
+     setup after a refusal, so the first read of a quiet held child blocked before the cancel
+     (`test_native_bridge_transport_setup.lua`; a native reproduction still needs a real installed peer).
+  5. Done: the case asserts the `pcall` status and an empty return; the archived r29 fault probe now fails it.
+  6. Done: the cause was a collection of earlier modules' garbage finishing inside one step (heap 40 MB to
+     15 MB in a 14 ms step, against 0.5 ms of replay work). Each step now runs after a full collection with the
+     collector paused, the 20 ms budget is unchanged, and a new bound caps a step's own allocation at six blocks.
 - CI: the macOS 26 "Run Swift launcher tests" step hit its 10-minute limit twice on 28 October, in main run
   40764020578 and fix/macos run 40765470617. `HomebrewArchiveAcceptanceTests` alone took 289 s, and a real PAC
   trust test was still running at the limit. Move the real-network cases into their own job, or raise the step
