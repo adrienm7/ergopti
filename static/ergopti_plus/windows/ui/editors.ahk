@@ -355,7 +355,7 @@ MagicKeySourceCapture(*) {
 _MagicKeySourceCaptureState(IsDown := _MagicKeySourceIsDown) {
 		Scans := []
 		Keycodes := LayoutRegistry_Keycodes()
-		for Code in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+		for Code in ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"] {
 				if MagicKeySourceIsCandidate(Code)
 						Scans.Push(LayoutRegistry_KeyScan(Code, Keycodes))
 		}
@@ -411,11 +411,11 @@ _MagicKeySourceCapturePoll(State, IH) {
 MagicKeySourceMenuRows() {
 	global ScriptInformation
 	Current := ScriptInformation["MagicKeySource"]
-	Automatic := ManifestDefaultFor("hotstrings.magic_key_source")
+	Automatic := ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 	Keycodes := LayoutRegistry_Keycodes()
 	Hkl := KS_ResolveKeyboardLayout()
 	Items := []
-	for Code in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+	for Code in ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"] {
 		if (Code == Automatic)
 			continue
 		Reason := MagicKeySourceChoiceReason(Code)
@@ -431,7 +431,7 @@ MagicKeySourceMenuRows() {
 		"magic_key_source_is_automatic", (*) => Current == Automatic)
 	Children := MenuRenderer_TemplateRows("magic_key_source_children", Commands, Getters,
 		Map("magic_key_source_candidates", (*) => Items))
-	if !(Children is Array) || Children.Length != ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"].Length + 3
+	if !(Children is Array) || Children.Length != ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"].Length + 3
 		return []
 	Rows := MenuRenderer_TemplateRows("magic_key_source_menu", Commands, Getters,
 		Map("magic_key_source_heading", Children))
@@ -447,7 +447,7 @@ MagicKeySourceMenuRows() {
 ; @param {String} Value Candidate or automatic source.
 ; @returns {String} Locale reason key, or empty when there is no conflict.
 MagicKeySourceChoiceReason(Value) {
-	if Value == ManifestDefaultFor("hotstrings.magic_key_source")
+	if Value == ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 		return ""
 	Scan := LayoutRegistry_KeyScan(Value, LayoutRegistry_Keycodes())
 	if TapKeyAssignedToScan(Integer("0x" . SubStr(Scan, 3))) != ""
@@ -492,9 +492,9 @@ _MagicKeySourceCaptureKeyDown(State, IH, VK, SC) {
 MagicKeySourceIsCandidate(Code) {
 		if !(Code is String) || Code == ""
 				return false
-		if (Code == ManifestDefaultFor("hotstrings.magic_key_source"))
+		if (Code == ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE))
 				return false
-		for Allowed in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+		for Allowed in ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"] {
 				if (Allowed == Code)
 						return true
 		}
@@ -504,7 +504,7 @@ MagicKeySourceIsCandidate(Code) {
 _EditorBuildMagicKeySourcePlan(Value) {
 	global Features
 	if _FeatureUsesDesiredState(Features) {
-		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.magic_key_source", Value, "")
+		Plan := _FeatureBuildSinglePlan(Features, ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE, Value, "")
 		Plan.publish := _EditorPublishDesiredMagicKeySource.Bind(Plan.publish, Value)
 		return Plan
 	}
@@ -522,7 +522,7 @@ _EditorPublishDesiredMagicKeySource(PublishFn, Value) {
 _EditorPublishMagicKeySource(Value) {
 	global ScriptInformation, Features
 	ScriptInformation["MagicKeySource"] := Value
-	ScriptInformation["MagicKeySourceChosen"] := Value !== ManifestDefaultFor("hotstrings.magic_key_source")
+	ScriptInformation["MagicKeySourceChosen"] := Value !== ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 	if IsSet(Features) && Features.Has("hotstrings")
 		Features["hotstrings"]["magic_key_source"] := Value
 }
@@ -533,7 +533,7 @@ _EditorPublishMagicKeySource(Value) {
 ; @returns {Boolean} Whether the choice was written and the reload accepted.
 ModifyMagicKeySource(Value, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 	global ConfigurationFile
-	if !MagicKeySourceIsCandidate(Value) && Value !== ManifestDefaultFor("hotstrings.magic_key_source") {
+	if !MagicKeySourceIsCandidate(Value) && Value !== ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE) {
 		LoggerWarn("Editors", "Refused physical magic key '{1}': no candidate key has that code.", String(Value))
 		return false
 	}
@@ -567,7 +567,7 @@ _EditorBuildRepeatKeyPlan() {
 	}
 	Candidate := !HSE_RepeatEnabled
 	return {
-		updates: [{ Section: "hotstrings", Key: "repeat_key_enabled", Value: Candidate }],
+		updates: [{ Section: "hotstrings", Key: ConfigLeaf.REPEAT_KEY_ENABLED, Value: Candidate }],
 		publish: _EditorPublishRepeatKey.Bind(Candidate),
 	}
 }
@@ -575,7 +575,7 @@ _EditorBuildRepeatKeyPlan() {
 _EditorPublishDesiredRepeatKey(PublishFn) {
 	global HSE_RepeatEnabled, Features
 	PublishFn.Call()
-	HSE_RepeatEnabled := Features["hotstrings"]["repeat_key_enabled"]
+	HSE_RepeatEnabled := Features["hotstrings"][ConfigLeaf.REPEAT_KEY_ENABLED]
 	if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 		HSE_AdvanceRuntimeDecisionGeneration()
 }
@@ -584,7 +584,7 @@ _EditorPublishRepeatKey(Candidate) {
 	global HSE_RepeatEnabled, Features
 	HSE_RepeatEnabled := Candidate
 	if IsSet(Features) && Features.Has("hotstrings")
-		Features["hotstrings"]["repeat_key_enabled"] := Candidate
+		Features["hotstrings"][ConfigLeaf.REPEAT_KEY_ENABLED] := Candidate
 	if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 		HSE_AdvanceRuntimeDecisionGeneration()
 	return true

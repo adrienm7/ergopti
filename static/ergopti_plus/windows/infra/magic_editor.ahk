@@ -8,6 +8,7 @@
 ; remap, ordinary assignment and legacy shortcut owners behind that one variant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\ai_action_gate.ahk
 
 
@@ -235,7 +236,7 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 	TapId := TapHoldResolveKeyIdFromVkSc(0, Numeric)
 	if TapId != "" && TapHoldIsActive(TapHold, TapId)
 		return { Count: 0, Text: "" }
-	if Features["hotstrings"]["magic_key"]["replace"]["enabled"]
+	if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"]
 			&& StrUpper(Scan) == StrUpper(ScriptInformation["MagicKeySourceScan"])
 		return { Count: StrLen(ScriptInformation["MagicKey"]), Text: ScriptInformation["MagicKey"] }
 	; « Also reorder the three edge keys » types the other level.
@@ -285,7 +286,7 @@ _MagicEditorCurrentSource(Generation, Keycodes, Hkl) {
 	global Features, ScriptInformation
 	Source := MagicEditorProbeSource(Hkl, ScriptInformation["MagicKey"], Generation, Keycodes,
 		0, _MagicEditorEffectivePlain)
-	if ScriptInformation["MagicKeySourceChosen"] && Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
+	if ScriptInformation["MagicKeySourceChosen"] && Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"] {
 		Chosen := StrUpper(ScriptInformation["MagicKeySourceScan"])
 		Owned := []
 		for Candidate in Source["candidates"] {
@@ -335,8 +336,8 @@ _MagicEditorSourceSignature() {
 	Layout := Features["layout"]
 	return ScriptInformation["MagicKey"] . "|" . ScriptInformation["MagicKeySourceScan"]
 		. "|" . ScriptInformation["MagicKeySourceChosen"] . "|" . ScriptInformation["MagicKeySourceOverridesEmulation"]
-		. "|" . Features["hotstrings"]["magic_key"]["replace"]["enabled"]
-		. "|" . Layout["ergopti_base"] . "|" . Layout["direct_access_digits"]
+		. "|" . Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"]
+		. "|" . Layout["ergopti_base"] . "|" . Layout[ConfigLeaf.DIRECT_ACCESS_DIGITS]
 		. "|" . Layout["emulated_layout"] . "|" . KLE_Id
 }
 

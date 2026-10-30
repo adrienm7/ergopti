@@ -22,6 +22,8 @@
 ;    Selecting a registry layout never changes their enabled state.
 ; ============================================================================== 
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -88,7 +90,7 @@ _MG_DisableFeatureNode(Node, Prefix) {
 			continue
 		}
 		Entry := ManifestFindEntryByPath(Path)
-		if Path == "layout.ergopti_variant"
+		if Path == ConfigKey.LAYOUT_ERGOPTI_VARIANT
 			Node[Key] := "ergopti"
 		else if (Entry is Map) && Entry.Get("type", "") == "boolean"
 			Node[Key] := false
@@ -237,7 +239,7 @@ _MG_SupersedeForEmulatedLayout(FeaturesTarget, Entries := unset) {
 		Count := 0
 		for Entry in Entries {
 				; The direct-digit override is independent of the selected source.
-				if Entry["section"] == "layout" && Entry["id"] == "direct_access_digits"
+				if Entry["section"] == "layout" && Entry["id"] == ConfigLeaf.DIRECT_ACCESS_DIGITS
 						continue
 				Node := FeaturesTarget
 				for Part in StrSplit(Entry["section"], ".") {

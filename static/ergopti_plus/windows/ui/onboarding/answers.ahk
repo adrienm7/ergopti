@@ -26,6 +26,8 @@
 ;    always a Boolean here.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 ; The catalogue format this module reads; the generator emits the same number.
 global ONBOARDING_CATALOGUE_SCHEMA_VERSION := 1
 ; This driver's platform key in the catalogue.
@@ -81,8 +83,8 @@ OnboardingCatalogueIndex(Text) {
 		; master no longer reaches.
 		if Page.Has("sub_switch")
 			_OnboardingClaim(Entries, Page["sub_switch"], "switch")
-		if Page.Has("magic_key")
-			_OnboardingClaim(Entries, Page["magic_key"], "character")
+		if Page.Has(ConfigLeaf.MAGIC_KEY)
+			_OnboardingClaim(Entries, Page[ConfigLeaf.MAGIC_KEY], "character")
 		_OnboardingClaimGroups(Entries, Page.Get("groups", []))
 		for Control in Page.Get("controls", [])
 			_OnboardingClaimControl(Entries, Control)

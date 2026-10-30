@@ -31,14 +31,14 @@ global ScriptInformation := Map(
 		; magic_key_source names it on every driver: a KeyboardEvent.code, or the
 		; manifest default "auto" that leaves the key to the layout.
 		"MagicKeySource", _FeatureStateRequireManifestDefault(
-			"hotstrings.magic_key_source"),
+			ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE),
 		; Its scan code, resolved once at boot by LayoutRegistry_MagicKeySource
 		; (ErgoptiPlus.ahk) before any hotkey registers on it.
 		"MagicKeySourceScan", "",
 		; The character whose key the boot looks for on the OS layout when no key
 		; is chosen and no emulated layout declares one.
 		"MagicKeySourceChar", _FeatureStateRequireManifestDefault(
-			"hotstrings.magic_key_source_char"),
+			ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE_CHAR),
 		; Whether config.toml names the source key: the user's choice then wins
 		; over the active layout's declared key and over any detection.
 		"MagicKeySourceChosen", false,
@@ -55,7 +55,7 @@ global ScriptInformation := Map(
 		; explicitly set to true or false; "auto" (or absent) defers to the
 		; probe. Kept as an escape hatch in case the probe ever misfires on an
 		; exotic layout.
-		"AltGrIsKanaRemap", _FeatureStateRequireManifestDefault("script.alt_gr_is_kana_remap"),
+		"AltGrIsKanaRemap", _FeatureStateRequireManifestDefault(ConfigKey.SCRIPT_ALT_GR_IS_KANA_REMAP),
 		; Configurable file paths — all derived from _ConfigDir set above.
 		; AHK-specific files (.ahk, AHK config.toml) go under ``autohotkey/`` so
 		; the folder can be safely shared with the Hammerspoon driver via cloud
@@ -109,7 +109,7 @@ global SCRIPT_SHORTCUT_LABELS := Map(
 		"script_altgr_delete",    "sg_labels.script_altgr_delete",
 		"script_altgr_escape",    "sg_labels.script_altgr_escape",
 )
-global SCRIPT_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection("shortcuts.script_control")
+global SCRIPT_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection(ConfigKey.SHORTCUTS_SCRIPT_CONTROL)
 global SCRIPT_SHORTCUT_FALLBACKS := Map(
 		"script_altgr_enter", "{Enter}",
 		"script_altgr_backspace", "{BackSpace}",
@@ -228,23 +228,23 @@ ReadScriptConfig(Cache) {
 		RawSource := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source")
 		ScriptInformation["MagicKeySource"] := _FeatureStateMagicKeySource(RawSource)
 		ScriptInformation["MagicKeySourceChosen"] := ScriptInformation["MagicKeySource"]
-			!== _FeatureStateRequireManifestDefault("hotstrings.magic_key_source")
-		RawChar := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_char")
+			!== _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
+		RawChar := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.MAGIC_KEY_SOURCE_CHAR)
 		if RawChar != "_"
 				ScriptInformation["MagicKeySourceChar"] :=
 					_FeatureStateValidateCodePoint(RawChar,
-						"hotstrings.magic_key_source_char")
+						ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE_CHAR)
 		; AltGr-as-Kana manual override. Default "auto" defers to the reverse
 		; VK_RMENU→SC probe in HotstringEngineInit(); "true" / "false" force the
 		; respective mode. Lives in [script] so the user can lock it once per
 		; machine if auto-detection misfires on an exotic layout.
-		RawKana := _FeatureStateIniGet(Cache, "script", "alt_gr_is_kana_remap")
+		RawKana := _FeatureStateIniGet(Cache, "script", ConfigLeaf.ALT_GR_IS_KANA_REMAP)
 		if RawKana != "_"
 				ScriptInformation["AltGrIsKanaRemap"] :=
 					_FeatureStateReadKanaOverride(Cache, RawKana)
 		; Missing repeat-key intent restores the same neutral baseline as first boot.
 		global HSE_RepeatEnabled
-		RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", "repeat_key_enabled")
+		RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.REPEAT_KEY_ENABLED)
 		if RawRepeat != "_"
 				HSE_RepeatEnabled := _FeatureStateValidateBoolean(
 					RawRepeat, "hotstrings.repeat_key_enabled")
@@ -347,7 +347,7 @@ _FeatureStateValidateKanaOverride(Value) {
 		throw ValueError("script.alt_gr_is_kana_remap must be 'auto' or a TOML boolean")
 	}
 	return _FeatureStateValidateBoolean(Value,
-		"script.alt_gr_is_kana_remap")
+		ConfigKey.SCRIPT_ALT_GR_IS_KANA_REMAP)
 }
 
 ; The configured magic-key source in its manifest spelling, or the manifest
@@ -355,10 +355,10 @@ _FeatureStateValidateKanaOverride(Value) {
 ; rule (TomlConfigValueMatchesManifest compares with AHK's case-insensitive =),
 ; so a value the loader applies is never read here as another key.
 _FeatureStateMagicKeySource(Raw) {
-	Default := _FeatureStateRequireManifestDefault("hotstrings.magic_key_source")
+	Default := _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 	if Raw == "_" || !(Raw is String)
 		return Default
-	Entry := ManifestFindEntryByPath("hotstrings.magic_key_source")
+	Entry := ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 	if !(Entry is Map) || !Entry.Has("enum_values")
 		throw Error("Missing required feature manifest candidates: hotstrings.magic_key_source")
 	for Allowed in Entry["enum_values"] {
