@@ -159,7 +159,7 @@ _MMJ_AppsPublication() {
 	global KLPF_LAST_JSON
 	Producer := _DriverFuncBody("KLPF_BuildAndWriteToPath")
 	AssertTrue(Producer != "", "the publication entry must resolve")
-	AssertTrue(RegExMatch(Producer, "KLPF_BuildApps\(\s*db\s*,\s*true\s*,\s*metrics_dir\s*\)") > 0,
+	AssertTrue(RegExMatch(Producer, "KLPF_BuildApps\(\s*db\s*,\s*true\s*,\s*KL_AppCat_StoreDir\(\)\s*\)") > 0,
 		"the production Apps path must retain the measured encoded-manifest optimization")
 	HadJson := IsSet(KLPF_LAST_JSON)
 	SavedJson := HadJson ? KLPF_LAST_JSON : 0
@@ -168,6 +168,8 @@ _MMJ_AppsPublication() {
 	try {
 		_KLRDC_EnsureSharedDir()
 		_KLRDC_Reset()
+		; The driver's boot owns this folder; the worker's category read requires it.
+		DirCreate(KL_AppCat_StoreDir())
 		Root := _KLRDC_Root()
 		App := '__klpf_manifest_json"fixture.exe'
 		FileAppend(_KLRDC_TypingBatch(1, "2026-01-02 10:00:00.000", "2026-01-02", App, ["a", "b"]),

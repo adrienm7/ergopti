@@ -1109,7 +1109,7 @@ KL_Init(metrics_dir) {
 		Critical(InitCritical)
 	}
 	try {
-		if !KL_AppCat_Init(metrics_dir)
+		if !KL_AppCat_Init(KL_AppCat_StoreDir(), metrics_dir)
 			throw Error("application category initialization failed")
 
 		; Initialise the walker batch dicts. KL_LoadState() above already

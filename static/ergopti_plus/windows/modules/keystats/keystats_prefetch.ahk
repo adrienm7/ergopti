@@ -1042,7 +1042,7 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 						if !FullRequired
 								blob := KLPF_BuildTyping(db, mode, mode = "full", SnapshotDay, true)
 				} else if (which = "apps") {
-						blob := KLPF_BuildApps(db, true, metrics_dir)
+						blob := KLPF_BuildApps(db, true, KL_AppCat_StoreDir())
 				}
 		} finally Refused := KLR_EndPartialRead()
 		if FullRequired {
@@ -1407,13 +1407,13 @@ KLPF_BuildTyping(db, mode := "full", CompleteSnapshot := false, SnapshotDay := "
 ; ======================================
 ; ======================================
 
-KLPF_BuildApps(db, EncodeManifest := false, MetricsRoot := "") {
+KLPF_BuildApps(db, EncodeManifest := false, CategoryStoreRoot := "") {
 		Categories := Map()
-		if MetricsRoot != "" {
+		if CategoryStoreRoot != "" {
 				Apps := []
 				for Row in KLR_ProjectionQuery(db, "SELECT DISTINCT app FROM agg_app_day;", "manifest", "categories")
 						Apps.Push(Row["app"])
-				Categories := KL_AppCat_ProjectAt(MetricsRoot, Apps)
+				Categories := KL_AppCat_ProjectAt(CategoryStoreRoot, Apps)
 		}
 		; metrics_apps reads (date, app) totals only — no n-grams. The same
 		; manifest projection covers it.
@@ -1551,10 +1551,10 @@ KLPF_PartialSnapshotPath(which, metrics_dir) {
 ; @param db {Integer} The rebuild's private candidate, borrowed for this call.
 ; @param Partial {Map} oldest / newest rolled-up day.
 ; @returns {String} Dashboard JSON.
-KLPF_BuildPartialJson(which, db, Partial, MetricsRoot := "") {
+KLPF_BuildPartialJson(which, db, Partial, CategoryStoreRoot := "") {
 		Blob := (which = "typing")
 				? KLPF_BuildTyping(db, "full", true, FormatTime(A_Now, "yyyy-MM-dd"), true)
-				: KLPF_BuildApps(db, true, MetricsRoot)
+				: KLPF_BuildApps(db, true, CategoryStoreRoot)
 		Blob["_partial"] := Partial
 		return KLPF_SerializeBlob(Blob)
 }
@@ -1638,7 +1638,7 @@ class KLPFRebuildPublisher {
 				for which in ["typing", "apps"] {
 						; A missed partial only delays the preview; the rebuild goes on.
 						if !KLPF_WriteAtomic(KLPF_PartialSnapshotPath(which, this.metrics_dir),
-										KLPF_BuildPartialJson(which, Info["db"], Partial, this.metrics_dir))
+										KLPF_BuildPartialJson(which, Info["db"], Partial, KL_AppCat_StoreDir()))
 								return false
 				}
 				this.partial_cost := TickElapsed64(Tick, this.clock.Call())

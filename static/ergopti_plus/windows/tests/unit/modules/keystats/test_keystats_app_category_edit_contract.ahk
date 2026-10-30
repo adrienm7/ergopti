@@ -4,7 +4,7 @@
 ; MODULE: App Category Edit Store Contracts
 ; DESCRIPTION:
 ; Exercises the canonical file, edit snapshots and native staging admission.
-; Unknown metadata and discoveries survive without treating legacy labels as edits.
+; Discoveries survive, unknown members are dropped, and an unedited record is no edit.
 ; ==============================================================================
 
 _KLACEC_With(Callback) {
@@ -24,7 +24,7 @@ _KLACEC_With(Callback) {
 		FSCreateDirectoryExclusiveStrict(Root), Owned := true
 		Content := '{"schema":"ergopti.app_categories","version":1,"apps":{'
 			. '"audit.exe":{"type":"productive","score":1,"extra":{"flag":true,"nil":null}},'
-			. '"other.exe":"neutral"},"metadata":{"flag":true,"nil":null,"array":[true,null]}}' . "`n"
+			. '"explorer.exe":{"type":"neutral","score":0}},"metadata":{"flag":true,"nil":null,"array":[true,null]}}' . "`n"
 		AssertTrue(FSWriteCreateDurable(Path, Content))
 		KLAppCat.categories := Map(), KLAppCat.file_path := "", KLAppCat.dirty := false
 		KLAppCat.save_fn := Timer, KLAppCat.write_owner := 0, KLAppCat.store_model := 0
@@ -82,21 +82,17 @@ _KLACEC_Metadata(Root, Path, Original) {
 	AssertEqual(1, Snapshot["current_score"])
 	AssertTrue(KL_AppCat_CommitEdit(Snapshot, "Travail 😀", -1.25))
 	Committed := FSReadUtf8Exact(Path)
-	BeforeTop := JsonObjectMemberSpans(Original)
-	AfterTop := JsonObjectMemberSpans(Committed)
-	AssertEqual(BeforeTop["metadata"]["member_text"], AfterTop["metadata"]["member_text"],
-		"unknown top-level JSON keeps boolean, null and nested values exactly")
-	BeforeRecord := JsonObjectMemberSpans(Original, ["apps", "audit.exe"])
-	AfterRecord := JsonObjectMemberSpans(Committed, ["apps", "audit.exe"])
-	AssertEqual(BeforeRecord["extra"]["member_text"], AfterRecord["extra"]["member_text"],
-		"unknown per-record metadata must not pass through the lossy primitive encoder")
-	Projected := KL_AppCat_ProjectAt(Root, ["AUDIT.EXE", "other.exe"])
-	AssertEqual(1, Projected.Count, "an unedited legacy label cannot acquire an historical score override")
+	AssertFalse(JsonObjectMemberSpans(Committed).Has("metadata"),
+		"an unknown top-level member is dropped, as the shared codec does")
+	AssertFalse(JsonObjectMemberSpans(Committed, ["apps", "audit.exe"]).Has("extra"),
+		"an unknown record member is dropped, as the shared codec does")
+	Projected := KL_AppCat_ProjectAt(Root, ["AUDIT.EXE", "explorer.exe"])
+	AssertEqual(1, Projected.Count, "an unedited shipped record cannot acquire an historical score override")
 	AssertEqual("Travail 😀", Projected["AUDIT.EXE"]["type"])
 	AssertEqual(-1.25, Projected["AUDIT.EXE"]["score"])
 	AssertTrue(KL_AppCat_Reload())
 	AssertEqual("Travail 😀", KL_AppCat_Get("audit.exe"))
-	AssertEqual("neutral", KL_AppCat_Get("other.exe"))
+	AssertEqual("neutral", KL_AppCat_Get("explorer.exe"))
 }
 
 _KLACEC_Full(Receipt, Path) {
@@ -172,7 +168,7 @@ Test("App category edit contract: unknown schema version refuses untouched (app-
 	_KLACEC_With.Bind(_KLACEC_Invalid.Bind("version")))
 Test("App category edit contract: JSON boolean cannot impersonate a score (app-category-edit-contract)",
 	_KLACEC_With.Bind(_KLACEC_Invalid.Bind("boolean")))
-Test("App category edit contract: unknown JSON metadata and legacy semantics survive (app-category-edit-contract)",
+Test("App category edit contract: unknown JSON members go and unedited records stay no edit (app-category-edit-contract)",
 	_KLACEC_With.Bind(_KLACEC_Metadata))
 Test("App category edit contract: final native admission refuses a retired owner (app-category-edit-contract)",
 	_KLACEC_With.Bind(_KLACEC_Staging.Bind("revoke")))
@@ -183,9 +179,9 @@ Test("App category edit contract: discovery during staging survives durable retr
 _KLACEC_CaseAliases(Kind, Root, Path, Original) {
 	Resident := KLAppCat.categories, Model := KLAppCat.store_model
 	Candidate := Kind == "legacy"
-		? '{"audit.exe":"productive","AUDIT.EXE":"distracting"}'
-		: StrReplace(Original, '"other.exe":"neutral"',
-			'"AUDIT.EXE":{"type":"distracting","score":-1,"extra":{"source":"upper"}},"other.exe":"neutral"')
+		? '{"audit.exe":{"type":"productive","score":0},"AUDIT.EXE":{"type":"distracting","score":0}}'
+		: StrReplace(Original, '"explorer.exe":',
+			'"AUDIT.EXE":{"type":"distracting","score":-1,"extra":{"source":"upper"}},"explorer.exe":')
 	Document := JsonParse(Candidate)
 	Apps := Kind == "legacy" ? Document : Document["apps"]
 	AssertTrue(Apps.Has("audit.exe") && Apps.Has("AUDIT.EXE"),
@@ -218,10 +214,6 @@ _KLACEC_UniqueMixedCase(Root, Path, Original) {
 	Apps := JsonParse(Committed)["apps"]
 	AssertTrue(Apps.Has("AuDiT.ExE") && !Apps.Has("audit.exe"),
 		"a native edit must preserve the unique original key spelling")
-	Before := JsonObjectMemberSpans(Candidate, ["apps", "AuDiT.ExE"])
-	After := JsonObjectMemberSpans(Committed, ["apps", "AuDiT.ExE"])
-	AssertEqual(Before["extra"]["member_text"], After["extra"]["member_text"],
-		"unique process normalization retains unknown typed record metadata")
 	AssertTrue(KL_AppCat_Reload())
 	AssertEqual("Reviewed", KL_AppCat_Get("audit.exe"))
 }
@@ -229,5 +221,5 @@ _KLACEC_UniqueMixedCase(Root, Path, Original) {
 for _KLACEC_AliasKind in ["legacy", "versioned"]
 	Test("App category identity: " . _KLACEC_AliasKind . " case aliases refuse without replacing authority (app-category-case-alias)",
 		_KLACEC_With.Bind(_KLACEC_CaseAliases.Bind(_KLACEC_AliasKind)))
-Test("App category identity: one mixed-case process keeps record metadata (app-category-case-alias)",
+Test("App category identity: one mixed-case process keeps its spelling (app-category-case-alias)",
 	_KLACEC_With.Bind(_KLACEC_UniqueMixedCase))

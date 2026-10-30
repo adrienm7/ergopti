@@ -5,14 +5,17 @@
 ; DESCRIPTION:
 ; Maintains a user-editable mapping from process names to productivity
 ; categories (productive / neutral / distracting / unknown). The mapping
-; is stored in ``app_categories.json`` inside the metrics dir alongside
-; data.sql so it travels with the device's data in Git.
+; is stored in ``app_categories.json`` at the root of the configuration folder,
+; the place macOS and Linux keep the same document.
 ;
 ; FEATURES & RATIONALE:
-; 1. Persistent sidecar — app_categories.json is a flat JSON object:
-;    { "chrome.exe": "productive", "Discord.exe": "distracting", … }
+; 1. Persistent document — app_categories.json is the shared versioned store:
+;    { "schema": "ergopti.app_categories", "version": 1,
+;      "apps": { "chrome.exe": { "type": "productive", "score": 0 }, … } }
 ;    The file is created with sensible defaults on first run and never
 ;    auto-overwritten once it exists, so users can customise freely.
+;    The older flat string form is refused and left untouched: the driver states
+;    it in the log and classifies from its defaults without saving anything.
 ; 2. In-memory Map — after load, KLAppCat.categories holds the runtime
 ;    lookup table. KL_AppCat_Get(app_name) returns the category string in
 ;    O(1) with a graceful "unknown" fallback.
@@ -57,6 +60,9 @@ class KLAppCatConst {
 		static STORE_VERSION := 1
 		static MIN_SCORE := -2
 		static MAX_SCORE := 2
+		; What a record holds before the user edits it.
+		static UNEDITED_SCORE := 0
+		static DISCOVERED_LABEL := "unknown"
 
 		; Delay before re-attempting a deferred save that fired while the driver was
 		; paused. Matches the original defer window: the write is not urgent, but it
@@ -171,8 +177,9 @@ class KLAppCatConst {
 ; ===============================
 
 class KLAppCat {
-		static categories  := Map()   ; lower(process_name) → legacy label or edit record
+		static categories  := Map()   ; lower(process_name) → { type, score } record
 		static file_path   := ""
+		static metrics_root := ""     ; the metrics store the dashboard editor must belong to
 		static dirty       := false   ; new apps were seen and need a save
 		static save_fn     := unset   ; bound timer ref for deferred save
 		static write_owner := 0       ; serialises edits with deferred persistence
@@ -208,28 +215,53 @@ KL_AppCat_RequireInit(func_name) {
 ; ==============================
 ; ==============================
 
-KL_AppCat_Init(metrics_dir) {
-		return KL_AppCat_InitWithIo(metrics_dir)
+; The folder of the store: the configuration root, as on macOS and Linux.
+KL_AppCat_StoreDir() {
+		global _ConfigDir
+		return RTrim(_ConfigDir, "\")
 }
 
-KL_AppCat_InitWithIo(metrics_dir, ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
-		if (metrics_dir = "") {
-				try LoggerError("KLAppCat", "Initialization requires a metrics directory.")
+; @param store_dir {String} Folder holding the store.
+; @param metrics_root {String} Metrics store of the dashboard editor; "" means store_dir.
+KL_AppCat_Init(store_dir, metrics_root := "") {
+		return KL_AppCat_InitWithIo(store_dir, 0, 0, 0, metrics_root)
+}
+
+KL_AppCat_InitWithIo(store_dir, ReadFn := 0, ExistsFn := 0, CreateFn := 0, metrics_root := "") {
+		if (store_dir = "") {
+				try LoggerError("KLAppCat", "Initialization requires a store directory.")
 				return false
 		}
 		if (KLAppCat.file_path != "") {
 				try LoggerError("KLAppCat", "Duplicate initialization refused.")
 				return false
 		}
-		path := metrics_dir . "\" . KLAppCatConst.FILE_NAME
+		path := store_dir . "\" . KLAppCatConst.FILE_NAME
 		cats := Map()
+		_KL_AppCat_ReportRetiredFile(store_dir, metrics_root)
 		if !KL_AppCat_Load(path, &cats, ReadFn, ExistsFn, CreateFn, &Model)
 				return false
 		KLAppCat.file_path := path
+		KLAppCat.metrics_root := metrics_root != "" ? metrics_root : store_dir
 		KLAppCat.store_model := Model
 		KLAppCat.categories := cats
 		KLAppCat.dirty := false
 		return true
+}
+
+; A file left in the folder the store used to live in is not read and not migrated:
+; say so, or the user's older categories would seem to vanish without a word.
+_KL_AppCat_ReportRetiredFile(store_dir, metrics_root) {
+		if (metrics_root = "" || RTrim(metrics_root, "\") = RTrim(store_dir, "\"))
+				return
+		Retired := RTrim(metrics_root, "\") . "\" . KLAppCatConst.FILE_NAME
+		try {
+				if FSStrictExists(Retired)
+						LoggerWarn("KLAppCat", "'{1}' is no longer read and stays untouched: the categories now live in '{2}'.",
+								Retired, store_dir)
+		} catch as Err {
+				try LoggerWarn("KLAppCat", "Cannot inspect the retired category file: {1}.", Err.Message)
+		}
 }
 
 KL_AppCat_Load(path, &cats, ReadFn := 0, ExistsFn := 0, CreateFn := 0, &Model := unset) {
@@ -243,7 +275,7 @@ KL_AppCat_Load(path, &cats, ReadFn := 0, ExistsFn := 0, CreateFn := 0, &Model :=
 		cats := Map()
 		; Start with built-in defaults so every entry is pre-populated
 		for k, v in KLAppCatConst.DEFAULTS
-				cats[k] := v
+				cats[k] := _KL_AppCat_NewRecord(v)
 
 		try exists := ExistsFn.Call(path)
 		catch as Err {
@@ -257,7 +289,13 @@ KL_AppCat_Load(path, &cats, ReadFn := 0, ExistsFn := 0, CreateFn := 0, &Model :=
 						return false
 				}
 				try Model := _KL_AppCat_DecodeStore(raw, path)
-				catch as Err {
+				catch KLAppCatFlatFormError as Err {
+						try LoggerError("KLAppCat", "Refused '{1}', which uses the old flat string form: {2} The file stays"
+								. " untouched and is not migrated; applications are classified from the defaults and no"
+								. " category is saved until it is replaced or removed.", path, Err.Message)
+						Model := _KL_AppCat_RefusedModel(raw, path)
+						return true
+				} catch as Err {
 						try LoggerError("KLAppCat", "Invalid app_categories.json; original preserved: {1}.", Err.Message)
 						return false
 				}
@@ -266,7 +304,7 @@ KL_AppCat_Load(path, &cats, ReadFn := 0, ExistsFn := 0, CreateFn := 0, &Model :=
 				return true
 		}
 
-		content := KL_JsonEncodeObject(cats)
+		content := _KL_AppCat_RenderStore(cats)
 		Model := _KL_AppCat_DecodeStore(content, path)
 		if CreateFn.Call(path, content) != 1 {
 				try LoggerError("KLAppCat", "Cannot create app_categories.json without replacing an existing path.")
@@ -366,6 +404,12 @@ _KL_AppCat_ReleaseWrite(Owner) {
 }
 
 KL_AppCat_Save(WriteFn := 0) {
+		; A refused store is never replaced: its discoveries live in RAM only, which
+		; the load already stated, so they leave no debt to retry or to block an exit.
+		if _KL_AppCat_StoreRefused() {
+				KLAppCat.dirty := false
+				return true
+		}
 		Owner := _KL_AppCat_AcquireWrite()
 		if !IsObject(Owner) {
 				if KLAppCat.file_path != "" && KLAppCat.dirty
@@ -460,7 +504,7 @@ KL_AppCat_DeferredSave() {
 ; =================================
 
 ; Returns the category for a process name (case-insensitive).
-; If the app is unknown it is registered as "unknown" and a deferred
+; If the app is unknown it is registered as an unedited record and a deferred
 ; save is scheduled so it appears in app_categories.json for the user
 ; to classify.
 KL_AppCat_Get(app_name) {
@@ -473,7 +517,7 @@ KL_AppCat_Get(app_name) {
 				return _KL_AppCat_RecordLabel(KLAppCat.categories[key])
 
 		; New app — register and schedule a lazy save
-		KLAppCat.categories[key] := "unknown"
+		KLAppCat.categories[key] := _KL_AppCat_NewRecord(KLAppCatConst.DISCOVERED_LABEL)
 		KLAppCat.dirty := true
 		if !KLAppCat.HasOwnProp("save_fn") || !IsObject(KLAppCat.save_fn) {
 				KLAppCat.save_fn := KL_AppCat_DeferredSave.Bind()
@@ -501,7 +545,9 @@ KL_AppCat_Set(app_name, category) {
 				for Key, Value in Owner["snapshot"]
 						Candidate[Key] := Value
 				Key := StrLower(app_name)
-				Candidate[Key] := _KL_AppCat_RecordWithLabel(Candidate.Get(Key, ""), category)
+				Existing := Candidate.Get(Key, 0)
+				_KL_AppCat_SetRecord(Candidate, Key, category,
+						Existing is Map ? Existing["score"] : KLAppCatConst.UNEDITED_SCORE)
 				Content := _KL_AppCat_RenderStore(Candidate, _KL_AppCat_OwnerModel(Owner))
 				NextModel := _KL_AppCat_DecodeStore(Content, Owner["path"])
 				if !_KL_AppCat_WriteOwned(Owner, Content)
@@ -537,41 +583,6 @@ KL_AppCat_Set(app_name, category) {
 ; ======= 5/ JSON helpers =======
 ; ===============================
 ; ===============================
-
-; Minimal encoder for a flat Map of string→string pairs.
-; KL_JsonEncode in keystats.ahk handles arbitrary depth; this variant
-; emits a tidy sorted object for the categories file so diffs are stable.
-KL_JsonEncodeObject(obj) {
-		if !(obj is Map) || (obj.Count = 0)
-				return "{}"
-
-		; Collect and sort keys for deterministic output
-		keys := []
-		for k, v in obj
-				keys.Push(k)
-		keys := KL_SortArray(keys)
-
-		parts := []
-		for , k in keys {
-				v := obj[k]
-				parts.Push("  " . KL_JsonStr(k) . ": " . KL_JsonStr(v))
-		}
-		; KL_JoinArray is defined in keystats.ahk (no prefix param)
-		return "{`n" . KL_JoinArray(parts, ",`n") . "`n}"
-}
-
-KL_JsonDecodeObject(raw) {
-		; Configuration parsing is strict. KL_JsonDecode deliberately converts any
-		; malformed journal line to Map() for skip-safe ingest, which would make a
-		; broken config indistinguishable from the valid empty object. Call the
-		; strict shared parser directly so its exception remains visible and the
-		; original configuration file stays untouched.
-		return JsonParse(raw)
-}
-
-KL_JsonStr(s) {
-		return JsonStringLiteral(s)
-}
 
 KL_SortArray(arr) {
 		; Bubble sort — the array is at most a few hundred entries; O(n²) is fine.

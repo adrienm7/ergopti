@@ -41,8 +41,8 @@ _KLACSR_Case() {
 		AssertTrue(Saved.Get("write_owner", 0) is Integer && Saved.Get("write_owner", 0) == 0,
 			"the fixture cannot replace a foreign category writer")
 		FSCreateDirectoryExclusiveStrict(Root), Owned := true
-		Original := '{"audit.exe":"productive","other.exe":"neutral"}' . "`n"
-		Candidate := '{"audit.exe":"Révision 😀","other.exe":"neutral"}' . "`n"
+		Original := '{"audit.exe":{"type":"productive","score":0},"other.exe":{"type":"neutral","score":0}}' . "`n"
+		Candidate := '{"audit.exe":{"type":"Révision 😀","score":0},"other.exe":{"type":"neutral","score":0}}' . "`n"
 		AssertTrue(FSWriteCreateDurable(Path, Original))
 		KLAppCat.categories := Map(), KLAppCat.file_path := "", KLAppCat.dirty := false
 		KLAppCat.save_fn := Timer, KLAppCat.write_owner := 0, KLAppCat.store_model := 0
