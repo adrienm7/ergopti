@@ -1768,6 +1768,7 @@
 	"menu.llm.api_test_ok_title": "API-testet lyckades",
 	"menu.llm.api_key_refused_body": "\"%s\" svarade men nekade nyckeln — kontrollera token som angetts på servern.",
 	"menu.llm.api_key_refused_title": "API-nyckel nekad",
+	"menu.llm.api_key_no_secret_store": "API-nyckeln sparades inte: ingen hemlighetstjänst på skrivbordet tog emot den ({1}). Ergopti+ skriver aldrig en nyckel i klartext. Starta din nyckelring (GNOME Keyring, KWallet eller KeePassXC) och försök igen.",
 	"menu.llm.api_unreachable_body": "\"%s\" svarade inte — kontrollera token, URL och modell.",
 	"menu.llm.api_unreachable_title": "API-post inte nåbar",
 	"menu.llm.api_validated_body": "\"%s\" svarade framgångsrikt.",

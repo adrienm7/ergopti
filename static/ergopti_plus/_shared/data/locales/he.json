@@ -1768,6 +1768,7 @@
 	"menu.llm.api_test_ok_title": "בדיקת ה-API הצליחה",
 	"menu.llm.api_key_refused_body": "\"%s\" ענה אך דחה את המפתח — בדקו את האסימון שהוגדר בשרת.",
 	"menu.llm.api_key_refused_title": "מפתח ה-API נדחה",
+	"menu.llm.api_key_no_secret_store": "מפתח ה-API לא נשמר: אף שירות סודות של שולחן העבודה לא קיבל אותו ({1}). Ergopti+ לעולם אינו כותב מפתח כטקסט גלוי. הפעילו את מחזיק המפתחות (GNOME Keyring, KWallet או KeePassXC) ונסו שוב.",
 	"menu.llm.api_unreachable_body": "\"%s\" לא הגיב — בדוק את האסימון, ה־URL והדגם.",
 	"menu.llm.api_unreachable_title": "רשומת ה־API לא נגישה",
 	"menu.llm.api_validated_body": "\"%s\" השיב בהצלחה.",

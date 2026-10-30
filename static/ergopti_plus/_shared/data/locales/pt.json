@@ -1768,6 +1768,7 @@
 	"menu.llm.api_test_ok_title": "Teste de API bem-sucedido",
 	"menu.llm.api_key_refused_body": "\"%s\" respondeu, mas recusou a chave — verifique o token definido no servidor.",
 	"menu.llm.api_key_refused_title": "Chave da API recusada",
+	"menu.llm.api_key_no_secret_store": "A chave de API não foi salva: nenhum serviço de segredos da área de trabalho a aceitou ({1}). O Ergopti+ nunca grava uma chave em texto simples. Inicie o seu chaveiro (GNOME Keyring, KWallet ou KeePassXC) e tente novamente.",
 	"menu.llm.api_unreachable_body": "\"%s\" não respondeu — verifique o token, a URL e o modelo.",
 	"menu.llm.api_unreachable_title": "Entrada da API inacessível",
 	"menu.llm.api_validated_body": "\"%s\" respondeu corretamente.",
