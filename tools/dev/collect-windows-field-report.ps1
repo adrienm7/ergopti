@@ -7,9 +7,11 @@
 # counterpart of tools/dev/collect-macos-field-report.sh and
 # collect-linux-field-report.sh: it updates the field branch from its base
 # (dev unless it was derived from another branch), gathers the evidence the
-# coordinator reads (system, toolchain, input-language, process, listener,
-# proxy and antivirus facts, today's ErgoptiPlus logs and their digest), stores
-# it under docs/field-reports/, then commits and pushes the branch. The logs are
+# coordinator reads (system, toolchain, runtime, input-language, keyboard,
+# autostart, privilege, process, memory, listener, proxy, antivirus and crash
+# facts, the collector's own checks, today's ErgoptiPlus logs, their digest
+# and their analysis), stores it under docs/field-reports/, then commits and
+# pushes the branch. The logs are
 # gitignored, so they are added with `git add -f`; the logger already masks
 # secrets, the home folder, e-mail addresses and personal names, and the branch is
 # public, so only copies scrubbed of typed text by tools/dev/field-log-scrub.py
@@ -19,6 +21,14 @@
 # replaced, and the proxy facts say only whether a proxy or a PAC file is set,
 # never its address.
 #
+# The analysis: tools/dev/field-log-analyse.py, the analyser the three
+# collectors share, reads the scrubbed day logs and writes analysis.md and
+# analysis.json at the top of the report (errors grouped by template, every
+# measured duration against the budget its code declares, lifecycle events,
+# check verdicts, what to fix first) and prints the verdict marks and their
+# summary line: the collector's own checks (step collector_checks) and the
+# tray checks clicked today.
+#
 # The branch, the report folder and the base config key are the field_report
 # names of static/ergopti_plus/_shared/data/identifiers.json; the git steps are
 # the ones tools/dev/field-report-git.sh runs for the two shell collectors. The
@@ -27,9 +37,14 @@
 #
 # NOT COVERED, AND WHY:
 # - No field run. The AutoHotkey driver has no request protocol like the macOS
-#   developer app's (infra/field_run.lua). Its one-click composer check runs
-#   from the tray and writes one "check=<id> verdict=<...>" line to the day
-#   log: the checks clicked today are in digest_field_checks.
+#   developer app's (infra/field_run.lua). Its one-click composer and network
+#   checks run from the tray and show a result a person closes, so running
+#   them would need the user. Each writes one "check=<id> verdict=<...>" line
+#   to the day log: the checks clicked today are in digest_field_checks and get
+#   their mark in the analysis. The checks that need no person run from the
+#   collector itself.
+# - No services: the driver is a per-user process started from the Startup
+#   folder or the Run key, which the autostart step lists.
 # - No diagnostics export. The Diagnostics collection keeps its own consent and
 #   guided steps in the driver's window, and the local control helper
 #   (tools/diagnostics/open_windows_diagnostics.ps1) only opens that window.
@@ -355,11 +370,11 @@ function Complete-Report {
 	# A run that crosses midnight spans two day logs: keep both, oldest first.
 	if ($Today -ne $StartDay) { $Days += $Today }
 	$script:Python = Find-Python
+	$DayLogs = @()
 	$Folder = Resolve-LogsDir
 	if (-not $Folder) {
 		Add-Step ('{0,-28} unresolved (%{1}% is empty; pass -LogsDir)' -f 'logs', $LogsBase)
 	} elseif (Test-Path -LiteralPath $Folder -PathType Container) {
-		$DayLogs = @()
 		foreach ($Day in $Days) {
 			foreach ($Name in "$MainPrefix$Day$Extension", "$ErrorsPrefix$Day$Extension") {
 				$Source = Join-Path $Folder $Name
@@ -409,6 +424,19 @@ function Complete-Report {
 		if (-not $script:Python) { throw 'No Python interpreter runs on this PC.' }
 		& $script:Python (Join-Path $DevTools 'hotstring-collisions.py') (
 			[IO.Path]::Combine((Resolve-ConfigDir), 'hotstrings', 'personal_hotstrings.toml')) $BundledHotstrings
+	}
+
+	# Last: it also reads the check verdicts the steps above wrote. Its output
+	# goes straight to the console: captured, Windows PowerShell 5.1 would decode
+	# the verdict marks in the OEM code page.
+	if ($script:Python) {
+		$ErrorActionPreference = 'Continue'
+		$Analyser = @((Join-Path $DevTools 'field-log-analyse.py'), '--repo', $RepoRoot, '--out', $script:Out)
+		& $script:Python @Analyser @DayLogs
+		Add-Step ('{0,-28} exit={1}' -f 'analysis', $LASTEXITCODE)
+		if ($LASTEXITCODE -ne 0) { Log "step 'analysis' exited $LASTEXITCODE" }
+	} else {
+		Add-Step ('{0,-28} skipped (no Python interpreter runs on this PC)' -f 'analysis')
 	}
 
 	$Subject = "docs(field): Windows field report $Stamp on $Base"
@@ -484,6 +512,91 @@ try {
 	Invoke-Step 'antivirus' {
 		Get-MpComputerStatus -ErrorAction Stop |
 			Format-List AMRunningMode, AntivirusEnabled, RealTimeProtectionEnabled, AntivirusSignatureVersion
+	}
+	# WinHTTP (the system services' proxy): direct or set, never its address.
+	Invoke-Step 'proxy_winhttp' {
+		$Text = (& netsh winhttp show proxy) -join "`n"
+		if ($Text -match '(?i)direct access') { 'WinHTTP: direct' } else { 'WinHTTP: set' }
+	}
+	Invoke-Step 'runtimes' {
+		foreach ($Name in 'python', 'py', 'node', 'curl', 'ollama') {
+			$Command = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+			if ($Command) { "${Name}: $((& $Command.Source --version 2>&1 | Select-Object -First 1))" } else { "${Name}: missing" }
+		}
+		# The WebView2 runtime the settings and diagnostics windows need.
+		$Key = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+		$Version = Get-ItemProperty -LiteralPath $Key -ErrorAction SilentlyContinue
+		if ($Version -and $Version.PSObject.Properties['pv']) { "WebView2: $($Version.pv)" } else { 'WebView2: missing' }
+		# A missing tool is a fact here, not a failed step.
+		$global:LASTEXITCODE = 0
+	}
+	Invoke-Step 'memory' {
+		Get-CimInstance Win32_OperatingSystem -ErrorAction Stop |
+			Format-List FreePhysicalMemory, TotalVisibleMemorySize, FreeVirtualMemory, LastBootUpTime
+	}
+	# The keyboards the hook sees: names and status, never what they type.
+	Invoke-Step 'input_devices' {
+		Get-PnpDevice -Class Keyboard -PresentOnly -ErrorAction Stop | Format-Table -AutoSize FriendlyName, Status
+	}
+	# How the driver starts at logon: names only, never a command line.
+	Invoke-Step 'autostart' {
+		$Startup = [Environment]::GetFolderPath('Startup')
+		$Links = @(Get-ChildItem -LiteralPath $Startup -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'ergopti' })
+		if ($Links.Count) { $Links | ForEach-Object { "Startup folder: $($_.Name)" } } else { 'Startup folder: no Ergopti entry' }
+		$Run = Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue
+		$Names = @()
+		if ($Run) { $Names = @($Run.PSObject.Properties | Where-Object { $_.Name -match 'ergopti' } | ForEach-Object { $_.Name }) }
+		if ($Names.Count) { $Names | ForEach-Object { "Run key: $_" } } else { 'Run key: no Ergopti entry' }
+		Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -match 'ergopti' } |
+			ForEach-Object { "Scheduled task: $($_.TaskName) $($_.State)" }
+	}
+	# An elevated window refuses the keys of a driver that is not elevated.
+	Invoke-Step 'privileges' {
+		$Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+		$Principal = New-Object Security.Principal.WindowsPrincipal $Identity
+		"collector elevated: $($Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))"
+		$Uac = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -ErrorAction SilentlyContinue
+		foreach ($Name in 'EnableLUA', 'ConsentPromptBehaviorAdmin') {
+			if ($Uac -and $Uac.PSObject.Properties[$Name]) { "${Name}: $($Uac.$Name)" } else { "${Name}: unset" }
+		}
+	}
+	# Crash dumps and application crashes of the last day: named, not copied.
+	Invoke-Step 'crash_dumps' {
+		$Pattern = 'AutoHotkey|ErgoptiPlus|ollama|python'
+		foreach ($Dir in (Join-Path $env:LOCALAPPDATA 'CrashDumps'), (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\WER\ReportArchive'), (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\WER\ReportQueue')) {
+			Get-ChildItem -LiteralPath $Dir -ErrorAction SilentlyContinue |
+				Where-Object { $_.Name -match $Pattern -and $_.LastWriteTime -gt (Get-Date).AddDays(-1) } |
+				ForEach-Object { "$($_.LastWriteTime.ToString('s')) $($_.Name)" }
+		}
+		$Since = (Get-Date).AddDays(-1)
+		Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000, 1001, 1002; StartTime = $Since } -ErrorAction SilentlyContinue |
+			Where-Object { $_.Message -match $Pattern } |
+			ForEach-Object { "$($_.TimeCreated.ToString('s')) event $($_.Id): $(($_.Message -split "`r?`n")[0])" }
+		'(end of the crash list)'
+	}
+	# The checks that need no person, one "check=<id> verdict=<...>" line each.
+	Invoke-Step 'collector_checks' {
+		# The interpreters tools/dev/run-windows-dev.ps1 looks for; a root that is
+		# not set is skipped, so every verdict below is still written.
+		$Interpreters = @()
+		if ($env:ProgramFiles) { $Interpreters += Join-Path $env:ProgramFiles 'AutoHotkey\v2\AutoHotkey64.exe' }
+		if ($env:LOCALAPPDATA) { $Interpreters += Join-Path $env:LOCALAPPDATA 'Programs\AutoHotkey\v2\AutoHotkey64.exe' }
+		$Found = @($Interpreters | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+		if ($Found.Count) { 'check=autohotkey verdict=pass codes=v2_x64_found' } else { 'check=autohotkey verdict=fail codes=v2_x64_missing' }
+		# The compiled driver, or an interpreter running the source script (a
+		# developer run); the command lines are only matched, never printed.
+		$Driver = @(Get-Process -Name $Identifiers.app.name -ErrorAction SilentlyContinue)
+		$Driver += @(Get-CimInstance Win32_Process -Filter "Name LIKE 'AutoHotkey%'" -ErrorAction SilentlyContinue |
+			Where-Object { $_.CommandLine -match [regex]::Escape("$($Identifiers.app.name).ahk") })
+		if ($Driver.Count -eq 1) { 'check=driver_running verdict=pass codes=one_instance' }
+		elseif ($Driver.Count -gt 1) { 'check=driver_running verdict=fail codes=several_instances' }
+		else { 'check=driver_running verdict=fail codes=not_running' }
+		if (Find-Python) { 'check=python verdict=pass codes=runs' } else { 'check=python verdict=fail codes=none_runs' }
+		$Key = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+		if (Get-ItemProperty -LiteralPath $Key -ErrorAction SilentlyContinue) { 'check=webview2 verdict=pass codes=installed' }
+		else { 'check=webview2 verdict=fail codes=missing' }
+		# The verdicts above are the result; a probe's exit code is not the step's.
+		$global:LASTEXITCODE = 0
 	}
 	$Completed = $true
 } finally {
