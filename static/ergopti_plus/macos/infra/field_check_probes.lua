@@ -49,6 +49,8 @@
 local Identifiers = require("identifiers")
 local Json = require("json")
 local NativePath = require("native_path")
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 
 local M = {}
 
@@ -506,11 +508,16 @@ function M.storage(ports, report, finish)
 end
 
 --- The URI SQLite opens without any lock, for a file another connection writes.
+--- Each path segment is percent-encoded and the separators kept, so a "?", "#"
+--- or "%" in a directory name cannot end the path or start an escape.
 --- @param path string Absolute database path.
 --- @return string uri
 function M.immutable_uri(path)
-	local escaped = path:gsub("[%%%?#%s]", function(char) return string.format("%%%02X", char:byte()) end)
-	return "file:" .. escaped .. "?immutable=1"
+	local segments = {}
+	for segment in (path .. "/"):gmatch("([^/]*)/") do
+		segments[#segments + 1] = TextUtils.percent_encode(segment)
+	end
+	return "file:" .. table.concat(segments, "/") .. "?immutable=1"
 end
 
 
@@ -640,9 +647,7 @@ end
 --- proxy, TLS trust), by the native helper. Any HTTP answer below 500 proves
 --- the route; a host the helper did not answer for fails by its key.
 function M.network_hosts(ports, report, finish)
-	local keys = {}
-	for key in pairs(Identifiers.hosts) do keys[#keys + 1] = key end
-	table.sort(keys)
+	local keys = TableUtil.sorted_keys(Identifiers.hosts)
 	ports.host_heads(function(code, output)
 		local steps = code == 0 and M.parse_host_lines(output) or {}
 		for _, key in ipairs(keys) do
