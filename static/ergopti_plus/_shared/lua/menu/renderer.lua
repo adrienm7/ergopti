@@ -951,10 +951,14 @@ function M.new(deps)
 		if item.show_current_choice == true then
 			title = title:gsub(item.current_choice_placeholder or "{1}", function() return current_label or tostring(current or "") end)
 		end
-		return {
-			label = title, items = sub,
-			disabled = R.resolve_disabled_when(manifest_key, row_id, getters) or nil,
-		}
+		local disabled = R.resolve_disabled_when(manifest_key, row_id, getters)
+		-- A greyed choice that declares why (`disabled_reason_key`) opens nothing
+		-- and names its reason: no driver repeats that policy. Without a reason
+		-- it stays navigable, as before.
+		if disabled and type(item.disabled_reason_key) == "string" then
+			return { label = title, disabled = true, disabled_reason_key = item.disabled_reason_key }
+		end
+		return { label = title, items = sub, disabled = disabled or nil }
 	end
 
 	--- Supplies one declared choice as provider data, without a private row policy.

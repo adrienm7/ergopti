@@ -4702,6 +4702,9 @@ platforms = ["ahk", "hs", "linux"]
 [[menu.about_update_channel_menu]]
 type = "choice"
 id = "update_channel"
+# A local version installs nothing: greyed with its reason by the shared renderer.
+disabled_when = ["installed_build"]
+disabled_reason_key = "menu.about.source_run_reason"
 path = "updater.channel"
 i18n = "menu.about.channel_menu"
 choice_registry = "updater.channels"
@@ -4713,6 +4716,9 @@ current_choice_placeholder = "{channel}"
 [[menu.about_update_frequency_menu]]
 type = "choice"
 id = "update_check_interval"
+# A local version installs nothing: greyed with its reason by the shared renderer.
+disabled_when = ["installed_build"]
+disabled_reason_key = "menu.about.source_run_reason"
 path = "updater.check_interval_seconds"
 i18n = "menu.about.frequency_menu"
 choice_registry = "updater.check_intervals"

@@ -582,19 +582,14 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 	for Row in SeparatorRows
 		Rows.Push(Row)
 
-	ChannelRow := _MI_ChannelPickerRow(SetChannelFn)
-	if IsLocal {
-		; A local version installs nothing, so its channel changes nothing.
-		ChannelRow.Delete("items")
-		ChannelRow["disabled"] := true
-		ChannelRow["disabled_reason_key"] := "menu.about.source_run_reason"
-	}
-	Rows.Push(ChannelRow)
+	; A local version installs nothing: the manifest's
+	; ``disabled_when = ["installed_build"]`` greys both choices with the reason.
+	Rows.Push(_MI_ChannelPickerRow(SetChannelFn, IsLocal))
 
 	; The preset in force, which both the live picker and its greyed stand-in name
 	; (a live value outside the presets reads as its nearest preset, the one a
 	; reload would load).
-	FrequencyRow := _MI_FrequencyPickerRow(SetIntervalFn)
+	FrequencyRow := _MI_FrequencyPickerRow(SetIntervalFn, IsLocal)
 
 	if IsLocal {
 		; A local version has no installation to update, so it checks for nothing.
@@ -605,9 +600,6 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 			Map("about_source_release_ready", () => !IsLocal))
 		if SourceRow is Map
 			Rows.Push(SourceRow)
-		FrequencyRow.Delete("items")
-		FrequencyRow["disabled"] := true
-		FrequencyRow["disabled_reason_key"] := "menu.about.source_run_reason"
 		Rows.Push(FrequencyRow)
 		return Rows
 	}
@@ -622,13 +614,14 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 }
 
 /** Supplies the registered cadence row to its acknowledged native owner. */
-_MI_FrequencyPickerRow(SetIntervalFn := 0) {
+_MI_FrequencyPickerRow(SetIntervalFn := 0, IsLocal := Updater_IsLocalSource()) {
 	global UPDATER_CHECK_INTERVAL
 	if !IsObject(SetIntervalFn)
 		SetIntervalFn := Updater_SetCheckInterval
 	return MenuRenderer_ChoiceRow("about_update_frequency_menu", "update_check_interval",
 		Map("update_check_interval", SetIntervalFn),
-		Map("updater.check_interval_seconds", () => UpdateSchedule_SnapInterval(UPDATER_CHECK_INTERVAL).Seconds))
+		Map("updater.check_interval_seconds", () => UpdateSchedule_SnapInterval(UPDATER_CHECK_INTERVAL).Seconds,
+			"installed_build", () => !IsLocal))
 }
 
 ; The channel picker: one submenu titled with the subscribed channel's registry
@@ -636,11 +629,11 @@ _MI_FrequencyPickerRow(SetIntervalFn := 0) {
 ; one. A click subscribes through the injected setter (Updater_SetChannel in
 ; production), which persists the choice and rebuilds the tray, so the title
 ; follows.
-_MI_ChannelPickerRow(SetChannelFn) {
+_MI_ChannelPickerRow(SetChannelFn, IsLocal := Updater_IsLocalSource()) {
 	global UPDATER_CHANNEL
 	return MenuRenderer_ChoiceRow("about_update_channel_menu", "update_channel",
 		Map("update_channel", (Id) => SetChannelFn.Call(Id)),
-		Map("updater.channel", () => UPDATER_CHANNEL))
+		Map("updater.channel", () => UPDATER_CHANNEL, "installed_build", () => !IsLocal))
 }
 
 

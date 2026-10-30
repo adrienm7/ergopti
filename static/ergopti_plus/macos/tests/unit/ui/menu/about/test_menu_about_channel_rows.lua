@@ -44,13 +44,19 @@ end
 --- with the shipped French catalogue.
 local function build(owner)
 	package.loaded["ui.menu.menu_about"] = nil
+	-- An installed build: a local version greys the picker (frequency rows test).
+	local Updater = require("modules.updater")
+	local real_local = Updater.is_local_source
+	Updater.is_local_source = function() return false end
 	local About = helpers.load_with_stubs("ui.menu.menu_about")
 	local catalogue = french()
 	require("infra.i18n").get = function(key) return catalogue[key] or key end
-	local item = About.build({ channel_owner = owner }, {
+	local ok, item = pcall(About.build, { channel_owner = owner }, {
 		start_at_login = function() error("Building About must not change startup.") end,
 		uninstall = function() error("Building About must not uninstall the application.") end,
 	})
+	Updater.is_local_source = real_local
+	if not ok then error(item, 0) end
 	return item.submenu, catalogue
 end
 

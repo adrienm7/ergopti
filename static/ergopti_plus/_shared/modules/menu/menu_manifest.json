@@ -572,6 +572,10 @@
 		{
 			"type": "choice",
 			"id": "update_channel",
+			"disabled_when": [
+				"installed_build"
+			],
+			"disabled_reason_key": "menu.about.source_run_reason",
 			"path": "updater.channel",
 			"i18n": "menu.about.channel_menu",
 			"show_current_choice": true,
@@ -594,6 +598,10 @@
 		{
 			"type": "choice",
 			"id": "update_check_interval",
+			"disabled_when": [
+				"installed_build"
+			],
+			"disabled_reason_key": "menu.about.source_run_reason",
 			"path": "updater.check_interval_seconds",
 			"i18n": "menu.about.frequency_menu",
 			"show_current_choice": true,
