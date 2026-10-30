@@ -73,7 +73,7 @@ _HSCS_PersonalEditorReadSite() {
 	Body := _DriverFuncBody("_HS_PersonalRows")
 	Assert(Body != "", "the actual personal provider must exist")
 	AssertTrue(_HSCS_PersonalFrameDelegation(Body), "the actual captured editor row reaches the canonical whole-frame renderer")
-	AssertContains(Body, "HS_TogglePersonalAllSections(Enabled, Options), PersonalMenu)",
+	AssertContains(Body, "HS_TogglePersonalAllSections(Enabled, Options)), PersonalMenu)",
 		"the unchanged scope builder owns the still-empty native repaint target")
 	Assert(!InStr(Body, 'Map("label", t("menu.hotstrings.open_editor")'), "the shared declaration owns the label")
 }

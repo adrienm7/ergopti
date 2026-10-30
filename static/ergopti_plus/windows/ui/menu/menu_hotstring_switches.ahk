@@ -83,6 +83,18 @@ _HS_AllSectionsRow(AllOn, Apply) {
 		Map("hotstring_scope_all_on", (*) => AllOn ? true : false))
 }
 
+; Announces a committed « all sections » switch; a refused one stays silent, the
+; writer having reported it.
+; @param Label {String} Display name of the scope.
+; @param Enabled {Boolean} The asked state.
+; @param Applied {Integer} What the scope's writer answered.
+; @returns {Integer} Applied, for the row's caller.
+_HS_SelectionNotice(Label, Enabled, Applied) {
+	if Applied
+		NotifyFeature(Label, Enabled)
+	return Applied
+}
+
 ; A bundled category's « check all » / « uncheck all »: its own sections and gate.
 _HS_CategorySelectionApply(Targets, Enabled) {
 	if Targets.Length != 1
@@ -125,5 +137,6 @@ _HS_LanguageSwitchRow(Pack) {
 			Paths.Push(V2Path)
 	}
 	return _HS_AllSectionsRow(_HS_ScopeAllOn(Gates, Paths),
-		((p) => (Bool) => ToggleLanguageAllSections(p, Bool))(Pack))
+		((p) => (Bool) => _HS_SelectionNotice(HotstringsLanguageName(p["locale"]), Bool,
+			ToggleLanguageAllSections(p, Bool)))(Pack))
 }
