@@ -111,21 +111,6 @@ const EXCEPTIONS = [
 		why: 'the generated features manifest is absent: a checkout the build step never ran, not a user state'
 	},
 	{
-		file: 'linux/ui/menu/llm_backend_rows.lua',
-		key: 'menu.llm.api_unreachable_body',
-		why: 'the verdict of the test the user ran from the entry row, whose own edit rows are the fix'
-	},
-	{
-		file: 'macos/ui/menu/menu_llm/api_panel.lua',
-		key: 'menu.llm.api_unreachable_body',
-		why: "the verdict of the check the user ran by adding a remote API entry, rolled back; the add row is the retry and the server, key or network is the user's to fix"
-	},
-	{
-		file: 'windows/ui/menu/menu_llm/menu_api_entries.ahk',
-		key: 'menu.llm.api_unreachable_body',
-		why: 'the verdict of the test the user ran from the entry row, whose own edit rows are the fix'
-	},
-	{
 		file: 'macos/ui/menu/menu_llm/models_manager_mlx.lua',
 		key: 'mlx.deps_missing_body',
 		why: 'posted only while the MLX runtime the user selected installs: the fix is already running in its progress window'
