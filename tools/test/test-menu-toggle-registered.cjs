@@ -34,6 +34,7 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('node:assert/strict');
 const { stripComments, scriptTokens } = require('../lib/script-source.cjs');
+const { commandConstantId } = require('../lib/menu-command-constant.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -98,22 +99,29 @@ function registers(source, ext, id) {
 			if ([')', ']', '}'].includes(value)) calls.pop();
 			if (value === ',' && calls.at(-1)?.open === '(') calls.at(-1).commas += 1;
 		}
-		if (value !== id) continue;
+		// An AutoHotkey key may name the id through its generated constant.
+		const constantId =
+			ext === '.ahk' && token.kind === 'identifier' && tokens[i + 1]?.value === '.'
+				? commandConstantId(ext, value, tokens[i + 2]?.value)
+				: undefined;
+		const namesKey = token.kind === 'string' || constantId !== undefined;
+		if (value !== id && constantId !== id) continue;
 		const before = tokens[i - 1]?.value;
+		const afterKey = constantId === id ? i + 3 : i + 1;
 		if (
-			token.kind === 'string' &&
+			namesKey &&
 			before === '[' &&
-			tokens[i + 1]?.value === ']' &&
-			tokens[i + 2]?.value === (ext === '.ahk' ? ':=' : '=')
+			tokens[afterKey]?.value === ']' &&
+			tokens[afterKey + 1]?.value === (ext === '.ahk' ? ':=' : '=')
 		)
 			return true;
 		if (
 			ext === '.ahk' &&
-			token.kind === 'string' &&
+			namesKey &&
 			calls.at(-1)?.name === 'Map' &&
 			calls.at(-1).commas % 2 === 0 &&
 			['(', ','].includes(before) &&
-			tokens[i + 1]?.value === ','
+			tokens[afterKey]?.value === ','
 		)
 			return true;
 		if (
@@ -150,6 +158,20 @@ for (const [ext, source] of [
 	['.lua', 'commands = { switch_other = handler }']
 ])
 	assert.equal(registers(source, ext, 'switch'), false, source);
+// The generated constant counts as the id's own spelling, only where the id would.
+for (const source of [
+	'Commands := Map(MenuCommand.GESTURES_TOGGLE, Handler)',
+	'Commands[MenuCommand.GESTURES_TOGGLE] := Handler'
+])
+	assert.equal(registers(source, '.ahk', 'gestures_toggle'), true, source);
+for (const source of [
+	'; Commands := Map(MenuCommand.GESTURES_TOGGLE, Handler)',
+	'Run(MenuCommand.GESTURES_TOGGLE, Handler)',
+	'Map("label", MenuCommand.GESTURES_TOGGLE, "other", Handler)',
+	'Commands := Map(Other.GESTURES_TOGGLE, Handler)',
+	'Commands := Map(MenuCommand.SCOPE_CLEAR, Handler)'
+])
+	assert.equal(registers(source, '.ahk', 'gestures_toggle'), false, source);
 
 const visible = (row, platform) =>
 	!Array.isArray(row.platforms) || row.platforms.includes(platform);
