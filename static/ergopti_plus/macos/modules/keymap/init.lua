@@ -1342,8 +1342,8 @@ local function run_trigger_checks()
 						action.mapping, logical_char_len, false, logical_buffer)
 				end
 				if fired then return true end
-				-- A final no-op deliberately clears the buffer via suppress_rescan.
-				-- Returning immediately preserves that fence against repeat fallback.
+				-- A final no-op wins without an edit: returning immediately keeps it
+				-- masking the repeat fallback.
 				if action.is_noop and action.mapping.final_result then return false end
 			end
 		end
@@ -1383,10 +1383,11 @@ local function run_trigger_checks()
 		-- gets a repeat-key instead of the intended expansion.
 		local skip_delay = star_validated
 		for _, m in ipairs(term_bucket) do
-			if not m.auto and m.tlen > min_len and (skip_delay or mapping_fires(m))
-				and Expander.try_terminator_expand(m, chars, char_len, is_ignored)
-			then
-				return true
+			if not m.auto and m.tlen > min_len and (skip_delay or mapping_fires(m)) then
+				local fired, reason = Expander.try_terminator_expand(m, chars, char_len, is_ignored)
+				if fired then return true end
+				-- A final entry that changes nothing masks the lower candidates.
+				if reason == "noop_final" then return false, "noop_final" end
 			end
 		end
 		return false
@@ -1420,14 +1421,18 @@ local function run_trigger_checks()
 		end
 	end
 
-	if run_end_char_checks(auto_len) then return true end
+	local end_fired, end_reason = run_end_char_checks(auto_len)
+	if end_fired then return true end
+	if end_reason == "noop_final" then return false end
 
 	if auto_bucket then
 		for _, m in ipairs(auto_bucket) do
-			if m.auto and ((star_validated and m.has_magic) or mapping_fires(m))
-				and Expander.try_auto_expand(m, char_len, is_ignored)
-			then
-				return true
+			if m.auto and ((star_validated and m.has_magic) or mapping_fires(m)) then
+				local fired, reason = Expander.try_auto_expand(m, char_len, is_ignored)
+				if fired then return true end
+				-- A final entry that changes nothing masks the lower candidates of
+				-- this keystroke, end-char ones included.
+				if reason == "noop_final" then return false end
 			end
 		end
 	end

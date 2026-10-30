@@ -121,6 +121,31 @@ end
 -- ========================================
 
 helpers.describe("star preview auto-expand gate", function()
+	-- Field report of 2026-10-30: a personal immediate "sru" -> "SRU" typed as
+	-- "SRU" changed nothing but wiped the buffer, so the bundled "sru" -> "sur"
+	-- had nothing left to match on the following space.
+	helpers.it("a final entry that changes nothing masks without wiping the buffer", function()
+		local effects = {}
+		local state, Registry, _, Expander = fresh_runtime(effects)
+		Registry.add("keep", "keep", {
+			auto_expand = true,
+			is_case_sensitive = true,
+			is_case_sensitive_strict = true,
+			final_result = true,
+		})
+		Registry.sort_mappings()
+		local mapping = nil
+		for _, candidate in ipairs(state.mappings) do
+			if candidate.trigger == "keep" then mapping = candidate end
+		end
+		helpers.assert_not_nil(mapping, "the real registry must retain the no-op fixture")
+		state.buffer = "word keep"
+		local fired, reason = Expander.try_auto_expand(mapping, ONE_CODEPOINT, false)
+		helpers.assert_eq(fired, false, "nothing is typed for a replacement equal to the trigger")
+		helpers.assert_eq(reason, "noop_final", "the caller is told to stop at this winner")
+		helpers.assert_eq(state.buffer, "word keep", "the typed text stays matchable by a later terminator")
+	end)
+
 	helpers.it("G5 star preview requires an auto-expand action", function()
 		local effects = {}
 		local state, Registry, Bridge, Expander, hs_stub = fresh_runtime(effects)
