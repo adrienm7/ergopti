@@ -139,6 +139,18 @@ M._active_tasks = {}
 --- @param module_sections table Extra module sections definitions.
 --- @return table|nil myMenu The created menubar object.
 --- @return table|nil configWatcher The file watcher object.
+-- The running menu's timed rebuild, published once the menu exists (M.start).
+local _timed_rebuild = nil
+
+--- Rebuilds the menu tree now, as a state change does, and times it: the
+--- developer field run's menu step (infra/field_check_probes.lua).
+--- @return table|nil outcome { ok, ms, items, slowest = { { id, ms } } }, nil
+---   before the menu exists.
+function M.timed_rebuild()
+	if type(_timed_rebuild) ~= "function" then return nil end
+	return _timed_rebuild()
+end
+
 --- Stops the watchers this module owns.
 ---
 --- The shutdown callback stops everything pinned in _G.script_watchers, but the
@@ -1670,6 +1682,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 	end
 	ctx.rebuild_menu_cache = rebuild_menu_cache
+	_timed_rebuild = function()
+		local started = hs.timer.secondsSinceEpoch()
+		local ok = rebuild_menu_cache() == true
+		local ms = (hs.timer.secondsSinceEpoch() - started) * 1000
+		local slowest = {}
+		for index, entry in ipairs(Builder.get_last_item_timings() or {}) do slowest[index] = entry end
+		table.sort(slowest, function(a, b) return a.ms > b.ms end)
+		return { ok = ok, ms = ms, items = type(_cached_menu_items) == "table" and #_cached_menu_items or 0,
+			slowest = slowest }
+	end
 	refresh_for_click = function()
 		ctx.paused = core_mods.shortcuts_mod
 			and type(core_mods.shortcuts_mod.is_paused) == "function"

@@ -24,7 +24,8 @@
 ---    driver or macOS wrote for it during the last day.
 --- 8. ai_local: the owned Ollama's signature, its server's listing, one token
 ---    predicted with a model already installed, and the MLX models on disk.
---- 9. typing_selftest: the automatic key accounting. The app types a fixed
+--- 9. menu_build: one timed rebuild of the menu tree and its slowest rows.
+--- 10. typing_selftest: the automatic key accounting. The app types a fixed
 ---    sequence into a scratch field of its own, and only there; the tap must
 ---    see each key once and the field must hold exactly the sequence.
 ---
@@ -627,11 +628,46 @@ end
 
 
 
--- ===================================
--- ===================================
--- ======= 9/ Typing self-test =======
--- ===================================
--- ===================================
+-- =============================
+-- =============================
+-- ======= 9/ Menu build =======
+-- =============================
+-- =============================
+
+-- Slowest top-level rows the menu step names.
+M.MENU_SLOWEST_LISTED = 3
+
+--- One rebuild of the menu tree, timed, as a state change rebuilds it. The
+--- rebuild must succeed (AppKit accepted the tree); its duration, the number
+--- of top-level rows and the slowest ones are information for the analyser.
+function M.menu_build(ports, report, finish)
+	local outcome = ports.menu_rebuild()
+	if type(outcome) ~= "table" then
+		report.step("menu_rebuild", STATE.fail, "menu_absent")
+		return finish()
+	end
+	report.step("menu_rebuild", outcome.ok and STATE.pass or STATE.fail, outcome.ok and "rebuilt" or "refused")
+	report.step("menu_rebuild_ms", STATE.info, math.floor(outcome.ms or 0))
+	report.step("menu_top_items", STATE.info, outcome.items or 0)
+	for index = 1, M.MENU_SLOWEST_LISTED do
+		local entry = (outcome.slowest or {})[index]
+		if entry then
+			report.step("menu_slowest_" .. index, STATE.info,
+				tostring(entry.id) .. ":" .. string.format("%.1f", tonumber(entry.ms) or 0))
+		end
+	end
+	finish()
+end
+
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 10/ Typing self-test =======
+-- ====================================
+-- ====================================
 
 -- The sequence typed into the scratch field: plain letters with no terminator,
 -- so no hotstring fires, short so keystats only gains these few keystrokes.
