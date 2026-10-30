@@ -40,6 +40,10 @@ const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.sh';
 const SHELL_CHECKS = 'tools/dev/macos-field-shell-checks.sh';
 const PRIVACY_PANES = 'static/ergopti_plus/macos/data/privacy_panes.json';
 const FIELD_GIT = 'tools/dev/field-report-git.sh';
+// The logs are scrubbed of typed text before they reach the pushed branch.
+const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
+const COLLISIONS = 'tools/dev/hotstring-collisions.py';
+const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml';
 
 if (process.platform === 'win32') {
 	console.log('[SKIP] The macOS field report collector is a macOS shell tool; not run on Windows.');
@@ -97,7 +101,17 @@ function fixture(name, { onDev = false } = {}) {
 	const origin = path.join(base, 'origin.git');
 	const bin = path.join(base, 'bin');
 	const home = path.join(base, 'home');
-	for (const relative of [SCRIPT, SPEC_PATH, IDENTIFIERS, SHELL_CHECKS, PRIVACY_PANES, FIELD_GIT]) {
+	for (const relative of [
+		SCRIPT,
+		SPEC_PATH,
+		IDENTIFIERS,
+		SHELL_CHECKS,
+		PRIVACY_PANES,
+		FIELD_GIT,
+		LOG_SCRUB,
+		COLLISIONS,
+		BUNDLED_SAMPLE
+	]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
 	}
@@ -719,7 +733,10 @@ function reportFolder(paths) {
 				String(today.getMonth() + 1).padStart(2, '0'),
 				String(today.getDate()).padStart(2, '0')
 			].join('-');
-			fs.writeFileSync(path.join(logs, `ErgoptiPlus_${day}.log`), '[INFO] fixture day log\n');
+			fs.writeFileSync(
+				path.join(logs, `ErgoptiPlus_${day}.log`),
+				"[INFO] fixture day log\n[DEBUG] [keymap] Auto-expand: 'adr' → '12 rue privée'.\n"
+			);
 			const driver = startDriver(paths, 'hang');
 			try {
 				await waitFor(driver.readyPath);
@@ -743,7 +760,9 @@ function reportFolder(paths) {
 				assert.equal(result.status, 130, `${result.stdout}\n${result.stderr}`);
 				const folder = reportFolder(paths);
 				assert(fs.existsSync(path.join(folder, 'field_run', '01_field_lease.json')));
-				assert(fs.existsSync(path.join(folder, `ErgoptiPlus_${day}.log`)));
+				const copied = fs.readFileSync(path.join(folder, `ErgoptiPlus_${day}.log`), 'utf8');
+				assert.match(copied, /fixture day log/);
+				assert.doesNotMatch(copied, /rue privée|'adr'/, 'the pushed log must carry no typed text');
 				assert.match(
 					fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
 					/^collector\s+interrupted$/m

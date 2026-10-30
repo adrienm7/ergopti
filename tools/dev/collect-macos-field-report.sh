@@ -50,6 +50,8 @@ set -e
 . "$REPO_ROOT/tools/dev/field-report-git.sh"
 set +e
 LOG_DIR="${HOME}/Library/Logs/ergopti_plus"
+CONFIG_DIR="${ERGOPTI_CONFIG_DIR:-${HOME}/.config/ergopti_plus}"
+BUNDLED_HOTSTRINGS="static/ergopti_plus/_shared/modules/hotstrings"
 FIELD_RUN_SPEC="static/ergopti_plus/macos/data/field_run.json"
 # How long the collector keeps waiting for done after the request's own
 # deadline (the declared default, which covers every step at its bound): the
@@ -126,6 +128,20 @@ copy_field_run_results() {
 	cp -R "${results_dir}" "${out}/field_run"
 }
 
+# Copies one log into the report without the user's typed text.
+scrub_log() {
+	local source="$1" name
+	name="$(basename "${source}")"
+	if python3 "${REPO_ROOT}/tools/dev/field-log-scrub.py" "${source}" "${out}/${name}" \
+		"${REPO_ROOT}/${BUNDLED_HOTSTRINGS}"; then
+		printf '%-28s copied (scrubbed)\n' "${name}" >> "${steps}"
+	else
+		# Never fall back to the raw log: it would publish the typed text.
+		rm -f "${out}/${name}"
+		printf '%-28s scrub failed, not copied\n' "${name}" >> "${steps}"
+	fi
+}
+
 # Copies the logs, commits and pushes, once: from the normal end and from the
 # INT/TERM trap, so an interrupted run still leaves its evidence on the branch.
 finalize() {
@@ -139,27 +155,35 @@ finalize() {
 	days=("${start_day}")
 	[ "${today}" = "${start_day}" ] || days+=("${today}")
 	if [ -d "${LOG_DIR}" ]; then
+		# The branch is pushed to a public repository and the logs carry typed
+		# text (hotstring expansions, AI prompts): only scrubbed copies leave
+		# the Mac, and the digests below read those copies.
 		for d in "${days[@]}"; do
 			for f in "${LOG_DIR}"/ErgoptiPlus_"${d}".log "${LOG_DIR}"/ErgoptiPlus_errors_"${d}".log; do
-				[ -f "${f}" ] && cp "${f}" "${out}/" && printf '%-28s copied\n' "$(basename "${f}")" >> "${steps}"
+				[ -f "${f}" ] && scrub_log "${f}"
 			done
 		done
 		for f in "${LOG_DIR}"/ErgoptiPlus_llm.log "${LOG_DIR}"/launcher.log; do
-			[ -f "${f}" ] && cp "${f}" "${out}/" && printf '%-28s copied\n' "$(basename "${f}")" >> "${steps}"
+			[ -f "${f}" ] && scrub_log "${f}"
 		done
 		local day_logs=()
 		for d in "${days[@]}"; do
-			[ -f "${LOG_DIR}/ErgoptiPlus_${d}.log" ] && day_logs+=("${LOG_DIR}/ErgoptiPlus_${d}.log")
+			[ -f "${out}/ErgoptiPlus_${d}.log" ] && day_logs+=("${out}/ErgoptiPlus_${d}.log")
 		done
 		if [ "${#day_logs[@]}" -gt 0 ]; then
 			step digest_boot grep -hE "Boot complete|Boot CPU|Boot stage completed|held the main thread" "${day_logs[@]}"
 			step digest_slow grep -hE "\[HotPath\]|Slow |Main-thread hold of" "${day_logs[@]}"
 			step digest_errors grep -hE "\[(ERROR|WARNING)\]" "${day_logs[@]}"
 			step digest_input grep -hE "key_event_health|karabiner.lease|guardian" "${day_logs[@]}"
+			step digest_hotstrings grep -hiE "expand|hotstring|terminator|rescan|priority" "${day_logs[@]}"
 		fi
 	else
 		printf '%-28s missing\n' "logs" >> "${steps}"
 	fi
+	# Which personal triggers share a bundled one, with both sides' flags and no
+	# replacement text: the personal file itself never travels.
+	step hotstring_collisions python3 "${REPO_ROOT}/tools/dev/hotstring-collisions.py" \
+		"${CONFIG_DIR}/personal_hotstrings.toml" "${REPO_ROOT}/${BUNDLED_HOTSTRINGS}"
 
 	subject="docs(field): macOS field report ${stamp} on ${base}"
 	"${interrupted}" && subject="${subject} (interrupted)"
