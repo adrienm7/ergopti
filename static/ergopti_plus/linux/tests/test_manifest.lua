@@ -414,6 +414,7 @@ return {
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_intercept_passthrough_acknowledged_consumed_repeats",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_modal_release",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold",
+	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_nav_wheel",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_layout_change",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_pump",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_shift",
