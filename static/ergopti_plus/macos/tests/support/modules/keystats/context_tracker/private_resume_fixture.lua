@@ -299,7 +299,9 @@ function M.with_runtime(callback)
 			package.loaded["infra.script_chord_catalogue"] = {}
 			local function yes() return true end
 			for _, name in ipairs({ "modules.llm.api_mlx", "modules.llm.api_ollama", "modules.llm.api_remote", "modules.llm.warmup_controller" }) do
-				package.loaded[name] = { pause_warmup = yes, resume_warmup = yes, stop_warmup = yes, stop = yes }
+				-- retry_deferred_warmup: a restored remote API entry replays the deferred warmup.
+				package.loaded[name] = { pause_warmup = yes, resume_warmup = yes, stop_warmup = yes, stop = yes,
+					retry_deferred_warmup = yes }
 			end
 			local remote = package.loaded["modules.llm.api_remote"]
 			local remote_entries, remote_active = {}, nil
