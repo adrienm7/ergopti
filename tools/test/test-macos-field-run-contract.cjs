@@ -892,8 +892,15 @@ function reportFolder(paths) {
 
 		await check('Ctrl-C during the field run still commits its results and logs', async () => {
 			const paths = fixture('interrupted');
-			const logs = path.join(paths.home, 'Library/Logs/ergopti_plus');
+			// LogsDirPath moves the day logs; the launcher's own log stays in the default folder
+			const defaultLogs = path.join(paths.home, 'Library/Logs/ergopti_plus');
+			const logs = path.join(paths.home, 'moved-logs/ergopti_plus');
+			fs.mkdirSync(defaultLogs, { recursive: true });
 			fs.mkdirSync(logs, { recursive: true });
+			fs.writeFileSync(
+				path.join(defaultLogs, 'launcher.log'),
+				'[2026-10-30 21:06:03] embedded Hammerspoon exited with status 70\n'
+			);
 			const today = new Date();
 			const day = [
 				today.getFullYear(),
@@ -908,7 +915,7 @@ function reportFolder(paths) {
 			);
 			// The trail a lost reload left (adapters/reload_breadcrumb.lua), then the next boot
 			fs.writeFileSync(
-				path.join(logs, 'reload_breadcrumb.txt'),
+				path.join(defaultLogs, 'reload_breadcrumb.txt'),
 				'accepted 5000.000\nlease_fence_requested 5001.250\nboot 9000.000\n'
 			);
 			// A configuration folder moved by the launcher's paths.toml, as
@@ -916,7 +923,10 @@ function reportFolder(paths) {
 			const moved = path.join(paths.home, 'moved-config');
 			const pathsFile = path.join(paths.home, 'Library/Application Support/ErgoptiPlus');
 			fs.mkdirSync(pathsFile, { recursive: true });
-			fs.writeFileSync(path.join(pathsFile, 'paths.toml'), `ConfigDirPath = "${moved}/"\n`);
+			fs.writeFileSync(
+				path.join(pathsFile, 'paths.toml'),
+				`ConfigDirPath = "${moved}/"\nLogsDirPath = "${logs}/"\n`
+			);
 			const personal = path.join(moved, 'hotstrings');
 			fs.mkdirSync(personal, { recursive: true });
 			fs.writeFileSync(
@@ -982,6 +992,15 @@ function reportFolder(paths) {
 					'the reload trail travels as written'
 				);
 				assert.match(committed, /reload_breadcrumb\.txt/);
+				assert.match(
+					fs.readFileSync(path.join(folder, 'launcher.log'), 'utf8'),
+					/embedded Hammerspoon exited with status 70/,
+					'launcher.log is read from the default folder, not the moved one'
+				);
+				assert.match(
+					fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+					/^hammerspoon-fatal\.txt\s+missing$/m
+				);
 				assert.equal(git(paths.clone, 'status', '--porcelain', '--untracked-files=no'), '');
 			} finally {
 				driver.child.kill();
