@@ -413,7 +413,7 @@ for (const name of ['LLM_Engine_OnKeystroke', 'LLM_Engine_StartTimer']) {
 // The request plan owns the delay, so live mode's debounce reaches it here.
 check(
 	bodyFrom(keystrokes, '_LLM_Engine_PlanInput').includes(
-		'"live_debounce_ms", LLM_Engine_LiveIsActive() ? LLM_Live_Config()["debounce_ms"] : false'
+		'"live_debounce_ms", LLM_Engine_LiveIsActive() ? LLM_Live_Config()[ConfigLeaf.DEBOUNCE_MS] : false'
 	),
 	"the request plan must receive live mode's debounce while live mode is on"
 );
