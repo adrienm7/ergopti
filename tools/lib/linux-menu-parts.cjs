@@ -191,6 +191,52 @@ function statementEnd(unit, at) {
 	return end;
 }
 
+// The only globals a part's header may read before it declares anything.
+const HEADER_GLOBALS = ['require', 'pcall', 'type', 'rawget', 'package'];
+const LUA_WORDS = new Set([
+	'and',
+	'or',
+	'not',
+	'nil',
+	'true',
+	'false',
+	'if',
+	'then',
+	'end',
+	'local'
+]);
+
+/** Names a `local a, b = ...` header statement declares. */
+function headerDeclares(unit, at) {
+	const t = unit.tokens,
+		names = [];
+	if (t[at].value !== 'local') return names;
+	for (let k = at + 1; t[k]?.kind === 'identifier'; k += 2) {
+		names.push(t[k].value);
+		if (t[k + 1]?.value !== ',') break;
+	}
+	return names;
+}
+
+/** Free names a header statement reads: not a field, not a keyword, not its own declaration. */
+function headerReads(unit, at, end) {
+	const t = unit.tokens,
+		declared = headerDeclares(unit, at),
+		valueAt = declared.length ? at + declared.length * 2 : at;
+	const reads = [];
+	for (let index = at; index < end; index++) {
+		const token = t[index];
+		if (token.kind !== 'identifier' || LUA_WORDS.has(token.value)) continue;
+		if (['.', ':'].includes(t[index - 1]?.value)) continue;
+		if (index < valueAt && declared.includes(token.value)) continue;
+		// The boot guard assigns the facade it declared just before.
+		if (t[at].value === 'if' && t[index + 1]?.value === '=' && t[index + 2]?.value !== '=')
+			continue;
+		reads.push(token.value);
+	}
+	return reads;
+}
+
 /**
  * Reads one part module into its header imports, its definitions and its exports.
  * @returns {{ ok: true, imports: object[], partBindings: object[], span: string, exports: Map<string,string> } | { ok: false, reason: string }}
@@ -203,7 +249,8 @@ function readPart(file, source) {
 	const imports = [],
 		partBindings = [],
 		definitions = new Set(),
-		exports = new Map();
+		exports = new Map(),
+		known = new Set(HEADER_GLOBALS);
 	let at = 0,
 		phase = 'header',
 		spanStart = null,
@@ -247,6 +294,7 @@ function readPart(file, source) {
 			if (expectedField(binding.name, binding.module) !== binding.field)
 				return refuse('binding ' + binding.name + ' reads a foreign field');
 			partBindings.push({ ...binding, text: text(unit, binding.at, binding.end) });
+			known.add(binding.name);
 			at = binding.end;
 			continue;
 		}
@@ -289,6 +337,13 @@ function readPart(file, source) {
 				continue;
 			}
 			if (phase !== 'header') return refuse('an import follows a definition: ' + statement);
+			// The recomposed root reads the root's own copy of this statement, so a
+			// name the module never declared would go unseen there and be a nil
+			// global here.
+			const unknown = headerReads(unit, at, end).find((name) => !known.has(name));
+			if (unknown !== undefined)
+				return refuse('`' + statement + '` reads ' + unknown + ', which the module never declared');
+			for (const name of headerDeclares(unit, at)) known.add(name);
 			imports.push({ statement, at, end });
 			at = end;
 			continue;
