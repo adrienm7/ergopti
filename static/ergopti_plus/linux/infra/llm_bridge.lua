@@ -35,10 +35,16 @@ M.OLLAMA_DELETE_PATH = "/api/delete"
 --- and prediction_engine.lua must read it here rather than re-typing "localhost".
 M.OLLAMA_DEFAULT_HOST = "127.0.0.1"
 
---- Default port for Ollama. Mirrors the cross-driver canonical
---- _shared/modules/llm/defaults.json (llm_ollama_port) — pinned equal by
+--- Port of the Ollama Ergopti installs and runs itself. Mirrors the
+--- cross-driver canonical _shared/modules/llm/defaults.json
+--- (llm_ollama_owned_port) — pinned equal by
 --- tools/test/test-linux-llm-defaults-single-source.cjs so it cannot drift.
-M.OLLAMA_DEFAULT_PORT = 11434
+M.OLLAMA_OWNED_PORT = 11435
+
+--- The stock Ollama port, which a user's own Ollama keeps: Ergopti never
+--- contacts, starts, stops or reuses a daemon there. Mirrors defaults.json
+--- (llm_ollama_port), pinned by the same gate.
+M.OLLAMA_STOCK_PORT = 11434
 
 --- Minimum / maximum valid port numbers.
 M.OLLAMA_PORT_MIN = 1024
@@ -76,13 +82,16 @@ M.CONTEXT_TAIL_WORDS = PromptBuilder.CONTEXT_TAIL_WORDS
 -- 2. Internal helpers
 -- ============================================================================
 
---- Resolves the Ollama origin from port and host overrides.
---- @param port_override number|nil User-configured port override.
+--- Resolves the Ollama origin from port and host overrides. The stock port is
+--- refused like an invalid one: a daemon answering there is the user's own
+--- Ollama, which Ergopti must never select or reuse.
+--- @param port_override number|nil Port override (tests, acceptance runs).
 --- @param host_override string|nil User-configured host override.
 --- @return string Origin with no operation path, or empty string on invalid port.
 function M.resolve_base_url(port_override, host_override)
-	local port = tonumber(port_override) or M.OLLAMA_DEFAULT_PORT
+	local port = tonumber(port_override) or M.OLLAMA_OWNED_PORT
 	if port < M.OLLAMA_PORT_MIN or port > M.OLLAMA_PORT_MAX then return "" end
+	if math.floor(port) == M.OLLAMA_STOCK_PORT then return "" end
 	local host = host_override or M.OLLAMA_DEFAULT_HOST
 	return "http://" .. host .. ":" .. tostring(math.floor(port))
 end

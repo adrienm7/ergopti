@@ -11,12 +11,15 @@
 --- FEATURES & RATIONALE:
 --- 1. Read-only: the managed runtime is read through the owned resolver and
 ---    ollama_installed_runtime.capture, which spawn nothing, write nothing and
----    acquire no descriptor; a system Ollama is a PATH directory lookup.
+---    acquire no descriptor.
 --- 2. A server that answers is never greyed: models in the inventory, or an
 ---    Ollama the user points at elsewhere than this computer, are available
 ---    whatever this computer has installed.
 --- 3. The failure is the owned repair's own result (prediction_engine records
 ---    it through note_repair); the next successful repair clears it.
+--- 4. An Ollama the user installed (on PATH, or a daemon on the stock port)
+---    never counts: Ergopti runs only its own pinned Ollama, so the group stays
+---    greyed until that one is installed, as on macOS and Windows.
 --- ==============================================================================
 
 local M = {}
@@ -62,40 +65,18 @@ local function managed_status()
 	return ok and type(verdict) == "table" and type(verdict.status) == "string" and verdict.status or "unavailable"
 end
 
---- Whether an executable of that name is in a PATH directory: a directory
---- lookup, never a program launch (a minimal image may lack every probe).
---- @param name string
---- @return boolean
-local function executable_on_path(name)
-	local ok, native = pcall(require, "luv")
-	for directory in (os.getenv("PATH") or ""):gmatch("[^:]+") do
-		local candidate = directory .. "/" .. name
-		if ok and type(native.fs_access) == "function" then
-			if native.fs_access(candidate, "X") == true then return true end
-		else
-			local handle = io.open(candidate, "rb")
-			if handle then
-				handle:close()
-				return true
-			end
-		end
-	end
-	return false
-end
-
 local DEFAULT_PORTS = {
 	failure = M.failure,
 	managed = managed_status,
-	system_command = function() return executable_on_path("ollama") end,
 	loopback = function(origin) return require("llm.runtime_repair").loopback_origin(origin) ~= nil end,
 }
 
 --- Whether the local Ollama can run a model now.
 --- @param llm table Prediction engine (get_cached_models, get_base_url).
---- @param ports table|nil { failure, managed, system_command, loopback } (tests).
+--- @param ports table|nil { failure, managed, loopback } (tests).
 --- @return boolean available
 --- @return string|nil reason_key Locale key of why it cannot.
---- @return string cause installed|answering|remote|system|absent|install_failed.
+--- @return string cause installed|answering|remote|absent|install_failed.
 function M.capture(llm, ports)
 	ports = ports or DEFAULT_PORTS
 	local cause
@@ -109,8 +90,6 @@ function M.capture(llm, ports)
 		cause = "remote"
 	elseif ports.managed() == "installed" then
 		cause = "installed"
-	elseif ports.system_command() then
-		cause = "system"
 	else
 		cause = "absent"
 	end

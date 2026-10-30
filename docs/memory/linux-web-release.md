@@ -714,3 +714,17 @@ machine without a desktop proxy add nothing; any other lookup failure refuses
 the start (`runtime_proxy_unavailable`). Ollama has no failover, so only the first
 selection is used, and a PAC that sends blob hosts elsewhere than the registry
 is not followed.
+
+### project-linux-ollama-runs-on-the-owned-port-only
+
+Ergopti's Linux Ollama listens on `llm_ollama_owned_port` (11435), mirrored as
+`infra/llm_bridge.lua` `OLLAMA_OWNED_PORT` and pinned to `defaults.json` by
+`tools/test/test-linux-llm-defaults-single-source.cjs`. The engine origin feeds
+the repair's serve address (`OLLAMA_HOST`) and its `/api/version` readiness
+probe, so an origin on the stock port 11434 adopted a user's own daemon there;
+`resolve_base_url` therefore refuses the stock port and `profiles.init` refuses
+it as an override. The binary is only the per-user pinned runtime of
+`ollama_install_resolver`, and a PATH `ollama` never makes the model page treat
+Ollama as available. Linux has no saved port setting, so no key migrates. Never
+point a test at 11434 to stand for Ergopti's own daemon:
+`test_owned_ollama_coexistence.lua` holds a fake system daemon there.
