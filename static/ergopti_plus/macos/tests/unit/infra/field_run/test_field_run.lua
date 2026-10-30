@@ -759,6 +759,34 @@ helpers.describe("field run: pure helpers", function()
 			helpers.assert_true(ollama.runtime_name ~= ollama.name, "an Ollama pull takes the library tag")
 		end)
 	end)
+
+	helpers.it("prefers an installed model over a smaller one it would have to download", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local catalogue = Json.decode(read(helpers.shared("modules/llm/models.json")))
+			local smallest = FieldRun.smallest_model(catalogue, "mlx")
+			local installed_name = nil
+			local largest = 0
+			for _, provider in ipairs(catalogue) do
+				for _, family in ipairs(provider.families) do
+					for _, model in ipairs(family.models) do
+						local size = model.hardware_requirements and model.hardware_requirements.mlx
+							and model.hardware_requirements.mlx.download_gb
+						if size and size > largest and model.urls and model.urls.mlx then
+							largest, installed_name = size, model.name
+						end
+					end
+				end
+			end
+			helpers.assert_true(installed_name ~= smallest.name, "the fixture needs a model larger than the smallest")
+			local chosen = FieldRun.smallest_model(catalogue, "mlx", function(model)
+				return model.name == installed_name
+			end)
+			helpers.assert_eq(chosen.name, installed_name, "the installed model is used, nothing is downloaded")
+			local none = FieldRun.smallest_model(catalogue, "mlx", function() return false end)
+			helpers.assert_eq(none.name, smallest.name, "with nothing installed the smallest is downloaded")
+		end)
+	end)
 end)
 
 helpers.describe("field run ports: configuration guard", function()

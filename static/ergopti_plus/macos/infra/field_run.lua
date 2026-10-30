@@ -286,11 +286,15 @@ end
 --- The smallest catalogue model a backend can download, for the AI flows.
 --- Ollama needs a library tag (the only form its registry pull takes); MLX
 --- takes the display name, which the models manager maps to its repository.
+--- A model already installed wins over a smaller one that is not: the
+--- maintainer's shared connection paid 20 minutes for 0.38 GB on 2026-10-30,
+--- and an installed model exercises the same pull and serve path for free.
 --- @param catalogue table Decoded _shared/modules/llm/models.json.
 --- @param backend string "ollama" or "mlx".
+--- @param installed function|nil fn(model) -> boolean, true for an installed model.
 --- @return table|nil model { name, runtime_name, download_gb }
-function M.smallest_model(catalogue, backend)
-	local best = nil
+function M.smallest_model(catalogue, backend, installed)
+	local best, best_installed = nil, nil
 	for _, provider in ipairs(type(catalogue) == "table" and catalogue or {}) do
 		for _, family in ipairs(type(provider.families) == "table" and provider.families or {}) do
 			for _, model in ipairs(type(family.models) == "table" and family.models or {}) do
@@ -302,15 +306,20 @@ function M.smallest_model(catalogue, backend)
 				local pullable = backend ~= "ollama"
 					or (type(url) == "string" and url:match("^https://ollama%.com/library/") ~= nil)
 				if runtime and size and size > 0 and pullable and type(model.name) == "string" then
-					if best == nil or size < best.download_gb
-						or (size == best.download_gb and model.name < best.name) then
-						best = { name = model.name, runtime_name = runtime, download_gb = size }
+					local candidate = { name = model.name, runtime_name = runtime, download_gb = size }
+					local function smaller(current)
+						return current == nil or size < current.download_gb
+							or (size == current.download_gb and model.name < current.name)
+					end
+					if smaller(best) then best = candidate end
+					if installed and smaller(best_installed) and installed(candidate) == true then
+						best_installed = candidate
 					end
 				end
 			end
 		end
 	end
-	return best
+	return best_installed or best
 end
 
 
