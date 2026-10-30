@@ -800,6 +800,7 @@ M.checks = {
 	composer = M.composer,
 	permissions = Probes.permissions,
 	event_taps = Probes.event_taps,
+	input_sources = Probes.input_sources,
 }
 
 return M
