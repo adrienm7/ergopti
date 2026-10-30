@@ -416,6 +416,17 @@ local function emit_dispatch(m, to_type)
 	return km_utils.emit_tokens(km_utils.tokens_from_repl(m.repl))
 end
 
+--- Forgets the buffer after an output that pressed a key: {Left} moved the caret
+--- into the text just typed and {Tab} may have left the field, so "the text behind
+--- the caret" is no longer the replacement. Windows and Linux clear theirs too.
+--- @param m table The mapping entry that fired.
+local function forget_buffer_after_keys(m)
+	if m.plain_repl == m.repl then return end
+	_state.buffer = ""
+	_state.start_is_word_boundary = false
+	_state.start_is_line_start = false
+end
+
 
 
 
@@ -1052,6 +1063,7 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		function() return emit_dispatch(m, injection.text) end,
 		function()
 			_state.buffer = active_buffer:sub(1, tstart_byte - 1) .. injection.buffer_suffix
+			forget_buffer_after_keys(m)
 		end,
 		is_final,
 		is_ignored,
@@ -1192,6 +1204,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 				-- buf_start is a valid byte index into _state.buffer: the buffer
 				-- is only mutated by this very closure, which runs after emit.
 				_state.buffer = _state.buffer:sub(1, start_byte - 1) .. injection.buffer_suffix
+				forget_buffer_after_keys(m)
 			end,
 			is_final,
 			is_ignored,

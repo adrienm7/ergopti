@@ -34,9 +34,46 @@ local LOG = "keymap.utils"
 
 -- Re-export pure-Lua functions from the shared module so callers that require
 -- this HS adapter keep working unchanged without needing to know about the split.
-M.tokens_from_repl          = shared_utils.tokens_from_repl
 M.plain_text                = shared_utils.plain_text
 M.resolve_prediction_overlap = shared_utils.resolve_prediction_overlap
+
+-- The decoded send_keys.json, read the first time an output holds a token.
+local _send_vocabulary = nil
+
+--- A missing or malformed vocabulary raises: outputs would otherwise be typed as
+--- the literal tokens the user asked to press.
+--- @return table
+local function send_vocabulary()
+	if _send_vocabulary then return _send_vocabulary end
+	local path = require("infra.paths").shared("modules/actions/send_keys.json")
+	local raw = require("adapters.file_system").read(path)
+	local decoded = raw and require("adapters.json_codec").decode(raw) or nil
+	if type(decoded) ~= "table" or type(decoded.keys) ~= "table" then
+		error("keymap.utils: the send-input vocabulary is unreadable at " .. tostring(path))
+	end
+	_send_vocabulary = decoded
+	return decoded
+end
+
+--- @param repl string A hotstring output.
+--- @return table The {kind, value} tokens macOS plays for it.
+function M.tokens_from_repl(repl)
+	return shared_utils.tokens_from_repl(repl, send_vocabulary)
+end
+
+--- @param repl string A hotstring output.
+--- @return string repl The output with {U+XXXX} and the brace escapes resolved
+---   when it presses no key; unchanged otherwise.
+--- @return boolean has_keys True when the output presses a key.
+function M.resolve_output(repl)
+	local has_keys = false
+	local plain = {}
+	for _, token in ipairs(M.tokens_from_repl(repl)) do
+		if token.kind == "key" then has_keys = true else plain[#plain + 1] = token.value end
+	end
+	if has_keys then return repl, true end
+	return table.concat(plain), false
+end
 
 
 
