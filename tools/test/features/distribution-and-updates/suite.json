@@ -593,6 +593,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-log-scrub.cjs"],
 			"repro": "npm run test:field-log-scrub"
+		},
+		{
+			"id": "js-field-log-analyse",
+			"ordinal": 538,
+			"name": "one log analyser reads every driver's spelling, judges each measure against the budget its code declares and ranks what to fix first",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-field-log-analyse.cjs"],
+			"repro": "npm run test:field-log-analyse"
 		}
 	]
 }

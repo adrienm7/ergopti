@@ -1,0 +1,890 @@
+{
+	"_comment": [
+		"One vector per driver spelling tools/dev/field-log-analyse.py reads. 'template' must stay in 'source'",
+		"(the test fails when a driver stops writing it); 'line' renders it; 'expect' is what the analyser must read in it."
+	],
+	"vectors": [
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/hotpath_profiler.lua",
+			"template": "Slow %s: %.2f ms own, %.2f ms total, parent %s (%d similar since the last line).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow hotstring.expand: 6.86 ms own, 6.86 ms total, parent hotstring.match (0 similar since the last line).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "hotpath:hotstring.expand",
+						"value": 6.86,
+						"declared": 5.0,
+						"budget": null
+					}
+				],
+				"family": "hotstrings"
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/hotpath_profiler.lua",
+			"template": "Slow %s: %.2f ms own, %.2f ms total, parent %s (%d similar since the last line).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow tooltip.show_predictions: 13.36 ms own, 13.36 ms total, parent none (0 similar since the last line).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "hotpath:tooltip.show_predictions",
+						"value": 13.36,
+						"declared": 5.0,
+						"budget": null
+					}
+				],
+				"family": "tooltip"
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/boot_profiler.lua",
+			"template": "Boot stage completed: %s in %.1f ms (+%.1f ms, total %.1f ms, cpu %.1f ms).",
+			"line": "2026-10-30 10:00:00:123 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 176.4 ms (+176.7 ms, total 1128.3 ms, cpu 52.7 ms).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "boot.stage:Shortcuts pre-start",
+						"value": 176.4,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/boot_profiler.lua",
+			"template": "Boot complete in %.0f ms.",
+			"line": "2026-10-30 10:00:00:123 [SUCCESS] [BootProfile] Boot complete in 1734 ms.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "boot.total",
+						"value": 1734.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/boot_profiler.lua",
+			"template": "Boot CPU: %.0f ms of process CPU over %.0f ms of boot.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Boot CPU: 1197 ms of process CPU over 1734 ms of boot.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "boot.cpu",
+						"value": 1197.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/logger.lua",
+			"template": "Main-thread hold of %d ms in an hs.timer.%s callback (%s).%s",
+			"line": "2026-10-30 10:00:00:123 [INFO] [runtime] Main-thread hold of 564 ms in an hs.timer.new callback (.../macos/ui/menu/init.lua:1753). Phases inside the hold: menu.rebuild=279.5 ms. Lua heap 44->37 MB.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "main_thread.hold",
+						"value": 564.0,
+						"declared": 250.0,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/logger.lua",
+			"template": "An hs.timer.%s callback (%s) held the main thread for %d ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.%s",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [runtime] An hs.timer.doAfter callback (.../keystats/log_manager.lua:2123) held the main thread for 17260 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 40->41 MB.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "main_thread.hold",
+						"value": 17260.0,
+						"declared": 250.0,
+						"budget": null
+					}
+				],
+				"lifecycle": []
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/ui/menu/init.lua",
+			"template": "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s",
+			"line": "2026-10-30 10:00:00:123 [INFO] [menu] Menu tree rebuilt in 279.5 ms (22 top-level item(s)). Slowest: keyboard_layout=61.8 ms, shortcuts=47.3 ms.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "menu.rebuild",
+						"value": 279.5,
+						"declared": null,
+						"budget": null
+					},
+					{
+						"metric": "menu.submenu:keyboard_layout",
+						"value": 61.8,
+						"declared": null,
+						"budget": null
+					},
+					{
+						"metric": "menu.submenu:shortcuts",
+						"value": 47.3,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/app_picker.lua",
+			"template": "Application exclusion menu built successfully (%d excluded app(s), %.1f ms).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [app_picker] Application exclusion menu built successfully (0 excluded app(s), 14.2 ms).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "menu.app_exclusions",
+						"value": 14.2,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/preferences.lua",
+			"template": "Slow preferences save %d ms (prepare=%d write=%d ms; operations=%d; ",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [preferences] Slow preferences save 2086 ms (prepare=1268 write=817 ms; operations=293; prepare: snapshot=7).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "preferences.save",
+						"value": 2086.0,
+						"declared": 250.0,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/modules/keystats/ingest_trace.lua",
+			"template": "Slow ingest tick %d ms (%s ms%s; entries=%d statements=%d).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [keystats.log_manager] Slow ingest tick 513 ms (drain=0 foreign=0 outbox=278 ms; entries=3 statements=4).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "keystats.ingest",
+						"value": 513.0,
+						"declared": 500.0,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/ui/healthcheck/core.lua",
+			"template": "The synchronous diagnostics took %.1f ms, over the %d ms budget.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [healthcheck] The synchronous diagnostics took 164.7 ms, over the 5 ms budget.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "healthcheck.sync",
+						"value": 164.7,
+						"declared": null,
+						"budget": 5.0
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/modules/llm/api_remote.lua",
+			"template": "[%s] #%d PARSED -> %d result(s) in %dms",
+			"line": "2026-10-30 10:00:00:123 [DEBUG] [llm.api_remote] [mlx-community--Qwen3.5-4B-MLX-4bit] #3 PARSED -> 1 result(s) in 1479ms",
+			"expect": {
+				"measures": [
+					{
+						"metric": "llm.request:remote",
+						"value": 1479.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/modules/llm/api_remote.lua",
+			"template": "Agent answer of provider '%s' received in %dms.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [llm.api_remote] Agent answer of provider 'mistral' received in 812ms.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "llm.request:mistral",
+						"value": 812.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/modules/llm/api_ollama.lua",
+			"template": "%s answer of the local server received in %dms (%d char(s)).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [llm.api_ollama] Rewrite answer of the local server received in 950ms (40 char(s)).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "llm.request:ollama",
+						"value": 950.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/modules/llm/streaming_handler.lua",
+			"template": "%d prediction(s) received in %dms from '%s'.",
+			"line": "2026-10-30 10:00:00:123 [SUCCESS] [llm.streaming_handler] 3 prediction(s) received in 3052ms from 'mlx-community--Qwen3.5-4B-MLX-4bit'.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "llm.stream",
+						"value": 3052.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/ui/tooltip/tooltip_llm.lua",
+			"template": "TTFT captured: %.0f ms.",
+			"line": "2026-10-30 10:00:00:123 [DEBUG] [tooltip_llm] TTFT captured: 1484 ms.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "llm.ttft",
+						"value": 1484.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/key_event_health.lua",
+			"template": " %d key-down(s) and %d key-up(s) seen %d ms or more late (max %.0f ms),",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 257 key-down(s), 260 key-up(s), 3 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 2 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 2050 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 2 Karabiner lease failure(s).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "input.late_key_event",
+						"value": 2050.0,
+						"declared": null,
+						"budget": 250.0
+					}
+				],
+				"lifecycle": ["karabiner_lease_failure"]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/key_event_health.lua",
+			"template": " %d key-down(s) and %d key-up(s) seen %d ms or more late (max %.0f ms),",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it; session totals: 12 key-down(s), 13 key-up(s), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 Karabiner lease failure(s).",
+			"expect": {
+				"measures": [],
+				"lifecycle": []
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/_shared/lua/phase_stats_core.lua",
+			"template": "Phase summary [%s] over %d s: %s.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [phase_stats] Phase summary [hotpath] over 300 s: keydown n=14 mean=2.60 max=3.69 total=36.4 ms | hotstring.match n=14 mean=0.02 max=0.05 total=0.3 ms | #timer_hold_over_250ms=3.",
+			"expect": {
+				"summaries": [
+					{
+						"metric": "phase:hotpath.keydown",
+						"n": 14,
+						"mean": 2.6,
+						"max": 3.69,
+						"slow": null
+					},
+					{
+						"metric": "phase:hotpath.hotstring.match",
+						"n": 14,
+						"mean": 0.02,
+						"max": 0.05,
+						"slow": null
+					},
+					{
+						"metric": "counter:hotpath.timer_hold_over_250ms",
+						"counter": 3
+					}
+				]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/termination_coordinator.lua",
+			"template": "Controlled %s requested (reason: %s).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [infra.termination_coordinator] Controlled reload requested (reason: hammerspoon_reload).",
+			"expect": {
+				"lifecycle": ["reload"]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/init.lua",
+			"template": "Hammerspoon local teardown started (%s).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [init] Hammerspoon local teardown started (reload).",
+			"expect": {
+				"lifecycle": ["stop"]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/modules/gestures/init.lua",
+			"template": "Wake-from-sleep detected (event=%d) — recycling watchers",
+			"line": "2026-10-30 10:00:00:123 [INFO] [gestures] Wake-from-sleep detected (event=0) — recycling watchers",
+			"expect": {
+				"lifecycle": ["sleep_wake"]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/modules/gestures/init.lua",
+			"template": "Wake-from-sleep detected",
+			"line": "2026-10-30 10:00:00:123 [INFO] [gestures] Startup phase timeout (30.5s) — switching to slow health-check (subsystem will wake on first physical touch).",
+			"expect": {
+				"lifecycle": []
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/modules/keystats/init.lua",
+			"template": "Keystats event tap found disabled — restarting.",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [keystats] Keystats event tap found disabled — restarting.",
+			"expect": {
+				"lifecycle": ["event_tap_disabled"]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/platform/remap/lease_controller.lua",
+			"template": "Karabiner lease %s read %s %.2f s after its deadline; task output was not being read meanwhile (an open menu or a modal window).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [karabiner.lease] Karabiner lease 1d5543ecc55c40d5b82c8d50b1bea79f read PONG 1 124.50 s after its deadline; task output was not being read meanwhile (an open menu or a modal window).",
+			"expect": {
+				"lifecycle": ["karabiner_lease_failure"],
+				"template": "Karabiner lease <*> read PONG <*> <*> s after its deadline; task output was not being read meanwhile (an open menu or a modal window)."
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/platform/remap/lease_controller.lua",
+			"template": "Karabiner lease %s waited %.2f s for %s; the deadline timer fired %.2f s late.",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [karabiner.lease] Karabiner lease 1d5543ecc55c40d5b82c8d50b1bea79f waited 124.50 s for PONG 1; the deadline timer fired 0.00 s late.",
+			"expect": {
+				"lifecycle": ["karabiner_lease_failure"]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_server.lua",
+			"template": "MLX server for ‘%s’ crashed — giving up. Reason: %s",
+			"line": "2026-10-30 10:00:00:123 [ERROR] [menu_llm.mlx] MLX server for ‘Qwen3.5-2B’ crashed — giving up. Reason: ModuleNotFoundError.",
+			"expect": {
+				"lifecycle": ["crash"]
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/_shared/lua/field_check_report.lua",
+			"template": "check=%s verdict=%s steps=%d %s",
+			"line": "2026-10-30 10:00:00:123 [INFO] [field_check] Field check 'network' result: check=network verdict=pass steps=6 proxy_settings=pass",
+			"expect": {
+				"field_check": {
+					"id": "network",
+					"verdict": "pass"
+				}
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/_shared/lua/logger/init.lua",
+			"template": "\\u{2191} \\\"%s\\\" repeated %d more %s between %s and %s%s.",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [llm.streaming_handler] ↑ \"Watchdog triggered: stream produced no visible result for %ds.\" repeated 4 more times between 2026-10-30 09:50:59:228 and 2026-10-30 09:55:59:228.",
+			"expect": {
+				"repeat": 4,
+				"template": "Watchdog triggered: stream produced no visible result for <*>s."
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/infra/perf_counters.lua",
+			"template": "Slow %s: %.2f ms own, %.2f ms total, parent %s (%d similar since the last line).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow input.dispatch: 7.10 ms own, 9.25 ms total, parent none (2 similar since the last line).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "hotpath:input.dispatch",
+						"value": 7.1,
+						"declared": 5.0,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/infra/boot_profiler.lua",
+			"template": "Boot stage '%s' done in %.0f ms (cpu %.0f ms)%s (total %.0f ms).",
+			"line": "2026-10-30 10:00:00:123 [SUCCESS] [BootProfile] Boot stage 'hotstrings' done in 210 ms (cpu 190 ms) (total 640 ms).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "boot.stage:hotstrings",
+						"value": 210.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/infra/boot_profiler.lua",
+			"template": "Boot complete in %.0f ms (cpu %.0f ms).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Boot complete in 812 ms (cpu 300 ms).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "boot.total",
+						"value": 812.0,
+						"declared": null,
+						"budget": null
+					},
+					{
+						"metric": "boot.cpu",
+						"value": 300.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/infra/boot_profiler.lua",
+			"template": "Boot timing started.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Boot timing started.",
+			"expect": {
+				"lifecycle": ["start"]
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/modules/llm/api_remote.lua",
+			"template": "Remote completion received (%d chars in %d ms).",
+			"line": "2026-10-30 10:00:00:123 [DEBUG] [llm.api_remote] Remote completion received (120 chars in 640 ms).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "llm.request:remote",
+						"value": 640.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/modules/updater/manager.lua",
+			"template": "Wake detected (%ds since the schedule timer was armed for %ds).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [updater] Wake detected (7300s since the schedule timer was armed for 3600s).",
+			"expect": {
+				"lifecycle": ["sleep_wake"]
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+			"template": "Reload requested from the tray menu…",
+			"line": "2026-10-30 10:00:00:123 [INFO] [menu] Reload requested from the tray menu…",
+			"expect": {
+				"lifecycle": ["reload"]
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+			"template": "Reload requested — re-scanning…",
+			"line": "2026-10-30 10:00:00:123 [INFO] [hotstrings_config] Reload requested — re-scanning…",
+			"expect": {
+				"lifecycle": []
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/ui/healthcheck/bridge.lua",
+			"template": "The synchronous diagnostics took %.1f ms, over the %d ms budget.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [healthcheck] The synchronous diagnostics took 12.0 ms, over the 5 ms budget.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "healthcheck.sync",
+						"value": 12.0,
+						"declared": null,
+						"budget": 5.0
+					}
+				]
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/ui/field_check/window.lua",
+			"template": "%s result: %s",
+			"line": "2026-10-30 10:00:00:123 [INFO] [network_check] Network check result: check=network verdict=fail steps=3 pac_download=fail:dns",
+			"expect": {
+				"field_check": {
+					"id": "network",
+					"verdict": "fail"
+				}
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/_shared/lua/phase_stats_core.lua",
+			"template": "Phase summary [%s] over %d s: %s.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [phase_stats] Phase summary [process] over 300 s: defaults n=150 mean=16.26 max=81.19 total=2439.4 ms.",
+			"expect": {
+				"summaries": [
+					{
+						"metric": "phase:process.defaults",
+						"n": 150,
+						"mean": 16.26,
+						"max": 81.19,
+						"slow": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/_shared/lua/logger/init.lua",
+			"template": "\\u{2191} \\\"%s\\\" repeated %d more %s between %s and %s%s.",
+			"line": "2026-10-30 10:00:00:123 [ERROR] [injector] ↑ \"Cannot deliver <text withheld> before erasing its trigger: %s.\" repeated 1 more time between 2026-10-30 09:00:00:000 and 2026-10-30 09:00:01:000.",
+			"expect": {
+				"repeat": 1
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/hotpath_profiler.ahk",
+			"template": "Slow {1}: {2} ms{3} ({4}).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow HSE.Dispatch: 7.25 ms [excl 3.1 ms, nested 4.15 ms] (trigger matched).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "hotpath:HSE.Dispatch",
+						"value": 7.25,
+						"declared": 5.0,
+						"budget": null
+					}
+				],
+				"family": "hotstrings"
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/hotpath_profiler.ahk",
+			"template": "Slow {1}: {2} ms{3} ({4}).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow UIA.SelectionPoll: 61.2 ms (poll).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "hotpath:UIA.SelectionPoll",
+						"value": 61.2,
+						"declared": 60.0,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/hotpath_profiler.ahk",
+			"template": "Slow {1}: {2} ms{3} ({4}).",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [HotPath] Slow Tooltip.Present: 12.5 ms (layered).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "hotpath:Tooltip.Present",
+						"value": 12.5,
+						"declared": 30.0,
+						"budget": null
+					}
+				],
+				"family": "tooltip"
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/hotpath_profiler.ahk",
+			"template": "Latency '{1}': count={2}, mean={3:.4f} ms, min={4:.4f} ms, max={5:.4f} ms, slow={6}, ge1={7}, ge5={8}, ge10={9}, ge50={10}.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [HotPath] Latency 'Hook.KeyDown': count=420, mean=0.3100 ms, min=0.0500 ms, max=6.2000 ms, slow=2, ge1=10, ge5=2, ge10=0, ge50=0.",
+			"expect": {
+				"summaries": [
+					{
+						"metric": "latency:Hook.KeyDown",
+						"n": 420,
+						"mean": 0.31,
+						"max": 6.2,
+						"slow": 2
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/boot_profiler.ahk",
+			"template": "Boot stage '{1}' done in {2} ms{3}.",
+			"line": "2026-10-30 10:00:00:123 [SUCCESS] [BootProfile] Boot stage 'Hotstrings' done in 312 ms (cpu 280 ms).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "boot.stage:Hotstrings",
+						"value": 312.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/ErgoptiPlus.ahk",
+			"template": "Boot complete in {1} ms (since process start).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Boot complete in 2410 ms (since process start).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "boot.total",
+						"value": 2410.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"template": "Complete configured menu usable at {1} ms since process start; input initialization pending={2}.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Complete configured menu usable at 1980 ms since process start; input initialization pending=0.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "menu.usable",
+						"value": 1980.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"template": "Tray global commands usable at {1} ms since process start.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Tray global commands usable at 820 ms since process start.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "menu.tray_usable",
+						"value": 820.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/ui/menu/menu_llm/menu_main.ahk",
+			"template": "LLM_Menu_Build: pre-emit staging took {1} ms.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [LLM] LLM_Menu_Build: pre-emit staging took 46 ms.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "menu.llm_staging",
+						"value": 46.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/modules/llm/api_ollama/ollama_streaming.ahk",
+			"template": "Streaming timed out after {1} ms.",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [LLM.ollama] Streaming timed out after 30000 ms.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "llm.timeout:ollama",
+						"value": 30000.0,
+						"declared": null,
+						"budget": null
+					}
+				],
+				"lifecycle": ["network_failure"]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/ui/menu/menu_llm/menu_api_entries.ahk",
+			"template": "API test for '{1}' succeeded in {2} ms ({3} reply chars).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [LLM] API test for 'mistral' succeeded in 640 ms (12 reply chars).",
+			"expect": {
+				"measures": [
+					{
+						"metric": "llm.api_test",
+						"value": 640.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/ui/healthcheck/core.ahk",
+			"template": "The synchronous diagnostics took {1} ms, over the {2} ms budget.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [Healthcheck] The synchronous diagnostics took 41 ms, over the 5 ms budget.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "healthcheck.sync",
+						"value": 41.0,
+						"declared": null,
+						"budget": 5.0
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/phase_stats.ahk",
+			"template": "Phase summary [{1}] over {2} s: {3}.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [Perf] Phase summary [menu] over 60 s: rebuild n=2 mean=140.50 max=181.00 total=281.0 ms | #rebuilds=2.",
+			"expect": {
+				"summaries": [
+					{
+						"metric": "phase:menu.rebuild",
+						"n": 2,
+						"mean": 140.5,
+						"max": 181.0,
+						"slow": null
+					},
+					{
+						"metric": "counter:menu.rebuilds",
+						"counter": 2
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"template": "Reload requested by {1} (suspended={2}).",
+			"line": "2026-10-30 10:00:00:123 [INFO] [Lifecycle] Reload requested by tray (suspended=0).",
+			"expect": {
+				"lifecycle": ["reload"]
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/ui/layout_manager/composer_check.ahk",
+			"template": "\" verdict=\"",
+			"line": "2026-10-30 10:00:00:123 [INFO] [ComposerCheck] Composer check result: check=composer verdict=pass steps=4 layout=pass",
+			"expect": {
+				"field_check": {
+					"id": "composer",
+					"verdict": "pass"
+				}
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/logger.ahk",
+			"template": "'\" repeated '",
+			"line": "2026-10-30 10:00:00:123 [WARNING] [Hotstrings] ↑ \"Fire-log drain failed for trigger <personal trigger>: {1}.\" repeated 2 more times between 2026-10-30 09:00:00:000 and 2026-10-30 09:01:00:000.",
+			"expect": {
+				"repeat": 2
+			}
+		},
+		{
+			"driver": "macos",
+			"source": "static/ergopti_plus/macos/infra/logger.lua",
+			"template": " — ErgoptiPlus session opened =====",
+			"line": "===== 2026-10-30 00:01:05:952 — ErgoptiPlus session opened =====",
+			"expect": {
+				"kind": "banner"
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/logger.ahk",
+			"template": " ErgoptiPlus session opened =====",
+			"line": "===== 2026-10-30 00:01:05:952 — ErgoptiPlus session opened =====",
+			"expect": {
+				"kind": "banner"
+			}
+		},
+		{
+			"driver": "windows",
+			"source": "static/ergopti_plus/windows/infra/logger.ahk",
+			"template": "FormatTime(A_Now, \"yyyy-MM-dd HH:mm:ss\") . \" [\" . Severity . \"] [\"",
+			"line": "2026-10-30 10:00:00 [ERROR] [Boot] Bootstrap failure before the logger.",
+			"expect": {
+				"kind": "record",
+				"level": "ERROR",
+				"module": "Boot"
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/_shared/lua/logger/init.lua",
+			"template": "\"%s [%s] [%s] %s\"",
+			"line": "  continued body line",
+			"expect": {
+				"kind": "continuation"
+			}
+		}
+	]
+}
