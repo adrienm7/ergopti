@@ -751,6 +751,7 @@ so `KeyboardShortcutsFollowAiSwitch` releases and re-arms their handles at boot 
 at the commit of the switch. Readers of what is stored (menu, writer) use
 `TapHoldConfiguredTapAction`. Action: a new key-claiming layer asks
 `AiActionBlocked`; extend `test_ai_action_gate.ahk`.
+The agent's manual actions refuse with the AI off (`_LLM_Agent_ManualRefusal`, notice`n`llm.manual_prediction.disabled`) and the picker greys them from the `ai:on` token of`nthe generated catalogue, with `dialog.action_picker.requires_ai`, read at each open.
 
 ### project-llm-validation-digit-is-the-digit-row-key
 

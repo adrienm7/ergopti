@@ -18,7 +18,7 @@ _AAG_WithAi(Body) {
 	global _LLM_Menu
 	Saved := _LLM_Menu
 	try {
-		_LLM_Menu := Map("enabled", false)
+		_LLM_Menu := _LPP_Menu(false)
 		Body.Call((On) => _LLM_Menu["enabled"] := On)
 	} finally _LLM_Menu := Saved
 }
@@ -238,6 +238,38 @@ _AAG_KeyboardHandles() {
 	}
 }
 Test("AI gate: native keyboard slots release and re-arm their exact handle (ai-off-keys)", _AAG_KeyboardHandles)
+
+; The picker greys the two actions the catalogue marks, at each open.
+_AAG_Picker() {
+	_AAG_WithAi(_Body)
+	_Body(SetAi) {
+		Off := _AAG_PickerRows()
+		for Id in ["llm_agent_selection", "llm_agent_command"] {
+			AssertTrue(Off[Id].HasOwnProp("Disabled"), Id . " is greyed while the AI is off")
+			AssertEqual(t("dialog.action_picker.requires_ai"), Off[Id].Hint, "with the dedicated reason")
+		}
+		AssertFalse(Off[AAG_ACTION].HasOwnProp("Disabled"), "an action the catalogue does not mark stays as it was")
+		Page := _ActPickWeb_BuildInitJs("Title", "none", [Off["llm_agent_command"]], false)
+		AssertContains(Page, '"disabled":true', "the page greys the row")
+		AssertContains(Page, JsonStringLiteral(t("dialog.action_picker.requires_ai")), "with its reason")
+		SetAi(true)
+		On := _AAG_PickerRows()
+		AssertFalse(On["llm_agent_selection"].HasOwnProp("Disabled"), "offered again with the AI on, no reload")
+		AssertFalse(On["llm_agent_command"].HasOwnProp("Disabled"))
+		AssertFalse(InStr(_ActPickWeb_BuildInitJs("Title", "none", [On["llm_agent_command"]], false), '"disabled":true'))
+	}
+}
+Test("AI gate: the picker greys the agent's manual actions with the AI-off hint (ai-off-picker)", _AAG_Picker)
+
+; @returns {Map} The action rows of the picker, by id.
+_AAG_PickerRows() {
+	Rows := Map()
+	for _, Item in GestureActionPickerItems() {
+		if (Item.Type == "action")
+			Rows[Item.Id] := Item
+	}
+	return Rows
+}
 
 _AAG_Throw(*) {
 	throw Error("Controlled native refusal.")
