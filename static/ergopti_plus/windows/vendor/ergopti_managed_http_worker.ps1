@@ -69,6 +69,7 @@ try {
             throw 'Native full-URL routing was refused.'
         }
         if ($Selection.Routes.Count -lt 1 -or $Selection.Routes.Count -gt $Selection.MaxRoutes) { throw 'Native route count was refused.' }
+        if ($Selection -is [hashtable] -and $Selection.ContainsKey('PacFallbackStage')) { $Answer.pac_fallback_stage = $Selection.PacFallbackStage }
         # The current shared policy preserves environment bypass for selected
         # system relays too. An explicit proxy must not erase no_proxy.
         if ($Policy.selected_proxy_bypass -cne 'environment') { throw 'Canonical selected-proxy bypass policy was refused.' }
