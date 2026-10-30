@@ -27,7 +27,9 @@
 #   developer app's (infra/field_run.lua): its Debug field checks (composed
 #   layout, network) run from the tray and show a zenity result a person
 #   closes. Each check writes one "check=<id> verdict=<...>" line to the day
-#   log, so the checks clicked today are in digest_field_checks.
+#   log, so the checks clicked today are in digest_field_checks; the collector
+#   prints them with the macOS marks (✅ pass, ❌ fail, ⏭️ skip, ⌨️ needs_typing,
+#   ⚠️ other) and a summary line, also kept in field_checks.txt.
 # - No diagnostics export. The health check is a tray window, with no
 #   command-line form; the boot diagnostic snapshot (the one [Diagnostics]
 #   line) is in the day log and digest_snapshot.
@@ -112,6 +114,44 @@ step() {
 	return 0
 }
 
+# Maps a check verdict to the mark the maintainer scans the output for, as the
+# macOS collector does; the verdict word stays after it so the logs remain
+# searchable.
+verdict_mark() {
+	case "$1" in
+		pass) printf '✅' ;;
+		fail) printf '❌' ;;
+		skip) printf '⏭️' ;;
+		needs_typing) printf '⌨️' ;;
+		*) printf '⚠️' ;;
+	esac
+}
+
+# Prints each "check=<id> verdict=<...>" line of the digest with its mark, then
+# one summary line, on the terminal and in field_checks.txt of the report.
+report_field_checks() {
+	local digest="$1" line check verdict
+	local passed=0 failed=0 skipped=0 typing=0 other=0
+	: > "${out}/field_checks.txt"
+	while IFS= read -r line; do
+		check="$(printf '%s\n' "${line}" | sed -n 's/.*check=\([a-z_]*\) verdict=.*/\1/p')"
+		verdict="$(printf '%s\n' "${line}" | sed -n 's/.*check=[a-z_]* verdict=\([^ ]*\).*/\1/p')"
+		[ -n "${check}" ] || continue
+		case "${verdict}" in
+			pass) passed=$((passed + 1)) ;;
+			fail) failed=$((failed + 1)) ;;
+			skip) skipped=$((skipped + 1)) ;;
+			needs_typing) typing=$((typing + 1)) ;;
+			*) other=$((other + 1)) ;;
+		esac
+		printf '  %s field check %s: %s\n' "$(verdict_mark "${verdict}")" "${check}" "${verdict:-unreadable}" \
+			| tee -a "${out}/field_checks.txt" | sed 's/^/[field-report] /'
+	done < "${digest}"
+	printf 'Field check summary: ✅ %d pass, ❌ %d fail, ⏭️ %d skip, ⌨️ %d needs_typing, ⚠️ %d other.\n' \
+		"${passed}" "${failed}" "${skipped}" "${typing}" "${other}" \
+		| tee -a "${out}/field_checks.txt" | sed 's/^/[field-report] /'
+}
+
 # Prints the logs folder the driver resolves and the log file names of
 # _shared/lua/app_dirs.lua, one per line: folder, unified prefix, errors prefix,
 # extension, bootstrap log, crash reports folder, personal hotstrings file.
@@ -181,6 +221,7 @@ finalize() {
 			step digest_errors grep -hE "\[(ERROR|WARNING)\]" "${day_logs[@]}"
 			step digest_snapshot grep -hE "\[Diagnostics\]" "${day_logs[@]}"
 			step digest_field_checks grep -hE "check=[a-z_]+ verdict=" "${day_logs[@]}"
+			report_field_checks "${out}/digest_field_checks.txt"
 			step digest_input grep -hE "grab|uinput|ydotool|device_finder|keymap" "${day_logs[@]}"
 		else
 			printf '%-28s missing\n' "day_log" >> "${steps}"
