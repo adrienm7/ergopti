@@ -341,7 +341,7 @@ local OWNED_CRASH_PROCESSES = {
 }
 
 -- Bytes of a report read for its closed tokens (the header and the exception).
-local CRASH_READ_BYTES = 65536
+local CRASH_READ_BYTES = require("infra.timings").count("limits", "crash_report_head_bytes")
 
 --- The closed tokens of one crash report: its kind (hang or crash), the
 --- exception type, the signal and the termination namespace macOS recorded.
