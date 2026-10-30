@@ -51,6 +51,11 @@ local ConfigKeys = require("config_keys")
 local RefusalRetry = require("modules.shortcuts.refusal_retry")
 
 local LOG = "shortcuts.keyboard_shortcuts"
+local TimerScheduler = require("adapters.timer_scheduler")
+-- Read when first needed: the timing registry is not consulted at module load.
+local FULL_REBIND_MIN_INTERVAL_SEC = nil
+-- Awake time of the last full rebind a refused retry asked for.
+local _last_full_rebind_at = nil
 
 -- Ownership inspection needs only key identities; action initialization belongs
 -- to assignment validation and delivery, not the cleanup reader.
@@ -1270,6 +1275,25 @@ function M.bind_pending(final)
 		if _lifecycle_epoch ~= epoch or _lifecycle_paused == true then break end
 	end
 	_layout_fallback_admitted = false
+	if next(_pending_slots) == nil then return true end
+	-- A chord macOS refused is usually held by another live registration: a
+	-- static chord resolved while the keycode map still described the previous
+	-- layout. Retrying this slot alone never moves it; one full rebind with the
+	-- current map does (field log 2026-10-30, Ctrl+. refused for 11 minutes).
+	for _, refusal in pairs(_pending_slots) do
+		if refusal == Registrar.OS_REFUSAL then
+			local now = TimerScheduler.awake_time()
+			FULL_REBIND_MIN_INTERVAL_SEC = FULL_REBIND_MIN_INTERVAL_SEC
+				or require("infra.timings").sec("adapters", "shortcut_full_rebind_min_interval_ms")
+			if _last_full_rebind_at == nil or now - _last_full_rebind_at >= FULL_REBIND_MIN_INTERVAL_SEC then
+				_last_full_rebind_at = now
+				Logger.info(LOG, "A refused shortcut may be held by a chord of the previous layout; rebinding every shortcut.")
+				local ok_rebind, rebound = pcall(function() return require("modules.shortcuts").rebind_for_layout() end)
+				if not ok_rebind then Logger.error(LOG, "Full shortcut rebind raised: %s.", tostring(rebound)) end
+			end
+			break
+		end
+	end
 	return next(_pending_slots) == nil
 end
 
