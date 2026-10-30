@@ -38,6 +38,12 @@
 		"chutes",
 		"requesty",
 		"baseten",
+		"reka",
+		"stepfun",
+		"volcengine",
+		"qianfan",
+		"spark",
+		"baichuan",
 		"backboard",
 		"typesafe",
 		"openrouter_jev",
@@ -364,6 +370,56 @@
 			"format": "openai",
 			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } },
 			"_source": "https://docs.baseten.co/development/model-apis/overview, https://docs.baseten.co/development/model-apis/reasoning (reasoning_effort none per model)"
+		},
+		"reka": {
+			"label": "Reka",
+			"base_url": "https://api.reka.ai/v1",
+			"default_model": "reka-edge-2603",
+			"format": "openai",
+			"_source": "https://docs.reka.ai/chat/models, https://docs.reka.ai/chat/api-reference/create-chat-completion (no thinking control documented; reka-edge-2603 does not reason)"
+		},
+		"stepfun": {
+			"label": "StepFun",
+			"base_url": "https://api.stepfun.ai/v1",
+			"default_model": "step-3.5-flash",
+			"format": "openai",
+			"_source": "https://platform.stepfun.ai/docs/en/guides/developer/openai, https://platform.stepfun.ai/docs/en/guides/models/step-3.5-flash (every text model reasons; reasoning_effort is not documented for step-3.5-flash)"
+		},
+		"volcengine": {
+			"label": "Volcengine Ark (Doubao)",
+			"base_url": "https://ark.cn-beijing.volces.com/api/v3",
+			"default_model": "doubao-seed-2-0-mini-260428",
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "thinking": { "type": "disabled" } },
+				"effort": { "reasoning_effort": "$level" }
+			},
+			"_source": "https://docs.volcengine.com/docs/82379/1298459, https://docs.volcengine.com/docs/82379/1494384, https://docs.volcengine.com/docs/82379/1449737"
+		},
+		"qianfan": {
+			"label": "Baidu Qianfan (ERNIE)",
+			"base_url": "https://qianfan.baidubce.com/v2",
+			"default_model": "ernie-5.1",
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "enable_thinking": false, "thinking": { "type": "disabled" } },
+				"effort": { "reasoning_effort": "$level" }
+			},
+			"_source": "https://cloud.baidu.com/doc/qianfan-api/s/3m9b5lqft, https://cloud.baidu.com/doc/qianfan-api/s/3m7of64lb, https://cloud.baidu.com/doc/qianfan-docs/s/Wm95lyynv (enable_thinking for ERNIE and Qwen3, thinking.type for DeepSeek, Kimi and GLM: a field a model refuses is dropped once and remembered)"
+		},
+		"spark": {
+			"label": "iFlytek Spark",
+			"base_url": "https://spark-api-open.xf-yun.com/v1",
+			"default_model": "lite",
+			"format": "openai",
+			"_source": "https://www.xfyun.cn/doc/spark/HTTP调用文档.html (the key is the APIPassword, sent as Bearer; the v1 models do not reason)"
+		},
+		"baichuan": {
+			"label": "Baichuan",
+			"base_url": "https://api.baichuan-ai.com/v1",
+			"default_model": "Baichuan4-Air",
+			"format": "openai",
+			"_source": "https://platform.baichuan-ai.com/docs-v2/api (no thinking control documented)"
 		},
 		"backboard": {
 			"label": "Backboard",
