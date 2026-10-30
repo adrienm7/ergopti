@@ -27,6 +27,31 @@ GestureSystemState() {
 	return State
 }
 
+; Removes the "notice dismissed" entries of the gesture notice this build no
+; longer has. They live in the registry-backed Storage, which the config.toml
+; migration registry cannot address, so boot sweeps them; an empty sweep costs
+; one enumeration of a few values and a failure only leaves them for the next boot.
+; @param EnumValuesFn {Func|Integer} Test seam for the registry enumeration.
+; @param DeleteFn {Func|Integer} Test seam for the deletion of one entry.
+; @returns {Integer} The number of entries removed.
+GestureSystemRetireDismissals(EnumValuesFn := 0, DeleteFn := 0) {
+	static Prefix := "gesture_conflict_dismissed."
+	if !_ST_EnumerateKeys(&Names, EnumValuesFn)
+		return 0
+	Removed := 0
+	for Name in Names {
+		if !(SubStr(Name, 1, StrLen(Prefix)) == Prefix)
+			continue
+		if IsObject(DeleteFn) ? DeleteFn.Call(Name) : ST_Delete(Name)
+			Removed += 1
+		else
+			try LoggerError("gestures.status", "The retired entry '{1}' could not be removed.", Name)
+	}
+	if Removed
+		try LoggerInfo("gestures.status", "Removed {1} retired gesture notice entry(ies).", Removed)
+	return Removed
+}
+
 ; Checks all fields needed for one slot, including its family and modifier mask.
 ; Read is injectable and returns an empty string for absent registry values.
 GestureSystemSlotConfigured(Slot, Read) {
