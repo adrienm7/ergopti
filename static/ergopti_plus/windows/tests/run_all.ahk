@@ -1619,6 +1619,7 @@ _LogBootProgress("keystats modules + tests included")
 ; cross-driver vectors.
 #Include meta/corpus/test_corpus_tooltip_layout.ahk
 ; TOML coercion corpus
+#Include meta/corpus/test_corpus_toml_batch_write.ahk
 #Include meta/corpus/test_corpus_toml_coercion.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
