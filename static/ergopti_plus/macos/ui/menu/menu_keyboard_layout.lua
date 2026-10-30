@@ -27,6 +27,7 @@ local NativePath = require("native_path")
 local Manifest      = require("infra.manifest_reader")
 local DeferredWork  = require("infra.deferred_work")
 local Timings       = require("infra.timings")
+local PhaseStats    = require("infra.phase_stats")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
@@ -305,6 +306,10 @@ function M.build(ctx)
 	-- list_active_keyboard_layouts() returns rich records {id, name, selected}
 	-- filtered to actual keyboard layouts, so the menu never displays
 	-- internal services (PressAndHold, CharacterPalette, …).
+	-- Each stage is a named phase: the row costs 42 ms on a field Mac but 100 to
+	-- 420 ms in some rebuilds (2026-10-30 report), and only the hold report's
+	-- phase list can say which stage the slow ones spend it in.
+	local stage_started = PhaseStats.now()
 	local records    = list_active_keyboard_layouts()
 	-- Build the active-Ergopti set directly from records — the same source used
 	-- to display the i18n.get("menu.layout.active_layouts") list below. If an entry appears there
@@ -331,7 +336,9 @@ function M.build(ctx)
 		end
 	end
 	local list_state = ergopti_in_active_layouts(records)
+	PhaseStats.stop("menu_keyboard_layout.sources", stage_started)
 
+	stage_started = PhaseStats.now()
 	local latest = M.pick_latest_bundle(bundles_dir)
 	-- The list-upgrade only makes sense once the latest bundle is on disk —
 	-- TIS can't enable an input source whose .bundle isn't installed.
@@ -397,6 +404,8 @@ function M.build(ctx)
 		installed_dir  = USER_LAYOUTS_DIR
 		installed_name = user_best.name
 	end
+	PhaseStats.stop("menu_keyboard_layout.bundles", stage_started)
+	stage_started = PhaseStats.now()
 	local bundle_full_path = (installed_dir and installed_name) and
 		(NativePath.without_trailing_separators(installed_dir) .. "/" .. installed_name) or ""
 	local variants = bundle_full_path ~= "" and install.bundle_variants(bundle_full_path) or {}
@@ -412,6 +421,8 @@ function M.build(ctx)
 	-- Installed bundle version: system preferred, then user. Used for the label in state 1.
 	-- We derive this from the filesystem, not from TIS, which is unreliable on Sequoia.
 	local installed_ver = (system_best and system_best.version) or (user_best and user_best.version)
+	PhaseStats.stop("menu_keyboard_layout.variants", stage_started)
+	stage_started = PhaseStats.now()
 	Logger.debug(LOG,
 		"Active layout state — stable=%d/%d legacy=%d installed=%s latest_installed=%s.",
 		active_variant_count, #variants, #legacy_active,
@@ -791,7 +802,9 @@ function M.build(ctx)
 	-- renders `items` as provider data, where every `title`/`fn` row is dropped,
 	-- which left this submenu empty on the real menu bar.
 	if type(submenu) ~= "table" or type(ManifestMenu.group_row) ~= "function" then return nil end
-	return ManifestMenu.group_row("layout_native_parent", "layout_parent_content", submenu, {})
+	local row = ManifestMenu.group_row("layout_native_parent", "layout_parent_content", submenu, {})
+	PhaseStats.stop("menu_keyboard_layout.rows", stage_started)
+	return row
 end
 
 -- Late-bound test hooks: the helpers below are defined after section 2, so we
