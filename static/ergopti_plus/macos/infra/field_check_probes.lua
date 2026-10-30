@@ -20,6 +20,8 @@
 ---    one request to a loopback server this check owns.
 --- 6. network_hosts: every external host the drivers declare answers one HEAD
 ---    through the managed transport (route lookup, proxy, TLS), by its key.
+---    ollama_blob_host: the host the Ollama registry sends a model's blob to
+---    is one the route inventory plans, so the daemon's pull takes its route.
 --- 7. app_health: the app's memory and CPU at idle, and the crash reports the
 ---    driver or macOS wrote for it during the last day.
 --- 8. ai_local: the owned Ollama's signature, its server's listing, one token
@@ -626,6 +628,46 @@ function M.network_hosts(ports, report, finish)
 				report.step("host_" .. key, step.state, step.value)
 			else
 				report.step("host_" .. key, STATE.fail, code == nil and "helper_unavailable" or "no_answer")
+			end
+		end
+		finish()
+	end)
+end
+
+--- Reads the helper's blob_manifest and blob_host lines.
+--- @param output any Helper stdout.
+--- @return table steps id → { state, value }
+function M.parse_blob_lines(output)
+	local steps = {}
+	for id, state, value in tostring(output or ""):gmatch("step (blob_[%w_]+) (%a+) (%S+)") do
+		if (id == "blob_manifest" or id == "blob_host") and not steps[id] then
+			steps[id] = { state = state, value = value }
+		end
+	end
+	return steps
+end
+
+--- The Ollama daemon pulls a model's blobs from the host the registry redirects
+--- it to, on the route the inventory (route_origins.json) planned for that
+--- host. The helper reads the smallest catalogue model's manifest and asks for
+--- one blob without following the redirect: a blob host the inventory does not
+--- plan fails, since behind a PAC the daemon would fetch it on the wrong route.
+function M.ollama_blob_host(ports, report, finish)
+	local model = ports.smallest_ollama_model()
+	if not model then
+		report.step("blob_manifest", STATE.skip, "no_catalogue_model")
+		report.step("blob_host", STATE.skip, "no_catalogue_model")
+		finish()
+		return
+	end
+	ports.blob_host(model.runtime_name, function(code, output)
+		local steps = code == 0 and M.parse_blob_lines(output) or {}
+		for _, id in ipairs({ "blob_manifest", "blob_host" }) do
+			local step = steps[id]
+			if step then
+				report.step(id, step.state, step.value)
+			else
+				report.step(id, STATE.fail, code == nil and "helper_unavailable" or "no_answer")
 			end
 		end
 		finish()

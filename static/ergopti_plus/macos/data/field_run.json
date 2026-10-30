@@ -104,6 +104,13 @@
 			"proves": "Every external host the drivers declare (GitHub and its API, Hugging Face, Ollama and its registry) answers one HEAD through the managed transport."
 		},
 		{
+			"id": "field_ollama_blob_host",
+			"kind": "field_check",
+			"check": "ollama_blob_host",
+			"deadline_seconds": 60,
+			"proves": "The host the Ollama registry redirects a model blob to is one the route inventory plans, so the daemon's pull behind a PAC takes the planned route."
+		},
+		{
 			"id": "key_accounting",
 			"kind": "field_check",
 			"check": "typing_selftest",
