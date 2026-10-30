@@ -127,10 +127,8 @@ function M.register(helpers, shared_root)
 			helpers.assert_eq(fields.log_path, "/logs/errors.log")
 			helpers.assert_eq(fields.report.fields, { title = "42: boom", version = "9.9.9", os = "TestOS 1", driver = "testdriver" })
 			helpers.assert_true(fields.report.text:find("first", 1, true) ~= nil, "recent issues are reported")
-			local crash = { kind = "crash", module = "daemon", message = "segfault", time = "t", log_path = "/crash/1.txt" }
-			local crashed = Core.compose(crash, snapshot(), "testdriver")
-			helpers.assert_eq(crashed.open_id, "errors_today", "no crash report file is ever offered by this window")
-			helpers.assert_eq(crashed.paths.crash_report, nil, "a record's log_path is no longer taken for a crash report")
+			local crash = { kind = "crash", module = "daemon", message = "segfault", time = "t" }
+			helpers.assert_eq(pcall(Core.compose, crash, snapshot(), "testdriver"), false, "a crash never reaches this window")
 			helpers.assert_eq(fields.paths.log, "/logs/today.log", "the snapshot's other paths are kept")
 			local unknown = snapshot()
 			unknown.sections.paths = {}
