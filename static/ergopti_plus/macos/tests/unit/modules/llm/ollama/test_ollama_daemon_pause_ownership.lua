@@ -164,7 +164,12 @@ local function load_fixture()
 	}
 	package.loaded["adapters.timer_scheduler"] = scheduler
 	package.loaded["adapters.shell_runner"] = shell
-	package.loaded["adapters.storage"] = { get = function() return nil end }
+	package.loaded["adapters.storage"] = {
+			-- The real adapter's read and write pair (api_remote's refused thinking fields)
+			get = function() return nil end,
+			read_exact = function() return true, nil end,
+			set = function() return true end,
+		}
 	package.loaded["adapters.json_codec"] = {
 		encode = function() return "{}" end,
 		decode = function() return {} end,

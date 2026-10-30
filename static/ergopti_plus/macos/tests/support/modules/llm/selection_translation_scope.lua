@@ -63,6 +63,7 @@ local OWNED = {
 	"llm.request_plan.ports",
 	"llm.request_plan.token_budget",
 	"llm.rewrite",
+	"llm.thinking_off",
 	"llm.tone",
 	"llm.translate",
 	"identifiers",
