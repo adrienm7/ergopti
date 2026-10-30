@@ -22,6 +22,11 @@
 ---    paths it added, so a provider refusing one of them (HTTP 400 naming it)
 ---    can be asked once more without it (refused_field, strip).
 --- 4. A malformed table is refused whole, never half-applied.
+--- 5. Refused fields persist (refusals_parse, refusals_export): a model a
+---    provider refused once is never sent that field again, even after a
+---    restart. The store is bounded; each driver owns where it lives.
+--- 6. A family may say its models accept only the default sampling
+---    (default_sampling_only): the drivers then send no temperature.
 ---
 --- The AutoHotkey port is _shared/modules/llm/thinking_off.ahk. Both replay
 --- _shared/tests/corpus/llm/thinking_off_vectors.json.
@@ -55,6 +60,9 @@ M.KINDS = {
 
 -- What a control asks for
 local INTENTS = { off = true, lowest = true }
+
+-- Most (provider, model) pairs whose refusals persist
+M.MAX_REFUSALS = 200
 
 
 
@@ -131,7 +139,7 @@ function M.parse_families(raw)
 		local where = "family " .. index
 		if not is_object(family) then return nil, where .. " is not an object" end
 		for key in pairs(family) do
-			if key ~= "models" and key ~= "controls" and key:sub(1, 1) ~= "_" then
+			if key ~= "models" and key ~= "controls" and key ~= "default_sampling_only" and key:sub(1, 1) ~= "_" then
 				return nil, where .. " has an unknown key " .. key
 			end
 		end
@@ -140,6 +148,9 @@ function M.parse_families(raw)
 			if type(glob) ~= "string" or not glob:match(GLOB_PATTERN) then return nil, where .. " has an invalid glob" end
 		end
 		if not is_list(family.controls) then return nil, where .. " has no controls array" end
+		if family.default_sampling_only ~= nil and type(family.default_sampling_only) ~= "boolean" then
+			return nil, where .. ": default_sampling_only must be a boolean"
+		end
 		local controls = {}
 		for _, control in ipairs(family.controls) do
 			if not is_object(control) or not M.KINDS[control.kind] or not INTENTS[control.intent] then
@@ -153,7 +164,8 @@ function M.parse_families(raw)
 			end
 			controls[#controls + 1] = { kind = control.kind, intent = control.intent, level = level }
 		end
-		families[#families + 1] = { models = family.models, controls = controls }
+		families[#families + 1] = { models = family.models, controls = controls,
+			default_sampling_only = family.default_sampling_only == true }
 	end
 	return families, nil
 end
@@ -220,6 +232,30 @@ function M.matches(glob, model)
 	return #subject - #last + 1 >= position and subject:sub(#subject - #last + 1) == last
 end
 
+--- Finds the family of a model.
+--- @param families table parse_families() output.
+--- @param model string The model id.
+--- @return integer|nil index, table|nil family
+local function family_of(families, model)
+	local name = M.normalize(model)
+	for index, family in ipairs(families) do
+		for _, glob in ipairs(family.models) do
+			if M.matches(glob, name) then return index, family end
+		end
+	end
+	return nil, nil
+end
+
+--- Tells whether a model accepts only the default sampling: a request to it
+--- must carry no temperature (an HTTP 400 otherwise).
+--- @param families table parse_families() output.
+--- @param model string The model id.
+--- @return boolean
+function M.default_sampling_only(families, model)
+	local _, family = family_of(families, model)
+	return family ~= nil and family.default_sampling_only == true
+end
+
 --- Copies a template with the level placeholder filled.
 --- @param value any
 --- @param level any
@@ -241,24 +277,18 @@ end
 --- @return string|nil kind The control kind applied, nil when none is carried.
 --- @return table|nil fields The body fields, nil when nothing applies.
 function M.resolve(families, dialect, model, refused)
-	local name = M.normalize(model)
-	for index, family in ipairs(families) do
-		for _, glob in ipairs(family.models) do
-			if M.matches(glob, name) then
-				for _, control in ipairs(family.controls) do
-					local template = dialect[control.kind]
-					if template then
-						local fields = fill(template, control.level)
-						for field in pairs(refused or {}) do fields[field] = nil end
-						if next(fields) == nil then return index, control.kind, nil end
-						return index, control.kind, fields
-					end
-				end
-				return index, nil, nil
-			end
+	local index, family = family_of(families, model)
+	if not family then return nil, nil, nil end
+	for _, control in ipairs(family.controls) do
+		local template = dialect[control.kind]
+		if template then
+			local fields = fill(template, control.level)
+			for field in pairs(refused or {}) do fields[field] = nil end
+			if next(fields) == nil then return index, control.kind, nil end
+			return index, control.kind, fields
 		end
 	end
-	return nil, nil, nil
+	return index, nil, nil
 end
 
 
@@ -352,6 +382,64 @@ function M.strip(body, added, field)
 		end
 	end
 	return body
+end
+
+--- Reads a persisted refusal store: "<provider>|<model>" -> array of field
+--- names. Malformed entries are dropped, and counted for the driver's log.
+--- @param raw any The decoded store.
+--- @return table refused key -> set of field names.
+--- @return integer dropped Entries that were not kept.
+function M.refusals_parse(raw)
+	local refused, dropped, count = {}, 0, 0
+	if type(raw) ~= "table" then return refused, raw == nil and 0 or 1 end
+	for key, fields in pairs(raw) do
+		local set = {}
+		if type(key) == "string" and key:find("|", 1, true) and is_list(fields) and count < M.MAX_REFUSALS then
+			for _, field in ipairs(fields) do
+				if type(field) == "string" and field:match(FIELD_PATTERN) then set[field] = true end
+			end
+		end
+		if next(set) then
+			refused[key] = set
+			count = count + 1
+		else
+			dropped = dropped + 1
+		end
+	end
+	return refused, dropped
+end
+
+--- Records a refused field. The store keeps at most MAX_REFUSALS pairs: a
+--- pair beyond them is refused (the caller still skips the field this session).
+--- @param refused table key -> set of field names, changed in place.
+--- @param provider string
+--- @param model string
+--- @param field string
+--- @return boolean stored False when the store is full.
+function M.record_refusal(refused, provider, model, field)
+	local key = provider .. "|" .. model
+	if not refused[key] then
+		local count = 0
+		for _ in pairs(refused) do count = count + 1 end
+		if count >= M.MAX_REFUSALS then return false end
+		refused[key] = {}
+	end
+	refused[key][field] = true
+	return true
+end
+
+--- The refusal store as plain data: key -> sorted array of field names.
+--- @param refused table key -> set of field names.
+--- @return table
+function M.refusals_export(refused)
+	local out = {}
+	for key, set in pairs(refused) do
+		local fields = {}
+		for field in pairs(set) do fields[#fields + 1] = field end
+		table.sort(fields)
+		out[key] = fields
+	end
+	return out
 end
 
 return M

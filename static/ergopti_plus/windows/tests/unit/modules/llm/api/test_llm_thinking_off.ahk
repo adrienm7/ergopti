@@ -171,6 +171,32 @@ _LTO_RefusalVectors() {
 }
 Test("LLM thinking off: a refused field replays the shared corpus (thinking-off-everywhere)", _LTO_RefusalVectors)
 
+_LTO_SamplingAndStoreVectors() {
+	global LLM_THINKING_FAMILIES, LLM_THINKING_OFF_MAX_REFUSALS
+	Checked := 0
+	for Vector in _LTO_Vectors("sampling_vectors") {
+		V := Vector["value"]
+		AssertEqual(V["default_sampling_only"] ? 1 : 0,
+			LLM_ThinkingOffDefaultSamplingOnly(LLM_THINKING_FAMILIES, V["model"]) ? 1 : 0, V["model"])
+		Checked += 1
+	}
+	for Vector in _LTO_Vectors("refusal_store_vectors") {
+		V := Vector["value"]
+		Refused := LLM_ThinkingOffRefusalsParse(V["stored"], &Dropped)
+		AssertEqual(V["dropped"], Dropped, V["id"] . ": dropped")
+		AssertEqual("", _LVS_DeepEqual(LLM_ThinkingOffRefusalsExport(Refused), V["refused"]), V["id"])
+		Checked += 1
+	}
+	AssertTrue(Checked >= 12, "expected at least 12 sampling and store vectors, found " . Checked)
+	Full := Map()
+	loop LLM_THINKING_OFF_MAX_REFUSALS
+		AssertTrue(LLM_ThinkingOffRecordRefusal(Full, "p", "m" . A_Index, "thinking"))
+	AssertFalse(LLM_ThinkingOffRecordRefusal(Full, "p", "one-more", "thinking"), "a full store refuses a new pair")
+	AssertTrue(LLM_ThinkingOffRecordRefusal(Full, "p", "m1", "reasoning"), "a known pair still records")
+}
+Test("LLM thinking off: default sampling and the refusal store replay the shared corpus (thinking-off-everywhere)",
+	_LTO_SamplingAndStoreVectors)
+
 _LTO_ParseVectors() {
 	Checked := 0
 	for Vector in _LTO_Vectors("family_parse_vectors") {
@@ -274,7 +300,9 @@ _LTO_RefusedFieldRetried() {
 	Sent := []
 	Fails := []
 	Saved := _LLM_Vision_RemoteTransport
-	SavedRefused := _LLM_ThinkingRefused.Clone()
+	SavedRefused := _LLM_ThinkingRefused
+	; A fresh store, so an earlier refusal cannot decide this test
+	_LLM_ThinkingRefused := Map()
 	try {
 		_LLM_Vision_RemoteTransport := _LTO_RecordSent.Bind(Sent)
 		DeepSeek := _LTO_Resolved("deepseek", "deepseek-chat")
@@ -298,3 +326,44 @@ _LTO_RefusedFieldRetried() {
 }
 Test("LLM thinking off: a refused field is sent once more without it, then never (thinking-off-everywhere)",
 	_LTO_RefusedFieldRetried)
+
+_LTO_RefusalPersists() {
+	global _LLM_ThinkingRefused, LLM_THINKING_REFUSED_KEY
+	Saved := _LLM_ThinkingRefused
+	try {
+		_LLM_ThinkingRefused := Map()
+		Resolved := _LTO_Resolved("deepseek", "deepseek-flash")
+		Body := _LLMRemoteCompleteBody(Resolved, '{"model":"deepseek-flash"}', &Added)
+		AssertTrue(_LLMRemoteThinkingRefusal(Resolved,
+			_LLMRemote_FailInfo("http", 400, "thinking is not supported"), Added, &Body))
+		Stored := ST_Get(LLM_THINKING_REFUSED_KEY, "")
+		AssertTrue(Stored is Map && Stored.Has("deepseek|deepseek-flash"), "the refusal is stored")
+		; A restart: the store is read again from the local state store
+		_LLM_ThinkingRefused := 0
+		Again := _LLMRemoteCompleteBody(Resolved, '{"model":"deepseek-flash"}')
+		AssertFalse(JsonParse(Again).Has("thinking"), "the stored refusal is read back")
+	} finally {
+		_LLM_ThinkingRefused := Saved
+		try ST_Set(LLM_THINKING_REFUSED_KEY, Map())
+	}
+}
+Test("LLM thinking off: a refused field is remembered across restarts", _LTO_RefusalPersists)
+
+_LTO_DefaultSamplingOnly() {
+	Opus := _LLMRemoteApplyThinkingOff(_LTO_Resolved("anthropic", "claude-opus-4-8"),
+		_LLMRemoteBuildPayload("anthropic", "claude-opus-4-8", "s", "u", 0.7, 40))
+	AssertFalse(JsonParse(Opus).Has("temperature"), "a non-default temperature is an HTTP 400 on Claude Opus 4.8")
+	Haiku := _LLMRemoteApplyThinkingOff(_LTO_Resolved("anthropic", "claude-haiku-4-5"),
+		_LLMRemoteBuildPayload("anthropic", "claude-haiku-4-5", "s", "u", 0.7, 40))
+	AssertTrue(JsonParse(Haiku).Has("temperature"), "Claude Haiku 4.5 keeps it")
+}
+Test("LLM thinking off: models that accept only the default sampling get no temperature", _LTO_DefaultSamplingOnly)
+
+_LTO_RetryCancelReachesTheRetry() {
+	global _LLM_Remote_RetryOf
+	AssertEqual(42, _LLMRemoteRetryOf(7, 42), "the retry's id passes through")
+	AssertEqual(42, _LLM_Remote_RetryOf.Get(7, 0), "the original id names its retry")
+	LLM_RemoteCancelAsync(7)
+	AssertFalse(_LLM_Remote_RetryOf.Has(7), "cancelling the original id reaches the retry")
+}
+Test("LLM thinking off: cancelling a prediction cancels its retry", _LTO_RetryCancelReachesTheRetry)

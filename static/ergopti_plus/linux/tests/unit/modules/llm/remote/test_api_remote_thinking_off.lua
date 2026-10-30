@@ -20,6 +20,10 @@
 local helpers = require("tests.helpers")
 local Json = require("json")
 
+-- The refusal store of these tests
+local REFUSED_FILE = os.tmpname()
+os.remove(REFUSED_FILE)
+
 --- Loads the module over a scripted HTTP client.
 --- @return table remote, table calls
 local function load_remote()
@@ -33,7 +37,8 @@ local function load_remote()
 		cancel = function() return true end,
 	}
 	local remote = helpers.load_module("modules.llm.api_remote")
-	remote._reset_for_test()
+	-- The refusals persist in a file of this test, never the user's state
+	remote._reset_for_test(REFUSED_FILE)
 	return remote, calls
 end
 
@@ -41,6 +46,7 @@ local function unload()
 	package.loaded["adapters.http_client"] = nil
 	package.loaded["modules.llm.api_remote"] = nil
 	package.loaded["modules.llm.vision_request"] = nil
+	os.remove(REFUSED_FILE)
 end
 
 local MESSAGES = {
@@ -198,6 +204,21 @@ helpers.describe("api_remote: a refused thinking field is dropped once and remem
 		helpers.assert_eq(Json.decode(request.body).thinking, nil, "the refusal is remembered")
 	end)
 
+	helpers.it("the refusal survives a restart", function()
+		local remote, calls = load_remote()
+		remote.chat({ provider = "deepseek", model = "deepseek-flash", token = "k" }, nil, MESSAGES, {}, nil, function() end)
+		calls[1].callback({ ok = false, status = 400, error_body = Json.encode({ error = { message = "thinking is not supported" } }) })
+		local fh = assert(io.open(REFUSED_FILE, "r"), "the refusal is written to the state file")
+		local stored = Json.decode(fh:read("*a"))
+		fh:close()
+		helpers.assert_eq(stored["deepseek|deepseek-flash"][1], "thinking")
+		-- A restart: the store is read again from the file
+		remote._reset_for_test(REFUSED_FILE)
+		local request = assert(remote.build_request({ provider = "deepseek", model = "deepseek-flash", token = "k" }, MESSAGES, {}))
+		unload()
+		helpers.assert_eq(Json.decode(request.body).thinking, nil, "the stored refusal is read back")
+	end)
+
 	helpers.it("an unrelated HTTP 400 is not a refusal", function()
 		local remote, calls = load_remote()
 		local answers = 0
@@ -207,6 +228,25 @@ helpers.describe("api_remote: a refused thinking field is dropped once and remem
 		unload()
 		helpers.assert_eq(#calls, 1, "nothing is sent again")
 		helpers.assert_eq(answers, 1, "the failure reaches the caller")
+	end)
+
+end)
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 5/ Default sampling =============
+-- =========================================
+-- =========================================
+
+helpers.describe("api_remote: models that accept only the default sampling get no temperature", function()
+
+	helpers.it("Claude Opus 5 and 4.8 are sent no temperature; Claude Haiku 4.5 keeps it", function()
+		helpers.assert_eq(body_for("anthropic", "claude-opus-5").temperature, nil, "a non-default temperature is an HTTP 400")
+		helpers.assert_eq(body_for("anthropic", "claude-opus-4-8").temperature, nil)
+		helpers.assert_true(body_for("anthropic", "claude-haiku-4-5").temperature ~= nil, "Claude 4.5 keeps it")
 	end)
 
 end)

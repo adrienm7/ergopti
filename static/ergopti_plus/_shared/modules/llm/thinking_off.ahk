@@ -21,6 +21,11 @@
 ;    reports the paths it added, so a provider refusing one of them (HTTP 400
 ;    naming it) can be asked once more without it.
 ; 4. A malformed table is refused whole, never half-applied.
+; 5. Refused fields persist (LLM_ThinkingOffRefusalsParse / Export): a model a
+;    provider refused once is never sent that field again, even after a
+;    restart. The store is bounded; the driver owns where it lives.
+; 6. A family may say its models accept only the default sampling
+;    (default_sampling_only): the driver then sends no temperature.
 ;
 ; The shared Lua implementation is _shared/lua/llm/thinking_off.lua. Both
 ; replay _shared/tests/corpus/llm/thinking_off_vectors.json.
@@ -47,6 +52,9 @@ global LLM_THINKING_OFF_FIELD_PATTERN := "^[A-Za-z_][A-Za-z0-9_]*$"
 ; The reasoning control kinds; a toggle carries no level
 global LLM_THINKING_OFF_KINDS := Map("toggle", 1, "effort", 1, "anthropic_thinking", 1,
 	"anthropic_effort", 1, "gemini_budget", 1, "gemini_level", 1)
+
+; Most (provider, model) pairs whose refusals persist
+global LLM_THINKING_OFF_MAX_REFUSALS := 200
 
 ; Added keys too generic to name a refusal alone: matched with their parent
 global LLM_THINKING_OFF_GENERIC_KEYS := Map("type", 1, "effort", 1, "enabled", 1)
@@ -79,7 +87,7 @@ LLM_ThinkingOffParseFamilies(Text) {
 		if !(Family is Map)
 			throw ValueError(Where . " is not an object.")
 		for Key in Family {
-			if (Key != "models" && Key != "controls" && SubStr(Key, 1, 1) != "_")
+			if (Key != "models" && Key != "controls" && Key != "default_sampling_only" && SubStr(Key, 1, 1) != "_")
 				throw ValueError(Where . " has an unknown key " . Key . ".")
 		}
 		if !(Family.Get("models", 0) is Array) || Family["models"].Length == 0
@@ -101,7 +109,9 @@ LLM_ThinkingOffParseFamilies(Text) {
 				throw ValueError(Where . ": a " . Control["kind"] . " control needs a level.")
 			}
 		}
-		Families.Push(Map("models", Family["models"], "controls", Family["controls"]))
+		; JsonParse decodes true as 1: the source table is checked by the JS guard
+		Families.Push(Map("models", Family["models"], "controls", Family["controls"],
+			"default_sampling_only", Family.Get("default_sampling_only", 0) ? true : false))
 	}
 	return Families
 }
@@ -217,30 +227,113 @@ LLM_ThinkingOffMatches(Glob, Model) {
  */
 LLM_ThinkingOffResolve(Families, Dialect, Model, Refused := "", &Kind := "") {
 	Kind := ""
+	Index := _LLM_ThinkingOffFamilyOf(Families, Model)
+	if !Index
+		return Map("family", 0, "fields", "")
+	for Control in Families[Index]["controls"] {
+		if !Dialect.Has(Control["kind"])
+			continue
+		Kind := Control["kind"]
+		Fields := Dialect[Kind]
+		if Control.Has("level")
+			Fields := StrReplace(Fields, '"$level"', Control["level"] is String
+				? JsonStringLiteral(Control["level"]) : String(Control["level"]))
+		Kept := ""
+		for Field, Span in JsonObjectMemberSpans(Fields) {
+			if !(Refused is Map && Refused.Has(Field))
+				Kept .= (Kept == "" ? "" : ",") . Span["member_text"]
+		}
+		return Map("family", Index, "fields", Kept == "" ? "" : "{" . Kept . "}")
+	}
+	return Map("family", Index, "fields", "")
+}
+
+; The 1-based index of a model's family, 0 when none matches.
+_LLM_ThinkingOffFamilyOf(Families, Model) {
 	Name := LLM_ThinkingOffNormalize(Model)
 	for Index, Family in Families {
 		for Glob in Family["models"] {
-			if !LLM_ThinkingOffMatches(Glob, Name)
-				continue
-			for Control in Family["controls"] {
-				if !Dialect.Has(Control["kind"])
-					continue
-				Kind := Control["kind"]
-				Fields := Dialect[Kind]
-				if Control.Has("level")
-					Fields := StrReplace(Fields, '"$level"', Control["level"] is String
-						? JsonStringLiteral(Control["level"]) : String(Control["level"]))
-				Kept := ""
-				for Field, Span in JsonObjectMemberSpans(Fields) {
-					if !(Refused is Map && Refused.Has(Field))
-						Kept .= (Kept == "" ? "" : ",") . Span["member_text"]
-				}
-				return Map("family", Index, "fields", Kept == "" ? "" : "{" . Kept . "}")
-			}
-			return Map("family", Index, "fields", "")
+			if LLM_ThinkingOffMatches(Glob, Name)
+				return Index
 		}
 	}
-	return Map("family", 0, "fields", "")
+	return 0
+}
+
+/**
+ * Tells whether a model accepts only the default sampling: a request to it
+ * must carry no temperature (an HTTP 400 otherwise).
+ * @param {Array} Families LLM_ThinkingOffParseFamilies's output.
+ * @param {String} Model The model id.
+ * @returns {Boolean}
+ */
+LLM_ThinkingOffDefaultSamplingOnly(Families, Model) {
+	Index := _LLM_ThinkingOffFamilyOf(Families, Model)
+	return Index ? Families[Index]["default_sampling_only"] : false
+}
+
+/**
+ * Reads a persisted refusal store: "<provider>|<model>" -> Array of field
+ * names. Malformed entries are dropped and counted.
+ * @param {Any} Raw The stored value.
+ * @param {VarRef} Dropped Receives how many entries were not kept.
+ * @returns {Map} Key -> Map of field names.
+ */
+LLM_ThinkingOffRefusalsParse(Raw, &Dropped := 0) {
+	global LLM_THINKING_OFF_FIELD_PATTERN, LLM_THINKING_OFF_MAX_REFUSALS
+	Refused := Map(), Dropped := 0
+	if !(Raw is Map) {
+		Dropped := (Raw is String && Raw == "") ? 0 : 1
+		return Refused
+	}
+	for Key, Fields in Raw {
+		Set := Map()
+		if (Key is String) && InStr(Key, "|") && (Fields is Array) && Refused.Count < LLM_THINKING_OFF_MAX_REFUSALS {
+			for Field in Fields {
+				if (Field is String) && RegExMatch(Field, LLM_THINKING_OFF_FIELD_PATTERN)
+					Set[Field] := true
+			}
+		}
+		if (Set.Count > 0)
+			Refused[Key] := Set
+		else
+			Dropped += 1
+	}
+	return Refused
+}
+
+/**
+ * Records a refused field; a full store refuses a new pair.
+ * @param {Map} Refused Key -> Map of field names, changed in place.
+ * @returns {Boolean} False when the store is full.
+ */
+LLM_ThinkingOffRecordRefusal(Refused, Provider, Model, Field) {
+	global LLM_THINKING_OFF_MAX_REFUSALS
+	Key := Provider . "|" . Model
+	if !Refused.Has(Key) {
+		if (Refused.Count >= LLM_THINKING_OFF_MAX_REFUSALS)
+			return false
+		Refused[Key] := Map()
+	}
+	Refused[Key][Field] := true
+	return true
+}
+
+/**
+ * The refusal store as plain data: key -> Array of field names (sorted, as
+ * a Map enumerates).
+ * @param {Map} Refused
+ * @returns {Map}
+ */
+LLM_ThinkingOffRefusalsExport(Refused) {
+	Out := Map()
+	for Key, Set in Refused {
+		Fields := []
+		for Field in Set
+			Fields.Push(Field)
+		Out[Key] := Fields
+	}
+	return Out
 }
 
 

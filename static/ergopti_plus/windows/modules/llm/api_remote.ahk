@@ -192,8 +192,8 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
             resolved.Has("Extras") ? resolved["Extras"] : Map(),
             resolved.Has("RequestFields") ? resolved["RequestFields"] : Map()), &Added)
     Retry["resolved"] := resolved, Retry["added"] := Added, Retry["body"] := Payload
-    Retry["send"] := (Body, Fail) => LLM_RemotePostBody_Async(resolved, Url, Body, OriginalSuccess, Fail,
-        timeout_ms, Kind, 0, CurrentFn)
+    Retry["send"] := (Body, Fail) => _LLMRemoteRetryOf(req_id, LLM_RemotePostBody_Async(resolved, Url, Body,
+        OriginalSuccess, Fail, timeout_ms, Kind, 0, CurrentFn))
 
     ; The managed worker (WinHTTP in its own process) is the only production
     ; transport: the WinHTTP COM object would put DNS/connect/Send back on the
@@ -1079,7 +1079,10 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
 }
 
 LLM_RemoteCancelAsync(req_id) {
-    global _LLM_Remote_Async, _LLM_Remote_BackboardExchanges
+    global _LLM_Remote_Async, _LLM_Remote_BackboardExchanges, _LLM_Remote_RetryOf
+    ; A prediction sent once more after a refused thinking field
+    if _LLM_Remote_RetryOf.Has(req_id)
+        LLM_RemoteCancelAsync(_LLM_Remote_RetryOf.Delete(req_id))
     if _LLM_Remote_BackboardExchanges.Has(req_id) {
         _LLMRemote_BackboardRetire(_LLM_Remote_BackboardExchanges[req_id], true)
         return
@@ -1806,8 +1809,31 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
 global LLM_THINKING_FAMILIES := []
 
 ; Fields a provider refused for a model (HTTP 400 naming them), by
-; "<provider>|<model>" -> Map of field names: later requests never send them
-global _LLM_ThinkingRefused := Map()
+; "<provider>|<model>" -> Map of field names: later requests never send them.
+; Read from the local state store at the first request (0 until then).
+global _LLM_ThinkingRefused := 0
+
+; Storage key of the refused thinking fields, in the local state store
+global LLM_THINKING_REFUSED_KEY := "llm_thinking_refused"
+
+; Prediction ids whose request was sent once more after a refused thinking
+; field: original id -> the retry's id, so a cancel reaches the retry
+global _LLM_Remote_RetryOf := Map()
+
+; The refusal store, read from the local state store on first use.
+_LLMRemoteThinkingRefused() {
+    global _LLM_ThinkingRefused, LLM_THINKING_REFUSED_KEY
+    if (_LLM_ThinkingRefused is Map)
+        return _LLM_ThinkingRefused
+    Stored := ""
+    try Stored := ST_Get(LLM_THINKING_REFUSED_KEY, "")
+    catch as Err
+        try LoggerError("LLM.remote", "The refused thinking fields could not be read ({1}); they are learned again.", Err.Message)
+    _LLM_ThinkingRefused := LLM_ThinkingOffRefusalsParse(Stored, &Dropped)
+    if (Dropped > 0)
+        try LoggerWarn("LLM.remote", "{1} malformed refused thinking field entr(ies) dropped.", Dropped)
+    return _LLM_ThinkingRefused
+}
 
 _LLMRemote_LoadThinkingFamilies() {
     global LLM_THINKING_FAMILIES, _SharedDir
@@ -1831,10 +1857,16 @@ _LLMRemoteApplyThinkingOff(Resolved, Body, &Added := "") {
     Model := Resolved.Get("Model", "")
     Provider := Resolved.Get("Provider", "")
     Result := LLM_ThinkingOffApply(LLM_THINKING_FAMILIES, Resolved.Get("ThinkingDialect", Map()), Model, Body,
-        _LLM_ThinkingRefused.Get(Provider . "|" . Model, ""), &Family, &Kind, &Added)
+        _LLMRemoteThinkingRefused().Get(Provider . "|" . Model, ""), &Family, &Kind, &Added)
     if (Added.Length > 0)
         try LoggerDebug("LLM.remote", "Thinking off: family {1} applies to model {2} through provider '{3}' ({4}).",
             Family, Model, Provider, Kind)
+    ; These models answer HTTP 400 to any temperature but the default
+    if LLM_ThinkingOffDefaultSamplingOnly(LLM_THINKING_FAMILIES, Model)
+            && JsonObjectMemberSpans(Result).Has("temperature") {
+        Result := LLM_ThinkingOffStrip(Result, [["temperature"]], "temperature")
+        try LoggerDebug("LLM.remote", "Model {1} accepts only the default sampling: no temperature is sent.", Model)
+    }
     return Result
 }
 
@@ -1847,20 +1879,39 @@ _LLMRemoteApplyThinkingOff(Resolved, Body, &Added := "") {
 ; @param {VarRef} Body The JSON body, rewritten without the field.
 ; @returns {Boolean} True when a refused field was removed.
 _LLMRemoteThinkingRefusal(Resolved, Info, Added, &Body) {
-    global _LLM_ThinkingRefused
+    global LLM_THINKING_REFUSED_KEY
     if !(Info is Map)
         return false
     Field := LLM_ThinkingOffRefusedField(Info.Get("status", 0), Info.Get("message", ""), Added)
     if (Field == "")
         return false
-    Key := Resolved.Get("Provider", "") . "|" . Resolved.Get("Model", "")
-    if !_LLM_ThinkingRefused.Has(Key)
-        _LLM_ThinkingRefused[Key] := Map()
-    _LLM_ThinkingRefused[Key][Field] := true
+    Refused := _LLMRemoteThinkingRefused()
+    Provider := Resolved.Get("Provider", ""), Model := Resolved.Get("Model", "")
+    if !LLM_ThinkingOffRecordRefusal(Refused, Provider, Model, Field) {
+        ; Skipped for this session all the same; only the restart forgets it
+        Refused[Provider . "|" . Model] := Map(Field, true)
+        try LoggerWarn("LLM.remote", "The refused thinking fields are full: '{1}' for model {2} is not remembered.", Field, Model)
+    } else {
+        Saved := false
+        try Saved := ST_Set(LLM_THINKING_REFUSED_KEY, LLM_ThinkingOffRefusalsExport(Refused))
+        if !Saved
+            try LoggerError("LLM.remote", "The refused thinking fields could not be saved; they hold until the next restart.")
+    }
     Body := LLM_ThinkingOffStrip(Body, Added, Field)
     try LoggerWarn("LLM.remote", "Provider '{1}' refused the thinking field '{2}' for model {3}: sent once more without it, and never again.",
         Resolved.Get("Provider", ""), Field, Resolved.Get("Model", ""))
     return true
+}
+
+; Remembers that a prediction was sent once more, so cancelling its original id
+; cancels the retry too.
+; @param {Integer} Original The prediction's id.
+; @param {Integer} Retry The retry's id.
+_LLMRemoteRetryOf(Original, Retry) {
+    global _LLM_Remote_RetryOf
+    if Retry
+        _LLM_Remote_RetryOf[Original] := Retry
+    return Retry
 }
 
 ; A request's failure callback that first gives a refused thinking field one
