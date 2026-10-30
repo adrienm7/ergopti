@@ -513,6 +513,19 @@ in the group carrying Ergopti and the type to map/preserve Control
 (`inspect_keymap()` in `desktop_activation.py`), print the compiler command
 and diagnostics on failure, and make a failed verification a non-zero exit.
 
+### project-linux-a-live-layout-is-proven-by-its-cells
+
+A live layout replacement is acknowledged only from the keymap read back from
+the session (`xkbcomp -xkb $DISPLAY -`: the X server, or XWayland, which
+receives the compositor's keymap), compared key by key with the same
+description compiled offline. The layout's name proves nothing: a desktop that
+puts back an older same-named build keeps it (`stale_keymap`). A compositor
+recompiles only when the selected id changes, so Wayland builds alternate
+between `<id>` and `<id>_live`; never rewrite the selected slot and expect a
+reload. The layout scope settles from that answer, which arrives after a child
+process, so `infra/global_scope.lua` is asynchronous: never reintroduce the
+"every participant settles synchronously" assertion.
+
 ### project-linux-install-is-proven-by-the-distribution-matrix
 
 The maintainer has no Linux host: `linux-layout.yml` runs
