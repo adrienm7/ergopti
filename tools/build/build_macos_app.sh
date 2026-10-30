@@ -122,6 +122,9 @@ GH_REPO="${GH_REPO:-${UPDATER_REPOSITORY#*/}}"
 # The names, bundle ids and hosts are declared once in _shared/data/identifiers.json.
 # shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
 . "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# One owner of the file digest: shasum escapes the digest of a name holding a
+# backslash, which sha256_file_digest strips (the checkout path is the user's).
+. "$REPO_ROOT/static/ergopti_plus/macos/modules/llm/network-retry.sh"
 BUNDLE_ID="$ERGOPTI_BUNDLE_ID_LAUNCHER"
 HAMMERSPOON_BUNDLE_ID="$ERGOPTI_BUNDLE_ID_HAMMERSPOON"
 
@@ -258,7 +261,7 @@ clean_build_dir() {
 # Reports whether a zip is the pinned official release asset.
 hammerspoon_zip_matches() {
 	local actual
-	actual="$(shasum -a 256 "$1" | awk '{print $1}')" || return 1
+	actual="$(sha256_file_digest "$1")" || return 1
 	[ "$actual" = "$HAMMERSPOON_SHA256" ]
 }
 
@@ -808,8 +811,7 @@ codesign_native_runtime() {
 	[ -f "$switcher" ] || fail "Native switcher state helper is missing."
 	sign_code --identifier "$BUNDLE_ID.system-switcher-state" "$switcher"
 	mkdir -p "$APP_PATH/Contents/Resources"
-	shasum -a 256 "$switcher" | awk '{print $1}' \
-		> "$APP_PATH/Contents/Resources/system-switcher-state.sha256"
+	sha256_file_digest "$switcher" > "$APP_PATH/Contents/Resources/system-switcher-state.sha256"
 
 	# Signing the bundle host also inspects its nested code; sign helpers first.
 	# Retain the launcher's stable identifier and entitlements.
