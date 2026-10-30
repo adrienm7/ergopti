@@ -1,6 +1,6 @@
 {
 	"description": "Thinking-off resolution, replayed by _shared/lua/llm/thinking_off.lua (macOS and Linux suites) and its AutoHotkey port _shared/modules/llm/thinking_off.ahk (Windows suite) over the shipped _shared/modules/llm/thinking_off.json families and api_providers.json thinking_dialect, so the drivers cannot drift.",
-	"rule": "normalize_vectors: lowercase, last path segment, an Ollama :tag dropped. glob_vectors: a glob matches the whole id, ignoring case, * the only wildcard. merge_vectors: fields deep-merged into body give expected (the body wins at every level); added lists the paths added. resolve_vectors: the model's family (first match on the normalized id) through the provider's dialect (first control kind it carries, $level filled) merged into body gives expected; family is its 1-based index and kind the control applied, both absent when none. refusal_vectors: after resolution, an HTTP 400 whose message names an added key (snake or camel; a generic leaf as parent.leaf) refuses its top-level field, stripped from the body (expected); field absent when nothing is refused. refused_vectors: a refused top-level field is never added. family_parse_vectors and dialect_parse_vectors: accepted whole (valid true) or refused whole. sampling_vectors: whether the model's family accepts only the default sampling (no temperature sent). refusal_store_vectors: a persisted store \"<provider>|<model>\" -> field -> epoch second keeps each valid field refused less than refusal_expiry_days (thinking_off.json) before now and not after it; a key left with none, or without |, is dropped and counted. ollama_think_vectors: the think value of an Ollama chat body: the model family's first control Ollama carries, false for a toggle or an off intent, the level of an effort control whose level is in ollama_think_levels (thinking_off.json), false with no family or no such control.",
+	"rule": "normalize_vectors: lowercase, last path segment, an Ollama :tag dropped. glob_vectors: a glob matches the whole id, ignoring case, * the only wildcard. merge_vectors: fields deep-merged into body give expected (the body wins at every level); added lists the paths added. resolve_vectors: the model's family (first match on the normalized id) through the provider's dialect (first control kind it carries, $level filled) merged into body gives expected; family is its 1-based index and kind the control applied, both absent when none. refusal_vectors: after resolution, an HTTP 400 whose message names an added key (snake or camel; a generic leaf as parent.leaf) refuses its top-level field, stripped from the body (expected); field absent when nothing is refused. refused_vectors: a refused top-level field is never added. family_parse_vectors and dialect_parse_vectors: accepted whole (valid true) or refused whole. sampling_vectors: whether the model's family accepts only the default sampling (no temperature sent). refusal_store_vectors: a persisted store \"<provider>|<model>\" -> field -> epoch second keeps each valid field refused less than refusal_expiry_days (thinking_off.json) before now and not after it; a key left with none, or without |, is dropped and counted. ollama_think_vectors: the think value of an Ollama chat body: the model family's first control Ollama carries, false for a toggle or an off intent, the level of an effort control whose level is in ollama_think_levels (thinking_off.json), false with no family or no such control. A families table also needs capability_listing (model_capabilities.lua parse_config): ttl_hours a positive integer, providers a non-empty object of provider id -> listing dialect, page_query an object of listing dialect -> one name=number query.",
 	"normalize_vectors": [
 		{
 			"model": "GPT-5.1",
@@ -2852,7 +2852,14 @@
 			"table": {
 				"families": ["x"],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -2872,7 +2879,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -2891,7 +2905,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -2911,7 +2932,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -2931,7 +2959,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -2945,7 +2980,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -2959,7 +3001,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -2974,7 +3023,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -2989,7 +3045,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": true
 		},
@@ -3013,7 +3076,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": true
 		},
@@ -3039,7 +3109,14 @@
 						"controls": []
 					}
 				],
-				"ollama_think_levels": ["low", "medium", "high"]
+				"ollama_think_levels": ["low", "medium", "high"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -3066,7 +3143,14 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": []
+				"ollama_think_levels": [],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
 			},
 			"valid": false
 		},
@@ -3080,7 +3164,112 @@
 					}
 				],
 				"refusal_expiry_days": 30,
-				"ollama_think_levels": ["low", 1]
+				"ollama_think_levels": ["low", 1],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "no_capability_listing",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low"]
+			},
+			"valid": false
+		},
+		{
+			"id": "capability_ttl_fractional",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low"],
+				"capability_listing": {
+					"ttl_hours": 1.5,
+					"providers": {
+						"openrouter": "openrouter"
+					},
+					"page_query": {}
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "capability_unknown_listing",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"openrouter": "openai"
+					},
+					"page_query": {}
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "capability_no_providers",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {},
+					"page_query": {}
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "capability_bad_page_query",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low"],
+				"capability_listing": {
+					"ttl_hours": 24,
+					"providers": {
+						"gemini": "gemini"
+					},
+					"page_query": {
+						"gemini": "pageSize=all"
+					}
+				}
 			},
 			"valid": false
 		}

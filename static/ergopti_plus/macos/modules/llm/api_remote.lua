@@ -55,6 +55,10 @@ local _warmup_client = _http_adapter.new(_http_options)   -- warmup has independ
 -- Screen reading (modules/llm/screen_answer.lua) names its own provider, which
 -- need not be the active entry: its requests never share the prediction owner
 local _vision_client = _http_adapter.new(_http_options)
+-- The capability listings (llm/model_capabilities.lua): one client per
+-- provider, created at its first fetch, so a background fetch never cancels or
+-- waits for a prediction nor for another provider's listing
+local _capability_clients = {}
 -- The Test-API probe of an entry that is not the prediction backend (a
 -- decisions provider): it must cancel neither a prediction nor an agent request
 local _probe_client = _http_adapter.new(_http_options)
@@ -69,6 +73,7 @@ local LocalServerPorts = require("modules.llm.local_server_ports")
 local AuthPolicy     = require("llm.local_server_auth")
 local ThinkingOff    = require("llm.thinking_off")
 local ThinkingFamilies = require("modules.llm.thinking_families")
+local ModelCapabilities = require("llm.model_capabilities")
 local Storage        = require("adapters.storage")
 local ProviderConfig = require("llm.provider_config_policy")
 local Json           = require("json")
@@ -1449,6 +1454,87 @@ local function thinking_refused()
 	return _thinking_refused
 end
 
+-- The capability listings by provider id (llm/model_capabilities.lua cache)
+local _capabilities = {}
+
+--- The capability check of one provider's model for the resolver: nil when
+--- the provider has no listing.
+--- @param provider_id string
+--- @param model string
+--- @return function|nil lacks (kind, level, template) -> boolean
+local function capability_lacks(provider_id, model)
+	local config = THINKING_FAMILIES.capability
+	if not config or not config.providers[provider_id] then return nil end
+	local record = ModelCapabilities.record(ModelCapabilities.records(_capabilities, provider_id), tostring(model))
+	if not record then return nil end
+	return function(kind, level, template)
+		local lacking = ModelCapabilities.lacks(record, kind, level, template)
+		if lacking then
+			Logger.debug(LOG, "Model %s of provider '%s' lacks the %s control (its listing): skipped.",
+				tostring(model), tostring(provider_id), kind)
+		end
+		return lacking
+	end
+end
+
+--- Fetches a provider's capability listing when it is missing or stale: on a
+--- zero-delay timer and with its own HTTP client, so the request that asked
+--- for it is never delayed. A failed fetch keeps the old listing.
+--- @param provider_id string
+--- @param provider table The catalogue descriptor.
+--- @param base string The provider's base URL.
+--- @param token string The entry's key.
+--- @return boolean scheduled
+local function refresh_capabilities(provider_id, provider, base, token)
+	local config = THINKING_FAMILIES.capability
+	local listing = config and config.providers[provider_id]
+	if not listing or type(base) ~= "string" or base == ""
+		or not ModelCapabilities.needs_fetch(_capabilities, provider_id, os.time(), config.ttl_sec) then
+		return false
+	end
+	local url = build_models_url(base, provider.format, token)
+	local query = config.page_query[listing]
+	if query then url = url .. (url:find("?", 1, true) and "&" or "?") .. query end
+	local headers = build_headers(provider.format, token)
+	ModelCapabilities.begin(_capabilities, provider_id)
+	local function finish(records)
+		ModelCapabilities.finish(_capabilities, provider_id, records, os.time())
+	end
+	local function fetch()
+		Logger.info(LOG, "Capability listing of provider %s requested.", tostring(provider_id))
+		local client = _capability_clients[provider_id] or _http_adapter.new(_http_options)
+		_capability_clients[provider_id] = client
+		local dispatched = client.get(url, headers, function(r)
+			if type(r) ~= "table" or r.ok ~= true then
+				Logger.warn(LOG, "Capability listing of provider %s unavailable (status=%s): kept the old one.",
+					tostring(provider_id), tostring(type(r) == "table" and r.status or nil))
+				return finish(nil)
+			end
+			local decoded_ok, decoded = pcall(JsonCodec.decode, r.body)
+			local records, reason = ModelCapabilities.parse(listing, decoded_ok and decoded or nil)
+			if not records then
+				Logger.warn(LOG, "Capability listing of provider %s could not be read (%s).", tostring(provider_id), tostring(reason))
+				return finish(nil)
+			end
+			local count = 0
+			for _ in pairs(records) do count = count + 1 end
+			Logger.info(LOG, "Capability listing of provider %s: %d model(s) described.", tostring(provider_id), count)
+			finish(records)
+		end)
+		if dispatched ~= true then
+			Logger.warn(LOG, "Capability listing of provider %s could not be sent.", tostring(provider_id))
+			finish(nil)
+		end
+	end
+	local _, committed = TimerScheduler.after(0, fetch)
+	if committed ~= true then
+		Logger.warn(LOG, "Capability listing of provider %s could not be scheduled.", tostring(provider_id))
+		finish(nil)
+	end
+	return committed == true
+end
+M.__capabilities_for_test = function() return _capabilities end
+
 --- Turns the model's reasoning off in a request body: its family's control
 --- (thinking_off.json) through the provider's thinking_dialect
 --- (llm/thinking_off.lua). A field the body already sets wins.
@@ -1460,7 +1546,7 @@ end
 --- @return table added Paths added, for refusal_retry.
 local function apply_thinking_off(provider_id, provider, model, body)
 	local family, kind, added = ThinkingOff.apply(THINKING_FAMILIES, provider.thinking_dialect or {}, model, body,
-		thinking_refused()[tostring(provider_id) .. "|" .. tostring(model)])
+		thinking_refused()[tostring(provider_id) .. "|" .. tostring(model)], capability_lacks(provider_id, model))
 	if #added > 0 then
 		Logger.debug(LOG, "Thinking off: family %d applies to model %s through provider '%s' (%s).",
 			family, tostring(model), tostring(provider_id), tostring(kind))
@@ -2413,6 +2499,7 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 	local payload, added = apply_thinking_off(entry.provider, provider, model,
 		build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens,
 			provider_extras, provider.request_fields))
+	refresh_capabilities(entry.provider, provider, base, entry.token or "")
 	thinking_retry.added, thinking_retry.payload = added, payload
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
@@ -2686,6 +2773,7 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 			AuthPolicy.apply_request_fields(body, provider.request_fields)
 		end
 		local _, added = apply_thinking_off(provider_id, provider, model, body)
+		refresh_capabilities(provider_id, provider, base, token)
 		local retried = false
 		local url, url_error = build_url(base, provider.format, model, token)
 		if not url then
