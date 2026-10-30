@@ -357,6 +357,15 @@ class ProductionServeControls(unittest.TestCase):
         self.assertFalse((self.target.parent / "ollama-native-sessions").exists())
 
     def test_cli_names_the_refusal_the_driver_logs(self):
+        native_failure = self.subject.API.ENGINE.NativeHTTPError("protocol")
+        native_failure.native_diagnostic = {
+            "stage": "native_request",
+            "exception_class": "NativeHTTPError",
+            "native_child_pid": 4242,
+            "native_child_status": -9,
+            "native_receipt_reason": "/private/secret",
+            "cleanup": "confirmed",
+        }
         argv = [
             "managed_ollama_serve.py",
             "--port",
@@ -377,6 +386,12 @@ class ProductionServeControls(unittest.TestCase):
                 ValueError("/private/secret/path"),
                 r"\AManaged Ollama daemon admission refused: ValueError at "
                 r"macos_managed_ollama_serve_test\.py:\d+ \w+\.\n\Z",
+            ),
+            (
+                native_failure,
+                r"\AManaged Ollama daemon admission refused: NativeHTTPError at "
+                r"macos_managed_ollama_serve_test\.py:\d+ \w+, reason=protocol, "
+                r"stage=native_request, native_child_status=-9, cleanup=confirmed\.\n\Z",
             ),
         ):
             diagnostic = io.StringIO()
