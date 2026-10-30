@@ -589,7 +589,7 @@ function reportFolder(paths) {
 					assert.match(result.stdout, /✅ field run 01_field_lease: pass/);
 					assert.match(result.stdout, /Field run summary: ✅ \d+ pass, ❌ \d+ fail, \d+ other\./);
 					// The analysis runs even without a day log, on the probes' verdicts.
-					assert.match(result.stdout, /Field checks summary: ✅ \d+ pass, ❌ \d+ fail, /);
+					assert.match(result.stdout, /Check verdicts summary: ✅ \d+ pass, ❌ \d+ fail, /);
 					assert.match(result.stdout, /Log analysis: \d+ error group\(s\)/);
 					assert.match(
 						fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),

@@ -1225,7 +1225,7 @@ def render(document):
     ]
 
     checks = document["field_checks"]
-    out += ["", "## Field checks", ""]
+    out += ["", "## Check verdicts", ""]
     if checks["items"]:
         for check in checks["items"]:
             runs = ""
@@ -1369,7 +1369,7 @@ def summary_line(counts):
     """The one summary line every collector prints for the check verdicts."""
     other = sum(value for verdict, value in counts.items() if verdict not in VERDICT_MARKS)
     return (
-        "Field checks summary: \u2705 {} pass, \u274c {} fail, \u23ed\ufe0f {} skip, \u2328\ufe0f {} needs_typing, "
+        "Check verdicts summary: \u2705 {} pass, \u274c {} fail, \u23ed\ufe0f {} skip, \u2328\ufe0f {} needs_typing, "
         "\u26a0\ufe0f {} other.".format(
             counts.get("pass", 0),
             counts.get("fail", 0),
