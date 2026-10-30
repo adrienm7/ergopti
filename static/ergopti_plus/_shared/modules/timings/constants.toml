@@ -1039,6 +1039,10 @@ release_list_body_bytes = 2097152
 # hexadecimal digest and its separators. LX: adapters/file_digest.lua.
 file_digest_output_bytes = 1024
 
+# Head of one crash report the macOS field run reads for its closed tokens (the
+# header and the exception record). HS: adapters/field_probe_ports.lua.
+crash_report_head_bytes = 65536
+
 # Longest keyboard input-source identifier the macOS driver selects or probes.
 # HS: adapters/input_source_selector.lua, adapters/keyboard_source_probe.lua.
 input_source_id_bytes = 1024
