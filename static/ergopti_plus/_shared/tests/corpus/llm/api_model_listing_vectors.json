@@ -166,6 +166,81 @@
 				]
 			},
 			"expect": ["01-ai/yi-large", "adept/fuyu-8b", "nvidia/nemotron-3.5-lightning-30b-a3b"]
+		},
+		{
+			"name": "novita listing (recorded)",
+			"provider": "novita",
+			"source": "GET https://api.novita.ai/openai/v1/models, recorded 2026-10-30 without a key (trimmed; no top-level object key, as documented)",
+			"format": "openai",
+			"body": {
+				"data": [
+					{
+						"id": "qwen/qwen3.8-flash",
+						"object": "model",
+						"created": 1787815610,
+						"owned_by": "novita"
+					},
+					{
+						"id": "deepseek/deepseek-v4.1-flash-1017",
+						"object": "model",
+						"created": 1792375957,
+						"owned_by": "novita"
+					},
+					{
+						"id": "moonshotai/kimi-k3.1-pro-highspeed",
+						"object": "model",
+						"created": 1792803395,
+						"owned_by": "novita"
+					}
+				]
+			},
+			"expect": [
+				"deepseek/deepseek-v4.1-flash-1017",
+				"moonshotai/kimi-k3.1-pro-highspeed",
+				"qwen/qwen3.8-flash"
+			]
+		},
+		{
+			"name": "hyperbolic listing (docs example)",
+			"provider": "hyperbolic",
+			"source": "https://hyperbolic.ai/docs/inference/text-apis (example response, 2026-10-30)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"data": [
+					{ "id": "glm-5.3-flash", "object": "model", "created": 1760000000, "owned_by": "z-ai" }
+				]
+			},
+			"expect": ["glm-5.3-flash"]
+		},
+		{
+			"name": "ovhcloud listing (recorded)",
+			"provider": "ovhcloud",
+			"source": "GET https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/models, recorded 2026-10-30 without a key (trimmed)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"data": [
+					{
+						"id": "Mistral-Small-3.2-24B-Instruct-2506",
+						"object": "model",
+						"created": 1752655627,
+						"owned_by": "mistralai"
+					},
+					{ "id": "gpt-oss-20b", "object": "model", "created": 1756386145, "owned_by": "OpenAI" },
+					{
+						"id": "Meta-Llama-3_3-70B-Instruct",
+						"object": "model",
+						"created": 1743520231,
+						"owned_by": "meta-llama"
+					}
+				]
+			},
+			"expect": [
+				"Meta-Llama-3_3-70B-Instruct",
+				"Mistral-Small-3.2-24B-Instruct-2506",
+				"gpt-oss-20b"
+			]
 		}
 	],
 	"names": [
@@ -310,6 +385,8 @@
 		"moonshot": "Documented as an OpenAI list (platform.kimi.ai docs/api/list-models), but no complete response is published and the route needs a key: none recorded.",
 		"dashscope": "compatible-mode/v1/models answers 401 without a key and its shape is undocumented; the documented listing is the native /api/v1/models (output.models[].model), which the listing reader does not take.",
 		"zai": "Not documented (docs.z.ai API reference); the route answers an authentication error without a key: none recorded.",
-		"siliconflow": "Documented as an OpenAI list (docs.siliconflow.com get-model-list) with field examples only; the route needs a key: none recorded."
+		"siliconflow": "Documented as an OpenAI list (docs.siliconflow.com get-model-list) with field examples only; the route needs a key: none recorded.",
+		"nebius": "The documented example lists only retired ids (meta-llama/Meta-Llama-3.1-8B-Instruct) and the route needs a key: none recorded that holds a current model.",
+		"scaleway": "Documented as OpenAI-compatible (using-models-api) with no example response; the route answers 401 without a key: none recorded."
 	}
 }
