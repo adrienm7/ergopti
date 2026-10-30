@@ -14,9 +14,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TCLW_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
+_TCLW_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TCLW_CountOccurrences(Haystack, Needle) {
@@ -236,7 +235,7 @@ Test("tickcount-wrap: startup smoke waits remain bounded across rollover "
 ; key-up straddled the 32-bit counter rollover produced a negative duration and
 ; was silently rejected by the minimum-tap guard.
 _TCLW_RShiftTapDurationIsWrapSafe() {
-	Src := _TCLW_ReadSource("platform/remap/rshift.ahk")
+	Src := _TCLW_ReadSource("rshift.ahk")
 	Assert(Src != "", "the RShift remap module must be readable")
 	Assert(!InStr(Src, "TimeAfter - TimeBefore"),
 		"RShift tap duration must not use rollover-unsafe signed subtraction")

@@ -37,10 +37,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_UFPS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_UFPS_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -53,7 +51,7 @@ _UFPS_ReadSource(RelPath) {
 ; ==================================================
 
 _UFPS_FocusPollHasSuspendGuard() {
-	Src := _UFPS_ReadSource("adapters/process_lifecycle.ahk")
+	Src := _UFPS_ReadSource("process_lifecycle.ahk")
 	Seg := _DriverFuncBody("PLC_Poll")
 	Assert(Seg != "", "PLC_Poll() declaration must exist in process_lifecycle.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
@@ -62,7 +60,7 @@ _UFPS_FocusPollHasSuspendGuard() {
 Test("process_lifecycle: PLC_Poll has an A_IsSuspended guard (no-suspend-guard-on-background-tick-and-focus-poll)", _UFPS_FocusPollHasSuspendGuard)
 
 _UFPS_BackgroundTickHasSuspendGuard() {
-	Src := _UFPS_ReadSource("modules/updater.ahk")
+	Src := _UFPS_ReadSource("updater.ahk")
 	Seg := _DriverFuncBody("Updater_BackgroundTick")
 	Assert(Seg != "", "Updater_BackgroundTick(*) declaration must exist in modules/updater.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,

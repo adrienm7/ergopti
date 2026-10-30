@@ -32,10 +32,8 @@
 ; =================================================
 ; =================================================
 
-_ADSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
+_ADSG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -46,7 +44,7 @@ _ADSG_ReadSource(RelPath) {
 ; ===================================================
 
 _ADSG_CheckActionAlwaysRuns() {
-	Src := _ADSG_ReadSource("infra/script_altgr_hotkeys.ahk")
+	Src := _ADSG_ReadSource("script_altgr_hotkeys.ahk")
 	Assert(Src != "", "infra/script_altgr_hotkeys.ahk must be readable")
 
 	Body := _DriverFuncBody("_ScriptAltGrDispatch")

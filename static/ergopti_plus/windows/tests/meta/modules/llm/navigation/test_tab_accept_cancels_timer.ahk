@@ -35,10 +35,8 @@
 
 ; Reads a file by path relative to the windows/ driver root.
 ; A_ScriptDir is the tests/ directory; its parent is windows/.
-_TACT_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_TACT_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -51,7 +49,7 @@ _TACT_ReadSource(RelPath) {
 ; ====================================================
 
 _TACT_CancelTimerCalledAfterTryAcceptTab() {
-	Src := _TACT_ReadSource("modules/keymap/llm_bridge.ahk")
+	Src := _TACT_ReadSource("llm_bridge.ahk")
 	Body := _DriverFuncBody("LLM_Bridge_FeedKeyDownIfActive")
 	Assert(Body != "",
 		"LLM_Bridge_FeedKeyDownIfActive must exist in modules/keymap/llm_bridge.ahk")

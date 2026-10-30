@@ -32,10 +32,8 @@
 ; =================================================
 ; =================================================
 
-_SDPS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
+_SDPS_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -46,7 +44,7 @@ _SDPS_ReadSource(RelPath) {
 ; ===================================================
 
 _SDPS_CheckDigitSCsMapExists() {
-	Src := _SDPS_ReadSource("modules/keymap/layout/layout_shift_caps.ahk")
+	Src := _SDPS_ReadSource("layout_shift_caps.ahk")
 	Assert(Src != "", "modules/keymap/layout/layout_shift_caps.ahk must be readable")
 
 	Assert(InStr(Src, "_SHIFT_DIGIT_SCS"),
@@ -61,7 +59,7 @@ _SDPS_CheckDigitSCsMapExists() {
 }
 
 _SDPS_CheckRegisterShiftHasSkipGuard() {
-	Src := _SDPS_ReadSource("modules/keymap/layout/layout_shift_caps.ahk")
+	Src := _SDPS_ReadSource("layout_shift_caps.ahk")
 	Assert(Src != "", "modules/keymap/layout/layout_shift_caps.ahk must be readable")
 
 	Body := _DriverFuncBody("RegisterShiftLayer")
@@ -75,7 +73,7 @@ _SDPS_CheckRegisterShiftHasSkipGuard() {
 }
 
 _SDPS_CheckSkipUsedInsideLoop() {
-	Src := _SDPS_ReadSource("modules/keymap/layout/layout_shift_caps.ahk")
+	Src := _SDPS_ReadSource("layout_shift_caps.ahk")
 	Assert(Src != "", "modules/keymap/layout/layout_shift_caps.ahk must be readable")
 
 	Body := _DriverFuncBody("RegisterShiftLayer")
@@ -112,7 +110,7 @@ Test("meta shift-digit-passthrough: digit-row skip applied inside SHIFTED_LETTER
 ; digit boxes specifically on the CapsLock layer.
 
 _SDPS_CheckRegisterCapsLockHasSkipGuard() {
-	Src := _SDPS_ReadSource("modules/keymap/layout/layout_shift_caps.ahk")
+	Src := _SDPS_ReadSource("layout_shift_caps.ahk")
 	Assert(Src != "", "modules/keymap/layout/layout_shift_caps.ahk must be readable")
 
 	Body := _DriverFuncBody("RegisterCapsLockLayer")

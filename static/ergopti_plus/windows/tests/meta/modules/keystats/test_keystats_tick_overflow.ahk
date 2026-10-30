@@ -26,9 +26,8 @@
 ; =================================================
 ; =================================================
 
-_KLTO_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
+_KLTO_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _KLTO_StripComments(Src) {
@@ -272,7 +271,7 @@ Test("keystats: native clock source guards reject narrowed or absent owners (key
 ; =========================================================================
 
 _KLTO_HookContextAtWrapSafe() {
-	Raw := _KLTO_ReadSource("modules/keystats/keystats_hook.ahk")
+	Raw := _KLTO_ReadSource("keystats_hook.ahk")
 	Src := _KLTO_StripComments(Raw)
 	Assert(Src != "", "modules/keystats/keystats_hook.ahk must be readable")
 

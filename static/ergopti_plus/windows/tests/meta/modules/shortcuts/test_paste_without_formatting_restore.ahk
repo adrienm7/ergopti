@@ -28,10 +28,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_PWF_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_PWF_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -44,7 +42,7 @@ _PWF_ReadSource(RelPath) {
 ; ================================================================
 
 _PWF_AssertSnapshot() {
-	Src := _PWF_ReadSource("modules/shortcuts/ctrl.ahk")
+	Src := _PWF_ReadSource("ctrl.ahk")
 	Body := _DriverFuncBody("PasteWithoutFormatting")
 	Assert(Body != "", "PasteWithoutFormatting(*) declaration must exist in ctrl.ahk")
 	Assert(InStr(Body, "CB_SavePlainSnapshot(OwnerToken, &Captured)") > 0,
@@ -53,7 +51,7 @@ _PWF_AssertSnapshot() {
 Test("ctrl: PasteWithoutFormatting snapshots clipboard before coercion (paste-without-formatting-no-restore)", _PWF_AssertSnapshot)
 
 _PWF_AssertDeferredRestore() {
-	Src := _PWF_ReadSource("modules/shortcuts/ctrl.ahk")
+	Src := _PWF_ReadSource("ctrl.ahk")
 	Body := _DriverFuncBody("PasteWithoutFormatting")
 	Assert(Body != "", "PasteWithoutFormatting(*) declaration must exist in ctrl.ahk")
 	Assert(InStr(Body, "SetTimer") > 0,

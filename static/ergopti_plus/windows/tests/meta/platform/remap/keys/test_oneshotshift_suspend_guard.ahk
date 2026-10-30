@@ -34,10 +34,8 @@
 ; ======================================
 
 ; Resolves a windows/-relative source path from the tests/ runner directory.
-_OSSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_OSSG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -51,7 +49,7 @@ _OSSG_ReadSource(RelPath) {
 ; ===================================================
 
 _OSSG_OneShotShiftHasSuspendGuard() {
-	Src := _OSSG_ReadSource("platform/remap/one_shot_shift.ahk")
+	Src := _OSSG_ReadSource("one_shot_shift.ahk")
 	Body := _DriverFuncBody("OneShotShift")
 	Assert(Body != "", "OneShotShift must exist in platform/remap/one_shot_shift.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,

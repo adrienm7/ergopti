@@ -27,7 +27,8 @@
 ;   app key BEFORE arming, so that path is unreachable for the same app once the
 ;   key exists. A transient lock lost the discovery permanently.
 ;
-; SCOPE: source introspection via the move-resilient helpers.
+; SCOPE: the two readers run for real on a persisted section; the menu and retry
+; paths are still read from source through the move-resilient helpers.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -42,24 +43,72 @@
 ; ===================================================
 ; ===================================================
 
-_DCIR_GestureConfigValidatesAndReports() {
-	Body := _DriverFuncBody("GesturesReadConfig")
-	Assert(Body != "", "GesturesReadConfig() must exist")
+; Runs the reader on a persisted section and returns the lines it logged.
+_DCIR_LinesWhileReading(Reader, Section, Stored) {
+	global _IniCache
+	SavedCache := _IniCache
+	Lines := []
+	try {
+		_IniCache := Map(Section, Stored)
+		LoggerSetTestSink((Line) => Lines.Push(Line))
+		Reader.Call()
+	} finally {
+		LoggerClearTestSink()
+		_IniCache := SavedCache
+	}
+	return Lines
+}
 
-	Assert(InStr(Body, "GESTURE_ACTIONS.Has(Value)") > 0,
-		"GesturesReadConfig must validate the persisted action id against GESTURE_ACTIONS, exactly as its keyboard-shortcut sibling does — an unknown id otherwise loads verbatim and is dropped later by the dispatcher, in silence")
-	Assert(InStr(Body, "LoggerWarn") > 0,
-		"a rejected gesture binding must be reported, naming the slot and the rejected id")
+_DCIR_Reported(Lines, Needle) {
+	for Line in Lines {
+		if InStr(Line, "[WARNING]") && InStr(Line, Needle)
+			return true
+	}
+	return false
+}
+
+_DCIR_GestureConfigValidatesAndReports() {
+	global GestureAssignments, GestureActionParameters, GESTURE_ACTIONS
+	SavedAssignments := IsSet(GestureAssignments) ? GestureAssignments : unset
+	SavedParameters := IsSet(GestureActionParameters) ? GestureActionParameters : unset
+	try {
+		GestureAssignments := Map("tap_3", "shipped_default", "tap_4", "shipped_default")
+		Known := ""
+		for ActionId, _ in GESTURE_ACTIONS {
+			Known := ActionId
+			break
+		}
+		Assert(Known != "", "the catalogue must offer a known action")
+		Lines := _DCIR_LinesWhileReading(GesturesReadConfig, "gestures",
+			Map("tap_3", "retired_action_id", "tap_4", Known))
+		AssertEqual("shipped_default", GestureAssignments["tap_3"],
+			"an unknown id must not load verbatim: the dispatcher would drop it later, in silence")
+		AssertEqual(Known, GestureAssignments["tap_4"], "a known id still loads")
+		AssertTrue(_DCIR_Reported(Lines, "retired_action_id"),
+			"a rejected gesture binding must be reported, naming the rejected id")
+	} finally {
+		GestureAssignments := IsSet(SavedAssignments) ? SavedAssignments : unset
+		GestureActionParameters := IsSet(SavedParameters) ? SavedParameters : unset
+	}
 }
 
 _DCIR_KeyboardShortcutFallbackIsReported() {
-	Body := _DriverFuncBody("ReadKeyboardShortcutsConfig")
-	Assert(Body != "", "ReadKeyboardShortcutsConfig() must exist")
-
-	Assert(InStr(Body, "GESTURE_ACTIONS.Has(Value)") > 0,
-		"prerequisite: the validity guard must still be present")
-	Assert(InStr(Body, "else if") > 0 and InStr(Body, "LoggerWarn") > 0,
-		"an unresolvable persisted shortcut must report the substitution — the key otherwise fires a different action than the user configured, with nothing anywhere to explain it")
+	global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS
+	SavedAssignments := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
+	SavedDefaults := IsSet(KEYBOARD_SHORTCUT_DEFAULTS) ? KEYBOARD_SHORTCUT_DEFAULTS : unset
+	try {
+		KEYBOARD_SHORTCUT_DEFAULTS := Map("win_d", "shipped_default")
+		KeyboardShortcutAssignments := Map()
+		Lines := _DCIR_LinesWhileReading(ReadKeyboardShortcutsConfig, "shortcuts.keyboard",
+			Map("win_d", "retired_action_id"))
+		AssertEqual("shipped_default", KeyboardShortcutAssignments["win_d"],
+			"an unresolvable shortcut falls back to the shipped default")
+		AssertTrue(_DCIR_Reported(Lines, "retired_action_id"),
+			"the substitution must be reported: the key otherwise fires a different action than the user configured, with nothing anywhere to explain it")
+	} finally {
+		KeyboardShortcutAssignments := IsSet(SavedAssignments) ? SavedAssignments : unset
+		KEYBOARD_SHORTCUT_DEFAULTS := IsSet(SavedDefaults) ? SavedDefaults : unset
+	}
 }
 
 ; Both id-keyed manifest branches must report a missing handler. Checking only

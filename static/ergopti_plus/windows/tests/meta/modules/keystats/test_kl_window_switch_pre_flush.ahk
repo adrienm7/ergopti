@@ -34,10 +34,8 @@
 ; ================================================
 ; ================================================
 
-_KLWSP_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_KLWSP_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 ; Extracts the title-change block — the if-block that starts with
@@ -64,7 +62,7 @@ _KLWSP_TitleChangeBlock(FuncBody) {
 ; ================================================
 
 _KLWSP_FlushBeforeWindowSwitch() {
-	Src := _KLWSP_ReadSource("modules/keystats/keystats_hook.ahk")
+	Src := _KLWSP_ReadSource("keystats_hook.ahk")
 
 	FuncBody := _DriverFuncBody("KL_Hook_RefreshContext")
 	Assert(FuncBody != "",

@@ -34,10 +34,8 @@
 ; ===================================================
 ; ===================================================
 
-_CPTL_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_CPTL_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -50,7 +48,7 @@ _CPTL_ReadSource(RelPath) {
 ; ===================================================
 
 _CPTL_DispatchSweepsOrphans() {
-	Src := _CPTL_ReadSource("modules/llm/api_ollama.ahk")
+	Src := _CPTL_ReadSource("api_ollama.ahk")
 	Seg := _DriverFuncBody("_LLM_Ollama_DispatchAsync")
 	Assert(Seg != "", "_LLM_Ollama_DispatchAsync must exist in api_ollama.ahk")
 	; The PII-writing hot path must TRIGGER the reaper -- but off-thread via the

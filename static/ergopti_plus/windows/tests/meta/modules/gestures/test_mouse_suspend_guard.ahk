@@ -43,10 +43,8 @@
 ; ======================================
 ; ======================================
 
-_MMSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_MMSG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -60,7 +58,7 @@ _MMSG_ReadSource(RelPath) {
 ; ====================================================
 
 _MMSG_LUpGuardBeforeBump() {
-	Src := _MMSG_ReadSource("modules/keystats/keystats_mouse.ahk")
+	Src := _MMSG_ReadSource("keystats_mouse.ahk")
 	Body := _DriverFuncBody("KL_Mouse_OnLUp")
 	Assert(Body != "", "KL_Mouse_OnLUp must exist in keystats_mouse.ahk")
 	PosGuard := InStr(Body, "KL_CaptureHeld()")
@@ -76,7 +74,7 @@ Test("mouse: KL_Mouse_OnLUp has a capture-hold guard before KL_BumpMouseClick", 
 
 
 _MMSG_RUpGuardBeforeBump() {
-	Src := _MMSG_ReadSource("modules/keystats/keystats_mouse.ahk")
+	Src := _MMSG_ReadSource("keystats_mouse.ahk")
 	Body := _DriverFuncBody("KL_Mouse_OnRUp")
 	Assert(Body != "", "KL_Mouse_OnRUp must exist in keystats_mouse.ahk")
 	PosGuard := InStr(Body, "KL_CaptureHeld()")
@@ -92,7 +90,7 @@ Test("mouse: KL_Mouse_OnRUp has a capture-hold guard before KL_BumpMouseClick", 
 
 
 _MMSG_AccumScrollHasSuspendGuard() {
-	Src := _MMSG_ReadSource("modules/keystats/keystats_mouse.ahk")
+	Src := _MMSG_ReadSource("keystats_mouse.ahk")
 	Body := _DriverFuncBody("KL_Mouse_AccumScroll")
 	Assert(Body != "", "KL_Mouse_AccumScroll must exist in keystats_mouse.ahk")
 	Assert(InStr(Body, "KL_CaptureHeld()") > 0,
@@ -102,7 +100,7 @@ Test("mouse: KL_Mouse_AccumScroll has a capture-hold guard", _MMSG_AccumScrollHa
 
 
 _MMSG_FlushScrollHasSuspendGuard() {
-	Src := _MMSG_ReadSource("modules/keystats/keystats_mouse.ahk")
+	Src := _MMSG_ReadSource("keystats_mouse.ahk")
 	Body := _DriverFuncBody("KL_Mouse_FlushScroll")
 	Assert(Body != "", "KL_Mouse_FlushScroll must exist in keystats_mouse.ahk")
 	Assert(InStr(Body, "KL_CaptureHeld()") > 0,
@@ -160,7 +158,7 @@ Test("mouse: the capture-hold gate covers native Suspend and the metrics pause",
 
 
 _MMSG_StopClearsScrollFlushFn() {
-	Src := _MMSG_ReadSource("modules/keystats/keystats_mouse.ahk")
+	Src := _MMSG_ReadSource("keystats_mouse.ahk")
 	Body := _DriverFuncBody("KL_Mouse_Stop")
 	Assert(Body != "", "KL_Mouse_Stop must exist in keystats_mouse.ahk")
 	Assert(InStr(Body, "scroll_flush_fn := unset") > 0,

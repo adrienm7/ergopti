@@ -353,6 +353,23 @@ _ParseTomlGroupConfig_ResolveFile(CategoryName, FilePath := "") {
 		return HotstringsBundledTomlPath(LowerCat)
 }
 
+; The name a log line may print for a hotstring category: the category itself when
+; the driver ships it, the redaction policy's name placeholder when the user chose
+; it (an extension or a personal file under the configuration directory, a personal
+; owner backed by no shipped file). The logger cannot do this at write time, because
+; a bare name is not a path.
+; @param Category {String} Category identity; may be empty.
+; @returns {String} What the line may print.
+HotstringCategoryLogName(Category) {
+		global _ConfigDir
+		if (Category == "")
+				return Category
+		Path := _ParseTomlGroupConfig_ResolveFile(Category)
+		if (InStr(Path, _ConfigDir) == 1 || !FileExist(Path))
+				return LoggerUserNamePlaceholder()
+		return Category
+}
+
 ; Evict all cache entries for a given file path so that the next call to
 ; ParseTomlGroupConfig or ReadTomlFile re-reads from disk. Called after
 ; _HCW_PatchTomlMeta writes changes to a personal TOML file.
@@ -732,7 +749,9 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 		}
 		if SelectedSection != "" && !SelectedFound
 				throw Error("The selected extension section is unavailable: " . SelectedSection)
-		try LoggerSuccess("TomlLoader", "Extension TOML '{1}': {2} entry(ies) loaded.", CategoryLabel, TotalLoaded)
+		; The file, not the label: a label is a name the user chose, and only a path
+		; under the configuration directory is masked when the line is written
+		try LoggerSuccess("TomlLoader", "Extension TOML '{1}': {2} entry(ies) loaded.", FilePath, TotalLoaded)
 		return TotalLoaded
 }
 
