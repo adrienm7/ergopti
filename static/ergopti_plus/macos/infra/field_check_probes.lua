@@ -259,22 +259,98 @@ local function count_refusals(ports, executable, prefix, files, callback)
 	check(1)
 end
 
+--- Rewrites a .keylayout into the XML 1.0 xmllint reads. Apple keyboard
+--- layouts are XML 1.1 and carry character references to C0 controls
+--- (`&#x0008;` for backspace), which XML 1.0 forbids: libxml2 refused all
+--- eight genuine Ergopti files on the 2026-10-30 20:51 run. The declaration is
+--- read as 1.0 and each such reference as a space, so the parser judges
+--- everything else; a UTF-16 file (byte order mark) is left as it is.
+--- @param text string File bytes.
+--- @return string text
+function M.keylayout_as_xml10(text)
+	local head = text:sub(1, 2)
+	if head == "\254\255" or head == "\255\254" then return text end
+	text = text:gsub('^(%s*<%?xml[^>]-version%s*=%s*["\'])1%.1(["\'])', "%11.0%2", 1)
+	local function control(code)
+		return code ~= nil and code >= 1 and code <= 31 and code ~= 9 and code ~= 10 and code ~= 13
+	end
+	text = text:gsub("&#[xX](%x+);", function(hex)
+		if control(tonumber(hex, 16)) then return "&#x20;" end
+	end)
+	text = text:gsub("&#(%d+);", function(decimal)
+		if control(tonumber(decimal)) then return "&#x20;" end
+	end)
+	return text
+end
+
+-- xmllint diagnostics, in the order a cause is looked for, with the closed
+-- token a refused layout names.
+local XML_CAUSES = {
+	{ "xmlParseCharRef", "char_ref" },
+	{ "Unsupported version", "xml_version" },
+	{ "Opening and ending tag mismatch", "tag_mismatch" },
+	{ "Premature end of data", "truncated" },
+	{ "Entity", "entity" },
+	{ "encoding", "encoding" },
+	{ "AttValue", "attribute" },
+}
+
+--- Names the construct xmllint refused.
+--- @param text any The tool's stderr.
+--- @return string token
+function M.xml_refusal(text)
+	text = tostring(text or "")
+	for _, cause in ipairs(XML_CAUSES) do
+		if text:find(cause[1], 1, true) then return cause[2] end
+	end
+	return "not_well_formed"
+end
+
+--- Parses each .keylayout with xmllint over stdin, after M.keylayout_as_xml10.
+--- @param ports table Check ports (read_text, exec_input).
+--- @param files table Absolute paths (never reported).
+--- @param callback function fn(bad, timed_out, first_cause).
+local function check_keylayouts(ports, files, callback)
+	local bad, timed_out, cause = 0, 0, nil
+	local function check(index)
+		if index > #files then return callback(bad, timed_out, cause) end
+		local text = ports.read_text(files[index])
+		if type(text) ~= "string" then
+			bad, cause = bad + 1, cause or "unreadable"
+			return check(index + 1)
+		end
+		ports.exec_input(XMLLINT, { "--noout", "--nonet", "-" }, M.keylayout_as_xml10(text), COMMAND_TIMEOUT,
+			function(code, _, errors)
+				if code == nil then
+					timed_out = timed_out + 1
+				elseif code ~= 0 then
+					bad, cause = bad + 1, cause or M.xml_refusal(errors)
+				end
+				check(index + 1)
+			end)
+	end
+	check(1)
+end
+
 --- Reports one family of files checked by a parser.
 --- @param report table Report.
 --- @param id string Step id.
 --- @param files table Paths checked.
 --- @param bad integer Files the parser refused.
 --- @param timed_out integer Files whose check timed out.
-local function report_parsed(report, id, files, bad, timed_out)
+--- @param cause string|nil The construct the first refused file failed on.
+local function report_parsed(report, id, files, bad, timed_out, cause)
 	if #files == 0 then return report.step(id, STATE.skip, "none_installed") end
 	if bad == 0 and timed_out == 0 then return report.step(id, STATE.pass, #files .. "_parsed") end
-	report.step(id, STATE.fail, bad > 0 and ("refused_" .. bad .. "_of_" .. #files) or ("timeout_" .. timed_out))
+	report.step(id, STATE.fail, bad > 0 and ("refused_" .. bad .. "_of_" .. #files .. (cause and (":" .. cause) or ""))
+		or ("timeout_" .. timed_out))
 end
 
 --- The input sources macOS has turned on and the Ergopti layouts on disk. The
 --- selected source and the enabled list are what the text-input system holds
 --- now (not the preference, which it reads at login); every Ergopti .keylayout
---- must parse as XML and every Ergopti bundle's Info.plist as a property list,
+--- must parse as XML (its 1.1 control references aside) and every Ergopti
+--- bundle's Info.plist as a property list,
 --- since macOS drops a layout it cannot read without a word.
 function M.input_sources(ports, report, finish)
 	local facts = ports.input_source_facts()
@@ -297,8 +373,8 @@ function M.input_sources(ports, report, finish)
 	end
 	local files = ports.layout_files()
 	report.step("layout_bundles", STATE.info, #files.plists)
-	count_refusals(ports, XMLLINT, { "--noout", "--nonet" }, files.keylayouts, function(bad, timed_out)
-		report_parsed(report, "keylayout_xml", files.keylayouts, bad, timed_out)
+	check_keylayouts(ports, files.keylayouts, function(bad, timed_out, cause)
+		report_parsed(report, "keylayout_xml", files.keylayouts, bad, timed_out, cause)
 		count_refusals(ports, PLUTIL, { "-lint", "-s" }, files.plists, function(plist_bad, plist_timed_out)
 			report_parsed(report, "bundle_plist", files.plists, plist_bad, plist_timed_out)
 			finish()
