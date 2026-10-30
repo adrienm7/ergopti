@@ -737,11 +737,9 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 		end
 	end
 
-	-- A no-op final action still mutates runtime state: try_*_expand calls
-	-- suppress_rescan(), which clears the buffer before returning false. Every
-	-- later attempt would therefore re-match against an empty buffer and cannot
-	-- fire. Keep the terminal attempt for that cleanup, but do not advertise or
-	-- dispatch actions beyond it.
+	-- A no-op final action wins and masks every later attempt: try_*_expand
+	-- returns "noop_final" and its callers stop there. Keep that terminal attempt,
+	-- but do not advertise or dispatch actions beyond it.
 	local attempt_count = #attempts
 	local reachable_count = attempt_count
 	for index = 1, attempt_count do
@@ -999,8 +997,14 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		-- The character must remain on screen — returning true would suppress it
 		-- even though nothing was injected (the dropped-char bug).
 		if is_noop then
-			if m.final_result then _state.suppress_rescan() end
 			if not is_ignored then TooltipRenderer.hide({ forced = true }) end
+			-- A final entry that changes nothing still wins: it masks the lower
+			-- candidates of this keystroke (the caller stops on this reason), as
+			-- Windows and the shared engine do. It no longer wipes the buffer, which
+			-- left a later terminator nothing to match: a personal immediate
+			-- "sru" -> "SRU" typed as "SRU" then lost the bundled "sru" -> "sur"
+			-- on the space (field report of 2026-10-30).
+			if m.final_result then return false, "noop_final" end
 		end
 		return false
 	end
@@ -1107,8 +1111,9 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		-- on screen — returning true would suppress it with nothing injected (the
 		-- dropped-terminator-chars bug).
 		if is_noop then
-			if m.final_result then _state.suppress_rescan() end
 			if not is_ignored then TooltipRenderer.hide({ forced = true }) end
+			-- Masks the lower candidates without wiping the buffer (try_auto_expand).
+			if m.final_result then return false, "noop_final" end
 		end
 		return false
 	end
@@ -1347,9 +1352,9 @@ function M.try_expand(chars, is_ignored)
 			pre_term_tail = (ok and off) and saved_buf:sub(off) or saved_buf:sub(-1)
 		end
 		for _, m in ipairs(bucket_for(pre_term_tail)) do
-			if M.try_terminator_expand(m, chars, char_len, is_ignored) then
-				return true
-			end
+			local fired, reason = M.try_terminator_expand(m, chars, char_len, is_ignored)
+			if fired then return true end
+			if reason == "noop_final" then break end
 		end
 		-- Restore buffer on no match.
 		_state.buffer = saved_buf
