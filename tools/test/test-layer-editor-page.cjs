@@ -368,9 +368,8 @@ const DATA = (() => {
 }
 
 // The wheel slots (layer-wheel-slots): Scroll up and down are layer inputs on
-// Windows and macOS, volume up and down by default, editable like any key;
-// Linux cannot intercept the wheel and says so.
-for (const os of ['windows', 'macos']) {
+// the three OS, volume up and down by default, editable like any key.
+for (const os of ['windows', 'macos', 'linux']) {
 	const page = loadPage();
 	page.call(
 		`init(${JSON.stringify({ os, path: '/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [] })})`
@@ -395,17 +394,6 @@ for (const os of ['windows', 'macos']) {
 			bindingsOf(saved.text, other).ok,
 			`(layer-wheel-slots) an edited ${os} wheel slot still loads on ${other}`
 		);
-}
-{
-	const page = loadPage();
-	page.call(
-		`init(${JSON.stringify({ os: 'linux', path: '/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [] })})`
-	);
-	check(
-		page.key('WheelUp').classList.contains('unavailable') &&
-			page.key('WheelUp').title === EN['platform_reason.layer_wheel_source_is_not_linux'],
-		'(layer-wheel-slots) the wheel cannot be a layer key on Linux, and the key says why'
-	);
 }
 
 // =================================
