@@ -937,6 +937,7 @@
 	"hs_config.label_category": "Kategori:",
 	"hs_config.label_color": "Renk",
 	"hs_config.label_delay": "Gecikme (ms)",
+	"hs_config.unit_ms": "ms",
 	"hs_config.label_file": "Dosya:",
 	"hs_config.label_group": "Grup:",
 	"hs_config.label_priority": "Öncelik",

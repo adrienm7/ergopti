@@ -279,7 +279,7 @@ OllamaWV_Create(kind, subtitle) {
 	; -DPIScale: tell AHK to treat all coordinates as logical pixels (no auto-scaling).
 	; Without this, AHK v2 in PerMonitorV2 mode interprets Gui dimensions as physical
 	; pixels, making the window larger than intended on scaled displays.
-	g := Gui_Create("+Caption +MinimizeBox +Resize -DPIScale", "IA")
+	g := Gui_Create("+Caption +MinimizeBox +Resize -DPIScale", t("ui_typing.dataset_ai"))
 	g.MarginX := 0
 	g.MarginY := 0
 	g.OnEvent("Close", OllamaWV_CloseIfEpoch.Bind(captured_epoch))

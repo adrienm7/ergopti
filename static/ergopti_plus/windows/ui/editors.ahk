@@ -49,7 +49,7 @@ MagicKeyEditor(*) {
 		try {
 				GuiToShow := Gui_Create("", t("dialog.magic_key.title"))
 				GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
-				GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
+				GuiToShow.Add("Text", "w300", t("button.cancel") . " → " . t("layer_editor.key.escape"))
 				; Construct while hidden: native Close otherwise hides an unowned Gui
 				; before the later factory returns and starts an invisible capture.
 				IH := InputHook("L2 E C I", ScalarEndKeys)

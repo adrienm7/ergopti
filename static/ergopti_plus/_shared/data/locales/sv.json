@@ -937,6 +937,7 @@
 	"hs_config.label_category": "Kategori:",
 	"hs_config.label_color": "Färg",
 	"hs_config.label_delay": "Fördröjning (ms)",
+	"hs_config.unit_ms": "ms",
 	"hs_config.label_file": "Fil:",
 	"hs_config.label_group": "Grupp:",
 	"hs_config.label_priority": "Prioritet",

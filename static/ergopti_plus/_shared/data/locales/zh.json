@@ -937,6 +937,7 @@
 	"hs_config.label_category": "类别：",
 	"hs_config.label_color": "颜色",
 	"hs_config.label_delay": "延迟 (ms)",
+	"hs_config.unit_ms": "毫秒",
 	"hs_config.label_file": "文件:",
 	"hs_config.label_group": "分组:",
 	"hs_config.label_priority": "优先级",

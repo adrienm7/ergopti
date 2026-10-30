@@ -937,6 +937,7 @@
 	"hs_config.label_category": "カテゴリー:",
 	"hs_config.label_color": "色",
 	"hs_config.label_delay": "遅延 (ms)",
+	"hs_config.unit_ms": "ミリ秒",
 	"hs_config.label_file": "ファイル:",
 	"hs_config.label_group": "グループ:",
 	"hs_config.label_priority": "優先度",
