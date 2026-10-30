@@ -115,6 +115,17 @@ local function remap_facts()
 	return { enabled = Remap.get_enabled(), phase = phase, guardian = Remap.guardian_state() }
 end
 
+--- The note and status of this lifecycle's guardian registration, read from memory.
+--- @return string|nil note `developer_adhoc_*`, or nil when no reset ran.
+--- @return string|nil status The registration's answer, nil before it settled.
+local function guardian_registration_note()
+	local ok, note, status = pcall(function()
+		return require("platform.remap.lease_controller").guardian_registration_note()
+	end)
+	if not ok then return nil, nil end
+	return note, status
+end
+
 --- Keystats facts, read from memory.
 local function keystats_facts()
 	local Accounting = require("modules.keystats.physical_accounting_mode")
@@ -253,6 +264,7 @@ function M.new()
 		exec = exec,
 		home = function() return os.getenv("HOME") end,
 		remap_facts = remap_facts,
+		guardian_registration_note = guardian_registration_note,
 		keystats_facts = keystats_facts,
 		health_counts = function() return require("infra.key_event_health").counts() end,
 		count_keys = count_keys,

@@ -52,7 +52,7 @@
 			"kind": "field_check",
 			"check": "login_items",
 			"deadline_seconds": 90,
-			"proves": "What starts Ergopti or Hammerspoon at login, and whether each entry belongs to this copy."
+			"proves": "What starts Ergopti or Hammerspoon at login, whether each entry belongs to this copy, and what an ad hoc build did to its stale remap guardian registrations before registering."
 		},
 		{
 			"id": "field_composer",

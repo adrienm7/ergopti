@@ -75,13 +75,15 @@ local LEASE_RECOVERY_RETRY_DELAYS_SEC = { 1.0, 10.0, 30.0 }
 local LEASE_RECOVERY_TIMER_ARM_ATTEMPTS = 3
 local LEASE_GUARDIAN_STATUS_POLL_SEC = 3.0
 local LEASE_GUARDIAN_PROBE_TIMEOUT_SEC = 2.0
--- The launcher's registration role runs at most five bounded launchctl steps
--- (3 s each plus a 0.25 s termination grace) and two 3 s guardian health waits
--- (a loaded job whose health check fails is booted out and bootstrapped again):
--- 22.25 s. The deadline keeps 2 s over that for the pipe and the main thread;
--- at 20 s it killed a slow registration that was still inside its own budget
+-- The launcher's registration role runs at most eight bounded launchctl steps
+-- (3 s each plus a 0.25 s termination grace) and four 3 s waits: an ad hoc
+-- build's reset (legacy removal, then the old guardian's exit), the modern
+-- health wait, and the legacy path's two health waits (a loaded job whose
+-- health check fails is booted out and bootstrapped again): 38 s. The deadline
+-- keeps 2 s over that for the pipe and the main thread; at 20 s it killed a
+-- slow registration still inside its own budget
 -- (hardening-d-native-timeout-contract).
-local LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC = 25.0
+local LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC = 40.0
 local FIRST_RUN_WIZARD_DELAY_SEC = Timings.sec("ui", "onboarding_startup_delay_ms")
 local FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS = 3
 -- A retained input-source event is an ordering barrier for lease recovery: the
