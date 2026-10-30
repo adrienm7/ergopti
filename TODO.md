@@ -563,9 +563,9 @@ dev.
   `[gestures.sensitivities]` swipe_3 value in `config.toml` (or remove it), then a normal and a
   short deliberate vertical three-finger swipe each switch exactly one tab, a swipe past 29
   units (the logged `sd`) two, and lifting never adds or removes one.
-  Since 30 October the field run proves the capture stamp: touch the trackpad once before the run;
-  `field_gesture_frames` fails `unstamped:N` on any frame without a stamp and names
-  `gesture_frame_spacing_ms` (about 8).
+  Since 30 October the field run proves the capture stamp from the session's own touches, with no
+  manual step: `field_gesture_frames` fails `unstamped:N` on any frame without a stamp, names
+  `gesture_frame_spacing_ms` (about 8), and skips when the trackpad was not touched.
 
 - **L16** [CODE][PHYS-M] Slow ingest tick, `append` phase 466 to 563 ms, peaks 1531 and 1709 ms
   (new.txt 14:25:50 to 16:53:38, 20 lines, still on 228f79f2). The 1.2 to 1.8 s ticks are the
@@ -1292,9 +1292,10 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       entry again (ea02cf7000: the generic registrar refuses Caps Lock and the whole shortcut start rolled
       back). The registrar tests say macOS never fires a Caps Lock hotkey: check on a real Mac that Ctrl+Caps
       Lock toggles Caps Lock; if not, report it and drop the slot's recommendation on macOS with a reason.
-      Since 30 October the field run proves it: press Ctrl+Caps Lock once before the run, then the step
-      `field_capslock_chord` passes `delivered:N` or fails `never_delivered` (the keymap modifier tap
-      counts the physical chord, the slot's native callback counts each delivery).
+      Since 30 October the field run judges it from the session's own keys, with no manual step: when a
+      Ctrl+Caps Lock was typed during the session, `field_capslock_chord` passes `delivered:N` or fails
+      `never_delivered` (the keymap modifier tap counts the physical chord, the slot's native callback
+      counts each delivery); with none typed it skips.
 - [ ] **Layout emulation on macOS and Linux through one generated `.keylayout`, live (maintainer request, 27
       October).** [CODE] Decided by the maintainer: no pre-generated variants. The user picks a layout
       (Ergopti, Bépo, ...), the menu options (number row in direct access or symbols, row switches) and later
