@@ -228,7 +228,11 @@ for (const [file, floor] of scopes) {
 			.jobsOfText(text, rel)
 			.filter((job) => job.id === 'integration-linux')
 			.flatMap((job) => pipeline.steps(job.body))
-			.filter((step) => step.name === 'Qualify actual LuaJIT XI2 ABI and property cookies');
+			.filter(
+				(step) =>
+					step.name ===
+					'Install prerequisites for Qualify actual LuaJIT XI2 ABI and property cookies'
+			);
 		assert.equal(
 			luaJitOwner.length,
 			1,

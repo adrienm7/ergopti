@@ -361,7 +361,8 @@ console.log(
 const { spawnSync } = require('node:child_process');
 const { pythonExecutable } = require('../lib/python.cjs');
 const LUAJIT_BLOCK =
-	'      # Real LuaJIT cdata is qualified separately from the unchanged C3 baseline.\n      # The child-local libXi projection grants no installed runtime or input epoch.\n      - name: Qualify actual LuaJIT XI2 ABI and property cookies\n        id: native_xi2_luajit\n        if: ${{ !cancelled() && matrix.group == \x27native\x27 }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          python3 -B static/ergopti_plus/linux/tests/hardware/test_xi2_luajit_diagnostic_portable.py\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc luajit libx11-dev libxi-dev libx11-xcb1 libxkbcommon-dev libxkbcommon-x11-dev xkb-data xvfb\n          python3 static/ergopti_plus/linux/tests/hardware/run_xi2_luajit_diagnostic.py "$RUNNER_TEMP/linux-xi2-luajit" "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/adapters/xkb_source_probe.lua"\n        timeout-minutes: 7\n\n      - name: Retain actual LuaJIT XI2 diagnostic evidence\n        if: ${{ always() && matrix.group == \x27native\x27 }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: linux-xi2-luajit-${{ github.sha }}-${{ github.run_attempt }}\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/linux-xi2-luajit/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/original-c3/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/display.json\n            ${{ runner.temp }}/linux-xi2-luajit/abi-compile.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stdout\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr\n          if-no-files-found: error\n\n';
+	'      # The LuaJIT XI2 prerequisites install in their own step, so a slow mirror\n      # fails the install and not the seven-minute native qualification.\n      - name: Install prerequisites for Qualify actual LuaJIT XI2 ABI and property cookies\n        if: ${{ !cancelled() && matrix.group == \x27native\x27 }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc luajit libx11-dev libxi-dev libx11-xcb1 libxkbcommon-dev libxkbcommon-x11-dev xkb-data xvfb\n        timeout-minutes: 20\n\n' +
+	'      # Real LuaJIT cdata is qualified separately from the unchanged C3 baseline.\n      # The child-local libXi projection grants no installed runtime or input epoch.\n      - name: Qualify actual LuaJIT XI2 ABI and property cookies\n        id: native_xi2_luajit\n        if: ${{ !cancelled() && matrix.group == \x27native\x27 }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          python3 -B static/ergopti_plus/linux/tests/hardware/test_xi2_luajit_diagnostic_portable.py\n          python3 static/ergopti_plus/linux/tests/hardware/run_xi2_luajit_diagnostic.py "$RUNNER_TEMP/linux-xi2-luajit" "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/adapters/xkb_source_probe.lua"\n        timeout-minutes: 7\n\n      - name: Retain actual LuaJIT XI2 diagnostic evidence\n        if: ${{ always() && matrix.group == \x27native\x27 }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: linux-xi2-luajit-${{ github.sha }}-${{ github.run_attempt }}\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/linux-xi2-luajit/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/original-c3/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/display.json\n            ${{ runner.temp }}/linux-xi2-luajit/abi-compile.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stdout\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr\n          if-no-files-found: error\n\n';
 function verifyLuaJitEnrollment(value) {
 	assert.strictEqual(
 		value.workflow.split(LUAJIT_BLOCK).length,
@@ -385,7 +386,28 @@ function verifyLuaJitEnrollment(value) {
 		return steps.findIndex((step) => step.name === name);
 	};
 	const driver = index('Run the driver integration tests');
+	const install = index(
+		'Install prerequisites for Qualify actual LuaJIT XI2 ABI and property cookies'
+	);
 	const native = index('Qualify actual LuaJIT XI2 ABI and property cookies');
+	// The packages install in their own step, right before the qualification it serves.
+	assert.strictEqual(
+		install,
+		native - 1,
+		'the LuaJIT XI2 prerequisites install immediately before'
+	);
+	assert.strictEqual(
+		pipeline.stepField(steps[install].body, 'if'),
+		"${{ !cancelled() && matrix.group == 'native' }}"
+	);
+	assert.strictEqual(pipeline.stepField(steps[install].body, 'continue-on-error'), null);
+	assert.deepStrictEqual(
+		(pipeline.runOf(steps[install].body) || []).filter((line) => line.includes('ubuntu_apt.py')),
+		[
+			'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc luajit libx11-dev libxi-dev libx11-xcb1 libxkbcommon-dev libxkbcommon-x11-dev xkb-data xvfb'
+		],
+		'the LuaJIT XI2 prerequisites keep the signed acquisition owner'
+	);
 	const evidence = index('Retain actual LuaJIT XI2 diagnostic evidence');
 	const record = index('Record mandatory integration evidence');
 	assert(
