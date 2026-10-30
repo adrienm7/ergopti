@@ -101,17 +101,19 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
 
 ## Maintainer: remote branch cleanup (run on your machine; the cloud container's proxy refuses ref deletion and tag pushes)
 
-Run this only once the coordinator says the fix/<os> integration is on dev. Until then, `tmp/preflight-dev`,
-`tmp/wip-fix-os-int`, `tmp/wip-rpm-luv`, `tmp/wip-win-units` and `tmp/wip-field-collectors` are still in use.
-
-The script first tags the three fix branches, because their audit handovers cite their original commits and
-their `.bundle` archives need them as prerequisites. The Mac field branch is not kept, since every problem it
+The fix/<os> integration is on dev (2026-10-29), so it can run now. The script first tags the three fix
+branches, because their audit handovers cite their original commits and their `.bundle` archives need them as
+prerequisites, and the tmp branches whose commits never landed on dev (see the next section). The Mac field
+branch is not kept, since every problem it
 reported is fixed. It then deletes every remote branch except `dev`, `main`, `sparkle-appcasts` and
 `gh-pages`.
 
 ```sh
 git fetch origin --prune
-for b in fix/macos fix/linux fix/windows; do
+for b in fix/macos fix/linux fix/windows \
+    tmp/wip-todo-ae tmp/wip-todo-ae-par30 tmp/wip-todo-af tmp/wip-todo-ag tmp/wip-todo-ag2 tmp/wip-todo-ag3 \
+    tmp/wip-todo-ah tmp/wip-ci-fix tmp/wip-fr-uncommitted tmp/wip-field-auto tmp/wip-field-run-checklist \
+    tmp/wip-issue103 tmp/wip-issue104; do
   if git rev-parse -q --verify "origin/$b" >/dev/null; then
     git tag -f "archive/${b//\//-}" "origin/$b"
   fi
@@ -122,7 +124,38 @@ git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin \
   | xargs -r -n 20 git push origin --delete
 ```
 
-The resulting tags are `archive/fix-macos`, `archive/fix-linux` and `archive/fix-windows`.
+The resulting tags are `archive/fix-macos`, `archive/fix-linux`, `archive/fix-windows` and one
+`archive/tmp-wip-<name>` per branch of "Commits never landed on dev" below.
+
+## Commits never landed on dev (on tmp branches, archived by the cleanup above)
+
+`git cherry -v origin/dev <branch>` still lists these on 2026-10-30. Some may have landed under another
+patch (a squash): compare by subject with `git log --oneline dev | grep <subject>` before integrating.
+After the cleanup, read them through the `archive/tmp-wip-<name>` tags.
+
+- `tmp/wip-todo-af`: 8634b1ff80 (Linux acknowledges the layout scope once loaded), 358e211a10 (Windows
+  number-row design answer), 3337d99bc8 (Linux number-row order onboarding), 4fcb4a979a (logger scalar),
+  then `tmp/wip-todo-ag3` d5cf3ba50b (number-row strings for that work; it conflicts in the 21 locales
+  unless the AF commits come first). AF also left: reconcile the Linux `keyboard_layout_scope` comments and
+  the design note with the ninth batch.
+- `tmp/wip-todo-ah`: 53b1bc5375 (reset every `hs.*` cache entry between macOS test files) and five CI
+  speed-ups (Ubuntu archive reuse, AHK shard split, one macOS checkout per E2E cell, Intel E2E start,
+  SwiftPM cache trial); run them on `tmp/preflight-dev` before dev.
+- `tmp/wip-todo-ag`: 5fb762dc57, 8a3afb1eb3 (Linux reads config keys and menu command ids from the
+  generated owner), 26fc3fbe61 (same on macOS), f091a98200 (generate the section and dynamic-table
+  constants). `tmp/wip-todo-ag2`: d2f705b248 (machine-translation corrections).
+- `tmp/wip-todo-ae`: 0c101e36bd (share the personal information editor source), 419a361a88 and
+  9ec0d6d122 (keystats query catalogue typed slots and its cross-driver test).
+- `tmp/wip-ci-fix`: f44fcc1e64, c9b90d11d7, ba13937b8c, 5009ad87b8 (Linux distribution-row CI fixtures):
+  check each against dev first, later fixes may have replaced them.
+- One commit each, probably superseded on dev: `tmp/wip-field-auto` 43675932bd (field run driven from the
+  developer app), `tmp/wip-field-run-checklist` cf852cf23d (version-aware privacy panes, L29),
+  `tmp/wip-issue103` b449da5713 (Windows updater reseal), `tmp/wip-issue104` aec2fb58cb (developer-build
+  remap guardian).
+- `tmp/wip-fr-uncommitted` (0d7e53b28b): an Ollama warmup-stop attempt, superseded by 708bc6671d; reference
+  only.
+- `tmp/wip-todo-ae-par30`: 41f72525cf is an unvalidated work-in-progress snapshot of the PAR-30 Linux
+  updater signature gate; redo it from the item, do not cherry-pick it as is.
 
 ## Linux open items from the July plan
 
