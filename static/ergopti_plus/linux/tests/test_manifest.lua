@@ -747,6 +747,7 @@ return {
 	"tests.unit.modules.gestures.engine.test_gesture_roundtrip_input_core",
 	"tests.unit.modules.gestures.engine.test_gesture_direction_vectors",
 	"tests.unit.modules.gestures.engine.test_touchpad_finder",
+	"tests.unit.modules.gestures.engine.test_gesture_slot_report",
 	"tests.unit.platform.remap.test_typing_rollover_catalog",
 	"tests.unit.ui.menu.about.test_log_level_choices",
 	"tests.unit.ui.menu.about.test_about_menu_channel_rows",
