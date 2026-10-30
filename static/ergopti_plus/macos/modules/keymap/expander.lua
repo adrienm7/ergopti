@@ -996,7 +996,8 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	-- A higher-priority end-char entry of the same trigger (a personal "sru" ->
 	-- "SRU" over the bundled immediate "sru" -> "sur") waits for its terminator
 	-- instead. Checked only once this trigger fires: its bucket can hold ~2100.
-	if eff_plain and HotstringCore.auto_shadowed(_registry.mappings_for_tail(m.tail_char) or {}, m, "auto") then
+	if eff_plain and HotstringCore.auto_shadowed(_registry.mappings_for_tail(m.tail_char) or {}, m, "auto",
+		function(other) return M.would_fire(other, active_buffer) ~= nil end) then
 		return false
 	end
 
