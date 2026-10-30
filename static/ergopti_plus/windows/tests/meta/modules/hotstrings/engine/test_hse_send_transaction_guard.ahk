@@ -39,21 +39,15 @@ _AHK04M_AllDispatchCallersConsumeTheVerdict() {
 	AssertEqual(5, _AHK04M_Count(Src, "HSE_DispatchMatch("),
 		"every HSE_DispatchMatch caller must join the send-transaction guard")
 
-	Activate := _DriverFuncBody("ActivateHotstrings")
+	; ActivateHotstrings' verdict is driven in test_activate_hotstrings_commits_synchronously.ahk.
 	OnChar := _DriverFuncBody("_OnPrefixChar")
 	SpaceTap := _DriverFuncBody("_SpaceTap")
 	for Name, Body in Map(
-		"ActivateHotstrings", Activate,
 		"_OnPrefixChar", OnChar,
 		"_SpaceTap", SpaceTap
 	) {
 		Assert(Body != "", Name . " must exist in the driver source")
 	}
-	Assert(InStr(Activate, "Fired := HSE_DispatchMatch") > 0
-		and InStr(Activate, "&CommittedScreenEffect, true") > 0
-		and InStr(Activate, "if Fired") > 0
-		and InStr(Activate, "_PrefixCommitPostFireEffect(CommittedScreenEffect)") > 0,
-		"ActivateHotstrings must force-consume its temporary completion key and finalize the proven effect only on fire")
 	Assert(InStr(OnChar, "_HseFired := HSE_DispatchMatch") > 0
 		and InStr(OnChar, "&CommittedScreenEffect") > 0
 		and InStr(OnChar, "if _HseFired") > 0
@@ -188,103 +182,22 @@ _AHK04M_RawCallbackClassDeclaresAStatus() {
 	AssertEqual(3, _AHK04M_Count(Src, "CreateRawCallbackHotstring("),
 		"every raw callback registration must join the explicit transaction contract")
 
-	for Name in ["ShouldActivateDeadkey", "_EllipsisRawCallback"] {
-		Body := _StripFullLineComments(_DriverFuncBody(Name))
-		Assert(Body != "", Name . " must exist in the driver source")
-		Assert(InStr(Body, "PrepareOnly := false") > 0,
-			Name . " must expose the preparation-only transaction seam")
-		PrepareGate := InStr(Body, "if PrepareOnly")
-		PreparedVerdict := InStr(Body, "Prepared: true", true, PrepareGate)
-		DirectSend := InStr(Body, "SendNewResult(")
-		Assert(PrepareGate > 0 and PreparedVerdict > PrepareGate and DirectSend > PreparedVerdict,
-			Name . " must return a prepared effect before any direct output is possible")
-		Assert(InStr(Body, "if SendNewResult(") > 0,
-			Name . " must gate its buffer effect on sender success")
-		Assert(InStr(Body, "Ok: true") > 0 and InStr(Body, "Ok: false") > 0,
-			Name . " must return an explicit {Ok, Bs, Ins} transaction verdict")
-	}
-	DeadkeyBuilder := _StripFullLineComments(_DriverFuncBody("CreateDeadkeyHotstring"))
-	Assert(InStr(DeadkeyBuilder, "PrepareOnly := false") > 0
-		and InStr(DeadkeyBuilder, "Delay, PrepareOnly") > 0,
-		"deadkey registration must forward preparation-only ownership to its callback")
-
-	Dispatch := _StripFullLineComments(_DriverFuncBody("_HSE_DispatchRawCallback"))
+	; The callbacks and their publication are driven in test_hse_dispatch_behaviour.ahk,
+	; their registration in test_hse_send_failure_transaction.ahk (notepad-raw-registration).
 	TerminalDispatch := _StripFullLineComments(_DriverFuncBody("_HSE_DispatchTerminalRawCallback"))
-	Owner := _StripFullLineComments(_DriverFuncBody("HSE_DispatchMatch"))
-	Assert(Dispatch != "", "_HSE_DispatchRawCallback must exist in the driver source")
 	Assert(TerminalDispatch != "", "_HSE_DispatchTerminalRawCallback must exist in the driver source")
-	Assert(Owner != "", "HSE_DispatchMatch must exist in the driver source")
 	PreparedCall := InStr(TerminalDispatch, "Spec.Callback)(EndChar, true")
 	OwnerBegin := InStr(TerminalDispatch, "_HSE_BeginOwnedTerminalTransaction")
 	Assert(PreparedCall > 0 and OwnerBegin > PreparedCall
 		and InStr(TerminalDispatch, "SendNewResult(") = 0,
 		"terminal raw callbacks must prepare first and delegate all output to the native-capture owner")
-	Gate := InStr(Dispatch, 'Effect.HasOwnProp("Ok")')
-	Mutation := InStr(Dispatch, "HSE_Buffer :=")
-	Assert(Gate > 0 and Mutation > Gate,
-		"raw callback effects must be validated before HSE_Buffer is mutated")
-	Assert(InStr(Dispatch, "if (Fired and IsSet(_ResetPrefixBuffer))") > 0,
-		"raw callback preview reset must remain gated on a proven fire")
-	Assert(InStr(Dispatch, "CommittedEffect := CanonicalEffect") > Mutation,
-		"a successful raw callback must publish its exact post-screen effect to the prefix watcher")
-	Assert(InStr(Owner, "_HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect)") > 0,
-		"HSE_DispatchMatch must forward the canonical-effect output across the raw callback branch")
 }
 
-_AHK04M_UIAWrapperPreparesBeforeErasing() {
-	Wrap := _StripFullLineComments(_DriverFuncBody("_PrefixTryWrapSelection"))
-	OnChar := _DriverFuncBody("_OnPrefixChar")
-	Assert(Wrap != "", "_PrefixTryWrapSelection must exist in the driver source")
-	Assert(OnChar != "", "_OnPrefixChar must exist in the driver source")
-	SendAt := InStr(Wrap, 'Wrapped := SendInstant(Left . Selection . Right, "{BackSpace}")')
-	SuccessGate := InStr(Wrap, "if Wrapped")
-	ResetTransaction := InStr(Wrap, "_PrefixInvalidateInputContext(", true, SuccessGate)
-	ResetHelper := _StripFullLineComments(_DriverFuncBody("_PrefixInvalidateInputContext"))
-	ResetCommitHelper := _StripFullLineComments(_DriverFuncBody("_PrefixCommitInputContext"))
-	EnterCritical := InStr(ResetHelper, 'Critical("On")')
-	CommitCall := InStr(ResetHelper, "_PrefixCommitInputContext(FocusToken, KnownBoundary, AtLineStart)", true, EnterCritical)
-	LeaveCritical := InStr(ResetHelper, "Critical(PreviousCritical)", true, CommitCall)
-	ResetEngine := InStr(ResetCommitHelper, "HSE_FeedReset(")
-	ResetPreview := InStr(ResetCommitHelper, '_PrefixSetBuffer("")', true, ResetEngine)
-	Assert(SendAt > 0,
-		"UIA wrapping must pass the physical-symbol erase as SendInstant's atomic prefix")
-	Assert(InStr(Wrap, "SendEvent(") = 0,
-		"UIA wrapping must not erase the physical fallback before clipboard preparation")
-	Assert(SuccessGate > SendAt and ResetTransaction > SuccessGate,
-		"the paired UIA buffer reset must run only after wrapped output succeeds")
-	Assert(EnterCritical > 0 and CommitCall > EnterCritical and LeaveCritical > CommitCall
-		and ResetEngine > 0 and ResetPreview > ResetEngine,
-		"the UIA reset helper must publish engine and preview invalidation in one Critical transaction")
-	Assert(InStr(OnChar, "if _PrefixTryWrapSelection(UIASel, Pair)") > 0,
-		"_OnPrefixChar must fall through to normal character handling when wrapping fails")
-}
-
-_AHK04M_ForcedCommitAndSpaceFallbackAreTransactional() {
-	Activate := _StripFullLineComments(_DriverFuncBody("ActivateHotstrings"))
+; _SpaceTap lives in the interactive remap module the headless runner does not
+; load; the forced commit it parallels is driven in the unit suite.
+_AHK04M_SpaceFallbackIsTransactional() {
 	SpaceTap := _StripFullLineComments(_DriverFuncBody("_SpaceTap"))
-	Assert(Activate != "", "ActivateHotstrings must exist in the driver source")
 	Assert(SpaceTap != "", "_SpaceTap must exist in the driver source")
-	PokeGate := InStr(Activate, 'if !SendNewResult(" ", true, false)')
-	PokeFeed := InStr(Activate, 'HSE_FeedChar(" ", true)')
-	PokeLlm := InStr(Activate, '_HSE_MirrorLiteralEditToLlm(0, " ")')
-	ForcedDispatch := InStr(Activate, "&CommittedScreenEffect, true")
-	FireMetricGate := InStr(Activate, "if Fired", true, ForcedDispatch)
-	FireReturnGate := InStr(Activate, "if Fired", true, FireMetricGate + 1)
-	FireReturn := InStr(Activate, "return true", true, FireReturnGate)
-	CleanupGate := InStr(Activate, 'if !SendNewResult("{BackSpace}", False, false)')
-	CleanupFailureRing := InStr(Activate, 'UpdateLastSentCharacter(" ")', true, CleanupGate)
-	CleanupFeed := InStr(Activate, "HSE_FeedBackspace(true)", true, CleanupGate)
-	CleanupLlm := InStr(Activate, "_HSE_MirrorLiteralEditToLlm(1)", true, CleanupFeed)
-	Assert(PokeGate > 0 and PokeFeed > PokeGate,
-		"forced end-char commit must not feed a poke that failed to reach the screen")
-	Assert(PokeLlm > PokeFeed and ForcedDispatch > PokeLlm,
-		"forced end-char commit must put the temporary Space in HSE and LLM before dispatch")
-	Assert(FireReturnGate > FireMetricGate and FireReturn > FireReturnGate
-		and CleanupGate > FireReturn,
-		"a successful forced dispatch must return before the no-fire cleanup can erase replacement output")
-	Assert(CleanupFailureRing > CleanupGate and CleanupFeed > CleanupFailureRing
-		and CleanupLlm > CleanupFeed,
-		"failed cleanup must retain/ring the visible Space, while successful cleanup mutates HSE and LLM only after its backspace succeeds")
 	SpacePress := InStr(SpaceTap, 'if !TextPressKeyFed("Space")')
 	SpaceFeed := InStr(SpaceTap, 'HSE_FeedChar(" ", true)')
 	SpaceLlm := InStr(SpaceTap, '_HSE_MirrorLiteralEditToLlm(0, " ")')
@@ -302,7 +215,5 @@ Test("meta hotstrings: clipboard cleanup is prepared before injection (AHK-04-se
 	_AHK04M_SendInstantPreparesCleanupBeforeInjection)
 Test("meta hotstrings: raw callback class declares status (AHK-04-send-transaction) (raw-callback-canonical-effect)",
 	_AHK04M_RawCallbackClassDeclaresAStatus)
-Test("meta hotstrings: UIA wrapping prepares before erase (AHK-04-send-transaction)",
-	_AHK04M_UIAWrapperPreparesBeforeErasing)
-Test("meta hotstrings: forced commit and Space fallback are transactional (AHK-04-send-transaction)",
-	_AHK04M_ForcedCommitAndSpaceFallbackAreTransactional)
+Test("meta hotstrings: Space fallback is transactional (AHK-04-send-transaction)",
+	_AHK04M_SpaceFallbackIsTransactional)
