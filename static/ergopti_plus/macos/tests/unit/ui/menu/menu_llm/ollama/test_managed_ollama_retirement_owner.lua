@@ -110,6 +110,11 @@ helpers.describe("Managed Ollama exact daemon retirement owner", function()
 			task.running = false
 			task.on_done(78)
 			helpers.assert_eq(f.active_tasks.ollama_pull, task)
+			-- Field run of 2026-10-30 23:10: a slot was kept and no line named the check.
+			helpers.assert_true(table.concat(f.error_records, " | "):find(
+				"receipt_not_retired(state=pending, worker_status=78, callback=78, admitted=true, retired=false)",
+				1, true) ~= nil, "the retained slot must name the receipt's state: "
+				.. table.concat(f.error_records, " | "))
 			helpers.assert_eq(f.removed(), false)
 			helpers.assert_nil(f.http_callback())
 			helpers.assert_eq(start(f), false)
@@ -134,6 +139,8 @@ helpers.describe("Managed Ollama exact daemon retirement owner", function()
 			end
 			helpers.assert_true(named, "the unsettled error must quote the helper's refusal: "
 				.. table.concat(f.error_records, " | "))
+			helpers.assert_true(table.concat(f.error_records, " | "):find("pending (receipt_empty)", 1, true) ~= nil,
+				"the retained slot must name the refused check: " .. table.concat(f.error_records, " | "))
 		end)
 	end)
 

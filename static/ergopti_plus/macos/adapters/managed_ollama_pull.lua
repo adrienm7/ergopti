@@ -42,6 +42,26 @@ function M.handles(executable)
 		and executable == home:gsub("/+$", "") .. "/Library/Application Support/Ergopti/ollama-native-http/ollama"
 end
 
+local RECEIPT_STATES = { retired = true, pending = true }
+
+--- Names why a reserved receipt does not prove retirement, from its
+--- non-secret fields only.
+--- @param raw string|nil Exact receipt bytes, nil when unreadable.
+--- @param callback_status number Actual task completion code.
+--- @return string reason
+local function receipt_refusal(raw, callback_status)
+	if type(raw) ~= "string" then return "receipt_unreadable" end
+	if raw == "" then return "receipt_empty" end
+	local ok, proof = pcall(Json.decode, raw)
+	if not ok or type(proof) ~= "table" then return "receipt_malformed" end
+	local state = RECEIPT_STATES[proof.state] and proof.state or "unknown"
+	local worker = proof.worker_status
+	worker = type(worker) == "number" and worker % 1 == 0 and string.format("%d", worker) or "invalid"
+	return string.format("receipt_not_retired(state=%s, worker_status=%s, callback=%s, admitted=%s, retired=%s)",
+		state, worker, tostring(callback_status), tostring(proof.source_admitted == true),
+		tostring(proof.daemon_operation_retired == true))
+end
+
 --- Prepares one private request and receipt without starting a model pull.
 --- The caller must pass its actual native interpreter; no Rosetta or download fallback.
 --- @param model string Requested registry model.
@@ -154,18 +174,21 @@ function M.prepare(model, port, python_bin)
 	end
 	function handle.settle(callback_status)
 		if cleaned then return true end
-		if not attempted then return false end
+		if not attempted then return false, "not_dispatched" end
 		if not retired then
-			if not matches(path, observed) then return false end
+			if not matches(path, observed) then return false, "receipt_replaced" end
 			local current = identity(path)
 			if type(current) ~= "table" or type(current.size) ~= "number"
-				or current.size > Receipt.maximum_bytes then return false end
+				or current.size > Receipt.maximum_bytes then return false, "receipt_oversize" end
 			local read_ok, raw, status = pcall(FileSystem.read_with_status, path, fixed_failure)
-			if not read_ok or status ~= "ok" or not matches(path, observed)
-				or Receipt.retired(raw, Json.decode, nonce, callback_status) ~= true then return false end
+			if not read_ok or status ~= "ok" or not matches(path, observed) then return false, "receipt_unreadable" end
+			if Receipt.retired(raw, Json.decode, nonce, callback_status) ~= true then
+				return false, receipt_refusal(raw, callback_status)
+			end
 			expected, retired = raw, true
 		end
-		return cleanup()
+		if cleanup() ~= true then return false, "receipt_not_removed" end
+		return true
 	end
 	if not observed or observed.size ~= 0 then return handle, false end
 	local encoded, input = pcall(Json.encode, {
@@ -202,7 +225,8 @@ end
 function M.retire(task, callback_status)
 	local handle = task_receipts[task]
 	if handle == nil then return true end
-	if handle.settle(callback_status) ~= true then return false end
+	local settled, reason = handle.settle(callback_status)
+	if settled ~= true then return false, reason end
 	task_receipts[task] = nil
 	return true
 end
@@ -401,36 +425,47 @@ function M.prepare_owned(model, port, python_bin)
 		if remove_reserved(original, "") ~= true then return false end
 		return remove_reserved(anchor, "")
 	end
+	-- Each refusal returns a closed-vocabulary reason: the field run of
+	-- 2026-10-30 23:10 kept a slot after a retired exit-1 receipt and no
+	-- line said which check refused it.
 	function handle.settle(callback_status)
-		if not attempted or context.cleanup_task ~= nil then return false end
+		if not attempted then return false, "not_dispatched" end
+		if context.cleanup_task ~= nil then return false, "cleanup_running" end
 		if callback_status == 78 then context.original_callback_status = 78 end
-		if context.original_retired_status ~= nil and context.original_retired_status ~= callback_status then return false end
+		if context.original_retired_status ~= nil and context.original_retired_status ~= callback_status then
+			return false, "callback_status_changed"
+		end
 		if context.original_retired_raw == nil then
 			local raw = read_reserved(original)
-			if Receipt.retired(raw, Json.decode, context.nonce, callback_status) ~= true then return false end
+			if Receipt.retired(raw, Json.decode, context.nonce, callback_status) ~= true then
+				return false, receipt_refusal(raw, callback_status)
+			end
 			context.original_retired_raw, context.original_retired_status = raw, callback_status
 		end
 		if context.anchor_raw == nil then
 			local raw = read_reserved(anchor)
-			if type(raw) ~= "string" then return false end
+			if type(raw) ~= "string" then return false, "anchor_unreadable" end
 			local proof = Json.decode(context.original_retired_raw)
 			if raw == "" then
-				if proof.operation ~= "" then return false end
+				if proof.operation ~= "" then return false, "anchor_empty_after_dispatch" end
 				-- Only the original Python owner can retire an unsealed directory
 				-- before publishing its pre-submission retired receipt.
 			else
 				local CleanupReceipt = require("core.llm.managed_ollama_cleanup_receipt")
 				local parsed = CleanupReceipt.anchor(raw, Json.decode, context.nonce, proof.operation, anchor.path)
-				if not parsed then return false end
+				if not parsed then return false, "anchor_invalid" end
 				local material = capture_material(parsed, anchor.observed.uid)
-				if not material then return false end
+				if not material then return false, "operation_files_mismatch" end
 				context.material = material
 			end
 			context.anchor_raw = raw
 		end
-		if context.material ~= nil and close_material(context.material) ~= true then return false end
-		if remove_reserved(original, context.original_retired_raw) ~= true then return false end
-		return remove_reserved(anchor, context.anchor_raw)
+		if context.material ~= nil and close_material(context.material) ~= true then
+			return false, "operation_files_not_removed"
+		end
+		if remove_reserved(original, context.original_retired_raw) ~= true then return false, "receipt_not_removed" end
+		if remove_reserved(anchor, context.anchor_raw) ~= true then return false, "anchor_not_removed" end
+		return true
 	end
 	if not anchor.observed or anchor.observed.size ~= 0 or not original.observed or original.observed.size ~= 0 then
 		return handle, false
