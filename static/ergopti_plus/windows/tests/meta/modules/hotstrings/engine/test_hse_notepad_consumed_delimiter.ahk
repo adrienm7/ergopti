@@ -37,8 +37,17 @@ _THNCD_NotepadBranchHasConsumedDelimiterGuard() {
 		"dispatch must derive the shared emitted delimiter")
 	Branch := _NHAB_NativeBranch(Dispatch)
 	BranchCode := _DriverMaskNonCode(&Branch)
-	Assert(RegExMatch(Assignment[1], "i)!ForceConsumeEndChar[\s\S]*!InStr\(HSE_CONSUMED_DELIMITERS,\s*EndChar\)"),
+	; The injection plan owns the tail; the consumption rule it reads must keep both
+	; authorities, and the plan must read that rule.
+	Assert(RegExMatch(Assignment[1], 'i)^\s*Plan\['),
+		"the shared delimiter must be the injection plan's tail")
+	Consumed := _DriverFuncBody("_HSE_EndCharConsumed")
+	Plan := _DriverFuncBody("_HSE_ExpansionPlan")
+	Assert(Consumed != "" && Plan != "", "the consumption rule and the plan builder must exist")
+	Assert(RegExMatch(_DriverMaskNonCode(&Consumed), "i)ForceConsumeEndChar[\s\S]*InStr\(HSE_CONSUMED_DELIMITERS,\s*EndChar\)"),
 		"the shared delimiter must honor both explicit consumption authorities")
+	Assert(RegExMatch(_DriverMaskNonCode(&Plan), "i)_HSE_EndCharConsumed\(EndChar,\s*ForceConsumeEndChar\)"),
+		"the plan must read the consumption rule")
 	Assert(Assignment.Pos < InStr(Code, "if IsNotepadApp {"),
 		"delimiter consumption must be resolved before the native branch")
 	Assert(RegExMatch(BranchCode, "i)_HSE_NewNotepadOwner\(\s*Spec,\s*Replacement,\s*EndCharPart,"),
