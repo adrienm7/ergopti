@@ -1003,7 +1003,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 34,
+			"family": 35,
 			"kind": "toggle"
 		},
 		{
@@ -1049,7 +1049,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 34,
+			"family": 35,
 			"kind": "toggle"
 		},
 		{
@@ -2291,6 +2291,211 @@
 				"temperature": 0.7
 			},
 			"added": []
+		},
+		{
+			"id": "featherless_meta-llama_Meta-Llama-3.1-8B-Instruct",
+			"provider": "featherless",
+			"model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+			"body": {
+				"model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "featherless_Qwen_Qwen3-8B",
+			"provider": "featherless",
+			"model": "Qwen/Qwen3-8B",
+			"body": { "model": "Qwen/Qwen3-8B", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "Qwen/Qwen3-8B",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false, "thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "featherless_deepseek-ai_DeepSeek-V3.2",
+			"provider": "featherless",
+			"model": "deepseek-ai/DeepSeek-V3.2",
+			"body": {
+				"model": "deepseek-ai/DeepSeek-V3.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-ai/DeepSeek-V3.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false, "thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 31,
+			"kind": "toggle"
+		},
+		{
+			"id": "inception_mercury-3",
+			"provider": "inception",
+			"model": "mercury-3",
+			"body": { "model": "mercury-3", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "mercury-3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "instant"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 34,
+			"kind": "effort"
+		},
+		{
+			"id": "inception_mercury-2",
+			"provider": "inception",
+			"model": "mercury-2",
+			"body": { "model": "mercury-2", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "mercury-2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "instant"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 34,
+			"kind": "effort"
+		},
+		{
+			"id": "chutes_Qwen_Qwen3.8-27B-TEE",
+			"provider": "chutes",
+			"model": "Qwen/Qwen3.8-27B-TEE",
+			"body": {
+				"model": "Qwen/Qwen3.8-27B-TEE",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Qwen/Qwen3.8-27B-TEE",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false, "thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "chutes_moonshotai_Kimi-K3",
+			"provider": "chutes",
+			"model": "moonshotai/Kimi-K3",
+			"body": {
+				"model": "moonshotai/Kimi-K3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "moonshotai/Kimi-K3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false, "thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 25,
+			"kind": "toggle"
+		},
+		{
+			"id": "requesty_openai_gpt-4o-mini",
+			"provider": "requesty",
+			"model": "openai/gpt-4o-mini",
+			"body": {
+				"model": "openai/gpt-4o-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-4o-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "requesty_openai_gpt-oss-120b",
+			"provider": "requesty",
+			"model": "openai/gpt-oss-120b",
+			"body": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "baseten_deepseek-ai_DeepSeek-V4-Flash-0731",
+			"provider": "baseten",
+			"model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+			"body": {
+				"model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 31,
+			"kind": "effort"
+		},
+		{
+			"id": "baseten_zai-org_GLM-5.2",
+			"provider": "baseten",
+			"model": "zai-org/GLM-5.2",
+			"body": { "model": "zai-org/GLM-5.2", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "zai-org/GLM-5.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 24,
+			"kind": "effort"
 		}
 	],
 	"refusal_vectors": [
