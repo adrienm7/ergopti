@@ -474,5 +474,77 @@ class NetworkCheckHelper(unittest.TestCase):
         )
 
 
+class HostReachability(unittest.TestCase):
+    """The field run's --hosts mode: one HEAD per declared host, named by its key."""
+
+    def setUp(self):
+        self.helper = load("network_check_hosts", MACOS / "modules/llm/managed_network_check.py")
+
+    def run_hosts(self, outcomes):
+        """Runs main_hosts over a stand-in transport; outcomes maps a URL to a status or a reason."""
+        requests = []
+
+        class Response:
+            def __init__(self, status):
+                self.status = status
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+        class Bootstrap:
+            @staticmethod
+            def _direct_route(url):
+                return False
+
+            @staticmethod
+            def _native_request(url, **options):
+                requests.append((url, options["method"], options["timeout"]))
+                outcome = outcomes.get(url, 200)
+                if isinstance(outcome, str):
+                    failure = Exception(outcome)
+                    failure.reason = outcome
+                    raise failure
+                return Response(outcome)
+
+        captured = io.StringIO()
+        with mock.patch.object(self.helper, "load_bootstrap", return_value=Bootstrap):
+            with contextlib.redirect_stdout(captured):
+                self.helper.main_hosts()
+        return captured.getvalue().splitlines(), requests
+
+    def test_every_declared_host_gets_one_head_in_key_order(self):
+        hosts = json.loads(
+            (ROOT / "static/ergopti_plus/_shared/data/identifiers.json").read_text()
+        )["hosts"]
+        lines, requests = self.run_hosts({})
+        self.assertEqual(
+            [line.split()[1] for line in lines], ["host_" + key for key in sorted(hosts)]
+        )
+        self.assertEqual(
+            [url for url, _, _ in requests],
+            ["https://" + hosts[key] + "/" for key in sorted(hosts)],
+        )
+        self.assertTrue(all(method == "HEAD" for _, method, _ in requests))
+        self.assertTrue(all(line.endswith(" pass http_200") for line in lines))
+
+    def test_a_server_error_and_a_transport_failure_fail_their_host_only(self):
+        lines, _ = self.run_hosts(
+            {"https://huggingface.co/": 503, "https://registry.ollama.ai/": "proxy"}
+        )
+        self.assertIn("step host_huggingface fail http_503", lines)
+        self.assertIn("step host_ollama_registry fail proxy", lines)
+        self.assertIn("step host_github pass http_200", lines)
+
+    def test_no_line_carries_a_host_name(self):
+        lines, _ = self.run_hosts({"https://github.com/": 404})
+        self.assertIn("step host_github pass http_404", lines)
+        for line in lines:
+            self.assertNotIn(".com", line)
+            self.assertNotIn(".co", line.split()[-1])
+
+
 if __name__ == "__main__":
     unittest.main()
