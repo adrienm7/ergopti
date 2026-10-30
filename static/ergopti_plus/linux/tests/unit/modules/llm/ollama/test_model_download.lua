@@ -549,4 +549,55 @@ helpers.describe("model download: exact requester retirement continuation", func
 		restore()
 		if not ok then error(err, 0) end
 	end)
+
+	-- pac-direct-fallback-pull: the managed daemon went direct because its PAC
+	-- route was unusable; a pull it then could not fetch names both causes.
+	local REGISTRY_TIMEOUT = "pull model manifest: Get \"https://registry.ollama.ai/v2/library/qwen/manifests/2b\": "
+		.. "dial tcp 104.21.75.227:443: i/o timeout"
+	for _, case in ipairs({
+		{ name = "a direct fetch after an unusable PAC names both causes", remote = REGISTRY_TIMEOUT,
+			stage = "native_proxy_lookup", key = "network.failure.pac_unreachable_direct_failed", logged = 1 },
+		{ name = "a registry answer proves the route and keeps the plain failure",
+			remote = "pull model manifest: file does not exist", stage = "native_proxy_lookup",
+			key = "menu.llm.download_failed", logged = 0 },
+		{ name = "a daemon whose routes were looked up keeps the plain failure", remote = REGISTRY_TIMEOUT,
+			stage = nil, key = "menu.llm.download_failed", logged = 0 },
+		{ name = "another origin than the daemon's keeps the plain failure", remote = REGISTRY_TIMEOUT,
+			stage = "native_proxy_lookup", origin = "http://127.0.0.1:11500", key = "menu.llm.download_failed", logged = 0 },
+		{ name = "a local transport failure is not a direct fetch", remote = nil, stage = "native_proxy_lookup",
+			key = "menu.llm.download_failed", logged = 0 },
+	}) do
+		helpers.it("(pac-direct-fallback-pull) " .. case.name, function()
+			local State = require("modules.llm.ollama_install_state")
+			local saved_logger = package.loaded["logger.shim"]
+			local errors = {}
+			package.loaded["logger.shim"] = setmetatable({ error = function(_, message, ...)
+				errors[#errors + 1] = string.format(message, ...)
+			end }, { __index = function() return function() end end })
+			local ok, err = xpcall(function()
+				State._reset()
+				State.note_repair({ ok = true, origin = case.origin or "http://127.0.0.1:11434",
+					direct_fallback = case.stage })
+				local Download, transport, window = load_fixture()
+				helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen"))
+				if case.remote then
+					transport.starts[1].on_chunk(require("json").encode({ error = case.remote }) .. "\n")
+				end
+				transport.starts[1].on_done({ ok = case.remote ~= nil })
+				helpers.assert_eq(window.completions[1][2], false)
+				helpers.assert_eq(window.completions[1][3], require("infra.i18n").get(case.key))
+				local named = 0
+				for _, line in ipairs(errors) do
+					if line:find(case.stage or "\0", 1, true) and line:find("direct connection failed", 1, true) then
+						named = named + 1
+					end
+				end
+				helpers.assert_eq(named, case.logged, "the log names the lookup stage and the direct failure")
+			end, debug.traceback)
+			package.loaded["logger.shim"] = saved_logger
+			require("modules.llm.ollama_install_state")._reset()
+			restore()
+			if not ok then error(err, 0) end
+		end)
+	end
 end)
