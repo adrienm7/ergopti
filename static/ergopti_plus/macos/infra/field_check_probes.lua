@@ -22,6 +22,8 @@
 ---    through the managed transport (route lookup, proxy, TLS), by its key.
 --- 7. app_health: the app's memory and CPU at idle, and the crash reports the
 ---    driver or macOS wrote for it during the last day.
+--- 8. ai_local: the owned Ollama's signature, its server's listing, one token
+---    predicted with a model already installed, and the MLX models on disk.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only, like the Debug checks: nothing is granted, prompted, written
@@ -553,6 +555,69 @@ function M.app_health(ports, report, finish)
 		end
 		finish()
 	end)
+end
+
+
+
+
+
+-- ===========================
+-- ===========================
+-- ======= 8/ Local AI =======
+-- ===========================
+-- ===========================
+
+-- The prediction the local AI step asks for: a few digits of the check's own,
+-- never a person's text, answered with one token.
+M.PREDICTION_TEXT = "1 2 3 4"
+
+--- The local AI without downloading or starting anything: the owned Ollama
+--- binary must pass a strict signature check (macOS kills an invalid one at
+--- launch, field run 2026-10-27 22:32); a running server must list its
+--- models; one token is predicted with the smallest catalogue model already
+--- installed, through the driver's own request path; the MLX runtime and the
+--- catalogue models in its cache are counted. A server that is not running
+--- and a Mac with no model are skips, never a download.
+function M.ai_local(ports, report, finish)
+	local facts = ports.ai_facts()
+	report.step("mlx_runtime", STATE.info, facts.mlx_runtime == nil and "unknown" or (facts.mlx_runtime and "installed" or "absent"))
+	report.step("mlx_models_installed", STATE.info, facts.mlx_installed == nil and "unknown" or facts.mlx_installed)
+	local function listing_stage()
+		ports.ollama_refresh(function(listed)
+			if not listed then
+				report.step("ollama_listing", STATE.skip, "not_running")
+				report.step("ollama_prediction", STATE.skip, "not_running")
+				return finish()
+			end
+			report.step("ollama_listing", STATE.pass, "listed")
+			local model = ports.ollama_installed_model()
+			report.step("ollama_installed", STATE.info, model and "yes" or "none_of_the_catalogue")
+			if not model then
+				report.step("ollama_prediction", STATE.skip, "no_installed_model")
+				return finish()
+			end
+			ports.ollama_predict(model, M.PREDICTION_TEXT, function(answered, token, elapsed_ms)
+				report.step("ollama_prediction", answered and STATE.pass or STATE.fail,
+					answered and (math.floor(elapsed_ms or 0) .. "ms") or (token or "failed"))
+				finish()
+			end)
+		end)
+	end
+	if type(facts.ollama_path) ~= "string" then
+		report.step("ollama_binary", STATE.skip, "not_installed")
+		return listing_stage()
+	end
+	ports.exec(CODESIGN, { "--verify", "--strict", "--verbose=2", facts.ollama_path }, COMMAND_TIMEOUT,
+		function(code, output, errors)
+			if code == 0 then
+				report.step("ollama_binary", STATE.pass, "signature_valid")
+			else
+				local text = tostring(output or "") .. "\n" .. tostring(errors or "")
+				report.step("ollama_binary", STATE.fail, code == nil and "timeout"
+					or failure_token(code) .. ":" .. (signature_cause(text) or "unclassified"))
+			end
+			listing_stage()
+		end)
 end
 
 return M
