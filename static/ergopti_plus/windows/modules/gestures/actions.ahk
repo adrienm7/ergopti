@@ -183,7 +183,7 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => GestureSaveAndReload(),
 		},
 		"script_quit", {
-				Fn: (*) => ExitApp(),
+				Fn: (*) => ActivateExitApp(),
 		},
 		; --- Debug (AHK only — Hammerspoon Console covers the three) ---
 		"open_window_spy", {

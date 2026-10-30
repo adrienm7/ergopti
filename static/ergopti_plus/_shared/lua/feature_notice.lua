@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The one behaviour of the menu's « feature switched on/off » notices and of the
 --- « cannot quit right now » refusal, shared by the macOS and Linux menus. The
---- Windows `NotifyFeature` has the same contract (see the TODO item PAR-45).
+--- Windows `NotifyFeature` (windows/adapters/notifier.ahk) has the same contract.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One Log Line: every menu feature toggle funnels through here. The toast
