@@ -24,7 +24,6 @@ _LLMCommon_TunablesSourcedFromInferenceJson() {
 	; retry.max_multiplier is a positive integer.
 	AssertTrue(_LLM_Common_Cfg("retry", "max_multiplier") + 0 >= 1)
 	; The ollama rate-limit floor is a positive number read from the JSON.
-	AssertTrue(LLM_ApiCommon_GetRateLimitMs("ollama") + 0 > 0)
 }
 Test("LLMApiCommon: tunables are sourced from inference.json", _LLMCommon_TunablesSourcedFromInferenceJson)
 

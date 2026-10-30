@@ -468,15 +468,6 @@
 			]
 		},
 		{
-			"type": "command",
-			"id": "llm_test_prediction",
-			"i18n": "menu.llm.test_prediction",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "hide"
-		},
-		{
 			"type": "---"
 		},
 		{
@@ -4889,6 +4880,16 @@
 			"id": "llm_trigger_debounce",
 			"i18n": "menu.llm.debounce_label",
 			"caption_getter": "llm_trigger_debounce_caption",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "llm_trigger_min_interval",
+			"i18n": "menu.llm.min_interval_label",
+			"caption_getter": "llm_trigger_min_interval_caption",
 			"platforms": [
 				"ahk"
 			],

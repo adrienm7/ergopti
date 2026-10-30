@@ -55,7 +55,7 @@ _LLM_Live_ValidateConfig(Candidate, Path) {
 	if !(Candidate is Map)
 		throw ValueError(Path . ": the root must be an object.")
 	; The same bounds as the menu's debounce: the timer period rule is shared
-	if !(Candidate.Get("debounce_ms", "") is Integer)
+	if !(Candidate.Get("debounce_ms", "") is Integer) || Candidate["debounce_ms"] < 0
 			|| !LLM_Option_TryNormalize("debounce_ms", Candidate["debounce_ms"], &Normalized)
 		throw ValueError(Path . ": debounce_ms must be an integer the debounce setting accepts.")
 	if !(Candidate.Get("min_words", "") is Integer) || Candidate["min_words"] < 0

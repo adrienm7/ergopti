@@ -465,7 +465,7 @@ _LLM_Vision_CancelEngine() {
 	global _LLM_Engine
 	LLM_Engine_CancelTimer()
 	LLM_Engine_CancelInflight()
-	_LLM_Engine["last_request_tick"] := A_TickCount
+	_LLM_Engine_Plan().OnSent(A_TickCount)
 }
 
 ; The vision model answered: extract the screen, then ask for the answers.
@@ -530,7 +530,7 @@ LLM_Vision_SendText(System, User, MaxTokens, OnSuccess, OnFail, CurrentFn := 0) 
 			return false
 		LLM_Engine_CancelTimer()
 		LLM_Engine_CancelInflight()
-		_LLM_Engine["last_request_tick"] := A_TickCount
+		_LLM_Engine_Plan().OnSent(A_TickCount)
 		; No PREFIX/TAIL in these prompts: the user turn goes as it is
 		Transport := _LLM_Engine_ResolveRemoteTransport()
 		if !_LLM_Vision_CallbackCurrent(CurrentFn)

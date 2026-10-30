@@ -43,6 +43,7 @@ global _LLM_Engine := Map(
 	"min_words",                  3,
 	"max_words",                  15,
 	"debounce_ms",                500,
+	"min_request_interval_ms",    300,
 	"ctx_chars",                  500,
 	"language",                   "",
 	"temperature",                "0.10",
@@ -75,7 +76,6 @@ global _LLM_Engine := Map(
 	"semantic_config_signature",  "",
 	"active_request_signature",   "",
 	"last_semantic_signature",    "",
-	"last_request_tick",          0,
 	; Monotonic id bumped on every LLM_Engine_FirePrediction call. Every
 	; async variant captures the id at dispatch time and bails when its
 	; callback finds the engine has moved on. Mirrors the HS
@@ -136,6 +136,7 @@ LLM_EffectiveStreaming(Backend, Requested) {
 
 global LLM_ENGINE_RUNTIME_POLICY_CONFIG_KEYS := [
 	"debounce_ms",
+	"min_request_interval_ms",
 	"instant_on_word_end",
 	"after_hotstring",
 	"reset_on_nav",
@@ -145,11 +146,22 @@ global LLM_ENGINE_RUNTIME_POLICY_CONFIG_KEYS := [
 	"streaming"
 ]
 
-; Per-backend minimum interval (ms) between two prediction requests is now
-; defined in ``static/ergopti_plus/_shared/modules/llm/inference.json`` and read via
-; ``LLM_ApiCommon_GetRateLimitMs(backend)``. The shared JSON keeps the AHK
-; and HS drivers in lockstep — changing a floor in one place applies to
-; both backends with no risk of drift.
+/**
+ * The plan of this engine state (modules/llm/request_plan.ahk), built on first
+ * use. Its floor port reads the engine's llm.trigger.min_request_interval_ms.
+ * @returns {LLMRequestPlan}
+ */
+_LLM_Engine_Plan() {
+	global _LLM_Engine
+	if !_LLM_Engine.Has("request_plan")
+		_LLM_Engine["request_plan"] := LLMRequestPlan(_LLM_Engine_FloorMs)
+	return _LLM_Engine["request_plan"]
+}
+
+_LLM_Engine_FloorMs() {
+	global _LLM_Engine
+	return _LLM_Engine["min_request_interval_ms"]
+}
 
 ; Overwrite the defaults with values loaded from defaults.json at module load time.
 ; LLM_Defaults is populated by LLM_Defaults_Load() which runs before this file.
@@ -158,7 +170,7 @@ LLM_Engine_ApplySharedDefaults() {
 	if !IsSet(LLM_Defaults)
 		return
 
-	static _num := ["n_predictions", "min_words", "max_words", "debounce_ms", "ctx_chars", "pred_indent"]
+	static _num := ["n_predictions", "min_words", "max_words", "debounce_ms", "min_request_interval_ms", "ctx_chars", "pred_indent"]
 	static _bool := ["show_info_bar", "streaming", "show_all_at_once", "instant_on_word_end",
 		"after_hotstring", "reset_on_nav", "auto_raise_temp", "disable_url_bars", "disable_password_fields"]
 	static _str := ["profile_id", "model", "val_modifiers", "nav_modifiers", "temperature"]
@@ -171,6 +183,7 @@ LLM_Engine_ApplySharedDefaults() {
 		"llm_min_words",            "min_words",
 		"llm_max_words",            "max_words",
 		"llm_debounce_ms",          "debounce_ms",
+		"llm_min_request_interval_ms", "min_request_interval_ms",
 		"llm_context_length",       "ctx_chars",
 		"llm_pred_indent",          "pred_indent",
 		"llm_temperature",          "temperature",
@@ -345,7 +358,7 @@ _LLM_Engine_RefreshSemanticConfig() {
 		; throws, the old signature forces a retry instead of authorizing stale state.
 		LLM_Engine_StopGeneration()
 		_LLM_Engine["semantic_config_signature"] := Current
-		_LLM_Engine["last_request_tick"] := 0
+		_LLM_Engine_Plan().Reset()
 		return true
 	} finally {
 		Critical(PreviousCritical)
@@ -419,7 +432,7 @@ LLM_Engine_Init(opts) {
 	if !(opts is Map)
 		throw TypeError("LLM_Engine_Init options must be a Map.")
 	static _optionKeys := ["model", "profile_id", "backend", "n_predictions",
-		"min_words", "max_words", "debounce_ms", "ctx_chars", "language",
+		"min_words", "max_words", "debounce_ms", "min_request_interval_ms", "ctx_chars", "language",
 		"temperature", "instant_on_word_end", "after_hotstring", "reset_on_nav",
 		"disable_url_bars", "disable_password_fields", "show_info_bar",
 		"streaming", "show_all_at_once", "pred_indent", "auto_raise_temp",
@@ -439,7 +452,7 @@ LLM_Engine_Init(opts) {
 		_LLM_Engine["enabled"] := true
 
 		static _keys := ["model", "profile_id", "backend", "n_predictions", "min_words", "max_words",
-			"debounce_ms", "ctx_chars", "language", "temperature",
+			"debounce_ms", "min_request_interval_ms", "ctx_chars", "language", "temperature",
 			"instant_on_word_end", "after_hotstring", "reset_on_nav",
 			"disable_url_bars", "disable_password_fields",
 			"show_info_bar", "streaming", "show_all_at_once",
@@ -495,6 +508,7 @@ LLM_Engine_SetEnabled(state) {
 
 
 
+#Include request_plan.ahk
 #Include prediction_keystats.ahk
 #Include prediction_exec.ahk
 #Include prediction_live.ahk
