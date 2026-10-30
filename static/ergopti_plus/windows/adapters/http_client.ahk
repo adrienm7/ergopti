@@ -74,6 +74,9 @@ global _SYSTEM_PROXY_PAC_CACHE := Map()
 ; Every waiter of the in-flight PAC resolution (0 = none running).
 global _SYSTEM_PROXY_PAC_PENDING := 0
 global _SYSTEM_PROXY_PAC_CONFIG := ""
+; The proxy variables curl reads per destination scheme, from proxy_policy.json
+; environment_precedence on first use (0 = not read yet).
+global _SYSTEM_PROXY_ENV_PRECEDENCE := 0
 
 
 
@@ -835,6 +838,31 @@ _SystemProxy_UrlParts(Url) {
 	return Map("scheme", StrLower(M[1]), "host", StrLower(Trim(M[2], "[]")))
 }
 
+; Returns the proxy variables curl reads for a destination scheme, in its
+; order. proxy_policy.json environment_precedence is their one declaration
+; (test-proxy-policy-single-source.cjs refuses a hand-typed copy here).
+; @param {String} Scheme "http" or "https".
+; @returns {Array} The variable names.
+; @throws {Error} The policy is unreadable or holds no list for the scheme.
+_SystemProxy_EnvironmentPrecedence(Scheme) {
+	global _SYSTEM_PROXY_ENV_PRECEDENCE, _SharedDir
+	if !(_SYSTEM_PROXY_ENV_PRECEDENCE is Map) {
+		Lists := JsonParse(FSReadStrict(_SharedDir . "\modules\network\proxy_policy.json"))
+			.Get("environment_precedence", 0)
+		if !(Lists is Map)
+			throw ValueError("proxy_policy.json holds no environment_precedence.")
+		for Name in ["http", "https"] {
+			if !(Lists.Get(Name, 0) is Array) || Lists[Name].Length == 0
+				throw ValueError("proxy_policy.json environment_precedence." . Name . " must be a non-empty list.")
+			for Variable in Lists[Name]
+				if !(Variable is String) || !RegExMatch(Variable, "^[A-Za-z_]+$")
+					throw ValueError("proxy_policy.json environment_precedence." . Name . " holds an invalid name.")
+		}
+		_SYSTEM_PROXY_ENV_PRECEDENCE := Map("http", Lists["http"], "https", Lists["https"])
+	}
+	return _SYSTEM_PROXY_ENV_PRECEDENCE[Scheme]
+}
+
 ; Adds the scheme WinINet omits ("host:port" means an HTTP proxy) and
 ; validates the result. Returns "" for an entry curl could not use.
 _SystemProxy_NormalizeEndpoint(Endpoint, DefaultScheme) {
@@ -1286,10 +1314,7 @@ SystemProxy_ResolveCurlAsync(Url, Callback, ReaderFn := 0, SpawnFn := 0, EnvFn :
 	}
 	; Mirror curl's destination-specific environment precedence. Windows
 	; environment lookup is case-insensitive, as curl's native getenv is.
-	Names := Parts["scheme"] == "https"
-		? ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
-		: ["http_proxy", "all_proxy", "ALL_PROXY"]
-	for Name in Names {
+	for Name in _SystemProxy_EnvironmentPrecedence(Parts["scheme"]) {
 		if EnvFn.Call(Name) != "" {
 			Callback.Call(Map("ok", true, "inherit", true, "proxy", "", "source", "environment", "native_error", 0))
 			return true
@@ -1311,11 +1336,7 @@ _SystemProxy_PublishCurlSelection(Url, Callback, ReaderFn, EnvFn, Resolved) {
 }
 
 _SystemProxy_CurlSelectionIsCurrent(Url, ReaderFn, EnvFn, Identity) {
-	Parts := _SystemProxy_UrlParts(Url)
-	Names := Parts["scheme"] == "https"
-		? ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
-		: ["http_proxy", "all_proxy", "ALL_PROXY"]
-	for Name in Names
+	for Name in _SystemProxy_EnvironmentPrecedence(_SystemProxy_UrlParts(Url)["scheme"])
 		if EnvFn.Call(Name) != ""
 			return false
 	Config := _SystemProxy_Config(ReaderFn, true)
