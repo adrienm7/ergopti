@@ -1547,6 +1547,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/corpus/test_corpus_dynamic_hotstrings_prefix.ahk
 #Include meta/corpus/test_corpus_hotstrings_config_resolve.ahk
 #Include meta/corpus/test_corpus_hotstring_family_samples.ahk
+#Include meta/corpus/test_corpus_hotstring_override_parse.ahk
 #Include meta/corpus/test_corpus_tap_hold.ahk
 #Include meta/corpus/test_corpus_tap_hold_decisions.ahk
 #Include meta/corpus/test_corpus_keymap_layers.ahk
