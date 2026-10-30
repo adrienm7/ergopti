@@ -80,10 +80,29 @@ if (
 ) {
 	failures.push('issue_new_url must take the repository from {owner} and {repo}');
 }
-if (!(registry.max_url_bytes > 0 && registry.max_url_bytes <= 8000)) {
-	failures.push(
-		`max_url_bytes ${registry.max_url_bytes} must be positive and under GitHub's ~8 KB limit`
-	);
+// Measured anonymously on github.com on 2026-10-30, with synthetic values: a
+// request URL over about 7015 bytes answers 500, and over about 8200 bytes 414.
+// A signed-out click goes through /login?return_to=<the URL encoded again>, where
+// each %XX grows to %25XX: 4199 bytes of %XX still reached the login page (6996
+// bytes), 4298 answered 500, and from about 5000 the redirect dropped return_to,
+// losing the prefill. So the budget holds with the whole URL percent-encoded.
+const GITHUB_REQUEST_URL_LIMIT = 7000;
+const LOGIN_REDIRECT_PREFIX = 'https://github.com/login?return_to=';
+const percentDenseUrl = (bytes) => {
+	const base = 'https://github.com/owner/repo/issues/new?template=bug_report.yml&diagnostics=';
+	return base + '%20'.repeat(Math.ceil((bytes - base.length) / 3));
+};
+if (!(registry.max_url_bytes > 0)) {
+	failures.push(`max_url_bytes ${registry.max_url_bytes} must be positive`);
+}
+{
+	const redirected =
+		LOGIN_REDIRECT_PREFIX + encodeURIComponent(percentDenseUrl(registry.max_url_bytes));
+	if (redirected.length > GITHUB_REQUEST_URL_LIMIT) {
+		failures.push(
+			`max_url_bytes ${registry.max_url_bytes} becomes a ${redirected.length}-byte login redirect, over GitHub's ${GITHUB_REQUEST_URL_LIMIT}-byte request limit`
+		);
+	}
 }
 
 // ── Every template against its form ───────────────────────────────────────
