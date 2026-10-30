@@ -1709,20 +1709,10 @@ Maintainer requests of 2026-10-30 (Windows, macOS and Linux each):
 
 Still true in the code on 2026-10-29, carried from the retired 2026-10-04 Linux handoff audit:
 
-- [ ] **Linux fractional AI context length.** [CODE] `linux/modules/llm/settings.lua` `BOUNDS.context_length`
-      lacks `integer = true`, so `M.set("context_length", 80.5)` is accepted and the shared prompt builder
-      then extracts an empty context. Add the flag and a `test_llm_settings.lua` case.
 - [ ] **Stateless GitHub installation tokens are not redacted.** [CODE] The `ghs_` rule of
       `_shared/modules/diagnostics/redaction.json` allows only an alphanumeric body, so a
       `ghs_<app-id>_<jwt>` token stays visible in diagnostics on every OS. Widen the charset and add a
       `redaction_vectors.json` case (Lua, JS and AHK consumers replay it).
-- [ ] **Linux confirmed force quit reads the PID after the question.** [CODE] `window_signal` in
-      `linux/modules/gestures/system_actions.lua` resolves the PID from the saved XID only after the
-      confirmation, so another process can be killed if the window closed meanwhile. Capture the PID
-      with the XID in `M.TARGETS`.
-- [ ] **Linux clipboard restore overwrites an external copy.** [CODE] `new_paste_stage` in
-      `linux/adapters/clipboard.lua` restores the saved value without checking that the clipboard still
-      holds the pasted text, so a copy made by another application during the paste is lost.
 
 Added October 22 (from the agents' reports; details in their commits):
 
