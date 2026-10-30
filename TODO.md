@@ -137,9 +137,23 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    - `key_accounting` (automatic, no person): the app opens its own scratch text field, brings it to the
      front and types `wkjx` there only, checking before each key that the field still has the focus (a lost
      focus stops the sequence with its code; no key reaches another app); the passive tap must see each key
-     once, the field must hold exactly `wkjx`, the previous app must get the focus back. Synthetic keys are
-     posted, tagged, through `adapters/synthetic_input.lua` (keymap and keystats treat them as the driver's
-     output) after Karabiner: the virtual keyboard path and the ledger's double count are `physical_keys_only`.
+     once, the field must hold exactly `wkjx`, the previous app must get the focus back. The keys are
+     selftest keys (`SyntheticInput.emit_selftest_key_stroke`): the keymap decodes them as typing only while
+     the developer runtime's published scratch window has the focus and consumes them anywhere else (one
+     `keymap.selftest_gate` warning per run names why), keystats never counts them, and the typing stops
+     before a key while the keymap taps are off (`keymap_tap_off`). They are posted after Karabiner: the
+     virtual keyboard path and the ledger's double count are `physical_keys_only`.
+   - `hotstring_roundtrip` (automatic, after `key_accounting`): the first shipped, enabled, terminator
+     hotstring with a plain lowercase trigger no other file registers is typed as selftest keys into the
+     scratch field, after a Space and followed by Space; the field must hold exactly the Space and its
+     expansion (plus the Space unless Space is a consumed terminator), and `terminator_to_text_ms` is named.
+     Codes: `keymap_absent`, `no_enabled_trigger`, `space_not_terminator`, `not_expanded`,
+     `mismatch_<n>_bytes`, `typing_incomplete`.
+   - `prediction_tooltip` (automatic): with predictions on and the active model already on this Mac (Ollama
+     listed by a running server, or an MLX model in the cache; nothing is started or downloaded),
+     `le chat dort sur le ` is typed into the scratch field and the prediction tooltip must show within 45 s;
+     `keystroke_to_tooltip_ms` (last key to tooltip) is named. Codes: `llm_disabled`, `no_installed_model`
+     (a remote backend included), `tooltip_not_shown`, `typing_incomplete`.
    - `driver_reload` (last step): the configuration is put back, the run's state goes to `resume.json`, the
      driver reloads through the termination coordinator, and the reloaded driver's field run resumes, naming
      the reload's duration (request to a ready field run, `reload_ms` in the report) and taking a fresh
