@@ -2,6 +2,7 @@
 ; Pure validators for option values crossing config, menu, and engine boundaries.
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 ; Generous but finite admission budgets. These protect boot/config inputs from
 ; turning canonical signature construction into an unbounded per-request walk.
@@ -36,7 +37,7 @@ global LLM_PROFILE_BATCH_PARAMS_B    := 4.0   ; ≥ 4B → batch_advanced
 global LLM_PROFILE_LIVE_TRANSLATIONS := ["translate_en", "translate_ja"]
 ; The AI agent's settings (llm.agent_* of the features manifest): the AI menu's
 ; state carries and persists them like its own options.
-global LLM_AGENT_SETTING_KEYS := ["agent_system1", "agent_system2", "agent_mode", "agent_disabled_apps"]
+global LLM_AGENT_SETTING_KEYS := [ConfigLeaf.AGENT_SYSTEM1, "agent_system2", "agent_mode", "agent_disabled_apps"]
 ; The agent's modes, in menu order: every agent action refuses, the actions
 ; only, the actions and the detection while typing.
 global LLM_AGENT_MODES := ["off", "action", "auto"]
@@ -346,7 +347,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 	static StringKeys := Map(
 		"model", true, "profile_id", true, "language", true,
 		"backend", true, "api_entry_id", true,
-		"agent_system1", true, "agent_system2", true)
+		ConfigLeaf.AGENT_SYSTEM1, true, "agent_system2", true)
 	; These are semantic consumer bounds, not merely storage types. Keep every
 	; public integer in this one table so boot restore, menu persistence, runtime
 	; publication and interactive setters cannot disagree. max_words=0 is the
@@ -355,17 +356,17 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		"n_predictions", [1, 10],
 		"min_words", [1, 20],
 		"max_words", [0, 10000],
-		"debounce_ms", [50, 10000],
-		"min_request_interval_ms", [0, 10000],
+		ConfigLeaf.DEBOUNCE_MS, [50, 10000],
+		ConfigLeaf.MIN_REQUEST_INTERVAL_MS, [0, 10000],
 		"ctx_chars", [50, 10000])
 	static BooleanKeys := Map(
 		"enabled", true, "auto_profile_for_model", true,
-		"instant_on_word_end", true, "after_hotstring", true,
-		"reset_on_nav", true, "disable_url_bars", true,
-		"disable_password_fields", true, "show_info_bar", true,
+		ConfigLeaf.INSTANT_ON_WORD_END, true, ConfigLeaf.AFTER_HOTSTRING, true,
+		ConfigLeaf.RESET_ON_NAV, true, "disable_url_bars", true,
+		"disable_password_fields", true, ConfigLeaf.SHOW_INFO_BAR, true,
 		"streaming", true, "show_all_at_once", true,
-		"auto_raise_temp", true, "onboarding_seen", true,
-		"inline_autotype", true)
+		ConfigLeaf.AUTO_RAISE_TEMP, true, ConfigLeaf.ONBOARDING_SEEN, true,
+		ConfigLeaf.INLINE_AUTOTYPE, true)
 	Normalized := false
 	if StringKeys.Has(Key) {
 		AggregateChars := 0
@@ -376,16 +377,16 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 	}
 	if (Key == "temperature")
 		return LLM_Option_TryNormalizeTemperature(Value, &Normalized)
-	if (Key == "nav_modifiers" || Key == "val_modifiers") {
+	if (Key == ConfigLeaf.NAV_MODIFIERS || Key == ConfigLeaf.VAL_MODIFIERS) {
 		Normalized := LLM_Option_NormalizeModifierString(Value)
 		return Normalized is String
 	}
 	if (Key == "ollama_port")
 		return LLM_Option_TryNormalizeOllamaPort(Value, &Normalized)
-	if (Key == "pred_indent") {
+	if (Key == ConfigLeaf.PRED_INDENT) {
 		if !(Value is Integer) && !(Value is Float)
 			return false
-		for Accepted in LLM_DisplayIndentValues(ManifestFindEntryByPath("llm.display.pred_indent")) {
+		for Accepted in LLM_DisplayIndentValues(ManifestFindEntryByPath(ConfigKey.LLM_DISPLAY_PRED_INDENT)) {
 			if Value == Accepted {
 				Normalized := Accepted
 				return true
@@ -402,7 +403,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		if (Candidate != Value)
 			return false
 		; The stored "never" of the debounce: the one value outside its range.
-		if (Key == "debounce_ms" && Candidate == LLM_REQUEST_PLAN_NEVER_MS) {
+		if (Key == ConfigLeaf.DEBOUNCE_MS && Candidate == LLM_REQUEST_PLAN_NEVER_MS) {
 			Normalized := Candidate
 			return true
 		}
@@ -418,7 +419,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		Normalized := Value == 1
 		return true
 	}
-	if (Key == "disabled_apps" || Key == "agent_disabled_apps") {
+	if (Key == ConfigLeaf.DISABLED_APPS || Key == "agent_disabled_apps") {
 		Normalized := LLM_Option_NormalizeStringArray(Value, true)
 		return Normalized is Array
 	}
@@ -439,7 +440,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		Normalized := LLM_Option_NormalizeApiEntries(Value)
 		return Normalized is Array
 	}
-	if (Key == "app_profile_overrides") {
+	if (Key == ConfigLeaf.APP_PROFILE_OVERRIDES) {
 		Normalized := LLM_Option_NormalizeAppProfileOverrides(Value)
 		return Normalized is Map
 	}
@@ -452,7 +453,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
  * timer; reject any value outside the same public option boundary first.
  */
 LLM_Option_DebounceTimerPeriod(Value) {
-	if !LLM_Option_TryNormalize("debounce_ms", Value, &Normalized) || Normalized < 0
+	if !LLM_Option_TryNormalize(ConfigLeaf.DEBOUNCE_MS, Value, &Normalized) || Normalized < 0
 		throw ValueError("Invalid LLM debounce delay.")
 	return -Normalized
 }

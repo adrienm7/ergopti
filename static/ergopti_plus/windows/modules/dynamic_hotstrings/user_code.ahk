@@ -8,6 +8,7 @@
 ; Metadata preview never executes user callbacks.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include ../../../_shared/modules/hotstrings/user_code.ahk
 #Include ../../adapters/user_hotstrings_native.ahk
 
@@ -101,8 +102,8 @@ UserHotstringsRepairWithExample(*) {
 	} else {
 		LoggerInfo("UserHotstrings", "Example programmable source created.")
 	}
-	Requested := Features["hotstrings"]["dynamic"].Has("user_code")
-		&& Features["hotstrings"]["dynamic"]["user_code"]["enabled"] && IsCategoryGated("Hotstrings")
+	Requested := Features["hotstrings"]["dynamic"].Has(ConfigLeaf.USER_CODE)
+		&& Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE]["enabled"] && IsCategoryGated("Hotstrings")
 	if !Requested
 		return true
 	return UserHotstringsSetEnabled(true)
@@ -129,8 +130,8 @@ UserHotstringsInit() {
 			"current", _UserHotstringsCurrent, "invoke", _UserHotstringsInvoke,
 			"commit", _UserHotstringsCommit, "report", _UserHotstringsReport))
 	}
-	Enabled := Features["hotstrings"]["dynamic"].Has("user_code")
-		&& Features["hotstrings"]["dynamic"]["user_code"]["enabled"] && IsCategoryGated("Hotstrings")
+	Enabled := Features["hotstrings"]["dynamic"].Has(ConfigLeaf.USER_CODE)
+		&& Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE]["enabled"] && IsCategoryGated("Hotstrings")
 	return UserHotstringsSetEnabled(Enabled)
 }
 
@@ -359,7 +360,7 @@ UserHotstringsOnChar(BufferValue) {
 	Rule := _UserHotstringsOwner.Find(LogicalBuffer)
 	if !(Rule is Map)
 		return false
-	Delay := Features["hotstrings"]["dynamic"]["user_code"]["time_activation_seconds"]
+	Delay := Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE]["time_activation_seconds"]
 	Trigger := Rule["suffix"] . MagicKey
 	Spec := {Replacement: Rule["preview"], Trigger: Trigger, Length: StrLen(Trigger),
 		TimeActivationSeconds: Delay, PrevCharKey: _TextPenultimateCodepoint(Trigger), OnlyText: true}
@@ -575,9 +576,9 @@ UserHotstringsPreviewSpec(BufferBefore, Completion) {
 	Trigger := Rule["suffix"] . Completion
 	return {Replacement: Rule["preview"], Trigger: Trigger, Length: StrLen(Trigger),
 		OnlyText: true, IsPrivate: true, Category: "dynamichotstrings",
-		TimeActivationSeconds: Features["hotstrings"]["dynamic"]["user_code"]["time_activation_seconds"],
+		TimeActivationSeconds: Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE]["time_activation_seconds"],
 		PrevCharKey: _TextPenultimateCodepoint(Trigger), UserCodeGeneration: _UserHotstringsOwner.generation,
-		TransientKind: "user_code"}
+		TransientKind: ConfigLeaf.USER_CODE}
 }
 
 UserHotstringsPreviewStillCurrent(Decision) {
