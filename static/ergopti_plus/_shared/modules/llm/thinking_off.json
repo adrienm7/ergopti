@@ -344,6 +344,12 @@
 			"_source": "https://docs.together.ai/docs/reasoning-models-guide"
 		},
 		{
+			"_family": "Qwen3 2507: the Instruct models never think and the Thinking models always do, so nothing applies",
+			"models": ["qwen3-*-instruct-2507*", "qwen3-*-thinking-2507*"],
+			"controls": [],
+			"_source": "https://huggingface.co/Qwen/Qwen3-30B-A3B-Instruct-2507"
+		},
+		{
 			"_family": "Qwen3, Qwen3.5, Qwen3.6: hybrid, thinking can be turned off",
 			"models": ["qwen3*", "qwen-3*"],
 			"controls": [
