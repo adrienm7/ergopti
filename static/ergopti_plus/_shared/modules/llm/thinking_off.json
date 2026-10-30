@@ -411,6 +411,18 @@
 			"_source": "https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b (chat_template_kwargs enable_thinking, default true)"
 		},
 		{
+			"_family": "Inception Mercury: reasoning cannot be disabled, instant is the lowest effort",
+			"models": ["mercury*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "instant"
+				}
+			],
+			"_source": "https://docs.inceptionlabs.ai/capabilities/reasoning-efforts"
+		},
+		{
 			"_family": "Generic: an unknown model whose name looks like a reasoning family gets thinking off through the provider's toggle (a field the provider refuses is dropped and remembered, see _comment)",
 			"models": ["*qwen3*", "*deepseek*", "*-r1*", "*think*", "*reasoning*"],
 			"controls": [
