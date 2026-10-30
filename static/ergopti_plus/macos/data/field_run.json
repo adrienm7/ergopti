@@ -87,7 +87,7 @@
 			"kind": "field_check",
 			"check": "storage",
 			"deadline_seconds": 90,
-			"proves": "The keystats database passes SQLite's read-only quick check, every configuration file parses, the logs folder takes a write and the file watchers are owned."
+			"proves": "The keystats database passes SQLite's read-only quick check (and the deferred keystats start's main-thread hold is named), every configuration file parses, the logs folder takes a write and the file watchers are owned."
 		},
 		{
 			"id": "field_launcher_roles",

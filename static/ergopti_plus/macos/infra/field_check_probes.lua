@@ -441,6 +441,9 @@ end
 --- takes one probe file that is removed at once; the file watcher owner must be
 --- published, since FSEvents refusing a stream leaves every edit unseen.
 function M.storage(ports, report, finish)
+	-- The deferred keystats start once held the main thread 1.1 to 1.3 s (L18).
+	local start_ms = ports.keystats_start_ms()
+	report.step("keystats_start_ms", STATE.info, start_ms and math.floor(start_ms + 0.5) or "not_started")
 	for _, file in ipairs(ports.config_files()) do
 		local id = "config_" .. file.name
 		if not file.present then
