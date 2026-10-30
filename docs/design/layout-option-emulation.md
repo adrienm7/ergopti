@@ -2,7 +2,8 @@
 
 # Layout options on macOS and Linux, live, through one generated `.keylayout`
 
-Status: design note, nothing implemented. It answers the TODO item « Number-row
+Status: Linux implemented (X11, GNOME and KDE Wayland, scope acknowledgement;
+section 3.2), macOS still a design. It answers the TODO item « Number-row
 and layout emulation on macOS and Linux, live » (maintainer request of
 27 October) in the form the maintainer settled on: the user picks a layout, the
 menu options and later per-key edits, and that produces **one custom
@@ -277,7 +278,28 @@ Xvfb in `test_user_layout_installer.py`):
 - A rewritten file needs no new name on X11 (every call compiles again), checked by
   reinstalling a modified Ergo-L and loading it again.
 
-Proposed Linux sequence (same invariant as macOS):
+Implemented (30 October), the Linux slices 3, 4 and the Linux half of 6:
+
+- The options are applied while converting the installed `.keylayout` (the
+  registry copy or the composer's `composed.keylayout`) with the shared rule;
+  Ctrl (Level5), AltGr and dead keys come from the layout untouched.
+- `apply-x11` and `apply-wayland` (`user_layout_installer.py`) succeed only once
+  the keymap read back from the session holds the installed cells on the
+  thirteen moved keys, not only the layout's name: a same-named older build is
+  `stale_keymap` (W4 shows up as that code).
+- Wayland uses two slots instead of a counter: the layout's id and `<id>_live`.
+  The build goes to the slot the desktop does not use, the setting moves to it,
+  and the slot left behind is rewritten with the same build once the switch is
+  proven. Two copies at most, no retirement step, no `stale_sources_pending`.
+  XWayland is the read-back; with no `DISPLAY` nothing is written (`no_display`).
+- Proof on this host: `tests/hardware/run_layout_rows_live.lua` (the layout
+  manager's whole chain on Xvfb, and the global scope composed with the real
+  producers) and `test_wayland_live_replace.py` (the installer against Xvfb as
+  XWayland with file-backed `gsettings`/kconfig tools and a stand-in compositor).
+  W1 to W4 still need GNOME and KDE.
+
+Proposed Linux sequence (same invariant as macOS; the implementation above
+replaces the counter of steps 1 and 4 with the two slots):
 
 1. Convert with `xkb_converter.lua` to `<id>.xkb` + XCompose, where the id is
    `ergopti_composed_<n>` (counter from the record).
@@ -385,9 +407,11 @@ asynchronous and settles through the continuation contract:
   the command returned:
   - macOS: the current keyboard-layout source id is the new id **and**
     `UCKeyTranslate` of the 13 keys at base/Shift equals the compiled cells;
-  - Linux: the daemon's XKB capture (`infra/xkb_keymap.lua`) reports a keymap
-    whose layout name is the new id and whose digit row equals the compiled
-    cells; on GNOME the `gsettings` read-back must also match.
+  - Linux (implemented): the installer reads the session's keymap back with
+    `xkbcomp` (the X server, or XWayland which receives the compositor's) and
+    requires the new id and the installed cells on the moved keys; on GNOME and
+    KDE the setting's read-back must also match. A choice the session cannot load
+    (`no_source_layout`, `session_unsupported`) is acknowledged with its reason.
 - A verification that does not pass within the bounded deadline calls
   `done(false, code)` with a code of section 3.2 and leaves the previous
   build selected: `revert` selects the previous build again if it is still
