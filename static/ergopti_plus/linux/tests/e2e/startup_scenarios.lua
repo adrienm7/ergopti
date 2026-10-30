@@ -68,6 +68,25 @@ end
 
 local CORPUS = "/../_shared/tests/corpus/config_migrations"
 
+-- The errors one refused word-delimiter write logs, as module and message
+-- start: the writer's, the owner's, then the menu's rollback. Only the
+-- delimiters_edit step may log them, each exactly once.
+local REFUSAL_ERRORS = {
+	{ "toml_writer", "batch_write: publication to '~/.config/ergopti/config.toml' failed" },
+	{ "hotstrings.terminator_settings", "Word-delimiter settings were not persisted: " },
+	{ "ui.menu.menu_builder", "Word-delimiter change was rolled back because persistence failed." },
+}
+
+--- The REFUSAL_ERRORS entry an error line is, if any.
+--- @param line string One log line.
+--- @return integer|nil index
+local function refusal_error(line)
+	local module, message = line:match("%[ERROR%] %[([^%]]+)%] (.*)$")
+	for index, entry in ipairs(REFUSAL_ERRORS) do
+		if module == entry[1] and message and message:sub(1, #entry[2]) == entry[2] then return index end
+	end
+end
+
 --- Every scenario. A fresh install opens the first-use wizard; a configured
 --- one never does. The config.toml files older Linux releases wrote are every
 --- shipped case of the shared migration corpus, found by name so a new case
@@ -82,6 +101,9 @@ local function scenarios(driver)
 			steps = { "restore_recommended", "boot" }, recommended = true },
 		{ name = "a table-array delimiter list can be saved and read at the next start",
 			seed = "/tests/e2e/fixtures/terminators_array.toml", steps = { "delimiters_add", "delimiters_verify" } },
+		{ name = "the tray's delimiter toggle, Delete and a refused write survive the next start",
+			seed = "/tests/e2e/fixtures/terminators_array.toml",
+			steps = { "delimiters_add", "delimiters_edit", "delimiters_verify_edit" } },
 	}
 	local cases = {}
 	local listing = io.popen("ls " .. q(driver .. CORPUS))
@@ -112,8 +134,13 @@ local function judge(output, action, wizard)
 		problems[#problems + 1] = wizard and "the first-use wizard never opened"
 			or "the first-use wizard opened over an existing configuration"
 	end
+	local refusal_errors = {}
 	for line in output:gmatch("[^\n]+") do
-		if line:find("%[ERROR%]") or line:find("%[FATAL%]") then
+		local refusal = action == "delimiters_edit" and refusal_error(line) or nil
+		if refusal then
+			-- The refused write the step provokes; counted, judged below.
+			refusal_errors[#refusal_errors + 1] = refusal
+		elseif line:find("%[ERROR%]") or line:find("%[FATAL%]") then
 			problems[#problems + 1] = "logged " .. line:gsub("^%S+ %S+ ", "")
 		else
 			local kind, detail = line:match("^E2E_([%u_]+) (.*)$")
@@ -134,6 +161,24 @@ local function judge(output, action, wizard)
 	end
 	if (action == "delimiters_add" or action == "delimiters_verify") and facts.custom_list_verified ~= "true" then
 		problems[#problems + 1] = "the saved delimiters, unknown fields or comment did not survive"
+	end
+	if action == "delimiters_edit" then
+		if facts.delimiter_toggled_off ~= "true" or facts.delimiter_deleted ~= "true" then
+			problems[#problems + 1] = string.format("the tray's toggle or Delete row did not commit (toggled_off=%s deleted=%s)",
+				tostring(facts.delimiter_toggled_off), tostring(facts.delimiter_deleted))
+		end
+		if facts.delimiter_refusal == "true" then
+			if table.concat(refusal_errors, ",") ~= "1,2,3" then
+				problems[#problems + 1] = "the refused write logged its errors as " .. table.concat(refusal_errors, ",")
+					.. ", not 1,2,3 (writer, owner, menu rollback)"
+			end
+		elseif facts.delimiter_refusal ~= "skipped_root" or #refusal_errors ~= 0 then
+			problems[#problems + 1] = "the refused write was not rolled back and retried: "
+				.. tostring(facts.delimiter_refusal)
+		end
+	end
+	if (action == "delimiters_edit" or action == "delimiters_verify_edit") and facts.edited_list_verified ~= "true" then
+		problems[#problems + 1] = "the edited delimiters, unknown fields or comment did not survive"
 	end
 	return problems, facts
 end
@@ -196,6 +241,9 @@ function M.run(check, options)
 			local step_problems
 			step_problems, facts = judge(output, action, scenario.wizard == true)
 			for _, problem in ipairs(step_problems) do problems[#problems + 1] = action .. ": " .. problem end
+			if facts.delimiter_refusal == "skipped_root" then
+				check.skip("hardening-a/b start: a refused delimiter write needs a user a read-only folder stops (root ignores it)")
+			end
 			-- The seed is the state before the first start only.
 			scenario.seed = nil
 		end
