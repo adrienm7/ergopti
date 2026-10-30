@@ -189,6 +189,20 @@ local function read_restorable_snapshot(selected_backend)
 	return true, contents, nil
 end
 
+--- Whether the clipboard may be restored over the text Ergopti put there. A
+--- copy made by another application during the paste replaced that text, and
+--- restoring over it would lose what the user just copied. An unreadable
+--- clipboard proves no such copy, so the restore stays owed.
+--- @param selected_backend table
+--- @param text string The text written for the paste.
+--- @return boolean restorable
+local function holds_pasted_text(selected_backend, text)
+	local ok, contents = read_backend_checked(selected_backend)
+	if not ok or contents == text then return true end
+	Logger.info(LOG, "Another application copied during the paste; its content is kept, not restored over.")
+	return false
+end
+
 --- Runs an injected wait and rejects both exceptions and explicit failure.
 --- @param sleep_ms function
 --- @param duration_ms number
@@ -323,6 +337,7 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 	assert(type(text) == "string" and text ~= "" and type(key_v) == "number", "invalid clipboard preparation")
 	local stage, b, saved = {}, nil, nil
 	local busy, revoked, restore_required, prepared = false, false, false, false
+	local written, restore_attempted = false, false
 	local function current()
 		return not revoked and admitted(admission) and not revoked
 	end
@@ -330,7 +345,14 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 		if busy then return false end
 		if not restore_required then return true end
 		busy = true
-		local ok, restored = pcall(write_backend_checked, b, saved)
+		local ok, restored = pcall(function()
+			-- Only a completed write proves the clipboard held our text. After a
+			-- failed write or a failed restore, a differing clipboard may be our
+			-- own damage, which the restore must still repair.
+			if written and not restore_attempted and not holds_pasted_text(b, text) then return true end
+			restore_attempted = true
+			return write_backend_checked(b, saved)
+		end)
 		busy = false
 		if ok and restored == true then restore_required, saved = false, nil end
 		return not restore_required
@@ -357,6 +379,7 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 			-- A failed/throwing setter may already have changed the clipboard.
 			restore_required = true
 			if not write_backend_checked(b, text) then return false end
+			written = true
 			if not current() then return false end
 			if not wait_checked(sleep_ms, SETTLE_MS) then return false end
 			return current()
@@ -442,7 +465,7 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 	-- Restored even when it was empty: writing "" back is what leaves the
 	-- clipboard as the user left it, and skipping the restore on an empty save
 	-- would leave our replacement sitting there.
-	if not write_backend_checked(b, saved) then
+	if holds_pasted_text(b, text) and not write_backend_checked(b, saved) then
 		Logger.warn(LOG, "paste_text(): the previous clipboard content could not be restored.")
 		return false, "clipboard restoration failed"
 	end
