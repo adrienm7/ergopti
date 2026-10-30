@@ -273,8 +273,10 @@ local function ollama_listing(model, callback)
 	ask()
 end
 
---- Pulls the smallest catalogue model through the AI menu's download window,
---- checks the server lists it, then removes it unless it was already there.
+--- Pulls the smallest catalogue model through the AI menu's download window
+--- and checks the server lists it. The model stays installed: the maintainer's
+--- shared connection paid its download once, and the next run's pull only
+--- compares the manifest.
 local function ollama_model(finish)
 	local manager = models_manager()
 	if not manager then return finish("skip", { "ai_menu_absent" }) end
@@ -295,9 +297,7 @@ local function ollama_model(finish)
 					return finish("fail", codes, report)
 				end
 				codes[#codes + 1] = "pulled"
-				if before == false then
-					codes[#codes + 1] = manager.delete_ollama_model(model.runtime_name) and "removal_started" or "removal_refused"
-				end
+				codes[#codes + 1] = "model_kept"
 				finish("pass", codes, report)
 			end)
 		end, function(reason)
@@ -348,8 +348,10 @@ local function keep_mlx_active_model()
 end
 
 --- Downloads the smallest catalogue MLX model, stops the server its download
---- starts, then removes the model unless it was already there and puts the
---- active-model file back as it found it.
+--- starts and puts the active-model file back as it found it. The model stays
+--- in the cache: removing it made every run download it again (about 380 MB
+--- over the maintainer's shared connection), while a complete cache only costs
+--- the next run a metadata check.
 local function mlx_model(finish)
 	if not mlx_supported() then return finish("skip", { "mlx_unsupported_here" }) end
 	local manager = models_manager()
@@ -378,9 +380,7 @@ local function mlx_model(finish)
 		codes[#codes + 1] = "downloaded_and_served"
 		require("ui.menu.menu_llm").stop_mlx_server(function(stopped)
 			codes[#codes + 1] = stopped and "server_stopped" or "server_stop_refused"
-			if not before then
-				codes[#codes + 1] = manager.delete_mlx_model(model.name) and "removal_started" or "removal_refused"
-			end
+			codes[#codes + 1] = "model_kept"
 			settle(stopped)
 		end)
 	end, function(reason)
