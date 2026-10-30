@@ -219,6 +219,7 @@
 		"test:script-chords-three-os": "node ./tools/test/test-script-chords-three-os.cjs",
 		"test:windows-hotstring-preview-shows": "node ./tools/test/test-windows-hotstring-preview-shows.cjs",
 		"test:send-input-vectors-shared": "node ./tools/test/test-send-input-vectors-shared.cjs",
+		"test:hotstring-output-tokens": "node ./tools/test/test-hotstring-output-tokens.cjs",
 		"test:tap-keys-single-source": "node ./tools/test/test-tap-keys-single-source.cjs",
 		"test:caps-word-auto-off-single-source": "node ./tools/test/test-caps-word-auto-off-single-source.cjs",
 		"test:manual-prediction-refusals": "node ./tools/test/test-manual-prediction-refusals-single-source.cjs",
