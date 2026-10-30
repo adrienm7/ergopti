@@ -160,13 +160,21 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      configuration snapshot for the guard. A reload refused, or accepted and never started, fails by name.
    - `field_menu_build`: one rebuild of the menu tree, as a state change triggers it, must be accepted by
      AppKit; its duration in ms, the number of top-level rows and the three slowest rows (`id:ms`) are named.
+   - `field_boot_cost` (after `field_composer`): the boot that started the app completed; its wall and CPU
+     totals and its slowest stage are named, the three slowest stages in its log window.
+   - `field_idle_cost`: over 30 quiet seconds the driver's process CPU share must stay at or under 3 %
+     (`idle_cpu_percent`); resident memory and its growth, Lua heap growth and main-thread holds over 250 ms
+     in the window are named.
+   - `field_fifo_safety`: in a folder of its own under `TMPDIR`, a FIFO (a reader attached first, so a
+     regressed guard cannot freeze the app) is named `named_pipe` by `followed_mode`, `exists` sees it, and
+     both `append` and the atomic `write` refuse it and leave it in place; the folder is removed.
    - `field_local_servers` (after `field_ai_local`, read-only): every server of
      `_shared/modules/llm/local_servers.json` must have a discovery descriptor the driver accepts
      (`servers_catalogue`, else `undescribed_<n>`); one detection sweep, the AI menu's own (process,
      settings file, listening port, then `GET /models`), names each server as `server_<id>`:
      `up:<port source>:<models>`, `not_running:<port source>`, `needs_key:...` or `no_answer:...`. A
      server added to the shared list is reported by the next run with no driver change.
-   - `field_layout_rows` (after `field_composer`): from the Ergo-L file the app ships, a loose layout typing
+   - `field_layout_rows` (after `field_idle_cost`): from the Ergo-L file the app ships, a loose layout typing
      the symbols first is written as `~/Library/Keyboard Layouts/ErgoptiFieldRows-<n>.keylayout` under a new
      name and id, enabled through the enabled-sources preference, selected, and read back from a fresh
      process (`rows_build:keys_13` when the launcher's keyboard probe types its thirteen base cells); a second
@@ -1590,13 +1598,21 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
 
 - [ ] Cold start: quit Ergopti, wait 10 s, start it; note the `Boot complete in … ms` and `Boot CPU` lines.
       Repeat three times, then once right after a macOS login. Report the three numbers and the slowest
-      `Boot stage` lines.
+      `Boot stage` lines. _Field run:_ `field_boot_cost` reports the boot that started the field run (wall,
+      CPU, slowest stage; the three slowest in its log window). _Hands:_ the three cold starts and the one
+      after a login (a quit ends the field run, a login ends the session).
 - [ ] Reload: Hammerspoon > Reload config three times; same lines. A menu click during the reload is held
-      and replayed; a second Reload click joins the first one (no double reload).
+      and replayed; a second Reload click joins the first one (no double reload). _Field run:_ the
+      `driver_reload` step (the timed reload, owned by another worker) times one reload; three reloads compared
+      line by line come with it. _Hands:_ the menu clicks during a reload.
 - [ ] Idle: 10 minutes without typing, then Activity Monitor CPU and memory of Hammerspoon; the PhaseStats
-      summary in the log should show no recurring work above a few ms per minute.
+      summary in the log should show no recurring work above a few ms per minute. _Field run:_
+      `field_idle_cost` measures the driver's own CPU share over 30 quiet seconds (fails above 3 %) and names
+      its resident memory, heap growth and main-thread holds; nothing here needs a person any more except
+      the 10-minute figure, which the next report's PhaseStats lines give.
 - [ ] Quit during a busy moment (typing, then Quit within a second): the app ends both processes within
       10 s (CI item "Quit did not end both processes within 10 s"); Quit wins over a reload in progress.
+      _Hands:_ a quit ends the field run itself; the CI launch gate times the quit of a packaged app.
 
 #### 2. Typing in real conditions (one working day if possible)
 
@@ -1613,7 +1629,8 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
       terminator (Return, Tab, a letter) is a fail.
 - [ ] Tap-hold: each tap-hold key alone, fast rolls (`one-shot`), holding with another key; the Karabiner JSON
       thresholds equal the shared per-key thresholds (PAR-15: compare `~/.config/karabiner/karabiner.json`
-      with the menu values).
+      with the menu values). _Hands:_ the key presses. The threshold comparison is a program's job, left to
+      the Karabiner input owner.
 - [ ] Ctrl+Caps Lock toggles Caps Lock (new `secondary_capslock` slot binding, ea02cf7000; the tests say
       macOS may never fire a Caps Lock hotkey: report exactly what happens).
 - [ ] Right Option + Return, Delete, Backspace and Escape run their script actions; Backspace word start in
@@ -1636,7 +1653,8 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
       window for each of its three slots.
 - [ ] Menu row order looks as before in every submenu (orders now come from one data file, PAR-76 R18).
 - [ ] « Retirer les anciennes règles » on an upgrade (item 43); Login Items show one Ergopti (item 24,
-      Debug > Show what starts Ergopti at login).
+      Debug > Show what starts Ergopti at login). _Field run:_ `field_login_items` names every login entry
+      and whether it belongs to this copy. _Hands:_ the upgrade.
 
 #### 4. AI predictions
 
@@ -1663,7 +1681,9 @@ probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.
       `Field check result:` lines; the new route-plan step shows which route each Ollama origin takes; an
       `http://` company PAC is fetched (Issue #101).
 - [ ] Debug > Test Karabiner lease, Test key accounting (30 s, type during it), Test third-party tools
-      (Shortcuts, Homebrew, timer; item 116), Test owned Karabiner runtime (must stay dormant).
+      (Shortcuts, Homebrew, timer; item 116), Test owned Karabiner runtime (must stay dormant). _Field run:_
+      `field_lease`, `key_accounting` (typed by the app into its own field), `field_toolchain` and
+      `field_owned_runtime` run each of them; nothing here needs a person.
 - [ ] Update check window: release notes pane readable in light and dark, links open the repository
       (PAR-52); a Sparkle update from the previous release installs and relaunches; Homebrew live upgrade.
 - [ ] MLX download behind a proxy (119/130/136); code 74.
@@ -1684,7 +1704,10 @@ probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.
 #### 7. Edge cases
 
 - [ ] `pipefail` and `printf %b` under the system bash 3.2 (automated: collector step `system_bash`), the native HTTPS downgrade refusal,
-      `hs.fs.attributes` on a FIFO, the read-only dashboard with a hot journal.
+      `hs.fs.attributes` on a FIFO, the read-only dashboard with a hot journal. _Field run:_
+      `field_fifo_safety` (a FIFO is named without being opened; append and the atomic write refuse it).
+      Left for a program: the HTTPS downgrade (needs an HTTPS origin that redirects to HTTP) and the hot
+      journal.
 - [ ] Recompile `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` from its source in Script
       Editor so its comment follows the keystats rename, and commit it.
 
@@ -1808,7 +1831,8 @@ Standing checks:
       once), 119/130/136 MLX PAC download, code 74, Homebrew live upgrade.
 - [ ] **Shell and file edge cases**: `pipefail` and `printf %b` under bash 3.2 (automated: collector step
       `system_bash`), the native HTTPS
-      downgrade refusal, `hs.fs.attributes` on a FIFO, the read-only dashboard with a hot journal.
+      downgrade refusal, `hs.fs.attributes` on a FIFO (automated: `field_fifo_safety`), the read-only
+      dashboard with a hot journal.
 
 ### Linux (no machine available)
 
