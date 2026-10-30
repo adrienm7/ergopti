@@ -146,7 +146,8 @@ end
 
 --- Runs the native network helper (one HEAD through the managed transport).
 --- @param callback function fn(exit_code|nil, stdout); nil when it cannot start.
---- @param mode string|nil "--hosts" for one HEAD per declared host.
+--- @param mode string|table|nil "--hosts" for one HEAD per declared host, or
+---   the argument list of another mode ({ "--ollama-blob", model }).
 --- @param timeout_s number|nil Seconds before the helper is terminated.
 local function network_chain(callback, mode, timeout_s)
 	local python = require("adapters.python_interpreter").resolve()
@@ -158,7 +159,7 @@ local function network_chain(callback, mode, timeout_s)
 		return
 	end
 	local args = { "-B", root .. "/modules/llm/managed_network_check.py" }
-	if mode then args[#args + 1] = mode end
+	for _, argument in ipairs(type(mode) == "table" and mode or { mode }) do args[#args + 1] = argument end
 	exec(python, args, timeout_s or 40, callback)
 end
 
@@ -247,6 +248,19 @@ M.exec = exec
 
 --- The ports of the real Mac.
 --- @return table ports
+--- The catalogue's smallest model for a backend, an installed one first; the
+--- field run's AI steps and the blob host check pick the same model.
+--- @param backend string "ollama" or "mlx".
+--- @param installed function|nil fn(model) -> boolean.
+--- @return table|nil model { name, runtime_name, download_gb }
+function M.smallest_model(backend, installed)
+	local path = require("infra.paths").shared_llm_path("models.json")
+	-- Resolved per call: the field run's ports and these share the caller's adapters.
+	local text = path and require("adapters.file_system").read(path) or nil
+	if type(text) ~= "string" then return nil end
+	return require("infra.field_run").smallest_model(require("json").decode(text), backend, installed)
+end
+
 function M.new()
 	local ports = {
 		path_exists = FileSystem.exists,
@@ -262,6 +276,9 @@ function M.new()
 		network_chain = function(callback) return network_chain(callback) end,
 		-- Five hosts of at most 15 s each, one after the other
 		host_heads = function(callback) return network_chain(callback, "--hosts", 100) end,
+		-- A manifest GET and one blob HEAD of at most 15 s each
+		blob_host = function(model, callback) return network_chain(callback, { "--ollama-blob", model }, 40) end,
+		smallest_ollama_model = function() return M.smallest_model("ollama") end,
 		route_plan = route_plan,
 		timer_probe = timer_probe,
 		after = function(seconds, callback)
