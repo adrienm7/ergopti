@@ -468,6 +468,9 @@
 			]
 		},
 		{
+			"type": "---"
+		},
+		{
 			"type": "command",
 			"id": "llm_test_prediction",
 			"i18n": "menu.llm.test_prediction"
