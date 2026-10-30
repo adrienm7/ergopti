@@ -183,4 +183,87 @@ function M.fifo_safety(ports, report, finish)
 	end)
 end
 
+
+
+
+
+-- ========================================
+-- ========================================
+-- ======= 4/ Slow lines of the day =======
+-- ========================================
+-- ========================================
+
+local AWK = "/usr/bin/awk"
+-- Segments named in the log window, by total own time.
+M.SLOW_SEGMENTS_LOGGED = 5
+
+-- One pass over the day log, printing a summary only: a task's output is read
+-- when it exits, so the lines themselves must never reach the pipe.
+M.SLOW_LINES_AWK = [=[
+match($0, /Slow [^ :]+: [0-9.]+ ms own/) {
+	text = substr($0, RSTART + 5, RLENGTH - 12); split(text, part, ": ")
+	n[part[1]]++; t[part[1]] += part[2]; if (part[2] + 0 > m[part[1]] + 0) m[part[1]] = part[2]
+}
+match($0, /Slow ingest tick [0-9]+ ms/) {
+	v = substr($0, RSTART + 17, RLENGTH - 20) + 0; ic++; if (v > im) im = v
+}
+match($0, /Slow preferences save [0-9]+ ms/) {
+	v = substr($0, RSTART + 22, RLENGTH - 25) + 0; pc++; if (v > pm) pm = v
+}
+END {
+	for (k in n) printf "segment %s %d %.2f %.2f\n", k, n[k], t[k], m[k]
+	printf "ingest %d %d\nprefs %d %d\n", ic, im, pc, pm
+}
+]=]
+
+--- Reads the awk summary.
+--- @param text any
+--- @return table|nil summary { segments = { { name, count, own_ms, worst_ms } } by own time, ingest = { count, worst_ms }, prefs = { ... } }
+function M.parse_slow_summary(text)
+	local summary = { segments = {} }
+	for line in tostring(text or ""):gmatch("[^\n]+") do
+		local name, count, own, worst = line:match("^segment (%S+) (%d+) ([%d.]+) ([%d.]+)$")
+		if name then
+			summary.segments[#summary.segments + 1] = { name = name, count = tonumber(count), own_ms = tonumber(own),
+				worst_ms = tonumber(worst) }
+		end
+		local kind, kind_count, kind_worst = line:match("^(%a+) (%d+) (%d+)$")
+		if kind == "ingest" or kind == "prefs" then
+			summary[kind] = { count = tonumber(kind_count), worst_ms = tonumber(kind_worst) }
+		end
+	end
+	if summary.ingest == nil or summary.prefs == nil then return nil end
+	table.sort(summary.segments, function(a, b) return a.own_ms > b.own_ms end)
+	return summary
+end
+
+--- Issue #101's first follow-up without a person: which main-thread phase the
+--- day's slow lines name most. ports.today_log_path(), exec.
+function M.slow_lines(ports, report, finish)
+	local path = ports.today_log_path()
+	if type(path) ~= "string" or path == "" then
+		report.step("slow_log", FAIL, "no_log")
+		return finish()
+	end
+	ports.exec(AWK, { M.SLOW_LINES_AWK, path }, TOOL_SECONDS, function(code, output)
+		local summary = code == 0 and M.parse_slow_summary(output) or nil
+		if summary == nil then
+			report.step("slow_log", FAIL, code == nil and "timeout" or "unreadable")
+			return finish()
+		end
+		report.step("slow_log", PASS)
+		for index = 1, math.min(M.SLOW_SEGMENTS_LOGGED, #summary.segments) do
+			local segment = summary.segments[index]
+			Logger.evidence(LOG, "Slow segment %s: %d line(s), %.1f ms own in all, worst %.1f ms.", segment.name,
+				segment.count, segment.own_ms, segment.worst_ms)
+		end
+		local dominant = summary.segments[1]
+		report.step("slow_dominant", INFO, dominant and dominant.name or "none")
+		report.step("slow_dominant_own_ms", INFO, dominant and math.floor(dominant.own_ms) or 0)
+		report.step("slow_ingest_ticks", INFO, summary.ingest.count .. ":" .. summary.ingest.worst_ms)
+		report.step("slow_preferences_saves", INFO, summary.prefs.count .. ":" .. summary.prefs.worst_ms)
+		finish()
+	end)
+end
+
 return M

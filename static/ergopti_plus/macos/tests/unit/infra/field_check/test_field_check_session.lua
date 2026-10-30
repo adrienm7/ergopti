@@ -64,6 +64,59 @@ helpers.describe("field check session: costs and edge cases a program can answer
 		helpers.assert_eq(steps_of(unfinished).boot_complete_ms.state, Report.STATE_FAIL)
 	end)
 
+	helpers.it("names the dominant slow segment of the day log, through the awk summary", function()
+		local summary = assert(Session.parse_slow_summary(
+			"segment keymap.keydown 2 15.75 12.50\nsegment hotstrings.match 1 40.00 40.00\ningest 1 230\nprefs 0 0\n"))
+		helpers.assert_eq(summary.segments[1].name, "hotstrings.match")
+		helpers.assert_eq(summary.prefs.count, 0)
+		helpers.assert_nil(Session.parse_slow_summary("segment x 1 1.00 1.00\n"), "a summary without its totals is refused")
+		local report = Report.new_report("slow_lines")
+		Session.slow_lines({
+			today_log_path = function() return "/logs/today.log" end,
+			exec = function(executable, args, _, callback)
+				helpers.assert_eq(executable, "/usr/bin/awk")
+				helpers.assert_eq(args[2], "/logs/today.log")
+				callback(0, "segment keymap.keydown 2 15.75 12.50\ningest 3 230\nprefs 1 88\n")
+			end,
+		}, report, function() end)
+		local steps = steps_of(report)
+		helpers.assert_eq(steps.slow_dominant.value, "keymap.keydown")
+		helpers.assert_eq(steps.slow_ingest_ticks.value, "3:230")
+		helpers.assert_eq(steps.slow_preferences_saves.value, "1:88")
+	end)
+
+	helpers.it("the awk program reads the three line shapes the drivers write", function()
+		local awk = io.open("/usr/bin/awk", "rb")
+		if not awk then return end
+		awk:close()
+		local dir = os.tmpname()
+		os.remove(dir)
+		local log, program = dir .. ".log", dir .. ".awk"
+		local function write(path, text)
+			local handle = assert(io.open(path, "wb"))
+			handle:write(text)
+			handle:close()
+		end
+		write(program, Session.SLOW_LINES_AWK)
+		write(log, table.concat({
+			"10:00 [WARN] HotPath: Slow keymap.keydown: 12.50 ms own, 14.00 ms total, parent none (0 similar since the last line).",
+			"10:01 [WARN] HotPath: Slow keymap.keydown: 3.25 ms own, 4.00 ms total, parent none (2 similar since the last line).",
+			"10:02 [WARN] keystats: Slow ingest tick 230 ms (12 ms; entries=4 statements=9).",
+			"10:03 [WARN] preferences: Slow preferences save 88 ms (prepare=1 write=80 ms; operations=2).",
+		}, "\n") .. "\n")
+		local pipe = assert(io.popen("/usr/bin/awk -f '" .. program .. "' '" .. log .. "'"))
+		local output = pipe:read("*a")
+		pipe:close()
+		os.remove(log)
+		os.remove(program)
+		local summary = assert(Session.parse_slow_summary(output), "the awk summary does not parse: " .. output)
+		helpers.assert_eq(summary.segments[1].name, "keymap.keydown")
+		helpers.assert_eq(summary.segments[1].count, 2)
+		helpers.assert_eq(summary.segments[1].worst_ms, 12.5)
+		helpers.assert_eq(summary.ingest.worst_ms, 230)
+		helpers.assert_eq(summary.prefs.count, 1)
+	end)
+
 	helpers.it("fails a FIFO the adapter opens, and removes its folder", function()
 		local commands = {}
 		local function ports(guarded)

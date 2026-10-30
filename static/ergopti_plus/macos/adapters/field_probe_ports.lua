@@ -876,6 +876,7 @@ function M.new()
 		local_servers_detect = local_servers_detect,
 		boot_facts = boot_facts,
 		fifo = fifo,
+		today_log_path = function() return require("infra.logger").today_log_path() end,
 		-- Process CPU and a monotonic clock, both in milliseconds
 		cpu_ms = function() return os.clock() * 1000 end,
 		now_ms = function() return hs.timer.absoluteTime() / 1000000 end,
