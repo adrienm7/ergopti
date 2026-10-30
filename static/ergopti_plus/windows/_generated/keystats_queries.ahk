@@ -4,10 +4,10 @@
 ; Source: _shared/data/db/queries.sql (the named keystats queries).
 
 /**
- * Renders a named keystats query for the in-process SQLite engine. Queries with
- * typed value slots (the write statements) are refused until Windows adopts them.
+ * Renders a named keystats query for the in-process SQLite engine.
  * @param {string} Name - Catalogue name, such as "manifest.app_day".
- * @param {Map} Params - Value of every parameter the query declares.
+ * @param {Map} Params - Raw string of every parameter and raw value of every
+ *   slot; an absent key is a missing value.
  * @returns {string} The SQL text.
  */
 KeystatsQuery(Name, Params := Map()) {
@@ -575,23 +575,32 @@ KeystatsQuery(Name, Params := Map()) {
 			["literal", ")`;"]
 		]
 	)
+	; A flush renders thousands of rows, so a query's names are collected once.
+	static Declared := Map()
 	if !Queries.Has(Name)
 		throw ValueError("Unknown keystats query: " . Name)
 	if !(Params is Map)
 		throw TypeError(Name . " parameters must be a Map.")
 	Parts := Queries[Name]
-	for Key in Params {
-		Declared := false
+	if !Declared.Has(Name) {
+		Names := Map()
 		for Part in Parts
-			if (Part[1] = "param" && Part[2] == Key)
-				Declared := true
-		if !Declared
-			throw ValueError(Name . " declares no parameter " . Key)
+			if (Part[1] != "literal")
+				Names[Part[2]] := true
+		Declared[Name] := Names
 	}
+	Names := Declared[Name]
+	for Key in Params
+		if !Names.Has(Key)
+			throw ValueError(Name . " declares no parameter " . Key)
 	Sql := ""
 	for Part in Parts {
 		if (Part[1] = "literal") {
 			Sql .= Part[2]
+			continue
+		}
+		if (Part[1] = "slot") {
+			Sql .= _KeystatsQuerySlot(Name, Part[2], Part[3], Params)
 			continue
 		}
 		if !Params.Has(Part[2]) || !(Params[Part[2]] is String)
@@ -599,4 +608,38 @@ KeystatsQuery(Name, Params := Map()) {
 		Sql .= Params[Part[2]]
 	}
 	return Sql
+}
+
+/**
+ * Renders one typed slot, as the Lua renderer does: an absent value is NULL for
+ * a nullable slot and an error for any other, text goes through the driver's one
+ * literal encoder, an integer is floored and a real keeps 17 significant digits.
+ * A numeric string is a number, because SQLite_Query hands every column back as
+ * text and AutoHotkey arithmetic makes no difference between the two.
+ * @param {string} Name - Query name, for errors.
+ * @param {string} Slot - Slot name.
+ * @param {string} Kind - "s", "i" or "r", with a trailing "?" when nullable.
+ * @param {Map} Params - The caller's values.
+ * @returns {string} SQL text.
+ */
+_KeystatsQuerySlot(Name, Slot, Kind, Params) {
+	if !Params.Has(Slot) {
+		if (SubStr(Kind, 2) == "?")
+			return "NULL"
+		throw ValueError(Name . " requires the value " . Slot)
+	}
+	Value := Params[Slot]
+	Base := SubStr(Kind, 1, 1)
+	if (Base == "s") {
+		if !(Value is String)
+			throw ValueError(Name . ": " . Slot . " must be a string.")
+		return SQLite_Q(Value)
+	}
+	if !IsNumber(Value)
+		throw ValueError(Name . ": " . Slot . " must be a finite number.")
+	Value += 0
+	; An infinity or a NaN minus itself is a NaN, which equals nothing.
+	if !(Value - Value == 0)
+		throw ValueError(Name . ": " . Slot . " must be a finite number.")
+	return (Base == "r") ? Format("{:.17g}", Value) : String(Floor(Value))
 }

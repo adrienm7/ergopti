@@ -26,7 +26,8 @@
  *    the kind (`{{s? name}}`) renders NULL for a missing value and every other
  *    slot refuses one. The driver passes the raw Lua value and the generated
  *    renderer quotes it through the one shared literal encoder
- *    (sqlite.literal), so no driver formats a value into SQL by hand.
+ *    (sqlite.literal, SQLite_Q on Windows), so no driver formats a value into
+ *    SQL by hand.
  *    `{{merge column}}` expands at generation time into the expression that
  *    sums a stored JSON number map with the incoming one key by key, the one
  *    accumulation every driver shares.
@@ -535,33 +536,42 @@ function renderAhk(queries) {
 ; Source: _shared/data/db/queries.sql (the named keystats queries).
 
 /**
- * Renders a named keystats query for the in-process SQLite engine. Queries with
- * typed value slots (the write statements) are refused until Windows adopts them.
+ * Renders a named keystats query for the in-process SQLite engine.
  * @param {string} Name - Catalogue name, such as "manifest.app_day".
- * @param {Map} Params - Value of every parameter the query declares.
+ * @param {Map} Params - Raw string of every parameter and raw value of every
+ *   slot; an absent key is a missing value.
  * @returns {string} The SQL text.
  */
 KeystatsQuery(Name, Params := Map()) {
 \tstatic Queries := Map(
 ${entries}
 \t)
+\t; A flush renders thousands of rows, so a query's names are collected once.
+\tstatic Declared := Map()
 \tif !Queries.Has(Name)
 \t\tthrow ValueError("Unknown keystats query: " . Name)
 \tif !(Params is Map)
 \t\tthrow TypeError(Name . " parameters must be a Map.")
 \tParts := Queries[Name]
-\tfor Key in Params {
-\t\tDeclared := false
+\tif !Declared.Has(Name) {
+\t\tNames := Map()
 \t\tfor Part in Parts
-\t\t\tif (Part[1] = "param" && Part[2] == Key)
-\t\t\t\tDeclared := true
-\t\tif !Declared
-\t\t\tthrow ValueError(Name . " declares no parameter " . Key)
+\t\t\tif (Part[1] != "literal")
+\t\t\t\tNames[Part[2]] := true
+\t\tDeclared[Name] := Names
 \t}
+\tNames := Declared[Name]
+\tfor Key in Params
+\t\tif !Names.Has(Key)
+\t\t\tthrow ValueError(Name . " declares no parameter " . Key)
 \tSql := ""
 \tfor Part in Parts {
 \t\tif (Part[1] = "literal") {
 \t\t\tSql .= Part[2]
+\t\t\tcontinue
+\t\t}
+\t\tif (Part[1] = "slot") {
+\t\t\tSql .= _KeystatsQuerySlot(Name, Part[2], Part[3], Params)
 \t\t\tcontinue
 \t\t}
 \t\tif !Params.Has(Part[2]) || !(Params[Part[2]] is String)
@@ -569,6 +579,40 @@ ${entries}
 \t\tSql .= Params[Part[2]]
 \t}
 \treturn Sql
+}
+
+/**
+ * Renders one typed slot, as the Lua renderer does: an absent value is NULL for
+ * a nullable slot and an error for any other, text goes through the driver's one
+ * literal encoder, an integer is floored and a real keeps 17 significant digits.
+ * A numeric string is a number, because SQLite_Query hands every column back as
+ * text and AutoHotkey arithmetic makes no difference between the two.
+ * @param {string} Name - Query name, for errors.
+ * @param {string} Slot - Slot name.
+ * @param {string} Kind - "s", "i" or "r", with a trailing "?" when nullable.
+ * @param {Map} Params - The caller's values.
+ * @returns {string} SQL text.
+ */
+_KeystatsQuerySlot(Name, Slot, Kind, Params) {
+\tif !Params.Has(Slot) {
+\t\tif (SubStr(Kind, 2) == "?")
+\t\t\treturn "NULL"
+\t\tthrow ValueError(Name . " requires the value " . Slot)
+\t}
+\tValue := Params[Slot]
+\tBase := SubStr(Kind, 1, 1)
+\tif (Base == "s") {
+\t\tif !(Value is String)
+\t\t\tthrow ValueError(Name . ": " . Slot . " must be a string.")
+\t\treturn SQLite_Q(Value)
+\t}
+\tif !IsNumber(Value)
+\t\tthrow ValueError(Name . ": " . Slot . " must be a finite number.")
+\tValue += 0
+\t; An infinity or a NaN minus itself is a NaN, which equals nothing.
+\tif !(Value - Value == 0)
+\t\tthrow ValueError(Name . ": " . Slot . " must be a finite number.")
+\treturn (Base == "r") ? Format("{:.17g}", Value) : String(Floor(Value))
 }
 `;
 }
