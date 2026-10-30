@@ -256,6 +256,9 @@ Recommends:     openssl
 Recommends:     yad
 Recommends:     xdotool
 Recommends:     wmctrl
+# secret-tool: remote API keys live in the desktop secret service
+# (modules/llm/api_token_store.lua), never in plaintext.
+Recommends:     libsecret
 
 %description
 Ergopti is a cross-platform keyboard optimizer that provides an intelligent
