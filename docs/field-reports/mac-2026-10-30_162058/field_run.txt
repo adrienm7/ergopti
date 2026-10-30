@@ -1,0 +1,22 @@
+[field-report] Building and opening the developer app (tools/build/__pycache__/build-macos-managed-ollama.cpython-313.pyc is newer than the build; a few minutes)...
+[macos-dev-app] Stopping the running ErgoptiPlus (pids: 77353 77370 77501 77510 77511)...
+[macos-dev-app] No ErgoptiPlus process is left.
+[macos-build] Single-architecture launcher (arm64 only): this local app runs on arm64 Macs and is never released.
+[macos-build] Wiping /Users/b519hs/perso/ergopti/build/macos
+[macos-build] Using cached Hammerspoon 1.1.1: /Users/b519hs/perso/ergopti/build/cache/hammerspoon/Hammerspoon-1.1.1.zip
+[macos-build] Extracting Hammerspoon into /Users/b519hs/perso/ergopti/build/macos
+[macos-build] Building Swift launcher (release, arm64)
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'ErgoptiPlus' complete! (0.17s)
+[macos-build] Launcher binary: /Users/b519hs/perso/ergopti/static/ergopti_plus/macos/launcher/.build/arm64-apple-macosx/release/ErgoptiPlus (archs: arm64 )
+[macos-build] launcher_bin resolved: '/Users/b519hs/perso/ergopti/static/ergopti_plus/macos/launcher/.build/arm64-apple-macosx/release/ErgoptiPlus'
+[macos-build] Assembling /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app
+[macos-build] Bundling Sparkle.framework (source: /Users/b519hs/perso/ergopti/static/ergopti_plus/macos/launcher/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework)
+[macos-bundle-payload] staged 1179 files into /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Resources/static
+[build-stamp] commit=e82798ba470216a2bad8b9765fadb9ac8f97a76a (git HEAD of /Users/b519hs/perso/ergopti) -> /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared/build_stamp.txt
+[build-stamp] no version entry: ERGOPTI_BUILD_VERSION is unset (not a release build)
+[macos-build] Bundling keyboard layout Ergopti_v2.2.2.bundle
+[macos-build] Bundling the keyboard-layout registry
+curl: (28) Failed to connect to www.lua.org port 443 after 75211 ms: Couldn't connect to server
+[field-report] The developer app could not be built.
