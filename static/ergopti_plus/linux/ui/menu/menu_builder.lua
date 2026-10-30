@@ -5411,38 +5411,7 @@ local function _build_about(ctx)
 	return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)
 end
 
---- Builds the reload item.
----
---- This used to run `kill -HUP $$` through os.execute. Two things were wrong
---- with that, and together they made the item a no-op that logged success:
---- `os.getpid` does not exist in Lua, so the expression always fell through to
---- the literal `"$$"`; and os.execute runs its string in a NEW /bin/sh, where
---- `$$` is that shell's own PID. The daemon therefore told a throwaway shell to
---- reload, and the shell obligingly killed itself.
----
---- The daemon owns the reload; the menu asks it to, exactly as the quit item
---- asks via on_quit. No signal, no subprocess, no PID to get wrong.
-local function _build_reload(ctx)
-	local row = ManifestMenu.command_row("top_level", "reload", {
-		reload = function()
-			if type(ctx.on_reload) ~= "function" then
-				-- Loudly, not silently: a Reload item that cannot reload is the
-				-- exact failure this replaced.
-				Logger.error(LOG, "Reload requested but ctx.on_reload is absent — the menu cannot reload the daemon.")
-				return
-			end
-			Logger.info(LOG, "Reload requested from the tray menu…")
-			local ok, err = pcall(ctx.on_reload)
-			if not ok then
-				Logger.error(LOG, "Reload callback raised: %s.", tostring(err))
-			end
-		end,
-	})
-	-- Read by ui/menu/rebuild_owner: a click on a stale Reload row joins the
-	-- reload that already ran instead of replaying a second one.
-	if type(row) == "table" then row.joins_reload = true end
-	return row
-end
+local _build_reload = require("ui.menu.menu_reload").build
 
 local _build_quit = require("ui.menu.menu_quit").build
 
