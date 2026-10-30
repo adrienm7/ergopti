@@ -646,6 +646,10 @@ function M.new()
 		ollama_predict = ollama_predict,
 		menu_rebuild = menu_rebuild,
 		scratch_typing = scratch_typing,
+		keystats_start_ms = function()
+			local MenuState = package.loaded["ui.menu.menu_state"]
+			return type(MenuState) == "table" and MenuState.keystats_start_ms() or nil
+		end,
 		gesture_frame_counts = function() return require("infra.gesture_frame_evidence").counts() end,
 		capslock_chord_facts = function()
 			local Shortcuts = require("modules.shortcuts.keyboard_shortcuts")
