@@ -209,6 +209,10 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-file-system-ports.cjs',
+		outputs: ['static/ergopti_plus/windows/_generated/file_system_ports.ahk']
+	},
+	{
 		script: 'codegen/codegen-layer-editor-data-js.cjs',
 		outputs: ['static/ergopti_plus/_shared/ui/layer_editor/_generated/layer_data.js']
 	},
