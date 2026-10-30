@@ -993,6 +993,13 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	-- function then declines to perform.
 	local eff_plain, typed, _, is_noop = M.would_fire(m, active_buffer)
 
+	-- A higher-priority end-char entry of the same trigger (a personal "sru" ->
+	-- "SRU" over the bundled immediate "sru" -> "sur") waits for its terminator
+	-- instead. Checked only once this trigger fires: its bucket can hold ~2100.
+	if eff_plain and HotstringCore.auto_shadowed(_registry.mappings_for_tail(m.tail_char) or {}, m, "auto") then
+		return false
+	end
+
 	if not eff_plain then
 		-- No-op guard: when the plain-text expansion equals what was typed, signal
 		-- pass-through so onKeyDownRaw does NOT consume the triggering keystroke.

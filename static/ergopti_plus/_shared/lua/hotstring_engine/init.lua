@@ -252,6 +252,31 @@ function M.mapping_fires(mapping, buf_cps, body_len, start_is_boundary)
 	return eff, typed
 end
 
+--- Whether an auto-expand mapping yields to an end-char one of the same trigger.
+--- An auto trigger fires on its own last character, before any end character
+--- exists, so an equal-length end-char trigger never gets to compete with it. A
+--- higher-priority end-char entry of the same trigger (a personal "sru" -> "SRU"
+--- over the bundled immediate "sru" -> "sur") would then never fire: the auto
+--- entry is shadowed by it and waits for the terminator, as on Windows
+--- (_HSE_StarShadowed).
+--- @param bucket table The tail-char bucket holding `mapping`.
+--- @param mapping table An auto-expand mapping.
+--- @param auto_field string|nil The field naming the auto flag ("auto_expand"; macOS "auto").
+--- @return boolean
+function M.auto_shadowed(bucket, mapping, auto_field)
+	auto_field = auto_field or "auto_expand"
+	local folded = text_utils.trig_lower(mapping.trigger)
+	local priority = tonumber(mapping.priority) or 0
+	for _, other in ipairs(bucket) do
+		if other[auto_field] ~= true and other.tlen == mapping.tlen and (tonumber(other.priority) or 0) > priority
+			and text_utils.trig_lower(other.trigger) == folded then
+			return true
+		end
+	end
+	return false
+end
+local auto_shadowed = M.auto_shadowed
+
 --- Finds the best mapping ending at `body_len`, among those selected by
 --- `want_auto`.
 ---
@@ -281,7 +306,8 @@ function M.best_match_at(buf_cps, buckets, body_len, want_auto, start_is_boundar
 	for _, mapping in ipairs(bucket) do
 		if mapping.auto_expand == want_auto then
 			local eff = M.mapping_fires(mapping, buf_cps, body_len, start_is_boundary)
-			if eff then return mapping, mapping.tlen, eff end
+			-- Checked only once a trigger fires: the magic-key bucket holds ~2100.
+			if eff and not (want_auto and auto_shadowed(bucket, mapping)) then return mapping, mapping.tlen, eff end
 		end
 	end
 	return nil
