@@ -52,7 +52,7 @@ function Set-ManagedRoutesDiagnosticResult {
                 'loopback','environment','environment_bypass','system_direct','system_bypass',
                 'system_config_absent_direct','system_config_absent_bypass','system_proxy',
                 'system_config_absent_proxy','wpad_absent_direct','wpad_absent_bypass','wpad_absent_proxy',
-                'native_proxy','native_direct','native_bypass')) {
+                'native_proxy','native_direct','native_bypass','pac_unavailable_direct')) {
                 $script:ManagedRoutesDiagnosticSingleSource=$Route['Source']
             }
             if($Route['Kind'] -is [string] -and $Route['Kind'] -cin @('direct','proxy')) {
@@ -241,8 +241,11 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
     $SlowClock.Stop()
     Set-ManagedRoutesDiagnosticResult $SlowAnswer
     $ManagedRoutesDiagnosticStage='slow_receipt'
-    if($SlowAnswer.Ok -or $SlowAnswer.Routes.Count -ne 0 -or $SlowAnswer.CleanupDebt -or
-        $SlowClock.ElapsedMilliseconds -gt 3000 -or $SlowServer.Requests -ne 1) {
+    # An unusable PAC goes direct (proxy_policy.json pac_unavailable_fallback), still
+    # inside the original deadline and with the native owner retired.
+    if(-not $SlowAnswer.Ok -or $SlowAnswer.Routes.Count -ne 1 -or $SlowAnswer.Routes[0].Kind -cne 'direct' -or
+        $SlowAnswer.Routes[0].Source -cne 'pac_unavailable_direct' -or $SlowAnswer.PacFallbackStage -isnot [string] -or
+        $SlowAnswer.CleanupDebt -or $SlowClock.ElapsedMilliseconds -gt 3000 -or $SlowServer.Requests -ne 1) {
         throw 'Progressing PAC body escaped its original lookup deadline or owner retirement.'
     }
     $ManagedRoutesDiagnosticStage='slow_owner'
@@ -254,6 +257,24 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
         $AfterSlow.Routes[0].Endpoint -cne 'http://second.invalid:38102/') {
         throw 'A retired PAC deadline owner contaminated the next actual native request.'
     }
+    # A PAC nobody serves goes direct and names the stage; an explicit relay wins
+    # and a listed stage is the only way there.
+    $ManagedRoutesDiagnosticStage='dead_pac_lookup'
+    $DeadReader={param($MaxBytes) @{Ok=$true;Absent=$false;AutoDetect=$false;PacUrl='http://127.0.0.1:9/dead.pac';Proxy='';Bypass='';NativeError=0;FailureOrigin=''}}.GetNewClosure()
+    Set-ManagedRoutesDiagnosticResult $null
+    $Dead=Resolve-ErgoptiNativeNetworkRoutes -DestinationUrl 'https://dead-pac-fixture.invalid/x' -BudgetMs 9000 -ReadConfig $DeadReader `
+        -ReadEnvironment $EmptyEnvironment -PolicyPath $PolicyPath -UpdaterDefaultsPath $UpdaterDefaultsPath
+    Set-ManagedRoutesDiagnosticResult $Dead
+    $ManagedRoutesDiagnosticStage='dead_pac_receipt'
+    if(-not $Dead.Ok -or $Dead.Routes.Count -ne 1 -or $Dead.Routes[0].Source -cne 'pac_unavailable_direct' -or
+        $Dead.PacFallbackStage -cne 'native_pac_download'){throw 'A PAC nobody serves did not go direct naming its stage.'}
+    $ManagedRoutesDiagnosticStage='dead_pac_relay'
+    $RelayEnvironment={param($Name) if($Name -ceq 'HTTPS_PROXY'){'http://relay.invalid:38110'}else{''}}
+    $Relayed=Resolve-ErgoptiNativeNetworkRoutes -DestinationUrl 'https://dead-pac-fixture.invalid/x' -BudgetMs 9000 -ReadConfig $DeadReader `
+        -ReadEnvironment $RelayEnvironment -PolicyPath $PolicyPath -UpdaterDefaultsPath $UpdaterDefaultsPath
+    if(-not $Relayed.Ok -or $Relayed.Routes.Count -ne 1 -or $Relayed.Routes[0].Kind -cne 'proxy' -or
+        $Relayed.PacFallbackStage){throw 'An explicit inherited relay must win and never fall back.'}
+    if($null -ne (New-ErgoptiPacDirectFallback (Get-ErgoptiNetworkPolicy $PolicyPath) 'not_a_listed_stage')){throw 'Only a listed stage goes direct.'}
     # Actual settings discovery is independently observed without mutating it;
     # an unavailable native reader is a failed qualification, not a synthetic pass.
     $ManagedRoutesDiagnosticStage='pac_auth_lookup'

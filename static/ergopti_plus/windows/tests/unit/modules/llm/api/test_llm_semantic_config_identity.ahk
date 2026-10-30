@@ -33,6 +33,7 @@ _AHK16_BaselineOpts() {
 		"max_words",               15,
 		"language",                "en",
 		"debounce_ms",             500,
+		"min_request_interval_ms", 300,
 		"ctx_chars",               500,
 		"temperature",             "0.10",
 		"instant_on_word_end",     true,
@@ -69,7 +70,7 @@ _AHK16_WithIsolatedEngine(Body) {
 	Base := _AHK16_BaselineOpts()
 	try {
 		LLM_Engine_Init(Base)
-		_LLM_Engine["last_request_tick"] := 0
+		_LLM_Engine_Plan().LastSentMs := ""
 		Body.Call(Base)
 	} finally {
 		try LLM_Engine_CancelTimer()

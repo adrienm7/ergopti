@@ -19,30 +19,30 @@ _OllamaSetPort_ValidApplies() {
 	ok := LLM_Ollama_SetPort(13434)
 	AssertTrue(ok, "a valid in-range port must be accepted")
 	AssertEqual("http://localhost:13434", LLM_OLLAMA_BASE_URL, "base URL must rebuild from the new port")
-	LLM_Ollama_SetPort(11434)  ; restore the default for downstream tests
+	LLM_Ollama_SetPort(11435)  ; restore the default for downstream tests
 }
 Test("LLM_Ollama_SetPort: valid port applies and rebuilds the base URL", _OllamaSetPort_ValidApplies)
 
 
 _OllamaSetPort_RejectsLow() {
 	global LLM_OLLAMA_BASE_URL
-	LLM_Ollama_SetPort(11434)
+	LLM_Ollama_SetPort(11435)
 	ok := LLM_Ollama_SetPort(80)
 	AssertFalse(ok, "privileged ports below 1024 must be rejected")
-	AssertEqual("http://localhost:11434", LLM_OLLAMA_BASE_URL, "a rejected port must leave the URL unchanged")
+	AssertEqual("http://localhost:11435", LLM_OLLAMA_BASE_URL, "a rejected port must leave the URL unchanged")
 }
 Test("LLM_Ollama_SetPort: rejects ports below 1024", _OllamaSetPort_RejectsLow)
 
 
 _OllamaSetPort_RejectsHigh() {
-	LLM_Ollama_SetPort(11434)
+	LLM_Ollama_SetPort(11435)
 	AssertFalse(LLM_Ollama_SetPort(70000), "ports above 65535 must be rejected")
 }
 Test("LLM_Ollama_SetPort: rejects ports above 65535", _OllamaSetPort_RejectsHigh)
 
 
 _OllamaSetPort_RejectsNonInteger() {
-	LLM_Ollama_SetPort(11434)
+	LLM_Ollama_SetPort(11435)
 	AssertFalse(LLM_Ollama_SetPort("abc"), "non-integer input must be rejected")
 }
 Test("LLM_Ollama_SetPort: rejects non-integer input", _OllamaSetPort_RejectsNonInteger)

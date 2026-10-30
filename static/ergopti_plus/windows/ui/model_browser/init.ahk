@@ -655,10 +655,10 @@ _LLM_MBW_BuildPayload() {
 	; The page's "Install Ollama" button posts the group action "install".
 	Tools["ollama`ninstall"] := (*) => _LLM_MBW_InstallOllama()
 	OllamaTools := []
-	PortDisplay := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
+	PortDisplay := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_owned_port")
 	OllamaTools.Push(_LLM_MBW_Tool(Tools, "ollama", "ollama_port",
 		StrReplace(t("menu.llm.ollama_port_label"), "%s", "" . PortDisplay), (*) => LLM_Menu_PromptOllamaPort()))
-	DefaultPort := _LLM_DefaultFor("llm_ollama_port")
+	DefaultPort := _LLM_DefaultFor("llm_ollama_owned_port")
 	if !(PortDisplay = DefaultPort)
 		OllamaTools.Push(_LLM_MBW_Tool(Tools, "ollama", "ollama_port_reset",
 			Trim(StrReplace(t("menu.llm.reset_label"), "%s", "" . DefaultPort)),

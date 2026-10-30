@@ -4,7 +4,7 @@
 	"drivers": {
 		"macos": "Replays every vector.",
 		"linux": "Replays every vector.",
-		"windows": "Not ported: one AHK consumer must call the Windows hotstring TOML reader on each text and compare the committed verdict, the sections, their first output and order, the source entry count and the metadata delays."
+		"windows": "windows/tests/meta/corpus/test_corpus_toml_hotstring_reader.ahk replays the committed vectors through its line readers; they have no whole-file verdict, so the 18 refused vectors have no Windows entry. Divergences are pinned with their reason."
 	},
 	"vectors": [
 		{

@@ -286,9 +286,13 @@ LLM_Option_NormalizeAppProfileOverrides(Value) {
 global LLM_OLLAMA_PORT_MIN := 1024
 global LLM_OLLAMA_PORT_MAX := 65535
 
-/** Normalizes the one Ollama port domain shared by menu, engine and client. */
+/**
+ * Normalizes the one Ollama port domain shared by menu, engine and client. The
+ * stock port (llm_ollama_port) is refused: a user's own Ollama keeps it, and
+ * Ergopti's daemon must never meet that Ollama.
+ */
 LLM_Option_TryNormalizeOllamaPort(Value, &Normalized) {
-	global LLM_OLLAMA_PORT_MIN, LLM_OLLAMA_PORT_MAX
+	global LLM_OLLAMA_PORT_MIN, LLM_OLLAMA_PORT_MAX, LLM_Defaults
 	Normalized := false
 	if !IsInteger(Value)
 		return false
@@ -296,6 +300,9 @@ LLM_Option_TryNormalizeOllamaPort(Value, &Normalized) {
 	catch
 		return false
 	if Candidate < LLM_OLLAMA_PORT_MIN || Candidate > LLM_OLLAMA_PORT_MAX
+		return false
+	if IsSet(LLM_Defaults) && LLM_Defaults is Map && LLM_Defaults.Has("llm_ollama_port")
+			&& Candidate == LLM_Defaults["llm_ollama_port"]
 		return false
 	Normalized := Candidate
 	return true
@@ -349,6 +356,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		"min_words", [1, 20],
 		"max_words", [0, 10000],
 		"debounce_ms", [50, 10000],
+		"min_request_interval_ms", [0, 10000],
 		"ctx_chars", [50, 10000])
 	static BooleanKeys := Map(
 		"enabled", true, "auto_profile_for_model", true,
@@ -393,6 +401,11 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 			return false
 		if (Candidate != Value)
 			return false
+		; The stored "never" of the debounce: the one value outside its range.
+		if (Key == "debounce_ms" && Candidate == LLM_REQUEST_PLAN_NEVER_MS) {
+			Normalized := Candidate
+			return true
+		}
 		Range := IntegerRanges[Key]
 		if (Candidate < Range[1] || Candidate > Range[2])
 			return false
@@ -439,7 +452,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
  * timer; reject any value outside the same public option boundary first.
  */
 LLM_Option_DebounceTimerPeriod(Value) {
-	if !LLM_Option_TryNormalize("debounce_ms", Value, &Normalized)
+	if !LLM_Option_TryNormalize("debounce_ms", Value, &Normalized) || Normalized < 0
 		throw ValueError("Invalid LLM debounce delay.")
 	return -Normalized
 }
