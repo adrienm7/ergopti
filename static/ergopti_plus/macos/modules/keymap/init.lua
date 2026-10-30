@@ -1411,6 +1411,7 @@ local function run_trigger_checks()
 		for _, m in ipairs(auto_bucket) do
 			if m.auto and ((star_validated and m.has_magic) or mapping_fires(m))
 				and Expander.would_fire(m, CoreState.buffer)
+				and not HotstringCore.auto_shadowed(auto_bucket, m, "auto")
 			then
 				-- The bucket is sorted longest-first, so the first that would fire is
 				-- the longest.
