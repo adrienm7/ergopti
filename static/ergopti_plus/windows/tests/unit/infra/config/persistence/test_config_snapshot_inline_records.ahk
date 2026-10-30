@@ -72,23 +72,22 @@ Test("configuration snapshot: inline owned namespaces retain record identity and
 	_FMS_InlineNamespaceSpellingsKeepDefaults)
 
 _FMS_InlineRecordAndPhysicalChildren() {
-	Inline := ConfigTomlDecodeSnapshot('shortcuts = { take_note = { enabled = true } }`n')
-	Assert(Inline.Cache["shortcuts"]["take_note"] is Map)
+	Inline := ConfigTomlDecodeSnapshot('[hotstrings.dynamic]`ndate = { enabled = true }`n')
+	Assert(Inline.Cache["hotstrings.dynamic"]["date"] is Map)
 	AssertEqual(1, Inline.Rows.Length, "the record must not be flattened into an alternative cache layout")
-	AssertEqual("shortcuts", Inline.Rows[1].Section)
-	AssertEqual("take_note", Inline.Rows[1].Key)
-	AssertTrue(Inline.Cache["shortcuts"]["take_note"]["enabled"])
-	Source := '[shortcuts]`ntake_note = { enabled = true }`n'
+	AssertEqual("hotstrings.dynamic", Inline.Rows[1].Section)
+	AssertEqual("date", Inline.Rows[1].Key)
+	AssertTrue(Inline.Cache["hotstrings.dynamic"]["date"]["enabled"])
+	Source := '[hotstrings.dynamic]`ndate = { enabled = true }`n'
 	_FMS_WithSource("inline_record", Source, _FMS_AssertRecordDefaults)
-	Source := '[shortcuts.take_note]`nenabled = true`n'
+	Source := '[hotstrings.dynamic.date]`nenabled = true`n'
 	_FMS_WithSource("physical_record", Source, _FMS_AssertRecordDefaults)
 }
 _FMS_AssertRecordDefaults(Path) {
 	Target := ManifestBuildFeaturesMap()
 	AssertEqual(1, ApplyConfigToml(Target, Path))
-	AssertTrue(Target["shortcuts"]["take_note"]["enabled"])
-	AssertFalse(Target["shortcuts"]["take_note"]["dated_notes"])
-	AssertEqual("D:\Bureau", Target["shortcuts"]["take_note"]["destination_folder"])
+	AssertTrue(Target["hotstrings"]["dynamic"]["date"]["enabled"])
+	AssertTrue(Target["hotstrings"]["dynamic"].Has("date_fr"), "a sibling keeps its default")
 }
 Test("configuration snapshot: owned inline records match physical child settings without dropping defaults (config-semantic-snapshot)",
 	_FMS_InlineRecordAndPhysicalChildren)
@@ -321,19 +320,19 @@ Test("configuration snapshot: source guard retains observed generation without p
 
 _FMS_InlineLiteralSpellingsKeepBooleanIntent(Path) {
 	Snapshot := ConfigTomlReadSnapshot(Path)
-	_FMS_AssertExactTree(Map("shortcuts", Map("screen", 0, "microsoft_bold", 0, "title_case", 1),
+	_FMS_AssertExactTree(Map("layout", Map("number_row_reorder_edges", 0, "ctrl_magic_save", 0, "ergopti_alt_gr", 1),
 		"hotstrings", Map("autocorrection", Map("names", Map("enabled", 0, "time_activation_seconds", 0.125)),
 		"french_autocorrection", Map("accents", Map("enabled", 1)))), Snapshot.Document)
-	_FMS_AssertExactTree(Map("shortcuts", Map("screen", 0, "microsoft_bold", 0, "title_case", 1),
+	_FMS_AssertExactTree(Map("layout", Map("number_row_reorder_edges", 0, "ctrl_magic_save", 0, "ergopti_alt_gr", 1),
 		"hotstrings.autocorrection", Map("names", Map("enabled", 0, "time_activation_seconds", 0.125)),
 		"hotstrings.french_autocorrection", Map("accents", Map("enabled", 1))), Snapshot.Cache)
 	Rows := Map()
 	for Row in Snapshot.Rows
 		Rows[Row.Section . "`n" . Row.Key] := Row
 	AssertEqual(5, Rows.Count)
-	AssertEqual("-0", Rows["shortcuts`nscreen"].Raw)
-	AssertEqual("-0", Rows["shortcuts`nmicrosoft_bold"].Raw)
-	AssertEqual("1", Rows["shortcuts`ntitle_case"].Raw)
+	AssertEqual("-0", Rows["layout`nnumber_row_reorder_edges"].Raw)
+	AssertEqual("-0", Rows["layout`nctrl_magic_save"].Raw)
+	AssertEqual("1", Rows["layout`nergopti_alt_gr"].Raw)
 	AssertEqual("-0", Rows["hotstrings.autocorrection`nnames"].ChildRaw["enabled"])
 	AssertEqual("1", Rows["hotstrings.french_autocorrection`naccents"].ChildRaw["enabled"])
 	Target := ManifestBuildFeaturesMap()
@@ -341,15 +340,15 @@ _FMS_InlineLiteralSpellingsKeepBooleanIntent(Path) {
 	AssertEqual(0, Rejected)
 	AssertEqual(2, Migrated, "only actual bare one leaves carry legacy Boolean intent")
 	AssertEqual(3, Outdated.Count, "signed-zero integers cannot invent legacy Boolean intent")
-	AssertFalse(Target["shortcuts"]["screen"])
-	AssertFalse(Target["shortcuts"]["microsoft_bold"])
-	AssertTrue(Target["shortcuts"]["title_case"])
+	AssertFalse(Target["layout"]["number_row_reorder_edges"])
+	AssertFalse(Target["layout"]["ctrl_magic_save"])
+	AssertTrue(Target["layout"]["ergopti_alt_gr"])
 	AssertFalse(Target["hotstrings"]["autocorrection"]["names"]["enabled"])
 	AssertEqual(0.125, Target["hotstrings"]["autocorrection"]["names"]["time_activation_seconds"])
 	AssertTrue(Target["hotstrings"]["french_autocorrection"]["accents"]["enabled"])
 }
 _FMS_InlineRawTokensNeverInventMigrationIntent() {
-	_FMS_WithSource("inline_spelling", 'shortcuts = { screen = -0, microsoft_bold = -0, title_case = 1 }`nhotstrings = { autocorrection = { names = { enabled = -0, time_activation_seconds = 0.125 } }, french_autocorrection = { accents = { enabled = 1 } } }`n',
+	_FMS_WithSource("inline_spelling", 'layout = { number_row_reorder_edges = -0, ctrl_magic_save = -0, ergopti_alt_gr = 1 }`nhotstrings = { autocorrection = { names = { enabled = -0, time_activation_seconds = 0.125 } }, french_autocorrection = { accents = { enabled = 1 } } }`n',
 		_FMS_InlineLiteralSpellingsKeepBooleanIntent)
 }
 Test("configuration snapshot: exact inline child spellings retain legacy Boolean admission (config-semantic-snapshot)",
@@ -378,7 +377,7 @@ _FMS_FullSaveChangedInlineSource(Path) {
 	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
 	Target := ManifestBuildFeaturesMap()
 	; A nondefault target exercises a durable leaf; the default 0.5 is sparse.
-	Expected := Chr(0xFEFF) . '_meta.schema_version = 17`nhotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.75, future = "retain"}}`n[future]`nold = "retain" # user data`n'
+	Expected := Chr(0xFEFF) . '_meta.schema_version = 19`nhotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.75, future = "retain"}}`n[future]`nold = "retain" # user data`n'
 	try {
 		_CFGFS_Prepare(Path)
 		_ConfigBootRejectedOverrides := 0
@@ -420,7 +419,7 @@ _FMS_FullSaveChangedInlineSource(Path) {
 	}
 }
 _FMS_FullSaveChangedInlineAndRestart() {
-	_FMS_WithSource("fullsave_inline_changed", '_meta.schema_version = 17`nhotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.25, future = "retain"}}`n[future]`nold = "retain" # user data`n',
+	_FMS_WithSource("fullsave_inline_changed", '_meta.schema_version = 19`nhotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.25, future = "retain"}}`n[future]`nold = "retain" # user data`n',
 		_FMS_FullSaveChangedInlineSource)
 }
 Test("configuration snapshot: actual full save changes an inline leaf and survives fresh native bootstrap (config-full-semantic-successor)",
@@ -498,7 +497,7 @@ _FMS_RemovedCapsPreservedUntilCleanup(Path) {
 	}
 }
 _FMS_RemovedCapsDoNotAcquireKnownOwnership() {
-	_FMS_WithSource("removed_caps", '_meta.schema_version = 17`n[hotstrings.autocorrection.names]`nenabled = true`ntime_activation_seconds = 0.25`n[hotstrings.autocorrection.caps]`nenabled = true`ntime_activation_seconds = 0.125`n',
+	_FMS_WithSource("removed_caps", '_meta.schema_version = 19`n[hotstrings.autocorrection.names]`nenabled = true`ntime_activation_seconds = 0.25`n[hotstrings.autocorrection.caps]`nenabled = true`ntime_activation_seconds = 0.125`n',
 		_FMS_RemovedCapsPreservedUntilCleanup)
 }
 Test("configuration snapshot: removed caps stays runtime unread and is preserved until explicit cleanup (config-current-feature-owner)",
@@ -588,7 +587,7 @@ _FMS_ConfigExactCollectedSubtree(Target) {
 _FMS_ConfigExactNameFullSave(Path, Fixture) {
 	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
 	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
-	Original := '_meta.schema_version = 17`n' . _FMS_ConfigExactNameSource(Fixture)
+	Original := '_meta.schema_version = 19`n' . _FMS_ConfigExactNameSource(Fixture)
 	Target := ManifestBuildFeaturesMap()
 	try {
 		_CFGFS_Prepare(Path)
@@ -601,7 +600,7 @@ _FMS_ConfigExactNameFullSave(Path, Fixture) {
 		AssertEqual(Original, FSRead(Path), "a collected semantic no-op retains the complete handwritten source")
 		Target["hotstrings"]["personal"][Fixture.name]["enabled"] := false
 		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0, Collector))
-		ExpectedSource := "_meta.schema_version = 17`n# private exact-name source`n" . Fixture.header . "`n"
+		ExpectedSource := "_meta.schema_version = 19`n# private exact-name source`n" . Fixture.header . "`n"
 			. "time_activation_seconds = 0.125`n"
 			. '# keep source trivia`n[future]`n"literal.dot" = { rows = [[1, "x"]], count = 9223372036854775807 }`n'
 		AssertEqual(ExpectedSource, FSRead(Path), "only the explicitly cleared leaf is removed")
@@ -610,7 +609,7 @@ _FMS_ConfigExactNameFullSave(Path, Fixture) {
 		Personal[Fixture.name] := Map("time_activation_seconds", 0.125)
 		_FMS_AssertExactTree(Map("hotstrings", Map("personal", Personal),
 			"future", Map("literal.dot", Map("rows", [[1, "x"]], "count", 9223372036854775807)),
-			"_meta", Map("schema_version", 17)),
+			"_meta", Map("schema_version", 19)),
 			TOML_ParseDocument(FSRead(Path)))
 		Reloaded := ManifestBuildFeaturesMap()
 		AssertEqual(1, ApplyConfigToml(Reloaded, Path), "the genuine reload reader keeps the exact remaining owner")
@@ -626,7 +625,7 @@ _FMS_ConfigExactNameFullSave(Path, Fixture) {
 }
 _FMS_ConfigFullSaveKeepsExactNames() {
 	for Index, Fixture in _FMS_ConfigExactNameFixtures()
-		_FMS_WithSource("fullsave_name_" . Index, '_meta.schema_version = 17`n' . _FMS_ConfigExactNameSource(Fixture),
+		_FMS_WithSource("fullsave_name_" . Index, '_meta.schema_version = 19`n' . _FMS_ConfigExactNameSource(Fixture),
 			_FMS_ConfigExactNameFullSave.Bind(, Fixture))
 }
 Test("configuration snapshot: real full-save publication and reload preserve exact semantic names (config-full-state-exact-path)",

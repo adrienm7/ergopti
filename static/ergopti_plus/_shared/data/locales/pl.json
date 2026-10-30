@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "Zamknij interfejs po dodaniu hotstring'a przez skrót",
 	"menu.hotstrings.config_item": "⚙️ Konfiguruj opóźnienia i kolory…",
 	"menu.hotstrings.consumed": "pochłonięty",
+	"menu.hotstrings.consumed_delimiters": "Pochłaniane przez rozwinięcie",
 	"menu.hotstrings.consumed_suffix": "(pochłonięty)",
 	"menu.hotstrings.custom_label": "Niestandardowy",
 	"menu.hotstrings.default_category_prefix": "Domyślna kategoria: ",

@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "Luk UI efter tilføjelse af hotstring via genvej",
 	"menu.hotstrings.config_item": "⚙️ Konfigurér forsinkelser og farver…",
 	"menu.hotstrings.consumed": "forbrugt",
+	"menu.hotstrings.consumed_delimiters": "Forbruges af udvidelsen",
 	"menu.hotstrings.consumed_suffix": "(forbrugt)",
 	"menu.hotstrings.custom_label": "Brugerdefineret",
 	"menu.hotstrings.default_category_prefix": "Standardkategori: ",

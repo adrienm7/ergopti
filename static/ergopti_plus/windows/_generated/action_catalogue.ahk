@@ -175,6 +175,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "screen_capture" })
 	Items.Push({ Kind: "action", Id: "screen_capture_instant" })
 	Items.Push({ Kind: "action", Id: "ocr_screenshot" })
+	Items.Push({ Kind: "action", Id: "open_chatgpt" })
 	Items.Push({ Kind: "action", Id: "open_url" })
 	Items.Push({ Kind: "action", Id: "open_downloads" })
 	Items.Push({ Kind: "action", Id: "open_file_manager" })
@@ -310,6 +311,7 @@ GestureActionCatalogueData() {
 	Actions["one_shot_shift"] := { Family: "sg", LabelKey: "sg_actions.one_shot_shift", Parameter: "", Confirm: false }
 	Actions["open_app"] := { Family: "sg", LabelKey: "sg_actions.open_app", Parameter: "app", Confirm: false }
 	Actions["open_changelog"] := { Family: "sg", LabelKey: "sg_actions.open_changelog", Parameter: "", Confirm: false }
+	Actions["open_chatgpt"] := { Family: "sg", LabelKey: "sg_actions.open_chatgpt", Parameter: "", Confirm: false }
 	Actions["open_config"] := { Family: "sg", LabelKey: "sg_actions.open_config", Parameter: "", Confirm: false }
 	Actions["open_downloads"] := { Family: "sg", LabelKey: "sg_actions.open_downloads", Parameter: "", Confirm: false }
 	Actions["open_emoji_picker"] := { Family: "sg", LabelKey: "sg_actions.open_emoji_picker", Parameter: "", Confirm: false }

@@ -1278,6 +1278,8 @@ function M.try_repeat_feature(chars, is_ignored)
 		or not text_utils.is_hotstring_word_char(last_char) then
 		return false
 	end
+	-- Minus any delimiter the user added: it ends a word, as on Windows.
+	if Terminators.is_terminator(pred_char) or Terminators.is_terminator(last_char) then return false end
 	-- The predecessor is the buffer's first character and its start is not known
 	-- to be a word start: it may be the tail of an older word.
 	if before_last == pred_char and _state.start_is_word_boundary == false then return false end

@@ -2112,6 +2112,69 @@ function M.translate_selection(value)
 	return accepted == true and completed ~= false
 end
 
+--- Sends the test sample straight to the active backend, with the active prompt
+--- and settings. A candidate offer would be a text the user could accept into the
+--- focused document, so none is opened and no engine state changes.
+--- @param sample string
+--- @param on_text function Receives the answer.
+--- @param on_fail function Receives the failure.
+function M._send_test_prediction(sample, on_text, on_fail)
+	local backend, target, model, runtime_response = M.resolve_backend()
+	if not backend then error("the backend is not ready", 0) end
+	local profile = ProfileSettings.resolve(model)
+	if not profile then error("the prediction profile catalogue is unavailable", 0) end
+	local params = PromptBuilder.build_params(sample, {
+		max_words = Settings.get(require("config_keys").LEAF.MAX_WORDS),
+		min_words = Settings.get(require("config_keys").LEAF.MIN_WORDS),
+		num_predictions = 1,
+		temperature = Settings.get("temperature"),
+		auto_raise_temp = false,
+		language = prompt_language(),
+		context_window_chars = max_context_chars(),
+	})
+	local system_prompt = resolve_system_prompt(profile, params, 1)
+	if type(system_prompt) ~= "string" then error("the active prompt has no usable system prompt", 0) end
+	backend.chat(target, model, PromptBuilder.build_messages(system_prompt, params.context, params.context_tail),
+		offer_request_opts(params.max_tokens, nil, runtime_response), nil,
+		function(full_text, err)
+			if err then return on_fail(err) end
+			on_text(Parser.strip_thinking(full_text or ""))
+		end)
+end
+
+--- The AI menu's « Test a prediction »: one prediction on a sample context, showing
+--- the answer or why it could not run (llm/test_prediction.lua).
+--- @return boolean sent True when the request left.
+function M.test_prediction()
+	-- A field, not a local: this chunk is at Lua's limit of 200 locals.
+	if not M._test_prediction then
+		M._test_prediction = require("llm.test_prediction").new({
+			text = function(key) return i18n.get(key) end,
+			refusal = function()
+				-- A sample is sent, so an empty typing buffer refuses nothing.
+				local reason = manual_refusal()
+				if reason == "empty_context" then reason = nil end
+				if not reason and not M.resolve_backend() then reason = "backend_not_ready" end
+				return reason and MANUAL_REFUSAL_KEYS[reason] or nil
+			end,
+			may_publish = function()
+				return not _runtime_closed and not _scope_owner and _enabled == true and not _is_paused()
+			end,
+			send = M._send_test_prediction,
+			show = function(text)
+				if not _notify then
+					Logger.error(LOG, "No notice surface injected: the test prediction is only logged.")
+				elseif _notify(text) ~= true then
+					Logger.warn(LOG, "A test prediction notice was not shown.")
+				end
+			end,
+			info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+			warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
+		})
+	end
+	return M._test_prediction.run()
+end
+
 --- Fills the {1}, {2}… of a translated template with plain values: a value is
 --- data, never a pattern replacement.
 --- @param template string

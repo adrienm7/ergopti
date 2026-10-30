@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "Chiudi UI dopo aver aggiunto un hotstring tramite scorciatoia",
 	"menu.hotstrings.config_item": "⚙️ Configura ritardi e colori…",
 	"menu.hotstrings.consumed": "consumato",
+	"menu.hotstrings.consumed_delimiters": "Consumati dall’espansione",
 	"menu.hotstrings.consumed_suffix": "(consumato)",
 	"menu.hotstrings.custom_label": "Personalizzato",
 	"menu.hotstrings.default_category_prefix": "Categoria predefinita: ",

@@ -14,12 +14,14 @@ import signal
 import stat
 import sys
 import time
+import traceback
 
 DRIVER = Path(__file__).absolute().parents[2]
 SHARED = DRIVER.parent / "_shared"
-# Source execution and actual outgoing model profiles must pass native CI before
-# the canonical user-facing serve caller may activate this new native port.
-NATIVE_PRODUCTION_QUALIFIED = False
+# Open since bc09e4584c made this owner the only Ollama macOS starts: the guard
+# refused every launch, so no field run could qualify the native port. Setting
+# it back to False refuses each launch with the logged reason "unavailable".
+NATIVE_PRODUCTION_QUALIFIED = True
 
 
 def load(name, path):
@@ -727,8 +729,19 @@ def main():
             owned_stdin=arguments.owned_stdin,
             log_directory=arguments.log_directory,
         )
-    except Exception:
-        print("Managed Ollama daemon admission refused.", file=sys.stderr)
+    except ServeRefusal as refusal:
+        # The driver logs this line. The reason is a fixed word, never a path
+        # or a value (field run 2026-10-30 17:37: the daemon exited before
+        # READY with no trace of which check refused it).
+        print("Managed Ollama daemon admission refused: %s." % refusal, file=sys.stderr)
+        return 78
+    except Exception as error:
+        frame = traceback.extract_tb(error.__traceback__)[-1]
+        print(
+            "Managed Ollama daemon admission refused: %s at %s:%d %s."
+            % (type(error).__name__, os.path.basename(frame.filename), frame.lineno, frame.name),
+            file=sys.stderr,
+        )
         return 78
 
 

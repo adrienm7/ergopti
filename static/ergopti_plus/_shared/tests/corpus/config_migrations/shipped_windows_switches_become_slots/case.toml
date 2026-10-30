@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_windows_switches_become_slots/case.toml
+
+[case]
+description = "A Windows switch left on becomes its slot and action, one turned off becomes none, an action the user chose wins, and the Win+G and Win+S values only the recommendations wrote become what the chord ran."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 18
+to_version = 19

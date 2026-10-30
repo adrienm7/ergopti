@@ -1,8 +1,8 @@
 # _shared/tests/corpus/config_migrations/shipped_keyboard_slot_parameters_kept_on_windows/case.toml
 
 [case]
-description = "The v15 slot renames are not a Windows step: a Windows file keeps every parameter key and only moves its stamp."
+description = "The v15 slot renames are not a Windows step: Windows keeps its parameters under [action_parameters], so a [gestures.action_parameters] key is left alone and the file only moves its stamp."
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 14
-to_version = 17
+to_version = 19

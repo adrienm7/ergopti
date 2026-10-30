@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "단축키로 핫스트링 추가 후 UI 닫기",
 	"menu.hotstrings.config_item": "⚙️ 지연 및 색상 설정…",
 	"menu.hotstrings.consumed": "소비됨",
+	"menu.hotstrings.consumed_delimiters": "확장 시 소비되는 구분 기호",
 	"menu.hotstrings.consumed_suffix": "(소비됨)",
 	"menu.hotstrings.custom_label": "사용자 지정",
 	"menu.hotstrings.default_category_prefix": "기본 카테고리: ",

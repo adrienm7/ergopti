@@ -256,3 +256,31 @@ _TQA_ToggleSites() {
 		"the notice is sent before the reload tears the tray icon down")
 }
 Test("feature notices: the toggles of the Lua menus notify on Windows (PAR-45)", _TQA_ToggleSites)
+
+; The scopes' « all sections » rows and the word-expander rows went unannounced.
+_TQA_ScopeRowsNotify() {
+	global _TQA_Displayed, _HotstringsTerminatorRecords
+	_TQA_Displayed := []
+	AssertEqual(0, _HS_SelectionNotice("Scope", true, 0), "a refused switch answers as it was")
+	AssertEqual(0, _TQA_Displayed.Length, "and says nothing")
+	AssertEqual(1, _HS_SelectionNotice("Scope", true, 1), "a committed switch answers as it was")
+	AssertEqual("Scope", _TQA_Displayed[1]["message"], "and is announced")
+	Saved := _HotstringsTerminatorRecords
+	Sent := []
+	Send := (Text, Opts) => (Sent.Push([Text, Opts["level"]]), true)
+	try {
+		_HotstringsTerminatorRecords := { Builtin: Map("comma", { Enabled: 0 }) }
+		_HS_DelimEntryNotice("comma", "Comma", Send)
+		AssertEqual(StrReplace(t("notify.word_expander_prefix"), "%s", "Comma"), Sent[1][1], "the prefix and the row's name")
+		AssertEqual("error", Sent[1][2], "off is the disabled level")
+	} finally
+		_HotstringsTerminatorRecords := Saved
+	Language := _DriverFuncBody("_HS_LanguageSwitchRow")
+	Assert(Language != "" && InStr(Language, "_HS_SelectionNotice(") > 0, "a language row notifies")
+	Assert(InStr(_DriverFuncBody("_BuildDynamicHotstringsSubmenu"), "_HS_SelectionNotice(") > 0, "the dynamic row notifies")
+	Assert(InStr(_DriverFuncBody("_HS_PersonalRows"), "_HS_SelectionNotice(") > 0, "the personal row notifies")
+	Rows :=_DriverFuncBody("_HS_WordExpanderRows")
+	Assert(Rows != "" && InStr(Rows, "_HS_DelimToggleEntry(EntryKey, 0, 0, EntryLabel)") > 0, "a catalogue row names itself")
+	Assert(InStr(Rows, "_HS_DelimRecordRowClick(") > 0, "a user delimiter row notifies")
+}
+Test("feature notices: the language, personal, dynamic and word-expander rows notify (PAR-45)", _TQA_ScopeRowsNotify)

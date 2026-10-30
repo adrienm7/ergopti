@@ -513,38 +513,17 @@ wpm_widget_graph = false
 
 [shortcuts]
 chatgpt_url = "https://chat.openai.com"
-get_hex_value = false
-microsoft_bold = false
-title_case = false
-uppercase = false
-paste_without_formatting = false
-select_line = false
-spotlight_mouse = false
-surround_with_parentheses = false
-teleport_mouse = false
 wrap_text_if_selected = false
-open_downloads = false
-move = false
-screen = false
-win_caps_lock = false
-
-
-
-[shortcuts.gpt]
-enabled = false
-link = "https://chatgpt.com/"
 
 
 
 [shortcuts.search]
-enabled = false
 search_engine = "https://www.google.com"
 search_engine_url_query = "https://www.google.com/search?q="
 
 
 
 [shortcuts.take_note]
-enabled = false
 dated_notes = false
 destination_folder = "D:\\Bureau"
 

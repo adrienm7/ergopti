@@ -78,7 +78,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 17
+current_version = 19
 unstamped_version = 2
 
 
@@ -816,4 +816,201 @@ drivers = ["hs"]
 reason = "The prompt profiles macOS kept as an array at [llm.profiles] user_profiles move to llm.user_profiles, the encoded envelope every OS reads. Only macOS ever wrote that array. A file that already holds the envelope keeps it, and the array stays for the cleanup to offer."
 ops = [
 	{ op = "encode_value", section = "llm.profiles", key = "user_profiles", to_section = "llm", to_key = "user_profiles", encoding = "user_profile_registry" },
+]
+
+[steps.v17_to_v18]
+from = 17
+to = 18
+drivers = ["ahk"]
+reason = "Windows keyboard slots are named by modifier role (primary_b, primary_shift_v, meta_a, meta_space) like macOS and Linux since v15: every saved binding keeps its action."
+# One rename per ordinary slot, so a target already there keeps its value (a
+# file copied from Linux can hold meta_space next to win_space). The physical
+# Win slots (win_SC03A, any letter case) are the one open-ended family, so a
+# prefix carries them. Each parameter key follows its slot: keyboard__ctrl_
+# also carries keyboard__ctrl_shift_ to keyboard__primary_shift_. A hand-written
+# key no slot owns (ctrl_f1) stays for the configuration cleanup.
+ops = [
+	{ op = "rename_prefix", section = "action_parameters", prefix = "keyboard__ctrl_", to_prefix = "keyboard__primary_" },
+	{ op = "rename_prefix", section = "action_parameters", prefix = "keyboard__win_", to_prefix = "keyboard__meta_" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_a", to_key = "primary_a" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_b", to_key = "primary_b" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_c", to_key = "primary_c" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_d", to_key = "primary_d" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_e", to_key = "primary_e" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_f", to_key = "primary_f" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_g", to_key = "primary_g" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_h", to_key = "primary_h" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_i", to_key = "primary_i" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_j", to_key = "primary_j" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_k", to_key = "primary_k" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_l", to_key = "primary_l" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_m", to_key = "primary_m" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_n", to_key = "primary_n" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_o", to_key = "primary_o" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_p", to_key = "primary_p" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_q", to_key = "primary_q" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_r", to_key = "primary_r" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_s", to_key = "primary_s" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_t", to_key = "primary_t" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_u", to_key = "primary_u" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_v", to_key = "primary_v" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_w", to_key = "primary_w" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_x", to_key = "primary_x" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_y", to_key = "primary_y" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_z", to_key = "primary_z" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_0", to_key = "primary_0" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_1", to_key = "primary_1" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_2", to_key = "primary_2" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_3", to_key = "primary_3" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_4", to_key = "primary_4" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_5", to_key = "primary_5" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_6", to_key = "primary_6" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_7", to_key = "primary_7" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_8", to_key = "primary_8" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_9", to_key = "primary_9" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_space", to_key = "primary_space" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_enter", to_key = "primary_enter" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_period", to_key = "primary_period" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_comma", to_key = "primary_comma" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_quote", to_key = "primary_quote" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_capslock", to_key = "primary_capslock" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_sc029", to_key = "primary_sc029" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_a", to_key = "primary_shift_a" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_b", to_key = "primary_shift_b" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_c", to_key = "primary_shift_c" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_d", to_key = "primary_shift_d" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_e", to_key = "primary_shift_e" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_f", to_key = "primary_shift_f" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_g", to_key = "primary_shift_g" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_h", to_key = "primary_shift_h" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_i", to_key = "primary_shift_i" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_j", to_key = "primary_shift_j" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_k", to_key = "primary_shift_k" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_l", to_key = "primary_shift_l" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_m", to_key = "primary_shift_m" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_n", to_key = "primary_shift_n" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_o", to_key = "primary_shift_o" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_p", to_key = "primary_shift_p" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_q", to_key = "primary_shift_q" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_r", to_key = "primary_shift_r" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_s", to_key = "primary_shift_s" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_t", to_key = "primary_shift_t" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_u", to_key = "primary_shift_u" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_v", to_key = "primary_shift_v" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_w", to_key = "primary_shift_w" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_x", to_key = "primary_shift_x" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_y", to_key = "primary_shift_y" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_z", to_key = "primary_shift_z" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_0", to_key = "primary_shift_0" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_1", to_key = "primary_shift_1" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_2", to_key = "primary_shift_2" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_3", to_key = "primary_shift_3" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_4", to_key = "primary_shift_4" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_5", to_key = "primary_shift_5" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_6", to_key = "primary_shift_6" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_7", to_key = "primary_shift_7" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_8", to_key = "primary_shift_8" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_9", to_key = "primary_shift_9" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_space", to_key = "primary_shift_space" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_enter", to_key = "primary_shift_enter" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_period", to_key = "primary_shift_period" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_comma", to_key = "primary_shift_comma" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_quote", to_key = "primary_shift_quote" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_capslock", to_key = "primary_shift_capslock" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_sc029", to_key = "primary_shift_sc029" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_a", to_key = "meta_a" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_b", to_key = "meta_b" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_c", to_key = "meta_c" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_d", to_key = "meta_d" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_e", to_key = "meta_e" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_f", to_key = "meta_f" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_g", to_key = "meta_g" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_h", to_key = "meta_h" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_i", to_key = "meta_i" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_j", to_key = "meta_j" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_k", to_key = "meta_k" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_l", to_key = "meta_l" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_m", to_key = "meta_m" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_n", to_key = "meta_n" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_o", to_key = "meta_o" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_p", to_key = "meta_p" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_q", to_key = "meta_q" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_r", to_key = "meta_r" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_s", to_key = "meta_s" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_t", to_key = "meta_t" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_u", to_key = "meta_u" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_v", to_key = "meta_v" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_w", to_key = "meta_w" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_x", to_key = "meta_x" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_y", to_key = "meta_y" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_z", to_key = "meta_z" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_0", to_key = "meta_0" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_1", to_key = "meta_1" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_2", to_key = "meta_2" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_3", to_key = "meta_3" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_4", to_key = "meta_4" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_5", to_key = "meta_5" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_6", to_key = "meta_6" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_7", to_key = "meta_7" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_8", to_key = "meta_8" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_9", to_key = "meta_9" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_space", to_key = "meta_space" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_enter", to_key = "meta_enter" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_period", to_key = "meta_period" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_comma", to_key = "meta_comma" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_quote", to_key = "meta_quote" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_capslock", to_key = "meta_capslock" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_sc029", to_key = "meta_sc029" },
+	{ op = "rename_prefix", section = "shortcuts.keyboard", prefix = "win_sc", to_prefix = "meta_sc" },
+	{ op = "rename_prefix", section = "shortcuts.keyboard", prefix = "win_SC", to_prefix = "meta_SC" },
+]
+
+[steps.v18_to_v19]
+from = 18
+to = 19
+drivers = ["ahk"]
+reason = "The Windows feature switches become the keyboard slots of the same chords, as on macOS since v15: a switch left on becomes its catalogue action, a switch turned off becomes none, and an action the user chose for the slot wins."
+# A saved slot is already under its neutral id (v18), so it keeps its value over
+# the switch of the same chord. Win+G and Win+S recommended open_url and
+# search_web, which read a per-binding parameter the switch never wrote, while
+# the switch ran the ChatGPT link and the selection opener. A file restored to
+# the recommendations holds both, so those two values become what the chord
+# actually ran. A URL on the slot and then the switch's link go to the setting
+# open_chatgpt reads, the first one present winning. The search and note fields
+# other than the switch stay where they are: they are now settings.
+ops = [
+	{ op = "rename", section = "action_parameters", key = "keyboard__meta_g__open_url", to_section = "shortcuts", to_key = "chatgpt_url" },
+	{ op = "rename", section = "shortcuts.gpt", key = "link", to_section = "shortcuts", to_key = "chatgpt_url" },
+	{ op = "rename", section = "shortcuts.gpt", key = "enabled", to_section = "shortcuts.keyboard", to_key = "meta_g" },
+	{ op = "rename", section = "shortcuts.search", key = "enabled", to_section = "shortcuts.keyboard", to_key = "meta_s" },
+	{ op = "rename", section = "shortcuts.take_note", key = "enabled", to_section = "shortcuts.keyboard", to_key = "meta_n" },
+	{ op = "rename", section = "shortcuts", key = "get_hex_value", to_section = "shortcuts.keyboard", to_key = "meta_x" },
+	{ op = "rename", section = "shortcuts", key = "microsoft_bold", to_section = "shortcuts.keyboard", to_key = "primary_b" },
+	{ op = "rename", section = "shortcuts", key = "title_case", to_section = "shortcuts.keyboard", to_key = "meta_w" },
+	{ op = "rename", section = "shortcuts", key = "uppercase", to_section = "shortcuts.keyboard", to_key = "meta_u" },
+	{ op = "rename", section = "shortcuts", key = "paste_without_formatting", to_section = "shortcuts.keyboard", to_key = "primary_shift_v" },
+	{ op = "rename", section = "shortcuts", key = "select_line", to_section = "shortcuts.keyboard", to_key = "meta_a" },
+	{ op = "rename", section = "shortcuts", key = "spotlight_mouse", to_section = "shortcuts.keyboard", to_key = "meta_quote" },
+	{ op = "rename", section = "shortcuts", key = "surround_with_parentheses", to_section = "shortcuts.keyboard", to_key = "meta_o" },
+	{ op = "rename", section = "shortcuts", key = "teleport_mouse", to_section = "shortcuts.keyboard", to_key = "meta_t" },
+	{ op = "rename", section = "shortcuts", key = "open_downloads", to_section = "shortcuts.keyboard", to_key = "meta_d" },
+	{ op = "rename", section = "shortcuts", key = "move", to_section = "shortcuts.keyboard", to_key = "meta_m" },
+	{ op = "rename", section = "shortcuts", key = "screen", to_section = "shortcuts.keyboard", to_key = "meta_h" },
+	{ op = "rename", section = "shortcuts", key = "win_caps_lock", to_section = "shortcuts.keyboard", to_key = "meta_capslock" },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_g", map = [{ from = "open_url", to = "open_chatgpt" }, { from = true, to = "open_chatgpt" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_s", map = [{ from = "search_web", to = "copy_selected_path" }, { from = true, to = "copy_selected_path" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_n", map = [{ from = true, to = "take_note" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_x", map = [{ from = true, to = "pick_color" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "primary_b", map = [{ from = true, to = "microsoft_bold" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_w", map = [{ from = true, to = "titlecase_selection" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_u", map = [{ from = true, to = "uppercase_selection" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "primary_shift_v", map = [{ from = true, to = "paste_plain" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_a", map = [{ from = true, to = "select_line" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_quote", map = [{ from = true, to = "spotlight_mouse" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_o", map = [{ from = true, to = "surround_parens" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_t", map = [{ from = true, to = "teleport_mouse" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_d", map = [{ from = true, to = "open_downloads" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_m", map = [{ from = true, to = "activity_simulation" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_h", map = [{ from = true, to = "screen_capture" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_capslock", map = [{ from = true, to = "toggle_capslock" }, { from = false, to = "none" }] },
 ]

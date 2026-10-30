@@ -632,7 +632,7 @@ jobs:
           receive_controls tools/test/macos_bootstrap_tls_numeric_binding_test.py 8 "$ERGOPTI_OLLAMA_BUILD_ROOT/numeric-tls-controls.log"
           # Portable process peers; actual native listener qualification is separate.
           receive_controls tools/test/macos_native_ollama_api_test.py 20 "$ERGOPTI_OLLAMA_BUILD_ROOT/api-wire-controls.log"
-          receive_controls tools/diagnostics/macos_managed_ollama_serve_test.py 45 "$ERGOPTI_OLLAMA_BUILD_ROOT/serve-lifecycle-controls.log"
+          receive_controls tools/diagnostics/macos_managed_ollama_serve_test.py 46 "$ERGOPTI_OLLAMA_BUILD_ROOT/serve-lifecycle-controls.log"
         timeout-minutes: 5
       - name: Retain actual private-session and numeric TLS peer diagnostics
         env:

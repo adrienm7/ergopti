@@ -100,7 +100,7 @@ _NPR_Run(Kind, Mode) {
 			AssertTrue(DllCall("IsWindowVisible", "Ptr", Hwnd))
 			List := ControlGetHwnd("ListBox1", "ahk_id " . Hwnd)
 			Rows := DllCall("SendMessageW", "Ptr", List, "UInt", 0x18B, "Ptr", 0, "Ptr", 0, "Int")
-			AssertTrue(Kind == "slots" ? Rows == 1 : Rows > 1,
+			AssertTrue(Kind == "slots" ? Rows == KeyboardSlotDeclaration()["keys"].Length : Rows > 1,
 				"the real constructor must populate its native selection control before retirement")
 			_NPR_Post(Hwnd, Mode)
 			Started := A_TickCount

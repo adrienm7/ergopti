@@ -26,8 +26,8 @@ _PPSNT_ChildSource(Client) {
 	Code .= "LoggerWarn(*) => 0`nLoggerError(*) => 0`nLoggerDebug(*) => 0`nLoggerInfo(*) => 0`n"
 	Code .= "global _SendHook := 0`nglobal SEND_INSTANT_PASTE_DELAY_MS := Integer(A_Args[4])`n"
 	Names := ["TickElapsed", "TickElapsed64", "_TextSenderNativeFocus", "_SendVerdictSucceeded", "SendFinalResult"]
-	Names.Push(Client == "gesture" ? "_GesturePastePlainRestore" : "_PasteWithoutFormattingRestore")
-	Names.Push(Client == "gesture" ? "GesturePastePlain" : "PasteWithoutFormatting")
+	Names.Push(Client == "gesture" ? "_GesturePastePlainRestore" : "_GesturePastePlainRestore")
+	Names.Push(Client == "gesture" ? "GesturePastePlain" : "GesturePastePlain")
 	for Name in Names {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "Every genuine plain-paste dependency must have a real body: " . Name)
@@ -44,7 +44,7 @@ _PPSNT_ChildSource(Client) {
 	}
 	AssertEqual(2, Count, "Only the two actual native SendFinalResult injection callsites may be observed")
 	Code .= ClipboardSource . "`n" . Overlaid . SubStr(Body, Position) . "`n"
-	Code .= "_PPSN_Invoke() => " . (Client == "gesture" ? "GesturePastePlain" : "PasteWithoutFormatting") . "()`n"
+	Code .= "_PPSN_Invoke() => " . (Client == "gesture" ? "GesturePastePlain" : "GesturePastePlain") . "()`n"
 	return Code . "#Include " . _DriverDir . "\tests\fixtures\plain_paste_snapshot_owner_body.ahk`n"
 }
 
@@ -148,6 +148,5 @@ _PPSNT_Case(Client) {
 }
 
 Test("Plain paste snapshot: gesture preserves a new non-text copy (plain-paste-snapshot-owner)", _PPSNT_Case.Bind("gesture"))
-Test("Plain paste snapshot: shortcut preserves a new non-text copy (plain-paste-snapshot-owner)", _PPSNT_Case.Bind("shortcut"))
 
 #Include test_plain_native_cas_owner.ahk

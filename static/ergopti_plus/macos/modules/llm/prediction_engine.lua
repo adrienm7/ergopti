@@ -2426,6 +2426,44 @@ function M.request_chat_answer(label, system_prompt, user_text, max_tokens, on_r
 	return true
 end
 
+--- The AI menu's « Test a prediction »: one prediction on a sample context, showing
+--- the answer or why it could not run (llm/test_prediction.lua). It goes straight
+--- to the backend: the notice is plain text, whereas a prediction tooltip is a
+--- text the user could accept into the focused document.
+--- @return boolean sent True when the request left.
+function M.test_prediction()
+	if not require_state("test_prediction") then return false end
+	if not M._test_prediction then
+		local function live_refusal()
+			-- A sample is sent, so an empty typing buffer refuses nothing.
+			local reason = manual_refusal()
+			if reason == "empty_context" then return nil end
+			return reason
+		end
+		M._test_prediction = require("llm.test_prediction").new({
+			text = function(key) return i18n.get(key) end,
+			refusal = function()
+				local reason = live_refusal()
+				return reason and MANUAL_REFUSAL_KEYS[reason] or nil
+			end,
+			may_publish = function() return runtime_available() and live_refusal() == nil end,
+			send = function(sample, on_text, on_fail, current)
+				core_llm.fetch_raw_completion(core_llm.get_active_profile(), sample, sample, core_llm.get_current_model(),
+					temperature, Rewrite.max_tokens(sample), on_text, on_fail, current)
+			end,
+			show = function(text)
+				local ok_show, shown = pcall(tooltip.show, text, true, true)
+				if not ok_show or shown ~= true then
+					Logger.warn(LOG, "A test prediction notice was not shown: %s.", tostring(shown))
+				end
+			end,
+			info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+			warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
+		})
+	end
+	return M._test_prediction.run()
+end
+
 --- Opens the prediction tooltip for answers (screen reading, translation): it
 --- supersedes any prediction in flight or shown, and shows the loading row
 --- until the first answer. The backend is not cancelled: the answers themselves

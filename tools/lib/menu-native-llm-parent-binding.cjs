@@ -1860,6 +1860,7 @@ function closedLlmContext(caller) {
 		'llm_ctx.commands = {}',
 		'llm_ctx.commands[key] = value',
 		'llm_ctx.commands["scope_restore"] = function()',
+		'llm_ctx.commands["llm_test_prediction"] = function()',
 		'llm_ctx.commands["llm_toggle"] = function()',
 		'llm_ctx.state_getters = {}',
 		'llm_ctx.state_getters[key] = value',

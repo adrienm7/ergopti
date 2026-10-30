@@ -1340,9 +1340,12 @@ time and are not obvious from the code:
 - The native CA cases (`managed remote native`, `updater native`, the two
   `test_managed_remote_sspi.ahk` cases, the artifact staging case) install
   their root in CurrentUser, which raises the Windows security warning that
-  needs a click. Headless they fail at `Machine root-store scope requires...`
-  when `ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE=LocalMachine` is set without
-  elevation; run them from an elevated shell or accept the prompt by hand.
+  needs a click, and `X509Store.Add` blocks behind it. A local run therefore
+  reports them NOT EXECUTED at `ChangeTrust(true)`, after their untrusted part;
+  `--interactive` lets a person click within the 10 s trust budget. Hosted CI
+  runs them in the elevated LocalMachine scope, which asks nothing. Setting
+  `ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE=LocalMachine` locally is refused by the
+  hosted-context guard (`Machine root-store scope requires...`).
 - `run_all.ahk` replaces a running copy of itself: launch a private,
   uniquely named copy, or two agents kill each other's runs with exit code 0.
 
@@ -1350,6 +1353,17 @@ time and are not obvious from the code:
 
 The native Windows TLS fixture takes OpenSSL tools from exactly one Git for
 Windows prefix that contains `git.exe` (mingw64 or ucrt64), with no cross-prefix
-fallback. Hosted Git 2.56 moved the SDK from mingw64 to ucrt64, which is why the
-seven managed-network `native_tls` cases started failing; check the prefix first
-when they fail.
+fallback; Git 2.56 moved the SDK to ucrt64. A wrong prefix stops the fixture at
+startup, before its `ready` receipt, so it cannot explain a trust install resting
+at `before_add`: that step is the blocked `X509Store.Add` of a CurrentUser root,
+behind the security warning (see `project-windows-managed-transport-is-winhttp`).
+The seven trust cases pass on the hosted Git 2.56 lanes in LocalMachine scope.
+
+## Keyboard slots bind after the layout
+
+`KeyboardShortcutsBindAll` runs after `modules/keymap/layout.ahk` because a slot's
+letter means the key that types it under the Ergopti emulation
+(`KeyboardSlotLayoutScan` reads `RemappedList`), and before `MagicEditorStart`
+because a Win slot on such a key joins the physical broker, which acquires its
+keys once. Moving the binding earlier silently returns every emulated letter to the
+host layout's key; keep the order pinned by `test_keyboard_slot_neutral_roles.ahk`.

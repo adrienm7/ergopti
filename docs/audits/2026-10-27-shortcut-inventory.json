@@ -1,199 +1,7 @@
 {
 	"schema_version": 1,
-	"description": "Inventory of every shortcut config entry on the three drivers, for PAR-41 (docs/design/one-shortcut-model.md, step 1). 'legacy_boolean' rows are a feature switch bound to one hard-coded chord; 'keyboard_slot' rows are a chord bound to a catalogue action id; 'slot_families' list the modifier prefixes under which a driver accepts any key of modifier_chords.json. 'chord.modifiers' use each driver's own modifier names. 'slot' names the keyboard slot that already binds the same chord, so a boolean and a slot never both own it after the change. Checked against the manifest, the AutoHotkey AddShortcut calls and the Lua hotkey registry by tools/test/test-shortcut-inventory-matches-sources.cjs. Updated after the macOS and Linux adoption: their slot ids and families are the role-named ones, the 18 macOS Ctrl-letter switches are keyboard slots, and the Windows rows still describe the Windows ids.",
+	"description": "Inventory of every shortcut config entry on the three drivers, for PAR-41 (docs/design/one-shortcut-model.md, step 1). 'legacy_boolean' rows are a feature switch bound to one hard-coded chord; 'keyboard_slot' rows are a chord bound to a catalogue action id; 'slot_families' list the modifier prefixes under which a driver accepts any key of modifier_chords.json. 'chord.modifiers' use each driver's own modifier names. 'slot' names the keyboard slot that already binds the same chord, so a boolean and a slot never both own it after the change. Checked against the manifest, the AutoHotkey AddShortcut calls and the Lua hotkey registry by tools/test/test-shortcut-inventory-matches-sources.cjs. Updated after the macOS and Linux adoption: their slot ids and families are the role-named ones and the 18 macOS Ctrl-letter switches are keyboard slots. The Windows slots took the same ids in schema v18 and the Windows switches became slots in schema v19.",
 	"rows": [
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.get_hex_value",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "x"
-			},
-			"action": "pick_color",
-			"slot": "win_x",
-			"note": null
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.gpt",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "g"
-			},
-			"action": "open_url",
-			"slot": "win_g",
-			"note": "Carries a link parameter (shortcuts.gpt.link); the slot takes the URL as an action parameter."
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.search",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "s"
-			},
-			"action": "search_web",
-			"slot": "win_s",
-			"note": "Carries search_engine and search_engine_url_query parameters."
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.take_note",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "n"
-			},
-			"action": "take_note",
-			"slot": "win_n",
-			"note": "Carries a dated-note parameter set."
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.microsoft_bold",
-			"chord": {
-				"modifiers": ["ctrl"],
-				"key": "b"
-			},
-			"action": "microsoft_bold",
-			"slot": "ctrl_b",
-			"note": null
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.title_case",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "w"
-			},
-			"action": "titlecase_selection",
-			"slot": "win_w",
-			"note": null
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.uppercase",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "u"
-			},
-			"action": "uppercase_selection",
-			"slot": "win_u",
-			"note": null
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.paste_without_formatting",
-			"chord": {
-				"modifiers": ["ctrl", "shift"],
-				"key": "v"
-			},
-			"action": "paste_plain",
-			"slot": "ctrl_shift_v",
-			"note": null
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.select_line",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "a"
-			},
-			"action": "select_line",
-			"slot": "win_a",
-			"note": null
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.spotlight_mouse",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "quote"
-			},
-			"action": "spotlight_mouse",
-			"slot": null,
-			"note": "Win+' has no slot id: the slot key list has no apostrophe."
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.surround_with_parentheses",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "o"
-			},
-			"action": "surround_parens",
-			"slot": "win_o",
-			"note": null
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.teleport_mouse",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "t"
-			},
-			"action": "teleport_mouse",
-			"slot": "win_t",
-			"note": null
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.open_downloads",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "d"
-			},
-			"action": "open_downloads",
-			"slot": "win_d",
-			"note": "Slot win_d recommends none while the boolean recommends on."
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.move",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "m"
-			},
-			"action": "activity_simulation",
-			"slot": "win_m",
-			"note": null
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.screen",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "h"
-			},
-			"action": "screen_capture",
-			"slot": "win_h",
-			"note": null
-		},
-		{
-			"driver": "windows",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.win_caps_lock",
-			"chord": {
-				"modifiers": ["win"],
-				"key": "capslock"
-			},
-			"action": "toggle_capslock",
-			"slot": null,
-			"note": "Win+CapsLock has no slot: CapsLock is not in the slot key list."
-		},
 		{
 			"driver": "windows",
 			"kind": "special_boolean",
@@ -206,193 +14,217 @@
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.ctrl_b",
+			"config_key": "shortcuts.keyboard.primary_b",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "b"
 			},
 			"action": "microsoft_bold",
-			"slot": "ctrl_b",
+			"slot": "primary_b",
 			"note": null
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.ctrl_shift_v",
+			"config_key": "shortcuts.keyboard.primary_shift_v",
 			"chord": {
 				"modifiers": ["ctrl", "shift"],
 				"key": "v"
 			},
 			"action": "paste_plain",
-			"slot": "ctrl_shift_v",
+			"slot": "primary_shift_v",
 			"note": null
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_a",
+			"config_key": "shortcuts.keyboard.meta_a",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "a"
 			},
 			"action": "select_line",
-			"slot": "win_a",
+			"slot": "meta_a",
 			"note": null
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_d",
+			"config_key": "shortcuts.keyboard.meta_d",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "d"
 			},
-			"action": null,
-			"slot": "win_d",
-			"note": null
+			"action": "open_downloads",
+			"slot": "meta_d",
+			"note": "Was the switch shortcuts.open_downloads; migrated by schema v19."
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_g",
+			"config_key": "shortcuts.keyboard.meta_g",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "g"
 			},
-			"action": "open_url",
-			"slot": "win_g",
-			"note": null
+			"action": "open_chatgpt",
+			"slot": "meta_g",
+			"note": "Was the switch shortcuts.gpt; its link moved to shortcuts.chatgpt_url in schema v19."
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_h",
+			"config_key": "shortcuts.keyboard.meta_h",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "h"
 			},
 			"action": "screen_capture",
-			"slot": "win_h",
+			"slot": "meta_h",
 			"note": null
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_m",
+			"config_key": "shortcuts.keyboard.meta_m",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "m"
 			},
 			"action": "activity_simulation",
-			"slot": "win_m",
+			"slot": "meta_m",
 			"note": null
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_n",
+			"config_key": "shortcuts.keyboard.meta_n",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "n"
 			},
 			"action": "take_note",
-			"slot": "win_n",
-			"note": null
+			"slot": "meta_n",
+			"note": "Was the switch shortcuts.take_note; its note fields stay as settings."
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_o",
+			"config_key": "shortcuts.keyboard.meta_o",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "o"
 			},
 			"action": "surround_parens",
-			"slot": "win_o",
+			"slot": "meta_o",
 			"note": null
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_s",
+			"config_key": "shortcuts.keyboard.meta_s",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "s"
 			},
-			"action": "search_web",
-			"slot": "win_s",
-			"note": null
+			"action": "copy_selected_path",
+			"slot": "meta_s",
+			"note": "Was the switch shortcuts.search; its engine fields stay as settings."
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_sc029",
+			"config_key": "shortcuts.keyboard.meta_sc029",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "sc029"
 			},
 			"action": "screen_capture_instant",
-			"slot": "win_sc029",
+			"slot": "meta_sc029",
 			"note": null
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_t",
+			"config_key": "shortcuts.keyboard.meta_t",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "t"
 			},
 			"action": "teleport_mouse",
-			"slot": "win_t",
+			"slot": "meta_t",
 			"note": null
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_u",
+			"config_key": "shortcuts.keyboard.meta_u",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "u"
 			},
 			"action": "uppercase_selection",
-			"slot": "win_u",
+			"slot": "meta_u",
 			"note": null
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_w",
+			"config_key": "shortcuts.keyboard.meta_w",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "w"
 			},
 			"action": "titlecase_selection",
-			"slot": "win_w",
+			"slot": "meta_w",
 			"note": null
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_x",
+			"config_key": "shortcuts.keyboard.meta_x",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "x"
 			},
 			"action": "pick_color",
-			"slot": "win_x",
+			"slot": "meta_x",
 			"note": null
 		},
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.win_space",
+			"config_key": "shortcuts.keyboard.meta_capslock",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "capslock"
+			},
+			"action": "toggle_capslock",
+			"slot": "meta_capslock",
+			"note": "Was the switch shortcuts.win_caps_lock; migrated by schema v19."
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.meta_quote",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "quote"
+			},
+			"action": "spotlight_mouse",
+			"slot": "meta_quote",
+			"note": "Was the switch shortcuts.spotlight_mouse; migrated by schema v19."
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.meta_space",
 			"chord": {
 				"modifiers": ["win"],
 				"key": "space"
 			},
 			"action": "llm_generate_prediction",
-			"slot": "win_space",
+			"slot": "meta_space",
 			"note": null
 		},
 		{
@@ -770,17 +602,17 @@
 		},
 		{
 			"driver": "windows",
-			"prefix": "ctrl_",
+			"prefix": "primary_",
 			"modifiers": ["ctrl"]
 		},
 		{
 			"driver": "windows",
-			"prefix": "ctrl_shift_",
+			"prefix": "primary_shift_",
 			"modifiers": ["ctrl", "shift"]
 		},
 		{
 			"driver": "windows",
-			"prefix": "win_",
+			"prefix": "meta_",
 			"modifiers": ["win"]
 		},
 		{

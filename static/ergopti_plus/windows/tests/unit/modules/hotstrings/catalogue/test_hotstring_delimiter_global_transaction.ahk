@@ -280,6 +280,31 @@ _HSDT_ToggleWritesOnceThenPublishes() {
 		AssertEqual(_HSDT_DefaultWord(), HSE_WORD_TERMINATORS)
 	} finally _HSDT_Restore(Saved)
 }
+_HSDT_ConsumeToggleWritesItsLeaf() {
+	global _HSDT_WriteCalls, _HSDT_WrittenUpdates, _HotstringsTerminatorRecords
+	Saved := _HSDT_SaveState()
+	try {
+		_HSDT_Seed("consume_row")
+		Sent := []
+		Send := (Text, Opts) => (Sent.Push([Text, Opts["level"]]), true)
+		Before := _HotstringsTerminatorRecords.Builtin["comma"].Consume
+		Enabled := _HotstringsTerminatorRecords.Builtin["comma"].Enabled
+		AssertTrue(_HS_DelimToggleConsume("comma", "Comma", _HSDT_AcceptWriter, Send))
+		AssertEqual(1, _HSDT_WriteCalls, "one click is one write")
+		AssertEqual("hotstrings.terminator_consume", _HSDT_WrittenUpdates[1][1].Section, "its own leaf")
+		AssertEqual(!Before, !!_HotstringsTerminatorRecords.Builtin["comma"].Consume, "the choice flips")
+		AssertEqual(Enabled, _HotstringsTerminatorRecords.Builtin["comma"].Enabled, "the row's switch stays")
+		AssertEqual(1, Sent.Length, "the switch is announced")
+		AssertContains(Sent[1][1], "Comma " . t("menu.hotstrings.consumed_suffix"))
+		AssertFalse(_HS_DelimToggleConsume("no_such_key", "X", _HSDT_AcceptWriter, Send), "an unknown entry is refused")
+		AssertEqual(1, _HSDT_WriteCalls)
+	} finally _HSDT_Restore(Saved)
+	Rows := _DriverFuncBody("_HS_WordExpanderRows")
+	Assert(InStr(Rows, '"parameter_consume_children", ConsumeRows') > 0, "the frame draws the rows")
+}
+Test("hotstring-delimiter-consume: a row of the submenu flips the consumption alone (PAR-8)",
+	_HSDT_ConsumeToggleWritesItsLeaf)
+
 Test("hotstring-delimiter-global-transaction-20260813: a toggle writes one leaf "
 	. "and publishes the strings after the writer",
 	_HSDT_ToggleWritesOnceThenPublishes)

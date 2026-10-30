@@ -1131,127 +1131,6 @@
 							{
 								"items": [
 									{
-										"path": "shortcuts.get_hex_value",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.gethexvalue"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.gpt.enabled",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.gpt"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.search.enabled",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.search"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.take_note.enabled",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.takenote"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.microsoft_bold",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.microsoftbold"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.title_case",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.titlecase"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.uppercase",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.uppercase"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.select_line",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "sg_actions.select_line"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.spotlight_mouse",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.spotlightmouse"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.surround_with_parentheses",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.surroundwithparentheses"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.teleport_mouse",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.teleportmouse"
-											}
-										]
-									},
-									{
 										"path": "shortcuts.wrap_text_if_selected",
 										"value": true,
 										"default": false,
@@ -1259,50 +1138,6 @@
 										"label": [
 											{
 												"key": "shortcuts.label_wrap_text"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.open_downloads",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.opendownloads"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.move",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.move"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.screen",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.screen"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.win_caps_lock",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.wincapslock"
 											}
 										]
 									},
@@ -1417,7 +1252,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.ctrl_b",
+										"path": "shortcuts.keyboard.primary_b",
 										"value": "microsoft_bold",
 										"default": "none",
 										"recommended": true,
@@ -1433,23 +1268,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.ctrl_shift_v",
-										"value": "paste_plain",
-										"default": "none",
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + Shift + V"
-											}
-										],
-										"value_label": [
-											{
-												"key": "sg_actions.paste_plain"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keyboard.win_a",
+										"path": "shortcuts.keyboard.meta_a",
 										"value": "select_line",
 										"default": "none",
 										"recommended": true,
@@ -1465,8 +1284,24 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_g",
-										"value": "open_url",
+										"path": "shortcuts.keyboard.meta_d",
+										"value": "open_downloads",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"text": "Win + D"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.open_downloads"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.meta_g",
+										"value": "open_chatgpt",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1476,12 +1311,12 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.open_url"
+												"key": "sg_actions.open_chatgpt"
 											}
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_h",
+										"path": "shortcuts.keyboard.meta_h",
 										"value": "screen_capture",
 										"default": "none",
 										"recommended": true,
@@ -1497,7 +1332,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_m",
+										"path": "shortcuts.keyboard.meta_m",
 										"value": "activity_simulation",
 										"default": "none",
 										"recommended": true,
@@ -1513,7 +1348,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_n",
+										"path": "shortcuts.keyboard.meta_n",
 										"value": "take_note",
 										"default": "none",
 										"recommended": true,
@@ -1529,7 +1364,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_o",
+										"path": "shortcuts.keyboard.meta_o",
 										"value": "surround_parens",
 										"default": "none",
 										"recommended": true,
@@ -1545,8 +1380,8 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_s",
-										"value": "search_web",
+										"path": "shortcuts.keyboard.meta_s",
+										"value": "copy_selected_path",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1556,12 +1391,12 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.search_web"
+												"key": "sg_actions.copy_selected_path"
 											}
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_sc029",
+										"path": "shortcuts.keyboard.meta_sc029",
 										"value": "screen_capture_instant",
 										"default": "none",
 										"recommended": true,
@@ -1577,7 +1412,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_t",
+										"path": "shortcuts.keyboard.meta_t",
 										"value": "teleport_mouse",
 										"default": "none",
 										"recommended": true,
@@ -1593,7 +1428,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_u",
+										"path": "shortcuts.keyboard.meta_u",
 										"value": "uppercase_selection",
 										"default": "none",
 										"recommended": true,
@@ -1609,7 +1444,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_w",
+										"path": "shortcuts.keyboard.meta_w",
 										"value": "titlecase_selection",
 										"default": "none",
 										"recommended": true,
@@ -1625,7 +1460,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_x",
+										"path": "shortcuts.keyboard.meta_x",
 										"value": "pick_color",
 										"default": "none",
 										"recommended": true,
@@ -1641,7 +1476,55 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_space",
+										"path": "shortcuts.keyboard.meta_capslock",
+										"value": "toggle_capslock",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"text": "Win + CapsLock"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.toggle_capslock"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.meta_quote",
+										"value": "spotlight_mouse",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"text": "Win + '"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.spotlight_mouse"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.primary_shift_v",
+										"value": "paste_plain",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"text": "Ctrl + Shift + V"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.paste_plain"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.meta_space",
 										"value": "llm_generate_prediction",
 										"default": "none",
 										"recommended": true,

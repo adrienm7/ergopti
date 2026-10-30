@@ -468,6 +468,11 @@
 			]
 		},
 		{
+			"type": "command",
+			"id": "llm_test_prediction",
+			"i18n": "menu.llm.test_prediction"
+		},
+		{
 			"type": "---"
 		},
 		{
@@ -4100,6 +4105,11 @@
 		{
 			"type": "list",
 			"id": "parameter_catalogue_entries"
+		},
+		{
+			"type": "group",
+			"id": "parameter_consume_children",
+			"i18n": "menu.hotstrings.consumed_delimiters"
 		},
 		{
 			"type": "---"

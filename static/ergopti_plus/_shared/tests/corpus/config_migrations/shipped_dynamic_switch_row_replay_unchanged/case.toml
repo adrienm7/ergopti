@@ -5,4 +5,4 @@ description = "Replaying the v16 step on rows it already wrote changes nothing b
 drivers = ["ahk", "hs", "linux"]
 outcome = "migrated"
 from_version = 15
-to_version = 17
+to_version = 19

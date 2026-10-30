@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_keyboard_slots_windows_step_skips_lua/case.toml
+
+[case]
+description = "The v18 slot renames are a Windows step: a macOS or Linux file only moves its stamp, whatever it holds."
+drivers = ["hs", "linux"]
+outcome = "migrated"
+from_version = 17
+to_version = 19

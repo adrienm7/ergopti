@@ -1,0 +1,7 @@
+# _shared/tests/corpus/config_migrations/shipped_windows_switches_step_skips_lua/expected.toml
+
+[_meta]
+schema_version = 19
+
+[shortcuts]
+get_hex_value = true

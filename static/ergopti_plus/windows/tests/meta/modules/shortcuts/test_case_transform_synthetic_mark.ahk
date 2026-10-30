@@ -37,18 +37,6 @@ _CTSM_CheckGestures() {
 		"the case actions must schedule KL_ClearSynthetic after SendInstant")
 }
 
-_CTSM_CheckWinShortcuts() {
-	for _, Name in ["ConvertToTitleCase", "ConvertToUppercase"] {
-		Src := _DriverFuncBody(Name)
-		Assert(Src != "", Name . " must exist")
-		Assert(InStr(Src, "GestureTransformSelection("),
-			Name . " must go through the marked case-action injector, not a copy of it")
-	}
-}
-
 
 Test("meta case-transform: gestures.ahk marks output as synthetic",
 	_CTSM_CheckGestures)
-
-Test("meta case-transform: shortcuts/win.ahk reuses the marked injector",
-	_CTSM_CheckWinShortcuts)
