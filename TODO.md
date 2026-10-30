@@ -126,6 +126,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    - `field_app_health` (after the AI steps): no crash report of the last day in the driver's `crash_reports`
      folder nor in `~/Library/Logs/DiagnosticReports` for ErgoptiPlus, Hammerspoon or Ollama (each fails with
      its count); the app's resident memory (MB) and CPU share from `ps` are named.
+   - `field_ai_local` (after the AI steps, read-only): the owned Ollama binary passes `codesign --verify
+--strict`; a running server lists its models (not running: skip, never started here); one token is
+     predicted from the check's own text with the smallest catalogue model already installed (none: skip, never
+     a download); the MLX runtime and the catalogue models in its cache are counted.
 
 ## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
 

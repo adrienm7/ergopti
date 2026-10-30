@@ -146,6 +146,13 @@
 			"proves": "The MLX model download and serve path works with the smallest installed catalogue model, and the active-model file is put back."
 		},
 		{
+			"id": "field_ai_local",
+			"kind": "field_check",
+			"check": "ai_local",
+			"deadline_seconds": 90,
+			"proves": "The owned Ollama passes a strict signature check, its running server lists its models and predicts one token with an installed model; the MLX models on disk are counted."
+		},
+		{
 			"id": "field_app_health",
 			"kind": "field_check",
 			"check": "app_health",

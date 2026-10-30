@@ -355,9 +355,111 @@ end
 
 
 
+-- ===========================
+-- ===========================
+-- ======= 7/ Local AI =======
+-- ===========================
+-- ===========================
+
+-- Seconds the one-token prediction may take, a cold model load included.
+local PREDICTION_TIMEOUT_SECONDS = 60
+
+--- The catalogue's models for one backend, smallest download first.
+--- @param backend string "ollama" or "mlx".
+--- @return table models { { name, runtime_name, download_gb } }
+local function catalogue_models(backend)
+	local path = require("infra.paths").shared_llm_path("models.json")
+	local text = path and require("adapters.file_system").read(path) or nil
+	if type(text) ~= "string" then return {} end
+	local ModelCatalogue = require("llm.model_catalogue")
+	local models = {}
+	for _, provider in ipairs(require("json").decode(text)) do
+		for _, family in ipairs(type(provider.families) == "table" and provider.families or {}) do
+			for _, model in ipairs(type(family.models) == "table" and family.models or {}) do
+				local runtime = ModelCatalogue.runtime_name(model, backend)
+				local sizes = type(model.hardware_requirements) == "table" and model.hardware_requirements[backend] or nil
+				local size = type(sizes) == "table" and tonumber(sizes.download_gb) or nil
+				if runtime and size and type(model.name) == "string" then
+					models[#models + 1] = { name = model.name, runtime_name = runtime, download_gb = size }
+				end
+			end
+		end
+	end
+	table.sort(models, function(a, b) return a.download_gb < b.download_gb end)
+	return models
+end
+
+--- The AI menu's models manager, or nil before the menu exists.
+local function models_manager()
+	local menu = package.loaded["ui.menu.menu_llm"]
+	return type(menu) == "table" and type(menu.active_models_manager) == "function"
+		and menu.active_models_manager() or nil
+end
+
+--- The local AI facts read without starting anything.
+--- @return table facts { ollama_path|nil, mlx_runtime|nil, mlx_installed|nil }
+local function ai_facts()
+	local facts = {}
+	facts.ollama_path = (require("modules.llm.ollama_binary").resolve())
+	local ok, installed = pcall(function() return require("modules.llm.mlx_deps_checker").runtime_installed() end)
+	if ok then facts.mlx_runtime = installed == true end
+	local manager = models_manager()
+	if manager and type(manager.mlx_model_installed) == "function" then
+		local count = 0
+		for _, model in ipairs(catalogue_models("mlx")) do
+			if manager.mlx_model_installed(model.name) == true then count = count + 1 end
+		end
+		facts.mlx_installed = count
+	end
+	return facts
+end
+
+--- Lists the models of a running Ollama server, without starting it.
+--- @param callback function fn(listed).
+local function ollama_refresh(callback)
+	local Api = require("modules.llm.api_ollama")
+	Api.forget_local_models()
+	Api.refresh_local_models(function(listed) callback(listed == true) end)
+end
+
+--- The smallest catalogue model the last listing holds.
+--- @return string|nil runtime_name
+local function ollama_installed_model()
+	local Api = require("modules.llm.api_ollama")
+	for _, model in ipairs(catalogue_models("ollama")) do
+		if Api.local_model_installed(model.runtime_name) == true then return model.runtime_name end
+	end
+	return nil
+end
+
+--- Predicts one token through the driver's own Ollama request path.
+--- @param model string Installed model.
+--- @param text string The check's own text.
+--- @param callback function fn(answered, failure_token|nil, elapsed_ms).
+local function ollama_predict(model, text, callback)
+	local Timer = require("adapters.timer_scheduler")
+	local started, settled, timer = hs.timer.absoluteTime(), false, nil
+	local function settle(answered, token)
+		if settled then return end
+		settled = true
+		if timer then Timer.cancel(timer) end
+		callback(answered, token, (hs.timer.absoluteTime() - started) / 1e6)
+	end
+	timer = Timer.after(PREDICTION_TIMEOUT_SECONDS, function()
+		timer = nil
+		settle(false, "timeout")
+	end)
+	require("modules.llm.api_ollama").request_raw(model, "", text, "", 0, 1,
+		function() settle(true) end, function() settle(false, "request_failed") end)
+end
+
+
+
+
+
 -- ==========================
 -- ==========================
--- ======= 7/ Factory =======
+-- ======= 8/ Factory =======
 -- ==========================
 -- ==========================
 
@@ -382,6 +484,10 @@ function M.new()
 		loopback_server = loopback_server,
 		crash_counts = crash_counts,
 		pid = function() return hs.processInfo.processID end,
+		ai_facts = ai_facts,
+		ollama_refresh = ollama_refresh,
+		ollama_installed_model = ollama_installed_model,
+		ollama_predict = ollama_predict,
 	}
 end
 
