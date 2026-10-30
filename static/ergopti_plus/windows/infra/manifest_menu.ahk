@@ -1948,10 +1948,17 @@ _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters) {
 			CurrentLabel := String(Current)
 		Label := StrReplace(Label, _MR_Get(Item, "current_choice_placeholder", "{1}"), CurrentLabel)
 	}
+	Disabled := MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
+	; A greyed choice that declares why (``disabled_reason_key``) opens nothing
+	; and names its reason: no driver repeats that policy. Without a reason it
+	; stays navigable, as before.
+	ReasonKey := _MR_Get(Item, "disabled_reason_key")
+	if (Disabled && ReasonKey != "")
+		return Map("label", Label, "disabled", true, "disabled_reason_key", ReasonKey,
+			"replay_group", _MR_ReplayIdentity(ManifestKey, Id, "container"))
 	Row := Map("label", Label, "items", Rows, "replay_group", _MR_ReplayIdentity(ManifestKey, Id, "container"))
-	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
+	if Disabled
 		Row["disabled"] := true
-	}
 	return Row
 }
 

@@ -106,9 +106,9 @@ function classifyMenuRow(row, where) {
 	if (row.disabled_reason_key !== undefined) {
 		if (typeof row.disabled_reason_key !== 'string' || row.disabled_reason_key === '')
 			throw new Error(`${where}: disabled_reason_key must name a locale key`);
-		if (!['command', 'check', 'toggle', 'group'].includes(row.type))
+		if (!['command', 'check', 'toggle', 'group', 'choice'].includes(row.type))
 			throw new Error(
-				`${where}: disabled_reason_key is read on command/check/toggle rows or identified labelled groups`
+				`${where}: disabled_reason_key is read on command/check/toggle/choice rows or identified labelled groups`
 			);
 		if (
 			row.type === 'group' &&
