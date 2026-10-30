@@ -3310,6 +3310,18 @@ function M.merge_into_existing_config(
 	return existing, nil, { status = "ok", content = raw }, changed
 end
 
+-- Size and write time of this session's last karabiner.json publication, or nil.
+local _last_deploy = nil
+
+--- The last karabiner.json publication of this session: the write runs on the
+--- main thread, so its duration decides whether the file must shrink (the
+--- 743 KB file of the swallowed-keys follow-up).
+--- @return table|nil facts { bytes, write_ms }, nil before the first deploy.
+function M.last_deploy()
+	if _last_deploy == nil then return nil end
+	return { bytes = _last_deploy.bytes, write_ms = _last_deploy.write_ms }
+end
+
 --- Re-reads, merges, encodes, and publishes the current Karabiner config.
 --- The exact bytes read for the merge remain the publication precondition, so a
 --- stock Karabiner or editor write that lands after the read is never overwritten.
@@ -3427,6 +3439,7 @@ function M.merge_and_deploy_config(
 
 	-- The write is synchronous on the Hammerspoon main thread: its duration is
 	-- the stall a typist can feel, so the log carries it next to the size.
+	_last_deploy = { bytes = #content, write_ms = write_ms }
 	Logger.info(LOG,
 		"Karabiner deploy decision: deployed (%s; %d bytes; written in %.0f ms; Karabiner reloads every rule).",
 		source_snapshot.status == "absent" and "no karabiner.json yet"
