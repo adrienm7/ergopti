@@ -1387,7 +1387,20 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       registry (none exists, so only installed registry layouts and the composition are sources); the row
       switches (`layout.emulate_*_row`) stay Windows-only: they mix Ergopti rows with the OS layout, which has
       no `.keylayout` source on Linux; the onboarding control is 3337d99bc8 on `tmp/wip-todo-af`
-      (compatible, it reads `number_row_live.available()`). macOS (1) to (3) are all left.
+      (compatible, it reads `number_row_live.available()`).
+      **macOS done in code** (branch `fix/macos-overnight-d`, 30 October): (1) the menu rows store the choice and
+      rebuild the layout typing now (an installed registry or composed layout, or the build typing for it) with
+      `layouts/keylayout_rows.lua`, the shared `.keylayout` editor proved against the Linux converter on every
+      vector and registry layout (`test-keylayout-row-options.cjs`; Cmd, Ctrl and Option keep the layout's
+      cells through a copy of the keyMap they shared); (2) `layout_rows_build.lua` writes each build under a new
+      name and id, enables it through the preference route, selects it, accepts it only on a fresh-process
+      read-back of its base cells, then retires the previous build (two failed retirements refuse the next);
+      (3) the global scope's layout participant settles only on that read-back and reverts the rows when the
+      system did not take the layout. Left [PHYS-M]: the next field report's `field_layout_rows` answers M4 to
+      M6 (live select, live replace, exact restore, ghosts until logout); if it fails on `select_refused` or
+      `requires_logout`, the live path needs the in-bundle route of the design note. Choosing an option in the
+      menu on the Mac and typing with it needs hands (the field step drives the same build path, not the menu
+      click). An Ergopti bundle source types digits on both levels, so its rows stay greyed (`digits_on_both`).
 - [ ] **Windows updater -File workers: real update check.** [PHYS] Install a build with 5d6beccf83
       by hand, then update from it to the next release: the exe is replaced and restarts, the
       three scripts are in `%LOCALAPPDATA%\Ergopti\vendor\`, the PowerShell command line shows

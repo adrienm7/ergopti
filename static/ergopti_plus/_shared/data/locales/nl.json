@@ -3740,6 +3740,7 @@
 	"platform_reason.number_row_live_session": "Niet beschikbaar: Alleen een X11-sessie, of GNOME of KDE onder Wayland, past dit direct toe. Deze desktop behoudt zijn huidige indeling; je keuze is opgeslagen.",
 	"platform_reason.number_row_live_no_layout": "Niet beschikbaar: Installeer eerst een ErgoptiPlus-indeling; deze keuze wijzigt de indeling die je gebruikt.",
 	"layouts.linux_rows_not_applied": "De keuze voor de cijferrij is opgeslagen, maar de actieve toetsenbordindeling kon niet worden bijgewerkt.",
+	"layouts.rows_not_applied": "De keuze voor de cijferrij is opgeslagen, maar de actieve toetsenbordindeling kon niet worden bijgewerkt.",
 	"platform_reason.number_row_source_unavailable": "Niet beschikbaar: Symbolen eerst vereist een actieve geëmuleerde indeling met geldige cijfer- en symboolniveaus op elke positie van de cijferrij.",
 	"menu.layout.number_row_not_applied": " (niet toegepast)",
 	"platform_reason.number_row_already_digits_first": "Geen effect: deze indeling typt de cijfers al zonder Shift.",

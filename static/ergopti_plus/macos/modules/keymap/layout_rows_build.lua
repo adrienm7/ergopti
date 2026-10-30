@@ -336,6 +336,14 @@ function M.replace(source, rows, on_done, deps)
 	return true
 end
 
+--- The build typing for a layout now, from the record; nil when none or unreadable.
+--- @param deps table
+--- @return table|nil build { n, name, path, source_id }
+function M.current(deps)
+	local record = read_record(deps)
+	return record and record.current or nil
+end
+
 --- Retires the current build and the recorded ones (the field run's restore, or
 --- a reset); selects nothing. on_done(ok, left) with the builds still listed.
 --- @param on_done function

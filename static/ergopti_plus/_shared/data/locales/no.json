@@ -3740,6 +3740,7 @@
 	"platform_reason.number_row_live_session": "Utilgjengelig: Bare en X11-økt, eller GNOME eller KDE på Wayland, bruker dette med en gang. Dette skrivebordet beholder det nåværende oppsettet; valget ditt er lagret.",
 	"platform_reason.number_row_live_no_layout": "Utilgjengelig: Installer først et ErgoptiPlus-oppsett; dette valget endrer oppsettet du bruker.",
 	"layouts.linux_rows_not_applied": "Valget for tallraden er lagret, men det aktive tastaturoppsettet kunne ikke oppdateres.",
+	"layouts.rows_not_applied": "Valget for tallraden er lagret, men det aktive tastaturoppsettet kunne ikke oppdateres.",
 	"platform_reason.number_row_source_unavailable": "Utilgjengelig: Symboler først krever et aktivt emulert oppsett med gyldige tall- og symbolnivåer på hver plass i tallrekken.",
 	"menu.layout.number_row_not_applied": " (ikke brukt)",
 	"platform_reason.number_row_already_digits_first": "Ingen effekt: dette oppsettet skriver allerede sifrene uten Skift.",

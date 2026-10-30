@@ -3740,6 +3740,7 @@
 	"platform_reason.number_row_live_session": "Indisponível: Apenas uma sessão X11, ou GNOME ou KDE em Wayland, o aplica de imediato. Este ambiente de trabalho mantém a disposição atual; a sua escolha está guardada.",
 	"platform_reason.number_row_live_no_layout": "Indisponível: Instale primeiro uma disposição ErgoptiPlus: esta opção altera a disposição que utiliza.",
 	"layouts.linux_rows_not_applied": "A escolha da fila de números está guardada, mas não foi possível atualizar a disposição de teclado em uso.",
+	"layouts.rows_not_applied": "A escolha da fila de números está guardada, mas não foi possível atualizar a disposição de teclado em uso.",
 	"platform_reason.number_row_source_unavailable": "Indisponível: Símbolos primeiro requer uma disposição emulada ativa com níveis válidos de números e símbolos em todas as posições da fila.",
 	"menu.layout.number_row_not_applied": " (não aplicado)",
 	"platform_reason.number_row_already_digits_first": "Sem efeito: este layout já digita os números sem Shift.",

@@ -3740,6 +3740,7 @@
 	"platform_reason.number_row_live_session": "Inte tillgängligt: Bara en X11-session, eller GNOME eller KDE på Wayland, tillämpar detta direkt. Det här skrivbordet behåller sin nuvarande layout; ditt val är sparat.",
 	"platform_reason.number_row_live_no_layout": "Inte tillgängligt: Installera först en ErgoptiPlus-layout; det här valet ändrar den layout du använder.",
 	"layouts.linux_rows_not_applied": "Valet för siffraden är sparat, men den aktiva tangentbordslayouten kunde inte uppdateras.",
+	"layouts.rows_not_applied": "Valet för siffraden är sparat, men den aktiva tangentbordslayouten kunde inte uppdateras.",
 	"platform_reason.number_row_source_unavailable": "Inte tillgängligt: Symboler först kräver en aktiv emulerad layout med giltiga siffer- och symbolnivåer på varje plats i sifferraden.",
 	"menu.layout.number_row_not_applied": " (tillämpas inte)",
 	"platform_reason.number_row_already_digits_first": "Ingen effekt: den här layouten skriver redan siffrorna utan Skift.",

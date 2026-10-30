@@ -3740,6 +3740,7 @@
 	"platform_reason.number_row_live_session": "No disponible: Solo una sesión X11, o GNOME o KDE en Wayland, lo aplica al instante. Este escritorio conserva su disposición actual; su elección está guardada.",
 	"platform_reason.number_row_live_no_layout": "No disponible: Instale primero una disposición ErgoptiPlus: esta opción modifica la disposición que usa.",
 	"layouts.linux_rows_not_applied": "La elección de la fila de números está guardada, pero no se pudo actualizar la disposición de teclado en uso.",
+	"layouts.rows_not_applied": "La elección de la fila de números está guardada, pero no se pudo actualizar la disposición de teclado en uso.",
 	"platform_reason.number_row_source_unavailable": "No disponible: Símbolos primero requiere una distribución emulada activa con niveles válidos de números y símbolos en cada posición de la fila.",
 	"menu.layout.number_row_not_applied": " (no aplicado)",
 	"platform_reason.number_row_already_digits_first": "Sin efecto: esta distribución ya escribe sus números sin Mayús.",

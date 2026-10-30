@@ -3740,6 +3740,7 @@
 	"platform_reason.number_row_live_session": "غير متاح: لا تطبّق هذا فورًا إلا جلسة X11 أو GNOME أو KDE على Wayland. تحتفظ سطح المكتب هذا بتخطيطه الحالي، وقد تم حفظ اختيارك.",
 	"platform_reason.number_row_live_no_layout": "غير متاح: ثبّت أولًا تخطيط ErgoptiPlus للوحة المفاتيح؛ فهذا الاختيار يغيّر التخطيط الذي تستخدمه.",
 	"layouts.linux_rows_not_applied": "تم حفظ اختيار صف الأرقام، لكن تعذّر تحديث تخطيط لوحة المفاتيح الجاري استخدامه.",
+	"layouts.rows_not_applied": "تم حفظ اختيار صف الأرقام، لكن تعذّر تحديث تخطيط لوحة المفاتيح الجاري استخدامه.",
 	"platform_reason.number_row_source_unavailable": "غير متاح: تتطلب أولوية الرموز تخطيطًا محاكى نشطًا بمستويات صالحة للأرقام والرموز في كل موضع من صف الأرقام.",
 	"menu.layout.number_row_not_applied": " (غير مطبق)",
 	"platform_reason.number_row_already_digits_first": "بلا تأثير: هذا التخطيط يكتب أرقامه بالفعل دون Shift.",
