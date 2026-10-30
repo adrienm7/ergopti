@@ -83,20 +83,49 @@ LLM_Engine_OnKeystroke(buffer, delay_override_ms := "", ScheduleFn := SetTimer,
 		if IsSet(PublishGuard) && !PublishGuard.Call()
 			return false
 		_LLM_Engine["last_buffer"] := buffer
-		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource,
-			LLM_Engine_LiveOverride())
 		; A word-end fast-fire (instant_on_word_end) passes a delay override; otherwise the
-		; configured debounce applies. Max(1, ...) keeps an override of 0 near-immediate.
+		; plan arms the configured debounce, or nothing when that is "never".
 		HasOverride := delay_override_ms != "" and IsNumber(delay_override_ms)
-		DebounceMs := LLM_Engine_LiveDebounceMs()
-		_arm_ms := HasOverride ? Max(1, delay_override_ms) : DebounceMs
-		TimerPeriod := HasOverride ? -_arm_ms
-			: LLM_Option_DebounceTimerPeriod(DebounceMs)
-		ScheduleFn.Call(_LLM_Engine["pending_timer"], TimerPeriod)
+		Decision := _LLM_Engine_PlanInput(HasOverride
+			? Map("cause", "override", "delay_ms", Max(0, delay_override_ms)) : Map("cause", "typing"))
+		if Decision["action"] != "arm"
+			return
+		_LLM_Engine["pending_timer"] := _LLM_Engine_FireArmed.Bind(Decision["token"], buffer, AcceptSource,
+			LLM_Engine_LiveOverride())
+		ScheduleFn.Call(_LLM_Engine["pending_timer"], _LLM_Engine_ArmPeriod(Decision, HasOverride))
 		_LLM_Engine["timer_active"] := true
 	} finally {
 		Critical(_c)
 	}
+}
+
+/**
+ * Feeds one input event to the plan under the engine's current settings.
+ * @param {Map} Event The plan's input event.
+ * @returns {Map} Its last decision: the arm, or the skip.
+ */
+_LLM_Engine_PlanInput(Event) {
+	global _LLM_Engine
+	Plan := _LLM_Engine_Plan()
+	Plan.Configure(Map("enabled", _LLM_Engine["enabled"] ? true : false,
+		"debounce_ms", _LLM_Engine["debounce_ms"],
+		"instant_on_word_end", _LLM_Engine["instant_on_word_end"] ? true : false,
+		"live_debounce_ms", LLM_Engine_LiveIsActive() ? LLM_Live_Config()["debounce_ms"] : false))
+	Decisions := Plan.OnInput(Event)
+	return Decisions[Decisions.Length]
+}
+
+/** The one-shot SetTimer period of an arm; an override of 0 stays near-immediate. */
+_LLM_Engine_ArmPeriod(Decision, HasOverride) {
+	return HasOverride ? -Max(1, Decision["delay_ms"])
+		: LLM_Option_DebounceTimerPeriod(Decision["delay_ms"])
+}
+
+/** A timer the plan no longer holds was superseded: it never sends. */
+_LLM_Engine_FireArmed(Token, Buffer, AcceptSource, Override) {
+	if _LLM_Engine_Plan().OnTimer(Token)[1]["action"] != "fire"
+		return
+	return LLM_Engine_FirePrediction(Buffer, AcceptSource, Override)
 }
 
 /**
@@ -126,23 +155,21 @@ LLM_Engine_StartTimer(delaySec := "", buffer := "", PublishGuard := unset,
 	; cancel/re-arm transaction, so a stale callback cannot cancel a newer timer.
 	AcceptSource := _LLM_Engine_CaptureAcceptSource()
 	HasOverride := delaySec != "" and IsNumber(delaySec)
-	DebounceMs := LLM_Engine_LiveDebounceMs()
-	delay_ms := HasOverride
-		? Max(1, Round(delaySec * 1000))
-		: DebounceMs
-	TimerPeriod := HasOverride ? -delay_ms
-		: LLM_Option_DebounceTimerPeriod(DebounceMs)
-	; The hotstring chain is the automatic trigger too: live mode redirects it
-	PendingTimer := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource,
-		LLM_Engine_LiveOverride())
+	Override := LLM_Engine_LiveOverride()
 	PreviousCritical := Critical("On")
 	try {
 		if IsSet(PublishGuard) && !PublishGuard.Call()
 			return false
 		LLM_Engine_CancelTimer()
+		; The hotstring chain is the automatic trigger too: live mode redirects it,
+		; and "never" arms nothing unless an override asks for a delay of its own.
+		Decision := _LLM_Engine_PlanInput(HasOverride
+			? Map("cause", "override", "delay_ms", Max(0, Round(delaySec * 1000))) : Map("cause", "typing"))
+		if Decision["action"] != "arm"
+			return false
 		_LLM_Engine["last_buffer"] := buffer
-		_LLM_Engine["pending_timer"] := PendingTimer
-		ScheduleFn.Call(_LLM_Engine["pending_timer"], TimerPeriod)
+		_LLM_Engine["pending_timer"] := _LLM_Engine_FireArmed.Bind(Decision["token"], buffer, AcceptSource, Override)
+		ScheduleFn.Call(_LLM_Engine["pending_timer"], _LLM_Engine_ArmPeriod(Decision, HasOverride))
 		_LLM_Engine["timer_active"] := true
 	} finally {
 		Critical(PreviousCritical)
@@ -163,6 +190,7 @@ LLM_Engine_CancelTimer() {
 		; state divergence when the guard and the actual timer state disagree.
 		if _LLM_Engine.Has("pending_timer") and IsObject(_LLM_Engine["pending_timer"])
 			SetTimer(_LLM_Engine["pending_timer"], 0)
+		_LLM_Engine_Plan().OnCancel()
 		_LLM_Engine["pending_timer"] := ""
 		_LLM_Engine["timer_active"]  := false
 	} finally {

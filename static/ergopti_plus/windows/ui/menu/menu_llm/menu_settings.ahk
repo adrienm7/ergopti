@@ -178,8 +178,10 @@ _LLM_Menu_TriggerRows(Position := "all") {
 
 	; Debounce — dialog like HS (free numeric input)
 	DebounceRows := MenuRenderer_TemplateRows("llm_trigger_debounce_control",
-		Map("llm_trigger_debounce", (*) => LLM_Menu_PromptDebounce()),
-		Map("llm_trigger_debounce_caption", () => _LLM_Menu["debounce_ms"] . " ms"), Map())
+		Map("llm_trigger_debounce", (*) => LLM_Menu_PromptDebounce(),
+			"llm_trigger_min_interval", (*) => LLM_Menu_PromptMinRequestInterval()),
+		Map("llm_trigger_debounce_caption", () => _LLM_Menu_DebounceCaption(_LLM_Menu["debounce_ms"]),
+			"llm_trigger_min_interval_caption", () => _LLM_Menu["min_request_interval_ms"] . " ms"), Map())
 	if !(DebounceRows is Array)
 		return []
 	for Row in DebounceRows
@@ -189,6 +191,11 @@ _LLM_Menu_TriggerRows(Position := "all") {
 		_LLM_DefaultFor("llm_debounce_ms", 500),
 		(*) => _LLM_AssignAndRebuild("debounce_ms",
 			_LLM_DefaultFor("llm_debounce_ms", 500)))
+	_LLM_MaybeResetRow(Rows,
+		_LLM_Menu["min_request_interval_ms"],
+		_LLM_DefaultFor("llm_min_request_interval_ms"),
+		(*) => _LLM_AssignAndRebuild("min_request_interval_ms",
+			_LLM_DefaultFor("llm_min_request_interval_ms")))
 
 	BoundaryRows := MenuRenderer_TemplateRows("llm_trigger_provider_boundary", Map(), Map(), Map())
 	if !(BoundaryRows is Array)
@@ -774,6 +781,16 @@ _LLM_MaybeResetRow(Rows, current, default_val, on_click) {
 LLM_Menu_PromptDebounce() {
 	LLM_Menu_PromptNumeric("debounce_ms", t("menu.llm.trigger_menu_title"),
 		t("menu.llm.debounce_prompt"))
+}
+
+/** The stored -1 reads as the shared "never" label, like the Lua menus. */
+_LLM_Menu_DebounceCaption(Value) {
+	return Value < 0 ? t("menu.settings.never") : Value . " ms"
+}
+
+LLM_Menu_PromptMinRequestInterval() {
+	LLM_Menu_PromptNumeric("min_request_interval_ms", t("menu.llm.trigger_menu_title"),
+		StrReplace(t("menu.settings.min_interval_prompt"), "%s", _LLM_DefaultFor("llm_min_request_interval_ms")))
 }
 
 ; Ollama port has its own prompt (not LLM_Menu_PromptNumeric) because applying it
