@@ -372,7 +372,7 @@ function read(folder, name) {
 				assert.doesNotMatch(read(folder, 'analysis.md'), /TYPEDCANARY/);
 				assert.match(result.stdout, /✅ check network: pass/);
 				assert.match(result.stdout, /❌ check daemon_unit: fail/);
-				assert.match(result.stdout, /Field checks summary: ✅ \d+ pass, ❌ \d+ fail, /);
+				assert.match(result.stdout, /Check verdicts summary: ✅ \d+ pass, ❌ \d+ fail, /);
 				const layout = read(folder, 'keyboard_layout.txt');
 				assert.match(layout, /VC Keymap: fr in ~\/keymaps for <user>/);
 				assert(!layout.includes(paths.home), 'the home folder is masked');
