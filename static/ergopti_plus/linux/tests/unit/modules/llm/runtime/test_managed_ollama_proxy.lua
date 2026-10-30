@@ -127,12 +127,16 @@ it("an authenticated desktop relay keeps its credentials", function()
 	eq(w:run().environment[1], "HTTPS_PROXY=http://user:pw@proxy.corp.example:3128")
 end)
 
-it("a failed lookup of the blob host refuses the start", function()
+-- (pac-unavailable-fallback) A lookup GIO could not answer is an unusable PAC:
+-- that origin goes direct, the other keeps the relay its PAC named.
+it("(pac-unavailable-fallback) an unusable lookup of the blob host sends only that host direct", function()
 	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } } })
 	w.receipts[BLOB] = { ok = false, error = "proxy-lookup-timeout" }
 	local result = w:run()
-	eq(result.ok, false)
-	eq(result.error, "proxy_lookup_failed")
+	eq(result.ok, true)
+	eq(result.environment[1], "HTTPS_PROXY=http://proxy.corp.example:3128")
+	eq(result.environment[2], "NO_PROXY=" .. BLOB:gsub("^https://", ""))
+	eq(result.direct_fallback, "native_proxy_budget")
 end)
 
 it("an inventory that does not start with the registry is refused at construction", function()
@@ -170,9 +174,46 @@ it("an empty exported variable does not count as a proxy", function()
 	eq(w:run().environment[1], "HTTPS_PROXY=http://p:1")
 end)
 
+it("(pac-unavailable-fallback) an unusable desktop configuration sends the daemon direct", function()
+	for receipt_error, stage in pairs({ ["proxy-lookup-failed"] = "native_proxy_lookup",
+		["proxy-lookup-timeout"] = "native_proxy_budget" }) do
+		local warnings = {}
+		local Logger = require("logger.shim")
+		local original = Logger.warn
+		Logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
+		local ok, result = pcall(function()
+			return world({ receipt = { ok = false, error = receipt_error } }):run()
+		end)
+		Logger.warn = original
+		assert(ok, result)
+		eq(result.ok, true)
+		eq(#result.environment, 0)
+		eq(result.direct_fallback, stage)
+		eq(#warnings, #ORIGINS)
+		assert(warnings[1]:find(stage, 1, true), warnings[1])
+	end
+end)
+
+it("(pac-unavailable-fallback) each fallback stage is one the shared policy lists", function()
+	local active = policy()
+	local Proxy = helpers.load_module("modules.llm.managed_ollama_proxy")
+	for _, stage in pairs(Proxy.LOOKUP_STAGES) do assert(active.falls_back_direct(stage), stage) end
+end)
+
+it("(pac-unavailable-fallback) an exported relay never reaches the lookup, so never falls back", function()
+	local w = world({ rows = { "PATH=/usr/bin", "HTTPS_PROXY=http://mine:1" },
+		receipt = { ok = false, error = "proxy-lookup-failed" } })
+	local result = w:run()
+	eq(w.lookups, 0)
+	eq(result.ok, true)
+	eq(#result.environment, 0)
+	eq(result.direct_fallback, nil)
+end)
+
 it("a failed lookup refuses with a classified reason", function()
 	for _, receipt in ipairs({
-		{ ok = false, error = "proxy-lookup-timeout" },
+		{ ok = false, error = "proxy-child-failed" },
+		{ ok = false, error = "proxy-receipt-invalid" },
 		{ ok = true, proxies = { "gopher://x:1" } },
 		{ ok = true, proxies = {} },
 		{ ok = "yes" },
@@ -270,15 +311,18 @@ end)
 it("no origin URL and no proxy ever reach the log", function()
 	local seen = {}
 	local Logger = require("logger.shim")
-	local originals = { info = Logger.info, error = Logger.error }
-	for _, level in ipairs({ "info", "error" }) do
+	local originals = { info = Logger.info, error = Logger.error, warn = Logger.warn }
+	for _, level in ipairs({ "info", "error", "warn" }) do
 		Logger[level] = function(_, message, ...) seen[#seen + 1] = string.format(message, ...) end
 	end
 	local ok, failure = pcall(function()
 		world({ receipt = { ok = true, proxies = { "http://user:secret@proxy.corp.example:3128" } } }):run()
 		world({ receipt = { ok = true, proxies = { "gopher://leak.example:1" } } }):run()
+		local fallback = world({ receipt = { ok = true, proxies = { "http://user:secret@proxy.corp.example:3128" } } })
+		fallback.receipts[BLOB] = { ok = false, error = "proxy-lookup-failed" }
+		fallback:run()
 	end)
-	Logger.info, Logger.error = originals.info, originals.error
+	Logger.info, Logger.error, Logger.warn = originals.info, originals.error, originals.warn
 	assert(ok, failure)
 	assert(#seen >= 2, "the lifecycle must be logged")
 	for _, line in ipairs(seen) do
