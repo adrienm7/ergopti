@@ -11,7 +11,7 @@
 	"drivers": {
 		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
 		"linux": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
-		"windows": "Not ported yet: the AutoHotkey engine must reach the same shared_behaviour and replay every vector; see the report of the 2026-10-26 request floor pass for the list of changes."
+		"windows": "Replays every vector (windows/tests/unit/modules/llm/prediction/test_llm_request_plan.ahk)."
 	},
 	"vectors": [
 		{

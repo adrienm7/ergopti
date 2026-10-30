@@ -3,7 +3,7 @@
 	"drivers": {
 		"macos": "Replays every vector.",
 		"linux": "Replays every vector.",
-		"windows": "Not ported: one AHK consumer must build the frame row above in the Windows menu engine, apply the named mutation and compare the label or the refusal."
+		"windows": "windows/tests/meta/corpus/test_corpus_menu_numbered_caption.ahk replays every vector through the menu renderer."
 	},
 	"default_value": "Native% $& {1}",
 	"positive": [

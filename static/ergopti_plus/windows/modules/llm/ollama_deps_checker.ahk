@@ -8,8 +8,9 @@
 ; reachable on the configured local Ollama endpoint.
 ;
 ; Production bootstrap consumes exact app-owned file/runtime components with
-; independent installation, start and model consent. A responding external
-; server remains external. Deferred callbacks retain their captured epoch.
+; independent installation, start and model consent. Only that owned runtime
+; is ever used: a listener Ergopti does not own is refused, never adopted, stopped
+; or modified. Deferred callbacks retain their captured epoch.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -176,8 +177,8 @@ LLM_Deps_AsyncCheck(default_model, on_ready?, on_failed?, show_ui := true,
 	if captured_epoch != _LLM_Deps_Epoch
 		return false
 
-	; Check the configured endpoint before offering a managed installation.
-	; A responding external server is never acquired, migrated or terminated.
+	; Check the owned endpoint before offering a managed installation. A
+	; responding foreign server is never adopted, migrated or terminated.
 	LLM_Deps_DoCheck(default_model, captured_epoch, on_ready?, on_failed?, show_ui)
 	return true
 }
@@ -197,7 +198,7 @@ LLM_Deps_DoCheck(default_model, captured_epoch, on_ready?, on_failed?, show_ui?)
 	return true
 }
 
-_LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_ready?, on_failed?, show_ui?, InstallerFn := 0) {
+_LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_ready?, on_failed?, show_ui?, InstallerFn := 0, OwnedFn := 0) {
 	global _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch
 	; AHK-14: discard stale callbacks from preempted checks. When Cancel() or a
 	; second CheckAndInstall bumps the epoch, any in-flight curl callback fires
@@ -208,7 +209,18 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
 		return
 	}
 	LoggerInfo("LLM", "DoCheck — Ollama reachability check took " TickElapsed(t_start) " ms, result=" (running ? "running" : "not running") ".")
-	if running {
+	Owned := HasMethod(OwnedFn, "Call") ? OwnedFn.Call() : LLM_OllamaManagedOriginRequired()
+	if running && !Owned {
+		; Ergopti's daemon dies with its driver, so an answer with no live owner
+		; is a foreign server: refused, and an explicit start then names the
+		; occupied port instead of chatting to someone else's Ollama.
+		LoggerWarn("LLM", "A server Ergopti does not own answers on its Ollama port; it is not used.")
+		if IsSet(show_ui) && !show_ui {
+			_LLM_Deps_Checking := false
+			return
+		}
+	}
+	if running && Owned {
 		LoggerInfo("LLM", "Ollama already running — fast path, state → ready.")
 		_LLM_Deps_State    := "ready"
 		_LLM_Deps_Checking := false
@@ -217,16 +229,15 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
 		return
 	}
 
-	; When called from the auto-boot path (show_ui=false), do not open the
-	; install window — the user has not asked for an installation.
+	Installer := HasMethod(InstallerFn, "Call") ? InstallerFn : LLM_Deps_RunManagedInstaller
+	; The auto-boot path (show_ui=false) restarts the installed runtime with no
+	; window; it never installs one, since the user has not asked for that.
 	if IsSet(show_ui) && !show_ui {
-		LoggerInfo("LLM", "Ollama not running but show_ui=false — silent abort, state stays pending.")
-		_LLM_Deps_Checking := false
-		return
+		LoggerInfo("LLM", "Ollama not running and show_ui=false — restarting the owned runtime silently.")
+		return Installer.Call(default_model, captured_epoch, on_ready?, on_failed?, true)
 	}
 
 	LoggerInfo("LLM", "Ollama not running — launching installer…")
-	Installer := HasMethod(InstallerFn, "Call") ? InstallerFn : LLM_Deps_RunManagedInstaller
 	return Installer.Call(default_model, captured_epoch, on_ready?, on_failed?)
 }
 

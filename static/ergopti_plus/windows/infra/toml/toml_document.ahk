@@ -400,6 +400,11 @@ _TOML_ValueKind(Value) {
 	return "unknown"
 }
 
+; Numeric equality cannot see the sign of a zero, and a division would throw.
+_TOML_IsNegativeZero(Value) {
+	return Value is Float && Value == 0 && SubStr(Format("{:g}", Value), 1, 1) == "-"
+}
+
 /** Compares native typed TOML values without coercing strings or Booleans. */
 TOML_SameValue(Left, Right) {
 	Kind := _TOML_ValueKind(Left)
@@ -408,7 +413,7 @@ TOML_SameValue(Left, Right) {
 	switch Kind {
 		case "boolean": return !!Left.Value == !!Right.Value
 		case "string": return StrCompare(Left, Right, true) == 0
-		case "number": return Left = Right
+		case "number": return Left = Right && _TOML_IsNegativeZero(Left) == _TOML_IsNegativeZero(Right)
 		case "array":
 			if Left.Length != Right.Length
 				return false
@@ -757,7 +762,7 @@ _TOML_ConfigInlineValue(Raw, Before, After, Path, Owned) {
 	if SubStr(Raw, SpanStart, 1) != "{" || SubStr(Raw, SpanEnd, 1) != "}"
 		throw ValueError("An inline container lost its physical braces")
 	Body := SubStr(Raw, SpanStart + 1, SpanEnd - SpanStart - 1)
-	Rows := [], Covered := [], Carry := "", ClosingTrivia := "", Position := 1
+	Rows := [], Covered := [], Carry := "", ClosingTrivia := "", Position := 1, RemovedLast := false
 	while Position <= StrLen(Body) {
 		Start := Position
 		Member := _TOML_DocumentToken(Body, &Position, ",", &Separated, , &MemberEnd)
@@ -786,7 +791,10 @@ _TOML_ConfigInlineValue(Raw, Before, After, Path, Owned) {
 		if !Desired["found"] {
 			TailPosition := 1
 			_TOML_DocumentToken(ValueRaw, &TailPosition, "", , , &ValueEnd)
-			Carry .= SubStr(Text, 1, KeyStart - 1) . SubStr(ValueRaw, ValueEnd + 1)
+			RemovedTrivia := SubStr(Text, 1, KeyStart - 1) . SubStr(ValueRaw, ValueEnd + 1)
+			if Trim(RemovedTrivia, " " . Chr(9) . Chr(13) . Chr(10)) != ""
+				Carry .= RemovedTrivia
+			RemovedLast := !Separated
 			continue
 		}
 		ChildPath := Path.Clone()
@@ -798,11 +806,19 @@ _TOML_ConfigInlineValue(Raw, Before, After, Path, Owned) {
 	}
 	NewRows := []
 	_TOML_ConfigInlineNewRows(After, [], Covered, NewRows)
+	; The separator space before a removed last member goes with it, and an empty
+	; container's own trivia stays at its opening brace.
+	if RemovedLast && Rows.Length
+		Rows[Rows.Length] := RTrim(Rows[Rows.Length], " " . Chr(9))
 	Content := ""
 	for Index, Row in Rows
 		Content .= (Index == 1 ? "" : ",") . Row
-	for Row in NewRows {
-		Content .= (Content == "" ? "" : ", ") . Carry . Row
+	if !Rows.Length && NewRows.Length {
+		Content := ClosingTrivia
+		ClosingTrivia := ""
+	}
+	for Index, Row in NewRows {
+		Content .= (Rows.Length || Index > 1 ? "," : "") . Carry . Row
 		Carry := ""
 	}
 	Content .= Carry . ClosingTrivia
@@ -886,6 +902,38 @@ _TOML_DocumentCloneTables(Value) {
 	return Copy
 }
 
+; Two rows on one path, or on a path and its descendant, have no single meaning:
+; the last one would silently win. Identities stay exact, so case-distinct
+; siblings remain separate rows.
+_TOML_ConfigRefuseOverlappingRows(RowPaths) {
+	Seen := Map()
+	Seen.CaseSense := "On"
+	for Parts in RowPaths {
+		Name := _TOML_ConfigPathName(Parts)
+		if Seen.Has(Name)
+			throw ValueError("Two configuration rows address " . Name)
+		Seen[Name] := true
+	}
+	for Parts in RowPaths {
+		Ancestor := []
+		loop Parts.Length - 1 {
+			Ancestor.Push(Parts[A_Index])
+			if Seen.Has(_TOML_ConfigPathName(Ancestor))
+				throw ValueError("A configuration row replaces the parent of " . _TOML_ConfigPathName(Parts))
+		}
+	}
+}
+
+; True when a table or array generation below this path has its own source header:
+; the assignment replacing that value has to take those headers away with it.
+_TOML_ConfigPathHasHeader(Physical, Parts) {
+	for PhysicalRecord in Physical {
+		if PhysicalRecord.Kind == "header" && _TOML_ConfigPathUnder(_TOML_ConfigPath(PhysicalRecord.Section), Parts)
+			return true
+	}
+	return false
+}
+
 /**
  * Renders explicit configuration effects against the complete semantic source.
  * @param {String} Source Exact source image captured by the existing I/O owner.
@@ -901,6 +949,10 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 		if PhysicalRecord.Kind == "opaque"
 			throw ValueError("Cannot retain an unclassified configuration source record")
 	}
+	RowPaths := []
+	for Update in Updates
+		RowPaths.Push(_TOML_ConfigPath(Update.Section, Update.Key))
+	_TOML_ConfigRefuseOverlappingRows(RowPaths)
 	Dropped := [], Deleted := []
 	for Prefix in Prefixes {
 		Parts := _TOML_ConfigPath(Prefix)
@@ -917,10 +969,17 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 		_TOML_ConfigSet(Expected, Parts, Update)
 		if Update.HasOwnProp("Delete") && Update.Delete == 1 {
 			Deleted.Push(Parts)
-			; A deleted array owns every [[...]] generation header and record
-			; beneath it; keeping a header would recreate an empty generation.
+			; A deleted table or array owns every header and record beneath it;
+			; keeping a header would recreate an empty table or generation.
 			Original := _TOML_DocumentLookup(Document, Parts)
-			if Original["found"] && Original["value"] is Array
+			if Original["found"] && (Original["value"] is Array || Original["value"] is Map)
+				Dropped.Push(Parts)
+		} else {
+			; A changed value replacing header-owned bytes becomes one assignment.
+			Original := _TOML_DocumentLookup(Document, Parts)
+			if Original["found"] && (Original["value"] is Array || Original["value"] is Map)
+					&& !TOML_SameValue(Original["value"], _TOML_DocumentLookup(Expected, Parts)["value"])
+					&& _TOML_ConfigPathHasHeader(Physical, Parts)
 				Dropped.Push(Parts)
 		}
 		Owned[_TOML_ConfigPathName(Parts)] := Parts
@@ -1053,8 +1112,10 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 				Flush(Current)
 				Parts := _TOML_ConfigPath(PhysicalRecord.Section)
 				Current := _TOML_ConfigPathName(Parts)
-				if !_TOML_ConfigPathDropped(Parts, Dropped)
+				if !_TOML_ConfigPathDropped(Parts, Dropped) {
 					Append(PhysicalRecord.Text)
+					Flush(Current)
+				}
 			case "assignment":
 				RecordIndex += 1
 				Record := Records[RecordIndex]
@@ -1077,7 +1138,10 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 				else {
 					Position := 1
 					KeyText := _TOML_DocumentToken(PhysicalRecord.Text, &Position, "=")
-					Append(KeyText . " = " . TOML_RenderValue(Desired["value"]) . "`n")
+					KeyParts := TOML_ParseKeyPath(KeyText, true)
+					Append((KeyParts.Length == 1 ? TOML_RenderKey(KeyParts[1]) : KeyText) . " = "
+						. TOML_RenderValue(Desired["value"])
+						. (TOML_EndsWithLineBreak(PhysicalRecord.Text) ? "`n" : ""))
 				}
 			default:
 				Append(PhysicalRecord.Text)

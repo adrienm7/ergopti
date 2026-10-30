@@ -88,7 +88,7 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 	for Key in ["enabled", "model", "backend", "profile_id", "n_predictions",
 		"auto_profile_for_model", "temperature", "min_words", "max_words",
 		"ctx_chars", "auto_raise_temp", "reset_on_nav", "show_info_bar",
-		"streaming", "show_all_at_once", "pred_indent", "debounce_ms",
+		"streaming", "show_all_at_once", "pred_indent", "debounce_ms", "min_request_interval_ms",
 		"instant_on_word_end", "after_hotstring", "inline_autotype",
 		"disable_url_bars", "disable_password_fields", "val_modifiers"] {
 		if !MenuState.Has(Key)
@@ -137,6 +137,7 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 	llm["display"]["streaming_multi"]         := LLM_DisplayProgressive(Validated["show_all_at_once"])
 	llm["display"]["pred_indent"]             := Validated["pred_indent"]
 	llm["trigger"]["debounce_ms"]             := Validated["debounce_ms"]
+	llm["trigger"]["min_request_interval_ms"] := Validated["min_request_interval_ms"]
 	llm["trigger"]["instant_on_word_end"]     := Validated["instant_on_word_end"]
 	llm["trigger"]["after_hotstring"]         := Validated["after_hotstring"]
 	llm["trigger"]["inline_autotype"]         := Validated["inline_autotype"]
@@ -258,6 +259,7 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 		["max_words", llm["generation"]["max_words"], "llm.generation.max_words"],
 		["ctx_chars", llm["generation"]["context_length"], "llm.generation.context_length"],
 		["debounce_ms", llm["trigger"]["debounce_ms"], "llm.trigger.debounce_ms"],
+		["min_request_interval_ms", llm["trigger"]["min_request_interval_ms"], "llm.trigger.min_request_interval_ms"],
 		["instant_on_word_end", llm["trigger"]["instant_on_word_end"], "llm.trigger.instant_on_word_end"],
 		["after_hotstring", llm["trigger"]["after_hotstring"], "llm.trigger.after_hotstring"],
 		["reset_on_nav", llm["generation"]["reset_on_nav"], "llm.generation.reset_on_nav"],
@@ -297,7 +299,11 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 		_LLM_Menu_LogInvalidPersistedOption("llm.navigation.val_modifiers")
 	if IsSet(Cache) {
 		raw := IniCacheGet(Cache, "llm", "ollama_port")
-		if !((raw is String) && raw == "_")
+		; Earlier releases saved the stock port, which now belongs to the user's
+		; own Ollama: such a value is dropped once, as on macOS, and is no error.
+		if (raw == LLM_Defaults["llm_ollama_port"])
+			LoggerInfo("LLM", "Saved Ollama port {1} is the stock port; Ergopti's own Ollama keeps its port.", raw)
+		else if !((raw is String) && raw == "_")
 			_LLM_Menu_PutValidatedPersistedOption(
 				opts, "ollama_port", raw, "llm.ollama_port")
 		raw := IniCacheGet(Cache, "llm", "api_entry_id")

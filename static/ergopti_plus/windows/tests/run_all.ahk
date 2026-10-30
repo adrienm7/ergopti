@@ -832,14 +832,14 @@ _LogBootProgress("LLM modules + tests included")
 global _LLM_Menu := Map(
 	"enabled", true, "backend", "ollama", "model", "Qwen3.5-0.8B",
 	"profile_id", "basic", "n_predictions", 3, "auto_profile_for_model", true,
-	"min_words", 3, "max_words", 15, "language", "fr", "debounce_ms", 500,
+	"min_words", 3, "max_words", 15, "language", "fr", "debounce_ms", 500, "min_request_interval_ms", 300,
 	"ctx_chars", 500, "temperature", "0.10", "instant_on_word_end", true,
 	"after_hotstring", true, "reset_on_nav", true, "disable_url_bars", true,
 	"disable_password_fields", true, "disabled_apps", [], "show_info_bar", true,
 	"streaming", true, "show_all_at_once", true, "pred_indent", 0,
 	"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
 	"inline_autotype", false,
-	"ollama_port", 11434
+	"ollama_port", 11435
 )
 global _LLM_Menu_Loaded := false
 ; Definitions-only chord translation and hotkey identities; registers no hotkey.
@@ -1546,6 +1546,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/shortcuts/test_wrap_symbols_catalogue.ahk
 #Include unit/modules/shortcuts/test_wrap_symbols_global_transaction.ahk
 ; ── Cross-driver corpus consumers ──
+#Include support/toml_corpus_values.ahk
 #Include meta/corpus/test_corpus_hotstrings.ahk
 #Include meta/modules/hotstrings/preview/test_preview_matches_engine.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_buffer_tracks_engine.ahk
@@ -1629,6 +1630,12 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/corpus/test_corpus_tooltip_layout.ahk
 ; TOML coercion corpus
 #Include meta/corpus/test_corpus_toml_batch_write.ahk
+#Include meta/corpus/test_corpus_updater_redirect.ahk
+#Include meta/corpus/test_corpus_config_scope_plan.ahk
+#Include meta/corpus/test_corpus_menu_numbered_caption.ahk
+#Include meta/corpus/test_corpus_toml_hotstring_reader.ahk
+#Include meta/corpus/test_corpus_toml_leaf_rows.ahk
+#Include meta/corpus/test_corpus_toml_inline_scalar.ahk
 #Include meta/corpus/test_corpus_toml_coercion.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
@@ -2271,6 +2278,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/llm/servers/test_ollama_runtime_owner.ahk
 #Include unit/modules/llm/servers/test_ollama_managed_bootstrap.ahk
 #Include unit/modules/llm/servers/test_ollama_managed_origin.ahk
+#Include unit/modules/llm/servers/test_ollama_owned_only.ahk
+#Include unit/modules/llm/prediction/test_llm_request_plan.ahk
 #Include unit/modules/llm/servers/test_ollama_managed_model_offer.ahk
 #Include unit/modules/shortcuts/test_run_program_actions.ahk
 #Include unit/modules/shortcuts/test_run_program_actions_custody.ahk

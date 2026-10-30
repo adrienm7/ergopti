@@ -298,14 +298,14 @@ _CTC_LlmMenuFirstRowIsCheckbox() {
 _CTC_LlmFixture(Enabled) {
 	return Map("enabled", Enabled, "backend", "api", "model", "stale-tag",
 		"profile_id", "basic", "n_predictions", 3, "auto_profile_for_model", true,
-		"min_words", 3, "max_words", 15, "language", "fr", "debounce_ms", 500,
+		"min_words", 3, "max_words", 15, "language", "fr", "debounce_ms", 500, "min_request_interval_ms", 300,
 		"ctx_chars", 500, "temperature", "0.10", "instant_on_word_end", true,
 		"after_hotstring", true, "reset_on_nav", true, "disable_url_bars", true,
 		"disable_password_fields", true, "disabled_apps", [], "show_info_bar", true,
 		"streaming", true, "show_all_at_once", true, "pred_indent", 0,
 		"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
 		"inline_autotype", false,
-		"ollama_port", 11434, "user_profiles", [], "api_entry_id", "e1",
+		"ollama_port", 11435, "user_profiles", [], "api_entry_id", "e1",
 		"api_entries", [Map("Id", "e1", "Name", "Cerebras",
 			"Provider", "cerebras", "BaseUrl", "https://b.invalid/v1",
 			"Token", "sekret", "Model", "qwen-3.8-27b")])

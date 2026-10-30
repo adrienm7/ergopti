@@ -21,13 +21,13 @@ global LLM_PULL_PERCENT_LISTENER := 0
 global LLM_PULL_PERCENT_TAIL_BYTES := 4096
 
 /** Dispatches explicit installation without an administrator/system fallback. */
-LLM_Deps_RunManagedInstaller(Model, Epoch, OnReady?, OnFailed?) {
+LLM_Deps_RunManagedInstaller(Model, Epoch, OnReady?, OnFailed?, Silent := false) {
 	global _LLM_ManagedBootstrap
 	if IsObject(_LLM_ManagedBootstrap) && !_LLM_ManagedBootstrap.CanReplace()
 		return _LLM_Deps_PublishFailure(t("ollama.deps_failed"), OnFailed?, Epoch)
 	try {
 		Flow := OllamaManagedBootstrap(Model, Epoch, IsSet(OnReady) ? OnReady : 0,
-			IsSet(OnFailed) ? OnFailed : 0)
+			IsSet(OnFailed) ? OnFailed : 0, 0, Silent)
 		_LLM_ManagedBootstrap := Flow
 		return Flow.Begin()
 	} catch as Err {
@@ -42,7 +42,7 @@ LLM_ManagedBootstrapCancel() {
 	return !IsObject(_LLM_ManagedBootstrap) || _LLM_ManagedBootstrap.Cancel()
 }
 
-/** Selected external origin or the exact live managed listener; never alias it. */
+/** The configured owned port or the exact live managed listener; never alias it. */
 LLM_OllamaRequestOrigin() {
 	global _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL
 	Flow := _LLM_ManagedBootstrap
@@ -201,9 +201,12 @@ LLM_OllamaPullPercent(Text) {
 /** One source-bound managed bootstrap, retaining physical debt independently. */
 class OllamaManagedBootstrap {
 	/** Captures every native source before admission; no installation occurs here. */
-	__New(Model, Epoch, OnReady, OnFailed, Port := 0) {
+	__New(Model, Epoch, OnReady, OnFailed, Port := 0, Silent := false) {
 		global _SharedDir, _StaticDir, _VendorDir, LLM_OLLAMA_BASE_URL, LLM_DEPS_POLL_TIMEOUT_MS, _LLM_Menu
 		this.Port := Port
+		; Restarting the installed runtime for an AI already on: no window and no
+		; question. It never installs or downloads; the first READY ends the mode.
+		this.Silent := Silent
 		this.Model := Model
 		this.Epoch := Epoch
 		this.OnReady := OnReady
@@ -338,6 +341,10 @@ class OllamaManagedBootstrap {
 					this.Port["menu_intent"].Call(), this.Port["aux_generation"].Call()))
 		}
 		try {
+			; READY outlives ordinary saves: a running daemon only follows the AI
+			; intent, and hashing every source each tick would tax the session.
+			if this.Ready
+				return this._ReadyIntentCurrent(_LLM_Menu, LLM_AuxGeneration())
 			if !this._ConfigCurrent(_LLM_Menu_EnableReadSource(), _LLM_Menu, LLM_AuxGeneration())
 				return false
 			for Path, Digest in this.Sources
@@ -428,6 +435,14 @@ class OllamaManagedBootstrap {
 			&& (this._IntentMatches(this.MenuIntent, Menu) || this._IntentMatches(Token["menu"], Menu))
 	}
 
+	_ReadyIntentCurrent(Menu, Generation) {
+		if Generation != this.AuxGeneration
+			return false
+		Token := this.EnableHandoff
+		return this._IntentMatches(this.MenuIntent, Menu)
+			|| (Token is Map && this._IntentMatches(Token["menu"], Menu))
+	}
+
 	_IntentMatches(Expected, Current) {
 		for Name, Value in Expected
 			if Type(Current.Get(Name, "")) != Type(Value) || Current[Name] != Value
@@ -442,11 +457,13 @@ class OllamaManagedBootstrap {
 	_Consent(Kind, Model := "") {
 		if !this._Current()
 			return false
+		if this.Silent
+			return Kind == "start"
 		if this.Port is Map
 			Accepted := this.Port["consent"].Call(Kind, Model)
 		else {
 			if Kind == "install"
-				Title := t("ollama.runtime_missing_title"), Body := t("ollama.offer_body")
+				Title := t("ollama.native_offer_title"), Body := StrReplace(t("ollama.native_offer_body"), "%s", this.Plan["version"])
 			else if Kind == "start"
 				Title := t("ollama.runtime_start"), Body := StrReplace(t("llm.unreachable.start"), "{1}", "Ollama") . "?"
 			else
@@ -479,6 +496,9 @@ class OllamaManagedBootstrap {
 		Receipt := this.LastReceipt
 		if !this._Success(Terminal, Receipt) || Receipt["phase"] != "downloaded"
 			return this._Fail("download")
+		if Receipt.Get("pac_fallback_stage", "") != ""
+			LoggerWarn("LLM.managed", "Automatic proxy configuration unusable at {1}; the download went direct.",
+				Receipt["pac_fallback_stage"])
 		Request := this._BaseRequest()
 		Request["TicketId"] := this._Ticket()
 		Request["ArchivePath"] := Receipt["archive"]
@@ -599,6 +619,9 @@ class OllamaManagedBootstrap {
 			return this._Complete()
 		if this.Pulled
 			return this._Fail("model_missing_after_pull")
+		; The local model offer names a missing model on first use, not at login.
+		if this.Silent
+			return this._Complete()
 		if !this._Consent("model", this.Model)
 			return this._Declined()
 		this.Pulled := true
@@ -823,6 +846,7 @@ class OllamaManagedBootstrap {
 		if !this._Current()
 			return this.Cancel()
 		this.Ready := true
+		this.Silent := false
 		SetTimer(this.Timer, 150)
 		if !(this.Port is Map) && this.UiShown
 			OllamaWV_Done(true, t("ollama.deps_step_ready"))
@@ -1038,7 +1062,7 @@ class OllamaManagedBootstrap {
 	}
 
 	_Ui(Key) {
-		if this.Port is Map || !this._Current()
+		if this.Port is Map || this.Silent || !this._Current()
 			return
 		if !this.UiShown {
 			OllamaWV_Show("ollama_install", t("ollama.install_subtitle"), (*) => LLM_Deps_Cancel(), ObjBindMethod(this, "_Retry"))
