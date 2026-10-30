@@ -194,6 +194,16 @@ local function runloop_lateness(ports, callback)
 	probe()
 end
 
+--- Names a callback site as "<file>:<line>" in the step grammar: the folders
+--- of the path are dropped, so no user path can reach a report.
+--- @param site any Callback site "path:line".
+--- @return string token
+function M.hold_site_token(site)
+	local file, line = tostring(site or ""):match("([^/\\]+)%.lua:(%d+)$")
+	if not file then return "unknown" end
+	return file .. ":" .. line
+end
+
 --- The keymap's event taps and the run loop that feeds them. Each tap the
 --- keymap owns is its own step, so a report names the one macOS disabled; the
 --- watchdog that revives a disabled tap must be running. The run loop answers
@@ -216,6 +226,10 @@ function M.event_taps(ports, report, finish)
 	local holds = ports.hold_counts()
 	report.step("holds_over_250ms", STATE.info, holds.over_250ms or 0)
 	report.step("holds_over_1000ms", STATE.info, holds.over_1000ms or 0)
+	-- The worst hold's site names the owner to fix (ledger L16, L18, L24).
+	local worst = holds.worst
+	report.step("worst_hold_ms", STATE.info, worst and math.floor(worst.ms) or "none")
+	report.step("worst_hold_site", STATE.info, worst and M.hold_site_token(worst.site) or "none")
 	report.step("lua_heap_mb", STATE.info, math.floor((tonumber(ports.lua_heap_kb()) or 0) / 1024))
 	runloop_lateness(ports, function(worst)
 		report.step("runloop_late_ms", worst <= M.RUNLOOP_LATE_MS and STATE.pass or STATE.fail,

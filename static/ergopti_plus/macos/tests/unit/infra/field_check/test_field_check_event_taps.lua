@@ -35,7 +35,9 @@ local function make_ports()
 	local ports = {
 		tap_states = function() return world.states end,
 		health_counts = function() return { late_downs = 2, late_ups = 1, stale_passed = 0 } end,
-		hold_counts = function() return { over_250ms = 4, over_1000ms = 1 } end,
+		hold_counts = function()
+			return { over_250ms = 4, over_1000ms = 1, worst = world.worst }
+		end,
 		lua_heap_kb = function() return 45 * 1024 + 300 end,
 		timer_probe = function(seconds, callback)
 			world.probes = world.probes + 1
@@ -66,6 +68,18 @@ local function run(ports)
 end
 
 helpers.describe("event taps probe", function()
+	helpers.it("(worst-hold-site) names the worst hold by file and line only", function()
+		local ports, world = make_ports()
+		world.worst = { ms = 1309.6, site = "/Users/jane/ergopti/static/ergopti_plus/macos/modules/keystats/log_manager.lua:1722" }
+		local steps = run(ports)
+		helpers.assert_eq(steps.worst_hold_ms.value, "1309")
+		helpers.assert_eq(steps.worst_hold_site.value, "log_manager:1722", "the owner to fix, with no user path")
+		world.worst = nil
+		local quiet = run(ports)
+		helpers.assert_eq(quiet.worst_hold_ms.value, "none")
+		helpers.assert_eq(quiet.worst_hold_site.value, "none")
+	end)
+
 	helpers.it("passes with every tap enabled, the watchdog running and a punctual run loop", function()
 		local ports, world = make_ports()
 		local steps, result = run(ports)
