@@ -1768,6 +1768,7 @@
 	"menu.llm.api_test_ok_title": "API-test gennemført",
 	"menu.llm.api_key_refused_body": "\"%s\" svarede, men afviste nøglen — kontrollér tokenet, der er angivet på serveren.",
 	"menu.llm.api_key_refused_title": "API-nøgle afvist",
+	"menu.llm.api_key_no_secret_store": "API-nøglen blev ikke gemt: ingen hemmelighedstjeneste på skrivebordet accepterede den ({1}). Ergopti+ skriver aldrig en nøgle i klartekst. Start din nøglering (GNOME Keyring, KWallet eller KeePassXC), og prøv igen.",
 	"menu.llm.api_unreachable_body": "\"%s\" svarede ikke — tjek token, URL og model.",
 	"menu.llm.api_unreachable_title": "API-post kan ikke nås",
 	"menu.llm.api_validated_body": "\"%s\" svarede vellykket.",

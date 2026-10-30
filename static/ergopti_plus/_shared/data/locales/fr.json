@@ -1763,6 +1763,7 @@
 	"menu.llm.api_test_ok_title": "Test API réussi",
 	"menu.llm.api_key_refused_body": "« %s » a répondu mais refuse la clé — vérifiez le jeton défini dans le serveur.",
 	"menu.llm.api_key_refused_title": "Clé API refusée",
+	"menu.llm.api_key_no_secret_store": "La clé d'API n'a pas été enregistrée : aucun service de secrets du bureau ne l'a acceptée ({1}). Ergopti+ n'écrit jamais une clé en clair. Démarrez votre trousseau (GNOME Keyring, KWallet ou KeePassXC), puis réessayez.",
 	"menu.llm.api_unreachable_body": "« %s » n'a pas répondu — vérifiez le jeton, l'URL et le modèle.",
 	"menu.llm.api_unreachable_title": "Entrée API injoignable",
 	"menu.llm.api_validated_body": "« %s » a répondu correctement.",

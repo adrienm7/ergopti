@@ -1768,6 +1768,7 @@
 	"menu.llm.api_test_ok_title": "API 테스트 성공",
 	"menu.llm.api_key_refused_body": "\"%s\"이(가) 응답했지만 키를 거부했습니다 — 서버에 설정된 토큰을 확인하세요.",
 	"menu.llm.api_key_refused_title": "API 키가 거부됨",
+	"menu.llm.api_key_no_secret_store": "API 키가 저장되지 않았습니다. 데스크톱 비밀 서비스가 받아들이지 않았습니다({1}). Ergopti+는 키를 평문으로 기록하지 않습니다. 키링(GNOME Keyring, KWallet 또는 KeePassXC)을 시작한 후 다시 시도하세요.",
 	"menu.llm.api_unreachable_body": "\"%s\"이(가) 응답하지 않았습니다 — 토큰, URL, 모델을 확인하세요.",
 	"menu.llm.api_unreachable_title": "API 항목에 연결할 수 없음",
 	"menu.llm.api_validated_body": "\"%s\"이(가) 성공적으로 응답했습니다.",
