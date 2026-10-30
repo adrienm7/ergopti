@@ -210,15 +210,19 @@ match($0, /Slow ingest tick [0-9]+ ms/) {
 match($0, /Slow preferences save [0-9]+ ms/) {
 	v = substr($0, RSTART + 22, RLENGTH - 25) + 0; pc++; if (v > pm) pm = v
 }
+/Lease-bound input startup failed/ { lease++ }
+/Layout [a-z]+ detected change before its baseline/ { early++ }
 END {
 	for (k in n) printf "segment %s %d %.2f %.2f\n", k, n[k], t[k], m[k]
 	printf "ingest %d %d\nprefs %d %d\n", ic, im, pc, pm
+	printf "lease_bound %d\nearly_layout %d\n", lease, early
 }
 ]=]
 
 --- Reads the awk summary.
 --- @param text any
---- @return table|nil summary { segments = { { name, count, own_ms, worst_ms } } by own time, ingest = { count, worst_ms }, prefs = { ... } }
+--- @return table|nil summary { segments = { { name, count, own_ms, worst_ms } } by own time, ingest = { count, worst_ms },
+---   prefs = { ... }, lease_bound = count, early_layout = count }
 function M.parse_slow_summary(text)
 	local summary = { segments = {} }
 	for line in tostring(text or ""):gmatch("[^\n]+") do
@@ -231,14 +235,19 @@ function M.parse_slow_summary(text)
 		if kind == "ingest" or kind == "prefs" then
 			summary[kind] = { count = tonumber(kind_count), worst_ms = tonumber(kind_worst) }
 		end
+		local counter, counted = line:match("^([%a_]+) (%d+)$")
+		if counter == "lease_bound" or counter == "early_layout" then summary[counter] = tonumber(counted) end
 	end
-	if summary.ingest == nil or summary.prefs == nil then return nil end
+	if summary.ingest == nil or summary.prefs == nil or summary.lease_bound == nil or summary.early_layout == nil then
+		return nil
+	end
 	table.sort(summary.segments, function(a, b) return a.own_ms > b.own_ms end)
 	return summary
 end
 
 --- Issue #101's first follow-up without a person: which main-thread phase the
---- day's slow lines name most. ports.today_log_path(), exec.
+--- day's slow lines name most; and item 38's two lines that must not appear.
+--- ports.today_log_path(), exec.
 function M.slow_lines(ports, report, finish)
 	local path = ports.today_log_path()
 	if type(path) ~= "string" or path == "" then
@@ -262,6 +271,11 @@ function M.slow_lines(ports, report, finish)
 		report.step("slow_dominant_own_ms", INFO, dominant and math.floor(dominant.own_ms) or 0)
 		report.step("slow_ingest_ticks", INFO, summary.ingest.count .. ":" .. summary.ingest.worst_ms)
 		report.step("slow_preferences_saves", INFO, summary.prefs.count .. ":" .. summary.prefs.worst_ms)
+		-- Item 38: neither line may appear (a lease-bound start that failed, the boot's
+		-- layout misread of project-hs-layout-name-forms).
+		report.step("log_lease_bound_failures", summary.lease_bound == 0 and PASS or FAIL, summary.lease_bound)
+		report.step("log_layout_change_before_baseline", summary.early_layout == 0 and PASS or FAIL,
+			summary.early_layout)
 		finish()
 	end)
 end
