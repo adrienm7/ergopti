@@ -70,6 +70,36 @@ M.REL_WHEEL_AXES = {
 	[0x0c] = true, -- REL_HWHEEL_HI_RES
 }
 
+-- The high-resolution reports that accompany each classic wheel notch
+-- (120 units per notch, and parts of one on a free-spinning wheel).
+M.REL_WHEEL_HI_RES  = 0x0b
+M.REL_HWHEEL_HI_RES = 0x0c
+
+-- A navigation-layer binding on a wheel direction is stored in the layer table
+-- under a code no key has: above KEY_MAX (0x2ff), one per axis and direction,
+-- so the table stays keyed by integers and a key code can never collide.
+M.WHEEL_LAYER_CODES = {
+	vertical = { [1] = 0x1001, [-1] = 0x1002 },
+	horizontal = { [1] = 0x1003, [-1] = 0x1004 },
+}
+
+-- The classic report, its high-resolution twin and the axis of each wheel.
+M.WHEEL_REPORTS = {
+	[M.REL_WHEEL] = { axis = "vertical", classic = true },
+	[M.REL_WHEEL_HI_RES] = { axis = "vertical", classic = false },
+	[M.REL_HWHEEL] = { axis = "horizontal", classic = true },
+	[M.REL_HWHEEL_HI_RES] = { axis = "horizontal", classic = false },
+}
+
+--- The layer-table code of a wheel direction.
+--- @param axis string "vertical" or "horizontal".
+--- @param direction integer 1 (up, right) or -1 (down, left), the sign evdev reports.
+--- @return integer|nil code
+function M.wheel_layer_code(axis, direction)
+	local codes = M.WHEEL_LAYER_CODES[axis]
+	return codes and codes[direction] or nil
+end
+
 -- The EV_KEY codes of a mouse's buttons: BTN_MISC (0x100) up to the last code
 -- before BTN_JOYSTICK (0x120), which spans BTN_0..BTN_9 and BTN_LEFT..BTN_TASK.
 -- A touchpad also reports EV_KEY codes from BTN_DIGI (0x140) up: BTN_TOUCH and
