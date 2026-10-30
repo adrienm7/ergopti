@@ -53,14 +53,29 @@ _CRWT_RequiredKeys() {
 	return [
 		"version", "driver", "timestamp", "error_type", "error_msg",
 		"error_extra", "error_what", "error_file", "error_line", "stack_trace",
-		"os_name", "os_build", "os_arch", "ahk_version", "ahk_bitness",
+		"os_version", "os_build", "os_arch", "hs_version", "ahk_bitness", "commit_source",
 		"cpu_name", "cpu_cores", "ram_total_gb", "ram_free_gb",
-		"screen_resolution", "dpi", "dpi_scale", "locale", "script_dir",
-		"git_hash", "uptime_sec", "active_window_title",
-		"active_window_process", "stuck_modifiers", "adapters_ok",
+		"screen_res", "dpi", "dpi_scale", "locale", "script_dir",
+		"git_hash", "uptime_sec", "active_title",
+		"active_app", "stuck_modifiers", "adapters_ok",
 		"adapters_failed", "session_warnings", "session_errors",
 		"keystats_initialized", "config_dir", "log_tail"
 	]
+}
+
+; Both worker scripts write the shared document: its file name, its LF layout and
+; the shared fields first, in the shared order (crash-report-shared-document).
+_CRWT_AssertSharedDocument(Artifact, Raw) {
+	SplitPath(Artifact, &Name)
+	Assert(_CrashReport_ParseName(Name) is Map, "the worker's report name is the shared one: " . Name)
+	AssertEqual(1, InStr(Raw, '{`n  "version": '), "the worker's report opens with the shared first field")
+	AssertEqual(0, InStr(Raw, "`r"), "the worker's report is LF")
+	Position := 0
+	for _, Field in CRASH_REPORT_FIELDS {
+		Next := InStr(Raw, '`n  "' . Field[1] . '": ')
+		Assert(Next > Position, "the worker keeps the shared order at " . Field[1])
+		Position := Next
+	}
 }
 
 ; Full detail stays on this machine. A crash report is the first thing read
@@ -73,7 +88,7 @@ _CRWT_FullDetailStaysLocal() {
 	Canary := "AuditCanary-full-detail"
 	Detail := [
 		"error_msg", "error_extra", "error_what", "error_file", "stack_trace",
-		"script_dir", "active_window_title", "active_window_process",
+		"script_dir", "active_title", "active_app",
 		"config_dir", "log_tail"
 	]
 	Report := Map()
@@ -225,6 +240,7 @@ _CRWT_LargeSnapshotCrossesProcessBoundary(Options := 0) {
 
 		Result := _CRWT_StartAndWait(Snapshot, Scope, Options)
 		Raw := FileRead(Result["artifact"], "UTF-8")
+		_CRWT_AssertSharedDocument(Result["artifact"], Raw)
 		AssertContains(Raw, "FIRST_SAFE_TRANSPORT_SENTINEL")
 		AssertContains(Raw, "LAST_SAFE_TRANSPORT_SENTINEL")
 		; Full detail stays on this machine (crash-full-detail-local); only the
@@ -427,6 +443,7 @@ _CRWT_PrimaryStartRefusalUsesMinimalWorker() {
 		AssertEqual(2, _CRWT_FallbackSpawnState["calls"],
 			"a refused primary launch must make exactly one isolated fallback attempt")
 		FallbackRaw := FileRead(Result["artifact"], "UTF-8")
+		_CRWT_AssertSharedDocument(Result["artifact"], FallbackRaw)
 		AssertContains(FallbackRaw, Canary, "the minimal fallback keeps the error whole (crash-full-detail-local)")
 		AssertFalse(InStr(FallbackRaw, "_transport_") > 0, "the minimal fallback drops the transport paths")
 		for _, Key in _CRWT_RequiredKeys()
@@ -784,7 +801,7 @@ _CRWT_ControlTextThroughNativeWorker() {
 		Snapshot := _CrashReport_CheapSnapshot(Error("control-text transport"))
 		Snapshot["_transport_reports_dir"] := Scope.Directory . "\reports\"
 		Payload := _CRWT_ControlPayload()
-		for Key in ["error_msg", "error_extra", "stack_trace", "active_window_title", "log_tail"]
+		for Key in ["error_msg", "error_extra", "stack_trace", "active_title", "log_tail"]
 			Snapshot[Key] := Payload
 		Result := _CRWT_StartAndWait(Snapshot, Scope, Map("faults", "os,cpu,git"))
 		AssertEqual(1, InStr(Result["artifact"], Scope.Directory . "\reports\"),
@@ -792,7 +809,7 @@ _CRWT_ControlTextThroughNativeWorker() {
 		AssertEqual("primary", Result["owner"]["phase"], "only the real primary writer qualifies this path")
 		AssertEqual(1, Scope.Tasks.Count, "the worker must not silently fall back")
 		AssertTrue(Result["owner"]["mapping"]["closed"], "completion must release the real IPC mapping")
-		for Key in ["error_msg", "error_extra", "stack_trace", "active_window_title", "log_tail"]
+		for Key in ["error_msg", "error_extra", "stack_trace", "active_title", "log_tail"]
 			_CRWT_AssertCodeUnits(Payload, Result["report"][Key], "native worker " . Key)
 	} catch Error as Caught {
 		Failure := Caught
