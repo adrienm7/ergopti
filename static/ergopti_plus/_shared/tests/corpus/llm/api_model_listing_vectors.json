@@ -241,6 +241,87 @@
 				"Mistral-Small-3.2-24B-Instruct-2506",
 				"gpt-oss-20b"
 			]
+		},
+		{
+			"name": "venice listing (recorded)",
+			"provider": "venice",
+			"source": "GET https://api.venice.ai/api/v1/models, recorded 2026-10-30 without a key (trimmed)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"type": "text",
+				"data": [
+					{
+						"id": "llama-3.2-3b",
+						"object": "model",
+						"created": 1727966436,
+						"owned_by": "venice.ai"
+					},
+					{
+						"id": "gemini-4-argon",
+						"object": "model",
+						"created": 1791849600,
+						"owned_by": "venice.ai"
+					},
+					{
+						"id": "gemini-3-6-flash",
+						"object": "model",
+						"created": 1783555200,
+						"owned_by": "venice.ai"
+					}
+				]
+			},
+			"expect": ["gemini-3-6-flash", "gemini-4-argon", "llama-3.2-3b"]
+		},
+		{
+			"name": "vercel listing (recorded)",
+			"provider": "vercel",
+			"source": "GET https://ai-gateway.vercel.sh/v1/models, recorded 2026-10-30 without a key (trimmed)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"data": [
+					{
+						"id": "openai/gpt-4.1-nano",
+						"object": "model",
+						"created": 1755815280,
+						"owned_by": "openai"
+					},
+					{
+						"id": "alibaba/qwen-3-14b",
+						"object": "model",
+						"created": 1755815280,
+						"owned_by": "alibaba"
+					},
+					{
+						"id": "alibaba/qwen-3-235b",
+						"object": "model",
+						"created": 1755815280,
+						"owned_by": "alibaba"
+					}
+				]
+			},
+			"expect": ["alibaba/qwen-3-14b", "alibaba/qwen-3-235b", "openai/gpt-4.1-nano"]
+		},
+		{
+			"name": "poe listing (recorded)",
+			"provider": "poe",
+			"source": "GET https://api.poe.com/v1/models, recorded 2026-10-30 without a key (trimmed)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"data": [
+					{
+						"id": "gpt-4.1-mini",
+						"object": "model",
+						"created": 1744675260112,
+						"owned_by": "OpenAI"
+					},
+					{ "id": "assistant", "object": "model", "created": 1694610718936, "owned_by": "Poe" },
+					{ "id": "grok-4.7", "object": "model", "created": 1790012963916, "owned_by": "XAI" }
+				]
+			},
+			"expect": ["assistant", "gpt-4.1-mini", "grok-4.7"]
 		}
 	],
 	"names": [
@@ -387,6 +468,8 @@
 		"zai": "Not documented (docs.z.ai API reference); the route answers an authentication error without a key: none recorded.",
 		"siliconflow": "Documented as an OpenAI list (docs.siliconflow.com get-model-list) with field examples only; the route needs a key: none recorded.",
 		"nebius": "The documented example lists only retired ids (meta-llama/Meta-Llama-3.1-8B-Instruct) and the route needs a key: none recorded that holds a current model.",
-		"scaleway": "Documented as OpenAI-compatible (using-models-api) with no example response; the route answers 401 without a key: none recorded."
+		"scaleway": "Documented as OpenAI-compatible (using-models-api) with no example response; the route answers 401 without a key: none recorded.",
+		"upstage": "No model listing is documented (console.upstage.ai llms.txt) and the route answers 401 without a key: none recorded.",
+		"ai21": "No model listing is documented; the route answers {\"data\": []} without a key, so no listing holding a model was recorded."
 	}
 }
