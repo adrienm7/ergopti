@@ -1077,11 +1077,10 @@ HSE_WordResetFlagCurrent(Key) {
 ; so triggers that span them — e.g. « ,a → ja » — can still match).
 HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := false, ExtraStrip := 0) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
-		global HSE_CONSUMED_DELIMITERS
 
-		StripLen := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0) + ExtraStrip
-		EmittedEndChar := (EndChar != "" and !ForceConsumeEndChar
-				and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
+		StripLen := _HSE_ExpansionStripUnits(Spec.Length + ExtraStrip, EndChar, HSE_TypoNbspStripped)
+		EmittedEndChar := HSE_PlanTail(_HSE_ExpansionPath(EndChar),
+				_HSE_EndCharConsumed(EndChar, ForceConsumeEndChar), EndChar)
 		ClearAll := Spec.HasOwnProp("OnlyText") and !Spec.OnlyText
 		InsertedText := ClearAll ? "" : Replacement . EmittedEndChar
 		Effect := {
@@ -1448,5 +1447,6 @@ HSE_PreviewNextMatch(Buffer, NextChar) {
 }
 
 #Include hotstring_match.ahk
+#Include hotstring_injection_plan.ahk
 #Include hotstring_dispatch.ahk
 #Include hotstring_cascade.ahk

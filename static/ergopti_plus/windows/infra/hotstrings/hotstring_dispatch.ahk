@@ -1218,6 +1218,53 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 		}
 }
 
+; The plan path of a completed match: an end character makes it the terminator path.
+_HSE_ExpansionPath(EndChar) {
+		return EndChar != "" ? HSE_PLAN_PATH_TERMINATOR : HSE_PLAN_PATH_AUTO
+}
+
+; Whether the end character stays off the screen: explicitly listed as consumed,
+; or forced by the caller.
+_HSE_EndCharConsumed(EndChar, ForceConsumeEndChar) {
+		global HSE_CONSUMED_DELIMITERS
+		return ForceConsumeEndChar or (EndChar != "" and !!InStr(HSE_CONSUMED_DELIMITERS, EndChar))
+}
+
+; The UTF-16 units an expansion strips from the engine buffer: the plan's erase
+; rule read in the units the buffer is indexed by.
+; @param TriggerUnits {Integer} Code units of the trigger, and of any cascade reach.
+; @param EndChar {String} The end character, "" on the auto path.
+; @param NbspStripped {Boolean} Whether a no-break space preceded it.
+; @returns {Integer}
+_HSE_ExpansionStripUnits(TriggerUnits, EndChar, NbspStripped) {
+		return HSE_PlanEraseCount(_HSE_ExpansionPath(EndChar), TriggerUnits, StrLen(EndChar), true, NbspStripped)
+}
+
+; The injection plan of one fire (hotstring_injection_plan.ahk), in codepoints.
+; @param Spec {Object} The matched spec.
+; @param Replacement {String} The first spec's resolved replacement.
+; @param EndChar {String} The end character, "" on the auto path.
+; @param NbspStripped {Boolean} Whether a no-break space preceded it.
+; @param ForceConsumeEndChar {Boolean} The caller swallows the end character.
+; @param CascadePlan {Object|String} The net edit of _HSE_PlanCascade, or "".
+; @returns {Map} The plan of HSE_PlanBuild.
+_HSE_ExpansionPlan(Spec, Replacement, EndChar, NbspStripped, ForceConsumeEndChar, CascadePlan) {
+		Path := _HSE_ExpansionPath(EndChar)
+		Consume := _HSE_EndCharConsumed(EndChar, ForceConsumeEndChar)
+		TriggerLen := _TextCodepointLength(Spec.Trigger)
+		Request := Map("path", Path, "trigger_len", TriggerLen,
+				"event_len", _TextCodepointLength(EndChar), "event_on_screen", true,
+				"nbsp_stripped", NbspStripped, "replacement", Replacement,
+				"terminator", EndChar, "consume_terminator", Consume,
+				"final_result", Spec.HasOwnProp("FinalResult") and Spec.FinalResult)
+		if IsObject(CascadePlan)
+				Request["cascade"] := Map("replacement", CascadePlan.Replacement,
+						"trigger_len", TriggerLen + CascadePlan.ExtraCodepoints,
+						"tail", HSE_PlanTail(Path, Consume, EndChar),
+						"final_result", CascadePlan.FinalResult)
+		return HSE_PlanBuild(Request)
+}
+
 ; Returns TRUE when the match actually produced an expansion, FALSE when it declined
 ; (no spec, a raw callback that refused, a time-activation timeout, or a mixed-case
 ; conform verdict). Callers use this to decide whether a fire really happened: logging
@@ -1287,14 +1334,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		; complete further hotstrings. The whole chain is resolved here and goes out
 		; as THIS burst: the same erase plus whatever typed text a later link
 		; reaches back over, and the last link's text as the replacement.
-		CascadeUnits := 0
-		CascadeCodepoints := 0
 		CascadePlan := _HSE_PlanCascade(Spec, Prepared, EndChar, GateTick)
-		if IsObject(CascadePlan) {
-				Replacement := CascadePlan.Replacement
-				CascadeUnits := CascadePlan.ExtraUnits
-				CascadeCodepoints := CascadePlan.ExtraCodepoints
-		}
+		CascadeUnits := IsObject(CascadePlan) ? CascadePlan.ExtraUnits : 0
 		; Sender choice and terminal ownership must share one foreground receipt.
 		; Acquire it before suppression/synthetic ownership so an ambiguous focus or
 		; title probe declines with no output-side mutation.
@@ -1343,12 +1384,13 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				; tap-hold owner lifts it (through TextSender's SendInput, which adds no
 				; hook-chain latency) and presses a tap-hold's own hold again after.
 
-				; +1 for the NNBSP/NBSP that was stripped before matching when the
-				; end-char is a typographic punctuation (``:`` / `` ; ``).
-				EraseUnits := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
-						+ CascadeUnits
-				BSCount := _TextCodepointLength(Spec.Trigger . EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
-						+ CascadeCodepoints
+				; The plan counts the NNBSP/NBSP that was stripped before matching when
+				; the end-char is a typographic punctuation (``:`` / `` ; ``).
+				Plan := _HSE_ExpansionPlan(Spec, Replacement, EndChar, HSE_TypoNbspStripped,
+						ForceConsumeEndChar, CascadePlan)
+				Replacement := Plan["text"]
+				EraseUnits := _HSE_ExpansionStripUnits(Spec.Length + CascadeUnits, EndChar, HSE_TypoNbspStripped)
+				BSCount := Plan["erase"]
 				BackSpaceSeq := "{BackSpace " . BSCount . "}"
 				; Replacement, casing and OnlyText were frozen by the shared decision
 				; preflight above. Never resolve a callable again here: when the tooltip
@@ -1367,8 +1409,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					ReplacementPart := OnlyText ? ("{Text}" . Replacement) : Replacement
 					; Consume the end-char when it is explicitly listed as consumed —
 					; otherwise always re-inject it so the user sees what they typed.
-					EndCharPart := (EndChar != "" and !ForceConsumeEndChar
-							and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
+					EndCharPart := Plan["tail"]
 					Burst := BackSpaceSeq . ReplacementPart . EndCharPart
 
 				if IsNotepadApp {
@@ -1399,7 +1440,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 									"Pending", true,
 									"Backspaces", BSCount,
 									"EraseUnits", EraseUnits,
-									"PlainInsertedText", Replacement . EndCharPart,
+									"PlainInsertedText", Plan["buffer_suffix"],
 									"SendPayload", ReplacementPart . EndCharPart,
 									"EndCharPart", EndCharPart,
 									"OnlyText", OnlyText,

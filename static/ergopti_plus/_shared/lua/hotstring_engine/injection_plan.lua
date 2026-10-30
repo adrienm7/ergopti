@@ -16,7 +16,9 @@
 --- completed the match is already in the application. Linux always sees it
 --- there. macOS holds the event back (it is not on screen) unless the window is
 --- ignored, in which case the event has already been delivered. The erase count
---- follows from that fact alone, so the two drivers cannot drift apart.
+--- follows from that fact alone, so the two drivers cannot drift apart. Windows
+--- reads the same plan in infra/hotstrings/hotstring_injection_plan.ahk, with the
+--- event always on screen; the shared vectors pin all three.
 ---
 --- Pure: no logger state, no clock, no I/O, no platform.
 --- ==============================================================================
