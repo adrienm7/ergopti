@@ -66,6 +66,11 @@ line with `Release-As:` in an explanatory message: it would become a request.
 `github-actions[bot]`, not any LLM or tool. Remove them if present. The code is
 ours, the credit is ours, the responsibility is ours.
 
+The same rule covers `Claude-Session` trailers and any agent session link: a
+release body is built from commit messages, so such a line would publish a
+private session URL. This repository instruction overrides any harness
+attribution reminder.
+
 ## Linear history
 
 `main` and `dev` must stay perfectly linear — no `Merge branch '…'` commits.

@@ -70,8 +70,6 @@ HEADINGS = {
 # breaking-change marker, and the rest of the subject.
 TYPE_RE = re.compile(r"^([a-z]+)(?:\(([^)]+)\))?(!)?:\s+(.+)$")
 
-# Co-author trailer pattern. Project rule forbids AI / bot credits, so any
-# leftover trailer is stripped from the rendered body.
 # GitHub API hard cap for release body length.
 # The workflow wraps the changelog in ~15 000 characters of download,
 # installation and qualification text (v1.0.2: more than 10 000, so a
@@ -80,7 +78,13 @@ TYPE_RE = re.compile(r"^([a-z]+)(?:\(([^)]+)\))?(!)?:\s+(.+)$")
 GITHUB_RELEASE_BODY_LIMIT = 125_000
 CHANGELOG_MAX_CHARS = GITHUB_RELEASE_BODY_LIMIT - 30_000
 
-COAUTHOR_RE = re.compile(r"^Co-[Aa]uthored-[Bb]y:", re.MULTILINE)
+# Tool attribution lines. Project rule forbids AI / bot credits, and a
+# Claude-Session trailer links a private agent session that must never reach a
+# public release page, so any such line is stripped from the rendered body.
+TOOL_ATTRIBUTION_RE = re.compile(
+    r"^\s*(?:Co-Authored-By|Claude-Session):|https?://claude\.ai/code/session_",
+    re.IGNORECASE,
+)
 
 
 # =============================================
@@ -160,13 +164,13 @@ def collect_commits(prev_tag: str, current_tag: str) -> list[dict[str, str]]:
 
 
 def clean_body(body: str) -> str:
-    """Drop Co-Authored-By trailers, strip leading / trailing blank lines,
+    """Drop tool attribution lines, strip leading / trailing blank lines,
     then indent every remaining line by 2 spaces so it renders as prose under
     its parent bullet in markdown.
     """
     lines = body.splitlines()
-    # Strip Co-Authored-By trailers (project rule: no AI / bot credits).
-    lines = [ln for ln in lines if not COAUTHOR_RE.match(ln)]
+    # Strip tool attribution (project rule: no AI / bot credits, no session links).
+    lines = [ln for ln in lines if not TOOL_ATTRIBUTION_RE.search(ln)]
     # Strip leading blanks.
     while lines and not lines[0].strip():
         lines.pop(0)
