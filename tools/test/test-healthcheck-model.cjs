@@ -103,7 +103,7 @@ function t(key, ...args) {
 if (schema.schema_version !== 2) fail(`schema_version is ${schema.schema_version}, expected 2`);
 if (!Array.isArray(schema.sections) || schema.sections.length < 10)
 	fail('the schema declares fewer than 10 sections');
-for (const key of ['phase_a_budget_ms', 'max_export_bytes']) {
+for (const key of ['phase_a_budget_ms', 'phase_a_slowest_named', 'max_export_bytes']) {
 	if (!Number.isInteger(schema[key]) || schema[key] < 1) fail(`${key} must be a positive integer`);
 }
 const report = schema.report || {};

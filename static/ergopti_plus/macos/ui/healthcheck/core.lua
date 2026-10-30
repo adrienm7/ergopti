@@ -806,8 +806,11 @@ function M.run(opts)
 
 	-- Each collector is isolated: a report exists to be read when things are
 	-- broken, so one collector raising costs its own section, never the window
+	local timings = {}
 	local function section(name, collector)
+		local section_started = hs.timer.absoluteTime()
 		local ok, value = pcall(collector)
+		timings[#timings + 1] = { name = name, ms = (hs.timer.absoluteTime() - section_started) / 1e6 }
 		if not ok then
 			Logger.error(LOG, "Diagnostics collector '%s' raised: %s — section left empty.", name, tostring(value))
 			return {}
@@ -849,8 +852,8 @@ function M.run(opts)
 	-- Not a warning: the next snapshot would count it among the session's
 	-- problems. The report's developer section carries the duration.
 	if elapsed > schema.phase_a_budget_ms then
-		Logger.info(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget.", elapsed,
-			schema.phase_a_budget_ms)
+		Logger.info(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget%s.", elapsed,
+			schema.phase_a_budget_ms, Snapshot.slowest_collectors(timings, schema.phase_a_slowest_named))
 	end
 	local undeclared = Snapshot.check_fields(snapshot, schema)
 	if #undeclared > 0 then
