@@ -1703,7 +1703,6 @@ not open software work.
       extension TOML files; Windows native cases and Fedora/Alpine ShellRunner fixtures; Linux E2E.
 - [ ] **121, 123, 137.** AI Agent submenu composed-menu qualification; native Linux export
       write/close refusal; provider published before model loading (macOS).
-- [ ] **30.** Linux tests of the physical magic-key notice (407db5fd50).
 - [ ] **Carbon and daemon-report Swift.** Carbon fixture compilation and both-architecture
       receipts; daemon-report Swift allocation failures on Intel and Apple silicon.
 - [ ] **CodeQL Go.** After the `native_http` Go module is published, re-enable Go and check a fresh
