@@ -3,12 +3,13 @@
 --- ==============================================================================
 --- MODULE: Field Run Stdin Port Streams Its Request
 --- DESCRIPTION:
---- The launcher's HTTP worker reads its JSON request on stdin to EOF. The
---- field run's loopback check spawned it as a non-streaming task, which never
---- received the bytes: the worker refused an empty request with 64 on the
---- maintainer's Mac (field run of 2026-10-30 20:51, exit_64:not_reached). The
---- port must spawn a streaming task, write the input once it runs, close it,
---- and hand back the stdout its chunks and its completion carried together.
+--- The launcher's HTTP worker reads its JSON request on stdin to EOF, and
+--- xmllint reads a whole layout there. hs.task queues setInput bytes written
+--- BEFORE the start and closes stdin itself, on a task with no streaming
+--- callback (modules/llm/api_token_crypto.lua relies on it). Writing after the
+--- start lost the request (exit_64:not_reached on 2026-10-30 20:51 and 21:53)
+--- and cut layouts short (keylayout_xml refused_7_of_8). The port must queue
+--- the input before the start, never stream, never call closeInput.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -30,18 +31,18 @@ local function run_exec_input()
 				local running = false
 				return {
 					isSettled = function() return false end,
-					start = function() running = true; world.order[#world.order + 1] = "start"; return true end,
 					set_input = function(data)
 						world.order[#world.order + 1] = running and "input_while_running" or "input_before_start"
 						world.input = data
 						return true
 					end,
-					close_input = function()
-						world.order[#world.order + 1] = "close"
-						on_chunk({}, '\0\0\0\44H{"version":1,', "")
-						on_done(0, '"status":204}', "")
+					start = function()
+						running = true
+						world.order[#world.order + 1] = "start"
+						on_done(0, '\0\0\0\44H{"version":1,"status":204}', "")
 						return true
 					end,
+					close_input = function() world.order[#world.order + 1] = "close"; return true end,
 					terminate = function() return true end,
 				}
 			end,
@@ -54,10 +55,10 @@ local function run_exec_input()
 end
 
 helpers.describe("field run stdin port", function()
-	helpers.it("streams the request to a running task, closes it, and joins the output", function()
+	helpers.it("queues the request before the start of a non-streaming task", function()
 		local world = run_exec_input()
-		helpers.assert_true(world.streaming, "a non-streaming task never receives its stdin")
-		helpers.assert_eq(table.concat(world.order, ","), "start,input_while_running,close")
+		helpers.assert_true(not world.streaming, "setInput closes stdin itself only without a streaming callback")
+		helpers.assert_eq(table.concat(world.order, ","), "input_before_start,start")
 		helpers.assert_eq(world.input, "{}")
 		helpers.assert_eq(world.environment.E, "1")
 		helpers.assert_eq(world.code, 0)
