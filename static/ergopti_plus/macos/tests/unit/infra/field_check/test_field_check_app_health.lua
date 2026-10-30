@@ -6,8 +6,10 @@
 --- The field run's app health check over scripted ports:
 --- 1. the app's own process is measured with ps (resident memory in MB, CPU
 ---    share), as information, and an unreadable answer fails the memory step;
---- 2. a crash report of the last day, from the driver or from macOS, fails
----    its own step with the count.
+--- 2. a crash report of the last day from the driver, or from macOS for one
+---    of this app's processes, fails, naming each process and listing the
+---    newest with its kind; other apps' reports are only counted (the
+---    2026-10-30 20:51 run read a bare system count of 11).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -17,7 +19,7 @@ local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks
 --- Builds scripted ports; `world` records every command.
 --- @return table ports, table world
 local function make_ports()
-	local world = { commands = {}, ps = { 0, "  412736   1,7\n" }, crashes = { driver = 0, system = 0 } }
+	local world = { commands = {}, ps = { 0, "  412736   1,7\n" }, crashes = { driver = 0, owned = {}, other = 4 } }
 	local ports = {
 		exec = function(executable, args, _, callback)
 			world.commands[#world.commands + 1] = executable .. " " .. table.concat(args, " ")
@@ -59,15 +61,34 @@ helpers.describe("app health probe", function()
 		helpers.assert_eq(steps.driver_crash_reports_24h.value, "0")
 	end)
 
-	helpers.it("fails each crash report family with its count", function()
+	helpers.it("fails the app's crash reports by process and only counts the others", function()
 		local ports, world = make_ports()
-		world.crashes = { driver = 0, system = 2 }
+		world.crashes = { driver = 0, other = 9, owned = {
+			{ process = "ergoptiplus", kind = "crash:exc_crash:sigkill:codesigning" },
+			{ process = "ollama", kind = "crash:exc_bad_access:sigsegv" },
+			{ process = "ergoptiplus", kind = "hang" },
+			{ process = "python", kind = "crash" },
+		} }
 		local steps, result = run(ports)
 		helpers.assert_true(not result.passed)
-		helpers.assert_eq(steps.system_crash_reports_24h.value, "2")
-		helpers.assert_eq(steps.driver_crash_reports_24h.state, "pass")
-		world.crashes = { driver = 1, system = 0 }
-		helpers.assert_eq(run(ports).driver_crash_reports_24h.state, "fail")
+		helpers.assert_eq(steps.app_crash_reports_24h.value, "ergoptiplus:2+ollama:1+python:1")
+		helpers.assert_eq(steps.app_crash_1.value, "ergoptiplus:crash:exc_crash:sigkill:codesigning")
+		helpers.assert_eq(steps.app_crash_3.value, "ergoptiplus:hang")
+		helpers.assert_nil(steps.app_crash_4)
+		helpers.assert_eq(steps.other_crash_reports_24h.state, "info")
+		helpers.assert_eq(steps.other_crash_reports_24h.value, "9")
+		world.crashes = { driver = 1, owned = {}, other = 0 }
+		steps, result = run(ports)
+		helpers.assert_eq(steps.driver_crash_reports_24h.state, "fail")
+		helpers.assert_eq(steps.app_crash_reports_24h.state, "pass")
+	end)
+
+	helpers.it("passes with other apps' crash reports only", function()
+		local ports, world = make_ports()
+		world.crashes = { driver = 0, owned = {}, other = 11 }
+		local steps, result = run(ports)
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.other_crash_reports_24h.value, "11")
 	end)
 
 	helpers.it("fails an unreadable process measure", function()

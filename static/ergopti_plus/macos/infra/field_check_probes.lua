@@ -606,6 +606,9 @@ end
 
 local PS = "/bin/ps"
 
+-- Newest app crash reports listed one by one with their kind.
+M.CRASHES_LISTED = 3
+
 --- Reads `ps -o rss=,%cpu=` output.
 --- @param output any Command output.
 --- @return number|nil rss_kb, number|nil cpu_percent
@@ -617,13 +620,29 @@ end
 
 --- The app's resident memory and CPU share while the field run waits between
 --- steps, and the crash reports of the last day: the driver's own (a Lua
---- fatal it caught) and the ones macOS wrote for this app or its helpers. A
---- crash report fails its step with the count; the reports themselves stay on
---- the Mac, and the day log names what each one was.
+--- fatal it caught) and the ones macOS wrote for this app's processes (the app
+--- and its launcher roles, Hammerspoon, Ollama, Python, Karabiner), which fail
+--- by process and are listed with their closed kind (hang or crash, exception,
+--- signal, termination namespace); other apps' reports are counted only.
 function M.app_health(ports, report, finish)
 	local crashes = ports.crash_counts()
 	report.step("driver_crash_reports_24h", (crashes.driver or 0) == 0 and STATE.pass or STATE.fail, crashes.driver or 0)
-	report.step("system_crash_reports_24h", (crashes.system or 0) == 0 and STATE.pass or STATE.fail, crashes.system or 0)
+	-- One of this app's processes fails the step; every other app's report is information
+	local owned = crashes.owned or {}
+	local per_process, names = {}, {}
+	for _, entry in ipairs(owned) do
+		if not per_process[entry.process] then names[#names + 1] = entry.process end
+		per_process[entry.process] = (per_process[entry.process] or 0) + 1
+	end
+	table.sort(names)
+	local parts = {}
+	for _, name in ipairs(names) do parts[#parts + 1] = name .. ":" .. per_process[name] end
+	report.step("app_crash_reports_24h", #owned == 0 and STATE.pass or STATE.fail,
+		#owned == 0 and 0 or table.concat(parts, "+"))
+	for index = 1, math.min(#owned, M.CRASHES_LISTED) do
+		report.step("app_crash_" .. index, STATE.info, owned[index].process .. ":" .. owned[index].kind)
+	end
+	report.step("other_crash_reports_24h", STATE.info, crashes.other or 0)
 	ports.exec(PS, { "-o", "rss=,%cpu=", "-p", tostring(ports.pid()) }, COMMAND_TIMEOUT, function(code, output)
 		local rss, cpu = M.parse_usage(code == 0 and output or "")
 		if not rss then

@@ -333,40 +333,72 @@ end
 -- =============================
 -- =============================
 
--- Seconds a crash report stays "recent", and the names that are this app's:
--- the app, its embedded Hammerspoon and the Ollama it runs. A python3 or uv
--- report could be any other program's, so those are left to the collector.
+-- Seconds a crash report stays "recent", and the processes that are this
+-- app's or that it runs (its own launcher roles, Hammerspoon, the owned Ollama
+-- and Python runtimes, Karabiner), by the lowercase start of the report name.
 local CRASH_WINDOW_SECONDS = 24 * 3600
-local CRASH_NAME_PATTERNS = { "^ergoptiplus", "^hammerspoon", "^ollama" }
+local OWNED_CRASH_PROCESSES = {
+	{ "^ergoptiplus", "ergoptiplus" }, { "^hammerspoon", "hammerspoon" }, { "^ollama", "ollama" },
+	{ "^python", "python" }, { "^karabiner", "karabiner" },
+}
 
---- Counts the files of a folder modified within the window whose lowercase
---- name matches one of the patterns (every file when patterns is nil).
---- @param dir string Absolute folder.
---- @param patterns table|nil Lua patterns.
---- @return integer count
-local function recent_files(dir, patterns)
-	local now, count = os.time(), 0
-	for _, name in ipairs(require("infra.fs_dir").entries(dir)) do
-		local lower, wanted = name:lower(), patterns == nil
-		for _, pattern in ipairs(patterns or {}) do
-			if lower:match(pattern) then wanted = true end
+-- Bytes of a report read for its closed tokens (the header and the exception).
+local CRASH_READ_BYTES = 65536
+
+--- The closed tokens of one crash report: its kind (hang or crash), the
+--- exception type, the signal and the termination namespace macOS recorded.
+--- Nothing else of the report is read into a value.
+--- @param path string Report path.
+--- @param name string Report file name.
+--- @return string kind Tokens joined by ":".
+local function crash_kind(path, name)
+	local tokens = { name:lower():match("%.hang$") and "hang" or (name:lower():match("%.spin$") and "spin" or "crash") }
+	local file = io.open(path, "rb")
+	if file then
+		local text = file:read(CRASH_READ_BYTES) or ""
+		file:close()
+		for _, pattern in ipairs({ '"type"%s*:%s*"(EXC_[%u_]+)"', '"signal"%s*:%s*"(SIG%u+)"',
+			'"namespace"%s*:%s*"(%u[%u_]+)"' }) do
+			local token = text:match(pattern)
+			if token then tokens[#tokens + 1] = token:lower() end
 		end
-		local attributes = wanted and hs.fs.attributes(dir .. "/" .. name) or nil
-		local modified = type(attributes) == "table" and attributes.mode == "file" and attributes.modification or nil
-		if type(modified) == "number" and now - modified <= CRASH_WINDOW_SECONDS then count = count + 1 end
 	end
-	return count
+	return table.concat(tokens, ":")
 end
 
---- The crash reports of the last day: the driver's own, and macOS's for this app.
---- @return table counts { driver, system }
+--- The crash reports of the last day: the driver's own, and macOS's split into
+--- this app's processes (each named, newest first) and every other one.
+--- An absent folder holds no report: it is not listed, so no error is logged.
+--- @return table counts { driver, owned = { { process, kind } }, other }
 local function crash_counts()
+	local FileSystem = require("adapters.file_system")
+	local FsDir = require("infra.fs_dir")
+	local now = os.time()
+	local function recent(dir, visit)
+		if FileSystem.exists(dir) ~= true then return end
+		for _, name in ipairs(FsDir.entries(dir)) do
+			local attributes = hs.fs.attributes(dir .. "/" .. name)
+			local modified = type(attributes) == "table" and attributes.mode == "file" and attributes.modification or nil
+			if type(modified) == "number" and now - modified <= CRASH_WINDOW_SECONDS then visit(name, modified) end
+		end
+	end
+	local counts = { driver = 0, owned = {}, other = 0 }
+	recent(require("infra.logger").crash_reports_dir():gsub("/+$", ""), function() counts.driver = counts.driver + 1 end)
 	local home = os.getenv("HOME")
-	local driver_dir = require("infra.logger").crash_reports_dir():gsub("/+$", "")
-	return {
-		driver = recent_files(driver_dir, nil),
-		system = home and recent_files(home .. "/Library/Logs/DiagnosticReports", CRASH_NAME_PATTERNS) or 0,
-	}
+	if home then
+		local dir = home .. "/Library/Logs/DiagnosticReports"
+		recent(dir, function(name, modified)
+			local lower, process = name:lower(), nil
+			for _, entry in ipairs(OWNED_CRASH_PROCESSES) do
+				if lower:match(entry[1]) then process = entry[2] break end
+			end
+			if not process then counts.other = counts.other + 1 return end
+			counts.owned[#counts.owned + 1] = { process = process, kind = crash_kind(dir .. "/" .. name, name),
+				modified = modified }
+		end)
+	end
+	table.sort(counts.owned, function(a, b) return a.modified > b.modified end)
+	return counts
 end
 
 
