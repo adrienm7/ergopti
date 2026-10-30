@@ -525,6 +525,11 @@ function reportFolder(paths) {
 			});
 			const body = JSON.stringify({
 				procName: 'ErgoptiPlus',
+				procRole: 'Background',
+				parentProc: 'launchd',
+				codeSigningID: 'com.ergoptiplus.app',
+				codeSigningTeamID: '',
+				codeSigningFlags: 570556929,
 				procPath: '/Users/someone/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus',
 				exception: {
 					type: 'EXC_CRASH',
@@ -574,6 +579,14 @@ function reportFolder(paths) {
 			assert.match(result.stdout, /^owned reports since the run started: 1$/m);
 			assert.match(result.stdout, /^ {2}exception\.signal: SIGKILL$/m);
 			assert.match(result.stdout, /^ {2}termination\.namespace: CODESIGNING$/m);
+			assert.match(result.stdout, /^ {2}procRole: Background$/m);
+			assert.match(result.stdout, /^ {2}parentProc: launchd$/m);
+			assert.match(result.stdout, /^ {2}codeSigningID: com\.ergoptiplus\.app$/m);
+			assert.match(
+				result.stdout,
+				/^ {2}codeSigningTeamID: none$/m,
+				'an ad hoc signature has no team'
+			);
 			assert.match(result.stdout, /^ {2}#1 ErgoptiPlus ManagedHTTPWorker\.run\(arguments:\)\+64$/m);
 			assert.match(result.stdout, /^ {2}#2 ErgoptiPlus 0x3000$/m);
 			assert.doesNotMatch(
