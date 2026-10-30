@@ -39,7 +39,7 @@
 ; True when the character at Index exists and belongs to the named class.
 ; @param Text {String}
 ; @param Index {Integer} 1-based position.
-; @param Class {String} "alnum", "word", "word_dash", "path", "bearer",
+; @param Class {String} "alnum", "word", "word_dash", "jwt", "path", "bearer",
 ;   "space", "quote", "separator", "value_stop", "email_local", "email_domain",
 ;   "url_userinfo", "at", "letter", "name" (a character of a folder or file
 ;   name chosen by a person: the path characters plus every non-ASCII one, the
@@ -60,6 +60,8 @@ _Redact_CharIs(Text, Index, Class) {
 			return Alphanumeric || Code = 0x5F
 		case "word_dash":
 			return Alphanumeric || Code = 0x5F || Code = 0x2D
+		case "jwt":
+			return Alphanumeric || Code = 0x5F || Code = 0x2D || Code = 0x2E
 		case "path":
 			return Alphanumeric || Code = 0x5F || Code = 0x2E || Code = 0x2D
 		case "bearer":
@@ -435,7 +437,7 @@ Redact_Apply(Text, Rules, Context) {
 		; Validated before scanning, so a bad rule fails even on text that never
 		; contains its prefix
 		if !(Token["charset"] == "alnum" || Token["charset"] == "word"
-			|| Token["charset"] == "word_dash")
+			|| Token["charset"] == "word_dash" || Token["charset"] == "jwt")
 			throw ValueError("redact: unknown charset '" . Token["charset"] . "'.")
 		Text := _Redact_Replace(Text, Token["prefix"], false,
 			_Redact_AcceptToken.Bind(Rules, Token))
