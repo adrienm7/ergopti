@@ -34,6 +34,10 @@
 ---    physical Ctrl+Caps Lock press this session ever reached it.
 ---    gesture_frames: every touch frame this session carried its capture stamp,
 ---    and the mean spacing of the stamps.
+--- 12. hotstring_roundtrip: a shipped hotstring typed into the scratch field
+---    with its terminator must leave exactly its expansion there.
+--- 13. prediction_tooltip: a short neutral text typed into the scratch field
+---    must bring up the prediction tooltip, with a model already installed.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only, like the Debug checks: nothing is granted, prompted, written
@@ -977,6 +981,133 @@ function M.gesture_frames(ports, report, finish)
 	report.step("gesture_frame_spacing_ms", STATE.info,
 		spacing and string.format("%.1f", spacing) or "single_frame")
 	finish()
+end
+
+
+
+
+
+-- =========================================================
+-- =========================================================
+-- ======= 12/ Typed steps: hotstring and prediction =======
+-- =========================================================
+-- =========================================================
+
+-- Seconds the field is read for the expansion after the terminator, and the
+-- whole typing bound (focus settle, keys, wait and the focus given back).
+M.HOTSTRING_WAIT_SECONDS = 3
+M.HOTSTRING_BOUND_SECONDS = 15
+
+-- The prediction step's own text: common words, no terminator punctuation,
+-- never a person's text. A cold model load can take most of the wait.
+M.TOOLTIP_TEXT = "le chat dort sur le "
+M.PREDICTION_WAIT_SECONDS = 45
+M.PREDICTION_BOUND_SECONDS = 60
+
+--- Splits text into the keys the scratch typing posts, Space by its name.
+--- @param text string ASCII text.
+--- @return table keys
+local function text_keys(text)
+	local keys = {}
+	for char in text:gmatch(".") do keys[#keys + 1] = char == " " and "space" or char end
+	return keys
+end
+
+--- Reports what every typed step shares: the scratch focus, the keys posted
+--- and the focus given back to the previous application.
+--- @param report table Step reporter.
+--- @param typed table The scratch typing outcome.
+--- @param count integer Keys asked for.
+--- @return boolean complete True when every key was posted.
+local function report_typing(report, typed, count)
+	report.step("scratch_focus", typed.focused and STATE.pass or STATE.fail, typed.focused and "focused"
+		or (typed.aborted or "not_focused"))
+	local posted = typed.posted or 0
+	report.step("keys_posted", posted == count and STATE.pass or STATE.fail,
+		posted == count and posted or ("posted_" .. posted .. "_of_" .. count
+			.. (typed.aborted and (":" .. typed.aborted) or "")))
+	return posted == count
+end
+
+--- The real typing path for one hotstring. The first shipped, enabled,
+--- terminator-expanded hotstring the registry lists (a plain lowercase trigger
+--- no other mapping shares) is typed as selftest keys into the scratch field,
+--- after a Space and followed by Space, its terminator. The field must hold
+--- exactly the Space and the expansion, plus the terminator unless Space is a
+--- consumed terminator; the time from the terminator to that text is named.
+--- Each assumption that does not hold fails with its own code: no keymap, no
+--- candidate, Space not a terminator, the trigger typed but not expanded.
+function M.hotstring_roundtrip(ports, report, finish)
+	local facts = ports.hotstring_candidates()
+	if type(facts) ~= "table" then
+		report.step("hotstring_trigger", STATE.fail, "keymap_absent")
+		return finish()
+	end
+	local candidate = (facts.candidates or {})[1]
+	if candidate == nil then
+		report.step("hotstring_trigger", STATE.fail, "no_enabled_trigger")
+		return finish()
+	end
+	if not facts.space_terminates then
+		report.step("hotstring_trigger", STATE.fail, "space_not_terminator")
+		return finish()
+	end
+	report.step("hotstring_trigger", STATE.pass, "candidates_" .. #facts.candidates)
+	report.step("hotstring_trigger_chars", STATE.info, #candidate.trigger)
+	report.step("space_consumed", STATE.info, facts.space_consumed and "yes" or "no")
+	local keys = text_keys(" " .. candidate.trigger .. " ")
+	local expected = " " .. candidate.expansion .. (facts.space_consumed and "" or " ")
+	ports.scratch_typing(keys, function(typed)
+		local complete = report_typing(report, typed, #keys)
+		if typed.text == nil then
+			report.step("hotstring_expanded", STATE.fail, "unreadable")
+		elseif typed.text == expected then
+			report.step("hotstring_expanded", STATE.pass, "exact")
+		elseif typed.text == " " .. candidate.trigger .. " " then
+			report.step("hotstring_expanded", STATE.fail, complete and "not_expanded" or "typing_incomplete")
+		else
+			report.step("hotstring_expanded", STATE.fail, "mismatch_" .. #typed.text .. "_bytes")
+		end
+		if typed.effect_ms then
+			report.step("terminator_to_text_ms", STATE.info, math.floor(typed.effect_ms))
+		end
+		report.step("front_restored", typed.restored and STATE.pass or STATE.fail, typed.restored and "yes" or "no")
+		finish()
+	end, { bound_seconds = M.HOTSTRING_BOUND_SECONDS, wait_seconds = M.HOTSTRING_WAIT_SECONDS, until_text = expected })
+end
+
+--- The real typing path for a prediction. With predictions on and the active
+--- model already installed (nothing is started or downloaded), the step's own
+--- text is typed as selftest keys into the scratch field and the prediction
+--- tooltip must show; the time from the last key to the tooltip is named.
+--- Predictions off, a model that is not on this Mac and a tooltip that never
+--- showed each fail with their own code.
+function M.prediction_tooltip(ports, report, finish)
+	ports.prediction_readiness(function(facts)
+		report.step("prediction_backend", STATE.info, facts.backend or "unknown")
+		if not facts.enabled then
+			report.step("prediction_ready", STATE.fail, "llm_disabled")
+			return finish()
+		end
+		if not facts.installed then
+			report.step("prediction_ready", STATE.fail, "no_installed_model")
+			return finish()
+		end
+		report.step("prediction_ready", STATE.pass, "installed_model")
+		local keys = text_keys(M.TOOLTIP_TEXT)
+		ports.scratch_typing(keys, function(typed)
+			local complete = report_typing(report, typed, #keys)
+			if typed.effect_ms then
+				report.step("prediction_shown", STATE.pass, "shown")
+				report.step("keystroke_to_tooltip_ms", STATE.info, math.floor(typed.effect_ms))
+			else
+				report.step("prediction_shown", STATE.fail, complete and "tooltip_not_shown" or "typing_incomplete")
+			end
+			report.step("front_restored", typed.restored and STATE.pass or STATE.fail, typed.restored and "yes" or "no")
+			finish()
+		end, { bound_seconds = M.PREDICTION_BOUND_SECONDS, wait_seconds = M.PREDICTION_WAIT_SECONDS,
+			until_prediction = true })
+	end)
 end
 
 return M
