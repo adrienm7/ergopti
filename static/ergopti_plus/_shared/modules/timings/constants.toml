@@ -267,6 +267,11 @@ terminal_hotstring_key_delay_ms = 20
 
 [gestures]
 
+# Windows: how often a worker-authored result file is checked after a touchpad
+# restart or gesture registration.
+# AHK: modules/gestures/config.ahk, ui/onboarding/gesture_registration.ahk.
+worker_result_poll_ms = 100
+
 # Touchdevice discovery: how often the startup phase checks for the first frame.
 # HS: gestures/init.lua STARTUP_PROBE_INTERVAL_SEC.
 probe_interval_ms = 500
@@ -812,6 +817,14 @@ webview_navigation_flush_delay_ms = 150
 # HS: ui/model_browser, ui/changelog.
 webview_ready_safety_flush_ms = 1500
 
+# Windows: the same safety flush of the Ollama, changelog and model browser pages.
+# AHK: modules/llm/ollama_webview.ahk, ui/changelog/init.ahk, ui/model_browser/init.ahk.
+webview_page_safety_flush_ms = 2000
+
+# Windows: the same safety flush of the shared webview host and of onboarding.
+# AHK: infra/webview_utils.ahk, ui/onboarding/webview.ahk.
+webview_host_safety_flush_ms = 2500
+
 # macOS: the same safety flush of the download window, which waits for its own
 # didFinishNavigation.
 # HS: ui/download_window.
@@ -954,6 +967,10 @@ hotpath_slow_ms = 5
 # ──────────────────────────────────────────────────────────────────────
 
 [adapters]
+
+# Windows: minimum age of an abandoned atomic-write stage before it is reaped.
+# AHK: infra/toml/toml_helpers.ahk StaleTempAgeMs (pinned copy).
+stale_temp_age_ms = 60000
 
 # Deadline of one HTTP request, file digest or child process when its caller
 # names none. HS: http_client.lua. LX: curl_http_client.lua, file_digest.lua,

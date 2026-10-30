@@ -183,6 +183,12 @@ const SOURCE_PINS = [
 	},
 	{
 		section: 'adapters',
+		key: 'stale_temp_age_ms',
+		file: 'windows/infra/toml/toml_helpers.ahk',
+		pattern: /^StaleTempAgeMs\(\) \{\n\treturn (\d+)\n\}$/gm
+	},
+	{
+		section: 'adapters',
 		key: 'default_timeout_ms',
 		file: 'macos/adapters/http_client.lua',
 		pattern: /^local HTTP_CLIENT_DEFAULT_TIMEOUT_MS\s*=\s*(\d+)\s*$/gm

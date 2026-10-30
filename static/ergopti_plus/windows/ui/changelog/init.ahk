@@ -307,7 +307,7 @@ _CLW_BuildWindow(Channel, Request) {
 	try _CLW_Controller.Fill()
 
 	; Safety flush in case the "ready" message from JS never fires.
-	SetTimer(_CLW_SafetyFlush.Bind(WindowEpoch), -2000)
+	SetTimer(_CLW_SafetyFlush.Bind(WindowEpoch), -TimingsGet("ui", "webview_page_safety_flush_ms"))
 
 	; Inject i18n strings once the page is ready (via the flush queue).
 	_CLW_Eval(_CLW_I18nApplyScript())

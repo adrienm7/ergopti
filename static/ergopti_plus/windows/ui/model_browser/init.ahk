@@ -476,7 +476,7 @@ _LLM_ModelBrowser_ShowWeb() {
 			try Controller.Fill()
 			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
 				return g
-			SetTimer(_LLM_MBW_SafetyFlush.Bind(SessionEpoch), -2000)
+			SetTimer(_LLM_MBW_SafetyFlush.Bind(SessionEpoch), -TimingsGet("ui", "webview_page_safety_flush_ms"))
 			Script := _LLM_MBW_I18nApplyScript()
 			_LLM_MBW_Eval(Script, SessionEpoch)
 			return g
