@@ -33,11 +33,13 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 const { parse: parseToml } = require('smol-toml');
 const { scriptTokens, stripComments } = require('../lib/script-source.cjs');
 
 const SP = path.resolve(__dirname, '..', '..', 'static', 'ergopti_plus');
-const read = (rel) => fs.readFileSync(path.join(SP, rel), 'utf8');
+const read = (rel) => readSourceFile(path.join(SP, rel));
 
 const manifest = parseToml(
 	read('_shared/modules/features/manifest.toml').replace(

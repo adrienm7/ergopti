@@ -29,6 +29,8 @@
 
 const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -118,10 +120,7 @@ if (modifiers && modifiers.length > 0) {
 	}
 
 	// The Linux menu must actually offer the picker — the point of the exercise.
-	const linuxMenu = fs.readFileSync(
-		path.join(SP, 'linux', 'ui', 'menu', 'menu_builder.lua'),
-		'utf8'
-	);
+	const linuxMenu = readSourceFile(path.join(SP, 'linux', 'ui', 'menu', 'menu_builder.lua'));
 	if (!/tap_hold\.hold_options/.test(linuxMenu)) {
 		errors.push(
 			'linux/ui/menu/menu_builder.lua no longer builds its hold picker from the shared catalogue. ' +

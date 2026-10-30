@@ -24,10 +24,12 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const sp = path.join(root, 'static', 'ergopti_plus');
-const read = (...parts) => fs.readFileSync(path.join(sp, ...parts), 'utf8');
+const read = (...parts) => readSourceFile(path.join(sp, ...parts));
 
 let passed = 0;
 const check = (label, action) => {

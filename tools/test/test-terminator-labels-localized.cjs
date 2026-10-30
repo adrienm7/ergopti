@@ -28,6 +28,8 @@
 
 const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -153,7 +155,7 @@ if (/\{ key = "[^"]+", chars = \{[^}]*\}, label =/.test(lua)) {
 }
 
 for (const renderer of RENDERERS) {
-	const source = fs.readFileSync(renderer.file, 'utf8');
+	const source = readSourceFile(renderer.file);
 	const rel = path.relative(ROOT, renderer.file).replace(/\\/g, '/');
 	if (!source.includes(renderer.resolves)) {
 		errors.push(`${rel} must resolve each catalogue row with ${renderer.resolves}`);
