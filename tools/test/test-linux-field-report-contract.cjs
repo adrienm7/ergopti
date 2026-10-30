@@ -133,7 +133,8 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 		'2026-10-28 10:00:00 [INFO] [BootProfile] Boot complete in 812 ms (cpu 300 ms).\n' +
 			'2026-10-28 10:01:00 [INFO] [network_check] check=network verdict=pass steps=1 pac=pass\n' +
 			'2026-10-28 10:02:00 [WARNING] [Fixture] a warning\n' +
-			"2026-10-28 10:03:00 [ERROR] [injector] Cannot deliver 'TYPEDCANARY' before erasing its trigger: boom.\n"
+			"2026-10-28 10:03:00 [ERROR] [injector] Cannot deliver 'TYPEDCANARY' before erasing its trigger: boom.\n" +
+			"2026-10-28 10:04:00 [TRACE] [injector] inject(): bc=3 text='TYPEDCANARY'…\n"
 	);
 	fs.writeFileSync(path.join(logs, `${LOG_FILES.main}2000-01-01${LOG_FILES.extension}`), 'old\n');
 	fs.writeFileSync(path.join(logs, LOG_FILES.bootstrap), 'refused session_lock\n');
@@ -297,6 +298,7 @@ function read(folder, name) {
 					'the pushed day log keeps no typed text'
 				);
 				assert.match(read(folder, dayLog), /Cannot deliver <text withheld> before erasing/);
+				assert.match(read(folder, dayLog), /inject\(\): bc=3 text=<text withheld>$/m);
 				assert(fs.existsSync(path.join(folder, LOG_FILES.bootstrap)));
 				assert(
 					!fs.existsSync(path.join(folder, `${LOG_FILES.main}2000-01-01${LOG_FILES.extension}`))
