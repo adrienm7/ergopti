@@ -73,7 +73,7 @@
 			"kind": "field_check",
 			"check": "event_taps",
 			"deadline_seconds": 30,
-			"proves": "Every keymap event tap is enabled, the tap watchdog runs, and the run loop answers a timer within 250 ms; holds, late keys and the Lua heap are named."
+			"proves": "Every keymap event tap is enabled, the tap watchdog runs, and the run loop answers a timer within 250 ms; holds, the worst hold with its file and line, late keys and the Lua heap are named."
 		},
 		{
 			"id": "field_input_sources",
