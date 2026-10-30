@@ -371,11 +371,20 @@ HTTP transport items are done (`linux/adapters/notifier.lua`, `[sections.llm]` l
     `test-menu-action-handler-bijection` also turns red (its template binding refuses that wiring).
     Reloading the parts with the root, which the Lua tests need, must be done another way (a fresh
     `loadfile` of each part, or the tests reloading the parts themselves).
-- 20 of the 36 gesture slots are physically out of reach on some machines.
+- 20 of the 36 gesture slots are physically out of reach on some machines. [PHYS-L] The menu greys
+  them; since 30 October the reader start also names every unreachable slot and warns for each bound
+  one (`modules/gestures/slot_report.lua`, a binding written by hand never passes through the menu).
+  Left: a three-finger pad on a real machine.
 - Without a grab, the desktop (GNOME 47+) acts on the same gesture.
-- The 9 two-finger slots fight with scrolling everywhere.
+- The 9 two-finger slots fight with scrolling everywhere. The decoder already refuses a scrolling
+  pair as a swipe (its rule 1) and the reader start now names each bound two-finger slot; the desktop
+  still acts on the same ungrabbed touches, which no code here can stop without the grab.
 - No external process can move, focus or close a window under Wayland.
-- The decoder's event trace is a reconstruction, not a capture.
+- The decoder's event trace is a reconstruction, not a capture. [PHYS-L] Code done 30 October:
+  `tests/support/touchpad_record.lua` reads `libinput record` files, `test_touchpad_record.lua` replays
+  every trace in `linux/tests/fixtures/touchpad_records/` into the decoder, and the uinput round trip
+  replays its own kernel capture through that reader. Left: one recording from a real touchpad
+  (`linux/HARDWARE.md` section 13).
 - Done: the navigation layer's wheel bindings run on Linux (the recommended layer makes it the
   volume, as on Windows and macOS). The hook grabs the mice only while the held layer binds a wheel
   direction and forwards everything else through the virtual device
