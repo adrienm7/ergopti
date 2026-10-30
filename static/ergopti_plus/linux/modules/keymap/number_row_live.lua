@@ -6,8 +6,9 @@
 --- Stores the number-row options (ordering and edge keys) and applies them to the
 --- keyboard layout of the running session through the layout manager
 --- (layout_registry.apply_rows): the layout is converted again with the options,
---- installed in the user XKB tree and loaded into the running X server. A session
---- that cannot load a user layout live keeps the stored choice and says why.
+--- installed in the user XKB tree and loaded into the running session (the X server
+--- on X11, the desktop setting on GNOME and KDE Wayland). A session that cannot load
+--- a user layout live keeps the stored choice and says why.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The choice is stored first and survives a refused application: the file is
@@ -21,25 +22,25 @@
 local M = {}
 
 --- The collaborators of the module, resolved lazily so the tests may replace them.
---- @param deps table|nil { preferences, registry, session_type, notify }
+--- @param deps table|nil { preferences, registry, registry_deps }
 --- @return table
 local function resolve(deps)
 	deps = deps or {}
 	return {
 		preferences = deps.preferences or require("infra.number_row_preferences"),
 		registry = deps.registry or require("modules.keymap.layout_registry"),
-		session_type = deps.session_type or function() return (os.getenv("XDG_SESSION_TYPE") or ""):lower() end,
 		registry_deps = deps.registry_deps,
 	}
 end
 
---- Whether the running session loads a user layout live.
+--- Whether the running session loads a user layout live (the layout manager's rule).
 --- @param deps table|nil
 --- @return boolean live
 --- @return string session The session type declared ("" when none).
 function M.session_supports_live(deps)
-	local session = resolve(deps).session_type()
-	return session == "x11", session
+	local resolved = resolve(deps)
+	local path, session = resolved.registry.live_path(resolved.registry_deps)
+	return path ~= nil, session
 end
 
 --- Whether the options can be applied now: a live session and a layout to apply them to.

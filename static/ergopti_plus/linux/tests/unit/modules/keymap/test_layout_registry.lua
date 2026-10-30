@@ -499,8 +499,8 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 	local APPLIED_RUN = { exit_code = 0, stdout = '{"ok": true, "verified": true, "detail": "loaded into the running X server"}\n', stderr = "" }
 	local NOT_LOADED_RUN = { exit_code = 1, stdout = '{"ok": false, "verified": false, "detail": "not loaded: not_loaded", "code": "not_loaded"}\n', stderr = "" }
 
-	--- An installed Ergo-L and a session of the given type.
-	local function with_ergol(session, runs)
+	--- An installed Ergo-L and a session of the given type and desktop.
+	local function with_ergol(session, runs, desktop)
 		local LayoutRegistry, deps, state = manager({
 			files = {
 				[LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1, layouts = { ergol = entry_of("ergol") } }),
@@ -509,6 +509,7 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 			runs = runs,
 		})
 		deps.session_type = function() return session end
+		deps.desktop_is = function(token) return (desktop or ""):find(token, 1, true) ~= nil end
 		return LayoutRegistry, deps, state
 	end
 
@@ -541,8 +542,10 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 	end)
 
 	helpers.it("refuses a session that cannot load a user layout live before anything is written (layout-rows-live)", function()
-		for _, session in ipairs({ "wayland", "tty", "" }) do
-			local LayoutRegistry, deps, state = with_ergol(session, {})
+		for _, case in ipairs({ { "wayland", "sway" }, { "wayland", "hyprland" }, { "wayland", "" }, { "tty", "gnome" },
+			{ "", "kde" } }) do
+			local session = case[1]
+			local LayoutRegistry, deps, state = with_ergol(session, {}, case[2])
 			local before = {}
 			for path, text in pairs(state.files) do before[path] = text end
 			local result = run(function(done) LayoutRegistry.apply_rows("ergol", ROWS, done, deps) end)
@@ -550,6 +553,39 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 			helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_SESSION, session)
 			helpers.assert_eq(#state.runs, 0, "no child runs")
 			helpers.assert_eq(state.files, before, "nothing is written")
+		end
+	end)
+
+	helpers.it("selects the new build through the GNOME or KDE setting on Wayland (layout-rows-live)", function()
+		for _, desktop in ipairs({ "ubuntu:gnome", "kde" }) do
+			local WAYLAND_RUN = { exit_code = 0, stdout = '{"ok": true, "verified": true, "slot": "ergol_live", "detail": "loaded"}\n', stderr = "" }
+			local LayoutRegistry, deps, state = with_ergol("wayland", { OK_RUN, WAYLAND_RUN }, desktop)
+			local result = run(function(done) LayoutRegistry.apply_rows(nil, ROWS, done, deps) end)
+			helpers.assert_true(result.ok, tostring(result.detail) .. " " .. tostring(result.extra))
+			helpers.assert_eq(result.detail.slot, "ergol_live")
+			helpers.assert_eq(result.detail.rows.order, "symbols")
+			helpers.assert_eq(#state.runs, 2, "one installer call converts nothing: the conversion is Lua")
+			helpers.assert_eq(state.runs[2].args[2], "apply-wayland")
+			helpers.assert_eq(arg_value(state.runs[2].args, "--layout-id"), "ergol")
+			helpers.assert_eq(arg_value(state.runs[2].args, "--source-dir"), LOCAL_DIR .. "ergol")
+			helpers.assert_eq(levels_of(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], "AE01")[1], "EuroSign")
+			helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
+		end
+	end)
+
+	helpers.it("reports the Wayland installer's closed code and keeps the session's own refusal (layout-rows-live)", function()
+		for _, case in ipairs({ { "stale_keymap", "live_apply_failed" }, { "select_refused", "live_apply_failed" },
+			{ "session_unsupported", "session_unsupported" } }) do
+			local refused = { exit_code = 1, stderr = "",
+				stdout = '{"ok": false, "verified": false, "detail": "not loaded", "code": "' .. case[1] .. '"}\n' }
+			local LayoutRegistry, deps = with_ergol("wayland", { OK_RUN, refused }, "gnome")
+			local failed, code
+			LayoutRegistry.apply_rows("ergol", ROWS, function(ok, detail, _, _, live)
+				failed, code = { ok = ok, detail = detail }, live
+			end, deps)
+			helpers.assert_eq(failed.ok, false)
+			helpers.assert_eq(failed.detail, case[2], case[1])
+			helpers.assert_eq(code, case[1])
 		end
 	end)
 
