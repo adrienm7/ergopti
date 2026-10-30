@@ -48,6 +48,7 @@
 
 local Identifiers = require("identifiers")
 local Json = require("json")
+local NativePath = require("native_path")
 
 local M = {}
 
@@ -199,7 +200,8 @@ end
 --- @param site any Callback site "path:line".
 --- @return string token
 function M.hold_site_token(site)
-	local file, line = tostring(site or ""):match("([^/\\]+)%.lua:(%d+)$")
+	local path, line = tostring(site or ""):match("^(.-)%.lua:(%d+)$")
+	local file = path and NativePath.basename(path)
 	if not file then return "unknown" end
 	return file .. ":" .. line
 end

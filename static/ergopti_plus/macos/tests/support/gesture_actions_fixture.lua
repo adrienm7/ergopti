@@ -85,6 +85,7 @@ local OWNERS = {
 	"modules.gestures.actions_click",
 	"modules.gestures.conflicts",
 	"modules.gestures.engine",
+	"infra.gesture_frame_evidence",
 	"modules.gestures.sticky_modifiers",
 	"modules.shortcuts",
 	"modules.shortcuts.actions.apps",
