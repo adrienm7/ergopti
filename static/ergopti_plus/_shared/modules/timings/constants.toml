@@ -995,6 +995,7 @@ window_switch_worker_sleep_ms = 10
 # What a child process may print before it is stopped: a version line, a df row,
 # a probe reply, never a stream. Lua canon: _shared/lua/llm/process_limits.lua
 # (every Linux process owner takes it from there; pinned to this key).
+# AHK: adapters/crash_report_worker.ahk and adapters/http_client.ahk, pinned copies.
 process_output_bytes = 65536
 
 # Largest managed-Ollama environment declaration file the Linux driver reads.

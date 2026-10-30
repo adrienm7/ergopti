@@ -153,6 +153,18 @@ const PINS = [
 		'gesture_auto_configure_delay_ms',
 		'windows/modules/gestures/init.ahk',
 		'GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS'
+	),
+	pin(
+		'limits',
+		'process_output_bytes',
+		'windows/adapters/crash_report_worker.ahk',
+		'CRASH_REPORT_WORKER_MAX_OUTPUT_BYTES'
+	),
+	pin(
+		'limits',
+		'process_output_bytes',
+		'windows/adapters/http_client.ahk',
+		'SYSTEM_PROXY_WORKER_MAX_OUTPUT_BYTES'
 	)
 ];
 
