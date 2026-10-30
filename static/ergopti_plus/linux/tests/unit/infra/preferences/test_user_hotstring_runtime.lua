@@ -295,11 +295,13 @@ helpers.describe("programmable native Linux runtime", function()
 				run = Shell.run, wayland = Display.is_wayland, x11 = Display.is_x11 }
 			local writes = {}
 			Shell.has_command = function() return true end
-			Shell.exec_checked = function() return true, "owned original clipboard" end
+			-- A completed write is what the next read sees, as on a real clipboard.
+			local clipboard = "owned original clipboard"
+			Shell.exec_checked = function() return true, clipboard end
 			Shell.with_exact_stdin = function(command, content)
 				writes[#writes + 1] = content; return command
 			end
-			Shell.run = function() return true end
+			Shell.run = function() clipboard = writes[#writes]; return true end
 			Display.is_wayland, Display.is_x11 = function() return false end, function() return true end
 			local ok, problem = xpcall(function()
 				f.clipboard = true; f.result = "∞"
