@@ -1,0 +1,25 @@
+[field-report] Opening the developer app...
+[macos-dev-app] Stopping the running ErgoptiPlus (pids: 34496 34502 34630)...
+[macos-dev-app] No ErgoptiPlus process is left.
+[dev-ollama-catalogue] The managed Ollama built from this clone is staged.
+[macos-dev-app] Opened /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app; its Lua runs from /Users/b519hs/perso/ergopti/static/ergopti_plus/macos.
+[macos-dev-app] A saved .lua edit reloads the driver; the menu's Reload does it on demand.
+[macos-dev-app] Launcher trail: ~/Library/Logs/ergopti_plus/launcher.log (look for 'developer source mode').
+[field-report] Waiting for the developer app to publish its readiness...
+[field-report] Developer app ready (pid 99543); requesting every step within 4800 s.
+[field-report]   field run 01_field_lease: pass
+[field-report]   field run 02_field_owned_runtime: pass
+[field-report]   field run 03_field_network: pass
+[field-report]   field run 04_field_toolchain: pass
+[field-report]   field run 05_field_login_items: pass
+[field-report]   field run 06_field_composer: pass
+[field-report]   field run 07_key_accounting: needs_typing
+[field-report]   field run 08_diagnostics: pass
+[field-report]   field run still running, 62 s since the request...
+[field-report]   field run 09_ollama_runtime: fail
+[field-report]   field run still running, 123 s since the request...
+[field-report]   field run 10_ollama_model: fail
+[field-report]   field run 11_mlx_runtime: pass
+[field-report]   field run 12_mlx_model: fail
+[field-report]   field run 13_config_guard: pass
+[field-report] Field run done: {"counts":{"fail":3,"needs_typing":1,"pass":9},"elapsed_ms":173662,"finished_at":"2026-10-30T16:38:49Z","interrupted":false,"order":["field_lease","field_owned_runtime","field_network","field_toolchain","field_login_items","field_composer","key_accounting","diagnostics","ollama_runtime","ollama_model","mlx_runtime","mlx_model","config_guard"],"pid":99543,"request_id":"mac-2026-10-30_173546","schema":1,"started_at":"2026-10-30T16:35:55Z","verdicts":{"config_guard":"pass","diagnostics":"pass","field_composer":"pass","field_lease":"pass","field_login_items":"pass","field_network":"pass","field_owned_runtime":"pass","field_toolchain":"pass","key_accounting":"needs_typing","mlx_model":"fail","mlx_runtime":"pass","ollama_model":"fail","ollama_runtime":"fail"}}
