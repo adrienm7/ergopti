@@ -3269,6 +3269,9 @@ local function _build_llm(ctx)
 		if llm.toggle then llm.toggle(ctx.on_menu_changed) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
+	llm_ctx.commands[require("config_keys").COMMAND.LLM_TEST_PREDICTION] = function()
+		return llm.test_prediction()
+	end
 	llm_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do llm_ctx.state_getters[key] = value end
 	llm_ctx.state_getters["llm_enabled"] = function() return enabled end

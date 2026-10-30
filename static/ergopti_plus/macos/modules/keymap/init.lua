@@ -934,6 +934,7 @@ M.set_preview_colored_tooltips    = LLMBridge.set_preview_colored_tooltips
 
 M.trigger_prediction = LLMBridge._perform_llm_check
 M.request_manual_prediction = LLMBridge.request_manual_prediction
+M.test_prediction = LLMBridge.test_prediction
 M.request_prompt_prediction = LLMBridge.request_prompt_prediction
 M.toggle_live_prompt = LLMBridge.toggle_live_prompt
 M.set_live_prompt    = LLMBridge.set_live_prompt

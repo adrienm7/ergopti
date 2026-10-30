@@ -4610,6 +4610,13 @@ disabled_when = ["llm_scope_ready"]
 disabled_reason_key = "menu.llm.save_unavailable"
 disabled_reasons = [{ when = "config_newer_schema", reason_key = "menu.read_only.newer_schema" }]
 
+# Straight to the backend, never through an engine answer the user could accept
+# into a document. Each driver answers with its own backend's seam.
+[[menu.llm_menu]]
+type = "command"
+id = "llm_test_prediction"
+i18n = "menu.llm.test_prediction"
+
 [[menu.llm_menu]]
 type = "---"
 
