@@ -30,6 +30,9 @@
 			"Qualify actual cursor-display window switching",
 			"Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland",
 			"Detect and read the keymap on a real X11 and a real Wayland",
+			"Install prerequisites for Load the number-row options into a real X server",
+			"Load the number-row options into a real X server",
+			"Restart the daemon through the local reload control",
 			"A virtual touchpad, described by the kernel and read back",
 			"A gesture written to uinput comes back as a gesture"
 		],
@@ -116,12 +119,14 @@
 			"Qualify native managed network runtime",
 			"Qualify the Go route plan twin",
 			"Qualify native retained FD SHA-256",
+			"Install prerequisites for Prepare authenticated managed HTTP validation tools",
 			"Prepare authenticated managed HTTP validation tools",
 			"Qualify native managed HTTP public and retained output",
 			"Qualify native updater archive pipeline",
 			"Qualify archive crypto and bin parent source controls",
 			"Install prerequisites for AI predictions against a real Ollama",
 			"AI predictions against a real Ollama",
+			"Install prerequisites for Run manual official runtime and model acceptance",
 			"Run manual official runtime and model acceptance",
 			"Upload manual runtime acceptance evidence",
 			"Install the model pull window prerequisites",
@@ -244,6 +249,7 @@
 		"platform-metrics": ["native-platform-metrics"]
 	},
 	"predicates": {
+		"Install prerequisites for Run manual official runtime and model acceptance": "${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}",
 		"Run manual official runtime and model acceptance": "${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}",
 		"Upload manual runtime acceptance evidence": "${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}"
 	},
@@ -261,6 +267,12 @@
 		"Upload live updater diagnostic evidence": ["Update to the newest release and restart"],
 		"Upload manual runtime acceptance evidence": [
 			"Run manual official runtime and model acceptance"
+		],
+		"Run manual official runtime and model acceptance": [
+			"Install prerequisites for Run manual official runtime and model acceptance"
+		],
+		"Prepare authenticated managed HTTP validation tools": [
+			"Install prerequisites for Prepare authenticated managed HTTP validation tools"
 		],
 		"Qualify native managed HTTP public and retained output": [
 			"Prepare authenticated managed HTTP validation tools"
@@ -320,6 +332,9 @@
 		],
 		"Detect and read the keymap on a real X11 and a real Wayland": [
 			"Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland"
+		],
+		"Load the number-row options into a real X server": [
+			"Install prerequisites for Load the number-row options into a real X server"
 		],
 		"The tray binding names libraries and symbols that exist": [
 			"Install prerequisites for The tray binding names libraries and symbols that exist"

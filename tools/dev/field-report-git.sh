@@ -2,9 +2,10 @@
 # tools/dev/field-report-git.sh
 
 # ==============================================================================
-# MODULE: Field report branch and commit
+# MODULE: Field report branch, analysis and commit
 # DESCRIPTION:
-# The git half that the macOS and Linux field report collectors share
+# The git half and the log analysis that the macOS and Linux field report
+# collectors share
 # (tools/dev/collect-macos-field-report.sh, collect-linux-field-report.sh); the
 # Windows collector (collect-windows-field-report.ps1) follows the same steps in
 # PowerShell. The names come from the field_report group of
@@ -27,6 +28,8 @@
 #    ran on before anything else.
 # 5. Only the report folder is committed, with `git add -f` because the logs
 #    it holds are gitignored.
+# 6. The analysis is tools/dev/field-log-analyse.py, the one analyser of the
+#    three collectors: it reads only the scrubbed copies in the report folder.
 #
 # Sourced only; defines functions and runs nothing. Bash 3.2 compatible: the
 # macOS collector runs under the system bash.
@@ -103,6 +106,19 @@ field_report_open_folder() {
 	: > "${steps}"
 	printf 'field_branch: %s\nbase: %s\ncommit: %s\n' "${branch}" "${base}" "$(git rev-parse --short HEAD)" > "${out}/base.txt" \
 		|| fail "Cannot write ${out}/base.txt."
+}
+
+# Analyses the scrubbed day logs and the collector's check verdicts into
+# analysis.md and analysis.json, prints the summary and records the step.
+# Uses REPO_ROOT, out and steps; $@: the scrubbed day logs in the report
+# folder, oldest first (none when the day has no log).
+field_report_analyse() {
+	python3 "${REPO_ROOT}/tools/dev/field-log-analyse.py" --repo "${REPO_ROOT}" --out "${out}" "$@" 2>&1 \
+		| tee "${out}/analysis_console.txt"
+	local status=${PIPESTATUS[0]}
+	printf '%-28s exit=%s\n' "analysis" "${status}" >> "${steps}"
+	[ "${status}" -eq 0 ] || log "step 'analysis' exited ${status} (kept in ${out}/analysis_console.txt)"
+	return 0
 }
 
 # Commits the report folder alone, then pushes unless push=false.

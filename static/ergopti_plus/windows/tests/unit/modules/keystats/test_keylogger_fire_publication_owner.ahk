@@ -10,6 +10,18 @@
 
 #Requires AutoHotkey v2.0
 
+/**
+ * Reads an owner whose text a child embeds. Embedded text runs from the child's
+ * temporary directory, so an A_LineFile anchor must be rewritten to the owner it
+ * was written against; any other relative import still has no faithful meaning.
+ */
+_KFPO_EmbeddableOwnerSource(Owner) {
+	Source := FileRead(Owner, "UTF-8")
+	AssertFalse(RegExMatch(Source, "im)^#Include\s+(?!%A_LineFile%)"),
+		"Embedding an import not anchored on A_LineFile requires explicit source composition")
+	return StrReplace(Source, "#Include %A_LineFile%", "#Include " . Owner, true)
+}
+
 _KFPO_ChildSource() {
 	global _DriverDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"

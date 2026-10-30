@@ -17,9 +17,7 @@ _KBSP_ChildSource() {
 	Source := StrReplace(Source, Tail, "", true, &Replaced)
 	AssertEqual(1, Replaced, "Only the original fixture tail is replaced; real fire and append bodies stay intact")
 	PrivacyOwner := _DriverProductionFileForSymbol("MF_ShouldFilter", _DriverDir)
-	PrivacySource := FileRead(PrivacyOwner, "UTF-8")
-	AssertFalse(RegExMatch(PrivacySource, "im)^#Include\b"),
-		"Embedding relative imports requires explicit source composition")
+	PrivacySource := _KFPO_EmbeddableOwnerSource(PrivacyOwner)
 	PrivacySource := StrReplace(PrivacySource, "MF_ShouldFilter() {", "_KBSP_NativeFilter() {", true, &Replaced)
 	AssertEqual(1, Replaced, "The real classifier body must remain unchanged behind its scheduling alias")
 	Source := StrReplace(Source, "#Include " . PrivacyOwner . "`n", PrivacySource . "`n", true, &Replaced)

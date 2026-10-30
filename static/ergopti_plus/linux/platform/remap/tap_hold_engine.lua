@@ -43,6 +43,7 @@
 
 local EvdevCodes = require("infra.evdev_codes")
 local OneShotShift = require("tap_hold.one_shot_shift")
+local InputEvent = require("infra.input_event")
 
 local M = {}
 
@@ -1090,6 +1091,46 @@ end
 --- chord.
 function M:activity()
 	cancel_taps(self, nil, true)
+end
+
+--- Whether the held navigation layer binds a wheel direction: the keyboard hook
+--- then owns the pointer, so a bound notch never also scrolls.
+--- @return boolean
+function M:wheel_bound()
+	if self.layer_depth <= 0 then return false end
+	for _, codes in pairs(InputEvent.WHEEL_LAYER_CODES) do
+		for _, code in pairs(codes) do
+			if self.nav_layer[code] then return true end
+		end
+	end
+	return false
+end
+
+--- The held layer's binding of one wheel direction, or nil.
+--- @param axis string "vertical" or "horizontal".
+--- @param direction integer 1 or -1.
+--- @return table|nil spec
+function M:wheel_binding(axis, direction)
+	if self.layer_depth <= 0 then return nil end
+	local code = InputEvent.wheel_layer_code(axis, direction)
+	return code and self.nav_layer[code] or nil
+end
+
+--- One wheel notch while the navigation layer is held: the binding of that
+--- direction, pressed and released (volume up for each notch, as on Windows),
+--- or nil when the layer leaves this direction alone and the notch scrolls.
+--- @param axis string "vertical" or "horizontal".
+--- @param direction integer 1 or -1, the sign evdev reports.
+--- @return table|nil events Key events to dispatch instead of the notch.
+function M:wheel(axis, direction)
+	local spec = self:wheel_binding(axis, direction)
+	if not spec then return nil end
+	local out = {}
+	for _, chord in ipairs(spec.chords or { spec }) do
+		chord_events(self, out, chord, DOWN)
+		chord_events(self, out, chord, UP)
+	end
+	return out
 end
 
 --- Lets time pass: presses the hold of every key held past its threshold

@@ -17,7 +17,10 @@
  *    base's new commit from origin and reuses the branch;
  * 4. a base that is not on origin is not updated and still reports;
  * 5. Ctrl-C still commits the evidence, marked interrupted;
- * 6. tracked changes are refused before anything is switched.
+ * 6. tracked changes are refused before anything is switched;
+ * 7. the collector runs its own checks (tools/dev/linux-field-shell-checks.sh)
+ *    and the shared analyser, which marks every verdict and writes
+ *    analysis.md and analysis.json from the scrubbed copies only.
  * ==============================================================================
  */
 
@@ -39,6 +42,15 @@ const IDENTIFIERS_JSON = 'static/ergopti_plus/_shared/data/identifiers.json';
 const APP_DIRS = 'static/ergopti_plus/_shared/lua/app_dirs.lua';
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
+const SHELL_CHECKS = 'tools/dev/linux-field-shell-checks.sh';
+const SERVICE = 'static/ergopti_plus/linux/ergopti-hotstrings.service';
+// The analyser and the declarations it reads its budgets from.
+const ANALYSER = 'tools/dev/field-log-analyse.py';
+const ANALYSER_SOURCES = JSON.parse(
+	spawnSync('python3', [path.join(ROOT, ANALYSER), '--repo', ROOT, '--describe'], {
+		encoding: 'utf8'
+	}).stdout
+).sources;
 const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml';
 
 if (process.platform === 'win32') {
@@ -117,7 +129,18 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 	const bin = path.join(base, 'bin');
 	const home = path.join(base, 'home');
 	const logs = path.join(home, 'state/ergopti_plus/logs');
-	for (const relative of [SCRIPT, FIELD_GIT, IDENTIFIERS, LOG_SCRUB, COLLISIONS, BUNDLED_SAMPLE]) {
+	for (const relative of [
+		SCRIPT,
+		FIELD_GIT,
+		IDENTIFIERS,
+		LOG_SCRUB,
+		COLLISIONS,
+		BUNDLED_SAMPLE,
+		SHELL_CHECKS,
+		SERVICE,
+		ANALYSER,
+		...ANALYSER_SOURCES
+	]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
 	}
@@ -332,6 +355,24 @@ function read(folder, name) {
 				);
 				assert.match(read(folder, 'digest_boot.txt'), /Boot complete in 812 ms/);
 				assert.match(read(folder, 'digest_errors.txt'), /\[WARNING\] \[Fixture\]/);
+				// The collector's own checks, in the grammar the analyser marks.
+				assert.match(steps, /^collector_checks\s+exit=0$/m);
+				const own = read(folder, 'collector_checks.txt');
+				for (const id of ['input_access', 'luajit_runtime', 'daemon_unit'])
+					assert.match(
+						own,
+						new RegExp(`^check=${id} verdict=(pass|fail|skip) codes=[a-z0-9_,]+$`, 'm')
+					);
+				assert.match(own, /^check=daemon_unit verdict=fail codes=enabled_systemctl_fixture/m);
+				// The analysis reads the scrubbed copy and marks every verdict.
+				assert.match(steps, /^analysis\s+exit=0$/m);
+				const analysis = JSON.parse(read(folder, 'analysis.json'));
+				assert.equal(analysis.performance.find((row) => row.metric === 'boot.total').max, 812);
+				assert.equal(analysis.errors.find((group) => group.module === 'injector').count, 1);
+				assert.doesNotMatch(read(folder, 'analysis.md'), /TYPEDCANARY/);
+				assert.match(result.stdout, /✅ check network: pass/);
+				assert.match(result.stdout, /❌ check daemon_unit: fail/);
+				assert.match(result.stdout, /Check verdicts summary: ✅ \d+ pass, ❌ \d+ fail, /);
 				const layout = read(folder, 'keyboard_layout.txt');
 				assert.match(layout, /VC Keymap: fr in ~\/keymaps for <user>/);
 				assert(!layout.includes(paths.home), 'the home folder is masked');
@@ -344,6 +385,11 @@ function read(folder, name) {
 					committed.some((file) => file.endsWith(`/${dayLog}`)),
 					'the ignored log is committed'
 				);
+				for (const name of ['analysis.md', 'analysis.json'])
+					assert(
+						committed.some((file) => file.endsWith(`/${name}`)),
+						`${name} is committed`
+					);
 				assert.match(
 					git(paths.clone, 'log', '-1', '--format=%s'),
 					/^docs\(field\): Linux field report .* on dev$/

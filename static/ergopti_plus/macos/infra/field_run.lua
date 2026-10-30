@@ -150,6 +150,9 @@ function M.validate(spec)
 		if step.kind ~= "field_check" and step.kind ~= "diagnostics" and step.kind ~= "ai" and step.kind ~= "reload" then
 			error("field run: step " .. step.id .. " has an unknown kind", 2)
 		end
+		if step.disabled ~= nil and (type(step.disabled) ~= "string" or not step.disabled:match("^[a-z][a-z0-9_]*$")) then
+			error("field run: step " .. step.id .. " has a disabled reason that is not a code", 2)
+		end
 		if step.kind == "field_check" and type(step.check) ~= "string" then
 			error("field run: field check step " .. step.id .. " names no check", 2)
 		end
@@ -624,6 +627,12 @@ function Session:run_step(index, step, continue)
 	end
 	if left_ms <= 0 then
 		self:record(index, step, { verdict = "skip", codes = { "global_deadline" }, elapsed_ms = 0 })
+		return continue()
+	end
+	-- A step whose run harmed the Mac stays declared and is skipped by name
+	-- until its fix is proven there (driver_reload lost the app on 2026-10-30).
+	if step.disabled then
+		self:record(index, step, { verdict = "skip", codes = { step.disabled }, elapsed_ms = 0 })
 		return continue()
 	end
 	if step.kind == "reload" then return self:reload_step(index, step, continue) end

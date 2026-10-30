@@ -36,8 +36,8 @@ a sealed Windows updater source, reseal with
 
 For a field report, check out a branch and run
 `powershell -ExecutionPolicy Bypass -File tools/dev/collect-windows-field-report.ps1`. It creates
-`field/win-<today>-<branch>` derived from that branch, collects the system facts, today's logs and their
-digest, writes the report (with `base.txt` naming the base and commit) under `docs/field-reports/`, commits and
+`field/win-<today>-<branch>` derived from that branch, collects the system facts, runs its own checks,
+copies today's logs scrubbed, writes their digest and their analysis (`analysis.md`), writes the report (with `base.txt` naming the base and commit) under `docs/field-reports/`, commits and
 pushes. The Linux PC runs `bash tools/dev/collect-linux-field-report.sh` the same way.
 
 Start from a fresh `dev` and work on a `fix/windows-pc-<date>` branch; build and run the AutoHotkey driver live
@@ -110,8 +110,9 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      250 ms and 1 s, late keys and the Lua heap are named.
    - `field_input_sources`: the selected source and the enabled list (as the text-input system holds them, not
      the preference) are readable; the Ergopti layouts enabled are counted; every installed Ergopti `.keylayout`
-     parses with `xmllint` and every Ergopti bundle `Info.plist` with `plutil -lint` (a failure names the count).
-   - `field_storage`: the keystats database passes `PRAGMA quick_check` opened `-readonly` (a damage names the
+     parses with `xmllint` (read as XML 1.0, its C0 control references blanked) and every Ergopti bundle `Info.plist` with `plutil -lint` (a failure names the count).
+   - `field_storage`: the keystats database passes `PRAGMA quick_check` opened `-readonly` and lock-free
+     (`immutable=1`, so the ingest never meets a lock; an issue counts when a second scan sees it) (a damage names the
      number of issue lines only); `config.toml`, `config_karabiner.toml`, the personal hotstrings and personal
      info files each parse with the driver's TOML reader, read-only; today's log exists; the logs folder takes a
      probe file (removed at once); the auto-reload file watcher owner is published (FSEvents accepted it).
@@ -121,11 +122,14 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      (the 2026-10-30 `native_child_status=64`), a refusal stage or `not_reached` names where it broke.
    - `field_network_hosts`: one HEAD, one after the other, to the root of every host of
      `_shared/data/identifiers.json` (`github`, `github_api` for the update feed, `huggingface`, `ollama`,
-     `ollama_registry`) through the managed transport a download uses (route lookup, PAC or proxy, TLS); any
+     `ollama_registry`) (the registry at `/v2/`, whose root answers 503) through the managed transport (route lookup, PAC or proxy,
+     TLS); any
      answer below 500 passes, a failure names the native reason by the host's key. Nothing is downloaded.
    - `field_app_health` (after the AI steps): no crash report of the last day in the driver's `crash_reports`
-     folder nor in `~/Library/Logs/DiagnosticReports` for ErgoptiPlus, Hammerspoon or Ollama (each fails with
-     its count); the app's resident memory (MB) and CPU share from `ps` are named.
+     folder (absent: none) nor in `~/Library/Logs/DiagnosticReports` for the app's processes (ErgoptiPlus and
+     its launcher roles, Hammerspoon, Ollama, Python, Karabiner): they fail as `<process>:<count>`, the three
+     newest are listed with closed tokens (hang or crash, exception, signal, termination namespace); other
+     apps' reports are counted only; the app's resident memory (MB) and CPU share from `ps` are named.
    - `field_ai_local` (after the AI steps, read-only): the owned Ollama binary passes `codesign --verify
 --strict`; a running server lists its models (not running: skip, never started here); one token is
      predicted from the check's own text with the smallest catalogue model already installed (none: skip, never
@@ -161,9 +165,31 @@ into its item below or into the matching existing item.
 - [ ] **Field run downloads.** Done: e8ff7479e1 keeps the Ollama and MLX test models, so a run no longer pulls
       about 740 MB over the maintainer's shared connection. Left [PHYS-M]: one complete download of each test
       model on a connection that does not count.
-- [ ] **Field report marks.** [CODE] The macOS collector prints ✅ pass, ❌ fail, ⏭️ skip, ⌨️ needs_typing,
-      ⚠️ other and a summary line; the Linux collector does the same over its `check=<id> verdict=<...>`
-      lines (also in `field_checks.txt`). Left: the Windows collector.
+- [ ] **Field report marks.** [CODE] Done: the macOS collector marks its field run steps and the Linux one
+      every tray check run of the day (`field_checks.txt`); the three collectors print ✅ pass, ❌ fail, ⏭️
+      skip, ⌨️ needs_typing, ⚠️ other and a "Check verdicts summary" line through the shared analyser, over
+      the `check=<id> verdict=<...>` lines of their own probes (Linux `tools/dev/linux-field-shell-checks.sh`,
+      Windows step `collector_checks`, macOS `macos-field-shell-checks.sh`) and the last run of each tray
+      check clicked today (runs and failures counted). Left [PHYS-W] [PHYS-L]: one real run of each
+      collector; the Windows runtime layer of `test-windows-field-report-contract.cjs` runs only where pwsh
+      is installed. The Linux and Windows tray checks still need a click: their drivers have no request
+      protocol like the macOS field run, so a collector cannot run them without the user.
+- [ ] **Field log analysis.** [CODE] Done: `tools/dev/field-log-analyse.py` (Python 3.8, stdlib) runs at the end
+      of every collector on the scrubbed day logs only and writes `analysis.md` and `analysis.json` at the top
+      of the report: errors and warnings grouped by module and template with first and last time, an example
+      and the groups new since the previous report of the same OS tag; boot total and stages, reload time
+      (request to next boot), menu rebuild and per submenu, hot-path segments (hotstrings, tooltip and
+      preview, keystroke), phase summaries and Windows latency lines, main-thread holds, preferences saves,
+      keystats ingest ticks, synchronous diagnostics, LLM latencies per backend, late key events, each with
+      count, p50, p95, max, worst occurrences and a verdict against the budget its code declares
+      (`[logger] hotpath_slow_ms` and the Windows per-segment overrides, `SLOW_TIMER_CALLBACK_COUNT_MS`,
+      `SLOW_SAVE_REPORT_MS`, ingest `REPORT_THRESHOLD_MS`, or the budget the line states); lifecycle events;
+      and a ranked top 10. One vector per driver spelling
+      (`tools/test/fixtures/field-log-analyse/vectors.json`) fails the test when a source stops writing a
+      template it reads. Left: no budget is declared for boot, reload, menu rebuild, LLM latency or the
+      tooltip display, so those say "no budget declared" until the code declares one; the Windows driver
+      logs no per-request LLM latency (only timeouts); `tools/test/features/test-infrastructure/suite.json`
+      on dev lists ordinal 537 before 485 (0ba0e905), which stops `npm run test:js` before any check.
 - [ ] **Thinking off for every model on every backend and OS (worker `fix/llm-thinking-off`).** [CODE] The
       rule depends on the MODEL, not on the provider: model families (normalized model id) declare an intent
       (off, or the lowest level a model allows) and a control kind; each provider and local server declares
@@ -310,7 +336,12 @@ HTTP transport items are done (`linux/adapters/notifier.lua`, `[sections.llm]` l
 - The 9 two-finger slots fight with scrolling everywhere.
 - No external process can move, focus or close a window under Wayland.
 - The decoder's event trace is a reconstruction, not a capture.
-- The navigation layer leaves the wheel transparent (`volu`/`vold`).
+- Done: the navigation layer's wheel bindings run on Linux (the recommended layer makes it the
+  volume, as on Windows and macOS). The hook grabs the mice only while the held layer binds a wheel
+  direction and forwards everything else through the virtual device
+  (`tests/unit/adapters/keyboard_hook/test_keyboard_hook_nav_wheel.lua`, hardware-free). Left
+  [PHYS-L]: a real mouse on a real desktop (pointer speed under the hold follows the virtual
+  device's libinput settings, not the mouse's); mouse buttons stay no layer source on Linux.
 - Remote API keys now live in the desktop secret service (`linux/modules/llm/api_token_store.lua`, commit
   "keep remote API keys in the desktop secret service"; refused, never written in plaintext, without one).
   Left: [PHYS-L] on a real desktop, add a key with the keyring locked and check the unlock prompt takes the
@@ -865,8 +896,10 @@ Not started:
       6fb83014e3). Built on ubuntu:22.04 (glibc 2.35 floor, no bundled libc or loader, musl refused in words,
       tray closure kept); the build refuses a foreign loader or a staged C library (dce846a0bd). Left: hosted
       CI evidence of the Build and `install-linux` AppImage rows on the distro matrix.
-- [ ] **Linux X11 window list.** [CODE] `getAll()` is covered by the Openbox receipts (962a25a973);
-      confirm in the first hosted run. Flatpak: wmctrl is only a documented host program.
+- [ ] **Linux X11 window list.** [CODE] `getAll()` is covered by the Openbox receipts (962a25a973),
+      run on Xvfb and Openbox in a Linux container on 30 October: `x11_window_list_names_owned_clients`
+      lists the three owned clients and all 34 native window receipts pass. Left: the first hosted
+      run; Flatpak: wmctrl is only a documented host program.
 
 ## Cross-OS parity, centralisation and constants (audit of 2026-10-24)
 
@@ -919,9 +952,11 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       Left: run the Windows corpus test on the PC.
 - [ ] **PAR-8. Word delimiters in config leaves on Windows.** [CODE] Done: the consume choice is the
       leaf `[hotstrings.terminator_consume]` on macOS and Linux (76716e7); Windows writes built-in states
-      through the live config writer and moves the old override strings at boot (2d734b6). Left: run the
-      rewritten AHK tests on the PC (never executed); no menu toggle for built-in consumption on any
-      driver; macOS and Linux still ignore user delimiters when deciding a repeat.
+      through the live config writer and moves the old override strings at boot (2d734b6); macOS and
+      Linux end a word on a user delimiter when deciding a repeat, as Windows does (1748df6: Linux
+      `repeat_key.lua`, the only decision site, and the macOS expander, each with a regression test).
+      Left: run the rewritten AHK tests on the PC (never executed); no menu toggle for built-in
+      consumption on any driver.
 - [ ] **PAR-12. Token streaming reason.** [CODE] Done: reason text rewritten in 21 locales and the key renamed
       `token_streaming_unvalidated_on_windows`. Left [PC]: enable the row on Windows after a live Ollama check.
 - [ ] **PAR-14. Check-only fallback when the GitHub API is blocked: Windows.** [CODE] Linux and shared
@@ -1064,7 +1099,10 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 
 ## Backlog (one line each)
 
-- [ ] **Windows field reports: confirm the scrubber covers the AHK log.** [CODE] Linux is done: since
+- [x] **Windows field reports: confirm the scrubber covers the AHK log.** [CODE] Checked 2026-10-30: of the 45
+      AHK logger calls whose arguments carry a text-like name, every one that logs typed or model text has a
+      case in `test-field-log-scrub.cjs`; the others log key names (nav-layer payloads), counts, menu titles
+      or error messages. Linux is done: since
       432c934 its collector copies logs only through `tools/dev/field-log-scrub.py` and pushes
       `hotstring-collisions.py` instead of the personal file, and the commit "scrub the Linux expansion
       trace from field reports" added the one Linux spelling it missed (the injector's
@@ -1228,14 +1266,19 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       explicit `--config` watcher topology (3dd420292d), `api_entries` retired rows (c03762d27b),
       parse cost (e525cd6615). Left: the physical keyboard slot parameters
       (`keyboard__win_SC03A__x`), the Windows `api_entries.json` per-row warning, the bare-root and
-      unknown-`[[x]]` cleanup offers, a reseal of the updater original source after e525cd6615
-      once `run_all.ahk` is clean, and the Linux reload as a daemon restart (the control protocol
-      needs a pending record that can name an unknowable successor pid; recommended: a TTL-bound
-      pending record completed by the successor).
+      unknown-`[[x]]` cleanup offers, and a reseal of the updater original source after e525cd6615
+      once `run_all.ahk` is clean. The Linux reload as a daemon restart with the TTL-bound pending
+      record is in (docs/design/driver-control-pending-record.md) and is now proven across real
+      processes on the relay path (`tests/hardware/run_reload_restart_live.lua`, CI step "Restart
+      the daemon through the local reload control"); left for it: a restart through the systemd
+      user unit on a real session [PHYS-L].
 - [ ] **Linux CI installs packages inside short test steps.** [CI] 18 steps moved and skipped when the
-      suite is deferred (c52cb916a7, 285d3363a1). Left: `Qualify three actual XI2 property cookies`
-      and `The whole daemon, live` (their text is pinned), the 35-minute and 18-minute steps, the
-      other jobs, and hosted validation.
+      suite is deferred (c52cb916a7, 285d3363a1); `Qualify three actual XI2 property cookies` and
+      `The whole daemon, live` already had their install steps; the LuaJIT XI2 qualification, the
+      35-minute managed HTTP preparation and the 18-minute manual Ollama acceptance now have theirs
+      too (branch `fix/linux-input-config`), with the pinned contracts updated. No Linux test step
+      runs the Ubuntu acquisition any more (the remaining ones are install, toolchain or package
+      steps). Left: hosted validation.
 - [ ] **macOS "Quit did not end both processes within 10 s".** [CI] Cause found: the Quit AppleEvent
       timed out while the launcher log had been silent since startup (run 39850037912); the gate now
       names the surviving process and keeps the failing attempt's evidence for 7 days
@@ -1281,7 +1324,7 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       editability after a form reload needs a real draft.
 - [ ] **142 gaps.** [CODE] Windows: a Reload click during a pending reload now follows the join rule
       (standing-checks agent); no hash-check requirement identified for the Windows client. Linux:
-      the reload is in process; see "Config policy remainders" for the protocol decision.
+      the reload restarts the daemon (pending record, see "Config policy remainders").
 - [ ] **13/35.** [CODE] Enrol the complete guardian acceptance collector in main CI.
 - [ ] **93. Linux ordered pairs.** [CODE] XI2 property cookies proven on Xvfb in WSL; the saved Xi
       packet is retired (libXi as a package dependency declined by the maintainer). Physical input

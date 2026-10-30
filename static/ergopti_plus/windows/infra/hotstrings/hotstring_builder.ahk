@@ -346,6 +346,20 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds, NowTick 
 ; the engine in both directions. Bundled categories always short-circuit into the
 ; cache registrar, so only the two least-covered paths were affected.
 HSE_RegisterFromTomlFlags(IsCaseSensitive, Flags, Trigger, Output, Options) {
+		; A TOML output is the grammar of send_input_parameter.ahk, which every loader
+		; reaches through here: with no answer from them the factories default to
+		; OnlyText = true, and {Text} typed {Left} and {U+27C3} as characters. A caller
+		; that names OnlyText has already decided what its output is.
+		if (!Options.Has("OnlyText") and RegExMatch(Output, "[{`r`n`t]")) {
+				Parsed := SendInputParseOutput(Output)
+				if Parsed["has_keys"] {
+						Options := Options.Clone()
+						Options["OnlyText"] := false
+						Output := SendInputOutputPayload(Parsed)
+				} else {
+						Output := Parsed["text"]
+				}
+		}
 		if IsCaseSensitive {
 				CreateHotstring(Flags, Trigger, Output, Options)
 				return

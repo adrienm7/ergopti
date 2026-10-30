@@ -16,6 +16,7 @@ local Toml = require("toml_codec")
 local Writer = require("toml_codec.writer")
 local Outdated = require("config_outdated")
 local Logger = require("logger.shim")
+local InputEvent = require("infra.input_event")
 
 local LOG = "platform.remap.nav_layer"
 
@@ -135,10 +136,22 @@ end
 --- @param bindings table Physical-key ids mapped to shared resolutions.
 --- @param registry table Canonical physical-key registry.
 --- @return table layer Evdev input codes mapped to native chord sequences.
+--- The layer-table code of a source: its evdev key code, or for a wheel
+--- direction the code infra/input_event.lua reserves for it above KEY_MAX.
+local function source_code(registry, name)
+	local entry = registry.keys[name]
+	if type(entry) == "table" and entry.kind == "wheel" then
+		local code = InputEvent.wheel_layer_code(entry.axis, entry.direction)
+		if code == nil then error("the native navigation engine has no wheel direction for " .. tostring(name), 2) end
+		return code
+	end
+	return key_code(registry, name)
+end
+
 function M.compile(bindings, registry)
 	local layer = {}
 	for source, resolved in pairs(bindings) do
-		local code = key_code(registry, source)
+		local code = source_code(registry, source)
 		if resolved.kind == "none" then
 			layer[code] = { mods = {}, keys = {} }
 		elseif resolved.kind == "call" and Brightness.actions[resolved.handler] then

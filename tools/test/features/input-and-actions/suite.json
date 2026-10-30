@@ -452,6 +452,14 @@
 			"repro": "npm run test:send-input-vectors-shared"
 		},
 		{
+			"id": "hotstring-output-tokens",
+			"ordinal": 539,
+			"name": "the {name} tokens of a hotstring output are one shared corpus every driver suite replays",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-output-tokens.cjs"],
+			"repro": "npm run test:hotstring-output-tokens"
+		},
+		{
 			"id": "js-0349",
 			"ordinal": 364,
 			"name": "the number-row tap keys are one list, pinned to the manifest defaults and the Windows hotkeys",

@@ -1802,7 +1802,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/infra/config/persistence/test_is_category_all_enabled_loop.ahk
 #Include meta/adapters/test_regread_no_type_arg.ahk
 #Include meta/infra/logger/test_logger_dedup_tick.ahk
-#Include meta/modules/hotstrings/engine/test_hse_endchar_consumed_delimiters.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_watcher_magic_suffix.ahk
 #Include meta/modules/hotstrings/magic_key/test_deadkey_uses_dynamic_magic_key.ahk
 #Include meta/infra/toml/test_parse_overrides_seen_sections.ahk
@@ -1910,10 +1909,12 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/hotstrings/engine/test_hotstring_send_failure_containment.ahk
 #Include unit/modules/hotstrings/engine/test_title_timeout_does_not_eat_expansion.ahk
 #Include unit/modules/hotstrings/engine/test_hse_send_failure_transaction.ahk
+#Include unit/modules/hotstrings/engine/test_hse_dispatch_behaviour.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_chaining.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_cascade.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_injection_plan.ahk
+#Include unit/modules/hotstrings/engine/test_hotstring_output_tokens.ahk
 #Include meta/modules/hotstrings/catalogue/test_hotstrings_combo_auto_escaping.ahk
 #Include meta/modules/keystats/ergonomics/test_ergo_flow_gap_end.ahk
 #Include meta/infra/config/persistence/test_config_window_patch_toml_meta_error.ahk
@@ -1923,7 +1924,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ui/menu/test_script_shortcut_labels_locale.ahk
 #Include meta/platform/remap/altgr/test_altgr_chord_debounce_per_slot.ahk
 #Include meta/modules/keystats/ergonomics/test_roi_halflife_threshold_reachable.ahk
-#Include meta/modules/hotstrings/engine/test_hse_notepad_consumed_delimiter.ahk
 #Include meta/modules/hotstrings/engine/test_notepad_hotstring_atomic_burst.ahk
 #Include unit/modules/llm/prediction/test_llm_parser_dedup_stats.ahk
 #Include meta/modules/shortcuts/test_paste_without_formatting_restore.ahk

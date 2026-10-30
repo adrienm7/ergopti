@@ -117,38 +117,11 @@ _FLNS_NoUnexpectedSynchronousCaller() {
 	}
 }
 
-; The queue must stay genuinely deferred. If the drain were ever invoked
-; directly by the enqueue function, every assertion above would be satisfied
-; while the disk work returned to the keystroke thread.
-_FLNS_QueueIsActuallyDeferred() {
-	Body := _DriverFuncBody("_HSE_QueueFireLog")
-	Assert(Body != "", "_HSE_QueueFireLog() must exist in the driver source")
-	Assert(InStr(Body, "_HSE_ArmFireLogDrain") > 0,
-		"the enqueue must hand the record to the lifecycle-owned timer arm — that is the only thing that moves the flush off the keystroke thread without losing suspend ownership")
-	Assert(InStr(Body, "KL_LogHotstring(") == 0,
-		"the enqueue must not log inline; it exists precisely to avoid that")
-
-	ArmBody := _DriverFuncBody("_HSE_ArmFireLogDrain")
-	Assert(ArmBody != "", "_HSE_ArmFireLogDrain() must exist in the driver source")
-	Assert(InStr(ArmBody, "_HSE_DrainFireLog.Bind(_PrefixDeferredGeneration)") > 0,
-		"the lifecycle-owned arm must freeze the exact generation in its callback — a stale queued timer must not impersonate the resumed owner")
-	Assert(InStr(ArmBody, "TimerAfter(") > 0,
-		"the lifecycle-owned callback must schedule through the TimerScheduler port")
-	AdapterBody := _DriverFuncBody("TimerAfter")
-	CommitBody := _DriverFuncBody("_TimerAdapterCommitNative")
-	NativeBody := _DriverFuncBody("_TimerAdapterSetNative")
-	Assert(InStr(AdapterBody, "_TimerAdapterCommitNative(Handle, BoundFn, Ms)") > 0
-			&& InStr(CommitBody, "NativeSetFn.Call(BoundFn, IntervalMs)") > 0
-			&& InStr(NativeBody, "SetTimer(BoundFn, IntervalMs)") > 0,
-		"TimerAfter must still reach the OS one-shot primitive — a synchronous fake adapter would make the deferral assertion false-green")
-	Assert(InStr(ArmBody, "KL_LogHotstring(") == 0,
-		"the timer arm must not hide a synchronous sink call")
-}
+; The queue's own deferral is driven through a real timer in
+; unit/modules/hotstrings/engine/test_hse_dispatch_behaviour.ahk.
 
 
 Test("meta fire-log-never-synchronous: every fire path queues the record",
 	_FLNS_FirePathsQueue)
 Test("meta fire-log-never-synchronous: no unexpected synchronous caller",
 	_FLNS_NoUnexpectedSynchronousCaller)
-Test("meta fire-log-never-synchronous: the queue stays deferred",
-	_FLNS_QueueIsActuallyDeferred)

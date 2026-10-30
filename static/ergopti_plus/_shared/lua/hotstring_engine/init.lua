@@ -334,6 +334,7 @@ function M.candidates_at(buf_cps, buckets, body_len, start_is_boundary, limit)
 		out[#out + 1] = {
 			trigger     = mapping.trigger,
 			replacement = eff or mapping.replacement,
+			has_key_tokens = mapping.has_key_tokens,
 			group       = mapping.group,
 			section     = mapping.section,
 			personal_source_id = mapping.personal_source and mapping.personal_source.id or nil,
@@ -640,6 +641,9 @@ function M.new()
 				-- the phone number is private and unmasked.
 				is_private   = source.is_private == true,
 				field        = source.field,
+				-- The replacement presses a key: it is not plain text for a preview or
+				-- a cascade, and the caret is no longer behind it after it fired.
+				has_key_tokens = source.has_key_tokens == true,
 				-- Registration order, the FINAL tiebreak. Lua's table.sort is not
 				-- stable, so two entries equal on every other key came out in an order
 				-- that depended on the sort's internals — a collision could elect a
@@ -872,7 +876,7 @@ function M.new()
 				M.CASCADE_MIN_ARROWS, M.CASCADE_MAX_ARROWS, tostring(max_arrows))
 			return first
 		end
-		if first.final_result or first.is_private then return first end
+		if first.final_result or first.is_private or first.has_key_tokens then return first end
 
 		local gate = options.cascade_gate
 		local consumed = options.terminator_consumed == true
@@ -894,6 +898,12 @@ function M.new()
 			-- hotstring's output: its text must stay under its own redaction.
 			if mapping.is_private then
 				Logger.debug(LOG, "Cascade stopped: a private mapping takes no part.")
+				return nil
+			end
+			-- Only plain text is a link: what a pressed key leaves behind the caret
+			-- is not known.
+			if mapping.has_key_tokens then
+				Logger.debug(LOG, "Cascade stopped: a mapping that presses a key takes no part.")
 				return nil
 			end
 			-- A terminator the chain still carries is the end character of an end
@@ -1051,6 +1061,7 @@ function M.new()
 			-- the same thing — see expander.lua, which threads the flag through every
 			-- sink rather than re-deriving it.
 			is_private         = mapping.is_private,
+			has_key_tokens     = mapping.has_key_tokens,
 			-- The expansion delay's interval: last input letter to expander. An
 			-- earlier pause in the trigger does not count (the delay measures how
 			-- long the user waited before giving the expander); other shared-engine

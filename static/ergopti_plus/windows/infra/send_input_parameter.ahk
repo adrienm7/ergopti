@@ -242,6 +242,126 @@ SendInputParseShortcut(Value) {
 	return Key
 }
 
+; Reads the inside of one {group} of a hotstring output.
+; @param {String} Inner The text between the braces.
+; @param {String} Text Set to the code point a {U+XXXX} names.
+; @param {Map|String} Entry Set to the key a {name} or {name N} names.
+; @param {Integer} Count Set to how many times to press it.
+; @returns {Boolean} False when the group is not a token.
+_SendInputReadOutputGroup(Inner, &Text, &Entry, &Count) {
+	Text := ""
+	Entry := ""
+	Count := 1
+	Vocabulary := SendInputVocabulary()
+	if RegExMatch(Inner, "^[Uu]\+([0-9A-Fa-f]+)$", &Hex) {
+		if (StrLen(Hex[1]) > 6)
+			return false
+		Code := Integer("0x" . Hex[1])
+		if (Code > 0x10FFFF || (Code >= 0xD800 && Code <= 0xDFFF)
+				|| Code <= 0x1F || (Code >= 0x7F && Code <= 0x9F))
+			return false
+		Text := Chr(Code)
+		return true
+	}
+	if !RegExMatch(Inner, "^([0-9A-Za-z][0-9A-Za-z_]*)(?: ([1-9][0-9]*))?$", &Group)
+		return false
+	if (Group[2] != "") {
+		; More digits than any bound: Integer() would wrap, and the text stays text.
+		if (StrLen(Group[2]) > 9)
+			return false
+		Count := Integer(Group[2])
+		if (Count > Vocabulary["output_key_max_repeat"])
+			return false
+	}
+	Entry := _SendInputFindEntry(Vocabulary["keys"], _SendInputAsciiLower(Group[1]))
+	return Entry is Map
+}
+
+; Parses a hotstring output into what it types and what it presses. The grammar is
+; the rule of _shared/tests/corpus/hotstrings/output_token_vectors.json; the macOS
+; and Linux drivers replay the same vectors against _shared/lua/send_input.
+; @param {String} Value The output as the TOML holds it.
+; @returns {Map} "tokens", an ordered Array of Map("kind", "text", "value", ...)
+;   and Map("kind", "key", "id", ..., "entry", ..., "count", ...); "text", the typed
+;   text alone; "has_keys".
+SendInputParseOutput(Value) {
+	if !(Value is String)
+		throw TypeError("A hotstring output must be a string.")
+	Vocabulary := SendInputVocabulary()
+	if !Vocabulary.Has("output_key_max_repeat")
+		throw Error("The send-input vocabulary has no output_key_max_repeat.")
+	Tokens := []
+	Typed := ""
+	HasKeys := false
+	PushText(Text) {
+		Typed .= Text
+		if (Tokens.Length > 0 && Tokens[Tokens.Length]["kind"] == "text")
+			Tokens[Tokens.Length]["value"] .= Text
+		else
+			Tokens.Push(Map("kind", "text", "value", Text))
+	}
+	PushKey(Entry, Count) {
+		HasKeys := true
+		Tokens.Push(Map("kind", "key", "id", Entry["id"], "entry", Entry, "count", Count))
+	}
+	Index := 1
+	Size := StrLen(Value)
+	while (Index <= Size) {
+		At := RegExMatch(Value, "[{`r`n`t]", , Index)
+		if (At == 0) {
+			PushText(SubStr(Value, Index))
+			break
+		}
+		if (At > Index)
+			PushText(SubStr(Value, Index, At - Index))
+		Char := SubStr(Value, At, 1)
+		Index := At + 1
+		if (Char == "`t") {
+			PushKey(_SendInputFindEntry(Vocabulary["keys"], "tab"), 1)
+		} else if (Char == "`r" || Char == "`n") {
+			if (Char == "`r" && SubStr(Value, Index, 1) == "`n")
+				Index += 1
+			PushKey(_SendInputFindEntry(Vocabulary["keys"], "enter"), 1)
+		} else if (SubStr(Value, At, 3) == "{{}") {
+			PushText("{")
+			Index := At + 3
+		} else if (SubStr(Value, At, 3) == "{}}") {
+			PushText("}")
+			Index := At + 3
+		} else {
+			Close := InStr(Value, "}", true, Index)
+			if (Close > 0 && _SendInputReadOutputGroup(SubStr(Value, Index, Close - Index),
+					&Text, &Entry, &Count)) {
+				if (Entry is Map)
+					PushKey(Entry, Count)
+				else
+					PushText(Text)
+				Index := Close + 1
+			} else {
+				; Only the brace: what follows may still hold a real token.
+				PushText("{")
+			}
+		}
+	}
+	return Map("tokens", Tokens, "text", Typed, "has_keys", HasKeys)
+}
+
+; The Send string of a parsed output. {Text} covers the whole rest of a Send, so
+; text and keys cannot alternate under it: the text goes out escaped instead.
+; @param {Map} Parsed A result of SendInputParseOutput.
+; @returns {String}
+SendInputOutputPayload(Parsed) {
+	Payload := ""
+	for _, Token in Parsed["tokens"] {
+		if (Token["kind"] == "text")
+			Payload .= SendEscapeLiteral(Token["value"])
+		else
+			Payload .= "{" . Token["entry"]["ahk"]
+				. (Token["count"] > 1 ? " " . Token["count"] : "") . "}"
+	}
+	return Payload
+}
+
 ; Parses a value of one of the three send parameter kinds.
 ; @param {String} Kind "text", "key" or "shortcut".
 ; @param {String} Value
