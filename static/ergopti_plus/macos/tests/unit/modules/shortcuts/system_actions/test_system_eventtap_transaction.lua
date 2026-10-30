@@ -188,6 +188,26 @@ helpers.describe("system shortcut eventtap factories are transactional", functio
 		end
 	end)
 
+	helpers.it("names the Accessibility trust when a tap does not enable (eventtap-refusal-cause)", function()
+		-- Field log 2026-10-30 10:07: eight taps were refused at once after macOS
+		-- withdrew Accessibility, and the error named only "enabled=false".
+		local fixture = load_fixture({{ enable_on_start = false }})
+		local errors = {}
+		local saved_permission = package.loaded["adapters.accessibility_permission"]
+		local saved_error = package.loaded["infra.logger"].error
+		package.loaded["adapters.accessibility_permission"] = { is_trusted = function() return false end }
+		package.loaded["infra.logger"].error = function(_, text, ...)
+			errors[#errors + 1] = string.format(text, ...)
+		end
+		local ok, owner = pcall(fixture.system.bind_cmd_star)
+		package.loaded["adapters.accessibility_permission"] = saved_permission
+		package.loaded["infra.logger"].error = saved_error
+		helpers.assert_true(ok)
+		helpers.assert_nil(owner)
+		helpers.assert_true(table.concat(errors, " | "):find("accessibility_trusted=false", 1, true) ~= nil,
+			"the refusal must name the Accessibility trust: " .. table.concat(errors, " | "))
+	end)
+
 	helpers.it("contains constructor false and throw without inventing cleanup debt", function()
 		for _, failed_plan in ipairs({
 			{ construct_result = false },
