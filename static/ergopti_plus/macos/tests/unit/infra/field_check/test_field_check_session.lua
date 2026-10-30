@@ -66,7 +66,8 @@ helpers.describe("field check session: costs and edge cases a program can answer
 
 	helpers.it("names the dominant slow segment of the day log, through the awk summary", function()
 		local summary = assert(Session.parse_slow_summary(
-			"segment keymap.keydown 2 15.75 12.50\nsegment hotstrings.match 1 40.00 40.00\ningest 1 230\nprefs 0 0\n"))
+			"segment keymap.keydown 2 15.75 12.50\nsegment hotstrings.match 1 40.00 40.00\ningest 1 230\nprefs 0 0\n"
+				.. "lease_bound 0\nearly_layout 0\n"))
 		helpers.assert_eq(summary.segments[1].name, "hotstrings.match")
 		helpers.assert_eq(summary.prefs.count, 0)
 		helpers.assert_nil(Session.parse_slow_summary("segment x 1 1.00 1.00\n"), "a summary without its totals is refused")
@@ -76,13 +77,16 @@ helpers.describe("field check session: costs and edge cases a program can answer
 			exec = function(executable, args, _, callback)
 				helpers.assert_eq(executable, "/usr/bin/awk")
 				helpers.assert_eq(args[2], "/logs/today.log")
-				callback(0, "segment keymap.keydown 2 15.75 12.50\ningest 3 230\nprefs 1 88\n")
+				callback(0, "segment keymap.keydown 2 15.75 12.50\ningest 3 230\nprefs 1 88\nlease_bound 2\nearly_layout 0\n")
 			end,
 		}, report, function() end)
 		local steps = steps_of(report)
 		helpers.assert_eq(steps.slow_dominant.value, "keymap.keydown")
 		helpers.assert_eq(steps.slow_ingest_ticks.value, "3:230")
 		helpers.assert_eq(steps.slow_preferences_saves.value, "1:88")
+		helpers.assert_eq(steps.log_lease_bound_failures.state, Report.STATE_FAIL)
+		helpers.assert_eq(steps.log_lease_bound_failures.value, "2")
+		helpers.assert_eq(steps.log_layout_change_before_baseline.state, Report.STATE_PASS)
 	end)
 
 	helpers.it("the awk program reads the three line shapes the drivers write", function()
@@ -103,6 +107,9 @@ helpers.describe("field check session: costs and edge cases a program can answer
 			"10:01 [WARN] HotPath: Slow keymap.keydown: 3.25 ms own, 4.00 ms total, parent none (2 similar since the last line).",
 			"10:02 [WARN] keystats: Slow ingest tick 230 ms (12 ms; entries=4 statements=9).",
 			"10:03 [WARN] preferences: Slow preferences save 88 ms (prepare=1 write=80 ms; operations=2).",
+			"10:04 [ERROR] remap: Lease-bound input startup failed: lease-stopping.",
+			"10:05 [INFO] remap.watchers: Layout poll detected change before its baseline: 'A' → 'B'.",
+			"10:06 [INFO] remap.watchers: Layout poll detected change: 'B' → 'C'.",
 		}, "\n") .. "\n")
 		local pipe = assert(io.popen("/usr/bin/awk -f '" .. program .. "' '" .. log .. "'"))
 		local output = pipe:read("*a")
@@ -115,6 +122,8 @@ helpers.describe("field check session: costs and edge cases a program can answer
 		helpers.assert_eq(summary.segments[1].worst_ms, 12.5)
 		helpers.assert_eq(summary.ingest.worst_ms, 230)
 		helpers.assert_eq(summary.prefs.count, 1)
+		helpers.assert_eq(summary.lease_bound, 1)
+		helpers.assert_eq(summary.early_layout, 1, "only the change before the baseline is the misread")
 	end)
 
 	helpers.it("fails a FIFO the adapter opens, and removes its folder", function()
