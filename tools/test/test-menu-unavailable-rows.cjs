@@ -34,6 +34,8 @@
 
 const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 const assert = require('node:assert/strict');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -916,7 +918,7 @@ console.log(
 	const numeric = Object.fromEntries(
 		Object.entries(numericPaths).map(([driver, file]) => [
 			driver,
-			stripComments(fs.readFileSync(file, 'utf8'), path.extname(file))
+			stripComments(readSourceFile(file), path.extname(file))
 		])
 	);
 	function numericCounterparts(source) {

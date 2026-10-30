@@ -169,6 +169,24 @@ trigger, but 141 of those triggers need an end character AND a word boundary
 before them (`Docker` ends with the word-bound trigger `r`), and the other 6 are
 identity masks (`prochaine` > `prochaine`) that never fire.
 
+### project-final-result-leaves-the-matcher
+
+A `final_result` entry stays final on every driver, three separate rules
+(`final_result_vectors.json`, 216 combinations plus explicit vectors). One: its
+output leaves the matcher: Windows `_HSE_ForgetFinalOutput` at all three commit
+sites (`HSE_ApplyExpansion`, the terminal and Notepad owners), macOS
+`commit_suppress_rescan`, Linux `engine:reset`. Windows alone kept the output, so
+a personal `sru` > `SRU` was matched case-insensitively by the bundled `sru` on
+the next Space. Two: a final entry whose output equals the typed text wins with no
+edit and claims that text against the very next end character only
+(`HSE_FinalNoOpPending`, `_final_noop_pending`, macOS `final_noop_buffer`); a
+longer word typed on still completes its own trigger, so never wipe here. Three:
+an immediate entry yields to a final end-character entry of strictly higher
+priority at least as long (`final_end_outranks`), or it fires first and priority
+never applies. A non-final end-character entry still loses that race on purpose.
+A case-sensitive personal entry is an exact match: a typed `SRU` does not match a
+checked `sru`, so the bundled correction still applies to that typing.
+
 ### project-hotstring-output-tokens
 
 A TOML output is a small grammar (`{Left}`, `{Left 2}`, `{U+27C3}`, `{{}`), one

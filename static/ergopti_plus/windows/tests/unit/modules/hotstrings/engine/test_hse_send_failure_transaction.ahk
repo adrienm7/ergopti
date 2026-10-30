@@ -185,7 +185,7 @@ _AHK04_NormalSpec() {
 		Length: 2,
 		Replacement: "Z",
 		OnlyText: true,
-		FinalResult: true,
+		FinalResult: false,
 		Category: "autocorrection",
 		Section: "common",
 		IsPrivate: false
@@ -821,7 +821,7 @@ _UnicodeLedgerOutput(Mode) {
 		Critical("On")
 		HSE_Buffer .= "★"
 		AppState_TouchLastSentKey("★")
-		Next := _MakeHotstringMeta("OK", Emoji . "★", true, true, 1)
+		Next := _MakeHotstringMeta("OK", Emoji . "★", true, false, 1)
 		Next.Star := true
 		Next.InWord := true
 		AssertTrue(HSE_DispatchMatch(Next, ""),
@@ -1026,13 +1026,14 @@ _HNP_InlineSend(Ok, Text, Opts, Callback) {
 	Callback.Call(Ok, Ok ? "" : "recorded native refusal")
 }
 
-_HNP_Dispatch(State, Buffer := "xxab", EndChar := "") {
+_HNP_Dispatch(State, Buffer := "xxab", EndChar := "", FinalResult := false) {
 	global HSE_Buffer, _PrefixBuffer, _LLM_Bridge_Buffer
 	HSE_Buffer := Buffer
 	_PrefixBuffer := Buffer
 	_LLM_Bridge_Buffer := Buffer
 	OutputHostResolverPrimeForTest("notepad.exe")
 	Spec := _AHK04_NormalSpec()
+	Spec.FinalResult := FinalResult
 	Effect := 0
 	return HSE_DispatchMatch(Spec, EndChar, &Effect, false, _HNP_Record.Bind(State))
 }
@@ -1218,6 +1219,21 @@ _HNP_InitiatingPrefixDoesNotRevoke() {
 }
 Test("Notepad pending owner: initiating prefix bookkeeping preserves immutable admission (notepad-pending)",
 	_HNP_InitiatingPrefixDoesNotRevoke)
+
+/** The Notepad commit is a commit site of a final output too. */
+_HNP_FinalOutputLeavesTheMatcher() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, HSE_StartIsWordBoundary
+		State := Map("Requests", [])
+		_HNP_Dispatch(State, , , true)
+		_HNP_Settle(State, true)
+		AssertEqual("", HSE_Buffer, "nothing may complete a trigger through a final output")
+		AssertEqual(false, HSE_StartIsWordBoundary, "the output ends in a word character")
+	}
+}
+Test("Notepad pending owner: a final output leaves the matcher (hotstring-final-result)",
+	_HNP_FinalOutputLeavesTheMatcher)
 
 /** Keys typed during the asynchronous edit are held from dispatch to completion. */
 _HNP_CaptureSpansTheEdit(Ok) {

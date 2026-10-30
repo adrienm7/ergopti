@@ -33,6 +33,8 @@ require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a
 
 const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
 const { scriptTokens } = require('../lib/script-source.cjs');
 
@@ -196,7 +198,7 @@ for (const rel of [
 	'windows/ui/menu/menu_hotstrings.ahk',
 	'linux/ui/menu/menu_builder.lua'
 ]) {
-	const text = fs.readFileSync(path.join(SP, rel), 'utf8');
+	const text = readSourceFile(path.join(SP, rel));
 	for (const owner of ['word_expanders_menu', 'word_expanders_restore', 'word_expander_entries']) {
 		if (!text.includes(`"${owner}"`)) {
 			errors.push(`${rel} does not delegate its word-delimiter restore through ${owner}.`);

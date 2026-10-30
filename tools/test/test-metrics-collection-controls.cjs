@@ -23,12 +23,13 @@
 const assert = require('assert');
 require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a generated config-key constant
 
-const fs = require('fs');
 const path = require('path');
+// The Linux tray root is read with its split section modules folded back in.
+const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PLUS = 'static/ergopti_plus';
-const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
+const read = (relative) => readSourceFile(path.join(ROOT, relative));
 const failures = [];
 
 function check(label, body) {
