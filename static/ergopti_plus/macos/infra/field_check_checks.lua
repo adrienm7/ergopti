@@ -847,6 +847,7 @@ M.checks = {
 	menu_build = Probes.menu_build,
 	typing_selftest = Probes.typing_selftest,
 	capslock_chord = Probes.capslock_chord,
+	gesture_frames = Probes.gesture_frames,
 }
 
 --- The Debug menu checks the field run does not ask for, each with the

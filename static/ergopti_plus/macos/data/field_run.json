@@ -125,6 +125,13 @@
 			"proves": "Ctrl+Caps Lock: the secondary_capslock slot is bound when assigned, and a physical Ctrl+Caps Lock pressed during this session reached it (pressed once before the run, it fails never_delivered when macOS does not fire a Caps Lock hotkey)."
 		},
 		{
+			"id": "field_gesture_frames",
+			"kind": "field_check",
+			"check": "gesture_frames",
+			"deadline_seconds": 10,
+			"proves": "Every touch frame of this session carried the trackpad's capture stamp, which gesture timing uses, and the stamps are about 8 ms apart (touch the trackpad once before the run)."
+		},
+		{
 			"id": "field_menu_build",
 			"kind": "field_check",
 			"check": "menu_build",
