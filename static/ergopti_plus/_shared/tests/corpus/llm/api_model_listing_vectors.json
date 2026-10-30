@@ -49,6 +49,21 @@
 			"body": { "data": [{ "id": "jev" }] },
 			"expect": null,
 			"reason": "unsupported"
+		},
+		{
+			"name": "minimax listing (docs example)",
+			"provider": "minimax",
+			"source": "https://platform.minimax.io/docs/api-reference/models/openai/list-models (example response, 2026-10-30)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"data": [
+					{ "id": "MiniMax-M3", "object": "model", "created": 1780272000, "owned_by": "minimax" },
+					{ "id": "MiniMax-M2.7", "object": "model", "created": 1773799200, "owned_by": "minimax" },
+					{ "id": "MiniMax-M2.5", "object": "model", "created": 1770948000, "owned_by": "minimax" }
+				]
+			},
+			"expect": ["MiniMax-M2.5", "MiniMax-M2.7", "MiniMax-M3"]
 		}
 	],
 	"names": [
@@ -188,6 +203,10 @@
 		"openrouter": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
 		"groq": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
 		"together": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
-		"fireworks": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape."
+		"fireworks": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
+		"perplexity": "GET <base_url>/models answers 404: Perplexity documents no listing for Sonar chat completions (its /v1/models lists Agent API ids), so the page offers the catalogue models and a typed id.",
+		"moonshot": "Documented as an OpenAI list (platform.kimi.ai docs/api/list-models), but no complete response is published and the route needs a key: none recorded.",
+		"dashscope": "compatible-mode/v1/models answers 401 without a key and its shape is undocumented; the documented listing is the native /api/v1/models (output.models[].model), which the listing reader does not take.",
+		"zai": "Not documented (docs.z.ai API reference); the route answers an authentication error without a key: none recorded."
 	}
 }
