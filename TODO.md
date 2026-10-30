@@ -123,6 +123,9 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      `_shared/data/identifiers.json` (`github`, `github_api` for the update feed, `huggingface`, `ollama`,
      `ollama_registry`) through the managed transport a download uses (route lookup, PAC or proxy, TLS); any
      answer below 500 passes, a failure names the native reason by the host's key. Nothing is downloaded.
+   - `field_app_health` (after the AI steps): no crash report of the last day in the driver's `crash_reports`
+     folder nor in `~/Library/Logs/DiagnosticReports` for ErgoptiPlus, Hammerspoon or Ollama (each fails with
+     its count); the app's resident memory (MB) and CPU share from `ps` are named.
 
 ## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
 
