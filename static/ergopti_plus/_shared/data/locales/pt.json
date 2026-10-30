@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "Fechar UI após adicionar um hotstring via atalho",
 	"menu.hotstrings.config_item": "⚙️ Configurar atrasos e cores…",
 	"menu.hotstrings.consumed": "consumido",
+	"menu.hotstrings.consumed_delimiters": "Consumidos pela expansão",
 	"menu.hotstrings.consumed_suffix": "(consumido)",
 	"menu.hotstrings.custom_label": "Personalizado",
 	"menu.hotstrings.default_category_prefix": "Categoria padrão: ",

@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "Kısayol aracılığıyla kısaltma ekledikten sonra arayüzü kapat",
 	"menu.hotstrings.config_item": "⚙️ Gecikmeleri ve renkleri yapılandır…",
 	"menu.hotstrings.consumed": "tüketildi",
+	"menu.hotstrings.consumed_delimiters": "Genişletme tarafından tüketilenler",
 	"menu.hotstrings.consumed_suffix": "(tüketildi)",
 	"menu.hotstrings.custom_label": "Özel",
 	"menu.hotstrings.default_category_prefix": "Varsayılan kategori: ",

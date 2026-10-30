@@ -4107,6 +4107,11 @@
 			"id": "parameter_catalogue_entries"
 		},
 		{
+			"type": "group",
+			"id": "parameter_consume_children",
+			"i18n": "menu.hotstrings.consumed_delimiters"
+		},
+		{
 			"type": "---"
 		},
 		{

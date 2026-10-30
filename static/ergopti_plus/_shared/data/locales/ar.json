@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "إغلاق الواجهة بعد إضافة سلسلة نصية عبر الاختصار",
 	"menu.hotstrings.config_item": "⚙️ ضبط التأخيرات والألوان…",
 	"menu.hotstrings.consumed": "مُستهلَك",
+	"menu.hotstrings.consumed_delimiters": "تستهلكها عملية التوسيع",
 	"menu.hotstrings.consumed_suffix": "(مُستهلَك)",
 	"menu.hotstrings.custom_label": "مخصص",
 	"menu.hotstrings.default_category_prefix": "الفئة الافتراضية: ",

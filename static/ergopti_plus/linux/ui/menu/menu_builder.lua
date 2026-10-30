@@ -1379,14 +1379,42 @@ local function _manifest_hotstring_rows(ctx, config)
 			local function reset_terminators()
 				if not word_expanders_ready() then return false end
 				local saved = snapshot()
-				local changes = {}
+				local changes, consumption = {}, {}
 				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
 					if def.key and not def.custom then
 						changes[def.key] = def.default_enabled ~= false
+						consumption[def.key] = def.consume == true
 					end
 				end
 				if Terminators.set_terminators_enabled(changes) ~= true then return false end
+				-- The consumed choice of every built-in goes back to the catalogue too.
+				if Terminators.set_terminators_consume(consumption) ~= true then return false end
 				return commit(saved)
+			end
+
+			-- Whether an expansion swallows each built-in delimiter: a click on its
+			-- catalogue row switches it on or off, so this half has its own rows.
+			local consume_rows = {}
+			for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+				if def.key and not def.custom and def.type ~= "separator" then
+					local key = def.key
+					local label = i18n_safe(def.label_key):gsub("★", MagicKey.get())
+					consume_rows[#consume_rows + 1] = {
+						label   = label,
+						checked = Terminators.is_terminator_consume(key) and true or false,
+						action  = function()
+							if not word_expanders_ready() then return false end
+							local saved = snapshot()
+							local next_consume = not Terminators.is_terminator_consume(key)
+							if Terminators.set_terminators_consume({ [key] = next_consume }) ~= true or not commit(saved) then
+								return false
+							end
+							require("ui.menu.feature_notice").feature(string.format(i18n_safe("notify.word_expander_prefix"),
+								label .. " " .. i18n_safe("menu.hotstrings.consumed_suffix")), next_consume)
+							return true
+						end,
+					}
+				end
 			end
 
 			for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
@@ -1485,6 +1513,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			}
 			local entries = ManifestMenu.template_rows("hotstrings_word_expander_frame", {}, {}, {
 				["parameter_catalogue_entries"] = function() return catalogue_rows end,
+				["parameter_consume_children"] = consume_rows,
 				["parameter_custom_entries"] = function() return sub end,
 			})
 			if not entries then return {} end
@@ -3264,13 +3293,13 @@ local function _build_llm(ctx)
 		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
+	llm_ctx.commands[require("config_keys").COMMAND.LLM_TEST_PREDICTION] = function()
+		return llm.test_prediction()
+	end
 	llm_ctx.commands[require("config_keys").COMMAND.LLM_TOGGLE] = function()
 		if not toggle_ready() then return false end
 		if llm.toggle then llm.toggle(ctx.on_menu_changed) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-	end
-	llm_ctx.commands[require("config_keys").COMMAND.LLM_TEST_PREDICTION] = function()
-		return llm.test_prediction()
 	end
 	llm_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do llm_ctx.state_getters[key] = value end

@@ -1532,6 +1532,7 @@
 	"menu.hotstrings.close_on_add": "ショートカットでホットストリング追加後にUIを閉じる",
 	"menu.hotstrings.config_item": "⚙️ 遅延と色を設定…",
 	"menu.hotstrings.consumed": "消費済み",
+	"menu.hotstrings.consumed_delimiters": "展開で消費される区切り文字",
 	"menu.hotstrings.consumed_suffix": "(消費済み)",
 	"menu.hotstrings.custom_label": "カスタム",
 	"menu.hotstrings.default_category_prefix": "デフォルトカテゴリー: ",

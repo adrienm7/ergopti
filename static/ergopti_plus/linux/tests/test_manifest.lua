@@ -658,6 +658,7 @@ return {
 	"tests.unit.modules.llm.prediction.test_prediction_engine_canonicals",
 	"tests.unit.modules.llm.prediction.test_prediction_trigger_now",
 	"tests.unit.modules.llm.prediction.test_prediction_test_button",
+	"tests.unit.ui.menu.test_word_expander_consumption_rows",
 	"tests.unit.modules.llm.prediction.test_prompt_prediction",
 	"tests.unit.modules.llm.prediction.test_live_mode",
 	"tests.unit.modules.llm.features.test_tone_selection",

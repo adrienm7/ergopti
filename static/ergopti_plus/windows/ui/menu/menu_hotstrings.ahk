@@ -406,6 +406,7 @@ _HS_WordExpanderRows(Commands := unset) {
 	Owner := _HotstringsTerminatorRecords
 
 	Rows := []
+	ConsumeRows := []
 
 	; ── Built-in catalogue entries, in catalogue order ───────────────────────
 	for _, D in Defs {
@@ -433,6 +434,10 @@ _HS_WordExpanderRows(Commands := unset) {
 			"label",   Lbl,
 			"action",  ((EntryKey, EntryLabel) => (*) => _HS_DelimToggleEntry(EntryKey, 0, 0, EntryLabel))(Key, Lbl),
 			"checked", State.Enabled ? true : false))
+		ConsumeRows.Push(Map(
+			"label",   t(D["label_key"]),
+			"action",  ((EntryKey, EntryLabel) => (*) => _HS_DelimToggleConsume(EntryKey, EntryLabel))(Key, t(D["label_key"])),
+			"checked", State.Consume ? true : false))
 	}
 	CatalogueRows := Rows
 	Rows := []
@@ -458,7 +463,8 @@ _HS_WordExpanderRows(Commands := unset) {
 		Map("word_expanders_ready", (*) => !A_IsSuspended)))
 
 	Entries := MenuRenderer_TemplateRows("hotstrings_word_expander_frame", Map(), Map(),
-		Map("parameter_catalogue_entries", (*) => CatalogueRows, "parameter_custom_entries", (*) => Rows))
+		Map("parameter_catalogue_entries", (*) => CatalogueRows, "parameter_consume_children", ConsumeRows,
+			"parameter_custom_entries", (*) => Rows))
 	if !(Entries is Array)
 		return []
 
@@ -502,6 +508,19 @@ _HS_WordExpanderCommand(Command, Ready, *) {
 _HS_DelimToggleEntry(Key, WriterFn := 0, NotifyFn := 0, Label := "") {
 	Notice := (Label != "") ? _HS_DelimEntryNotice.Bind(Key, Label, NotifyFn) : 0
 	return _HS_DelimCommit(() => HotstringsTerminatorToggle(Key, WriterFn), NotifyFn, Notice)
+}
+
+; Switches whether the expansion swallows one built-in delimiter, the other half
+; of its state: a click on its catalogue row switches it on or off.
+; @param Label {String} The row's label: names the entry in the feature notice.
+_HS_DelimToggleConsume(Key, Label, WriterFn := 0, NotifyFn := 0) {
+	global _HotstringsTerminatorRecords
+	Owner := _HotstringsTerminatorRecords
+	if !(Owner is Object) || !Owner.Builtin.Has(Key)
+		return false
+	Next := Owner.Builtin[Key].Consume ? 0 : 1
+	return _HS_DelimCommit(() => HotstringsTerminatorBuiltinCommit(Map(Key, Map("consume", Next)), WriterFn), NotifyFn,
+		() => NotifyFeature(_HS_DelimNoticeLabel(Label . " " . t("menu.hotstrings.consumed_suffix")), Next, NotifyFn))
 }
 
 ; Announces the state one built-in delimiter row reached.

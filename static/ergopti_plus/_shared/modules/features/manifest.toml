@@ -7998,6 +7998,14 @@ type = "---"
 type = "list"
 id = "parameter_catalogue_entries"
 
+# A click on a catalogue row switches the delimiter on or off on every driver, so
+# whether its expansion swallows it takes a row of its own, one per delimiter, in
+# this submenu (PAR-8). Each driver draws the rows from the same catalogue.
+[[menu.hotstrings_word_expander_frame]]
+type = "group"
+id = "parameter_consume_children"
+i18n = "menu.hotstrings.consumed_delimiters"
+
 [[menu.hotstrings_word_expander_frame]]
 type = "---"
 
