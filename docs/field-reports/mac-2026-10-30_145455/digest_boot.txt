@@ -1,0 +1,74 @@
+2026-10-30 00:01:05:569 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 8.8 ms (+11.9 ms, total 11.9 ms, cpu 5.3 ms).
+2026-10-30 00:01:05:950 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 381.0 ms (+381.8 ms, total 393.7 ms, cpu 298.3 ms).
+2026-10-30 00:01:22:082 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 6.9 ms (+8.0 ms, total 8.0 ms, cpu 5.1 ms).
+2026-10-30 00:01:22:497 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 414.5 ms (+415.1 ms, total 423.1 ms, cpu 319.2 ms).
+2026-10-30 00:02:09:030 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 7.0 ms (+9.7 ms, total 9.7 ms, cpu 5.5 ms).
+2026-10-30 00:02:09:358 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 327.4 ms (+328.0 ms, total 337.7 ms, cpu 281.1 ms).
+2026-10-30 00:02:22:321 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 7.3 ms (+8.4 ms, total 8.4 ms, cpu 5.7 ms).
+2026-10-30 00:02:22:650 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 328.5 ms (+329.1 ms, total 337.5 ms, cpu 284.4 ms).
+2026-10-30 00:06:40:619 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 10.8 ms (+12.0 ms, total 12.0 ms, cpu 5.7 ms).
+2026-10-30 00:06:41:005 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 385.2 ms (+385.9 ms, total 397.9 ms, cpu 353.8 ms).
+2026-10-30 00:15:58:134 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 10.5 ms (+11.9 ms, total 11.9 ms, cpu 5.6 ms).
+2026-10-30 00:15:58:544 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 408.9 ms (+409.6 ms, total 421.4 ms, cpu 309.5 ms).
+2026-10-30 00:16:24:240 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 9.9 ms (+11.4 ms, total 11.4 ms, cpu 5.6 ms).
+2026-10-30 00:16:24:589 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 348.9 ms (+349.6 ms, total 360.9 ms, cpu 310.0 ms).
+2026-10-30 00:17:31:659 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 7.7 ms (+8.9 ms, total 8.9 ms, cpu 5.8 ms).
+2026-10-30 00:17:32:041 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 382.0 ms (+382.6 ms, total 391.5 ms, cpu 333.7 ms).
+2026-10-30 00:17:48:290 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 6.6 ms (+7.6 ms, total 7.6 ms, cpu 5.3 ms).
+2026-10-30 00:17:48:639 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 348.1 ms (+348.9 ms, total 356.6 ms, cpu 318.7 ms).
+2026-10-30 00:18:28:403 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 14.4 ms (+17.1 ms, total 17.1 ms, cpu 5.7 ms).
+2026-10-30 00:18:28:795 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 391.2 ms (+392.2 ms, total 409.2 ms, cpu 322.9 ms).
+2026-10-30 00:55:58:265 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 9.0 ms (+10.3 ms, total 10.3 ms, cpu 5.3 ms).
+2026-10-30 00:55:58:655 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 389.5 ms (+390.1 ms, total 400.5 ms, cpu 287.7 ms).
+2026-10-30 00:58:26:668 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 6.5 ms (+9.2 ms, total 9.2 ms, cpu 4.6 ms).
+2026-10-30 00:58:27:005 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 336.5 ms (+337.2 ms, total 346.3 ms, cpu 275.2 ms).
+2026-10-30 01:08:44:532 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 8.3 ms (+9.6 ms, total 9.6 ms, cpu 5.1 ms).
+2026-10-30 01:08:44:917 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 385.0 ms (+385.5 ms, total 395.1 ms, cpu 283.1 ms).
+2026-10-30 01:09:31:008 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 6.9 ms (+8.3 ms, total 8.3 ms, cpu 4.6 ms).
+2026-10-30 01:09:31:349 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 340.9 ms (+341.6 ms, total 349.8 ms, cpu 279.6 ms).
+2026-10-30 01:11:27:735 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 7.2 ms (+8.4 ms, total 8.4 ms, cpu 5.5 ms).
+2026-10-30 01:11:28:053 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 317.5 ms (+318.0 ms, total 326.4 ms, cpu 274.4 ms).
+2026-10-30 01:12:45:547 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 6.7 ms (+7.9 ms, total 7.9 ms).
+2026-10-30 01:12:45:906 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 357.8 ms (+358.2 ms, total 366.1 ms).
+2026-10-30 01:13:31:714 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 8.5 ms (+10.0 ms, total 10.0 ms).
+2026-10-30 01:13:32:000 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 283.9 ms (+285.3 ms, total 295.4 ms).
+2026-10-30 01:14:26:845 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 6.8 ms (+7.8 ms, total 7.8 ms, cpu 4.7 ms).
+2026-10-30 01:14:27:233 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 387.8 ms (+388.2 ms, total 396.0 ms, cpu 312.4 ms).
+2026-10-30 01:18:30:042 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 9.1 ms (+14.5 ms, total 14.5 ms, cpu 5.3 ms).
+2026-10-30 01:18:30:504 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 460.8 ms (+461.3 ms, total 475.8 ms, cpu 317.4 ms).
+2026-10-30 10:09:48:321 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 8.5 ms (+9.6 ms, total 9.6 ms, cpu 5.4 ms).
+2026-10-30 10:09:49:097 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 775.7 ms (+776.1 ms, total 785.7 ms, cpu 381.9 ms).
+2026-10-30 10:12:23:976 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 9.3 ms (+11.3 ms, total 11.3 ms, cpu 5.0 ms).
+2026-10-30 10:12:24:322 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 346.1 ms (+346.6 ms, total 357.9 ms, cpu 304.1 ms).
+2026-10-30 10:12:49:575 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 6.2 ms (+7.1 ms, total 7.1 ms).
+2026-10-30 10:12:49:935 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 359.3 ms (+359.6 ms, total 366.6 ms).
+2026-10-30 10:13:15:684 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 7.5 ms (+9.1 ms, total 9.1 ms).
+2026-10-30 10:13:16:007 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 322.6 ms (+323.0 ms, total 332.1 ms).
+2026-10-30 10:13:29:819 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 7.0 ms (+8.1 ms, total 8.1 ms).
+2026-10-30 10:13:30:168 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 348.1 ms (+348.6 ms, total 356.7 ms).
+2026-10-30 10:13:46:305 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 11.1 ms (+12.3 ms, total 12.3 ms, cpu 5.3 ms).
+2026-10-30 10:13:46:692 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 387.3 ms (+387.8 ms, total 400.0 ms, cpu 315.2 ms).
+2026-10-30 10:14:23:186 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 7.6 ms (+8.9 ms, total 8.9 ms, cpu 4.6 ms).
+2026-10-30 10:14:23:576 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 389.6 ms (+390.2 ms, total 399.1 ms, cpu 292.6 ms).
+2026-10-30 10:15:22:706 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 23.7 ms (+24.9 ms, total 24.9 ms, cpu 5.8 ms).
+2026-10-30 10:15:23:110 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 403.3 ms (+403.9 ms, total 428.9 ms, cpu 316.2 ms).
+2026-10-30 11:37:25:716 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 24.8 ms (+27.5 ms, total 27.5 ms, cpu 7.1 ms).
+2026-10-30 11:37:26:460 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 742.7 ms (+744.6 ms, total 772.1 ms, cpu 393.4 ms).
+2026-10-30 11:37:59:921 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 15.9 ms (+17.6 ms, total 17.6 ms, cpu 7.6 ms).
+2026-10-30 11:38:00:614 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 692.2 ms (+693.1 ms, total 710.7 ms, cpu 388.4 ms).
+2026-10-30 11:44:03:780 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 18.8 ms (+20.6 ms, total 20.6 ms, cpu 7.0 ms).
+2026-10-30 11:44:04:715 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 933.3 ms (+935.3 ms, total 956.0 ms, cpu 430.4 ms).
+2026-10-30 11:55:35:414 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 9.8 ms (+11.4 ms, total 11.4 ms, cpu 5.9 ms).
+2026-10-30 11:55:35:834 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 419.9 ms (+420.6 ms, total 431.9 ms, cpu 330.2 ms).
+2026-10-30 11:55:37:308 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 6.5 ms (+7.9 ms, total 7.9 ms, cpu 5.5 ms).
+2026-10-30 11:55:37:665 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 356.4 ms (+357.3 ms, total 365.1 ms, cpu 325.7 ms).
+2026-10-30 11:56:20:423 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 12.3 ms (+15.2 ms, total 15.2 ms, cpu 5.3 ms).
+2026-10-30 11:56:20:788 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 364.0 ms (+365.0 ms, total 380.2 ms, cpu 329.7 ms).
+2026-10-30 11:58:21:391 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 16.7 ms (+21.4 ms, total 21.4 ms, cpu 5.5 ms).
+2026-10-30 11:58:21:948 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 555.6 ms (+556.2 ms, total 577.5 ms, cpu 334.2 ms).
+2026-10-30 13:48:40:449 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 12.5 ms (+16.7 ms, total 16.7 ms, cpu 6.4 ms).
+2026-10-30 13:48:40:930 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 479.6 ms (+481.6 ms, total 498.3 ms, cpu 340.0 ms).
+2026-10-30 14:54:57:266 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 11.2 ms (+13.8 ms, total 13.8 ms, cpu 5.3 ms).
+2026-10-30 14:54:57:740 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 473.6 ms (+474.6 ms, total 488.4 ms, cpu 313.2 ms).
+2026-10-30 15:02:34:005 [SUCCESS] [BootProfile] Boot stage completed: Core module requires in 9.4 ms (+11.1 ms, total 11.1 ms, cpu 5.2 ms).
+2026-10-30 15:02:34:407 [SUCCESS] [BootProfile] Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 401.5 ms (+402.3 ms, total 413.4 ms, cpu 322.6 ms).
