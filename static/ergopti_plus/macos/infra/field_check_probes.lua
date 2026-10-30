@@ -10,6 +10,8 @@
 ---    (bundle identifier, code signature) macOS files them under.
 --- 2. event_taps: every keymap event tap is enabled and watched, the run loop
 ---    answers a timer on time, and how many holds and late keys the session saw.
+--- 3. input_sources: the selected and enabled input sources, and whether every
+---    installed Ergopti layout file and bundle property list parses.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only, like the Debug checks: nothing is granted, prompted, written
@@ -196,6 +198,94 @@ function M.event_taps(ports, report, finish)
 		report.step("runloop_late_ms", worst <= M.RUNLOOP_LATE_MS and STATE.pass or STATE.fail,
 			math.max(0, math.floor(worst)))
 		finish()
+	end)
+end
+
+
+
+
+
+-- ================================
+-- ================================
+-- ======= 3/ Input sources =======
+-- ================================
+-- ================================
+
+local XMLLINT = "/usr/bin/xmllint"
+local PLUTIL = "/usr/bin/plutil"
+
+--- True when an input source identifier or name is an Ergopti layout.
+--- @param value any Identifier or name.
+--- @return boolean
+local function is_ergopti(value)
+	return type(value) == "string" and value:lower():find("ergopti", 1, true) ~= nil
+end
+
+--- Runs one bounded checker over each file and counts the refusals.
+--- @param ports table Check ports (exec).
+--- @param executable string Absolute path of the checker.
+--- @param prefix table Arguments before the file.
+--- @param files table Absolute paths (never reported).
+--- @param callback function fn(bad, timed_out).
+local function count_refusals(ports, executable, prefix, files, callback)
+	local bad, timed_out = 0, 0
+	local function check(index)
+		if index > #files then return callback(bad, timed_out) end
+		local args = {}
+		for _, argument in ipairs(prefix) do args[#args + 1] = argument end
+		args[#args + 1] = files[index]
+		ports.exec(executable, args, COMMAND_TIMEOUT, function(code)
+			if code == nil then timed_out = timed_out + 1 elseif code ~= 0 then bad = bad + 1 end
+			check(index + 1)
+		end)
+	end
+	check(1)
+end
+
+--- Reports one family of files checked by a parser.
+--- @param report table Report.
+--- @param id string Step id.
+--- @param files table Paths checked.
+--- @param bad integer Files the parser refused.
+--- @param timed_out integer Files whose check timed out.
+local function report_parsed(report, id, files, bad, timed_out)
+	if #files == 0 then return report.step(id, STATE.skip, "none_installed") end
+	if bad == 0 and timed_out == 0 then return report.step(id, STATE.pass, #files .. "_parsed") end
+	report.step(id, STATE.fail, bad > 0 and ("refused_" .. bad .. "_of_" .. #files) or ("timeout_" .. timed_out))
+end
+
+--- The input sources macOS has turned on and the Ergopti layouts on disk. The
+--- selected source and the enabled list are what the text-input system holds
+--- now (not the preference, which it reads at login); every Ergopti .keylayout
+--- must parse as XML and every Ergopti bundle's Info.plist as a property list,
+--- since macOS drops a layout it cannot read without a word.
+function M.input_sources(ports, report, finish)
+	local facts = ports.input_source_facts()
+	if facts.current == nil then
+		report.step("current_source", STATE.fail, "unreadable")
+	else
+		report.step("current_source", STATE.info, facts.current)
+	end
+	report.step("current_is_ergopti", STATE.info, is_ergopti(facts.current) and "yes" or "no")
+	if type(facts.enabled_ids) ~= "table" then
+		report.step("enabled_sources", STATE.fail, "unreadable")
+		report.step("ergopti_enabled", STATE.skip, "unreadable")
+	else
+		local ergopti = 0
+		for _, id in ipairs(facts.enabled_ids) do
+			if is_ergopti(id) then ergopti = ergopti + 1 end
+		end
+		report.step("enabled_sources", #facts.enabled_ids > 0 and STATE.pass or STATE.fail, #facts.enabled_ids)
+		report.step("ergopti_enabled", STATE.info, ergopti)
+	end
+	local files = ports.layout_files()
+	report.step("layout_bundles", STATE.info, #files.plists)
+	count_refusals(ports, XMLLINT, { "--noout", "--nonet" }, files.keylayouts, function(bad, timed_out)
+		report_parsed(report, "keylayout_xml", files.keylayouts, bad, timed_out)
+		count_refusals(ports, PLUTIL, { "-lint", "-s" }, files.plists, function(plist_bad, plist_timed_out)
+			report_parsed(report, "bundle_plist", files.plists, plist_bad, plist_timed_out)
+			finish()
+		end)
 	end)
 end
 

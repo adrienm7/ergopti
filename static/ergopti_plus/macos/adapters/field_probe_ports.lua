@@ -89,9 +89,60 @@ end
 
 
 
+-- ================================
+-- ================================
+-- ======= 3/ Input sources =======
+-- ================================
+-- ================================
+
+-- The folders macOS reads keyboard layouts from, the user's first.
+local LAYOUT_DIRS = { "/Library/Keyboard Layouts" }
+
+--- The selected source and the enabled ones, as the text-input system holds them.
+--- @return table facts { current = id|nil, enabled_ids = { id }|nil }
+local function input_source_facts()
+	local Probe = require("adapters.keyboard_source_probe")
+	local layouts = Probe.enabled_layouts()
+	return { current = Probe.current_source_id(), enabled_ids = layouts and layouts.ids or nil }
+end
+
+--- The Ergopti layout files installed for this user and for every user.
+--- @return table files { keylayouts = { path }, plists = { path } }
+local function layout_files()
+	local FsDir = require("infra.fs_dir")
+	local files = { keylayouts = {}, plists = {} }
+	local dirs = {}
+	local home = os.getenv("HOME")
+	if home then dirs[#dirs + 1] = home .. "/Library/Keyboard Layouts" end
+	for _, dir in ipairs(LAYOUT_DIRS) do dirs[#dirs + 1] = dir end
+	for _, dir in ipairs(dirs) do
+		for _, name in ipairs(FsDir.entries(dir)) do
+			if name:lower():find("ergopti", 1, true) then
+				local path = dir .. "/" .. name
+				if name:match("%.keylayout$") then
+					files.keylayouts[#files.keylayouts + 1] = path
+				elseif name:match("%.bundle$") then
+					files.plists[#files.plists + 1] = path .. "/Contents/Info.plist"
+					local resources = path .. "/Contents/Resources"
+					for _, inner in ipairs(FsDir.entries(resources)) do
+						if inner:match("%.keylayout$") then files.keylayouts[#files.keylayouts + 1] = resources .. "/" .. inner end
+					end
+				end
+			end
+		end
+	end
+	table.sort(files.keylayouts)
+	table.sort(files.plists)
+	return files
+end
+
+
+
+
+
 -- ==========================
 -- ==========================
--- ======= 3/ Factory =======
+-- ======= 4/ Factory =======
 -- ==========================
 -- ==========================
 
@@ -104,6 +155,8 @@ function M.new()
 		tap_states = tap_states,
 		hold_counts = hold_counts,
 		lua_heap_kb = function() return collectgarbage("count") end,
+		input_source_facts = input_source_facts,
+		layout_files = layout_files,
 	}
 end
 
