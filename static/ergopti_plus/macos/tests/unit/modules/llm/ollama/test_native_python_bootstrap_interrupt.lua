@@ -42,6 +42,7 @@ end
 local CALLER = [[
 set -eu
 SCRIPT_DIR="$FX/src"
+source "$SCRIPT_DIR/network-retry.sh"
 source "$SCRIPT_DIR/native_python_bootstrap.sh"
 managed_bootstrap_download() {
 	case "$2" in *uv.whl) stage=uv ;; *) stage=python ;; esac
@@ -82,17 +83,22 @@ printf 'left=%s\n' "$(ls -A "$FX/tmp")"
 --- @param extra string|nil Extra environment assignments for the caller.
 --- @return table The parsed fields plus the fixture root.
 local function run(mode, extra)
-	local root = helpers.temp_dir() .. "/bootstrap-interrupt-" .. mode
+	-- A private root: a parallel suite run must not share the fixture.
+	local root = os.tmpname()
+	os.remove(root)
+	root = root .. "-bootstrap-interrupt-" .. mode
 	local llm = helpers.driver_root() .. "modules/llm/"
 	local _, prepared = command("rm -rf " .. quote(root) .. " && mkdir -p " .. quote(root .. "/home")
 		.. " " .. quote(root .. "/tmp") .. " " .. quote(root .. "/src")
 		.. " && cp " .. quote(llm .. "native_python_bootstrap.sh") .. " " .. quote(llm .. "uv-release.sh")
+		.. " " .. quote(llm .. "network-retry.sh")
 		.. " " .. quote(llm .. "managed-python-release.sh") .. " " .. quote(root .. "/src/"))
 	helpers.assert_eq(prepared, 0, "fixture copies the real bootstrap sources")
 	write(root .. "/run.sh", CALLER)
 	write(root .. "/driver.sh", DRIVER)
 	local output = command("env -u BASH_ENV -u ENV FX=" .. quote(root) .. " MODE=" .. mode
 		.. " HOME=" .. quote(root .. "/home") .. " TMPDIR=" .. quote(root .. "/tmp")
+		.. " ROUTE_ORIGINS_FILE=" .. quote(helpers.shared("modules/network/route_origins.json"))
 		.. " ERGOPTI_NATIVE_ARCH=arm64 " .. (extra or "") .. " /bin/bash " .. quote(root .. "/driver.sh"))
 	local result = { root = root, output = output }
 	for key, value in output:gmatch("(%w+)=([^\n]*)") do result[key] = value end
@@ -139,7 +145,9 @@ helpers.describe("native Python bootstrap workspace on interruption (bootstrap-s
 	end)
 
 	helpers.it("a workspace replaced by a symlink is left in place, not followed", function()
-		local root = helpers.temp_dir() .. "/bootstrap-interrupt-foreign"
+		local root = os.tmpname()
+		os.remove(root)
+		root = root .. "-bootstrap-interrupt-foreign"
 		local llm = helpers.driver_root() .. "modules/llm/"
 		local script = "set -eu; source " .. quote(llm .. "native_python_bootstrap.sh")
 			.. "; mkdir -p " .. quote(root .. "/foreign") .. "; printf keep > " .. quote(root .. "/foreign/sentinel")

@@ -170,7 +170,7 @@ if ! retry_network download_archive; then
 	exit 1
 fi
 
-if ! actual_sha="$(shasum -a 256 "$archive_path" | awk '{print $1}')"; then
+if ! actual_sha="$(sha256_file_digest "$archive_path")"; then
 	log_error "Ollama archive SHA-256 checksum could not be computed."
 	exit 1
 fi
