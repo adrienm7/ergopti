@@ -11,13 +11,13 @@
 
 local helpers = require("tests.helpers")
 local Live = require("modules.keymap.number_row_live")
+local Registry = require("modules.keymap.layout_registry")
 
 --- Fakes: stored settings, the layout manager and the session.
 local function fakes(options)
 	options = options or {}
 	local state = { stored = { order = "native", edges = false }, applied = {}, set_calls = {} }
 	local deps = {
-		session_type = function() return options.session or "x11" end,
 		preferences = {
 			settings = function() return { order = state.stored.order, edges = state.stored.edges } end,
 			set = function(role, value)
@@ -28,6 +28,13 @@ local function fakes(options)
 			end,
 		},
 		registry = {
+			-- The layout manager's own rule, over the fake session.
+			live_path = function()
+				return Registry.live_path({
+					session_type = function() return options.session or "x11" end,
+					desktop_is = function(token) return (options.desktop or ""):find(token, 1, true) ~= nil end,
+				})
+			end,
 			snapshot = function() return { installed = options.installed or { ergol = {} } } end,
 			apply_rows = function(id, rows, on_done)
 				state.applied[#state.applied + 1] = { id = id, rows = { order = rows.order, edges = rows.edges } }
@@ -44,13 +51,16 @@ local function fakes(options)
 end
 
 helpers.describe("number row options, live (Linux)", function()
-	helpers.it("is available on X11 with an installed layout, with the reason otherwise (number-row-live)", function()
+	helpers.it("is available on X11 and GNOME or KDE Wayland with an installed layout, with the reason otherwise (number-row-live)", function()
 		local deps = fakes()
 		helpers.assert_true(Live.available(deps))
 		local wayland = fakes({ session = "wayland" })
 		local available, reason = Live.available(wayland)
 		helpers.assert_eq(available, false)
 		helpers.assert_eq(reason, "session_unsupported")
+		helpers.assert_true(Live.available(fakes({ session = "wayland", desktop = "gnome" })), "GNOME Wayland")
+		helpers.assert_true(Live.available(fakes({ session = "wayland", desktop = "kde" })), "KDE Wayland")
+		helpers.assert_eq(Live.available(fakes({ session = "wayland", desktop = "sway" })), false, "sway")
 		local empty = fakes({ installed = {} })
 		available, reason = Live.available(empty)
 		helpers.assert_eq(available, false)
