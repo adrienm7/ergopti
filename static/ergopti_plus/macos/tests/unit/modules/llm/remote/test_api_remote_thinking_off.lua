@@ -204,6 +204,29 @@ helpers.describe("api_remote: a refused thinking field is dropped once and remem
 		end)
 	end)
 
+	helpers.it("the refusal survives a restart", function()
+		with_remote(function(remote, pending, posts)
+			remote.set_entries({ { id = "d", provider = "deepseek", token = "keychain:k" } })
+			remote.request_chat("deepseek", "deepseek-flash", { model = "deepseek-flash", messages = {} },
+				function() end, function() end)
+			posted_body(pending, posts)
+			posts[1].done(refusal("thinking is not supported"))
+			local ok, stored = require("adapters.storage").read_exact(remote.THINKING_REFUSED_KEY)
+			helpers.assert_true(ok and type(stored) == "table", "the refusal is stored")
+			helpers.assert_eq(stored["deepseek|deepseek-flash"][1], "thinking")
+			-- A restart: a fresh module over the same storage
+			package.loaded["modules.llm.api_remote"] = nil
+			local fresh = require("modules.llm.api_remote")
+			fresh.set_entries({ { id = "d", provider = "deepseek", token = "keychain:k" } })
+			fresh.request_chat("deepseek", "deepseek-flash", { model = "deepseek-flash", messages = {} },
+				function() end, function() end)
+			pending[#pending].done(true, "cleartext-key")
+			helpers.assert_eq(require("json").decode(posts[#posts].body).thinking, nil,
+				"a fresh module reads the stored refusal")
+			require("adapters.storage").set(fresh.THINKING_REFUSED_KEY, nil)
+		end)
+	end)
+
 	helpers.it("an unrelated HTTP 400 is not a refusal", function()
 		with_remote(function(remote, pending, posts)
 			remote.set_entries({ { id = "o", provider = "openai", token = "keychain:k" } })
@@ -226,6 +249,40 @@ helpers.describe("api_remote: a refused thinking field is dropped once and remem
 			posts[1].done(refusal("Unrecognized request argument supplied: reasoning_effort"))
 			helpers.assert_eq(#posts, 2, "the probe is sent once more")
 			helpers.assert_eq(require("json").decode(posts[2].body).reasoning_effort, nil)
+		end)
+	end)
+
+end)
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 4/ Default sampling =============
+-- =========================================
+-- =========================================
+
+helpers.describe("api_remote: models that accept only the default sampling get no temperature", function()
+
+	helpers.it("the agent's Claude Opus 5 body loses its temperature", function()
+		with_remote(function(remote, pending, posts)
+			remote.set_entries({ { id = "a", provider = "anthropic", token = "keychain:k" } })
+			remote.request_chat("anthropic", "claude-opus-5", { model = "claude-opus-5", temperature = 0.7, messages = {} },
+				function() end, function() end)
+			helpers.assert_eq(posted_body(pending, posts).temperature, nil, "a non-default temperature is an HTTP 400")
+		end)
+	end)
+
+	helpers.it("a prediction to Claude Opus 4.8 is sent no temperature; Claude Haiku 4.5 keeps it", function()
+		with_remote(function(remote, _, posts)
+			local opus = { id = "o", provider = "anthropic", token = "plain-key", model = "claude-opus-4-8" }
+			local haiku = { id = "h", provider = "anthropic", token = "plain-key", model = "claude-haiku-4-5" }
+			remote.set_entries({ opus, haiku })
+			remote.test_request(opus, remote.get_test_request_spec(), function() end, function() end)
+			remote.test_request(haiku, remote.get_test_request_spec(), function() end, function() end)
+			helpers.assert_eq(require("json").decode(posts[1].body).temperature, nil)
+			helpers.assert_true(require("json").decode(posts[2].body).temperature ~= nil, "Claude 4.5 keeps it")
 		end)
 	end)
 

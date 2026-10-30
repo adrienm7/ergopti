@@ -1,6 +1,6 @@
 {
 	"description": "Thinking-off resolution, replayed by _shared/lua/llm/thinking_off.lua (macOS and Linux suites) and its AutoHotkey port _shared/modules/llm/thinking_off.ahk (Windows suite) over the shipped _shared/modules/llm/thinking_off.json families and api_providers.json thinking_dialect, so the drivers cannot drift.",
-	"rule": "normalize_vectors: lowercase, last path segment, an Ollama :tag dropped. glob_vectors: a glob matches the whole id, ignoring case, * the only wildcard. merge_vectors: fields deep-merged into body give expected (the body wins at every level); added lists the paths added. resolve_vectors: the model's family (first match on the normalized id) through the provider's dialect (first control kind it carries, $level filled) merged into body gives expected; family is its 1-based index and kind the control applied, both absent when none. refusal_vectors: after resolution, an HTTP 400 whose message names an added key (snake or camel; a generic leaf as parent.leaf) refuses its top-level field, stripped from the body (expected); field absent when nothing is refused. refused_vectors: a refused top-level field is never added. family_parse_vectors and dialect_parse_vectors: accepted whole (valid true) or refused whole.",
+	"rule": "normalize_vectors: lowercase, last path segment, an Ollama :tag dropped. glob_vectors: a glob matches the whole id, ignoring case, * the only wildcard. merge_vectors: fields deep-merged into body give expected (the body wins at every level); added lists the paths added. resolve_vectors: the model's family (first match on the normalized id) through the provider's dialect (first control kind it carries, $level filled) merged into body gives expected; family is its 1-based index and kind the control applied, both absent when none. refusal_vectors: after resolution, an HTTP 400 whose message names an added key (snake or camel; a generic leaf as parent.leaf) refuses its top-level field, stripped from the body (expected); field absent when nothing is refused. refused_vectors: a refused top-level field is never added. family_parse_vectors and dialect_parse_vectors: accepted whole (valid true) or refused whole. sampling_vectors: whether the model's family accepts only the default sampling (no temperature sent). refusal_store_vectors: a persisted store keeps each \"<provider>|<model>\" key with its valid field names; a key with none, or without |, is dropped and counted.",
 	"normalize_vectors": [
 		{
 			"model": "GPT-5.1",
@@ -307,7 +307,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 6,
+			"family": 7,
 			"kind": "effort"
 		},
 		{
@@ -328,7 +328,7 @@
 				"reasoning_effort": "minimal"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 7,
+			"family": 8,
 			"kind": "effort"
 		},
 		{
@@ -348,7 +348,7 @@
 				"temperature": 0.7
 			},
 			"added": [],
-			"family": 5
+			"family": 6
 		},
 		{
 			"id": "openai_o3",
@@ -368,7 +368,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 8,
+			"family": 9,
 			"kind": "effort"
 		},
 		{
@@ -389,7 +389,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 4,
+			"family": 5,
 			"kind": "effort"
 		},
 		{
@@ -411,7 +411,7 @@
 				"reasoning_effort": "medium"
 			},
 			"added": [],
-			"family": 6,
+			"family": 7,
 			"kind": "effort"
 		},
 		{
@@ -681,7 +681,7 @@
 				}
 			},
 			"added": [["generationConfig", "thinkingConfig"]],
-			"family": 12,
+			"family": 13,
 			"kind": "gemini_budget"
 		},
 		{
@@ -722,7 +722,7 @@
 				}
 			},
 			"added": [["generationConfig", "thinkingConfig"]],
-			"family": 13,
+			"family": 14,
 			"kind": "gemini_budget"
 		},
 		{
@@ -760,7 +760,7 @@
 				}
 			},
 			"added": [],
-			"family": 11
+			"family": 12
 		},
 		{
 			"id": "gemini_gemini-3.8-flash",
@@ -800,7 +800,7 @@
 				}
 			},
 			"added": [["generationConfig", "thinkingConfig"]],
-			"family": 15,
+			"family": 16,
 			"kind": "gemini_level"
 		},
 		{
@@ -841,7 +841,7 @@
 				}
 			},
 			"added": [["generationConfig", "thinkingConfig"]],
-			"family": 14,
+			"family": 15,
 			"kind": "gemini_level"
 		},
 		{
@@ -862,7 +862,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 16,
+			"family": 17,
 			"kind": "effort"
 		},
 		{
@@ -883,7 +883,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 17,
+			"family": 18,
 			"kind": "effort"
 		},
 		{
@@ -904,7 +904,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 18,
+			"family": 19,
 			"kind": "effort"
 		},
 		{
@@ -961,7 +961,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 20,
+			"family": 21,
 			"kind": "effort"
 		},
 		{
@@ -981,7 +981,7 @@
 				"temperature": 0.7
 			},
 			"added": [],
-			"family": 24
+			"family": 25
 		},
 		{
 			"id": "deepseek_deepseek-chat",
@@ -1003,7 +1003,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 29,
+			"family": 30,
 			"kind": "toggle"
 		},
 		{
@@ -1026,7 +1026,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 27,
+			"family": 28,
 			"kind": "toggle"
 		},
 		{
@@ -1049,7 +1049,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 29,
+			"family": 30,
 			"kind": "toggle"
 		},
 		{
@@ -1088,7 +1088,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 26,
+			"family": 27,
 			"kind": "effort"
 		},
 		{
@@ -1109,7 +1109,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 21,
+			"family": 22,
 			"kind": "effort"
 		},
 		{
@@ -1130,7 +1130,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 10,
+			"family": 11,
 			"kind": "effort"
 		},
 		{
@@ -1151,7 +1151,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 23,
+			"family": 24,
 			"kind": "effort"
 		},
 		{
@@ -1192,7 +1192,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 10,
+			"family": 11,
 			"kind": "effort"
 		},
 		{
@@ -1215,7 +1215,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 26,
+			"family": 27,
 			"kind": "toggle"
 		},
 		{
@@ -1273,7 +1273,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 26,
+			"family": 27,
 			"kind": "effort"
 		},
 		{
@@ -1294,7 +1294,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 10,
+			"family": 11,
 			"kind": "effort"
 		},
 		{
@@ -1314,7 +1314,7 @@
 				"temperature": 0.7
 			},
 			"added": [],
-			"family": 9
+			"family": 10
 		},
 		{
 			"id": "together_moonshotai_Kimi-K3",
@@ -1336,7 +1336,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 23,
+			"family": 24,
 			"kind": "toggle"
 		},
 		{
@@ -1359,7 +1359,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 22,
+			"family": 23,
 			"kind": "toggle"
 		},
 		{
@@ -1380,7 +1380,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 10,
+			"family": 11,
 			"kind": "effort"
 		},
 		{
@@ -1403,7 +1403,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 26,
+			"family": 27,
 			"kind": "toggle"
 		},
 		{
@@ -1442,7 +1442,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 26,
+			"family": 27,
 			"kind": "effort"
 		},
 		{
@@ -1463,7 +1463,7 @@
 				"reasoning_effort": "low"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 10,
+			"family": 11,
 			"kind": "effort"
 		},
 		{
@@ -1484,7 +1484,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 27,
+			"family": 28,
 			"kind": "effort"
 		},
 		{
@@ -1504,7 +1504,7 @@
 				"temperature": 0.7
 			},
 			"added": [],
-			"family": 26
+			"family": 27
 		},
 		{
 			"id": "openai_compat_gpt-5.1",
@@ -1523,7 +1523,7 @@
 				"temperature": 0.7
 			},
 			"added": [],
-			"family": 6
+			"family": 7
 		}
 	],
 	"refusal_vectors": [
@@ -1734,7 +1734,7 @@
 				"stream": false,
 				"temperature": 0.7
 			},
-			"family": 6,
+			"family": 7,
 			"kind": "effort"
 		}
 	],
@@ -1976,6 +1976,79 @@
 			"id": "empty",
 			"dialect": {},
 			"valid": true
+		}
+	],
+	"sampling_vectors": [
+		{
+			"model": "claude-opus-5-5",
+			"default_sampling_only": true
+		},
+		{
+			"model": "claude-sonnet-5",
+			"default_sampling_only": true
+		},
+		{
+			"model": "claude-haiku-5-5-20261001",
+			"default_sampling_only": true
+		},
+		{
+			"model": "claude-opus-4-8",
+			"default_sampling_only": true
+		},
+		{
+			"model": "claude-opus-4-7",
+			"default_sampling_only": true
+		},
+		{
+			"model": "claude-opus-4-6",
+			"default_sampling_only": false
+		},
+		{
+			"model": "claude-haiku-4-5",
+			"default_sampling_only": false
+		},
+		{
+			"model": "anthropic/claude-sonnet-5-5",
+			"default_sampling_only": true
+		},
+		{
+			"model": "gpt-5.1",
+			"default_sampling_only": false
+		},
+		{
+			"model": "qwen3:8b",
+			"default_sampling_only": false
+		}
+	],
+	"refusal_store_vectors": [
+		{
+			"id": "kept",
+			"stored": {
+				"openai|gpt-5.1": ["reasoning_effort"]
+			},
+			"refused": {
+				"openai|gpt-5.1": ["reasoning_effort"]
+			},
+			"dropped": 0
+		},
+		{
+			"id": "malformed_entries_dropped",
+			"stored": {
+				"openai|gpt-5.1": ["reasoning_effort", "bad-name", 3],
+				"nobar": ["thinking"],
+				"x|y": "thinking",
+				"a|b": []
+			},
+			"refused": {
+				"openai|gpt-5.1": ["reasoning_effort"]
+			},
+			"dropped": 3
+		},
+		{
+			"id": "not_an_object",
+			"stored": ["x"],
+			"refused": {},
+			"dropped": 1
 		}
 	]
 }

@@ -150,6 +150,30 @@ helpers.describe("thinking_off replays the shared corpus (thinking-off-everywher
 		end)
 	end
 
+	for _, v in ipairs(corpus.sampling_vectors) do
+		helpers.it("sampling vector '" .. v.model .. "'", function()
+			helpers.assert_eq(ThinkingOff.default_sampling_only(families, v.model), v.default_sampling_only, v.model)
+		end)
+	end
+
+	for _, v in ipairs(corpus.refusal_store_vectors) do
+		helpers.it("refusal store vector '" .. v.id .. "'", function()
+			local refused, dropped = ThinkingOff.refusals_parse(v.stored)
+			helpers.assert_eq(dropped, v.dropped, v.id .. ": dropped")
+			local ok, why = deep_equal(ThinkingOff.refusals_export(refused), v.refused)
+			helpers.assert_true(ok, v.id .. ": " .. tostring(why))
+		end)
+	end
+
+	helpers.it("the refusal store is bounded", function()
+		local refused = {}
+		for i = 1, ThinkingOff.MAX_REFUSALS do
+			helpers.assert_true(ThinkingOff.record_refusal(refused, "p", "m" .. i, "thinking"))
+		end
+		helpers.assert_eq(ThinkingOff.record_refusal(refused, "p", "one-more", "thinking"), false, "a full store refuses a new pair")
+		helpers.assert_true(ThinkingOff.record_refusal(refused, "p", "m1", "reasoning"), "a known pair still records")
+	end)
+
 	helpers.it("every shipped dialect parses", function()
 		for id, provider in pairs(providers) do
 			helpers.assert_true(ThinkingOff.parse_dialect(provider.thinking_dialect) ~= nil, id)

@@ -68,6 +68,7 @@ local LocalServers   = require("modules.llm.local_servers")
 local LocalServerPorts = require("modules.llm.local_server_ports")
 local AuthPolicy     = require("llm.local_server_auth")
 local ThinkingOff    = require("llm.thinking_off")
+local Storage        = require("adapters.storage")
 local ProviderConfig = require("llm.provider_config_policy")
 local Json           = require("json")
 local ApiModelListing = require("llm.api_model_listing")
@@ -1435,9 +1436,28 @@ local THINKING_FAMILIES = (function()
 	return families
 end)()
 
+-- Storage key of the refused thinking fields, kept across restarts
+M.THINKING_REFUSED_KEY = "llm_thinking_refused"
+
 -- Fields a provider refused for a model (HTTP 400 naming them), by
--- "<provider>|<model>": later requests never send them again
-local _thinking_refused = {}
+-- "<provider>|<model>": later requests never send them again. Read from
+-- storage at the first request.
+local _thinking_refused = nil
+
+--- The refusal store, read from storage on first use.
+--- @return table key -> set of field names.
+local function thinking_refused()
+	if _thinking_refused then return _thinking_refused end
+	local ok, stored = Storage.read_exact(M.THINKING_REFUSED_KEY)
+	if not ok then
+		Logger.error(LOG, "The refused thinking fields could not be read; they are learned again.")
+		stored = nil
+	end
+	local dropped
+	_thinking_refused, dropped = ThinkingOff.refusals_parse(stored)
+	if dropped > 0 then Logger.warn(LOG, "%d malformed refused thinking field entr(ies) dropped.", dropped) end
+	return _thinking_refused
+end
 
 --- Turns the model's reasoning off in a request body: its family's control
 --- (thinking_off.json) through the provider's thinking_dialect
@@ -1450,10 +1470,15 @@ local _thinking_refused = {}
 --- @return table added Paths added, for refusal_retry.
 local function apply_thinking_off(provider_id, provider, model, body)
 	local family, kind, added = ThinkingOff.apply(THINKING_FAMILIES, provider.thinking_dialect or {}, model, body,
-		_thinking_refused[tostring(provider_id) .. "|" .. tostring(model)])
+		thinking_refused()[tostring(provider_id) .. "|" .. tostring(model)])
 	if #added > 0 then
 		Logger.debug(LOG, "Thinking off: family %d applies to model %s through provider '%s' (%s).",
 			family, tostring(model), tostring(provider_id), tostring(kind))
+	end
+	-- These models answer HTTP 400 to any temperature but the default
+	if body.temperature ~= nil and ThinkingOff.default_sampling_only(THINKING_FAMILIES, model) then
+		body.temperature = nil
+		Logger.debug(LOG, "Model %s accepts only the default sampling: no temperature is sent.", tostring(model))
 	end
 	return body, added
 end
@@ -1471,15 +1496,19 @@ end
 local function thinking_refusal(provider_id, model, status, response_body, added, body)
 	local field = ThinkingOff.refused_field(status, extract_server_message(response_body), added)
 	if not field then return false end
-	local key = tostring(provider_id) .. "|" .. tostring(model)
-	_thinking_refused[key] = _thinking_refused[key] or {}
-	_thinking_refused[key][field] = true
+	if not ThinkingOff.record_refusal(thinking_refused(), tostring(provider_id), tostring(model), field) then
+		-- Skipped for this session all the same; only the restart forgets it
+		_thinking_refused[tostring(provider_id) .. "|" .. tostring(model)] = { [field] = true }
+		Logger.warn(LOG, "The refused thinking fields are full: '%s' for model %s is not remembered.", field, tostring(model))
+	elseif Storage.set(M.THINKING_REFUSED_KEY, ThinkingOff.refusals_export(_thinking_refused)) ~= true then
+		Logger.error(LOG, "The refused thinking fields could not be saved; they hold until the next restart.")
+	end
 	ThinkingOff.strip(body, added, field)
 	Logger.warn(LOG, "Provider '%s' refused the thinking field '%s' for model %s: sent once more without it, and never again.",
 		tostring(provider_id), field, tostring(model))
 	return true
 end
-M.__thinking_refused_for_test = function() return _thinking_refused end
+M.__thinking_refused_for_test = function() return thinking_refused() end
 M.__apply_thinking_off_for_test = apply_thinking_off
 
 --- Builds the failure detail a caller shows: the status and the provider's own message.

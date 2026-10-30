@@ -427,8 +427,77 @@ end
 local _thinking_families = nil
 
 -- Fields a provider refused for a model (HTTP 400 naming them), by
--- "<provider>|<model>": later requests never send them again
-local _thinking_refused = {}
+-- "<provider>|<model>": later requests never send them again. Read from the
+-- state file at the first request, written at each new refusal.
+local _thinking_refused = nil
+
+-- The state file of the refusals, under the XDG state home
+local THINKING_REFUSED_FILE = "ergopti_plus/llm_thinking_refused.json"
+
+-- Its path, replaced by the tests
+local _thinking_refused_path = nil
+
+-- Linux reports genuine absence separately from a read refusal
+local ENOENT = 2
+
+--- The refusal store's path.
+--- @return string
+local function thinking_refused_path()
+	return _thinking_refused_path
+		or (require("infra.config_paths").state_home() .. "/" .. THINKING_REFUSED_FILE)
+end
+
+--- The refusal store, read from its state file on first use. An unreadable
+--- file is logged and the refusals are learned again.
+--- @return table key -> set of field names.
+local function thinking_refused()
+	if _thinking_refused then return _thinking_refused end
+	local path = thinking_refused_path()
+	local fh, _, errno = require("infra.regular_file_reader").open_source(path)
+	local stored = nil
+	if fh then
+		local read_ok, text = pcall(fh.read, fh, "*a")
+		pcall(fh.close, fh)
+		stored = read_ok and type(text) == "string" and Json.decode(text) or nil
+		if stored == nil then Logger.error(LOG, "The refused thinking fields are unreadable; they are learned again.") end
+	elseif errno ~= ENOENT then
+		Logger.error(LOG, "The refused thinking fields could not be read; they are learned again.")
+	end
+	local dropped
+	_thinking_refused, dropped = ThinkingOff.refusals_parse(stored)
+	if dropped > 0 then Logger.warn(LOG, "%d malformed refused thinking field entr(ies) dropped.", dropped) end
+	return _thinking_refused
+end
+
+--- Writes the refusal store: a temporary file, then a rename.
+--- @return boolean saved
+local function save_thinking_refused()
+	local path = thinking_refused_path()
+	local dir = require("native_path").dirname(path)
+	local Shell = require("adapters.shell_runner")
+	if dir and not Shell.run("mkdir -p " .. Shell.quote(dir) .. " 2>/dev/null") then return false end
+	local text = Json.encode(ThinkingOff.refusals_export(_thinking_refused))
+	local temp = path .. ".tmp"
+	-- A temporary file a crash left behind would refuse the exclusive creation
+	if io.open(temp, "r") then os.remove(temp) end
+	local opened, fh, _, _, remove_owned = pcall(require("infra.regular_file_writer").open, temp, "wx")
+	if not opened or not fh or type(text) ~= "string" then
+		if opened and fh then pcall(fh.close, fh); remove_owned() end
+		return false
+	end
+	local wrote, written = pcall(fh.write, fh, text)
+	local closed, flushed = pcall(fh.close, fh)
+	if not wrote or not written or not closed or flushed ~= true then
+		remove_owned()
+		return false
+	end
+	local called, renamed = pcall(os.rename, temp, path)
+	if not called or renamed ~= true then
+		remove_owned()
+		return false
+	end
+	return true
+end
 
 --- The model families, loaded at their first use. An unreadable table is
 --- logged and turns nothing off: no guess.
@@ -462,10 +531,15 @@ function M.complete_body(provider_id, model, body)
 	if not provider then error("api_remote.complete_body: unknown provider " .. tostring(provider_id), 2) end
 	if provider.format == "openai" then AuthPolicy.apply_request_fields(body, provider.request_fields) end
 	local family, kind, added = ThinkingOff.apply(thinking_families(), provider.thinking_dialect, model, body,
-		_thinking_refused[provider_id .. "|" .. model])
+		thinking_refused()[provider_id .. "|" .. model])
 	if #added > 0 then
 		Logger.debug(LOG, "Thinking off: family %d applies to model %s through provider '%s' (%s).",
 			family, model, provider_id, kind)
+	end
+	-- These models answer HTTP 400 to any temperature but the default
+	if body.temperature ~= nil and ThinkingOff.default_sampling_only(thinking_families(), model) then
+		body.temperature = nil
+		Logger.debug(LOG, "Model %s accepts only the default sampling: no temperature is sent.", model)
 	end
 	return body, added
 end
@@ -483,9 +557,13 @@ function M.thinking_refusal(provider_id, model, result, added, body)
 	if type(result) ~= "table" then return false end
 	local field = ThinkingOff.refused_field(result.status, M.server_message(result.error_body), added)
 	if not field then return false end
-	local key = provider_id .. "|" .. model
-	_thinking_refused[key] = _thinking_refused[key] or {}
-	_thinking_refused[key][field] = true
+	if not ThinkingOff.record_refusal(thinking_refused(), provider_id, model, field) then
+		-- Skipped for this session all the same; only the restart forgets it
+		_thinking_refused[provider_id .. "|" .. model] = { [field] = true }
+		Logger.warn(LOG, "The refused thinking fields are full: '%s' for model %s is not remembered.", field, model)
+	elseif not save_thinking_refused() then
+		Logger.error(LOG, "The refused thinking fields could not be saved; they hold until the next restart.")
+	end
 	ThinkingOff.strip(body, added, field)
 	Logger.warn(LOG, "Provider '%s' refused the thinking field '%s' for model %s: sent once more without it, and never again.",
 		provider_id, field, model)
@@ -1129,7 +1207,8 @@ function M.test(entry, on_done, admission)
 end
 
 --- Forgets the loaded catalogue and the Backboard assistants (tests).
-function M._reset_for_test()
+function M._reset_for_test(thinking_refused_file)
+	_thinking_refused, _thinking_refused_path = nil, thinking_refused_file
 	_catalogue = nil
 	_config_catalogue_failed = false
 	for _, scope in ipairs({ _inference, _probe }) do
