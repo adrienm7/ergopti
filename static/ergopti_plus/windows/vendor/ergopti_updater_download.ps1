@@ -141,6 +141,21 @@ function Assert-ErgoptiUpdaterDestination {
     }
 }
 
+# One redirect decision from values alone: no response, request or file is held
+# here, so staged-file custody stays with the transport that owns those handles.
+# Answers follow with the next absolute URL or terminal; a refused redirect throws.
+function Get-ErgoptiUpdaterRedirectDecision {
+    param([Uri]$Destination, [int]$Status, [string]$Location, [long]$Hop, [long]$MaximumHops)
+    if ($Status -notin @(301, 302, 303, 307, 308)) { return @{ Action = 'terminal' } }
+    if ($Hop -eq $MaximumHops -or [string]::IsNullOrEmpty($Location) -or
+        $Location -match '[\x00-\x1f\x7f]') {
+        throw [InvalidOperationException]::new('Updater redirect was refused.')
+    }
+    $Next = [Uri]::new($Destination, $Location)
+    Assert-ErgoptiUpdaterDestination $Next
+    return @{ Action = 'follow'; Next = $Next }
+}
+
 function New-ErgoptiUpdaterProxyCredentials {
     param([Parameter(Mandatory = $true)][Uri]$ProxyUri)
     # The legacy .NET path authenticates the proxy with the Negotiate package only.
@@ -287,17 +302,11 @@ function Invoke-ErgoptiUpdaterDownload {
             if ($null -eq $Response) { throw [InvalidOperationException]::new('No updater response.') }
             $State.Stage = 'http'
             $Status = [int]$Response.StatusCode
-            if ($Status -in @(301, 302, 303, 307, 308)) {
-                $Location = $Response.Headers['Location']
-                if ($Hop -eq $MaximumHops -or [string]::IsNullOrEmpty($Location) -or
-                    $Location -match '[\x00-\x1f\x7f]') {
-                    throw [InvalidOperationException]::new('Updater redirect was refused.')
-                }
-                $Next = [Uri]::new($Destination, $Location)
-                Assert-ErgoptiUpdaterDestination $Next
+            $Redirect = Get-ErgoptiUpdaterRedirectDecision $Destination $Status $Response.Headers['Location'] $Hop $MaximumHops
+            if ($Redirect.Action -ceq 'follow') {
                 $Response.Dispose()
                 $Response = $null
-                $Destination = $Next
+                $Destination = $Redirect.Next
                 $Hop++
                 continue
             }
