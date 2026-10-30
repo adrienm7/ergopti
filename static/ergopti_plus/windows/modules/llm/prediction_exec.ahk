@@ -10,6 +10,8 @@
 ; Included by modules/llm/prediction_engine.ahk after the keystroke-handler section.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -59,7 +61,7 @@ _LLM_Engine_NormalizePromptOverride(Override) {
 	ProfileId := Override.Get("profile_id", "")
 	if !(ProfileId is String) || ProfileId == ""
 		throw ValueError("A prompt override must name a profile.")
-	Count := Override.Get("num_predictions", 0)
+	Count := Override.Get(ConfigLeaf.NUM_PREDICTIONS, 0)
 	if !(Count is Integer) || (Count != 0
 			&& (Count < LLM_PROMPT_ACTION_MIN_PREDICTIONS
 				|| Count > LLM_PROMPT_ACTION_MAX_PREDICTIONS))
@@ -67,7 +69,7 @@ _LLM_Engine_NormalizePromptOverride(Override) {
 	Live := Override.Get("live", false)
 	if !(Live is Integer) || (Live != 0 && Live != 1)
 		throw TypeError("A prompt override's live flag must be a Boolean.")
-	Checked := Map("profile_id", ProfileId, "num_predictions", Count, "live", Live ? true : false)
+	Checked := Map("profile_id", ProfileId, ConfigLeaf.NUM_PREDICTIONS, Count, "live", Live ? true : false)
 	if Override.Has("translation_target") {
 		Target := Override["translation_target"]
 		if (!(ProfileId == "translate") || !LLM_Translate_IsValid(Target))
@@ -171,7 +173,7 @@ _LLM_Engine_AppIsExcluded(AppId, Apps) {
 ; tests cannot disagree about invalid state, focus lookup, or name matching.
 _LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
 	global _LLM_Engine
-	Apps := _LLM_Engine.Get("disabled_apps", [])
+	Apps := _LLM_Engine.Get(ConfigLeaf.DISABLED_APPS, [])
 	if !(Apps is Array) {
 		try LoggerError("LLM",
 			"Prediction suppressed because disabled-app state is not a validated array.")
@@ -351,7 +353,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		}
 		if IsSet(LLM_OllamaScheduleWarmupRetry)
 			LLM_OllamaScheduleWarmupRetry(_LLM_Engine["model"])
-		retry_ms := Max(500, Min(_LLM_Engine["debounce_ms"], 2000))
+		retry_ms := Max(500, Min(_LLM_Engine[ConfigLeaf.DEBOUNCE_MS], 2000))
 		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)
 		SetTimer(_LLM_Engine["pending_timer"], -retry_ms)
 		_LLM_Engine["timer_active"] := true
@@ -368,8 +370,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 
 	; A binding's own count replaces the menu's for this request only, and feeds
 	; every consumer of the global one below: temperature, dispatch, budget.
-	request_n_predictions := (Override is Map && Override["num_predictions"] > 0)
-		? Override["num_predictions"] : _LLM_Engine["n_predictions"]
+	request_n_predictions := (Override is Map && Override[ConfigLeaf.NUM_PREDICTIONS] > 0)
+		? Override[ConfigLeaf.NUM_PREDICTIONS] : _LLM_Engine["n_predictions"]
 	; Live mode shows what is typed from the first word: its own floor replaces
 	; the menu's minimum word count for the prompt and the parser alike.
 	request_min_words := IsLive ? LLM_Live_Config()["min_words"] : _LLM_Engine["min_words"]
@@ -377,9 +379,9 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	pb_cfg := Map(
 		"max_words",            _LLM_Engine["max_words"],
 		"min_words",            request_min_words,
-		"num_predictions",      request_n_predictions,
+		ConfigLeaf.NUM_PREDICTIONS,      request_n_predictions,
 		"temperature",          _LLM_Engine["temperature"] + 0.0,
-		"auto_raise_temp",      _LLM_Engine["auto_raise_temp"],
+		ConfigLeaf.AUTO_RAISE_TEMP,      _LLM_Engine[ConfigLeaf.AUTO_RAISE_TEMP],
 		"language",             _LLM_Engine["language"],
 		; The user's llm_context_length. Omitting it is why the setting had no
 		; effect on the automatic path: the menu wrote it, the manual trigger
@@ -414,7 +416,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	}
 	request_semantic_signature := _LLM_Engine_RequestSemanticSignature(
 		effective_profile_id, profile,
-		(Override is Map) ? Override["num_predictions"] : 0, IsLive)
+		(Override is Map) ? Override[ConfigLeaf.NUM_PREDICTIONS] : 0, IsLive)
 	_LLM_Engine["active_request_signature"] := request_semantic_signature
 	; Per-prediction output-token budget computed once by the shared PromptBuilder
 	; (max(15, max_words*6+10), default 150) — the single cross-driver source.
@@ -559,7 +561,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; alternatives sequentially into the active document would produce
 	; chaos. The user-facing n_predictions setting is left untouched so
 	; flipping inline mode back off restores the original count.
-	if (_LLM_Engine.Has("inline_autotype") and _LLM_Engine["inline_autotype"])
+	if (_LLM_Engine.Has(ConfigLeaf.INLINE_AUTOTYPE) and _LLM_Engine[ConfigLeaf.INLINE_AUTOTYPE])
 		n_predictions := 1
 	system_prompt := LLM_ResolveSystemPrompt(
 		profile,
@@ -720,18 +722,18 @@ _LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
 		}
 	}
 	info_model := ""
-	if (_LLM_Engine.Has("show_info_bar") and _LLM_Engine["show_info_bar"])
+	if (_LLM_Engine.Has(ConfigLeaf.SHOW_INFO_BAR) and _LLM_Engine[ConfigLeaf.SHOW_INFO_BAR])
 		info_model := _LLM_Engine_BuildInfoBarText(
 			_LLM_Engine.Has("model") ? _LLM_Engine["model"] : "",
 			_LLM_Engine_ResolveBackendLabel(),
 			profile_label)
 	LLM_Tooltip_SetDisplayOpts(Map(
-		"show_info_bar", !!(_LLM_Engine.Has("show_info_bar") and _LLM_Engine["show_info_bar"]),
+		ConfigLeaf.SHOW_INFO_BAR, !!(_LLM_Engine.Has(ConfigLeaf.SHOW_INFO_BAR) and _LLM_Engine[ConfigLeaf.SHOW_INFO_BAR]),
 		"info_model", info_model,
 		"slot_count", Max(1, Integer(slotCount)),
-		"nav_modifiers", _LLM_Engine.Has("nav_modifiers") ? _LLM_Engine["nav_modifiers"] : "",
-		"pred_indent", _LLM_Engine.Has("pred_indent") ? Integer(_LLM_Engine["pred_indent"]) : 0,
-		"val_modifiers", _LLM_Engine.Has("val_modifiers") ? _LLM_Engine["val_modifiers"] : "",
+		ConfigLeaf.NAV_MODIFIERS, _LLM_Engine.Has(ConfigLeaf.NAV_MODIFIERS) ? _LLM_Engine[ConfigLeaf.NAV_MODIFIERS] : "",
+		ConfigLeaf.PRED_INDENT, _LLM_Engine.Has(ConfigLeaf.PRED_INDENT) ? Integer(_LLM_Engine[ConfigLeaf.PRED_INDENT]) : 0,
+		ConfigLeaf.VAL_MODIFIERS, _LLM_Engine.Has(ConfigLeaf.VAL_MODIFIERS) ? _LLM_Engine[ConfigLeaf.VAL_MODIFIERS] : "",
 	))
 }
 
@@ -739,7 +741,7 @@ _LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
 ; debounced request after the inactivity delay, before HTTP dispatch.
 _LLM_Engine_ShowLoadingTooltip() {
 	global _LLM_Engine
-	if (_LLM_Engine.Has("inline_autotype") and _LLM_Engine["inline_autotype"])
+	if (_LLM_Engine.Has(ConfigLeaf.INLINE_AUTOTYPE) and _LLM_Engine[ConfigLeaf.INLINE_AUTOTYPE])
 		return
 	; macOS parity (prediction_engine.lua:590 — "only show the spinner when the
 	; screen is empty"). If a real prediction is already on screen, KEEP it while
@@ -1219,9 +1221,9 @@ _LLM_Engine_MaxAttempts(n) {
 ; mid-typing flips the prompt without any explicit toggle.
 _LLM_Engine_ResolveProfileIdForApp(default_id) {
 	global _LLM_Engine
-	if !_LLM_Engine.Has("app_profile_overrides")
+	if !_LLM_Engine.Has(ConfigLeaf.APP_PROFILE_OVERRIDES)
 		return default_id
-	overrides := _LLM_Engine["app_profile_overrides"]
+	overrides := _LLM_Engine[ConfigLeaf.APP_PROFILE_OVERRIDES]
 	if !(overrides is Map) or overrides.Count == 0
 		return default_id
 	; Pull the focused process via the WindowInfo adapter. WIGetFocused() can throw when no
@@ -1330,7 +1332,7 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; on_partial would race the user's own keystrokes with no clean way
 	; to roll back. Letting the variant complete first means one
 	; deterministic SendText burst with a known length.
-	if (is_final and _LLM_Engine.Has("inline_autotype") and _LLM_Engine["inline_autotype"]) {
+	if (is_final and _LLM_Engine.Has(ConfigLeaf.INLINE_AUTOTYPE) and _LLM_Engine[ConfigLeaf.INLINE_AUTOTYPE]) {
 		if (slots.Length > 0) {
 			idx := Max(1, Min(active, slots.Length))
 			text := slots[idx]

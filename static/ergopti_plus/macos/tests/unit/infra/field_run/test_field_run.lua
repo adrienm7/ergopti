@@ -910,7 +910,7 @@ helpers.describe("field run ports: the MLX model step", function()
 					on_success()
 					return true
 				end,
-				delete_mlx_model = function() return true end,
+				delete_mlx_model = function() error("the step must keep the downloaded model", 0) end,
 			}
 			package.loaded["ui.menu.menu_llm"] = {
 				active_models_manager = function() return manager end,
@@ -931,7 +931,7 @@ helpers.describe("field run ports: the MLX model step", function()
 		helpers.assert_eq(outcome.active, "/home/models/Qwen3.5-4B\n", "the user's model stays the active one")
 		helpers.assert_eq(outcome.verdict, "pass")
 		helpers.assert_eq(outcome.codes,
-			"model_absent,downloaded_and_served,server_stopped,removal_started,active_model_restored")
+			"model_absent,downloaded_and_served,server_stopped,model_kept,active_model_restored")
 	end)
 
 	helpers.it("removes the active-model file the step created", function()

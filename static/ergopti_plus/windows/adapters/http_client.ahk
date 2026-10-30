@@ -67,6 +67,8 @@ global _HTTP_CURL_ABORT_TIMER := 0
 ; worked in the browser. Mirrors release_sources.proxy_resolve_timeout_sec in
 ; _shared/modules/updater/defaults.json (pinned by the JS drift gate).
 global SYSTEM_PROXY_RESOLVE_TIMEOUT_MS := 10000
+; Copy of [limits] process_output_bytes: a request can run before the registry loads (pinned by test-keystats-timings-single-source.cjs).
+global SYSTEM_PROXY_WORKER_MAX_OUTPUT_BYTES := 65536
 ; PAC answers resolved this session, keyed by exact destination URL ("" = direct).
 global _SYSTEM_PROXY_PAC_CACHE := Map()
 ; Every waiter of the in-flight PAC resolution (0 = none running).
@@ -1040,7 +1042,7 @@ SystemProxy_ResolveAsync(Urls, Callback, ReaderFn := 0, SpawnFn := 0, Strict := 
 			: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", Command]
 		PacRun.Handle := IsObject(SpawnFn)
 			? SpawnFn.Call(Exe, Args, OnDone)
-			: ShellRunner_SpawnTreeOwned(Exe, Args, OnDone, 0, 0, 65536)
+			: ShellRunner_SpawnTreeOwned(Exe, Args, OnDone, 0, 0, SYSTEM_PROXY_WORKER_MAX_OUTPUT_BYTES)
 		if !(IsObject(PacRun.Handle) && PacRun.Handle.start())
 			throw Error("the PowerShell child did not start")
 	} catch as Err {

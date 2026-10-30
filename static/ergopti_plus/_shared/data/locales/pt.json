@@ -937,6 +937,7 @@
 	"hs_config.label_category": "Categoria:",
 	"hs_config.label_color": "Cor",
 	"hs_config.label_delay": "Atraso (ms)",
+	"hs_config.unit_ms": "ms",
 	"hs_config.label_file": "Arquivo:",
 	"hs_config.label_group": "Grupo:",
 	"hs_config.label_priority": "Prioridade",

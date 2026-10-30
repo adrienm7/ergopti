@@ -803,6 +803,14 @@ TOML_WriteRefusal(Path) {
 	return Refusals.Has(Key) ? Refusals[Key] : ""
 }
 
+; Minimum age of an abandoned atomic-write stage: one minute tells it from a live
+; writer, and the reapers also check producer ownership. Writers can run before the
+; timing registry loads, so this copy is pinned to [adapters] stale_temp_age_ms by
+; tools/test/test-keystats-timings-single-source.cjs.
+StaleTempAgeMs() {
+	return 60000
+}
+
 ; Apply every (Section, Key, Value) update in one read-modify-write cycle.
 ; Renders explicitly owned rows canonically and retains foreign physical records
 ; and comments before the one atomic replace. A wholly owned, uncommented source
@@ -1207,11 +1215,10 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		; and from timer-driven saves, so the two really can overlap. A_ScriptHwnd
 		; rather than a GetCurrentProcessId DllCall: unique per process all the
 		; same, and it keeps the OS-call purity ratchet at its baseline.
-		static STALE_TEMP_MS := 60000  ; Minimum age; the reaper also checks producer ownership
 		static WriteSeq := 0
 		WriteSeq += 1
 		tmp := Path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
-		_TOML_ReapStaleTemps(Path, STALE_TEMP_MS)
+		_TOML_ReapStaleTemps(Path, StaleTempAgeMs())
 		try FileDelete(tmp)
 		f := 0
 		StageOwned := false

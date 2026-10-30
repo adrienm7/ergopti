@@ -937,6 +937,7 @@
 	"hs_config.label_category": "카테고리:",
 	"hs_config.label_color": "색상",
 	"hs_config.label_delay": "지연 (ms)",
+	"hs_config.unit_ms": "ms",
 	"hs_config.label_file": "파일:",
 	"hs_config.label_group": "그룹:",
 	"hs_config.label_priority": "우선순위",

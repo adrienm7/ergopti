@@ -11,6 +11,8 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -158,7 +160,7 @@ _HS_MagicKeyRows() {
 _HS_ParameterDelayCaptions() {
 	Root := _MR_GetManifestRoot()
 	Captions := Root is Map ? Root.Get("hotstrings_delay_captions", false) : false
-	Keys := ["default", "magic_key", "autocorrection", "ai_acceptance", "autocompletion"]
+	Keys := ["default", ConfigLeaf.MAGIC_KEY, "autocorrection", "ai_acceptance", "autocompletion"]
 	if !(Captions is Map) || Captions.Count != Keys.Length
 		return false
 	Declared := Map()
@@ -196,7 +198,7 @@ _HS_DelaysColorsRows(OpenConfigFn := OpenHotstringsConfigWindow) {
 		"parameter_delay_config", (*) => [MenuRenderer_CommandRow("hotstrings_delays_menu", "hotstrings_config_window",
 			Map("hotstrings_config_window", (*) => OpenConfigFn.Call()), Map("hotstrings_config_ready", (*) => true))],
 		"parameter_delay_default", (*) => [Map("label", _HS_DefaultDelayLabel(Captions["default"]), "action", (*) => _HS_PromptDefaultDelay())],
-		"parameter_delay_magic_key", (*) => [Map("label", _HS_CategoryDelayLabel("magickey", Captions["magic_key"]),
+		"parameter_delay_magic_key", (*) => [Map("label", _HS_CategoryDelayLabel("magickey", Captions[ConfigLeaf.MAGIC_KEY]),
 			"action", (*) => _HS_PromptCategoryDelay("magickey", "menu.hotstrings.delay_magic_key"))],
 		"parameter_delay_autocorrection", (*) => [Map("label", _HS_CategoryDelayLabel("autocorrection", Captions["autocorrection"]),
 			"action", (*) => _HS_PromptCategoryDelay("autocorrection", "menu.hotstrings.delay_autocorrection"))],

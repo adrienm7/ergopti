@@ -34,6 +34,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -84,8 +85,8 @@ CapsWordAutoOffPointerKinds() {
 
 ; The stored delay, or its default when absent or not a number of seconds.
 _CapsWordAutoOffReadIdle(Cache) {
-	Default := ManifestDefaultFor("shortcuts.caps_word.idle_timeout_seconds")
-	Raw := IniCacheGet(Cache, "shortcuts.caps_word", "idle_timeout_seconds")
+	Default := ManifestDefaultFor(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS)
+	Raw := IniCacheGet(Cache, ConfigKey.SHORTCUTS_CAPS_WORD, ConfigLeaf.IDLE_TIMEOUT_SECONDS)
 	if Raw == "_"
 		return Default
 	if CapsWordAutoOffValidateIdleTimeout(Raw)
@@ -99,7 +100,7 @@ _CapsWordAutoOffReadIdle(Cache) {
 ; repeated one, is outdated configuration: one WARNING each, the rest kept.
 _CapsWordAutoOffReadTerminators(Cache) {
 	Default := ManifestDefaultFor("shortcuts.caps_word.terminators")
-	Raw := IniCacheGet(Cache, "shortcuts.caps_word", "terminators")
+	Raw := IniCacheGet(Cache, ConfigKey.SHORTCUTS_CAPS_WORD, "terminators")
 	if Raw == "_"
 		return ManifestCloneValue(Default)
 	if !(Raw is Array) {
@@ -149,7 +150,7 @@ _CapsWordAutoOffReadPointer(Cache, Kinds) {
 ; @returns {Map} "idle_timeout_seconds", "terminators", "pointer".
 CapsWordAutoOffReadValues(Cache) {
 	return Map(
-		"idle_timeout_seconds", _CapsWordAutoOffReadIdle(Cache),
+		ConfigLeaf.IDLE_TIMEOUT_SECONDS, _CapsWordAutoOffReadIdle(Cache),
 		"terminators", _CapsWordAutoOffReadTerminators(Cache),
 		"pointer", _CapsWordAutoOffReadPointer(Cache, CapsWordAutoOffPointerKinds()))
 }
@@ -217,7 +218,7 @@ CapsWordAutoOffValues() {
 CapsWordAutoOffStore(Path, Value, ConfigPath := "") {
 	global ConfigurationFile
 	Values := CapsWordAutoOffValues()
-	if Path == "shortcuts.caps_word.idle_timeout_seconds" || Path == "shortcuts.caps_word.terminators" {
+	if Path == ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS || Path == "shortcuts.caps_word.terminators" {
 		Values[SubStr(Path, StrLen("shortcuts.caps_word.") + 1)] := ManifestCloneValue(Value)
 	} else if InStr(Path, "shortcuts.caps_word.pointer.") == 1 {
 		Kind := SubStr(Path, StrLen("shortcuts.caps_word.pointer.") + 1)

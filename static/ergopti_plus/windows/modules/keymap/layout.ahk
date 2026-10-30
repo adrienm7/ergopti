@@ -9,6 +9,8 @@
 ; .keylayout (layout/layout_ergopti.ahk); this file owns the hotkeys.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -826,8 +828,8 @@ _DeadKeyDispatch(BareChar, Mapping, *) {
 ; own magic-key position takes every level of the source character, a key the
 ; user chose only its plain press.
 _MagicKeyHotkeys := LayoutRegistry_MagicKeyHotkeys(ScriptInformation["MagicKeySourceScan"],
-	ScriptInformation["MagicKeySourceChosen"], Features["layout"]["ctrl_magic_save"])
-if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
+	ScriptInformation["MagicKeySourceChosen"], Features["layout"][ConfigLeaf.CTRL_MAGIC_SAVE])
+if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"] {
 	for _MagicKeyHotkey in _MagicKeyHotkeys {
 		switch _MagicKeyHotkey["kind"] {
 			case "remap":

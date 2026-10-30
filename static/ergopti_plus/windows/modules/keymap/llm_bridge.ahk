@@ -25,6 +25,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -1339,7 +1340,7 @@ LLM_Bridge_ScheduleAfterHotstring(items, SurfaceToken := 0) {
 	; Live mode waits for the hotstring tooltip to close whatever after_hotstring
 	; says: its tooltip follows every keystroke, so it must come back after it.
 	if !(IsSet(_LLM_Engine) && _LLM_Engine["enabled"]
-			&& (_LLM_Engine["after_hotstring"] || LLM_Engine_LiveIsActive()))
+			&& (_LLM_Engine[ConfigLeaf.AFTER_HOTSTRING] || LLM_Engine_LiveIsActive()))
 		return
 	if !(IsObject(items) && items.Length > 0)
 		return false
@@ -1387,7 +1388,7 @@ _LLM_Bridge_IsBoundaryChar(c) {
 ; appended) is a word character. Mirrors macOS engine.start_timer_word_end gating.
 _LLM_Bridge_IsWordEndTrigger(ch) {
 	global _LLM_Engine, _LLM_Bridge_Buffer
-	if !(_LLM_Engine.Has("instant_on_word_end") and _LLM_Engine["instant_on_word_end"])
+	if !(_LLM_Engine.Has(ConfigLeaf.INSTANT_ON_WORD_END) and _LLM_Engine[ConfigLeaf.INSTANT_ON_WORD_END])
 		return false
 	if !_LLM_Bridge_IsBoundaryChar(ch)
 		return false
@@ -1684,7 +1685,7 @@ LLM_Bridge_ResetPredictions() {
 		return
 	; Context retention applies even between requests, while work cancellation
 	; and visual disposal remain conditional on actual active work.
-	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("reset_on_nav") and _LLM_Engine["reset_on_nav"])
+	if (IsSet(_LLM_Engine) and _LLM_Engine.Has(ConfigLeaf.RESET_ON_NAV) and _LLM_Engine[ConfigLeaf.RESET_ON_NAV])
 		_LLM_Bridge_ClearBuffer()
 	if !LLM_Bridge_HasActivePredictionWork()
 		return

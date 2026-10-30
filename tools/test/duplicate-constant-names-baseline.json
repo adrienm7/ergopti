@@ -94,16 +94,6 @@
 		],
 		"divergent": false
 	},
-	"STALE_TEMP_MS": {
-		"files": [
-			"windows/infra/hotstrings/hotstrings_io.ahk",
-			"windows/infra/hotstrings/personal_toml_io.ahk",
-			"windows/infra/toml/toml_helpers.ahk",
-			"windows/modules/keystats/keystats.ahk",
-			"windows/modules/keystats/keystats_prefetch.ahk"
-		],
-		"divergent": false
-	},
 	"STREAM_TMPFILE_CLEANUP_SEC": {
 		"files": ["macos/modules/llm/api_mlx_inference.lua", "macos/modules/llm/api_ollama.lua"],
 		"divergent": false

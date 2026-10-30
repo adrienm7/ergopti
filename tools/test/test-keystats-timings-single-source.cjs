@@ -153,6 +153,18 @@ const PINS = [
 		'gesture_auto_configure_delay_ms',
 		'windows/modules/gestures/init.ahk',
 		'GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS'
+	),
+	pin(
+		'limits',
+		'process_output_bytes',
+		'windows/adapters/crash_report_worker.ahk',
+		'CRASH_REPORT_WORKER_MAX_OUTPUT_BYTES'
+	),
+	pin(
+		'limits',
+		'process_output_bytes',
+		'windows/adapters/http_client.ahk',
+		'SYSTEM_PROXY_WORKER_MAX_OUTPUT_BYTES'
 	)
 ];
 
@@ -168,6 +180,12 @@ const SOURCE_PINS = [
 		key: 'process_output_bytes',
 		file: '_shared/lua/llm/process_limits.lua',
 		pattern: /\bmax_output_bytes\s*=\s*(\d+)\b/g
+	},
+	{
+		section: 'adapters',
+		key: 'stale_temp_age_ms',
+		file: 'windows/infra/toml/toml_helpers.ahk',
+		pattern: /^StaleTempAgeMs\(\) \{\n\treturn (\d+)\n\}$/gm
 	},
 	{
 		section: 'adapters',

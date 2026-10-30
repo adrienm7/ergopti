@@ -191,6 +191,7 @@ class ServeOwner:
         self.retirement_timeout = retirement_timeout
         self.deadline = time.monotonic() + timeout
         self.source_fd = None
+        self.binary = None
         self.alias = self.session = self.bootstrap = self.authority = self.operation = None
         self._prepared = False
         self._started = False
@@ -274,6 +275,7 @@ class ServeOwner:
         binary = RUNTIME.native_verify(
             self.target, self.contract, self.asset, self.expected_receipt, self.deadline
         )
+        self.binary = binary
         try:
             self.source_fd = os.open(binary, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
             before = os.fstat(self.source_fd)
@@ -495,9 +497,12 @@ class ServeOwner:
         ports = AUTHORITY.POLICY.BoundAliasPorts(
             RegisteredPorts(), proof, self.session.data, os.geteuid()
         )
+        # The API worker admits only the canonical runtime path and reads the
+        # alias from the source_alias proof; the alias spelling made every
+        # request exit 64 (field run of 2026-10-30 18:38, native_first_frame).
         self._api_admission = PULL.PullOwner(
             self.session.data,
-            str(self.alias.executable),
+            str(self.binary),
             ports,
             self.idle_timeout,
             self.policy.shared.maximum_bytes,

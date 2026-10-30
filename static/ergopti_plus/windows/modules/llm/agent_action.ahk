@@ -48,6 +48,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include local_model_offer.ahk
 
 
@@ -200,12 +201,12 @@ LLM_Agent_Backend(Key, &Reason := "") {
  */
 LLM_Agent_BackendChoices(Key) {
 	global LLM_VISION_LOCAL_BACKEND, LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER
-	if (Key != "agent_system1" && Key != "agent_system2")
+	if (Key != ConfigLeaf.AGENT_SYSTEM1 && Key != "agent_system2")
 		throw ValueError("LLM_Agent_BackendChoices: unknown system " . String(Key) . ".")
 	Choices := [Map("value", LLM_VISION_LOCAL_BACKEND, "label", t("llm.vision.local_backend"))]
 	for ProviderId in LLM_API_PROVIDER_ORDER {
 		Provider := LLM_API_PROVIDERS[ProviderId]
-		if (Key == "agent_system1" || LLM_RemoteFormatServes(Provider["Format"], "chat"))
+		if (Key == ConfigLeaf.AGENT_SYSTEM1 || LLM_RemoteFormatServes(Provider["Format"], "chat"))
 			Choices.Push(Map("value", ProviderId, "label", Provider["Label"]))
 	}
 	return Choices
@@ -217,7 +218,7 @@ LLM_Agent_BackendChoices(Key) {
  * @returns {String}
  */
 LLM_Agent_BackendLabel(Backend) {
-	for Choice in LLM_Agent_BackendChoices("agent_system1") {
+	for Choice in LLM_Agent_BackendChoices(ConfigLeaf.AGENT_SYSTEM1) {
 		if (Choice["value"] == Backend)
 			return Choice["label"]
 	}
@@ -315,7 +316,7 @@ _LLM_Agent_ApplyCommitted(Key, Previous, Candidate) {
 ; Tells whether the automatic mode can run, and says why when it cannot.
 ; @returns {Boolean}
 _LLM_Agent_AutoIsPossible() {
-	if !(LLM_Agent_Backend("agent_system1", &Reason) is Map) {
+	if !(LLM_Agent_Backend(ConfigLeaf.AGENT_SYSTEM1, &Reason) is Map) {
 		LoggerInfo("LLM", "AI agent automatic mode refused: System 1 is not usable ({1}).", Reason)
 		_LLM_Menu_ShowManualPredictionNotice("llm.agent.no_system1")
 		return false
@@ -936,7 +937,7 @@ _LLM_Agent_OnPause(Generation, Buffer) {
 		LoggerDebug("LLM", "AI agent: no triage, live mode or another tooltip holds the surface.")
 		return false
 	}
-	System1 := LLM_Agent_Backend("agent_system1", &Reason)
+	System1 := LLM_Agent_Backend(ConfigLeaf.AGENT_SYSTEM1, &Reason)
 	System2 := LLM_Agent_Backend("agent_system2", &Reason)
 	if !(System1 is Map) || !(System2 is Map) {
 		LoggerDebug("LLM", "AI agent: no triage, a system is not usable ({1}).", Reason)

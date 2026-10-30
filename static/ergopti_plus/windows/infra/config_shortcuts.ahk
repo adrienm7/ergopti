@@ -27,6 +27,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 
 
@@ -224,9 +225,9 @@ _CS_ValidateMetricsSection(Section) {
 				if Section.Has(Key)
 						Validated[Key] := _CS_RequireBoolean(Section[Key], Key)
 		}
-		if Section.Has("disabled_apps")
-				Validated["disabled_apps"] :=
-						TomlConfigMetricsDisabledApps(Section["disabled_apps"])
+		if Section.Has(ConfigLeaf.DISABLED_APPS)
+				Validated[ConfigLeaf.DISABLED_APPS] :=
+						TomlConfigMetricsDisabledApps(Section[ConfigLeaf.DISABLED_APPS])
 		return Validated
 }
 
@@ -265,8 +266,8 @@ CS_Load() {
 		if Validated.Has("encrypt")
 				MetricsFilters.encrypt := Validated["encrypt"]
 
-		if Validated.Has("disabled_apps")
-				MetricsFilters.disabled_apps := Validated["disabled_apps"]
+		if Validated.Has(ConfigLeaf.DISABLED_APPS)
+				MetricsFilters.disabled_apps := Validated[ConfigLeaf.DISABLED_APPS]
 		return data
 }
 

@@ -16,6 +16,7 @@
 
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include ../../../_shared/modules/llm/display_policy.ahk
 
 
@@ -42,26 +43,26 @@ global _LLM_Engine := Map(
 	"n_predictions",              3,
 	"min_words",                  3,
 	"max_words",                  15,
-	"debounce_ms",                500,
-	"min_request_interval_ms",    300,
+	ConfigLeaf.DEBOUNCE_MS,                500,
+	ConfigLeaf.MIN_REQUEST_INTERVAL_MS,    300,
 	"ctx_chars",                  500,
 	"language",                   "",
 	"temperature",                "0.10",
-	"instant_on_word_end",        true,
-	"after_hotstring",            true,
-	"reset_on_nav",               true,
+	ConfigLeaf.INSTANT_ON_WORD_END,        true,
+	ConfigLeaf.AFTER_HOTSTRING,            true,
+	ConfigLeaf.RESET_ON_NAV,               true,
 	"disable_url_bars",           false,
 	"disable_password_fields",    true,
-	"disabled_apps",              [],
-	"show_info_bar",              true,
+	ConfigLeaf.DISABLED_APPS,              [],
+	ConfigLeaf.SHOW_INFO_BAR,              true,
 	"streaming",                  true,
 	"show_all_at_once",           true,
-	"pred_indent",                0,
-	"auto_raise_temp",            true,
-	"nav_modifiers",              "",
+	ConfigLeaf.PRED_INDENT,                0,
+	ConfigLeaf.AUTO_RAISE_TEMP,            true,
+	ConfigLeaf.NAV_MODIFIERS,              "",
 	; Placeholder only: LLM_Engine_ApplySharedDefaults() overwrites it from
 	; defaults.json ("" = bare digits select a prediction).
-	"val_modifiers",              "",
+	ConfigLeaf.VAL_MODIFIERS,              "",
 	"timer_active",               false,
 	; Acceptance origin captured with the keystroke that arms a request. The
 	; detached presentation record receives its own immutable copy at pixel
@@ -89,7 +90,7 @@ global _LLM_Engine := Map(
 	; persisted across reloads via the shared TOML config.
 	"api_entries",                [],
 	"api_entry_id",               "",
-	"app_profile_overrides",      Map()
+	ConfigLeaf.APP_PROFILE_OVERRIDES,      Map()
 )
 
 ; Every option emitted by LLM_Menu_BuildOpts belongs to exactly one class.
@@ -108,19 +109,19 @@ global LLM_ENGINE_SEMANTIC_CONFIG_KEYS := [
 	"ctx_chars",
 	"language",
 	"temperature",
-	"auto_raise_temp",
-	"inline_autotype",
+	ConfigLeaf.AUTO_RAISE_TEMP,
+	ConfigLeaf.INLINE_AUTOTYPE,
 	"api_entries",
 	"api_entry_id",
-	"app_profile_overrides"
+	ConfigLeaf.APP_PROFILE_OVERRIDES
 ]
 
 global LLM_ENGINE_DISPLAY_ONLY_CONFIG_KEYS := [
-	"show_info_bar",
+	ConfigLeaf.SHOW_INFO_BAR,
 	"show_all_at_once",
-	"pred_indent",
-	"nav_modifiers",
-	"val_modifiers"
+	ConfigLeaf.PRED_INDENT,
+	ConfigLeaf.NAV_MODIFIERS,
+	ConfigLeaf.VAL_MODIFIERS
 ]
 
 LLM_BackendCapabilities(Backend) {
@@ -135,14 +136,14 @@ LLM_EffectiveStreaming(Backend, Requested) {
 }
 
 global LLM_ENGINE_RUNTIME_POLICY_CONFIG_KEYS := [
-	"debounce_ms",
-	"min_request_interval_ms",
-	"instant_on_word_end",
-	"after_hotstring",
-	"reset_on_nav",
+	ConfigLeaf.DEBOUNCE_MS,
+	ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
+	ConfigLeaf.INSTANT_ON_WORD_END,
+	ConfigLeaf.AFTER_HOTSTRING,
+	ConfigLeaf.RESET_ON_NAV,
 	"disable_url_bars",
 	"disable_password_fields",
-	"disabled_apps",
+	ConfigLeaf.DISABLED_APPS,
 	"streaming"
 ]
 
@@ -160,7 +161,7 @@ _LLM_Engine_Plan() {
 
 _LLM_Engine_FloorMs() {
 	global _LLM_Engine
-	return _LLM_Engine["min_request_interval_ms"]
+	return _LLM_Engine[ConfigLeaf.MIN_REQUEST_INTERVAL_MS]
 }
 
 ; Overwrite the defaults with values loaded from defaults.json at module load time.
@@ -170,10 +171,10 @@ LLM_Engine_ApplySharedDefaults() {
 	if !IsSet(LLM_Defaults)
 		return
 
-	static _num := ["n_predictions", "min_words", "max_words", "debounce_ms", "min_request_interval_ms", "ctx_chars", "pred_indent"]
-	static _bool := ["show_info_bar", "streaming", "show_all_at_once", "instant_on_word_end",
-		"after_hotstring", "reset_on_nav", "auto_raise_temp", "disable_url_bars", "disable_password_fields"]
-	static _str := ["profile_id", "model", "val_modifiers", "nav_modifiers", "temperature"]
+	static _num := ["n_predictions", "min_words", "max_words", ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS, "ctx_chars", ConfigLeaf.PRED_INDENT]
+	static _bool := [ConfigLeaf.SHOW_INFO_BAR, "streaming", "show_all_at_once", ConfigLeaf.INSTANT_ON_WORD_END,
+		ConfigLeaf.AFTER_HOTSTRING, ConfigLeaf.RESET_ON_NAV, ConfigLeaf.AUTO_RAISE_TEMP, "disable_url_bars", "disable_password_fields"]
+	static _str := ["profile_id", "model", ConfigLeaf.VAL_MODIFIERS, ConfigLeaf.NAV_MODIFIERS, "temperature"]
 
 	; Map shared-default key names → engine key names
 	static _key_map := Map(
@@ -182,22 +183,22 @@ LLM_Engine_ApplySharedDefaults() {
 		"llm_num_predictions",      "n_predictions",
 		"llm_min_words",            "min_words",
 		"llm_max_words",            "max_words",
-		"llm_debounce_ms",          "debounce_ms",
-		"llm_min_request_interval_ms", "min_request_interval_ms",
+		"llm_debounce_ms",          ConfigLeaf.DEBOUNCE_MS,
+		"llm_min_request_interval_ms", ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
 		"llm_context_length",       "ctx_chars",
-		"llm_pred_indent",          "pred_indent",
+		"llm_pred_indent",          ConfigLeaf.PRED_INDENT,
 		"llm_temperature",          "temperature",
-		"llm_show_info_bar",        "show_info_bar",
+		"llm_show_info_bar",        ConfigLeaf.SHOW_INFO_BAR,
 		"llm_streaming",            "streaming",
 		"llm_streaming_multi",      "show_all_at_once",
-		"llm_instant_on_word_end",  "instant_on_word_end",
-		"llm_after_hotstring",      "after_hotstring",
-		"llm_reset_on_nav",         "reset_on_nav",
-		"llm_auto_raise_temp",      "auto_raise_temp",
+		"llm_instant_on_word_end",  ConfigLeaf.INSTANT_ON_WORD_END,
+		"llm_after_hotstring",      ConfigLeaf.AFTER_HOTSTRING,
+		"llm_reset_on_nav",         ConfigLeaf.RESET_ON_NAV,
+		"llm_auto_raise_temp",      ConfigLeaf.AUTO_RAISE_TEMP,
 		"llm_disable_url_bars",     "disable_url_bars",
 		"llm_disable_password_fields", "disable_password_fields",
-		"llm_nav_modifiers",        "nav_modifiers",
-		"llm_val_modifiers",        "val_modifiers"
+		"llm_nav_modifiers",        ConfigLeaf.NAV_MODIFIERS,
+		"llm_val_modifiers",        ConfigLeaf.VAL_MODIFIERS
 	)
 
 	for shared_key, engine_key in _key_map {
@@ -432,13 +433,13 @@ LLM_Engine_Init(opts) {
 	if !(opts is Map)
 		throw TypeError("LLM_Engine_Init options must be a Map.")
 	static _optionKeys := ["model", "profile_id", "backend", "n_predictions",
-		"min_words", "max_words", "debounce_ms", "min_request_interval_ms", "ctx_chars", "language",
-		"temperature", "instant_on_word_end", "after_hotstring", "reset_on_nav",
-		"disable_url_bars", "disable_password_fields", "show_info_bar",
-		"streaming", "show_all_at_once", "pred_indent", "auto_raise_temp",
-		"nav_modifiers", "val_modifiers", "inline_autotype", "api_entry_id",
-		"ollama_port", "user_profiles", "disabled_apps", "api_entries",
-		"app_profile_overrides"]
+		"min_words", "max_words", ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS, "ctx_chars", "language",
+		"temperature", ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING, ConfigLeaf.RESET_ON_NAV,
+		"disable_url_bars", "disable_password_fields", ConfigLeaf.SHOW_INFO_BAR,
+		"streaming", "show_all_at_once", ConfigLeaf.PRED_INDENT, ConfigLeaf.AUTO_RAISE_TEMP,
+		ConfigLeaf.NAV_MODIFIERS, ConfigLeaf.VAL_MODIFIERS, ConfigLeaf.INLINE_AUTOTYPE, "api_entry_id",
+		"ollama_port", "user_profiles", ConfigLeaf.DISABLED_APPS, "api_entries",
+		ConfigLeaf.APP_PROFILE_OVERRIDES]
 	ValidatedOpts := Map()
 	for Key in _optionKeys {
 		if !opts.Has(Key)
@@ -452,12 +453,12 @@ LLM_Engine_Init(opts) {
 		_LLM_Engine["enabled"] := true
 
 		static _keys := ["model", "profile_id", "backend", "n_predictions", "min_words", "max_words",
-			"debounce_ms", "min_request_interval_ms", "ctx_chars", "language", "temperature",
-			"instant_on_word_end", "after_hotstring", "reset_on_nav",
+			ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS, "ctx_chars", "language", "temperature",
+			ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING, ConfigLeaf.RESET_ON_NAV,
 			"disable_url_bars", "disable_password_fields",
-			"show_info_bar", "streaming", "show_all_at_once",
-			"pred_indent", "auto_raise_temp", "nav_modifiers", "val_modifiers",
-			"inline_autotype", "api_entry_id", "ollama_port"]
+			ConfigLeaf.SHOW_INFO_BAR, "streaming", "show_all_at_once",
+			ConfigLeaf.PRED_INDENT, ConfigLeaf.AUTO_RAISE_TEMP, ConfigLeaf.NAV_MODIFIERS, ConfigLeaf.VAL_MODIFIERS,
+			ConfigLeaf.INLINE_AUTOTYPE, "api_entry_id", "ollama_port"]
 
 		for _, k in _keys
 			if ValidatedOpts.Has(k)
@@ -477,8 +478,8 @@ LLM_Engine_Init(opts) {
 			_LLM_Engine["language"] := _I18nLocale
 
 		; Arrays require explicit type validation before replacing live state.
-		for Key in ["user_profiles", "disabled_apps", "api_entries",
-			"app_profile_overrides"]
+		for Key in ["user_profiles", ConfigLeaf.DISABLED_APPS, "api_entries",
+			ConfigLeaf.APP_PROFILE_OVERRIDES]
 			if ValidatedOpts.Has(Key)
 				_LLM_Engine[Key] := ValidatedOpts[Key]
 

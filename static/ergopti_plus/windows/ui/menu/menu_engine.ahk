@@ -345,7 +345,7 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 	; {date} substitution — only the three dynamic-date entries carry it.
 	if (InStr(Label, "{date}")) {
 		switch V2Path {
-			case "hotstrings.dynamic.date_fr":
+			case ConfigKey.HOTSTRINGS_DYNAMIC_DATE_FR:
 				Label := StrReplace(Label, "{date}", FormatTime(, "dd/MM/yyyy"))
 			case "hotstrings.dynamic.date_long_fr":
 				Label := StrReplace(Label, "{date}", _DateLongFr())
@@ -361,7 +361,7 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 		V2Cat := Parts[2]
 		V2SecId := Parts[3]
 		switch V2Cat {
-			case "autocorrection", "distances_reduction", "magic_key", "rolls", "sfbs_reduction":
+			case "autocorrection", ConfigLeaf.DISTANCES_REDUCTION, ConfigLeaf.MAGIC_KEY, "rolls", ConfigLeaf.SFBS_REDUCTION:
 				N := CountTomlSection(StrReplace(V2Cat, "_", ""), V2SecId)
 				if (N > 0)
 					Label := Label . " (" . N . ")"
@@ -427,7 +427,7 @@ ToggleFeatureV2(V2Path, Label := "") {
 ; here (they keep the v1 MenuAddItemWithLabel path).
 _HS_TryLiveToggleV2(V2Path) {
 	global Features
-	if V2Path == "hotstrings.dynamic.user_code"
+	if V2Path == ConfigKey.HOTSTRINGS_DYNAMIC_USER_CODE
 		return _HS_ToggleProgrammableHotstrings(V2Path)
 	V2Parts := StrSplit(V2Path, ".")
 	if (V2Parts.Length != 3 or V2Parts[1] != "hotstrings") {

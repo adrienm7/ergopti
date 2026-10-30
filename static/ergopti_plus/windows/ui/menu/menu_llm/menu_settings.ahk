@@ -25,6 +25,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 #Include ../../../../_shared/modules/llm/trigger_policy.ahk
 
 
@@ -84,7 +85,7 @@ LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset, Privac
 	if !IsSet(InstantCommand)
 		InstantCommand := LLM_Menu_OnInstantToggle
 	if !IsSet(AfterCommand)
-		AfterCommand := (*) => LLM_Menu_ToggleBool("after_hotstring")
+		AfterCommand := (*) => LLM_Menu_ToggleBool(ConfigLeaf.AFTER_HOTSTRING)
 	UrlSource := _LLM_Menu_PrivacySnapshot("disable_url_bars")
 	SecureSource := _LLM_Menu_PrivacySnapshot("disable_password_fields")
 	return MenuRenderer_Build("llm_trigger_menu", "LLM", "", "",
@@ -96,8 +97,8 @@ LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset, Privac
 				PrivacyCommands is Map ? PrivacyCommands.Get("disable_url_bars", 0) : 0),
 			"llm_secure_field_filter", (*) => _LLM_Menu_PrivacyCommand(SecureSource, "disable_password_fields",
 				PrivacyCommands is Map ? PrivacyCommands.Get("disable_password_fields", 0) : 0)),
-		Map("llm_instant_on_word_end_enabled", (*) => _LLM_Menu["instant_on_word_end"],
-			"llm_after_hotstring_enabled", (*) => _LLM_Menu["after_hotstring"],
+		Map("llm_instant_on_word_end_enabled", (*) => _LLM_Menu[ConfigLeaf.INSTANT_ON_WORD_END],
+			"llm_after_hotstring_enabled", (*) => _LLM_Menu[ConfigLeaf.AFTER_HOTSTRING],
 			"llm_trigger_ready", _LLM_Menu_TriggerReady,
 			"llm_url_bar_filter_enabled", (*) => _LLM_Menu["disable_url_bars"],
 			"llm_secure_field_filter_enabled", (*) => _LLM_Menu["disable_password_fields"],
@@ -132,8 +133,8 @@ _LLM_Menu_PrivacySnapshot(Key) {
 			|| !(_LLM_Engine["backend"] is String)
 			|| StrCompare(_LLM_Engine["backend"], Snapshot["backend"], true) != 0
 			|| !ManifestValuesEqual(_LLM_Engine[Key], Snapshot["value"])
-		NativeKey := Key == "disable_url_bars" ? "url_bar_filter_enabled" : "secure_filter_enabled"
-		for Field, Path in Map("enabled", "llm.enabled", "backend", "llm.models.selected",
+		NativeKey := Key == "disable_url_bars" ? ConfigLeaf.URL_BAR_FILTER_ENABLED : ConfigLeaf.SECURE_FILTER_ENABLED
+		for Field, Path in Map("enabled", "llm.enabled", "backend", ConfigKey.LLM_MODELS_SELECTED,
 				"value", "llm.trigger." . NativeKey) {
 			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
 			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
@@ -180,21 +181,21 @@ _LLM_Menu_TriggerRows(Position := "all") {
 	DebounceRows := MenuRenderer_TemplateRows("llm_trigger_debounce_control",
 		Map("llm_trigger_debounce", (*) => LLM_Menu_PromptDebounce(),
 			"llm_trigger_min_interval", (*) => LLM_Menu_PromptMinRequestInterval()),
-		Map("llm_trigger_debounce_caption", () => _LLM_Menu_DebounceCaption(_LLM_Menu["debounce_ms"]),
-			"llm_trigger_min_interval_caption", () => _LLM_Menu["min_request_interval_ms"] . " ms"), Map())
+		Map("llm_trigger_debounce_caption", () => _LLM_Menu_DebounceCaption(_LLM_Menu[ConfigLeaf.DEBOUNCE_MS]),
+			"llm_trigger_min_interval_caption", () => _LLM_Menu[ConfigLeaf.MIN_REQUEST_INTERVAL_MS] . " ms"), Map())
 	if !(DebounceRows is Array)
 		return []
 	for Row in DebounceRows
 		Rows.Push(Row)
 	_LLM_MaybeResetRow(Rows,
-		_LLM_Menu["debounce_ms"],
+		_LLM_Menu[ConfigLeaf.DEBOUNCE_MS],
 		_LLM_DefaultFor("llm_debounce_ms", 500),
-		(*) => _LLM_AssignAndRebuild("debounce_ms",
+		(*) => _LLM_AssignAndRebuild(ConfigLeaf.DEBOUNCE_MS,
 			_LLM_DefaultFor("llm_debounce_ms", 500)))
 	_LLM_MaybeResetRow(Rows,
-		_LLM_Menu["min_request_interval_ms"],
+		_LLM_Menu[ConfigLeaf.MIN_REQUEST_INTERVAL_MS],
 		_LLM_DefaultFor("llm_min_request_interval_ms"),
-		(*) => _LLM_AssignAndRebuild("min_request_interval_ms",
+		(*) => _LLM_AssignAndRebuild(ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
 			_LLM_DefaultFor("llm_min_request_interval_ms")))
 
 	BoundaryRows := MenuRenderer_TemplateRows("llm_trigger_provider_boundary", Map(), Map(), Map())
@@ -207,7 +208,7 @@ _LLM_Menu_TriggerRows(Position := "all") {
 	Rows := []
 
 	; App exclusion picker
-	n := _LLM_Menu["disabled_apps"].Length
+	n := _LLM_Menu[ConfigLeaf.DISABLED_APPS].Length
 	Rows.Push(Map(
 		"label", (n > 0)
 			? StrReplace(StrReplace(t("menu.llm.disabled_in_label"), "%d", n), "%s", (n > 1 ? "s" : ""))
@@ -243,13 +244,13 @@ _LLM_Menu_TriggerRows(Position := "all") {
 LLM_Menu_BuildGenerationMenu(AutoCommand := unset, ValuesProvider := unset) {
 	global _LLM_Menu
 	if !IsSet(AutoCommand)
-		AutoCommand := (*) => LLM_Menu_ToggleBool("auto_raise_temp")
+		AutoCommand := (*) => LLM_Menu_ToggleBool(ConfigLeaf.AUTO_RAISE_TEMP)
 	if !IsSet(ValuesProvider)
 		ValuesProvider := (*) => _LLM_Menu_GenerationRows()
 	return MenuRenderer_Build("llm_generation_menu", "LLM", Map(), Map(),
 		Map("llm_generation_values", ValuesProvider),
 		Map("llm_auto_raise_temperature", (*) => _LLM_Menu_AutoRaiseReady() ? AutoCommand.Call() : false),
-		Map("llm_auto_raise_enabled", (*) => _LLM_Menu["auto_raise_temp"],
+		Map("llm_auto_raise_enabled", (*) => _LLM_Menu[ConfigLeaf.AUTO_RAISE_TEMP],
 			"llm_auto_raise_ready", (*) => _LLM_Menu_AutoRaiseReady()))
 }
 
@@ -307,13 +308,13 @@ _LLM_Menu_GenerationRows() {
 		"llm_generation_max_words_reset", (*) => _LLM_AssignAndRebuild("max_words", _LLM_DefaultFor("llm_max_words", 15)),
 		"llm_generation_temperature", (*) => LLM_Menu_PromptTemperature(),
 		"llm_generation_temperature_reset", (*) => _LLM_AssignAndRebuild("temperature", TempDefault),
-		"llm_reset_on_nav", (*) => LLM_Menu_ToggleBool("reset_on_nav"))
+		"llm_reset_on_nav", (*) => LLM_Menu_ToggleBool(ConfigLeaf.RESET_ON_NAV))
 	GenerationGetters := Map(
 		"llm_generation_ready", () => true,
 		"llm_generation_context_caption", () => "" . _LLM_Menu["ctx_chars"],
 		"llm_generation_context_reset_caption", () => "" . ContextDefault,
 		"llm_generation_context_reset_present", () => _LLM_Menu["ctx_chars"] != ContextDefault,
-		"llm_reset_on_nav_checked", () => _LLM_Menu["reset_on_nav"],
+		"llm_reset_on_nav_checked", () => _LLM_Menu[ConfigLeaf.RESET_ON_NAV],
 		"llm_generation_min_words_caption", () => "" . _LLM_Menu["min_words"],
 		"llm_generation_min_words_reset_caption", () => "" . MinDefault,
 		"llm_generation_min_words_reset_present", () => _LLM_Menu["min_words"] != MinDefault,
@@ -369,7 +370,7 @@ _LLM_Menu_GenerationRows() {
 ; owns the accepted range used by menu selection and runtime normalization.
 global LLM_MENU_INDENT_OPTIONS := _LLMMenuBuildIndentRange()
 _LLMMenuBuildIndentRange() {
-	return LLM_DisplayIndentValues(ManifestFindEntryByPath("llm.display.pred_indent"))
+	return LLM_DisplayIndentValues(ManifestFindEntryByPath(ConfigKey.LLM_DISPLAY_PRED_INDENT))
 }
 
 /**
@@ -400,7 +401,7 @@ LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset, Streami
 			"llm_token_streaming", (*) => _LLM_Menu_StreamingCommand(StreamingSource, StreamingCommand),
 			"llm_show_all", (*) =>
 			_LLM_Menu_ShowAllReady() ? ShowAllCommand.Call() : false),
-		Map("llm.display.pred_indent", (*) => IndentSource["indentation"],
+		Map(ConfigKey.LLM_DISPLAY_PRED_INDENT, (*) => IndentSource["indentation"],
 			"llm_indentation_ready", (*) => LLM_DisplayIndentReady(IndentSource),
 			"llm_info_bar_enabled", (*) => InfoSource["info_bar"],
 			"llm_info_bar_ready", (*) => LLM_DisplayInfoBarReady(InfoSource),
@@ -414,18 +415,18 @@ LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset, Streami
 _LLM_Menu_InfoBarSnapshot() {
 	global _LLM_Menu, _LLM_Engine, ConfigurationFile
 	Snapshot := Map("owner", _LLM_Menu, "generation", LLM_AuxGeneration(),
-		"backend", _LLM_Menu["backend"], "info_bar", _LLM_Menu["show_info_bar"],
+		"backend", _LLM_Menu["backend"], "info_bar", _LLM_Menu[ConfigLeaf.SHOW_INFO_BAR],
 		"enabled", _LLM_Menu["enabled"], "paused", A_IsSuspended ? true : false,
 		"source", 0, "blocked", !IsSet(_LLM_Engine) || !(_LLM_Engine is Map)
-			|| !_LLM_Engine.Has("enabled") || !_LLM_Engine.Has("backend") || !_LLM_Engine.Has("show_info_bar")
+			|| !_LLM_Engine.Has("enabled") || !_LLM_Engine.Has("backend") || !_LLM_Engine.Has(ConfigLeaf.SHOW_INFO_BAR)
 			|| _LLM_Engine["enabled"] != _LLM_Menu["enabled"]
 			|| _LLM_Engine["backend"] != _LLM_Menu["backend"]
-			|| _LLM_Engine["show_info_bar"] != _LLM_Menu["show_info_bar"])
+			|| _LLM_Engine[ConfigLeaf.SHOW_INFO_BAR] != _LLM_Menu[ConfigLeaf.SHOW_INFO_BAR])
 	try {
 		Snapshot["source"] := _LLM_Menu_EnableReadSource()
 		Document := TOML_ParseDocumentShared(FSReadUtf8Exact(ConfigurationFile))
-		for Field, Path in Map("enabled", "llm.enabled", "info_bar", "llm.display.show_info_bar",
-				"backend", "llm.models.selected") {
+		for Field, Path in Map("enabled", "llm.enabled", "info_bar", ConfigKey.LLM_DISPLAY_SHOW_INFO_BAR,
+				"backend", ConfigKey.LLM_MODELS_SELECTED) {
 			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
 			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
 			if Read["found"] && (Field == "enabled" || Field == "info_bar") && !(Value is TOML_Bool)
@@ -458,24 +459,24 @@ _LLM_Menu_InfoBarCommand(Expected, Command) {
 _LLM_Menu_IndentSnapshot() {
 	global _LLM_Menu, _LLM_Engine, ConfigurationFile
 	Snapshot := Map("owner", _LLM_Menu, "generation", LLM_AuxGeneration(),
-		"backend", _LLM_Menu["backend"], "indentation", _LLM_Menu["pred_indent"],
+		"backend", _LLM_Menu["backend"], "indentation", _LLM_Menu[ConfigLeaf.PRED_INDENT],
 		"progressive", LLM_DisplayProgressive(_LLM_Menu["show_all_at_once"]),
 		"count", _LLM_Menu["n_predictions"], "enabled", _LLM_Menu["enabled"],
 		"paused", A_IsSuspended ? true : false, "source", 0,
 		"blocked", !IsSet(_LLM_Engine) || !(_LLM_Engine is Map) || !_LLM_Engine.Has("enabled") || !_LLM_Engine.Has("backend")
-			|| !_LLM_Engine.Has("pred_indent") || !_LLM_Engine.Has("n_predictions")
+			|| !_LLM_Engine.Has(ConfigLeaf.PRED_INDENT) || !_LLM_Engine.Has("n_predictions")
 			|| !_LLM_Engine.Has("show_all_at_once")
 			|| _LLM_Engine["enabled"] != _LLM_Menu["enabled"]
 			|| _LLM_Engine["backend"] != _LLM_Menu["backend"]
-			|| _LLM_Engine["pred_indent"] != _LLM_Menu["pred_indent"]
+			|| _LLM_Engine[ConfigLeaf.PRED_INDENT] != _LLM_Menu[ConfigLeaf.PRED_INDENT]
 			|| _LLM_Engine["n_predictions"] != _LLM_Menu["n_predictions"]
 			|| _LLM_Engine["show_all_at_once"] != _LLM_Menu["show_all_at_once"])
 	try {
 		Snapshot["source"] := _LLM_Menu_EnableReadSource()
 		Document := TOML_ParseDocumentShared(FSReadUtf8Exact(ConfigurationFile))
-		for Field, Path in Map("enabled", "llm.enabled", "count", "llm.profiles.num_predictions",
-				"indentation", "llm.display.pred_indent", "progressive", "llm.display.streaming_multi",
-				"backend", "llm.models.selected") {
+		for Field, Path in Map("enabled", "llm.enabled", "count", ConfigKey.LLM_PROFILES_NUM_PREDICTIONS,
+				"indentation", ConfigKey.LLM_DISPLAY_PRED_INDENT, "progressive", ConfigKey.LLM_DISPLAY_STREAMING_MULTI,
+				"backend", ConfigKey.LLM_MODELS_SELECTED) {
 			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
 			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
 			if Read["found"] && (Field == "enabled" || Field == "progressive") && !(Value is TOML_Bool)
@@ -556,8 +557,8 @@ _LLM_Menu_DisplayRows(Position := "all") {
 	; user keeps the option of bare Backspace / Ctrl+Z to roll back what
 	; was typed.
 	InlineRows := MenuRenderer_TemplateRows("llm_display_inline_control",
-		Map("llm_display_inline", (*) => LLM_Menu_ToggleBool("inline_autotype")),
-		Map("llm_display_inline_checked", () => _LLM_Menu["inline_autotype"]), Map())
+		Map("llm_display_inline", (*) => LLM_Menu_ToggleBool(ConfigLeaf.INLINE_AUTOTYPE)),
+		Map("llm_display_inline_checked", () => _LLM_Menu[ConfigLeaf.INLINE_AUTOTYPE]), Map())
 	if !(InlineRows is Array)
 		return []
 	for Row in InlineRows
@@ -573,9 +574,9 @@ _LLM_Menu_DisplayRows(Position := "all") {
 	Rows := []
 
 	_LLM_MaybeResetRow(Rows,
-		_LLM_Menu["pred_indent"],
+		_LLM_Menu[ConfigLeaf.PRED_INDENT],
 		_LLM_DefaultFor("llm_pred_indent", 0),
-		(*) => _LLM_AssignAndRebuild("pred_indent",
+		(*) => _LLM_AssignAndRebuild(ConfigLeaf.PRED_INDENT,
 			_LLM_DefaultFor("llm_pred_indent", 0)))
 
 	if Position == "remaining"
@@ -618,8 +619,8 @@ _LLM_Menu_NavRows() {
 	global _LLM_Menu
 	n := _LLM_Menu["n_predictions"]
 
-	nav_display   := (_LLM_Menu["nav_modifiers"] != "") ? _LLM_Menu["nav_modifiers"] : t("menu.llm.arrows_only")
-	val_display   := (_LLM_Menu["val_modifiers"] != "") ? _LLM_Menu["val_modifiers"] : t("menu.llm.digits_only")
+	nav_display   := (_LLM_Menu[ConfigLeaf.NAV_MODIFIERS] != "") ? _LLM_Menu[ConfigLeaf.NAV_MODIFIERS] : t("menu.llm.arrows_only")
+	val_display   := (_LLM_Menu[ConfigLeaf.VAL_MODIFIERS] != "") ? _LLM_Menu[ConfigLeaf.VAL_MODIFIERS] : t("menu.llm.digits_only")
 	val_key_range := (n == 10) ? "1-0" : "1-" . n
 
 	Rows := []
@@ -779,7 +780,7 @@ _LLM_MaybeResetRow(Rows, current, default_val, on_click) {
 }
 
 LLM_Menu_PromptDebounce() {
-	LLM_Menu_PromptNumeric("debounce_ms", t("menu.llm.trigger_menu_title"),
+	LLM_Menu_PromptNumeric(ConfigLeaf.DEBOUNCE_MS, t("menu.llm.trigger_menu_title"),
 		t("menu.llm.debounce_prompt"))
 }
 
@@ -789,7 +790,7 @@ _LLM_Menu_DebounceCaption(Value) {
 }
 
 LLM_Menu_PromptMinRequestInterval() {
-	LLM_Menu_PromptNumeric("min_request_interval_ms", t("menu.llm.trigger_menu_title"),
+	LLM_Menu_PromptNumeric(ConfigLeaf.MIN_REQUEST_INTERVAL_MS, t("menu.llm.trigger_menu_title"),
 		StrReplace(t("menu.settings.min_interval_prompt"), "%s", _LLM_DefaultFor("llm_min_request_interval_ms")))
 }
 
@@ -891,10 +892,10 @@ LLM_Menu_PromptNavModifiers() {
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
-	ib := Ui_InputBox(t("menu.llm.nav_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu["nav_modifiers"])
+	ib := Ui_InputBox(t("menu.llm.nav_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu[ConfigLeaf.NAV_MODIFIERS])
 	if (ib.Result != "OK")
 		return
-	return LLM_Menu_CommitNavModifier("nav_modifiers", ib.Value)
+	return LLM_Menu_CommitNavModifier(ConfigLeaf.NAV_MODIFIERS, ib.Value)
 }
 
 LLM_Menu_PromptValModifiers() {
@@ -905,10 +906,10 @@ LLM_Menu_PromptValModifiers() {
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
-	ib := Ui_InputBox(t("menu.llm.val_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu["val_modifiers"])
+	ib := Ui_InputBox(t("menu.llm.val_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu[ConfigLeaf.VAL_MODIFIERS])
 	if (ib.Result != "OK")
 		return
-	return LLM_Menu_CommitNavModifier("val_modifiers", ib.Value)
+	return LLM_Menu_CommitNavModifier(ConfigLeaf.VAL_MODIFIERS, ib.Value)
 }
 
 _LLM_Menu_ApplyNavCommitted(*) {
@@ -1014,8 +1015,8 @@ LLM_Menu_TestPrediction(SendFn := 0) {
 	Generation := _LLM_Menu_TestPredictionGeneration
 	LoggerStart("LLM", "Test prediction #{1} sent to the active backend.", Generation)
 	_LLM_Menu_ShowManualPredictionNotice("llm.test_prediction.running")
-	Send := HasMethod(SendFn, "Call") ? SendFn : _LLM_Menu_TestPredictionSend
-	try Send.Call(Sample, _LLM_Menu_OnTestPredictionAnswer.Bind(Generation),
+	Transport := HasMethod(SendFn, "Call") ? SendFn : _LLM_Menu_TestPredictionSend
+	try Transport.Call(Sample, _LLM_Menu_OnTestPredictionAnswer.Bind(Generation),
 		_LLM_Menu_OnTestPredictionFailure.Bind(Generation), _LLM_Menu_TestPredictionIsCurrent.Bind(Generation))
 	catch as Err {
 		_LLM_Menu_OnTestPredictionFailure(Generation, Map("reason", Err.Message))
@@ -1121,7 +1122,7 @@ LLM_Menu_TriggerPredictionWith(ProfileId, NumPredictions := 0, FireFn := 0, Tran
 	}
 	LoggerInfo("LLM", "Prompt prediction requested with '{1}' ({2} prediction(s), {3} context character(s)).",
 		ProfileId, (NumPredictions > 0) ? NumPredictions : _LLM_Menu["n_predictions"], StrLen(Context))
-	Override := Map("profile_id", ProfileId, "num_predictions", NumPredictions)
+	Override := Map("profile_id", ProfileId, ConfigLeaf.NUM_PREDICTIONS, NumPredictions)
 	if (TranslationTarget != "")
 		Override["translation_target"] := TranslationTarget
 	if HasMethod(FireFn, "Call") {

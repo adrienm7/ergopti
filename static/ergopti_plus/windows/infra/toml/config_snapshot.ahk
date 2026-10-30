@@ -10,6 +10,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 global _ConfigTomlSnapshots := Map()
 
@@ -349,10 +350,10 @@ TomlConfigStaticForeignOwnershipRegistry() {
 	static Registry := Map(
 		"category_enabled", Map(
 			"autocorrection", "FeatureState",
-			"distances_reduction", "FeatureState",
-			"magic_key", "FeatureState",
+			ConfigLeaf.DISTANCES_REDUCTION, "FeatureState",
+			ConfigLeaf.MAGIC_KEY, "FeatureState",
 			"rolls", "FeatureState",
-			"sfbs_reduction", "FeatureState"),
+			ConfigLeaf.SFBS_REDUCTION, "FeatureState"),
 		"hotstrings", Map(
 			"terminators", "TerminatorRecords",
 			"terminator_states", "TerminatorRecords",
@@ -366,10 +367,10 @@ TomlConfigStaticForeignOwnershipRegistry() {
 		"llm", Map(
 			"api_entry_id", "LLMMenu",
 			"ollama_port", "LLMMenu"),
-		"llm.navigation", Map(
-			"nav_modifiers", "LLMMenu"),
-		"llm.trigger", Map(
-			"disabled_apps", "LLMMenu"))
+		ConfigKey.LLM_NAVIGATION, Map(
+			ConfigLeaf.NAV_MODIFIERS, "LLMMenu"),
+		ConfigKey.LLM_TRIGGER, Map(
+			ConfigLeaf.DISABLED_APPS, "LLMMenu"))
 	return Registry
 }
 
