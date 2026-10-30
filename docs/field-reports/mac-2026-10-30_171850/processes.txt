@@ -1,0 +1,10 @@
+581 /Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon
+582 /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service
+697 /Library/SystemExtensions/9EFC2659-31E3-451D-8D2C-CE38E09D8183/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice.dext/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice org.pqrs.Karabiner-DriverKit-VirtualHIDDevice 0x100001171 org.pqrs.Karabiner-DriverKit-VirtualHIDDevice
+2247 /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_session_monitor
+2253 /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_console_user_server
+2254 /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-NotificationWindow.app/Contents/MacOS/Karabiner-NotificationWindow
+2259 /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service
+27040 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
+27046 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon
+27145 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus --karabiner-lease-guardian
