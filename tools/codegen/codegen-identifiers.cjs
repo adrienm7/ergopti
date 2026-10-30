@@ -4,8 +4,8 @@
  * ==============================================================================
  * MODULE: Identifiers and Hosts Codegen
  * DESCRIPTION:
- * Emits _shared/lua/identifiers.lua, the shell, Python, Swift and browser
- * counterparts from _shared/data/identifiers.json: the
+ * Emits _shared/lua/identifiers.lua, the shell, Python, Swift, AutoHotkey and
+ * browser counterparts from _shared/data/identifiers.json: the
  * ErgoptiPlus file and bundle names, the bundle ids, the service labels and the
  * external hosts (GitHub, Ollama, Hugging Face) that the macOS and Linux Lua
  * drivers used to spell in dozens of files, and the field report names the
@@ -15,8 +15,7 @@
  * The parity audit (K4, K9) counted the `ErgoptiPlus.app` name 459 times, the
  * launcher bundle id 49 times and the Hugging Face host 388 times. A rename or
  * a mirror switch had no single place to start from. The generated file is
- * committed so no driver parses JSON for a constant; the Windows driver is not
- * generated here yet (see the PAR-83 note in TODO.md).
+ * committed so no driver parses JSON for a constant.
  *
  * USAGE:  node tools/codegen/codegen-identifiers.cjs
  * ==============================================================================
@@ -34,6 +33,7 @@ const OUTPUT = path.join(SP, '_shared/lua/identifiers.lua');
 const OUTPUT_JS = path.join(SP, '_shared/ui/_generated/identifiers.js');
 const OUTPUT_SH = path.join(SP, '_shared/data/identifiers.sh');
 const OUTPUT_PY = path.join(SP, '_shared/data/identifiers.py');
+const OUTPUT_AHK = path.join(SP, 'windows/_generated/identifiers.ahk');
 const OUTPUT_SWIFT = path.join(
 	SP,
 	'macos/launcher/Sources/ErgoptiPlus/Identifiers.generated.swift'
@@ -170,12 +170,37 @@ ${GROUPS.map((group) => {
 }
 `;
 
+/** AutoHotkey class name of a group. */
+const AHK_CLASS = SWIFT_ENUM;
+const ahk = `\uFEFF; _generated/identifiers.ahk
+${BANNER(';')}
+#Requires AutoHotkey v2.0
+
+; ==============================================================================
+; MODULE: Application Identifiers and External Hosts
+; DESCRIPTION:
+; The application file names, bundle ids, service labels, external hosts and
+; field report names. A misspelt name fails at the first access. Hosts are bare
+; names: build a URL as "https://" . Identifiers.Hosts.GITHUB . "/...".
+; ==============================================================================
+
+class Identifiers {
+${GROUPS.map((group) => {
+	const rows = Object.entries(source[group]).map(
+		([key, value]) => `\t\tstatic ${key.toUpperCase()} := "${value}"`
+	);
+	return `\tclass ${AHK_CLASS[group]} {\n${rows.join('\n')}\n\t}`;
+}).join('\n')}
+}
+`;
+
 for (const [file, text] of [
 	[OUTPUT, lua],
 	[OUTPUT_JS, js],
 	[OUTPUT_SH, shell],
 	[OUTPUT_PY, python],
-	[OUTPUT_SWIFT, swift]
+	[OUTPUT_SWIFT, swift],
+	[OUTPUT_AHK, ahk]
 ]) {
 	fs.mkdirSync(path.dirname(file), { recursive: true });
 	fs.writeFileSync(file, text, 'utf8');

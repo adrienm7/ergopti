@@ -274,16 +274,28 @@ function checkSharedBudgets() {
 		path.join(PLUS, 'windows', 'adapters', 'http_client.ahk'),
 		'utf8'
 	);
+	// A URL template is built from the generated host constants: resolve them
+	// against identifiers.json, so the pin still compares the whole URL.
+	const hosts = JSON.parse(
+		fs.readFileSync(path.join(PLUS, '_shared', 'data', 'identifiers.json'), 'utf8')
+	).hosts;
+	const ahkUrlTemplate = (source, name) => {
+		const match = new RegExp(
+			`^global ${name}\\s*:=\\s*"https://" \\. Identifiers\\.Hosts\\.(\\w+) \\. "([^"]*)"$`,
+			'm'
+		).exec(source);
+		return match ? `https://${hosts[match[1].toLowerCase()]}${match[2]}` : undefined;
+	};
 	const ahkLiteral = (source, name) => {
 		const match = new RegExp(`global ${name}\\s*:=\\s*("([^"]*)"|(\\d+))`).exec(source);
 		return match ? (match[2] !== undefined ? match[2] : Number(match[3])) : undefined;
 	};
 	expect(
-		ahkLiteral(ahkChangelog, 'CHANGELOG_API_URL_TEMPLATE') === sources.api_releases_url,
+		ahkUrlTemplate(ahkChangelog, 'CHANGELOG_API_URL_TEMPLATE') === sources.api_releases_url,
 		'the Windows API URL template must mirror release_sources.api_releases_url'
 	);
 	expect(
-		ahkLiteral(ahkChangelog, 'CHANGELOG_FEED_URL_TEMPLATE') === sources.atom_feed_url,
+		ahkUrlTemplate(ahkChangelog, 'CHANGELOG_FEED_URL_TEMPLATE') === sources.atom_feed_url,
 		'the Windows feed URL template must mirror release_sources.atom_feed_url'
 	);
 	expect(

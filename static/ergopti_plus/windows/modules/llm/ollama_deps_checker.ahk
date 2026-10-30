@@ -14,6 +14,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
 #Include ollama_managed_bootstrap.ahk
 
 
@@ -389,10 +390,11 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?, Port := 0) {
 	}
 
 	if !winget_available {
-		LoggerInfo("LLM", "Opening https://ollama.com/download in the default browser.")
+		DownloadUrl := "https://" . Identifiers.Hosts.OLLAMA . "/download"
+		LoggerInfo("LLM", "Opening {1} in the default browser.", DownloadUrl)
 		try {
 			RunFn := _LLM_CurlArtifactPortFn(Port, "run", Run)
-			RunFn.Call('https://ollama.com/download')
+			RunFn.Call(DownloadUrl)
 		} catch as err {
 			LoggerError("LLM", "Could not open the download page: " err.Message ".")
 			LLM_Deps_Fail(t("menu.llm.deps_download_page_failed"),
