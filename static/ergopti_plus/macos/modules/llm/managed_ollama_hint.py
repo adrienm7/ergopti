@@ -11,6 +11,7 @@ import platform
 import stat
 import sys
 import time
+import traceback
 
 DRIVER = Path(__file__).absolute().parents[2]
 SHARED = DRIVER.parent / "_shared"
@@ -116,7 +117,15 @@ def main():
         ValueError,
         KeyError,
         TypeError,
-    ):
+    ) as error:
+        # The driver logs this line: the refusing check and its file and line,
+        # never a path or a metadata value (field run 2026-10-30 17:06 refused
+        # an installed runtime with no trace of which check failed).
+        frame = traceback.extract_tb(error.__traceback__)[-1]
+        sys.stderr.write(
+            "refused: %s at %s:%d %s\n"
+            % (type(error).__name__, os.path.basename(frame.filename), frame.lineno, frame.name)
+        )
         return 78
 
 
