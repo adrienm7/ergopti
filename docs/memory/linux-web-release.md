@@ -227,6 +227,18 @@ call them with an inline `require(...)` at the call site, as
 `ui/menu/feature_notice.lua` is. Check fast with
 `declaredLinuxTopLevelPublication(source)` instead of the four-minute suite.
 
+### project-linux-e2e-tray-clicks-need-the-idle-pump
+
+A committed menu row asks `ui/menu/rebuild_owner.lua` for a redraw; the tray
+publishes the new tree only on the event loop's idle tick, and a click on a
+stale tree is held, not run. An E2E that clicks rows must click the tree the
+tray was handed (the appindicator stub's `set_menu`), then run `loop.onIdle()`
+before reading the menu again, as `tests/e2e/startup_child.lua` does for the
+delimiter rows. A switched-off feature notice is error-level by design
+(`_shared/lua/feature_notice.lua`), so the start-up child's error-dialog watch
+flags it unless the step names the notice it causes. A refused write through a
+read-only folder needs a non-root user: report it as SKIP under root.
+
 ## Linux native boundaries
 
 ### project-linux-absence-needs-enoent
