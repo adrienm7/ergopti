@@ -209,8 +209,8 @@ assert.equal(new Set(listed).size, listed.length, 'a step is listed twice');
 assert.equal(FIXTURE.shared.length, 6);
 assert.equal(
 	listed.length,
-	184,
-	'the former E2E job had 158 steps, gained 23 install steps (two, then one per test step that installed inside itself) and the Go route plan twin, and gained the two manual acceptance steps; none may be lost'
+	186,
+	'the former E2E job had 158 steps, gained 23 install steps (two, then one per test step that installed inside itself) and the Go route plan twin, gained the two manual acceptance steps, then the live number-row step and its install step; none may be lost'
 );
 assert.deepEqual(
 	Object.keys(FIXTURE.subjects),
