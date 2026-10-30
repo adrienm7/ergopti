@@ -2335,11 +2335,20 @@ _LLMRemote_LoadCatalog() {
     LocalCatalogue := Map("order", [], "servers", Map())
     LocalRoot := 0
     LocalRequestFields := Map()
+    LocalDialect := Map()
     try {
         LocalText := FSReadUtf8Exact(_SharedDir . "\modules\llm\local_servers.json")
         LocalRoot := JsonParse(LocalText)
         LocalCatalogue := LocalServerAuthCatalogue(LocalRoot, candidateProviders)
         LocalRequestFields := _LLMRemote_LocalRequestFields(LocalText)
+        ; The family controls a local server carries, on top of request_fields
+        try {
+            LocalSpans := JsonObjectMemberSpans(LocalText)
+            LocalDialect := LLM_ThinkingOffParseDialect(LocalSpans.Has("thinking_dialect") ? LocalSpans["thinking_dialect"]["text"] : "")
+        } catch as DialectErr {
+            LocalDialect := Map()
+            try LoggerError("LLM.remote", "local_servers.json thinking_dialect is invalid ({1}); only request_fields apply.", DialectErr.Message)
+        }
     } catch as Err
         try LoggerError("LLM.remote", "The local API catalogue is unavailable; optional authentication is refused.")
     LocalDiscovery := Map()
@@ -2353,8 +2362,9 @@ _LLMRemote_LoadCatalog() {
     for Id in LocalCatalogue["order"] {
         Desc := LocalCatalogue["servers"][Id]
         candidateProviders[Id] := Map("Label", Desc["label"], "BaseUrl", Desc["base_url"],
-            ; local_servers.json request_fields turn every model's thinking off
-            "DefaultModel", "", "Format", "openai", "ModelExtras", Map(), "ThinkingDialect", Map(),
+            ; local_servers.json request_fields turn every model's thinking off;
+            ; its thinking_dialect adds a family's level on top
+            "DefaultModel", "", "Format", "openai", "ModelExtras", Map(), "ThinkingDialect", LocalDialect,
             "RequestFields", LocalRequestFields)
         candidateOrder.Push(Id)
     }
