@@ -29,8 +29,13 @@
 ---    were loaded from (config.toml) is put back byte for byte, which leaves
 ---    the live state on the changed values, so the guard then asks for one
 ---    driver reload once the run is closed: the reload reads the restored file.
---- 6. A run never reloads itself: while one runs, the auto-reload watchers hold
----    a source-change reload (M.holds_reload) and name the paths they hold.
+--- 6. A run never reloads itself by accident: while one runs, the auto-reload
+---    watchers hold a source-change reload (M.holds_reload) and name the paths
+---    they hold. The one deliberate reload is a "reload" step: it puts back
+---    what earlier steps changed, writes the run's state to the resume file and
+---    asks the termination coordinator for a reload; the reloaded driver's
+---    start reads that file once, records the step with the reload's duration
+---    and runs the next step under a fresh configuration snapshot.
 ---    A reload or quit that still happens (the menu, a person) closes the run
 ---    at teardown with its kind and reason; a run cut short without teardown is
 ---    closed at the next start. Either way the done file says interrupted, so
@@ -55,6 +60,9 @@ M.ALL_STEPS = "all"
 
 -- The reload reason the configuration guard gives the termination coordinator.
 M.RESTORE_RELOAD_REASON = "field_run_config_restored"
+
+-- The reload reason of a "reload" step.
+M.TIMED_RELOAD_REASON = "field_run_timed_reload"
 
 local _session = nil
 
@@ -101,7 +109,7 @@ function M.validate(spec)
 	if type(spec.folder) ~= "string" or not spec.folder:match("^[%w_%-/]+$") or spec.folder:sub(1, 1) == "/" then
 		error("field run: folder must be a relative plain path", 2)
 	end
-	for _, key in ipairs({ "ready", "request", "refused", "running", "results", "accepted", "done" }) do
+	for _, key in ipairs({ "ready", "request", "refused", "running", "results", "accepted", "done", "resume" }) do
 		local name = type(spec.files) == "table" and spec.files[key] or nil
 		if type(name) ~= "string" or not name:match("^[%w_.]+$") then
 			error("field run: files." .. key .. " must be a plain file name", 2)
@@ -139,7 +147,7 @@ function M.validate(spec)
 			or spec.step_by_id[step.id] or step.id == M.ALL_STEPS then
 			error("field run: a step has an invalid or duplicate id", 2)
 		end
-		if step.kind ~= "field_check" and step.kind ~= "diagnostics" and step.kind ~= "ai" then
+		if step.kind ~= "field_check" and step.kind ~= "diagnostics" and step.kind ~= "ai" and step.kind ~= "reload" then
 			error("field run: step " .. step.id .. " has an unknown kind", 2)
 		end
 		if step.kind == "field_check" and type(step.check) ~= "string" then
@@ -397,7 +405,8 @@ function Session:start()
 	if self.started then error("the field run session cannot be started twice", 2) end
 	self.started = true
 	if not self.ports.make_dir(self:path("results")) then error("the field run folder could not be created: " .. self.folder, 0) end
-	self:close_interrupted()
+	local resumed = self:take_resume()
+	if not resumed then self:close_interrupted() end
 	-- A request left from an earlier session was written for a driver that is gone
 	if self.ports.exists(self:path("request")) then
 		Logger.warn(LOG, "A stale field run request was left by an earlier session; removed.")
@@ -424,6 +433,13 @@ function Session:start()
 		steps = Json.array(ids) }) then
 		error("the field run readiness file could not be written", 0)
 	end
+	-- The run a timed reload suspended goes on once this start has returned
+	if resumed then
+		self.pending = self.ports.after(0, function()
+			self.pending = nil
+			if self.active then self:resume(resumed) end
+		end)
+	end
 end
 
 --- Defers one request out of the watcher callback.
@@ -441,6 +457,12 @@ function Session:close_running(cause)
 	if run == nil or run.abandoned then return end
 	run.abandoned = true
 	run.cancel_timers()
+	if run.reloading then
+		-- The timed reload this run asked for: its resume file carries it on
+		self.run = nil
+		Logger.info(LOG, "Field run %s suspended for its timed reload.", run.request.request_id)
+		return
+	end
 	local kind = type(cause) == "table" and safe_code(cause.kind) or nil
 	local reason = type(cause) == "table" and safe_code(cause.reason) or nil
 	local step = run.current_step or "none"
@@ -524,13 +546,7 @@ end
 --- @return boolean started
 function Session:begin(request, dir)
 	local spec, ports = self.spec, self.ports
-	local run = { request = request, dir = dir, verdicts = {}, order = {}, timers = {}, abandoned = false,
-		started_ms = ports.now_ms(), started_at = ports.iso_now() }
-	run.deadline_ms = run.started_ms + request.deadline_seconds * 1000
-	function run.cancel_timers()
-		for handle in pairs(run.timers) do pcall(ports.cancel, handle) end
-		run.timers = {}
-	end
+	local run = self:new_run(request, dir, ports.now_ms(), ports.iso_now())
 	self.run = run
 	local ids = {}
 	for _, step in ipairs(request.steps) do ids[#ids + 1] = step.id end
@@ -553,7 +569,33 @@ function Session:begin(request, dir)
 		return true
 	end
 	run.snapshot = snapshot
+	self:advance(1)
+	return true
+end
 
+--- Builds the run table of a request.
+--- @param request table { request_id, steps, deadline_seconds }.
+--- @param dir string Results folder.
+--- @param started_ms number Monotonic start of the run.
+--- @param started_at string ISO start of the run.
+--- @return table run
+function Session:new_run(request, dir, started_ms, started_at)
+	local ports = self.ports
+	local run = { request = request, dir = dir, verdicts = {}, order = {}, timers = {}, abandoned = false,
+		started_ms = started_ms, started_at = started_at }
+	run.deadline_ms = started_ms + request.deadline_seconds * 1000
+	function run.cancel_timers()
+		for handle in pairs(run.timers) do pcall(ports.cancel, handle) end
+		run.timers = {}
+	end
+	return run
+end
+
+--- Runs the steps from one index on, then the configuration guard.
+--- @param first integer Index of the first step to run.
+function Session:advance(first)
+	local ports, run = self.ports, self.run
+	local request = run.request
 	local function next_step(index)
 		if run.abandoned then return end
 		local step = request.steps[index]
@@ -569,8 +611,7 @@ function Session:begin(request, dir)
 			if handle then run.timers[handle] = true end
 		end)
 	end
-	next_step(1)
-	return true
+	next_step(first)
 end
 
 --- Runs one step under its deadline and records it once.
@@ -585,6 +626,7 @@ function Session:run_step(index, step, continue)
 		self:record(index, step, { verdict = "skip", codes = { "global_deadline" }, elapsed_ms = 0 })
 		return continue()
 	end
+	if step.kind == "reload" then return self:reload_step(index, step, continue) end
 	local stall_ms = step.deadline_seconds * 1000
 	local deadline_ms = math.min(M.step_bound_seconds(step) * 1000, left_ms)
 	local progress_aware = step.progress_max_seconds ~= nil
@@ -678,6 +720,124 @@ function Session:run_step(index, step, continue)
 		Logger.error(LOG, "Field run step '%s' raised: %s", step.id, tostring(err))
 		settle("fail", { "raised" })
 	end
+end
+
+--- The timed reload: puts back what earlier steps changed (the snapshot does
+--- not survive the reload), writes the run's state to the resume file and asks
+--- for the reload. The reloaded driver records the step (Session:resume); a
+--- reload refused or never started is recorded here.
+function Session:reload_step(index, step, continue)
+	local spec, ports, run = self.spec, self.ports, self.run
+	run.current_step = step.id
+	local ok, outcome = pcall(ports.config_restore, run.snapshot)
+	if not ok or type(outcome) ~= "table" then
+		Logger.error(LOG, "The configuration could not be put back before the timed reload: %s.", tostring(outcome))
+		self:record(index, step, { verdict = "fail", codes = { "restore_raised" }, elapsed_ms = 0 })
+		return continue()
+	end
+	local codes = {}
+	for _, name in ipairs(outcome.restored or {}) do codes[#codes + 1] = "restored_" .. name end
+	for _, name in ipairs(outcome.failed or {}) do codes[#codes + 1] = "restore_failed_" .. name end
+	if #(outcome.failed or {}) > 0 then
+		self:record(index, step, { verdict = "fail", codes = codes, elapsed_ms = 0 })
+		return continue()
+	end
+	local ids = {}
+	for _, item in ipairs(run.request.steps) do ids[#ids + 1] = item.id end
+	local resume_path = self:path("resume")
+	if not self:publish(resume_path, { schema = spec.schema, request_id = run.request.request_id, index = index,
+		step = step.id, steps = Json.array(ids), deadline_seconds = run.request.deadline_seconds,
+		requested_ms = ports.now_ms(), started_ms = run.started_ms, started_at = run.started_at,
+		verdicts = run.verdicts, order = Json.array(run.order), codes = Json.array(codes) }) then
+		self:record(index, step, { verdict = "fail", codes = { "resume_unwritten" }, elapsed_ms = 0 })
+		return continue()
+	end
+	run.reloading = true
+	Logger.info(LOG, "Field run step %d/%d '%s': asking for the timed reload.", index, #run.request.steps, step.id)
+	local asked, accepted = pcall(ports.reload_driver, M.TIMED_RELOAD_REASON)
+	if not asked or accepted ~= true then
+		run.reloading = false
+		ports.remove(resume_path)
+		Logger.error(LOG, "The timed reload was refused: %s.", tostring(accepted))
+		self:record(index, step, { verdict = "fail", codes = { "reload_refused" }, elapsed_ms = 0 })
+		return continue()
+	end
+	local timer
+	timer = ports.after(step.deadline_seconds, function()
+		if timer then run.timers[timer] = nil end
+		if not run.reloading or run.abandoned then return end
+		run.reloading = false
+		ports.remove(resume_path)
+		Logger.error(LOG, "The timed reload was accepted but never tore this state down.")
+		self:record(index, step, { verdict = "timeout", codes = { "reload_not_started" }, elapsed_ms = 0 })
+		continue()
+	end)
+	if timer then run.timers[timer] = true end
+end
+
+--- Reads and consumes the resume file a timed reload left, once.
+--- @return table|nil resume The run to carry on, nil when there is none.
+function Session:take_resume()
+	local path = self:path("resume")
+	local text, status = self.ports.read(path)
+	if status == "absent" then return nil end
+	self.ports.remove(path)
+	local ok, resume = pcall(Json.decode, text or "")
+	local running_text = self.ports.read(self:path("running"))
+	local running_ok, running = pcall(Json.decode, running_text or "")
+	if not ok or type(resume) ~= "table" or not is_request_id(self.spec, resume.request_id)
+		or not running_ok or type(running) ~= "table" or running.request_id ~= resume.request_id
+		or type(resume.steps) ~= "table" or not is_integer(resume.index) then
+		Logger.warn(LOG, "An unusable field run resume file was left; the run is closed as interrupted.")
+		return nil
+	end
+	local steps = {}
+	for _, id in ipairs(resume.steps) do
+		local step = self.spec.step_by_id[id]
+		if not step then
+			Logger.warn(LOG, "The resumed field run names an undeclared step %s; closed as interrupted.", tostring(id))
+			return nil
+		end
+		steps[#steps + 1] = step
+	end
+	if steps[resume.index] == nil or steps[resume.index].kind ~= "reload" then return nil end
+	resume.step_list = steps
+	return resume
+end
+
+--- Carries on a run its timed reload suspended: records the reload step with
+--- its duration, takes a fresh snapshot and runs the next step.
+--- @param resume table From Session:take_resume().
+function Session:resume(resume)
+	local spec, ports = self.spec, self.ports
+	local request = { request_id = resume.request_id, steps = resume.step_list,
+		deadline_seconds = resume.deadline_seconds }
+	local run = self:new_run(request, self:results_dir(resume.request_id), resume.started_ms, resume.started_at)
+	for id, verdict in pairs(type(resume.verdicts) == "table" and resume.verdicts or {}) do run.verdicts[id] = verdict end
+	for _, id in ipairs(type(resume.order) == "table" and resume.order or {}) do run.order[#run.order + 1] = id end
+	self.run = run
+	local index, step = resume.index, resume.step_list[resume.index]
+	local reload_ms = math.max(0, ports.now_ms() - (tonumber(resume.requested_ms) or ports.now_ms()))
+	local codes = { "reloaded" }
+	for _, code in ipairs(type(resume.codes) == "table" and resume.codes or {}) do codes[#codes + 1] = code end
+	-- A step before the reload that changed the configuration is that step's failure, named here
+	local verdict = #codes > 1 and "fail" or "pass"
+	Logger.info(LOG, "Field run %s resumed after its timed reload (%d ms).", request.request_id, math.floor(reload_ms))
+	self:record(index, step, { verdict = verdict, codes = codes, elapsed_ms = reload_ms,
+		report = { reload_ms = math.floor(reload_ms) } })
+	local ok, snapshot = pcall(ports.config_snapshot)
+	if not ok or snapshot == nil then
+		Logger.error(LOG, "The configuration could not be snapshot after the reload; no step runs: %s.", tostring(snapshot))
+		for later = index + 1, #request.steps do
+			self:record(later, request.steps[later], { verdict = "skip", codes = { "config_unprotected" }, elapsed_ms = 0 })
+		end
+		self:record(#request.steps + 1, { id = spec.guard_step, kind = "guard" },
+			{ verdict = "fail", codes = { "snapshot_failed" }, elapsed_ms = 0 })
+		self:finish()
+		return
+	end
+	run.snapshot = snapshot
+	self:advance(index + 1)
 end
 
 --- Writes one step result.

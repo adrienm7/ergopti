@@ -6,6 +6,8 @@ import hashlib
 import importlib.util
 import json
 import os
+import traceback
+import re
 from pathlib import Path
 import platform
 import secrets
@@ -554,6 +556,47 @@ def create_session(deadline, port):
 
 def cancelled(signum, frame):
     raise POLICY.RuntimeRefusal("cancelled")
+
+
+_REFUSAL_FACT_WORD = re.compile(r"[a-z][a-z0-9_]{0,63}")
+
+
+def describe_refusal(error, owner_file):
+    """Name an unexpected refusal with fixed words and numbers only.
+
+    The serve and pull owners print this on stderr, which the driver logs:
+    before it named its check, the field runs of 2026-10-30 logged only
+    "admission refused" and each cause needed a new run.
+
+    The innermost frame names the failing check, the last frame in the owner
+    script the phase, and a native HTTP failure adds its fixed reason, stage
+    and worker exit status.
+    """
+    owner = os.path.basename(owner_file)
+    frames = traceback.extract_tb(error.__traceback__)
+    inner = frames[-1]
+    facts = [
+        "%s at %s:%d %s"
+        % (type(error).__name__, os.path.basename(inner.filename), inner.lineno, inner.name)
+    ]
+    phases = [
+        frame
+        for frame in frames
+        if os.path.basename(frame.filename) == owner and frame.name != "main"
+    ]
+    if phases and phases[-1] is not inner:
+        facts.append("from %s:%d %s" % (owner, phases[-1].lineno, phases[-1].name))
+    named = {"reason": getattr(error, "reason", None)}
+    native = getattr(error, "native_diagnostic", None)
+    if type(native) is dict:
+        for key in ("stage", "native_child_status", "native_receipt_reason", "cleanup"):
+            named[key] = native.get(key)
+    for key, value in named.items():
+        if (type(value) is int and -65535 <= value <= 65535) or (
+            type(value) is str and _REFUSAL_FACT_WORD.fullmatch(value)
+        ):
+            facts.append("%s=%s" % (key, value))
+    return ", ".join(facts)
 
 
 if __name__ == "__main__":
