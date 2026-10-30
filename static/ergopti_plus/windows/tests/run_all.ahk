@@ -1165,6 +1165,7 @@ global _AhkSubDir := ""
 #Include unit/infra/config/migration/test_keystats_migration_read_refusal.ahk
 #Include unit/modules/hotstrings/engine/test_build_inserts_covers_emitted_types.ahk
 #Include unit/modules/keystats/metrics/test_metrics_and_locale_honesty.ahk
+#Include unit/modules/keystats/test_corpus_app_category_store.ahk
 #Include unit/modules/keystats/test_keystats_app_categories.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader_manifest_contract.ahk
