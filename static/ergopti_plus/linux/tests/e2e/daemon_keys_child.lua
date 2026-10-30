@@ -20,7 +20,8 @@
 --- tap-hold manager's action runner. {TICK} turns the scripted whole-second
 --- clock (ERGOPTI_E2E_CLOCK=seconds) over to the next second, no time passing.
 --- Selection-only tokens {SELECT}, {TAPKEY}, {WRAP} exercise the real hook
---- consumption callback when ERGOPTI_E2E_TAP_WRAP selects a scenario. A private
+--- consumption callback when ERGOPTI_E2E_TAP_WRAP selects a scenario;
+--- ERGOPTI_E2E_DYNAMIC=dates switches the built-in date rules on. A private
 --- compiled neutral config is explicitly enabled through its real owners;
 --- only PRIMARY and the focused field/action effects are desktop models.
 --- Prints SCREEN <quoted text> and, for selection scenarios, TAP_WRAP receipts.
@@ -48,15 +49,32 @@ require("tests.win_compat").install()
 local TAP_WRAP = os.getenv("ERGOPTI_E2E_TAP_WRAP") or "none"
 local selection = { primary = "", reads = 0, attempts = 0, queued = 0, executed = 0, focused = false }
 local selection_config = nil
-if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" then
+-- ERGOPTI_E2E_DYNAMIC=dates: the same private config with the built-in date
+-- rules switched on in the file, as a user's config.toml would hold them.
+local DYNAMIC = os.getenv("ERGOPTI_E2E_DYNAMIC") or "none"
+assert(DYNAMIC == "none" or DYNAMIC == "dates", "unknown dynamic hotstring scenario")
+--- The neutral template with the dynamic master and the three date sections on.
+--- @param content string
+--- @return string
+local function with_date_rules(content)
+	for _, section in ipairs({ "", ".date", ".date_fr", ".date_long_fr" }) do
+		local header = "[hotstrings.dynamic" .. section .. "]\nenabled = "
+		local at = assert(content:find(header .. "false", 1, true), "the template lost " .. header)
+		content = content:sub(1, at - 1) .. header .. "true" .. content:sub(at + #header + #"false")
+	end
+	return content
+end
+if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" then
 	local modes = { accepted = true, unassigned = true, modified = true, refused = true, reopened = true }
 	assert(TAP_WRAP == "none" or modes[TAP_WRAP], "unknown tap/wrap scenario")
 	local Paths = require("infra.config_paths")
 	local original = Paths.config
 	selection_config = os.tmpname()
 	local template = assert(io.open("_generated/config_template.toml", "rb"))
+	local content = template:read("*a")
+	if DYNAMIC == "dates" then content = with_date_rules(content) end
 	local file = assert(io.open(selection_config, "wb"))
-	assert(file:write(template:read("*a")))
+	assert(file:write(content))
 	assert(file:close())
 	template:close()
 	Paths.config = function(relative)
