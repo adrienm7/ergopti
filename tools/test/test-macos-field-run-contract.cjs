@@ -534,6 +534,12 @@ function reportFolder(paths) {
 						'the runner rebuilds (no --open-only) even though the stale app answers'
 					);
 					assert(!fs.existsSync(stale.stagerLog), 'the runner, not the collector, stages it');
+					// Field run 2026-10-30 14:54: the stopped app's readiness took the
+					// request and the collector waited 80 minutes for nothing.
+					assert(
+						!fs.existsSync(staleDriver.record),
+						"the stale app's readiness never receives the request"
+					);
 				} finally {
 					staleDriver.child.kill();
 				}
