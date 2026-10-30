@@ -89,7 +89,7 @@ _MBPT_WriterDiagnosticOwner(Directory) {
 		}
 		Private .= (Index > 1 ? "`n" : "") . Line
 	}
-	AssertEqual(2, Rewrites.Length, "The real configuration owner has exactly two sibling imports")
+	AssertEqual(3, Rewrites.Length, "The real configuration owner has exactly three sibling imports")
 	Inverse := Private
 	for Rewrite in Rewrites {
 		Inverse := StrReplace(Inverse, Rewrite.Private, Rewrite.Original, true, &Count)
