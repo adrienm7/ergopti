@@ -1340,9 +1340,12 @@ time and are not obvious from the code:
 - The native CA cases (`managed remote native`, `updater native`, the two
   `test_managed_remote_sspi.ahk` cases, the artifact staging case) install
   their root in CurrentUser, which raises the Windows security warning that
-  needs a click. Headless they fail at `Machine root-store scope requires...`
-  when `ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE=LocalMachine` is set without
-  elevation; run them from an elevated shell or accept the prompt by hand.
+  needs a click, and `X509Store.Add` blocks behind it. A local run therefore
+  reports them NOT EXECUTED at `ChangeTrust(true)`, after their untrusted part;
+  `--interactive` lets a person click within the 10 s trust budget. Hosted CI
+  runs them in the elevated LocalMachine scope, which asks nothing. Setting
+  `ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE=LocalMachine` locally is refused by the
+  hosted-context guard (`Machine root-store scope requires...`).
 - `run_all.ahk` replaces a running copy of itself: launch a private,
   uniquely named copy, or two agents kill each other's runs with exit code 0.
 
