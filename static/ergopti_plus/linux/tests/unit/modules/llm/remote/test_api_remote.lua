@@ -54,14 +54,14 @@ local MESSAGES = {
 
 helpers.describe("api_remote: the shared provider catalogue", function()
 
-	helpers.it("loads Cerebras with its per-model extras", function()
+	helpers.it("loads Cerebras with its thinking dialect", function()
 		local remote = load_remote()
 		local cerebras = remote.provider("cerebras")
 		unload()
 		helpers.assert_true(cerebras ~= nil, "Cerebras is in the shared catalogue")
 		helpers.assert_eq(cerebras.format, "openai")
 		helpers.assert_eq(cerebras.base_url, "https://api.cerebras.ai/v1")
-		helpers.assert_true(next(cerebras.model_extras) ~= nil, "its model_extras are kept")
+		helpers.assert_true(cerebras.thinking_dialect.effort ~= nil, "its thinking dialect is kept")
 	end)
 
 	helpers.it("keeps only the valid providers of the shared validation corpus, once each", function()
@@ -93,7 +93,7 @@ end)
 
 helpers.describe("api_remote: requests follow each provider's contract", function()
 
-	helpers.it("Cerebras: bearer key, chat completions, catalogue extras, no streaming", function()
+	helpers.it("Cerebras: bearer key, chat completions, reasoning off, no streaming", function()
 		local remote = load_remote()
 		local provider = remote.provider("cerebras")
 		local request = assert(remote.build_request({ provider = "cerebras", token = "csk-1" }, MESSAGES,
@@ -107,9 +107,9 @@ helpers.describe("api_remote: requests follow each provider's contract", functio
 		helpers.assert_eq(body.max_tokens, 40)
 		helpers.assert_eq(body.messages[1].role, "system")
 		helpers.assert_eq(body.messages[2].content, "Bonjour, je voulais")
-		for field, value in pairs(provider.model_extras[provider.default_model] or {}) do
-			helpers.assert_eq(body[field], value, "catalogue extra " .. field .. " is sent")
-		end
+		-- The default model reasons at xhigh effort and stalls tiny probes unless
+		-- told not to: the qwen3 family through Cerebras' effort dialect
+		helpers.assert_eq(body.reasoning_effort, "none", "Cerebras' default model is sent reasoning off")
 	end)
 
 	helpers.it("omits an empty system turn (the raw profile)", function()

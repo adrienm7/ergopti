@@ -59,6 +59,9 @@ end
 -- real HOME is replaced by a scratch directory for this process (see
 -- _shared/lua/test/runner_home.lua). Done before any module resolves a path.
 require("test.runner_home").isolate()
+-- Nor the developer's keyring: the API key store gets an in-memory secret
+-- service on every load (tests/support/secret_service_fake.lua).
+require("tests.support.secret_service_fake").isolate()
 
 -- Install the pure-Lua UTF-8 compatibility shim BEFORE any test module is
 -- loaded. LuaJIT 2.x does not bundle Lua 5.3's built-in utf8 library, and

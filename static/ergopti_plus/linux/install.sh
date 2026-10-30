@@ -382,6 +382,16 @@ _required_dependency_package() {
 		pacman:zenity) echo "zenity" ;;
 		xbps:zenity) echo "zenity" ;;
 		apk:zenity) echo "zenity" ;;
+		# Remote API keys live in the desktop secret service, through
+		# secret-tool (modules/llm/api_token_store.lua); without it a key is
+		# refused, never written in plaintext. Only Debian and openSUSE split the
+		# command from the library.
+		apt:secret-tool) echo "libsecret-tools" ;;
+		dnf:secret-tool) echo "libsecret" ;;
+		zypper:secret-tool) echo "secret-tool" ;;
+		pacman:secret-tool) echo "libsecret" ;;
+		xbps:secret-tool) echo "libsecret" ;;
+		apk:secret-tool) echo "libsecret" ;;
 		# The tray icon. platform/tray/appindicator.lua binds this library
 		# through FFI; without it --tray has nothing to host the icon in.
 		apt:tray) echo "libayatana-appindicator3-1" ;;
@@ -592,6 +602,7 @@ _section install.section_dependency_check "${ERGOPTI_VERSION}"
 _check_or_install luajit
 _check_or_install notify-send
 _check_or_install zenity
+_check_or_install secret-tool
 _check_or_install sqlite3
 _check_or_install openssl
 _check_or_install sha256sum

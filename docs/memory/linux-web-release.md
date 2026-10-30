@@ -513,6 +513,19 @@ in the group carrying Ergopti and the type to map/preserve Control
 (`inspect_keymap()` in `desktop_activation.py`), print the compiler command
 and diagnostics on failure, and make a failed verification a non-zero exit.
 
+### project-linux-a-live-layout-is-proven-by-its-cells
+
+A live layout replacement is acknowledged only from the keymap read back from
+the session (`xkbcomp -xkb $DISPLAY -`: the X server, or XWayland, which
+receives the compositor's keymap), compared key by key with the same
+description compiled offline. The layout's name proves nothing: a desktop that
+puts back an older same-named build keeps it (`stale_keymap`). A compositor
+recompiles only when the selected id changes, so Wayland builds alternate
+between `<id>` and `<id>_live`; never rewrite the selected slot and expect a
+reload. The layout scope settles from that answer, which arrives after a child
+process, so `infra/global_scope.lua` is asynchronous: never reintroduce the
+"every participant settles synchronously" assertion.
+
 ### project-linux-install-is-proven-by-the-distribution-matrix
 
 The maintainer has no Linux host: `linux-layout.yml` runs
@@ -710,7 +723,25 @@ the shared runtime repair before the daemon starts: the shared proxy policy
 routes the registry URL, and only a `system` route calls the owned GIO lookup
 (`adapters/system_proxy.lua`); the first selection becomes `HTTPS_PROXY` of the
 daemon. A proxy the user exported wins and is never overridden; DIRECT and a
-machine without a desktop proxy add nothing; any other lookup failure refuses
-the start (`runtime_proxy_unavailable`). Ollama has no failover, so only the first
+machine without a desktop proxy add nothing. A GIO lookup that fails or times
+out (an unusable PAC: GIO names no finer step) sends that origin direct with one
+WARNING naming `native_proxy_lookup` or `native_proxy_budget`, stages the shared
+policy's `falls_back_direct` admits from `pac_unavailable_fallback`; a failure of
+Ergopti's own helper child still refuses the start (`runtime_proxy_unavailable`).
+Ollama has no failover, so only the first
 selection is used, and a PAC that sends blob hosts elsewhere than the registry
 is not followed.
+
+### project-linux-ollama-runs-on-the-owned-port-only
+
+Ergopti's Linux Ollama listens on `llm_ollama_owned_port` (11435), mirrored as
+`infra/llm_bridge.lua` `OLLAMA_OWNED_PORT` and pinned to `defaults.json` by
+`tools/test/test-linux-llm-defaults-single-source.cjs`. The engine origin feeds
+the repair's serve address (`OLLAMA_HOST`) and its `/api/version` readiness
+probe, so an origin on the stock port 11434 adopted a user's own daemon there;
+`resolve_base_url` therefore refuses the stock port and `profiles.init` refuses
+it as an override. The binary is only the per-user pinned runtime of
+`ollama_install_resolver`, and a PATH `ollama` never makes the model page treat
+Ollama as available. Linux has no saved port setting, so no key migrates. Never
+point a test at 11434 to stand for Ergopti's own daemon:
+`test_owned_ollama_coexistence.lua` holds a fake system daemon there.

@@ -15,9 +15,9 @@ local Logger = require("logger.shim")
 
 local CLOUD = [[{"provider_order":["cerebras"],"providers":{"cerebras":{"label":"Cerebras","base_url":"https://example.invalid/v1","default_model":"fixture","format":"openai"}}}]]
 local LOCAL = [[{"server_order":["lmstudio"],"servers":{"lmstudio":{"label":"LM Studio","base_url":"http://127.0.0.1:1234/v1","auth":"optional","discovery":{"process_names":["lm-studio"]}}}}]]
-local SOURCE = [[{"version":1,"active_id":"retired-1","entries":[{"id":"retired-1","provider":"removed_vendor_for_probe","label":"Old provider","token":"invented-fixture-token","future":{"empty":[],"nothing":null}},{"id":"usable-1","provider":"cerebras","label":"Usable provider","token":"invented-fixture-token"},{"id":"local-1","provider":"lmstudio","label":"Local provider","token":"","model":"first-model","base_url":"http://127.0.0.1:1234/v1"}],"future_root":{"flag":false}}]]
-local SELECTED = [[{"version":1,"active_id":"usable-1","entries":[{"id":"retired-1","provider":"removed_vendor_for_probe","label":"Old provider","token":"invented-fixture-token","future":{"empty":[],"nothing":null}},{"id":"usable-1","provider":"cerebras","label":"Usable provider","token":"invented-fixture-token","model":"","base_url":""},{"id":"local-1","provider":"lmstudio","label":"Local provider","token":"","model":"first-model","base_url":"http://127.0.0.1:1234/v1"}],"future_root":{"flag":false}}]]
-local LOCAL_UPDATED = [[{"version":1,"active_id":"retired-1","entries":[{"id":"retired-1","provider":"removed_vendor_for_probe","label":"Old provider","token":"invented-fixture-token","future":{"empty":[],"nothing":null}},{"id":"usable-1","provider":"cerebras","label":"Usable provider","token":"invented-fixture-token","model":"","base_url":""},{"id":"local-1","provider":"lmstudio","label":"Local provider","token":"","model":"second-model","base_url":"http://127.0.0.1:1234/v1"}],"future_root":{"flag":false}}]]
+local SOURCE = [[{"version":1,"active_id":"retired-1","entries":[{"id":"retired-1","provider":"removed_vendor_for_probe","label":"Old provider","token":"invented-fixture-token","future":{"empty":[],"nothing":null}},{"id":"usable-1","provider":"cerebras","label":"Usable provider","token":"secret-service:usable-1#1-1"},{"id":"local-1","provider":"lmstudio","label":"Local provider","token":"","model":"first-model","base_url":"http://127.0.0.1:1234/v1"}],"future_root":{"flag":false}}]]
+local SELECTED = [[{"version":1,"active_id":"usable-1","entries":[{"id":"retired-1","provider":"removed_vendor_for_probe","label":"Old provider","token":"invented-fixture-token","future":{"empty":[],"nothing":null}},{"id":"usable-1","provider":"cerebras","label":"Usable provider","token":"secret-service:usable-1#1-1","model":"","base_url":""},{"id":"local-1","provider":"lmstudio","label":"Local provider","token":"","model":"first-model","base_url":"http://127.0.0.1:1234/v1"}],"future_root":{"flag":false}}]]
+local LOCAL_UPDATED = [[{"version":1,"active_id":"retired-1","entries":[{"id":"retired-1","provider":"removed_vendor_for_probe","label":"Old provider","token":"invented-fixture-token","future":{"empty":[],"nothing":null}},{"id":"usable-1","provider":"cerebras","label":"Usable provider","token":"secret-service:usable-1#1-1","model":"","base_url":""},{"id":"local-1","provider":"lmstudio","label":"Local provider","token":"","model":"second-model","base_url":"http://127.0.0.1:1234/v1"}],"future_root":{"flag":false}}]]
 
 local function write(path, bytes)
 	local file = assert(io.open(path, "wb"))
@@ -58,6 +58,9 @@ local function create_private(path, bytes)
 end
 
 local function with_case(options, body)
+	-- The usable row's key lives in the secret service, as this build writes
+	-- it; the retired row keeps the plaintext an earlier build wrote.
+	require("tests.support.secret_service_fake").install().items["usable-1#1-1"] = "invented-fixture-token"
 	local names = { "modules.llm.api_entries", "modules.llm.api_remote", "modules.llm.local_server_catalogue" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end

@@ -164,6 +164,22 @@ for the desktop pickers, and an owned block of includes in `~/.XCompose`.
 - `install` compiles the layout with `xkbcli` when it is installed and reports
   `verified`; `activate` and `uninstall` add or remove the layout in the
   GNOME/KDE input sources through `desktop_activation.py`.
+- Two commands replace a layout live, for the daemon's number-row options. Both
+  succeed only once the session's keymap, read back with `xkbcomp -xkb
+$DISPLAY -`, holds the installed cells on the thirteen number-row keys, not
+  only the layout's name (`stale_keymap` otherwise).
+  - `apply-x11` (after `install --allow-xorg`) compiles the layout from the tree
+    straight into the running X server.
+  - `apply-wayland` serves GNOME and KDE on Wayland. A compositor recompiles only
+    when the selected id changes, so each build alternates between the layout's
+    id and `<id>_live`: the build is installed under the slot not in use, the
+    GNOME `sources`/`mru-sources` or Plasma `LayoutList` move to it with a
+    read-back, and XWayland, which receives the compositor's keymap, must hold
+    it. Every refusal (`no_display`, `select_refused`, `not_loaded`,
+    `stale_keymap`, ...) writes the previous setting back. Both slots then hold
+    the same build; `install` mirrors updates into `<id>_live`, `activate`
+    drops it from the desktop list and `uninstall` removes both. Other sessions
+    get `session_unsupported` before anything is written.
 - `ERGOPTI_XKB_USER_ROOT` and `ERGOPTI_XKB_USER_HOME` override the tree and the
   home folder for sandboxed tests.
 

@@ -167,7 +167,7 @@ helpers.describe("Ollama install state on Linux", function()
 	end
 	local function llm(models, origin)
 		return { get_cached_models = function() return models or {} end,
-			get_base_url = function() return origin or "http://127.0.0.1:11434" end }
+			get_base_url = function() return origin or "http://127.0.0.1:11435" end }
 	end
 
 	helpers.it("(linux-ollama-install-state) greys an absent or failed runtime with its reason", function()
@@ -175,7 +175,8 @@ helpers.describe("Ollama install state on Linux", function()
 		local cases = {
 			{ fields = {}, available = false, cause = "absent" },
 			{ fields = { managed = "installed" }, available = true, cause = "installed" },
-			{ fields = { system = true }, available = true, cause = "system" },
+			-- An Ollama the user installed never counts: Ergopti runs only its own.
+			{ fields = { system = true }, available = false, cause = "absent" },
 			{ fields = { failure = "runtime_install_failed", managed = "installed" }, available = false, cause = "install_failed" },
 			{ fields = {}, models = { "qwen3:4b" }, available = true, cause = "answering" },
 			{ fields = {}, origin = "http://gpu.lan:11434", available = true, cause = "remote" },

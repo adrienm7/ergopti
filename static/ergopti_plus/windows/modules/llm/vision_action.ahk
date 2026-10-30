@@ -441,9 +441,15 @@ _LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine := true, CurrentF
 	if !_LLM_Vision_CallbackCurrent(CurrentFn)
 		return false
 	if Target.Has("resolved") {
+		; The model family's thinking control (and a local server's request fields)
+		Body := _LLMRemoteCompleteBody(Target["resolved"], Body, &Added)
 		Transport := HasMethod(_LLM_Vision_RemoteTransport, "Call")
 			? _LLM_Vision_RemoteTransport : _LLM_Vision_RemoteRequest
-		Transport.Call(Target["resolved"], Target["url"], Body, OnSuccess, OnFail, CurrentFn)
+		; A provider refusing a thinking field gets the request once more without it
+		Send := (Sent, Fail) => Transport.Call(Target["resolved"], Target["url"], Sent, OnSuccess, Fail, CurrentFn)
+		Transport.Call(Target["resolved"], Target["url"], Body, OnSuccess,
+			_LLMRemoteThinkingRetryFail.Bind(Map("retried", false, "resolved", Target["resolved"], "added", Added,
+				"body", Body, "send", Send), OnFail), CurrentFn)
 		return
 	}
 	Transport := HasMethod(_LLM_Vision_OllamaTransport, "Call")

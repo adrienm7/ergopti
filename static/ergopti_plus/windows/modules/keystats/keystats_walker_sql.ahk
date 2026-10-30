@@ -9,7 +9,7 @@
 ; independently from the inner-loop walking code.
 ;
 ; FEATURES & RATIONALE:
-; 1. KLW_SqlEscape / KLW_SplitKey: helpers of KLW_BuildBatchSql. A statement the
+; 1. KLW_SplitKey: helper of KLW_BuildBatchSql. A statement the
 ;    three drivers share is rendered from the catalogue
 ;    (_shared/data/db/queries.sql) by name; the Windows-only tables stay spelled here.
 ; 2. KLW_BuildBatchSql: drains KLW.batch into one SQL string (all tables in one
@@ -29,11 +29,6 @@
 ; ======= 1/ SQL emission helpers =======
 ; =======================================
 ; =======================================
-
-; Delegates to the driver's one literal encoder, which keeps NUL and CR exact.
-KLW_SqlEscape(s) {
-		return SQLite_Q(s)
-}
 
 ; Renders one catalogue statement of the batch, one per line of data.sql.
 _KLW_Statement(Name, Row, Fields, DeviceId, Extra := unset) {
@@ -94,7 +89,6 @@ KLW_BuildBatchSql(DeviceId := "", TrimTitles := true) {
 		if !KLW.batch.Has("app_day")
 				return ""
 		Device := (DeviceId != "") ? DeviceId : Keystats.device_id
-		d := KLW_SqlEscape(Device)
 		out := ""
 
 		; agg_app_day — walker-owned columns ONLY. `time_ms` stays here because
@@ -143,27 +137,19 @@ KLW_BuildBatchSql(DeviceId := "", TrimTitles := true) {
 
 		; ngram_keycodes.
 		for _, row in KLW.batch["kc_ngram"] {
-				out .= Format(
-						"INSERT INTO ngram_keycodes (device_id, date, app, keycode, c) VALUES ({1},{2},{3},{4},{5}) ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET c=c+excluded.c;`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						row["keycode"], row["count"])
+				out .= _KLW_Statement("agg.ngram_keycode", row, Map("keycode", "keycode", "c", "count"), Device)
 		}
 
 		; ngram_scancodes (Windows hardware scancodes — independent of layout).
 		for _, row in KLW.batch["sc_kb_ngram"] {
-				out .= Format(
-						"INSERT INTO ngram_scancodes (device_id, date, app, scancode, c) VALUES ({1},{2},{3},{4},{5}) ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c=c+excluded.c;`n",
-						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						row["scancode"], row["count"])
+				out .= _KLW_Statement("agg.ngram_scancode", row, Map("scancode", "scancode", "c", "count"), Device)
 		}
 
 		; ngram_shortcuts / ngram_shortcut_bigrams.
 		for tbl_name, tbl in KLW.batch["sc_ngram"] {
 				for _, row in tbl {
-						out .= Format(
-								"INSERT INTO {1} (device_id, date, app, token, c) VALUES ({2},{3},{4},{5},{6}) ON CONFLICT(device_id, date, app, token) DO UPDATE SET c=c+excluded.c;`n",
-								tbl_name, d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-								KLW_SqlEscape(row["token"]), row["count"])
+						out .= _KLW_Statement("agg.ngram_shortcut", row, Map("c", "count"), Device,
+								Map("table", tbl_name, "token", String(row["token"])))
 				}
 		}
 
@@ -273,11 +259,14 @@ KLW_BuildBatchSql(DeviceId := "", TrimTitles := true) {
 		; wifi_changes / locked_ms / sleep_ms / awake_ms are owned by the SQL
 		; rebuild from events_system, so they are not written here.
 		for _, row in KLW.batch["system_day"] {
-				out .= Format(
-						"INSERT INTO agg_system_day (device_id, date, space_switches, audio_muted_ms, passive_count, night_wake_count) VALUES ({1},{2},{3},{4},{5},{6}) ON CONFLICT(device_id, date) DO UPDATE SET space_switches=space_switches+excluded.space_switches,audio_muted_ms=audio_muted_ms+excluded.audio_muted_ms,passive_count=passive_count+excluded.passive_count,night_wake_count=night_wake_count+excluded.night_wake_count;`n",
-						d, KLW_SqlEscape(row["date"]),
-						row["space_switches"], row["audio_muted_ms"],
-						row["passive_count"], row["night_wake_count"])
+				Slots := _KLW_Zeros(["wifi_changes", "locked_ms", "sleep_ms", "awake_ms"])
+				Slots["device_id"] := Device
+				Slots["date"] := String(row["date"])
+				Slots["space_switches"] := row["space_switches"]
+				Slots["audio_muted_ms"] := row["audio_muted_ms"]
+				Slots["passive_count"] := row["passive_count"]
+				Slots["night_wake_count"] := row["night_wake_count"]
+				out .= KeystatsQuery("agg.system_day", Slots) . "`n"
 		}
 
 		KLW_ResetBatch()

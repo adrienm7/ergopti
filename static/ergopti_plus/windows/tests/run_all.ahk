@@ -690,6 +690,7 @@ _LLM_Deps_State := "ready"
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/remote_formats.ahk
 #Include ..\..\_shared\modules\llm\local_server_auth.ahk
+#Include ..\..\_shared\modules\llm\thinking_off.ahk
 #Include ..\..\_shared\modules\llm\local_server_discovery.ahk
 #Include ..\..\_shared\modules\llm\local_server_ports.ahk
 #Include ../../_shared/modules/llm/local_server_menu.ahk
@@ -707,6 +708,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/api/test_llm_api_remote.ahk
 #Include unit/modules/llm/api/test_llm_api_remote_async_registry.ahk
 #Include unit/modules/llm/api/test_llm_api_remote_requests.ahk
+#Include unit/modules/llm/api/test_llm_thinking_off.ahk
 #Include unit/platform/network/test_managed_curl_owner.ahk
 #Include unit/platform/network/test_managed_curl_empty_header.ahk
 #Include unit/platform/network/test_http_post_replacement_validation.ahk

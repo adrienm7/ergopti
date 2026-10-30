@@ -14,10 +14,9 @@ class KLHotstringUnits {
 	static Prefix := "hotstring_count_unit:"
 	static WindowsUnit := "utf16"
 
-	; DeviceSql is the producer's already-quoted, validated device identity.
-	static DeclarationSql(DeviceSql) {
-		return "INSERT OR IGNORE INTO meta(key,value) VALUES('" . this.Prefix . "'||"
-			. DeviceSql . ",'" . this.WindowsUnit . "');"
+	; DeviceId is the producer's raw identity, which the catalogue slot quotes.
+	static DeclarationSql(DeviceId) {
+		return KeystatsQuery("meta.seed", Map("key", this.Prefix . DeviceId, "value", this.WindowsUnit))
 	}
 
 	static Read(Db) {

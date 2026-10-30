@@ -1,5 +1,5 @@
 {
-	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of backboard and decisions live in _shared/lua/llm/remote_formats.lua.",
+	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of backboard and decisions live in _shared/lua/llm/remote_formats.lua. `thinking_dialect` (optional) says how the provider carries each reasoning control kind of _shared/modules/llm/thinking_off.json: kind -> body fields deep-merged into the request (a field the body already sets wins), the string $level replaced by the model family's level. A kind the provider does not list is never sent (openai_compat lists none: it may point at a strict endpoint). Sources: platform.claude.com build-with-claude/thinking and effort, developers.openai.com guides/reasoning, ai.google.dev thinking, docs.x.ai reasoning, docs.mistral.ai reasoning, api-docs.deepseek.com thinking_mode, docs.cohere.com compatibility-api, inference-docs.cerebras.ai reasoning, openrouter.ai reasoning-tokens, console.groq.com reasoning, docs.together.ai reasoning-models-guide, docs.fireworks.ai post-chatcompletions (checked 2026-10-30).",
 	"provider_order": [
 		"openai",
 		"anthropic",
@@ -23,77 +23,99 @@
 			"label": "OpenAI",
 			"base_url": "https://api.openai.com/v1",
 			"default_model": "gpt-4o-mini",
-			"format": "openai"
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"anthropic": {
 			"label": "Anthropic",
 			"base_url": "https://api.anthropic.com/v1",
 			"default_model": "claude-haiku-4-5",
-			"format": "anthropic"
+			"format": "anthropic",
+			"thinking_dialect": {
+				"anthropic_thinking": { "thinking": { "type": "$level" } },
+				"anthropic_effort": { "output_config": { "effort": "$level" } }
+			}
 		},
 		"gemini": {
 			"label": "Google Gemini",
 			"base_url": "https://generativelanguage.googleapis.com/v1beta",
 			"default_model": "gemini-2.0-flash",
-			"format": "gemini"
+			"format": "gemini",
+			"thinking_dialect": {
+				"gemini_budget": {
+					"generationConfig": { "thinkingConfig": { "thinkingBudget": "$level" } }
+				},
+				"gemini_level": { "generationConfig": { "thinkingConfig": { "thinkingLevel": "$level" } } }
+			}
 		},
 		"xai": {
 			"label": "xAI (Grok)",
 			"base_url": "https://api.x.ai/v1",
 			"default_model": "grok-2-mini",
-			"format": "openai"
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"mistral": {
 			"label": "Mistral",
 			"base_url": "https://api.mistral.ai/v1",
 			"default_model": "mistral-small-latest",
-			"format": "openai"
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"deepseek": {
 			"label": "DeepSeek",
 			"base_url": "https://api.deepseek.com",
 			"default_model": "deepseek-chat",
-			"format": "openai"
+			"format": "openai",
+			"thinking_dialect": { "toggle": { "thinking": { "type": "disabled" } } }
 		},
 		"cohere": {
 			"label": "Cohere",
 			"base_url": "https://api.cohere.ai/compatibility/v1",
 			"default_model": "command-r7b-12-2024",
-			"format": "openai"
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"cerebras": {
 			"label": "Cerebras",
 			"base_url": "https://api.cerebras.ai/v1",
 			"default_model": "qwen-3.8-27b",
 			"format": "openai",
-			"model_extras": {
-				"_comment": "Per-model body fields merged into OpenAI-shape payloads by both drivers. qwen-3.8-27b reasons at xhigh effort by default and stalls tiny probes — reasoning stays disabled. Keys starting with _ are documentation, not models.",
-				"qwen-3.8-27b": { "reasoning_effort": "none" }
-			}
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"openrouter": {
 			"label": "OpenRouter",
 			"base_url": "https://openrouter.ai/api/v1",
 			"default_model": "openai/gpt-4o-mini",
-			"format": "openai"
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "reasoning": { "enabled": false } },
+				"effort": { "reasoning": { "effort": "$level" } }
+			}
 		},
 		"groq": {
 			"label": "Groq",
 			"base_url": "https://api.groq.com/openai/v1",
 			"default_model": "llama-3.3-70b-versatile",
-			"format": "openai"
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"together": {
 			"label": "Together AI",
 			"base_url": "https://api.together.xyz/v1",
 			"default_model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-			"format": "openai"
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "reasoning": { "enabled": false } },
+				"effort": { "reasoning_effort": "$level" }
+			}
 		},
 		"fireworks": {
 			"label": "Fireworks AI",
 			"base_url": "https://api.fireworks.ai/inference/v1",
 			"default_model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
-			"format": "openai"
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"backboard": {
 			"label": "Backboard",

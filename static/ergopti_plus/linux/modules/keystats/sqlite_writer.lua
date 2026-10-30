@@ -589,7 +589,7 @@ end
 --- @param derived table|nil Optional { ngrams, daily } rows committed with their raw source.
 _raw_sql.typing = function(device_id, events, first_id, derived)
 
-	local parts = {}
+	local statements = {}
 	for i, ev in ipairs(events) do
 		local event_id = first_id + i - 1
 
@@ -609,35 +609,22 @@ _raw_sql.typing = function(device_id, events, first_id, derived)
 			return false
 		end
 
-		local ts      = _sql_escape(ev.ts      or os.date("!%Y-%m-%d %H:%M:%S"))
-		local date    = _sql_escape(ev.date    or os.date("%Y-%m-%d"))
-		local app     = _sql_escape(ev.app     or "unknown")
-		local text    = _sql_escape(enc_text)
-		local title   = _sql_escape(ev.title   or "")
-		-- WPM is a fractional rate in a REAL column, not an integer counter.
-		local wpm     = tonumber(ev.wpm) or 0
-		local layout  = _sql_escape(ev.layout  or "")
-		local events_json = _sql_escape(enc_json)
-		-- The pointer activity since the application's previous row (pointer_metrics).
-		local mouse_clicks = math.floor(tonumber(ev.mouse_clicks) or 0)
-		local mouse_scrolls = math.floor(tonumber(ev.mouse_scrolls) or 0)
-		local mouse_distance = math.floor(tonumber(ev.mouse_distance_px) or 0)
-
-		parts[#parts + 1] = string.format(
-			"('%s',%d,'%s','%s','%s','%s','','','%s','',0,0,%d,%d,%d,0,0,0.0,%.17g,'%s','','%s')",
-			_sql_escape(device_id), event_id, ts, date, app, title,
-			layout, mouse_clicks, mouse_scrolls, mouse_distance, wpm, text, events_json
-		)
+		-- WPM is a fractional rate in a REAL column, not an integer counter. The
+		-- pointer activity is since the application's previous row (pointer_metrics).
+		statements[i] = Queries.render("events.typing", "cli_json", {
+			device_id = device_id, id = event_id,
+			ts = ev.ts or os.date("!%Y-%m-%d %H:%M:%S"), date = ev.date or os.date("%Y-%m-%d"),
+			app = ev.app or "unknown", title = ev.title or "", url = "", field_role = "",
+			layout = ev.layout or "", document_path = "",
+			is_fullscreen = 0, in_meeting = 0,
+			mouse_clicks = tonumber(ev.mouse_clicks) or 0, mouse_scrolls = tonumber(ev.mouse_scrolls) or 0,
+			mouse_distance_px = tonumber(ev.mouse_distance_px) or 0,
+			pause_before_ms = 0, battery_level = 0, audio_volume = 0,
+			wpm = tonumber(ev.wpm) or 0, text = enc_text, rich_text = "", events_json = enc_json,
+		})
 	end
 
-	local sql = string.format(
-		"INSERT OR IGNORE INTO events_typing "
-		.. "(device_id,id,ts,date,app,title,url,field_role,layout,document_path,"
-		.. "is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,"
-		.. "pause_before_ms,battery_level,audio_volume,wpm,text,rich_text,events_json) "
-		.. "VALUES %s;",
-		table.concat(parts, ",")
-	)
+	local sql = table.concat(statements, "\n")
 	if derived ~= nil then
 		local composed, statements = pcall(function()
 			assert(type(derived) == "table" and type(derived.ngrams) == "table" and type(derived.daily) == "table")
@@ -707,22 +694,21 @@ function M.insert_hotstring_events(device_id, events)
 	return _exec_raw_batch(sql)
 end
 
---- The nullable text and number literals of an events_llm row. A column the event does
+--- The nullable text, number and list values of an events_llm row. A column the event does
 --- not carry is NULL, exactly as the other two drivers write it: the dashboard tells a
 --- generation that reported no token count from one that reported zero.
 local function _llm_text(value)
-	if type(value) ~= "string" then return "NULL" end
-	return "'" .. _sql_escape(value) .. "'"
+	if type(value) == "string" then return value end
 end
 
 local function _llm_number(value)
-	if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then return "NULL" end
-	return string.format("%.17g", value)
+	if type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge then
+		return value
+	end
 end
 
 local function _llm_list(value)
-	if type(value) ~= "table" then return "NULL" end
-	return "'" .. _sql_escape(Json.encode(Json.array(value))) .. "'"
+	if type(value) == "table" then return Json.encode(Json.array(value)) end
 end
 
 --- Inserts LLM prediction events in the canonical events_llm shape macOS and Windows write.
@@ -734,30 +720,27 @@ end
 ---   all_predictions?, chosen_index?, deletes?, deleted_text?, net_saved_chars?,
 ---   prompt_tokens?, completion_tokens?, total_tokens?, est_cost_usd? }.
 _raw_sql.llm = function(device_id, events, first_id)
-	local parts = {}
+	local statements = {}
 	for i, ev in ipairs(events) do
 		local kind = ev.kind
 		if kind ~= "generation" and kind ~= "suggested" and kind ~= "dismissed" and kind ~= "accepted" then
 			Logger.error(LOG, "LLM event batch refused: '%s' is not an events_llm kind.", tostring(kind))
 			return nil
 		end
-		parts[#parts + 1] = string.format("('%s',%d,'%s','%s','%s','%s',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-			_sql_escape(device_id), first_id + i - 1,
-			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
-			_sql_escape(ev.date or os.date("%Y-%m-%d")),
-			_sql_escape(ev.app or "unknown"),
-			kind,
-			_llm_text(ev.context), _llm_list(ev.predictions), _llm_text(ev.prediction),
-			_llm_list(ev.all_predictions), _llm_number(ev.chosen_index), _llm_number(ev.deletes),
-			_llm_text(ev.deleted_text), _llm_number(ev.net_saved_chars), _llm_number(ev.count),
-			_llm_number(ev.prompt_tokens), _llm_number(ev.completion_tokens),
-			_llm_number(ev.total_tokens), _llm_number(ev.est_cost_usd))
+		statements[i] = Queries.render("events.llm", "cli_json", {
+			device_id = device_id, id = first_id + i - 1,
+			ts = ev.ts or os.date("!%Y-%m-%d %H:%M:%S"), date = ev.date or os.date("%Y-%m-%d"),
+			app = ev.app or "unknown", kind = kind,
+			context = _llm_text(ev.context), predictions_json = _llm_list(ev.predictions),
+			prediction = _llm_text(ev.prediction), all_predictions_json = _llm_list(ev.all_predictions),
+			chosen_index = _llm_number(ev.chosen_index), deletes = _llm_number(ev.deletes),
+			deleted_text = _llm_text(ev.deleted_text), net_saved_chars = _llm_number(ev.net_saved_chars),
+			count = _llm_number(ev.count), prompt_tokens = _llm_number(ev.prompt_tokens),
+			completion_tokens = _llm_number(ev.completion_tokens), total_tokens = _llm_number(ev.total_tokens),
+			est_cost_usd = _llm_number(ev.est_cost_usd),
+		})
 	end
-	return "INSERT OR IGNORE INTO events_llm "
-		.. "(device_id,id,ts,date,app,kind,context,predictions_json,prediction,all_predictions_json,"
-		.. "chosen_index,deletes,deleted_text,net_saved_chars,count,prompt_tokens,completion_tokens,"
-		.. "total_tokens,est_cost_usd) VALUES "
-		.. table.concat(parts, ",") .. ";"
+	return table.concat(statements, "\n")
 end
 
 --- Commits one canonical raw LLM batch and returns its native receipt.
@@ -1478,19 +1461,16 @@ end
 --- @param scancodes table { [evdev_code] = count }.
 _derived_sql.scancodes = function(device_id, date, app, scancodes)
 	if type(scancodes) ~= "table" then return end
-	local parts = {}
+	local statements = {}
 	for scancode, count in pairs(scancodes) do
 		local code = tonumber(scancode)
 		if code and code > 0 and type(count) == "number" and count > 0 then
-			parts[#parts + 1] = string.format("('%s','%s','%s',%d,%d)",
-				_sql_escape(device_id), _sql_escape(date), _sql_escape(app),
-				math.floor(code), math.floor(count))
+			statements[#statements + 1] = Queries.render("agg.ngram_scancode", "cli_json", {
+				device_id = device_id, date = date, app = app, scancode = code, c = count,
+			})
 		end
 	end
-	if #parts == 0 then return "" end
-	return "INSERT INTO ngram_scancodes (device_id, date, app, scancode, c) VALUES "
-		.. table.concat(parts, ",")
-		.. " ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c = c + excluded.c;"
+	return table.concat(statements, "\n")
 end
 
 --- Commits one canonical scancodes upsert and returns its native receipt.

@@ -25,6 +25,23 @@ _PBAT_Count(Haystack, Needle) {
 	return Count
 }
 
+; The two buffers after one physical key on the live callback, without modifiers.
+_PBAT_Key(VK, SC, Engine, Preview) {
+	global _PrefixModifierIsDown, HSE_Buffer, _PrefixBuffer
+	SavedEngine := HSE_Buffer
+	SavedPreview := _PrefixBuffer
+	HSE_Buffer := Engine
+	_PrefixBuffer := Preview
+	_PrefixModifierIsDown := (*) => false
+	try {
+		_OnPrefixKeyDown(0, VK, SC)
+		return { Engine: HSE_Buffer, Preview: _PrefixBuffer }
+	} finally {
+		HSE_Buffer := SavedEngine
+		_PrefixBuffer := SavedPreview
+	}
+}
+
 _PBAT_ContextResetSitesUseOneOwner() {
 	Mouse := _DriverFuncBody("_OnMouseClickReset")
 	KeyDown := _DriverFuncBody("_OnPrefixKeyDown")
@@ -78,9 +95,9 @@ _PBAT_BackspaceHasOneAtomicDecrement() {
 	Assert(KeyDown != "" and Pair != "" and Commit != "" and Finish != "" and Synthetic != "",
 		"backspace transition bodies must be source-visible")
 
-	Assert(InStr(KeyDown, "_PrefixFeedBackspace()") > 0
-		and InStr(KeyDown, "HSE_FeedBackspace") == 0,
-		"physical Backspace must have one owner instead of decrementing the engine before the preview helper")
+	After := _PBAT_Key(0x08, 0x0E, "abc", "abc")
+	AssertEqual("ab", After.Engine, "physical Backspace must decrement the engine exactly once")
+	AssertEqual("ab", After.Preview, "physical Backspace must decrement the preview exactly once")
 	EnterCritical := InStr(Pair, 'Critical("On")')
 	CommitCall := InStr(Pair, "_PrefixCommitBackspace()", true, EnterCritical)
 	LeaveCritical := InStr(Pair, "Critical(PreviousCritical)", true, CommitCall)
@@ -100,16 +117,13 @@ _PBAT_BackspaceHasOneAtomicDecrement() {
 }
 
 _PBAT_SpaceKeepsEngineLeftContext() {
-	Body := _DriverFuncBody("_OnPrefixKeyDown")
-	Space := InStr(Body, "else if (VK == 0x20)")
-	SpaceReset := InStr(Body, "_ResetPrefixBuffer()", true, Space)
-	NextBranch := InStr(Body, "else if KS_IsContextResetKey(VK)", true, SpaceReset)
-	Assert(Space > 0 and SpaceReset > Space and NextBranch > SpaceReset,
-		"Space must keep a dedicated preview-only branch before paired navigation resets")
-	Window := SubStr(Body, Space, NextBranch - Space)
-	Assert(InStr(Window, "HSE_FeedReset") == 0
-		and InStr(Window, "_PrefixInvalidateInputContext") == 0,
+	After := _PBAT_Key(0x20, 0x39, "abc", "abc")
+	AssertEqual("abc", After.Engine,
 		"Space keydown must not erase the engine's left context before HSE_FeedChar receives its terminator")
+	AssertEqual("", After.Preview, "Space starts a new word in the preview")
+	Nav := _PBAT_Key(0x1B, 0x01, "abc", "abc")
+	AssertEqual("", Nav.Engine, "a paired navigation reset does clear the engine, which Space must not")
+	AssertEqual("", Nav.Preview, "a paired navigation reset clears the preview too")
 }
 
 _PBAT_SyntheticDeclarationsCannotEscapeTheSendOwner() {

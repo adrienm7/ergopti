@@ -1123,6 +1123,269 @@ check('events: a NOT NULL column refuses a missing value instead of losing the w
 	);
 });
 
+// ---------------------------------------------------------------------------
+// Family: key and shortcut n-grams, the system day, typing and LLM events
+// ---------------------------------------------------------------------------
+
+check('key and shortcut n-grams: the catalogue stores the rows of the hand-built upserts', () => {
+	const tables = ['ngram_keycodes', 'ngram_scancodes', 'ngram_shortcuts', 'ngram_shortcut_bigrams'];
+	const rows = equivalent(
+		tables,
+		(db) => {
+			for (let flush = 0; flush < 2; flush++) {
+				db.exec(
+					`INSERT INTO ngram_keycodes (device_id, date, app, keycode, c) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},38,2) ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET c=c+excluded.c`
+				);
+				db.exec(
+					`INSERT INTO ngram_scancodes (device_id, date, app, scancode, c) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},30,3),(${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},31,1) ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c = c + excluded.c;`
+				);
+				for (const table of ['ngram_shortcuts', 'ngram_shortcut_bigrams'])
+					db.exec(
+						`INSERT INTO ${table} (device_id, date, app, token, c) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},${sq("Cmd+K'")},4) ON CONFLICT(device_id, date, app, token) DO UPDATE SET c=c+excluded.c`
+					);
+			}
+		},
+		(db) => {
+			for (let flush = 0; flush < 2; flush++) {
+				db.exec(catalogue('agg.ngram_keycode', { ...KEYED, keycode: 38, c: 2 }));
+				// One statement per scan code instead of one multi-row INSERT: the same rows.
+				db.exec(catalogue('agg.ngram_scancode', { ...KEYED, scancode: 30, c: 3 }));
+				db.exec(catalogue('agg.ngram_scancode', { ...KEYED, scancode: 31, c: 1 }));
+				for (const table of ['ngram_shortcuts', 'ngram_shortcut_bigrams'])
+					db.exec(catalogue('agg.ngram_shortcut', { table, ...KEYED, token: "Cmd+K'", c: 4 }));
+			}
+		}
+	);
+	assert.equal(rows.ngram_keycodes[0].c, 4);
+	assert.equal(rows.ngram_scancodes.length, 2);
+	assert.equal(rows.ngram_shortcut_bigrams[0].c, 8);
+});
+
+check('system day: the catalogue adds the deltas macOS and Windows stored', () => {
+	const macos = (r) =>
+		`INSERT INTO agg_system_day (device_id, date, wifi_changes, space_switches, audio_muted_ms, locked_ms, sleep_ms, awake_ms, passive_count, night_wake_count) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${r.join(',')}) ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=wifi_changes+excluded.wifi_changes,space_switches=space_switches+excluded.space_switches,audio_muted_ms=audio_muted_ms+excluded.audio_muted_ms,locked_ms=locked_ms+excluded.locked_ms,sleep_ms=sleep_ms+excluded.sleep_ms,awake_ms=awake_ms+excluded.awake_ms,passive_count=passive_count+excluded.passive_count,night_wake_count=night_wake_count+excluded.night_wake_count`;
+	const windows = `INSERT INTO agg_system_day (device_id, date, space_switches, audio_muted_ms, passive_count, night_wake_count) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},2,3,7,8) ON CONFLICT(device_id, date) DO UPDATE SET space_switches=space_switches+excluded.space_switches,audio_muted_ms=audio_muted_ms+excluded.audio_muted_ms,passive_count=passive_count+excluded.passive_count,night_wake_count=night_wake_count+excluded.night_wake_count;`;
+	const slots = (r) => ({
+		device_id: KEY.device_id,
+		date: KEY.date,
+		wifi_changes: r[0],
+		space_switches: r[1],
+		audio_muted_ms: r[2],
+		locked_ms: r[3],
+		sleep_ms: r[4],
+		awake_ms: r[5],
+		passive_count: r[6],
+		night_wake_count: r[7]
+	});
+	const full = [1, 2, 3, 4, 5, 6, 7, 8];
+	const rows = equivalent(
+		['agg_system_day'],
+		(db) => {
+			db.exec(macos(full));
+			db.exec(macos(full));
+		},
+		(db) => {
+			db.exec(catalogue('agg.system_day', slots(full)));
+			db.exec(catalogue('agg.system_day', slots(full)));
+		}
+	);
+	assert.equal(rows.agg_system_day[0].night_wake_count, 16);
+	// Windows owns four columns and passes 0 for the others, which adds nothing.
+	const owned = [0, 2, 3, 0, 0, 0, 7, 8];
+	equivalent(
+		['agg_system_day'],
+		(db) => {
+			db.exec(windows);
+			db.exec(windows);
+		},
+		(db) => {
+			db.exec(catalogue('agg.system_day', slots(owned)));
+			db.exec(catalogue('agg.system_day', slots(owned)));
+		}
+	);
+});
+
+const TYPING_COLUMNS =
+	'device_id, id, ts, date, app, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json';
+
+check('typing: the catalogue stores the rows of the three drivers', () => {
+	const rows = equivalent(
+		['events_typing'],
+		(db) => {
+			// macOS: absent optional columns are NULL. Linux: one multi-row INSERT with
+			// empty strings and zeros. Windows also names the application category.
+			db.exec(
+				`INSERT OR IGNORE INTO events_typing (${TYPING_COLUMNS}) VALUES ('dev', 1, ${msStr(STAMP.ts)}, ${msStr(STAMP.date)}, 'Code', ${legacyQuote("it's")}, NULL, NULL, NULL, NULL, 1, 0, 2, 3, 44, 90, 80, 0.5, 61.25, ${legacyQuote('a\r\0b')}, NULL, '[]');`
+			);
+			db.exec(
+				`INSERT OR IGNORE INTO events_typing (${TYPING_COLUMNS.replaceAll(', ', ',')}) VALUES ('dev',2,'${STAMP.ts}','${STAMP.date}','Term','t','','','azerty','',0,0,1,0,9,0,0,0.0,12.5,'x','','[]'),('dev',3,'${STAMP.ts}','${STAMP.date}','Term','t','','','azerty','',0,0,1,0,9,0,0,0.0,12.5,'y','','[]');`
+			);
+			db.exec(
+				`INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ('dev', 4, ${msStr(STAMP.ts)}, ${msStr(STAMP.date)}, 'Code', 'editor', NULL, NULL, NULL, NULL, NULL, 0, 0, 0, 0, 0, 0, NULL, NULL, 0, 'z', NULL, '{}');`
+			);
+		},
+		(db) => {
+			const base = { device_id: 'dev', ...STAMP };
+			db.exec(
+				catalogue('events.typing', {
+					...base,
+					id: 1,
+					app: 'Code',
+					title: "it's",
+					is_fullscreen: 1,
+					in_meeting: 0,
+					mouse_clicks: 2,
+					mouse_scrolls: 3,
+					mouse_distance_px: 44,
+					pause_before_ms: 90,
+					battery_level: 80,
+					audio_volume: 0.5,
+					wpm: 61.25,
+					text: 'a\r\0b',
+					events_json: '[]'
+				})
+			);
+			for (const [id, text] of [
+				[2, 'x'],
+				[3, 'y']
+			])
+				db.exec(
+					catalogue('events.typing', {
+						...base,
+						id,
+						app: 'Term',
+						title: 't',
+						url: '',
+						field_role: '',
+						layout: 'azerty',
+						document_path: '',
+						is_fullscreen: 0,
+						in_meeting: 0,
+						mouse_clicks: 1,
+						mouse_scrolls: 0,
+						mouse_distance_px: 9,
+						pause_before_ms: 0,
+						battery_level: 0,
+						audio_volume: 0,
+						wpm: 12.5,
+						text,
+						rich_text: '',
+						events_json: '[]'
+					})
+				);
+			db.exec(
+				catalogue('events.typing', {
+					...base,
+					id: 4,
+					app: 'Code',
+					app_category: 'editor',
+					is_fullscreen: 0,
+					in_meeting: 0,
+					mouse_clicks: 0,
+					mouse_scrolls: 0,
+					mouse_distance_px: 0,
+					pause_before_ms: 0,
+					wpm: 0,
+					text: 'z',
+					events_json: '{}'
+				})
+			);
+		}
+	);
+	assert.equal(rows.events_typing.length, 4);
+	assert.equal(rows.events_typing.find((r) => r.id === 4).app_category, 'editor');
+	assert.equal(rows.events_typing.find((r) => r.id === 1).url, null);
+	assert.throws(
+		() =>
+			catalogue('events.typing', {
+				device_id: 'dev',
+				id: 1,
+				...STAMP,
+				app: 'A',
+				text: 'x',
+				events_json: '[]'
+			}),
+		TypeError,
+		'a NOT NULL counter refuses a missing value instead of losing the whole event'
+	);
+});
+
+check('llm: the catalogue stores the rows of the three drivers', () => {
+	const columns =
+		'device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd';
+	const rows = equivalent(
+		['events_llm'],
+		(db) => {
+			db.exec(
+				`INSERT OR IGNORE INTO events_llm (${columns}) VALUES ('dev', 1, ${msStr(STAMP.ts)}, ${msStr(STAMP.date)}, 'Code', 'generation', ${legacyQuote("it's\r")}, '["a"]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 10, 5, 15, 0.00125);`
+			);
+			db.exec(
+				`INSERT OR IGNORE INTO events_llm (${columns.replaceAll(', ', ',')}) VALUES ('dev',2,'${STAMP.ts}','${STAMP.date}','unknown','accepted',NULL,NULL,'p',NULL,1,0,NULL,4,NULL,NULL,NULL,NULL,NULL),('dev',3,'${STAMP.ts}','${STAMP.date}','unknown','suggested',NULL,NULL,NULL,'["b"]',NULL,NULL,'d',NULL,3,NULL,NULL,NULL,NULL);`
+			);
+			db.exec(
+				`INSERT OR IGNORE INTO events_llm (${columns}) VALUES ('dev', 4, ${msStr(STAMP.ts)}, ${msStr(STAMP.date)}, 'Unknown', 'dismissed', NULL, '{}', NULL, '{}', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);`
+			);
+		},
+		(db) => {
+			const base = { device_id: 'dev', ...STAMP };
+			db.exec(
+				catalogue('events.llm', {
+					...base,
+					id: 1,
+					app: 'Code',
+					kind: 'generation',
+					context: "it's\r",
+					predictions_json: '["a"]',
+					prompt_tokens: 10,
+					completion_tokens: 5,
+					total_tokens: 15,
+					est_cost_usd: 0.00125
+				})
+			);
+			db.exec(
+				catalogue('events.llm', {
+					...base,
+					id: 2,
+					app: 'unknown',
+					kind: 'accepted',
+					prediction: 'p',
+					chosen_index: 1,
+					deletes: 0,
+					net_saved_chars: 4
+				})
+			);
+			db.exec(
+				catalogue('events.llm', {
+					...base,
+					id: 3,
+					app: 'unknown',
+					kind: 'suggested',
+					all_predictions_json: '["b"]',
+					deleted_text: 'd',
+					count: 3
+				})
+			);
+			db.exec(
+				catalogue('events.llm', {
+					...base,
+					id: 4,
+					app: 'Unknown',
+					kind: 'dismissed',
+					predictions_json: '{}',
+					all_predictions_json: '{}'
+				})
+			);
+		}
+	);
+	assert.equal(rows.events_llm.length, 4);
+	assert.equal(rows.events_llm.find((r) => r.id === 1).est_cost_usd, 0.00125);
+	assert.equal(
+		rows.events_llm.find((r) => r.id === 2).count,
+		null,
+		'no count is not a count of zero'
+	);
+});
+
 if (failures > 0) {
 	console.error(`\n${failures} keystats write catalogue check(s) failed.`);
 	process.exit(1);

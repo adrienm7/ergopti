@@ -25,7 +25,7 @@ local function with_refused_storage(body)
     package.loaded["infra.llm_preferences"] = storage
     package.loaded["adapters.http_client"] = {
       get = function(url, _, _, callback)
-        helpers.assert_eq(url, "http://127.0.0.1:11434/api/version")
+        helpers.assert_eq(url, "http://127.0.0.1:11435/api/version")
         pending = callback
         return true
       end,
@@ -79,7 +79,7 @@ helpers.describe("prediction_engine integration", function()
         get_current_model = function() return "codellama" end,
         set_model = function() end,
         refresh_models = function() end,
-        get_base_url = function() return "http://127.0.0.1:11434" end,
+        get_base_url = function() return "http://127.0.0.1:11435" end,
       }
     end
 
@@ -238,7 +238,7 @@ helpers.describe("prediction_engine integration", function()
       helpers.assert_true(type(pf.get_current_model) == "function")
       helpers.assert_true(type(pf.get_models) == "function")
       helpers.assert_true(type(pf.get_base_url) == "function")
-      helpers.assert_eq(pf.get_base_url(), "http://127.0.0.1:11434",
+      helpers.assert_eq(pf.get_base_url(), "http://127.0.0.1:11435",
         "profiles own an origin, never an operation endpoint")
     end)
 
@@ -258,7 +258,7 @@ helpers.describe("prediction_engine integration", function()
               notifications = notifications + 1
               projected = prediction.get_cached_models()
             end }))
-            helpers.assert_eq(pf.get_base_url(), "http://127.0.0.1:11434")
+            helpers.assert_eq(pf.get_base_url(), "http://127.0.0.1:11435")
             local receipt = prediction.capture_runtime_response()
             helpers.assert_true(prediction.runtime_response_current(receipt, pf.get_base_url()))
             helpers.assert_eq(pf.get_cached_models(), {})
@@ -273,7 +273,7 @@ helpers.describe("prediction_engine integration", function()
             deferred:close()
             helpers.assert_eq(#world.inventory_requests, 1)
             local request = world.inventory_requests[1]
-            helpers.assert_eq(request.url, "http://127.0.0.1:11434/api/tags",
+            helpers.assert_eq(request.url, "http://127.0.0.1:11435/api/tags",
               "the model catalogue must request the exact tags endpoint")
             helpers.assert_true(request.url:find("/api/chat/api/tags", 1, true) == nil,
               "the chat path must never prefix the tags operation")

@@ -84,8 +84,9 @@ local function name_set(list, where)
 	return set
 end
 
---- The longest a step may run: its progress bound for a download step, its
---- deadline otherwise.
+--- The longest a step is budgeted: its progress bound for a download step, its
+--- deadline otherwise. A download still progressing at its bound may go on
+--- into the request time the later steps do not need (Session:run_step).
 --- @param step table Step declaration.
 --- @return integer seconds
 function M.step_bound_seconds(step)
@@ -286,11 +287,15 @@ end
 --- The smallest catalogue model a backend can download, for the AI flows.
 --- Ollama needs a library tag (the only form its registry pull takes); MLX
 --- takes the display name, which the models manager maps to its repository.
+--- A model already installed wins over a smaller one that is not: the
+--- maintainer's shared connection paid 20 minutes for 0.38 GB on 2026-10-30,
+--- and an installed model exercises the same pull and serve path for free.
 --- @param catalogue table Decoded _shared/modules/llm/models.json.
 --- @param backend string "ollama" or "mlx".
+--- @param installed function|nil fn(model) -> boolean, true for an installed model.
 --- @return table|nil model { name, runtime_name, download_gb }
-function M.smallest_model(catalogue, backend)
-	local best = nil
+function M.smallest_model(catalogue, backend, installed)
+	local best, best_installed = nil, nil
 	for _, provider in ipairs(type(catalogue) == "table" and catalogue or {}) do
 		for _, family in ipairs(type(provider.families) == "table" and provider.families or {}) do
 			for _, model in ipairs(type(family.models) == "table" and family.models or {}) do
@@ -302,15 +307,20 @@ function M.smallest_model(catalogue, backend)
 				local pullable = backend ~= "ollama"
 					or (type(url) == "string" and url:match("^https://ollama%.com/library/") ~= nil)
 				if runtime and size and size > 0 and pullable and type(model.name) == "string" then
-					if best == nil or size < best.download_gb
-						or (size == best.download_gb and model.name < best.name) then
-						best = { name = model.name, runtime_name = runtime, download_gb = size }
+					local candidate = { name = model.name, runtime_name = runtime, download_gb = size }
+					local function smaller(current)
+						return current == nil or size < current.download_gb
+							or (size == current.download_gb and model.name < current.name)
+					end
+					if smaller(best) then best = candidate end
+					if installed and smaller(best_installed) and installed(candidate) == true then
+						best_installed = candidate
 					end
 				end
 			end
 		end
 	end
-	return best
+	return best_installed or best
 end
 
 
@@ -578,6 +588,16 @@ function Session:run_step(index, step, continue)
 	local stall_ms = step.deadline_seconds * 1000
 	local deadline_ms = math.min(M.step_bound_seconds(step) * 1000, left_ms)
 	local progress_aware = step.progress_max_seconds ~= nil
+	if progress_aware then
+		-- A download still moving at its bound may use the request time the later
+		-- steps do not need: the Mac run of 2026-10-30 19:17 cut the 0.38 GB MLX
+		-- model at 90 % over a shared connection while it still progressed.
+		local reserve_ms = 0
+		for later = index + 1, #run.request.steps do
+			reserve_ms = reserve_ms + M.step_bound_seconds(run.request.steps[later]) * 1000
+		end
+		deadline_ms = math.max(deadline_ms, left_ms - reserve_ms)
+	end
 	local ring_before = ports.log_ring()
 	local started_ms, started_at = ports.now_ms(), ports.iso_now()
 	local settled, timer = false, nil

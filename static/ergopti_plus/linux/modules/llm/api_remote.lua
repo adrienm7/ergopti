@@ -46,6 +46,7 @@ local Monotonic = require("infra.monotonic")
 local Formats = require("llm.remote_formats")
 local Classifier = require("llm.remote_response_classifier")
 local AuthPolicy = require("llm.local_server_auth")
+local ThinkingOff = require("llm.thinking_off")
 local ApiModelListing = require("llm.api_model_listing")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local ProviderConfig = require("llm.provider_config_policy")
@@ -167,8 +168,14 @@ function M.parse_catalogue(text)
 	end
 	for _, id in ipairs(root.provider_order) do
 		local desc = type(id) == "string" and root.providers[id] or nil
+		local thinking_dialect, thinking_reason = nil, nil
+		if type(desc) == "table" then thinking_dialect, thinking_reason = ThinkingOff.parse_dialect(desc.thinking_dialect) end
 		if catalogue.providers[id] then
 			Logger.warn(LOG, "api_providers.json: provider '%s' is listed twice; the first is kept.", id)
+		elseif descriptor_is_valid(id, desc) and not thinking_dialect then
+			-- A half-read dialect would let some models think: refuse the provider whole
+			Logger.error(LOG, "api_providers.json: providers.%s.thinking_dialect is invalid (%s) — skipped.",
+				tostring(id), tostring(thinking_reason))
 		elseif descriptor_is_valid(id, desc) then
 			catalogue.providers[id] = {
 				id = id,
@@ -177,6 +184,7 @@ function M.parse_catalogue(text)
 				default_model = desc.default_model,
 				format = desc.format,
 				model_extras = normalize_model_extras(desc.model_extras),
+				thinking_dialect = thinking_dialect,
 			}
 			catalogue.order[#catalogue.order + 1] = id
 		else
@@ -210,7 +218,7 @@ local function catalogue()
 	for _, id in ipairs(order) do
 		local desc = servers[id]
 		_catalogue.providers[id] = { id = id, label = desc.label, base_url = desc.base_url,
-			default_model = "", format = "openai", model_extras = {}, request_fields = request_fields }
+			default_model = "", format = "openai", model_extras = {}, thinking_dialect = {}, request_fields = request_fields }
 		_catalogue.order[#_catalogue.order + 1] = id
 	end
 	return _catalogue
@@ -415,6 +423,156 @@ local function split_messages(messages)
 	return system, user
 end
 
+-- The reasoning control of every model family (thinking_off.json), read once
+local _thinking_families = nil
+
+-- Fields a provider refused for a model (HTTP 400 naming them), by
+-- "<provider>|<model>": later requests never send them again. Read from the
+-- state file at the first request, written at each new refusal.
+local _thinking_refused = nil
+
+-- The state file of the refusals, under the XDG state home
+local THINKING_REFUSED_FILE = "ergopti_plus/llm_thinking_refused.json"
+
+-- Its path, replaced by the tests
+local _thinking_refused_path = nil
+
+-- Linux reports genuine absence separately from a read refusal
+local ENOENT = 2
+
+--- The refusal store's path.
+--- @return string
+local function thinking_refused_path()
+	return _thinking_refused_path
+		or (require("infra.config_paths").state_home() .. "/" .. THINKING_REFUSED_FILE)
+end
+
+-- Defined below; declared here for thinking_refused, which reads its expiry
+local thinking_families
+
+--- The refusal store, read from its state file on first use. An unreadable
+--- file is logged and the refusals are learned again.
+--- @return table key -> set of field names.
+local function thinking_refused()
+	if _thinking_refused then return _thinking_refused end
+	local path = thinking_refused_path()
+	local fh, _, errno = require("infra.regular_file_reader").open_source(path)
+	local stored = nil
+	if fh then
+		local read_ok, text = pcall(fh.read, fh, "*a")
+		pcall(fh.close, fh)
+		stored = read_ok and type(text) == "string" and Json.decode(text) or nil
+		if stored == nil then Logger.error(LOG, "The refused thinking fields are unreadable; they are learned again.") end
+	elseif errno ~= ENOENT then
+		Logger.error(LOG, "The refused thinking fields could not be read; they are learned again.")
+	end
+	local dropped
+	_thinking_refused, dropped = ThinkingOff.refusals_parse(stored, os.time(), thinking_families().expiry_sec or 0) -- no families table: nothing is remembered
+	if dropped > 0 then Logger.warn(LOG, "%d malformed refused thinking field entr(ies) dropped.", dropped) end
+	return _thinking_refused
+end
+
+--- Writes the refusal store: a temporary file, then a rename.
+--- @return boolean saved
+local function save_thinking_refused()
+	local path = thinking_refused_path()
+	local dir = require("native_path").dirname(path)
+	local Shell = require("adapters.shell_runner")
+	if dir and not Shell.run("mkdir -p " .. Shell.quote(dir) .. " 2>/dev/null") then return false end
+	local text = Json.encode(_thinking_refused)
+	local temp = path .. ".tmp"
+	-- A temporary file a crash left behind would refuse the exclusive creation
+	if io.open(temp, "r") then os.remove(temp) end
+	local opened, fh, _, _, remove_owned = pcall(require("infra.regular_file_writer").open, temp, "wx")
+	if not opened or not fh or type(text) ~= "string" then
+		if opened and fh then pcall(fh.close, fh); remove_owned() end
+		return false
+	end
+	local wrote, written = pcall(fh.write, fh, text)
+	local closed, flushed = pcall(fh.close, fh)
+	if not wrote or not written or not closed or flushed ~= true then
+		remove_owned()
+		return false
+	end
+	local called, renamed = pcall(os.rename, temp, path)
+	if not called or renamed ~= true then
+		remove_owned()
+		return false
+	end
+	return true
+end
+
+--- The model families, loaded at their first use. An unreadable table is
+--- logged and turns nothing off: no guess.
+--- @return table families
+function thinking_families()
+	if _thinking_families then return _thinking_families end
+	local path = Paths.shared("modules/llm/thinking_off.json")
+	local fh = path and io.open(path, "r")
+	local text = fh and fh:read("*a") or nil
+	if fh then fh:close() end
+	local families, reason = ThinkingOff.parse_families(type(text) == "string" and Json.decode(text) or nil)
+	if not families then
+		Logger.error(LOG, "thinking_off.json is unreadable (%s) — no request turns thinking off.", tostring(reason))
+		families = {}
+	end
+	_thinking_families = families
+	return families
+end
+
+--- Completes a request body for a provider: a local server's request_fields
+--- of local_servers.json (OpenAI shape), then the model family's reasoning
+--- control (thinking_off.json) through the provider's thinking_dialect. A
+--- field the body already sets wins.
+--- @param provider_id string
+--- @param model string The model the request names.
+--- @param body table The request body, changed in place.
+--- @return table body
+--- @return table added Paths the thinking control added (for M.thinking_refusal).
+function M.complete_body(provider_id, model, body)
+	local provider = M.provider(provider_id)
+	if not provider then error("api_remote.complete_body: unknown provider " .. tostring(provider_id), 2) end
+	if provider.format == "openai" then AuthPolicy.apply_request_fields(body, provider.request_fields) end
+	local family, kind, added = ThinkingOff.apply(thinking_families(), provider.thinking_dialect, model, body,
+		thinking_refused()[provider_id .. "|" .. model])
+	if #added > 0 then
+		Logger.debug(LOG, "Thinking off: family %d applies to model %s through provider '%s' (%s).",
+			family, model, provider_id, kind)
+	end
+	-- These models answer HTTP 400 to any temperature but the default
+	if body.temperature ~= nil and ThinkingOff.default_sampling_only(thinking_families(), model) then
+		body.temperature = nil
+		Logger.debug(LOG, "Model %s accepts only the default sampling: no temperature is sent.", model)
+	end
+	return body, added
+end
+
+--- When a provider answered HTTP 400 naming a field complete_body added,
+--- remembers that field as refused for the provider and model and removes it
+--- from the body, so the caller can send the request once more without it.
+--- @param provider_id string
+--- @param model string
+--- @param result table The failed HTTP result (status, error_body).
+--- @param added table complete_body's paths.
+--- @param body table The request body, changed in place.
+--- @return boolean retry True when a refused field was removed.
+function M.thinking_refusal(provider_id, model, result, added, body)
+	if type(result) ~= "table" then return false end
+	local field = ThinkingOff.refused_field(result.status, M.server_message(result.error_body), added)
+	if not field then return false end
+	if not ThinkingOff.record_refusal(thinking_refused(), provider_id, model, field, os.time()) then
+		-- Skipped for this session all the same; only the restart forgets it
+		_thinking_refused[provider_id .. "|" .. model] = { [field] = os.time() }
+		Logger.warn(LOG, "The refused thinking fields are full: '%s' for model %s is not remembered.", field, model)
+	elseif not save_thinking_refused() then
+		Logger.error(LOG, "The refused thinking fields could not be saved; they hold until the next restart.")
+	end
+	ThinkingOff.strip(body, added, field)
+	Logger.warn(LOG, "Provider '%s' refused the thinking field '%s' for model %s: sent once more without it, and never again.",
+		provider_id, field, model)
+	return true
+end
+
 --- Builds one chat completion request for an entry (openai, anthropic and
 --- gemini formats; Backboard's two-step exchange is chat()'s own).
 --- @param entry table { provider, base_url?, model?, token }
@@ -454,16 +612,16 @@ function M.build_request(entry, messages, opts)
 		if system ~= "" then sent[#sent + 1] = { role = "system", content = system } end
 		sent[#sent + 1] = { role = "user", content = user }
 		payload = { model = model, messages = sent, temperature = temperature, max_tokens = max_tokens, stream = false }
-		-- Per-model fields from the catalogue (Cerebras' qwen reasons at length
-		-- unless told not to), never restated here.
+		-- Per-model fields from the catalogue, never restated here.
 		for field, value in pairs(provider.model_extras[model] or {}) do payload[field] = value end
-		-- A local server also gets the shared local_servers.json request
-		-- fields (thinking off), never over a field already set.
-		AuthPolicy.apply_request_fields(payload, provider.request_fields)
 	end
+	-- Reasoning off for every format: a local server's request fields, then
+	-- the provider's thinking_off rules, never over a field already set.
+	local _, added = M.complete_body(entry.provider, model, payload)
 	local body = Json.encode(payload)
 	if type(body) ~= "string" then return nil, "request could not be encoded" end
-	return { url = endpoint.url, headers = endpoint.headers, body = body, format = provider.format, model = model }
+	return { url = endpoint.url, headers = endpoint.headers, body = body, format = provider.format, model = model,
+		provider = entry.provider, payload = payload, added = added }
 end
 
 
@@ -776,16 +934,28 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	local request, reason = M.build_request(entry, messages, opts)
 	if not request then return refuse(reason) end
 	Logger.debug(LOG, "chat() → %s (model=%s)", M.redact_url(request.url), request.model)
-	local dispatched = (InferenceClient or HttpClient).post(request.url, request.headers, request.body, function(result)
+	local options = { owner = scope.owner, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized }
+	local retried = false
+	local function on_result(result)
 		if epoch ~= scope.epoch then return end
 		if authorized and not authorized() then return end
 		if type(result) ~= "table" or result.ok ~= true then
+			-- A refused thinking field: the same request once more without it
+			if not retried and M.thinking_refusal(request.provider, request.model, result, request.added, request.payload) then
+				retried = true
+				local again = Json.encode(request.payload)
+				if type(again) == "string"
+					and (InferenceClient or HttpClient).post(request.url, request.headers, again, on_result, options) == true then
+					return
+				end
+			end
 			fail(failure_detail(result), failure_receipt(result))
 			return
 		end
 		local classified = Classifier.classify(request.format, result.body)
 		deliver(classified.text ~= "" and classified.text or nil, priced(classified.usage, request.model))
-	end, { owner = scope.owner, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized })
+	end
+	local dispatched = (InferenceClient or HttpClient).post(request.url, request.headers, request.body, on_result, options)
 	if dispatched ~= true then
 		done("", "HTTP transport unavailable")
 		return false
@@ -1040,7 +1210,8 @@ function M.test(entry, on_done, admission)
 end
 
 --- Forgets the loaded catalogue and the Backboard assistants (tests).
-function M._reset_for_test()
+function M._reset_for_test(thinking_refused_file)
+	_thinking_refused, _thinking_refused_path = nil, thinking_refused_file
 	_catalogue = nil
 	_config_catalogue_failed = false
 	for _, scope in ipairs({ _inference, _probe }) do

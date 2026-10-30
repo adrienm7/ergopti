@@ -1,0 +1,2126 @@
+{
+	"description": "Thinking-off resolution, replayed by _shared/lua/llm/thinking_off.lua (macOS and Linux suites) and its AutoHotkey port _shared/modules/llm/thinking_off.ahk (Windows suite) over the shipped _shared/modules/llm/thinking_off.json families and api_providers.json thinking_dialect, so the drivers cannot drift.",
+	"rule": "normalize_vectors: lowercase, last path segment, an Ollama :tag dropped. glob_vectors: a glob matches the whole id, ignoring case, * the only wildcard. merge_vectors: fields deep-merged into body give expected (the body wins at every level); added lists the paths added. resolve_vectors: the model's family (first match on the normalized id) through the provider's dialect (first control kind it carries, $level filled) merged into body gives expected; family is its 1-based index and kind the control applied, both absent when none. refusal_vectors: after resolution, an HTTP 400 whose message names an added key (snake or camel; a generic leaf as parent.leaf) refuses its top-level field, stripped from the body (expected); field absent when nothing is refused. refused_vectors: a refused top-level field is never added. family_parse_vectors and dialect_parse_vectors: accepted whole (valid true) or refused whole. sampling_vectors: whether the model's family accepts only the default sampling (no temperature sent). refusal_store_vectors: a persisted store \"<provider>|<model>\" -> field -> epoch second keeps each valid field refused less than refusal_expiry_days (thinking_off.json) before now and not after it; a key left with none, or without |, is dropped and counted.",
+	"normalize_vectors": [
+		{
+			"model": "GPT-5.1",
+			"normalized": "gpt-5.1"
+		},
+		{
+			"model": "openai/gpt-5.1",
+			"normalized": "gpt-5.1"
+		},
+		{
+			"model": "accounts/fireworks/models/qwen3-235b",
+			"normalized": "qwen3-235b"
+		},
+		{
+			"model": "Qwen/Qwen3-32B",
+			"normalized": "qwen3-32b"
+		},
+		{
+			"model": "qwen3:8b",
+			"normalized": "qwen3"
+		},
+		{
+			"model": "hf.co/unsloth/Qwen3-8B-GGUF:Q4_K_M",
+			"normalized": "qwen3-8b-gguf"
+		},
+		{
+			"model": "models/gemini-2.5-flash",
+			"normalized": "gemini-2.5-flash"
+		}
+	],
+	"glob_vectors": [
+		{
+			"glob": "gpt-5.*",
+			"model": "gpt-5.1",
+			"match": true
+		},
+		{
+			"glob": "gpt-5.*",
+			"model": "GPT-5.2-mini",
+			"match": true
+		},
+		{
+			"glob": "gpt-5.*",
+			"model": "gpt-5",
+			"match": false
+		},
+		{
+			"glob": "gpt-5",
+			"model": "gpt-5",
+			"match": true
+		},
+		{
+			"glob": "gpt-5",
+			"model": "gpt-5-mini",
+			"match": false
+		},
+		{
+			"glob": "claude-opus-5*",
+			"model": "claude-opus-5-5-20261001",
+			"match": true
+		},
+		{
+			"glob": "*/kimi-k3*",
+			"model": "moonshotai/Kimi-K3-Instruct",
+			"match": true
+		},
+		{
+			"glob": "*/kimi-k3*",
+			"model": "kimi-k3",
+			"match": false
+		},
+		{
+			"glob": "a*b*c",
+			"model": "abc",
+			"match": true
+		},
+		{
+			"glob": "a*b*c",
+			"model": "aXbYc",
+			"match": true
+		},
+		{
+			"glob": "a*b*c",
+			"model": "acb",
+			"match": false
+		},
+		{
+			"glob": "a*a",
+			"model": "a",
+			"match": false
+		},
+		{
+			"glob": "a*a",
+			"model": "aa",
+			"match": true
+		},
+		{
+			"glob": "*",
+			"model": "",
+			"match": true
+		},
+		{
+			"glob": "*",
+			"model": "anything",
+			"match": true
+		},
+		{
+			"glob": "o1",
+			"model": "o1-mini",
+			"match": false
+		},
+		{
+			"glob": "gemini-2.5-flash*tts*",
+			"model": "gemini-2.5-flash-preview-tts",
+			"match": true
+		},
+		{
+			"glob": "qwen/qwen3*",
+			"model": "Qwen/Qwen3-32B",
+			"match": true
+		}
+	],
+	"merge_vectors": [
+		{
+			"id": "adds_top_level",
+			"fields": {
+				"reasoning_effort": "none"
+			},
+			"body": {
+				"model": "m",
+				"max_tokens": 16
+			},
+			"expected": {
+				"model": "m",
+				"max_tokens": 16,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]]
+		},
+		{
+			"id": "body_wins_top_level",
+			"fields": {
+				"reasoning_effort": "none"
+			},
+			"body": {
+				"model": "m",
+				"reasoning_effort": "high"
+			},
+			"expected": {
+				"model": "m",
+				"reasoning_effort": "high"
+			},
+			"added": []
+		},
+		{
+			"id": "deep_into_existing_object",
+			"fields": {
+				"generationConfig": {
+					"thinkingConfig": {
+						"thinkingBudget": 0
+					}
+				}
+			},
+			"body": {
+				"generationConfig": {
+					"maxOutputTokens": 16,
+					"temperature": 0.7
+				}
+			},
+			"expected": {
+				"generationConfig": {
+					"maxOutputTokens": 16,
+					"temperature": 0.7,
+					"thinkingConfig": {
+						"thinkingBudget": 0
+					}
+				}
+			},
+			"added": [["generationConfig", "thinkingConfig"]]
+		},
+		{
+			"id": "deep_body_wins_nested",
+			"fields": {
+				"generationConfig": {
+					"thinkingConfig": {
+						"thinkingBudget": 0,
+						"includeThoughts": false
+					}
+				}
+			},
+			"body": {
+				"generationConfig": {
+					"thinkingConfig": {
+						"thinkingBudget": 512
+					}
+				}
+			},
+			"expected": {
+				"generationConfig": {
+					"thinkingConfig": {
+						"thinkingBudget": 512,
+						"includeThoughts": false
+					}
+				}
+			},
+			"added": [["generationConfig", "thinkingConfig", "includeThoughts"]]
+		},
+		{
+			"id": "scalar_in_body_blocks_object",
+			"fields": {
+				"thinking": {
+					"type": "disabled"
+				}
+			},
+			"body": {
+				"thinking": "keep"
+			},
+			"expected": {
+				"thinking": "keep"
+			},
+			"added": []
+		},
+		{
+			"id": "boolean_field",
+			"fields": {
+				"reasoning": {
+					"enabled": false
+				}
+			},
+			"body": {
+				"model": "m",
+				"stream": false
+			},
+			"expected": {
+				"model": "m",
+				"stream": false,
+				"reasoning": {
+					"enabled": false
+				}
+			},
+			"added": [["reasoning"]]
+		},
+		{
+			"id": "into_empty_body",
+			"fields": {
+				"output_config": {
+					"effort": "low"
+				}
+			},
+			"body": {},
+			"expected": {
+				"output_config": {
+					"effort": "low"
+				}
+			},
+			"added": [["output_config"]]
+		},
+		{
+			"id": "empty_fields_add_nothing",
+			"fields": {},
+			"body": {
+				"model": "m"
+			},
+			"expected": {
+				"model": "m"
+			},
+			"added": []
+		}
+	],
+	"resolve_vectors": [
+		{
+			"id": "openai_gpt-4o-mini",
+			"provider": "openai",
+			"model": "gpt-4o-mini",
+			"body": {
+				"model": "gpt-4o-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "gpt-4o-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "openai_gpt-5.1",
+			"provider": "openai",
+			"model": "gpt-5.1",
+			"body": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 7,
+			"kind": "effort"
+		},
+		{
+			"id": "openai_gpt-5",
+			"provider": "openai",
+			"model": "gpt-5",
+			"body": {
+				"model": "gpt-5",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "gpt-5",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "minimal"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 8,
+			"kind": "effort"
+		},
+		{
+			"id": "openai_gpt-5-pro",
+			"provider": "openai",
+			"model": "gpt-5-pro",
+			"body": {
+				"model": "gpt-5-pro",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "gpt-5-pro",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 6
+		},
+		{
+			"id": "openai_o3",
+			"provider": "openai",
+			"model": "o3",
+			"body": {
+				"model": "o3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "o3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 9,
+			"kind": "effort"
+		},
+		{
+			"id": "openai_gpt-6.1-sol",
+			"provider": "openai",
+			"model": "gpt-6.1-sol",
+			"body": {
+				"model": "gpt-6.1-sol",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "gpt-6.1-sol",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 5,
+			"kind": "effort"
+		},
+		{
+			"id": "openai_gpt-5.1_body_wins",
+			"provider": "openai",
+			"model": "gpt-5.1",
+			"body": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "medium"
+			},
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "medium"
+			},
+			"added": [],
+			"family": 7,
+			"kind": "effort"
+		},
+		{
+			"id": "anthropic_claude-haiku-4-5",
+			"provider": "anthropic",
+			"model": "claude-haiku-4-5",
+			"body": {
+				"model": "claude-haiku-4-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				]
+			},
+			"expected": {
+				"model": "claude-haiku-4-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				]
+			},
+			"added": []
+		},
+		{
+			"id": "anthropic_claude-opus-5-5",
+			"provider": "anthropic",
+			"model": "claude-opus-5-5",
+			"body": {
+				"model": "claude-opus-5-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				]
+			},
+			"expected": {
+				"model": "claude-opus-5-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				],
+				"output_config": {
+					"effort": "low"
+				}
+			},
+			"added": [["output_config"]],
+			"family": 1,
+			"kind": "anthropic_effort"
+		},
+		{
+			"id": "anthropic_claude-fable-5-1",
+			"provider": "anthropic",
+			"model": "claude-fable-5-1",
+			"body": {
+				"model": "claude-fable-5-1",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				]
+			},
+			"expected": {
+				"model": "claude-fable-5-1",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				],
+				"output_config": {
+					"effort": "low"
+				}
+			},
+			"added": [["output_config"]],
+			"family": 1,
+			"kind": "anthropic_effort"
+		},
+		{
+			"id": "anthropic_claude-sonnet-5-5",
+			"provider": "anthropic",
+			"model": "claude-sonnet-5-5",
+			"body": {
+				"model": "claude-sonnet-5-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				]
+			},
+			"expected": {
+				"model": "claude-sonnet-5-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				],
+				"thinking": {
+					"type": "between_tools"
+				}
+			},
+			"added": [["thinking"]],
+			"family": 2,
+			"kind": "anthropic_thinking"
+		},
+		{
+			"id": "anthropic_claude-opus-5",
+			"provider": "anthropic",
+			"model": "claude-opus-5",
+			"body": {
+				"model": "claude-opus-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				]
+			},
+			"expected": {
+				"model": "claude-opus-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				],
+				"thinking": {
+					"type": "disabled"
+				}
+			},
+			"added": [["thinking"]],
+			"family": 3,
+			"kind": "anthropic_thinking"
+		},
+		{
+			"id": "anthropic_claude-haiku-5-5",
+			"provider": "anthropic",
+			"model": "claude-haiku-5-5",
+			"body": {
+				"model": "claude-haiku-5-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				]
+			},
+			"expected": {
+				"model": "claude-haiku-5-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				],
+				"thinking": {
+					"type": "disabled"
+				}
+			},
+			"added": [["thinking"]],
+			"family": 3,
+			"kind": "anthropic_thinking"
+		},
+		{
+			"id": "gemini_gemini-2.0-flash",
+			"provider": "gemini",
+			"model": "gemini-2.0-flash",
+			"body": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"expected": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"added": []
+		},
+		{
+			"id": "gemini_gemini-2.5-flash",
+			"provider": "gemini",
+			"model": "gemini-2.5-flash",
+			"body": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"expected": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16,
+					"thinkingConfig": {
+						"thinkingBudget": 0
+					}
+				}
+			},
+			"added": [["generationConfig", "thinkingConfig"]],
+			"family": 13,
+			"kind": "gemini_budget"
+		},
+		{
+			"id": "gemini_models_gemini-2.5-pro",
+			"provider": "gemini",
+			"model": "models/gemini-2.5-pro",
+			"body": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"expected": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16,
+					"thinkingConfig": {
+						"thinkingBudget": 128
+					}
+				}
+			},
+			"added": [["generationConfig", "thinkingConfig"]],
+			"family": 14,
+			"kind": "gemini_budget"
+		},
+		{
+			"id": "gemini_gemini-2.5-flash-image",
+			"provider": "gemini",
+			"model": "gemini-2.5-flash-image",
+			"body": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"expected": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"added": [],
+			"family": 12
+		},
+		{
+			"id": "gemini_gemini-3.8-flash",
+			"provider": "gemini",
+			"model": "gemini-3.8-flash",
+			"body": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"expected": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16,
+					"thinkingConfig": {
+						"thinkingLevel": "low"
+					}
+				}
+			},
+			"added": [["generationConfig", "thinkingConfig"]],
+			"family": 16,
+			"kind": "gemini_level"
+		},
+		{
+			"id": "gemini_gemini-3-flash-preview",
+			"provider": "gemini",
+			"model": "gemini-3-flash-preview",
+			"body": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"expected": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16,
+					"thinkingConfig": {
+						"thinkingLevel": "minimal"
+					}
+				}
+			},
+			"added": [["generationConfig", "thinkingConfig"]],
+			"family": 15,
+			"kind": "gemini_level"
+		},
+		{
+			"id": "xai_grok-4.3",
+			"provider": "xai",
+			"model": "grok-4.3",
+			"body": {
+				"model": "grok-4.3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "grok-4.3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 17,
+			"kind": "effort"
+		},
+		{
+			"id": "xai_grok-4.6",
+			"provider": "xai",
+			"model": "grok-4.6",
+			"body": {
+				"model": "grok-4.6",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "grok-4.6",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 18,
+			"kind": "effort"
+		},
+		{
+			"id": "xai_grok-3-mini",
+			"provider": "xai",
+			"model": "grok-3-mini",
+			"body": {
+				"model": "grok-3-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "grok-3-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 19,
+			"kind": "effort"
+		},
+		{
+			"id": "xai_grok-2-mini",
+			"provider": "xai",
+			"model": "grok-2-mini",
+			"body": {
+				"model": "grok-2-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "grok-2-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "mistral_mistral-small-latest",
+			"provider": "mistral",
+			"model": "mistral-small-latest",
+			"body": {
+				"model": "mistral-small-latest",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "mistral-small-latest",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "mistral_mistral-large-4-0",
+			"provider": "mistral",
+			"model": "mistral-large-4-0",
+			"body": {
+				"model": "mistral-large-4-0",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "mistral-large-4-0",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 21,
+			"kind": "effort"
+		},
+		{
+			"id": "mistral_magistral-medium-latest",
+			"provider": "mistral",
+			"model": "magistral-medium-latest",
+			"body": {
+				"model": "magistral-medium-latest",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "magistral-medium-latest",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 25
+		},
+		{
+			"id": "deepseek_deepseek-chat",
+			"provider": "deepseek",
+			"model": "deepseek-chat",
+			"body": {
+				"model": "deepseek-chat",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-chat",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": {
+					"type": "disabled"
+				}
+			},
+			"added": [["thinking"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "deepseek_deepseek-flash",
+			"provider": "deepseek",
+			"model": "deepseek-flash",
+			"body": {
+				"model": "deepseek-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": {
+					"type": "disabled"
+				}
+			},
+			"added": [["thinking"]],
+			"family": 28,
+			"kind": "toggle"
+		},
+		{
+			"id": "deepseek_deepseek-reasoner",
+			"provider": "deepseek",
+			"model": "deepseek-reasoner",
+			"body": {
+				"model": "deepseek-reasoner",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-reasoner",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": {
+					"type": "disabled"
+				}
+			},
+			"added": [["thinking"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "cohere_command-r7b-12-2024",
+			"provider": "cohere",
+			"model": "command-r7b-12-2024",
+			"body": {
+				"model": "command-r7b-12-2024",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "command-r7b-12-2024",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "cerebras_qwen-3.8-27b",
+			"provider": "cerebras",
+			"model": "qwen-3.8-27b",
+			"body": {
+				"model": "qwen-3.8-27b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen-3.8-27b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 27,
+			"kind": "effort"
+		},
+		{
+			"id": "cerebras_zai-glm-5.3-flash",
+			"provider": "cerebras",
+			"model": "zai-glm-5.3-flash",
+			"body": {
+				"model": "zai-glm-5.3-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "zai-glm-5.3-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 22,
+			"kind": "effort"
+		},
+		{
+			"id": "cerebras_gpt-oss-120b",
+			"provider": "cerebras",
+			"model": "gpt-oss-120b",
+			"body": {
+				"model": "gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "cerebras_kimi-k3",
+			"provider": "cerebras",
+			"model": "kimi-k3",
+			"body": {
+				"model": "kimi-k3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "kimi-k3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 24,
+			"kind": "effort"
+		},
+		{
+			"id": "openrouter_openai_gpt-4o-mini",
+			"provider": "openrouter",
+			"model": "openai/gpt-4o-mini",
+			"body": {
+				"model": "openai/gpt-4o-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-4o-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "openrouter_openai_gpt-oss-120b",
+			"provider": "openrouter",
+			"model": "openai/gpt-oss-120b",
+			"body": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": {
+					"effort": "low"
+				}
+			},
+			"added": [["reasoning"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "openrouter_qwen_qwen3-32b",
+			"provider": "openrouter",
+			"model": "qwen/qwen3-32b",
+			"body": {
+				"model": "qwen/qwen3-32b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen/qwen3-32b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": {
+					"enabled": false
+				}
+			},
+			"added": [["reasoning"]],
+			"family": 27,
+			"kind": "toggle"
+		},
+		{
+			"id": "openrouter_anthropic_claude-opus-5",
+			"provider": "openrouter",
+			"model": "anthropic/claude-opus-5",
+			"body": {
+				"model": "anthropic/claude-opus-5",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "anthropic/claude-opus-5",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 3
+		},
+		{
+			"id": "groq_llama-3.3-70b-versatile",
+			"provider": "groq",
+			"model": "llama-3.3-70b-versatile",
+			"body": {
+				"model": "llama-3.3-70b-versatile",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "llama-3.3-70b-versatile",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "groq_qwen_qwen3.8-27b",
+			"provider": "groq",
+			"model": "qwen/qwen3.8-27b",
+			"body": {
+				"model": "qwen/qwen3.8-27b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen/qwen3.8-27b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 27,
+			"kind": "effort"
+		},
+		{
+			"id": "groq_openai_gpt-oss-20b",
+			"provider": "groq",
+			"model": "openai/gpt-oss-20b",
+			"body": {
+				"model": "openai/gpt-oss-20b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-20b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "groq_openai_gpt-oss-safeguard-20b",
+			"provider": "groq",
+			"model": "openai/gpt-oss-safeguard-20b",
+			"body": {
+				"model": "openai/gpt-oss-safeguard-20b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-safeguard-20b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 10
+		},
+		{
+			"id": "together_moonshotai_Kimi-K3",
+			"provider": "together",
+			"model": "moonshotai/Kimi-K3",
+			"body": {
+				"model": "moonshotai/Kimi-K3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "moonshotai/Kimi-K3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": {
+					"enabled": false
+				}
+			},
+			"added": [["reasoning"]],
+			"family": 24,
+			"kind": "toggle"
+		},
+		{
+			"id": "together_zai-org_GLM-5.2",
+			"provider": "together",
+			"model": "zai-org/GLM-5.2",
+			"body": {
+				"model": "zai-org/GLM-5.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "zai-org/GLM-5.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": {
+					"enabled": false
+				}
+			},
+			"added": [["reasoning"]],
+			"family": 23,
+			"kind": "toggle"
+		},
+		{
+			"id": "together_openai_gpt-oss-120b",
+			"provider": "together",
+			"model": "openai/gpt-oss-120b",
+			"body": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "together_Qwen_Qwen3-235B-A22B",
+			"provider": "together",
+			"model": "Qwen/Qwen3-235B-A22B",
+			"body": {
+				"model": "Qwen/Qwen3-235B-A22B",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Qwen/Qwen3-235B-A22B",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": {
+					"enabled": false
+				}
+			},
+			"added": [["reasoning"]],
+			"family": 27,
+			"kind": "toggle"
+		},
+		{
+			"id": "together_meta-llama_Llama-3.3-70B-Instruct-Turbo",
+			"provider": "together",
+			"model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+			"body": {
+				"model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "fireworks_accounts_fireworks_models_qwen3-235b-a22b",
+			"provider": "fireworks",
+			"model": "accounts/fireworks/models/qwen3-235b-a22b",
+			"body": {
+				"model": "accounts/fireworks/models/qwen3-235b-a22b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "accounts/fireworks/models/qwen3-235b-a22b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 27,
+			"kind": "effort"
+		},
+		{
+			"id": "fireworks_accounts_fireworks_models_gpt-oss-120b",
+			"provider": "fireworks",
+			"model": "accounts/fireworks/models/gpt-oss-120b",
+			"body": {
+				"model": "accounts/fireworks/models/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "accounts/fireworks/models/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "fireworks_accounts_fireworks_models_deepseek-v3p2",
+			"provider": "fireworks",
+			"model": "accounts/fireworks/models/deepseek-v3p2",
+			"body": {
+				"model": "accounts/fireworks/models/deepseek-v3p2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "accounts/fireworks/models/deepseek-v3p2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 28,
+			"kind": "effort"
+		},
+		{
+			"id": "openai_compat_qwen3_8b",
+			"provider": "openai_compat",
+			"model": "qwen3:8b",
+			"body": {
+				"model": "qwen3:8b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen3:8b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 27
+		},
+		{
+			"id": "openai_compat_gpt-5.1",
+			"provider": "openai_compat",
+			"model": "gpt-5.1",
+			"body": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 7
+		}
+	],
+	"refusal_vectors": [
+		{
+			"id": "openai_unknown_argument",
+			"provider": "openai",
+			"model": "gpt-5.1",
+			"body": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"status": 400,
+			"message": "Unrecognized request argument supplied: reasoning_effort",
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"field": "reasoning_effort"
+		},
+		{
+			"id": "anthropic_thinking_type",
+			"provider": "anthropic",
+			"model": "claude-opus-5",
+			"body": {
+				"model": "claude-opus-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				]
+			},
+			"status": 400,
+			"message": "thinking.type: Input should be 'enabled' or 'adaptive'",
+			"expected": {
+				"model": "claude-opus-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				]
+			},
+			"field": "thinking"
+		},
+		{
+			"id": "gemini_snake_case",
+			"provider": "gemini",
+			"model": "gemini-2.5-flash",
+			"body": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"status": 400,
+			"message": "Invalid JSON payload received. Unknown name \"thinking_config\" at 'generation_config'",
+			"expected": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"field": "generationConfig"
+		},
+		{
+			"id": "gemini_other_field_is_not_a_refusal",
+			"provider": "gemini",
+			"model": "gemini-2.5-flash",
+			"body": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"status": 400,
+			"message": "generation_config.max_output_tokens must be positive",
+			"expected": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16,
+					"thinkingConfig": {
+						"thinkingBudget": 0
+					}
+				}
+			}
+		},
+		{
+			"id": "not_a_400",
+			"provider": "openai",
+			"model": "gpt-5.1",
+			"body": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"status": 500,
+			"message": "reasoning_effort overloaded",
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			}
+		},
+		{
+			"id": "openrouter_reasoning",
+			"provider": "openrouter",
+			"model": "qwen/qwen3-32b",
+			"body": {
+				"model": "qwen/qwen3-32b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"status": 400,
+			"message": "reasoning is mandatory for this endpoint and cannot be disabled",
+			"expected": {
+				"model": "qwen/qwen3-32b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"field": "reasoning"
+		},
+		{
+			"id": "unrelated_400",
+			"provider": "openai",
+			"model": "gpt-5.1",
+			"body": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"status": 400,
+			"message": "max_tokens is too large",
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			}
+		}
+	],
+	"refused_vectors": [
+		{
+			"id": "refused_field_is_skipped",
+			"provider": "openai",
+			"model": "gpt-5.1",
+			"refused": ["reasoning_effort"],
+			"body": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"family": 7,
+			"kind": "effort"
+		}
+	],
+	"family_parse_vectors": [
+		{
+			"id": "no_families",
+			"table": {},
+			"valid": false
+		},
+		{
+			"id": "family_not_object",
+			"table": {
+				"families": ["x"],
+				"refusal_expiry_days": 30
+			},
+			"valid": false
+		},
+		{
+			"id": "toggle_with_level",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": [
+							{
+								"kind": "toggle",
+								"intent": "off",
+								"level": "none"
+							}
+						]
+					}
+				],
+				"refusal_expiry_days": 30
+			},
+			"valid": false
+		},
+		{
+			"id": "effort_without_level",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": [
+							{
+								"kind": "effort",
+								"intent": "lowest"
+							}
+						]
+					}
+				],
+				"refusal_expiry_days": 30
+			},
+			"valid": false
+		},
+		{
+			"id": "unknown_kind",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": [
+							{
+								"kind": "magic",
+								"intent": "off",
+								"level": 1
+							}
+						]
+					}
+				],
+				"refusal_expiry_days": 30
+			},
+			"valid": false
+		},
+		{
+			"id": "unknown_intent",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": [
+							{
+								"kind": "effort",
+								"intent": "max",
+								"level": "low"
+							}
+						]
+					}
+				],
+				"refusal_expiry_days": 30
+			},
+			"valid": false
+		},
+		{
+			"id": "glob_with_space",
+			"table": {
+				"families": [
+					{
+						"models": ["a b"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30
+			},
+			"valid": false
+		},
+		{
+			"id": "no_models",
+			"table": {
+				"families": [
+					{
+						"models": [],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30
+			},
+			"valid": false
+		},
+		{
+			"id": "unknown_key",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": [],
+						"extra": 1
+					}
+				],
+				"refusal_expiry_days": 30
+			},
+			"valid": false
+		},
+		{
+			"id": "shield_and_docs",
+			"table": {
+				"families": [
+					{
+						"models": ["a*"],
+						"controls": [],
+						"_family": "doc"
+					}
+				],
+				"refusal_expiry_days": 30
+			},
+			"valid": true
+		},
+		{
+			"id": "toggle_then_effort",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": [
+							{
+								"kind": "toggle",
+								"intent": "off"
+							},
+							{
+								"kind": "effort",
+								"intent": "off",
+								"level": "none"
+							}
+						]
+					}
+				],
+				"refusal_expiry_days": 30
+			},
+			"valid": true
+		},
+		{
+			"id": "no_refusal_expiry",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				]
+			},
+			"valid": false
+		},
+		{
+			"id": "fractional_refusal_expiry",
+			"table": {
+				"refusal_expiry_days": 1.5,
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				]
+			},
+			"valid": false
+		}
+	],
+	"dialect_parse_vectors": [
+		{
+			"id": "not_object",
+			"dialect": ["x"],
+			"valid": false
+		},
+		{
+			"id": "unknown_kind",
+			"dialect": {
+				"magic": {
+					"a": 1
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "toggle_with_level",
+			"dialect": {
+				"toggle": {
+					"a": "$level"
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "effort_without_level",
+			"dialect": {
+				"effort": {
+					"a": "low"
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "field_null",
+			"dialect": {
+				"effort": {
+					"a": null
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "field_array",
+			"dialect": {
+				"toggle": {
+					"a": [1]
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "bad_name",
+			"dialect": {
+				"effort": {
+					"a-b": "$level"
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "valid",
+			"dialect": {
+				"toggle": {
+					"reasoning": {
+						"enabled": false
+					}
+				},
+				"effort": {
+					"reasoning": {
+						"effort": "$level"
+					}
+				},
+				"_doc": "x"
+			},
+			"valid": true
+		},
+		{
+			"id": "empty",
+			"dialect": {},
+			"valid": true
+		}
+	],
+	"sampling_vectors": [
+		{
+			"model": "claude-opus-5-5",
+			"default_sampling_only": true
+		},
+		{
+			"model": "claude-sonnet-5",
+			"default_sampling_only": true
+		},
+		{
+			"model": "claude-haiku-5-5-20261001",
+			"default_sampling_only": true
+		},
+		{
+			"model": "claude-opus-4-8",
+			"default_sampling_only": true
+		},
+		{
+			"model": "claude-opus-4-7",
+			"default_sampling_only": true
+		},
+		{
+			"model": "claude-opus-4-6",
+			"default_sampling_only": false
+		},
+		{
+			"model": "claude-haiku-4-5",
+			"default_sampling_only": false
+		},
+		{
+			"model": "anthropic/claude-sonnet-5-5",
+			"default_sampling_only": true
+		},
+		{
+			"model": "gpt-5.1",
+			"default_sampling_only": false
+		},
+		{
+			"model": "qwen3:8b",
+			"default_sampling_only": false
+		}
+	],
+	"refusal_store_vectors": [
+		{
+			"id": "kept",
+			"now": 1793000000,
+			"stored": {
+				"openai|gpt-5.1": {
+					"reasoning_effort": 1792913600
+				}
+			},
+			"refused": {
+				"openai|gpt-5.1": {
+					"reasoning_effort": 1792913600
+				}
+			},
+			"dropped": 0
+		},
+		{
+			"id": "expired_refusal_forgotten",
+			"now": 1793000000,
+			"stored": {
+				"openai|gpt-5.1": {
+					"reasoning_effort": 1790408000
+				}
+			},
+			"refused": {},
+			"dropped": 1
+		},
+		{
+			"id": "future_stamp_dropped",
+			"now": 1793000000,
+			"stored": {
+				"openai|gpt-5.1": {
+					"reasoning_effort": 1793000010
+				}
+			},
+			"refused": {},
+			"dropped": 1
+		},
+		{
+			"id": "malformed_entries_dropped",
+			"now": 1793000000,
+			"stored": {
+				"openai|gpt-5.1": {
+					"reasoning_effort": 1793000000,
+					"bad-name": 1793000000,
+					"x": "soon"
+				},
+				"nobar": {
+					"thinking": 1793000000
+				},
+				"x|y": ["thinking"],
+				"a|b": {}
+			},
+			"refused": {
+				"openai|gpt-5.1": {
+					"reasoning_effort": 1793000000
+				}
+			},
+			"dropped": 3
+		},
+		{
+			"id": "not_an_object",
+			"now": 1793000000,
+			"stored": ["x"],
+			"refused": {},
+			"dropped": 1
+		}
+	]
+}

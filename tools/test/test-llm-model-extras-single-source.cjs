@@ -2,22 +2,26 @@
 
 /**
  * ==============================================================================
- * MODULE: API Model-Extras Single-Source Guard
+ * MODULE: API Model-Extras And Thinking-Off Single-Source Guard
  * DESCRIPTION:
- * Per-model body fields (e.g. reasoning_effort:none for qwen-3.8-27b, which
- * otherwise reasons at xhigh effort by default and stalls tiny probes) live
- * in exactly ONE place — _shared/modules/llm/api_providers.json
- * (providers.<id>.model_extras). Both drivers merge them generically from
- * data; neither may restate a field name in shipped code, or a tuning fix on
- * one driver silently stops applying to the other.
+ * Per-model body fields live in exactly ONE place —
+ * _shared/modules/llm/api_providers.json: providers.<id>.model_extras, and
+ * providers.<id>.thinking_dialect, how each provider carries the reasoning
+ * controls of the model families of thinking_off.json (e.g.
+ * reasoning_effort:none for the qwen3 family, which covers Cerebras'
+ * qwen-3.8-27b: it otherwise reasons at xhigh effort by default and stalls
+ * tiny probes). Every driver merges them generically from data; none may
+ * restate a field name in shipped code, or a tuning fix on one driver
+ * silently stops applying to the others.
  *
  * ROOT CAUSE ENCODED:
  * A provider quirk fixed with a literal in one payload builder (say AHK)
  * stays broken in the twin (Hammerspoon) with no failure anywhere — the
  * request still goes out, the model just never answers in time. This guard
- * fails if a model_extras field name appears in shipped driver sources, if
- * either payload builder stops consuming model_extras, or if the JSON
- * section itself is malformed.
+ * fails if a model_extras or thinking_off field name appears in shipped
+ * driver sources, if a payload builder stops consuming model_extras or
+ * thinking_off, or if either JSON
+ * section is malformed.
  * ==============================================================================
  */
 
@@ -37,13 +41,44 @@ const SSOT_FILE = path.join(
 	'api_providers.json'
 );
 
-// Shipped driver sources that must consume model_extras generically.
-// Test files are excluded: asserting merged output legitimately names fields.
+// Shipped driver sources that must consume model_extras and thinking_off
+// generically. Test files are excluded: asserting merged output legitimately
+// names fields.
 const SHIPPED = [
 	'static/ergopti_plus/windows/modules/llm/api_remote.ahk',
 	'static/ergopti_plus/macos/modules/llm/api_remote.lua',
 	'static/ergopti_plus/linux/modules/llm/api_remote.lua'
 ];
+
+// Other shipped sources that build or complete request bodies: they may not
+// restate a rule field either.
+const BODY_SOURCES = [
+	'static/ergopti_plus/_shared/lua/llm/thinking_off.lua',
+	'static/ergopti_plus/_shared/modules/llm/thinking_off.ahk',
+	'static/ergopti_plus/_shared/lua/llm/vision.lua',
+	'static/ergopti_plus/windows/modules/llm/vision.ahk',
+	'static/ergopti_plus/windows/modules/llm/vision_action.ahk',
+	'static/ergopti_plus/windows/modules/llm/agent_action.ahk',
+	'static/ergopti_plus/linux/modules/llm/vision_request.lua'
+];
+
+// Nested thinking_dialect names too generic to be a restated rule (an object's
+// "type"), and the Gemini envelope every Gemini body builder owns.
+const GENERIC_FIELDS = new Set(['type', 'effort', 'enabled', 'generationConfig']);
+
+// The reasoning control kinds of thinking_off.json.
+const KINDS = new Set([
+	'toggle',
+	'effort',
+	'anthropic_thinking',
+	'anthropic_effort',
+	'gemini_budget',
+	'gemini_level'
+]);
+
+// The glob alphabet both resolvers accept, `*` being the only wildcard.
+const GLOB = /^[A-Za-z0-9._:/@+*-]+$/;
+const FIELD = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 let failed = false;
 const fail = (msg) => {
@@ -59,6 +94,25 @@ try {
 }
 
 const fieldNames = new Set();
+const ruleFieldNames = new Set();
+
+// Validates a thinking_dialect fields template and records its names at every depth.
+function checkRuleFields(where, fields, allowEmpty) {
+	if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
+		fail(`${where} must be an object.`);
+		return;
+	}
+	if (!allowEmpty && Object.keys(fields).length === 0) fail(`${where} must not be empty.`);
+	for (const [name, value] of Object.entries(fields)) {
+		if (!FIELD.test(name)) fail(`${where} has an unshippable field name: ${name}.`);
+		if (!GENERIC_FIELDS.has(name)) ruleFieldNames.add(name);
+		if (value && typeof value === 'object') checkRuleFields(`${where}.${name}`, value, false);
+		else if (!['string', 'number', 'boolean'].includes(typeof value)) {
+			fail(`${where}.${name} must be a string, number, boolean or object.`);
+		}
+	}
+}
+
 if (root && typeof root === 'object') {
 	const providers = root.providers;
 	if (!providers || typeof providers !== 'object') {
@@ -67,6 +121,18 @@ if (root && typeof root === 'object') {
 		for (const [pid, desc] of Object.entries(providers)) {
 			if (!desc || typeof desc !== 'object') continue;
 			const extras = desc.model_extras;
+			const dialect = desc.thinking_dialect;
+			if (dialect !== undefined) {
+				if (!dialect || typeof dialect !== 'object' || Array.isArray(dialect)) {
+					fail(`providers.${pid}.thinking_dialect must be an object.`);
+				}
+				for (const [kind, fields] of Object.entries(dialect || {})) {
+					if (kind.startsWith('_')) continue;
+					if (!KINDS.has(kind))
+						fail(`providers.${pid}.thinking_dialect has an unknown kind ${kind}.`);
+					checkRuleFields(`providers.${pid}.thinking_dialect.${kind}`, fields, false);
+				}
+			}
 			if (extras === undefined) continue;
 			if (!extras || typeof extras !== 'object' || Array.isArray(extras)) {
 				fail(`providers.${pid}.model_extras must be an object.`);
@@ -105,12 +171,33 @@ function stripLineComments(src, isAhk) {
 		.join('\n');
 }
 
-for (const rel of SHIPPED) {
+// A rule field restated as a body field: a Lua key (`name =`, `.name`,
+// `["name"]`) or a quoted name followed by `:` or `,` (JSON text, Map()).
+function restatesField(code, name) {
+	const quoted = `["']${name}["']\\s*[:,\\]]`;
+	const bare = `(^|[^A-Za-z0-9_.])${name}\\s*=[^=]|\\.${name}(?![A-Za-z0-9_])`;
+	return new RegExp(`${quoted}|${bare}`).test(code);
+}
+
+for (const rel of BODY_SOURCES.concat(SHIPPED)) {
 	const abs = path.join(ROOT, rel);
 	if (!fs.existsSync(abs)) {
 		fail(`shipped file missing: ${rel}.`);
 		continue;
 	}
+	const code = stripLineComments(fs.readFileSync(abs, 'utf8'), rel.endsWith('.ahk'));
+	for (const name of ruleFieldNames) {
+		if (restatesField(code, name)) {
+			fail(
+				`${rel} restates the shared thinking_dialect field '${name}' (keep it in api_providers.json only).`
+			);
+		}
+	}
+}
+
+for (const rel of SHIPPED) {
+	const abs = path.join(ROOT, rel);
+	if (!fs.existsSync(abs)) continue;
 	const src = fs.readFileSync(abs, 'utf8');
 	const code = stripLineComments(src, rel.endsWith('.ahk'));
 	for (const field of fieldNames) {
@@ -123,9 +210,101 @@ for (const rel of SHIPPED) {
 	if (!src.includes('model_extras')) {
 		fail(`${rel} no longer consumes model_extras — generic merge deleted?`);
 	}
+	if (!/ThinkingOff/.test(code)) {
+		fail(`${rel} no longer applies thinking_off — reasoning would stay on.`);
+	}
 }
+
+if (ruleFieldNames.size === 0) fail('api_providers.json holds no thinking_dialect field.');
+
+// The model families: one home for what each family needs.
+const FAMILIES_FILE = path.join(path.dirname(SSOT_FILE), 'thinking_off.json');
+let familiesRoot = null;
+try {
+	familiesRoot = JSON.parse(fs.readFileSync(FAMILIES_FILE, 'utf8'));
+} catch (err) {
+	fail(`could not read thinking_off.json: ${err.message}`);
+}
+const families = familiesRoot && Array.isArray(familiesRoot.families) ? familiesRoot.families : [];
+if (familiesRoot && families.length === 0) fail('thinking_off.json holds no families.');
+for (const [index, family] of families.entries()) {
+	const where = `thinking_off.json families[${index}]`;
+	if (!Array.isArray(family.models) || family.models.length === 0) fail(`${where} names no model.`);
+	for (const glob of family.models || [])
+		if (typeof glob !== 'string' || !GLOB.test(glob)) fail(`${where} has an invalid glob.`);
+	if (!Array.isArray(family.controls)) fail(`${where} has no controls array.`);
+	for (const control of family.controls || []) {
+		if (!KINDS.has(control.kind)) fail(`${where} has an unknown kind ${control.kind}.`);
+	}
+}
+
+// Every Ollama chat body the drivers write carries keep_alive; each must also
+// turn thinking off, or a thinking model spends its whole budget reasoning (a
+// warmup's single token, a screenshot's transcription). Lua bodies are table
+// literals, AHK bodies are JSON text built in one function.
+const OLLAMA_ROOTS = [
+	'static/ergopti_plus/macos/modules',
+	'static/ergopti_plus/macos/ui',
+	'static/ergopti_plus/linux/modules',
+	'static/ergopti_plus/linux/infra',
+	'static/ergopti_plus/_shared/lua/llm',
+	'static/ergopti_plus/windows/modules/llm'
+];
+
+function sourceFiles(dir) {
+	const out = [];
+	for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+		const rel = `${dir}/${entry.name}`;
+		if (entry.isDirectory()) out.push(...sourceFiles(rel));
+		else if (/\.(lua|ahk)$/.test(entry.name)) out.push(rel);
+	}
+	return out;
+}
+
+// The table literal around a position: from its unmatched { to the matching }.
+function enclosingTable(code, at) {
+	let depth = 0;
+	let start = at;
+	while (start > 0) {
+		start -= 1;
+		if (code[start] === '}') depth += 1;
+		else if (code[start] === '{') {
+			if (depth === 0) break;
+			depth -= 1;
+		}
+	}
+	let end = start;
+	depth = 0;
+	for (; end < code.length; end += 1) {
+		if (code[end] === '{') depth += 1;
+		else if (code[end] === '}' && --depth === 0) break;
+	}
+	return code.slice(start, end + 1);
+}
+
+let ollamaBodies = 0;
+for (const rel of OLLAMA_ROOTS.flatMap(sourceFiles)) {
+	const isAhk = rel.endsWith('.ahk');
+	const code = stripLineComments(fs.readFileSync(path.join(ROOT, rel), 'utf8'), isAhk);
+	const anchor = isAhk ? /"keep_alive":/g : /(^|[^A-Za-z0-9_.])keep_alive\s*=[^=]/g;
+	for (const match of code.matchAll(anchor)) {
+		const body = isAhk
+			? code.slice(code.lastIndexOf('\n}', match.index) + 1, code.indexOf('\n}', match.index))
+			: enclosingTable(code, match.index);
+		ollamaBodies += 1;
+		const off = isAhk
+			? /"think":false/.test(body)
+			: /(^|[^A-Za-z0-9_.])think\s*=\s*false/.test(body);
+		if (!off) {
+			const line = code.slice(0, match.index).split('\n').length;
+			fail(`${rel}:${line} writes an Ollama chat body without think = false.`);
+		}
+	}
+}
+if (ollamaBodies < 4)
+	fail(`found only ${ollamaBodies} Ollama chat bodies: the scan lost its anchor.`);
 
 if (failed) process.exit(1);
 console.log(
-	'\x1b[32m[OK] API model extras are single-sourced (api_providers.json model_extras).\x1b[0m'
+	'\x1b[32m[OK] API model extras and thinking-off rules are single-sourced (api_providers.json).\x1b[0m'
 );

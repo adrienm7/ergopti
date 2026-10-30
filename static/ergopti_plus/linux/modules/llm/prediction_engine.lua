@@ -650,7 +650,7 @@ function M.init(opts)
 
 	local profiles = get_profiles()
 	if profiles then
-		if profiles.init({ port = HttpBridge.OLLAMA_DEFAULT_PORT, on_models_changed = on_models_changed }) == false then return false end
+		if profiles.init({ port = HttpBridge.OLLAMA_OWNED_PORT, on_models_changed = on_models_changed }) == false then return false end
 		Collision.inventory.profiles, Collision.inventory.cancel, Collision.inventory.pending =
 			profiles, profiles.cancel_model_inventory, profiles.model_inventory_pending
 		if _runtime_closed or _scope_owner then return false end

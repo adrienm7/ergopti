@@ -4981,16 +4981,18 @@ local function _build_configuration(ctx)
 	local function apply_global_scope(mode)
 		if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
 		local GlobalScope = require("infra.global_scope")
-		local committed, report = GlobalScope.apply(mode, GlobalScope.participants(ctx))
-		-- The refusal names its typed failure point, as the Windows reset does:
-		-- the generic « could not be saved, it has been reverted » claimed a
-		-- revert for a pending rollback or finalization, where none took place.
-		if not committed then
-			local title, message = require("config_reset_failure").message(report, i18n_safe)
-			show_error(message, title)
-		end
-		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		return committed
+		-- The layout category settles once the session holds its layout, after a
+		-- child answers: the outcome is shown from the continuation.
+		return GlobalScope.apply(mode, GlobalScope.participants(ctx), function(committed, report)
+			-- The refusal names its typed failure point, as the Windows reset does:
+			-- the generic « could not be saved, it has been reverted » claimed a
+			-- revert for a pending rollback or finalization, where none took place.
+			if not committed then
+				local title, message = require("config_reset_failure").message(report, i18n_safe)
+				show_error(message, title)
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end)
 	end
 
 	-- Every row is `type = "command"` in the manifest, and so is the separator
