@@ -52,6 +52,10 @@
 #       Same conflict rule.
 #   { op = "map_value", section, key, map = [{ from, to }, ...] }
 #       Replaces a present value equal (same type) to a ``from``.
+#   { op = "encode_value", section, key, to_section, to_key, encoding }
+#       A non-empty array of tables becomes the encoded string of its new key
+#       (the one encoding: "user_profile_registry", the llm.user_profiles
+#       envelope); an occupied target, or anything else, stays where it is.
 #   { op = "wrap_value", section, key, to_key }
 #       Moves a present scalar into its own [section.key] table as to_key (a
 #       bare `date = true` becomes [section.date] enabled = true). A table, an
@@ -74,7 +78,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 16
+current_version = 17
 unstamped_version = 2
 
 
@@ -803,4 +807,13 @@ ops = [
 	{ op = "wrap_value", section = "hotstrings.dynamic", key = "ssn_prefixes", to_key = "enabled" },
 	{ op = "wrap_value", section = "hotstrings.dynamic", key = "user_code", to_key = "enabled" },
 	{ op = "wrap_value", section = "hotstrings.dynamic", key = "text_expansion_personal_information", to_key = "enabled" },
+]
+
+[steps.v16_to_v17]
+from = 16
+to = 17
+drivers = ["hs"]
+reason = "The prompt profiles macOS kept as an array at [llm.profiles] user_profiles move to llm.user_profiles, the encoded envelope every OS reads. Only macOS ever wrote that array. A file that already holds the envelope keeps it, and the array stays for the cleanup to offer."
+ops = [
+	{ op = "encode_value", section = "llm.profiles", key = "user_profiles", to_section = "llm", to_key = "user_profiles", encoding = "user_profile_registry" },
 ]

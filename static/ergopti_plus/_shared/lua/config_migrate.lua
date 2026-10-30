@@ -12,7 +12,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Data-only steps. A step is a list of ops from a closed set (rename,
----    rename_prefix, move_section, merge_into, map_value, wrap_value,
+---    rename_prefix, move_section, merge_into, map_value, wrap_value, encode_value,
 ---    delete, set_if_absent). The engine
 ---    holds the only op semantics on this side; the corpus under
 ---    _shared/tests/corpus/config_migrations pins them to the Windows
@@ -165,6 +165,7 @@ local OPS = {
 	merge_into    = { required = { "section", "to_section" }, optional = {} },
 	map_value     = { required = { "section", "key", "map" }, optional = {} },
 	wrap_value    = { required = { "section", "key", "to_key" }, optional = {} },
+	encode_value  = { required = { "section", "key", "to_section", "to_key", "encoding" }, optional = {} },
 	delete        = { required = { "section" }, optional = { "key" } },
 	set_if_absent = { required = { "section", "key", "value" }, optional = {} },
 }
@@ -430,6 +431,9 @@ local function validate_op(op)
 		if op[field] ~= nil and not is_bare_key(op[field]) then
 			return false, "'" .. field .. "' must be one bare segment"
 		end
+	end
+	if op.op == "encode_value" and op.encoding ~= "user_profile_registry" then
+		return false, "encode_value names no known encoding"
 	end
 	if (op.op == "rename" or op.op == "copy_if_absent") and op.to_section == nil and op.to_key == nil then
 		return false, op.op .. " needs to_section or to_key"
@@ -957,6 +961,25 @@ function APPLY.wrap_value(sections, op)
 	local entry = entries and entries[op.key]
 	if entry == nil or not is_scalar(entry.value) then return end
 	move_entry(sections, op.section, op.key, op.section .. "." .. op.key, op.to_key)
+	drop_if_empty(sections, op.section)
+end
+
+--- A non-empty array of tables becomes the encoded string of its new key. An
+--- occupied target wins (the source stays for the cleanup), and anything the
+--- encoding cannot carry stays where it is: not encoded means not deleted.
+function APPLY.encode_value(sections, op)
+	local entries = sections[op.section]
+	local entry = entries and entries[op.key]
+	if entry == nil or type(entry.value) ~= "table" or #entry.value == 0 then return end
+	if sections[op.to_section] ~= nil and sections[op.to_section][op.to_key] ~= nil then return end
+	for _, item in ipairs(entry.value) do
+		if type(item) ~= "table" then return end
+	end
+	local encodable, envelope = pcall(require("llm.profile_registry_codec").encode, entry.value)
+	if not encodable or type(envelope) ~= "string" then return end
+	if sections[op.to_section] == nil then sections[op.to_section] = {} end
+	sections[op.to_section][op.to_key] = { value = envelope }
+	entries[op.key] = nil
 	drop_if_empty(sections, op.section)
 end
 

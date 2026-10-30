@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_user_profiles_envelope_wins_on_macos/case.toml
+
+[case]
+description = "A file that already holds the envelope keeps it; the older array stays for the cleanup to offer."
+drivers = ["hs"]
+outcome = "migrated"
+from_version = 16
+to_version = 17

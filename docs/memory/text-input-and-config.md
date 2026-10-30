@@ -572,11 +572,10 @@ base64(JSON array) envelope of `_shared/lua/llm/profile_registry_codec.lua`
 (Windows writes the same bytes). macOS keeps the list decoded in its state and
 crosses the disk boundary in `scalar_units` through the KEY_MAP `codec` field,
 so its menus never see the string. Its older `[llm.profiles] user_profiles`
-array is imported by `legacy_user_profiles` in `infra/preferences.lua` while
-`llm.user_profiles` is absent, and the next save deletes it: the registry
-cannot carry it (no op re-encodes a value, and the Windows engine rejects an
-op it does not know). Once the envelope exists the array is unknown
-configuration that the cleanup offers. Action: add another
+array reaches the envelope through step `v16_to_v17` of the config registry
+(the `encode_value` op, which all three interpreters know). When the envelope
+already exists the array stays as unknown configuration that the cleanup
+offers. Action: add another
 encoded preference through a `codec` on its KEY_MAP row, never a nested map.
 
 ## Gestures and keymaps
