@@ -1012,7 +1012,8 @@ platform = "ahk"
 emit_ahk = "#+t"
 
 [sg_actions.open_chatgpt]
-platform = "linux"
+# macOS binds its Ctrl+G switch to its own owner of the same URL.
+platform = "ahk,linux"
 requires_linux = ["tool:xdg-open"]
 
 [sg_actions.open_url]

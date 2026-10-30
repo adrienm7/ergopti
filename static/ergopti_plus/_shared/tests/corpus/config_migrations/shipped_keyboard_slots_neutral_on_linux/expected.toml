@@ -1,5 +1,5 @@
 [_meta]
-schema_version = 18
+schema_version = 19
 
 [shortcuts.keyboard]
 alt_x = "undo"

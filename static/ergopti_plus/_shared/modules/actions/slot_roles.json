@@ -58,7 +58,7 @@
 			{
 				"id": "capslock",
 				"label": "Caps Lock",
-				"chord_key": "capslock"
+				"chord_key": "sc03a"
 			},
 			{
 				"id": "sc029",

@@ -189,6 +189,22 @@ MagicEditorRecordOrdinaryPhysical(Slot, Action, Keycodes := unset) {
 	return true
 }
 
+/**
+ * Joins an ordinary Win slot whose letter lives on a key the layout owner decides,
+ * so the slot shares that key's one Win variant with its remap.
+ * @param {String} Scan Canonical physical scan.
+ * @param {String} Slot The ordinary slot.
+ * @param {String} Action Its validated action.
+ * @param {Map} Keycodes Actual physical catalogue, optional fixture root seam.
+ */
+MagicEditorRecordOrdinaryScan(Scan, Slot, Action, Keycodes := unset) {
+	State := MagicEditorState()
+	if State["initialized"]
+		throw Error("An ordinary Win slot requires an unstarted broker.")
+	Canonical := MagicEditorNormalizeScan(Scan, IsSet(Keycodes) ? Keycodes : MagicEditorPhysicalCatalogue())
+	State["ordinary_physical"][Canonical] := Map("slot", Slot, "action", Action)
+}
+
 /** Retains an effective legacy feature's Win callback without a parallel variant. */
 MagicEditorRecordLegacy(Scan, Callback, Keycodes := unset) {
 	State := MagicEditorState()

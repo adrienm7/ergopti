@@ -1777,126 +1777,6 @@ type = "string"
 description_key = "menu.shortcuts.chatgpt_url"
 
 [[features.shortcuts]]
-id = "get_hex_value"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.get_hex_value"
-platforms = ["ahk"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts]]
-id = "gpt"
-default = { enabled = false, link = "https://chatgpt.com/" }
-recommended = { enabled = true, link = "https://chatgpt.com/" }
-input_altering = true
-type = "feature"
-description_key = "menu.shortcuts.gpt"
-platforms = ["ahk"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts]]
-id = "search"
-default = { enabled = false, search_engine = "https://www.google.com", search_engine_url_query = "https://www.google.com/search?q=" }
-recommended = { enabled = true, search_engine = "https://www.google.com", search_engine_url_query = "https://www.google.com/search?q=" }
-input_altering = true
-type = "feature"
-description_key = "menu.shortcuts.search"
-platforms = ["ahk"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts]]
-id = "take_note"
-default = { enabled = false, dated_notes = false, destination_folder = "D:\\Bureau" }
-recommended = { enabled = true, dated_notes = false, destination_folder = "D:\\Bureau" }
-input_altering = true
-type = "feature"
-description_key = "menu.shortcuts.take_note"
-platforms = ["ahk"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts]]
-id = "microsoft_bold"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.microsoft_bold"
-platforms = ["ahk"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts]]
-id = "title_case"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.title_case"
-platforms = ["ahk"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts]]
-id = "uppercase"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.uppercase"
-platforms = ["ahk"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts]]
-id = "paste_without_formatting"
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_cmd_shift_v"
-platforms = ["ahk"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts]]
-id = "select_line"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.select_line"
-platforms = ["ahk"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts]]
-id = "spotlight_mouse"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.spotlight_mouse"
-platforms = ["ahk"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts]]
-id = "surround_with_parentheses"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.surround_with_parentheses"
-platforms = ["ahk"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts]]
-id = "teleport_mouse"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.teleport_mouse"
-platforms = ["ahk"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts]]
 id = "wrap_text_if_selected"
 default = false
 recommended = true
@@ -1908,47 +1788,54 @@ description_key = "shortcuts.label_wrap_text"
 platforms = ["ahk", "linux"]
 reason_key = "platform_reason.wrap_selection_is_a_shortcut_key_on_macos"
 
-[[features.shortcuts]]
-id = "open_downloads"
+
+
+# ====================================
+# ===== 3.5.0 shortcut action settings
+# ====================================
+
+# What the copy_selected_path action searches with, and where take_note writes.
+# They were fields of the Win+S and Win+N switches until config schema v19, when
+# those switches became the slots meta_s and meta_n.
+[[features.shortcuts.search]]
+id = "search_engine"
+default = "https://www.google.com"
+recommended = "https://www.google.com"
+input_altering = false
+type = "string"
+description_key = "menu.shortcuts.search"
 platforms = ["ahk"]
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.open_downloads"
 
-[[features.shortcuts]]
-id = "move"
+[[features.shortcuts.search]]
+id = "search_engine_url_query"
+default = "https://www.google.com/search?q="
+recommended = "https://www.google.com/search?q="
+input_altering = false
+type = "string"
+description_key = "menu.shortcuts.search"
 platforms = ["ahk"]
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.move"
 
-[[features.shortcuts]]
-id = "screen"
+[[features.shortcuts.take_note]]
+id = "dated_notes"
+default = false
+recommended = false
+input_altering = false
+type = "boolean"
+description_key = "menu.shortcuts.take_note"
 platforms = ["ahk"]
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.screen"
 
-[[features.shortcuts]]
-id = "win_caps_lock"
+[[features.shortcuts.take_note]]
+id = "destination_folder"
+default = "D:\\Bureau"
+recommended = "D:\\Bureau"
+input_altering = false
+type = "string"
+description_key = "menu.shortcuts.take_note"
 platforms = ["ahk"]
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.win_caps_lock"
-
-
 
 # ===================================
 # ===== 3.5.1 shortcuts.a_grave =====
@@ -2286,7 +2173,7 @@ description_key = "menu.shortcuts.keyboard.win_a"
 id = "meta_d"
 platforms = ["ahk"]
 default = "none"
-recommended = "none"
+recommended = "open_downloads"
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_d"
@@ -2295,7 +2182,7 @@ description_key = "menu.shortcuts.keyboard.win_d"
 id = "meta_g"
 platforms = ["ahk"]
 default = "none"
-recommended = "open_url"
+recommended = "open_chatgpt"
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_g"
@@ -2340,7 +2227,7 @@ description_key = "menu.shortcuts.keyboard.win_o"
 id = "meta_s"
 platforms = ["ahk"]
 default = "none"
-recommended = "search_web"
+recommended = "copy_selected_path"
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_s"
@@ -2389,6 +2276,24 @@ recommended = "pick_color"
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_x"
+
+[[features.shortcuts.keyboard]]
+id = "meta_capslock"
+platforms = ["ahk"]
+default = "none"
+recommended = "toggle_capslock"
+input_altering = true
+type = "action"
+description_key = "menu.shortcuts.keyboard.meta_capslock"
+
+[[features.shortcuts.keyboard]]
+id = "meta_quote"
+platforms = ["ahk"]
+default = "none"
+recommended = "spotlight_mouse"
+input_altering = true
+type = "action"
+description_key = "menu.shortcuts.keyboard.meta_quote"
 
 # "Generate an AI prediction" on the chord each OS leaves for it; the key is
 # swallowed so the OS never sees it (Win+Space no longer switches the input
@@ -7212,9 +7117,6 @@ exclude = ["shortcuts.personal"]
 # them off as the master once did. macOS lists no combination here and Linux
 # owns ordered combinations independently of the Shortcuts master.
 sub_switch = { ahk = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"] }, linux = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"], independent = true } }
-
-[onboarding.pages.shortcuts.labels]
-"shortcuts.select_line" = "sg_actions.select_line"
 
 # What triggers a macOS built-in shortcut whose id spells no key combination,
 # as the Shortcuts menu names it; every other one of them shows the chord its id

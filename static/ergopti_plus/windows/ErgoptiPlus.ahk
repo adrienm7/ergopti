@@ -1192,35 +1192,6 @@ BootProfile_StageBegin("shortcuts")
 ReadScriptShortcutsConfig()
 ReadKeyboardShortcutsConfig()
 
-LoggerStart("KeyboardShortcuts", "Registering configurable keyboard hotkeys…")
-_KbBoundCount := 0
-for _KbSlot, _KbAction in KeyboardShortcutAssignments {
-		if _KbSlot == MagicEditorSlot()["id"]
-				continue
-		if MagicEditorRecordOrdinaryPhysical(_KbSlot, _KbAction)
-				continue
-		if (_KbAction == "none")
-				continue
-		_KbChord := _KeyboardSlotChord(_KbSlot)
-		if (_KbChord == "") {
-				LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — chord not resolvable.", _KbSlot)
-				continue
-		}
-		; The registrar owns the OS call and reports refusal by returning "", so the
-		; try/catch that used to wrap Hotkey() here would now only ever catch our own
-		; bugs — which must surface, not be logged as a skipped shortcut
-		_KbHandle := HotkeyRegistrarBind(_KbChord, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
-		if (_KbHandle == "") {
-				LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}' ({2}).", _KbSlot, _KbChord)
-				continue
-		}
-		LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", _KbSlot, _KbAction)
-		MagicEditorRecordOrdinaryHandle(_KbSlot, _KbHandle)
-		KeyboardShortcutRecordHandle(_KbSlot, _KbAction, _KbHandle)
-		_KbBoundCount++
-}
-LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)
-
 #Include infra/config_io.ahk
 #Include infra/config_scope.ahk
 #Include ../_shared/modules/hotstrings/scope_overrides.ahk
@@ -1232,7 +1203,7 @@ global _ParseExtTomlSectionsCache := Map()
 if MetricsShortcuts.enabled
 		WPMWidget_LoadConfig(_BootMetricsCache)
 
-BootProfile_StageEnd("shortcuts", _KbBoundCount . " configurable hotkey(s) bound")
+BootProfile_StageEnd("shortcuts", KeyboardShortcutAssignments.Count . " configured keyboard slot(s) read")
 BootProfile_Mark("Config, features & shortcuts loaded")
 ; Publish the configured native root before registering the input surface. Leaf
 ; pickers finish before paint or prewarm after input readiness; command admission
@@ -1426,6 +1397,10 @@ BootProfile_Mark("LAYOUT: registry emulation registered")
 #Include modules/keymap/layout.ahk
 BootProfile_Mark("LAYOUT: Ergopti layout registered")
 #Include modules/shortcuts.ahk
+; After the layout: a slot's letter is the key that types it under the emulation,
+; which RemappedList only knows from here. Before MagicEditorStart: a Win slot on
+; a remapped key joins the physical broker, which acquires its keys once.
+KeyboardShortcutsBindAll()
 ; [shortcuts.caps_word], read before the first activation arms its listeners.
 CapsWordAutoOffReadConfig(_IniCache)
 BootProfile_Mark("LAYOUT: shortcut modules registered")

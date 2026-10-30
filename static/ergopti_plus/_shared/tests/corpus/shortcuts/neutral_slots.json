@@ -244,45 +244,9 @@
 	"crosswalk": [
 		{
 			"driver": "windows",
-			"modifiers": ["win"],
-			"key": "x",
-			"slot": "meta_x"
-		},
-		{
-			"driver": "windows",
-			"modifiers": ["win"],
-			"key": "g",
-			"slot": "meta_g"
-		},
-		{
-			"driver": "windows",
-			"modifiers": ["win"],
-			"key": "s",
-			"slot": "meta_s"
-		},
-		{
-			"driver": "windows",
-			"modifiers": ["win"],
-			"key": "n",
-			"slot": "meta_n"
-		},
-		{
-			"driver": "windows",
 			"modifiers": ["ctrl"],
 			"key": "b",
 			"slot": "primary_b"
-		},
-		{
-			"driver": "windows",
-			"modifiers": ["win"],
-			"key": "w",
-			"slot": "meta_w"
-		},
-		{
-			"driver": "windows",
-			"modifiers": ["win"],
-			"key": "u",
-			"slot": "meta_u"
 		},
 		{
 			"driver": "windows",
@@ -299,32 +263,14 @@
 		{
 			"driver": "windows",
 			"modifiers": ["win"],
-			"key": "quote",
-			"slot": "meta_quote"
-		},
-		{
-			"driver": "windows",
-			"modifiers": ["win"],
-			"key": "o",
-			"slot": "meta_o"
-		},
-		{
-			"driver": "windows",
-			"modifiers": ["win"],
-			"key": "t",
-			"slot": "meta_t"
-		},
-		{
-			"driver": "windows",
-			"modifiers": ["win"],
 			"key": "d",
 			"slot": "meta_d"
 		},
 		{
 			"driver": "windows",
 			"modifiers": ["win"],
-			"key": "m",
-			"slot": "meta_m"
+			"key": "g",
+			"slot": "meta_g"
 		},
 		{
 			"driver": "windows",
@@ -335,14 +281,68 @@
 		{
 			"driver": "windows",
 			"modifiers": ["win"],
-			"key": "capslock",
-			"slot": "meta_capslock"
+			"key": "m",
+			"slot": "meta_m"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "n",
+			"slot": "meta_n"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "o",
+			"slot": "meta_o"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "s",
+			"slot": "meta_s"
 		},
 		{
 			"driver": "windows",
 			"modifiers": ["win"],
 			"key": "sc029",
 			"slot": "meta_sc029"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "t",
+			"slot": "meta_t"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "u",
+			"slot": "meta_u"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "w",
+			"slot": "meta_w"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "x",
+			"slot": "meta_x"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "capslock",
+			"slot": "meta_capslock"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "quote",
+			"slot": "meta_quote"
 		},
 		{
 			"driver": "windows",

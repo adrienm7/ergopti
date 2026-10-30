@@ -947,8 +947,8 @@ _GPTLinkEditorClose(Window, *) {
 GPTLinkEditor(*) {
 		global Features
 		CurrentLink := ""
-		if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("gpt") and Features["shortcuts"]["gpt"].Has("link")
-				CurrentLink := Features["shortcuts"]["gpt"]["link"]
+		if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("chatgpt_url")
+				CurrentLink := Features["shortcuts"]["chatgpt_url"]
 		GuiToShow := Gui_Create(, t("dialog.gpt_link.title"))
 		GuiToShow.OnEvent("Close", _GPTLinkEditorClose)
 		GuiToShow.OnEvent("Escape", _GPTLinkEditorClose)
@@ -960,17 +960,17 @@ GPTLinkEditor(*) {
 _EditorBuildLinkPlan(NewValue) {
 	global Features
 	if _FeatureUsesDesiredState(Features)
-		return _FeatureBuildSinglePlan(Features, "shortcuts.gpt", NewValue, "link")
+		return _FeatureBuildSinglePlan(Features, "shortcuts.chatgpt_url", NewValue, "")
 	return {
-		updates: [{ Section: "shortcuts.gpt", Key: "link", Value: NewValue }],
+		updates: [{ Section: "shortcuts", Key: "chatgpt_url", Value: NewValue }],
 		publish: _EditorPublishLink.Bind(NewValue),
 	}
 }
 
 _EditorPublishLink(NewValue) {
 	global Features
-	if IsSet(Features) && Features.Has("shortcuts") && Features["shortcuts"].Has("gpt")
-		Features["shortcuts"]["gpt"]["link"] := NewValue
+	if IsSet(Features) && Features.Has("shortcuts")
+		Features["shortcuts"]["chatgpt_url"] := NewValue
 }
 
 ModifyLink(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {

@@ -485,55 +485,19 @@ M.features = {
 		path = "shortcuts.chatgpt_url", id = "chatgpt_url", section = "shortcuts", default = "https://chat.openai.com", type = "string", description_key = "menu.shortcuts.chatgpt_url", platforms = { "ahk", "hs", "linux" }, recommended = "https://chat.openai.com", input_altering = false,
 	},
 	{
-		path = "shortcuts.get_hex_value", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.gpt", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.search", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.take_note", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.microsoft_bold", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.title_case", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.uppercase", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.paste_without_formatting", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.select_line", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.spotlight_mouse", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.surround_with_parentheses", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.teleport_mouse", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
-	},
-	{
 		path = "shortcuts.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "ahk", "linux" }, recommended = true, input_altering = true, reason_key = "platform_reason.wrap_selection_is_a_shortcut_key_on_macos",
 	},
 	{
-		path = "shortcuts.open_downloads", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
+		path = "shortcuts.search.search_engine", section = "shortcuts.search", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.move", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
+		path = "shortcuts.search.search_engine_url_query", section = "shortcuts.search", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.screen", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
+		path = "shortcuts.take_note.dated_notes", section = "shortcuts.take_note", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.win_caps_lock", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
+		path = "shortcuts.take_note.destination_folder", section = "shortcuts.take_note", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.a_grave.enabled", section = "shortcuts.a_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
@@ -648,6 +612,12 @@ M.features = {
 	},
 	{
 		path = "shortcuts.keyboard.meta_x", section = "shortcuts.keyboard", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.meta_capslock", section = "shortcuts.keyboard", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.meta_quote", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.keyboard.secondary_space", id = "secondary_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.hs_ctrl_space", platforms = { "hs" }, recommended = "llm_generate_prediction", input_altering = true, reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",

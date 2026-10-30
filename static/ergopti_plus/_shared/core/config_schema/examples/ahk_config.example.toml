@@ -466,20 +466,37 @@ list = []
 
 [shortcuts]
 # Universal section; the modifier-combo variants are the [shortcuts.*] sub-tables.
-get_hex_value = true
-gpt = { enabled = true, link = "https://chatgpt.com/" }
-search = { enabled = true, search_engine = "https://www.google.com", search_engine_url_query = "https://www.google.com/search?q=" }
-microsoft_bold = true
-take_note = { enabled = true, dated_notes = false, destination_folder = "D:\\Bureau" }
-title_case = true
-uppercase = true
-paste_without_formatting = false
+chatgpt_url = "https://chatgpt.com/"
 save = false
-select_line = true
-spotlight_mouse = true
-surround_with_parentheses = true
-teleport_mouse = true
 wrap_text_if_selected = true
+
+# One chord, one action: a neutral slot id (primary is Ctrl, meta is the Windows
+# key) holding a catalogue action, "none" clearing it.
+[shortcuts.keyboard]
+meta_a = "select_line"
+meta_capslock = "toggle_capslock"
+meta_d = "open_downloads"
+meta_g = "open_chatgpt"
+meta_h = "screen_capture"
+meta_m = "activity_simulation"
+meta_n = "take_note"
+meta_o = "surround_parens"
+meta_quote = "spotlight_mouse"
+meta_s = "copy_selected_path"
+meta_t = "teleport_mouse"
+meta_u = "uppercase_selection"
+meta_w = "titlecase_selection"
+meta_x = "pick_color"
+primary_b = "microsoft_bold"
+primary_shift_v = "none"
+
+[shortcuts.search]
+search_engine = "https://www.google.com"
+search_engine_url_query = "https://www.google.com/search?q="
+
+[shortcuts.take_note]
+dated_notes = false
+destination_folder = "D:\\Bureau"
 
 
 
@@ -490,10 +507,6 @@ wrap_text_if_selected = true
 # Windows-only shortcuts. They are not namespaced by driver: a shortcut is a
 # shortcut, and which drivers implement it is the manifest's "platforms" field.
 ctrl_j = false
-open_downloads = true
-move = true
-screen = true
-win_caps_lock = true
 
 
 [shortcuts.a_grave]

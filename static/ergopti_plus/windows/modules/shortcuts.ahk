@@ -25,7 +25,6 @@
 ; ======================================
 
 #Include shortcuts/utils.ahk
-#Include shortcuts/ctrl.ahk
 #Include shortcuts/win.ahk
 #Include shortcuts/capsword_auto_off.ahk
 #Include shortcuts/capsword.ahk

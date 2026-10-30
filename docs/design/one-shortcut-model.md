@@ -1,8 +1,9 @@
 <!-- docs/design/one-shortcut-model.md -->
 
-# One shortcut data model (plan for PAR-41, in progress)
+# One shortcut data model (PAR-41)
 
-Status: steps 1, 2 and the shared part of step 7 are done (see "Progress").
+Status: every step is done on the three drivers (see "Progress" and the two
+status sections below). Left: macOS `ctrl_g` to a slot.
 Rows C12 and C13 of the 2026-10-24 cross-OS parity audit are the evidence.
 
 ## What exists today
@@ -137,3 +138,30 @@ through `ConfigOutdated` and offered by the cleanup, on macOS and Linux.
 - Chord action ids (`cmd_a`, `hs_ctrl_a`, `ctrl_a` ... the modifier chords of
   `modifier_chords.json`) are actions, not slots, and keep their names; the
   macOS `shortcut_groups` prefixes of that file build them.
+
+## Status after the Windows adoption
+
+- Schema v18 (`v17_to_v18`, Windows only) renames every saved slot by role and
+  carries the `keyboard__<slot>__<action>` parameters of `[action_parameters]`
+  with `rename_prefix`. Schema v19 (`v18_to_v19`) converts the 16 switches; a
+  switch left on becomes its action, off becomes `none`, a slot the user set wins
+  (the same known edge as macOS: a cleared slot beats a switch left on).
+- Windows reads `slot_roles.json` through `windows/_generated/slot_roles.ahk` and
+  `windows/infra/slot_roles.ahk`, and replays `neutral_slots.json`. Its slot-only
+  keys (`extra_keys`) are `quote`, `capslock` and `sc029`.
+- Three switch behaviours a slot did not have were kept, not lost. A slot's letter
+  binds the key that types it under the emulation (`KeyboardSlotLayoutScan`), so
+  the slots bind after the layout tables and before `MagicEditorStart`, and a Win
+  slot on such a key joins the physical broker. `select_line` and
+  `surround_parens` tell the hotstring buffers the caret moved. A keyboard
+  `take_note` starts its note on a fresh line.
+- Win+G recommends `open_chatgpt` (now on Windows too) reading
+  `shortcuts.chatgpt_url`, and Win+S `copy_selected_path`, because the recommended
+  `open_url` and `search_web` read a per-binding parameter nothing wrote: only the
+  switch made those chords work. v19 maps those two values in a saved file. The
+  search and note fields stay as settings (`[shortcuts.search]`,
+  `[shortcuts.take_note]`), Win+D recommends `open_downloads` as its switch did.
+- Not converted, on purpose: the five `shortcuts.personal` toggles (a script's
+  own switches, no chord or action, see "Target model"); `wrap_text_if_selected`
+  (no chord). `AddShortcut` and the broker's legacy owner stay for the same
+  personal scripts.
