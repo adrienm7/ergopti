@@ -190,10 +190,18 @@ local function log_facts()
 		files = 0, bytes = 0 }
 	if type(dir) ~= "string" or dir == "" then return facts end
 	dir = dir:gsub("/+$", "")
+	-- A plain write and remove: the file system adapter's atomic write keeps a
+	-- lock file beside its target, which would stay in the user's logs folder.
 	local probe = dir .. "/.ergopti-field-probe"
-	facts.writable = FileSystem.write(probe, "field run\n") == true and FileSystem.delete(probe) == true
+	local handle = io.open(probe, "wb")
+	if handle then
+		local written = handle:write("field run\n") ~= nil
+		local closed = handle:close() == true
+		facts.writable = written and closed and os.remove(probe) == true
+	end
 	for _, name in ipairs(require("infra.fs_dir").entries(dir)) do
-		local size = hs.fs.attributes(dir .. "/" .. name, "size")
+		local attributes = hs.fs.attributes(dir .. "/" .. name)
+		local size = type(attributes) == "table" and attributes.mode == "file" and attributes.size or nil
 		if type(size) == "number" then
 			facts.files = facts.files + 1
 			facts.bytes = facts.bytes + size
@@ -334,7 +342,8 @@ local function recent_files(dir, patterns)
 		for _, pattern in ipairs(patterns or {}) do
 			if lower:match(pattern) then wanted = true end
 		end
-		local modified = wanted and hs.fs.attributes(dir .. "/" .. name, "modification") or nil
+		local attributes = wanted and hs.fs.attributes(dir .. "/" .. name) or nil
+		local modified = type(attributes) == "table" and attributes.mode == "file" and attributes.modification or nil
 		if type(modified) == "number" and now - modified <= CRASH_WINDOW_SECONDS then count = count + 1 end
 	end
 	return count
