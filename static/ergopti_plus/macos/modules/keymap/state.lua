@@ -136,6 +136,9 @@ function M.new(defaults, delays_default)
 		last_key_time              = 0,
 		last_key_was_complex       = false,
 		no_rescan_until            = 0,
+		-- Whether that window keeps the replacement in the buffer (a chain step),
+		-- where a quick key could still complete a trigger spanning it.
+		no_rescan_keeps_buffer     = false,
 		lifecycle_generation       = 0,
 		-- The pause, in seconds, after which the next key starts a new word
 		-- (hotstrings.idle_reset_seconds, 0 = never) and whether a mouse click
@@ -186,6 +189,7 @@ function M.new(defaults, delays_default)
 	-- from rolling Quartz back after the engine already describes new text.
 	s.commit_suppress_rescan = function(deadline)
 		s.no_rescan_until = deadline
+		s.no_rescan_keeps_buffer = false
 		s.buffer = ""
 		s.llm_buffer = ""
 		s.llm_private_mark = ""
@@ -271,6 +275,7 @@ function M.new(defaults, delays_default)
 	s.suppress_rescan_keep_buffer = function(duration)
 		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
 		s.no_rescan_until = epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_KEEP_SEC)
+		s.no_rescan_keeps_buffer = true
 	end
 
 	-- Seed the initial per-group delays from defaults.

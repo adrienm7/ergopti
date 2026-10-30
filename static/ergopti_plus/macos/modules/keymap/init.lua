@@ -1906,7 +1906,15 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- buffer (via perform_text_replacement), so the pre-expansion preview
 	-- was pure waste. We now defer the preview call to the branch below
 	-- that actually keeps the buffer unchanged.
+	-- After a wiping expansion the window only fences Ergopti's own loopback:
+	-- the replacement it injected exits above as owned output, and the buffer
+	-- holds none of it. Applied to the user's own keys, it swallowed every
+	-- trigger typed within a second of a final-result expansion: typing
+	-- "sru sru sru sru" fast expanded one word in two (field report of
+	-- 2026-10-30). A chain step keeps its replacement in the buffer, so there
+	-- the window still holds for every key.
 	local rescan_suppressed = now < CoreState.no_rescan_until
+		and (internal_loopback or CoreState.no_rescan_keeps_buffer == true)
 	if suppress_triggers or rescan_suppressed then
 		-- Buffer didn't expand, so refresh the tooltip/predictions once here.
 		update_preview_with_action_recovery(CoreState.buffer)

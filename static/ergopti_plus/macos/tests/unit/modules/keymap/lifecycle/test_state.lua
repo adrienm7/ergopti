@@ -142,6 +142,17 @@ end)
 -- =====================================
 
 helpers.describe("State.new: suppress_rescan", function()
+	-- The key handler fences the user's own keys only behind a window that kept
+	-- the replacement in the buffer; after a wiping one, "sru sru" typed fast lost
+	-- the second expansion (field report of 2026-10-30).
+	helpers.it("says whether the window kept the replacement in the buffer", function()
+		local s = State.new(make_defaults(), { a = 0.3 })
+		s.suppress_rescan_keep_buffer()
+		helpers.assert_eq(s.no_rescan_keeps_buffer, true)
+		s.suppress_rescan()
+		helpers.assert_eq(s.no_rescan_keeps_buffer, false)
+	end)
+
 	helpers.it("clears the buffer when called", function()
 		local s = State.new(make_defaults(), { a = 0.3 })
 		s.buffer = "abc"
