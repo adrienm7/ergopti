@@ -169,7 +169,7 @@
 			"id": "driver_reload",
 			"kind": "reload",
 			"deadline_seconds": 180,
-			"proves": "The driver reloads on request and the field run resumes at its next step; the reload's duration, request to a ready field run, is named."
+			"proves": "Skipped as reload_unproven since a timed reload did not come back on 2026-10-30; once proven, the driver reloads and the run resumes with the reload's duration."
 		}
 	],
 	"guard_step": "config_guard"

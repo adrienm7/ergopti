@@ -64,6 +64,12 @@ M.RESTORE_RELOAD_REASON = "field_run_config_restored"
 -- The reload reason of a "reload" step.
 M.TIMED_RELOAD_REASON = "field_run_timed_reload"
 
+-- Whether a "reload" step asks for its reload. Off since the maintainer's run
+-- of 2026-10-30 21:01: the reload it asked for never came back (no boot after
+-- the Karabiner lease revocation, the developer app gone), so the step is
+-- recorded as skipped, by name, until a reload is proven to return.
+M.TIMED_RELOAD_ENABLED = false
+
 local _session = nil
 
 
@@ -729,6 +735,11 @@ end
 function Session:reload_step(index, step, continue)
 	local spec, ports, run = self.spec, self.ports, self.run
 	run.current_step = step.id
+	if not M.TIMED_RELOAD_ENABLED then
+		Logger.warn(LOG, "Field run step '%s' skipped: a timed reload did not come back on 2026-10-30.", step.id)
+		self:record(index, step, { verdict = "skip", codes = { "reload_unproven" }, elapsed_ms = 0 })
+		return continue()
+	end
 	local ok, outcome = pcall(ports.config_restore, run.snapshot)
 	if not ok or type(outcome) ~= "table" then
 		Logger.error(LOG, "The configuration could not be put back before the timed reload: %s.", tostring(outcome))
