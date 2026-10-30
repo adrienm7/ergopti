@@ -60,7 +60,7 @@ _LMCC_Script(Framework, Receipt) {
 	for Name in ["LLM_Menu_Build", "_LLM_Menu_PublishRoot",
 			"_LLM_Menu_PreparedRootCurrent", "_LLM_Menu_ReplacePublishedRow",
 			"initMenu", "_MI_TopLevelBuilders", "_MI_StageTopLevel",
-			"_MI_StageLlm", "_MI_StagePrebuiltLlm",
+			"_MI_StageLlm", "_MI_StagePrebuiltLlm", "LLM_Menu_TrayTitle",
 			"TrayMenuItemCount", "TrayMenuItemCaption", "TrayMenuSubmenuHandle",
 			"TrayMenuRebindSubmenu",
 			"RebuildTrayMenu", "_TrayRootRequestAndTryAcquire", "_TrayRootClaimLatest",

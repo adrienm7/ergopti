@@ -174,7 +174,8 @@ _AMCR_LocalCheckoutGreysTheUpdateRows() {
 		UPDATER_CHECK_INTERVAL := 86400
 		Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind({ Calls: [] }))
 		AssertTrue(Rows[1].Has("disabled") && Rows[1]["disabled"], "a local checkout's version is a label")
-		AssertTrue(Rows[_AMCR_PICKER_AT].Has("items"), "the channel picker stays")
+		Channel := Rows[_AMCR_PICKER_AT]
+		AssertTrue(Channel.Has("label") && Channel["label"] != "", "the channel picker stays, by name")
 		AssertEqual(_AMCR_PICKER_AT + 2, Rows.Length,
 			"a local checkout draws the check row and the frequency row after the channel picker")
 		Check := Rows[_AMCR_PICKER_AT + 1]
@@ -182,7 +183,8 @@ _AMCR_LocalCheckoutGreysTheUpdateRows() {
 		AssertEqual(t("menu.about.check_for_updates"), Check["label"])
 		AssertEqual(t("menu.about.frequency_menu") . ": " . t("menu.about.frequency.1d"), Frequency["label"],
 			"the frequency row still names the preset in force")
-		for _, Row in [Check, Frequency] {
+		; A local version installs nothing, so no channel can be chosen either.
+		for _, Row in [Channel, Check, Frequency] {
 			AssertTrue(Row.Has("disabled") && Row["disabled"], Row["label"] . " is greyed on a local version")
 			AssertEqual("menu.about.source_run_reason", Row.Get("disabled_reason_key", ""),
 				Row["label"] . " says why it is greyed")
@@ -191,8 +193,9 @@ _AMCR_LocalCheckoutGreysTheUpdateRows() {
 		}
 		Installed := _MI_AboutUpdateRows(false, _AMCR_RecordChannel.Bind({ Calls: [] }))
 		AssertEqual(Rows.Length, Installed.Length, "a local version and an installed one draw the same rows")
-		for _, Row in [Installed[_AMCR_PICKER_AT + 1], Installed[_AMCR_PICKER_AT + 2]]
+		for _, Row in [Installed[_AMCR_PICKER_AT], Installed[_AMCR_PICKER_AT + 1], Installed[_AMCR_PICKER_AT + 2]]
 			AssertFalse(Row.Has("disabled_reason_key"), "an installed build greys no update row for this reason")
+		AssertTrue(Installed[_AMCR_PICKER_AT]["items"] is Array, "an installed build opens the channel picker")
 	} finally {
 		UPDATER_CHECK_INTERVAL := SavedInterval
 	}
@@ -482,7 +485,8 @@ _AMCR_VersionFragmentOrder() {
 	Definition := _MR_GetMenuDef(Corpus["section"])
 	AssertEqual(1, Definition.Length, "the independent fixed fragment contains one separator")
 	AssertEqual(Corpus["rows"][1]["type"], Definition[1]["type"])
-	Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind({ Calls: [] }))
+	; An installed build: a local version greys the channel picker without items.
+	Rows := _MI_AboutUpdateRows(false, _AMCR_RecordChannel.Bind({ Calls: [] }))
 	Assert(Rows[Corpus["version_index"]].Has("label"))
 	Assert(Rows[Corpus["separator_index"]]["separator"])
 	Assert(Rows[Corpus["channel_index"]]["items"] is Array)
@@ -505,7 +509,7 @@ _AMCR_VersionFragmentPresentation() {
 		AssertEqual(t("menu.about.title"), Rows[2]["label"])
 		Assert(Rows[2]["disabled"] && !Rows[2].Has("action"), "alternate shared presentation is inert")
 		Root["about_version_separator"] := [Map("type", "---", "platforms", ["hs"], "unavailable", "hide")]
-		Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind({ Calls: [] }))
+		Rows := _MI_AboutUpdateRows(false, _AMCR_RecordChannel.Bind({ Calls: [] }))
 		Assert(Rows[2]["items"] is Array, "only the unavailable separator is hidden")
 	} finally Root["about_version_separator"] := Previous
 }

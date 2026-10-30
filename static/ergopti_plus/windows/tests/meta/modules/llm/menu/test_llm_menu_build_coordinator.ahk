@@ -286,7 +286,7 @@ _LMPC_ProjectionScript(Framework, Receipt, ReadBody := _DriverFuncBodyOrEmpty) {
 		return Chr(34) StrReplace(StrReplace(Value, Chr(96), Chr(96) Chr(96)), Chr(34), Chr(96) Chr(34)) Chr(34)
 	}
 	Sources := ""
-	for Name in ["LLM_Menu_Build", "_LLM_Menu_PublishRoot", "initMenu",
+	for Name in ["LLM_Menu_Build", "_LLM_Menu_PublishRoot", "initMenu", "LLM_Menu_TrayTitle",
 			"_MI_TopLevelBuilders", "_MI_StageTopLevel", "_MI_StageLlm",
 			"TrayMenuItemCount", "TrayMenuItemCaption", "TrayMenuSubmenuHandle",
 			"TrayMenuRebindSubmenu"] {
