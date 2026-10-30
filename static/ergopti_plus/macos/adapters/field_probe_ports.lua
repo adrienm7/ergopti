@@ -310,9 +310,54 @@ end
 
 
 
+-- =============================
+-- =============================
+-- ======= 6/ App health =======
+-- =============================
+-- =============================
+
+-- Seconds a crash report stays "recent", and the names that are this app's:
+-- the app, its embedded Hammerspoon and the Ollama it runs. A python3 or uv
+-- report could be any other program's, so those are left to the collector.
+local CRASH_WINDOW_SECONDS = 24 * 3600
+local CRASH_NAME_PATTERNS = { "^ergoptiplus", "^hammerspoon", "^ollama" }
+
+--- Counts the files of a folder modified within the window whose lowercase
+--- name matches one of the patterns (every file when patterns is nil).
+--- @param dir string Absolute folder.
+--- @param patterns table|nil Lua patterns.
+--- @return integer count
+local function recent_files(dir, patterns)
+	local now, count = os.time(), 0
+	for _, name in ipairs(require("infra.fs_dir").entries(dir)) do
+		local lower, wanted = name:lower(), patterns == nil
+		for _, pattern in ipairs(patterns or {}) do
+			if lower:match(pattern) then wanted = true end
+		end
+		local modified = wanted and hs.fs.attributes(dir .. "/" .. name, "modification") or nil
+		if type(modified) == "number" and now - modified <= CRASH_WINDOW_SECONDS then count = count + 1 end
+	end
+	return count
+end
+
+--- The crash reports of the last day: the driver's own, and macOS's for this app.
+--- @return table counts { driver, system }
+local function crash_counts()
+	local home = os.getenv("HOME")
+	local driver_dir = require("infra.logger").crash_reports_dir():gsub("/+$", "")
+	return {
+		driver = recent_files(driver_dir, nil),
+		system = home and recent_files(home .. "/Library/Logs/DiagnosticReports", CRASH_NAME_PATTERNS) or 0,
+	}
+end
+
+
+
+
+
 -- ==========================
 -- ==========================
--- ======= 6/ Factory =======
+-- ======= 7/ Factory =======
 -- ==========================
 -- ==========================
 
@@ -335,6 +380,8 @@ function M.new()
 		launcher = launcher,
 		exec_input = exec_input,
 		loopback_server = loopback_server,
+		crash_counts = crash_counts,
+		pid = function() return hs.processInfo.processID end,
 	}
 end
 
