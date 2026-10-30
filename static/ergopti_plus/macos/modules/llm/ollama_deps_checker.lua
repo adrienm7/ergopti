@@ -91,6 +91,8 @@ local FAILURE_TAIL_CHARS    = 280
 -- Output lines a failed bootstrap logs, so the log names where it stopped.
 local FAILURE_LOG_LINES     = 12
 local SUCCESS_AUTO_HIDE_SEC = Timings.sec("tooltip", "success_banner_autohide_ms")
+local RUNTIME_METADATA_POLL_SEC = Timings.sec("llm", "ollama_runtime_metadata_poll_ms")
+local RUNTIME_METADATA_BUDGET_SEC = require("modules.llm.bootstrap_retry_generated").admission_seconds
 local BOOTSTRAP_TIMEOUT_SEC = Timings.sec("llm", "dependency_bootstrap_timeout_ms")
 
 -- "pending" until the first check, "ready" once an executable is provisioned,
@@ -927,23 +929,45 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 			-- Installation presence permits client reuse, not daemon ownership.
 			return finish_provisioning(false)
 		end
-		local daemon_ok, daemon_accepted = xpcall(function()
-			return ApiOllama.ensure_running({
-				is_authorized = owner_is_current,
-				on_settled = function(ready)
-					if not owner_is_current() then return end
-					if ready ~= true then
-						return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon")
-					end
-					return finish_provisioning(true)
-				end,
-			})
-		end, debug.traceback)
-		if not daemon_ok or daemon_accepted ~= true then
-			if owner_is_current() then return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon") end
-			return false
+		local function start_daemon()
+			local daemon_ok, daemon_accepted = xpcall(function()
+				return ApiOllama.ensure_running({
+					is_authorized = owner_is_current,
+					on_settled = function(ready)
+						if not owner_is_current() then return end
+						if ready ~= true then
+							return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon")
+						end
+						return finish_provisioning(true)
+					end,
+				})
+			end, debug.traceback)
+			if not daemon_ok or daemon_accepted ~= true then
+				if owner_is_current() then return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon") end
+				return false
+			end
+			return true
 		end
-		return true
+		-- The runtime metadata is read off the UI thread, and the first read
+		-- after the install is still pending: starting then refused the daemon
+		-- (field run 2026-10-30 16:29). Wait for the read, within its budget.
+		local metadata_deadline = TimerScheduler.awake_time() + RUNTIME_METADATA_BUDGET_SEC
+		local function start_when_metadata_settled()
+			if not owner_is_current() then return false end
+			local candidate_ok, _, _, state = pcall(OllamaBinary.native_candidate)
+			if not candidate_ok or state ~= "pending" then return start_daemon() end
+			if TimerScheduler.awake_time() >= metadata_deadline then
+				Logger.error(LOG, "Owned Ollama runtime metadata still pending after %d s; daemon not started.",
+					RUNTIME_METADATA_BUDGET_SEC)
+				return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon")
+			end
+			if arm_owned_timer("runtime_metadata", RUNTIME_METADATA_POLL_SEC, start_when_metadata_settled,
+				"Ollama runtime metadata wait") ~= true then
+				return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon")
+			end
+			return true
+		end
+		return start_when_metadata_settled()
 	end
 
 	local function process_settled_terminal(args)
