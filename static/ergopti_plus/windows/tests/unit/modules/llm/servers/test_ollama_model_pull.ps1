@@ -86,6 +86,10 @@ try {
 		Assert-Model ($start.EnvironmentVariables['OLLAMA_MODELS'] -ceq 'C:\captured\models') 'The managed models path replaces ambient storage for this child.'
 		Assert-Model ([Environment]::GetEnvironmentVariable('OLLAMA_HOST', 'Process') -ceq 'https://unowned.invalid:4444') 'The personal process environment survives.'
 	}
+	Case 'a pull refused for a Windows-login relay has its own exit code' {
+		$code = Get-OllamaPullProxyLoginExitCode
+		Assert-Model ($code -is [int] -and $code -gt 1) 'The refusal is told apart from success and from a generic failure.'
+	}
 	Case 'display strings and metacharacters are rejected at native boundary' {
 		foreach ($model in @('Qwen Display Name', 'tag" --other', 'tag;Remove-Item', 'tag`nnext')) {
 			Refuse { New-OllamaModelStart 'C:\captured\ollama.exe' 'C:\captured\models' 18148 $model $environment }

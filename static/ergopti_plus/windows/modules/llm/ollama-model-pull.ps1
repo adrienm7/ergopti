@@ -40,6 +40,10 @@ function Open-OllamaModelSource([string]$Path, [string]$ExpectedHash) {
 	} catch { $stream.Dispose(); throw }
 }
 
+# The exit code of a pull refused because the relay demands a Windows login;
+# the AHK owner reads it as LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT.
+function Get-OllamaPullProxyLoginExitCode { return 3 }
+
 function New-OllamaModelStart([string]$Executable, [string]$ModelsPath, [int]$Port, [string]$Model, $ServeEnvironment) {
 	if ($Model -cnotmatch '^[A-Za-z0-9_][A-Za-z0-9_./:-]*\z' -or $Port -lt 1 -or $Port -gt 65535) {
 		throw 'The model child requires a canonical literal request.'
@@ -97,6 +101,12 @@ function Invoke-OllamaManagedModelPull {
 			$receipt.root_identity -cne $root.identity -or $receipt.version_identity -cne $request.identity -or
 			$receipt.manifest_sha256 -cne $request.manifest -or $receipt.origin -cne ('http://127.0.0.1:' + $request.port)) {
 			throw 'Model admission refuses a foreign runtime receipt.'
+		}
+		# A relay that demands a Windows login was not given to the daemon, which
+		# cannot answer it: the pull would fail later on an unnamed error.
+		if ($receipt.proxy_tunnel -ceq 'windows_login') {
+			[Console]::Error.WriteLine('Managed model pull refused: proxy_windows_login')
+			return (Get-OllamaPullProxyLoginExitCode)
 		}
 		$server = [Diagnostics.Process]::GetProcessById($receipt.child_pid)
 		$null = $server.Handle
