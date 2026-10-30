@@ -1360,6 +1360,10 @@ if LoginStartupWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(LoginStartupWorker.run(arguments: CommandLine.arguments))
 }
 
+if InputMonitoringAccessWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(InputMonitoringAccessWorker.run(arguments: CommandLine.arguments))
+}
+
 if UninstallWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(UninstallWorker.run(arguments: CommandLine.arguments))
 }
