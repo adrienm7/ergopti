@@ -71,9 +71,9 @@ function rowErrors(where, row) {
 	if (row.disabled_reason_key !== undefined) {
 		if (typeof row.disabled_reason_key !== 'string' || row.disabled_reason_key === '')
 			errors.push(`${where}: disabled_reason_key must name a locale key.`);
-		if (!['command', 'check', 'toggle', 'group'].includes(row.type))
+		if (!['command', 'check', 'toggle', 'group', 'choice'].includes(row.type))
 			errors.push(
-				`${where}: disabled_reason_key is read on command/check/toggle rows or identified labelled groups.`
+				`${where}: disabled_reason_key is read on command/check/toggle/choice rows or identified labelled groups.`
 			);
 		if (
 			row.type === 'group' &&
@@ -683,7 +683,7 @@ console.log(
 		[{ disabled_reason_key: 'r', disabled_when: [] }, /needs the disabled_when/],
 		[
 			{ disabled_reason_key: 'r', disabled_when: ['ready'], type: 'label' },
-			/command\/check\/toggle rows/
+			/command\/check\/toggle\/choice rows/
 		]
 	])
 		assert.throws(() => availability.classifyMenuRow({ ...base, ...patch }, 'hand'), message);
