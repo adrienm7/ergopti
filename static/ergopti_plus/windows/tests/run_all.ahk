@@ -965,6 +965,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/llm/prediction/test_llm_live_mode.ahk
 #Include unit/modules/shortcuts/test_send_input_actions.ahk
 #Include unit/platform/remap/keys/test_tap_keys.ahk
+#Include unit/platform/remap/keys/test_ai_action_gate.ahk
 #Include unit/platform/remap/key_combinations/test_key_combinations.ahk
 #Include unit/modules/gestures/test_gesture_cycle_candidates.ahk
 #Include unit/modules/gestures/test_gesture_recommended_actions.ahk

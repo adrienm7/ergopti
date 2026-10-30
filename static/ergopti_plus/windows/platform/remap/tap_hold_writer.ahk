@@ -217,7 +217,7 @@ TapHoldHoldOptions() {
 ; the single source of truth for action names.
 TapHoldCurrentTapLabel(KeyId) {
 	global TapHold, _TH_TapNoneI18n
-	TapAction := TapHoldTapAction(MasterGateDesiredTapHold(TapHold), KeyId)
+	TapAction := TapHoldConfiguredTapAction(MasterGateDesiredTapHold(TapHold), KeyId)
 	if (TapAction == "") {
 		return t(_TH_TapNoneI18n)
 	}
@@ -278,7 +278,7 @@ IsTapHoldTapActive(KeyId, ActionId) {
 	if !IsSet(TapHold) {
 		return false
 	}
-	Current := TapHoldTapAction(MasterGateDesiredTapHold(TapHold), KeyId)
+	Current := TapHoldConfiguredTapAction(MasterGateDesiredTapHold(TapHold), KeyId)
 	if (ActionId == "") {
 		return (Current == "")
 	}
