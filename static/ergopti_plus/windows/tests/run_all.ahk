@@ -1604,6 +1604,7 @@ _LogBootProgress("keystats modules + tests included")
 ; Keystats aggregation corpus -- tests KLW_WalkTypingEntry / KLW_WalkAppSwitch /
 ; KLW_WalkWindowSwitch / KLW_WalkSystemEvent against shared cross-driver vectors.
 #Include meta/corpus/test_corpus_keystats_aggregation.ahk
+#Include meta/corpus/test_corpus_keystats_correction_erased.ahk
 ; Healthcheck snapshot corpus -- tests _HealthCheck_FormatUptime and validates
 ; the golden vectors for the shared snapshot logic (format_uptime, issues, schema).
 #Include meta/corpus/test_corpus_healthcheck_snapshot.ahk
