@@ -47,6 +47,7 @@ local Formats = require("llm.remote_formats")
 local Classifier = require("llm.remote_response_classifier")
 local AuthPolicy = require("llm.local_server_auth")
 local ThinkingOff = require("llm.thinking_off")
+local ModelCapabilities = require("llm.model_capabilities")
 local ApiModelListing = require("llm.api_model_listing")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local ProviderConfig = require("llm.provider_config_policy")
@@ -60,6 +61,9 @@ local PROBE_OWNER = "llm_remote_probe"
 -- The model selector page's provider listings: their own owner, so a listing
 -- never cancels a prediction or a test.
 local LISTING_OWNER = "llm_remote_listing"
+-- The capability listings (model_capabilities.lua): their own owner, so a
+-- background fetch never cancels or waits for a prediction, a test or a page.
+local CAPABILITY_OWNER = "llm_remote_capabilities"
 local ANTHROPIC_VERSION = "2023-06-01"
 -- What each format serves: "chat" (predictions, tone, translation, the screen
 -- answers' text step, the agent's System 2 and chat triage), "vision" (an image
@@ -530,6 +534,28 @@ function M.ollama_think(model)
 	return think
 end
 
+-- The capability listings by provider id (model_capabilities.lua cache)
+local _capabilities = {}
+
+--- The capability check of one provider's model for the resolver: nil when
+--- the provider has no listing.
+--- @param provider_id string
+--- @param model string
+--- @return function|nil lacks (kind, level, template) -> boolean
+local function capability_lacks(provider_id, model)
+	local config = thinking_families().capability
+	if not config or not config.providers[provider_id] then return nil end
+	local record = ModelCapabilities.record(ModelCapabilities.records(_capabilities, provider_id), model)
+	if not record then return nil end
+	return function(kind, level, template)
+		local lacking = ModelCapabilities.lacks(record, kind, level, template)
+		if lacking then
+			Logger.debug(LOG, "Model %s of provider '%s' lacks the %s control (its listing): skipped.", model, provider_id, kind)
+		end
+		return lacking
+	end
+end
+
 --- Completes a request body for a provider: a local server's request_fields
 --- of local_servers.json (OpenAI shape), then the model family's reasoning
 --- control (thinking_off.json) through the provider's thinking_dialect. A
@@ -544,7 +570,7 @@ function M.complete_body(provider_id, model, body)
 	if not provider then error("api_remote.complete_body: unknown provider " .. tostring(provider_id), 2) end
 	if provider.format == "openai" then AuthPolicy.apply_request_fields(body, provider.request_fields) end
 	local family, kind, added = ThinkingOff.apply(thinking_families(), provider.thinking_dialect, model, body,
-		thinking_refused()[provider_id .. "|" .. model])
+		thinking_refused()[provider_id .. "|" .. model], capability_lacks(provider_id, model))
 	if #added > 0 then
 		Logger.debug(LOG, "Thinking off: family %d applies to model %s through provider '%s' (%s).",
 			family, model, provider_id, kind)
@@ -628,6 +654,7 @@ function M.build_request(entry, messages, opts)
 	-- Reasoning off for every format: a local server's request fields, then
 	-- the provider's thinking_off rules, never over a field already set.
 	local _, added = M.complete_body(entry.provider, model, payload)
+	M.refresh_capabilities(entry)
 	local body = Json.encode(payload)
 	if type(body) ~= "string" then return nil, "request could not be encoded" end
 	return { url = endpoint.url, headers = endpoint.headers, body = body, format = provider.format, model = model,
@@ -1159,6 +1186,62 @@ function M.list_models(entry, on_done)
 	return true
 end
 
+--- Fetches a provider's capability listing when it is missing or stale: on
+--- the next event-loop tick and with its own HTTP owner, so the request that
+--- asked for it is never delayed. A failed fetch keeps the old listing.
+--- @param entry table The API entry whose key reads the listing.
+--- @return boolean scheduled
+function M.refresh_capabilities(entry)
+	local config = thinking_families().capability
+	local provider_id = type(entry) == "table" and entry.provider or nil
+	local listing = config and config.providers[provider_id]
+	if not listing or not ModelCapabilities.needs_fetch(_capabilities, provider_id, os.time(), config.ttl_sec) then
+		return false
+	end
+	local url, headers = listing_endpoint(entry)
+	if not url then return false end
+	local query = config.page_query[listing]
+	if query then url = url .. (url:find("?", 1, true) and "&" or "?") .. query end
+	ModelCapabilities.begin(_capabilities, provider_id)
+	local function finish(records)
+		ModelCapabilities.finish(_capabilities, provider_id, records, os.time())
+	end
+	local scheduled = require("adapters.event_loop").defer(function()
+		Logger.info(LOG, "Capability listing of provider %s requested.", provider_id)
+		local dispatched = HttpClient.get(url, headers,
+			{ owner = CAPABILITY_OWNER, timeout_ms = Timings.ms("llm", "request_timeout_ms"), follow_redirects = false },
+			function(result)
+				if type(result) ~= "table" or result.ok ~= true then
+					Logger.warn(LOG, "Capability listing of provider %s unavailable (status=%s): kept the old one.",
+						provider_id, tostring(type(result) == "table" and result.status or nil))
+					return finish(nil)
+				end
+				local decoded_ok, decoded = pcall(Json.decode, type(result.body) == "string" and result.body or "")
+				local records, reason = ModelCapabilities.parse(listing, decoded_ok and decoded or nil)
+				if not records then
+					Logger.warn(LOG, "Capability listing of provider %s could not be read (%s).", provider_id, tostring(reason))
+					return finish(nil)
+				end
+				local count = 0
+				for _ in pairs(records) do count = count + 1 end
+				Logger.info(LOG, "Capability listing of provider %s: %d model(s) described.", provider_id, count)
+				finish(records)
+			end)
+		if dispatched ~= true then
+			Logger.warn(LOG, "Capability listing of provider %s could not be sent.", provider_id)
+			finish(nil)
+		end
+	end, 0)
+	if not scheduled then finish(nil) end
+	return scheduled == true
+end
+
+--- The capability cache (tests).
+--- @return table
+function M._capabilities_for_test()
+	return _capabilities
+end
+
 --- Sends the connectivity probe with one entry: the shared test_request as a
 --- chat (a Backboard entry as one message), or decisions_test to a decisions
 --- provider, which passes when the answer holds answers.
@@ -1228,6 +1311,7 @@ function M._reset_for_test(thinking_refused_file)
 		scope.epoch, scope.active, scope.used = scope.epoch + 1, nil, nil
 	end
 	_assistants = {}
+	_capabilities = {}
 end
 
 --- Hands in the HttpClient that sends and cancels inference requests (engine init).

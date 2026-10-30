@@ -51,6 +51,7 @@ local OWNED = {
 	"llm.local_server_auth",
 	"llm.local_server_discovery",
 	"llm.local_server_ports",
+	"llm.model_capabilities",
 	"llm.parser",
 	"llm.profile_selector",
 	"llm.prompt_action",
