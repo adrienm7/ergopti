@@ -1763,6 +1763,16 @@ local function main()
 		}) then
 			require("modules.llm.warmup").schedule("startup")
 		end
+		-- API keys an earlier build wrote in plaintext move to the desktop secret
+		-- service once, here: a load never rewrites the file, and waiting for the
+		-- next save would keep them in plaintext while nothing changes.
+		-- A failure here costs the migration, never the boot.
+		local entries_loaded, entries = pcall(require, "modules.llm.api_entries")
+		local migration_ran, failure = entries_loaded, entries
+		if entries_loaded then migration_ran, failure = pcall(entries.migrate_plaintext) end
+		if not migration_ran then
+			Logger.error(LOG, "Plaintext API keys were not migrated: %s", tostring(failure))
+		end
 	end
 
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).
