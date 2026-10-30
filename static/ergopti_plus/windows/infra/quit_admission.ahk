@@ -152,10 +152,10 @@ QuitRequest_Run(Ports) {
 		return true
 	}
 	Started := false
-	Run := Ports.Clone()
-	Run["on_admitted"] := (Decision) => (Started := _QuitRequest_Start(Ports, Decision))
-	Run["on_refused"] := (Decision) => _QuitRequest_Refuse(Ports, Decision)
-	State := QuitAdmission_Await(Run)
+	AwaitPorts := Ports.Clone()
+	AwaitPorts["on_admitted"] := (Decision) => (Started := _QuitRequest_Start(Ports, Decision))
+	AwaitPorts["on_refused"] := (Decision) => _QuitRequest_Refuse(Ports, Decision)
+	State := QuitAdmission_Await(AwaitPorts)
 	_QuitRequestWaiting := (State == "waiting")
 	return State == "waiting" || Started
 }
