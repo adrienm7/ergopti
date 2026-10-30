@@ -208,7 +208,8 @@ Test("hotstring output: Notepad presses the token through the Send route (hs-out
 	() => _AHK04_RunIsolated(_HOT_NotepadImpl))
 
 _HOT_TerminalPayloadSource() {
-	Source := FileRead(A_ScriptDir . "\..\infra\hotstrings\hotstring_dispatch.ahk", "UTF-8")
+	; By name, not by path: a move of the file cannot leave the test reading nothing
+	Source := _DriverFileSource("hotstring_dispatch.ahk")
 	Escape := InStr(Source, "EndCharPart := SendEscapeLiteral(EndCharPart)")
 	Payload := InStr(Source, '"SendPayload", ReplacementPart . EndCharPart')
 	AssertTrue(Escape > 0 and Payload > Escape,
