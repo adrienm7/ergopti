@@ -49,8 +49,14 @@ set -e
 # shellcheck source=field-report-git.sh
 . "$REPO_ROOT/tools/dev/field-report-git.sh"
 set +e
-LOG_DIR="${HOME}/Library/Logs/ergopti_plus"
-CONFIG_DIR="${ERGOPTI_CONFIG_DIR:-${HOME}/.config/ergopti_plus}"
+# The folders and file names come from their shared declarations, never from
+# a copy here (tools/dev/field-report-paths.py). The topical logs that help a
+# diagnosis; the hotstring and keystroke logs can carry typed text and stay.
+FIELD_TOPICAL_LOGS="llm ollama mlx boot karabiner menu"
+# shellcheck disable=SC2086 # one word per log name
+field_paths="$(python3 "${REPO_ROOT}/tools/dev/field-report-paths.py" "${REPO_ROOT}/static/ergopti_plus/_shared" ${FIELD_TOPICAL_LOGS})" \
+	|| { printf '[field-report] ERROR: cannot resolve the driver folders.\n' >&2; exit 1; }
+eval "${field_paths}"
 BUNDLED_HOTSTRINGS="static/ergopti_plus/_shared/modules/hotstrings"
 FIELD_RUN_SPEC="static/ergopti_plus/macos/data/field_run.json"
 # How long the collector keeps waiting for done after the request's own
@@ -159,16 +165,18 @@ finalize() {
 		# text (hotstring expansions, AI prompts): only scrubbed copies leave
 		# the Mac, and the digests below read those copies.
 		for d in "${days[@]}"; do
-			for f in "${LOG_DIR}"/ErgoptiPlus_"${d}".log "${LOG_DIR}"/ErgoptiPlus_errors_"${d}".log; do
+			for f in "${LOG_DIR}/${LOG_UNIFIED_PREFIX}${d}${LOG_EXTENSION}" "${LOG_DIR}/${LOG_ERRORS_PREFIX}${d}${LOG_EXTENSION}"; do
 				[ -f "${f}" ] && scrub_log "${f}"
 			done
 		done
-		for f in "${LOG_DIR}"/ErgoptiPlus_llm.log "${LOG_DIR}"/launcher.log; do
+		for f in ${LOG_TOPICAL} "${LOG_LAUNCHER}"; do
+			f="${LOG_DIR}/${f}"
 			[ -f "${f}" ] && scrub_log "${f}"
 		done
 		local day_logs=()
 		for d in "${days[@]}"; do
-			[ -f "${out}/ErgoptiPlus_${d}.log" ] && day_logs+=("${out}/ErgoptiPlus_${d}.log")
+			f="${out}/${LOG_UNIFIED_PREFIX}${d}${LOG_EXTENSION}"
+			[ -f "${f}" ] && day_logs+=("${f}")
 		done
 		if [ "${#day_logs[@]}" -gt 0 ]; then
 			step digest_boot grep -hE "Boot complete|Boot CPU|Boot stage completed|held the main thread" "${day_logs[@]}"
@@ -183,7 +191,7 @@ finalize() {
 	# Which personal triggers share a bundled one, with both sides' flags and no
 	# replacement text: the personal file itself never travels.
 	step hotstring_collisions python3 "${REPO_ROOT}/tools/dev/hotstring-collisions.py" \
-		"${CONFIG_DIR}/personal_hotstrings.toml" "${REPO_ROOT}/${BUNDLED_HOTSTRINGS}"
+		"${PERSONAL_HOTSTRINGS}" "${REPO_ROOT}/${BUNDLED_HOTSTRINGS}"
 
 	subject="docs(field): macOS field report ${stamp} on ${base}"
 	"${interrupted}" && subject="${subject} (interrupted)"
@@ -209,7 +217,8 @@ trap on_interrupt INT TERM HUP
 # ===========================================
 
 step versions sh -c 'git rev-parse --short HEAD; sw_vers; uname -m; sysctl -n hw.ncpu hw.memsize'
-step toolchain sh -c 'xcode-select -p; swift --version; swift build --version; which -a swift'
+# Go builds the developer app's own Ollama (stage-macos-dev-ollama-catalogue.py).
+step toolchain sh -c 'xcode-select -p; swift --version; swift build --version; which -a swift; go version || echo "no go on PATH"'
 step karabiner sh -c '"/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli" --version'
 # The app's field check only sees codesign's exit code; keep both tools' own
 # reasons so a failed signature check names its cause.

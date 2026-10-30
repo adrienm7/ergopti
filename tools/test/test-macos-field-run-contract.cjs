@@ -44,6 +44,10 @@ const FIELD_GIT = 'tools/dev/field-report-git.sh';
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml';
+// The folders and log names come from their shared declarations.
+const FIELD_PATHS = 'tools/dev/field-report-paths.py';
+const APP_DIRS = 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml';
+const SUB_FILES = 'static/ergopti_plus/_shared/modules/logger/sub_files.toml';
 
 if (process.platform === 'win32') {
 	console.log('[SKIP] The macOS field report collector is a macOS shell tool; not run on Windows.');
@@ -110,7 +114,10 @@ function fixture(name, { onDev = false } = {}) {
 		FIELD_GIT,
 		LOG_SCRUB,
 		COLLISIONS,
-		BUNDLED_SAMPLE
+		BUNDLED_SAMPLE,
+		FIELD_PATHS,
+		APP_DIRS,
+		SUB_FILES
 	]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
@@ -737,6 +744,13 @@ function reportFolder(paths) {
 				path.join(logs, `ErgoptiPlus_${day}.log`),
 				"[INFO] fixture day log\n[DEBUG] [keymap] Auto-expand: 'adr' → '12 rue privée'.\n"
 			);
+			// Where config_paths.lua keeps it: the collisions must find it.
+			const personal = path.join(paths.home, '.config/ergopti_plus/hotstrings');
+			fs.mkdirSync(personal, { recursive: true });
+			fs.writeFileSync(
+				path.join(personal, 'personal_hotstrings.toml'),
+				'[[metiers]]\n"sru" = { output = "SECRET-SRU", is_word = true, priority = 100 }\n'
+			);
 			const driver = startDriver(paths, 'hang');
 			try {
 				await waitFor(driver.readyPath);
@@ -763,6 +777,13 @@ function reportFolder(paths) {
 				const copied = fs.readFileSync(path.join(folder, `ErgoptiPlus_${day}.log`), 'utf8');
 				assert.match(copied, /fixture day log/);
 				assert.doesNotMatch(copied, /rue privée|'adr'/, 'the pushed log must carry no typed text');
+				const collisions = fs.readFileSync(path.join(folder, 'hotstring_collisions.txt'), 'utf8');
+				assert.match(collisions, /^'sru' personal is_word=True priority=100$/m);
+				assert.doesNotMatch(
+					collisions,
+					/SECRET-SRU|metiers/,
+					'no personal text or section travels'
+				);
 				assert.match(
 					fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
 					/^collector\s+interrupted$/m
