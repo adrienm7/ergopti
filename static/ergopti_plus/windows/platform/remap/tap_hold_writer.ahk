@@ -726,9 +726,9 @@ _TH_DurationInitialImage(Data) {
 	InheritDefaults := Data.Get("inherit_defaults", false)
 	if !(InheritDefaults is Integer) || (InheritDefaults != 0 && InheritDefaults != 1)
 		throw ValueError("The inheritance flag needs strict Boolean intent")
-	Content := Chr(0xFEFF) . "[tap_hold]`n"
+	Content := Chr(0xFEFF) . "[_meta]`nschema_version = " . TapHoldMigrationRegistry()["current"] . "`n`n"
+	Content .= "[tap_hold]`n"
 	Content .= "inherit_defaults = " . TOML_RenderValue(TOML_Bool(InheritDefaults)) . "`n"
-	Content .= "explicit_delays = true`n"
 	if Data.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
 		Content .= "time_activation_seconds = " . TOML_RenderValue(Data[ConfigLeaf.TIME_ACTIVATION_SECONDS]) . "`n"
 	for KeyId, Entry in Data["keys"] {
@@ -750,49 +750,17 @@ _TH_DurationInitialImage(Data) {
 	return Content
 }
 
+; A write migrates before it applies (see tap_hold_migration.ahk), so the key being
+; set keeps the value being set, even one an earlier build shipped.
 _TH_DurationLeafImage(Source, KeyId, Seconds) {
+	global _SharedDir
 	Section := "tap_hold.keys." . TOML_RenderKey(KeyId)
 	Rows := [{ Section: Section, Key: ConfigLeaf.TIME_ACTIVATION_SECONDS, Value: Seconds }]
-	for Row in _TH_RetiredDelayRows(Source, KeyId)
-		Rows.Push(Row)
-	Admitted := TOML_BuildConfigDocumentCandidate(Source, Rows, [])
+	Migrated := TapHoldMigrateSource(Source, _SharedDir . "\tap_hold\defaults.toml")
+	Admitted := TOML_BuildConfigDocumentCandidate(Migrated, Rows, [])
 	if !(Admitted is Map) || !Admitted.Has("content") || !(Admitted["content"] is String)
 		throw ValueError("The semantic TOML owner refused the duration image")
 	return Admitted["content"]
-}
-
-; The rows that finish the migration of a file written before no key shipped a
-; delay: each delay equal to a retired shipped one is removed (it was copied in
-; by a rewrite, not chosen), then the file is flagged so every delay it keeps is
-; the user's own from now on. A file already flagged needs no row; the key being
-; written keeps the value being set.
-; @param Source {String} The physical bytes the edit starts from.
-; @param KeepKeyId {String} The key whose delay is being set.
-; @returns {Array} Rows for TOML_BuildConfigDocumentCandidate.
-_TH_RetiredDelayRows(Source, KeepKeyId := "") {
-	global _SharedDir
-	Rows := []
-	Document := TOML_ParseDocument(Source)
-	Root := Document.Get("tap_hold", Map())
-	if !(Root is Map)
-		throw ValueError("The tap_hold source namespace must be a table.")
-	if Root.Has("explicit_delays") && _TH_TomlTrue(Root["explicit_delays"])
-		return Rows
-	Retired := TapHoldRetiredDelays(_SharedDir . "\tap_hold\defaults.toml")
-	Entries := Root.Get("keys", Map())
-	if (Entries is Map) {
-		for KeyId, Fields in Entries {
-			if !(KeyId is String) || KeyId == KeepKeyId || !(Fields is Map)
-					|| !Retired.Has(KeyId) || !Fields.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
-				continue
-			Raw := _ConfigTomlNativeValue(Fields[ConfigLeaf.TIME_ACTIVATION_SECONDS])
-			if IsNumber(Raw) && Raw == Retired[KeyId]
-				Rows.Push({ Section: "tap_hold.keys." . TOML_RenderKey(KeyId),
-					Key: ConfigLeaf.TIME_ACTIVATION_SECONDS, Delete: true })
-		}
-	}
-	Rows.Push({ Section: "tap_hold", Key: "explicit_delays", Value: TOML_Bool(1) })
-	return Rows
 }
 
 _TH_DurationWasPublished(KeyId, Seconds) {
@@ -1084,6 +1052,13 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 		try LoggerError("TapHoldWriter", "Refusing to rewrite '{1}': it could not be read at load, so the in-memory tap-hold map holds the shipped defaults rather than the user's configuration. Restart the driver once the file is readable.", BoundPath)
 		return false
 	}
+	; Nor to replace a file this build cannot version: a newer build's settings
+	; are not in the map below, and a downgrade must not destroy them.
+	Refusal := TapHoldMigrationWriteRefusal(BoundPath)
+	if (Refusal != "") {
+		try LoggerError("TapHoldWriter", "Refusing to rewrite '{1}': {2}.", BoundPath, Refusal)
+		return false
+	}
 	try LoggerDebug("TapHoldWriter", "Persisting tap-hold config to '{1}' (keys={2}, inherit_defaults={3}).",
 		BoundPath, Data.Has("keys") ? Data["keys"].Count : 0,
                 Data.Has("inherit_defaults") ? (Data["inherit_defaults"] ? "true" : "false") : "unset")
@@ -1109,15 +1084,18 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 		Lines.Push("# is set in layers.toml, not here.")
 		Lines.Push("")
 
+		; The stamp says every per-key delay written below is one the user set: the
+		; loader dropped the delays earlier builds copied into the file.
+		Lines.Push("[_meta]")
+		Lines.Push("schema_version = " . TapHoldMigrationRegistry()["current"])
+		Lines.Push("")
+
 		; Root [tap_hold] section — inherit_defaults when it is false, so the loader
 		; does not re-merge shipped defaults on the next reload; the global delay
-		; when the user set one; and always explicit_delays, because every
-		; per-key delay written below is one the user set (the loader dropped the
-		; delays earlier builds copied into the file).
+		; when the user set one.
 		Lines.Push("[tap_hold]")
 		if Data.Has("inherit_defaults") and !Data["inherit_defaults"]
 			Lines.Push("inherit_defaults = false")
-		Lines.Push("explicit_delays = true")
 		if Data.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
 			Lines.Push(_TH_TomlFormatLine(ConfigLeaf.TIME_ACTIVATION_SECONDS, Data[ConfigLeaf.TIME_ACTIVATION_SECONDS]))
 		Lines.Push("")
@@ -1418,11 +1396,10 @@ class TapHoldScopeOwner {
 		Source := Present ? FSReadUtf8Exact(this.path) : ""
 		if !(Source is String)
 			throw Error("The tap-hold source cannot be read.")
-		Existing := TOML_ParseDocument(Source)
+		Existing := TOML_ParseDocument(TapHoldMigrateSource(Source, this.defaults))
 		Kinds := TapHoldFieldKinds()
 		; Every delay goes, the global one included: the recommendation sets none, and
-		; the per-key ones are deleted below with the rest of each key's fields, so no
-		; delay an earlier build copied into the file survives (no flag is needed).
+		; the per-key ones are deleted below with the rest of each key's fields.
 		Rows := [{ Section: "tap_hold", Key: "inherit_defaults", Delete: true },
 			{ Section: "tap_hold", Key: ConfigLeaf.TIME_ACTIVATION_SECONDS, Delete: true }]
 		for KeyId, Fields in _TH_OwnedDocumentKeys(Existing) {
@@ -1444,7 +1421,7 @@ class TapHoldScopeOwner {
 				}
 			}
 		}
-		Image := _TH_BuildSemanticImage(this.path, Source, Present, Rows)
+		Image := _TH_BuildSemanticImage(this.path, Source, Present, Rows, this.defaults)
 		if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
 				|| Image["source_present"] != Present || !(Image["source_content"] == Source)
 			throw Error("The tap-hold source changed or its scoped image could not be rendered.")
@@ -1526,13 +1503,20 @@ _TH_OwnedDocumentKeys(Document) {
 	return Keys
 }
 
-; Tap-hold files have no config.toml schema metadata. Build a detached image
-; through the same semantic leaf owner as per-key duration persistence, without
-; config.toml first-use stamping or publication of a runtime cache.
-_TH_BuildSemanticImage(Path, Source, Present, Rows) {
+; Tap-hold files carry their own version, not config.toml's. Build a detached
+; image through the same semantic leaf owner as per-key duration persistence,
+; from the source at the current version, without config.toml first-use stamping
+; or publication of a runtime cache. An edit that changes nothing in an absent
+; file creates nothing.
+_TH_BuildSemanticImage(Path, Source, Present, Rows, Defaults) {
 	if TOML_WriteRefusal(Path) != ""
 		throw Error("The tap-hold source is read-only for this session.")
-	Admitted := TOML_BuildConfigDocumentCandidate(Source, Rows, [])
+	Migrated := TapHoldMigrateSource(Source, Defaults)
+	Admitted := TOML_BuildConfigDocumentCandidate(Migrated, Rows, [])
+	if !Present && Admitted["content"] == Migrated
+		Admitted := Map("content", Source, "preserve_source", true)
+	else if !(Migrated == Source)
+		Admitted["preserve_source"] := false
 	if !_TOML_WriteSourceMatches(Path, Present, Source)
 		throw Error("The tap-hold source changed during candidate preparation.")
 	return Map("status", "ok", "kind", "rendered", "content", Admitted["content"],
@@ -1550,7 +1534,7 @@ _TH_BuildSemanticImage(Path, Source, Present, Rows) {
 TapHoldKeyReport(Path, Defaults) {
 	if !FileExist(Path)
 		return Map()
-	try Document := TOML_ParseDocument(FSReadStrict(Path))
+	try Document := TOML_ParseDocument(TapHoldMigrateSource(FSReadStrict(Path), Defaults))
 	catch
 		return "the tap-hold file '" . Path . "' could not be read"
 	try return _TH_KeyReportDocument(Document, Defaults)
@@ -1559,7 +1543,8 @@ TapHoldKeyReport(Path, Defaults) {
 }
 
 ; Report and import inspect the same captured source instead of racing a second
-; file read between the customised-key refusal and candidate construction.
+; file read between the customised-key refusal and candidate construction. The
+; document is at the current version, so every delay in it is the user's own.
 _TH_KeyReportDocument(Document, Defaults) {
 	Preset := LoadTapHoldToml(Defaults)["keys"]
 	Keys := Map()
@@ -1568,16 +1553,7 @@ _TH_KeyReportDocument(Document, Defaults) {
 		for KeyId, Fields in Preset
 			Keys[KeyId] := _TH_CloneData(Fields)
 	}
-	; A delay equal to a retired shipped one, in a file not yet flagged, was copied
-	; in by an earlier rewrite: it is not the user's setting.
-	Retired := (Root.Has("explicit_delays") && _TH_TomlTrue(Root["explicit_delays"]))
-		? Map() : TapHoldRetiredDelays(Defaults)
 	for KeyId, Fields in _TH_OwnedDocumentKeys(Document) {
-		if Fields.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS) && Retired.Has(KeyId) {
-			Raw := _ConfigTomlNativeValue(Fields[ConfigLeaf.TIME_ACTIVATION_SECONDS])
-			if IsNumber(Raw) && Raw == Retired[KeyId]
-				Fields.Delete(ConfigLeaf.TIME_ACTIVATION_SECONDS)
-		}
 		if !Keys.Has(KeyId)
 			Keys[KeyId] := Map()
 		; A modifier hold and a layer hold exclude each other, as in the loader.
@@ -1641,7 +1617,7 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 	Source := Present ? FSReadUtf8Exact(Path) : ""
 	if !(Source is String)
 		throw Error("The tap-hold source cannot be read.")
-	Document := TOML_ParseDocument(Source)
+	Document := TOML_ParseDocument(TapHoldMigrateSource(Source, Defaults))
 	Existing := _TH_OwnedDocumentKeys(Document)
 	Report := _TH_KeyReportDocument(Document, Defaults)
 	Kinds := TapHoldFieldKinds()
@@ -1669,7 +1645,7 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 			Rows.Push({ Section: Section, Key: Field, Value: Serialized })
 		}
 	}
-	Image := _TH_BuildSemanticImage(Path, Source, Present, Rows)
+	Image := _TH_BuildSemanticImage(Path, Source, Present, Rows, Defaults)
 	if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
 			|| Image["source_present"] != Present
 		throw Error("The tap-hold file '" . Path . "' could not be read or rendered.")
