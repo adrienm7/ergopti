@@ -359,3 +359,22 @@ _GSS_RegistryWritersRequestRefresh() {
 		"the built Gestures submenu is the one watched")
 }
 Test("Gestures availability: registry rewrites and the menu open both re-evaluate it", _GSS_RegistryWritersRequestRefresh)
+
+; The notice is gone: boot removes what it stored and nothing else in the store.
+_GSS_RetiresTheDismissedEntries() {
+	Records := []
+	for Name in ["gesture_conflict_dismissed.swipe_3", "theme", "gesture_conflict_dismissed.tap_2",
+			"gesture_conflict_dismissed"]
+		Records.Push({ name: Name })
+	Deleted := []
+	Removed := GestureSystemRetireDismissals((*) => Records, (Key) => (Deleted.Push(Key), true))
+	AssertEqual(2, Removed)
+	AssertEqual(2, Deleted.Length)
+	AssertEqual("gesture_conflict_dismissed.swipe_3", Deleted[1])
+	AssertEqual("gesture_conflict_dismissed.tap_2", Deleted[2])
+	AssertEqual(0, GestureSystemRetireDismissals((*) => Records, (*) => false),
+		"a refused deletion is not counted and raises nothing")
+	Assert(InStr(FSReadUtf8Exact(A_ScriptDir . "\..\ErgoptiPlus.ahk"), "`nGestureSystemRetireDismissals()`n"),
+		"the boot runs the sweep")
+}
+Test("Gestures availability: boot removes the retired notice entries and nothing else", _GSS_RetiresTheDismissedEntries)
