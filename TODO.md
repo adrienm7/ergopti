@@ -563,6 +563,9 @@ dev.
   `[gestures.sensitivities]` swipe_3 value in `config.toml` (or remove it), then a normal and a
   short deliberate vertical three-finger swipe each switch exactly one tab, a swipe past 29
   units (the logged `sd`) two, and lifting never adds or removes one.
+  Since 30 October the field run proves the capture stamp: touch the trackpad once before the run;
+  `field_gesture_frames` fails `unstamped:N` on any frame without a stamp and names
+  `gesture_frame_spacing_ms` (about 8).
 
 - **L16** [CODE][PHYS-M] Slow ingest tick, `append` phase 466 to 563 ms, peaks 1531 and 1709 ms
   (new.txt 14:25:50 to 16:53:38, 20 lines, still on 228f79f2). The 1.2 to 1.8 s ticks are the
@@ -579,7 +582,7 @@ dev.
   `; append: lock= journal= prepare= publish= write= clear= settle= release= ms; metadata_commands=<n>
 in <ms> ms` (`adapters/metadata_command_stats.lua` counts every metadata fork). Mac confirms: the
   next `Slow ingest tick` line names the stage; if `publish` and `settle` carry it with
-  metadata_commands=8 near the total, the fix is to stop forking for the private journal. The 23:33 run measured a fork: four `mkdir -p` of the keystats start took 161 ms, about 40 ms each, so eight journal forks match the 0.3 to 0.7 s append. Fixed on `tmp/wip-mac-holds-2` (016ef6adc5): the driver-owned journal is published by `FileSystem.write_private_if_unchanged` (same lock, route, staging and compare-before-write, no carried ACL or xattrs); a flush forks nothing (`test_append_retry.lua`: 4 forks before, 0 after). Mac confirms: no `Slow ingest tick` and no `Main-thread hold` line from log_manager.lua during typing.
+  metadata_commands=8 near the total, the fix is to stop forking for the private journal. The 23:33 run measured a fork: four `mkdir -p` of the keystats start took 161 ms, about 40 ms each, so eight journal forks match the 0.3 to 0.7 s append. Fixed on `tmp/wip-mac-holds-2` (016ef6adc5): the driver-owned journal is published by `FileSystem.write_private_if_unchanged` (same lock, route, staging and compare-before-write, no carried ACL or xattrs); a flush forks nothing (`test_append_retry.lua`: 4 forks before, 0 after). Mac confirms: no `Slow ingest tick` and no `Main-thread hold` line from log_manager.lua during typing. Since 30 October the field run's event taps check names `worst_hold_ms` and `worst_hold_site` (file and line).
 - **L17** [CODE][PHYS-M] "Slow preferences save 1.9 to 2.1 s (prepare about 1.25 s, write about
   0.8 s; operations=293)" (new.txt 15:27:35 to 16:48:20, 6 times, also on 228f79f2). It is the
   2.06 s hold of startup_controller.lua:263 (15:28:57, 16:48:20). Next: profile `prepare` for 293
@@ -595,7 +598,7 @@ in <ms> ms` (the forks of the write phase). Not reproduced here: the save writes
   270 ms before `sqlite_writer` initializes, then 917 to 1047 ms between `rotation Initialized` and
   `Aggregate cache recovery continues in 8 ms slices` on the two boots that started a recovery;
   boots without a recovery hold 264 to 874 ms (16:54 to 22:55). Not changed on `tmp/wip-mac-holds`
-  (time box); the slicing remains the fix. Fixed on `tmp/wip-mac-holds-2` (58f82e9fdc) after the 23:33 run (1300 ms: 161 ms of four `mkdir -p` forks, 696 ms of the one-time L19 index build, 392 ms of the synchronous first `ingest_once`, 48 ms of watchers): existing folders are answered from their attributes and the first ingest runs on the first 5 s tick, which flushes the outbox first (`cold_rollover_context_process.lua` asserts no synchronous ingest and no fork; 4 forks before). The index build happens once per cache and is done on this Mac. Mac confirms: `Keystats engine start (deferred)` under 100 ms and no hold from menu_state.lua:531.
+  (time box); the slicing remains the fix. Fixed on `tmp/wip-mac-holds-2` (58f82e9fdc) after the 23:33 run (1300 ms: 161 ms of four `mkdir -p` forks, 696 ms of the one-time L19 index build, 392 ms of the synchronous first `ingest_once`, 48 ms of watchers): existing folders are answered from their attributes and the first ingest runs on the first 5 s tick, which flushes the outbox first (`cold_rollover_context_process.lua` asserts no synchronous ingest and no fork; 4 forks before). The index build happens once per cache and is done on this Mac. Mac confirms: `Keystats engine start (deferred)` under 100 ms and no hold from menu_state.lua:531. Since 30 October the field run's storage check names `keystats_start_ms`.
 - **L23** [CODE] "Ignored-window prewarm incomplete; tracking remains fail-closed" (new.txt
   15:28:28, 16:28:04) and 1 s holds from keymap/utils.lua:1426 and :1455 (14:26:05, 15:34:09).
   Next: log which prewarm stage was incomplete and bound the 1 s probe. Instrumented on
