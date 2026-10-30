@@ -1007,7 +1007,8 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 	for _, step in ipairs(steps) do
 		local run, stage = step.run, "step_" .. step.name
 		step.run = function()
-			pcall(ReloadBreadcrumb.record, termination_kind, stage)
+			-- A diagnostic never fails a step, even before its owner is wired
+			pcall(function() return ReloadBreadcrumb.record(termination_kind, stage) end)
 			return run()
 		end
 	end
