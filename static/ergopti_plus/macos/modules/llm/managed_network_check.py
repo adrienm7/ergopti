@@ -59,7 +59,7 @@ def load_bootstrap():
     return module
 
 
-def route_step(fallback):
+def route_step(fallback, kind=None):
     """The lookup verdict: no fallback means the native route was usable.
 
     A fallback is the policy of proxy_policy.json "pac_unavailable_fallback":
@@ -67,7 +67,9 @@ def route_step(fallback):
     so the step informs and the transfer step says whether direct worked.
     """
     if fallback is None:
-        emit("route_lookup", "pass", "selected")
+        # The kind of route the lookup chose: a DIRECT it answered by itself
+        # leaves no fallback stage (ledger L42). An older launcher names none.
+        emit("route_lookup", "pass", "selected:" + kind if kind else "selected")
     else:
         emit("route_lookup", "info", "direct_" + fallback.removeprefix("native_"))
 
@@ -113,7 +115,7 @@ def main():
             idle_timeout=IDLE_TIMEOUT,
             direct=bootstrap._direct_route(url),
         ) as response:
-            route_step(response.route_fallback)
+            route_step(response.route_fallback, getattr(response, "route_kind", None))
             emit("tls", "pass", "trusted")
             emit(
                 "transfer",

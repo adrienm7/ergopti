@@ -67,6 +67,11 @@ FAILURE_STAGES = {
 _FALLBACK_MARKER = re.compile(
     r"^# native_http_proxy_fallback route=direct reason=(native_[a-z_]{1,63})$", re.MULTILINE
 )
+# The kind of the route each attempt dispatched on; the last one carried the answer.
+_ROUTE_MARKER = re.compile(
+    r"^# native_http_route kind=(direct|http|https|socks|other) attempt=\d{1,3}/\d{1,3}$",
+    re.MULTILINE,
+)
 
 REASONS = frozenset(
     (
@@ -263,6 +268,7 @@ class NativeHTTPResponse:
         self._role_process_complete = False
         self._stderr_file = None
         self._route_fallback = None
+        self._route_kind = None
         try:
             if absolute_deadline is not None:
                 if not _positive_timeout(absolute_deadline):
@@ -674,6 +680,24 @@ class NativeHTTPResponse:
                 self._route_fallback = match.group(1)
         return self._route_fallback
 
+    @property
+    def route_kind(self):
+        """Kind of the route the worker's last attempt used, or None.
+
+        A closed token (direct, http, https, socks, other) from the worker's own
+        marker: a lookup that answered DIRECT by itself leaves no fallback stage,
+        and only this tells it from a relay (ledger L42).
+        """
+        if self._route_kind is None and self._stderr_file is not None:
+            try:
+                text = os.pread(self._stderr_file.fileno(), 4096, 0).decode("ascii", "replace")
+            except (OSError, ValueError):
+                return None
+            kinds = _ROUTE_MARKER.findall(text)
+            if kinds:
+                self._route_kind = kinds[-1]
+        return self._route_kind
+
     def close(self):
         if self._closed:
             return
@@ -695,8 +719,9 @@ class NativeHTTPResponse:
                     stream.close()
             # No successor/publication may race the physical native process.
             self._process.wait()
-        # Read the marker once the child has retired, then release the file.
+        # Read the markers once the child has retired, then release the file.
         _ = self.route_fallback
+        _ = self.route_kind
         if self._stderr_file is not None:
             self._stderr_file.close()
             self._stderr_file = None

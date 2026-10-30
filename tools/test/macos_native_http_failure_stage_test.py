@@ -380,6 +380,26 @@ class NativeRouteFallback(unittest.TestCase):
             "the outcome is reported once",
         )
 
+    def test_the_last_attempt_names_its_route_kind_without_a_fallback(self):
+        # Ledger L42: a lookup that answered DIRECT by itself left no marker at all.
+        marker = (
+            "# native_http_route kind=http attempt=1/2\n# native_http_route kind=direct attempt=2/2"
+        )
+        with self.open(marker, "ok") as response:
+            self.assertEqual(response.read(), b"")
+        self.assertEqual(response.route_kind, "direct")
+        self.assertIsNone(response.route_fallback)
+
+    def test_a_forged_route_kind_is_never_reported(self):
+        for marker in (
+            "# native_http_route kind=relay.private-company.invalid attempt=1/1",
+            "# native_http_route kind=direct",
+        ):
+            with self.subTest(marker=marker):
+                with self.open(marker, "ok") as response:
+                    response.read()
+                self.assertIsNone(response.route_kind)
+
     def test_no_fallback_reports_no_outcome(self):
         self.assertEqual(self.report(self.reporter._report_pac_fallback_outcome, None), "")
         self.assertEqual(self.report(self.reporter._report_pac_fallback_outcome, "connect"), "")
@@ -439,6 +459,11 @@ class NetworkCheckHelper(unittest.TestCase):
     def test_route_step_names_the_stage_that_made_the_transfer_go_direct(self):
         self.assertEqual(
             self.lines(self.helper.route_step, None), ["step route_lookup pass selected"]
+        )
+        self.assertEqual(
+            self.lines(self.helper.route_step, None, "direct"),
+            ["step route_lookup pass selected:direct"],
+            "the kind the lookup chose by itself is named (ledger L42)",
         )
         self.assertEqual(
             self.lines(self.helper.route_step, "native_pac_download"),
