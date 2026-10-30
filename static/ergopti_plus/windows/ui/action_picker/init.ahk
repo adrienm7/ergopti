@@ -90,9 +90,10 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := ""
 						&& (!IsSet(ProgramActions_Available) || !IsSet(ProgramActions_BindingSupported)
 				|| !ProgramActions_Available() || !ProgramActions_BindingSupported(BindingId))
 						continue
+				; A ListBox cannot grey a row, so this fallback leaves it out.
 				if (Item.Type = "heading")
 						CurrentCat := Item.Text
-				else
+				else if !Item.HasOwnProp("Disabled")
 						_PushItem(Item.Id, Item.Label, CurrentCat)
 		}
 		BuildListRows(Items) {

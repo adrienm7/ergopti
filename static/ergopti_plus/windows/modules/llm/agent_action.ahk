@@ -10,11 +10,12 @@
 ; per-application thresholds the automatic mode learns.
 ;
 ; FEATURES & RATIONALE:
-; 1. The agent never uses the AI menu's prediction backend, so it refuses only
-;    while paused, when its mode is off, or when System 2 is not chosen or its
-;    provider has no API entry with a key: the AI menu switched off or its
-;    backend not ready refuse nothing. Nothing is read for a request that
-;    cannot run.
+; 1. Refusals first: a paused script and the AI switched off refuse with the
+;    notices of llm_generate_prediction (the picker greys the manual actions
+;    while the AI is off), then the agent's own (mode off, System 2 not chosen or
+;    its provider without an API entry with a key). The agent never uses the AI
+;    menu's prediction backend: that backend not ready refuses nothing. Nothing
+;    is read for a request that cannot run.
 ; 2. System 1 and System 2 each go through ONE transport function taking the
 ;    backend and the payload (LLM_Agent_System1Request,
 ;    LLM_Agent_System2Request): a new API format plugs in there. The backend is
@@ -380,14 +381,14 @@ LLM_Agent_TriggerCommand() {
 		"backend", Backend, "auto", false), Answer["value"])
 }
 
-; Applies the refusals every agent action shares, with their notices. The agent
-; never uses the AI menu's prediction backend: the AI switched off or its
-; backend not ready refuse nothing here, only the pause does.
+; Applies the refusals every agent action shares, with their notices: a pause,
+; the AI switch, then the agent's own. The agent never uses the AI menu's
+; prediction backend: that backend not ready refuses nothing here.
 ; @returns {Map|String} The System 2 backend, "" when the action is refused.
 _LLM_Agent_ManualRefusal() {
 	global LLM_AGENT_REFUSAL_CONTEXT
-	Refusal := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, true, true, LLM_AGENT_REFUSAL_CONTEXT)
-	; A pause outranks everything, the agent's own switch included
+	Refusal := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, LLM_Menu_AiEnabled(), true, LLM_AGENT_REFUSAL_CONTEXT)
+	; A pause and the AI switch outrank the agent's own switch
 	if (Refusal != "") {
 		_LLM_Menu_ShowManualPredictionRefusal(Refusal, 0)
 		return ""

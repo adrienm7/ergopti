@@ -1099,7 +1099,7 @@ GestureActionPickerItems() {
 								Items.Push({ Type: "heading", Level: Item.Level, Text: _GestureHeadingText(Item.Key) })
 						case "action":
 								if (Item.Id != "none")
-										Items.Push({ Type: "action", Id: Item.Id, Label: _GestureActionLabel(Item.Id) })
+										Items.Push(_GesturePickerActionItem(Item.Id))
 						case "modifier_chords":
 								; One sub-heading per modifier combination. The combination label
 								; ("Ctrl + Shift") is language-neutral; the words around it are not,
@@ -1109,13 +1109,45 @@ GestureActionPickerItems() {
 										Items.Push({ Type: "heading", Level: Item.Level,
 												Text: StrReplace(Template, "{1}", Group.Label) })
 										for _, ActionId in Group.Actions
-												Items.Push({ Type: "action", Id: ActionId, Label: _GestureActionLabel(ActionId) })
+												Items.Push(_GesturePickerActionItem(ActionId))
 								}
 						default:
 								throw ValueError("Unknown action catalogue item kind '" . Item.Kind . "'.")
 				}
 		}
 		return Items
+}
+
+; One picker row: an action whose catalogue requirement is proven absent stays
+; visible and greyed, with the reason. Read at each open, so switching the AI on
+; offers it again without a reload.
+; @param {String} ActionId A catalogue action id.
+; @returns {Object} { Type: "action", Id, Label[, Disabled, Hint] }
+_GesturePickerActionItem(ActionId) {
+		Item := { Type: "action", Id: ActionId, Label: _GestureActionLabel(ActionId) }
+		Hint := _GestureActionRequirementHint(ActionId)
+		if (Hint != "") {
+				Item.Disabled := true
+				Item.Hint := Hint
+		}
+		return Item
+}
+
+; Why a catalogue requirement of this action does not hold right now.
+; @param {String} ActionId A catalogue action id.
+; @returns {String} The translated reason, "" when every requirement holds.
+_GestureActionRequirementHint(ActionId) {
+		global GESTURE_ACTION_CATALOGUE
+		Actions := GESTURE_ACTION_CATALOGUE.Actions
+		if !Actions.Has(ActionId) || !Actions[ActionId].HasOwnProp("Requires")
+				return ""
+		for _, Token in Actions[ActionId].Requires {
+				if (Token != "ai:on")
+						throw ValueError("Unknown action requirement token '" . Token . "'.")
+				if !LLM_Menu_AiEnabled()
+						return t("dialog.action_picker.requires_ai")
+		}
+		return ""
 }
 
 ; The translated text of one picker heading. Older header values carry a

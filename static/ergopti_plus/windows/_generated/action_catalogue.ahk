@@ -9,7 +9,7 @@
 ; Every action the Windows driver offers, already filtered to its platform:
 ; the picker order with heading levels and locale keys, the modifier-chord
 ; block the driver expands from its own chord registry, and per-action
-; metadata (label key, parameter kind, confirmation). A data function rather
+; metadata (label key, parameter kind, confirmation, requirements). A data function rather
 ; than a global, so include order cannot matter, and no TOML is parsed to
 ; build the picker.
 ; ==============================================================================
@@ -270,8 +270,8 @@ GestureActionCatalogueData() {
 	Actions["line_start"] := { Family: "sg", LabelKey: "sg_actions.line_start", Parameter: "", Confirm: false }
 	Actions["line_up"] := { Family: "sg", LabelKey: "sg_actions.line_up", Parameter: "", Confirm: false }
 	Actions["llm_agent_auto_toggle"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_auto_toggle", Parameter: "", Confirm: false }
-	Actions["llm_agent_command"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_command", Parameter: "", Confirm: false }
-	Actions["llm_agent_selection"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_selection", Parameter: "", Confirm: false }
+	Actions["llm_agent_command"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_command", Parameter: "", Confirm: false, Requires: ["ai:on"] }
+	Actions["llm_agent_selection"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_selection", Parameter: "", Confirm: false, Requires: ["ai:on"] }
 	Actions["llm_generate_prediction"] := { Family: "sg", LabelKey: "sg_actions.llm_generate_prediction", Parameter: "", Confirm: false }
 	Actions["llm_live_prompt_toggle"] := { Family: "sg", LabelKey: "sg_actions.llm_live_prompt_toggle", Parameter: "llm_prompt", Confirm: false }
 	Actions["llm_predict_advanced"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_advanced", Parameter: "", Confirm: false }
