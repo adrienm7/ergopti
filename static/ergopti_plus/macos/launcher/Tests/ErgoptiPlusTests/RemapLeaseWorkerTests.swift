@@ -32,6 +32,7 @@
 import Darwin
 import Dispatch
 import Foundation
+import Security
 import ServiceManagement
 import XCTest
 @testable import ErgoptiPlus
@@ -1032,6 +1033,109 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			developerBuild: true
 		), .requiresApproval)
 		XCTAssertEqual(approvalLegacyCalls, 0)
+	}
+
+	/// An ad hoc build's coexisting legacy agent and Background Items record
+	/// spawned the job under the previous cdhash, which macOS killed (Launch
+	/// Constraint Violation, field run 2026-10-30). Both are removed, in that
+	/// order, and the previous guardian's exit is proven before registering.
+	func testAdhocResetRemovesBothRegistrationsBeforeRegistering() throws {
+		guard #available(macOS 13.0, *) else { return }
+		for initial in [SMAppService.Status.enabled, .notRegistered, .notFound] {
+			let service = ScriptedModernGuardianService(status: initial)
+			var order: [String] = []
+			var lines: [String] = []
+			let note = resetAdhocRemapGuardianRegistration(
+				service: service,
+				leasesAreEmpty: { order.append("leases"); return true },
+				removeLegacy: {
+					order.append("legacy")
+					XCTAssertEqual(service.unregisterCalls, 0, "the legacy agent goes first")
+					return true
+				},
+				guardianHasExited: {
+					order.append("exit:\(service.unregisterCalls)")
+					return true
+				},
+				report: { lines.append($0) }
+			)
+			XCTAssertEqual(note, .adhocReregistered)
+			XCTAssertEqual(service.unregisterCalls, initial == .enabled ? 1 : 0)
+			XCTAssertEqual(service.registerCalls, 0, "the reset itself never registers")
+			XCTAssertEqual(order, ["leases", "legacy", "exit:\(initial == .enabled ? 1 : 0)"])
+			XCTAssertEqual(lines.count, 1, "\(lines)")
+			XCTAssertEqual(resolveModernRemapGuardianRegistration(
+				service: service,
+				guardianHealth: { true },
+				legacyInvalidSignatureFallback: { XCTFail("registered"); return false }
+			), .ready)
+			XCTAssertEqual(service.registerCalls, 1, "the fresh registration follows the reset")
+		}
+	}
+
+	/// Live leases and a pending approval keep the registration untouched; an
+	/// unproven removal or exit is named and leaves the ordinary registration.
+	func testAdhocResetKeepsLiveLeasesApprovalAndUnprovenRemovals() throws {
+		guard #available(macOS 13.0, *) else { return }
+		let live = ScriptedModernGuardianService(status: .enabled)
+		XCTAssertEqual(resetAdhocRemapGuardianRegistration(
+			service: live,
+			leasesAreEmpty: { false },
+			removeLegacy: { XCTFail("live leases"); return true },
+			guardianHasExited: { XCTFail("live leases"); return true },
+			report: { _ in }
+		), .adhocResetDeferred)
+		XCTAssertEqual(live.unregisterCalls, 0)
+
+		let pending = ScriptedModernGuardianService(status: .requiresApproval)
+		XCTAssertEqual(resetAdhocRemapGuardianRegistration(
+			service: pending,
+			leasesAreEmpty: { true },
+			removeLegacy: { XCTFail("approval is the user's"); return true },
+			guardianHasExited: { true },
+			report: { _ in }
+		), .adhocResetDeferred)
+		XCTAssertEqual(pending.unregisterCalls, 0)
+
+		let foreignLegacy = ScriptedModernGuardianService(status: .enabled)
+		XCTAssertEqual(resetAdhocRemapGuardianRegistration(
+			service: foreignLegacy,
+			leasesAreEmpty: { true },
+			removeLegacy: { false },
+			guardianHasExited: { XCTFail("refused"); return true },
+			report: { _ in }
+		), .adhocResetRefused)
+		XCTAssertEqual(foreignLegacy.unregisterCalls, 0)
+
+		let stuck = ScriptedModernGuardianService(
+			status: .enabled,
+			unregistrationError: NSError(domain: kRemapGuardianServiceErrorDomain, code: 1)
+		)
+		XCTAssertEqual(resetAdhocRemapGuardianRegistration(
+			service: stuck,
+			leasesAreEmpty: { true },
+			removeLegacy: { true },
+			guardianHasExited: { XCTFail("refused"); return true },
+			report: { _ in }
+		), .adhocResetRefused)
+
+		XCTAssertEqual(resetAdhocRemapGuardianRegistration(
+			service: ScriptedModernGuardianService(status: .enabled),
+			leasesAreEmpty: { true },
+			removeLegacy: { true },
+			guardianHasExited: { false },
+			report: { _ in }
+		), .adhocResetRefused)
+	}
+
+	/// Only a signature without a team is ad hoc: Developer ID builds keep
+	/// their registration, and an unsigned answer is not mistaken for ad hoc.
+	func testAdhocSignatureIsAnIdentifierWithoutATeam() {
+		let identifier = kSecCodeInfoIdentifier as String
+		let team = kSecCodeInfoTeamIdentifier as String
+		XCTAssertTrue(signingInformationIsAdhoc([identifier: "com.ergoptiplus.app"]))
+		XCTAssertFalse(signingInformationIsAdhoc([identifier: "com.ergoptiplus.app", team: "ABCDE12345"]))
+		XCTAssertFalse(signingInformationIsAdhoc([:]))
 	}
 
 	/// Runtime observation is read-only and requires both eligibility and health.
