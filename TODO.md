@@ -1124,6 +1124,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       replayed by both drivers (48be669def, 7442ab5edd, d18f573791; the decisions of October 26 are on
       `work/todo-af`). Left: the Windows twin replaying the vectors, then the HttpClient, TimerScheduler and
       TooltipRenderer ports, the live prompt, the token budget, the info-bar text and the agent flows. Audit R1.
+      Checked 30 October: on macOS and Linux those are done, `_shared/lua/llm/request_plan/` holds `ports`,
+      `token_budget`, `live`, `info_bar` and `agent`, required by both prediction engines, the remote and MLX
+      clients and the agent runner; only the Windows twin is left [PC].
 - [ ] **PAR-67. Shared keystats query catalogue and walker.** [CODE] Reader catalogue, shared walker and
       aggregation vectors done; `meta.rev` shared and a gate refuses SQL spelled by hand in both Lua drivers.
       In progress: write-statement catalogue with typed slots (agent). Windows: adopt it later.
