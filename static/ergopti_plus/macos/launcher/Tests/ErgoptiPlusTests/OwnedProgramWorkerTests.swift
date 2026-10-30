@@ -21,6 +21,7 @@ private final class OwnedProgramTestSession {
 	private(set) var stdout = Data()
 	private(set) var stderr = Data()
 	private var inputClosed = false
+	private var outputClosed = false
 
 	init(executable: URL, payload: URL? = nil, arguments: [String], symlinkSource: Bool = false, sendInitialRequest: Bool = true, prepareFixture: ((URL) throws -> Void)? = nil) throws {
 		self.executable = executable
@@ -70,6 +71,13 @@ private final class OwnedProgramTestSession {
 		try input.fileHandleForWriting.write(contentsOf: Data("{\"version\":1".utf8))
 	}
 
+	// Closes the caller's receipt reader, so the next forwarded receipt is refused.
+	func closeOutput() throws {
+		guard !outputClosed else { return }
+		try output.fileHandleForReading.close()
+		outputClosed = true
+	}
+
 	func closeInput() throws {
 		guard !inputClosed else { return }
 		try input.fileHandleForWriting.close()
@@ -85,7 +93,8 @@ private final class OwnedProgramTestSession {
 	}
 
 	func poll() throws {
-		let bytes = try drain(output.fileHandleForReading)
+		var bytes = Data()
+		if !outputClosed { bytes = try drain(output.fileHandleForReading) }
 		stdout.append(bytes)
 		stderr.append(try drain(error.fileHandleForReading))
 		guard stdout.count <= 128, stderr.isEmpty, decoder.append(bytes) else {
@@ -347,6 +356,27 @@ final class OwnedProgramWorkerTests: XCTestCase {
 		try session.wait { session.markers.contains("V1 RETIRED 137") }
 		try session.finish()
 		XCTAssertFalse(FileManager.default.fileExists(atPath: session.directory.appendingPathComponent("must-not-exist.json").path))
+	}
+
+	// 28 October audit lead: a terminal receipt the bridge could not forward
+	// still set its verified terminal, so it exited 0 having delivered nothing.
+	func testRefusedReceiptForwardingNeverReportsSuccess() throws {
+		let session = try OwnedProgramTestSession(executable: launcherExecutable(), arguments: [
+			ownedProgramFixtureFlag, "argv", "@FIXTURE_DIR@/must-not-exist.json",
+		])
+		try session.wait { session.markers.contains("V1 HELD") }
+		try session.closeOutput()
+		try session.send("CANCEL")
+		try session.closeInput()
+		let deadline = Date().addingTimeInterval(10)
+		while session.process.isRunning && Date() < deadline { usleep(1_000) }
+		if session.process.isRunning { session.process.terminate() }
+		session.process.waitUntilExit()
+		XCTAssertEqual(session.process.terminationReason, .exit)
+		XCTAssertEqual(session.process.terminationStatus, 70,
+			"a terminal receipt the caller never received must not become exit 0")
+		XCTAssertFalse(FileManager.default.fileExists(atPath: session.directory.appendingPathComponent("must-not-exist.json").path))
+		try FileManager.default.removeItem(at: session.directory)
 	}
 
 	func testEOFBeforeAnyRequestReturnsProvenConstructorRefusal() throws {
