@@ -195,6 +195,14 @@ finalize() {
 	else
 		printf '%-28s missing\n' "logs" >> "${steps}"
 	fi
+	# The last controlled reload's stage trail (adapters/reload_breadcrumb.lua):
+	# stage names and monotonic times only, so it travels unscrubbed. Its last
+	# line names the stage a lost reload stopped in; `boot` proves one followed.
+	if [ -f "${RELOAD_BREADCRUMB}" ]; then
+		cp "${RELOAD_BREADCRUMB}" "${out}/reload_breadcrumb.txt"
+	else
+		printf '%-28s missing\n' "reload_breadcrumb" >> "${steps}"
+	fi
 	# Which personal triggers share a bundled one, with both sides' flags and no
 	# replacement text: the personal file itself never travels.
 	step hotstring_collisions python3 "${REPO_ROOT}/tools/dev/hotstring-collisions.py" \

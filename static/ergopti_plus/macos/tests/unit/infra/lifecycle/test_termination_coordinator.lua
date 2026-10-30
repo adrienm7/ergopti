@@ -45,6 +45,7 @@ local function load_coordinator(options)
 		"before init nothing owns the process, and the query must not raise")
 	local initialized = coordinator.init({
 		capture_publication_admission = options.capture_publication_admission,
+		record_stage = options.record_stage,
 		request_lease = function(reason, callback)
 			calls.lease_requests = calls.lease_requests + 1
 			calls.reason = reason
@@ -804,5 +805,66 @@ helpers.describe("controlled termination coordinator", function()
 		local coordinator, calls = load_coordinator()
 		helpers.assert_true(coordinator.request_exit("invalid", 256) == false)
 		helpers.assert_eq(calls.lease_requests, 0)
+	end)
+
+	-- The field run's timed reload of 2026-10-30 21:06 lost the app after its
+	-- lease revocation was requested; its queued log lines were lost with it.
+	helpers.it("names every reload stage to the breadcrumb before it runs (reload-breadcrumb)", function()
+		local stages = {}
+		-- Declared first: the doubles' order table is read from inside the breadcrumb
+		local coordinator, calls
+		coordinator, calls = load_coordinator({ record_stage = function(kind, stage)
+			stages[#stages + 1] = kind .. ":" .. stage
+			calls.order[#calls.order + 1] = "stage-" .. stage
+		end })
+		helpers.assert_true(coordinator.request_reload("field_run"))
+		helpers.assert_eq(stages, { "reload:accepted", "reload:lease_fence_requested" },
+			"a lost fence leaves the request as the last stage")
+		calls.lease_callback(true, "stopped")
+		helpers.assert_eq(calls.reloads, 1)
+		helpers.assert_eq(stages, {
+			"reload:accepted", "reload:lease_fence_requested", "reload:lease_fenced",
+			"reload:input_drain_started", "reload:input_drained", "reload:reload_marked",
+			"reload:teardown_attempt", "reload:teardown_completed", "reload:log_drain_started",
+			"reload:log_drained", "reload:finalized", "reload:hs_reload_called", "reload:hs_reload_returned",
+		})
+		local function before(first, second)
+			local a, b
+			for index, entry in ipairs(calls.order) do
+				if entry == first and not a then a = index end
+				if entry == second and not b then b = index end
+			end
+			return a ~= nil and b ~= nil and a < b
+		end
+		helpers.assert_true(before("stage-lease_fence_requested", "request-lease"))
+		helpers.assert_true(before("stage-teardown_attempt", "teardown-reload"))
+		helpers.assert_true(before("stage-hs_reload_called", "reload"))
+	end)
+
+	helpers.it("names a refused fence, an upgrade to exit and a raising breadcrumb changes nothing (reload-breadcrumb)", function()
+		local stages = {}
+		local coordinator, calls = load_coordinator({ record_stage = function(kind, stage)
+			stages[#stages + 1] = kind .. ":" .. stage
+		end })
+		helpers.assert_true(coordinator.request_reload("first"))
+		calls.lease_callback(false, "refused")
+		helpers.assert_eq(stages[#stages - 1], "reload:lease_fence_refused")
+		helpers.assert_eq(stages[#stages], "reload:aborted")
+
+		stages = {}
+		local upgraded, upgrade_calls = load_coordinator({ record_stage = function(kind, stage)
+			stages[#stages + 1] = kind .. ":" .. stage
+		end })
+		helpers.assert_true(upgraded.request_reload("first"))
+		helpers.assert_true(upgraded.request_exit("quit", 0))
+		helpers.assert_eq(stages[#stages], "exit:upgraded_to_exit")
+		upgrade_calls.lease_callback(true, "stopped")
+		helpers.assert_eq(upgrade_calls.exits, 1)
+
+		local raising, raising_calls = load_coordinator({ record_stage = function() error("disk full") end })
+		helpers.assert_true(raising.request_reload("first"))
+		raising_calls.lease_callback(true, "stopped")
+		helpers.assert_eq(raising_calls.reloads, 1, "a failing breadcrumb never blocks the reload")
+		helpers.assert_eq(raising_calls.fatal_exits, 0)
 	end)
 end)
