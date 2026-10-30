@@ -1058,12 +1058,15 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       has one, and never selects, reuses, stops or modifies the user's Ollama. macOS is done (bc09e4584c:
       `ollama_binary.resolve()` returns only the owned runtime, pinned 0.40.4 from `managed_ollama_runtime.json`;
       the shared key `llm_ollama_owned_port` = 11435 in `defaults.json`, read through `ollama_endpoint`; a saved
-      11434 override is refused and the old `llm.ollama_port` is migrated once and logged). Left: Linux
-      (`managed_ollama_proxy.lua`, the Ollama resolver and the endpoint still on `llm_ollama_port` 11434) and
-      Windows (it already has an owner for its own Ollama taking a models directory and port; check its
-      installer and every caller against the rule), both moved to `llm_ollama_owned_port`, the user's daemon
-      on 11434 left untouched, with regression tests that an installed system Ollama is never resolved or
-      started. [PHYS-W] [PHYS-L] confirm with a system Ollama running on 11434: Ergopti's listens on 11435.
+      11434 override is refused and the old `llm.ollama_port` is migrated once and logged). Linux is done
+      (1c75ea5: origin, serve address and readiness probe on `llm_ollama_owned_port` via `llm_bridge`
+      `OLLAMA_OWNED_PORT`, the stock port refused, a PATH `ollama` no longer counted; Linux never saved a
+      port, so nothing migrates; `test_owned_ollama_coexistence.lua` holds a fake system Ollama on PATH and
+      11434). Left: Windows (it already has an owner for its own Ollama taking a models directory and port;
+      check its installer and every caller against the rule), moved to `llm_ollama_owned_port`, the user's
+      daemon on 11434 left untouched, with regression tests that an installed system Ollama is never
+      resolved or started. [PHYS-W] [PHYS-L] confirm with a system Ollama running on 11434: Ergopti's
+      listens on 11435 (Linux: enable the AI from the menu on a machine running `ollama serve`).
 - [ ] **Ctrl+Caps Lock slot on macOS.** [PHYS-M] The `secondary_capslock` slot binds through its own native
       entry again (ea02cf7000: the generic registrar refuses Caps Lock and the whole shortcut start rolled
       back). The registrar tests say macOS never fires a Caps Lock hotkey: check on a real Mac that Ctrl+Caps
