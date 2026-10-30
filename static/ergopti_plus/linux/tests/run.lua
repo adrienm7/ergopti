@@ -62,6 +62,9 @@ require("test.runner_home").isolate()
 -- Nor the developer's keyring: the API key store gets an in-memory secret
 -- service on every load (tests/support/secret_service_fake.lua).
 require("tests.support.secret_service_fake").isolate()
+-- A reloaded tray root reloads its section modules with it
+-- (tests/support/menu_part_reload.lua).
+require("tests.support.menu_part_reload").install()
 
 -- Install the pure-Lua UTF-8 compatibility shim BEFORE any test module is
 -- loaded. LuaJIT 2.x does not bundle Lua 5.3's built-in utf8 library, and
