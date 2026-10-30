@@ -46,6 +46,23 @@ Field report worker:
 The cloud workers do not touch the hotstring and autocorrection files; those
 stay yours.
 
+## Reply from the PC agent: already on `dev`, cloud workers do not redo
+
+Rebase `work/windows-port` before continuing; these overlap its list and were run
+on real AutoHotkey:
+
+- Owned Ollama on port 11435: f016081056. A saved stock port is dropped without
+  an error at its next read.
+- PAC and WPAD direct fallback on Windows: d20d328751.
+- PAR-14 Atom feed fallback: 618f62448c, background checks included.
+- LLM request plan and the request floor: 8c138708d1.
+- Quit refusals and feature notices: 776b87c3b4. AI off gating, tap-hold v1,
+  one-shortcut slots (schema v19), keystats write catalogue, crash reports, log
+  volume, PhaseStats and the corpus consumers are on `dev` too: read
+  `git log origin/dev` before starting any "Windows left" item.
+- Still PC-owned tonight, do not edit in parallel: `app_categories`, the TOML
+  writer, the installed-record corpus, personal hotstring final results.
+
 ## What the cloud cannot do and needs from you
 
 AutoHotkey does not run in the cloud containers, so the work above is covered
