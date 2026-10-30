@@ -279,7 +279,7 @@ h.describe("native caption consumer inventory", function()
 			["ui/config_dir_picker.lua"] = 2,
 			["ui/gesture_conflicts.lua"] = 1,
 			["modules/gestures/system_actions.lua"] = 2,
-			["ui/menu/menu_builder.lua"] = 3,
+			["ui/menu/menu_dialogs.lua"] = 3,
 			["modules/llm/local_model_offer.lua"] = 2,
 			-- The enable refusal tests prove both policy-owned native captions and modal receipts.
 			["ui/llm_enable_refusal.lua"] = 2,

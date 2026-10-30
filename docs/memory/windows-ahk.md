@@ -591,6 +591,8 @@ change did not touch it (`test_hotstring_chaining.ahk`, `--interactive`). Any
 change that stops committing the expansion to the buffer, or that clears it
 (`HSE_HardReset`, a wipe after a fire), breaks chaining. The earlier note that
 chaining does not exist was wrong: it only looked for a re-feed of the output.
+A final entry is the exception (see `project-final-result-leaves-the-matcher`
+in `text-input-and-config.md`): its output leaves the buffer.
 
 Layout emulation stays a `SendEvent` on purpose (decided 2026-10-23 with live
 numbers): `_RemapEmit` measured mean 2.1 to 2.6 ms and max 5.7 ms per emitted key

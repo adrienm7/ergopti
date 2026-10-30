@@ -1913,6 +1913,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_chaining.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_cascade.ahk
+#Include unit/modules/hotstrings/engine/test_hotstring_final_result.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_injection_plan.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_output_tokens.ahk
 #Include meta/modules/hotstrings/catalogue/test_hotstrings_combo_auto_escaping.ahk

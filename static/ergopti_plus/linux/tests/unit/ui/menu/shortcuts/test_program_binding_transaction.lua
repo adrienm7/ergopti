@@ -18,8 +18,7 @@ local CASES = {
 
 --- Loads the exact production helper without booting unrelated tray providers.
 local function callback(logger)
-	local file = assert(io.open(helpers.driver_root() .. "/ui/menu/menu_builder.lua", "rb"))
-	local source = file:read("*a"); file:close()
+	local source = helpers.read_menu_source()
 	local body = assert(source:match("(local function assign_parameterized_action%(.+\nend)\n\n%-%-%- Opens the shared searchable"))
 	local factory = assert(load("return function(Logger) " .. body .. "\nreturn assign_parameterized_action end", "actual-program-picker"))()
 	return factory(logger)

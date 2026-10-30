@@ -220,6 +220,8 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 					? SubStr(HSE_Buffer, 1, CurrentLength - DeleteCount) : ""
 				HSE_Buffer .= InsertedText
 				_HSE_TrimBufferToCapacity()
+				if Owner.Get("OutputIsFinal", false)
+					_HSE_ForgetFinalOutput(Effect)
 			}
 			_HSE_MirrorCanonicalEffectToLlm(Effect)
 		} catch {
@@ -708,6 +710,8 @@ _HSE_CommitNotepadOwner(Owner) {
 	try {
 		HSE_Buffer := SubStr(HSE_Buffer, 1, StrLen(HSE_Buffer) - Owner["EraseUnits"]) . InsertedText
 		_HSE_TrimBufferToCapacity()
+		if Owner.Get("OutputIsFinal", false)
+			_HSE_ForgetFinalOutput(Effect)
 		_HSE_MirrorCanonicalEffectToLlm(Effect)
 		UpdateLastSentCharacter(SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)))
 	} catch {
@@ -1336,6 +1340,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		; reaches back over, and the last link's text as the replacement.
 		CascadePlan := _HSE_PlanCascade(Spec, Prepared, EndChar, GateTick)
 		CascadeUnits := IsObject(CascadePlan) ? CascadePlan.ExtraUnits : 0
+		OutputIsFinal := IsObject(CascadePlan) ? CascadePlan.FinalResult
+				: (Spec.HasOwnProp("FinalResult") and Spec.FinalResult)
 		; Sender choice and terminal ownership must share one foreground receipt.
 		; Acquire it before suppression/synthetic ownership so an ambiguous focus or
 		; title probe declines with no output-side mutation.
@@ -1420,6 +1426,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					; Literal native output owns completion; scheduling is never a fire.
 					DeferredOwner := _HSE_NewNotepadOwner(Spec, Replacement,
 						EndCharPart, EraseUnits, BSCount, OutputHost, SyntheticOwner, DispatchState)
+					DeferredOwner["OutputIsFinal"] := OutputIsFinal
 					TerminalOwnershipTransferred := true
 					return _HSE_BeginOwnedNotepadTransaction(DeferredOwner, NativeSendFn?)
 				} else if IsTerminalApp {
@@ -1448,6 +1455,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 									"SendPayload", ReplacementPart . EndCharPart,
 									"EndCharPart", EndCharPart,
 									"OnlyText", OnlyText,
+									"OutputIsFinal", OutputIsFinal,
 									"DelayMs", TerminalDelayMs,
 									"EmitFn", EmitFn,
 									"DelayFn", 0,
@@ -1576,7 +1584,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					_BufferCrit := Critical("On")
 					try {
 							ExpansionEffect := HSE_ApplyExpansion(
-									Spec, Replacement, EndChar, ForceConsumeEndChar, CascadeUnits)
+									Spec, Replacement, EndChar, ForceConsumeEndChar, CascadeUnits, OutputIsFinal)
 							_HSE_MirrorCanonicalEffectToLlm(ExpansionEffect)
 							CommittedEffect := ExpansionEffect
 					} finally {

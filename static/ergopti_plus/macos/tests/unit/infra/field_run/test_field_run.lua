@@ -137,6 +137,13 @@ local function world(runners)
 end
 
 --- Starts a session over a world.
+--- The shipped declaration with every step enabled, for tests of the whole run's mechanics.
+local function enabled_spec_of(FieldRun)
+	local declaration = Json.decode(SPEC_TEXT)
+	for _, step in ipairs(declaration.steps) do step.disabled = nil end
+	return FieldRun.validate(declaration)
+end
+
 local function started(FieldRun, state)
 	local session = FieldRun.new({ spec = spec_of(FieldRun), folder = FOLDER, pid = 4242, ports = state.ports })
 	session:start()
@@ -504,8 +511,10 @@ helpers.describe("field run: a run", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
 			local state = world()
-			local spec = spec_of(FieldRun)
-			local session = started(FieldRun, state)
+			-- A disabled shipped step is a skip, proven apart; the whole run keeps the reload
+			local spec = enabled_spec_of(FieldRun)
+			local session = FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports })
+			session:start()
 			state.request({ schema = 1, request_id = "r11", steps = Json.array({ "all" }) })
 			state.advance(0)
 			-- The timed reload: this state is torn down, the reloaded one carries on
@@ -515,7 +524,7 @@ helpers.describe("field run: a run", function()
 			session:stop({ kind = "reload", reason = FieldRun.TIMED_RELOAD_REASON })
 			helpers.assert_not_nil(state.files[FOLDER .. "/running.json"], "the running marker survives the reload")
 			state.now = state.now + 4200
-			FieldRun.new({ spec = spec_of(FieldRun), folder = FOLDER, pid = 4343, ports = state.ports }):start()
+			FieldRun.new({ spec = enabled_spec_of(FieldRun), folder = FOLDER, pid = 4343, ports = state.ports }):start()
 			state.advance(0)
 			for index, step in ipairs(spec.steps) do
 				local result = state.json(result_path("r11", index, step.id))

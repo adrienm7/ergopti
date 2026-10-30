@@ -141,6 +141,8 @@ _HSE_SourcePriority(CategoryName) {
 ; HSE_FeedBackspace (chop one char), HSE_FeedReset (clear), and
 ; HSE_ApplyExpansion (replace trigger suffix by replacement).
 global HSE_Buffer := ""
+global HSE_FinalNoOpPending := false
+global HSE_FinalNoOpFound := false
 
 ; True when the character immediately to the left of HSE_Buffer is known to
 ; be a word terminator (or there is no character at all — start of input).
@@ -896,6 +898,7 @@ _HSE_TrimBufferToCapacity() {
 HSE_FeedChar(Char, IsPhysical := false) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_MAX_BUFFER_LEN
 		global HSE_LastMatch, HSE_LastEndChar, HSE_Suppressed
+		global HSE_FinalNoOpPending, HSE_FinalNoOpFound
 		HSE_LastMatch := ""
 		HSE_LastEndChar := ""
 		if ((HSE_Suppressed and !IsPhysical) or (Char == "")) {
@@ -907,7 +910,11 @@ HSE_FeedChar(Char, IsPhysical := false) {
 		HSE_Buffer .= Char
 		_HSE_TrimBufferToCapacity()
 
-		Match := HSE_FindMatchAtEnd(Char)
+		; A final entry that changed nothing claims its text for one key only, so
+		; typing on (a longer word, another trigger) is judged afresh.
+		TextIsClaimed := HSE_FinalNoOpPending
+		Match := HSE_FindMatchAtEnd(Char, TextIsClaimed)
+		HSE_FinalNoOpPending := HSE_FinalNoOpFound
 		HSE_LastMatch := Match
 		return Match
 }
@@ -932,9 +939,11 @@ HSE_FeedChar(Char, IsPhysical := false) {
 ;        remap or a tap-hold sends for the user), not an internal edit.
 HSE_FeedBackspace(IsPhysical := false, ErasesTypedText := false) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_Suppressed
+		global HSE_FinalNoOpPending
 		if HSE_Suppressed and !IsPhysical {
 				return
 		}
+		HSE_FinalNoOpPending := false
 		if (HSE_Buffer != "") {
 				HSE_Buffer := SubStr(HSE_Buffer, 1, StrLen(HSE_Buffer) - _TextTailCodeUnits(HSE_Buffer, 1))
 				if (HSE_Buffer == "" and ErasesTypedText)
@@ -959,9 +968,11 @@ HSE_FeedBackspace(IsPhysical := false, ErasesTypedText := false) {
 ; input line (HSE_StartIsLineStart); it holds only with a known boundary.
 HSE_FeedReset(KnownTerminatorBefore := false, IsPhysical := false, AtLineStart := false) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_Suppressed
+		global HSE_FinalNoOpPending
 		if HSE_Suppressed and !IsPhysical {
 				return
 		}
+		HSE_FinalNoOpPending := false
 		HSE_Buffer := ""
 		HSE_StartIsWordBoundary := !!KnownTerminatorBefore
 		HSE_StartIsLineStart := HSE_StartIsWordBoundary and !!AtLineStart
@@ -991,10 +1002,24 @@ HSE_Suppress(YesNo) {
 ; sit flush at the start of the new buffer will refuse to fire until a
 ; word terminator has been observed.
 HSE_HardReset() {
-		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_FinalNoOpPending
 		HSE_Buffer := ""
 		HSE_StartIsWordBoundary := false
 		HSE_StartIsLineStart := false
+		HSE_FinalNoOpPending := false
+}
+
+; Forgets a final expansion's output from the matcher: nothing may complete a
+; trigger through it, on any later key. Only what the output says about the word
+; start survives. A caller holds the buffer transaction open (Critical). macOS
+; (commit_suppress_rescan) and Linux (engine:reset) do the same.
+; @param Effect {Object} The committed effect, for KnownBoundaryAfter.
+_HSE_ForgetFinalOutput(Effect) {
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_FinalNoOpPending
+		HSE_Buffer := ""
+		HSE_StartIsWordBoundary := Effect.KnownBoundaryAfter
+		HSE_StartIsLineStart := false
+		HSE_FinalNoOpPending := false
 }
 
 ; Whether a value is a valid hotstrings.idle_reset_seconds: a finite
@@ -1075,7 +1100,10 @@ HSE_WordResetFlagCurrent(Key) {
 ; sits behind » exactly, regardless of whether the end char was a word
 ; terminator (the new HSE_FeedChar keeps terminators in the buffer too,
 ; so triggers that span them — e.g. « ,a → ja » — can still match).
-HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := false, ExtraStrip := 0) {
+;
+; A final entry (Spec.FinalResult, or the final last link of a chain: ChainIsFinal)
+; is the end of it: its output leaves the matcher (_HSE_ForgetFinalOutput).
+HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := false, ExtraStrip := 0, ChainIsFinal := false) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
 
 		StripLen := _HSE_ExpansionStripUnits(Spec.Length + ExtraStrip, EndChar, HSE_TypoNbspStripped)
@@ -1124,6 +1152,8 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 		HSE_Buffer .= Effect.InsertedText
 
 		_HSE_TrimBufferToCapacity()
+		if (ChainIsFinal or (Spec.HasOwnProp("FinalResult") and Spec.FinalResult))
+				_HSE_ForgetFinalOutput(Effect)
 		return Effect
 }
 
@@ -1350,7 +1380,7 @@ HSE_PreviewNextDecision(Buffer, NextChar) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_LastMatch, HSE_LastEndChar
 		global HSE_TypoNbspStripped, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
 		global HSE_RegistryTransitionDepth
-		global HSE_RebuildInProgress, ScriptInformation
+		global HSE_RebuildInProgress, ScriptInformation, HSE_FinalNoOpPending
 		if !(Buffer is String) or !(NextChar is String) or NextChar == ""
 				return ""
 
@@ -1368,6 +1398,7 @@ HSE_PreviewNextDecision(Buffer, NextChar) {
 		SavedLastMatch := HSE_LastMatch
 		SavedLastEndChar := HSE_LastEndChar
 		SavedTypoNbsp := HSE_TypoNbspStripped
+		SavedFinalNoOpPending := HSE_FinalNoOpPending
 		RegistryGeneration := HSE_RegistryGeneration
 		RuntimeDecisionGeneration := HSE_RuntimeDecisionGeneration
 		Match := ""
@@ -1397,6 +1428,7 @@ HSE_PreviewNextDecision(Buffer, NextChar) {
 				HSE_LastMatch := SavedLastMatch
 				HSE_LastEndChar := SavedLastEndChar
 				HSE_TypoNbspStripped := SavedTypoNbsp
+				HSE_FinalNoOpPending := SavedFinalNoOpPending
 				Critical(PreviousCritical)
 		}
 		if !IsObject(Match)
