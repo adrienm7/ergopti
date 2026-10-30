@@ -63,7 +63,7 @@ func installPrivateProcessUmask(
 /// - Parameter homeDirectory: Current user's Foundation home directory.
 /// - Returns: Absolute path exported to the embedded Hammerspoon process.
 func managedPathsFile(homeDirectory: String = NSHomeDirectory()) -> String {
-	return homeDirectory + "/Library/Application Support/ErgoptiPlus/paths.toml"
+	return homeDirectory + "/" + kMacOSPathsFileHomeRelativePath
 }
 
 /// Returns the inherited child environment with the exact live launcher

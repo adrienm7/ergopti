@@ -139,10 +139,12 @@ if (configSegments.filter((s) => s === APP_PLACEHOLDER).length !== 1) {
 	fail(`config.macos.segments must name "${APP_PLACEHOLDER}" exactly once.`);
 }
 const config = {
+	overrideKey: requireString(configSection, 'override_key', 'config'),
 	hotstringsDir: requireString(configSection, 'hotstrings_dir', 'config'),
 	personalHotstringsFile: requireString(configSection, 'personal_hotstrings_file', 'config'),
 	macosBase: requireString(configMacos, 'base', 'config.macos'),
-	macosRelative: configSegments.map((s) => (s === APP_PLACEHOLDER ? folderName : s)).join('/')
+	macosRelative: configSegments.map((s) => (s === APP_PLACEHOLDER ? folderName : s)).join('/'),
+	macosPathsFile: requireSegments(configMacos, 'paths_file', 'config.macos').join('/')
 };
 if (!macos.relative.endsWith(folderName)) {
 	fail(
@@ -206,10 +208,12 @@ function emitLua() {
 		`\t\trelative = ${luaStr(linux.relative)},\n` +
 		'\t},\n' +
 		'\tconfig = {\n' +
+		`\t\toverride_key = ${luaStr(config.overrideKey)},\n` +
 		`\t\thotstrings_dir = ${luaStr(config.hotstringsDir)},\n` +
 		`\t\tpersonal_hotstrings_file = ${luaStr(config.personalHotstringsFile)},\n` +
 		`\t\tmacos_base_env = ${luaStr(config.macosBase)},\n` +
 		`\t\tmacos_relative = ${luaStr(config.macosRelative)},\n` +
+		`\t\tmacos_paths_file = ${luaStr(config.macosPathsFile)},\n` +
 		'\t},\n' +
 		'}\n'
 	);
@@ -356,6 +360,12 @@ function emitSwift() {
 			'kFatalReportFileName',
 			macos.fatalReport,
 			'Per-launch fatal report, beside launcher.log.'
+		) +
+		'\n' +
+		constant(
+			'kMacOSPathsFileHomeRelativePath',
+			config.macosPathsFile,
+			'The paths.toml that may move the configuration folder, relative to the home folder.'
 		)
 	);
 }
