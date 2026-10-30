@@ -244,10 +244,23 @@ HTTP transport items are done (`linux/adapters/notifier.lua`, `[sections.llm]` l
     `build -> _build_<section> -> helper` by upvalue name, so the root must reload its parts when it
     loads and keep the `_build_<section>` local names.
   - The header builder shares the root's separator facade checks and belongs with the root.
-  - Decision needed first (shared `tools/test`, coordinator or maintainer): either (a) teach the analysers
-    to follow a module boundary (`local X = require("ui.menu.menu_x").build`), with new counterexamples,
-    or (b) give them one exact assembled Linux tray source built from the parts, rejecting any other
-    wiring. Then split one builder per commit, smallest first.
+  - Decided by the coordinator on 2026-10-30: (a), teach the analysers to follow the module boundary as
+    they follow the macOS `ui/menu/menu_*.lua` modules, with new counterexamples, in their own
+    `tools/test` commits green on dev before any split; then one builder per commit, smallest first.
+  - Measured with the smallest step (Quit alone to `menu_quit.lua`, module bindings required in the
+    file): `test-menu-manifest` (lifecycle rows looked up in `menu_builder.lua`, line ~1917),
+    `test-menu-parity` via `fixtures/linux-native-caption-binding-counterexamples.cjs` ("complete native
+    root ... closed caption cohort") and `test-hotstring-category-submenu-order` via
+    `fixtures/hotstring-language-owner-counterexamples.cjs` turn red: the root analysers embed literal
+    multi-line fragments of the root and expect `["quit"] = _build_quit` to name a local function of the
+    same file. The analyser change is therefore a resolver in `tools/lib` (root binding
+    `local _build_x = require("ui.menu.menu_x").build` to that module's `local function _build_x`,
+    refusing any other wiring) used by `menu-native-root-binding*.cjs`, the caption and language-owner
+    fixtures and the lifecycle check, each with a counterexample placed in the split module.
+  - The root must not write `package.loaded`: with a `package.loaded[name] = nil` reload helper,
+    `test-menu-action-handler-bijection` also turns red (its template binding refuses that wiring).
+    Reloading the parts with the root, which the Lua tests need, must be done another way (a fresh
+    `loadfile` of each part, or the tests reloading the parts themselves).
 - 20 of the 36 gesture slots are physically out of reach on some machines.
 - Without a grab, the desktop (GNOME 47+) acts on the same gesture.
 - The 9 two-finger slots fight with scrolling everywhere.
