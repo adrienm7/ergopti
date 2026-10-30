@@ -1003,7 +1003,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 33,
+			"family": 34,
 			"kind": "toggle"
 		},
 		{
@@ -1026,7 +1026,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 30,
+			"family": 31,
 			"kind": "toggle"
 		},
 		{
@@ -1049,7 +1049,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 33,
+			"family": 34,
 			"kind": "toggle"
 		},
 		{
@@ -1088,7 +1088,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 29,
+			"family": 30,
 			"kind": "effort"
 		},
 		{
@@ -1215,7 +1215,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 29,
+			"family": 30,
 			"kind": "toggle"
 		},
 		{
@@ -1273,7 +1273,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 29,
+			"family": 30,
 			"kind": "effort"
 		},
 		{
@@ -1403,7 +1403,7 @@
 				}
 			},
 			"added": [["reasoning"]],
-			"family": 29,
+			"family": 30,
 			"kind": "toggle"
 		},
 		{
@@ -1442,7 +1442,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 29,
+			"family": 30,
 			"kind": "effort"
 		},
 		{
@@ -1484,7 +1484,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 30,
+			"family": 31,
 			"kind": "effort"
 		},
 		{
@@ -1504,7 +1504,7 @@
 				"temperature": 0.7
 			},
 			"added": [],
-			"family": 29
+			"family": 30
 		},
 		{
 			"id": "openai_compat_gpt-5.1",
@@ -1604,7 +1604,7 @@
 				"enable_thinking": false
 			},
 			"added": [["enable_thinking"]],
-			"family": 29,
+			"family": 30,
 			"kind": "toggle"
 		},
 		{
@@ -1620,7 +1620,7 @@
 				"enable_thinking": false
 			},
 			"added": [["enable_thinking"]],
-			"family": 29,
+			"family": 30,
 			"kind": "toggle"
 		},
 		{
@@ -1735,7 +1735,7 @@
 				"enable_thinking": false
 			},
 			"added": [["enable_thinking"]],
-			"family": 29,
+			"family": 30,
 			"kind": "toggle"
 		},
 		{
@@ -1756,7 +1756,7 @@
 				"enable_thinking": false
 			},
 			"added": [["enable_thinking"]],
-			"family": 30,
+			"family": 31,
 			"kind": "toggle"
 		},
 		{
@@ -1777,7 +1777,7 @@
 				"reasoning": { "enabled": false }
 			},
 			"added": [["reasoning"]],
-			"family": 30,
+			"family": 31,
 			"kind": "toggle"
 		},
 		{
@@ -1848,7 +1848,7 @@
 				"chat_template_kwargs": { "enable_thinking": false }
 			},
 			"added": [["chat_template_kwargs"]],
-			"family": 30,
+			"family": 31,
 			"kind": "toggle"
 		},
 		{
@@ -1887,7 +1887,7 @@
 				"reasoning_effort": "none"
 			},
 			"added": [["reasoning_effort"]],
-			"family": 29,
+			"family": 30,
 			"kind": "effort"
 		},
 		{
@@ -1908,7 +1908,7 @@
 				"chat_template_kwargs": { "enable_thinking": false }
 			},
 			"added": [["chat_template_kwargs"]],
-			"family": 32,
+			"family": 33,
 			"kind": "toggle"
 		},
 		{
@@ -1950,8 +1950,202 @@
 				"chat_template_kwargs": { "enable_thinking": false }
 			},
 			"added": [["chat_template_kwargs"]],
-			"family": 29,
+			"family": 30,
 			"kind": "toggle"
+		},
+		{
+			"id": "nebius_Qwen_Qwen3-30B-A3B-Instruct-2507",
+			"provider": "nebius",
+			"model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+			"body": {
+				"model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 29
+		},
+		{
+			"id": "nebius_Qwen_Qwen3-32B",
+			"provider": "nebius",
+			"model": "Qwen/Qwen3-32B",
+			"body": { "model": "Qwen/Qwen3-32B", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "Qwen/Qwen3-32B",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 30,
+			"kind": "effort"
+		},
+		{
+			"id": "nebius_openai_gpt-oss-120b",
+			"provider": "nebius",
+			"model": "openai/gpt-oss-120b",
+			"body": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "novita_qwen_qwen3.8-flash",
+			"provider": "novita",
+			"model": "qwen/qwen3.8-flash",
+			"body": {
+				"model": "qwen/qwen3.8-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen/qwen3.8-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "novita_deepseek_deepseek-v4.1-flash-1017",
+			"provider": "novita",
+			"model": "deepseek/deepseek-v4.1-flash-1017",
+			"body": {
+				"model": "deepseek/deepseek-v4.1-flash-1017",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek/deepseek-v4.1-flash-1017",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 31,
+			"kind": "toggle"
+		},
+		{
+			"id": "hyperbolic_glm-5.3-flash",
+			"provider": "hyperbolic",
+			"model": "glm-5.3-flash",
+			"body": { "model": "glm-5.3-flash", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "glm-5.3-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 23
+		},
+		{
+			"id": "scaleway_mistral-small-3.2-24b-instruct-2506",
+			"provider": "scaleway",
+			"model": "mistral-small-3.2-24b-instruct-2506",
+			"body": {
+				"model": "mistral-small-3.2-24b-instruct-2506",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "mistral-small-3.2-24b-instruct-2506",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "scaleway_qwen3.5-397b-a17b",
+			"provider": "scaleway",
+			"model": "qwen3.5-397b-a17b",
+			"body": {
+				"model": "qwen3.5-397b-a17b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen3.5-397b-a17b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 30,
+			"kind": "effort"
+		},
+		{
+			"id": "scaleway_gpt-oss-120b",
+			"provider": "scaleway",
+			"model": "gpt-oss-120b",
+			"body": { "model": "gpt-oss-120b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "ovhcloud_Mistral-Small-3.2-24B-Instruct-2506",
+			"provider": "ovhcloud",
+			"model": "Mistral-Small-3.2-24B-Instruct-2506",
+			"body": {
+				"model": "Mistral-Small-3.2-24B-Instruct-2506",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Mistral-Small-3.2-24B-Instruct-2506",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "ovhcloud_gpt-oss-20b",
+			"provider": "ovhcloud",
+			"model": "gpt-oss-20b",
+			"body": { "model": "gpt-oss-20b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "gpt-oss-20b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": [],
+			"family": 11
 		}
 	],
 	"refusal_vectors": [
