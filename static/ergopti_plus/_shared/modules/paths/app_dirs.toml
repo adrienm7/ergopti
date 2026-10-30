@@ -110,14 +110,17 @@ segments = ["{app}", "logs"]
 # =====================================
 
 # The default configuration folder of the macOS driver (a ConfigDirPath set in
-# paths.toml replaces it) and, inside it, where the personal hotstrings live.
+# paths.toml replaces it), inside it where the personal hotstrings live, and
+# where the launcher keeps that paths.toml (relative to the home folder).
 [config]
+override_key = "ConfigDirPath"
 hotstrings_dir = "hotstrings"
 personal_hotstrings_file = "personal_hotstrings.toml"
 
 [config.macos]
 base = "HOME"
 segments = [".config", "{app}"]
+paths_file = ["Library", "Application Support", "ErgoptiPlus", "paths.toml"]
 
 
 [runtime.windows]

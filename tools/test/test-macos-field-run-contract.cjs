@@ -744,8 +744,13 @@ function reportFolder(paths) {
 				path.join(logs, `ErgoptiPlus_${day}.log`),
 				"[INFO] fixture day log\n[DEBUG] [keymap] Auto-expand: 'adr' → '12 rue privée'.\n"
 			);
-			// Where config_paths.lua keeps it: the collisions must find it.
-			const personal = path.join(paths.home, '.config/ergopti_plus/hotstrings');
+			// A configuration folder moved by the launcher's paths.toml, as
+			// config_paths.lua reads it: the collisions must follow it.
+			const moved = path.join(paths.home, 'moved-config');
+			const pathsFile = path.join(paths.home, 'Library/Application Support/ErgoptiPlus');
+			fs.mkdirSync(pathsFile, { recursive: true });
+			fs.writeFileSync(path.join(pathsFile, 'paths.toml'), `ConfigDirPath = "${moved}/"\n`);
+			const personal = path.join(moved, 'hotstrings');
 			fs.mkdirSync(personal, { recursive: true });
 			fs.writeFileSync(
 				path.join(personal, 'personal_hotstrings.toml'),

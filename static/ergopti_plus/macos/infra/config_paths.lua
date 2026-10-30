@@ -91,7 +91,7 @@ end
 
 -- The two keys stored in paths.toml: the configuration folder, and the logs
 -- folder named by the shared application-folders registry.
-local CONFIG_DIR_KEY = "ConfigDirPath"
+local CONFIG_DIR_KEY = AppDirs.config.override_key
 local LOGS_DIR_KEY   = AppDirs.override_key
 
 -- Driver root — derived at module-load time so standalone source-tree launches
