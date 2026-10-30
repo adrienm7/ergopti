@@ -107,7 +107,7 @@ def select_owner(value, deadline, idle_timeout, maximum_bytes):
             contract,
             asset,
         )
-    actual = binary.stat(follow_symlinks=False)
+    actual = os.stat(binary, follow_symlinks=False)
     expected = {
         "source_commit": asset["source_commit"],
         "binary_sha256": asset["binary_sha256"],
@@ -169,7 +169,7 @@ def select_alias_owner(
     )
     target = RUNTIME.owned_directory()
     binary = target / contract["binary_path"]
-    actual = binary.stat(follow_symlinks=False)
+    actual = os.stat(binary, follow_symlinks=False)
     if not stat.S_ISREG(actual.st_mode) or actual.st_uid != os.geteuid() or actual.st_mode & 0o022:
         raise POLICY.RuntimeRefusal("session")
     expected = {

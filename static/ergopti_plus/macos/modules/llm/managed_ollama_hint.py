@@ -79,7 +79,8 @@ def receive(
         host,
     )
     executable = directory / binary
-    observed = executable.stat(follow_symlinks=False)
+    # os.stat: the no-follow argument of Path.stat needs Python 3.10.
+    observed = os.stat(executable, follow_symlinks=False)
     if not stat.S_ISREG(observed.st_mode) or not observed.st_mode & 0o111:
         raise POLICY.RuntimeRefusal("metadata")
     progress()

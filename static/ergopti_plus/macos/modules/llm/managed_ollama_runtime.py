@@ -523,7 +523,7 @@ def create_session(deadline, port):
         POLICY.receipt(contract_bytes, catalogue_bytes, host, asset),
         deadline,
     )
-    identity = binary.stat(follow_symlinks=False)
+    identity = os.stat(binary, follow_symlinks=False)
     data = {
         "version": 1,
         "token": secrets.token_hex(32),

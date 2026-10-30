@@ -267,6 +267,14 @@
 			"repro": "npm run test:ollama-server-command"
 		},
 		{
+			"id": "js-macos-python-system-compat",
+			"ordinal": 348,
+			"name": "macOS and shared Python helpers run on Apple's system Python 3.9",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-python-system-compat.cjs"],
+			"repro": "node tools/test/test-macos-python-system-compat.cjs"
+		},
+		{
 			"id": "js-0334",
 			"ordinal": 349,
 			"name": "prompt editor bridge (shared frontend ↔ Windows host)",

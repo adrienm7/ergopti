@@ -518,3 +518,45 @@ helpers.describe("ignored-window cache lifecycle: start/stop ownership", functio
 		helpers.assert_true(f.state.secure_watcher_active == false)
 	end)
 end)
+
+helpers.describe("ignored-window cache lifecycle: an application that does not answer", function()
+	helpers.it("cache lifecycle: a focused-window read that timed out is not repeated for that application", function()
+		-- Field log 2026-10-30: one application that did not answer Accessibility
+		-- held the main thread 500 ms on each probe, 13 times that day.
+		local f = new_fixture()
+		local ns, front_pid = 0, 7001
+		f.scheduler.now_ns = function() return ns end
+		f.hs.application.frontmostApplication = function()
+			return { pid = function() return front_pid end }
+		end
+		local answer = f.hs.window.focusedWindow
+		f.hs.window.focusedWindow = function()
+			f.state.ax_reads = f.state.ax_reads + 1
+			ns = ns + 500 * 1e6
+			return nil
+		end
+		f.Utils.start_ignored_win_tracking(f.titles, f.patterns)
+		f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns)
+		helpers.assert_eq(f.state.ax_reads, 1, "the first read times out")
+		f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns)
+		helpers.assert_eq(f.state.ax_reads, 1, "the same front application is not asked again")
+		helpers.assert_nil(f.Utils.is_ignored_window(f.titles, f.patterns, f.state.now),
+			"the classification stays unknown while it is skipped")
+
+		front_pid = 7002
+		f.hs.window.focusedWindow = answer
+		f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns)
+		helpers.assert_eq(f.state.ax_reads, 2, "another front application is read at once")
+
+		front_pid = 7001
+		f.hs.window.focusedWindow = function()
+			f.state.ax_reads = f.state.ax_reads + 1
+			ns = ns + 500 * 1e6
+			return nil
+		end
+		f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns)
+		f.state.now = f.state.now + 31
+		f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns)
+		helpers.assert_eq(f.state.ax_reads, 4, "the backoff ends after its delay")
+	end)
+end)

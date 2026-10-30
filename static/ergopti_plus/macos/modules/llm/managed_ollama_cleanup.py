@@ -92,7 +92,7 @@ def verify_runtime(authority, deadline):
         deadline,
         **keywords,
     )
-    actual = binary.stat(follow_symlinks=False)
+    actual = os.stat(binary, follow_symlinks=False)
     if (
         str(binary) != authority["executable"]
         or str(actual.st_dev) != authority["session"]["device"]
