@@ -305,6 +305,19 @@ _HSDT_ConsumeToggleWritesItsLeaf() {
 Test("hotstring-delimiter-consume: a row of the submenu flips the consumption alone (PAR-8)",
 	_HSDT_ConsumeToggleWritesItsLeaf)
 
+; G.Show pumps messages: a dialog answered before the thread resumes is destroyed,
+; and reading G.Hwnd afterwards threw "Gui has no window" out of the menu click.
+_HSDT_AddDialogWaitsOnAHandleReadBeforeShow() {
+	Body := _DriverFuncBody("_HS_DelimAddCustom")
+	Read := InStr(Body, "DialogHwnd := G.Hwnd")
+	Shown := InStr(Body, "G.Show(")
+	Assert(Read > 0 && Read < Shown, "the handle is read before the dialog is shown")
+	Assert(InStr(Body, 'WinWaitClose("ahk_id " . DialogHwnd)') > 0, "and the wait uses it")
+	AssertEqual(0, InStr(Body, 'WinWaitClose("ahk_id " . G.Hwnd)'), "the Gui is never asked after Show")
+}
+Test("hotstring-delimiter-add-dialog: the wait survives a dialog answered at once (delimiter-add-destroyed-gui)",
+	_HSDT_AddDialogWaitsOnAHandleReadBeforeShow)
+
 Test("hotstring-delimiter-global-transaction-20260813: a toggle writes one leaf "
 	. "and publishes the strings after the writer",
 	_HSDT_ToggleWritesOnceThenPublishes)

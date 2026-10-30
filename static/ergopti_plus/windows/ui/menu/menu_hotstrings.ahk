@@ -620,10 +620,13 @@ _HS_DelimAddCustom() {
 	G.OnEvent("Close", (*) => G.Destroy())
 	G.OnEvent("Escape", (*) => G.Destroy())
 
+	; Read before Show: Show pumps messages, so the dialog can be answered before
+	; this thread resumes, and a destroyed Gui has no Hwnd left to wait on.
+	DialogHwnd := G.Hwnd
 	G.Show("Center AutoSize")
 	_HS_DelimAddGui := G
 	; Block until the GUI is closed (OK or Cancel)
-	try WinWaitClose("ahk_id " . G.Hwnd)
+	try WinWaitClose("ahk_id " . DialogHwnd)
 	finally _HS_DelimAddGui := ""
 
 	; A held native dialog cannot borrow its pre-pause menu admission.
