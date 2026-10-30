@@ -193,20 +193,20 @@ helpers.describe("linux daemon: output is the logical commit boundary", function
 		local delivery_at = match_path:find("delivery.ok == true", 1, true)
 		local commit_guard_at = match_path:find("if expansion_committed then", 1, true)
 		local metrics_at = match_path:find("keystats.record_hotstring(", 1, true)
-		local undo_at = match_path:find("_undoable = not parsed_output and {", 1, true)
+		-- The undo record's assignment, whatever guards its value (a key output
+		-- arms none); the reset in the failure branch assigns nil, never a table.
+		local undo_at = match_path:find("_undoable = [^\n]-{")
 		local apply_guard_at = match_path:find("if expansion_committed then",
 			(commit_guard_at or 0) + 1, true)
 		local apply_at = match_path:find("engine:apply_expansion(result)", 1, true)
 
-		for label, position in pairs({
-			delivery = delivery_at,
-			commit_guard = commit_guard_at,
-			metrics = metrics_at,
-			undo = undo_at,
-			apply_guard = apply_guard_at,
-			apply = apply_at,
-		}) do
-			helpers.assert_not_nil(position, label .. " must exist in the static expansion path")
+		-- Walked by name: a nil value drops its key from a table, so pairs() over
+		-- the positions never visited a lost locator and the order checks below
+		-- failed on a nil comparison instead of naming it.
+		local positions = { delivery = delivery_at, commit_guard = commit_guard_at, metrics = metrics_at,
+			undo = undo_at, apply_guard = apply_guard_at, apply = apply_at }
+		for _, label in ipairs({ "delivery", "commit_guard", "metrics", "undo", "apply_guard", "apply" }) do
+			helpers.assert_not_nil(positions[label], label .. " must exist in the static expansion path")
 		end
 		helpers.assert_true(delivery_at < commit_guard_at and commit_guard_at < metrics_at,
 			"metrics must be inside the success branch after delivery.ok")
