@@ -25,6 +25,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -216,7 +217,7 @@ _LLM_Menu_ProfileClonePresent() {
  */
 _LLM_Menu_PerAppProfileRows() {
 	global _LLM_Menu
-	overrides := _LLM_Menu["app_profile_overrides"]
+	overrides := _LLM_Menu[ConfigLeaf.APP_PROFILE_OVERRIDES]
 	; "Override active app with the currently-selected profile". Lazy
 	; closure so WinGetProcessName fires when the user clicks, not when
 	; the menu is built.
@@ -258,15 +259,15 @@ _LLM_Menu_AddOverrideForActiveApp() {
 
 _LLM_Menu_SetOverrideCandidate(Candidate, AppName) {
 	if !(Candidate is Map)
-			|| !(Candidate["app_profile_overrides"] is Map)
+			|| !(Candidate[ConfigLeaf.APP_PROFILE_OVERRIDES] is Map)
 		return false
-	Candidate["app_profile_overrides"][AppName] := Candidate["profile_id"]
+	Candidate[ConfigLeaf.APP_PROFILE_OVERRIDES][AppName] := Candidate["profile_id"]
 	return true
 }
 
 _LLM_Menu_ClearOverrideFor(app_name) {
 	global _LLM_Menu
-	overrides := _LLM_Menu["app_profile_overrides"]
+	overrides := _LLM_Menu[ConfigLeaf.APP_PROFILE_OVERRIDES]
 	if !(overrides is Map) or !overrides.Has(app_name)
 		return false
 	return LLM_Menu_CommitMutation("the application profile override removal",
@@ -275,7 +276,7 @@ _LLM_Menu_ClearOverrideFor(app_name) {
 }
 
 _LLM_Menu_ClearOverrideCandidate(Candidate, AppName) {
-	Overrides := Candidate["app_profile_overrides"]
+	Overrides := Candidate[ConfigLeaf.APP_PROFILE_OVERRIDES]
 	if !(Overrides is Map) || !Overrides.Has(AppName)
 		return false
 	Overrides.Delete(AppName)
@@ -425,8 +426,8 @@ _LLM_Menu_DeleteProfileCandidate(Candidate, ProfileId) {
 
 	OverrideKeys := []
 	Overrides := 0
-	if Candidate.Has("app_profile_overrides") {
-		Overrides := Candidate["app_profile_overrides"]
+	if Candidate.Has(ConfigLeaf.APP_PROFILE_OVERRIDES) {
+		Overrides := Candidate[ConfigLeaf.APP_PROFILE_OVERRIDES]
 		if !(Overrides is Map)
 			return false
 		for AppName, OverrideId in Overrides {
@@ -447,8 +448,8 @@ _LLM_Menu_DeleteProfileCandidate(Candidate, ProfileId) {
 
 _LLM_Menu_PruneOrphanProfileOverrides(MenuState) {
 	global LLM_PROFILE_BUILTIN_ORDER
-	if !(MenuState is Map) || !MenuState.Has("app_profile_overrides")
-			|| !(MenuState["app_profile_overrides"] is Map)
+	if !(MenuState is Map) || !MenuState.Has(ConfigLeaf.APP_PROFILE_OVERRIDES)
+			|| !(MenuState[ConfigLeaf.APP_PROFILE_OVERRIDES] is Map)
 			|| !MenuState.Has("user_profiles")
 			|| !(MenuState["user_profiles"] is Array)
 		return false
@@ -462,12 +463,12 @@ _LLM_Menu_PruneOrphanProfileOverrides(MenuState) {
 		Valid[Profile["id"]] := true
 	}
 	OrphanKeys := []
-	for AppName, ProfileId in MenuState["app_profile_overrides"] {
+	for AppName, ProfileId in MenuState[ConfigLeaf.APP_PROFILE_OVERRIDES] {
 		if !(ProfileId is String) || !Valid.Has(ProfileId)
 			OrphanKeys.Push(AppName)
 	}
 	for AppName in OrphanKeys
-		MenuState["app_profile_overrides"].Delete(AppName)
+		MenuState[ConfigLeaf.APP_PROFILE_OVERRIDES].Delete(AppName)
 	return OrphanKeys.Length > 0
 }
 

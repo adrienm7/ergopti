@@ -28,6 +28,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -1886,8 +1887,8 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		; This private mutation owns API fields only. Establish unchanged picker
 		; selections outside Critical; the ordinary publisher's no-change branch
 		; has exactly the two native Map assignments performed below.
-		if !(Stamp is Map) || !AppPicker_SelectionsEqual(Held["menu"].Get("disabled_apps", []),
-				CandidateMenu.Get("disabled_apps", []))
+		if !(Stamp is Map) || !AppPicker_SelectionsEqual(Held["menu"].Get(ConfigLeaf.DISABLED_APPS, []),
+				CandidateMenu.Get(ConfigLeaf.DISABLED_APPS, []))
 				|| !this.CandidateAdmitted(Capability, AdmissionFn)
 			return false
 		PreviousCritical := Critical("On")
@@ -1930,7 +1931,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			"lifecycle", Held["lifecycle"], "lifecycle_generation", Held["lifecycle_generation"],
 			"held", Held, "source", Candidate["source"], "bundle", Candidate["bundle"],
 			"llm", Llm, "models", Models, "entries", _LLM_Menu.Get("api_entries", 0),
-			"disabled_apps", _LLM_Menu.Get("disabled_apps", 0),
+			ConfigLeaf.DISABLED_APPS, _LLM_Menu.Get(ConfigLeaf.DISABLED_APPS, 0),
 			"lease_state", LeaseState, "lease_owners", LeaseState.owners,
 			"config_token", ConfigToken, "api_token", ApiToken, "locator_token", LocatorToken,
 			"refusals", Refusals, "refusal_key", RefusalKey,
@@ -1973,7 +1974,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			&& LLM_Defaults == Held["defaults"] && LLM_Defaults.Get("llm_backend", 0) == Held["default_backend"]
 			&& _LLM_Menu.Get("backend", 0) == Held["backend"] && _LLM_Menu.Get("api_entry_id", 0) == Held["active_id"]
 			&& _LLM_Menu.Get("api_entries", 0) == Stamp["entries"]
-			&& _LLM_Menu.Get("disabled_apps", 0) == Stamp["disabled_apps"]
+			&& _LLM_Menu.Get(ConfigLeaf.DISABLED_APPS, 0) == Stamp[ConfigLeaf.DISABLED_APPS]
 	}
 
 	_Held(Receipt) {
@@ -2125,7 +2126,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 					return false
 				if Path.Length >= 2 && Path[2] == "models" {
 					if Path.Length < 3 || (Path[3] == "selected"
-							&& (!(Record.NativeSection == "llm.models") || !(Record.NativeKey == "selected")))
+							&& (!(Record.NativeSection == ConfigKey.LLM_MODELS) || !(Record.NativeKey == "selected")))
 						return false
 				}
 				if Path.Length >= 2 && Path[2] == "api_entry_id"

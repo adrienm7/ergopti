@@ -19,6 +19,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -200,7 +201,7 @@ LLM_Menu_BuildSubmenu() {
 	if (_LLM_Menu["enabled"] and _LLM_Menu["backend"] == "ollama" and !_deps_ready) {
 		LoggerInfo("LLM", "Tray: showing 'Ollama not installed' warning row.")
 		WarningRows := MenuRenderer_TemplateRows("llm_install_warning_frame",
-			Map("llm_install_warning", _LLM_Menu_OnWarningInstallClick), Map(), Map())
+			Map(MenuCommand.LLM_INSTALL_WARNING, _LLM_Menu_OnWarningInstallClick), Map(), Map())
 		if !(WarningRows is Array)
 			throw Error("Declared backend installation warning was refused.")
 	}

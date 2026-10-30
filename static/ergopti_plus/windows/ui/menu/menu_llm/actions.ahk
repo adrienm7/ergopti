@@ -28,6 +28,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -220,7 +221,7 @@ _LLM_Menu_ResumeAfterRefusedReload(RequestedGeneration, *) {
 LLM_Menu_OnInstantToggle(*) {
 	return LLM_Menu_CommitMutation("the instant-on-word-end setting",
 		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate,
-			"instant_on_word_end"), _LLM_Menu_ApplyStandardCommitted)
+			ConfigLeaf.INSTANT_ON_WORD_END), _LLM_Menu_ApplyStandardCommitted)
 }
 
 /**
@@ -261,10 +262,10 @@ _LLM_Menu_PrivacyWrite(Expected, Key, Path, Updates, WriterFn := 0) {
 	if !Decision["admitted"]
 			|| !_LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
 		return false
-	NativeKey := Key == "disable_url_bars" ? "url_bar_filter_enabled" : "secure_filter_enabled"
+	NativeKey := Key == "disable_url_bars" ? ConfigLeaf.URL_BAR_FILTER_ENABLED : ConfigLeaf.SECURE_FILTER_ENABLED
 	Owned := []
 	for Update in Updates {
-		if Update.Section == "llm.trigger" && Update.Key == NativeKey
+		if Update.Section == ConfigKey.LLM_TRIGGER && Update.Key == NativeKey
 			Owned.Push(Update)
 	}
 	if Owned.Length != 1
@@ -488,7 +489,7 @@ LLM_Menu_SetN(n) {
 /** Publishes one Info Bar value through the existing leased transaction. */
 LLM_Menu_SetInfoBar(Value, Expected) {
 	return LLM_Menu_CommitMutation("the LLM Info Bar setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "show_info_bar", Value),
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, ConfigLeaf.SHOW_INFO_BAR, Value),
 		_LLM_Menu_ApplyStandardCommitted, _LLM_Menu_InfoBarWrite.Bind(Expected))
 }
 
@@ -500,7 +501,7 @@ _LLM_Menu_InfoBarWrite(Expected, Path, Updates, WriterFn := 0) {
 		return false
 	Owned := []
 	for Update in Updates {
-		if Update.Section == "llm.display" && Update.Key == "show_info_bar"
+		if Update.Section == ConfigKey.LLM_DISPLAY && Update.Key == ConfigLeaf.SHOW_INFO_BAR
 			Owned.Push(Update)
 	}
 	if Owned.Length != 1
@@ -518,7 +519,7 @@ _LLM_Menu_InfoBarWrite(Expected, Path, Updates, WriterFn := 0) {
 LLM_Menu_SetIndent(lvl, Expected := 0) {
 	Writer := Expected is Map ? _LLM_Menu_IndentWrite.Bind(Expected) : 0
 	return LLM_Menu_CommitMutation("the LLM indentation setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "pred_indent", lvl),
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, ConfigLeaf.PRED_INDENT, lvl),
 		_LLM_Menu_ApplyStandardCommitted, Writer)
 }
 
@@ -530,7 +531,7 @@ _LLM_Menu_IndentWrite(Expected, Path, Updates, WriterFn := 0) {
 		return false
 	Owned := []
 	for Update in Updates {
-		if Update.Section == "llm.display" && Update.Key == "pred_indent"
+		if Update.Section == ConfigKey.LLM_DISPLAY && Update.Key == ConfigLeaf.PRED_INDENT
 			Owned.Push(Update)
 	}
 	if Owned.Length != 1
@@ -564,7 +565,7 @@ LLM_Menu_OpenAppPicker() {
 		"title",    t("menu.llm.exclude_from_ai"),
 		"prompt",   t("dialog.llm.exclude_prompt"),
 		"ok_label", t("dialog.llm.exclude_ok"),
-		"initial",  _LLM_Menu["disabled_apps"],
+		"initial",  _LLM_Menu[ConfigLeaf.DISABLED_APPS],
 		"on_save",  LLM_Menu_OnAppPickerSave
 	))
 }

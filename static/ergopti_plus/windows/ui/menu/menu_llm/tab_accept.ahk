@@ -30,12 +30,13 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 LLM_Menu_CommitNavModifier(Key, Raw, CommitFn := 0, ApplyFn := 0,
 		RejectFn := 0, TransactionPort := 0) {
-	if !(Key == "nav_modifiers" || Key == "val_modifiers")
+	if !(Key == ConfigLeaf.NAV_MODIFIERS || Key == ConfigLeaf.VAL_MODIFIERS)
 		return false
-	Context := Key == "nav_modifiers"
+	Context := Key == ConfigLeaf.NAV_MODIFIERS
 		? "the LLM navigation-modifier setting"
 		: "the LLM validation-modifier setting"
 	if !(Raw is String) || !LLM_Menu_IsValidModifierString(Raw) {
