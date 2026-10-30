@@ -3736,7 +3736,7 @@
 	"menu.layout.number_row_digits": "Tal først",
 	"menu.layout.number_row_symbols": "Symboler først",
 	"platform_reason.number_row_override_unsupported": "Kun Windows: på dette system skriver det installerede systemlayout talrækken; kun Windows, der emulerer layoutet, sætter tal eller symboler først.",
-	"platform_reason.number_row_live_session": "Ikke tilgængelig: Kun en X11-session anvender dette med det samme. Denne session beholder sit nuværende layout; dit valg er gemt.",
+	"platform_reason.number_row_live_session": "Ikke tilgængelig: Kun en X11-session eller GNOME eller KDE på Wayland anvender dette med det samme. Dette skrivebord beholder sit nuværende layout; dit valg er gemt.",
 	"platform_reason.number_row_live_no_layout": "Ikke tilgængelig: Installer først et ErgoptiPlus-layout; dette valg ændrer det layout, du bruger.",
 	"layouts.linux_rows_not_applied": "Valget for talrækken er gemt, men det aktive tastaturlayout kunne ikke opdateres.",
 	"platform_reason.number_row_source_unavailable": "Ikke tilgængelig: Symboler først kræver et aktivt emuleret layout med gyldige tal- og symbolniveauer på alle positioner i talrækken.",

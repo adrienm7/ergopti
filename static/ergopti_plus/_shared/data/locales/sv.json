@@ -3736,7 +3736,7 @@
 	"menu.layout.number_row_digits": "Siffror först",
 	"menu.layout.number_row_symbols": "Symboler först",
 	"platform_reason.number_row_override_unsupported": "Endast Windows: på det här systemet skriver den installerade systemlayouten sifferraden; bara Windows, som emulerar layouten, sätter siffror eller symboler först.",
-	"platform_reason.number_row_live_session": "Inte tillgängligt: Bara en X11-session tillämpar detta direkt. Den här sessionen behåller sin nuvarande layout; ditt val är sparat.",
+	"platform_reason.number_row_live_session": "Inte tillgängligt: Bara en X11-session, eller GNOME eller KDE på Wayland, tillämpar detta direkt. Det här skrivbordet behåller sin nuvarande layout; ditt val är sparat.",
 	"platform_reason.number_row_live_no_layout": "Inte tillgängligt: Installera först en ErgoptiPlus-layout; det här valet ändrar den layout du använder.",
 	"layouts.linux_rows_not_applied": "Valet för siffraden är sparat, men den aktiva tangentbordslayouten kunde inte uppdateras.",
 	"platform_reason.number_row_source_unavailable": "Inte tillgängligt: Symboler först kräver en aktiv emulerad layout med giltiga siffer- och symbolnivåer på varje plats i sifferraden.",
