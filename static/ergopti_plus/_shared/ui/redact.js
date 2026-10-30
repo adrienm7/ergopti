@@ -46,7 +46,8 @@
 	var CHARSETS = {
 		alnum: /^[A-Za-z0-9]$/,
 		word: /^[A-Za-z0-9_]$/,
-		word_dash: /^[A-Za-z0-9_-]$/
+		word_dash: /^[A-Za-z0-9_-]$/,
+		jwt: /^[A-Za-z0-9_.-]$/
 	};
 
 	// A character that continues an identifier: a match next to one is part of a

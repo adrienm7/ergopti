@@ -1707,13 +1707,6 @@ Maintainer requests of 2026-10-30 (Windows, macOS and Linux each):
       went wrong". Check the generated `issues/new` URL (length limit, query encoding, template or label
       names) and fix it on the three OS.
 
-Still true in the code on 2026-10-29, carried from the retired 2026-10-04 Linux handoff audit:
-
-- [ ] **Stateless GitHub installation tokens are not redacted.** [CODE] The `ghs_` rule of
-      `_shared/modules/diagnostics/redaction.json` allows only an alphanumeric body, so a
-      `ghs_<app-id>_<jwt>` token stays visible in diagnostics on every OS. Widen the charset and add a
-      `redaction_vectors.json` case (Lua, JS and AHK consumers replay it).
-
 Added October 22 (from the agents' reports; details in their commits):
 
 - [ ] **macOS swallowed-keys check on v1.0.6.** [PHYS-M] The fixes (03a2c2fa4b, d026f3e024,
