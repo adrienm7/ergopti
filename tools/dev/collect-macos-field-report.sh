@@ -103,6 +103,8 @@ field_report_enter_branch mac
 
 field_report_update_from_base "${REPO_ROOT}/tools/dev/collect-macos-field-report.sh" "$@"
 field_report_open_folder mac
+# The crash report summaries keep the reports written from here on.
+run_started_epoch="$(date +%s)"
 # Set by the INT/TERM trap; the remaining evidence is still collected.
 interrupted=false
 finalized=false
@@ -489,6 +491,13 @@ step native_runtime sh -c '
 	printf "== kernel and code-signing kills of the last 30 minutes\n"
 	log show --last 30m --style compact --predicate "(process == \"kernel\" OR sender == \"AppleMobileFileIntegrity\") AND (eventMessage CONTAINS[c] \"code sign\" OR eventMessage CONTAINS[c] \"killed\" OR eventMessage CONTAINS[c] \"cs_invalid\" OR eventMessage CONTAINS[c] \"memorystatus\")" 2>&1 | tail -60
 ' native_runtime "${native_root}"
+
+# The app's own crash reports of this run (the 2026-10-30 runs left
+# ErgoptiPlus .ips files with no cause in the report): process, exception,
+# signal, termination and the faulting thread's frames of the app's own
+# images, scrubbed of paths and user data (tools/dev/field-ips-summary.py).
+step crash_summaries python3 "${REPO_ROOT}/tools/dev/field-ips-summary.py" --since "${run_started_epoch}" \
+	"${HOME}/Library/Logs/DiagnosticReports"
 
 # The native PTY guardian runs its installer as /bin/bash /dev/fd/3 over an
 # unlinked copy. On the 2026-10-27 runs that bash was killed by SIGKILL about
