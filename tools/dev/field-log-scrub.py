@@ -50,6 +50,10 @@ WITHHELD = tuple(
         # The selection the shortcut acted on: a path, a URL or any selected text.
         r"(?P<head>\b(?:Opening|Handed) the selected \w+ )'.*'(?P<tail>(?:…| to the shell\.).*)$",
         r"(?P<head>Registry navigation to )'.*'(?P<tail> did not .*)$",
+        # Linux: every expansion's replacement, logged at TRACE (written by
+        # default) without its trigger. To the end of the line: a replacement
+        # may itself hold a quote or a line break.
+        r"(?P<head>\binject\(\): bc=\d+ text=)'.*(?P<tail>)$",
         # Linux: the replacement refused by the injector, the typed symbol.
         r"(?P<head>\bCannot deliver )'.*'(?P<tail> (?:before|—) .*)$",
         r"(?P<head>selection window opened — typing )'.*'(?P<tail>\.)$",
