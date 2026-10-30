@@ -27,6 +27,8 @@ local LOG    = "menu_state"
 local KEYSTATS_START_DELAY_SEC = 0.5
 local _keystats_start_generation = 0
 local _keystats_start_pending = false
+-- Milliseconds the last deferred keystats start held the main thread, nil before one.
+local _keystats_start_ms = nil
 
 --- Reports boot activation that has not reached the native lifecycle owner.
 --- @return boolean pending True until the current deferred start settles.
@@ -65,6 +67,13 @@ local clone_value = TableUtil.deep_copy_with_keys
 --- @param deps table Dependency bag: { keymap, gestures, hotstring_editor, core_mods, apply_llm_enabled, on_runtime_demotion }.
 --- @return boolean committed True only when every feature applied.
 --- @return table report { failures, demotions, unsettled, repairs } per feature.
+--- How long the last deferred keystats start held the main thread: the field
+--- run names it, since that start once held it 1.1 to 1.3 s (ledger L18).
+--- @return number|nil milliseconds Nil before the first start.
+function M.keystats_start_ms()
+	return _keystats_start_ms
+end
+
 function M.sync_state_to_modules(state, saved, config_absent, deps)
 	if config_absent then
 		error("sync_state_to_modules never persists; seed config.toml after the save transaction exists", 2)
@@ -552,8 +561,8 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 					end
 				end
 				_keystats_start_pending = false
-				Logger.info(LOG, "Keystats engine start (deferred): %.1f ms.",
-					(hs.timer.secondsSinceEpoch() - _t_kl) * 1000)
+				_keystats_start_ms = (hs.timer.secondsSinceEpoch() - _t_kl) * 1000
+				Logger.info(LOG, "Keystats engine start (deferred): %.1f ms.", _keystats_start_ms)
 			end
 			local scheduled = DeferredWork.after(KEYSTATS_START_DELAY_SEC, activate, "menu_state.keystats_start")
 			scheduling = false

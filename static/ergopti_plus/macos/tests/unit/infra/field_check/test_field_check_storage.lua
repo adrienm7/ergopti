@@ -53,6 +53,7 @@ local function make_ports()
 		log_facts = function() return world.logs end,
 		watcher_owners = function() return world.owners end,
 		keystats_database = function() return world.database end,
+		keystats_start_ms = function() return world.keystats_start_ms end,
 	}
 	return ports, world
 end
@@ -77,6 +78,16 @@ local function run(ports)
 end
 
 helpers.describe("storage probe", function()
+	helpers.it("(keystats-start-ms) names how long the deferred keystats start held the main thread", function()
+		local ports, world = make_ports()
+		world.keystats_start_ms = 87.4
+		local steps = run(ports)
+		helpers.assert_eq(steps.keystats_start_ms.state, "info")
+		helpers.assert_eq(steps.keystats_start_ms.value, "87", "ledger L18 asks for under 100 ms")
+		world.keystats_start_ms = nil
+		helpers.assert_eq(run(ports).keystats_start_ms.value, "not_started")
+	end)
+
 	helpers.it("passes a healthy database, parsing files, writable logs and owned watchers", function()
 		local ports, world = make_ports()
 		local steps, result = run(ports)
