@@ -960,6 +960,22 @@ hotpath_slow_ms = 5
 # process_runner.lua.
 default_timeout_ms = 30000
 
+# macOS: how long an application whose focused window did not answer
+# Accessibility within the messaging timeout is not asked again, unless another
+# application comes to the front. Each unanswered read holds the main thread
+# for the whole timeout (field log 2026-10-30: 13 holds of 500 ms on one app).
+# HS: modules/keymap/utils.lua UNRESPONSIVE_AX_BACKOFF_SEC.
+unresponsive_ax_backoff_ms = 30000
+
+# macOS: the shortest interval between two full shortcut rebinds that a
+# refused shortcut retry asks for. A layout switch can leave a static chord
+# resolved with the previous layout on the key a configurable chord needs
+# (field log 2026-10-30: Ctrl+G held keycode 5, the Ergopti '.', for 11
+# minutes); only a full rebind moves it, and this bound keeps a chord macOS
+# itself holds from rebinding forever.
+# HS: modules/shortcuts/keyboard_shortcuts.lua FULL_REBIND_MIN_INTERVAL_SEC.
+shortcut_full_rebind_min_interval_ms = 60000
+
 # Linux: how long the window switch worker sleeps between two polls of its queue.
 # LX: platform/window_switch_worker.lua.
 window_switch_worker_sleep_ms = 10
