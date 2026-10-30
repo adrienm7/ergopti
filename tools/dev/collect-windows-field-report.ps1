@@ -266,6 +266,7 @@ if ((Get-Git rev-parse HEAD) -ne $Before) {
 	$Rerun = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath)
 	if ($NoPush) { $Rerun += '-NoPush' }
 	if ($LogsDir) { $Rerun += @('-LogsDir', $LogsDir) }
+	if ($ConfigDir) { $Rerun += @('-ConfigDir', $ConfigDir) }
 	& (Get-Process -Id $PID).Path @Rerun
 	exit $LASTEXITCODE
 }
