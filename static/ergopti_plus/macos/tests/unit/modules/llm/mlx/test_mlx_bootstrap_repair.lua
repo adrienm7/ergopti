@@ -42,7 +42,7 @@ local OWNED = {
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.mlx_repair_offer",
 	"adapters.python_interpreter", "ui.python_runtime_offer",
 	"adapters.file_system", "modules.llm.network_env", "modules.llm.opaque_network_admission",
-	"adapters.native_bootstrap_pty",
+	"adapters.native_bootstrap_pty", "ui.menu.menu_llm",
 }
 
 -- The closing lines ensure-mlx-deps.sh prints after any failed uv sync: they
@@ -290,6 +290,14 @@ local function load_world(world)
 		spawn = function(executable, args)
 			world.spawns[#world.spawns + 1] = { executable = executable, args = args }
 			return { start = function() return true end }
+		end,
+	}
+	world.server_stops = {}
+	package.loaded["ui.menu.menu_llm"] = {
+		stop_mlx_server = function(on_settled)
+			world.server_stops[#world.server_stops + 1] = on_settled
+			if not world.defer_server_stop then on_settled(true, "mlx-listener-absent") end
+			return true
 		end,
 	}
 	local router = require("ui.menu.menu_llm.runtime_install_offer")
@@ -641,6 +649,35 @@ helpers.describe("A runtime whose import probe failed is repaired, never reused 
 		drain(world)
 		helpers.assert_eq(resumed, 1, "a repaired runtime restarts the model it could not load")
 		helpers.assert_eq(#world.dialogs, 1, "a success offers nothing more")
+	end))
+
+	helpers.it("stops the running MLX server before the repair removes its runtime (mlx-repair-stops-server)", scoped(function()
+		-- Field log 2026-10-30 01:18: a server started 4 s before the repair
+		-- crashed with ModuleNotFoundError while the venv was being removed.
+		local world = new_world({ installed = true })
+		local checker, _, offer = load_world(world)
+		speak("fr")
+		local cause = { kind = "import_failed", repairable = true, line = "ModuleNotFoundError" }
+		helpers.assert_true(checker.invalidate_runtime(cause))
+		world.defer_server_stop = true
+		helpers.assert_true(offer.repair())
+		helpers.assert_eq(#world.server_stops, 1, "the repair asks the MLX server to stop")
+		helpers.assert_eq(#world.tasks, 0, "nothing is removed while the server may still run")
+		world.server_stops[1](true, "mlx-listener-absent")
+		helpers.assert_eq(#world.tasks, 1, "the repair starts once the server stopped")
+		helpers.assert_true(world.tasks[1].command():find("ERGOPTI_MLX_REPAIR=1", 1, true) ~= nil)
+	end))
+
+	helpers.it("refuses the repair when the MLX server does not stop", scoped(function()
+		local world = new_world({ installed = true })
+		local checker, _, offer = load_world(world)
+		speak("fr")
+		helpers.assert_true(checker.invalidate_runtime({ kind = "import_failed", repairable = true }))
+		world.defer_server_stop = true
+		helpers.assert_true(offer.repair())
+		world.server_stops[1](false, "mlx-listener-cleanup-refused")
+		helpers.assert_eq(#world.tasks, 0, "a live server keeps its runtime")
+		helpers.assert_true(table.concat(world.errors, " | "):find("did not stop", 1, true) ~= nil)
 	end))
 end)
 
