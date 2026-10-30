@@ -1,0 +1,17 @@
+{
+	"_comment": "The official Go archives the macOS developer app installs when no go is on PATH (tools/dev/stage-macos-dev-ollama-catalogue.py). version must equal go_version in _shared/modules/llm/managed_ollama_runtime.json; bumping it means copying the two darwin archive digests and sizes from https://go.dev/dl/?mode=json&include=all.",
+	"version": "go1.26.8",
+	"url": "https://dl.google.com/go/{filename}",
+	"archives": {
+		"arm64": {
+			"filename": "go1.26.8.darwin-arm64.tar.gz",
+			"sha256": "a012b25b571bd0138a03dcd25375ceba866fe5ca822f426d2c66a4de56fd3f4b",
+			"size": 64626620
+		},
+		"x86_64": {
+			"filename": "go1.26.8.darwin-amd64.tar.gz",
+			"sha256": "186be014105aa6542b767d2c6ed5cca10a0214bdff809ef1724022a8c7894150",
+			"size": 67759394
+		}
+	}
+}
