@@ -164,7 +164,11 @@ function M.resolve_target(backend, model)
 	if not Remote.serves(backend, "vision") then return nil, "the provider " .. backend .. " reads no image" end
 	local entry = M.entry_for(backend)
 	if not entry then return nil, "no API key is stored for " .. backend end
-	return Remote.endpoint(entry, model)
+	local target, reason = Remote.endpoint(entry, model)
+	if not target then return nil, reason end
+	-- send() completes the body for this provider and model (thinking off)
+	target.provider, target.model = backend, model
+	return target, nil
 end
 
 
@@ -194,6 +198,9 @@ end
 --- @param on_done function
 --- @return boolean dispatched
 function M.send(target, body, on_done)
+	if target.format ~= LOCAL_FORMAT then
+		require("modules.llm.api_remote").complete_body(target.provider, target.model, body)
+	end
 	local encoded = Json.encode(body)
 	if type(encoded) ~= "string" then
 		Logger.error(LOG, "Vision request could not be encoded.")

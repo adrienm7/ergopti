@@ -46,6 +46,7 @@ local Monotonic = require("infra.monotonic")
 local Formats = require("llm.remote_formats")
 local Classifier = require("llm.remote_response_classifier")
 local AuthPolicy = require("llm.local_server_auth")
+local ThinkingOff = require("llm.thinking_off")
 local ApiModelListing = require("llm.api_model_listing")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local ProviderConfig = require("llm.provider_config_policy")
@@ -167,8 +168,14 @@ function M.parse_catalogue(text)
 	end
 	for _, id in ipairs(root.provider_order) do
 		local desc = type(id) == "string" and root.providers[id] or nil
+		local thinking_off, thinking_reason = nil, nil
+		if type(desc) == "table" then thinking_off, thinking_reason = ThinkingOff.parse(desc.thinking_off) end
 		if catalogue.providers[id] then
 			Logger.warn(LOG, "api_providers.json: provider '%s' is listed twice; the first is kept.", id)
+		elseif descriptor_is_valid(id, desc) and not thinking_off then
+			-- A half-read rule list would let some models think: refuse the provider whole
+			Logger.error(LOG, "api_providers.json: providers.%s.thinking_off is invalid (%s) — skipped.",
+				tostring(id), tostring(thinking_reason))
 		elseif descriptor_is_valid(id, desc) then
 			catalogue.providers[id] = {
 				id = id,
@@ -177,6 +184,7 @@ function M.parse_catalogue(text)
 				default_model = desc.default_model,
 				format = desc.format,
 				model_extras = normalize_model_extras(desc.model_extras),
+				thinking_off = thinking_off,
 			}
 			catalogue.order[#catalogue.order + 1] = id
 		else
@@ -210,7 +218,7 @@ local function catalogue()
 	for _, id in ipairs(order) do
 		local desc = servers[id]
 		_catalogue.providers[id] = { id = id, label = desc.label, base_url = desc.base_url,
-			default_model = "", format = "openai", model_extras = {}, request_fields = request_fields }
+			default_model = "", format = "openai", model_extras = {}, thinking_off = {}, request_fields = request_fields }
 		_catalogue.order[#_catalogue.order + 1] = id
 	end
 	return _catalogue
@@ -415,6 +423,24 @@ local function split_messages(messages)
 	return system, user
 end
 
+--- Completes a request body for a provider: a local server's request_fields
+--- of local_servers.json (OpenAI shape), then the provider's thinking_off
+--- rules of api_providers.json. A field the body already sets wins.
+--- @param provider_id string
+--- @param model string The model the request names.
+--- @param body table The request body, changed in place.
+--- @return table body
+function M.complete_body(provider_id, model, body)
+	local provider = M.provider(provider_id)
+	if not provider then error("api_remote.complete_body: unknown provider " .. tostring(provider_id), 2) end
+	if provider.format == "openai" then AuthPolicy.apply_request_fields(body, provider.request_fields) end
+	local index = ThinkingOff.apply(provider.thinking_off, model, body)
+	if index then
+		Logger.debug(LOG, "Thinking off: provider '%s' rule %d applies to model %s.", provider_id, index, model)
+	end
+	return body
+end
+
 --- Builds one chat completion request for an entry (openai, anthropic and
 --- gemini formats; Backboard's two-step exchange is chat()'s own).
 --- @param entry table { provider, base_url?, model?, token }
@@ -454,13 +480,12 @@ function M.build_request(entry, messages, opts)
 		if system ~= "" then sent[#sent + 1] = { role = "system", content = system } end
 		sent[#sent + 1] = { role = "user", content = user }
 		payload = { model = model, messages = sent, temperature = temperature, max_tokens = max_tokens, stream = false }
-		-- Per-model fields from the catalogue (Cerebras' qwen reasons at length
-		-- unless told not to), never restated here.
+		-- Per-model fields from the catalogue, never restated here.
 		for field, value in pairs(provider.model_extras[model] or {}) do payload[field] = value end
-		-- A local server also gets the shared local_servers.json request
-		-- fields (thinking off), never over a field already set.
-		AuthPolicy.apply_request_fields(payload, provider.request_fields)
 	end
+	-- Reasoning off for every format: a local server's request fields, then
+	-- the provider's thinking_off rules, never over a field already set.
+	M.complete_body(entry.provider, model, payload)
 	local body = Json.encode(payload)
 	if type(body) ~= "string" then return nil, "request could not be encoded" end
 	return { url = endpoint.url, headers = endpoint.headers, body = body, format = provider.format, model = model }

@@ -349,7 +349,8 @@
 				"options": {
 					"num_predict": 1200
 				},
-				"stream": false
+				"stream": false,
+				"think": false
 			},
 			"format": "ollama",
 			"id": "ollama_image",
@@ -378,7 +379,8 @@
 				"options": {
 					"num_predict": 600
 				},
-				"stream": false
+				"stream": false,
+				"think": false
 			},
 			"format": "ollama",
 			"id": "ollama_text",
