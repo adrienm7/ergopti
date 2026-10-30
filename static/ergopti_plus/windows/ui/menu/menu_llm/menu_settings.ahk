@@ -1015,8 +1015,8 @@ LLM_Menu_TestPrediction(SendFn := 0) {
 	Generation := _LLM_Menu_TestPredictionGeneration
 	LoggerStart("LLM", "Test prediction #{1} sent to the active backend.", Generation)
 	_LLM_Menu_ShowManualPredictionNotice("llm.test_prediction.running")
-	Send := HasMethod(SendFn, "Call") ? SendFn : _LLM_Menu_TestPredictionSend
-	try Send.Call(Sample, _LLM_Menu_OnTestPredictionAnswer.Bind(Generation),
+	Transport := HasMethod(SendFn, "Call") ? SendFn : _LLM_Menu_TestPredictionSend
+	try Transport.Call(Sample, _LLM_Menu_OnTestPredictionAnswer.Bind(Generation),
 		_LLM_Menu_OnTestPredictionFailure.Bind(Generation), _LLM_Menu_TestPredictionIsCurrent.Bind(Generation))
 	catch as Err {
 		_LLM_Menu_OnTestPredictionFailure(Generation, Map("reason", Err.Message))
