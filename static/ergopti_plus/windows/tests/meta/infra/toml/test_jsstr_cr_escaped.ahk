@@ -16,10 +16,8 @@
 ; over a hand-written list covers whatever someone remembered; this one discovers
 ; its subjects, so the next helper is covered the day it lands.
 ;
-; ESCAPING NOTE: AHK v2 treats the backtick as the string-escape character
-; regardless of quote style, so producing a literal backtick at RUNTIME in
-; this test's own string constants requires a DOUBLED backtick in source —
-; that is what the two-backtick sequences below encode.
+; The source scan only names the subjects: each helper is then called, so a helper
+; that escapes through any route passes and one that deletes fails.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -42,16 +40,11 @@ _MetaJsStr_AllHelperNames() {
 }
 
 _MetaJsStrEscapesCr(FuncName) {
-	Body := _DriverFuncBody(FuncName)
-	; OLD deleting pattern: StrReplace(s, "`r", "") — must be gone.
-	Assert(!InStr(Body, '"``r", ""'),
-		FuncName . " must not silently DELETE carriage returns: the character vanishes from the injected JS string and the user sees two lines joined, with nothing logged")
-	; A helper may either perform the exact escape locally or delegate to the
-	; shared JSON string encoder whose behavior is covered by a round-trip test.
-	Delegates := InStr(Body, "JsonStringLiteral(") > 0
-	EscapesLocally := InStr(Body, '"``r", "\r"') > 0
-	Assert(Delegates or EscapesLocally,
-		FuncName . " must delegate to JsonStringLiteral or escape carriage returns to the two-character sequence backslash-r")
+	Literal := %FuncName%("first" . Chr(13) . "second")
+	Assert(InStr(Literal, Chr(13)) == 0,
+		FuncName . " must not leave a raw carriage return in the injected JS string")
+	Assert(InStr(Literal, "first" . Chr(92) . "rsecond") > 0,
+		FuncName . " must escape a carriage return to backslash-r, not delete it: the user would see two lines joined, with nothing logged. Got " . Literal)
 }
 
 _MetaJsStr_EveryHelperEscapesCr() {

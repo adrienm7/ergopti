@@ -79,6 +79,24 @@ helpers.describe("HS-119 Ollama provisioning and daemon verdicts", function()
 		helpers.assert_eq(fixture.checker.get_daemon_failure_message(), nil)
 	end)
 
+	helpers.it("waits for the pending runtime metadata before starting the daemon", function()
+		-- Field run 2026-10-30 16:29: the first read after the install was
+		-- pending and the daemon start was refused at once.
+		local fixture = load_fixture({ backend = "ollama", metadata_pending_reads = 2 })
+		helpers.assert_true(fixture.checker.check_and_install_deps())
+
+		fixture.tasks[1]:complete(0, "", "")
+		helpers.assert_eq(fixture.daemon_calls, 0, "no daemon start while the metadata is pending")
+		for _ = 1, 10 do
+			if fixture.daemon_calls > 0 then break end
+			for _, timer in ipairs(fixture.timers) do timer:fire() end
+		end
+
+		helpers.assert_eq(fixture.daemon_calls, 1)
+		helpers.assert_eq(fixture.metadata_reads, 3)
+		helpers.assert_eq(fixture.checker.get_daemon_state(), "ready")
+	end)
+
 	helpers.it("keeps daemon verdict pending when dependency provisioning fails", function()
 		local fixture = load_fixture({ backend = "ollama" })
 		helpers.assert_true(fixture.checker.check_and_install_deps())
