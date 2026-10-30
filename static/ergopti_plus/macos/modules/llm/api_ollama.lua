@@ -1240,6 +1240,8 @@ local MAX_LOGGED_SERVER_ERROR = 300
 -- owners cannot publish an older inventory over a newer or forgotten receipt.
 local _listed_models = nil
 local _model_listing_epoch = 0
+-- Consecutive failed model-list reads of the current outage.
+local _listing_failures = 0
 -- Chat and vision share one HTTP owner; an inventory refresh has a different one.
 local _prebuilt_request_epoch = 0
 
@@ -1321,8 +1323,16 @@ local function list_models(client, on_done, origin, service_current)
 			if r.status ~= 200 then
 				local server_error = server_error_text(r)
 				if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
-				Logger.error(LOG, "The local server's model list is unavailable: HTTP %s (%s).",
-					tostring(r.status), server_error)
+				-- One line per outage: every poll while the daemon is down used to log
+				-- the same error (field log 2026-10-30 17:37: 20 lines in 38 s).
+				_listing_failures = _listing_failures + 1
+				if _listing_failures == 1 then
+					Logger.error(LOG, "The local server's model list is unavailable: HTTP %s (%s).",
+						tostring(r.status), server_error)
+				else
+					Logger.debug(LOG, "The local server's model list is still unavailable (read %d): HTTP %s.",
+						_listing_failures, tostring(r.status))
+				end
 				if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
 				on_done(nil, "http_" .. tostring(r.status or "unknown"))
 				return
@@ -1346,6 +1356,11 @@ local function list_models(client, on_done, origin, service_current)
 			end
 			receipt.models = names
 			_listed_models = receipt
+			if _listing_failures > 0 then
+				Logger.info(LOG, "The local server's model list is available again after %d failed read(s).",
+					_listing_failures)
+				_listing_failures = 0
+			end
 			Logger.debug(LOG, "The local server returned a readable model list.")
 			if _listed_models ~= receipt or not listing_current(receipt) or _listed_models ~= receipt then
 				on_done(nil, "model_list_unavailable")
