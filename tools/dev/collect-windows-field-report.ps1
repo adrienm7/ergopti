@@ -224,6 +224,8 @@ if ($Branch -and $Branch.StartsWith($Names.branch_prefix)) {
 # field branch, so the update deepens both until the merge base is known; full
 # history is never downloaded. A base that is not a branch on origin (a local
 # branch or a commit) is not updated.
+$Before = Get-Git rev-parse HEAD
+if ($script:GitStatus -ne 0) { Fail 'Cannot read HEAD.' }
 $null = Get-Git ls-remote '--exit-code' '--heads' origin $Base
 if ($script:GitStatus -eq 0) {
 	Log "Fetching $Base and bringing it into $Branch..."
@@ -243,6 +245,20 @@ if ($script:GitStatus -eq 0) {
 	}
 } else {
 	Log "$Base is not a branch on origin: $Branch is not updated."
+}
+# PowerShell runs the version of this file it parsed at start, so when the
+# update moved the branch the updated collector runs instead; it finds HEAD
+# current and never reruns, the marker is a guard.
+if ((Get-Git rev-parse HEAD) -ne $Before) {
+	if ($env:ERGOPTI_FIELD_REPORT_RERUN) { Fail "The rerun moved $Branch again; run the collector again." }
+	Log "$Branch updated: running the updated collector."
+	$env:ERGOPTI_FIELD_REPORT_RERUN = '1'
+	# -File takes plain arguments, not the "-Name:value" form of a splat.
+	$Rerun = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath)
+	if ($NoPush) { $Rerun += '-NoPush' }
+	if ($LogsDir) { $Rerun += @('-LogsDir', $LogsDir) }
+	& (Get-Process -Id $PID).Path @Rerun
+	exit $LASTEXITCODE
 }
 
 $Stamp = Get-Date -Format 'yyyy-MM-dd_HHmmss'

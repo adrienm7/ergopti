@@ -20,9 +20,12 @@
 #    field branch, so the update deepens both until the merge base is known;
 #    full history is never downloaded. A base that is not a branch on origin
 #    (a local branch or a commit) is not updated.
-# 3. base.txt is written first: the coordinator reads which code the report
+# 3. When the update moves the branch, the collector runs again from the
+#    updated files: bash keeps executing the version it started with, so
+#    without the rerun a fix pushed to the base would only apply next time.
+# 4. base.txt is written first: the coordinator reads which code the report
 #    ran on before anything else.
-# 4. Only the report folder is committed, with `git add -f` because the logs
+# 5. Only the report folder is committed, with `git add -f` because the logs
 #    it holds are gitignored.
 #
 # Sourced only; defines functions and runs nothing. Bash 3.2 compatible: the
@@ -56,9 +59,13 @@ field_report_enter_branch() {
 	esac
 }
 
-# Brings the base from origin into the field branch (uses branch and base).
+# Brings the base from origin into the field branch (uses branch and base),
+# then runs the collector again when that moved the branch.
+# $1: the collector script; the remaining arguments are its own.
 field_report_update_from_base() {
-	local depth base_head
+	local script="$1" depth base_head before
+	shift
+	before="$(git rev-parse HEAD)" || fail "Cannot read HEAD."
 	if ! git ls-remote --exit-code --heads origin "${base}" >/dev/null 2>&1; then
 		log "${base} is not a branch on origin: ${branch} is not updated."
 		return 0
@@ -75,6 +82,11 @@ field_report_update_from_base() {
 	git merge --ff-only "${base_head}" >/dev/null 2>&1 \
 		|| git merge --no-edit "${base_head}" \
 		|| fail "Could not bring ${base} into ${branch}; resolve the merge and run again."
+	[ "$(git rev-parse HEAD)" != "${before}" ] || return 0
+	# The rerun finds HEAD current, so it never loops; the marker is a guard.
+	[ -z "${ERGOPTI_FIELD_REPORT_RERUN:-}" ] || fail "The rerun moved ${branch} again; run the collector again."
+	log "${branch} updated: running the updated collector."
+	ERGOPTI_FIELD_REPORT_RERUN=1 exec bash "${script}" "$@"
 }
 
 # Creates this run's report folder with an empty steps.txt and its base.txt.
