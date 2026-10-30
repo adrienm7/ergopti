@@ -890,6 +890,13 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 
 ## Backlog (one line each)
 
+- [ ] **Windows: a personal immediate `sru` -> `SRU` (priority 100) loses to the bundled `sru` -> `sur`.**
+      [CODE] [PHYS-W] Field report of 2026-10-30, section « metiers », whole word, not case-sensitive, final
+      result. The same entry wins on macOS. Static reading of the Windows path (priority 100 accepted, both
+      specs in `HSE_StarByTriggerCI`, `_HSE_Beats` by priority, no native registration) found no cause: get the
+      user's version, a diagnostic report right after typing `sru`, and the entry's line in
+      `personal_hotstrings.toml`. Since then the bundled `sru` waits for a terminator, which hides the symptom.
+
 - [ ] **macOS cold official-Ollama lane.** [CI] since bc09e4584c no product path calls the stock
       `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
       `runtime_install_offer.lua`), so the macOS "official cold Ollama without stock Python" lane only proves
