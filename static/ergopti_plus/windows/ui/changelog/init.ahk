@@ -27,6 +27,8 @@
 ;    posts restore_backup; the driver reloads on the restored configuration.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
+
 
 
 
@@ -81,8 +83,8 @@ global CHANGELOG_HOST_ACCESS_ALLOW := 1
 ; or throttle api.github.com. Mirrors release_sources in
 ; _shared/modules/updater/defaults.json (pinned by
 ; tools/test/test-changelog-network-resilience.cjs).
-global CHANGELOG_API_URL_TEMPLATE  := "https://api.github.com/repos/{owner}/{repo}/releases?per_page=20"
-global CHANGELOG_FEED_URL_TEMPLATE := "https://github.com/{owner}/{repo}/releases.atom"
+global CHANGELOG_API_URL_TEMPLATE  := "https://" . Identifiers.Hosts.GITHUB_API . "/repos/{owner}/{repo}/releases?per_page=20"
+global CHANGELOG_FEED_URL_TEMPLATE := "https://" . Identifiers.Hosts.GITHUB . "/{owner}/{repo}/releases.atom"
 global CHANGELOG_SOURCE_TIMEOUT_MS := 15000
 ; Share of the source budget allowed for DNS, proxy and TCP/TLS connection.
 global CHANGELOG_CONNECT_TIMEOUT_MS := 10000

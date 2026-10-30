@@ -239,7 +239,8 @@ const GENERATORS = [
 			'static/ergopti_plus/_shared/ui/_generated/identifiers.js',
 			'static/ergopti_plus/_shared/data/identifiers.sh',
 			'static/ergopti_plus/_shared/data/identifiers.py',
-			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/Identifiers.generated.swift'
+			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/Identifiers.generated.swift',
+			'static/ergopti_plus/windows/_generated/identifiers.ahk'
 		]
 	},
 	{

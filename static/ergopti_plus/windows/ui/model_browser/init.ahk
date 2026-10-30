@@ -23,6 +23,8 @@
 ;    case install flow lives in this file.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
+
 #Requires AutoHotkey v2.0
 
 
@@ -719,13 +721,18 @@ _LLM_MBW_BuildPayload() {
  * One local (Ollama) row: the catalogue fields the page's columns read. The
  * tray's delete runs only on the Ollama backend, so the page offers it there.
  */
+; The public page of a model tag in the Ollama library.
+_LLM_ModelLibraryUrl(Tag) {
+	return "https://" . Identifiers.Hosts.OLLAMA . "/library/" . Tag
+}
+
 _LLM_MBW_LocalRow(Name, Tag, Info, IsInstalled, IsDefault, Custom, Deletable) {
 	global _LLM_MBW_PullPercents
 	Params := Info.Has("params_b") ? Info["params_b"] : 0
 	ActiveB := Info.Has("active_b") ? Info["active_b"] : 0
 	if (ActiveB <= 0)
 		ActiveB := Params
-	Url := Custom ? "" : "https://ollama.com/library/" . Tag
+	Url := Custom ? "" : _LLM_ModelLibraryUrl(Tag)
 	Json := "{backend:" . JsonStringLiteral("ollama")
 		. ",name:" . JsonStringLiteral(Name)
 		. ",runtime_name:" . JsonStringLiteral(Tag)
@@ -1149,7 +1156,7 @@ _LLM_MBW_IsCatalogueSourceUrl(Url) {
 			continue
 		Tag := Info["ollama"]
 		if ((Tag is String) && Tag != ""
-				&& Url == "https://ollama.com/library/" . Tag)
+				&& Url == _LLM_ModelLibraryUrl(Tag))
 			return true
 	}
 	return false
