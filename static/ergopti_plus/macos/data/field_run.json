@@ -62,6 +62,20 @@
 			"proves": "The layout composer installs, enables and removes its check layout through the real path."
 		},
 		{
+			"id": "field_boot_cost",
+			"kind": "field_check",
+			"check": "boot_cost",
+			"deadline_seconds": 10,
+			"proves": "The boot that started the app completed, with its wall and CPU totals and its slowest stage named."
+		},
+		{
+			"id": "field_idle_cost",
+			"kind": "field_check",
+			"check": "idle_cost",
+			"deadline_seconds": 45,
+			"proves": "Over a quiet window the driver's own CPU share stays under the declared bound, and its memory, heap and main-thread holds are named."
+		},
+		{
 			"id": "field_layout_rows",
 			"kind": "field_check",
 			"check": "layout_rows",
@@ -199,6 +213,13 @@
 			"check": "ai_local",
 			"deadline_seconds": 90,
 			"proves": "The owned Ollama passes a strict signature check, its running server lists its models and predicts one token with an installed model; the MLX models on disk are counted."
+		},
+		{
+			"id": "field_fifo_safety",
+			"kind": "field_check",
+			"check": "fifo_safety",
+			"deadline_seconds": 20,
+			"proves": "A FIFO is classified as a named pipe without being opened, and neither the append nor the atomic write of the file system adapter opens or replaces it."
 		},
 		{
 			"id": "field_local_servers",

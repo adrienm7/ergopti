@@ -741,6 +741,27 @@ local ROWS_SOURCE_ID = "ergol"
 local ROWS_KEYBOARD_NAME = "Ergopti Field Rows"
 local ROWS_FILE_PREFIX = "ErgoptiFieldRows-"
 
+--- The boot that started this app (infra/field_check_session.lua).
+--- @return table { complete_ms, cpu_ms, slowest }
+local function boot_facts()
+	local Boot = require("infra.boot_profiler")
+	return { complete_ms = Boot.boot_complete_ms(), cpu_ms = Boot.boot_cpu_ms(), slowest = Boot.slowest_stages(3) }
+end
+
+--- The file system calls the FIFO check drives, in a folder of its own.
+--- @return table { dir, mode, exists, append, write }
+local function fifo()
+	local FileSystem = require("adapters.file_system")
+	local tmp = (os.getenv("TMPDIR") or "/tmp"):gsub("/+$", "")
+	return {
+		dir = tmp .. "/ergopti-field-fifo-" .. tostring(hs.processInfo.processID),
+		mode = FileSystem.followed_mode,
+		exists = FileSystem.exists,
+		append = FileSystem.append,
+		write = FileSystem.write,
+	}
+end
+
 --- The local server catalogue the driver loaded (infra/field_check_local_servers.lua).
 --- @return table { order, discovery, published }
 local function local_server_catalogue()
@@ -853,6 +874,11 @@ function M.new()
 		layout_rows_env = layout_rows_env,
 		local_server_catalogue = local_server_catalogue,
 		local_servers_detect = local_servers_detect,
+		boot_facts = boot_facts,
+		fifo = fifo,
+		-- Process CPU and a monotonic clock, both in milliseconds
+		cpu_ms = function() return os.clock() * 1000 end,
+		now_ms = function() return hs.timer.absoluteTime() / 1000000 end,
 	}
 end
 
