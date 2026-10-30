@@ -174,5 +174,20 @@
 				"typed": { "hint_key": "model_browser.hint_api_listing_unavailable" }
 			}
 		}
-	]
+	],
+	"unlisted_providers": {
+		"_comment": "Chat providers of api_providers.json with no listing recorded in ids (an ids vector naming a provider is a trimmed listing it answered, with its source), and why. tests/unit/modules/llm/vectors/test_api_provider_catalogue.lua (macOS and Linux) requires one or the other.",
+		"openai": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
+		"anthropic": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
+		"gemini": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
+		"xai": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
+		"mistral": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
+		"deepseek": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
+		"cohere": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
+		"cerebras": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
+		"openrouter": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
+		"groq": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
+		"together": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
+		"fireworks": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape."
+	}
 }
