@@ -169,6 +169,7 @@
 			"id": "driver_reload",
 			"kind": "reload",
 			"deadline_seconds": 180,
+			"disabled": "reload_lost_the_app",
 			"proves": "The driver reloads on request and the field run resumes at its next step; the reload's duration, request to a ready field run, is named."
 		}
 	],
