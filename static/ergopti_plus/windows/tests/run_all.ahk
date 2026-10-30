@@ -2234,6 +2234,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/infra/config/persistence/test_group_config_cache_alias_invalidation.ahk
 #Include unit/infra/dispatch/test_hotpath_profiler_exclusive.ahk
 #Include unit/infra/dispatch/test_hotpath_latency_statistics.ahk
+#Include unit/infra/dispatch/test_phase_stats.ahk
 #Include unit/infra/dispatch/test_hotpath_breakdown_reentry.ahk
 #Include unit/infra/dispatch/test_hook_timing_input_privacy.ahk
 #Include unit/infra/dispatch/test_hotpath_per_segment_threshold.ahk

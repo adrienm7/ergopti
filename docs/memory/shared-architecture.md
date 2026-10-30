@@ -52,7 +52,8 @@ undeclared segment or drops a declared one; the Windows list stays in
 are always timed (two `luv.hrtime` reads, no string unless slow); a span that is
 not an inventory segment (idle wait, tray, keystats flush) is timed but never
 warns. `PhaseStats` bookkeeping is `_shared/lua/phase_stats_core.lua` on both
-Lua drivers. A new typing-path span joins the inventory, never a private list.
+Lua drivers and its port `windows/infra/phase_stats.ahk`, with the same phases
+and evidence line. A new typing-path span joins the inventory, never a private list.
 
 ### project-fixed-field-lists-drop-flags
 

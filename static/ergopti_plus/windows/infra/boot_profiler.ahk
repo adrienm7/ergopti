@@ -17,6 +17,7 @@
 ; ==============================================================================
 
 #Include ../adapters/boot_clock.ahk
+#Include phase_stats.ahk
 
 global _BOOT_PROFILE_LAST  := 0  ; A_TickCount captured at the previous mark
 global _BOOT_PROFILE_START  := 0  ; A_TickCount captured at BootProfile_Begin
@@ -174,6 +175,12 @@ BootProfile_StageEnd(Name, Detail := "") {
 	try LoggerSuccess("BootProfile", "Boot stage '{1}' done in {2} ms{3}.",
 		Name, DurationMs, Detail != "" ? ": " . Detail : "")
 	_BootProfileStageResources(Name, Started)
+	; The phases macOS and Linux record for a boot stage: a process CPU of -1 means
+	; the clock could not be read, which is no duration.
+	PhaseStats_AddMs("boot.stage", BootClockWallMs() - Started.WallMs)
+	CpuMs := BootClockCpuMs()
+	if (CpuMs >= 0 && Started.CpuMs >= 0)
+		PhaseStats_AddMs("boot.stage_cpu", CpuMs - Started.CpuMs)
 }
 
 ; Closes a stage that did not complete, as a WARNING rather than a SUCCESS.
