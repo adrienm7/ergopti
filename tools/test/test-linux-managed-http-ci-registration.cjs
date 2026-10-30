@@ -34,6 +34,8 @@ const ROOT = path.resolve(__dirname, '../..');
 const read = (name) => fs.readFileSync(path.join(ROOT, name), 'utf8');
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 const SETUP = 'Prepare authenticated managed HTTP validation tools';
+// Its packages install in their own step, so a slow mirror fails the install.
+const SETUP_INSTALL = 'Install prerequisites for ' + SETUP;
 const NATIVE = 'Qualify native managed HTTP public and retained output';
 const NOT_CANCELLED = '${{ !cancelled() }}';
 const sources = [
@@ -163,7 +165,12 @@ function validateWorkflow(text, entry, release = releaseWorkflow) {
 		assert.equal(Pipeline.stepField(step, 'timeout-minutes'), '35');
 		assert.ok(Pipeline.runOf(step).includes('set -euo pipefail'));
 	}
+	const install = Pipeline.step(body, SETUP_INSTALL);
+	assert.equal(Pipeline.stepField(install, 'if'), LinuxE2E.condition(SETUP_INSTALL, NOT_CANCELLED));
+	assert.equal(Pipeline.stepField(install, 'continue-on-error'), null);
+	const packages = Pipeline.runOf(install).join('\n');
 	const setup = Pipeline.runOf(Pipeline.step(body, SETUP)).join('\n');
+	assert.equal(setup.includes('ubuntu_apt.py'), false, 'the setup itself installs nothing');
 	for (const dependency of [
 		'build-essential',
 		'pkg-config',
@@ -178,7 +185,7 @@ function validateWorkflow(text, entry, release = releaseWorkflow) {
 		'gsettings-desktop-schemas',
 		'dconf-gsettings-backend'
 	]) {
-		assert.ok(setup.split(/\s+/).includes(dependency), dependency);
+		assert.ok(packages.split(/\s+/).includes(dependency), dependency);
 	}
 	assert.ok(setup.includes('umask 077'));
 	assert.ok(setup.includes('mkdir -m 700 "$validation_parent"'));

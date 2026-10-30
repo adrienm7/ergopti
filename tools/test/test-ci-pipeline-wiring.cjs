@@ -624,6 +624,12 @@ const STEP_CONDITIONS = [
 	[
 		LINUX_BOX,
 		'integration-linux',
+		'Install prerequisites for Qualify actual LuaJIT XI2 ABI and property cookies',
+		'${{ !cancelled() && ' + LINUX_INTEGRATION_NATIVE_ROW + ' }}'
+	],
+	[
+		LINUX_BOX,
+		'integration-linux',
 		'Qualify actual LuaJIT XI2 ABI and property cookies',
 		'${{ !cancelled() && ' + LINUX_INTEGRATION_NATIVE_ROW + ' }}'
 	],
@@ -645,6 +651,12 @@ const STEP_CONDITIONS = [
 		'common-integration',
 		'Verify native cross-driver histogram multiplicity',
 		COMMON_HISTOGRAM_LOT
+	],
+	[
+		LINUX_BOX,
+		'e2e-linux',
+		'Install prerequisites for Run manual official runtime and model acceptance',
+		MANUAL_RUNTIME_IF
 	],
 	[LINUX_BOX, 'e2e-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[LINUX_BOX, 'e2e-linux', 'Upload manual runtime acceptance evidence', MANUAL_RUNTIME_EVIDENCE_IF],
@@ -5075,6 +5087,7 @@ mustCatch(
 );
 
 for (const [name, expected] of [
+	['Install prerequisites for Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	['Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	['Upload manual runtime acceptance evidence', MANUAL_RUNTIME_EVIDENCE_IF]
 ]) {
