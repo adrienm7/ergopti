@@ -893,6 +893,10 @@ enum ManagedHTTPWorker {
 			let scoped = ManagedHTTPRequest(url: request.url, method: request.method,
 				headers: request.headers, timeout: remaining, idleTimeout: request.idleTimeout, direct: request.direct)
 			let owned = ManagedHTTPSession(output: output, certificates: certificates)
+			// The kind of the route this attempt dispatches on, a closed token and
+			// never the relay: a lookup that answered DIRECT by itself carried no
+			// fallback marker, so the field report could not tell it from a proxy (L42).
+			_ = fputs("# native_http_route kind=\(managedHTTPRouteKind(route)) attempt=\(index + 1)/\(routes.count)\n", stderr)
 			let status = owned.execute(scoped, proxy: proxy)
 			if status == 0 || !owned.permitsProxyFailover || index == routes.count - 1 {
 				return owned.publishTerminal()
@@ -900,4 +904,14 @@ enum ManagedHTTPWorker {
 		}
 		return refuse(reason: "unavailable", status: 78, stage: .routeEmpty, output: output)
 	}
+}
+
+/// The closed kind of a selected route: direct, http, https, socks or other.
+func managedHTTPRouteKind(_ route: [String: Any]) -> String {
+	guard let kind = route[kCFProxyTypeKey as String] as? String else { return "other" }
+	let kinds: [(String, String)] = [
+		(kCFProxyTypeNone as String, "direct"), (kCFProxyTypeHTTP as String, "http"),
+		(kCFProxyTypeHTTPS as String, "https"), (kCFProxyTypeSOCKS as String, "socks"),
+	]
+	return kinds.first(where: { $0.0 == kind })?.1 ?? "other"
 }
