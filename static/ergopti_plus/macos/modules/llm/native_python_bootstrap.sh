@@ -93,7 +93,7 @@ native_bootstrap_python_in_work() {
 	local root="$1" work="$2" uv_path="$3" uv_url="$4" uv_sha256="$5"
 	local rc interpreter actual_hash cached_uv_hash extracted_uv_hash
 	if [ -f "$root/uv.whl" ] && [ ! -L "$root/uv.whl" ]; then
-		actual_hash="$(shasum -a 256 "$root/uv.whl" | awk '{print $1}')" || actual_hash=""
+		actual_hash="$(sha256_file_digest "$root/uv.whl")" || actual_hash=""
 	else
 		actual_hash=""
 	fi
@@ -111,9 +111,9 @@ native_bootstrap_python_in_work() {
 		return 1
 	fi
 	chmod 755 "$work/uv" || return 1
-	extracted_uv_hash="$(shasum -a 256 "$work/uv" | awk '{print $1}')" || return 1
+	extracted_uv_hash="$(sha256_file_digest "$work/uv")" || return 1
 	if [ -f "$uv_path" ] && [ ! -L "$uv_path" ]; then
-		cached_uv_hash="$(shasum -a 256 "$uv_path" | awk '{print $1}')" || cached_uv_hash=""
+		cached_uv_hash="$(sha256_file_digest "$uv_path")" || cached_uv_hash=""
 	else cached_uv_hash=""; fi
 	if [ "$cached_uv_hash" != "$extracted_uv_hash" ]; then
 		[ ! -L "$uv_path" ] || return 78

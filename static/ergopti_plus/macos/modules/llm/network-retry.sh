@@ -325,6 +325,16 @@ EOF_ROUTE_PLAN
 	return 0
 }
 
+# Prints the SHA-256 hex digest of one file. shasum marks a line whose name
+# holds a backslash or a newline with a leading backslash before the digest,
+# so the first field alone was "\<digest>" for such a path and never matched.
+sha256_file_digest() {
+	local line
+	line="$(shasum -a 256 "$1")" || return 1
+	line="${line%% *}"
+	printf '%s\n' "${line#\\}"
+}
+
 managed_bootstrap_download() {
 	local url="$1" output="$2" digest="$3" size="${4:-}" transfer="${5:-resumable}" replace_owner="${6:-}"
 	case "$transfer" in resilient|resumable) ;; *) return 64 ;; esac

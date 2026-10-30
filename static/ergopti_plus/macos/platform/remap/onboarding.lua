@@ -815,7 +815,8 @@ local function verify_sha256_async(owner, path, expected_sha, callback)
 				callback(false, "shasum exit code " .. tostring(rc))
 				return
 			end
-			local actual = stdout:match("^([%x]+)")
+			-- shasum prefixes the digest with a backslash when the path holds one.
+			local actual = stdout:match("^\\?([%x]+)")
 			if not actual then
 				callback(false, "Could not parse shasum output: " .. stdout)
 				return
