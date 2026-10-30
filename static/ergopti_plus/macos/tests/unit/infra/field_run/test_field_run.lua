@@ -371,6 +371,94 @@ helpers.describe("field run: declaration and requests", function()
 	end)
 end)
 
+helpers.describe("field run: the timed reload", function()
+	--- Declares a two-step run: one check, then the reload, then a check.
+	local function reload_spec(FieldRun)
+		local declaration = Json.decode(SPEC_TEXT)
+		local check, reload, last
+		for _, step in ipairs(declaration.steps) do
+			if step.kind == "reload" then reload = step end
+			if step.id == "field_lease" then check = step end
+			if step.id == "field_network" then last = step end
+		end
+		declaration.steps = { check, reload, last }
+		declaration.deadline_seconds.default = 600
+		return FieldRun.validate(declaration), reload
+	end
+
+	helpers.it("resumes at the next step with the reload's duration and a fresh snapshot", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			local spec, reload = reload_spec(FieldRun)
+			local first = FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports })
+			first:start()
+			state.request({ schema = 1, request_id = "r40", steps = Json.array({ "all" }) })
+			state.advance(0)
+			helpers.assert_eq(table.concat(state.calls, ","), "field_lease", "nothing runs past the reload")
+			helpers.assert_eq(state.restored.tag, "snapshot", "the configuration is put back before the reload")
+			local resume = state.json(FOLDER .. "/resume.json")
+			helpers.assert_eq(resume.request_id, "r40")
+			helpers.assert_eq(resume.index, 2)
+			first:stop({ kind = "reload", reason = FieldRun.TIMED_RELOAD_REASON })
+			helpers.assert_nil(state.files[FOLDER .. "/results/r40/done.json"])
+			state.now = state.now + 3500
+			state.restored = nil
+			FieldRun.new({ spec = spec, folder = FOLDER, pid = 4343, ports = state.ports }):start()
+			helpers.assert_nil(state.files[FOLDER .. "/resume.json"], "the resume file is consumed once")
+			state.advance(0)
+			local result = state.json(result_path("r40", 2, reload.id))
+			helpers.assert_eq(result.verdict, "pass")
+			helpers.assert_eq(result.elapsed_ms, 3500)
+			helpers.assert_eq(result.report.reload_ms, 3500)
+			helpers.assert_eq(table.concat(state.calls, ","), "field_lease,field_network")
+			local done = state.json(FOLDER .. "/results/r40/done.json")
+			helpers.assert_eq(done.interrupted, false)
+			helpers.assert_eq(table.concat(done.order, ","), "field_lease," .. reload.id .. ",field_network,config_guard")
+			helpers.assert_eq(state.restored.tag, "snapshot", "the guard compares against the fresh snapshot")
+		end)
+	end)
+
+	helpers.it("fails a refused reload and one that never tears the state down, and runs on", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			local spec, reload = reload_spec(FieldRun)
+			state.reload_accepted = false
+			FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports }):start()
+			state.request({ schema = 1, request_id = "r41", steps = Json.array({ "all" }) })
+			state.advance(0)
+			helpers.assert_eq(state.json(result_path("r41", 2, reload.id)).codes[1], "reload_refused")
+			helpers.assert_nil(state.files[FOLDER .. "/resume.json"])
+			helpers.assert_not_nil(state.json(FOLDER .. "/results/r41/done.json"))
+			state.reload_accepted = true
+			state.request({ schema = 1, request_id = "r42", steps = Json.array({ "all" }) })
+			state.advance(reload.deadline_seconds * 1000)
+			local result = state.json(result_path("r42", 2, reload.id))
+			helpers.assert_eq(result.verdict, "timeout")
+			helpers.assert_eq(result.codes[1], "reload_not_started")
+			helpers.assert_nil(state.files[FOLDER .. "/resume.json"])
+			helpers.assert_not_nil(state.json(FOLDER .. "/results/r42/done.json"))
+		end)
+	end)
+
+	helpers.it("closes the run as interrupted when the resume file is unusable", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			local spec = reload_spec(FieldRun)
+			state.files[FOLDER .. "/running.json"] = Json.encode({ schema = 1, request_id = "r43" })
+			state.files[FOLDER .. "/resume.json"] = Json.encode({ schema = 1, request_id = "other", index = 2,
+				steps = Json.array({}) })
+			FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports }):start()
+			state.advance(0)
+			helpers.assert_eq(state.json(FOLDER .. "/results/r43/done.json").interrupted, true)
+			helpers.assert_nil(state.files[FOLDER .. "/resume.json"])
+			helpers.assert_eq(#state.calls, 0)
+		end)
+	end)
+end)
+
 helpers.describe("field run: a run", function()
 	helpers.it("reports a step declared for a person with its reason and does not run it", function()
 		helpers.with_stub_scope(MODULES, function()
@@ -395,8 +483,17 @@ helpers.describe("field run: a run", function()
 			local FieldRun = engine()
 			local state = world()
 			local spec = spec_of(FieldRun)
-			started(FieldRun, state)
+			local session = started(FieldRun, state)
 			state.request({ schema = 1, request_id = "r11", steps = Json.array({ "all" }) })
+			state.advance(0)
+			-- The timed reload: this state is torn down, the reloaded one carries on
+			helpers.assert_eq(#state.reloads, 1, "the reload step asks for one reload")
+			helpers.assert_eq(state.reloads[1].reason, FieldRun.TIMED_RELOAD_REASON)
+			helpers.assert_nil(state.files[FOLDER .. "/results/r11/done.json"], "a suspended run writes no done")
+			session:stop({ kind = "reload", reason = FieldRun.TIMED_RELOAD_REASON })
+			helpers.assert_not_nil(state.files[FOLDER .. "/running.json"], "the running marker survives the reload")
+			state.now = state.now + 4200
+			FieldRun.new({ spec = spec_of(FieldRun), folder = FOLDER, pid = 4343, ports = state.ports }):start()
 			state.advance(0)
 			for index, step in ipairs(spec.steps) do
 				local result = state.json(result_path("r11", index, step.id))
@@ -422,7 +519,7 @@ helpers.describe("field run: a run", function()
 			for _, id in ipairs(state.calls) do ran[id] = true end
 			for _, step in ipairs(spec.steps) do
 				helpers.assert_nil(step.person, step.id .. " waits for a person: the field run must be automatic")
-				helpers.assert_true(ran[step.id], step.id .. " did not run")
+				if step.kind ~= "reload" then helpers.assert_true(ran[step.id], step.id .. " did not run") end
 			end
 			local lease = state.json(result_path("r11", 1, "field_lease"))
 			helpers.assert_eq(lease.verdict, "pass")
