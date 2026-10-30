@@ -653,6 +653,8 @@ class ProductionServeControls(unittest.TestCase):
 import hashlib, hmac, json, pathlib, struct, sys, time
 if len(sys.argv) > 1 and sys.argv[1] in ('--managed-ollama-listener-probe', '--managed-ollama-api-worker'):
     request = json.loads(sys.stdin.buffer.readline())
+    with open(pathlib.Path(__file__).parents[2] / 'api-executables.txt', 'a') as seen:
+        seen.write(request['executable'] + '\n')
     fixture = json.loads((pathlib.Path(__file__).parents[2] / 'api-fixture.json').read_text())
     session, identity = fixture['session'], fixture['listener']
     mode = fixture['mode']
@@ -715,6 +717,11 @@ if len(sys.argv) > 1 and sys.argv[1] in ('--managed-ollama-listener-probe', '--m
         self.assertEqual(owner._api_admission.listener, owner.operation.listener)
         self.assertEqual(owner.deadline, original_deadline)
         self.assertEqual(len(owner._api_responses), 2)
+        # The launcher's API worker refuses (exit 64) any path but the canonical one.
+        self.assertEqual(
+            (self.app / "api-executables.txt").read_text().splitlines(),
+            [str(self.binary), str(self.binary)],
+        )
         for record in owner._api_responses:
             self.assertTrue(record["closed"])
             response = record["response"]
