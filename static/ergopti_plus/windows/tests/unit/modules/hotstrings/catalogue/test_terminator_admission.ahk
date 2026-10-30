@@ -172,6 +172,30 @@ _HTRD_WithDisplayed(Body) {
 	return _HTR_WithRuntime(Body)
 }
 
+; The boot and every live setting write the file after the owner read it: a row
+; whose record is unchanged stays clickable, and the edit keeps what they stored.
+_HTRD_SourceWrittenElsewhere(Mode) {
+	global _HotstringsTerminatorRecords
+	Original := _HTR_Source()
+	HotstringsTerminatorRecordsInit(Original)
+	Admission := HotstringsTerminatorRecordCapture(_HotstringsTerminatorRecords.Records[1])
+	Written := Original . '`n[zz_other]`nvalue = 1`n'
+	Plan := HotstringsTerminatorRecordPlan(Written,
+		Map("mode", Mode, "key", Admission.Key, "enabled", false, "admission", Admission))
+	AssertEqual(1, TOML_ParseDocument(Plan.Content)["zz_other"]["value"], "the other write survives the edit")
+}
+_HTRD_RefusalNamesItsCause() {
+	Body := _DriverFuncBody("HotstringsTerminatorRecordsEdit")
+	Assert(InStr(Body, 'refused before runtime publication: {1}.", Err.Message)') > 0,
+		"a refused edit logs why, or the failure says nothing")
+}
+Test("terminator-admission: a state edit survives another write of the file (terminator-row-stale-source)",
+	_HTRD_WithDisplayed.Bind(_HTRD_SourceWrittenElsewhere.Bind("state")))
+Test("terminator-admission: a removal survives another write of the file (terminator-row-stale-source)",
+	_HTRD_WithDisplayed.Bind(_HTRD_SourceWrittenElsewhere.Bind("remove")))
+Test("terminator-admission: a refused edit logs its cause (terminator-row-stale-source)",
+	_HTRD_RefusalNamesItsCause)
+
 _HTRD_SourceReplacement(Mode) {
 	global _HotstringsTerminatorRecords
 	Original := _HTR_Source()
