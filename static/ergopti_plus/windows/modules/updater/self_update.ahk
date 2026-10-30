@@ -2137,6 +2137,20 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		return false
 	}
 
+	; Before the transaction and the download: every install path, the release
+	; installer's included, ends here. The fetch can pump messages.
+	SignatureAllows := AssetSignature_AllowsInstall(AssetName, Asset, Release, Request)
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
+			return false
+	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
+		return false
+	}
+	if !SignatureAllows {
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_unexpected", "Icon!", 0, InstallObserver)
+		return false
+	}
+
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
