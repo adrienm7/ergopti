@@ -198,6 +198,14 @@ _OllamaPayload_ThinkDisabled() {
 }
 Test("LLM_BuildOllamaPayload: think is false for qwen3 models", _OllamaPayload_ThinkDisabled)
 
+; gpt-oss ignores think:false and keeps reasoning: its family's lowest level goes instead
+_OllamaPayload_ThinkLowestLevel() {
+	payload := LLM_BuildOllamaPayload("gpt-oss:20b", "sys", "ctx", 0.1)
+	AssertContains(payload, '"think":"low"')
+	AssertFalse(InStr(payload, '"think":false'), "gpt-oss must not get the false it ignores")
+}
+Test("LLM_BuildOllamaPayload: gpt-oss gets its lowest think level", _OllamaPayload_ThinkLowestLevel)
+
 
 _OllamaPayload_StopCrNotEmpty() {
 	payload := LLM_BuildOllamaPayload("m", "s", "u", 0.1)

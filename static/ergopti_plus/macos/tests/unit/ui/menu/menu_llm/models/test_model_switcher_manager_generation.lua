@@ -68,6 +68,8 @@ local function install_common_stubs()
 			return xpcall(callback, debug.traceback, ...)
 		end,
 	}
+	-- Its loader reads the shared tree through hs.fs, which this fixture omits
+	package.loaded["modules.llm.thinking_families"] = { ollama_think = function() return false end }
 	return logger
 end
 

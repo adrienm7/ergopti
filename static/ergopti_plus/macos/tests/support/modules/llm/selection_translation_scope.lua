@@ -166,6 +166,7 @@ local OWNED = {
 	"modules.llm.selection_publication",
 	"modules.llm.selection_translation",
 	"modules.llm.streaming_handler",
+	"modules.llm.thinking_families",
 	"modules.llm.warmup_controller",
 	"modules.shortcuts.actions.screen_capture_flow",
 	"modules.shortcuts.actions.screenshot_save",

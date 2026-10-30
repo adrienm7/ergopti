@@ -1860,6 +1860,7 @@ local function finish_capture(flow, spec, outcome)
 		image = Base64.encode(image),
 		mime = config.image_mime,
 		max_tokens = config.read_max_tokens,
+		think = spec.target.format == "ollama" and require("modules.llm.api_remote").ollama_think(spec.model),
 	})
 	flow.reading = true
 	-- The tooltip says something is coming: reading a screen takes seconds.

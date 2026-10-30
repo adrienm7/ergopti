@@ -294,6 +294,13 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 	local engine = dependency("modules.llm.prediction_engine", "admit_answer_request")
 	if not engine or engine.admit_answer_request("Screen reading") ~= true then return end
 	if not is_current(generation, "capture admission") then return end
+	-- The local server's reasoning goes off before the session opens
+	local think
+	if backend.format == "ollama" then
+		local Remote = dependency("modules.llm.thinking_families", "ollama_think")
+		if not Remote then return end
+		think = Remote.ollama_think(model)
+	end
 	local session = engine.open_answer_surface("Screen reading")
 	if not session then
 		Logger.warn(LOG, "Screen reading stopped: the prediction tooltip could not be opened.")
@@ -310,6 +317,7 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 		image = data,
 		mime = config.image_mime,
 		max_tokens = config.read_max_tokens,
+		think = think,
 	})
 
 	--- Ends a screen reading whose vision request failed.
