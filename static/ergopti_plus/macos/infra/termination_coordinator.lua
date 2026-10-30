@@ -29,6 +29,9 @@
 ---    request. A stage that never settles (lease fence, input drain, teardown,
 ---    logger drain) or a fence failure force-exits non-zero, naming the stuck
 ---    stage; native stdin EOF then lets the guardian revoke the exact lease.
+--- 9. Breadcrumb: each stage is handed to the optional `record_stage` (the
+---    synchronous reload breadcrumb), so a reload that loses the app names the
+---    stage it was lost in although its queued log lines are gone.
 --- ==============================================================================
 
 local M = {}
@@ -46,6 +49,15 @@ local _deps = nil
 local _transaction = nil
 local _admission_abort = nil
 local _admission_abort_active = false
+
+--- Hands one stage of a transition to the reload breadcrumb. A diagnostic only:
+--- neither its absence nor its failure changes the transition.
+--- @param transaction table The transition.
+--- @param stage string Stage name.
+local function breadcrumb(transaction, stage)
+	if _deps == nil or _deps.record_stage == nil then return end
+	pcall(_deps.record_stage, transaction.kind, stage)
+end
 
 local function require_state(func_name)
 	if not _deps then
@@ -108,6 +120,7 @@ end
 
 local function abort_transaction(transaction, detail, legacy_notify)
 	if transaction.settled then return false end
+	breadcrumb(transaction, "aborted")
 	transaction.settled = true
 	transaction.completion_ok = false
 	if _transaction == transaction then _transaction = nil end
@@ -135,6 +148,7 @@ end
 --- @return boolean Always false if the injected fatal exit itself returns.
 local function force_post_teardown_exit(transaction)
 	if transaction.settled then return false end
+	breadcrumb(transaction, "fatal_exit")
 	transaction.settled = true
 	transaction.completion_ok = false
 	if _transaction == transaction then _transaction = nil end
@@ -174,14 +188,18 @@ local function invoke_terminal(transaction)
 		return fail_after_teardown(transaction,
 			"post-drain finalizer failed: " .. tostring(finalizer_result))
 	end
+	breadcrumb(transaction, "finalized")
 	if transaction.kind == "reload" then
+		breadcrumb(transaction, "hs_reload_called")
 		local reload_ok, reload_result = xpcall(function()
 			return _deps.reload(table.unpack(transaction.arguments, 1, transaction.arguments.n))
 		end, debug.traceback)
 		if not reload_ok then
+			breadcrumb(transaction, "hs_reload_raised")
 			transaction.terminal_failure = tostring(reload_result)
 			return force_post_teardown_exit(transaction)
 		end
+		breadcrumb(transaction, "hs_reload_returned")
 
 		-- hs.reload() schedules replacement of the Lua state and is allowed to
 		-- return to its caller while that native transition is pending. A protected
@@ -207,11 +225,13 @@ end
 local function begin_drain(transaction)
 	if transaction.drain_started then return true end
 	transaction.drain_started = true
+	breadcrumb(transaction, "log_drain_started")
 	local callback_fired = false
 	local function on_drained(drained, detail)
 		if callback_fired then return end
 		callback_fired = true
 		if _transaction ~= transaction or transaction.settled then return end
+		breadcrumb(transaction, drained == true and "log_drained" or "log_drain_failed")
 		local callback_ok, callback_err = xpcall(function()
 			if drained ~= true then
 				fail_after_teardown(transaction,
@@ -251,6 +271,7 @@ local resume_after_teardown_boundary
 --- @param completed boolean Whether every local owner settled.
 --- @param detail any Exact result or failure detail.
 local function settle_teardown(transaction, completed, detail)
+	breadcrumb(transaction, completed == true and "teardown_completed" or "teardown_failed")
 	transaction.teardown_pending = false
 	transaction.teardown_settled = true
 	transaction.teardown_completed = completed == true
@@ -317,6 +338,7 @@ local function run_teardown_attempt(transaction)
 			return false
 		end
 
+		breadcrumb(transaction, "teardown_attempt")
 		local results = table.pack(xpcall(function()
 			return _deps.teardown(transaction.kind, on_teardown_ready)
 		end, debug.traceback))
@@ -336,6 +358,7 @@ local function run_teardown_attempt(transaction)
 			local state = results[3]
 			if not call_ok then return false, result, false end
 			if result == true and state == "pending" then
+				breadcrumb(transaction, "teardown_pending")
 				transaction.teardown_pending = true
 				transaction.teardown_result = "pending"
 				return nil, "pending", true
@@ -415,6 +438,7 @@ local function begin_terminal_sequence(transaction)
 				"reload sentinel could not be committed: " .. tostring(marked_or_err))
 		end
 		transaction.reload_marked = true
+		breadcrumb(transaction, "reload_marked")
 	end
 
 	local teardown_completed, teardown_result, pending = teardown_once(transaction)
@@ -434,11 +458,13 @@ end
 local function begin_input_drain(transaction)
 	if transaction.input_drain_started then return true end
 	transaction.input_drain_started = true
+	breadcrumb(transaction, "input_drain_started")
 	local callback_fired = false
 	local function on_input_drained()
 		if callback_fired then return end
 		callback_fired = true
 		if _transaction ~= transaction or transaction.settled then return end
+		breadcrumb(transaction, "input_drained")
 		local ok, result = xpcall(function()
 			transaction.input_drained = true
 			return begin_terminal_sequence(transaction)
@@ -470,11 +496,13 @@ end
 local function finish_transaction(transaction, fenced, detail)
 	if _transaction ~= transaction or transaction.settled then return end
 	if fenced ~= true then
+		breadcrumb(transaction, "lease_fence_refused")
 		abort_transaction(transaction,
 			"exact Karabiner revocation was not proven: " .. tostring(detail))
 		return
 	end
 	transaction.fenced = true
+	breadcrumb(transaction, "lease_fenced")
 	if not admission_current(transaction.admission) then
 		return teardown_then_fail_after_fence(transaction, "hotstring publication admission revoked after fence")
 	end
@@ -521,6 +549,7 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 			_transaction.reason = reason
 			_transaction.exit_code = exit_code
 			_transaction.arguments = table.pack()
+			breadcrumb(_transaction, "upgraded_to_exit")
 			Logger.info(LOG, "Pending controlled reload upgraded to an exit request.")
 			if _transaction.teardown_completed then
 				-- The drain remains live and includes records emitted by this added
@@ -555,6 +584,7 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 		admission = admission,
 	}
 	_transaction = transaction
+	breadcrumb(transaction, "accepted")
 	-- Who asked is the first question about any reload or quit in a user log, and
 	-- the reason was stored on the transaction without ever being written out.
 	-- Protected: a failing logger has no other sink to report to, and must never
@@ -596,6 +626,7 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 		end
 	end
 
+	breadcrumb(transaction, "lease_fence_requested")
 	local call_ok, accepted_or_err = xpcall(function()
 		return _deps.request_lease(reason, on_fenced)
 	end, debug.traceback)
@@ -647,6 +678,10 @@ function M.init(deps)
 	end
 	if deps.capture_publication_admission ~= nil and type(deps.capture_publication_admission) ~= "function" then
 		Logger.error(LOG, "M.init(): optional publication admission must be a function.")
+		return false
+	end
+	if deps.record_stage ~= nil and type(deps.record_stage) ~= "function" then
+		Logger.error(LOG, "M.init(): optional record_stage must be a function.")
 		return false
 	end
 	if type(deps.user_exit_deadline_seconds) ~= "number" or deps.user_exit_deadline_seconds <= 0 then
