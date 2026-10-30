@@ -40,6 +40,16 @@ and its keystats ledger recorded the test keys. Judge such a check from the
 private driver's own state (`HSE_Buffer`, its log), and leave CapsWord, which
 writes the real CapsLock state, to a desktop with no other driver.
 
+### project-live-checks-send-restores-capslock
+
+A `Send` that is not `{Blind}` lifts CapsLock around its keys and restores it
+when it ends, even a Send from another process. CapsWord ends between those two
+moments on the driver side, so `{Space}` put the toggle back on 15 ms after
+CapsWord had turned it off and the next word came out in capitals: a false
+failure, the driver had done its work (a probe saw `CapsWordEnabled` 0, `SC039`
+as the hotkey, U+0009 in OnChar). Named keys of a CapsLock check are therefore
+`{Blind}{SC039}`, the form a physical key takes. `{Text}` is a packet and is safe.
+
 ### project-live-checks-quiet-logs-do-not-prove-an-idle-driver
 
 A scope restore or clear spends seconds inside native menu code without logging

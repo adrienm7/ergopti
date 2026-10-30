@@ -23,7 +23,9 @@ cannot do is the short manual list at the end of this page.
   open). Nothing replaces a driver function with a stub.
 - Real keys come from `windows/tests/live/typist.ahk`, a separate hook-free
   process. Its `SendInput` at level 0 is ignored by the driver's InputHook, as a
-  tap-hold's tap is, so it types with `SendEvent` at `SendLevel` 100.
+  tap-hold's tap is, so it types with `SendEvent` at `SendLevel` 100. A check
+  that depends on CapsLock sends named keys as `{Blind}{SC039}`: a `Send` that is
+  not blind restores CapsLock when it ends, which no physical key can do.
 - Every driver and typist it starts is stopped before it returns, the successors
   of a reload included. The report names the other AutoHotkey scripts that were
   running, because AutoHotkey's `SendInput` falls back to `SendEvent` while
