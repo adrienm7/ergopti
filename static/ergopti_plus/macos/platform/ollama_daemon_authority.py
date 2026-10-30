@@ -120,7 +120,7 @@ def read_pair(directory, name, policy, expected_uid, *, progress):
         def directory_check():
             progress()
             held = os.fstat(directory_fd)
-            named = directory.stat(follow_symlinks=False)
+            named = os.stat(directory, follow_symlinks=False)
             if (
                 not stat.S_ISDIR(held.st_mode)
                 or held.st_uid != expected_uid
