@@ -956,6 +956,7 @@ HotstringsDelimitersBoot()
 TapHoldMigrateFile(_ConfigDir . _AhkSubDir . "tap_hold.toml", _SharedDir . "\tap_hold\defaults.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
+GestureSystemRetireDismissals()
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",
 	_BootConfigApplied, (TapHold is Map && TapHold.Has("keys")) ? TapHold["keys"].Count : 0))
 
