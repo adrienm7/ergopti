@@ -95,6 +95,8 @@ sign_code() {
  printf 'sign:%s\n' "$argument"
 }
 shasum() { printf 'fixedsignedswitcher\n'; }
+# The build's digest owner (network-retry.sh), modelled like shasum above.
+sha256_file_digest() { printf 'fixedsignedswitcher\n'; }
 ${sign}
 codesign_native_runtime
 `,
