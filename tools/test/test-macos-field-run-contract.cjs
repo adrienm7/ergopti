@@ -576,7 +576,9 @@ function reportFolder(paths) {
 						fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
 						/^field_run\s+exit=0$/m
 					);
-					assert.match(result.stdout, /field run 01_field_lease: pass/);
+					// The maintainer scans the output for the marks, not the words.
+					assert.match(result.stdout, /✅ field run 01_field_lease: pass/);
+					assert.match(result.stdout, /Field run summary: ✅ \d+ pass, ❌ \d+ fail, \d+ other\./);
 					const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD');
 					assert.match(committed, /field_run\/done\.json/);
 				} finally {
