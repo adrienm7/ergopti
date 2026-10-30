@@ -1802,6 +1802,7 @@
 	"menu.llm.debounce_label": "Inactieve tijd voor suggestie: %s",
 	"menu.llm.debounce_prompt": "Inactiviteitsvertraging voor generatie (in ms, bijv. 600):",
 	"menu.llm.min_interval_label": "Minimale tijd tussen twee automatische AI-verzoeken: %s",
+	"menu.llm.trigger.min_request_interval_ms": "Verzoekinterval",
 	"menu.llm.delete_model_body": "Wilt u echt het model \"%s\" uit de lokale cache verwijderen?",
 	"menu.llm.delete_model_cache": "🗑️ Dit model uit cache verwijderen",
 	"menu.llm.delete_model_title": "Model verwijderen?",

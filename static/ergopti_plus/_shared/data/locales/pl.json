@@ -1802,6 +1802,7 @@
 	"menu.llm.debounce_label": "Czas bezczynności przed sugestią: %s",
 	"menu.llm.debounce_prompt": "Opóźnienie bezczynności przed generowaniem (w ms, np. 600):",
 	"menu.llm.min_interval_label": "Minimalny odstęp między dwoma automatycznymi żądaniami AI: %s",
+	"menu.llm.trigger.min_request_interval_ms": "Odstęp żądań",
 	"menu.llm.delete_model_body": "Czy naprawdę chcesz usunąć model \"%s\" z lokalnej pamięci podręcznej?",
 	"menu.llm.delete_model_cache": "🗑️ Usuń ten model z pamięci podręcznej",
 	"menu.llm.delete_model_title": "Usunąć model?",

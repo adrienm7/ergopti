@@ -1802,6 +1802,7 @@
 	"menu.llm.debounce_label": "Время простоя до предложения: %s",
 	"menu.llm.debounce_prompt": "Задержка простоя перед генерацией (в мс, напр. 600):",
 	"menu.llm.min_interval_label": "Минимальный интервал между двумя автоматическими запросами к ИИ: %s",
+	"menu.llm.trigger.min_request_interval_ms": "Интервал запросов",
 	"menu.llm.delete_model_body": "Действительно удалить модель \"%s\" из локального кэша?",
 	"menu.llm.delete_model_cache": "🗑️ Удалить эту модель из кэша",
 	"menu.llm.delete_model_title": "Удалить модель?",
