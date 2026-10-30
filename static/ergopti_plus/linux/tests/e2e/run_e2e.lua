@@ -801,6 +801,7 @@ do
 	local rows_output, rows_status = ChildCapture.run(daemon_child_command(interpreter, rows_env, device, "a", false))
 	local rows_fh = io.open(rows_file, "r")
 	local rows = rows_fh and tonumber(rows_fh:read("*l")) or nil
+	local agent = rows_fh and rows_fh:read("*l") or nil
 	if rows_fh then rows_fh:close() end
 	os.remove(rows_file)
 	local rows_child_accepted = ChildCapture.accepted(rows_output, rows_status, false)
@@ -812,6 +813,16 @@ do
 		fail("the real tray menu stays navigable", string.format("100 < rows <= %d and an accepted child", MENU_ROW_CEILING),
 			string.format("rows=%s child=%s%s", tostring(rows), rows_child_accepted and "accepted" or "failed",
 				rows_child_accepted and "" or ": " .. rows_output:sub(-300)))
+	end
+	-- Item 121: the unfinished agent is declared unavailable once, in the shared
+	-- manifest; in the composed tray its row says why and runs nothing, while
+	-- the AI submenu beside it keeps its controls.
+	local AGENT_RECEIPT = "agent disabled=true reason=true actions=0 ai_actions=some"
+	if rows_child_accepted and agent == AGENT_RECEIPT then
+		pass("the real tray shows the AI agent unavailable beside a working AI submenu (agent-disabled-root)")
+	else
+		fail("the real tray shows the AI agent unavailable beside a working AI submenu (agent-disabled-root)",
+			AGENT_RECEIPT, tostring(agent))
 	end
 
 	os.remove(device)
