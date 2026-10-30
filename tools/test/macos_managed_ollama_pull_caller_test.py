@@ -98,6 +98,25 @@ class RefusalLineTests(unittest.TestCase):
         self.assertIs(receipt["daemon_operation_retired"], True)
         self.assertEqual(receipt["operation"], "")
 
+    def test_non_byte_rows_print_closed_vocabulary_lines(self):
+        # Field run of 2026-10-30 23:10: the pull exited 1 after its last byte
+        # row; the statuses and the error that followed were never printed.
+        self.assertEqual(CALLER.status_word("verifying sha256 digest"), "verifying_digest")
+        self.assertEqual(CALLER.status_word("pulling 0f6ec9740c76"), "pulling_layer")
+        self.assertEqual(
+            CALLER.status_word("couldn't remove unused layers: /x"), "unused_layers_not_removed"
+        )
+        self.assertEqual(CALLER.status_word("independent new status"), "other")
+        self.assertEqual(
+            CALLER.error_class("digest mismatch, file must be downloaded again: sha256:abc"),
+            "digest_mismatch",
+        )
+        self.assertEqual(
+            CALLER.error_class("open /Users/x/.ollama/models: permission denied"),
+            "permission_denied",
+        )
+        self.assertEqual(CALLER.error_class("https://registry.example/secret failed"), "other")
+
 
 class ReservedFileTests(unittest.TestCase):
     def setUp(self):
@@ -251,6 +270,29 @@ class CallerOwnershipTests(unittest.TestCase):
         self.assertIs(receipt["request_reaped"], True)
         self.assertIs(receipt["daemon_operation_retired"], False)
         self.assertEqual(receipt["state"], "pending")
+
+    def test_failed_pull_emits_its_outcome_before_the_receipt(self):
+        owner = Owner()
+        owner.outcome = "error_row"
+        owner.pull = lambda model, emit, timeout: (
+            setattr(owner, "submitted", True) or setattr(owner, "request_finished", True)
+        )
+        emitted = []
+        with CALLER.RECEIPT.ReservedReceipt(self.path) as receipt:
+            status = CALLER.execute(
+                self.value,
+                owner_factory=lambda *args: owner,
+                idle_timeout=60,
+                maximum_bytes=65536,
+                deadline=time.monotonic() + 30,
+                retirement_timeout=1,
+                cancellation=CALLER.Cancellation(),
+                emit=emitted.append,
+                private_receipt=receipt,
+            )
+        self.assertEqual(status, 1)
+        self.assertIn({"outcome": "error_row"}, emitted)
+        self.assertEqual(json.loads(self.path.read_text())["state"], "retired")
 
     def test_pre_submission_refusal_closes_only_empty_operation(self):
         def refuse(*unused):
