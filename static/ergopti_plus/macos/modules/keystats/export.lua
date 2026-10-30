@@ -421,11 +421,45 @@ local function _scan_ledger(chunk, device_sql, collect_ids, is_rollover, pace)
 end
 
 --- Return the legacy last complete LF-terminated COMMIT byte offset.
+--- Same lexical rules as `_scan_ledger` without a device, but it jumps between
+--- the only bytes that change state (`-`, `'`, LF) with a native find: the
+--- unjournaled-ledger admission scans the whole local data.sql on the main
+--- thread, and the byte-by-byte loop held it 17 s on a 290 MB ledger in the
+--- 2026-10-30 field report.
 ---@param chunk string
 ---@return integer
 function M._last_complete_batch_offset(chunk)
-	local offset = _scan_ledger(chunk)
-	return offset
+	chunk = chunk or ""
+	local find, sub = string.find, string.sub
+	local last_commit, i = 0, 1
+	while true do
+		local at = find(chunk, "[-'\n]", i)
+		if not at then return last_commit end
+		local ch = sub(chunk, at, at)
+		if ch == "-" then
+			if sub(chunk, at + 1, at + 1) == "-" then
+				-- The comment's LF is consumed without a COMMIT check, as in the full scan.
+				local ending = find(chunk, "\n", at + 2, true)
+				if not ending then return last_commit end
+				i = ending + 1
+			else
+				i = at + 1
+			end
+		elseif ch == "'" then
+			local close = at
+			repeat
+				close = find(chunk, "'", close + 1, true)
+				if not close then return last_commit end
+				local doubled = sub(chunk, close + 1, close + 1) == "'"
+				if doubled then close = close + 1 end
+			until not doubled
+			i = close + 1
+		elseif sub(chunk, at + 1, at + 8) == "COMMIT;\n" then
+			last_commit, i = at + 8, at + 9
+		else
+			i = at + 1
+		end
+	end
 end
 
 --- Read authoritative per-device typing cutoffs from uncompacted producer SQL.
