@@ -301,35 +301,57 @@ fi
 # ====================================
 # ====================================
 
+# Each bootstrap subshell owns only the directory identity it allocated. An
+# interrupted download must retire that directory before the PTY worker exits.
+cleanup_mlx_bootstrap_workspace() {
+	local rc="$1" work="$2" identity="$3" current
+	trap - EXIT INT TERM HUP
+	if [ -n "$work" ]; then
+		current="$(/usr/bin/stat -f '%d:%i' "$work" 2>/dev/null)" || current=""
+		if [ -n "$identity" ] && [ "$current" = "$identity" ] && [ -d "$work" ] && [ ! -L "$work" ]; then
+			if ! rm -rf "$work"; then
+				log_error "Could not remove the owned MLX bootstrap workspace: $work" || true
+				[ "$rc" -ne 0 ] || rc=1
+			fi
+		else
+			log_error "Refusing to remove an unverified MLX bootstrap workspace: $work" || true
+			[ "$rc" -ne 0 ] || rc=1
+		fi
+	fi
+	exit "$rc"
+}
+
 # Installs the pinned uv wheel's executable into the install folder: PyPI's
 # own file, checked against its SHA-256, and no installer script.
-install_pinned_uv() {
+install_pinned_uv() (
 	local target_dir="${UV_INSTALL_DIR:-$HOME/.local/bin}"
-	local work wheel digest
+	local work="" identity="" wheel digest
+	trap - EXIT INT TERM HUP
+	trap 'cleanup_mlx_bootstrap_workspace "$?" "$work" "$identity"' EXIT
+	trap 'exit 130' INT
+	trap 'exit 143' TERM
+	trap 'exit 129' HUP
 	work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-uv.XXXXXX")" || return 1
+	identity="$(/usr/bin/stat -f '%d:%i' "$work")" || return 1
 	wheel="$work/uv.whl"
 	if ! managed_bootstrap_download "$UV_WHEEL_ARM64_URL" "$wheel" "$UV_WHEEL_ARM64_SHA256" "" resilient >&2; then
-		rm -rf "$work"
 		return 1
 	fi
 	digest="$(shasum -a 256 "$wheel" | awk '{print $1}')"
 	if [ "$digest" != "$UV_WHEEL_ARM64_SHA256" ]; then
 		log_error "The uv $UV_RELEASE_VERSION wheel does not match its pinned SHA-256 (got $digest)."
-		rm -rf "$work"
 		return 1
 	fi
 	if ! /usr/bin/unzip -q -o "$wheel" "uv-$UV_RELEASE_VERSION.data/scripts/uv" -d "$work/unpacked" >&2; then
 		log_error "The uv $UV_RELEASE_VERSION wheel could not be unpacked."
-		rm -rf "$work"
 		return 1
 	fi
 	mkdir -p "$target_dir" \
 		&& mv -f "$work/unpacked/uv-$UV_RELEASE_VERSION.data/scripts/uv" "$target_dir/uv" \
 		&& chmod 755 "$target_dir/uv"
 	local rc=$?
-	rm -rf "$work"
 	return "$rc"
-}
+)
 
 UV_BIN=""
 if UV_BIN="$(locate_uv)"; then
@@ -413,22 +435,29 @@ native_offline_bootstrap() {
 # Generated metadata comes from the shared release contract; genuine uv owns
 # the offline hash check, extraction and publication of its Python directory.
 native_install_managed_python_without_python() {
-	local work rc python_path
+	local rc python_path
 	[ -f "$SCRIPT_DIR/managed-python-release.sh" ] || return 78
 	# shellcheck source=/dev/null
 	source "$SCRIPT_DIR/managed-python-release.sh"
 	[ "$MANAGED_PYTHON_UV_RELEASE" = "$UV_RELEASE_VERSION" ] || return 78
 	case "$MANAGED_PYTHON_REQUEST" in cpython-"$PYTHON_VERSION".*-macos-aarch64-none) ;; *) return 78 ;; esac
 	[ -f "$SCRIPT_DIR/$MANAGED_PYTHON_DOWNLOADS_BASENAME" ] || return 78
-	work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-native-python.XXXXXX")" || return 1
-	if ! managed_bootstrap_download "$MANAGED_PYTHON_URL" "$work/$MANAGED_PYTHON_CACHE_BASENAME" "$MANAGED_PYTHON_SHA256" "" resilient >&2; then
-		rm -rf "$work"
-		return 1
-	fi
-	UV_PYTHON_CACHE_DIR="$work" UV_PYTHON_DOWNLOADS=manual "$UV_BIN" python install "$MANAGED_PYTHON_REQUEST" \
-		--offline --no-config --python-downloads-json-url "$SCRIPT_DIR/$MANAGED_PYTHON_DOWNLOADS_BASENAME" >&2
+	(
+		local work="" identity=""
+		trap - EXIT INT TERM HUP
+		trap 'cleanup_mlx_bootstrap_workspace "$?" "$work" "$identity"' EXIT
+		trap 'exit 130' INT
+		trap 'exit 143' TERM
+		trap 'exit 129' HUP
+		work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-native-python.XXXXXX")" || exit 1
+		identity="$(/usr/bin/stat -f '%d:%i' "$work")" || exit 1
+		if ! managed_bootstrap_download "$MANAGED_PYTHON_URL" "$work/$MANAGED_PYTHON_CACHE_BASENAME" "$MANAGED_PYTHON_SHA256" "" resilient >&2; then
+			exit 1
+		fi
+		UV_PYTHON_CACHE_DIR="$work" UV_PYTHON_DOWNLOADS=manual "$UV_BIN" python install "$MANAGED_PYTHON_REQUEST" \
+			--offline --no-config --python-downloads-json-url "$SCRIPT_DIR/$MANAGED_PYTHON_DOWNLOADS_BASENAME" >&2
+	)
 	rc=$?
-	rm -rf "$work"
 	[ "$rc" -eq 0 ] || return "$rc"
 	python_path="$("$UV_BIN" python find "$MANAGED_PYTHON_REQUEST" --offline)" || return 1
 	[ -x "$python_path" ] && ! lacks_native_slice "$python_path" || return 1

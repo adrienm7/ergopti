@@ -169,7 +169,13 @@ class MenuPopulation {
 		this.Started := true
 		this.Timer := ObjBindMethod(this, "Pump")
 		try LoggerStart("MenuPopulation", "Prewarming {1} native leaf menu(s)…", this.Pending.Count)
-		SetTimer(this.Timer, -MENU_POPULATION_TICK_MS, MENU_POPULATION_THREAD_PRIORITY)
+		try SetTimer(this.Timer, -MENU_POPULATION_TICK_MS, MENU_POPULATION_THREAD_PRIORITY)
+		catch as FirstError {
+			try this.Stop()
+			catch as CleanupError
+				FirstError.MenuPopulationRetirementError := CleanupError
+			throw FirstError
+		}
 		return true
 	}
 
@@ -182,8 +188,15 @@ class MenuPopulation {
 		}
 		for Handle in this.Pending {
 			this.Complete(Handle, "background", 0, MENU_POPULATION_BATCH_ROWS)
-			if this.Pending.Count > 0 && HasMethod(this.Timer, "Call")
-				SetTimer(this.Timer, -MENU_POPULATION_TICK_MS, MENU_POPULATION_THREAD_PRIORITY)
+			if this.Pending.Count > 0 && HasMethod(this.Timer, "Call") {
+				try SetTimer(this.Timer, -MENU_POPULATION_TICK_MS, MENU_POPULATION_THREAD_PRIORITY)
+				catch as FirstError {
+					try this.Stop()
+					catch as CleanupError
+						FirstError.MenuPopulationRetirementError := CleanupError
+					throw FirstError
+				}
+			}
 			return
 		}
 		this.Stop(true)

@@ -31,7 +31,7 @@
 ; that splits the burst, or drops the Critical, fails this test instead of
 ; silently reintroducing a corruption class that took a full audit to diagnose.
 ;
-; See docs/PROJECT_MEMORY.md, project-typing-order-and-atomicity.
+; See docs/memory, project-typing-order-and-atomicity.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

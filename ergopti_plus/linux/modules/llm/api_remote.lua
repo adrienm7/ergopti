@@ -203,14 +203,14 @@ local function catalogue()
 	local closed = fh and fh:close()
 	local cloud_published
 	_catalogue, cloud_published = M.parse_catalogue(text)
-	local order, servers, local_published = LocalCatalogue.load(_catalogue.providers)
+	local order, servers, local_published, _, request_fields = LocalCatalogue.load(_catalogue.providers)
 	_catalogue.config_cloud_published = cloud_published == true and type(text) == "string" and closed == true
 	_catalogue.config_local_published = local_published == true
 	_catalogue.local_servers = servers
 	for _, id in ipairs(order) do
 		local desc = servers[id]
 		_catalogue.providers[id] = { id = id, label = desc.label, base_url = desc.base_url,
-			default_model = "", format = "openai", model_extras = {} }
+			default_model = "", format = "openai", model_extras = {}, request_fields = request_fields }
 		_catalogue.order[#_catalogue.order + 1] = id
 	end
 	return _catalogue
@@ -457,6 +457,9 @@ function M.build_request(entry, messages, opts)
 		-- Per-model fields from the catalogue (Cerebras' qwen reasons at length
 		-- unless told not to), never restated here.
 		for field, value in pairs(provider.model_extras[model] or {}) do payload[field] = value end
+		-- A local server also gets the shared local_servers.json request
+		-- fields (thinking off), never over a field already set.
+		AuthPolicy.apply_request_fields(payload, provider.request_fields)
 	end
 	local body = Json.encode(payload)
 	if type(body) ~= "string" then return nil, "request could not be encoded" end

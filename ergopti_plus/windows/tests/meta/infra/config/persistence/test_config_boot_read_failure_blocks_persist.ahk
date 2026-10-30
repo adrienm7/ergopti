@@ -527,10 +527,13 @@ _CBRF_SaveFixtureRestoresPendingCaller() {
 	try {
 		_ConfigFullSaveCoordinator(Caller)
 		for FailAfterRefusal in [false, true] {
-			Threw := ""
+			Threw := "", ContractThrew := false
 			try _CBRF_SaveDeclinesWhileFlagged(FailAfterRefusal)
-			catch as Err
+			catch as Err {
+				ContractThrew := true
 				Threw := Err.Message
+			}
+			AssertEqual(FailAfterRefusal, ContractThrew, "The real cleanup fixture must preserve its actual exception outcome.")
 			AssertEqual(FailAfterRefusal ? "CBRF fixture cleanup control after genuine refusal" : "", Threw)
 			AssertTrue(_ConfigFullSaveCoordinator() == Caller, "cleanup must restore the original caller object after either exit")
 			AfterProperties := Map()

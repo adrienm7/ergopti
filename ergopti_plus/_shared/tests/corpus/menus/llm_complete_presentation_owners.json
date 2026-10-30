@@ -8,17 +8,7 @@
 				"hs": "macos/ui/menu/menu_llm/init.lua"
 			},
 			"signatures": {
-				"ahk": "_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {",
-				"hs": "local function build_item()"
-			}
-		},
-		{
-			"parent": "llm_model",
-			"section": "llm_after_model_boundary",
-			"owners": {
-				"hs": "macos/ui/menu/menu_llm/init.lua"
-			},
-			"signatures": {
+				"ahk": "_LLM_Menu_EmitRow(id, disabled) {",
 				"hs": "local function build_item()"
 			}
 		},
@@ -50,7 +40,7 @@
 				"hs": "macos/ui/menu/menu_llm/init.lua"
 			},
 			"signatures": {
-				"ahk": "_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {",
+				"ahk": "_LLM_Menu_EmitRow(id, disabled) {",
 				"hs": "local function build_item()"
 			}
 		},
@@ -195,15 +185,6 @@
 		"section": "llm_menu",
 		"rows": [
 			{
-				"preceding_id": "llm_model",
-				"declaration": {
-					"type": "list",
-					"id": "llm_after_model_boundary",
-					"platforms": ["hs"],
-					"unavailable": "hide"
-				}
-			},
-			{
 				"preceding_id": "llm_profile",
 				"declaration": {
 					"type": "list",
@@ -215,13 +196,6 @@
 		],
 		"owner": "macos/ui/menu/menu_llm/init.lua",
 		"signature": "local function build_item()",
-		"linux_presentation_boundary": {
-			"preceding_id": "llm_after_model_boundary",
-			"declaration": {
-				"type": "---",
-				"platforms": ["linux"],
-				"unavailable": "hide"
-			}
-		}
+		"adjacent_without_boundary": ["llm_model", "llm_profile"]
 	}
 }

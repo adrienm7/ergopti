@@ -3,48 +3,41 @@
 ; ==============================================================================
 ; MODULE: TimerScheduler Adapter Unit Tests
 ; DESCRIPTION:
-; Validates the TimerScheduler adapter contract without triggering real OS
-; timers. Tests inject a recording stub for SetTimer / callback execution
-; and drive callbacks manually via _TimerAdapterMakeOneShot / _TimerAdapterMakeRepeating
-; to assert handle lifecycle, activeCount, and exception isolation.
-;
-; APPROACH:
-; AHK v2 SetTimer fires asynchronously so we cannot assert side effects after
-; a delay. Instead we:
-;   1. Call TimerAfter/TimerEvery to get a handle and its wrapped BoundFn.
-;   2. Invoke BoundFn() directly — this simulates the OS firing the timer.
-;   3. Assert the handle and registry state are updated correctly.
-; This gives deterministic results with zero real timers created.
+; Validates native timer handles, callback lifecycle, activeCount, cancellation,
+; and exception isolation. Logical delivery tests explicitly consume the actual
+; native one-shot before invoking its callback. Native controls prove delivery
+; and physical retirement while an independent heartbeat pumps the message loop.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 
-; Reset registry before each logical group so handles from one test do not
-; bleed into the next.
+; One fixture owner retires native callbacks before removing logical identities.
+; Disarm both callbacks independently of the cancellation behavior under test,
+; then require its logical acknowledgement. A refusal keeps the registry owner.
 _TS_ResetRegistry() {
 	global _TIMER_ADAPTER_REGISTRY
-	; Disarm any REAL OS timer a prior test left armed before discarding the
-	; registry. The adapter calls the genuine AHK SetTimer, so a test that arms a
-	; handle without firing OR cancelling it (the "Fired is false" lifecycle test
-	; arms a -1 ms one-shot and only asserts the flag) leaves an overdue timer that
-	; later dispatches and, via _OneShot, Deletes an entry from whatever registry is
-	; current THEN — corrupting a later test's live count. That was the cancelAll
-	; flake (expected 3, got 2). Drain here to stop the cross-test bleed at source.
-	for _, H in _TIMER_ADAPTER_REGISTRY {
-		if (H is Map and H.Has("Fn") and H["Fn"] != 0)
-			try SetTimer(H["Fn"], 0)
-	}
-	_TIMER_ADAPTER_REGISTRY := Map()
-	; Deliberately do NOT reset _TIMER_ADAPTER_NEXT_ID: ids stay monotonic across
-	; tests so that if a stale timer ever does dispatch, its now-defunct id cannot
-	; collide with — and evict — a live handle a later test registered under a
-	; reused id (_OneShot guards its Delete with Has(Id), so a defunct id is a
-	; harmless no-op). Belt-and-suspenders with the drain above.
+	PreviousCritical := Critical("On")
+	try {
+		for _, Handle in _TIMER_ADAPTER_REGISTRY.Clone()
+			_TSTest_RetireHandle(Handle)
+		AssertEqual(0, _TIMER_ADAPTER_REGISTRY.Count,
+			"fixture reset cannot discard an unacknowledged timer owner")
+		; Identities remain monotonic; cleanup never makes a stale callback current.
+	} finally Critical(PreviousCritical)
 }
 
 
-
+; Cleanup knows every frozen callback even if a failed assertion lost its registry entry.
+_TSTest_RetireHandle(Handle) {
+	AssertTrue(Handle is Map, "the timer fixture registry requires an owned handle")
+	for Key in ["Fn", "RequeuedFn"] {
+		Callback := Handle.Get(Key, 0)
+		if Callback != 0
+			SetTimer(Callback, 0)
+	}
+	AssertTrue(TimerCancel(Handle), "fixture reset requires acknowledged logical timer retirement")
+}
 
 ; Consume the exact native one-shot before modeling its OS delivery. A direct
 ; function call alone would leave the real timer armed after logical retirement.
@@ -328,30 +321,69 @@ _TSTest_CancelAllDrainsRegistry() {
 }
 Test("TimerScheduler — cancelAll(): drains all live handles", _TSTest_CancelAllDrainsRegistry)
 
-; Regression for the intermittent cancelAll flake (expected 3, got 2): a stale OS
-; timer leaked by an EARLIER test (armed, never fired or cancelled) must never evict
-; a LIVE handle when it finally dispatches. The old _TS_ResetRegistry reset the id
-; counter to 0 each test, so the leaked handle's id (1) was reused by a later test's
-; first handle; the leaked timer's _OneShot then Deleted that live entry, dropping
-; the count. With monotonic ids (+ the reset-time drain) the stale id is defunct and
-; _OneShot's Has(Id) guard makes its Delete a no-op. Reproduced deterministically by
-; invoking the leaked handle's bound fn directly — no real-timer timing dependency.
+; Reenact the original allocator-rewind fault inside one Critical span. The
+; abandoned callback stays logically pending while three genuine handles are
+; allocated, including a different live owner under its old id. This reaches
+; the registry identity fence rather than a cancelled/Fired short circuit.
 _TSTest_StaleTimerCannotEvictLiveHandle() {
+	global _TIMER_ADAPTER_REGISTRY, _TIMER_ADAPTER_NEXT_ID
+	static RetirementDebt := []
+	AssertEqual(0, RetirementDebt.Length, "an earlier stale fixture still owns callback retirement")
 	_TS_ResetRegistry()
-	; Leak a handle exactly like the "Fired is false" lifecycle test: armed via the
-	; adapter, never fired and never cancelled.
-	Leaked := TimerAfter(0.001, () => 0)
-	_TS_ResetRegistry()   ; begin a fresh logical group, as the next test would
-	; Three fresh LIVE handles — the cancelAll scenario.
-	TimerAfter(1, () => 0)
-	TimerAfter(2, () => 0)
-	TimerEvery(3, () => 0)
-	AssertEqual(3, TimerActiveCount(), "three live handles before the stale fire")
-	; Simulate the leaked OS timer finally dispatching its _OneShot wrapper.
-	Leaked["Fn"]()
-	AssertEqual(3, TimerActiveCount(),
-		"a stale leaked timer's fire must NOT evict a live handle (id-reuse regression)")
-	TimerCancelAll()   ; tidy: disarm this test's three real timers
+	Owners := [], Failure := 0
+	HighWater := _TIMER_ADAPTER_NEXT_ID
+	PreviousCritical := Critical("On")
+	try {
+		Leaked := TimerAfter(0.001, () => 0)
+		Owners.Push(Leaked)
+		HighWater := Max(HighWater, _TIMER_ADAPTER_NEXT_ID)
+		LeakedFn := Leaked["Fn"]
+		SetTimer(LeakedFn, 0)
+		AssertTrue(_TIMER_ADAPTER_REGISTRY.Has(Leaked["Id"])
+			&& _TIMER_ADAPTER_REGISTRY[Leaked["Id"]] == Leaked,
+			"unpublication must own the exact stale fixture identity")
+		_TIMER_ADAPTER_REGISTRY.Delete(Leaked["Id"])
+		_TIMER_ADAPTER_NEXT_ID := Leaked["Id"] - 1
+		for Delay in [1, 2]
+			Owners.Push(TimerAfter(Delay, () => 0))
+		Owners.Push(TimerEvery(3, () => 0))
+		AssertEqual(Leaked["Id"], Owners[2]["Id"], "positive control: the fault really reuses the abandoned id")
+		AssertTrue(_TIMER_ADAPTER_REGISTRY[Leaked["Id"]] == Owners[2]
+			&& Owners[2] != Leaked, "the reused key must belong to a different real live handle")
+		AssertEqual(3, TimerActiveCount(), "three live handles before the stale fire")
+		AssertFalse(Leaked["Fired"], "the stale wrapper must reach its registry fence, not a terminal-marker short circuit")
+		_TestPrint("# stale_registry_guard old_id=" . Leaked["Id"] . " live_id=" . Owners[2]["Id"]
+			. " before=" . TimerActiveCount() . " old_fired=" . Leaked["Fired"])
+		LeakedFn.Call()
+		_TestPrint("# stale_registry_guard after=" . TimerActiveCount())
+		AssertEqual(3, TimerActiveCount(),
+			"a stale leaked timer's fire must NOT evict a live handle (id-reuse regression)")
+	} catch as PrimaryFailure {
+		Failure := PrimaryFailure
+	} finally {
+		try {
+			_TIMER_ADAPTER_NEXT_ID := Max(HighWater, _TIMER_ADAPTER_NEXT_ID)
+			for Handle in Owners {
+				try _TSTest_RetireHandle(Handle)
+				catch as CleanupFailure {
+					RetirementDebt.Push(Handle)
+					if IsObject(Failure)
+						Failure.Message .= " Owned callback cleanup also failed: " . CleanupFailure.Message
+					else
+						Failure := CleanupFailure
+				}
+			}
+			try _TS_ResetRegistry()
+			catch as CleanupFailure {
+				if IsObject(Failure)
+					Failure.Message .= " Registry cleanup also failed: " . CleanupFailure.Message
+				else
+					Failure := CleanupFailure
+			}
+		} finally Critical(PreviousCritical)
+	}
+	if IsObject(Failure)
+		throw Failure
 }
 Test("TimerScheduler — a stale leaked timer cannot evict a live handle (id-reuse regression)",
 	_TSTest_StaleTimerCannotEvictLiveHandle)

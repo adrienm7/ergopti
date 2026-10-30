@@ -43,7 +43,7 @@ helpers.assert_true(
 	has_gen_check,
 	"validation rollback must own the live mutation lease before reverting (ui-menu-llm-core-4)"
 )
-local on_missing_pos = src:find("function(_unreachable)", rollback_pos, true)
+local on_missing_pos = src:find("function(_unreachable, status)", rollback_pos, true)
 helpers.assert_true(on_missing_pos ~= nil,
 	"api_panel.lua must define on_missing callback (ui-menu-llm-core-4)")
 local on_missing_body = src:sub(on_missing_pos, on_missing_pos + 400)

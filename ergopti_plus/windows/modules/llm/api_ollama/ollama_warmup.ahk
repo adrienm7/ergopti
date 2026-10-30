@@ -105,11 +105,7 @@ LLM_OllamaWarmup(model) {
 		; Only this committed request can defer an ordinary retry. Its original
 		; model, origin custody, generation and absolute deadline remain retained.
 		_LLM_Ollama_WarmupPendingFn := PendingRequest
-		_LLM_Ollama_PollGeneric(Request,
-			(status, _body) => CurrentRequest() ? _LLM_Ollama_OnWarmupDone(status, gen)
-				: _LLM_Ollama_OnWarmupPollFailed("source_withdrawal", gen),
-			() => _LLM_Ollama_OnWarmupPollFailed("timeout", gen),
-			Started, WarmupTimeoutBudget, _LLM_OLLAMA_WARMUP_POLL_MS)
+		_LLM_Ollama_PollWarmupRequest(Request, CurrentRequest, gen, Started, WarmupTimeoutBudget)
 	} catch as e {
 		try LoggerWarn("LLM.ollama", "Warmup POST failed: {1}.", e.Message)
 		RetireRequest()
@@ -126,9 +122,18 @@ LLM_OllamaWarmup(model) {
 	}
 
 	PendingRequest(ExpectedModel) {
-		return ExpectedModel == model && CurrentRequest()
-			&& !_LLM_DeadlineExpired(Started, WarmupTimeoutBudget) && !Request.WaitForResponse(0) && CurrentRequest()
-			&& !_LLM_DeadlineExpired(Started, WarmupTimeoutBudget)
+		global _LLM_Ollama_IsReady
+		if !(ExpectedModel == model) || !CurrentRequest() || _LLM_DeadlineExpired(Started, WarmupTimeoutBudget)
+			return false
+		Completed := Request.Completed
+		if !CurrentRequest() || _LLM_DeadlineExpired(Started, WarmupTimeoutBudget)
+			return false
+		if !Completed
+			return true
+		; Native completion can precede the separate ready poll. Settle the
+		; original response through that same owner before acquiring a retry.
+		_LLM_Ollama_PollWarmupRequest(Request, CurrentRequest, gen, Started, WarmupTimeoutBudget)
+		return _LLM_Ollama_IsReady
 	}
 
 	RetireRequest() {
@@ -147,6 +152,22 @@ LLM_OllamaWarmup(model) {
 		}
 		return false
 	}
+}
+
+; Initial polling and a due retry consume the same response and absolute budget.
+_LLM_Ollama_PollWarmupRequest(Request, CurrentFn, Generation, Started, TimeoutBudget) {
+	global _LLM_OLLAMA_WARMUP_POLL_MS
+	return _LLM_Ollama_PollGeneric(Request,
+		_LLM_Ollama_OnWarmupPollResult.Bind(CurrentFn, Generation),
+		_LLM_Ollama_OnWarmupPollFailed.Bind("timeout", Generation),
+		Started, TimeoutBudget, _LLM_OLLAMA_WARMUP_POLL_MS)
+}
+
+_LLM_Ollama_OnWarmupPollResult(CurrentFn, Generation, Status, Body) {
+	if CurrentFn.Call()
+		_LLM_Ollama_OnWarmupDone(Status, Generation)
+	else
+		_LLM_Ollama_OnWarmupPollFailed("source_withdrawal", Generation)
 }
 
 _LLM_Ollama_OnWarmupPollFailed(reason, gen := 0) {
@@ -206,7 +227,7 @@ LLM_OllamaScheduleWarmupRetry(model := "") {
 
 LLM_Ollama_WarmupRetryTick() {
 	global _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupRetryModel, _LLM_Ollama_Async
-	global _LLM_Ollama_WarmupRetryFn, _LLM_Ollama_WarmupPendingFn
+	global _LLM_Ollama_WarmupRetryFn, _LLM_Ollama_WarmupPendingFn, _LLM_Ollama_WarmupGeneration
 	; TERMINAL condition: warmup succeeded, the chain is done.
 	if LLM_OllamaIsReady()
 		return
@@ -230,12 +251,18 @@ LLM_Ollama_WarmupRetryTick() {
 	}
 	; A retry observes the admitted request instead of cancelling a cold model load.
 	if HasMethod(_LLM_Ollama_WarmupPendingFn, "Call") {
+		ObservedGeneration := _LLM_Ollama_WarmupGeneration
+		PendingFn := _LLM_Ollama_WarmupPendingFn
 		try {
-			if _LLM_Ollama_WarmupPendingFn.Call(_LLM_Ollama_WarmupRetryModel)
+			if PendingFn.Call(_LLM_Ollama_WarmupRetryModel)
 				return
 		} catch as PendingError {
 			LoggerWarn("LLM.ollama", "Warmup pending observation failed: {1}.", PendingError.Message)
 		}
+		; Origin observation can pump an explicit cancellation or replacement.
+		; A revoked retry must not acquire a new request or recreate its timer.
+		if ObservedGeneration != _LLM_Ollama_WarmupGeneration
+			return
 	}
 	_LLM_Ollama_WarmupRetryIntervalMs := Min(_LLM_Ollama_WarmupRetryIntervalMs * 2, 60000)
 	try LoggerInfo("LLM.ollama", "Warmup retry in {1} ms for '{2}'.",

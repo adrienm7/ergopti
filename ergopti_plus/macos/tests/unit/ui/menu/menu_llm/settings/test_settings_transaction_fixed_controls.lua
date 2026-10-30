@@ -55,7 +55,7 @@ helpers.describe("Complete LLM fixed controls: real transaction owners", functio
 		end)
 	end)
 
-	for _, section in ipairs({ "llm_generation_native_controls", "llm_after_model_boundary", "llm_after_profile_boundary" }) do
+	for _, section in ipairs({ "llm_generation_native_controls", "llm_after_profile_boundary" }) do
 		helpers.it("refuses the actual missing " .. section .. " before native action delivery and repairs it", function()
 			with_fixture({ parent_only = true }, function(f)
 				local rebuild = f.top_level_callbacks().rebuild
@@ -210,7 +210,7 @@ end)
 
 
 helpers.describe("Complete LLM outer boundary context", function()
-	helpers.it("keeps the actual model and profile boundaries in the complete parent", function()
+	helpers.it("joins the model and profile rows and keeps the after-profile boundary", function()
 		with_fixture({parent_only = true}, function(fixture)
 			local callbacks = fixture.top_level_callbacks()
 			local rows = callbacks.rebuild()
@@ -221,18 +221,18 @@ helpers.describe("Complete LLM outer boundary context", function()
 				if type(row.title) == "string" and row.title:find(emoji .. " ", 1, true) then model = index end
 			end
 			helpers.assert_type(model, "number")
-			helpers.assert_eq(rows[model + 1].title, "-", "the original after-model boundary remains")
-			helpers.assert_eq(rows[model + 3].title, "-", "the original after-profile boundary remains")
+			helpers.assert_true(rows[model + 1].title ~= "-", "no separator between the model and the profile rows")
+			helpers.assert_eq(rows[model + 2].title, "-", "the original after-profile boundary remains")
 			local renderer = package.loaded["infra.manifest_menu"]
-			local fragment = renderer.get_array("llm_after_model_boundary")
+			local fragment = renderer.get_array("llm_after_profile_boundary")
 			local original = fragment[1]
 			local ok, err = xpcall(function()
-				fragment[1] = {type = "command", id = "unbound_actual_model_boundary", i18n = "button.cancel"}
+				fragment[1] = {type = "command", id = "unbound_actual_profile_boundary", i18n = "button.cancel"}
 				helpers.assert_nil(callbacks.rebuild(), "unbound complete-parent boundary refuses construction")
 			end, debug.traceback)
 			fragment[1] = original
 			if not ok then error(err, 0) end
-			helpers.assert_eq(callbacks.rebuild()[model + 1].title, "-", "exact original repairs the same whole context")
+			helpers.assert_eq(callbacks.rebuild()[model + 2].title, "-", "exact original repairs the same whole context")
 		end)
 	end)
 end)

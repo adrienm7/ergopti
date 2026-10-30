@@ -1097,6 +1097,18 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 		end)
 	end)
 
+	helpers.it("(lease-streamed-exit-reason) retains the streamed worker refusal on exit", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.spawns[1].on_chunk(ctx.spawns[1], "", "lease worker: inner silence budget expired\n")
+			ctx.complete(1, 73, "")
+			helpers.assert_eq(level_lines(ctx, "error",
+				"watchdog exited unexpectedly (exit 73): lease worker: inner silence budget expired"), 1)
+		end)
+	end)
+
 	helpers.it("(lease-timeout-evidence) a slow READY reports how long it took", function()
 		with_fixture(function(load_controller)
 			local controller, ctx = load_controller()

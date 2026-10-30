@@ -1133,7 +1133,8 @@ _LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine := true, Curre
 	if Target.Has("resolved") {
 		Resolved := Target["resolved"]
 		Body := _LLMRemoteBuildPayload(Resolved["Format"], Resolved["Model"], Payload["system"],
-			Payload["user"], _LLM_Engine["temperature"] + 0.0, Payload["max_tokens"], Resolved["Extras"])
+			Payload["user"], _LLM_Engine["temperature"] + 0.0, Payload["max_tokens"], Resolved["Extras"],
+			Resolved.Has("RequestFields") ? Resolved["RequestFields"] : Map())
 	} else {
 		Body := LLM_Vision_BuildRequest(Target["format"], Map(
 			"model", Backend["model"],

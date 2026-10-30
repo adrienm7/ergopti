@@ -96,10 +96,20 @@ _LCRA_Run(World, Mode) {
 		Old := World.Requests[1]
 		AssertTrue(Old != Live && Old.Path != Live.Path)
 		World.Complete(Old, 200, '"A"')
-		World.Poll(Old)
-		AssertEqual(1, World.Results.Length, "late completion cannot settle the already-retired exchange twice")
-		AssertTrue(FileExist(Live.Path), "late old cleanup cannot remove the successor response")
-		AssertFalse(FileExist(Old.Path), "late terminal cleans only its own private response")
+		AssertFalse(FileExist(Old.Path), "acknowledged retirement already removed the exact private response")
+		; An independent writer may reuse the retired name; late cleanup no longer
+		; owns that pathname and must leave the foreign file untouched.
+		Foreign := "foreign replacement é`r`n"
+		_LCR_Write(Old.Path, Foreign)
+		try {
+			World.Poll(Old)
+			AssertEqual(1, World.Results.Length, "late completion cannot settle the already-retired exchange twice")
+			AssertTrue(FileExist(Live.Path), "late old cleanup cannot remove the successor response")
+			AssertEqual(Foreign, FileRead(Old.Path, "UTF-8-RAW"), "late terminal cleans only its own private response")
+		} finally {
+			if FileExist(Old.Path)
+				FileDelete(Old.Path)
+		}
 	}
 	World.Poll(Live)
 	AssertEqual(2, World.Results.Length)

@@ -134,11 +134,13 @@ _ORRC_RetiredBootstrapCallback() {
 		Critical("Off")
 		AssertTrue(F.Bootstrap.Flow.Cancel(), "the real bootstrap must retire its exact runtime owner")
 		AssertFalse(F.Runtime.Owner.HasOwner())
-		Failure := ""
+		Failure := "", ContractThrew := false
 		try F.Callback.Call(F.Target.Clone(), F.Receipt.Clone())
-		catch as Err
+		catch as Err {
+			ContractThrew := true
 			Failure := Err.Message
-		AssertEqual("", Failure, "a retained real bootstrap callback cannot dereference a retired runtime record")
+		}
+		AssertFalse(ContractThrew, "a retained real bootstrap callback cannot dereference a retired runtime record: " . Failure)
 		AssertFalse(F.Bootstrap.Flow.ServerReady, "a retired callback cannot publish server metadata")
 		AssertFalse(F.Bootstrap.Flow.Ready)
 		AssertEqual(0, F.Bootstrap.ReadyCalls)

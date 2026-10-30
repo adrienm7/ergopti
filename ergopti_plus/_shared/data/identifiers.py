@@ -35,3 +35,9 @@ DEV_SOURCE = {
     "plist_key": "ErgoptiDevSourceRoot",
     "environment": "ERGOPTI_DEV_SOURCE_ROOT",
 }
+
+FIELD_REPORT = {
+    "branch_prefix": "field/",
+    "folder": "docs/field-reports",
+    "base_config_key": "ergoptiFieldBase",
+}

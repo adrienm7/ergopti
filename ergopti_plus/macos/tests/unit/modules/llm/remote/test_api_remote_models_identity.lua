@@ -5,6 +5,8 @@
 --- DESCRIPTION:
 --- Proves that an HTTP success is not enough to establish remote readiness.
 --- Warmup and availability must both require a provider-shaped models payload.
+--- A refused key reaches the caller as its HTTP status, so the add-entry flow
+--- can name the key instead of reporting an endpoint that did not answer.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -80,9 +82,10 @@ local function exercise(api, format, response)
 
 		helpers.assert_true(api.check_availability("fixture-model",
 			function() result.available = result.available + 1 end,
-			function(unreachable)
+			function(unreachable, status)
 				result.missing = result.missing + 1
 				result.unreachable = unreachable
+				result.status = status
 			end))
 		helpers.assert_eq(type(check_callback), "function")
 		check_callback(response)
@@ -154,4 +157,29 @@ helpers.describe("HS-097 remote models endpoint identity", function()
 			helpers.assert_eq(result.missing, 0)
 		end)
 	end
+
+	helpers.it("hands a refused key's HTTP status to the missing callback and logs it", function()
+		package.loaded["modules.llm.api_remote"] = nil
+		local api = helpers.load_with_stubs("modules.llm.api_remote")
+		local logger = get_upvalue(api.warmup, "Logger")
+		local original_warn = logger.warn
+		local warnings = {}
+		logger.warn = function(_, message, ...)
+			warnings[#warnings + 1] = string.format(message, ...)
+		end
+		local ok, err = xpcall(function()
+			local result = exercise(api, "openai", { ok = false, status = 401, body = "" })
+			helpers.assert_eq(result.missing, 1)
+			helpers.assert_eq(result.unreachable, false, "an endpoint that answered 401 is reachable")
+			helpers.assert_eq(result.status, 401,
+				"the caller needs the status to tell a refused key from a silent endpoint")
+			local rendered = table.concat(warnings, "\n")
+			helpers.assert_true(rendered:find("answered HTTP 401", 1, true) ~= nil,
+				"a failed availability check must say what the endpoint answered")
+			helpers.assert_true(rendered:find("plain-token", 1, true) == nil,
+				"health diagnostics must never expose credentials")
+		end, debug.traceback)
+		logger.warn = original_warn
+		if not ok then error(err, 0) end
+	end)
 end)

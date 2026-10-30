@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Layout Composer Store (Shared)
 --- DESCRIPTION:
---- The part of the per-layer layout composer (docs/layout-composer.md) that
+--- The part of the per-layer layout composer (docs/design/layout-composer.md) that
 --- macOS and Linux do the same way: what the composer page may save, the
 --- installed-layout record entry built from the compiled file, which layouts
 --- the page may compose from, and the open, save and remove operations over

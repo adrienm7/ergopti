@@ -167,7 +167,7 @@ end)
 -- ===============================================
 -- ===============================================
 -- Critical: pause must fully silence features (no LLM, keystats, gestures, tooltips,
--- predictions, etc.). See project_suspend_pause_invariant in PROJECT_MEMORY.
+-- predictions, etc.). See project_suspend_pause_invariant in docs/memory.
 -- These tests ensure the guard is present and works for new paths.
 
 helpers.describe("ScriptControl pause invariant", function()

@@ -19,17 +19,21 @@ local function with_clipboard(read_ok, read_value, body)
 	local previous = {}
 	for key, name in pairs(names) do previous[key] = package.loaded[name] end
 
-	local shell = { writes = {} }
+	-- A completed write is what the next read sees, as on a real clipboard.
+	local shell = { writes = {}, value = read_value }
 	function shell.has_command() return true end
-	function shell.exec() return read_ok and read_value or "" end
+	function shell.exec() return read_ok and shell.value or "" end
 	function shell.exec_checked()
-		return read_ok, read_ok and read_value or "", read_ok and nil or "clipboard read failed"
+		return read_ok, read_ok and shell.value or "", read_ok and nil or "clipboard read failed"
 	end
 	function shell.with_exact_stdin(command, text)
 		shell.writes[#shell.writes + 1] = { command = command, text = text }
 		return command
 	end
-	function shell.run() return true end
+	function shell.run()
+		shell.value = shell.writes[#shell.writes].text
+		return true
+	end
 
 	package.loaded[names.shell] = shell
 	package.loaded[names.display] = {
@@ -80,6 +84,17 @@ helpers.describe("clipboard paste snapshot", function()
 			helpers.assert_eq(#shell.writes, 2, "the replacement and empty restoration must both be written")
 			helpers.assert_eq(shell.writes[2].text, "", "restore must preserve the original empty state")
 			helpers.assert_eq(#uinput.emitted, 4, "one complete Ctrl+V chord must be emitted")
+		end)
+	end)
+
+	helpers.it("keeps a copy another application made during the paste", function()
+		with_clipboard(true, "saved", function(clipboard, shell)
+			local uinput = channel()
+			local result = clipboard.paste_text("replacement", uinput, function() shell.value = "copied elsewhere" end)
+
+			helpers.assert_eq(result, true, "the paste itself succeeded")
+			helpers.assert_eq(#shell.writes, 1, "nothing is restored over the other application's copy")
+			helpers.assert_eq(shell.value, "copied elsewhere")
 		end)
 	end)
 

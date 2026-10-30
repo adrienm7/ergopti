@@ -4432,6 +4432,11 @@ id = "---"
 [[menu.top_level]]
 id = "llm"
 greyed_when_paused = true
+# The AI title carries the backend health dot on every driver (maintainer,
+# 2026-10-29): ready once the model answers, warming while the server answers
+# but the model loads, unreachable when the server is silent or the model was
+# given up on. No dot while the AI is off or paused, or before a first probe.
+health_dot = { ready = "🟢", warming = "🟡", unreachable = "🔴" }
 
 [[menu.top_level]]
 id = "agent"
@@ -4575,7 +4580,6 @@ rows = []
 # `disabled_when_off` is the greying policy the retired spec owned: false means
 # the row stays usable while the feature is OFF, so the user can configure a
 # backend and a model before enabling anything. Everything else greys out.
-# `health_dot` marks the one row that carries the backend-reachability dot.
 # The IA master gate, and like every `toggle` the first row of its submenu: a
 # checkbox labelled by ONE key and ticked from checked_when. The two alternating
 # « activée (cliquer pour désactiver) » labels it replaced were a status line
@@ -4627,27 +4631,15 @@ status_rows.unavailable = [
 ]
 i18n = "menu.llm.model_label"
 disabled_when_off = false
-health_dot = true
 platforms = ["ahk", "hs", "linux"]
 
-# The macOS native model bucket ends here; the whole renderer owns this boundary.
-[[menu.llm_menu]]
-type = "list"
-id = "llm_after_model_boundary"
-platforms = ["hs"]
-unavailable = "hide"
-
-[[menu.llm_menu]]
-type = "---"
-platforms = ["linux"]
-unavailable = "hide"
-
+# The model and the prompt rows form one block on every driver: no separator
+# between them (maintainer, 2026-10-29).
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_profile"
 i18n = "menu.profiles.profile_label_prefix"
 disabled_when_off = true
-health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
 # Keep the macOS profile boundary in the complete parent, where separators defer.
@@ -4666,7 +4658,6 @@ type = "group"
 id = "llm_trigger"
 i18n = "menu.llm.trigger_menu_title"
 disabled_when_off = true
-health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
 
@@ -4675,7 +4666,6 @@ type = "group"
 id = "llm_generation_settings"
 i18n = "menu.llm.generation_menu_title"
 disabled_when_off = true
-health_dot = false
 platforms = ["ahk", "hs"]
 reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
 
@@ -4690,7 +4680,6 @@ type = "group"
 id = "llm_display"
 i18n = "menu.llm.display_menu_title"
 disabled_when_off = true
-health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
@@ -4698,7 +4687,6 @@ type = "group"
 id = "llm_navigation"
 i18n = "menu.llm.nav_menu_title"
 disabled_when_off = true
-health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
 # The About submenu. Declared 2026-08-07; it had no description on any driver,
@@ -4714,6 +4702,9 @@ platforms = ["ahk", "hs", "linux"]
 [[menu.about_update_channel_menu]]
 type = "choice"
 id = "update_channel"
+# A local version installs nothing: greyed with its reason by the shared renderer.
+disabled_when = ["installed_build"]
+disabled_reason_key = "menu.about.source_run_reason"
 path = "updater.channel"
 i18n = "menu.about.channel_menu"
 choice_registry = "updater.channels"
@@ -4725,6 +4716,9 @@ current_choice_placeholder = "{channel}"
 [[menu.about_update_frequency_menu]]
 type = "choice"
 id = "update_check_interval"
+# A local version installs nothing: greyed with its reason by the shared renderer.
+disabled_when = ["installed_build"]
+disabled_reason_key = "menu.about.source_run_reason"
 path = "updater.check_interval_seconds"
 i18n = "menu.about.frequency_menu"
 choice_registry = "updater.check_intervals"
@@ -8596,10 +8590,6 @@ i18n = "menu.llm.show_download_window"
 platforms = ["hs"]
 unavailable = "hide"
 
-[[menu.llm_after_model_boundary]]
-type = "---"
-platforms = ["hs"]
-unavailable = "hide"
 # Personal hotstring frames retain native source inventory and callback owners.
 [[menu.hotstring_personal_none]]
 type = "check"

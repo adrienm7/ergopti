@@ -13,7 +13,7 @@
 ; 1. Shared UX: one editor frontend for both drivers — fixing a wording or a
 ;    behaviour there updates Windows and macOS at once. The bridge mirrors the
 ;    proven onboarding WebView2 host (infra/webview_utils + vendor/WebView2), and
-;    carries the same four hard-won gotcha fixes (see PROJECT_MEMORY
+;    carries the same four hard-won gotcha fixes (see docs/memory
 ;    project-webview2-bridge-gotchas): show-before-create, virtual-host origin,
 ;    stored WebMessageReceived subscription, and fire-and-forget ExecuteScript.
 ; 2. Reuses the native I/O: ReadPersonalToml / WritePersonalToml /
@@ -31,7 +31,7 @@
 ; Virtual host mapped to the _shared tree so the editor loads from a stable
 ; origin (https://<host>/…) instead of an opaque file:// origin — file:// pages
 ; are unique security origins and the chrome.webview JS->AHK channel does not
-; reliably deliver from them (see PROJECT_MEMORY project-webview2-bridge-gotchas).
+; reliably deliver from them (see docs/memory project-webview2-bridge-gotchas).
 ; One host covers the frontend (ui/hotstring_editor/), the shared i18n.js
 ; (ui/i18n.js) and the locale JSON (data/locales/).
 global HSED_VHOST := "ergopti.hotstrings"   ; -> _SharedDir

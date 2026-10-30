@@ -46,7 +46,7 @@ local function with_swap(options, check)
 		assert(shell("mkdir -p " .. quote(app) .. " " .. quote(staged)) == 0)
 		write(app .. "/marker", "installed")
 		write(staged .. "/marker", "chosen")
-		if options.no_stage then assert(shell("rm -r " .. quote(staged)) == 0) end
+
 		local opened = dir .. "/opened"
 		local open = dir .. "/open"
 		write(open, "#!/bin/sh\n" .. 'printf "%s\\n" "$2" >> ' .. quote(opened) .. "\n"
@@ -54,17 +54,19 @@ local function with_swap(options, check)
 		assert(shell("chmod +x " .. quote(open)) == 0)
 		local script = require("modules.updater.release_installer").SWAP_SCRIPT
 			:gsub("/usr/bin/open", function() return open end)
-		if options.rollback_refused then
+		script = require("tests.support.release_swap_ports").observe(script, dir)
+		if options.publication_refused then
 			local move = dir .. "/move"
 			write(move, "#!/bin/sh\n" .. '[ "$2" = ' .. quote(previous)
-				.. ' ] && exit 44' .. "\n" .. 'exec /bin/mv "$@"' .. "\n")
+				.. ' ] && ' .. (options.rollback_refused and 'exit 44' or ':') .. "\n"
+				.. '[ \"$2\" = ' .. quote(staged) .. ' ] && exit 45' .. "\n" .. 'exec ' .. require("tests.support.release_swap_ports").command() .. ' --release-rename move \"$2\" \"$3\"' .. "\n")
 			assert(shell("chmod +x " .. quote(move)) == 0)
-			script = script:gsub("/bin/mv", function() return move end)
+			script = script:gsub('%"%$launcher%" %"%$rename_flag%" move', function() return move .. " --" end)
 		end
 		local acknowledgement = dir .. "/arming-receipt"
 		local receipt_route = options.arming_refused and " 3>&-" or " 3>" .. quote(acknowledgement)
-		local status, output = shell("/bin/sh -c " .. quote(script) .. " swap 999999999 "
-			.. quote(app) .. " " .. quote(staged) .. " " .. quote(previous) .. receipt_route)
+		local status, output = shell(require("tests.support.release_swap_ports").command() .. " --release-rename lock " .. quote(app)
+			.. " " .. quote(script) .. " 999999999 " .. quote(staged) .. " " .. quote(previous) .. receipt_route)
 		if not options.arming_refused then
 			helpers.assert_eq(read(acknowledgement), "ARMED\n", "the actual worker must acknowledge before moving any app")
 		end
@@ -97,7 +99,7 @@ helpers.describe("release swap physical command receipts", function()
 	end)
 
 	helpers.it("retains the previous app and reports a refused rollback (release-swap-receipts)", function()
-		with_swap({ no_stage = true, rollback_refused = true }, function(result)
+		with_swap({ publication_refused = true, rollback_refused = true }, function(result)
 			helpers.assert_nil(result.app)
 			helpers.assert_eq(result.previous, "installed")
 			helpers.assert_eq(result.opened, "", "Do not launch an app whose restoration failed")
@@ -117,7 +119,7 @@ helpers.describe("release swap physical command receipts", function()
 	end)
 
 	helpers.it("restores and opens the previous app after refused publication (release-swap-receipts)", function()
-		with_swap({ no_stage = true }, function(result)
+		with_swap({ publication_refused = true }, function(result)
 			helpers.assert_eq(result.status, 6, result.output)
 			helpers.assert_eq(result.app, "installed")
 			helpers.assert_nil(result.previous)

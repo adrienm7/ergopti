@@ -82,6 +82,7 @@ M.FAILURE_MODEL_MISSING = "model_missing"
 --- @return table servers Server id -> { id, label, base_url }.
 --- @return boolean published Complete same-source local inventory.
 --- @return table discovery Server id -> validated discovery descriptor.
+--- @return table request_fields Body fields of every request to a local server.
 local function load_catalogue()
 	local path = Paths.shared_llm_path("local_servers.json")
 	local raw, status = nil, "error"
@@ -89,12 +90,12 @@ local function load_catalogue()
 	if status ~= "ok" or type(raw) ~= "string" then
 		Logger.error(LOG, "local_servers.json is unreadable at %s (%s): no local server is detected.",
 			tostring(path), tostring(status))
-		return {}, {}, false
+		return {}, {}, false, {}, {}
 	end
 	local ok, root = pcall(JsonCodec.decode, raw)
 	if not ok or type(root) ~= "table" or type(root.server_order) ~= "table" or type(root.servers) ~= "table" then
 		Logger.error(LOG, "local_servers.json is malformed: no local server is detected.")
-		return {}, {}, false
+		return {}, {}, false, {}, {}
 	end
 	local source = Json.decode_lossless(raw)
 	local shaped = type(source) == "table" and not Json.is_array(source) and not Json.is_null(source)
@@ -112,11 +113,11 @@ local function load_catalogue()
 		if descriptor then discovery[id] = descriptor
 		else Logger.error(LOG, "local_servers.json: %s; that server is never probed.", reason) end
 	end
-	return order, servers, shaped and #order == #source.server_order, discovery
+	return order, servers, shaped and #order == #source.server_order, discovery, AuthPolicy.request_fields(root)
 end
 
 local config_published
-M.ORDER, M.SERVERS, config_published, M.DISCOVERY = load_catalogue()
+M.ORDER, M.SERVERS, config_published, M.DISCOVERY, M.REQUEST_FIELDS = load_catalogue()
 
 --- Reports admission of the original local catalogue, including a valid empty list.
 --- Runtime mutations and server reachability cannot grant inventory authority.
@@ -282,14 +283,34 @@ end
 
 --- Returns where the last scan found a catalogue server.
 --- @param id string Server id.
---- @return table|nil { running, pids, base_url, port, source, detail }; nil before any scan.
+--- @return table|nil { running, pids, base_url, port, source, detail, api_key };
+---        nil before any scan. api_key is the server's settings-file key.
 function M.port_scan(id)
 	local result = _port_scans[id]
 	if not result then return nil end
 	local pids = {}
 	for index, pid in ipairs(result.pids or {}) do pids[index] = pid end
 	return { running = result.running, pids = pids, base_url = result.base_url, port = result.port,
-		source = result.source, detail = result.detail }
+		source = result.source, detail = result.detail, api_key = result.api_key }
+end
+
+--- Returns every server's last scan, for matching a keyless request to the
+--- key its loopback server holds (llm.local_server_auth.discovered_key).
+--- @return table Server id -> M.port_scan(id).
+function M.port_scans()
+	local scans = {}
+	for id in pairs(_port_scans) do scans[id] = M.port_scan(id) end
+	return scans
+end
+
+--- The key a running loopback server's own settings file holds, for a
+--- request the user gave no key (oMLX started with auth.api_key answers 401
+--- otherwise, and was neither listed nor addable by hand). Never logged.
+--- @param provider_id string Provider id of the entry or probe.
+--- @param base_url string|nil Its configured address; "" for the scanned one.
+--- @return string key "" when no scanned server holds one.
+function M.discovered_key(provider_id, base_url)
+	return AuthPolicy.discovered_key(provider_id, base_url, M.port_scans(), M.SERVERS)
 end
 
 --- Marks the process scan that precedes a sweep as running or finished.

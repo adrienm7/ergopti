@@ -89,8 +89,11 @@ local function report_test(dialogs, name, ok, detail, elapsed_ms)
 			fill(tr("menu.llm.api_test_ok_body"), { name, math.floor(elapsed_ms or 0), reply }))
 		return
 	end
-	local body = (tr("menu.llm.api_unreachable_body"):gsub("%%s", function() return name end))
-	dialogs.error(body .. "\n" .. tostring(detail or ""), tr("menu.llm.api_unreachable_title"))
+	-- api_remote prefixes HTTP failures with "HTTP <status>"; 401/403 prove the server answered.
+	local text = tostring(detail or "")
+	local kind = (text:match("^HTTP 401") or text:match("^HTTP 403")) and "api_key_refused_" or "api_unreachable_"
+	local body = (tr("menu.llm." .. kind .. "body"):gsub("%%s", function() return name end))
+	dialogs.error(body .. "\n" .. text, tr("menu.llm." .. kind .. "title"))
 end
 
 --- Tests one entry and reports the verdict when the answer arrives.

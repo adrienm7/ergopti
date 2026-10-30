@@ -85,7 +85,9 @@ class DiagnosticCollectionWindows {
 			; This refusal must precede the central handler's irreversible driver teardown.
 			OnExit(this.ExitCallback, -1)
 			this.ExitArmed := true
-			DirCreate(this.Directory)
+			SplitPath(this.Directory, , &Parent)
+			FSEnsureDirectoryStrict(Parent)
+			FSCreateDirectoryExclusiveStrict(this.Directory)
 			Identity := DiagSnapshot_CollectionIdentity()
 			Identity["resident_observations"] := DiagSnapshot_ResidentObservations(this.Contract)
 			Identity["schema_version"] := 1

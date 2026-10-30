@@ -20,7 +20,7 @@
 --- WHY THIS TEST IS A SOURCE-ORDER TEST: the failure has no observable symptom
 --- today. A behavioural test would be green either way, and a test that merely
 --- greps that `local _file_handle` EXISTS would be green against the broken code
---- too — exactly the false-green PROJECT_MEMORY records for this bug class. The
+--- too — exactly the false-green docs/memory records for this bug class. The
 --- only assertion that encodes the root cause is the relative ORDER of the
 --- declaration and its first user.
 --- ==============================================================================

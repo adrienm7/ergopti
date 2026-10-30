@@ -29,11 +29,11 @@
 
 global _SRLSM_NEXT_TASK_ID := 910000
 
-_SRLSM_NewState(OnDone := 0) {
+_SRLSM_NewState(OnDone := 0, TaskId := 0) {
 	global _SRLSM_NEXT_TASK_ID
-	local task_id := ++_SRLSM_NEXT_TASK_ID
-	return _SR_LegacyNewState(task_id,
-		A_Temp . "\ergopti_sr_state_test_" . task_id . ".tmp", OnDone)
+	local task_id := TaskId ? TaskId : ++_SRLSM_NEXT_TASK_ID
+	; These pure transitions own no native capture or physical cleanup resource.
+	return _SR_LegacyNewState(task_id, "", OnDone)
 }
 
 _SRLSM_DropState(State) {
@@ -46,9 +46,6 @@ _SRLSM_DropState(State) {
 	} finally {
 		Critical(previous_critical)
 	}
-	local tmp_file := State["TmpFile"]
-	if FileExist(tmp_file)
-		FileDelete(tmp_file)
 }
 
 
@@ -397,12 +394,8 @@ _SRLSM_StaleIdentityCannotTouchSuccessor() {
 	local task_id := ++_SRLSM_NEXT_TASK_ID
 	local stale_calls := 0
 	local live_calls := 0
-	local stale := _SR_LegacyNewState(task_id,
-		A_Temp . "\ergopti_sr_stale_" . task_id . ".tmp",
-		(*) => (stale_calls += 1))
-	local live := _SR_LegacyNewState(task_id,
-		A_Temp . "\ergopti_sr_live_" . task_id . ".tmp",
-		(*) => (live_calls += 1))
+	local stale := _SRLSM_NewState((*) => (stale_calls += 1), task_id)
+	local live := _SRLSM_NewState((*) => (live_calls += 1), task_id)
 	try {
 		stale["Phase"] := SR_LEGACY_PHASE_RUNNING
 		stale["Pid"] := 610001
@@ -522,10 +515,8 @@ Test("shell_runner legacy: STARTING failure owns private PID (shellrunner-legacy
 _SRLSM_PublicationCollisionPreservesLiveOwner() {
 	global _SRLSM_NEXT_TASK_ID
 	local task_id := ++_SRLSM_NEXT_TASK_ID
-	local live := _SR_LegacyNewState(task_id,
-		A_Temp . "\ergopti_sr_collision_live_" . task_id . ".tmp", (*) => 0)
-	local candidate := _SR_LegacyNewState(task_id,
-		A_Temp . "\ergopti_sr_collision_candidate_" . task_id . ".tmp", (*) => 0)
+	local live := _SRLSM_NewState((*) => 0, task_id)
+	local candidate := _SRLSM_NewState((*) => 0, task_id)
 	try {
 		_SR_LegacyBeginStart(live)
 		AssertTrue(_SR_LegacyPublishStart(live, 625003)["Published"],
@@ -665,3 +656,38 @@ _SRLSM_CompletionCallbackIsAtMostOnce() {
 }
 Test("shell_runner legacy: completion callback is at most once (shellrunner-legacy-callback-once)",
 	_SRLSM_CompletionCallbackIsAtMostOnce)
+
+
+_SRLSM_SyntheticClaimsDoNotCreateCaptureDebt() {
+	local state := _SRLSM_NewState()
+	local claim := 0
+	try {
+		AssertFalse(IsObject(state["Native"]), "the transition fixture owns no native process")
+		_SR_LegacyBeginStart(state)
+		AssertTrue(_SR_LegacyPublishStart(state, 640001)["Published"],
+			"publish only the fixture's synthetic identity without starting a process")
+		claim := _SR_LegacyClaimCompletion(state["TaskId"], state)
+		AssertTrue(IsObject(claim), "the actual transition must produce its terminal claim")
+		_SRLSM_DropState(state)
+		AssertFalse(_SR_ActiveTasks.Has(state["TaskId"]), "the fixture retires its exact active state")
+		AssertFalse(_SR_LegacyReleaseOwners.Has(ObjPtr(claim)),
+			"a native-free transition fixture must not leave phantom capture ownership")
+		AssertEqual("", claim["TmpFile"], "a pure state fixture cannot invent an unowned capture path")
+		AssertFalse(claim["CapturePending"], "there is no physical capture resource to release")
+	} finally {
+		_SRLSM_DropState(state)
+	}
+}
+Test("shell_runner legacy: synthetic fixtures leave no native capture debt (legacy-fixture-capture-debt)",
+	_SRLSM_SyntheticClaimsDoNotCreateCaptureDebt)
+
+
+_SRLSM_IdentityFixturesDoNotCreateCaptureDebt() {
+	local previous_owners := _SR_LegacyReleaseOwners.Count
+	_SRLSM_StaleIdentityCannotTouchSuccessor()
+	_SRLSM_PublicationCollisionPreservesLiveOwner()
+	AssertEqual(previous_owners, _SR_LegacyReleaseOwners.Count,
+		"identity-only fixtures cannot enroll nonexistent native capture resources")
+}
+Test("shell_runner legacy: identity fixtures leave no native capture debt (legacy-identity-fixture-capture-debt)",
+	_SRLSM_IdentityFixturesDoNotCreateCaptureDebt)

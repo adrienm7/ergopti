@@ -7,7 +7,7 @@
 ; SetTimer while the driver was paused. AHK native Suspend only disarms
 ; Hotkeys/Hotstrings; SetTimer callbacks keep firing. Its sibling
 ; WPMWidget_Tick had the A_IsSuspended guard, MouseWatch did not — the
-; "one missed sibling" pattern documented in PROJECT_MEMORY.
+; "one missed sibling" pattern documented in docs/memory.
 ;
 ; The cost was a MouseGetPos + Hide() call every MOUSE_WATCH_MS while paused.
 ; Hide() was a Win32 no-op because Tick had already hidden the surface, so

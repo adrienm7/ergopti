@@ -37,9 +37,11 @@ local function injection(boundary, body)
 				if point == "ctrl-down" then guard.invalidate() end
 			end
 		end
+		local clipboard = "SAVED"
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,
-			exec_checked = function() transition("read"); return true, "SAVED" end,
+			-- A completed write is what the next read sees, as on a real clipboard.
+			exec_checked = function() transition("read"); return true, clipboard end,
 			with_exact_stdin = function(_, text)
 				local command = "controlled-clipboard-" .. tostring(#commands + 1)
 				commands[#commands + 1] = { command = command, text = text }
@@ -52,6 +54,7 @@ local function injection(boundary, body)
 						if item.text == "SAVED" and boundary == "restore-false" and not restoration_recovered then return false end
 						if item.text == "SAVED" and boundary == "restore-throw" and not restoration_recovered then error("controlled restore transport failure") end
 						if item.text == "☃" then transition("write") end
+						clipboard = item.text
 						return true
 					end
 				end

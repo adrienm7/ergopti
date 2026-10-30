@@ -35,20 +35,21 @@ end
 --- @return boolean published Complete admitted nonempty local inventory.
 --- @return table discovery Server id -> validated discovery descriptor; a server
 ---         without one is never probed (modules/llm/local_servers.lua).
+--- @return table request_fields Body fields of every request to a local server.
 function M.load(occupied)
 	local path = Paths.shared("modules/llm/local_servers.json")
 	local raw = read_source(path)
 	local root = type(raw) == "string" and Json.decode(raw) or nil
 	if type(root) ~= "table" then
 		Logger.error("llm.local_server_catalogue", "The local API catalogue is unavailable; optional authentication is refused.")
-		return {}, {}, false, {}
+		return {}, {}, false, {}, {}
 	end
 	-- Storage and transport consult the same authoritative cloud identities.
 	-- A local descriptor cannot shadow a registered cloud provider.
 	local cloud_path = Paths.shared("modules/llm/api_providers.json")
 	local cloud_raw = read_source(cloud_path)
 	local cloud = type(cloud_raw) == "string" and Json.decode(cloud_raw) or nil
-	if type(cloud) ~= "table" or type(cloud.providers) ~= "table" then return {}, {}, false, {} end
+	if type(cloud) ~= "table" or type(cloud.providers) ~= "table" then return {}, {}, false, {}, {} end
 	local claimed = {}
 	for id in pairs(cloud.providers) do claimed[id] = true end
 	for id in pairs(occupied or {}) do claimed[id] = true end
@@ -60,7 +61,7 @@ function M.load(occupied)
 		if descriptor then discovery[id] = descriptor
 		else Logger.error("llm.local_server_catalogue", "local_servers.json: %s; that server is never probed.", reason) end
 	end
-	return order, servers, published, discovery
+	return order, servers, published, discovery, Policy.request_fields(root)
 end
 
 return M

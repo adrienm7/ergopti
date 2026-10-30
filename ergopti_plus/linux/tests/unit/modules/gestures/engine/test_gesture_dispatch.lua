@@ -18,8 +18,8 @@
 --- gesture to the wrong action.
 ---
 --- WHAT IS NOT TESTED HERE: whether the action does anything. That is the emit
---- path, which is still xdotool and therefore silent under Wayland — recorded in
---- todo_linux.md §12.5 rather than asserted as working.
+--- path: uinput, whose exact key order test_combo_press_order.lua checks, with
+--- an xdotool fallback that stays silent under Wayland.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

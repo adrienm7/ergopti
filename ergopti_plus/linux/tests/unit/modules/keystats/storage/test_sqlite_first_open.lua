@@ -259,6 +259,18 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		helpers.assert_true(status == true or status == 0, "capture admission must preserve permitted raw events and independent machine aggregates")
 	end)
 
+	helpers.it("system-capture-integer-origin: fractional raw clocks preserve canonical native aggregates", function()
+		local quote = require("text_utils").shell_quote
+		local root = helpers.driver_root()
+		local fixture = root .. "/tests/hardware/run_system_event_capture_origin.lua"
+		local receipt = os.tmpname()
+		local status = os.execute(native_fixture_command(rawget(_G, "jit") and runtime or "luajit", rawget(_G, "jit") ~= nil)
+			.. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
+		os.remove(receipt)
+		helpers.assert_true(status == true or status == 0,
+			"the real Calendar origin must preserve exact COMMIT, privacy and system aggregate assertions")
+	end)
+
 	helpers.it("retains the actual physical family at input capture (layout-capture-context)", function()
 		local quote = require("text_utils").shell_quote
 		local root = helpers.driver_root()

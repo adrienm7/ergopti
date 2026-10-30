@@ -10,6 +10,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include diagnostics_archive_observation.ahk
+
 ; The unchanged donor prefix calls these hoisted diagnostics before owner loading.
 _EDOS_Phase(Phase, Failure := 0, Mode := "") {
 	static Ordinal := 0, FirstException := 0, LastPhase := "", FirstExceptionPhase := ""
@@ -154,9 +156,11 @@ _HCPO_HasSubmission(Id, Terminal := false) {
 _HCPO_CheckArchive(Owner) {
 	_HCPO_Require(Owner.Terminal && Owner.Result.Get("worker_tree_retired", false) && !Owner.Result["owner_pending"],
 		"Only actual native completion may qualify terminal worker retirement.")
-	_HCPO_Require(Owner.Result.Get("archive_created", false) && FileExist(Owner.Archive) && Owner.HasProp("ArchiveDigest")
-		&& CryptoSha256Bytes(FSReadBytesStrict(Owner.Archive)) == Owner.ArchiveDigest,
-		"The unchanged collector must commit an archive with a genuine native acknowledgement.")
+	ArchiveAcknowledged := Owner.Result.Get("archive_created", false) && FileExist(Owner.Archive) && Owner.HasProp("ArchiveDigest")
+		&& CryptoSha256Bytes(FSReadBytesStrict(Owner.Archive)) == Owner.ArchiveDigest
+	_HCPO_Require(ArchiveAcknowledged,
+		"The unchanged collector must commit an archive with a genuine native acknowledgement: "
+			. (ArchiveAcknowledged ? "" : _HC_TestArchiveObservation(Owner)))
 }
 
 _HCPO_Actor() {

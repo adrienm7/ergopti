@@ -4,7 +4,7 @@
 ; MODULE: GestureGetCyclableWindows Bare-Try Meta Test (Pattern 3)
 ; DESCRIPTION:
 ; Regression guard for the documented "bare try with no catch"
-; anti-pattern (docs/PROJECT_MEMORY.md's project-ahk-invariant-incomplete-
+; anti-pattern (docs/memory's project-ahk-invariant-incomplete-
 ; application). GestureGetCyclableWindows enumerates every top-level window
 ; and calls several WinGet* functions per window; a window closing
 ; mid-enumeration (a routine race, not a bug) throws TargetError on the next

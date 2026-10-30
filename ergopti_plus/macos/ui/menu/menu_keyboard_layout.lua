@@ -147,7 +147,7 @@ M._version_gt        = version_gt
 local function schedule_menu_refresh(update_menu)
 	if type(update_menu) ~= "function" then return false end
 	return DeferredWork.after(POST_INSTALL_REFRESH_DELAY,
-		function() pcall(update_menu) end,
+		update_menu,
 		"menu_keyboard_layout.refresh")
 end
 
@@ -162,7 +162,7 @@ end
 local function defer_tis_call(fn)
 	if type(fn) ~= "function" then return false end
 	return DeferredWork.after(TIS_CALL_DELAY,
-		function() pcall(fn) end,
+		fn,
 		"menu_keyboard_layout.tis_call")
 end
 

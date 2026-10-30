@@ -3773,6 +3773,13 @@ function M.warmup_request(target, on_done)
 	return ollama.warmup(target.origin, target.model, target.receipt, on_done)
 end
 
+--- The health the AI title dot shows, from the Ollama warmup chain.
+--- @return string|nil status "ready", "warming", "unreachable", or nil when
+---   no Ollama model may be loaded now (the API backend has no load gate).
+function M.health_status()
+	return require("modules.llm.warmup").status()
+end
+
 --- The model the next prediction goes to, whichever backend serves it. The
 --- menu resolves the automatic profile against it: resolving against the
 --- Ollama model while an API answered showed one profile and used another.

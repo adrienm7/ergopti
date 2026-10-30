@@ -1,6 +1,6 @@
 --- _shared/lua/test/layout_composer_contract.lua
 
---- Exercises a driver's composer operations (docs/layout-composer.md) with the
+--- Exercises a driver's composer operations (docs/design/layout-composer.md) with the
 --- shared composer corpus: what the page may save, the record entry, the
 --- stored declaration, the sources sent to the page, the removal, and the
 --- messages of the layout manager bridge. The native installation, transport

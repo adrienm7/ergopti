@@ -9,7 +9,10 @@
 --- phases the macOS driver already records.
 --- ==============================================================================
 
-local helpers = require("tests.helpers")
+local helpers = require("tests.support.logger_fixture").helpers({
+	"infra.phase_stats", "adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "infra.boot_profiler",
+	"infra.perf_counters", "toml_codec.reader",
+})
 
 local MS = 1e6
 

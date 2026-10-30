@@ -33,6 +33,7 @@ local M = {}
 local Identifiers = require("identifiers")
 local Logger      = require("infra.logger")
 local Paths       = require("infra.paths")
+local NativePath  = require("native_path")
 local FileSystem  = require("adapters.file_system")
 local JsonCodec   = require("adapters.json_codec")
 local ShellRunner = require("adapters.shell_runner")
@@ -40,6 +41,7 @@ local Archives    = require("updater.release_assets")
 
 local LOG = "updater.release_installer"
 local ARMING_RECEIPT = "ARMED"
+local RENAME_FLAG = "--release-rename"
 
 -- The executable inside the app bundle the launcher runs from.
 local EXECUTABLE_SUFFIX = "/Contents/MacOS/ErgoptiPlus"
@@ -75,6 +77,20 @@ assert(type(M.STAGE_SCRIPT) == "string" and M.STAGE_SCRIPT ~= "", "The native re
 M.SWAP_SCRIPT = table.concat({
 	"set -u",
 	'pid=$1; app=$2; staged=$3; previous=$4',
+	'# Stage/destination filesystem admission begins',
+	'parent=${app%/*}; [ -n "$parent" ] || parent=/',
+	'[ -d "$staged" ] && [ ! -L "$staged" ] || { echo "The verified app is not an owned directory."; exit 1; }',
+	"staged_device=$(/usr/bin/stat -f '%d' \"$staged\") || exit 1",
+	"parent_device=$(/usr/bin/stat -L -f '%d' \"$parent\") || exit 1",
+	'for device in "$staged_device" "$parent_device"; do',
+	'	case "$device" in ""|*[!0-9]*) echo "The replacement filesystem identity is invalid."; exit 1 ;; esac',
+	'done',
+	'[ "$staged_device" = "$parent_device" ] || { echo "The verified app is not on the installation filesystem: nothing was replaced."; exit 1; }',
+	'# Stage/destination filesystem admission ends',
+	'rename_flag=' .. RENAME_FLAG,
+	'launcher="$app' .. EXECUTABLE_SUFFIX .. '"',
+	'receipt=$("$launcher" "$rename_flag" probe && printf .) || { echo "The native release rename role is unavailable."; exit 1; }',
+	"[ \"$receipt\" = \"$(printf '%s\\n.' \"$rename_flag\")\" ] || { echo \"The native release rename receipt is invalid.\"; exit 1; }",
 	"printf '" .. ARMING_RECEIPT .. "\\n' >&3 || exit 1",
 	"exec 3>&- || exit 1",
 	"waited=0",
@@ -84,13 +100,25 @@ M.SWAP_SCRIPT = table.concat({
 	"	/bin/sleep 0.1",
 	"done",
 	'/bin/rm -rf -- "$previous" || { echo "The previous backup app could not be removed."; /usr/bin/open -- "$app"; exit 4; }',
-	'/bin/mv -- "$app" "$previous" || { echo "The installed app could not be moved aside."; /usr/bin/open -- "$app"; exit 5; }',
-	'if /bin/mv -- "$staged" "$app"; then',
+	'"$launcher" "$rename_flag" move "$app" "$previous" || { echo "The installed app could not be moved aside."; /usr/bin/open -- "$app"; exit 5; }',
+	'launcher="$previous' .. EXECUTABLE_SUFFIX .. '"',
+	'# Occupied destinations are retained rather than overwritten or nested into',
+	'replacement_path_clear() {',
+	'	if [ -e "$app" ] || [ -L "$app" ]; then',
+	'		echo "The replacement path is occupied: the previous app remains at $previous."',
+	'		return 1',
+	'	fi',
+	'	return 0',
+	'}',
+	'# Occupied destination admission ends',
+	'replacement_path_clear || exit 8',
+	'if "$launcher" "$rename_flag" move "$staged" "$app"; then',
 	'	echo "Installed."',
 	'	/usr/bin/open -- "$app" || { echo "The installed app could not be opened."; exit 7; }',
 	"	exit 0",
 	"fi",
-	'if ! /bin/mv -- "$previous" "$app"; then',
+	'replacement_path_clear || exit 8',
+	'if ! "$launcher" "$rename_flag" move "$previous" "$app"; then',
 	'	echo "The previous app could not be restored: it remains at $previous."',
 	"	exit 8",
 	"fi",
@@ -105,7 +133,7 @@ local DETACH_SCRIPT = table.concat({
 	"{",
 	"\texec 3>&1",
 	'\texec >>"$6" 2>&1 || exit 1',
-	'\t/usr/bin/nohup /bin/sh -c "$1" swap "$2" "$3" "$4" "$5" </dev/null &',
+	'\t/usr/bin/nohup "$3' .. EXECUTABLE_SUFFIX .. '" ' .. RENAME_FLAG .. ' lock "$3" "$1" "$2" "$4" "$5" </dev/null &',
 	"} | {",
 	"\tIFS= read -r receipt || exit 1",
 	'\t[ "$receipt" = ' .. ARMING_RECEIPT .. ' ] || exit 1',
@@ -192,8 +220,8 @@ end
 --- @return boolean dispatched
 function M.stage(asset, done)
 	local app = M.app_bundle()
-	local tmp = M._getenv("TMPDIR")
-	if not app or type(tmp) ~= "string" or tmp:sub(1, 1) ~= "/" then
+	local parent = app and NativePath.dirname(app)
+	if not app or type(parent) ~= "string" then
 		Logger.error(LOG, "Cannot stage %s: this is not a packaged ErgoptiPlus.", tostring(asset and asset.tag))
 		return false
 	end
@@ -201,7 +229,9 @@ function M.stage(asset, done)
 		Logger.error(LOG, "Cannot stage a release without its declared native archive format.")
 		return false
 	end
-	local stage_dir = (tmp:gsub("/+$", "")) .. "/ergopti-release-install-" .. os.date("!%Y%m%d-%H%M%S")
+	-- Publication must remain a rename: a failed cross-device mv can leave a
+	-- partial destination that makes rollback nest the original app inside it.
+	local stage_dir = (parent:gsub("/+$", "")) .. "/.ergopti-release-install-" .. os.date("!%Y%m%d-%H%M%S")
 	-- Keep JSON release data out of shell source and bind the native request to
 	-- this exact stage, using the existing per-child environment override.
 	local request, request_err = JsonCodec.encode({ version = 1, url = asset.url, sha256 = asset.digest,
@@ -223,7 +253,7 @@ function M.stage(asset, done)
 		local code = tonumber(exit_code)
 		local stage = (code and code >= M.EXIT_VERIFY_FIRST) and "verify" or "download"
 		local detail = string.format("exit %s: %s", tostring(exit_code), (tostring(stderr or ""):gsub("%s+$", "")))
-		Logger.error(LOG, "Release %s refused at the %s (%s).", asset.tag, stage, detail)
+		Logger.error(LOG, "Release %s refused at the %s; stage path: %s (%s).", asset.tag, stage, stage_dir, detail)
 		done(nil, stage, detail)
 	end, nil, { ERGOPTI_RELEASE_STAGE_REQUEST = request })
 	return type(handle) == "table" and handle.start() == true

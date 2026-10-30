@@ -169,6 +169,18 @@ helpers.describe("prepared clipboard exact lifetime", function()
 			end, { wait_refused = true, throws = throws })
 		end)
 	end
+	helpers.it("keeps a copy another application made during the paste", function()
+		with_stage(function(s)
+			s.boundary = function(phase)
+				if phase == "paste_wait" then s.value = "copied elsewhere" end
+			end
+			helpers.assert_eq(s.stage.prepare(), true)
+			helpers.assert_eq(s.stage.paste(s.channel), true)
+			helpers.assert_eq(s.stage.close(), true)
+			helpers.assert_eq(s.value, "copied elsewhere", "restoring would erase what the user just copied")
+			helpers.assert_eq(s.writes, { "replacement" })
+		end)
+	end)
 	helpers.it("a late native setter cannot overwrite restoration after a close request", function()
 		with_stage(function(s)
 			local close_ack, requests = nil, 0
@@ -196,7 +208,10 @@ helpers.describe("prepared clipboard exact lifetime", function()
 				end
 				helpers.assert_eq(s.stage.prepare(), false)
 				helpers.assert_eq(checks, index)
-				helpers.assert_eq(s.reads, index == 2 and 0 or 1, "revocation before a native read must prevent that read")
+				-- After the replacement is written, the restore reads once more to
+				-- see whether another application copied meanwhile.
+				local expected_reads = ({ [2] = 0, [3] = 1, [4] = 2 })[index]
+				helpers.assert_eq(s.reads, expected_reads, "revocation before a native read must prevent that read")
 				helpers.assert_eq(s.writes, index == 4 and { "replacement", "original" } or {}, "no setter starts after a stale affirmative callback")
 				helpers.assert_eq(s.waits, {}, "revocation before the settle boundary prevents its native wait")
 				helpers.assert_eq(s.stage.close(), true)

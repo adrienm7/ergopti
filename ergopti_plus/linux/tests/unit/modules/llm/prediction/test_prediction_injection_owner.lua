@@ -86,11 +86,13 @@ local function scenario(action, phase, body)
 			end
 		end
 		local commands = {}
+		-- A completed write is what the next read sees, as on a real clipboard.
+		local clipboard = "SAVED"
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,
 			exec_checked = function()
 				state.clipboard_reads = state.clipboard_reads + 1
-				transition("read"); return true, "SAVED"
+				transition("read"); return true, clipboard
 			end,
 			with_exact_stdin = function(_, text)
 				local command = "controlled-prediction-clipboard-" .. (#commands + 1)
@@ -101,6 +103,7 @@ local function scenario(action, phase, body)
 					if item.command == command then
 						state.writes[#state.writes + 1] = item.text
 						if item.text ~= "SAVED" then transition("write") end
+						clipboard = item.text
 						return true
 					end
 				end

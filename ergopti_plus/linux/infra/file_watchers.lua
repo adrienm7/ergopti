@@ -464,16 +464,23 @@ end
 --- @return table paths Absolute paths.
 local function _source_tree(root, kind)
 	local quoted = TextUtils.shell_quote(root)
-	local predicate = kind == "d" and "-type d -print" or "-type f -name '*.lua' -print"
+	local predicate = kind == "d" and "-type d -print0" or "-type f -name '*.lua' -print0"
 	local command = "find " .. quoted .. " -mindepth 1 -type d \\( -name tests -o -name '.*' \\) -prune -o "
 		.. predicate .. " 2>/dev/null"
 	local paths = kind == "d" and { root } or {}
-	local fh = io.popen(command, "r")
-	if not fh then return paths end
-	for line in fh:lines() do
-		if line ~= "" then paths[#paths + 1] = line end
+	-- LF is valid filename data, including in a checkout's absolute root.
+	-- A failed or truncated walk cannot establish complete reload coverage.
+	local completed, output, detail = Shell.exec_checked(command)
+	if completed ~= true or type(output) ~= "string" then
+		error("Developer source enumeration failed: " .. tostring(detail), 0)
 	end
-	fh:close()
+	if output ~= "" and output:sub(-1) ~= "\0" then
+		error("Developer source enumeration has incomplete NUL framing", 0)
+	end
+	for path in output:gmatch("([^%z]*)%z") do
+		if path == "" then error("Developer source enumeration returned an empty path", 0) end
+		paths[#paths + 1] = path
+	end
 	return paths
 end
 

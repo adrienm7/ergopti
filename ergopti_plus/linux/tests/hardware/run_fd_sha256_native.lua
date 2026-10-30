@@ -8,12 +8,10 @@
 --- This fixture does not establish updater, publication or install admission.
 --- ==============================================================================
 
-local self_path = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
-local driver_root = self_path:match("^(.*)/tests/hardware/run_fd_sha256_native%.lua$")
-if not driver_root then
-	assert(self_path == "tests/hardware/run_fd_sha256_native.lua", "Canonical native fixture path required")
-	driver_root = "."
-end
+local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+local tests_dir = assert(self_path:match("^(.*)/hardware/run_fd_sha256_native%.lua$"),
+	"the native fixture needs its tests directory")
+local driver_root = assert(loadfile(tests_dir .. "/runner_root.lua"))()
 package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;"
 	.. driver_root .. "/../_shared/lua/?.lua;" .. driver_root .. "/../_shared/lua/?/init.lua;" .. package.path
 assert(type(jit) == "table" and jit.os == "Linux", "Actual Linux LuaJIT required for native FD digest")

@@ -62,6 +62,12 @@
 			"expected": "openai <secret> github <secret> pat <secret> hf <secret> google <secret>"
 		},
 		{
+			"id": "stateless_github_installation_token",
+			"context": {},
+			"input": "token ghs_123456_eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiIxMjM0NTYifQ.c2lnbmF0dXJlLXNhbXBsZQ-_x end",
+			"expected": "token <secret> end"
+		},
+		{
 			"id": "token_prefix_needs_a_long_body_and_a_word_start",
 			"context": {},
 			"input": "sk-short task-abcdefghijklmnopqrstuvwxyz disk-cache ghp_tooShort",

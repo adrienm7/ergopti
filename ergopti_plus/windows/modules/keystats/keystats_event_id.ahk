@@ -126,11 +126,14 @@ KL_RecoverSqlEventId(Path, DeviceLiteral, ChunkChars := unset) {
 ; inside captured text or nested metadata as the record's durable identity.
 KL_ScanMaxJournalEventId(journal_text) {
 	max_id := 0
+	Refusal := Map("invalid", false)
 	for line in StrSplit(journal_text, "`n", "`r") {
 		if (line = "")
 			continue
-		entry := KL_JsonDecode(line)
-		if (entry is Map && entry.Has("_event_id")
+		entry := _KL_JournalDecodeIdentity(Refusal, line)
+		if Refusal["invalid"]
+			throw ValueError("Journal reserved event identity must be a JSON number.")
+		if (entry is Map && entry.Has("type") && entry.Has("_event_id")
 				&& entry["_event_id"] is Integer && entry["_event_id"] > 0)
 			max_id := Max(max_id, entry["_event_id"])
 	}
@@ -183,7 +186,7 @@ _KL_ReadRecoveryText(Path, Offset := 0, TailBytes := 0) {
 _KL_RecoverJournalEventId(Path, Offset) {
 	MaxId := 0
 	loop {
-		Read := _KL_JournalReadLines(Path, Offset, KeystatsConst.INGEST_BATCH_LINES, KL_JsonDecode)
+		Read := _KL_ReadJournalEvents(Path, Offset, KeystatsConst.INGEST_BATCH_LINES)
 		if !Read["ok"]
 			throw Error("Cannot read journal event identities")
 		for Entry in Read["entries"] {

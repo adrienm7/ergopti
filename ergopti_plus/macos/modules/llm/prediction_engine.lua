@@ -1915,6 +1915,21 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 		return true
 	end
 
+	--- Abandons a request whose model showed nothing before the watchdog fired.
+	--- @return boolean reset True when this request performed the reset.
+	local function abandon_silent_request()
+		if not is_current_fetch() then return false end
+		retire_request_log(my_fetch_id)
+		log_request_cancellation(my_fetch_id, "timeout")
+		local reset_ok, reset_result = xpcall(M.reset, debug.traceback)
+		if not reset_ok or reset_result ~= true then
+			Logger.error(LOG, "LLM request cleanup did not commit after its timeout (result: %s).",
+				tostring(reset_result))
+			return false
+		end
+		return true
+	end
+
 	-- An empty surface needs an explicit loading commit before any backend work.
 	-- Existing predictions were themselves committed by StreamingHandler, so they
 	-- may remain visible while the replacement request is dispatched.
@@ -2082,6 +2097,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 			resolve_backend_label   = resolve_backend_label,
 			runtime_available       = runtime_available,
 			on_ui_unavailable       = close_current_request,
+			on_stream_timeout       = abandon_silent_request,
 		})
 	end, debug.traceback)
 	if not watchdog_ok or watchdog_result ~= true then

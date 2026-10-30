@@ -25,6 +25,11 @@ end
 helpers.describe("Local API optional authentication policy (local-api-optional-auth)", function()
 	local _, servers = Policy.catalogue(read("modules/llm/local_servers.json"), { openai = true, openai_compat = true })
 	local corpus = read("tests/corpus/llm/local_server_auth.json")
+	for _, vector in ipairs(corpus.discovered_key_cases) do
+		helpers.it("settings-file key: " .. vector.name .. " (local-api-optional-auth)", function()
+			helpers.assert_eq(Policy.discovered_key(vector.provider, vector.base_url, vector.scans, servers), vector.key)
+		end)
+	end
 	for _, vector in ipairs(corpus.auth_cases) do
 		helpers.it("auth material: " .. vector.name .. " (local-api-optional-auth)", function()
 			helpers.assert_eq(Policy.token_allowed(vector.provider, vector.token, servers), vector.allowed)

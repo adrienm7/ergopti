@@ -172,3 +172,256 @@ for Date in ["", "2024-02-29", "2000-02-29", "2026-09-12"]
 for JsonDate in ['"\u0000"', '"\u0000hidden"', '"2026-09-12\u0000"']
 	Test("keystats: reject NUL date case " . A_Index . " (state-calendar-nul)",
 		_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":4,"today_log_date":' . JsonDate . '}'))
+
+Test("keystats: reject nonnumeric state counter-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":true,"today_log_offset":4}'))
+Test("keystats: reject nonnumeric state counter-final-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"next_event_id":true,"today_log_offset":4}'))
+Test("keystats: reject nonnumeric state counter-escaped-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_\u0069d":true,"today_log_offset":4}'))
+Test("keystats: reject nonnumeric state counter-final-escaped-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"next_event_\u0069d":true,"today_log_offset":4}'))
+Test("keystats: reject nonnumeric state offset-true (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":true}'))
+Test("keystats: reject nonnumeric state offset-false (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":false}'))
+Test("keystats: reject nonnumeric state offset-final-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":4,"today_log_offset":true}'))
+Test("keystats: reject nonnumeric state offset-escaped-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_\u006fffset":true}'))
+Test("keystats: reject nonnumeric state offset-final-escaped-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":4,"today_log_\u006fffset":false}'))
+Test("keystats: preserve canonical numeric state counter-final-number (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":true,"next_event_id":42,"today_log_offset":4,"today_log_date":"2026-09-11"}', true))
+Test("keystats: preserve canonical numeric state offset-final-number (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":true,"today_log_offset":4,"today_log_date":"2026-09-11"}', true))
+Test("keystats: preserve canonical numeric state counter-escaped-number (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_\u0069d":42,"today_log_offset":4,"today_log_date":"2026-09-11"}', true))
+Test("keystats: preserve canonical numeric state offset-escaped-number (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_\u006fffset":4,"today_log_date":"2026-09-11"}', true))
+
+_KFIR_StateOffsetIngest(BooleanOffset) {
+	Names := ["initialized", "_shutting_down", "today_log_path", "today_log_offset",
+		"today_log_date", "state_json_path", "data_sql_path", "_today_fh",
+		"_today_fh_date", "_pending_entries", "next_event_id", "device_id", "_device_id_lit", "rollover_pending"]
+	Saved := Map()
+	for Name in Names
+		if Keystats.HasOwnProp(Name)
+			Saved[Name] := Keystats.%Name%
+	Windows := KLWV.windows
+	Root := _FSWL_Path() . "-state-ingest"
+	Db := 0, OwnsRoot := false, OwnsJournal := false
+	try {
+		AssertFalse(DirExist(Root))
+		DirCreate(Root)
+		OwnsRoot := true
+		Keystats.initialized := true
+		Keystats._shutting_down := false
+		Keystats.today_log_path := Root . "\today.log"
+		Keystats.today_log_offset := 0
+		Keystats.today_log_date := KL_Today()
+		Keystats.state_json_path := Root . "\state.json"
+		Keystats.data_sql_path := Root . "\data.sql"
+		Keystats._today_fh := unset
+		OwnsJournal := true
+		Keystats._today_fh_date := ""
+		Keystats.next_event_id := 77
+		Keystats.device_id := "dev-one"
+		Keystats._device_id_lit := KL_SqlStr("dev-one")
+		Keystats._pending_entries := []
+		Keystats.rollover_pending := 0
+		KLWV.windows := Map()
+		FileAppend("-- private source`n", Keystats.data_sql_path, "UTF-8-RAW")
+		Entry := Map("type", "mouse_click", "_event_id", 3, "timestamp", KL_NowTimestamp(), "app", "fixture.exe")
+		FileAppend(KL_JsonEncode(Entry) . "`n", Keystats.today_log_path, "UTF-8-RAW")
+		Source := '{"next_event_id":42,"today_log_offset":' . (BooleanOffset ? "true" : "0")
+			. ',"today_log_date":"' . KL_Today() . '"}'
+		FileAppend(Source, Keystats.state_json_path, "UTF-8-RAW")
+		Loaded := KL_LoadState()
+		Result := KL_IngestOnce(true, true)
+		FileAppend("# state_offset_boolean=" . BooleanOffset . " loaded=" . Loaded
+			. " ingest_ok=" . Result["ok"] . " reason=" . Result.Get("reason", "accepted") . "`n", "*")
+		AssertTrue(Result["ok"], "a rejected boolean checkpoint must leave the real journal readable from its intact initial boundary")
+		AssertEqual(!BooleanOffset, Loaded)
+		AssertEqual(FileGetSize(Keystats.today_log_path), Keystats.today_log_offset)
+		_KLRDC_EnsureSharedDir()
+		Db := SQLite_Open(":memory:")
+		AssertTrue(Db != 0)
+		AssertTrue(KLR_LoadSchema(Db))
+		AssertTrue(SQLite_Exec(Db, FileRead(Keystats.data_sql_path, "UTF-8")))
+		AssertEqual(1, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_mouse WHERE id=3;")[1]["n"],
+			"the actual saved journal record must reach native SQL exactly once")
+	} finally {
+		if Db
+			SQLite_Close(Db)
+		if OwnsJournal && Keystats.HasOwnProp("_today_fh") && IsObject(Keystats._today_fh)
+			Keystats._today_fh.Close()
+		for Name in Names {
+			if Saved.Has(Name)
+				Keystats.%Name% := Saved[Name]
+			else if Keystats.HasOwnProp(Name)
+				Keystats.DeleteProp(Name)
+		}
+		KLWV.windows := Windows
+		if OwnsRoot
+			DirDelete(Root, true)
+	}
+}
+for _KFIR_BooleanOffset in [false, true]
+	Test("keystats: state checkpoint boolean=" . _KFIR_BooleanOffset . " cannot block real journal ingestion (state-numeric-ingest-boundary)",
+		_KFIR_StateOffsetIngest.Bind(_KFIR_BooleanOffset))
+
+_KFIR_JournalIdentityIngest(Kind, FieldSource, Accept, Suffix := "") {
+	Names := ["initialized", "_shutting_down", "today_log_path", "today_log_offset",
+		"today_log_date", "state_json_path", "data_sql_path", "_today_fh",
+		"_today_fh_date", "_pending_entries", "next_event_id", "device_id", "_device_id_lit", "rollover_pending"]
+	Saved := Map()
+	for Name in Names
+		if Keystats.HasOwnProp(Name)
+			Saved[Name] := Keystats.%Name%
+	Windows := KLWV.windows
+	Root := _FSWL_Path() . "-journal-id"
+	Db := 0, OwnsRoot := false, OwnsJournal := false
+	try {
+		AssertFalse(DirExist(Root))
+		DirCreate(Root)
+		OwnsRoot := true
+		Keystats.initialized := true
+		Keystats._shutting_down := false
+		Keystats.today_log_path := Root . "\today.log"
+		Keystats.today_log_offset := 0
+		Keystats.today_log_date := KL_Today()
+		Keystats.state_json_path := Root . "\state.json"
+		Keystats.data_sql_path := Root . "\data.sql"
+		Keystats._today_fh := unset
+		OwnsJournal := true
+		Keystats._today_fh_date := ""
+		Keystats.next_event_id := 77
+		Keystats.device_id := "dev-one"
+		Keystats._device_id_lit := KL_SqlStr("dev-one")
+		Keystats._pending_entries := []
+		Keystats.rollover_pending := 0
+		KLWV.windows := Map()
+		Prior := Map("type", "mouse_click", "timestamp", KL_NowTimestamp(),
+			"app", "fixture.exe", "detail", "prior-owned-event")
+		Sql := "PRAGMA foreign_keys=OFF;`nBEGIN TRANSACTION;`n"
+			. KL_BuildInsertMouseEvent(Prior, 1) . "`nCOMMIT;`n"
+		FileAppend(Sql, Keystats.data_sql_path, "UTF-8-RAW")
+		Record := '{"type":"mouse_click","timestamp":"' . KL_NowTimestamp()
+			. '","app":"fixture.exe","detail":"new-owned-event",' . FieldSource . '}' . "`n"
+		Record .= Suffix
+		FileAppend(Record, Keystats.today_log_path, "UTF-8-RAW")
+		Decoded := _KL_JournalReadLines(Keystats.today_log_path, 0, 10, KL_JsonDecode)
+		AssertTrue(Decoded["ok"])
+		AssertEqual(Suffix = "" ? 1 : 2, Decoded["entries"].Length, "the fixtures must be complete typed JSONL records before semantic identity admission")
+		AssertTrue(KL_SaveState())
+		StateBefore := FileRead(Keystats.state_json_path, "UTF-8")
+		Result := KL_IngestOnce(true, true)
+		_KLRDC_EnsureSharedDir()
+		Db := SQLite_Open(":memory:")
+		AssertTrue(Db != 0)
+		AssertTrue(KLR_LoadSchema(Db))
+		AssertTrue(SQLite_Exec(Db, FileRead(Keystats.data_sql_path, "UTF-8")))
+		NewRows := SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_mouse WHERE meta_json LIKE '%new-owned-event%';")[1]["n"]
+		FileAppend("# journal_identity kind=" . Kind . " ok=" . Result["ok"]
+			. " reason=" . Result.Get("reason", "accepted") . " new_rows=" . NewRows
+			. " offset=" . Keystats.today_log_offset . " eof=" . FileGetSize(Keystats.today_log_path) . "`n", "*")
+		if Accept {
+			AssertTrue(Result["ok"])
+			AssertEqual(1, NewRows, "a numeric reserved identity must publish the distinct native raw event")
+			AssertEqual(FileGetSize(Keystats.today_log_path), Keystats.today_log_offset)
+		} else {
+			AssertFalse(Result["ok"], "a nonnumeric JSON identity cannot be acknowledged as Integer1 and discarded by INSERT OR IGNORE")
+			AssertEqual(0, Keystats.today_log_offset)
+			AssertEqual(StateBefore, FileRead(Keystats.state_json_path, "UTF-8"))
+			AssertEqual(Sql, FileRead(Keystats.data_sql_path, "UTF-8"))
+		}
+		AssertEqual(Record, FileRead(Keystats.today_log_path, "UTF-8"))
+		AssertEqual(1, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_mouse WHERE meta_json LIKE '%prior-owned-event%';")[1]["n"])
+	} finally {
+		if Db
+			SQLite_Close(Db)
+		if OwnsJournal && Keystats.HasOwnProp("_today_fh") && IsObject(Keystats._today_fh)
+			Keystats._today_fh.Close()
+		for Name in Names {
+			if Saved.Has(Name)
+				Keystats.%Name% := Saved[Name]
+			else if Keystats.HasOwnProp(Name)
+				Keystats.DeleteProp(Name)
+		}
+		KLWV.windows := Windows
+		if OwnsRoot
+			DirDelete(Root, true)
+	}
+}
+for _KFIR_JournalCase in [
+	["number", '"_event_id":2', true],
+	["boolean-true", '"_event_id":true', false],
+	["boolean-false", '"_event_id":false', false],
+	["escaped-boolean", '"_event_\u0069d":true', false],
+	["final-boolean", '"_event_id":2,"_event_id":true', false],
+	["final-number", '"_event_id":true,"_event_id":2', true],
+	["string", '"_event_id":"2"', false],
+	["null", '"_event_id":null', false],
+	["array", '"_event_id":[]', false],
+	["object", '"_event_id":{}', false],
+	["float", '"_event_id":2.0', false],
+	["zero", '"_event_id":0', false],
+	["negative", '"_event_id":-1', false],
+	["nested-boolean", '"_event_id":2,"nested":{"_event_id":true}', true],
+	["quoted-boolean", '"_event_id":2,"quoted":"\"_event_id\":true"', true],
+	["bad-before-valid", '"_event_id":true', false,
+		'{"type":"mouse_click","timestamp":"2026-03-04 11:00:00.000","app":"fixture.exe","detail":"later-owned-event","_event_id":2}' . "`n"],
+	["valid-before-bad", '"_event_id":2', false,
+		'{"type":"mouse_click","timestamp":"2026-03-04 11:00:00.000","app":"fixture.exe","detail":"later-owned-event","_event_id":true}' . "`n"]
+]
+	Test("keystats: journal identity " . _KFIR_JournalCase[1] . " retains native row ownership (journal-identity-numeric-provenance)",
+		_KFIR_JournalIdentityIngest.Bind(_KFIR_JournalCase*))
+
+_KFIR_JournalIdentityRecovery(Kind, FieldSource, Refuse, Prefix := "") {
+	Path := _FSWL_Path()
+	try {
+		AssertFalse(FileExist(Path))
+		Source := Prefix . '{"type":"mouse_click",' . FieldSource . '}' . "`n"
+		FileAppend(Source, Path, "UTF-8-RAW")
+		Before := KLR_LedgerSnapshot(Path)
+		Failure := 0, Recovered := -1
+		try Recovered := _KL_RecoverJournalEventId(Path, 0)
+		catch as Err
+			Failure := Err
+		FileAppend("# journal_identity_recovery kind=" . Kind . " refused=" . IsObject(Failure)
+			. " maximum=" . Recovered . "`n", "*")
+		if Refuse {
+			AssertTrue(Failure is Error, "startup cannot trust or silently ignore a nonnumeric reserved journal identity")
+			AssertEqual(-1, Recovered)
+			AssertThrows(KL_ScanMaxJournalEventId.Bind(Source), "the raw journal recovery helper must share numeric source admission")
+		} else {
+			AssertFalse(IsObject(Failure))
+			AssertEqual(2, Recovered, "canonical numeric identity recovery must survive unrelated malformed or quoted data")
+			AssertEqual(2, KL_ScanMaxJournalEventId(Source))
+		}
+		AssertEqual(Source, FileRead(Path, "UTF-8"))
+		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+for _KFIR_RecoveryCase in [
+	["number", '"_event_id":2', false],
+	["boolean-true", '"_event_id":true', true],
+	["boolean-false", '"_event_id":false', true],
+	["escaped-boolean", '"_event_\u0069d":true', true],
+	["final-boolean", '"_event_id":2,"_event_id":true', true],
+	["final-number", '"_event_id":true,"_event_id":2', false],
+	["nested-boolean", '"_event_id":2,"nested":{"_event_id":true}', false],
+	["quoted-boolean", '"_event_id":2,"quoted":"\"_event_id\":true"', false],
+	["malformed-prefix", '"_event_id":2', false, "broken`n"],
+	["missing-type-prefix", '"_event_id":2', false, '{"_event_id":true}' . "`n"],
+	["string", '"_event_id":"2"', true],
+	["null", '"_event_id":null', true],
+	["array", '"_event_id":[]', true],
+	["object", '"_event_id":{}', true]
+]
+	Test("keystats: startup journal identity " . _KFIR_RecoveryCase[1] . " preserves recovery admission (journal-identity-recovery-provenance)",
+		_KFIR_JournalIdentityRecovery.Bind(_KFIR_RecoveryCase*))

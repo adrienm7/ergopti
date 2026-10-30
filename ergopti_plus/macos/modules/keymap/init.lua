@@ -1178,7 +1178,7 @@ end
 ---
 --- Arming only: does NOT emit any keystroke. The caller is responsible for
 --- also calling suppress_rescan() and keystats.notify_synthetic() to complete
---- the synthetic-injection contract (see docs/PROJECT_MEMORY.md §synthetic).
+--- the synthetic-injection contract (see docs/memory §synthetic).
 ---
 --- @param deletes number Retained for compatibility with legacy callers.
 --- @param text string Retained for compatibility with legacy callers.
@@ -1342,8 +1342,8 @@ local function run_trigger_checks()
 						action.mapping, logical_char_len, false, logical_buffer)
 				end
 				if fired then return true end
-				-- A final no-op deliberately clears the buffer via suppress_rescan.
-				-- Returning immediately preserves that fence against repeat fallback.
+				-- A final no-op wins without an edit: returning immediately keeps it
+				-- masking the repeat fallback.
 				if action.is_noop and action.mapping.final_result then return false end
 			end
 		end
@@ -1383,10 +1383,11 @@ local function run_trigger_checks()
 		-- gets a repeat-key instead of the intended expansion.
 		local skip_delay = star_validated
 		for _, m in ipairs(term_bucket) do
-			if not m.auto and m.tlen > min_len and (skip_delay or mapping_fires(m))
-				and Expander.try_terminator_expand(m, chars, char_len, is_ignored)
-			then
-				return true
+			if not m.auto and m.tlen > min_len and (skip_delay or mapping_fires(m)) then
+				local fired, reason = Expander.try_terminator_expand(m, chars, char_len, is_ignored)
+				if fired then return true end
+				-- A final entry that changes nothing masks the lower candidates.
+				if reason == "noop_final" then return false, "noop_final" end
 			end
 		end
 		return false
@@ -1420,14 +1421,18 @@ local function run_trigger_checks()
 		end
 	end
 
-	if run_end_char_checks(auto_len) then return true end
+	local end_fired, end_reason = run_end_char_checks(auto_len)
+	if end_fired then return true end
+	if end_reason == "noop_final" then return false end
 
 	if auto_bucket then
 		for _, m in ipairs(auto_bucket) do
-			if m.auto and ((star_validated and m.has_magic) or mapping_fires(m))
-				and Expander.try_auto_expand(m, char_len, is_ignored)
-			then
-				return true
+			if m.auto and ((star_validated and m.has_magic) or mapping_fires(m)) then
+				local fired, reason = Expander.try_auto_expand(m, char_len, is_ignored)
+				if fired then return true end
+				-- A final entry that changes nothing masks the lower candidates of
+				-- this keystroke, end-char ones included.
+				if reason == "noop_final" then return false end
 			end
 		end
 	end
@@ -1906,7 +1911,15 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- buffer (via perform_text_replacement), so the pre-expansion preview
 	-- was pure waste. We now defer the preview call to the branch below
 	-- that actually keeps the buffer unchanged.
+	-- After a wiping expansion the window only fences Ergopti's own loopback:
+	-- the replacement it injected exits above as owned output, and the buffer
+	-- holds none of it. Applied to the user's own keys, it swallowed every
+	-- trigger typed within a second of a final-result expansion: typing
+	-- "sru sru sru sru" fast expanded one word in two (field report of
+	-- 2026-10-30). A chain step keeps its replacement in the buffer, so there
+	-- the window still holds for every key.
 	local rescan_suppressed = now < CoreState.no_rescan_until
+		and (internal_loopback or CoreState.no_rescan_keeps_buffer == true)
 	if suppress_triggers or rescan_suppressed then
 		-- Buffer didn't expand, so refresh the tooltip/predictions once here.
 		update_preview_with_action_recovery(CoreState.buffer)

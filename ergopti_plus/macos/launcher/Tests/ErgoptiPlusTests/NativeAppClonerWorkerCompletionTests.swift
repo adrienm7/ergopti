@@ -66,13 +66,19 @@ final class NativeAppClonerWorkerCompletionTests: XCTestCase {
 		XCTAssertEqual(process.terminationStatus, 0, "Native worker regression must pass every case: \(String(decoding: data, as: UTF8.self)); \(stderr)")
 		XCTAssertEqual(report["state"] as? String, "NATIVE_COMPLETION_REGRESSION_PASSED")
 		let cases = try XCTUnwrap(report["cases"] as? [[String: Any]])
-		XCTAssertEqual(cases.count, 3)
-		XCTAssertEqual(Set(cases.compactMap { $0["name"] as? String }), ["healthy", "refused-default", "refused-inherited-ignore"])
+		XCTAssertEqual(cases.count, 4)
+		XCTAssertEqual(Set(cases.compactMap { $0["name"] as? String }), ["healthy", "refused-default", "refused-inherited-ignore", "refused-default-signaled"])
 		for item in cases {
 			let native = try XCTUnwrap(item["native"] as? [String: Any])
 			XCTAssertEqual(native["predicate_accepted"] as? Bool, true, "Completion may not be absent after worker retirement")
 			XCTAssertEqual(native["absent_control_accepted"] as? Bool, false, "An absent completion cannot pass the predicate oracle")
 			XCTAssertEqual(native["worker_retired_by_actual_wait"] as? Bool, true)
+			if item["name"] as? String == "refused-default-signaled" {
+				XCTAssertEqual(item["helper_survived"] as? Bool, false, "The actual helper must terminate at its default SIGXFSZ")
+				XCTAssertEqual(native["worker_wait_status"] as? Int, 0)
+				let files = try XCTUnwrap(native["files"] as? [String: String])
+				XCTAssertEqual(files["status"], "", "Quota-refused status must remain invalid, never false success")
+			}
 		}
 	}
 }
