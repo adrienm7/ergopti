@@ -263,7 +263,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 	; Per-keystroke hot path — gate the arg-array build behind the cached flag so
 	; nothing is interpolated when DEBUG is off (logger.ahk convention).
 	if is_hs and LoggerIsDebugEnabled()
-		LoggerDebug("WPMWidget", "Push hs: category='{1}' section='{2}' stored='{3}'", category, section, StoredCategory)
+		LoggerDebug("WPMWidget", "Push hs: category='{1}' section='{2}' stored='{3}'", HotstringCategoryLogName(category), section, HotstringCategoryLogName(StoredCategory))
 }
 
 
@@ -362,7 +362,7 @@ _WPMWidget_ReadTomlColor(CategoryName) {
     global _SharedDir, GLOBAL_DEFAULT_COLOR
     FilePath := HotstringsBundledTomlPath(CategoryName)
     if !FileExist(FilePath) {
-        LoggerDebug("WPMWidget", "ReadTomlColor: file not found for '{1}': {2}", CategoryName, FilePath)
+        LoggerDebug("WPMWidget", "ReadTomlColor: file not found for '{1}': {2}", HotstringCategoryLogName(CategoryName), FilePath)
         _color_cache[CategoryName] := ""
         return ""
     }
@@ -384,14 +384,14 @@ _WPMWidget_ReadTomlColor(CategoryName) {
         }
         if InMeta and RegExMatch(Line, '^color\s*=\s*"([^"]+)"', &M) {
             c := M[1]
-            LoggerDebug("WPMWidget", "ReadTomlColor: '{1}' → raw='{2}' default='{3}'", CategoryName, c, GLOBAL_DEFAULT_COLOR)
+            LoggerDebug("WPMWidget", "ReadTomlColor: '{1}' → raw='{2}' default='{3}'", HotstringCategoryLogName(CategoryName), c, GLOBAL_DEFAULT_COLOR)
             ; Skip the global blue fallback — it means "no category color set"
             result := (c != GLOBAL_DEFAULT_COLOR) ? c : ""
             _color_cache[CategoryName] := result
             return result
         }
     }
-    LoggerDebug("WPMWidget", "ReadTomlColor: no color key found for '{1}'", CategoryName)
+    LoggerDebug("WPMWidget", "ReadTomlColor: no color key found for '{1}'", HotstringCategoryLogName(CategoryName))
     _color_cache[CategoryName] := ""
     return ""
 }
@@ -406,7 +406,7 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
         raw := _WPMWidget_ReadTomlColor(CategoryName)
         if (raw != "") {
             result := (SubStr(raw, 1, 1) == "#") ? SubStr(raw, 2) : raw
-            LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → '{2}'", CategoryName, result)
+            LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → '{2}'", HotstringCategoryLogName(CategoryName), result)
             if RegExMatch(result, "^[0-9A-Fa-f]{6}$")
                 return result
             ; Falls through to fallback if format is invalid
@@ -417,7 +417,7 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
                 raw2 := _WPMWidget_ReadTomlColor(Basecat)
                 if (raw2 != "") {
                     result2 := (SubStr(raw2, 1, 1) == "#") ? SubStr(raw2, 2) : raw2
-                    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' via section '{2}' → '{3}'", CategoryName, Basecat, result2)
+                    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' via section '{2}' → '{3}'", HotstringCategoryLogName(CategoryName), Basecat, result2)
                     if RegExMatch(result2, "^[0-9A-Fa-f]{6}$")
                         return result2
                     ; Falls through to fallback if format is invalid
@@ -425,9 +425,9 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
             }
         }
     } catch as e {
-        LoggerError("WPMWidget", "CategoryBgColor failed for '{1}': {2}", CategoryName, e.Message)
+        LoggerError("WPMWidget", "CategoryBgColor failed for '{1}': {2}", HotstringCategoryLogName(CategoryName), e.Message)
     }
-    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → fallback '{2}'", CategoryName, FallbackHex)
+    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → fallback '{2}'", HotstringCategoryLogName(CategoryName), FallbackHex)
     return FallbackHex
 }
 
