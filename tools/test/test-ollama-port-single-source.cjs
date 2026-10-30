@@ -6,8 +6,9 @@
  * DESCRIPTION:
  * The default Ollama port lives in exactly ONE place —
  * _shared/modules/llm/defaults.json. Ergopti's own Ollama reads
- * llm_ollama_owned_port on Windows and macOS, and the stock llm_ollama_port names
- * only the port a user's own Ollama keeps. The AHK driver loads it
+ * llm_ollama_owned_port on Windows, macOS and Linux, and the stock llm_ollama_port
+ * names only the port a user's own Ollama keeps. Linux mirrors both in
+ * infra/llm_bridge.lua, pinned by test-linux-llm-defaults-single-source.cjs. The AHK driver loads it
  * into LLM_Defaults (infra/llm_defaults.ahk) and sources every default from there:
  * api_ollama.ahk seeds LLM_OLLAMA_PORT at boot (LLM_Ollama_LoadDefaults), the
  * tray menu seeds _LLM_Menu["ollama_port"] (LLM_Menu_ApplySharedDefaults) and
@@ -23,8 +24,9 @@
  * (which would mean the default resolution was silently deleted).
  *
  * The Ollama install script (install/ollama_install.sh) probed and announced a
- * typed 11434 too; it now reads the port from the same defaults.json (it stays on
- * the stock key until Linux moves) and is held to the same rule. Its PowerShell
+ * typed 11434 too; it now reads the port from the same defaults.json and is held
+ * to the same rule. It stays on the stock key: it is the legacy system installer,
+ * which no driver calls. Its PowerShell
  * twin installed a system Ollama and is gone: its absence is checked here.
  * ==============================================================================
  */
