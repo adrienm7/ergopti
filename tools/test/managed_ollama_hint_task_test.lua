@@ -26,6 +26,8 @@ local function fresh(options)
 		return { mode = configuration.directory_mode or "directory" }
 	end } }
 	package.loaded["modules.llm.bootstrap_retry_generated"] = { admission_seconds = 30, source_sha256 = string.rep("a", 64) }
+	-- A refused hint is logged with the check the script names.
+	package.loaded["infra.logger"] = { warn = function() end }
 	package.loaded["adapters.timer_scheduler"] = { awake_time = function()
 			if configuration.clock_throw then error("controlled native clock refusal") end
 			if configuration.clock_missing then return nil end
