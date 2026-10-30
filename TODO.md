@@ -647,8 +647,10 @@ application|app_name|title|context_watchers|secure_field>, TTL refresh <armed|no
   0, select -50 and the source still disabled): known limitation, not re-fixed.
 - **L32** Partly fixed on tmp/wip-field-run-checklist (cce99afbc7): the shared schema enum lacked
   `missing`, `unavailable` and `not_used`, so the share projection turned a refused Screen Recording
-  grant (and a guardian needing approval) into `unknown`. Still open: Input Monitoring has no
-  non-prompting reader (IOHIDCheckAccess via a native helper), and the resident size breakdown.
+  grant (and a guardian needing approval) into `unknown`. Still open: the resident size breakdown.
+  Input Monitoring: done 30 October in code (`fix/macos-overnight-c-2` 28a6dec3, 10bcfeca), the
+  launcher role `--input-monitoring status` answers from IOHIDCheckAccess (never prompts) and the
+  field run's permissions check reads it; the macOS Build stage must compile and run its XCTest.
   Original entry: issue #104 diagnostics: Input Monitoring, Login Items and Screen Recording read
   `unknown`; memory used 843 MB with 93 MB free. Next: read or label those permissions, and
   measure the 843 MB resident size.
@@ -678,7 +680,8 @@ Linux Ollama lookup still refuse an unusable PAC, so their check keeps failing, 
 what they do; their fallback is the deferred item "PAC unusable: direct fallback". Open on macOS:
 `route_lookup pass:selected`in the 22:31 run carried no fallback marker although the route role
 saw`native_pac_download`; confirm on the Mac whether the HEAD worker's CFNetwork lookup went
-  direct by itself. Mac confirms: off the company network, 03_field_network passes with those
+  direct by itself. Done in code 30 October (49020f18, e45e7572): the worker writes a closed
+  `# native_http_route kind=`marker per attempt and the check reads`route_lookup pass:selected:direct`  (or`:http`), so the next report answers it; the macOS Build stage must compile it. Mac confirms: off the company network, 03_field_network passes with those
   info values.
 - **L43** [PHYS-M] 04_field_toolchain `karabiner_signature fail:exit_1` (19:47 run). Not a
   wrong check: `karabiner_cask info:absent` only means Homebrew did not install it; Karabiner
