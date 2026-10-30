@@ -175,7 +175,9 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    - `field_slow_lines`: one `awk` pass over today's log (a summary only reaches the task's pipe) tallies
      the HotPath `Slow <segment>: X ms own` lines by segment, and the `Slow ingest tick` and
      `Slow preferences save` lines; `slow_dominant` names the segment with the most own time (the five
-     largest in the log window), the two others are `count:worst_ms`.
+     largest in the log window), the two others are `count:worst_ms`; `log_lease_bound_failures` and
+     `log_layout_change_before_baseline` fail when a `Lease-bound input startup failed` or a
+     `Layout … detected change before its baseline` line is in the day log (item 38).
    - `field_fifo_safety`: in a folder of its own under `TMPDIR`, a FIFO (a reader attached first, so a
      regressed guard cannot freeze the app) is named `named_pipe` by `followed_mode`, `exists` sees it, and
      both `append` and the atomic `write` refuse it and leave it in place; the folder is removed.
@@ -1843,7 +1845,8 @@ Standing checks:
       restore/clear; Ctrl+S open target (as on Windows, registry keys answer « Windows only »);
       Backspace word start (Terminal Return, `ab`, three Backspaces, `c★`; TextEdit
       Option+Backspace; Safari Cmd+L).
-- [ ] **Item 38**: no "Lease-bound input startup failed" or spurious "Layout poll detected change";
+- [ ] **Item 38**: no "Lease-bound input startup failed" or spurious "Layout poll detected change"
+      (automated: `field_slow_lines`' `log_lease_bound_failures` and `log_layout_change_before_baseline`);
       Right Option + Return/Delete/Backspace/Escape run script actions; no Python or Rosetta notice;
       MLX behind a proxy; Versions rollback.
 - [ ] **Installed app**: 7 (Cocoa Finish, folder disagreement, native restart), 116 page, 120
