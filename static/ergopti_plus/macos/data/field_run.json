@@ -96,6 +96,13 @@
 			"proves": "The launcher resolves, its headless HTTP worker role refuses malformed arguments with EX_USAGE, and it carries one direct GET to a loopback server the check owns."
 		},
 		{
+			"id": "field_network_hosts",
+			"kind": "field_check",
+			"check": "network_hosts",
+			"deadline_seconds": 120,
+			"proves": "Every external host the drivers declare (GitHub and its API, Hugging Face, Ollama and its registry) answers one HEAD through the managed transport."
+		},
+		{
 			"id": "key_accounting",
 			"kind": "field_check",
 			"check": "key_accounting",
