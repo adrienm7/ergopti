@@ -31,6 +31,11 @@
 ---    which redact again before anything leaves the machine.
 --- 5. One window at a time, owned by a generation: a late message or callback
 ---    of a closed window is inert.
+--- 6. Never during a controlled reload or quit: the field run's timed reload of
+---    2026-10-30 21:06 opened a window between its lease revocation and its
+---    teardown, then lost the app. An error logged while a terminal transition
+---    owns the process stays in the log, and a window already scheduled is
+---    dropped before it opens.
 --- ==============================================================================
 
 local M = {}
@@ -48,6 +53,7 @@ local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
 local Storage        = require("adapters.storage")
 local WebviewResult  = require("adapters.webview_result")
 local ConfigKeys = require("config_keys")
+local TerminationCoordinator = require("infra.termination_coordinator")
 
 local LOG = "error_dialog"
 
@@ -479,6 +485,12 @@ local function schedule(record)
 	local _, committed = TimerScheduler.after(_policy.present_delay_ms / 1000, function()
 		if _scheduled ~= record then return end
 		_scheduled = nil
+		if TerminationCoordinator.terminal_in_progress() then
+			_busy = false
+			_folded = 0
+			Logger.info(LOG, "A reload or quit is under way; the error window stays closed.")
+			return
+		end
 		local ok, opened = xpcall(open_window, debug.traceback, record)
 		if ok and opened then return end
 		if not ok then
@@ -594,6 +606,7 @@ end
 --- @param message string
 --- @return boolean handled Always true.
 decide_error = function(module_name, template, message)
+	if TerminationCoordinator.terminal_in_progress() then return true end
 	local verdict = Policy.decide(_decisions, _policy, {
 		module = module_name, template = template, at = M.clock(), enabled = M.is_enabled(), open = _busy,
 	})

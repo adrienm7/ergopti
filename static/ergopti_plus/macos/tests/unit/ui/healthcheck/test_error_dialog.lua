@@ -37,6 +37,7 @@ local function load_dialog(controls)
 	for _, name in ipairs({
 		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "infra.i18n",
 		"infra.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "adapters.timer_scheduler", "adapters.storage", "infra.manifest_reader",
+		"infra.termination_coordinator",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -53,6 +54,9 @@ local function load_dialog(controls)
 	logger.warn = function(_, message, ...) context.warnings[#context.warnings + 1] = string.format(message, ...) end
 	package.loaded["infra.logger"] = logger
 	package.loaded["infra.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
+	package.loaded["infra.termination_coordinator"] = {
+		terminal_in_progress = function() return context.terminal == true end,
+	}
 	local function catalogue() return { ["common.error_title"] = "Error" } end
 	package.loaded["infra.locale"] = { all = catalogue, catalogue = catalogue }
 	package.loaded["adapters.timer_scheduler"] = {
@@ -279,6 +283,28 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 		helpers.assert_eq(context.focused, 1,
 			"the error window is raised and focused once through the shared helper (ui-focus-not-topmost)")
 		helpers.assert_eq(context.title, "ErgoptiPlus — common.error_title", "the window is titled Error")
+	end)
+
+	helpers.it("opens nothing while a reload or quit owns the process (error-dialog-during-reload)", function()
+		local dialog, context = load_dialog()
+		dialog.init()
+		context.terminal = true
+		dialog.on_error("karabiner", "Revocation failed: %s", "Revocation failed: x")
+		helpers.assert_eq(#context.timers, 0, "an error logged mid-reload arms no window")
+
+		-- A window decided before the reload started is dropped when it would open
+		context.terminal = false
+		dialog.on_error("keystats", "Flush failed: %s", "Flush failed: disk full")
+		helpers.assert_eq(#context.timers, 1)
+		context.terminal = true
+		fire_timers(context)
+		helpers.assert_eq(context.windows, nil, "the reload began before the window opened")
+
+		-- The dropped window freed the policy: after an aborted reload a new error opens one
+		context.terminal = false
+		dialog.on_error("menu", "New failure", "New failure")
+		fire_timers(context)
+		helpers.assert_eq(context.windows, 1)
 	end)
 
 	helpers.it("the same signature opens once; errors while pending or open are folded (error-dialog-macos)", function()
