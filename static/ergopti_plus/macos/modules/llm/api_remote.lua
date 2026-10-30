@@ -304,8 +304,9 @@ local function register_local_servers()
 				default_model = "",
 				format        = "openai",
 				model_extras  = {},
-				-- local_servers.json request_fields turn every model's thinking off
-				thinking_dialect = {},
+				-- local_servers.json request_fields turn every model's thinking off;
+				-- its thinking_dialect adds a family's level on top
+				thinking_dialect = LocalServers.THINKING_DIALECT or {},
 				local_server  = true,
 				request_fields = LocalServers.REQUEST_FIELDS,
 			}
