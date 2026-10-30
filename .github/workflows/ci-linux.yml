@@ -2952,6 +2952,46 @@ jobs:
           fi
         timeout-minutes: 6
 
+      - name: Install prerequisites for Load the number-row options into a real X server
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xvfb x11-xkb-utils python3
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+
+      # The layout manager's whole live chain on an owned Xvfb: the composer's save
+      # path and a packaged registry layout installed in a private user tree, the
+      # number-row options converted in Lua, installed by the Python installer and
+      # loaded into the server, each read back with xkbcomp. No desktop settings
+      # daemon and no Wayland compositor is involved; those need a real desktop.
+      - name: Load the number-row options into a real X server
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          # Absolute roots: the configuration writer proves its sibling modules by path.
+          env LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/lua/?.lua;$PWD/../_shared/lua/?/init.lua;;" luajit tests/hardware/run_layout_rows_live.lua
+          else
+              exit 1
+          fi
+        timeout-minutes: 3
+
       - name: Install prerequisites for The tray binding names libraries and symbols that exist
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
