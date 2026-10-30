@@ -1,16 +1,18 @@
 --- tests/unit/infra/field_check/test_field_check_typing_selftest.lua
 
 --- ==============================================================================
---- MODULE: Field Run Typing Self-Test Probe
+--- MODULE: Field Run Typing Self-Test and Menu Build Probes
 --- DESCRIPTION:
---- The automatic key accounting over scripted ports:
+--- The automatic key accounting and the timed menu rebuild over scripted ports:
 --- 1. the self-test types the fixed sequence into the scratch field only; a
 ---    field that never had the focus, a focus lost mid-sequence, a tap that
 ---    missed or doubled a key and a field holding other text each fail their
 ---    own step, and the previous app must get the focus back;
 --- 2. the Karabiner path and the ledger's double count are named as needing
 ---    physical keys, and the keystrokes keystats gains are named;
---- 3. a typing that has not settled when the counter stops fails, never passes.
+--- 3. a typing that has not settled when the counter stops fails, never passes;
+--- 4. the menu rebuild must be accepted, and its duration and slowest rows are
+---    named; a menu that does not exist fails.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -25,6 +27,7 @@ local function make_ports()
 		presses = 4,
 		ledger = { 10, 10 },
 		reads = 0,
+		menu = { ok = true, ms = 612.4, items = 14, slowest = { { id = "llm", ms = 201.33 }, { id = "hotstrings", ms = 120 } } },
 	}
 	local ports = {
 		keystats_facts = function()
@@ -40,6 +43,7 @@ local function make_ports()
 			if not world.unsettled then callback(world.typed) end
 			world.finish_count()
 		end,
+		menu_rebuild = function() return world.menu end,
 	}
 	return ports, world
 end
@@ -122,3 +126,25 @@ helpers.describe("typing self-test probe", function()
 	end)
 end)
 
+helpers.describe("menu build probe", function()
+	helpers.it("names the rebuild's duration and its slowest rows", function()
+		local ports = make_ports()
+		local steps, result = run("menu_build", ports)
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.menu_rebuild_ms.value, "612")
+		helpers.assert_eq(steps.menu_top_items.value, "14")
+		helpers.assert_eq(steps.menu_slowest_1.value, "llm:201.3")
+		helpers.assert_eq(steps.menu_slowest_2.value, "hotstrings:120.0")
+		helpers.assert_nil(steps.menu_slowest_3)
+	end)
+
+	helpers.it("fails a refused rebuild and a menu that does not exist", function()
+		local ports, world = make_ports()
+		world.menu.ok = false
+		helpers.assert_eq(run("menu_build", ports).menu_rebuild.value, "refused")
+		world.menu = nil
+		local steps, result = run("menu_build", ports)
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(steps.menu_rebuild.value, "menu_absent")
+	end)
+end)

@@ -466,11 +466,11 @@ end
 
 
 
--- =======================================
--- =======================================
--- ======= 8/ Scratch typing field =======
--- =======================================
--- =======================================
+-- ================================================
+-- ================================================
+-- ======= 8/ Menu and scratch typing field =======
+-- ================================================
+-- ================================================
 
 -- Seconds the scratch window takes to come to the front, between two typed
 -- keys, before the field is read, and at most in all.
@@ -483,6 +483,14 @@ local SCRATCH_BOUND_SECONDS = 5
 local SCRATCH_HTML = [[<!doctype html><html><body style="margin:12px;font:14px -apple-system">
 <textarea id="field" rows="2" cols="30" autofocus></textarea>
 <script>document.getElementById("field").focus();</script></body></html>]]
+
+--- The menu's timed rebuild, or nil before the menu exists.
+--- @return table|nil outcome
+local function menu_rebuild()
+	local menu = package.loaded["ui.menu"]
+	if type(menu) ~= "table" or type(menu.timed_rebuild) ~= "function" then return nil end
+	return menu.timed_rebuild()
+end
 
 --- Types keys into a scratch text field this process opens, and only there:
 --- the focus is checked before each key, and the window is closed and the
@@ -591,6 +599,7 @@ function M.new()
 		ollama_refresh = ollama_refresh,
 		ollama_installed_model = ollama_installed_model,
 		ollama_predict = ollama_predict,
+		menu_rebuild = menu_rebuild,
 		scratch_typing = scratch_typing,
 	}
 end

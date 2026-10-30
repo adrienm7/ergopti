@@ -110,6 +110,13 @@
 			"proves": "Without a person: the app types a fixed sequence into its own scratch field only, the tap sees each key once, the field holds it exactly and the previous app gets the focus back."
 		},
 		{
+			"id": "field_menu_build",
+			"kind": "field_check",
+			"check": "menu_build",
+			"deadline_seconds": 30,
+			"proves": "One rebuild of the menu tree succeeds; its duration, its top-level rows and the slowest ones are named."
+		},
+		{
 			"id": "diagnostics",
 			"kind": "diagnostics",
 			"deadline_seconds": 60,
