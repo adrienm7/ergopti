@@ -195,7 +195,9 @@ helpers.describe("keymap.expander: no-op identity mapping pass-through", functio
 		end
 		helpers.assert_true(saw_tab,
 			"the production replacement transaction must contain the Tab keydown")
-		helpers.assert_eq(fixture.state.buffer, "go",
-			"non-text directives must not corrupt the logical text buffer")
+		-- {Tab} may have left the field, so the buffer no longer describes the
+		-- text behind the caret: a key output forgets it, as on Windows and Linux
+		helpers.assert_eq(fixture.state.buffer, "",
+			"a key-token output must forget the logical text buffer")
 	end)
 end)
