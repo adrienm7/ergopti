@@ -109,6 +109,17 @@ segments = ["{app}", "logs"]
 # =====================================
 # =====================================
 
+# The default configuration folder of the macOS driver (a ConfigDirPath set in
+# paths.toml replaces it) and, inside it, where the personal hotstrings live.
+[config]
+hotstrings_dir = "hotstrings"
+personal_hotstrings_file = "personal_hotstrings.toml"
+
+[config.macos]
+base = "HOME"
+segments = [".config", "{app}"]
+
+
 [runtime.windows]
 # A separate direct child of LocalApplicationData owns the runtime-only ACL.
 # Existing logs and the native macOS/Linux runtime hierarchy are unchanged.
