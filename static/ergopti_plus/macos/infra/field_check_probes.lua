@@ -496,6 +496,15 @@ function M.storage(ports, report, finish)
 		report.step("keystats_db", STATE.skip, "absent")
 		return finish()
 	end
+	-- v1.0.7 moved the cache out of TMPDIR (Mac todo): the live one sits under
+	-- the persistent folder and the adopted one is gone.
+	local root = type(database.expected_root) == "string" and database.expected_root:gsub("/+$", "") .. "/" or nil
+	if root == nil or database.path:sub(1, #root) ~= root then
+		report.step("keystats_cache_place", STATE.fail, "outside_caches")
+	else
+		report.step("keystats_cache_place", database.legacy_present and STATE.fail or STATE.pass,
+			database.legacy_present and "legacy_left" or "caches")
+	end
 	-- immutable=1 takes no lock: the ingest writes in rollback-journal mode, and
 	-- a reader's shared lock made its COMMIT fail with "database is locked"
 	-- (2026-10-30 20:52:44, during this step). Without a lock a write can land
