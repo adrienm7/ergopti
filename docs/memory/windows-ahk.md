@@ -754,6 +754,8 @@ at the commit of the switch. Readers of what is stored (menu, writer) use
 The agent's manual actions refuse with the AI off (`_LLM_Agent_ManualRefusal`, notice`n`llm.manual_prediction.disabled`) and the picker greys them from the `ai:on` token of`nthe generated catalogue, with `dialog.action_picker.requires_ai`, read at each open.
 The automatic mode is disarmed too: `LLM_Agent_WatchesTyping` and `LLM_Agent_OnTyping`
 arm no pause and the triage refuses while the AI is off, and`n`LLM_Agent_OnAiSwitchedOff` retires the pause, the feed and the flow in flight at the`nswitch-off; the first keystroke after the switch-on re-arms it. The agent-only typing`nfeed therefore only runs with the AI on and the prediction bridge stopped.
+The menu's `LLM_Menu_TestPrediction` bypasses the engine on purpose: an engine answer is
+a tooltip the user could accept into the focused document.
 
 ### project-llm-validation-digit-is-the-digit-row-key
 

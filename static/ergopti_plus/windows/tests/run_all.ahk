@@ -959,6 +959,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/llm/actions/test_llm_agent.ahk
 #Include unit/modules/llm/actions/test_llm_agent_connectors.ahk
 #Include unit/modules/llm/actions/test_llm_agent_ai_off.ahk
+#Include unit/modules/llm/menu/test_llm_menu_test_prediction.ahk
 #Include unit/modules/llm/actions/test_llm_agent_system_menu.ahk
 #Include unit/modules/llm/actions/test_llm_agent_requester.ahk
 #Include unit/modules/llm/api/test_llm_remote_formats.ahk
