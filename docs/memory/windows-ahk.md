@@ -1353,9 +1353,11 @@ time and are not obvious from the code:
 
 The native Windows TLS fixture takes OpenSSL tools from exactly one Git for
 Windows prefix that contains `git.exe` (mingw64 or ucrt64), with no cross-prefix
-fallback. Hosted Git 2.56 moved the SDK from mingw64 to ucrt64, which is why the
-seven managed-network `native_tls` cases started failing; check the prefix first
-when they fail.
+fallback; Git 2.56 moved the SDK to ucrt64. A wrong prefix stops the fixture at
+startup, before its `ready` receipt, so it cannot explain a trust install resting
+at `before_add`: that step is the blocked `X509Store.Add` of a CurrentUser root,
+behind the security warning (see `project-windows-managed-transport-is-winhttp`).
+The seven trust cases pass on the hosted Git 2.56 lanes in LocalMachine scope.
 
 ## Keyboard slots bind after the layout
 
