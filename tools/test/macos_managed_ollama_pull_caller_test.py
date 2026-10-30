@@ -53,6 +53,51 @@ class RefusalLineTests(unittest.TestCase):
         )
         self.assertNotIn("secret", diagnostic.getvalue())
 
+    def test_refusal_after_reservation_publishes_a_pre_dispatch_receipt(self):
+        # Field run of 2026-10-30 20:47, 20:56 and 21:05: each refused pull
+        # left its receipt empty, so the menu never released the task slot.
+        root = tempfile.TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        path = Path(root.name) / "receipt"
+        path.touch(mode=0o600)
+        path.chmod(0o600)
+        nonce = "0" * 36
+        argv = [
+            "managed_ollama_pull.py",
+            "--admission-timeout",
+            "5",
+            "--idle-timeout",
+            "5",
+            "--retirement-timeout",
+            "5",
+            "--maximum-bytes",
+            "1024",
+        ]
+
+        def refuse(*unused):
+            raise CALLER.AUTH.AuthorityRefusal()
+
+        with (
+            patch.object(
+                CALLER,
+                "request",
+                return_value={"receipt_path": str(path), "nonce": nonce, "anchor": "/x"},
+            ),
+            patch.object(CALLER.AUTH, "OperationFiles", side_effect=refuse),
+            patch.object(CALLER, "execute") as execute,
+            patch.object(sys, "stderr", __import__("io").StringIO()),
+            patch.object(sys, "argv", argv),
+        ):
+            self.assertEqual(CALLER.main(), 78)
+        execute.assert_not_called()
+        receipt = json.loads(path.read_text())
+        self.assertEqual(receipt["nonce"], nonce)
+        self.assertEqual(receipt["state"], "retired")
+        self.assertEqual(receipt["worker_status"], 78)
+        self.assertIs(receipt["source_admitted"], False)
+        self.assertIs(receipt["daemon_operation_retired"], True)
+        self.assertEqual(receipt["operation"], "")
+
 
 class ReservedFileTests(unittest.TestCase):
     def setUp(self):
