@@ -817,20 +817,23 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       tests own their HOME fixture (29b7c5a0fe). Left: on Lua 5.4 an `io.popen` child still sees the real
       HOME.
 - [ ] **Reasoning off in every AI request: verify the open rules.** [CODE] [CI] Done on the three OS
-      (branch `fix/llm-thinking-off`): `api_providers.json` `thinking_off` rules, resolved by
-      `_shared/lua/llm/thinking_off.lua` and its AHK port `_shared/modules/llm/thinking_off.ahk`, pinned by
-      `thinking_off_vectors.json`, applied to predictions, the Test-API probe, translation, tone, the screen
-      reading and the agent; Ollama vision/agent/warmup bodies send `think:false`. Each rule cites its
-      official source (checked 2026-10-30). Left, deliberately without a rule until a doc confirms it
-      (an unknown field is an HTTP 400): OpenAI `gpt-5-mini`/`gpt-5-nano` (likely `minimal`) and
-      `gpt-5.x-chat-latest`; xAI `grok-3-mini`; OpenRouter `effort:none` for models whose
-      `reasoning.mandatory` is false (needs the models endpoint, not a static glob); Cohere (`none` is
-      documented, the models are not); Mistral `mistral-small-latest`/`magistral`; DeepSeek
-      `deepseek-chat`/`deepseek-reasoner`; Fireworks DeepSeek V3.2/V4 and Qwen3 rules were read from a
-      search summary, not the page itself; Gemini 2.5 Flash image/TTS/audio models. Also open: the Anthropic
-      payload always sends `temperature`, which Opus 4.7+, Sonnet 5/5.5, Haiku 5.5, Fable and Mythos refuse
-      with HTTP 400 when it is not the default (and every model from API version 2026-10-21). The AHK
-      suite and parse of this change must run in hosted Windows CI (no AutoHotkey in the cloud container).
+      (branch `fix/llm-thinking-off`): model families in `_shared/modules/llm/thinking_off.json` (intent and
+      control kind per family, matched on the normalized model id) crossed with each provider's
+      `thinking_dialect` in `api_providers.json`, resolved by `_shared/lua/llm/thinking_off.lua` and its AHK
+      port `_shared/modules/llm/thinking_off.ahk`, pinned by `thinking_off_vectors.json`; applied to
+      predictions, the Test-API probe, translation, tone, the screen reading and the agent. An HTTP 400 naming
+      an added field is retried once without it (WARN) and remembered for that provider and model. Ollama
+      bodies send `think:false`; local servers keep their `request_fields`. Left: (1) the refusal memory lives
+      only for the session, not persisted; (2) no capability discovery yet (OpenRouter `/models`
+      `supported_parameters`, Anthropic Models API `capabilities`, Gemini `models.list` `thinking`); (3) on
+      Windows a retried prediction gets a new request id, which `LLM_RemoteCancelAsync(old id)` does not
+      cancel; (4) unverified families: `grok-3-mini`, `hermes-4`, the generic name heuristic (`*qwen3*`,
+      `*deepseek*`, `*-r1*`, `*think*`, `*reasoning*`), Together/Kimi effort, Fireworks DeepSeek (read from a
+      search summary), OpenAI `gpt-5-mini`/`gpt-5-nano`, Gemini 2.5 Flash image/TTS/audio; (5) Ollama gpt-oss
+      ignores `think:false` (it wants a level); (6) the Anthropic payload always sends `temperature`, which
+      Opus 4.7+, Sonnet 5/5.5, Haiku 5.5, Fable and Mythos refuse with HTTP 400 when it is not the default.
+      The AHK suite and parse of this change must run in hosted Windows CI (no AutoHotkey in the cloud
+      container).
 - [ ] **Retire the orphaned Windows gesture-notice entries.** [CODE] The gesture status submenu and notice
       are gone (dbc29c5077); the `gesture_conflict_dismissed.*` storage entries they wrote stay in user
       state. Remove them in a config migration.
