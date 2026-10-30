@@ -81,6 +81,7 @@ const OPS = {
 	merge_into: { required: ['section', 'to_section'], optional: [] },
 	map_value: { required: ['section', 'key', 'map'], optional: [] },
 	wrap_value: { required: ['section', 'key', 'to_key'], optional: [] },
+	encode_value: { required: ['section', 'key', 'to_section', 'to_key', 'encoding'], optional: [] },
 	delete: { required: ['section'], optional: ['key'] },
 	set_if_absent: { required: ['section', 'key', 'value'], optional: [] }
 };
@@ -148,6 +149,25 @@ function sameValue(left, right) {
 }
 
 /**
+ * The llm.user_profiles envelope: "v1:" + base64(JSON array, keys sorted).
+ * @param {Array} registry
+ * @returns {string}
+ */
+function encodeUserProfileRegistry(registry) {
+	const sorted = (value) => {
+		if (typeof value === 'bigint') return Number(value);
+		if (Array.isArray(value)) return value.map(sorted);
+		if (value === null || typeof value !== 'object') return value;
+		return Object.fromEntries(
+			Object.keys(value)
+				.sort()
+				.map((key) => [key, sorted(value[key])])
+		);
+	};
+	return `v1:${Buffer.from(JSON.stringify(sorted(registry)), 'utf8').toString('base64')}`;
+}
+
+/**
  * Validates one op against the closed set.
  * @param {object} op
  * @param {string} where
@@ -174,6 +194,8 @@ function validateOp(op, where) {
 			fail(where, `'${field}' must be one bare segment`);
 		}
 	}
+	if (op.op === 'encode_value' && op.encoding !== 'user_profile_registry')
+		fail(where, 'encode_value names no known encoding');
 	if (op.op === 'rename') {
 		if (op.to_section === undefined && op.to_key === undefined)
 			fail(where, 'rename needs to_section or to_key');
@@ -635,6 +657,21 @@ function applyOp(model, op, context) {
 			const values = model.get(op.section);
 			if (!values || !values.has(op.key) || !isScalar(values.get(op.key))) break;
 			moveValue(model, op.section, op.key, `${op.section}.${op.key}`, op.to_key);
+			dropIfEmpty(model, op.section);
+			break;
+		}
+		case 'encode_value': {
+			// A non-empty array of tables becomes its key's encoded string; an occupied
+			// target or anything else leaves the source for the cleanup.
+			const values = model.get(op.section);
+			const value = values && values.get(op.key);
+			if (!Array.isArray(value) || value.length === 0) break;
+			if (model.has(op.to_section) && model.get(op.to_section).has(op.to_key)) break;
+			if (!value.every((item) => item !== null && typeof item === 'object' && !Array.isArray(item)))
+				break;
+			if (!model.has(op.to_section)) model.set(op.to_section, new Map());
+			model.get(op.to_section).set(op.to_key, encodeUserProfileRegistry(value));
+			values.delete(op.key);
 			dropIfEmpty(model, op.section);
 			break;
 		}
