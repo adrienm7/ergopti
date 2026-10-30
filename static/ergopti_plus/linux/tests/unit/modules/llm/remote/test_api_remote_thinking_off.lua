@@ -132,12 +132,14 @@ end)
 
 helpers.describe("vision_request: thinking off in the screen reading", function()
 
-	helpers.it("send() completes a cloud body with the provider's rule", function()
+	-- The endpoint's own target, as every caller builds it: one that had to be
+	-- given its provider by hand reached complete_body with nil (CI run
+	-- 41141808375, 54 of 75 provider receipts).
+	helpers.it("send() completes a cloud body with the provider's rule (vision-endpoint-provider)", function()
 		local remote, calls = load_remote()
 		package.loaded["modules.llm.vision_request"] = nil
 		local VisionRequest = helpers.load_module("modules.llm.vision_request")
 		local target = assert(remote.endpoint({ provider = "anthropic", token = "k" }, "claude-sonnet-5-5"))
-		target.provider, target.model = "anthropic", "claude-sonnet-5-5"
 		local body = { model = "claude-sonnet-5-5", max_tokens = 600, messages = {} }
 		VisionRequest.send(target, body, function() end)
 		unload()
@@ -145,12 +147,12 @@ helpers.describe("vision_request: thinking off in the screen reading", function(
 		helpers.assert_eq(Json.decode(calls[1].body).thinking.type, "between_tools")
 	end)
 
-	helpers.it("resolve_target names the provider and model send() completes for", function()
-		local source = assert(io.open("modules/llm/vision_request.lua", "r")):read("*a")
-		local resolve = source:find("function M.resolve_target", 1, true)
-		local named = source:find("target.provider, target.model = backend, model", 1, true)
-		helpers.assert_true(resolve ~= nil and named ~= nil and named > resolve,
-			"resolve_target must hand send() the provider and the model")
+	helpers.it("an endpoint names the provider and model send() completes for (vision-endpoint-provider)", function()
+		local remote = load_remote()
+		local target = assert(remote.endpoint({ provider = "anthropic", token = "k" }, "claude-sonnet-5-5"))
+		unload()
+		helpers.assert_eq(target.provider, "anthropic")
+		helpers.assert_eq(target.model, "claude-sonnet-5-5")
 	end)
 
 end)
