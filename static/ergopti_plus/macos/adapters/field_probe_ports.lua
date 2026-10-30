@@ -142,7 +142,90 @@ end
 
 -- ==========================
 -- ==========================
--- ======= 4/ Factory =======
+-- ======= 4/ Storage =======
+-- ==========================
+-- ==========================
+
+-- The configuration files the storage step parses, by config_paths key.
+local CONFIG_FILES = {
+	{ name = "config_toml", key = "ConfigTomlPath" },
+	{ name = "karabiner_toml", key = "KarabinerConfigPath" },
+	{ name = "personal_toml", key = "PersonalTomlPath" },
+	{ name = "personal_info_toml", key = "PersonalInfoTomlPath" },
+}
+
+--- The configuration files, with whether each one exists.
+--- @return table files { { name, path, present } }
+local function config_files()
+	local ConfigPaths = require("infra.config_paths")
+	local FileSystem = require("adapters.file_system")
+	local files = {}
+	for _, entry in ipairs(CONFIG_FILES) do
+		local path = ConfigPaths.get(entry.key)
+		local present = type(path) == "string" and path ~= "" and FileSystem.exists(path) == true
+		files[#files + 1] = { name = entry.name, path = path, present = present }
+	end
+	return files
+end
+
+--- Parses one TOML file with the driver's reader, writing nothing.
+--- @param path string Absolute path.
+--- @return boolean parsed
+local function parse_toml(path)
+	local ok, document = pcall(require("infra.toml.reader").parse, path)
+	if not ok then
+		require("infra.logger").warn("adapters.field_probe_ports", "A configuration file did not parse: %s.",
+			tostring(document))
+	end
+	return ok and type(document) == "table"
+end
+
+--- The logs folder: today's log, a probe write, and the files it holds.
+--- @return table facts { today_present, writable, files, bytes }
+local function log_facts()
+	local Logger = require("infra.logger")
+	local FileSystem = require("adapters.file_system")
+	local dir = Logger.logs_dir()
+	local facts = { today_present = FileSystem.exists(Logger.today_log_path()) == true, writable = false,
+		files = 0, bytes = 0 }
+	if type(dir) ~= "string" or dir == "" then return facts end
+	dir = dir:gsub("/+$", "")
+	local probe = dir .. "/.ergopti-field-probe"
+	facts.writable = FileSystem.write(probe, "field run\n") == true and FileSystem.delete(probe) == true
+	for _, name in ipairs(require("infra.fs_dir").entries(dir)) do
+		local size = hs.fs.attributes(dir .. "/" .. name, "size")
+		if type(size) == "number" then
+			facts.files = facts.files + 1
+			facts.bytes = facts.bytes + size
+		end
+	end
+	return facts
+end
+
+--- How many file watcher owners the boot published.
+--- @return integer owners
+local function watcher_owners()
+	local roots = rawget(_G, "script_watchers")
+	return type(roots) == "table" and #roots or 0
+end
+
+--- The keystats database, when the keystats module resolved it.
+--- @return table database { path|nil, present }
+local function keystats_database()
+	local manager = package.loaded["modules.keystats.log_manager"]
+	local path = type(manager) == "table" and type(manager.get_sqlite_path) == "function"
+		and manager.get_sqlite_path() or nil
+	if type(path) ~= "string" or path == "" then return { path = nil, present = false } end
+	return { path = path, present = require("adapters.file_system").exists(path) == true }
+end
+
+
+
+
+
+-- ==========================
+-- ==========================
+-- ======= 5/ Factory =======
 -- ==========================
 -- ==========================
 
@@ -157,6 +240,11 @@ function M.new()
 		lua_heap_kb = function() return collectgarbage("count") end,
 		input_source_facts = input_source_facts,
 		layout_files = layout_files,
+		config_files = config_files,
+		parse_toml = parse_toml,
+		log_facts = log_facts,
+		watcher_owners = watcher_owners,
+		keystats_database = keystats_database,
 	}
 end
 
