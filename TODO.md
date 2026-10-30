@@ -192,7 +192,9 @@ After the cleanup, read them through the `archive/tmp-wip-<name>` tags.
   number-row design answer), 3337d99bc8 (Linux number-row order onboarding), 4fcb4a979a (logger scalar),
   then `tmp/wip-todo-ag3` d5cf3ba50b (number-row strings for that work; it conflicts in the 21 locales
   unless the AF commits come first). AF also left: reconcile the Linux `keyboard_layout_scope` comments and
-  the design note with the ninth batch.
+  the design note with the ninth batch. 8634b1ff80 is superseded by `fix/linux-layout-emulation` (its
+  participant settles asynchronously, which the global scope's synchronous assertion refused); do not land
+  both. That branch also reconciles the comments and both design notes.
 - `tmp/wip-todo-ah`: 53b1bc5375 (reset every `hs.*` cache entry between macOS test files) and five CI
   speed-ups (Ubuntu archive reuse, AHK shard split, one macOS checkout per E2E cell, Intel E2E start,
   SwiftPM cache trial); run them on `tmp/preflight-dev` before dev.
@@ -1116,6 +1118,17 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       desktop input-source setting on GNOME and KDE Wayland, with an honest reason where a compositor cannot;
       (3) the scope participant acknowledges only after the new layout is selected. Design note
       `docs/design/layout-option-emulation.md` first (agent AF), then slices.
+      **Linux done** (branch `fix/linux-layout-emulation`, 30 October): the options convert the installed
+      `.keylayout` (registry copy or `composed.keylayout`) with Ctrl, AltGr and dead keys from the layout; X11
+      and GNOME/KDE Wayland load it live (two slots `<id>`/`<id>_live` replace the counter) and both succeed
+      only on the cells read back from the session; the scope settles on that answer. Proved on Xvfb
+      (`tests/hardware/run_layout_rows_live.lua`, `test_wayland_live_replace.py`). Left for Linux: W1 to W4 of
+      the design note on a real GNOME and a real KDE session (mutter/KWin read `~/.config/xkb` and recompile
+      on the slot switch); typing on a physical keyboard; the Bépo base needs a Bépo `.keylayout` in the
+      registry (none exists, so only installed registry layouts and the composition are sources); the row
+      switches (`layout.emulate_*_row`) stay Windows-only: they mix Ergopti rows with the OS layout, which has
+      no `.keylayout` source on Linux; the onboarding control is 3337d99bc8 on `tmp/wip-todo-af`
+      (compatible, it reads `number_row_live.available()`). macOS (1) to (3) are all left.
 - [ ] **Windows updater -File workers: real update check.** [PHYS] Install a build with 5d6beccf83
       by hand, then update from it to the next release: the exe is replaced and restarts, the
       three scripts are in `%LOCALAPPDATA%\Ergopti\vendor\`, the PowerShell command line shows
@@ -1163,8 +1176,9 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       hotstrings, macOS audit-named tests renamed, neutral-installation gate. Left: Windows replay of
       the shared HTTP-redirect, timer-ceiling and key-chord corpora (needs a decision to build those
       policies on Windows), conversion of Windows source assertions to behaviour (audit item 14).
-- [ ] **5.** [CODE] Linux layout and number-row scope participants composed with the real runtime
-      producers; Linux/macOS numeric-owned Script aliases need an explicit snapshot contract.
+- [ ] **5.** [CODE] Linux/macOS numeric-owned Script aliases need an explicit snapshot contract. Done: the
+      Linux layout and number-row scope participant composed with the real producers (global scope,
+      preferences, layout manager, installer and an Xvfb server, `run_layout_rows_live.lua` section 5).
 - [ ] **116. Guided third-party validation report.** [PHYS-M] macOS `field_check_toolchain` landed
       (timer, Shortcuts, Homebrew, Karabiner signature); needs a run on a real Mac. Package
       provenance beyond the signature check is open.
