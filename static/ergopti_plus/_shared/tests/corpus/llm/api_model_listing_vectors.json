@@ -64,6 +64,108 @@
 				]
 			},
 			"expect": ["MiniMax-M2.5", "MiniMax-M2.7", "MiniMax-M3"]
+		},
+		{
+			"name": "deepinfra listing (recorded)",
+			"provider": "deepinfra",
+			"source": "GET https://api.deepinfra.com/v1/openai/models, recorded 2026-10-30 without a key (trimmed)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"data": [
+					{
+						"id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+						"object": "model",
+						"created": 0,
+						"owned_by": "deepinfra"
+					},
+					{
+						"id": "google/gemma-4-31B-it-Ultra",
+						"object": "model",
+						"created": 0,
+						"owned_by": "deepinfra"
+					},
+					{
+						"id": "black-forest-labs/FLUX-2-max",
+						"object": "model",
+						"created": 0,
+						"owned_by": "deepinfra"
+					}
+				]
+			},
+			"expect": [
+				"black-forest-labs/FLUX-2-max",
+				"deepseek-ai/DeepSeek-V4-Flash-0731",
+				"google/gemma-4-31B-it-Ultra"
+			]
+		},
+		{
+			"name": "sambanova listing (recorded)",
+			"provider": "sambanova",
+			"source": "GET https://api.sambanova.ai/v1/models, recorded 2026-10-30 without a key (trimmed)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"data": [
+					{
+						"id": "Meta-Llama-3.3-70B-Instruct",
+						"object": "model",
+						"owned_by": "no-reply@sambanova.ai"
+					},
+					{ "id": "DeepSeek-V3.1", "object": "model", "owned_by": "no-reply@sambanova.ai" },
+					{ "id": "DeepSeek-V3.2", "object": "model", "owned_by": "no-reply@sambanova.ai" }
+				]
+			},
+			"expect": ["DeepSeek-V3.1", "DeepSeek-V3.2", "Meta-Llama-3.3-70B-Instruct"]
+		},
+		{
+			"name": "huggingface listing (recorded)",
+			"provider": "huggingface",
+			"source": "GET https://router.huggingface.co/v1/models, recorded 2026-10-30 without a key (trimmed)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"data": [
+					{
+						"id": "meta-llama/Llama-3.1-8B-Instruct",
+						"object": "model",
+						"created": 1721292960,
+						"owned_by": "meta-llama"
+					},
+					{
+						"id": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+						"object": "model",
+						"created": 1792204838,
+						"owned_by": "deepseek-ai"
+					},
+					{ "id": "Qwen/Qwen3.8-27B", "object": "model", "created": 1785918179, "owned_by": "Qwen" }
+				]
+			},
+			"expect": [
+				"Qwen/Qwen3.8-27B",
+				"deepseek-ai/DeepSeek-V4.1-Flash-1017",
+				"meta-llama/Llama-3.1-8B-Instruct"
+			]
+		},
+		{
+			"name": "nvidia listing (recorded)",
+			"provider": "nvidia",
+			"source": "GET https://integrate.api.nvidia.com/v1/models, recorded 2026-10-30 without a key (trimmed)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"data": [
+					{
+						"id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+						"object": "model",
+						"created": 735790403,
+						"owned_by": "nvidia"
+					},
+					{ "id": "01-ai/yi-large", "object": "model", "created": 735790403, "owned_by": "01-ai" },
+					{ "id": "adept/fuyu-8b", "object": "model", "created": 735790403, "owned_by": "adept" }
+				]
+			},
+			"expect": ["01-ai/yi-large", "adept/fuyu-8b", "nvidia/nemotron-3.5-lightning-30b-a3b"]
 		}
 	],
 	"names": [
@@ -207,6 +309,7 @@
 		"perplexity": "GET <base_url>/models answers 404: Perplexity documents no listing for Sonar chat completions (its /v1/models lists Agent API ids), so the page offers the catalogue models and a typed id.",
 		"moonshot": "Documented as an OpenAI list (platform.kimi.ai docs/api/list-models), but no complete response is published and the route needs a key: none recorded.",
 		"dashscope": "compatible-mode/v1/models answers 401 without a key and its shape is undocumented; the documented listing is the native /api/v1/models (output.models[].model), which the listing reader does not take.",
-		"zai": "Not documented (docs.z.ai API reference); the route answers an authentication error without a key: none recorded."
+		"zai": "Not documented (docs.z.ai API reference); the route answers an authentication error without a key: none recorded.",
+		"siliconflow": "Documented as an OpenAI list (docs.siliconflow.com get-model-list) with field examples only; the route needs a key: none recorded."
 	}
 }
