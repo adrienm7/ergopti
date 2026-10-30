@@ -191,16 +191,21 @@ helpers.describe("api_common.protected_call: a throwing callback is reported", f
 	helpers.it("a non-function callback is a no-op", function()
 		local A = api_common()
 
-		local _, nil_err = pcall(A.protected_call, nil, "on_partial", "payload")
-		helpers.assert_eq(nil_err, nil,
+		-- The pcall status is the verdict: error(nil) also leaves a nil payload, so
+		-- checking the payload alone accepted a genuine throw (28 October Windows
+		-- pass, optional-callback-status).
+		local nil_call = table.pack(pcall(A.protected_call, nil, "on_partial", "payload"))
+		helpers.assert_eq(nil_call[1], true,
 			"several backends leave on_partial and on_cancel unset by design, so a nil callback "
 				.. "must be a no-op — exactly what the type(x) == \"function\" guards at the call "
 				.. "sites already expressed")
+		helpers.assert_eq(nil_call.n, 1, "a no-op returns nothing for the caller to act on")
 
-		local _, table_err = pcall(A.protected_call, {}, "on_cancel")
-		helpers.assert_eq(table_err, nil,
+		local table_call = table.pack(pcall(A.protected_call, {}, "on_cancel"))
+		helpers.assert_eq(table_call[1], true,
 			"and the guard must test callability rather than mere presence: a value that is set "
 				.. "but not a function has to be ignored too, not called")
+		helpers.assert_eq(table_call.n, 1, "an ignored value returns nothing either")
 	end)
 
 	helpers.it("uses xpcall with a traceback, not bare pcall", function()
