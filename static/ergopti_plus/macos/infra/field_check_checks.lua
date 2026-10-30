@@ -17,6 +17,8 @@
 --- 5. login_items: what starts Ergopti or Hammerspoon at login (login item state,
 ---    background items, launch agents), and does each entry belong to the
 ---    running copy or to another one?
+--- The checks only the developer field run asks for live in
+--- infra/field_check_probes.lua and are registered in M.checks below.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only: no step starts, stops or reconfigures Karabiner, writes a file
@@ -784,6 +786,9 @@ function M.composer(ports, report, finish)
 	require("layouts.composer_check").run(env, report, finish)
 end
 
+-- The checks only the developer field run asks for (data/field_run.json)
+local Probes = require("infra.field_check_probes")
+
 --- Check identity → definition(ports, report, finish), as run by infra.field_check.
 M.checks = {
 	network = M.network,
@@ -793,6 +798,7 @@ M.checks = {
 	toolchain = M.toolchain,
 	login_items = M.login_items,
 	composer = M.composer,
+	permissions = Probes.permissions,
 }
 
 return M
