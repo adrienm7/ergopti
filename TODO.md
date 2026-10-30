@@ -160,17 +160,19 @@ into its item below or into the matching existing item.
 - [ ] **Field report marks.** [CODE] The macOS collector prints ✅ pass, ❌ fail, ⏭️ skip, ⌨️ needs_typing,
       ⚠️ other and a summary line; the Linux collector does the same over its `check=<id> verdict=<...>`
       lines (also in `field_checks.txt`). Left: the Windows collector.
-- [ ] **Thinking off for every model on every backend and OS (worker `fix/llm-thinking-off`).** [CODE] The
-      rule depends on the MODEL, not on the provider: model families (normalized model id) declare an intent
-      (off, or the lowest level a model allows) and a control kind; each provider and local server declares
-      the dialect that carries each kind; a 400 naming an injected field is retried once without it, logged
-      and remembered; provider capability listings (OpenRouter `supported_parameters`, Anthropic Models API,
-      Gemini `models.list`) confirm it automatically. Covers predictions, warmups, vision, translation, tone,
-      live mode, the agent and the test prediction, for local servers, Ollama, MLX and every cloud provider.
-      Already done before: local servers (c9ca910659), Ollama predictions, macOS MLX. Gaps found:
-      `_shared/lua/llm/vision.lua` (no format turns thinking off), the Windows Ollama warmup, every cloud
-      model except Cerebras `qwen-3.8-27b`. Also check whether Anthropic requests send `temperature`
-      (Opus 5.5, Sonnet 5.5 and Fable reject non-default sampling with a 400).
+- [ ] **Thinking off for every model on every backend and OS (workers `fix/llm-thinking-off`,
+      `fix/llm-thinking-off-2`).** [CODE] The rule depends on the MODEL, not on the provider: model families
+      of `thinking_off.json` declare an intent and a control kind, each provider and local server the dialect
+      that carries it; a 400 naming an injected field is retried once without it and remembered. Done on the
+      three OS: cloud providers, local servers, MLX, default-only sampling, the resolved Ollama `think` of
+      every Ollama body (predictions, warmups, test prediction, models manager check, vision and agent: false,
+      or the family's level when Ollama ignores false, gpt-oss `low`; the single-source guard fails a literal),
+      and capability listings (OpenRouter `supported_parameters`, Anthropic Models API `capabilities`, Gemini
+      `models.list` `thinking`): fetched per provider off the request path, cached `ttl_hours`, and a control
+      a listing says a model lacks is skipped before sending. Left: run the Windows suite (AutoHotkey could
+      not run in the cloud container: `model_capabilities.ahk`, the `think` spec of `vision.ahk` and
+      `LLM_OllamaThink` are covered by the shared corpus but unexecuted); the listing cache lives in memory,
+      so a restart fetches it again on its first request.
 - [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS.** [CODE] Each one with its
       key handling, model listing, the thinking-off dialect of the item above, localized labels and tests.
       Verify every endpoint against the provider's official documentation.
