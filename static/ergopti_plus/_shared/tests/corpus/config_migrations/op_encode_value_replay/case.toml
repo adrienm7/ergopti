@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/op_encode_value_replay/case.toml
+
+[case]
+description = "A replay of encode_value on its own output changes nothing: the source is gone and the target is occupied."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

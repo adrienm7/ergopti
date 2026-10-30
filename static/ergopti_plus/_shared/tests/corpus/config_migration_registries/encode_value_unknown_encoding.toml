@@ -1,0 +1,10 @@
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "An encoding outside the closed set."
+ops = [{ op = "encode_value", section = "a", key = "b", to_section = "c", to_key = "d", encoding = "rot13" }]

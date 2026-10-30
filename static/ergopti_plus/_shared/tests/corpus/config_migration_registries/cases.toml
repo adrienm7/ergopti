@@ -13,6 +13,7 @@
 [corpus]
 control = "control"
 rejected = [
+	"encode_value_unknown_encoding",
 	"chord_missing_action",
 	"chord_missing_platform",
 	"chord_wrong_platform",
