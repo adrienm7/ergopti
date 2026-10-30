@@ -185,11 +185,7 @@ KL_AppCat_CommitEdit(Snapshot, Category, Score, FullCurrentFn := 0, AdmissionFn 
 		for Key, Value in Owner["snapshot"]
 			if !Candidate.Has(Key) && _KL_AppCat_IsDiscovery(Key, Value, Owner["model"])
 				Candidate[Key] := Value
-		Key := Snapshot["key"]
-		Existing := Candidate.Get(Key, "")
-		Record := Existing is Map ? _KL_AppCat_RecordWithLabel(Existing, Category) : Map("type", Category)
-		Record["score"] := Score
-		Candidate[Key] := Record
+		_KL_AppCat_SetRecord(Candidate, Snapshot["key"], Category, Score)
 		Content := _KL_AppCat_RenderStore(Candidate, Model, true)
 		NextModel := _KL_AppCat_DecodeStore(Content, Owner["path"])
 		Canonical := Map()
