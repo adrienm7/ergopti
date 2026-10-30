@@ -61,9 +61,37 @@ end
 
 
 
+-- ======================================
+-- ======================================
+-- ======= 2/ Event taps and loop =======
+-- ======================================
+-- ======================================
+
+--- The keymap's tap states, or nil before the keymap is loaded.
+--- @return table|nil states
+local function tap_states()
+	local keymap = package.loaded["modules.keymap"]
+	if type(keymap) ~= "table" or type(keymap.tap_states) ~= "function" then return nil end
+	return keymap.tap_states()
+end
+
+--- The main-thread holds counted since the last phase summary.
+--- @return table counts { over_250ms, over_1000ms }
+local function hold_counts()
+	local PhaseStats = require("infra.phase_stats")
+	return {
+		over_250ms = PhaseStats.counter("runtime.timer_hold_over_250ms"),
+		over_1000ms = PhaseStats.counter("runtime.timer_hold_over_1000ms"),
+	}
+end
+
+
+
+
+
 -- ==========================
 -- ==========================
--- ======= 2/ Factory =======
+-- ======= 3/ Factory =======
 -- ==========================
 -- ==========================
 
@@ -73,6 +101,9 @@ function M.new()
 	return {
 		permission_facts = permission_facts,
 		running_bundle_path = running_bundle_path,
+		tap_states = tap_states,
+		hold_counts = hold_counts,
+		lua_heap_kb = function() return collectgarbage("count") end,
 	}
 end
 

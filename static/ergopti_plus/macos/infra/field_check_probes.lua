@@ -8,6 +8,8 @@
 --- single run on the maintainer's Mac, the piece that is broken:
 --- 1. permissions: the privacy grants this process holds and the identity
 ---    (bundle identifier, code signature) macOS files them under.
+--- 2. event_taps: every keymap event tap is enabled and watched, the run loop
+---    answers a timer on time, and how many holds and late keys the session saw.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only, like the Debug checks: nothing is granted, prompted, written
@@ -133,6 +135,68 @@ function M.permissions(ports, report, finish)
 					finish()
 				end)
 		end)
+end
+
+
+
+
+
+-- ======================================
+-- ======================================
+-- ======= 2/ Event taps and loop =======
+-- ======================================
+-- ======================================
+
+-- Timer probes the run-loop step takes, how long each asks, and the lateness
+-- above which key events arrive late at the taps (infra/logger.lua's hold count).
+M.RUNLOOP_PROBES = 5
+M.RUNLOOP_PROBE_SECONDS = 0.1
+M.RUNLOOP_LATE_MS = 250
+
+--- Takes the run-loop probes one after the other.
+--- @param ports table Check ports (timer_probe).
+--- @param callback function fn(max_late_ms).
+local function runloop_lateness(ports, callback)
+	local worst, taken = 0, 0
+	local function probe()
+		ports.timer_probe(M.RUNLOOP_PROBE_SECONDS, function(late_ms)
+			taken = taken + 1
+			worst = math.max(worst, tonumber(late_ms) or 0)
+			if taken >= M.RUNLOOP_PROBES then return callback(worst) end
+			probe()
+		end)
+	end
+	probe()
+end
+
+--- The keymap's event taps and the run loop that feeds them. Each tap the
+--- keymap owns is its own step, so a report names the one macOS disabled; the
+--- watchdog that revives a disabled tap must be running. The run loop answers
+--- a short timer within the lateness that makes keys late; the session's holds
+--- and late keys are information.
+function M.event_taps(ports, report, finish)
+	local states = ports.tap_states()
+	if type(states) ~= "table" then
+		report.step("keymap_started", STATE.fail, "not_loaded")
+	else
+		report.step("keymap_started", states.started and STATE.pass or STATE.fail, states.started and "yes" or "no")
+		for _, entry in ipairs(states.taps or {}) do
+			report.step("tap_" .. entry.name, entry.state == "enabled" and STATE.pass or STATE.fail, entry.state)
+		end
+		report.step("tap_watchdog", states.watchdog and STATE.pass or STATE.fail, states.watchdog and "running" or "stopped")
+	end
+	local counts = ports.health_counts()
+	report.step("key_late", STATE.info, (counts.late_downs or 0) + (counts.late_ups or 0))
+	report.step("key_late_passed", STATE.info, counts.stale_passed or 0)
+	local holds = ports.hold_counts()
+	report.step("holds_over_250ms", STATE.info, holds.over_250ms or 0)
+	report.step("holds_over_1000ms", STATE.info, holds.over_1000ms or 0)
+	report.step("lua_heap_mb", STATE.info, math.floor((tonumber(ports.lua_heap_kb()) or 0) / 1024))
+	runloop_lateness(ports, function(worst)
+		report.step("runloop_late_ms", worst <= M.RUNLOOP_LATE_MS and STATE.pass or STATE.fail,
+			math.max(0, math.floor(worst)))
+		finish()
+	end)
 end
 
 return M
