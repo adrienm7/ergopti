@@ -380,6 +380,8 @@ TrayMenuStage_AddFeature(Label, Target) {
 }
 TrayMenuStage_Check(Args*) => 0
 MenuManifest_LoadTopLevel() => [Map("id", "metrics"), Map("id", "llm")]
+; LLM_Menu_TrayTitle reads it for the health dot; no backend is ready here.
+_LLM_Menu_BackendIsReadyForUse() => false
 _MI_StageLayout() => 0
 _MI_StageHotstrings() {
  global _LMPC_State

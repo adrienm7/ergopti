@@ -155,6 +155,8 @@ TrayMenuStage_Publish(AuthorizeFn) {
  return true
 }
 MenuManifest_LoadTopLevel() => [Map("id", "metrics"), Map("id", "llm")]
+; LLM_Menu_TrayTitle reads it for the health dot; no backend is ready here.
+_LLM_Menu_BackendIsReadyForUse() => false
 _MI_StageLayout() => 0
 _MI_StageHotstrings() => 0
 _MI_StageAgent() => 0

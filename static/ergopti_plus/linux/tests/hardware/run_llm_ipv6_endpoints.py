@@ -105,6 +105,9 @@ def main():
                         },
                     },
                 }[fmt]
+                if provider == "lmstudio":
+                    # A local server request turns thinking off (c9ca910659).
+                    payload["chat_template_kwargs"] = {"enable_thinking": False}
                 response = {
                     "openai": '{"choices":[{"message":{"content":"valid reply"}}]}',
                     "anthropic": '{"content":[{"type":"text","text":"valid reply"}]}',
