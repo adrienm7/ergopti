@@ -29,6 +29,7 @@
 ; ==================================
 
 global CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES := 1048576
+; Copy of [limits] process_output_bytes: a crash can fire before the registry loads (pinned by test-keystats-timings-single-source.cjs).
 global CRASH_REPORT_WORKER_MAX_OUTPUT_BYTES := 65536
 global CRASH_REPORT_WORKER_PRIMARY_BUDGET_MS := 5000
 global CRASH_REPORT_WORKER_DEADLINE_RETRY_MS := 100

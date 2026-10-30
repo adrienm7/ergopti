@@ -472,7 +472,7 @@ OpenHotstringsConfigWindow() {
 	G.Add("Text", "xm y+14 w70 h20", t("hs_config.label_delay"))
 	DelayEdit := G.Add("Edit", "x+6 yp-3 w80 Number")
 	DelayUpDown := G.Add("UpDown", "Range0-10000", 0)
-	G.Add("Text", "x+4 yp+3 w24", "ms")
+	G.Add("Text", "x+4 yp+3 w24", t("hs_config.unit_ms"))
 	DelayDefault := G.Add("Text", "x+6 yp w300 Right", "")
 	DelayReset := G.Add("Button", "x512 yp-3 w28 h24", "↺")
 

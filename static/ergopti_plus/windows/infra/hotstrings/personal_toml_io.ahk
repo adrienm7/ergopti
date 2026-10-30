@@ -711,7 +711,6 @@ _PersonalTomlAppendOverrides(Lines, Overrides) {
 _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		DeleteFn := 0, AuthorizeFn := 0, PublishFn := 0,
 		OpeningSource := 0, OwnerToken := 0, PreservationSource := 0) {
-	static STALE_TEMP_MS := 60000
 	static WriteSeq := 0
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
@@ -731,7 +730,7 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 	}
 	LocalSeq := ++WriteSeq
 	StagePath := FilePath . "." . A_ScriptHwnd . "-" . LocalSeq . ".tmp"
-	_TOML_ReapStaleTemps(FilePath, STALE_TEMP_MS)
+	_TOML_ReapStaleTemps(FilePath, StaleTempAgeMs())
 	_PersonalTomlCleanupStage(StagePath, DeleteFn)
 
 	Written := false

@@ -28,6 +28,8 @@
 ;    tests/meta/test_feature_io_locator_parity.ahk before any call site flips.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -297,7 +299,7 @@ ReadFeatureStateV2(V2Path) {
 		return State
 	if Loc["is_alpha"] {
 		for _, P in ["enabled", "letter", "link", "search_engine", "search_engine_url_query"
-			, "dated_notes", "destination_folder", "pattern_max_length"] {
+			, "dated_notes", "destination_folder", ConfigLeaf.PATTERN_MAX_LENGTH] {
 			if Node.Has(P)
 				State[P] := (P == "enabled" or P == "dated_notes") ? (Node[P] = true) : Node[P]
 		}

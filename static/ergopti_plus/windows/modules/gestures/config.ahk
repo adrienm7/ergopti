@@ -742,9 +742,9 @@ _GestureRestartReserve(Candidate, TimerFn := 0) {
 		; The poller handles the UAC interval where Candidate has no PID yet.
 		PollFn := _GestureRestartPoll.Bind(Candidate["epoch"])
 		if HasMethod(TimerFn, "Call")
-			TimerFn.Call(PollFn, -100)
+			TimerFn.Call(PollFn, -TimingsGet("gestures", "worker_result_poll_ms"))
 		else
-			SetTimer(PollFn, -100)
+			SetTimer(PollFn, -TimingsGet("gestures", "worker_result_poll_ms"))
 		_GestureRestartJob := Candidate
 		return true
 	} finally {
@@ -841,7 +841,7 @@ _GestureRestartPoll(Epoch) {
 		if (_GestureRestartJob["epoch"] != Epoch)
 				return
 		if _GestureRestartJob.Get("starting", false) {
-				SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
+				SetTimer(_GestureRestartPoll.Bind(Epoch), -TimingsGet("gestures", "worker_result_poll_ms"))
 				return
 		}
 		if !_GestureRestartJob["pid"]
@@ -850,14 +850,14 @@ _GestureRestartPoll(Epoch) {
 		; resumes rather than presenting status or invoking a user callback while
 		; suspended.
 		if A_IsSuspended {
-				SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
+				SetTimer(_GestureRestartPoll.Bind(Epoch), -TimingsGet("gestures", "worker_result_poll_ms"))
 				return
 		}
 		; A complete atomic result is authoritative even if Windows has recycled
 		; the launch PID. Liveness is only an advisory while no receipt exists.
 		if !FileExist(_GestureRestartJob["result"])
 				&& ProcessExist(_GestureRestartJob["pid"]) {
-				SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
+				SetTimer(_GestureRestartPoll.Bind(Epoch), -TimingsGet("gestures", "worker_result_poll_ms"))
 				return
 		}
 		Ok := _GestureRestartReadResult(_GestureRestartJob["result"])

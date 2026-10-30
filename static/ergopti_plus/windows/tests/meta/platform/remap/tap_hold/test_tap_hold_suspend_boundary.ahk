@@ -10,34 +10,53 @@
 
 #Requires AutoHotkey v2.0
 
+; One press through the real owner: the release wait runs SuspendInWait, which
+; models a pause arriving while the pseudo-thread sits in KeyWait.
+_THSB_OwnPress(SuspendAtEntry, SuspendInWait) {
+	World := {Suspended: SuspendAtEntry, Tick: 1000, Downs: 0, Ups: 0, Waits: 0}
+	Wait(Name, Seconds) {
+		World.Waits += 1
+		World.Tick += 200
+		World.Suspended := World.Suspended || SuspendInWait
+		return true
+	}
+	Result := TapHoldOwnImmediateModifier("thsb_key", "SC999", "LCtrl", 0.5, Wait,
+		(Name) => false, () => World.Tick, (Mod) => (World.Downs += 1, true), (Mod) => (World.Ups += 1, true),
+		(*) => "", false, () => World.Suspended)
+	World.Result := Result
+	return World
+}
+
 _THSB_HoldModifierGateChecksSuspendBeforeInjection() {
-	Body := _DriverFuncBody("TapHoldOwnImmediateModifier")
-	Assert(Body != "", "TapHoldOwnImmediateModifier must remain the common hold-modifier owner")
-	DownPos := InStr(Body, "KeyDownFn.Call(ModKey)")
-	WaitPos := InStr(Body, "WaitReleaseFn.Call(KeyName")
-	SuspendPos := InStr(Body, "!A_IsSuspended")
-	TapPos := InStr(Body, "TapAllowed :=")
-	Assert(DownPos > 0 and WaitPos > DownPos,
-		"the modifier owner must acquire before its first interruptible release wait")
-	Assert(SuspendPos > 0,
-		"TapHoldOwnImmediateModifier must reject a tap when Suspend occurs during its release wait")
-	Assert(TapPos > SuspendPos,
-		"the suspend veto must run before the owner can report an isolated tap")
+	Control := _THSB_OwnPress(false, false)
+	AssertTrue(Control.Result["tap"], "without a pause the same press is a tap, or this test proves nothing")
+	Paused := _THSB_OwnPress(false, true)
+	AssertFalse(Paused.Result["tap"], "a Suspend during the release wait must veto the tap")
+	AssertEqual(1, Paused.Downs, "the modifier was acquired before the pause")
+	AssertEqual(1, Paused.Ups, "the acquired modifier is still released")
+	AlreadyPaused := _THSB_OwnPress(true, false)
+	AssertEqual(0, AlreadyPaused.Waits, "a press admitted under pause must not wait for its release")
+	AssertFalse(AlreadyPaused.Result["tap"], "a press admitted under pause is no tap")
+	AssertEqual(1, AlreadyPaused.Ups, "the modifier it pressed is released at once")
 }
 Test("tap-holds: immediate hold-modifier owners suppress their tap after Suspend (tap-hold-suspend-boundary)",
 	_THSB_HoldModifierGateChecksSuspendBeforeInjection)
 
 _THSB_HoldLayerGateChecksSuspendBeforeMutation() {
-	Body := _DriverFuncBody("ActivateLayer")
-	Assert(Body != "", "ActivateLayer must remain the common hold-layer activation boundary")
-	SuspendPos := InStr(Body, "if A_IsSuspended")
-	WritePos := InStr(Body, "global LayerEnabled := True")
-	Assert(SuspendPos > 0,
-		"ActivateLayer must reject stale hold candidates after Suspend")
-	Assert(WritePos > SuspendPos,
-		"ActivateLayer must check A_IsSuspended before setting LayerEnabled true")
-	Assert(InStr(Body, "return false") > SuspendPos,
-		"ActivateLayer must return without mutating state when the driver is suspended")
+	global LayerEnabled
+	Saved := LayerEnabled
+	LayerEnabled := false
+	try {
+		Suspend(true)
+		AssertFalse(ActivateLayer(), "a stale hold candidate is refused under Suspend")
+		AssertFalse(LayerEnabled, "the refused activation must not touch the layer")
+		Suspend(false)
+		AssertTrue(ActivateLayer(), "the same activation succeeds once resumed")
+		AssertTrue(LayerEnabled, "the admitted activation publishes the layer")
+	} finally {
+		Suspend(false)
+		LayerEnabled := Saved
+	}
 }
 Test("tap-holds: in-flight hold-layer candidates cannot activate after Suspend (tap-hold-suspend-boundary)",
 	_THSB_HoldLayerGateChecksSuspendBeforeMutation)

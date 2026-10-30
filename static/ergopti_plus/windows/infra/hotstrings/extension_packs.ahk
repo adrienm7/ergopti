@@ -19,6 +19,8 @@
 ; extension_magic_key_vectors.json corpora of _shared/tests/corpus/layouts.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 global _HotstringExtensionPacks := []
 global _HotstringExtensionPaths := Map()
 ; The bundled categories this boot's extensions bind to their own files, keyed
@@ -281,8 +283,8 @@ HotstringExtensions_Bindings(Manifest) {
 HotstringExtensions_MagicKey(Manifest) {
 	global EXTENSION_MAGIC_KEY_FIELDS, EXTENSION_KEY_CODE_PATTERN
 	Declared := []
-	if Manifest.Has("extension") && Manifest["extension"].Has("magic_key")
-		Declared.Push(Manifest["extension"]["magic_key"])
+	if Manifest.Has("extension") && Manifest["extension"].Has(ConfigLeaf.MAGIC_KEY)
+		Declared.Push(Manifest["extension"][ConfigLeaf.MAGIC_KEY])
 	if Manifest.Has("extension.magic_key")
 		Declared.Push(Manifest["extension.magic_key"])
 	if Declared.Length == 0

@@ -99,6 +99,61 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    identity lookup, keystats app attribution, canvas/AX work and the remaining synchronous shell helpers before
    optimizing any of them from source reading alone.
 
+## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
+
+The coordinator integrates the worker branches `fix/linux-owned-ollama`, `fix/linux-privacy-menu`,
+`fix/linux-layout-emulation` and `fix/llm-thinking-off` into dev linearly; each worker writes its own remainder
+into its item below or into the matching existing item.
+
+- [ ] **Release notes leaked agent session links.** [CODE] Done: `build_changelog.py` strips `Claude-Session`
+      and `Co-Authored-By` lines and any `claude.ai/code/session_` link (0ba0e90580, test
+      `tools/build/build_changelog_test.py`), and the convention lint flags the trailer. Left: rewrite the
+      bodies of the releases already published with such lines, once the maintainer agrees.
+- [ ] **Ergopti's own Ollama on macOS starts.** [CODE] [PHYS-M] The serve owner refused every launch
+      (`NATIVE_PRODUCTION_QUALIFIED` stayed False since 2026-10-09; 6170813ea9 opens it). The field run of
+      18:26 then failed in the readiness check: `NativeHTTPError at native_http.py:490 _read_exact`, the
+      `--managed-http-worker` closed its pipe. afecfadd93 logs the serve phase and the worker's exit status;
+      the next field report names the cause (74 parent lost, 75 budget, a signal a crash). Fix it from there.
+- [ ] **Field run downloads.** Done: e8ff7479e1 keeps the Ollama and MLX test models, so a run no longer pulls
+      about 740 MB over the maintainer's shared connection. Left [PHYS-M]: one complete download of each test
+      model on a connection that does not count.
+- [ ] **Field report marks.** [CODE] The macOS collector prints ✅ pass, ❌ fail, ⏭️ skip, ⌨️ needs_typing,
+      ⚠️ other and a summary line. Left: give the Windows and Linux collectors the same marks and summary
+      over their `check=<id> verdict=<...>` lines.
+- [ ] **Thinking off for every model on every backend and OS (worker `fix/llm-thinking-off`).** [CODE] The
+      rule depends on the MODEL, not on the provider: model families (normalized model id) declare an intent
+      (off, or the lowest level a model allows) and a control kind; each provider and local server declares
+      the dialect that carries each kind; a 400 naming an injected field is retried once without it, logged
+      and remembered; provider capability listings (OpenRouter `supported_parameters`, Anthropic Models API,
+      Gemini `models.list`) confirm it automatically. Covers predictions, warmups, vision, translation, tone,
+      live mode, the agent and the test prediction, for local servers, Ollama, MLX and every cloud provider.
+      Already done before: local servers (c9ca910659), Ollama predictions, macOS MLX. Gaps found:
+      `_shared/lua/llm/vision.lua` (no format turns thinking off), the Windows Ollama warmup, every cloud
+      model except Cerebras `qwen-3.8-27b`. Also check whether Anthropic requests send `temperature`
+      (Opus 5.5, Sonnet 5.5 and Fable reject non-default sampling with a 400).
+- [ ] **Every known cloud AI provider in `api_providers.json`, on the three OS.** [CODE] Each one with its
+      key handling, model listing, the thinking-off dialect of the item above, localized labels and tests.
+      Verify every endpoint against the provider's official documentation.
+  - OpenAI-compatible with one key: Perplexity, Moonshot (Kimi), Alibaba Qwen (DashScope international),
+    Z.ai (Zhipu GLM), MiniMax, SiliconFlow, DeepInfra, SambaNova, Hugging Face Inference Providers, NVIDIA NIM,
+    Nebius AI Studio, Novita AI, Hyperbolic, Scaleway Generative APIs, OVHcloud AI Endpoints, Upstage (Solar),
+    AI21 (Jamba), Venice.ai, Vercel AI Gateway, GitHub Models, Poe, Featherless, Lambda, Inception Labs
+    (Mercury), Chutes, Requesty, Baseten, Writer (Palmyra), Aleph Alpha, Reka, Liquid AI, StepFun, 01.AI.
+  - Own authentication or per-account address: Azure OpenAI / Microsoft Foundry (deployment URL, `api-key`
+    header, Entra ID), Amazon Bedrock (SigV4 and Bedrock API keys), Google Vertex AI (OAuth service account),
+    Cloudflare Workers AI and AI Gateway (account id), IBM watsonx, Databricks Model Serving, Snowflake Cortex.
+  - Mainly used in China: ByteDance Doubao (Volcengine Ark), Baidu Qianfan (ERNIE), Tencent Hunyuan, iFlytek
+    Spark, Baichuan.
+- [ ] **Every known local AI server in `local_servers.json`, on the three OS.** [CODE] Detection by process,
+      settings file and port like the existing four, with the thinking-off dialect: vLLM (8000), SGLang
+      (30000), KoboldCpp (5001), text-generation-webui (5000), TabbyAPI (5000), GPT4All (4891), AMD Lemonade
+      (8000), Docker Model Runner (12434), Microsoft Foundry Local (dynamic port), llamafile (8080, shared with
+      llama.cpp and LocalAI), a hand-started `mlx_lm.server` (8080), exo (52415), Msty, AnythingLLM. Ports
+      shared by several servers are probed once and named together, as llama.cpp and LocalAI are.
+- [ ] **Container note.** `tools/test/test-managed-ollama-protocol.cjs` stops in a cloud container on Git's
+      "dubious ownership" when run as a non-root user over a root-owned checkout; give the test its own
+      `safe.directory` for its child Git calls instead of relying on the host configuration.
+
 ## Maintainer: remote branch cleanup (run on your machine; the cloud container's proxy refuses ref deletion and tag pushes)
 
 The fix/<os> integration is on dev (2026-10-29), so it can run now. The script first tags the three fix

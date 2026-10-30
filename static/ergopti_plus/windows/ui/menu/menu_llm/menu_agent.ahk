@@ -20,6 +20,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -37,7 +38,7 @@
  */
 LLM_Agent_MenuBuild() {
 	return MenuRenderer_Build("agent_menu", "Agent", Map(), "", Map(
-		"agent_system1", () => _LLM_Agent_MenuSystemRows("agent_system1"),
+		ConfigLeaf.AGENT_SYSTEM1, () => _LLM_Agent_MenuSystemRows(ConfigLeaf.AGENT_SYSTEM1),
 		"agent_system2", () => _LLM_Agent_MenuSystemRows("agent_system2")),
 		Map("agent_mode", _LLM_Agent_MenuSetMode, "agent_disabled_apps", (*) => LLM_Agent_OpenAppPicker()),
 		Map("llm.agent_mode", () => LLM_Agent_Setting("agent_mode"),
@@ -114,10 +115,10 @@ _LLM_Agent_SystemRow(Key) {
  * @returns {Map|false} One canonical group or a refused declaration.
  */
 _LLM_Agent_MenuSystemFrame(Key, Caption, Items) {
-	if Key == "agent_system1"
+	if Key == ConfigLeaf.AGENT_SYSTEM1
 		Rows := MenuRenderer_TemplateRows("agent_linux_system1_frame", Map(),
 			Map("agent_system_backend_current_caption", (*) => Caption),
-			Map("agent_system1", Items))
+			Map(ConfigLeaf.AGENT_SYSTEM1, Items))
 	else if Key == "agent_system2"
 		Rows := MenuRenderer_TemplateRows("agent_linux_system2_frame", Map(),
 			Map("agent_system_backend_current_caption", (*) => Caption),

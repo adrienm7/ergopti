@@ -19,6 +19,7 @@
 ;    containing French letters (e.g. ``IÉ``) with lowercase TOML keys.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include ../hotstrings/common_autocorrection_migration.ahk
 
 ; Holds the raw UTF-8 content of every TOML file that has been read this
@@ -445,8 +446,8 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				if FeatureConfig.Has("time_activation_seconds") {
 						_V1Compat.TimeActivationSeconds := FeatureConfig["time_activation_seconds"]
 				}
-				if FeatureConfig.Has("pattern_max_length") {
-						_V1Compat.PatternMaxLength := FeatureConfig["pattern_max_length"]
+				if FeatureConfig.Has(ConfigLeaf.PATTERN_MAX_LENGTH) {
+						_V1Compat.PatternMaxLength := FeatureConfig[ConfigLeaf.PATTERN_MAX_LENGTH]
 				}
 				FeatureConfig := _V1Compat
 		}

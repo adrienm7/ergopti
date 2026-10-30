@@ -249,7 +249,19 @@ ready_pid() {
 	printf '%s\n' "${pid}"
 }
 
-# Prints each step result once, as it appears.
+# Maps a step verdict to the mark the maintainer scans the output for; the
+# verdict word stays after it so the logs remain searchable.
+verdict_mark() {
+	case "$1" in
+		pass) printf '✅' ;;
+		fail) printf '❌' ;;
+		skip) printf '⏭️' ;;
+		needs_typing) printf '⌨️' ;;
+		*) printf '⚠️' ;;
+	esac
+}
+
+# Prints each step result once, as it appears, and counts the passes and fails.
 report_new_results() {
 	local file name verdict
 	for file in "${results_dir}"/[0-9][0-9]_*.json; do
@@ -258,7 +270,12 @@ report_new_results() {
 		case " ${seen_results} " in *" ${name} "*) continue ;; esac
 		seen_results="${seen_results} ${name}"
 		verdict="$(plutil -extract verdict raw -o - "${file}" 2>/dev/null || printf 'unreadable')"
-		log "  field run ${name}: ${verdict}"
+		case "${verdict}" in
+			pass) passed_results=$((passed_results + 1)) ;;
+			fail) failed_results=$((failed_results + 1)) ;;
+			*) other_results=$((other_results + 1)) ;;
+		esac
+		log "  $(verdict_mark "${verdict}") field run ${name}: ${verdict}"
 	done
 }
 
@@ -325,6 +342,9 @@ run_field_run() {
 	done_name="$(spec_value files.done)"
 	deadline_seconds="$(spec_value deadline_seconds.default)"
 	seen_results=""
+	passed_results=0
+	failed_results=0
+	other_results=0
 	local started_at now pid
 	started_at="$(date +%s)"
 
@@ -421,6 +441,7 @@ run_field_run() {
 	report_new_results
 	copy_field_run_results || { log "Cannot copy the field run results."; return 1; }
 	log "Field run done: $(cat "${results_dir}/${done_name}")"
+	log "Field run summary: ✅ ${passed_results} pass, ❌ ${failed_results} fail, ${other_results} other."
 	# A run a reload cut short is closed by the app with interrupted=true
 	if [ "$(plutil -extract interrupted raw -o - "${results_dir}/${done_name}" 2>/dev/null)" = "true" ]; then
 		log "The field run was cut short in the app (see its log); the results so far are kept."

@@ -14,10 +14,8 @@
 ; violating the fail-loud / setter-logging conventions.
 ;
 ; The fix coerces with Integer() inside a try, rejects only genuinely invalid
-; (non-numeric or negative) input, and LoggerWarn's on rejection. This is a
-; meta-static test (scans source text) because calling Updater_SetCheckInterval
-; has real side effects (TOML_Write to the global config file, timer restart,
-; initMenu rebuild) that are unsafe in the headless runner.
+; (non-numeric or negative) input, and LoggerWarn's on rejection. The real setter
+; runs here against its writer and menu seams and a private configuration file.
 ;
 ; If the exact-type rejection regresses, this test fails.
 ; ==============================================================================
@@ -29,49 +27,71 @@
 
 ; ==================================================
 ; ==================================================
-; ======= 1/ Source scan helper ====================
+; ======= 1/ Coercion and refusal ==================
 ; ==================================================
 ; ==================================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_USCI_ReadSource(FileName) {
-	return _DriverFileSource(FileName)
+; Calls the setter with a private request. Cadence 0 stops the background checks,
+; so these cases arm no timer whatever they exercise.
+_USCI_Call(Seconds, State) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false)
+	return Updater_SetCheckInterval(Seconds, Request, false,
+		_UpdaterTest_RecordChannelNotice.Bind(State),
+		_UpdaterTest_CountUnexpectedSettingsWrite.Bind(State),
+		_UpdaterTest_AcceptMenuSchedule.Bind(State))
 }
 
-
-
-
-; ==================================================
-; ==================================================
-; ======= 2/ Coercion-guard assertions =============
-; ==================================================
-; ==================================================
+_USCI_WithRequestState(Body) {
+	global UPDATER_CHECK_INTERVAL
+	Saved := _UpdaterTest_SaveRequestState()
+	SavedInterval := UPDATER_CHECK_INTERVAL
+	try {
+		_UpdaterTest_ResetRequestState()
+		Body.Call()
+	} finally {
+		UPDATER_CHECK_INTERVAL := SavedInterval
+		_UpdaterTest_RestoreRequestState(Saved)
+	}
+}
 
 _USCI_CoercesInsteadOfExactTypeReject() {
-	Src := _USCI_ReadSource("updater.ahk")
-	Seg := _DriverFuncBody("Updater_SetCheckInterval")
-	Assert(Seg != "", "Updater_SetCheckInterval(Seconds) declaration must exist in modules/updater.ahk")
-
-	; The exact-type rejection must be gone — it silently dropped valid String
-	; and Float cadences.
-	Assert(!InStr(Seg, 'Type(Seconds) != "Integer"'),
-		"Updater_SetCheckInterval must not reject on Type(Seconds) != Integer — that silently drops valid String/Float cadences (updater-setcheckinterval-type-guard-rejects-non-integer)")
-
-	; It must coerce defensively instead.
-	Assert(InStr(Seg, "Integer(Seconds)") > 0,
-		"Updater_SetCheckInterval must coerce with Integer(Seconds) so a String/Float cadence is accepted (updater-setcheckinterval-type-guard-rejects-non-integer)")
+	global UPDATER_CHECK_INTERVAL
+	for Cadence in ["0", 0.0, 0] {
+		UPDATER_CHECK_INTERVAL := 60
+		State := {Writes: 0, Notices: 0, MenuSchedules: 0}
+		AssertEqual(true, _USCI_Call(Cadence, State), "a " . Type(Cadence) . " cadence is valid")
+		AssertEqual(1, State.Writes, "a " . Type(Cadence) . " cadence persists once")
+		AssertEqual(0, UPDATER_CHECK_INTERVAL, "a " . Type(Cadence) . " cadence is published")
+		AssertTrue(UPDATER_CHECK_INTERVAL is Integer, "the published cadence is an integer")
+	}
 }
-Test("updater: Updater_SetCheckInterval coerces instead of exact-type reject (updater-setcheckinterval-type-guard-rejects-non-integer)", _USCI_CoercesInsteadOfExactTypeReject)
+Test("updater: Updater_SetCheckInterval coerces instead of exact-type reject (updater-setcheckinterval-type-guard-rejects-non-integer)",
+	_UpdaterTest_WithCurrentConfiguration.Bind(_USCI_WithRequestState.Bind(_USCI_CoercesInsteadOfExactTypeReject)))
 
 _USCI_LogsOnRejection() {
-	Src := _USCI_ReadSource("updater.ahk")
-	Seg := _DriverFuncBody("Updater_SetCheckInterval")
-	; A rejected value must be visible in the log rather than silently dropped.
-	Assert(InStr(Seg, "LoggerWarn") > 0,
-		"Updater_SetCheckInterval must LoggerWarn on a rejected value — fail loud, do not silently no-op (updater-setcheckinterval-type-guard-rejects-non-integer)")
+	global UPDATER_CHECK_INTERVAL, _LOGGER_WARN_ENABLED
+	SavedWarn := _LOGGER_WARN_ENABLED
+	_LOGGER_WARN_ENABLED := true
+	Lines := []
+	LoggerSetTestSink((Line) => InStr(Line, "[WARN") ? Lines.Push(Line) : 0)
+	try {
+		for Index, Invalid in ["soon", -5] {
+			UPDATER_CHECK_INTERVAL := 60
+			State := {Writes: 0, Notices: 0, MenuSchedules: 0}
+			Assert(!_USCI_Call(Invalid, State), "an invalid cadence is refused")
+			AssertEqual(0, State.Writes, "a refused cadence reaches no writer")
+			AssertEqual(60, UPDATER_CHECK_INTERVAL, "a refused cadence publishes nothing")
+			AssertEqual(Index, Lines.Length, "a refused cadence is visible in the log")
+			AssertContains(Lines[Index], String(Invalid), "the warning names the refused value")
+		}
+	} finally {
+		LoggerClearTestSink()
+		_LOGGER_WARN_ENABLED := SavedWarn
+	}
 }
-Test("updater: Updater_SetCheckInterval logs a warning on rejection (updater-setcheckinterval-type-guard-rejects-non-integer)", _USCI_LogsOnRejection)
+Test("updater: Updater_SetCheckInterval logs a warning on rejection (updater-setcheckinterval-type-guard-rejects-non-integer)",
+	_UpdaterTest_WithCurrentConfiguration.Bind(_USCI_WithRequestState.Bind(_USCI_LogsOnRejection)))
 
 _USCI_PersistsBeforePublishingTimerState() {
 	Seg := _DriverFuncBody("Updater_SetCheckInterval")

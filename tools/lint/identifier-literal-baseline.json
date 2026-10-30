@@ -72,15 +72,6 @@
 		"static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_hf.lua": {
 			"host": 1
 		},
-		"static/ergopti_plus/windows/infra/bundle.ahk": {
-			"app_file_name": 1
-		},
-		"static/ergopti_plus/windows/infra/start_at_login.ahk": {
-			"app_file_name": 1
-		},
-		"static/ergopti_plus/windows/modules/llm/ollama_deps_checker.ahk": {
-			"host": 2
-		},
 		"static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1": {
 			"host": 1
 		},
@@ -90,12 +81,6 @@
 		"static/ergopti_plus/windows/modules/updater/self_update.ahk": {
 			"host": 1,
 			"app_file_name": 1
-		},
-		"static/ergopti_plus/windows/ui/changelog/init.ahk": {
-			"host": 2
-		},
-		"static/ergopti_plus/windows/ui/model_browser/init.ahk": {
-			"host": 2
 		},
 		"tools/build/InstalledRuntimePublisher.hpp": {
 			"bundle_id_or_label": 4

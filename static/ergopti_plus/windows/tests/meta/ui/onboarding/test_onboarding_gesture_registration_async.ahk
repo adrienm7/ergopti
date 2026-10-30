@@ -12,8 +12,8 @@ _OGRA_NativeRegistrationIsAsync() {
     Reserve := _DriverFuncBody("_Onboarding_ReserveGestureAuto")
     Assert(InStr(Start, "Run(") > 0 && InStr(Start, "&Pid") > 0
 			&& InStr(Start, "_Onboarding_ReserveGestureAuto(") > 0
-			&& InStr(Reserve, "TimerFn.Call(PollFn, -100)") > 0
-			&& InStr(Reserve, "SetTimer(PollFn, -100)") > 0,
+			&& InStr(Reserve, 'TimerFn.Call(PollFn, -TimingsGet("gestures", "worker_result_poll_ms"))') > 0
+			&& InStr(Reserve, 'SetTimer(PollFn, -TimingsGet("gestures", "worker_result_poll_ms"))') > 0,
 		"registration must launch asynchronously, retain its PID, and arm a completion poll")
 	Assert(InStr(Start, "result") > 0 && InStr(Start, "DriverPid") > 0,
 		"each worker must own a fresh result file (DriverPid + epoch), so an old successful status cannot be reused")

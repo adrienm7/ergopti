@@ -26,6 +26,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -136,7 +137,7 @@ _DynHS_RegisterAll() {
 	if Features["hotstrings"]["dynamic"]["date_fr"]["enabled"] {
 		CreateHotstring("*?", "@dt" . MK, _DateShortFr, _DynOpts)
 	}
-	if Features["hotstrings"]["dynamic"]["date_long_fr"]["enabled"] {
+	if Features["hotstrings"]["dynamic"][ConfigLeaf.DATE_LONG_FR]["enabled"] {
 		CreateHotstring("*?", "@date" . MK, _DateLongFr, _DynOpts)
 	}
 	if Features["hotstrings"]["dynamic"]["date"]["enabled"] {
@@ -171,7 +172,7 @@ _DynHS_RegisterAll() {
 	SsnRaw  := StrReplace(Ssn,  " ", "")
 	IbanRaw := StrReplace(Iban, " ", "")
 
-	if Features["hotstrings"]["dynamic"]["phone_prefixes"]["enabled"] {
+	if Features["hotstrings"]["dynamic"][ConfigLeaf.PHONE_PREFIXES]["enabled"] {
 		; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
 		MK := ScriptInformation["MagicKey"]
 		if StrLen(Phone) >= 2 {
@@ -190,7 +191,7 @@ _DynHS_RegisterAll() {
 		}
 	}
 
-	if Features["hotstrings"]["dynamic"]["ssn_prefixes"]["enabled"] {
+	if Features["hotstrings"]["dynamic"][ConfigLeaf.SSN_PREFIXES]["enabled"] {
 		; No-space trigger → SSN without spaces; spaced trigger → SSN with spaces.
 		; Both use the first 5 raw digits as the distinguishing prefix.
 		if StrLen(SsnRaw) >= 5 {
@@ -203,7 +204,7 @@ _DynHS_RegisterAll() {
 		}
 	}
 
-	if Features["hotstrings"]["dynamic"]["iban_prefixes"]["enabled"] {
+	if Features["hotstrings"]["dynamic"][ConfigLeaf.IBAN_PREFIXES]["enabled"] {
 		; 6 raw chars (case-insensitive) → IBAN without spaces.
 		; 7 spaced chars (e.g. "FR76 XX") → IBAN with spaces.
 		; Both triggers fire at the 6th raw character typed.

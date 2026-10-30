@@ -39,7 +39,7 @@ _OPRP_ChildSource() {
 	}
 	Create := _DriverFuncBody("OllamaWV_Create")
 	AssertTrue(Create != "", "the real safety producer must be present")
-	Pattern := 'SetTimer\(\s*([A-Za-z_]\w*\.Bind\(captured_epoch\))\s*,\s*-2000\s*\)'
+	Pattern := 'SetTimer\(\s*([A-Za-z_]\w*\.Bind\(captured_epoch\))\s*,\s*-TimingsGet\("ui", "webview_page_safety_flush_ms"\)\s*\)'
 	At := RegExMatch(Create, Pattern, &Safety)
 	AssertTrue(At > 0 && RegExMatch(Create, Pattern, , At + Safety.Len) == 0,
 		"Create must publish one source-authenticated epoch-bound safety callback")

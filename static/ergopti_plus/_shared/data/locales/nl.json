@@ -937,6 +937,7 @@
 	"hs_config.label_category": "Categorie:",
 	"hs_config.label_color": "Kleur",
 	"hs_config.label_delay": "Vertraging (ms)",
+	"hs_config.unit_ms": "ms",
 	"hs_config.label_file": "Bestand:",
 	"hs_config.label_group": "Groep:",
 	"hs_config.label_priority": "Prioriteit",

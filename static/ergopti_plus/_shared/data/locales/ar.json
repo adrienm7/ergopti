@@ -937,6 +937,7 @@
 	"hs_config.label_category": "الفئة:",
 	"hs_config.label_color": "اللون",
 	"hs_config.label_delay": "التأخير (ms)",
+	"hs_config.unit_ms": "م.ث",
 	"hs_config.label_file": "الملف:",
 	"hs_config.label_group": "المجموعة:",
 	"hs_config.label_priority": "الأولوية",

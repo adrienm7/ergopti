@@ -937,6 +937,7 @@
 	"hs_config.label_category": "קטגוריה:",
 	"hs_config.label_color": "צבע",
 	"hs_config.label_delay": "השהיה (מ\"ש)",
+	"hs_config.unit_ms": "מ\"ש",
 	"hs_config.label_file": "קובץ:",
 	"hs_config.label_group": "קבוצה:",
 	"hs_config.label_priority": "עדיפות",

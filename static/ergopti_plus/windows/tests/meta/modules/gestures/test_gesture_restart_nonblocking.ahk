@@ -22,8 +22,8 @@ _GRN_GestureRestartDoesNotBlockDriverThread() {
 		"GestureRestartTouchpadDevice must launch the restart asynchronously and retain its PID for diagnostics")
 	Reserve := _DriverFuncBody("_GestureRestartReserve")
 	Assert(InStr(Body, "_GestureRestartReserve(") > 0
-			&& InStr(Reserve, "TimerFn.Call(PollFn, -100)") > 0
-			&& InStr(Reserve, "SetTimer(PollFn, -100)") > 0
+			&& InStr(Reserve, 'TimerFn.Call(PollFn, -TimingsGet("gestures", "worker_result_poll_ms"))') > 0
+			&& InStr(Reserve, 'SetTimer(PollFn, -TimingsGet("gestures", "worker_result_poll_ms"))') > 0
 			&& InStr(Body, "result") > 0,
 		"the launch must retain a worker-owned result and poll it asynchronously")
 	StartReceiptPos := InStr(Body, "FileExist(_GestureRestartJob")

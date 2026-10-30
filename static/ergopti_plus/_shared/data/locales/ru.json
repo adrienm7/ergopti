@@ -937,6 +937,7 @@
 	"hs_config.label_category": "Категория:",
 	"hs_config.label_color": "Цвет",
 	"hs_config.label_delay": "Задержка (мс)",
+	"hs_config.unit_ms": "мс",
 	"hs_config.label_file": "Файл:",
 	"hs_config.label_group": "Группа:",
 	"hs_config.label_priority": "Приоритет",

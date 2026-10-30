@@ -18,6 +18,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -64,29 +65,29 @@ LLM_Menu_BuildOpts() {
 		"min_words",               _LLM_Menu["min_words"],
 		"max_words",               _LLM_Menu["max_words"],
 		"language",                I18nGetLocale(),
-		"debounce_ms",             _LLM_Menu["debounce_ms"],
-		"min_request_interval_ms", _LLM_Menu["min_request_interval_ms"],
+		ConfigLeaf.DEBOUNCE_MS,             _LLM_Menu[ConfigLeaf.DEBOUNCE_MS],
+		ConfigLeaf.MIN_REQUEST_INTERVAL_MS, _LLM_Menu[ConfigLeaf.MIN_REQUEST_INTERVAL_MS],
 		"ctx_chars",               _LLM_Menu["ctx_chars"],
 		"temperature",             _LLM_Menu["temperature"],
-		"instant_on_word_end",     _LLM_Menu["instant_on_word_end"],
-		"after_hotstring",         _LLM_Menu["after_hotstring"],
-		"reset_on_nav",            _LLM_Menu["reset_on_nav"],
+		ConfigLeaf.INSTANT_ON_WORD_END,     _LLM_Menu[ConfigLeaf.INSTANT_ON_WORD_END],
+		ConfigLeaf.AFTER_HOTSTRING,         _LLM_Menu[ConfigLeaf.AFTER_HOTSTRING],
+		ConfigLeaf.RESET_ON_NAV,            _LLM_Menu[ConfigLeaf.RESET_ON_NAV],
 		"disable_url_bars",        _LLM_Menu["disable_url_bars"],
 		"disable_password_fields", _LLM_Menu["disable_password_fields"],
-		"disabled_apps",           _LLM_Menu["disabled_apps"],
-		"show_info_bar",           _LLM_Menu["show_info_bar"],
+		ConfigLeaf.DISABLED_APPS,           _LLM_Menu[ConfigLeaf.DISABLED_APPS],
+		ConfigLeaf.SHOW_INFO_BAR,           _LLM_Menu[ConfigLeaf.SHOW_INFO_BAR],
 		"streaming",               _LLM_Menu["streaming"],
 		"show_all_at_once",        _LLM_Menu["show_all_at_once"],
-		"pred_indent",             _LLM_Menu["pred_indent"],
-		"auto_raise_temp",         _LLM_Menu["auto_raise_temp"],
-		"nav_modifiers",           _LLM_Menu["nav_modifiers"],
-		"val_modifiers",           _LLM_Menu["val_modifiers"],
+		ConfigLeaf.PRED_INDENT,             _LLM_Menu[ConfigLeaf.PRED_INDENT],
+		ConfigLeaf.AUTO_RAISE_TEMP,         _LLM_Menu[ConfigLeaf.AUTO_RAISE_TEMP],
+		ConfigLeaf.NAV_MODIFIERS,           _LLM_Menu[ConfigLeaf.NAV_MODIFIERS],
+		ConfigLeaf.VAL_MODIFIERS,           _LLM_Menu[ConfigLeaf.VAL_MODIFIERS],
 		"backend",                 _LLM_Menu["backend"],
 		"ollama_port",             _LLM_Menu["ollama_port"],
 		"api_entries",             _LLM_Menu["api_entries"],
 		"api_entry_id",            _LLM_Menu["api_entry_id"],
-		"inline_autotype",         _LLM_Menu["inline_autotype"],
-		"app_profile_overrides",   _LLM_Menu["app_profile_overrides"]
+		ConfigLeaf.INLINE_AUTOTYPE,         _LLM_Menu[ConfigLeaf.INLINE_AUTOTYPE],
+		ConfigLeaf.APP_PROFILE_OVERRIDES,   _LLM_Menu[ConfigLeaf.APP_PROFILE_OVERRIDES]
 	)
 }
 
@@ -106,11 +107,11 @@ _LLM_Menu_ToggleCandidateBool(Candidate, Key) {
 
 _LLM_Menu_ApplyAppPickerSelection(Candidate, Selected, Receipt) {
 	if !(Candidate is Map) || !(Selected is Array)
-			|| !Candidate.Has("disabled_apps")
+			|| !Candidate.Has(ConfigLeaf.DISABLED_APPS)
 		return false
-	if !AppPicker_ClaimReceipt(Receipt, Candidate["disabled_apps"])
+	if !AppPicker_ClaimReceipt(Receipt, Candidate[ConfigLeaf.DISABLED_APPS])
 		return false
-	Candidate["disabled_apps"] := LLM_Menu_DeepClone(Selected)
+	Candidate[ConfigLeaf.DISABLED_APPS] := LLM_Menu_DeepClone(Selected)
 	return true
 }
 
@@ -118,10 +119,10 @@ _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu) {
 	global Features, _LLM_Menu, _LLM_Menu_ApiPrivateAuthorityGeneration
 	if !(CandidateFeatures is Map) || !(CandidateMenu is Map)
 		return false
-	DisabledAppsChanged := _LLM_Menu.Has("disabled_apps")
-		&& CandidateMenu.Has("disabled_apps")
-		&& !AppPicker_SelectionsEqual(_LLM_Menu["disabled_apps"],
-			CandidateMenu["disabled_apps"])
+	DisabledAppsChanged := _LLM_Menu.Has(ConfigLeaf.DISABLED_APPS)
+		&& CandidateMenu.Has(ConfigLeaf.DISABLED_APPS)
+		&& !AppPicker_SelectionsEqual(_LLM_Menu[ConfigLeaf.DISABLED_APPS],
+			CandidateMenu[ConfigLeaf.DISABLED_APPS])
 	PreviousCritical := Critical("On")
 	try {
 		Features := CandidateFeatures

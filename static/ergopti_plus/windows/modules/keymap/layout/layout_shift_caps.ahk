@@ -33,6 +33,8 @@
 ; matter.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -302,7 +304,7 @@ _LayoutRowPassthroughCriterion(Sc, HotkeyName := "", *) {
 	if !BuiltinNumberRowIsActive() || LayoutRowIsEmulated(Sc)
 		return false
 	if !(IsSet(ScriptInformation) && StrCompare(ScriptInformation["MagicKeySourceScan"], Sc, true) == 0
-		&& Features["hotstrings"]["magic_key"]["replace"]["enabled"])
+		&& Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"])
 		return true
 	; A chosen source owns only its plain press. Its wildcard and modifier
 	; variants follow the effective row; a layout's own source keeps every level.
@@ -387,7 +389,7 @@ RegisterCapsLockLayer() {
 	; happened to be active. RegisterShiftLayer already guards this way; this
 	; sibling did not.
 	try {
-		HotIf((*) => GetCapsLockCondition() and Features["hotstrings"]["magic_key"]["replace"]["enabled"])
+		HotIf((*) => GetCapsLockCondition() and Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"])
 		Hotkey(ScriptInformation["MagicKeySourceScan"], ((*) => SendNewResult(ScriptInformation["MagicKey"])), "I2")
 
 		; --- Letters and symbols (registered last, highest precedence) ---
@@ -471,7 +473,7 @@ NumberRowEffectiveMode(Hkl := unset, Caps := unset) {
 			|| !IsSet(CategoryEnabled) || !(CategoryEnabled is Map) || !CategoryEnabled.Has("Layout")
 			|| !(CategoryEnabled["Layout"] is Integer) || CategoryEnabled["Layout"] != true
 		return "native"
-	Mode := NumberRowPolicyMode(Features["layout"].Get("direct_access_digits", ""))
+	Mode := NumberRowPolicyMode(Features["layout"].Get(ConfigLeaf.DIRECT_ACCESS_DIGITS, ""))
 	if Mode == "" || Mode == "native"
 		return "native"
 	if !IsSet(Caps)
@@ -555,7 +557,7 @@ global _NumberRowMenuSignature := ""
 NumberRowMenuSignature(Hkl, Caps) {
 	global Features
 	Stored := IsSet(Features) && Features is Map && Features.Has("layout") && Features["layout"] is Map
-		? NumberRowPolicyMode(Features["layout"].Get("direct_access_digits", "")) : ""
+		? NumberRowPolicyMode(Features["layout"].Get(ConfigLeaf.DIRECT_ACCESS_DIGITS, "")) : ""
 	Availability := NumberRowAvailability(Hkl, Caps)
 	return Stored . "|" . NumberRowEffectiveMode(Hkl, Caps) . "|" . Availability["digits"]
 		. "|" . Availability["symbols"] . "|" . NumberRowEdgesState(Hkl, Caps)["reason"]
@@ -682,7 +684,7 @@ NumberRowEdgesState(Hkl := unset, Caps := unset) {
 	if !IsSet(Caps)
 		Caps := KS_CapsLockToggleState()
 	Stored := IsSet(Features) && Features is Map && Features.Has("layout") && Features["layout"] is Map
-		&& Features["layout"].Has("number_row_reorder_edges") && Features["layout"]["number_row_reorder_edges"] == true
+		&& Features["layout"].Has(ConfigLeaf.NUMBER_ROW_REORDER_EDGES) && Features["layout"][ConfigLeaf.NUMBER_ROW_REORDER_EDGES] == true
 	Edges := []
 	for _, Sc in NUMBER_ROW_EDGE_SCS {
 		Row := _DigitRowEffectiveKey(Sc, Hkl, Caps)
