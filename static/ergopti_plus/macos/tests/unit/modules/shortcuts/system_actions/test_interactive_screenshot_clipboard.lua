@@ -318,6 +318,8 @@ helpers.describe("Ctrl+H interactive screenshot: verified clipboard result", fun
 			f.tasks[1].callback(0, "", "")
 			assert_clipboard_failure(f)
 			helpers.assert_contains(table.concat(f.logs.error, "\n"), "produced no image")
+			-- Field log 2026-10-30 10:15: the line could not tell an Escape from a refusal.
+			helpers.assert_contains(table.concat(f.logs.error, "\n"), "(interactive=true, stderr=empty)")
 		end)
 	end)
 

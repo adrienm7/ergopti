@@ -292,7 +292,12 @@ function M.settle(capture)
 		logger().info(LOG, "screencapture sent the image to the clipboard (Control held).")
 		return M.OUTCOME_COPIED
 	end
-	return M.OUTCOME_FAILED, "screencapture exited with code 0 but produced no image"
+	-- Whether the capture was interactive and what screencapture printed tell
+	-- an Escape that macOS reports as success from a capture it refused (field
+	-- log 2026-10-30 10:15: one interactive region capture, nothing else known).
+	return M.OUTCOME_FAILED, string.format(
+		"screencapture exited with code 0 but produced no image (interactive=%s, stderr=%s)",
+		tostring(capture.interactive == true), stderr ~= "" and stderr or "empty")
 end
 
 return M
