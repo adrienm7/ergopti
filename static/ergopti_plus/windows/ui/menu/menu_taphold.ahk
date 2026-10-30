@@ -307,7 +307,7 @@ class _TH_TapPickerFnObj {
 		global TapHold
 		; Current tap action at call time (not at menu-build time).
 		; "" means native (unconfigured) — pass as-is; ShowNative:=true adds the entry.
-		Current := IsSet(TapHold) ? TapHoldTapAction(TapHold, this.KeyId) : ""
+		Current := IsSet(TapHold) ? TapHoldConfiguredTapAction(TapHold, this.KeyId) : ""
 		try LoggerDebug("TapHoldMenu", "Opening tap picker for '{1}' (current='{2}').", this.KeyId, (Current == "" ? "<native>" : Current))
 		Title := t("tap_hold.picker.title_prefix") . this.KeyLabel
 		_KeyId := this.KeyId
@@ -640,7 +640,7 @@ _TH_ApplyTap(KeyId, ActionId) {
 		try return _TH_ApplyTap(KeyId, ActionId)
 		finally Critical(InheritedCritical)
 	}
-	Current := IsSet(TapHold) ? TapHoldTapAction(TapHold, KeyId) : "<not_ready>"
+	Current := IsSet(TapHold) ? TapHoldConfiguredTapAction(TapHold, KeyId) : "<not_ready>"
 	try LoggerInfo("TapHoldMenu", "ApplyTap key='{1}' current='{2}' -> '{3}' (pid={4}).", KeyId,
 		(Current == "" ? "<native>" : Current), (ActionId == "" ? "<native>" : ActionId), DriverPid)
 	if !GestureEnsureActionParameter(GestureBindingId("tap_hold", KeyId), ActionId)

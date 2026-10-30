@@ -8,6 +8,8 @@
 ; remap, ordinary assignment and legacy shortcut owners behind that one variant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\ai_action_gate.ahk
+
 
 
 
@@ -339,25 +341,43 @@ _MagicEditorSourceIsCurrent() {
 
 /** Returns live delivery gates with the exact source and configuration epochs. */
 _MagicEditorDeliveryState() {
-	global KeyboardShortcutAssignments
 	State := MagicEditorState()
 	Admission := _MagicEditorAdmission()
 	Admission["source_generation"] := _MagicEditorSourceIsCurrent() ? State["source_generation"] : -1
 	Admission["configuration_generation"] := State["configuration_generation"]
-	Admission["action"] := KeyboardShortcutAssignments.Get(MagicEditorSlot()["id"], "none")
+	Admission["action"] := _MagicEditorArmedAction(MagicEditorSlot()["id"])
 	return Admission
+}
+
+/** Returns a slot's action as armed now: an AI action is not while the AI is off. */
+_MagicEditorArmedAction(Slot) {
+	global KeyboardShortcutAssignments
+	Action := KeyboardShortcutAssignments.Get(Slot, "none")
+	return AiActionBlocked(Action) ? "none" : Action
+}
+
+/** Whether the broker took this ordinary slot, whose native hotkey it keeps disabled. */
+MagicEditorOwnsOrdinarySlot(Slot) {
+	State := MagicEditorState()
+	Claim := State["ordinary_claim"]
+	if !State["initialized"] || !(Claim is Map)
+		return false
+	for Taken in Claim["slots"] {
+		if Taken == Slot
+			return true
+	}
+	return false
 }
 
 /** Selects the live callback owner without running it from a native criterion. */
 _MagicEditorBrokerWinner(Scan) {
-	global KeyboardShortcutAssignments
 	State := MagicEditorState()
 	if !State["initialized"] || A_IsSuspended
 		return 0
 	Admission := _MagicEditorAdmission()
 	if Admission["master"] && !Admission["inhibited"] && State["ordinary_physical"].Has(Scan) {
 		Physical := State["ordinary_physical"][Scan]
-		if KeyboardShortcutAssignments.Get(Physical["slot"], "none") != "none"
+		if _MagicEditorArmedAction(Physical["slot"]) != "none"
 			return Map("kind", "ordinary", "slot", Physical["slot"])
 	}
 	Decision := State["decision"]
@@ -366,7 +386,7 @@ _MagicEditorBrokerWinner(Scan) {
 	if Scan == SourceScan && Admission["master"] && !Admission["inhibited"]
 			&& _MagicEditorSourceIsCurrent() {
 		Claim := State["ordinary_claim"]
-		if (Claim is Map) && KeyboardShortcutAssignments.Get(Claim["slot"], "none") != "none"
+		if (Claim is Map) && _MagicEditorArmedAction(Claim["slot"]) != "none"
 			return Map("kind", "ordinary", "slot", Claim["slot"])
 	}
 	if Admission["master"] && !Admission["inhibited"] && State["legacy"].Has(Scan)
