@@ -30,6 +30,8 @@
 			"Qualify actual cursor-display window switching",
 			"Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland",
 			"Detect and read the keymap on a real X11 and a real Wayland",
+			"Install prerequisites for Load the number-row options into a real X server",
+			"Load the number-row options into a real X server",
 			"A virtual touchpad, described by the kernel and read back",
 			"A gesture written to uinput comes back as a gesture"
 		],
@@ -320,6 +322,9 @@
 		],
 		"Detect and read the keymap on a real X11 and a real Wayland": [
 			"Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland"
+		],
+		"Load the number-row options into a real X server": [
+			"Install prerequisites for Load the number-row options into a real X server"
 		],
 		"The tray binding names libraries and symbols that exist": [
 			"Install prerequisites for The tray binding names libraries and symbols that exist"
