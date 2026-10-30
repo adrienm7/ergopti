@@ -276,6 +276,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.field_probe_ports",
+		contract = { "new" },
+		-- Merged into the field check ports; only the field run's probes read it.
+		wired    = true,
+	},
+	{
 		id       = "adapters.field_run_ports",
 		contract = { "new" },
 		-- Built by infra/field_run.lua, which starts only in developer source mode.

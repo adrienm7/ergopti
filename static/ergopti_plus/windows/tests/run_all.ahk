@@ -401,6 +401,7 @@ InstallSendNoOps()
 
 ; ── Per-module test files (each registers Test() cases) ──
 #Include unit/adapters/test_adapter_compliance.ahk
+#Include unit/adapters/test_file_system_ports.ahk
 #Include unit/infra/config/persistence/test_feature_io_locator.ahk
 #Include meta/infra/config/persistence/test_feature_io_impl_no_global.ahk
 #Include meta/suite/test_isset_no_property_arg.ahk
@@ -1273,6 +1274,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/test_keystats_network_transitions.ahk
 #Include ../infra/menu_command_origin.ahk
 #Include unit/ui/menu/test_menu_command_origin.ahk
+#Include unit/ui/menu/test_menu_row_order.ahk
 ; KLW_GetMap and KLW_GetAppCtx must handle missing context keys without throwing.
 #Include unit/modules/keystats/ergonomics/test_walker_ctx_missing_key.ahk
 ; Shared timings (A3): tap_holds/constants.ahk defines the tap-hold timing
@@ -1911,6 +1913,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_chaining.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_cascade.ahk
+#Include unit/modules/hotstrings/engine/test_hotstring_injection_plan.ahk
 #Include meta/modules/hotstrings/catalogue/test_hotstrings_combo_auto_escaping.ahk
 #Include meta/modules/keystats/ergonomics/test_ergo_flow_gap_end.ahk
 #Include meta/infra/config/persistence/test_config_window_patch_toml_meta_error.ahk

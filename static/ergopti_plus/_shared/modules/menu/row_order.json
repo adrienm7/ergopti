@@ -1,5 +1,5 @@
 {
-	"_comment": "The display-order rules of the menus, in one place. Each rule is an ordered list; a name outside a list sorts after every listed name. Read by the Lua drivers through menu.row_order (generated into _shared/lua/menu/row_order_data.lua by tools/codegen/codegen-menu-row-order.cjs). tools/test/test-menu-row-order-single-source.cjs refuses a hard-coded copy of any of these orders in a driver.",
+	"_comment": "The display-order rules of the menus, in one place. Each rule is an ordered list; a name outside a list sorts after every listed name. Read by the Lua drivers through menu.row_order and by Windows through infra/menu_row_order.ahk (generated into _shared/lua/menu/row_order_data.lua and windows/_generated/menu_row_order.ahk by tools/codegen/codegen-menu-row-order.cjs). tools/test/test-menu-row-order-single-source.cjs refuses a hard-coded copy of any of these orders in a driver.",
 	"rules": {
 		"hotstring_group_classes": {
 			"description": "Order of the hotstring group classes in a menu: the classes of menu_manifest.json hotstring_groups, listed by the order of their members.",

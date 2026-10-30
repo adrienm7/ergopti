@@ -21,11 +21,12 @@
 ---    cooperative write locks and a receipt chain; Linux publishes through
 ---    toml_codec.writer inside the single-threaded daemon, so it holds no lease
 ---    and issues no receipt. Absence is a capability the caller branches on.
---- 3. Seen by the Windows port as a reading list: the AHK FileSystem owner is
----    to offer the same required names once the PC adopts the spec.
+--- 3. Windows cannot load this file: tools/codegen/codegen-file-system-ports.cjs
+---    projects the method names for its owner (adapters/file_system.ahk), which
+---    checks itself against them when it loads.
 ---
 --- Pinned by file_system_ports_contract (corpus file_system/port_vectors.json)
---- and by the real owners of both Lua drivers.
+--- and by the real owners of the three drivers.
 --- ==============================================================================
 
 local TableUtil = require("table_util")

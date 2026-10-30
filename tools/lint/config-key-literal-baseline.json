@@ -61,7 +61,7 @@
 		"static/ergopti_plus/windows/ui/layer_editor/init.ahk": 2,
 		"static/ergopti_plus/windows/ui/layout_manager/init.ahk": 1,
 		"static/ergopti_plus/windows/ui/menu/menu_engine.ahk": 2,
-		"static/ergopti_plus/windows/ui/menu/menu_gestures.ahk": 7,
+		"static/ergopti_plus/windows/ui/menu/menu_gestures.ahk": 1,
 		"static/ergopti_plus/windows/ui/menu/menu_hotstring_switches.ahk": 6,
 		"static/ergopti_plus/windows/ui/menu/menu_hotstrings.ahk": 47,
 		"static/ergopti_plus/windows/ui/menu/menu_init.ahk": 49,

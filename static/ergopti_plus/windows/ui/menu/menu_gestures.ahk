@@ -38,12 +38,12 @@ BuildGesturesMenu(Options := unset) {
 	; the dedicated writer (gestures.enabled + reload) rather than the generic
 	; CategoryEnabled flip the master-gated menus register.
 	Commands := Map(
-		"gestures_toggle",  (*) => ToggleGesturesEnabled(),
-		"system_gesture_settings", (*) => GestureOpenTouchpadSettings(),
-		"scope_restore",    (*) => _GES_ApplyScope("recommended", ScopeOptions),
-		"scope_clear",      (*) => _GES_ApplyScope("clear", ScopeOptions),
-		"auto_configure",   (*) => GestureAutoConfigureAction(),
-		"manual_tutorial",  (*) => GestureShowManualTutorialDialog(),
+		MenuCommand.GESTURES_TOGGLE, (*) => ToggleGesturesEnabled(),
+		MenuCommand.SYSTEM_GESTURE_SETTINGS, (*) => GestureOpenTouchpadSettings(),
+		MenuCommand.SCOPE_RESTORE, (*) => _GES_ApplyScope("recommended", ScopeOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => _GES_ApplyScope("clear", ScopeOptions),
+		MenuCommand.AUTO_CONFIGURE, (*) => GestureAutoConfigureAction(),
+		MenuCommand.MANUAL_TUTORIAL, (*) => GestureShowManualTutorialDialog(),
 		MenuCommand.GESTURE_RECOMMENDED_INFO, (*) => GestureShowRecommendedInfo(),
 	)
 	Getters := Map("gestures_enabled", _GES_IsEnabled)

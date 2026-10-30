@@ -203,7 +203,14 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-menu-row-order.cjs',
-		outputs: ['static/ergopti_plus/_shared/lua/menu/row_order_data.lua']
+		outputs: [
+			'static/ergopti_plus/_shared/lua/menu/row_order_data.lua',
+			'static/ergopti_plus/windows/_generated/menu_row_order.ahk'
+		]
+	},
+	{
+		script: 'codegen/codegen-file-system-ports.cjs',
+		outputs: ['static/ergopti_plus/windows/_generated/file_system_ports.ahk']
 	},
 	{
 		script: 'codegen/codegen-layer-editor-data-js.cjs',

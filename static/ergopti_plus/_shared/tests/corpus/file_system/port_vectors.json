@@ -2,7 +2,8 @@
 	"_comment": "Vectors of file_system.ports (the lease and atomic write spec of the FileSystem owner). `owner` lists the method names an owner offers (each a function) and `non_functions` the names it offers as something else. `expect.error` is a text the refusal must contain; `expect.offered` is the capability list a complete owner reports. `drivers` gives, per driver, the capabilities its real owner must report: the shared contract replays them against the owner of the driver it runs on.",
 	"drivers": {
 		"macos": ["ConditionalRemoval", "PublicationReceipts", "WriteLease"],
-		"linux": []
+		"linux": [],
+		"windows": []
 	},
 	"required": [
 		"read",

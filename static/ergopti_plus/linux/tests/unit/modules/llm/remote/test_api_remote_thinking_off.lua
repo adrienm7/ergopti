@@ -104,6 +104,14 @@ helpers.describe("api_remote: thinking off in every format (thinking-off-everywh
 		helpers.assert_eq(body_for("openai", "gpt-4o-mini").reasoning_effort, nil)
 	end)
 
+	helpers.it("a local server keeps request_fields and adds the family's level on top", function()
+		local body = body_for("omlx", "gpt-oss-20b")
+		helpers.assert_eq(body.chat_template_kwargs.enable_thinking, false, "request_fields hold for every model")
+		helpers.assert_eq(body.chat_template_kwargs.reasoning_effort, "low", "gpt-oss cannot stop, low is its lowest")
+		helpers.assert_eq(body_for("omlx", "llama-3.2-3b").chat_template_kwargs.reasoning_effort, nil,
+			"a model of no family gets request_fields only")
+	end)
+
 	helpers.it("Qwen3 is turned off on every provider, in that provider's dialect", function()
 		helpers.assert_eq(body_for("groq", "qwen/qwen3.8-27b").reasoning_effort, "none")
 		helpers.assert_eq(body_for("cerebras", "qwen-3.8-27b").reasoning_effort, "none")
