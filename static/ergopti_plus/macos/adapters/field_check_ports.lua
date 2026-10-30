@@ -255,6 +255,7 @@ function M.new()
 		remap_facts = remap_facts,
 		keystats_facts = keystats_facts,
 		health_counts = function() return require("infra.key_event_health").counts() end,
+		swallowed_keys = function() return require("infra.keystroke_integrity").drop_count() end,
 		count_keys = count_keys,
 		fetch_pac = fetch_pac,
 		network_chain = function(callback) return network_chain(callback) end,
