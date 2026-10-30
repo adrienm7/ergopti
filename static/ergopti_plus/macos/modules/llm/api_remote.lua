@@ -68,6 +68,7 @@ local LocalServers   = require("modules.llm.local_servers")
 local LocalServerPorts = require("modules.llm.local_server_ports")
 local AuthPolicy     = require("llm.local_server_auth")
 local ThinkingOff    = require("llm.thinking_off")
+local ThinkingFamilies = require("modules.llm.thinking_families")
 local Storage        = require("adapters.storage")
 local ProviderConfig = require("llm.provider_config_policy")
 local Json           = require("json")
@@ -1421,21 +1422,9 @@ local function extract_server_message(body)
 end
 M.__extract_server_message_for_test = extract_server_message
 
---- The reasoning control of every model family (thinking_off.json), read once.
---- An unreadable table is logged and turns nothing off: no guess.
-local THINKING_FAMILIES = (function()
-	local path = Paths.shared_llm_path("thinking_off.json")
-	local fh = path and io.open(path, "r")
-	local raw = fh and fh:read("*a")
-	if fh then fh:close() end
-	local ok, decoded = pcall(JsonCodec.decode, raw)
-	local families, reason = ThinkingOff.parse_families(ok and decoded or nil)
-	if not families then
-		Logger.error(LOG, "thinking_off.json is unreadable (%s) — no request turns thinking off.", tostring(reason))
-		return {}
-	end
-	return families
-end)()
+--- The reasoning control of every model family (thinking_off.json), shared
+--- with every Ollama body (modules/llm/thinking_families.lua).
+local THINKING_FAMILIES = ThinkingFamilies.families()
 
 -- Storage key of the refused thinking fields, kept across restarts
 M.THINKING_REFUSED_KEY = "llm_thinking_refused"

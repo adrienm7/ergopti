@@ -39,6 +39,15 @@ local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local LOG            = "llm.api_ollama"
 local LocalModelPolicy = require("llm.local_model_policy")
 
+--- The think field of an Ollama chat body: false, or the effort level of a
+--- family that ignores false (thinking_off.json through thinking_families,
+--- required at the first body: it reads the shared tree).
+--- @param model_name string The Ollama model tag.
+--- @return boolean|string think
+local function ollama_think(model_name)
+	return require("modules.llm.thinking_families").ollama_think(model_name)
+end
+
 -- Ollama bind address. The default port is the single source in
 -- _shared/modules/llm/defaults.json (llm_ollama_owned_port, surfaced via DEFAULT_STATE); a user
 -- override owned by OllamaEndpoint wins so a port collision can be resolved
@@ -1011,7 +1020,7 @@ function M.warmup(model_name, on_acquired)
 		messages = { { role = "user", content = " " } },
 		stream = false,
 		-- Its one token must not open a reasoning block
-		think = false,
+		think = ollama_think(model_name),
 		keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
 		options = { num_predict = 1, temperature = 0 },
 	})
@@ -1447,7 +1456,6 @@ local function build_options(temperature, num_predict_tokens, model_name, is_bat
         stop        = (line_mode and not is_batch) and STOP_LINE or STOP_BATCH,
     }
     
-    opts.think = false
     opts.thinking_budget = 0
     
     return opts
@@ -1526,7 +1534,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
         model      = tostring(model_name),
         messages   = messages,
         stream     = false,
-        think      = false,
+        think      = ollama_think(model_name),
         keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
         options    = build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode),
     }
@@ -1693,7 +1701,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		model      = tostring(model_name),
 		messages   = messages,
 		stream     = true,
-		think      = false,
+		think      = ollama_think(model_name),
 		keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
 		options    = build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode),
 	}

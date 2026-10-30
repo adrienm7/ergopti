@@ -102,10 +102,15 @@ end
 
 --- Builds the request body of one vision or text call.
 --- @param format string "openai", "anthropic", "gemini" or "ollama".
---- @param spec table { model, system, text, image (base64 or nil), mime, max_tokens }.
+--- @param spec table { model, system, text, image (base64 or nil), mime, max_tokens, think }:
+---     think is required for ollama, false or a level (thinking_off.lua ollama_think).
 --- @return table body The JSON body, without address or credentials.
 function M.build_request(format, spec)
 	if not M.FORMATS[format] then error("vision.build_request: unknown format " .. tostring(format)) end
+	local think = spec.think
+	if format == "ollama" and think ~= false and (type(think) ~= "string" or think == "") then
+		error("vision.build_request: an ollama request needs its think value (false or a level)")
+	end
 	local image, mime = spec.image, spec.mime
 	if image ~= nil and (type(image) ~= "string" or image == "" or type(mime) ~= "string") then
 		error("vision.build_request: an image needs base64 data and a mime type")
@@ -151,7 +156,7 @@ function M.build_request(format, spec)
 	return {
 		model = spec.model,
 		stream = false,
-		think = false,
+		think = think,
 		messages = { { role = "system", content = spec.system }, user },
 		options = { num_predict = spec.max_tokens },
 	}

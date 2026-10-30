@@ -29,6 +29,9 @@
 ---    driver owns where it lives.
 --- 6. A family may say its models accept only the default sampling
 ---    (default_sampling_only): the drivers then send no temperature.
+--- 7. Ollama has its own field, think (ollama_think): false, or the family's
+---    effort level when Ollama takes one (ollama_think_levels), since
+---    gpt-oss ignores think false.
 ---
 --- The AutoHotkey port is _shared/modules/llm/thinking_off.ahk. Both replay
 --- _shared/tests/corpus/llm/thinking_off_vectors.json.
@@ -62,6 +65,9 @@ M.KINDS = {
 
 -- What a control asks for
 local INTENTS = { off = true, lowest = true }
+
+-- An Ollama think level: a lowercase word
+local OLLAMA_LEVEL_PATTERN = "^%l+$"
 
 -- Most (provider, model) pairs whose refusals persist
 M.MAX_REFUSALS = 200
@@ -130,7 +136,8 @@ end
 
 --- Validates the decoded thinking_off.json.
 --- @param raw any
---- @return table|nil families Array of { models = { glob }, controls = { { kind, intent, level } } }.
+--- @return table|nil families Array of { models = { glob }, controls = { { kind, intent, level } } },
+---     with expiry_sec and ollama_levels (set of the think levels Ollama takes).
 --- @return string|nil reason Why the table is refused.
 function M.parse_families(raw)
 	if not is_object(raw) or not is_list(raw.families) or raw.families[1] == nil then
@@ -139,6 +146,16 @@ function M.parse_families(raw)
 	local days = raw.refusal_expiry_days
 	if type(days) ~= "number" or days <= 0 or days % 1 ~= 0 then
 		return nil, "thinking_off.json refusal_expiry_days must be a positive integer"
+	end
+	local ollama_levels = {}
+	if not is_list(raw.ollama_think_levels) or raw.ollama_think_levels[1] == nil then
+		return nil, "thinking_off.json ollama_think_levels must be a non-empty array"
+	end
+	for _, level in ipairs(raw.ollama_think_levels) do
+		if type(level) ~= "string" or not level:match(OLLAMA_LEVEL_PATTERN) then
+			return nil, "thinking_off.json ollama_think_levels holds an invalid level"
+		end
+		ollama_levels[level] = true
 	end
 	local families = {}
 	for index, family in ipairs(raw.families) do
@@ -174,6 +191,7 @@ function M.parse_families(raw)
 			default_sampling_only = family.default_sampling_only == true }
 	end
 	families.expiry_sec = days * 86400
+	families.ollama_levels = ollama_levels
 	return families, nil
 end
 
@@ -261,6 +279,23 @@ end
 function M.default_sampling_only(families, model)
 	local _, family = family_of(families, model)
 	return family ~= nil and family.default_sampling_only == true
+end
+
+--- The think value of an Ollama chat body for a model: its family's first
+--- control Ollama carries. A toggle or an off intent is false; an effort
+--- level Ollama takes (ollama_think_levels) is that level, since gpt-oss
+--- ignores false; no family or no such control is false.
+--- @param families table parse_families() output ({} when unreadable).
+--- @param model string The model id.
+--- @return boolean|string think false or a level.
+function M.ollama_think(families, model)
+	local _, family = family_of(families, model)
+	local levels = families.ollama_levels or {}
+	for _, control in ipairs(family and family.controls or {}) do
+		if control.kind == "toggle" or (control.kind == "effort" and control.intent == "off") then return false end
+		if control.kind == "effort" and levels[control.level] then return control.level end
+	end
+	return false
 end
 
 --- Copies a template with the level placeholder filled.

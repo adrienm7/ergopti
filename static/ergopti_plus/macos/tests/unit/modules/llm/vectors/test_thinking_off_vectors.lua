@@ -159,6 +159,20 @@ helpers.describe("thinking_off replays the shared corpus (thinking-off-everywher
 		end)
 	end
 
+	helpers.it("the corpus covers the Ollama think values", function()
+		helpers.assert_true(#corpus.ollama_think_vectors >= 10, "the corpus must hold its Ollama think vectors")
+	end)
+
+	for _, v in ipairs(corpus.ollama_think_vectors) do
+		helpers.it("ollama think vector '" .. v.model .. "'", function()
+			helpers.assert_eq(ThinkingOff.ollama_think(families, v.model), v.think, v.model)
+		end)
+	end
+
+	helpers.it("an unreadable families table sends Ollama think false", function()
+		helpers.assert_eq(ThinkingOff.ollama_think({}, "gpt-oss:20b"), false, "no table: no level")
+	end)
+
 	for _, v in ipairs(corpus.refusal_store_vectors) do
 		helpers.it("refusal store vector '" .. v.id .. "'", function()
 			local refused, dropped = ThinkingOff.refusals_parse(v.stored, v.now, families.expiry_sec)
