@@ -1417,7 +1417,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.ctrl_b",
+										"path": "shortcuts.keyboard.primary_b",
 										"value": "microsoft_bold",
 										"default": "none",
 										"recommended": true,
@@ -1433,23 +1433,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.ctrl_shift_v",
-										"value": "paste_plain",
-										"default": "none",
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + Shift + V"
-											}
-										],
-										"value_label": [
-											{
-												"key": "sg_actions.paste_plain"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keyboard.win_a",
+										"path": "shortcuts.keyboard.meta_a",
 										"value": "select_line",
 										"default": "none",
 										"recommended": true,
@@ -1465,7 +1449,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_g",
+										"path": "shortcuts.keyboard.meta_g",
 										"value": "open_url",
 										"default": "none",
 										"recommended": true,
@@ -1481,7 +1465,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_h",
+										"path": "shortcuts.keyboard.meta_h",
 										"value": "screen_capture",
 										"default": "none",
 										"recommended": true,
@@ -1497,7 +1481,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_m",
+										"path": "shortcuts.keyboard.meta_m",
 										"value": "activity_simulation",
 										"default": "none",
 										"recommended": true,
@@ -1513,7 +1497,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_n",
+										"path": "shortcuts.keyboard.meta_n",
 										"value": "take_note",
 										"default": "none",
 										"recommended": true,
@@ -1529,7 +1513,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_o",
+										"path": "shortcuts.keyboard.meta_o",
 										"value": "surround_parens",
 										"default": "none",
 										"recommended": true,
@@ -1545,7 +1529,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_s",
+										"path": "shortcuts.keyboard.meta_s",
 										"value": "search_web",
 										"default": "none",
 										"recommended": true,
@@ -1561,7 +1545,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_sc029",
+										"path": "shortcuts.keyboard.meta_sc029",
 										"value": "screen_capture_instant",
 										"default": "none",
 										"recommended": true,
@@ -1577,7 +1561,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_t",
+										"path": "shortcuts.keyboard.meta_t",
 										"value": "teleport_mouse",
 										"default": "none",
 										"recommended": true,
@@ -1593,7 +1577,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_u",
+										"path": "shortcuts.keyboard.meta_u",
 										"value": "uppercase_selection",
 										"default": "none",
 										"recommended": true,
@@ -1609,7 +1593,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_w",
+										"path": "shortcuts.keyboard.meta_w",
 										"value": "titlecase_selection",
 										"default": "none",
 										"recommended": true,
@@ -1625,7 +1609,7 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_x",
+										"path": "shortcuts.keyboard.meta_x",
 										"value": "pick_color",
 										"default": "none",
 										"recommended": true,
@@ -1641,7 +1625,23 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_space",
+										"path": "shortcuts.keyboard.primary_shift_v",
+										"value": "paste_plain",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"text": "Ctrl + Shift + V"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.paste_plain"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.meta_space",
 										"value": "llm_generate_prediction",
 										"default": "none",
 										"recommended": true,

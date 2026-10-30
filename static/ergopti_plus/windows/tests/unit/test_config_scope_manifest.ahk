@@ -252,12 +252,12 @@ _SGM_LabelAt(TargetMenu, Position) {
 _ScopeGestureMenuOwnsParameters() {
 	global GestureActionParameters, _MenuDispatchCallbacks
 	SavedParameters := GestureActionParameters
-	Source := '[gestures]`nenabled = true`ntap_4 = "open_url"`n[action_parameters]`ngesture__tap_4__open_url = "https://example.com/old"`nkeyboard__win_a__open_url = "https://example.com/keep"`nunknown_user_key = "keep"`n[llm]`nenabled = true`n'
+	Source := '[gestures]`nenabled = true`ntap_4 = "open_url"`n[action_parameters]`ngesture__tap_4__open_url = "https://example.com/old"`nkeyboard__meta_a__open_url = "https://example.com/keep"`nunknown_user_key = "keep"`n[llm]`nenabled = true`n'
 	Fixture := _ScopeOwnerFixture(Source)
 	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
 	GestureActionParameters := Map("gesture__tap_4__open_url", "https://example.com/old",
-		"keyboard__win_a__open_url", "https://example.com/keep", "unknown_user_key", "keep")
+		"keyboard__meta_a__open_url", "https://example.com/keep", "unknown_user_key", "keep")
 	Refusal := 0, Bundle := 0
 	Launch(_Success, Borrowed, Refused) {
 		Bundle := Borrowed
@@ -289,7 +289,7 @@ _ScopeGestureMenuOwnsParameters() {
 			AssertEqual(Receipt["status"], "pending")
 			Parsed := TOML_ParseFreshFile(Fixture.path)
 			Assert(!Parsed["action_parameters"].Has("gesture__tap_4__open_url"), "old binding parameters leave with their scope")
-			AssertEqual(Parsed["action_parameters"]["keyboard__win_a__open_url"], "https://example.com/keep")
+			AssertEqual(Parsed["action_parameters"]["keyboard__meta_a__open_url"], "https://example.com/keep")
 			AssertEqual(Parsed["action_parameters"]["unknown_user_key"], "keep")
 			AssertEqual(Parsed["llm"]["enabled"], true)
 			if Mode == "clear" {

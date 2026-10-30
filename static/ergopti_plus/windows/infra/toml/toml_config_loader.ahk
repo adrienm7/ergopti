@@ -329,7 +329,7 @@ TomlConfigForeignOwner(SectionPath, Key) {
 		return "Gestures"
 	; The keyboard picker persists slots outside the shipped-default manifest.
 	; Admit exactly the slots the keyboard input owner binds (its published
-	; domain); a broad section exemption would hide misspellings such as win_cc
+	; domain); a broad section exemption would hide misspellings such as meta_cc
 	; forever, and a narrower rule would offer a live physical slot for removal.
 	if (SectionPath == "shortcuts.keyboard" && KeyboardSlotIsCatalogued(Key))
 		return "ConfigIO"

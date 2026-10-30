@@ -15,7 +15,7 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 	; Real line feeds: escaped backticks once left both switches out of the file,
 	; so the clear's assertion on the Tap-Holds switch could not fail.
 	Assert(InStr(Fixture.source, "[category_enabled]`n"), "the fixture declares the category switches")
-	ConfigSource := StrReplace(Fixture.source, "[category_enabled]`n", "[category_enabled]`nshortcuts = true`ntap_holds = true`n") . '[layout]`nergopti_base = true`n[shortcuts.personal]`n"registered tool" = true`nunknown_user = true`n[shortcuts.keyboard]`nwin_b = "open_url"`nwin_cc = "unknown"`n[gestures]`ntap_4 = "open_url"`n[llm]`nenabled = true`nollama_port = 12345`n[metrics]`nenabled = true`nwpm_widget_visible = true`n[action_parameters]`ngesture__tap_4__open_url = "gesture"`nkeyboard__win_b__open_url = "keyboard"`ntap_hold__space__open_url = "hold"`nunknown_user = "keep"`n'
+	ConfigSource := StrReplace(Fixture.source, "[category_enabled]`n", "[category_enabled]`nshortcuts = true`ntap_holds = true`n") . '[layout]`nergopti_base = true`n[shortcuts.personal]`n"registered tool" = true`nunknown_user = true`n[shortcuts.keyboard]`nmeta_b = "open_url"`nmeta_cc = "unknown"`n[gestures]`ntap_4 = "open_url"`n[llm]`nenabled = true`nollama_port = 12345`n[metrics]`nenabled = true`nwpm_widget_visible = true`n[action_parameters]`ngesture__tap_4__open_url = "gesture"`nkeyboard__meta_b__open_url = "keyboard"`ntap_hold__space__open_url = "hold"`nunknown_user = "keep"`n'
 	if Scenario == "absent"
 		ConfigSource := StrReplace(ConfigSource, '`nenabled = true`n', '`n')
 	Assert(FSWriteDurable(Fixture.path, ConfigSource))
@@ -56,7 +56,7 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 	Rendered := Menu()
 	try {
 		_PersonalShortcutsRegistry := Map("__Order", ["registered tool"], "registered tool", Map())
-		KeyboardShortcutAssignments := Map("win_b", "open_url")
+		KeyboardShortcutAssignments := Map("meta_b", "open_url")
 		GestureActionParameters := TOML_ParseFreshFile(Fixture.path)["action_parameters"].Clone()
 		; Both rows of the Configuration menu's first group dispatch to the
 		; global owner: « Restaurer » first, « Tout effacer » second, then a
@@ -109,9 +109,9 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 			Parsed := TOML_ParseFreshFile(Fixture.path)
 			AssertEqual("keep", Parsed["private"]["credential"])
 			AssertEqual(true, Parsed["shortcuts.personal"]["unknown_user"])
-			AssertEqual("unknown", Parsed["shortcuts.keyboard"]["win_cc"])
+			AssertEqual("unknown", Parsed["shortcuts.keyboard"]["meta_cc"])
 			Assert(!Parsed["shortcuts.personal"].Has("registered tool"))
-			Assert(!Parsed["shortcuts.keyboard"].Has("win_b"))
+			Assert(!Parsed["shortcuts.keyboard"].Has("meta_b"))
 			Assert(!Parsed["llm"].Has("ollama_port"))
 			if Mode == "clear" {
 				Assert(!Parsed["gestures"].Has("tap_4"))
@@ -122,7 +122,7 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 				AssertEqual(ManifestRecommendedFor("gestures.tap_4"), Parsed["gestures"]["tap_4"])
 				AssertEqual(ManifestRecommendedFor("category_enabled.tap_holds"), Parsed["category_enabled"]["tap_holds"])
 			}
-			for Key in ["gesture__tap_4__open_url", "keyboard__win_b__open_url", "tap_hold__space__open_url"]
+			for Key in ["gesture__tap_4__open_url", "keyboard__meta_b__open_url", "tap_hold__space__open_url"]
 				Assert(!Parsed["action_parameters"].Has(Key))
 			AssertEqual("keep", Parsed["action_parameters"]["unknown_user"])
 			for Scope in ["llm", "metrics"] {

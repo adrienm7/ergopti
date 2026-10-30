@@ -456,9 +456,9 @@ function createLabels(locales) {
 // first; only named keys translate.
 const CHORD_PREFIXES = {
 	ahk: [
-		['ctrl_shift_', 'Ctrl + Shift + '],
-		['ctrl_', 'Ctrl + '],
-		['win_', 'Win + '],
+		['primary_shift_', 'Ctrl + Shift + '],
+		['primary_', 'Ctrl + '],
+		['meta_', 'Win + '],
 		['alt_', 'Alt + ']
 	],
 	hs: [
@@ -519,7 +519,7 @@ function combinationSegments(slot, labels, context) {
 /**
  * Label segments of a keyboard slot or built-in shortcut id on one platform,
  * or null when the id spells no chord.
- * @param {string} slot Id such as win_a or cmd_shift_v.
+ * @param {string} slot Id such as meta_a or cmd_shift_v.
  * @param {string} platform Manifest platform token.
  * @param {object} labels Label helpers.
  * @param {function(): string} triggerCharacter The platform's default trigger.

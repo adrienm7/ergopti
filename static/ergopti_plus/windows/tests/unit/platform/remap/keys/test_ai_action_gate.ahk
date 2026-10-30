@@ -179,14 +179,14 @@ _AAG_KeyboardDelivery() {
 	_Body(SetAi) {
 		global KeyboardShortcutAssignments
 		try {
-			KeyboardShortcutAssignments := Map("ctrl_x", AAG_ACTION)
+			KeyboardShortcutAssignments := Map("primary_x", AAG_ACTION)
 			_AAG_WithFn(GestureInvokeAction, (Self, Action, Binding := "", *) => Ran.Push(Action), _Deliver)
 		} finally KeyboardShortcutAssignments := IsSet(Saved) ? Saved : unset
 		_Deliver() {
-			RunKeyboardShortcutAction("ctrl_x")
+			RunKeyboardShortcutAction("primary_x")
 			AssertEqual(0, Ran.Length, "a press queued across the switch-off runs nothing")
 			SetAi(true)
-			RunKeyboardShortcutAction("ctrl_x")
+			RunKeyboardShortcutAction("primary_x")
 			AssertEqual(1, Ran.Length, "the slot runs with the AI on")
 		}
 	}
@@ -208,13 +208,13 @@ _AAG_KeyboardHandles() {
 		try {
 			Handles.Clear()
 			State["initialized"] := false
-			KeyboardShortcutAssignments := Map("ctrl_x", AAG_ACTION, "ctrl_y", "copy", "win_z", AAG_ACTION)
-			KeyboardShortcutRecordHandle("ctrl_x", AAG_ACTION, "h-ai")
-			KeyboardShortcutRecordHandle("ctrl_y", "copy", "h-copy")
-			KeyboardShortcutRecordHandle("win_z", AAG_ACTION, "h-broker")
-			AssertFalse(Handles.Has("ctrl_y"), "a slot with another action does not follow the switch")
-			; The broker took win_z: its native hotkey stays off, its criterion asks.
-			State["ordinary_claim"] := Map("slot", "win_z", "slots", ["win_z"])
+			KeyboardShortcutAssignments := Map("primary_x", AAG_ACTION, "primary_y", "copy", "meta_z", AAG_ACTION)
+			KeyboardShortcutRecordHandle("primary_x", AAG_ACTION, "h-ai")
+			KeyboardShortcutRecordHandle("primary_y", "copy", "h-copy")
+			KeyboardShortcutRecordHandle("meta_z", AAG_ACTION, "h-broker")
+			AssertFalse(Handles.Has("primary_y"), "a slot with another action does not follow the switch")
+			; The broker took meta_z: its native hotkey stays off, its criterion asks.
+			State["ordinary_claim"] := Map("slot", "meta_z", "slots", ["meta_z"])
 			State["initialized"] := true
 			Calls := []
 			Record := (Handle, On) => (Calls.Push(Handle . "=" . (On ? 1 : 0)), true)
@@ -286,12 +286,12 @@ _AAG_Broker() {
 		global KeyboardShortcutAssignments, CategoryEnabled
 		try {
 			CategoryEnabled["Shortcuts"] := true
-			KeyboardShortcutAssignments := Map("win_sc029", AAG_ACTION)
+			KeyboardShortcutAssignments := Map("meta_sc029", AAG_ACTION)
 			State["initialized"] := true
 			State["decision"] := 0
 			State["legacy"] := Map()
 			State["layouts"] := Map()
-			State["ordinary_physical"] := Map("SC029", Map("slot", "win_sc029", "action", AAG_ACTION))
+			State["ordinary_physical"] := Map("SC029", Map("slot", "meta_sc029", "action", AAG_ACTION))
 			_AAG_WithFn(_MagicEditorAdmission, (*) => Map("master", true, "paused", false, "inhibited", false), _Press)
 		} finally {
 			KeyboardShortcutAssignments := IsSet(SavedAssignments) ? SavedAssignments : unset
@@ -304,7 +304,7 @@ _AAG_Broker() {
 			SetAi(true)
 			AssertEqual("ordinary", _MagicEditorBrokerWinner("SC029")["kind"], "armed by the switch-on")
 			SetAi(false)
-			AssertEqual("none", _MagicEditorArmedAction("win_sc029"), "no contextual delivery of an AI action")
+			AssertEqual("none", _MagicEditorArmedAction("meta_sc029"), "no contextual delivery of an AI action")
 		}
 	}
 }

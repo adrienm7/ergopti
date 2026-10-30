@@ -41,7 +41,7 @@ _FMS_RootAndSectionRows(Path) {
 	Cache := ParseConfigTomlFile(Path)
 	AssertEqual("@", IniCacheGet(Cache, "hotstrings", "trigger_char"))
 	AssertEqual(true, IniCacheGet(Cache, "category_enabled", "hotstrings"))
-	AssertEqual("none", IniCacheGet(Cache, "shortcuts.keyboard", "win_space"))
+	AssertEqual("none", IniCacheGet(Cache, "shortcuts.keyboard", "meta_space"))
 	Target := ManifestBuildFeaturesMap()
 	Target["hotstrings"]["autocorrection"]["names"]["enabled"] := false
 	Assert(ApplyConfigToml(Target, Path) >= 1, "at least the actual known dotted feature must apply")
@@ -49,9 +49,9 @@ _FMS_RootAndSectionRows(Path) {
 	AssertEqual(false, TOML_UnreadableFile(Path))
 }
 _FMS_RootSettingsAndDottedFeatureApply() {
-	Source := 'hotstrings.trigger_char = "@"`ncategory_enabled.hotstrings = true`nshortcuts.keyboard.win_space = "none"`nhotstrings.autocorrection.names.enabled = true`n'
+	Source := 'hotstrings.trigger_char = "@"`ncategory_enabled.hotstrings = true`nshortcuts.keyboard.meta_space = "none"`nhotstrings.autocorrection.names.enabled = true`n'
 	_FMS_WithSource("root", Source, _FMS_RootAndSectionRows)
-	Source := '[hotstrings]`ntrigger_char = "@"`nautocorrection.names.enabled = true`n[category_enabled]`nhotstrings = true`n[shortcuts]`nkeyboard.win_space = "none"`n'
+	Source := '[hotstrings]`ntrigger_char = "@"`nautocorrection.names.enabled = true`n[category_enabled]`nhotstrings = true`n[shortcuts]`nkeyboard.meta_space = "none"`n'
 	_FMS_WithSource("section", Source, _FMS_RootAndSectionRows)
 }
 Test("configuration snapshot: root and dotted settings reach cache and features (config-semantic-snapshot)",

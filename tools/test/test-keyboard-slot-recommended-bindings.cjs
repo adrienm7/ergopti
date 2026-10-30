@@ -20,7 +20,7 @@ const path = require('path');
 const toml = require('smol-toml');
 const { stripComments } = require('../lib/script-source.cjs');
 const SP = path.resolve(__dirname, '../../static/ergopti_plus');
-const PREDICTION_SLOTS = { ahk: 'win_space', hs: 'secondary_space', linux: 'meta_space' };
+const PREDICTION_SLOTS = { ahk: 'meta_space', hs: 'secondary_space', linux: 'meta_space' };
 const read = (file) => fs.readFileSync(path.join(SP, file), 'utf8').replace(/^\uFEFF/, '');
 
 /**
@@ -91,7 +91,7 @@ function validate(input) {
 		'editor: the contextual slot must belong to every driver'
 	);
 	check(
-		slots.find((entry) => entry.id === 'win_d')?.recommended === 'none',
+		slots.find((entry) => entry.id === 'meta_d')?.recommended === 'none',
 		'editor: Win+D has no fixed editor recommendation'
 	);
 	for (const [platform, slot] of Object.entries(PREDICTION_SLOTS)) {
@@ -106,9 +106,10 @@ function validate(input) {
 			`prediction: ${platform} must recommend exactly ${slot}`
 		);
 		const entry = slots.find((candidate) => candidate.id === slot);
+		const owners = Object.keys(PREDICTION_SLOTS).filter((name) => PREDICTION_SLOTS[name] === slot);
 		check(
-			entry && JSON.stringify(entry.platforms) === JSON.stringify([platform]),
-			`platform: ${slot} must belong only to ${platform}`
+			entry && JSON.stringify(entry.platforms) === JSON.stringify(owners),
+			`platform: ${slot} must belong only to ${owners.join(' and ')}`
 		);
 	}
 	const ahk = stripComments(input.ahk, '.ahk');
@@ -191,7 +192,7 @@ const mutations = [
 	[
 		'editor',
 		(copy) => {
-			copy.slots.find((entry) => entry.id === 'win_d').recommended_per_platform = {
+			copy.slots.find((entry) => entry.id === 'meta_d').recommended_per_platform = {
 				ahk: 'open_hotstrings_editor'
 			};
 		}
@@ -211,13 +212,13 @@ const mutations = [
 	[
 		'neutral',
 		(copy) => {
-			copy.slots.find((entry) => entry.id === 'win_a').default = 'paste_plain';
+			copy.slots.find((entry) => entry.id === 'meta_a').default = 'paste_plain';
 		}
 	],
 	[
 		'neutral',
 		(copy) => {
-			copy.slots.find((entry) => entry.id === 'win_a').default_per_platform = {
+			copy.slots.find((entry) => entry.id === 'meta_a').default_per_platform = {
 				ahk: 'paste_plain'
 			};
 		}
@@ -225,7 +226,7 @@ const mutations = [
 	[
 		'prediction',
 		(copy) => {
-			copy.slots.find((entry) => entry.id === 'win_space').recommended = 'none';
+			copy.slots.find((entry) => entry.id === 'meta_space').recommended = 'none';
 		}
 	],
 	[

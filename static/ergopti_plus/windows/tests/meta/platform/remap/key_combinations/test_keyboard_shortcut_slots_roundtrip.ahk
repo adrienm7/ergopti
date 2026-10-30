@@ -8,7 +8,7 @@
 ; SetKeyboardShortcutAction persists the chosen slot to config.toml and then
 ; calls Reload. ReadKeyboardShortcutsConfig iterated only the fifteen shipped
 ; KEYBOARD_SHORTCUT_DEFAULTS, while the slot picker offers every modifier chord
-; in GESTURE_ACTIONS — on the order of six hundred. So a slot like win_b was
+; in GESTURE_ACTIONS — on the order of six hundred. So a slot like meta_b was
 ; written to disk and then never read back: absent from
 ; KeyboardShortcutAssignments, no hotkey registered by the boot loop, and gone
 ; from the menu, which builds from the same Map.
@@ -18,7 +18,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Encodes the ROOT CAUSE — the read must cover PERSISTED slots, not just the
-;    shipped ones — rather than naming win_b or any particular chord.
+;    shipped ones — rather than naming meta_b or any particular chord.
 ; (The clear-path twin this file once pinned is gone, and so is the global
 ; « tout désactiver » row whose bulk flip it guarded.)
 ;
