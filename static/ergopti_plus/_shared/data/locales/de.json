@@ -3734,7 +3734,7 @@
 	"menu.layout.number_row_digits": "Ziffern zuerst",
 	"menu.layout.number_row_symbols": "Symbole zuerst",
 	"platform_reason.number_row_override_unsupported": "Nur Windows: Auf diesem System tippt die im System installierte Tastaturbelegung die Zahlenreihe; nur Windows, das die Belegung emuliert, stellt Ziffern oder Symbole voran.",
-	"platform_reason.number_row_live_session": "Nicht verfügbar: Nur eine X11-Sitzung wendet dies sofort an. Diese Sitzung behält ihre aktuelle Belegung bei; Ihre Auswahl ist gespeichert.",
+	"platform_reason.number_row_live_session": "Nicht verfügbar: Nur eine X11-Sitzung oder GNOME bzw. KDE unter Wayland wendet dies sofort an. Diese Arbeitsumgebung behält ihre aktuelle Belegung bei; Ihre Auswahl ist gespeichert.",
 	"platform_reason.number_row_live_no_layout": "Nicht verfügbar: Installieren Sie zuerst eine ErgoptiPlus-Tastaturbelegung; diese Auswahl ändert die Belegung, die Sie verwenden.",
 	"layouts.linux_rows_not_applied": "Die Auswahl für die Ziffernreihe ist gespeichert, aber die laufende Tastaturbelegung konnte nicht aktualisiert werden.",
 	"platform_reason.number_row_source_unavailable": "Nicht verfügbar: Symbole zuerst erfordert ein aktives emuliertes Layout mit gültigen Ziffern- und Symbolebenen an jeder Position der Ziffernreihe.",

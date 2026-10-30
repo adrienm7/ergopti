@@ -3734,7 +3734,7 @@
 	"menu.layout.number_row_digits": "숫자 우선",
 	"menu.layout.number_row_symbols": "기호 우선",
 	"platform_reason.number_row_override_unsupported": "Windows 전용: 이 시스템에서는 숫자 줄을 시스템에 설치된 자판이 입력합니다. 숫자나 기호를 먼저 두는 것은 자판을 에뮬레이션하는 Windows뿐입니다.",
-	"platform_reason.number_row_live_session": "사용 불가: X11 세션에서만 즉시 적용됩니다. 이 세션은 현재 배열을 유지하며 선택 내용은 저장됩니다.",
+	"platform_reason.number_row_live_session": "사용 불가: X11 세션 또는 Wayland의 GNOME이나 KDE에서만 즉시 적용됩니다. 이 데스크톱은 현재 배열을 유지하며 선택 내용은 저장됩니다.",
 	"platform_reason.number_row_live_no_layout": "사용 불가: 먼저 ErgoptiPlus 키보드 배열을 설치하세요. 이 선택은 사용 중인 배열을 변경합니다.",
 	"layouts.linux_rows_not_applied": "숫자 행 선택은 저장되었지만 실행 중인 키보드 배열을 업데이트하지 못했습니다.",
 	"platform_reason.number_row_source_unavailable": "사용 불가: 기호 우선은 숫자 행의 모든 위치에 유효한 숫자와 기호 단계가 있는 활성 에뮬레이션 배열이 필요합니다.",

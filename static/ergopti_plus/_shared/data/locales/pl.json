@@ -3734,7 +3734,7 @@
 	"menu.layout.number_row_digits": "Najpierw cyfry",
 	"menu.layout.number_row_symbols": "Najpierw symbole",
 	"platform_reason.number_row_override_unsupported": "Tylko Windows: w tym systemie rząd cyfr wpisuje układ zainstalowany w systemie; tylko Windows, który emuluje układ, stawia cyfry lub symbole na pierwszym miejscu.",
-	"platform_reason.number_row_live_session": "Niedostępne: Tylko sesja X11 stosuje to od razu. Ta sesja zachowuje obecny układ; Twój wybór został zapisany.",
+	"platform_reason.number_row_live_session": "Niedostępne: Tylko sesja X11 albo GNOME lub KDE w Waylandzie stosuje to od razu. To środowisko zachowuje obecny układ; Twój wybór został zapisany.",
 	"platform_reason.number_row_live_no_layout": "Niedostępne: Najpierw zainstaluj układ ErgoptiPlus; ten wybór zmienia układ, którego używasz.",
 	"layouts.linux_rows_not_applied": "Wybór rzędu cyfr został zapisany, ale nie udało się zaktualizować aktywnego układu klawiatury.",
 	"platform_reason.number_row_source_unavailable": "Niedostępne: Symbole najpierw wymagają aktywnego emulowanego układu z prawidłowymi poziomami cyfr i symboli na każdej pozycji rzędu.",

@@ -3734,7 +3734,7 @@
 	"menu.layout.number_row_digits": "Números primeiro",
 	"menu.layout.number_row_symbols": "Símbolos primeiro",
 	"platform_reason.number_row_override_unsupported": "Apenas Windows: neste sistema, o layout instalado no sistema digita a linha de números; só o Windows, que emula o layout, coloca primeiro os dígitos ou os símbolos.",
-	"platform_reason.number_row_live_session": "Indisponível: Apenas uma sessão X11 o aplica de imediato. Esta sessão mantém a disposição atual; a sua escolha está guardada.",
+	"platform_reason.number_row_live_session": "Indisponível: Apenas uma sessão X11, ou GNOME ou KDE em Wayland, o aplica de imediato. Este ambiente de trabalho mantém a disposição atual; a sua escolha está guardada.",
 	"platform_reason.number_row_live_no_layout": "Indisponível: Instale primeiro uma disposição ErgoptiPlus: esta opção altera a disposição que utiliza.",
 	"layouts.linux_rows_not_applied": "A escolha da fila de números está guardada, mas não foi possível atualizar a disposição de teclado em uso.",
 	"platform_reason.number_row_source_unavailable": "Indisponível: Símbolos primeiro requer uma disposição emulada ativa com níveis válidos de números e símbolos em todas as posições da fila.",
