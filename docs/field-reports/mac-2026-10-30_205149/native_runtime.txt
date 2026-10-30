@@ -1,0 +1,104 @@
+== /Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/bin
+total 72648
+drwx------@ 3 b519hs@login.axa  staff        96 28 oct.  08:55 .
+drwx------@ 7 b519hs@login.axa  staff       224 28 oct.  08:55 ..
+-rwxr-xr-x@ 1 b519hs@login.axa  staff  37194640 28 oct.  08:55 uv
+== /Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python-bin
+total 0
+drwx------@ 3 b519hs@login.axa  staff   96 28 oct.  08:56 .
+drwx------@ 7 b519hs@login.axa  staff  224 28 oct.  08:55 ..
+lrwx------@ 1 b519hs@login.axa  staff  123 28 oct.  08:56 python3.11 -> /Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python/cpython-3.11.16-macos-aarch64-none/bin/python3.11
+== /Users/b519hs/Library/Application Support/Ergopti/ollama-native-http
+total 232216
+drwx------@ 54 b519hs@login.axa  staff      1728 30 oct.  20:56 .
+drwxr-xr-x   7 b519hs@login.axa  staff       224 30 oct.  18:26 ..
+-rwxr-xr-x@  2 b519hs@login.axa  staff  25093232  1 janv.  1970 .ergopti-image-395cae9a502d1ab4c4f6fc5fbf88fba2
+drwx------@  3 b519hs@login.axa  staff        96 30 oct.  20:56 .ergopti-lease-395cae9a502d1ab4c4f6fc5fbf88fba2
+-rw-------@  1 b519hs@login.axa  staff       534 30 oct.  16:29 .ergopti-managed-runtime.json
+-rw-r--r--@  1 b519hs@login.axa  staff      1075  1 janv.  1970 CPP_HTTPLIB_LICENSE
+-rw-r--r--@  1 b519hs@login.axa  staff     11345  1 janv.  1970 DLPACK_LICENSE
+-rw-r--r--@  1 b519hs@login.axa  staff      1431  1 janv.  1970 FMT_LICENSE
+-rw-r--r--@  1 b519hs@login.axa  staff    147791  1 janv.  1970 GO_LICENSE
+-rwxr-xr-x@  1 b519hs@login.axa  staff    790480  1 janv.  1970 libggml-base.0.26.0.dylib
+lrwx------@  1 b519hs@login.axa  staff        25 30 oct.  16:29 libggml-base.0.dylib -> libggml-base.0.26.0.dylib
+lrwx------@  1 b519hs@login.axa  staff        20 30 oct.  16:29 libggml-base.dylib -> libggml-base.0.dylib
+-rw-r--r--@  1 b519hs@login.axa  staff     52560  1 janv.  1970 libggml-blas.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1632608  1 janv.  1970 libggml-cpu-alderlake.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1888528  1 janv.  1970 libggml-cpu-cannonlake.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1873408  1 janv.  1970 libggml-cpu-cascadelake.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1873536  1 janv.  1970 libggml-cpu-cooperlake.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1640864  1 janv.  1970 libggml-cpu-haswell.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1881664  1 janv.  1970 libggml-cpu-icelake.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1447968  1 janv.  1970 libggml-cpu-ivybridge.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1460256  1 janv.  1970 libggml-cpu-piledriver.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1426448  1 janv.  1970 libggml-cpu-sandybridge.so
+-rw-r--r--@  1 b519hs@login.axa  staff   2116416  1 janv.  1970 libggml-cpu-sapphirerapids.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1880272  1 janv.  1970 libggml-cpu-skylakex.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1060928  1 janv.  1970 libggml-cpu-sse42.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1069184  1 janv.  1970 libggml-cpu-x64.so
+-rw-r--r--@  1 b519hs@login.axa  staff   1877664  1 janv.  1970 libggml-cpu-zen4.so
+-rwxr-xr-x@  1 b519hs@login.axa  staff     57840  1 janv.  1970 libggml.0.26.0.dylib
+lrwx------@  1 b519hs@login.axa  staff        20 30 oct.  16:29 libggml.0.dylib -> libggml.0.26.0.dylib
+lrwx------@  1 b519hs@login.axa  staff        15 30 oct.  16:29 libggml.dylib -> libggml.0.dylib
+-rwxr-xr-x@  1 b519hs@login.axa  staff   5407936  1 janv.  1970 libllama-common.0.6.0.dylib
+lrwx------@  1 b519hs@login.axa  staff        27 30 oct.  16:29 libllama-common.0.dylib -> libllama-common.0.6.0.dylib
+lrwx------@  1 b519hs@login.axa  staff        23 30 oct.  16:29 libllama-common.dylib -> libllama-common.0.dylib
+-rwxr-xr-x@  1 b519hs@login.axa  staff     89984  1 janv.  1970 libllama-quantize-impl.dylib
+-rwxr-xr-x@  1 b519hs@login.axa  staff   3635152  1 janv.  1970 libllama-server-impl.dylib
+-rwxr-xr-x@  1 b519hs@login.axa  staff   3884880  1 janv.  1970 libllama.0.6.0.dylib
+lrwx------@  1 b519hs@login.axa  staff        20 30 oct.  16:29 libllama.0.dylib -> libllama.0.6.0.dylib
+lrwx------@  1 b519hs@login.axa  staff        16 30 oct.  16:29 libllama.dylib -> libllama.0.dylib
+-rwxr-xr-x@  1 b519hs@login.axa  staff   1533216  1 janv.  1970 libmtmd.0.6.0.dylib
+lrwx------@  1 b519hs@login.axa  staff        19 30 oct.  16:29 libmtmd.0.dylib -> libmtmd.0.6.0.dylib
+lrwx------@  1 b519hs@login.axa  staff        15 30 oct.  16:29 libmtmd.dylib -> libmtmd.0.dylib
+-rw-r--r--@  1 b519hs@login.axa  staff      1058  1 janv.  1970 LICENSE.ollama
+-rw-r--r--@  1 b519hs@login.axa  staff      1078  1 janv.  1970 LLAMA_CPP_LICENSE
+-rw-r--r--@  1 b519hs@login.axa  staff      7257  1 janv.  1970 LLAMA_CPP_VENDORS_LICENSE
+-rwxr-xr-x@  1 b519hs@login.axa  staff  11304336  1 janv.  1970 llama-quantize
+-rwxr-xr-x@  1 b519hs@login.axa  staff  18541984  1 janv.  1970 llama-server
+-rw-r--r--@  1 b519hs@login.axa  staff      1067  1 janv.  1970 MLX_C_LICENSE
+-rw-r--r--@  1 b519hs@login.axa  staff      1066  1 janv.  1970 MLX_LICENSE
+drwx------@  7 b519hs@login.axa  staff       224  1 janv.  1970 mlx_metal_v3
+drwx------@  8 b519hs@login.axa  staff       256  1 janv.  1970 mlx_metal_v4
+-rwxr-xr-x@  2 b519hs@login.axa  staff  25093232  1 janv.  1970 ollama
+-rw-r--r--@  1 b519hs@login.axa  staff      1414  1 janv.  1970 PICOJSON_LICENSE
+-rw-r--r--@  1 b519hs@login.axa  staff     11357  1 janv.  1970 XGRAMMAR_LICENSE
+-rw-r--r--@  1 b519hs@login.axa  staff        54  1 janv.  1970 XGRAMMAR_NOTICE
+== codesign /Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/bin/uv
+/Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/bin/uv: valid on disk
+/Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/bin/uv: satisfies its Designated Requirement
+Executable=/Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/bin/uv
+Identifier=uv-1dcedb59c92e2a84
+Format=Mach-O thin (arm64)
+CodeDirectory v=20500 size=288415 flags=0x10000(runtime) hashes=9007+2 location=embedded
+Signature size=9046
+Timestamp=29 Sep 2026 at 23:02:05
+Info.plist=not bound
+TeamIdentifier=2DC432GLL2
+== codesign /Users/b519hs/Library/Application Support/Ergopti/ollama-native-http/ollama
+/Users/b519hs/Library/Application Support/Ergopti/ollama-native-http/ollama: valid on disk
+/Users/b519hs/Library/Application Support/Ergopti/ollama-native-http/ollama: satisfies its Designated Requirement
+Executable=/Users/b519hs/Library/Application Support/Ergopti/ollama-native-http/ollama
+Identifier=ollama-555549443b4237f66cf832d8ce465f142c703a62
+Format=Mach-O thin (arm64)
+CodeDirectory v=20500 size=49104 flags=0x10002(adhoc,runtime) hashes=1528+2 location=embedded
+Signature=adhoc
+Info.plist=not bound
+TeamIdentifier=not set
+Runtime Version=26.5.0
+== codesign /Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python-bin/python3.11
+/Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python-bin/python3.11: valid on disk
+/Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python-bin/python3.11: satisfies its Designated Requirement
+Executable=/Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python/cpython-3.11.16-macos-aarch64-none/bin/python3.11
+Identifier=-
+Format=Mach-O thin (arm64)
+CodeDirectory v=20400 size=134184 flags=0x20002(adhoc,linker-signed) hashes=4190+0 location=embedded
+Signature=adhoc
+Info.plist=not bound
+TeamIdentifier=not set
+Sealed Resources=none
+== diagnostic reports of the last hour
+/Users/b519hs/Library/Logs/DiagnosticReports/ErgoptiPlus-2026-10-30-205212.ips
+/Users/b519hs/Library/Logs/DiagnosticReports/ErgoptiPlus-2026-10-30-204258.ips
+== kernel and code-signing kills of the last 30 minutes
+log: Could not open local log store: Operation not permitted
