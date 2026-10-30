@@ -341,6 +341,7 @@
 		"test:hotstrings-bridge-parity": "node ./tools/test/test-hotstrings-bridge-parity.cjs",
 		"test:menu-parity": "node ./tools/test/test-menu-parity.cjs",
 		"test:menu-top-level-parity": "node ./tools/test/test-menu-top-level-parity.cjs",
+		"test:linux-menu-parts": "node ./tools/test/test-linux-menu-parts.cjs",
 		"test:karabiner-binary-paths-single-source": "node ./tools/test/test-karabiner-binary-paths-single-source.cjs",
 		"test:remap-runtime-manifest": "node ./tools/test/test-remap-runtime-manifest.cjs",
 		"test:wpm-chars-per-word-single-source": "node ./tools/test/test-wpm-chars-per-word-single-source.cjs",

@@ -2,20 +2,18 @@
 
 /** Independent withdrawal controls for the actual Hotstrings language producer routes. */
 'use strict';
-const fs = require('node:fs');
-const path = require('node:path');
 const assert = require('node:assert/strict');
 const {
 	hotstringLanguagePublication,
-	files
+	files,
+	readOwnerSources
 } = require('../../lib/menu-hotstring-language-binding.cjs');
+const { verifyQuitSplit } = require('../lib/linux-menu-split.cjs');
 
 module.exports = function verifyHotstringLanguageOwners(base, manifest) {
 	let controls = 0;
 	for (const platform of ['ahk', 'hs', 'linux']) {
-		const sources = Object.fromEntries(
-			files[platform].map((file) => [file, fs.readFileSync(path.join(base, file), 'utf8')])
-		);
+		const sources = readOwnerSources(base, platform);
 		const target =
 			platform === 'ahk' ? 'hotstring_language_parent_windows' : 'hotstring_language_parent_lua';
 		const admits = (candidate = sources, declaration = manifest, key = target) =>
@@ -369,6 +367,7 @@ module.exports = function verifyHotstringLanguageOwners(base, manifest) {
 	controls += verifyPublicationGraphCounterexamples(base, manifest);
 	controls += verifyLiveModuleExportCounterexamples(base, manifest);
 	controls += verifySingleModuleExportCounterexamples(base, manifest);
+	controls += verifySplitModuleCounterexamples(base, manifest);
 	return controls;
 };
 
@@ -433,9 +432,7 @@ function mutate(source, control) {
 function verifyIndependentHotstringMutants(base, manifest) {
 	for (const control of reviewerCases) {
 		const platform = control.platform;
-		const sources = Object.fromEntries(
-			files[platform].map((file) => [file, fs.readFileSync(path.join(base, file), 'utf8')])
-		);
+		const sources = readOwnerSources(base, platform);
 		const sourceFile = control.control.includes('import shadowed')
 			? files[platform][2]
 			: files[platform][0];
@@ -523,8 +520,13 @@ const publicationCases = [
 function verifyPublicationGraphCounterexamples(base, manifest) {
 	const platform = 'linux',
 		file = files[platform][0],
-		source = fs.readFileSync(path.join(base, file), 'utf8');
-	const sources = { [file]: source };
+		sources = readOwnerSources(base, platform);
+	// A mutation lands in whichever tray module now holds its anchor.
+	const holder = (before) => {
+		const owners = Object.keys(sources).filter((name) => sources[name].includes(before));
+		assert.equal(owners.length, 1, 'one tray module holds ' + JSON.stringify(before));
+		return owners[0];
+	};
 	assert.equal(
 		hotstringLanguagePublication(sources, manifest, platform, 'hotstring_language_parent_lua'),
 		true,
@@ -540,12 +542,14 @@ function verifyPublicationGraphCounterexamples(base, manifest) {
 			: control
 	);
 	for (const control of livePublicationCases) {
+		const owner = holder(control.before),
+			source = sources[owner];
 		assert.equal(
 			source.split(control.before).length - 1,
 			1,
 			'one exact second-review mutation preimage'
 		);
-		const changed = { [file]: source.replace(control.before, control.after) };
+		const changed = { ...sources, [owner]: source.replace(control.before, control.after) };
 		assert.equal(
 			hotstringLanguagePublication(changed, manifest, platform, 'hotstring_language_parent_lua'),
 			control.expected,
@@ -583,9 +587,7 @@ const exportCases = [
 ];
 function verifyLiveModuleExportCounterexamples(base, manifest) {
 	for (const control of exportCases) {
-		const sources = Object.fromEntries(
-			files[control.platform].map((file) => [file, fs.readFileSync(path.join(base, file), 'utf8')])
-		);
+		const sources = readOwnerSources(base, control.platform);
 		const source = sources[control.source_file],
 			before = '\nreturn M';
 		assert.equal(
@@ -656,9 +658,7 @@ const singleExportCases = [
 ];
 function verifySingleModuleExportCounterexamples(base, manifest) {
 	for (const control of singleExportCases) {
-		const sources = Object.fromEntries(
-			files[control.platform].map((file) => [file, fs.readFileSync(path.join(base, file), 'utf8')])
-		);
+		const sources = readOwnerSources(base, control.platform);
 		const source = sources[control.source_file],
 			before = '\nreturn M';
 		assert.equal(
@@ -699,4 +699,32 @@ function verifySingleModuleExportCounterexamples(base, manifest) {
 		);
 	}
 	return singleExportCases.length;
+}
+
+/** The language owner is still enforced through a section builder split into its own module. */
+function verifySplitModuleCounterexamples(base, manifest) {
+	const sources = readOwnerSources(base, 'linux');
+	return verifyQuitSplit(
+		sources,
+		(root) =>
+			hotstringLanguagePublication(
+				{ ...sources, [files.linux[0]]: root },
+				manifest,
+				'linux',
+				'hotstring_language_parent_lua'
+			),
+		[
+			[
+				'local function _build_quit(ctx)',
+				'local function _build_quit(ctx)\n\tManifestMenu = nil',
+				'split module reassigns the facade'
+			],
+			[
+				'local function _build_quit(ctx)',
+				'local function _build_quit(ctx)\n\t_build_hotstrings = nil',
+				'split module withdraws the hotstrings producer'
+			]
+		],
+		'language owner'
+	);
 }
