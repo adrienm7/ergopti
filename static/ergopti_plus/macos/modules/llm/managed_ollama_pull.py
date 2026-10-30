@@ -274,6 +274,8 @@ def execute(
         if before_submit is not None:
             before_submit(owner)
         status = 0 if owner.pull(value["model"], emit, timeout=None) else 1
+        if status == 1:
+            emit({"outcome": getattr(owner, "outcome", "unknown")})
     except Cancelled:
         status = 130
     except Exception:
@@ -366,6 +368,12 @@ def main():
                         )
                     elif progress.get("status") == "success":
                         print("OLLAMA_PULL_COMPLETE", flush=True)
+                    elif "outcome" in progress:
+                        print("OLLAMA_PULL_OUTCOME " + progress["outcome"], flush=True)
+                    elif "error" in progress:
+                        print("OLLAMA_PULL_ERROR " + error_class(progress["error"]), flush=True)
+                    elif "status" in progress:
+                        print("OLLAMA_PULL_STATUS " + status_word(progress["status"]), flush=True)
 
                 files = AUTH.OperationFiles(value["anchor"], value["nonce"])
                 try:
@@ -421,6 +429,46 @@ def main():
             file=sys.stderr,
         )
         return 78
+
+
+# Closed vocabularies for the pull's non-byte rows: Ollama's status and error
+# strings carry digests, paths and URLs, which never reach the log. Field run
+# of 2026-10-30 23:10: a pull exited 1 after its last byte row and nothing
+# said which row ended it.
+STATUS_WORDS = {
+    "pulling manifest": "pulling_manifest",
+    "verifying sha256 digest": "verifying_digest",
+    "writing manifest": "writing_manifest",
+    "removing unused layers": "removing_unused_layers",
+}
+ERROR_CLASSES = (
+    ("digest mismatch", "digest_mismatch"),
+    ("no space left", "no_space"),
+    ("permission denied", "permission_denied"),
+    ("context canceled", "cancelled"),
+    ("max retries", "max_retries"),
+    ("manifest", "manifest"),
+)
+
+
+def status_word(status):
+    """Name one Ollama pull status without its digest."""
+    if status in STATUS_WORDS:
+        return STATUS_WORDS[status]
+    if status.startswith("pulling "):
+        return "pulling_layer"
+    if status.startswith("couldn't remove unused layers"):
+        return "unused_layers_not_removed"
+    return "other"
+
+
+def error_class(error):
+    """Name one Ollama pull error without its paths or URLs."""
+    lowered = error.lower()
+    for marker, name in ERROR_CLASSES:
+        if marker in lowered:
+            return name
+    return "other"
 
 
 def publish_pre_dispatch_refusal(private_receipt, nonce, status):
