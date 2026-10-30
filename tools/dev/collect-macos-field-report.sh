@@ -7,7 +7,7 @@
 # One command for a maintainer session on a real Mac: it updates the field
 # branch from its base (dev unless it was derived from another branch), gathers the evidence the coordinator reads (system and
 # toolchain facts, the field run of the developer app, the input-source probe,
-# today's ErgoptiPlus logs and their digest), stores it under
+# today's ErgoptiPlus logs, their digest and their analysis), stores it under
 # docs/field-reports/, then commits and pushes the branch. The logs are
 # gitignored, so they are added with `git add -f`; the logger already masks
 # secrets, the home folder, e-mail addresses and personal names, and the
@@ -20,6 +20,12 @@
 # download flows (infra/field_run.lua; contract in
 # static/ergopti_plus/macos/data/field_run.json), waits for its done marker
 # until the request's own deadline plus a grace, and copies its results.
+#
+# The analysis: tools/dev/field-log-analyse.py, the analyser the three
+# collectors share, reads the scrubbed day logs and writes analysis.md and
+# analysis.json at the top of the report (errors grouped by template, every
+# measured duration against the budget its code declares, lifecycle events,
+# check verdicts, what to fix first) and prints its summary.
 #
 # USAGE (from any branch: outside a field/ branch the collector switches to
 # field/mac-<today>-<branch>, derived from that branch and created when
@@ -154,7 +160,7 @@ finalize() {
 	"${finalized}" && return 0
 	finalized=true
 	local start_day today d f subject
-	local days=()
+	local days=() day_logs=()
 	# A run that crosses midnight spans two day logs: keep both, oldest first.
 	start_day="${stamp%%_*}"
 	today="$(date +%Y-%m-%d)"
@@ -173,7 +179,6 @@ finalize() {
 			f="${LOG_DIR}/${f}"
 			[ -f "${f}" ] && scrub_log "${f}"
 		done
-		local day_logs=()
 		for d in "${days[@]}"; do
 			f="${out}/${LOG_UNIFIED_PREFIX}${d}${LOG_EXTENSION}"
 			[ -f "${f}" ] && day_logs+=("${f}")
@@ -192,6 +197,8 @@ finalize() {
 	# replacement text: the personal file itself never travels.
 	step hotstring_collisions python3 "${REPO_ROOT}/tools/dev/hotstring-collisions.py" \
 		"${PERSONAL_HOTSTRINGS}" "${REPO_ROOT}/${BUNDLED_HOTSTRINGS}"
+	# Last: it also reads the check verdicts the steps above wrote.
+	field_report_analyse ${day_logs[@]+"${day_logs[@]}"}
 
 	subject="docs(field): macOS field report ${stamp} on ${base}"
 	"${interrupted}" && subject="${subject} (interrupted)"
@@ -234,6 +241,15 @@ step launchd sh -c 'launchctl list | grep -iE "ergopti|pqrs" || true'
 step listeners sh -c 'lsof -nP -iTCP -sTCP:LISTEN || true'
 step input_sources sh -c 'defaults read com.apple.HIToolbox AppleEnabledInputSources; defaults read com.apple.HIToolbox AppleSelectedInputSources'
 step user_layouts sh -c 'ls -la "${HOME}/Library/Keyboard Layouts" 2>&1'
+# The day's sleeps and wakes: a key stuck across a sleep or a lease lost at
+# wake reads against them.
+step power sh -c 'uptime; pmset -g batt | head -2; pmset -g log | grep -E " (Sleep|Wake|DarkWake) " | grep "$(date +%Y-%m-%d)" | tail -40'
+# Whether a proxy or a PAC file is set, never its address.
+step proxy sh -c 'scutil --proxy | sed -nE "s/^ *([A-Za-z]+Enable) : ([0-9]+)$/\1: \2/p; s/^ *([A-Za-z]*(Proxy|URLString)) : .+$/\1: set/p"; for v in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy; do eval "x=\${$v:-}"; [ -n "$x" ] && echo "$v: set" || echo "$v: unset"; done'
+# Crash reports of the day of the processes Ergopti runs or drives: named, not copied.
+step crash_reports sh -c 'names="$(find "${HOME}/Library/Logs/DiagnosticReports" /Library/Logs/DiagnosticReports -maxdepth 2 -type f -mtime -1 2>/dev/null | sed "s#.*/##" | grep -iE "^(ErgoptiPlus|Hammerspoon|karabiner|ollama|omlx|python|uv)[-_. ]")"; [ -n "$names" ] && printf "%s\n" "$names" || echo "no crash report today"'
+step launch_agents sh -c 'ls "${HOME}/Library/LaunchAgents" /Library/LaunchAgents /Library/LaunchDaemons 2>/dev/null | grep -iE "ergopti|pqrs|karabiner|ollama|hammerspoon" || echo "none"'
+step disk sh -c 'df -h / "${TMPDIR:-/tmp}" | sed "s#${HOME}#~#g"'
 
 # ===========================================
 # ======= 3/ Field run in the app ===========

@@ -43,6 +43,13 @@ const FIELD_GIT = 'tools/dev/field-report-git.sh';
 // The logs are scrubbed of typed text before they reach the pushed branch.
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
+// The analyser and the declarations it reads its budgets from.
+const ANALYSER = 'tools/dev/field-log-analyse.py';
+const ANALYSER_SOURCES = JSON.parse(
+	spawnSync('python3', [path.join(ROOT, ANALYSER), '--repo', ROOT, '--describe'], {
+		encoding: 'utf8'
+	}).stdout
+).sources;
 const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml';
 // The folders and log names come from their shared declarations.
 const FIELD_PATHS = 'tools/dev/field-report-paths.py';
@@ -117,7 +124,9 @@ function fixture(name, { onDev = false } = {}) {
 		BUNDLED_SAMPLE,
 		FIELD_PATHS,
 		APP_DIRS,
-		SUB_FILES
+		SUB_FILES,
+		ANALYSER,
+		...ANALYSER_SOURCES
 	]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
@@ -579,8 +588,17 @@ function reportFolder(paths) {
 					// The maintainer scans the output for the marks, not the words.
 					assert.match(result.stdout, /✅ field run 01_field_lease: pass/);
 					assert.match(result.stdout, /Field run summary: ✅ \d+ pass, ❌ \d+ fail, \d+ other\./);
+					// The analysis runs even without a day log, on the probes' verdicts.
+					assert.match(result.stdout, /Field checks summary: ✅ \d+ pass, ❌ \d+ fail, /);
+					assert.match(result.stdout, /Log analysis: \d+ error group\(s\)/);
+					assert.match(
+						fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+						/^analysis\s+exit=0$/m
+					);
 					const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD');
 					assert.match(committed, /field_run\/done\.json/);
+					assert.match(committed, /\/analysis\.md$/m);
+					assert.match(committed, /\/analysis\.json$/m);
 				} finally {
 					driver.child.kill();
 				}
@@ -750,7 +768,9 @@ function reportFolder(paths) {
 			].join('-');
 			fs.writeFileSync(
 				path.join(logs, `ErgoptiPlus_${day}.log`),
-				"[INFO] fixture day log\n[DEBUG] [keymap] Auto-expand: 'adr' → '12 rue privée'.\n"
+				"[INFO] fixture day log\n[DEBUG] [keymap] Auto-expand: 'adr' → '12 rue privée'.\n" +
+					`${day} 10:00:00:000 [ERROR] [menu] Fixture menu failure 3.\n` +
+					`${day} 10:00:01:000 [WARNING] [preferences] Slow preferences save 900 ms (prepare=1 write=1 ms; operations=1; ).\n`
 			);
 			// A configuration folder moved by the launcher's paths.toml, as
 			// config_paths.lua reads it: the collisions must follow it.
@@ -790,6 +810,18 @@ function reportFolder(paths) {
 				const copied = fs.readFileSync(path.join(folder, `ErgoptiPlus_${day}.log`), 'utf8');
 				assert.match(copied, /fixture day log/);
 				assert.doesNotMatch(copied, /rue privée|'adr'/, 'the pushed log must carry no typed text');
+				// The analysis reads the scrubbed copy, even after Ctrl-C.
+				const analysis = JSON.parse(fs.readFileSync(path.join(folder, 'analysis.json'), 'utf8'));
+				assert.equal(analysis.errors.find((group) => group.module === 'menu').count, 1);
+				assert.equal(
+					analysis.performance.find((row) => row.metric === 'preferences.save').verdict,
+					'over'
+				);
+				assert.doesNotMatch(
+					fs.readFileSync(path.join(folder, 'analysis.md'), 'utf8'),
+					/rue privée|'adr'/,
+					'the analysis quotes no typed text'
+				);
 				const collisions = fs.readFileSync(path.join(folder, 'hotstring_collisions.txt'), 'utf8');
 				assert.match(collisions, /^'sru' personal is_word=True priority=100$/m);
 				assert.doesNotMatch(
