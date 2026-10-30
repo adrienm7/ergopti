@@ -7,9 +7,11 @@
 # One command for a maintainer session on a real Linux desktop, the Linux
 # counterpart of tools/dev/collect-macos-field-report.sh: it updates the field
 # branch from its base (dev unless it was derived from another branch), gathers
-# the evidence the coordinator reads (system, session, toolchain and input
-# access facts, the driver's units and processes, today's ErgoptiPlus logs and
-# their digest), stores it under docs/field-reports/, then commits and pushes
+# the evidence the coordinator reads (system, session, toolchain, runtime,
+# input access and device facts, the driver's units, autostart, processes,
+# memory, listeners, proxy settings and crash dumps, the collector's own
+# checks, today's ErgoptiPlus logs, their digest and their analysis), stores
+# it under docs/field-reports/, then commits and pushes
 # the branch. The logs are gitignored, so they are added with `git add -f`; the
 # logger already masks secrets, the home folder, e-mail addresses and personal
 # names, and the branch is public, so only copies scrubbed of typed text by
@@ -17,6 +19,14 @@
 # The personal hotstrings file never travels: tools/dev/hotstring-collisions.py
 # reports which of its triggers share a bundled one. The facts below have the home
 # folder and the user name replaced.
+#
+# The analysis: tools/dev/field-log-analyse.py, the analyser the three
+# collectors share, reads the scrubbed day logs and writes analysis.md and
+# analysis.json at the top of the report (errors grouped by template, every
+# measured duration against the budget its code declares, lifecycle events,
+# check verdicts, what to fix first) and prints the verdict marks and their
+# summary line: the collector's own checks (tools/dev/linux-field-shell-checks.sh)
+# and the tray checks clicked today.
 #
 # The logs folder is the one the driver itself resolves
 # (infra/config_paths.lua get_logs_dir: the paths.logs_dir override, else
@@ -26,10 +36,12 @@
 # - No field run. The Linux daemon has no request protocol like the macOS
 #   developer app's (infra/field_run.lua): its Debug field checks (composed
 #   layout, network) run from the tray and show a zenity result a person
-#   closes. Each check writes one "check=<id> verdict=<...>" line to the day
-#   log, so the checks clicked today are in digest_field_checks; the collector
-#   prints them with the macOS marks (✅ pass, ❌ fail, ⏭️ skip, ⌨️ needs_typing,
-#   ⚠️ other) and a summary line, also kept in field_checks.txt.
+#   closes, so running them would need the user. Each check writes one
+#   "check=<id> verdict=<...>" line to the day log: the checks clicked today
+#   are in digest_field_checks; the collector prints each run with the macOS
+#   marks (✅ pass, ❌ fail, ⏭️ skip, ⌨️ needs_typing, ⚠️ other) and a summary
+#   line, also kept in field_checks.txt, and the analysis marks the last run of
+#   each. The checks that need no person run from the collector itself.
 # - No diagnostics export. The health check is a tray window, with no
 #   command-line form; the boot diagnostic snapshot (the one [Diagnostics]
 #   line) is in the day log and digest_snapshot.
@@ -60,6 +72,8 @@ set -e
 . "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
 # shellcheck source=field-report-git.sh
 . "$REPO_ROOT/tools/dev/field-report-git.sh"
+# shellcheck source=linux-field-shell-checks.sh
+. "$REPO_ROOT/tools/dev/linux-field-shell-checks.sh"
 set +e
 DRIVER_ROOT="$REPO_ROOT/static/ergopti_plus/linux"
 SHARED_LUA="$REPO_ROOT/static/ergopti_plus/_shared/lua"
@@ -185,7 +199,7 @@ finalize() {
 	"${finalized}" && return 0
 	finalized=true
 	local start_day today d f subject layout log_dir main errors ext bootstrap crashes personal
-	local days=()
+	local days=() day_logs=()
 	# A run that crosses midnight spans two day logs: keep both, oldest first.
 	start_day="${stamp%%_*}"
 	today="$(date +%Y-%m-%d)"
@@ -210,7 +224,6 @@ finalize() {
 		done
 		# Crash reports are named, not copied: a dump is read on request.
 		step crash_reports sh -c 'ls -la "$1" 2>/dev/null || echo "no crash report"' sh "${log_dir}/${crashes}"
-		local day_logs=()
 		for d in "${days[@]}"; do
 			# The digests read the scrubbed copies, never the raw day log.
 			[ -f "${out}/${main}${d}${ext}" ] && day_logs+=("${out}/${main}${d}${ext}")
@@ -238,6 +251,21 @@ finalize() {
 		step hotstring_collisions python3 "${REPO_ROOT}/tools/dev/hotstring-collisions.py" \
 			"${personal}" "${BUNDLED_HOTSTRINGS}"
 	fi
+	# The daemon's own journal lines of today at warning or worse: they hold
+	# what it printed before its logger opened or after it crashed. Scrubbed
+	# like a log, the stdout of a daemon can carry typed text.
+	local journal_dir=""
+	if command -v journalctl >/dev/null 2>&1 && journal_dir="$(mktemp -d)" \
+		&& journalctl --user --since today -p warning -o cat --no-pager -u 'ergopti*' \
+			> "${journal_dir}/journal_warnings.txt" 2>/dev/null; then
+		scrub_log "${journal_dir}/journal_warnings.txt"
+		[ -f "${out}/journal_warnings.txt" ] && mask_file "${out}/journal_warnings.txt"
+	else
+		printf '%-28s unavailable\n' "journal_warnings" >> "${steps}"
+	fi
+	[ -z "${journal_dir}" ] || rm -rf "${journal_dir}"
+	# Last: it also reads the check verdicts the steps above wrote.
+	field_report_analyse ${day_logs[@]+"${day_logs[@]}"}
 
 	subject="docs(field): Linux field report ${stamp} on ${base}"
 	"${interrupted}" && subject="${subject} (interrupted)"
@@ -272,6 +300,18 @@ step processes sh -c 'pgrep -af "ergopti|ydotoold|ollama|llama-server|omlx|local
 # Loopback listeners show which local AI server runs (process names and ports).
 step listeners sh -c 'ss -ltnpH 2>/dev/null || true'
 step native_backend sh -c 'ls -l "$1"/bin/ 2>&1' sh "${DRIVER_ROOT}"
+step runtimes sh -c 'for t in python3 node curl ollama llama-server; do printf "%s: " "$t"; if command -v "$t" >/dev/null; then "$t" --version 2>&1 | head -1; else echo missing; fi; done'
+step memory sh -c 'free -m; cat /proc/pressure/memory /proc/pressure/cpu 2>/dev/null; uptime'
+# The keyboards the daemon may grab: names and handlers, never what they type.
+step input_devices sh -c 'grep -E "^(N: Name|H: Handlers)=" /proc/bus/input/devices'
+step autostart sh -c 'systemctl --user list-unit-files --no-pager "ergopti*"; ls "${XDG_CONFIG_HOME:-$HOME/.config}/autostart" 2>/dev/null | grep -i ergopti || echo "no desktop autostart entry"'
+step services sh -c 'systemctl --user status --no-pager -n 0 "ergopti*"; systemctl status --no-pager -n 0 "ydotool*" 2>&1 | head -12'
+# Whether a proxy or a PAC file is set, never its address.
+step proxy sh -c 'for v in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy all_proxy; do eval "x=\${$v:-}"; [ -n "$x" ] && echo "$v: set" || echo "$v: unset"; done; if command -v gsettings >/dev/null; then echo "gnome mode: $(gsettings get org.gnome.system.proxy mode 2>&1)"; [ "$(gsettings get org.gnome.system.proxy autoconfig-url 2>/dev/null)" = "'"''"'" ] && echo "gnome autoconfig-url: unset" || echo "gnome autoconfig-url: set"; fi'
+# Core dumps of today of the daemon's processes: named, not copied.
+step crash_dumps sh -c 'command -v coredumpctl >/dev/null || { echo "no coredumpctl"; exit 0; }; coredumpctl list --since today --no-pager 2>&1 | grep -iE "luajit|ergopti|ydotool|ollama|COMMAND|No coredumps" || echo "no core dump today"'
+# The checks that need no person (tools/dev/linux-field-shell-checks.sh).
+step collector_checks field_linux_checks "${REPO_ROOT}"
 
 # ===========================================
 # ======= 3/ Logs, commit and push ==========
