@@ -134,8 +134,8 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      front and types `wkjx` there only, checking before each key that the field still has the focus (a lost
      focus stops the sequence with its code; no key reaches another app); the passive tap must see each key
      once, the field must hold exactly `wkjx`, the previous app must get the focus back. Synthetic keys are
-     posted after Karabiner: the virtual keyboard path and the ledger's double count are `physical_keys_only`.
-     Keystats gains these four keystrokes under ErgoptiPlus (`keystats_effect`).
+     posted, tagged, through `adapters/synthetic_input.lua` (keymap and keystats treat them as the driver's
+     output) after Karabiner: the virtual keyboard path and the ledger's double count are `physical_keys_only`.
    - `field_menu_build`: one rebuild of the menu tree, as a state change triggers it, must be accepted by
      AppKit; its duration in ms, the number of top-level rows and the three slowest rows (`id:ms`) are named.
 

@@ -492,7 +492,7 @@ local function menu_rebuild()
 	return menu.timed_rebuild()
 end
 
---- Types keys into a scratch text field this process opens, and only there:
+--- Types tagged keys into a scratch text field this process opens, and only there:
 --- the focus is checked before each key, and the window is closed and the
 --- previous application brought back whatever happens.
 --- @param keys table Single characters.
@@ -556,8 +556,10 @@ local function scratch_typing(keys, callback)
 		if not focused then return settle(index == 1 and reason or ("focus_lost_" .. reason)) end
 		outcome.focused = true
 		started = started or hs.timer.absoluteTime()
-		hs.eventtap.event.newKeyEvent({}, keys[index], true):post()
-		hs.eventtap.event.newKeyEvent({}, keys[index], false):post()
+		-- Through the one tagged injection owner: the keymap and keystats know
+		-- these keys as the driver's own output, the passive counter still sees them
+		local sent, emitted = pcall(require("adapters.synthetic_input").emit_key_stroke, {}, keys[index], 0)
+		if not sent or emitted ~= true then return settle("injection_refused") end
 		outcome.posted = index
 		Timer.after(SCRATCH_KEY_GAP_SECONDS, function() type_key(index + 1) end)
 	end
