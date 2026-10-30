@@ -876,7 +876,12 @@ Maintainer requests of 2026-10-30 (Windows, macOS and Linux each):
       meaning in a source checkout that was not built; grey it with its reason.
 - [ ] **"Create a GitHub issue" button is broken.** [CODE] It opens a GitHub page saying "Whoops, something
       went wrong". Check the generated `issues/new` URL (length limit, query encoding, template or label
-      names) and fix it on the three OS.
+      names) and fix it on the three OS. Checked on 2026-10-30 from the cloud container: every prefilled id
+      (version, os, driver, diagnostics) is a field of `bug_report.yml`, and the Lua builder measures its
+      budget on the percent-encoded URL. The prime suspect is `max_url_bytes` = 7000 in
+      `_shared/modules/diagnostics/issue_templates.json` being above what GitHub accepts for a signed-in
+      issue form. The container's proxy blocks the signed-in page, so reproduce it from a browser: copy the
+      URL the button opens, note its length, and retry with the diagnostics value shortened.
 
 Added October 22 (from the agents' reports; details in their commits):
 
