@@ -1974,6 +1974,13 @@ local function create_menu(deps)
 								local render_ctx = {
 										commands      = {
 											llm_toggle = toggle_action,
+											[require("config_keys").COMMAND.LLM_TEST_PREDICTION] = function()
+												if not keymap or type(keymap.test_prediction) ~= "function" then
+													Logger.error(LOG, "Test prediction refused: the keymap is unavailable.")
+													return false
+												end
+												return keymap.test_prediction()
+											end,
 											[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
 												-- A retained row rechecks what greyed it when it was built.
 												if paused or not configuration_writable() then

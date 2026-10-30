@@ -1989,6 +1989,12 @@ function M.request_manual_prediction()
 	return engine.request_manual_prediction()
 end
 
+--- Runs the AI menu's test prediction. The engine logs and shows every refusal.
+--- @return boolean sent True when the request left.
+function M.test_prediction()
+	return engine.test_prediction()
+end
+
 --- Runs a prediction now with a chosen prompt profile and count (the
 --- llm_prompt_prediction action and its presets). The engine logs and shows
 --- every refusal, an unknown prompt included.

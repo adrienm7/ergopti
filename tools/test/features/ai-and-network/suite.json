@@ -449,6 +449,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-llm-backend-brands-single-source.cjs"],
 			"repro": "npm run test:llm-backend-brands-single-source"
+		},
+		{
+			"id": "js-test-prediction-single-source",
+			"ordinal": 536,
+			"name": "the AI menu's test prediction: one excerpt length and blank-answer reason, on the three drivers",
+			"cmd": "node",
+			"args": ["tools/test/test-test-prediction-single-source.cjs"],
+			"repro": "npm run test:test-prediction-single-source"
 		}
 	]
 }
