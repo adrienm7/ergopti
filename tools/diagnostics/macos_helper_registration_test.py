@@ -28,6 +28,7 @@ class NativeBoundary:
         self.bootout_error = None
         self.final_observation_error = None
         self.print_count = 0
+        self.register_stdout = "ready\n"
 
     def run(self, arguments, **options):
         self.calls.append(arguments)
@@ -53,7 +54,7 @@ class NativeBoundary:
             return subprocess.CompletedProcess(arguments, 64, "", "")
         if arguments[1] == "--register-remap-guardian":
             self.present = True
-            return subprocess.CompletedProcess(arguments, 0, "ready\n", "")
+            return subprocess.CompletedProcess(arguments, 0, self.register_stdout, "")
         if arguments[1] == "--remap-guardian-status":
             return subprocess.CompletedProcess(arguments, 0, "ready\n", "")
         if arguments[1] == "--unregister-remap-guardian":
@@ -103,6 +104,19 @@ class HelperGuardianAcceptanceTests(unittest.TestCase):
         self.assertEqual(receipt["final_job_status"], 113)
         self.assertEqual(receipt["cleanup_errors"], [])
         self.assertFalse(any(call[1] == "bootout" for call in boundary.calls))
+
+    def test_an_ad_hoc_helper_names_its_registration_reset_and_nothing_else(self):
+        def configure(stdout):
+            return lambda boundary: setattr(boundary, "register_stdout", stdout)
+
+        _, receipt, error = self.run_probe(configure("ready\ndeveloper_adhoc_reregistered\n"))
+        self.assertIsNone(error)
+        self.assertTrue(receipt["unregistration_verified"])
+        for stdout in ["ready\ndeveloper_adhoc_reset_refused\n", "ready\nready\n", "ready"]:
+            with self.subTest(stdout=stdout):
+                _, receipt, error = self.run_probe(configure(stdout))
+                self.assertIn("did not register a ready guardian", error)
+                self.assertNotIn("unregistration_verified", receipt)
 
     def test_refuses_unknown_initial_status_and_never_changes_an_existing_job(self):
         for status in [0, 1, 5, 64, -9]:
