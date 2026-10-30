@@ -12,7 +12,11 @@
 # their digest), stores it under docs/field-reports/, then commits and pushes
 # the branch. The logs are gitignored, so they are added with `git add -f`; the
 # logger already masks secrets, the home folder, e-mail addresses and personal
-# names, and the facts below have the home folder and the user name replaced.
+# names, and the branch is public, so only copies scrubbed of typed text by
+# tools/dev/field-log-scrub.py leave the machine and the digests read those copies.
+# The personal hotstrings file never travels: tools/dev/hotstring-collisions.py
+# reports which of its triggers share a bundled one. The facts below have the home
+# folder and the user name replaced.
 #
 # The logs folder is the one the driver itself resolves
 # (infra/config_paths.lua get_logs_dir: the paths.logs_dir override, else
@@ -57,6 +61,7 @@ set -e
 set +e
 DRIVER_ROOT="$REPO_ROOT/static/ergopti_plus/linux"
 SHARED_LUA="$REPO_ROOT/static/ergopti_plus/_shared/lua"
+BUNDLED_HOTSTRINGS="$REPO_ROOT/static/ergopti_plus/_shared/modules/hotstrings"
 
 fail() { printf '[field-report] ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '[field-report] %s\n' "$*"; }
@@ -109,14 +114,29 @@ step() {
 
 # Prints the logs folder the driver resolves and the log file names of
 # _shared/lua/app_dirs.lua, one per line: folder, unified prefix, errors prefix,
-# extension, bootstrap log, crash reports folder.
+# extension, bootstrap log, crash reports folder, personal hotstrings file.
 driver_log_layout() {
 	LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;" \
 		luajit -e '
 			local dirs, files = require("app_dirs"), require("app_dirs").files
 			print(require("infra.config_paths").get_logs_dir())
 			print(files.unified_prefix); print(files.errors_prefix); print(files.extension)
-			print(files.bootstrap_log); print(dirs.crash_reports_dir)'
+			print(files.bootstrap_log); print(dirs.crash_reports_dir)
+			print(require("infra.config_paths").config("personal_hotstrings.toml"))'
+}
+
+# Copies one log into the report without the user's typed text.
+scrub_log() {
+	local source="$1" name
+	name="$(basename "${source}")"
+	if python3 "${REPO_ROOT}/tools/dev/field-log-scrub.py" "${source}" "${out}/${name}" \
+		"${BUNDLED_HOTSTRINGS}"; then
+		printf '%-28s copied (scrubbed)\n' "${name}" >> "${steps}"
+	else
+		# Never fall back to the raw log: it would publish the typed text.
+		rm -f "${out}/${name}"
+		printf '%-28s scrub failed, not copied\n' "${name}" >> "${steps}"
+	fi
 }
 
 # Copies the logs and the digest, commits and pushes, once: from the normal end
@@ -124,7 +144,7 @@ driver_log_layout() {
 finalize() {
 	"${finalized}" && return 0
 	finalized=true
-	local start_day today d f subject layout log_dir main errors ext bootstrap crashes
+	local start_day today d f subject layout log_dir main errors ext bootstrap crashes personal
 	local days=()
 	# A run that crosses midnight spans two day logs: keep both, oldest first.
 	start_day="${stamp%%_*}"
@@ -132,7 +152,7 @@ finalize() {
 	days=("${start_day}")
 	[ "${today}" = "${start_day}" ] || days+=("${today}")
 	if layout="$(driver_log_layout 2>"${out}/logs_dir.txt")"; then
-		{ read -r log_dir; read -r main; read -r errors; read -r ext; read -r bootstrap; read -r crashes; } <<< "${layout}"
+		{ read -r log_dir; read -r main; read -r errors; read -r ext; read -r bootstrap; read -r crashes; read -r personal; } <<< "${layout}"
 	fi
 	if [ -z "${crashes:-}" ]; then
 		printf '%-28s unresolved (luajit could not run infra/config_paths.lua, see logs_dir.txt)\n' "logs" >> "${steps}"
@@ -141,18 +161,19 @@ finalize() {
 		: > "${out}/logs_dir.txt"
 		for d in "${days[@]}"; do
 			for f in "${log_dir}/${main}${d}${ext}" "${log_dir}/${errors}${d}${ext}"; do
-				[ -f "${f}" ] && cp "${f}" "${out}/" && printf '%-28s copied\n' "$(basename "${f}")" >> "${steps}"
+				[ -f "${f}" ] && scrub_log "${f}"
 			done
 		done
 		# The LLM sub-log keeps the download and server lines of earlier days.
 		for f in "${log_dir}/${main}llm${ext}" "${log_dir}/${bootstrap}"; do
-			[ -f "${f}" ] && cp "${f}" "${out}/" && printf '%-28s copied\n' "$(basename "${f}")" >> "${steps}"
+			[ -f "${f}" ] && scrub_log "${f}"
 		done
 		# Crash reports are named, not copied: a dump is read on request.
 		step crash_reports sh -c 'ls -la "$1" 2>/dev/null || echo "no crash report"' sh "${log_dir}/${crashes}"
 		local day_logs=()
 		for d in "${days[@]}"; do
-			[ -f "${log_dir}/${main}${d}${ext}" ] && day_logs+=("${log_dir}/${main}${d}${ext}")
+			# The digests read the scrubbed copies, never the raw day log.
+			[ -f "${out}/${main}${d}${ext}" ] && day_logs+=("${out}/${main}${d}${ext}")
 		done
 		if [ "${#day_logs[@]}" -gt 0 ]; then
 			step digest_boot grep -hE "Boot complete|Boot completed with|Boot stage completed" "${day_logs[@]}"
@@ -168,6 +189,13 @@ finalize() {
 		printf '%-28s missing\n' "logs" >> "${steps}"
 		printf '%s\n' "${log_dir}" > "${out}/logs_dir.txt"
 		mask_file "${out}/logs_dir.txt"
+	fi
+
+	# Which personal triggers share a bundled one, with both sides' flags and no
+	# replacement text: the personal file itself never travels.
+	if [ -n "${personal:-}" ]; then
+		step hotstring_collisions python3 "${REPO_ROOT}/tools/dev/hotstring-collisions.py" \
+			"${personal}" "${BUNDLED_HOTSTRINGS}"
 	fi
 
 	subject="docs(field): Linux field report ${stamp} on ${base}"

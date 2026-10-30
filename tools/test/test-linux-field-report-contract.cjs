@@ -37,6 +37,9 @@ const MAC_SCRIPT = 'tools/dev/collect-macos-field-report.sh';
 const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.sh';
 const IDENTIFIERS_JSON = 'static/ergopti_plus/_shared/data/identifiers.json';
 const APP_DIRS = 'static/ergopti_plus/_shared/lua/app_dirs.lua';
+const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
+const COLLISIONS = 'tools/dev/hotstring-collisions.py';
+const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml';
 
 if (process.platform === 'win32') {
 	console.log('[SKIP] The Linux field report collector is a Linux shell tool; not run on Windows.');
@@ -114,7 +117,7 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 	const bin = path.join(base, 'bin');
 	const home = path.join(base, 'home');
 	const logs = path.join(home, 'state/ergopti_plus/logs');
-	for (const relative of [SCRIPT, FIELD_GIT, IDENTIFIERS]) {
+	for (const relative of [SCRIPT, FIELD_GIT, IDENTIFIERS, LOG_SCRUB, COLLISIONS, BUNDLED_SAMPLE]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
 	}
@@ -129,7 +132,8 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 		path.join(logs, `${LOG_FILES.main}${day}${LOG_FILES.extension}`),
 		'2026-10-28 10:00:00 [INFO] [BootProfile] Boot complete in 812 ms (cpu 300 ms).\n' +
 			'2026-10-28 10:01:00 [INFO] [network_check] check=network verdict=pass steps=1 pac=pass\n' +
-			'2026-10-28 10:02:00 [WARNING] [Fixture] a warning\n'
+			'2026-10-28 10:02:00 [WARNING] [Fixture] a warning\n' +
+			"2026-10-28 10:03:00 [ERROR] [injector] Cannot deliver 'TYPEDCANARY' before erasing its trigger: boom.\n"
 	);
 	fs.writeFileSync(path.join(logs, `${LOG_FILES.main}2000-01-01${LOG_FILES.extension}`), 'old\n');
 	fs.writeFileSync(path.join(logs, LOG_FILES.bootstrap), 'refused session_lock\n');
@@ -149,7 +153,7 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 	shim(
 		bin,
 		'luajit',
-		`case "$*" in *get_logs_dir*) printf '%s\\n' "${logs}" "${LOG_FILES.main}" "${LOG_FILES.errors}" "${LOG_FILES.extension}" "${LOG_FILES.bootstrap}" "${LOG_FILES.crashes}" ;; *) echo "LuaJIT fixture" ;; esac`
+		`case "$*" in *get_logs_dir*) printf '%s\\n' "${logs}" "${LOG_FILES.main}" "${LOG_FILES.errors}" "${LOG_FILES.extension}" "${LOG_FILES.bootstrap}" "${LOG_FILES.crashes}" "${home}/personal_hotstrings.toml" ;; *) echo "LuaJIT fixture" ;; esac`
 	);
 	// A fact that names the home folder and the user: both must be masked.
 	shim(bin, 'localectl', `echo "VC Keymap: fr in ${home}/keymaps for fixtureuser"`);
@@ -282,7 +286,17 @@ function read(folder, name) {
 				])
 					assert.match(steps, new RegExp(`^${name}\\s+exit=\\d+$`, 'm'));
 				const dayLog = `${LOG_FILES.main}${today()}${LOG_FILES.extension}`;
-				assert.match(steps, new RegExp(`^${dayLog.replace(/\./g, '\\.')}\\s+copied$`, 'm'));
+				assert.match(
+					steps,
+					new RegExp(`^${dayLog.replace(/\./g, '\\.')}\\s+copied \\(scrubbed\\)$`, 'm')
+				);
+				assert.match(steps, /^hotstring_collisions\s+exit=0$/m);
+				assert.doesNotMatch(
+					read(folder, dayLog),
+					/TYPEDCANARY/,
+					'the pushed day log keeps no typed text'
+				);
+				assert.match(read(folder, dayLog), /Cannot deliver <text withheld> before erasing/);
 				assert(fs.existsSync(path.join(folder, LOG_FILES.bootstrap)));
 				assert(
 					!fs.existsSync(path.join(folder, `${LOG_FILES.main}2000-01-01${LOG_FILES.extension}`))
