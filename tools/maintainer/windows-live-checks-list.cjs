@@ -245,8 +245,10 @@ async function clickScoped(session, pid, row, label, scope, problems) {
 	const after = configBytes(session, 'autohotkey/config.toml');
 	if (!after.equals(before)) {
 		const fresh = backupNames(session, /\.backup-/).filter((name) => !backups.has(name));
-		const config = fresh.filter((name) => name.startsWith('config.'));
-		const tap = fresh.filter((name) => name.startsWith('tap_hold.'));
+		// Whole stems: a literal ending in "." reads as a locale key prefix to
+		// audit-translations.cjs and kept the dead tap_hold.picker keys alive.
+		const config = fresh.filter((name) => name.startsWith('config.backup-'));
+		const tap = fresh.filter((name) => name.startsWith('tap_hold.backup-'));
 		if (config.length !== 1) problems.push(`${label}: ${config.length} configuration backups`);
 		else if (!configBytes(session, `autohotkey/${config[0]}`).equals(before))
 			problems.push(`${label}: the backup ${config[0]} is not the exact earlier file`);
