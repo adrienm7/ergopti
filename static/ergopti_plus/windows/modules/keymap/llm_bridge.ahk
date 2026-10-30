@@ -1592,7 +1592,7 @@ _LLM_Bridge_ObserveAgentTyping(DeleteFromEnd, InsertedText) {
 }
 
 ; Tells whether the inactive bridge feeds the AI agent: its automatic mode
-; watches the typing (LLM_Agent_WatchesTyping: mode "auto", not paused). The
+; watches the typing (LLM_Agent_WatchesTyping: mode "auto", AI on, not paused). The
 ; answer is read on every keystroke from the agent's own settings, so a mode
 ; change, a pause or a restored config starts or stops the feed at the next
 ; keystroke with no second copy of that state; the transitions are logged.

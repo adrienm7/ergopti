@@ -30,7 +30,9 @@
 ;    triage or an answer carrying an older one is dropped. A keystroke retires
 ;    the flow in flight, as it cancels the requests of the prediction engine.
 ; 5. The automatic mode asks System 1 about the current sentence once the user
-;    pauses, never twice about the same sentence, never while paused, in a
+;    pauses, never twice about the same sentence, never while paused or with the
+;    AI off (no pause armed, no triage, no request in flight, as on macOS and
+;    Linux: the next keystroke after the switch-on arms it again), in a
 ;    secure field, in an excluded application, in live mode or while a
 ;    hotstring tooltip or another AI tooltip is shown. An automatic next-word
 ;    prediction does not hold it back: it appears before the pause ends, and
@@ -693,7 +695,7 @@ _LLM_Agent_FlowRenderIsCurrent(Flow) {
 
 _LLM_Agent_TriageIsCurrent(Generation, Revision) {
 	global _LLM_Agent_System1Revision
-	return (_LLM_Agent_RenderIsCurrent(Generation) && Revision == _LLM_Agent_System1Revision) ? true : false
+	return (_LLM_Agent_RenderIsCurrent(Generation) && Revision == _LLM_Agent_System1Revision && LLM_Menu_AiEnabled()) ? true : false
 }
 
 ; Render guard of the candidates: a strict Boolean the tooltip checks before
@@ -759,14 +761,14 @@ _LLM_Agent_TimeZone() {
 ; =================================
 
 /**
- * Tells whether the automatic mode watches the typing: its mode is "auto" and
- * Ergopti+ is not paused. While predictions are off the LLM bridge feeds
- * LLM_Agent_OnTyping on this alone, so the AI menu's switch never starves the
- * automatic mode; the agent's mode and the pause start and stop that feed.
+ * Tells whether the automatic mode watches the typing: its mode is "auto", the
+ * AI is on and Ergopti+ is not paused. While the prediction bridge is stopped it
+ * feeds LLM_Agent_OnTyping on this alone; the agent's mode, the AI switch and the
+ * pause start and stop that feed.
  * @returns {Boolean}
  */
 LLM_Agent_WatchesTyping() {
-	if A_IsSuspended
+	if A_IsSuspended || !LLM_Menu_AiEnabled()
 		return false
 	return LLM_Agent_Setting("agent_mode") == "auto"
 }
@@ -783,6 +785,11 @@ LLM_Agent_OnTyping(Buffer, PublishGuard := unset) {
 	global _LLM_Agent_Generation, _LLM_Agent_Auto
 	if IsSet(PublishGuard) && !PublishGuard.Call()
 		return false
+	; With the AI off no pause is armed: a keystroke only withdraws what is left.
+	if !LLM_Menu_AiEnabled() {
+		LLM_Agent_InvalidateTyping()
+		return false
+	}
 	_LLM_Agent_SettleOffer(false)
 	Automatic := LLM_Agent_Setting("agent_mode") == "auto"
 	; Configuration may be cold; resolve it before mutating the pause owner.
@@ -921,9 +928,8 @@ _LLM_Agent_OnPause(Generation, Buffer) {
 	Revision := _LLM_Agent_System1Revision
 	Current := _LLM_Agent_TriageIsCurrent.Bind(Generation, Revision)
 	_LLM_Agent_Auto["timer"] := 0
-	if (Generation != _LLM_Agent_Generation) || A_IsSuspended
+	if (Generation != _LLM_Agent_Generation) || A_IsSuspended || !LLM_Menu_AiEnabled()
 		return false
-	; The AI menu's switch is not the agent's: only its own mode counts
 	if (LLM_Agent_Setting("agent_mode") != "auto")
 		return false
 	if LLM_Engine_LiveIsActive() || _LLM_Agent_SurfaceIsHeld() || _LLM_Engine_HotstringTooltipShown() {
@@ -978,7 +984,7 @@ _LLM_Agent_OnTriage(Flow, Triage) {
 		LoggerInfo("LLM", "AI agent #{1}: triage ignored, the user kept typing.", Flow["generation"])
 		return
 	}
-	if A_IsSuspended
+	if A_IsSuspended || !LLM_Menu_AiEnabled()
 		return
 	if !(Triage is Map) {
 		LoggerInfo("LLM", "AI agent #{1}: the triage is unreadable.", Flow["generation"])
@@ -1078,14 +1084,34 @@ _LLM_Agent_StopAuto(Reason) {
  * @returns {Boolean} True, the lifecycle step's contract.
  */
 LLM_Agent_OnSuspend() {
+	_LLM_Agent_Withdraw("Ergopti+ was paused")
+	return true
+}
+
+/**
+ * The AI was switched off: nothing of it runs, so the flow in flight, the armed
+ * pause and the typing feed go like at a pause, and an agent tooltip goes with
+ * them (the bridge hides only what it owns, and may not be running). The next
+ * keystroke after the switch-on arms the automatic mode again.
+ */
+LLM_Agent_OnAiSwitchedOff() {
+	_LLM_Agent_Withdraw("the AI was switched off")
+	Record := LLM_Tooltip_GetPresentedToken()
+	if IsObject(Record) && Record.HasOwnProp("Lifecycle") && IsObject(Record.Lifecycle)
+			&& (Record.Lifecycle.OfferId is String) && SubStr(Record.Lifecycle.OfferId, 1, 6) == "agent_"
+		LLM_Tooltip_HideExact(Record)
+}
+
+; Retires the flow in flight, the armed pause and the agent-only typing feed. The
+; suggestion on screen is dropped unlearned: the user did not dismiss it.
+_LLM_Agent_Withdraw(Reason) {
 	global _LLM_Agent_Generation, _LLM_Agent_Auto
 	_LLM_Agent_Generation += 1
 	_LLM_Agent_CancelPause()
 	_LLM_Agent_Auto["offer"] := ""
 	if IsSet(LLM_Bridge_ResetAgentFeed)
-		LLM_Bridge_ResetAgentFeed("Ergopti+ was paused")
-	LoggerInfo("LLM", "AI agent #{1}: typing watch and flow in flight retired by the pause.", _LLM_Agent_Generation)
-	return true
+		LLM_Bridge_ResetAgentFeed(Reason)
+	LoggerInfo("LLM", "AI agent #{1}: typing watch and flow in flight retired ({2}).", _LLM_Agent_Generation, Reason)
 }
 
 ; Arms a one-shot timer (a negative period) or cancels one (0), through the

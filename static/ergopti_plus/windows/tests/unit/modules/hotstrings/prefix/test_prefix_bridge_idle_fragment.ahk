@@ -91,7 +91,7 @@ _PBIF_Case(Mode) {
 		; Park the exact existing timer owner until every nested port is restored.
 		_LLM_Bridge_PrefixObserver := 0
 		Body(Fx, Lines, Sent) => _PCA_WithObserverFixture(_PBIF_Sequence.Bind(Mode))
-		_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), Body)
+		_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), Body)
 	} finally {
 		_LLM_Bridge_PrefixObserver := SavedObserver
 		Critical(PreviousCritical)
