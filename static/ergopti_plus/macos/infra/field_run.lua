@@ -84,8 +84,9 @@ local function name_set(list, where)
 	return set
 end
 
---- The longest a step may run: its progress bound for a download step, its
---- deadline otherwise.
+--- The longest a step is budgeted: its progress bound for a download step, its
+--- deadline otherwise. A download still progressing at its bound may go on
+--- into the request time the later steps do not need (Session:run_step).
 --- @param step table Step declaration.
 --- @return integer seconds
 function M.step_bound_seconds(step)
@@ -587,6 +588,16 @@ function Session:run_step(index, step, continue)
 	local stall_ms = step.deadline_seconds * 1000
 	local deadline_ms = math.min(M.step_bound_seconds(step) * 1000, left_ms)
 	local progress_aware = step.progress_max_seconds ~= nil
+	if progress_aware then
+		-- A download still moving at its bound may use the request time the later
+		-- steps do not need: the Mac run of 2026-10-30 19:17 cut the 0.38 GB MLX
+		-- model at 90 % over a shared connection while it still progressed.
+		local reserve_ms = 0
+		for later = index + 1, #run.request.steps do
+			reserve_ms = reserve_ms + M.step_bound_seconds(run.request.steps[later]) * 1000
+		end
+		deadline_ms = math.max(deadline_ms, left_ms - reserve_ms)
+	end
 	local ring_before = ports.log_ring()
 	local started_ms, started_at = ports.now_ms(), ports.iso_now()
 	local settled, timer = false, nil

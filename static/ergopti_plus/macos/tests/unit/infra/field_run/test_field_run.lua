@@ -511,7 +511,7 @@ helpers.describe("field run: a run", function()
 		end)
 	end)
 
-	helpers.it("times a stalled download out after one silent window, and any download at its bound", function()
+	helpers.it("times a stalled download out after one silent window, and a moving one only at the request's spare time", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
 			local state = world({ ollama_model = function() end, mlx_model = function() end })
@@ -528,18 +528,50 @@ helpers.describe("field run: a run", function()
 			helpers.assert_eq(stalled.verdict, "timeout")
 			helpers.assert_eq(stalled.codes[1], "stalled_" .. step.deadline_seconds .. "s")
 
+			-- Still moving at its bound, a download goes on into the request time no
+			-- later step needs (the 19:17 Mac run cut the MLX model at 90 %).
 			local bound = spec.step_by_id.mlx_model
-			state.request({ schema = 1, request_id = "r32", steps = Json.array({ "mlx_model" }) })
+			local request_seconds = bound.progress_max_seconds + 600
+			local function moving_until_settled(id, steps)
+				state.request({ schema = 1, request_id = id, steps = Json.array(steps),
+					deadline_seconds = request_seconds })
+				state.advance(0)
+				local waited = 0
+				while state.files[result_path(id, 1, "mlx_model")] == nil and waited <= request_seconds do
+					state.mark = state.mark + 1
+					state.advance(10000)
+					waited = waited + 10
+				end
+				return state.json(result_path(id, 1, "mlx_model")), waited
+			end
+			local alone, waited_alone = moving_until_settled("r32", { "mlx_model" })
+			helpers.assert_eq(alone.codes[1], "bound_" .. request_seconds .. "s")
+			helpers.assert_eq(waited_alone, request_seconds, "a moving download may use the whole request")
+		end)
+	end)
+
+	helpers.it("keeps the later steps' budget when a moving download runs past its bound", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world({ ollama_model = function() end, mlx_model = function() end })
+			local spec = spec_of(FieldRun)
+			local bound = spec.step_by_id.ollama_model
+			local reserve = spec.step_by_id.mlx_model.progress_max_seconds
+			local request_seconds = bound.progress_max_seconds + reserve + 600
+			started(FieldRun, state)
+			-- Steps run in declaration order: the Ollama download comes before the MLX one.
+			state.request({ schema = 1, request_id = "r33", steps = Json.array({ "ollama_model", "mlx_model" }),
+				deadline_seconds = request_seconds })
 			state.advance(0)
 			local waited = 0
-			while state.files[result_path("r32", 1, "mlx_model")] == nil and waited <= bound.progress_max_seconds do
+			while state.files[result_path("r33", 1, "ollama_model")] == nil and waited <= request_seconds do
 				state.mark = state.mark + 1
 				state.advance(10000)
 				waited = waited + 10
 			end
-			local bounded = state.json(result_path("r32", 1, "mlx_model"))
-			helpers.assert_eq(bounded.codes[1], "bound_" .. bound.progress_max_seconds .. "s")
-			helpers.assert_eq(waited, bound.progress_max_seconds, "the bound ends the step exactly")
+			local expected = request_seconds - reserve
+			helpers.assert_eq(state.json(result_path("r33", 1, "ollama_model")).codes[1], "bound_" .. expected .. "s")
+			helpers.assert_eq(waited, expected, "the later steps keep their own budget")
 		end)
 	end)
 
@@ -1029,5 +1061,22 @@ helpers.describe("field run ports: Ollama model step", function()
 			helpers.assert_eq(timers, 2, "it looked again once per pending answer")
 			helpers.assert_eq(codes, "model_preexisting,pulled,model_kept")
 		end)
+	end)
+end)
+
+helpers.describe("field run: model download bounds", function()
+	helpers.it("lets a model download over a slow shared connection finish", function()
+		local spec = Json.decode(SPEC_TEXT)
+		local total = 0
+		for _, step in ipairs(spec.steps) do
+			total = total + (step.progress_max_seconds or step.deadline_seconds)
+			if step.id == "ollama_model" or step.id == "mlx_model" then
+				-- The Mac run of 2026-10-30 19:17 stopped the 0.38 GB MLX model at 90 %
+				-- after 1 200 s while it still progressed; 40 minutes covers 0.4 GB at 0.2 MB/s.
+				helpers.assert_true(step.progress_max_seconds >= 2400,
+					step.id .. " stops a progressing download too early")
+			end
+		end
+		helpers.assert_true(spec.deadline_seconds.default >= total, "the default request covers every bound")
 	end)
 end)
