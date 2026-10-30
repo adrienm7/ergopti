@@ -931,8 +931,21 @@ function M.reload_toml(name, path)
 			group.kind = "toml"
 			return true
 		end
-		if M.disable_group(name) ~= true then return false end
-		return M.load_toml(name, path, group.section_sources, path == group.path and group.personal_source or nil) == true
+		-- Each refusal names its step: an editor save once reported only that the
+		-- reload rolled back, with no registry line saying why (field log
+		-- 2026-10-30 11:37, twice).
+		if M.disable_group(name) ~= true then
+			Logger.error(LOG, "reload_toml: group '%s' could not be disabled before its reload.",
+				PrivateLabel.mask(name))
+			return false
+		end
+		if M.load_toml(name, path, group.section_sources,
+				path == group.path and group.personal_source or nil) ~= true then
+			Logger.error(LOG, "reload_toml: group '%s' did not load its saved file; the previous mappings stay live.",
+				PrivateLabel.mask(name))
+			return false
+		end
+		return true
 	end)
 end
 

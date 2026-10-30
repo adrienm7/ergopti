@@ -467,6 +467,35 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 		package.loaded["ui.hotstring_editor"] = nil
 	end)
 
+	helpers.it("names why a post-save live reload was refused (hotstring-reload-cause)", function()
+		-- Field log 2026-10-30 11:37: two saves reported that the live reload
+		-- rolled back, and no line said which owner refused it.
+		local initial = "[_meta]\nsections_order = []\n"
+		local editor, dispatch = load_editor({
+			write_if_unchanged = function()
+				return true, nil, "[_meta]\nsections_order = []\n# saved\n"
+			end,
+		}, {
+			parse = function() return { sections = {}, sections_order = {} }, true end,
+		}, {
+			read_with_status = function() return initial, "ok" end,
+		})
+		editor.init("/virtual/personal_hotstrings.toml", { PERSONAL_GROUP_NAME = "personal" },
+			function() end, 50)
+		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
+		local lines = {}
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line) lines[#lines + 1] = line end)
+		editor.open("menu")
+		dispatch({ action = "save", data = { sections = {}, sections_order = {} } })
+		Logger.set_sink(nil)
+		helpers.assert_contains(table.concat(lines, "\n"),
+			"live group reload rolled back (the keymap reload API is unavailable)",
+			"the refusal must name its owner")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+
 	helpers.it("logs a deferred menu-refresh callback failure after a committed save", function()
 		local path = "/virtual/personal_hotstrings.toml"
 		local initial = "[_meta]\nsections_order = []\n"
