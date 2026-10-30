@@ -30,6 +30,8 @@
 --- 10. typing_selftest: the automatic key accounting. The app types a fixed
 ---    sequence into a scratch field of its own, and only there; the tap must
 ---    see each key once and the field must hold exactly the sequence.
+--- 11. capslock_chord: whether the Ctrl+Caps Lock slot is bound, and whether a
+---    physical Ctrl+Caps Lock press this session ever reached it.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only, like the Debug checks: nothing is granted, prompted, written
@@ -898,6 +900,44 @@ function M.typing_selftest(ports, report, finish)
 		finish()
 	end)
 	ports.scratch_typing(M.SELFTEST_KEYS, function(outcome) typed = outcome end)
+end
+
+
+
+
+
+-- =======================================
+-- =======================================
+-- ======= 11/ Ctrl+Caps Lock slot =======
+-- =======================================
+-- =======================================
+
+--- The secondary_capslock slot (Ctrl+Caps Lock) binds through its own native
+--- entry, and the registrar tests say macOS may never fire a Caps Lock hotkey.
+--- No synthetic event can stand in for the physical chord (Caps Lock reaches
+--- the taps as a modifier change, not as a key press), so the check judges the
+--- session's own evidence: once the person pressed the chord, a slot that
+--- never received it fails, which proves the slot cannot work on this Mac.
+function M.capslock_chord(ports, report, finish)
+	local facts = ports.capslock_chord_facts()
+	local action = facts.action or "none"
+	report.step("capslock_slot_action", STATE.info, action)
+	if action == "none" then
+		report.step("capslock_slot_bound", STATE.skip, "unassigned")
+	else
+		report.step("capslock_slot_bound", facts.bound and STATE.pass or STATE.fail, facts.bound and "yes" or "no")
+	end
+	report.step("capslock_chord_presses", STATE.info, facts.presses)
+	if facts.presses == 0 then
+		report.step("capslock_chord_delivered", STATE.skip, "not_pressed")
+	elseif facts.deliveries > 0 then
+		report.step("capslock_chord_delivered", STATE.pass, "delivered:" .. facts.deliveries)
+	elseif action == "none" or not facts.bound then
+		report.step("capslock_chord_delivered", STATE.skip, "slot_inactive")
+	else
+		report.step("capslock_chord_delivered", STATE.fail, "never_delivered")
+	end
+	finish()
 end
 
 return M
