@@ -4,9 +4,12 @@
 --- MODULE: Field Run Storage Probe
 --- DESCRIPTION:
 --- The field run's storage check over scripted ports:
---- 1. the keystats database is opened read-only and passes only on SQLite's
----    "ok"; a damaged one fails with the number of issue lines, never their
----    text, and a database not resolved yet or absent is skipped;
+--- 1. the keystats database is opened read-only and without a lock (immutable
+---    URI: a reader's shared lock failed the ingest's COMMIT with "database is
+---    locked" on 2026-10-30 20:52:44) and passes only on SQLite's "ok"; an
+---    issue counts only when a second scan sees it too (a lock-free scan can
+---    race a write), a damaged one fails with the number of issue lines, never
+---    their text, and a database not resolved yet or absent is skipped;
 --- 2. each configuration file is its own step: absent is skipped, a parse
 ---    error fails that file only;
 --- 3. a logs folder that refuses a write, a missing day log and unpublished
@@ -18,7 +21,7 @@ local helpers = require("tests.helpers")
 local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "infra.field_check_probes" }
 
 local DB = "/Users/someone/Library/Caches/ergopti_plus/metrics/db.sqlite"
-local QUICK_CHECK = "/usr/bin/sqlite3 -readonly " .. DB .. " PRAGMA quick_check;"
+local QUICK_CHECK = "/usr/bin/sqlite3 -readonly file:" .. DB .. "?immutable=1 PRAGMA quick_check;"
 
 --- Builds scripted ports; `world` records every command.
 --- @return table ports, table world
@@ -38,7 +41,12 @@ local function make_ports()
 	local ports = {
 		exec = function(executable, args, timeout_s, callback)
 			world.commands[#world.commands + 1] = { key = executable .. " " .. table.concat(args, " "), timeout = timeout_s }
-			callback(world.sqlite[1], world.sqlite[2], "")
+			local scripted = world.scans and table.remove(world.scans, 1) or world.sqlite
+			callback(scripted[1], scripted[2], "")
+		end,
+		after = function(_, callback)
+			world.waits = (world.waits or 0) + 1
+			callback()
 		end,
 		config_files = function() return world.files end,
 		parse_toml = function(path) return world.unparsable[path] == nil end,
@@ -92,6 +100,28 @@ helpers.describe("storage probe", function()
 		helpers.assert_eq(run(ports).keystats_db.value, "exit_26")
 		world.sqlite = { nil, "" }
 		helpers.assert_eq(run(ports).keystats_db.value, "timeout")
+	end)
+
+	helpers.it("names a lock-free scan that raced a write, and fails an issue seen twice", function()
+		local ports, world = make_ports()
+		world.scans = { { 0, "*** in database main ***\nPage 3 is never used\n" }, { 0, "ok\n" } }
+		local steps, result = run(ports)
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.keystats_db.value, "concurrent_write")
+		helpers.assert_eq(#world.commands, 2)
+		helpers.assert_eq(world.waits, 1)
+		world.commands = {}
+		world.scans = { { 0, "row 1 missing from index x\n" }, { 0, "row 1 missing from index x\n" } }
+		steps = run(ports)
+		helpers.assert_eq(steps.keystats_db.value, "issues_1")
+	end)
+
+	helpers.it("escapes the database path in the immutable URI", function()
+		helpers.with_stub_scope(MODULES, function()
+			package.loaded["infra.field_check_probes"] = nil
+			local Probes = require("infra.field_check_probes")
+			helpers.assert_eq(Probes.immutable_uri("/a b/c%d?#.sqlite"), "file:/a%20b/c%25d%3F%23.sqlite?immutable=1")
+		end)
 	end)
 
 	helpers.it("skips a database not resolved yet or absent", function()
