@@ -3740,6 +3740,7 @@
 	"platform_reason.number_row_live_session": "לא זמין: רק הפעלת X11, או GNOME או KDE ב-Wayland, מחילים זאת מיד. שולחן עבודה זה שומר על הפריסה הנוכחית שלו; הבחירה שלך נשמרה.",
 	"platform_reason.number_row_live_no_layout": "לא זמין: התקינו תחילה פריסת ErgoptiPlus; בחירה זו משנה את הפריסה שבה אתם משתמשים.",
 	"layouts.linux_rows_not_applied": "בחירת שורת הספרות נשמרה, אך לא ניתן היה לעדכן את פריסת המקלדת הפעילה.",
+	"layouts.rows_not_applied": "בחירת שורת הספרות נשמרה, אך לא ניתן היה לעדכן את פריסת המקלדת הפעילה.",
 	"platform_reason.number_row_source_unavailable": "לא זמין: העדפת סמלים דורשת פריסה מדומה פעילה עם רמות תקינות לספרות ולסמלים בכל מיקום בשורת הספרות.",
 	"menu.layout.number_row_not_applied": " (לא מוחל)",
 	"platform_reason.number_row_already_digits_first": "ללא השפעה: פריסה זו כבר מקלידה את הספרות ללא Shift.",
