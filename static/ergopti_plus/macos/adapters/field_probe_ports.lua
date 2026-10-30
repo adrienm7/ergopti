@@ -248,7 +248,11 @@ local function launcher()
 	return path, environment
 end
 
---- Runs one executable with exact stdin bytes and settles once.
+--- Runs one executable with exact stdin bytes and settles once. The task is a
+--- streaming one: hs.task writes setInput bytes to a running task's stdin only
+--- then, and the reader sees EOF once the input is closed. The non-streaming
+--- form gave the HTTP worker an empty request, which it refused with 64 (field
+--- run of 2026-10-30 20:51, http_worker_loopback exit_64:not_reached).
 --- @param executable string Absolute path.
 --- @param args table Argument array.
 --- @param input string Bytes written to stdin, then closed.
@@ -256,7 +260,7 @@ end
 --- @param callback function fn(exit_code|nil, stdout, stderr).
 --- @param environment table|nil Explicit child environment.
 local function exec_input(executable, args, input, timeout_s, callback, environment)
-	local ShellRunner = require("adapters.shell_runner")
+	local ShellRunner = M._shell_runner or require("adapters.shell_runner")
 	local Timer = require("adapters.timer_scheduler")
 	local settled, timer = false, nil
 	local function settle(code, stdout, stderr)
@@ -265,9 +269,14 @@ local function exec_input(executable, args, input, timeout_s, callback, environm
 		if timer then Timer.cancel(timer) end
 		callback(code, stdout or "", stderr or "")
 	end
+	local out, err = {}, {}
 	local handle = ShellRunner.spawn(executable, args, function(code, stdout, stderr)
-		settle(code, stdout, stderr)
-	end, nil, environment)
+		out[#out + 1], err[#err + 1] = stdout or "", stderr or ""
+		settle(code, table.concat(out), table.concat(err))
+	end, function(_, stdout, stderr)
+		out[#out + 1], err[#err + 1] = stdout or "", stderr or ""
+		return true
+	end, environment)
 	if handle.isSettled() or not handle.start() then return settle(nil, "") end
 	timer = Timer.after(timeout_s, function()
 		timer = nil
@@ -575,6 +584,9 @@ end
 -- ======= 9/ Factory =======
 -- ==========================
 -- ==========================
+
+-- Test seam: the shell runner exec_input spawns through; nil in production.
+M._shell_runner = nil
 
 --- The probe ports, merged into adapters/field_check_ports.lua's table.
 --- @return table ports
