@@ -16,7 +16,8 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths" }
+local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths",
+	"platform.remap.lease_memory_snapshot" }
 
 --- Builds scripted ports; `world` records every command.
 --- @param overrides table|nil Fields replacing the defaults.
@@ -37,6 +38,7 @@ local function make_ports(overrides)
 			return { credit_source = "legacy", capture_loaded = false, ledger_drained = 0 }
 		end,
 		health_counts = function() return { lease = {}, ups_without_down = 0, downs_without_up = 0, stuck = 0 } end,
+		swallowed_keys = function() return 0 end,
 		count_keys = function(_, callback) callback({ tap_running = true, presses = 10 }) end,
 		owned_readiness = function(callback)
 			callback({ unpinned = 6, source = false, helper_present = false, active = 0 })
@@ -108,6 +110,38 @@ helpers.describe("lease check", function()
 		helpers.assert_eq(steps.lease_failures.state, "fail")
 		helpers.assert_eq(steps.lease_failures.value, "3")
 		helpers.assert_eq(steps.key_losses.value, "3")
+		helpers.assert_eq(steps.lease_failure_kinds.state, "info")
+		helpers.assert_eq(steps.lease_failure_kinds.value, "pong:1+ready_timeout:2",
+			"the field run names which lease answers timed out (117/140)")
+	end)
+
+	helpers.it("fails on a key consumed and never delivered (lease-swallowed-keys)", function()
+		local ports, world = make_ports({ swallowed_keys = function() return 2 end })
+		world.existing[CLI] = true
+		world.outputs[CLI .. " --version"] = { 0, "16.0.0\n" }
+		local steps, result = run("lease", ports)
+		helpers.assert_eq(steps.swallowed_keys.state, "fail")
+		helpers.assert_eq(steps.swallowed_keys.value, "2")
+		helpers.assert_true(not result.passed, "a dropped letter the driver saw fails the lease check")
+		helpers.assert_eq(steps.lease_failure_kinds.value, "none")
+	end)
+
+	helpers.it("names the free memory, for the starvation hypothesis (lease-memory-free)", function()
+		local ports, world = make_ports()
+		world.existing[CLI] = true
+		world.outputs[CLI .. " --version"] = { 0, "16.0.0\n" }
+		world.outputs["/usr/bin/memory_pressure"] = { 0,
+			"The system has 17179869184 (1048576 pages with a page size of 16384).\n"
+				.. "Pages free: 12345\nSystem-wide memory free percentage: 37%\n" }
+		local steps, result = run("lease", ports)
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.memory_free_percent.state, "info")
+		helpers.assert_eq(steps.memory_free_percent.value, "37")
+		world.outputs["/usr/bin/memory_pressure"] = { nil, "" }
+		helpers.assert_eq(run("lease", ports).memory_free_percent.value, "timeout")
+		local no_cli = make_ports()
+		helpers.assert_eq(run("lease", no_cli).memory_free_percent.state, "info",
+			"the reading also runs when the command line tool is missing")
 	end)
 
 	-- Field run 2026-10-27 22:32: the check ran while this lifecycle's guardian
@@ -280,6 +314,7 @@ helpers.describe("field check commands are read-only", function()
 			["/usr/bin/systemextensionsctl list"] = true,
 			["/usr/bin/pgrep -f org.pqrs/Karabiner"] = true,
 			["/usr/bin/pgrep -f ErgoptiPlus/Runtime"] = true,
+			["/usr/bin/memory_pressure "] = true,
 		}
 		helpers.assert_true(#world.commands >= 5)
 		for _, command in ipairs(world.commands) do
