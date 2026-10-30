@@ -27,6 +27,10 @@ local function with_watch(fn)
 			after = function() return {}, true end,
 		}
 		local MenuLlm = require("ui.menu.menu_llm")
+		-- Loading the menu may already build it and arm the watch, depending on
+		-- the state earlier test files left: each case starts from a stopped one.
+		MenuLlm.__stop_health_watch_for_test()
+		timers.armed, timers.cancelled, timers.tick = 0, 0, nil
 		local ok, err = pcall(fn, MenuLlm, timers)
 		MenuLlm.__stop_health_watch_for_test()
 		if not ok then error(err, 0) end
