@@ -190,6 +190,21 @@ into its item below or into the matching existing item.
       tooltip display, so those say "no budget declared" until the code declares one; the Windows driver
       logs no per-request LLM latency (only timeouts); `tools/test/features/test-infrastructure/suite.json`
       on dev lists ordinal 537 before 485 (0ba0e905), which stops `npm run test:js` before any check.
+- [ ] **macOS field holds of 2026-10-30 (worker `perf/macos-field-holds`).** [CODE] [PHYS-M] From the field
+      report `mac-2026-10-30_210120` (141 holds over 250 ms). Done: the unjournaled-ledger admission scans data.sql
+      with native finds (17 s hold, append prepare=17225 ms; about 15x faster); the personal-row alias check of a
+      preferences save is indexed once (hotstrings=970 ms of the 2 s saves, which are also the 2 s
+      `startup_controller` holds; 3.3 s to 0.16 s with 12 personal groups); the dynamic-rule preview provider tests
+      a suffix before its settings-reading section guard (preview.providers 1.7 ms per key); the synchronous
+      diagnostics line names its slowest collectors on the three OS; the keyboard-layout row times its sources,
+      bundles, variants and rows stages. Left, from the next field report: (1) menu rebuilds are 90 of the holds
+      (28 s, about 300 ms each, every ~67 s in the evening with keyboard_layout up to 420 ms): read the new
+      `menu_keyboard_layout.*` phases and find what asks for the periodic refresh (its requester is a DEBUG
+      line); (2) preferences save `sparse` (about 280 ms) and `write` (600 to 800 ms, 4 metadata forks) were not
+      reproduced off the Mac; (3) keystats append `write` 150 to 350 ms and the ledger read itself remain on the
+      main thread; (4) name the collector behind the healthcheck 100 to 230 ms from its new line, and the
+      ignored-window AX probe (500 ms timeout); (5) the one-off holds of `field_run`, `error_dialog`, `keymap/utils`
+      timers and `menu_state` (shell.ioreg 146 ms).
 - [ ] **Thinking off for every model on every backend and OS (worker `fix/llm-thinking-off`).** [CODE] The
       rule depends on the MODEL, not on the provider: model families (normalized model id) declare an intent
       (off, or the lowest level a model allows) and a control kind; each provider and local server declares
