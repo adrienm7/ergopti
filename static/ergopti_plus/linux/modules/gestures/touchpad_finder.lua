@@ -294,18 +294,7 @@ function M.find(text)
 	return chosen, nil
 end
 
---- Whether a gesture slot can ever fire on this hardware.
----
---- Answers TRUE when the capability is unknown. A wrong parse must not remove a
---- gesture that works; the worst it may do is fail to explain one that cannot.
---- @param slot string e.g. "swipe_5_up", "tap_4"
---- @param max_fingers integer|nil 0 or nil means unknown.
---- @return boolean
-function M.slot_is_reachable(slot, max_fingers)
-	if type(max_fingers) ~= "number" or max_fingers <= 0 then return true end
-	local needed = tostring(slot):match("^swipe_(%d)_") or tostring(slot):match("^tap_(%d)$")
-	if not needed then return true end
-	return tonumber(needed) <= max_fingers
-end
+--- Whether a gesture slot can ever fire on this hardware (gestures/slot_report.lua).
+M.slot_is_reachable = require("modules.gestures.slot_report").slot_is_reachable
 
 return M
