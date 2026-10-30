@@ -806,6 +806,7 @@ M.checks = {
 	network_hosts = Probes.network_hosts,
 	app_health = Probes.app_health,
 	ai_local = Probes.ai_local,
+	menu_build = Probes.menu_build,
 	typing_selftest = Probes.typing_selftest,
 }
 
