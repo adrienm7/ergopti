@@ -1003,7 +1003,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 32,
+			"family": 33,
 			"kind": "toggle"
 		},
 		{
@@ -1049,7 +1049,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 32,
+			"family": 33,
 			"kind": "toggle"
 		},
 		{
@@ -1721,6 +1721,237 @@
 			},
 			"added": [],
 			"family": 26
+		},
+		{
+			"id": "siliconflow_Qwen_Qwen3-8B",
+			"provider": "siliconflow",
+			"model": "Qwen/Qwen3-8B",
+			"body": { "model": "Qwen/Qwen3-8B", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "Qwen/Qwen3-8B",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 29,
+			"kind": "toggle"
+		},
+		{
+			"id": "siliconflow_deepseek-ai_DeepSeek-V3.2",
+			"provider": "siliconflow",
+			"model": "deepseek-ai/DeepSeek-V3.2",
+			"body": {
+				"model": "deepseek-ai/DeepSeek-V3.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-ai/DeepSeek-V3.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false
+			},
+			"added": [["enable_thinking"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "deepinfra_deepseek-ai_DeepSeek-V4-Flash-0731",
+			"provider": "deepinfra",
+			"model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+			"body": {
+				"model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": { "enabled": false }
+			},
+			"added": [["reasoning"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "deepinfra_openai_gpt-oss-120b",
+			"provider": "deepinfra",
+			"model": "openai/gpt-oss-120b",
+			"body": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "sambanova_Meta-Llama-3.3-70B-Instruct",
+			"provider": "sambanova",
+			"model": "Meta-Llama-3.3-70B-Instruct",
+			"body": {
+				"model": "Meta-Llama-3.3-70B-Instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Meta-Llama-3.3-70B-Instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "sambanova_gpt-oss-120b",
+			"provider": "sambanova",
+			"model": "gpt-oss-120b",
+			"body": { "model": "gpt-oss-120b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "gpt-oss-120b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "sambanova_DeepSeek-V3.2",
+			"provider": "sambanova",
+			"model": "DeepSeek-V3.2",
+			"body": { "model": "DeepSeek-V3.2", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "DeepSeek-V3.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "huggingface_meta-llama_Llama-3.1-8B-Instruct",
+			"provider": "huggingface",
+			"model": "meta-llama/Llama-3.1-8B-Instruct",
+			"body": {
+				"model": "meta-llama/Llama-3.1-8B-Instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "meta-llama/Llama-3.1-8B-Instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "huggingface_Qwen_Qwen3-32B:cheapest",
+			"provider": "huggingface",
+			"model": "Qwen/Qwen3-32B:cheapest",
+			"body": {
+				"model": "Qwen/Qwen3-32B:cheapest",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Qwen/Qwen3-32B:cheapest",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 29,
+			"kind": "effort"
+		},
+		{
+			"id": "nvidia_nvidia_nemotron-3.5-lightning-30b-a3b",
+			"provider": "nvidia",
+			"model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+			"body": {
+				"model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 32,
+			"kind": "toggle"
+		},
+		{
+			"id": "nvidia_openai_gpt-oss-20b",
+			"provider": "nvidia",
+			"model": "openai/gpt-oss-20b",
+			"body": {
+				"model": "openai/gpt-oss-20b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "openai/gpt-oss-20b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 11,
+			"kind": "effort"
+		},
+		{
+			"id": "nvidia_qwen_qwen3-next-80b-a3b-instruct",
+			"provider": "nvidia",
+			"model": "qwen/qwen3-next-80b-a3b-instruct",
+			"body": {
+				"model": "qwen/qwen3-next-80b-a3b-instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen/qwen3-next-80b-a3b-instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"chat_template_kwargs": { "enable_thinking": false }
+			},
+			"added": [["chat_template_kwargs"]],
+			"family": 29,
+			"kind": "toggle"
 		}
 	],
 	"refusal_vectors": [
