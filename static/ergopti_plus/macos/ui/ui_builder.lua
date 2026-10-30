@@ -18,6 +18,7 @@ local M = {}
 local hs = hs
 local Logger = require("infra.logger")
 local Paths = require("infra.paths")
+local NativePath = require("native_path")
 local I18nSeed = require("webview.i18n_seed")
 local DeferredWork = require("infra.deferred_work")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -148,8 +149,12 @@ local _locales_base_url = (function()
 	-- trailing slash is preserved because the browser-side fetch() concatenates
 	-- the locale filename directly onto this base.
 	local locales = (Paths.shared("data/locales") or "") .. "/"
-	-- Normalise to forward slashes and prepend file:// so fetch() accepts it
-	locales = locales:gsub("\\", "/")
+	-- A backslash separates components only on a Windows host (the headless
+	-- suite); on macOS it is a filename byte, so it and every other byte a URL
+	-- path cannot carry verbatim (a quote would also end the injected string)
+	-- are percent-encoded rather than rewritten.
+	if NativePath.separators() ~= "/" then locales = locales:gsub("\\", "/") end
+	locales = locales:gsub("[^%w%-%._~/:]", function(byte) return string.format("%%%02X", byte:byte()) end)
 	if not locales:match("^/") then locales = "/" .. locales end
 	return "file://" .. locales
 end)()

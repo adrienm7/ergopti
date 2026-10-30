@@ -26,16 +26,19 @@ local text_utils = require("infra.text_utils")
 local FileSystem = require("adapters.file_system")
 local Json = require("json")
 local Admission = require("modules.llm.opaque_network_admission")
+local NativePath = require("native_path")
 
 -- The shared policy, relative to the driver root.
 local POLICY_RELATIVE = "modules/llm/network-retry.sh"
 
---- The driver root this module was loaded from.
+--- The driver root this module was loaded from. A backslash is a filename
+--- byte on macOS, so only the host's own separators split the path.
 --- @return string|nil root
 local function driver_root()
 	local source = debug.getinfo(1, "S").source or ""
-	source = (source:sub(1, 1) == "@" and source:sub(2) or source):gsub("\\", "/")
-	return source:match("^(.*)/modules/llm/network_env%.lua$")
+	source = source:sub(1, 1) == "@" and source:sub(2) or source
+	local sep = "[" .. NativePath.separators() .. "]"
+	return source:match("^(.*)" .. sep .. "modules" .. sep .. "llm" .. sep .. "network_env%.lua$")
 end
 
 --- Locates the shared network policy file.
