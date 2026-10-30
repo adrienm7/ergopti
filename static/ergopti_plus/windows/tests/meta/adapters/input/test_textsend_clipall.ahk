@@ -27,10 +27,8 @@
 ; ===================================================
 ; ===================================================
 
-_TSCA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_TSCA_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 ; Extracts the function body from FuncDef to the next non-indented closing brace,
@@ -64,7 +62,7 @@ _TSCA_FuncBodyStripped(Src, FuncDef) {
 ; preserves all formats without retaining a stale snapshot across an intervening
 ; user copy while another clipboard request is queued.
 _TSCA_TextSendUsesSaveAll() {
-	Src := _TSCA_ReadSource("adapters/text_sender.ahk")
+	Src := _TSCA_ReadSource("text_sender.ahk")
 	Body := _TSCA_FuncBodyStripped(Src, "_TextSenderStartClipboard() {")
 	Assert(Body != "", "_TextSenderStartClipboard must exist in adapters/text_sender.ahk")
 	Assert(!InStr(Body, "CB_Save()"),
@@ -75,7 +73,7 @@ _TSCA_TextSendUsesSaveAll() {
 Test("text_sender: FIFO clipboard owner uses CB_SaveAll instead of CB_Save (textsend-clip-destroys-nontext)", _TSCA_TextSendUsesSaveAll)
 
 _TSCA_TextSendUsesRestoreAll() {
-	Src := _TSCA_ReadSource("adapters/text_sender.ahk")
+	Src := _TSCA_ReadSource("text_sender.ahk")
 	; The retrying all-format restore coordinator is called from both timeout
 	; bail-outs and the deferred restore helper, so assert against the whole file.
 	Assert(!InStr(Src, "CB_Restore("),
@@ -95,7 +93,7 @@ Test("text_sender: clipboard branch uses CB_RestoreAll instead of CB_Restore (te
 ; ===================================================
 
 _TSCA_SaveAllUsesClipboardAll() {
-	Src := _TSCA_ReadSource("adapters/clipboard.ahk")
+	Src := _TSCA_ReadSource("clipboard.ahk")
 	Body := _TSCA_FuncBodyStripped(Src, "CB_SaveAll() {")
 	Assert(Body != "", "CB_SaveAll must exist in adapters/clipboard.ahk")
 	Assert(InStr(Body, "ClipboardAll()") > 0,
@@ -104,7 +102,7 @@ _TSCA_SaveAllUsesClipboardAll() {
 Test("clipboard: CB_SaveAll uses ClipboardAll() to capture all formats (textsend-clip-destroys-nontext)", _TSCA_SaveAllUsesClipboardAll)
 
 _TSCA_RestoreAllAssignsClipboard() {
-	Src := _TSCA_ReadSource("adapters/clipboard.ahk")
+	Src := _TSCA_ReadSource("clipboard.ahk")
 	Body := _TSCA_FuncBodyStripped(Src, "CB_RestoreAll(Saved) {")
 	Assert(Body != "", "CB_RestoreAll must exist in adapters/clipboard.ahk")
 	Assert(InStr(Body, "A_Clipboard := Saved") > 0,

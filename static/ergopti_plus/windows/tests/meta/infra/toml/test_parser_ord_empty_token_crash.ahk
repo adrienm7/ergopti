@@ -42,10 +42,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_POETC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_POETC_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -58,7 +56,7 @@ _POETC_ReadSource(RelPath) {
 ; ==================================================
 
 _POETC_PublicWrapsImplInTryCatch() {
-	Src := _POETC_ReadSource("modules/llm/parser.ahk")
+	Src := _POETC_ReadSource("parser.ahk")
 	Seg := _DriverFuncBody("LLM_Parser_ProcessPrediction")
 	Assert(Seg != "", "LLM_Parser_ProcessPrediction(full_text...) must exist in parser.ahk")
 	Assert(InStr(Seg, "try {") > 0,
@@ -73,14 +71,14 @@ _POETC_PublicWrapsImplInTryCatch() {
 Test("LLM parser: ProcessPrediction wraps impl in a logging crash firewall (parser-ord-empty-token-crash)", _POETC_PublicWrapsImplInTryCatch)
 
 _POETC_ImplFunctionExists() {
-	Src := _POETC_ReadSource("modules/llm/parser.ahk")
+	Src := _POETC_ReadSource("parser.ahk")
 	Assert(InStr(Src, "_LLM_Parser_ProcessPredictionImpl(full_text") > 0,
 		"the private _LLM_Parser_ProcessPredictionImpl implementation must exist - it carries the body the firewall wraps")
 }
 Test("LLM parser: private ProcessPrediction impl exists for the firewall (parser-ord-empty-token-crash)", _POETC_ImplFunctionExists)
 
 _POETC_AnchorLoopsGuardKeyAccess() {
-	Src := _POETC_ReadSource("modules/llm/parser.ahk")
+	Src := _POETC_ReadSource("parser.ahk")
 	Seg := _DriverFuncBody("_LLM_Parser_ProcessPredictionImpl")
 	Assert(Seg != "", "_LLM_Parser_ProcessPredictionImpl declaration must exist in parser.ahk")
 	; The anchor loops walk stripped_ops / ops which can hold "ins" ops (t2 only,

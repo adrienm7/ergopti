@@ -31,10 +31,8 @@
 ; ==================================================
 ; ==================================================
 
-_EHHD_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_EHHD_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 ; Counts non-overlapping occurrences of Needle in Hay.
@@ -58,7 +56,7 @@ _EHHD_CountOccurrences(Hay, Needle) {
 ; ==================================================
 
 _EHHD_HealthCheckRunAtMostOnce() {
-	Src := _EHHD_ReadSource("modules/diagnostics/crash_reporter.ahk")
+	Src := _EHHD_ReadSource("crash_reporter.ahk")
 	Seg := _DriverFuncBody("CrashReport_Build")
 	Assert(Seg != "", "CrashReport_Build(ErrorObj) must exist in crash_reporter.ahk")
 	Runs := _EHHD_CountOccurrences(Seg, "HealthCheck_Run()")

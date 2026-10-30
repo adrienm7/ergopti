@@ -35,10 +35,8 @@
 ; ======================================
 ; ======================================
 
-_LTAFK_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_LTAFK_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -54,7 +52,7 @@ _LTAFK_ReadSource(RelPath) {
 ; The shared helper must exist; it is what advances last_tick + drives the
 ; watcher for every physical keypress, filtered or not.
 _LTAFK_HelperExists() {
-	Src := _LTAFK_ReadSource("modules/keystats/keystats_hook.ahk")
+	Src := _LTAFK_ReadSource("keystats_hook.ahk")
 	Body := _DriverFuncBody("KL_Hook_NoteActivity")
 	Assert(Body != "",
 		"KL_Hook_NoteActivity must exist in keystats_hook.ahk - it is the single place that advances KLHook.last_tick for every physical keypress (lost-tick-after-filtered-keystroke)")

@@ -167,7 +167,9 @@ helpers.describe("State.new: suppress_rescan", function()
 		local s = State.new(make_defaults(), { a = 0.3 })
 		s.buffer = "abc"
 		s.llm_buffer = "prompt"
-		s.suppress_rescan_keep_buffer(0.5)
+		-- Field log 2026-10-30: the LLM chain read the missing return value as a
+		-- refusal ("Chain rescan suppression did not commit: nil").
+		helpers.assert_eq(s.suppress_rescan_keep_buffer(0.5), true)
 		helpers.assert_eq(s.buffer, "abc")
 		helpers.assert_eq(s.llm_buffer, "prompt")
 	end)

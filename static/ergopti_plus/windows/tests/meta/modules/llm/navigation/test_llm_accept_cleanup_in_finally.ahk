@@ -27,10 +27,8 @@
 ; ==========================================
 ; ==========================================
 
-_LACF_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_LACF_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 ; Returns the substring of Body starting at the first "} finally {" token.
@@ -51,7 +49,7 @@ _LACF_AfterFinally(Body) {
 ; ==============================================
 
 _LACF_BridgeHasFinally() {
-	Src := _LACF_ReadSource("modules/keymap/llm_bridge.ahk")
+	Src := _LACF_ReadSource("llm_bridge.ahk")
 	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
 	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/keymap/llm_bridge.ahk")
 	Assert(InStr(Body, "_LLM_Bridge_InjectionOptions(Transaction)") > 0
@@ -61,7 +59,7 @@ _LACF_BridgeHasFinally() {
 Test("llm_bridge: LLM_Bridge_OnAccept delegates cleanup to sender completion (llm-accept-cleanup-in-finally)", _LACF_BridgeHasFinally)
 
 _LACF_BridgeKLClearInFinally() {
-	Src := _LACF_ReadSource("modules/keymap/llm_bridge.ahk")
+	Src := _LACF_ReadSource("llm_bridge.ahk")
 	Body := _DriverFuncBody("_LLM_Bridge_OnInjectComplete")
 	Accept := _DriverFuncBody("LLM_Bridge_OnAccept")
 	Assert(InStr(Body, "if !Ok") > 0,
@@ -75,7 +73,7 @@ Test("llm_bridge: acceptance owns no queue-wide keystats guard (llm-accept-clean
 ; PrefixWatcherSuppress(false) release timer must also be in the finally
 ; block -- a stuck suppression silences the hotstring engine permanently.
 _LACF_BridgePrefixSupInFinally() {
-	Src := _LACF_ReadSource("modules/keymap/llm_bridge.ahk")
+	Src := _LACF_ReadSource("llm_bridge.ahk")
 	Body := _DriverFuncBody("_LLM_Bridge_OnInjectComplete")
 	Accept := _DriverFuncBody("LLM_Bridge_OnAccept")
 	Assert(InStr(Accept . Body, "PrefixWatcherSuppress") = 0,
@@ -93,7 +91,7 @@ Test("llm_bridge: acceptance owns no queue-wide prefix guard (llm-accept-cleanup
 ; The inline auto-type path in LLM_Engine_OnResults has the same invariant:
 ; the cleanup timers must be in a finally block, not inline after TextSend.
 _LACF_EngineHasFinally() {
-	Src := _LACF_ReadSource("modules/llm/prediction_engine.ahk")
+	Src := _LACF_ReadSource("prediction_engine.ahk")
 	Body := _DriverFuncBody("LLM_Engine_OnResults")
 	Assert(Body != "", "LLM_Engine_OnResults must exist in modules/llm/prediction_exec.ahk")
 	Assert(InStr(Body, "_LLM_Bridge_InjectionOptions(Transaction)") > 0
@@ -103,7 +101,7 @@ _LACF_EngineHasFinally() {
 Test("prediction_engine: inline accept delegates cleanup to sender completion (llm-accept-cleanup-in-finally)", _LACF_EngineHasFinally)
 
 _LACF_EngineKLClearInFinally() {
-	Src := _LACF_ReadSource("modules/llm/prediction_engine.ahk")
+	Src := _LACF_ReadSource("prediction_engine.ahk")
 	Body := _DriverFuncBody("LLM_Engine_OnInlineInjectComplete")
 	Producer := _DriverFuncBody("LLM_Engine_OnResults")
 	Assert(InStr(Body, "if !Ok") > 0,

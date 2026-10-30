@@ -367,8 +367,29 @@ _LoggerPrivacyState() {
 	return State
 }
 
-/** Returns zero only before the shared source exists; invalid admission throws. */
+/**
+ * The admitted policy with the live configuration directory. Boot reads paths.toml
+ * after the first possible admission (a bootstrap line) and a transition can move
+ * the directory, so a copy taken at admission would mask the wrong one or none.
+ */
 _LoggerPrivacyConfig() {
+	global _ConfigDir
+	Config := _LoggerPrivacyAdmitted()
+	if Config is Map
+		Config["context"]["config_dir"] := (IsSet(_ConfigDir) && _ConfigDir is String) ? _ConfigDir : ""
+	return Config
+}
+
+/** The name a line prints in place of a bare name the user chose, which is no path to mask. */
+LoggerUserNamePlaceholder() {
+	Config := _LoggerPrivacyConfig()
+	if !(Config is Map)
+		throw Error("Logger privacy policy is not initialized.")
+	return Config["rules"]["config_name_placeholder"]
+}
+
+/** Returns zero only before the shared source exists; invalid admission throws. */
+_LoggerPrivacyAdmitted() {
 	global _SharedDir
 	State := _LoggerPrivacyState()
 	if !IsSet(_SharedDir) || (_SharedDir is String && _SharedDir == "") {
