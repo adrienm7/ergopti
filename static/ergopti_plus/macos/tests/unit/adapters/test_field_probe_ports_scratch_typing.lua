@@ -20,16 +20,20 @@ local MODULES = {
 local OWN_PID = 1234
 local SCRATCH_WINDOW = 99
 
+-- The virtual clock of the scripted timers, in seconds.
+local now = 0
+
 --- Runs scratch_typing over scripted system pieces until every timer fired.
 --- @param world table { taps = "enabled"|"disabled", focus = fn(index)->boolean }
 --- @param keys table Keys.
 --- @return table world With outcome, emitted keys, publications seen per key.
-local function run(world, keys)
+local function run(world, keys, options)
 	world.emitted, world.published_at_key = {}, {}
 	helpers.with_stub_scope(MODULES, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		-- A virtual clock: the earliest pending timer fires next.
-		local queue, now = {}, 0
+		local queue = {}
+		now = 0
 		package.loaded["adapters.timer_scheduler"] = {
 			after = function(seconds, fn)
 				local entry = { at = now + seconds, fn = fn }
@@ -63,7 +67,10 @@ local function run(world, keys)
 			view[name] = function(self) return self end
 		end
 		view.delete = function() world.window_id_at_close = Selftest.window_id() end
-		view.evaluateJavaScript = function(_, _, fn) fn(table.concat(world.emitted)) end
+		view.evaluateJavaScript = function(_, _, fn)
+			world.reads = (world.reads or 0) + 1
+			fn(world.field_text and world.field_text(world.reads) or table.concat(world.emitted))
+		end
 		_G.hs = {
 			application = { frontmostApplication = function() return own_app end },
 			processInfo = { processID = OWN_PID },
@@ -77,11 +84,11 @@ local function run(world, keys)
 			screen = { mainScreen = function() return { frame = function() return { x = 0, y = 0, w = 800, h = 600 } end } end },
 			webview = { new = function() return view end },
 			drawing = { windowLevels = { floating = 3 } },
-			timer = { absoluteTime = function() return 0 end },
+			timer = { absoluteTime = function() return math.floor(now * 1e9) end },
 		}
 		package.loaded["adapters.field_probe_ports"] = nil
 		local Ports = require("adapters.field_probe_ports")
-		Ports.new().scratch_typing(keys, function(outcome) world.outcome = outcome end)
+		Ports.new().scratch_typing(keys, function(outcome) world.outcome = outcome end, options)
 		while #queue > 0 do
 			table.sort(queue, function(a, b) return a.at < b.at end)
 			local entry = table.remove(queue, 1)
@@ -116,5 +123,22 @@ helpers.describe("field run scratch typing", function()
 		helpers.assert_eq(table.concat(world.emitted, ","), "w")
 		helpers.assert_eq(world.outcome.aborted, "focus_lost_window_unfocused")
 		helpers.assert_nil(world.selftest.window_id())
+	end)
+
+	helpers.it("names the time from the last key to the awaited text", function()
+		local world = run({ taps = "enabled", field_text = function(reads) return reads >= 3 and " AXA " or " axa" end },
+			{ "a" }, { until_text = " AXA ", wait_seconds = 1, bound_seconds = 10 })
+		helpers.assert_eq(world.outcome.text, " AXA ")
+		helpers.assert_not_nil(world.outcome.effect_ms, "the expansion was seen, so its delay is named")
+		helpers.assert_true(world.outcome.effect_ms > 0 and world.outcome.effect_ms < 1000)
+		helpers.assert_nil(world.outcome.aborted)
+	end)
+
+	helpers.it("gives up on an effect that never comes and names no delay", function()
+		local world = run({ taps = "enabled", field_text = function() return " axa " end },
+			{ "a" }, { until_text = " AXA ", wait_seconds = 0.5, bound_seconds = 10 })
+		helpers.assert_eq(world.outcome.text, " axa ")
+		helpers.assert_nil(world.outcome.effect_ms)
+		helpers.assert_nil(world.outcome.aborted, "the wait ends before the bound")
 	end)
 end)
