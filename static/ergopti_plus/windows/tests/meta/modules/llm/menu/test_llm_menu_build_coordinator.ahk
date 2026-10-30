@@ -110,7 +110,7 @@ _LMBCM_ToggleRecordingScript(Source, Framework, Receipt) {
 		"SetTimer", true, "_LLM_Menu_FireHealthProbe", true,
 		"LLM_Menu_ScheduleBackendLifecycle", true, "LLM_Menu_BackendLifecycleInvalidate", true,
 		"LLM_Bridge_Stop", true, "LLM_Menu_RequestBuild", true,
-		"LLM_Menu_ScheduleHotkeysAwaitingEnable", true)
+		"LLM_Menu_ScheduleHotkeysAwaitingEnable", true, "KeyboardShortcutsFollowAiSwitch", true)
 	Position := 1, Scanned := 0
 	while Found := RegExMatch(Code, "[A-Za-z_][A-Za-z0-9_]*", &Word, Position) {
 		AssertTrue(Allowed.Has(Word[0]), "the exact toggle recorder refuses an uncontrolled effect: " Word[0])
@@ -155,6 +155,10 @@ LLM_Menu_ScheduleHotkeysAwaitingEnable() {
 	global _LMTO_State
 	_LMTO_State["hotkeys"] += 1
 	_LMTO_State["events"].Push("hotkeys")
+}
+KeyboardShortcutsFollowAiSwitch() {
+	global _LMTO_State
+	_LMTO_State["events"].Push("keys")
 }
 LLM_Menu_BackendLifecycleInvalidate(Stop) {
 	global _LMTO_State
@@ -203,7 +207,7 @@ _LMTO_Case(Enabled, ShowUi, ThrowBuild) {
 	AssertEqual(ThrowBuild ? "Controlled repaint refusal." : "", Observed)
 	AssertEqual(!ThrowBuild, Accepted)
 	AssertEqual(1, _LMTO_State["builds"])
-	Expected := Enabled ? ["log", "timer", "schedule", "hotkeys", "build"] : ["log", "timer", "invalidate", "stop", "build"]
+	Expected := Enabled ? ["log", "timer", "schedule", "hotkeys", "keys", "build"] : ["log", "timer", "invalidate", "stop", "keys", "build"]
 	AssertEqual(Expected.Length, _LMTO_State["events"].Length)
 	for Index, Event in Expected
 		AssertEqual(Event, _LMTO_State["events"][Index], "all committed effects keep exact order")

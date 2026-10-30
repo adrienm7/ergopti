@@ -34,7 +34,8 @@ _OSRA_ChildSource() {
 		"TapHoldDispatchTap", "TapHoldTapInDispatch", "TapHoldShouldCancelTap", "_TH_TakePressTakenByCombination",
 		"TapHoldForgetTrackedKey", "TapHoldTapIsCommand", "_TapHoldTapEndsCapsWord", "TapHoldDuration",
 		"_TapHoldDurationValid", "TapHoldGlobalDuration",
-		"TapHoldIsEnabled", "TapHoldEntryHasKnownAction", "TapHoldTapAction", "TapHoldHoldModifier", "TapHoldHoldLayer"] {
+		"TapHoldIsEnabled", "TapHoldEntryHasKnownAction", "TapHoldTapAction", "TapHoldConfiguredTapAction",
+		"AiActionBlocked", "AiActionIsAi", "TapHoldHoldModifier", "TapHoldHoldLayer"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the genuine route dependency must exist: " . Name)
 		if Name == "OneShotShift" {
