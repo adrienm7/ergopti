@@ -177,7 +177,7 @@ finalize() {
 				[ -f "${f}" ] && scrub_log "${f}"
 			done
 		done
-		for f in ${LOG_TOPICAL} "${LOG_LAUNCHER}"; do
+		for f in ${LOG_TOPICAL}; do
 			f="${LOG_DIR}/${f}"
 			[ -f "${f}" ] && scrub_log "${f}"
 		done
@@ -195,6 +195,17 @@ finalize() {
 	else
 		printf '%-28s missing\n' "logs" >> "${steps}"
 	fi
+	# The launcher's own log and fatal report live in the default folder even
+	# when LogsDirPath moves the others: looking for them in LOG_DIR skipped
+	# them silently, so the reload lost on 2026-10-30 21:06 left no trace of
+	# how the launcher saw its runtime end.
+	for f in "${LOG_LAUNCHER}" "${LOG_FATAL_REPORT}"; do
+		if [ -f "${LOG_DEFAULT_DIR}/${f}" ]; then
+			scrub_log "${LOG_DEFAULT_DIR}/${f}"
+		else
+			printf '%-28s missing\n' "${f}" >> "${steps}"
+		fi
+	done
 	# The last controlled reload's stage trail (adapters/reload_breadcrumb.lua):
 	# stage names and monotonic times only, so it travels unscrubbed. Its last
 	# line names the stage a lost reload stopped in; `boot` proves one followed.
