@@ -652,10 +652,15 @@ const CHECKS = [
 				['level', '100'],
 				['gap', '120']
 			];
+			// A Send that is not blind saves CapsLock, lifts it, and restores it when
+			// it ends: measured, {Space} put the toggle back on 15 ms after CapsWord
+			// had turned it off, which no physical key can do. So a named key is sent
+			// blind and by scan code, what a physical key is and what SC039 and SC01C
+			// are bound to. {Text} goes out as a packet and does not touch CapsLock.
 			const delimiters = [
-				['Space', ['key', '{Space}']],
-				['Tab', ['key', '{Tab}']],
-				['Enter', ['key', '{Enter}']],
+				['Space', ['key', '{Blind}{SC039}']],
+				['Tab', ['key', '{Blind}{SC00F}']],
+				['Enter', ['key', '{Blind}{SC01C}']],
 				['comma', ['text', ',']],
 				['semicolon', ['text', ';']],
 				['period', ['text', '.']],
@@ -664,8 +669,26 @@ const CHECKS = [
 			];
 			const ends = [
 				...delimiters.map(([name, step]) => ({ name: `the ${name}`, between: [step], gap: 0 })),
+				{
+					// Fast typing: the next key goes down while Space is still held.
+					name: 'the Space held over the next key',
+					between: [
+						['key', '{Blind}{SC039 down}'],
+						['key', '{Blind}x'],
+						['key', '{Blind}{SC039 up}']
+					],
+					gap: 0,
+					expectEnd: 'xcd'
+				},
 				{ name: 'a left click', between: [['mouse', 'left']], gap: 0 },
-				{ name: 'a right click', between: [['mouse', 'right']], gap: 0 },
+				{
+					// The edit control's context menu would take the next word (its "c"
+					// is Copy): the next word goes to a fresh target instead.
+					name: 'a right click',
+					between: [['mouse', 'right']],
+					gap: 0,
+					freshTarget: true
+				},
 				{ name: 'the 2 s delay', between: [['wait', '3500']], gap: 0 }
 			];
 			const problems = [];
@@ -677,21 +700,25 @@ const CHECKS = [
 				// Without {Blind} a Send lifts CapsLock around its keys, {Text} included,
 				// so only blind letters can show the capitals CapsWord asks for.
 				const letters = (word) => [...word].map((letter) => ['key', `{Blind}${letter}`]);
-				session.type([
-					...head,
-					...letters('ab'),
-					...end.between,
-					...letters('cd'),
-					['wait', '500']
-				]);
-				const value = (await session.run('edit_value')).replace(/^value=/, '');
+				session.type([...head, ...letters('ab'), ...end.between, ['wait', '150']]);
+				// Read before the next word, well inside the 2 s delay: this event ended it.
+				const endedByThis = /enabled=0/.test(await session.run('capsword_state'));
+				let earlier = '';
+				if (end.freshTarget) {
+					earlier = (await session.run('edit_value')).replace(/^value=/, '');
+					await session.run('edit_close');
+					await session.run('edit_open');
+				}
+				session.type([...head, ...letters('cd'), ['wait', '500']]);
+				const value = earlier + (await session.run('edit_value')).replace(/^value=/, '');
 				const stillOn = /enabled=1/.test(await session.run('capsword_state'));
 				await session.run('edit_close');
 				if (stillOn) await session.run('capsword_toggle');
 				if (!value.startsWith('AB'))
 					problems.push(`${end.name}: the first word is "${value}", expected capitals`);
-				else if (!value.endsWith('cd'))
+				else if (!value.endsWith(end.expectEnd || 'cd'))
 					problems.push(`${end.name}: the word after it is "${value}", expected lower case`);
+				if (!endedByThis) problems.push(`${end.name}: CapsWord was still on right after it`);
 				if (stillOn) problems.push(`${end.name}: CapsWord is still on`);
 			}
 			if (problems.length > 0) return fail(problems.join('; '));
