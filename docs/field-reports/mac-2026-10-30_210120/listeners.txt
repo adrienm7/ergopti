@@ -1,0 +1,10 @@
+COMMAND     PID             USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+OneDrive   2323 b519hs@login.axa   39u  IPv6 0x2199ba947a195cce      0t0  TCP [::1]:42050 (LISTEN)
+node       2533 b519hs@login.axa  142u  IPv4 0xd5487afc32836c02      0t0  TCP 127.0.0.1:7265 (LISTEN)
+Code\x20H 72174 b519hs@login.axa   33u  IPv4 0xf6eda8bec9941fdc      0t0  TCP 127.0.0.1:61133 (LISTEN)
+Code\x20H 72175 b519hs@login.axa   51u  IPv4 0x6037de7cb770acb7      0t0  TCP 127.0.0.1:61241 (LISTEN)
+Code\x20H 72175 b519hs@login.axa   52u  IPv4 0x585be848d0cff965      0t0  TCP 127.0.0.1:15209 (LISTEN)
+Code\x20H 72175 b519hs@login.axa   57u  IPv4 0x90287dd5ae0cc5c5      0t0  TCP 127.0.0.1:61185 (LISTEN)
+Code\x20H 72175 b519hs@login.axa   58u  IPv4 0xe0c1671756b6c2fb      0t0  TCP 127.0.0.1:61186 (LISTEN)
+Code\x20H 72175 b519hs@login.axa   61u  IPv6 0x12619d61d214b9ba      0t0  TCP *:9542 (LISTEN)
+kilo      72342 b519hs@login.axa   16u  IPv4 0x152d78fd0b129a01      0t0  TCP 127.0.0.1:4096 (LISTEN)
