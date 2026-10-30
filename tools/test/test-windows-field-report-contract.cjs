@@ -421,7 +421,7 @@ try {
 				'fail'
 			);
 			assert.equal(analysis.performance.find((row) => row.metric === 'boot.total').max, 900);
-			assert.match(result.stdout, /Field checks summary: /);
+			assert.match(result.stdout, /Check verdicts summary: /);
 			assert.doesNotMatch(fs.readFileSync(path.join(folders[0], 'steps.txt'), 'utf8'), /\r/);
 			const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD').split('\n');
 			assert(

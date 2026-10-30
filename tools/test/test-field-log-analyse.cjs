@@ -305,7 +305,7 @@ try {
 		assert.match(run.stdout, /⏭️ check autohotkey: skip/);
 		assert.match(
 			run.stdout,
-			/Field checks summary: ✅ 1 pass, ❌ 0 fail, ⏭️ 1 skip, ⌨️ 0 needs_typing, ⚠️ 0 other\./
+			/Check verdicts summary: ✅ 1 pass, ❌ 0 fail, ⏭️ 1 skip, ⌨️ 0 needs_typing, ⚠️ 0 other\./
 		);
 	});
 
