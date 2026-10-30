@@ -286,6 +286,9 @@ _LTO_LocalServerPrebuilt() {
 		AssertContains(RegExReplace(Body, "\s"), '"chat_template_kwargs":{"enable_thinking":false}',
 			Id . ": a screenshot request turns the local server's thinking off")
 		AssertEqual(64, JsonParse(Body)["max_tokens"], Id . ": a request field never replaces the budget")
+		Oss := JsonParse(_LLMRemoteCompleteBody(_LTO_Resolved(Id, "gpt-oss-20b"),
+			LLM_Vision_BuildRequest("openai", Map("model", "gpt-oss-20b", "system", "s", "text", "t", "max_tokens", 64))))
+		AssertEqual("low", Oss["chat_template_kwargs"]["reasoning_effort"], Id . ": gpt-oss gets its lowest level on top")
 	}
 }
 Test("LLM thinking off: a local server's screenshot request turns thinking off", _LTO_LocalServerPrebuilt)
