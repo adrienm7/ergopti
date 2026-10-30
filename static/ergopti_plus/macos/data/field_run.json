@@ -24,7 +24,7 @@
 			"kind": "field_check",
 			"check": "lease",
 			"deadline_seconds": 45,
-			"proves": "The Karabiner lease is healthy: CLI present, lease phase, guardian ready, no lease failure or key loss this session."
+			"proves": "The Karabiner lease is healthy: CLI present, lease phase, guardian ready, no lease failure, key loss or swallowed key this session; the lease answers that timed out and the free memory are named."
 		},
 		{
 			"id": "field_owned_runtime",

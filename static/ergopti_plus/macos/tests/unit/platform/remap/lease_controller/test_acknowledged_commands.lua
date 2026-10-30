@@ -1154,6 +1154,24 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 			"the live lease's fence is the transition a held key can be lost across")
 	end)
 
+	helpers.it("(lease-memory-snapshot) a lease failure asks for the free memory with its kind", function()
+		local saved = package.loaded["platform.remap.lease_memory_snapshot"]
+		local kinds = {}
+		local ok, err = pcall(with_fixture, function(load_controller)
+			package.loaded["platform.remap.lease_memory_snapshot"] = {
+				note_failure = function(kind) kinds[#kinds + 1] = kind; return true end,
+			}
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.clock = ctx.clock + 11.5
+			ctx.fire_ack_deadline()
+		end)
+		package.loaded["platform.remap.lease_memory_snapshot"] = saved
+		if not ok then error(err, 0) end
+		helpers.assert_eq(kinds, { "ready" }, "the READY timeout is read once, under its kind")
+	end)
+
 	helpers.it("accepts several short complete lines delivered in one late chunk", function()
 		with_fixture(function(load_controller)
 			local controller, ctx = load_controller()
