@@ -31,6 +31,8 @@
 ; 7. Ollama has its own field, think (LLM_ThinkingOffOllamaThink): false, or
 ;    the family's effort level when Ollama takes one (ollama_think_levels),
 ;    since gpt-oss ignores think false.
+; 8. A provider's model listing may say a model lacks a control
+;    (model_capabilities.ahk): LLM_ThinkingOffResolve skips it for the next one.
 ;
 ; The shared Lua implementation is _shared/lua/llm/thinking_off.lua. Both
 ; replay _shared/tests/corpus/llm/thinking_off_vectors.json.
@@ -81,8 +83,9 @@ global LLM_THINKING_OFF_OLLAMA_LEVEL_PATTERN := "^[a-z]+$"
  * Validates thinking_off.json.
  * @param {String} Text The file's JSON source.
  * @returns {Array} Families, each Map("models", Array of globs, "controls",
- *     Array of Map("kind", "intent", "level")), with ExpirySec and
- *     OllamaLevels (Map of the think levels Ollama takes).
+ *     Array of Map("kind", "intent", "level")), with ExpirySec, OllamaLevels
+ *     (Map of the think levels Ollama takes) and Capability
+ *     (LLM_ModelCapsParseConfig).
  * @throws {Error} A malformed table, refused whole.
  */
 LLM_ThinkingOffParseFamilies(Text) {
@@ -105,6 +108,7 @@ LLM_ThinkingOffParseFamilies(Text) {
 	Families := []
 	Families.ExpirySec := Days * 86400
 	Families.OllamaLevels := OllamaLevels
+	Families.Capability := LLM_ModelCapsParseConfig(Root.Get("capability_listing", 0))
 	for Index, Family in Root["families"] {
 		Where := "family " . Index
 		if !(Family is Map)
@@ -246,15 +250,20 @@ LLM_ThinkingOffMatches(Glob, Model) {
  * @param {String} Model The model id as the request names it.
  * @param {Map} Refused Top-level field names refused for this provider and model.
  * @param {VarRef} Kind Receives the control kind applied, "" when none.
+ * @param {Func} Lacks (Kind, Level, TemplateText) -> true when the provider's
+ *     model listing says the model lacks that control (model_capabilities.ahk):
+ *     it is skipped for the next one. 0 when no listing applies.
  * @returns {Map} Map("family", 1-based index or 0, "fields", JSON source or "").
  */
-LLM_ThinkingOffResolve(Families, Dialect, Model, Refused := "", &Kind := "") {
+LLM_ThinkingOffResolve(Families, Dialect, Model, Refused := "", &Kind := "", Lacks := 0) {
 	Kind := ""
 	Index := _LLM_ThinkingOffFamilyOf(Families, Model)
 	if !Index
 		return Map("family", 0, "fields", "")
 	for Control in Families[Index]["controls"] {
 		if !Dialect.Has(Control["kind"])
+			continue
+		if HasMethod(Lacks) && Lacks(Control["kind"], Control.Get("level", ""), Dialect[Control["kind"]])
 			continue
 		Kind := Control["kind"]
 		Fields := Dialect[Kind]
@@ -446,11 +455,12 @@ _LLM_ThinkingOffSplice(Text, Edits) {
  * @param {VarRef} Family Receives the matching family, 0 when none.
  * @param {VarRef} Kind Receives the control kind applied, "" when none.
  * @param {VarRef} Added Receives the paths added.
+ * @param {Func} Lacks See LLM_ThinkingOffResolve.
  * @returns {String} The body.
  */
-LLM_ThinkingOffApply(Families, Dialect, Model, BodyText, Refused := "", &Family := 0, &Kind := "", &Added := "") {
+LLM_ThinkingOffApply(Families, Dialect, Model, BodyText, Refused := "", &Family := 0, &Kind := "", &Added := "", Lacks := 0) {
 	Added := []
-	Resolved := LLM_ThinkingOffResolve(Families, Dialect, Model, Refused, &Kind)
+	Resolved := LLM_ThinkingOffResolve(Families, Dialect, Model, Refused, &Kind, Lacks)
 	Family := Resolved["family"]
 	return Resolved["fields"] == "" ? BodyText : LLM_ThinkingOffMerge(BodyText, Resolved["fields"], &Added)
 }
