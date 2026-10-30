@@ -2071,6 +2071,22 @@ function M.new(deps, presets, ram_getter)
 					return false
 				end
 				owner.start_committed = true
+				if managed_handle ~= nil then
+					-- A streaming task keeps stdin open after setInput, and the pull
+					-- owner reads its request to EOF: without this close it waited
+					-- its 30 s admission budget and refused (field run 2026-10-30 20:47).
+					local closed, result = pcall(function() return task:closeInput() end)
+					if not closed or result == nil or result == false then
+						Logger.error(LOG, "The managed Ollama pull's request input could not be closed: %s.",
+							tostring(result))
+						owner.authorized = false
+						owner.cancel_requested = true
+						cancel_current_pull()
+						complete_progress_ui(owner, false, target_model)
+						settle_cancel("managed_input_close_refused")
+						return false
+					end
+				end
 				local committed_chunks = pending_chunks
 				pending_chunks = {}
 				for _, chunk in ipairs(committed_chunks) do
