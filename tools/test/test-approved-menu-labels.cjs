@@ -47,14 +47,15 @@ const APPROVED = {
 	// The Tap-Hold keys are listed under one header per hand (A4), replacing a
 	// « Tap / Hold » header above « Main gauche » and « Main droite ». The
 	// maintainer dropped the inner dash on 2026-09-30: the menu frames every
-	// section header in dashes already.
+	// section header in dashes already. On 2026-10-30 they asked for spaces
+	// around the slash.
 	'menu.tapholds.left_hand_tap_hold': {
-		fr: 'Main gauche (tap/hold)',
-		en: 'Left hand (tap/hold)'
+		fr: 'Main gauche (tap / hold)',
+		en: 'Left hand (tap / hold)'
 	},
 	'menu.tapholds.right_hand_tap_hold': {
-		fr: 'Main droite (tap/hold)',
-		en: 'Right hand (tap/hold)'
+		fr: 'Main droite (tap / hold)',
+		en: 'Right hand (tap / hold)'
 	},
 	// The modifier combinations moved to their own group under Shortcuts (A4),
 	// with a first-row switch and slots that say what each one waits for.
