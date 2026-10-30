@@ -44,6 +44,10 @@ const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BUILD = fs.readFileSync(path.join(ROOT, 'tools/build/build_macos_app.sh'), 'utf8');
+const NETWORK_RETRY = fs.readFileSync(
+	path.join(ROOT, 'static/ergopti_plus/macos/modules/llm/network-retry.sh'),
+	'utf8'
+);
 const CREATE = path.join(ROOT, 'tools/build/create_macos_signing_identity.sh');
 const HASH = '0123456789ABCDEF0123456789ABCDEF01234567';
 const P12_BYTES = Buffer.from('not a real pkcs12, only bytes to round-trip');
@@ -100,7 +104,9 @@ function replay(source, options) {
 	// main() admits the developer source switch first; replay the real check.
 	const devSource = [
 		shellFunction(source, 'check_dev_source_configuration'),
-		shellFunction(source, 'select_launcher_archs')
+		shellFunction(source, 'select_launcher_archs'),
+		// The build sources the shared digest owner; the replay runs the real one.
+		shellFunction(NETWORK_RETRY, 'sha256_file_digest')
 	].join('\n');
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-signing-'));
 	const posix = bashPath(tmp);
@@ -715,9 +721,16 @@ for (const [label, run] of [
 		`${label}: actual private helper bytes determine its checksum sidecar`
 	);
 }
+// shasum escapes the digest of a name holding a backslash, and the checkout
+// path is the user's: every build digest goes through the shared owner.
+check(
+	!/shasum -a 256 [^\n|]*\|\s*(awk|cut|sed)/.test(BUILD) &&
+		BUILD.includes('sha256_file_digest "$switcher"'),
+	'build digests use sha256_file_digest, never the first field of shasum'
+);
 const checksumTargetWithdrawal = BUILD.replace(
-	'shasum -a 256 "$switcher"',
-	'shasum -a 256 "$APP_PATH/Contents/MacOS/ErgoptiPlus"'
+	'sha256_file_digest "$switcher"',
+	'sha256_file_digest "$APP_PATH/Contents/MacOS/ErgoptiPlus"'
 );
 check(checksumTargetWithdrawal !== BUILD, 'checksum target withdrawal must change the real source');
 const checksumRefused = replay(checksumTargetWithdrawal, {

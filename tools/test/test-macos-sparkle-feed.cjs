@@ -2282,6 +2282,8 @@ try {
 		for (const relative of [
 			'tools/build/launcher_localizations.py',
 			'static/ergopti_plus/_shared/data/identifiers.sh',
+			'static/ergopti_plus/macos/modules/llm/network-retry.sh',
+			'static/ergopti_plus/_shared/modules/network/route_origins.json',
 			'static/ergopti_plus/_shared/data/locale_order.json'
 		]) {
 			const destination = path.join(repository, relative);
