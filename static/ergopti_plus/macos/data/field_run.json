@@ -215,6 +215,13 @@
 			"proves": "The owned Ollama passes a strict signature check, its running server lists its models and predicts one token with an installed model; the MLX models on disk are counted."
 		},
 		{
+			"id": "field_slow_lines",
+			"kind": "field_check",
+			"check": "slow_lines",
+			"deadline_seconds": 20,
+			"proves": "One bounded pass over today's log names the main-thread segment the slow HotPath lines charge most, and counts the slow ingest ticks and preferences saves with their worst duration."
+		},
+		{
 			"id": "field_fifo_safety",
 			"kind": "field_check",
 			"check": "fifo_safety",

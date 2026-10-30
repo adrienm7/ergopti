@@ -165,6 +165,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    - `field_idle_cost`: over 30 quiet seconds the driver's process CPU share must stay at or under 3 %
      (`idle_cpu_percent`); resident memory and its growth, Lua heap growth and main-thread holds over 250 ms
      in the window are named.
+   - `field_slow_lines`: one `awk` pass over today's log (a summary only reaches the task's pipe) tallies
+     the HotPath `Slow <segment>: X ms own` lines by segment, and the `Slow ingest tick` and
+     `Slow preferences save` lines; `slow_dominant` names the segment with the most own time (the five
+     largest in the log window), the two others are `count:worst_ms`.
    - `field_fifo_safety`: in a folder of its own under `TMPDIR`, a FIFO (a reader attached first, so a
      regressed guard cannot freeze the app) is named `named_pipe` by `followed_mode`, `exists` sees it, and
      both `append` and the atomic `write` refuse it and leave it in place; the folder is removed.
@@ -1283,7 +1287,9 @@ Added October 22 (from the agents' reports; details in their commits):
 - [ ] **macOS swallowed-keys check on v1.0.6.** [PHYS-M] The fixes (03a2c2fa4b, d026f3e024,
       a414e83fb7, 19fa9fa872, 89cbcae90b, 9b500a9e8c, c21e920d7e, bb6fcc2cc2) shipped in v1.0.6;
       they need a Mac day of typing with the `key_event_health` counters (`infra/key_event_health.lua`,
-      written to the driver log).
+      written to the driver log). _Hands:_ the day of typing. Once typed, the field run's
+      `diagnostics` step carries the `key_*` counters and `field_event_taps` the late keys of the
+      session, so no reading by hand is left.
 - [ ] **Keystats rename leftovers.** [CODE] The rename is done (180a53e4de, 1 283 files, 579 paths). Left:
       the comment in `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` (a compiled
       script: recompile on a Mac); declare each persisted name once and make tests read it instead
@@ -1303,6 +1309,11 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       Swift on macOS CI, add Go table cases for the new stages; (6) the network check's digest step
       is skipped (HEAD only); (7) PAC fetch/evaluation failures now fall back to a direct connection on
       macOS (item "PAC unusable: direct fallback"): confirm on the Mac.
+      Field run (branch `fix/macos-overnight-d`): (1) is `field_slow_lines` (the segment the day's
+      `Slow <segment>` lines charge most, the slow ingest ticks and preferences saves with their worst
+      duration); (3) is `field_local_servers` (each server's answer and port source); the PAC route of (7)
+      shows in `field_network`'s route steps, but a PAC that fails on purpose needs a PAC the maintainer
+      breaks. (2), (4), (5), (6) are code.
 - [ ] **macOS input follow-ups (swallowed keys).** [CODE] Done: late keys pass through (ed2d9fe65c),
       AXValue read once per burst (34765cde7c), no error window for a lease failure that recovered
       within 60 s (fcf4af85dc), `key_*` counters in the diagnostics (6f2daed2e5). Lease token reuse
@@ -1480,7 +1491,8 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       policies on Windows), conversion of Windows source assertions to behaviour (audit item 14).
 - [ ] **116. Guided third-party validation report.** [PHYS-M] macOS `field_check_toolchain` landed
       (timer, Shortcuts, Homebrew, Karabiner signature); needs a run on a real Mac. Package
-      provenance beyond the signature check is open.
+      provenance beyond the signature check is open. The field run's `field_toolchain` step is that run,
+      with no person: the next field report answers it.
 - [ ] **139. Personal identities in logs.** [CODE] Done: email, URL-credential, foreign-profile
       rules (5ef12e8a2a) and config-directory name masking (20e845692b); opt-in redacted day log
       attachment (1c6f891ed3, item 138). Left: emitter-side pack labels (the TomlLoader SUCCESS line
@@ -1514,6 +1526,11 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       the hook's input+XI2+writer join is deliberately unreachable (nothing passes `numberRowMode`)
       and is not owed; left for Linux only [PHYS-L] mutter and KWin reloading a `~/.config/xkb`
       layout (W1 to W4 of that note).
+      refusal-in-time probe exists (in 116). _Hands:_ a genuine run needs a shortcut the maintainer
+      owns and names (the `shortcuts` command cannot create or import one without a dialog, and running an
+      arbitrary shortcut of theirs is not read-only); `field_toolchain`'s `shortcuts_list` and
+      `shortcuts_refusal` are what a program can prove.
+- [ ] **107.** [CODE] macOS forced output, Linux input+XI2+writer join.
 - [ ] **108.** [CODE] Item 97's collision/source/modifier/output joins.
 - [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible
       Variables/KeyHistory snapshot.
