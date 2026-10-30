@@ -175,3 +175,112 @@ function Resolve-ErgoptiRoutePlanRedirect {
 	}
 	return @{ Ok = $true; Route = $(if ($Plan.Hosts[$HostName] -ceq 'direct') { 'direct' } else { 'proxy' }) }
 }
+
+
+
+
+
+# ===================================
+# ===================================
+# ======= 4/ Owned Daemon ===========
+# ===================================
+# ===================================
+
+# The relay variable the owned Ollama daemon (Go net/http) reads for its HTTPS
+# registry and blob traffic, and its bypass variable. Linux writes NO_PROXY and
+# no_proxy; Windows environment names are case-insensitive, so they are one.
+$script:ErgoptiOwnedProxyVariable = 'HTTPS_PROXY'
+$script:ErgoptiOwnedBypassVariable = 'NO_PROXY'
+
+# Route sources that mean the user's exported relay already covers the daemon,
+# which inherits it: nothing is looked up or overridden.
+$script:ErgoptiOwnedInheritedSources = @('environment', 'environment_bypass')
+
+# Builds the proxy environment of the owned daemon from one native lookup per
+# origin of route_origins.json "ollama". Resolve is called as
+# & $Resolve $OriginUrl and answers like Resolve-ErgoptiNativeNetworkRoutes;
+# ReadEnvironment as & $ReadEnvironment $Name.
+# Returns @{ Ok = $true; Mode = 'inherit'|'direct'|'relay'; Proxy; Environment }
+# or @{ Ok = $false; Reason } with a closed reason, never a URL.
+function Get-ErgoptiOwnedProxyEnvironment {
+	param([Parameter(Mandatory = $true)][string[]]$Origins,
+		[Parameter(Mandatory = $true)][scriptblock]$Resolve,
+		[Parameter(Mandatory = $true)][scriptblock]$ReadEnvironment)
+	if ($Origins.Count -eq 0) { return @{ Ok = $false; Reason = $script:ErgoptiRoutePlanEmpty } }
+	$Entries = New-Object System.Collections.ArrayList
+	foreach ($Origin in $Origins) {
+		$Answer = & $Resolve $Origin
+		if ($null -eq $Answer -or $Answer.Ok -ne $true -or @($Answer.Routes).Count -eq 0) {
+			return @{ Ok = $false; Reason = 'route-lookup-refused' }
+		}
+		# The daemon has no failover: only the first selection is used
+		$First = @($Answer.Routes)[0]
+		if ($script:ErgoptiOwnedInheritedSources -ccontains $First.Source) {
+			return @{ Ok = $true; Mode = 'inherit'; Proxy = ''; Environment = [ordered]@{} }
+		}
+		if ($First.Kind -ceq 'direct') { $Route = 'direct' }
+		elseif ($First.Kind -ceq 'proxy' -and $First.Endpoint -is [string]) {
+			# Relays are normalized absolute URIs ("http://host:port/"); the plan takes host:port
+			$Route = $First.Endpoint -replace '/$', ''
+		} else { return @{ Ok = $false; Reason = $script:ErgoptiRoutePlanInvalid } }
+		[void]$Entries.Add(@{ origin = $Origin; route = $Route })
+	}
+	$Plan = New-ErgoptiRoutePlan @($Entries)
+	if (-not $Plan.Ok) { return @{ Ok = $false; Reason = $Plan.Reason } }
+	$Environment = [ordered]@{}
+	if ($Plan.Proxy -ceq 'direct') { return @{ Ok = $true; Mode = 'direct'; Proxy = ''; Environment = $Environment } }
+	$Environment[$script:ErgoptiOwnedProxyVariable] = $Plan.Proxy
+	if ($Plan.NoProxy -cne '') {
+		# The user's own bypass entries are kept ahead of the origins sent direct
+		$Current = & $ReadEnvironment $script:ErgoptiOwnedBypassVariable
+		$Environment[$script:ErgoptiOwnedBypassVariable] = $(if ($Current -isnot [string] -or $Current -ceq '') {
+			$Plan.NoProxy } else { $Current + ',' + $Plan.NoProxy })
+	}
+	return @{ Ok = $true; Mode = 'relay'; Proxy = $Plan.Proxy; Environment = $Environment }
+}
+
+# Asks a plain http relay for a tunnel to Target ("host:443") without any
+# credential, the way the daemon will. Returns 'open', 'windows_login' (the
+# relay demands NTLM, Negotiate or Kerberos, which the daemon cannot answer),
+# 'credentials' (another scheme the daemon holds no secret for), 'refused'
+# (another status) or 'unreachable'. Only the login answers stop a pull: the
+# others reach the daemon, which reports them itself.
+function Test-ErgoptiRelayTunnel {
+	param([Parameter(Mandatory = $true)][string]$Relay,
+		[Parameter(Mandatory = $true)][string]$Target,
+		[Parameter(Mandatory = $true)][ValidateRange(1, 600000)][int]$TimeoutMs)
+	if ($Relay -cnotmatch '^http://([A-Za-z0-9.\-]+|\[[0-9A-Fa-f:]+\]):([0-9]{1,5})$') {
+		throw 'Only a plain http relay can be probed.'
+	}
+	$RelayHost = $Matches[1].Trim('[', ']')
+	$RelayPort = [int]$Matches[2]
+	if ($Target -cnotmatch '^[a-z0-9.\-]+:[0-9]{1,5}$') { throw 'The tunnel target must be host:port.' }
+	$Client = New-Object System.Net.Sockets.TcpClient
+	try {
+		$Connect = $Client.BeginConnect($RelayHost, $RelayPort, $null, $null)
+		if (-not $Connect.AsyncWaitHandle.WaitOne($TimeoutMs)) { return 'unreachable' }
+		try { $Client.EndConnect($Connect) } catch { return 'unreachable' }
+		$Stream = $Client.GetStream()
+		$Stream.ReadTimeout = $TimeoutMs
+		$Stream.WriteTimeout = $TimeoutMs
+		$Request = [Text.Encoding]::ASCII.GetBytes("CONNECT $Target HTTP/1.1`r`nHost: $Target`r`n`r`n")
+		$Stream.Write($Request, 0, $Request.Length)
+		# The status line and headers, bounded: nothing past them is read
+		$Head = New-Object System.Text.StringBuilder
+		$Byte = New-Object byte[] 1
+		while ($Head.Length -lt 16384 -and -not $Head.ToString().EndsWith("`r`n`r`n")) {
+			try { $Read = $Stream.Read($Byte, 0, 1) } catch { return 'unreachable' }
+			if ($Read -le 0) { break }
+			[void]$Head.Append([char]$Byte[0])
+		}
+		$Lines = $Head.ToString() -split "`r`n"
+		if ($Lines[0] -cnotmatch '^HTTP/1\.[01] ([0-9]{3})') { return 'refused' }
+		$Status = [int]$Matches[1]
+		if ($Status -eq 200) { return 'open' }
+		if ($Status -ne 407) { return 'refused' }
+		foreach ($Line in $Lines) {
+			if ($Line -match '^Proxy-Authenticate:\s*(NTLM|Negotiate|Kerberos)\b') { return 'windows_login' }
+		}
+		return 'credentials'
+	} finally { $Client.Close() }
+}

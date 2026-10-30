@@ -2191,6 +2191,7 @@
 	"mlx.cause_venv_not_native": "MLX 环境是用适用于其他处理器（{1}）的 Python 构建的：macOS 会通过 Rosetta 运行它，因此不会启动。",
 	"network.failure.certificate": "安全连接的证书验证失败。请检查系统证书、时钟和服务器地址；如果使用受管理的网络，请向IT部门寻求帮助。",
 	"network.failure.proxy": "无法使用系统代理配置，或代理拒绝了连接或要求身份验证。请检查系统代理设置。",
+	"network.failure.proxy_windows_login": "代理要求进行 Windows 登录（NTLM 或 Negotiate），而 Ergopti 的 Ollama 无法提供，因此无法通过该代理下载任何模型。请在其他网络中下载模型，或请 IT 部门提供无需此登录的代理。",
 	"network.failure.host_blocked": "网络阻止了对此服务器的访问（公司过滤或防火墙）。",
 	"network.failure.offline": "网络或网络路由不可用。请检查连接和系统网络设置。",
 	"network.failure.pac_unreachable_direct_failed": "无法访问或读取自动代理配置（PAC），改用的直接连接也失败了。请检查网络连接和系统代理设置，或咨询您的 IT 部门。",

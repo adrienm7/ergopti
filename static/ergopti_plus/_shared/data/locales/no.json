@@ -2191,6 +2191,7 @@
 	"mlx.cause_venv_not_native": "MLX-miljøet ble bygd med en Python for en annen prosessor ({1}): macOS ville kjørt det via Rosetta, så det startes ikke.",
 	"network.failure.certificate": "Sertifikatkontrollen for den sikre forbindelsen mislyktes. Kontroller systemsertifikatene, klokken og serveradressen; be IT-avdelingen om hjelp på et administrert nettverk.",
 	"network.failure.proxy": "Systemets proxyoppsett kunne ikke brukes, eller proxyen avviste forbindelsen eller krevde autentisering. Kontroller systemets proxyinnstillinger.",
+	"network.failure.proxy_windows_login": "Proxyen krever Windows-påloggingen din (NTLM eller Negotiate), som Ergoptis Ollama ikke kan gi, så ingen modell kan lastes ned gjennom den. Last ned modellen på et annet nettverk, eller be IT-avdelingen om en proxy uten denne påloggingen.",
 	"network.failure.host_blocked": "Nettverket blokkerer tilgangen til denne serveren (bedriftens filtrering eller brannmur).",
 	"network.failure.offline": "Nettverket eller nettverksruten er utilgjengelig. Kontroller forbindelsen og systemets nettverksinnstillinger.",
 	"network.failure.pac_unreachable_direct_failed": "Den automatiske proxykonfigurasjonen (PAC) kunne ikke nås eller leses, og den direkte tilkoblingen som ble forsøkt i stedet, mislyktes også. Kontroller nettverkstilkoblingen og systemets proxyinnstillinger, eller spør IT-avdelingen.",
