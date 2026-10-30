@@ -31,18 +31,24 @@ local REASON = "model_browser.reason_ollama_missing"
 
 -- The error of the last owned runtime repair that failed, nil after a success.
 local _failure = nil
+-- The origin of the daemon the last successful repair started, and the PAC
+-- lookup stage that made it go direct, nil when its routes were looked up.
+local _fallback_origin, _fallback_stage = nil, nil
 -- The cause last reported, so the log names each change once.
 local _last_cause = nil
 -- The read-only managed-runtime resolver, built on the first capture.
 local _resolver = nil
 
 --- Records the result of one owned runtime repair.
---- @param result table { ok, error? } as the repair controller reports it.
+--- @param result table { ok, error?, origin?, direct_fallback? } as the repair controller reports it.
 function M.note_repair(result)
 	if type(result) ~= "table" then return end
 	if result.ok == true then
 		if _failure ~= nil then Logger.info(LOG, "Local Ollama repair succeeded; its failure is cleared.") end
 		_failure = nil
+		-- A failed repair leaves the daemon an earlier one started, and its routes.
+		_fallback_stage = type(result.direct_fallback) == "string" and result.direct_fallback or nil
+		_fallback_origin = _fallback_stage and result.origin or nil
 	elseif result.ok == false and result.error ~= "runtime_cancelled" then
 		_failure = tostring(result.error)
 		Logger.warn(LOG, "Local Ollama repair failed (%s); the page greys Ollama.", _failure)
@@ -52,6 +58,14 @@ end
 --- The error of the last owned repair that failed, nil after a success.
 --- @return string|nil failure
 function M.failure() return _failure end
+
+--- The PAC lookup stage that sent the daemon serving this origin direct.
+--- @param origin string|nil The Ollama origin a request went to.
+--- @return string|nil stage Nil for another origin or a daemon whose routes were looked up.
+function M.direct_fallback(origin)
+	if _fallback_stage == nil or origin ~= _fallback_origin then return nil end
+	return _fallback_stage
+end
 
 --- The managed runtime's read-only status: installed, missing or unavailable.
 --- @return string status
@@ -101,9 +115,10 @@ function M.capture(llm, ports)
 	return available, (not available) and REASON or nil, cause
 end
 
---- Test seam: forgets the recorded failure, the resolver and the last cause.
+--- Test seam: forgets the recorded failure and fallback, the resolver and the last cause.
 function M._reset()
 	_failure, _resolver, _last_cause = nil, nil, nil
+	_fallback_origin, _fallback_stage = nil, nil
 end
 
 return M
