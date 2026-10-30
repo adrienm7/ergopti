@@ -823,15 +823,18 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       port `_shared/modules/llm/thinking_off.ahk`, pinned by `thinking_off_vectors.json`; applied to
       predictions, the Test-API probe, translation, tone, the screen reading and the agent. An HTTP 400 naming
       an added field is retried once without it (WARN) and remembered for that provider and model. Ollama
-      bodies send `think:false`; local servers keep their `request_fields`. Left: (1) the refusal memory lives
-      only for the session, not persisted; (2) no capability discovery yet (OpenRouter `/models`
-      `supported_parameters`, Anthropic Models API `capabilities`, Gemini `models.list` `thinking`); (3) on
-      Windows a retried prediction gets a new request id, which `LLM_RemoteCancelAsync(old id)` does not
-      cancel; (4) unverified families: `grok-3-mini`, `hermes-4`, the generic name heuristic (`*qwen3*`,
-      `*deepseek*`, `*-r1*`, `*think*`, `*reasoning*`), Together/Kimi effort, Fireworks DeepSeek (read from a
-      search summary), OpenAI `gpt-5-mini`/`gpt-5-nano`, Gemini 2.5 Flash image/TTS/audio; (5) Ollama gpt-oss
-      ignores `think:false` (it wants a level); (6) the Anthropic payload always sends `temperature`, which
-      Opus 4.7+, Sonnet 5/5.5, Haiku 5.5, Fable and Mythos refuse with HTTP 400 when it is not the default.
+      bodies send `think:false`; local servers keep their `request_fields`. The refusals persist across
+      restarts (macOS settings, Linux state file, Windows state store; 200 pairs at most), a cancelled
+      Windows prediction also cancels its retry, and the families that accept only the default sampling
+      (Claude Opus 4.7+, Sonnet 5/5.5, Haiku 5.5, Fable, Mythos) are sent no temperature. Left: (1) no
+      capability discovery (OpenRouter `/models` `supported_parameters`, Anthropic Models API
+      `capabilities`, Gemini `models.list` `thinking`): it needs a per-provider listing fetch and cache
+      before each request, while the persisted refusal already makes a wrong guess cost one request;
+      (2) Ollama gpt-oss ignores `think:false` (it wants a level such as `low`) and every Ollama builder
+      writes `false`; (3) unverified families: `grok-3-mini`, `hermes-4`, the generic name heuristic
+      (`*qwen3*`, `*deepseek*`, `*-r1*`, `*think*`, `*reasoning*`), Together/Kimi effort, Fireworks
+      DeepSeek (read from a search summary), OpenAI `gpt-5-mini`/`gpt-5-nano`, Gemini 2.5 Flash
+      image/TTS/audio.
       The AHK suite and parse of this change must run in hosted Windows CI (no AutoHotkey in the cloud
       container).
 - [ ] **Retire the orphaned Windows gesture-notice entries.** [CODE] The gesture status submenu and notice
