@@ -201,6 +201,13 @@
 			"proves": "The owned Ollama passes a strict signature check, its running server lists its models and predicts one token with an installed model; the MLX models on disk are counted."
 		},
 		{
+			"id": "field_local_servers",
+			"kind": "field_check",
+			"check": "local_servers",
+			"deadline_seconds": 60,
+			"proves": "Every local AI server of local_servers.json has a discovery descriptor the driver accepts, and one read-only sweep names where each was looked for and what answered."
+		},
+		{
 			"id": "field_app_health",
 			"kind": "field_check",
 			"check": "app_health",

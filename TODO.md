@@ -160,6 +160,12 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      configuration snapshot for the guard. A reload refused, or accepted and never started, fails by name.
    - `field_menu_build`: one rebuild of the menu tree, as a state change triggers it, must be accepted by
      AppKit; its duration in ms, the number of top-level rows and the three slowest rows (`id:ms`) are named.
+   - `field_local_servers` (after `field_ai_local`, read-only): every server of
+     `_shared/modules/llm/local_servers.json` must have a discovery descriptor the driver accepts
+     (`servers_catalogue`, else `undescribed_<n>`); one detection sweep, the AI menu's own (process,
+     settings file, listening port, then `GET /models`), names each server as `server_<id>`:
+     `up:<port source>:<models>`, `not_running:<port source>`, `needs_key:...` or `no_answer:...`. A
+     server added to the shared list is reported by the next run with no driver change.
    - `field_layout_rows` (after `field_composer`): from the Ergo-L file the app ships, a loose layout typing
      the symbols first is written as `~/Library/Keyboard Layouts/ErgoptiFieldRows-<n>.keylayout` under a new
      name and id, enabled through the enabled-sources preference, selected, and read back from a fresh
@@ -280,6 +286,11 @@ into its item below or into the matching existing item.
       llama.cpp and LocalAI), a hand-started `mlx_lm.server` (8080), exo (52415), Msty, AnythingLLM. Ports
       shared by several servers are probed once and named together, as llama.cpp and LocalAI are.
       Windows (30 Oct): detection is data-driven (`LocalServerPortsDescriptor`, `.exe` names, command-line and config ports, the shared port corpus), so a server added to the JSON needs no AHK code; the new servers themselves are not in the JSON yet on any OS.
+      macOS: detection reads every server of the shared list through the shared discovery descriptor
+      (`local_servers.lua`, `llm.local_server_ports`), so the added servers need no macOS code; the field
+      run's `field_local_servers` fails when the driver cannot use a declared server's descriptor and names
+      each server's answer read-only (branch `fix/macos-overnight-d`). Left: the shared entries themselves
+      (another worker), then one field report on a Mac running some of them [PHYS-M].
 - [ ] **Mac field report 2026-10-30 21:01, functional errors left open (worker `fix/macos-field-errors`).**
       Fixed there: shortcut full rebind on each bounded retry (35cc4a5d), pre-dispatch Ollama pull receipt
       (6f6b752f), one model-list error per outage (6051b50c), MLX server stopped before a repair (fcdb6f27),
