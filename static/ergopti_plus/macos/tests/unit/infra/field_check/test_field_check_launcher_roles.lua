@@ -90,6 +90,8 @@ helpers.describe("launcher roles probe", function()
 		helpers.assert_eq(steps.launcher_present.value, "yes")
 		helpers.assert_eq(steps.http_worker_usage.value, "usage_refused")
 		helpers.assert_eq(steps.http_worker_loopback.value, "http_204")
+		helpers.assert_eq(steps.http_worker_request.value, "args_4:bytes_" .. #world.worker_call.input,
+			"the worker's own argument count includes the executable")
 		helpers.assert_eq(world.commands[1].key, LAUNCHER .. " --managed-http-worker")
 		helpers.assert_eq(world.commands[1].environment, world.environment, "the launcher's own environment")
 		helpers.assert_eq(world.worker_call.key, LAUNCHER .. " --managed-http-worker 5 5")
