@@ -132,3 +132,54 @@ _KLQCat_ReaderRendersByName() {
 }
 Test("Keystats query catalogue: the manifest reader renders by name (keystats-query-catalogue)",
 	_KLQCat_ReaderRendersByName)
+
+; The same corpus the JS reference and both Lua renderers replay: byte-exact SQL.
+; JSON null is how the corpus spells a missing slot, which here is an absent key.
+_KLQCat_WriteVectorsRenderExactly() {
+	global _SharedDir
+	Vectors := JsonParse(FSReadStrict(_SharedDir . "\tests\corpus\keystats\write_query_vectors.json"))["vectors"]
+	Native := 0
+	Seen := Map()
+	for Vector in Vectors {
+		if (Vector["dialect"] != "native")
+			continue
+		Values := Map()
+		for Key, Value in Vector["values"]
+			if (Value !== JSON_NULL)
+				Values[Key] := Value
+		AssertEqual(Vector["sql"], KeystatsQuery(Vector["name"], Values), Vector["name"] . " vector " . A_Index)
+		Native += 1
+		Seen[Vector["name"]] := true
+	}
+	AssertTrue(Native > 0, "the corpus must hold native vectors")
+	for Name in ["meta.set", "devices.upsert", "agg.app_day", "agg.burst", "agg.ngram", "agg.title_prune",
+			"events.app_switch", "events.session"]
+		AssertTrue(Seen.Has(Name), "the replay must reach " . Name)
+}
+Test("Keystats query catalogue: the write vectors render to the exact SQL (keystats-query-catalogue)",
+	_KLQCat_WriteVectorsRenderExactly)
+
+_KLQCat_SlotRefusals() {
+	Good := Map("key", "k", "value", "v")
+	AssertEqual("INSERT OR REPLACE INTO meta (key, value) VALUES ('k', 'v');", KeystatsQuery("meta.set", Good))
+	for Misuse in [Map("key", "k"), Map("key", "k", "value", 1), Map("key", "k", "value", "v", "extra", "x")] {
+		Refused := false
+		try KeystatsQuery("meta.set", Misuse)
+		catch ValueError
+			Refused := true
+		AssertTrue(Refused, "meta.set must refuse text-slot misuse " . A_Index)
+	}
+	Values := Map("device_id", "d", "id", 7, "ts", "t", "date", "x", "app", "a", "kind", "k", "trigger", "g", "replacement", "r")
+	Sql := KeystatsQuery("events.hotstring", Values)
+	AssertContains(Sql, "'r', NULL, NULL);", "both absent nullable slots are NULL")
+	Values["id"] := "not a number"
+	AssertThrows(() => KeystatsQuery("events.hotstring", Values), "a non-number in an integer slot")
+	Values["id"] := 1e308 * 10
+	AssertThrows(() => KeystatsQuery("events.hotstring", Values), "an infinity in an integer slot")
+	Values["id"] := "7"
+	AssertContains(KeystatsQuery("events.hotstring", Values), "VALUES ('d', 7, ", "a numeric string is a number")
+	Values["id"] := 7.9
+	AssertContains(KeystatsQuery("events.hotstring", Values), "VALUES ('d', 7, ", "an integer slot floors")
+}
+Test("Keystats query catalogue: a slot refuses a missing or mistyped value (keystats-query-catalogue)",
+	_KLQCat_SlotRefusals)
