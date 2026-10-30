@@ -47,7 +47,7 @@ local BOUNDS = {
 	-- from and predicts the language rather than the user. The upper bound is
 	-- where a local model's prompt handling starts to cost more than the
 	-- prediction saves.
-	context_length = { min = 80, max = 4000 },
+	context_length = { min = 80, max = 4000, integer = true },
 	min_words = { min = 1, max = 20, integer = true },
 	max_words = { min = 0, max = 10000, integer = true },
 }

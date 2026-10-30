@@ -190,6 +190,7 @@ end
 --- @param default_val number|string|nil The fallback default value.
 --- @param min_val number|nil Minimum allowed value.
 --- @param max_val number|nil Maximum allowed value.
+--- @param integer_only boolean|nil Refuse a fractional value (a count, not a measure).
 local function generic_numeric_prompt(
 	deps,
 	apply_setting_transaction,
@@ -200,7 +201,8 @@ local function generic_numeric_prompt(
 	hs_fn,
 	default_val,
 	min_val,
-	max_val
+	max_val,
+	integer_only
 )
 	local state = deps.state
 
@@ -227,7 +229,11 @@ local function generic_numeric_prompt(
 			new_val = tonumber(raw)
 		end
 		
-		if new_val and is_finite_number(new_val) then
+		if new_val and integer_only and new_val ~= math.floor(new_val) then
+			-- The shared prompt builder slices the context by this count; a
+			-- fraction made it extract an empty context.
+			return reject_numeric_input(title)
+		elseif new_val and is_finite_number(new_val) then
 			if min_val and new_val < min_val then new_val = min_val end
 			if max_val and new_val > max_val then new_val = max_val end
 
@@ -650,7 +656,8 @@ function M.new(deps)
 		return generic_numeric_prompt(deps, obj.apply_setting_transaction,
 			i18n.get("menu.settings.context_length_title"),
 			i18n.get("menu.llm.context_length_prompt"),
-			"llm_context_length", nil, "set_llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length
+			"llm_context_length", nil, "set_llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length,
+			nil, nil, true
 		)
 	end
 	
