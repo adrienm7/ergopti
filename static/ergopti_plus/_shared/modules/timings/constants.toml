@@ -42,6 +42,13 @@ chain_fallback_ms = 500
 # LX: modules/llm/prediction_engine.lua send_when_free.
 backend_busy_recheck_ms = 300
 
+# How often a just-installed owned Ollama re-reads its runtime metadata
+# before the daemon starts: the metadata is read off the UI thread, so the
+# first read after the install is still pending; the wait stops at the
+# metadata admission budget (_shared/modules/network/bootstrap_retry.json).
+# HS: modules/llm/ollama_deps_checker.lua RUNTIME_METADATA_POLL_SEC.
+ollama_runtime_metadata_poll_ms = 250
+
 # HTTP request hard timeout for the remote LLM API.
 # AHK: api_remote.ahk LLM_REMOTE_TIMEOUT_MS.
 # HS:  api_remote.lua REQUEST_TIMEOUT_MS.

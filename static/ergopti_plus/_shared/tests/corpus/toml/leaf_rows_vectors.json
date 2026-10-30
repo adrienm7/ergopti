@@ -4,7 +4,7 @@
 	"drivers": {
 		"macos": "Replays every vector.",
 		"linux": "Replays every vector.",
-		"windows": "Not ported: one AHK consumer must call the Windows leaf-row planner and batch writer in that order and decode the candidate for the decoded checks."
+		"windows": "windows/tests/meta/corpus/test_corpus_toml_leaf_rows.ahk replays every vector through the writer; Windows has no leaf-row planner. Divergences are pinned with their reason."
 	},
 	"vectors": [
 		{

@@ -1527,7 +1527,22 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL })
 		if IsSet(UPDATER_CHANNEL)
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL })
-		return _ConfigKeepOutdatedEntries(_ConfigSparseUpdates(Updates))
+		return _ConfigKeepOutdatedEntries(_ConfigLastRowWins(_ConfigSparseUpdates(Updates)))
+}
+
+; The feature walk collects rows a dedicated owner below it overrules (the magic
+; key, the personal file controls). The writer refuses two rows on one path, so the
+; overruling is settled here, where the order means something.
+_ConfigLastRowWins(Updates) {
+	Last := Map()
+	Last.CaseSense := "On"
+	for Index, Update in Updates
+		Last[_TOML_ConfigPathName(_TOML_ConfigPath(Update.Section, Update.Key))] := Index
+	Kept := []
+	for Index, Update in Updates
+		if Last[_TOML_ConfigPathName(_TOML_ConfigPath(Update.Section, Update.Key))] == Index
+			Kept.Push(Update)
+	return Kept
 }
 
 ; Manifest comparison uses native values; Boolean serialization sentinels belong

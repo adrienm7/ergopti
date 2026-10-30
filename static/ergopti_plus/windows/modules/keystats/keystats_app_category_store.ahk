@@ -92,6 +92,70 @@ _KL_AppCat_RecordWithLabel(Value, Label) {
 	return Candidate
 }
 
+/**
+ * Assigns a category and score to one application of a candidate map.
+ * @param {Map} Categories Candidate map, keyed by lower-case process name.
+ * @param {String} App Process name.
+ * @param {String} Category Nonblank category text.
+ * @param {Number} Score Score in the shared interval.
+ * @throws {ValueError} An invalid edit, leaving the map unchanged.
+ */
+_KL_AppCat_SetRecord(Categories, App, Category, Score) {
+	if !(App is String) || App == "" || !_KL_AppCat_LabelValid(Category) || !_KL_AppCat_ScoreValid(Score)
+		throw ValueError("An app category edit requires a name, a label and a score in range.")
+	Key := StrLower(App)
+	Existing := Categories.Get(Key, "")
+	Record := Existing is Map ? _KL_AppCat_RecordWithLabel(Existing, Category) : Map("type", Category)
+	Record["score"] := Score
+	Categories[Key] := Record
+}
+
+/**
+ * Renames a category on every application holding it. A legacy string entry keeps
+ * its form: it is a classification and only its label changes.
+ * @param {Map} Categories Candidate map.
+ * @param {String} Old Category text to replace, compared exactly.
+ * @param {String} New Nonblank replacement.
+ * @returns {Integer} Applications changed.
+ * @throws {ValueError} A blank new name, leaving the map unchanged.
+ */
+_KL_AppCat_RenameCategory(Categories, Old, New) {
+	if !_KL_AppCat_LabelValid(New)
+		throw ValueError("The new category must be a nonblank string.")
+	Holders := []
+	for Key, Value in Categories
+		if _KL_AppCat_RecordLabel(Value) == Old
+			Holders.Push(Key)
+	for Key in Holders
+		Categories[Key] := _KL_AppCat_RecordWithLabel(Categories[Key], New)
+	return Holders.Length
+}
+
+/**
+ * Adds the applications an older store held, keeping every entry already present:
+ * an edit made after the upgrade is newer than what is imported.
+ * @param {Map} Categories Candidate map.
+ * @param {Map} Imported Process name to a { type, score } record.
+ * @returns {Integer} Entries added.
+ * @throws {ValueError} One invalid entry refuses them all, leaving the map unchanged.
+ */
+_KL_AppCat_ImportMissing(Categories, Imported) {
+	for App, Record in Imported {
+		if !(App is String) || App == "" || !(Record is Map) || !Record.Has("type") || !Record.Has("score")
+			|| !_KL_AppCat_LabelValid(Record["type"]) || !_KL_AppCat_ScoreValid(Record["score"])
+			throw ValueError("An imported app category requires a name, a label and a score in range.")
+	}
+	Added := 0
+	for App, Record in Imported {
+		Key := StrLower(App)
+		if !Categories.Has(Key) {
+			Categories[Key] := Map("type", Record["type"], "score", Record["score"])
+			Added += 1
+		}
+	}
+	return Added
+}
+
 _KL_AppCat_RenderRecord(Value, Fields) {
 	Parts := [JsonStringLiteral("type") . ":" . JsonStringLiteral(Value["type"]),
 		JsonStringLiteral("score") . ":" . String(Value["score"])]

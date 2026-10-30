@@ -1546,6 +1546,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/shortcuts/test_wrap_symbols_catalogue.ahk
 #Include unit/modules/shortcuts/test_wrap_symbols_global_transaction.ahk
 ; ── Cross-driver corpus consumers ──
+#Include support/toml_corpus_values.ahk
 #Include meta/corpus/test_corpus_hotstrings.ahk
 #Include meta/modules/hotstrings/preview/test_preview_matches_engine.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_buffer_tracks_engine.ahk
@@ -1629,6 +1630,12 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/corpus/test_corpus_tooltip_layout.ahk
 ; TOML coercion corpus
 #Include meta/corpus/test_corpus_toml_batch_write.ahk
+#Include meta/corpus/test_corpus_updater_redirect.ahk
+#Include meta/corpus/test_corpus_config_scope_plan.ahk
+#Include meta/corpus/test_corpus_menu_numbered_caption.ahk
+#Include meta/corpus/test_corpus_toml_hotstring_reader.ahk
+#Include meta/corpus/test_corpus_toml_leaf_rows.ahk
+#Include meta/corpus/test_corpus_toml_inline_scalar.ahk
 #Include meta/corpus/test_corpus_toml_coercion.ahk
 
 ; -- Audit finding regression tests (batch-wired) --

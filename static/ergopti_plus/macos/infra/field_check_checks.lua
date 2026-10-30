@@ -291,6 +291,8 @@ M.TIMER_LATE_MS = 250
 
 -- Homebrew may need to update its index before answering.
 local BREW_TIMEOUT = 20
+-- The Homebrew cask that installs Karabiner-Elements.
+local KARABINER_CASK = "karabiner-elements"
 
 --- Describes why a bounded command did not succeed, as a closed token.
 --- @param code any Exit code, nil when it timed out.
@@ -477,13 +479,13 @@ function M.toolchain(ports, report, finish)
 		ports.exec(brew, { "--version" }, BREW_TIMEOUT, function(code, output)
 			local version = code == 0 and M.parse_version(output) or nil
 			report.step("brew_version", version and STATE.pass or STATE.fail, version or failure_token(code))
-			ports.exec(brew, { "list", "--cask", "--versions", "karabiner-elements" }, BREW_TIMEOUT, function(list_code, list_output)
-				local installed = list_code == 0 and count_lines(list_output) > 0
-				-- A cask that is absent exits non-zero: that is an answer, not a fault
-				local token = installed and "installed" or (list_code == nil and "timeout" or "absent")
-				report.step("karabiner_cask", list_code == nil and STATE.fail or STATE.info, token)
-				signature_stage()
-			end)
+			-- Homebrew keeps each installed cask in its Caskroom folder. Reading it
+			-- answers at once where `brew list --cask` outlived its bound on a Mac
+			-- whose security agents slow every brew start (field run 2026-10-30
+			-- 16:28, karabiner_cask fail:timeout); an absent cask is information.
+			local caskroom = brew:match("^(.*)/bin/brew$") .. "/Caskroom/" .. KARABINER_CASK
+			report.step("karabiner_cask", STATE.info, ports.path_exists(caskroom) and "installed" or "absent")
+			signature_stage()
 		end)
 	end
 
