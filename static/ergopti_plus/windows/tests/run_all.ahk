@@ -2285,6 +2285,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/adapters/shell_runner/test_shell_runner_deferred_completion.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_tree_deferred_completion.ahk
 #Include unit/adapters/crash_report/test_crash_report_worker_transport.ahk
+#Include unit/adapters/crash_report/test_crash_report_shared_document.ahk
 #Include unit/adapters/crash_report/test_crash_mapping_drain_reentry.ahk
 #Include unit/adapters/crash_report/test_crash_mapping_payload_bounds.ahk
 #Include unit/adapters/crash_report/test_crash_worker_git_exit.ahk

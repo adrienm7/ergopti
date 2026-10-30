@@ -750,9 +750,11 @@ macOS and Linux write the same crash report through `_shared/lua/crash_report.lu
 `crash_report_vectors.json`. The logger core counts lines per level plus
 dropped, suppressed and collapsed lines (`volume()`, `volume_interval()`; SPEC
 5.3) and each driver appends them to its interval evidence record. A driver that
-filters before the core must call `note_dropped()`. Windows has neither yet
-(PAR-55, PAR-56): add the fields and counters to the shared vectors, never a
-third layout.
+filters before the core must call `note_dropped()`. Windows has no Lua core and
+replays the same vectors in `crash_reporter.ahk` and its two PowerShell workers,
+with its own detail after the shared fields, and counts the same seven figures in
+`logger.ahk`. A new field or counter joins the shared vectors, never a third
+layout.
 
 ### project-logs-folder-single-resolver
 

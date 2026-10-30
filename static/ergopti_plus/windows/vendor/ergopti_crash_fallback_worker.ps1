@@ -20,6 +20,47 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# The shared crash document (_shared/lua/crash_report.lua): the fields in the order
+# the driver serialized them, two spaces deep, one line per field.
+function ConvertTo-CrashDocument {
+	param([Parameter(Mandatory = $true)]$Snapshot)
+	$lines = foreach ($field in $Snapshot.PSObject.Properties) {
+		"  " + (ConvertTo-Json -InputObject $field.Name -Compress) + ": " +
+			(ConvertTo-Json -InputObject $field.Value -Compress -Depth 8)
+	}
+	return "{`n" + ($lines -join ",`n") + "`n}"
+}
+
+# Writes the document under the shared name, <timestamp>.json then <timestamp>-2.json
+# for a second report within the same second. CreateNew refuses an existing file, so
+# a concurrent writer can never be replaced.
+function Write-CrashDocument {
+	param(
+		[Parameter(Mandatory = $true)][string]$Directory,
+		[Parameter(Mandatory = $true)][string]$Timestamp,
+		[Parameter(Mandatory = $true)][string]$Document
+	)
+	if ($Timestamp -notmatch '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$') {
+		throw "A crash report timestamp is YYYY-MM-DDTHH:MM:SSZ, got '$Timestamp'"
+	}
+	$stem = $Timestamp.Replace(":", "-")
+	$bytes = [Text.UTF8Encoding]::new($false).GetBytes($Document)
+	$attempt = 1
+	while ($true) {
+		$name = if ($attempt -eq 1) { "$stem.json" } else { "$stem-$attempt.json" }
+		$path = Join-Path $Directory $name
+		try {
+			$stream = [IO.File]::Open($path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
+		} catch [IO.IOException] {
+			if (-not [IO.File]::Exists($path)) { throw }
+			$attempt += 1
+			continue
+		}
+		try { $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
+		return $path
+	}
+}
+
 $mapping = [IO.MemoryMappedFiles.MemoryMappedFile]::OpenExisting(
 	$MappingName,
 	[IO.MemoryMappedFiles.MemoryMappedFileRights]::Read
@@ -41,6 +82,5 @@ if ([string]::IsNullOrWhiteSpace($reportsDir)) { throw "no crash reports folder"
 [IO.Directory]::CreateDirectory($reportsDir) | Out-Null
 $snapshot.PSObject.Properties.Remove("_transport_script_dir")
 $snapshot.PSObject.Properties.Remove("_transport_reports_dir")
-$artifactPath = Join-Path $reportsDir ((Get-Date -Format "yyyy-MM-ddTHH-mm-ss") + "_" + [guid]::NewGuid().ToString("N") + ".json")
-[IO.File]::WriteAllText($artifactPath, ($snapshot | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+$artifactPath = Write-CrashDocument $reportsDir ([string]$snapshot.timestamp) (ConvertTo-CrashDocument $snapshot)
 Write-Output ("OK:" + $artifactPath)
