@@ -937,6 +937,7 @@
 	"hs_config.label_category": "श्रेणी:",
 	"hs_config.label_color": "रंग",
 	"hs_config.label_delay": "विलंब (ms)",
+	"hs_config.unit_ms": "मि.से.",
 	"hs_config.label_file": "फ़ाइल:",
 	"hs_config.label_group": "समूह:",
 	"hs_config.label_priority": "प्राथमिकता",

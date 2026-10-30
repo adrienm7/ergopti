@@ -81,6 +81,11 @@ const ALLOWED = [
 		reason: 'the fatal boot handler can fire before i18n is loaded (audit I10)'
 	},
 	{
+		file: 'windows/ui/personal_toml_editor.ahk',
+		sink: 'AddText',
+		reason: 'the send tokens the user types in the replacement field, the same in every language'
+	},
+	{
 		file: 'linux/install/messages.sh',
 		sink: 'printf',
 		reason:

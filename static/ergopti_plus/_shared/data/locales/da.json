@@ -937,6 +937,7 @@
 	"hs_config.label_category": "Kategori:",
 	"hs_config.label_color": "Farve",
 	"hs_config.label_delay": "Forsinkelse (ms)",
+	"hs_config.unit_ms": "ms",
 	"hs_config.label_file": "Fil:",
 	"hs_config.label_group": "Gruppe:",
 	"hs_config.label_priority": "Prioritet",
