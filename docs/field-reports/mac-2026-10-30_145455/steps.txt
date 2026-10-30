@@ -1,0 +1,21 @@
+versions                     exit=0
+toolchain                    exit=0
+karabiner                    exit=0
+karabiner_signature          exit=0
+memory                       exit=0
+processes                    exit=0
+launchd                      exit=0
+listeners                    exit=0
+input_sources                exit=0
+user_layouts                 exit=0
+collector                    interrupted
+ErgoptiPlus_2026-10-30.log   copied (scrubbed)
+ErgoptiPlus_errors_2026-10-30.log copied (scrubbed)
+ErgoptiPlus_llm.log          copied (scrubbed)
+launcher.log                 copied (scrubbed)
+digest_boot                  exit=0
+digest_slow                  exit=1
+digest_errors                exit=0
+digest_input                 exit=1
+digest_hotstrings            exit=0
+hotstring_collisions         exit=0
