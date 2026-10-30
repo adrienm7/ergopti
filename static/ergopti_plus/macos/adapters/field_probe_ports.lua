@@ -248,14 +248,16 @@ local function launcher()
 	return path, environment
 end
 
---- Runs one executable with exact stdin bytes and settles once. The task is a
---- streaming one: hs.task writes setInput bytes to a running task's stdin only
---- then, and the reader sees EOF once the input is closed. The non-streaming
---- form gave the HTTP worker an empty request, which it refused with 64 (field
---- run of 2026-10-30 20:51, http_worker_loopback exit_64:not_reached).
+--- Runs one executable with exact stdin bytes and settles once. The bytes are
+--- queued with setInput BEFORE the task starts, on a task with no streaming
+--- callback: hs.task then writes them at launch and closes stdin itself
+--- (modules/llm/api_token_crypto.lua relies on the same contract), and
+--- closeInput belongs to the streaming form only. Writing after the start lost
+--- the request (the HTTP worker refused it with 64) and cut large layouts short
+--- (xmllint refused 7 of 8 on the 2026-10-30 21:53 run).
 --- @param executable string Absolute path.
 --- @param args table Argument array.
---- @param input string Bytes written to stdin, then closed.
+--- @param input string Bytes written to stdin.
 --- @param timeout_s number Seconds before the child is terminated.
 --- @param callback function fn(exit_code|nil, stdout, stderr).
 --- @param environment table|nil Explicit child environment.
@@ -269,24 +271,19 @@ local function exec_input(executable, args, input, timeout_s, callback, environm
 		if timer then Timer.cancel(timer) end
 		callback(code, stdout or "", stderr or "")
 	end
-	local out, err = {}, {}
 	local handle = ShellRunner.spawn(executable, args, function(code, stdout, stderr)
-		out[#out + 1], err[#err + 1] = stdout or "", stderr or ""
-		settle(code, table.concat(out), table.concat(err))
-	end, function(_, stdout, stderr)
-		out[#out + 1], err[#err + 1] = stdout or "", stderr or ""
-		return true
-	end, environment)
-	if handle.isSettled() or not handle.start() then return settle(nil, "") end
+		settle(code, stdout, stderr)
+	end, nil, environment)
+	if handle.isSettled() or not handle.set_input(input) then
+		pcall(handle.terminate)
+		return settle(nil, "")
+	end
+	if not handle.start() then return settle(nil, "") end
 	timer = Timer.after(timeout_s, function()
 		timer = nil
 		pcall(handle.terminate)
 		settle(nil, "")
 	end)
-	if not handle.set_input(input) or not handle.close_input() then
-		pcall(handle.terminate)
-		settle(nil, "")
-	end
 end
 
 --- Opens a loopback HTTP server that answers one path with 204 and counts the

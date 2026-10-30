@@ -290,6 +290,9 @@ local XML_CAUSES = {
 	{ "Unsupported version", "xml_version" },
 	{ "Opening and ending tag mismatch", "tag_mismatch" },
 	{ "Premature end of data", "truncated" },
+	{ "Document is empty", "empty_input" },
+	{ "Start tag expected", "no_root" },
+	{ "Extra content at the end", "trailing_content" },
 	{ "Entity", "entity" },
 	{ "encoding", "encoding" },
 	{ "AttValue", "attribute" },
@@ -560,7 +563,11 @@ function M.launcher_roles(ports, report, finish)
 				return finish()
 			end
 			local seconds = tostring(M.LOOPBACK_SECONDS)
-			ports.exec_input(launcher, { M.HTTP_WORKER_FLAG, seconds, seconds }, M.loopback_request(server.port),
+			local request = M.loopback_request(server.port)
+			local args = { M.HTTP_WORKER_FLAG, seconds, seconds }
+			-- What the worker received, for an EX_USAGE that names no guard
+			report.step("http_worker_request", STATE.info, "args_" .. (#args + 1) .. ":bytes_" .. #request)
+			ports.exec_input(launcher, args, request,
 				COMMAND_TIMEOUT, function(code, stdout)
 					local hits = server.hits()
 					server.stop()
