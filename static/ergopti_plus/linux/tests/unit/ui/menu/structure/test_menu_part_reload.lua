@@ -44,6 +44,15 @@ helpers.describe("tray section modules reload with the tray root", function()
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("reads the tray source with every section module the root binds", function()
+		local source = helpers.read_menu_source()
+		helpers.assert_true(source:find("function M.build(ctx)", 1, true) ~= nil, "the root itself is read")
+		helpers.assert_true(source:find('require("ui.menu.menu_quit").build', 1, true) ~= nil,
+			"the root binds the Quit module")
+		helpers.assert_true(source:find("local function _build_quit(ctx)", 1, true) ~= nil,
+			"the Quit builder is read from its own module")
+	end)
+
 	helpers.it("refuses a second installation", function()
 		local ok, err = pcall(require("tests.support.menu_part_reload").install)
 		helpers.assert_eq(ok, false, "the searcher is installed once")

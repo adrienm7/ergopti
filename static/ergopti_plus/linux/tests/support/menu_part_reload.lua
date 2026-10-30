@@ -23,8 +23,9 @@ local PART = "^ui%.menu%.menu_"
 
 local _installed = false
 
---- Forgets every cached tray section module, never the root itself.
-local function forget_parts()
+--- Forgets every cached tray section module, never the root itself. A test
+--- that runs the root's file with loadfile, bypassing require, calls it first.
+function M.forget_parts()
 	local cached = {}
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and name ~= ROOT and name:match(PART) then cached[#cached + 1] = name end
@@ -43,7 +44,7 @@ function M.install()
 		local loader, extra = file_searcher(name)
 		if type(loader) ~= "function" then return loader end
 		return function(...)
-			forget_parts()
+			M.forget_parts()
 			return loader(...)
 		end, extra
 	end)
