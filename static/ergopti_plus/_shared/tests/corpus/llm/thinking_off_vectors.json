@@ -1,6 +1,6 @@
 {
 	"description": "Thinking-off resolution, replayed by _shared/lua/llm/thinking_off.lua (macOS and Linux suites) and its AutoHotkey port _shared/modules/llm/thinking_off.ahk (Windows suite) over the shipped _shared/modules/llm/thinking_off.json families and api_providers.json thinking_dialect, so the drivers cannot drift.",
-	"rule": "normalize_vectors: lowercase, last path segment, an Ollama :tag dropped. glob_vectors: a glob matches the whole id, ignoring case, * the only wildcard. merge_vectors: fields deep-merged into body give expected (the body wins at every level); added lists the paths added. resolve_vectors: the model's family (first match on the normalized id) through the provider's dialect (first control kind it carries, $level filled) merged into body gives expected; family is its 1-based index and kind the control applied, both absent when none. refusal_vectors: after resolution, an HTTP 400 whose message names an added key (snake or camel; a generic leaf as parent.leaf) refuses its top-level field, stripped from the body (expected); field absent when nothing is refused. refused_vectors: a refused top-level field is never added. family_parse_vectors and dialect_parse_vectors: accepted whole (valid true) or refused whole. sampling_vectors: whether the model's family accepts only the default sampling (no temperature sent). refusal_store_vectors: a persisted store \"<provider>|<model>\" -> field -> epoch second keeps each valid field refused less than refusal_expiry_days (thinking_off.json) before now and not after it; a key left with none, or without |, is dropped and counted.",
+	"rule": "normalize_vectors: lowercase, last path segment, an Ollama :tag dropped. glob_vectors: a glob matches the whole id, ignoring case, * the only wildcard. merge_vectors: fields deep-merged into body give expected (the body wins at every level); added lists the paths added. resolve_vectors: the model's family (first match on the normalized id) through the provider's dialect (first control kind it carries, $level filled) merged into body gives expected; family is its 1-based index and kind the control applied, both absent when none. refusal_vectors: after resolution, an HTTP 400 whose message names an added key (snake or camel; a generic leaf as parent.leaf) refuses its top-level field, stripped from the body (expected); field absent when nothing is refused. refused_vectors: a refused top-level field is never added. family_parse_vectors and dialect_parse_vectors: accepted whole (valid true) or refused whole. sampling_vectors: whether the model's family accepts only the default sampling (no temperature sent). refusal_store_vectors: a persisted store \"<provider>|<model>\" -> field -> epoch second keeps each valid field refused less than refusal_expiry_days (thinking_off.json) before now and not after it; a key left with none, or without |, is dropped and counted. ollama_think_vectors: the think value of an Ollama chat body: the model family's first control Ollama carries, false for a toggle or an off intent, the level of an effort control whose level is in ollama_think_levels (thinking_off.json), false with no family or no such control.",
 	"normalize_vectors": [
 		{
 			"model": "GPT-5.1",
@@ -1748,7 +1748,8 @@
 			"id": "family_not_object",
 			"table": {
 				"families": ["x"],
-				"refusal_expiry_days": 30
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low", "medium", "high"]
 			},
 			"valid": false
 		},
@@ -1767,7 +1768,8 @@
 						]
 					}
 				],
-				"refusal_expiry_days": 30
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low", "medium", "high"]
 			},
 			"valid": false
 		},
@@ -1785,7 +1787,8 @@
 						]
 					}
 				],
-				"refusal_expiry_days": 30
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low", "medium", "high"]
 			},
 			"valid": false
 		},
@@ -1804,7 +1807,8 @@
 						]
 					}
 				],
-				"refusal_expiry_days": 30
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low", "medium", "high"]
 			},
 			"valid": false
 		},
@@ -1823,7 +1827,8 @@
 						]
 					}
 				],
-				"refusal_expiry_days": 30
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low", "medium", "high"]
 			},
 			"valid": false
 		},
@@ -1836,7 +1841,8 @@
 						"controls": []
 					}
 				],
-				"refusal_expiry_days": 30
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low", "medium", "high"]
 			},
 			"valid": false
 		},
@@ -1849,7 +1855,8 @@
 						"controls": []
 					}
 				],
-				"refusal_expiry_days": 30
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low", "medium", "high"]
 			},
 			"valid": false
 		},
@@ -1863,7 +1870,8 @@
 						"extra": 1
 					}
 				],
-				"refusal_expiry_days": 30
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low", "medium", "high"]
 			},
 			"valid": false
 		},
@@ -1877,7 +1885,8 @@
 						"_family": "doc"
 					}
 				],
-				"refusal_expiry_days": 30
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low", "medium", "high"]
 			},
 			"valid": true
 		},
@@ -1900,7 +1909,8 @@
 						]
 					}
 				],
-				"refusal_expiry_days": 30
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low", "medium", "high"]
 			},
 			"valid": true
 		},
@@ -1925,7 +1935,49 @@
 						"models": ["a"],
 						"controls": []
 					}
-				]
+				],
+				"ollama_think_levels": ["low", "medium", "high"]
+			},
+			"valid": false
+		},
+		{
+			"id": "no_ollama_think_levels",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30
+			},
+			"valid": false
+		},
+		{
+			"id": "empty_ollama_think_levels",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": []
+			},
+			"valid": false
+		},
+		{
+			"id": "ollama_think_level_not_word",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				],
+				"refusal_expiry_days": 30,
+				"ollama_think_levels": ["low", 1]
 			},
 			"valid": false
 		}
@@ -2121,6 +2173,68 @@
 			"stored": ["x"],
 			"refused": {},
 			"dropped": 1
+		}
+	],
+	"ollama_think_vectors": [
+		{
+			"model": "gpt-oss:20b",
+			"think": "low"
+		},
+		{
+			"model": "gpt-oss:120b",
+			"think": "low"
+		},
+		{
+			"model": "hf.co/unsloth/gpt-oss-20b-GGUF:Q4_K_M",
+			"think": "low"
+		},
+		{
+			"model": "gpt-oss-safeguard:20b",
+			"think": false
+		},
+		{
+			"model": "qwen3:8b",
+			"think": false
+		},
+		{
+			"model": "qwen3.5:9b",
+			"think": false
+		},
+		{
+			"model": "deepseek-v3.1:671b",
+			"think": false
+		},
+		{
+			"model": "glm-4.6",
+			"think": false
+		},
+		{
+			"model": "kimi-k3",
+			"think": false
+		},
+		{
+			"model": "deepseek-r1:8b",
+			"think": false
+		},
+		{
+			"model": "llama3.2:3b",
+			"think": false
+		},
+		{
+			"model": "gpt-5",
+			"think": false
+		},
+		{
+			"model": "claude-opus-5-5",
+			"think": false
+		},
+		{
+			"model": "gemini-2.5-pro",
+			"think": false
+		},
+		{
+			"model": "o3",
+			"think": "low"
 		}
 	]
 }
