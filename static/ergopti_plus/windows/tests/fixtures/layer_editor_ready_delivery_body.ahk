@@ -226,6 +226,8 @@ _LRDS_Main() {
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_LRDS_OnError)
 	LoggerSetTestSink(_LRDS_Log)
+	; The genuine host reads its safety flush from the shared timing registry.
+	TimingsLoadShared(A_Args[3])
 	_VendorDir := A_Args[2], WEBVIEW_SHARED_UDIR := A_Args[2] . "\profile"
 	_SharedDir := A_Args[3], _ConfigDir := A_Args[2] . "\config\"
 	; Configuration/legend inputs are passive data. No remap/Hotkey initializer
