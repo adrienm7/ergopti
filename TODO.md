@@ -105,6 +105,9 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      secure input are named; Automation is skipped (no query without a prompt); the bundle identifier is a
      declared one; the running bundle's strict signature is valid; the signing identity (team or ad hoc)
      says whether a rebuild keeps the grants.
+   - `field_event_taps`: each keymap tap (keyDown, loopbackKeyUp, flagsChanged, mouse) is enabled, by name;
+     the tap watchdog runs; the worst of five 100 ms timers is under 250 ms late; the session's holds over
+     250 ms and 1 s, late keys and the Lua heap are named.
 
 ## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
 
