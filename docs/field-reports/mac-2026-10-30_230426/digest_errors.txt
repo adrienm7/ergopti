@@ -1,0 +1,436 @@
+2026-10-30 00:00:00:313 [WARNING] [llm.streaming_handler] ↑ "Watchdog triggered: stream produced no visible result for 12s." repeated 1 more time between 2026-10-29 23:50:59:228 and 2026-10-29 23:50:59:228.
+2026-10-30 00:15:58:965 [ERROR] [menu] Failed to load "AI menu" (ui.menu.menu_llm): ...erso/ergopti/static/ergopti_plus/_shared/lua/timings.lua:85: [timings] missing or non-numeric key [llm].ai_health_watch_ms in constants.toml.
+2026-10-30 00:15:59:702 [ERROR] [llm.core] set_user_profiles(): profiles_table must be a table.
+2026-10-30 00:15:59:702 [ERROR] [menu_state] sync_state_to_modules: feature 'ai' was not fully applied: llm.set_user_profiles did not commit — false.
+2026-10-30 00:15:59:703 [ERROR] [menu_state] Feature 'ai' is OFF for this session because llm.set_user_profiles was refused; config.toml keeps its saved value.
+2026-10-30 00:15:59:739 [WARNING] [menu] Saved preferences applied except 1 refused step(s), isolated to their feature.
+2026-10-30 00:16:02:158 [WARNING] [builder] LLM handler missing or incomplete — AI component ignored.
+2026-10-30 00:16:22:594 [WARNING] [HotPath] Slow preview.rebuild: 5.45 ms own, 5.45 ms total, parent keydown (0 similar since the last line).
+2026-10-30 00:19:05:050 [WARNING] [HotPath] Slow preview.rebuild: 8.03 ms own, 8.03 ms total, parent keydown (0 similar since the last line).
+2026-10-30 00:19:05:563 [WARNING] [HotPath] Slow hotstring.expand: 6.86 ms own, 6.86 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 00:19:08:174 [WARNING] [HotPath] Slow tooltip.show_predictions: 13.36 ms own, 13.36 ms total, parent none (0 similar since the last line).
+2026-10-30 00:19:09:420 [ERROR] [llm.prediction_engine] Chain rescan suppression did not commit: nil
+2026-10-30 00:19:09:420 [ERROR] [keymap.llm_bridge] Prediction applied, but LLM chain ownership did not commit (result: false).
+2026-10-30 00:19:09:642 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 12 key-down(s), 13 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 00:20:39:509 [WARNING] [HotPath] Slow preview.rebuild: 5.85 ms own, 5.85 ms total, parent keydown (0 similar since the last line).
+2026-10-30 00:20:49:156 [WARNING] [HotPath] Slow hotstring.expand: 5.40 ms own, 5.40 ms total, parent hotstring.match (1 similar since the last line).
+2026-10-30 00:20:49:704 [WARNING] [HotPath] Slow preview.rebuild: 5.37 ms own, 5.37 ms total, parent keydown (1 similar since the last line).
+2026-10-30 00:23:37:700 [WARNING] [HotPath] Slow preview.rebuild: 6.05 ms own, 6.05 ms total, parent keydown (1 similar since the last line).
+2026-10-30 00:23:39:740 [WARNING] [HotPath] Slow tooltip.show_predictions: 14.73 ms own, 14.73 ms total, parent none (1 similar since the last line).
+2026-10-30 00:23:41:630 [WARNING] [HotPath] Slow hotstring.expand: 11.79 ms own, 11.79 ms total, parent none (0 similar since the last line).
+2026-10-30 00:23:41:641 [ERROR] [llm.prediction_engine] Chain rescan suppression did not commit: nil
+2026-10-30 00:23:41:641 [ERROR] [keymap.llm_bridge] Prediction applied, but LLM chain ownership did not commit (result: false).
+2026-10-30 00:23:42:635 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 103 key-down(s), 105 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 00:45:09:789 [WARNING] [HotPath] Slow preview.rebuild: 5.27 ms own, 5.27 ms total, parent keydown (0 similar since the last line).
+2026-10-30 00:45:24:830 [WARNING] [HotPath] Slow tooltip.show_predictions: 15.59 ms own, 15.59 ms total, parent none (3 similar since the last line).
+2026-10-30 00:45:37:030 [WARNING] [HotPath] Slow preview.rebuild: 5.56 ms own, 5.56 ms total, parent keydown (4 similar since the last line).
+2026-10-30 00:45:37:581 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 147 key-down(s), 150 key-up(s), 3 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 00:45:58:063 [WARNING] [HotPath] Slow preview.rebuild: 5.82 ms own, 5.82 ms total, parent keydown (1 similar since the last line).
+2026-10-30 00:50:45:436 [WARNING] [HotPath] Slow preview.rebuild: 5.02 ms own, 5.02 ms total, parent keydown (1 similar since the last line).
+2026-10-30 00:53:56:018 [WARNING] [preferences] Slow preferences save 2086 ms (prepare=1268 write=817 ms; operations=293; prepare: snapshot=7 decode=0 models=0 sparse=287 wrap=1 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=965 ms; proposed=295; metadata_commands=4 in 189 ms; lua_heap=53->33 MB).
+2026-10-30 00:53:58:040 [WARNING] [preferences] Slow preferences save 2022 ms (prepare=1248 write=773 ms; operations=293; prepare: snapshot=6 decode=0 models=0 sparse=273 wrap=1 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=962 ms; proposed=295; metadata_commands=4 in 159 ms; lua_heap=33->47 MB).
+2026-10-30 00:53:58:065 [WARNING] [keystats] Keystats event tap found disabled — restarting.
+2026-10-30 00:54:06:072 [WARNING] [keystats.log_manager] Slow ingest tick 513 ms (drain=0 foreign=0 outbox=278 read=1 build=0 apply=1 commit=1 append=229 notify=0 ms; append: lock=0 journal=0 prepare=0 publish=2 write=154 clear=8 settle=62 release=0 ms; metadata_commands=0 in 0 ms; entries=1 statements=1).
+2026-10-30 00:54:09:324 [WARNING] [preferences] Slow preferences save 1945 ms (prepare=1309 write=636 ms; operations=293; prepare: snapshot=3 decode=0 models=0 sparse=304 wrap=1 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=993 ms; proposed=295; metadata_commands=0 in 0 ms; lua_heap=50->60 MB).
+2026-10-30 00:54:13:641 [WARNING] [preferences] Slow preferences save 2119 ms (prepare=1297 write=821 ms; operations=293; prepare: snapshot=8 decode=0 models=2 sparse=285 wrap=0 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=994 ms; proposed=295; metadata_commands=4 in 166 ms; lua_heap=61->42 MB).
+2026-10-30 00:54:14:761 [WARNING] [keymap] macOS disabled the loopbackKeyUp event tap — re-enabling.
+2026-10-30 00:54:14:761 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 257 key-down(s), 260 key-up(s), 3 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 2050 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 00:55:31:146 [WARNING] [HotPath] Slow preview.rebuild: 5.44 ms own, 5.44 ms total, parent keydown (2 similar since the last line).
+2026-10-30 00:55:32:898 [WARNING] [HotPath] Slow hotstring.expand: 12.08 ms own, 12.08 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 00:56:02:438 [WARNING] [menu_llm.mlx] MLX model Qwen3.5-2B not detected as installed. Starting download flow…
+2026-10-30 00:58:10:318 [WARNING] [karabiner.lease] Karabiner lease 1d5543ecc55c40d5b82c8d50b1bea79f: task output stayed unread for 120.0 s after the PONG 1 deadline.
+2026-10-30 00:58:10:319 [WARNING] [karabiner.lease] Karabiner lease 1d5543ecc55c40d5b82c8d50b1bea79f waited 124.50 s for PONG 1; the deadline timer fired 0.00 s late.
+2026-10-30 00:58:10:319 [ERROR] [karabiner.lease] Karabiner lease 1d5543ecc55c40d5b82c8d50b1bea79f failed; fencing before publishing failure: timeout waiting for PONG 1
+2026-10-30 00:58:10:319 [WARNING] [key_event_health] A Karabiner lease failed (pong); session totals: 2 key-down(s), 2 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 1 Karabiner lease failure(s) (pong=1).
+2026-10-30 00:58:10:319 [WARNING] [karabiner.lease] Starting detached fallback revoker for lease 1d5543ecc55c40d5b82c8d50b1bea79f (timeout waiting for PONG 1).
+2026-10-30 00:58:10:990 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 1/3 in 1.0 s (unexpected-worker-loss).
+2026-10-30 00:58:17:639 [WARNING] [startup_ctrl] Disabling LLM: the mlx backend (startup_model_download_declined: Qwen3.5-2B).
+2026-10-30 00:58:19:875 [WARNING] [preferences] Slow preferences save 2068 ms (prepare=1270 write=797 ms; operations=293; prepare: snapshot=5 decode=0 models=0 sparse=280 wrap=1 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=977 ms; proposed=295; metadata_commands=4 in 164 ms; lua_heap=57->43 MB).
+2026-10-30 00:58:19:875 [WARNING] [runtime] An hs.timer.new callback (...gopti_plus/macos/ui/menu/menu_llm/startup_controller.lua:263) held the main thread for 2072 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: shell.ls=55.8 ms, shell.cp=39.7 ms, shell.ls=35.1 ms, shell.ls=34.0 ms. Lua heap 57->43 MB.
+2026-10-30 00:58:19:882 [WARNING] [menu_llm.mlx] ↑ "MLX model Qwen3.5-2B not detected as installed. Starting download flow…" repeated 1 more time between 2026-10-30 00:56:04:373 and 2026-10-30 00:56:04:373.
+2026-10-30 00:58:28:019 [WARNING] [keymap.utils] Ignored-window prewarm incomplete (probe stage focused_window, TTL refresh armed); tracking remains fail-closed.
+2026-10-30 00:58:28:020 [WARNING] [keymap] Ignored-window watcher preparation incomplete; tracking remains fail-closed: false.
+2026-10-30 00:58:36:403 [WARNING] [preferences] Slow preferences save 1945 ms (prepare=1166 write=779 ms; operations=293; prepare: snapshot=4 decode=0 models=0 sparse=249 wrap=1 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=905 ms; proposed=295; metadata_commands=4 in 192 ms; lua_heap=38->33 MB).
+2026-10-30 00:58:37:722 [WARNING] [menu_llm.mlx] MLX model Qwen3.5-2B not detected as installed. Starting download flow…
+2026-10-30 01:01:42:389 [WARNING] [llm.api_mlx] Endpoint discovery: gave up waiting for MLX server after 185.9s. Falling back to default routes; warmup will keep retrying.
+2026-10-30 01:03:46:462 [ERROR] [llm.api_mlx] MLX discovery for 'Qwen3.5-2B-4bit' gave up after 310s — surfacing as load failure.
+2026-10-30 01:03:46:462 [ERROR] [llm.api_mlx] MLX model 'Qwen3.5-2B-4bit' marked as failed to load — status dot will show red.
+2026-10-30 01:03:46:470 [WARNING] [llm.core] warmup_model: backend warmup did not commit: false
+2026-10-30 01:04:48:177 [WARNING] [llm.api_mlx] Endpoint discovery: gave up waiting for MLX server after 180.8s. Falling back to default routes; warmup will keep retrying.
+2026-10-30 01:08:45:989 [WARNING] [keymap.utils] Ignored-window prewarm incomplete (probe stage focused_window, TTL refresh armed); tracking remains fail-closed.
+2026-10-30 01:08:45:989 [WARNING] [keymap] Ignored-window watcher preparation incomplete; tracking remains fail-closed: false.
+2026-10-30 01:08:55:554 [WARNING] [llm.api_mlx] Endpoint discovery: expected model 'Qwen3.5-2B-4bit' not visible in /v1/models cache list — POST may 404 if mlx_lm cannot resolve it.
+2026-10-30 01:08:55:558 [WARNING] [llm.api_mlx] MLX endpoint discovery: all candidates returned 404 — model may still be loading. Will retry on next warmup.
+2026-10-30 01:08:56:498 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=500 ms).
+2026-10-30 01:09:41:875 [WARNING] [llm.api_mlx] Endpoint discovery: expected model 'Qwen3.5-2B-4bit' not visible in /v1/models cache list — POST may 404 if mlx_lm cannot resolve it.
+2026-10-30 01:09:41:877 [WARNING] [llm.api_mlx] MLX endpoint discovery: all candidates returned 404 — model may still be loading. Will retry on next warmup.
+2026-10-30 01:11:38:557 [WARNING] [llm.api_mlx] Endpoint discovery: expected model 'Qwen3.5-2B-4bit' not visible in /v1/models cache list — POST may 404 if mlx_lm cannot resolve it.
+2026-10-30 01:11:38:665 [ERROR] [llm.api_mlx] Discovery reset POST-probe cancellation retained exact HTTP debt: false.
+2026-10-30 01:11:38:665 [ERROR] [llm.api_mlx] Endpoint reset retained predecessor debt (discovery=false, warmup=true, pgid=true).
+2026-10-30 01:11:38:665 [ERROR] [menu_llm.mlx] Server settlement refused MLX endpoint reset: false.
+2026-10-30 01:12:46:423 [ERROR] [config_migrate] Config migration of '~/perso/config/ergopti_plus/hammerspoon/config.toml' refused (newer): canonical schema version is newer than this build. The file is left untouched and this session will not write it.
+2026-10-30 01:12:47:129 [ERROR] [karabiner.lease] 'status' called before M.init() — lease controller unavailable.
+2026-10-30 01:13:32:611 [ERROR] [config_migrate] Config migration of '~/perso/config/ergopti_plus/hammerspoon/config.toml' refused (newer): canonical schema version is newer than this build. The file is left untouched and this session will not write it.
+2026-10-30 01:13:33:021 [ERROR] [karabiner.lease] 'status' called before M.init() — lease controller unavailable.
+2026-10-30 01:14:37:909 [WARNING] [llm.api_mlx] Endpoint discovery: expected model 'Qwen3.5-2B-4bit' not visible in /v1/models cache list — POST may 404 if mlx_lm cannot resolve it.
+2026-10-30 01:14:37:912 [WARNING] [llm.api_mlx] MLX endpoint discovery: all candidates returned 404 — model may still be loading. Will retry on next warmup.
+2026-10-30 01:15:28:699 [WARNING] [HotPath] Slow preview.rebuild: 11.36 ms own, 11.36 ms total, parent keydown (0 similar since the last line).
+2026-10-30 01:15:32:666 [WARNING] [HotPath] Slow hotstring.expand: 6.36 ms own, 6.36 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 01:16:08:402 [WARNING] [preferences] Slow preferences save 2038 ms (prepare=1242 write=796 ms; operations=293; prepare: snapshot=3 decode=0 models=0 sparse=262 wrap=0 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=970 ms; proposed=295; metadata_commands=4 in 194 ms; lua_heap=35->45 MB).
+2026-10-30 01:16:14:982 [WARNING] [llm.api_mlx] PGID pending timeout (15s) — unblocking zombie kills.
+2026-10-30 01:16:40:451 [WARNING] [adapters.http_client] Request timed out after 30000ms.
+2026-10-30 01:17:52:922 [WARNING] [llm.api_mlx] MLX endpoint discovery: all candidates returned 404 — model may still be loading. Will retry on next warmup.
+2026-10-30 01:18:03:152 [WARNING] [keymap.utils] Slow ignored-window probe 506 ms (watchers=0 focused_window=4 application=0 app_name=0 title=0 context_watchers=0 secure_field=0 destination=501 ms).
+2026-10-30 01:18:03:705 [WARNING] [adapters.http_client] ↑ "Request timed out after 30000ms." repeated 2 more times between 2026-10-30 01:17:10:451 and 2026-10-30 01:17:40:452.
+2026-10-30 01:18:07:613 [WARNING] [keymap.utils] Slow ignored-window probe 635 ms (watchers=0 focused_window=60 application=0 app_name=0 title=0 context_watchers=0 secure_field=47 destination=527 ms).
+2026-10-30 01:18:35:233 [ERROR] [menu_llm.mlx] MLX packages are not importable from the installed runtime ~/Library/Application Support/Ergopti/mlx-venv/bin/python (exit=9, cause=import_failed, path=nil): (no output)
+2026-10-30 01:18:35:234 [WARNING] [mlx_deps] MLX runtime invalidated; the next MLX selection repairs ~/Library/Application Support/Ergopti/mlx-venv.
+2026-10-30 01:18:35:235 [WARNING] [startup_ctrl] Startup MLX backup check failed for Qwen3.5-2B.
+2026-10-30 01:18:35:238 [WARNING] [menu_llm.mlx_repair_offer] Offering the MLX repair action for a import_failed failure.
+2026-10-30 01:18:41:070 [ERROR] [menu_llm.mlx] MLX server for ‘Qwen3.5-2B’ crashed — giving up. Reason: 01:18:41 [MLX-SERVER] ModuleNotFoundError: No module named 'transformers.models.auto'
+2026-10-30 01:18:41:070 [ERROR] [menu_llm.mlx] MLX crash for ‘Qwen3.5-2B’ — last 15 line(s) from MLX server stdout (full trace in ~/perso/ergopti/ergopti_plus/ErgoptiPlus_2026-10-30.log):
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER] Traceback (most recent call last):
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER]   File "~/Library/Application Support/Ergopti/mlx-venv/lib/python3.13/site-packages/transformers/utils/import_utils.py", line 2560, in __getattr__
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER]   File "~/Library/Application Support/Ergopti/mlx-venv/lib/python3.13/site-packages/transformers/utils/import_utils.py", line 2794, in _get_module
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER]   File "~/Library/Application Support/Ergopti/mlx-venv/lib/python3.13/site-packages/transformers/utils/import_utils.py", line 2792, in _get_module
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER]   File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/importlib/__init__.py", line 88, in import_module
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER]     return _bootstrap._gcd_import(name[level:], package, level)
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER]            ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER]   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER]   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER]   File "<frozen importlib._bootstrap>", line 1310, in _find_and_load_unlocked
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER]   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER]   File "<frozen importlib._bootstrap>", line 1324, in _find_and_load_unlocked
+2026-10-30 01:18:41:070 [WARNING] [menu_llm.mlx]   | 01:18:41 [MLX-SERVER] ModuleNotFoundError: No module named 'transformers.models.auto'
+2026-10-30 01:18:41:073 [ERROR] [llm.api_mlx] MLX model 'Qwen3.5-2B' marked as failed to load — status dot will show red.
+2026-10-30 01:18:41:073 [ERROR] [startup_ctrl] Disabling LLM (requirements check failed: server_start_failed).
+2026-10-30 01:18:43:317 [WARNING] [preferences] Slow preferences save 2141 ms (prepare=1309 write=832 ms; operations=293; prepare: snapshot=3 decode=0 models=0 sparse=286 wrap=1 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=1012 ms; proposed=295; metadata_commands=4 in 187 ms; lua_heap=42->59 MB).
+2026-10-30 01:18:43:318 [WARNING] [runtime] An hs.timer.new callback (...gopti_plus/macos/ui/menu/menu_llm/startup_controller.lua:263) held the main thread for 2144 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: shell.ls=58.0 ms, shell.ls=46.9 ms, shell.cp=43.1 ms, shell.ls=39.6 ms. Lua heap 42->59 MB.
+2026-10-30 01:19:48:336 [WARNING] [menu_llm.mlx] ↑ "  | 01:18:41 [MLX-SERVER]   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import" repeated 1 more time between 2026-10-30 01:18:41:070 and 2026-10-30 01:18:41:070.
+2026-10-30 01:19:48:340 [WARNING] [menu_llm.mlx] ↑ "  | 01:18:41 [MLX-SERVER]   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load" repeated 1 more time between 2026-10-30 01:18:41:070 and 2026-10-30 01:18:41:070.
+2026-10-30 01:19:50:467 [WARNING] [preferences] Slow preferences save 2126 ms (prepare=1280 write=845 ms; operations=293; prepare: snapshot=5 decode=0 models=0 sparse=281 wrap=1 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=985 ms; proposed=295; metadata_commands=4 in 212 ms; lua_heap=34->49 MB).
+2026-10-30 01:20:02:926 [WARNING] [llm.api_mlx] MLX endpoint discovery: all candidates returned 404 — model may still be loading. Will retry on next warmup.
+2026-10-30 01:20:04:549 [WARNING] [HotPath] Slow preview.rebuild: 11.79 ms own, 11.79 ms total, parent keydown (0 similar since the last line).
+2026-10-30 01:22:17:829 [WARNING] [karabiner.lease] Karabiner lease 554cdd2c504645b99d32c4549c501c37: task output stayed unread for 120.0 s after the PONG 20 deadline.
+2026-10-30 01:22:17:829 [WARNING] [karabiner.lease] Karabiner lease 554cdd2c504645b99d32c4549c501c37 waited 124.50 s for PONG 20; the deadline timer fired 0.00 s late.
+2026-10-30 01:22:17:829 [ERROR] [karabiner.lease] Karabiner lease 554cdd2c504645b99d32c4549c501c37 failed; fencing before publishing failure: timeout waiting for PONG 20
+2026-10-30 01:22:17:829 [WARNING] [key_event_health] A Karabiner lease failed (pong); session totals: 15 key-down(s), 15 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 1 Karabiner lease failure(s) (pong=1).
+2026-10-30 01:22:17:829 [WARNING] [karabiner.lease] Starting detached fallback revoker for lease 554cdd2c504645b99d32c4549c501c37 (timeout waiting for PONG 20).
+2026-10-30 01:22:18:503 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 1/3 in 1.0 s (unexpected-worker-loss).
+2026-10-30 01:23:23:236 [WARNING] [llm.api_mlx] Endpoint discovery: gave up waiting for MLX server after 182.7s. Falling back to default routes; warmup will keep retrying.
+2026-10-30 01:59:49:563 [ERROR] [llm.api_mlx] MLX discovery for 'Qwen3.5-2B-4bit' gave up after 340s — surfacing as load failure.
+2026-10-30 01:59:49:563 [ERROR] [llm.api_mlx] MLX model 'Qwen3.5-2B-4bit' marked as failed to load — status dot will show red.
+2026-10-30 01:59:49:565 [WARNING] [llm.core] warmup_model: backend warmup did not commit: false
+2026-10-30 02:16:58:409 [WARNING] [llm.api_mlx] Endpoint discovery: gave up waiting for MLX server after 181.0s. Falling back to default routes; warmup will keep retrying.
+2026-10-30 03:13:08:919 [WARNING] [karabiner.lease] Karabiner lease 41f76e8f91874db28cbdae98a3409773 heartbeat 72 had no clean local CLI transport.
+2026-10-30 08:40:26:021 [WARNING] [karabiner.lease] Karabiner lease 41f76e8f91874db28cbdae98a3409773 heartbeat 203 had no clean local CLI transport.
+2026-10-30 09:59:40:743 [WARNING] [HotPath] Slow preview.rebuild: 7.15 ms own, 7.15 ms total, parent keydown (1 similar since the last line).
+2026-10-30 10:01:24:025 [WARNING] [HotPath] Slow preview.rebuild: 5.11 ms own, 5.11 ms total, parent keydown (0 similar since the last line).
+2026-10-30 10:02:04:828 [WARNING] [HotPath] Slow preview.rebuild: 9.99 ms own, 9.99 ms total, parent keydown (2 similar since the last line).
+2026-10-30 10:03:22:911 [WARNING] [HotPath] Slow preview.rebuild: 6.43 ms own, 6.43 ms total, parent keydown (3 similar since the last line).
+2026-10-30 10:06:50:067 [WARNING] [shortcuts.actions.screen_capture] Clipboard screenshot refused: Screen Recording is not granted to the ErgoptiPlus runtime.
+2026-10-30 10:07:36:253 [WARNING] [keystats.context_tracker] Accessibility observer setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:749: The accessibility API is disabled
+2026-10-30 10:07:38:814 [ERROR] [shortcuts.actions.system] Eventtap 'tap keys' activation did not commit (start=hs.eventtap: Eventtap Mask: 0x400 (0x8c666f538), enabled=false).
+2026-10-30 10:07:38:814 [WARNING] [shortcuts.bindings] Hotkey 'tap_keys' could not be registered (its factory returned no hotkey); the other shortcuts stay active and it is retried.
+2026-10-30 10:07:38:814 [ERROR] [shortcuts.actions.system] Eventtap 'Cmd+star' activation did not commit (start=hs.eventtap: Eventtap Mask: 0x400 (0x8c666fbb8), enabled=false).
+2026-10-30 10:07:38:814 [WARNING] [shortcuts.actions.screen_capture] ↑ "Clipboard screenshot refused: Screen Recording is not granted to the ErgoptiPlus runtime." repeated 1 more time between 2026-10-30 10:06:56:878 and 2026-10-30 10:06:56:878.
+2026-10-30 10:07:38:814 [WARNING] [shortcuts.bindings] Hotkey 'cmd_star' could not be registered (its factory returned no hotkey); the other shortcuts stay active and it is retried.
+2026-10-30 10:07:38:814 [ERROR] [shortcuts.actions.system] Eventtap 'selection wrapping' activation did not commit (start=hs.eventtap: Eventtap Mask: 0x400 (0x8c666ffb8), enabled=false).
+2026-10-30 10:07:38:814 [WARNING] [shortcuts.bindings] Hotkey 'wrap_text_if_selected' could not be registered (its factory returned no hotkey); the other shortcuts stay active and it is retried.
+2026-10-30 10:07:38:814 [ERROR] [shortcuts.actions.system] Eventtap 'layer wheel' activation did not commit (start=hs.eventtap: Eventtap Mask: 0x400000 (0x8c6674738), enabled=false).
+2026-10-30 10:07:38:815 [WARNING] [shortcuts.bindings] Hotkey 'layer_wheel' could not be registered (its factory returned no hotkey); the other shortcuts stay active and it is retried.
+2026-10-30 10:07:39:827 [ERROR] [shortcuts.actions.system] Eventtap 'Cmd+star' activation did not commit (start=hs.eventtap: Eventtap Mask: 0x400 (0x8c3ea72b8), enabled=false).
+2026-10-30 10:07:39:828 [ERROR] [shortcuts.actions.system] Eventtap 'layer wheel' activation did not commit (start=hs.eventtap: Eventtap Mask: 0x400000 (0x8c3ea79b8), enabled=false).
+2026-10-30 10:07:39:829 [ERROR] [shortcuts.actions.system] Eventtap 'tap keys' activation did not commit (start=hs.eventtap: Eventtap Mask: 0x400 (0x8c6610eb8), enabled=false).
+2026-10-30 10:07:39:829 [ERROR] [shortcuts.actions.system] Eventtap 'selection wrapping' activation did not commit (start=hs.eventtap: Eventtap Mask: 0x400 (0x8c6613438), enabled=false).
+2026-10-30 10:07:42:832 [ERROR] [shortcuts.actions.system] Eventtap 'Cmd+star' activation did not commit (start=hs.eventtap: Eventtap Mask: 0x400 (0x8c2ff1838), enabled=false).
+2026-10-30 10:07:42:836 [ERROR] [shortcuts.actions.system] Eventtap 'layer wheel' activation did not commit (start=hs.eventtap: Eventtap Mask: 0x400000 (0x8c2a29838), enabled=false).
+2026-10-30 10:07:42:836 [ERROR] [shortcuts.actions.system] Eventtap 'tap keys' activation did not commit (start=hs.eventtap: Eventtap Mask: 0x400 (0x8c2a296b8), enabled=false).
+2026-10-30 10:07:42:837 [ERROR] [shortcuts.actions.system] Eventtap 'selection wrapping' activation did not commit (start=hs.eventtap: Eventtap Mask: 0x400 (0x8c2a29d38), enabled=false).
+2026-10-30 10:10:21:380 [WARNING] [runtime] An hs.timer.new callback (...i/static/ergopti_plus/macos/infra/accessibility_wait.lua:139) held the main thread for 1595 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: boot.stage=355.9 ms, boot.stage=234.6 ms, boot.stage_cpu=221.8 ms, boot.requires=211.5 ms, boot.stage_cpu=198.1 ms. Lua heap 20->30 MB.
+2026-10-30 10:10:24:191 [ERROR] [menu_llm.mlx] MLX packages are not importable from the installed runtime ~/Library/Application Support/Ergopti/mlx-venv/bin/python (exit=9, cause=import_failed, path=nil): (no output)
+2026-10-30 10:10:24:192 [WARNING] [mlx_deps] MLX runtime invalidated; the next MLX selection repairs ~/Library/Application Support/Ergopti/mlx-venv.
+2026-10-30 10:10:24:193 [WARNING] [startup_ctrl] Startup MLX backup check failed for Qwen3.5-2B.
+2026-10-30 10:10:24:196 [WARNING] [menu_llm.mlx_repair_offer] Offering the MLX repair action for a import_failed failure.
+2026-10-30 10:10:43:816 [WARNING] [keystats.log_manager] Slow ingest tick 17260 ms (drain=0 foreign=0 outbox=2 read=0 build=1 apply=13 commit=0 append=17241 notify=0 ms; append: lock=0 journal=0 prepare=17225 publish=4 write=4 clear=2 settle=3 release=0 ms; metadata_commands=0 in 0 ms; entries=1 statements=1).
+2026-10-30 10:10:43:816 [WARNING] [runtime] An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:2123) held the main thread for 17260 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 52->342 MB.
+2026-10-30 10:10:43:827 [ERROR] [karabiner] Remap guardian status is 'unavailable': the background helper is not registered, so tap-holds and remaps stay inert; ~/Library/Logs/ergopti_plus/launcher.log names the registration cause.
+2026-10-30 10:10:43:833 [WARNING] [karabiner] Karabiner regeneration remains fail-closed after guardian status 'unavailable' (regeneration-preflight).
+2026-10-30 10:10:43:848 [WARNING] [keystats] Keystats event tap found disabled — restarting.
+2026-10-30 10:10:43:856 [WARNING] [llm.api_mlx] PGID pending timeout (15s) — unblocking zombie kills.
+2026-10-30 10:12:24:991 [WARNING] [menu_llm.runtime_offer] The mlx runtime is not installed; its notice offers the install.
+2026-10-30 10:12:26:969 [WARNING] [mlx_deps] MLX runtime is not installed; no bootstrap without an MLX backend selection.
+2026-10-30 10:12:27:150 [WARNING] [startup_ctrl] Disabling LLM: the mlx backend (startup_runtime_not_installed).
+2026-10-30 10:12:29:002 [WARNING] [preferences] Slow preferences save 1850 ms (prepare=1124 write=725 ms; operations=293; prepare: snapshot=4 decode=0 models=0 sparse=240 wrap=1 rows=0 gestures=1 llm=1 shortcuts=1 hotstrings=872 ms; proposed=295; metadata_commands=4 in 148 ms; lua_heap=26->29 MB).
+2026-10-30 10:12:29:002 [WARNING] [runtime] An hs.timer.new callback (...gopti_plus/macos/ui/menu/menu_llm/startup_controller.lua:263) held the main thread for 1853 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: shell.ls=51.3 ms, shell.cp=33.3 ms, shell.ls=32.3 ms, shell.ls=31.9 ms. Lua heap 26->29 MB.
+2026-10-30 10:12:34:280 [WARNING] [shortcuts.actions.screen_capture] Clipboard screenshot refused: Screen Recording is not granted to the ErgoptiPlus runtime.
+2026-10-30 10:12:50:429 [ERROR] [config_migrate] Config migration of '~/perso/config/ergopti_plus/hammerspoon/config.toml' refused (newer): canonical schema version is newer than this build. The file is left untouched and this session will not write it.
+2026-10-30 10:12:51:066 [ERROR] [karabiner.lease] 'status' called before M.init() — lease controller unavailable.
+2026-10-30 10:13:16:478 [ERROR] [config_migrate] Config migration of '~/perso/config/ergopti_plus/hammerspoon/config.toml' refused (newer): canonical schema version is newer than this build. The file is left untouched and this session will not write it.
+2026-10-30 10:13:17:077 [ERROR] [karabiner.lease] 'status' called before M.init() — lease controller unavailable.
+2026-10-30 10:13:30:619 [ERROR] [config_migrate] Config migration of '~/perso/config/ergopti_plus/hammerspoon/config.toml' refused (newer): canonical schema version is newer than this build. The file is left untouched and this session will not write it.
+2026-10-30 10:13:31:032 [ERROR] [karabiner.lease] 'status' called before M.init() — lease controller unavailable.
+2026-10-30 10:14:12:452 [WARNING] [runtime] An hs.timer.new callback (...i/static/ergopti_plus/macos/infra/accessibility_wait.lua:139) held the main thread for 1312 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: boot.stage=228.5 ms, boot.stage=216.9 ms, boot.stage_cpu=207.5 ms, boot.stage_cpu=190.9 ms, boot.stage=111.6 ms. Lua heap 20->28 MB.
+2026-10-30 10:14:32:888 [WARNING] [shortcuts.actions.screen_capture] Clipboard screenshot refused: Screen Recording is not granted to the ErgoptiPlus runtime.
+2026-10-30 10:14:54:259 [WARNING] [keymap.utils] Slow ignored-window probe 483 ms (watchers=0 focused_window=459 application=0 app_name=0 title=0 context_watchers=0 secure_field=22 destination=0 ms).
+2026-10-30 10:15:04:432 [WARNING] [keymap.utils] Slow ignored-window probe 1032 ms (watchers=0 focused_window=7 application=0 app_name=0 title=0 context_watchers=1023 secure_field=0 destination=0 ms).
+2026-10-30 10:15:07:604 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 3 key-down(s), 2 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 1 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 1341 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 10:15:07:604 [WARNING] [key_event_health] A character key stayed down 3.8 s with no further event: its key-up was lost before the keymap taps; session totals: 3 key-down(s), 2 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 1 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 1341 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 10:15:08:926 [WARNING] [keymap.utils] Slow ignored-window probe 487 ms (watchers=0 focused_window=433 application=0 app_name=0 title=0 context_watchers=0 secure_field=52 destination=0 ms).
+2026-10-30 10:15:30:849 [ERROR] [shortcuts.actions.screenshot_save] Screenshot capture failed: screencapture exited with code 0 but produced no image.
+2026-10-30 10:15:47:305 [WARNING] [HotPath] Slow preview.rebuild: 6.40 ms own, 6.40 ms total, parent keydown (0 similar since the last line).
+2026-10-30 10:15:59:719 [WARNING] [HotPath] Slow preview.rebuild: 5.50 ms own, 5.50 ms total, parent keydown (2 similar since the last line).
+2026-10-30 10:16:01:026 [WARNING] [HotPath] Slow hotstring.expand: 7.56 ms own, 7.56 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 10:16:05:745 [WARNING] [HotPath] Slow keydown: 5.35 ms own, 5.35 ms total, parent none (0 similar since the last line).
+2026-10-30 10:16:09:787 [WARNING] [HotPath] Slow preview.rebuild: 5.94 ms own, 5.94 ms total, parent keydown (8 similar since the last line).
+2026-10-30 10:16:19:286 [WARNING] [HotPath] Slow keydown: 5.01 ms own, 5.01 ms total, parent none (2 similar since the last line).
+2026-10-30 10:16:19:877 [WARNING] [HotPath] Slow preview.rebuild: 5.08 ms own, 5.08 ms total, parent keydown (6 similar since the last line).
+2026-10-30 10:16:29:428 [WARNING] [HotPath] Slow hotstring.expand: 9.49 ms own, 9.49 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 10:16:29:428 [WARNING] [HotPath] Slow hotstring.match: 12.21 ms own, 21.70 ms total, parent keydown (0 similar since the last line).
+2026-10-30 10:16:30:303 [WARNING] [HotPath] Slow preview.rebuild: 6.24 ms own, 6.24 ms total, parent keydown (4 similar since the last line).
+2026-10-30 10:16:47:765 [WARNING] [HotPath] Slow preview.rebuild: 5.26 ms own, 5.26 ms total, parent keydown (1 similar since the last line).
+2026-10-30 10:17:03:288 [WARNING] [HotPath] Slow preview.rebuild: 6.17 ms own, 6.17 ms total, parent keydown (0 similar since the last line).
+2026-10-30 10:18:47:300 [WARNING] [HotPath] Slow preview.rebuild: 5.25 ms own, 5.25 ms total, parent keydown (4 similar since the last line).
+2026-10-30 10:18:58:551 [WARNING] [HotPath] Slow preview.rebuild: 5.75 ms own, 5.75 ms total, parent keydown (3 similar since the last line).
+2026-10-30 10:19:01:794 [WARNING] [HotPath] Slow keydown: 5.91 ms own, 5.91 ms total, parent none (0 similar since the last line).
+2026-10-30 10:19:15:492 [WARNING] [HotPath] Slow preview.rebuild: 5.10 ms own, 5.10 ms total, parent keydown (4 similar since the last line).
+2026-10-30 10:19:44:135 [WARNING] [HotPath] Slow preview.rebuild: 5.34 ms own, 5.34 ms total, parent keydown (0 similar since the last line).
+2026-10-30 10:20:03:182 [WARNING] [HotPath] Slow preview.rebuild: 5.26 ms own, 5.26 ms total, parent keydown (7 similar since the last line).
+2026-10-30 10:20:03:498 [WARNING] [HotPath] Slow hotstring.expand: 6.71 ms own, 6.71 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 10:20:15:346 [WARNING] [HotPath] Slow hotstring.expand: 6.07 ms own, 6.07 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 10:20:18:409 [WARNING] [HotPath] Slow preview.rebuild: 5.19 ms own, 5.19 ms total, parent keydown (3 similar since the last line).
+2026-10-30 10:20:25:488 [WARNING] [HotPath] Slow keydown: 6.18 ms own, 6.18 ms total, parent none (3 similar since the last line).
+2026-10-30 10:20:36:951 [WARNING] [HotPath] Slow preview.rebuild: 5.63 ms own, 5.63 ms total, parent keydown (4 similar since the last line).
+2026-10-30 10:20:41:168 [WARNING] [HotPath] Slow keydown: 6.60 ms own, 22.93 ms total, parent none (0 similar since the last line).
+2026-10-30 10:20:47:767 [WARNING] [HotPath] Slow preview.rebuild: 5.04 ms own, 5.04 ms total, parent keydown (6 similar since the last line).
+2026-10-30 10:20:54:091 [WARNING] [HotPath] Slow keydown: 5.34 ms own, 5.34 ms total, parent none (2 similar since the last line).
+2026-10-30 10:20:59:179 [WARNING] [HotPath] Slow preview.rebuild: 6.21 ms own, 6.21 ms total, parent keydown (4 similar since the last line).
+2026-10-30 10:21:10:627 [WARNING] [HotPath] Slow preview.rebuild: 5.01 ms own, 5.01 ms total, parent keydown (1 similar since the last line).
+2026-10-30 10:21:24:609 [WARNING] [HotPath] Slow preview.rebuild: 5.25 ms own, 5.25 ms total, parent keydown (9 similar since the last line).
+2026-10-30 10:21:36:085 [WARNING] [HotPath] Slow preview.rebuild: 6.15 ms own, 6.15 ms total, parent keydown (5 similar since the last line).
+2026-10-30 10:21:51:079 [WARNING] [HotPath] Slow hotstring.match: 8.44 ms own, 8.44 ms total, parent keydown (0 similar since the last line).
+2026-10-30 10:21:51:079 [WARNING] [HotPath] Slow preview.rebuild: 8.10 ms own, 8.10 ms total, parent keydown (6 similar since the last line).
+2026-10-30 10:22:00:760 [WARNING] [HotPath] Slow keydown: 5.62 ms own, 5.62 ms total, parent none (0 similar since the last line).
+2026-10-30 10:22:03:209 [WARNING] [HotPath] Slow preview.rebuild: 5.84 ms own, 5.84 ms total, parent keydown (0 similar since the last line).
+2026-10-30 10:22:11:243 [WARNING] [HotPath] Slow keydown: 6.86 ms own, 6.86 ms total, parent none (0 similar since the last line).
+2026-10-30 10:28:00:121 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 1406 key-down(s), 1407 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 10:28:07:124 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 1406 key-down(s), 1408 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 10:28:22:306 [WARNING] [HotPath] Slow hotstring.expand: 6.09 ms own, 6.09 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 10:28:26:108 [WARNING] [HotPath] Slow preview.rebuild: 9.12 ms own, 9.12 ms total, parent keydown (3 similar since the last line).
+2026-10-30 10:28:33:121 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 1470 key-down(s), 1471 key-up(s), 2 key-up(s) without key-down, 1 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 10:28:56:578 [WARNING] [HotPath] Slow keydown: 5.16 ms own, 5.16 ms total, parent none (0 similar since the last line).
+2026-10-30 10:29:00:366 [WARNING] [HotPath] Slow preview.rebuild: 5.31 ms own, 5.31 ms total, parent keydown (3 similar since the last line).
+2026-10-30 10:29:27:122 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 1583 key-down(s), 1585 key-up(s), 3 key-up(s) without key-down, 1 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 10:30:48:201 [WARNING] [HotPath] Slow preview.rebuild: 6.01 ms own, 6.01 ms total, parent keydown (0 similar since the last line).
+2026-10-30 10:31:37:066 [WARNING] [HotPath] Slow preview.rebuild: 5.45 ms own, 5.45 ms total, parent keydown (3 similar since the last line).
+2026-10-30 10:33:12:742 [WARNING] [HotPath] Slow preview.rebuild: 11.21 ms own, 11.21 ms total, parent keydown (3 similar since the last line).
+2026-10-30 10:34:22:723 [WARNING] [HotPath] Slow preview.rebuild: 5.14 ms own, 5.14 ms total, parent keydown (4 similar since the last line).
+2026-10-30 10:34:35:434 [WARNING] [HotPath] Slow preview.rebuild: 5.35 ms own, 5.35 ms total, parent keydown (4 similar since the last line).
+2026-10-30 10:34:47:037 [WARNING] [HotPath] Slow preview.rebuild: 5.23 ms own, 5.23 ms total, parent keydown (4 similar since the last line).
+2026-10-30 10:34:56:128 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 2011 key-down(s), 2011 key-up(s), 3 key-up(s) without key-down, 2 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 10:34:56:527 [WARNING] [HotPath] Slow keydown: 5.91 ms own, 5.91 ms total, parent none (0 similar since the last line).
+2026-10-30 10:34:59:053 [WARNING] [HotPath] Slow preview.rebuild: 5.11 ms own, 5.11 ms total, parent keydown (4 similar since the last line).
+2026-10-30 10:35:03:160 [WARNING] [HotPath] Slow hotstring.expand: 8.69 ms own, 8.69 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 10:35:09:728 [WARNING] [HotPath] Slow preview.rebuild: 5.32 ms own, 5.32 ms total, parent keydown (3 similar since the last line).
+2026-10-30 10:37:11:360 [WARNING] [HotPath] Slow preview.rebuild: 5.56 ms own, 5.56 ms total, parent keydown (4 similar since the last line).
+2026-10-30 10:37:29:569 [WARNING] [HotPath] Slow preview.rebuild: 5.01 ms own, 5.01 ms total, parent keydown (3 similar since the last line).
+2026-10-30 10:37:37:466 [WARNING] [HotPath] Slow hotstring.expand: 6.03 ms own, 6.03 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 10:37:40:426 [WARNING] [HotPath] Slow preview.rebuild: 5.10 ms own, 5.10 ms total, parent keydown (4 similar since the last line).
+2026-10-30 10:37:52:498 [WARNING] [HotPath] Slow preview.rebuild: 5.23 ms own, 5.23 ms total, parent keydown (2 similar since the last line).
+2026-10-30 10:37:57:906 [WARNING] [HotPath] Slow keydown: 12.50 ms own, 19.50 ms total, parent none (0 similar since the last line).
+2026-10-30 10:38:07:853 [WARNING] [HotPath] Slow preview.rebuild: 6.26 ms own, 6.26 ms total, parent keydown (4 similar since the last line).
+2026-10-30 10:38:12:427 [WARNING] [HotPath] Slow keydown: 6.17 ms own, 6.17 ms total, parent none (0 similar since the last line).
+2026-10-30 10:38:14:111 [WARNING] [HotPath] Slow hotstring.expand: 5.32 ms own, 5.32 ms total, parent hotstring.match (1 similar since the last line).
+2026-10-30 10:39:14:130 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 2476 key-down(s), 2478 key-up(s), 4 key-up(s) without key-down, 2 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 302 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 10:39:14:130 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 2476 key-down(s), 2478 key-up(s), 4 key-up(s) without key-down, 2 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 302 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 10:39:36:523 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).
+2026-10-30 10:39:42:590 [WARNING] [keymap.utils] Slow ignored-window probe 286 ms (watchers=0 focused_window=285 application=0 app_name=0 title=0 context_watchers=0 secure_field=0 destination=0 ms).
+2026-10-30 10:42:47:700 [WARNING] [HotPath] Slow preview.rebuild: 5.06 ms own, 5.06 ms total, parent keydown (3 similar since the last line).
+2026-10-30 10:42:56:030 [WARNING] [HotPath] Slow keydown: 5.03 ms own, 5.03 ms total, parent none (1 similar since the last line).
+2026-10-30 10:42:56:146 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 2534 key-down(s), 2536 key-up(s), 5 key-up(s) without key-down, 2 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 302 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 10:42:58:135 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 2550 key-down(s), 2551 key-up(s), 5 key-up(s) without key-down, 3 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 302 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 10:42:59:545 [WARNING] [HotPath] Slow preview.rebuild: 5.71 ms own, 5.71 ms total, parent keydown (15 similar since the last line).
+2026-10-30 10:43:09:817 [WARNING] [HotPath] Slow preview.rebuild: 6.26 ms own, 6.26 ms total, parent keydown (6 similar since the last line).
+2026-10-30 10:43:20:804 [WARNING] [HotPath] Slow preview.rebuild: 5.29 ms own, 5.29 ms total, parent keydown (9 similar since the last line).
+2026-10-30 10:44:47:559 [WARNING] [HotPath] Slow preview.rebuild: 5.13 ms own, 5.13 ms total, parent keydown (5 similar since the last line).
+2026-10-30 10:44:59:416 [WARNING] [HotPath] Slow preview.rebuild: 5.35 ms own, 5.35 ms total, parent keydown (1 similar since the last line).
+2026-10-30 10:47:30:590 [WARNING] [keystats.log_manager] Slow ingest tick 579 ms (drain=0 foreign=1 outbox=73 read=114 build=2 apply=7 commit=2 append=376 notify=0 ms; append: lock=0 journal=0 prepare=0 publish=3 write=355 clear=6 settle=10 release=0 ms; metadata_commands=0 in 0 ms; entries=7 statements=7).
+2026-10-30 10:48:49:593 [WARNING] [HotPath] Slow hotstring.expand: 5.20 ms own, 5.20 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 10:48:49:922 [WARNING] [HotPath] Slow preview.rebuild: 9.62 ms own, 9.62 ms total, parent keydown (3 similar since the last line).
+2026-10-30 10:51:08:207 [WARNING] [HotPath] Slow preview.rebuild: 5.54 ms own, 5.54 ms total, parent keydown (1 similar since the last line).
+2026-10-30 10:51:10:509 [WARNING] [HotPath] Slow hotstring.expand: 8.11 ms own, 8.11 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 10:51:11:305 [WARNING] [HotPath] Slow keydown: 5.20 ms own, 19.90 ms total, parent none (2 similar since the last line).
+2026-10-30 10:52:53:141 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 2922 key-down(s), 2925 key-up(s), 6 key-up(s) without key-down, 3 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 302 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 10:55:45:623 [WARNING] [HotPath] Slow preview.rebuild: 5.58 ms own, 5.58 ms total, parent keydown (6 similar since the last line).
+2026-10-30 10:57:12:759 [WARNING] [HotPath] Slow preview.rebuild: 5.82 ms own, 5.82 ms total, parent keydown (3 similar since the last line).
+2026-10-30 10:57:23:526 [WARNING] [HotPath] Slow preview.rebuild: 6.34 ms own, 6.34 ms total, parent keydown (2 similar since the last line).
+2026-10-30 10:57:34:773 [WARNING] [HotPath] Slow preview.rebuild: 6.13 ms own, 6.13 ms total, parent keydown (1 similar since the last line).
+2026-10-30 10:58:40:368 [WARNING] [HotPath] Slow preview.rebuild: 5.98 ms own, 5.98 ms total, parent keydown (0 similar since the last line).
+2026-10-30 10:59:02:741 [WARNING] [HotPath] Slow keydown: 5.05 ms own, 5.05 ms total, parent none (0 similar since the last line).
+2026-10-30 10:59:30:662 [WARNING] [HotPath] Slow preview.rebuild: 5.72 ms own, 5.72 ms total, parent keydown (1 similar since the last line).
+2026-10-30 11:00:00:333 [WARNING] [HotPath] Slow keydown: 5.13 ms own, 5.13 ms total, parent none (0 similar since the last line).
+2026-10-30 11:00:03:285 [WARNING] [HotPath] Slow preview.rebuild: 5.07 ms own, 5.07 ms total, parent keydown (0 similar since the last line).
+2026-10-30 11:01:46:097 [WARNING] [HotPath] Slow preview.rebuild: 5.04 ms own, 5.04 ms total, parent keydown (4 similar since the last line).
+2026-10-30 11:04:30:626 [WARNING] [HotPath] Slow preview.rebuild: 6.98 ms own, 6.98 ms total, parent keydown (5 similar since the last line).
+2026-10-30 11:15:53:159 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 3360 key-down(s), 3362 key-up(s), 6 key-up(s) without key-down, 4 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 302 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 11:16:19:321 [WARNING] [HotPath] Slow preview.rebuild: 7.69 ms own, 7.69 ms total, parent keydown (4 similar since the last line).
+2026-10-30 11:16:31:157 [WARNING] [HotPath] Slow preview.rebuild: 5.85 ms own, 5.85 ms total, parent keydown (1 similar since the last line).
+2026-10-30 11:19:47:566 [WARNING] [HotPath] Slow preview.rebuild: 5.08 ms own, 5.08 ms total, parent keydown (1 similar since the last line).
+2026-10-30 11:36:21:457 [WARNING] [HotPath] Slow preview.rebuild: 6.44 ms own, 6.44 ms total, parent keydown (2 similar since the last line).
+2026-10-30 11:36:45:995 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).
+2026-10-30 11:36:50:102 [WARNING] [keymap.utils] Slow ignored-window probe 502 ms (watchers=0 focused_window=502 ms).
+2026-10-30 11:37:12:920 [ERROR] [hotstring_editor] Personal hotstrings were saved but the live group reload rolled back.
+2026-10-30 11:37:25:391 [WARNING] [keymap.utils] ↑ "Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms)." repeated 1 more time between 2026-10-30 11:37:15:579 and 2026-10-30 11:37:15:579.
+2026-10-30 11:37:28:093 [WARNING] [keymap.utils] Ignored-window prewarm incomplete (probe stage focused_window, TTL refresh armed); tracking remains fail-closed.
+2026-10-30 11:37:28:093 [WARNING] [keymap] Ignored-window watcher preparation incomplete; tracking remains fail-closed: false.
+2026-10-30 11:37:32:371 [WARNING] [HotPath] Slow preview.rebuild: 9.18 ms own, 9.18 ms total, parent keydown (0 similar since the last line).
+2026-10-30 11:37:51:838 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).
+2026-10-30 11:37:53:444 [ERROR] [hotstring_editor] Personal hotstrings were saved but the live group reload rolled back.
+2026-10-30 11:38:10:897 [WARNING] [HotPath] Slow preview.rebuild: 10.36 ms own, 10.36 ms total, parent keydown (0 similar since the last line).
+2026-10-30 11:38:11:156 [WARNING] [HotPath] Slow hotstring.match: 5.49 ms own, 9.90 ms total, parent keydown (0 similar since the last line).
+2026-10-30 11:38:15:668 [WARNING] [HotPath] Slow keydown: 7.72 ms own, 7.72 ms total, parent none (0 similar since the last line).
+2026-10-30 11:38:21:282 [WARNING] [HotPath] Slow preview.rebuild: 5.33 ms own, 5.33 ms total, parent keydown (2 similar since the last line).
+2026-10-30 11:38:26:144 [WARNING] [HotPath] Slow keydown: 5.18 ms own, 5.18 ms total, parent none (0 similar since the last line).
+2026-10-30 11:40:54:476 [WARNING] [HotPath] Slow preview.rebuild: 5.60 ms own, 5.60 ms total, parent keydown (2 similar since the last line).
+2026-10-30 11:41:04:879 [WARNING] [HotPath] Slow preview.rebuild: 6.24 ms own, 6.24 ms total, parent keydown (5 similar since the last line).
+2026-10-30 11:44:09:255 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream (2 times); session totals: 3 key-down(s), 2 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 289 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 11:44:09:255 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 3 key-down(s), 2 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 289 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 11:44:15:252 [WARNING] [key_event_health] A character key stayed down 5.1 s with no further event: its key-up was lost before the keymap taps (2 times); session totals: 10 key-down(s), 10 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 289 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 11:44:31:411 [WARNING] [HotPath] Slow preview.rebuild: 11.58 ms own, 11.58 ms total, parent keydown (0 similar since the last line).
+2026-10-30 11:44:31:823 [WARNING] [HotPath] Slow hotstring.expand: 5.15 ms own, 5.15 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 11:44:47:294 [WARNING] [HotPath] Slow preview.rebuild: 5.08 ms own, 5.08 ms total, parent keydown (0 similar since the last line).
+2026-10-30 11:44:48:251 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 35 key-down(s), 34 key-up(s), 2 key-up(s) without key-down, 1 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 289 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 11:45:22:023 [WARNING] [HotPath] Slow preview.rebuild: 6.45 ms own, 6.45 ms total, parent keydown (1 similar since the last line).
+2026-10-30 11:47:16:787 [WARNING] [HotPath] Slow preview.rebuild: 5.09 ms own, 5.09 ms total, parent keydown (3 similar since the last line).
+2026-10-30 11:48:49:970 [WARNING] [HotPath] Slow preview.rebuild: 5.13 ms own, 5.13 ms total, parent keydown (0 similar since the last line).
+2026-10-30 11:54:10:258 [WARNING] [HotPath] Slow preview.rebuild: 5.02 ms own, 5.02 ms total, parent keydown (1 similar since the last line).
+2026-10-30 11:55:34:625 [WARNING] [karabiner.lease] Starting detached fallback revoker for lease 9b5e0fe253c44c43afd493904017df2b (watchdog completion).
+2026-10-30 11:58:29:509 [WARNING] [HotPath] Slow hotstring.expand: 15.35 ms own, 15.35 ms total, parent hotstring.match (0 similar since the last line).
+2026-10-30 11:58:31:104 [WARNING] [HotPath] Slow preview.rebuild: 8.05 ms own, 8.05 ms total, parent keydown (0 similar since the last line).
+2026-10-30 12:00:59:432 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).
+2026-10-30 12:02:20:504 [WARNING] [HotPath] Slow preview.rebuild: 12.56 ms own, 12.56 ms total, parent keydown (0 similar since the last line).
+2026-10-30 12:09:11:851 [ERROR] [ollama_deps] Ollama bootstrap ended with exit=1 (no signal, path=native_runtime_pty); output received: streamed stdout=253 stderr=0 bytes, final stdout=0 stderr=0 bytes; last 5 line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | {"success":false,"version":1,"reason":"deadline"} | [OLLAMA-DEPS] ERROR: stage python_download ended with exit 1.
+2026-10-30 12:09:11:851 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=1) — [OLLAMA-DEPS] ERROR: stage python_download ended with exit 1.
+2026-10-30 12:09:11:872 [WARNING] [download_window] Progress UI flipped to error state: [OLLAMA-DEPS] ERROR: stage python_download ended with exit 1.
+2026-10-30 12:09:11:872 [ERROR] [model_selector_page] The ollama runtime install from the model selector page failed.
+2026-10-30 13:42:55:257 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 13:44:59:856 [ERROR] [ollama_deps] Ollama bootstrap ended with exit=78 (no signal, path=native_runtime_pty); output received: streamed stdout=463 stderr=0 bytes, final stdout=0 stderr=0 bytes; last 10 line(s): [OLLAMA-DEPS] stage: python_bootstrap | [NATIVE-BOOTSTRAP] stage: uv_extract | [NATIVE-BOOTSTRAP] stage: python_download | {"success":true,"version":1,"reason":"complete"} | [NATIVE-BOOTSTRAP] stage: python_install | cpython-3.11.16-macos-aarch64-none is already installed | [NATIVE-BOOTSTRAP] stage: python_find | [OLLAMA-DEPS] stage: runtime_install | OLLAMA_MANAGED_CATALOGUE_MISSING | [OLLAMA-DEPS] ERROR: stage runtime_install ended with exit 78.
+2026-10-30 13:44:59:856 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=78) — Cette app de développement n'a pas encore construit son Ollama épinglé depuis les sources du clone : rien n'a été installé. Relancez tools/dev/run-macos-dev-app.sh et lisez la raison qu'il affiche (Go et les outils Xcode sont nécessaires).
+2026-10-30 13:44:59:856 [WARNING] [download_window] Progress UI flipped to error state: Cette app de développement n'a pas encore construit son Ollama épinglé depuis les sources du clone : rien n'a été installé. Relancez tools/dev/run-macos-dev-app.sh et lisez la raison qu'il affiche (Go et les outils Xcode sont nécessaires).
+2026-10-30 13:45:16:293 [WARNING] [menu_watchers] Menu source reload held while the developer field run runs (3 file(s): ~/perso/ergopti/static/ergopti_plus/macos/modules/keymap/expander.lua, ~/perso/ergopti/static/ergopti_plus/macos/modules/keymap/init.lua, ~/perso/ergopti/static/ergopti_plus/macos/tests/unit/modules/keymap/preview/test_preview_star_requires_auto_expand.lua).
+2026-10-30 13:48:42:013 [WARNING] [keymap.utils] Ignored-window prewarm incomplete (probe stage focused_window, TTL refresh armed); tracking remains fail-closed.
+2026-10-30 13:48:42:013 [WARNING] [keymap] Ignored-window watcher preparation incomplete; tracking remains fail-closed: false.
+2026-10-30 13:52:05:792 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-10-30 13:52:08:328 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-10-30 13:52:08:328 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.
+2026-10-30 13:52:51:338 [WARNING] [logger] ↑ 1 identical line suppressed
+2026-10-30 13:52:51:338 [WARNING] [shortcuts.keyboard_shortcuts] Some shortcuts are still unregistered after 4 retries; the next keyboard-layout change retries them.
+2026-10-30 14:02:05:955 [WARNING] [shortcuts.keyboard_shortcuts] ↑ "Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried." repeated 2 more times between 2026-10-30 13:52:06:794 and 2026-10-30 13:52:07:317.
+2026-10-30 14:02:08:454 [WARNING] [adapters.hotkey_registrar] ↑ "bind(): the OS refused 'Ctrl+.' — nil." repeated 3 more times between 2026-10-30 13:52:11:331 and 2026-10-30 13:52:51:338.
+2026-10-30 14:02:08:454 [WARNING] [shortcuts.keyboard_shortcuts] ↑ "Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried." repeated 2 more times between 2026-10-30 13:52:21:334 and 2026-10-30 13:52:51:338.
+2026-10-30 14:07:32:033 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 9 key-down(s), 10 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 14:19:57:479 [WARNING] [HotPath] Slow preview.rebuild: 7.83 ms own, 7.83 ms total, parent keydown (0 similar since the last line).
+2026-10-30 15:02:36:076 [WARNING] [field_run] A stale field run request was left by an earlier session; removed.
+2026-10-30 15:32:55:137 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 1 key-down(s), 2 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-10-30 16:28:06:085 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 16:29:57:670 [ERROR] [llm.api_ollama] Ollama server executable resolution did not commit (result: managed runtime metadata is pending); launch remains retryable.
+2026-10-30 16:29:57:670 [ERROR] [ollama_deps] Ollama daemon start failed (exit=-1) — Impossible de lancer le démon Ollama.
+2026-10-30 16:29:57:670 [WARNING] [download_window] Progress UI flipped to error state: Impossible de lancer le démon Ollama.
+2026-10-30 16:29:57:674 [ERROR] [llm.api_ollama] ensure_running() did not commit: false
+2026-10-30 16:36:23:278 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-10-30 17:05:21:778 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 17:06:56:036 [ERROR] [llm.api_ollama] Ollama server executable resolution did not commit (result: Ergopti's own Ollama runtime is not installed); launch remains retryable.
+2026-10-30 17:06:56:036 [ERROR] [ollama_deps] Ollama daemon start failed (exit=-1) — Impossible de lancer le démon Ollama.
+2026-10-30 17:06:56:036 [WARNING] [download_window] Progress UI flipped to error state: Impossible de lancer le démon Ollama.
+2026-10-30 17:06:56:040 [ERROR] [llm.api_ollama] ensure_running() did not commit: false
+2026-10-30 17:10:47:580 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-10-30 17:10:48:583 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-10-30 17:10:48:583 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.
+2026-10-30 17:19:06:761 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 17:19:31:251 [WARNING] [managed_ollama_hint] Owned Ollama runtime metadata refused (exit=78): refused: TypeError at ollama_hint_metadata.py:51 read_regular
+2026-10-30 17:20:46:724 [ERROR] [llm.api_ollama] Ollama server executable resolution did not commit (result: Ergopti's own Ollama runtime is not installed); launch remains retryable.
+2026-10-30 17:20:46:724 [ERROR] [ollama_deps] Ollama daemon start failed (exit=-1) — Impossible de lancer le démon Ollama.
+2026-10-30 17:20:46:724 [WARNING] [download_window] Progress UI flipped to error state: Impossible de lancer le démon Ollama.
+2026-10-30 17:20:46:729 [ERROR] [llm.api_ollama] ensure_running() did not commit: false
+2026-10-30 17:22:08:103 [WARNING] [keymap.utils] Slow ignored-window probe 365 ms (watchers=0 focused_window=364 application=0 app_name=0 title=0 context_watchers=0 secure_field=0 destination=0 ms).
+2026-10-30 17:24:42:361 [WARNING] [keystats] Keystats event tap found disabled — restarting.
+2026-10-30 17:24:44:375 [WARNING] [runtime] An hs.timer.new callback (...opti/static/ergopti_plus/macos/modules/keystats/init.lua:2321) held the main thread for 2014 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 30->30 MB.
+2026-10-30 17:24:45:161 [WARNING] [keymap.utils] Slow ignored-window probe 502 ms (watchers=0 focused_window=502 ms).
+2026-10-30 17:36:02:261 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 17:37:35:409 [ERROR] [llm.api_ollama] Ollama ollama_server_exited_before_publication did not commit (result: false); launch remains retryable.
+2026-10-30 17:37:35:409 [ERROR] [ollama_deps] Ollama daemon start failed (exit=-1) — Impossible de lancer le démon Ollama.
+2026-10-30 17:37:35:409 [WARNING] [download_window] Progress UI flipped to error state: Impossible de lancer le démon Ollama.
+2026-10-30 17:37:35:422 [ERROR] [llm.api_ollama] The local server's model list is unavailable: HTTP 0 (Network request failed: Connection failed: Could not connect to the server. - http://127.0.0.1:11435/api/tags).
+2026-10-30 17:41:03:743 [ERROR] [llm.api_ollama] ↑ "Ollama ollama_server_exited_before_publication did not commit (result: false); launch remains retryable." repeated 1 more time between 2026-10-30 17:37:35:627 and 2026-10-30 17:37:35:627.
+2026-10-30 17:41:05:366 [ERROR] [llm.api_ollama] ↑ "The local server's model list is unavailable: HTTP 0 (Network request failed: Connection failed: Could not connect to the server. - http://127.0.0.1:11435/api/tags)." repeated 19 more times between 2026-10-30 17:37:37:430 and 2026-10-30 17:38:13:499.
+2026-10-30 17:42:19:847 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-10-30 17:42:21:025 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-10-30 17:42:21:025 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.
+2026-10-30 18:23:28:239 [WARNING] [keymap.utils] Slow ignored-window probe 503 ms (watchers=0 focused_window=503 ms).
+2026-10-30 18:24:16:710 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 18:26:39:407 [WARNING] [managed_ollama_daemon] Managed Ollama daemon exited (status=78): Managed Ollama daemon admission refused: NativeHTTPError at native_http.py:490 _read_exact.
+2026-10-30 18:26:39:407 [ERROR] [llm.api_ollama] Ollama ollama_server_exited_before_publication did not commit (result: false); launch remains retryable.
+2026-10-30 18:26:39:407 [ERROR] [ollama_deps] Ollama daemon start failed (exit=-1) — Impossible de lancer le démon Ollama.
+2026-10-30 18:26:39:407 [WARNING] [download_window] Progress UI flipped to error state: Impossible de lancer le démon Ollama.
+2026-10-30 18:30:07:807 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-10-30 18:30:09:275 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-10-30 18:30:09:275 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.
+2026-10-30 18:30:10:741 [WARNING] [keymap.utils] Slow ignored-window probe 384 ms (watchers=0 focused_window=383 application=0 app_name=0 title=0 context_watchers=0 secure_field=0 destination=0 ms).
+2026-10-30 18:30:54:035 [WARNING] [shortcuts.keyboard_shortcuts] Some shortcuts are still unregistered after 4 retries; the next keyboard-layout change retries them.
+2026-10-30 18:36:00:944 [WARNING] [shortcuts.keyboard_shortcuts] ↑ "Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried." repeated 1 more time between 2026-10-30 18:30:09:613 and 2026-10-30 18:30:09:613.
+2026-10-30 18:36:01:474 [WARNING] [adapters.hotkey_registrar] ↑ "bind(): the OS refused 'Ctrl+.' — nil." repeated 4 more times between 2026-10-30 18:30:11:028 and 2026-10-30 18:30:54:035.
+2026-10-30 18:36:01:474 [WARNING] [shortcuts.keyboard_shortcuts] ↑ "Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried." repeated 4 more times between 2026-10-30 18:30:11:028 and 2026-10-30 18:30:54:035.
+2026-10-30 18:36:06:008 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 18:38:20:258 [WARNING] [managed_ollama_daemon] Managed Ollama daemon exited (status=78): Managed Ollama daemon admission refused: NativeHTTPError at native_http.py:490 _read_exact, from managed_ollama_serve.py:470 discover, reason=protocol, stage=native_first_frame, native_child_status=64, cleanup=confirmed.
+2026-10-30 18:38:20:258 [ERROR] [llm.api_ollama] Ollama ollama_server_exited_before_publication did not commit (result: false); launch remains retryable.
+2026-10-30 18:38:20:258 [ERROR] [ollama_deps] Ollama daemon start failed (exit=-1) — Impossible de lancer le démon Ollama.
+2026-10-30 18:38:20:258 [WARNING] [download_window] Progress UI flipped to error state: Impossible de lancer le démon Ollama.
+2026-10-30 18:39:26:780 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 18:39:53:753 [WARNING] [keymap.utils] Slow ignored-window probe 305 ms (watchers=0 focused_window=304 application=0 app_name=0 title=0 context_watchers=0 secure_field=0 destination=0 ms).
+2026-10-30 18:48:20:597 [WARNING] [managed_ollama_daemon] ↑ "Managed Ollama daemon exited (status=78): Managed Ollama daemon admission refused: NativeHTTPError at native_http.py:490 _read_exact, from managed_ollama_serve.py:470 discover, reason=protocol, stage=native_first_frame, native_child_status=64, cleanup=confirmed." repeated 1 more time between 2026-10-30 18:39:55:692 and 2026-10-30 18:39:55:692.
+2026-10-30 18:48:20:597 [ERROR] [llm.api_ollama] ↑ "Ollama ollama_server_exited_before_publication did not commit (result: false); launch remains retryable." repeated 1 more time between 2026-10-30 18:39:55:692 and 2026-10-30 18:39:55:692.
+2026-10-30 18:48:20:597 [ERROR] [ollama_deps] ↑ "Ollama daemon start failed (exit=-1) — Impossible de lancer le démon Ollama." repeated 1 more time between 2026-10-30 18:39:55:692 and 2026-10-30 18:39:55:692.
+2026-10-30 18:48:20:597 [WARNING] [download_window] ↑ "Progress UI flipped to error state: Impossible de lancer le démon Ollama." repeated 1 more time between 2026-10-30 18:39:55:733 and 2026-10-30 18:39:55:733.
+2026-10-30 19:03:21:372 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-10-30 19:03:22:374 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-10-30 19:03:22:374 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.
+2026-10-30 19:14:10:076 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 19:40:30:733 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-10-30 19:40:32:016 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-10-30 19:40:32:016 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.
+2026-10-30 20:42:03:918 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).
+2026-10-30 20:43:05:114 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 20:47:10:697 [ERROR] [menu_llm.ollama] Managed model pull retirement is pending; exact task slot retained.
+2026-10-30 20:47:10:697 [ERROR] [menu_llm.ollama] The Ollama pull of granite4:350m-h ended (code 78) but its task could not be settled.
+2026-10-30 20:50:47:041 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-10-30 20:50:48:042 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-10-30 20:50:48:042 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.
+2026-10-30 20:52:19:147 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 20:52:44:430 [ERROR] [keystats.log_manager] Ingest batch rolled back: cannot commit ingest transaction: database is locked.
+2026-10-30 20:56:42:118 [ERROR] [menu_llm.ollama] Managed model pull retirement is pending; exact task slot retained.
+2026-10-30 20:56:42:118 [ERROR] [menu_llm.ollama] The Ollama pull of granite4:350m-h ended (code 78) but its task could not be settled.
+2026-10-30 20:56:56:292 [ERROR] [fs_dir] Cannot iterate directory '~/perso/ergopti/ergopti_plus/crash_reports' — ...perso/ergopti/static/ergopti_plus/macos/infra/fs_dir.lua:48: cannot open ~/perso/ergopti/ergopti_plus/crash_reports: No such file or directory.
+2026-10-30 21:00:22:279 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-10-30 21:00:23:563 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-10-30 21:00:23:563 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.
+2026-10-30 21:01:36:912 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 21:05:49:620 [ERROR] [menu_llm.ollama] Managed model pull retirement is pending; exact task slot retained.
+2026-10-30 21:05:49:620 [ERROR] [menu_llm.ollama] The Ollama pull of granite4:350m-h ended (code 78) but its task could not be settled.
+2026-10-30 21:06:02:260 [ERROR] [fs_dir] Cannot iterate directory '~/perso/ergopti/ergopti_plus/crash_reports' — ...perso/ergopti/static/ergopti_plus/macos/infra/fs_dir.lua:48: cannot open ~/perso/ergopti/ergopti_plus/crash_reports: No such file or directory.
+2026-10-30 21:54:10:639 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 21:57:41:763 [ERROR] [menu_llm.ollama] Managed model pull retirement is pending; exact task slot retained.
+2026-10-30 21:57:41:763 [ERROR] [menu_llm.ollama] The Ollama pull of granite4:350m-h ended (code 78) but its task could not be settled.
+2026-10-30 22:02:59:664 [WARNING] [keymap.utils] Slow ignored-window probe 334 ms (watchers=0 focused_window=329 application=0 app_name=0 title=3 context_watchers=0 secure_field=0 destination=0 ms).
+2026-10-30 22:03:02:476 [WARNING] [keymap.utils] Slow ignored-window probe 502 ms (watchers=0 focused_window=502 ms).
+2026-10-30 22:03:07:238 [ERROR] [keystats.context_tracker] Replacement AXValueChanged watcher setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:655: Notification has already been registered
+2026-10-30 22:03:07:261 [WARNING] [karabiner.lease] Karabiner lease 15f9d1eabf564443b1683c4fa52dbe22 waited 4.77 s for PONG 106; the deadline timer fired 0.00 s late.
+2026-10-30 22:03:07:261 [ERROR] [karabiner.lease] Karabiner lease 15f9d1eabf564443b1683c4fa52dbe22 failed; fencing before publishing failure: timeout waiting for PONG 106
+2026-10-30 22:03:07:261 [WARNING] [key_event_health] A Karabiner lease failed (pong); session totals: 0 key-down(s), 0 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 1 Karabiner lease failure(s) (pong=1).
+2026-10-30 22:03:07:261 [WARNING] [karabiner.lease] Starting detached fallback revoker for lease 15f9d1eabf564443b1683c4fa52dbe22 (timeout waiting for PONG 106).
+2026-10-30 22:03:07:265 [WARNING] [karabiner.lease] Lease watchdog 15f9d1eabf564443b1683c4fa52dbe22 stderr: lease worker: Hammerspoon closed its input without STOP; last private command HEARTBEAT 1 107 sent 0.00 s earlier, unanswered.
+2026-10-30 22:03:33:015 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 1/3 in 1.0 s (unexpected-worker-loss).
+2026-10-30 22:20:05:684 [ERROR] [keystats.context_tracker] ↑ "Replacement AXValueChanged watcher setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:655: Notification has already been registered
+2026-10-30 23:04:10:083 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).
+2026-10-30 23:04:44:752 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-30 23:10:42:587 [ERROR] [menu_llm.ollama] Managed model pull retirement is pending; exact task slot retained.
+2026-10-30 23:10:42:589 [ERROR] [menu_llm.ollama] The Ollama pull of granite4:350m-h ended (code 1) but its task could not be settled; last output: OLLAMA_PULL_BYTES 430 430.
