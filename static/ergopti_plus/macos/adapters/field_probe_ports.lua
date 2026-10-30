@@ -82,6 +82,7 @@ local function hold_counts()
 	return {
 		over_250ms = PhaseStats.counter("runtime.timer_hold_over_250ms"),
 		over_1000ms = PhaseStats.counter("runtime.timer_hold_over_1000ms"),
+		worst = require("infra.logger").worst_timer_hold(),
 	}
 end
 
