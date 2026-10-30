@@ -58,6 +58,13 @@ while it parses. "Quiet" therefore needs a command the driver answers (its only
 thread is free) and a single live process of the session; counting the log is
 not enough.
 
+### project-live-checks-a-held-write-delays-every-menu-click
+
+`MenuDispatcher` holds a click behind a configuration write for 10 s before it
+runs it, so a Quit clicked under a held lease reports its refusal after 10 s plus
+its own 12 s deadline. A check that waits for only the deadline sees nothing and
+blames the driver. Read the log with `waitForLog` for both.
+
 ### project-live-checks-versions-window-needs-memory
 
 `Changelog_Open` opens its WebView2 form only when `WebView_ShouldUseNativeFallback()`
