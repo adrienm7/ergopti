@@ -947,7 +947,7 @@ check(
 			'swift_root_suite'
 		])
 			assert.equal(full.includes(removed), false, removed);
-		assert.equal(Scoped.contract.slots.length, 187);
+		assert.equal(Scoped.contract.slots.length, 189);
 		const retained = Raw.step(job.body, 'Retain scoped native Brew qualification receipt');
 		assert.ok(
 			retained.includes(
