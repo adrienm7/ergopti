@@ -221,28 +221,33 @@ gesture routes are in `docs/memory/rejected_proposals.md`. Its notifier, LLM man
 HTTP transport items are done (`linux/adapters/notifier.lua`, `[sections.llm]` lists `linux`,
 `linux/modules/llm/api_remote.lua`). Still open on 2026-10-29:
 
-- M3.3: remove `linux/ui/menu/menu_builder.lua` in favour of the shared renderer. [CODE] Measured on
-  2026-10-30 (fix/linux-privacy-menu): every submenu ALREADY renders through `_shared/lua/menu/renderer.lua`
-  (`infra/manifest_menu.lua`, 21 `ManifestMenu.build` calls, root included). What is left is not a
-  renderer migration but a split: the 5 727-line file is the Linux counterpart of macOS's per-section
-  `ui/menu/menu_*.lua` modules, in one file. It was not started, because a partial split breaks the
-  gates that read it by path: 96 Linux tests and 27 shared `tools/test` files (menu parity, bijection,
-  manifest, rows-outside-renderer, top-level parity, tap-hold parity, keys-exist, dialog titles, the
-  native menu census fixture, the duplicate-constant baseline...) name `menu_builder`. Plan, one commit
-  per step, each green on `test:linux` and `test:js`. Behaviour must not change:
-  `test_menu_matches_manifest`, `test-menu-parity` and `test-menu-top-level-parity` stay green at every
-  step without editing their expectations.
-  1. Move the shared prelude (lines 1-412: dialogs, zenity/Modal helpers, `i18n_safe`, separators,
-     `_row_is_for_linux`, `_grey_for_pause`) to `ui/menu/menu_common.lua`, re-exported by `menu_builder`.
-  2. One step per builder, smallest first, each to `ui/menu/menu_<section>.lua` exporting `build(ctx)`
-     (lines: header 126, reload 23, quit 52, debug 53, configuration 86, language 302, about 74,
-     metrics 142, gestures 198, layouts 197, tap_holds 290, agent 378, shortcuts 628, llm 928, and
-     hotstrings 99 plus its 1 562-line helper block, lines 736-2297). Repoint, in the
-     same commit, every test and `tools/test` reader of that builder's source to the new file (a shared
-     file: announce it to the coordinator first, or land the `tools/test` half as its own commit).
-  3. `M.build` and the `builders` table become `ui/menu/tray_root.lua`; `ergopti_hotstrings.lua`,
-     `ui/menu/timed_build.lua` and `rebuild_owner.lua` require it; delete `menu_builder.lua` and its
-     entry in `tools/test/fixtures/native-menu-census-legacy.json` and the duplicate-constant baseline.
+- M3.3: remove `linux/ui/menu/menu_builder.lua` in favour of the shared renderer. [CODE] Every submenu
+  already renders through `_shared/lua/menu/renderer.lua` (`infra/manifest_menu.lua`, 21
+  `ManifestMenu.build` calls), so what is left is splitting the 5 729-line file into per-section modules.
+  Started and reverted on 2026-10-30: the earlier plan here (repoint each reader to the new file) does
+  not hold. The menu gates are single-file data-flow analysers with mutation counterexamples:
+  `checkLinuxDeclaredAboutParent` (`test-menu-manifest.cjs`) needs `_build_about` and `M.build` in one
+  source, `test-menu-parity.cjs` names the file as the native source of ~90 rows, and
+  `fixtures/linux-native-caption-binding-counterexamples.cjs` and
+  `fixtures/hotstring-language-owner-counterexamples.cjs` trace helpers inside it. Moving only the 12 pure
+  dialog helpers and `i18n_safe` to a `menu_common.lua` (module bindings kept per file) turned
+  `test-menu-parity`, `test-menu-manifest`, `test-menu-action-handler-bijection` and
+  `test-hotstring-category-submenu-order` red, against a `dev` baseline where they pass. Measured facts
+  for whoever resumes:
+  - The dependency graph is clean: each top-level definition is reached by one builder or is shared, and
+    no builder assigns a shared local. Shared: the zenity dialogs, `_fill`, `shell_quote`, `succeeded`,
+    `prompt_text`, `assign_parameterized_action`, `open_action_picker`, `slot_binding_rows`,
+    `ask_yes_no`; module bindings (`ManifestMenu`, `Logger`, `COMMAND`...) must stay per file for the
+    gates. Splitting all 14 builders leaves a 438-line root.
+  - `i18n_safe` is a global that tests replace in `_G`: parts must read it at call time, never alias it.
+  - Tests reload the builder after swapping `package.loaded` entries, and walk
+    `build -> _build_<section> -> helper` by upvalue name, so the root must reload its parts when it
+    loads and keep the `_build_<section>` local names.
+  - The header builder shares the root's separator facade checks and belongs with the root.
+  - Decision needed first (shared `tools/test`, coordinator or maintainer): either (a) teach the analysers
+    to follow a module boundary (`local X = require("ui.menu.menu_x").build`), with new counterexamples,
+    or (b) give them one exact assembled Linux tray source built from the parts, rejecting any other
+    wiring. Then split one builder per commit, smallest first.
 - 20 of the 36 gesture slots are physically out of reach on some machines.
 - Without a grab, the desktop (GNOME 47+) acts on the same gesture.
 - The 9 two-finger slots fight with scrolling everywhere.
