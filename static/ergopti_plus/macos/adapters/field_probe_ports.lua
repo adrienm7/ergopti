@@ -531,22 +531,51 @@ local function menu_rebuild()
 	return menu.timed_rebuild()
 end
 
---- Types tagged keys into a scratch text field this process opens, and only there:
---- the focus is checked before each key, and the window is closed and the
---- previous application brought back whatever happens.
---- @param keys table Single characters.
+--- True when the keymap taps that decode a selftest key, and consume it
+--- anywhere but the scratch window, are running.
+--- @return boolean running
+local function keymap_taps_enabled()
+	local states = tap_states()
+	if type(states) ~= "table" or states.started ~= true then return false end
+	local enabled = {}
+	for _, entry in ipairs(states.taps or {}) do enabled[entry.name] = entry.state == "enabled" end
+	return enabled.keyDown == true and enabled.loopbackKeyUp == true
+end
+
+--- Types selftest keys into a scratch text field this process opens, and only
+--- there. The keymap decodes them as typing only while that window is the
+--- focused one and consumes them anywhere else (modules/keymap/selftest_gate.lua);
+--- this side also checks the focus and the keymap taps before each key, and
+--- closes the window and brings the previous application back whatever happens.
+--- A key is a single character or a key name such as "space".
+--- @param keys table Keys, typed in order.
 --- @param callback function fn({ focused, posted, aborted, text, latency_ms, restored }).
-local function scratch_typing(keys, callback)
+--- @param options table|nil { bound_seconds, watch = fn(field, done(text)) }:
+---        watch replaces the plain read after the last key, for a step that
+---        waits for an effect; field = { read(fn(text)), last_key_at }.
+local function scratch_typing(keys, callback, options)
 	local Timer = require("adapters.timer_scheduler")
 	local OwnWindow = require("adapters.own_window")
+	local Selftest = require("infra.field_run_selftest")
+	options = options or {}
 	local outcome = { focused = false, posted = 0 }
 	local previous = hs.application.frontmostApplication()
-	local view, settled, bound, started = nil, false, nil, nil
+	local view, settled, bound, started, publication = nil, false, nil, nil, nil
 	local function settle(aborted)
 		if settled then return end
 		settled = true
 		if bound then Timer.cancel(bound) end
 		outcome.aborted = outcome.aborted or aborted
+		-- Retracted before the window closes: no selftest key is decoded as
+		-- typing once the scratch field is gone.
+		if publication then
+			local retracted, err = pcall(Selftest.retract, publication)
+			if not retracted then
+				require("infra.logger").error("adapters.field_probe_ports", "The selftest window was not retracted: %s.",
+					tostring(err))
+			end
+			publication = nil
+		end
 		if view then pcall(function() view:delete() end) end
 		if previous then pcall(function() previous:activate() end) end
 		Timer.after(SCRATCH_READ_SECONDS, function()
@@ -556,12 +585,13 @@ local function scratch_typing(keys, callback)
 		end)
 	end
 	--- True while the scratch field's window is the focused one of this process.
+	--- @return boolean focused, string|integer reason_or_window_id
 	local function scratch_has_focus()
 		local front = hs.application.frontmostApplication()
 		if not front or front:pid() ~= hs.processInfo.processID then return false, "not_frontmost" end
 		local focused, own = hs.window.focusedWindow(), OwnWindow.for_webview(view)
 		if not focused or not own or focused:id() ~= own:id() then return false, "window_unfocused" end
-		return true
+		return true, own:id()
 	end
 	local ok, err = pcall(function()
 		local screen = hs.screen.mainScreen():frame()
@@ -575,30 +605,54 @@ local function scratch_typing(keys, callback)
 		require("infra.logger").error("adapters.field_probe_ports", "The scratch field could not open: %s.", tostring(err))
 		return settle("scratch_refused")
 	end
-	bound = Timer.after(SCRATCH_BOUND_SECONDS, function()
+	bound = Timer.after(options.bound_seconds or SCRATCH_BOUND_SECONDS, function()
 		bound = nil
 		settle("scratch_bound")
 	end)
+	local last_key_at = nil
+	local function finish_typing()
+		if settled then return end
+		local function done(text)
+			if settled then return end
+			outcome.text = type(text) == "string" and text or nil
+			outcome.latency_ms = (hs.timer.absoluteTime() - started) / 1e6
+			settle(nil)
+		end
+		if options.watch then
+			return options.watch({
+				read = function(fn) view:evaluateJavaScript('document.getElementById("field").value', fn) end,
+				last_key_at = last_key_at,
+			}, done)
+		end
+		Timer.after(SCRATCH_READ_SECONDS, function()
+			if settled then return end
+			view:evaluateJavaScript('document.getElementById("field").value', done)
+		end)
+	end
 	local function type_key(index)
 		if settled then return end
-		if index > #keys then
-			return Timer.after(SCRATCH_READ_SECONDS, function()
-				if settled then return end
-				view:evaluateJavaScript('document.getElementById("field").value', function(text)
-					outcome.text = type(text) == "string" and text or nil
-					outcome.latency_ms = (hs.timer.absoluteTime() - started) / 1e6
-					settle(nil)
-				end)
-			end)
-		end
+		if index > #keys then return finish_typing() end
 		local focused, reason = scratch_has_focus()
 		if not focused then return settle(index == 1 and reason or ("focus_lost_" .. reason)) end
+		-- A selftest key is consumed only by the keymap tap: with it off, the
+		-- key would reach whatever has the focus when it is delivered.
+		if not keymap_taps_enabled() then return settle(index == 1 and "keymap_tap_off" or "keymap_tap_lost") end
+		if publication == nil then
+			local published, generation = pcall(Selftest.publish, reason)
+			if not published then
+				require("infra.logger").error("adapters.field_probe_ports", "The selftest window could not be published: %s.",
+					tostring(generation))
+				return settle("selftest_busy")
+			end
+			publication = generation
+		end
 		outcome.focused = true
 		started = started or hs.timer.absoluteTime()
-		-- Through the one tagged injection owner: the keymap and keystats know
-		-- these keys as the driver's own output, the passive counter still sees them
-		local sent, emitted = pcall(require("adapters.synthetic_input").emit_key_stroke, {}, keys[index], 0)
+		-- The selftest class: the keymap decodes these keys as typing in this
+		-- window only, keystats never counts them, the passive counter sees them
+		local sent, emitted = pcall(require("adapters.synthetic_input").emit_selftest_key_stroke, {}, keys[index])
 		if not sent or emitted ~= true then return settle("injection_refused") end
+		last_key_at = hs.timer.absoluteTime()
 		outcome.posted = index
 		Timer.after(SCRATCH_KEY_GAP_SECONDS, function() type_key(index + 1) end)
 	end

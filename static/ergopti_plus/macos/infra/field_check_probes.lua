@@ -878,10 +878,10 @@ M.SELFTEST_COUNT_SECONDS = 6
 --- user's application, and a lost focus stops the sequence with its code. The
 --- passive counter must see each posted key once and the field must hold the
 --- sequence exactly; the previous application gets the focus back. The keys
---- go through the tagged injection owner, so the keymap and keystats treat
---- them as the driver's own output; they are posted after Karabiner, so the
---- virtual keyboard path and the ledger's double count are only provable with
---- physical keys, as their codes say.
+--- are selftest keys: the keymap decodes them as typing in the scratch window
+--- only and keystats never counts them; they are posted after Karabiner, so
+--- the virtual keyboard path and the ledger's double count are only provable
+--- with physical keys, as their codes say.
 function M.typing_selftest(ports, report, finish)
 	local expected = table.concat(M.SELFTEST_KEYS)
 	local before = ports.keystats_facts()
@@ -915,7 +915,7 @@ function M.typing_selftest(ports, report, finish)
 		report.step("karabiner_path", STATE.skip, "physical_keys_only")
 		report.step("double_count", STATE.skip, "physical_keys_only")
 		report.step("front_restored", typed.restored and STATE.pass or STATE.fail, typed.restored and "yes" or "no")
-		report.step("keystats_effect", STATE.info, "tagged_synthetic_input")
+		report.step("keystats_effect", STATE.info, "selftest_never_counted")
 		finish()
 	end)
 	ports.scratch_typing(M.SELFTEST_KEYS, function(outcome) typed = outcome end)
