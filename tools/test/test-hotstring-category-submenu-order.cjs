@@ -30,7 +30,7 @@ const manifest = JSON.parse(
 const {
 	hotstringScopePublication,
 	hotstringLanguagePublication,
-	files: languageOwnerFiles
+	readOwnerSources
 } = require('../lib/menu-hotstring-language-binding.cjs');
 
 const ALL_SECTIONS_KEY = 'menu.hotstrings.enable_all_sections';
@@ -450,9 +450,7 @@ for (const region of LANGUAGE_REGIONS) {
 
 // Shared declarations keep the original label, order, checked getter and scope callback causal.
 for (const platform of ['ahk', 'hs', 'linux']) {
-	const sources = Object.fromEntries(
-		languageOwnerFiles[platform].map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
-	);
+	const sources = readOwnerSources(SP, platform);
 	const target =
 		platform === 'ahk' ? 'hotstring_language_parent_windows' : 'hotstring_language_parent_lua';
 	if (!hotstringLanguagePublication(sources, manifest, platform, target))

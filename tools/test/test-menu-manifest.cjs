@@ -1914,8 +1914,21 @@ checkPrivacyTriggerControls();
 		],
 		'the existing root owns both lifecycle labels and their order'
 	);
+	// The Linux root is read with its split section modules folded back in.
+	const lifecycleProvider = (source) =>
+		['reload', 'quit'].every(
+			(id) =>
+				source.includes(`ManifestMenu.command_row("top_level", "${id}"`) &&
+				!new RegExp(
+					`(?:label|title)\\s*=.*(?:i18n_safe|i18n\\.get)\\("menu\\.global\\.${id}"\\)`
+				).test(source)
+		);
+	const linuxMenu = require('../lib/linux-menu-parts.cjs');
 	for (const file of ['macos/ui/menu/builder.lua', 'linux/ui/menu/menu_builder.lua']) {
-		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		const source =
+			file === linuxMenu.LINUX_MENU_ROOT
+				? linuxMenu.linuxMenuRootSource(resolve(REPO_ROOT, 'static/ergopti_plus'))
+				: readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
 		for (const id of ['reload', 'quit']) {
 			assert(
 				source.includes(`ManifestMenu.command_row("top_level", "${id}"`),
@@ -1929,6 +1942,23 @@ checkPrivacyTriggerControls();
 			);
 		}
 	}
+	require('./lib/linux-menu-split.cjs').verifyQuitSplit(
+		linuxMenu.readLinuxMenuSources(resolve(REPO_ROOT, 'static/ergopti_plus')),
+		lifecycleProvider,
+		[
+			[
+				'ManifestMenu.command_row("top_level", "quit"',
+				'ManifestMenu.command_row("top_level", "foreign"',
+				'split Quit module withdraws its shared command'
+			],
+			[
+				'ManifestMenu.command_row("top_level", "quit", {',
+				'{ label = i18n_safe("menu.global.quit"), ManifestMenu.command_row("top_level", "quit", {',
+				'split Quit module redeclares its label'
+			]
+		],
+		'lifecycle provider'
+	);
 	const windows = readFileSync(
 		resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_init.ahk'),
 		'utf8'
