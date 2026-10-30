@@ -989,9 +989,9 @@ Not started:
       change compiles in the macOS cell. Linux follows it for the Ollama daemon start (fe9199b9, 838af0c0:
       the shared policy's `falls_back_direct` read by `managed_ollama_proxy.lua`): a GIO lookup that
       fails or times out sends that origin direct with a WARNING naming `native_proxy_lookup` or
-      `native_proxy_budget`. Linux left: the pull failure does not yet name both causes
-      (`network.failure.pac_unreachable_direct_failed`; the start result carries `direct_fallback` for it),
-      GIO names no finer stage than the lookup, and the daemon holds one relay, so a PAC list such as
+      `native_proxy_budget`; a pull that daemon then fails to fetch shows
+      `network.failure.pac_unreachable_direct_failed` and logs the stage (`pac-direct-fallback-pull`).
+      Linux left: GIO names no finer stage than the lookup, and the daemon holds one relay, so a PAC list such as
       `PROXY a; DIRECT` keeps only its first entry; [PHYS-L] a pull on a PAC-only network whose PAC is
       unreachable. Deferred: Windows (`ergopti_network_routes.ps1` still refuses with `pac_failed` or
       `wpad_failed`) must follow the same policy.
@@ -1433,9 +1433,6 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       hotstrings, macOS audit-named tests renamed, neutral-installation gate. Left: Windows replay of
       the shared HTTP-redirect, timer-ceiling and key-chord corpora (needs a decision to build those
       policies on Windows), conversion of Windows source assertions to behaviour (audit item 14).
-- [ ] **5.** [CODE] Linux/macOS numeric-owned Script aliases need an explicit snapshot contract. Done: the
-      Linux layout and number-row scope participant composed with the real producers (global scope,
-      preferences, layout manager, installer and an Xvfb server, `run_layout_rows_live.lua` section 5).
 - [ ] **116. Guided third-party validation report.** [PHYS-M] macOS `field_check_toolchain` landed
       (timer, Shortcuts, Homebrew, Karabiner signature); needs a run on a real Mac. Package
       provenance beyond the signature check is open.
@@ -1798,10 +1795,17 @@ not open software work.
       save and installed upgrade.
 - [ ] **104, 105.** Common autocorrection sections (native Windows/macOS, per-section E2E, package;
       the 140-rule corpus is never regenerated from production); dynamic hotstrings on macOS.
-- [ ] **34, 37, 102, 129.** Native Linux/macOS delimiter transactions; macOS packaging with both
-      extension TOML files; Windows native cases and Fedora/Alpine ShellRunner fixtures; Linux E2E.
-- [ ] **121, 123, 137.** AI Agent submenu composed-menu qualification; native Linux export
-      write/close refusal; provider published before model loading (macOS).
+- [ ] **34, 37, 102, 129.** Native macOS delimiter transactions; macOS packaging with both
+      extension TOML files; Windows native cases and Fedora/Alpine ShellRunner fixtures. Linux done in
+      the start-up E2E: the tray's toggle and Delete rows, a refused write rolled back and retried, and
+      the next start (`run_e2e.lua`, "the tray's delimiter toggle, Delete and a refused write"; the refusal needs a non-root runner and reports SKIP as root); the
+      built-in date rules typed through the real daemon, `update` never proposing `date` (`dynamic-word-start`).
+- [ ] **121, 123, 137.** AI Agent submenu composed-menu qualification on macOS and Windows; provider
+      published before model loading (macOS). Linux done: the composed tray's agent row is disabled with
+      its reason and runs nothing (`run_e2e.lua`, `agent-disabled-root`); the native export write/close refusal
+      (`tests/hardware/run_diagnostics_save_receipts.py`, real RLIMIT_FSIZE and permission failures)
+      passes 7/7 as a non-root user, and 5/7 fail when the save ignores the write receipt; the Linux E2E
+      job runs it on every run outside a deferred stable-release profile.
 - [ ] **Carbon and daemon-report Swift.** Carbon fixture compilation and both-architecture
       receipts; daemon-report Swift allocation failures on Intel and Apple silicon.
 - [ ] **CodeQL Go.** After the `native_http` Go module is published, re-enable Go and check a fresh
