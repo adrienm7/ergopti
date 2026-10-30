@@ -111,6 +111,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    - `field_input_sources`: the selected source and the enabled list (as the text-input system holds them, not
      the preference) are readable; the Ergopti layouts enabled are counted; every installed Ergopti `.keylayout`
      parses with `xmllint` and every Ergopti bundle `Info.plist` with `plutil -lint` (a failure names the count).
+   - `field_storage`: the keystats database passes `PRAGMA quick_check` opened `-readonly` (a damage names the
+     number of issue lines only); `config.toml`, `config_karabiner.toml`, the personal hotstrings and personal
+     info files each parse with the driver's TOML reader, read-only; today's log exists; the logs folder takes a
+     probe file (removed at once); the auto-reload file watcher owner is published (FSEvents accepted it).
 
 ## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
 

@@ -801,6 +801,7 @@ M.checks = {
 	permissions = Probes.permissions,
 	event_taps = Probes.event_taps,
 	input_sources = Probes.input_sources,
+	storage = Probes.storage,
 }
 
 return M
