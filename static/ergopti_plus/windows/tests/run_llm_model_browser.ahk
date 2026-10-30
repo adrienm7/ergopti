@@ -70,7 +70,7 @@ LLM_Deps_IsChecking()  => _MBW_DepsChecking
 ; No managed runtime is published under this folder name on a test runner.
 AppDirsWindowsManagedOllamaFolderName() => "ErgoptiModelBrowserRunnerNoManagedOllama"
 _LLM_Menu_ModelDisplayText() => ""
-_LLM_DefaultFor(Key, Default := "") => (Key == "llm_ollama_port" ? 11434 : Default)
+_LLM_DefaultFor(Key, Default := "") => (Key == "llm_ollama_owned_port" ? 11435 : Default)
 _LLM_Menu_ApiEntryPageRows(Rows, Models, Listings := 0) => ""
 LLM_Menu_LocalServersLiveRows() => []
 _LLM_Menu_ConfigBlockReason() => ""

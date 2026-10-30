@@ -788,9 +788,9 @@ LLM_Menu_PromptOllamaPort() {
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
-	current := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
+	current := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_owned_port")
 	ib := Ui_InputBox(
-		StrReplace(StrReplace(t("menu.llm.server_port_prompt"), "%s", "Ollama", , , 1), "%s", _LLM_DefaultFor("llm_ollama_port")),
+		StrReplace(StrReplace(t("menu.llm.server_port_prompt"), "%s", "Ollama", , , 1), "%s", _LLM_DefaultFor("llm_ollama_owned_port")),
 		StrReplace(t("menu.llm.server_port_title"), "%s", "Ollama"), "w400 h120", current)
 	if !_LLM_Menu_TryNormalizePortPrompt(ib.Result, ib.Value, &val)
 		return
