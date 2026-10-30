@@ -33,6 +33,11 @@
 		"venice",
 		"vercel",
 		"poe",
+		"featherless",
+		"inception",
+		"chutes",
+		"requesty",
+		"baseten",
 		"backboard",
 		"typesafe",
 		"openrouter_jev",
@@ -315,6 +320,50 @@
 			"default_model": "gpt-4.1-mini",
 			"format": "openai",
 			"_source": "https://creator.poe.com/docs/external-applications/openai-compatible-api (the reasoning field differs per bot and top-level reasoning_effort is documented as ignored, so no dialect), https://creator.poe.com/api-reference/listModels"
+		},
+		"featherless": {
+			"label": "Featherless",
+			"base_url": "https://api.featherless.ai/v1",
+			"default_model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "chat_template_kwargs": { "enable_thinking": false, "thinking": false } }
+			},
+			"_source": "https://featherless.ai/docs/chat-template-kwargs (enable_thinking for Qwen-style templates, thinking for DeepSeek and Kimi; a template ignores the other key), https://featherless.ai/docs/api-overview-and-common-options"
+		},
+		"inception": {
+			"label": "Inception (Mercury)",
+			"base_url": "https://api.inceptionlabs.ai/v1",
+			"default_model": "mercury-3",
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } },
+			"_source": "https://docs.inceptionlabs.ai/get-started/models, https://docs.inceptionlabs.ai/capabilities/reasoning-efforts (instant, low, medium, high)"
+		},
+		"chutes": {
+			"label": "Chutes",
+			"base_url": "https://llm.chutes.ai/v1",
+			"default_model": "Qwen/Qwen3.8-27B-TEE",
+			"format": "openai",
+			"thinking_dialect": {
+				"toggle": { "chat_template_kwargs": { "enable_thinking": false, "thinking": false } }
+			},
+			"_source": "https://chutes.ai/llms.txt, https://chutes.ai/llms-full.txt (chat_template_kwargs thinking false for Kimi; enable_thinking is the key of the Qwen templates it serves)"
+		},
+		"requesty": {
+			"label": "Requesty",
+			"base_url": "https://router.requesty.ai/v1",
+			"default_model": "openai/gpt-4o-mini",
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } },
+			"_source": "https://docs.requesty.ai/features/reasoning (reasoning_effort none to max), https://docs.requesty.ai/api-reference/endpoint/models-list"
+		},
+		"baseten": {
+			"label": "Baseten",
+			"base_url": "https://inference.baseten.co/v1",
+			"default_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } },
+			"_source": "https://docs.baseten.co/development/model-apis/overview, https://docs.baseten.co/development/model-apis/reasoning (reasoning_effort none per model)"
 		},
 		"backboard": {
 			"label": "Backboard",

@@ -322,6 +322,106 @@
 				]
 			},
 			"expect": ["assistant", "gpt-4.1-mini", "grok-4.7"]
+		},
+		{
+			"name": "featherless listing (recorded)",
+			"provider": "featherless",
+			"source": "GET https://api.featherless.ai/v1/models, recorded 2026-10-30 without a key (trimmed)",
+			"format": "openai",
+			"body": {
+				"data": [
+					{
+						"id": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+						"created": 1726585673,
+						"owned_by": "Feather"
+					},
+					{ "id": "recursal/EagleX_1-7T", "created": 1719250778, "owned_by": "Feather" },
+					{ "id": "recursal/EagleX_1-7T_Chat", "created": 1719251061, "owned_by": "Feather" }
+				]
+			},
+			"expect": [
+				"meta-llama/Meta-Llama-3.1-8B-Instruct",
+				"recursal/EagleX_1-7T",
+				"recursal/EagleX_1-7T_Chat"
+			]
+		},
+		{
+			"name": "inception listing (recorded)",
+			"provider": "inception",
+			"source": "GET https://api.inceptionlabs.ai/v1/models, recorded 2026-10-30 without a key (trimmed)",
+			"format": "openai",
+			"body": {
+				"data": [
+					{ "id": "mercury-3", "created": 1743465660 },
+					{ "id": "mercury-2", "created": 1743465660 },
+					{ "id": "mercury-2.5", "created": 1743465660 }
+				]
+			},
+			"expect": ["mercury-2", "mercury-2.5", "mercury-3"]
+		},
+		{
+			"name": "chutes listing (recorded)",
+			"provider": "chutes",
+			"source": "GET https://llm.chutes.ai/v1/models, recorded 2026-10-30 without a key (trimmed)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"data": [
+					{
+						"id": "Qwen/Qwen3.8-27B-TEE",
+						"object": "model",
+						"created": 1793400135,
+						"owned_by": "vllm"
+					},
+					{
+						"id": "google/gemma-4-31B-turbo-TEE",
+						"object": "model",
+						"created": 1793400135,
+						"owned_by": "sglang"
+					},
+					{
+						"id": "deepseek-ai/DeepSeek-V3.2-TEE",
+						"object": "model",
+						"created": 1793400135,
+						"owned_by": "sglang"
+					}
+				]
+			},
+			"expect": [
+				"Qwen/Qwen3.8-27B-TEE",
+				"deepseek-ai/DeepSeek-V3.2-TEE",
+				"google/gemma-4-31B-turbo-TEE"
+			]
+		},
+		{
+			"name": "requesty listing (recorded)",
+			"provider": "requesty",
+			"source": "GET https://router.requesty.ai/v1/models, recorded 2026-10-30 without a key (trimmed)",
+			"format": "openai",
+			"body": {
+				"object": "list",
+				"data": [
+					{
+						"id": "openai/gpt-4o-mini",
+						"object": "model",
+						"created": 1721264400,
+						"owned_by": "system"
+					},
+					{
+						"id": "particle/particle-1",
+						"object": "model",
+						"created": 1793264499,
+						"owned_by": "system"
+					},
+					{
+						"id": "fireworks/ultramarine-1-flash",
+						"object": "model",
+						"created": 1793059200,
+						"owned_by": "system"
+					}
+				]
+			},
+			"expect": ["fireworks/ultramarine-1-flash", "openai/gpt-4o-mini", "particle/particle-1"]
 		}
 	],
 	"names": [
@@ -470,6 +570,7 @@
 		"nebius": "The documented example lists only retired ids (meta-llama/Meta-Llama-3.1-8B-Instruct) and the route needs a key: none recorded that holds a current model.",
 		"scaleway": "Documented as OpenAI-compatible (using-models-api) with no example response; the route answers 401 without a key: none recorded.",
 		"upstage": "No model listing is documented (console.upstage.ai llms.txt) and the route answers 401 without a key: none recorded.",
-		"ai21": "No model listing is documented; the route answers {\"data\": []} without a key, so no listing holding a model was recorded."
+		"ai21": "No model listing is documented; the route answers {\"data\": []} without a key, so no listing holding a model was recorded.",
+		"baseten": "GET <base_url>/models needs a key and the docs show no response: none recorded."
 	}
 }
