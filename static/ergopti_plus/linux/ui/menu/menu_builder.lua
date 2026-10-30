@@ -5444,21 +5444,7 @@ local function _build_reload(ctx)
 	return row
 end
 
---- Builds the quit item.
-local function _build_quit(ctx)
-	return ManifestMenu.command_row("top_level", "quit", {
-		quit = function()
-			Logger.info(LOG, "Quit requested via tray menu.")
-			if not ctx.on_quit then return end
-			-- Only an explicit false is a refusal: the owner answers false for the
-			-- causes of the shared quit admission (infra/quit_request.lua), as the
-			-- macOS menu does, and the user is told with the one notice.
-			if ctx.on_quit() == false then
-				require("ui.menu.feature_notice").quit_refused(i18n_safe)
-			end
-		end,
-	})
-end
+local _build_quit = require("ui.menu.menu_quit").build
 
 --- Delegates the raw dense-array check to the shared section admission.
 --- @param value table Source array.
