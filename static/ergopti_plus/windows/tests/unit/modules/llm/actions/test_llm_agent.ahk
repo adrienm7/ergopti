@@ -775,24 +775,35 @@ _LAG_Refusals() {
 }
 Test("LLM agent: no usable System 2, an agent off or a pause refuse with their notice", _LAG_Refusals)
 
-; The agent never uses the AI menu's prediction backend: the AI switched off
-; or its backend not ready refuse nothing.
-_LAG_AiMenuOffDoesNotRefuse() {
+; Nothing of the AI runs with its switch off, the manual agent included. It still
+; never uses the prediction backend: that backend not ready refuses nothing.
+_LAG_AiOffRefuses() {
 	Screen := _LTN_Screen(LAG_SELECTION)
 	_LAG_Run(_LAG_Menu("action", "", "cerebras", false), Screen, _Body)
 	_Body(Fx, Lines, Sent) {
-		global _LLM_Menu
-		AssertTrue(_LAG_Invoke("llm_agent_selection"), "the AI menu is off, the agent still runs")
-		AssertEqual(1, Fx.Remote.Length, "System 2 is asked")
-		AssertEqual("cerebras", Fx.Remote[1]["resolved"]["Provider"], "with its own provider's key")
+		global _LLM_Menu, _LOGGER_DEDUP_KEY
+		; An earlier suite may have logged this very refusal within the dedup window.
+		_LOGGER_DEDUP_KEY := ""
+		AssertFalse(_LAG_Invoke("llm_agent_selection"), "the AI is off, the selection is refused")
+		AssertEqual(t("llm.manual_prediction.disabled"), _LPP_PendingNotice(), "with the notice of the other AI actions")
+		AssertEqual(0, Screen.Reads, "before anything is read")
+		AssertFalse(_LAG_Invoke("llm_agent_command"), "the command too")
+		AssertEqual(0, Fx.Prompts.Length, "no dialog opened")
+		AssertEqual(0, Fx.Remote.Length, "no request left")
+		AssertTrue(_LPP_LinesWith(Lines, "INFO", "Manual prediction refused (disabled)") > 0, "and logged")
+		; The AI switch outranks the agent's own: its mode off is not what is told
+		_LLM_Menu["agent_mode"] := "off"
+		AssertFalse(_LAG_Invoke("llm_agent_selection"))
+		AssertEqual(t("llm.manual_prediction.disabled"), _LPP_PendingNotice(), "the AI switch is told first")
+		_LLM_Menu["agent_mode"] := "action"
 		_LLM_Menu["enabled"] := true
 		_LLM_Menu["api_entry_id"] := "missing"
-		Fx.PromptAnswers.Push(Map("ok", true, "value", "réunion demain"))
-		AssertTrue(_LAG_Invoke("llm_agent_command"), "a prediction backend not ready refuses nothing either")
-		AssertEqual(2, Fx.Remote.Length, "the command is sent")
+		AssertTrue(_LAG_Invoke("llm_agent_selection"), "switched on with no reload, its backend not ready refuses nothing")
+		AssertEqual(1, Fx.Remote.Length, "System 2 is asked")
+		AssertEqual("cerebras", Fx.Remote[1]["resolved"]["Provider"], "with its own provider's key")
 	}
 }
-Test("LLM agent: the actions run with the AI menu off or its backend not ready", _LAG_AiMenuOffDoesNotRefuse)
+Test("LLM agent: the manual actions refuse with the AI off, not with its backend not ready (ai-off-picker)", _LAG_AiOffRefuses)
 
 _LAG_AnswersRefusedOrFailing() {
 	Screen := _LTN_Screen(LAG_SELECTION)

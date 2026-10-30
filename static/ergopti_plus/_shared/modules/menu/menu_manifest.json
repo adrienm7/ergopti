@@ -4884,6 +4884,16 @@
 				"ahk"
 			],
 			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "llm_trigger_min_interval",
+			"i18n": "menu.llm.min_interval_label",
+			"caption_getter": "llm_trigger_min_interval_caption",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
 		}
 	],
 	"llm_display_inline_control": [

@@ -202,7 +202,7 @@ _LLV_Type(Text) {
 ; Fires an armed debounce as its timer would, with the rate floor open.
 _LLV_Fire(Armed) {
 	global _LLM_Engine
-	_LLM_Engine["last_request_tick"] := 0
+	_LLM_Engine_Plan().LastSentMs := ""
 	_LLM_Engine["timer_active"] := false
 	Armed["fn"].Call()
 }
@@ -228,7 +228,10 @@ _LLV_CaptureRealTimer(Action) {
 			_LLM_Bridge_RunPrefixObserver(Owner)
 		}
 		Captured := { Fn: _LLM_Engine["pending_timer"], Active: _LLM_Engine["timer_active"] }
-		LLM_Engine_CancelTimer()
+		; Only the native timer stops: the plan keeps the token this callback carries.
+		if Captured.Active
+			SetTimer(Captured.Fn, 0)
+		_LLM_Engine["timer_active"] := false
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -770,7 +773,7 @@ _LLV_ExplicitActionsTakeOver() {
 		AssertTrue(_LLV_Toggle("translate_en|1"), "live mode on")
 		_LLV_Fire(_LLV_Type(" de"))
 		AssertEqual(1, Calls.Length, "a live request is in flight")
-		_LLM_Engine["last_request_tick"] := 0
+		_LLM_Engine_Plan().LastSentMs := ""
 		AssertTrue(LLM_Menu_TriggerPredictionWith("basic", 1), "an explicit prompt prediction runs")
 		AssertEqual(2, Calls.Length, "with its own request")
 		AssertEqual(_LLV_System("basic", 1, 8), Calls[2]["system"],

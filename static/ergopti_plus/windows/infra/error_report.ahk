@@ -24,9 +24,9 @@
 
 #Requires AutoHotkey v2.0
 
-; The kinds of error the window reports: an ERROR logged by a running driver,
-; and the notice of a crash found at the next launch
-global ERROR_REPORT_KINDS := Map("error", true, "crash", true)
+; The kinds of error the window reports: an ERROR logged by a running driver. A
+; crash is announced by its own notice and never reaches this window.
+global ERROR_REPORT_KINDS := Map("error", true)
 
 
 
@@ -55,7 +55,7 @@ _ErrorReport_Check(Err) {
 }
 
 ; Builds the report of one error.
-; @param Err {Map} { kind: "error"|"crash", module, message, time, recent: Array }
+; @param Err {Map} { kind: "error", module, message, time, recent: Array }
 ; @param Identity {Map} { version, commit, os, driver, generated_utc, warn_count, err_count }
 ; @returns {Map} { text, fields: { title, version, os, driver } }
 ErrorReport_Compose(Err, Identity) {

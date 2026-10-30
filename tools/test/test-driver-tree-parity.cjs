@@ -20,7 +20,9 @@
  * the code it covers rather than being structure of its own) and excluding
  * build/tooling residue that is not part of the driver's architecture —
  * .venv, __pycache__, .pytest_cache, node_modules and the macOS .app bundles,
- * none of which any other driver could meaningfully mirror.
+ * none of which any other driver could meaningfully mirror. The tests/ trees
+ * are ratcheted on their own measurement below, so a suite that moves away from
+ * its counterparts fails without moving the architecture's number.
  *
  * The metric is the share of DISTINCT directory paths that exist in all three
  * drivers. A path present in one driver only counts against it, which is the
@@ -260,6 +262,54 @@ const BASELINE_SHARED = 39;
 //   counterpart folder there would hold nothing.
 const BASELINE_UNION = 63;
 
+// ── The test trees, measured apart from the architecture ────────────────────
+//
+// The tests/ trees were excluded from the numbers above, so nothing noticed them
+// drifting (audit 2026-10-18, item 4 of its tidy-tree plan). They get their own
+// pair of literals rather than joining the architecture's ratio: a directory of
+// fixtures is not structure a driver owes its siblings.
+/** Depth-≤2 directory paths of a driver's tests/ tree, POSIX-style. */
+function testsTreeOf(driver) {
+	const out = new Set();
+	const prefix = `${TRACKED_PREFIX}${driver}/tests/`;
+	for (const file of trackedFiles) {
+		if (!file.startsWith(prefix)) continue;
+		const parts = file.slice(prefix.length).split('/');
+		const top = parts[0];
+		if (parts.length < 2 || isIgnored(top)) continue;
+		out.add(top);
+		const sub = parts[1];
+		if (parts.length < 3 || isIgnored(sub)) continue;
+		out.add(`${top}/${sub}`);
+	}
+	return out;
+}
+
+const testsTrees = new Map(DRIVERS.map((d) => [d, testsTreeOf(d)]));
+const testsUnion = new Set();
+for (const t of testsTrees.values()) for (const p of t) testsUnion.add(p);
+const testsShared = [...testsUnion]
+	.filter((p) => DRIVERS.every((d) => testsTrees.get(d).has(p)))
+	.sort();
+
+// Measured 2026-10-30. Raise the first and lower the second as the trees converge;
+// never the other way to make a change pass.
+const BASELINE_TESTS_SHARED = 11;
+const BASELINE_TESTS_UNION = 62;
+
+if (testsShared.length < BASELINE_TESTS_SHARED) {
+	errors.push(
+		`only ${testsShared.length} test director(ies) are present in all three drivers, below the recorded ` +
+			`${BASELINE_TESTS_SHARED}. A suite moved without its counterparts.`
+	);
+}
+if (testsUnion.size > BASELINE_TESTS_UNION) {
+	errors.push(
+		`the union of driver test directories grew to ${testsUnion.size} (recorded ${BASELINE_TESTS_UNION}). ` +
+			'Mirror the new directory on its counterparts, or raise this deliberately with a note saying why.'
+	);
+}
+
 // ── The canonical features, the third measurement this gate never had ───────
 //
 // Comparing the drivers to EACH OTHER says nothing about a feature none of them
@@ -372,7 +422,8 @@ if (process.argv.includes('--measure')) {
 	for (const f of canonicalNowhere) console.log(`  nowhere: ${f.tree}/${f.name} — ${f.role}`);
 	console.log('');
 	console.log(`union: ${union.size} distinct path(s) across ${DRIVERS.length} driver(s)`);
-	console.log(`shared by all three: ${shared.length} (${ratio.toFixed(1)} %)\n`);
+	console.log(`shared by all three: ${shared.length} (${ratio.toFixed(1)} %)`);
+	console.log(`tests/ trees: ${testsShared.length} of ${testsUnion.size} shared by all three\n`);
 	console.log('shared:');
 	for (const p of shared) console.log('  ' + p);
 	// Two classes, not one. The report used to print every non-shared path under
@@ -411,5 +462,5 @@ if (errors.length > 0) {
 console.log(
 	`\x1b[32m[OK] driver tree parity (I1): ${shared.length}/${union.size} director(ies) shared by all ` +
 		`three drivers — ${ratio.toFixed(1)} %; ${canonicalOnAll.length}/${CANONICAL.length} canonical ` +
-		`features on all three.\x1b[0m`
+		`features on all three; tests/ trees ${testsShared.length}/${testsUnion.size}.\x1b[0m`
 );

@@ -178,8 +178,10 @@ _LLM_Menu_TriggerRows(Position := "all") {
 
 	; Debounce — dialog like HS (free numeric input)
 	DebounceRows := MenuRenderer_TemplateRows("llm_trigger_debounce_control",
-		Map("llm_trigger_debounce", (*) => LLM_Menu_PromptDebounce()),
-		Map("llm_trigger_debounce_caption", () => _LLM_Menu["debounce_ms"] . " ms"), Map())
+		Map("llm_trigger_debounce", (*) => LLM_Menu_PromptDebounce(),
+			"llm_trigger_min_interval", (*) => LLM_Menu_PromptMinRequestInterval()),
+		Map("llm_trigger_debounce_caption", () => _LLM_Menu_DebounceCaption(_LLM_Menu["debounce_ms"]),
+			"llm_trigger_min_interval_caption", () => _LLM_Menu["min_request_interval_ms"] . " ms"), Map())
 	if !(DebounceRows is Array)
 		return []
 	for Row in DebounceRows
@@ -189,6 +191,11 @@ _LLM_Menu_TriggerRows(Position := "all") {
 		_LLM_DefaultFor("llm_debounce_ms", 500),
 		(*) => _LLM_AssignAndRebuild("debounce_ms",
 			_LLM_DefaultFor("llm_debounce_ms", 500)))
+	_LLM_MaybeResetRow(Rows,
+		_LLM_Menu["min_request_interval_ms"],
+		_LLM_DefaultFor("llm_min_request_interval_ms"),
+		(*) => _LLM_AssignAndRebuild("min_request_interval_ms",
+			_LLM_DefaultFor("llm_min_request_interval_ms")))
 
 	BoundaryRows := MenuRenderer_TemplateRows("llm_trigger_provider_boundary", Map(), Map(), Map())
 	if !(BoundaryRows is Array)
@@ -776,6 +783,16 @@ LLM_Menu_PromptDebounce() {
 		t("menu.llm.debounce_prompt"))
 }
 
+/** The stored -1 reads as the shared "never" label, like the Lua menus. */
+_LLM_Menu_DebounceCaption(Value) {
+	return Value < 0 ? t("menu.settings.never") : Value . " ms"
+}
+
+LLM_Menu_PromptMinRequestInterval() {
+	LLM_Menu_PromptNumeric("min_request_interval_ms", t("menu.llm.trigger_menu_title"),
+		StrReplace(t("menu.settings.min_interval_prompt"), "%s", _LLM_DefaultFor("llm_min_request_interval_ms")))
+}
+
 ; Ollama port has its own prompt (not LLM_Menu_PromptNumeric) because applying it
 ; means rebuilding the HTTP client's base URL via LLM_Ollama_SetPort, not feeding
 ; the value through LLM_Engine_Init(LLM_Menu_BuildOpts()) — the port is a property
@@ -788,9 +805,9 @@ LLM_Menu_PromptOllamaPort() {
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
-	current := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
+	current := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_owned_port")
 	ib := Ui_InputBox(
-		StrReplace(StrReplace(t("menu.llm.server_port_prompt"), "%s", "Ollama", , , 1), "%s", _LLM_DefaultFor("llm_ollama_port")),
+		StrReplace(StrReplace(t("menu.llm.server_port_prompt"), "%s", "Ollama", , , 1), "%s", _LLM_DefaultFor("llm_ollama_owned_port")),
 		StrReplace(t("menu.llm.server_port_title"), "%s", "Ollama"), "w400 h120", current)
 	if !_LLM_Menu_TryNormalizePortPrompt(ib.Result, ib.Value, &val)
 		return
@@ -965,6 +982,96 @@ LLM_Menu_TriggerPrediction(FireFn := 0) {
 	Fire(Context)
 	_LLM_Menu_MarkExplicitPrediction()
 	return true
+}
+
+; The most characters of an answer the test prediction's notice shows.
+global LLM_TEST_PREDICTION_EXCERPT_CHARS := 200
+
+; Generation of the newest test prediction: an older answer is dropped.
+global _LLM_Menu_TestPredictionGeneration := 0
+
+/**
+ * The AI menu's "Test a prediction": one prediction on a sample context with the
+ * active backend, showing its result or why it could not run. It goes straight
+ * to the backend rather than through the engine, whose answer is a tooltip the
+ * user could accept into the focused document, and never touches the typed
+ * context. The refusals are those of a manual request.
+ * @param {Func} SendFn Test seam taking the sample, the two callbacks and the
+ *     requester's admission; the active backend when omitted.
+ * @returns {Boolean} True when the request was sent.
+ */
+LLM_Menu_TestPrediction(SendFn := 0) {
+	global _LLM_Menu_TestPredictionGeneration
+	Sample := t("llm.test_prediction.sample")
+	Enabled := LLM_Menu_AiEnabled()
+	Reason := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, Enabled,
+		Enabled && _LLM_Menu_BackendIsReadyForUse(), Sample)
+	if (Reason != "") {
+		_LLM_Menu_ShowManualPredictionRefusal(Reason, StrLen(Sample))
+		return false
+	}
+	_LLM_Menu_TestPredictionGeneration += 1
+	Generation := _LLM_Menu_TestPredictionGeneration
+	LoggerStart("LLM", "Test prediction #{1} sent to the active backend.", Generation)
+	_LLM_Menu_ShowManualPredictionNotice("llm.test_prediction.running")
+	Send := HasMethod(SendFn, "Call") ? SendFn : _LLM_Menu_TestPredictionSend
+	try Send.Call(Sample, _LLM_Menu_OnTestPredictionAnswer.Bind(Generation),
+		_LLM_Menu_OnTestPredictionFailure.Bind(Generation), _LLM_Menu_TestPredictionIsCurrent.Bind(Generation))
+	catch as Err {
+		_LLM_Menu_OnTestPredictionFailure(Generation, Map("reason", Err.Message))
+		return false
+	}
+	return true
+}
+
+; Sends the sample to the active backend, with the active prompt and settings.
+_LLM_Menu_TestPredictionSend(Sample, OnSuccess, OnFail, Current) {
+	global _LLM_Menu, _LLM_Engine
+	Profile := LLM_FindProfile(_LLM_Menu["profile_id"], _LLM_Menu["user_profiles"])
+	System := LLM_ResolveSystemPrompt(Profile, 1, _LLM_Engine["min_words"], _LLM_Engine["max_words"],
+		_LLM_Engine["language"])
+	Temperature := _LLM_Engine["temperature"] + 0.0
+	if (_LLM_Menu["backend"] == "api") {
+		Entry := _LLM_Engine_GetActiveApiEntry()
+		if (Entry == "")
+			throw Error("no API entry is selected")
+		_LLM_Engine_ResolveRemoteTransport().Call(Entry, System, Sample, Temperature, OnSuccess, OnFail, "", "", "", 0, Current)
+		return
+	}
+	LLM_OllamaGenerate_Async(LLM_ResolveOllamaTag(_LLM_Menu["model"]), System, Sample, Temperature, OnSuccess, OnFail,
+		"", "", false, "", "", Current)
+}
+
+; @returns {Boolean} True while this test's answer may still be shown.
+_LLM_Menu_TestPredictionIsCurrent(Generation) {
+	global _LLM_Menu_TestPredictionGeneration
+	return (Generation == _LLM_Menu_TestPredictionGeneration && !A_IsSuspended && LLM_Menu_AiEnabled()) ? true : false
+}
+
+; The backend answered: show the answer, a blank one being a failure.
+_LLM_Menu_OnTestPredictionAnswer(Generation, Text, *) {
+	global LLM_TEST_PREDICTION_EXCERPT_CHARS
+	if !_LLM_Menu_TestPredictionIsCurrent(Generation)
+		return
+	Answer := (Text is String) ? Trim(Text, " `t`r`n") : ""
+	if (Answer == "") {
+		_LLM_Menu_OnTestPredictionFailure(Generation, Map("reason", "the backend returned an empty answer"))
+		return
+	}
+	; Sizes only: the answer stays out of the log, like every prediction.
+	LoggerSuccess("LLM", "Test prediction #{1} answered ({2} character(s)).", Generation, StrLen(Answer))
+	Shown := StrLen(Answer) > LLM_TEST_PREDICTION_EXCERPT_CHARS
+		? SubStr(Answer, 1, LLM_TEST_PREDICTION_EXCERPT_CHARS) . "…" : Answer
+	_LLM_Menu_ShowNotice(StrReplace(t("llm.test_prediction.result"), "{1}", Shown))
+}
+
+; The backend refused or failed: show why.
+_LLM_Menu_OnTestPredictionFailure(Generation, Failure := "") {
+	if !_LLM_Menu_TestPredictionIsCurrent(Generation)
+		return
+	Reason := _LLM_Vision_FailureReason(Failure)
+	LoggerWarn("LLM", "Test prediction #{1} failed: {2}.", Generation, Reason)
+	_LLM_Menu_ShowNotice(StrReplace(t("llm.test_prediction.failed"), "{1}", Reason))
 }
 
 ; Marks the prediction request just fired as one the user asked for: the AI

@@ -31,6 +31,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\ai_action_gate.ahk
 
 
 
@@ -368,6 +369,10 @@ KeyCombinationOwns(Second, IsDownFn := 0) {
 	if (First == "")
 		return false
 	PairId := KeyCombinationPairId(First, Second)
+	; A pair whose only slot is an AI action is unarmed while the AI is off: the
+	; key stays its own, and the switch-on needs no reload.
+	if (KeyCombinationHoldOf(PairId) == KEY_COMBINATION_NONE && AiActionBlocked(KeyCombinationTapOf(PairId)))
+		return false
 	_KeyCombinationTaken[Second] := First
 	_KeyCombinationPressAssignments[Second] := { Taken: _KeyCombinationTaken, First: First,
 		Taps: KeyCombinationTaps, Holds: KeyCombinationHolds,
@@ -426,6 +431,9 @@ KeyCombinationFire(Second, Ports := 0) {
 	First := _KeyCombinationTaken[Second]
 	PairId := KeyCombinationPairId(First, Second)
 	Tap := KeyCombinationTapOf(PairId)
+	; A hold is a modifier or a layer, never an action: only the tap is gated.
+	if AiActionBlocked(Tap)
+		Tap := KEY_COMBINATION_NONE
 	Hold := KeyCombinationHoldOf(PairId)
 	if _KeyCombinationHandled.Has(Second) {
 		; The press's own auto-repeat: a pair without a hold types its tap

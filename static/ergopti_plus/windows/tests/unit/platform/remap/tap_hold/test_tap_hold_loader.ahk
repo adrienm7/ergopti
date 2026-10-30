@@ -668,7 +668,7 @@ _TH_InvalidGlobalDelayFallsBackToRegistry() {
 Test("tap_hold delay: an unusable global delay falls back to the registry default", _TH_InvalidGlobalDelayFallsBackToRegistry)
 
 _TH_LoaderReadsTheGlobalDelayFromTheFile() {
-	Path := _TH_Write("[tap_hold]`r`nexplicit_delays = true`r`ntime_activation_seconds = 0.31`r`n"
+	Path := _TH_Write("[tap_hold]`r`ntime_activation_seconds = 0.31`r`n"
 		. '[tap_hold.keys.caps_lock]`r`ntap_action = "enter"`r`n')
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()

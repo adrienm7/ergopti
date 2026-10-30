@@ -11,9 +11,13 @@
 # proxy and antivirus facts, today's ErgoptiPlus logs and their digest), stores
 # it under docs/field-reports/, then commits and pushes the branch. The logs are
 # gitignored, so they are added with `git add -f`; the logger already masks
-# secrets, the home folder, e-mail addresses and personal names, the facts have
-# the profile folder and the user name replaced, and the proxy facts say only
-# whether a proxy or a PAC file is set, never its address.
+# secrets, the home folder, e-mail addresses and personal names, and the branch is
+# public, so only copies scrubbed of typed text by tools/dev/field-log-scrub.py
+# leave the PC and the digests read those copies. The personal hotstrings file
+# never travels: tools/dev/hotstring-collisions.py reports which of its triggers
+# share a bundled one. The facts have the profile folder and the user name
+# replaced, and the proxy facts say only whether a proxy or a PAC file is set,
+# never its address.
 #
 # The branch, the report folder and the base config key are the field_report
 # names of static/ergopti_plus/_shared/data/identifiers.json; the git steps are
@@ -46,6 +50,8 @@
 #   powershell -ExecutionPolicy Bypass -File tools/dev/collect-windows-field-report.ps1
 #   ... -NoPush                 same, without the push
 #   ... -LogsDir 'D:\logs'      the logs folder, when LogsDirPath moved it
+#   ... -ConfigDir 'D:\config'  the configuration folder, instead of the one
+#                               paths.toml names
 #
 # Each step records its exit status in steps.txt; a failed step never hides
 # the others. This file stays ASCII: Windows PowerShell 5.1 reads a file
@@ -55,7 +61,8 @@
 [CmdletBinding()]
 param(
 	[switch]$NoPush,
-	[string]$LogsDir = ''
+	[string]$LogsDir = '',
+	[string]$ConfigDir = ''
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -84,6 +91,8 @@ foreach ($Key in 'branch_prefix', 'folder', 'base_config_key') {
 $AppDirsToml = Get-Content -Raw -Encoding UTF8 -LiteralPath (
 	[IO.Path]::Combine($SharedRoot, 'modules', 'paths', 'app_dirs.toml'))
 $Utf8 = New-Object System.Text.UTF8Encoding $false
+$DevTools = [IO.Path]::Combine($RepoRoot, 'tools', 'dev')
+$BundledHotstrings = [IO.Path]::Combine($SharedRoot, 'modules', 'hotstrings')
 
 # ===========================================
 # ======= 1/ Helpers ========================
@@ -257,6 +266,7 @@ if ((Get-Git rev-parse HEAD) -ne $Before) {
 	$Rerun = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath)
 	if ($NoPush) { $Rerun += '-NoPush' }
 	if ($LogsDir) { $Rerun += @('-LogsDir', $LogsDir) }
+	if ($ConfigDir) { $Rerun += @('-ConfigDir', $ConfigDir) }
 	& (Get-Process -Id $PID).Path @Rerun
 	exit $LASTEXITCODE
 }
@@ -288,6 +298,51 @@ function Resolve-LogsDir {
 	return $Folder
 }
 
+# The configuration folder, resolved like infra/boot.ahk: -ConfigDir, else the
+# ConfigDirPath of the installed paths.toml or of the source run's, else the default.
+function Resolve-ConfigDir {
+	if ($ConfigDir) { return $ConfigDir }
+	$Driver = [IO.Path]::Combine($SharedRoot, '..', 'windows', '_generated', 'paths.toml')
+	foreach ($Candidate in (Join-Path $env:APPDATA 'Ergopti\paths.toml'), $Driver) {
+		if (-not (Test-Path -LiteralPath $Candidate -PathType Leaf)) { continue }
+		$Text = Get-Content -Raw -Encoding UTF8 -LiteralPath $Candidate
+		if ($Text -match '(?m)^\s*ConfigDirPath\s*=\s*"([^"]+)"') { return $Matches[1] }
+	}
+	return Join-Path $env:USERPROFILE ('.config\' + $FolderName)
+}
+
+# The first Python that really runs: the python3 of a Windows without Python is
+# a Microsoft Store stub that only prints a hint and fails.
+function Find-Python {
+	$ErrorActionPreference = 'Continue'
+	foreach ($Name in 'python3', 'python', 'py') {
+		if (-not (Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue)) { continue }
+		$null = & $Name --version 2>&1
+		if ($LASTEXITCODE -eq 0) { return $Name }
+	}
+	return ''
+}
+
+# Copies one log into the report without the user's typed text; true when copied.
+# Never falls back to the raw log: it would publish the typed text.
+function Copy-ScrubbedLog([string]$Source) {
+	$Name = Split-Path -Leaf $Source
+	$Target = Join-Path $script:Out $Name
+	$Code = 1
+	if ($script:Python) {
+		$ErrorActionPreference = 'Continue'
+		& $script:Python (Join-Path $DevTools 'field-log-scrub.py') $Source $Target $BundledHotstrings 2>$null
+		$Code = $LASTEXITCODE
+	}
+	if ($Code -eq 0) {
+		Add-Step ('{0,-28} copied (scrubbed)' -f $Name)
+		return $true
+	}
+	if (Test-Path -LiteralPath $Target) { Remove-Item -LiteralPath $Target -Force }
+	Add-Step ('{0,-28} scrub failed, not copied' -f $Name)
+	return $false
+}
+
 # Copies the logs and the digest, commits and pushes, once: from the normal end
 # and from the closing block after Ctrl-C.
 $script:Finalized = $false
@@ -299,6 +354,7 @@ function Complete-Report {
 	$Today = Get-Date -Format 'yyyy-MM-dd'
 	# A run that crosses midnight spans two day logs: keep both, oldest first.
 	if ($Today -ne $StartDay) { $Days += $Today }
+	$script:Python = Find-Python
 	$Folder = Resolve-LogsDir
 	if (-not $Folder) {
 		Add-Step ('{0,-28} unresolved (%{1}% is empty; pass -LogsDir)' -f 'logs', $LogsBase)
@@ -307,21 +363,16 @@ function Complete-Report {
 		foreach ($Day in $Days) {
 			foreach ($Name in "$MainPrefix$Day$Extension", "$ErrorsPrefix$Day$Extension") {
 				$Source = Join-Path $Folder $Name
-				if (Test-Path -LiteralPath $Source -PathType Leaf) {
-					Copy-Item -LiteralPath $Source -Destination $script:Out
-					Add-Step ('{0,-28} copied' -f $Name)
-				}
+				if (Test-Path -LiteralPath $Source -PathType Leaf) { $null = Copy-ScrubbedLog $Source }
 			}
-			$DayLog = Join-Path $Folder "$MainPrefix$Day$Extension"
+			# The digests read the scrubbed copies, never the raw day log.
+			$DayLog = Join-Path $script:Out "$MainPrefix$Day$Extension"
 			if (Test-Path -LiteralPath $DayLog -PathType Leaf) { $DayLogs += $DayLog }
 		}
 		# The LLM sub-log keeps the download and server lines of earlier days.
 		foreach ($Name in "$($MainPrefix)llm$Extension", $BootstrapLog) {
 			$Source = Join-Path $Folder $Name
-			if (Test-Path -LiteralPath $Source -PathType Leaf) {
-				Copy-Item -LiteralPath $Source -Destination $script:Out
-				Add-Step ('{0,-28} copied' -f $Name)
-			}
+			if (Test-Path -LiteralPath $Source -PathType Leaf) { $null = Copy-ScrubbedLog $Source }
 		}
 		# Crash reports are named, not copied: a dump is read on request.
 		$Crashes = Join-Path $Folder $CrashReports
@@ -350,6 +401,14 @@ function Complete-Report {
 	} else {
 		Add-Step ('{0,-28} missing' -f 'logs')
 		Write-Text (Join-Path $script:Out 'logs_dir.txt') (Hide-User "$Folder`n")
+	}
+
+	# Which personal triggers share a bundled one, with both sides' flags and no
+	# replacement text: the personal file itself never travels.
+	Invoke-Step 'hotstring_collisions' {
+		if (-not $script:Python) { throw 'No Python interpreter runs on this PC.' }
+		& $script:Python (Join-Path $DevTools 'hotstring-collisions.py') (
+			[IO.Path]::Combine((Resolve-ConfigDir), 'hotstrings', 'personal_hotstrings.toml')) $BundledHotstrings
 	}
 
 	$Subject = "docs(field): Windows field report $Stamp on $Base"

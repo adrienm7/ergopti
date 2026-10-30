@@ -65,6 +65,7 @@ LLM_Menu_BuildOpts() {
 		"max_words",               _LLM_Menu["max_words"],
 		"language",                I18nGetLocale(),
 		"debounce_ms",             _LLM_Menu["debounce_ms"],
+		"min_request_interval_ms", _LLM_Menu["min_request_interval_ms"],
 		"ctx_chars",               _LLM_Menu["ctx_chars"],
 		"temperature",             _LLM_Menu["temperature"],
 		"instant_on_word_end",     _LLM_Menu["instant_on_word_end"],

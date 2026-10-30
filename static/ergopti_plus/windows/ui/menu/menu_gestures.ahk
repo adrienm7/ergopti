@@ -156,6 +156,7 @@ ToggleGesturesEnabled() {
 	; the path and persists in lock-step (see infra/feature_io.ahk).
 	if !WriteFeatureV2(Features, "gestures.enabled", NewVal)
 		return ConfigReportPersistenceFailure("the gestures enable toggle")
+	NotifyFeature(t("menu.gestures.notify_title"), NewVal)
 	return ReloadPreservingSuspend()
 }
 

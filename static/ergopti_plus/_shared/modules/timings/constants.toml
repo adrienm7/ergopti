@@ -938,8 +938,7 @@ native_slow_batch_ms = 500
 # yet far above the sub-millisecond cost of a healthy keystroke.
 # HS: infra/hotpath_profiler.lua. Linux: infra/perf_counters.lua (both through
 # _shared/lua/hotpath_segments.lua threshold_ms).
-# AHK: infra/hotpath_profiler.ahk _HOTPATH_SLOW_MS is still a literal 5.0; it
-# must read this key (TimingsGet("logger", "hotpath_slow_ms")).
+# AHK: infra/hotpath_profiler.ahk HotPath_LoadTimings.
 hotpath_slow_ms = 5
 
 

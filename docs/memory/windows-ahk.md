@@ -670,6 +670,16 @@ other AutoHotkey hooks, through their mutex. Action: never let correctness
 depend on the order of the AutoHotkey hook and a native hook; give each
 decision to one hook outright.
 
+### project-llm-ollama-is-only-the-owned-runtime
+
+The Windows engine talks only to the daemon `OllamaManagedBootstrap` started
+(`llm_ollama_owned_port`, 11435): `_LLM_Deps_DoCheck_Result` and
+`_LLM_Menu_EnableProbe` refuse any listener without a live owner, and the stock
+port is refused as an override. That daemon dies with its driver, so the
+auto-boot path restarts it silently (`Silent`: no window, no install, no pull),
+and a READY flow follows only the AI intent, not the config bytes. Tests of the
+real curl paths inject `OwnedFn`; never point them at the stock port.
+
 ### project-llm-nav-cycle-is-ahk-owned
 
 The native owner's plan validation (NavPlanIsValid) requires one Up and one
@@ -738,6 +748,24 @@ chord's focus and held-modifier gates. Injected Ctrl combinations are not
 usable either: the LCtrl tap-hold turns them into a tap (Paste). Action: add
 any new external trigger as a caller of that primitive, never by relaxing the
 Tab policy (`test_llm_tab_accept_policy.ahk`).
+
+### project-ahk-ai-off-disarms-ai-keys
+
+A key bound to an `llm_*` action is unarmed while the AI is off, so it stays the
+application's and the switch-on needs no reload: `AiActionBlocked`
+(`infra/ai_action_gate.ahk`) is asked at each press by `TapHoldTapAction`, whose
+blocked answer is the native tap, by `TapKeyShouldFire`,
+`ScriptShortcutSlotRunsAction`, `KeyCombinationOwns`/`KeyCombinationFire`,
+`GestureDispatch` and `_MagicEditorBrokerWinner`. Native keyboard slots cannot ask,
+so `KeyboardShortcutsFollowAiSwitch` releases and re-arms their handles at boot and
+at the commit of the switch. Readers of what is stored (menu, writer) use
+`TapHoldConfiguredTapAction`. Action: a new key-claiming layer asks
+`AiActionBlocked`; extend `test_ai_action_gate.ahk`.
+The agent's manual actions refuse with the AI off (`_LLM_Agent_ManualRefusal`, notice`n`llm.manual_prediction.disabled`) and the picker greys them from the `ai:on` token of`nthe generated catalogue, with `dialog.action_picker.requires_ai`, read at each open.
+The automatic mode is disarmed too: `LLM_Agent_WatchesTyping` and `LLM_Agent_OnTyping`
+arm no pause and the triage refuses while the AI is off, and`n`LLM_Agent_OnAiSwitchedOff` retires the pause, the feed and the flow in flight at the`nswitch-off; the first keystroke after the switch-on re-arms it. The agent-only typing`nfeed therefore only runs with the AI on and the prediction bridge stopped.
+The menu's `LLM_Menu_TestPrediction` bypasses the engine on purpose: an engine answer is
+a tooltip the user could accept into the focused document.
 
 ### project-llm-validation-digit-is-the-digit-row-key
 

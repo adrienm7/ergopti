@@ -72,7 +72,7 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 	static _str_keys := ["model", "profile_id", "temperature",
 		"nav_modifiers", "val_modifiers", "backend",
 		"api_entry_id", "agent_system1", "agent_system2", "agent_mode"]
-	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms",
+	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms", "min_request_interval_ms",
 		"ctx_chars", "pred_indent", "ollama_port"]
 	static _bool_keys := ["enabled", "instant_on_word_end", "after_hotstring",
 		"reset_on_nav", "disable_url_bars", "disable_password_fields",
@@ -425,6 +425,8 @@ LLM_Menu_ActivateRuntime(ActivateHotkeysFn := 0, ScheduleBackendFn := 0, HealthT
 	; no health timer or probe starts. A boot with the AI off used to bind them
 	; anyway, and a refused native navigation plan aborted the boot (issue #97).
 	Enabled := LLM_Menu_AiEnabled()
+	; The slots bound to an AI action were bound before this state was restored.
+	KeyboardShortcutsFollowAiSwitch()
 	if Enabled {
 		Activate := HasMethod(ActivateHotkeysFn, "Call") ? ActivateHotkeysFn : _LLM_Menu_RequireFirstRestoreHotkeys
 		try Activate.Call(true)

@@ -270,12 +270,22 @@ report_new_results() {
 # collector gave up (and loses its results).
 # Returns 0 once accepted, consumed, refused or done; 1 when it gave up.
 wait_for_acceptance() {
-	local now current app_pid="${pid}" waited_from="${sent_at}" budget
+	local now current app_pid="${pid}" waited_from="${sent_at}" budget taken_at=""
 	while [ ! -f "${results_dir}/${accepted_name}" ]; do
 		[ -f "${run_folder}/${refused_name}" ] && return 0
 		[ -f "${results_dir}/${done_name}" ] && return 0
-		[ -f "${run_folder}/${request_name}" ] || return 0
 		now="$(date +%s)"
+		# An app that took the request accepts it at once; one that took it and
+		# never accepts it is not running the field run.
+		if [ ! -f "${run_folder}/${request_name}" ]; then
+			taken_at="${taken_at:-${now}}"
+			if [ $((now - taken_at)) -ge "${FIELD_RUN_ACCEPT_SECONDS}" ]; then
+				log "The request was taken but not accepted within ${FIELD_RUN_ACCEPT_SECONDS} s; no developer app is running the field run."
+				return 1
+			fi
+			sleep "${FIELD_RUN_POLL_SECONDS}"
+			continue
+		fi
 		if current="$(ready_pid)"; then
 			if [ "${current}" != "${app_pid}" ]; then
 				log "The developer app published its readiness again (pid ${current}); waiting for it to accept the request."
@@ -295,8 +305,9 @@ wait_for_acceptance() {
 				log "The app did not accept the request within $((now - sent_at)) s; request withdrawn so no run starts without the collector."
 				return 1
 			fi
-			# The app took it between the check and the withdrawal: the run is its.
-			return 0
+			# The app took it between the check and the withdrawal: wait for its
+			# acceptance like any taken request.
+			continue
 		fi
 		sleep "${FIELD_RUN_POLL_SECONDS}"
 	done
@@ -329,6 +340,11 @@ run_field_run() {
 	else
 		stale="$(find "${REPO_ROOT}/static/ergopti_plus/macos/launcher" "${REPO_ROOT}/tools/build" \
 			-type f -newer "${app_binary}" -print -quit 2>/dev/null)"
+	fi
+	# A readiness left by an app the runner is about to stop would send the
+	# request to that app: only the readiness of the app opened here counts.
+	if [ -n "${stale}" ] || ! ready_pid >/dev/null; then
+		rm -f "${ready_file}" || { log "Cannot remove the previous readiness."; return 1; }
 	fi
 	if [ -n "${stale}" ]; then
 		log "Building and opening the developer app (${stale#"${REPO_ROOT}/"} is newer than the build; a few minutes)..."
@@ -363,7 +379,7 @@ run_field_run() {
 		|| { log "Cannot write the field run request."; return 1; }
 	mv -f "${run_folder}/.${request_name}.tmp" "${run_folder}/${request_name}" \
 		|| { log "Cannot publish the field run request."; return 1; }
-	local sent_at last_note
+	local sent_at last_note gone_since=""
 	sent_at="$(date +%s)"
 	last_note="${sent_at}"
 	wait_for_acceptance || return 1
@@ -380,6 +396,19 @@ run_field_run() {
 			report_new_results
 			copy_field_run_results
 			return 1
+		fi
+		# An app that is gone writes no done: wait for it to come back (a reload)
+		# for as long as a first readiness, then keep the partial results.
+		if ready_pid >/dev/null; then
+			gone_since=""
+		else
+			gone_since="${gone_since:-${now}}"
+			if [ $((now - gone_since)) -ge "${FIELD_RUN_READY_SECONDS}" ]; then
+				log "The developer app has been gone for ${FIELD_RUN_READY_SECONDS} s; keeping the partial results."
+				report_new_results
+				copy_field_run_results
+				return 1
+			fi
 		fi
 		report_new_results
 		# A download can stay silent for minutes: say the run is still alive

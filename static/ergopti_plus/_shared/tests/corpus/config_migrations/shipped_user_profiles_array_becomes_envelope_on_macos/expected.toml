@@ -1,0 +1,11 @@
+# _shared/tests/corpus/config_migrations/shipped_user_profiles_array_becomes_envelope_on_macos/expected.toml
+
+[_meta]
+schema_version = 17
+
+[llm]
+enabled = true
+user_profiles = "v1:W3siaWQiOiJ1c2VyX2ZpcnN0IiwibGFiZWwiOiJGaXJzdCBQcm9maWxlIiwic3lzdGVtX3NpbmdsZSI6ImZpcnN0In0seyJpZCI6InVzZXJfc2Vjb25kIiwibGFiZWwiOiJTZWNvbmQgUHJvZmlsZSIsInN5c3RlbV9zaW5nbGUiOiJzZWNvbmQifV0="
+
+[llm.profiles]
+active = "user_first"

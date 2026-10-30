@@ -408,14 +408,15 @@ choice, frozen against later changes of the shared value. That is why no key
 ships a tap-hold delay (`[tap_hold.keys.*]` has no `time_activation_seconds`;
 every key follows the global delay, the registry's
 `tap_hold.default_activation_ms`) and why `[tap_hold.retired_delays]` exists:
-Linux's tap_hold.toml carries `[_meta] schema_version`, and step `v0_to_v1` of
+tap_hold.toml carries `[_meta] schema_version`, and step `v0_to_v1` of
 `_shared/tap_hold/migrations.toml` (its own registry: the config.toml one
 cannot express a delete-if-equal and Windows validates it at every boot)
 removes exactly the retired values, once, from a file that was never stamped
 and does not carry the old `explicit_delays = true` flag, then stamps it. The
-boot edit is line-preserving (explicit `delete`/`set_if_absent` ops through
-`config_migrate.plan_operations`), so the user's comments and formatting stay.
-Windows still uses that flag until it replays the step. Action: do not ship a
+boot edit is line-preserving (Linux: explicit `delete`/`set_if_absent` ops
+through `config_migrate.plan_operations`; Windows:
+`TOML_BuildConfigDocumentCandidate`), so the user's comments and formatting
+stay. Action: do not ship a
 per-key default for anything the user can also override; ship a global one, and
 when retiring a shipped per-key value, record it as retired and add a migration
 step instead of a marker.
@@ -571,11 +572,10 @@ base64(JSON array) envelope of `_shared/lua/llm/profile_registry_codec.lua`
 (Windows writes the same bytes). macOS keeps the list decoded in its state and
 crosses the disk boundary in `scalar_units` through the KEY_MAP `codec` field,
 so its menus never see the string. Its older `[llm.profiles] user_profiles`
-array is imported by `legacy_user_profiles` in `infra/preferences.lua` while
-`llm.user_profiles` is absent, and the next save deletes it: the registry
-cannot carry it (no op re-encodes a value, and the Windows engine rejects an
-op it does not know). Once the envelope exists the array is unknown
-configuration that the cleanup offers. Action: add another
+array reaches the envelope through step `v16_to_v17` of the config registry
+(the `encode_value` op, which all three interpreters know). When the envelope
+already exists the array stays as unknown configuration that the cleanup
+offers. Action: add another
 encoded preference through a `codec` on its KEY_MAP row, never a nested map.
 
 ## Gestures and keymaps
