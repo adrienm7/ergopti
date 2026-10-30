@@ -757,6 +757,16 @@ end
 function M.login_items(ports, report, finish)
 	local app_path = ports.app_path()
 	report.step("this_copy_known", STATE.info, yes_no(app_path ~= nil))
+	-- What an ad hoc build did to its stale guardian registrations before this
+	-- lifecycle's registration (RemapGuardianRegistrationNote), with that
+	-- registration's own answer. A refused reset leaves the stale definition
+	-- whose spawn macOS killed (field run 2026-10-30); a reset whose registration
+	-- was not ready at once is the same 10 s throttle again.
+	local note, status = ports.guardian_registration_note()
+	local failed = note == "developer_adhoc_reset_refused"
+		or (note == "developer_adhoc_reregistered" and status ~= "ready")
+	report.step("guardian_registration", failed and STATE.fail or STATE.info,
+		(note or "no_reset") .. ":" .. (status or "unknown"))
 
 	local function agents_stage()
 		find_agent_files(ports, function(files)
