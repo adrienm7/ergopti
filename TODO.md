@@ -118,8 +118,8 @@ into its item below or into the matching existing item.
       about 740 MB over the maintainer's shared connection. Left [PHYS-M]: one complete download of each test
       model on a connection that does not count.
 - [ ] **Field report marks.** [CODE] The macOS collector prints ✅ pass, ❌ fail, ⏭️ skip, ⌨️ needs_typing,
-      ⚠️ other and a summary line. Left: give the Windows and Linux collectors the same marks and summary
-      over their `check=<id> verdict=<...>` lines.
+      ⚠️ other and a summary line; the Linux collector does the same over its `check=<id> verdict=<...>`
+      lines (also in `field_checks.txt`). Left: the Windows collector.
 - [ ] **Thinking off for every model on every backend and OS (worker `fix/llm-thinking-off`).** [CODE] The
       rule depends on the MODEL, not on the provider: model families (normalized model id) declare an intent
       (off, or the lowest level a model allows) and a control kind; each provider and local server declares
@@ -253,9 +253,8 @@ HTTP transport items are done (`linux/adapters/notifier.lua`, `[sections.llm]` l
   "keep remote API keys in the desktop secret service"; refused, never written in plaintext, without one).
   Left: [PHYS-L] on a real desktop, add a key with the keyring locked and check the unlock prompt takes the
   keyboard under the grab (`ui/modal.lua`), then restart and check the plaintext migration of an older
-  `api_keys.json`; [CODE] `install.sh` does not install `secret-tool` yet (deb and rpm only recommend it):
-  add `_check_or_install secret-tool` once the package names are checked for apt (`libsecret-tools`), dnf
-  (`libsecret`), zypper, pacman (`libsecret`), xbps and apk.
+  `api_keys.json`. `install.sh` now installs `secret-tool` (apt `libsecret-tools`, dnf `libsecret`, zypper
+  `secret-tool`, pacman, xbps and apk `libsecret`); the deb and rpm still only recommend it.
 
 ## Next fix/<os> agent pass (read when the maintainer asks for a new fix/linux, fix/macos or fix/windows)
 
@@ -317,7 +316,9 @@ runs the branch cleanup below. Each pass left a full handover; read it first:
      cases failed under Wine, cause unknown.
 - Linux (from its closeout):
   1. Physical acceptance (evdev/uinput grabs, polkit, autostart, Wayland/X11) still needs a real machine.
-  2. The Python 3.8 floor checks were structural only; a native 3.8 run is still owed.
+  2. Done 30 October: on CPython 3.8.20 (uv) both XKB suites pass (42 and 265 tests, 14 skips for
+     xkbcli >= 1.13 and the xkbcommon binding, absent here), `generate_xkb_files.py --check` reproduces the
+     shipped files and every installer CLI starts; nothing needed a fix.
 - macOS (from its TODO, plus Mac bugs the Linux pass proved):
   1. `native_python_bootstrap` in `macos/modules/llm/native_python_bootstrap.sh` leaves its uv-wheel and
      Python-archive temp workspaces behind on SIGTERM. Give it operation-local cleanup; the proof is in the
@@ -789,9 +790,15 @@ Not started:
       every OS. Mac must confirm: on the company network, an Ollama pull and the MLX install log the
       WARNING with `native_pac_download` or `native_pac_evaluation`, then the direct success line (or
       the two-cause error), Debug > Test network shows the `route_lookup` info step, and the Swift
-      change compiles in the macOS cell. Deferred: Linux (`managed_ollama_proxy.lua` still refuses
-      with `runtime_proxy_unavailable`) and Windows (`ergopti_network_routes.ps1` still refuses with
-      `pac_failed` or `wpad_failed`) must follow the same policy.
+      change compiles in the macOS cell. Linux follows it for the Ollama daemon start (fe9199b9, 838af0c0:
+      the shared policy's `falls_back_direct` read by `managed_ollama_proxy.lua`): a GIO lookup that
+      fails or times out sends that origin direct with a WARNING naming `native_proxy_lookup` or
+      `native_proxy_budget`. Linux left: the pull failure does not yet name both causes
+      (`network.failure.pac_unreachable_direct_failed`; the start result carries `direct_fallback` for it),
+      GIO names no finer stage than the lookup, and the daemon holds one relay, so a PAC list such as
+      `PROXY a; DIRECT` keeps only its first entry; [PHYS-L] a pull on a PAC-only network whose PAC is
+      unreachable. Deferred: Windows (`ergopti_network_routes.ps1` still refuses with `pac_failed` or
+      `wpad_failed`) must follow the same policy.
 - [ ] **AppImage self-contained.** [CODE] `.zsync` and update information are done (10c016e51f,
       6fb83014e3). Built on ubuntu:22.04 (glibc 2.35 floor, no bundled libc or loader, musl refused in words,
       tray closure kept); the build refuses a foreign loader or a staged C library (dce846a0bd). Left: hosted
