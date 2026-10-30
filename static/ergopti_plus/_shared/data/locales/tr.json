@@ -3740,6 +3740,7 @@
 	"platform_reason.number_row_live_session": "Kullanılamıyor: Bunu anında yalnızca bir X11 oturumu ya da Wayland üzerinde GNOME veya KDE uygular. Bu masaüstü mevcut düzenini korur; seçiminiz kaydedildi.",
 	"platform_reason.number_row_live_no_layout": "Kullanılamıyor: Önce bir ErgoptiPlus düzeni kurun; bu seçim kullandığınız düzeni değiştirir.",
 	"layouts.linux_rows_not_applied": "Sayı sırası seçimi kaydedildi, ancak çalışan klavye düzeni güncellenemedi.",
+	"layouts.rows_not_applied": "Sayı sırası seçimi kaydedildi, ancak çalışan klavye düzeni güncellenemedi.",
 	"platform_reason.number_row_source_unavailable": "Kullanılamıyor: Önce simgeler için sayı satırının her konumunda geçerli rakam ve simge düzeyleri bulunan etkin bir öykünülmüş düzen gerekir.",
 	"menu.layout.number_row_not_applied": " (uygulanmadı)",
 	"platform_reason.number_row_already_digits_first": "Etkisiz: bu düzen rakamlarını zaten Shift olmadan yazıyor.",

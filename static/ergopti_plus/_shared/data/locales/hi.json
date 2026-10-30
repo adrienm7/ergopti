@@ -3740,6 +3740,7 @@
 	"platform_reason.number_row_live_session": "अनुपलब्ध: केवल X11 सत्र, या Wayland पर GNOME या KDE, इसे तुरंत लागू करते हैं। यह डेस्कटॉप अपना मौजूदा लेआउट रखता है; आपकी पसंद सहेज ली गई है।",
 	"platform_reason.number_row_live_no_layout": "अनुपलब्ध: पहले ErgoptiPlus कीबोर्ड लेआउट इंस्टॉल करें; यह विकल्प आपके उपयोग के लेआउट को बदलता है।",
 	"layouts.linux_rows_not_applied": "संख्या पंक्ति की पसंद सहेज ली गई है, लेकिन चालू कीबोर्ड लेआउट अपडेट नहीं हो सका।",
+	"layouts.rows_not_applied": "संख्या पंक्ति की पसंद सहेज ली गई है, लेकिन चालू कीबोर्ड लेआउट अपडेट नहीं हो सका।",
 	"platform_reason.number_row_source_unavailable": "अनुपलब्ध: चिह्न पहले के लिए सक्रिय अनुकरण लेआउट चाहिए, जिसकी अंक पंक्ति के हर स्थान पर मान्य अंक और चिह्न स्तर हों।",
 	"menu.layout.number_row_not_applied": " (लागू नहीं)",
 	"platform_reason.number_row_already_digits_first": "कोई प्रभाव नहीं: यह लेआउट पहले से ही अपने अंक बिना Shift के टाइप करता है।",
