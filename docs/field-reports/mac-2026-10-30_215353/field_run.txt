@@ -1,0 +1,37 @@
+[field-report] Opening the developer app...
+[macos-dev-app] Stopping the running ErgoptiPlus (pids: 77028)...
+[macos-dev-app] No ErgoptiPlus process is left.
+[dev-ollama-catalogue] The managed Ollama built from this clone is staged.
+[macos-dev-app] Opened /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app; its Lua runs from /Users/b519hs/perso/ergopti/static/ergopti_plus/macos.
+[macos-dev-app] A saved .lua edit reloads the driver; the menu's Reload does it on demand.
+[macos-dev-app] Launcher trail: ~/Library/Logs/ergopti_plus/launcher.log (look for 'developer source mode').
+[field-report] Waiting for the developer app to publish its readiness...
+[field-report] Developer app ready (pid 99610); requesting every step within 8100 s.
+[field-report]   ✅ field run 01_field_lease: pass
+[field-report]   ✅ field run 02_field_owned_runtime: pass
+[field-report]   ✅ field run 03_field_network: pass
+[field-report]   ✅ field run 04_field_toolchain: pass
+[field-report]   ✅ field run 05_field_login_items: pass
+[field-report]   ✅ field run 06_field_composer: pass
+[field-report]   ✅ field run 07_field_permissions: pass
+[field-report]   ✅ field run 08_field_event_taps: pass
+[field-report]   ❌ field run 09_field_input_sources: fail
+[field-report]   ✅ field run 10_field_storage: pass
+[field-report]   ❌ field run 11_field_launcher_roles: fail
+[field-report]   ✅ field run 12_field_network_hosts: pass
+[field-report]   ✅ field run 13_key_accounting: pass
+[field-report]   ✅ field run 14_field_menu_build: pass
+[field-report]   ✅ field run 15_diagnostics: pass
+[field-report]   field run still running, 61 s since the request...
+[field-report]   field run still running, 123 s since the request...
+[field-report]   field run still running, 185 s since the request...
+[field-report]   ✅ field run 16_ollama_runtime: pass
+[field-report]   ❌ field run 17_ollama_model: fail
+[field-report]   ✅ field run 18_mlx_runtime: pass
+[field-report]   ✅ field run 19_mlx_model: pass
+[field-report]   ✅ field run 20_field_ai_local: pass
+[field-report]   ❌ field run 21_field_app_health: fail
+[field-report]   ⏭️ field run 22_driver_reload: skip
+[field-report]   ✅ field run 23_config_guard: pass
+[field-report] Field run done: {"counts":{"fail":4,"pass":18,"skip":1},"elapsed_ms":228775,"finished_at":"2026-10-30T20:57:52Z","interrupted":false,"order":["field_lease","field_owned_runtime","field_network","field_toolchain","field_login_items","field_composer","field_permissions","field_event_taps","field_input_sources","field_storage","field_launcher_roles","field_network_hosts","key_accounting","field_menu_build","diagnostics","ollama_runtime","ollama_model","mlx_runtime","mlx_model","field_ai_local","field_app_health","driver_reload","config_guard"],"pid":99610,"request_id":"mac-2026-10-30_215353","schema":1,"started_at":"2026-10-30T20:54:03Z","verdicts":{"config_guard":"pass","diagnostics":"pass","driver_reload":"skip","field_ai_local":"pass","field_app_health":"fail","field_composer":"pass","field_event_taps":"pass","field_input_sources":"fail","field_launcher_roles":"fail","field_lease":"pass","field_login_items":"pass","field_menu_build":"pass","field_network":"pass","field_network_hosts":"pass","field_owned_runtime":"pass","field_permissions":"pass","field_storage":"pass","field_toolchain":"pass","key_accounting":"pass","mlx_model":"pass","mlx_runtime":"pass","ollama_model":"fail","ollama_runtime":"pass"}}
+[field-report] Field run summary: ✅ 18 pass, ❌ 4 fail, 1 other.

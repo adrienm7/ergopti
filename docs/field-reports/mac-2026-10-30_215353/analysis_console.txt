@@ -1,0 +1,23 @@
+[field-report]   ✅ check lease: pass
+[field-report]   ✅ check owned_runtime: pass
+[field-report]   ✅ check network: pass
+[field-report]   ✅ check toolchain: pass
+[field-report]   ✅ check login_items: pass
+[field-report]   ✅ check composer: pass
+[field-report]   ✅ check permissions: pass
+[field-report]   ✅ check event_taps: pass
+[field-report]   ❌ check input_sources: fail
+[field-report]   ✅ check storage: pass
+[field-report]   ❌ check launcher_roles: fail
+[field-report]   ✅ check network_hosts: pass
+[field-report]   ✅ check typing_selftest: pass
+[field-report]   ✅ check menu_build: pass
+[field-report]   ✅ check ai_local: pass
+[field-report]   ❌ check app_health: fail
+[field-report]   ⚠️ check privacy_pane_urls: info
+[field-report]   ✅ check system_bash: pass
+[field-report] Check verdicts summary: ✅ 14 pass, ❌ 3 fail, ⏭️ 0 skip, ⌨️ 0 needs_typing, ⚠️ 1 other.
+[field-report] Log analysis: 46 error group(s), 79 warning group(s), 10 measure(s) over budget; see analysis.md.
+[field-report]   fix first #1: main_thread.hold over its 250 ms budget (slow x146)
+[field-report]   fix first #2: hotpath:preview.rebuild over its 5 ms budget (slow x87)
+[field-report]   fix first #3: [llm.api_ollama] The local server's model list is unavailable: HTTP <*> (Network request failed: Connection failed: Could not connect to the (error x20)
