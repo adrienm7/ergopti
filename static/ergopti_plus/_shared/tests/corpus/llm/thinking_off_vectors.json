@@ -1524,6 +1524,24 @@
 			},
 			"added": [],
 			"family": 7
+		},
+		{
+			"id": "fireworks_accounts_fireworks_models_llama-v3p3-70b-instruct",
+			"provider": "fireworks",
+			"model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+			"body": {
+				"model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
 		}
 	],
 	"refusal_vectors": [
