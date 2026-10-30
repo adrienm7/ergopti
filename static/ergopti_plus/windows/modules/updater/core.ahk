@@ -43,6 +43,7 @@ global UPDATER_UNKNOWN_COMMIT_KEY := "menu.about.commit_unknown"
 global UPDATER_RELEASES_API_URL_TEMPLATE := "https://api.github.com/repos/{owner}/{repo}/releases?per_page=100"
 ; The public releases Atom feed, read when api.github.com gives no list: a
 ; check-only answer, because the feed names no asset and no digest.
+global UPDATER_GITHUB_WEB_ROOT := "https://github.com/"
 global UPDATER_RELEASES_FEED_URL_TEMPLATE := "https://github.com/{owner}/{repo}/releases.atom"
 
 ; Returned instead of a release when the list holds none of the requested
@@ -2444,7 +2445,7 @@ Updater_ReleaseFeedUrl() {
 ; Returns the GitHub Releases HTML page URL (for "Open in browser" actions).
 Updater_ReleasesPageUrl() {
 	global UPDATER_GH_OWNER, UPDATER_GH_REPO
-	return "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases"
+	return UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases"
 }
 
 ; Returns the GitHub release URL to surface as the "current version" deep link
@@ -2459,7 +2460,7 @@ Updater_CurrentReleaseUrl() {
 		and BUNDLE_RELEASE_URL != ""
 		and BUNDLE_RELEASE_URL != "__BUNDLE_RELEASE_URL__"
 		return BUNDLE_RELEASE_URL
-	return "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases/latest"
+	return UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases/latest"
 }
 
 ; Shared manual URL boundary for both About-menu links and changelog actions.
@@ -2471,7 +2472,7 @@ _Updater_IsAllowedManualUrl(Url) {
 		return false
 	if RegExMatch(Url, "[\x00-\x20\x7f]")
 		return false
-	AllowedRoot := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+	AllowedRoot := UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
 	if SubStr(Url, 1, StrLen(AllowedRoot)) !== AllowedRoot
 		return false
 	Suffix := SubStr(Url, StrLen(AllowedRoot) + 1)
@@ -2769,7 +2770,7 @@ _Updater_ParseReleaseFeed(Body, Owner, Repo, &Reason := "") {
 		Reason := "not an Atom feed"
 		return ""
 	}
-	Prefix := "https://github.com/" . Owner . "/" . Repo . "/releases/tag/"
+	Prefix := UPDATER_GITHUB_WEB_ROOT . Owner . "/" . Repo . "/releases/tag/"
 	Rows := ""
 	Position := 1
 	while (Position := RegExMatch(Body, "s)<entry[\s>].*?</entry\s*>", &Entry, Position)) {
