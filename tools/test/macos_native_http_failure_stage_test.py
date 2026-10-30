@@ -554,5 +554,89 @@ class HostReachability(unittest.TestCase):
             self.assertNotIn(".co", line.split()[-1])
 
 
+class OllamaBlobHost(unittest.TestCase):
+    """The field run's --ollama-blob mode: is the registry's blob host planned?"""
+
+    def setUp(self):
+        self.helper = load("network_check_blob", MACOS / "modules/llm/managed_network_check.py")
+        self.registry, self.planned = self.helper.ollama_planned_hosts()
+
+    def run_blob(self, manifest_status=200, manifest=None, blob=(307, None)):
+        """Runs main_blob over a stand-in transport; blob is (status, location)."""
+        requests = []
+        body = json.dumps(
+            manifest if manifest is not None else {"config": {"digest": "sha256:" + "a" * 64}}
+        ).encode()
+
+        class Response:
+            def __init__(self, status, headers=(), payload=b""):
+                self.status, self.headers, self._payload = status, list(headers), payload
+
+            def read(self, maximum=None):
+                chunk, self._payload = self._payload, b""
+                return chunk
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+        class Bootstrap:
+            @staticmethod
+            def _direct_route(url):
+                return False
+
+            @staticmethod
+            def _native_request(url, **options):
+                requests.append((url, options["method"]))
+                if "/manifests/" in url:
+                    return Response(manifest_status, payload=body)
+                status, location = blob
+                return Response(status, [["Location", location]] if location else [])
+
+        captured = io.StringIO()
+        with mock.patch.object(self.helper, "load_bootstrap", return_value=Bootstrap):
+            with contextlib.redirect_stdout(captured):
+                self.helper.main_blob("tiny:0.5b")
+        return captured.getvalue().splitlines(), requests
+
+    def planned_blob_host(self):
+        return sorted(host for host in self.planned if host != self.registry.split("://")[1])[0]
+
+    def test_a_redirect_to_the_planned_blob_host_passes(self):
+        location = (
+            "https://" + self.planned_blob_host() + "/ollama/docker/registry/v2/blobs/x?sig=1"
+        )
+        lines, requests = self.run_blob(blob=(307, location))
+        self.assertEqual(lines, ["step blob_manifest pass http_200", "step blob_host pass planned"])
+        self.assertEqual(
+            requests,
+            [
+                (self.registry + "/v2/library/tiny/manifests/0.5b", "GET"),
+                (self.registry + "/v2/library/tiny/blobs/sha256:" + "a" * 64, "HEAD"),
+            ],
+        )
+
+    def test_a_redirect_to_an_unplanned_host_fails_without_naming_it(self):
+        lines, _ = self.run_blob(blob=(302, "https://blobs.elsewhere.example/x"))
+        self.assertIn("step blob_host fail unplanned_host", lines)
+        self.assertFalse(any("elsewhere" in line for line in lines))
+
+    def test_a_refused_manifest_or_a_missing_location_fail_their_own_step(self):
+        lines, requests = self.run_blob(manifest_status=404)
+        self.assertEqual(
+            lines, ["step blob_manifest fail http_404", "step blob_host skip no_manifest"]
+        )
+        self.assertEqual(len(requests), 1, "no blob request without a manifest")
+        self.assertIn("step blob_host fail no_location", self.run_blob(blob=(307, None))[0])
+        self.assertIn("step blob_manifest fail no_digest", self.run_blob(manifest={})[0])
+        self.assertIn("step blob_host pass registry_served", self.run_blob(blob=(200, None))[0])
+
+    def test_the_inventory_plans_the_registry_and_its_blob_host(self):
+        self.assertTrue(self.registry.startswith("https://registry.ollama.ai"))
+        self.assertGreaterEqual(len(self.planned), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

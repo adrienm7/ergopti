@@ -841,6 +841,7 @@ M.checks = {
 	storage = Probes.storage,
 	launcher_roles = Probes.launcher_roles,
 	network_hosts = Probes.network_hosts,
+	ollama_blob_host = Probes.ollama_blob_host,
 	app_health = Probes.app_health,
 	ai_local = Probes.ai_local,
 	menu_build = Probes.menu_build,
