@@ -9,6 +9,8 @@
 ; handlers. Pure helpers — no boot-time side effects.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -24,7 +26,7 @@
 ; Uses a global cache to avoid redundant calculations during menu build.
 CountDynamicSection(SectionName) {
 		; Loaded user metadata can change asynchronously; never freeze its count.
-		if SectionName == "user_code"
+		if SectionName == ConfigLeaf.USER_CODE
 			return UserHotstringsCount()
 		global PersonalInformation, _TomlCountCache
 		CacheKey := "dynamic|" . StrLower(SectionName)
@@ -40,9 +42,9 @@ CountDynamicSection(SectionName) {
 
 		Count := 0
 		switch SectionName {
-				case "DateFr", "DateLongFr", "Date", "date_fr", "date_long_fr", "date":
+				case "DateFr", "DateLongFr", "Date", "date_fr", ConfigLeaf.DATE_LONG_FR, "date":
 						Count := 1
-				case "PhonePrefixes", "phone_prefixes":
+				case "PhonePrefixes", ConfigLeaf.PHONE_PREFIXES:
 						N := 0
 						if StrLen(Phone) >= 2
 								N += 2  ; phone[1:2]+★ and +33+phone[1:2]
@@ -53,13 +55,13 @@ CountDynamicSection(SectionName) {
 						if StrLen(FPhone) >= 5
 								N += 1  ; fphone[1:5]
 						Count := N
-				case "SsnPrefixes", "ssn_prefixes":
+				case "SsnPrefixes", ConfigLeaf.SSN_PREFIXES:
 						; No-space + spaced triggers — both fire when ssn_raw has >= 5 digits
 						Count := StrLen(SsnRaw) >= 5 ? 2 : 0
-				case "IbanPrefixes", "iban_prefixes":
+				case "IbanPrefixes", ConfigLeaf.IBAN_PREFIXES:
 						; 6 raw chars (no-space) and 7-char spaced trigger if iban_raw has >= 6 chars
 						Count := StrLen(IbanRaw) >= 6 ? 2 : 0
-				case "TextExpansionPersonalInformation", "text_expansion_personal_information":
+				case "TextExpansionPersonalInformation", ConfigLeaf.TEXT_EXPANSION_PERSONAL_INFORMATION:
 						N := 0
 						for Key, Val in PersonalInformation {
 								if (Val != "")

@@ -10,6 +10,8 @@
 ; Included by modules/llm/prediction_engine.ahk after the lifecycle section.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -108,9 +110,9 @@ _LLM_Engine_PlanInput(Event) {
 	global _LLM_Engine
 	Plan := _LLM_Engine_Plan()
 	Plan.Configure(Map("enabled", _LLM_Engine["enabled"] ? true : false,
-		"debounce_ms", _LLM_Engine["debounce_ms"],
-		"instant_on_word_end", _LLM_Engine["instant_on_word_end"] ? true : false,
-		"live_debounce_ms", LLM_Engine_LiveIsActive() ? LLM_Live_Config()["debounce_ms"] : false))
+		ConfigLeaf.DEBOUNCE_MS, _LLM_Engine[ConfigLeaf.DEBOUNCE_MS],
+		ConfigLeaf.INSTANT_ON_WORD_END, _LLM_Engine[ConfigLeaf.INSTANT_ON_WORD_END] ? true : false,
+		"live_debounce_ms", LLM_Engine_LiveIsActive() ? LLM_Live_Config()[ConfigLeaf.DEBOUNCE_MS] : false))
 	Decisions := Plan.OnInput(Event)
 	return Decisions[Decisions.Length]
 }

@@ -39,6 +39,7 @@
 
 
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include ../../_generated/action_catalogue.ahk
 #Include ../../../_shared/ahk/config_binding_identity.ahk
 
@@ -571,9 +572,9 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 				ExpectedType := "boolean"
 			else if Key == "time_activation_seconds"
 				ExpectedType := "non-negative number"
-			else if (Key == "pattern_max_length"
+			else if (Key == ConfigLeaf.PATTERN_MAX_LENGTH
 					&& CurrentSection
-						== "hotstrings.dynamic.text_expansion_personal_information")
+						== ConfigKey.HOTSTRINGS_DYNAMIC_TEXT_EXPANSION_PERSONAL_INFORMATION)
 				ExpectedType := "integer from 1 through 16"
 			else
 				return ""

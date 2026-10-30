@@ -13,6 +13,7 @@
 
 global SubMenus := Map()
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 #Include menu/menu_engine.ahk
 #Include menu/menu_gestures.ahk
 #Include menu/menu_metrics.ahk
@@ -73,10 +74,10 @@ global _FLAT_HOTSTRING_V1_CATS := ["Autocorrection", "DistancesReduction",
 ; v1 -> v2 category name map used by _CountEnabledForCategory
 global _V1CatToV2CatMap := Map(
 	"Autocorrection",     "autocorrection",
-	"DistancesReduction", "distances_reduction",
-	"SFBsReduction",      "sfbs_reduction",
+	"DistancesReduction", ConfigLeaf.DISTANCES_REDUCTION,
+	"SFBsReduction",      ConfigLeaf.SFBS_REDUCTION,
 	"Rolls",              "rolls",
-	"MagicKey",           "magic_key",
+	"MagicKey",           ConfigLeaf.MAGIC_KEY,
 )
 
 ; Menu category id (PascalCase, the tray menu's internal category key) -> v2
@@ -88,11 +89,11 @@ global _LegacyTopCategoryMap := Map(
 	"Layout",             "layout",
 	"Gestures",           "gestures",
 	"Shortcuts",          "shortcuts",
-	"Autocorrection",     "hotstrings.autocorrection",
-	"DistancesReduction", "hotstrings.distances_reduction",
-	"SFBsReduction",      "hotstrings.sfbs_reduction",
-	"Rolls",              "hotstrings.rolls",
-	"MagicKey",           "hotstrings.magic_key",
+	"Autocorrection",     ConfigKey.HOTSTRINGS_AUTOCORRECTION,
+	"DistancesReduction", ConfigKey.HOTSTRINGS_DISTANCES_REDUCTION,
+	"SFBsReduction",      ConfigKey.HOTSTRINGS_SFBS_REDUCTION,
+	"Rolls",              ConfigKey.HOTSTRINGS_ROLLS,
+	"MagicKey",           ConfigKey.HOTSTRINGS_MAGIC_KEY,
 	"DynamicHotstrings",  "hotstrings.dynamic",
 	"Personal",           "hotstrings.personal",
 )

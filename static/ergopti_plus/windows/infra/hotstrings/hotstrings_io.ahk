@@ -23,6 +23,7 @@
 ; ==============================================================================
 
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include common_autocorrection_migration.ahk
 
 ; ============================================================
@@ -53,7 +54,7 @@ HotstringsConfigLoadSharedDefaults(SharedDir := "") {
 				throw Error("_shared/modules/hotstrings/defaults.toml introuvable ou vide : " . Path)
 		}
 
-		GLOBAL_DEFAULT_DELAY := Float(ManifestDefaultFor("hotstrings.expansion_delay"))
+		GLOBAL_DEFAULT_DELAY := Float(ManifestDefaultFor(ConfigKey.HOTSTRINGS_EXPANSION_DELAY))
 		DYN_HOTSTRINGS_DEFAULT_DELAY := Float(_HSDefaultsRequire(c, "delays", "dynamichotstrings_sec", Path))
 		GLOBAL_DEFAULT_COLOR := _HSDefaultsRequireHex(c, "colors", "global_default", Path)
 		HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"] := _HSDefaultsRequireHex(c, "colors", "personal", Path)

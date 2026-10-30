@@ -27,6 +27,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 
 
@@ -219,14 +220,14 @@ _CS_RequireString(Value, Key) {
 _CS_ValidateMetricsSection(Section) {
 		Validated := Map()
 		for Key in ["enabled",
-				"private_filter_enabled", "secure_filter_enabled",
-				"system_auth_filter_enabled", "encrypt"] {
+				"private_filter_enabled", ConfigLeaf.SECURE_FILTER_ENABLED,
+				ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED, "encrypt"] {
 				if Section.Has(Key)
 						Validated[Key] := _CS_RequireBoolean(Section[Key], Key)
 		}
-		if Section.Has("disabled_apps")
-				Validated["disabled_apps"] :=
-						TomlConfigMetricsDisabledApps(Section["disabled_apps"])
+		if Section.Has(ConfigLeaf.DISABLED_APPS)
+				Validated[ConfigLeaf.DISABLED_APPS] :=
+						TomlConfigMetricsDisabledApps(Section[ConfigLeaf.DISABLED_APPS])
 		return Validated
 }
 
@@ -258,15 +259,15 @@ CS_Load() {
 		; through Manifest.default_for("metrics.<id>").
 		if Validated.Has("private_filter_enabled")
 				MetricsFilters.private_browsing := Validated["private_filter_enabled"]
-		if Validated.Has("secure_filter_enabled")
-				MetricsFilters.secure_field := Validated["secure_filter_enabled"]
-		if Validated.Has("system_auth_filter_enabled")
-				MetricsFilters.system_auth := Validated["system_auth_filter_enabled"]
+		if Validated.Has(ConfigLeaf.SECURE_FILTER_ENABLED)
+				MetricsFilters.secure_field := Validated[ConfigLeaf.SECURE_FILTER_ENABLED]
+		if Validated.Has(ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED)
+				MetricsFilters.system_auth := Validated[ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED]
 		if Validated.Has("encrypt")
 				MetricsFilters.encrypt := Validated["encrypt"]
 
-		if Validated.Has("disabled_apps")
-				MetricsFilters.disabled_apps := Validated["disabled_apps"]
+		if Validated.Has(ConfigLeaf.DISABLED_APPS)
+				MetricsFilters.disabled_apps := Validated[ConfigLeaf.DISABLED_APPS]
 		return data
 }
 

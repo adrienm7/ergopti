@@ -21,6 +21,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -396,11 +397,11 @@ _LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn) {
 		throw Error("The selected helper source intent changed or could not be admitted.")
 	if LayoutManager_BuiltinIds().Has(Id)
 		return [
-			ManifestSparseOperation("layout.emulated_layout", ""),
-			ManifestSparseOperation("layout.ergopti_base", true),
-			ManifestSparseOperation("layout.ergopti_variant", Id),
+			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),
+			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_BASE, true),
+			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_VARIANT, Id),
 		]
-	return [ManifestSparseOperation("layout.emulated_layout", Id)]
+	return [ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, Id)]
 }
 
 ; The successor discovers committed extension roots even for nonselected layouts.
@@ -426,7 +427,7 @@ _LayMgrWeb_After(Id, Action, OnDone, Options := unset) {
 	}
 	if Selected && Action == "uninstall" {
 		LoggerInfo("LayoutManager", "The emulated '{1}' layout was uninstalled; back to the system layout.", Id)
-		WriteSelection := Options.Get("write_selection", (Value) => WriteFeatureV2(Features, "layout.emulated_layout", Value))
+		WriteSelection := Options.Get("write_selection", (Value) => WriteFeatureV2(Features, ConfigKey.LAYOUT_EMULATED_LAYOUT, Value))
 		if !WriteSelection.Call("")
 			return ConfigReportPersistenceFailure("the layout selection")
 	}
@@ -665,18 +666,18 @@ _LayMgrWeb_BuiltinVariantSnapshot(Path) {
 		Legacy := _TOML_DocumentLookup(Document, ["layout", "ergopti_plus"])
 		if Legacy["found"] || Legacy["blocked"]
 			return Snapshot
-		for Field in ["layout.ergopti_variant", "layout.emulated_layout", "layout.ergopti_base",
-			"layout.ergopti_alt_gr", "category_enabled.layout"] {
+		for Field in [ConfigKey.LAYOUT_ERGOPTI_VARIANT, ConfigKey.LAYOUT_EMULATED_LAYOUT, ConfigKey.LAYOUT_ERGOPTI_BASE,
+			ConfigKey.LAYOUT_ERGOPTI_ALT_GR, "category_enabled.layout"] {
 			Read := _TOML_DocumentLookup(Document, StrSplit(Field, "."))
 			if Read["blocked"]
 				return Snapshot
 			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Field)
-			if Field == "layout.ergopti_base" || Field == "layout.ergopti_alt_gr" || Field == "category_enabled.layout" {
+			if Field == ConfigKey.LAYOUT_ERGOPTI_BASE || Field == ConfigKey.LAYOUT_ERGOPTI_ALT_GR || Field == "category_enabled.layout" {
 				if Read["found"] && !(Value is TOML_Bool)
 					return Snapshot
 				if Value is TOML_Bool
 					Value := Value.Value
-			} else if Field == "layout.ergopti_variant" {
+			} else if Field == ConfigKey.LAYOUT_ERGOPTI_VARIANT {
 				if !(Value is String) || (StrCompare(Value, "none", true) != 0 && StrCompare(Value, "ergopti", true) != 0 && StrCompare(Value, "ergopti_plus", true) != 0)
 					return Snapshot
 			} else if !(Value is String) || (Value != "" && !LayoutRegistry_IsValidId(Value))

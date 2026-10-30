@@ -11,6 +11,8 @@
 ; across the tooltip/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -1208,17 +1210,17 @@ LLM_TooltipSetDisplayOpts(opts) {
 	global _LLM_Tooltip_PredIndent, _LLM_Tooltip_ValMods
 	if !(opts is Map)
 		return
-	_LLM_Tooltip_ShowInfoBar := !!(opts.Has("show_info_bar") and opts["show_info_bar"])
+	_LLM_Tooltip_ShowInfoBar := !!(opts.Has(ConfigLeaf.SHOW_INFO_BAR) and opts[ConfigLeaf.SHOW_INFO_BAR])
 	_LLM_Tooltip_InfoModel := (opts.Has("info_model") and opts["info_model"] != "")
 		? opts["info_model"] : ""
 	_LLM_Tooltip_FooterSlots := (opts.Has("slot_count") and opts["slot_count"] > 0)
 		? Integer(opts["slot_count"]) : 1
-	_LLM_Tooltip_NavMods := (opts.Has("nav_modifiers") and opts["nav_modifiers"] != "")
-		? opts["nav_modifiers"] : ""
-	if opts.Has("pred_indent")
-		_LLM_Tooltip_PredIndent := Integer(opts["pred_indent"])
-	if opts.Has("val_modifiers")
-		_LLM_Tooltip_ValMods := opts["val_modifiers"]
+	_LLM_Tooltip_NavMods := (opts.Has(ConfigLeaf.NAV_MODIFIERS) and opts[ConfigLeaf.NAV_MODIFIERS] != "")
+		? opts[ConfigLeaf.NAV_MODIFIERS] : ""
+	if opts.Has(ConfigLeaf.PRED_INDENT)
+		_LLM_Tooltip_PredIndent := Integer(opts[ConfigLeaf.PRED_INDENT])
+	if opts.Has(ConfigLeaf.VAL_MODIFIERS)
+		_LLM_Tooltip_ValMods := opts[ConfigLeaf.VAL_MODIFIERS]
 }
 
 LLM_TooltipSetChainStart() {

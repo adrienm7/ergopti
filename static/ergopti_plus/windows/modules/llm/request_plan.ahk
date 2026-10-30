@@ -21,6 +21,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 ; The debounce that turns the automatic trigger off: the stored value of
 ; llm.trigger.debounce_ms. Any negative number given to the plan means the same.
@@ -73,14 +74,14 @@ class LLMRequestPlan {
 			_LLM_RequestPlanRequireBool(Settings["enabled"], "enabled")
 			this.Enabled := Settings["enabled"]
 		}
-		if Settings.Has("debounce_ms") {
-			if !(Settings["debounce_ms"] is Number)
+		if Settings.Has(ConfigLeaf.DEBOUNCE_MS) {
+			if !(Settings[ConfigLeaf.DEBOUNCE_MS] is Number)
 				throw ValueError("debounce_ms must be a number")
-			this.DebounceMs := Settings["debounce_ms"]
+			this.DebounceMs := Settings[ConfigLeaf.DEBOUNCE_MS]
 		}
-		if Settings.Has("instant_on_word_end") {
-			_LLM_RequestPlanRequireBool(Settings["instant_on_word_end"], "instant_on_word_end")
-			this.InstantOnWordEnd := Settings["instant_on_word_end"]
+		if Settings.Has(ConfigLeaf.INSTANT_ON_WORD_END) {
+			_LLM_RequestPlanRequireBool(Settings[ConfigLeaf.INSTANT_ON_WORD_END], ConfigLeaf.INSTANT_ON_WORD_END)
+			this.InstantOnWordEnd := Settings[ConfigLeaf.INSTANT_ON_WORD_END]
 		}
 		if Settings.Has("live_debounce_ms") {
 			_LLM_RequestPlanRequireDelay(Settings["live_debounce_ms"], "the live debounce")
