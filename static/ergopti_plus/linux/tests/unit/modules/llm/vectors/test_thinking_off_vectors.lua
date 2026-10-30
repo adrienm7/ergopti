@@ -10,9 +10,9 @@
 ---
 --- ROOT CAUSE ENCODED:
 --- Only Cerebras' default model had its reasoning turned off: every other
---- cloud model a user picked (gpt-5.x, the o-series, Claude 5, Gemini 2.5 and
---- 3, Grok, Qwen3 on Groq...) spent the small prediction budget thinking and
---- answered late or not at all.
+--- model a user picked (gpt-5.x, the o-series, Claude 5, Gemini 2.5 and 3,
+--- Grok, Qwen3 on any provider...) spent the small prediction budget thinking
+--- and answered late or not at all.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -54,13 +54,42 @@ end
 -- ======= 1/ Corpus replay ===================
 -- ============================================
 
+--- Sorted dotted form of added paths, for an order-free comparison.
+--- @param added table Array of paths.
+--- @return string
+local function paths(added)
+	local out = {}
+	for _, path in ipairs(added) do out[#out + 1] = table.concat(path, ".") end
+	table.sort(out)
+	return table.concat(out, ",")
+end
+
+--- Decoded array of strings as a set.
+local function set(list)
+	local out = {}
+	for _, name in ipairs(list or {}) do out[name] = true end
+	return out
+end
+
 helpers.describe("thinking_off replays the shared corpus (thinking-off-everywhere)", function()
 	local corpus = read_json("tests/corpus/llm/thinking_off_vectors.json")
 	local providers = read_json("modules/llm/api_providers.json").providers
+	local families = assert(ThinkingOff.parse_families(read_json("modules/llm/thinking_off.json")))
 
-	helpers.it("the corpus covers every format with a rule", function()
-		helpers.assert_true(#corpus.provider_vectors >= 40, "the corpus must hold its provider vectors")
+	--- The shipped dialect of a provider.
+	local function dialect(provider)
+		return assert(ThinkingOff.parse_dialect(providers[provider].thinking_dialect))
+	end
+
+	helpers.it("the corpus covers the families on every provider", function()
+		helpers.assert_true(#corpus.resolve_vectors >= 40, "the corpus must hold its resolve vectors")
 	end)
+
+	for _, v in ipairs(corpus.normalize_vectors) do
+		helpers.it("normalize '" .. v.model .. "'", function()
+			helpers.assert_eq(ThinkingOff.normalize(v.model), v.normalized, v.model)
+		end)
+	end
 
 	for _, v in ipairs(corpus.glob_vectors) do
 		helpers.it("glob '" .. v.glob .. "' against '" .. v.model .. "'", function()
@@ -70,34 +99,68 @@ helpers.describe("thinking_off replays the shared corpus (thinking-off-everywher
 
 	for _, v in ipairs(corpus.merge_vectors) do
 		helpers.it("merge vector '" .. v.id .. "'", function()
-			local ok, why = deep_equal(ThinkingOff.merge(v.body, v.fields), v.expected)
+			local added = ThinkingOff.merge(v.body, v.fields)
+			local ok, why = deep_equal(v.body, v.expected)
 			helpers.assert_true(ok, v.id .. ": " .. tostring(why))
+			helpers.assert_eq(paths(added), paths(v.added), v.id .. ": added paths")
 		end)
 	end
 
-	for _, v in ipairs(corpus.provider_vectors) do
-		helpers.it("provider vector '" .. v.id .. "'", function()
-			local rules, reason = ThinkingOff.parse(providers[v.provider].thinking_off)
-			helpers.assert_true(rules ~= nil, v.provider .. ": " .. tostring(reason))
-			local index = ThinkingOff.apply(rules, v.model, v.body)
-			helpers.assert_eq(index, v.rule, v.id .. ": rule index")
+	for _, v in ipairs(corpus.resolve_vectors) do
+		helpers.it("resolve vector '" .. v.id .. "'", function()
+			local family, kind, added = ThinkingOff.apply(families, dialect(v.provider), v.model, v.body)
+			helpers.assert_eq(family, v.family, v.id .. ": family")
+			helpers.assert_eq(kind, v.kind, v.id .. ": kind")
+			helpers.assert_eq(paths(added), paths(v.added), v.id .. ": added paths")
 			local ok, why = deep_equal(v.body, v.expected)
 			helpers.assert_true(ok, v.id .. ": " .. tostring(why))
 		end)
 	end
 
-	for _, v in ipairs(corpus.parse_vectors) do
-		helpers.it("parse vector '" .. v.id .. "'", function()
-			local rules = ThinkingOff.parse(v.thinking_off)
-			helpers.assert_eq(rules ~= nil, v.valid, v.id)
+	for _, v in ipairs(corpus.refusal_vectors) do
+		helpers.it("refusal vector '" .. v.id .. "'", function()
+			local _, _, added = ThinkingOff.apply(families, dialect(v.provider), v.model, v.body)
+			local field = ThinkingOff.refused_field(v.status, v.message, added)
+			helpers.assert_eq(field, v.field, v.id .. ": refused field")
+			if field then ThinkingOff.strip(v.body, added, field) end
+			local ok, why = deep_equal(v.body, v.expected)
+			helpers.assert_true(ok, v.id .. ": " .. tostring(why))
 		end)
 	end
 
-	helpers.it("a merged rule shares no table with the catalogue", function()
-		local rules = ThinkingOff.parse({ { models = { "m" }, fields = { a = { b = 1 } } } })
+	for _, v in ipairs(corpus.refused_vectors) do
+		helpers.it("refused vector '" .. v.id .. "'", function()
+			local family, kind = ThinkingOff.apply(families, dialect(v.provider), v.model, v.body, set(v.refused))
+			helpers.assert_eq(family, v.family, v.id .. ": family")
+			helpers.assert_eq(kind, v.kind, v.id .. ": kind")
+			local ok, why = deep_equal(v.body, v.expected)
+			helpers.assert_true(ok, v.id .. ": " .. tostring(why))
+		end)
+	end
+
+	for _, v in ipairs(corpus.family_parse_vectors) do
+		helpers.it("family parse vector '" .. v.id .. "'", function()
+			helpers.assert_eq(ThinkingOff.parse_families(v.table) ~= nil, v.valid, v.id)
+		end)
+	end
+
+	for _, v in ipairs(corpus.dialect_parse_vectors) do
+		helpers.it("dialect parse vector '" .. v.id .. "'", function()
+			helpers.assert_eq(ThinkingOff.parse_dialect(v.dialect) ~= nil, v.valid, v.id)
+		end)
+	end
+
+	helpers.it("every shipped dialect parses", function()
+		for id, provider in pairs(providers) do
+			helpers.assert_true(ThinkingOff.parse_dialect(provider.thinking_dialect) ~= nil, id)
+		end
+	end)
+
+	helpers.it("a merged field shares no table with the catalogue", function()
+		local fields = { a = { b = 1 } }
 		local body = {}
-		ThinkingOff.apply(rules, "m", body)
+		ThinkingOff.merge(body, fields)
 		body.a.b = 2
-		helpers.assert_eq(rules[1].fields.a.b, 1, "the rule keeps its value")
+		helpers.assert_eq(fields.a.b, 1, "the template keeps its value")
 	end)
 end)

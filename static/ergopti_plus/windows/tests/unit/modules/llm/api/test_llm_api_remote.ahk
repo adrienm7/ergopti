@@ -464,8 +464,8 @@ _RemoteResolve_ExposesModelExtras() {
 	R := _LLMRemoteResolveEntry(Entry)
 	AssertTrue(R is Map, "the cerebras entry must resolve")
 	AssertTrue(R["Extras"] is Map, "the resolved entry must carry its model extras")
-	AssertTrue(LLM_ThinkingOffResolve(R["ThinkingOff"], "qwen-3.8-27b") > 0,
-		"the resolved entry must carry the provider's thinking_off rules")
+	AssertTrue(R["ThinkingDialect"].Has("effort"),
+		"the resolved entry must carry the provider's thinking dialect")
 	Plain := Map("Provider", "openai", "BaseUrl", "https://api.openai.com/v1",
 		"Token", "sekret", "Model", "gpt-4o-mini")
 	R2 := _LLMRemoteResolveEntry(Plain)

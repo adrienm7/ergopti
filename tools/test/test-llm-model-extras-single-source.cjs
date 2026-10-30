@@ -6,9 +6,10 @@
  * DESCRIPTION:
  * Per-model body fields live in exactly ONE place —
  * _shared/modules/llm/api_providers.json: providers.<id>.model_extras, and
- * providers.<id>.thinking_off, the ordered { models: [glob], fields } rules
- * that turn each model's reasoning off (e.g. reasoning_effort:none for
- * qwen-3.8-27b, which otherwise reasons at xhigh effort by default and stalls
+ * providers.<id>.thinking_dialect, how each provider carries the reasoning
+ * controls of the model families of thinking_off.json (e.g.
+ * reasoning_effort:none for the qwen3 family, which covers Cerebras'
+ * qwen-3.8-27b: it otherwise reasons at xhigh effort by default and stalls
  * tiny probes). Every driver merges them generically from data; none may
  * restate a field name in shipped code, or a tuning fix on one driver
  * silently stops applying to the others.
@@ -61,9 +62,19 @@ const BODY_SOURCES = [
 	'static/ergopti_plus/linux/modules/llm/vision_request.lua'
 ];
 
-// Nested thinking_off names too generic to be a restated rule (an object's
+// Nested thinking_dialect names too generic to be a restated rule (an object's
 // "type"), and the Gemini envelope every Gemini body builder owns.
 const GENERIC_FIELDS = new Set(['type', 'effort', 'enabled', 'generationConfig']);
+
+// The reasoning control kinds of thinking_off.json.
+const KINDS = new Set([
+	'toggle',
+	'effort',
+	'anthropic_thinking',
+	'anthropic_effort',
+	'gemini_budget',
+	'gemini_level'
+]);
 
 // The glob alphabet both resolvers accept, `*` being the only wildcard.
 const GLOB = /^[A-Za-z0-9._:/@+*-]+$/;
@@ -85,7 +96,7 @@ try {
 const fieldNames = new Set();
 const ruleFieldNames = new Set();
 
-// Validates a thinking_off fields object and records its names at every depth.
+// Validates a thinking_dialect fields template and records its names at every depth.
 function checkRuleFields(where, fields, allowEmpty) {
 	if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
 		fail(`${where} must be an object.`);
@@ -110,27 +121,16 @@ if (root && typeof root === 'object') {
 		for (const [pid, desc] of Object.entries(providers)) {
 			if (!desc || typeof desc !== 'object') continue;
 			const extras = desc.model_extras;
-			const rules = desc.thinking_off;
-			if (rules !== undefined) {
-				if (!Array.isArray(rules)) fail(`providers.${pid}.thinking_off must be an array.`);
-				for (const [index, rule] of (Array.isArray(rules) ? rules : []).entries()) {
-					const where = `providers.${pid}.thinking_off[${index}]`;
-					if (!rule || typeof rule !== 'object' || Array.isArray(rule)) {
-						fail(`${where} must be an object.`);
-						continue;
-					}
-					for (const key of Object.keys(rule)) {
-						if (key !== 'models' && key !== 'fields' && !key.startsWith('_')) {
-							fail(`${where} has an unknown key ${key}.`);
-						}
-					}
-					if (!Array.isArray(rule.models) || rule.models.length === 0) {
-						fail(`${where}.models must be a non-empty array.`);
-					}
-					for (const glob of Array.isArray(rule.models) ? rule.models : []) {
-						if (typeof glob !== 'string' || !GLOB.test(glob)) fail(`${where} has an invalid glob.`);
-					}
-					checkRuleFields(`${where}.fields`, rule.fields, true);
+			const dialect = desc.thinking_dialect;
+			if (dialect !== undefined) {
+				if (!dialect || typeof dialect !== 'object' || Array.isArray(dialect)) {
+					fail(`providers.${pid}.thinking_dialect must be an object.`);
+				}
+				for (const [kind, fields] of Object.entries(dialect || {})) {
+					if (kind.startsWith('_')) continue;
+					if (!KINDS.has(kind))
+						fail(`providers.${pid}.thinking_dialect has an unknown kind ${kind}.`);
+					checkRuleFields(`providers.${pid}.thinking_dialect.${kind}`, fields, false);
 				}
 			}
 			if (extras === undefined) continue;
@@ -189,7 +189,7 @@ for (const rel of BODY_SOURCES.concat(SHIPPED)) {
 	for (const name of ruleFieldNames) {
 		if (restatesField(code, name)) {
 			fail(
-				`${rel} restates the shared thinking_off field '${name}' (keep it in api_providers.json only).`
+				`${rel} restates the shared thinking_dialect field '${name}' (keep it in api_providers.json only).`
 			);
 		}
 	}
@@ -215,7 +215,28 @@ for (const rel of SHIPPED) {
 	}
 }
 
-if (ruleFieldNames.size === 0) fail('api_providers.json holds no thinking_off rule field.');
+if (ruleFieldNames.size === 0) fail('api_providers.json holds no thinking_dialect field.');
+
+// The model families: one home for what each family needs.
+const FAMILIES_FILE = path.join(path.dirname(SSOT_FILE), 'thinking_off.json');
+let familiesRoot = null;
+try {
+	familiesRoot = JSON.parse(fs.readFileSync(FAMILIES_FILE, 'utf8'));
+} catch (err) {
+	fail(`could not read thinking_off.json: ${err.message}`);
+}
+const families = familiesRoot && Array.isArray(familiesRoot.families) ? familiesRoot.families : [];
+if (familiesRoot && families.length === 0) fail('thinking_off.json holds no families.');
+for (const [index, family] of families.entries()) {
+	const where = `thinking_off.json families[${index}]`;
+	if (!Array.isArray(family.models) || family.models.length === 0) fail(`${where} names no model.`);
+	for (const glob of family.models || [])
+		if (typeof glob !== 'string' || !GLOB.test(glob)) fail(`${where} has an invalid glob.`);
+	if (!Array.isArray(family.controls)) fail(`${where} has no controls array.`);
+	for (const control of family.controls || []) {
+		if (!KINDS.has(control.kind)) fail(`${where} has an unknown kind ${control.kind}.`);
+	}
+}
 
 // Every Ollama chat body the drivers write carries keep_alive; each must also
 // turn thinking off, or a thinking model spends its whole budget reasoning (a

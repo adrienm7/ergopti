@@ -3,10 +3,12 @@
 --- ==============================================================================
 --- MODULE: Thinking Off In Every Linux Cloud Request
 --- DESCRIPTION:
---- Every request body Linux sends to a cloud provider carries the provider's
---- thinking_off rule of api_providers.json, whatever the format: predictions
---- and the agent through build_request, the screen reading through
---- vision_request.send. A malformed rule list refuses its provider whole.
+--- Every request body Linux sends to a cloud provider carries its model
+--- family's reasoning control (thinking_off.json) through the provider's
+--- thinking_dialect, whatever the format: predictions and the agent through
+--- build_request, the screen reading through vision_request.send. A provider
+--- refusing an added field with HTTP 400 gets the request once more without
+--- it, and never again. A malformed dialect refuses its provider whole.
 ---
 --- ROOT CAUSE ENCODED:
 --- Only Cerebras' default model had its reasoning turned off, and only in
@@ -25,7 +27,7 @@ local function load_remote()
 	package.loaded["adapters.http_client"] = {
 		get = function() return true end,
 		post = function(url, headers, body, callback, options)
-			calls[#calls + 1] = { url = url, body = body }
+			calls[#calls + 1] = { url = url, body = body, callback = callback }
 			return true
 		end,
 		cancel = function() return true end,
@@ -96,8 +98,11 @@ helpers.describe("api_remote: thinking off in every format (thinking-off-everywh
 		helpers.assert_eq(body_for("openai", "gpt-4o-mini").reasoning_effort, nil)
 	end)
 
-	helpers.it("Groq: Qwen3 is sent reasoning_effort none", function()
+	helpers.it("Qwen3 is turned off on every provider, in that provider's dialect", function()
 		helpers.assert_eq(body_for("groq", "qwen/qwen3.8-27b").reasoning_effort, "none")
+		helpers.assert_eq(body_for("cerebras", "qwen-3.8-27b").reasoning_effort, "none")
+		helpers.assert_eq(body_for("together", "Qwen/Qwen3-235B-A22B").reasoning.enabled, false)
+		helpers.assert_eq(body_for("openrouter", "qwen/qwen3-32b").reasoning.enabled, false)
 	end)
 
 end)
@@ -145,7 +150,7 @@ end)
 -- =========================================
 -- =========================================
 
-helpers.describe("api_remote: a malformed thinking_off refuses its provider", function()
+helpers.describe("api_remote: a malformed thinking dialect refuses its provider", function()
 
 	helpers.it("the provider is skipped, its neighbours kept", function()
 		local remote = load_remote()
@@ -153,16 +158,55 @@ helpers.describe("api_remote: a malformed thinking_off refuses its provider", fu
 			provider_order = { "good", "bad" },
 			providers = {
 				good = { label = "Good", base_url = "https://a.example", default_model = "m", format = "openai",
-					thinking_off = { { models = { "m*" }, fields = { reasoning_effort = "none" } } } },
+					thinking_dialect = { effort = { reasoning_effort = "$level" } } },
 				bad = { label = "Bad", base_url = "https://b.example", default_model = "m", format = "openai",
-					thinking_off = { { models = { "m?" }, fields = { reasoning_effort = "none" } } } },
+					thinking_dialect = { effort = { reasoning_effort = "low" } } },
 			},
 			model_prices = {},
 		})
 		local catalogue = remote.parse_catalogue(text)
 		unload()
 		helpers.assert_eq(table.concat(catalogue.order, ","), "good")
-		helpers.assert_eq(#catalogue.providers.good.thinking_off, 1)
+		helpers.assert_true(catalogue.providers.good.thinking_dialect.effort ~= nil)
+	end)
+
+end)
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 4/ Refused fields ===============
+-- =========================================
+-- =========================================
+
+helpers.describe("api_remote: a refused thinking field is dropped once and remembered", function()
+
+	helpers.it("chat() sends the request once more without the field, then never with it", function()
+		local remote, calls = load_remote()
+		local answers = {}
+		local entry = { provider = "deepseek", model = "deepseek-chat", token = "k" }
+		remote.chat(entry, nil, MESSAGES, {}, nil, function(text, err) answers[#answers + 1] = { text, err } end)
+		helpers.assert_eq(Json.decode(calls[1].body).thinking.type, "disabled", "the generic family turns thinking off")
+		calls[1].callback({ ok = false, status = 400, error_body = Json.encode({ error = { message = "Unknown parameter: thinking" } }) })
+		helpers.assert_eq(#calls, 2, "the request is sent once more")
+		helpers.assert_eq(Json.decode(calls[2].body).thinking, nil, "without the refused field")
+		helpers.assert_eq(#answers, 0, "a correction is not a failure")
+		local request = assert(remote.build_request(entry, MESSAGES, {}))
+		unload()
+		helpers.assert_eq(Json.decode(request.body).thinking, nil, "the refusal is remembered")
+	end)
+
+	helpers.it("an unrelated HTTP 400 is not a refusal", function()
+		local remote, calls = load_remote()
+		local answers = 0
+		remote.chat({ provider = "openai", model = "gpt-5.1", token = "k" }, nil, MESSAGES, {}, nil,
+			function() answers = answers + 1 end)
+		calls[1].callback({ ok = false, status = 400, error_body = Json.encode({ error = { message = "max_tokens is too large" } }) })
+		unload()
+		helpers.assert_eq(#calls, 1, "nothing is sent again")
+		helpers.assert_eq(answers, 1, "the failure reaches the caller")
 	end)
 
 end)
