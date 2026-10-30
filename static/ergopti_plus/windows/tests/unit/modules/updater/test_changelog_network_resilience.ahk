@@ -538,6 +538,33 @@ _CNR_CurlAdmissionKeepsEnvironmentAndLoopback() {
 }
 Test("system proxy: explicit relay wins and loopback stays direct", _CNR_CurlAdmissionKeepsEnvironmentAndLoopback)
 
+; The relay variables curl inherits are proxy_policy.json's, read once (the JS
+; gate test-proxy-policy-single-source.cjs refuses a hand-typed copy): every
+; name the policy lists for a scheme suppresses the GUI lookup, as curl would.
+_CNR_CurlRelayNamesFollowThePolicy() {
+	Https := _SystemProxy_EnvironmentPrecedence("https")
+	AssertEqual("https_proxy", Https[1], "curl reads the lower-case https name first")
+	AssertTrue(Https.Length >= 4, "the https precedence holds its upper-case and all_proxy names")
+	AssertTrue(_SystemProxy_EnvironmentPrecedence("http").Length >= 3, "the http precedence is read too")
+	for Scheme in ["http", "https"]
+		for Name in _SystemProxy_EnvironmentPrecedence(Scheme)
+			_CNR_AssertRelayNameInherited(Scheme, Name)
+}
+
+_CNR_AssertRelayNameInherited(Scheme, Name) {
+	Results := []
+	SystemProxy_ResolveCurlAsync(Scheme . "://remote.invalid/api", (R) => Results.Push(R),
+		(*) => Assert(false, "a policy relay variable must avoid GUI discovery"), 0,
+		_CNR_OnlyVariable.Bind(Name))
+	AssertEqual(1, Results.Length)
+	AssertTrue(Results[1]["inherit"], Scheme . ": " . Name . " is inherited by curl")
+}
+
+_CNR_OnlyVariable(Selected, Asked) {
+	return Asked == Selected ? "http://selected.corp:80" : ""
+}
+Test("system proxy: the inherited relay variables are proxy_policy.json's (PAR-71)", _CNR_CurlRelayNamesFollowThePolicy)
+
 
 _CNR_StrictAdmissionResolvesWpadAndRefusesFailure() {
 	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_PENDING, _SYSTEM_PROXY_PAC_CONFIG
