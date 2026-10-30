@@ -243,9 +243,10 @@ const CHECKS = [
 		title: 'Tap-Hold > a key > "Tap delay: N ms" opens the input box with N; OK saves and reloads',
 		async run(context) {
 			const { session, pid } = await bootEnglish(context, 'delay');
-			const row = ['re:Tap-Holds$', 're:^Escape', 're:^Tap delay: \\d+ ms$'];
-			const shown = await session.run('rows', ['^Tap delay: \\d+ ms$', 'Escape']);
-			const before = /Tap delay: (\d+) ms/.exec(shown);
+			// The row reads « global (200 ms) » until the key has a delay of its own.
+			const row = ['re:Tap-Holds$', 're:^Escape', 're:^Tap delay: '];
+			const shown = await session.run('rows', ['^Tap delay: ', 'Escape']);
+			const before = /Tap delay: \D*(\d+) ms/.exec(shown);
 			if (!before) return fail(`the Escape key shows no delay row: ${shown}`);
 			const answer = Number(before[1]) === 333 ? '444' : '333';
 			const seen = fields(
@@ -259,7 +260,7 @@ const CHECKS = [
 				return fail(`the input box opened with "${seen.initial}", the row showed ${before[1]} ms`);
 			const settled = await session.quiesce(pid);
 			if (!settled.reloaded) return fail('OK did not reload the driver');
-			const after = await session.run('rows', ['^Tap delay: \\d+ ms$', 'Escape']);
+			const after = await session.run('rows', ['^Tap delay: ', 'Escape']);
 			if (!after.includes(`Tap delay: ${answer} ms`))
 				return fail(`after the reload the row reads: ${after}`);
 			const errors = session.loggedErrors();
@@ -673,7 +674,16 @@ const CHECKS = [
 				if (/enabled=1/.test(await session.run('capsword_state')))
 					await session.run('capsword_toggle');
 				await session.run('capsword_toggle');
-				session.type([...head, ['text', 'ab'], ...end.between, ['text', 'cd'], ['wait', '500']]);
+				// Without {Blind} a Send lifts CapsLock around its keys, {Text} included,
+				// so only blind letters can show the capitals CapsWord asks for.
+				const letters = (word) => [...word].map((letter) => ['key', `{Blind}${letter}`]);
+				session.type([
+					...head,
+					...letters('ab'),
+					...end.between,
+					...letters('cd'),
+					['wait', '500']
+				]);
 				const value = (await session.run('edit_value')).replace(/^value=/, '');
 				const stillOn = /enabled=1/.test(await session.run('capsword_state'));
 				await session.run('edit_close');
