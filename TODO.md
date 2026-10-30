@@ -136,6 +136,10 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
      once, the field must hold exactly `wkjx`, the previous app must get the focus back. Synthetic keys are
      posted, tagged, through `adapters/synthetic_input.lua` (keymap and keystats treat them as the driver's
      output) after Karabiner: the virtual keyboard path and the ledger's double count are `physical_keys_only`.
+   - `driver_reload` (last step): the configuration is put back, the run's state goes to `resume.json`, the
+     driver reloads through the termination coordinator, and the reloaded driver's field run resumes, naming
+     the reload's duration (request to a ready field run, `reload_ms` in the report) and taking a fresh
+     configuration snapshot for the guard. A reload refused, or accepted and never started, fails by name.
    - `field_menu_build`: one rebuild of the menu tree, as a state change triggers it, must be accepted by
      AppKit; its duration in ms, the number of top-level rows and the three slowest rows (`id:ms`) are named.
 
