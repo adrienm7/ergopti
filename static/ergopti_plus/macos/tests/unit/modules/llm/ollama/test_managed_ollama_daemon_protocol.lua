@@ -447,11 +447,13 @@ helpers.describe("Managed daemon refusal diagnostic", function()
 			local Daemon = helpers.load_with_stubs("adapters.managed_ollama_daemon")
 			assert(Daemon.prepare("exec /fixture/serve", string.rep("a", 32), {}))
 			callbacks.chunk(nil, "", "Traceback: /Users/private/path\n")
-			callbacks.chunk(nil, "", "Managed Ollama daemon admission refused: unavailable.\n")
+			callbacks.chunk(nil, "", "Managed Ollama daemon admission refused: NativeHTTPError at native_http.py:490"
+				.. " _read_exact, from managed_ollama_serve.py:670 serve, reason=protocol, native_child_status=-9.\n")
 			callbacks.done(78, "", "")
 			helpers.assert_eq(#logs, 1)
-			helpers.assert_eq(logs[1],
-				"Managed Ollama daemon exited (status=78): Managed Ollama daemon admission refused: unavailable.")
+			helpers.assert_eq(logs[1], "Managed Ollama daemon exited (status=78): Managed Ollama daemon admission"
+				.. " refused: NativeHTTPError at native_http.py:490 _read_exact, from managed_ollama_serve.py:670 serve,"
+				.. " reason=protocol, native_child_status=-9.")
 			callbacks.done(0, "", "")
 			helpers.assert_eq(#logs, 1, "a clean exit logs no refusal")
 		end)

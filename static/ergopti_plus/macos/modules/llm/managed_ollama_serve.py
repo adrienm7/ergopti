@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import math
 import os
+import re
 from pathlib import Path
 import secrets
 import select
@@ -702,6 +703,44 @@ def serve(
             signal.signal(name, handler)
 
 
+_FACT_WORD = re.compile(r"[a-z][a-z0-9_]{0,63}")
+
+
+def _refusal_facts(error):
+    """Name an unexpected refusal with fixed words and numbers only.
+
+    The innermost frame names the failing check, the last frame in this file
+    the serve phase, and a native HTTP failure adds its fixed reason, stage and
+    worker exit status (field run 2026-10-30 18:26 named only the frame).
+    """
+    frames = traceback.extract_tb(error.__traceback__)
+    inner = frames[-1]
+    facts = [
+        "%s at %s:%d %s"
+        % (type(error).__name__, os.path.basename(inner.filename), inner.lineno, inner.name)
+    ]
+    phases = [
+        frame
+        for frame in frames
+        if os.path.basename(frame.filename) == os.path.basename(__file__) and frame.name != "main"
+    ]
+    if phases and phases[-1] is not inner:
+        facts.append(
+            "from %s:%d %s" % (os.path.basename(__file__), phases[-1].lineno, phases[-1].name)
+        )
+    named = {"reason": getattr(error, "reason", None)}
+    native = getattr(error, "native_diagnostic", None)
+    if type(native) is dict:
+        for key in ("stage", "native_child_status", "native_receipt_reason", "cleanup"):
+            named[key] = native.get(key)
+    for key, value in named.items():
+        if (type(value) is int and -65535 <= value <= 65535) or (
+            type(value) is str and _FACT_WORD.fullmatch(value)
+        ):
+            facts.append("%s=%s" % (key, value))
+    return ", ".join(facts)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, required=True)
@@ -736,11 +775,8 @@ def main():
         print("Managed Ollama daemon admission refused: %s." % refusal, file=sys.stderr)
         return 78
     except Exception as error:
-        frame = traceback.extract_tb(error.__traceback__)[-1]
         print(
-            "Managed Ollama daemon admission refused: %s at %s:%d %s."
-            % (type(error).__name__, os.path.basename(frame.filename), frame.lineno, frame.name),
-            file=sys.stderr,
+            "Managed Ollama daemon admission refused: %s." % _refusal_facts(error), file=sys.stderr
         )
         return 78
 

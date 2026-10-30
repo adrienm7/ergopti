@@ -14,7 +14,7 @@ local Receipt = require("core.llm.managed_ollama_daemon_receipt")
 local MAX_PROTOCOL_BYTES = require("adapters.owned_program_runner").MAX_PROTOCOL_BYTES
 -- The serve owner writes one fixed refusal line on stderr; anything else there
 -- (a traceback names paths) is never logged.
-local REFUSAL_PATTERN = "Managed Ollama daemon admission refused: [%w_.: ]+%."
+local REFUSAL_PATTERN = "Managed Ollama daemon admission refused: [%w_.:=, %-]+%."
 local DIAGNOSTIC_LIMIT = 4096
 
 --- Logs the serve owner's fixed refusal line once, when its stderr carries one.
