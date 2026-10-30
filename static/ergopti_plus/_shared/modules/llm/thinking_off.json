@@ -1,0 +1,383 @@
+{
+	"_comment": "Single source of the reasoning controls of each model family, independent of the provider that serves it. A model id is normalized (lowercase, last path segment, an Ollama :tag dropped) and matched against each family's globs (* is the only wildcard); the first family wins. Its controls are tried in order and the first control kind the provider's dialect carries applies (api_providers.json thinking_dialect: kind -> body fields, $level replaced by the control's level); a family with no control, or a provider without that kind, sends nothing. intent off turns thinking off; lowest is the lowest level when the family cannot turn it off. A family with default_sampling_only true accepts only the default sampling: the drivers send it no temperature (Anthropic answers HTTP 400 to any other value on these models). Kinds: toggle (hybrid models: on or off), effort (reasoning_effort scale), anthropic_thinking, anthropic_effort, gemini_budget, gemini_level. Local servers turn thinking off for every model through local_servers.json request_fields; Ollama bodies send think false. A provider answering HTTP 400 that names an injected field gets the request once more without it, and that field is remembered as refused for that provider and model, across restarts (at most 200 pairs), until refusal_expiry_days pass, so a later provider fix is picked up. Resolved by _shared/lua/llm/thinking_off.lua and _shared/modules/llm/thinking_off.ahk, pinned by _shared/tests/corpus/llm/thinking_off_vectors.json. Sources checked 2026-10-30.",
+	"refusal_expiry_days": 30,
+	"families": [
+		{
+			"_family": "Claude Opus 5.5, Fable 5, Mythos 5: thinking cannot be disabled, low is the lowest effort",
+			"models": [
+				"claude-opus-5-5*",
+				"claude-fable-5*",
+				"claude-mythos-5*",
+				"claude-mythos-preview*"
+			],
+			"controls": [
+				{
+					"kind": "anthropic_effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://platform.claude.com/docs/en/build-with-claude/thinking",
+			"default_sampling_only": true
+		},
+		{
+			"_family": "Claude Sonnet 5.5: between_tools is the lowest thinking setting",
+			"models": ["claude-sonnet-5-5*"],
+			"controls": [
+				{
+					"kind": "anthropic_thinking",
+					"intent": "lowest",
+					"level": "between_tools"
+				}
+			],
+			"_source": "https://platform.claude.com/docs/en/build-with-claude/thinking",
+			"default_sampling_only": true
+		},
+		{
+			"_family": "Claude Opus 5, Sonnet 5, Haiku 5.5: thinking off (Claude 4.x and older think only when asked)",
+			"models": ["claude-opus-5*", "claude-sonnet-5*", "claude-haiku-5-5*"],
+			"controls": [
+				{
+					"kind": "anthropic_thinking",
+					"intent": "off",
+					"level": "disabled"
+				}
+			],
+			"_source": "https://platform.claude.com/docs/en/build-with-claude/thinking",
+			"default_sampling_only": true
+		},
+		{
+			"_family": "Claude Opus 4.7 and 4.8: no thinking rule (off unless asked), and only the default sampling",
+			"models": ["claude-opus-4-7*", "claude-opus-4-8*"],
+			"controls": [],
+			"default_sampling_only": true,
+			"_source": "https://platform.claude.com/docs/en/build-with-claude/thinking"
+		},
+		{
+			"_family": "GPT-6: none and minimal are refused",
+			"models": ["gpt-6*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://developers.openai.com/api/docs/guides/reasoning"
+		},
+		{
+			"_family": "GPT-5 pro, codex and chat models: no documented reasoning_effort on chat completions",
+			"models": ["gpt-5-pro*", "gpt-5*-pro*", "gpt-5*-codex*", "gpt-5*-chat*"],
+			"controls": [],
+			"_source": "https://developers.openai.com/api/docs/models"
+		},
+		{
+			"_family": "GPT-5.1 and later: none turns reasoning off",
+			"models": ["gpt-5.*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "off",
+					"level": "none"
+				}
+			],
+			"_source": "https://developers.openai.com/api/docs/models/gpt-5.1"
+		},
+		{
+			"_family": "GPT-5: minimal is the lowest effort",
+			"models": ["gpt-5", "gpt-5-2025-*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "minimal"
+				}
+			],
+			"_source": "https://developers.openai.com/api/docs/models/gpt-5"
+		},
+		{
+			"_family": "o-series: low is the lowest effort",
+			"models": ["o1", "o1-2*", "o3", "o3-2*", "o3-pro*", "o4-mini*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://developers.openai.com/api/docs/guides/reasoning"
+		},
+		{
+			"_family": "gpt-oss safeguard: no documented reasoning_effort",
+			"models": ["gpt-oss-safeguard*"],
+			"controls": [],
+			"_source": "https://console.groq.com/docs/reasoning"
+		},
+		{
+			"_family": "gpt-oss: reasoning cannot be disabled, low is the lowest effort",
+			"models": ["gpt-oss*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://console.groq.com/docs/reasoning"
+		},
+		{
+			"_family": "Gemini 2.5 Flash image, speech and audio models: no documented thinking",
+			"models": ["gemini-2.5-flash-image*", "gemini-2.5-flash*tts*", "gemini-2.5-flash*audio*"],
+			"controls": [],
+			"_source": "https://ai.google.dev/gemini-api/docs/generate-content/thinking"
+		},
+		{
+			"_family": "Gemini 2.5 Flash and Flash-Lite: thinkingBudget 0 disables thinking",
+			"models": ["gemini-2.5-flash*"],
+			"controls": [
+				{
+					"kind": "gemini_budget",
+					"intent": "off",
+					"level": 0
+				}
+			],
+			"_source": "https://ai.google.dev/gemini-api/docs/generate-content/thinking"
+		},
+		{
+			"_family": "Gemini 2.5 Pro: thinking cannot be disabled, 128 is the lowest budget",
+			"models": ["gemini-2.5-pro*"],
+			"controls": [
+				{
+					"kind": "gemini_budget",
+					"intent": "lowest",
+					"level": 128
+				}
+			],
+			"_source": "https://ai.google.dev/gemini-api/docs/generate-content/thinking"
+		},
+		{
+			"_family": "Gemini 3 Flash models that accept minimal",
+			"models": [
+				"gemini-3.1-flash-lite-image*",
+				"gemini-3-flash*",
+				"gemini-3.1-flash-lite*",
+				"gemini-3.5-flash-lite*",
+				"gemini-3.6-flash*"
+			],
+			"controls": [
+				{
+					"kind": "gemini_level",
+					"intent": "lowest",
+					"level": "minimal"
+				}
+			],
+			"_source": "https://ai.google.dev/gemini-api/docs/generate-content/thinking"
+		},
+		{
+			"_family": "Gemini 3 Pro, gemini-3.8-flash and Gemini 4: low is the lowest level",
+			"models": ["gemini-3*", "gemini-4*"],
+			"controls": [
+				{
+					"kind": "gemini_level",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://ai.google.dev/gemini-api/docs/generate-content/thinking"
+		},
+		{
+			"_family": "Grok 4.3: none turns reasoning off",
+			"models": ["grok-4.3*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "off",
+					"level": "none"
+				}
+			],
+			"_source": "https://docs.x.ai/developers/models/grok-4.3"
+		},
+		{
+			"_family": "Grok 4.5 to 4.7: reasoning cannot be disabled",
+			"models": ["grok-4.5*", "grok-4.6*", "grok-4.7*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://docs.x.ai/developers/model-capabilities/text/reasoning"
+		},
+		{
+			"_family": "Grok 3 mini: low is the lowest effort (unverified: not on the current models page)",
+			"models": ["grok-3-mini*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://docs.x.ai/developers/model-capabilities/text/reasoning"
+		},
+		{
+			"_family": "Mistral Small 2603 and Medium 3.5: none turns reasoning off",
+			"models": ["mistral-small-2603*", "mistral-medium-3-5*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "off",
+					"level": "none"
+				}
+			],
+			"_source": "https://docs.mistral.ai/capabilities/reasoning/"
+		},
+		{
+			"_family": "Mistral Large 4.0: none is refused",
+			"models": ["mistral-large-4-0*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://docs.mistral.ai/capabilities/reasoning/"
+		},
+		{
+			"_family": "GLM served as zai-glm: none is refused, low is the lowest",
+			"models": ["zai-glm*"],
+			"controls": [
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://inference-docs.cerebras.ai/capabilities/reasoning"
+		},
+		{
+			"_family": "GLM 4.5 and later: hybrid, thinking can be turned off",
+			"models": ["glm-4.5*", "glm-4.6*", "glm-4.7*", "glm-5*"],
+			"controls": [
+				{
+					"kind": "toggle",
+					"intent": "off"
+				},
+				{
+					"kind": "effort",
+					"intent": "off",
+					"level": "none"
+				},
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://docs.together.ai/docs/reasoning-models-guide"
+		},
+		{
+			"_family": "Kimi K3: hybrid on Together; on Cerebras none is refused",
+			"models": ["kimi-k3*"],
+			"controls": [
+				{
+					"kind": "toggle",
+					"intent": "off"
+				},
+				{
+					"kind": "effort",
+					"intent": "lowest",
+					"level": "low"
+				}
+			],
+			"_source": "https://docs.together.ai/docs/reasoning-models-guide"
+		},
+		{
+			"_family": "Always-reasoning models: nothing turns them off",
+			"models": [
+				"kimi-k2-thinking*",
+				"qwq*",
+				"deepseek-r1*",
+				"phi-4-reasoning*",
+				"minimax-m2*",
+				"magistral*"
+			],
+			"controls": [],
+			"_source": "https://docs.fireworks.ai/api-reference/post-chatcompletions"
+		},
+		{
+			"_family": "MiniMax M3: hybrid on Together",
+			"models": ["minimax-m3*"],
+			"controls": [
+				{
+					"kind": "toggle",
+					"intent": "off"
+				}
+			],
+			"_source": "https://docs.together.ai/docs/reasoning-models-guide"
+		},
+		{
+			"_family": "Qwen3, Qwen3.5, Qwen3.6: hybrid, thinking can be turned off",
+			"models": ["qwen3*", "qwen-3*"],
+			"controls": [
+				{
+					"kind": "toggle",
+					"intent": "off"
+				},
+				{
+					"kind": "effort",
+					"intent": "off",
+					"level": "none"
+				}
+			],
+			"_source": "https://inference-docs.cerebras.ai/capabilities/reasoning"
+		},
+		{
+			"_family": "DeepSeek V3.1 and later, deepseek-flash: hybrid, thinking can be turned off",
+			"models": [
+				"deepseek-v3.1*",
+				"deepseek-v3p1*",
+				"deepseek-v3.2*",
+				"deepseek-v3p2*",
+				"deepseek-v4*",
+				"deepseek-flash*"
+			],
+			"controls": [
+				{
+					"kind": "toggle",
+					"intent": "off"
+				},
+				{
+					"kind": "effort",
+					"intent": "off",
+					"level": "none"
+				}
+			],
+			"_source": "https://api-docs.deepseek.com/guides/thinking_mode"
+		},
+		{
+			"_family": "Hermes 4: hybrid, thinking can be turned off",
+			"models": ["hermes-4*"],
+			"controls": [
+				{
+					"kind": "toggle",
+					"intent": "off"
+				}
+			],
+			"_source": "https://huggingface.co/NousResearch/Hermes-4-70B"
+		},
+		{
+			"_family": "Generic: an unknown model whose name looks like a reasoning family gets thinking off through the provider's toggle (a field the provider refuses is dropped and remembered, see _comment)",
+			"models": ["*qwen3*", "*deepseek*", "*-r1*", "*think*", "*reasoning*"],
+			"controls": [
+				{
+					"kind": "toggle",
+					"intent": "off"
+				}
+			],
+			"_source": "heuristic of api_remote.is_thinking_model"
+		}
+	]
+}

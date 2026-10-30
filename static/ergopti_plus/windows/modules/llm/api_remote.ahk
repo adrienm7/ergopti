@@ -154,6 +154,11 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     req_id := _LLM_Remote_AsyncCounter
     timeout_ms := (TimeoutMs > 0) ? TimeoutMs
         : ((LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000)
+    ; A provider refusing a thinking field gets the request once more without
+    ; it: the state is filled once the payload is built
+    OriginalSuccess := on_success
+    Retry := Map("retried", false, "added", [], "body", "")
+    on_fail := _LLMRemoteThinkingRetryFail.Bind(Retry, on_fail)
     reservation := _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
         timeout_ms, A_TickCount, 0, CurrentFn)
     on_success := reservation["on_success"], on_fail := reservation["on_fail"]
@@ -182,9 +187,13 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
             on_success, on_fail, Kind, timeout_ms, CurrentFn)
     }
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
-    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens,
-        resolved.Has("Extras") ? resolved["Extras"] : Map(),
-        resolved.Has("RequestFields") ? resolved["RequestFields"] : Map())
+    Payload := _LLMRemoteApplyThinkingOff(resolved,
+        _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens,
+            resolved.Has("Extras") ? resolved["Extras"] : Map(),
+            resolved.Has("RequestFields") ? resolved["RequestFields"] : Map()), &Added)
+    Retry["resolved"] := resolved, Retry["added"] := Added, Retry["body"] := Payload
+    Retry["send"] := (Body, Fail) => _LLMRemoteRetryOf(req_id, LLM_RemotePostBody_Async(resolved, Url, Body,
+        OriginalSuccess, Fail, timeout_ms, Kind, 0, CurrentFn))
 
     ; The managed worker (WinHTTP in its own process) is the only production
     ; transport: the WinHTTP COM object would put DNS/connect/Send back on the
@@ -1070,7 +1079,10 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
 }
 
 LLM_RemoteCancelAsync(req_id) {
-    global _LLM_Remote_Async, _LLM_Remote_BackboardExchanges
+    global _LLM_Remote_Async, _LLM_Remote_BackboardExchanges, _LLM_Remote_RetryOf
+    ; A prediction sent once more after a refused thinking field
+    if _LLM_Remote_RetryOf.Has(req_id)
+        LLM_RemoteCancelAsync(_LLM_Remote_RetryOf.Delete(req_id))
     if _LLM_Remote_BackboardExchanges.Has(req_id) {
         _LLMRemote_BackboardRetire(_LLM_Remote_BackboardExchanges[req_id], true)
         return
@@ -1366,7 +1378,7 @@ _LLMRemoteResolveEntry(Entry) {
     Extras := (ModelExtras is Map && ModelExtras.Has(Model)) ? ModelExtras[Model] : Map()
     RequestFields := Provider.Has("RequestFields") ? Provider["RequestFields"] : Map()
     return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model,
-        "Extras", Extras, "RequestFields", RequestFields)
+        "Extras", Extras, "RequestFields", RequestFields, "ThinkingDialect", Provider.Get("ThinkingDialect", Map()))
 }
 
 ; Per-phase timeout (ms) for the readiness ping. Same value the sync path
@@ -1792,6 +1804,163 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
         ModelEsc, SysEsc, UserEsc, Temp, MaxTok, ExtraFrag)
 }
 
+; The reasoning control of every model family (thinking_off.json), loaded with
+; the catalogue. An unreadable table is logged and turns nothing off: no guess.
+global LLM_THINKING_FAMILIES := []
+
+; Fields a provider refused for a model (HTTP 400 naming them), by
+; "<provider>|<model>" -> Map of field names: later requests never send them.
+; Read from the local state store at the first request (0 until then).
+global _LLM_ThinkingRefused := 0
+
+; Storage key of the refused thinking fields, in the local state store
+global LLM_THINKING_REFUSED_KEY := "llm_thinking_refused"
+
+; Prediction ids whose request was sent once more after a refused thinking
+; field: original id -> the retry's id, so a cancel reaches the retry
+global _LLM_Remote_RetryOf := Map()
+
+; Epoch seconds, the clock the refusal store is stamped with.
+_LLMRemoteEpochNow() {
+    return DateDiff(A_NowUTC, "19700101000000", "Seconds")
+}
+
+; The refusal store, read from the local state store on first use.
+_LLMRemoteThinkingRefused() {
+    global _LLM_ThinkingRefused, LLM_THINKING_REFUSED_KEY
+    if (_LLM_ThinkingRefused is Map)
+        return _LLM_ThinkingRefused
+    Stored := ""
+    try Stored := ST_Get(LLM_THINKING_REFUSED_KEY, "")
+    catch as Err
+        try LoggerError("LLM.remote", "The refused thinking fields could not be read ({1}); they are learned again.", Err.Message)
+    global LLM_THINKING_FAMILIES
+    ; No families table: nothing is remembered
+    Expiry := LLM_THINKING_FAMILIES.HasOwnProp("ExpirySec") ? LLM_THINKING_FAMILIES.ExpirySec : 0
+    _LLM_ThinkingRefused := LLM_ThinkingOffRefusalsParse(Stored, _LLMRemoteEpochNow(), Expiry, &Dropped)
+    if (Dropped > 0)
+        try LoggerWarn("LLM.remote", "{1} malformed refused thinking field entr(ies) dropped.", Dropped)
+    return _LLM_ThinkingRefused
+}
+
+_LLMRemote_LoadThinkingFamilies() {
+    global LLM_THINKING_FAMILIES, _SharedDir
+    try LLM_THINKING_FAMILIES := LLM_ThinkingOffParseFamilies(
+        FileRead(_SharedDir . "\modules\llm\thinking_off.json", "UTF-8"))
+    catch as Err {
+        LLM_THINKING_FAMILIES := []
+        try LoggerError("LLM.remote", "thinking_off.json is unreadable ({1}) — no request turns thinking off.", Err.Message)
+    }
+}
+
+; Turns the model's reasoning off in a request body: its family's control
+; (thinking_off.json) through the provider's thinking_dialect
+; (_shared/modules/llm/thinking_off.ahk). A field the body already sets wins.
+; @param {Map} Resolved _LLMRemoteResolveEntry's record.
+; @param {String} Body The JSON body.
+; @param {VarRef} Added Receives the paths added, for _LLMRemoteThinkingRefusal.
+; @returns {String} The body.
+_LLMRemoteApplyThinkingOff(Resolved, Body, &Added := "") {
+    global LLM_THINKING_FAMILIES, _LLM_ThinkingRefused
+    Model := Resolved.Get("Model", "")
+    Provider := Resolved.Get("Provider", "")
+    Result := LLM_ThinkingOffApply(LLM_THINKING_FAMILIES, Resolved.Get("ThinkingDialect", Map()), Model, Body,
+        _LLMRemoteThinkingRefused().Get(Provider . "|" . Model, ""), &Family, &Kind, &Added)
+    if (Added.Length > 0)
+        try LoggerDebug("LLM.remote", "Thinking off: family {1} applies to model {2} through provider '{3}' ({4}).",
+            Family, Model, Provider, Kind)
+    ; These models answer HTTP 400 to any temperature but the default
+    if LLM_ThinkingOffDefaultSamplingOnly(LLM_THINKING_FAMILIES, Model)
+            && JsonObjectMemberSpans(Result).Has("temperature") {
+        Result := LLM_ThinkingOffStrip(Result, [["temperature"]], "temperature")
+        try LoggerDebug("LLM.remote", "Model {1} accepts only the default sampling: no temperature is sent.", Model)
+    }
+    return Result
+}
+
+; When a provider answered HTTP 400 naming a field _LLMRemoteApplyThinkingOff
+; added, remembers that field as refused for the provider and model and
+; removes it from the body, so the caller can send the request once more.
+; @param {Map} Resolved The request's resolved entry.
+; @param {Map} Info _LLMRemote_FailInfo's record.
+; @param {Array} Added The paths added.
+; @param {VarRef} Body The JSON body, rewritten without the field.
+; @returns {Boolean} True when a refused field was removed.
+_LLMRemoteThinkingRefusal(Resolved, Info, Added, &Body) {
+    global LLM_THINKING_REFUSED_KEY
+    if !(Info is Map)
+        return false
+    Field := LLM_ThinkingOffRefusedField(Info.Get("status", 0), Info.Get("message", ""), Added)
+    if (Field == "")
+        return false
+    Refused := _LLMRemoteThinkingRefused()
+    Provider := Resolved.Get("Provider", ""), Model := Resolved.Get("Model", "")
+    if !LLM_ThinkingOffRecordRefusal(Refused, Provider, Model, Field, _LLMRemoteEpochNow()) {
+        ; Skipped for this session all the same; only the restart forgets it
+        Refused[Provider . "|" . Model] := Map(Field, _LLMRemoteEpochNow())
+        try LoggerWarn("LLM.remote", "The refused thinking fields are full: '{1}' for model {2} is not remembered.", Field, Model)
+    } else {
+        Saved := false
+        try Saved := ST_Set(LLM_THINKING_REFUSED_KEY, Refused)
+        if !Saved
+            try LoggerError("LLM.remote", "The refused thinking fields could not be saved; they hold until the next restart.")
+    }
+    Body := LLM_ThinkingOffStrip(Body, Added, Field)
+    try LoggerWarn("LLM.remote", "Provider '{1}' refused the thinking field '{2}' for model {3}: sent once more without it, and never again.",
+        Resolved.Get("Provider", ""), Field, Resolved.Get("Model", ""))
+    return true
+}
+
+; Remembers that a prediction was sent once more, so cancelling its original id
+; cancels the retry too.
+; @param {Integer} Original The prediction's id.
+; @param {Integer} Retry The retry's id.
+_LLMRemoteRetryOf(Original, Retry) {
+    global _LLM_Remote_RetryOf
+    if Retry
+        _LLM_Remote_RetryOf[Original] := Retry
+    return Retry
+}
+
+; A request's failure callback that first gives a refused thinking field one
+; more chance: State holds "resolved", "added", "body", "send" (Body, Fail)
+; and "retried".
+_LLMRemoteThinkingRetryFail(State, OriginalFail, Args*) {
+    if !State["retried"] && State["body"] != "" && Args.Length > 0 {
+        Body := State["body"]
+        if _LLMRemoteThinkingRefusal(State["resolved"], Args[1], State["added"], &Body) {
+            State["retried"] := true
+            State["send"].Call(Body, OriginalFail)
+            return
+        }
+    }
+    if HasMethod(OriginalFail, "Call")
+        OriginalFail.Call(Args*)
+}
+
+; Completes a body its caller wrote whole (the screen reading, the AI agent)
+; as a prediction's: a local server's request_fields of local_servers.json
+; (OpenAI shape), then the model family's thinking control. Bodies of other
+; formats (Backboard, decisions) are not chat bodies and pass unchanged.
+; @param {Map} Resolved _LLMRemoteResolveEntry's record.
+; @param {String} Body The JSON body.
+; @param {VarRef} Added Receives the paths the thinking control added.
+; @returns {String} The body.
+_LLMRemoteCompleteBody(Resolved, Body, &Added := "") {
+    Added := []
+    Fmt := Resolved.Get("Format", "")
+    if (Fmt != "openai" && Fmt != "anthropic" && Fmt != "gemini")
+        return Body
+    Fields := Resolved.Get("RequestFields", Map())
+    if (Fmt == "openai" && Fields is Map && Fields.Count > 0) {
+        Source := ""
+        for Name, Value in Fields
+            Source .= (Source == "" ? "" : ",") . JsonStringLiteral(Name) . ":" . Value
+        Body := LLM_ThinkingOffMerge(Body, "{" . Source . "}")
+    }
+    return _LLMRemoteApplyThinkingOff(Resolved, Body, &Added)
+}
+
 ; Parse one immutable provider root and classify both the completion and usage
 ; owned by that root. Canonical containers own an empty result too: falling back
 ; after ``content:null`` or an empty parts array would promote reasoning/metadata
@@ -2104,7 +2273,8 @@ _LLMRemote_LoadCatalog() {
     if !FileExist(path)
         throw Error("api_providers.json not found at " . path)
     try {
-        root := JsonParse(FileRead(path, "UTF-8"))
+        text := FileRead(path, "UTF-8")
+        root := JsonParse(text)
     } catch as err {
         throw Error("api_providers.json parse failed: " . err.Message)
     }
@@ -2123,6 +2293,8 @@ _LLMRemote_LoadCatalog() {
     candidateProviders := Map()
     candidateOrder := []
     seenProviders := Map()
+    ; thinking_off travels as JSON source (JsonParse decodes booleans as 0/1)
+    ProviderSpans := JsonObjectMemberSpans(text, ["providers"])
     for _, pid in order {
         if (Type(pid) != "String" or Trim(pid) = "")
             continue
@@ -2140,7 +2312,17 @@ _LLMRemote_LoadCatalog() {
             try LoggerWarn("LLM.remote", "api_providers.json: provider '{1}' has an invalid descriptor and was skipped.", pid)
             continue
         }
+        try {
+            Members := JsonObjectMemberSpans(ProviderSpans[pid]["text"])
+            Dialect := LLM_ThinkingOffParseDialect(Members.Has("thinking_dialect") ? Members["thinking_dialect"]["text"] : "")
+        } catch as ThinkingErr {
+            ; A half-read dialect would let some models think: refuse the provider whole
+            try LoggerError("LLM.remote", "api_providers.json: providers.{1}.thinking_dialect is invalid ({2}) — skipped.",
+                pid, ThinkingErr.Message)
+            continue
+        }
         candidateProviders[pid] := Map(
+            "ThinkingDialect", Dialect,
             "Label", desc["label"],
             "BaseUrl", desc["base_url"],
             "DefaultModel", desc["default_model"],
@@ -2171,7 +2353,8 @@ _LLMRemote_LoadCatalog() {
     for Id in LocalCatalogue["order"] {
         Desc := LocalCatalogue["servers"][Id]
         candidateProviders[Id] := Map("Label", Desc["label"], "BaseUrl", Desc["base_url"],
-            "DefaultModel", "", "Format", "openai", "ModelExtras", Map(),
+            ; local_servers.json request_fields turn every model's thinking off
+            "DefaultModel", "", "Format", "openai", "ModelExtras", Map(), "ThinkingDialect", Map(),
             "RequestFields", LocalRequestFields)
         candidateOrder.Push(Id)
     }
@@ -2222,6 +2405,7 @@ _LLMRemote_LoadCatalog() {
     ; can never leak raw catalogue scalars to the menu or inference path.
     LLM_API_PROVIDERS := candidateProviders
     LLM_API_PROVIDER_ORDER := candidateOrder
+    _LLMRemote_LoadThinkingFamilies()
     LLM_REMOTE_MODEL_PRICES := candidatePrices
     LLM_REMOTE_TEST_REQUEST := candidateTestRequest
     LLM_REMOTE_DECISIONS_TEST := candidateDecisionsTest

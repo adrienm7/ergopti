@@ -55,6 +55,21 @@ local function fill(template, values)
 	return (template:gsub("{(%d+)}", function(index) return tostring(values[tonumber(index)] or "") end))
 end
 
+--- Says why an API entry was not saved: the secret service's refusal when it
+--- refused the key (a key is never written in plaintext instead), else the
+--- generic save failure.
+--- @param dialogs table
+--- @param entries table api_entries
+--- @param title string
+local function save_failed(dialogs, entries, title)
+	local called, refusal = pcall(entries.store_refusal)
+	if called and type(refusal) == "string" then
+		dialogs.error(fill(tr("menu.llm.api_key_no_secret_store"), { refusal }), title)
+	else
+		dialogs.error(tr("dialog.bulk_toggle.save_failed"), title)
+	end
+end
+
 --- The automatic name of every entry, by id: <provider>/<model>, with the
 --- model and address its requests use.
 --- @param remote table api_remote
@@ -190,7 +205,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		end
 	end
 	if not called or not entry then
-		dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+		save_failed(dialogs, entries, heading)
 		return false
 	end
 	local function published_current()
@@ -401,7 +416,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 					local saved
 					if own then saved = entries.set_active(entry.id) else saved = entries.set_model(entry.id, model) end
 					if saved ~= true then
-						dialogs.error(tr("dialog.bulk_toggle.save_failed"), tr("common.error_title"))
+						save_failed(dialogs, entries, tr("common.error_title"))
 						return false
 					end
 					changed()
@@ -419,8 +434,12 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 					local typed = dialogs.prompt(label, tr("menu.llm.api_prompt_model"), configured)
 					typed = type(typed) == "string" and TextUtils.trim(typed) or ""
 					if typed == "" then return false end
-					if llm.set_backend("api") ~= true or entries.set_model(entry.id, typed) ~= true then
+					if llm.set_backend("api") ~= true then
 						dialogs.error(tr("dialog.bulk_toggle.save_failed"), tr("common.error_title"))
+						return false
+					end
+					if entries.set_model(entry.id, typed) ~= true then
+						save_failed(dialogs, entries, tr("common.error_title"))
 						return false
 					end
 					changed()

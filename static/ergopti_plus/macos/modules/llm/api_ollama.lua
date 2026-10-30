@@ -1010,6 +1010,8 @@ function M.warmup(model_name, on_acquired)
 		model = model_name,
 		messages = { { role = "user", content = " " } },
 		stream = false,
+		-- Its one token must not open a reasoning block
+		think = false,
 		keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
 		options = { num_predict = 1, temperature = 0 },
 	})

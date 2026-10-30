@@ -15,6 +15,17 @@
 ---    previous file intact and a pre-existing file's looser mode never carries
 ---    over.
 --- 3. Keys never reach a log: entries are described by id and provider.
+--- 5. The keys themselves live in the desktop secret service
+---    (modules/llm/api_token_store.lua), as in the macOS Keychain and under
+---    Windows DPAPI: the file holds a "secret-service:<id>#<revision>"
+---    reference per key. A save whose key the service refuses is refused
+---    whole, never written in plaintext. A changed key gets a new revision and
+---    the old one is deleted only once the file names the new one, so a failed
+---    save never leaves the file naming a key it did not publish.
+--- 6. A key an earlier build wrote in plaintext is moved to the service by
+---    migrate_plaintext(), which the daemon runs once at boot, or by the next
+---    save. A load alone never rewrites the file. Without a service the key
+---    stays as it was, and the migration logs why.
 --- 4. `label` stays required, so this file still loads in the builds before
 ---    2026-10; it holds the automatic name the tray writes and no build after
 ---    them reads it: every tray names an entry after its provider and model.
@@ -33,6 +44,7 @@ local SourceWriter = require("toml_codec.writer")
 local ProviderConfig = require("llm.provider_config_policy")
 local EntryIdentity = require("llm.api_entry_identity")
 local NativePath = require("native_path")
+local TokenStore = require("modules.llm.api_token_store")
 
 local LOG = "modules.llm.api_entries"
 local VERSION = 1
@@ -203,7 +215,8 @@ end
 --- @return table state
 local function state()
 	if _state then return _state end
-	_state = { version = VERSION, entries = {}, active_id = "", outdated = {}, extras = {}, row_order = {}, root_extras = {} }
+	_state = { version = VERSION, entries = {}, active_id = "", outdated = {}, extras = {}, row_order = {}, root_extras = {},
+		secrets = {}, plaintext = 0 }
 	local text, read_status = SourceWriter.read_classified(M.path())
 	if read_status ~= "ok" and read_status ~= "absent" then
 		_state.write_refusal = "its physical source could not be read completely"
@@ -235,9 +248,36 @@ local function state()
 	for key, value in pairs(root) do
 		if key ~= "version" and key ~= "entries" and key ~= "active_id" then _state.root_extras[key] = value end
 	end
+	-- Every stored reference is read in one keyboard hand-over: a locked
+	-- keyring asks for its password once, not once per key.
+	local references = {}
+	for _, raw in ipairs(root.entries) do
+		if type(raw) == "table" and TokenStore.is_reference(raw.token) then references[#references + 1] = raw.token end
+	end
+	local tokens, unread = TokenStore.lookup_many(references)
 	local ids = {}
 	for index, raw in ipairs(root.entries) do
-		local entry, outdated_reason = valid_entry(raw, true)
+		local reference = type(raw) == "table" and TokenStore.is_reference(raw.token) and raw.token or nil
+		local entry, outdated_reason
+		if reference and not tokens[reference] then
+			-- Kept as written, like any row this load cannot use: the key is
+			-- still in the service, and the next load that reaches it uses it.
+			outdated_reason = "its key is in the desktop secret service, which could not be read ("
+				.. tostring(unread[reference]) .. ")"
+		else
+			local candidate = raw
+			if reference then
+				candidate = {}
+				for key, value in pairs(raw) do candidate[key] = value end
+				candidate.token = tokens[reference]
+			end
+			entry, outdated_reason = valid_entry(candidate, true)
+		end
+		if entry and reference then
+			_state.secrets[entry.id] = { reference = reference, token = entry.token }
+		elseif entry and entry.token ~= "" then
+			_state.plaintext = _state.plaintext + 1
+		end
 		_state.row_order[#_state.row_order + 1] = { id = entry and entry.id or nil, raw = raw }
 		if entry and ids[entry.id] then _state.write_refusal = "it contains duplicate API entry identities" end
 		if entry then ids[entry.id] = true end
@@ -261,14 +301,28 @@ local function state()
 	return _state
 end
 
---- One entry as written back: its stored fields, this build's values over them.
+--- One entry as written back: its stored fields, this build's values over
+--- them, its key replaced by the reference the secret service holds it under.
 --- @param entry table A usable entry.
+--- @param token string The stored token field: a reference, or "" for no key.
 --- @return table
-local function stored_form(entry)
+local function stored_form(entry, token)
 	local out = {}
 	for key, value in pairs(state().extras[entry.id] or {}) do out[key] = value end
 	for key, value in pairs(entry) do out[key] = value end
+	out.token = token
 	return out
+end
+
+--- Deletes secret-service keys no published file names any more. A key that
+--- cannot be deleted is left behind, never lost: it is only logged.
+--- @param references table
+local function retire_secrets(references)
+	for _, reference in ipairs(references) do
+		if not TokenStore.clear(reference) then
+			pcall(Logger.warn, LOG, "A replaced API key stays in the secret service under '%s'.", reference)
+		end
+	end
 end
 
 --- Persists the current state, the outdated entries included as they were.
@@ -280,6 +334,8 @@ end
 --- @return boolean
 local function persist(admit, publication, quiet)
 	local current = state()
+	-- The reason belongs to this attempt only: a caller reads it right after.
+	current.store_refusal = nil
 	if current.publishing == true and not (publication and publication.owner == current) then return false end
 	if admit then
 		local accepted, allowed = pcall(admit)
@@ -290,20 +346,47 @@ local function persist(admit, publication, quiet)
 			.. "or rewriting it would lose its keys.", M.path(), current.write_refusal)
 		return false
 	end
+	-- Each key goes to the secret service before the file can name it. A key
+	-- that is new or changed gets a fresh reference; the one it replaces is
+	-- deleted only after the file stops naming it.
+	local held, fresh, store_refusal = {}, {}, nil
+	for _, entry in ipairs(current.entries) do
+		local secret = current.secrets[entry.id]
+		if entry.token == "" then
+			held[entry.id] = false
+		elseif secret and secret.token == entry.token then
+			held[entry.id] = secret
+		else
+			local reference, reason = TokenStore.store(entry.id, entry.token)
+			if not reference then store_refusal = reason; break end
+			fresh[#fresh + 1] = reference
+			held[entry.id] = { reference = reference, token = entry.token }
+		end
+	end
+	if store_refusal then
+		retire_secrets(fresh)
+		current.store_refusal = store_refusal
+		if not quiet then
+			Logger.error(LOG, "API entries were not saved: the desktop secret service refused a key (%s); "
+				.. "no key is written in plaintext.", tostring(store_refusal))
+		end
+		return false
+	end
+	local function token_of(entry) return held[entry.id] and held[entry.id].reference or "" end
 	local entries = {}
 	local pending = {}
 	for _, entry in ipairs(current.entries) do pending[entry.id] = entry end
 	for _, row in ipairs(current.row_order) do
 		if row.id then
 			local entry = pending[row.id]
-			if entry then entries[#entries + 1] = stored_form(entry); pending[row.id] = nil end
+			if entry then entries[#entries + 1] = stored_form(entry, token_of(entry)); pending[row.id] = nil end
 		else
 			entries[#entries + 1] = row.raw
 		end
 	end
 	-- New entries have no historical row yet; append in the user's order.
 	for _, entry in ipairs(current.entries) do
-		if pending[entry.id] then entries[#entries + 1] = stored_form(entry); pending[entry.id] = nil end
+		if pending[entry.id] then entries[#entries + 1] = stored_form(entry, token_of(entry)); pending[entry.id] = nil end
 	end
 	local active = current.active_id ~= "" and current.active_id or current.dangling_active_id or ""
 	local image = {}
@@ -323,9 +406,49 @@ local function persist(admit, publication, quiet)
 	-- An interrupted rename cannot manufacture either commit or rollback ACK.
 	current.publishing = publication ~= nil and publication.renaming == true
 	if not called then ok, err = false, ok end
-	if ok == true then current.source = { status = "ok", content = payload } end
+	if ok == true then
+		current.source = { status = "ok", content = payload }
+		current.store_refusal = nil
+		local retired = {}
+		for id, secret in pairs(current.secrets) do
+			if not (held[id] and held[id].reference == secret.reference) then retired[#retired + 1] = secret.reference end
+		end
+		local secrets = {}
+		for id, secret in pairs(held) do if secret then secrets[id] = secret end end
+		current.secrets = secrets
+		current.plaintext = 0
+		retire_secrets(retired)
+	elseif not current.publishing then
+		-- The previous file stands: the keys stored for this write name nothing.
+		-- An unacknowledged rename may have published them, so those stay.
+		retire_secrets(fresh)
+	end
 	if not ok and not quiet then Logger.error(LOG, "API entries could not be saved: %s.", tostring(err)) end
 	return ok
+end
+
+--- Moves the keys an earlier build wrote in plaintext to the secret service,
+--- rewriting the file with their references. Without a service the file is
+--- left as it is: removing the key would lose it, so the load says why.
+--- @return boolean moved
+function M.migrate_plaintext()
+	local current = state()
+	local count = current.plaintext
+	if count == 0 then return true end
+	Logger.start(LOG, "Moving %d plaintext API key(s) of '%s' to the desktop secret service…", count, M.path())
+	if persist() then
+		Logger.success(LOG, "%d API key(s) moved to the desktop secret service.", count)
+		return true
+	end
+	Logger.error(LOG, "%d API key(s) stay in plaintext in '%s' until a desktop secret service is available.",
+		count, M.path())
+	return false
+end
+
+--- Why the last save was refused by the secret service, or nil.
+--- @return string|nil
+function M.store_refusal()
+	return state().store_refusal
 end
 
 
@@ -377,6 +500,7 @@ function M.add(fields, select, admit)
 	if select ~= nil and type(select) ~= "boolean" then return nil, "selection must be a boolean", true end
 	if not admitted() then return nil, "API entry admission changed", true end
 	local current = state()
+	current.store_refusal = nil
 	local source, path = current.source, M.path()
 	if current.publishing then return nil, "API entries are already publishing", true end
 	if current.write_refusal then

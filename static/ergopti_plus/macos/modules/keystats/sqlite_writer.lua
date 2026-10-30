@@ -32,7 +32,6 @@ local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
-local Literal = require("sqlite.literal")
 local Queries = require("keystats.queries")
 -- At-rest encryption of the typed-text columns. Hard require: the setting must
 -- never silently degrade into "stored in clear".
@@ -475,25 +474,8 @@ end
 -- =================================
 -- =================================
 
---- Escape a Lua string for a SQL single-quoted literal. nil → SQL NULL.
---- db:exec hands SQL to sqlite3_exec as a C string, so NUL (and CR) are spelled
---- as char() by the shared encoder instead of being embedded raw.
-local function _sql_str(s)
-	if s == nil then return "NULL" end
-	if type(s) ~= "string" then s = tostring(s) end
-	return "'" .. Literal.escape(s) .. "'"
-end
-
---- Format a numeric / boolean for SQL.
-local function _sql_num(n)
-	if n == nil then return "NULL" end
-	if type(n) == "boolean" then return n and "1" or "0" end
-	return tostring(n)
-end
-
---- JSON-encode a Lua value compactly, WITHOUT quoting it for SQL. Split out from
---- _sql_json because the typing builder must encrypt the payload before it is
---- turned into a SQL literal.
+--- JSON-encode a Lua value compactly, unquoted: the catalogue slot quotes it, and
+--- the typing builder must encrypt the payload first.
 --- @param v any
 --- @return string The encoded JSON, or "{}" when encoding fails.
 local function _json_text(v)
@@ -504,11 +486,6 @@ local function _json_text(v)
 		return "{}"
 	end
 	return encoded
-end
-
---- JSON-encode a Lua value compactly as a SQL literal. nil → '{}'.
-local function _sql_json(v)
-	return _sql_str(_json_text(v))
 end
 
 --- Allocate the next event id (per-device autoincrement).
@@ -530,6 +507,12 @@ end
 
 local _builders = {}
 
+--- A value as the text of a nullable text column: nil stays absent (NULL), anything else is its text.
+local function _opt_text(value)
+	if value == nil then return nil end
+	return tostring(value)
+end
+
 function _builders.typing(e, id)
 	-- `text` and `events_json` are the only columns holding what the user
 	-- literally typed, so they are the only ones encrypted. The aggregates the
@@ -543,29 +526,22 @@ function _builders.typing(e, id)
 		return nil
 	end
 
-	return string.format(
-		"INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.app or "Unknown"), _sql_str(e.title), _sql_str(e.url),
-		_sql_str(e.field_role), _sql_str(e.layout), _sql_str(e.document_path),
-		-- events_typing declares both columns INTEGER NOT NULL. _sql_num(nil) emits
-		-- the literal NULL, and the statement is INSERT OR IGNORE, so a nil here
-		-- does not raise — it silently discards the ENTIRE typing event. The three
-		-- siblings below always carried `or 0` for exactly this reason; these two
-		-- did not, and hs.window:isFullScreen() returns nil for any window that
-		-- does not expose the attribute.
-		_sql_num(e.is_fullscreen or false), _sql_num(e.in_meeting or false),
-		_sql_num(e.mouse_clicks or 0), _sql_num(e.mouse_scrolls or 0),
-		_sql_num(e.mouse_distance_px or 0), _sql_num(e.pause_before_ms),
-		_sql_num(e.battery_level), _sql_num(e.audio_volume), _sql_num(e.wpm),
-		_sql_str(enc_text), _sql_str(e.rich_text), _sql_str(enc_json))
-end
-
---- A value as the text of a nullable text column: nil stays absent (NULL), anything else is its text.
-local function _opt_text(value)
-	if value == nil then return nil end
-	return tostring(value)
+	return Queries.render("events.typing", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		app = tostring(e.app or "Unknown"), title = _opt_text(e.title), url = _opt_text(e.url),
+		field_role = _opt_text(e.field_role), layout = _opt_text(e.layout),
+		document_path = _opt_text(e.document_path),
+		-- events_typing declares these INTEGER NOT NULL, and the slots refuse an
+		-- absent value rather than lose the whole event to INSERT OR IGNORE.
+		-- hs.window:isFullScreen() returns nil for a window without the attribute.
+		is_fullscreen = e.is_fullscreen and 1 or 0, in_meeting = e.in_meeting and 1 or 0,
+		mouse_clicks = tonumber(e.mouse_clicks) or 0, mouse_scrolls = tonumber(e.mouse_scrolls) or 0,
+		mouse_distance_px = tonumber(e.mouse_distance_px) or 0,
+		pause_before_ms = tonumber(e.pause_before_ms),
+		battery_level = tonumber(e.battery_level), audio_volume = tonumber(e.audio_volume),
+		wpm = tonumber(e.wpm), text = enc_text, rich_text = _opt_text(e.rich_text), events_json = enc_json,
+	})
 end
 
 function _builders.app_switch(e, id)
@@ -636,26 +612,21 @@ function _builders.hotstring(e, id, kind)
 end
 
 function _builders.llm(e, id, kind)
-	local columns = {
-		"device_id", "id", "ts", "date", "app", "kind", "context",
-		"predictions_json", "prediction", "all_predictions_json", "chosen_index",
-		"deletes", "deleted_text", "net_saved_chars", "count",
-	}
 	local values = {
-		_sql_str(_device_id), tostring(id), _sql_str(e.timestamp),
-		_sql_str(e.timestamp:sub(1, 10)), _sql_str(e.app or "Unknown"), _sql_str(kind),
-		_sql_str(e.context), (e.predictions and _sql_json(e.predictions) or "NULL"),
-		_sql_str(e.prediction),
-		(e.all_predictions and _sql_json(e.all_predictions) or "NULL"),
-		_sql_num(e.chosen_index), _sql_num(e.deletes), _sql_str(e.deleted_text),
-		_sql_num(e.net_saved_chars), _sql_num(e.count),
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		app = tostring(e.app or "Unknown"), kind = tostring(kind),
+		context = _opt_text(e.context), prediction = _opt_text(e.prediction),
+		predictions_json = e.predictions and _json_text(e.predictions) or nil,
+		all_predictions_json = e.all_predictions and _json_text(e.all_predictions) or nil,
+		chosen_index = tonumber(e.chosen_index), deletes = tonumber(e.deletes),
+		deleted_text = _opt_text(e.deleted_text), net_saved_chars = tonumber(e.net_saved_chars),
+		count = tonumber(e.count),
 	}
 	for _, column in ipairs(LLM_ACCOUNTING_COLUMNS) do
-		columns[#columns + 1] = column[1]
-		values[#values + 1] = _sql_num(e[column[1]])
+		values[column[1]] = tonumber(e[column[1]])
 	end
-	return "INSERT OR IGNORE INTO events_llm (" .. table.concat(columns, ", ")
-		.. ") VALUES (" .. table.concat(values, ", ") .. ");"
+	return Queries.render("events.llm", "native", values)
 end
 
 function _builders.session(e, id, kind)

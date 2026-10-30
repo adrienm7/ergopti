@@ -59,6 +59,8 @@ local function split_tuple(text)
 			position = stop
 		end
 		if text:sub(position, position) == "," then position = position + 1 end
+		-- The catalogue spells its tuples with a space after each comma.
+		while text:sub(position, position) == " " do position = position + 1 end
 	end
 	return values
 end

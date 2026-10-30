@@ -20,7 +20,12 @@
 ---    each origin the PAC sends direct, and refuses two different relays.
 --- 3. Ollama has no failover: only the first selection of each origin is used.
 ---    DIRECT, or a machine without a desktop proxy source, is a direct route.
---- 4. Any lookup failure or refused plan refuses the start with a classified
+--- 4. An unusable desktop configuration (GIO could not resolve the origin, or
+---    ran out of time: a PAC it could not fetch or evaluate) sends that origin
+---    direct, at the closed stages of proxy_policy.json "pac_unavailable_fallback",
+---    with one WARNING naming the stage, as macOS does. A relay the user exported
+---    never reaches the lookup, and a relay the PAC names is kept as named.
+---    Any other failure or a refused plan refuses the start with a classified
 ---    reason instead of launching a daemon that would fail its first pull.
 --- 5. Logs name the outcome only: never an origin URL or the proxy.
 --- ==============================================================================
@@ -43,6 +48,14 @@ M.BYPASS_VARIABLES = { "NO_PROXY", "no_proxy" }
 
 --- Every variable the stage may set; the composition admits only these.
 M.VARIABLES = { M.VARIABLE, M.BYPASS_VARIABLES[1], M.BYPASS_VARIABLES[2] }
+
+--- The closed lookup stage each GIO lookup failure stands for. GIO names no
+--- finer step: a PAC it cannot download or evaluate fails the lookup itself.
+--- Failures of Ergopti's own helper process are not listed and keep refusing.
+M.LOOKUP_STAGES = {
+	["proxy-lookup-failed"] = "native_proxy_lookup",
+	["proxy-lookup-timeout"] = "native_proxy_budget",
+}
 
 --- Splits "NAME=value" rows into a name -> value map for the given names.
 --- @param rows table Process environment rows.
@@ -141,6 +154,8 @@ function M.new(deps)
 			return operation
 		end
 		local entries = {}
+		-- The first lookup stage that sent an origin direct, for the pull's error.
+		local fallback = nil
 		local dispatch
 
 		--- Settles the plan once every origin has a route.
@@ -158,7 +173,7 @@ function M.new(deps)
 				Logger.info(LOG, "Managed Ollama proxy lookup finished: proxy selected, %d direct origin(s).",
 					direct == "" and 0 or select(2, direct:gsub(",", "")) + 1)
 			end
-			finish({ ok = true, environment = environment_of(plan, rows) })
+			finish({ ok = true, environment = environment_of(plan, rows), direct_fallback = fallback })
 		end
 
 		--- Records one origin's first selection, then looks up the next origin.
@@ -173,9 +188,16 @@ function M.new(deps)
 			end
 			local choices, selection_error = policy.selection(receipt)
 			if not choices then
-				Logger.error(LOG, "Managed Ollama proxy lookup refused: %s", tostring(selection_error))
-				finish({ ok = false, error = "proxy_lookup_failed" })
-				return
+				local stage = M.LOOKUP_STAGES[selection_error]
+				if not policy.falls_back_direct(stage) then
+					Logger.error(LOG, "Managed Ollama proxy lookup refused: %s", tostring(selection_error))
+					finish({ ok = false, error = "proxy_lookup_failed" })
+					return
+				end
+				Logger.warn(LOG, "Managed Ollama proxy lookup unusable at %s: origin %d of %d goes direct.",
+					stage, index, #origins)
+				fallback = fallback or stage
+				choices = { { mode = "direct" } }
 			end
 			local first = choices[1]
 			-- DIRECT, or the explicit "no native proxy source" acknowledgement.

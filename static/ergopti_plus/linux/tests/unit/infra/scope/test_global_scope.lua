@@ -32,6 +32,14 @@ local function stub(trace, name, refuse)
 	return participant
 end
 
+--- Runs one global request whose participants all settle at once.
+local function apply_now(GlobalScope, mode, registry)
+	local settled
+	GlobalScope.apply(mode, registry, function(committed, report) settled = { committed, report } end)
+	helpers.assert_not_nil(settled, "the global request settled")
+	return settled[1], settled[2]
+end
+
 --- Runs body with fresh global and owner modules, restoring them afterwards.
 local function with_modules(body)
 	local saved = {}
@@ -94,7 +102,7 @@ helpers.describe("Linux global scope: registry and composition", function()
 			local registry = GlobalScope.participants({ gestures = Manager, is_paused = function() return false end })
 			helpers.assert_nil(registry.gestures, "a gesture reader that cannot start refuses every restore")
 			registry.tap_holds = stub({}, "tap_holds")
-			local committed, report = GlobalScope.apply("recommended", registry)
+			local committed, report = apply_now(GlobalScope, "recommended", registry)
 			helpers.assert_eq(committed, true, report.detail)
 			helpers.assert_eq(report.skipped[2], "gestures")
 		end)
@@ -106,7 +114,7 @@ helpers.describe("Linux global scope: registry and composition", function()
 		with_modules(function()
 			local trace = {}
 			local GlobalScope = require("infra.global_scope")
-			local committed, report = GlobalScope.apply("recommended", {
+			local committed, report = apply_now(GlobalScope, "recommended", {
 				metrics = stub(trace, "metrics"), tap_holds = stub(trace, "tap_holds"), llm = stub(trace, "llm") })
 			helpers.assert_eq(committed, true, report.detail)
 			helpers.assert_eq(trace, { "tap_holds:recommended", "llm:recommended", "metrics:recommended",
@@ -121,11 +129,11 @@ helpers.describe("Linux global scope: registry and composition", function()
 			local GlobalScope = require("infra.global_scope")
 			local tap_holds = stub(trace, "tap_holds")
 			tap_holds.revert = function(done) trace[#trace + 1] = "tap_holds:revert"; return done(not stuck) end
-			local committed, report = GlobalScope.apply("clear", { tap_holds = tap_holds, llm = stub(trace, "llm", true) })
+			local committed, report = apply_now(GlobalScope, "clear", { tap_holds = tap_holds, llm = stub(trace, "llm", true) })
 			helpers.assert_eq(committed, false)
 			helpers.assert_eq(report.reverted, false)
 			helpers.assert_eq({ report.point, report.kind, report.failed }, { "rollback", "rollback_pending", "llm" })
-			committed, report = GlobalScope.apply("clear", { tap_holds = stub(trace, "other") })
+			committed, report = apply_now(GlobalScope, "clear", { tap_holds = stub(trace, "other") })
 			helpers.assert_eq(committed, false)
 			helpers.assert_true(report.detail:find("pending", 1, true) ~= nil, report.detail)
 			-- The refused retry is the acquire point, as on Windows: another
@@ -134,7 +142,7 @@ helpers.describe("Linux global scope: registry and composition", function()
 			-- The tray's Quit reads this as an active global writer (quit-admission).
 			helpers.assert_eq(GlobalScope.pending(), true, "a retained rollback is a pending global writer")
 			stuck = false
-			committed = GlobalScope.apply("clear", { tap_holds = stub(trace, "fresh") })
+			committed = apply_now(GlobalScope, "clear", { tap_holds = stub(trace, "fresh") })
 			helpers.assert_eq(GlobalScope.pending(), false, "a settled composition is no longer pending")
 			helpers.assert_eq(committed, true)
 			helpers.assert_eq(trace, { "tap_holds:clear", "llm:clear", "tap_holds:revert", "tap_holds:revert",
@@ -183,7 +191,7 @@ helpers.describe("Linux global scope: the Configuration row", function()
 	local function restore_row(ctx, calls)
 		package.loaded["infra.global_scope"] = {
 			participants = function() calls[#calls + 1] = "participants"; return {} end,
-			apply = function(mode) calls[#calls + 1] = mode; return true, { reverted = nil } end,
+			apply = function(mode, _, done) calls[#calls + 1] = mode; done(true, { reverted = nil }); return true end,
 		}
 		package.loaded["ui.menu.menu_builder"] = nil
 		local items = require("ui.menu.menu_builder").build(ctx)
@@ -341,7 +349,7 @@ helpers.describe("Linux global scope: the Configuration clear", function()
 		with_real_tap_holds(source, function(_, _, tap_path, config_path)
 			local trace = {}
 			local GlobalScope = require("infra.global_scope")
-			local committed, report = GlobalScope.apply("clear", {
+			local committed, report = apply_now(GlobalScope, "clear", {
 				tap_holds = require("infra.tap_hold_scope").participant(function() return false end),
 				llm = stub(trace, "llm", true),
 			})
@@ -382,7 +390,7 @@ helpers.describe("Linux global scope: a real owner is reverted", function()
 			})
 			local trace = {}
 			local GlobalScope = require("infra.global_scope")
-			local committed, report = GlobalScope.apply("recommended", {
+			local committed, report = apply_now(GlobalScope, "recommended", {
 				tap_holds = require("infra.tap_hold_scope").participant(function() return false end),
 				llm = stub(trace, "llm", true),
 			})

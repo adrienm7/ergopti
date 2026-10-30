@@ -885,6 +885,24 @@ local function session_type()
 	return (os.getenv("XDG_SESSION_TYPE") or ""):lower()
 end
 
+--- How this session loads a user layout live: "x11" (the server's keymap is
+--- replaced), "wayland" (GNOME or KDE select it through their own setting), or nil
+--- with the declared session type. The installer decides again from the full
+--- desktop identity and refuses with session_unsupported where it has no path.
+--- @param deps table|nil { session_type, desktop_is } (tests replace them).
+--- @return string|nil path
+--- @return string session
+function M.live_path(deps)
+	deps = deps or {}
+	local session = (deps.session_type or session_type)()
+	if session == "x11" then return "x11", session end
+	if session == "wayland" then
+		local desktop_is = deps.desktop_is or require("infra.display_server").desktop_is
+		if desktop_is("gnome") or desktop_is("kde") then return "wayland", session end
+	end
+	return nil, session
+end
+
 --- The layout the options apply to: the one named, else the one this session made
 --- the input source, else the only installed one.
 --- @param id string|nil
@@ -902,13 +920,17 @@ local function rows_base(id, record)
 end
 
 --- Applies the number-row options to an installed layout and loads it into the
---- running session: the layout is converted again with the options, installed in the
---- user XKB tree and, on X11, compiled into the running server (apply-x11). Nothing is
---- written where the session cannot load a user layout live (Wayland, until a
---- compositor is known to compile one); the stored choice is kept by the caller.
---- on_done(true, { id, rows }) or on_done(false, failure_code, detail, user_message,
---- live_code) runs once unless terminal shutdown cancels its delivery. live_code is the
---- closed code of apply-x11 (not_loaded, compile_failed, ...) when that step failed.
+--- running session: the layout is converted again with the options, then on X11
+--- installed in the user XKB tree and compiled into the running server (apply-x11),
+--- and on GNOME or KDE Wayland installed under the live slot the desktop does not use
+--- and selected through the desktop setting (apply-wayland). Either succeeds only once
+--- the keymap read back from the session (the server, or XWayland which receives the
+--- compositor's) holds the new cells. Nothing is written where the session has no live
+--- path; the stored choice is kept by the caller.
+--- on_done(true, { id, rows, slot }) or on_done(false, failure_code, detail,
+--- user_message, live_code) runs once unless terminal shutdown cancels its delivery.
+--- live_code is the installer's closed code (not_loaded, stale_keymap, select_refused,
+--- ...) when the load failed.
 --- @param id string|nil Installed layout id; nil takes the active or the only one.
 --- @param rows table { order = "native"|"digits"|"symbols", edges = boolean }
 --- @param on_done function
@@ -924,8 +946,8 @@ function M.apply_rows(id, rows, on_done, deps)
 		return false
 	end
 	deps = resolved
-	local session = (deps.session_type or session_type)()
-	if session ~= "x11" then
+	local path, session = M.live_path(deps)
+	if path == nil then
 		Logger.warn(LOG, "The number-row options were not applied: a '%s' session cannot load a user layout live.",
 			session == "" and "unknown" or session)
 		on_done(false, M.FAILURE_SESSION, session, nil)
@@ -961,6 +983,25 @@ function M.apply_rows(id, rows, on_done, deps)
 		if not current(epoch) then return end
 		if not converted then
 			finish(false, code, convert_err)
+			return
+		end
+		if path == "wayland" then
+			local args = { "apply-wayland", "--layout-id", base, "--display-name", entry.name,
+				"--source-dir", deps.local_dir .. base }
+			for _, language in ipairs(type(entry.languages) == "table" and entry.languages or {}) do
+				args[#args + 1] = "--language"
+				args[#args + 1] = language
+			end
+			run_installer(deps, args, function(applied, applied_report, apply_err, live_code)
+				if not current(epoch) then return end
+				if not applied then
+					local code = live_code == M.FAILURE_SESSION and M.FAILURE_SESSION or M.FAILURE_LIVE
+					finish(false, applied_report == M.FAILURE_INSTALLER and code or applied_report, apply_err, live_code)
+					return
+				end
+				_active = base
+				finish(true, { id = base, rows = report, slot = applied_report.slot })
+			end)
 			return
 		end
 		run_installer(deps, { "install", "--layout-id", base, "--display-name", entry.name,

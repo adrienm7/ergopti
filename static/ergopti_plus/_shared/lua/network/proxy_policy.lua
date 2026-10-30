@@ -167,7 +167,26 @@ function M.new(data)
 		"requires_verified_native_receipt", "connect_requires_actual_proxy_used" }) do
 		if data.failover[key] ~= true then return invalid() end
 	end
+	-- An unusable automatic configuration (PAC, WPAD) sends a download direct
+	-- only at these lookup stages; an exported or PAC-named relay never does.
+	local fallback = data.pac_unavailable_fallback
+	if type(fallback) ~= "table" or fallback.route ~= "direct"
+		or fallback.explicit_environment_relay ~= "no_fallback"
+		or fallback.pac_selected_relay_failure ~= "no_fallback" then return invalid() end
+	local fallback_stages = inventory(fallback.stages)
+	if not fallback_stages then return invalid() end
+	for stage in pairs(fallback_stages) do
+		if not stage:match("^native_[a-z_]+$") then return invalid() end
+	end
 	local policy = {}
+
+	--- Whether a failed route lookup at this closed stage sends the download
+	--- direct (proxy_policy.json "pac_unavailable_fallback").
+	--- @param stage any Closed stage code of the lookup step that gave up.
+	--- @return boolean
+	function policy.falls_back_direct(stage)
+		return type(stage) == "string" and fallback_stages[stage] == true
+	end
 
 	--- Returns only the canonical native environment names, never their values.
 	--- @return table

@@ -13,7 +13,7 @@
 	},
 	"max_request_bytes": 4096,
 	"request_id_pattern": "^[A-Za-z0-9_-]{1,64}$",
-	"deadline_seconds": { "default": 4800, "min": 60, "max": 7200 },
+	"deadline_seconds": { "default": 7200, "min": 60, "max": 7200 },
 	"log_window_max_lines": 200,
 	"verdicts": ["pass", "fail", "skip", "timeout", "needs_person", "needs_typing"],
 	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
@@ -58,7 +58,7 @@
 			"id": "ollama_model",
 			"kind": "ai",
 			"deadline_seconds": 240,
-			"progress_max_seconds": 1200
+			"progress_max_seconds": 2400
 		},
 		{
 			"id": "mlx_runtime",
@@ -70,7 +70,7 @@
 			"id": "mlx_model",
 			"kind": "ai",
 			"deadline_seconds": 240,
-			"progress_max_seconds": 1200
+			"progress_max_seconds": 2400
 		}
 	],
 	"guard_step": "config_guard"

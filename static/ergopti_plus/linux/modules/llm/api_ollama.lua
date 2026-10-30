@@ -217,7 +217,7 @@ end
 -- =========================================
 
 --- Sends a chat completion request to the Ollama /api/chat endpoint.
---- @param base_url string   Ollama base URL (e.g. "http://localhost:11434").
+--- @param base_url string   Ollama base URL (e.g. "http://127.0.0.1:11435").
 --- @param model    string   Model name.
 --- @param messages table    Array of { role, content } message objects.
 --- @param opts     table|nil  { stream?, temperature?, max_tokens?, verify_local_model? }
@@ -337,7 +337,8 @@ function M.warmup(base_url, model, runtime_receipt, on_done)
 		or not runtime_current(response) then
 		return { started = false }
 	end
-	local body = json_encode({ model = model, messages = Json.array({}), stream = false, keep_alive = OLLAMA_KEEP_ALIVE })
+	local body = json_encode({ model = model, messages = Json.array({}), stream = false, think = false,
+		keep_alive = OLLAMA_KEEP_ALIVE })
 	Logger.debug(LOG, "warmup() → %s (model=%s)", url, model)
 	return HttpClient.post_stream_owned(url, { ["Content-Type"] = "application/json" }, body, {
 		owner = WARMUP_OWNER, timeout_ms = Timings.ms("llm", "warmup_post_timeout_ms"),
