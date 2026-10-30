@@ -127,6 +127,15 @@ local function stop_for(line_mode)
 	return nil
 end
 
+--- The think field of an Ollama chat body: false, or the effort level of a
+--- family that ignores false (thinking_off.json through api_remote, required
+--- lazily: api_remote reaches the prediction engine this module loads).
+--- @param model string The Ollama model tag.
+--- @return boolean|string think
+local function ollama_think(model)
+	return require("modules.llm.api_remote").ollama_think(model)
+end
+
 
 --- Checks the original managed owner after potentially reentrant native readers.
 --- @param request table Retained private response owner.
@@ -247,7 +256,7 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 		keep_alive = OLLAMA_KEEP_ALIVE,
 		-- Windows and macOS disable thinking in the request; stripping the trace
 		-- afterwards would still pay its tokens and latency.
-		think = false,
+		think = ollama_think(model),
 		options = { thinking_budget = 0 },
 	}
 	if type(options.temperature) == "number" then
@@ -337,8 +346,8 @@ function M.warmup(base_url, model, runtime_receipt, on_done)
 		or not runtime_current(response) then
 		return { started = false }
 	end
-	local body = json_encode({ model = model, messages = Json.array({}), stream = false, think = false,
-		keep_alive = OLLAMA_KEEP_ALIVE })
+	local body = json_encode({ model = model, messages = Json.array({}), stream = false,
+		think = ollama_think(model), keep_alive = OLLAMA_KEEP_ALIVE })
 	Logger.debug(LOG, "warmup() → %s (model=%s)", url, model)
 	return HttpClient.post_stream_owned(url, { ["Content-Type"] = "application/json" }, body, {
 		owner = WARMUP_OWNER, timeout_ms = Timings.ms("llm", "warmup_post_timeout_ms"),

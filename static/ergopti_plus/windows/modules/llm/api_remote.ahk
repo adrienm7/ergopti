@@ -1853,6 +1853,18 @@ _LLMRemote_LoadThinkingFamilies() {
     }
 }
 
+; The think value of an Ollama chat body for a model (thinking_off.json): false,
+; or the effort level of a family that ignores false (gpt-oss).
+; @param {String} Model The Ollama model tag.
+; @returns {String} Its JSON source: false or a quoted level.
+LLM_OllamaThink(Model) {
+    global LLM_THINKING_FAMILIES
+    Think := LLM_ThinkingOffOllamaThink(LLM_THINKING_FAMILIES, String(Model))
+    if (Think != "false")
+        try LoggerDebug("LLM.remote", "Ollama think for model {1}: {2}.", Model, Think)
+    return Think
+}
+
 ; Turns the model's reasoning off in a request body: its family's control
 ; (thinking_off.json) through the provider's thinking_dialect
 ; (_shared/modules/llm/thinking_off.ahk). A field the body already sets wins.

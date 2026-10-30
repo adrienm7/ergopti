@@ -96,6 +96,15 @@ helpers.describe("llm_vision parameter replays the shared vision corpus", functi
 		end)
 	end
 
+	helpers.it("an ollama request without its resolved think is refused", function()
+		local spec = { model = "m", system = "S", text = "T", max_tokens = 10 }
+		helpers.assert_eq(pcall(Vision.build_request, "ollama", spec), false, "no think")
+		spec.think = 0
+		helpers.assert_eq(pcall(Vision.build_request, "ollama", spec), false, "think is false or a level")
+		spec.think = "low"
+		helpers.assert_eq(Vision.build_request("ollama", spec).think, "low", "a level is sent as given")
+	end)
+
 	for _, vector in ipairs(corpus.extract_vectors) do
 		helpers.it("extract vector '" .. vector.id .. "'", function()
 			helpers.assert_eq(Vision.extract(vector.block, vector.tag), vector.text, vector.id)

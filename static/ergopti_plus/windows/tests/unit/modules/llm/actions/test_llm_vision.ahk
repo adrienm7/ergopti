@@ -123,11 +123,17 @@ _LVS_RequestVectors() {
 	Checked := 0
 	Formats := Map()
 	for Vector in _LVS_Corpus()["request_vectors"] {
-		Body := LLM_Vision_BuildRequest(Vector["format"], Vector["spec"])
+		Spec := Vector["spec"]
+		; The spec's think is JSON source (LLM_OllamaThink); the decoder read false as 0
+		if Spec.Has("think")
+			Spec["think"] := (Spec["think"] is String) ? JsonStringLiteral(Spec["think"]) : "false"
+		Body := LLM_Vision_BuildRequest(Vector["format"], Spec)
 		AssertEqual("", _LVS_DeepEqual(Vector["body"], JsonParse(Body)), Vector["id"] . ": body")
 		; The decoder reads false as 0: the wire text must say false
 		if (Vector["format"] == "openai" || Vector["format"] == "ollama")
 			AssertContains(Body, '"stream":false', Vector["id"] . ": streaming is off")
+		if (Vector["format"] == "ollama")
+			AssertContains(Body, '"think":' . Spec["think"], Vector["id"] . ": the resolved think is sent")
 		Formats[Vector["format"]] := true
 		Checked += 1
 	}
@@ -150,6 +156,12 @@ Test("LLM vision: reading a tagged answer replays the shared corpus", _LVS_Extra
 _LVS_RequestRefusals() {
 	Spec := Map("model", "m", "system", "S", "text", "T", "max_tokens", 10)
 	AssertThrows(() => LLM_Vision_BuildRequest("xml", Spec), "an unknown dialect is a caller bug")
+	AssertThrows(() => LLM_Vision_BuildRequest("ollama", Spec), "an ollama request needs its think value")
+	Spec["think"] := "0"
+	AssertThrows(() => LLM_Vision_BuildRequest("ollama", Spec), "think is false or a quoted level")
+	Spec["think"] := '"low"'
+	AssertContains(LLM_Vision_BuildRequest("ollama", Spec), '"think":"low"', "a level is sent as given")
+	Spec.Delete("think")
 	Spec["image"] := "QUJD"
 	AssertThrows(() => LLM_Vision_BuildRequest("openai", Spec), "an image needs its mime type")
 	Spec["mime"] := "image/png"
