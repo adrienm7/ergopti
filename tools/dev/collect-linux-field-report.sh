@@ -78,7 +78,7 @@ field_report_enter_branch linux
 # ======= 1/ Update from the base ===========
 # ===========================================
 
-field_report_update_from_base
+field_report_update_from_base "${REPO_ROOT}/tools/dev/collect-linux-field-report.sh" "$@"
 field_report_open_folder linux
 # Set by the INT/TERM trap; the remaining evidence is still collected.
 interrupted=false

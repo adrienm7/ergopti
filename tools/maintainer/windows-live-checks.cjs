@@ -424,14 +424,15 @@ class LiveSession {
 	 * @returns {string[]}
 	 */
 	logLines(fragment) {
-		const found = [];
-		if (!fs.existsSync(this.logs)) return found;
+		// A line reaches both the day log and its module's log: count it once.
+		const found = new Set();
+		if (!fs.existsSync(this.logs)) return [];
 		for (const name of fs.readdirSync(this.logs)) {
 			if (!name.endsWith('.log') || name.includes('errors_')) continue;
 			for (const line of fs.readFileSync(path.join(this.logs, name), 'utf8').split(/\r?\n/))
-				if (line.includes(fragment)) found.push(line.trim());
+				if (line.includes(fragment)) found.add(line.trim());
 		}
-		return found;
+		return [...found];
 	}
 
 	/**

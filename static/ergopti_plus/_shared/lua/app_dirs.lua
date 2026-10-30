@@ -34,4 +34,12 @@ return {
 		base_fallback = ".local/state",
 		relative = "ergopti_plus/logs",
 	},
+	config = {
+		override_key = "ConfigDirPath",
+		hotstrings_dir = "hotstrings",
+		personal_hotstrings_file = "personal_hotstrings.toml",
+		macos_base_env = "HOME",
+		macos_relative = ".config/ergopti_plus",
+		macos_paths_file = "Library/Application Support/ErgoptiPlus/paths.toml",
+	},
 }
