@@ -1,5 +1,5 @@
 {
-	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of backboard and decisions live in _shared/lua/llm/remote_formats.lua. `thinking_off` (optional) turns reasoning off, or to the lowest level a model accepts, in every request to that provider: an ordered list of { models: [glob], fields: {...} }. A glob matches the whole model id, ignoring case, with * as its only wildcard; the first matching rule wins and no match adds nothing (an unknown field is an HTTP 400, so an undocumented model is sent as it is; empty fields shield a model from a broader glob below). The fields are deep-merged into the body of every format, and a field the body already sets wins at every level. Each rule cites its official source in _source (checked 2026-10-30). Resolved by _shared/lua/llm/thinking_off.lua and _shared/modules/llm/thinking_off.ahk, pinned by _shared/tests/corpus/llm/thinking_off_vectors.json.",
+	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of backboard and decisions live in _shared/lua/llm/remote_formats.lua. `thinking_dialect` (optional) says how the provider carries each reasoning control kind of _shared/modules/llm/thinking_off.json: kind -> body fields deep-merged into the request (a field the body already sets wins), the string $level replaced by the model family's level. A kind the provider does not list is never sent (openai_compat lists none: it may point at a strict endpoint). Sources: platform.claude.com build-with-claude/thinking and effort, developers.openai.com guides/reasoning, ai.google.dev thinking, docs.x.ai reasoning, docs.mistral.ai reasoning, api-docs.deepseek.com thinking_mode, docs.cohere.com compatibility-api, inference-docs.cerebras.ai reasoning, openrouter.ai reasoning-tokens, console.groq.com reasoning, docs.together.ai reasoning-models-guide, docs.fireworks.ai post-chatcompletions (checked 2026-10-30).",
 	"provider_order": [
 		"openai",
 		"anthropic",
@@ -24,266 +24,98 @@
 			"base_url": "https://api.openai.com/v1",
 			"default_model": "gpt-4o-mini",
 			"format": "openai",
-			"thinking_off": [
-				{
-					"models": ["gpt-6*"],
-					"fields": { "reasoning_effort": "low" },
-					"_source": "https://developers.openai.com/api/docs/guides/reasoning (GPT-6 Astra and GPT-6.1 Sol refuse none; 6.1 Sol refuses minimal)"
-				},
-				{
-					"models": ["gpt-5-pro*", "gpt-5*-pro*", "gpt-5*-codex*", "gpt-5*-chat*"],
-					"fields": {},
-					"_source": "https://developers.openai.com/api/docs/models (pro and codex models are not served on chat completions; chat-latest documents no reasoning_effort)"
-				},
-				{
-					"models": ["gpt-5.*"],
-					"fields": { "reasoning_effort": "none" },
-					"_source": "https://developers.openai.com/api/docs/models/gpt-5.1 (none, low, medium, high)"
-				},
-				{
-					"models": ["gpt-5", "gpt-5-2025-*"],
-					"fields": { "reasoning_effort": "minimal" },
-					"_source": "https://developers.openai.com/api/docs/models/gpt-5 (minimal, low, medium, high)"
-				},
-				{
-					"models": ["o1", "o1-2*", "o3", "o3-2*", "o4-mini*"],
-					"fields": { "reasoning_effort": "low" },
-					"_source": "https://developers.openai.com/api/docs/guides/reasoning (o-series: low, medium, high)"
-				}
-			]
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"anthropic": {
 			"label": "Anthropic",
 			"base_url": "https://api.anthropic.com/v1",
 			"default_model": "claude-haiku-4-5",
 			"format": "anthropic",
-			"thinking_off": [
-				{
-					"models": [
-						"claude-opus-5-5*",
-						"claude-fable-5*",
-						"claude-mythos-5*",
-						"claude-mythos-preview*"
-					],
-					"fields": { "output_config": { "effort": "low" } },
-					"_source": "https://platform.claude.com/docs/en/build-with-claude/thinking (they reject thinking disabled; low is the lowest effort: https://platform.claude.com/docs/en/build-with-claude/effort)"
-				},
-				{
-					"models": ["claude-sonnet-5-5*"],
-					"fields": { "thinking": { "type": "between_tools" } },
-					"_source": "https://platform.claude.com/docs/en/build-with-claude/thinking (lowest thinking setting; disabled is refused)"
-				},
-				{
-					"models": ["claude-opus-5*", "claude-haiku-5-5*", "claude-sonnet-5*"],
-					"fields": { "thinking": { "type": "disabled" } },
-					"_source": "https://platform.claude.com/docs/en/build-with-claude/thinking (Claude 4.x and older think only when asked)"
-				}
-			]
+			"thinking_dialect": {
+				"anthropic_thinking": { "thinking": { "type": "$level" } },
+				"anthropic_effort": { "output_config": { "effort": "$level" } }
+			}
 		},
 		"gemini": {
 			"label": "Google Gemini",
 			"base_url": "https://generativelanguage.googleapis.com/v1beta",
 			"default_model": "gemini-2.0-flash",
 			"format": "gemini",
-			"thinking_off": [
-				{
-					"models": ["gemini-2.5-flash-image*", "gemini-2.5-flash*tts*", "gemini-2.5-flash*audio*"],
-					"fields": {},
-					"_source": "https://ai.google.dev/gemini-api/docs/generate-content/thinking (documents no thinking for the image, speech and audio models)"
+			"thinking_dialect": {
+				"gemini_budget": {
+					"generationConfig": { "thinkingConfig": { "thinkingBudget": "$level" } }
 				},
-				{
-					"models": ["gemini-2.5-flash*"],
-					"fields": { "generationConfig": { "thinkingConfig": { "thinkingBudget": 0 } } },
-					"_source": "https://ai.google.dev/gemini-api/docs/generate-content/thinking (Flash and Flash-Lite: disable with thinkingBudget = 0)"
-				},
-				{
-					"models": ["gemini-2.5-pro*"],
-					"fields": { "generationConfig": { "thinkingConfig": { "thinkingBudget": 128 } } },
-					"_source": "https://ai.google.dev/gemini-api/docs/generate-content/thinking (Pro: 128 to 32768, cannot disable thinking)"
-				},
-				{
-					"models": [
-						"gemini-3.1-flash-lite-image*",
-						"gemini-3-flash*",
-						"gemini-3.1-flash-lite*",
-						"gemini-3.5-flash-lite*",
-						"gemini-3.6-flash*"
-					],
-					"fields": { "generationConfig": { "thinkingConfig": { "thinkingLevel": "minimal" } } },
-					"_source": "https://ai.google.dev/gemini-api/docs/generate-content/thinking (these accept minimal)"
-				},
-				{
-					"models": ["gemini-3*", "gemini-4*"],
-					"fields": { "generationConfig": { "thinkingConfig": { "thinkingLevel": "low" } } },
-					"_source": "https://ai.google.dev/gemini-api/docs/generate-content/thinking (gemini-3.8-flash refuses minimal; Pro and gemini-4 start at low)"
-				}
-			]
+				"gemini_level": { "generationConfig": { "thinkingConfig": { "thinkingLevel": "$level" } } }
+			}
 		},
 		"xai": {
 			"label": "xAI (Grok)",
 			"base_url": "https://api.x.ai/v1",
 			"default_model": "grok-2-mini",
 			"format": "openai",
-			"thinking_off": [
-				{
-					"models": ["grok-4.3*"],
-					"fields": { "reasoning_effort": "none" },
-					"_source": "https://docs.x.ai/developers/models/grok-4.3 (none, low, medium, high, xhigh)"
-				},
-				{
-					"models": ["grok-4.5*", "grok-4.6*", "grok-4.7*"],
-					"fields": { "reasoning_effort": "low" },
-					"_source": "https://docs.x.ai/developers/model-capabilities/text/reasoning (reasoning cannot be disabled)"
-				}
-			]
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"mistral": {
 			"label": "Mistral",
 			"base_url": "https://api.mistral.ai/v1",
 			"default_model": "mistral-small-latest",
 			"format": "openai",
-			"thinking_off": [
-				{
-					"models": ["mistral-small-2603*", "mistral-medium-3-5*"],
-					"fields": { "reasoning_effort": "none" },
-					"_source": "https://docs.mistral.ai/capabilities/reasoning/"
-				},
-				{
-					"models": ["mistral-large-4-0*", "zai-glm-5-3*"],
-					"fields": { "reasoning_effort": "low" },
-					"_source": "https://docs.mistral.ai/capabilities/reasoning/ (none is refused)"
-				}
-			]
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"deepseek": {
 			"label": "DeepSeek",
 			"base_url": "https://api.deepseek.com",
 			"default_model": "deepseek-chat",
 			"format": "openai",
-			"thinking_off": [
-				{
-					"models": ["deepseek-flash*", "deepseek-v4-pro*"],
-					"fields": { "thinking": { "type": "disabled" } },
-					"_source": "https://api-docs.deepseek.com/guides/thinking_mode"
-				}
-			]
+			"thinking_dialect": { "toggle": { "thinking": { "type": "disabled" } } }
 		},
 		"cohere": {
 			"label": "Cohere",
 			"base_url": "https://api.cohere.ai/compatibility/v1",
 			"default_model": "command-r7b-12-2024",
-			"format": "openai"
+			"format": "openai",
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"cerebras": {
 			"label": "Cerebras",
 			"base_url": "https://api.cerebras.ai/v1",
 			"default_model": "qwen-3.8-27b",
 			"format": "openai",
-			"thinking_off": [
-				{
-					"models": ["qwen-3*"],
-					"fields": { "reasoning_effort": "none" },
-					"_source": "https://inference-docs.cerebras.ai/capabilities/reasoning (qwen-3.8-27b reasons at xhigh by default and stalls tiny probes)"
-				},
-				{
-					"models": ["gpt-oss*", "zai-glm*", "kimi-k3*"],
-					"fields": { "reasoning_effort": "low" },
-					"_source": "https://inference-docs.cerebras.ai/capabilities/reasoning (none is refused)"
-				}
-			]
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"openrouter": {
 			"label": "OpenRouter",
 			"base_url": "https://openrouter.ai/api/v1",
 			"default_model": "openai/gpt-4o-mini",
 			"format": "openai",
-			"thinking_off": [
-				{
-					"models": [
-						"openai/o1",
-						"openai/o3*",
-						"openai/o4*",
-						"openai/gpt-oss*",
-						"openai/gpt-5*",
-						"openai/gpt-6*",
-						"google/gemini-2.5-pro*",
-						"google/gemini-3*",
-						"google/gemini-4*"
-					],
-					"fields": { "reasoning": { "effort": "low" } },
-					"_source": "https://openrouter.ai/docs/guides/best-practices/reasoning-tokens (mandatory reasoning refuses none; an unsupported level maps to the nearest one)"
-				}
-			]
+			"thinking_dialect": {
+				"toggle": { "reasoning": { "enabled": false } },
+				"effort": { "reasoning": { "effort": "$level" } }
+			}
 		},
 		"groq": {
 			"label": "Groq",
 			"base_url": "https://api.groq.com/openai/v1",
 			"default_model": "llama-3.3-70b-versatile",
 			"format": "openai",
-			"thinking_off": [
-				{
-					"models": ["qwen/qwen3*"],
-					"fields": { "reasoning_effort": "none" },
-					"_source": "https://console.groq.com/docs/reasoning"
-				},
-				{
-					"models": ["openai/gpt-oss-safeguard*"],
-					"fields": {},
-					"_source": "https://console.groq.com/docs/reasoning (lists no reasoning_effort)"
-				},
-				{
-					"models": ["openai/gpt-oss*", "meta-models/muse-spark-open*"],
-					"fields": { "reasoning_effort": "low" },
-					"_source": "https://console.groq.com/docs/reasoning (none is refused)"
-				}
-			]
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"together": {
 			"label": "Together AI",
 			"base_url": "https://api.together.xyz/v1",
 			"default_model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
 			"format": "openai",
-			"thinking_off": [
-				{
-					"models": [
-						"*/deepseek-v4-pro-0813*",
-						"*/glm-5.2*",
-						"*/kimi-k3*",
-						"*/minimax-m3*",
-						"*/qwen3.6-plus*",
-						"*/qwen3.5-9b*"
-					],
-					"fields": { "reasoning": { "enabled": false } },
-					"_source": "https://docs.together.ai/docs/reasoning-models-guide (hybrid models)"
-				},
-				{
-					"models": ["openai/gpt-oss*"],
-					"fields": { "reasoning_effort": "low" },
-					"_source": "https://docs.together.ai/docs/reasoning-models-guide"
-				}
-			]
+			"thinking_dialect": {
+				"toggle": { "reasoning": { "enabled": false } },
+				"effort": { "reasoning_effort": "$level" }
+			}
 		},
 		"fireworks": {
 			"label": "Fireworks AI",
 			"base_url": "https://api.fireworks.ai/inference/v1",
 			"default_model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
 			"format": "openai",
-			"thinking_off": [
-				{
-					"models": ["accounts/fireworks/models/gpt-oss*"],
-					"fields": { "reasoning_effort": "low" },
-					"_source": "https://docs.fireworks.ai/api-reference/post-chatcompletions (GPT-OSS refuses none)"
-				},
-				{
-					"models": [
-						"accounts/fireworks/models/qwen3*",
-						"accounts/fireworks/models/deepseek-v3p2*",
-						"accounts/fireworks/models/deepseek-v4*"
-					],
-					"fields": { "reasoning_effort": "none" },
-					"_source": "https://docs.fireworks.ai/api-reference/post-chatcompletions"
-				}
-			]
+			"thinking_dialect": { "effort": { "reasoning_effort": "$level" } }
 		},
 		"backboard": {
 			"label": "Backboard",

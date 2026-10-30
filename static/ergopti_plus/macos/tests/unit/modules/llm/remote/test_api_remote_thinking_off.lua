@@ -3,10 +3,13 @@
 --- ==============================================================================
 --- MODULE: Thinking Off In Every macOS Cloud Request
 --- DESCRIPTION:
---- Every body macOS posts to a cloud provider carries the provider's
---- thinking_off rule of api_providers.json: the predictions and the Test-API
---- probe (post_and_parse_resolved), the AI agent (request_chat) and the screen
---- reading (request_vision), in the openai, anthropic and gemini formats.
+--- Every body macOS posts to a cloud provider carries its model family's
+--- reasoning control (thinking_off.json) through the provider's
+--- thinking_dialect: the predictions and the Test-API probe
+--- (post_and_parse_resolved), the AI agent (request_chat) and the screen
+--- reading (request_vision), in the openai, anthropic and gemini formats. A
+--- provider refusing an added field with HTTP 400 gets the request once more
+--- without it, and never again for that model.
 ---
 --- ROOT CAUSE ENCODED:
 --- Only Cerebras' default model had its reasoning turned off, in OpenAI-shape
@@ -158,6 +161,71 @@ helpers.describe("api_remote: the prediction payload turns thinking off", functi
 			local body = require("json").decode(posts[1].body)
 			helpers.assert_eq(body.thinking.type, "between_tools")
 			helpers.assert_eq(body.max_tokens, remote.get_test_request_spec().max_tokens)
+		end)
+	end)
+
+end)
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Refused fields ===============
+-- =========================================
+-- =========================================
+
+--- An HTTP 400 answer whose message names a field.
+local function refusal(message)
+	return { ok = false, status = 400, body = require("json").encode({ error = { message = message } }) }
+end
+
+helpers.describe("api_remote: a refused thinking field is dropped once and remembered", function()
+
+	helpers.it("the agent's request is sent once more without the field, then never with it", function()
+		with_remote(function(remote, pending, posts)
+			remote.set_entries({ { id = "d", provider = "deepseek", token = "keychain:k" } })
+			local texts, failures = {}, 0
+			remote.request_chat("deepseek", "deepseek-chat", { model = "deepseek-chat", messages = {} },
+				function(text) texts[#texts + 1] = text end, function() failures = failures + 1 end)
+			local first = posted_body(pending, posts)
+			helpers.assert_eq(first.thinking.type, "disabled", "the generic family turns thinking off")
+			posts[1].done(refusal("Unknown parameter: thinking"))
+			helpers.assert_eq(#posts, 2, "the request is sent once more")
+			helpers.assert_eq(require("json").decode(posts[2].body).thinking, nil, "without the refused field")
+			helpers.assert_eq(failures, 0, "a correction is not a failure")
+			posts[2].done(refusal("Unknown parameter: thinking"))
+			helpers.assert_eq(#posts, 2, "only once")
+			helpers.assert_eq(failures, 1, "the second refusal fails the request")
+			remote.request_chat("deepseek", "deepseek-chat", { model = "deepseek-chat", messages = {} },
+				function() end, function() end)
+			pending[2].done(true, "cleartext-key")
+			helpers.assert_eq(require("json").decode(posts[3].body).thinking, nil, "the refusal is remembered")
+		end)
+	end)
+
+	helpers.it("an unrelated HTTP 400 is not a refusal", function()
+		with_remote(function(remote, pending, posts)
+			remote.set_entries({ { id = "o", provider = "openai", token = "keychain:k" } })
+			local failures = 0
+			remote.request_chat("openai", "gpt-5.1", { model = "gpt-5.1", messages = {} },
+				function() end, function() failures = failures + 1 end)
+			posted_body(pending, posts)
+			posts[1].done(refusal("max_tokens is too large"))
+			helpers.assert_eq(#posts, 1, "nothing is sent again")
+			helpers.assert_eq(failures, 1)
+		end)
+	end)
+
+	helpers.it("a prediction is sent once more without the refused field", function()
+		with_remote(function(remote, _, posts)
+			local entry = { id = "s", provider = "openai", token = "plain-key", model = "gpt-5.1" }
+			remote.set_entries({ entry })
+			remote.test_request(entry, remote.get_test_request_spec(), function() end, function() end)
+			helpers.assert_eq(require("json").decode(posts[1].body).reasoning_effort, "none")
+			posts[1].done(refusal("Unrecognized request argument supplied: reasoning_effort"))
+			helpers.assert_eq(#posts, 2, "the probe is sent once more")
+			helpers.assert_eq(require("json").decode(posts[2].body).reasoning_effort, nil)
 		end)
 	end)
 

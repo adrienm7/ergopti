@@ -5,10 +5,11 @@
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/llm/thinking_off_vectors.json, which the shared
 ; Lua resolver (macOS, Linux) replays too, through the AutoHotkey port
-; (_shared/modules/llm/thinking_off.ahk) and the rules the driver loaded from
-; api_providers.json. Then pins both request paths: the prediction payload
-; (LLM_RemoteGenerate_Async) and the bodies the screen reading and the AI
-; agent write whole (_LLM_Vision_Send).
+; (_shared/modules/llm/thinking_off.ahk), the families the driver loaded from
+; thinking_off.json and the dialects it loaded from api_providers.json. Then
+; pins both request paths: the prediction payload (LLM_RemoteGenerate_Async)
+; and the bodies the screen reading and the AI agent write whole
+; (_LLM_Vision_Send), with the HTTP 400 refusal of an added field.
 ;
 ; ROOT CAUSE ENCODED:
 ; Only Cerebras' default model had its reasoning turned off, in OpenAI-shape
@@ -49,6 +50,48 @@ _LTO_Member(Vector, Name) {
 	return JsonObjectMemberSpans(Vector["text"])[Name]["text"]
 }
 
+; Sorted dotted form of added paths, for an order-free comparison.
+_LTO_Paths(Added) {
+	Out := []
+	for Path in Added {
+		Dotted := ""
+		for Name in Path
+			Dotted .= (Dotted == "" ? "" : ".") . Name
+		Out.Push(Dotted)
+	}
+	; Insertion sort: a handful of paths
+	loop Out.Length {
+		I := A_Index
+		while (I > 1 && StrCompare(Out[I - 1], Out[I], true) > 0) {
+			Swap := Out[I], Out[I] := Out[I - 1], Out[I - 1] := Swap
+			I -= 1
+		}
+	}
+	Joined := ""
+	for Dotted in Out
+		Joined .= (Joined == "" ? "" : ",") . Dotted
+	return Joined
+}
+
+; The refused names of a vector as a Map.
+_LTO_Set(List) {
+	Out := Map()
+	for Name in List
+		Out[Name] := true
+	return Out
+}
+
+_LTO_NormalizeVectors() {
+	Checked := 0
+	for Vector in _LTO_Vectors("normalize_vectors") {
+		V := Vector["value"]
+		AssertEqual(V["normalized"], LLM_ThinkingOffNormalize(V["model"]), V["model"])
+		Checked += 1
+	}
+	AssertTrue(Checked >= 5, "expected at least 5 normalize vectors, found " . Checked)
+}
+Test("LLM thinking off: model ids normalize as the shared corpus says (thinking-off-everywhere)", _LTO_NormalizeVectors)
+
 _LTO_GlobVectors() {
 	Checked := 0
 	for Vector in _LTO_Vectors("glob_vectors") {
@@ -64,9 +107,10 @@ Test("LLM thinking off: glob matching replays the shared corpus (thinking-off-ev
 _LTO_MergeVectors() {
 	Checked := 0
 	for Vector in _LTO_Vectors("merge_vectors") {
-		Id := Vector["value"]["id"]
-		Merged := LLM_ThinkingOffMerge(_LTO_Member(Vector, "body"), _LTO_Member(Vector, "fields"))
-		AssertEqual("", _LVS_DeepEqual(JsonParse(Merged), Vector["value"]["expected"]), Id)
+		V := Vector["value"]
+		Merged := LLM_ThinkingOffMerge(_LTO_Member(Vector, "body"), _LTO_Member(Vector, "fields"), &Added)
+		AssertEqual("", _LVS_DeepEqual(JsonParse(Merged), V["expected"]), V["id"])
+		AssertEqual(_LTO_Paths(V["added"]), _LTO_Paths(Added), V["id"] . ": added paths")
 		Checked += 1
 	}
 	AssertTrue(Checked >= 8, "expected at least 8 merge vectors, found " . Checked)
@@ -80,36 +124,74 @@ _LTO_BooleanKeepsItsSource() {
 }
 Test("LLM thinking off: a boolean field is sent as the JSON literal", _LTO_BooleanKeepsItsSource)
 
-_LTO_ProviderVectors() {
-	global LLM_API_PROVIDERS
+_LTO_ResolveVectors() {
+	global LLM_API_PROVIDERS, LLM_THINKING_FAMILIES
+	AssertTrue(LLM_THINKING_FAMILIES.Length > 0, "the driver loaded thinking_off.json")
 	Checked := 0
-	for Vector in _LTO_Vectors("provider_vectors") {
+	for Vector in _LTO_Vectors("resolve_vectors") {
 		V := Vector["value"]
 		AssertTrue(LLM_API_PROVIDERS.Has(V["provider"]), V["id"] . ": the driver loaded the provider")
-		Rules := LLM_API_PROVIDERS[V["provider"]]["ThinkingOff"]
-		Body := LLM_ThinkingOffApply(Rules, V["model"], _LTO_Member(Vector, "body"), &Index)
-		AssertEqual(V.Get("rule", 0), Index, V["id"] . ": rule index")
+		Body := LLM_ThinkingOffApply(LLM_THINKING_FAMILIES, LLM_API_PROVIDERS[V["provider"]]["ThinkingDialect"],
+			V["model"], _LTO_Member(Vector, "body"), "", &Family, &Kind, &Added)
+		AssertEqual(V.Get("family", 0), Family, V["id"] . ": family")
+		AssertEqual(V.Get("kind", ""), Kind, V["id"] . ": kind")
+		AssertEqual(_LTO_Paths(V["added"]), _LTO_Paths(Added), V["id"] . ": added paths")
 		AssertEqual("", _LVS_DeepEqual(JsonParse(Body), V["expected"]), V["id"])
 		Checked += 1
 	}
-	AssertTrue(Checked >= 40, "expected at least 40 provider vectors, found " . Checked)
+	AssertTrue(Checked >= 40, "expected at least 40 resolve vectors, found " . Checked)
 }
-Test("LLM thinking off: the shipped rules replay the shared corpus (thinking-off-everywhere)", _LTO_ProviderVectors)
+Test("LLM thinking off: every family through every dialect replays the shared corpus (thinking-off-everywhere)",
+	_LTO_ResolveVectors)
+
+_LTO_RefusalVectors() {
+	global LLM_API_PROVIDERS, LLM_THINKING_FAMILIES
+	Checked := 0
+	for Vector in _LTO_Vectors("refusal_vectors") {
+		V := Vector["value"]
+		Body := LLM_ThinkingOffApply(LLM_THINKING_FAMILIES, LLM_API_PROVIDERS[V["provider"]]["ThinkingDialect"],
+			V["model"], _LTO_Member(Vector, "body"), "", , , &Added)
+		Field := LLM_ThinkingOffRefusedField(V["status"], V["message"], Added)
+		AssertEqual(V.Get("field", ""), Field, V["id"] . ": refused field")
+		if (Field != "")
+			Body := LLM_ThinkingOffStrip(Body, Added, Field)
+		AssertEqual("", _LVS_DeepEqual(JsonParse(Body), V["expected"]), V["id"])
+		Checked += 1
+	}
+	for Vector in _LTO_Vectors("refused_vectors") {
+		V := Vector["value"]
+		Body := LLM_ThinkingOffApply(LLM_THINKING_FAMILIES, LLM_API_PROVIDERS[V["provider"]]["ThinkingDialect"],
+			V["model"], _LTO_Member(Vector, "body"), _LTO_Set(V["refused"]), &Family, &Kind)
+		AssertEqual(V.Get("family", 0), Family, V["id"] . ": family")
+		AssertEqual(V.Get("kind", ""), Kind, V["id"] . ": kind")
+		AssertEqual("", _LVS_DeepEqual(JsonParse(Body), V["expected"]), V["id"])
+		Checked += 1
+	}
+	AssertTrue(Checked >= 6, "expected at least 6 refusal vectors, found " . Checked)
+}
+Test("LLM thinking off: a refused field replays the shared corpus (thinking-off-everywhere)", _LTO_RefusalVectors)
 
 _LTO_ParseVectors() {
 	Checked := 0
-	for Vector in _LTO_Vectors("parse_vectors") {
-		V := Vector["value"]
+	for Vector in _LTO_Vectors("family_parse_vectors") {
 		Accepted := true
-		try LLM_ThinkingOffParse(_LTO_Member(Vector, "thinking_off"))
+		try LLM_ThinkingOffParseFamilies(_LTO_Member(Vector, "table"))
 		catch
 			Accepted := false
-		AssertEqual(V["valid"] ? 1 : 0, Accepted ? 1 : 0, V["id"])
+		AssertEqual(Vector["value"]["valid"] ? 1 : 0, Accepted ? 1 : 0, Vector["value"]["id"])
+		Checked += 1
+	}
+	for Vector in _LTO_Vectors("dialect_parse_vectors") {
+		Accepted := true
+		try LLM_ThinkingOffParseDialect(_LTO_Member(Vector, "dialect"))
+		catch
+			Accepted := false
+		AssertEqual(Vector["value"]["valid"] ? 1 : 0, Accepted ? 1 : 0, "dialect " . Vector["value"]["id"])
 		Checked += 1
 	}
 	AssertTrue(Checked >= 15, "expected at least 15 parse vectors, found " . Checked)
 }
-Test("LLM thinking off: a malformed list is refused whole (thinking-off-everywhere)", _LTO_ParseVectors)
+Test("LLM thinking off: a malformed table is refused whole (thinking-off-everywhere)", _LTO_ParseVectors)
 
 
 
@@ -140,6 +222,8 @@ _LTO_PredictionPayload() {
 	Generate := _DriverFuncBody("LLM_RemoteGenerate_Async")
 	AssertTrue(InStr(Generate, "_LLMRemoteApplyThinkingOff(") > 0,
 		"LLM_RemoteGenerate_Async must turn thinking off in the payload it sends")
+	AssertTrue(InStr(Generate, "_LLMRemoteThinkingRetryFail.Bind(") > 0,
+		"LLM_RemoteGenerate_Async must give a refused thinking field one more chance")
 }
 Test("LLM thinking off: the prediction payload turns thinking off (thinking-off-everywhere)", _LTO_PredictionPayload)
 
@@ -179,3 +263,38 @@ _LTO_LocalServerPrebuilt() {
 	}
 }
 Test("LLM thinking off: a local server's screenshot request turns thinking off", _LTO_LocalServerPrebuilt)
+
+; A remote transport that records what it was handed.
+_LTO_RecordSent(Sent, Resolved, Url, Body, OnSuccess, OnFail, CurrentFn) {
+	Sent.Push(Map("body", Body, "on_fail", OnFail))
+}
+
+_LTO_RefusedFieldRetried() {
+	global _LLM_Vision_RemoteTransport, _LLM_ThinkingRefused
+	Sent := []
+	Fails := []
+	Saved := _LLM_Vision_RemoteTransport
+	SavedRefused := _LLM_ThinkingRefused.Clone()
+	try {
+		_LLM_Vision_RemoteTransport := _LTO_RecordSent.Bind(Sent)
+		DeepSeek := _LTO_Resolved("deepseek", "deepseek-chat")
+		_LLM_Vision_Send(Map("format", "openai", "resolved", DeepSeek, "url", "https://example.invalid"),
+			LLM_Vision_BuildRequest("openai", Map("model", "deepseek-chat", "system", "s", "text", "t",
+				"max_tokens", 64)), (*) => 0, (Info := "") => Fails.Push(Info), false, 0)
+		AssertEqual("disabled", JsonParse(Sent[1]["body"])["thinking"]["type"], "the generic family turns thinking off")
+		Sent[1]["on_fail"].Call(_LLMRemote_FailInfo("http", 400, "Unknown parameter: thinking"))
+		AssertEqual(2, Sent.Length, "the request is sent once more")
+		AssertFalse(JsonParse(Sent[2]["body"]).Has("thinking"), "without the refused field")
+		AssertEqual(0, Fails.Length, "a correction is not a failure")
+		Sent[2]["on_fail"].Call(_LLMRemote_FailInfo("http", 400, "Unknown parameter: thinking"))
+		AssertEqual(2, Sent.Length, "only once")
+		AssertEqual(1, Fails.Length, "the second refusal fails the request")
+		Again := _LLMRemoteCompleteBody(DeepSeek, '{"model":"deepseek-chat"}')
+		AssertFalse(JsonParse(Again).Has("thinking"), "the refusal is remembered")
+	} finally {
+		_LLM_Vision_RemoteTransport := Saved
+		_LLM_ThinkingRefused := SavedRefused
+	}
+}
+Test("LLM thinking off: a refused field is sent once more without it, then never (thinking-off-everywhere)",
+	_LTO_RefusedFieldRetried)

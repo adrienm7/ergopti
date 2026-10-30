@@ -242,13 +242,13 @@ local function load_api_providers()
 			else
 				seen_providers[pid] = true
 				local desc = p_providers[pid]
-				local thinking_off, thinking_reason = nil, nil
-				if type(desc) == "table" then thinking_off, thinking_reason = ThinkingOff.parse(desc.thinking_off) end
+				local thinking_dialect, thinking_reason = nil, nil
+				if type(desc) == "table" then thinking_dialect, thinking_reason = ThinkingOff.parse_dialect(desc.thinking_dialect) end
 				if not catalog_descriptor_is_valid(pid, desc) then
 					Logger.warn("llm.api_remote", "api_providers.json: providers.%s has an invalid descriptor — skipped.", tostring(pid))
-				elseif not thinking_off then
-					-- A half-read rule list would let some models think: refuse the provider whole
-					Logger.error("llm.api_remote", "api_providers.json: providers.%s.thinking_off is invalid (%s) — skipped.",
+				elseif not thinking_dialect then
+					-- A half-read dialect would let some models think: refuse the provider whole
+					Logger.error("llm.api_remote", "api_providers.json: providers.%s.thinking_dialect is invalid (%s) — skipped.",
 						tostring(pid), tostring(thinking_reason))
 				else
 					out_providers[pid] = {
@@ -257,7 +257,7 @@ local function load_api_providers()
 						default_model = desc.default_model,
 						format        = desc.format,
 						model_extras  = normalize_model_extras(desc.model_extras),
-						thinking_off  = thinking_off,
+						thinking_dialect = thinking_dialect,
 					}
 					out_order[#out_order + 1] = pid
 				end
@@ -303,7 +303,8 @@ local function register_local_servers()
 				default_model = "",
 				format        = "openai",
 				model_extras  = {},
-				thinking_off  = {},
+				-- local_servers.json request_fields turn every model's thinking off
+				thinking_dialect = {},
 				local_server  = true,
 				request_fields = LocalServers.REQUEST_FIELDS,
 			}
@@ -1393,23 +1394,6 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 end
 M.__build_payload_for_test = build_payload
 
---- Turns the model's reasoning off in a request body, by the provider's
---- thinking_off rules of api_providers.json (llm/thinking_off.lua). A field
---- the body already sets wins.
---- @param provider_id string The provider id, for the log.
---- @param provider table The catalogue descriptor.
---- @param model string The model the body names.
---- @param body table The request body, changed in place.
---- @return table body
-local function apply_thinking_off(provider_id, provider, model, body)
-	local index = ThinkingOff.apply(provider.thinking_off, model, body)
-	if index then
-		Logger.debug(LOG, "Thinking off: provider '%s' rule %d applies to model %s.",
-			tostring(provider_id), index, tostring(model))
-	end
-	return body
-end
-M.__apply_thinking_off_for_test = apply_thinking_off
 
 -- Byte ceiling of the provider message shown in notifications and logs (Linux: 200).
 local MAX_SERVER_MESSAGE = 200
@@ -1434,6 +1418,69 @@ local function extract_server_message(body)
 	return nil
 end
 M.__extract_server_message_for_test = extract_server_message
+
+--- The reasoning control of every model family (thinking_off.json), read once.
+--- An unreadable table is logged and turns nothing off: no guess.
+local THINKING_FAMILIES = (function()
+	local path = Paths.shared_llm_path("thinking_off.json")
+	local fh = path and io.open(path, "r")
+	local raw = fh and fh:read("*a")
+	if fh then fh:close() end
+	local ok, decoded = pcall(JsonCodec.decode, raw)
+	local families, reason = ThinkingOff.parse_families(ok and decoded or nil)
+	if not families then
+		Logger.error(LOG, "thinking_off.json is unreadable (%s) — no request turns thinking off.", tostring(reason))
+		return {}
+	end
+	return families
+end)()
+
+-- Fields a provider refused for a model (HTTP 400 naming them), by
+-- "<provider>|<model>": later requests never send them again
+local _thinking_refused = {}
+
+--- Turns the model's reasoning off in a request body: its family's control
+--- (thinking_off.json) through the provider's thinking_dialect
+--- (llm/thinking_off.lua). A field the body already sets wins.
+--- @param provider_id string The provider id, for the log and the refusals.
+--- @param provider table The catalogue descriptor.
+--- @param model string The model the body names.
+--- @param body table The request body, changed in place.
+--- @return table body
+--- @return table added Paths added, for refusal_retry.
+local function apply_thinking_off(provider_id, provider, model, body)
+	local family, kind, added = ThinkingOff.apply(THINKING_FAMILIES, provider.thinking_dialect or {}, model, body,
+		_thinking_refused[tostring(provider_id) .. "|" .. tostring(model)])
+	if #added > 0 then
+		Logger.debug(LOG, "Thinking off: family %d applies to model %s through provider '%s' (%s).",
+			family, tostring(model), tostring(provider_id), tostring(kind))
+	end
+	return body, added
+end
+
+--- When a provider answered HTTP 400 naming a field apply_thinking_off added,
+--- remembers that field as refused for the provider and model and removes it
+--- from the body, so the caller can send the request once more without it.
+--- @param provider_id string
+--- @param model string
+--- @param status any HTTP status.
+--- @param response_body any The provider's error body.
+--- @param added table apply_thinking_off's paths.
+--- @param body table The request body, changed in place.
+--- @return boolean retry True when a refused field was removed.
+local function thinking_refusal(provider_id, model, status, response_body, added, body)
+	local field = ThinkingOff.refused_field(status, extract_server_message(response_body), added)
+	if not field then return false end
+	local key = tostring(provider_id) .. "|" .. tostring(model)
+	_thinking_refused[key] = _thinking_refused[key] or {}
+	_thinking_refused[key][field] = true
+	ThinkingOff.strip(body, added, field)
+	Logger.warn(LOG, "Provider '%s' refused the thinking field '%s' for model %s: sent once more without it, and never again.",
+		tostring(provider_id), field, tostring(model))
+	return true
+end
+M.__thinking_refused_for_test = function() return _thinking_refused end
+M.__apply_thinking_off_for_test = apply_thinking_off
 
 --- Builds the failure detail a caller shows: the status and the provider's own message.
 --- @param reason string Short reason.
@@ -2190,6 +2237,9 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 
 	--- Handles the provider's answer: the chat completion, or the Backboard message.
 	--- @param r table HTTP response.
+	-- Declared before on_response, which re-sends the payload once when the
+	-- provider refuses a thinking field (filled where the payload is built)
+	local thinking_retry = { added = {}, retried = false, payload = nil, url = nil, headers = nil }
 	local function on_response(r)
 		if my_identity ~= _identity_generation or find_active_entry() ~= identity_entry then
 			Logger.debug(LOG, "[%s] #%d response discarded after remote identity changed.",
@@ -2205,6 +2255,17 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 		-- one backend never migrated off that anti-pattern.
 		Logger.pcall(LOG, function()
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
+			if not r.ok and not thinking_retry.retried and thinking_retry.payload
+				and thinking_refusal(entry.provider, model, status, body, thinking_retry.added, thinking_retry.payload) then
+				thinking_retry.retried = true
+				local again = JsonCodec.encode(thinking_retry.payload)
+				if again and request_authorized("Raw text", current, function(reason)
+					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail", reason) end
+				end) then
+					_infer_client.post(thinking_retry.url, thinking_retry.headers, again, on_response)
+					return
+				end
+			end
 			if not r.ok then
 				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s body=%s",
 					model, req_id, tostring(status), (body or ""):sub(1, 200))
@@ -2336,9 +2397,10 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 	end
 
 	local provider_extras = type(provider.model_extras) == "table" and provider.model_extras[model] or nil
-	local payload = apply_thinking_off(entry.provider, provider, model,
+	local payload, added = apply_thinking_off(entry.provider, provider, model,
 		build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens,
 			provider_extras, provider.request_fields))
+	thinking_retry.added, thinking_retry.payload = added, payload
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
 		Logger.error(LOG, "[%s] #%d Payload encode failed — %s", model, req_id, tostring(enc_err))
@@ -2347,6 +2409,7 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 	end
 
 	local headers = build_headers(provider.format, entry.token or "")
+	thinking_retry.url, thinking_retry.headers = url, headers
 
 	Logger.debug(LOG, "[%s] #%d POST -> %s (provider=%s, %d chars prompt)",
 		model, req_id, redact_url(url), provider.format, #(user_prompt or ""))
@@ -2601,7 +2664,8 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 		if with_extras and provider.format == "openai" then
 			AuthPolicy.apply_request_fields(body, provider.request_fields)
 		end
-		apply_thinking_off(provider_id, provider, model, body)
+		local _, added = apply_thinking_off(provider_id, provider, model, body)
+		local retried = false
 		local url, url_error = build_url(base, provider.format, model, token)
 		if not url then
 			log_endpoint_refusal(label:lower(), entry, url_error)
@@ -2621,9 +2685,17 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 		-- the action that captured this private request. Check its own authority
 		-- at the actual transport boundary, independently of provider selection.
 		if not request_authorized(label, current, fail) then return end
-		client.post(url, build_headers(provider.format, token), encoded, function(r)
+		local function on_answer(r)
 			Logger.pcall(LOG, function()
 				local ms = math.floor((TimerScheduler.now() - t0) * 1000)
+				if not r.ok and not retried and thinking_refusal(provider_id, model, r.status, r.body, added, body) then
+					retried = true
+					local again = JsonCodec.encode(body)
+					if again and request_authorized(label, current, fail) then
+						client.post(url, build_headers(provider.format, token), again, on_answer)
+						return
+					end
+				end
 				if not r.ok then
 					local message = extract_server_message(r.body)
 					Logger.error(LOG, "%s request to provider '%s' failed in %dms: HTTP %s (%s).",
@@ -2645,7 +2717,8 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 					label, provider_id, ms, #text)
 				ApiCommon.protected_call(on_text, "on_text", text)
 			end)
-		end)
+		end
+		client.post(url, build_headers(provider.format, token), encoded, on_answer)
 	end)
 end
 

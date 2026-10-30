@@ -168,13 +168,13 @@ function M.parse_catalogue(text)
 	end
 	for _, id in ipairs(root.provider_order) do
 		local desc = type(id) == "string" and root.providers[id] or nil
-		local thinking_off, thinking_reason = nil, nil
-		if type(desc) == "table" then thinking_off, thinking_reason = ThinkingOff.parse(desc.thinking_off) end
+		local thinking_dialect, thinking_reason = nil, nil
+		if type(desc) == "table" then thinking_dialect, thinking_reason = ThinkingOff.parse_dialect(desc.thinking_dialect) end
 		if catalogue.providers[id] then
 			Logger.warn(LOG, "api_providers.json: provider '%s' is listed twice; the first is kept.", id)
-		elseif descriptor_is_valid(id, desc) and not thinking_off then
-			-- A half-read rule list would let some models think: refuse the provider whole
-			Logger.error(LOG, "api_providers.json: providers.%s.thinking_off is invalid (%s) — skipped.",
+		elseif descriptor_is_valid(id, desc) and not thinking_dialect then
+			-- A half-read dialect would let some models think: refuse the provider whole
+			Logger.error(LOG, "api_providers.json: providers.%s.thinking_dialect is invalid (%s) — skipped.",
 				tostring(id), tostring(thinking_reason))
 		elseif descriptor_is_valid(id, desc) then
 			catalogue.providers[id] = {
@@ -184,7 +184,7 @@ function M.parse_catalogue(text)
 				default_model = desc.default_model,
 				format = desc.format,
 				model_extras = normalize_model_extras(desc.model_extras),
-				thinking_off = thinking_off,
+				thinking_dialect = thinking_dialect,
 			}
 			catalogue.order[#catalogue.order + 1] = id
 		else
@@ -218,7 +218,7 @@ local function catalogue()
 	for _, id in ipairs(order) do
 		local desc = servers[id]
 		_catalogue.providers[id] = { id = id, label = desc.label, base_url = desc.base_url,
-			default_model = "", format = "openai", model_extras = {}, thinking_off = {}, request_fields = request_fields }
+			default_model = "", format = "openai", model_extras = {}, thinking_dialect = {}, request_fields = request_fields }
 		_catalogue.order[#_catalogue.order + 1] = id
 	end
 	return _catalogue
@@ -423,22 +423,73 @@ local function split_messages(messages)
 	return system, user
 end
 
+-- The reasoning control of every model family (thinking_off.json), read once
+local _thinking_families = nil
+
+-- Fields a provider refused for a model (HTTP 400 naming them), by
+-- "<provider>|<model>": later requests never send them again
+local _thinking_refused = {}
+
+--- The model families, loaded at their first use. An unreadable table is
+--- logged and turns nothing off: no guess.
+--- @return table families
+local function thinking_families()
+	if _thinking_families then return _thinking_families end
+	local path = Paths.shared("modules/llm/thinking_off.json")
+	local fh = path and io.open(path, "r")
+	local text = fh and fh:read("*a") or nil
+	if fh then fh:close() end
+	local families, reason = ThinkingOff.parse_families(type(text) == "string" and Json.decode(text) or nil)
+	if not families then
+		Logger.error(LOG, "thinking_off.json is unreadable (%s) — no request turns thinking off.", tostring(reason))
+		families = {}
+	end
+	_thinking_families = families
+	return families
+end
+
 --- Completes a request body for a provider: a local server's request_fields
---- of local_servers.json (OpenAI shape), then the provider's thinking_off
---- rules of api_providers.json. A field the body already sets wins.
+--- of local_servers.json (OpenAI shape), then the model family's reasoning
+--- control (thinking_off.json) through the provider's thinking_dialect. A
+--- field the body already sets wins.
 --- @param provider_id string
 --- @param model string The model the request names.
 --- @param body table The request body, changed in place.
 --- @return table body
+--- @return table added Paths the thinking control added (for M.thinking_refusal).
 function M.complete_body(provider_id, model, body)
 	local provider = M.provider(provider_id)
 	if not provider then error("api_remote.complete_body: unknown provider " .. tostring(provider_id), 2) end
 	if provider.format == "openai" then AuthPolicy.apply_request_fields(body, provider.request_fields) end
-	local index = ThinkingOff.apply(provider.thinking_off, model, body)
-	if index then
-		Logger.debug(LOG, "Thinking off: provider '%s' rule %d applies to model %s.", provider_id, index, model)
+	local family, kind, added = ThinkingOff.apply(thinking_families(), provider.thinking_dialect, model, body,
+		_thinking_refused[provider_id .. "|" .. model])
+	if #added > 0 then
+		Logger.debug(LOG, "Thinking off: family %d applies to model %s through provider '%s' (%s).",
+			family, model, provider_id, kind)
 	end
-	return body
+	return body, added
+end
+
+--- When a provider answered HTTP 400 naming a field complete_body added,
+--- remembers that field as refused for the provider and model and removes it
+--- from the body, so the caller can send the request once more without it.
+--- @param provider_id string
+--- @param model string
+--- @param result table The failed HTTP result (status, error_body).
+--- @param added table complete_body's paths.
+--- @param body table The request body, changed in place.
+--- @return boolean retry True when a refused field was removed.
+function M.thinking_refusal(provider_id, model, result, added, body)
+	if type(result) ~= "table" then return false end
+	local field = ThinkingOff.refused_field(result.status, M.server_message(result.error_body), added)
+	if not field then return false end
+	local key = provider_id .. "|" .. model
+	_thinking_refused[key] = _thinking_refused[key] or {}
+	_thinking_refused[key][field] = true
+	ThinkingOff.strip(body, added, field)
+	Logger.warn(LOG, "Provider '%s' refused the thinking field '%s' for model %s: sent once more without it, and never again.",
+		provider_id, field, model)
+	return true
 end
 
 --- Builds one chat completion request for an entry (openai, anthropic and
@@ -485,10 +536,11 @@ function M.build_request(entry, messages, opts)
 	end
 	-- Reasoning off for every format: a local server's request fields, then
 	-- the provider's thinking_off rules, never over a field already set.
-	M.complete_body(entry.provider, model, payload)
+	local _, added = M.complete_body(entry.provider, model, payload)
 	local body = Json.encode(payload)
 	if type(body) ~= "string" then return nil, "request could not be encoded" end
-	return { url = endpoint.url, headers = endpoint.headers, body = body, format = provider.format, model = model }
+	return { url = endpoint.url, headers = endpoint.headers, body = body, format = provider.format, model = model,
+		provider = entry.provider, payload = payload, added = added }
 end
 
 
@@ -801,16 +853,28 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	local request, reason = M.build_request(entry, messages, opts)
 	if not request then return refuse(reason) end
 	Logger.debug(LOG, "chat() → %s (model=%s)", M.redact_url(request.url), request.model)
-	local dispatched = (InferenceClient or HttpClient).post(request.url, request.headers, request.body, function(result)
+	local options = { owner = scope.owner, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized }
+	local retried = false
+	local function on_result(result)
 		if epoch ~= scope.epoch then return end
 		if authorized and not authorized() then return end
 		if type(result) ~= "table" or result.ok ~= true then
+			-- A refused thinking field: the same request once more without it
+			if not retried and M.thinking_refusal(request.provider, request.model, result, request.added, request.payload) then
+				retried = true
+				local again = Json.encode(request.payload)
+				if type(again) == "string"
+					and (InferenceClient or HttpClient).post(request.url, request.headers, again, on_result, options) == true then
+					return
+				end
+			end
 			fail(failure_detail(result), failure_receipt(result))
 			return
 		end
 		local classified = Classifier.classify(request.format, result.body)
 		deliver(classified.text ~= "" and classified.text or nil, priced(classified.usage, request.model))
-	end, { owner = scope.owner, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized })
+	end
+	local dispatched = (InferenceClient or HttpClient).post(request.url, request.headers, request.body, on_result, options)
 	if dispatched ~= true then
 		done("", "HTTP transport unavailable")
 		return false

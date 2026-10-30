@@ -3,23 +3,25 @@
 --- ==============================================================================
 --- MODULE: Thinking Off — Shared Lua Implementation
 --- DESCRIPTION:
---- Every request Ergopti sends to a cloud model turns its reasoning off, or
---- down to the lowest level the model accepts. Each provider of
---- _shared/modules/llm/api_providers.json lists, in `thinking_off`, ordered
---- rules { models = { glob, ... }, fields = { ... } }; this module picks the
---- rule of a model and deep-merges its fields into a request body.
+--- Every request Ergopti sends to a model turns its reasoning off, or down to
+--- the lowest level the model accepts. What a model needs depends on its
+--- FAMILY (_shared/modules/llm/thinking_off.json); how a request carries it
+--- depends on the PROVIDER (thinking_dialect of api_providers.json). This
+--- module crosses the two into body fields and deep-merges them.
 ---
 --- FEATURES & RATIONALE:
---- 1. A glob matches the whole model id, case-insensitively; `*` is its only
----    wildcard. The first matching rule wins and no match adds nothing: an
----    unknown field is an HTTP 400 on a strict endpoint, so a model nobody
----    documented is sent as it is.
---- 2. A rule whose fields are empty matches and adds nothing: it shields a
----    model a broader glob below would otherwise reach.
---- 3. The merge is deep (Gemini's thinkingConfig sits inside the body's own
----    generationConfig) and the body wins at every level: a field the caller
----    set is never replaced.
---- 4. A malformed rule list is refused whole, never half-applied.
+--- 1. A model id is normalized (lowercase, last path segment, an Ollama
+---    :tag dropped), so a qwen3 model gets the same family on Groq, Cerebras,
+---    OpenRouter, Together or Fireworks with no per-provider model list.
+--- 2. The first family whose glob (`*` its only wildcard) matches wins. Its
+---    controls are tried in order; the first kind the provider's dialect
+---    carries applies, with the string "$level" replaced by the control's
+---    level. A family with no control, or a provider without the kind, sends
+---    nothing: an unknown field is an HTTP 400 on a strict endpoint.
+--- 3. The merge is deep and the body wins at every level; it reports the
+---    paths it added, so a provider refusing one of them (HTTP 400 naming it)
+---    can be asked once more without it (refused_field, strip).
+--- 4. A malformed table is refused whole, never half-applied.
 ---
 --- The AutoHotkey port is _shared/modules/llm/thinking_off.ahk. Both replay
 --- _shared/tests/corpus/llm/thinking_off_vectors.json.
@@ -42,6 +44,18 @@ local GLOB_PATTERN = "^[%w%._:/@%+%-%*]+$"
 -- A body field name: what every provider dialect uses
 local FIELD_PATTERN = "^[A-Za-z_][A-Za-z0-9_]*$"
 
+-- The placeholder a dialect template holds for the family's level
+M.LEVEL = "$level"
+
+-- The reasoning control kinds; a toggle carries no level
+M.KINDS = {
+	toggle = true, effort = true, anthropic_thinking = true,
+	anthropic_effort = true, gemini_budget = true, gemini_level = true,
+}
+
+-- What a control asks for
+local INTENTS = { off = true, lowest = true }
+
 
 
 
@@ -63,11 +77,11 @@ local function is_object(value)
 	return true
 end
 
---- Tells whether a decoded value is a non-empty JSON array.
+--- Tells whether a decoded value is a JSON array (an empty table counts).
 --- @param value any
 --- @return boolean
 local function is_list(value)
-	if type(value) ~= "table" or value[1] == nil then return false end
+	if type(value) ~= "table" then return false end
 	local count = 0
 	for key in pairs(value) do
 		if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then return false end
@@ -76,19 +90,17 @@ local function is_list(value)
 	return count == #value
 end
 
---- Checks the fields of a rule: identifier names holding strings, numbers,
---- booleans or non-empty objects of the same.
+--- Checks body fields: identifier names holding strings, numbers, booleans or
+--- non-empty objects of the same.
 --- @param fields any
---- @param allow_empty boolean True at the top level only.
 --- @return boolean ok
-local function fields_are_valid(fields, allow_empty)
-	if not is_object(fields) then return false end
-	if not allow_empty and next(fields) == nil then return false end
+local function fields_are_valid(fields)
+	if not is_object(fields) or next(fields) == nil then return false end
 	for name, value in pairs(fields) do
 		if not name:match(FIELD_PATTERN) then return false end
 		local kind = type(value)
 		if kind == "table" then
-			if not fields_are_valid(value, false) then return false end
+			if not fields_are_valid(value) then return false end
 		elseif kind ~= "string" and kind ~= "number" and kind ~= "boolean" then
 			return false
 		end
@@ -96,35 +108,75 @@ local function fields_are_valid(fields, allow_empty)
 	return true
 end
 
---- Validates a provider's decoded `thinking_off` list.
---- @param raw any providers.<id>.thinking_off; nil when the provider has none.
---- @return table|nil rules Array of { models = { glob }, fields = table }.
---- @return string|nil reason Why the list is refused.
-function M.parse(raw)
-	if raw == nil or (type(raw) == "table" and next(raw) == nil) then return {}, nil end
-	if not is_list(raw) then return nil, "thinking_off must be an array" end
-	local rules = {}
-	for index, rule in ipairs(raw) do
-		if not is_object(rule) then return nil, "rule " .. index .. " is not an object" end
-		for key in pairs(rule) do
-			if key ~= "models" and key ~= "fields" and key:sub(1, 1) ~= "_" then
-				return nil, "rule " .. index .. " has an unknown key " .. key
-			end
-		end
-		if not is_list(rule.models) then
-			return nil, "rule " .. index .. " names no model"
-		end
-		for _, glob in ipairs(rule.models) do
-			if type(glob) ~= "string" or not glob:match(GLOB_PATTERN) then
-				return nil, "rule " .. index .. " has an invalid glob"
-			end
-		end
-		if not fields_are_valid(rule.fields, true) then
-			return nil, "rule " .. index .. " has invalid fields"
-		end
-		rules[#rules + 1] = { models = rule.models, fields = rule.fields }
+--- Tells whether a template holds the level placeholder.
+--- @param fields table
+--- @return boolean
+local function holds_level(fields)
+	for _, value in pairs(fields) do
+		if value == M.LEVEL or (type(value) == "table" and holds_level(value)) then return true end
 	end
-	return rules, nil
+	return false
+end
+
+--- Validates the decoded thinking_off.json.
+--- @param raw any
+--- @return table|nil families Array of { models = { glob }, controls = { { kind, intent, level } } }.
+--- @return string|nil reason Why the table is refused.
+function M.parse_families(raw)
+	if not is_object(raw) or not is_list(raw.families) or raw.families[1] == nil then
+		return nil, "thinking_off.json holds no families array"
+	end
+	local families = {}
+	for index, family in ipairs(raw.families) do
+		local where = "family " .. index
+		if not is_object(family) then return nil, where .. " is not an object" end
+		for key in pairs(family) do
+			if key ~= "models" and key ~= "controls" and key:sub(1, 1) ~= "_" then
+				return nil, where .. " has an unknown key " .. key
+			end
+		end
+		if not is_list(family.models) or family.models[1] == nil then return nil, where .. " names no model" end
+		for _, glob in ipairs(family.models) do
+			if type(glob) ~= "string" or not glob:match(GLOB_PATTERN) then return nil, where .. " has an invalid glob" end
+		end
+		if not is_list(family.controls) then return nil, where .. " has no controls array" end
+		local controls = {}
+		for _, control in ipairs(family.controls) do
+			if not is_object(control) or not M.KINDS[control.kind] or not INTENTS[control.intent] then
+				return nil, where .. " has an invalid control"
+			end
+			local level, level_type = control.level, type(control.level)
+			if control.kind == "toggle" then
+				if level ~= nil or control.intent ~= "off" then return nil, where .. ": a toggle only turns off" end
+			elseif level_type ~= "string" and level_type ~= "number" then
+				return nil, where .. ": a " .. control.kind .. " control needs a level"
+			end
+			controls[#controls + 1] = { kind = control.kind, intent = control.intent, level = level }
+		end
+		families[#families + 1] = { models = family.models, controls = controls }
+	end
+	return families, nil
+end
+
+--- Validates a provider's decoded thinking_dialect.
+--- @param raw any providers.<id>.thinking_dialect; nil when the provider has none.
+--- @return table|nil dialect kind -> fields template.
+--- @return string|nil reason Why the dialect is refused.
+function M.parse_dialect(raw)
+	if raw == nil then return {}, nil end
+	if not is_object(raw) then return nil, "thinking_dialect must be an object" end
+	local dialect = {}
+	for kind, fields in pairs(raw) do
+		if kind:sub(1, 1) ~= "_" then
+			if not M.KINDS[kind] then return nil, "thinking_dialect has an unknown kind " .. kind end
+			if not fields_are_valid(fields) then return nil, "thinking_dialect." .. kind .. " has invalid fields" end
+			if (kind == "toggle") == holds_level(fields) then
+				return nil, "thinking_dialect." .. kind .. (kind == "toggle" and " cannot hold a level" or " needs a level")
+			end
+			dialect[kind] = fields
+		end
+	end
+	return dialect, nil
 end
 
 
@@ -136,7 +188,16 @@ end
 -- =============================================
 -- =============================================
 
---- Tells whether a glob matches a whole model id, ignoring case.
+--- Normalizes a model id for matching: lowercase, its last path segment
+--- (openai/gpt-5.1 -> gpt-5.1), an Ollama :tag dropped.
+--- @param model string
+--- @return string
+function M.normalize(model)
+	local name = tostring(model):lower():match("([^/]*)$")
+	return (name:gsub(":.*$", ""))
+end
+
+--- Tells whether a glob matches a whole normalized model id, ignoring case.
 --- @param glob string Pattern whose only wildcard is `*`.
 --- @param model string The model id.
 --- @return boolean
@@ -150,72 +211,147 @@ function M.matches(glob, model)
 	if subject:sub(1, #first) ~= first then return false end
 	local position = #first + 1
 	for i = 2, #parts - 1 do
-		local found = subject:find(parts[i], position, true)
-		if not found then return false end
-		position = found + #parts[i]
+		if parts[i] ~= "" then
+			local found = subject:find(parts[i], position, true)
+			if not found then return false end
+			position = found + #parts[i]
+		end
 	end
 	return #subject - #last + 1 >= position and subject:sub(#subject - #last + 1) == last
 end
 
---- Finds the rule of a model.
---- @param rules table parse() output.
---- @param model string The model id.
---- @return integer|nil index 1-based index of the first matching rule.
---- @return table|nil fields Its fields.
-function M.resolve(rules, model)
-	for index, rule in ipairs(type(rules) == "table" and rules or {}) do
-		for _, glob in ipairs(rule.models) do
-			if M.matches(glob, model) then return index, rule.fields end
-		end
-	end
-	return nil, nil
-end
-
-
-
-
--- =============================================
--- =============================================
--- ======= 4/ Merge ============================
--- =============================================
--- =============================================
-
---- Copies a rule value, so a request never shares a table with the catalogue.
+--- Copies a template with the level placeholder filled.
 --- @param value any
+--- @param level any
 --- @return any
-local function copy(value)
+local function fill(value, level)
+	if value == M.LEVEL then return level end
 	if type(value) ~= "table" then return value end
 	local result = {}
-	for key, nested in pairs(value) do result[key] = copy(nested) end
+	for key, nested in pairs(value) do result[key] = fill(nested, level) end
 	return result
 end
 
+--- Resolves the fields a model needs on a provider.
+--- @param families table parse_families() output.
+--- @param dialect table parse_dialect() output.
+--- @param model string The model id as the request names it.
+--- @param refused table|nil Set of top-level field names refused for this provider and model.
+--- @return integer|nil family 1-based index of the matching family.
+--- @return string|nil kind The control kind applied, nil when none is carried.
+--- @return table|nil fields The body fields, nil when nothing applies.
+function M.resolve(families, dialect, model, refused)
+	local name = M.normalize(model)
+	for index, family in ipairs(families) do
+		for _, glob in ipairs(family.models) do
+			if M.matches(glob, name) then
+				for _, control in ipairs(family.controls) do
+					local template = dialect[control.kind]
+					if template then
+						local fields = fill(template, control.level)
+						for field in pairs(refused or {}) do fields[field] = nil end
+						if next(fields) == nil then return index, control.kind, nil end
+						return index, control.kind, fields
+					end
+				end
+				return index, nil, nil
+			end
+		end
+	end
+	return nil, nil, nil
+end
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 4/ Merge And Refusal ================
+-- =============================================
+-- =============================================
+
 --- Deep-merges fields into a body; the body wins at every level.
 --- @param body table The request body, changed in place.
---- @param fields table A rule's fields.
---- @return table body
-function M.merge(body, fields)
+--- @param fields table Body fields.
+--- @param prefix table|nil Path of body inside the request (internal).
+--- @param added table|nil Paths added so far (internal).
+--- @return table added Paths added, each an array of field names.
+function M.merge(body, fields, prefix, added)
+	prefix, added = prefix or {}, added or {}
 	for name, value in pairs(fields) do
+		local path = {}
+		for i, segment in ipairs(prefix) do path[i] = segment end
+		path[#path + 1] = name
 		local current = body[name]
 		if current == nil then
-			body[name] = copy(value)
+			-- A copy: a request never shares a table with the catalogue
+			body[name] = fill(value, M.LEVEL)
+			added[#added + 1] = path
 		elseif type(value) == "table" and is_object(current) then
-			M.merge(current, value)
+			M.merge(current, value, path, added)
+		end
+	end
+	return added
+end
+
+--- Applies a model's family through a provider's dialect to a body.
+--- @param families table parse_families() output.
+--- @param dialect table parse_dialect() output.
+--- @param model string The model id.
+--- @param body table The request body, changed in place.
+--- @param refused table|nil Refused top-level field names for this provider and model.
+--- @return integer|nil family The matching family.
+--- @return string|nil kind The control kind applied.
+--- @return table added Paths added to the body.
+function M.apply(families, dialect, model, body, refused)
+	if type(body) ~= "table" then error("thinking_off.apply: the body must be a table", 2) end
+	local family, kind, fields = M.resolve(families, dialect, model, refused)
+	return family, kind, fields and M.merge(body, fields) or {}
+end
+
+-- Added keys too generic to name a refusal alone: matched with their parent
+local GENERIC_KEYS = { type = true, effort = true, enabled = true }
+
+--- Tells whether a provider message names a key, snake or camel case.
+--- @param text string Lowercase message.
+--- @param name string
+--- @return boolean
+local function names(text, name)
+	local snake = name:gsub("(%l)(%u)", "%1_%2"):lower()
+	return text:find(name:lower(), 1, true) ~= nil or text:find(snake, 1, true) ~= nil
+end
+
+--- Names the top-level field a provider refused, when its HTTP 400 message
+--- names a key apply() added (a generic leaf such as type as parent.leaf).
+--- @param status any The HTTP status.
+--- @param message any The provider's error message.
+--- @param added table Paths apply() added.
+--- @return string|nil field The refused top-level field.
+function M.refused_field(status, message, added)
+	if tonumber(status) ~= 400 or type(message) ~= "string" or type(added) ~= "table" then return nil end
+	local text = message:lower()
+	for _, path in ipairs(added) do
+		local leaf = path[#path]
+		local key = (GENERIC_KEYS[leaf] and #path > 1) and (path[#path - 1] .. "." .. leaf) or leaf
+		if names(text, key) then return path[1] end
+	end
+	return nil
+end
+
+--- Removes the added paths under a refused top-level field.
+--- @param body table The request body, changed in place.
+--- @param added table Paths apply() added.
+--- @param field string The refused top-level field.
+--- @return table body
+function M.strip(body, added, field)
+	for _, path in ipairs(added) do
+		if path[1] == field then
+			local node = body
+			for i = 1, #path - 1 do node = type(node) == "table" and node[path[i]] or nil end
+			if type(node) == "table" then node[path[#path]] = nil end
 		end
 	end
 	return body
-end
-
---- Applies a model's rule to a body.
---- @param rules table parse() output.
---- @param model string The model id.
---- @param body table The request body, changed in place.
---- @return integer|nil index The rule applied, nil when none matched.
-function M.apply(rules, model, body)
-	if type(body) ~= "table" then error("thinking_off.apply: the body must be a table", 2) end
-	local index, fields = M.resolve(rules, model)
-	if index then M.merge(body, fields) end
-	return index
 end
 
 return M

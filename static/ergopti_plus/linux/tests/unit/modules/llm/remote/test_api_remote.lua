@@ -54,14 +54,14 @@ local MESSAGES = {
 
 helpers.describe("api_remote: the shared provider catalogue", function()
 
-	helpers.it("loads Cerebras with its thinking_off rules", function()
+	helpers.it("loads Cerebras with its thinking dialect", function()
 		local remote = load_remote()
 		local cerebras = remote.provider("cerebras")
 		unload()
 		helpers.assert_true(cerebras ~= nil, "Cerebras is in the shared catalogue")
 		helpers.assert_eq(cerebras.format, "openai")
 		helpers.assert_eq(cerebras.base_url, "https://api.cerebras.ai/v1")
-		helpers.assert_true(#cerebras.thinking_off > 0, "its thinking_off rules are kept")
+		helpers.assert_true(cerebras.thinking_dialect.effort ~= nil, "its thinking dialect is kept")
 	end)
 
 	helpers.it("keeps only the valid providers of the shared validation corpus, once each", function()
@@ -107,12 +107,9 @@ helpers.describe("api_remote: requests follow each provider's contract", functio
 		helpers.assert_eq(body.max_tokens, 40)
 		helpers.assert_eq(body.messages[1].role, "system")
 		helpers.assert_eq(body.messages[2].content, "Bonjour, je voulais")
-		-- The default model reasons at xhigh effort and stalls tiny probes unless told not to
-		local index, fields = require("llm.thinking_off").resolve(provider.thinking_off, provider.default_model)
-		helpers.assert_true(index ~= nil, "a thinking_off rule covers Cerebras' default model")
-		for field, value in pairs(fields) do
-			helpers.assert_eq(body[field], value, "thinking_off field " .. field .. " is sent")
-		end
+		-- The default model reasons at xhigh effort and stalls tiny probes unless
+		-- told not to: the qwen3 family through Cerebras' effort dialect
+		helpers.assert_eq(body.reasoning_effort, "none", "Cerebras' default model is sent reasoning off")
 	end)
 
 	helpers.it("omits an empty system turn (the raw profile)", function()

@@ -3,22 +3,24 @@
 ; ==============================================================================
 ; MODULE: Thinking Off
 ; DESCRIPTION:
-; Every request Ergopti sends to a cloud model turns its reasoning off, or down
-; to the lowest level the model accepts. Each provider of api_providers.json
-; lists, in `thinking_off`, ordered rules { models: [glob], fields: {...} };
-; this module picks the rule of a model and deep-merges its fields into a
-; request body.
+; Every request Ergopti sends to a model turns its reasoning off, or down to
+; the lowest level the model accepts. What a model needs depends on its FAMILY
+; (_shared/modules/llm/thinking_off.json); how a request carries it depends on
+; the PROVIDER (thinking_dialect of api_providers.json). This module crosses
+; the two into body fields and deep-merges them.
 ;
 ; FEATURES & RATIONALE:
-; 1. A glob matches the whole model id, case-insensitively; * is its only
-;    wildcard. The first matching rule wins and no match adds nothing: an
-;    unknown field is an HTTP 400 on a strict endpoint.
-; 2. A rule with empty fields matches and adds nothing: it shields a model a
-;    broader glob below would otherwise reach.
+; 1. A model id is normalized (lowercase, last path segment, an Ollama :tag
+;    dropped), so a qwen3 model gets the same family on every provider.
+; 2. The first family whose glob (* its only wildcard) matches wins; its first
+;    control kind the dialect carries applies, "$level" replaced by the
+;    control's level. No family, no control or no kind: nothing is sent.
 ; 3. The merge works on the JSON text: the drivers write their bodies as
 ;    text, and JsonParse decodes booleans as 0/1, so the fields travel as
-;    their exact source. It is deep and the body wins at every level.
-; 4. A malformed rule list is refused whole, never half-applied.
+;    their exact source. It is deep, the body wins at every level, and it
+;    reports the paths it added, so a provider refusing one of them (HTTP 400
+;    naming it) can be asked once more without it.
+; 4. A malformed table is refused whole, never half-applied.
 ;
 ; The shared Lua implementation is _shared/lua/llm/thinking_off.lua. Both
 ; replay _shared/tests/corpus/llm/thinking_off_vectors.json.
@@ -42,6 +44,13 @@ global LLM_THINKING_OFF_GLOB_PATTERN := "^[A-Za-z0-9._:/@+*-]+$"
 ; A body field name: what every provider dialect uses
 global LLM_THINKING_OFF_FIELD_PATTERN := "^[A-Za-z_][A-Za-z0-9_]*$"
 
+; The reasoning control kinds; a toggle carries no level
+global LLM_THINKING_OFF_KINDS := Map("toggle", 1, "effort", 1, "anthropic_thinking", 1,
+	"anthropic_effort", 1, "gemini_budget", 1, "gemini_level", 1)
+
+; Added keys too generic to name a refusal alone: matched with their parent
+global LLM_THINKING_OFF_GENERIC_KEYS := Map("type", 1, "effort", 1, "enabled", 1)
+
 
 
 
@@ -53,58 +62,90 @@ global LLM_THINKING_OFF_FIELD_PATTERN := "^[A-Za-z_][A-Za-z0-9_]*$"
 ; ======================================
 
 /**
- * Validates a provider's thinking_off list.
- * @param {String} Text The list's JSON source, "" when the provider has none.
- * @returns {Array} Rules, each Map("models", Array of globs, "fields", the
- *     exact JSON source of its fields object).
- * @throws {Error} A malformed list, refused whole.
+ * Validates thinking_off.json.
+ * @param {String} Text The file's JSON source.
+ * @returns {Array} Families, each Map("models", Array of globs, "controls",
+ *     Array of Map("kind", "intent", "level")).
+ * @throws {Error} A malformed table, refused whole.
  */
-LLM_ThinkingOffParse(Text) {
-	global LLM_THINKING_OFF_GLOB_PATTERN
-	Rules := []
-	if (Text == "")
-		return Rules
-	for Index, Span in JsonArrayElementSpans(Text) {
-		if !(Span["value"] is Map)
-			throw ValueError("thinking_off rule " . Index . " is not an object.")
-		Members := JsonObjectMemberSpans(Span["text"])
-		for Key in Members {
-			if (Key != "models" && Key != "fields" && SubStr(Key, 1, 1) != "_")
-				throw ValueError("thinking_off rule " . Index . " has an unknown key " . Key . ".")
+LLM_ThinkingOffParseFamilies(Text) {
+	global LLM_THINKING_OFF_GLOB_PATTERN, LLM_THINKING_OFF_KINDS
+	Root := JsonParse(Text)
+	if !(Root is Map) || !(Root.Get("families", 0) is Array) || Root["families"].Length == 0
+		throw ValueError("thinking_off.json holds no families array.")
+	Families := []
+	for Index, Family in Root["families"] {
+		Where := "family " . Index
+		if !(Family is Map)
+			throw ValueError(Where . " is not an object.")
+		for Key in Family {
+			if (Key != "models" && Key != "controls" && SubStr(Key, 1, 1) != "_")
+				throw ValueError(Where . " has an unknown key " . Key . ".")
 		}
-		if !Members.Has("models") || Members["models"]["kind"] != "array"
-			throw ValueError("thinking_off rule " . Index . " names no model.")
-		Models := JsonParse(Members["models"]["text"])
-		if (Models.Length == 0)
-			throw ValueError("thinking_off rule " . Index . " names no model.")
-		for Glob in Models {
+		if !(Family.Get("models", 0) is Array) || Family["models"].Length == 0
+			throw ValueError(Where . " names no model.")
+		for Glob in Family["models"] {
 			if !(Glob is String) || !RegExMatch(Glob, LLM_THINKING_OFF_GLOB_PATTERN)
-				throw ValueError("thinking_off rule " . Index . " has an invalid glob.")
+				throw ValueError(Where . " has an invalid glob.")
 		}
-		if !Members.Has("fields") || Members["fields"]["kind"] != "object"
-				|| !_LLM_ThinkingOffFieldsValid(Members["fields"]["text"], true)
-			throw ValueError("thinking_off rule " . Index . " has invalid fields.")
-		Rules.Push(Map("models", Models, "fields", Members["fields"]["text"]))
+		if !(Family.Get("controls", 0) is Array)
+			throw ValueError(Where . " has no controls array.")
+		for Control in Family["controls"] {
+			if !(Control is Map) || !LLM_THINKING_OFF_KINDS.Has(Control.Get("kind", ""))
+					|| !(Control.Get("intent", "") == "off" || Control.Get("intent", "") == "lowest")
+				throw ValueError(Where . " has an invalid control.")
+			if (Control["kind"] == "toggle") {
+				if Control.Has("level") || Control["intent"] != "off"
+					throw ValueError(Where . ": a toggle only turns off.")
+			} else if !Control.Has("level") || !(Control["level"] is Number || Control["level"] is String) {
+				throw ValueError(Where . ": a " . Control["kind"] . " control needs a level.")
+			}
+		}
+		Families.Push(Map("models", Family["models"], "controls", Family["controls"]))
 	}
-	return Rules
+	return Families
 }
 
-; Checks a fields object: identifier names holding strings, numbers, booleans
-; or non-empty objects of the same.
+/**
+ * Validates a provider's thinking_dialect.
+ * @param {String} Text The dialect's JSON source, "" when the provider has none.
+ * @returns {Map} Kind -> exact JSON source of its fields template.
+ * @throws {Error} A malformed dialect, refused whole.
+ */
+LLM_ThinkingOffParseDialect(Text) {
+	global LLM_THINKING_OFF_KINDS
+	Dialect := Map()
+	if (Text == "")
+		return Dialect
+	for Kind, Span in JsonObjectMemberSpans(Text) {
+		if (SubStr(Kind, 1, 1) == "_")
+			continue
+		if !LLM_THINKING_OFF_KINDS.Has(Kind)
+			throw ValueError("thinking_dialect has an unknown kind " . Kind . ".")
+		if (Span["kind"] != "object") || !_LLM_ThinkingOffFieldsValid(Span["text"])
+			throw ValueError("thinking_dialect." . Kind . " has invalid fields.")
+		if ((Kind == "toggle") == (InStr(Span["text"], '"$level"', true) > 0))
+			throw ValueError("thinking_dialect." . Kind . (Kind == "toggle" ? " cannot hold a level." : " needs a level."))
+		Dialect[Kind] := Span["text"]
+	}
+	return Dialect
+}
+
+; Checks body fields: identifier names holding strings, numbers, booleans or
+; non-empty objects of the same.
 ; @param {String} Text The object's JSON source.
-; @param {Boolean} AllowEmpty True at the top level only.
 ; @returns {Boolean}
-_LLM_ThinkingOffFieldsValid(Text, AllowEmpty) {
+_LLM_ThinkingOffFieldsValid(Text) {
 	global LLM_THINKING_OFF_FIELD_PATTERN
 	Members := JsonObjectMemberSpans(Text)
-	if (!AllowEmpty && Members.Count == 0)
+	if (Members.Count == 0)
 		return false
 	for Name, Span in Members {
 		if !RegExMatch(Name, LLM_THINKING_OFF_FIELD_PATTERN)
 			return false
 		Kind := Span["kind"]
 		if (Kind == "object") {
-			if !_LLM_ThinkingOffFieldsValid(Span["text"], false)
+			if !_LLM_ThinkingOffFieldsValid(Span["text"])
 				return false
 		} else if (Kind != "string" && Kind != "number" && Kind != "boolean") {
 			return false
@@ -122,6 +163,17 @@ _LLM_ThinkingOffFieldsValid(Text, AllowEmpty) {
 ; ======= 3/ Matching ==================
 ; ======================================
 ; ======================================
+
+/**
+ * Normalizes a model id for matching: lowercase, its last path segment, an
+ * Ollama :tag dropped.
+ * @param {String} Model
+ * @returns {String}
+ */
+LLM_ThinkingOffNormalize(Model) {
+	Parts := StrSplit(StrLower(String(Model)), "/")
+	return StrSplit(Parts[Parts.Length], ":")[1]
+}
 
 /**
  * Tells whether a glob matches a whole model id, ignoring case.
@@ -155,19 +207,40 @@ LLM_ThinkingOffMatches(Glob, Model) {
 }
 
 /**
- * Finds the rule of a model.
- * @param {Array} Rules LLM_ThinkingOffParse's output.
- * @param {String} Model The model id.
- * @returns {Integer} 1-based index of the first matching rule, 0 when none.
+ * Resolves the fields a model needs on a provider.
+ * @param {Array} Families LLM_ThinkingOffParseFamilies's output.
+ * @param {Map} Dialect LLM_ThinkingOffParseDialect's output.
+ * @param {String} Model The model id as the request names it.
+ * @param {Map} Refused Top-level field names refused for this provider and model.
+ * @param {VarRef} Kind Receives the control kind applied, "" when none.
+ * @returns {Map} Map("family", 1-based index or 0, "fields", JSON source or "").
  */
-LLM_ThinkingOffResolve(Rules, Model) {
-	for Index, Rule in Rules {
-		for Glob in Rule["models"] {
-			if LLM_ThinkingOffMatches(Glob, Model)
-				return Index
+LLM_ThinkingOffResolve(Families, Dialect, Model, Refused := "", &Kind := "") {
+	Kind := ""
+	Name := LLM_ThinkingOffNormalize(Model)
+	for Index, Family in Families {
+		for Glob in Family["models"] {
+			if !LLM_ThinkingOffMatches(Glob, Name)
+				continue
+			for Control in Family["controls"] {
+				if !Dialect.Has(Control["kind"])
+					continue
+				Kind := Control["kind"]
+				Fields := Dialect[Kind]
+				if Control.Has("level")
+					Fields := StrReplace(Fields, '"$level"', Control["level"] is String
+						? JsonStringLiteral(Control["level"]) : String(Control["level"]))
+				Kept := ""
+				for Field, Span in JsonObjectMemberSpans(Fields) {
+					if !(Refused is Map && Refused.Has(Field))
+						Kept .= (Kept == "" ? "" : ",") . Span["member_text"]
+				}
+				return Map("family", Index, "fields", Kept == "" ? "" : "{" . Kept . "}")
+			}
+			return Map("family", Index, "fields", "")
 		}
 	}
-	return 0
+	return Map("family", 0, "fields", "")
 }
 
 
@@ -176,7 +249,7 @@ LLM_ThinkingOffResolve(Rules, Model) {
 
 ; ======================================
 ; ======================================
-; ======= 4/ Merge =====================
+; ======= 4/ Merge And Refusal =========
 ; ======================================
 ; ======================================
 
@@ -185,24 +258,42 @@ LLM_ThinkingOffResolve(Rules, Model) {
  * wins at every level. Also merges a local server's request_fields.
  * @param {String} BodyText The body's JSON source.
  * @param {String} FieldsText The fields object's JSON source.
+ * @param {VarRef} Added Receives the paths added, each an Array of names.
  * @returns {String} The merged body.
  */
-LLM_ThinkingOffMerge(BodyText, FieldsText) {
+LLM_ThinkingOffMerge(BodyText, FieldsText, &Added := "") {
+	Added := []
+	return _LLM_ThinkingOffMergeAt(BodyText, FieldsText, [], Added)
+}
+
+_LLM_ThinkingOffMergeAt(BodyText, FieldsText, Prefix, Added) {
 	Body := JsonObjectMemberSpans(BodyText)
 	Edits := []
-	Added := ""
+	Appended := ""
 	for Name, Span in JsonObjectMemberSpans(FieldsText) {
+		Path := Prefix.Clone()
+		Path.Push(Name)
 		if !Body.Has(Name) {
-			Added .= "," . JsonStringLiteral(Name) . ":" . Span["text"]
+			Appended .= "," . JsonStringLiteral(Name) . ":" . Span["text"]
+			Added.Push(Path)
 			continue
 		}
 		Existing := Body[Name]
 		if (Existing["kind"] == "object" && Span["kind"] == "object")
 			Edits.Push(Map("start", Existing["start"], "length", Existing["length"],
-				"text", LLM_ThinkingOffMerge(Existing["text"], Span["text"])))
+				"text", _LLM_ThinkingOffMergeAt(Existing["text"], Span["text"], Path, Added)))
 	}
-	; Splice the nested merges from the last one back, so earlier offsets hold
-	Result := BodyText
+	Result := _LLM_ThinkingOffSplice(BodyText, Edits)
+	if (Appended == "")
+		return Result
+	if (Body.Count == 0)
+		Appended := SubStr(Appended, 2)
+	Close := InStr(Result, "}", true, -1)
+	return SubStr(Result, 1, Close - 1) . Appended . SubStr(Result, Close)
+}
+
+; Replaces spans of a text from the last one back, so earlier offsets hold.
+_LLM_ThinkingOffSplice(Text, Edits) {
 	while (Edits.Length > 0) {
 		Latest := 1
 		for Index, Candidate in Edits {
@@ -210,26 +301,91 @@ LLM_ThinkingOffMerge(BodyText, FieldsText) {
 				Latest := Index
 		}
 		Splice := Edits.RemoveAt(Latest)
-		Result := SubStr(Result, 1, Splice["start"] - 1) . Splice["text"]
-			. SubStr(Result, Splice["start"] + Splice["length"])
+		Text := SubStr(Text, 1, Splice["start"] - 1) . Splice["text"]
+			. SubStr(Text, Splice["start"] + Splice["length"])
 	}
-	if (Added == "")
-		return Result
-	if (Body.Count == 0)
-		Added := SubStr(Added, 2)
-	Close := InStr(Result, "}", true, -1)
-	return SubStr(Result, 1, Close - 1) . Added . SubStr(Result, Close)
+	return Text
 }
 
 /**
- * Applies a model's rule to a body.
- * @param {Array} Rules LLM_ThinkingOffParse's output.
+ * Applies a model's family through a provider's dialect to a body.
+ * @param {Array} Families LLM_ThinkingOffParseFamilies's output.
+ * @param {Map} Dialect LLM_ThinkingOffParseDialect's output.
  * @param {String} Model The model id.
  * @param {String} BodyText The body's JSON source.
- * @param {VarRef} Index Receives the rule applied, 0 when none matched.
- * @returns {String} The body, merged when a rule matched.
+ * @param {Map} Refused Refused top-level field names for this provider and model.
+ * @param {VarRef} Family Receives the matching family, 0 when none.
+ * @param {VarRef} Kind Receives the control kind applied, "" when none.
+ * @param {VarRef} Added Receives the paths added.
+ * @returns {String} The body.
  */
-LLM_ThinkingOffApply(Rules, Model, BodyText, &Index := 0) {
-	Index := LLM_ThinkingOffResolve(Rules, Model)
-	return Index ? LLM_ThinkingOffMerge(BodyText, Rules[Index]["fields"]) : BodyText
+LLM_ThinkingOffApply(Families, Dialect, Model, BodyText, Refused := "", &Family := 0, &Kind := "", &Added := "") {
+	Added := []
+	Resolved := LLM_ThinkingOffResolve(Families, Dialect, Model, Refused, &Kind)
+	Family := Resolved["family"]
+	return Resolved["fields"] == "" ? BodyText : LLM_ThinkingOffMerge(BodyText, Resolved["fields"], &Added)
+}
+
+; Tells whether a lowercase message names a key, snake or camel case.
+_LLM_ThinkingOffNames(Text, Name) {
+	Snake := StrLower(RegExReplace(Name, "([a-z])([A-Z])", "$1_$2"))
+	return InStr(Text, StrLower(Name), true) || InStr(Text, Snake, true)
+}
+
+/**
+ * Names the top-level field a provider refused, when its HTTP 400 message
+ * names a key LLM_ThinkingOffApply added (a generic leaf as parent.leaf).
+ * @param {Integer} Status The HTTP status.
+ * @param {String} Message The provider's error message.
+ * @param {Array} Added The paths added.
+ * @returns {String} The refused top-level field, "" when none.
+ */
+LLM_ThinkingOffRefusedField(Status, Message, Added) {
+	global LLM_THINKING_OFF_GENERIC_KEYS
+	if !(Status is Number) || Status != 400 || !(Message is String) || !(Added is Array)
+		return ""
+	Text := StrLower(Message)
+	for Path in Added {
+		Leaf := Path[Path.Length]
+		Key := (LLM_THINKING_OFF_GENERIC_KEYS.Has(Leaf) && Path.Length > 1) ? Path[Path.Length - 1] . "." . Leaf : Leaf
+		if _LLM_ThinkingOffNames(Text, Key)
+			return Path[1]
+	}
+	return ""
+}
+
+/**
+ * Removes the added paths under a refused top-level field.
+ * @param {String} BodyText The body's JSON source.
+ * @param {Array} Added The paths added.
+ * @param {String} Field The refused top-level field.
+ * @returns {String} The body without them.
+ */
+LLM_ThinkingOffStrip(BodyText, Added, Field) {
+	for Path in Added {
+		if (Path[1] == Field)
+			BodyText := _LLM_ThinkingOffRemove(BodyText, Path, 1)
+	}
+	return BodyText
+}
+
+; Removes one path from a JSON object's text.
+_LLM_ThinkingOffRemove(Text, Path, Depth) {
+	Members := JsonObjectMemberSpans(Text)
+	Name := Path[Depth]
+	if !Members.Has(Name)
+		return Text
+	if (Depth < Path.Length) {
+		Member := Members[Name]
+		if (Member["kind"] != "object")
+			return Text
+		return _LLM_ThinkingOffSplice(Text, [Map("start", Member["start"], "length", Member["length"],
+			"text", _LLM_ThinkingOffRemove(Member["text"], Path, Depth + 1))])
+	}
+	Kept := ""
+	for Key, Member in Members {
+		if (Key != Name)
+			Kept .= (Kept == "" ? "" : ",") . Member["member_text"]
+	}
+	return "{" . Kept . "}"
 }

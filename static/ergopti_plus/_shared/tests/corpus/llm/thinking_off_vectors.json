@@ -1,6 +1,36 @@
 {
-	"description": "Thinking-off rules of _shared/modules/llm/api_providers.json, replayed by _shared/lua/llm/thinking_off.lua (macOS and Linux suites) and its AutoHotkey port _shared/modules/llm/thinking_off.ahk (Windows suite), so the drivers cannot drift.",
-	"rule": "glob_vectors: a glob matches the whole model id, ignoring case, with * as the only wildcard. merge_vectors: fields deep-merged into body give expected; the body wins at every level. provider_vectors: the provider's shipped thinking_off applied to model over body gives expected; rule is the 1-based index of the first matching rule, absent when none matches. parse_vectors: a thinking_off list is accepted whole (valid true) or refused whole (valid false).",
+	"description": "Thinking-off resolution, replayed by _shared/lua/llm/thinking_off.lua (macOS and Linux suites) and its AutoHotkey port _shared/modules/llm/thinking_off.ahk (Windows suite) over the shipped _shared/modules/llm/thinking_off.json families and api_providers.json thinking_dialect, so the drivers cannot drift.",
+	"rule": "normalize_vectors: lowercase, last path segment, an Ollama :tag dropped. glob_vectors: a glob matches the whole id, ignoring case, * the only wildcard. merge_vectors: fields deep-merged into body give expected (the body wins at every level); added lists the paths added. resolve_vectors: the model's family (first match on the normalized id) through the provider's dialect (first control kind it carries, $level filled) merged into body gives expected; family is its 1-based index and kind the control applied, both absent when none. refusal_vectors: after resolution, an HTTP 400 whose message names an added key (snake or camel; a generic leaf as parent.leaf) refuses its top-level field, stripped from the body (expected); field absent when nothing is refused. refused_vectors: a refused top-level field is never added. family_parse_vectors and dialect_parse_vectors: accepted whole (valid true) or refused whole.",
+	"normalize_vectors": [
+		{
+			"model": "GPT-5.1",
+			"normalized": "gpt-5.1"
+		},
+		{
+			"model": "openai/gpt-5.1",
+			"normalized": "gpt-5.1"
+		},
+		{
+			"model": "accounts/fireworks/models/qwen3-235b",
+			"normalized": "qwen3-235b"
+		},
+		{
+			"model": "Qwen/Qwen3-32B",
+			"normalized": "qwen3-32b"
+		},
+		{
+			"model": "qwen3:8b",
+			"normalized": "qwen3"
+		},
+		{
+			"model": "hf.co/unsloth/Qwen3-8B-GGUF:Q4_K_M",
+			"normalized": "qwen3-8b-gguf"
+		},
+		{
+			"model": "models/gemini-2.5-flash",
+			"normalized": "gemini-2.5-flash"
+		}
+	],
 	"glob_vectors": [
 		{
 			"glob": "gpt-5.*",
@@ -107,7 +137,8 @@
 				"model": "m",
 				"max_tokens": 16,
 				"reasoning_effort": "none"
-			}
+			},
+			"added": [["reasoning_effort"]]
 		},
 		{
 			"id": "body_wins_top_level",
@@ -121,7 +152,8 @@
 			"expected": {
 				"model": "m",
 				"reasoning_effort": "high"
-			}
+			},
+			"added": []
 		},
 		{
 			"id": "deep_into_existing_object",
@@ -146,7 +178,8 @@
 						"thinkingBudget": 0
 					}
 				}
-			}
+			},
+			"added": [["generationConfig", "thinkingConfig"]]
 		},
 		{
 			"id": "deep_body_wins_nested",
@@ -172,7 +205,8 @@
 						"includeThoughts": false
 					}
 				}
-			}
+			},
+			"added": [["generationConfig", "thinkingConfig", "includeThoughts"]]
 		},
 		{
 			"id": "scalar_in_body_blocks_object",
@@ -186,7 +220,8 @@
 			},
 			"expected": {
 				"thinking": "keep"
-			}
+			},
+			"added": []
 		},
 		{
 			"id": "boolean_field",
@@ -205,7 +240,8 @@
 				"reasoning": {
 					"enabled": false
 				}
-			}
+			},
+			"added": [["reasoning"]]
 		},
 		{
 			"id": "into_empty_body",
@@ -219,7 +255,8 @@
 				"output_config": {
 					"effort": "low"
 				}
-			}
+			},
+			"added": [["output_config"]]
 		},
 		{
 			"id": "empty_fields_add_nothing",
@@ -229,10 +266,11 @@
 			},
 			"expected": {
 				"model": "m"
-			}
+			},
+			"added": []
 		}
 	],
-	"provider_vectors": [
+	"resolve_vectors": [
 		{
 			"id": "openai_gpt-4o-mini",
 			"provider": "openai",
@@ -248,7 +286,8 @@
 				"max_tokens": 16,
 				"stream": false,
 				"temperature": 0.7
-			}
+			},
+			"added": []
 		},
 		{
 			"id": "openai_gpt-5.1",
@@ -267,7 +306,9 @@
 				"temperature": 0.7,
 				"reasoning_effort": "none"
 			},
-			"rule": 3
+			"added": [["reasoning_effort"]],
+			"family": 6,
+			"kind": "effort"
 		},
 		{
 			"id": "openai_gpt-5",
@@ -286,24 +327,9 @@
 				"temperature": 0.7,
 				"reasoning_effort": "minimal"
 			},
-			"rule": 4
-		},
-		{
-			"id": "openai_gpt-5-mini",
-			"provider": "openai",
-			"model": "gpt-5-mini",
-			"body": {
-				"model": "gpt-5-mini",
-				"max_tokens": 16,
-				"stream": false,
-				"temperature": 0.7
-			},
-			"expected": {
-				"model": "gpt-5-mini",
-				"max_tokens": 16,
-				"stream": false,
-				"temperature": 0.7
-			}
+			"added": [["reasoning_effort"]],
+			"family": 7,
+			"kind": "effort"
 		},
 		{
 			"id": "openai_gpt-5-pro",
@@ -321,25 +347,8 @@
 				"stream": false,
 				"temperature": 0.7
 			},
-			"rule": 2
-		},
-		{
-			"id": "openai_gpt-5.1-codex-max",
-			"provider": "openai",
-			"model": "gpt-5.1-codex-max",
-			"body": {
-				"model": "gpt-5.1-codex-max",
-				"max_tokens": 16,
-				"stream": false,
-				"temperature": 0.7
-			},
-			"expected": {
-				"model": "gpt-5.1-codex-max",
-				"max_tokens": 16,
-				"stream": false,
-				"temperature": 0.7
-			},
-			"rule": 2
+			"added": [],
+			"family": 5
 		},
 		{
 			"id": "openai_o3",
@@ -358,26 +367,9 @@
 				"temperature": 0.7,
 				"reasoning_effort": "low"
 			},
-			"rule": 5
-		},
-		{
-			"id": "openai_o4-mini",
-			"provider": "openai",
-			"model": "o4-mini",
-			"body": {
-				"model": "o4-mini",
-				"max_tokens": 16,
-				"stream": false,
-				"temperature": 0.7
-			},
-			"expected": {
-				"model": "o4-mini",
-				"max_tokens": 16,
-				"stream": false,
-				"temperature": 0.7,
-				"reasoning_effort": "low"
-			},
-			"rule": 5
+			"added": [["reasoning_effort"]],
+			"family": 8,
+			"kind": "effort"
 		},
 		{
 			"id": "openai_gpt-6.1-sol",
@@ -396,10 +388,12 @@
 				"temperature": 0.7,
 				"reasoning_effort": "low"
 			},
-			"rule": 1
+			"added": [["reasoning_effort"]],
+			"family": 4,
+			"kind": "effort"
 		},
 		{
-			"id": "openai_gpt-5.1_body_effort_wins",
+			"id": "openai_gpt-5.1_body_wins",
 			"provider": "openai",
 			"model": "gpt-5.1",
 			"body": {
@@ -416,7 +410,9 @@
 				"temperature": 0.7,
 				"reasoning_effort": "medium"
 			},
-			"rule": 3
+			"added": [],
+			"family": 6,
+			"kind": "effort"
 		},
 		{
 			"id": "anthropic_claude-haiku-4-5",
@@ -443,7 +439,8 @@
 						"content": "u"
 					}
 				]
-			}
+			},
+			"added": []
 		},
 		{
 			"id": "anthropic_claude-opus-5-5",
@@ -474,7 +471,9 @@
 					"effort": "low"
 				}
 			},
-			"rule": 1
+			"added": [["output_config"]],
+			"family": 1,
+			"kind": "anthropic_effort"
 		},
 		{
 			"id": "anthropic_claude-fable-5-1",
@@ -505,38 +504,9 @@
 					"effort": "low"
 				}
 			},
-			"rule": 1
-		},
-		{
-			"id": "anthropic_claude-mythos-preview",
-			"provider": "anthropic",
-			"model": "claude-mythos-preview",
-			"body": {
-				"model": "claude-mythos-preview",
-				"max_tokens": 16,
-				"system": "S",
-				"messages": [
-					{
-						"role": "user",
-						"content": "u"
-					}
-				]
-			},
-			"expected": {
-				"model": "claude-mythos-preview",
-				"max_tokens": 16,
-				"system": "S",
-				"messages": [
-					{
-						"role": "user",
-						"content": "u"
-					}
-				],
-				"output_config": {
-					"effort": "low"
-				}
-			},
-			"rule": 1
+			"added": [["output_config"]],
+			"family": 1,
+			"kind": "anthropic_effort"
 		},
 		{
 			"id": "anthropic_claude-sonnet-5-5",
@@ -567,38 +537,9 @@
 					"type": "between_tools"
 				}
 			},
-			"rule": 2
-		},
-		{
-			"id": "anthropic_claude-sonnet-5",
-			"provider": "anthropic",
-			"model": "claude-sonnet-5",
-			"body": {
-				"model": "claude-sonnet-5",
-				"max_tokens": 16,
-				"system": "S",
-				"messages": [
-					{
-						"role": "user",
-						"content": "u"
-					}
-				]
-			},
-			"expected": {
-				"model": "claude-sonnet-5",
-				"max_tokens": 16,
-				"system": "S",
-				"messages": [
-					{
-						"role": "user",
-						"content": "u"
-					}
-				],
-				"thinking": {
-					"type": "disabled"
-				}
-			},
-			"rule": 3
+			"added": [["thinking"]],
+			"family": 2,
+			"kind": "anthropic_thinking"
 		},
 		{
 			"id": "anthropic_claude-opus-5",
@@ -629,7 +570,9 @@
 					"type": "disabled"
 				}
 			},
-			"rule": 3
+			"added": [["thinking"]],
+			"family": 3,
+			"kind": "anthropic_thinking"
 		},
 		{
 			"id": "anthropic_claude-haiku-5-5",
@@ -660,7 +603,9 @@
 					"type": "disabled"
 				}
 			},
-			"rule": 3
+			"added": [["thinking"]],
+			"family": 3,
+			"kind": "anthropic_thinking"
 		},
 		{
 			"id": "gemini_gemini-2.0-flash",
@@ -695,7 +640,8 @@
 				"generationConfig": {
 					"maxOutputTokens": 16
 				}
-			}
+			},
+			"added": []
 		},
 		{
 			"id": "gemini_gemini-2.5-flash",
@@ -734,12 +680,14 @@
 					}
 				}
 			},
-			"rule": 2
+			"added": [["generationConfig", "thinkingConfig"]],
+			"family": 12,
+			"kind": "gemini_budget"
 		},
 		{
-			"id": "gemini_gemini-2.5-flash-lite",
+			"id": "gemini_models_gemini-2.5-pro",
 			"provider": "gemini",
-			"model": "gemini-2.5-flash-lite",
+			"model": "models/gemini-2.5-pro",
 			"body": {
 				"contents": [
 					{
@@ -769,11 +717,13 @@
 				"generationConfig": {
 					"maxOutputTokens": 16,
 					"thinkingConfig": {
-						"thinkingBudget": 0
+						"thinkingBudget": 128
 					}
 				}
 			},
-			"rule": 2
+			"added": [["generationConfig", "thinkingConfig"]],
+			"family": 13,
+			"kind": "gemini_budget"
 		},
 		{
 			"id": "gemini_gemini-2.5-flash-image",
@@ -809,46 +759,8 @@
 					"maxOutputTokens": 16
 				}
 			},
-			"rule": 1
-		},
-		{
-			"id": "gemini_gemini-2.5-pro",
-			"provider": "gemini",
-			"model": "gemini-2.5-pro",
-			"body": {
-				"contents": [
-					{
-						"role": "user",
-						"parts": [
-							{
-								"text": "u"
-							}
-						]
-					}
-				],
-				"generationConfig": {
-					"maxOutputTokens": 16
-				}
-			},
-			"expected": {
-				"contents": [
-					{
-						"role": "user",
-						"parts": [
-							{
-								"text": "u"
-							}
-						]
-					}
-				],
-				"generationConfig": {
-					"maxOutputTokens": 16,
-					"thinkingConfig": {
-						"thinkingBudget": 128
-					}
-				}
-			},
-			"rule": 3
+			"added": [],
+			"family": 11
 		},
 		{
 			"id": "gemini_gemini-3.8-flash",
@@ -887,7 +799,9 @@
 					}
 				}
 			},
-			"rule": 5
+			"added": [["generationConfig", "thinkingConfig"]],
+			"family": 15,
+			"kind": "gemini_level"
 		},
 		{
 			"id": "gemini_gemini-3-flash-preview",
@@ -926,85 +840,9 @@
 					}
 				}
 			},
-			"rule": 4
-		},
-		{
-			"id": "gemini_gemini-3.1-pro-preview",
-			"provider": "gemini",
-			"model": "gemini-3.1-pro-preview",
-			"body": {
-				"contents": [
-					{
-						"role": "user",
-						"parts": [
-							{
-								"text": "u"
-							}
-						]
-					}
-				],
-				"generationConfig": {
-					"maxOutputTokens": 16
-				}
-			},
-			"expected": {
-				"contents": [
-					{
-						"role": "user",
-						"parts": [
-							{
-								"text": "u"
-							}
-						]
-					}
-				],
-				"generationConfig": {
-					"maxOutputTokens": 16,
-					"thinkingConfig": {
-						"thinkingLevel": "low"
-					}
-				}
-			},
-			"rule": 5
-		},
-		{
-			"id": "gemini_gemini-4-argon",
-			"provider": "gemini",
-			"model": "gemini-4-argon",
-			"body": {
-				"contents": [
-					{
-						"role": "user",
-						"parts": [
-							{
-								"text": "u"
-							}
-						]
-					}
-				],
-				"generationConfig": {
-					"maxOutputTokens": 16
-				}
-			},
-			"expected": {
-				"contents": [
-					{
-						"role": "user",
-						"parts": [
-							{
-								"text": "u"
-							}
-						]
-					}
-				],
-				"generationConfig": {
-					"maxOutputTokens": 16,
-					"thinkingConfig": {
-						"thinkingLevel": "low"
-					}
-				}
-			},
-			"rule": 5
+			"added": [["generationConfig", "thinkingConfig"]],
+			"family": 14,
+			"kind": "gemini_level"
 		},
 		{
 			"id": "xai_grok-4.3",
@@ -1023,7 +861,9 @@
 				"temperature": 0.7,
 				"reasoning_effort": "none"
 			},
-			"rule": 1
+			"added": [["reasoning_effort"]],
+			"family": 16,
+			"kind": "effort"
 		},
 		{
 			"id": "xai_grok-4.6",
@@ -1042,7 +882,30 @@
 				"temperature": 0.7,
 				"reasoning_effort": "low"
 			},
-			"rule": 2
+			"added": [["reasoning_effort"]],
+			"family": 17,
+			"kind": "effort"
+		},
+		{
+			"id": "xai_grok-3-mini",
+			"provider": "xai",
+			"model": "grok-3-mini",
+			"body": {
+				"model": "grok-3-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "grok-3-mini",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 18,
+			"kind": "effort"
 		},
 		{
 			"id": "xai_grok-2-mini",
@@ -1059,7 +922,8 @@
 				"max_tokens": 16,
 				"stream": false,
 				"temperature": 0.7
-			}
+			},
+			"added": []
 		},
 		{
 			"id": "mistral_mistral-small-latest",
@@ -1076,7 +940,8 @@
 				"max_tokens": 16,
 				"stream": false,
 				"temperature": 0.7
-			}
+			},
+			"added": []
 		},
 		{
 			"id": "mistral_mistral-large-4-0",
@@ -1095,7 +960,28 @@
 				"temperature": 0.7,
 				"reasoning_effort": "low"
 			},
-			"rule": 2
+			"added": [["reasoning_effort"]],
+			"family": 20,
+			"kind": "effort"
+		},
+		{
+			"id": "mistral_magistral-medium-latest",
+			"provider": "mistral",
+			"model": "magistral-medium-latest",
+			"body": {
+				"model": "magistral-medium-latest",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "magistral-medium-latest",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 24
 		},
 		{
 			"id": "deepseek_deepseek-chat",
@@ -1111,8 +997,14 @@
 				"model": "deepseek-chat",
 				"max_tokens": 16,
 				"stream": false,
-				"temperature": 0.7
-			}
+				"temperature": 0.7,
+				"thinking": {
+					"type": "disabled"
+				}
+			},
+			"added": [["thinking"]],
+			"family": 29,
+			"kind": "toggle"
 		},
 		{
 			"id": "deepseek_deepseek-flash",
@@ -1133,7 +1025,32 @@
 					"type": "disabled"
 				}
 			},
-			"rule": 1
+			"added": [["thinking"]],
+			"family": 27,
+			"kind": "toggle"
+		},
+		{
+			"id": "deepseek_deepseek-reasoner",
+			"provider": "deepseek",
+			"model": "deepseek-reasoner",
+			"body": {
+				"model": "deepseek-reasoner",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-reasoner",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": {
+					"type": "disabled"
+				}
+			},
+			"added": [["thinking"]],
+			"family": 29,
+			"kind": "toggle"
 		},
 		{
 			"id": "cohere_command-r7b-12-2024",
@@ -1150,7 +1067,8 @@
 				"max_tokens": 16,
 				"stream": false,
 				"temperature": 0.7
-			}
+			},
+			"added": []
 		},
 		{
 			"id": "cerebras_qwen-3.8-27b",
@@ -1169,7 +1087,9 @@
 				"temperature": 0.7,
 				"reasoning_effort": "none"
 			},
-			"rule": 1
+			"added": [["reasoning_effort"]],
+			"family": 26,
+			"kind": "effort"
 		},
 		{
 			"id": "cerebras_zai-glm-5.3-flash",
@@ -1188,7 +1108,9 @@
 				"temperature": 0.7,
 				"reasoning_effort": "low"
 			},
-			"rule": 2
+			"added": [["reasoning_effort"]],
+			"family": 21,
+			"kind": "effort"
 		},
 		{
 			"id": "cerebras_gpt-oss-120b",
@@ -1207,7 +1129,30 @@
 				"temperature": 0.7,
 				"reasoning_effort": "low"
 			},
-			"rule": 2
+			"added": [["reasoning_effort"]],
+			"family": 10,
+			"kind": "effort"
+		},
+		{
+			"id": "cerebras_kimi-k3",
+			"provider": "cerebras",
+			"model": "kimi-k3",
+			"body": {
+				"model": "kimi-k3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "kimi-k3",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "low"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 23,
+			"kind": "effort"
 		},
 		{
 			"id": "openrouter_openai_gpt-4o-mini",
@@ -1224,7 +1169,8 @@
 				"max_tokens": 16,
 				"stream": false,
 				"temperature": 0.7
-			}
+			},
+			"added": []
 		},
 		{
 			"id": "openrouter_openai_gpt-oss-120b",
@@ -1245,7 +1191,51 @@
 					"effort": "low"
 				}
 			},
-			"rule": 1
+			"added": [["reasoning"]],
+			"family": 10,
+			"kind": "effort"
+		},
+		{
+			"id": "openrouter_qwen_qwen3-32b",
+			"provider": "openrouter",
+			"model": "qwen/qwen3-32b",
+			"body": {
+				"model": "qwen/qwen3-32b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen/qwen3-32b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": {
+					"enabled": false
+				}
+			},
+			"added": [["reasoning"]],
+			"family": 26,
+			"kind": "toggle"
+		},
+		{
+			"id": "openrouter_anthropic_claude-opus-5",
+			"provider": "openrouter",
+			"model": "anthropic/claude-opus-5",
+			"body": {
+				"model": "anthropic/claude-opus-5",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "anthropic/claude-opus-5",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 3
 		},
 		{
 			"id": "groq_llama-3.3-70b-versatile",
@@ -1262,7 +1252,8 @@
 				"max_tokens": 16,
 				"stream": false,
 				"temperature": 0.7
-			}
+			},
+			"added": []
 		},
 		{
 			"id": "groq_qwen_qwen3.8-27b",
@@ -1281,7 +1272,9 @@
 				"temperature": 0.7,
 				"reasoning_effort": "none"
 			},
-			"rule": 1
+			"added": [["reasoning_effort"]],
+			"family": 26,
+			"kind": "effort"
 		},
 		{
 			"id": "groq_openai_gpt-oss-20b",
@@ -1300,7 +1293,9 @@
 				"temperature": 0.7,
 				"reasoning_effort": "low"
 			},
-			"rule": 3
+			"added": [["reasoning_effort"]],
+			"family": 10,
+			"kind": "effort"
 		},
 		{
 			"id": "groq_openai_gpt-oss-safeguard-20b",
@@ -1318,7 +1313,8 @@
 				"stream": false,
 				"temperature": 0.7
 			},
-			"rule": 2
+			"added": [],
+			"family": 9
 		},
 		{
 			"id": "together_moonshotai_Kimi-K3",
@@ -1339,7 +1335,32 @@
 					"enabled": false
 				}
 			},
-			"rule": 1
+			"added": [["reasoning"]],
+			"family": 23,
+			"kind": "toggle"
+		},
+		{
+			"id": "together_zai-org_GLM-5.2",
+			"provider": "together",
+			"model": "zai-org/GLM-5.2",
+			"body": {
+				"model": "zai-org/GLM-5.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "zai-org/GLM-5.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": {
+					"enabled": false
+				}
+			},
+			"added": [["reasoning"]],
+			"family": 22,
+			"kind": "toggle"
 		},
 		{
 			"id": "together_openai_gpt-oss-120b",
@@ -1358,7 +1379,32 @@
 				"temperature": 0.7,
 				"reasoning_effort": "low"
 			},
-			"rule": 2
+			"added": [["reasoning_effort"]],
+			"family": 10,
+			"kind": "effort"
+		},
+		{
+			"id": "together_Qwen_Qwen3-235B-A22B",
+			"provider": "together",
+			"model": "Qwen/Qwen3-235B-A22B",
+			"body": {
+				"model": "Qwen/Qwen3-235B-A22B",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "Qwen/Qwen3-235B-A22B",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning": {
+					"enabled": false
+				}
+			},
+			"added": [["reasoning"]],
+			"family": 26,
+			"kind": "toggle"
 		},
 		{
 			"id": "together_meta-llama_Llama-3.3-70B-Instruct-Turbo",
@@ -1375,7 +1421,8 @@
 				"max_tokens": 16,
 				"stream": false,
 				"temperature": 0.7
-			}
+			},
+			"added": []
 		},
 		{
 			"id": "fireworks_accounts_fireworks_models_qwen3-235b-a22b",
@@ -1394,7 +1441,9 @@
 				"temperature": 0.7,
 				"reasoning_effort": "none"
 			},
-			"rule": 2
+			"added": [["reasoning_effort"]],
+			"family": 26,
+			"kind": "effort"
 		},
 		{
 			"id": "fireworks_accounts_fireworks_models_gpt-oss-120b",
@@ -1413,7 +1462,49 @@
 				"temperature": 0.7,
 				"reasoning_effort": "low"
 			},
-			"rule": 1
+			"added": [["reasoning_effort"]],
+			"family": 10,
+			"kind": "effort"
+		},
+		{
+			"id": "fireworks_accounts_fireworks_models_deepseek-v3p2",
+			"provider": "fireworks",
+			"model": "accounts/fireworks/models/deepseek-v3p2",
+			"body": {
+				"model": "accounts/fireworks/models/deepseek-v3p2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "accounts/fireworks/models/deepseek-v3p2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			},
+			"added": [["reasoning_effort"]],
+			"family": 27,
+			"kind": "effort"
+		},
+		{
+			"id": "openai_compat_qwen3_8b",
+			"provider": "openai_compat",
+			"model": "qwen3:8b",
+			"body": {
+				"model": "qwen3:8b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "qwen3:8b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": [],
+			"family": 26
 		},
 		{
 			"id": "openai_compat_gpt-5.1",
@@ -1430,176 +1521,460 @@
 				"max_tokens": 16,
 				"stream": false,
 				"temperature": 0.7
+			},
+			"added": [],
+			"family": 6
+		}
+	],
+	"refusal_vectors": [
+		{
+			"id": "openai_unknown_argument",
+			"provider": "openai",
+			"model": "gpt-5.1",
+			"body": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"status": 400,
+			"message": "Unrecognized request argument supplied: reasoning_effort",
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"field": "reasoning_effort"
+		},
+		{
+			"id": "anthropic_thinking_type",
+			"provider": "anthropic",
+			"model": "claude-opus-5",
+			"body": {
+				"model": "claude-opus-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				]
+			},
+			"status": 400,
+			"message": "thinking.type: Input should be 'enabled' or 'adaptive'",
+			"expected": {
+				"model": "claude-opus-5",
+				"max_tokens": 16,
+				"system": "S",
+				"messages": [
+					{
+						"role": "user",
+						"content": "u"
+					}
+				]
+			},
+			"field": "thinking"
+		},
+		{
+			"id": "gemini_snake_case",
+			"provider": "gemini",
+			"model": "gemini-2.5-flash",
+			"body": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"status": 400,
+			"message": "Invalid JSON payload received. Unknown name \"thinking_config\" at 'generation_config'",
+			"expected": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"field": "generationConfig"
+		},
+		{
+			"id": "gemini_other_field_is_not_a_refusal",
+			"provider": "gemini",
+			"model": "gemini-2.5-flash",
+			"body": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16
+				}
+			},
+			"status": 400,
+			"message": "generation_config.max_output_tokens must be positive",
+			"expected": {
+				"contents": [
+					{
+						"role": "user",
+						"parts": [
+							{
+								"text": "u"
+							}
+						]
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 16,
+					"thinkingConfig": {
+						"thinkingBudget": 0
+					}
+				}
+			}
+		},
+		{
+			"id": "not_a_400",
+			"provider": "openai",
+			"model": "gpt-5.1",
+			"body": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"status": 500,
+			"message": "reasoning_effort overloaded",
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
+			}
+		},
+		{
+			"id": "openrouter_reasoning",
+			"provider": "openrouter",
+			"model": "qwen/qwen3-32b",
+			"body": {
+				"model": "qwen/qwen3-32b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"status": 400,
+			"message": "reasoning is mandatory for this endpoint and cannot be disabled",
+			"expected": {
+				"model": "qwen/qwen3-32b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"field": "reasoning"
+		},
+		{
+			"id": "unrelated_400",
+			"provider": "openai",
+			"model": "gpt-5.1",
+			"body": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"status": 400,
+			"message": "max_tokens is too large",
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"reasoning_effort": "none"
 			}
 		}
 	],
-	"parse_vectors": [
+	"refused_vectors": [
 		{
-			"id": "not_an_array",
-			"thinking_off": {
-				"models": ["a"],
-				"fields": {}
+			"id": "refused_field_is_skipped",
+			"provider": "openai",
+			"model": "gpt-5.1",
+			"refused": ["reasoning_effort"],
+			"body": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "gpt-5.1",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"family": 6,
+			"kind": "effort"
+		}
+	],
+	"family_parse_vectors": [
+		{
+			"id": "no_families",
+			"table": {},
+			"valid": false
+		},
+		{
+			"id": "family_not_object",
+			"table": {
+				"families": ["x"]
 			},
 			"valid": false
 		},
 		{
-			"id": "rule_not_object",
-			"thinking_off": ["x"],
+			"id": "toggle_with_level",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": [
+							{
+								"kind": "toggle",
+								"intent": "off",
+								"level": "none"
+							}
+						]
+					}
+				]
+			},
 			"valid": false
 		},
 		{
-			"id": "no_models",
-			"thinking_off": [
-				{
-					"fields": {
-						"a": 1
+			"id": "effort_without_level",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": [
+							{
+								"kind": "effort",
+								"intent": "lowest"
+							}
+						]
 					}
-				}
-			],
+				]
+			},
 			"valid": false
 		},
 		{
-			"id": "empty_models",
-			"thinking_off": [
-				{
-					"models": [],
-					"fields": {
-						"a": 1
+			"id": "unknown_kind",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": [
+							{
+								"kind": "magic",
+								"intent": "off",
+								"level": 1
+							}
+						]
 					}
-				}
-			],
+				]
+			},
+			"valid": false
+		},
+		{
+			"id": "unknown_intent",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": [
+							{
+								"kind": "effort",
+								"intent": "max",
+								"level": "low"
+							}
+						]
+					}
+				]
+			},
 			"valid": false
 		},
 		{
 			"id": "glob_with_space",
-			"thinking_off": [
-				{
-					"models": ["gpt 5"],
-					"fields": {
-						"a": 1
+			"table": {
+				"families": [
+					{
+						"models": ["a b"],
+						"controls": []
 					}
-				}
-			],
+				]
+			},
 			"valid": false
 		},
 		{
-			"id": "glob_with_question_mark",
-			"thinking_off": [
-				{
-					"models": ["gpt-5?"],
-					"fields": {
-						"a": 1
+			"id": "no_models",
+			"table": {
+				"families": [
+					{
+						"models": [],
+						"controls": []
 					}
-				}
-			],
+				]
+			},
 			"valid": false
 		},
 		{
-			"id": "no_fields",
-			"thinking_off": [
-				{
-					"models": ["a"]
-				}
-			],
+			"id": "unknown_key",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": [],
+						"extra": 1
+					}
+				]
+			},
 			"valid": false
 		},
 		{
-			"id": "fields_array",
-			"thinking_off": [
-				{
-					"models": ["a"],
-					"fields": ["x"]
+			"id": "shield_and_docs",
+			"table": {
+				"families": [
+					{
+						"models": ["a*"],
+						"controls": [],
+						"_family": "doc"
+					}
+				]
+			},
+			"valid": true
+		},
+		{
+			"id": "toggle_then_effort",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": [
+							{
+								"kind": "toggle",
+								"intent": "off"
+							},
+							{
+								"kind": "effort",
+								"intent": "off",
+								"level": "none"
+							}
+						]
+					}
+				]
+			},
+			"valid": true
+		}
+	],
+	"dialect_parse_vectors": [
+		{
+			"id": "not_object",
+			"dialect": ["x"],
+			"valid": false
+		},
+		{
+			"id": "unknown_kind",
+			"dialect": {
+				"magic": {
+					"a": 1
 				}
-			],
+			},
+			"valid": false
+		},
+		{
+			"id": "toggle_with_level",
+			"dialect": {
+				"toggle": {
+					"a": "$level"
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "effort_without_level",
+			"dialect": {
+				"effort": {
+					"a": "low"
+				}
+			},
 			"valid": false
 		},
 		{
 			"id": "field_null",
-			"thinking_off": [
-				{
-					"models": ["a"],
-					"fields": {
-						"a": null
+			"dialect": {
+				"effort": {
+					"a": null
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "field_array",
+			"dialect": {
+				"toggle": {
+					"a": [1]
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "bad_name",
+			"dialect": {
+				"effort": {
+					"a-b": "$level"
+				}
+			},
+			"valid": false
+		},
+		{
+			"id": "valid",
+			"dialect": {
+				"toggle": {
+					"reasoning": {
+						"enabled": false
 					}
-				}
-			],
-			"valid": false
-		},
-		{
-			"id": "field_array_value",
-			"thinking_off": [
-				{
-					"models": ["a"],
-					"fields": {
-						"a": [1]
+				},
+				"effort": {
+					"reasoning": {
+						"effort": "$level"
 					}
-				}
-			],
-			"valid": false
-		},
-		{
-			"id": "nested_empty_object",
-			"thinking_off": [
-				{
-					"models": ["a"],
-					"fields": {
-						"a": {}
-					}
-				}
-			],
-			"valid": false
-		},
-		{
-			"id": "bad_field_name",
-			"thinking_off": [
-				{
-					"models": ["a"],
-					"fields": {
-						"a-b": 1
-					}
-				}
-			],
-			"valid": false
-		},
-		{
-			"id": "unknown_rule_key",
-			"thinking_off": [
-				{
-					"models": ["a"],
-					"fields": {
-						"a": 1
-					},
-					"extra": 1
-				}
-			],
-			"valid": false
-		},
-		{
-			"id": "documentation_key_ignored",
-			"thinking_off": [
-				{
-					"models": ["a"],
-					"fields": {
-						"a": 1
-					},
-					"_source": "https://example.invalid"
-				}
-			],
+				},
+				"_doc": "x"
+			},
 			"valid": true
 		},
 		{
-			"id": "empty_list",
-			"thinking_off": [],
-			"valid": true
-		},
-		{
-			"id": "empty_fields",
-			"thinking_off": [
-				{
-					"models": ["a*"],
-					"fields": {}
-				}
-			],
+			"id": "empty",
+			"dialect": {},
 			"valid": true
 		}
 	]
