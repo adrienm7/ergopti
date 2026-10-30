@@ -670,6 +670,16 @@ other AutoHotkey hooks, through their mutex. Action: never let correctness
 depend on the order of the AutoHotkey hook and a native hook; give each
 decision to one hook outright.
 
+### project-llm-ollama-is-only-the-owned-runtime
+
+The Windows engine talks only to the daemon `OllamaManagedBootstrap` started
+(`llm_ollama_owned_port`, 11435): `_LLM_Deps_DoCheck_Result` and
+`_LLM_Menu_EnableProbe` refuse any listener without a live owner, and the stock
+port is refused as an override. That daemon dies with its driver, so the
+auto-boot path restarts it silently (`Silent`: no window, no install, no pull),
+and a READY flow follows only the AI intent, not the config bytes. Tests of the
+real curl paths inject `OwnedFn`; never point them at the stock port.
+
 ### project-llm-nav-cycle-is-ahk-owned
 
 The native owner's plan validation (NavPlanIsValid) requires one Up and one
