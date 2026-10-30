@@ -154,6 +154,114 @@ function fields(detail) {
 	return found;
 }
 
+/**
+ * A file of the driver's configuration folder, as exact bytes.
+ * @param {object} session The session.
+ * @param {string} relative Path under the configuration folder.
+ * @returns {Buffer|null} The bytes, or null when absent.
+ */
+function configBytes(session, relative) {
+	const file = path.join(session.config, relative);
+	return fs.existsSync(file) ? fs.readFileSync(file) : null;
+}
+
+/**
+ * The names of the driver's backup files for one base name.
+ * @param {object} session The session.
+ * @param {RegExp} pattern What a backup's name looks like.
+ * @returns {string[]}
+ */
+function backupNames(session, pattern) {
+	const folder = path.join(session.config, 'autohotkey');
+	return fs.existsSync(folder) ? fs.readdirSync(folder).filter((name) => pattern.test(name)) : [];
+}
+
+/**
+ * The current version of a migration registry, read from its file.
+ * @param {string} relative Path under _shared.
+ * @returns {number}
+ */
+function registryVersion(relative) {
+	const text = fs.readFileSync(
+		path.join(live.ROOT, 'static', 'ergopti_plus', '_shared', relative),
+		'utf8'
+	);
+	return Number(/^current_version = (\d+)/m.exec(text)[1]);
+}
+
+/**
+ * The HKCU touchpad values, so a check that clicks Restore proves it left them alone.
+ * @returns {string}
+ */
+function touchpadRegistry() {
+	const out = spawnSync(
+		'reg.exe',
+		['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad', '/s'],
+		{ encoding: 'utf8', windowsHide: true }
+	);
+	return out.stdout || '';
+}
+
+// What Clear all and Restore recommended must leave alone in every category.
+const SENTINELS_TOML = [
+	'# a comment the user wrote',
+	'[zz_live_unknown]',
+	"keep = 'unknown key'",
+	'[llm]',
+	"trigger_shortcut = '^!a'",
+	''
+].join('\n');
+
+/**
+ * Clicks one Clear or Restore row and judges what any scoped change must respect.
+ * @param {object} session The session.
+ * @param {number} pid The serving pid.
+ * @param {string[]} row The row's path.
+ * @param {string} label The name in a failure.
+ * @param {RegExp} scope The configuration keys the row may change.
+ * @param {string[]} problems Collects failures.
+ * @returns {Promise<{pid: number, config: object, changed: number}>}
+ */
+async function clickScoped(session, pid, row, label, scope, problems) {
+	const before = configBytes(session, 'autohotkey/config.toml');
+	const beforeTap = configBytes(session, 'autohotkey/tap_hold.toml');
+	const snapshot = live.configSnapshot(session);
+	const backups = new Set(backupNames(session, /\.backup-/));
+	try {
+		await session.run('click_confirming', ['.', ...row], 180000, { followReload: true });
+	} catch (error) {
+		throw new Error(`${label}: ${error.message}`);
+	}
+	const settled = await session.quiesce(pid);
+	const config = live.configSnapshot(session);
+	const changes = live.diffSnapshots(snapshot, config);
+	const stray = changes.filter((change) => !scope.test(change.key));
+	if (stray.length > 0)
+		problems.push(`${label}: outside its scope: ${stray.map((c) => c.key).join(', ')}`);
+	if (config['zz_live_unknown.keep'] !== JSON.stringify('unknown key'))
+		problems.push(`${label}: the unknown key is gone`);
+	if (config['llm.trigger_shortcut'] !== JSON.stringify('^!a'))
+		problems.push(`${label}: the outdated key is gone`);
+	const after = configBytes(session, 'autohotkey/config.toml');
+	if (!after.equals(before)) {
+		const fresh = backupNames(session, /\.backup-/).filter((name) => !backups.has(name));
+		const config = fresh.filter((name) => name.startsWith('config.'));
+		const tap = fresh.filter((name) => name.startsWith('tap_hold.'));
+		if (config.length !== 1) problems.push(`${label}: ${config.length} configuration backups`);
+		else if (!configBytes(session, `autohotkey/${config[0]}`).equals(before))
+			problems.push(`${label}: the backup ${config[0]} is not the exact earlier file`);
+		// With no tap_hold.toml yet the backup holds the empty source it replaced.
+		for (const name of tap)
+			if (!configBytes(session, `autohotkey/${name}`).equals(beforeTap ?? Buffer.alloc(0)))
+				problems.push(`${label}: the backup ${name} is not the exact earlier file`);
+	}
+	const dialogs = await session.run('dialogs');
+	if (dialogs !== 'dialogs=') problems.push(`${label}: a dialog stays open: ${dialogs}`);
+	const afterTap = configBytes(session, 'autohotkey/tap_hold.toml');
+	const tapChanged = (afterTap ?? Buffer.alloc(0)).equals(beforeTap ?? Buffer.alloc(0)) ? 0 : 1;
+	return { pid: settled.pid, config, changed: changes.length + tapChanged };
+}
+
 /** @type {{id: string, title: string, run: (context: object) => Promise<object>}[]} */
 const CHECKS = [
 	{
@@ -806,6 +914,557 @@ const CHECKS = [
 			if (!hold.title) return fail(`Hold opened a picker without a caption (menu: ${hold.rows})`);
 			return pass(
 				`the pair menu offers ${tap.rows}; Tap opened "${tap.title}", Hold opened "${hold.title}"`
+			);
+		}
+	},
+	{
+		id: 'clear-restore-categories',
+		title:
+			'Clear all and Restore recommended of each category: in scope, unknown keys kept, exact backups, stable over a restart',
+		async run(context) {
+			const registryBefore = touchpadRegistry();
+			const { session, pid: first } = await bootEnglish(context, 'scopes', SENTINELS_TOML);
+			// A first boot saves its full state late: wait, or that save reads as the row's.
+			let pid = (await session.quiesce(first, { quietMs: 8000 })).pid;
+			const personal = configBytes(session, 'hotstrings/personal_hotstrings.toml');
+			const problems = [];
+			const report = [];
+			// Each row's own namespace; category_enabled is the master switch it may set.
+			const categories = [
+				['Tap-Holds', 're:Tap-Holds$', /^(tap_hold|category_enabled|shortcuts\.key_combinations)/],
+				['Shortcuts', 're:Shortcuts$', /^(shortcuts|category_enabled|gestures\.action_parameters)/],
+				['Gestures', 're:Gestures$', /^(gestures|category_enabled)/],
+				['Keyboard layout', 're:Keyboard layout$', /^(layout|category_enabled)/],
+				['Hotstrings', 're:Hotstrings \\(', /^(hotstrings|category_enabled)/]
+			];
+			for (const [name, menu, scope] of categories) {
+				const restore = [menu, 're:Restore recommended'];
+				const clear = [menu, 're:Clear all'];
+				const r1 = await clickScoped(session, pid, restore, `${name} Restore`, scope, problems);
+				const c = await clickScoped(session, r1.pid, clear, `${name} Clear`, scope, problems);
+				const r2 = await clickScoped(
+					session,
+					c.pid,
+					restore,
+					`${name} Restore again`,
+					scope,
+					problems
+				);
+				pid = r2.pid;
+				// A restore never turns the AI preview back on: that consent is the
+				// user's (restore_exclude, pinned by test_config_scope_manifest.ahk).
+				const drift = live
+					.diffSnapshots(r1.config, r2.config)
+					.map((change) => change.key)
+					.filter((key) => key !== 'hotstrings.preview_ai_enabled');
+				if (drift.length > 0)
+					problems.push(`${name}: Restore after Clear differs from Restore: ${drift.join(', ')}`);
+				if (c.changed === 0 && r2.changed === 0)
+					problems.push(`${name}: Clear and Restore changed nothing`);
+				report.push(`${name} ${c.changed}/${r2.changed}`);
+			}
+			const metrics = await clickScoped(
+				session,
+				pid,
+				['re:Metrics$', 're:Restore recommended'],
+				'Metrics Restore',
+				/^(metrics|keystats|category_enabled)/,
+				problems
+			);
+			pid = metrics.pid;
+			const everything = /./;
+			const allClear = await clickScoped(
+				session,
+				pid,
+				['re:Configuration$', 're:Clear all'],
+				'Global Clear',
+				everything,
+				problems
+			);
+			const allRestore = await clickScoped(
+				session,
+				allClear.pid,
+				// The global Clear also clears the language: the row is named by its mark.
+				['re:Configuration$', 're:^↺'],
+				'Global Restore',
+				everything,
+				problems
+			);
+			report.push(`global ${allClear.changed}/${allRestore.changed}`);
+			if (allClear.changed === 0 || allRestore.changed === 0)
+				problems.push('the global Clear or Restore changed nothing');
+			const now = configBytes(session, 'hotstrings/personal_hotstrings.toml');
+			if (personal && !personal.equals(now)) problems.push('the personal hotstrings file changed');
+			const settledConfig = configBytes(session, 'autohotkey/config.toml');
+			await session.restart();
+			if (!configBytes(session, 'autohotkey/config.toml').equals(settledConfig))
+				problems.push('a restart rewrote the configuration');
+			if (touchpadRegistry() !== registryBefore)
+				problems.push('the touchpad registry values changed');
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`keys changed by Clear/Restore: ${report.join(', ')}`);
+		}
+	},
+	{
+		id: 'number-row-layouts',
+		title: 'Number row: each ordering typed with real keys on every installed layout',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const problems = [];
+			const seen = [];
+			const DIGITS = '1234567890';
+			const isDigit = (text) => /^[0-9]$/.test(text);
+			for (const order of ['native', 'digits', 'symbols']) {
+				const { session } = await bootEnglish(
+					context,
+					`layouts-${order}`,
+					`[category_enabled]\nlayout = true\n[layout]\ndirect_access_digits = "${order}"\n`
+				);
+				await session.run('pump', ['2000']);
+				const layouts = (await session.run('keyboard_layouts')).replace('layouts=', '').split(' ');
+				await session.run('edit_open');
+				for (const hkl of layouts) {
+					await session.run('edit_layout', [hkl]);
+					const shown = await session.run('layout_row', [hkl]);
+					const mode = /mode=(\S+)/.exec(shown)[1];
+					const keys = shown.replace(/^.*row=/, '').split(' ');
+					const expected = keys.map((key, index) => {
+						const [base, shift] = key.split('/');
+						if (mode === 'digits') return DIGITS[index];
+						if (mode === 'symbols') return isDigit(base) ? shift : base;
+						return base;
+					});
+					if (expected.includes('dead') || expected.includes('')) {
+						seen.push(`${order}/${hkl}: a dead or empty key, not judged`);
+						continue;
+					}
+					await session.run('edit_clear');
+					session.type([
+						['mode', 'event'],
+						['level', '100'],
+						['gap', '50'],
+						...[...Array(10).keys()].map((index) => [
+							'key',
+							`{Blind}{SC00${(index + 2).toString(16).toUpperCase()}}`
+						]),
+						['wait', '300']
+					]);
+					const typed = (await session.run('edit_value')).replace(/^value=/, '');
+					if (typed !== expected.join(''))
+						problems.push(
+							`${order} on ${hkl} (${mode}): typed "${typed}", expected "${expected.join('')}"`
+						);
+					else seen.push(`${order}/${hkl}=${mode}`);
+				}
+				await session.run('edit_close');
+				const errors = session.loggedErrors();
+				if (errors.length > 0) problems.push(`${order}: the log holds an error: ${errors[0]}`);
+				await session.stop();
+			}
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`typed as the system tables say: ${seen.join(', ')}`);
+		}
+	},
+	{
+		id: 'hotstring-delays-recommended-cleared',
+		title: 'Hotstring delays: 0.5 s after Restore recommended, 1.0 s after Clear all',
+		async run(context) {
+			const { session, pid: first } = await bootEnglish(context, 'delays');
+			const problems = [];
+			const menu = 're:Hotstrings \\(';
+			const families = ['names', 'abbreviations', 'technical_terms'];
+			const judge = async (label, delay, override) => {
+				for (const family of families) {
+					const seen = fields(await session.run('hotstring_delay', ['autocorrection', family]));
+					if (Number(seen.delay) !== delay || seen.override !== override)
+						problems.push(`${label}: ${family} reads ${JSON.stringify(seen)}, ${delay} s expected`);
+				}
+			};
+			await session.run('click_confirming', ['.', menu, 're:Restore recommended'], 180000, {
+				followReload: true
+			});
+			let pid = (await session.quiesce(first)).pid;
+			await judge('after Restore', 0.5, '1');
+			await session.run('click_confirming', ['.', menu, 're:Clear all'], 180000, {
+				followReload: true
+			});
+			pid = (await session.quiesce(pid)).pid;
+			await judge('after Clear', 1, '0');
+			const rows = await session.run('rows', ['Autocorrection delay', 'Delays and colours']);
+			if (!/Autocorrection delay : 1000 ms/.test(rows))
+				problems.push(`after Clear the row reads: ${rows}`);
+			await session.restart();
+			await judge('after Clear and a restart', 1, '0');
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(
+				`${families.join(', ')}: 0.5 s after Restore, inherited 1.0 s after Clear and a restart`
+			);
+		}
+	},
+	{
+		id: 'handwritten-delimiters',
+		title: 'Handwritten [[hotstrings.terminators]] through Add, toggle, Delete, save and restart',
+		async run(context) {
+			const handwritten = [
+				'# my own delimiters',
+				'[[hotstrings.terminators]]',
+				'key = "custom_cur"',
+				'char = "¤"',
+				'label = "Currency"',
+				'consume = true',
+				''
+			].join('\n');
+			const { session, pid: first } = await bootEnglish(context, 'delimiters', handwritten);
+			const expanders = ['re:Hotstrings \\(', 're:Hotstring settings', 're:^Expanders'];
+			const rows = () => session.run('rows', ['.', 'Expanders']);
+			const records = () => {
+				const parsed = require('smol-toml').parse(session.configText());
+				return parsed.hotstrings?.terminators ?? [];
+			};
+			const problems = [];
+			if (!/Currency/.test(await rows())) problems.push('the handwritten record has no row');
+
+			await session.run(
+				'add_delimiter',
+				['§', '1', ...expanders, 're:Add custom delimiter'],
+				180000,
+				{
+					followReload: true
+				}
+			);
+			let pid = (await session.quiesce(first)).pid;
+			let held = records();
+			if (held.length !== 2 || !held.some((r) => r.char === '§' && r.consume === true))
+				problems.push(`after Add: ${JSON.stringify(held)}`);
+			if (!held.some((r) => r.key === 'custom_cur' && r.char === '¤'))
+				problems.push('Add lost the handwritten record');
+			if (!session.configText().includes('# my own delimiters'))
+				problems.push('Add lost the comment above the handwritten records');
+
+			// The record's own submenu holds its toggle and its Delete.
+			const under = [...expanders, 're:Currency'];
+			await session.run('click', [...under, 're:^Currency'], 180000, { followReload: true });
+			pid = (await session.quiesce(pid)).pid;
+			// A record's state is a leaf beside the records, not a field of the record.
+			const stateOff = () =>
+				require('smol-toml').parse(session.configText()).hotstrings?.terminator_states
+					?.custom_cur === false;
+			const ticked = async () => /Currency\s+\[checked\]/.test(await rows());
+			if (!stateOff()) problems.push('the toggle stored no state');
+			if (await ticked()) problems.push('the row stays ticked after the toggle');
+			await session.restart();
+			pid = Number(/pid=(\d+)/.exec(await session.run('info'))[1]);
+			if (!stateOff() || (await ticked())) problems.push('a restart lost the toggle');
+
+			await session.run('click_confirming', ['.', ...under, 're:Delete'], 180000, {
+				followReload: true
+			});
+			pid = (await session.quiesce(pid)).pid;
+			held = records();
+			if (held.length !== 1 || held[0].char !== '§')
+				problems.push(`after Delete: ${JSON.stringify(held)}`);
+			if (/Currency/.test(await rows())) problems.push('the deleted record still has a row');
+			await session.restart();
+			held = records();
+			if (held.length !== 1 || held[0].char !== '§')
+				problems.push(`after the last restart: ${JSON.stringify(held)}`);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(
+				'a handwritten record kept its comment through Add, toggle, Delete and two restarts'
+			);
+		}
+	},
+	{
+		id: 'consume-submenu',
+		title: 'Expanders > Consumed by the expansion: a row ticks, saves and survives a reload',
+		async run(context) {
+			const { session, pid } = await bootEnglish(context, 'consume');
+			const under = [
+				're:Hotstrings \\(',
+				're:Hotstring settings',
+				're:^Expanders',
+				're:^Consumed by',
+				're:^, : Comma'
+			];
+			const rows = () => session.run('rows', ['^, : Comma', 'Consumed by']);
+			if (/\[checked\]/.test(await rows())) return notExecuted('the comma is already consumed');
+			await session.run('click', under, 180000, { followReload: true });
+			await session.quiesce(pid);
+			const config = live.configSnapshot(session);
+			const stored = Object.entries(config).filter(
+				([key, value]) => /comma/.test(key) && /consume/.test(key) && value === 'true'
+			);
+			if (stored.length === 0) return fail('no comma consume key reads true');
+			if (!/\[checked\]/.test(await rows())) return fail(`the row is not ticked: ${await rows()}`);
+			const shown = await session.run('rows', ['^, : Comma', '> Expanders > $']);
+			if (!/consumed/.test(shown)) return fail(`the Expanders row reads: ${shown}`);
+			const errors = session.loggedErrors();
+			if (errors.length > 0) return fail(`the log holds an error: ${errors[0]}`);
+			return pass(`saved as ${stored[0][0]}, ticked after the reload, suffixed in Expanders`);
+		}
+	},
+	{
+		id: 'ai-off-inert',
+		title: 'AI off: no server sweep, no AI hotkeys, a refused hotkey leaves the driver running',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			// Named ollama, not merely mentioning it: the query's own command line does.
+			const ollama = () =>
+				live
+					.processesMatching('ollama')
+					.filter((p) => /^ollama/i.test(p.name))
+					.map((p) => p.pid)
+					.sort();
+			const ollamaBefore = ollama();
+			const { session } = await bootEnglish(context, 'aioff');
+			await session.run('tree');
+			await session.run('pump', ['4000']);
+			const state = fields(await session.run('ai_state'));
+			const problems = [];
+			if (state.enabled !== '0') return notExecuted('the AI is on in a default configuration');
+			if (state.await !== '1') problems.push('the AI hotkeys do not wait for the switch-on');
+			if (state.navslot !== '0')
+				problems.push(`a navigation plan is active (slot ${state.navslot})`);
+			if (state.scans !== '0') problems.push(`a server sweep reported ${state.scans} servers`);
+			// The profile hotkey of the menu, typed for real: the profile must not move.
+			const profile = () => session.run('rows', ['Ctrl\\+[234]\\)$', 'Profile']);
+			const before = await profile();
+			await session.run('edit_open');
+			session.type([
+				['mode', 'event'],
+				['level', '100'],
+				['gap', '80'],
+				['key', '^{SC003}'],
+				['key', '^{SC004}'],
+				['wait', '500']
+			]);
+			await session.run('edit_close');
+			if ((await profile()) !== before) problems.push('Ctrl+2/3 changed the AI profile');
+			const after = fields(await session.run('ai_state'));
+			if (after.scans !== '0') problems.push('a sweep started after the hotkeys');
+			if (ollama().join() !== ollamaBefore.join()) problems.push('an Ollama process started');
+			if (session.loggedErrors().length > 0)
+				problems.push(`the log holds an error: ${session.loggedErrors()[0]}`);
+			const refused = fields(await session.run('ai_hotkey_refused'));
+			if (refused.settled !== '1' || refused.await !== '1' || refused.notified !== '1')
+				problems.push(`a refused hotkey: ${JSON.stringify(refused)}`);
+			await session.run('pump', ['500']);
+			if (!/pid=/.test(await session.run('info'))) problems.push('the driver stopped answering');
+			if (driverCount(session) !== 1) problems.push('the driver did not survive the refusal');
+			if ((await waitForLog(session, 'the system refused them', new Set(), 8000)) === null)
+				problems.push('the refusal was not logged with its cause');
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(
+				'no sweep, no navigation plan, Ctrl+2/3 inert, no Ollama; a refused hotkey settles, notifies, logs and the driver serves'
+			);
+		}
+	},
+	{
+		id: 'test-prediction-ai-off',
+		title: 'AI > Test a prediction, with the AI off: refused, says why, sends nothing',
+		async run(context) {
+			const { session } = await bootEnglish(context, 'testpred');
+			const before = fields(await session.run('ai_state'));
+			if (before.enabled !== '0') return notExecuted('the AI is on in a default configuration');
+			const started = session.logLines('Test prediction #').length;
+			const state = await session.run('click_read_notice', [
+				're:Artificial Intelligence$',
+				're:^Test a prediction'
+			]);
+			const expected = (await session.run('translate', ['llm.manual_prediction.disabled'])).replace(
+				/^text=/,
+				''
+			);
+			if (!state.includes(expected))
+				return fail(`the notice reads: ${state}; expected "${expected}"`);
+			if (session.logLines('Test prediction #').length !== started)
+				return fail('a test prediction was sent');
+			if ((await session.run('dialogs')) !== 'dialogs=') return fail('a dialog opened');
+			if (session.loggedErrors().length > 0)
+				return fail(`the log holds an error: ${session.loggedErrors()[0]}`);
+			return pass(`refused with the notice "${expected}", nothing sent, no dialog`);
+		}
+	},
+	{
+		id: 'tap-hold-v1-migration',
+		title:
+			'An unstamped tap_hold.toml: exact backup, v1 stamp, retired delays gone, comments kept, once',
+		async run(context) {
+			const version = registryVersion('tap_hold/migrations.toml');
+			const session = context.newSession('taphold');
+			const old = [
+				'# my tap-holds',
+				'[tap_hold.keys.caps_lock]',
+				'time_activation_seconds = 0.35 # retired',
+				'[tap_hold.keys.escape]',
+				'time_activation_seconds = 0.42 # my own',
+				''
+			].join('\n');
+			session.seed('autohotkey/config.toml', ENGLISH);
+			session.seed('autohotkey/tap_hold.toml', old);
+			await session.start();
+			const text = configBytes(session, 'autohotkey/tap_hold.toml').toString('utf8');
+			const parsed = require('smol-toml').parse(text);
+			const backups = backupNames(session, /^tap_hold\.pre-v/);
+			const problems = [];
+			if (backups.length !== 1) problems.push(`${backups.length} backups`);
+			else if (!configBytes(session, `autohotkey/${backups[0]}`).equals(Buffer.from(old)))
+				problems.push(`the backup ${backups[0]} is not the exact old file`);
+			if (parsed._meta?.schema_version !== version)
+				problems.push(`the stamp reads ${parsed._meta?.schema_version}, ${version} expected`);
+			if (parsed.tap_hold?.keys?.caps_lock?.time_activation_seconds !== undefined)
+				problems.push('the retired 0.35 s delay stays');
+			if (parsed.tap_hold?.keys?.escape?.time_activation_seconds !== 0.42)
+				problems.push("the user's own 0.42 s delay is gone");
+			if (!text.includes('# my tap-holds') || !text.includes('# my own'))
+				problems.push('a comment is gone');
+			const first = configBytes(session, 'autohotkey/tap_hold.toml');
+			await session.restart();
+			if (!configBytes(session, 'autohotkey/tap_hold.toml').equals(first))
+				problems.push('a second boot rewrote the file');
+			if (backupNames(session, /^tap_hold\.pre-v/).length !== 1)
+				problems.push('a second boot made another backup');
+			if (session.loggedErrors().length > 0)
+				problems.push(`the log holds an error: ${session.loggedErrors()[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(
+				`${backups[0]} is the exact file; stamped v${version}; second boot wrote nothing`
+			);
+		}
+	},
+	{
+		id: 'old-config-migration',
+		title: 'An old config.toml climbs the whole registry at boot and keeps its actions',
+		async run(context) {
+			const version = registryVersion('core/config_schema/migrations.toml');
+			// Spellings a Windows build wrote before each step, unstamped (v2).
+			const old = [
+				'# from an old build',
+				'[script]',
+				"locale = 'en'",
+				'[category_enabled]',
+				'shortcuts = true',
+				'dynamichotstrings = false',
+				'[llm]',
+				"trigger_shortcut = '^!a'",
+				'[hotstrings]',
+				'cascade_depth = 2',
+				'magic_key_source_scan = "SC029"',
+				'[hotstrings.autocorrection.caps]',
+				'enabled = true',
+				'[layout]',
+				'direct_access_digits = true',
+				'[shortcuts.keyboard]',
+				'ctrl_g = "open_hotstrings_editor"',
+				'win_e = "search_web"',
+				''
+			].join('\n');
+			const session = context.newSession('oldconfig');
+			session.seed('autohotkey/config.toml', old);
+			await session.start();
+			const config = live.configSnapshot(session);
+			const backups = backupNames(session, /^config\.pre-v/);
+			const problems = [];
+			if (backups.length !== 1) problems.push(`${backups.length} migration backups`);
+			else if (!configBytes(session, `autohotkey/${backups[0]}`).equals(Buffer.from(old)))
+				problems.push(`the backup ${backups[0]} is not the exact old file`);
+			const want = {
+				'_meta.schema_version': String(version),
+				'shortcuts.keyboard.ctrl_g': '"open_hotstrings_editor"',
+				'shortcuts.keyboard.win_e': '"search_web"',
+				'hotstrings.dynamic.enabled': 'false',
+				'hotstrings.cascade_max_arrows': '3',
+				'layout.direct_access_digits': '"digits"',
+				'hotstrings.autocorrection.names.enabled': 'true',
+				'hotstrings.magic_key_source': '"Backquote"',
+				'llm.trigger_shortcut': '"^!a"'
+			};
+			for (const [key, value] of Object.entries(want))
+				if (config[key] !== value) problems.push(`${key} reads ${config[key]}, ${value} expected`);
+			if (!session.configText().includes('# from an old build'))
+				problems.push('the comment is gone');
+			const rows = await session.run('rows', ['.', 'Ctrl shortcuts']);
+			if (!/hotstrings editor/i.test(rows))
+				problems.push(`the Ctrl row does not show the action: ${rows}`);
+			const first = configBytes(session, 'autohotkey/config.toml');
+			await session.restart();
+			if (!configBytes(session, 'autohotkey/config.toml').equals(first))
+				problems.push('a second boot rewrote the file');
+			if (session.loggedErrors().length > 0)
+				problems.push(`the log holds an error: ${session.loggedErrors()[0]}`);
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(`${backups[0]} is exact; v${version}; every action and mapped value kept`);
+		}
+	},
+	{
+		id: 'quit-refused-during-write',
+		title: 'Quit during a configuration write waits, gives up with a notice, and quits once free',
+		async run(context) {
+			const timings = fs.readFileSync(
+				path.join(
+					live.ROOT,
+					'static',
+					'ergopti_plus',
+					'_shared',
+					'modules',
+					'timings',
+					'constants.toml'
+				),
+				'utf8'
+			);
+			const deadline = Number(/user_quit_deadline_ms\s*=\s*(\d+)/.exec(timings)[1]);
+			const quit = ['re:Quit$'];
+			const { session } = await bootEnglish(context, 'quit');
+			await session.run('lease_hold');
+			await session.run('click', quit);
+			// The dispatcher first holds a menu click 10 s behind a write, then Quit
+			// waits for its own deadline, so the refusal takes both.
+			const held = 15000 + deadline + 15000;
+			if (
+				(await waitForLog(
+					session,
+					'Quit waits: a global configuration writer',
+					new Set(),
+					held
+				)) === null
+			)
+				return fail('the wait for the writer was not logged');
+			if ((await waitForLog(session, 'Quit gave up waiting', new Set(), held)) === null)
+				return fail('the give-up was not logged');
+			if ((await waitForLog(session, 'Quit was refused', new Set(), 8000)) === null)
+				return fail('the user was not told of the refusal');
+			if (!/pid=/.test(await session.run('info'))) return fail('the driver exited under the write');
+			await session.run('lease_release');
+			await session.run('pump', ['1000']);
+			if (!/pid=/.test(await session.run('info')))
+				return fail('a refused Quit still exited after the write ended');
+			await session.run('click', quit, 20000, { followReload: true });
+			const started = Date.now();
+			while (session.child.exitCode === null && Date.now() - started < 30000) await live.sleep(100);
+			if (session.child.exitCode !== 0)
+				return fail(`the second Quit ended with ${session.child.exitCode}, 0 expected`);
+
+			// One Quit is enough when the write ends in time.
+			const second = await bootEnglish(context, 'quit2');
+			await second.session.run('lease_hold');
+			await second.session.run('click', quit);
+			await live.sleep(1000);
+			await second.session.run('lease_release', [], 20000, { followReload: true });
+			const since = Date.now();
+			while (second.session.child.exitCode === null && Date.now() - since < 30000)
+				await live.sleep(100);
+			if (second.session.child.exitCode !== 0)
+				return fail(`the Quit that waited ended with ${second.session.child.exitCode}, 0 expected`);
+			return pass(
+				`refused after ${deadline} ms with a notice, the driver kept serving; a later Quit and a Quit that waited both exit 0`
 			);
 		}
 	}
