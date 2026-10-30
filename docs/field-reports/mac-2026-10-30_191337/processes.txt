@@ -1,0 +1,13 @@
+581 /Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon
+582 /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service
+697 /Library/SystemExtensions/9EFC2659-31E3-451D-8D2C-CE38E09D8183/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice.dext/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice org.pqrs.Karabiner-DriverKit-VirtualHIDDevice 0x100001171 org.pqrs.Karabiner-DriverKit-VirtualHIDDevice
+2247 /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_session_monitor
+2253 /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_console_user_server
+2254 /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-NotificationWindow.app/Contents/MacOS/Karabiner-NotificationWindow
+2259 /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service
+9481 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
+9531 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon
+9659 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus --karabiner-lease-guardian
+32327 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus --karabiner-lease-worker /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli ergopti_mode_d5b4606d1ee2401e9db848718e9bc091 ergopti_revoked_d5b4606d1ee2401e9db848718e9bc091 2 5
+32332 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus --karabiner-lease-inner /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli ergopti_mode_d5b4606d1ee2401e9db848718e9bc091 ergopti_revoked_d5b4606d1ee2401e9db848718e9bc091 5.0 16777233 122696518
+32345 sh -c '/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Elements Privileged Daemons v2.app/Contents/MacOS/Karabiner-Elements Privileged Daemons v2' core-daemons-enabled

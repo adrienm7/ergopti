@@ -1,0 +1,3 @@
+COMMAND    PID             USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+OneDrive  2323 b519hs@login.axa   39u  IPv6 0x2199ba947a195cce      0t0  TCP [::1]:42050 (LISTEN)
+node      2533 b519hs@login.axa  142u  IPv4 0xd5487afc32836c02      0t0  TCP 127.0.0.1:7265 (LISTEN)
