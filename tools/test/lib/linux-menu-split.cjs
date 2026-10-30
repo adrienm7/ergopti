@@ -114,7 +114,11 @@ function quitWiringCases(split) {
 			'definition reaching the module table',
 			inPart('local function _build_quit(ctx)', 'local function _build_quit(ctx)\n\tM.build = nil')
 		],
-		['foreign log source', inPart('"ui.menu.menu_quit"', '"ui.menu.menu_foreign"')]
+		['foreign log source', inPart('"ui.menu.menu_quit"', '"ui.menu.menu_foreign"')],
+		[
+			'header reading a facade the module never declared',
+			inPart('local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")\n', '')
+		]
 	];
 }
 
