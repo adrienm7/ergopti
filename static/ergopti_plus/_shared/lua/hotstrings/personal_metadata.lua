@@ -31,10 +31,44 @@ function M.valid(field, value)
 	return type(hex) == "string" and #hex >= 3 and #hex <= 8 and hex:match("^[0-9a-fA-F]+$") ~= nil
 end
 
-local function same_folded(a, b)
-	if #a ~= #b then return false end
-	for index, segment in ipairs(a) do if segment:lower() ~= b[index]:lower() then return false end end
-	return true
+--- Returns an injective identity of a path whose segments compare case-folded.
+--- @param segments table Path segments.
+--- @return string
+local function folded_identity(segments)
+	local parts = {}
+	for index, segment in ipairs(segments) do parts[index] = #segment .. ":" .. segment:lower() end
+	return table.concat(parts, "\0")
+end
+
+--- Indexes the scanned headers and single-key records by case-folded identity,
+--- each with the exact spellings found under it. A whole-snapshot save checks
+--- every personal row against the source: re-parsing every header and record
+--- per row held the main thread about 1 s (96 personal rows, 2026-10-30 field
+--- report, hotstrings=970 ms).
+--- @param scanned table Record scanner result.
+--- @return table headers { [folded path] = { [rendered path] = true } }
+--- @return table records { [folded path .. "\0\0" .. lowered key] = list of { owner, key } }
+local function index_scan(scanned)
+	local headers, records = {}, {}
+	for _, header in ipairs(scanned.headers) do
+		if header.segments then
+			local folded = folded_identity(header.segments)
+			headers[folded] = headers[folded] or {}
+			headers[folded][KeyPath.render(header.segments)] = true
+		end
+	end
+	for _, record in ipairs(scanned.records) do
+		local section, key = record.section, record.key
+		if record.quoted then section, key = record.quoted.section, record.quoted.key end
+		local owner = section and KeyPath.parse(section, true)
+		if owner and type(key) == "string" and (record.quoted or record.addressable and #record.key_segments == 1) then
+			local slot = folded_identity(owner) .. "\0\0" .. key:lower()
+			records[slot] = records[slot] or {}
+			local spellings = records[slot]
+			spellings[#spellings + 1] = { owner = KeyPath.render(owner), key = key }
+		end
+	end
+	return headers, records
 end
 
 --- Refuses case aliases without changing the generic writer's historical dialect.
@@ -44,19 +78,16 @@ end
 local function exact_row_owners(content, rows)
 	local scanned = Scanner.scan_records(content, { quoted_headers = true })
 	if not scanned then return false end
+	if #rows == 0 then return true end
+	local headers, records = index_scan(scanned)
 	for _, row in ipairs(rows) do
 		local target = assert(KeyPath.parse(row.section, true))
-		for _, header in ipairs(scanned.headers) do
-			if header.segments and same_folded(header.segments, target)
-				and KeyPath.render(header.segments) ~= KeyPath.render(target) then return false end
+		local folded, rendered = folded_identity(target), KeyPath.render(target)
+		for spelling in pairs(headers[folded] or {}) do
+			if spelling ~= rendered then return false end
 		end
-		for _, record in ipairs(scanned.records) do
-			local section, key = record.section, record.key
-			if record.quoted then section, key = record.quoted.section, record.quoted.key end
-			local owner = section and KeyPath.parse(section, true)
-			if owner and (record.quoted or record.addressable and #record.key_segments == 1)
-				and same_folded(owner, target) and key:lower() == row.key:lower()
-				and (KeyPath.render(owner) ~= KeyPath.render(target) or key ~= row.key) then return false end
+		for _, spelling in ipairs(records[folded .. "\0\0" .. row.key:lower()] or {}) do
+			if spelling.owner ~= rendered or spelling.key ~= row.key then return false end
 		end
 	end
 	return true
