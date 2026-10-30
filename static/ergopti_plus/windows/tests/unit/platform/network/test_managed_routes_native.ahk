@@ -40,12 +40,12 @@ _ManagedRoutes_NativeDiagnostic(Observation) {
 	Err := Observation.Get("stdout", "")
 	if !(Err is String) || StrLen(Err) > 8192
 		return
-	Pattern := "m)^ROUTE_DIAG stage=(load_routes|abi_sizes|compile_server|start_server|vector_lookup|vector_receipt|vector_order|fresh_lookup|fresh_order|unsupported_lookup|unsupported_receipt|slow_lookup|slow_receipt|slow_owner|pac_auth_lookup|pac_auth_receipt|pac_auth_owner|settings_read|settings_receipt|server_receipt|cleanup)"
+	Pattern := "m)^ROUTE_DIAG stage=(load_routes|abi_sizes|compile_server|start_server|vector_lookup|vector_receipt|vector_order|fresh_lookup|fresh_order|unsupported_lookup|unsupported_receipt|slow_lookup|slow_receipt|slow_owner|dead_pac_lookup|dead_pac_receipt|dead_pac_relay|pac_auth_lookup|pac_auth_receipt|pac_auth_owner|settings_read|settings_receipt|server_receipt|cleanup)"
 		. " vector=([0-3]) native_observed=([01]) native_errno=(-?(?:0|[1-9][0-9]{0,9}))"
 		. " status=(unknown|unavailable|invalid_configuration|pac_failed|wpad_failed)"
 		. " result_shape=(unknown|null|hashtable|array|other) ok=(unknown|true|false)"
 		. " route_count=(-1|0|[1-9][0-9]{0,3}) limits=(unknown|match|mismatch)"
-		. " single_source=(unknown|loopback|environment|environment_bypass|system_direct|system_bypass|system_config_absent_direct|system_config_absent_bypass|system_proxy|system_config_absent_proxy|wpad_absent_direct|wpad_absent_bypass|wpad_absent_proxy|native_proxy|native_direct|native_bypass)"
+		. " single_source=(unknown|loopback|environment|environment_bypass|system_direct|system_bypass|system_config_absent_direct|system_config_absent_bypass|system_proxy|system_config_absent_proxy|wpad_absent_direct|wpad_absent_bypass|wpad_absent_proxy|native_proxy|native_direct|native_bypass|pac_unavailable_direct)"
 		. " single_kind=(unknown|direct|proxy)`r?$"
 	if !RegExMatch(Err, Pattern, &Fact)
 		return

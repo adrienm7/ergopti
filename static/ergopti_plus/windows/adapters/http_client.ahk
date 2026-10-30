@@ -527,6 +527,10 @@ class CurlAsyncRequest {
 					&& Receipt.Get("child_quiesced", false) is Integer
 					&& Receipt["child_quiesced"] == true {
 				this.NativeReceipt := Receipt.Get("receipt", Map())
+				; proxy_policy.json pac_unavailable_fallback: the stage is a closed token.
+				if Receipt.Has("pac_fallback_stage")
+					LoggerWarn("Network", "Automatic proxy configuration unusable at {1}; this request goes direct.",
+						Receipt["pac_fallback_stage"])
 				if !this.ManagedPayloadPublished && Receipt.Get("ok", 0) is Integer && Receipt.Get("ok", 0) == false
 						&& Receipt.Get("status", -1) is Integer && Receipt.Get("status", -1) == 0
 					this._MarkNativeDispatchRefused()

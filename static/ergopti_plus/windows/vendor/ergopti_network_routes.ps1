@@ -25,6 +25,27 @@ function New-ErgoptiRouteRefusal {
     return @{ Ok = $false; Routes = @(); Receipt = $Receipt }
 }
 
+# Closed lookup stage of a PAC or WPAD that could not be used; never route text.
+function Get-ErgoptiPacFailureStage {
+    param($Native)
+    if ($Native.Backend -ceq 'winhttp') { return 'native_wpad_discovery' }
+    if ($Native.FailureOrigin -ceq 'pac_download') { return 'native_pac_download' }
+    if ($Native.FailureOrigin -ceq 'application_budget') { return 'native_proxy_budget' }
+    if ($Native.Backend -ceq 'native_socket') { return 'native_pac_evaluation' }
+    return 'native_proxy_lookup'
+}
+
+# proxy_policy.json pac_unavailable_fallback owns which stages go direct. A PAC
+# that answered is a route decision and never reaches this: its list is followed,
+# and a relay it names that then fails is not retried direct.
+function New-ErgoptiPacDirectFallback {
+    param($Policy, [string]$Stage)
+    if ($Policy.pac_unavailable_fallback.route -cne 'direct' -or
+        $Policy.pac_unavailable_fallback.stages -cnotcontains $Stage) { return $null }
+    return @{ Ok = $true; MaxRoutes = $Policy.max_selections; MaxRedirects = $Policy.redirects.max_hops; PacFallbackStage = $Stage;
+        Routes = @(@{ Kind = 'direct'; Endpoint = ''; Source = 'pac_unavailable_direct'; Authentication = 'none' }) }
+}
+
 function Get-ErgoptiNetworkPolicy {
     param([Parameter(Mandatory=$true)][string]$Path)
     $Policy = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -37,7 +58,7 @@ function Get-ErgoptiNetworkPolicy {
     }
     foreach ($Inventory in @($Policy.allowed_proxy_schemes,
         $Policy.environment_precedence.http, $Policy.environment_precedence.https,
-        $Policy.environment_bypass_precedence,
+        $Policy.environment_bypass_precedence, $Policy.pac_unavailable_fallback.stages,
         $Policy.loopback.dns_hosts, $Policy.loopback.dns_suffixes,
         $Policy.loopback.ipv4_cidrs, $Policy.loopback.ipv6_addresses)) {
         if ($Inventory -isnot [array] -or $Inventory.Count -eq 0) { throw 'Invalid canonical proxy inventory.' }
@@ -263,7 +284,10 @@ function Resolve-ErgoptiNativeNetworkRoutes {
             } else {
                 if ($Config.PacUrl -ne '') { $null = Get-ErgoptiDestination $Config.PacUrl }
                 $Remaining = [int][Math]::Min($LookupBudget, $BudgetMs - $Clock.ElapsedMilliseconds)
-                if ($Remaining -lt 1500) { return New-ErgoptiRouteRefusal }
+                if ($Remaining -lt 1500) {
+                    $Fallback = New-ErgoptiPacDirectFallback $Policy 'native_proxy_budget'
+                    return $(if ($null -ne $Fallback) { $Fallback } else { New-ErgoptiRouteRefusal })
+                }
                 $Native = Resolve-ErgoptiFullUrlPac -DestinationUrl $DestinationUrl -PacUrl $Config.PacUrl -AutoDetect $Config.AutoDetect `
                     -Deadline ([ErgoptiNetworkPac]::CurrentTick() + $Remaining) -Policy $Policy
                 if (-not $Native.OwnersRetired) {
@@ -276,6 +300,8 @@ function Resolve-ErgoptiNativeNetworkRoutes {
                     $Config.PacUrl -eq '' -and $Config.AutoDetect) {
                     $Routes = Get-ErgoptiStaticRoutes $Destination $Config $Policy 'wpad_absent'
                 } elseif (-not $Native.Ok -or $Native.Kind -cne 'pac_routes') {
+                    $Fallback = New-ErgoptiPacDirectFallback $Policy (Get-ErgoptiPacFailureStage $Native)
+                    if ($null -ne $Fallback) { return $Fallback }
                     $Status = if ($Config.PacUrl -ne '') { 'pac_failed' } else { 'wpad_failed' }
                     return New-ErgoptiRouteRefusal $Native.Backend $Status $Native.NativeError ($Native.FailureOrigin -ceq 'native') $(if($Native.NativeErrorDomain -cin @('win32','winsock','posix')){$Native.NativeErrorDomain}else{'win32'})
                 } else {
