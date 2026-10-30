@@ -406,32 +406,6 @@ TestHSE_NoExplicitPriorityResolvesOverrideCascade() {
 Test("HSE no-explicit-priority registration honours the section override cascade",
     TestHSE_NoExplicitPriorityResolvesOverrideCascade)
 
-; Field report of 2026-10-30: a personal "sru" -> "SRU" (waits for a space)
-; never fired, because the bundled immediate "sru" -> "sur" expanded on the "u"
-; before any end character could let priority decide.
-TestHSE_HigherPriorityEndCharShadowsStar() {
-    HSE_TestReset()
-    HSE_Register("*", "sru", () => 0, Map("group", "bundled", "Priority", 10))
-    HSE_Register("", "sru", () => 0, Map("group", "personal", "Priority", 50))
-    HSE_FeedChar("s")
-    HSE_FeedChar("r")
-    AssertEqual("", HSE_FeedChar("u"),
-        "the bundled immediate entry waits for the personal one's terminator")
-    Match := HSE_FeedChar(" ")
-    AssertTrue(Match != "", "the personal entry fires on the space")
-    AssertEqual("personal", Match.Group)
-    HSE_TestReset()
-    HSE_Register("*", "sru", () => 0, Map("group", "bundled", "Priority", 10))
-    HSE_Register("", "sru", () => 0, Map("group", "lower", "Priority", 5))
-    HSE_FeedChar("s")
-    HSE_FeedChar("r")
-    Match := HSE_FeedChar("u")
-    AssertTrue(Match != "" && Match.Group == "bundled",
-        "a lower-priority end-char entry leaves the immediate one firing")
-}
-Test("HSE a higher-priority end-char entry shadows an immediate one of the same trigger",
-    TestHSE_HigherPriorityEndCharShadowsStar)
-
 TestHSE_NonStarTriggerNeedsEndChar() {
     HSE_TestReset()
     HSE_Register("", "btw", () => 0)

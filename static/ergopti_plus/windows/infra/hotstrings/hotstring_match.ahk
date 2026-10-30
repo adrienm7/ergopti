@@ -65,24 +65,6 @@ _HSE_Beats(Cand, Best) {
 		return CandSeq < BestSeq
 }
 
-; A star trigger expands as soon as its last character is typed, before any
-; end character exists, so an equal-length end-char trigger never gets to
-; compete with it. A higher-priority end-char entry of the same trigger (a
-; personal "sru" -> "SRU" over the bundled immediate "sru" -> "sur") would then
-; never fire: the star entry is shadowed by it and waits for the terminator.
-_HSE_StarShadowed(Spec, Suffix) {
-		global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_PRIORITY_COMMON
-		SpecPrio := Spec.HasOwnProp("Priority") ? Spec.Priority : HSE_PRIORITY_COMMON
-		for _, Candidates in [HSE_EndByTriggerCS.Get(Suffix, []), HSE_EndByTriggerCI.Get(StrLower(Suffix), [])] {
-				for _, EndSpec in Candidates {
-						EndPrio := EndSpec.HasOwnProp("Priority") ? EndSpec.Priority : HSE_PRIORITY_COMMON
-						if (EndSpec.Length == Spec.Length and EndPrio > SpecPrio)
-								return true
-				}
-		}
-		return false
-}
-
 ; Precedence for an end-char candidate against the current best, which may be a
 ; star match carried over from the star path. A star match only yields to a
 ; STRICTLY longer end-char trigger — this preserves the long-standing rule that
@@ -207,8 +189,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 						; Case-sensitive triggers: exact suffix key.
 						if HasCS and HSE_StarByTriggerCS.Has(Suffix) {
 								for _, Spec in HSE_StarByTriggerCS[Suffix] {
-										if !_HSE_CaseConformAllows(HSE_Buffer, Spec) or !_HSE_Beats(Spec, BestMatch)
-												or _HSE_StarShadowed(Spec, Suffix) {
+										if !_HSE_CaseConformAllows(HSE_Buffer, Spec) or !_HSE_Beats(Spec, BestMatch) {
 												continue
 										}
 										if _HSE_WordBoundaryAllows(HSE_Buffer, Spec) {
@@ -222,8 +203,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 								LowerSuffix := StrLower(Suffix)
 								if HSE_StarByTriggerCI.Has(LowerSuffix) {
 										for _, Spec in HSE_StarByTriggerCI[LowerSuffix] {
-												if !_HSE_CaseConformAllows(HSE_Buffer, Spec) or !_HSE_Beats(Spec, BestMatch)
-														or _HSE_StarShadowed(Spec, Suffix) {
+												if !_HSE_CaseConformAllows(HSE_Buffer, Spec) or !_HSE_Beats(Spec, BestMatch) {
 														continue
 												}
 												if _HSE_WordBoundaryAllows(HSE_Buffer, Spec) {

@@ -87,32 +87,6 @@ helpers.describe("shared hotstring engine — suffix matching", function()
 			.. "the AutoHotkey * flag ignored, so the user's word is rewritten as they type it")
 	end)
 
-	helpers.it("a higher-priority end-char entry of the same trigger shadows an immediate one", function()
-		-- Field report of 2026-10-30: a personal "sru" -> "SRU" (waits for a
-		-- space) never fired, because the bundled immediate "sru" -> "sur" expanded
-		-- on the "u" before any end character could let priority decide.
-		local function feed(mappings, chars)
-			local e = engine_mod.new()
-			e:load_mappings(mappings)
-			local result
-			for _, ch in ipairs(chars) do
-				result = e:on_char(ch, ch == " " and { is_terminator = true, terminator_consumed = false } or nil)
-			end
-			return result
-		end
-		local bundled = { auto_expand = true, trigger = "sru", replacement = "sur", priority = 10 }
-		local personal = { auto_expand = false, trigger = "sru", replacement = "SRU", priority = 50 }
-		helpers.assert_true(feed({ bundled, personal }, { "s", "r", "u" }) == nil,
-			"the bundled immediate entry must wait for the personal one's terminator")
-		local result = feed({ bundled, personal }, { "s", "r", "u", " " })
-		helpers.assert_true(result ~= nil, "the personal entry fires on the space")
-		helpers.assert_eq("SRU", result.replacement, "the personal replacement wins")
-		local lower = { auto_expand = false, trigger = "sru", replacement = "SRU", priority = 5 }
-		result = feed({ bundled, lower }, { "s", "r", "u" })
-		helpers.assert_true(result ~= nil and result.replacement == "sur",
-			"a lower-priority end-char entry leaves the immediate one firing")
-	end)
-
 	helpers.it("the same trigger WITH auto_expand does fire there", function()
 		-- The contrast, so the case above cannot pass through an engine that simply
 		-- never matches anything.
