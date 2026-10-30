@@ -20,6 +20,8 @@
 ---    one request to a loopback server this check owns.
 --- 6. network_hosts: every external host the drivers declare answers one HEAD
 ---    through the managed transport (route lookup, proxy, TLS), by its key.
+--- 7. app_health: the app's memory and CPU at idle, and the crash reports the
+---    driver or macOS wrote for it during the last day.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only, like the Debug checks: nothing is granted, prompted, written
@@ -505,6 +507,49 @@ function M.network_hosts(ports, report, finish)
 			else
 				report.step("host_" .. key, STATE.fail, code == nil and "helper_unavailable" or "no_answer")
 			end
+		end
+		finish()
+	end)
+end
+
+
+
+
+
+-- =============================
+-- =============================
+-- ======= 7/ App health =======
+-- =============================
+-- =============================
+
+local PS = "/bin/ps"
+
+--- Reads `ps -o rss=,%cpu=` output.
+--- @param output any Command output.
+--- @return number|nil rss_kb, number|nil cpu_percent
+function M.parse_usage(output)
+	local rss, cpu = tostring(output or ""):match("^%s*(%d+)%s+([%d.,]+)")
+	if not rss then return nil, nil end
+	return tonumber(rss), tonumber((cpu:gsub(",", ".")))
+end
+
+--- The app's resident memory and CPU share while the field run waits between
+--- steps, and the crash reports of the last day: the driver's own (a Lua
+--- fatal it caught) and the ones macOS wrote for this app or its helpers. A
+--- crash report fails its step with the count; the reports themselves stay on
+--- the Mac, and the day log names what each one was.
+function M.app_health(ports, report, finish)
+	local crashes = ports.crash_counts()
+	report.step("driver_crash_reports_24h", (crashes.driver or 0) == 0 and STATE.pass or STATE.fail, crashes.driver or 0)
+	report.step("system_crash_reports_24h", (crashes.system or 0) == 0 and STATE.pass or STATE.fail, crashes.system or 0)
+	ports.exec(PS, { "-o", "rss=,%cpu=", "-p", tostring(ports.pid()) }, COMMAND_TIMEOUT, function(code, output)
+		local rss, cpu = M.parse_usage(code == 0 and output or "")
+		if not rss then
+			report.step("app_rss_mb", STATE.fail, failure_token(code))
+			report.step("app_cpu_pct", STATE.skip, "unreadable")
+		else
+			report.step("app_rss_mb", STATE.info, math.floor(rss / 1024))
+			report.step("app_cpu_pct", STATE.info, string.format("%.1f", cpu or 0))
 		end
 		finish()
 	end)
