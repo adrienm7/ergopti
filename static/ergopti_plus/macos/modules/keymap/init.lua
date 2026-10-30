@@ -22,6 +22,7 @@ local text_utils = require("infra.text_utils")
 local EventProvenance = require("adapters.event_provenance")
 local KeyboardGeometry = require("adapters.keyboard_geometry")
 local ControlSentinels = require("modules.keymap.control_sentinels")
+local SelftestGate = require("modules.keymap.selftest_gate")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
 local km_utils   = require("modules.keymap.utils")
@@ -2094,6 +2095,19 @@ local function onKeyDown(e)
 		HotPath.log_if_slow("keydown", t0_hot)
 		return true, fence_events
 	end
+	-- A field-run selftest key is the driver's own output, typed to prove this
+	-- very path. It is decoded as typing only while the field run's scratch
+	-- window has the focus; anywhere else it is consumed, so no application
+	-- receives it. An admitted key takes no physical fence: a fenced replay
+	-- would carry a physical tag and lose the class for every other tap.
+	local selftest_admitted = false
+	if provenance and provenance.selftest == true then
+		if not SelftestGate.admits(provenance) then
+			HotPath.log_if_slow("keydown", t0_hot)
+			return true
+		end
+		provenance, provenance_status, selftest_admitted = nil, EventProvenance.STATUS_FOREIGN, true
+	end
 	if provenance_status ~= EventProvenance.STATUS_OWNED then _user_hotstring_input = {} end
 
 	-- Synthetic injectors reached below build tagged Quartz events instead of
@@ -2144,8 +2158,8 @@ local function onKeyDown(e)
 	if t0 then Perf.sample("keymap_keydown", t0) end
 	HotPath.log_if_slow("keydown", t0_hot)
 	-- Owned echoes are the driver's own output; only physical presses (replays
-	-- included) enter the integrity ring.
-	if provenance_status ~= EventProvenance.STATUS_OWNED then
+	-- included) enter the integrity ring, never an admitted selftest key.
+	if provenance_status ~= EventProvenance.STATUS_OWNED and not selftest_admitted then
 		KeystrokeIntegrity.note(not ok and "error" or (result == true and "consumed" or "passed"))
 	end
 	if not ok then
@@ -2198,6 +2212,11 @@ loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
 	end
 	local fence_events = fence and fence.events or nil
 	if fence and fence.consume_original == true then return true, fence_events end
+	-- The release of a selftest key follows its press's rule (keyDown wrapper).
+	if provenance and provenance.selftest == true then
+		if not SelftestGate.admits(provenance) then return true, fence_events end
+		provenance, status = nil, EventProvenance.STATUS_FOREIGN
+	end
 	if provenance and (provenance.loopback or provenance.stale_loopback) then
 		return true, fence_events
 	end
@@ -2255,6 +2274,11 @@ shift_tap = eventtap.new(
 			e, "keymap.shift")
 		local fence_events = fence and fence.events or nil
 		if fence and fence.consume_original == true then return true, fence_events end
+		-- A selftest modifier edge follows the selftest key rule (keyDown wrapper).
+		if provenance and provenance.selftest == true then
+			if not SelftestGate.admits(provenance) then return true, fence_events end
+			provenance, provenance_status = nil, EventProvenance.STATUS_FOREIGN
+		end
 		if provenance then return false end
 		_user_hotstring_input = {}
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
