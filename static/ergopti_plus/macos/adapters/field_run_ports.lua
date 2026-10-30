@@ -205,14 +205,15 @@ end
 -- =============================
 -- =============================
 
---- The catalogue's smallest model for a backend.
+--- The catalogue's smallest model for a backend, an installed one first.
 --- @param backend string "ollama" or "mlx".
+--- @param installed function|nil fn(model) -> boolean.
 --- @return table|nil model
-local function smallest_model(backend)
+local function smallest_model(backend, installed)
 	local path = require("infra.paths").shared_llm_path("models.json")
 	local text = path and FileSystem.read(path) or nil
 	if type(text) ~= "string" then return nil end
-	return require("infra.field_run").smallest_model(Json.decode(text), backend)
+	return require("infra.field_run").smallest_model(Json.decode(text), backend, installed)
 end
 
 --- The AI menu's models manager, or nil before the menu exists.
@@ -365,7 +366,7 @@ local function mlx_model(finish)
 	if Llm.get_backend() == "mlx" and Llm.get_runtime_llm_enabled() == true then
 		return finish("skip", { "mlx_backend_in_use" })
 	end
-	local model = smallest_model("mlx")
+	local model = smallest_model("mlx", function(candidate) return manager.mlx_model_installed(candidate.name) end)
 	if not model then return finish("fail", { "no_catalogue_model" }) end
 	local report = { model = model.name, download_gb = model.download_gb }
 	local before = manager.mlx_model_installed(model.name)
