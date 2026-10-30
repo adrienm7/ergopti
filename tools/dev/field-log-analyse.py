@@ -1437,6 +1437,10 @@ def main():
                         prefix: value for prefix, (value, _source, _inclusive) in budgets.items()
                     },
                     "segments": {label: value for label, (value, _source) in segments.items()},
+                    "sources": sorted(
+                        {source for _prefix, source, _pattern, _inclusive in BUDGETS}
+                        | {WINDOWS_SEGMENT_BUDGETS[0]}
+                    ),
                 },
                 sort_keys=True,
             )
