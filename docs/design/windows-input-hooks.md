@@ -212,6 +212,49 @@ plus up to 64 ms if the settle pass is the one that matters), a physical key
 reaches AutoHotkey's hook first. A reinstall is not seen by a callback in flight:
 both hooks live only inside one non-pumping stretch of the hook thread.
 
+## SendInput consumers: the decision per site (2026-10-30)
+
+Question left by item 49: can a remaining SendInput consumer avoid SendInput, or
+be made order-independent, without a new DLL? Answer: no site should change, and
+the consumers that could have depended on the order no longer do. Nothing in
+AutoHotkey is left to implement; `tools/test/test-windows-sendinput-consumers.cjs`
+pins this list, so a new site needs a decision here first.
+
+| Site                                  | Keeps SendInput because                                                                                                                                                                                                                                                |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adapters/text_sender.ahk`            | Predictions and paste: measured 56 against 191 ms, and the burst is atomic, so a physical key cannot land inside an accepted text. SendEvent would trade that for nothing, since the order no longer decides anything.                                                 |
+| `infra/hotstrings/hotstring_send.ahk` | The HSE dispatch: measured 51 against 137 ms, one atomic erase and replacement. The terminal burst stays SendEvent, for its pacing only.                                                                                                                               |
+| `infra/config_io.ahk`                 | One key given back when a script chord lost its action. It must stay: its hotkey is at a higher `#InputLevel` than a level-0 SendEvent, which could fire the chord again, while SendInput hides the key from this script's own hook. It is rare and outside any burst. |
+| `infra/input_probe.ahk`               | The measurements of items 49 and 50 themselves, in a window the check owns.                                                                                                                                                                                            |
+
+Why the order no longer decides anything:
+
+- Each key's decision belongs to one hook. The native owner never cycles (its two
+  contract routes are parked on an impossible scan code) and the cycle chords are
+  AutoHotkey's (`menu_llm/tab_accept.ahk`). A digit jump or an accepted Tab shares
+  one committed plan: whichever hook runs first consumes the press, and the other
+  never sees it. Neither order drops or doubles it.
+- The physical key generation collapses the two InputHooks' callbacks for one
+  key-down whichever runs first (`KS_RecordPhysicalKeyDown`).
+- The owner reinstalls its hook after every burst (above), which only narrows the
+  window in which AutoHotkey decides first; it no longer guards correctness.
+
+### What still needs a genuine MSVC DLL (item 91)
+
+None of this can be done from AutoHotkey, which cannot read `dwExtraInfo`:
+
+1. A native physical-state query, so that the AltGr prefix (`IsRealAltGrPress`),
+   the KLE Shift read and the tap-hold roll can treat a replayed edge as physical.
+2. The single-hook or RawInput source for simultaneous and first-key hold
+   arbitration, and with it AltGr hook provenance.
+3. Event-specific capture, source pin, authenticated event stream, non-hook
+   handler conversion and chained or repeat semantics, all built on 1.
+4. Removing the parked cycle routes, which only the DLL's `NavPlanIsValid`
+   requires.
+
+The physical terminal capture list above stays open: it says what a user sees
+during a capture, a separate question from the order.
+
 ## Handover patches (checked against the tree, 2026-10-23)
 
 The four pending patches of the retired `docs/handovers/2026-10-12-dev-consolidation/` no
