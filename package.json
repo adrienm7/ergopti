@@ -194,7 +194,6 @@
 		"test:hs-config-fold": "node ./tools/test/test-hotstrings-config-window-fold.cjs",
 		"test:report-button-contrast": "node ./tools/test/test-report-button-contrast.cjs",
 		"test:metrics-open-rows-wording": "node ./tools/test/test-metrics-open-rows-wording.cjs",
-		"test:color-presets-parity": "node ./tools/test/test-color-presets-parity.cjs",
 		"test:hex-colours": "node ./tools/test/test-hex-colours.cjs",
 		"test:shared-ui-theme": "node ./tools/test/test-shared-ui-theme.cjs",
 		"test:prompt-editor-bridge": "node ./tools/test/test-prompt-editor-bridge.cjs",

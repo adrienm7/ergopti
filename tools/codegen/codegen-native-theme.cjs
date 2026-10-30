@@ -6,14 +6,15 @@
  * DESCRIPTION:
  * Projects _shared/data/native_theme.toml (the hotstring colour palette and the
  * download-window accents) into _shared/lua/native_theme_data.lua, the module
- * the macOS and Linux drivers require instead of typing the colours again.
+ * the macOS and Linux drivers require, and the palette into
+ * windows/_generated/native_theme.ahk, instead of typing the colours again.
  *
  * WHY THIS EXISTS:
  * The palette was written in the macOS window, the Linux bridge and the Windows
  * helper, and a gate had to keep the copies equal. The shared hotstrings TOML
- * reader has no array support, so the Lua drivers cannot read an ordered
- * palette at runtime; a generated table has no such limit and costs no file
- * read at startup.
+ * reader has no array support, so no driver can read an ordered palette at
+ * runtime; a generated table has no such limit and costs no file read at
+ * startup.
  *
  * USAGE:  node tools/codegen/codegen-native-theme.cjs
  * ==============================================================================
@@ -27,6 +28,7 @@ const { shared } = require('../lib/paths.cjs');
 
 const SOURCE = shared('data', 'native_theme.toml');
 const TARGET = shared('lua', 'native_theme_data.lua');
+const AHK_TARGET = shared('..', 'windows', '_generated', 'native_theme.ahk');
 const LOCALE_SOURCE = shared('data', 'locales', 'en.json');
 const TOOLTIP_SOURCE = shared('modules', 'tooltip', 'constants.toml');
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -145,8 +147,38 @@ function emit(theme, accentColors) {
 	].join('\n');
 }
 
+/**
+ * Renders the AHK palette: one function returning a fresh Array of Maps, because
+ * the window translates the labels when it opens.
+ * @param {object} theme The validated theme.
+ * @param {object} accentColors The tooltip constants' [accent_colors] table.
+ * @returns {string} The module text, with the UTF-8 BOM every AHK source carries.
+ */
+function emitAhk(theme, accentColors) {
+	const rows = theme.hotstring_palette.map(
+		(row) =>
+			`\t\tMap("Name", "${row.name}", "I18n", "${row.i18n}", "Hex", "${resolveHex(row, accentColors)}"),`
+	);
+	return [
+		'﻿; _generated/native_theme.ahk',
+		'; AUTO-GENERATED from _shared/data/native_theme.toml.',
+		'; DO NOT EDIT BY HAND: run `npm run gen` to refresh.',
+		'#Requires AutoHotkey v2.0',
+		'',
+		'; The ordered palette of the hotstrings settings window, the 14 colours the three drivers offer.',
+		'; @returns {Array} Maps { Name, I18n, Hex }, in the order of the source.',
+		'NativeThemeHotstringPalette() {',
+		'\treturn [',
+		...rows,
+		'\t]',
+		'}',
+		''
+	].join('\n');
+}
+
 const theme = toml.parse(fs.readFileSync(SOURCE, 'utf8'));
 const accentColors = toml.parse(fs.readFileSync(TOOLTIP_SOURCE, 'utf8')).accent_colors;
 validate(theme, JSON.parse(fs.readFileSync(LOCALE_SOURCE, 'utf8')), accentColors);
 fs.writeFileSync(TARGET, emit(theme, accentColors), 'utf8');
+fs.writeFileSync(AHK_TARGET, emitAhk(theme, accentColors), 'utf8');
 console.log('[OK] Generated the shared native theme data.');

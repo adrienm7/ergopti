@@ -674,13 +674,13 @@ function checkMacOsPathIntegrity() {
 const THEME_OWNER_FILES = new Set([
 	'static/ergopti_plus/_shared/ui/theme.css',
 	'static/ergopti_plus/_shared/data/native_theme.toml',
-	'static/ergopti_plus/_shared/lua/native_theme_data.lua'
+	'static/ergopti_plus/_shared/lua/native_theme_data.lua',
+	'static/ergopti_plus/windows/_generated/native_theme.ahk'
 ]);
 const HEX_BASELINE_PATH = join(REPO_ROOT, 'tools/lint/hex-literal-baseline.json');
 
-// The literals each file may still spell, from before the theme existed (the
-// Windows driver's included: its palette awaits an AHK emitter). A file may
-// only go down: a rise is a new literal outside the theme, and a drop must
+// The literals each file may still spell, from before the theme existed. A file
+// may only go down: a rise is a new literal outside the theme, and a drop must
 // lower the entry so the debt cannot grow back unnoticed.
 function checkHexLiteralsOutsideTheme() {
 	const found = new Map();
