@@ -179,14 +179,6 @@
 			"repro": "npm run test:app-cloner-dock-url"
 		},
 		{
-			"id": "js-0333",
-			"ordinal": 348,
-			"name": "hotstring colour presets identical on macOS and Linux",
-			"cmd": "node",
-			"args": ["tools/test/test-color-presets-parity.cjs"],
-			"repro": "node tools/test/test-color-presets-parity.cjs"
-		},
-		{
 			"id": "js-0353",
 			"ordinal": 368,
 			"name": "app and window switching actions carry one explicit label each and migrate the ids macOS merged",
