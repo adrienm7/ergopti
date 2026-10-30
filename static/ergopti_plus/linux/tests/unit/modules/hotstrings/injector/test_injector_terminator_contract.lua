@@ -193,7 +193,7 @@ helpers.describe("linux daemon: output is the logical commit boundary", function
 		local delivery_at = match_path:find("delivery.ok == true", 1, true)
 		local commit_guard_at = match_path:find("if expansion_committed then", 1, true)
 		local metrics_at = match_path:find("keystats.record_hotstring(", 1, true)
-		local undo_at = match_path:find("_undoable = {", 1, true)
+		local undo_at = match_path:find("_undoable = not parsed_output and {", 1, true)
 		local apply_guard_at = match_path:find("if expansion_committed then",
 			(commit_guard_at or 0) + 1, true)
 		local apply_at = match_path:find("engine:apply_expansion(result)", 1, true)
