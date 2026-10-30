@@ -1820,6 +1820,11 @@ global LLM_THINKING_REFUSED_KEY := "llm_thinking_refused"
 ; field: original id -> the retry's id, so a cancel reaches the retry
 global _LLM_Remote_RetryOf := Map()
 
+; Epoch seconds, the clock the refusal store is stamped with.
+_LLMRemoteEpochNow() {
+    return DateDiff(A_NowUTC, "19700101000000", "Seconds")
+}
+
 ; The refusal store, read from the local state store on first use.
 _LLMRemoteThinkingRefused() {
     global _LLM_ThinkingRefused, LLM_THINKING_REFUSED_KEY
@@ -1829,7 +1834,10 @@ _LLMRemoteThinkingRefused() {
     try Stored := ST_Get(LLM_THINKING_REFUSED_KEY, "")
     catch as Err
         try LoggerError("LLM.remote", "The refused thinking fields could not be read ({1}); they are learned again.", Err.Message)
-    _LLM_ThinkingRefused := LLM_ThinkingOffRefusalsParse(Stored, &Dropped)
+    global LLM_THINKING_FAMILIES
+    ; No families table: nothing is remembered
+    Expiry := LLM_THINKING_FAMILIES.HasOwnProp("ExpirySec") ? LLM_THINKING_FAMILIES.ExpirySec : 0
+    _LLM_ThinkingRefused := LLM_ThinkingOffRefusalsParse(Stored, _LLMRemoteEpochNow(), Expiry, &Dropped)
     if (Dropped > 0)
         try LoggerWarn("LLM.remote", "{1} malformed refused thinking field entr(ies) dropped.", Dropped)
     return _LLM_ThinkingRefused
@@ -1887,13 +1895,13 @@ _LLMRemoteThinkingRefusal(Resolved, Info, Added, &Body) {
         return false
     Refused := _LLMRemoteThinkingRefused()
     Provider := Resolved.Get("Provider", ""), Model := Resolved.Get("Model", "")
-    if !LLM_ThinkingOffRecordRefusal(Refused, Provider, Model, Field) {
+    if !LLM_ThinkingOffRecordRefusal(Refused, Provider, Model, Field, _LLMRemoteEpochNow()) {
         ; Skipped for this session all the same; only the restart forgets it
-        Refused[Provider . "|" . Model] := Map(Field, true)
+        Refused[Provider . "|" . Model] := Map(Field, _LLMRemoteEpochNow())
         try LoggerWarn("LLM.remote", "The refused thinking fields are full: '{1}' for model {2} is not remembered.", Field, Model)
     } else {
         Saved := false
-        try Saved := ST_Set(LLM_THINKING_REFUSED_KEY, LLM_ThinkingOffRefusalsExport(Refused))
+        try Saved := ST_Set(LLM_THINKING_REFUSED_KEY, Refused)
         if !Saved
             try LoggerError("LLM.remote", "The refused thinking fields could not be saved; they hold until the next restart.")
     }

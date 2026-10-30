@@ -1,6 +1,6 @@
 {
 	"description": "Thinking-off resolution, replayed by _shared/lua/llm/thinking_off.lua (macOS and Linux suites) and its AutoHotkey port _shared/modules/llm/thinking_off.ahk (Windows suite) over the shipped _shared/modules/llm/thinking_off.json families and api_providers.json thinking_dialect, so the drivers cannot drift.",
-	"rule": "normalize_vectors: lowercase, last path segment, an Ollama :tag dropped. glob_vectors: a glob matches the whole id, ignoring case, * the only wildcard. merge_vectors: fields deep-merged into body give expected (the body wins at every level); added lists the paths added. resolve_vectors: the model's family (first match on the normalized id) through the provider's dialect (first control kind it carries, $level filled) merged into body gives expected; family is its 1-based index and kind the control applied, both absent when none. refusal_vectors: after resolution, an HTTP 400 whose message names an added key (snake or camel; a generic leaf as parent.leaf) refuses its top-level field, stripped from the body (expected); field absent when nothing is refused. refused_vectors: a refused top-level field is never added. family_parse_vectors and dialect_parse_vectors: accepted whole (valid true) or refused whole. sampling_vectors: whether the model's family accepts only the default sampling (no temperature sent). refusal_store_vectors: a persisted store keeps each \"<provider>|<model>\" key with its valid field names; a key with none, or without |, is dropped and counted.",
+	"rule": "normalize_vectors: lowercase, last path segment, an Ollama :tag dropped. glob_vectors: a glob matches the whole id, ignoring case, * the only wildcard. merge_vectors: fields deep-merged into body give expected (the body wins at every level); added lists the paths added. resolve_vectors: the model's family (first match on the normalized id) through the provider's dialect (first control kind it carries, $level filled) merged into body gives expected; family is its 1-based index and kind the control applied, both absent when none. refusal_vectors: after resolution, an HTTP 400 whose message names an added key (snake or camel; a generic leaf as parent.leaf) refuses its top-level field, stripped from the body (expected); field absent when nothing is refused. refused_vectors: a refused top-level field is never added. family_parse_vectors and dialect_parse_vectors: accepted whole (valid true) or refused whole. sampling_vectors: whether the model's family accepts only the default sampling (no temperature sent). refusal_store_vectors: a persisted store \"<provider>|<model>\" -> field -> epoch second keeps each valid field refused less than refusal_expiry_days (thinking_off.json) before now and not after it; a key left with none, or without |, is dropped and counted.",
 	"normalize_vectors": [
 		{
 			"model": "GPT-5.1",
@@ -1747,7 +1747,8 @@
 		{
 			"id": "family_not_object",
 			"table": {
-				"families": ["x"]
+				"families": ["x"],
+				"refusal_expiry_days": 30
 			},
 			"valid": false
 		},
@@ -1765,7 +1766,8 @@
 							}
 						]
 					}
-				]
+				],
+				"refusal_expiry_days": 30
 			},
 			"valid": false
 		},
@@ -1782,7 +1784,8 @@
 							}
 						]
 					}
-				]
+				],
+				"refusal_expiry_days": 30
 			},
 			"valid": false
 		},
@@ -1800,7 +1803,8 @@
 							}
 						]
 					}
-				]
+				],
+				"refusal_expiry_days": 30
 			},
 			"valid": false
 		},
@@ -1818,7 +1822,8 @@
 							}
 						]
 					}
-				]
+				],
+				"refusal_expiry_days": 30
 			},
 			"valid": false
 		},
@@ -1830,7 +1835,8 @@
 						"models": ["a b"],
 						"controls": []
 					}
-				]
+				],
+				"refusal_expiry_days": 30
 			},
 			"valid": false
 		},
@@ -1842,7 +1848,8 @@
 						"models": [],
 						"controls": []
 					}
-				]
+				],
+				"refusal_expiry_days": 30
 			},
 			"valid": false
 		},
@@ -1855,7 +1862,8 @@
 						"controls": [],
 						"extra": 1
 					}
-				]
+				],
+				"refusal_expiry_days": 30
 			},
 			"valid": false
 		},
@@ -1868,7 +1876,8 @@
 						"controls": [],
 						"_family": "doc"
 					}
-				]
+				],
+				"refusal_expiry_days": 30
 			},
 			"valid": true
 		},
@@ -1890,9 +1899,35 @@
 							}
 						]
 					}
-				]
+				],
+				"refusal_expiry_days": 30
 			},
 			"valid": true
+		},
+		{
+			"id": "no_refusal_expiry",
+			"table": {
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				]
+			},
+			"valid": false
+		},
+		{
+			"id": "fractional_refusal_expiry",
+			"table": {
+				"refusal_expiry_days": 1.5,
+				"families": [
+					{
+						"models": ["a"],
+						"controls": []
+					}
+				]
+			},
+			"valid": false
 		}
 	],
 	"dialect_parse_vectors": [
@@ -2023,29 +2058,66 @@
 	"refusal_store_vectors": [
 		{
 			"id": "kept",
+			"now": 1793000000,
 			"stored": {
-				"openai|gpt-5.1": ["reasoning_effort"]
+				"openai|gpt-5.1": {
+					"reasoning_effort": 1792913600
+				}
 			},
 			"refused": {
-				"openai|gpt-5.1": ["reasoning_effort"]
+				"openai|gpt-5.1": {
+					"reasoning_effort": 1792913600
+				}
 			},
 			"dropped": 0
 		},
 		{
-			"id": "malformed_entries_dropped",
+			"id": "expired_refusal_forgotten",
+			"now": 1793000000,
 			"stored": {
-				"openai|gpt-5.1": ["reasoning_effort", "bad-name", 3],
-				"nobar": ["thinking"],
-				"x|y": "thinking",
-				"a|b": []
+				"openai|gpt-5.1": {
+					"reasoning_effort": 1790408000
+				}
+			},
+			"refused": {},
+			"dropped": 1
+		},
+		{
+			"id": "future_stamp_dropped",
+			"now": 1793000000,
+			"stored": {
+				"openai|gpt-5.1": {
+					"reasoning_effort": 1793000010
+				}
+			},
+			"refused": {},
+			"dropped": 1
+		},
+		{
+			"id": "malformed_entries_dropped",
+			"now": 1793000000,
+			"stored": {
+				"openai|gpt-5.1": {
+					"reasoning_effort": 1793000000,
+					"bad-name": 1793000000,
+					"x": "soon"
+				},
+				"nobar": {
+					"thinking": 1793000000
+				},
+				"x|y": ["thinking"],
+				"a|b": {}
 			},
 			"refused": {
-				"openai|gpt-5.1": ["reasoning_effort"]
+				"openai|gpt-5.1": {
+					"reasoning_effort": 1793000000
+				}
 			},
 			"dropped": 3
 		},
 		{
 			"id": "not_an_object",
+			"now": 1793000000,
 			"stored": ["x"],
 			"refused": {},
 			"dropped": 1

@@ -447,6 +447,9 @@ local function thinking_refused_path()
 		or (require("infra.config_paths").state_home() .. "/" .. THINKING_REFUSED_FILE)
 end
 
+-- Defined below; declared here for thinking_refused, which reads its expiry
+local thinking_families
+
 --- The refusal store, read from its state file on first use. An unreadable
 --- file is logged and the refusals are learned again.
 --- @return table key -> set of field names.
@@ -464,7 +467,7 @@ local function thinking_refused()
 		Logger.error(LOG, "The refused thinking fields could not be read; they are learned again.")
 	end
 	local dropped
-	_thinking_refused, dropped = ThinkingOff.refusals_parse(stored)
+	_thinking_refused, dropped = ThinkingOff.refusals_parse(stored, os.time(), thinking_families().expiry_sec or 0) -- no families table: nothing is remembered
 	if dropped > 0 then Logger.warn(LOG, "%d malformed refused thinking field entr(ies) dropped.", dropped) end
 	return _thinking_refused
 end
@@ -476,7 +479,7 @@ local function save_thinking_refused()
 	local dir = require("native_path").dirname(path)
 	local Shell = require("adapters.shell_runner")
 	if dir and not Shell.run("mkdir -p " .. Shell.quote(dir) .. " 2>/dev/null") then return false end
-	local text = Json.encode(ThinkingOff.refusals_export(_thinking_refused))
+	local text = Json.encode(_thinking_refused)
 	local temp = path .. ".tmp"
 	-- A temporary file a crash left behind would refuse the exclusive creation
 	if io.open(temp, "r") then os.remove(temp) end
@@ -502,7 +505,7 @@ end
 --- The model families, loaded at their first use. An unreadable table is
 --- logged and turns nothing off: no guess.
 --- @return table families
-local function thinking_families()
+function thinking_families()
 	if _thinking_families then return _thinking_families end
 	local path = Paths.shared("modules/llm/thinking_off.json")
 	local fh = path and io.open(path, "r")
@@ -557,9 +560,9 @@ function M.thinking_refusal(provider_id, model, result, added, body)
 	if type(result) ~= "table" then return false end
 	local field = ThinkingOff.refused_field(result.status, M.server_message(result.error_body), added)
 	if not field then return false end
-	if not ThinkingOff.record_refusal(thinking_refused(), provider_id, model, field) then
+	if not ThinkingOff.record_refusal(thinking_refused(), provider_id, model, field, os.time()) then
 		-- Skipped for this session all the same; only the restart forgets it
-		_thinking_refused[provider_id .. "|" .. model] = { [field] = true }
+		_thinking_refused[provider_id .. "|" .. model] = { [field] = os.time() }
 		Logger.warn(LOG, "The refused thinking fields are full: '%s' for model %s is not remembered.", field, model)
 	elseif not save_thinking_refused() then
 		Logger.error(LOG, "The refused thinking fields could not be saved; they hold until the next restart.")

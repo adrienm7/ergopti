@@ -824,7 +824,8 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       predictions, the Test-API probe, translation, tone, the screen reading and the agent. An HTTP 400 naming
       an added field is retried once without it (WARN) and remembered for that provider and model. Ollama
       bodies send `think:false`; local servers keep their `request_fields`. The refusals persist across
-      restarts (macOS settings, Linux state file, Windows state store; 200 pairs at most), a cancelled
+      restarts (macOS settings, Linux state file, Windows state store; 200 pairs at most) and expire after
+      `refusal_expiry_days` (thinking_off.json) so a later provider fix is picked up, a cancelled
       Windows prediction also cancels its retry, and the families that accept only the default sampling
       (Claude Opus 4.7+, Sonnet 5/5.5, Haiku 5.5, Fable, Mythos) are sent no temperature. Left: (1) no
       capability discovery (OpenRouter `/models` `supported_parameters`, Anthropic Models API
