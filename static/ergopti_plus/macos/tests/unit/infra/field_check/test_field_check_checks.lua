@@ -39,6 +39,7 @@ local function make_ports(overrides)
 		end,
 		health_counts = function() return { lease = {}, ups_without_down = 0, downs_without_up = 0, stuck = 0 } end,
 		swallowed_keys = function() return 0 end,
+		deploy_facts = function() return nil end,
 		count_keys = function(_, callback) callback({ tap_running = true, presses = 10 }) end,
 		owned_readiness = function(callback)
 			callback({ unpinned = 6, source = false, helper_present = false, active = 0 })
@@ -124,6 +125,17 @@ helpers.describe("lease check", function()
 		helpers.assert_eq(steps.swallowed_keys.value, "2")
 		helpers.assert_true(not result.passed, "a dropped letter the driver saw fails the lease check")
 		helpers.assert_eq(steps.lease_failure_kinds.value, "none")
+	end)
+
+	helpers.it("names the last karabiner.json write, size and time (lease-deploy-write)", function()
+		local ports, world = make_ports({ deploy_facts = function() return { bytes = 760832, write_ms = 41.6 } end })
+		world.existing[CLI] = true
+		local steps = run("lease", ports)
+		helpers.assert_eq(steps.deploy_write_ms.state, "info")
+		helpers.assert_eq(steps.deploy_write_ms.value, "42")
+		helpers.assert_eq(steps.deploy_kb.value, "743")
+		local quiet = make_ports()
+		helpers.assert_eq(run("lease", quiet).deploy_write_ms.value, "none", "no deploy this session is named")
 	end)
 
 	helpers.it("names the free memory, for the starvation hypothesis (lease-memory-free)", function()

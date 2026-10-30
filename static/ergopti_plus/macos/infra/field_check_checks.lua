@@ -185,6 +185,11 @@ function M.lease_with_facts(ports, report, finish, remap, waited)
 	report.step("swallowed_keys", swallowed == 0 and STATE.pass or STATE.fail, swallowed)
 	-- PONG and READY timeouts are the Apple silicon lease failures (117/140).
 	report.step("lease_failure_kinds", STATE.info, M.format_lease_kinds(counts.lease))
+	-- Every rule change rewrites karabiner.json on the main thread: a long write
+	-- is the stall that decides whether the file must shrink.
+	local deploy = ports.deploy_facts()
+	report.step("deploy_write_ms", STATE.info, deploy and math.floor(deploy.write_ms + 0.5) or "none")
+	report.step("deploy_kb", STATE.info, deploy and math.floor(deploy.bytes / 1024 + 0.5) or "none")
 	-- Starvation is their open explanation: the free memory names it.
 	local function memory_then_finish()
 		ports.exec(LeaseMemorySnapshot.TOOL, {}, COMMAND_TIMEOUT, function(code, output)
