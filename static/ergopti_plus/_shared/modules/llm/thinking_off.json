@@ -423,6 +423,15 @@
 			"_source": "https://docs.inceptionlabs.ai/capabilities/reasoning-efforts"
 		},
 		{
+			"_family": "ByteDance Doubao Seed: hybrid, thinking can be turned off",
+			"models": ["doubao-seed*"],
+			"controls": [
+				{ "kind": "toggle", "intent": "off" },
+				{ "kind": "effort", "intent": "off", "level": "none" }
+			],
+			"_source": "https://docs.volcengine.com/docs/82379/1449737"
+		},
+		{
 			"_family": "Generic: an unknown model whose name looks like a reasoning family gets thinking off through the provider's toggle (a field the provider refuses is dropped and remembered, see _comment)",
 			"models": ["*qwen3*", "*deepseek*", "*-r1*", "*think*", "*reasoning*"],
 			"controls": [
