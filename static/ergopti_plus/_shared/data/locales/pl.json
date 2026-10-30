@@ -1767,6 +1767,7 @@
 	"menu.llm.api_test_ok_title": "Test API zakończony powodzeniem",
 	"menu.llm.api_key_refused_body": "\"%s\" odpowiedział, ale odrzucił klucz — sprawdź token ustawiony na serwerze.",
 	"menu.llm.api_key_refused_title": "Klucz API odrzucony",
+	"menu.llm.api_key_no_secret_store": "Klucz API nie został zapisany: żadna usługa sekretów pulpitu go nie przyjęła ({1}). Ergopti+ nigdy nie zapisuje klucza jawnym tekstem. Uruchom pęk kluczy (GNOME Keyring, KWallet lub KeePassXC) i spróbuj ponownie.",
 	"menu.llm.api_unreachable_body": "\"%s\" nie odpowiedział — sprawdź token, URL i model.",
 	"menu.llm.api_unreachable_title": "Wpis API nieosiągalny",
 	"menu.llm.api_validated_body": "\"%s\" odpowiedział pomyślnie.",

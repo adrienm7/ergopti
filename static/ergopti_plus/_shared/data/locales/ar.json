@@ -1767,6 +1767,7 @@
 	"menu.llm.api_test_ok_title": "نجح اختبار واجهة API",
 	"menu.llm.api_key_refused_body": "استجاب \"%s\" لكنه رفض المفتاح — تحقق من الرمز المحدد في الخادم.",
 	"menu.llm.api_key_refused_title": "تم رفض مفتاح API",
+	"menu.llm.api_key_no_secret_store": "لم يتم حفظ مفتاح API: لم تقبله أي خدمة أسرار لسطح المكتب ({1}). لا يكتب Ergopti+ أي مفتاح كنص واضح أبدًا. شغّل حلقة المفاتيح (GNOME Keyring أو KWallet أو KeePassXC)، ثم أعد المحاولة.",
 	"menu.llm.api_unreachable_body": "\"%s\" لم يستجب — تحقق من الرمز والعنوان والنموذج.",
 	"menu.llm.api_unreachable_title": "إدخال API غير قابل للوصول",
 	"menu.llm.api_validated_body": "\"%s\" استجاب بنجاح.",
