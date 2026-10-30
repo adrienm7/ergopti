@@ -180,6 +180,30 @@ hook.pump = function() return 0 end
 -- write the count. The menu once held 103 058 rows — eight seconds of GTK at
 -- every rebuild — and nothing measured it.
 local MENU_ROWS_FILE = os.getenv("ERGOPTI_E2E_MENU_ROWS")
+--- How the composed root shows the unfinished AI agent (item 121): its row,
+--- the AI submenu beside it, and how many actions either row could run.
+--- @param items table Top-level rows the tray was handed.
+--- @return string receipt
+local function agent_receipt(items)
+	local i18n = require("infra.i18n")
+	local agent_title, ai_title = i18n.get("menu.agent.title"), i18n.get("menu.llm.title")
+	local function actions(row)
+		local n = type(row.fn) == "function" and 1 or 0
+		for _, child in ipairs(type(row.menu) == "table" and row.menu or {}) do n = n + actions(child) end
+		return n
+	end
+	local agent, ai
+	for _, item in ipairs(items) do
+		local title = type(item.title) == "string" and item.title or ""
+		if title:sub(1, #agent_title) == agent_title then agent = item end
+		if title:sub(1, #ai_title) == ai_title then ai = item end
+	end
+	if not agent then return "agent absent" end
+	return string.format("agent disabled=%s reason=%s actions=%d ai_actions=%s", tostring(agent.disabled == true),
+		tostring(agent.title:find(i18n.get("menu.agent.not_ready"), #agent_title + 1, true) ~= nil), actions(agent),
+		ai and (actions(ai) > 0 and "some" or "none") or "absent")
+end
+
 if MENU_ROWS_FILE then
 	arg[#arg + 1] = "--tray"
 	package.preload["platform.tray.appindicator"] = function()
@@ -198,6 +222,7 @@ if MENU_ROWS_FILE then
 			set_menu = function(items)
 				local fh = io.open(MENU_ROWS_FILE, "w")
 				fh:write(tostring(count(items)), "\n")
+				fh:write(agent_receipt(items), "\n")
 				fh:close()
 				return true
 			end,
