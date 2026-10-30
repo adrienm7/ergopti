@@ -309,12 +309,18 @@ package.preload["adapters.event_loop"] = function()
 				record("SCENARIO_FAILED", "the tray never built its menu context")
 			else
 				local GlobalScope = require("infra.global_scope")
-				local committed, report = GlobalScope.apply("recommended", GlobalScope.participants(menu_ctx))
+				-- The layout category may settle after a child answers: the loop runs on.
+				local settled
+				GlobalScope.apply("recommended", GlobalScope.participants(menu_ctx), function(committed, report)
+					settled = { committed = committed, report = report }
+				end)
+				soak(loop)
+				local committed, report = settled and settled.committed, settled and settled.report
 				record("FACT", "restore_committed=" .. tostring(committed))
 				if committed ~= true then
-					record("SCENARIO_FAILED", "the recommended restore did not commit: " .. tostring(report and report.detail))
+					record("SCENARIO_FAILED", "the recommended restore did not commit: "
+						.. tostring(settled == nil and "it never settled" or (report and report.detail)))
 				end
-				soak(loop)
 			end
 		elseif ACTION == "delimiters_add" or ACTION == "delimiters_verify" then
 			local Terminators = require("keymap.terminators")
