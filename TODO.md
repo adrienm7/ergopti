@@ -890,11 +890,6 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 
 ## Backlog (one line each)
 
-- [ ] **macOS tray test fake lacks `TimerScheduler.every`.** [CODE] Since 9d5cf69e76 (AI title dot watch, codex
-      branch) `tests/unit/ui/menu/tray/test_every_category_toggle_reachable.lua` fails 7 cases at
-      `macos/ui/menu/menu_llm/init.lua:245` (`attempt to call a nil value (field 'every')`): the timer
-      scheduler the menu reaches in that test has no `every`. Find which fixture leaves its stub loaded.
-
 - [ ] **macOS cold official-Ollama lane.** [CI] since bc09e4584c no product path calls the stock
       `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
       `runtime_install_offer.lua`), so the macOS "official cold Ollama without stock Python" lane only proves

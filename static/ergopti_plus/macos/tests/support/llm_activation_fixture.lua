@@ -567,6 +567,10 @@ local function build_fixture(backend, save_results, options)
 			handle.observers[#handle.observers + 1] = observer
 			return true
 		end,
+		-- The AI title dot's health watch repeats; the fixture never fires it.
+		every = function(_, callback)
+			return { timer = {}, callback = callback, observers = {} }, true
+		end,
 	}
 	package.loaded["ui.menu.menu_llm.activation_pause_owner"] = nil
 
