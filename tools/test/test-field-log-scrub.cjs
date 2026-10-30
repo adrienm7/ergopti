@@ -274,6 +274,11 @@ check('the collectors copy logs through the scrubber only', () => {
 	assert.match(windows, /Copy-ScrubbedLog \$Source/);
 	assert.match(windows, /\$DayLog = Join-Path \$script:Out /, 'the digests read the scrubbed copy');
 	assert.match(windows, /hotstring-collisions\.py/);
+	assert.match(
+		windows,
+		/\$Rerun \+= @\('-ConfigDir', \$ConfigDir\)/,
+		'the updated collector keeps the folder'
+	);
 	const linux = fs.readFileSync(path.join(ROOT, 'tools/dev/collect-linux-field-report.sh'), 'utf8');
 	assert.doesNotMatch(linux, /\bcp "\$\{f\}"/, 'a raw copy of a log');
 	assert.match(linux, /scrub_log "\$\{f\}"/);
