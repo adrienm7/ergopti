@@ -36,8 +36,8 @@ a sealed Windows updater source, reseal with
 
 For a field report, check out a branch and run
 `powershell -ExecutionPolicy Bypass -File tools/dev/collect-windows-field-report.ps1`. It creates
-`field/win-<today>-<branch>` derived from that branch, collects the system facts, today's logs and their
-digest, writes the report (with `base.txt` naming the base and commit) under `docs/field-reports/`, commits and
+`field/win-<today>-<branch>` derived from that branch, collects the system facts, runs its own checks,
+copies today's logs scrubbed, writes their digest and their analysis (`analysis.md`), writes the report (with `base.txt` naming the base and commit) under `docs/field-reports/`, commits and
 pushes. The Linux PC runs `bash tools/dev/collect-linux-field-report.sh` the same way.
 
 Start from a fresh `dev` and work on a `fix/windows-pc-<date>` branch; build and run the AutoHotkey driver live
@@ -117,9 +117,31 @@ into its item below or into the matching existing item.
 - [ ] **Field run downloads.** Done: e8ff7479e1 keeps the Ollama and MLX test models, so a run no longer pulls
       about 740 MB over the maintainer's shared connection. Left [PHYS-M]: one complete download of each test
       model on a connection that does not count.
-- [ ] **Field report marks.** [CODE] The macOS collector prints ✅ pass, ❌ fail, ⏭️ skip, ⌨️ needs_typing,
-      ⚠️ other and a summary line; the Linux collector does the same over its `check=<id> verdict=<...>`
-      lines (also in `field_checks.txt`). Left: the Windows collector.
+- [ ] **Field report marks.** [CODE] Done: the macOS collector marks its field run steps and the Linux one
+      every tray check run of the day (`field_checks.txt`); the three collectors print ✅ pass, ❌ fail, ⏭️
+      skip, ⌨️ needs_typing, ⚠️ other and a "Check verdicts summary" line through the shared analyser, over
+      the `check=<id> verdict=<...>` lines of their own probes (Linux `tools/dev/linux-field-shell-checks.sh`,
+      Windows step `collector_checks`, macOS `macos-field-shell-checks.sh`) and the last run of each tray
+      check clicked today (runs and failures counted). Left [PHYS-W] [PHYS-L]: one real run of each
+      collector; the Windows runtime layer of `test-windows-field-report-contract.cjs` runs only where pwsh
+      is installed. The Linux and Windows tray checks still need a click: their drivers have no request
+      protocol like the macOS field run, so a collector cannot run them without the user.
+- [ ] **Field log analysis.** [CODE] Done: `tools/dev/field-log-analyse.py` (Python 3.8, stdlib) runs at the end
+      of every collector on the scrubbed day logs only and writes `analysis.md` and `analysis.json` at the top
+      of the report: errors and warnings grouped by module and template with first and last time, an example
+      and the groups new since the previous report of the same OS tag; boot total and stages, reload time
+      (request to next boot), menu rebuild and per submenu, hot-path segments (hotstrings, tooltip and
+      preview, keystroke), phase summaries and Windows latency lines, main-thread holds, preferences saves,
+      keystats ingest ticks, synchronous diagnostics, LLM latencies per backend, late key events, each with
+      count, p50, p95, max, worst occurrences and a verdict against the budget its code declares
+      (`[logger] hotpath_slow_ms` and the Windows per-segment overrides, `SLOW_TIMER_CALLBACK_COUNT_MS`,
+      `SLOW_SAVE_REPORT_MS`, ingest `REPORT_THRESHOLD_MS`, or the budget the line states); lifecycle events;
+      and a ranked top 10. One vector per driver spelling
+      (`tools/test/fixtures/field-log-analyse/vectors.json`) fails the test when a source stops writing a
+      template it reads. Left: no budget is declared for boot, reload, menu rebuild, LLM latency or the
+      tooltip display, so those say "no budget declared" until the code declares one; the Windows driver
+      logs no per-request LLM latency (only timeouts); `tools/test/features/test-infrastructure/suite.json`
+      on dev lists ordinal 537 before 485 (0ba0e905), which stops `npm run test:js` before any check.
 - [ ] **Thinking off for every model on every backend and OS (worker `fix/llm-thinking-off`).** [CODE] The
       rule depends on the MODEL, not on the provider: model families (normalized model id) declare an intent
       (off, or the lowest level a model allows) and a control kind; each provider and local server declares
@@ -1020,7 +1042,10 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 
 ## Backlog (one line each)
 
-- [ ] **Windows field reports: confirm the scrubber covers the AHK log.** [CODE] Linux is done: since
+- [x] **Windows field reports: confirm the scrubber covers the AHK log.** [CODE] Checked 2026-10-30: of the 45
+      AHK logger calls whose arguments carry a text-like name, every one that logs typed or model text has a
+      case in `test-field-log-scrub.cjs`; the others log key names (nav-layer payloads), counts, menu titles
+      or error messages. Linux is done: since
       432c934 its collector copies logs only through `tools/dev/field-log-scrub.py` and pushes
       `hotstring-collisions.py` instead of the personal file, and the commit "scrub the Linux expansion
       trace from field reports" added the one Linux spelling it missed (the injector's
