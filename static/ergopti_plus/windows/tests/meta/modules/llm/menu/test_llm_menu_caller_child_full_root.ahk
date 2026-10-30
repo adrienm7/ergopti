@@ -107,6 +107,8 @@ LoggerError(Args*) {
 }
 TickElapsed(Args*) => 0
 t(Key, Args*) => Key
+PhaseStats_Now(Args*) => 0
+PhaseStats_Stop(Args*) => 0
 BootProfile_Mark(Args*) => 0
 BootProfile_StageBegin(Args*) => 0
 BootProfile_StageEnd(Args*) => 0
