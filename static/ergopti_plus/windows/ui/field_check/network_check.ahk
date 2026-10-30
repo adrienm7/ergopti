@@ -131,7 +131,7 @@ NetworkCheck_PacMaxBytes() {
 	global _SharedDir
 	static Maximum := 0
 	if !Maximum
-		Maximum := JsonParse(FileRead(_SharedDir . "\modules\network\proxy_policy.json", "UTF-8"))["native_pac"]["max_script_bytes"]
+		Maximum := JsonParse(FSReadStrict(_SharedDir . "\modules\network\proxy_policy.json"))["native_pac"]["max_script_bytes"]
 	return Maximum
 }
 
