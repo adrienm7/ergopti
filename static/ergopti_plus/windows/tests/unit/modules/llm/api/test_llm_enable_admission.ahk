@@ -349,7 +349,7 @@ _LEA_NativeServerCase(State, Status, Body, Expected) {
 		AssertTrue(_NDB_WaitForReadyPort(ReadyPath, &Port), "server readiness requires an actual bound loopback port")
 		LLM_OLLAMA_BASE_URL := "http://127.0.0.1:" . Port
 		_LLM_Menu["ollama_port"] := Port
-		State["port"].Delete("probe")
+		State["port"]["probe"] := _LLM_Menu_EnableOwnedProbe
 		AssertTrue(LLM_Menu_OnToggle(State["port"]), "the real toggle must launch the genuine curl version request")
 		Started := A_TickCount
 		RequestLine := ""
