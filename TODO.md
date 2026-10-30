@@ -98,6 +98,13 @@ Tools and python3 3.11.4 or newer. Set Debug > Log level > DEBUG first. Order:
    `boot_profiler` and `perf` artifacts on the Mac and measure MLX adoption, WPM `mouseMoved` traffic, Terminal
    identity lookup, keystats app attribution, canvas/AX work and the remaining synchronous shell helpers before
    optimizing any of them from source reading alone.
+6. **Field run checks (`field_run/NN_<step>.json`, each step's `proves` line in
+   `static/ergopti_plus/macos/data/field_run.json`).** A failing step's codes are `fail_<check step>`; read the
+   step's report and log window before the day log. The read-only checks added for the field run alone:
+   - `field_permissions`: Accessibility is granted (fail otherwise); Input Monitoring, Screen Recording and
+     secure input are named; Automation is skipped (no query without a prompt); the bundle identifier is a
+     declared one; the running bundle's strict signature is valid; the signing identity (team or ad hoc)
+     says whether a rebuild keeps the grants.
 
 ## Maintainer requests of 2026-10-30 (coordinator session; everything here is to be done)
 
