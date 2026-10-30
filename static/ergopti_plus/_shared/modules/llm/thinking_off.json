@@ -394,6 +394,17 @@
 			"_source": "https://huggingface.co/NousResearch/Hermes-4-70B"
 		},
 		{
+			"_family": "NVIDIA Nemotron 3: hybrid, enable_thinking is on unless turned off",
+			"models": ["nemotron-3*"],
+			"controls": [
+				{
+					"kind": "toggle",
+					"intent": "off"
+				}
+			],
+			"_source": "https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b (chat_template_kwargs enable_thinking, default true)"
+		},
+		{
 			"_family": "Generic: an unknown model whose name looks like a reasoning family gets thinking off through the provider's toggle (a field the provider refuses is dropped and remembered, see _comment)",
 			"models": ["*qwen3*", "*deepseek*", "*-r1*", "*think*", "*reasoning*"],
 			"controls": [
