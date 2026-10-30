@@ -561,25 +561,32 @@ function M.build_snapshot(state, detailed, extensive, complete_local)
 	-- session, before the clock starts
 	local schema = M.config().schema
 	local started = now_ms()
-	local facts = collect("system facts", function() return require("infra.diagnostic_snapshot").system_facts() end)
+	local timings = {}
+	local function collect_timed(name, fn)
+		local section_started = now_ms()
+		local value = collect(name, fn)
+		timings[#timings + 1] = { name = name, ms = now_ms() - section_started }
+		return value
+	end
+	local facts = collect_timed("system facts", function() return require("infra.diagnostic_snapshot").system_facts() end)
 	local permission_ids = TableUtil.sorted_keys(schema.permissions[M.DRIVER] or {})
 	local sections = {
-		paths       = collect("paths", function() return collect_paths(schema) end),
-		versions    = collect("versions", function() return collect_versions(facts) end),
-		hardware    = collect("hardware", function() return collect_hardware(facts) end),
-		system      = collect("system", function() return collect_system(facts, state, detailed == true) end),
-		input       = collect("input", function() return collect_input(state) end),
-		features    = collect("features", function() return collect_features(state) end),
+		paths       = collect_timed("paths", function() return collect_paths(schema) end),
+		versions    = collect_timed("versions", function() return collect_versions(facts) end),
+		hardware    = collect_timed("hardware", function() return collect_hardware(facts) end),
+		system      = collect_timed("system", function() return collect_system(facts, state, detailed == true) end),
+		input       = collect_timed("input", function() return collect_input(state) end),
+		features    = collect_timed("features", function() return collect_features(state) end),
 		-- Filled by the configuration probe: reading and decoding the files is far
 		-- over the phase A budget
 		configuration_files = { items = {} },
 		configuration = { items = {} },
-		ai          = collect("ai", function() return collect_ai(state) end),
+		ai          = collect_timed("ai", function() return collect_ai(state) end),
 		network     = {},
-		permissions = collect("permissions", function() return collect_permissions(permission_ids) end),
-		peripherals = collect("peripherals", function() return collect_peripherals(detailed == true) end),
-		issues      = collect("issues", collect_issues),
-		developer   = collect("developer", function() return collect_developer(state) end),
+		permissions = collect_timed("permissions", function() return collect_permissions(permission_ids) end),
+		peripherals = collect_timed("peripherals", function() return collect_peripherals(detailed == true) end),
+		issues      = collect_timed("issues", collect_issues),
+		developer   = collect_timed("developer", function() return collect_developer(state) end),
 	}
 	local snapshot = {
 		schema_version = schema.schema_version,
@@ -595,8 +602,8 @@ function M.build_snapshot(state, detailed, extensive, complete_local)
 	-- Not a warning: the next snapshot would count it among the session's
 	-- problems. The report's developer section carries the duration.
 	if elapsed > schema.phase_a_budget_ms then
-		Logger.info(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget.", elapsed,
-			schema.phase_a_budget_ms)
+		Logger.info(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget%s.", elapsed,
+			schema.phase_a_budget_ms, Snapshot.slowest_collectors(timings, schema.phase_a_slowest_named))
 	end
 	local undeclared = Snapshot.check_fields(snapshot, schema)
 	if #undeclared > 0 then

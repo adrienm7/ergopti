@@ -386,3 +386,41 @@ helpers.describe("diagnostics configuration is collected by a probe, not by phas
 		if not ran then error(err, 0) end
 	end)
 end)
+
+helpers.describe("an over-budget synchronous collection names its slowest collectors", function()
+	helpers.it("puts the collector that held the thread first on the line", function()
+		under_stub(function(hs_stub)
+			slow_configuration_reader({}, 0)
+			local lines = {}
+			package.loaded["infra.logger"].info = function(_, format, ...)
+				lines[#lines + 1] = string.format(format, ...)
+			end
+			-- The memory read is the hardware collector's: make it hold the thread
+			-- far longer than the whole stubbed collection otherwise takes
+			local baseline = require("ui.healthcheck.core").run().sections.developer.phase_a_ms
+			local hold_ms = 5 * baseline + 50
+			local vm_stat = hs_stub.host.vmStat
+			hs_stub.host.vmStat = function()
+				local until_clock = os.clock() + hold_ms / 1000
+				while os.clock() < until_clock do end
+				return vm_stat()
+			end
+			lines = {}
+			require("ui.healthcheck.core").run()
+			local line
+			for _, text in ipairs(lines) do
+				if text:find("The synchronous diagnostics took", 1, true) then line = text end
+			end
+			helpers.assert_true(line ~= nil, "the over-budget collection logged its duration")
+			local list = line:match("budget; slowest: (.-)%.$")
+			helpers.assert_true(list ~= nil, "the line names the slowest collectors: " .. line)
+			local named = {}
+			for name, ms in list:gmatch("([^=,]+)=([%d.]+) ms") do
+				named[#named + 1] = { name = name:gsub("^%s+", ""), ms = tonumber(ms) }
+			end
+			helpers.assert_true((named[1].name == "hardware" or named[1].name == "system") and named[1].ms >= 45,
+				"the first named collector is one that read the slow memory figure: " .. line)
+			helpers.assert_eq(#named, require("ui.healthcheck.core").config().schema.phase_a_slowest_named)
+		end)
+	end)
+end)
