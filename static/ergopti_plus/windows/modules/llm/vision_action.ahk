@@ -441,6 +441,8 @@ _LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine := true, CurrentF
 	if !_LLM_Vision_CallbackCurrent(CurrentFn)
 		return false
 	if Target.Has("resolved") {
+		; The provider's thinking_off rule (and a local server's request fields)
+		Body := _LLMRemoteCompleteBody(Target["resolved"], Body)
 		Transport := HasMethod(_LLM_Vision_RemoteTransport, "Call")
 			? _LLM_Vision_RemoteTransport : _LLM_Vision_RemoteRequest
 		Transport.Call(Target["resolved"], Target["url"], Body, OnSuccess, OnFail, CurrentFn)

@@ -182,9 +182,10 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
             on_success, on_fail, Kind, timeout_ms, CurrentFn)
     }
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
-    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens,
-        resolved.Has("Extras") ? resolved["Extras"] : Map(),
-        resolved.Has("RequestFields") ? resolved["RequestFields"] : Map())
+    Payload := _LLMRemoteApplyThinkingOff(resolved,
+        _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens,
+            resolved.Has("Extras") ? resolved["Extras"] : Map(),
+            resolved.Has("RequestFields") ? resolved["RequestFields"] : Map()))
 
     ; The managed worker (WinHTTP in its own process) is the only production
     ; transport: the WinHTTP COM object would put DNS/connect/Send back on the
@@ -1366,7 +1367,7 @@ _LLMRemoteResolveEntry(Entry) {
     Extras := (ModelExtras is Map && ModelExtras.Has(Model)) ? ModelExtras[Model] : Map()
     RequestFields := Provider.Has("RequestFields") ? Provider["RequestFields"] : Map()
     return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model,
-        "Extras", Extras, "RequestFields", RequestFields)
+        "Extras", Extras, "RequestFields", RequestFields, "ThinkingOff", Provider.Get("ThinkingOff", []))
 }
 
 ; Per-phase timeout (ms) for the readiness ping. Same value the sync path
@@ -1792,6 +1793,42 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
         ModelEsc, SysEsc, UserEsc, Temp, MaxTok, ExtraFrag)
 }
 
+; Turns the model's reasoning off in a request body, by the provider's
+; thinking_off rules of api_providers.json (_shared/modules/llm/thinking_off.ahk).
+; A field the body already sets wins.
+; @param {Map} Resolved _LLMRemoteResolveEntry's record.
+; @param {String} Body The JSON body.
+; @returns {String} The body.
+_LLMRemoteApplyThinkingOff(Resolved, Body) {
+    Model := Resolved.Get("Model", "")
+    Result := LLM_ThinkingOffApply(Resolved.Get("ThinkingOff", []), Model, Body, &Index)
+    if Index
+        try LoggerDebug("LLM.remote", "Thinking off: provider '{1}' rule {2} applies to model {3}.",
+            Resolved.Get("Provider", ""), Index, Model)
+    return Result
+}
+
+; Completes a body its caller wrote whole (the screen reading, the AI agent)
+; as a prediction's: a local server's request_fields of local_servers.json
+; (OpenAI shape), then the provider's thinking_off rules. Bodies of other
+; formats (Backboard, decisions) are not chat bodies and pass unchanged.
+; @param {Map} Resolved _LLMRemoteResolveEntry's record.
+; @param {String} Body The JSON body.
+; @returns {String} The body.
+_LLMRemoteCompleteBody(Resolved, Body) {
+    Fmt := Resolved.Get("Format", "")
+    if (Fmt != "openai" && Fmt != "anthropic" && Fmt != "gemini")
+        return Body
+    Fields := Resolved.Get("RequestFields", Map())
+    if (Fmt == "openai" && Fields is Map && Fields.Count > 0) {
+        Source := ""
+        for Name, Value in Fields
+            Source .= (Source == "" ? "" : ",") . JsonStringLiteral(Name) . ":" . Value
+        Body := LLM_ThinkingOffMerge(Body, "{" . Source . "}")
+    }
+    return _LLMRemoteApplyThinkingOff(Resolved, Body)
+}
+
 ; Parse one immutable provider root and classify both the completion and usage
 ; owned by that root. Canonical containers own an empty result too: falling back
 ; after ``content:null`` or an empty parts array would promote reasoning/metadata
@@ -2104,7 +2141,8 @@ _LLMRemote_LoadCatalog() {
     if !FileExist(path)
         throw Error("api_providers.json not found at " . path)
     try {
-        root := JsonParse(FileRead(path, "UTF-8"))
+        text := FileRead(path, "UTF-8")
+        root := JsonParse(text)
     } catch as err {
         throw Error("api_providers.json parse failed: " . err.Message)
     }
@@ -2123,6 +2161,8 @@ _LLMRemote_LoadCatalog() {
     candidateProviders := Map()
     candidateOrder := []
     seenProviders := Map()
+    ; thinking_off travels as JSON source (JsonParse decodes booleans as 0/1)
+    ProviderSpans := JsonObjectMemberSpans(text, ["providers"])
     for _, pid in order {
         if (Type(pid) != "String" or Trim(pid) = "")
             continue
@@ -2140,7 +2180,17 @@ _LLMRemote_LoadCatalog() {
             try LoggerWarn("LLM.remote", "api_providers.json: provider '{1}' has an invalid descriptor and was skipped.", pid)
             continue
         }
+        try {
+            Members := JsonObjectMemberSpans(ProviderSpans[pid]["text"])
+            ThinkingOff := LLM_ThinkingOffParse(Members.Has("thinking_off") ? Members["thinking_off"]["text"] : "")
+        } catch as ThinkingErr {
+            ; A half-read rule list would let some models think: refuse the provider whole
+            try LoggerError("LLM.remote", "api_providers.json: providers.{1}.thinking_off is invalid ({2}) — skipped.",
+                pid, ThinkingErr.Message)
+            continue
+        }
         candidateProviders[pid] := Map(
+            "ThinkingOff", ThinkingOff,
             "Label", desc["label"],
             "BaseUrl", desc["base_url"],
             "DefaultModel", desc["default_model"],
@@ -2171,7 +2221,7 @@ _LLMRemote_LoadCatalog() {
     for Id in LocalCatalogue["order"] {
         Desc := LocalCatalogue["servers"][Id]
         candidateProviders[Id] := Map("Label", Desc["label"], "BaseUrl", Desc["base_url"],
-            "DefaultModel", "", "Format", "openai", "ModelExtras", Map(),
+            "DefaultModel", "", "Format", "openai", "ModelExtras", Map(), "ThinkingOff", [],
             "RequestFields", LocalRequestFields)
         candidateOrder.Push(Id)
     }

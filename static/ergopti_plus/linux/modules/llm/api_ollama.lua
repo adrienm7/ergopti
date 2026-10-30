@@ -337,7 +337,8 @@ function M.warmup(base_url, model, runtime_receipt, on_done)
 		or not runtime_current(response) then
 		return { started = false }
 	end
-	local body = json_encode({ model = model, messages = Json.array({}), stream = false, keep_alive = OLLAMA_KEEP_ALIVE })
+	local body = json_encode({ model = model, messages = Json.array({}), stream = false, think = false,
+		keep_alive = OLLAMA_KEEP_ALIVE })
 	Logger.debug(LOG, "warmup() → %s (model=%s)", url, model)
 	return HttpClient.post_stream_owned(url, { ["Content-Type"] = "application/json" }, body, {
 		owner = WARMUP_OWNER, timeout_ms = Timings.ms("llm", "warmup_post_timeout_ms"),

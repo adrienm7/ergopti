@@ -67,6 +67,7 @@ local ProviderUses   = require("modules.llm.provider_uses")
 local LocalServers   = require("modules.llm.local_servers")
 local LocalServerPorts = require("modules.llm.local_server_ports")
 local AuthPolicy     = require("llm.local_server_auth")
+local ThinkingOff    = require("llm.thinking_off")
 local ProviderConfig = require("llm.provider_config_policy")
 local Json           = require("json")
 local ApiModelListing = require("llm.api_model_listing")
@@ -241,8 +242,14 @@ local function load_api_providers()
 			else
 				seen_providers[pid] = true
 				local desc = p_providers[pid]
+				local thinking_off, thinking_reason = nil, nil
+				if type(desc) == "table" then thinking_off, thinking_reason = ThinkingOff.parse(desc.thinking_off) end
 				if not catalog_descriptor_is_valid(pid, desc) then
 					Logger.warn("llm.api_remote", "api_providers.json: providers.%s has an invalid descriptor — skipped.", tostring(pid))
+				elseif not thinking_off then
+					-- A half-read rule list would let some models think: refuse the provider whole
+					Logger.error("llm.api_remote", "api_providers.json: providers.%s.thinking_off is invalid (%s) — skipped.",
+						tostring(pid), tostring(thinking_reason))
 				else
 					out_providers[pid] = {
 						label         = desc.label,
@@ -250,6 +257,7 @@ local function load_api_providers()
 						default_model = desc.default_model,
 						format        = desc.format,
 						model_extras  = normalize_model_extras(desc.model_extras),
+						thinking_off  = thinking_off,
 					}
 					out_order[#out_order + 1] = pid
 				end
@@ -295,6 +303,7 @@ local function register_local_servers()
 				default_model = "",
 				format        = "openai",
 				model_extras  = {},
+				thinking_off  = {},
 				local_server  = true,
 				request_fields = LocalServers.REQUEST_FIELDS,
 			}
@@ -1384,6 +1393,24 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 end
 M.__build_payload_for_test = build_payload
 
+--- Turns the model's reasoning off in a request body, by the provider's
+--- thinking_off rules of api_providers.json (llm/thinking_off.lua). A field
+--- the body already sets wins.
+--- @param provider_id string The provider id, for the log.
+--- @param provider table The catalogue descriptor.
+--- @param model string The model the body names.
+--- @param body table The request body, changed in place.
+--- @return table body
+local function apply_thinking_off(provider_id, provider, model, body)
+	local index = ThinkingOff.apply(provider.thinking_off, model, body)
+	if index then
+		Logger.debug(LOG, "Thinking off: provider '%s' rule %d applies to model %s.",
+			tostring(provider_id), index, tostring(model))
+	end
+	return body
+end
+M.__apply_thinking_off_for_test = apply_thinking_off
+
 -- Byte ceiling of the provider message shown in notifications and logs (Linux: 200).
 local MAX_SERVER_MESSAGE = 200
 
@@ -2309,8 +2336,9 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 	end
 
 	local provider_extras = type(provider.model_extras) == "table" and provider.model_extras[model] or nil
-	local payload = build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens,
-		provider_extras, provider.request_fields)
+	local payload = apply_thinking_off(entry.provider, provider, model,
+		build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens,
+			provider_extras, provider.request_fields))
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
 		Logger.error(LOG, "[%s] #%d Payload encode failed — %s", model, req_id, tostring(enc_err))
@@ -2534,6 +2562,7 @@ end
 --- @param with_extras boolean|nil Merge the model's model_extras of
 ---        api_providers.json, and a local server's request_fields of
 ---        local_servers.json, into an OpenAI-shape body, as a prediction does.
+---        The provider's thinking_off rules apply to every body regardless.
 --- @param current function|nil Must still return true immediately before HTTP.
 --- @return boolean sent True when the key resolution started.
 local function request_prebuilt(client, label, use, provider_id, model, body, on_text, on_fail, with_extras, current)
@@ -2572,6 +2601,7 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 		if with_extras and provider.format == "openai" then
 			AuthPolicy.apply_request_fields(body, provider.request_fields)
 		end
+		apply_thinking_off(provider_id, provider, model, body)
 		local url, url_error = build_url(base, provider.format, model, token)
 		if not url then
 			log_endpoint_refusal(label:lower(), entry, url_error)
@@ -2629,8 +2659,9 @@ end
 --- @param current function|nil Must still return true after a pending key resolves.
 --- @return boolean sent True when the key resolution started.
 function M.request_vision(provider_id, model, body, on_text, on_fail, current)
+	-- A local server's request_fields turn its thinking off for a screenshot too
 	return request_prebuilt(_vision_client, "Vision", ProviderUses.VISION, provider_id, model, body,
-		on_text, on_fail, nil, current)
+		on_text, on_fail, true, current)
 end
 
 --- Posts one prebuilt text chat body (llm/vision.lua build_request without an

@@ -56,14 +56,15 @@ helpers.describe("api_remote.model_extras", function()
 			"a model must map to a field table")
 	end)
 
-	helpers.it("loads cerebras qwen extras from the shared catalogue", function()
+	helpers.it("loads cerebras qwen's reasoning rule from the shared catalogue", function()
+		-- The rule moved from model_extras to thinking_off: one home per field
 		local api = helpers.load_with_stubs("modules.llm.api_remote")
 		local cerebras = api.PROVIDERS.cerebras
-		helpers.assert_true(type(cerebras) == "table"
-			and type(cerebras.model_extras) == "table",
-			"catalogue must carry cerebras model extras")
-		helpers.assert_eq(cerebras.model_extras["qwen-3.8-27b"].reasoning_effort, "none",
-			"qwen extras must come from api_providers.json")
+		helpers.assert_true(type(cerebras) == "table" and type(cerebras.thinking_off) == "table",
+			"catalogue must carry cerebras thinking_off rules")
+		local body = api.__apply_thinking_off_for_test("cerebras", cerebras, "qwen-3.8-27b", {})
+		helpers.assert_eq(body.reasoning_effort, "none",
+			"qwen's reasoning_effort must come from api_providers.json")
 	end)
 
 end)

@@ -196,7 +196,8 @@ LLM_Vision_BuildRequest(Fmt, Spec) {
 	}
 	User := '{"role":"user","content":' . Text
 		. (HasImage ? ',"images":[' . JsonStringLiteral(Image) . ']' : "") . '}'
-	return '{"model":' . Model . ',"stream":false,'
+	; A thinking model would spend the whole budget reasoning before it answers
+	return '{"model":' . Model . ',"stream":false,"think":false,'
 		. '"messages":[{"role":"system","content":' . System . '},' . User . '],'
 		. '"options":{"num_predict":' . Tokens . '}}'
 }

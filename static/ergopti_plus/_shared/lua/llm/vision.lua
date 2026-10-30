@@ -14,7 +14,9 @@
 ---    a backend without one needs the model in the binding, never a guess.
 --- 2. Each API dialect carries an image differently; build_request() writes
 ---    the request body for all four (openai, anthropic, gemini, ollama), so the
----    drivers only add the address and the credentials.
+---    drivers only add the address and the credentials. The ollama body
+---    turns thinking off; the API dialects get it from the provider's
+---    thinking_off rules (llm/thinking_off.lua), applied by the drivers.
 --- 3. Prompts, tags, token budgets and defaults live in vision.json, read by
 ---    every driver.
 ---
@@ -145,9 +147,11 @@ function M.build_request(format, spec)
 	end
 	local user = { role = "user", content = spec.text }
 	if image then user.images = { image } end
+	-- A thinking model would spend the whole budget reasoning before it answers
 	return {
 		model = spec.model,
 		stream = false,
+		think = false,
 		messages = { { role = "system", content = spec.system }, user },
 		options = { num_predict = spec.max_tokens },
 	}
