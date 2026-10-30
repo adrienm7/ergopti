@@ -890,6 +890,12 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 
 ## Backlog (one line each)
 
+- [ ] **Windows and Linux field reports still push raw logs.** [CODE] The macOS collector scrubs its copies
+      (`tools/dev/field-log-scrub.py`: hotstring expansions, AI prompts and stream chunks lose their text)
+      and pushes `hotstring-collisions.py` instead of the personal file. `collect-linux-field-report.sh` and
+      `collect-windows-field-report.ps1` copy the day logs as they are onto the public branch: route them
+      through the same scrubber (the AHK log spells its expansion lines differently, extend the patterns).
+
 - [ ] **Windows: a personal immediate `sru` -> `SRU` (priority 100) loses to the bundled `sru` -> `sur`.**
       [CODE] [PHYS-W] Field report of 2026-10-30, section « metiers », whole word, not case-sensitive, final
       result. The same entry wins on macOS. Static reading of the Windows path (priority 100 accepted, both
