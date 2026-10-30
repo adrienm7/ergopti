@@ -340,13 +340,15 @@ _HC_PacInterpret(Request, Interpret, Status, Body) {
 	return Answer
 }
 
-; The existing PAC limit counts source bytes including BOM, not UTF16 units.
+; The PAC limit counts source bytes including BOM, not UTF16 units. It is
+; proxy_policy.json native_pac.max_script_bytes, the managed download's limit
+; (NetworkCheck_PacMaxBytes), so the diagnostic judges the script it would.
 ; The source worker also bounds the UTF8 normalization of a UTF16 script.
 _HC_PacReadSource(Path) {
-	Maximum := 1048576
+	Maximum := NetworkCheck_PacMaxBytes()
 	Size := FileGetSize(Path)
 	if Size > Maximum
-		return Map("error", "PAC is over the 1048576 byte limit")
+		return Map("error", "PAC is over the " . Maximum . " byte limit")
 	Raw := FSReadBytesStrict(Path)
 	if Raw.Size != Size
 		return Map("error", "PAC source changed during validation")
@@ -360,7 +362,7 @@ _HC_PacDecodeSource(Raw, Maximum) {
 	if Count == 0
 		return Map("error", "PAC is empty")
 	if Count > Maximum
-		return Map("error", "PAC is over the 1048576 byte limit")
+		return Map("error", "PAC is over the " . Maximum . " byte limit")
 	Offset := 0, Encoding := "UTF-8", BigEndian := false
 	if Count >= 3 && NumGet(Raw, 0, "UChar") == 0xEF
 		&& NumGet(Raw, 1, "UChar") == 0xBB && NumGet(Raw, 2, "UChar") == 0xBF
@@ -397,11 +399,11 @@ _HC_PacDecodeSource(Raw, Maximum) {
 		; Reuse the native boundary before StrGet, which copies lone surrogates.
 		if !NativeTextIsWellFormedUtf16(WidePtr, Units)
 			return Map("error", "PAC encoding is invalid")
-		; The source bound also bounds this UTF16 text allocation to one MiB.
+		; The source bound also bounds this UTF16 text allocation.
 		Body := StrGet(WidePtr, -Units, "UTF-16")
 		NormalizedBytes := StrPut(Body, "UTF-8") - 1
 		if NormalizedBytes > Maximum
-			return Map("error", "PAC is over the 1048576 byte limit")
+			return Map("error", "PAC is over the " . Maximum . " byte limit")
 	}
 	if RegExMatch(Body, "\x00")
 		return Map("error", "PAC contains a null character")
