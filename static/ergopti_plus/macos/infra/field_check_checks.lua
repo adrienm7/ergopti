@@ -858,6 +858,7 @@ M.checks = {
 	boot_cost = Session.boot_cost,
 	idle_cost = Session.idle_cost,
 	fifo_safety = Session.fifo_safety,
+	slow_lines = Session.slow_lines,
 }
 
 --- The Debug menu checks the field run does not ask for, each with the
