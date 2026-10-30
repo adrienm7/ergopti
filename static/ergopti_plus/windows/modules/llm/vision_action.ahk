@@ -447,10 +447,10 @@ _LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine := true, CurrentF
 		Transport := HasMethod(_LLM_Vision_RemoteTransport, "Call")
 			? _LLM_Vision_RemoteTransport : _LLM_Vision_RemoteRequest
 		; A provider refusing a thinking field gets the request once more without it
-		Send := (Sent, Fail) => Transport.Call(Target["resolved"], Target["url"], Sent, OnSuccess, Fail, CurrentFn)
+		Resend := (Sent, Fail) => Transport.Call(Target["resolved"], Target["url"], Sent, OnSuccess, Fail, CurrentFn)
 		Transport.Call(Target["resolved"], Target["url"], Body, OnSuccess,
 			_LLMRemoteThinkingRetryFail.Bind(Map("retried", false, "resolved", Target["resolved"], "added", Added,
-				"body", Body, "send", Send), OnFail), CurrentFn)
+				"body", Body, "send", Resend), OnFail), CurrentFn)
 		return
 	}
 	Transport := HasMethod(_LLM_Vision_OllamaTransport, "Call")
