@@ -105,11 +105,9 @@
 		{
 			"id": "key_accounting",
 			"kind": "field_check",
-			"check": "key_accounting",
-			"deadline_seconds": 45,
-			"person": "needs_typing",
-			"reason": "synthetic_input_unsafe",
-			"proves": "Quartz sees key presses and the ledger credits them once; needs a person typing, so it is not run."
+			"check": "typing_selftest",
+			"deadline_seconds": 30,
+			"proves": "Without a person: the app types a fixed sequence into its own scratch field only, the tap sees each key once, the field holds it exactly and the previous app gets the focus back."
 		},
 		{
 			"id": "diagnostics",

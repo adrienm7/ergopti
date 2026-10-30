@@ -9,8 +9,10 @@
 ---    init.lua starts it only behind infra/dev_source.lua;
 --- 2. request parsing: every step, a subset in declaration order, and the
 ---    refusals (unknown step, unknown key, bad deadline, oversized);
---- 3. a run writes one result per step with the declared shape, reports the
----    typing step as needs_typing without running it, and ends with done;
+--- 3. a run writes one result per step with the declared shape, runs every
+---    declared step (the maintainer's field run needs no person, the key
+---    accounting included), reports a step declared for a person with its
+---    reason without running it, and ends with done;
 --- 4. deadlines: a step that never answers times out and its late answer is
 ---    dropped; past the request's deadline the remaining steps are skipped;
 --- 5. the configuration guard restores and names what a step changed, and a
@@ -280,8 +282,14 @@ helpers.describe("field run: declaration and requests", function()
 			for _, step in ipairs(spec.steps) do
 				if step.kind == "field_check" then declared[step.check] = true end
 			end
-			for check in pairs(require("infra.field_check_checks").checks) do
-				helpers.assert_true(declared[check], "no field run step runs the check " .. check)
+			local Checks = require("infra.field_check_checks")
+			for check in pairs(Checks.checks) do
+				local substitute = Checks.FIELD_RUN_SUBSTITUTES[check]
+				helpers.assert_true(declared[check] or (substitute and declared[substitute]),
+					"no field run step runs the check " .. check)
+				if substitute then
+					helpers.assert_nil(declared[check], check .. " waits for a person; the field run runs " .. substitute)
+				end
 			end
 		end)
 	end)
@@ -364,6 +372,24 @@ helpers.describe("field run: declaration and requests", function()
 end)
 
 helpers.describe("field run: a run", function()
+	helpers.it("reports a step declared for a person with its reason and does not run it", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			local declaration = Json.decode(SPEC_TEXT)
+			declaration.steps[1].person = "needs_typing"
+			declaration.steps[1].reason = "synthetic_input_unsafe"
+			local spec = FieldRun.validate(declaration)
+			FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports }):start()
+			state.request({ schema = 1, request_id = "r10", steps = Json.array({ spec.steps[1].id }) })
+			state.advance(0)
+			local result = state.json(result_path("r10", 1, spec.steps[1].id))
+			helpers.assert_eq(result.verdict, "needs_typing")
+			helpers.assert_eq(result.codes[1], "synthetic_input_unsafe")
+			helpers.assert_eq(#state.calls, 0, "a step that needs a person must not run")
+		end)
+	end)
+
 	helpers.it("writes one result per step, the guard and done", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
@@ -391,10 +417,12 @@ helpers.describe("field run: a run", function()
 				if step.id == "key_accounting" then typing_index = index end
 			end
 			local typing = state.json(result_path("r11", typing_index, "key_accounting"))
-			helpers.assert_eq(typing.verdict, "needs_typing")
-			helpers.assert_eq(typing.codes[1], "synthetic_input_unsafe")
-			for _, id in ipairs(state.calls) do
-				helpers.assert_true(id ~= "key_accounting", "a step that needs a person must not run")
+			helpers.assert_eq(typing.verdict, "pass", "the key accounting runs without a person")
+			local ran = {}
+			for _, id in ipairs(state.calls) do ran[id] = true end
+			for _, step in ipairs(spec.steps) do
+				helpers.assert_nil(step.person, step.id .. " waits for a person: the field run must be automatic")
+				helpers.assert_true(ran[step.id], step.id .. " did not run")
 			end
 			local lease = state.json(result_path("r11", 1, "field_lease"))
 			helpers.assert_eq(lease.verdict, "pass")
@@ -405,7 +433,7 @@ helpers.describe("field run: a run", function()
 			helpers.assert_eq(state.restored.tag, "snapshot", "the guard compares against the run's snapshot")
 			local done = state.json(FOLDER .. "/results/r11/done.json")
 			helpers.assert_eq(done.interrupted, false)
-			helpers.assert_eq(done.verdicts.key_accounting, "needs_typing")
+			helpers.assert_eq(done.verdicts.key_accounting, "pass")
 			helpers.assert_eq(#done.order, #spec.steps + 1)
 			helpers.assert_nil(state.files[FOLDER .. "/running.json"], "done clears the running marker")
 			helpers.assert_not_nil(state.json(FOLDER .. "/results/r11/accepted.json"))
