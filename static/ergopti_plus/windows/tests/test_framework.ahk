@@ -635,6 +635,31 @@ _DriverDirConcat(RelDir) {
 	return Combined
 }
 
+; Reads ONE production file by its name, wherever the tree holds it, for a test
+; whose claim is about that whole file (a single-file absence assertion that a
+; directory-wide scan would weaken). A move between directories cannot break it;
+; a rename, a missing file or a second file of that name throws, because each of
+; those would otherwise leave the test scanning the wrong text or nothing.
+; @param FileName {String} Base name, such as "logger.ahk".
+; @returns {String} The file's content.
+_DriverFileSource(FileName) {
+	static ByName := 0
+	if !IsObject(ByName) {
+		Found := Map()
+		Found.CaseSense := "Off"
+		for Path in _DriverProductionSourceCensus().Paths {
+			SplitPath(Path, &Name)
+			Found[Name] := Found.Has(Name) ? "" : Path
+		}
+		ByName := Found
+	}
+	if !ByName.Has(FileName)
+		throw Error("_DriverFileSource: no production file is named '" . FileName . "': it was renamed or deleted. Update the test.")
+	if (ByName[FileName] == "")
+		throw Error("_DriverFileSource: several production files are named '" . FileName . "'. Read it by a symbol it defines instead.")
+	return FileRead(ByName[FileName], "UTF-8")
+}
+
 ; Export a callable reference for fragment tests. AHK's isolated #Warn pass
 ; cannot resolve a global function supplied by the runner's preceding include;
 ; fragment functions can declare this variable global without suppressing an

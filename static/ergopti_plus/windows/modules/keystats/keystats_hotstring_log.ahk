@@ -83,9 +83,9 @@ KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "", categ
 	; DEBUG is the level a user is asked to switch on when reporting a bug — so
 	; a private trigger is withheld here exactly as it is withheld from the row.
 	if is_private {
-		LoggerDebug("WPMWidget", "KL_LogHotstring: private mapping cat='{1}' sec='{2}' init={3} (trigger withheld).", category, section, Keystats.initialized)
+		LoggerDebug("WPMWidget", "KL_LogHotstring: private mapping cat='{1}' sec='{2}' init={3} (trigger withheld).", HotstringCategoryLogName(category), section, Keystats.initialized)
 	} else {
-		LoggerDebug("WPMWidget", "KL_LogHotstring: trigger='{1}' cat='{2}' sec='{3}' init={4}", trigger, category, section, Keystats.initialized)
+		LoggerDebug("WPMWidget", "KL_LogHotstring: trigger='{1}' cat='{2}' sec='{3}' init={4}", trigger, HotstringCategoryLogName(category), section, Keystats.initialized)
 	}
 	if !Keystats.initialized
 		return true

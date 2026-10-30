@@ -834,6 +834,9 @@ end
 M.add                   = preview_fenced_registry_mutation(Registry.add)
 M.load_file             = preview_fenced_registry_mutation(Registry.load_file, true)
 M.load_toml             = preview_fenced_registry_mutation(Registry.load_toml, true)
+-- The hotstring editor reloads the personal group after each save; disable and
+-- load run as one registry transaction that keeps the old mappings on failure.
+M.reload_toml           = preview_fenced_registry_mutation(Registry.reload_toml, true)
 M.replace_personal_source = preview_fenced_registry_mutation(Registry.replace_personal_source, true)
 -- Exposed so the hotstring editor can show the personal source default (the
 -- single source kept in sync with _shared/modules/hotstrings/priority.json) instead of

@@ -19,11 +19,14 @@ Defined in `tests/test_framework.ahk`:
 | `_DriverSourceNoComments()`   | same, with comments stripped               |
 | `_DriverFuncBody(Name)`       | one function's body                        |
 | `_DriverDirConcat(RelDir)`    | every file under one directory             |
+| `_DriverFileSource(Name)`     | one file by base name, wherever it lives   |
 | `_StripFullLineComments(Src)` | comment-stripped copy of any source string |
 
 **Never hardcode a path like `"platform/remap/lalt.ahk"`.** A CI ratchet
 (`tools/test/test-no-pinned-source-reads.cjs`) fails the build when the count of
-location-pinned reads rises above `BASELINE = 20`.
+location-pinned reads rises above its frozen baselines. `_DriverFileSource` is for
+a claim about a whole file, such as a single-file absence assertion; it throws on
+a renamed or an ambiguous name.
 
 **Never raise that baseline to make a change pass** — convert the test to a
 helper read instead. Raising it is the ratchet equivalent of weakening a test.

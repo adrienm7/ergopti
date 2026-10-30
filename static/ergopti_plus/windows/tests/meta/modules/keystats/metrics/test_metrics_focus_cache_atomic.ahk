@@ -24,10 +24,8 @@
 ; ===================================================
 ; ===================================================
 
-_MFCA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_MFCA_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -38,7 +36,7 @@ _MFCA_ReadSource(RelPath) {
 ; ===================================================
 
 _MFCA_FocusCacheIsAtomic() {
-	Src := _MFCA_ReadSource("infra/metrics/metrics_filters.ahk")
+	Src := _MFCA_ReadSource("metrics_filters.ahk")
 	
 	; 1. Verify the class uses a single state object.
 	Assert(InStr(Src, "static state :=") > 0, "MetricsFocusCache must use a single 'state' object for atomic updates")

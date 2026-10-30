@@ -17,10 +17,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TCBS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TCBS_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TCBS_StripLineComments(Src) {
@@ -40,7 +38,7 @@ _TCBS_StripLineComments(Src) {
 ; ===========================================================
 
 _TCBS_SaveReturnsSentinel() {
-	Src := _TCBS_StripLineComments(_TCBS_ReadSource("adapters/clipboard.ahk"))
+	Src := _TCBS_StripLineComments(_TCBS_ReadSource("clipboard.ahk"))
 	Assert(Src != "", "adapters/clipboard.ahk must be readable")
 
 	Body := _DriverFuncBody("CB_Save")
@@ -59,7 +57,7 @@ Test("clipboard: CB_Save returns __CB_SAVE_ERROR__ sentinel on clipboard-lock fa
 ; ===========================================================
 
 _TCBS_RestoreGuardsOnSentinel() {
-	Src := _TCBS_StripLineComments(_TCBS_ReadSource("adapters/clipboard.ahk"))
+	Src := _TCBS_StripLineComments(_TCBS_ReadSource("clipboard.ahk"))
 
 	Body := _DriverFuncBody("CB_Restore")
 	Assert(Body != "", "CB_Restore(Saved) must be defined in adapters/clipboard.ahk")

@@ -35,10 +35,8 @@
 ; ===================================================
 ; ===================================================
 
-_SFFC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_SFFC_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -51,7 +49,7 @@ _SFFC_ReadSource(RelPath) {
 ; ===================================================
 
 _SFFC_StopClearsScrollFlushFn() {
-	Src  := _SFFC_ReadSource("modules/keystats/keystats_mouse.ahk")
+	Src  := _SFFC_ReadSource("keystats_mouse.ahk")
 	Body := _DriverFuncBody("KL_Mouse_Stop")
 	Assert(Body != "", "KL_Mouse_Stop must exist in keystats_mouse.ahk")
 	Assert(InStr(Body, "scroll_flush_fn := unset") > 0,

@@ -28,10 +28,8 @@
 ; ==================================================
 ; ==================================================
 
-_SIRG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_SIRG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -42,7 +40,7 @@ _SIRG_ReadSource(RelPath) {
 ; ==================================================
 
 _SIRG_AssertGuardDeclared() {
-	Src := _SIRG_ReadSource("adapters/clipboard.ahk")
+	Src := _SIRG_ReadSource("clipboard.ahk")
 	Assert(InStr(Src, "CB_TryBeginPasteTransaction") > 0
 		and InStr(Src, "paste_transaction") > 0,
 		"the clipboard adapter must own the process-wide exact-token paste lease")
@@ -50,7 +48,7 @@ _SIRG_AssertGuardDeclared() {
 Test("clipboard: adapter declares an exact-owner paste lease (send-instant-sleep-clipboard-on-keyboard-thread)", _SIRG_AssertGuardDeclared)
 
 _SIRG_AssertSendInstantChecksGuard() {
-	Src := _SIRG_ReadSource("infra/hotstrings/hotstring_engine.ahk")
+	Src := _SIRG_ReadSource("hotstring_engine.ahk")
 	Body := _DriverFuncBody("SendInstant")
 	Assert(Body != "", "SendInstant(Text) declaration must exist in hotstring_engine.ahk")
 	ClaimPos := InStr(Body, "CB_TryBeginPasteTransaction(")
@@ -61,7 +59,7 @@ _SIRG_AssertSendInstantChecksGuard() {
 Test("hotstring_engine: SendInstant body consults the reentrancy guard (send-instant-sleep-clipboard-on-keyboard-thread)", _SIRG_AssertSendInstantChecksGuard)
 
 _SIRG_AssertRestoreClearsGuard() {
-	Src := _SIRG_ReadSource("infra/hotstrings/hotstring_engine.ahk")
+	Src := _SIRG_ReadSource("hotstring_engine.ahk")
 	Body := _DriverFuncBody("_SendInstant_RestoreClipboard")
 	Assert(Body != "", "_SendInstant_RestoreClipboard(OldClip) declaration must exist in hotstring_engine.ahk")
 	Assert(InStr(Body, "CB_RestoreOwnedAllEventually") > 0

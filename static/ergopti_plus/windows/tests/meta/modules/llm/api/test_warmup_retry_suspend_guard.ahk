@@ -31,10 +31,8 @@
 ; ===================================================
 ; ===================================================
 
-_WRS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_WRS_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -45,7 +43,7 @@ _WRS_ReadSource(RelPath) {
 ; ===================================================
 
 _WRS_WarmupTickHasSuspendGuard() {
-	Src := _WRS_ReadSource("modules/llm/api_ollama.ahk")
+	Src := _WRS_ReadSource("api_ollama.ahk")
 	Seg := _DriverFuncBody("LLM_Ollama_WarmupRetryTick")
 	Assert(Seg != "", "LLM_Ollama_WarmupRetryTick must exist in api_ollama.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
