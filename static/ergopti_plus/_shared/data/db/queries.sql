@@ -394,6 +394,39 @@ ON CONFLICT(device_id, date, app, token) DO UPDATE SET
   c = c + excluded.c, td = td + excluded.td, cd = cd + excluded.cd, e = e + excluded.e,
   esrc_json = {{merge esrc_json}};
 
+-- name: agg.ngram_keycode
+-- doc: Presses of one layout key code.
+INSERT INTO ngram_keycodes (device_id, date, app, keycode, c)
+VALUES ({{s device_id}},{{s date}},{{s app}},{{i keycode}},{{i c}})
+ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET c = c + excluded.c;
+
+-- name: agg.ngram_scancode
+-- doc: Presses of one physical scan code, whatever the active layout.
+INSERT INTO ngram_scancodes (device_id, date, app, scancode, c)
+VALUES ({{s device_id}},{{s date}},{{s app}},{{i scancode}},{{i c}})
+ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c = c + excluded.c;
+
+-- name: agg.ngram_shortcut
+-- doc: One shortcut token. {{table}} is ngram_shortcuts or ngram_shortcut_bigrams,
+-- doc: which the driver takes from its fixed list.
+INSERT INTO {{table}} (device_id, date, app, token, c)
+VALUES ({{s device_id}},{{s date}},{{s app}},{{s token}},{{i c}})
+ON CONFLICT(device_id, date, app, token) DO UPDATE SET c = c + excluded.c;
+
+-- name: agg.system_day
+-- doc: A delta of the machine's day. A caller that does not own a counter passes
+-- doc: 0, which adds nothing. The Linux day row is a snapshot it recomputes, with
+-- doc: battery columns, so it replaces its row instead and is not this statement.
+INSERT INTO agg_system_day (device_id, date, wifi_changes, space_switches, audio_muted_ms, locked_ms, sleep_ms, awake_ms, passive_count, night_wake_count)
+VALUES ({{s device_id}},{{s date}},{{i wifi_changes}},{{i space_switches}},{{i audio_muted_ms}},{{i locked_ms}},{{i sleep_ms}},{{i awake_ms}},{{i passive_count}},{{i night_wake_count}})
+ON CONFLICT(device_id, date) DO UPDATE SET
+  wifi_changes = wifi_changes + excluded.wifi_changes,
+  space_switches = space_switches + excluded.space_switches,
+  audio_muted_ms = audio_muted_ms + excluded.audio_muted_ms,
+  locked_ms = locked_ms + excluded.locked_ms, sleep_ms = sleep_ms + excluded.sleep_ms,
+  awake_ms = awake_ms + excluded.awake_ms, passive_count = passive_count + excluded.passive_count,
+  night_wake_count = night_wake_count + excluded.night_wake_count;
+
 -- name: agg.title
 -- doc: One window title's counters for an application day.
 INSERT INTO agg_app_day_titles (device_id, date, app, title, c, ms)
@@ -444,3 +477,15 @@ VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s kind}}, 
 -- doc: The start or end of a typing session or an idle period.
 INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms)
 VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{i? duration_ms}});
+
+-- name: events.typing
+-- doc: A flushed run of typed text. text and events_json arrive already encrypted
+-- doc: when the at-rest setting is on; the renderer only quotes them.
+INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s? app_category}}, {{s? title}}, {{s? url}}, {{s? field_role}}, {{s? layout}}, {{s? document_path}}, {{i is_fullscreen}}, {{i in_meeting}}, {{i mouse_clicks}}, {{i mouse_scrolls}}, {{i mouse_distance_px}}, {{i? pause_before_ms}}, {{i? battery_level}}, {{r? audio_volume}}, {{r? wpm}}, {{s text}}, {{s? rich_text}}, {{s events_json}});
+
+-- name: events.llm
+-- doc: A prediction generated, shown, dismissed or accepted. An absent number is
+-- doc: NULL, so the dashboard tells no token count from a count of zero.
+INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s kind}}, {{s? context}}, {{s? predictions_json}}, {{s? prediction}}, {{s? all_predictions_json}}, {{i? chosen_index}}, {{i? deletes}}, {{s? deleted_text}}, {{i? net_saved_chars}}, {{i? count}}, {{i? prompt_tokens}}, {{i? completion_tokens}}, {{i? total_tokens}}, {{r? est_cost_usd}});
