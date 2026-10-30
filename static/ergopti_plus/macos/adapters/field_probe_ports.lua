@@ -645,6 +645,7 @@ function M.new()
 		ollama_predict = ollama_predict,
 		menu_rebuild = menu_rebuild,
 		scratch_typing = scratch_typing,
+		gesture_frame_counts = function() return require("infra.gesture_frame_evidence").counts() end,
 		capslock_chord_facts = function()
 			local Shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 			local counts = require("infra.capslock_chord_evidence").counts()

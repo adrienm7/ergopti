@@ -32,6 +32,8 @@
 ---    see each key once and the field must hold exactly the sequence.
 --- 11. capslock_chord: whether the Ctrl+Caps Lock slot is bound, and whether a
 ---    physical Ctrl+Caps Lock press this session ever reached it.
+---    gesture_frames: every touch frame this session carried its capture stamp,
+---    and the mean spacing of the stamps.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only, like the Debug checks: nothing is granted, prompted, written
@@ -937,6 +939,26 @@ function M.capslock_chord(ports, report, finish)
 	else
 		report.step("capslock_chord_delivered", STATE.fail, "never_delivered")
 	end
+	finish()
+end
+
+--- The gestures engine times touch frames on the trackpad's capture stamp, so a
+--- burst delivered after a main-thread stall keeps its real spacing (ledger
+--- L46). Any frame without a stamp fails; the mean spacing of the stamped ones
+--- (about 8 ms on a built-in trackpad) shows the stamp is in seconds.
+function M.gesture_frames(ports, report, finish)
+	local counts = ports.gesture_frame_counts()
+	if counts.stamped + counts.unstamped == 0 then
+		report.step("gesture_frames_stamped", STATE.skip, "no_touch")
+		report.step("gesture_frame_spacing_ms", STATE.skip, "no_touch")
+		finish()
+		return
+	end
+	report.step("gesture_frames_stamped", counts.unstamped == 0 and STATE.pass or STATE.fail,
+		counts.unstamped == 0 and counts.stamped or ("unstamped:" .. counts.unstamped))
+	local spacing = counts.mean_spacing_ms
+	report.step("gesture_frame_spacing_ms", STATE.info,
+		spacing and string.format("%.1f", spacing) or "single_frame")
 	finish()
 end
 
