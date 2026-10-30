@@ -480,6 +480,34 @@ local function ollama_installed_model()
 	return nil
 end
 
+--- Whether predictions can show with a model already on this Mac. Nothing is
+--- started or downloaded: an Ollama server that is not running lists nothing,
+--- and a remote backend never counts as installed.
+--- @param callback function fn({ enabled, backend, installed }).
+local function prediction_readiness(callback)
+	local engine = package.loaded["modules.llm.prediction_engine"]
+	if type(engine) ~= "table" or type(engine.get_llm_enabled) ~= "function" then
+		return callback({ enabled = false, backend = "absent", installed = false })
+	end
+	local _, model = engine.get_llm_runtime_setting("llm_model")
+	local facts = { enabled = engine.get_llm_enabled() == true, backend = require("modules.llm").get_backend(),
+		installed = false }
+	if not facts.enabled or type(model) ~= "string" or model == "" then return callback(facts) end
+	if facts.backend == "ollama" then
+		return ollama_refresh(function(listed)
+			facts.installed = listed and require("modules.llm.api_ollama").local_model_installed(model) == true
+			callback(facts)
+		end)
+	end
+	if facts.backend == "mlx" then
+		local manager = models_manager()
+		local _, display = engine.get_llm_runtime_setting("llm_display_model_name")
+		facts.installed = manager ~= nil and type(manager.mlx_model_installed) == "function"
+			and manager.mlx_model_installed(display) == true
+	end
+	callback(facts)
+end
+
 --- Predicts one token through the driver's own Ollama request path.
 --- @param model string Installed model.
 --- @param text string The check's own text.
@@ -517,11 +545,33 @@ local SCRATCH_SETTLE_SECONDS = 0.6
 local SCRATCH_KEY_GAP_SECONDS = 0.08
 local SCRATCH_READ_SECONDS = 0.4
 local SCRATCH_BOUND_SECONDS = 5
+-- Seconds between two reads of an awaited effect (expanded text, prediction).
+local SCRATCH_POLL_SECONDS = 0.05
 
 -- The scratch page: one text field that takes the focus itself.
 local SCRATCH_HTML = [[<!doctype html><html><body style="margin:12px;font:14px -apple-system">
 <textarea id="field" rows="2" cols="30" autofocus></textarea>
 <script>document.getElementById("field").focus();</script></body></html>]]
+
+--- True while the prediction engine shows predictions, read without starting it.
+--- @return boolean shown
+local function prediction_shown()
+	local engine = package.loaded["modules.llm.prediction_engine"]
+	return type(engine) == "table" and type(engine.is_visible) == "function" and engine.is_visible() == true
+end
+
+--- The shipped hotstrings the hotstring round-trip may type, and how Space
+--- ends one, or nil before the keymap registry is loaded.
+--- @return table|nil facts { candidates = { { trigger, expansion } }, space_terminates, space_consumed }
+local function hotstring_candidates()
+	local registry = package.loaded["modules.keymap.registry"]
+	if type(registry) ~= "table" or type(registry.field_run_candidates) ~= "function" then return nil end
+	return {
+		candidates = registry.field_run_candidates(),
+		space_terminates = registry.is_terminator(" ") == true,
+		space_consumed = registry.terminator_is_consumed(" ") == true,
+	}
+end
 
 --- The menu's timed rebuild, or nil before the menu exists.
 --- @return table|nil outcome
@@ -549,10 +599,12 @@ end
 --- closes the window and brings the previous application back whatever happens.
 --- A key is a single character or a key name such as "space".
 --- @param keys table Keys, typed in order.
---- @param callback function fn({ focused, posted, aborted, text, latency_ms, restored }).
---- @param options table|nil { bound_seconds, watch = fn(field, done(text)) }:
----        watch replaces the plain read after the last key, for a step that
----        waits for an effect; field = { read(fn(text)), last_key_at }.
+--- @param callback function fn({ focused, posted, aborted, text, latency_ms,
+---        effect_ms, restored }).
+--- @param options table|nil { bound_seconds, wait_seconds, until_text, until_prediction }:
+---        after the last key, the field (until_text) or the prediction tooltip
+---        (until_prediction) is polled for wait_seconds; effect_ms is the time
+---        from the last key to the effect, nil when it never came.
 local function scratch_typing(keys, callback, options)
 	local Timer = require("adapters.timer_scheduler")
 	local OwnWindow = require("adapters.own_window")
@@ -614,23 +666,33 @@ local function scratch_typing(keys, callback, options)
 		settle("scratch_bound")
 	end)
 	local last_key_at = nil
+	local function read_field(fn) view:evaluateJavaScript('document.getElementById("field").value', fn) end
+	local function done(text)
+		if settled then return end
+		outcome.text = type(text) == "string" and text or nil
+		outcome.latency_ms = (hs.timer.absoluteTime() - started) / 1e6
+		settle(nil)
+	end
+	--- Polls for the awaited effect until it shows or wait_seconds run out.
+	--- @param polls integer Polls left.
+	local function poll(polls)
+		if settled then return end
+		local function observed(effect)
+			if effect then outcome.effect_ms = (hs.timer.absoluteTime() - last_key_at) / 1e6 end
+			if effect or polls <= 1 then return read_field(done) end
+			Timer.after(SCRATCH_POLL_SECONDS, function() poll(polls - 1) end)
+		end
+		if options.until_prediction then return observed(prediction_shown()) end
+		read_field(function(text) observed(text == options.until_text) end)
+	end
 	local function finish_typing()
 		if settled then return end
-		local function done(text)
-			if settled then return end
-			outcome.text = type(text) == "string" and text or nil
-			outcome.latency_ms = (hs.timer.absoluteTime() - started) / 1e6
-			settle(nil)
-		end
-		if options.watch then
-			return options.watch({
-				read = function(fn) view:evaluateJavaScript('document.getElementById("field").value', fn) end,
-				last_key_at = last_key_at,
-			}, done)
+		if options.until_text or options.until_prediction then
+			return poll(math.max(1, math.floor((options.wait_seconds or SCRATCH_READ_SECONDS) / SCRATCH_POLL_SECONDS)))
 		end
 		Timer.after(SCRATCH_READ_SECONDS, function()
 			if settled then return end
-			view:evaluateJavaScript('document.getElementById("field").value', done)
+			read_field(done)
 		end)
 	end
 	local function type_key(index)
@@ -719,6 +781,8 @@ function M.new()
 				deliveries = counts.deliveries,
 			}
 		end,
+		hotstring_candidates = hotstring_candidates,
+		prediction_readiness = prediction_readiness,
 	}
 end
 

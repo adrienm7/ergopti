@@ -848,6 +848,8 @@ M.checks = {
 	typing_selftest = Probes.typing_selftest,
 	capslock_chord = Probes.capslock_chord,
 	gesture_frames = Probes.gesture_frames,
+	hotstring_roundtrip = Probes.hotstring_roundtrip,
+	prediction_tooltip = Probes.prediction_tooltip,
 }
 
 --- The Debug menu checks the field run does not ask for, each with the

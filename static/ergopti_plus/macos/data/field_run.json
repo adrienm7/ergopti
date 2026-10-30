@@ -132,6 +132,20 @@
 			"proves": "Every touch frame of this session carried the trackpad's capture stamp, which gesture timing uses, and the stamps are about 8 ms apart; no touch this session is a skip."
 		},
 		{
+			"id": "hotstring_roundtrip",
+			"kind": "field_check",
+			"check": "hotstring_roundtrip",
+			"deadline_seconds": 30,
+			"proves": "Without a person: a shipped hotstring typed with its terminator into the app's own scratch field, through the real keymap path, leaves exactly its expansion there."
+		},
+		{
+			"id": "prediction_tooltip",
+			"kind": "field_check",
+			"check": "prediction_tooltip",
+			"deadline_seconds": 90,
+			"proves": "Without a person: with an installed model, a short neutral text typed into the app's own scratch field brings up the prediction tooltip, and how long it took is named."
+		},
+		{
 			"id": "field_menu_build",
 			"kind": "field_check",
 			"check": "menu_build",
