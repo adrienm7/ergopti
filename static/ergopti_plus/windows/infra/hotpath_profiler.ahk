@@ -39,7 +39,12 @@ global _HOTPATH_QPC_FREQ := 0
 ; Keystrokes whose hot-path processing exceeds this many milliseconds are logged
 ; at WARNING. 5 ms is below the threshold of perceptible single-keystroke lag yet
 ; high enough that a healthy keystroke (sub-millisecond) never trips it.
-global _HOTPATH_SLOW_MS := 5.0
+; Single source: _shared/modules/timings/constants.toml [logger] hotpath_slow_ms,
+; assigned by HotPath_LoadTimings. Declared unset on purpose: every reader already
+; skips an unset threshold (a message-pumping Bundle_Init reaches the profiler
+; before this file's initializers), so a sample taken before the registry is read
+; is not judged against a guessed number.
+global _HOTPATH_SLOW_MS
 ; Per-segment overrides of the threshold above, for segments whose NORMAL cost is
 ; already past it. The global 5 ms is calibrated for per-keystroke work, where
 ; 5 ms is alarming. Applied to a repeating background probe whose healthy cost is
@@ -95,6 +100,18 @@ global _HOTPATH_BREAKDOWN_CAP := 24
 ; ======= 1/ Hot-path keystroke profiler API =======
 ; ==================================================
 ; ==================================================
+
+; Assign the slow-segment threshold from the shared registry. AHK v2 runs global
+; initializers before the auto-execute body, so infra/boot.ahk calls this right
+; after TimingsLoadShared(). Fail-fast: TimingsGet throws on a missing key, and a
+; threshold of zero would report every keystroke as slow.
+HotPath_LoadTimings() {
+	global _HOTPATH_SLOW_MS
+	SlowMs := TimingsGet("logger", "hotpath_slow_ms")
+	if (SlowMs <= 0)
+		throw ValueError(Format("[logger] hotpath_slow_ms must be positive, got {1}.", SlowMs))
+	_HOTPATH_SLOW_MS := SlowMs
+}
 
 ; Read the current high-resolution performance counter.
 ; @returns {Integer} Raw QPC tick value; pass to HotPath_LogIfSlow as the start.
@@ -230,7 +247,8 @@ _HotPathBreakdown(Marks, Op, Label := "", StartTicks := 0) {
 		ElapsedMs := (_HOTPATH_QPC_FREQ > 0)
 			? ((now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0) : 0.0
 		Marks.Push({ L: Label, Ms: ElapsedMs })
-		HotPath_RecordLatency("Substep." . Label, ElapsedMs, _HOTPATH_SLOW_MS)
+		if IsSet(_HOTPATH_SLOW_MS)
+			HotPath_RecordLatency("Substep." . Label, ElapsedMs, _HOTPATH_SLOW_MS)
 		return ""
 	}
 	if Op != "drain"
