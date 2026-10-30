@@ -194,6 +194,7 @@ LLM_Menu_BuildSubmenu() {
 
 	Commands := _LLM_ScopeCommands()
 	Commands["llm_toggle"] := LLM_Menu_OnToggle
+	Commands["llm_test_prediction"] := (*) => LLM_Menu_TestPrediction()
 	StateGetters := _LLM_Menu_StateGetters()
 	WarningRows := []
 	if (_LLM_Menu["enabled"] and _LLM_Menu["backend"] == "ollama" and !_deps_ready) {

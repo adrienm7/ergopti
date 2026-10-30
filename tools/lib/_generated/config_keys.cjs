@@ -459,6 +459,7 @@ module.exports = Object.freeze({
 		LLM_RESET_ON_NAV: "llm_reset_on_nav",
 		LLM_SECURE_FIELD_FILTER: "llm_secure_field_filter",
 		LLM_SHOW_ALL: "llm_show_all",
+		LLM_TEST_PREDICTION: "llm_test_prediction",
 		LLM_TOGGLE: "llm_toggle",
 		LLM_TOKEN_STREAMING: "llm_token_streaming",
 		LLM_TRIGGER_DEBOUNCE: "llm_trigger_debounce",
