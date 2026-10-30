@@ -387,6 +387,10 @@ local function register_boot(h, driver)
 				h.assert_eq(read_bytes(path), newer, "the newer file keeps its exact bytes")
 				h.assert_nil(read_bytes(Engine.backup_path(path, 3, STAMP)), "nothing is backed up")
 				h.assert_eq(count_level(lines, "error"), 1, "the refusal is logged as ERROR")
+				local logged = {}
+				for _, line in ipairs(lines) do logged[#logged + 1] = line.text end
+				h.assert_true(table.concat(logged, "\n"):find("v999 is newer than this build's v", 1, true) ~= nil,
+					"the refusal names both schema versions: " .. table.concat(logged, " | "))
 				h.assert_true(type(Engine.read_only_reason(path)) == "string", "the session is read-only")
 				h.assert_eq(Engine.read_only_notice_key(result), "config.read_only.newer_schema",
 					"the driver tells the user why settings do not stick")
