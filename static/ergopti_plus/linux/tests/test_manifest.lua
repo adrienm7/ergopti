@@ -456,6 +456,7 @@ return {
 	"tests.unit.ui.menu.structure.test_menu_no_double_separator",
 	"tests.unit.ui.menu.structure.test_menu_off_platform_rows_hidden",
 	"tests.unit.ui.menu.structure.test_menu_reload_reaches_the_daemon",
+	"tests.unit.ui.menu.structure.test_menu_part_reload",
 	"tests.unit.ui.menu.structure.test_menu_row_dialect",
 	"tests.unit.ui.menu.structure.test_menu_magic_frame",
 	"tests.unit.ui.menu.structure.test_menu_parent_source",
