@@ -61,7 +61,15 @@ process exited. Window and program cleanup debt still refuses the request as
 flight joins it. The hotstring file watcher and the magic-key change keep the
 in-process catalogue reload: they are not a Reload.
 
-## Not decided here
+## Proof
 
-The relay and systemd restarts cannot be exercised without a Linux host. The
-flow is tested with fakes under WSL; a real restart stays a field check.
+`linux/tests/hardware/run_reload_restart_live.lua` (CI: "Restart the daemon
+through the local reload control") runs the relay path across real processes:
+the published `tools/control/request_driver_reload.sh` rings a process hosting
+the production `infra/driver_control.lua` and `infra/daemon_restart.lua`, which
+writes the pending record, arms the real detached relay and exits; the relay
+starts the launcher and the successor, a new pid, completes the request,
+refuses it with its own boot's reason, or reports a timeout when it was ready
+past a short deadline. The host is not the whole daemon (no keyboard or tray).
+A restart through the systemd user unit still needs a user session with the
+unit installed: a field check.
