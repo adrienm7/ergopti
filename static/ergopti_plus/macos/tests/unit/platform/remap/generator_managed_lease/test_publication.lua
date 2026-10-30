@@ -46,9 +46,15 @@ helpers.describe("Karabiner generator publication uses the proven filesystem wri
 			fixture.write_succeeds = true
 			fixture.before_publication = nil
 
+			helpers.assert_nil(Generator.last_deploy(), "no publication yet in this session")
 			local ok, detail, attempts = Generator.merge_and_deploy_config(incoming, path)
 			helpers.assert_true(ok, tostring(detail))
 			helpers.assert_eq(attempts, 1)
+			-- (lease-deploy-write) the field run's lease check names this publication.
+			local deploy = Generator.last_deploy()
+			helpers.assert_eq(deploy and deploy.bytes, #fixture.file_writes[1].content,
+				"the last deploy names the bytes it wrote")
+			helpers.assert_true(type(deploy.write_ms) == "number" and deploy.write_ms >= 0)
 			helpers.assert_eq(#fixture.parent_prepare_calls, 1)
 			helpers.assert_eq(fixture.parent_prepare_calls[1], path)
 			helpers.assert_eq(#fixture.file_reads, 1, "publication must merge from one exact post-preparation read")
