@@ -508,6 +508,7 @@ return {
 	"tests.unit.infra.test_features_manifest_projection",
 	"tests.unit.modules.updater.vectors.test_update_channels_vectors",
 	"tests.unit.modules.updater.check.test_update_check_feedback",
+	"tests.unit.modules.updater.vectors.test_update_check_session_vectors",
 	"tests.unit.modules.updater.vectors.test_update_schedule_vectors",
 	"tests.unit.modules.updater.check.test_updater_check_schedule",
 	"tests.meta.architecture.test_updater_constants_single_source",
