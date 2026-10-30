@@ -5136,13 +5136,18 @@ local function _about_update_rows(ctx)
 		return out
 	end
 
-	out[#out + 1] = _channel_picker(ctx, up)
-
 	-- A local version has no installation to update, so it checks for nothing
-	-- (the updater starts no background check for it). Its check row and its
-	-- frequency row are still drawn, greyed with the reason: left out, nobody
+	-- (the updater starts no background check for it). Its channel, check and
+	-- frequency rows are still drawn, greyed with the reason: left out, nobody
 	-- could tell whether the automatic update exists.
 	local source_run = Installation.is_source_run()
+	local channel_row = _channel_picker(ctx, up)
+	if source_run then
+		channel_row.items = nil
+		channel_row.disabled = true
+		channel_row.disabled_reason_key = "menu.about.source_run_reason"
+	end
+	out[#out + 1] = channel_row
 	-- A system package never self-updates either, so it gets the same greyed rows
 	-- with its own reason (the key the Versions window already shows).
 	local update_blocked_reason = source_run and "menu.about.source_run_reason" or nil

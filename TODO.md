@@ -899,14 +899,6 @@ Maintainer requests of 2026-10-30 (Windows, macOS and Linux each):
 
 - [ ] **AI menu: a button to test a prediction.** [CODE] It runs one prediction on a sample context with the
       active backend and shows the result or the refusal reason.
-- [ ] **Update channel picker greyed in an unbuilt local copy.** [CODE] The dev versus main selector has no
-      meaning in a source checkout that was not built; grey it with its reason.
-      Lead (2026-10-30): Uninstall is already greyed this way through `disabled_when = ["installed_build"]` and
-      `disabled_reason_key = "menu.about.source_run_reason"` (`_shared/modules/features/manifest.toml`), and
-      each driver answers `installed_build` (macOS `ui/menu/menu_about.lua`). The picker is a `choice` row
-      (`[[menu.about_update_channel_menu]]`, built by `ManifestMenu.choice_row`), and the choice renderers
-      (`_shared/lua/menu/renderer.lua`, `windows/infra/manifest_menu.ahk`, Linux `menu_builder.lua`) do not
-      read `disabled_when` yet: add it there first, with a renderer test per driver.
 - [ ] **"Create a GitHub issue" button is broken.** [CODE] It opens a GitHub page saying "Whoops, something
       went wrong". Check the generated `issues/new` URL (length limit, query encoding, template or label
       names) and fix it on the three OS. Checked on 2026-10-30 from the cloud container: every prefilled id

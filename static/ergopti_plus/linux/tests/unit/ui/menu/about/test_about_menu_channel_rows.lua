@@ -181,6 +181,19 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		end
 	end)
 
+	helpers.it("a local version greys the channel submenu with its reason", function()
+		local i18n = require("infra.i18n")
+		local rows = submenu_of(build(fake_updater("dev"), nil, true), "menu.about.title")
+		helpers.assert_true(rows ~= nil, "the About submenu must be drawn")
+		local picker = rows[CHANNEL_AT]
+		local reason = i18n.get("menu.about.source_run_reason")
+		local head = reason:match("^(.-)%s*[:：]") or reason
+		helpers.assert_true(picker.title:find(" — " .. head, 1, true) ~= nil,
+			"the channel row says why it is greyed: " .. tostring(picker.title))
+		helpers.assert_eq(picker.disabled, true, "the channel row is greyed")
+		helpers.assert_nil(picker.menu, "a local version installs nothing, so no channel can be chosen")
+	end)
+
 	helpers.it("no channel is a flat row of the About submenu any more", function()
 		local up = fake_updater("dev")
 		local rows = submenu_of(build(up), "menu.about.title")
