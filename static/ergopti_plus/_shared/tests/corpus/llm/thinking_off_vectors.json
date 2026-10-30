@@ -1003,7 +1003,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 35,
+			"family": 36,
 			"kind": "toggle"
 		},
 		{
@@ -1049,7 +1049,7 @@
 				}
 			},
 			"added": [["thinking"]],
-			"family": 35,
+			"family": 36,
 			"kind": "toggle"
 		},
 		{
@@ -2496,6 +2496,137 @@
 			"added": [["reasoning_effort"]],
 			"family": 24,
 			"kind": "effort"
+		},
+		{
+			"id": "reka_reka-edge-2603",
+			"provider": "reka",
+			"model": "reka-edge-2603",
+			"body": { "model": "reka-edge-2603", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "reka-edge-2603",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "stepfun_step-3.5-flash",
+			"provider": "stepfun",
+			"model": "step-3.5-flash",
+			"body": { "model": "step-3.5-flash", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "step-3.5-flash",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
+		},
+		{
+			"id": "volcengine_doubao-seed-2-0-mini-260428",
+			"provider": "volcengine",
+			"model": "doubao-seed-2-0-mini-260428",
+			"body": {
+				"model": "doubao-seed-2-0-mini-260428",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "doubao-seed-2-0-mini-260428",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["thinking"]],
+			"family": 35,
+			"kind": "toggle"
+		},
+		{
+			"id": "volcengine_deepseek-v3-2-251201",
+			"provider": "volcengine",
+			"model": "deepseek-v3-2-251201",
+			"body": {
+				"model": "deepseek-v3-2-251201",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"expected": {
+				"model": "deepseek-v3-2-251201",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["thinking"]],
+			"family": 36,
+			"kind": "toggle"
+		},
+		{
+			"id": "qianfan_ernie-5.1",
+			"provider": "qianfan",
+			"model": "ernie-5.1",
+			"body": { "model": "ernie-5.1", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "ernie-5.1", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "qianfan_qwen3-32b",
+			"provider": "qianfan",
+			"model": "qwen3-32b",
+			"body": { "model": "qwen3-32b", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "qwen3-32b",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["enable_thinking"], ["thinking"]],
+			"family": 30,
+			"kind": "toggle"
+		},
+		{
+			"id": "qianfan_deepseek-v3.2",
+			"provider": "qianfan",
+			"model": "deepseek-v3.2",
+			"body": { "model": "deepseek-v3.2", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "deepseek-v3.2",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7,
+				"enable_thinking": false,
+				"thinking": { "type": "disabled" }
+			},
+			"added": [["enable_thinking"], ["thinking"]],
+			"family": 31,
+			"kind": "toggle"
+		},
+		{
+			"id": "spark_lite",
+			"provider": "spark",
+			"model": "lite",
+			"body": { "model": "lite", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": { "model": "lite", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"added": []
+		},
+		{
+			"id": "baichuan_Baichuan4-Air",
+			"provider": "baichuan",
+			"model": "Baichuan4-Air",
+			"body": { "model": "Baichuan4-Air", "max_tokens": 16, "stream": false, "temperature": 0.7 },
+			"expected": {
+				"model": "Baichuan4-Air",
+				"max_tokens": 16,
+				"stream": false,
+				"temperature": 0.7
+			},
+			"added": []
 		}
 	],
 	"refusal_vectors": [
