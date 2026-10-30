@@ -2678,16 +2678,30 @@ def _observe(
         render_cask(children, repository, tap, c, good_c)
         refused = invoke_brew(children, upgrade, check=False)
         checksum_output = refused.stdout + refused.stderr
+        # Homebrew rewords this refusal between releases ("SHA256 mismatch",
+        # "SHA-256 mismatch", "Cask reports different checksum:"); both digests
+        # in the output stay the independent evidence.
+        lowered = checksum_output.lower()
         diagnostic = any(
-            marker in checksum_output
-            for marker in ("SHA256 mismatch", "Cask reports different checksum:")
+            marker in lowered
+            for marker in (
+                "sha256 mismatch",
+                "sha-256 mismatch",
+                "checksum mismatch",
+                "different checksum",
+            )
         )
+        facts = {
+            "refused": refused.returncode != 0,
+            "diagnostic": diagnostic,
+            "expected_digest": digest(good_c) in checksum_output,
+            "served_digest": digest(bad_c) in checksum_output,
+        }
         require(
-            refused.returncode != 0
-            and diagnostic
-            and digest(good_c) in checksum_output
-            and digest(bad_c) in checksum_output,
-            "Actual Brew did not report independent expected/served checksum refusal",
+            all(facts.values()),
+            "Actual Brew did not report independent expected/served checksum refusal: "
+            + ", ".join(name for name, held in facts.items() if not held)
+            + " missing",
         )
         require(
             verify_installed(children, b, apps[b]) == installed,
