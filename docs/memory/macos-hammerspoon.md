@@ -488,6 +488,14 @@ On POSIX Lua, `file:read(0)` returns nil without an error at EOF for an empty
 regular file; a directory returns nil with an error. Test doubles must inspect
 both returns instead of treating nil as proof of a directory.
 
+### project-macos-atomic-write-leaves-a-lock-file
+
+`adapters/file_system.lua` writes through a sibling `<path>.ergoptiplus-write-lock-v1`
+that stays after the write (the field run results show one per result file). A
+scratch file in a folder the user owns (a writability probe) must be written and
+removed with plain `io.open`/`os.remove`, or each run leaves that lock file behind.
+The stub `hs.fs.attributes` ignores its second argument: read the attribute table.
+
 ### project-macos-split-module-stub-reload
 
 When extracting a stateful module, add it to every `load_with_stubs` reload list.
