@@ -113,7 +113,7 @@ DriverControl_Folder(Spec, Base) {
 ; ===========================
 
 DriverControl_IsToken(Spec, Text) {
-	return (Text is String) && StrLen(Text) == Spec["token_hex_length"] && RegExMatch(Text, "^[0-9a-f]+$")
+	return (Text is String) && StrLen(Text) == Spec["token_hex_length"] && RegExMatch(Text, "\A[0-9a-f]+\z")
 }
 
 ; Compares every character, so the time taken does not tell how many match.
@@ -127,7 +127,7 @@ DriverControl_SameToken(First, Second) {
 }
 
 DriverControl_IsRequestId(Value) {
-	return (Value is String) && RegExMatch(Value, "^[A-Za-z0-9_-]{1,64}$")
+	return (Value is String) && RegExMatch(Value, "\A[A-Za-z0-9_-]{1,64}\z")
 }
 
 /**
@@ -159,7 +159,7 @@ DriverControl_ParseRequest(Spec, Text, Token, &Reason, &Echoed) {
 	if DriverControl_IsRequestId(Request.Get("request_id", ""))
 		Echoed := Request["request_id"]
 	for Key in Request
-		if Key != "schema" && Key != "token" && Key != "request_id" {
+		if Key !== "schema" && Key !== "token" && Key !== "request_id" {
 			Reason := "malformed"
 			return ""
 		}
@@ -283,7 +283,7 @@ DriverControl_Completion(Spec, Text, OwnPid) {
 	for Key in Result
 		if !(Key ~= "^(schema|request_id|state|driver_pid|successor_pid|reason)$")
 			return ""
-	if Result.Get("schema", "") != Spec["schema"] || Result.Get("state", "") != "requested"
+	if Result.Get("schema", "") != Spec["schema"] || Result.Get("state", "") !== "requested"
 			|| !DriverControl_IsRequestId(Result.Get("request_id", ""))
 			|| !(Result.Get("successor_pid", "") is Integer) || Result["successor_pid"] != OwnPid
 		return ""
@@ -324,6 +324,8 @@ DriverControl_Resolve(Spec, Text, OwnPid, Now, &Kind) {
 	if Result.Get("schema", "") != Spec["schema"] || !DriverControl_IsRequestId(Id)
 		return ""
 	Deadline := Result.Get("deadline", "")
+	if Members.Has("deadline") && Members["deadline"]["kind"] != "number"
+		return ""
 	State := Result.Get("state", "")
 	Successor := Result.Get("successor_pid", "")
 	if State == "requested" && Successor == JSON_NULL {

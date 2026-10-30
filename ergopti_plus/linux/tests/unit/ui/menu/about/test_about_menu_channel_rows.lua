@@ -181,6 +181,19 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		end
 	end)
 
+	helpers.it("a local version greys the channel submenu with its reason", function()
+		local i18n = require("infra.i18n")
+		local rows = submenu_of(build(fake_updater("dev"), nil, true), "menu.about.title")
+		helpers.assert_true(rows ~= nil, "the About submenu must be drawn")
+		local picker = rows[CHANNEL_AT]
+		local reason = i18n.get("menu.about.source_run_reason")
+		local head = reason:match("^(.-)%s*[:：]") or reason
+		helpers.assert_true(picker.title:find(" — " .. head, 1, true) ~= nil,
+			"the channel row says why it is greyed: " .. tostring(picker.title))
+		helpers.assert_eq(picker.disabled, true, "the channel row is greyed")
+		helpers.assert_nil(picker.menu, "a local version installs nothing, so no channel can be chosen")
+	end)
+
 	helpers.it("no channel is a flat row of the About submenu any more", function()
 		local up = fake_updater("dev")
 		local rows = submenu_of(build(up), "menu.about.title")
@@ -602,6 +615,58 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 				helpers.assert_eq(result, false)
 			end)
 		end
+	end)
+
+	for _, refusal in ipairs({"false", "nil", "text"}) do
+		helpers.it("refuses cadence publication when the owned timer cannot stop: " .. refusal .. " (update-frequency-timer-receipt)", function()
+			with_frequency_owner(nil, function(up, obs, path)
+				local row = submenu_of(build(up, obs.redraws), "menu.about.title")[CHANNEL_AT + 2]
+				local timer = package.loaded["adapters.timer_scheduler"]
+				local previous_cancel = timer.cancel
+				local current_timer, timer_count = obs.timers[#obs.timers], #obs.timers
+				timer.cancel = function()
+					obs.cancels = obs.cancels + 1
+					if refusal == "false" then return false end
+					if refusal == "text" then return "refused" end
+					return nil
+				end
+				local result = row.menu[1].fn()
+				timer.cancel = previous_cancel
+				helpers.assert_eq(result, false, "the row must expose the schedule owner's refusal")
+				helpers.assert_eq(obs.redraws.count, 0, "a refused restart cannot publish success")
+				helpers.assert_eq(obs.cancels, 1, "the schedule owner alone attempts retirement")
+				helpers.assert_eq(#obs.timers, timer_count, "retained cleanup refuses a successor")
+				helpers.assert_true(current_timer.armed, "the exact previous timer remains retained")
+				helpers.assert_eq(up.get_check_interval(), frequency_corpus().choices[1].value,
+					"the acknowledged durable preference belongs to its writer")
+				local file = assert(io.open(path, "rb"))
+				local bytes = assert(file:read("*a")); assert(file:close())
+				helpers.assert_true(bytes:find("future_interval_option = 42", 1, true) ~= nil)
+				helpers.assert_true(bytes:find("check_interval_seconds = " .. up.get_check_interval(), 1, true) ~= nil)
+			end)
+		end)
+	end
+
+	helpers.it("refuses cadence publication when a replacement timer is not armed (update-frequency-timer-receipt)", function()
+		with_frequency_owner(nil, function(up, obs)
+			local row = submenu_of(build(up, obs.redraws), "menu.about.title")[CHANNEL_AT + 2]
+			local timer = package.loaded["adapters.timer_scheduler"]
+			local previous_after, attempts = timer.after, 0
+			local current_timer, timer_count = obs.timers[#obs.timers], #obs.timers
+			timer.after = function()
+				attempts = attempts + 1
+				return {armed = false}
+			end
+			local result = row.menu[1].fn()
+			timer.after = previous_after
+			helpers.assert_eq(result, false, "allocation refusal must reach the native row")
+			helpers.assert_eq(obs.redraws.count, 0)
+			helpers.assert_eq(obs.cancels, 1)
+			helpers.assert_eq(attempts, 1)
+			helpers.assert_eq(#obs.timers, timer_count)
+			helpers.assert_eq(current_timer.armed, false, "the predecessor acknowledged retirement")
+			helpers.assert_eq(up.get_check_interval(), frequency_corpus().choices[1].value)
+		end)
 	end)
 
 	helpers.it("returns acknowledged writes preserves unknown preferences and replays absolute held selections (shared-update-frequency)", function()

@@ -633,8 +633,14 @@ end
 --- "Illegal argument", others "Notification unsupported") is simply not
 --- watchable. Both are ordinary focus traffic, not driver faults (issue #104).
 local AX_DEAD_ELEMENT = "AXUIElementRef is invalid"
+--- Removal errors after which the element is released. "Messaging failed"
+--- (kAXErrorCannotComplete) means the application did not answer; keeping the
+--- element retried it on every focus change with an ERROR each time, while a
+--- watcher left behind is harmless because AXValueChanged is only handled for
+--- the current element.
+local AX_RELEASED_ON_REMOVAL = { [AX_DEAD_ELEMENT] = true, ["Messaging failed"] = true }
 local AX_UNWATCHABLE_ELEMENT = { ["Illegal argument"] = true, ["Notification unsupported"] = true,
-	[AX_DEAD_ELEMENT] = true }
+	[AX_DEAD_ELEMENT] = true, ["Messaging failed"] = true }
 
 --- Returns the AX message of a watcher error, without its location or traceback.
 --- @param detail any xpcall error value.
@@ -650,8 +656,8 @@ local function mutate_ax_value_watcher(observer, method, element, label)
 	end, debug.traceback)
 	if ok and result ~= false then return true end
 	local message = not ok and ax_watcher_error(result) or nil
-	if method == "removeWatcher" and message == AX_DEAD_ELEMENT then
-		Logger.debug(LOG, "%s: the element no longer exists, so its watcher is already gone.", label)
+	if method == "removeWatcher" and AX_RELEASED_ON_REMOVAL[message] then
+		Logger.debug(LOG, "%s: the element is released without a confirmed removal (%s).", label, message)
 		return true
 	end
 	if method == "addWatcher" and AX_UNWATCHABLE_ELEMENT[message] then

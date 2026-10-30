@@ -110,14 +110,14 @@ function M.reset_permission(bundle_id, on_done)
 end
 
 --- Opens System Settings on the Screen Recording privacy pane.
---- @return boolean opened True only when macOS accepted the URL.
+--- hs.urlevent.openURL rejects every URL lacking "://", and the pane URL is an
+--- x-apple.systempreferences: URI, so it goes through Launch Services instead.
+--- @param on_done function|nil Optional fn(ok) once `open` has exited.
+--- @return boolean opened True when `open` was started.
 --- @return string|nil detail Exact failure otherwise.
-function M.open_permission_settings()
-	local fn, missing = native("urlevent", "openURL")
-	if not fn then return false, missing end
-	local ok, accepted = pcall(fn, M.settings_url())
-	if not ok then return false, tostring(accepted) end
-	if accepted ~= true then return false, "openURL returned " .. tostring(accepted) end
+function M.open_permission_settings(on_done)
+	local started = require("adapters.shell_runner").open(M.settings_url(), on_done)
+	if started ~= true then return false, "open could not be started" end
 	return true
 end
 

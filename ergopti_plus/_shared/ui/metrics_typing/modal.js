@@ -72,7 +72,7 @@ function update_app_btn_text() {
 	const sel = app_state.selected_apps.size;
 	const tot = app_state.available_apps.length;
 
-	if (sel === tot) {
+	if (sel === tot && app_state.app_selection_mode !== APP_SELECTION_MODE.NONE) {
 		btn.innerText = _t('ui_typing.apps_all');
 		btn.classList.add('active');
 	} else {
@@ -83,6 +83,9 @@ function update_app_btn_text() {
 		btn.classList.remove('active');
 	}
 }
+
+// Locale application rewrites declared labels before this dynamic caption is restored.
+document.addEventListener('i18n:applied', update_app_btn_text);
 
 // ======================================
 // ======================================
@@ -169,7 +172,8 @@ function render_app_list() {
 		if (!app.toLowerCase().includes(query)) return;
 
 		const checked = app_state.selected_apps.has(app) ? 'checked' : '';
-		const icon_src = window.app_icons?.[app];
+		const icon_src =
+			window.app_icons && Object.hasOwn(window.app_icons, app) ? window.app_icons[app] : null;
 		const icon_html = icon_src
 			? `<img src="${icon_src}" class="app-icon-img" alt="${escape_html(app)}" />`
 			: `<div class="app-icon-div" style="background-color:${get_app_color(app)}">${app.charAt(0).toUpperCase()}</div>`;

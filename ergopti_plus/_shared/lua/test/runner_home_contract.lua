@@ -116,6 +116,19 @@ function M.run(helpers)
 				"tests/run.lua must isolate HOME before loading any test: " .. tostring(os.getenv("HOME")))
 		end)
 
+		helpers.it("Lua home: the test helpers isolate HOME for a test file run without the runner", function()
+			-- A unit test run on its own wrote into the account's real log folder
+			local source = debug.getinfo(helpers.it, "S").source
+			helpers.assert_eq(source:sub(1, 1), "@", "the helpers must be loaded from a file")
+			local file = assert(io.open(source:sub(2), "rb"))
+			local text = file:read("*a")
+			file:close()
+			local isolate = text:find('\nrequire%("test%.runner_home"%)%.isolate%(%)')
+			helpers.assert_true(isolate ~= nil, "the helpers must call runner_home.isolate() at load")
+			local first_require = text:find("require%(")
+			helpers.assert_eq(first_require, isolate + 1, "isolate() must run before the helpers load any module")
+		end)
+
 		helpers.it("Lua home: a path that climbs out of the temporary directory is a real home", function()
 			helpers.assert_eq(Home.is_scratch("/tmp/../root", os.getenv), false)
 			helpers.assert_eq(Home.is_scratch("/tmpfoo", os.getenv), false, "a sibling prefix is not inside /tmp")

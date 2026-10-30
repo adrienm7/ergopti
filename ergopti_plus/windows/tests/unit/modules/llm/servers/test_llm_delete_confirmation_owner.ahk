@@ -101,10 +101,13 @@ _LDCO_ConfirmationRetainsOwner(Mode) {
 			"tick", (*) => 992, "terminate_process", _LDCO_Release.Bind(State, "terminate"),
 			"wait_process", (*) => 0, "close_process", _LDCO_Release.Bind(State, "close"))
 		Accepted := false
-		ConfirmationError := ""
+		ConfirmationError := "", ContractThrew := false
 		try Accepted := _LLM_Menu_PromptDeleteCachedModel(State.Tag, _LDCO_Confirm.Bind(State), Port)
-		catch as Err
+		catch as Err {
+			ContractThrew := true
 			ConfirmationError := Err.Message
+		}
+		AssertEqual(Mode == "confirm-error", ContractThrew, "Unexpected callback failures cannot pass as a refused action.")
 		AssertEqual(Mode == "confirm-error" ? "injected confirmation failure" : "", ConfirmationError,
 			"A confirmation exception must propagate after ownership cleanup, retaining the original API contract.")
 		AssertEqual(1, State.ConfirmCalls, "Every scenario must reach the actual confirmation boundary.")

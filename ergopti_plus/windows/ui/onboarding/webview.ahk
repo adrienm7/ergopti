@@ -169,18 +169,25 @@ _Onboarding_TryWeb() {
 
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 	try {
-		_OnbWeb_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
+		CreatedController := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
 	} catch as Err {
 		try LoggerError("Onboarding", "WebView2 create failed: {1} — the wizard cannot be shown.", Err.Message)
-		try g.Destroy()
-		_OnbWeb_Reset()
-		; The window was shown before create(): clear the shared sentinel so the
-		; caller's park-loop and a later retry start from a clean slate.
-		_ob_gui := 0
+		if _OnbWeb_SessionCurrent(SessionEpoch) && _ob_gui == g {
+			try g.Destroy()
+			_OnbWeb_Reset()
+			; Clear only this opening's sentinel; a replacement owns its own state.
+			_ob_gui := 0
+		}
 		return false
 	}
-
-	_OnbWeb_WebView := _OnbWeb_Controller.CoreWebView2
+	; SDK creation pumps messages: a close or reopen can supersede this window.
+	if !_OnbWeb_SessionCurrent(SessionEpoch) || _ob_gui != g {
+		CreatedController.Close()
+		LoggerInfo("Onboarding", "Wizard opening cancelled after its window was closed or replaced.")
+		return false
+	}
+	_OnbWeb_Controller := CreatedController
+	_OnbWeb_WebView := CreatedController.CoreWebView2
 	; This controller/webview pair is fresh — re-arm the Reset() guard so this
 	; session's close actually tears it down instead of short-circuiting on a
 	; flag left behind by an earlier _OnbWeb_Reset() call.

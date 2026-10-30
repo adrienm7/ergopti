@@ -29,7 +29,7 @@
 --                       JSON mode cuts raw TEXT at NUL, so its dialect selects
 --                       `json_quote(<expr>) AS <name>_json` and decodes it.
 --                       `<expr>` is a column, or `EXPR AS name`.
--- Census and parity findings: docs/audits/2026-10-24-keystats-sql-census.md.
+-- Census and parity findings: node tools/audit/keystats-sql-census.cjs.
 -- ============================================================================
 
 

@@ -311,10 +311,17 @@ _SRLC_FinalizersTakeClaimBeforeYielding() {
 	local completion_claim := InStr(completion, "_SR_CompletionBegin(", true)
 	Assert(completion_claim > 0,
 		"completion must take the one-shot finalization claim")
+	; An expected capture must be read even when it disappeared. Existence checks
+	; are optional, but every occurrence of yielding work still needs ownership.
 	for token in ["FileExist(", "FileRead(", "_SR_LegacyCleanupCaptureDirectory(", ".Call("] {
 		local pos := InStr(completion, token, true)
-		Assert(pos > completion_claim,
-			"completion token " . token . " must appear only after the finalization claim")
+		if token != "FileExist("
+			Assert(pos > 0, "completion must retain its required operation " . token)
+		while pos {
+			Assert(pos > completion_claim,
+				"completion token " . token . " must appear only after the finalization claim")
+			pos := InStr(completion, token, true, pos + StrLen(token))
+		}
 	}
 	local file_delete := InStr(completion, "_SR_LegacyCleanupCaptureDirectory(", true)
 	local queue_pos := InStr(completion, "_SR_CompletionQueue(", true)

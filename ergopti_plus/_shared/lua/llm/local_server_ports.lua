@@ -95,6 +95,7 @@ function M.descriptor(id, raw)
 			and type(config.file) == "string" and config.file ~= ""
 			and type(config.port_key) == "string" and config.port_key:match("^[%w_]+[%w_%.]*$") ~= nil
 			and (config.dir_file == nil or (type(config.dir_file) == "string" and config.dir_file ~= ""))
+			and (config.key_key == nil or (type(config.key_key) == "string" and config.key_key:match("^[%w_]+[%w_%.]*$") ~= nil))
 		for _, os_name in ipairs(valid and config.os or {}) do valid = valid and OS_NAMES[os_name] == true end
 		if not valid then
 			return nil, "server '" .. id .. "' discovery.config_files[" .. index .. "] is malformed"
@@ -288,13 +289,13 @@ local function expand(path, home)
 	return path
 end
 
---- Reads the port a settings file holds, with its dotted key.
+--- Reads the decoded settings file of one config_files entry.
 --- @param config table A config_files entry.
 --- @param context table { home, read_file, decode_json }.
---- @return number|nil port
---- @return string|nil path The file that gave it.
---- @return string|nil problem Why a present file gave none.
-local function port_from_config(config, context)
+--- @return table|nil root The decoded file, nil when absent or malformed.
+--- @return string path The file read.
+--- @return string|nil problem Why a present file gave nothing.
+local function read_config(config, context)
 	local dir = expand(config.dir, context.home)
 	if config.dir_file then
 		-- A pointer file holding the data folder the user moved the server to
@@ -307,10 +308,31 @@ local function port_from_config(config, context)
 	if type(raw) ~= "string" then return nil, path, nil end
 	local ok, root = pcall(context.decode_json, raw)
 	if not ok or type(root) ~= "table" then return nil, path, "malformed JSON" end
+	return root, path, nil
+end
+
+--- Follows a dotted key through a decoded settings file.
+--- @param root table
+--- @param dotted string "server.port".
+--- @return any
+local function dotted_value(root, dotted)
 	local node = root
-	for key in config.port_key:gmatch("[^%.]+") do
+	for key in dotted:gmatch("[^%.]+") do
 		node = type(node) == "table" and node[key] or nil
 	end
+	return node
+end
+
+--- Reads the port a settings file holds, with its dotted key.
+--- @param config table A config_files entry.
+--- @param context table { home, read_file, decode_json }.
+--- @return number|nil port
+--- @return string|nil path The file that gave it.
+--- @return string|nil problem Why a present file gave none.
+local function port_from_config(config, context)
+	local root, path, problem = read_config(config, context)
+	if not root then return nil, path, problem end
+	local node = dotted_value(root, config.port_key)
 	if node == nil then return nil, path, nil end
 	local port = valid_port(node)
 	if not port then return nil, path, config.port_key .. " is not a TCP port" end
@@ -367,6 +389,46 @@ resolve_config = function(result, descriptor, base_url, context)
 	return result
 end
 
+--- Reads the API key the server's own settings file requires (key_key): a
+--- server started with authentication answers 401 to a keyless probe, and
+--- the user never typed a key the server already holds (oMLX auth.api_key).
+--- The key is only returned, never put in the result's detail nor logged.
+--- @param descriptor table From M.descriptor.
+--- @param context table { os, home, read_file, decode_json }.
+--- @return string|nil key
+local function key_from_configs(descriptor, context)
+	for _, config in ipairs(descriptor.config_files) do
+		local applies = false
+		for _, os_name in ipairs(config.os) do applies = applies or os_name == context.os end
+		if applies and config.key_key then
+			local root = read_config(config, context)
+			local key = root and dotted_value(root, config.key_key)
+			if type(key) == "string" and key ~= "" and not key:find("[%c%s]") then return key end
+		end
+	end
+	return nil
+end
+
+--- Reads the API key the server's own settings file requires (key_key): a
+--- server started with authentication answers 401 to a keyless probe, and
+--- the user never typed a key the server already holds (oMLX auth.api_key).
+--- The key is only returned, never put in the result's detail nor logged.
+--- @param descriptor table From M.descriptor.
+--- @param context table { os, home, read_file, decode_json }.
+--- @return string|nil key
+local function key_from_configs(descriptor, context)
+	for _, config in ipairs(descriptor.config_files) do
+		local applies = false
+		for _, os_name in ipairs(config.os) do applies = applies or os_name == context.os end
+		if applies and config.key_key then
+			local root = read_config(config, context)
+			local key = root and dotted_value(root, config.key_key)
+			if type(key) == "string" and key ~= "" and not key:find("[%c%s]") then return key end
+		end
+	end
+	return nil
+end
+
 --- Resolves one server from the process list and its settings files.
 --- @param id string Server id.
 --- @param descriptor table From M.descriptor.
@@ -389,6 +451,7 @@ function M.resolve(id, descriptor, base_url, processes, context)
 		return result
 	end
 	result.running = true
+	result.api_key = key_from_configs(descriptor, context)
 	if cli_port then
 		result.port, result.source, result.detail = cli_port, M.SOURCE_CLI, cli_flag
 		result.base_url = M.with_port(base_url, cli_port)
@@ -407,6 +470,7 @@ end
 --- @return table result As M.resolve, with needs_all_listeners instead of needs_listeners.
 function M.resolve_unlisted(id, descriptor, base_url, context)
 	local result = { id = id, running = true, pids = {}, base_url = base_url, port = M.default_port(base_url) }
+	result.api_key = key_from_configs(descriptor, context)
 	resolve_config(result, descriptor, base_url, context)
 	if result.needs_listeners then
 		result.needs_listeners, result.needs_all_listeners = nil, true

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Regression guard for modules/llm/ollama_webview.ahk discarding the return
 ; value of WebMessageReceived() — the same GC-unsubscribe bug already fixed
-; at 9 sibling WebView2 hosts (see docs/PROJECT_MEMORY.md's
+; at 9 sibling WebView2 hosts (see docs/memory's
 ; project_webview2_bridge_gotchas entry, item 3). Currently dormant
 ; (OllamaWV_Show has zero live callers after the AHK-29 winget refactor,
 ; confirmed via `grep -rn "OllamaWV_Show(" .`), but OllamaWV_Close retains 2

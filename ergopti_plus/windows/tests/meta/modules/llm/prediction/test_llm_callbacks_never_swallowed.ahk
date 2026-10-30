@@ -52,15 +52,16 @@ _LCS_Throws(Args*) {
 _LCS_ThrowingCallbackIsLoggedNotSwallowed() {
 	Captured := []
 	LoggerSetTestSink((Line) => Captured.Push(Line))
-	Threw := ""
+	Threw := "", ContractThrew := false
 	try {
 		_LLM_InvokeCallback(_LCS_Throws, "on_success", "payload")
 	} catch as Err {
+		ContractThrew := true
 		Threw := Err.Message
 	}
 	LoggerClearTestSink()
 
-	Assert(Threw == "",
+	Assert(!ContractThrew,
 		"the wrapper must contain the exception — it runs from completion handlers where an escaping throw reaches the global error net and is fatal before the driver is ready. Got: " . Threw)
 
 	Joined := ""
@@ -94,11 +95,13 @@ _LCS_SuccessfulCallbackIsForwardedQuietly() {
 ; A missing callback is a no-op, matching what the bare `try` did when a caller
 ; passed nothing. Making this throw would turn optional callbacks into crashes.
 _LCS_MissingCallbackIsANoOp() {
-	Threw := ""
+	Threw := "", ContractThrew := false
 	try _LLM_InvokeCallback("", "on_fail")
-	catch as Err
+	catch as Err {
+		ContractThrew := true
 		Threw := Err.Message
-	Assert(Threw == "",
+	}
+	Assert(!ContractThrew,
 		"an absent callback must be a no-op — several backends leave on_partial and on_cancel unset by design. Got: " . Threw)
 }
 

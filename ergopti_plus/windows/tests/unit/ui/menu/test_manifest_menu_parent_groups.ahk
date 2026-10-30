@@ -148,7 +148,7 @@ _WPF_CheckProductionRefusal(Root) {
 		_LLM_Menu := Map()
 		_LLM_Menu_Handle := Target
 		Root.Delete("llm_profile_parent_frame_ahk")
-		try _LLM_Menu_EmitRow(_LLM_Menu_Handle, "llm_profile", false, false)
+		try _LLM_Menu_EmitRow(_LLM_Menu_Handle, "llm_profile", false)
 		catch as Err
 			Failure := Err.Message
 		AssertEqual("Declared profile parent frame was refused.", Failure,
@@ -187,7 +187,7 @@ _WPF_CheckProductionParentRefusal(Root) {
 		AssertTrue(Root.Has("llm_profile_parent_frame_ahk"), "the complete frame remains present")
 		AssertTrue(Root.Has("llm_after_profile_boundary"), "the existing boundary remains present")
 		Root.Delete("llm_profile_parent_ahk")
-		try _LLM_Menu_EmitRow(_LLM_Menu_Handle, "llm_profile", false, false)
+		try _LLM_Menu_EmitRow(_LLM_Menu_Handle, "llm_profile", false)
 		catch as Err
 			Failure := Err.Message
 		AssertEqual("Declared profile parent frame was refused.", Failure,
@@ -221,7 +221,7 @@ _WPF_CheckCurrentCapturedParentRefusal(Root) {
 		AssertTrue(Root.Has("llm_profile_parent_frame_ahk"), "the whole frame is still admitted")
 		AssertTrue(Root.Has("llm_after_profile_boundary"), "the original following boundary is still admitted")
 		Root.Delete("llm_profile_parent_ahk")
-		try _LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle, "llm_profile", false, false, false, [], Target, "LLM")
+		try _LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle, "llm_profile", false, [], Target, "LLM")
 		catch as Err
 			Failure := Err.Message
 		AssertEqual("Declared profile parent frame was refused.", Failure,

@@ -20,7 +20,10 @@
 ---    chained to the command with &&, so Cancel (or no dialog tool at all)
 ---    runs nothing. The window an action targets (TARGETS) is read before the
 ---    question, so a confirmed force quit kills the application the user acted
----    from, never the one focused once the dialog is gone.
+---    from, never the one focused once the dialog is gone. Its process id is
+---    read before the question too, and the signal goes only to a window that
+---    still belongs to it: a window closed meanwhile leaves no XID to resolve,
+---    and its freed process id may already be another program's.
 --- ==============================================================================
 
 local M = {}
@@ -45,22 +48,24 @@ local quote = ShellRunner.quote
 -- ==================================
 -- ==================================
 
---- Reads the active X11 window into `$win`.
-local ACTIVE_WINDOW = "win=$(xdotool getactivewindow 2>/dev/null)"
-
---- The shell command that signals the process owning the window `$win`.
---- `$PPID` is the daemon (the shell that runs this is its child): its own
---- windows are refused, as are pid 0 and 1, so the action can neither kill the
---- driver nor init. The desktop and the panels (EWMH DESKTOP and DOCK windows)
---- are refused too: they belong to the desktop shell (plasmashell,
+--- Reads the active X11 window into `$win` and the process owning it into
+--- `$pid`. `$PPID` is the daemon (the shell that runs this is its child): its
+--- own windows are refused, as are pid 0 and 1, so the action can neither kill
+--- the driver nor init. The desktop and the panels (EWMH DESKTOP and DOCK
+--- windows) are refused too: they belong to the desktop shell (plasmashell,
 --- xfdesktop…), which a clean SIGTERM exit leaves gone for the session.
+local ACTIVE_WINDOW_OWNER = "win=$(xdotool getactivewindow 2>/dev/null)"
+	.. ' && kind=$(xprop -id "$win" _NET_WM_WINDOW_TYPE 2>/dev/null)'
+	.. ' && case "$kind" in *_NET_WM_WINDOW_TYPE_DESKTOP*|*_NET_WM_WINDOW_TYPE_DOCK*) false;; esac'
+	.. ' && pid=$(xdotool getwindowpid "$win" 2>/dev/null)'
+	.. ' && [ "$pid" -gt 1 ] && [ "$pid" != "$PPID" ]'
+
+--- The shell command that signals `$pid`, read with `$win` beforehand, only
+--- while `$win` still belongs to it.
 --- @param signal string "TERM" or "KILL".
 --- @return string
 local function window_signal(signal)
-	return 'kind=$(xprop -id "$win" _NET_WM_WINDOW_TYPE 2>/dev/null)'
-		.. ' && case "$kind" in *_NET_WM_WINDOW_TYPE_DESKTOP*|*_NET_WM_WINDOW_TYPE_DOCK*) false;; esac'
-		.. ' && pid=$(xdotool getwindowpid "$win" 2>/dev/null)'
-		.. ' && [ "$pid" -gt 1 ] && [ "$pid" != "$PPID" ] && kill -' .. signal .. ' "$pid"'
+	return '[ "$(xdotool getwindowpid "$win" 2>/dev/null)" = "$pid" ] && kill -' .. signal .. ' "$pid"'
 end
 
 --- The GNOME interface setting dark mode lives in, and its two values.
@@ -86,8 +91,8 @@ M.COMMANDS = {
 --- the user acted on. A confirmation reads it before its question, whose own
 --- window would otherwise be what a force quit finds active.
 M.TARGETS = {
-	quit_frontmost_app = ACTIVE_WINDOW,
-	force_quit_frontmost = ACTIVE_WINDOW,
+	quit_frontmost_app = ACTIVE_WINDOW_OWNER,
+	force_quit_frontmost = ACTIVE_WINDOW_OWNER,
 }
 
 --- The notification daemons whose client can dismiss every notification.

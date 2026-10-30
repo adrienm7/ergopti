@@ -202,9 +202,22 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 	end)
 
 	helpers.it("carries every expected submenu", function()
+		-- The AI title carries the health dot the manifest declares; the key
+		-- identity is the title without it.
+		local dots = {}
+		local MenuLayout = require("ui.menu.menu_llm.menu_layout")
+		for _, status in ipairs({ "ready", "warming", "unreachable" }) do
+			dots[#dots + 1] = MenuLayout.title_health_dot(status)
+		end
 		local top = {}
 		for _, row in ipairs(MENU or {}) do
-			if type(row.title) == "string" then top[row.title:gsub(" %(.*%)$", "")] = row end
+			if type(row.title) == "string" then
+				local title = row.title
+				for _, dot in ipairs(dots) do
+					if title:sub(-(#dot + 1)) == " " .. dot then title = title:sub(1, -(#dot + 2)) end
+				end
+				top[(title:gsub(" %(.*%)$", ""))] = row
+			end
 		end
 		for _, key in ipairs(EXPECTED_SUBMENUS) do
 			local row = top[key]

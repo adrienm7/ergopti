@@ -24,7 +24,7 @@ _OllamaStreamNul_Boundary(AfterLine, Newline) {
 	_LLM_ManagedBootstrap := 0
 	Path := A_Temp . "\ergopti_stream_nul_" . A_TickCount . "_" . Random(1, 1000000)
 	Handle := {Pid: 0, ProcessOwner: 0, Cancelled: false,
-		TmpPayload: Path . ".json", TmpStdout: Path . ".out"}
+		TmpPayload: Path . ".json", TmpStdout: Path . ".out", TmpHeaders: ""}
 	_LLM_Ollama_ActiveStreams := [Handle]
 	Events := Map("partials", 0, "successes", 0, "failures", 0, "text", "")
 	try {
@@ -46,6 +46,7 @@ _OllamaStreamNul_Boundary(AfterLine, Newline) {
 		AssertEqual(StrPut(Prefix, "UTF-8") + StrPut(Suffix, "UTF-8") - 1, Bytes.Size,
 			"the authenticated native file must retain both complete records around the NUL")
 		State := Map("acc", "", "last_pos", 0)
+		_OllamaStream_FixtureHttpResponse(Handle)
 		_LLM_Ollama_StreamFinalFlush(Handle, State,
 			(*) => Events["partials"] += 1,
 			(Text) => (Events["successes"] += 1, Events["text"] := Text),
@@ -58,10 +59,13 @@ _OllamaStreamNul_Boundary(AfterLine, Newline) {
 		AssertEqual(1, Events["failures"], "the genuine final flush must settle the invalid response exactly once")
 		AssertEqual("", Events["text"], "no truncated text may cross the success callback")
 		AssertFalse(FileExist(Handle.TmpStdout), "the actual output must retire after invalid-response settlement")
+		AssertFalse(FileExist(Handle.TmpHeaders), "the settled stream retires its actual HTTP header image")
 		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "the actual stream registry must retire the handle")
 	} finally {
 		if FileExist(Handle.TmpStdout)
 			FileDelete(Handle.TmpStdout)
+		if FileExist(Handle.TmpHeaders)
+			FileDelete(Handle.TmpHeaders)
 		_LLM_Ollama_ActiveStreams := SavedStreams
 		_LLM_Ollama_IsReady := SavedReady
 		_LLM_ManagedBootstrap := SavedBootstrap

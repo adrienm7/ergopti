@@ -115,7 +115,10 @@ local function channel_picker(owner, subscribed)
 			local ok, committed = pcall(owner.set, id)
 			return ok and committed == true
 		end,
-	}, { [require("config_keys").KEY.UPDATER_CHANNEL] = function() return subscribed end })
+	}, {
+		[require("config_keys").KEY.UPDATER_CHANNEL] = function() return subscribed end,
+		installed_build = function() return not is_local_source() end,
+	})
 end
 
 --- The check-frequency picker: one row per shared preset, ticked on the
@@ -135,6 +138,7 @@ local function frequency_picker(checks, stored_seconds)
 			if stored_seconds ~= nil then return stored_seconds end
 			return checks.interval()
 		end,
+		installed_build = function() return not is_local_source() end,
 	})
 end
 
@@ -244,11 +248,7 @@ function M.build(ctx, actions)
 			[require("config_keys").COMMAND.ABOUT_SOURCE_CHECK] = function() return false end,
 		}, { ["about_source_release_ready"] = function() return not local_src end })
 		if source_row then table.insert(menu_items, source_row) end
-		local frequency_row = frequency_picker(nil, seconds)
-		frequency_row.items = nil
-		frequency_row.disabled = true
-		frequency_row.disabled_reason_key = "menu.about.source_run_reason"
-		table.insert(menu_items, frequency_row)
+		table.insert(menu_items, frequency_picker(nil, seconds))
 	end
 
 	-- The updater block above is the manifest's `about_updates` list; the rows

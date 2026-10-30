@@ -189,7 +189,7 @@ _DG_ReorderedManifestReordersTheRoot() {
 global _DG_BUILDER_TITLES := Map(
 	"keyboard_layout", 'MenuRenderer_GroupReceiver("top_level", "keyboard_layout")',
 	"hotstrings",      'MenuRenderer_GroupReceiver("top_level", "hotstrings")',
-	"llm",             't("menu.llm.title")',
+	"llm",             'LLM_Menu_TrayTitle()',
 	"agent",           't("menu.agent.title")',
 	"metrics",         't("menu.metrics.title")',
 	"shortcuts",       'MenuRenderer_GroupReceiver("top_level", "shortcuts")',

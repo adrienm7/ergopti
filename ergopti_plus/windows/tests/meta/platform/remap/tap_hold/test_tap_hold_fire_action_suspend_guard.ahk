@@ -4,7 +4,7 @@
 ; MODULE: Tap-Hold Suspend Guard Meta Test (Pattern 1)
 ; DESCRIPTION:
 ; Static source guard for the systemic "native Suspend() never disarms a
-; tap-hold's own dispatch call" gap-class (docs/PROJECT_MEMORY.md's
+; tap-hold's own dispatch call" gap-class (docs/memory's
 ; project-suspend-pause-invariant). Covers TapHoldDispatchTap, the shared gate
 ; used by both configured actions and native/special delayed tap outputs.
 ; ==============================================================================

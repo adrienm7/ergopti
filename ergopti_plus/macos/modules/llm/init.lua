@@ -404,6 +404,7 @@ local API_STATE_VERSION  = 1
 local KEYCHAIN_REFERENCE_PREFIX = "keychain:"
 local TokenCrypto = require("modules.llm.api_token_crypto")
 local ApiCommon = require("modules.llm.api_common")
+local WarmupController = require("modules.llm.warmup_controller")
 
 --- Copies acyclic settings data so later runtime mutations cannot mutate a test
 --- stub's by-reference backing store or our last-known durable snapshot.
@@ -856,6 +857,9 @@ function M.load_api_entries()
 	end
 	ApiRemote.set_entries(copy_settings_value(state.entries))
 	ApiRemote.set_active_entry_id(state.active_id)
+	if WarmupController.retry_deferred_warmup("remote API identity restore") ~= true then
+		Logger.error(LOG, "Deferred warmup replay after remote API identity restore was refused.")
+	end
 
 	local prewarm_ok, prewarm_err = xpcall(ApiRemote.prewarm_active_entry_decrypt, debug.traceback)
 	if not prewarm_ok then Logger.error(LOG, "API token prewarm raised: %s", tostring(prewarm_err)) end

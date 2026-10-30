@@ -43,6 +43,10 @@ luajit - "$BUILD/luv.so" <<'LUA'
 local uv = assert(package.loadlib(arg[1], "luaopen_luv"))()
 assert(jit.os == "Linux" and _VERSION == "Lua 5.1")
 assert(debug.getinfo(uv.fs_stat, "S").what == "C")
+-- infra/native_directory.lua enumerates directories through these entry points.
+for _, name in ipairs({ "fs_opendir", "fs_readdir", "fs_closedir", "fs_lstat", "fs_stat" }) do
+	assert(type(uv[name]) == "function" and debug.getinfo(uv[name], "S").what == "C", name)
+end
 assert(uv.fs_stat(".").type == "directory")
 assert(uv.loop_alive() == false)
 LUA

@@ -9,6 +9,7 @@
 
 local M = {}
 local Json = require("json")
+local TableUtil = require("table_util")
 
 
 
@@ -40,6 +41,54 @@ function M.catalogue(root, occupied)
 		end
 	end
 	return order, servers
+end
+
+--- Copies one request field value made only of JSON scalars and objects.
+--- @param value any Decoded JSON value.
+--- @return any|nil copy nil when a part cannot travel as plain JSON.
+local function copy_request_value(value)
+	local kind = type(value)
+	if kind == "boolean" or kind == "string" or (kind == "number" and value == value) then return value end
+	if kind ~= "table" or Json.is_array(value) or next(value) == nil then return nil end
+	local copy = {}
+	for key, nested in pairs(value) do
+		if type(key) ~= "string" or not key:match("^[A-Za-z_][A-Za-z0-9_]*$") then return nil end
+		local kept = copy_request_value(nested)
+		if kept == nil then return nil end
+		copy[key] = kept
+	end
+	return copy
+end
+
+--- Projects the body fields every request to a local server carries.
+--- Documentation keys start with _; a field that cannot travel as plain JSON
+--- is dropped alone, so one bad field never disables the others.
+--- @param root any Decoded local_servers.json.
+--- @return table fields Field name -> value (possibly empty).
+function M.request_fields(root)
+	local fields = {}
+	local raw = type(root) == "table" and root.request_fields or nil
+	if type(raw) ~= "table" or Json.is_array(raw) then return fields end
+	for name, value in pairs(raw) do
+		if type(name) == "string" and name:match("^[A-Za-z][A-Za-z0-9_]*$") then
+			fields[name] = copy_request_value(value)
+		end
+	end
+	return fields
+end
+
+--- Merges the local request fields into an OpenAI-shape body.
+--- A field the body already sets wins, so no catalogue entry can replace the
+--- model, the messages or the token budget of a request.
+--- @param body table Request body, modified in place.
+--- @param fields table|nil Output of request_fields.
+--- @return table body
+function M.apply_request_fields(body, fields)
+	if type(body) ~= "table" or type(fields) ~= "table" then return body end
+	for name, value in pairs(fields) do
+		if body[name] == nil then body[name] = value end
+	end
+	return body
 end
 
 --- Checks authentication material, independently of configured endpoint ownership.
@@ -110,6 +159,36 @@ function M.entry_matches(provider, base_url, server_id, servers)
 	if provider ~= "openai" and provider ~= "openai_compat" then return false end
 	local configured, canonical = loopback_endpoint(base_url), loopback_endpoint(server.base_url)
 	return configured ~= nil and canonical ~= nil and configured == canonical
+end
+
+--- Finds the key a running local server's own settings file holds for a
+--- request the user gave no key: the scanned server of that catalogue
+--- provider, else, for a generic provider, the scanned server listening at
+--- the same canonical loopback endpoint. A key never leaves loopback.
+--- @param provider any Provider id of the entry or probe.
+--- @param base_url any Its configured address; "" for the scanned address.
+--- @param scans table Server id -> { running, base_url, api_key }.
+--- @param servers table Validated catalogue.
+--- @return string key "" when no scanned server holds one.
+function M.discovered_key(provider, base_url, scans, servers)
+	if type(provider) ~= "string" or type(scans) ~= "table" or type(servers) ~= "table" then return "" end
+	local typed = type(base_url) == "string" and base_url ~= ""
+	local configured = typed and loopback_endpoint(base_url) or nil
+	if typed and not configured then return "" end
+	local function key_of(id)
+		local scan = scans[id]
+		if type(scan) ~= "table" or scan.running ~= true or type(scan.api_key) ~= "string" or scan.api_key == "" then return nil end
+		local scanned = loopback_endpoint(scan.base_url)
+		if not scanned or (configured and configured ~= scanned) then return nil end
+		return scan.api_key
+	end
+	if servers[provider] ~= nil then return key_of(provider) or "" end
+	if (provider ~= "openai" and provider ~= "openai_compat") or not configured then return "" end
+	for _, id in ipairs(TableUtil.sorted_keys(servers)) do
+		local key = key_of(id)
+		if key then return key end
+	end
+	return ""
 end
 
 --- Projects configured generic loopback endpoints as views, never new providers.

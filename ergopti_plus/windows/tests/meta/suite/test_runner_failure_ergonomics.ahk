@@ -11,6 +11,9 @@
 ;
 ; These are real behaviour tests: they call _TestCallSite directly with synthetic
 ; stack strings and assert the parsed result, rather than scanning source.
+; Native child cases also require every thrown callback value to fail its case
+; headlessly and leave the following callback runnable. Opaque payloads must not
+; execute getters or string conversion while the failure is being reported.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -916,3 +919,128 @@ _TRFE_ReplayInvalidCases := [
 for _TRFE_ReplayInvalidVector in _TRFE_ReplayInvalidCases
 	Test("runner replay: " . _TRFE_ReplayInvalidVector.Name . " (runner-replay-command)",
 		_TRFE_ReplayInvalidOperand.Bind(_TRFE_ReplayInvalidVector))
+
+; Every legal thrown value must fail its case and leave the next callback runnable.
+
+_TRFC_SourceString(Value) {
+	return Chr(34) . StrReplace(StrReplace(Value, Chr(96), Chr(96) . Chr(96)),
+		Chr(34), Chr(96) . Chr(34)) . Chr(34)
+}
+
+_TRFC_CallbackThrowChild(Vector) {
+	global _StaticDir, _SR_TreeOwnedTasks
+	static CompletionDeadlineMs := 10000
+	AssertEqual(0, _SR_TreeOwnedTasks.Count, "the callback fixture cannot replace foreign native children")
+	Directory := A_Temp . "\ergopti-callback-value-" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "-" . A_TickCount
+	if !DllCall("Kernel32\CreateDirectoryW", "Str", Directory, "Ptr", 0, "Int")
+		throw OSError(A_LastError, "Cannot acquire the owned callback failure fixture")
+	Owned := _TRFE_AbsoluteTapPath(Directory)
+	Receipt := Directory . "\child.tap", Marker := Directory . "\callbacks.txt"
+	Child := Directory . "\callback-child.ahk", FrameworkCopy := Directory . "\test_framework.ahk"
+	Handle := 0, CanRetire := true
+	Observation := {Calls: 0, Code: -1, Output: "", Errors: ""}
+	Completed(Code, Output, Errors) {
+		Observation.Calls += 1
+		Observation.Code := Code
+		Observation.Output := Output
+		Observation.Errors := Errors
+	}
+	try {
+		FileCopy(_StaticDir . "\ergopti_plus\windows\tests\test_framework.ahk", FrameworkCopy)
+		Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
+			. "EnvSet(" . _TRFC_SourceString("ERGOPTI_AHK_RESULTS_FILE") . ", " . _TRFC_SourceString(Receipt) . ")`n"
+			. "#Include test_framework.ahk`n"
+			. "_OwnedInspectFailure(Params*) {`nFileAppend(" . _TRFC_SourceString("|inspected") . ", "
+			. _TRFC_SourceString(Marker) . ', "UTF-8-RAW")' . "`nthrow Error(" . _TRFC_SourceString("Unexpected payload inspection") . ")`n}`n"
+			. "class _OwnedOpaqueFailure {`n__Get(Name, Params) {`nreturn _OwnedInspectFailure()`n}`n"
+			. "__ToString() {`nreturn _OwnedInspectFailure()`n}`nToString() {`nreturn _OwnedInspectFailure()`n}`n}`n"
+			. '_OwnedPoisonMap() {`nValue := Map("reason", "private")`nValue.DefineProp("__Enum", {Call: _OwnedInspectFailure})`nreturn Value`n}' . "`n"
+			. "_OwnedCallbackFailure() {`nFileAppend(" . _TRFC_SourceString("entered") . ", "
+			. _TRFC_SourceString(Marker) . ', "UTF-8-RAW")' . "`n" . Vector.Statement . "`n}`n"
+			. 'Test("owned callback failure", _OwnedCallbackFailure)' . "`n"
+			. 'Test("owned following callback", () => FileAppend("|after", '
+			. _TRFC_SourceString(Marker) . ', "UTF-8-RAW"))' . "`nRunTests()`n"
+		FileAppend(Source, Child, "UTF-8")
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Child], Completed)
+		AssertTrue(Handle.start(), "the actual callback failure child must start")
+		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
+		while !Observation.Calls && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < CompletionDeadlineMs {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		Entered := FileExist(Marker) ? FileRead(Marker, "UTF-8") : ""
+		_TestPrint("# callback_throw kind=" . Vector.Name . " completions=" . Observation.Calls
+			. " native_exit=" . Observation.Code . " marker=" . Entered)
+		AssertEqual(1, Observation.Calls, "a real callback throw must settle the actual runner without a modal dialog")
+		AssertEqual("", Observation.Errors, "callback failure cannot conceal a transport or capture failure")
+		AssertEqual(1, Observation.Code, "a callback failure must fail the native child process")
+		AssertEqual("entered|after", Entered, "the genuine following callback must execute after failure accounting")
+		Tap := FileRead(Receipt, "UTF-8")
+		AssertContains(Tap, "1..2", "both actual callbacks belong to the execution plan")
+		AssertContains(Tap, "not ok 1 - owned callback failure")
+		AssertContains(Tap, "ok 2 - owned following callback")
+		AssertContains(Tap, "# 1 passed, 1 failed.")
+		AssertContains(Tap, Vector.Diagnostic, "the callback failure retains its original kind and value")
+	} finally {
+		if IsObject(Handle) {
+			CanRetire := Handle.terminate()
+			AssertTrue(CanRetire, "retire the exact callback child before removing its owned fixture")
+		}
+		if CanRetire {
+			Attributes := DllCall("Kernel32\GetFileAttributesW", "Str", Directory, "UInt")
+			if _TRFE_AbsoluteTapPath(Directory) != Owned || Attributes == 0xFFFFFFFF || (Attributes & 0x400)
+				throw Error("Owned callback fixture cleanup refused.")
+			for Leaf in [Receipt, Marker, Child, FrameworkCopy] {
+				if _TRFE_AbsoluteTapPath(Leaf) != Owned . "\" . SubStr(Leaf, StrLen(Directory) + 2)
+					throw Error("Owned callback fixture leaf cleanup refused.")
+				if FileExist(Leaf)
+					FileDelete(Leaf)
+			}
+			DirDelete(Directory)
+		}
+	}
+}
+_TRFC_ThrowVectors := [
+	{Name: "Error", Statement: 'throw Error("owned Error callback failure")', Diagnostic: "owned Error callback failure"},
+	{Name: "String", Statement: 'throw "owned scalar callback failure"', Diagnostic: "String: owned scalar callback failure"},
+	{Name: "zero Integer", Statement: "throw 0", Diagnostic: "Integer: 0"},
+	{Name: "empty String", Statement: 'throw ""', Diagnostic: 'String: ""'},
+	{Name: "Map", Statement: 'throw Map("reason", "owned map callback failure")', Diagnostic: "callback threw Map"},
+	{Name: "Array", Statement: 'throw ["owned array callback failure"]', Diagnostic: "callback threw Array"},
+	{Name: "opaque Object", Statement: "throw _OwnedOpaqueFailure()", Diagnostic: "callback threw Object", Extra: true},
+	{Name: "poisoned Map", Statement: "throw _OwnedPoisonMap()", Diagnostic: "callback threw Map", Extra: true},
+	{Name: "newline String", Statement: 'throw "owned newline``n# 999 passed, 0 failed."',
+		Diagnostic: "String: owned newline\x0A# 999 passed, 0 failed.", Extra: true}
+]
+for _TRFC_Vector in _TRFC_ThrowVectors
+	Test("runner callbacks: actual " . _TRFC_Vector.Name . " failure preserves following callback (runner-callback-throw-values"
+		. (_TRFC_Vector.HasOwnProp("Extra") ? " runner-callback-throw-extra" : "") . ")",
+		_TRFC_CallbackThrowChild.Bind(_TRFC_Vector))
+
+; The assertion helper must accept the same legal throw domain as the runner.
+_TRFC_ThrowValue(Observation, Value) {
+	Observation.Calls += 1
+	throw Value
+}
+
+_TRFC_AssertThrowsValue(Name, Value) {
+	Observation := {Calls: 0}
+	Escaped := false
+	try AssertThrows(_TRFC_ThrowValue.Bind(Observation, Value))
+	catch Any
+		Escaped := true
+	AssertEqual(1, Observation.Calls, "the real assertion callback must execute exactly once")
+	AssertFalse(Escaped, "AssertThrows must account for a legal thrown " . Name)
+}
+
+for _TRFC_AssertionVector in [
+	["Error", Error("owned assertion failure")],
+	["String", "owned assertion failure"],
+	["zero Integer", 0],
+	["empty String", ""],
+	["Float", 1.5],
+	["Map", Map("reason", "owned assertion failure")],
+	["Array", ["owned assertion failure"]]
+]
+	Test("runner assertions: actual " . _TRFC_AssertionVector[1] . " throw is accepted (runner-assert-throws-values)",
+		_TRFC_AssertThrowsValue.Bind(_TRFC_AssertionVector*))

@@ -23,7 +23,7 @@ _OllamaStreamUtf8_EncodingBoundary(Bytes, Expected, Newline) {
 	_LLM_ManagedBootstrap := 0
 	Path := A_Temp . "\ergopti_stream_utf8_" . A_TickCount . "_" . Random(1, 1000000)
 	Handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
-		TmpPayload: Path . ".json", TmpStdout: Path . ".out" }
+		TmpPayload: Path . ".json", TmpStdout: Path . ".out", TmpHeaders: "" }
 	_LLM_Ollama_ActiveStreams := [Handle]
 	State := Map("partials", 0, "successes", 0, "failures", 0, "text", "")
 	try {
@@ -45,6 +45,7 @@ _OllamaStreamUtf8_EncodingBoundary(Bytes, Expected, Newline) {
 			AssertEqual(FileGetSize(Handle.TmpStdout), Cursor["last_pos"],
 				"only an accepted byte image may advance the checkpoint")
 		}
+		_OllamaStream_FixtureHttpResponse(Handle)
 		_LLM_Ollama_StreamFinalFlush(Handle, Map("acc", "", "last_pos", 0),
 			(*) => State["partials"] += 1,
 			(Text) => (State["successes"] += 1, State["text"] := Text),
@@ -54,10 +55,13 @@ _OllamaStreamUtf8_EncodingBoundary(Bytes, Expected, Newline) {
 		AssertEqual(Expected == "" ? 1 : 0, State["failures"], "malformed encoding must settle failure once")
 		AssertEqual(Expected, State["text"], "no replacement text may cross the completion callback")
 		AssertFalse(FileExist(Handle.TmpStdout), "terminal encoding refusal must still clean its real output")
+		AssertFalse(FileExist(Handle.TmpHeaders), "the settled stream retires its actual HTTP header image")
 		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "encoding settlement must retire the stream handle")
 	} finally {
 		if FileExist(Handle.TmpStdout)
 			FileDelete(Handle.TmpStdout)
+		if FileExist(Handle.TmpHeaders)
+			FileDelete(Handle.TmpHeaders)
 		_LLM_Ollama_ActiveStreams := SavedStreams
 		_LLM_Ollama_IsReady := SavedReady
 		_LLM_ManagedBootstrap := SavedBootstrap

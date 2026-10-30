@@ -78,6 +78,10 @@ local _warmup_callback_depth = 0
 -- Exact pre-pause scheduling intent. A quiescent controller must remain
 -- quiescent after resume; a refused native cancellation retains this debt.
 local _pause_resume_pending = false
+-- Reason of a warmup refused only because the backend model was unresolved.
+-- The remote API identity is restored asynchronously after the runtime gate
+-- opens; without this intent nothing would ever warm the API backend.
+local _deferred_unresolved_reason = nil
 
 
 -- =====================================
@@ -206,6 +210,7 @@ function M.schedule_warmup_with_retry(reason)
 	if entry_gen ~= _warmup_gen then return false end
 	if enabled == nil then return false end
 	if enabled ~= true then
+		_deferred_unresolved_reason = nil
 		_warmup_gen = _warmup_gen + 1
 		Logger.debug(LOG, "%s: warmup skipped — live LLM gate is disabled.", reason)
 		return cancel_warmup_timer("disabled warmup schedule")
@@ -219,8 +224,10 @@ function M.schedule_warmup_with_retry(reason)
 	end
 	if type(resolved) ~= "string" or resolved == "" then
 		Logger.debug(LOG, "%s: warmup skipped — backend model not resolved yet.", reason)
+		_deferred_unresolved_reason = reason
 		return true
 	end
+	_deferred_unresolved_reason = nil
 	-- Bump the generation counter to cancel any in-flight retry chain from a
 	-- previous call (e.g. a toggle or model switch that arrived before ready).
 	_warmup_gen = _warmup_gen + 1
@@ -361,6 +368,7 @@ end
 --- Safe to call before M.init() or when no chain is running.
 --- @return boolean settled True only when no native warmup timer can remain.
 function M.stop()
+	_deferred_unresolved_reason = nil
 	_warmup_gen = _warmup_gen + 1
 	Logger.debug(LOG, "Warmup retry chain cancelled (gen bumped to %d).", _warmup_gen)
 	return cancel_warmup_timer("M.stop")
@@ -371,6 +379,7 @@ end
 function M.pause_warmup()
 	if _pause_resume_pending ~= true then
 		_pause_resume_pending = _warmup_timer ~= nil
+			or _deferred_unresolved_reason ~= nil
 			or _warmup_acquisition_depth > 0
 			or _warmup_callback_depth > 0
 	end
@@ -384,6 +393,19 @@ function M.resume_warmup()
 	if M.schedule_warmup_with_retry("script-control resume") ~= true then return false end
 	_pause_resume_pending = false
 	return true
+end
+
+--- Replays a warmup that was skipped because the backend model was not yet
+--- resolved. The model owner calls this once it publishes a new identity
+--- (for instance after restoring the persisted remote API entries).
+--- @param source string Who published the identity, for the log entry.
+--- @return boolean committed True for an intentional no-op or an owned timer.
+function M.retry_deferred_warmup(source)
+	local reason = _deferred_unresolved_reason
+	if reason == nil then return true end
+	if not require_state("retry_deferred_warmup") then return false end
+	Logger.debug(LOG, "Replaying warmup deferred by '%s' after %s.", reason, tostring(source))
+	return M.schedule_warmup_with_retry(reason)
 end
 
 --- Initializes the warmup controller with its required dependencies.

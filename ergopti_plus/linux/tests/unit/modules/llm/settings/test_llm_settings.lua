@@ -132,6 +132,16 @@ helpers.describe("llm settings: changing them", function()
 		drop_storage()
 	end)
 
+	helpers.it("refuses a fractional context length", function()
+		-- The shared prompt builder slices the context by this count; a fraction
+		-- made it extract an empty context.
+		local settings, storage = load_over_storage()
+		helpers.assert_eq(settings.set("context_length", 80.5), false)
+		helpers.assert_eq(storage.get("llm.generation.context_length"), nil)
+		helpers.assert_true(settings.set("context_length", 81))
+		drop_storage()
+	end)
+
 	helpers.it("clears the entry when it returns to the shipped value", function()
 		local settings, storage = load_over_storage()
 		local shipped = settings.get("temperature")

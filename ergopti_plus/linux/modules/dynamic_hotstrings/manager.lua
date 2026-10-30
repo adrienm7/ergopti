@@ -266,7 +266,7 @@ end
 --- the WHOLE tag rather than skipping that field. A partial expansion in a form
 --- shifts every later value up by one box, which is silently wrong; nothing
 --- happening is merely visibly wrong. Note this differs from macOS's
---- `resolve_combo`, which skips what it cannot resolve — see PROJECT_MEMORY.
+--- `resolve_combo`, which skips what it cannot resolve — see docs/memory.
 --- @param tag string The tag WITHOUT its leading "@" and without the trigger.
 --- @return table Array of personal_info field names; empty when the tag resolves to none.
 function M.resolve_combo(tag)

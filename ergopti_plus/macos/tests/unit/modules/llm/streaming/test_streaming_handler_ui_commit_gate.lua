@@ -215,6 +215,9 @@ local function load_fixture(render_result, reset_result, mark_result, timer_new)
 		predictions_visible_ref = fixture.visible,
 		is_ai_preview_enabled = true,
 		runtime_available = function() return true end,
+		on_stream_timeout = function()
+			fixture.timeouts = (fixture.timeouts or 0) + 1
+		end,
 		on_ui_unavailable = function(stage, detail)
 			fixture.ui_failures = fixture.ui_failures + 1
 			fixture.ui_failure_details[#fixture.ui_failure_details + 1] = {
@@ -691,10 +694,10 @@ helpers.describe("streaming_handler: every repaint propagates UI failure", funct
 
 		helpers.assert_eq(fixture.renders, 0,
 			"an empty stream has no prediction frame it can truthfully paint")
-		helpers.assert_eq(fixture.ui_failures, 1,
+		helpers.assert_eq(fixture.timeouts, 1,
 			"the loading owner must close instead of leaving a permanent spinner")
-		helpers.assert_eq(fixture.ui_failure_details[1].stage, "watchdog render")
-		helpers.assert_eq(fixture.ui_failure_details[1].detail, "no committed partial prediction")
+		helpers.assert_eq(fixture.ui_failures, 0,
+			"a slow model is a timeout, not a failed paint that opens the error window")
 	end)
 
 	Scope.it("contains a tint throw inside the partial-render transaction", function()

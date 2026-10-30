@@ -134,6 +134,7 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 		helpers.assert_eq(call.args[5], DIGEST)
 		helpers.assert_eq(call.args[7], "0.0.0-dev.139")
 		helpers.assert_eq(call.args[8], "/Applications/ErgoptiPlus.app")
+		helpers.assert_true(call.args[6]:match("^/Applications/%.ergopti%-release%-install%-%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d$") ~= nil, "the private stage belongs to the destination parent, regardless of TMPDIR")
 		call.on_done(0, "READY /private/tmp/user/x/app/ErgoptiPlus.app\n", "")
 		call.on_done(10, "", "curl: (6) Could not resolve host")
 		call.on_done(21, "", "")
@@ -203,13 +204,40 @@ helpers.describe("release_installer: the staging script under /bin/sh", function
 		local script = Installer.STAGE_SCRIPT
 			:gsub("/usr/bin/curl", curl):gsub("/usr/bin/shasum", shasum):gsub("/usr/bin/ditto", ditto)
 			:gsub("/usr/libexec/PlistBuddy", plist):gsub("/usr/bin/codesign", codesign):gsub("/usr/bin/tar", tar)
+		if opts.archive_retirement_refused then
+			local rm = fake(tools, "rm", 'exit 46')
+			script = script:gsub("/bin/rm", function() return rm end)
+		end
+		if opts.parent_readonly then assert(sh("chmod 500 " .. quote(dir)) == 0) end
 		local status, output = sh("sh -c " .. quote(script) .. " stage " .. quote(URL) .. " " .. quote(digest)
 			.. " " .. quote(dir .. "/stage") .. " 0.0.0-dev.139 /Applications/ErgoptiPlus.app "
 			.. quote(opts.format or "zip") .. " " .. quote(opts.bundle or "ErgoptiPlus.app"))
+		if opts.parent_readonly then assert(sh("chmod 700 " .. quote(dir)) == 0) end
 		local called = read(calls) or ""
+		local retained_archive = read(dir .. "/stage/release." .. (opts.format or "zip"))
+		local _, permissions = sh("if [ -d " .. quote(dir .. "/stage") .. " ]; then python3 -c "
+			.. quote("import os,stat,sys; print(stat.S_IMODE(os.stat(sys.argv[1]).st_mode))") .. " " .. quote(dir .. "/stage") .. "; fi")
 		sh("rm -rf " .. quote(dir))
-		return status, output, called
+		return status, output, called, retained_archive, permissions
 	end
+
+	helpers.it("retires only the verified owned archive before READY and refuses failed retirement", function()
+		local status, output, _, archive, permissions = stage({})
+		helpers.assert_eq(permissions, "448\n", "the actual stage must be private mode 0700")
+		helpers.assert_eq(status, 0, output)
+		helpers.assert_nil(archive, "a successful private stage must not retain the downloaded archive")
+		local refused, text, _, retained = stage({ archive_retirement_refused = true })
+		helpers.assert_eq(refused, 28, text)
+		helpers.assert_eq(retained, "archive bytes")
+		helpers.assert_true(text:find("READY", 1, true) == nil, text)
+	end)
+
+	helpers.it("refuses a destination parent without write access before downloading", function()
+		local status, output, calls = stage({ parent_readonly = true })
+		helpers.assert_eq(status, Installer.EXIT_DOWNLOAD, output)
+		helpers.assert_eq(calls, "", "an unallocatable private stage must not acquire a download")
+		helpers.assert_true(output:find("READY", 1, true) == nil, output)
+	end)
 
 	helpers.it("prints READY only after the digest, the version and the signature pass", function()
 		local status, output, called = stage({})
@@ -289,14 +317,20 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		write(app .. "/marker", "installed")
 		write(staged .. "/marker", "chosen")
 		if opts.previous then assert(sh("mkdir -p " .. quote(previous)) == 0) end
-		if opts.no_stage then sh("rm -rf " .. quote(staged)) end
+
 		local opened = dir .. "/opened"
 		local open = fake(dir, "open", 'echo "$2" >> ' .. quote(opened))
 		local script = Installer.SWAP_SCRIPT:gsub("/usr/bin/open", open)
+		script = require("tests.support.release_swap_ports").observe(script, dir)
+		if opts.publication_refused then
+			local move = fake(dir, "move", '[ "$2" = ' .. quote(staged) .. ' ] && exit 45\nexec ' .. require("tests.support.release_swap_ports").command() .. ' --release-rename move "$2" "$3"')
+			script = script:gsub('%"%$launcher%" %"%$rename_flag%" move', function() return move .. " --" end)
+		end
 		local pid = opts.pid or "999999999"
 		local acknowledgement = dir .. "/arming-receipt"
-		local status, output = sh("sh -c " .. quote(script) .. " swap " .. pid .. " " .. quote(app) .. " "
-			.. quote(staged) .. " " .. quote(previous) .. " 3>" .. quote(acknowledgement))
+		local status, output = sh(require("tests.support.release_swap_ports").command() .. " --release-rename lock " .. quote(app)
+			.. " " .. quote(script) .. " " .. pid .. " " .. quote(staged) .. " " .. quote(previous)
+			.. " 3>" .. quote(acknowledgement))
 		helpers.assert_eq(read(acknowledgement), "ARMED\n", "the actual worker acknowledges before the same swap checks")
 		local result = {
 			status = status, output = output,
@@ -327,7 +361,7 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 	end)
 
 	helpers.it("puts the previous app back and opens it when the chosen one cannot move in", function()
-		local result = swap({ no_stage = true })
+		local result = swap({ publication_refused = true })
 		helpers.assert_eq(result.status, 6)
 		helpers.assert_eq(result.app, "installed")
 		helpers.assert_eq(result.opened, result.app_path .. "\n")
@@ -449,4 +483,148 @@ helpers.describe("release_installer: the native stage request", function()
 		helpers.assert_eq(calls, 0)
 	end)
 
+end)
+
+helpers.describe("release_installer: filesystem publication admission", function()
+	helpers.it("executes real filesystem refusals and preserves every owned original", function()
+		local dir = scratch()
+		local ok, err = xpcall(function()
+			local probe = helpers.driver_root() .. "tests/support/release_swap_physical_probe.py"
+			local source = dir .. "/release-swap-source.lua"
+			write(source, assert(helpers.read_driver_unit("M.SWAP_SCRIPT = table.concat({")))
+			local status, output = sh("python3 -B " .. quote(probe) .. " controls " .. quote(source) .. " " .. quote(dir .. "/controls"))
+			helpers.assert_eq(status, 0, output)
+			local receipt = assert(require("json").decode(output))
+			helpers.assert_eq(#receipt.parser_refusals, 25, "the literal parser must refuse every malformed authority")
+			helpers.assert_eq(#receipt.cases, 8, "all independent physical refusals and healthy controls execute")
+			local emitted, program = sh("python3 -B " .. quote(probe) .. " emit " .. quote(source))
+			helpers.assert_eq(emitted, 0, program)
+			helpers.assert_eq(program, fresh_installer().SWAP_SCRIPT, "the shared extractor must equal actual production Lua bytes")
+		end, debug.traceback)
+		assert(sh("rm -rf " .. quote(dir)) == 0)
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("release_installer: concurrent filesystem publication", function()
+	helpers.it("refuses racing destinations and serializes detached installers before arming (release-exclusive-publication)", function()
+		local dir = scratch()
+		local ok, err = xpcall(function()
+			local probe = helpers.driver_root() .. "tests/support/release_swap_concurrent_probe.py"
+			local status, output = sh("python3 -B " .. quote(probe) .. " " .. quote(helpers.driver_root()) .. " " .. quote(dir))
+			helpers.assert_eq(status, 0, output)
+			local receipt = assert(require("json").decode(output))
+			helpers.assert_eq(#receipt.cases, 4, "all three native boundaries and the two-installer transaction execute")
+			local names = {}
+			for _, case in ipairs(receipt.cases) do names[#names + 1] = case.name end
+			helpers.assert_eq(names, { "backup", "publish", "rollback", "two-installers-before-arming" })
+			for index = 1, 3 do
+				helpers.assert_eq(receipt.cases[index].foreign_identity_preserved, true)
+				helpers.assert_eq(receipt.cases[index].nested_source, false)
+			end
+			helpers.assert_eq(receipt.cases[4].original_restored, true)
+		end, debug.traceback)
+		assert(sh("rm -rf " .. quote(dir)) == 0)
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("release_installer: complete literal extraction", function()
+	helpers.it("rejects four valid Lua suffix expressions on both literal authorities", function()
+		local dir = scratch()
+		local ok, err = xpcall(function()
+			local source = assert(helpers.read_driver_unit("M.SWAP_SCRIPT = table.concat({"))
+			local original = fresh_installer().SWAP_SCRIPT
+			local binding = "M.SWAP_SCRIPT = table.concat({"
+			local first, last_binding = assert(source:find(binding, 1, true))
+			helpers.assert_nil(source:find(binding, last_binding + 1, true), "the script has one literal authority")
+			local _, swap_end = assert(source:find([=[}, "\n")]=], first, true))
+			local _, receipt_end = assert(source:find('local ARMING_RECEIPT = "ARMED"', 1, true))
+			local changed_receipt, count = original:gsub("ARMED", "ARMEDX")
+			helpers.assert_eq(count, 1, "the worker must emit exactly one arming receipt")
+			local authorities = {
+				{ ending = swap_end, suffix = [=[ .. "\nexit 42"]=], expected = original .. "\nexit 42" },
+				{ ending = receipt_end, suffix = [=[ .. "X"]=], expected = changed_receipt },
+			}
+			for index, authority in ipairs(authorities) do
+				for variant, prefix in ipairs({ "", "\n" }) do
+					local path = dir .. "/continued-" .. index .. "-" .. variant .. ".lua"
+					write(path, source:sub(1, authority.ending) .. prefix .. authority.suffix .. source:sub(authority.ending + 1))
+					local evaluated = assert(loadfile(path))()
+					helpers.assert_eq(evaluated.SWAP_SCRIPT, authority.expected,
+						"the control must be valid Lua that changes the actual worker bytes")
+					local status, output = sh("python3 -B " .. quote(helpers.driver_root() .. "tests/support/release_swap_physical_probe.py")
+						.. " emit " .. quote(path))
+					helpers.assert_true(status ~= 0, "the extractor must refuse the complete changed expression: " .. output)
+				end
+			end
+			local suffix_literal = assert(source:match('\nlocal EXECUTABLE_SUFFIX = ("[^"\n]+")'))
+			local suffix = assert(load("return " .. suffix_literal))()
+			local changed_suffix = suffix .. ".fixture"
+			local changed_source, changed_count = source:gsub('\nlocal EXECUTABLE_SUFFIX = "[^"\n]+"', function()
+				return "\nlocal EXECUTABLE_SUFFIX = " .. string.format("%q", changed_suffix)
+			end)
+			helpers.assert_eq(changed_count, 1, "the executable has one declared authority")
+			local path = dir .. "/changed-executable-suffix.lua"
+			write(path, changed_source)
+			local evaluated = assert(loadfile(path))()
+			local suffix_pattern = suffix:gsub("([^%w])", "%%%1")
+			local expected, replacements = original:gsub(suffix_pattern, function() return changed_suffix end)
+			helpers.assert_eq(replacements, 2, "both worker launch paths consume the executable authority")
+			helpers.assert_eq(evaluated.SWAP_SCRIPT, expected)
+			local status, output = sh("python3 -B " .. quote(helpers.driver_root() .. "tests/support/release_swap_physical_probe.py")
+				.. " emit " .. quote(path))
+			helpers.assert_eq(status, 0, output)
+			helpers.assert_eq(output, evaluated.SWAP_SCRIPT, "the extractor must read a changed declared suffix rather than a fallback")
+		end, debug.traceback)
+		assert(sh("rm -rf " .. quote(dir)) == 0)
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("release_installer: explicit native script observation", function()
+	helpers.it("executes only the explicit script observer without discovering Lua (release-native-script-scope)", function()
+		local dir = scratch()
+		local ok, err = xpcall(function()
+			local probe = helpers.driver_root() .. "tests/support/release_swap_concurrent_probe.py"
+			local command = "LUA=" .. quote(dir .. "/missing-lua") .. " python3 -B " .. quote(probe)
+				.. " " .. quote(helpers.driver_root()) .. " " .. quote(dir)
+			local status, output = sh(command .. " --emission-source strict-source")
+			helpers.assert_eq(status, 0, output)
+			local receipt = assert(require("json").decode(output))
+			helpers.assert_eq(receipt.emission_source, "strict-source")
+			helpers.assert_eq(receipt.execution_scope, "script-only/source-parser")
+			helpers.assert_eq(#receipt.cases, 4, "the explicit observer must still execute every physical boundary")
+			local rejected, detail = sh(command)
+			helpers.assert_true(rejected ~= 0, "the default mode must fail without its required Lua")
+			helpers.assert_true(detail:find("Lua 5.4 is required", 1, true) ~= nil)
+		end, debug.traceback)
+		assert(sh("rm -rf " .. quote(dir)) == 0)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("binds both extracted scripts and complete argv to actual Lua emission (release-native-script-scope)", function()
+		local dir = scratch()
+		local ok, err = xpcall(function()
+			local probe = helpers.driver_root() .. "tests/support/release_swap_concurrent_probe.py"
+			local status, output = sh("python3 -B " .. quote(probe) .. " " .. quote(helpers.driver_root())
+				.. " " .. quote(dir) .. " --emission-controls")
+			helpers.assert_eq(status, 0, output)
+			local receipt = assert(require("json").decode(output))
+			helpers.assert_eq(receipt.emission_source, "actual-lua-compared-with-strict-source")
+			helpers.assert_eq(#receipt.commands, 3, "each complete argv and both scripts must match real Lua")
+			helpers.assert_eq(#receipt.parser_refusals, 10, "every malformed detach authority must refuse")
+			for _, command in ipairs(receipt.commands) do
+				helpers.assert_eq(command.interpreter_version, "Lua 5.4")
+				helpers.assert_eq(command.argv_equal, true)
+				helpers.assert_eq(command.swap_equal, true)
+				helpers.assert_eq(command.detach_equal, true)
+			end
+		end, debug.traceback)
+		assert(sh("rm -rf " .. quote(dir)) == 0)
+		if not ok then error(err, 0) end
+	end)
 end)

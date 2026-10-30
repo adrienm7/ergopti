@@ -2012,6 +2012,7 @@ local function start_generation(initial_paused, on_done)
 	Logger.start(LOG, "Starting Karabiner lease watchdog %s…", generation.token)
 	set_phase(generation, "starting")
 	generation.launched_at = TimerScheduler.awake_time()
+	local worker_stderr = ""
 	local handle, helper_error = spawn_current_helper(
 		{
 			WORKER_FLAG,
@@ -2024,12 +2025,13 @@ local function start_generation(initial_paused, on_done)
 		},
 		function(exit_code, stdout, stderr)
 			generation.completed = true
+			local detail = type(stderr) == "string" and stderr:gsub("%s+$", "") or ""
+			if detail == "" then detail = worker_stderr end
 			if generation.failed and not generation.stop_requested then
 				-- fail_generation() already ran (an ACK deadline), so the line below
 				-- would be dropped. How the worker then ended tells a worker that was
 				-- alive and fenced on stdin EOF (exit 0) from one that had lost its
 				-- inner (73) or never answered at all.
-				local detail = type(stderr) == "string" and stderr:gsub("%s+$", "") or ""
 				Logger.info(LOG, "Karabiner lease %s worker exited (exit %s) after the driver had failed it%s",
 					generation.token, tostring(exit_code),
 					detail ~= "" and (": " .. detail) or ".")
@@ -2038,9 +2040,8 @@ local function start_generation(initial_paused, on_done)
 			if not generation.stop_requested then
 				-- Completion status is authoritative. A final buffered READY from a
 				-- process that exited non-zero must never settle activation true.
-				local detail = string.format("watchdog exited unexpectedly (exit %s): %s",
-					tostring(exit_code), tostring(stderr))
-				fail_generation(generation, detail)
+				fail_generation(generation, string.format("watchdog exited unexpectedly (exit %s): %s",
+					tostring(exit_code), detail))
 				return
 			end
 			consume_stdout(generation, stdout)
@@ -2058,8 +2059,9 @@ local function start_generation(initial_paused, on_done)
 		function(_task, stdout_chunk, stderr_chunk)
 			consume_stdout(generation, stdout_chunk)
 			if type(stderr_chunk) == "string" and stderr_chunk ~= "" then
+				worker_stderr = stderr_chunk:gsub("%s+$", "")
 				Logger.warn(LOG, "Lease watchdog %s stderr: %s",
-					generation.token, stderr_chunk:gsub("%s+$", ""))
+					generation.token, worker_stderr)
 			end
 			return true
 		end

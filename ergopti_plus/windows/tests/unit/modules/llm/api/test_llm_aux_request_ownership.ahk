@@ -444,6 +444,19 @@ _LAO_ApiValidationRequiresExactEntryOwner() {
 Test("[ahk-008-aux-owner] API validation is bound to the exact entry generation",
 	_LAO_ApiValidationRequiresExactEntryOwner)
 
+_LAO_ApiValidationNamesRefusedKey() {
+	AssertEqual("menu.llm.api_key_refused_", _LLM_Menu_ApiValidationFailurePrefix(Map("http_status", 401)),
+		"an endpoint that answered 401 must not be reported as unreachable")
+	AssertEqual("menu.llm.api_key_refused_", _LLM_Menu_ApiValidationFailurePrefix(Map("http_status", 403)),
+		"an endpoint that answered 403 refused the key")
+	AssertEqual("menu.llm.api_unreachable_", _LLM_Menu_ApiValidationFailurePrefix(Map("http_status", 0)),
+		"an endpoint that never answered stays unreachable")
+	AssertEqual("menu.llm.api_unreachable_", _LLM_Menu_ApiValidationFailurePrefix(Map()),
+		"an owner without a status stays unreachable")
+}
+Test("[ahk-008-aux-owner] API validation names a refused key on 401/403",
+	_LAO_ApiValidationNamesRefusedKey)
+
 _LAO_ApiValidationPublishesWhileDisabled() {
 	global _LLM_Menu
 	SavedMenu := _LLM_Menu

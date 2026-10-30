@@ -777,6 +777,48 @@ end)
 
 
 helpers.describe("input-source confirm: a fresh process reads the state (composer-macos26)", function()
+	status_test("passes the canonical settle delay to every refresh child (input-source-refresh-timing)", function()
+		local previous_timings = require("infra.timings")
+		local previous_loader = package.preload["infra.timings"]
+		local original_sec = previous_timings.sec
+		local injected, reads = 0.137, 0
+		local deadline = original_sec("ui", "input_source_operation_timeout_ms")
+		local timing_port = setmetatable({}, { __index = previous_timings })
+		timing_port.sec = function(section, key)
+			if section == "ui" and key == "input_source_reselect_settle_ms" then
+				reads = reads + 1
+				return injected
+			end
+			return original_sec(section, key)
+		end
+		local ok, detail = xpcall(function()
+			-- The normal loader clears timings; the preload owns this one injection
+			package.preload["infra.timings"] = function() return timing_port end
+			local f = load_fixture()
+			package.preload["infra.timings"] = previous_loader
+			local answers = 0
+			for _, refresh in ipairs({ true, false }) do
+				helpers.assert_eq(f.IS.confirm_source_async("Composer Check", { refresh = refresh }, function(confirmed)
+					helpers.assert_eq(confirmed, true)
+					answers = answers + 1
+				end), true)
+				local task = f.tasks[#f.tasks]
+				helpers.assert_eq(task.args[6], tostring(injected),
+					"the real child argv must carry the injected timing, not a Python default")
+				helpers.assert_eq(#task.args, 6)
+				task:complete(0, '{"listed":true,"enabled":true}', "")
+				injected = 0.291
+			end
+			helpers.assert_eq(reads, 2, "read the current shared duration once for each child")
+			helpers.assert_eq(answers, 2)
+			helpers.assert_eq(f.timers[1].delay, deadline, "the overall operation deadline is independent")
+		end, debug.traceback)
+		package.preload["infra.timings"] = previous_loader
+		package.loaded["infra.timings"] = previous_timings
+		reset_fixture_modules()
+		if not ok then error(detail, 0) end
+	end)
+
 	-- Probe v5 (P5, P9): after the preference write, the writing process and
 	-- Hammerspoon keep a stale list (enabled=false, select -50) while a process
 	-- started after the write sees the layout on and selects it.
@@ -857,5 +899,43 @@ helpers.describe("input-source confirm: fresh reads until the write applies (com
 		helpers.assert_eq(answers[1].ok, true)
 		helpers.assert_eq(answers[1].state.enabled, false)
 		reset_fixture_modules()
+	end)
+end)
+
+helpers.describe("input-source refresh: one admitted settling delay", function()
+	status_test("forwards the timing reader's value to the actual confirmation program (input-source-refresh-delay)", function()
+		BaseHelpers.provide_timings()
+		local real = require("infra.timings")
+		local previous_loader = package.preload["infra.timings"]
+		local previous_loaded = package.loaded["infra.timings"]
+		local admitted, reads = {}, 0
+		for key, value in pairs(real) do admitted[key] = value end
+		admitted.sec = function(section, key)
+			if section == "ui" and key == "input_source_reselect_settle_ms" then
+				reads = reads + 1
+				return 0.417
+			end
+			return real.sec(section, key)
+		end
+		local ok, failure = xpcall(function()
+			package.preload["infra.timings"] = function() return admitted end
+			package.loaded["infra.timings"] = nil
+			local f, calls = load_fixture(), 0
+			helpers.assert_eq(f.IS.confirm_source_async("Composer Check", { refresh = true }, function()
+				calls = calls + 1
+			end), true)
+			local args = f.tasks[1].args
+			helpers.assert_eq(args[1], "-c")
+			helpers.assert_eq(args[3], "Composer Check")
+			helpers.assert_eq(args[5], "refresh")
+			helpers.assert_eq(args[6], "0.417", "the private worker receives the admitted timing, not a copied default")
+			helpers.assert_true(reads > 0, "the genuine timing interface must be consulted")
+			f.tasks[1]:complete(0, '{"listed":true,"enabled":true,"select_capable":true,"selected":false}', "")
+			helpers.assert_eq(calls, 1)
+		end, debug.traceback)
+		package.preload["infra.timings"] = previous_loader
+		package.loaded["infra.timings"] = previous_loaded
+		reset_fixture_modules()
+		if not ok then error(failure, 0) end
 	end)
 end)

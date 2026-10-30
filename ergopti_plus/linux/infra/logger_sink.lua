@@ -24,11 +24,11 @@
 --- 4. Date rollover repoints BOTH handles. Repointing only the main file is a
 ---    bug the macOS driver already shipped and fixed; doing it here from the start
 ---    is cheaper than rediscovering it.
---- 5. Dependency-free by construction. This module is installed before any
----    adapter, and `adapters/shell_runner.lua` itself requires the logger — so
----    using it here would be a load-time cycle. mkdir and mktemp quote
----    inline with the same POSIX idiom, and a unit test pins that quoting against
----    `shell_runner.quote()` so the two can never diverge. The retention purge
+--- 5. No load-time shell adapter dependency: this module is installed before
+---    adapters, and the shell adapter itself requires the logger. Only the later
+---    public directory preparation loads its checked capture owner lazily, after
+---    this module is available. mkdir quotes with the same POSIX idiom; a unit
+---    test pins it against shell_runner.quote(). The retention purge
 ---    lists the folder in process through infra/native_directory.lua, which
 ---    needs no logger.
 --- 6. Never fatal. A directory that cannot be created degrades to stdout-only and
@@ -558,11 +558,10 @@ function M.prepare_dir(dir)
 	-- mktemp exclusively creates a mode-0600 file. Only that owned path may be
 	-- opened and removed; .write_probe may already belong to somebody else.
 	local created, probe_path = pcall(function()
-		local pipe = io.popen("mktemp -- " .. M.shell_quote(dir .. "/.ergopti-log-probe-XXXXXXXXXX")
-			.. " 2>/dev/null", "r")
-		if not pipe then return nil end
-		local path = pipe:read("*a")
-		pipe:close()
+		local completed, path = require("adapters.shell_runner").exec_checked(
+			"mktemp -- " .. M.shell_quote(dir .. "/.ergopti-log-probe-XXXXXXXXXX") .. " 2>/dev/null",
+			{ output_dir = dir })
+		if not completed then return nil end
 		-- Preserve any literal line breaks in dir; only mktemp's final LF frames it.
 		if type(path) ~= "string" or path:sub(-1) ~= "\n" then return nil end
 		path = path:sub(1, -2)

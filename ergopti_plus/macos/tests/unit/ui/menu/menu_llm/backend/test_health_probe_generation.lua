@@ -237,7 +237,9 @@ local function build_fixture(callback, options)
 		package.loaded["ui.menu.menu_llm.menu_layout"] = {
 			row_ids = function() return { "llm_backend", "llm_model" } end,
 			row_disabled = function() return false end,
-			has_health_dot = function(id) return id == "llm_model" end,
+			title_health_dot = function(status)
+				return ({ ready = "🟢", warming = "🟡", unreachable = "🔴" })[status]
+			end,
 		}
 		local presentation_renderer = assert(require("menu.renderer").new({
 			platform = "hs",
@@ -418,7 +420,23 @@ local function port_action()
 	return function() return require("ui.menu.menu_llm.model_selector_page").group_action("mlx", "mlx_port") end
 end
 
---- The tray's model button: health dot, then the backend's emoji.
+--- The AI title's text, whichever field the renderer filled.
+local function title_text(item)
+	return type(item) == "table" and (item.title or item.label) or nil
+end
+
+--- Asserts the AI title ends with the health dot and the model button has none.
+local function assert_title_dot(item, model_row, glyph, message)
+	local title = title_text(item)
+	helpers.assert_type(title, "string")
+	helpers.assert_true(title:sub(-(#glyph + 1)) == " " .. glyph, message .. " (AI title: " .. title .. ")")
+	for _, dot in ipairs({ "🟢", "🟡", "🔴" }) do
+		helpers.assert_true(model_row.title:find(dot, 1, true) == nil,
+			"the model button must no longer carry the health dot: " .. model_row.title)
+	end
+end
+
+--- The tray's model button: the backend's emoji, then the model.
 local function model_button(item, fixture)
 	local emoji = require("ui.menu.menu_llm.backend_labels").emoji(fixture.state.llm_backend)
 	for _, row in ipairs(item and item.submenu or {}) do
@@ -431,7 +449,7 @@ local function build_and_assert_red(fixture)
 	local item = fixture.handler.build_item()
 	local model_row = model_button(item, fixture)
 	helpers.assert_type(model_row, "table")
-	helpers.assert_true(model_row.title:find("🔴 ", 1, true) == 1,
+	assert_title_dot(item, model_row, "🔴",
 		"an invalidated health cache must render the current backend as unprobed")
 	return item
 end
@@ -480,7 +498,7 @@ helpers.describe("LLM health probe ownership", function()
 			local item = build_and_assert_red(fixture)
 			local model_row = model_button(item, fixture)
 			helpers.assert_type(model_row, "table")
-			helpers.assert_true(model_row.title:find("🔴 ", 1, true) == 1)
+			assert_title_dot(item, model_row, "🔴", "an unprobed backend shows red on the AI title")
 			local updates_before_current = fixture.updates()
 			fixture.probes[1].completion(200)
 			helpers.assert_eq(fixture.updates(), updates_before_current + 1,
@@ -488,7 +506,7 @@ helpers.describe("LLM health probe ownership", function()
 			local refreshed = fixture.handler.build_item()
 			local refreshed_model = model_button(refreshed, fixture)
 			helpers.assert_type(refreshed_model, "table")
-			helpers.assert_true(refreshed_model.title:find("🟡 ", 1, true) == 1,
+			assert_title_dot(refreshed, refreshed_model, "🟡",
 				"a committed current MLX response must render the reachable state")
 		end)
 	end)

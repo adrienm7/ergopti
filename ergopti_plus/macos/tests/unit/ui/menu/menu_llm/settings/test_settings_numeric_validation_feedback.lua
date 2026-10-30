@@ -127,6 +127,12 @@ local INVALID_ROUTES = {
 		invoke = function(manager) return manager.set_context_length() end,
 	},
 	{
+		name = "fractional context length",
+		raw = "80.5",
+		title = "menu.settings.context_length_title",
+		invoke = function(manager) return manager.set_context_length() end,
+	},
+	{
 		name = "debounce garbage",
 		raw = "garbage",
 		title = "menu.settings.delay_title",

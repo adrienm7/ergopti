@@ -8,8 +8,8 @@
 ; The Ollama backend carried a whole WinHTTP generation path that could never
 ; run. LLM_OllamaCancelAsync had no production caller, _LLM_Ollama_PollRequest
 ; was never armed by anything except itself, and both branched on
-; entry.Has("http") - a key the ONE site that creates a registry entry
-; (_LLM_Ollama_DispatchAsync) has never written, because the live transport is a
+; entry.Has("http") - a key the live curl creation site never wrote, because
+; the supported transport is a
 ; curl child identified by its pid. The branch read as a supported path, the
 ; poll re-armed itself so a "who calls this?" search found a caller, and the only
 ; test that touched the shape fabricated an "http" key of its own. Three
@@ -75,67 +75,117 @@ _OACR_CountWord(Src, Word) {
 
 ; Collects the keys written by the single creation site, then requires every key
 ; read off an entry anywhere in the backend to be one of them.
-_OACR_EntryShapeIsClosed() {
-	Src := _OACR_OllamaSrc()
+_OACR_RegistryCallback(*) => 0
+_OACR_RegistryCurrent(*) => true
 
-	; One creation site is the premise of the whole invariant: it is what lets a
-	; written-key set be enumerated at all.
-	Creations := 0
-	CreationAt := 0
-	Pos := 1
-	while (F := RegExMatch(Src, "_LLM_Ollama_Async\[\w+\]\s*:=\s*Map\(", &M, Pos)) {
-		Pos := F + M.Len
-		CreationAt := F + M.Len - 1
-		Creations += 1
-	}
-	Assert(Creations == 1,
-		"the async registry must be created at exactly ONE site (found " . Creations . ") - with two shapes in circulation, a branch keyed on the field only one of them writes is dead half the time and nobody can tell which half")
-
-	; Walk to the closing parenthesis of that Map(...) literal so the key scan
-	; cannot spill into the next statement.
-	Depth := 0
-	i := CreationAt
-	Len := StrLen(Src)
-	End := Len
-	while (i <= Len) {
-		ch := SubStr(Src, i, 1)
-		if (ch == "(")
-			Depth++
-		else if (ch == ")") {
-			Depth--
-			if (Depth <= 0) {
-				End := i
-				break
-			}
-		}
-		i++
-	}
-	Literal := SubStr(Src, CreationAt, End - CreationAt + 1)
-
-	Written := Map()
-	Pos := 1
-	while (F := RegExMatch(Literal, '"(\w+)"', &M2, Pos)) {
-		Pos := F + M2.Len
-		Written[M2[1]] := true
-	}
-	Assert(Written.Count >= 5,
-		"the creation site must write a recognisable set of keys (found " . Written.Count . ") - fewer means the literal was not parsed and every check below would pass vacuously")
-
-	Reads := 0
-	for _, Pattern in ['(?:entry|oldest_entry)\.Has\("(\w+)"\)',
-	                   '(?:entry|oldest_entry)\["(\w+)"\]',
-	                   '_LLM_Ollama_Async\[\w+\]\["(\w+)"\]'] {
-		Pos := 1
-		while (F := RegExMatch(Src, Pattern, &M3, Pos)) {
-			Pos := F + M3.Len
-			Reads += 1
-			Assert(Written.Has(M3[1]),
-				"the Ollama backend reads the registry key '" . M3[1] . "', which _LLM_Ollama_DispatchAsync never writes - the branch behind it can never be taken, so it is dead code wearing the costume of a supported transport")
-		}
-	}
-	Assert(Reads >= 10,
-		"the key scan must actually reach the entry reads (found " . Reads . ") - a regex that stopped matching would make this guard vacuous")
+; Admission only publishes RAM metadata; restore the live registry before I/O.
+_OACR_ActualEntry() {
+	global _LLM_Ollama_Async
+	Creator := _LLM_Ollama_ReserveAsync
+	AssertFalse(Creator.HasOwnProp("Call"), "the entry shape must come from the genuine constructor")
+	Temporary := Map()
+	Job := Map("req_id", 1, "on_success", _OACR_RegistryCallback, "on_fail", _OACR_RegistryCallback,
+		"requester_current", _OACR_RegistryCurrent)
+	PreviousCritical := Critical("On")
+	try {
+		Saved := _LLM_Ollama_Async
+		_LLM_Ollama_Async := Temporary
+		try Entry := Creator.Call(Job)
+		finally _LLM_Ollama_Async := Saved
+	} finally Critical(PreviousCritical)
+	AssertTrue(_LLM_Ollama_Async == Saved, "metadata inspection restores the exact prior registry")
+	AssertTrue(Entry is Map, "the real admission owner creates the registry's map")
+	AssertEqual(1, Temporary.Count, "one real admission publishes one entry")
+	AssertTrue(Temporary.Has(1) && Temporary[1] == Entry, "the returned shape is the actual published entry")
+	AssertTrue(Entry.Count >= 5, "the constructor must publish a recognisable field set")
+	return Entry
 }
+
+_OACR_RequireClosedShape(Src, Written) {
+	AssertTrue(Src != "", "the actual backend source must be readable")
+	Code := _DriverMaskNonCode(&Src)
+	Publication := "(?i)\b_LLM_Ollama_Async\s*\[[^\]\r\n]+\]\s*:=\s*(\w+)"
+	Creations := 0, Position := 1, Published := ""
+	while RegExMatch(Code, Publication, &Store, Position) {
+		Creations += 1
+		Published := Store[1]
+		Position := Store.Pos + Store.Len
+	}
+	AssertEqual(1, Creations, "the registry must have exactly one admission publication")
+	Creator := _LLM_Ollama_ReserveAsync
+	Body := _DriverExtractFunctionBody(&Code, Creator.Name, 1, true)
+	AssertTrue(Body != "", "the genuine admission constructor must be readable")
+	RegExReplace(Body, Publication, "", &OwnerStores)
+	AssertEqual(1, OwnerStores, "the sole publication belongs to the real constructor")
+	RegExReplace(Body, "(?i)\b" . Published . "\s*:=\s*Map\s*\(", "", &Constructors)
+	AssertEqual(1, Constructors, "the published value must come from one local map constructor")
+
+	; The canonical mask aligns code positions while field literals stay readable.
+	; A comment or quoted example cannot add a registry read or publication.
+	Quote := "[\x22\x27]"
+	Alias := "\b(?:entry|oldest_entry|" . Published . "|_LLM_Ollama_Async\s*\[[^\]\r\n]+\])"
+	Reads := 0
+	for Pattern in [
+		"(?i)" . Alias . "\s*\.\s*(?:Has|Get)\s*\(\s*" . Quote . "(\w+)" . Quote,
+		"(?i)" . Alias . "\s*\[\s*" . Quote . "(\w+)" . Quote . "\s*\]"
+	] {
+		Position := 1
+		while RegExMatch(Src, Pattern, &Read, Position) {
+			Position := Read.Pos + Read.Len
+			if !RegExMatch(SubStr(Code, Read.Pos, 1), "[A-Za-z_]")
+				continue
+			Reads += 1
+			AssertTrue(Written.Has(Read[1]), "undeclared async registry key: " . Read[1])
+		}
+	}
+	AssertTrue(Reads >= 10, "the key scan must reach the actual entry reads")
+}
+
+_OACR_EntryShapeIsClosed() {
+	_OACR_RequireClosedShape(_OACR_OllamaSrc(), _OACR_ActualEntry())
+}
+
+_OACR_RejectShapeMutation(Expression, Expected) {
+	Src := _OACR_OllamaSrc(), Written := _OACR_ActualEntry()
+	AssertFalse(Written.Has("__oacr_absent"), "the negative field is genuinely absent")
+	if Expression == "duplicate"
+		Src .= "`n_LLM_Ollama_Async[other_id] := Other`n"
+	else if Expression == "foreign" {
+		Src := RegExReplace(Src, "(?i)(_LLM_Ollama_Async\[[^\]\r\n]+\]\s*:=\s*)Entry\b", "$1job", &Changed)
+		AssertEqual(1, Changed, "the foreign same-count publication mutation is nonvacuous")
+	} else
+		Src .= "`n_OACR_SourceFixture(Entry, oldest_entry, id) {`n" . Expression . "`n}`n"
+	Rejected := false
+	try _OACR_RequireClosedShape(Src, Written)
+	catch Error as Failure {
+		AssertContains(Failure.Message, Expected, "the exact invariant rejects the source mutation")
+		Rejected := true
+	}
+	AssertTrue(Rejected, "an invalid registry variant cannot pass the shape guard")
+}
+
+for _OACR_ReadFixture in [
+	["Has", 'entry.Has("__oacr_absent")'],
+	["case-insensitive Get", 'ENTRY.Get("__oacr_absent", 0)'],
+	["indexed field", 'entry["__oacr_absent"]'],
+	["oldest Get", 'oldest_entry.Get("__oacr_absent", 0)'],
+	["direct registry Get", '_LLM_Ollama_Async[id].Get("__oacr_absent", 0)']
+]
+	Test("meta ollama-registry: " . _OACR_ReadFixture[1] . " rejects an undeclared field (ollama-registry-live-shape)",
+		_OACR_RejectShapeMutation.Bind(_OACR_ReadFixture[2], "__oacr_absent"))
+Test("meta ollama-registry: duplicate publication is rejected (ollama-registry-live-shape)",
+	_OACR_RejectShapeMutation.Bind("duplicate", "exactly one admission publication"))
+Test("meta ollama-registry: same-count foreign map is rejected (ollama-registry-live-shape)",
+	_OACR_RejectShapeMutation.Bind("foreign", "one local map constructor"))
+
+_OACR_QuotedDecoys() {
+	Src := _OACR_OllamaSrc()
+	Src .= "`n; entry.Get(" . Chr(34) . "__oacr_absent" . Chr(34) . ", 0)`n"
+	Src .= Chr(39) . 'ENTRY.Get("__oacr_absent", 0)' . Chr(39) . "`n"
+	Src .= Chr(39) . '_LLM_Ollama_Async[other_id] := Other' . Chr(39) . "`n"
+	_OACR_RequireClosedShape(Src, _OACR_ActualEntry())
+}
+Test("meta ollama-registry: comments and quoted decoys confer no authority (ollama-registry-live-shape)", _OACR_QuotedDecoys)
 
 
 

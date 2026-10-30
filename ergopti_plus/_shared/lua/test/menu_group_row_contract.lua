@@ -333,7 +333,8 @@ function M.register(helpers, driver)
 				local calls, selected = 0, nil
 				local ctx = { commands = { update_channel = function(value)
 					calls = calls + 1; selected = value; return true
-				end }, state_getters = { ["updater.channel"] = function() return "main" end } }
+				end }, state_getters = { ["updater.channel"] = function() return "main" end,
+					installed_build = function() return true end } }
 				local rows = menu.build("about_update_channel_menu", "", {}, {}, ctx)
 				helpers.assert_eq(#rows, 1)
 				helpers.assert_eq(rows[1].title, "Update channel: Stable")

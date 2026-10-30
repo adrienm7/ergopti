@@ -99,6 +99,7 @@ _PEC_Profile(Id, Label) {
 }
 
 _PEC_InstallFixture() {
+	global _PromptEdWeb_Gui, _PromptEdWeb_ResetDone
 	global _PromptEdWeb_DeferHook, _PromptEdWeb_PersistHook
 	global _PromptEdWeb_CloseHook, _PromptEdWeb_EvalHook
 	global _PromptEdWeb_IsEdit, _PromptEdWeb_EditId
@@ -108,6 +109,7 @@ _PEC_InstallFixture() {
 	global _PEC_Deferred, _PEC_Persisted, _PEC_Closed, _PEC_Evaluated
 
 	Previous := Map(
+		"gui", _PromptEdWeb_Gui, "reset_done", _PromptEdWeb_ResetDone,
 		"defer_hook", _PromptEdWeb_DeferHook,
 		"persist_hook", _PromptEdWeb_PersistHook,
 		"close_hook", _PromptEdWeb_CloseHook,
@@ -123,6 +125,9 @@ _PEC_InstallFixture() {
 		"llm_menu", _LLM_Menu
 	)
 
+	FixtureWindow := Gui(, "Private prompt context unit fixture")
+	Previous["fixture_gui"] := FixtureWindow
+	_PromptEdWeb_Gui := FixtureWindow, _PromptEdWeb_ResetDone := false
 	_PromptEdWeb_DeferHook   := _PEC_Queue
 	_PromptEdWeb_PersistHook := _PEC_Persist
 	_PromptEdWeb_CloseHook   := _PEC_Close
@@ -151,6 +156,7 @@ _PEC_InstallFixture() {
 }
 
 _PEC_RestoreFixture(Previous) {
+	global _PromptEdWeb_Gui, _PromptEdWeb_ResetDone
 	global _PromptEdWeb_DeferHook, _PromptEdWeb_PersistHook
 	global _PromptEdWeb_CloseHook, _PromptEdWeb_EvalHook
 	global _PromptEdWeb_IsEdit, _PromptEdWeb_EditId
@@ -171,10 +177,12 @@ _PEC_RestoreFixture(Previous) {
 	_PromptEdWeb_EpochSerial  := Previous["epoch_serial"]
 	_PromptEdWeb_OpeningSource := Previous["opening_source"]
 	_LLM_Menu                  := Previous["llm_menu"]
+	_PromptEdWeb_Gui := Previous["gui"], _PromptEdWeb_ResetDone := Previous["reset_done"]
+	Previous["fixture_gui"].Destroy()
 }
 
 _PEC_QueuedContextACannotAffectContextB() {
-	global _PromptEdWeb_EditId, _PromptEdWeb_ContextEpoch
+	global _PromptEdWeb_EditId, _PromptEdWeb_ContextEpoch, _PromptEdWeb_Gui
 	global _LLM_Menu
 	global _PEC_Deferred, _PEC_Persisted, _PEC_Closed, _PEC_Evaluated
 
@@ -183,7 +191,7 @@ _PEC_QueuedContextACannotAffectContextB() {
 		ContextA := _PromptEdWeb_BeginContext(_PEC_Profile("profile_a", "Profile A"))
 		_PEC_Post(_PEC_SaveMessage(ContextA.EditId, ContextA.Epoch,
 			"Visible A", true, "Visible prompt A"))
-		_PromptEdWeb_OnNavigationCompleted(0, 0)
+		_PromptEdWeb_OnNavigationCompleted(_PromptEdWeb_Gui, 0, 0)
 		_PEC_Post(_PEC_CancelMessage(ContextA.EditId, ContextA.Epoch))
 		AssertEqual(3, _PEC_Deferred.Length,
 			"the fixture must hold A's save, deferred init and cancel callbacks")

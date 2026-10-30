@@ -1247,7 +1247,6 @@ function saveEntry(andNew) {
 	});
 
 	const executeSave = () => {
-		const previous = edEntry.ei === null ? null : D.sections[edEntry.si].entries[edEntry.ei];
 		const entry = {
 			trigger: trig,
 			output: out,
@@ -1255,7 +1254,10 @@ function saveEntry(andNew) {
 			auto_expand: document.getElementById('cb-auto').checked,
 			is_case_sensitive: document.getElementById('cb-case').checked,
 			final_result: document.getElementById('cb-final').checked,
-			is_case_sensitive_strict: !!(previous && previous.is_case_sensitive_strict)
+			// The box is the user's "case-sensitive": an exact match, not only a
+			// replacement kept as written. Field report of 2026-10-30: a checked
+			// personal "sru" -> "SRU" still fired on a typed "SRU".
+			is_case_sensitive_strict: document.getElementById('cb-case').checked
 		};
 		// Optional collision-priority override; omitted when the field is blank
 		// so the entry inherits the personal source default.

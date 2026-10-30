@@ -30,5 +30,10 @@ const ERGOPTI_IDENTIFIERS = Object.freeze({
 	dev_source: Object.freeze({
 		plist_key: 'ErgoptiDevSourceRoot',
 		environment: 'ERGOPTI_DEV_SOURCE_ROOT'
+	}),
+	field_report: Object.freeze({
+		branch_prefix: 'field/',
+		folder: 'docs/field-reports',
+		base_config_key: 'ergoptiFieldBase'
 	})
 });

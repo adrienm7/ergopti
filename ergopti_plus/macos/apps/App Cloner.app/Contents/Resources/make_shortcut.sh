@@ -39,18 +39,24 @@ if [[ "$base" != *.app ]]; then
 else
   san="$base"
 fi
+UNIQUE_ID="$(new_bundle_identifier shortcut)" || {
+	identity_status=$?
+	printf 'Error: shortcut bundle identity generation failed\n' >&2
+	exit "$identity_status"
+}
 mkdir -p "$HOME/Desktop"
-DEST="$(reserve_bundle_directory "$HOME/Desktop/$san")"
+initialize_bundle_creation
+trap cleanup_bundle_creation EXIT
+reserve_owned_bundle_directory "$HOME/Desktop/$san"
 
 CONTENTS="$DEST/Contents"
 MACOS="$CONTENTS/MacOS"
 RES="$CONTENTS/Resources"
 mkdir -p "$MACOS" "$RES"
 
-TMPDIR=$(mktemp -d "/tmp/shortcut.XXXXXX")
-trap 'rm -rf "$TMPDIR"' EXIT
+TMPDIR_WORK=$(mktemp -d "/tmp/shortcut.XXXXXX")
 
-SVG="$TMPDIR/icon.svg"
+SVG="$TMPDIR_WORK/icon.svg"
 cat > "$SVG" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
@@ -62,14 +68,14 @@ cat > "$SVG" <<EOF
 EOF
 
 # render SVG to PNG using QuickLook
-qlmanage -t -s 1024 -o "$TMPDIR" "$SVG" >/dev/null 2>&1 || true
-PNG=$(ls -S "$TMPDIR"/*.png 2>/dev/null | head -n1 || true)
+qlmanage -t -s 1024 -o "$TMPDIR_WORK" "$SVG" >/dev/null 2>&1 || true
+PNG=$(ls -S "$TMPDIR_WORK"/*.png 2>/dev/null | head -n1 || true)
 if [ -z "$PNG" ]; then
   echo "Erreur: aucune image PNG produite" >&2
   exit 1
 fi
 
-ICONSET="$TMPDIR/icon.iconset"
+ICONSET="$TMPDIR_WORK/icon.iconset"
 mkdir -p "$ICONSET"
 
 sips -z 16 16 "$PNG" --out "$ICONSET/icon_16x16.png" >/dev/null 2>&1 || true
@@ -95,7 +101,7 @@ cat > "$CONTENTS/Info.plist" <<PLIST
   <key>CFBundleExecutable</key>
   <string>open_target</string>
   <key>CFBundleIdentifier</key>
-  <string>fr.b519hs.shortcut.$(date +%s)</string>
+  <string>${UNIQUE_ID}</string>
   <key>CFBundleName</key>
   <string>${san%.app}</string>
   <key>CFBundleDisplayName</key>
@@ -165,4 +171,5 @@ chmod +x "$MACOS/open_target"
 
 touch "$DEST"
 
-echo "$DEST"
+CLONE_COMPLETE=1
+write_bundle_receipt "$DEST" || exit "$?"

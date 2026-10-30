@@ -40,11 +40,7 @@ local function with_sources(scenario)
 			w.errors[#w.errors + 1] = string.format(message, ...)
 		end
 		package.loaded["infra.logger"] = logger
-		package.loaded["infra.timings"] = { sec = function(section, key)
-			helpers.assert_eq(section, "ui")
-			helpers.assert_eq(key, "input_source_operation_timeout_ms")
-			return 10
-		end }
+		helpers.provide_timings()
 		package.loaded["modules.keymap.layout_install"] = {
 			highest_installed = function() return nil end,
 			version_gt = function() return false end,

@@ -113,7 +113,11 @@ local function setup(backend)
 			state.prompts[#state.prompts + 1] = { title = title, text = text, initial = initial, hidden = hidden }
 			return table.remove(state.answers, 1)
 		end,
-		error = function(text) state.errors[#state.errors + 1] = text end,
+		error = function(text, title)
+			state.errors[#state.errors + 1] = text
+			state.error_titles = state.error_titles or {}
+			state.error_titles[#state.errors] = title
+		end,
 		info = function(title, text) state.infos[#state.infos + 1] = title .. " | " .. text end,
 		confirm = function()
 			if type(state.confirm) == "function" then return state.confirm() end

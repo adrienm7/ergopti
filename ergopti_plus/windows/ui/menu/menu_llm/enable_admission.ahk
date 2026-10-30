@@ -69,7 +69,11 @@ LLM_Menu_CancelEnableAdmission() {
 	if !(Request is Map)
 		return true
 	Request["active"] := false
-	if Request.Get("aux", 0) is Map
+	AuxOwner := Request.Get("aux", 0)
+	; A native delivery ticket can retain this inactive caller as cleanup drains.
+	; Release the caller's reverse ownership before cancelling native custody.
+	Request["aux"] := 0
+	if AuxOwner is Map
 		LLM_AuxRetirePrefix("ollama_enable_admission")
 	return LLM_AuxRetryCleanupDebt() && LLM_CurlRetryCleanupDebt()
 }

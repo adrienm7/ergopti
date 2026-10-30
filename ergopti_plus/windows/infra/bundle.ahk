@@ -156,16 +156,13 @@ _Bundle_BuildMarker() {
 ; point Bundle_Init() runs.
 _Bundle_WriteMarker(BundleDir) {
 	MarkerPath := BundleDir . "\.bundle-version"
-	try {
-		FileDelete(MarkerPath)
-	}
-	try {
-		FileAppend(_Bundle_BuildMarker(), MarkerPath, "UTF-8")
-	} catch as Err {
-		OutputDebug("[bundle] WriteMarker failed: " . Err.Message)
+	; A refused unlink must not turn replacement into an append. The marker is
+	; still private to staging; publish only a checked, flushed complete image.
+	if !FSWriteDurable(MarkerPath, _Bundle_BuildMarker()) {
+		OutputDebug("[bundle] WriteMarker failed: the complete build identity was not written.")
 		return false
 	}
-	return FileExist(MarkerPath)
+	return true
 }
 
 ; The compiled inventory comes from the same selected bytes as the embedded ZIP.

@@ -36,7 +36,7 @@
 --- leaves uncovered is stated in section 3.
 ---
 --- WHY THIS SHAPE OF DEFECT KEEPS RECURRING HERE:
---- docs/PROJECT_MEMORY.md records it shipping once already: routing the dynamic
+--- docs/memory records it shipping once already: routing the dynamic
 --- injectors through a common entry point "closed the desynchronisation of the
 --- two trackers — and lost is_private, so SSN, IBAN, card and phone were
 --- persisted in clear for fourteen days". Every time a value crosses a layer

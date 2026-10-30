@@ -5087,7 +5087,10 @@ local function _channel_picker(ctx, up)
 			end
 			return true
 		end,
-	}, { [require("config_keys").KEY.UPDATER_CHANNEL] = function() return up.get_channel() end })
+	}, {
+		[require("config_keys").KEY.UPDATER_CHANNEL] = function() return up.get_channel() end,
+		installed_build = function() return not Installation.is_source_run() end,
+	})
 end
 
 --- Supplies the registered cadence choice to the existing updater owner.
@@ -5098,8 +5101,7 @@ local function _frequency_picker(ctx, up)
 	return ManifestMenu.choice_row("about_update_frequency_menu", require("config_keys").COMMAND.UPDATE_CHECK_INTERVAL, {
 		update_check_interval = function(seconds)
 			if up.set_check_interval(seconds) ~= true then return false end
-			up.stop_background_checks()
-			up.start_background_checks()
+			if up.start_background_checks() ~= true then return false end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end,
@@ -5107,6 +5109,7 @@ local function _frequency_picker(ctx, up)
 		[require("config_keys").KEY.UPDATER_CHECK_INTERVAL_SECONDS] = function()
 			return Schedule.snap_interval(up.get_check_interval(), up.TIMING)
 		end,
+		installed_build = function() return not Installation.is_source_run() end,
 	})
 end
 
@@ -5140,9 +5143,10 @@ local function _about_update_rows(ctx)
 	out[#out + 1] = _channel_picker(ctx, up)
 
 	-- A local version has no installation to update, so it checks for nothing
-	-- (the updater starts no background check for it). Its check row and its
-	-- frequency row are still drawn, greyed with the reason: left out, nobody
-	-- could tell whether the automatic update exists.
+	-- (the updater starts no background check for it). Its channel, check and
+	-- frequency rows are still drawn, greyed with the reason: left out, nobody
+	-- could tell whether the automatic update exists. The manifest's
+	-- `disabled_when = ["installed_build"]` greys the two choices.
 	local source_run = Installation.is_source_run()
 	-- A system package never self-updates either, so it gets the same greyed rows
 	-- with its own reason (the key the Versions window already shows).
@@ -5228,12 +5232,11 @@ local function _about_update_rows(ctx)
 	end
 
 
-	if update_blocked_reason then
+	-- A system package is an installed build, so only its own reason is applied here.
+	if update_blocked_reason and not source_run then
 		frequency_row.items = nil
 		frequency_row.disabled = true
 		frequency_row.disabled_reason_key = update_blocked_reason
-		out[#out + 1] = frequency_row
-		return out
 	end
 
 	out[#out + 1] = frequency_row
