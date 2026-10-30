@@ -838,12 +838,17 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       worker (25411ee080, after v1.0.5). Reproduce on the Mac with these log lines; the only
       workaround is Configuration > Ergopti uses Karabiner > Off. Recovery deploys (28 of 33 on
       2026-10-19) cannot be reduced without fewer lease failures. Leftovers: the starvation
-      hypothesis for silent PONG/READY timeouts (`memory_pressure | tail -1` during lease errors);
-      only the keymap tap skips an event that waited behind the main thread (`adapters/event_clock.lua`),
-      the tap-keys and script-control taps do not yet.
+      hypothesis for silent PONG/READY timeouts: done 30 October (`fix/macos-overnight-c`), every lease
+      failure logs `Memory free when the Karabiner lease failed (<kind>): N%.` once a minute, and the field
+      run's lease check names `lease_failure_kinds` (pong:N, ready:N) and `memory_free_percent`. The late-event
+      gate is in every consuming physical tap already: tap keys (`actions/system.lua`), script control and the
+      modifier injector call `KeyEventHealth.passes_late_event`, with behavioural tests. Mac action: send the
+      field report; a low free percentage next to the PONG/READY kinds confirms starvation.
 - [ ] **Dropped letters on macOS.** [PHYS-M] Unproven. Every consumed and never delivered key is
-      reported ("typed key(s) swallowed", decisions only, never the key). Mac action: Debug > Report
-      a bug right when a letter disappears, then compare with lease failures or Karabiner deploys.
+      reported ("typed key(s) swallowed", decisions only, never the key). Since 30 October the field run's
+      lease check fails `swallowed_keys` on any such key, so the report proves it without a person. Mac
+      action: Debug > Report a bug right when a letter disappears, then compare with lease failures or
+      Karabiner deploys.
 - [ ] **31. HS-274 exact physical key accounting with an owned Karabiner runtime.** [CODE] Work
       packages WP3-WP10 (production consumer, headless producer v2, reproducible runtime, launchd
       ownership, owned configuration, native and real-Mac acceptance, enable and retire); media keys
@@ -1236,8 +1241,9 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       within 60 s (fcf4af85dc), `key_*` counters in the diagnostics (6f2daed2e5). Lease token reuse
       was analysed and refused (ADR 012): a reused token could never reach READY because the
       revocation tombstone is monotone; reuse needs a native acknowledged rearm, decided NOT to
-      build for now. The next Mac log carries `Lease token decision=` and `written in N ms`: if the
-      write is short, keep it; if long, shrink the 743 KB file instead.
+      build for now. The next Mac log carries `Lease token decision=` and `written in N ms`, and since
+      30 October the field run's lease check names `deploy_write_ms` and `deploy_kb`: if the write is
+      short, keep it; if long, shrink the 743 KB file instead.
 - [ ] **Linux correction parity remainders.** [CODE] Done (06bbbe5985): Backspace pops the word, erased
       n-grams get `e`, synthetic output chains. Erased and synthetic vectors in the shared corpus, replayed on
       macOS and Linux (ee2eab6b1e, `keystats/correction_erased_vectors.json`). Left [PC]: the AHK replayer
