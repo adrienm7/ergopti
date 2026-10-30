@@ -415,3 +415,45 @@ helpers.describe("Managed daemon exact preactivation rollback", function()
 		if not outcome[1] then error(outcome[2], 0) end
 	end)
 end)
+
+helpers.describe("Managed daemon refusal diagnostic", function()
+	helpers.it("(daemon-refusal-logged) logs the serve owner's fixed refusal line and nothing else", function()
+		helpers.with_stub_scope({ "adapters.managed_ollama_daemon", "adapters.shell_runner",
+			"core.llm.managed_ollama_daemon_lifecycle", "infra.logger" }, function()
+			local logs = {}
+			local Logger = helpers.make_logger_stub()
+			Logger.warn = function(_log, format_string, ...)
+				logs[#logs + 1] = string.format(format_string, ...)
+			end
+			package.loaded["infra.logger"] = Logger
+			local callbacks = {}
+			package.loaded["adapters.shell_runner"] = {
+				spawn = function(_, _, on_done, on_chunk)
+					callbacks.done, callbacks.chunk = on_done, on_chunk
+					local task = {}
+					function task.start() return true end
+					function task.terminate() return true end
+					function task.isSettled() return false end
+					function task.wasStartAttempted() return true end
+					function task.onSettled() return true end
+					return task
+				end,
+			}
+			package.loaded["core.llm.managed_ollama_daemon_lifecycle"] = {
+				new = function()
+					return { complete = function() end, feed = function() end }
+				end,
+			}
+			local Daemon = helpers.load_with_stubs("adapters.managed_ollama_daemon")
+			assert(Daemon.prepare("exec /fixture/serve", string.rep("a", 32), {}))
+			callbacks.chunk(nil, "", "Traceback: /Users/private/path\n")
+			callbacks.chunk(nil, "", "Managed Ollama daemon admission refused: unavailable.\n")
+			callbacks.done(78, "", "")
+			helpers.assert_eq(#logs, 1)
+			helpers.assert_eq(logs[1],
+				"Managed Ollama daemon exited (status=78): Managed Ollama daemon admission refused: unavailable.")
+			callbacks.done(0, "", "")
+			helpers.assert_eq(#logs, 1, "a clean exit logs no refusal")
+		end)
+	end)
+end)
