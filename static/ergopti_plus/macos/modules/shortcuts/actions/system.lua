@@ -808,9 +808,17 @@ acquire_tap = function(types, callback, label)
 		return owner
 	end
 
+	-- macOS refuses every eventtap of a process it no longer trusts for
+	-- Accessibility; naming that state separates a revoked permission from a
+	-- native refusal (field log 2026-10-30 10:07: eight taps refused at once).
+	local trust_ok, trusted, trust_detail = pcall(function()
+		return require("adapters.accessibility_permission").is_trusted()
+	end)
 	Logger.error(LOG,
-		"Eventtap '%s' activation did not commit (start=%s, enabled=%s).",
-		label, tostring(start_result), tostring(enabled))
+		"Eventtap '%s' activation did not commit (start=%s, enabled=%s, accessibility_trusted=%s).",
+		label, tostring(start_result), tostring(enabled),
+		trust_ok and tostring(trusted == nil and ("unknown: " .. tostring(trust_detail)) or trusted)
+			or ("unknown: " .. tostring(trusted)))
 	if owner:delete() ~= true then _failed_tap_cleanup[owner] = true end
 	return nil
 end
